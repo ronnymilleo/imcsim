@@ -1,0 +1,37 @@
+# =============================================================================
+# imgui
+# =============================================================================
+
+set(IMGUI_DIR ${CMAKE_CURRENT_SOURCE_DIR}/imgui)
+find_package(Vulkan REQUIRED)
+find_package(SDL3 REQUIRED)
+message(STATUS "Vulkan include dirs: ${Vulkan_INCLUDE_DIRS}")
+message(STATUS "Vulkan libraries: ${Vulkan_LIBRARIES}")
+message(STATUS "Vulkan version: ${Vulkan_VERSION}")
+
+add_library(imgui
+        STATIC
+            ${IMGUI_DIR}/imgui.cpp
+            ${IMGUI_DIR}/imgui_draw.cpp
+            ${IMGUI_DIR}/imgui_tables.cpp
+            ${IMGUI_DIR}/imgui_widgets.cpp
+            ${IMGUI_DIR}/imgui_demo.cpp
+            ${IMGUI_DIR}/backends/imgui_impl_vulkan.cpp
+            ${IMGUI_DIR}/backends/imgui_impl_sdl3.cpp
+)
+
+target_include_directories(imgui
+        PUBLIC
+            ${IMGUI_DIR}
+            ${IMGUI_DIR}/backends
+)
+
+target_link_libraries(imgui
+        PUBLIC
+            SDL3::SDL3
+            Vulkan::Vulkan
+)
+
+# =============================================================================
+# End of file
+# =============================================================================
