@@ -34,8 +34,6 @@ find_program(CLANG_FORMAT NAMES clang-format)
 if(CLANG_FORMAT)
     # Collect all source files for formatting
     file(GLOB_RECURSE ALL_SOURCE_FILES
-            ${CMAKE_CURRENT_SOURCE_DIR}/main.cpp
-            ${CMAKE_CURRENT_SOURCE_DIR}/main.h
             ${CMAKE_CURRENT_SOURCE_DIR}/app-core/*.cpp
             ${CMAKE_CURRENT_SOURCE_DIR}/app-core/*.h
             ${CMAKE_CURRENT_SOURCE_DIR}/app-gui/*.cpp
@@ -45,7 +43,7 @@ if(CLANG_FORMAT)
     )
 
     add_custom_target(format
-            COMMAND ${CLANG_FORMAT} -i ${ALL_SOURCE_FILES}
+            COMMAND ${CLANG_FORMAT} -i ${ALL_SOURCE_FILES} main.cpp
             WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
             COMMENT "Formatting source code with clang-format"
             VERBATIM
