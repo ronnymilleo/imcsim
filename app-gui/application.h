@@ -26,7 +26,7 @@ class Application {
     SDL_WindowFlags m_SDLWindowFlags{};
     SDL_Window *m_SDLWindow = nullptr;
     VulkanContext m_Vulkan;
-    ImGui_ImplVulkan_InitInfo m_VulkanInitInfo;
+    ImGui_ImplVulkan_InitInfo m_VulkanInitInfo{};
     std::vector<std::string> m_Errors;
 
     void AddError(const std::string &message);
