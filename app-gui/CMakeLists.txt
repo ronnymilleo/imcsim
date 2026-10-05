@@ -5,6 +5,7 @@
 add_library(imcsim-gui-lib
         STATIC
         application.cpp
+        vulkan_context.cpp
 )
 
 target_include_directories(imcsim-gui-lib
