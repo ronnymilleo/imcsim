@@ -1,9 +1,19 @@
 /***********************************************************************************************************************
- Vulkan Context
+* @file    vulkan_context.h
+ * @brief
+ * @details
+ *
+ * @project imcsim
+ * @author  ronnymilleo
+ * @date    10/6/26
 ***********************************************************************************************************************/
 
 #ifndef IMCSIM_VULKAN_SETUP_H
 #define IMCSIM_VULKAN_SETUP_H
+
+/***********************************************************************************************************************
+ Includes
+***********************************************************************************************************************/
 
 #include "imgui.h"
 #include "imgui_impl_vulkan.h"
@@ -12,14 +22,18 @@
 
 void check_vk_result(VkResult err);
 
+/***********************************************************************************************************************
+ Class
+***********************************************************************************************************************/
+
 class VulkanContext {
   public:
     // Instance, physical/logical device, queue and descriptor pool.
     bool Init();
-    // Surface, swapchain, render pass and framebuffers for the given window.
+    // Surface, swap chain, render pass and framebuffers for the given window.
     bool InitWindow(SDL_Window *window);
 
-    // Rebuilds the swapchain when the window size changed or a rebuild was requested.
+    // Rebuilds the swap chain when the window size changed or a rebuild was requested.
     void ResizeIfNeeded(SDL_Window *window);
     void SetClearColor(const ImVec4 &color);
     void FrameRender(ImDrawData *draw_data);

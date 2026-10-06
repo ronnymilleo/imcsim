@@ -1,5 +1,15 @@
 /***********************************************************************************************************************
- Vulkan Context
+ * @file    vulkan_context.cpp
+ * @brief
+ * @details
+ *
+ * @project imcsim
+ * @author  ronnymilleo
+ * @date    10/6/26
+***********************************************************************************************************************/
+
+/***********************************************************************************************************************
+ Includes
 ***********************************************************************************************************************/
 
 #include "vulkan_context.h"
@@ -7,6 +17,10 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+
+/***********************************************************************************************************************
+ Macro definitions
+***********************************************************************************************************************/
 
 // Volk headers
 #ifdef IMGUI_IMPL_VULKAN_USE_VOLK
@@ -18,6 +32,10 @@
 #ifdef _DEBUG
 #define APP_USE_VULKAN_DEBUG_REPORT
 #endif
+
+/***********************************************************************************************************************
+ Functions
+***********************************************************************************************************************/
 
 void check_vk_result(VkResult err) {
     if (err == VK_SUCCESS)
@@ -49,7 +67,9 @@ static bool IsExtensionAvailable(const ImVector<VkExtensionProperties> &properti
     return false;
 }
 
-// Public
+/***********************************************************************************************************************
+ Method Definitions
+***********************************************************************************************************************/
 
 bool VulkanContext::Init() {
     uint32_t sdl_extensions_count = 0;
@@ -260,8 +280,6 @@ void VulkanContext::FillImGuiInitInfo(ImGui_ImplVulkan_InitInfo &info) {
     info.CheckVkResultFn = check_vk_result;
 }
 
-// Private
-
 void VulkanContext::CreateInstance(ImVector<const char *> instance_extensions) {
     VkResult err;
     VkInstanceCreateInfo create_info = {};
@@ -369,8 +387,6 @@ void VulkanContext::CreateDescriptorPool() {
     check_vk_result(err);
 }
 
-// All the ImGui_ImplVulkanH_XXX structures/functions are optional helpers used
-// by the demo. Your real engine/app may not use them.
 void VulkanContext::SetupWindow(int width, int height) {
     ImGui_ImplVulkanH_Window *wd = &m_WindowData;
 
