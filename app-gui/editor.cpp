@@ -6,9 +6,12 @@
 #include "editor.h"
 
 #include "ui_elements/ui_capacitor.h"
+#include "ui_elements/ui_ground.h"
 #include "ui_elements/ui_inductor.h"
 #include "ui_elements/ui_resistor.h"
+#include "ui_elements/ui_vcc.h"
 #include <algorithm>
+#include <array>
 #include <cmath>
 
 namespace {
@@ -24,6 +27,23 @@ constexpr float ZoomStep = 1.1f;
 // Below this spacing the dots are thinned out, otherwise far zoom-out draws hundreds of thousands of them
 constexpr float MinDotSpacing = 8.0f;
 
+/**
+ * @struct  ToolbarItem
+ * @brief   A toolbar button that starts placing a component type.
+ */
+struct ToolbarItem {
+    const char *Label;
+    Core::ComponentType Type;
+};
+
+constexpr auto ToolbarComponents = std::to_array<ToolbarItem>({
+    {"Resistor", Core::ComponentType::Resistor},
+    {"Capacitor", Core::ComponentType::Capacitor},
+    {"Inductor", Core::ComponentType::Inductor},
+    {"Ground", Core::ComponentType::Ground},
+    {"VCC", Core::ComponentType::VCC},
+});
+
 std::unique_ptr<GUI::UIElement> CreateElement(const Core::ComponentType type, const ImVec2 position,
                                               const GUI::Rotation rotation) {
     switch (type) {
@@ -33,6 +53,10 @@ std::unique_ptr<GUI::UIElement> CreateElement(const Core::ComponentType type, co
         return std::make_unique<GUI::UICapacitor>(position, rotation);
     case Core::ComponentType::Inductor:
         return std::make_unique<GUI::UIInductor>(position, rotation);
+    case Core::ComponentType::Ground:
+        return std::make_unique<GUI::UIGround>(position, rotation);
+    case Core::ComponentType::VCC:
+        return std::make_unique<GUI::UIVCC>(position, rotation);
     }
     return nullptr;
 }
@@ -95,22 +119,13 @@ void Editor::Draw() {
 }
 
 void Editor::DrawToolbar() {
-    if (ImGui::Button("Resistor")) {
-        m_PlacingType = Core::ComponentType::Resistor;
-        m_PlacingRotation = Rotation::R0;
+    for (const auto &[label, type] : ToolbarComponents) {
+        if (ImGui::Button(label)) {
+            m_PlacingType = type;
+            m_PlacingRotation = Rotation::R0;
+        }
+        ImGui::SameLine();
     }
-    ImGui::SameLine();
-    if (ImGui::Button("Capacitor")) {
-        m_PlacingType = Core::ComponentType::Capacitor;
-        m_PlacingRotation = Rotation::R0;
-    }
-    ImGui::SameLine();
-    if (ImGui::Button("Inductor")) {
-        m_PlacingType = Core::ComponentType::Inductor;
-        m_PlacingRotation = Rotation::R0;
-    }
-
-    ImGui::SameLine();
     ImGui::TextUnformatted("|  Symbols:");
     ImGui::SameLine();
     if (ImGui::RadioButton("IEC", m_SymbolStyle == SymbolStyle::IEC)) {

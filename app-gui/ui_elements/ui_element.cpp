@@ -28,8 +28,7 @@ UIElement::UIElement(std::unique_ptr<Core::Component> component, const ImVec2 po
  */
 void UIElement::Draw(ImDrawList *draw_list, const ViewTransform &view, const ImU32 color,
                      const SymbolStyle style) const {
-    draw_list->AddLine(LocalToScreen(view, -2, 0), LocalToScreen(view, -1, 0), color, LineThickness);
-    draw_list->AddLine(LocalToScreen(view, 1, 0), LocalToScreen(view, 2, 0), color, LineThickness);
+    DrawTerminals(draw_list, view, color);
     DrawSymbol(draw_list, view, color, style);
 }
 
@@ -55,6 +54,17 @@ ImVec2 UIElement::GetPosition() const {
  */
 Rotation UIElement::GetRotation() const {
     return m_Rotation;
+}
+
+/**
+ * @brief   Draws the leads of a two-terminal component, from x = -2 to -1 and from x = 1 to 2.
+ * @param[in] draw_list  Draw list of the editor window.
+ * @param[in] view       Transform of the current frame.
+ * @param[in] color      Line color.
+ */
+void UIElement::DrawTerminals(ImDrawList *draw_list, const ViewTransform &view, const ImU32 color) const {
+    draw_list->AddLine(LocalToScreen(view, -2, 0), LocalToScreen(view, -1, 0), color, LineThickness);
+    draw_list->AddLine(LocalToScreen(view, 1, 0), LocalToScreen(view, 2, 0), color, LineThickness);
 }
 
 /**

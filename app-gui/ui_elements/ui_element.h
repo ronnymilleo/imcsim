@@ -27,8 +27,8 @@ enum class SymbolStyle {
 /**
  * @class   UIElement
  * @brief   A component placed on the schematic grid, with its position and rotation.
- * @details Owns its Core::Component. Every element has two terminals at local x = -2 and x = +2;
- *          derived classes only draw the symbol between them.
+ * @details Owns its Core::Component. By default an element has two terminals at local x = -2 and x = +2 and
+ *          derived classes only draw the symbol between them; single-terminal symbols override DrawTerminals().
  */
 class UIElement {
 public:
@@ -45,6 +45,7 @@ protected:
     static constexpr float LineThickness = 2.0f;
 
     virtual void DrawSymbol(ImDrawList *draw_list, const ViewTransform &view, ImU32 color, SymbolStyle style) const = 0;
+    virtual void DrawTerminals(ImDrawList *draw_list, const ViewTransform &view, ImU32 color) const;
     ImVec2 LocalToScreen(const ViewTransform &view, float x, float y) const;
 
 private:

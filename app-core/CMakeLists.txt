@@ -6,8 +6,10 @@ add_library(imcsim-core-lib
         STATIC
             components/capacitor.cpp
             components/component.cpp
+            components/ground.cpp
             components/inductor.cpp
             components/resistor.cpp
+            components/vcc.cpp
 )
 
 target_include_directories(imcsim-core-lib

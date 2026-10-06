@@ -15,7 +15,9 @@ namespace Core {
 enum class ComponentType {
     Resistor,
     Capacitor,
-    Inductor
+    Inductor,
+    Ground,
+    VCC
 };
 
 /**
