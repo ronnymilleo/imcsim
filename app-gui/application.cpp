@@ -3,6 +3,7 @@
 ***********************************************************************************************************************/
 
 #include "application.h"
+#include "error_codes.h"
 #include "imgui.h"
 #include "imgui_impl_sdl3.h"
 #include <SDL3/SDL.h>
@@ -12,12 +13,12 @@
 
 int Application::Init() {
     if (InitSDL())
-        return 1;
+        return Core::ExitFailure;
     if (InitVulkan())
-        return 1;
+        return Core::ExitFailure;
     if (InitIMGUI())
-        return 1;
-    return 0;
+        return Core::ExitFailure;
+    return Core::ExitSuccess;
 }
 
 // Private
@@ -33,7 +34,7 @@ void Application::DumpErrors() {
 int Application::InitSDL() {
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMEPAD)) {
         AddError(std::string("SDL_Init(): ") + SDL_GetError());
-        return 1;
+        return Core::ExitFailure;
     }
 
     // Create window with Vulkan graphics context
@@ -44,25 +45,25 @@ int Application::InitSDL() {
 
     if (m_SDLWindow == nullptr) {
         AddError(std::string("SDL_CreateWindow(): ") + SDL_GetError());
-        return 1;
+        return Core::ExitFailure;
     }
 
-    return 0;
+    return Core::ExitSuccess;
 }
 
 int Application::InitVulkan() {
     if (!m_Vulkan.Init()) {
         AddError(m_Vulkan.LastError());
-        return 1;
+        return Core::ExitFailure;
     }
     if (!m_Vulkan.InitWindow(m_SDLWindow)) {
         AddError(m_Vulkan.LastError());
-        return 1;
+        return Core::ExitFailure;
     }
 
     SDL_SetWindowPosition(m_SDLWindow, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
     SDL_ShowWindow(m_SDLWindow);
-    return 0;
+    return Core::ExitSuccess;
 }
 
 int Application::InitIMGUI() {
@@ -96,7 +97,7 @@ int Application::InitIMGUI() {
     ImGui_ImplSDL3_InitForVulkan(m_SDLWindow);
     m_Vulkan.FillImGuiInitInfo(m_VulkanInitInfo);
     ImGui_ImplVulkan_Init(&m_VulkanInitInfo);
-    return 0;
+    return Core::ExitSuccess;
 }
 
 int Application::Run() {
@@ -200,7 +201,7 @@ int Application::Run() {
             m_Vulkan.FramePresent();
     }
 
-    return 0;
+    return Core::ExitSuccess;
 }
 
 void Application::Shutdown() {

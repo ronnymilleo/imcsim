@@ -1,20 +1,16 @@
 /***********************************************************************************************************************
- Main
+ Error codes
 ***********************************************************************************************************************/
 
-#include "application.h"
-#include "error_codes.h"
+#ifndef IMCSIM_ERROR_CODES_H
+#define IMCSIM_ERROR_CODES_H
 
-// Main code
-int main(int, char **) {
-    Application app;
-    int result = app.Init();
-    if (result == Core::ExitSuccess) {
-        result = app.Run();
-    }
-    app.Shutdown();
-    return result;
+namespace Core {
+    constexpr int ExitFailure = EXIT_FAILURE;
+    constexpr int ExitSuccess = EXIT_SUCCESS;
 }
+
+#endif //IMCSIM_ERROR_CODES_H
 
 /***********************************************************************************************************************
  End of file
