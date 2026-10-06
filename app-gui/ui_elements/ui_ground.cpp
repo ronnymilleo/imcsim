@@ -8,6 +8,8 @@
 #include "components/ground.h"
 #include <memory>
 
+namespace GUI {
+
 namespace {
 
 constexpr float LeadLength = 1.0f;
@@ -15,8 +17,6 @@ constexpr float BarSpacing = 0.3f;
 constexpr float BarHalfWidths[] = {0.8f, 0.5f, 0.2f};
 
 } // namespace
-
-namespace GUI {
 
 /**
  * @brief   Creates a ground reference placed on the grid, together with its simulation component.
@@ -33,6 +33,10 @@ void UIGround::DrawTerminals(ImDrawList *draw_list, const ViewTransform &view, c
 
 std::vector<GridPoint> UIGround::GetLocalTerminals() const {
     return {{0, 0}};
+}
+
+LocalBounds UIGround::GetLocalBounds() const {
+    return {{-0.8f, 0.0f}, {0.8f, 1.6f}};
 }
 
 void UIGround::DrawSymbol(ImDrawList *draw_list, const ViewTransform &view, const ImU32 color,

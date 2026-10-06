@@ -26,6 +26,15 @@ enum class SymbolStyle {
 };
 
 /**
+ * @struct  LocalBounds
+ * @brief   Axis-aligned box around a symbol, in local grid units before rotation.
+ */
+struct LocalBounds {
+    ImVec2 Min;
+    ImVec2 Max;
+};
+
+/**
  * @class   UIElement
  * @brief   A component placed on the schematic grid, with its position and rotation.
  * @details Owns its Core::Component. By default an element has two terminals at local x = -2 and x = +2 and
@@ -41,13 +50,17 @@ public:
 
     const Core::Component &GetComponent() const;
     GridPoint GetPosition() const;
+    void SetPosition(GridPoint position);
     Rotation GetRotation() const;
+    void SetRotation(Rotation rotation);
     std::vector<GridPoint> GetTerminals() const;
+    bool Contains(ImVec2 world_pos) const;
 
 protected:
     virtual void DrawSymbol(ImDrawList *draw_list, const ViewTransform &view, ImU32 color, SymbolStyle style) const = 0;
     virtual void DrawTerminals(ImDrawList *draw_list, const ViewTransform &view, ImU32 color) const;
     virtual std::vector<GridPoint> GetLocalTerminals() const;
+    virtual LocalBounds GetLocalBounds() const;
     ImVec2 LocalToScreen(const ViewTransform &view, float x, float y) const;
 
 private:

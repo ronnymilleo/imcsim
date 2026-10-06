@@ -26,6 +26,8 @@
 
 // endregion
 
+namespace GUI {
+
 // region Private definitions
 
 namespace {
@@ -62,8 +64,6 @@ bool IsExtensionAvailable(const ImVector<VkExtensionProperties> &properties, con
 // endregion
 
 // region Definitions
-
-namespace GUI {
 
 /**
  * @brief   Creates the instance, selects the physical device and creates the logical device, queue and
@@ -475,6 +475,6 @@ int VulkanContext::SetupWindow(int width, int height) {
     return Core::ExitSuccess;
 }
 
-} // namespace GUI
-
 // endregion
+
+} // namespace GUI

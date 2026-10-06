@@ -31,6 +31,7 @@ public:
     virtual ~Component() = default;
 
     ComponentType GetType() const;
+    const char *GetName() const;
 
 protected:
     ComponentType m_Type{};

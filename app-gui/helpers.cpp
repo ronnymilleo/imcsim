@@ -48,6 +48,16 @@ GridPoint operator+(const GridPoint first, const GridPoint second) {
 }
 
 /**
+ * @brief   Subtracts two grid points component-wise.
+ * @param[in] first   Point to subtract from.
+ * @param[in] second  Point to subtract.
+ * @return  The offset from the second point to the first.
+ */
+GridPoint operator-(const GridPoint first, const GridPoint second) {
+    return {first.X - second.X, first.Y - second.Y};
+}
+
+/**
  * @brief   Converts a grid point to world coordinates for drawing.
  * @param[in] point  Point on the grid.
  * @return  The same position as floats.
@@ -71,6 +81,25 @@ Rotation NextRotation(const Rotation rotation) {
         return Rotation::R270;
     case Rotation::R270:
         return Rotation::R0;
+    }
+    return Rotation::R0;
+}
+
+/**
+ * @brief   Returns the rotation that undoes the given one.
+ * @param[in] rotation  Orientation to undo.
+ * @return  The opposite orientation, so applying both leaves a point unchanged.
+ */
+Rotation InverseRotation(const Rotation rotation) {
+    switch (rotation) {
+    case Rotation::R0:
+        return Rotation::R0;
+    case Rotation::R90:
+        return Rotation::R270;
+    case Rotation::R180:
+        return Rotation::R180;
+    case Rotation::R270:
+        return Rotation::R90;
     }
     return Rotation::R0;
 }

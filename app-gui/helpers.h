@@ -7,6 +7,7 @@
 #define IMCSIM_HELPERS_H
 
 #include "imgui.h"
+#include <compare>
 #include <cstdint>
 
 namespace GUI {
@@ -22,7 +23,8 @@ struct GridPoint {
     int X = 0;
     int Y = 0;
 
-    bool operator==(const GridPoint &) const = default;
+    // Ordering lets grid points be keys of std::map
+    auto operator<=>(const GridPoint &) const = default;
 };
 
 /**
@@ -54,8 +56,10 @@ private:
 };
 
 GridPoint operator+(GridPoint first, GridPoint second);
+GridPoint operator-(GridPoint first, GridPoint second);
 ImVec2 ToVec2(GridPoint point);
 Rotation NextRotation(Rotation rotation);
+Rotation InverseRotation(Rotation rotation);
 ImVec2 Rotate(ImVec2 point, Rotation rotation);
 GridPoint Rotate(GridPoint point, Rotation rotation);
 GridPoint Snap(ImVec2 world_pos);

@@ -10,6 +10,8 @@
 #include <cmath>
 #include <memory>
 
+namespace GUI {
+
 namespace {
 
 constexpr float LeadLength = 1.0f;
@@ -22,8 +24,6 @@ constexpr float LabelGapScale = 0.2f;
 constexpr float MinLabelSize = 6.0f;
 
 } // namespace
-
-namespace GUI {
 
 /**
  * @brief   Creates a VCC supply rail placed on the grid, together with its simulation component.
@@ -40,6 +40,10 @@ void UIVCC::DrawTerminals(ImDrawList *draw_list, const ViewTransform &view, cons
 
 std::vector<GridPoint> UIVCC::GetLocalTerminals() const {
     return {{0, 0}};
+}
+
+LocalBounds UIVCC::GetLocalBounds() const {
+    return {{-0.6f, -1.0f}, {0.6f, 0.0f}};
 }
 
 // ImGui text cannot rotate, so the label stays upright and is pushed past the bar along the rotated lead direction

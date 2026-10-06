@@ -9,6 +9,8 @@
 #include <array>
 #include <memory>
 
+namespace GUI {
+
 namespace {
 
 constexpr int ZigZagPeakCount = 6;
@@ -16,8 +18,6 @@ constexpr float ZigZagStep = 2.0f / ZigZagPeakCount;
 constexpr float ZigZagAmplitude = 0.4f;
 
 } // namespace
-
-namespace GUI {
 
 /**
  * @brief   Creates a resistor placed on the grid, together with its simulation component.

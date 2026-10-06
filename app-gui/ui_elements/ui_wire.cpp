@@ -5,6 +5,8 @@
 
 #include "ui_wire.h"
 
+#include <algorithm>
+
 namespace GUI {
 
 /**
@@ -46,6 +48,37 @@ GridPoint UIWire::GetStart() const {
  */
 GridPoint UIWire::GetEnd() const {
     return m_End;
+}
+
+/**
+ * @brief   Checks whether a grid point lies strictly between the two ends of the wire.
+ * @param[in] point  Grid point to test.
+ * @return  True when the point is on the wire but is not one of its ends.
+ * @note    Wires are always horizontal or vertical, so only the axis the wire runs along is checked.
+ */
+bool UIWire::PassesThrough(const GridPoint point) const {
+    if (m_Start.X == m_End.X && point.X == m_Start.X) {
+        return point.Y > std::min(m_Start.Y, m_End.Y) && point.Y < std::max(m_Start.Y, m_End.Y);
+    }
+    if (m_Start.Y == m_End.Y && point.Y == m_Start.Y) {
+        return point.X > std::min(m_Start.X, m_End.X) && point.X < std::max(m_Start.X, m_End.X);
+    }
+    return false;
+}
+
+/**
+ * @brief   Checks whether a world position is close enough to the wire to pick it with the mouse.
+ * @param[in] world_pos  Position in world units, usually the cursor.
+ * @param[in] tolerance  Maximum distance in world units.
+ * @return  True when the position is within the tolerance of the segment.
+ */
+bool UIWire::IsNear(const ImVec2 world_pos, const float tolerance) const {
+    // The segment is axis-aligned, so its bounding box grown by the tolerance is the pick area
+    const float min_x = static_cast<float>(std::min(m_Start.X, m_End.X)) - tolerance;
+    const float max_x = static_cast<float>(std::max(m_Start.X, m_End.X)) + tolerance;
+    const float min_y = static_cast<float>(std::min(m_Start.Y, m_End.Y)) - tolerance;
+    const float max_y = static_cast<float>(std::max(m_Start.Y, m_End.Y)) + tolerance;
+    return world_pos.x >= min_x && world_pos.x <= max_x && world_pos.y >= min_y && world_pos.y <= max_y;
 }
 
 } // namespace GUI

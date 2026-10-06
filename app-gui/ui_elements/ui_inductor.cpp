@@ -11,6 +11,8 @@
 #include <memory>
 #include <numbers>
 
+namespace GUI {
+
 namespace {
 
 constexpr int TurnCount = 4;
@@ -20,8 +22,6 @@ constexpr float TurnWidth = 2.0f / TurnCount;
 constexpr float TurnRadius = TurnWidth / 2.0f;
 
 } // namespace
-
-namespace GUI {
 
 /**
  * @brief   Creates an inductor placed on the grid, together with its simulation component.

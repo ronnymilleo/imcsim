@@ -25,6 +25,8 @@ public:
 
     GridPoint GetStart() const;
     GridPoint GetEnd() const;
+    bool PassesThrough(GridPoint point) const;
+    bool IsNear(ImVec2 world_pos, float tolerance) const;
 
 private:
     GridPoint m_Start;

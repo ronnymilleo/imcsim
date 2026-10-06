@@ -5,6 +5,7 @@
 add_library(imcsim-gui-lib
         STATIC
             application.cpp
+            connectivity.cpp
             editor.cpp
             helpers.cpp
             ui_elements/ui_capacitor.cpp
@@ -15,6 +16,7 @@ add_library(imcsim-gui-lib
             ui_elements/ui_vcc.cpp
             ui_elements/ui_wire.cpp
             vulkan_context.cpp
+            wire_editing.cpp
 )
 
 target_include_directories(imcsim-gui-lib

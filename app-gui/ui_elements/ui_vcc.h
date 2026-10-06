@@ -23,6 +23,7 @@ public:
 protected:
     void DrawTerminals(ImDrawList *draw_list, const ViewTransform &view, ImU32 color) const override;
     std::vector<GridPoint> GetLocalTerminals() const override;
+    LocalBounds GetLocalBounds() const override;
     void DrawSymbol(ImDrawList *draw_list, const ViewTransform &view, ImU32 color, SymbolStyle style) const override;
 };
 

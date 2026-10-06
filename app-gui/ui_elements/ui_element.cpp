@@ -49,11 +49,27 @@ GridPoint UIElement::GetPosition() const {
 }
 
 /**
+ * @brief   Moves the element to another grid position.
+ * @param[in] position  New grid position in world units.
+ */
+void UIElement::SetPosition(const GridPoint position) {
+    m_Position = position;
+}
+
+/**
  * @brief   Returns the orientation of the element.
  * @return  The element rotation.
  */
 Rotation UIElement::GetRotation() const {
     return m_Rotation;
+}
+
+/**
+ * @brief   Changes the orientation of the element.
+ * @param[in] rotation  New orientation on the grid.
+ */
+void UIElement::SetRotation(const Rotation rotation) {
+    m_Rotation = rotation;
 }
 
 /**
@@ -66,6 +82,17 @@ std::vector<GridPoint> UIElement::GetTerminals() const {
         terminal = m_Position + Rotate(terminal, m_Rotation);
     }
     return terminals;
+}
+
+/**
+ * @brief   Checks whether a world position falls on the element, for picking it with the mouse.
+ * @param[in] world_pos  Position in world units, usually the cursor.
+ * @return  True when the position is inside the symbol bounds, terminals included.
+ */
+bool UIElement::Contains(const ImVec2 world_pos) const {
+    const ImVec2 local = Rotate(world_pos - ToVec2(m_Position), InverseRotation(m_Rotation));
+    const LocalBounds bounds = GetLocalBounds();
+    return local.x >= bounds.Min.x && local.x <= bounds.Max.x && local.y >= bounds.Min.y && local.y <= bounds.Max.y;
 }
 
 /**
@@ -85,6 +112,14 @@ void UIElement::DrawTerminals(ImDrawList *draw_list, const ViewTransform &view, 
  */
 std::vector<GridPoint> UIElement::GetLocalTerminals() const {
     return {{-2, 0}, {2, 0}};
+}
+
+/**
+ * @brief   Returns the pick area of a two-terminal component, in local grid units before rotation.
+ * @return  A box from terminal to terminal, as tall as the tallest symbol.
+ */
+LocalBounds UIElement::GetLocalBounds() const {
+    return {{-2.0f, -0.8f}, {2.0f, 0.8f}};
 }
 
 /**
