@@ -24,11 +24,13 @@ UIElement::UIElement(std::unique_ptr<Core::Component> component, const ImVec2 po
  * @param[in] draw_list  Draw list of the editor window.
  * @param[in] view       Transform of the current frame.
  * @param[in] color      Line color, so the same element can be drawn as a placement preview.
+ * @param[in] style      Drawing standard for the symbol.
  */
-void UIElement::Draw(ImDrawList *draw_list, const ViewTransform &view, const ImU32 color) const {
+void UIElement::Draw(ImDrawList *draw_list, const ViewTransform &view, const ImU32 color,
+                     const SymbolStyle style) const {
     draw_list->AddLine(LocalToScreen(view, -2, 0), LocalToScreen(view, -1, 0), color, LineThickness);
     draw_list->AddLine(LocalToScreen(view, 1, 0), LocalToScreen(view, 2, 0), color, LineThickness);
-    DrawSymbol(draw_list, view, color);
+    DrawSymbol(draw_list, view, color, style);
 }
 
 /**

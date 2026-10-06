@@ -20,7 +20,7 @@ public:
     ~UICapacitor() override = default;
 
 protected:
-    void DrawSymbol(ImDrawList *draw_list, const ViewTransform &view, ImU32 color) const override;
+    void DrawSymbol(ImDrawList *draw_list, const ViewTransform &view, ImU32 color, SymbolStyle style) const override;
 };
 
 } // namespace GUI

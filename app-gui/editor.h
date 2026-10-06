@@ -33,6 +33,7 @@ private:
     std::vector<std::unique_ptr<UIElement>> m_Elements;
     std::optional<Core::ComponentType> m_PlacingType;
     Rotation m_PlacingRotation = Rotation::R0;
+    SymbolStyle m_SymbolStyle = SymbolStyle::IEC;
     ImVec2 m_Pan = {0, 0};
     float m_Zoom = 20.0f;
 

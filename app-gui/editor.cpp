@@ -6,6 +6,7 @@
 #include "editor.h"
 
 #include "ui_elements/ui_capacitor.h"
+#include "ui_elements/ui_inductor.h"
 #include "ui_elements/ui_resistor.h"
 #include <algorithm>
 #include <cmath>
@@ -30,6 +31,8 @@ std::unique_ptr<GUI::UIElement> CreateElement(const Core::ComponentType type, co
         return std::make_unique<GUI::UIResistor>(position, rotation);
     case Core::ComponentType::Capacitor:
         return std::make_unique<GUI::UICapacitor>(position, rotation);
+    case Core::ComponentType::Inductor:
+        return std::make_unique<GUI::UIInductor>(position, rotation);
     }
     return nullptr;
 }
@@ -83,7 +86,7 @@ void Editor::Draw() {
     DrawGrid(draw_list, view, origin, size, m_Zoom);
 
     for (const auto &element : m_Elements) {
-        element->Draw(draw_list, view, ElementColor);
+        element->Draw(draw_list, view, ElementColor, m_SymbolStyle);
     }
     HandlePlacement(draw_list, view, hovered);
 
@@ -100,6 +103,22 @@ void Editor::DrawToolbar() {
     if (ImGui::Button("Capacitor")) {
         m_PlacingType = Core::ComponentType::Capacitor;
         m_PlacingRotation = Rotation::R0;
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Inductor")) {
+        m_PlacingType = Core::ComponentType::Inductor;
+        m_PlacingRotation = Rotation::R0;
+    }
+
+    ImGui::SameLine();
+    ImGui::TextUnformatted("|  Symbols:");
+    ImGui::SameLine();
+    if (ImGui::RadioButton("IEC", m_SymbolStyle == SymbolStyle::IEC)) {
+        m_SymbolStyle = SymbolStyle::IEC;
+    }
+    ImGui::SameLine();
+    if (ImGui::RadioButton("ANSI", m_SymbolStyle == SymbolStyle::ANSI)) {
+        m_SymbolStyle = SymbolStyle::ANSI;
     }
 }
 
@@ -146,7 +165,7 @@ void Editor::HandlePlacement(ImDrawList *draw_list, const ViewTransform &view, c
 
     const ImVec2 position = Snap(view.ToWorld(ImGui::GetIO().MousePos));
     auto preview = CreateElement(*m_PlacingType, position, m_PlacingRotation);
-    preview->Draw(draw_list, view, PreviewColor);
+    preview->Draw(draw_list, view, PreviewColor, m_SymbolStyle);
     if (ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
         m_Elements.push_back(std::move(preview));
     }

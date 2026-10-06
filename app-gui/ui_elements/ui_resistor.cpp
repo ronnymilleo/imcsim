@@ -6,7 +6,16 @@
 #include "ui_resistor.h"
 
 #include "components/resistor.h"
+#include <array>
 #include <memory>
+
+namespace {
+
+constexpr int ZigZagPeakCount = 6;
+constexpr float ZigZagStep = 2.0f / ZigZagPeakCount;
+constexpr float ZigZagAmplitude = 0.4f;
+
+} // namespace
 
 namespace GUI {
 
@@ -19,10 +28,25 @@ UIResistor::UIResistor(const ImVec2 position, const Rotation rotation)
     : UIElement(std::make_unique<Core::Resistor>(), position, rotation) {
 }
 
-void UIResistor::DrawSymbol(ImDrawList *draw_list, const ViewTransform &view, const ImU32 color) const {
-    const ImVec2 rectangle[4] = {LocalToScreen(view, -1, -0.4f), LocalToScreen(view, 1, -0.4f),
-                                 LocalToScreen(view, 1, 0.4f), LocalToScreen(view, -1, 0.4f)};
-    draw_list->AddPolyline(rectangle, 4, color, ImDrawFlags_Closed, LineThickness);
+void UIResistor::DrawSymbol(ImDrawList *draw_list, const ViewTransform &view, const ImU32 color,
+                            const SymbolStyle style) const {
+    if (style == SymbolStyle::IEC) {
+        const ImVec2 rectangle[4] = {LocalToScreen(view, -1, -0.4f), LocalToScreen(view, 1, -0.4f),
+                                     LocalToScreen(view, 1, 0.4f), LocalToScreen(view, -1, 0.4f)};
+        draw_list->AddPolyline(rectangle, 4, color, ImDrawFlags_Closed, LineThickness);
+        return;
+    }
+
+    // Peaks alternate above and below the axis, evenly spaced between x = -1 and x = 1
+    std::array<ImVec2, ZigZagPeakCount + 2> zig_zag;
+    zig_zag.front() = LocalToScreen(view, -1, 0);
+    for (int peak = 0; peak < ZigZagPeakCount; ++peak) {
+        const float x = -1.0f + ZigZagStep * (static_cast<float>(peak) + 0.5f);
+        const float y = peak % 2 == 0 ? -ZigZagAmplitude : ZigZagAmplitude;
+        zig_zag[peak + 1] = LocalToScreen(view, x, y);
+    }
+    zig_zag.back() = LocalToScreen(view, 1, 0);
+    draw_list->AddPolyline(zig_zag.data(), static_cast<int>(zig_zag.size()), color, ImDrawFlags_None, LineThickness);
 }
 
 } // namespace GUI

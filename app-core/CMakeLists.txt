@@ -5,12 +5,9 @@
 add_library(imcsim-core-lib
         STATIC
             components/capacitor.cpp
-            components/capacitor.h
             components/component.cpp
-            components/component.h
+            components/inductor.cpp
             components/resistor.cpp
-            components/resistor.h
-            error_codes.h
 )
 
 target_include_directories(imcsim-core-lib

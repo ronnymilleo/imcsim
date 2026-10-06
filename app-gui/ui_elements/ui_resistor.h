@@ -12,7 +12,7 @@ namespace GUI {
 
 /**
  * @class   UIResistor
- * @brief   Resistor drawn as a rectangle between its terminals.
+ * @brief   Resistor drawn as a rectangle (IEC) or a zig-zag (ANSI) between its terminals.
  */
 class UIResistor : public UIElement {
 public:
@@ -20,7 +20,7 @@ public:
     ~UIResistor() override = default;
 
 protected:
-    void DrawSymbol(ImDrawList *draw_list, const ViewTransform &view, ImU32 color) const override;
+    void DrawSymbol(ImDrawList *draw_list, const ViewTransform &view, ImU32 color, SymbolStyle style) const override;
 };
 
 } // namespace GUI

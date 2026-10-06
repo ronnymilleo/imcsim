@@ -9,6 +9,7 @@ add_library(imcsim-gui-lib
             helpers.cpp
             ui_elements/ui_capacitor.cpp
             ui_elements/ui_element.cpp
+            ui_elements/ui_inductor.cpp
             ui_elements/ui_resistor.cpp
             vulkan_context.cpp
 )
