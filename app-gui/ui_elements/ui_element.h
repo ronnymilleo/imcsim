@@ -10,6 +10,7 @@
 #include "helpers.h"
 #include "imgui.h"
 #include <memory>
+#include <string>
 #include <vector>
 
 namespace GUI {
@@ -49,6 +50,7 @@ public:
     void Draw(ImDrawList *draw_list, const ViewTransform &view, ImU32 color, SymbolStyle style) const;
 
     const Core::Component &GetComponent() const;
+    Core::Component &GetComponent();
     GridPoint GetPosition() const;
     void SetPosition(GridPoint position);
     Rotation GetRotation() const;
@@ -61,6 +63,9 @@ protected:
     virtual void DrawTerminals(ImDrawList *draw_list, const ViewTransform &view, ImU32 color) const;
     virtual std::vector<GridPoint> GetLocalTerminals() const;
     virtual LocalBounds GetLocalBounds() const;
+    virtual void DrawLabels(ImDrawList *draw_list, const ViewTransform &view, ImU32 color) const;
+    void DrawLabel(ImDrawList *draw_list, const ViewTransform &view, ImVec2 local_anchor, ImVec2 local_direction,
+                   const std::string &text, ImU32 color) const;
     ImVec2 LocalToScreen(const ViewTransform &view, float x, float y) const;
 
 private:

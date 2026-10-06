@@ -12,6 +12,7 @@
 #include "imgui.h"
 #include "ui_elements/ui_element.h"
 #include "ui_elements/ui_wire.h"
+#include <array>
 #include <memory>
 #include <optional>
 #include <vector>
@@ -54,6 +55,10 @@ private:
     std::optional<std::size_t> m_SelectedElement;
     std::optional<std::size_t> m_SelectedWire;
     std::optional<ElementDrag> m_Drag;
+    // Text being edited in the Properties window, and the element it was loaded from
+    std::array<char, 32> m_ValueText{};
+    std::optional<std::size_t> m_ValueTextElement;
+    bool m_ValueTextInvalid = false;
     // Rebuilt lazily after the schematic changes
     std::optional<Connectivity> m_Connectivity;
     bool m_ShowNodes = false;
@@ -65,6 +70,9 @@ private:
     void DrawToolbar();
     void DrawWires(ImDrawList *draw_list, const ViewTransform &view);
     void DrawNetlistWindow();
+    void DrawPropertiesWindow();
+    void LoadValueText();
+    void AssignName(Core::Component &component) const;
     void StartPlacing(Core::ComponentType type);
     void StartDrawingWires();
     void HandlePanAndZoom(ImVec2 origin, bool hovered, bool active);

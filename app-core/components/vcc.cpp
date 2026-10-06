@@ -7,10 +7,16 @@
 
 namespace Core {
 
+namespace {
+
+constexpr double DefaultVoltage = 5.0;
+
+} // namespace
+
 /**
- * @brief   Creates a supply rail.
+ * @brief   Creates a supply rail at 5 V.
  */
-VCC::VCC() : Component(ComponentType::VCC) {
+VCC::VCC() : Component(ComponentType::VCC, DefaultVoltage) {
 }
 
 } // namespace Core

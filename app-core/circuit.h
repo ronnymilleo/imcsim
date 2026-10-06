@@ -7,6 +7,7 @@
 #define IMCSIM_CIRCUIT_H
 
 #include "components/component.h"
+#include <string>
 #include <vector>
 
 namespace Core {
@@ -32,6 +33,7 @@ public:
 
     const std::vector<CircuitEntry> &GetEntries() const;
     int GetNodeCount() const;
+    std::string ToSpiceNetlist() const;
 
 private:
     std::vector<CircuitEntry> m_Entries;

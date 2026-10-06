@@ -10,7 +10,7 @@ namespace Core {
 /**
  * @brief   Creates a ground reference.
  */
-Ground::Ground() : Component(ComponentType::Ground) {
+Ground::Ground() : Component(ComponentType::Ground, 0.0) {
 }
 
 } // namespace Core

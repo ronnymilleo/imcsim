@@ -39,6 +39,10 @@ LocalBounds UIGround::GetLocalBounds() const {
     return {{-0.8f, 0.0f}, {0.8f, 1.6f}};
 }
 
+// Ground has no name or value to show
+void UIGround::DrawLabels(ImDrawList * /*draw_list*/, const ViewTransform & /*view*/, ImU32 /*color*/) const {
+}
+
 void UIGround::DrawSymbol(ImDrawList *draw_list, const ViewTransform &view, const ImU32 color,
                           SymbolStyle /*style*/) const {
     float y = LeadLength;

@@ -11,6 +11,7 @@ add_library(imcsim-core-lib
             components/inductor.cpp
             components/resistor.cpp
             components/vcc.cpp
+            spice_value.cpp
 )
 
 target_include_directories(imcsim-core-lib

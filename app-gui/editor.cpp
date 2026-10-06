@@ -5,6 +5,7 @@
 
 #include "editor.h"
 
+#include "spice_value.h"
 #include "ui_elements/ui_capacitor.h"
 #include "ui_elements/ui_ground.h"
 #include "ui_elements/ui_inductor.h"
@@ -13,10 +14,12 @@
 #include "wire_editing.h"
 #include <algorithm>
 #include <array>
+#include <charconv>
 #include <cmath>
 #include <format>
 #include <iterator>
 #include <string>
+#include <string_view>
 
 namespace GUI {
 
@@ -28,6 +31,7 @@ constexpr ImU32 ElementColor = IM_COL32(220, 220, 220, 255);
 constexpr ImU32 PreviewColor = IM_COL32(100, 180, 255, 160);
 constexpr ImU32 WireColor = IM_COL32(120, 200, 120, 255);
 constexpr ImU32 SelectedColor = IM_COL32(255, 200, 80, 255);
+constexpr ImVec4 ErrorTextColor = {1.0f, 0.4f, 0.4f, 1.0f};
 constexpr float MinCanvasSize = 50.0f;
 constexpr float MinZoom = 4.0f;
 constexpr float MaxZoom = 200.0f;
@@ -158,6 +162,7 @@ void Editor::Draw() {
     draw_list->PopClipRect();
     ImGui::End();
 
+    DrawPropertiesWindow();
     if (m_ShowNetlist) {
         DrawNetlistWindow();
     }
@@ -224,7 +229,7 @@ void Editor::DrawWires(ImDrawList *draw_list, const ViewTransform &view) {
     }
 }
 
-// Debug view of the topology that will be handed to the simulator
+// Shows the SPICE netlist that will be handed to ngspice
 void Editor::DrawNetlistWindow() {
     if (!ImGui::Begin("Netlist", &m_ShowNetlist)) {
         ImGui::End();
@@ -234,17 +239,96 @@ void Editor::DrawNetlistWindow() {
         m_Connectivity.emplace(m_Elements, m_Wires);
     }
 
-    const Core::Circuit circuit = BuildCircuit(m_Elements, *m_Connectivity);
-    ImGui::TextUnformatted(std::format("{} nodes (0 = ground)", circuit.GetNodeCount()).c_str());
-    ImGui::Separator();
-    for (const Core::CircuitEntry &entry : circuit.GetEntries()) {
-        std::string line = entry.Part->GetName();
-        for (const int node : entry.Nodes) {
-            line += std::format(" {}", node);
-        }
-        ImGui::TextUnformatted(line.c_str());
+    const std::string netlist = BuildCircuit(m_Elements, *m_Connectivity).ToSpiceNetlist();
+    if (ImGui::Button("Copy")) {
+        ImGui::SetClipboardText(netlist.c_str());
     }
+    ImGui::Separator();
+    ImGui::TextUnformatted(netlist.c_str());
     ImGui::End();
+}
+
+// Values are typed with SPICE suffixes and applied as soon as they are valid: the schematic window is handled
+// before this one, so a click on the canvas would change the selection before a deferred edit was applied
+void Editor::DrawPropertiesWindow() {
+    if (!ImGui::Begin("Properties")) {
+        ImGui::End();
+        return;
+    }
+    if (m_SelectedWire) {
+        ImGui::TextUnformatted("Wire");
+        ImGui::End();
+        return;
+    }
+    if (!m_SelectedElement) {
+        ImGui::TextDisabled("Select a component to edit it");
+        ImGui::End();
+        return;
+    }
+
+    Core::Component &component = m_Elements[*m_SelectedElement]->GetComponent();
+    ImGui::TextUnformatted(component.GetTypeName());
+    if (!component.GetName().empty()) {
+        ImGui::TextUnformatted(std::format("Name: {}", component.GetName()).c_str());
+    }
+    if (!component.HasValue()) {
+        ImGui::End();
+        return;
+    }
+
+    if (m_ValueTextElement != m_SelectedElement) {
+        LoadValueText();
+    }
+    ImGui::SetNextItemWidth(ImGui::GetFontSize() * 8.0f);
+    if (ImGui::InputText("##value", m_ValueText.data(), m_ValueText.size())) {
+        const std::optional<double> value = Core::ParseValue(m_ValueText.data(), component.GetUnit());
+        m_ValueTextInvalid = !value || !component.IsValidValue(*value);
+        if (!m_ValueTextInvalid) {
+            component.SetValue(*value);
+        }
+    }
+    if (ImGui::IsItemDeactivatedAfterEdit() && !m_ValueTextInvalid) {
+        // Rewrite the text in canonical form, so "4700" becomes "4.7k"
+        LoadValueText();
+    }
+    ImGui::SameLine();
+    ImGui::TextUnformatted(component.GetUnit());
+    if (m_ValueTextInvalid) {
+        ImGui::TextColored(ErrorTextColor, "Invalid value");
+    }
+    ImGui::TextDisabled("Suffixes: T G M k m u n p f (case sensitive)");
+    ImGui::End();
+}
+
+void Editor::LoadValueText() {
+    const Core::Component &component = m_Elements[*m_SelectedElement]->GetComponent();
+    const std::string text = Core::FormatValue(component.GetValue());
+    m_ValueText.fill('\0');
+    text.copy(m_ValueText.data(), m_ValueText.size() - 1);
+    m_ValueTextElement = m_SelectedElement;
+    m_ValueTextInvalid = false;
+}
+
+// The next free number for the prefix, so names stay unique after deletions: R1, R2, R3...
+void Editor::AssignName(Core::Component &component) const {
+    const std::string_view prefix = component.GetNamePrefix();
+    if (prefix.empty()) {
+        return;
+    }
+    int highest = 0;
+    for (const auto &element : m_Elements) {
+        const std::string &name = element->GetComponent().GetName();
+        if (!name.starts_with(prefix)) {
+            continue;
+        }
+        int number = 0;
+        const char *digits_end = name.data() + name.size();
+        const auto [end, error] = std::from_chars(name.data() + prefix.size(), digits_end, number);
+        if (error == std::errc{} && end == digits_end) {
+            highest = std::max(highest, number);
+        }
+    }
+    component.SetName(std::format("{}{}", prefix, highest + 1));
 }
 
 void Editor::StartPlacing(const Core::ComponentType type) {
@@ -306,6 +390,7 @@ void Editor::HandlePlacement(ImDrawList *draw_list, const ViewTransform &view, c
     auto preview = CreateElement(*m_PlacingType, position, m_PlacingRotation);
     preview->Draw(draw_list, view, PreviewColor, m_SymbolStyle);
     if (ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+        AssignName(preview->GetComponent());
         m_Elements.push_back(std::move(preview));
         m_Connectivity.reset();
     }
@@ -458,6 +543,8 @@ void Editor::ClearSelection() {
     EndDrag();
     m_SelectedElement.reset();
     m_SelectedWire.reset();
+    // Indices are reused after a deletion, so the next selection must always reload the value text
+    m_ValueTextElement.reset();
 }
 
 // While dragging, wires are rebuilt from the snapshot every frame; the cleanup waits until the drop
