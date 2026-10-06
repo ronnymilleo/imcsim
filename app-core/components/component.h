@@ -20,13 +20,17 @@ enum class ComponentType {
 /**
  * @class   Component
  * @brief   A circuit component in the simulation model.
+ * @details Polymorphic base: store derived components through pointers to avoid slicing.
  */
 class Component {
 public:
-    Component() = default;
-    ~Component() = default;
+    explicit Component(ComponentType type);
+    virtual ~Component() = default;
 
-private:
+    ComponentType GetType() const;
+
+protected:
+    ComponentType m_Type{};
 };
 
 } // namespace Core

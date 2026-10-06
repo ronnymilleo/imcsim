@@ -6,8 +6,11 @@
 #ifndef IMCSIM_EDITOR_H
 #define IMCSIM_EDITOR_H
 
-#include "component.h"
+#include "components/component.h"
+#include "helpers.h"
 #include "imgui.h"
+#include "ui_elements/ui_element.h"
+#include <memory>
 #include <optional>
 #include <vector>
 
@@ -24,19 +27,18 @@ public:
     Editor() = default;
     ~Editor() = default;
 
-    void EnableGrid() const;
     void Draw();
 
 private:
-    std::vector<Core::Component> m_Components;
+    std::vector<std::unique_ptr<UIElement>> m_Elements;
     std::optional<Core::ComponentType> m_PlacingType;
-    int m_PlacingRotation = 0;
+    Rotation m_PlacingRotation = Rotation::R0;
     ImVec2 m_Pan = {0, 0};
     float m_Zoom = 20.0f;
 
-    ImVec2 ToScreen(ImVec2 origin, ImVec2 world_pos) const;
-    ImVec2 ToWorld(ImVec2 origin, ImVec2 screen_pos) const;
-    ImVec2 Snap(ImVec2 world_pos);
+    void DrawToolbar();
+    void HandlePanAndZoom(ImVec2 origin, bool hovered, bool active);
+    void HandlePlacement(ImDrawList *draw_list, const ViewTransform &view, bool hovered);
 };
 
 } // namespace GUI

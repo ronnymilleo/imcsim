@@ -105,7 +105,3 @@ message(STATUS "C++ standard: ${CMAKE_CXX_STANDARD}")
 message(STATUS "Compiler:     ${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}")
 message(STATUS "=================================================")
 message(STATUS "")
-
-# =============================================================================
-# End of file
-# =============================================================================
