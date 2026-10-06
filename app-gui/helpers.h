@@ -1,6 +1,6 @@
 /**
  * @file    helpers.h
- * @brief   Geometry helpers for the schematic editor: rotations, grid snapping and world/screen conversion.
+ * @brief   Geometry helpers for the schematic editor: grid points, rotations, snapping and world/screen conversion.
  */
 
 #ifndef IMCSIM_HELPERS_H
@@ -10,6 +10,20 @@
 #include <cstdint>
 
 namespace GUI {
+
+inline constexpr float LineThickness = 2.0f;
+
+/**
+ * @struct  GridPoint
+ * @brief   A point on the schematic grid, in integer world units.
+ * @details Connections are found by comparing points exactly, which is reliable with integers but not with floats.
+ */
+struct GridPoint {
+    int X = 0;
+    int Y = 0;
+
+    bool operator==(const GridPoint &) const = default;
+};
 
 /**
  * @enum    Rotation
@@ -39,9 +53,12 @@ private:
     float m_Zoom;
 };
 
+GridPoint operator+(GridPoint first, GridPoint second);
+ImVec2 ToVec2(GridPoint point);
 Rotation NextRotation(Rotation rotation);
 ImVec2 Rotate(ImVec2 point, Rotation rotation);
-ImVec2 Snap(ImVec2 world_pos);
+GridPoint Rotate(GridPoint point, Rotation rotation);
+GridPoint Snap(ImVec2 world_pos);
 
 } // namespace GUI
 

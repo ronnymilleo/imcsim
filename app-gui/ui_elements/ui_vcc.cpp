@@ -30,12 +30,16 @@ namespace GUI {
  * @param[in] position  Grid position of the terminal, in world units.
  * @param[in] rotation  Orientation on the grid.
  */
-UIVCC::UIVCC(const ImVec2 position, const Rotation rotation)
+UIVCC::UIVCC(const GridPoint position, const Rotation rotation)
     : UIElement(std::make_unique<Core::VCC>(), position, rotation) {
 }
 
 void UIVCC::DrawTerminals(ImDrawList *draw_list, const ViewTransform &view, const ImU32 color) const {
     draw_list->AddLine(LocalToScreen(view, 0, 0), LocalToScreen(view, 0, -LeadLength), color, LineThickness);
+}
+
+std::vector<GridPoint> UIVCC::GetLocalTerminals() const {
+    return {{0, 0}};
 }
 
 // ImGui text cannot rotate, so the label stays upright and is pushed past the bar along the rotated lead direction

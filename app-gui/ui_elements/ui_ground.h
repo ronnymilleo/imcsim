@@ -17,11 +17,12 @@ namespace GUI {
  */
 class UIGround : public UIElement {
 public:
-    UIGround(ImVec2 position, Rotation rotation);
+    UIGround(GridPoint position, Rotation rotation);
     ~UIGround() override = default;
 
 protected:
     void DrawTerminals(ImDrawList *draw_list, const ViewTransform &view, ImU32 color) const override;
+    std::vector<GridPoint> GetLocalTerminals() const override;
     void DrawSymbol(ImDrawList *draw_list, const ViewTransform &view, ImU32 color, SymbolStyle style) const override;
 };
 

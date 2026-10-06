@@ -16,7 +16,7 @@ namespace GUI {
  */
 class UIResistor : public UIElement {
 public:
-    UIResistor(ImVec2 position, Rotation rotation);
+    UIResistor(GridPoint position, Rotation rotation);
     ~UIResistor() override = default;
 
 protected:

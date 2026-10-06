@@ -10,6 +10,7 @@
 #include "helpers.h"
 #include "imgui.h"
 #include <memory>
+#include <vector>
 
 namespace GUI {
 
@@ -28,29 +29,30 @@ enum class SymbolStyle {
  * @class   UIElement
  * @brief   A component placed on the schematic grid, with its position and rotation.
  * @details Owns its Core::Component. By default an element has two terminals at local x = -2 and x = +2 and
- *          derived classes only draw the symbol between them; single-terminal symbols override DrawTerminals().
+ *          derived classes only draw the symbol between them; single-terminal symbols override DrawTerminals()
+ *          and GetLocalTerminals().
  */
 class UIElement {
 public:
-    UIElement(std::unique_ptr<Core::Component> component, ImVec2 position, Rotation rotation);
+    UIElement(std::unique_ptr<Core::Component> component, GridPoint position, Rotation rotation);
     virtual ~UIElement() = default;
 
     void Draw(ImDrawList *draw_list, const ViewTransform &view, ImU32 color, SymbolStyle style) const;
 
     const Core::Component &GetComponent() const;
-    ImVec2 GetPosition() const;
+    GridPoint GetPosition() const;
     Rotation GetRotation() const;
+    std::vector<GridPoint> GetTerminals() const;
 
 protected:
-    static constexpr float LineThickness = 2.0f;
-
     virtual void DrawSymbol(ImDrawList *draw_list, const ViewTransform &view, ImU32 color, SymbolStyle style) const = 0;
     virtual void DrawTerminals(ImDrawList *draw_list, const ViewTransform &view, ImU32 color) const;
+    virtual std::vector<GridPoint> GetLocalTerminals() const;
     ImVec2 LocalToScreen(const ViewTransform &view, float x, float y) const;
 
 private:
     std::unique_ptr<Core::Component> m_Component;
-    ImVec2 m_Position;
+    GridPoint m_Position;
     Rotation m_Rotation;
 };
 

@@ -13,6 +13,7 @@ add_library(imcsim-gui-lib
             ui_elements/ui_inductor.cpp
             ui_elements/ui_resistor.cpp
             ui_elements/ui_vcc.cpp
+            ui_elements/ui_wire.cpp
             vulkan_context.cpp
 )
 

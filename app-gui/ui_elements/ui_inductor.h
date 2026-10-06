@@ -16,7 +16,7 @@ namespace GUI {
  */
 class UIInductor : public UIElement {
 public:
-    UIInductor(ImVec2 position, Rotation rotation);
+    UIInductor(GridPoint position, Rotation rotation);
     ~UIInductor() override = default;
 
 protected:

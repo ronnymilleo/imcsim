@@ -24,7 +24,7 @@ namespace GUI {
  * @param[in] position  Grid position in world units.
  * @param[in] rotation  Orientation on the grid.
  */
-UIResistor::UIResistor(const ImVec2 position, const Rotation rotation)
+UIResistor::UIResistor(const GridPoint position, const Rotation rotation)
     : UIElement(std::make_unique<Core::Resistor>(), position, rotation) {
 }
 

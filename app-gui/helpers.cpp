@@ -1,6 +1,6 @@
 /**
  * @file    helpers.cpp
- * @brief   Geometry helpers for the schematic editor: rotations, grid snapping and world/screen conversion.
+ * @brief   Geometry helpers for the schematic editor: grid points, rotations, snapping and world/screen conversion.
  */
 
 #include "helpers.h"
@@ -35,6 +35,25 @@ ImVec2 ViewTransform::ToScreen(const ImVec2 world_pos) const {
  */
 ImVec2 ViewTransform::ToWorld(const ImVec2 screen_pos) const {
     return (screen_pos - m_Origin - m_Pan) / m_Zoom;
+}
+
+/**
+ * @brief   Adds two grid points component-wise.
+ * @param[in] first   First point.
+ * @param[in] second  Second point.
+ * @return  The sum of both points.
+ */
+GridPoint operator+(const GridPoint first, const GridPoint second) {
+    return {first.X + second.X, first.Y + second.Y};
+}
+
+/**
+ * @brief   Converts a grid point to world coordinates for drawing.
+ * @param[in] point  Point on the grid.
+ * @return  The same position as floats.
+ */
+ImVec2 ToVec2(const GridPoint point) {
+    return {static_cast<float>(point.X), static_cast<float>(point.Y)};
 }
 
 /**
@@ -78,12 +97,32 @@ ImVec2 Rotate(const ImVec2 point, const Rotation rotation) {
 }
 
 /**
+ * @brief   Rotates a grid point around the origin.
+ * @param[in] point     Point in local grid units.
+ * @param[in] rotation  Orientation to apply.
+ * @return  The rotated point, still on the grid.
+ */
+GridPoint Rotate(const GridPoint point, const Rotation rotation) {
+    switch (rotation) {
+    case Rotation::R0:
+        return point;
+    case Rotation::R90:
+        return {-point.Y, point.X};
+    case Rotation::R180:
+        return {-point.X, -point.Y};
+    case Rotation::R270:
+        return {point.Y, -point.X};
+    }
+    return point;
+}
+
+/**
  * @brief   Rounds a world position to the nearest grid point.
  * @param[in] world_pos  Position in grid units.
  * @return  The closest grid point.
  */
-ImVec2 Snap(const ImVec2 world_pos) {
-    return {std::round(world_pos.x), std::round(world_pos.y)};
+GridPoint Snap(const ImVec2 world_pos) {
+    return {static_cast<int>(std::lround(world_pos.x)), static_cast<int>(std::lround(world_pos.y))};
 }
 
 } // namespace GUI

@@ -20,12 +20,14 @@ constexpr ImU32 BackgroundColor = IM_COL32(30, 30, 35, 255);
 constexpr ImU32 GridDotColor = IM_COL32(90, 90, 100, 255);
 constexpr ImU32 ElementColor = IM_COL32(220, 220, 220, 255);
 constexpr ImU32 PreviewColor = IM_COL32(100, 180, 255, 160);
+constexpr ImU32 WireColor = IM_COL32(120, 200, 120, 255);
 constexpr float MinCanvasSize = 50.0f;
 constexpr float MinZoom = 4.0f;
 constexpr float MaxZoom = 200.0f;
 constexpr float ZoomStep = 1.1f;
 // Below this spacing the dots are thinned out, otherwise far zoom-out draws hundreds of thousands of them
 constexpr float MinDotSpacing = 8.0f;
+constexpr float WireCursorHalfSize = 4.0f;
 
 /**
  * @struct  ToolbarItem
@@ -44,7 +46,7 @@ constexpr auto ToolbarComponents = std::to_array<ToolbarItem>({
     {"VCC", Core::ComponentType::VCC},
 });
 
-std::unique_ptr<GUI::UIElement> CreateElement(const Core::ComponentType type, const ImVec2 position,
+std::unique_ptr<GUI::UIElement> CreateElement(const Core::ComponentType type, const GUI::GridPoint position,
                                               const GUI::Rotation rotation) {
     switch (type) {
     case Core::ComponentType::Resistor:
@@ -85,7 +87,7 @@ void DrawGrid(ImDrawList *draw_list, const GUI::ViewTransform &view, const ImVec
 namespace GUI {
 
 /**
- * @brief   Draws the editor window and handles toolbar, pan, zoom and placement input. Call once per frame.
+ * @brief   Draws the editor window and handles toolbar, pan, zoom, placement and wiring input. Call once per frame.
  */
 void Editor::Draw() {
     ImGui::Begin("Schematic");
@@ -109,10 +111,18 @@ void Editor::Draw() {
     draw_list->AddRectFilled(origin, origin + size, BackgroundColor);
     DrawGrid(draw_list, view, origin, size, m_Zoom);
 
+    for (const UIWire &wire : m_Wires) {
+        wire.Draw(draw_list, view, WireColor);
+    }
     for (const auto &element : m_Elements) {
         element->Draw(draw_list, view, ElementColor, m_SymbolStyle);
     }
+
+    if (ImGui::IsWindowFocused() && ImGui::IsKeyPressed(ImGuiKey_W)) {
+        StartDrawingWires();
+    }
     HandlePlacement(draw_list, view, hovered);
+    HandleWireDrawing(draw_list, view, hovered);
 
     draw_list->PopClipRect();
     ImGui::End();
@@ -121,11 +131,14 @@ void Editor::Draw() {
 void Editor::DrawToolbar() {
     for (const auto &[label, type] : ToolbarComponents) {
         if (ImGui::Button(label)) {
-            m_PlacingType = type;
-            m_PlacingRotation = Rotation::R0;
+            StartPlacing(type);
         }
         ImGui::SameLine();
     }
+    if (ImGui::Button("Wire")) {
+        StartDrawingWires();
+    }
+    ImGui::SameLine();
     ImGui::TextUnformatted("|  Symbols:");
     ImGui::SameLine();
     if (ImGui::RadioButton("IEC", m_SymbolStyle == SymbolStyle::IEC)) {
@@ -135,6 +148,18 @@ void Editor::DrawToolbar() {
     if (ImGui::RadioButton("ANSI", m_SymbolStyle == SymbolStyle::ANSI)) {
         m_SymbolStyle = SymbolStyle::ANSI;
     }
+}
+
+void Editor::StartPlacing(const Core::ComponentType type) {
+    m_DrawingWires = false;
+    m_WireStart.reset();
+    m_PlacingType = type;
+    m_PlacingRotation = Rotation::R0;
+}
+
+void Editor::StartDrawingWires() {
+    m_PlacingType.reset();
+    m_DrawingWires = true;
 }
 
 void Editor::HandlePanAndZoom(const ImVec2 origin, const bool hovered, const bool active) {
@@ -178,12 +203,93 @@ void Editor::HandlePlacement(ImDrawList *draw_list, const ViewTransform &view, c
         return;
     }
 
-    const ImVec2 position = Snap(view.ToWorld(ImGui::GetIO().MousePos));
+    const GridPoint position = Snap(view.ToWorld(ImGui::GetIO().MousePos));
     auto preview = CreateElement(*m_PlacingType, position, m_PlacingRotation);
     preview->Draw(draw_list, view, PreviewColor, m_SymbolStyle);
     if (ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
         m_Elements.push_back(std::move(preview));
     }
+}
+
+/**
+ * @brief   Handles wire mode: the first click starts a wire, each following click adds an L-shaped bend up to the
+ *          cursor and continues from there. F flips the bend, and the wire ends on a terminal, on a second click
+ *          at the same point, or with Esc or right click. Esc or right click with no wire in progress leaves
+ *          the mode.
+ */
+void Editor::HandleWireDrawing(ImDrawList *draw_list, const ViewTransform &view, const bool hovered) {
+    if (!m_DrawingWires) {
+        return;
+    }
+
+    if (ImGui::IsWindowFocused()) {
+        if (ImGui::IsKeyPressed(ImGuiKey_F)) {
+            m_WireVerticalFirst = !m_WireVerticalFirst;
+        }
+        if (ImGui::IsKeyPressed(ImGuiKey_Escape)) {
+            StopWire();
+            return;
+        }
+    }
+    if (!hovered) {
+        return;
+    }
+    if (ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
+        StopWire();
+        return;
+    }
+
+    const GridPoint cursor = Snap(view.ToWorld(ImGui::GetIO().MousePos));
+    const bool clicked = ImGui::IsMouseClicked(ImGuiMouseButton_Left);
+    if (!m_WireStart) {
+        const ImVec2 cursor_on_screen = view.ToScreen(ToVec2(cursor));
+        const ImVec2 half_size = {WireCursorHalfSize, WireCursorHalfSize};
+        draw_list->AddRect(cursor_on_screen - half_size, cursor_on_screen + half_size, PreviewColor);
+        if (clicked) {
+            m_WireStart = cursor;
+        }
+        return;
+    }
+
+    const GridPoint start = *m_WireStart;
+    const GridPoint corner = m_WireVerticalFirst ? GridPoint{start.X, cursor.Y} : GridPoint{cursor.X, start.Y};
+    UIWire(start, corner).Draw(draw_list, view, PreviewColor);
+    UIWire(corner, cursor).Draw(draw_list, view, PreviewColor);
+    if (!clicked) {
+        return;
+    }
+    if (cursor == start) {
+        m_WireStart.reset();
+        return;
+    }
+    AddWire(start, corner);
+    AddWire(corner, cursor);
+    if (IsTerminal(cursor)) {
+        m_WireStart.reset();
+    } else {
+        m_WireStart = cursor;
+    }
+}
+
+// Esc and right click first drop the wire in progress, and only leave wire mode when there is none
+void Editor::StopWire() {
+    if (m_WireStart) {
+        m_WireStart.reset();
+    } else {
+        m_DrawingWires = false;
+    }
+}
+
+// Zero-length segments appear when the bend lands on an end point, as with straight wires
+void Editor::AddWire(const GridPoint start, const GridPoint end) {
+    if (start != end) {
+        m_Wires.emplace_back(start, end);
+    }
+}
+
+bool Editor::IsTerminal(const GridPoint point) const {
+    return std::ranges::any_of(
+        m_Elements, [point](const auto &element) { return std::ranges::contains(element->GetTerminals(), point); });
 }
 
 } // namespace GUI

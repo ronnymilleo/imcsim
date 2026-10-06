@@ -17,11 +17,12 @@ namespace GUI {
  */
 class UIVCC : public UIElement {
 public:
-    UIVCC(ImVec2 position, Rotation rotation);
+    UIVCC(GridPoint position, Rotation rotation);
     ~UIVCC() override = default;
 
 protected:
     void DrawTerminals(ImDrawList *draw_list, const ViewTransform &view, ImU32 color) const override;
+    std::vector<GridPoint> GetLocalTerminals() const override;
     void DrawSymbol(ImDrawList *draw_list, const ViewTransform &view, ImU32 color, SymbolStyle style) const override;
 };
 

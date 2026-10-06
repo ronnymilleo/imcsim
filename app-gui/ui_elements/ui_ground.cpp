@@ -23,12 +23,16 @@ namespace GUI {
  * @param[in] position  Grid position of the terminal, in world units.
  * @param[in] rotation  Orientation on the grid.
  */
-UIGround::UIGround(const ImVec2 position, const Rotation rotation)
+UIGround::UIGround(const GridPoint position, const Rotation rotation)
     : UIElement(std::make_unique<Core::Ground>(), position, rotation) {
 }
 
 void UIGround::DrawTerminals(ImDrawList *draw_list, const ViewTransform &view, const ImU32 color) const {
     draw_list->AddLine(LocalToScreen(view, 0, 0), LocalToScreen(view, 0, LeadLength), color, LineThickness);
+}
+
+std::vector<GridPoint> UIGround::GetLocalTerminals() const {
+    return {{0, 0}};
 }
 
 void UIGround::DrawSymbol(ImDrawList *draw_list, const ViewTransform &view, const ImU32 color,

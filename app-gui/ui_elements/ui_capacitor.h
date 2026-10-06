@@ -16,7 +16,7 @@ namespace GUI {
  */
 class UICapacitor : public UIElement {
 public:
-    UICapacitor(ImVec2 position, Rotation rotation);
+    UICapacitor(GridPoint position, Rotation rotation);
     ~UICapacitor() override = default;
 
 protected:

@@ -15,7 +15,7 @@ namespace GUI {
  * @param[in] position   Grid position in world units.
  * @param[in] rotation   Orientation on the grid.
  */
-UIElement::UIElement(std::unique_ptr<Core::Component> component, const ImVec2 position, const Rotation rotation)
+UIElement::UIElement(std::unique_ptr<Core::Component> component, const GridPoint position, const Rotation rotation)
     : m_Component(std::move(component)), m_Position(position), m_Rotation(rotation) {
 }
 
@@ -44,7 +44,7 @@ const Core::Component &UIElement::GetComponent() const {
  * @brief   Returns the grid position of the element.
  * @return  Position in world units.
  */
-ImVec2 UIElement::GetPosition() const {
+GridPoint UIElement::GetPosition() const {
     return m_Position;
 }
 
@@ -54,6 +54,18 @@ ImVec2 UIElement::GetPosition() const {
  */
 Rotation UIElement::GetRotation() const {
     return m_Rotation;
+}
+
+/**
+ * @brief   Returns the terminals of the element on the grid, after rotation and translation.
+ * @return  Connection points in world units, where wires can attach.
+ */
+std::vector<GridPoint> UIElement::GetTerminals() const {
+    std::vector<GridPoint> terminals = GetLocalTerminals();
+    for (GridPoint &terminal : terminals) {
+        terminal = m_Position + Rotate(terminal, m_Rotation);
+    }
+    return terminals;
 }
 
 /**
@@ -68,6 +80,14 @@ void UIElement::DrawTerminals(ImDrawList *draw_list, const ViewTransform &view, 
 }
 
 /**
+ * @brief   Returns the terminals of a two-terminal component, in local grid units before rotation.
+ * @return  The points at x = -2 and x = +2.
+ */
+std::vector<GridPoint> UIElement::GetLocalTerminals() const {
+    return {{-2, 0}, {2, 0}};
+}
+
+/**
  * @brief   Converts a point of the symbol, in local grid units, to screen pixels.
  * @param[in] view  Transform of the current frame.
  * @param[in] x     Local X before rotation.
@@ -75,7 +95,7 @@ void UIElement::DrawTerminals(ImDrawList *draw_list, const ViewTransform &view, 
  * @return  Position in screen pixels.
  */
 ImVec2 UIElement::LocalToScreen(const ViewTransform &view, const float x, const float y) const {
-    return view.ToScreen(m_Position + Rotate({x, y}, m_Rotation));
+    return view.ToScreen(ToVec2(m_Position) + Rotate(ImVec2{x, y}, m_Rotation));
 }
 
 } // namespace GUI

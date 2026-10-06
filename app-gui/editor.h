@@ -10,6 +10,7 @@
 #include "helpers.h"
 #include "imgui.h"
 #include "ui_elements/ui_element.h"
+#include "ui_elements/ui_wire.h"
 #include <memory>
 #include <optional>
 #include <vector>
@@ -18,9 +19,10 @@ namespace GUI {
 
 /**
  * @class   Editor
- * @brief   Schematic editor window where circuit components are placed on a grid.
+ * @brief   Schematic editor window where circuit components are placed and wired on a grid.
  * @details Positions are stored in world units (one unit per grid cell) and converted to screen pixels
- *          using the current pan offset and zoom factor.
+ *          using the current pan offset and zoom factor. The editor is either idle, placing a component
+ *          or drawing wires; starting one mode leaves the other.
  */
 class Editor {
 public:
@@ -31,15 +33,25 @@ public:
 
 private:
     std::vector<std::unique_ptr<UIElement>> m_Elements;
+    std::vector<UIWire> m_Wires;
     std::optional<Core::ComponentType> m_PlacingType;
     Rotation m_PlacingRotation = Rotation::R0;
+    bool m_DrawingWires = false;
+    std::optional<GridPoint> m_WireStart;
+    bool m_WireVerticalFirst = false;
     SymbolStyle m_SymbolStyle = SymbolStyle::IEC;
     ImVec2 m_Pan = {0, 0};
     float m_Zoom = 20.0f;
 
     void DrawToolbar();
+    void StartPlacing(Core::ComponentType type);
+    void StartDrawingWires();
     void HandlePanAndZoom(ImVec2 origin, bool hovered, bool active);
     void HandlePlacement(ImDrawList *draw_list, const ViewTransform &view, bool hovered);
+    void HandleWireDrawing(ImDrawList *draw_list, const ViewTransform &view, bool hovered);
+    void StopWire();
+    void AddWire(GridPoint start, GridPoint end);
+    bool IsTerminal(GridPoint point) const;
 };
 
 } // namespace GUI
