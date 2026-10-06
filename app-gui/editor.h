@@ -1,5 +1,5 @@
 /***********************************************************************************************************************
- * @file    application.h
+ * @file    editor.h
  * @brief
  * @details
  *
@@ -8,18 +8,17 @@
  * @date    10/6/26
  ***********************************************************************************************************************/
 
-#ifndef IMCSIM_APPLICATION_H
-#define IMCSIM_APPLICATION_H
+#ifndef IMCSIM_EDITOR_H
+#define IMCSIM_EDITOR_H
 
 /***********************************************************************************************************************
  Includes
 ***********************************************************************************************************************/
 
-#include "editor.h"
-#include "imgui_impl_vulkan.h"
-#include "vulkan_context.h"
-#include <SDL3/SDL_video.h>
-#include <string>
+#include "component.h"
+#include "imgui.h"
+#include <cmath>
+#include <optional>
 #include <vector>
 
 /***********************************************************************************************************************
@@ -27,36 +26,34 @@
 ***********************************************************************************************************************/
 
 namespace GUI {
-class Application {
+/**
+ * @class   Editor
+ * @brief
+ * @details
+ *
+ * @note
+ */
+class Editor {
 public:
-    Application() = default;
-
-    ~Application() = default;
-
-    int Init();
-    int Run();
-    void Shutdown();
+    Editor() = default;
+    ~Editor() = default;
+    void EnableGrid() const;
+    void Draw();
 
 private:
-    float m_SDLWindowScale{};
-    SDL_WindowFlags m_SDLWindowFlags{};
-    SDL_Window *m_SDLWindow = nullptr;
-    VulkanContext m_Vulkan;
-    ImGui_ImplVulkan_InitInfo m_VulkanInitInfo{};
-    std::vector<std::string> m_Errors;
-    Editor m_Editor{};
+    std::vector<Core::Component> m_ComponentsVector;
+    std::optional<Core::ComponentType> m_IsPlacing;
+    int m_PlacingRotation = 0;
+    ImVec2 m_Pan = {0, 0};
+    float m_Zoom = 20.0f;
 
-    void AddError(const std::string &message);
-    void DumpErrors();
-
-    int InitSDL();
-    int InitVulkan();
-    int InitIMGUI();
+    ImVec2 ToScreen(ImVec2 origin, ImVec2 w) const;
+    ImVec2 ToWorld(ImVec2 origin, ImVec2 s) const;
+    ImVec2 Snap(ImVec2 w);
 };
 } // namespace GUI
 
-#endif // IMCSIM_APPLICATION_H
-
+#endif // IMCSIM_EDITOR_H
 /***********************************************************************************************************************
  End of file
 ***********************************************************************************************************************/

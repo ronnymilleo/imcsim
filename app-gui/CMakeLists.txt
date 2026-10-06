@@ -4,19 +4,21 @@
 
 add_library(imcsim-gui-lib
         STATIC
-        application.cpp
-        vulkan_context.cpp
+            application.cpp
+            vulkan_context.cpp
+            editor.cpp
+            ui_element.cpp
 )
 
 target_include_directories(imcsim-gui-lib
         PUBLIC
-        ${CMAKE_CURRENT_SOURCE_DIR}
+            ${CMAKE_CURRENT_SOURCE_DIR}
 )
 
 target_link_libraries(imcsim-gui-lib
         PUBLIC
-        imcsim-core-lib
-        imgui
+            imcsim-core-lib
+            imgui
 )
 
 # =============================================================================

@@ -7,7 +7,7 @@
 
 // Main code
 int main(int, char **) {
-    Application app;
+    GUI::Application app;
     int result = app.Init();
     if (result == Core::ExitSuccess) {
         result = app.Run();

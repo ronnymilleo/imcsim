@@ -1,12 +1,12 @@
 /***********************************************************************************************************************
-* @file    vulkan_context.h
+ * @file    vulkan_context.h
  * @brief
  * @details
  *
  * @project imcsim
  * @author  ronnymilleo
  * @date    10/6/26
-***********************************************************************************************************************/
+ ***********************************************************************************************************************/
 
 #ifndef IMCSIM_VULKAN_SETUP_H
 #define IMCSIM_VULKAN_SETUP_H
@@ -27,7 +27,7 @@ void check_vk_result(VkResult err);
 ***********************************************************************************************************************/
 
 class VulkanContext {
-  public:
+public:
     // Instance, physical/logical device, queue and descriptor pool.
     bool Init();
     // Surface, swap chain, render pass and framebuffers for the given window.
@@ -48,7 +48,7 @@ class VulkanContext {
     // Reason for the last Init()/InitWindow() failure.
     const std::string &LastError() const { return m_LastError; }
 
-  private:
+private:
     VkAllocationCallbacks *m_Allocator = nullptr;
     VkInstance m_Instance = VK_NULL_HANDLE;
     VkPhysicalDevice m_PhysicalDevice = VK_NULL_HANDLE;

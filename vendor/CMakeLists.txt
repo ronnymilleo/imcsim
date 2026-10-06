@@ -32,6 +32,8 @@ target_link_libraries(imgui
             Vulkan::Vulkan
 )
 
+target_compile_definitions(imgui PUBLIC IMGUI_DEFINE_MATH_OPERATORS)
+
 # =============================================================================
 # End of file
 # =============================================================================

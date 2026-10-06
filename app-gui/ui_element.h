@@ -1,5 +1,5 @@
 /***********************************************************************************************************************
- * @file    application.h
+ * @file    Component.h
  * @brief
  * @details
  *
@@ -8,55 +8,45 @@
  * @date    10/6/26
  ***********************************************************************************************************************/
 
-#ifndef IMCSIM_APPLICATION_H
-#define IMCSIM_APPLICATION_H
+#ifndef IMCSIM_COMPONENT_H
+#define IMCSIM_COMPONENT_H
 
 /***********************************************************************************************************************
  Includes
 ***********************************************************************************************************************/
 
-#include "editor.h"
-#include "imgui_impl_vulkan.h"
-#include "vulkan_context.h"
-#include <SDL3/SDL_video.h>
-#include <string>
-#include <vector>
+#include "component.h"
+#include "imgui.h"
 
 /***********************************************************************************************************************
  Class
 ***********************************************************************************************************************/
 
+namespace Core {
+enum class ComponentType;
+}
+
 namespace GUI {
-class Application {
+/**
+ * @class   UIElement
+ * @brief
+ * @details
+ *
+ * @note
+ */
+class UIElement {
 public:
-    Application() = default;
-
-    ~Application() = default;
-
-    int Init();
-    int Run();
-    void Shutdown();
+    UIElement() = default;
+    ~UIElement() = default;
 
 private:
-    float m_SDLWindowScale{};
-    SDL_WindowFlags m_SDLWindowFlags{};
-    SDL_Window *m_SDLWindow = nullptr;
-    VulkanContext m_Vulkan;
-    ImGui_ImplVulkan_InitInfo m_VulkanInitInfo{};
-    std::vector<std::string> m_Errors;
-    Editor m_Editor{};
-
-    void AddError(const std::string &message);
-    void DumpErrors();
-
-    int InitSDL();
-    int InitVulkan();
-    int InitIMGUI();
+    Core::ComponentType m_ComponentType{};
+    ImVec2 m_position;
+    int m_rotationDegrees{};
 };
 } // namespace GUI
 
-#endif // IMCSIM_APPLICATION_H
-
+#endif // IMCSIM_COMPONENT_H
 /***********************************************************************************************************************
  End of file
 ***********************************************************************************************************************/

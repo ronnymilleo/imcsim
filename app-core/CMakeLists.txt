@@ -4,17 +4,18 @@
 
 add_library(imcsim-core-lib
         STATIC
-        lib_core.cpp
+        component.cpp
+        component.h
 )
 
 target_include_directories(imcsim-core-lib
         PUBLIC
-        ${CMAKE_CURRENT_SOURCE_DIR}
+            ${CMAKE_CURRENT_SOURCE_DIR}
 )
 
 target_link_libraries(imcsim-core-lib
         PUBLIC
-        #
+            #
 )
 
 # =============================================================================

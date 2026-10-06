@@ -1,12 +1,12 @@
 /***********************************************************************************************************************
-* @file    application.cpp
+ * @file    application.cpp
  * @brief
  * @details
  *
  * @project imcsim
  * @author  ronnymilleo
  * @date    10/6/26
-***********************************************************************************************************************/
+ ***********************************************************************************************************************/
 
 /***********************************************************************************************************************
  Includes
@@ -18,6 +18,8 @@
 #include "imgui_impl_sdl3.h"
 #include <SDL3/SDL.h>
 #include <cstdio>
+
+using namespace GUI;
 
 /***********************************************************************************************************************
  Method Definitions
@@ -33,7 +35,9 @@ int Application::Init() {
     return Core::ExitSuccess;
 }
 
-void Application::AddError(const std::string &message) { m_Errors.push_back(message); }
+void Application::AddError(const std::string &message) {
+    m_Errors.push_back(message);
+}
 
 void Application::DumpErrors() {
     for (const std::string &error : m_Errors)
@@ -142,6 +146,8 @@ int Application::Run() {
         ImGui_ImplVulkan_NewFrame();
         ImGui_ImplSDL3_NewFrame();
         ImGui::NewFrame();
+
+        m_Editor.Draw();
 
         // 1. Show the big demo window (Most of the sample code is in
         // ImGui::ShowDemoWindow()! You can browse its code to learn more about
