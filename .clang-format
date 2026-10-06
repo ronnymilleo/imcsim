@@ -8,3 +8,4 @@ AllowShortBlocksOnASingleLine: Never
 AllowShortEnumsOnASingleLine: false
 AllowShortLoopsOnASingleLine: false
 AllowShortIfStatementsOnASingleLine: Never
+InsertBraces: true

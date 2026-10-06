@@ -1,19 +1,10 @@
-/***********************************************************************************************************************
+/**
  * @file    application.h
- * @brief
- * @details
- *
- * @project imcsim
- * @author  ronnymilleo
- * @date    10/6/26
- ***********************************************************************************************************************/
+ * @brief   Top-level application: owns the window, the Vulkan context, Dear ImGui and the main loop.
+ */
 
 #ifndef IMCSIM_APPLICATION_H
 #define IMCSIM_APPLICATION_H
-
-/***********************************************************************************************************************
- Includes
-***********************************************************************************************************************/
 
 #include "editor.h"
 #include "imgui_impl_vulkan.h"
@@ -22,15 +13,17 @@
 #include <string>
 #include <vector>
 
-/***********************************************************************************************************************
- Class
-***********************************************************************************************************************/
-
 namespace GUI {
+
+/**
+ * @class   Application
+ * @brief   Owns the SDL window, the Vulkan context and Dear ImGui, and runs the main loop.
+ * @details Call Init() once, then Run() if it succeeded, and always finish with Shutdown().
+ *          Errors collected during the session are printed to stderr by Shutdown().
+ */
 class Application {
 public:
     Application() = default;
-
     ~Application() = default;
 
     int Init();
@@ -51,12 +44,9 @@ private:
 
     int InitSDL();
     int InitVulkan();
-    int InitIMGUI();
+    int InitImGui();
 };
+
 } // namespace GUI
 
 #endif // IMCSIM_APPLICATION_H
-
-/***********************************************************************************************************************
- End of file
-***********************************************************************************************************************/

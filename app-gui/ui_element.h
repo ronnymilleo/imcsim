@@ -1,38 +1,19 @@
-/***********************************************************************************************************************
- * @file    Component.h
- * @brief
- * @details
- *
- * @project imcsim
- * @author  ronnymilleo
- * @date    10/6/26
- ***********************************************************************************************************************/
+/**
+ * @file    ui_element.h
+ * @brief   Visual representation of a circuit component inside the schematic editor.
+ */
 
-#ifndef IMCSIM_COMPONENT_H
-#define IMCSIM_COMPONENT_H
-
-/***********************************************************************************************************************
- Includes
-***********************************************************************************************************************/
+#ifndef IMCSIM_UI_ELEMENT_H
+#define IMCSIM_UI_ELEMENT_H
 
 #include "component.h"
 #include "imgui.h"
 
-/***********************************************************************************************************************
- Class
-***********************************************************************************************************************/
-
-namespace Core {
-enum class ComponentType;
-}
-
 namespace GUI {
+
 /**
  * @class   UIElement
- * @brief
- * @details
- *
- * @note
+ * @brief   Placement data (type, grid position and rotation) of a component drawn in the editor.
  */
 class UIElement {
 public:
@@ -41,12 +22,10 @@ public:
 
 private:
     Core::ComponentType m_ComponentType{};
-    ImVec2 m_position;
-    int m_rotationDegrees{};
+    ImVec2 m_Position;
+    int m_RotationDegrees{};
 };
+
 } // namespace GUI
 
-#endif // IMCSIM_COMPONENT_H
-/***********************************************************************************************************************
- End of file
-***********************************************************************************************************************/
+#endif // IMCSIM_UI_ELEMENT_H

@@ -4,8 +4,9 @@
 
 add_library(imcsim-core-lib
         STATIC
-        component.cpp
-        component.h
+            component.cpp
+            component.h
+            error_codes.h
 )
 
 target_include_directories(imcsim-core-lib

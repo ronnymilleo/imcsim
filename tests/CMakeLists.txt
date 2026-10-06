@@ -4,17 +4,17 @@
 
 add_library(imcsim-tests
         STATIC
-        #
+            #
 )
 
 target_include_directories(imcsim-tests
         PUBLIC
-        ${CMAKE_CURRENT_SOURCE_DIR}
+            ${CMAKE_CURRENT_SOURCE_DIR}
 )
 
 target_link_libraries(imcsim-tests
         PUBLIC
-        #
+            #
 )
 
 # =============================================================================
