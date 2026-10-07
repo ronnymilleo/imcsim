@@ -5,8 +5,10 @@
 
 #include "editor_window.h"
 
+#include "current_flow.h"
 #include "element_factory.h"
 #include "node_colors.h"
+#include "probing.h"
 #include "schematic_file.h"
 #include "spice_value.h"
 #include "theme.h"
@@ -15,6 +17,7 @@
 #include <array>
 #include <cmath>
 #include <format>
+#include <set>
 #include <string>
 #include <utility>
 
@@ -45,6 +48,17 @@ constexpr ImU32 NodeLabelColor = IM_COL32(255, 255, 255, 255);
 constexpr ImU32 VoltageLabelColor = IM_COL32(255, 220, 120, 255);
 // Voltage labels sit just above and right of their point, clear of the line
 constexpr ImVec2 VoltageLabelOffset = {4.0f, -16.0f};
+// Measurement markers sit below and right of their point, clear of the voltage labels
+constexpr ImVec2 MeasurementLabelOffset = {6.0f, 2.0f};
+constexpr float MeasurementMarkerRadius = 4.0f;
+constexpr ImU32 ProbeHighlightColor = IM_COL32(236, 96, 100, 255);
+// Currents span decades, so the heat scale is logarithmic and shows this many below the largest current
+constexpr double CurrentDecades = 4.0;
+// Heat legend, in font sizes, at the bottom left of the canvas
+constexpr float LegendWidth = 10.0f;
+constexpr float LegendHeight = 0.6f;
+constexpr float ColoringComboWidth = 6.0f;
+constexpr auto WireColoringNames = std::to_array<const char *>({"Plain", "Nodes", "Voltage", "Current"});
 /**
  * @struct  ToolbarItem
  * @brief   A toolbar button that starts placing a component type.
@@ -132,6 +146,52 @@ private:
     bool m_First = true;
 };
 
+// Operating point value of a measurement, or no value before a simulation or for a current it lacks
+std::optional<double> FindOperatingPointValue(const MeasurementTarget &target,
+                                              const Core::OperatingPoint &operating_point) {
+    if (target.Node) {
+        const auto node = static_cast<std::size_t>(*target.Node);
+        return node < operating_point.NodeVoltages.size() ? std::optional(operating_point.NodeVoltages[node])
+                                                          : std::nullopt;
+    }
+    const auto current = std::ranges::find(operating_point.Currents, target.Current, &Core::ComponentCurrent::Name);
+    return current != operating_point.Currents.end() ? std::optional(current->Current) : std::nullopt;
+}
+
+// "V(3) = 4.5V" once there is an operating point, or just "V(3)"
+std::string DescribeMeasurement(const MeasurementTarget &target,
+                                const std::optional<Core::OperatingPoint> &operating_point) {
+    const std::optional<double> value =
+        operating_point ? FindOperatingPointValue(target, *operating_point) : std::nullopt;
+    if (!value) {
+        return GetMeasurementLabel(target);
+    }
+    return std::format("{} = {}{}", GetMeasurementLabel(target), Core::FormatValue(*value), target.Node ? "V" : "A");
+}
+
+// Heat level of a current: 1 for the largest in the circuit, 0 for those CurrentDecades below it or less
+float CurrentLevel(const double current, const double largest_current) {
+    if (current == 0.0 || largest_current <= 0.0) {
+        return 0.0f;
+    }
+    return static_cast<float>((std::log10(std::abs(current)) - std::log10(largest_current) + CurrentDecades) /
+                              CurrentDecades);
+}
+
+double LargestCurrent(const Core::OperatingPoint &operating_point) {
+    double largest = 0.0;
+    for (const Core::ComponentCurrent &current : operating_point.Currents) {
+        largest = std::max(largest, std::abs(current.Current));
+    }
+    return largest;
+}
+
+// Heat level of a node voltage, between the lowest and the highest node of the circuit, ground included
+float VoltageLevel(const double voltage, const std::vector<double> &voltages) {
+    const auto [lowest, highest] = std::ranges::minmax(voltages);
+    return highest > lowest ? static_cast<float>((voltage - lowest) / (highest - lowest)) : 0.5f;
+}
+
 } // namespace
 
 /**
@@ -189,16 +249,22 @@ void EditorWindow::Draw() {
     DrawWires(draw_list, view);
     const auto &elements = m_Schematic.GetElements();
     for (std::size_t index = 0; index < elements.size(); ++index) {
-        const ImU32 color = index == m_Schematic.GetSelectedElementIndex() ? SelectedColor : ElementColor;
-        elements[index]->Draw(draw_list, view, color, m_SymbolStyle);
+        elements[index]->Draw(draw_list, view, GetElementColor(index), m_SymbolStyle);
     }
     DrawNodeVoltages(draw_list, view);
+    DrawMeasurements(draw_list, view);
 
     if (ImGui::IsWindowFocused() && ImGui::IsKeyPressed(ImGuiKey_W)) {
         StartDrawingWires();
     }
+    if (ImGui::IsWindowFocused() && ImGui::IsKeyPressed(ImGuiKey_P)) {
+        StartProbing();
+    }
     HandlePlacement(draw_list, view, hovered);
     HandleWireDrawing(draw_list, view, hovered);
+    HandleProbing(draw_list, view, hovered);
+    DrawHoveredValue(view, hovered);
+    DrawColorLegend(draw_list, origin, size);
 
     draw_list->PopClipRect();
     DrawFilePopups();
@@ -254,10 +320,37 @@ void EditorWindow::DrawToolbar() {
         StartDrawingWires();
     }
 
+    // Measuring; the button stands out while its tool is active, to remind that clicks pick measurements
+    row.Place(ToolbarRow::ButtonWidth("Probe"), gap);
+    if (m_Probing ? PrimaryButton("Probe") : ImGui::Button("Probe")) {
+        if (m_Probing) {
+            m_Probing = false;
+        } else {
+            StartProbing();
+        }
+    }
+
     // View
-    row.Place(ToolbarRow::CheckWidth("Nodes"), gap);
-    ImGui::Checkbox("Nodes", &m_ShowNodes);
-    row.Place(ToolbarRow::TextWidth("Symbols:"), gap);
+    // A label reserves the width of its whole group, so it never ends a line apart from its controls
+    const float spacing = ImGui::GetStyle().ItemSpacing.x;
+    const float combo_width = ImGui::GetFontSize() * ColoringComboWidth;
+    row.Place(ToolbarRow::TextWidth("Colors:") + spacing + combo_width, gap);
+    ImGui::AlignTextToFramePadding();
+    ImGui::TextUnformatted("Colors:");
+    row.Place(combo_width);
+    ImGui::SetNextItemWidth(combo_width);
+    const auto coloring_index = static_cast<std::size_t>(m_WireColoring);
+    if (ImGui::BeginCombo("##colors", WireColoringNames[coloring_index])) {
+        for (std::size_t index = 0; index < WireColoringNames.size(); ++index) {
+            if (ImGui::Selectable(WireColoringNames[index], index == coloring_index)) {
+                m_WireColoring = static_cast<WireColoring>(index);
+            }
+        }
+        ImGui::EndCombo();
+    }
+    row.Place(ToolbarRow::TextWidth("Symbols:") + spacing + ToolbarRow::CheckWidth("IEC") + spacing +
+                  ToolbarRow::CheckWidth("ANSI"),
+              gap);
     ImGui::AlignTextToFramePadding();
     ImGui::TextUnformatted("Symbols:");
     row.Place(ToolbarRow::CheckWidth("IEC"));
@@ -278,28 +371,46 @@ void EditorWindow::DrawToolbar() {
     ImGui::TextDisabled("%s", title.c_str());
 }
 
+// Voltage and Current need an operating point; without one, wires stay plain and the legend asks for it
 void EditorWindow::DrawWires(ImDrawList *draw_list, const ViewTransform &view) {
     const Connectivity &connectivity = m_Schematic.GetConnectivity();
+    const auto &operating_point = m_Schematic.GetOperatingPoint();
     const auto &wires = m_Schematic.GetWires();
+    const bool by_nodes = m_WireColoring == WireColoring::Nodes;
+    const bool by_voltage = m_WireColoring == WireColoring::Voltage && operating_point;
+    if (m_WireColoring == WireColoring::Current && operating_point) {
+        DrawWireCurrents(draw_list, view, *operating_point);
+    }
+    const auto node_color = [&](const int node) {
+        if (by_nodes) {
+            return GetNodeColor(node);
+        }
+        if (by_voltage && static_cast<std::size_t>(node) < operating_point->NodeVoltages.size()) {
+            const std::vector<double> &voltages = operating_point->NodeVoltages;
+            return GetHeatColor(VoltageLevel(voltages[static_cast<std::size_t>(node)], voltages));
+        }
+        return WireColor;
+    };
+
+    const bool drawn_by_current = m_WireColoring == WireColoring::Current && operating_point;
     for (std::size_t index = 0; index < wires.size(); ++index) {
         const UIWire &wire = wires[index];
+        const bool selected = index == m_Schematic.GetSelectedWireIndex();
+        if (drawn_by_current && !selected) {
+            continue;
+        }
         // Every wire end is a connection point, so it always has a node
         const int node = connectivity.GetNode(wire.GetStart()).value_or(0);
-        ImU32 color = m_ShowNodes ? GetNodeColor(node) : WireColor;
-        if (index == m_Schematic.GetSelectedWireIndex()) {
-            color = SelectedColor;
-        }
-        wire.Draw(draw_list, view, color);
+        wire.Draw(draw_list, view, selected ? SelectedColor : node_color(node));
     }
 
     const float junction_radius = std::max(m_Zoom * JunctionRadiusScale, MinJunctionRadius);
     for (const GridPoint junction : connectivity.GetJunctions()) {
         const int node = connectivity.GetNode(junction).value_or(0);
-        draw_list->AddCircleFilled(view.ToScreen(ToVec2(junction)), junction_radius,
-                                   m_ShowNodes ? GetNodeColor(node) : WireColor);
+        draw_list->AddCircleFilled(view.ToScreen(ToVec2(junction)), junction_radius, node_color(node));
     }
 
-    if (!m_ShowNodes) {
+    if (!by_nodes) {
         return;
     }
     for (const UIWire &wire : wires) {
@@ -307,6 +418,76 @@ void EditorWindow::DrawWires(ImDrawList *draw_list, const ViewTransform &view) {
         const ImVec2 middle = view.ToScreen((ToVec2(wire.GetStart()) + ToVec2(wire.GetEnd())) / 2.0f);
         draw_list->AddText(middle, NodeLabelColor, std::format("{}", node).c_str());
     }
+}
+
+// Each piece of wire takes the heat color of its own current, so the path of the current shows along the wires
+void EditorWindow::DrawWireCurrents(ImDrawList *draw_list, const ViewTransform &view,
+                                    const Core::OperatingPoint &operating_point) {
+    const double largest = LargestCurrent(operating_point);
+    for (const WireCurrent &piece :
+         ComputeWireCurrents(m_Schematic.GetElements(), m_Schematic.GetWires(), operating_point.Currents)) {
+        UIWire(piece.Start, piece.End).Draw(draw_list, view, GetHeatColor(CurrentLevel(piece.Current, largest)));
+    }
+}
+
+// Selection wins; coloring by current heats each part by the largest current through its terminals
+ImU32 EditorWindow::GetElementColor(const std::size_t index) const {
+    if (index == m_Schematic.GetSelectedElementIndex()) {
+        return SelectedColor;
+    }
+    const auto &operating_point = m_Schematic.GetOperatingPoint();
+    if (m_WireColoring != WireColoring::Current || !operating_point) {
+        return ElementColor;
+    }
+    const UIElement &element = *m_Schematic.GetElements()[index];
+    const Core::Component &component = element.GetComponent();
+    if (component.GetType() == Core::ComponentType::Ground) {
+        return ElementColor;
+    }
+    double current = 0.0;
+    for (std::size_t terminal = 0; terminal < element.GetTerminals().size(); ++terminal) {
+        current = std::max(current,
+                           std::abs(GetTerminalCurrent(component, terminal, operating_point->Currents).value_or(0.0)));
+    }
+    return GetHeatColor(CurrentLevel(current, LargestCurrent(*operating_point)));
+}
+
+// A gradient with the values at its ends, or a reminder to run an operating point
+void EditorWindow::DrawColorLegend(ImDrawList *draw_list, const ImVec2 origin, const ImVec2 size) const {
+    if (m_WireColoring != WireColoring::Voltage && m_WireColoring != WireColoring::Current) {
+        return;
+    }
+    const float font_size = ImGui::GetFontSize();
+    const ImVec2 corner = {origin.x + font_size, origin.y + size.y - font_size * 2.0f};
+    const auto &operating_point = m_Schematic.GetOperatingPoint();
+    if (!operating_point) {
+        draw_list->AddText(corner, NodeLabelColor, "Run an operating point (.op) to color by voltage or current");
+        return;
+    }
+
+    std::string low_label;
+    std::string high_label;
+    if (m_WireColoring == WireColoring::Voltage) {
+        const auto [lowest, highest] = std::ranges::minmax(operating_point->NodeVoltages);
+        low_label = std::format("{}V", Core::FormatValue(lowest));
+        high_label = std::format("{}V", Core::FormatValue(highest));
+    } else {
+        const double largest = LargestCurrent(*operating_point);
+        low_label = std::format("<{}A", Core::FormatValue(largest * std::pow(10.0, -CurrentDecades)));
+        high_label = std::format("{}A", Core::FormatValue(largest));
+    }
+    const ImVec2 bar_size = {font_size * LegendWidth, font_size * LegendHeight};
+    constexpr int Steps = 32;
+    for (int step = 0; step < Steps; ++step) {
+        const float left = corner.x + bar_size.x * static_cast<float>(step) / Steps;
+        const float right = corner.x + bar_size.x * static_cast<float>(step + 1) / Steps;
+        draw_list->AddRectFilled({left, corner.y}, {right, corner.y + bar_size.y},
+                                 GetHeatColor((static_cast<float>(step) + 0.5f) / Steps));
+    }
+    const float text_y = corner.y + bar_size.y + 2.0f;
+    draw_list->AddText({corner.x, text_y}, NodeLabelColor, low_label.c_str());
+    const float high_width = ImGui::CalcTextSize(high_label.c_str()).x;
+    draw_list->AddText({corner.x + bar_size.x - high_width, text_y}, NodeLabelColor, high_label.c_str());
 }
 
 // One label per node, on its first wire or, for terminals joined without wires, on a terminal. Ground is
@@ -343,6 +524,53 @@ void EditorWindow::DrawNodeVoltages(ImDrawList *draw_list, const ViewTransform &
     }
 }
 
+// A dot on the first wire of each measured node and a ring on each measured part (on the terminal, for a
+// transistor), in the colors of their plots
+void EditorWindow::DrawMeasurements(ImDrawList *draw_list, const ViewTransform &view) {
+    const Connectivity &connectivity = m_Schematic.GetConnectivity();
+    std::set<int> marked_nodes;
+    for (const UIWire &wire : m_Schematic.GetWires()) {
+        const int node = connectivity.GetNode(wire.GetStart()).value_or(0);
+        if (node == 0 || !m_Schematic.IsVoltageMeasured(node) || !marked_nodes.insert(node).second) {
+            continue;
+        }
+        const ImVec2 point = view.ToScreen((ToVec2(wire.GetStart()) + ToVec2(wire.GetEnd())) / 2.0f);
+        draw_list->AddCircleFilled(point, MeasurementMarkerRadius, GetNodeColor(node));
+        draw_list->AddText(point + MeasurementLabelOffset, GetNodeColor(node), std::format("V({})", node).c_str());
+    }
+
+    // Currents keep the colors of their plots, which follow their order in the circuit
+    std::size_t current_index = 0;
+    for (const auto &element : m_Schematic.GetElements()) {
+        const std::vector<std::string> currents = Core::GetCurrentNames(element->GetComponent());
+        const std::vector<GridPoint> terminals = element->GetTerminals();
+        for (std::size_t index = 0; index < currents.size(); ++index, ++current_index) {
+            if (!m_Schematic.IsCurrentMeasured(currents[index])) {
+                continue;
+            }
+            const GridPoint anchor = currents.size() == 1 ? element->GetPosition() : terminals[index];
+            const ImVec2 point = view.ToScreen(ToVec2(anchor));
+            const ImU32 color = GetCurrentColor(current_index);
+            draw_list->AddCircle(point, MeasurementMarkerRadius, color, 0, LineThickness);
+            draw_list->AddText(point + MeasurementLabelOffset, color, std::format("I({})", currents[index]).c_str());
+        }
+    }
+}
+
+// In selection mode, hovering a wire or a part shows its operating point value, once there is one
+void EditorWindow::DrawHoveredValue(const ViewTransform &view, const bool hovered) {
+    const auto &operating_point = m_Schematic.GetOperatingPoint();
+    if (!hovered || !operating_point || m_PlacingType || m_DrawingWires || m_Probing || m_Drag) {
+        return;
+    }
+    const std::optional<MeasurementTarget> target =
+        FindMeasurementTarget(m_Schematic.GetElements(), m_Schematic.GetWires(), m_Schematic.GetConnectivity(),
+                              view.ToWorld(ImGui::GetIO().MousePos), WirePickDistance / m_Zoom);
+    if (target && FindOperatingPointValue(*target, *operating_point)) {
+        ImGui::SetTooltip("%s", DescribeMeasurement(*target, operating_point).c_str());
+    }
+}
+
 void EditorWindow::HandlePanAndZoom(const ImVec2 origin, const bool hovered, const bool active) {
     const ImGuiIO &io = ImGui::GetIO();
     if (active && ImGui::IsMouseDragging(ImGuiMouseButton_Middle)) {
@@ -359,6 +587,7 @@ void EditorWindow::HandlePanAndZoom(const ImVec2 origin, const bool hovered, con
 
 void EditorWindow::StartPlacing(const Core::ComponentType type) {
     ClearSelection();
+    m_Probing = false;
     m_DrawingWires = false;
     m_WireStart.reset();
     m_PlacingType = type;
@@ -368,7 +597,16 @@ void EditorWindow::StartPlacing(const Core::ComponentType type) {
 void EditorWindow::StartDrawingWires() {
     ClearSelection();
     m_PlacingType.reset();
+    m_Probing = false;
     m_DrawingWires = true;
+}
+
+void EditorWindow::StartProbing() {
+    ClearSelection();
+    m_PlacingType.reset();
+    m_DrawingWires = false;
+    m_WireStart.reset();
+    m_Probing = true;
 }
 
 /**
@@ -476,12 +714,58 @@ void EditorWindow::StopWire() {
 }
 
 /**
- * @brief   Handles selection mode, active while not placing or wiring: click selects an element or a wire,
+ * @brief   Handles probe mode: the item under the cursor is outlined with what it measures, a node voltage on a
+ *          wire or a current on a part, and a left click adds it to the plots or removes it. Esc or right click
+ *          leaves the mode.
+ */
+void EditorWindow::HandleProbing(ImDrawList *draw_list, const ViewTransform &view, const bool hovered) {
+    if (!m_Probing) {
+        return;
+    }
+    if (ImGui::IsWindowFocused() && ImGui::IsKeyPressed(ImGuiKey_Escape)) {
+        m_Probing = false;
+        return;
+    }
+    if (!hovered) {
+        return;
+    }
+    if (ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
+        m_Probing = false;
+        return;
+    }
+
+    const ImVec2 cursor = ImGui::GetIO().MousePos;
+    const std::optional<MeasurementTarget> target =
+        FindMeasurementTarget(m_Schematic.GetElements(), m_Schematic.GetWires(), m_Schematic.GetConnectivity(),
+                              view.ToWorld(cursor), WirePickDistance / m_Zoom);
+    if (!target) {
+        ImGui::SetTooltip("Click a wire for its voltage, or a part for its current");
+        return;
+    }
+    const bool measured =
+        target->Node ? m_Schematic.IsVoltageMeasured(*target->Node) : m_Schematic.IsCurrentMeasured(target->Current);
+    draw_list->AddCircle(cursor, MeasurementMarkerRadius * 2.0f, ProbeHighlightColor, 0, LineThickness);
+    ImGui::SetTooltip("%s", std::format("{}\nClick to {} the plots",
+                                        DescribeMeasurement(*target, m_Schematic.GetOperatingPoint()),
+                                        measured ? "remove it from" : "add it to")
+                                .c_str());
+    if (!ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+        return;
+    }
+    if (target->Node) {
+        m_Schematic.SetVoltageMeasured(*target->Node, !measured);
+    } else {
+        m_Schematic.SetCurrentMeasured(target->Current, !measured);
+    }
+}
+
+/**
+ * @brief   Handles selection mode, active while not placing, wiring or probing: click selects an element or a wire,
  *          dragging an element moves it with its wires following, R rotates the selected element, Delete removes
  *          the selection and Esc clears it.
  */
 void EditorWindow::HandleSelection(const ViewTransform &view, const bool hovered) {
-    if (m_PlacingType || m_DrawingWires) {
+    if (m_PlacingType || m_DrawingWires || m_Probing) {
         return;
     }
 
@@ -657,6 +941,7 @@ void EditorWindow::NewSchematic() {
     m_DrawingWires = false;
     m_WireStart.reset();
     m_Schematic.Clear();
+    m_Schematic.ClearMeasurements();
 }
 
 // Skipped parts are reported, and the schematic counts as modified because saving it would drop them

@@ -240,6 +240,58 @@ std::size_t Schematic::GetSelectionVersion() const {
 }
 
 /**
+ * @brief   Tells whether the plots show the voltage of a node.
+ * @param[in] node  Node number, as numbered by GetConnectivity().
+ * @return  True when the node is measured.
+ */
+bool Schematic::IsVoltageMeasured(const int node) const {
+    return m_MeasuredNodes.contains(node);
+}
+
+/**
+ * @brief   Adds or removes the voltage of a node from the plots.
+ * @param[in] node      Node number, as numbered by GetConnectivity().
+ * @param[in] measured  Whether to show it.
+ */
+void Schematic::SetVoltageMeasured(const int node, const bool measured) {
+    if (measured) {
+        m_MeasuredNodes.insert(node);
+    } else {
+        m_MeasuredNodes.erase(node);
+    }
+}
+
+/**
+ * @brief   Tells whether the plots show a current.
+ * @param[in] name  Current name as in the results, such as "R1" or "Q1.C".
+ * @return  True when the current is measured.
+ */
+bool Schematic::IsCurrentMeasured(const std::string &name) const {
+    return m_MeasuredCurrents.contains(name);
+}
+
+/**
+ * @brief   Adds or removes a current from the plots.
+ * @param[in] name      Current name as in the results, such as "R1" or "Q1.C".
+ * @param[in] measured  Whether to show it.
+ */
+void Schematic::SetCurrentMeasured(const std::string &name, const bool measured) {
+    if (measured) {
+        m_MeasuredCurrents.insert(name);
+    } else {
+        m_MeasuredCurrents.erase(name);
+    }
+}
+
+/**
+ * @brief   Removes every measurement, so the plots start empty; for a new or opened schematic.
+ */
+void Schematic::ClearMeasurements() {
+    m_MeasuredNodes.clear();
+    m_MeasuredCurrents.clear();
+}
+
+/**
  * @brief   Tells whether there are unsaved changes.
  * @return  True after any change since the last save, open or clear.
  */

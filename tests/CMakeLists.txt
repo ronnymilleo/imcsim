@@ -9,7 +9,10 @@ add_executable(imcsim-tests
             circuit_tests.cpp
             component_tests.cpp
             connectivity_tests.cpp
+            current_flow_tests.cpp
             helpers_tests.cpp
+            plot_helpers_tests.cpp
+            probing_tests.cpp
             schematic_file_tests.cpp
             schematic_tests.cpp
             simulator_tests.cpp

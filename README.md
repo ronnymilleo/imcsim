@@ -16,8 +16,10 @@ netlist](docs/screenshot.png)
   or custom SPICE parameters
 - Warnings when a diode goes into reverse breakdown or a transistor exceeds its voltage, current or power ratings
 - Operating point, transient, AC sweep and DC sweep analyses, with node voltages and component currents
-- Plots of transients, Bode diagrams and DC sweeps (including curve families, such as transistor characteristics),
-  with the nodes shown in the same colors as in the schematic
+- Plots of transients, Bode diagrams and DC sweeps (including curve families, such as transistor characteristics):
+  pick what to measure with the Probe tool, read every trace under the cursor, currents dashed apart from voltages
+- Operating point results on the schematic: values on hover, and wires colored by node, by voltage or by a current
+  heat map that shows the path of the current
 - IEC or ANSI symbols, undo and redo, and schematics saved as JSON
 
 On Wayland, the windows cannot be dragged out of the main window. Run with `SDL_VIDEODRIVER=x11` to allow it.

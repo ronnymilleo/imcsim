@@ -6,9 +6,12 @@ add_library(imcsim-gui-lib
         STATIC
             application.cpp
             connectivity.cpp
+            current_flow.cpp
             element_factory.cpp
             helpers.cpp
             node_colors.cpp
+            plot_helpers.cpp
+            probing.cpp
             schematic.cpp
             schematic_file.cpp
             theme.cpp
