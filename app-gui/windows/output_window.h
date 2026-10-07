@@ -1,6 +1,6 @@
 /**
  * @file    output_window.h
- * @brief   Window that plots the transient and AC sweep results of the schematic.
+ * @brief   Window that plots the transient, AC sweep and DC sweep results of the schematic.
  */
 
 #ifndef IMCSIM_OUTPUT_WINDOW_H
@@ -11,8 +11,6 @@
 #include "windows/app_window.h"
 #include <cstddef>
 #include <optional>
-#include <set>
-#include <string>
 #include <vector>
 
 namespace GUI {
@@ -22,10 +20,11 @@ namespace GUI {
  * @brief   Plots the node voltages and component currents of the last transient over time, the last AC sweep as
  *          a Bode plot, and the last DC sweep against its swept source.
  * @details The results come from the Schematic, which the Simulation window fills, so the plots disappear as
- *          soon as the circuit changes. A list beside the plots picks the voltages shown, in the colors the
- *          editor gives the nodes, and the currents shown, which use the secondary Y axis on the right. The axes of
- * each analysis fit its new results, and keep zoom and pan until the next one. The window floats instead of being
- * docked, so the plots can be as large as needed.
+ *          soon as the circuit changes. Plots show only the measured traces, picked with the Probe tool of the
+ *          editor or in the list beside the plots; voltages take the colors the editor gives the nodes, and
+ *          currents are dashed on the secondary Y axis on the right. Hovering a plot reads every shown trace at
+ *          the nearest sample. The axes of each analysis fit its new results, and keep zoom and pan until the
+ *          next one. The window floats instead of being docked, so the plots can be as large as needed.
  */
 class OutputWindow : public AppWindow {
 public:
@@ -42,9 +41,6 @@ private:
     bool m_TransientShowedCurrents = false;
     bool m_ACSweepShowedCurrents = false;
     bool m_DCSweepShowedCurrents = false;
-    // Kept across runs, since small edits rarely renumber the nodes or rename the components
-    std::set<std::size_t> m_HiddenNodes;
-    std::set<std::string> m_HiddenCurrents;
 
     void Draw() override;
     void DrawTraceList(std::size_t node_count, const std::vector<Core::ComponentTrace> &currents);

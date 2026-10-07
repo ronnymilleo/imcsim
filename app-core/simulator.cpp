@@ -845,4 +845,18 @@ std::vector<std::string> GetSweepableSources(const Circuit &circuit) {
     return names;
 }
 
+/**
+ * @brief   Lists the currents a component reports in simulation results, in the order they appear.
+ * @param[in] component  Any component.
+ * @return  The component name for a two-terminal part or a supply, one name per terminal for a transistor
+ *          (such as "Q1.C"), and nothing for ground.
+ */
+std::vector<std::string> GetCurrentNames(const Component &component) {
+    std::vector<std::string> names;
+    for (const CurrentVector &current : CurrentVectors(component)) {
+        names.push_back(current.TraceName);
+    }
+    return names;
+}
+
 } // namespace Core

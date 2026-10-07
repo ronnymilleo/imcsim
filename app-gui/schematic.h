@@ -15,6 +15,7 @@
 #include <filesystem>
 #include <memory>
 #include <optional>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -30,7 +31,9 @@ namespace GUI {
  *          the circuit once it changes. Indices returned by the selection stay valid until an element or wire
  *          is added, deleted or the wires are replaced. Undo works on whole snapshots: changes pile up until
  *          CommitUndoStep(), which the application calls once the user finishes an interaction, so a whole drag
- *          or a typed value is undone in one step.
+ *          or a typed value is undone in one step. Measurements, the traces the plots show, are view state
+ *          shared by the editor and the plots: they stay out of the history and the file, and are kept by key
+ *          (node number or current name) across edits, since small edits rarely renumber nodes.
  */
 class Schematic {
 public:
@@ -60,6 +63,13 @@ public:
     std::optional<std::size_t> GetSelectedWireIndex() const;
     UIElement *GetSelectedElement();
     std::size_t GetSelectionVersion() const;
+
+    // Measurements
+    bool IsVoltageMeasured(int node) const;
+    void SetVoltageMeasured(int node, bool measured);
+    bool IsCurrentMeasured(const std::string &name) const;
+    void SetCurrentMeasured(const std::string &name, bool measured);
+    void ClearMeasurements();
 
     // Document state
     bool IsModified() const;
@@ -99,6 +109,10 @@ private:
     std::optional<std::size_t> m_SelectedElement;
     std::optional<std::size_t> m_SelectedWire;
     std::size_t m_SelectionVersion = 0;
+
+    // Measurements: node numbers and current names, such as "R1" or "Q1.C"
+    std::set<int> m_MeasuredNodes;
+    std::set<std::string> m_MeasuredCurrents;
 
     // Document state
     bool m_Modified = false;

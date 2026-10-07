@@ -181,8 +181,9 @@ TransientRun RunTransient(const Circuit &circuit, const TransientSettings &setti
 ACSweepRun RunACSweep(const Circuit &circuit, const ACSweepSettings &settings);
 DCSweepRun RunDCSweep(const Circuit &circuit, const DCSweepSettings &settings);
 
-// Sources
+// Names in the results
 std::vector<std::string> GetSweepableSources(const Circuit &circuit);
+std::vector<std::string> GetCurrentNames(const Component &component);
 
 } // namespace Core
 

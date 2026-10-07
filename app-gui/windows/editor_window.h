@@ -54,6 +54,18 @@ private:
     };
 
     /**
+     * @enum    WireColoring
+     * @brief   What the colors of wires (and, by current, of parts) show.
+     * @details Voltage and Current color by the last operating point, on a heat scale with a legend.
+     */
+    enum class WireColoring {
+        Plain,
+        Nodes,
+        Voltage,
+        Current
+    };
+
+    /**
      * @enum    FileAction
      * @brief   File operation waiting for a file dialog or for the user to confirm discarding changes.
      */
@@ -90,7 +102,7 @@ private:
     ImVec2 m_Pan = {0, 0};
     float m_Zoom = 20.0f;
     SymbolStyle m_SymbolStyle = SymbolStyle::IEC;
-    bool m_ShowNodes = false;
+    WireColoring m_WireColoring = WireColoring::Plain;
 
     // Placement
     std::optional<Core::ComponentType> m_PlacingType;
@@ -100,6 +112,9 @@ private:
     bool m_DrawingWires = false;
     std::optional<GridPoint> m_WireStart;
     bool m_WireVerticalFirst = false;
+
+    // Probing: picks what the plots measure
+    bool m_Probing = false;
 
     // Selection and dragging
     std::optional<ElementDrag> m_Drag;
@@ -120,12 +135,19 @@ private:
     void Draw() override;
     void DrawToolbar();
     void DrawWires(ImDrawList *draw_list, const ViewTransform &view);
+    void DrawWireCurrents(ImDrawList *draw_list, const ViewTransform &view,
+                          const Core::OperatingPoint &operating_point);
+    ImU32 GetElementColor(std::size_t index) const;
+    void DrawColorLegend(ImDrawList *draw_list, ImVec2 origin, ImVec2 size) const;
     void DrawNodeVoltages(ImDrawList *draw_list, const ViewTransform &view);
+    void DrawMeasurements(ImDrawList *draw_list, const ViewTransform &view);
+    void DrawHoveredValue(const ViewTransform &view, bool hovered);
     void HandlePanAndZoom(ImVec2 origin, bool hovered, bool active);
 
     // Modes
     void StartPlacing(Core::ComponentType type);
     void StartDrawingWires();
+    void StartProbing();
 
     // Placement
     void HandlePlacement(ImDrawList *draw_list, const ViewTransform &view, bool hovered);
@@ -133,6 +155,9 @@ private:
     // Wiring
     void HandleWireDrawing(ImDrawList *draw_list, const ViewTransform &view, bool hovered);
     void StopWire();
+
+    // Probing
+    void HandleProbing(ImDrawList *draw_list, const ViewTransform &view, bool hovered);
 
     // Selection and dragging
     void HandleSelection(const ViewTransform &view, bool hovered);
