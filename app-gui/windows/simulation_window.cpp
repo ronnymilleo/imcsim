@@ -6,6 +6,7 @@
 #include "simulation_window.h"
 
 #include "spice_value.h"
+#include "theme.h"
 #include <algorithm>
 #include <format>
 #include <utility>
@@ -14,8 +15,6 @@ namespace GUI {
 
 namespace {
 
-constexpr ImVec4 ErrorTextColor = {1.0f, 0.4f, 0.4f, 1.0f};
-constexpr ImVec4 WarningTextColor = {1.0f, 0.8f, 0.4f, 1.0f};
 // In font sizes, so the layout follows the DPI scale; matches the labels of ValueField
 constexpr float LabelWidth = 6.0f;
 constexpr float InputWidth = 8.0f;
@@ -28,7 +27,7 @@ bool IsPositive(const double value) {
 bool DrawRunStatus(const std::optional<std::string> &error, const std::vector<Core::SimulatorMessage> &messages,
                    const bool has_result) {
     if (error) {
-        ImGui::TextColored(ErrorTextColor, "%s", error->c_str());
+        ImGui::TextColored(GetErrorTextColor(), "%s", error->c_str());
         return false;
     }
     if (!has_result) {
@@ -38,8 +37,8 @@ bool DrawRunStatus(const std::optional<std::string> &error, const std::vector<Co
     const bool has_warnings =
         std::ranges::any_of(messages, [](const Core::SimulatorMessage &message) { return message.FromErrorStream; });
     if (has_warnings) {
-        ImGui::TextColored(WarningTextColor, "ngspice reported warnings; check its output before trusting the "
-                                             "results");
+        ImGui::TextColored(GetWarningTextColor(), "ngspice reported warnings; check its output before trusting the "
+                                                  "results");
     }
     return true;
 }
@@ -50,7 +49,7 @@ void DrawOutput(const std::vector<Core::SimulatorMessage> &messages) {
     }
     for (const Core::SimulatorMessage &message : messages) {
         if (message.FromErrorStream) {
-            ImGui::TextColored(WarningTextColor, "%s", message.Text.c_str());
+            ImGui::TextColored(GetWarningTextColor(), "%s", message.Text.c_str());
         } else {
             ImGui::TextUnformatted(message.Text.c_str());
         }
@@ -90,7 +89,7 @@ void SimulationWindow::Draw() {
 }
 
 void SimulationWindow::DrawOperatingPointTab() {
-    if (ImGui::Button("Run operating point (.op)")) {
+    if (PrimaryButton("Run operating point (.op)")) {
         RunOperatingPoint();
     }
     const auto &operating_point = m_Schematic.GetOperatingPoint();
@@ -109,7 +108,7 @@ void SimulationWindow::DrawTransientTab() {
     if (const std::optional<double> time_step = m_TimeStep.Draw("Time step", "s", IsPositive)) {
         m_TransientSettings.TimeStep = *time_step;
     }
-    if (ImGui::Button("Run transient (.tran)")) {
+    if (PrimaryButton("Run transient (.tran)")) {
         RunTransient();
     }
     const auto &transient = m_Schematic.GetTransient();
@@ -131,7 +130,7 @@ void SimulationWindow::DrawACSweepTab() {
     ImGui::SameLine(ImGui::GetFontSize() * LabelWidth);
     ImGui::SetNextItemWidth(ImGui::GetFontSize() * InputWidth);
     ImGui::InputInt("per decade", &m_ACSweepSettings.PointsPerDecade);
-    if (ImGui::Button("Run AC sweep (.ac)")) {
+    if (PrimaryButton("Run AC sweep (.ac)")) {
         RunACSweep();
     }
     const auto &sweep = m_Schematic.GetACSweep();

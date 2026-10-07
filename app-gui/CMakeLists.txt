@@ -11,6 +11,7 @@ add_library(imcsim-gui-lib
             node_colors.cpp
             schematic.cpp
             schematic_file.cpp
+            theme.cpp
             ui_elements/ui_capacitor.cpp
             ui_elements/ui_current_source.cpp
             ui_elements/ui_element.cpp

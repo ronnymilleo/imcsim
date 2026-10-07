@@ -5,6 +5,7 @@
 
 #include "netlist_window.h"
 
+#include "theme.h"
 #include <string>
 
 namespace GUI {
@@ -22,7 +23,9 @@ void NetlistWindow::Draw() {
         ImGui::SetClipboardText(netlist.c_str());
     }
     ImGui::Separator();
+    ImGui::PushFont(GetMonospaceFont(), 0.0f);
     ImGui::TextUnformatted(netlist.c_str());
+    ImGui::PopFont();
 }
 
 } // namespace GUI
