@@ -41,8 +41,8 @@ private:
     std::array<ValueField, 7> m_PulseFields;
     // One per member of the parameters of custom diodes and transistors
     std::array<ValueField, 9> m_DiodeFields;
-    std::array<ValueField, 13> m_BJTFields;
-    std::array<ValueField, 9> m_MOSFETFields;
+    std::array<ValueField, 16> m_BJTFields;
+    std::array<ValueField, 13> m_MOSFETFields;
 
     void Draw() override;
     void LoadFields(const Core::Component &component);

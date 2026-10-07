@@ -78,6 +78,9 @@ constexpr auto BJTKeys = std::to_array<ParameterKey<Core::BJTParameters>>({
     {"cje", &Core::BJTParameters::EmitterCapacitance},
     {"cjc", &Core::BJTParameters::CollectorCapacitance},
     {"tf", &Core::BJTParameters::TransitTime},
+    {"vceo", &Core::BJTParameters::MaxCollectorEmitterVoltage},
+    {"icmax", &Core::BJTParameters::MaxCollectorCurrent},
+    {"pmax", &Core::BJTParameters::MaxPower},
 });
 
 constexpr auto MOSFETKeys = std::to_array<ParameterKey<Core::MOSFETParameters>>({
@@ -90,6 +93,10 @@ constexpr auto MOSFETKeys = std::to_array<ParameterKey<Core::MOSFETParameters>>(
     {"cgdo", &Core::MOSFETParameters::GateDrainOverlap},
     {"w", &Core::MOSFETParameters::Width},
     {"l", &Core::MOSFETParameters::Length},
+    {"vdsmax", &Core::MOSFETParameters::MaxDrainSourceVoltage},
+    {"vgsmax", &Core::MOSFETParameters::MaxGateSourceVoltage},
+    {"idmax", &Core::MOSFETParameters::MaxDrainCurrent},
+    {"pmax", &Core::MOSFETParameters::MaxPower},
 });
 
 // Readers return no value when the key is missing or holds another type, so a damaged file never throws

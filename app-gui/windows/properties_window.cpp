@@ -76,6 +76,9 @@ constexpr auto BJTFields = std::to_array<ParameterField<Core::BJTParameters>>({
     {"CJE", &Core::BJTParameters::EmitterCapacitance, "F"},
     {"CJC", &Core::BJTParameters::CollectorCapacitance, "F"},
     {"TF", &Core::BJTParameters::TransitTime, "s"},
+    {"VCEO", &Core::BJTParameters::MaxCollectorEmitterVoltage, "V"},
+    {"IC max", &Core::BJTParameters::MaxCollectorCurrent, "A"},
+    {"P max", &Core::BJTParameters::MaxPower, "W"},
 });
 
 constexpr auto MOSFETFields = std::to_array<ParameterField<Core::MOSFETParameters>>({
@@ -88,6 +91,10 @@ constexpr auto MOSFETFields = std::to_array<ParameterField<Core::MOSFETParameter
     {"CGDO", &Core::MOSFETParameters::GateDrainOverlap, "F/m"},
     {"W", &Core::MOSFETParameters::Width, "m"},
     {"L", &Core::MOSFETParameters::Length, "m"},
+    {"VDS max", &Core::MOSFETParameters::MaxDrainSourceVoltage, "V"},
+    {"VGS max", &Core::MOSFETParameters::MaxGateSourceVoltage, "V"},
+    {"ID max", &Core::MOSFETParameters::MaxDrainCurrent, "A"},
+    {"P max", &Core::MOSFETParameters::MaxPower, "W"},
 });
 
 template <typename Parameters, std::size_t Count>
@@ -279,6 +286,7 @@ void PropertiesWindow::DrawBJT(Core::BJT &bjt) {
     }
     if (bjt.IsCustom()) {
         ImGui::TextDisabled("A VAF or IKF of 0 turns that effect off");
+        ImGui::TextDisabled("VCEO, IC max and P max are checked after each simulation");
     }
 }
 
@@ -289,6 +297,7 @@ void PropertiesWindow::DrawMOSFET(Core::MOSFET &mosfet) {
     }
     if (mosfet.IsCustom()) {
         ImGui::TextDisabled("Level 1: ID = KP/2 W/L (VGS - VTO)^2; VTO is negative for PMOS");
+        ImGui::TextDisabled("The max ratings are checked after each simulation");
     }
 }
 

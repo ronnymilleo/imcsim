@@ -19,7 +19,8 @@ namespace Core {
  *          size (W, L), in SI units.
  * @details Defaults follow ngspice. The drain current in saturation is KP/2 * W/L * (VGS - VTO)^2, so only the
  *          ratio W/L matters for it; W also scales the gate overlap capacitances, given per meter of width. Level 1
- *          has no body diode.
+ *          has no body diode. The ratings are not part of the SPICE model: the simulator checks the results
+ *          against them.
  */
 struct MOSFETParameters {
     double ThresholdVoltage = 0.0;
@@ -31,6 +32,11 @@ struct MOSFETParameters {
     double GateDrainOverlap = 0.0;
     double Width = 100e-6;
     double Length = 100e-6;
+    // Datasheet ratings; the defaults are those of a small-signal part
+    double MaxDrainSourceVoltage = 60.0;
+    double MaxGateSourceVoltage = 20.0;
+    double MaxDrainCurrent = 0.2;
+    double MaxPower = 0.4;
 };
 
 /**

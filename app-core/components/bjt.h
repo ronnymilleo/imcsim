@@ -19,6 +19,7 @@ namespace Core {
  *          CJC, TF), in SI units.
  * @details Defaults follow ngspice. A VAF or IKF of 0 turns the Early effect or the high-current roll-off off, as
  *          in SPICE. Parameters that only matter away from 27 degrees Celsius are left at their ngspice defaults.
+ *          The ratings are not part of the SPICE model: the simulator checks the results against them.
  */
 struct BJTParameters {
     double SaturationCurrent = 1e-16;
@@ -35,6 +36,10 @@ struct BJTParameters {
     double EmitterCapacitance = 0.0;
     double CollectorCapacitance = 0.0;
     double TransitTime = 0.0;
+    // Datasheet ratings; the defaults are those of a small-signal part
+    double MaxCollectorEmitterVoltage = 40.0;
+    double MaxCollectorCurrent = 0.2;
+    double MaxPower = 0.5;
 };
 
 /**

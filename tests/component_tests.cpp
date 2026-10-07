@@ -307,6 +307,8 @@ TEST_CASE("Custom transistor parameters must be in the range ngspice simulates",
     CHECK_FALSE(bjt.IsValidParameters({.LeakageEmissionCoefficient = 0.0}));
     CHECK_FALSE(bjt.IsValidParameters({.BaseResistance = -1.0}));
     CHECK_FALSE(bjt.IsValidParameters({.TransitTime = -1e-12}));
+    CHECK_FALSE(bjt.IsValidParameters({.MaxCollectorEmitterVoltage = 0.0}));
+    CHECK_FALSE(bjt.IsValidParameters({.MaxPower = 0.0}));
 
     const Core::MOSFET mosfet(Core::ComponentType::NMOS);
     CHECK(mosfet.IsValidParameters({}));
@@ -316,4 +318,6 @@ TEST_CASE("Custom transistor parameters must be in the range ngspice simulates",
     CHECK_FALSE(mosfet.IsValidParameters({.GateDrainOverlap = -1.0}));
     CHECK_FALSE(mosfet.IsValidParameters({.Width = 0.0}));
     CHECK_FALSE(mosfet.IsValidParameters({.Length = 0.0}));
+    CHECK_FALSE(mosfet.IsValidParameters({.MaxGateSourceVoltage = 0.0}));
+    CHECK_FALSE(mosfet.IsValidParameters({.MaxDrainCurrent = -1.0}));
 }

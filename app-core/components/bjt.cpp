@@ -14,7 +14,8 @@ namespace Core {
 namespace {
 
 // Grouped by part, default model first. Common vendor cards reduced to the parameters of BJTParameters; the gain
-// stays within the datasheet range at the test currents of each part
+// stays within the datasheet range at the test currents of each part. Ratings are the absolute maximum VCEO and
+// IC and the free-air dissipation
 constexpr auto BJTModels = std::to_array<BJTModel>({
     {"2N3904",
      "General-purpose NPN, 40 V 200 mA",
@@ -30,7 +31,10 @@ constexpr auto BJTModels = std::to_array<BJTModel>({
       .CollectorResistance = 1.0,
       .EmitterCapacitance = 4.493e-12,
       .CollectorCapacitance = 3.638e-12,
-      .TransitTime = 301.2e-12},
+      .TransitTime = 301.2e-12,
+      .MaxCollectorEmitterVoltage = 40.0,
+      .MaxCollectorCurrent = 0.2,
+      .MaxPower = 0.625},
      ComponentType::NPN},
     {"2N2222A",
      "General-purpose NPN, 40 V 600 mA",
@@ -46,7 +50,10 @@ constexpr auto BJTModels = std::to_array<BJTModel>({
       .CollectorResistance = 1.0,
       .EmitterCapacitance = 22.01e-12,
       .CollectorCapacitance = 7.306e-12,
-      .TransitTime = 411.1e-12},
+      .TransitTime = 411.1e-12,
+      .MaxCollectorEmitterVoltage = 40.0,
+      .MaxCollectorCurrent = 0.6,
+      .MaxPower = 0.5},
      ComponentType::NPN},
     {"BC547B",
      "Small-signal NPN, 45 V 100 mA, high gain",
@@ -63,7 +70,10 @@ constexpr auto BJTModels = std::to_array<BJTModel>({
       .EmitterResistance = 0.4683,
       .EmitterCapacitance = 13.58e-12,
       .CollectorCapacitance = 3.728e-12,
-      .TransitTime = 439.1e-12},
+      .TransitTime = 439.1e-12,
+      .MaxCollectorEmitterVoltage = 45.0,
+      .MaxCollectorCurrent = 0.1,
+      .MaxPower = 0.5},
      ComponentType::NPN},
     {"2N3906",
      "General-purpose PNP, 40 V 200 mA",
@@ -77,7 +87,10 @@ constexpr auto BJTModels = std::to_array<BJTModel>({
       .CollectorResistance = 2.5,
       .EmitterCapacitance = 8.063e-12,
       .CollectorCapacitance = 9.728e-12,
-      .TransitTime = 179.3e-12},
+      .TransitTime = 179.3e-12,
+      .MaxCollectorEmitterVoltage = 40.0,
+      .MaxCollectorCurrent = 0.2,
+      .MaxPower = 0.625},
      ComponentType::PNP},
     {"2N2907A",
      "General-purpose PNP, 60 V 600 mA",
@@ -93,7 +106,10 @@ constexpr auto BJTModels = std::to_array<BJTModel>({
       .CollectorResistance = 0.715,
       .EmitterCapacitance = 19.82e-12,
       .CollectorCapacitance = 14.76e-12,
-      .TransitTime = 603.7e-12},
+      .TransitTime = 603.7e-12,
+      .MaxCollectorEmitterVoltage = 60.0,
+      .MaxCollectorCurrent = 0.6,
+      .MaxPower = 0.4},
      ComponentType::PNP},
     {"BC557B",
      "Small-signal PNP, 45 V 100 mA, high gain",
@@ -110,7 +126,10 @@ constexpr auto BJTModels = std::to_array<BJTModel>({
       .EmitterResistance = 0.6202,
       .EmitterCapacitance = 12.3e-12,
       .CollectorCapacitance = 10.8e-12,
-      .TransitTime = 636e-12},
+      .TransitTime = 636e-12,
+      .MaxCollectorEmitterVoltage = 45.0,
+      .MaxCollectorCurrent = 0.1,
+      .MaxPower = 0.5},
      ComponentType::PNP},
 });
 
@@ -172,7 +191,7 @@ void BJT::SetCustomParameters(const BJTParameters &parameters) {
 /**
  * @brief   Checks whether custom parameters can be simulated.
  * @param[in] parameters  Candidate parameters.
- * @return  True when IS, BF, BR and NE are positive and everything else is not negative.
+ * @return  True when IS, BF, BR, NE and the ratings are positive and everything else is not negative.
  */
 bool BJT::IsValidParameters(const BJTParameters &parameters) const {
     return parameters.SaturationCurrent > 0.0 && parameters.ForwardBeta > 0.0 && parameters.ReverseBeta > 0.0 &&
@@ -180,7 +199,9 @@ bool BJT::IsValidParameters(const BJTParameters &parameters) const {
            parameters.LeakageSaturationCurrent >= 0.0 && parameters.LeakageEmissionCoefficient > 0.0 &&
            parameters.BaseResistance >= 0.0 && parameters.CollectorResistance >= 0.0 &&
            parameters.EmitterResistance >= 0.0 && parameters.EmitterCapacitance >= 0.0 &&
-           parameters.CollectorCapacitance >= 0.0 && parameters.TransitTime >= 0.0;
+           parameters.CollectorCapacitance >= 0.0 && parameters.TransitTime >= 0.0 &&
+           parameters.MaxCollectorEmitterVoltage > 0.0 && parameters.MaxCollectorCurrent > 0.0 &&
+           parameters.MaxPower > 0.0;
 }
 
 /**

@@ -294,6 +294,7 @@ TEST_CASE("Transistors keep their model or custom parameters", "[schematic_file]
     nmos.SetCustom();
     Core::MOSFETParameters parameters = nmos.GetParameters();
     parameters.ThresholdVoltage = 1.2;
+    parameters.MaxPower = 1.5;
     nmos.SetCustomParameters(parameters);
 
     const GUI::LoadedSchematic loaded = LoadOrFail(GUI::SaveSchematic(elements, {}));
@@ -304,6 +305,7 @@ TEST_CASE("Transistors keep their model or custom parameters", "[schematic_file]
     const auto &nmos_copy = static_cast<const Core::MOSFET &>(loaded.Elements[1]->GetComponent());
     CHECK(nmos_copy.IsCustom());
     CHECK(nmos_copy.GetParameters().ThresholdVoltage == 1.2);
+    CHECK(nmos_copy.GetParameters().MaxPower == 1.5);
     CHECK(nmos_copy.GetParameters().Transconductance == parameters.Transconductance);
 }
 

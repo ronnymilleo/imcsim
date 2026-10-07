@@ -884,3 +884,121 @@ TEST_CASE("An AC sweep gives the small-signal gain and currents of a common-emit
         CHECK(std::abs(current("Q1.C") - current("R2")) < 1e-9);
     }
 }
+
+// True when some warning starts with the text, so tests can check one rating at a time
+bool HasWarning(const std::vector<std::string> &warnings, const std::string &start) {
+    return std::ranges::any_of(warnings, [&start](const std::string &warning) { return warning.starts_with(start); });
+}
+
+TEST_CASE("A BJT above its VCEO rating is reported", "[simulator]") {
+    // A small base current keeps the 2N3904 barely on, so nearly the whole 60 V supply sits across it
+    CommonEmitter stage(Core::ComponentType::NPN);
+    stage.Supply.SetValue(60.0);
+    stage.BaseResistor.SetValue(10e6);
+    const Core::OperatingPointRun run = Core::RunOperatingPoint(stage.Circuit);
+    if (!run.Result) {
+        FAIL(run.Result.error());
+    }
+    REQUIRE(run.Result->Warnings.size() == 1);
+    CAPTURE(run.Result->Warnings[0]);
+    CHECK(run.Result->Warnings[0].starts_with("Q1 (2N3904) exceeds its VCE rating: "));
+    CHECK(run.Result->Warnings[0].ends_with("against 40V"));
+}
+
+TEST_CASE("A BJT above its collector current and power ratings is reported", "[simulator]") {
+    // About 11 mA into the base drives the 2N3904 past 200 mA, with several volts left across it
+    CommonEmitter stage(Core::ComponentType::NPN);
+    stage.BaseResistor.SetValue(1e3);
+    stage.CollectorResistor.SetValue(10.0);
+    const Core::OperatingPointRun run = Core::RunOperatingPoint(stage.Circuit);
+    if (!run.Result) {
+        FAIL(run.Result.error());
+    }
+    CAPTURE(run.Result->Warnings);
+    CHECK(HasWarning(run.Result->Warnings, "Q1 (2N3904) exceeds its IC rating"));
+    CHECK(HasWarning(run.Result->Warnings, "Q1 (2N3904) exceeds its power rating"));
+    CHECK_FALSE(HasWarning(run.Result->Warnings, "Q1 (2N3904) exceeds its VCE rating"));
+}
+
+TEST_CASE("A MOSFET above its power rating is reported, with its other ratings respected", "[simulator]") {
+    // About 70 mA with nearly 20 V across the 2N7000 is about 1.4 W, over its 400 mW
+    LowSideSwitch stage(Core::ComponentType::NMOS, 3.5);
+    stage.Supply.SetValue(20.0);
+    stage.Load.SetValue(10.0);
+    const Core::OperatingPointRun run = Core::RunOperatingPoint(stage.Circuit);
+    if (!run.Result) {
+        FAIL(run.Result.error());
+    }
+    REQUIRE(run.Result->Warnings.size() == 1);
+    CAPTURE(run.Result->Warnings[0]);
+    CHECK(run.Result->Warnings[0].starts_with("M1 (2N7000) exceeds its power rating: "));
+    CHECK(run.Result->Warnings[0].ends_with("against 400mW"));
+}
+
+TEST_CASE("A MOSFET gate above its VGS rating is reported", "[simulator]") {
+    LowSideSwitch stage(Core::ComponentType::PMOS, 25.0);
+    const Core::OperatingPointRun run = Core::RunOperatingPoint(stage.Circuit);
+    if (!run.Result) {
+        FAIL(run.Result.error());
+    }
+    CAPTURE(run.Result->Warnings);
+    CHECK(HasWarning(run.Result->Warnings, "M1 (BS250) exceeds its VGS rating: 25V against 20V"));
+}
+
+TEST_CASE("A transient checks the average power, so short pulses above the rating pass", "[simulator]") {
+    // The same 1.4 W as the operating point test, but only during a tenth of every period
+    Core::VCC supply;
+    supply.SetName("V1");
+    supply.SetValue(20.0);
+    Core::VoltageSource gate;
+    gate.SetName("Vin1");
+    gate.SetSourceType(Core::VoltageSource::SourceType::Pulse);
+    gate.SetPulse({.Low = 0.0, .High = 3.5, .Width = 0.1e-3, .Period = 1e-3});
+    Core::Resistor load;
+    load.SetName("R1");
+    load.SetValue(10.0);
+    Core::MOSFET transistor(Core::ComponentType::NMOS);
+    transistor.SetName("M1");
+    const Core::Ground reference;
+    Core::Circuit circuit;
+    circuit.Add(supply, {1});
+    circuit.Add(gate, {3, 0});
+    circuit.Add(load, {1, 2});
+    circuit.Add(transistor, {2, 3, 0});
+    circuit.Add(reference, {0});
+
+    const Core::TransientRun pulsed = Core::RunTransient(circuit, {.StopTime = 5e-3, .TimeStep = 1e-6});
+    if (!pulsed.Result) {
+        FAIL(pulsed.Result.error());
+    }
+    CAPTURE(pulsed.Result->Warnings);
+    CHECK(pulsed.Result->Warnings.empty());
+    // With picofarads of gate capacitance the drain current settles within microseconds of each gate edge
+    const std::vector<double> &times = pulsed.Result->Times;
+    const std::vector<double> &drain = FindCurrent(pulsed.Result->Currents, "M1.D").Values;
+    const auto current_at = [&](const double time) {
+        return drain[static_cast<std::size_t>(std::ranges::lower_bound(times, time) - times.begin())];
+    };
+    CHECK_THAT(current_at(10e-6), Catch::Matchers::WithinRel(current_at(95e-6), 0.01));
+
+    gate.SetPulse({.Low = 0.0, .High = 3.5, .Width = 0.9e-3, .Period = 1e-3});
+    const Core::TransientRun mostly_on = Core::RunTransient(circuit, {.StopTime = 5e-3, .TimeStep = 1e-6});
+    if (!mostly_on.Result) {
+        FAIL(mostly_on.Result.error());
+    }
+    CAPTURE(mostly_on.Result->Warnings);
+    CHECK(HasWarning(mostly_on.Result->Warnings, "M1 (2N7000) exceeds its power rating"));
+}
+
+TEST_CASE("The rating warnings use the ratings of a custom transistor", "[simulator]") {
+    CommonEmitter stage(Core::ComponentType::NPN);
+    Core::BJTParameters parameters = stage.Transistor.GetParameters();
+    parameters.MaxCollectorEmitterVoltage = 5.0;
+    stage.Transistor.SetCustomParameters(parameters);
+    const Core::OperatingPointRun run = Core::RunOperatingPoint(stage.Circuit);
+    if (!run.Result) {
+        FAIL(run.Result.error());
+    }
+    CAPTURE(run.Result->Warnings);
+    CHECK(HasWarning(run.Result->Warnings, "Q1 (Custom) exceeds its VCE rating"));
+}

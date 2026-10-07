@@ -14,6 +14,7 @@ netlist](docs/screenshot.png)
 - Resistors, capacitors, inductors, ground, a VCC rail, and voltage and current sources (DC, sine or pulse)
 - Diodes, Zener diodes, LEDs, NPN and PNP bipolar transistors, and N- and P-channel MOSFETs, each with ready models
   or custom SPICE parameters
+- Warnings when a diode goes into reverse breakdown or a transistor exceeds its voltage, current or power ratings
 - Operating point, transient and AC sweep analyses, with node voltages and component currents
 - Plots of transients and Bode diagrams, with the nodes shown in the same colors as in the schematic
 - IEC or ANSI symbols, undo and redo, and schematics saved as JSON

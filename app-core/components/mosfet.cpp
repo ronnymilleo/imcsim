@@ -14,8 +14,9 @@ namespace Core {
 namespace {
 
 // Grouped by part, default model first. Level 1 approximations: VTO is the typical threshold, KP sets the
-// datasheet RDS(on) at |VGS| = 10 V, and the overlaps give the typical input and reverse transfer capacitances
-// with the default 100 um width
+// datasheet RDS(on) at |VGS| = 10 V, and the overlaps, in F per meter of width, give the typical input and reverse
+// transfer capacitances with the default 100 um width (20 pF is 2e-7 F/m). Ratings are the absolute maximum VDS, VGS
+// and continuous ID, and the dissipation in free air, or with an ideal heatsink for the power parts
 constexpr auto MOSFETModels = std::to_array<MOSFETModel>({
     {"2N7000",
      "Small-signal N-channel, 60 V 200 mA, 1.8 Ohm",
@@ -23,8 +24,12 @@ constexpr auto MOSFETModels = std::to_array<MOSFETModel>({
      {.ThresholdVoltage = 2.1,
       .Transconductance = 0.0703,
       .ChannelModulation = 0.01,
-      .GateSourceOverlap = 0.2,
-      .GateDrainOverlap = 0.05},
+      .GateSourceOverlap = 2e-07,
+      .GateDrainOverlap = 5e-08,
+      .MaxDrainSourceVoltage = 60.0,
+      .MaxGateSourceVoltage = 20.0,
+      .MaxDrainCurrent = 0.2,
+      .MaxPower = 0.4},
      ComponentType::NMOS},
     {"BS170",
      "Small-signal N-channel, 60 V 500 mA, 1.2 Ohm",
@@ -32,8 +37,12 @@ constexpr auto MOSFETModels = std::to_array<MOSFETModel>({
      {.ThresholdVoltage = 2.1,
       .Transconductance = 0.105,
       .ChannelModulation = 0.01,
-      .GateSourceOverlap = 0.24,
-      .GateDrainOverlap = 0.05},
+      .GateSourceOverlap = 2.4e-07,
+      .GateDrainOverlap = 5e-08,
+      .MaxDrainSourceVoltage = 60.0,
+      .MaxGateSourceVoltage = 20.0,
+      .MaxDrainCurrent = 0.5,
+      .MaxPower = 0.83},
      ComponentType::NMOS},
     {"IRF540N",
      "Power N-channel, 100 V 33 A, 44 mOhm, no body diode",
@@ -41,8 +50,12 @@ constexpr auto MOSFETModels = std::to_array<MOSFETModel>({
      {.ThresholdVoltage = 3.0,
       .Transconductance = 3.25,
       .ChannelModulation = 0.002,
-      .GateSourceOverlap = 19.6,
-      .GateDrainOverlap = 0.4},
+      .GateSourceOverlap = 1.96e-05,
+      .GateDrainOverlap = 4e-07,
+      .MaxDrainSourceVoltage = 100.0,
+      .MaxGateSourceVoltage = 20.0,
+      .MaxDrainCurrent = 33,
+      .MaxPower = 130.0},
      ComponentType::NMOS},
     {"BS250",
      "Small-signal P-channel, 45 V 250 mA, 14 Ohm",
@@ -50,8 +63,12 @@ constexpr auto MOSFETModels = std::to_array<MOSFETModel>({
      {.ThresholdVoltage = -2.0,
       .Transconductance = 0.0089,
       .ChannelModulation = 0.01,
-      .GateSourceOverlap = 0.6,
-      .GateDrainOverlap = 0.1},
+      .GateSourceOverlap = 6e-07,
+      .GateDrainOverlap = 1e-07,
+      .MaxDrainSourceVoltage = 45.0,
+      .MaxGateSourceVoltage = 20.0,
+      .MaxDrainCurrent = 0.23,
+      .MaxPower = 0.83},
      ComponentType::PMOS},
     {"IRF9540N",
      "Power P-channel, 100 V 23 A, 117 mOhm, no body diode",
@@ -59,8 +76,12 @@ constexpr auto MOSFETModels = std::to_array<MOSFETModel>({
      {.ThresholdVoltage = -3.0,
       .Transconductance = 1.22,
       .ChannelModulation = 0.002,
-      .GateSourceOverlap = 13.0,
-      .GateDrainOverlap = 0.3},
+      .GateSourceOverlap = 1.3e-05,
+      .GateDrainOverlap = 3e-07,
+      .MaxDrainSourceVoltage = 100.0,
+      .MaxGateSourceVoltage = 20.0,
+      .MaxDrainCurrent = 23,
+      .MaxPower = 140.0},
      ComponentType::PMOS},
 });
 
@@ -122,14 +143,15 @@ void MOSFET::SetCustomParameters(const MOSFETParameters &parameters) {
 /**
  * @brief   Checks whether custom parameters can be simulated.
  * @param[in] parameters  Candidate parameters.
- * @return  True when KP, W and L are positive and LAMBDA, RD, RS, CGSO and CGDO are not negative. VTO may have
- *          either sign, so depletion parts can be modeled too.
+ * @return  True when KP, W, L and the ratings are positive and LAMBDA, RD, RS, CGSO and CGDO are not negative. VTO
+ *          may have either sign, so depletion parts can be modeled too.
  */
 bool MOSFET::IsValidParameters(const MOSFETParameters &parameters) const {
     return parameters.Transconductance > 0.0 && parameters.ChannelModulation >= 0.0 &&
            parameters.DrainResistance >= 0.0 && parameters.SourceResistance >= 0.0 &&
            parameters.GateSourceOverlap >= 0.0 && parameters.GateDrainOverlap >= 0.0 && parameters.Width > 0.0 &&
-           parameters.Length > 0.0;
+           parameters.Length > 0.0 && parameters.MaxDrainSourceVoltage > 0.0 && parameters.MaxGateSourceVoltage > 0.0 &&
+           parameters.MaxDrainCurrent > 0.0 && parameters.MaxPower > 0.0;
 }
 
 /**

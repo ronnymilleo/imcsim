@@ -231,7 +231,7 @@ TEST_CASE("ToSpiceNetlist writes transistors in SPICE terminal order with the MO
           "M1 3 2 0 0 M2N7000 W=0.0001 L=0.0001\n"
           ".model Q2N3904 NPN(IS=6.734e-15 BF=416.4 BR=0.7371 VAF=74.03 IKF=0.06678 ISE=6.734e-15 NE=1.259 RB=10 "
           "RC=1 RE=0 CJE=4.493e-12 CJC=3.638e-12 TF=3.012e-10)\n"
-          ".model M2N7000 NMOS(LEVEL=1 VTO=2.1 KP=0.0703 LAMBDA=0.01 RD=0 RS=0 CGSO=0.2 CGDO=0.05)\n"
+          ".model M2N7000 NMOS(LEVEL=1 VTO=2.1 KP=0.0703 LAMBDA=0.01 RD=0 RS=0 CGSO=2e-07 CGDO=5e-08)\n"
           ".end\n");
 }
 
