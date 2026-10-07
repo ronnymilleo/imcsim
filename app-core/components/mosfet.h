@@ -18,9 +18,10 @@ namespace Core {
  * @brief   Parameters of the SPICE level 1 MOSFET model (VTO, KP, LAMBDA, RD, RS, CGSO, CGDO) and the channel
  *          size (W, L), in SI units.
  * @details Defaults follow ngspice. The drain current in saturation is KP/2 * W/L * (VGS - VTO)^2, so only the
- *          ratio W/L matters for it; W also scales the gate overlap capacitances, given per meter of width. Level 1
- *          has no body diode. The ratings are not part of the SPICE model: the simulator checks the results
- *          against them.
+ *          ratio W/L matters for it; W also scales the gate overlap capacitances, given per meter of width. With
+ *          the body tied to the source, the level 1 body-drain junction acts as the body diode, with the ngspice
+ *          default saturation current and no series resistance, junction capacitance or reverse recovery. The
+ *          ratings are not part of the SPICE model: the simulator checks the results against them.
  */
 struct MOSFETParameters {
     double ThresholdVoltage = 0.0;

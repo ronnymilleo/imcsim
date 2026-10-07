@@ -1002,3 +1002,20 @@ TEST_CASE("The rating warnings use the ratings of a custom transistor", "[simula
     CAPTURE(run.Result->Warnings);
     CHECK(HasWarning(run.Result->Warnings, "Q1 (Custom) exceeds its VCE rating"));
 }
+
+TEST_CASE("An NMOS that is off conducts in reverse through its body diode", "[simulator]") {
+    // The drain is pulled below the source with the gate off, so only the body-drain junction can conduct
+    LowSideSwitch stage(Core::ComponentType::NMOS, 0.0);
+    stage.Supply.SetValue(-5.0);
+    stage.Load.SetValue(100.0);
+    const Core::OperatingPointRun run = Core::RunOperatingPoint(stage.Circuit);
+    if (!run.Result) {
+        FAIL(run.Result.error());
+    }
+    const double drain_voltage = run.Result->NodeVoltages[2];
+    CHECK(drain_voltage < -0.6);
+    CHECK(drain_voltage > -0.9);
+    // The current flows out of the drain, from source to drain through the diode
+    CHECK_THAT(FindCurrent(run.Result->Currents, "M1.D").Current,
+               Catch::Matchers::WithinRel((-5.0 - drain_voltage) / 100.0, 1e-6));
+}
