@@ -10,6 +10,7 @@
 #include "ui_elements/ui_inductor.h"
 #include "ui_elements/ui_resistor.h"
 #include "ui_elements/ui_vcc.h"
+#include "ui_elements/ui_voltage_source.h"
 
 namespace GUI {
 
@@ -33,6 +34,8 @@ std::unique_ptr<UIElement> CreateElement(const Core::ComponentType type, const G
         return std::make_unique<UIGround>(position, rotation);
     case Core::ComponentType::VCC:
         return std::make_unique<UIVCC>(position, rotation);
+    case Core::ComponentType::VoltageSource:
+        return std::make_unique<UIVoltageSource>(position, rotation);
     }
     return nullptr;
 }

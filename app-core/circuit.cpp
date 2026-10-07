@@ -70,6 +70,9 @@ std::string Circuit::ToSpiceNetlist(const std::string_view analysis) const {
         case ComponentType::VCC:
             netlist += std::format("{} {} 0 DC {}\n", component.GetName(), entry.Nodes[0], value);
             break;
+        case ComponentType::VoltageSource:
+            netlist += std::format("{} {} {} DC {}\n", component.GetName(), entry.Nodes[0], entry.Nodes[1], value);
+            break;
         case ComponentType::Ground:
             break;
         }

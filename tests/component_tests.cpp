@@ -8,6 +8,7 @@
 #include "components/inductor.h"
 #include "components/resistor.h"
 #include "components/vcc.h"
+#include "components/voltage_source.h"
 #include <catch2/catch_test_macros.hpp>
 #include <string_view>
 
@@ -31,6 +32,12 @@ TEST_CASE("Components start with SPICE prefixes, units and default values", "[co
     CHECK(std::string_view(supply.GetNamePrefix()) == "V");
     CHECK(std::string_view(supply.GetUnit()) == "V");
     CHECK(supply.GetValue() == 5.0);
+
+    const Core::VoltageSource source;
+    CHECK(std::string_view(source.GetNamePrefix()) == "Vin");
+    CHECK(std::string_view(source.GetUnit()) == "V");
+    CHECK(source.GetValue() == 5.0);
+    CHECK(source.GetSourceType() == Core::VoltageSource::SourceType::DC);
 }
 
 TEST_CASE("Ground has no name prefix and no value", "[component]") {
@@ -40,7 +47,7 @@ TEST_CASE("Ground has no name prefix and no value", "[component]") {
     CHECK_FALSE(ground.IsValidValue(0.0));
 }
 
-TEST_CASE("IsValidValue requires positive passive values but allows any supply voltage", "[component]") {
+TEST_CASE("IsValidValue requires positive passive values but allows any source voltage", "[component]") {
     const Core::Resistor resistor;
     CHECK(resistor.IsValidValue(1.0));
     CHECK_FALSE(resistor.IsValidValue(0.0));
@@ -49,12 +56,16 @@ TEST_CASE("IsValidValue requires positive passive values but allows any supply v
     const Core::VCC supply;
     CHECK(supply.IsValidValue(0.0));
     CHECK(supply.IsValidValue(-12.0));
+
+    const Core::VoltageSource source;
+    CHECK(source.IsValidValue(0.0));
+    CHECK(source.IsValidValue(-12.0));
 }
 
 TEST_CASE("Type names convert both ways", "[component]") {
     for (const Core::ComponentType type :
          {Core::ComponentType::Resistor, Core::ComponentType::Capacitor, Core::ComponentType::Inductor,
-          Core::ComponentType::Ground, Core::ComponentType::VCC}) {
+          Core::ComponentType::Ground, Core::ComponentType::VCC, Core::ComponentType::VoltageSource}) {
         CHECK(Core::ParseComponentType(Core::GetTypeName(type)) == type);
     }
     CHECK_FALSE(Core::ParseComponentType("resistor"));

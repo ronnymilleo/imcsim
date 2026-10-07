@@ -22,7 +22,8 @@ enum class ComponentType {
     Capacitor,
     Inductor,
     Ground,
-    VCC
+    VCC,
+    VoltageSource,
 };
 
 /**

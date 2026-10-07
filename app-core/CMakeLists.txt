@@ -11,6 +11,7 @@ add_library(imcsim-core-lib
             components/inductor.cpp
             components/resistor.cpp
             components/vcc.cpp
+            components/voltage_source.cpp
             simulator.cpp
             spice_value.cpp
 )

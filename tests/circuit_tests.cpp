@@ -9,6 +9,7 @@
 #include "components/inductor.h"
 #include "components/resistor.h"
 #include "components/vcc.h"
+#include "components/voltage_source.h"
 #include <catch2/catch_test_macros.hpp>
 
 TEST_CASE("Circuit counts nodes including ground", "[circuit]") {
@@ -47,6 +48,19 @@ TEST_CASE("ToSpiceNetlist writes one line per component and leaves ground out", 
                                       "R1 1 2 2.2Meg\n"
                                       "C1 2 0 100n\n"
                                       "L1 2 0 1m\n"
+                                      ".end\n");
+}
+
+TEST_CASE("ToSpiceNetlist writes a voltage source between its two nodes, positive first", "[circuit]") {
+    Core::VoltageSource source;
+    source.SetName("Vin1");
+    source.SetValue(12.0);
+
+    Core::Circuit circuit;
+    circuit.Add(source, {2, 1});
+
+    CHECK(circuit.ToSpiceNetlist() == "* imcsim netlist\n"
+                                      "Vin1 2 1 DC 12\n"
                                       ".end\n");
 }
 
