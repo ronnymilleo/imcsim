@@ -8,6 +8,7 @@ add_library(imcsim-gui-lib
             connectivity.cpp
             element_factory.cpp
             helpers.cpp
+            node_colors.cpp
             schematic.cpp
             schematic_file.cpp
             ui_elements/ui_capacitor.cpp

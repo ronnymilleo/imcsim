@@ -15,6 +15,7 @@
 #include "windows/app_window.h"
 #include <SDL3/SDL_dialog.h>
 #include <filesystem>
+#include <memory>
 #include <mutex>
 #include <optional>
 #include <string>
@@ -36,6 +37,10 @@ public:
     explicit EditorWindow(Schematic &schematic);
     ~EditorWindow() override = default;
 
+    // Quitting
+    void RequestQuit();
+    bool IsQuitConfirmed() const;
+
 private:
     /**
      * @struct  ElementDrag
@@ -55,7 +60,8 @@ private:
     enum class FileAction {
         New,
         Open,
-        Save
+        Save,
+        Quit
     };
 
     /**
@@ -64,6 +70,18 @@ private:
      */
     struct DialogResult {
         std::optional<std::filesystem::path> Path;
+    };
+
+    /**
+     * @struct  DialogChannel
+     * @brief   Where the file dialog callback leaves its result for the main thread.
+     * @details Shared between the editor and each pending dialog, so a dialog that answers after the editor is
+     *          gone, such as when the application quits with a dialog open, writes to memory that still exists.
+     */
+    struct DialogChannel {
+        // SDL may call the dialog callback from another thread
+        std::mutex Mutex;
+        std::optional<DialogResult> Result;
     };
 
     Schematic &m_Schematic;
@@ -86,13 +104,15 @@ private:
     // Selection and dragging
     std::optional<ElementDrag> m_Drag;
 
+    // Quitting: requested by the application between frames, handled by the next Draw()
+    bool m_QuitRequested = false;
+    bool m_QuitConfirmed = false;
+
     // Files: the dialog in progress and the confirmation are touched only by the main thread
     std::optional<FileAction> m_ActionToConfirm;
     std::optional<FileAction> m_DialogAction;
     std::string m_DialogLocation;
-    // Written by the dialog callback, which SDL may call from another thread
-    std::mutex m_DialogMutex;
-    std::optional<DialogResult> m_DialogResult;
+    std::shared_ptr<DialogChannel> m_DialogChannel = std::make_shared<DialogChannel>();
     std::string m_FileMessagesTitle;
     std::vector<std::string> m_FileMessages;
 
@@ -126,6 +146,7 @@ private:
     void HandleFileShortcuts();
     void RequestNew();
     void RequestOpen();
+    void HandleQuitRequest();
     void Save();
     void NewSchematic();
     void OpenFile(const std::filesystem::path &path);

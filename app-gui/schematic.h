@@ -73,7 +73,8 @@ public:
     const std::optional<Core::Transient> &GetTransient() const;
     void SetACSweep(std::optional<Core::ACSweep> sweep);
     const std::optional<Core::ACSweep> &GetACSweep() const;
-    std::size_t GetResultsVersion() const;
+    std::size_t GetTransientVersion() const;
+    std::size_t GetACSweepVersion() const;
 
 private:
     // Content
@@ -94,8 +95,9 @@ private:
     std::optional<Core::OperatingPoint> m_OperatingPoint;
     std::optional<Core::Transient> m_Transient;
     std::optional<Core::ACSweep> m_ACSweep;
-    // Changes with every new result, so windows can tell a rerun from the result they already showed
-    std::size_t m_ResultsVersion = 0;
+    // Change with every new result, so windows can tell a rerun from the result they already showed
+    std::size_t m_TransientVersion = 0;
+    std::size_t m_ACSweepVersion = 0;
 
     void InvalidateDerivedData();
 };

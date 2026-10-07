@@ -11,6 +11,7 @@
 #include "windows/app_window.h"
 #include <cstddef>
 #include <optional>
+#include <set>
 
 namespace GUI {
 
@@ -18,7 +19,8 @@ namespace GUI {
  * @class   OutputWindow
  * @brief   Plots the node voltages of the last transient over time, and the last AC sweep as a Bode plot.
  * @details The results come from the Schematic, which the Simulation window fills, so the plots disappear as
- *          soon as the circuit changes. The axes fit each new result, and keep zoom and pan until the next one.
+ *          soon as the circuit changes. A list beside the plots picks the nodes shown, in the colors the editor
+ *          gives them. The axes of each analysis fit its new results, and keep zoom and pan until the next one.
  *          The window floats instead of being docked, so the plots can be as large as needed.
  */
 class OutputWindow : public AppWindow {
@@ -28,12 +30,16 @@ public:
 
 private:
     Schematic &m_Schematic;
-    // Results version the axes were last fitted to
-    std::optional<std::size_t> m_FittedResults;
+    // Result versions the axes were last fitted to
+    std::optional<std::size_t> m_FittedTransient;
+    std::optional<std::size_t> m_FittedACSweep;
+    // Kept across runs, since small edits rarely renumber the nodes
+    std::set<std::size_t> m_HiddenNodes;
 
     void Draw() override;
-    void DrawTransient(const Core::Transient &transient, bool fit);
-    void DrawACSweep(const Core::ACSweep &sweep, bool fit);
+    void DrawNodeList(std::size_t node_count);
+    void DrawTransient(const Core::Transient &transient);
+    void DrawACSweep(const Core::ACSweep &sweep);
 };
 
 } // namespace GUI

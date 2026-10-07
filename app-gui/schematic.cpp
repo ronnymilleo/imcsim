@@ -290,7 +290,6 @@ std::string Schematic::BuildSpiceNetlist() {
  */
 void Schematic::SetOperatingPoint(std::optional<Core::OperatingPoint> operating_point) {
     m_OperatingPoint = std::move(operating_point);
-    ++m_ResultsVersion;
 }
 
 /**
@@ -308,7 +307,7 @@ const std::optional<Core::OperatingPoint> &Schematic::GetOperatingPoint() const 
  */
 void Schematic::SetTransient(std::optional<Core::Transient> transient) {
     m_Transient = std::move(transient);
-    ++m_ResultsVersion;
+    ++m_TransientVersion;
 }
 
 /**
@@ -326,7 +325,7 @@ const std::optional<Core::Transient> &Schematic::GetTransient() const {
  */
 void Schematic::SetACSweep(std::optional<Core::ACSweep> sweep) {
     m_ACSweep = std::move(sweep);
-    ++m_ResultsVersion;
+    ++m_ACSweepVersion;
 }
 
 /**
@@ -338,11 +337,19 @@ const std::optional<Core::ACSweep> &Schematic::GetACSweep() const {
 }
 
 /**
- * @brief   Returns a number that changes whenever a simulation result is stored.
- * @return  The results version; compare it with a stored one to know whether a result was replaced.
+ * @brief   Returns a number that changes whenever a transient result is stored.
+ * @return  The transient version; compare it with a stored one to know whether the result was replaced.
  */
-std::size_t Schematic::GetResultsVersion() const {
-    return m_ResultsVersion;
+std::size_t Schematic::GetTransientVersion() const {
+    return m_TransientVersion;
+}
+
+/**
+ * @brief   Returns a number that changes whenever an AC sweep result is stored.
+ * @return  The AC sweep version; compare it with a stored one to know whether the result was replaced.
+ */
+std::size_t Schematic::GetACSweepVersion() const {
+    return m_ACSweepVersion;
 }
 
 void Schematic::InvalidateDerivedData() {

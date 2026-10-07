@@ -6,6 +6,7 @@
 #include "editor_window.h"
 
 #include "element_factory.h"
+#include "node_colors.h"
 #include "schematic_file.h"
 #include "spice_value.h"
 #include "wire_editing.h"
@@ -42,25 +43,6 @@ constexpr ImU32 NodeLabelColor = IM_COL32(255, 255, 255, 255);
 constexpr ImU32 VoltageLabelColor = IM_COL32(255, 220, 120, 255);
 // Voltage labels sit just above and right of their point, clear of the line
 constexpr ImVec2 VoltageLabelOffset = {4.0f, -16.0f};
-// Debug colors for "Nodes": ground (node 0) uses the first one, the others cycle through the rest
-constexpr auto NodeColors = std::to_array<ImU32>({
-    IM_COL32(160, 160, 160, 255),
-    IM_COL32(230, 120, 100, 255),
-    IM_COL32(110, 170, 240, 255),
-    IM_COL32(240, 200, 90, 255),
-    IM_COL32(190, 130, 230, 255),
-    IM_COL32(100, 210, 190, 255),
-    IM_COL32(240, 150, 200, 255),
-});
-
-ImU32 GetNodeColor(const int node) {
-    if (node == 0) {
-        return NodeColors[0];
-    }
-    const auto cycle_length = static_cast<int>(NodeColors.size()) - 1;
-    return NodeColors[1 + (node - 1) % cycle_length];
-}
-
 /**
  * @struct  ToolbarItem
  * @brief   A toolbar button that starts placing a component type.
@@ -112,10 +94,28 @@ void DrawGrid(ImDrawList *draw_list, const ViewTransform &view, const ImVec2 ori
 EditorWindow::EditorWindow(Schematic &schematic) : AppWindow("Schematic", false), m_Schematic(schematic) {
 }
 
+/**
+ * @brief   Asks to quit, as when the user closes the main window. Call it between frames.
+ * @note    Quitting is confirmed right away when there is nothing to lose; otherwise the next frame asks the user
+ *          to discard the changes. Check IsQuitConfirmed() after drawing the frame.
+ */
+void EditorWindow::RequestQuit() {
+    m_QuitRequested = true;
+}
+
+/**
+ * @brief   Tells whether the application may quit.
+ * @return  True once a quit request was confirmed, by the user or because there were no unsaved changes.
+ */
+bool EditorWindow::IsQuitConfirmed() const {
+    return m_QuitConfirmed;
+}
+
 // Window content only: AppWindow::Render() wraps it in Begin/End
 void EditorWindow::Draw() {
-    // File results open popups, which must belong to this window
+    // File results and the quit request open popups, which must belong to this window
     ProcessDialogResult();
+    HandleQuitRequest();
     HandleFileShortcuts();
     DrawToolbar();
 
@@ -536,6 +536,18 @@ void EditorWindow::RequestOpen() {
     }
 }
 
+void EditorWindow::HandleQuitRequest() {
+    if (!std::exchange(m_QuitRequested, false)) {
+        return;
+    }
+    if (m_Schematic.IsModified()) {
+        m_ActionToConfirm = FileAction::Quit;
+        ImGui::OpenPopup(DiscardPopup);
+    } else {
+        m_QuitConfirmed = true;
+    }
+}
+
 void EditorWindow::Save() {
     if (const auto &file_path = m_Schematic.GetFilePath()) {
         SaveFile(*file_path);
@@ -598,31 +610,36 @@ void EditorWindow::ShowFileDialog(const FileAction action) {
     m_DialogLocation = file_path ? file_path->string() : "";
     const char *location = m_DialogLocation.empty() ? nullptr : m_DialogLocation.c_str();
     const int filter_count = static_cast<int>(SchematicFilters.size());
+    // The callback owns this copy of the channel and deletes it, so the channel outlives the editor if needed
+    auto *channel = new std::shared_ptr<DialogChannel>(m_DialogChannel);
     if (action == FileAction::Open) {
-        SDL_ShowOpenFileDialog(HandleFileDialogResult, this, nullptr, SchematicFilters.data(), filter_count, location,
-                               false);
+        SDL_ShowOpenFileDialog(HandleFileDialogResult, channel, nullptr, SchematicFilters.data(), filter_count,
+                               location, false);
     } else {
-        SDL_ShowSaveFileDialog(HandleFileDialogResult, this, nullptr, SchematicFilters.data(), filter_count, location);
+        SDL_ShowSaveFileDialog(HandleFileDialogResult, channel, nullptr, SchematicFilters.data(), filter_count,
+                               location);
     }
 }
 
-// SDL may call this from another thread, so it only stores the result for the main thread to handle
+// SDL may call this from another thread, and after the editor is gone, so it only stores the result in the
+// channel for the main thread to handle. SDL calls it exactly once per dialog
 void SDLCALL EditorWindow::HandleFileDialogResult(void *userdata, const char *const *file_list, int /*filter*/) {
-    auto *editor = static_cast<EditorWindow *>(userdata);
+    const std::unique_ptr<std::shared_ptr<DialogChannel>> channel(
+        static_cast<std::shared_ptr<DialogChannel> *>(userdata));
     DialogResult result;
     // A null list means an error and an empty list means the user canceled
     if (file_list != nullptr && file_list[0] != nullptr) {
         result.Path = std::filesystem::path(file_list[0]);
     }
-    const std::scoped_lock lock(editor->m_DialogMutex);
-    editor->m_DialogResult = std::move(result);
+    const std::scoped_lock lock((*channel)->Mutex);
+    (*channel)->Result = std::move(result);
 }
 
 void EditorWindow::ProcessDialogResult() {
     std::optional<DialogResult> result;
     {
-        const std::scoped_lock lock(m_DialogMutex);
-        result = std::exchange(m_DialogResult, std::nullopt);
+        const std::scoped_lock lock(m_DialogChannel->Mutex);
+        result = std::exchange(m_DialogChannel->Result, std::nullopt);
     }
     if (!result) {
         return;
@@ -646,6 +663,8 @@ void EditorWindow::DrawFilePopups() {
                 NewSchematic();
             } else if (m_ActionToConfirm == FileAction::Open) {
                 ShowFileDialog(FileAction::Open);
+            } else if (m_ActionToConfirm == FileAction::Quit) {
+                m_QuitConfirmed = true;
             }
             m_ActionToConfirm.reset();
             ImGui::CloseCurrentPopup();

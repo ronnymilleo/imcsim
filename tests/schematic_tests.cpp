@@ -201,3 +201,17 @@ TEST_CASE("Selecting does not drop simulation results", "[schematic]") {
     schematic.ClearSelection();
     CHECK(schematic.GetOperatingPoint());
 }
+
+TEST_CASE("Each analysis has its own results version", "[schematic]") {
+    GUI::Schematic schematic;
+    const std::size_t transient_version = schematic.GetTransientVersion();
+    const std::size_t sweep_version = schematic.GetACSweepVersion();
+
+    schematic.SetTransient(Core::Transient{});
+    CHECK(schematic.GetTransientVersion() != transient_version);
+    CHECK(schematic.GetACSweepVersion() == sweep_version);
+
+    schematic.SetACSweep(Core::ACSweep{});
+    schematic.SetOperatingPoint(Core::OperatingPoint{});
+    CHECK(schematic.GetACSweepVersion() != sweep_version);
+}

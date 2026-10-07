@@ -160,11 +160,15 @@ void Application::PollEvents() {
     SDL_Event event;
     while (SDL_PollEvent(&event)) {
         ImGui_ImplSDL3_ProcessEvent(&event);
-        if (event.type == SDL_EVENT_QUIT) {
-            m_IsOpen = false;
-        }
-        if (event.type == SDL_EVENT_WINDOW_CLOSE_REQUESTED && event.window.windowID == SDL_GetWindowID(m_SDLWindow)) {
-            m_IsOpen = false;
+        const bool main_window_closed =
+            event.type == SDL_EVENT_WINDOW_CLOSE_REQUESTED && event.window.windowID == SDL_GetWindowID(m_SDLWindow);
+        if (event.type == SDL_EVENT_QUIT || main_window_closed) {
+            // The editor asks before unsaved changes are lost and Render() quits once it confirms. Minimized
+            // windows draw no frames, so the window is restored for the question to show up
+            m_EditorWindow.RequestQuit();
+            if (SDL_GetWindowFlags(m_SDLWindow) & SDL_WINDOW_MINIMIZED) {
+                SDL_RestoreWindow(m_SDLWindow);
+            }
         }
     }
 }
@@ -197,6 +201,9 @@ void Application::Render() {
     m_NetlistWindow.Render();
     m_SimulationWindow.Render();
     m_OutputWindow.Render();
+    if (m_EditorWindow.IsQuitConfirmed()) {
+        m_IsOpen = false;
+    }
     ImGui::Render();
 }
 
