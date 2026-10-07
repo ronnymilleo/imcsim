@@ -1,10 +1,10 @@
 /**
- * @file    editor.h
+ * @file    editor_window.h
  * @brief   Schematic editor window with a pannable and zoomable grid canvas.
  */
 
-#ifndef IMCSIM_EDITOR_H
-#define IMCSIM_EDITOR_H
+#ifndef IMCSIM_EDITOR_WINDOW_H
+#define IMCSIM_EDITOR_WINDOW_H
 
 #include "components/component.h"
 #include "connectivity.h"
@@ -12,8 +12,9 @@
 #include "imgui.h"
 #include "ui_elements/ui_element.h"
 #include "ui_elements/ui_wire.h"
+#include "windows/app_window.h"
 #include <SDL3/SDL_dialog.h>
-#include <array>
+#include <cstddef>
 #include <filesystem>
 #include <memory>
 #include <mutex>
@@ -24,19 +25,24 @@
 namespace GUI {
 
 /**
- * @class   Editor
+ * @class   EditorWindow
  * @brief   Schematic editor window where circuit components are placed and wired on a grid.
  * @details Positions are stored in world units (one unit per grid cell) and converted to screen pixels
  *          using the current pan offset and zoom factor. The editor is either selecting (the default), placing
  *          a component or drawing wires; starting one mode leaves the other. Schematics are saved to and opened
- *          from JSON files through the native file dialogs of SDL.
+ *          from JSON files through the native file dialogs of SDL. It owns the schematic; the Properties and
+ *          Netlist windows read and edit it through the public methods.
  */
-class Editor {
+class EditorWindow : public AppWindow {
 public:
-    Editor() = default;
-    ~Editor() = default;
+    EditorWindow();
+    ~EditorWindow() override = default;
 
-    void Draw();
+    UIElement *GetSelectedElement();
+    bool IsWireSelected() const;
+    std::size_t GetSelectionVersion() const;
+    void MarkModified();
+    std::string BuildSpiceNetlist();
 
 private:
     /**
@@ -78,14 +84,11 @@ private:
     std::optional<std::size_t> m_SelectedElement;
     std::optional<std::size_t> m_SelectedWire;
     std::optional<ElementDrag> m_Drag;
-    // Text being edited in the Properties window, and the element it was loaded from
-    std::array<char, 32> m_ValueText{};
-    std::optional<std::size_t> m_ValueTextElement;
-    bool m_ValueTextInvalid = false;
+    // Changes whenever the selection changes, so other windows can tell even when an index is reused
+    std::size_t m_SelectionVersion = 0;
     // Rebuilt lazily after the schematic changes
     std::optional<Connectivity> m_Connectivity;
     bool m_ShowNodes = false;
-    bool m_ShowNetlist = false;
     SymbolStyle m_SymbolStyle = SymbolStyle::IEC;
     ImVec2 m_Pan = {0, 0};
     float m_Zoom = 20.0f;
@@ -101,6 +104,7 @@ private:
     std::string m_FileMessagesTitle;
     std::vector<std::string> m_FileMessages;
 
+    void Draw() override;
     void DrawToolbar();
     void DrawFileButtons();
     void HandleFileShortcuts();
@@ -115,11 +119,8 @@ private:
     void OpenFile(const std::filesystem::path &path);
     void SaveFile(std::filesystem::path path);
     void ShowFileMessages(std::string title, std::vector<std::string> messages);
-    void MarkModified();
+    const Connectivity &GetConnectivity();
     void DrawWires(ImDrawList *draw_list, const ViewTransform &view);
-    void DrawNetlistWindow();
-    void DrawPropertiesWindow();
-    void LoadValueText();
     void AssignName(Core::Component &component) const;
     void StartPlacing(Core::ComponentType type);
     void StartDrawingWires();
@@ -141,4 +142,4 @@ private:
 
 } // namespace GUI
 
-#endif // IMCSIM_EDITOR_H
+#endif // IMCSIM_EDITOR_WINDOW_H

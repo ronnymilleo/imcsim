@@ -6,7 +6,6 @@ add_library(imcsim-gui-lib
         STATIC
             application.cpp
             connectivity.cpp
-            editor.cpp
             element_factory.cpp
             helpers.cpp
             schematic_file.cpp
@@ -18,6 +17,10 @@ add_library(imcsim-gui-lib
             ui_elements/ui_vcc.cpp
             ui_elements/ui_wire.cpp
             vulkan_context.cpp
+            windows/app_window.cpp
+            windows/editor_window.cpp
+            windows/netlist_window.cpp
+            windows/properties_window.cpp
             wire_editing.cpp
 )
 

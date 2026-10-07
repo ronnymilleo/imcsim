@@ -8,7 +8,9 @@
 #include "error_codes.h"
 #include "imgui.h"
 #include "imgui_impl_sdl3.h"
+#include "imgui_internal.h"
 #include <SDL3/SDL.h>
+#include <array>
 #include <cstdio>
 
 namespace GUI {
@@ -35,22 +37,8 @@ int Application::Init() {
  * @return  Core::ExitSuccess when the loop ends normally.
  */
 int Application::Run() {
-    const ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
-    const ImGuiIO &io = ImGui::GetIO();
-
-    bool done = false;
-    while (!done) {
-        SDL_Event event;
-        while (SDL_PollEvent(&event)) {
-            ImGui_ImplSDL3_ProcessEvent(&event);
-            if (event.type == SDL_EVENT_QUIT) {
-                done = true;
-            }
-            if (event.type == SDL_EVENT_WINDOW_CLOSE_REQUESTED &&
-                event.window.windowID == SDL_GetWindowID(m_SDLWindow)) {
-                done = true;
-            }
-        }
+    while (m_IsOpen) {
+        PollEvents();
 
         if (SDL_GetWindowFlags(m_SDLWindow) & SDL_WINDOW_MINIMIZED) {
             SDL_Delay(10);
@@ -59,29 +47,9 @@ int Application::Run() {
 
         m_Vulkan.ResizeIfNeeded(m_SDLWindow);
 
-        ImGui_ImplVulkan_NewFrame();
-        ImGui_ImplSDL3_NewFrame();
-        ImGui::NewFrame();
-
-        m_Editor.Draw();
-        ImGui::ShowDemoWindow();
-
-        ImGui::Render();
-        ImDrawData *main_draw_data = ImGui::GetDrawData();
-        const bool main_is_minimized = (main_draw_data->DisplaySize.x <= 0.0f || main_draw_data->DisplaySize.y <= 0.0f);
-        m_Vulkan.SetClearColor(clear_color);
-        if (!main_is_minimized) {
-            m_Vulkan.FrameRender(main_draw_data);
-        }
-
-        if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
-            ImGui::UpdatePlatformWindows();
-            ImGui::RenderPlatformWindowsDefault();
-        }
-
-        if (!main_is_minimized) {
-            m_Vulkan.FramePresent();
-        }
+        NewFrame();
+        Render();
+        EndFrame();
     }
 
     return Core::ExitSuccess;
@@ -183,6 +151,109 @@ int Application::InitImGui() {
     m_Vulkan.FillImGuiInitInfo(m_VulkanInitInfo);
     ImGui_ImplVulkan_Init(&m_VulkanInitInfo);
     return Core::ExitSuccess;
+}
+
+void Application::PollEvents() {
+    SDL_Event event;
+    while (SDL_PollEvent(&event)) {
+        ImGui_ImplSDL3_ProcessEvent(&event);
+        if (event.type == SDL_EVENT_QUIT) {
+            m_IsOpen = false;
+        }
+        if (event.type == SDL_EVENT_WINDOW_CLOSE_REQUESTED && event.window.windowID == SDL_GetWindowID(m_SDLWindow)) {
+            m_IsOpen = false;
+        }
+    }
+}
+
+void Application::NewFrame() {
+    ImGui_ImplVulkan_NewFrame();
+    ImGui_ImplSDL3_NewFrame();
+    ImGui::NewFrame();
+}
+
+void Application::Render() {
+    // The menu bar goes first so the dockspace fills the space left below it
+    DrawMainMenuBar();
+
+    // A fixed ID lets the layout be rebuilt before the dockspace is submitted this frame
+    const ImGuiID dockspace_id = ImGui::GetID("MainDockSpace");
+    if (m_ResetLayout) {
+        ImGui::DockBuilderRemoveNode(dockspace_id);
+        m_ResetLayout = false;
+    }
+    // No node means imgui.ini has no saved layout, or it was just reset, so the default one is built
+    if (ImGui::DockBuilderGetNode(dockspace_id) == nullptr) {
+        ImGui::DockBuilderAddNode(dockspace_id, ImGuiDockNodeFlags_DockSpace);
+        SetupDefaultLayout(dockspace_id);
+    }
+    ImGui::DockSpaceOverViewport(dockspace_id, ImGui::GetMainViewport());
+
+    m_EditorWindow.Render();
+    m_PropertiesWindow.Render();
+    m_NetlistWindow.Render();
+    ImGui::Render();
+}
+
+void Application::DrawMainMenuBar() {
+    if (!ImGui::BeginMainMenuBar()) {
+        return;
+    }
+    if (ImGui::BeginMenu("View")) {
+        // The editor cannot be closed, so only the side windows are listed
+        const std::array<AppWindow *, 2> closable_windows = {&m_PropertiesWindow, &m_NetlistWindow};
+        for (AppWindow *window : closable_windows) {
+            bool open = window->IsOpen();
+            if (ImGui::MenuItem(window->GetWindowTitle().c_str(), nullptr, &open)) {
+                window->SetOpen(open);
+            }
+        }
+        ImGui::Separator();
+        // Render() applies it right after the menu, and closed windows are reopened so the whole layout shows up
+        if (ImGui::MenuItem("Reset Layout")) {
+            m_ResetLayout = true;
+            for (AppWindow *window : closable_windows) {
+                window->SetOpen(true);
+            }
+        }
+        ImGui::EndMenu();
+    }
+    ImGui::EndMainMenuBar();
+}
+
+// Editor on top, Properties and Netlist side by side below it. Must run before the windows are drawn.
+// Each split returns the new node in the given direction and leaves the rest in its last argument
+void Application::SetupDefaultLayout(ImGuiID dockspace_id) {
+    ImGui::DockBuilderSetNodeSize(dockspace_id, ImGui::GetMainViewport()->WorkSize);
+    ImGuiID editor_id = dockspace_id;
+    ImGuiID properties_id = ImGui::DockBuilderSplitNode(editor_id, ImGuiDir_Down, 0.3f, nullptr, &editor_id);
+    const ImGuiID netlist_id =
+        ImGui::DockBuilderSplitNode(properties_id, ImGuiDir_Right, 0.5f, nullptr, &properties_id);
+    ImGui::DockBuilderDockWindow(m_EditorWindow.GetWindowTitle().c_str(), editor_id);
+    ImGui::DockBuilderDockWindow(m_PropertiesWindow.GetWindowTitle().c_str(), properties_id);
+    ImGui::DockBuilderDockWindow(m_NetlistWindow.GetWindowTitle().c_str(), netlist_id);
+    ImGui::DockBuilderFinish(dockspace_id);
+}
+
+void Application::EndFrame() {
+    constexpr auto ClearColor = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
+    const ImGuiIO &io = ImGui::GetIO();
+
+    ImDrawData *main_draw_data = ImGui::GetDrawData();
+    const bool main_is_minimized = (main_draw_data->DisplaySize.x <= 0.0f || main_draw_data->DisplaySize.y <= 0.0f);
+    m_Vulkan.SetClearColor(ClearColor);
+    if (!main_is_minimized) {
+        m_Vulkan.FrameRender(main_draw_data);
+    }
+
+    if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
+        ImGui::UpdatePlatformWindows();
+        ImGui::RenderPlatformWindowsDefault();
+    }
+
+    if (!main_is_minimized) {
+        m_Vulkan.FramePresent();
+    }
 }
 
 } // namespace GUI

@@ -1,13 +1,12 @@
 /**
- * @file    editor.cpp
+ * @file    editor_window.cpp
  * @brief   Schematic editor window with a pannable and zoomable grid canvas.
  */
 
-#include "editor.h"
+#include "editor_window.h"
 
 #include "element_factory.h"
 #include "schematic_file.h"
-#include "spice_value.h"
 #include "wire_editing.h"
 #include <algorithm>
 #include <array>
@@ -28,7 +27,6 @@ constexpr ImU32 ElementColor = IM_COL32(220, 220, 220, 255);
 constexpr ImU32 PreviewColor = IM_COL32(100, 180, 255, 160);
 constexpr ImU32 WireColor = IM_COL32(120, 200, 120, 255);
 constexpr ImU32 SelectedColor = IM_COL32(255, 200, 80, 255);
-constexpr ImVec4 ErrorTextColor = {1.0f, 0.4f, 0.4f, 1.0f};
 constexpr float MinCanvasSize = 50.0f;
 constexpr float MinZoom = 4.0f;
 constexpr float MaxZoom = 200.0f;
@@ -105,11 +103,54 @@ void DrawGrid(ImDrawList *draw_list, const ViewTransform &view, const ImVec2 ori
 } // namespace
 
 /**
- * @brief   Draws the editor window and handles toolbar, pan, zoom, selection, placement and wiring input.
- *          Call once per frame.
+ * @brief   Creates the editor with an empty, untitled schematic.
  */
-void Editor::Draw() {
-    ImGui::Begin("Schematic");
+EditorWindow::EditorWindow() : AppWindow("Schematic", false) {
+}
+
+/**
+ * @brief   Returns the selected element, for editing it from another window.
+ * @return  The element, or nullptr when no element is selected. Valid until the next frame of the editor.
+ */
+UIElement *EditorWindow::GetSelectedElement() {
+    return m_SelectedElement ? m_Elements[*m_SelectedElement].get() : nullptr;
+}
+
+/**
+ * @brief   Tells whether a wire is selected.
+ * @return  True when the selection is a wire.
+ */
+bool EditorWindow::IsWireSelected() const {
+    return m_SelectedWire.has_value();
+}
+
+/**
+ * @brief   Returns a number that changes every time the selection changes.
+ * @return  The selection version; compare it with a stored one to know whether to reload selection data.
+ */
+std::size_t EditorWindow::GetSelectionVersion() const {
+    return m_SelectionVersion;
+}
+
+/**
+ * @brief   Records that the schematic changed, so it counts as unsaved and its nodes are recomputed.
+ * @note    Call it after editing an element obtained from GetSelectedElement().
+ */
+void EditorWindow::MarkModified() {
+    m_Modified = true;
+    m_Connectivity.reset();
+}
+
+/**
+ * @brief   Builds the SPICE netlist of the current schematic.
+ * @return  The netlist text, as handed to ngspice.
+ */
+std::string EditorWindow::BuildSpiceNetlist() {
+    return BuildCircuit(m_Elements, GetConnectivity()).ToSpiceNetlist();
+}
+
+// Window content only: AppWindow::Render() wraps it in Begin/End
+void EditorWindow::Draw() {
     // File results open popups, which must belong to this window
     ProcessDialogResult();
     HandleFileShortcuts();
@@ -149,15 +190,9 @@ void Editor::Draw() {
 
     draw_list->PopClipRect();
     DrawFilePopups();
-    ImGui::End();
-
-    DrawPropertiesWindow();
-    if (m_ShowNetlist) {
-        DrawNetlistWindow();
-    }
 }
 
-void Editor::DrawToolbar() {
+void EditorWindow::DrawToolbar() {
     DrawFileButtons();
     ImGui::SameLine();
     ImGui::TextUnformatted("|");
@@ -176,8 +211,6 @@ void Editor::DrawToolbar() {
     ImGui::SameLine();
     ImGui::Checkbox("Nodes", &m_ShowNodes);
     ImGui::SameLine();
-    ImGui::Checkbox("Netlist", &m_ShowNetlist);
-    ImGui::SameLine();
     ImGui::TextUnformatted("|  Symbols:");
     ImGui::SameLine();
     if (ImGui::RadioButton("IEC", m_SymbolStyle == SymbolStyle::IEC)) {
@@ -192,7 +225,7 @@ void Editor::DrawToolbar() {
     ImGui::TextDisabled("|  %s%s", file_name.c_str(), m_Modified ? " *" : "");
 }
 
-void Editor::DrawFileButtons() {
+void EditorWindow::DrawFileButtons() {
     if (ImGui::Button("New")) {
         RequestNew();
     }
@@ -211,7 +244,7 @@ void Editor::DrawFileButtons() {
 }
 
 // Global routing makes the shortcuts work while another editor window, such as Properties, has focus
-void Editor::HandleFileShortcuts() {
+void EditorWindow::HandleFileShortcuts() {
     if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_N, ImGuiInputFlags_RouteGlobal)) {
         RequestNew();
     }
@@ -226,7 +259,7 @@ void Editor::HandleFileShortcuts() {
     }
 }
 
-void Editor::DrawFilePopups() {
+void EditorWindow::DrawFilePopups() {
     if (ImGui::BeginPopupModal(DiscardPopup, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
         ImGui::TextUnformatted("The schematic has unsaved changes. Discard them?");
         if (ImGui::Button("Discard")) {
@@ -259,7 +292,7 @@ void Editor::DrawFilePopups() {
     }
 }
 
-void Editor::RequestNew() {
+void EditorWindow::RequestNew() {
     if (m_Modified) {
         m_ActionToConfirm = FileAction::New;
         ImGui::OpenPopup(DiscardPopup);
@@ -268,7 +301,7 @@ void Editor::RequestNew() {
     }
 }
 
-void Editor::RequestOpen() {
+void EditorWindow::RequestOpen() {
     if (m_Modified) {
         m_ActionToConfirm = FileAction::Open;
         ImGui::OpenPopup(DiscardPopup);
@@ -277,7 +310,7 @@ void Editor::RequestOpen() {
     }
 }
 
-void Editor::Save() {
+void EditorWindow::Save() {
     if (m_FilePath) {
         SaveFile(*m_FilePath);
     } else {
@@ -286,7 +319,7 @@ void Editor::Save() {
 }
 
 // The dialog runs asynchronously: its result is picked up by ProcessDialogResult() on a later frame
-void Editor::ShowFileDialog(const FileAction action) {
+void EditorWindow::ShowFileDialog(const FileAction action) {
     if (m_DialogAction) {
         return;
     }
@@ -303,8 +336,8 @@ void Editor::ShowFileDialog(const FileAction action) {
 }
 
 // SDL may call this from another thread, so it only stores the result for the main thread to handle
-void SDLCALL Editor::HandleFileDialogResult(void *userdata, const char *const *file_list, int /*filter*/) {
-    auto *editor = static_cast<Editor *>(userdata);
+void SDLCALL EditorWindow::HandleFileDialogResult(void *userdata, const char *const *file_list, int /*filter*/) {
+    auto *editor = static_cast<EditorWindow *>(userdata);
     DialogResult result;
     // A null list means an error and an empty list means the user canceled
     if (file_list != nullptr && file_list[0] != nullptr) {
@@ -314,7 +347,7 @@ void SDLCALL Editor::HandleFileDialogResult(void *userdata, const char *const *f
     editor->m_DialogResult = std::move(result);
 }
 
-void Editor::ProcessDialogResult() {
+void EditorWindow::ProcessDialogResult() {
     std::optional<DialogResult> result;
     {
         const std::scoped_lock lock(m_DialogMutex);
@@ -334,7 +367,7 @@ void Editor::ProcessDialogResult() {
     }
 }
 
-void Editor::NewSchematic() {
+void EditorWindow::NewSchematic() {
     ClearSelection();
     m_PlacingType.reset();
     m_DrawingWires = false;
@@ -347,7 +380,7 @@ void Editor::NewSchematic() {
 }
 
 // Skipped parts are reported, and the schematic counts as modified because saving it would drop them
-void Editor::OpenFile(const std::filesystem::path &path) {
+void EditorWindow::OpenFile(const std::filesystem::path &path) {
     const auto text = ReadTextFile(path);
     if (!text) {
         ShowFileMessages("Could not open the schematic", {text.error()});
@@ -371,7 +404,7 @@ void Editor::OpenFile(const std::filesystem::path &path) {
 }
 
 // Dialogs do not always add the extension, so it is added here when missing
-void Editor::SaveFile(std::filesystem::path path) {
+void EditorWindow::SaveFile(std::filesystem::path path) {
     if (path.extension() != SchematicExtension) {
         path += SchematicExtension;
     }
@@ -384,26 +417,27 @@ void Editor::SaveFile(std::filesystem::path path) {
     m_Modified = false;
 }
 
-void Editor::ShowFileMessages(std::string title, std::vector<std::string> messages) {
+void EditorWindow::ShowFileMessages(std::string title, std::vector<std::string> messages) {
     m_FileMessagesTitle = std::move(title);
     m_FileMessages = std::move(messages);
     ImGui::OpenPopup(FileMessagesPopup);
 }
 
-void Editor::MarkModified() {
-    m_Modified = true;
-    m_Connectivity.reset();
-}
-
-void Editor::DrawWires(ImDrawList *draw_list, const ViewTransform &view) {
+// Built on first use after a change and kept until MarkModified() or another change resets it
+const Connectivity &EditorWindow::GetConnectivity() {
     if (!m_Connectivity) {
         m_Connectivity.emplace(m_Elements, m_Wires);
     }
+    return *m_Connectivity;
+}
+
+void EditorWindow::DrawWires(ImDrawList *draw_list, const ViewTransform &view) {
+    const Connectivity &connectivity = GetConnectivity();
 
     for (std::size_t index = 0; index < m_Wires.size(); ++index) {
         const UIWire &wire = m_Wires[index];
         // Every wire end is a connection point, so it always has a node
-        const int node = m_Connectivity->GetNode(wire.GetStart()).value_or(0);
+        const int node = connectivity.GetNode(wire.GetStart()).value_or(0);
         ImU32 color = m_ShowNodes ? GetNodeColor(node) : WireColor;
         if (index == m_SelectedWire) {
             color = SelectedColor;
@@ -412,8 +446,8 @@ void Editor::DrawWires(ImDrawList *draw_list, const ViewTransform &view) {
     }
 
     const float junction_radius = std::max(m_Zoom * JunctionRadiusScale, MinJunctionRadius);
-    for (const GridPoint junction : m_Connectivity->GetJunctions()) {
-        const int node = m_Connectivity->GetNode(junction).value_or(0);
+    for (const GridPoint junction : connectivity.GetJunctions()) {
+        const int node = connectivity.GetNode(junction).value_or(0);
         draw_list->AddCircleFilled(view.ToScreen(ToVec2(junction)), junction_radius,
                                    m_ShowNodes ? GetNodeColor(node) : WireColor);
     }
@@ -422,94 +456,13 @@ void Editor::DrawWires(ImDrawList *draw_list, const ViewTransform &view) {
         return;
     }
     for (const UIWire &wire : m_Wires) {
-        const int node = m_Connectivity->GetNode(wire.GetStart()).value_or(0);
+        const int node = connectivity.GetNode(wire.GetStart()).value_or(0);
         const ImVec2 middle = view.ToScreen((ToVec2(wire.GetStart()) + ToVec2(wire.GetEnd())) / 2.0f);
         draw_list->AddText(middle, NodeLabelColor, std::format("{}", node).c_str());
     }
 }
 
-// Shows the SPICE netlist that will be handed to ngspice
-void Editor::DrawNetlistWindow() {
-    if (!ImGui::Begin("Netlist", &m_ShowNetlist)) {
-        ImGui::End();
-        return;
-    }
-    if (!m_Connectivity) {
-        m_Connectivity.emplace(m_Elements, m_Wires);
-    }
-
-    const std::string netlist = BuildCircuit(m_Elements, *m_Connectivity).ToSpiceNetlist();
-    if (ImGui::Button("Copy")) {
-        ImGui::SetClipboardText(netlist.c_str());
-    }
-    ImGui::Separator();
-    ImGui::TextUnformatted(netlist.c_str());
-    ImGui::End();
-}
-
-// Values are typed with SPICE suffixes and applied as soon as they are valid: the schematic window is handled
-// before this one, so a click on the canvas would change the selection before a deferred edit was applied
-void Editor::DrawPropertiesWindow() {
-    if (!ImGui::Begin("Properties")) {
-        ImGui::End();
-        return;
-    }
-    if (m_SelectedWire) {
-        ImGui::TextUnformatted("Wire");
-        ImGui::End();
-        return;
-    }
-    if (!m_SelectedElement) {
-        ImGui::TextDisabled("Select a component to edit it");
-        ImGui::End();
-        return;
-    }
-
-    Core::Component &component = m_Elements[*m_SelectedElement]->GetComponent();
-    ImGui::TextUnformatted(component.GetTypeName());
-    if (!component.GetName().empty()) {
-        ImGui::TextUnformatted(std::format("Name: {}", component.GetName()).c_str());
-    }
-    if (!component.HasValue()) {
-        ImGui::End();
-        return;
-    }
-
-    if (m_ValueTextElement != m_SelectedElement) {
-        LoadValueText();
-    }
-    ImGui::SetNextItemWidth(ImGui::GetFontSize() * 8.0f);
-    if (ImGui::InputText("##value", m_ValueText.data(), m_ValueText.size())) {
-        const std::optional<double> value = Core::ParseValue(m_ValueText.data(), component.GetUnit());
-        m_ValueTextInvalid = !value || !component.IsValidValue(*value);
-        if (!m_ValueTextInvalid) {
-            component.SetValue(*value);
-            MarkModified();
-        }
-    }
-    if (ImGui::IsItemDeactivatedAfterEdit() && !m_ValueTextInvalid) {
-        // Rewrite the text in canonical form, so "4700" becomes "4.7k"
-        LoadValueText();
-    }
-    ImGui::SameLine();
-    ImGui::TextUnformatted(component.GetUnit());
-    if (m_ValueTextInvalid) {
-        ImGui::TextColored(ErrorTextColor, "Invalid value");
-    }
-    ImGui::TextDisabled("Suffixes: T G M k m u n p f (case sensitive)");
-    ImGui::End();
-}
-
-void Editor::LoadValueText() {
-    const Core::Component &component = m_Elements[*m_SelectedElement]->GetComponent();
-    const std::string text = Core::FormatValue(component.GetValue());
-    m_ValueText.fill('\0');
-    text.copy(m_ValueText.data(), m_ValueText.size() - 1);
-    m_ValueTextElement = m_SelectedElement;
-    m_ValueTextInvalid = false;
-}
-
-void Editor::AssignName(Core::Component &component) const {
+void EditorWindow::AssignName(Core::Component &component) const {
     const std::string_view prefix = component.GetNamePrefix();
     if (prefix.empty()) {
         return;
@@ -521,7 +474,7 @@ void Editor::AssignName(Core::Component &component) const {
     component.SetName(Core::NextComponentName(prefix, names));
 }
 
-void Editor::StartPlacing(const Core::ComponentType type) {
+void EditorWindow::StartPlacing(const Core::ComponentType type) {
     ClearSelection();
     m_DrawingWires = false;
     m_WireStart.reset();
@@ -529,13 +482,13 @@ void Editor::StartPlacing(const Core::ComponentType type) {
     m_PlacingRotation = Rotation::R0;
 }
 
-void Editor::StartDrawingWires() {
+void EditorWindow::StartDrawingWires() {
     ClearSelection();
     m_PlacingType.reset();
     m_DrawingWires = true;
 }
 
-void Editor::HandlePanAndZoom(const ImVec2 origin, const bool hovered, const bool active) {
+void EditorWindow::HandlePanAndZoom(const ImVec2 origin, const bool hovered, const bool active) {
     const ImGuiIO &io = ImGui::GetIO();
     if (active && ImGui::IsMouseDragging(ImGuiMouseButton_Middle)) {
         m_Pan += io.MouseDelta;
@@ -553,7 +506,7 @@ void Editor::HandlePanAndZoom(const ImVec2 origin, const bool hovered, const boo
  * @brief   Handles placement mode: R rotates, Esc or right click cancels, left click places and keeps the mode
  *          active so several components can be placed in a row.
  */
-void Editor::HandlePlacement(ImDrawList *draw_list, const ViewTransform &view, const bool hovered) {
+void EditorWindow::HandlePlacement(ImDrawList *draw_list, const ViewTransform &view, const bool hovered) {
     if (!m_PlacingType) {
         return;
     }
@@ -592,7 +545,7 @@ void Editor::HandlePlacement(ImDrawList *draw_list, const ViewTransform &view, c
  *          at the same point, or with Esc or right click. Esc or right click with no wire in progress leaves
  *          the mode.
  */
-void Editor::HandleWireDrawing(ImDrawList *draw_list, const ViewTransform &view, const bool hovered) {
+void EditorWindow::HandleWireDrawing(ImDrawList *draw_list, const ViewTransform &view, const bool hovered) {
     if (!m_DrawingWires) {
         return;
     }
@@ -647,7 +600,7 @@ void Editor::HandleWireDrawing(ImDrawList *draw_list, const ViewTransform &view,
 }
 
 // Esc and right click first drop the wire in progress, and only leave wire mode when there is none
-void Editor::StopWire() {
+void EditorWindow::StopWire() {
     if (m_WireStart) {
         m_WireStart.reset();
     } else {
@@ -656,14 +609,14 @@ void Editor::StopWire() {
 }
 
 // Zero-length segments appear when the bend lands on an end point, as with straight wires
-void Editor::AddWire(const GridPoint start, const GridPoint end) {
+void EditorWindow::AddWire(const GridPoint start, const GridPoint end) {
     if (start != end) {
         m_Wires.emplace_back(start, end);
         MarkModified();
     }
 }
 
-bool Editor::IsTerminal(const GridPoint point) const {
+bool EditorWindow::IsTerminal(const GridPoint point) const {
     return std::ranges::any_of(
         m_Elements, [point](const auto &element) { return std::ranges::contains(element->GetTerminals(), point); });
 }
@@ -673,7 +626,7 @@ bool Editor::IsTerminal(const GridPoint point) const {
  *          dragging an element moves it with its wires following, R rotates the selected element, Delete removes
  *          the selection and Esc clears it.
  */
-void Editor::HandleSelection(const ViewTransform &view, const bool hovered) {
+void EditorWindow::HandleSelection(const ViewTransform &view, const bool hovered) {
     if (m_PlacingType || m_DrawingWires) {
         return;
     }
@@ -717,7 +670,7 @@ void Editor::HandleSelection(const ViewTransform &view, const bool hovered) {
 }
 
 // Elements win over wires, and the most recently added item wins because it is drawn on top
-void Editor::SelectAt(const ImVec2 world_pos) {
+void EditorWindow::SelectAt(const ImVec2 world_pos) {
     ClearSelection();
     for (std::size_t index = m_Elements.size(); index-- > 0;) {
         if (m_Elements[index]->Contains(world_pos)) {
@@ -734,16 +687,15 @@ void Editor::SelectAt(const ImVec2 world_pos) {
     }
 }
 
-void Editor::ClearSelection() {
+void EditorWindow::ClearSelection() {
     EndDrag();
     m_SelectedElement.reset();
     m_SelectedWire.reset();
-    // Indices are reused after a deletion, so the next selection must always reload the value text
-    m_ValueTextElement.reset();
+    ++m_SelectionVersion;
 }
 
 // While dragging, wires are rebuilt from the snapshot every frame; the cleanup waits until the drop
-void Editor::EndDrag() {
+void EditorWindow::EndDrag() {
     if (!m_Drag) {
         return;
     }
@@ -752,7 +704,7 @@ void Editor::EndDrag() {
 }
 
 // During a drag only the rotation changes here; the drag rebuilds the wires from its snapshot on the next frame
-void Editor::RotateSelectedElement() {
+void EditorWindow::RotateSelectedElement() {
     UIElement &element = *m_Elements[*m_SelectedElement];
     const std::vector<GridPoint> old_terminals = element.GetTerminals();
     element.SetRotation(NextRotation(element.GetRotation()));
@@ -765,7 +717,7 @@ void Editor::RotateSelectedElement() {
 }
 
 // Wires attached to a deleted element stay in place, like in LTspice
-void Editor::DeleteSelection() {
+void EditorWindow::DeleteSelection() {
     if (m_SelectedElement) {
         m_Elements.erase(m_Elements.begin() + static_cast<std::ptrdiff_t>(*m_SelectedElement));
     } else if (m_SelectedWire) {
@@ -778,13 +730,13 @@ void Editor::DeleteSelection() {
 }
 
 // Simplifying merges and removes wires, so wire indices are no longer valid afterwards
-void Editor::SimplifyAllWires() {
+void EditorWindow::SimplifyAllWires() {
     m_Wires = SimplifyWires(m_Wires, CollectTerminals());
     m_SelectedWire.reset();
     m_Connectivity.reset();
 }
 
-std::vector<GridPoint> Editor::CollectTerminals() const {
+std::vector<GridPoint> EditorWindow::CollectTerminals() const {
     std::vector<GridPoint> terminals;
     for (const auto &element : m_Elements) {
         std::ranges::copy(element->GetTerminals(), std::back_inserter(terminals));
