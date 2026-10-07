@@ -3,11 +3,13 @@
  * @brief   Tests for the per-type metadata of simulation components.
  */
 
+#include "components/bjt.h"
 #include "components/capacitor.h"
 #include "components/current_source.h"
 #include "components/diode.h"
 #include "components/ground.h"
 #include "components/inductor.h"
+#include "components/mosfet.h"
 #include "components/resistor.h"
 #include "components/vcc.h"
 #include "components/voltage_source.h"
@@ -78,7 +80,8 @@ TEST_CASE("Type names convert both ways", "[component]") {
          {Core::ComponentType::Resistor, Core::ComponentType::Capacitor, Core::ComponentType::Inductor,
           Core::ComponentType::Ground, Core::ComponentType::VCC, Core::ComponentType::VoltageSource,
           Core::ComponentType::CurrentSource, Core::ComponentType::Diode, Core::ComponentType::ZenerDiode,
-          Core::ComponentType::LED}) {
+          Core::ComponentType::LED, Core::ComponentType::NPN, Core::ComponentType::PNP, Core::ComponentType::NMOS,
+          Core::ComponentType::PMOS}) {
         CHECK(Core::ParseComponentType(Core::GetTypeName(type)) == type);
     }
     CHECK_FALSE(Core::ParseComponentType("resistor"));
@@ -227,4 +230,94 @@ TEST_CASE("Custom diode parameters must be in the range ngspice simulates", "[co
     CHECK(diode.IsValidParameters({.GradingCoefficient = 0.9}));
     CHECK_FALSE(diode.IsValidParameters({.GradingCoefficient = 0.95}));
     CHECK_FALSE(diode.IsValidParameters({.TransitTime = -1e-9}));
+}
+
+TEST_CASE("Transistors have the Q or M prefix, a model and no value", "[component]") {
+    for (const Core::ComponentType type : {Core::ComponentType::NPN, Core::ComponentType::PNP}) {
+        const Core::BJT bjt(type);
+        CAPTURE(bjt.GetTypeName());
+        CHECK(Core::IsBJT(type));
+        CHECK(std::string_view(bjt.GetNamePrefix()) == "Q");
+        CHECK_FALSE(bjt.HasValue());
+        CHECK(bjt.GetModel() == Core::GetBJTModels(type).data());
+        CHECK(Core::GetBJTModels(type).size() == 3);
+    }
+    for (const Core::ComponentType type : {Core::ComponentType::NMOS, Core::ComponentType::PMOS}) {
+        const Core::MOSFET mosfet(type);
+        CAPTURE(mosfet.GetTypeName());
+        CHECK(Core::IsMOSFET(type));
+        CHECK(std::string_view(mosfet.GetNamePrefix()) == "M");
+        CHECK_FALSE(mosfet.HasValue());
+        CHECK(mosfet.GetModel() == Core::GetMOSFETModels(type).data());
+    }
+    CHECK(Core::GetMOSFETModels(Core::ComponentType::NMOS).size() == 3);
+    CHECK(Core::GetMOSFETModels(Core::ComponentType::PMOS).size() == 2);
+    CHECK_FALSE(Core::IsBJT(Core::ComponentType::NMOS));
+    CHECK_FALSE(Core::IsMOSFET(Core::ComponentType::NPN));
+}
+
+TEST_CASE("Transistor models are found by name for their own part only", "[component]") {
+    for (const Core::ComponentType type : {Core::ComponentType::NPN, Core::ComponentType::PNP}) {
+        for (const Core::BJTModel &model : Core::GetBJTModels(type)) {
+            CAPTURE(model.Name);
+            CHECK(model.Type == type);
+            CHECK(Core::FindBJTModel(type, model.Name) == &model);
+        }
+    }
+    for (const Core::ComponentType type : {Core::ComponentType::NMOS, Core::ComponentType::PMOS}) {
+        for (const Core::MOSFETModel &model : Core::GetMOSFETModels(type)) {
+            CAPTURE(model.Name);
+            CHECK(model.Type == type);
+            CHECK(Core::FindMOSFETModel(type, model.Name) == &model);
+            // Enhancement parts: positive thresholds for NMOS, negative for PMOS
+            CHECK((type == Core::ComponentType::NMOS) == (model.Parameters.ThresholdVoltage > 0.0));
+        }
+    }
+    CHECK(Core::FindBJTModel(Core::ComponentType::PNP, "2N3904") == nullptr);
+    CHECK(Core::FindMOSFETModel(Core::ComponentType::PMOS, "2N7000") == nullptr);
+}
+
+TEST_CASE("Custom transistors start from their model and keep their edits", "[component]") {
+    Core::BJT bjt(Core::ComponentType::NPN);
+    bjt.SetName("Q3");
+    bjt.SetCustom();
+    CHECK(bjt.IsCustom());
+    CHECK(std::string_view(bjt.GetModelName()) == "Custom");
+    CHECK(bjt.GetSpiceModelName() == "QCUSTOM_Q3");
+    CHECK(bjt.GetParameters().ForwardBeta == 416.4);
+
+    Core::MOSFET mosfet(Core::ComponentType::PMOS);
+    mosfet.SetName("M2");
+    Core::MOSFETParameters parameters = mosfet.GetParameters();
+    parameters.Width = 200e-6;
+    mosfet.SetCustomParameters(parameters);
+    mosfet.SetCustom();
+    CHECK(mosfet.GetSpiceModelName() == "MCUSTOM_M2");
+    CHECK(mosfet.GetParameters().Width == 200e-6);
+    CHECK(mosfet.GetParameters().ThresholdVoltage == -2.0);
+}
+
+TEST_CASE("Custom transistor parameters must be in the range ngspice simulates", "[component]") {
+    const Core::BJT bjt(Core::ComponentType::NPN);
+    CHECK(bjt.IsValidParameters({}));
+    CHECK_FALSE(bjt.IsValidParameters({.SaturationCurrent = 0.0}));
+    CHECK_FALSE(bjt.IsValidParameters({.ForwardBeta = 0.0}));
+    CHECK_FALSE(bjt.IsValidParameters({.ReverseBeta = -1.0}));
+    CHECK_FALSE(bjt.IsValidParameters({.EarlyVoltage = -1.0}));
+    CHECK_FALSE(bjt.IsValidParameters({.LeakageEmissionCoefficient = 0.0}));
+    CHECK_FALSE(bjt.IsValidParameters({.BaseResistance = -1.0}));
+    CHECK_FALSE(bjt.IsValidParameters({.TransitTime = -1e-12}));
+    CHECK_FALSE(bjt.IsValidParameters({.MaxCollectorEmitterVoltage = 0.0}));
+    CHECK_FALSE(bjt.IsValidParameters({.MaxPower = 0.0}));
+
+    const Core::MOSFET mosfet(Core::ComponentType::NMOS);
+    CHECK(mosfet.IsValidParameters({}));
+    CHECK(mosfet.IsValidParameters({.ThresholdVoltage = -1.0}));
+    CHECK_FALSE(mosfet.IsValidParameters({.Transconductance = 0.0}));
+    CHECK_FALSE(mosfet.IsValidParameters({.ChannelModulation = -0.1}));
+    CHECK_FALSE(mosfet.IsValidParameters({.GateDrainOverlap = -1.0}));
+    CHECK_FALSE(mosfet.IsValidParameters({.Width = 0.0}));
+    CHECK_FALSE(mosfet.IsValidParameters({.Length = 0.0}));
+    CHECK_FALSE(mosfet.IsValidParameters({.MaxGateSourceVoltage = 0.0}));
+    CHECK_FALSE(mosfet.IsValidParameters({.MaxDrainCurrent = -1.0}));
 }

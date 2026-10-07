@@ -5,12 +5,13 @@
 
 #include "circuit.h"
 
+#include "components/bjt.h"
 #include "components/diode.h"
+#include "components/mosfet.h"
 #include "components/source.h"
 #include "spice_value.h"
 #include <algorithm>
 #include <format>
-#include <optional>
 #include <utility>
 
 namespace Core {
@@ -48,13 +49,27 @@ std::string FormatSource(const Source &source, const std::vector<int> &nodes) {
     return "";
 }
 
-// With a probe, a 0 V source in series measures the diode current; ngspice saves no usable diode current in .ac
-std::string FormatDiode(const Diode &diode, const std::vector<int> &nodes, const std::optional<int> probe_node) {
-    if (!probe_node) {
-        return std::format("{} {} {} {}\n", diode.GetName(), nodes[0], nodes[1], diode.GetSpiceModelName());
+// Moves every probed terminal onto a node of its own, joined to its circuit node by a 0 V source whose current
+// flows into the terminal, and returns the lines of those sources
+std::string ProbeTerminals(const Component &component, std::vector<int> &nodes, int &next_probe_node) {
+    std::string lines;
+    for (const CurrentProbe &probe : GetCurrentProbes(component)) {
+        const auto terminal = static_cast<std::size_t>(probe.Terminal);
+        lines += std::format("{} {} {} DC 0\n", GetCurrentProbeName(component, probe.Label), nodes[terminal],
+                             next_probe_node);
+        nodes[terminal] = next_probe_node++;
     }
-    return std::format("{} {} {} {}\n{} {} {} DC 0\n", diode.GetName(), nodes[0], *probe_node,
-                       diode.GetSpiceModelName(), GetCurrentProbeName(diode), *probe_node, nodes[1]);
+    return lines;
+}
+
+// Parts that share a ready model share its line, written the first time the model comes up
+void AddModelLine(std::string spice_name, const std::string &line, std::vector<std::string> &written_names,
+                  std::string &models) {
+    if (std::ranges::contains(written_names, spice_name)) {
+        return;
+    }
+    models += line;
+    written_names.push_back(std::move(spice_name));
 }
 
 } // namespace
@@ -107,10 +122,11 @@ bool Circuit::HasACSource() const {
 /**
  * @brief   Writes the circuit as a SPICE netlist, ready to hand to ngspice.
  * @param[in] analysis            Optional analysis command, such as ".op", written right before ".end".
- * @param[in] add_current_probes  Adds a 0 V source in series with every diode, named by GetCurrentProbeName(),
- *                                whose branch current is the diode current; for simulation only.
- * @return  One line per component, with node numbers as SPICE node names (0 is ground), then one ".model" line
- *          per diode model in use, ending in ".end".
+ * @param[in] add_current_probes  Adds a 0 V source in series with every terminal GetCurrentProbes() lists, named
+ *                                by GetCurrentProbeName(), whose branch current is the terminal current; for
+ *                                simulation only.
+ * @return  One line per component, plus its probes, with node numbers as SPICE node names (0 is ground), then one
+ *          ".model" line per model in use, ending in ".end".
  * @note    Ground components produce no line; they only make their node 0. A supply rail becomes a DC voltage
  *          source from its node to ground. An AC source writes its offset, AC magnitude and sine together, and a
  *          pulse source its low level and pulse, so the same netlist works for .op, .ac and .tran. Probes connect
@@ -118,13 +134,15 @@ bool Circuit::HasACSource() const {
  */
 std::string Circuit::ToSpiceNetlist(const std::string_view analysis, const bool add_current_probes) const {
     std::string netlist = "* imcsim netlist\n";
-    // Diodes that share a ready model share its line
     std::vector<std::string> model_names;
     std::string models;
     int next_probe_node = m_NodeCount;
     for (const CircuitEntry &entry : m_Entries) {
         const Component &component = *entry.Part;
         const std::string value = FormatSpiceValue(component.GetValue());
+        // Probed parts connect through the probe nodes; the probe lines follow the part
+        std::vector<int> nodes = entry.Nodes;
+        const std::string probes = add_current_probes ? ProbeTerminals(component, nodes, next_probe_node) : "";
         switch (component.GetType()) {
         case ComponentType::Resistor:
         case ComponentType::Capacitor:
@@ -142,19 +160,35 @@ std::string Circuit::ToSpiceNetlist(const std::string_view analysis, const bool 
         case ComponentType::ZenerDiode:
         case ComponentType::LED: {
             const auto &diode = static_cast<const Diode &>(component);
-            const std::optional<int> probe_node =
-                add_current_probes ? std::optional<int>(next_probe_node++) : std::nullopt;
-            netlist += FormatDiode(diode, entry.Nodes, probe_node);
-            if (std::string model_name = diode.GetSpiceModelName();
-                std::ranges::find(model_names, model_name) == model_names.end()) {
-                models += FormatDiodeModel(model_name, diode.GetParameters());
-                model_names.push_back(std::move(model_name));
-            }
+            std::string model_name = diode.GetSpiceModelName();
+            netlist += std::format("{} {} {} {}\n", diode.GetName(), nodes[0], nodes[1], model_name);
+            AddModelLine(model_name, FormatDiodeModel(model_name, diode.GetParameters()), model_names, models);
+            break;
+        }
+        case ComponentType::NPN:
+        case ComponentType::PNP: {
+            const auto &bjt = static_cast<const BJT &>(component);
+            std::string model_name = bjt.GetSpiceModelName();
+            netlist += std::format("{} {} {} {} {}\n", bjt.GetName(), nodes[0], nodes[1], nodes[2], model_name);
+            AddModelLine(model_name, FormatBJTModel(bjt.GetType(), model_name, bjt.GetParameters()), model_names,
+                         models);
+            break;
+        }
+        case ComponentType::NMOS:
+        case ComponentType::PMOS: {
+            // The body is tied to the source, past its probe, so the source current includes it
+            const auto &mosfet = static_cast<const MOSFET &>(component);
+            const MOSFETParameters &parameters = mosfet.GetParameters();
+            std::string model_name = mosfet.GetSpiceModelName();
+            netlist += std::format("{} {} {} {} {} {} W={:.6g} L={:.6g}\n", mosfet.GetName(), nodes[0], nodes[1],
+                                   nodes[2], nodes[2], model_name, parameters.Width, parameters.Length);
+            AddModelLine(model_name, FormatMOSFETModel(mosfet.GetType(), model_name, parameters), model_names, models);
             break;
         }
         case ComponentType::Ground:
             break;
         }
+        netlist += probes;
     }
     netlist += models;
     if (!analysis.empty()) {
@@ -165,12 +199,49 @@ std::string Circuit::ToSpiceNetlist(const std::string_view analysis, const bool 
 }
 
 /**
- * @brief   Returns the name of the 0 V source that measures the current of a diode in a netlist with probes.
- * @param[in] diode  Diode the probe is in series with.
- * @return  "Vprobe-" followed by the diode name; the dash keeps it apart from any name IsValidName() accepts.
+ * @brief   Lists the terminals of a component whose current is measured with a probe.
+ * @param[in] component  Any component.
+ * @return  The anode of a diode part, and every terminal of a transistor; nothing for the others, whose currents
+ *          ngspice reports directly.
  */
-std::string GetCurrentProbeName(const Component &diode) {
-    return std::format("Vprobe-{}", diode.GetName());
+std::vector<CurrentProbe> GetCurrentProbes(const Component &component) {
+    if (IsDiode(component.GetType())) {
+        return {{0, ""}};
+    }
+    if (IsBJT(component.GetType())) {
+        return {{0, "C"}, {1, "B"}, {2, "E"}};
+    }
+    if (IsMOSFET(component.GetType())) {
+        return {{0, "D"}, {1, "G"}, {2, "S"}};
+    }
+    return {};
+}
+
+/**
+ * @brief   Returns the name of the 0 V source that measures the current of a terminal in a netlist with probes.
+ * @param[in] component  Part the probe belongs to.
+ * @param[in] label      Label of the probed terminal, from GetCurrentProbes().
+ * @return  "Vprobe-" followed by the part name and, when there is one, "-" and the label, such as "Vprobe-Q1-C".
+ *          The dash keeps it apart from any name IsValidName() accepts.
+ */
+std::string GetCurrentProbeName(const Component &component, const std::string_view label) {
+    if (label.empty()) {
+        return std::format("Vprobe-{}", component.GetName());
+    }
+    return std::format("Vprobe-{}-{}", component.GetName(), label);
+}
+
+/**
+ * @brief   Returns the name a probed terminal current has in the simulation results.
+ * @param[in] component  Part the probe belongs to.
+ * @param[in] label      Label of the probed terminal, from GetCurrentProbes().
+ * @return  The part name and, when there is one, "." and the label, such as "Q1.C"; just "D1" for a diode.
+ */
+std::string GetCurrentName(const Component &component, const std::string_view label) {
+    if (label.empty()) {
+        return component.GetName();
+    }
+    return std::format("{}.{}", component.GetName(), label);
 }
 
 } // namespace Core

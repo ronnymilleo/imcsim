@@ -3,8 +3,10 @@
  * @brief   Tests for saving schematics to JSON and loading them back.
  */
 
+#include "components/bjt.h"
 #include "components/current_source.h"
 #include "components/diode.h"
+#include "components/mosfet.h"
 #include "components/voltage_source.h"
 #include "element_factory.h"
 #include "schematic_file.h"
@@ -276,6 +278,46 @@ TEST_CASE("Custom diode parameters fill in from the default model and are checke
     CHECK(zener.GetParameters().BreakdownVoltage == 9.1);
     // The rest comes from 5V1, the default Zener
     CHECK(zener.GetParameters().BreakdownCurrent == 5e-3);
+    CAPTURE(loaded.Warnings);
+    CHECK(loaded.Warnings.size() == 2);
+}
+
+TEST_CASE("Transistors keep their model or custom parameters", "[schematic_file]") {
+    std::vector<std::unique_ptr<GUI::UIElement>> elements;
+    elements.push_back(GUI::CreateElement(Core::ComponentType::PNP, {0, 0}, GUI::Rotation::R90));
+    auto &pnp = static_cast<Core::BJT &>(elements.back()->GetComponent());
+    pnp.SetName("Q1");
+    pnp.SetModel(*Core::FindBJTModel(Core::ComponentType::PNP, "BC557B"));
+    elements.push_back(GUI::CreateElement(Core::ComponentType::NMOS, {6, 0}, GUI::Rotation::R0));
+    auto &nmos = static_cast<Core::MOSFET &>(elements.back()->GetComponent());
+    nmos.SetName("M1");
+    nmos.SetCustom();
+    Core::MOSFETParameters parameters = nmos.GetParameters();
+    parameters.ThresholdVoltage = 1.2;
+    parameters.MaxPower = 1.5;
+    nmos.SetCustomParameters(parameters);
+
+    const GUI::LoadedSchematic loaded = LoadOrFail(GUI::SaveSchematic(elements, {}));
+    CHECK(loaded.Warnings.empty());
+    REQUIRE(loaded.Elements.size() == 2);
+    const auto &pnp_copy = static_cast<const Core::BJT &>(loaded.Elements[0]->GetComponent());
+    CHECK(std::string_view(pnp_copy.GetModelName()) == "BC557B");
+    const auto &nmos_copy = static_cast<const Core::MOSFET &>(loaded.Elements[1]->GetComponent());
+    CHECK(nmos_copy.IsCustom());
+    CHECK(nmos_copy.GetParameters().ThresholdVoltage == 1.2);
+    CHECK(nmos_copy.GetParameters().MaxPower == 1.5);
+    CHECK(nmos_copy.GetParameters().Transconductance == parameters.Transconductance);
+}
+
+TEST_CASE("Transistors with an unknown model or bad parameters are skipped", "[schematic_file]") {
+    const GUI::LoadedSchematic loaded = LoadOrFail(Document(
+        R"({"type": "NPN", "name": "Q1", "model": "2N3906", "x": 0, "y": 0, "rotation": 0},
+           {"type": "NMOS", "name": "M1", "model": "Custom", "parameters": {"kp": 0}, "x": 0, "y": 0, "rotation": 0},
+           {"type": "PMOS", "name": "M2", "model": "IRF9540N", "x": 0, "y": 0, "rotation": 0})",
+        ""));
+
+    REQUIRE(loaded.Elements.size() == 1);
+    CHECK(loaded.Elements[0]->GetComponent().GetName() == "M2");
     CAPTURE(loaded.Warnings);
     CHECK(loaded.Warnings.size() == 2);
 }

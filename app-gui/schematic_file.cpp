@@ -5,7 +5,9 @@
 
 #include "schematic_file.h"
 
+#include "components/bjt.h"
 #include "components/diode.h"
+#include "components/mosfet.h"
 #include "components/source.h"
 #include "element_factory.h"
 #include "nlohmann/json.hpp"
@@ -60,6 +62,41 @@ constexpr auto DiodeKeys = std::to_array<ParameterKey<Core::DiodeParameters>>({
     {"vj", &Core::DiodeParameters::JunctionPotential},
     {"m", &Core::DiodeParameters::GradingCoefficient},
     {"tt", &Core::DiodeParameters::TransitTime},
+});
+
+constexpr auto BJTKeys = std::to_array<ParameterKey<Core::BJTParameters>>({
+    {"is", &Core::BJTParameters::SaturationCurrent},
+    {"bf", &Core::BJTParameters::ForwardBeta},
+    {"br", &Core::BJTParameters::ReverseBeta},
+    {"vaf", &Core::BJTParameters::EarlyVoltage},
+    {"ikf", &Core::BJTParameters::ForwardKneeCurrent},
+    {"ise", &Core::BJTParameters::LeakageSaturationCurrent},
+    {"ne", &Core::BJTParameters::LeakageEmissionCoefficient},
+    {"rb", &Core::BJTParameters::BaseResistance},
+    {"rc", &Core::BJTParameters::CollectorResistance},
+    {"re", &Core::BJTParameters::EmitterResistance},
+    {"cje", &Core::BJTParameters::EmitterCapacitance},
+    {"cjc", &Core::BJTParameters::CollectorCapacitance},
+    {"tf", &Core::BJTParameters::TransitTime},
+    {"vceo", &Core::BJTParameters::MaxCollectorEmitterVoltage},
+    {"icmax", &Core::BJTParameters::MaxCollectorCurrent},
+    {"pmax", &Core::BJTParameters::MaxPower},
+});
+
+constexpr auto MOSFETKeys = std::to_array<ParameterKey<Core::MOSFETParameters>>({
+    {"vto", &Core::MOSFETParameters::ThresholdVoltage},
+    {"kp", &Core::MOSFETParameters::Transconductance},
+    {"lambda", &Core::MOSFETParameters::ChannelModulation},
+    {"rd", &Core::MOSFETParameters::DrainResistance},
+    {"rs", &Core::MOSFETParameters::SourceResistance},
+    {"cgso", &Core::MOSFETParameters::GateSourceOverlap},
+    {"cgdo", &Core::MOSFETParameters::GateDrainOverlap},
+    {"w", &Core::MOSFETParameters::Width},
+    {"l", &Core::MOSFETParameters::Length},
+    {"vdsmax", &Core::MOSFETParameters::MaxDrainSourceVoltage},
+    {"vgsmax", &Core::MOSFETParameters::MaxGateSourceVoltage},
+    {"idmax", &Core::MOSFETParameters::MaxDrainCurrent},
+    {"pmax", &Core::MOSFETParameters::MaxPower},
 });
 
 // Readers return no value when the key is missing or holds another type, so a damaged file never throws
@@ -121,6 +158,18 @@ std::expected<void, std::string> ReadParameters(const std::array<ParameterKey<Pa
     return {};
 }
 
+// Parts with a model save its name, plus their parameters when custom
+template <typename Part, typename Parameters, std::size_t Count>
+void WriteModelChoice(const Part &part, const std::array<ParameterKey<Parameters>, Count> &keys,
+                      nlohmann::json &object) {
+    object["model"] = part.GetModelName();
+    if (part.IsCustom()) {
+        nlohmann::json parameters = nlohmann::json::object();
+        WriteParameters(keys, part.GetParameters(), parameters);
+        object["parameters"] = parameters;
+    }
+}
+
 nlohmann::json WriteElement(const UIElement &element) {
     const Core::Component &component = element.GetComponent();
     nlohmann::json object = {
@@ -144,14 +193,13 @@ nlohmann::json WriteElement(const UIElement &element) {
         WriteParameters(PulseKeys, source.GetPulse(), pulse);
         object["pulse"] = pulse;
     }
-    if (Core::IsDiode(component.GetType())) {
-        const auto &diode = static_cast<const Core::Diode &>(component);
-        object["model"] = diode.GetModelName();
-        if (diode.IsCustom()) {
-            nlohmann::json parameters = nlohmann::json::object();
-            WriteParameters(DiodeKeys, diode.GetParameters(), parameters);
-            object["parameters"] = parameters;
-        }
+    const Core::ComponentType type = component.GetType();
+    if (Core::IsDiode(type)) {
+        WriteModelChoice(static_cast<const Core::Diode &>(component), DiodeKeys, object);
+    } else if (Core::IsBJT(type)) {
+        WriteModelChoice(static_cast<const Core::BJT &>(component), BJTKeys, object);
+    } else if (Core::IsMOSFET(type)) {
+        WriteModelChoice(static_cast<const Core::MOSFET &>(component), MOSFETKeys, object);
     }
     return object;
 }
@@ -193,33 +241,54 @@ std::expected<void, std::string> ReadSource(const nlohmann::json &object, Core::
 }
 
 // Missing custom parameters keep those of the default model of the part
-std::expected<void, std::string> ReadDiode(const nlohmann::json &object, Core::Diode &diode) {
+template <typename Part, typename Model, typename Parameters, std::size_t Count>
+std::expected<void, std::string> ReadModelChoice(const nlohmann::json &object, Part &part,
+                                                 const Model *(*find_model)(Core::ComponentType, std::string_view),
+                                                 const char *custom_name,
+                                                 const std::array<ParameterKey<Parameters>, Count> &keys) {
     const std::optional<std::string> model_name = ReadString(object, "model");
     if (!model_name) {
         return std::unexpected("has no valid model");
     }
-    if (*model_name != Core::CustomDiodeModelName) {
-        const Core::DiodeModel *model = Core::FindDiodeModel(diode.GetType(), *model_name);
+    if (*model_name != custom_name) {
+        const Model *model = find_model(part.GetType(), *model_name);
         if (model == nullptr) {
             return std::unexpected("has no valid model");
         }
-        diode.SetModel(*model);
+        part.SetModel(*model);
         return {};
     }
 
-    Core::DiodeParameters parameters = diode.GetParameters();
+    Parameters parameters = part.GetParameters();
     if (const auto parameters_object = object.find("parameters"); parameters_object != object.end()) {
         if (!parameters_object->is_object()) {
-            return std::unexpected("has diode parameters that are not an object");
+            return std::unexpected("has model parameters that are not an object");
         }
-        if (const auto read = ReadParameters(DiodeKeys, *parameters_object, parameters); !read) {
+        if (const auto read = ReadParameters(keys, *parameters_object, parameters); !read) {
             return read;
         }
     }
-    if (!diode.IsValidParameters(parameters)) {
-        return std::unexpected("has diode parameters out of range");
+    if (!part.IsValidParameters(parameters)) {
+        return std::unexpected("has model parameters out of range");
     }
-    diode.SetCustomParameters(parameters);
+    part.SetCustomParameters(parameters);
+    return {};
+}
+
+std::expected<void, std::string> ReadModel(const nlohmann::json &object, Core::Component &component) {
+    const Core::ComponentType type = component.GetType();
+    if (Core::IsDiode(type)) {
+        return ReadModelChoice(object, static_cast<Core::Diode &>(component), &Core::FindDiodeModel,
+                               Core::CustomDiodeModelName, DiodeKeys);
+    }
+    if (Core::IsBJT(type)) {
+        return ReadModelChoice(object, static_cast<Core::BJT &>(component), &Core::FindBJTModel,
+                               Core::CustomBJTModelName, BJTKeys);
+    }
+    if (Core::IsMOSFET(type)) {
+        return ReadModelChoice(object, static_cast<Core::MOSFET &>(component), &Core::FindMOSFETModel,
+                               Core::CustomMOSFETModelName, MOSFETKeys);
+    }
     return {};
 }
 
@@ -262,11 +331,8 @@ std::expected<std::unique_ptr<UIElement>, std::string> ReadElement(const nlohman
             return std::unexpected(source.error());
         }
     }
-    if (Core::IsDiode(component.GetType())) {
-        const std::expected<void, std::string> diode = ReadDiode(object, static_cast<Core::Diode &>(component));
-        if (!diode) {
-            return std::unexpected(diode.error());
-        }
+    if (const std::expected<void, std::string> model = ReadModel(object, component); !model) {
+        return std::unexpected(model.error());
     }
     if (const std::optional<std::string> name = ReadString(object, "name")) {
         component.SetName(*name);

@@ -4,11 +4,14 @@
  */
 
 #include "test_printers.h"
+#include "ui_elements/ui_bjt.h"
 #include "ui_elements/ui_diode.h"
 #include "ui_elements/ui_ground.h"
+#include "ui_elements/ui_mosfet.h"
 #include "ui_elements/ui_resistor.h"
 #include "ui_elements/ui_vcc.h"
 #include <catch2/catch_test_macros.hpp>
+#include <cstdlib>
 #include <vector>
 
 TEST_CASE("Two-terminal elements have terminals two units each side, after rotation", "[ui_element]") {
@@ -69,4 +72,27 @@ TEST_CASE("An LED is also picked on its arrows", "[ui_element]") {
     const GUI::UIDiode led(Core::ComponentType::LED, {0, 0}, GUI::Rotation::R0);
     CHECK_FALSE(diode.Contains({0.3f, -1.0f}));
     CHECK(led.Contains({0.3f, -1.0f}));
+}
+
+TEST_CASE("Transistors have collector or drain, base or gate, and emitter or source terminals", "[ui_element]") {
+    GUI::UIBJT bjt(Core::ComponentType::NPN, {0, 0}, GUI::Rotation::R0);
+    CHECK(bjt.GetTerminals() == std::vector<GUI::GridPoint>{{1, -2}, {-2, 0}, {1, 2}});
+    bjt.SetRotation(GUI::Rotation::R90);
+    for (const GUI::GridPoint terminal : bjt.GetTerminals()) {
+        // A quarter turn keeps every terminal on the grid, two units from the body at most
+        CHECK(std::abs(terminal.X) <= 2);
+        CHECK(std::abs(terminal.Y) <= 2);
+    }
+
+    const GUI::UIMOSFET mosfet(Core::ComponentType::PMOS, {3, 3}, GUI::Rotation::R180);
+    CHECK(mosfet.GetComponent().GetType() == Core::ComponentType::PMOS);
+    CHECK(mosfet.GetTerminals() == std::vector<GUI::GridPoint>{{2, 5}, {5, 3}, {2, 1}});
+}
+
+TEST_CASE("Transistors are picked inside their body but not beyond the terminals", "[ui_element]") {
+    const GUI::UIMOSFET mosfet(Core::ComponentType::NMOS, {0, 0}, GUI::Rotation::R0);
+    CHECK(mosfet.Contains({0.0f, 0.0f}));
+    CHECK(mosfet.Contains({1.0f, -1.9f}));
+    CHECK_FALSE(mosfet.Contains({2.0f, 0.0f}));
+    CHECK_FALSE(mosfet.Contains({0.0f, 2.5f}));
 }
