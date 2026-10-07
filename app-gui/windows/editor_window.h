@@ -142,7 +142,6 @@ private:
     void RotateSelectedElement();
 
     // File and history commands
-    void DrawFileButtons();
     void HandleFileShortcuts();
     void Undo();
     void Redo();

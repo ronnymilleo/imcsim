@@ -9,7 +9,7 @@
 cmake_minimum_required(VERSION 4.3)
 
 project(imcsim
-    VERSION 0.2.0
+    VERSION 0.2.1
 )
 
 add_compile_definitions(IMCSIM_VERSION="${PROJECT_VERSION}")

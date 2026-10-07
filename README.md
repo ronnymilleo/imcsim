@@ -5,8 +5,18 @@
 Immediate Mode Circuit Simulator, built with Dear ImGui, SDL3 and Vulkan. Circuits are simulated with
 [ngspice](https://ngspice.sourceforge.io/).
 
-![imcsim showing three resistive dividers with their node voltages, the selected resistor's properties, the SPICE
-netlist and the operating point results](docs/screenshot.png)
+![imcsim showing an RC low-pass driven by a 1 kHz sine source, with its nodes colored in the schematic, the
+transient voltages and currents plotted in the Output window, and the simulation settings and SPICE
+netlist](docs/screenshot.png)
+
+## Features
+
+- Resistors, capacitors, inductors, ground, a VCC rail, and voltage and current sources (DC, sine or pulse)
+- Operating point, transient and AC sweep analyses, with node voltages and component currents
+- Plots of transients and Bode diagrams, with the nodes shown in the same colors as in the schematic
+- IEC or ANSI symbols, undo and redo, and schematics saved as JSON
+
+On Wayland, the windows cannot be dragged out of the main window. Run with `SDL_VIDEODRIVER=x11` to allow it.
 
 ## Requirements
 
@@ -18,7 +28,7 @@ netlist and the operating point results](docs/screenshot.png)
 - Vulkan headers and loader (the Vulkan SDK is not required)
 - ngspice built as a shared library (`libngspice` and its `sharedspice.h` header; tested with ngspice 47)
 - pkg-config, which CMake uses to find ngspice
-- Git, for the submodules in `vendor/`: Dear ImGui (`docking` branch), nlohmann/json and Catch2
+- Git, for the submodules in `vendor/`: Dear ImGui (`docking` branch), ImPlot, nlohmann/json and Catch2
 
 On Arch Linux:
 

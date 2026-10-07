@@ -37,6 +37,9 @@ private:
     // Result versions the axes were last fitted to
     std::optional<std::size_t> m_FittedTransient;
     std::optional<std::size_t> m_FittedACSweep;
+    // Whether each analysis showed its current axis last frame; the axis is fitted when it appears again
+    bool m_TransientShowedCurrents = false;
+    bool m_ACSweepShowedCurrents = false;
     // Kept across runs, since small edits rarely renumber the nodes or rename the components
     std::set<std::size_t> m_HiddenNodes;
     std::set<std::string> m_HiddenCurrents;

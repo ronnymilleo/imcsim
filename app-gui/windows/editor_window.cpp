@@ -86,6 +86,43 @@ void DrawGrid(ImDrawList *draw_list, const ViewTransform &view, const ImVec2 ori
     }
 }
 
+/**
+ * @class   ToolbarRow
+ * @brief   Lays toolbar items out left to right, moving the next item to a new line when it does not fit.
+ * @details Call Place() with the width of each item right before drawing it. A gap separates groups of items
+ *          and disappears when the group starts a new line.
+ */
+class ToolbarRow {
+public:
+    ToolbarRow() : m_RightEdge(ImGui::GetCursorScreenPos().x + ImGui::GetContentRegionAvail().x) {}
+
+    void Place(const float width, const float gap = 0.0f) {
+        if (std::exchange(m_First, false)) {
+            return;
+        }
+        const float spacing = ImGui::GetStyle().ItemSpacing.x + gap;
+        if (ImGui::GetItemRectMax().x + spacing + width <= m_RightEdge) {
+            ImGui::SameLine(0.0f, spacing);
+        }
+    }
+
+    // Widths of the kinds of items the toolbar has, as ImGui draws them
+    static float ButtonWidth(const char *label) {
+        return ImGui::CalcTextSize(label).x + ImGui::GetStyle().FramePadding.x * 2.0f;
+    }
+    static float CheckWidth(const char *label) {
+        return ImGui::GetFrameHeight() + ImGui::GetStyle().ItemInnerSpacing.x + ImGui::CalcTextSize(label).x;
+    }
+    static float TextWidth(const char *text) { return ImGui::CalcTextSize(text).x; }
+
+    // Space between groups, in font sizes
+    static float GroupGap() { return ImGui::GetFontSize(); }
+
+private:
+    float m_RightEdge;
+    bool m_First = true;
+};
+
 } // namespace
 
 /**
@@ -158,38 +195,78 @@ void EditorWindow::Draw() {
     DrawFilePopups();
 }
 
+// Groups of buttons wrap onto new lines when the window is narrow, instead of being cut off
 void EditorWindow::DrawToolbar() {
-    DrawFileButtons();
-    ImGui::SameLine();
-    ImGui::TextUnformatted("|");
-    ImGui::SameLine();
+    ToolbarRow row;
+    const float gap = ToolbarRow::GroupGap();
+
+    // File
+    row.Place(ToolbarRow::ButtonWidth("New"));
+    if (ImGui::Button("New")) {
+        RequestNew();
+    }
+    row.Place(ToolbarRow::ButtonWidth("Open"));
+    if (ImGui::Button("Open")) {
+        RequestOpen();
+    }
+    row.Place(ToolbarRow::ButtonWidth("Save"));
+    if (ImGui::Button("Save")) {
+        Save();
+    }
+    row.Place(ToolbarRow::ButtonWidth("Save As"));
+    if (ImGui::Button("Save As")) {
+        ShowFileDialog(FileAction::Save);
+    }
+
+    // History
+    row.Place(ToolbarRow::ButtonWidth("Undo"), gap);
+    ImGui::BeginDisabled(!m_Schematic.CanUndo());
+    if (ImGui::Button("Undo")) {
+        Undo();
+    }
+    ImGui::EndDisabled();
+    row.Place(ToolbarRow::ButtonWidth("Redo"));
+    ImGui::BeginDisabled(!m_Schematic.CanRedo());
+    if (ImGui::Button("Redo")) {
+        Redo();
+    }
+    ImGui::EndDisabled();
+
+    // Components and wires
+    float component_gap = gap;
     for (const auto &[label, type] : ToolbarComponents) {
+        row.Place(ToolbarRow::ButtonWidth(label), std::exchange(component_gap, 0.0f));
         if (ImGui::Button(label)) {
             StartPlacing(type);
         }
-        ImGui::SameLine();
     }
+    row.Place(ToolbarRow::ButtonWidth("Wire"));
     if (ImGui::Button("Wire")) {
         StartDrawingWires();
     }
-    ImGui::SameLine();
-    ImGui::TextUnformatted("|");
-    ImGui::SameLine();
+
+    // View
+    row.Place(ToolbarRow::CheckWidth("Nodes"), gap);
     ImGui::Checkbox("Nodes", &m_ShowNodes);
-    ImGui::SameLine();
-    ImGui::TextUnformatted("|  Symbols:");
-    ImGui::SameLine();
+    row.Place(ToolbarRow::TextWidth("Symbols:"), gap);
+    ImGui::AlignTextToFramePadding();
+    ImGui::TextUnformatted("Symbols:");
+    row.Place(ToolbarRow::CheckWidth("IEC"));
     if (ImGui::RadioButton("IEC", m_SymbolStyle == SymbolStyle::IEC)) {
         m_SymbolStyle = SymbolStyle::IEC;
     }
-    ImGui::SameLine();
+    row.Place(ToolbarRow::CheckWidth("ANSI"));
     if (ImGui::RadioButton("ANSI", m_SymbolStyle == SymbolStyle::ANSI)) {
         m_SymbolStyle = SymbolStyle::ANSI;
     }
-    ImGui::SameLine();
+
+    // Document
     const auto &file_path = m_Schematic.GetFilePath();
-    const std::string file_name = file_path ? file_path->filename().string() : "Untitled";
-    ImGui::TextDisabled("|  %s%s", file_name.c_str(), m_Schematic.IsModified() ? " *" : "");
+    const std::string title = std::format("{}{}", file_path ? file_path->filename().string() : "Untitled",
+                                          m_Schematic.IsModified() ? " *" : "");
+    row.Place(ToolbarRow::TextWidth(title.c_str()), gap);
+    ImGui::AlignTextToFramePadding();
+    ImGui::TextDisabled("%s", title.c_str());
 }
 
 void EditorWindow::DrawWires(ImDrawList *draw_list, const ViewTransform &view) {
@@ -483,36 +560,6 @@ void EditorWindow::RotateSelectedElement() {
     }
     m_Schematic.SetWires(FollowTerminals(m_Schematic.GetWires(), old_terminals, element.GetTerminals()));
     m_Schematic.SimplifyAllWires();
-}
-
-void EditorWindow::DrawFileButtons() {
-    if (ImGui::Button("New")) {
-        RequestNew();
-    }
-    ImGui::SameLine();
-    if (ImGui::Button("Open")) {
-        RequestOpen();
-    }
-    ImGui::SameLine();
-    if (ImGui::Button("Save")) {
-        Save();
-    }
-    ImGui::SameLine();
-    if (ImGui::Button("Save As")) {
-        ShowFileDialog(FileAction::Save);
-    }
-    ImGui::SameLine();
-    ImGui::BeginDisabled(!m_Schematic.CanUndo());
-    if (ImGui::Button("Undo")) {
-        Undo();
-    }
-    ImGui::EndDisabled();
-    ImGui::SameLine();
-    ImGui::BeginDisabled(!m_Schematic.CanRedo());
-    if (ImGui::Button("Redo")) {
-        Redo();
-    }
-    ImGui::EndDisabled();
 }
 
 // Global routing makes the shortcuts work while another editor window, such as Properties, has focus

@@ -94,6 +94,12 @@ template <typename Key> void DrawAllNoneButtons(const char *id, std::set<Key> &h
     ImGui::PopID();
 }
 
+// Returns whether the current axis has just appeared: it did not exist when the axes last fitted, so its range
+// is meaningless until it is fitted too
+bool TakeCurrentAxisAppeared(bool &showed_currents, const bool show_currents) {
+    return show_currents && !std::exchange(showed_currents, show_currents);
+}
+
 // Returns whether the axes must fit, which is the case once for every new result
 bool TakeFit(std::optional<std::size_t> &fitted_version, const std::size_t version) {
     return std::exchange(fitted_version, version) != version;
@@ -199,8 +205,12 @@ void OutputWindow::DrawTraceList(const std::size_t node_count, const std::vector
 }
 
 void OutputWindow::DrawTransient(const Core::Transient &transient) {
+    const bool show_currents = HasShownCurrent(transient.Currents, m_HiddenCurrents);
+    const bool current_axis_appeared = TakeCurrentAxisAppeared(m_TransientShowedCurrents, show_currents);
     if (TakeFit(m_FittedTransient, m_Schematic.GetTransientVersion())) {
         ImPlot::SetNextAxesToFit();
+    } else if (current_axis_appeared) {
+        ImPlot::SetNextAxisToFit(ImAxis_Y2);
     }
     if (!ImPlot::BeginPlot("##transient", ImVec2(-1.0f, PlotHeight(1)))) {
         return;
@@ -208,7 +218,6 @@ void OutputWindow::DrawTransient(const Core::Transient &transient) {
     ImPlot::SetupAxes("Time", "Voltage");
     ImPlot::SetupAxisFormat(ImAxis_X1, FormatAxisValue, const_cast<char *>("s"));
     ImPlot::SetupAxisFormat(ImAxis_Y1, FormatAxisValue, const_cast<char *>("V"));
-    const bool show_currents = HasShownCurrent(transient.Currents, m_HiddenCurrents);
     if (show_currents) {
         ImPlot::SetupAxis(ImAxis_Y2, "Current", ImPlotAxisFlags_AuxDefault);
         ImPlot::SetupAxisFormat(ImAxis_Y2, FormatAxisValue, const_cast<char *>("A"));
@@ -225,9 +234,12 @@ void OutputWindow::DrawTransient(const Core::Transient &transient) {
 void OutputWindow::DrawACSweep(const Core::ACSweep &sweep) {
     const bool fit = TakeFit(m_FittedACSweep, m_Schematic.GetACSweepVersion());
     const bool show_currents = HasShownCurrent(sweep.CurrentMagnitudesDecibels, m_HiddenCurrents);
+    const bool current_axis_appeared = TakeCurrentAxisAppeared(m_ACSweepShowedCurrents, show_currents);
     const float height = PlotHeight(2);
     if (fit) {
         ImPlot::SetNextAxesToFit();
+    } else if (current_axis_appeared) {
+        ImPlot::SetNextAxisToFit(ImAxis_Y2);
     }
     if (ImPlot::BeginPlot("Magnitude##ac", ImVec2(-1.0f, height))) {
         ImPlot::SetupAxes("Frequency", "Voltage (dB)");
@@ -244,6 +256,8 @@ void OutputWindow::DrawACSweep(const Core::ACSweep &sweep) {
     }
     if (fit) {
         ImPlot::SetNextAxesToFit();
+    } else if (current_axis_appeared) {
+        ImPlot::SetNextAxisToFit(ImAxis_Y2);
     }
     if (ImPlot::BeginPlot("Phase##ac", ImVec2(-1.0f, height))) {
         ImPlot::SetupAxes("Frequency", "Phase (deg)");

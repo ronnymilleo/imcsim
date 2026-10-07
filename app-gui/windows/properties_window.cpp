@@ -188,7 +188,6 @@ void PropertiesWindow::DrawPulse(Core::Source &source) {
     }
 
     ImGui::TextDisabled("%s", std::format("Repeats at {}Hz", Core::FormatValue(1.0 / pulse.Period)).c_str());
-    ImGui::TextDisabled("%s", std::format("Repeats at {}Hz", Core::FormatValue(1.0 / pulse.Period)).c_str());
     if (pulse.RiseTime + pulse.Width + pulse.FallTime > pulse.Period) {
         ImGui::TextColored(WarningTextColor, "Rise, width and fall add up to more than the period");
     }
