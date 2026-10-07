@@ -7,6 +7,7 @@
 #define IMCSIM_APPLICATION_H
 
 #include "imgui_impl_vulkan.h"
+#include "schematic.h"
 #include "vulkan_context.h"
 #include "windows/editor_window.h"
 #include "windows/netlist_window.h"
@@ -34,27 +35,34 @@ public:
     void Shutdown();
 
 private:
+    // Platform and rendering
     float m_SDLWindowScale{};
     SDL_WindowFlags m_SDLWindowFlags{};
     SDL_Window *m_SDLWindow = nullptr;
     VulkanContext m_Vulkan;
     ImGui_ImplVulkan_InitInfo m_VulkanInitInfo{};
+
+    // Application state
     std::vector<std::string> m_Errors;
     bool m_IsOpen{true};
     bool m_ResetLayout{false};
 
-    // The editor owns the schematic, so it is declared first and the other windows can refer to it
-    EditorWindow m_EditorWindow;
-    PropertiesWindow m_PropertiesWindow{m_EditorWindow};
-    NetlistWindow m_NetlistWindow{m_EditorWindow};
+    // The schematic is declared first, so it exists when the windows that refer to it are built
+    Schematic m_Schematic;
+    EditorWindow m_EditorWindow{m_Schematic};
+    PropertiesWindow m_PropertiesWindow{m_Schematic};
+    NetlistWindow m_NetlistWindow{m_Schematic};
 
+    // Errors
     void AddError(const std::string &message);
     void DumpErrors();
 
+    // Initialization
     int InitSDL();
     int InitVulkan();
     int InitImGui();
 
+    // Frame
     void PollEvents();
     void NewFrame();
     void Render();

@@ -1,6 +1,6 @@
 /**
  * @file    properties_window.cpp
- * @brief   Window that shows and edits the component selected in the schematic editor.
+ * @brief   Window that shows and edits the component selected in the schematic.
  */
 
 #include "properties_window.h"
@@ -18,20 +18,20 @@ constexpr ImVec4 ErrorTextColor = {1.0f, 0.4f, 0.4f, 1.0f};
 } // namespace
 
 /**
- * @brief   Creates the window for an editor.
- * @param[in] editor  Editor whose selection is shown; it must outlive the window.
+ * @brief   Creates the window for a schematic.
+ * @param[in] schematic  Schematic whose selection is shown; it must outlive the window.
  */
-PropertiesWindow::PropertiesWindow(EditorWindow &editor) : AppWindow("Properties", true), m_Editor(editor) {
+PropertiesWindow::PropertiesWindow(Schematic &schematic) : AppWindow("Properties", true), m_Schematic(schematic) {
 }
 
 // Values are typed with SPICE suffixes and applied as soon as they are valid: the editor window is drawn before
 // this one, so a click on the canvas would change the selection before a deferred edit was applied
 void PropertiesWindow::Draw() {
-    if (m_Editor.IsWireSelected()) {
+    if (m_Schematic.GetSelectedWireIndex()) {
         ImGui::TextUnformatted("Wire");
         return;
     }
-    UIElement *element = m_Editor.GetSelectedElement();
+    UIElement *element = m_Schematic.GetSelectedElement();
     if (element == nullptr) {
         ImGui::TextDisabled("Select a component to edit it");
         return;
@@ -46,7 +46,7 @@ void PropertiesWindow::Draw() {
         return;
     }
 
-    if (m_ValueTextSelection != m_Editor.GetSelectionVersion()) {
+    if (m_ValueTextSelection != m_Schematic.GetSelectionVersion()) {
         LoadValueText(component);
     }
     ImGui::SetNextItemWidth(ImGui::GetFontSize() * 8.0f);
@@ -55,7 +55,7 @@ void PropertiesWindow::Draw() {
         m_ValueTextInvalid = !value || !component.IsValidValue(*value);
         if (!m_ValueTextInvalid) {
             component.SetValue(*value);
-            m_Editor.MarkModified();
+            m_Schematic.MarkModified();
         }
     }
     if (ImGui::IsItemDeactivatedAfterEdit() && !m_ValueTextInvalid) {
@@ -74,7 +74,7 @@ void PropertiesWindow::LoadValueText(const Core::Component &component) {
     const std::string text = Core::FormatValue(component.GetValue());
     m_ValueText.fill('\0');
     text.copy(m_ValueText.data(), m_ValueText.size() - 1);
-    m_ValueTextSelection = m_Editor.GetSelectionVersion();
+    m_ValueTextSelection = m_Schematic.GetSelectionVersion();
     m_ValueTextInvalid = false;
 }
 

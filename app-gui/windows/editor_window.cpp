@@ -12,9 +12,7 @@
 #include <array>
 #include <cmath>
 #include <format>
-#include <iterator>
 #include <string>
-#include <string_view>
 #include <utility>
 
 namespace GUI {
@@ -103,50 +101,10 @@ void DrawGrid(ImDrawList *draw_list, const ViewTransform &view, const ImVec2 ori
 } // namespace
 
 /**
- * @brief   Creates the editor with an empty, untitled schematic.
+ * @brief   Creates the editor for a schematic.
+ * @param[in] schematic  Schematic to edit; it must outlive the window.
  */
-EditorWindow::EditorWindow() : AppWindow("Schematic", false) {
-}
-
-/**
- * @brief   Returns the selected element, for editing it from another window.
- * @return  The element, or nullptr when no element is selected. Valid until the next frame of the editor.
- */
-UIElement *EditorWindow::GetSelectedElement() {
-    return m_SelectedElement ? m_Elements[*m_SelectedElement].get() : nullptr;
-}
-
-/**
- * @brief   Tells whether a wire is selected.
- * @return  True when the selection is a wire.
- */
-bool EditorWindow::IsWireSelected() const {
-    return m_SelectedWire.has_value();
-}
-
-/**
- * @brief   Returns a number that changes every time the selection changes.
- * @return  The selection version; compare it with a stored one to know whether to reload selection data.
- */
-std::size_t EditorWindow::GetSelectionVersion() const {
-    return m_SelectionVersion;
-}
-
-/**
- * @brief   Records that the schematic changed, so it counts as unsaved and its nodes are recomputed.
- * @note    Call it after editing an element obtained from GetSelectedElement().
- */
-void EditorWindow::MarkModified() {
-    m_Modified = true;
-    m_Connectivity.reset();
-}
-
-/**
- * @brief   Builds the SPICE netlist of the current schematic.
- * @return  The netlist text, as handed to ngspice.
- */
-std::string EditorWindow::BuildSpiceNetlist() {
-    return BuildCircuit(m_Elements, GetConnectivity()).ToSpiceNetlist();
+EditorWindow::EditorWindow(Schematic &schematic) : AppWindow("Schematic", false), m_Schematic(schematic) {
 }
 
 // Window content only: AppWindow::Render() wraps it in Begin/End
@@ -177,9 +135,10 @@ void EditorWindow::Draw() {
     DrawGrid(draw_list, view, origin, size, m_Zoom);
 
     DrawWires(draw_list, view);
-    for (std::size_t index = 0; index < m_Elements.size(); ++index) {
-        const ImU32 color = index == m_SelectedElement ? SelectedColor : ElementColor;
-        m_Elements[index]->Draw(draw_list, view, color, m_SymbolStyle);
+    const auto &elements = m_Schematic.GetElements();
+    for (std::size_t index = 0; index < elements.size(); ++index) {
+        const ImU32 color = index == m_Schematic.GetSelectedElementIndex() ? SelectedColor : ElementColor;
+        elements[index]->Draw(draw_list, view, color, m_SymbolStyle);
     }
 
     if (ImGui::IsWindowFocused() && ImGui::IsKeyPressed(ImGuiKey_W)) {
@@ -221,225 +180,20 @@ void EditorWindow::DrawToolbar() {
         m_SymbolStyle = SymbolStyle::ANSI;
     }
     ImGui::SameLine();
-    const std::string file_name = m_FilePath ? m_FilePath->filename().string() : "Untitled";
-    ImGui::TextDisabled("|  %s%s", file_name.c_str(), m_Modified ? " *" : "");
-}
-
-void EditorWindow::DrawFileButtons() {
-    if (ImGui::Button("New")) {
-        RequestNew();
-    }
-    ImGui::SameLine();
-    if (ImGui::Button("Open")) {
-        RequestOpen();
-    }
-    ImGui::SameLine();
-    if (ImGui::Button("Save")) {
-        Save();
-    }
-    ImGui::SameLine();
-    if (ImGui::Button("Save As")) {
-        ShowFileDialog(FileAction::Save);
-    }
-}
-
-// Global routing makes the shortcuts work while another editor window, such as Properties, has focus
-void EditorWindow::HandleFileShortcuts() {
-    if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_N, ImGuiInputFlags_RouteGlobal)) {
-        RequestNew();
-    }
-    if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_O, ImGuiInputFlags_RouteGlobal)) {
-        RequestOpen();
-    }
-    if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_S, ImGuiInputFlags_RouteGlobal)) {
-        Save();
-    }
-    if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiMod_Shift | ImGuiKey_S, ImGuiInputFlags_RouteGlobal)) {
-        ShowFileDialog(FileAction::Save);
-    }
-}
-
-void EditorWindow::DrawFilePopups() {
-    if (ImGui::BeginPopupModal(DiscardPopup, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
-        ImGui::TextUnformatted("The schematic has unsaved changes. Discard them?");
-        if (ImGui::Button("Discard")) {
-            if (m_ActionToConfirm == FileAction::New) {
-                NewSchematic();
-            } else if (m_ActionToConfirm == FileAction::Open) {
-                ShowFileDialog(FileAction::Open);
-            }
-            m_ActionToConfirm.reset();
-            ImGui::CloseCurrentPopup();
-        }
-        ImGui::SameLine();
-        if (ImGui::Button("Cancel")) {
-            m_ActionToConfirm.reset();
-            ImGui::CloseCurrentPopup();
-        }
-        ImGui::EndPopup();
-    }
-
-    if (ImGui::BeginPopupModal(FileMessagesPopup, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
-        ImGui::TextUnformatted(m_FileMessagesTitle.c_str());
-        ImGui::Separator();
-        for (const std::string &message : m_FileMessages) {
-            ImGui::BulletText("%s", message.c_str());
-        }
-        if (ImGui::Button("OK")) {
-            ImGui::CloseCurrentPopup();
-        }
-        ImGui::EndPopup();
-    }
-}
-
-void EditorWindow::RequestNew() {
-    if (m_Modified) {
-        m_ActionToConfirm = FileAction::New;
-        ImGui::OpenPopup(DiscardPopup);
-    } else {
-        NewSchematic();
-    }
-}
-
-void EditorWindow::RequestOpen() {
-    if (m_Modified) {
-        m_ActionToConfirm = FileAction::Open;
-        ImGui::OpenPopup(DiscardPopup);
-    } else {
-        ShowFileDialog(FileAction::Open);
-    }
-}
-
-void EditorWindow::Save() {
-    if (m_FilePath) {
-        SaveFile(*m_FilePath);
-    } else {
-        ShowFileDialog(FileAction::Save);
-    }
-}
-
-// The dialog runs asynchronously: its result is picked up by ProcessDialogResult() on a later frame
-void EditorWindow::ShowFileDialog(const FileAction action) {
-    if (m_DialogAction) {
-        return;
-    }
-    m_DialogAction = action;
-    m_DialogLocation = m_FilePath ? m_FilePath->string() : "";
-    const char *location = m_DialogLocation.empty() ? nullptr : m_DialogLocation.c_str();
-    const int filter_count = static_cast<int>(SchematicFilters.size());
-    if (action == FileAction::Open) {
-        SDL_ShowOpenFileDialog(HandleFileDialogResult, this, nullptr, SchematicFilters.data(), filter_count, location,
-                               false);
-    } else {
-        SDL_ShowSaveFileDialog(HandleFileDialogResult, this, nullptr, SchematicFilters.data(), filter_count, location);
-    }
-}
-
-// SDL may call this from another thread, so it only stores the result for the main thread to handle
-void SDLCALL EditorWindow::HandleFileDialogResult(void *userdata, const char *const *file_list, int /*filter*/) {
-    auto *editor = static_cast<EditorWindow *>(userdata);
-    DialogResult result;
-    // A null list means an error and an empty list means the user canceled
-    if (file_list != nullptr && file_list[0] != nullptr) {
-        result.Path = std::filesystem::path(file_list[0]);
-    }
-    const std::scoped_lock lock(editor->m_DialogMutex);
-    editor->m_DialogResult = std::move(result);
-}
-
-void EditorWindow::ProcessDialogResult() {
-    std::optional<DialogResult> result;
-    {
-        const std::scoped_lock lock(m_DialogMutex);
-        result = std::exchange(m_DialogResult, std::nullopt);
-    }
-    if (!result) {
-        return;
-    }
-    const std::optional<FileAction> action = std::exchange(m_DialogAction, std::nullopt);
-    if (!result->Path) {
-        return;
-    }
-    if (action == FileAction::Open) {
-        OpenFile(*result->Path);
-    } else if (action == FileAction::Save) {
-        SaveFile(*result->Path);
-    }
-}
-
-void EditorWindow::NewSchematic() {
-    ClearSelection();
-    m_PlacingType.reset();
-    m_DrawingWires = false;
-    m_WireStart.reset();
-    m_Elements.clear();
-    m_Wires.clear();
-    m_Connectivity.reset();
-    m_FilePath.reset();
-    m_Modified = false;
-}
-
-// Skipped parts are reported, and the schematic counts as modified because saving it would drop them
-void EditorWindow::OpenFile(const std::filesystem::path &path) {
-    const auto text = ReadTextFile(path);
-    if (!text) {
-        ShowFileMessages("Could not open the schematic", {text.error()});
-        return;
-    }
-    auto loaded = LoadSchematic(*text);
-    if (!loaded) {
-        ShowFileMessages(std::format("Could not open {}", path.filename().string()), {loaded.error()});
-        return;
-    }
-
-    NewSchematic();
-    m_Elements = std::move(loaded->Elements);
-    m_Wires = std::move(loaded->Wires);
-    m_FilePath = path;
-    m_Modified = !loaded->Warnings.empty();
-    if (m_Modified) {
-        ShowFileMessages(std::format("{} was opened, but some parts were changed or skipped", path.filename().string()),
-                         std::move(loaded->Warnings));
-    }
-}
-
-// Dialogs do not always add the extension, so it is added here when missing
-void EditorWindow::SaveFile(std::filesystem::path path) {
-    if (path.extension() != SchematicExtension) {
-        path += SchematicExtension;
-    }
-    const auto written = WriteTextFile(path, SaveSchematic(m_Elements, m_Wires));
-    if (!written) {
-        ShowFileMessages("Could not save the schematic", {written.error()});
-        return;
-    }
-    m_FilePath = std::move(path);
-    m_Modified = false;
-}
-
-void EditorWindow::ShowFileMessages(std::string title, std::vector<std::string> messages) {
-    m_FileMessagesTitle = std::move(title);
-    m_FileMessages = std::move(messages);
-    ImGui::OpenPopup(FileMessagesPopup);
-}
-
-// Built on first use after a change and kept until MarkModified() or another change resets it
-const Connectivity &EditorWindow::GetConnectivity() {
-    if (!m_Connectivity) {
-        m_Connectivity.emplace(m_Elements, m_Wires);
-    }
-    return *m_Connectivity;
+    const auto &file_path = m_Schematic.GetFilePath();
+    const std::string file_name = file_path ? file_path->filename().string() : "Untitled";
+    ImGui::TextDisabled("|  %s%s", file_name.c_str(), m_Schematic.IsModified() ? " *" : "");
 }
 
 void EditorWindow::DrawWires(ImDrawList *draw_list, const ViewTransform &view) {
-    const Connectivity &connectivity = GetConnectivity();
-
-    for (std::size_t index = 0; index < m_Wires.size(); ++index) {
-        const UIWire &wire = m_Wires[index];
+    const Connectivity &connectivity = m_Schematic.GetConnectivity();
+    const auto &wires = m_Schematic.GetWires();
+    for (std::size_t index = 0; index < wires.size(); ++index) {
+        const UIWire &wire = wires[index];
         // Every wire end is a connection point, so it always has a node
         const int node = connectivity.GetNode(wire.GetStart()).value_or(0);
         ImU32 color = m_ShowNodes ? GetNodeColor(node) : WireColor;
-        if (index == m_SelectedWire) {
+        if (index == m_Schematic.GetSelectedWireIndex()) {
             color = SelectedColor;
         }
         wire.Draw(draw_list, view, color);
@@ -455,37 +209,11 @@ void EditorWindow::DrawWires(ImDrawList *draw_list, const ViewTransform &view) {
     if (!m_ShowNodes) {
         return;
     }
-    for (const UIWire &wire : m_Wires) {
+    for (const UIWire &wire : wires) {
         const int node = connectivity.GetNode(wire.GetStart()).value_or(0);
         const ImVec2 middle = view.ToScreen((ToVec2(wire.GetStart()) + ToVec2(wire.GetEnd())) / 2.0f);
         draw_list->AddText(middle, NodeLabelColor, std::format("{}", node).c_str());
     }
-}
-
-void EditorWindow::AssignName(Core::Component &component) const {
-    const std::string_view prefix = component.GetNamePrefix();
-    if (prefix.empty()) {
-        return;
-    }
-    std::vector<std::string> names;
-    for (const auto &element : m_Elements) {
-        names.push_back(element->GetComponent().GetName());
-    }
-    component.SetName(Core::NextComponentName(prefix, names));
-}
-
-void EditorWindow::StartPlacing(const Core::ComponentType type) {
-    ClearSelection();
-    m_DrawingWires = false;
-    m_WireStart.reset();
-    m_PlacingType = type;
-    m_PlacingRotation = Rotation::R0;
-}
-
-void EditorWindow::StartDrawingWires() {
-    ClearSelection();
-    m_PlacingType.reset();
-    m_DrawingWires = true;
 }
 
 void EditorWindow::HandlePanAndZoom(const ImVec2 origin, const bool hovered, const bool active) {
@@ -500,6 +228,20 @@ void EditorWindow::HandlePanAndZoom(const ImVec2 origin, const bool hovered, con
         const ImVec2 after = ViewTransform(origin, m_Pan, m_Zoom).ToWorld(io.MousePos);
         m_Pan += (after - before) * m_Zoom;
     }
+}
+
+void EditorWindow::StartPlacing(const Core::ComponentType type) {
+    ClearSelection();
+    m_DrawingWires = false;
+    m_WireStart.reset();
+    m_PlacingType = type;
+    m_PlacingRotation = Rotation::R0;
+}
+
+void EditorWindow::StartDrawingWires() {
+    ClearSelection();
+    m_PlacingType.reset();
+    m_DrawingWires = true;
 }
 
 /**
@@ -533,9 +275,7 @@ void EditorWindow::HandlePlacement(ImDrawList *draw_list, const ViewTransform &v
     auto preview = CreateElement(*m_PlacingType, position, m_PlacingRotation);
     preview->Draw(draw_list, view, PreviewColor, m_SymbolStyle);
     if (ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
-        AssignName(preview->GetComponent());
-        m_Elements.push_back(std::move(preview));
-        MarkModified();
+        m_Schematic.AddElement(std::move(preview));
     }
 }
 
@@ -590,9 +330,9 @@ void EditorWindow::HandleWireDrawing(ImDrawList *draw_list, const ViewTransform 
         m_WireStart.reset();
         return;
     }
-    AddWire(start, corner);
-    AddWire(corner, cursor);
-    if (IsTerminal(cursor)) {
+    m_Schematic.AddWire(start, corner);
+    m_Schematic.AddWire(corner, cursor);
+    if (m_Schematic.IsTerminal(cursor)) {
         m_WireStart.reset();
     } else {
         m_WireStart = cursor;
@@ -608,19 +348,6 @@ void EditorWindow::StopWire() {
     }
 }
 
-// Zero-length segments appear when the bend lands on an end point, as with straight wires
-void EditorWindow::AddWire(const GridPoint start, const GridPoint end) {
-    if (start != end) {
-        m_Wires.emplace_back(start, end);
-        MarkModified();
-    }
-}
-
-bool EditorWindow::IsTerminal(const GridPoint point) const {
-    return std::ranges::any_of(
-        m_Elements, [point](const auto &element) { return std::ranges::contains(element->GetTerminals(), point); });
-}
-
 /**
  * @brief   Handles selection mode, active while not placing or wiring: click selects an element or a wire,
  *          dragging an element moves it with its wires following, R rotates the selected element, Delete removes
@@ -634,34 +361,34 @@ void EditorWindow::HandleSelection(const ViewTransform &view, const bool hovered
     const ImVec2 cursor_world = view.ToWorld(ImGui::GetIO().MousePos);
     if (hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
         SelectAt(cursor_world);
-        if (m_SelectedElement) {
-            const UIElement &element = *m_Elements[*m_SelectedElement];
-            m_Drag = ElementDrag{Snap(cursor_world), element.GetPosition(), element.GetTerminals(), m_Wires};
+        if (const UIElement *element = m_Schematic.GetSelectedElement()) {
+            m_Drag = ElementDrag{Snap(cursor_world), element->GetPosition(), element->GetTerminals(),
+                                 m_Schematic.GetWires()};
         }
     }
 
     if (m_Drag) {
         if (ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
-            UIElement &element = *m_Elements[*m_SelectedElement];
+            UIElement &element = *m_Schematic.GetSelectedElement();
             const GridPoint position = m_Drag->StartPosition + (Snap(cursor_world) - m_Drag->StartCursor);
             if (position != element.GetPosition()) {
                 element.SetPosition(position);
-                MarkModified();
+                m_Schematic.MarkModified();
             }
             // Rebuilt every frame, not only on moves, so a rotation during the drag is followed too
-            m_Wires = FollowTerminals(m_Drag->StartWires, m_Drag->StartTerminals, element.GetTerminals());
-            m_Connectivity.reset();
+            m_Schematic.SetWires(FollowTerminals(m_Drag->StartWires, m_Drag->StartTerminals, element.GetTerminals()));
         } else {
             EndDrag();
         }
     }
 
     if (ImGui::IsWindowFocused()) {
-        if (ImGui::IsKeyPressed(ImGuiKey_R) && m_SelectedElement) {
+        if (ImGui::IsKeyPressed(ImGuiKey_R) && m_Schematic.GetSelectedElement() != nullptr) {
             RotateSelectedElement();
         }
+        // Deleting mid-drag would leave the drag pointing at a removed element
         if (ImGui::IsKeyPressed(ImGuiKey_Delete) && !m_Drag) {
-            DeleteSelection();
+            m_Schematic.DeleteSelection();
         }
         if (ImGui::IsKeyPressed(ImGuiKey_Escape)) {
             ClearSelection();
@@ -672,26 +399,27 @@ void EditorWindow::HandleSelection(const ViewTransform &view, const bool hovered
 // Elements win over wires, and the most recently added item wins because it is drawn on top
 void EditorWindow::SelectAt(const ImVec2 world_pos) {
     ClearSelection();
-    for (std::size_t index = m_Elements.size(); index-- > 0;) {
-        if (m_Elements[index]->Contains(world_pos)) {
-            m_SelectedElement = index;
+    const auto &elements = m_Schematic.GetElements();
+    for (std::size_t index = elements.size(); index-- > 0;) {
+        if (elements[index]->Contains(world_pos)) {
+            m_Schematic.SelectElement(index);
             return;
         }
     }
     const float tolerance = WirePickDistance / m_Zoom;
-    for (std::size_t index = m_Wires.size(); index-- > 0;) {
-        if (m_Wires[index].IsNear(world_pos, tolerance)) {
-            m_SelectedWire = index;
+    const auto &wires = m_Schematic.GetWires();
+    for (std::size_t index = wires.size(); index-- > 0;) {
+        if (wires[index].IsNear(world_pos, tolerance)) {
+            m_Schematic.SelectWire(index);
             return;
         }
     }
 }
 
+// A drag belongs to the selected element, so it ends with the selection
 void EditorWindow::ClearSelection() {
     EndDrag();
-    m_SelectedElement.reset();
-    m_SelectedWire.reset();
-    ++m_SelectionVersion;
+    m_Schematic.ClearSelection();
 }
 
 // While dragging, wires are rebuilt from the snapshot every frame; the cleanup waits until the drop
@@ -700,48 +428,213 @@ void EditorWindow::EndDrag() {
         return;
     }
     m_Drag.reset();
-    SimplifyAllWires();
+    m_Schematic.SimplifyAllWires();
 }
 
 // During a drag only the rotation changes here; the drag rebuilds the wires from its snapshot on the next frame
 void EditorWindow::RotateSelectedElement() {
-    UIElement &element = *m_Elements[*m_SelectedElement];
+    UIElement &element = *m_Schematic.GetSelectedElement();
     const std::vector<GridPoint> old_terminals = element.GetTerminals();
     element.SetRotation(NextRotation(element.GetRotation()));
-    MarkModified();
+    m_Schematic.MarkModified();
     if (m_Drag) {
         return;
     }
-    m_Wires = FollowTerminals(m_Wires, old_terminals, element.GetTerminals());
-    SimplifyAllWires();
+    m_Schematic.SetWires(FollowTerminals(m_Schematic.GetWires(), old_terminals, element.GetTerminals()));
+    m_Schematic.SimplifyAllWires();
 }
 
-// Wires attached to a deleted element stay in place, like in LTspice
-void EditorWindow::DeleteSelection() {
-    if (m_SelectedElement) {
-        m_Elements.erase(m_Elements.begin() + static_cast<std::ptrdiff_t>(*m_SelectedElement));
-    } else if (m_SelectedWire) {
-        m_Wires.erase(m_Wires.begin() + static_cast<std::ptrdiff_t>(*m_SelectedWire));
+void EditorWindow::DrawFileButtons() {
+    if (ImGui::Button("New")) {
+        RequestNew();
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Open")) {
+        RequestOpen();
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Save")) {
+        Save();
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Save As")) {
+        ShowFileDialog(FileAction::Save);
+    }
+}
+
+// Global routing makes the shortcuts work while another editor window, such as Properties, has focus
+void EditorWindow::HandleFileShortcuts() {
+    if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_N, ImGuiInputFlags_RouteGlobal)) {
+        RequestNew();
+    }
+    if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_O, ImGuiInputFlags_RouteGlobal)) {
+        RequestOpen();
+    }
+    if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_S, ImGuiInputFlags_RouteGlobal)) {
+        Save();
+    }
+    if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiMod_Shift | ImGuiKey_S, ImGuiInputFlags_RouteGlobal)) {
+        ShowFileDialog(FileAction::Save);
+    }
+}
+
+void EditorWindow::RequestNew() {
+    if (m_Schematic.IsModified()) {
+        m_ActionToConfirm = FileAction::New;
+        ImGui::OpenPopup(DiscardPopup);
     } else {
+        NewSchematic();
+    }
+}
+
+void EditorWindow::RequestOpen() {
+    if (m_Schematic.IsModified()) {
+        m_ActionToConfirm = FileAction::Open;
+        ImGui::OpenPopup(DiscardPopup);
+    } else {
+        ShowFileDialog(FileAction::Open);
+    }
+}
+
+void EditorWindow::Save() {
+    if (const auto &file_path = m_Schematic.GetFilePath()) {
+        SaveFile(*file_path);
+    } else {
+        ShowFileDialog(FileAction::Save);
+    }
+}
+
+void EditorWindow::NewSchematic() {
+    EndDrag();
+    m_PlacingType.reset();
+    m_DrawingWires = false;
+    m_WireStart.reset();
+    m_Schematic.Clear();
+}
+
+// Skipped parts are reported, and the schematic counts as modified because saving it would drop them
+void EditorWindow::OpenFile(const std::filesystem::path &path) {
+    const auto text = ReadTextFile(path);
+    if (!text) {
+        ShowFileMessages("Could not open the schematic", {text.error()});
         return;
     }
-    ClearSelection();
-    MarkModified();
-}
-
-// Simplifying merges and removes wires, so wire indices are no longer valid afterwards
-void EditorWindow::SimplifyAllWires() {
-    m_Wires = SimplifyWires(m_Wires, CollectTerminals());
-    m_SelectedWire.reset();
-    m_Connectivity.reset();
-}
-
-std::vector<GridPoint> EditorWindow::CollectTerminals() const {
-    std::vector<GridPoint> terminals;
-    for (const auto &element : m_Elements) {
-        std::ranges::copy(element->GetTerminals(), std::back_inserter(terminals));
+    auto loaded = LoadSchematic(*text);
+    if (!loaded) {
+        ShowFileMessages(std::format("Could not open {}", path.filename().string()), {loaded.error()});
+        return;
     }
-    return terminals;
+
+    NewSchematic();
+    m_Schematic.Replace(std::move(loaded->Elements), std::move(loaded->Wires));
+    m_Schematic.MarkSaved(path);
+    if (!loaded->Warnings.empty()) {
+        m_Schematic.MarkModified();
+        ShowFileMessages(std::format("{} was opened, but some parts were changed or skipped", path.filename().string()),
+                         std::move(loaded->Warnings));
+    }
+}
+
+// Dialogs do not always add the extension, so it is added here when missing
+void EditorWindow::SaveFile(std::filesystem::path path) {
+    if (path.extension() != SchematicExtension) {
+        path += SchematicExtension;
+    }
+    const auto written = WriteTextFile(path, SaveSchematic(m_Schematic.GetElements(), m_Schematic.GetWires()));
+    if (!written) {
+        ShowFileMessages("Could not save the schematic", {written.error()});
+        return;
+    }
+    m_Schematic.MarkSaved(std::move(path));
+}
+
+// The dialog runs asynchronously: its result is picked up by ProcessDialogResult() on a later frame
+void EditorWindow::ShowFileDialog(const FileAction action) {
+    if (m_DialogAction) {
+        return;
+    }
+    m_DialogAction = action;
+    const auto &file_path = m_Schematic.GetFilePath();
+    m_DialogLocation = file_path ? file_path->string() : "";
+    const char *location = m_DialogLocation.empty() ? nullptr : m_DialogLocation.c_str();
+    const int filter_count = static_cast<int>(SchematicFilters.size());
+    if (action == FileAction::Open) {
+        SDL_ShowOpenFileDialog(HandleFileDialogResult, this, nullptr, SchematicFilters.data(), filter_count, location,
+                               false);
+    } else {
+        SDL_ShowSaveFileDialog(HandleFileDialogResult, this, nullptr, SchematicFilters.data(), filter_count, location);
+    }
+}
+
+// SDL may call this from another thread, so it only stores the result for the main thread to handle
+void SDLCALL EditorWindow::HandleFileDialogResult(void *userdata, const char *const *file_list, int /*filter*/) {
+    auto *editor = static_cast<EditorWindow *>(userdata);
+    DialogResult result;
+    // A null list means an error and an empty list means the user canceled
+    if (file_list != nullptr && file_list[0] != nullptr) {
+        result.Path = std::filesystem::path(file_list[0]);
+    }
+    const std::scoped_lock lock(editor->m_DialogMutex);
+    editor->m_DialogResult = std::move(result);
+}
+
+void EditorWindow::ProcessDialogResult() {
+    std::optional<DialogResult> result;
+    {
+        const std::scoped_lock lock(m_DialogMutex);
+        result = std::exchange(m_DialogResult, std::nullopt);
+    }
+    if (!result) {
+        return;
+    }
+    const std::optional<FileAction> action = std::exchange(m_DialogAction, std::nullopt);
+    if (!result->Path) {
+        return;
+    }
+    if (action == FileAction::Open) {
+        OpenFile(*result->Path);
+    } else if (action == FileAction::Save) {
+        SaveFile(*result->Path);
+    }
+}
+
+void EditorWindow::DrawFilePopups() {
+    if (ImGui::BeginPopupModal(DiscardPopup, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+        ImGui::TextUnformatted("The schematic has unsaved changes. Discard them?");
+        if (ImGui::Button("Discard")) {
+            if (m_ActionToConfirm == FileAction::New) {
+                NewSchematic();
+            } else if (m_ActionToConfirm == FileAction::Open) {
+                ShowFileDialog(FileAction::Open);
+            }
+            m_ActionToConfirm.reset();
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Cancel")) {
+            m_ActionToConfirm.reset();
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndPopup();
+    }
+
+    if (ImGui::BeginPopupModal(FileMessagesPopup, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+        ImGui::TextUnformatted(m_FileMessagesTitle.c_str());
+        ImGui::Separator();
+        for (const std::string &message : m_FileMessages) {
+            ImGui::BulletText("%s", message.c_str());
+        }
+        if (ImGui::Button("OK")) {
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndPopup();
+    }
+}
+
+void EditorWindow::ShowFileMessages(std::string title, std::vector<std::string> messages) {
+    m_FileMessagesTitle = std::move(title);
+    m_FileMessages = std::move(messages);
+    ImGui::OpenPopup(FileMessagesPopup);
 }
 
 } // namespace GUI

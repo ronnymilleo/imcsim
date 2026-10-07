@@ -31,18 +31,6 @@ void UIGround::DrawTerminals(ImDrawList *draw_list, const ViewTransform &view, c
     draw_list->AddLine(LocalToScreen(view, 0, 0), LocalToScreen(view, 0, LeadLength), color, LineThickness);
 }
 
-std::vector<GridPoint> UIGround::GetLocalTerminals() const {
-    return {{0, 0}};
-}
-
-LocalBounds UIGround::GetLocalBounds() const {
-    return {{-0.8f, 0.0f}, {0.8f, 1.6f}};
-}
-
-// Ground has no name or value to show
-void UIGround::DrawLabels(ImDrawList * /*draw_list*/, const ViewTransform & /*view*/, ImU32 /*color*/) const {
-}
-
 void UIGround::DrawSymbol(ImDrawList *draw_list, const ViewTransform &view, const ImU32 color,
                           SymbolStyle /*style*/) const {
     float y = LeadLength;
@@ -51,6 +39,18 @@ void UIGround::DrawSymbol(ImDrawList *draw_list, const ViewTransform &view, cons
                            LineThickness);
         y += BarSpacing;
     }
+}
+
+// Ground has no name or value to show
+void UIGround::DrawLabels(ImDrawList * /*draw_list*/, const ViewTransform & /*view*/, ImU32 /*color*/) const {
+}
+
+std::vector<GridPoint> UIGround::GetLocalTerminals() const {
+    return {{0, 0}};
+}
+
+LocalBounds UIGround::GetLocalBounds() const {
+    return {{-0.8f, 0.0f}, {0.8f, 1.6f}};
 }
 
 } // namespace GUI

@@ -1,0 +1,269 @@
+/**
+ * @file    schematic.cpp
+ * @brief   The schematic document shared by every window: elements, wires, selection and file state.
+ */
+
+#include "schematic.h"
+
+#include "components/component.h"
+#include "wire_editing.h"
+#include <algorithm>
+#include <iterator>
+#include <string_view>
+#include <utility>
+
+namespace GUI {
+
+/**
+ * @brief   Returns every element, in the order they were added.
+ * @return  The elements; later ones are drawn on top.
+ */
+const std::vector<std::unique_ptr<UIElement>> &Schematic::GetElements() const {
+    return m_Elements;
+}
+
+/**
+ * @brief   Returns an element for editing its position, rotation or component.
+ * @param[in] index  Index into GetElements().
+ * @return  The element. Call MarkModified() or SetWires() after changing it, as appropriate.
+ */
+UIElement &Schematic::GetElement(const std::size_t index) {
+    return *m_Elements[index];
+}
+
+/**
+ * @brief   Returns every wire segment.
+ * @return  The wires, all horizontal or vertical.
+ */
+const std::vector<UIWire> &Schematic::GetWires() const {
+    return m_Wires;
+}
+
+/**
+ * @brief   Checks whether a grid point is the terminal of some element.
+ * @param[in] point  Grid point to test.
+ * @return  True when an element has a terminal there.
+ */
+bool Schematic::IsTerminal(const GridPoint point) const {
+    return std::ranges::any_of(
+        m_Elements, [point](const auto &element) { return std::ranges::contains(element->GetTerminals(), point); });
+}
+
+/**
+ * @brief   Returns the terminals of every element.
+ * @return  Terminal positions in world units.
+ */
+std::vector<GridPoint> Schematic::CollectTerminals() const {
+    std::vector<GridPoint> terminals;
+    for (const auto &element : m_Elements) {
+        std::ranges::copy(element->GetTerminals(), std::back_inserter(terminals));
+    }
+    return terminals;
+}
+
+/**
+ * @brief   Adds an element and gives its component the next free SPICE name.
+ * @param[in] element  Element to add; its component is renamed even if it already had a name.
+ */
+void Schematic::AddElement(std::unique_ptr<UIElement> element) {
+    Core::Component &component = element->GetComponent();
+    const std::string_view prefix = component.GetNamePrefix();
+    if (!prefix.empty()) {
+        std::vector<std::string> names;
+        for (const auto &existing : m_Elements) {
+            names.push_back(existing->GetComponent().GetName());
+        }
+        component.SetName(Core::NextComponentName(prefix, names));
+    }
+    m_Elements.push_back(std::move(element));
+    MarkModified();
+}
+
+/**
+ * @brief   Adds a wire segment.
+ * @param[in] start  First end.
+ * @param[in] end    Second end; when it equals start, nothing is added.
+ * @note    Zero-length segments appear when an L-shaped bend lands on one of its ends.
+ */
+void Schematic::AddWire(const GridPoint start, const GridPoint end) {
+    if (start == end) {
+        return;
+    }
+    m_Wires.emplace_back(start, end);
+    MarkModified();
+}
+
+/**
+ * @brief   Replaces every wire, for example while wires follow a dragged element.
+ * @param[in] wires  New wires.
+ * @note    Only the nodes are invalidated: call MarkModified() once the gesture counts as a change.
+ */
+void Schematic::SetWires(std::vector<UIWire> wires) {
+    m_Wires = std::move(wires);
+    m_Connectivity.reset();
+}
+
+/**
+ * @brief   Joins and deduplicates wire segments without changing the circuit.
+ * @note    Wires are merged and removed, so a selected wire is deselected.
+ */
+void Schematic::SimplifyAllWires() {
+    m_Wires = SimplifyWires(m_Wires, CollectTerminals());
+    if (m_SelectedWire) {
+        ClearSelection();
+    }
+    m_Connectivity.reset();
+}
+
+/**
+ * @brief   Deletes the selected element or wire, if any.
+ * @note    Wires attached to a deleted element stay in place, like in LTspice.
+ */
+void Schematic::DeleteSelection() {
+    if (m_SelectedElement) {
+        m_Elements.erase(m_Elements.begin() + static_cast<std::ptrdiff_t>(*m_SelectedElement));
+    } else if (m_SelectedWire) {
+        m_Wires.erase(m_Wires.begin() + static_cast<std::ptrdiff_t>(*m_SelectedWire));
+    } else {
+        return;
+    }
+    ClearSelection();
+    MarkModified();
+}
+
+/**
+ * @brief   Empties the schematic, leaving it untitled and unmodified.
+ */
+void Schematic::Clear() {
+    Replace({}, {});
+    m_FilePath.reset();
+}
+
+/**
+ * @brief   Replaces the whole content, for example with a schematic read from a file.
+ * @param[in] elements  New elements, with names already set.
+ * @param[in] wires     New wires.
+ * @note    The schematic becomes unmodified; the file path is kept.
+ */
+void Schematic::Replace(std::vector<std::unique_ptr<UIElement>> elements, std::vector<UIWire> wires) {
+    ClearSelection();
+    m_Elements = std::move(elements);
+    m_Wires = std::move(wires);
+    m_Connectivity.reset();
+    m_Modified = false;
+}
+
+/**
+ * @brief   Selects an element, replacing the previous selection.
+ * @param[in] index  Index into GetElements().
+ */
+void Schematic::SelectElement(const std::size_t index) {
+    ClearSelection();
+    m_SelectedElement = index;
+}
+
+/**
+ * @brief   Selects a wire, replacing the previous selection.
+ * @param[in] index  Index into GetWires().
+ */
+void Schematic::SelectWire(const std::size_t index) {
+    ClearSelection();
+    m_SelectedWire = index;
+}
+
+/**
+ * @brief   Deselects everything.
+ */
+void Schematic::ClearSelection() {
+    m_SelectedElement.reset();
+    m_SelectedWire.reset();
+    ++m_SelectionVersion;
+}
+
+/**
+ * @brief   Returns the index of the selected element.
+ * @return  The index into GetElements(), or no value when no element is selected.
+ */
+std::optional<std::size_t> Schematic::GetSelectedElementIndex() const {
+    return m_SelectedElement;
+}
+
+/**
+ * @brief   Returns the index of the selected wire.
+ * @return  The index into GetWires(), or no value when no wire is selected.
+ */
+std::optional<std::size_t> Schematic::GetSelectedWireIndex() const {
+    return m_SelectedWire;
+}
+
+/**
+ * @brief   Returns the selected element.
+ * @return  The element, or nullptr when no element is selected.
+ */
+UIElement *Schematic::GetSelectedElement() {
+    return m_SelectedElement ? m_Elements[*m_SelectedElement].get() : nullptr;
+}
+
+/**
+ * @brief   Returns a number that changes every time the selection changes.
+ * @return  The selection version; compare it with a stored one to know whether to reload selection data.
+ */
+std::size_t Schematic::GetSelectionVersion() const {
+    return m_SelectionVersion;
+}
+
+/**
+ * @brief   Tells whether there are unsaved changes.
+ * @return  True after any change since the last save, open or clear.
+ */
+bool Schematic::IsModified() const {
+    return m_Modified;
+}
+
+/**
+ * @brief   Records that the schematic changed, so it counts as unsaved and its nodes are recomputed.
+ * @note    Call it after editing an element obtained from GetElement() or GetSelectedElement().
+ */
+void Schematic::MarkModified() {
+    m_Modified = true;
+    m_Connectivity.reset();
+}
+
+/**
+ * @brief   Returns the file the schematic was last opened from or saved to.
+ * @return  The path, or no value for an untitled schematic.
+ */
+const std::optional<std::filesystem::path> &Schematic::GetFilePath() const {
+    return m_FilePath;
+}
+
+/**
+ * @brief   Records that the schematic was written to a file, or opened from one.
+ * @param[in] path  The file.
+ * @note    The schematic becomes unmodified.
+ */
+void Schematic::MarkSaved(std::filesystem::path path) {
+    m_FilePath = std::move(path);
+    m_Modified = false;
+}
+
+/**
+ * @brief   Returns the nodes and junctions of the schematic.
+ * @return  The connectivity, computed on first use after a change and cached until the next one.
+ */
+const Connectivity &Schematic::GetConnectivity() {
+    if (!m_Connectivity) {
+        m_Connectivity.emplace(m_Elements, m_Wires);
+    }
+    return *m_Connectivity;
+}
+
+/**
+ * @brief   Builds the SPICE netlist of the schematic.
+ * @return  The netlist text, as handed to ngspice.
+ */
+std::string Schematic::BuildSpiceNetlist() {
+    return BuildCircuit(m_Elements, GetConnectivity()).ToSpiceNetlist();
+}
+
+} // namespace GUI

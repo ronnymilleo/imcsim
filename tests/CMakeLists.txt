@@ -11,6 +11,7 @@ add_executable(imcsim-tests
             connectivity_tests.cpp
             helpers_tests.cpp
             schematic_file_tests.cpp
+            schematic_tests.cpp
             spice_value_tests.cpp
             ui_element_tests.cpp
             ui_wire_tests.cpp

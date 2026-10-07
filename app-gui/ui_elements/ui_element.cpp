@@ -130,6 +130,20 @@ void UIElement::DrawTerminals(ImDrawList *draw_list, const ViewTransform &view, 
 }
 
 /**
+ * @brief   Draws the component name above the symbol and its value below, in local orientation.
+ * @param[in] draw_list  Draw list of the editor window.
+ * @param[in] view       Transform of the current frame.
+ * @param[in] color      Text color.
+ */
+void UIElement::DrawLabels(ImDrawList *draw_list, const ViewTransform &view, const ImU32 color) const {
+    DrawLabel(draw_list, view, {0.0f, -LabelOffset}, {0.0f, -1.0f}, m_Component->GetName(), color);
+    if (m_Component->HasValue()) {
+        DrawLabel(draw_list, view, {0.0f, LabelOffset}, {0.0f, 1.0f}, Core::FormatValue(m_Component->GetValue()),
+                  color);
+    }
+}
+
+/**
  * @brief   Returns the terminals of a two-terminal component, in local grid units before rotation.
  * @return  The points at x = -2 and x = +2.
  */
@@ -143,20 +157,6 @@ std::vector<GridPoint> UIElement::GetLocalTerminals() const {
  */
 LocalBounds UIElement::GetLocalBounds() const {
     return {{-2.0f, -0.8f}, {2.0f, 0.8f}};
-}
-
-/**
- * @brief   Draws the component name above the symbol and its value below, in local orientation.
- * @param[in] draw_list  Draw list of the editor window.
- * @param[in] view       Transform of the current frame.
- * @param[in] color      Text color.
- */
-void UIElement::DrawLabels(ImDrawList *draw_list, const ViewTransform &view, const ImU32 color) const {
-    DrawLabel(draw_list, view, {0.0f, -LabelOffset}, {0.0f, -1.0f}, m_Component->GetName(), color);
-    if (m_Component->HasValue()) {
-        DrawLabel(draw_list, view, {0.0f, LabelOffset}, {0.0f, 1.0f}, Core::FormatValue(m_Component->GetValue()),
-                  color);
-    }
 }
 
 // ImGui text cannot rotate, so the text stays upright and is pushed from the anchor along the rotated direction

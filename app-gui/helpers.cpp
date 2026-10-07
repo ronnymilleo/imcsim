@@ -67,6 +67,15 @@ ImVec2 ToVec2(const GridPoint point) {
 }
 
 /**
+ * @brief   Rounds a world position to the nearest grid point.
+ * @param[in] world_pos  Position in grid units.
+ * @return  The closest grid point.
+ */
+GridPoint Snap(const ImVec2 world_pos) {
+    return {static_cast<int>(std::lround(world_pos.x)), static_cast<int>(std::lround(world_pos.y))};
+}
+
+/**
  * @brief   Returns the next orientation, turning 90 degrees clockwise.
  * @param[in] rotation  Current orientation.
  * @return  The orientation after one step, wrapping from R270 back to R0.
@@ -182,15 +191,6 @@ GridPoint Rotate(const GridPoint point, const Rotation rotation) {
         return {point.Y, -point.X};
     }
     return point;
-}
-
-/**
- * @brief   Rounds a world position to the nearest grid point.
- * @param[in] world_pos  Position in grid units.
- * @return  The closest grid point.
- */
-GridPoint Snap(const ImVec2 world_pos) {
-    return {static_cast<int>(std::lround(world_pos.x)), static_cast<int>(std::lround(world_pos.y))};
 }
 
 } // namespace GUI

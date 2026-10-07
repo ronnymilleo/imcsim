@@ -120,6 +120,73 @@ int VulkanContext::InitWindow(SDL_Window *window) {
 }
 
 /**
+ * @brief   Fills the Dear ImGui Vulkan backend init info with the handles owned by this context.
+ * @param[out] info  Structure passed to ImGui_ImplVulkan_Init().
+ */
+void VulkanContext::FillImGuiInitInfo(ImGui_ImplVulkan_InitInfo &info) {
+    info.ApiVersion = VK_API_VERSION_1_4;
+    info.Instance = m_Instance;
+    info.PhysicalDevice = m_PhysicalDevice;
+    info.Device = m_Device;
+    info.QueueFamily = m_QueueFamily;
+    info.Queue = m_Queue;
+    info.PipelineCache = m_PipelineCache;
+    info.DescriptorPool = m_DescriptorPool;
+    info.MinImageCount = m_MinImageCount;
+    info.ImageCount = m_WindowData.ImageCount;
+    info.Allocator = m_Allocator;
+    info.PipelineInfoMain.RenderPass = m_WindowData.RenderPass;
+    info.PipelineInfoMain.Subpass = 0;
+    info.PipelineInfoMain.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
+    info.CheckVkResultFn = CheckVkResult;
+}
+
+/**
+ * @brief   Blocks until the device has finished all submitted work.
+ */
+void VulkanContext::WaitIdle() const {
+    if (m_Device != VK_NULL_HANDLE) {
+        CheckVkResult(vkDeviceWaitIdle(m_Device));
+    }
+}
+
+/**
+ * @brief   Destroys every Vulkan object owned by this context.
+ * @note    Safe to call after a partial Init(); destroys only what was created.
+ */
+void VulkanContext::Shutdown() {
+    if (m_Device != VK_NULL_HANDLE) {
+        if (m_WindowCreated) {
+            ImGui_ImplVulkanH_DestroyWindow(m_Instance, m_Device, &m_WindowData, m_Allocator);
+            m_WindowCreated = false;
+        }
+        vkDestroyDescriptorPool(m_Device, m_DescriptorPool, m_Allocator);
+        m_DescriptorPool = VK_NULL_HANDLE;
+    }
+
+    if (m_Instance != VK_NULL_HANDLE) {
+        vkDestroySurfaceKHR(m_Instance, m_Surface, m_Allocator);
+        m_Surface = VK_NULL_HANDLE;
+
+#ifdef APP_USE_VULKAN_DEBUG_REPORT
+        auto destroy_debug_report_callback = reinterpret_cast<PFN_vkDestroyDebugReportCallbackEXT>(
+            vkGetInstanceProcAddr(m_Instance, "vkDestroyDebugReportCallbackEXT"));
+        destroy_debug_report_callback(m_Instance, m_DebugReport, m_Allocator);
+        m_DebugReport = VK_NULL_HANDLE;
+#endif
+    }
+
+    if (m_Device != VK_NULL_HANDLE) {
+        vkDestroyDevice(m_Device, m_Allocator);
+        m_Device = VK_NULL_HANDLE;
+    }
+    if (m_Instance != VK_NULL_HANDLE) {
+        vkDestroyInstance(m_Instance, m_Allocator);
+        m_Instance = VK_NULL_HANDLE;
+    }
+}
+
+/**
  * @brief   Rebuilds the swap chain when the window size changed or a rebuild was requested.
  * @param[in] window  Window whose current size is checked.
  */
@@ -252,73 +319,6 @@ void VulkanContext::FramePresent() {
         CheckVkResult(result);
     }
     window_data->SemaphoreIndex = (window_data->SemaphoreIndex + 1) % window_data->SemaphoreCount;
-}
-
-/**
- * @brief   Blocks until the device has finished all submitted work.
- */
-void VulkanContext::WaitIdle() const {
-    if (m_Device != VK_NULL_HANDLE) {
-        CheckVkResult(vkDeviceWaitIdle(m_Device));
-    }
-}
-
-/**
- * @brief   Destroys every Vulkan object owned by this context.
- * @note    Safe to call after a partial Init(); destroys only what was created.
- */
-void VulkanContext::Shutdown() {
-    if (m_Device != VK_NULL_HANDLE) {
-        if (m_WindowCreated) {
-            ImGui_ImplVulkanH_DestroyWindow(m_Instance, m_Device, &m_WindowData, m_Allocator);
-            m_WindowCreated = false;
-        }
-        vkDestroyDescriptorPool(m_Device, m_DescriptorPool, m_Allocator);
-        m_DescriptorPool = VK_NULL_HANDLE;
-    }
-
-    if (m_Instance != VK_NULL_HANDLE) {
-        vkDestroySurfaceKHR(m_Instance, m_Surface, m_Allocator);
-        m_Surface = VK_NULL_HANDLE;
-
-#ifdef APP_USE_VULKAN_DEBUG_REPORT
-        auto destroy_debug_report_callback = reinterpret_cast<PFN_vkDestroyDebugReportCallbackEXT>(
-            vkGetInstanceProcAddr(m_Instance, "vkDestroyDebugReportCallbackEXT"));
-        destroy_debug_report_callback(m_Instance, m_DebugReport, m_Allocator);
-        m_DebugReport = VK_NULL_HANDLE;
-#endif
-    }
-
-    if (m_Device != VK_NULL_HANDLE) {
-        vkDestroyDevice(m_Device, m_Allocator);
-        m_Device = VK_NULL_HANDLE;
-    }
-    if (m_Instance != VK_NULL_HANDLE) {
-        vkDestroyInstance(m_Instance, m_Allocator);
-        m_Instance = VK_NULL_HANDLE;
-    }
-}
-
-/**
- * @brief   Fills the Dear ImGui Vulkan backend init info with the handles owned by this context.
- * @param[out] info  Structure passed to ImGui_ImplVulkan_Init().
- */
-void VulkanContext::FillImGuiInitInfo(ImGui_ImplVulkan_InitInfo &info) {
-    info.ApiVersion = VK_API_VERSION_1_4;
-    info.Instance = m_Instance;
-    info.PhysicalDevice = m_PhysicalDevice;
-    info.Device = m_Device;
-    info.QueueFamily = m_QueueFamily;
-    info.Queue = m_Queue;
-    info.PipelineCache = m_PipelineCache;
-    info.DescriptorPool = m_DescriptorPool;
-    info.MinImageCount = m_MinImageCount;
-    info.ImageCount = m_WindowData.ImageCount;
-    info.Allocator = m_Allocator;
-    info.PipelineInfoMain.RenderPass = m_WindowData.RenderPass;
-    info.PipelineInfoMain.Subpass = 0;
-    info.PipelineInfoMain.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
-    info.CheckVkResultFn = CheckVkResult;
 }
 
 /**

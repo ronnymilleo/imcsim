@@ -35,14 +35,6 @@ void UIVCC::DrawTerminals(ImDrawList *draw_list, const ViewTransform &view, cons
     draw_list->AddLine(LocalToScreen(view, 0, 0), LocalToScreen(view, 0, -LeadLength), color, LineThickness);
 }
 
-std::vector<GridPoint> UIVCC::GetLocalTerminals() const {
-    return {{0, 0}};
-}
-
-LocalBounds UIVCC::GetLocalBounds() const {
-    return {{-0.6f, -1.0f}, {0.6f, 0.0f}};
-}
-
 void UIVCC::DrawSymbol(ImDrawList *draw_list, const ViewTransform &view, const ImU32 color,
                        SymbolStyle /*style*/) const {
     draw_list->AddLine(LocalToScreen(view, -BarHalfWidth, -LeadLength), LocalToScreen(view, BarHalfWidth, -LeadLength),
@@ -53,6 +45,14 @@ void UIVCC::DrawSymbol(ImDrawList *draw_list, const ViewTransform &view, const I
 void UIVCC::DrawLabels(ImDrawList *draw_list, const ViewTransform &view, const ImU32 color) const {
     const std::string label = std::format("VCC {}V", Core::FormatValue(GetComponent().GetValue()));
     DrawLabel(draw_list, view, {0.0f, -LabelOffset}, {0.0f, -1.0f}, label, color);
+}
+
+std::vector<GridPoint> UIVCC::GetLocalTerminals() const {
+    return {{0, 0}};
+}
+
+LocalBounds UIVCC::GetLocalBounds() const {
+    return {{-0.6f, -1.0f}, {0.6f, 0.0f}};
 }
 
 } // namespace GUI

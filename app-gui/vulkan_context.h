@@ -20,18 +20,24 @@ namespace GUI {
  */
 class VulkanContext {
 public:
+    // Setup and teardown
     int Init();
     int InitWindow(SDL_Window *window);
+    void FillImGuiInitInfo(ImGui_ImplVulkan_InitInfo &info);
+    void WaitIdle() const;
+    void Shutdown();
+
+    // Frame
     void ResizeIfNeeded(SDL_Window *window);
     void SetClearColor(const ImVec4 &color);
     void FrameRender(ImDrawData *draw_data);
     void FramePresent();
-    void WaitIdle() const;
-    void Shutdown();
-    void FillImGuiInitInfo(ImGui_ImplVulkan_InitInfo &info);
+
+    // Errors
     const std::string &LastError() const;
 
 private:
+    // Vulkan objects
     VkAllocationCallbacks *m_Allocator = nullptr;
     VkInstance m_Instance = VK_NULL_HANDLE;
     VkPhysicalDevice m_PhysicalDevice = VK_NULL_HANDLE;
@@ -43,12 +49,16 @@ private:
     VkDebugReportCallbackEXT m_DebugReport = VK_NULL_HANDLE;
     VkSurfaceKHR m_Surface = VK_NULL_HANDLE;
 
+    // Window and swap chain
     ImGui_ImplVulkanH_Window m_WindowData;
     bool m_WindowCreated = false;
     uint32_t m_MinImageCount = 2;
     bool m_SwapChainRebuild = false;
+
+    // Errors
     std::string m_LastError;
 
+    // Setup steps
     void CreateInstance(ImVector<const char *> instance_extensions);
     void CreateDevice();
     void CreateDescriptorPool();

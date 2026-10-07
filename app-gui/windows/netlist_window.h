@@ -1,13 +1,13 @@
 /**
  * @file    netlist_window.h
- * @brief   Window that shows the SPICE netlist of the schematic being edited.
+ * @brief   Window that shows the SPICE netlist of the schematic.
  */
 
 #ifndef IMCSIM_NETLIST_WINDOW_H
 #define IMCSIM_NETLIST_WINDOW_H
 
+#include "schematic.h"
 #include "windows/app_window.h"
-#include "windows/editor_window.h"
 
 namespace GUI {
 
@@ -17,11 +17,11 @@ namespace GUI {
  */
 class NetlistWindow : public AppWindow {
 public:
-    explicit NetlistWindow(EditorWindow &editor);
+    explicit NetlistWindow(Schematic &schematic);
     ~NetlistWindow() override = default;
 
 private:
-    EditorWindow &m_Editor;
+    Schematic &m_Schematic;
 
     void Draw() override;
 };

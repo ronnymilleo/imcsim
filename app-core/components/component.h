@@ -36,6 +36,7 @@ public:
     Component(ComponentType type, double value);
     virtual ~Component() = default;
 
+    // Kind of component
     ComponentType GetType() const;
     const char *GetTypeName() const;
     const char *GetNamePrefix() const;
@@ -43,6 +44,7 @@ public:
     bool HasValue() const;
     bool IsValidValue(double value) const;
 
+    // Instance data
     const std::string &GetName() const;
     void SetName(std::string name);
     double GetValue() const;
@@ -54,8 +56,11 @@ protected:
     double m_Value = 0.0;
 };
 
+// Type names
 const char *GetTypeName(ComponentType type);
 std::optional<ComponentType> ParseComponentType(std::string_view text);
+
+// Instance names
 bool IsValidName(std::string_view name, std::string_view prefix);
 std::string NextComponentName(std::string_view prefix, const std::vector<std::string> &existing_names);
 
