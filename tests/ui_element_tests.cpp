@@ -96,3 +96,28 @@ TEST_CASE("Transistors are picked inside their body but not beyond the terminals
     CHECK_FALSE(mosfet.Contains({2.0f, 0.0f}));
     CHECK_FALSE(mosfet.Contains({0.0f, 2.5f}));
 }
+
+TEST_CASE("Mirroring flips an element across its local vertical axis before rotating it", "[ui_element]") {
+    GUI::UIBJT transistor(Core::ComponentType::PNP, {0, 0}, GUI::Rotation::R0);
+    transistor.SetMirrored(true);
+    CHECK(transistor.IsMirrored());
+    // Collector, base and emitter: the base moves to the right
+    CHECK(transistor.GetTerminals() == std::vector<GUI::GridPoint>{{-1, -2}, {2, 0}, {-1, 2}});
+    // Mirrored and turned half a turn, the emitter ends on top, as a high-side PNP is drawn
+    transistor.SetRotation(GUI::Rotation::R180);
+    CHECK(transistor.GetTerminals() == std::vector<GUI::GridPoint>{{1, 2}, {-2, 0}, {1, -2}});
+
+    GUI::UIResistor resistor({5, 5}, GUI::Rotation::R0);
+    resistor.SetMirrored(true);
+    CHECK(resistor.GetTerminals() == std::vector<GUI::GridPoint>{{7, 5}, {3, 5}});
+}
+
+TEST_CASE("Picking follows the mirrored outline", "[ui_element]") {
+    GUI::UIMOSFET mosfet(Core::ComponentType::NMOS, {0, 0}, GUI::Rotation::R0);
+    // The gate side reaches x = -2 and the drain and source side only x = 1.2
+    CHECK(mosfet.Contains({-1.5f, 0.0f}));
+    CHECK_FALSE(mosfet.Contains({1.5f, 0.0f}));
+    mosfet.SetMirrored(true);
+    CHECK(mosfet.Contains({1.5f, 0.0f}));
+    CHECK_FALSE(mosfet.Contains({-1.5f, 0.0f}));
+}

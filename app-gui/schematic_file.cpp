@@ -124,6 +124,14 @@ std::optional<std::string> ReadString(const nlohmann::json &object, const char *
     return entry->get<std::string>();
 }
 
+std::optional<bool> ReadBool(const nlohmann::json &object, const char *key) {
+    const auto entry = object.find(key);
+    if (entry == object.end() || !entry->is_boolean()) {
+        return std::nullopt;
+    }
+    return entry->get<bool>();
+}
+
 std::optional<GridPoint> ReadPoint(const nlohmann::json &object, const char *key) {
     const auto entry = object.find(key);
     if (entry == object.end() || !entry->is_array() || entry->size() != 2 || !(*entry)[0].is_number_integer() ||
@@ -178,6 +186,10 @@ nlohmann::json WriteElement(const UIElement &element) {
         {"y", element.GetPosition().Y},
         {"rotation", ToDegrees(element.GetRotation())},
     };
+    // Only mirrored elements carry the key, so files of unmirrored schematics stay as they were
+    if (element.IsMirrored()) {
+        object["mirrored"] = true;
+    }
     if (!component.GetName().empty()) {
         object["name"] = component.GetName();
     }
@@ -317,6 +329,13 @@ std::expected<std::unique_ptr<UIElement>, std::string> ReadElement(const nlohman
     }
 
     std::unique_ptr<UIElement> element = CreateElement(*type, {*x, *y}, *rotation);
+    if (object.contains("mirrored")) {
+        const std::optional<bool> mirrored = ReadBool(object, "mirrored");
+        if (!mirrored) {
+            return std::unexpected("has a mirrored flag that is not true or false");
+        }
+        element->SetMirrored(*mirrored);
+    }
     Core::Component &component = element->GetComponent();
     if (component.HasValue()) {
         const std::optional<double> value = ReadNumber(object, "value");

@@ -107,6 +107,7 @@ private:
     // Placement
     std::optional<Core::ComponentType> m_PlacingType;
     Rotation m_PlacingRotation = Rotation::R0;
+    bool m_PlacingMirrored = false;
 
     // Wiring
     bool m_DrawingWires = false;
@@ -165,6 +166,7 @@ private:
     void ClearSelection();
     void EndDrag();
     void RotateSelectedElement();
+    void MirrorSelectedElement(bool vertically);
 
     // File and history commands
     void HandleFileShortcuts();

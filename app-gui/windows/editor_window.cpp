@@ -592,6 +592,7 @@ void EditorWindow::StartPlacing(const Core::ComponentType type) {
     m_WireStart.reset();
     m_PlacingType = type;
     m_PlacingRotation = Rotation::R0;
+    m_PlacingMirrored = false;
 }
 
 void EditorWindow::StartDrawingWires() {
@@ -610,8 +611,8 @@ void EditorWindow::StartProbing() {
 }
 
 /**
- * @brief   Handles placement mode: R rotates, Esc or right click cancels, left click places and keeps the mode
- *          active so several components can be placed in a row.
+ * @brief   Handles placement mode: R rotates, M mirrors left to right and Shift+M top to bottom, Esc or right click
+ *          cancels, left click places and keeps the mode active so several components can be placed in a row.
  */
 void EditorWindow::HandlePlacement(ImDrawList *draw_list, const ViewTransform &view, const bool hovered) {
     if (!m_PlacingType) {
@@ -622,6 +623,12 @@ void EditorWindow::HandlePlacement(ImDrawList *draw_list, const ViewTransform &v
     if (ImGui::IsWindowFocused()) {
         if (ImGui::IsKeyPressed(ImGuiKey_R)) {
             m_PlacingRotation = NextRotation(m_PlacingRotation);
+        }
+        if (ImGui::IsKeyPressed(ImGuiKey_M)) {
+            m_PlacingMirrored = !m_PlacingMirrored;
+            if (ImGui::GetIO().KeyShift) {
+                m_PlacingRotation = NextRotation(NextRotation(m_PlacingRotation));
+            }
         }
         if (ImGui::IsKeyPressed(ImGuiKey_Escape)) {
             m_PlacingType.reset();
@@ -638,6 +645,7 @@ void EditorWindow::HandlePlacement(ImDrawList *draw_list, const ViewTransform &v
 
     const GridPoint position = Snap(view.ToWorld(ImGui::GetIO().MousePos));
     auto preview = CreateElement(*m_PlacingType, position, m_PlacingRotation);
+    preview->SetMirrored(m_PlacingMirrored);
     preview->Draw(draw_list, view, PreviewColor, m_SymbolStyle);
     if (ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
         m_Schematic.AddElement(std::move(preview));
@@ -761,8 +769,8 @@ void EditorWindow::HandleProbing(ImDrawList *draw_list, const ViewTransform &vie
 
 /**
  * @brief   Handles selection mode, active while not placing, wiring or probing: click selects an element or a wire,
- *          dragging an element moves it with its wires following, R rotates the selected element, Delete removes
- *          the selection and Esc clears it.
+ *          dragging an element moves it with its wires following, R rotates the selected element, M mirrors it left
+ *          to right and Shift+M top to bottom, Delete removes the selection and Esc clears it.
  */
 void EditorWindow::HandleSelection(const ViewTransform &view, const bool hovered) {
     if (m_PlacingType || m_DrawingWires || m_Probing) {
@@ -796,6 +804,9 @@ void EditorWindow::HandleSelection(const ViewTransform &view, const bool hovered
     if (ImGui::IsWindowFocused()) {
         if (ImGui::IsKeyPressed(ImGuiKey_R) && m_Schematic.GetSelectedElement() != nullptr) {
             RotateSelectedElement();
+        }
+        if (ImGui::IsKeyPressed(ImGuiKey_M) && m_Schematic.GetSelectedElement() != nullptr) {
+            MirrorSelectedElement(ImGui::GetIO().KeyShift);
         }
         // Deleting mid-drag would leave the drag pointing at a removed element
         if (ImGui::IsKeyPressed(ImGuiKey_Delete) && !m_Drag) {
@@ -847,6 +858,23 @@ void EditorWindow::RotateSelectedElement() {
     UIElement &element = *m_Schematic.GetSelectedElement();
     const std::vector<GridPoint> old_terminals = element.GetTerminals();
     element.SetRotation(NextRotation(element.GetRotation()));
+    m_Schematic.MarkModified();
+    if (m_Drag) {
+        return;
+    }
+    m_Schematic.SetWires(FollowTerminals(m_Schematic.GetWires(), old_terminals, element.GetTerminals()));
+    m_Schematic.SimplifyAllWires();
+}
+
+// A vertical flip is a mirror plus half a turn, so it needs no state of its own. Like a rotation, the wires follow
+// the terminals, and a drag rebuilds them from its snapshot on the next frame
+void EditorWindow::MirrorSelectedElement(const bool vertically) {
+    UIElement &element = *m_Schematic.GetSelectedElement();
+    const std::vector<GridPoint> old_terminals = element.GetTerminals();
+    element.SetMirrored(!element.IsMirrored());
+    if (vertically) {
+        element.SetRotation(NextRotation(NextRotation(element.GetRotation())));
+    }
     m_Schematic.MarkModified();
     if (m_Drag) {
         return;

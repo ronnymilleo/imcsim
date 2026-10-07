@@ -96,12 +96,31 @@ void UIElement::SetRotation(const Rotation rotation) {
 }
 
 /**
- * @brief   Returns the terminals of the element on the grid, after rotation and translation.
+ * @brief   Tells whether the element is flipped across its local vertical axis.
+ * @return  True for a mirrored element.
+ */
+bool UIElement::IsMirrored() const {
+    return m_Mirrored;
+}
+
+/**
+ * @brief   Flips the element across its local vertical axis, or back.
+ * @param[in] mirrored  Whether the element is mirrored; it applies before the rotation.
+ */
+void UIElement::SetMirrored(const bool mirrored) {
+    m_Mirrored = mirrored;
+}
+
+/**
+ * @brief   Returns the terminals of the element on the grid, after mirroring, rotation and translation.
  * @return  Connection points in world units, where wires can attach.
  */
 std::vector<GridPoint> UIElement::GetTerminals() const {
     std::vector<GridPoint> terminals = GetLocalTerminals();
     for (GridPoint &terminal : terminals) {
+        if (m_Mirrored) {
+            terminal.X = -terminal.X;
+        }
         terminal = m_Position + Rotate(terminal, m_Rotation);
     }
     return terminals;
@@ -113,7 +132,10 @@ std::vector<GridPoint> UIElement::GetTerminals() const {
  * @return  True when the position is inside the symbol bounds, terminals included.
  */
 bool UIElement::Contains(const ImVec2 world_pos) const {
-    const ImVec2 local = Rotate(world_pos - ToVec2(m_Position), InverseRotation(m_Rotation));
+    ImVec2 local = Rotate(world_pos - ToVec2(m_Position), InverseRotation(m_Rotation));
+    if (m_Mirrored) {
+        local.x = -local.x;
+    }
     const LocalBounds bounds = GetLocalBounds();
     return local.x >= bounds.Min.x && local.x <= bounds.Max.x && local.y >= bounds.Min.y && local.y <= bounds.Max.y;
 }
@@ -187,12 +209,12 @@ void UIElement::DrawLabel(ImDrawList *draw_list, const ViewTransform &view, cons
 /**
  * @brief   Converts a point of the symbol, in local grid units, to screen pixels.
  * @param[in] view  Transform of the current frame.
- * @param[in] x     Local X before rotation.
+ * @param[in] x     Local X before mirroring and rotation.
  * @param[in] y     Local Y before rotation.
  * @return  Position in screen pixels.
  */
 ImVec2 UIElement::LocalToScreen(const ViewTransform &view, const float x, const float y) const {
-    return view.ToScreen(ToVec2(m_Position) + Rotate(ImVec2{x, y}, m_Rotation));
+    return view.ToScreen(ToVec2(m_Position) + Rotate(ImVec2{m_Mirrored ? -x : x, y}, m_Rotation));
 }
 
 } // namespace GUI

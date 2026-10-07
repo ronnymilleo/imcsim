@@ -321,3 +321,32 @@ TEST_CASE("Transistors with an unknown model or bad parameters are skipped", "[s
     CAPTURE(loaded.Warnings);
     CHECK(loaded.Warnings.size() == 2);
 }
+
+TEST_CASE("Mirrored elements keep their mirroring, and only they carry the key", "[schematic_file]") {
+    std::vector<std::unique_ptr<GUI::UIElement>> elements;
+    elements.push_back(GUI::CreateElement(Core::ComponentType::PNP, {0, 0}, GUI::Rotation::R180));
+    elements.back()->GetComponent().SetName("Q1");
+    elements.back()->SetMirrored(true);
+    elements.push_back(GUI::CreateElement(Core::ComponentType::Resistor, {6, 0}, GUI::Rotation::R0));
+    elements.back()->GetComponent().SetName("R1");
+
+    const std::string saved = GUI::SaveSchematic(elements, {});
+    CHECK(saved.find(R"("mirrored": true)") != std::string::npos);
+    CHECK(saved.find(R"("mirrored": false)") == std::string::npos);
+    const GUI::LoadedSchematic loaded = LoadOrFail(saved);
+    CHECK(loaded.Warnings.empty());
+    REQUIRE(loaded.Elements.size() == 2);
+    CHECK(loaded.Elements[0]->IsMirrored());
+    CHECK(loaded.Elements[0]->GetRotation() == GUI::Rotation::R180);
+    CHECK_FALSE(loaded.Elements[1]->IsMirrored());
+}
+
+TEST_CASE("A mirrored flag that is not a boolean skips the element", "[schematic_file]") {
+    const GUI::LoadedSchematic loaded = LoadOrFail(Document(
+        R"({"type": "Resistor", "name": "R1", "value": 10, "x": 0, "y": 0, "rotation": 0, "mirrored": "yes"},
+           {"type": "Resistor", "name": "R2", "value": 10, "x": 0, "y": 4, "rotation": 0, "mirrored": false})",
+        ""));
+    REQUIRE(loaded.Elements.size() == 1);
+    CHECK(loaded.Elements[0]->GetComponent().GetName() == "R2");
+    CHECK(loaded.Warnings.size() == 1);
+}
