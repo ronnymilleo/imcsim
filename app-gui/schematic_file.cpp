@@ -5,6 +5,7 @@
 
 #include "schematic_file.h"
 
+#include "components/voltage_source.h"
 #include "element_factory.h"
 #include "nlohmann/json.hpp"
 #include <format>
@@ -68,7 +69,50 @@ nlohmann::json WriteElement(const UIElement &element) {
     if (component.HasValue()) {
         object["value"] = component.GetValue();
     }
+    // Both waveforms are saved, so switching type after loading keeps the other one's parameters
+    if (component.GetType() == Core::ComponentType::VoltageSource) {
+        const auto &source = static_cast<const Core::VoltageSource &>(component);
+        object["source"] = Core::GetSourceTypeName(source.GetSourceType());
+        object["amplitude"] = source.GetAmplitude();
+        object["frequency"] = source.GetFrequency();
+        object["offset"] = source.GetOffset();
+    }
     return object;
+}
+
+// Every key is optional, so files saved before sources had a type load as DC with the default sine
+std::expected<void, std::string> ReadVoltageSource(const nlohmann::json &object, Core::VoltageSource &source) {
+    if (object.contains("source")) {
+        const std::optional<std::string> type_name = ReadString(object, "source");
+        const std::optional<Core::VoltageSource::SourceType> type =
+            type_name ? Core::ParseSourceType(*type_name) : std::nullopt;
+        if (!type) {
+            return std::unexpected("has a source type other than DC or AC");
+        }
+        source.SetSourceType(*type);
+    }
+    if (object.contains("amplitude")) {
+        const std::optional<double> amplitude = ReadNumber(object, "amplitude");
+        if (!amplitude) {
+            return std::unexpected("has no valid amplitude");
+        }
+        source.SetAmplitude(*amplitude);
+    }
+    if (object.contains("frequency")) {
+        const std::optional<double> frequency = ReadNumber(object, "frequency");
+        if (!frequency || !source.IsValidFrequency(*frequency)) {
+            return std::unexpected("has no valid frequency");
+        }
+        source.SetFrequency(*frequency);
+    }
+    if (object.contains("offset")) {
+        const std::optional<double> offset = ReadNumber(object, "offset");
+        if (!offset) {
+            return std::unexpected("has no valid offset");
+        }
+        source.SetOffset(*offset);
+    }
+    return {};
 }
 
 // Names are checked separately, once every element is read, so duplicates can be found
@@ -103,6 +147,13 @@ std::expected<std::unique_ptr<UIElement>, std::string> ReadElement(const nlohman
             return std::unexpected("has no valid value");
         }
         component.SetValue(*value);
+    }
+    if (component.GetType() == Core::ComponentType::VoltageSource) {
+        const std::expected<void, std::string> source =
+            ReadVoltageSource(object, static_cast<Core::VoltageSource &>(component));
+        if (!source) {
+            return std::unexpected(source.error());
+        }
     }
     if (const std::optional<std::string> name = ReadString(object, "name")) {
         component.SetName(*name);

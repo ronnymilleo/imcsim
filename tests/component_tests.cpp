@@ -87,3 +87,27 @@ TEST_CASE("NextComponentName continues after the highest number for the prefix",
     CHECK(Core::NextComponentName("R", {"Rload", "R2x"}) == "R1");
     CHECK(Core::NextComponentName("C", {"R1", "R3", "C9"}) == "C10");
 }
+
+TEST_CASE("A voltage source keeps its sine parameters while switching type", "[component]") {
+    Core::VoltageSource source;
+    CHECK(source.GetAmplitude() == 1.0);
+    CHECK(source.GetFrequency() == 1e3);
+    CHECK(source.GetOffset() == 0.0);
+
+    source.SetAmplitude(3.0);
+    source.SetSourceType(Core::VoltageSource::SourceType::AC);
+    source.SetSourceType(Core::VoltageSource::SourceType::DC);
+    CHECK(source.GetAmplitude() == 3.0);
+    CHECK(source.GetValue() == 5.0);
+
+    CHECK(source.IsValidFrequency(50.0));
+    CHECK_FALSE(source.IsValidFrequency(0.0));
+    CHECK_FALSE(source.IsValidFrequency(-1.0));
+}
+
+TEST_CASE("Source type names convert both ways", "[component]") {
+    for (const auto type : {Core::VoltageSource::SourceType::DC, Core::VoltageSource::SourceType::AC}) {
+        CHECK(Core::ParseSourceType(Core::GetSourceTypeName(type)) == type);
+    }
+    CHECK_FALSE(Core::ParseSourceType("ac"));
+}

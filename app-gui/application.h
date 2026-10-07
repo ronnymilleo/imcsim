@@ -11,6 +11,7 @@
 #include "vulkan_context.h"
 #include "windows/editor_window.h"
 #include "windows/netlist_window.h"
+#include "windows/output_window.h"
 #include "windows/properties_window.h"
 #include "windows/simulation_window.h"
 
@@ -54,6 +55,7 @@ private:
     PropertiesWindow m_PropertiesWindow{m_Schematic};
     NetlistWindow m_NetlistWindow{m_Schematic};
     SimulationWindow m_SimulationWindow{m_Schematic};
+    OutputWindow m_OutputWindow{m_Schematic};
 
     // Errors
     void AddError(const std::string &message);

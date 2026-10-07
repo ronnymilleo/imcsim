@@ -9,6 +9,7 @@
 #include "imgui.h"
 #include "imgui_impl_sdl3.h"
 #include "imgui_internal.h"
+#include "implot.h"
 #include <SDL3/SDL.h>
 #include <array>
 #include <cstdio>
@@ -65,6 +66,7 @@ void Application::Shutdown() {
     if (ImGui::GetCurrentContext() != nullptr) {
         ImGui_ImplVulkan_Shutdown();
         ImGui_ImplSDL3_Shutdown();
+        ImPlot::DestroyContext();
         ImGui::DestroyContext();
     }
 
@@ -126,6 +128,7 @@ int Application::InitVulkan() {
 int Application::InitImGui() {
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
+    ImPlot::CreateContext();
 
     ImGuiIO &io = ImGui::GetIO();
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
@@ -193,6 +196,7 @@ void Application::Render() {
     m_PropertiesWindow.Render();
     m_NetlistWindow.Render();
     m_SimulationWindow.Render();
+    m_OutputWindow.Render();
     ImGui::Render();
 }
 
@@ -202,8 +206,8 @@ void Application::DrawMainMenuBar() {
     }
     if (ImGui::BeginMenu("View")) {
         // The editor cannot be closed, so only the side windows are listed
-        const std::array<AppWindow *, 3> closable_windows = {&m_PropertiesWindow, &m_NetlistWindow,
-                                                             &m_SimulationWindow};
+        const std::array<AppWindow *, 4> closable_windows = {&m_PropertiesWindow, &m_NetlistWindow, &m_SimulationWindow,
+                                                             &m_OutputWindow};
         for (AppWindow *window : closable_windows) {
             bool open = window->IsOpen();
             if (ImGui::MenuItem(window->GetWindowTitle().c_str(), nullptr, &open)) {
@@ -223,8 +227,9 @@ void Application::DrawMainMenuBar() {
     ImGui::EndMainMenuBar();
 }
 
-// Editor on top, Properties below it on the left and Netlist and Simulation as tabs on the right. Must run before the
-// windows are drawn. Each split returns the new node in the given direction and leaves the rest in its last argument
+// Editor on top, Properties below it on the left and Netlist and Simulation as tabs on the right; Output floats.
+// Must run before the windows are drawn. Each split returns the new node in the given direction and leaves the
+// rest in its last argument
 void Application::SetupDefaultLayout(ImGuiID dockspace_id) {
     ImGui::DockBuilderSetNodeSize(dockspace_id, ImGui::GetMainViewport()->WorkSize);
     ImGuiID editor_id = dockspace_id;

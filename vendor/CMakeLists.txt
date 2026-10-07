@@ -35,6 +35,29 @@ target_link_libraries(imgui
 target_compile_definitions(imgui PUBLIC IMGUI_DEFINE_MATH_OPERATORS)
 
 # =============================================================================
+# implot
+# =============================================================================
+
+# The demo is left out: it is not used and warns under C++23
+set(IMPLOT_DIR ${CMAKE_CURRENT_SOURCE_DIR}/implot)
+
+add_library(implot
+        STATIC
+            ${IMPLOT_DIR}/implot.cpp
+            ${IMPLOT_DIR}/implot_items.cpp
+)
+
+target_include_directories(implot
+        PUBLIC
+            ${IMPLOT_DIR}
+)
+
+target_link_libraries(implot
+        PUBLIC
+            imgui
+)
+
+# =============================================================================
 # nlohmann/json
 # =============================================================================
 

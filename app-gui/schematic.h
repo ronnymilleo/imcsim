@@ -26,9 +26,9 @@ namespace GUI {
  * @details Adding and deleting mark the schematic as modified. Geometry updates that may be undone within the
  *          same gesture, such as wires following a dragged element, only invalidate the nodes; the caller
  *          decides when the gesture counts as a change and calls MarkModified(). Nodes are computed lazily and
- *          cached until the next change, and so is the last simulation result, which no longer matches the
- *          circuit once it changes. Indices returned by the selection stay valid until an element or wire is
- *          added, deleted or the wires are replaced.
+ *          cached until the next change, and so is the last result of each analysis, which no longer matches
+ *          the circuit once it changes. Indices returned by the selection stay valid until an element or wire
+ *          is added, deleted or the wires are replaced.
  */
 class Schematic {
 public:
@@ -69,6 +69,11 @@ public:
     std::string BuildSpiceNetlist();
     void SetOperatingPoint(std::optional<Core::OperatingPoint> operating_point);
     const std::optional<Core::OperatingPoint> &GetOperatingPoint() const;
+    void SetTransient(std::optional<Core::Transient> transient);
+    const std::optional<Core::Transient> &GetTransient() const;
+    void SetACSweep(std::optional<Core::ACSweep> sweep);
+    const std::optional<Core::ACSweep> &GetACSweep() const;
+    std::size_t GetResultsVersion() const;
 
 private:
     // Content
@@ -87,6 +92,10 @@ private:
     // Derived data, dropped on every change: nodes are rebuilt on first use, results by the next simulation
     std::optional<Connectivity> m_Connectivity;
     std::optional<Core::OperatingPoint> m_OperatingPoint;
+    std::optional<Core::Transient> m_Transient;
+    std::optional<Core::ACSweep> m_ACSweep;
+    // Changes with every new result, so windows can tell a rerun from the result they already showed
+    std::size_t m_ResultsVersion = 0;
 
     void InvalidateDerivedData();
 };

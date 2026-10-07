@@ -184,8 +184,12 @@ TEST_CASE("Simulation results are dropped when the circuit changes", "[schematic
         CHECK_FALSE(schematic.GetOperatingPoint());
     }
     SECTION("when a value or anything else is edited") {
+        schematic.SetTransient(Core::Transient{});
+        schematic.SetACSweep(Core::ACSweep{});
         schematic.MarkModified();
         CHECK_FALSE(schematic.GetOperatingPoint());
+        CHECK_FALSE(schematic.GetTransient());
+        CHECK_FALSE(schematic.GetACSweep());
     }
 }
 

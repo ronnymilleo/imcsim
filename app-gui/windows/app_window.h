@@ -7,6 +7,7 @@
 #define IMCSIM_APP_WINDOW_H
 
 #include "imgui.h"
+#include <optional>
 #include <string>
 
 namespace GUI {
@@ -27,6 +28,9 @@ public:
     void SetOpen(bool open);
     const std::string &GetWindowTitle() const;
 
+protected:
+    void SetInitialSize(ImVec2 size);
+
 private:
     virtual void Draw() = 0;
 
@@ -34,6 +38,8 @@ private:
     bool m_Closable;
     ImGuiWindowFlags m_WindowFlags;
     bool m_IsOpen = true;
+    // In font sizes; only used the first time the window appears, before imgui.ini remembers it
+    std::optional<ImVec2> m_InitialSize;
 };
 
 } // namespace GUI

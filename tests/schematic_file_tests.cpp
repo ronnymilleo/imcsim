@@ -3,6 +3,7 @@
  * @brief   Tests for saving schematics to JSON and loading them back.
  */
 
+#include "components/voltage_source.h"
 #include "element_factory.h"
 #include "schematic_file.h"
 #include "test_printers.h"
@@ -121,4 +122,37 @@ TEST_CASE("Missing and repeated names are replaced with the next free number", "
     CHECK(loaded.Elements[4]->GetComponent().GetName() == "Rload");
     CAPTURE(loaded.Warnings);
     CHECK(loaded.Warnings.size() == 3);
+}
+
+TEST_CASE("A voltage source keeps its type and sine parameters", "[schematic_file]") {
+    std::vector<std::unique_ptr<GUI::UIElement>> elements;
+    elements.push_back(GUI::CreateElement(Core::ComponentType::VoltageSource, {0, 0}, GUI::Rotation::R90));
+    auto &source = static_cast<Core::VoltageSource &>(elements.back()->GetComponent());
+    source.SetName("Vin1");
+    source.SetSourceType(Core::VoltageSource::SourceType::AC);
+    source.SetAmplitude(2.5);
+    source.SetFrequency(60.0);
+    source.SetOffset(-1.0);
+
+    const GUI::LoadedSchematic loaded = LoadOrFail(GUI::SaveSchematic(elements, {}));
+    CHECK(loaded.Warnings.empty());
+    REQUIRE(loaded.Elements.size() == 1);
+    const auto &copy = static_cast<const Core::VoltageSource &>(loaded.Elements[0]->GetComponent());
+    CHECK(copy.GetSourceType() == Core::VoltageSource::SourceType::AC);
+    CHECK(copy.GetAmplitude() == 2.5);
+    CHECK(copy.GetFrequency() == 60.0);
+    CHECK(copy.GetOffset() == -1.0);
+}
+
+TEST_CASE("A voltage source without a type loads as DC, and an invalid one is skipped", "[schematic_file]") {
+    const GUI::LoadedSchematic loaded = LoadOrFail(Document(
+        R"({"type": "VoltageSource", "name": "Vin1", "x": 0, "y": 0, "rotation": 0, "value": 3},)"
+        R"({"type": "VoltageSource", "name": "Vin2", "x": 4, "y": 0, "rotation": 0, "value": 3, "source": "RF"},)"
+        R"({"type": "VoltageSource", "name": "Vin3", "x": 8, "y": 0, "rotation": 0, "value": 3, "frequency": 0})",
+        ""));
+    REQUIRE(loaded.Elements.size() == 1);
+    const auto &source = static_cast<const Core::VoltageSource &>(loaded.Elements[0]->GetComponent());
+    CHECK(source.GetSourceType() == Core::VoltageSource::SourceType::DC);
+    CHECK(source.GetValue() == 3.0);
+    CHECK(loaded.Warnings.size() == 2);
 }

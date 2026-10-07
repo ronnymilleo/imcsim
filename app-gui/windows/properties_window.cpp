@@ -5,15 +5,15 @@
 
 #include "properties_window.h"
 
-#include "spice_value.h"
 #include <format>
-#include <string>
 
 namespace GUI {
 
 namespace {
 
-constexpr ImVec4 ErrorTextColor = {1.0f, 0.4f, 0.4f, 1.0f};
+bool AnyValue(double /*value*/) {
+    return true;
+}
 
 } // namespace
 
@@ -24,8 +24,6 @@ constexpr ImVec4 ErrorTextColor = {1.0f, 0.4f, 0.4f, 1.0f};
 PropertiesWindow::PropertiesWindow(Schematic &schematic) : AppWindow("Properties", true), m_Schematic(schematic) {
 }
 
-// Values are typed with SPICE suffixes and applied as soon as they are valid: the editor window is drawn before
-// this one, so a click on the canvas would change the selection before a deferred edit was applied
 void PropertiesWindow::Draw() {
     if (m_Schematic.GetSelectedWireIndex()) {
         ImGui::TextUnformatted("Wire");
@@ -46,36 +44,71 @@ void PropertiesWindow::Draw() {
         return;
     }
 
-    if (m_ValueTextSelection != m_Schematic.GetSelectionVersion()) {
-        LoadValueText(component);
+    if (m_LoadedSelection != m_Schematic.GetSelectionVersion()) {
+        LoadFields(component);
     }
-    ImGui::SetNextItemWidth(ImGui::GetFontSize() * 8.0f);
-    if (ImGui::InputText("##value", m_ValueText.data(), m_ValueText.size())) {
-        const std::optional<double> value = Core::ParseValue(m_ValueText.data(), component.GetUnit());
-        m_ValueTextInvalid = !value || !component.IsValidValue(*value);
-        if (!m_ValueTextInvalid) {
-            component.SetValue(*value);
-            m_Schematic.MarkModified();
-        }
-    }
-    if (ImGui::IsItemDeactivatedAfterEdit() && !m_ValueTextInvalid) {
-        // Rewrite the text in canonical form, so "4700" becomes "4.7k"
-        LoadValueText(component);
-    }
-    ImGui::SameLine();
-    ImGui::TextUnformatted(component.GetUnit());
-    if (m_ValueTextInvalid) {
-        ImGui::TextColored(ErrorTextColor, "Invalid value");
+    if (component.GetType() == Core::ComponentType::VoltageSource) {
+        DrawVoltageSource(static_cast<Core::VoltageSource &>(component));
+    } else {
+        DrawValue(component);
     }
     ImGui::TextDisabled("Suffixes: T G M k m u n p f (case sensitive)");
 }
 
-void PropertiesWindow::LoadValueText(const Core::Component &component) {
-    const std::string text = Core::FormatValue(component.GetValue());
-    m_ValueText.fill('\0');
-    text.copy(m_ValueText.data(), m_ValueText.size() - 1);
-    m_ValueTextSelection = m_Schematic.GetSelectionVersion();
-    m_ValueTextInvalid = false;
+void PropertiesWindow::LoadFields(const Core::Component &component) {
+    m_Value.Load(component.GetValue());
+    if (component.GetType() == Core::ComponentType::VoltageSource) {
+        const auto &source = static_cast<const Core::VoltageSource &>(component);
+        m_Amplitude.Load(source.GetAmplitude());
+        m_Frequency.Load(source.GetFrequency());
+        m_Offset.Load(source.GetOffset());
+    }
+    m_LoadedSelection = m_Schematic.GetSelectionVersion();
+}
+
+void PropertiesWindow::DrawValue(Core::Component &component) {
+    const auto is_valid = [&component](const double value) { return component.IsValidValue(value); };
+    if (const std::optional<double> value = m_Value.Draw("Value", component.GetUnit(), is_valid)) {
+        component.SetValue(*value);
+        m_Schematic.MarkModified();
+    }
+}
+
+void PropertiesWindow::DrawVoltageSource(Core::VoltageSource &source) {
+    using SourceType = Core::VoltageSource::SourceType;
+    for (const SourceType type : {SourceType::DC, SourceType::AC}) {
+        if (type != SourceType::DC) {
+            ImGui::SameLine();
+        }
+        if (ImGui::RadioButton(Core::GetSourceTypeName(type), source.GetSourceType() == type) &&
+            source.GetSourceType() != type) {
+            source.SetSourceType(type);
+            m_Schematic.MarkModified();
+        }
+    }
+
+    if (source.GetSourceType() == SourceType::DC) {
+        if (const std::optional<double> value = m_Value.Draw("Voltage", "V", AnyValue)) {
+            source.SetValue(*value);
+            m_Schematic.MarkModified();
+        }
+        return;
+    }
+
+    if (const std::optional<double> amplitude = m_Amplitude.Draw("Amplitude", "V", AnyValue)) {
+        source.SetAmplitude(*amplitude);
+        m_Schematic.MarkModified();
+    }
+    const auto is_valid_frequency = [&source](const double frequency) { return source.IsValidFrequency(frequency); };
+    if (const std::optional<double> frequency = m_Frequency.Draw("Frequency", "Hz", is_valid_frequency)) {
+        source.SetFrequency(*frequency);
+        m_Schematic.MarkModified();
+    }
+    if (const std::optional<double> offset = m_Offset.Draw("Offset", "V", AnyValue)) {
+        source.SetOffset(*offset);
+        m_Schematic.MarkModified();
+    }
+    ImGui::TextDisabled("The amplitude is the peak; it is also the AC sweep magnitude");
 }
 
 } // namespace GUI

@@ -6,10 +6,13 @@
 #include "ui_voltage_source.h"
 
 #include "components/voltage_source.h"
+#include "spice_value.h"
 #include <array>
 #include <cmath>
+#include <format>
 #include <memory>
 #include <numbers>
+#include <string>
 
 namespace GUI {
 
@@ -26,6 +29,8 @@ constexpr float IECPlusHeight = 0.4f;
 constexpr int SineSegmentCount = 16;
 constexpr float SineHalfWidth = 0.5f;
 constexpr float SineAmplitude = 0.3f;
+// Same distance as the default labels of two-terminal symbols
+constexpr float LabelOffset = 1.0f;
 
 } // namespace
 
@@ -79,6 +84,19 @@ void UIVoltageSource::DrawSymbol(ImDrawList *draw_list, const ViewTransform &vie
                        color, LineThickness);
     draw_list->AddLine(LocalToScreen(view, SignOffset, -SignHalfSize), LocalToScreen(view, SignOffset, SignHalfSize),
                        color, LineThickness);
+}
+
+// An AC source ignores its DC value, so it is labeled by its sine instead
+void UIVoltageSource::DrawLabels(ImDrawList *draw_list, const ViewTransform &view, const ImU32 color) const {
+    const auto &source = static_cast<const Core::VoltageSource &>(GetComponent());
+    if (source.GetSourceType() == Core::VoltageSource::SourceType::DC) {
+        UIElement::DrawLabels(draw_list, view, color);
+        return;
+    }
+    const std::string sine =
+        std::format("{}V {}Hz", Core::FormatValue(source.GetAmplitude()), Core::FormatValue(source.GetFrequency()));
+    DrawLabel(draw_list, view, {0.0f, -LabelOffset}, {0.0f, -1.0f}, source.GetName(), color);
+    DrawLabel(draw_list, view, {0.0f, LabelOffset}, {0.0f, 1.0f}, sine, color);
 }
 
 } // namespace GUI

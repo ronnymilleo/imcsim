@@ -28,6 +28,11 @@ void AppWindow::Render() {
     if (!m_IsOpen) {
         return;
     }
+    if (m_InitialSize) {
+        const ImGuiViewport *viewport = ImGui::GetMainViewport();
+        ImGui::SetNextWindowSize(*m_InitialSize * ImGui::GetFontSize(), ImGuiCond_FirstUseEver);
+        ImGui::SetNextWindowPos(viewport->GetCenter(), ImGuiCond_FirstUseEver, ImVec2(0.5f, 0.5f));
+    }
     if (ImGui::Begin(m_WindowTitle.c_str(), m_Closable ? &m_IsOpen : nullptr, m_WindowFlags)) {
         Draw();
     }
@@ -56,6 +61,15 @@ void AppWindow::SetOpen(const bool open) {
  */
 const std::string &AppWindow::GetWindowTitle() const {
     return m_WindowTitle;
+}
+
+/**
+ * @brief   Gives a floating window a size, centered on the main viewport, for the first time it appears.
+ * @param[in] size  Width and height in font sizes, so they follow the DPI scale.
+ * @note    Afterwards imgui.ini keeps where the user left it. Docked windows take the size of their dock node.
+ */
+void AppWindow::SetInitialSize(const ImVec2 size) {
+    m_InitialSize = size;
 }
 
 } // namespace GUI

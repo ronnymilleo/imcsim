@@ -5,12 +5,34 @@
 
 #include "circuit.h"
 
+#include "components/voltage_source.h"
 #include "spice_value.h"
 #include <algorithm>
 #include <format>
 #include <utility>
 
 namespace Core {
+
+namespace {
+
+bool IsACSource(const Component &component) {
+    return component.GetType() == ComponentType::VoltageSource &&
+           static_cast<const VoltageSource &>(component).GetSourceType() == VoltageSource::SourceType::AC;
+}
+
+// One line serves every analysis: .op reads the DC offset, .ac the AC magnitude and .tran the sine
+std::string FormatVoltageSource(const VoltageSource &source, const std::vector<int> &nodes) {
+    if (source.GetSourceType() == VoltageSource::SourceType::DC) {
+        return std::format("{} {} {} DC {}\n", source.GetName(), nodes[0], nodes[1],
+                           FormatSpiceValue(source.GetValue()));
+    }
+    const std::string offset = FormatSpiceValue(source.GetOffset());
+    const std::string amplitude = FormatSpiceValue(source.GetAmplitude());
+    return std::format("{} {} {} DC {} AC {} SIN({} {} {})\n", source.GetName(), nodes[0], nodes[1], offset, amplitude,
+                       offset, amplitude, FormatSpiceValue(source.GetFrequency()));
+}
+
+} // namespace
 
 /**
  * @brief   Adds a component and the nodes its terminals connect to.
@@ -50,11 +72,20 @@ bool Circuit::HasGround() const {
 }
 
 /**
+ * @brief   Tells whether the circuit has a source that an AC sweep can excite.
+ * @return  True when it contains at least one voltage source set to AC.
+ */
+bool Circuit::HasACSource() const {
+    return std::ranges::any_of(m_Entries, [](const CircuitEntry &entry) { return IsACSource(*entry.Part); });
+}
+
+/**
  * @brief   Writes the circuit as a SPICE netlist, ready to hand to ngspice.
  * @param[in] analysis  Optional analysis command, such as ".op", written right before ".end".
  * @return  One line per component, with node numbers as SPICE node names (0 is ground), ending in ".end".
  * @note    Ground components produce no line; they only make their node 0. A supply rail becomes a DC voltage
- *          source from its node to ground.
+ *          source from its node to ground. An AC source writes its offset, AC magnitude and sine together, so
+ *          the same netlist works for .op, .ac and .tran.
  */
 std::string Circuit::ToSpiceNetlist(const std::string_view analysis) const {
     std::string netlist = "* imcsim netlist\n";
@@ -71,7 +102,7 @@ std::string Circuit::ToSpiceNetlist(const std::string_view analysis) const {
             netlist += std::format("{} {} 0 DC {}\n", component.GetName(), entry.Nodes[0], value);
             break;
         case ComponentType::VoltageSource:
-            netlist += std::format("{} {} {} DC {}\n", component.GetName(), entry.Nodes[0], entry.Nodes[1], value);
+            netlist += FormatVoltageSource(static_cast<const VoltageSource &>(component), entry.Nodes);
             break;
         case ComponentType::Ground:
             break;

@@ -64,6 +64,33 @@ TEST_CASE("ToSpiceNetlist writes a voltage source between its two nodes, positiv
                                       ".end\n");
 }
 
+TEST_CASE("ToSpiceNetlist writes an AC source for every analysis at once", "[circuit]") {
+    Core::VoltageSource source;
+    source.SetName("Vin1");
+    source.SetSourceType(Core::VoltageSource::SourceType::AC);
+    source.SetAmplitude(2.0);
+    source.SetFrequency(50.0);
+    source.SetOffset(0.5);
+
+    Core::Circuit circuit;
+    circuit.Add(source, {1, 0});
+
+    CHECK(circuit.ToSpiceNetlist() == "* imcsim netlist\n"
+                                      "Vin1 1 0 DC 500m AC 2 SIN(500m 2 50)\n"
+                                      ".end\n");
+}
+
+TEST_CASE("HasACSource looks for a voltage source set to AC", "[circuit]") {
+    Core::VoltageSource source;
+    source.SetName("Vin1");
+    Core::Circuit circuit;
+    circuit.Add(source, {1, 0});
+    CHECK_FALSE(circuit.HasACSource());
+
+    source.SetSourceType(Core::VoltageSource::SourceType::AC);
+    CHECK(circuit.HasACSource());
+}
+
 TEST_CASE("ToSpiceNetlist writes the analysis right before .end", "[circuit]") {
     Core::Resistor resistor;
     resistor.SetName("R1");

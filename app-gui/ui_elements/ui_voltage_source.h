@@ -21,6 +21,7 @@ public:
 
 protected:
     void DrawSymbol(ImDrawList *draw_list, const ViewTransform &view, ImU32 color, SymbolStyle style) const override;
+    void DrawLabels(ImDrawList *draw_list, const ViewTransform &view, ImU32 color) const override;
 };
 
 } // namespace GUI

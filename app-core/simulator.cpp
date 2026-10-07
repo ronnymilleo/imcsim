@@ -7,8 +7,14 @@
 
 #include "simulator.h"
 
+#include "spice_value.h"
+#include <algorithm>
+#include <cmath>
+#include <complex>
 #include <format>
 #include <ngspice/sharedspice.h>
+#include <numbers>
+#include <optional>
 #include <sstream>
 #include <string_view>
 #include <utility>
@@ -19,6 +25,11 @@ namespace {
 
 constexpr std::string_view OutputPrefix = "stdout ";
 constexpr std::string_view ErrorPrefix = "stderr ";
+// Limits that keep a mistyped setting from running for minutes or exhausting memory
+constexpr int MaxTransientPoints = 1000000;
+constexpr int MaxPointsPerDecade = 1000;
+// 1e-15 V is -300 dB
+constexpr double MinMagnitude = 1e-15;
 
 /**
  * @struct  NgspiceState
@@ -102,24 +113,160 @@ bool HasErrorLine(const std::vector<SimulatorMessage> &messages) {
     return false;
 }
 
-// Return codes stay 0 even when the netlist is rejected, so success is told by the plot the run created
-std::expected<OperatingPoint, std::string> ReadOperatingPoint(const Circuit &circuit,
-                                                              const std::vector<SimulatorMessage> &messages) {
-    const char *plot = ngSpice_CurPlot();
-    if (plot == nullptr || !std::string_view(plot).starts_with("op") || HasErrorLine(messages)) {
-        return std::unexpected("ngspice could not simulate the circuit; see its output for details");
+std::optional<std::string> CheckCircuit(const Circuit &circuit) {
+    if (circuit.GetEntries().empty()) {
+        return "The schematic is empty";
     }
+    if (!circuit.HasGround()) {
+        return "The circuit has no ground; add a Ground so node voltages have a reference";
+    }
+    return std::nullopt;
+}
+
+std::optional<std::string> CheckTransientSettings(const TransientSettings &settings) {
+    if (settings.StopTime <= 0.0) {
+        return "The stop time must be positive";
+    }
+    if (settings.TimeStep <= 0.0) {
+        return "The time step must be positive";
+    }
+    if (settings.TimeStep > settings.StopTime) {
+        return "The time step must not be longer than the stop time";
+    }
+    if (settings.StopTime / settings.TimeStep > MaxTransientPoints) {
+        return std::format("The time step is too small for the stop time: it would produce more than {} points",
+                           MaxTransientPoints);
+    }
+    return std::nullopt;
+}
+
+std::optional<std::string> CheckACSweepSettings(const Circuit &circuit, const ACSweepSettings &settings) {
+    if (settings.StartFrequency <= 0.0) {
+        return "The start frequency must be positive";
+    }
+    if (settings.StopFrequency <= settings.StartFrequency) {
+        return "The stop frequency must be higher than the start frequency";
+    }
+    if (settings.PointsPerDecade < 1 || settings.PointsPerDecade > MaxPointsPerDecade) {
+        return std::format("The points per decade must be between 1 and {}", MaxPointsPerDecade);
+    }
+    if (!circuit.HasACSource()) {
+        return "An AC sweep needs an AC source; select a voltage source and set it to AC";
+    }
+    return std::nullopt;
+}
+
+// ngspice keeps no reference to the name after the call
+pvector_info FindVector(std::string name) {
+    const pvector_info vector = ngGet_Vec_Info(name.data());
+    if (vector == nullptr || vector->v_length < 1 || (vector->v_realdata == nullptr && vector->v_compdata == nullptr)) {
+        return nullptr;
+    }
+    return vector;
+}
+
+// Analyses with complex results, such as .ac, also store their scale (the frequency) as complex numbers
+std::vector<double> RealPart(const vector_info &vector) {
+    std::vector<double> values(static_cast<std::size_t>(vector.v_length));
+    for (std::size_t index = 0; index < values.size(); ++index) {
+        values[index] = vector.v_realdata != nullptr ? vector.v_realdata[index] : vector.v_compdata[index].cx_real;
+    }
+    return values;
+}
+
+std::vector<std::complex<double>> ComplexValues(const vector_info &vector) {
+    std::vector<std::complex<double>> values(static_cast<std::size_t>(vector.v_length));
+    for (std::size_t index = 0; index < values.size(); ++index) {
+        values[index] = vector.v_compdata != nullptr
+                            ? std::complex<double>(vector.v_compdata[index].cx_real, vector.v_compdata[index].cx_imag)
+                            : std::complex<double>(vector.v_realdata[index], 0.0);
+    }
+    return values;
+}
+
+std::expected<OperatingPoint, std::string> ReadOperatingPoint(const Circuit &circuit) {
     OperatingPoint result;
     result.NodeVoltages.assign(static_cast<std::size_t>(circuit.GetNodeCount()), 0.0);
     for (int node = 1; node < circuit.GetNodeCount(); ++node) {
-        std::string name = std::format("v({})", node);
-        const pvector_info vector = ngGet_Vec_Info(name.data());
-        if (vector == nullptr || vector->v_realdata == nullptr || vector->v_length < 1) {
+        const pvector_info vector = FindVector(std::format("v({})", node));
+        if (vector == nullptr || vector->v_realdata == nullptr) {
             return std::unexpected(std::format("ngspice returned no voltage for node {}", node));
         }
         result.NodeVoltages[static_cast<std::size_t>(node)] = vector->v_realdata[0];
     }
     return result;
+}
+
+std::expected<Transient, std::string> ReadTransient(const Circuit &circuit) {
+    const pvector_info time = FindVector("time");
+    if (time == nullptr) {
+        return std::unexpected("ngspice returned no time points");
+    }
+    Transient result;
+    result.Times = RealPart(*time);
+    result.NodeVoltages.resize(static_cast<std::size_t>(circuit.GetNodeCount()));
+    result.NodeVoltages[0].assign(result.Times.size(), 0.0);
+    for (int node = 1; node < circuit.GetNodeCount(); ++node) {
+        const pvector_info vector = FindVector(std::format("v({})", node));
+        if (vector == nullptr || vector->v_length != time->v_length) {
+            return std::unexpected(std::format("ngspice returned no voltages for node {}", node));
+        }
+        result.NodeVoltages[static_cast<std::size_t>(node)] = RealPart(*vector);
+    }
+    return result;
+}
+
+std::expected<ACSweep, std::string> ReadACSweep(const Circuit &circuit) {
+    const pvector_info frequency = FindVector("frequency");
+    if (frequency == nullptr) {
+        return std::unexpected("ngspice returned no frequency points");
+    }
+    ACSweep result;
+    result.Frequencies = RealPart(*frequency);
+    result.NodeMagnitudesDecibels.resize(static_cast<std::size_t>(circuit.GetNodeCount()));
+    result.NodePhasesDegrees.resize(static_cast<std::size_t>(circuit.GetNodeCount()));
+    for (int node = 1; node < circuit.GetNodeCount(); ++node) {
+        const pvector_info vector = FindVector(std::format("v({})", node));
+        if (vector == nullptr || vector->v_length != frequency->v_length) {
+            return std::unexpected(std::format("ngspice returned no response for node {}", node));
+        }
+        std::vector<double> &magnitudes = result.NodeMagnitudesDecibels[static_cast<std::size_t>(node)];
+        std::vector<double> &phases = result.NodePhasesDegrees[static_cast<std::size_t>(node)];
+        for (const std::complex<double> value : ComplexValues(*vector)) {
+            // A node the AC sources do not reach has no response; the floor keeps it finite for plotting
+            magnitudes.push_back(20.0 * std::log10(std::max(std::abs(value), MinMagnitude)));
+            phases.push_back(std::arg(value) * 180.0 / std::numbers::pi);
+        }
+    }
+    return result;
+}
+
+// Runs one analysis on a clean library. Return codes stay 0 even when the netlist is rejected, so success is
+// told by the plot the run created, whose name starts with the analysis (op1, tran1, ac1)
+template <typename Data, typename Reader>
+SimulationRun<Data> Simulate(const Circuit &circuit, const std::string_view analysis,
+                             const std::string_view plot_prefix, Reader read_result) {
+    SimulationRun<Data> run;
+    if (!EnsureInitialized()) {
+        run.Result = std::unexpected("ngspice stopped after a fatal error; restart imcsim to simulate again");
+        return run;
+    }
+
+    NgspiceState &state = GetState();
+    state.Messages = &run.Messages;
+    LoadCircuit(circuit.ToSpiceNetlist(analysis));
+    SendCommand("run");
+    const char *plot = ngSpice_CurPlot();
+    if (plot == nullptr || !std::string_view(plot).starts_with(plot_prefix) || HasErrorLine(run.Messages)) {
+        run.Result = std::unexpected("ngspice could not simulate the circuit; see its output for details");
+    } else {
+        run.Result = read_result();
+    }
+    // Drop the results and the circuit, so every run starts from a clean library
+    SendCommand("destroy all");
+    SendCommand("remcirc");
+    state.Messages = nullptr;
+    return run;
 }
 
 } // namespace
@@ -132,30 +279,53 @@ std::expected<OperatingPoint, std::string> ReadOperatingPoint(const Circuit &cir
  * @note    Not thread-safe: ngspice is a single global library instance.
  */
 OperatingPointRun RunOperatingPoint(const Circuit &circuit) {
-    OperatingPointRun run;
-    if (circuit.GetEntries().empty()) {
-        run.Result = std::unexpected("The schematic is empty");
-        return run;
+    if (const std::optional<std::string> error = CheckCircuit(circuit)) {
+        return {std::unexpected(*error), {}};
     }
-    if (!circuit.HasGround()) {
-        run.Result = std::unexpected("The circuit has no ground; add a Ground so node voltages have a reference");
-        return run;
-    }
-    if (!EnsureInitialized()) {
-        run.Result = std::unexpected("ngspice stopped after a fatal error; restart imcsim to simulate again");
-        return run;
-    }
+    return Simulate<OperatingPoint>(circuit, ".op", "op", [&circuit] { return ReadOperatingPoint(circuit); });
+}
 
-    NgspiceState &state = GetState();
-    state.Messages = &run.Messages;
-    LoadCircuit(circuit.ToSpiceNetlist(".op"));
-    SendCommand("run");
-    run.Result = ReadOperatingPoint(circuit, run.Messages);
-    // Drop the results and the circuit, so every run starts from a clean library
-    SendCommand("destroy all");
-    SendCommand("remcirc");
-    state.Messages = nullptr;
-    return run;
+/**
+ * @brief   Simulates how the node voltages of a circuit change over time, starting from its operating point.
+ * @param[in] circuit   Circuit to simulate; it needs a ground component.
+ * @param[in] settings  Stop time and time step.
+ * @return  The voltages at every time point or an error, plus every line ngspice printed. Invalid settings
+ *          are rejected before reaching ngspice.
+ * @note    Not thread-safe: ngspice is a single global library instance.
+ */
+TransientRun RunTransient(const Circuit &circuit, const TransientSettings &settings) {
+    std::optional<std::string> error = CheckCircuit(circuit);
+    if (!error) {
+        error = CheckTransientSettings(settings);
+    }
+    if (error) {
+        return {std::unexpected(*error), {}};
+    }
+    const std::string analysis =
+        std::format(".tran {} {}", FormatSpiceValue(settings.TimeStep), FormatSpiceValue(settings.StopTime));
+    return Simulate<Transient>(circuit, analysis, "tran", [&circuit] { return ReadTransient(circuit); });
+}
+
+/**
+ * @brief   Sweeps the small-signal response of a circuit across frequency, excited by its AC sources.
+ * @param[in] circuit   Circuit to simulate; it needs a ground component and at least one AC source.
+ * @param[in] settings  Frequency range and points per decade.
+ * @return  The magnitude and phase of every node at every frequency or an error, plus every line ngspice
+ *          printed. Invalid settings and circuits without an AC source are rejected before reaching ngspice.
+ * @note    Not thread-safe: ngspice is a single global library instance.
+ */
+ACSweepRun RunACSweep(const Circuit &circuit, const ACSweepSettings &settings) {
+    std::optional<std::string> error = CheckCircuit(circuit);
+    if (!error) {
+        error = CheckACSweepSettings(circuit, settings);
+    }
+    if (error) {
+        return {std::unexpected(*error), {}};
+    }
+    const std::string analysis =
+        std::format(".ac dec {} {} {}", settings.PointsPerDecade, FormatSpiceValue(settings.StartFrequency),
+                    FormatSpiceValue(settings.StopFrequency));
+    return Simulate<ACSweep>(circuit, analysis, "ac", [&circuit] { return ReadACSweep(circuit); });
 }
 
 } // namespace Core

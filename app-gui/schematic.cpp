@@ -290,6 +290,7 @@ std::string Schematic::BuildSpiceNetlist() {
  */
 void Schematic::SetOperatingPoint(std::optional<Core::OperatingPoint> operating_point) {
     m_OperatingPoint = std::move(operating_point);
+    ++m_ResultsVersion;
 }
 
 /**
@@ -300,9 +301,55 @@ const std::optional<Core::OperatingPoint> &Schematic::GetOperatingPoint() const 
     return m_OperatingPoint;
 }
 
+/**
+ * @brief   Stores the result of a transient simulation of the current schematic.
+ * @param[in] transient  Node voltages over time, numbered like GetConnectivity(), or no value to clear them.
+ * @note    The result is dropped on the next change, since it no longer matches the circuit.
+ */
+void Schematic::SetTransient(std::optional<Core::Transient> transient) {
+    m_Transient = std::move(transient);
+    ++m_ResultsVersion;
+}
+
+/**
+ * @brief   Returns the last transient simulated for the current schematic.
+ * @return  The node voltages over time, or no value when there was no simulation since the last change.
+ */
+const std::optional<Core::Transient> &Schematic::GetTransient() const {
+    return m_Transient;
+}
+
+/**
+ * @brief   Stores the result of an AC sweep of the current schematic.
+ * @param[in] sweep  Node responses across frequency, numbered like GetConnectivity(), or no value to clear them.
+ * @note    The result is dropped on the next change, since it no longer matches the circuit.
+ */
+void Schematic::SetACSweep(std::optional<Core::ACSweep> sweep) {
+    m_ACSweep = std::move(sweep);
+    ++m_ResultsVersion;
+}
+
+/**
+ * @brief   Returns the last AC sweep simulated for the current schematic.
+ * @return  The node responses, or no value when there was no simulation since the last change.
+ */
+const std::optional<Core::ACSweep> &Schematic::GetACSweep() const {
+    return m_ACSweep;
+}
+
+/**
+ * @brief   Returns a number that changes whenever a simulation result is stored.
+ * @return  The results version; compare it with a stored one to know whether a result was replaced.
+ */
+std::size_t Schematic::GetResultsVersion() const {
+    return m_ResultsVersion;
+}
+
 void Schematic::InvalidateDerivedData() {
     m_Connectivity.reset();
     m_OperatingPoint.reset();
+    m_Transient.reset();
+    m_ACSweep.reset();
 }
 
 } // namespace GUI

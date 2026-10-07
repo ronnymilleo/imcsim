@@ -18,10 +18,12 @@ add_library(imcsim-gui-lib
             ui_elements/ui_vcc.cpp
             ui_elements/ui_voltage_source.cpp
             ui_elements/ui_wire.cpp
+            value_field.cpp
             vulkan_context.cpp
             windows/app_window.cpp
             windows/editor_window.cpp
             windows/netlist_window.cpp
+            windows/output_window.cpp
             windows/properties_window.cpp
             windows/simulation_window.cpp
             wire_editing.cpp
@@ -37,6 +39,7 @@ target_link_libraries(imcsim-gui-lib
         PUBLIC
             imcsim-core-lib
             imgui
+            implot
         PRIVATE
             nlohmann_json::nlohmann_json
 )

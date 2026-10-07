@@ -35,6 +35,7 @@ public:
     const std::vector<CircuitEntry> &GetEntries() const;
     int GetNodeCount() const;
     bool HasGround() const;
+    bool HasACSource() const;
     std::string ToSpiceNetlist(std::string_view analysis = "") const;
 
 private:
