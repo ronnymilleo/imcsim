@@ -4,11 +4,13 @@
  */
 
 #include "circuit.h"
+#include "components/bjt.h"
 #include "components/capacitor.h"
 #include "components/current_source.h"
 #include "components/diode.h"
 #include "components/ground.h"
 #include "components/inductor.h"
+#include "components/mosfet.h"
 #include "components/resistor.h"
 #include "components/vcc.h"
 #include "components/voltage_source.h"
@@ -174,7 +176,7 @@ TEST_CASE("ToSpiceNetlist writes diodes from anode to cathode and each model onc
                                            ".end\n");
 }
 
-TEST_CASE("ToSpiceNetlist puts a probe source after each diode only when asked", "[circuit]") {
+TEST_CASE("ToSpiceNetlist puts a probe source on each diode anode only when asked", "[circuit]") {
     Core::Diode first(Core::ComponentType::ZenerDiode);
     first.SetName("D1");
     Core::Diode second(Core::ComponentType::ZenerDiode);
@@ -185,14 +187,16 @@ TEST_CASE("ToSpiceNetlist puts a probe source after each diode only when asked",
 
     const std::string model = ".model DZ5V1 D(IS=1e-09 N=1.5 RS=1 BV=5.1 IBV=0.005 CJO=1e-10 VJ=1 M=0.5 TT=0)\n";
     CHECK(circuit.ToSpiceNetlist() == "* imcsim netlist\nD1 0 1 DZ5V1\nDclamp 2 1 DZ5V1\n" + model + ".end\n");
-    // Probe nodes come after the circuit nodes, which keep their numbers
+    // Probe nodes come after the circuit nodes, which keep their numbers; the current flows from the circuit node
+    // into the anode
     CHECK(circuit.ToSpiceNetlist("", true) == "* imcsim netlist\n"
-                                              "D1 0 3 DZ5V1\n"
-                                              "Vprobe-D1 3 1 DC 0\n"
-                                              "Dclamp 2 4 DZ5V1\n"
-                                              "Vprobe-Dclamp 4 1 DC 0\n" +
+                                              "D1 3 1 DZ5V1\n"
+                                              "Vprobe-D1 0 3 DC 0\n"
+                                              "Dclamp 4 1 DZ5V1\n"
+                                              "Vprobe-Dclamp 2 4 DC 0\n" +
                                                   model + ".end\n");
-    CHECK(Core::GetCurrentProbeName(second) == "Vprobe-Dclamp");
+    CHECK(Core::GetCurrentProbeName(second, "") == "Vprobe-Dclamp");
+    CHECK(Core::GetCurrentName(second, "") == "Dclamp");
 }
 
 TEST_CASE("ToSpiceNetlist gives each custom diode a model of its own", "[circuit]") {
@@ -211,4 +215,39 @@ TEST_CASE("ToSpiceNetlist gives each custom diode a model of its own", "[circuit
                                       ".model DCUSTOM_D1 D(IS=1e-12 N=1 RS=0 BV=50 IBV=0.001 CJO=0 VJ=1 M=0.5 TT=0)\n"
                                       ".model DCUSTOM_D2 D(IS=1e-12 N=1 RS=0 BV=50 IBV=0.001 CJO=0 VJ=1 M=0.5 TT=0)\n"
                                       ".end\n");
+}
+
+TEST_CASE("ToSpiceNetlist writes transistors in SPICE terminal order with the MOSFET body on its source", "[circuit]") {
+    Core::BJT npn(Core::ComponentType::NPN);
+    npn.SetName("Q1");
+    Core::MOSFET nmos(Core::ComponentType::NMOS);
+    nmos.SetName("M1");
+    Core::Circuit circuit;
+    circuit.Add(npn, {1, 2, 0});
+    circuit.Add(nmos, {3, 2, 0});
+    CHECK(circuit.ToSpiceNetlist() ==
+          "* imcsim netlist\n"
+          "Q1 1 2 0 Q2N3904\n"
+          "M1 3 2 0 0 M2N7000 W=0.0001 L=0.0001\n"
+          ".model Q2N3904 NPN(IS=6.734e-15 BF=416.4 BR=0.7371 VAF=74.03 IKF=0.06678 ISE=6.734e-15 NE=1.259 RB=10 "
+          "RC=1 RE=0 CJE=4.493e-12 CJC=3.638e-12 TF=3.012e-10)\n"
+          ".model M2N7000 NMOS(LEVEL=1 VTO=2.1 KP=0.0703 LAMBDA=0.01 RD=0 RS=0 CGSO=0.2 CGDO=0.05)\n"
+          ".end\n");
+}
+
+TEST_CASE("ToSpiceNetlist probes every transistor terminal, with the current flowing into it", "[circuit]") {
+    Core::BJT pnp(Core::ComponentType::PNP);
+    pnp.SetName("Q1");
+    Core::MOSFET pmos(Core::ComponentType::PMOS);
+    pmos.SetName("M1");
+    Core::Circuit circuit;
+    circuit.Add(pnp, {1, 2, 0});
+    circuit.Add(pmos, {1, 2, 0});
+    const std::string netlist = circuit.ToSpiceNetlist("", true);
+    CHECK(netlist.contains("Q1 3 4 5 Q2N3906\nVprobe-Q1-C 1 3 DC 0\nVprobe-Q1-B 2 4 DC 0\nVprobe-Q1-E 0 5 DC 0\n"));
+    CHECK(netlist.contains("M1 6 7 8 8 MBS250 W=0.0001 L=0.0001\nVprobe-M1-D 1 6 DC 0\nVprobe-M1-G 2 7 DC 0\n"
+                           "Vprobe-M1-S 0 8 DC 0\n"));
+    CHECK(netlist.contains(".model Q2N3906 PNP("));
+    CHECK(netlist.contains(".model MBS250 PMOS(LEVEL=1 VTO=-2 "));
+    CHECK(Core::GetCurrentName(pnp, "C") == "Q1.C");
 }

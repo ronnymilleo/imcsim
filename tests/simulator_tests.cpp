@@ -4,10 +4,12 @@
  */
 
 #include "circuit.h"
+#include "components/bjt.h"
 #include "components/capacitor.h"
 #include "components/current_source.h"
 #include "components/diode.h"
 #include "components/ground.h"
+#include "components/mosfet.h"
 #include "components/resistor.h"
 #include "components/vcc.h"
 #include "components/voltage_source.h"
@@ -97,6 +99,70 @@ struct DiodeLoop {
         Circuit.Add(Reference, {0});
     }
 };
+
+/**
+ * @struct  CommonEmitter
+ * @brief   A bipolar transistor with its emitter on ground, its base fed from the supply through 470k and its
+ *          collector through 1k, with the supply on node 1, the base on node 2 and the collector on node 3.
+ * @details For a PNP the supply is negative, which mirrors every voltage and current of the NPN version.
+ */
+struct CommonEmitter {
+    Core::VCC Supply;
+    Core::Resistor BaseResistor;
+    Core::Resistor CollectorResistor;
+    Core::BJT Transistor;
+    Core::Ground Reference;
+    Core::Circuit Circuit;
+
+    explicit CommonEmitter(const Core::ComponentType type) : Transistor(type) {
+        Supply.SetName("V1");
+        Supply.SetValue(type == Core::ComponentType::PNP ? -12.0 : 12.0);
+        BaseResistor.SetName("R1");
+        BaseResistor.SetValue(470e3);
+        CollectorResistor.SetName("R2");
+        Transistor.SetName("Q1");
+        Circuit.Add(Supply, {1});
+        Circuit.Add(BaseResistor, {1, 2});
+        Circuit.Add(CollectorResistor, {1, 3});
+        Circuit.Add(Transistor, {3, 2, 0});
+        Circuit.Add(Reference, {0});
+    }
+};
+
+/**
+ * @struct  LowSideSwitch
+ * @brief   A MOSFET with its source on ground, its drain fed from a 5 V supply through 1k and its gate held by
+ *          a second supply, with the drain on node 2 and the gate on node 3.
+ * @details For a PMOS both supplies are negative, which mirrors the NMOS version.
+ */
+struct LowSideSwitch {
+    Core::VCC Supply;
+    Core::VCC Gate;
+    Core::Resistor Load;
+    Core::MOSFET Transistor;
+    Core::Ground Reference;
+    Core::Circuit Circuit;
+
+    LowSideSwitch(const Core::ComponentType type, const double gate_voltage) : Transistor(type) {
+        const double sign = type == Core::ComponentType::PMOS ? -1.0 : 1.0;
+        Supply.SetName("V1");
+        Supply.SetValue(sign * 5.0);
+        Gate.SetName("V2");
+        Gate.SetValue(sign * gate_voltage);
+        Load.SetName("R1");
+        Transistor.SetName("M1");
+        Circuit.Add(Supply, {1});
+        Circuit.Add(Gate, {3});
+        Circuit.Add(Load, {1, 2});
+        Circuit.Add(Transistor, {2, 3, 0});
+        Circuit.Add(Reference, {0});
+    }
+};
+
+// Rebuilds a complex current from the decibels and degrees an AC sweep reports
+std::complex<double> FromDecibels(const double decibels, const double degrees) {
+    return std::polar(std::pow(10.0, decibels / 20.0), degrees * std::numbers::pi / 180.0);
+}
 
 // Finds a current by component name, failing the test when it is missing
 template <typename Current> const Current &FindCurrent(const std::vector<Current> &currents, const std::string &name) {
@@ -594,4 +660,227 @@ TEST_CASE("The breakdown warning uses the voltage of a custom diode", "[simulato
     CAPTURE(custom.Result->Warnings[0]);
     CHECK(custom.Result->Warnings[0].starts_with("D1 (Custom) goes into reverse breakdown"));
     CHECK(custom.Result->Warnings[0].ends_with("rated for 10V"));
+}
+
+TEST_CASE("A common-emitter NPN amplifies its base current", "[simulator]") {
+    const CommonEmitter stage(Core::ComponentType::NPN);
+    const Core::OperatingPointRun run = Core::RunOperatingPoint(stage.Circuit);
+    if (!run.Result) {
+        FAIL(run.Result.error());
+    }
+    const std::vector<Core::ComponentCurrent> &currents = run.Result->Currents;
+    const double collector = FindCurrent(currents, "Q1.C").Current;
+    const double base = FindCurrent(currents, "Q1.B").Current;
+    const double emitter = FindCurrent(currents, "Q1.E").Current;
+    // Currents flow into the collector and base and out of the emitter, and add up to zero
+    CHECK(collector > 0.0);
+    CHECK(base > 0.0);
+    // ngspice converges to within a picoampere, so the sum is only that close to zero
+    CHECK_THAT(collector + base + emitter, Catch::Matchers::WithinAbs(0.0, 1e-9));
+    CHECK_THAT(collector, Catch::Matchers::WithinRel(FindCurrent(currents, "R2").Current, 1e-6));
+    CHECK_THAT(base, Catch::Matchers::WithinRel(FindCurrent(currents, "R1").Current, 1e-6));
+    // The 2N3904 gain at a few milliamperes, in its datasheet range
+    CHECK(collector / base > 100.0);
+    CHECK(collector / base < 300.0);
+    // Active region: the collector stays above the base
+    CHECK(run.Result->NodeVoltages[3] > run.Result->NodeVoltages[2]);
+}
+
+TEST_CASE("A PNP mirrors the voltages and currents of the NPN stage", "[simulator]") {
+    const CommonEmitter stage(Core::ComponentType::PNP);
+    const Core::OperatingPointRun run = Core::RunOperatingPoint(stage.Circuit);
+    if (!run.Result) {
+        FAIL(run.Result.error());
+    }
+    const std::vector<Core::ComponentCurrent> &currents = run.Result->Currents;
+    const double collector = FindCurrent(currents, "Q1.C").Current;
+    const double base = FindCurrent(currents, "Q1.B").Current;
+    CHECK(collector < 0.0);
+    CHECK(base < 0.0);
+    CHECK(FindCurrent(currents, "Q1.E").Current > 0.0);
+    CHECK(collector / base > 100.0);
+    CHECK(run.Result->NodeVoltages[3] < run.Result->NodeVoltages[2]);
+}
+
+TEST_CASE("Each bipolar model has its datasheet gain", "[simulator]") {
+    struct Rating {
+        Core::ComponentType Type;
+        const char *Model;
+        double MinimumGain;
+        double MaximumGain;
+    };
+    const Rating rating = GENERATE(Rating{Core::ComponentType::NPN, "2N3904", 100.0, 300.0},
+                                   Rating{Core::ComponentType::NPN, "2N2222A", 100.0, 300.0},
+                                   Rating{Core::ComponentType::NPN, "BC547B", 200.0, 450.0},
+                                   Rating{Core::ComponentType::PNP, "2N3906", 100.0, 300.0},
+                                   Rating{Core::ComponentType::PNP, "2N2907A", 100.0, 300.0},
+                                   Rating{Core::ComponentType::PNP, "BC557B", 220.0, 475.0});
+    CAPTURE(rating.Model);
+    CommonEmitter stage(rating.Type);
+    stage.Transistor.SetModel(*Core::FindBJTModel(rating.Type, rating.Model));
+    // 47k sets a base current near 0.24 mA, so the collector runs at a few tens of milliamperes
+    stage.BaseResistor.SetValue(47e3);
+    stage.CollectorResistor.SetValue(10.0);
+
+    const Core::OperatingPointRun run = Core::RunOperatingPoint(stage.Circuit);
+    if (!run.Result) {
+        FAIL(run.Result.error());
+    }
+    const double gain =
+        FindCurrent(run.Result->Currents, "Q1.C").Current / FindCurrent(run.Result->Currents, "Q1.B").Current;
+    CHECK(gain > rating.MinimumGain);
+    CHECK(gain < rating.MaximumGain);
+}
+
+TEST_CASE("An NMOS in saturation follows the level 1 square law", "[simulator]") {
+    // 3 V on the gate of a 2N7000 (VTO = 2.1 V) sets about 30 mA; through 10 Ohm the drain stays near 5 V, well
+    // above the 0.9 V overdrive, so the channel is saturated
+    LowSideSwitch stage(Core::ComponentType::NMOS, 3.0);
+    stage.Load.SetValue(10.0);
+    const Core::OperatingPointRun run = Core::RunOperatingPoint(stage.Circuit);
+    if (!run.Result) {
+        FAIL(run.Result.error());
+    }
+    const Core::MOSFETParameters &model = stage.Transistor.GetParameters();
+    const double drain_voltage = run.Result->NodeVoltages[2];
+    const double overdrive = 3.0 - model.ThresholdVoltage;
+    REQUIRE(drain_voltage > overdrive);
+    const double expected =
+        model.Transconductance / 2.0 * overdrive * overdrive * (1.0 + model.ChannelModulation * drain_voltage);
+    const std::vector<Core::ComponentCurrent> &currents = run.Result->Currents;
+    CHECK_THAT(FindCurrent(currents, "M1.D").Current, Catch::Matchers::WithinRel(expected, 1e-4));
+    CHECK_THAT(FindCurrent(currents, "M1.G").Current, Catch::Matchers::WithinAbs(0.0, 1e-12));
+    CHECK_THAT(FindCurrent(currents, "M1.S").Current, Catch::Matchers::WithinRel(-expected, 1e-4));
+}
+
+TEST_CASE("Each MOSFET model has its datasheet on-resistance at 10 V of gate drive", "[simulator]") {
+    struct Rating {
+        Core::ComponentType Type;
+        const char *Model;
+        double OnResistance;
+    };
+    const Rating rating =
+        GENERATE(Rating{Core::ComponentType::NMOS, "2N7000", 1.8}, Rating{Core::ComponentType::NMOS, "BS170", 1.2},
+                 Rating{Core::ComponentType::NMOS, "IRF540N", 0.044}, Rating{Core::ComponentType::PMOS, "BS250", 14.0},
+                 Rating{Core::ComponentType::PMOS, "IRF9540N", 0.117});
+    CAPTURE(rating.Model);
+    LowSideSwitch stage(rating.Type, 10.0);
+    stage.Transistor.SetModel(*Core::FindMOSFETModel(rating.Type, rating.Model));
+
+    const Core::OperatingPointRun run = Core::RunOperatingPoint(stage.Circuit);
+    if (!run.Result) {
+        FAIL(run.Result.error());
+    }
+    // The drain sits close to the source, so the channel is in its linear region
+    const double resistance = run.Result->NodeVoltages[2] / FindCurrent(run.Result->Currents, "M1.D").Current;
+    CHECK_THAT(resistance, Catch::Matchers::WithinRel(rating.OnResistance, 0.05));
+}
+
+TEST_CASE("A PMOS high-side switch turns on when its gate is pulled low", "[simulator]") {
+    Core::VCC supply;
+    supply.SetName("V1");
+    Core::VCC gate;
+    gate.SetName("V2");
+    Core::MOSFET transistor(Core::ComponentType::PMOS);
+    transistor.SetName("M1");
+    Core::Resistor load;
+    load.SetName("R1");
+    const Core::Ground reference;
+    Core::Circuit circuit;
+    circuit.Add(supply, {1});
+    circuit.Add(gate, {2});
+    circuit.Add(transistor, {3, 2, 1});
+    circuit.Add(load, {3, 0});
+    circuit.Add(reference, {0});
+
+    gate.SetValue(0.0);
+    const Core::OperatingPointRun on = Core::RunOperatingPoint(circuit);
+    if (!on.Result) {
+        FAIL(on.Result.error());
+    }
+    CHECK(on.Result->NodeVoltages[3] > 4.5);
+
+    gate.SetValue(5.0);
+    const Core::OperatingPointRun off = Core::RunOperatingPoint(circuit);
+    if (!off.Result) {
+        FAIL(off.Result.error());
+    }
+    CHECK(off.Result->NodeVoltages[3] < 0.01);
+}
+
+TEST_CASE("A transient keeps the transistor terminal currents balanced", "[simulator]") {
+    CommonEmitter stage(Core::ComponentType::NPN);
+    Core::VoltageSource input;
+    input.SetName("Vin1");
+    input.SetSourceType(Core::VoltageSource::SourceType::AC);
+    input.SetAC({.Amplitude = 10e-3, .Frequency = 1e3, .Offset = 0.0});
+    Core::Capacitor coupling;
+    coupling.SetName("C1");
+    coupling.SetValue(10e-6);
+    stage.Circuit.Add(input, {4, 0});
+    stage.Circuit.Add(coupling, {4, 2});
+
+    const Core::TransientRun run = Core::RunTransient(stage.Circuit, {.StopTime = 2e-3, .TimeStep = 10e-6});
+    if (!run.Result) {
+        FAIL(run.Result.error());
+    }
+    const std::vector<double> &collector = FindCurrent(run.Result->Currents, "Q1.C").Values;
+    const std::vector<double> &base = FindCurrent(run.Result->Currents, "Q1.B").Values;
+    const std::vector<double> &emitter = FindCurrent(run.Result->Currents, "Q1.E").Values;
+    for (std::size_t index = 0; index < collector.size(); ++index) {
+        CHECK_THAT(collector[index] + base[index] + emitter[index], Catch::Matchers::WithinAbs(0.0, 1e-9));
+    }
+    // The input sine shows up amplified and inverted on the collector
+    const auto [lowest, highest] = std::ranges::minmax(run.Result->NodeVoltages[3]);
+    CHECK(highest - lowest > 0.5);
+}
+
+TEST_CASE("An AC sweep gives the small-signal gain and currents of a common-emitter stage", "[simulator]") {
+    CommonEmitter stage(Core::ComponentType::NPN);
+    // Without base and collector resistance, high injection and leakage, the gain is the textbook gm * RC
+    Core::BJTParameters ideal = stage.Transistor.GetParameters();
+    ideal.BaseResistance = 0.0;
+    ideal.CollectorResistance = 0.0;
+    ideal.ForwardKneeCurrent = 0.0;
+    ideal.LeakageSaturationCurrent = 0.0;
+    stage.Transistor.SetCustomParameters(ideal);
+    const Core::OperatingPointRun bias = Core::RunOperatingPoint(stage.Circuit);
+    if (!bias.Result) {
+        FAIL(bias.Result.error());
+    }
+    const double collector_current = FindCurrent(bias.Result->Currents, "Q1.C").Current;
+
+    Core::VoltageSource input;
+    input.SetName("Vin1");
+    input.SetSourceType(Core::VoltageSource::SourceType::AC);
+    input.SetAC({.Amplitude = 1e-3, .Frequency = 1e3, .Offset = 0.0});
+    Core::Capacitor coupling;
+    coupling.SetName("C1");
+    coupling.SetValue(100e-6);
+    stage.Circuit.Add(input, {4, 0});
+    stage.Circuit.Add(coupling, {4, 2});
+
+    const Core::ACSweepRun run = Core::RunACSweep(stage.Circuit, {.StartFrequency = 1e3, .StopFrequency = 1e4});
+    if (!run.Result) {
+        FAIL(run.Result.error());
+    }
+    const Core::ACSweep &sweep = *run.Result;
+    // Gain from base to collector is gm * RC, with gm = IC / VT, reduced a little by the Early effect output
+    // resistance in parallel with RC
+    const double thermal_voltage = 0.025865;
+    const double early_voltage = stage.Transistor.GetParameters().EarlyVoltage;
+    const double output_resistance = early_voltage / collector_current;
+    const double load = 1e3 * output_resistance / (1e3 + output_resistance);
+    const double expected_gain = collector_current / thermal_voltage * load;
+    for (std::size_t index = 0; index < sweep.Frequencies.size(); ++index) {
+        const double gain_decibels = sweep.NodeMagnitudesDecibels[3][index] - sweep.NodeMagnitudesDecibels[2][index];
+        CHECK_THAT(std::pow(10.0, gain_decibels / 20.0), Catch::Matchers::WithinRel(expected_gain, 0.02));
+
+        const auto current = [&](const std::string &name) {
+            return FromDecibels(FindCurrent(sweep.CurrentMagnitudesDecibels, name).Values[index],
+                                FindCurrent(sweep.CurrentPhasesDegrees, name).Values[index]);
+        };
+        CHECK(std::abs(current("Q1.C") + current("Q1.B") + current("Q1.E")) < 1e-9);
+        CHECK(std::abs(current("Q1.C") - current("R2")) < 1e-9);
+    }
 }

@@ -27,6 +27,10 @@ constexpr auto AllTypes = std::to_array<ComponentType>({
     ComponentType::Diode,
     ComponentType::ZenerDiode,
     ComponentType::LED,
+    ComponentType::NPN,
+    ComponentType::PNP,
+    ComponentType::NMOS,
+    ComponentType::PMOS,
 });
 
 } // namespace
@@ -57,7 +61,7 @@ const char *Component::GetTypeName() const {
 
 /**
  * @brief   Returns the SPICE letter that starts the name of this kind of component.
- * @return  "R", "C", "L", "V", "Vin", "I" or "D", or an empty string for ground, which is not named.
+ * @return  "R", "C", "L", "V", "Vin", "I", "D", "Q" or "M", or an empty string for ground, which is not named.
  */
 const char *Component::GetNamePrefix() const {
     switch (m_Type) {
@@ -78,6 +82,12 @@ const char *Component::GetNamePrefix() const {
     case ComponentType::ZenerDiode:
     case ComponentType::LED:
         return "D";
+    case ComponentType::NPN:
+    case ComponentType::PNP:
+        return "Q";
+    case ComponentType::NMOS:
+    case ComponentType::PMOS:
+        return "M";
     case ComponentType::Ground:
         return "";
     }
@@ -105,6 +115,10 @@ const char *Component::GetUnit() const {
     case ComponentType::Diode:
     case ComponentType::ZenerDiode:
     case ComponentType::LED:
+    case ComponentType::NPN:
+    case ComponentType::PNP:
+    case ComponentType::NMOS:
+    case ComponentType::PMOS:
         return "";
     }
     return "";
@@ -112,7 +126,7 @@ const char *Component::GetUnit() const {
 
 /**
  * @brief   Tells whether the component carries a numeric value.
- * @return  False for ground and for diodes, whose model sets their behavior; true for everything else.
+ * @return  False for ground and for diodes and transistors, whose model sets their behavior; true for the rest.
  */
 bool Component::HasValue() const {
     switch (m_Type) {
@@ -120,6 +134,10 @@ bool Component::HasValue() const {
     case ComponentType::Diode:
     case ComponentType::ZenerDiode:
     case ComponentType::LED:
+    case ComponentType::NPN:
+    case ComponentType::PNP:
+    case ComponentType::NMOS:
+    case ComponentType::PMOS:
         return false;
     case ComponentType::Resistor:
     case ComponentType::Capacitor:
@@ -151,6 +169,10 @@ bool Component::IsValidValue(const double value) const {
     case ComponentType::Diode:
     case ComponentType::ZenerDiode:
     case ComponentType::LED:
+    case ComponentType::NPN:
+    case ComponentType::PNP:
+    case ComponentType::NMOS:
+    case ComponentType::PMOS:
         return false;
     }
     return false;
@@ -215,6 +237,14 @@ const char *GetTypeName(const ComponentType type) {
         return "ZenerDiode";
     case ComponentType::LED:
         return "LED";
+    case ComponentType::NPN:
+        return "NPN";
+    case ComponentType::PNP:
+        return "PNP";
+    case ComponentType::NMOS:
+        return "NMOS";
+    case ComponentType::PMOS:
+        return "PMOS";
     }
     return "Unknown";
 }

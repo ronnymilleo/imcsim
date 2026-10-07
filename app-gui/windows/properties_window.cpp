@@ -11,6 +11,7 @@
 #include <cstddef>
 #include <format>
 #include <optional>
+#include <span>
 #include <string>
 
 namespace GUI {
@@ -61,6 +62,34 @@ constexpr auto DiodeFields = std::to_array<ParameterField<Core::DiodeParameters>
     {"TT", &Core::DiodeParameters::TransitTime, "s"},
 });
 
+constexpr auto BJTFields = std::to_array<ParameterField<Core::BJTParameters>>({
+    {"IS", &Core::BJTParameters::SaturationCurrent, "A"},
+    {"BF", &Core::BJTParameters::ForwardBeta, ""},
+    {"BR", &Core::BJTParameters::ReverseBeta, ""},
+    {"VAF", &Core::BJTParameters::EarlyVoltage, "V"},
+    {"IKF", &Core::BJTParameters::ForwardKneeCurrent, "A"},
+    {"ISE", &Core::BJTParameters::LeakageSaturationCurrent, "A"},
+    {"NE", &Core::BJTParameters::LeakageEmissionCoefficient, ""},
+    {"RB", &Core::BJTParameters::BaseResistance, "Ohm"},
+    {"RC", &Core::BJTParameters::CollectorResistance, "Ohm"},
+    {"RE", &Core::BJTParameters::EmitterResistance, "Ohm"},
+    {"CJE", &Core::BJTParameters::EmitterCapacitance, "F"},
+    {"CJC", &Core::BJTParameters::CollectorCapacitance, "F"},
+    {"TF", &Core::BJTParameters::TransitTime, "s"},
+});
+
+constexpr auto MOSFETFields = std::to_array<ParameterField<Core::MOSFETParameters>>({
+    {"VTO", &Core::MOSFETParameters::ThresholdVoltage, "V"},
+    {"KP", &Core::MOSFETParameters::Transconductance, "A/V2"},
+    {"LAMBDA", &Core::MOSFETParameters::ChannelModulation, "1/V"},
+    {"RD", &Core::MOSFETParameters::DrainResistance, "Ohm"},
+    {"RS", &Core::MOSFETParameters::SourceResistance, "Ohm"},
+    {"CGSO", &Core::MOSFETParameters::GateSourceOverlap, "F/m"},
+    {"CGDO", &Core::MOSFETParameters::GateDrainOverlap, "F/m"},
+    {"W", &Core::MOSFETParameters::Width, "m"},
+    {"L", &Core::MOSFETParameters::Length, "m"},
+});
+
 template <typename Parameters, std::size_t Count>
 void LoadParameterFields(const std::array<ParameterField<Parameters>, Count> &fields,
                          std::array<ValueField, Count> &value_fields, const Parameters &parameters) {
@@ -92,6 +121,66 @@ bool DrawParameterFields(const std::array<ParameterField<Parameters>, Count> &fi
     return changed;
 }
 
+// Draws the model combo of a part that offers ready models or custom parameters, its description or its custom
+// fields, and applies a change; returns whether the part changed. Custom starts from the parameters of the model it
+// replaces, so a ready part can be tweaked
+template <typename Part, typename Model, typename Parameters, std::size_t Count>
+bool DrawModelChoice(Part &part, const std::span<const Model> models, const char *custom_name,
+                     const std::array<ParameterField<Parameters>, Count> &fields,
+                     std::array<ValueField, Count> &value_fields) {
+    bool changed = false;
+    DrawFieldLabel("Model");
+    if (ImGui::BeginCombo("##Model", part.GetModelName())) {
+        for (const Model &model : models) {
+            const bool selected = &model == part.GetModel();
+            if (ImGui::Selectable(model.Name, selected) && !selected) {
+                part.SetModel(model);
+                changed = true;
+            }
+            if (selected) {
+                ImGui::SetItemDefaultFocus();
+            }
+        }
+        if (ImGui::Selectable(custom_name, part.IsCustom()) && !part.IsCustom()) {
+            part.SetCustom();
+            LoadParameterFields(fields, value_fields, part.GetParameters());
+            changed = true;
+        }
+        ImGui::EndCombo();
+    }
+
+    if (!part.IsCustom()) {
+        ImGui::TextDisabled("%s", part.GetModel()->Description);
+        return changed;
+    }
+    Parameters parameters = part.GetParameters();
+    const auto is_valid = [&part](const Parameters &candidate) { return part.IsValidParameters(candidate); };
+    if (DrawParameterFields(fields, value_fields, "", is_valid, parameters)) {
+        part.SetCustomParameters(parameters);
+        changed = true;
+    }
+    return changed;
+}
+
+bool HasModel(const Core::ComponentType type) {
+    return Core::IsDiode(type) || Core::IsBJT(type) || Core::IsMOSFET(type);
+}
+
+// Value fields show for parts with a value, and for parts with a model only while they are custom
+bool ShowsValueFields(const Core::Component &component) {
+    const Core::ComponentType type = component.GetType();
+    if (Core::IsDiode(type)) {
+        return static_cast<const Core::Diode &>(component).IsCustom();
+    }
+    if (Core::IsBJT(type)) {
+        return static_cast<const Core::BJT &>(component).IsCustom();
+    }
+    if (Core::IsMOSFET(type)) {
+        return static_cast<const Core::MOSFET &>(component).IsCustom();
+    }
+    return component.HasValue();
+}
+
 } // namespace
 
 /**
@@ -117,24 +206,27 @@ void PropertiesWindow::Draw() {
     if (!component.GetName().empty()) {
         ImGui::TextUnformatted(std::format("Name: {}", component.GetName()).c_str());
     }
-    const bool is_diode = Core::IsDiode(component.GetType());
-    if (!component.HasValue() && !is_diode) {
+    const Core::ComponentType type = component.GetType();
+    if (!component.HasValue() && !HasModel(type)) {
         return;
     }
 
     if (m_LoadedSelection != m_Schematic.GetSelectionVersion()) {
         LoadFields(component);
     }
-    if (is_diode) {
-        auto &diode = static_cast<Core::Diode &>(component);
-        DrawDiode(diode);
-        if (!diode.IsCustom()) {
-            return;
-        }
-    } else if (Core::IsSource(component.GetType())) {
+    if (Core::IsDiode(type)) {
+        DrawDiode(static_cast<Core::Diode &>(component));
+    } else if (Core::IsBJT(type)) {
+        DrawBJT(static_cast<Core::BJT &>(component));
+    } else if (Core::IsMOSFET(type)) {
+        DrawMOSFET(static_cast<Core::MOSFET &>(component));
+    } else if (Core::IsSource(type)) {
         DrawSource(static_cast<Core::Source &>(component));
     } else {
         DrawValue(component);
+    }
+    if (!ShowsValueFields(component)) {
+        return;
     }
     ImGui::TextDisabled("Suffixes: T G M k m u n p f (case sensitive)");
 }
@@ -150,6 +242,14 @@ void PropertiesWindow::LoadFields(const Core::Component &component) {
         const auto &diode = static_cast<const Core::Diode &>(component);
         LoadParameterFields(DiodeFields, m_DiodeFields, diode.GetParameters());
     }
+    if (Core::IsBJT(component.GetType())) {
+        const auto &bjt = static_cast<const Core::BJT &>(component);
+        LoadParameterFields(BJTFields, m_BJTFields, bjt.GetParameters());
+    }
+    if (Core::IsMOSFET(component.GetType())) {
+        const auto &mosfet = static_cast<const Core::MOSFET &>(component);
+        LoadParameterFields(MOSFETFields, m_MOSFETFields, mosfet.GetParameters());
+    }
     m_LoadedSelection = m_Schematic.GetSelectionVersion();
 }
 
@@ -162,43 +262,34 @@ void PropertiesWindow::DrawValue(Core::Component &component) {
 }
 
 void PropertiesWindow::DrawDiode(Core::Diode &diode) {
-    DrawFieldLabel("Model");
-    if (ImGui::BeginCombo("##Model", diode.GetModelName())) {
-        for (const Core::DiodeModel &model : Core::GetDiodeModels(diode.GetType())) {
-            const bool selected = &model == diode.GetModel();
-            if (ImGui::Selectable(model.Name, selected) && !selected) {
-                diode.SetModel(model);
-                m_Schematic.MarkModified();
-            }
-            if (selected) {
-                ImGui::SetItemDefaultFocus();
-            }
-        }
-        // Custom starts from the parameters of the model it replaces, so a ready part can be tweaked
-        if (ImGui::Selectable(Core::CustomDiodeModelName, diode.IsCustom()) && !diode.IsCustom()) {
-            diode.SetCustom();
-            LoadParameterFields(DiodeFields, m_DiodeFields, diode.GetParameters());
-            m_Schematic.MarkModified();
-        }
-        ImGui::EndCombo();
-    }
-
-    if (!diode.IsCustom()) {
-        ImGui::TextDisabled("%s", diode.GetModel()->Description);
-        return;
-    }
-    Core::DiodeParameters parameters = diode.GetParameters();
-    const auto is_valid = [&diode](const Core::DiodeParameters &candidate) {
-        return diode.IsValidParameters(candidate);
-    };
-    if (DrawParameterFields(DiodeFields, m_DiodeFields, "", is_valid, parameters)) {
-        diode.SetCustomParameters(parameters);
+    if (DrawModelChoice(diode, Core::GetDiodeModels(diode.GetType()), Core::CustomDiodeModelName, DiodeFields,
+                        m_DiodeFields)) {
         m_Schematic.MarkModified();
     }
-    const char *breakdown_hint = diode.GetType() == Core::ComponentType::ZenerDiode
-                                     ? "BV is the voltage the Zener regulates at"
-                                     : "BV is the reverse voltage the diode is rated for";
-    ImGui::TextDisabled("%s", breakdown_hint);
+    if (diode.IsCustom()) {
+        ImGui::TextDisabled("%s", diode.GetType() == Core::ComponentType::ZenerDiode
+                                      ? "BV is the voltage the Zener regulates at"
+                                      : "BV is the reverse voltage the diode is rated for");
+    }
+}
+
+void PropertiesWindow::DrawBJT(Core::BJT &bjt) {
+    if (DrawModelChoice(bjt, Core::GetBJTModels(bjt.GetType()), Core::CustomBJTModelName, BJTFields, m_BJTFields)) {
+        m_Schematic.MarkModified();
+    }
+    if (bjt.IsCustom()) {
+        ImGui::TextDisabled("A VAF or IKF of 0 turns that effect off");
+    }
+}
+
+void PropertiesWindow::DrawMOSFET(Core::MOSFET &mosfet) {
+    if (DrawModelChoice(mosfet, Core::GetMOSFETModels(mosfet.GetType()), Core::CustomMOSFETModelName, MOSFETFields,
+                        m_MOSFETFields)) {
+        m_Schematic.MarkModified();
+    }
+    if (mosfet.IsCustom()) {
+        ImGui::TextDisabled("Level 1: ID = KP/2 W/L (VGS - VTO)^2; VTO is negative for PMOS");
+    }
 }
 
 void PropertiesWindow::DrawSource(Core::Source &source) {

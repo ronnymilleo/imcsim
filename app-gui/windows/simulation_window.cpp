@@ -213,7 +213,10 @@ void SimulationWindow::DrawCurrents(const Core::OperatingPoint &operating_point)
         ImGui::TextUnformatted(std::format("{}A", Core::FormatValue(current.Current)).c_str());
     }
     ImGui::EndTable();
-    ImGui::TextDisabled("Positive through the component from its first terminal to its second, as in SPICE");
+    ImGui::PushTextWrapPos(0.0f);
+    ImGui::TextDisabled("As in SPICE: positive through a two-terminal part from its first terminal to its second, "
+                        "and into each terminal of a transistor");
+    ImGui::PopTextWrapPos();
 }
 
 } // namespace GUI

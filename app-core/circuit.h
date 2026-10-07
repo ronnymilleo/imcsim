@@ -25,6 +25,18 @@ struct CircuitEntry {
 };
 
 /**
+ * @struct  CurrentProbe
+ * @brief   A terminal whose current the simulator measures with a 0 V source in series, positive into the terminal.
+ * @details ngspice saves no usable current for diodes and transistors in an AC sweep, so their terminals are
+ *          probed in every analysis. Label tells the terminals of one part apart, such as "C" for a collector;
+ *          it is empty for a part with a single probe.
+ */
+struct CurrentProbe {
+    int Terminal;
+    const char *Label;
+};
+
+/**
  * @class   Circuit
  * @brief   Topology of a circuit, without geometry: which nodes each component connects.
  */
@@ -43,7 +55,10 @@ private:
     int m_NodeCount = 0;
 };
 
-std::string GetCurrentProbeName(const Component &diode);
+// Current probes
+std::vector<CurrentProbe> GetCurrentProbes(const Component &component);
+std::string GetCurrentProbeName(const Component &component, std::string_view label);
+std::string GetCurrentName(const Component &component, std::string_view label);
 
 } // namespace Core
 

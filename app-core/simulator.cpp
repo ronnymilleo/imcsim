@@ -194,33 +194,55 @@ std::string ToLower(std::string text) {
     return text;
 }
 
-// The branch current of a voltage source, or of an inductor, or of the probe in series with a diode
-std::string BranchVectorName(const Component &component) {
-    const std::string source = IsDiode(component.GetType()) ? GetCurrentProbeName(component) : component.GetName();
-    return std::format("{}#branch", ToLower(source));
+// The branch current of a voltage source, an inductor or a current probe
+std::string BranchVectorName(const std::string &element_name) {
+    return std::format("{}#branch", ToLower(element_name));
 }
 
-// The vector where ngspice saves the current through a component in .op and .tran, with .options savecurrents.
-// Every one of them is positive from the first terminal to the second, through the component
-std::optional<std::string> CurrentVectorName(const Component &component) {
+/**
+ * @struct  CurrentVector
+ * @brief   A current the results report, and the ngspice vector it is read from.
+ */
+struct CurrentVector {
+    std::string TraceName;
+    std::string VectorName;
+};
+
+// Where ngspice saves the currents of a component, with .options savecurrents and the current probes. Two-terminal
+// parts report one current, positive from their first terminal to their second; probed parts one per probed
+// terminal, positive into it
+std::vector<CurrentVector> CurrentVectors(const Component &component) {
+    const std::vector<CurrentProbe> probes = GetCurrentProbes(component);
+    if (!probes.empty()) {
+        std::vector<CurrentVector> vectors;
+        for (const CurrentProbe &probe : probes) {
+            vectors.push_back({GetCurrentName(component, probe.Label),
+                               BranchVectorName(GetCurrentProbeName(component, probe.Label))});
+        }
+        return vectors;
+    }
     const std::string name = ToLower(component.GetName());
     switch (component.GetType()) {
     case ComponentType::Resistor:
     case ComponentType::Capacitor:
     case ComponentType::Inductor:
-        return std::format("@{}[i]", name);
+        return {{component.GetName(), std::format("@{}[i]", name)}};
     case ComponentType::VCC:
     case ComponentType::VoltageSource:
+        return {{component.GetName(), BranchVectorName(name)}};
+    case ComponentType::CurrentSource:
+        return {{component.GetName(), std::format("@{}[current]", name)}};
+    case ComponentType::Ground:
     case ComponentType::Diode:
     case ComponentType::ZenerDiode:
     case ComponentType::LED:
-        return BranchVectorName(component);
-    case ComponentType::CurrentSource:
-        return std::format("@{}[current]", name);
-    case ComponentType::Ground:
+    case ComponentType::NPN:
+    case ComponentType::PNP:
+    case ComponentType::NMOS:
+    case ComponentType::PMOS:
         break;
     }
-    return std::nullopt;
+    return {};
 }
 
 // 20 log10 of the magnitude, with a floor that keeps a value the AC sources do not reach finite for plotting
@@ -259,15 +281,13 @@ std::expected<OperatingPoint, std::string> ReadOperatingPoint(const Circuit &cir
         result.NodeVoltages[static_cast<std::size_t>(node)] = vector->v_realdata[0];
     }
     for (const CircuitEntry &entry : circuit.GetEntries()) {
-        const std::optional<std::string> vector_name = CurrentVectorName(*entry.Part);
-        if (!vector_name) {
-            continue;
+        for (const CurrentVector &current : CurrentVectors(*entry.Part)) {
+            const pvector_info vector = FindVector(current.VectorName);
+            if (vector == nullptr || vector->v_realdata == nullptr) {
+                return std::unexpected(std::format("ngspice returned no current for {}", current.TraceName));
+            }
+            result.Currents.push_back({current.TraceName, vector->v_realdata[0]});
         }
-        const pvector_info vector = FindVector(*vector_name);
-        if (vector == nullptr || vector->v_realdata == nullptr) {
-            return std::unexpected(std::format("ngspice returned no current for {}", entry.Part->GetName()));
-        }
-        result.Currents.push_back({entry.Part->GetName(), vector->v_realdata[0]});
     }
     for (const CircuitEntry &entry : circuit.GetEntries()) {
         if (!IsDiode(entry.Part->GetType())) {
@@ -299,15 +319,13 @@ std::expected<Transient, std::string> ReadTransient(const Circuit &circuit) {
         result.NodeVoltages[static_cast<std::size_t>(node)] = RealPart(*vector);
     }
     for (const CircuitEntry &entry : circuit.GetEntries()) {
-        const std::optional<std::string> vector_name = CurrentVectorName(*entry.Part);
-        if (!vector_name) {
-            continue;
+        for (const CurrentVector &current : CurrentVectors(*entry.Part)) {
+            const pvector_info vector = FindVector(current.VectorName);
+            if (vector == nullptr || vector->v_length != time->v_length) {
+                return std::unexpected(std::format("ngspice returned no currents for {}", current.TraceName));
+            }
+            result.Currents.push_back({current.TraceName, RealPart(*vector)});
         }
-        const pvector_info vector = FindVector(*vector_name);
-        if (vector == nullptr || vector->v_length != time->v_length) {
-            return std::unexpected(std::format("ngspice returned no currents for {}", entry.Part->GetName()));
-        }
-        result.Currents.push_back({entry.Part->GetName(), RealPart(*vector)});
     }
     for (const CircuitEntry &entry : circuit.GetEntries()) {
         if (!IsDiode(entry.Part->GetType())) {
@@ -327,8 +345,26 @@ std::expected<Transient, std::string> ReadTransient(const Circuit &circuit) {
 }
 
 // ngspice computes no device currents in .ac, so resistors, capacitors and current sources are worked out from
-// their node voltages and values; inductors, voltage sources and diode probes have their branch current in the
-// results
+// their node voltages and values; inductors and voltage sources have their branch current in the results. Probed
+// parts are read from their probes instead
+std::expected<std::vector<std::complex<double>>, std::string>
+ReadACCurrent(const std::string &vector_name, const std::string &trace_name, const std::size_t point_count) {
+    const pvector_info vector = FindVector(vector_name);
+    if (vector == nullptr || static_cast<std::size_t>(vector->v_length) != point_count) {
+        return std::unexpected(std::format("ngspice returned no currents for {}", trace_name));
+    }
+    return ComplexValues(*vector);
+}
+
+void AddACCurrent(std::string name, const std::vector<std::complex<double>> &currents, ACSweep &result) {
+    ComponentTrace magnitudes{name, {}};
+    ComponentTrace phases{std::move(name), {}};
+    std::ranges::transform(currents, std::back_inserter(magnitudes.Values), ToDecibels);
+    std::ranges::transform(currents, std::back_inserter(phases.Values), ToDegrees);
+    result.CurrentMagnitudesDecibels.push_back(std::move(magnitudes));
+    result.CurrentPhasesDegrees.push_back(std::move(phases));
+}
+
 std::expected<std::vector<std::complex<double>>, std::string>
 ACCurrent(const CircuitEntry &entry, const std::vector<double> &frequencies,
           const std::vector<std::vector<std::complex<double>>> &node_voltages) {
@@ -357,16 +393,15 @@ ACCurrent(const CircuitEntry &entry, const std::vector<double> &frequencies,
     case ComponentType::Inductor:
     case ComponentType::VCC:
     case ComponentType::VoltageSource:
+        return ReadACCurrent(BranchVectorName(component.GetName()), component.GetName(), frequencies.size());
+    case ComponentType::Ground:
     case ComponentType::Diode:
     case ComponentType::ZenerDiode:
-    case ComponentType::LED: {
-        const pvector_info vector = FindVector(BranchVectorName(component));
-        if (vector == nullptr || static_cast<std::size_t>(vector->v_length) != frequencies.size()) {
-            return std::unexpected(std::format("ngspice returned no currents for {}", component.GetName()));
-        }
-        return ComplexValues(*vector);
-    }
-    case ComponentType::Ground:
+    case ComponentType::LED:
+    case ComponentType::NPN:
+    case ComponentType::PNP:
+    case ComponentType::NMOS:
+    case ComponentType::PMOS:
         break;
     }
     return std::unexpected(std::format("{} carries no current", component.GetName()));
@@ -398,7 +433,18 @@ std::expected<ACSweep, std::string> ReadACSweep(const Circuit &circuit) {
     }
 
     for (const CircuitEntry &entry : circuit.GetEntries()) {
-        if (!CurrentVectorName(*entry.Part)) {
+        const std::vector<CurrentVector> vectors = CurrentVectors(*entry.Part);
+        if (!GetCurrentProbes(*entry.Part).empty()) {
+            for (const CurrentVector &current : vectors) {
+                const auto currents = ReadACCurrent(current.VectorName, current.TraceName, point_count);
+                if (!currents) {
+                    return std::unexpected(currents.error());
+                }
+                AddACCurrent(current.TraceName, *currents, result);
+            }
+            continue;
+        }
+        if (vectors.empty()) {
             continue;
         }
         // A supply rail has one terminal; its other side is ground
@@ -408,12 +454,7 @@ std::expected<ACSweep, std::string> ReadACSweep(const Circuit &circuit) {
         if (!currents) {
             return std::unexpected(currents.error());
         }
-        ComponentTrace magnitudes{entry.Part->GetName(), {}};
-        ComponentTrace phases{entry.Part->GetName(), {}};
-        std::ranges::transform(*currents, std::back_inserter(magnitudes.Values), ToDecibels);
-        std::ranges::transform(*currents, std::back_inserter(phases.Values), ToDegrees);
-        result.CurrentMagnitudesDecibels.push_back(std::move(magnitudes));
-        result.CurrentPhasesDegrees.push_back(std::move(phases));
+        AddACCurrent(entry.Part->GetName(), *currents, result);
     }
     return result;
 }
