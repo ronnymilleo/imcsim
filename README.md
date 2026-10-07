@@ -1,5 +1,7 @@
 # imcsim
 
+[![CI](https://github.com/ronnymilleo/imcsim/actions/workflows/ci.yml/badge.svg)](https://github.com/ronnymilleo/imcsim/actions/workflows/ci.yml)
+
 Immediate Mode Circuit Simulator, built with Dear ImGui, SDL3 and Vulkan. Circuits are simulated with
 [ngspice](https://ngspice.sourceforge.io/).
 
