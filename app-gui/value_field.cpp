@@ -40,10 +40,7 @@ void ValueField::Load(const double value) {
  */
 std::optional<double> ValueField::Draw(const char *label, const std::string &unit,
                                        const std::function<bool(double)> &is_valid) {
-    ImGui::AlignTextToFramePadding();
-    ImGui::TextUnformatted(label);
-    ImGui::SameLine(ImGui::GetFontSize() * LabelWidth);
-    ImGui::SetNextItemWidth(ImGui::GetFontSize() * InputWidth);
+    DrawFieldLabel(label);
     ImGui::PushID(label);
     std::optional<double> edited;
     if (ImGui::InputText("##value", m_Text.data(), m_Text.size())) {
@@ -66,6 +63,17 @@ std::optional<double> ValueField::Draw(const char *label, const std::string &uni
         ImGui::TextColored(GetErrorTextColor(), "Invalid value");
     }
     return edited;
+}
+
+/**
+ * @brief   Draws a label and sizes the next widget like the input of a ValueField, so other widgets line up with it.
+ * @param[in] label  Text before the widget.
+ */
+void DrawFieldLabel(const char *label) {
+    ImGui::AlignTextToFramePadding();
+    ImGui::TextUnformatted(label);
+    ImGui::SameLine(ImGui::GetFontSize() * LabelWidth);
+    ImGui::SetNextItemWidth(ImGui::GetFontSize() * InputWidth);
 }
 
 } // namespace GUI

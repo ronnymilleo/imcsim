@@ -17,10 +17,6 @@ namespace GUI {
 
 namespace {
 
-// In font sizes, so the layout follows the DPI scale; matches the labels of ValueField
-constexpr float LabelWidth = 6.0f;
-constexpr float InputWidth = 8.0f;
-
 bool AnyValue(double /*value*/) {
     return true;
 }
@@ -166,10 +162,7 @@ void PropertiesWindow::DrawValue(Core::Component &component) {
 }
 
 void PropertiesWindow::DrawDiode(Core::Diode &diode) {
-    ImGui::AlignTextToFramePadding();
-    ImGui::TextUnformatted("Model");
-    ImGui::SameLine(ImGui::GetFontSize() * LabelWidth);
-    ImGui::SetNextItemWidth(ImGui::GetFontSize() * InputWidth);
+    DrawFieldLabel("Model");
     if (ImGui::BeginCombo("##Model", diode.GetModelName())) {
         for (const Core::DiodeModel &model : Core::GetDiodeModels(diode.GetType())) {
             const bool selected = &model == diode.GetModel();

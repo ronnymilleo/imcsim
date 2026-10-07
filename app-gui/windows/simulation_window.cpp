@@ -15,10 +15,6 @@ namespace GUI {
 
 namespace {
 
-// In font sizes, so the layout follows the DPI scale; matches the labels of ValueField
-constexpr float LabelWidth = 6.0f;
-constexpr float InputWidth = 8.0f;
-
 bool IsPositive(const double value) {
     return value > 0.0;
 }
@@ -135,10 +131,7 @@ void SimulationWindow::DrawACSweepTab() {
     if (const std::optional<double> stop = m_StopFrequency.Draw("Stop", "Hz", IsPositive)) {
         m_ACSweepSettings.StopFrequency = *stop;
     }
-    ImGui::AlignTextToFramePadding();
-    ImGui::TextUnformatted("Points");
-    ImGui::SameLine(ImGui::GetFontSize() * LabelWidth);
-    ImGui::SetNextItemWidth(ImGui::GetFontSize() * InputWidth);
+    DrawFieldLabel("Points");
     ImGui::InputInt("per decade", &m_ACSweepSettings.PointsPerDecade);
     if (PrimaryButton("Run AC sweep (.ac)")) {
         RunACSweep();
