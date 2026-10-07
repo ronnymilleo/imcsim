@@ -7,6 +7,7 @@
 
 #include "ui_elements/ui_capacitor.h"
 #include "ui_elements/ui_current_source.h"
+#include "ui_elements/ui_diode.h"
 #include "ui_elements/ui_ground.h"
 #include "ui_elements/ui_inductor.h"
 #include "ui_elements/ui_resistor.h"
@@ -39,6 +40,10 @@ std::unique_ptr<UIElement> CreateElement(const Core::ComponentType type, const G
         return std::make_unique<UIVoltageSource>(position, rotation);
     case Core::ComponentType::CurrentSource:
         return std::make_unique<UICurrentSource>(position, rotation);
+    case Core::ComponentType::Diode:
+    case Core::ComponentType::ZenerDiode:
+    case Core::ComponentType::LED:
+        return std::make_unique<UIDiode>(type, position, rotation);
     }
     return nullptr;
 }

@@ -53,6 +53,8 @@ struct OperatingPoint {
     std::vector<double> NodeVoltages;
     // One per named component, in circuit order; ground carries none
     std::vector<ComponentCurrent> Currents;
+    // Problems in the results that ngspice does not report, such as a diode in reverse breakdown
+    std::vector<std::string> Warnings;
 };
 
 /**
@@ -75,6 +77,8 @@ struct Transient {
     std::vector<std::vector<double>> NodeVoltages;
     // One per named component, in circuit order, with a value per time point
     std::vector<ComponentTrace> Currents;
+    // Problems in the results that ngspice does not report, such as a diode in reverse breakdown
+    std::vector<std::string> Warnings;
 };
 
 /**

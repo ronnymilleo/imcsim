@@ -8,6 +8,7 @@ add_library(imcsim-core-lib
             components/capacitor.cpp
             components/component.cpp
             components/current_source.cpp
+            components/diode.cpp
             components/ground.cpp
             components/inductor.cpp
             components/resistor.cpp

@@ -15,10 +15,6 @@ namespace GUI {
 
 namespace {
 
-// In font sizes, so the layout follows the DPI scale; matches the labels of ValueField
-constexpr float LabelWidth = 6.0f;
-constexpr float InputWidth = 8.0f;
-
 bool IsPositive(const double value) {
     return value > 0.0;
 }
@@ -41,6 +37,14 @@ bool DrawRunStatus(const std::optional<std::string> &error, const std::vector<Co
                                                   "results");
     }
     return true;
+}
+
+void DrawResultWarnings(const std::vector<std::string> &warnings) {
+    ImGui::PushTextWrapPos(0.0f);
+    for (const std::string &warning : warnings) {
+        ImGui::TextColored(GetWarningTextColor(), "%s", warning.c_str());
+    }
+    ImGui::PopTextWrapPos();
 }
 
 void DrawOutput(const std::vector<Core::SimulatorMessage> &messages) {
@@ -94,6 +98,7 @@ void SimulationWindow::DrawOperatingPointTab() {
     }
     const auto &operating_point = m_Schematic.GetOperatingPoint();
     if (DrawRunStatus(m_OperatingPointStatus.Error, m_OperatingPointStatus.Messages, operating_point.has_value())) {
+        DrawResultWarnings(operating_point->Warnings);
         DrawNodeVoltages(*operating_point);
         DrawCurrents(*operating_point);
     }
@@ -113,6 +118,7 @@ void SimulationWindow::DrawTransientTab() {
     }
     const auto &transient = m_Schematic.GetTransient();
     if (DrawRunStatus(m_TransientStatus.Error, m_TransientStatus.Messages, transient.has_value())) {
+        DrawResultWarnings(transient->Warnings);
         ImGui::TextUnformatted("Done; the voltages and currents are in the Output window");
     }
     DrawOutput(m_TransientStatus.Messages);
@@ -125,10 +131,7 @@ void SimulationWindow::DrawACSweepTab() {
     if (const std::optional<double> stop = m_StopFrequency.Draw("Stop", "Hz", IsPositive)) {
         m_ACSweepSettings.StopFrequency = *stop;
     }
-    ImGui::AlignTextToFramePadding();
-    ImGui::TextUnformatted("Points");
-    ImGui::SameLine(ImGui::GetFontSize() * LabelWidth);
-    ImGui::SetNextItemWidth(ImGui::GetFontSize() * InputWidth);
+    DrawFieldLabel("Points");
     ImGui::InputInt("per decade", &m_ACSweepSettings.PointsPerDecade);
     if (PrimaryButton("Run AC sweep (.ac)")) {
         RunACSweep();

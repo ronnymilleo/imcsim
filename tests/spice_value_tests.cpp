@@ -76,6 +76,10 @@ TEST_CASE("FormatValue keeps the number between 1 and 1000", "[spice_value]") {
     CHECK(Core::FormatValue(0.5) == "500m");
     CHECK(Core::FormatValue(4.7e-6) == "4.7u");
     CHECK(Core::FormatValue(-12.0) == "-12");
+    CHECK(Core::FormatValue(10e-15) == "10f");
+    // Below femto there is no suffix left, so the exponent is written out
+    CHECK(Core::FormatValue(9.9e-20) == "9.9e-20");
+    CHECK(Core::FormatSpiceValue(-3.3e-17) == "-3.3e-17");
 }
 
 TEST_CASE("FormatSpiceValue writes mega as Meg because SPICE reads M as milli", "[spice_value]") {
@@ -85,7 +89,7 @@ TEST_CASE("FormatSpiceValue writes mega as Meg because SPICE reads M as milli", 
 }
 
 TEST_CASE("FormatValue output parses back to the same value", "[spice_value]") {
-    const double value = GENERATE(1e3, 4.7e-6, 2.2e6, 5.0, 100e-9, 2.2e-12, 0.5, 470.0, 1.5e-3, -12.0);
+    const double value = GENERATE(1e3, 4.7e-6, 2.2e6, 5.0, 100e-9, 2.2e-12, 0.5, 470.0, 1.5e-3, -12.0, 9.9e-20);
     CAPTURE(value);
     CHECK_THAT(ParseOrFail(Core::FormatValue(value), ""), Catch::Matchers::WithinRel(value));
 }

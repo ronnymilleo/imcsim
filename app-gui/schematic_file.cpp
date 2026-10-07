@@ -5,6 +5,7 @@
 
 #include "schematic_file.h"
 
+#include "components/diode.h"
 #include "components/source.h"
 #include "element_factory.h"
 #include "nlohmann/json.hpp"
@@ -46,6 +47,19 @@ constexpr auto PulseKeys = std::to_array<ParameterKey<Core::PulseParameters>>({
     {"fall", &Core::PulseParameters::FallTime},
     {"width", &Core::PulseParameters::Width},
     {"period", &Core::PulseParameters::Period},
+});
+
+// Named after the SPICE diode parameters
+constexpr auto DiodeKeys = std::to_array<ParameterKey<Core::DiodeParameters>>({
+    {"is", &Core::DiodeParameters::SaturationCurrent},
+    {"n", &Core::DiodeParameters::EmissionCoefficient},
+    {"rs", &Core::DiodeParameters::SeriesResistance},
+    {"bv", &Core::DiodeParameters::BreakdownVoltage},
+    {"ibv", &Core::DiodeParameters::BreakdownCurrent},
+    {"cjo", &Core::DiodeParameters::JunctionCapacitance},
+    {"vj", &Core::DiodeParameters::JunctionPotential},
+    {"m", &Core::DiodeParameters::GradingCoefficient},
+    {"tt", &Core::DiodeParameters::TransitTime},
 });
 
 // Readers return no value when the key is missing or holds another type, so a damaged file never throws
@@ -130,6 +144,15 @@ nlohmann::json WriteElement(const UIElement &element) {
         WriteParameters(PulseKeys, source.GetPulse(), pulse);
         object["pulse"] = pulse;
     }
+    if (Core::IsDiode(component.GetType())) {
+        const auto &diode = static_cast<const Core::Diode &>(component);
+        object["model"] = diode.GetModelName();
+        if (diode.IsCustom()) {
+            nlohmann::json parameters = nlohmann::json::object();
+            WriteParameters(DiodeKeys, diode.GetParameters(), parameters);
+            object["parameters"] = parameters;
+        }
+    }
     return object;
 }
 
@@ -166,6 +189,37 @@ std::expected<void, std::string> ReadSource(const nlohmann::json &object, Core::
         }
         source.SetPulse(pulse);
     }
+    return {};
+}
+
+// Missing custom parameters keep those of the default model of the part
+std::expected<void, std::string> ReadDiode(const nlohmann::json &object, Core::Diode &diode) {
+    const std::optional<std::string> model_name = ReadString(object, "model");
+    if (!model_name) {
+        return std::unexpected("has no valid model");
+    }
+    if (*model_name != Core::CustomDiodeModelName) {
+        const Core::DiodeModel *model = Core::FindDiodeModel(diode.GetType(), *model_name);
+        if (model == nullptr) {
+            return std::unexpected("has no valid model");
+        }
+        diode.SetModel(*model);
+        return {};
+    }
+
+    Core::DiodeParameters parameters = diode.GetParameters();
+    if (const auto parameters_object = object.find("parameters"); parameters_object != object.end()) {
+        if (!parameters_object->is_object()) {
+            return std::unexpected("has diode parameters that are not an object");
+        }
+        if (const auto read = ReadParameters(DiodeKeys, *parameters_object, parameters); !read) {
+            return read;
+        }
+    }
+    if (!diode.IsValidParameters(parameters)) {
+        return std::unexpected("has diode parameters out of range");
+    }
+    diode.SetCustomParameters(parameters);
     return {};
 }
 
@@ -206,6 +260,12 @@ std::expected<std::unique_ptr<UIElement>, std::string> ReadElement(const nlohman
         const std::expected<void, std::string> source = ReadSource(object, static_cast<Core::Source &>(component));
         if (!source) {
             return std::unexpected(source.error());
+        }
+    }
+    if (Core::IsDiode(component.GetType())) {
+        const std::expected<void, std::string> diode = ReadDiode(object, static_cast<Core::Diode &>(component));
+        if (!diode) {
+            return std::unexpected(diode.error());
         }
     }
     if (const std::optional<std::string> name = ReadString(object, "name")) {

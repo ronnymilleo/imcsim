@@ -4,6 +4,7 @@
  */
 
 #include "test_printers.h"
+#include "ui_elements/ui_diode.h"
 #include "ui_elements/ui_ground.h"
 #include "ui_elements/ui_resistor.h"
 #include "ui_elements/ui_vcc.h"
@@ -52,4 +53,20 @@ TEST_CASE("Ground is picked below its terminal", "[ui_element]") {
     const GUI::UIGround ground({0, 0}, GUI::Rotation::R0);
     CHECK(ground.Contains({0.0f, 1.2f}));
     CHECK_FALSE(ground.Contains({0.0f, -0.5f}));
+}
+
+TEST_CASE("Diode parts run from the anode at x = -2 to the cathode at x = +2", "[ui_element]") {
+    for (const Core::ComponentType type :
+         {Core::ComponentType::Diode, Core::ComponentType::ZenerDiode, Core::ComponentType::LED}) {
+        const GUI::UIDiode diode(type, {1, 1}, GUI::Rotation::R180);
+        CHECK(diode.GetComponent().GetType() == type);
+        CHECK(diode.GetTerminals() == std::vector<GUI::GridPoint>{{3, 1}, {-1, 1}});
+    }
+}
+
+TEST_CASE("An LED is also picked on its arrows", "[ui_element]") {
+    const GUI::UIDiode diode(Core::ComponentType::Diode, {0, 0}, GUI::Rotation::R0);
+    const GUI::UIDiode led(Core::ComponentType::LED, {0, 0}, GUI::Rotation::R0);
+    CHECK_FALSE(diode.Contains({0.3f, -1.0f}));
+    CHECK(led.Contains({0.3f, -1.0f}));
 }

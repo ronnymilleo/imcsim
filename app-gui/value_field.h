@@ -29,6 +29,8 @@ private:
     bool m_Invalid = false;
 };
 
+void DrawFieldLabel(const char *label);
+
 } // namespace GUI
 
 #endif // IMCSIM_VALUE_FIELD_H

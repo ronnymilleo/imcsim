@@ -5,10 +5,12 @@
 
 #include "circuit.h"
 
+#include "components/diode.h"
 #include "components/source.h"
 #include "spice_value.h"
 #include <algorithm>
 #include <format>
+#include <optional>
 #include <utility>
 
 namespace Core {
@@ -44,6 +46,15 @@ std::string FormatSource(const Source &source, const std::vector<int> &nodes) {
     }
     }
     return "";
+}
+
+// With a probe, a 0 V source in series measures the diode current; ngspice saves no usable diode current in .ac
+std::string FormatDiode(const Diode &diode, const std::vector<int> &nodes, const std::optional<int> probe_node) {
+    if (!probe_node) {
+        return std::format("{} {} {} {}\n", diode.GetName(), nodes[0], nodes[1], diode.GetSpiceModelName());
+    }
+    return std::format("{} {} {} {}\n{} {} {} DC 0\n", diode.GetName(), nodes[0], *probe_node,
+                       diode.GetSpiceModelName(), GetCurrentProbeName(diode), *probe_node, nodes[1]);
 }
 
 } // namespace
@@ -95,14 +106,22 @@ bool Circuit::HasACSource() const {
 
 /**
  * @brief   Writes the circuit as a SPICE netlist, ready to hand to ngspice.
- * @param[in] analysis  Optional analysis command, such as ".op", written right before ".end".
- * @return  One line per component, with node numbers as SPICE node names (0 is ground), ending in ".end".
+ * @param[in] analysis            Optional analysis command, such as ".op", written right before ".end".
+ * @param[in] add_current_probes  Adds a 0 V source in series with every diode, named by GetCurrentProbeName(),
+ *                                whose branch current is the diode current; for simulation only.
+ * @return  One line per component, with node numbers as SPICE node names (0 is ground), then one ".model" line
+ *          per diode model in use, ending in ".end".
  * @note    Ground components produce no line; they only make their node 0. A supply rail becomes a DC voltage
  *          source from its node to ground. An AC source writes its offset, AC magnitude and sine together, and a
- *          pulse source its low level and pulse, so the same netlist works for .op, .ac and .tran.
+ *          pulse source its low level and pulse, so the same netlist works for .op, .ac and .tran. Probes connect
+ *          through nodes numbered after GetNodeCount(), so the circuit nodes keep their numbers.
  */
-std::string Circuit::ToSpiceNetlist(const std::string_view analysis) const {
+std::string Circuit::ToSpiceNetlist(const std::string_view analysis, const bool add_current_probes) const {
     std::string netlist = "* imcsim netlist\n";
+    // Diodes that share a ready model share its line
+    std::vector<std::string> model_names;
+    std::string models;
+    int next_probe_node = m_NodeCount;
     for (const CircuitEntry &entry : m_Entries) {
         const Component &component = *entry.Part;
         const std::string value = FormatSpiceValue(component.GetValue());
@@ -119,15 +138,39 @@ std::string Circuit::ToSpiceNetlist(const std::string_view analysis) const {
         case ComponentType::CurrentSource:
             netlist += FormatSource(static_cast<const Source &>(component), entry.Nodes);
             break;
+        case ComponentType::Diode:
+        case ComponentType::ZenerDiode:
+        case ComponentType::LED: {
+            const auto &diode = static_cast<const Diode &>(component);
+            const std::optional<int> probe_node =
+                add_current_probes ? std::optional<int>(next_probe_node++) : std::nullopt;
+            netlist += FormatDiode(diode, entry.Nodes, probe_node);
+            if (std::string model_name = diode.GetSpiceModelName();
+                std::ranges::find(model_names, model_name) == model_names.end()) {
+                models += FormatDiodeModel(model_name, diode.GetParameters());
+                model_names.push_back(std::move(model_name));
+            }
+            break;
+        }
         case ComponentType::Ground:
             break;
         }
     }
+    netlist += models;
     if (!analysis.empty()) {
         netlist += std::format("{}\n", analysis);
     }
     netlist += ".end\n";
     return netlist;
+}
+
+/**
+ * @brief   Returns the name of the 0 V source that measures the current of a diode in a netlist with probes.
+ * @param[in] diode  Diode the probe is in series with.
+ * @return  "Vprobe-" followed by the diode name; the dash keeps it apart from any name IsValidName() accepts.
+ */
+std::string GetCurrentProbeName(const Component &diode) {
+    return std::format("Vprobe-{}", diode.GetName());
 }
 
 } // namespace Core

@@ -48,6 +48,19 @@ constexpr auto PulseFields = std::to_array<ParameterField<Core::PulseParameters>
     {"Period", &Core::PulseParameters::Period, "s"},
 });
 
+// Labeled with the SPICE parameter names, as datasheet models list them
+constexpr auto DiodeFields = std::to_array<ParameterField<Core::DiodeParameters>>({
+    {"IS", &Core::DiodeParameters::SaturationCurrent, "A"},
+    {"N", &Core::DiodeParameters::EmissionCoefficient, ""},
+    {"RS", &Core::DiodeParameters::SeriesResistance, "Ohm"},
+    {"BV", &Core::DiodeParameters::BreakdownVoltage, "V"},
+    {"IBV", &Core::DiodeParameters::BreakdownCurrent, "A"},
+    {"CJO", &Core::DiodeParameters::JunctionCapacitance, "F"},
+    {"VJ", &Core::DiodeParameters::JunctionPotential, "V"},
+    {"M", &Core::DiodeParameters::GradingCoefficient, ""},
+    {"TT", &Core::DiodeParameters::TransitTime, "s"},
+});
+
 template <typename Parameters, std::size_t Count>
 void LoadParameterFields(const std::array<ParameterField<Parameters>, Count> &fields,
                          std::array<ValueField, Count> &value_fields, const Parameters &parameters) {
@@ -104,14 +117,21 @@ void PropertiesWindow::Draw() {
     if (!component.GetName().empty()) {
         ImGui::TextUnformatted(std::format("Name: {}", component.GetName()).c_str());
     }
-    if (!component.HasValue()) {
+    const bool is_diode = Core::IsDiode(component.GetType());
+    if (!component.HasValue() && !is_diode) {
         return;
     }
 
     if (m_LoadedSelection != m_Schematic.GetSelectionVersion()) {
         LoadFields(component);
     }
-    if (Core::IsSource(component.GetType())) {
+    if (is_diode) {
+        auto &diode = static_cast<Core::Diode &>(component);
+        DrawDiode(diode);
+        if (!diode.IsCustom()) {
+            return;
+        }
+    } else if (Core::IsSource(component.GetType())) {
         DrawSource(static_cast<Core::Source &>(component));
     } else {
         DrawValue(component);
@@ -126,6 +146,10 @@ void PropertiesWindow::LoadFields(const Core::Component &component) {
         LoadParameterFields(ACFields, m_ACFields, source.GetAC());
         LoadParameterFields(PulseFields, m_PulseFields, source.GetPulse());
     }
+    if (Core::IsDiode(component.GetType())) {
+        const auto &diode = static_cast<const Core::Diode &>(component);
+        LoadParameterFields(DiodeFields, m_DiodeFields, diode.GetParameters());
+    }
     m_LoadedSelection = m_Schematic.GetSelectionVersion();
 }
 
@@ -135,6 +159,46 @@ void PropertiesWindow::DrawValue(Core::Component &component) {
         component.SetValue(*value);
         m_Schematic.MarkModified();
     }
+}
+
+void PropertiesWindow::DrawDiode(Core::Diode &diode) {
+    DrawFieldLabel("Model");
+    if (ImGui::BeginCombo("##Model", diode.GetModelName())) {
+        for (const Core::DiodeModel &model : Core::GetDiodeModels(diode.GetType())) {
+            const bool selected = &model == diode.GetModel();
+            if (ImGui::Selectable(model.Name, selected) && !selected) {
+                diode.SetModel(model);
+                m_Schematic.MarkModified();
+            }
+            if (selected) {
+                ImGui::SetItemDefaultFocus();
+            }
+        }
+        // Custom starts from the parameters of the model it replaces, so a ready part can be tweaked
+        if (ImGui::Selectable(Core::CustomDiodeModelName, diode.IsCustom()) && !diode.IsCustom()) {
+            diode.SetCustom();
+            LoadParameterFields(DiodeFields, m_DiodeFields, diode.GetParameters());
+            m_Schematic.MarkModified();
+        }
+        ImGui::EndCombo();
+    }
+
+    if (!diode.IsCustom()) {
+        ImGui::TextDisabled("%s", diode.GetModel()->Description);
+        return;
+    }
+    Core::DiodeParameters parameters = diode.GetParameters();
+    const auto is_valid = [&diode](const Core::DiodeParameters &candidate) {
+        return diode.IsValidParameters(candidate);
+    };
+    if (DrawParameterFields(DiodeFields, m_DiodeFields, "", is_valid, parameters)) {
+        diode.SetCustomParameters(parameters);
+        m_Schematic.MarkModified();
+    }
+    const char *breakdown_hint = diode.GetType() == Core::ComponentType::ZenerDiode
+                                     ? "BV is the voltage the Zener regulates at"
+                                     : "BV is the reverse voltage the diode is rated for";
+    ImGui::TextDisabled("%s", breakdown_hint);
 }
 
 void PropertiesWindow::DrawSource(Core::Source &source) {

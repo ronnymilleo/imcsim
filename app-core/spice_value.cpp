@@ -54,6 +54,11 @@ std::string_view Trim(std::string_view text) {
     return text;
 }
 
+// Such a value would read like "9.9e-05f" with the smallest suffix, so it is written in exponent notation instead
+bool IsBelowSuffixes(const double value) {
+    return std::abs(value) < Suffixes.back().Factor;
+}
+
 const ScaleSuffix &ChooseSuffix(const double value) {
     const double magnitude = std::abs(value);
     for (const ScaleSuffix &suffix : Suffixes) {
@@ -107,11 +112,15 @@ std::optional<double> ParseValue(const std::string_view text, const std::string_
 /**
  * @brief   Formats a value for the user, with the suffix that keeps the number between 1 and 1000.
  * @param[in] value  Value to format.
- * @return  Text such as "4.7k", "1M" or "100n", with up to four significant digits. ParseValue() reads it back.
+ * @return  Text such as "4.7k", "1M" or "100n", with up to four significant digits, or exponent notation such as
+ *          "9.9e-20" below the femto range. ParseValue() reads it back.
  */
 std::string FormatValue(const double value) {
     if (value == 0.0) {
         return "0";
+    }
+    if (IsBelowSuffixes(value)) {
+        return std::format("{:.4g}", value);
     }
     const ScaleSuffix &suffix = ChooseSuffix(value);
     return std::format("{:.4g}{}", value / suffix.Factor, suffix.Text);
@@ -125,6 +134,9 @@ std::string FormatValue(const double value) {
 std::string FormatSpiceValue(const double value) {
     if (value == 0.0) {
         return "0";
+    }
+    if (IsBelowSuffixes(value)) {
+        return std::format("{:.4g}", value);
     }
     const ScaleSuffix &suffix = ChooseSuffix(value);
     return std::format("{:.4g}{}", value / suffix.Factor, suffix.SpiceText);
