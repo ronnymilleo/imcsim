@@ -3,6 +3,9 @@
 Immediate Mode Circuit Simulator, built with Dear ImGui, SDL3 and Vulkan. Circuits are simulated with
 [ngspice](https://ngspice.sourceforge.io/).
 
+![imcsim showing three resistive dividers with their node voltages, the selected resistor's properties, the SPICE
+netlist and the operating point results](docs/screenshot.png)
+
 ## Requirements
 
 - Linux with a GPU and driver that support Vulkan
