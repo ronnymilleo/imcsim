@@ -10,6 +10,7 @@
 #include "imgui_impl_sdl3.h"
 #include "imgui_internal.h"
 #include "implot.h"
+#include "theme.h"
 #include <SDL3/SDL.h>
 #include <array>
 #include <cstdio>
@@ -136,7 +137,8 @@ int Application::InitImGui() {
     io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
     io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
 
-    ImGui::StyleColorsDark();
+    ApplyTheme();
+    LoadThemeFonts();
 
     ImGuiStyle &style = ImGui::GetStyle();
     style.ScaleAllSizes(m_SDLWindowScale);
@@ -258,12 +260,11 @@ void Application::SetupDefaultLayout(ImGuiID dockspace_id) {
 }
 
 void Application::EndFrame() {
-    constexpr auto ClearColor = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
     const ImGuiIO &io = ImGui::GetIO();
 
     ImDrawData *main_draw_data = ImGui::GetDrawData();
     const bool main_is_minimized = (main_draw_data->DisplaySize.x <= 0.0f || main_draw_data->DisplaySize.y <= 0.0f);
-    m_Vulkan.SetClearColor(ClearColor);
+    m_Vulkan.SetClearColor(GetThemeBackground());
     if (!main_is_minimized) {
         m_Vulkan.FrameRender(main_draw_data);
     }

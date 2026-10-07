@@ -7,12 +7,12 @@
 
 #include "imgui.h"
 #include "spice_value.h"
+#include "theme.h"
 
 namespace GUI {
 
 namespace {
 
-constexpr ImVec4 ErrorTextColor = {1.0f, 0.4f, 0.4f, 1.0f};
 // In font sizes, so the layout follows the DPI scale
 constexpr float LabelWidth = 6.0f;
 constexpr float InputWidth = 8.0f;
@@ -63,7 +63,7 @@ std::optional<double> ValueField::Draw(const char *label, const std::string &uni
     ImGui::SameLine();
     ImGui::TextUnformatted(unit.c_str());
     if (m_Invalid) {
-        ImGui::TextColored(ErrorTextColor, "Invalid value");
+        ImGui::TextColored(GetErrorTextColor(), "Invalid value");
     }
     return edited;
 }

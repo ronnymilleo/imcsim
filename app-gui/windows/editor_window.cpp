@@ -9,6 +9,7 @@
 #include "node_colors.h"
 #include "schematic_file.h"
 #include "spice_value.h"
+#include "theme.h"
 #include "wire_editing.h"
 #include <algorithm>
 #include <array>
@@ -21,11 +22,12 @@ namespace GUI {
 
 namespace {
 
-constexpr ImU32 BackgroundColor = IM_COL32(30, 30, 35, 255);
-constexpr ImU32 GridDotColor = IM_COL32(90, 90, 100, 255);
+// Warm tones that match the theme; selection stays amber so it is not mistaken for the salmon of node 1
+constexpr ImU32 BackgroundColor = IM_COL32(18, 15, 16, 255);
+constexpr ImU32 GridDotColor = IM_COL32(78, 63, 66, 255);
 constexpr ImU32 ElementColor = IM_COL32(220, 220, 220, 255);
-constexpr ImU32 PreviewColor = IM_COL32(100, 180, 255, 160);
-constexpr ImU32 WireColor = IM_COL32(120, 200, 120, 255);
+constexpr ImU32 PreviewColor = IM_COL32(236, 96, 100, 170);
+constexpr ImU32 WireColor = IM_COL32(158, 192, 120, 255);
 constexpr ImU32 SelectedColor = IM_COL32(255, 200, 80, 255);
 constexpr float MinCanvasSize = 50.0f;
 constexpr float MinZoom = 4.0f;
@@ -210,7 +212,7 @@ void EditorWindow::DrawToolbar() {
         RequestOpen();
     }
     row.Place(ToolbarRow::ButtonWidth("Save"));
-    if (ImGui::Button("Save")) {
+    if (PrimaryButton("Save")) {
         Save();
     }
     row.Place(ToolbarRow::ButtonWidth("Save As"));
@@ -769,7 +771,7 @@ void EditorWindow::DrawFilePopups() {
         for (const std::string &message : m_FileMessages) {
             ImGui::BulletText("%s", message.c_str());
         }
-        if (ImGui::Button("OK")) {
+        if (PrimaryButton("OK")) {
             ImGui::CloseCurrentPopup();
         }
         ImGui::EndPopup();

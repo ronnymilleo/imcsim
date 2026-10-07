@@ -6,6 +6,7 @@
 #include "properties_window.h"
 
 #include "spice_value.h"
+#include "theme.h"
 #include <array>
 #include <cstddef>
 #include <format>
@@ -15,8 +16,6 @@
 namespace GUI {
 
 namespace {
-
-constexpr ImVec4 WarningTextColor = {1.0f, 0.8f, 0.4f, 1.0f};
 
 bool AnyValue(double /*value*/) {
     return true;
@@ -189,7 +188,7 @@ void PropertiesWindow::DrawPulse(Core::Source &source) {
 
     ImGui::TextDisabled("%s", std::format("Repeats at {}Hz", Core::FormatValue(1.0 / pulse.Period)).c_str());
     if (pulse.RiseTime + pulse.Width + pulse.FallTime > pulse.Period) {
-        ImGui::TextColored(WarningTextColor, "Rise, width and fall add up to more than the period");
+        ImGui::TextColored(GetWarningTextColor(), "Rise, width and fall add up to more than the period");
     }
 }
 
