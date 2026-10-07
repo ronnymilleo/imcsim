@@ -425,6 +425,25 @@ const std::optional<Core::ACSweep> &Schematic::GetACSweep() const {
 }
 
 /**
+ * @brief   Stores the result of a DC sweep of the current schematic.
+ * @param[in] sweep  Node voltages and currents along the sweep, numbered like GetConnectivity(), or no value to
+ *                   clear them.
+ * @note    The result is dropped on the next change, since it no longer matches the circuit.
+ */
+void Schematic::SetDCSweep(std::optional<Core::DCSweep> sweep) {
+    m_DCSweep = std::move(sweep);
+    ++m_DCSweepVersion;
+}
+
+/**
+ * @brief   Returns the last DC sweep simulated for the current schematic.
+ * @return  The curves of the sweep, or no value when there was no simulation since the last change.
+ */
+const std::optional<Core::DCSweep> &Schematic::GetDCSweep() const {
+    return m_DCSweep;
+}
+
+/**
  * @brief   Returns a number that changes whenever a transient result is stored.
  * @return  The transient version; compare it with a stored one to know whether the result was replaced.
  */
@@ -440,11 +459,20 @@ std::size_t Schematic::GetACSweepVersion() const {
     return m_ACSweepVersion;
 }
 
+/**
+ * @brief   Returns a number that changes whenever a DC sweep result is stored.
+ * @return  The DC sweep version; compare it with a stored one to know whether the result was replaced.
+ */
+std::size_t Schematic::GetDCSweepVersion() const {
+    return m_DCSweepVersion;
+}
+
 void Schematic::InvalidateDerivedData() {
     m_Connectivity.reset();
     m_OperatingPoint.reset();
     m_Transient.reset();
     m_ACSweep.reset();
+    m_DCSweep.reset();
 }
 
 std::string Schematic::TakeSnapshot() const {

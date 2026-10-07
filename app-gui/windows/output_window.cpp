@@ -1,6 +1,6 @@
 /**
  * @file    output_window.cpp
- * @brief   Window that plots the transient and AC sweep results of the schematic.
+ * @brief   Window that plots the transient, AC sweep and DC sweep results of the schematic.
  */
 
 #include "output_window.h"
@@ -94,6 +94,35 @@ template <typename Key> void DrawAllNoneButtons(const char *id, std::set<Key> &h
     ImGui::PopID();
 }
 
+// Labels the end of every shown curve with the value of the stepped source, so the curves of a family tell apart.
+// Currents sit on the secondary Y axis, like the curves they label
+void LabelCurveEnds(const Core::DCSweep &sweep, const std::set<std::size_t> &hidden_nodes,
+                    const std::set<std::string> &hidden_currents, const bool show_currents) {
+    const std::size_t last = sweep.SweptValues.size() - 1;
+    const double x = sweep.SweptValues[last];
+    const ImVec4 color = ImGui::GetStyleColorVec4(ImGuiCol_PopupBg);
+    for (const Core::DCSweepCurve &curve : sweep.Curves) {
+        const std::string label =
+            std::format("{}={}{}", sweep.SteppedSource, Core::FormatValue(curve.StepValue), sweep.SteppedUnit);
+        for (std::size_t node = 1; node < curve.NodeVoltages.size(); ++node) {
+            if (!hidden_nodes.contains(node)) {
+                ImPlot::Annotation(x, curve.NodeVoltages[node][last], color, ImVec2(4.0f, 0.0f), true, "%s",
+                                   label.c_str());
+            }
+        }
+        if (!show_currents) {
+            continue;
+        }
+        ImPlot::SetAxes(ImAxis_X1, ImAxis_Y2);
+        for (const Core::ComponentTrace &current : curve.Currents) {
+            if (!hidden_currents.contains(current.Name)) {
+                ImPlot::Annotation(x, current.Values[last], color, ImVec2(4.0f, 0.0f), true, "%s", label.c_str());
+            }
+        }
+        ImPlot::SetAxes(ImAxis_X1, ImAxis_Y1);
+    }
+}
+
 // Returns whether the current axis has just appeared: it did not exist when the axes last fitted, so its range
 // is meaningless until it is fitted too
 bool TakeCurrentAxisAppeared(bool &showed_currents, const bool show_currents) {
@@ -118,14 +147,22 @@ OutputWindow::OutputWindow(Schematic &schematic) : AppWindow("Output", true), m_
 void OutputWindow::Draw() {
     const auto &transient = m_Schematic.GetTransient();
     const auto &sweep = m_Schematic.GetACSweep();
-    // Both results come from the same circuit, so they have the same nodes and components
+    const auto &dc_sweep = m_Schematic.GetDCSweep();
+    // Every result comes from the same circuit, so they have the same nodes and components
     const std::size_t node_count =
-        std::max(transient ? transient->NodeVoltages.size() : 0, sweep ? sweep->NodeMagnitudesDecibels.size() : 0);
+        std::max({transient ? transient->NodeVoltages.size() : 0, sweep ? sweep->NodeMagnitudesDecibels.size() : 0,
+                  dc_sweep ? dc_sweep->Curves.front().NodeVoltages.size() : 0});
     static const std::vector<Core::ComponentTrace> no_currents;
-    const std::vector<Core::ComponentTrace> &currents =
-        transient ? transient->Currents : (sweep ? sweep->CurrentMagnitudesDecibels : no_currents);
-    if (node_count > 1 || !currents.empty()) {
-        DrawTraceList(node_count, currents);
+    const std::vector<Core::ComponentTrace> *currents = &no_currents;
+    if (transient) {
+        currents = &transient->Currents;
+    } else if (sweep) {
+        currents = &sweep->CurrentMagnitudesDecibels;
+    } else if (dc_sweep) {
+        currents = &dc_sweep->Curves.front().Currents;
+    }
+    if (node_count > 1 || !currents->empty()) {
+        DrawTraceList(node_count, *currents);
         ImGui::SameLine();
     }
 
@@ -149,6 +186,14 @@ void OutputWindow::Draw() {
             DrawACSweep(*sweep);
         } else {
             ImGui::TextDisabled("No AC sweep for the current circuit; run one in the Simulation window");
+        }
+        ImGui::EndTabItem();
+    }
+    if (ImGui::BeginTabItem("DC sweep")) {
+        if (dc_sweep) {
+            DrawDCSweep(*dc_sweep);
+        } else {
+            ImGui::TextDisabled("No DC sweep for the current circuit; run one in the Simulation window");
         }
         ImGui::EndTabItem();
     }
@@ -272,6 +317,42 @@ void OutputWindow::DrawACSweep(const Core::ACSweep &sweep) {
         }
         ImPlot::EndPlot();
     }
+}
+
+// Every curve of a family plots under the same label, so a trace keeps one color and one legend entry
+void OutputWindow::DrawDCSweep(const Core::DCSweep &sweep) {
+    const Core::DCSweepCurve &first_curve = sweep.Curves.front();
+    const bool show_currents = HasShownCurrent(first_curve.Currents, m_HiddenCurrents);
+    const bool current_axis_appeared = TakeCurrentAxisAppeared(m_DCSweepShowedCurrents, show_currents);
+    if (TakeFit(m_FittedDCSweep, m_Schematic.GetDCSweepVersion())) {
+        ImPlot::SetNextAxesToFit();
+    } else if (current_axis_appeared) {
+        ImPlot::SetNextAxisToFit(ImAxis_Y2);
+    }
+    if (!sweep.SteppedSource.empty()) {
+        ImGui::TextDisabled("%s",
+                            std::format("One curve per value of {}, labeled at its end", sweep.SteppedSource).c_str());
+    }
+    if (!ImPlot::BeginPlot("##dc", ImVec2(-1.0f, PlotHeight(1)))) {
+        return;
+    }
+    ImPlot::SetupAxes(sweep.SweptSource.c_str(), "Voltage");
+    ImPlot::SetupAxisFormat(ImAxis_X1, FormatAxisValue, const_cast<char *>(sweep.SweptUnit.c_str()));
+    ImPlot::SetupAxisFormat(ImAxis_Y1, FormatAxisValue, const_cast<char *>("V"));
+    if (show_currents) {
+        ImPlot::SetupAxis(ImAxis_Y2, "Current", ImPlotAxisFlags_AuxDefault);
+        ImPlot::SetupAxisFormat(ImAxis_Y2, FormatAxisValue, const_cast<char *>("A"));
+    }
+    for (const Core::DCSweepCurve &curve : sweep.Curves) {
+        PlotNodes(sweep.SweptValues, curve.NodeVoltages, m_HiddenNodes);
+        if (show_currents) {
+            PlotCurrents(sweep.SweptValues, curve.Currents, m_HiddenCurrents);
+        }
+    }
+    if (!sweep.SteppedSource.empty()) {
+        LabelCurveEnds(sweep, m_HiddenNodes, m_HiddenCurrents, show_currents);
+    }
+    ImPlot::EndPlot();
 }
 
 } // namespace GUI

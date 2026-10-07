@@ -84,8 +84,11 @@ public:
     const std::optional<Core::Transient> &GetTransient() const;
     void SetACSweep(std::optional<Core::ACSweep> sweep);
     const std::optional<Core::ACSweep> &GetACSweep() const;
+    void SetDCSweep(std::optional<Core::DCSweep> sweep);
+    const std::optional<Core::DCSweep> &GetDCSweep() const;
     std::size_t GetTransientVersion() const;
     std::size_t GetACSweepVersion() const;
+    std::size_t GetDCSweepVersion() const;
 
 private:
     // Content
@@ -114,9 +117,11 @@ private:
     std::optional<Core::OperatingPoint> m_OperatingPoint;
     std::optional<Core::Transient> m_Transient;
     std::optional<Core::ACSweep> m_ACSweep;
+    std::optional<Core::DCSweep> m_DCSweep;
     // Change with every new result, so windows can tell a rerun from the result they already showed
     std::size_t m_TransientVersion = 0;
     std::size_t m_ACSweepVersion = 0;
+    std::size_t m_DCSweepVersion = 0;
 
     void InvalidateDerivedData();
     std::string TakeSnapshot() const;

@@ -10,6 +10,7 @@
 #include "simulator.h"
 #include "value_field.h"
 #include "windows/app_window.h"
+#include <array>
 #include <optional>
 #include <string>
 #include <vector>
@@ -56,17 +57,28 @@ private:
     ValueField m_StopFrequency;
     RunStatus m_ACSweepStatus;
 
+    // DC sweep; the stepped range keeps its values while stepping is off
+    Core::SweepRange m_SweptRange;
+    Core::SweepRange m_SteppedRange{.Start = 0.0, .Stop = 5.0, .Step = 1.0};
+    bool m_StepSource = false;
+    // Start, stop and step of each range
+    std::array<ValueField, 3> m_SweptFields;
+    std::array<ValueField, 3> m_SteppedFields;
+    RunStatus m_DCSweepStatus;
+
     void Draw() override;
 
     // Tabs
     void DrawOperatingPointTab();
     void DrawTransientTab();
     void DrawACSweepTab();
+    void DrawDCSweepTab();
 
     // Runs
     void RunOperatingPoint();
     void RunTransient();
     void RunACSweep();
+    void RunDCSweep();
 
     // Results
     void DrawNodeVoltages(const Core::OperatingPoint &operating_point) const;

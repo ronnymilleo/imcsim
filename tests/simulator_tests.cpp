@@ -1019,3 +1019,136 @@ TEST_CASE("An NMOS that is off conducts in reverse through its body diode", "[si
     CHECK_THAT(FindCurrent(run.Result->Currents, "M1.D").Current,
                Catch::Matchers::WithinRel((-5.0 - drain_voltage) / 100.0, 1e-6));
 }
+
+TEST_CASE("A DC sweep of a supply follows the divider ratio at every point", "[simulator]") {
+    const Divider divider;
+    const Core::DCSweepRun run =
+        Core::RunDCSweep(divider.Circuit, {.Swept = {.Source = "V1", .Start = 0.0, .Stop = 10.0, .Step = 1.0}});
+    if (!run.Result) {
+        FAIL(run.Result.error());
+    }
+    const Core::DCSweep &sweep = *run.Result;
+    CHECK(sweep.SweptSource == "V1");
+    CHECK(sweep.SweptUnit == "V");
+    CHECK(sweep.SteppedSource.empty());
+    REQUIRE(sweep.SweptValues.size() == 11);
+    REQUIRE(sweep.Curves.size() == 1);
+    const Core::DCSweepCurve &curve = sweep.Curves[0];
+    for (std::size_t index = 0; index < sweep.SweptValues.size(); ++index) {
+        const double supply = sweep.SweptValues[index];
+        CHECK_THAT(supply, Catch::Matchers::WithinAbs(static_cast<double>(index), 1e-9));
+        CHECK_THAT(curve.NodeVoltages[2][index], Catch::Matchers::WithinAbs(0.75 * supply, 1e-9));
+        CHECK_THAT(FindCurrent(curve.Currents, "R1").Values[index], Catch::Matchers::WithinAbs(supply / 4e3, 1e-12));
+    }
+}
+
+TEST_CASE("A DC sweep can drive a current source", "[simulator]") {
+    Core::CurrentSource source;
+    source.SetName("I1");
+    Core::Resistor load;
+    load.SetName("R1");
+    const Core::Ground reference;
+    Core::Circuit circuit;
+    circuit.Add(source, {0, 1});
+    circuit.Add(load, {1, 0});
+    circuit.Add(reference, {0});
+
+    const Core::DCSweepRun run =
+        Core::RunDCSweep(circuit, {.Swept = {.Source = "I1", .Start = 0.0, .Stop = 2e-3, .Step = 0.5e-3}});
+    if (!run.Result) {
+        FAIL(run.Result.error());
+    }
+    CHECK(run.Result->SweptUnit == "A");
+    REQUIRE(run.Result->SweptValues.size() == 5);
+    for (std::size_t index = 0; index < 5; ++index) {
+        CHECK_THAT(run.Result->Curves[0].NodeVoltages[1][index],
+                   Catch::Matchers::WithinAbs(run.Result->SweptValues[index] * 1e3, 1e-9));
+    }
+}
+
+TEST_CASE("A DC sweep traces the I-V curve of a diode", "[simulator]") {
+    DiodeLoop loop(Core::ComponentType::Diode, 1.0, 10.0);
+    const Core::DCSweepRun run =
+        Core::RunDCSweep(loop.Circuit, {.Swept = {.Source = "V1", .Start = 0.0, .Stop = 1.0, .Step = 0.01}});
+    if (!run.Result) {
+        FAIL(run.Result.error());
+    }
+    const std::vector<double> &current = FindCurrent(run.Result->Curves[0].Currents, "D1").Values;
+    REQUIRE(current.size() == 101);
+    // Barely any current at 0.2 V, below the knee, and well over a milliampere once the supply passes it
+    CHECK(current[20] < 1e-6);
+    CHECK(current[100] > 1e-3);
+    CHECK(std::ranges::is_sorted(current));
+}
+
+TEST_CASE("A stepped DC sweep draws the collector characteristics of a BJT", "[simulator]") {
+    // VCE swept on the collector, with the base current stepped from 10 uA to 30 uA
+    Core::VCC collector;
+    collector.SetName("V1");
+    Core::CurrentSource base;
+    base.SetName("I1");
+    Core::BJT transistor(Core::ComponentType::NPN);
+    transistor.SetName("Q1");
+    const Core::Ground reference;
+    Core::Circuit circuit;
+    circuit.Add(collector, {1});
+    circuit.Add(base, {0, 2});
+    circuit.Add(transistor, {1, 2, 0});
+    circuit.Add(reference, {0});
+
+    const Core::DCSweepRun run = Core::RunDCSweep(
+        circuit, {.Swept = {.Source = "V1", .Start = 0.0, .Stop = 5.0, .Step = 0.05},
+                  .Stepped = Core::SweepRange{.Source = "I1", .Start = 10e-6, .Stop = 30e-6, .Step = 10e-6}});
+    if (!run.Result) {
+        FAIL(run.Result.error());
+    }
+    const Core::DCSweep &sweep = *run.Result;
+    CHECK(sweep.SteppedSource == "I1");
+    CHECK(sweep.SteppedUnit == "A");
+    REQUIRE(sweep.Curves.size() == 3);
+    double previous_current = 0.0;
+    for (std::size_t step = 0; step < sweep.Curves.size(); ++step) {
+        const Core::DCSweepCurve &curve = sweep.Curves[step];
+        CHECK_THAT(curve.StepValue, Catch::Matchers::WithinRel(10e-6 * static_cast<double>(step + 1), 1e-9));
+        const std::vector<double> &collector_current = FindCurrent(curve.Currents, "Q1.C").Values;
+        REQUIRE(collector_current.size() == sweep.SweptValues.size());
+        // Each curve rises from saturation to the active region, where it sits at about BF times the base current
+        CHECK(std::abs(collector_current.front()) < 0.1 * collector_current.back());
+        const double gain = collector_current.back() / curve.StepValue;
+        CHECK(gain > 100.0);
+        CHECK(gain < 500.0);
+        CHECK(collector_current.back() > previous_current);
+        previous_current = collector_current.back();
+    }
+}
+
+TEST_CASE("Invalid DC sweep settings are rejected before reaching ngspice", "[simulator]") {
+    const Divider divider;
+    const auto error_of = [&divider](const Core::DCSweepSettings &settings) {
+        const Core::DCSweepRun run = Core::RunDCSweep(divider.Circuit, settings);
+        REQUIRE_FALSE(run.Result);
+        CHECK(run.Messages.empty());
+        return run.Result.error();
+    };
+    CHECK(error_of({.Swept = {.Source = ""}}).starts_with("Pick the swept source"));
+    CHECK(error_of({.Swept = {.Source = "R1"}}).contains("not a voltage source"));
+    CHECK(error_of({.Swept = {.Source = "V9"}}).contains("not a voltage source"));
+    CHECK(error_of({.Swept = {.Source = "V1", .Start = 1.0, .Stop = 1.0}}).contains("must differ"));
+    CHECK(error_of({.Swept = {.Source = "V1", .Step = 0.0}}).contains("toward its stop value"));
+    CHECK(error_of({.Swept = {.Source = "V1", .Step = -0.1}}).contains("toward its stop value"));
+    CHECK(error_of({.Swept = {.Source = "V1", .Step = 1e-6}}).contains("more than"));
+    CHECK(error_of({.Swept = {.Source = "V1"}, .Stepped = Core::SweepRange{.Source = "V1"}})
+              .contains("must differ from the swept one"));
+    // A downward sweep is fine
+    const Core::DCSweepRun downward =
+        Core::RunDCSweep(divider.Circuit, {.Swept = {.Source = "V1", .Start = 5.0, .Stop = 0.0, .Step = -1.0}});
+    REQUIRE(downward.Result);
+    CHECK(downward.Result->SweptValues.front() == 5.0);
+}
+
+TEST_CASE("Only supplies and independent sources can be swept", "[simulator]") {
+    const Divider divider;
+    CHECK(Core::GetSweepableSources(divider.Circuit) == std::vector<std::string>{"V1"});
+    const LowPass low_pass;
+    CHECK(Core::GetSweepableSources(low_pass.Circuit) == std::vector<std::string>{"Vin1"});
+}

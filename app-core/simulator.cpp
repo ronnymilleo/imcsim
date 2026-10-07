@@ -34,6 +34,7 @@ constexpr std::string_view ErrorPrefix = "stderr ";
 // Limits that keep a mistyped setting from running for minutes or exhausting memory
 constexpr int MaxTransientPoints = 1000000;
 constexpr int MaxPointsPerDecade = 1000;
+constexpr int MaxDCSweepPoints = 100000;
 // 1e-15 V is -300 dB
 constexpr double MinMagnitude = 1e-15;
 
@@ -158,6 +159,65 @@ std::optional<std::string> CheckACSweepSettings(const Circuit &circuit, const AC
     }
     if (!circuit.HasACSource()) {
         return "An AC sweep needs an AC source; select a voltage or current source and set it to AC";
+    }
+    return std::nullopt;
+}
+
+// The sources a DC sweep can drive: independent voltage and current sources, and supply rails
+bool IsSweepable(const ComponentType type) {
+    return type == ComponentType::VCC || type == ComponentType::VoltageSource || type == ComponentType::CurrentSource;
+}
+
+const Component *FindSweepableSource(const Circuit &circuit, const std::string_view name) {
+    const auto entry = std::ranges::find_if(circuit.GetEntries(), [name](const CircuitEntry &candidate) {
+        return candidate.Part->GetName() == name && IsSweepable(candidate.Part->GetType());
+    });
+    return entry != circuit.GetEntries().end() ? entry->Part : nullptr;
+}
+
+const char *SourceUnit(const Component &source) {
+    return source.GetType() == ComponentType::CurrentSource ? "A" : "V";
+}
+
+// Values from start to stop, both included, as ngspice counts them
+double SweepPointCount(const SweepRange &range) {
+    return std::floor((range.Stop - range.Start) / range.Step + 1e-9) + 1.0;
+}
+
+std::optional<std::string> CheckSweepRange(const Circuit &circuit, const SweepRange &range, const char *role) {
+    if (range.Source.empty()) {
+        return std::format("Pick the {} source", role);
+    }
+    if (FindSweepableSource(circuit, range.Source) == nullptr) {
+        return std::format("The {} source {} is not a voltage source, current source or VCC in the circuit", role,
+                           range.Source);
+    }
+    if (range.Start == range.Stop) {
+        return std::format("The start and stop values of the {} source must differ", role);
+    }
+    if (range.Step == 0.0 || (range.Stop - range.Start) / range.Step < 0.0) {
+        return std::format("The step of the {} source must go from its start value toward its stop value", role);
+    }
+    return std::nullopt;
+}
+
+std::optional<std::string> CheckDCSweepSettings(const Circuit &circuit, const DCSweepSettings &settings) {
+    if (std::optional<std::string> error = CheckSweepRange(circuit, settings.Swept, "swept")) {
+        return error;
+    }
+    double point_count = SweepPointCount(settings.Swept);
+    if (settings.Stepped) {
+        if (std::optional<std::string> error = CheckSweepRange(circuit, *settings.Stepped, "stepped")) {
+            return error;
+        }
+        if (settings.Stepped->Source == settings.Swept.Source) {
+            return "The stepped source must differ from the swept one";
+        }
+        point_count *= SweepPointCount(*settings.Stepped);
+    }
+    if (point_count > MaxDCSweepPoints) {
+        return std::format("The steps are too small for the ranges: they would produce more than {} points",
+                           MaxDCSweepPoints);
     }
     return std::nullopt;
 }
@@ -586,6 +646,77 @@ std::expected<ACSweep, std::string> ReadACSweep(const Circuit &circuit) {
     return result;
 }
 
+// The swept values repeat once per value of the stepped source, so the curves are the stretches between repeats
+std::expected<DCSweep, std::string> ReadDCSweep(const Circuit &circuit, const DCSweepSettings &settings) {
+    const Component &swept = *FindSweepableSource(circuit, settings.Swept.Source);
+    const pvector_info scale = FindVector(swept.GetType() == ComponentType::CurrentSource ? "i-sweep" : "v-sweep");
+    if (scale == nullptr) {
+        return std::unexpected("ngspice returned no swept values");
+    }
+    const std::vector<double> all_values = RealPart(*scale);
+    const auto repeat = std::ranges::find(all_values.begin() + 1, all_values.end(), all_values.front());
+    const auto curve_length = static_cast<std::size_t>(repeat - all_values.begin());
+    if (all_values.size() % curve_length != 0) {
+        return std::unexpected("ngspice returned curves of different lengths");
+    }
+
+    DCSweep result;
+    result.SweptSource = swept.GetName();
+    result.SweptUnit = SourceUnit(swept);
+    result.SweptValues.assign(all_values.begin(), repeat);
+    if (settings.Stepped) {
+        result.SteppedSource = settings.Stepped->Source;
+        result.SteppedUnit = SourceUnit(*FindSweepableSource(circuit, settings.Stepped->Source));
+    }
+    const std::size_t curve_count = all_values.size() / curve_length;
+    result.Curves.resize(curve_count);
+    for (std::size_t curve = 0; curve < curve_count; ++curve) {
+        if (settings.Stepped) {
+            result.Curves[curve].StepValue =
+                settings.Stepped->Start + static_cast<double>(curve) * settings.Stepped->Step;
+        }
+        result.Curves[curve].NodeVoltages.resize(static_cast<std::size_t>(circuit.GetNodeCount()));
+    }
+
+    // Splits a vector that holds every curve back to back
+    const auto split = [&](const std::vector<double> &values, const auto &store) {
+        for (std::size_t curve = 0; curve < curve_count; ++curve) {
+            const auto begin = values.begin() + static_cast<std::ptrdiff_t>(curve * curve_length);
+            store(result.Curves[curve], std::vector<double>(begin, begin + static_cast<std::ptrdiff_t>(curve_length)));
+        }
+    };
+    for (int node = 0; node < circuit.GetNodeCount(); ++node) {
+        std::vector<double> voltages(all_values.size(), 0.0);
+        if (node > 0) {
+            const pvector_info vector = FindVector(std::format("v({})", node));
+            if (vector == nullptr || vector->v_length != scale->v_length) {
+                return std::unexpected(std::format("ngspice returned no voltages for node {}", node));
+            }
+            voltages = RealPart(*vector);
+        }
+        split(voltages, [node](DCSweepCurve &curve, std::vector<double> values) {
+            curve.NodeVoltages[static_cast<std::size_t>(node)] = std::move(values);
+        });
+    }
+    for (const CircuitEntry &entry : circuit.GetEntries()) {
+        for (const CurrentVector &current : CurrentVectors(*entry.Part)) {
+            const pvector_info vector = FindVector(current.VectorName);
+            if (vector == nullptr || vector->v_length != scale->v_length) {
+                return std::unexpected(std::format("ngspice returned no currents for {}", current.TraceName));
+            }
+            split(RealPart(*vector), [&current](DCSweepCurve &curve, std::vector<double> values) {
+                curve.Currents.push_back({current.TraceName, std::move(values)});
+            });
+        }
+    }
+    return result;
+}
+
+std::string FormatSweepRange(const SweepRange &range) {
+    return std::format("{} {} {} {}", range.Source, FormatSpiceValue(range.Start), FormatSpiceValue(range.Stop),
+                       FormatSpiceValue(range.Step));
+}
+
 // Runs one analysis on a clean library. Return codes stay 0 even when the netlist is rejected, so success is
 // told by the plot the run created, whose name starts with the analysis (op1, tran1, ac1)
 template <typename Data, typename Reader>
@@ -673,6 +804,45 @@ ACSweepRun RunACSweep(const Circuit &circuit, const ACSweepSettings &settings) {
         std::format(".ac dec {} {} {}", settings.PointsPerDecade, FormatSpiceValue(settings.StartFrequency),
                     FormatSpiceValue(settings.StopFrequency));
     return Simulate<ACSweep>(circuit, analysis, "ac", [&circuit] { return ReadACSweep(circuit); });
+}
+
+/**
+ * @brief   Sweeps a source through a range of DC values and finds the operating point at each one.
+ * @param[in] circuit   Circuit to simulate; it needs a ground component.
+ * @param[in] settings  Swept source and range, and optionally a second source stepped once per curve.
+ * @return  The node voltages and currents along the sweep, one curve per stepped value, or an error, plus every
+ *          line ngspice printed. Invalid settings are rejected before reaching ngspice.
+ * @note    AC and pulse sources are swept through their DC value. Not thread-safe: ngspice is a single global
+ *          library instance.
+ */
+DCSweepRun RunDCSweep(const Circuit &circuit, const DCSweepSettings &settings) {
+    std::optional<std::string> error = CheckCircuit(circuit);
+    if (!error) {
+        error = CheckDCSweepSettings(circuit, settings);
+    }
+    if (error) {
+        return {std::unexpected(*error), {}};
+    }
+    std::string analysis = std::format(".dc {}", FormatSweepRange(settings.Swept));
+    if (settings.Stepped) {
+        analysis += std::format(" {}", FormatSweepRange(*settings.Stepped));
+    }
+    return Simulate<DCSweep>(circuit, analysis, "dc", [&circuit, &settings] { return ReadDCSweep(circuit, settings); });
+}
+
+/**
+ * @brief   Lists the sources a DC sweep can drive.
+ * @param[in] circuit  Circuit to look in.
+ * @return  Names of its voltage sources, current sources and VCC rails, in circuit order.
+ */
+std::vector<std::string> GetSweepableSources(const Circuit &circuit) {
+    std::vector<std::string> names;
+    for (const CircuitEntry &entry : circuit.GetEntries()) {
+        if (IsSweepable(entry.Part->GetType())) {
+            names.push_back(entry.Part->GetName());
+        }
+    }
+    return names;
 }
 
 } // namespace Core
