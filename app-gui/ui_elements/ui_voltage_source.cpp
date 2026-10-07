@@ -27,8 +27,10 @@ constexpr float SignOffset = 0.4f;
 constexpr float IECPlusPosition = 1.4f;
 constexpr float IECPlusHeight = 0.4f;
 constexpr int SineSegmentCount = 16;
-constexpr float SineHalfWidth = 0.5f;
-constexpr float SineAmplitude = 0.3f;
+constexpr float WaveHalfWidth = 0.5f;
+constexpr float WaveAmplitude = 0.3f;
+// The pulse stays high for the middle half of the box the waves are drawn in
+constexpr float PulseHalfWidth = 0.25f;
 // Same distance as the default labels of two-terminal symbols
 constexpr float LabelOffset = 1.0f;
 
@@ -58,11 +60,20 @@ void UIVoltageSource::DrawSymbol(ImDrawList *draw_list, const ViewTransform &vie
         std::array<ImVec2, SineSegmentCount + 1> sine;
         for (int point = 0; point <= SineSegmentCount; ++point) {
             const float fraction = static_cast<float>(point) / SineSegmentCount;
-            const float x = -SineHalfWidth + 2.0f * SineHalfWidth * fraction;
-            const float y = -SineAmplitude * std::sin(2.0f * std::numbers::pi_v<float> * fraction);
+            const float x = -WaveHalfWidth + 2.0f * WaveHalfWidth * fraction;
+            const float y = -WaveAmplitude * std::sin(2.0f * std::numbers::pi_v<float> * fraction);
             sine[point] = LocalToScreen(view, x, y);
         }
         draw_list->AddPolyline(sine.data(), static_cast<int>(sine.size()), color, ImDrawFlags_None, LineThickness);
+        return;
+    }
+    if (source.GetSourceType() == Core::VoltageSource::SourceType::Pulse) {
+        // Screen Y grows downwards, so the high level has the negative Y
+        const std::array<ImVec2, 6> pulse = {
+            LocalToScreen(view, -WaveHalfWidth, WaveAmplitude),   LocalToScreen(view, -PulseHalfWidth, WaveAmplitude),
+            LocalToScreen(view, -PulseHalfWidth, -WaveAmplitude), LocalToScreen(view, PulseHalfWidth, -WaveAmplitude),
+            LocalToScreen(view, PulseHalfWidth, WaveAmplitude),   LocalToScreen(view, WaveHalfWidth, WaveAmplitude)};
+        draw_list->AddPolyline(pulse.data(), static_cast<int>(pulse.size()), color, ImDrawFlags_None, LineThickness);
         return;
     }
 
@@ -86,17 +97,27 @@ void UIVoltageSource::DrawSymbol(ImDrawList *draw_list, const ViewTransform &vie
                        color, LineThickness);
 }
 
-// An AC source ignores its DC value, so it is labeled by its sine instead
+// AC and pulse sources ignore their DC value, so they are labeled by their waveform instead
 void UIVoltageSource::DrawLabels(ImDrawList *draw_list, const ViewTransform &view, const ImU32 color) const {
     const auto &source = static_cast<const Core::VoltageSource &>(GetComponent());
-    if (source.GetSourceType() == Core::VoltageSource::SourceType::DC) {
+    std::string waveform;
+    switch (source.GetSourceType()) {
+    case Core::VoltageSource::SourceType::DC:
         UIElement::DrawLabels(draw_list, view, color);
         return;
+    case Core::VoltageSource::SourceType::AC:
+        waveform =
+            std::format("{}V {}Hz", Core::FormatValue(source.GetAmplitude()), Core::FormatValue(source.GetFrequency()));
+        break;
+    case Core::VoltageSource::SourceType::Pulse: {
+        const Core::PulseParameters &pulse = source.GetPulse();
+        waveform = std::format("{}V/{}V {}Hz", Core::FormatValue(pulse.Low), Core::FormatValue(pulse.High),
+                               Core::FormatValue(1.0 / pulse.Period));
+        break;
     }
-    const std::string sine =
-        std::format("{}V {}Hz", Core::FormatValue(source.GetAmplitude()), Core::FormatValue(source.GetFrequency()));
+    }
     DrawLabel(draw_list, view, {0.0f, -LabelOffset}, {0.0f, -1.0f}, source.GetName(), color);
-    DrawLabel(draw_list, view, {0.0f, LabelOffset}, {0.0f, 1.0f}, sine, color);
+    DrawLabel(draw_list, view, {0.0f, LabelOffset}, {0.0f, 1.0f}, waveform, color);
 }
 
 } // namespace GUI

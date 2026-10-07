@@ -98,9 +98,37 @@ void VoltageSource::SetOffset(const double offset) {
 }
 
 /**
+ * @brief   Returns the shape of the pulse.
+ * @return  Levels in volts and times in seconds.
+ */
+const PulseParameters &VoltageSource::GetPulse() const {
+    return m_Pulse;
+}
+
+/**
+ * @brief   Changes the shape of the pulse.
+ * @param[in] pulse  New levels and times; check them with IsValidPulse() first.
+ */
+void VoltageSource::SetPulse(const PulseParameters &pulse) {
+    m_Pulse = pulse;
+}
+
+/**
+ * @brief   Checks whether a pulse can be simulated.
+ * @param[in] pulse  Candidate levels and times.
+ * @return  True when no time is negative and the period is positive. Levels can be any value.
+ * @note    A period shorter than the rise, width and fall together is accepted, as ngspice does, but the pulse
+ *          then never reaches its full shape.
+ */
+bool VoltageSource::IsValidPulse(const PulseParameters &pulse) const {
+    return pulse.Delay >= 0.0 && pulse.RiseTime >= 0.0 && pulse.FallTime >= 0.0 && pulse.Width >= 0.0 &&
+           pulse.Period > 0.0;
+}
+
+/**
  * @brief   Returns a readable name for a source type.
  * @param[in] type  Source type.
- * @return  "DC" or "AC"; ParseSourceType() reads it back.
+ * @return  "DC", "AC" or "Pulse"; ParseSourceType() reads it back.
  */
 const char *GetSourceTypeName(const VoltageSource::SourceType type) {
     switch (type) {
@@ -108,6 +136,8 @@ const char *GetSourceTypeName(const VoltageSource::SourceType type) {
         return "DC";
     case VoltageSource::SourceType::AC:
         return "AC";
+    case VoltageSource::SourceType::Pulse:
+        return "Pulse";
     }
     return "Unknown";
 }
@@ -118,7 +148,8 @@ const char *GetSourceTypeName(const VoltageSource::SourceType type) {
  * @return  The matching type, or no value for an unknown name.
  */
 std::optional<VoltageSource::SourceType> ParseSourceType(const std::string_view text) {
-    for (const VoltageSource::SourceType type : {VoltageSource::SourceType::DC, VoltageSource::SourceType::AC}) {
+    for (const VoltageSource::SourceType type :
+         {VoltageSource::SourceType::DC, VoltageSource::SourceType::AC, VoltageSource::SourceType::Pulse}) {
         if (text == GetSourceTypeName(type)) {
             return type;
         }

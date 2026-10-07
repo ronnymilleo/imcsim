@@ -8,6 +8,7 @@
 #include "components/voltage_source.h"
 #include "element_factory.h"
 #include "nlohmann/json.hpp"
+#include <array>
 #include <format>
 #include <fstream>
 #include <optional>
@@ -20,6 +21,25 @@ namespace {
 
 constexpr std::string_view FormatName = "imcsim-schematic";
 constexpr int FormatVersion = 1;
+
+/**
+ * @struct  PulseKey
+ * @brief   JSON key of one pulse parameter and the member it is read into.
+ */
+struct PulseKey {
+    const char *Name;
+    double Core::PulseParameters::*Value;
+};
+
+constexpr auto PulseKeys = std::to_array<PulseKey>({
+    {"low", &Core::PulseParameters::Low},
+    {"high", &Core::PulseParameters::High},
+    {"delay", &Core::PulseParameters::Delay},
+    {"rise", &Core::PulseParameters::RiseTime},
+    {"fall", &Core::PulseParameters::FallTime},
+    {"width", &Core::PulseParameters::Width},
+    {"period", &Core::PulseParameters::Period},
+});
 
 // Readers return no value when the key is missing or holds another type, so a damaged file never throws
 std::optional<int> ReadInt(const nlohmann::json &object, const char *key) {
@@ -69,18 +89,23 @@ nlohmann::json WriteElement(const UIElement &element) {
     if (component.HasValue()) {
         object["value"] = component.GetValue();
     }
-    // Both waveforms are saved, so switching type after loading keeps the other one's parameters
+    // Every waveform is saved, so switching type after loading keeps the parameters of the others
     if (component.GetType() == Core::ComponentType::VoltageSource) {
         const auto &source = static_cast<const Core::VoltageSource &>(component);
         object["source"] = Core::GetSourceTypeName(source.GetSourceType());
         object["amplitude"] = source.GetAmplitude();
         object["frequency"] = source.GetFrequency();
         object["offset"] = source.GetOffset();
+        nlohmann::json pulse = nlohmann::json::object();
+        for (const PulseKey &key : PulseKeys) {
+            pulse[key.Name] = source.GetPulse().*key.Value;
+        }
+        object["pulse"] = pulse;
     }
     return object;
 }
 
-// Every key is optional, so files saved before sources had a type load as DC with the default sine
+// Every key is optional, so files saved before sources had a type load as DC with the default sine and pulse
 std::expected<void, std::string> ReadVoltageSource(const nlohmann::json &object, Core::VoltageSource &source) {
     if (object.contains("source")) {
         const std::optional<std::string> type_name = ReadString(object, "source");
@@ -111,6 +136,26 @@ std::expected<void, std::string> ReadVoltageSource(const nlohmann::json &object,
             return std::unexpected("has no valid offset");
         }
         source.SetOffset(*offset);
+    }
+    if (const auto pulse_object = object.find("pulse"); pulse_object != object.end()) {
+        if (!pulse_object->is_object()) {
+            return std::unexpected("has a pulse that is not an object");
+        }
+        Core::PulseParameters pulse = source.GetPulse();
+        for (const PulseKey &key : PulseKeys) {
+            if (!pulse_object->contains(key.Name)) {
+                continue;
+            }
+            const std::optional<double> value = ReadNumber(*pulse_object, key.Name);
+            if (!value) {
+                return std::unexpected(std::format("has no valid pulse {}", key.Name));
+            }
+            pulse.*key.Value = *value;
+        }
+        if (!source.IsValidPulse(pulse)) {
+            return std::unexpected("has a pulse with a negative time or a period that is not positive");
+        }
+        source.SetPulse(pulse);
     }
     return {};
 }

@@ -106,8 +106,27 @@ TEST_CASE("A voltage source keeps its sine parameters while switching type", "[c
 }
 
 TEST_CASE("Source type names convert both ways", "[component]") {
-    for (const auto type : {Core::VoltageSource::SourceType::DC, Core::VoltageSource::SourceType::AC}) {
+    for (const auto type : {Core::VoltageSource::SourceType::DC, Core::VoltageSource::SourceType::AC,
+                            Core::VoltageSource::SourceType::Pulse}) {
         CHECK(Core::ParseSourceType(Core::GetSourceTypeName(type)) == type);
     }
     CHECK_FALSE(Core::ParseSourceType("ac"));
+}
+
+TEST_CASE("A pulse needs non-negative times and a positive period", "[component]") {
+    const Core::VoltageSource source;
+    const Core::PulseParameters pulse;
+    CHECK(source.IsValidPulse(pulse));
+    CHECK(source.IsValidPulse({.Low = 5.0, .High = -5.0}));
+    CHECK(source.IsValidPulse({.RiseTime = 0.0, .FallTime = 0.0, .Width = 0.0}));
+
+    Core::PulseParameters invalid = pulse;
+    invalid.Delay = -1e-3;
+    CHECK_FALSE(source.IsValidPulse(invalid));
+    invalid = pulse;
+    invalid.RiseTime = -1e-9;
+    CHECK_FALSE(source.IsValidPulse(invalid));
+    invalid = pulse;
+    invalid.Period = 0.0;
+    CHECK_FALSE(source.IsValidPulse(invalid));
 }

@@ -156,3 +156,33 @@ TEST_CASE("A voltage source without a type loads as DC, and an invalid one is sk
     CHECK(source.GetValue() == 3.0);
     CHECK(loaded.Warnings.size() == 2);
 }
+
+TEST_CASE("A pulse source keeps its pulse, and an invalid pulse is skipped", "[schematic_file]") {
+    std::vector<std::unique_ptr<GUI::UIElement>> elements;
+    elements.push_back(GUI::CreateElement(Core::ComponentType::VoltageSource, {0, 0}, GUI::Rotation::R0));
+    auto &source = static_cast<Core::VoltageSource &>(elements.back()->GetComponent());
+    source.SetName("Vin1");
+    source.SetSourceType(Core::VoltageSource::SourceType::Pulse);
+    const Core::PulseParameters pulse{
+        .Low = -2.0, .High = 3.3, .Delay = 1e-3, .RiseTime = 5e-9, .FallTime = 7e-9, .Width = 2e-3, .Period = 4e-3};
+    source.SetPulse(pulse);
+
+    const GUI::LoadedSchematic loaded = LoadOrFail(GUI::SaveSchematic(elements, {}));
+    CHECK(loaded.Warnings.empty());
+    REQUIRE(loaded.Elements.size() == 1);
+    const auto &copy = static_cast<const Core::VoltageSource &>(loaded.Elements[0]->GetComponent());
+    CHECK(copy.GetSourceType() == Core::VoltageSource::SourceType::Pulse);
+    CHECK(copy.GetPulse().Low == pulse.Low);
+    CHECK(copy.GetPulse().High == pulse.High);
+    CHECK(copy.GetPulse().Delay == pulse.Delay);
+    CHECK(copy.GetPulse().RiseTime == pulse.RiseTime);
+    CHECK(copy.GetPulse().FallTime == pulse.FallTime);
+    CHECK(copy.GetPulse().Width == pulse.Width);
+    CHECK(copy.GetPulse().Period == pulse.Period);
+
+    const GUI::LoadedSchematic invalid = LoadOrFail(Document(
+        R"({"type": "VoltageSource", "name": "Vin1", "x": 0, "y": 0, "rotation": 0, "value": 3, "pulse": {"period": 0}})",
+        ""));
+    CHECK(invalid.Elements.empty());
+    CHECK(invalid.Warnings.size() == 1);
+}

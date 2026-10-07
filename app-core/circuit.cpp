@@ -20,16 +20,29 @@ bool IsACSource(const Component &component) {
            static_cast<const VoltageSource &>(component).GetSourceType() == VoltageSource::SourceType::AC;
 }
 
-// One line serves every analysis: .op reads the DC offset, .ac the AC magnitude and .tran the sine
+// One line serves every analysis: .op reads the DC value, .ac the AC magnitude and .tran the waveform. A pulse
+// starts at its low level, so that is its DC value
 std::string FormatVoltageSource(const VoltageSource &source, const std::vector<int> &nodes) {
-    if (source.GetSourceType() == VoltageSource::SourceType::DC) {
-        return std::format("{} {} {} DC {}\n", source.GetName(), nodes[0], nodes[1],
-                           FormatSpiceValue(source.GetValue()));
+    const std::string start = std::format("{} {} {}", source.GetName(), nodes[0], nodes[1]);
+    switch (source.GetSourceType()) {
+    case VoltageSource::SourceType::DC:
+        return std::format("{} DC {}\n", start, FormatSpiceValue(source.GetValue()));
+    case VoltageSource::SourceType::AC: {
+        const std::string offset = FormatSpiceValue(source.GetOffset());
+        const std::string amplitude = FormatSpiceValue(source.GetAmplitude());
+        return std::format("{} DC {} AC {} SIN({} {} {})\n", start, offset, amplitude, offset, amplitude,
+                           FormatSpiceValue(source.GetFrequency()));
     }
-    const std::string offset = FormatSpiceValue(source.GetOffset());
-    const std::string amplitude = FormatSpiceValue(source.GetAmplitude());
-    return std::format("{} {} {} DC {} AC {} SIN({} {} {})\n", source.GetName(), nodes[0], nodes[1], offset, amplitude,
-                       offset, amplitude, FormatSpiceValue(source.GetFrequency()));
+    case VoltageSource::SourceType::Pulse: {
+        const PulseParameters &pulse = source.GetPulse();
+        const std::string low = FormatSpiceValue(pulse.Low);
+        return std::format("{} DC {} PULSE({} {} {} {} {} {} {})\n", start, low, low, FormatSpiceValue(pulse.High),
+                           FormatSpiceValue(pulse.Delay), FormatSpiceValue(pulse.RiseTime),
+                           FormatSpiceValue(pulse.FallTime), FormatSpiceValue(pulse.Width),
+                           FormatSpiceValue(pulse.Period));
+    }
+    }
+    return "";
 }
 
 } // namespace
@@ -84,8 +97,8 @@ bool Circuit::HasACSource() const {
  * @param[in] analysis  Optional analysis command, such as ".op", written right before ".end".
  * @return  One line per component, with node numbers as SPICE node names (0 is ground), ending in ".end".
  * @note    Ground components produce no line; they only make their node 0. A supply rail becomes a DC voltage
- *          source from its node to ground. An AC source writes its offset, AC magnitude and sine together, so
- *          the same netlist works for .op, .ac and .tran.
+ *          source from its node to ground. An AC source writes its offset, AC magnitude and sine together, and a
+ *          pulse source its low level and pulse, so the same netlist works for .op, .ac and .tran.
  */
 std::string Circuit::ToSpiceNetlist(const std::string_view analysis) const {
     std::string netlist = "* imcsim netlist\n";

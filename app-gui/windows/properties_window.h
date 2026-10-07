@@ -11,6 +11,7 @@
 #include "schematic.h"
 #include "value_field.h"
 #include "windows/app_window.h"
+#include <array>
 #include <cstddef>
 #include <optional>
 
@@ -19,7 +20,7 @@ namespace GUI {
 /**
  * @class   PropertiesWindow
  * @brief   Shows the type and name of the selected component and edits its values with SPICE suffixes.
- * @details Voltage sources also switch between DC and AC, and show the sine parameters when AC.
+ * @details Voltage sources also switch between DC, AC and pulse, and show the parameters of the chosen type.
  */
 class PropertiesWindow : public AppWindow {
 public:
@@ -34,11 +35,15 @@ private:
     ValueField m_Amplitude;
     ValueField m_Frequency;
     ValueField m_Offset;
+    // One per member of Core::PulseParameters, in the order the window lists them
+    std::array<ValueField, 7> m_PulseFields;
 
     void Draw() override;
     void LoadFields(const Core::Component &component);
     void DrawValue(Core::Component &component);
     void DrawVoltageSource(Core::VoltageSource &source);
+    void DrawSine(Core::VoltageSource &source);
+    void DrawPulse(Core::VoltageSource &source);
 };
 
 } // namespace GUI

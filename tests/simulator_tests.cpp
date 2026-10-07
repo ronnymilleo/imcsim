@@ -182,11 +182,32 @@ TEST_CASE("An AC sweep of an RC low-pass matches its transfer function", "[simul
 
 TEST_CASE("An AC sweep without an AC source is rejected before reaching ngspice", "[simulator]") {
     LowPass low_pass;
-    low_pass.Source.SetSourceType(Core::VoltageSource::SourceType::DC);
-    const Core::ACSweepRun run = Core::RunACSweep(low_pass.Circuit, {});
-    REQUIRE_FALSE(run.Result);
-    CHECK(run.Result.error().find("AC source") != std::string::npos);
-    CHECK(run.Messages.empty());
+    for (const auto type : {Core::VoltageSource::SourceType::DC, Core::VoltageSource::SourceType::Pulse}) {
+        low_pass.Source.SetSourceType(type);
+        const Core::ACSweepRun run = Core::RunACSweep(low_pass.Circuit, {});
+        REQUIRE_FALSE(run.Result);
+        CHECK(run.Result.error().find("AC source") != std::string::npos);
+        CHECK(run.Messages.empty());
+    }
+}
+
+TEST_CASE("A pulse charges an RC low-pass with its time constant", "[simulator]") {
+    LowPass low_pass;
+    low_pass.Source.SetSourceType(Core::VoltageSource::SourceType::Pulse);
+    // A single 1 V step at t = 0, far longer than the 1 ms time constant
+    low_pass.Source.SetPulse(
+        {.Low = 0.0, .High = 1.0, .RiseTime = 1e-9, .FallTime = 1e-9, .Width = 1.0, .Period = 2.0});
+
+    const Core::TransientRun run = Core::RunTransient(low_pass.Circuit, {.StopTime = 5e-3, .TimeStep = 10e-6});
+    if (!run.Result) {
+        FAIL(run.Result.error());
+    }
+    const Core::Transient &transient = *run.Result;
+    CHECK(transient.NodeVoltages[2].front() == 0.0);
+    for (std::size_t index = 0; index < transient.Times.size(); ++index) {
+        const double expected = 1.0 - std::exp(-transient.Times[index] / 1e-3);
+        CHECK_THAT(transient.NodeVoltages[2][index], Catch::Matchers::WithinAbs(expected, 5e-3));
+    }
 }
 
 TEST_CASE("Invalid analysis settings are rejected before reaching ngspice", "[simulator]") {

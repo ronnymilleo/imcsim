@@ -23,6 +23,8 @@ namespace {
 constexpr float MinPlotHeight = 12.0f;
 constexpr float NodeListWidth = 7.0f;
 constexpr ImVec2 InitialSize = {50.0f, 35.0f};
+// ImPlot adds half of it on each side, so 0.4 leaves 20% of the data range above and below the curves
+constexpr ImVec2 FitPadding = {0.0f, 0.4f};
 
 // Axis ticks use the same suffixes as the values the user types, such as "10m" or "1k", followed by the unit.
 // ImPlot hands the unit back as untyped user data, which is why callers cast away the const of the literal
@@ -82,6 +84,8 @@ void OutputWindow::Draw() {
         ImGui::EndChild();
         return;
     }
+    // Applies to the automatic fit of every new result and to the user's double-click fit
+    ImPlot::PushStyleVar(ImPlotStyleVar_FitPadding, FitPadding);
     if (ImGui::BeginTabItem("Transient")) {
         if (transient) {
             DrawTransient(*transient);
@@ -99,6 +103,7 @@ void OutputWindow::Draw() {
         }
         ImGui::EndTabItem();
     }
+    ImPlot::PopStyleVar();
     ImGui::EndTabBar();
     ImGui::EndChild();
 }

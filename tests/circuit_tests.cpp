@@ -80,11 +80,34 @@ TEST_CASE("ToSpiceNetlist writes an AC source for every analysis at once", "[cir
                                       ".end\n");
 }
 
+TEST_CASE("ToSpiceNetlist writes a pulse source starting at its low level", "[circuit]") {
+    Core::VoltageSource source;
+    source.SetName("Vin1");
+    source.SetSourceType(Core::VoltageSource::SourceType::Pulse);
+    source.SetPulse({.Low = -1.0,
+                     .High = 3.3,
+                     .Delay = 1e-3,
+                     .RiseTime = 10e-9,
+                     .FallTime = 20e-9,
+                     .Width = 0.5e-3,
+                     .Period = 2e-3});
+
+    Core::Circuit circuit;
+    circuit.Add(source, {1, 0});
+
+    CHECK(circuit.ToSpiceNetlist() == "* imcsim netlist\n"
+                                      "Vin1 1 0 DC -1 PULSE(-1 3.3 1m 10n 20n 500u 2m)\n"
+                                      ".end\n");
+}
+
 TEST_CASE("HasACSource looks for a voltage source set to AC", "[circuit]") {
     Core::VoltageSource source;
     source.SetName("Vin1");
     Core::Circuit circuit;
     circuit.Add(source, {1, 0});
+    CHECK_FALSE(circuit.HasACSource());
+
+    source.SetSourceType(Core::VoltageSource::SourceType::Pulse);
     CHECK_FALSE(circuit.HasACSource());
 
     source.SetSourceType(Core::VoltageSource::SourceType::AC);
