@@ -501,6 +501,18 @@ void EditorWindow::DrawFileButtons() {
     if (ImGui::Button("Save As")) {
         ShowFileDialog(FileAction::Save);
     }
+    ImGui::SameLine();
+    ImGui::BeginDisabled(!m_Schematic.CanUndo());
+    if (ImGui::Button("Undo")) {
+        Undo();
+    }
+    ImGui::EndDisabled();
+    ImGui::SameLine();
+    ImGui::BeginDisabled(!m_Schematic.CanRedo());
+    if (ImGui::Button("Redo")) {
+        Redo();
+    }
+    ImGui::EndDisabled();
 }
 
 // Global routing makes the shortcuts work while another editor window, such as Properties, has focus
@@ -517,6 +529,32 @@ void EditorWindow::HandleFileShortcuts() {
     if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiMod_Shift | ImGuiKey_S, ImGuiInputFlags_RouteGlobal)) {
         ShowFileDialog(FileAction::Save);
     }
+    // A focused text field keeps Ctrl+Z for undoing its own typing
+    if (ImGui::GetIO().WantTextInput) {
+        return;
+    }
+    if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_Z, ImGuiInputFlags_RouteGlobal)) {
+        Undo();
+    }
+    if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_Y, ImGuiInputFlags_RouteGlobal) ||
+        ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiMod_Shift | ImGuiKey_Z, ImGuiInputFlags_RouteGlobal)) {
+        Redo();
+    }
+}
+
+// A drag keeps pointers into the elements, so undoing in the middle of one waits until it ends
+void EditorWindow::Undo() {
+    if (m_Drag) {
+        return;
+    }
+    m_Schematic.Undo();
+}
+
+void EditorWindow::Redo() {
+    if (m_Drag) {
+        return;
+    }
+    m_Schematic.Redo();
 }
 
 void EditorWindow::RequestNew() {

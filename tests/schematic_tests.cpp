@@ -215,3 +215,124 @@ TEST_CASE("Each analysis has its own results version", "[schematic]") {
     schematic.SetOperatingPoint(Core::OperatingPoint{});
     CHECK(schematic.GetACSweepVersion() != sweep_version);
 }
+
+TEST_CASE("Undo and redo step through committed changes", "[schematic]") {
+    GUI::Schematic schematic;
+    CHECK_FALSE(schematic.CanUndo());
+    schematic.AddElement(MakeResistor({0, 0}));
+    schematic.CommitUndoStep();
+    schematic.AddWire({2, 0}, {6, 0});
+    schematic.CommitUndoStep();
+
+    schematic.Undo();
+    CHECK(schematic.GetElements().size() == 1);
+    CHECK(schematic.GetWires().empty());
+    schematic.Undo();
+    CHECK(schematic.GetElements().empty());
+    CHECK_FALSE(schematic.CanUndo());
+
+    schematic.Redo();
+    schematic.Redo();
+    CHECK(schematic.GetElements().size() == 1);
+    CHECK(schematic.GetWires().size() == 1);
+    CHECK_FALSE(schematic.CanRedo());
+}
+
+TEST_CASE("Undo restores values and positions edited in place", "[schematic]") {
+    GUI::Schematic schematic;
+    schematic.AddElement(MakeResistor({0, 0}));
+    schematic.CommitUndoStep();
+
+    // A drag moves the element several times before the gesture ends, and counts as one step
+    schematic.GetElement(0).SetPosition({2, 0});
+    schematic.MarkModified();
+    schematic.GetElement(0).SetPosition({4, 0});
+    schematic.MarkModified();
+    schematic.CommitUndoStep();
+    schematic.GetElement(0).GetComponent().SetValue(4.7e3);
+    schematic.MarkModified();
+    schematic.CommitUndoStep();
+
+    schematic.Undo();
+    CHECK(schematic.GetElement(0).GetComponent().GetValue() == 1e3);
+    CHECK(schematic.GetElement(0).GetPosition() == GUI::GridPoint{4, 0});
+    schematic.Undo();
+    CHECK(schematic.GetElement(0).GetPosition() == GUI::GridPoint{0, 0});
+    CHECK(schematic.GetElement(0).GetComponent().GetName() == "R1");
+}
+
+TEST_CASE("A new change after undoing drops what could be redone", "[schematic]") {
+    GUI::Schematic schematic;
+    schematic.AddElement(MakeResistor({0, 0}));
+    schematic.CommitUndoStep();
+    schematic.Undo();
+    REQUIRE(schematic.CanRedo());
+
+    schematic.AddElement(MakeResistor({4, 0}));
+    schematic.CommitUndoStep();
+    CHECK_FALSE(schematic.CanRedo());
+}
+
+TEST_CASE("Undo also takes back changes that were not committed yet", "[schematic]") {
+    GUI::Schematic schematic;
+    schematic.AddElement(MakeResistor({0, 0}));
+    CHECK(schematic.CanUndo());
+    schematic.Undo();
+    CHECK(schematic.GetElements().empty());
+}
+
+TEST_CASE("Changes that leave the schematic as it was add no undo step", "[schematic]") {
+    GUI::Schematic schematic;
+    schematic.AddElement(MakeResistor({0, 0}));
+    schematic.CommitUndoStep();
+    schematic.Undo();
+    schematic.Redo();
+
+    schematic.GetElement(0).SetPosition({2, 0});
+    schematic.GetElement(0).SetPosition({0, 0});
+    schematic.MarkModified();
+    schematic.CommitUndoStep();
+    CHECK(schematic.CanUndo());
+    schematic.Undo();
+    CHECK(schematic.GetElements().empty());
+}
+
+TEST_CASE("Undoing back to the saved state makes the schematic unmodified again", "[schematic]") {
+    GUI::Schematic schematic;
+    schematic.AddElement(MakeResistor({0, 0}));
+    schematic.MarkSaved("saved.imcsim");
+    schematic.AddElement(MakeResistor({4, 0}));
+    schematic.CommitUndoStep();
+    REQUIRE(schematic.IsModified());
+
+    schematic.Undo();
+    CHECK_FALSE(schematic.IsModified());
+    schematic.Undo();
+    CHECK(schematic.IsModified());
+    schematic.Redo();
+    CHECK_FALSE(schematic.IsModified());
+}
+
+TEST_CASE("Opening or clearing a schematic starts a new history", "[schematic]") {
+    GUI::Schematic schematic;
+    schematic.AddElement(MakeResistor({0, 0}));
+    schematic.CommitUndoStep();
+    schematic.Clear();
+    CHECK_FALSE(schematic.CanUndo());
+    CHECK_FALSE(schematic.CanRedo());
+}
+
+TEST_CASE("The history keeps the last 100 steps", "[schematic]") {
+    GUI::Schematic schematic;
+    for (int index = 0; index < 105; ++index) {
+        schematic.AddWire({index, 0}, {index, 1});
+        schematic.CommitUndoStep();
+    }
+    int undone = 0;
+    while (schematic.CanUndo()) {
+        schematic.Undo();
+        ++undone;
+    }
+    CHECK(undone == 100);
+    CHECK(schematic.GetWires().size() == 5);
+}

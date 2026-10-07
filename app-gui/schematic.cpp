@@ -6,6 +6,7 @@
 #include "schematic.h"
 
 #include "components/component.h"
+#include "schematic_file.h"
 #include "wire_editing.h"
 #include <algorithm>
 #include <iterator>
@@ -13,6 +14,20 @@
 #include <utility>
 
 namespace GUI {
+
+namespace {
+
+// Older steps are dropped beyond this, so a long session does not keep growing
+constexpr std::size_t MaxUndoSteps = 100;
+
+} // namespace
+
+/**
+ * @brief   Creates an empty, untitled and unmodified schematic.
+ */
+Schematic::Schematic() {
+    ResetHistory();
+}
 
 /**
  * @brief   Returns every element, in the order they were added.
@@ -105,6 +120,7 @@ void Schematic::SetWires(std::vector<UIWire> wires) {
         return;
     }
     m_Wires = std::move(wires);
+    m_ChangedSinceCommit = true;
     InvalidateDerivedData();
 }
 
@@ -121,6 +137,7 @@ void Schematic::SimplifyAllWires() {
     if (m_SelectedWire) {
         ClearSelection();
     }
+    m_ChangedSinceCommit = true;
     InvalidateDerivedData();
 }
 
@@ -152,7 +169,7 @@ void Schematic::Clear() {
  * @brief   Replaces the whole content, for example with a schematic read from a file.
  * @param[in] elements  New elements, with names already set.
  * @param[in] wires     New wires.
- * @note    The schematic becomes unmodified; the file path is kept.
+ * @note    The schematic becomes unmodified and the undo history starts over; the file path is kept.
  */
 void Schematic::Replace(std::vector<std::unique_ptr<UIElement>> elements, std::vector<UIWire> wires) {
     ClearSelection();
@@ -160,6 +177,7 @@ void Schematic::Replace(std::vector<std::unique_ptr<UIElement>> elements, std::v
     m_Wires = std::move(wires);
     InvalidateDerivedData();
     m_Modified = false;
+    ResetHistory();
 }
 
 /**
@@ -235,6 +253,7 @@ bool Schematic::IsModified() const {
  */
 void Schematic::MarkModified() {
     m_Modified = true;
+    m_ChangedSinceCommit = true;
     InvalidateDerivedData();
 }
 
@@ -249,11 +268,80 @@ const std::optional<std::filesystem::path> &Schematic::GetFilePath() const {
 /**
  * @brief   Records that the schematic was written to a file, or opened from one.
  * @param[in] path  The file.
- * @note    The schematic becomes unmodified.
+ * @note    The schematic becomes unmodified, and undoing or redoing back to this state keeps it unmodified.
  */
 void Schematic::MarkSaved(std::filesystem::path path) {
+    CommitUndoStep();
     m_FilePath = std::move(path);
     m_Modified = false;
+    m_SavedSnapshot = m_CurrentSnapshot;
+}
+
+/**
+ * @brief   Turns the changes made since the last call into one undo step.
+ * @note    Call it once the user finishes an interaction, such as at the end of a frame with no item active, so
+ *          a whole drag counts as one step. Changes that leave the schematic as it was add no step. A new step
+ *          clears what could be redone.
+ */
+void Schematic::CommitUndoStep() {
+    if (!std::exchange(m_ChangedSinceCommit, false)) {
+        return;
+    }
+    std::string snapshot = TakeSnapshot();
+    if (snapshot == m_CurrentSnapshot) {
+        return;
+    }
+    m_UndoSnapshots.push_back(std::move(m_CurrentSnapshot));
+    if (m_UndoSnapshots.size() > MaxUndoSteps) {
+        m_UndoSnapshots.erase(m_UndoSnapshots.begin());
+    }
+    m_CurrentSnapshot = std::move(snapshot);
+    m_RedoSnapshots.clear();
+}
+
+/**
+ * @brief   Tells whether there is a step to undo.
+ * @return  True when Undo() would change something.
+ */
+bool Schematic::CanUndo() const {
+    return !m_UndoSnapshots.empty() || m_ChangedSinceCommit;
+}
+
+/**
+ * @brief   Tells whether there is an undone step to redo.
+ * @return  True when Redo() would change something.
+ */
+bool Schematic::CanRedo() const {
+    return !m_RedoSnapshots.empty();
+}
+
+/**
+ * @brief   Goes back to the schematic as it was before the last step.
+ * @note    Pending changes are committed first, so they are what gets undone. The selection is cleared.
+ */
+void Schematic::Undo() {
+    CommitUndoStep();
+    if (m_UndoSnapshots.empty()) {
+        return;
+    }
+    m_RedoSnapshots.push_back(std::move(m_CurrentSnapshot));
+    m_CurrentSnapshot = std::move(m_UndoSnapshots.back());
+    m_UndoSnapshots.pop_back();
+    RestoreSnapshot(m_CurrentSnapshot);
+}
+
+/**
+ * @brief   Applies again the last step that was undone.
+ * @note    The selection is cleared.
+ */
+void Schematic::Redo() {
+    if (m_RedoSnapshots.empty()) {
+        return;
+    }
+    m_UndoSnapshots.push_back(std::move(m_CurrentSnapshot));
+    m_CurrentSnapshot = std::move(m_RedoSnapshots.back());
+    m_RedoSnapshots.pop_back();
+    RestoreSnapshot(m_CurrentSnapshot);
 }
 
 /**
@@ -357,6 +445,33 @@ void Schematic::InvalidateDerivedData() {
     m_OperatingPoint.reset();
     m_Transient.reset();
     m_ACSweep.reset();
+}
+
+std::string Schematic::TakeSnapshot() const {
+    return SaveSchematic(m_Elements, m_Wires);
+}
+
+// Snapshots come from TakeSnapshot(), so they always load back without warnings
+void Schematic::RestoreSnapshot(const std::string &snapshot) {
+    auto loaded = LoadSchematic(snapshot);
+    if (!loaded) {
+        return;
+    }
+    ClearSelection();
+    m_Elements = std::move(loaded->Elements);
+    m_Wires = std::move(loaded->Wires);
+    m_ChangedSinceCommit = false;
+    m_Modified = m_CurrentSnapshot != m_SavedSnapshot;
+    InvalidateDerivedData();
+}
+
+// The current content becomes the only state, and also the saved one
+void Schematic::ResetHistory() {
+    m_CurrentSnapshot = TakeSnapshot();
+    m_SavedSnapshot = m_CurrentSnapshot;
+    m_UndoSnapshots.clear();
+    m_RedoSnapshots.clear();
+    m_ChangedSinceCommit = false;
 }
 
 } // namespace GUI

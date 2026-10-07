@@ -28,10 +28,14 @@ namespace GUI {
  *          decides when the gesture counts as a change and calls MarkModified(). Nodes are computed lazily and
  *          cached until the next change, and so is the last result of each analysis, which no longer matches
  *          the circuit once it changes. Indices returned by the selection stay valid until an element or wire
- *          is added, deleted or the wires are replaced.
+ *          is added, deleted or the wires are replaced. Undo works on whole snapshots: changes pile up until
+ *          CommitUndoStep(), which the application calls once the user finishes an interaction, so a whole drag
+ *          or a typed value is undone in one step.
  */
 class Schematic {
 public:
+    Schematic();
+
     // Content
     const std::vector<std::unique_ptr<UIElement>> &GetElements() const;
     UIElement &GetElement(std::size_t index);
@@ -63,6 +67,13 @@ public:
     const std::optional<std::filesystem::path> &GetFilePath() const;
     void MarkSaved(std::filesystem::path path);
 
+    // History
+    void CommitUndoStep();
+    bool CanUndo() const;
+    bool CanRedo() const;
+    void Undo();
+    void Redo();
+
     // Derived data
     const Connectivity &GetConnectivity();
     Core::Circuit BuildCircuit();
@@ -90,6 +101,14 @@ private:
     bool m_Modified = false;
     std::optional<std::filesystem::path> m_FilePath;
 
+    // History, as whole schematics saved to text: simple and always consistent, at the cost of some memory
+    std::string m_CurrentSnapshot;
+    std::string m_SavedSnapshot;
+    std::vector<std::string> m_UndoSnapshots;
+    std::vector<std::string> m_RedoSnapshots;
+    // Set by every change and cleared by CommitUndoStep(), so unchanged frames skip taking a snapshot
+    bool m_ChangedSinceCommit = false;
+
     // Derived data, dropped on every change: nodes are rebuilt on first use, results by the next simulation
     std::optional<Connectivity> m_Connectivity;
     std::optional<Core::OperatingPoint> m_OperatingPoint;
@@ -100,6 +119,9 @@ private:
     std::size_t m_ACSweepVersion = 0;
 
     void InvalidateDerivedData();
+    std::string TakeSnapshot() const;
+    void RestoreSnapshot(const std::string &snapshot);
+    void ResetHistory();
 };
 
 } // namespace GUI

@@ -201,6 +201,11 @@ void Application::Render() {
     m_NetlistWindow.Render();
     m_SimulationWindow.Render();
     m_OutputWindow.Render();
+    // A held mouse button or a focused text field is an interaction in progress, which becomes one undo step
+    // once it ends
+    if (!ImGui::IsAnyItemActive()) {
+        m_Schematic.CommitUndoStep();
+    }
     if (m_EditorWindow.IsQuitConfirmed()) {
         m_IsOpen = false;
     }

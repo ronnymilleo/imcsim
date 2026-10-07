@@ -141,9 +141,11 @@ private:
     void EndDrag();
     void RotateSelectedElement();
 
-    // File commands
+    // File and history commands
     void DrawFileButtons();
     void HandleFileShortcuts();
+    void Undo();
+    void Redo();
     void RequestNew();
     void RequestOpen();
     void HandleQuitRequest();
