@@ -216,6 +216,8 @@ void Application::DrawMainMenuBar() {
     if (!ImGui::BeginMainMenuBar()) {
         return;
     }
+    ImGui::Text("Version: %s", IMCSIM_VERSION);
+    ImGui::Separator();
     if (ImGui::BeginMenu("View")) {
         // The editor cannot be closed, so only the side windows are listed
         const std::array<AppWindow *, 4> closable_windows = {&m_PropertiesWindow, &m_NetlistWindow, &m_SimulationWindow,
