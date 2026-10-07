@@ -33,3 +33,10 @@ target_link_libraries(imgui
 )
 
 target_compile_definitions(imgui PUBLIC IMGUI_DEFINE_MATH_OPERATORS)
+
+# =============================================================================
+# nlohmann/json
+# =============================================================================
+
+# Header-only; its own tests and install rules stay off because it is not the top-level project
+add_subdirectory(json)

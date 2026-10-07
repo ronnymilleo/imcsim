@@ -5,21 +5,18 @@
 
 #include "editor.h"
 
+#include "element_factory.h"
+#include "schematic_file.h"
 #include "spice_value.h"
-#include "ui_elements/ui_capacitor.h"
-#include "ui_elements/ui_ground.h"
-#include "ui_elements/ui_inductor.h"
-#include "ui_elements/ui_resistor.h"
-#include "ui_elements/ui_vcc.h"
 #include "wire_editing.h"
 #include <algorithm>
 #include <array>
-#include <charconv>
 #include <cmath>
 #include <format>
 #include <iterator>
 #include <string>
 #include <string_view>
+#include <utility>
 
 namespace GUI {
 
@@ -81,22 +78,10 @@ constexpr auto ToolbarComponents = std::to_array<ToolbarItem>({
     {"VCC", Core::ComponentType::VCC},
 });
 
-std::unique_ptr<UIElement> CreateElement(const Core::ComponentType type, const GridPoint position,
-                                         const Rotation rotation) {
-    switch (type) {
-    case Core::ComponentType::Resistor:
-        return std::make_unique<UIResistor>(position, rotation);
-    case Core::ComponentType::Capacitor:
-        return std::make_unique<UICapacitor>(position, rotation);
-    case Core::ComponentType::Inductor:
-        return std::make_unique<UIInductor>(position, rotation);
-    case Core::ComponentType::Ground:
-        return std::make_unique<UIGround>(position, rotation);
-    case Core::ComponentType::VCC:
-        return std::make_unique<UIVCC>(position, rotation);
-    }
-    return nullptr;
-}
+constexpr const char *DiscardPopup = "Discard changes?";
+constexpr const char *FileMessagesPopup = "File messages";
+// Must stay valid until the dialog callback runs, so it lives for the whole program
+constexpr std::array<SDL_DialogFileFilter, 1> SchematicFilters = {{{"imcsim schematic", "imcsim"}}};
 
 void DrawGrid(ImDrawList *draw_list, const ViewTransform &view, const ImVec2 origin, const ImVec2 size,
               const float zoom) {
@@ -125,6 +110,9 @@ void DrawGrid(ImDrawList *draw_list, const ViewTransform &view, const ImVec2 ori
  */
 void Editor::Draw() {
     ImGui::Begin("Schematic");
+    // File results open popups, which must belong to this window
+    ProcessDialogResult();
+    HandleFileShortcuts();
     DrawToolbar();
 
     const ImVec2 origin = ImGui::GetCursorScreenPos();
@@ -160,6 +148,7 @@ void Editor::Draw() {
     HandleWireDrawing(draw_list, view, hovered);
 
     draw_list->PopClipRect();
+    DrawFilePopups();
     ImGui::End();
 
     DrawPropertiesWindow();
@@ -169,6 +158,10 @@ void Editor::Draw() {
 }
 
 void Editor::DrawToolbar() {
+    DrawFileButtons();
+    ImGui::SameLine();
+    ImGui::TextUnformatted("|");
+    ImGui::SameLine();
     for (const auto &[label, type] : ToolbarComponents) {
         if (ImGui::Button(label)) {
             StartPlacing(type);
@@ -194,6 +187,212 @@ void Editor::DrawToolbar() {
     if (ImGui::RadioButton("ANSI", m_SymbolStyle == SymbolStyle::ANSI)) {
         m_SymbolStyle = SymbolStyle::ANSI;
     }
+    ImGui::SameLine();
+    const std::string file_name = m_FilePath ? m_FilePath->filename().string() : "Untitled";
+    ImGui::TextDisabled("|  %s%s", file_name.c_str(), m_Modified ? " *" : "");
+}
+
+void Editor::DrawFileButtons() {
+    if (ImGui::Button("New")) {
+        RequestNew();
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Open")) {
+        RequestOpen();
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Save")) {
+        Save();
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Save As")) {
+        ShowFileDialog(FileAction::Save);
+    }
+}
+
+// Global routing makes the shortcuts work while another editor window, such as Properties, has focus
+void Editor::HandleFileShortcuts() {
+    if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_N, ImGuiInputFlags_RouteGlobal)) {
+        RequestNew();
+    }
+    if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_O, ImGuiInputFlags_RouteGlobal)) {
+        RequestOpen();
+    }
+    if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_S, ImGuiInputFlags_RouteGlobal)) {
+        Save();
+    }
+    if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiMod_Shift | ImGuiKey_S, ImGuiInputFlags_RouteGlobal)) {
+        ShowFileDialog(FileAction::Save);
+    }
+}
+
+void Editor::DrawFilePopups() {
+    if (ImGui::BeginPopupModal(DiscardPopup, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+        ImGui::TextUnformatted("The schematic has unsaved changes. Discard them?");
+        if (ImGui::Button("Discard")) {
+            if (m_ActionToConfirm == FileAction::New) {
+                NewSchematic();
+            } else if (m_ActionToConfirm == FileAction::Open) {
+                ShowFileDialog(FileAction::Open);
+            }
+            m_ActionToConfirm.reset();
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Cancel")) {
+            m_ActionToConfirm.reset();
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndPopup();
+    }
+
+    if (ImGui::BeginPopupModal(FileMessagesPopup, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+        ImGui::TextUnformatted(m_FileMessagesTitle.c_str());
+        ImGui::Separator();
+        for (const std::string &message : m_FileMessages) {
+            ImGui::BulletText("%s", message.c_str());
+        }
+        if (ImGui::Button("OK")) {
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndPopup();
+    }
+}
+
+void Editor::RequestNew() {
+    if (m_Modified) {
+        m_ActionToConfirm = FileAction::New;
+        ImGui::OpenPopup(DiscardPopup);
+    } else {
+        NewSchematic();
+    }
+}
+
+void Editor::RequestOpen() {
+    if (m_Modified) {
+        m_ActionToConfirm = FileAction::Open;
+        ImGui::OpenPopup(DiscardPopup);
+    } else {
+        ShowFileDialog(FileAction::Open);
+    }
+}
+
+void Editor::Save() {
+    if (m_FilePath) {
+        SaveFile(*m_FilePath);
+    } else {
+        ShowFileDialog(FileAction::Save);
+    }
+}
+
+// The dialog runs asynchronously: its result is picked up by ProcessDialogResult() on a later frame
+void Editor::ShowFileDialog(const FileAction action) {
+    if (m_DialogAction) {
+        return;
+    }
+    m_DialogAction = action;
+    m_DialogLocation = m_FilePath ? m_FilePath->string() : "";
+    const char *location = m_DialogLocation.empty() ? nullptr : m_DialogLocation.c_str();
+    const int filter_count = static_cast<int>(SchematicFilters.size());
+    if (action == FileAction::Open) {
+        SDL_ShowOpenFileDialog(HandleFileDialogResult, this, nullptr, SchematicFilters.data(), filter_count, location,
+                               false);
+    } else {
+        SDL_ShowSaveFileDialog(HandleFileDialogResult, this, nullptr, SchematicFilters.data(), filter_count, location);
+    }
+}
+
+// SDL may call this from another thread, so it only stores the result for the main thread to handle
+void SDLCALL Editor::HandleFileDialogResult(void *userdata, const char *const *file_list, int /*filter*/) {
+    auto *editor = static_cast<Editor *>(userdata);
+    DialogResult result;
+    // A null list means an error and an empty list means the user canceled
+    if (file_list != nullptr && file_list[0] != nullptr) {
+        result.Path = std::filesystem::path(file_list[0]);
+    }
+    const std::scoped_lock lock(editor->m_DialogMutex);
+    editor->m_DialogResult = std::move(result);
+}
+
+void Editor::ProcessDialogResult() {
+    std::optional<DialogResult> result;
+    {
+        const std::scoped_lock lock(m_DialogMutex);
+        result = std::exchange(m_DialogResult, std::nullopt);
+    }
+    if (!result) {
+        return;
+    }
+    const std::optional<FileAction> action = std::exchange(m_DialogAction, std::nullopt);
+    if (!result->Path) {
+        return;
+    }
+    if (action == FileAction::Open) {
+        OpenFile(*result->Path);
+    } else if (action == FileAction::Save) {
+        SaveFile(*result->Path);
+    }
+}
+
+void Editor::NewSchematic() {
+    ClearSelection();
+    m_PlacingType.reset();
+    m_DrawingWires = false;
+    m_WireStart.reset();
+    m_Elements.clear();
+    m_Wires.clear();
+    m_Connectivity.reset();
+    m_FilePath.reset();
+    m_Modified = false;
+}
+
+// Skipped parts are reported, and the schematic counts as modified because saving it would drop them
+void Editor::OpenFile(const std::filesystem::path &path) {
+    const auto text = ReadTextFile(path);
+    if (!text) {
+        ShowFileMessages("Could not open the schematic", {text.error()});
+        return;
+    }
+    auto loaded = LoadSchematic(*text);
+    if (!loaded) {
+        ShowFileMessages(std::format("Could not open {}", path.filename().string()), {loaded.error()});
+        return;
+    }
+
+    NewSchematic();
+    m_Elements = std::move(loaded->Elements);
+    m_Wires = std::move(loaded->Wires);
+    m_FilePath = path;
+    m_Modified = !loaded->Warnings.empty();
+    if (m_Modified) {
+        ShowFileMessages(std::format("{} was opened, but some parts were changed or skipped", path.filename().string()),
+                         std::move(loaded->Warnings));
+    }
+}
+
+// Dialogs do not always add the extension, so it is added here when missing
+void Editor::SaveFile(std::filesystem::path path) {
+    if (path.extension() != SchematicExtension) {
+        path += SchematicExtension;
+    }
+    const auto written = WriteTextFile(path, SaveSchematic(m_Elements, m_Wires));
+    if (!written) {
+        ShowFileMessages("Could not save the schematic", {written.error()});
+        return;
+    }
+    m_FilePath = std::move(path);
+    m_Modified = false;
+}
+
+void Editor::ShowFileMessages(std::string title, std::vector<std::string> messages) {
+    m_FileMessagesTitle = std::move(title);
+    m_FileMessages = std::move(messages);
+    ImGui::OpenPopup(FileMessagesPopup);
+}
+
+void Editor::MarkModified() {
+    m_Modified = true;
+    m_Connectivity.reset();
 }
 
 void Editor::DrawWires(ImDrawList *draw_list, const ViewTransform &view) {
@@ -285,6 +484,7 @@ void Editor::DrawPropertiesWindow() {
         m_ValueTextInvalid = !value || !component.IsValidValue(*value);
         if (!m_ValueTextInvalid) {
             component.SetValue(*value);
+            MarkModified();
         }
     }
     if (ImGui::IsItemDeactivatedAfterEdit() && !m_ValueTextInvalid) {
@@ -309,26 +509,16 @@ void Editor::LoadValueText() {
     m_ValueTextInvalid = false;
 }
 
-// The next free number for the prefix, so names stay unique after deletions: R1, R2, R3...
 void Editor::AssignName(Core::Component &component) const {
     const std::string_view prefix = component.GetNamePrefix();
     if (prefix.empty()) {
         return;
     }
-    int highest = 0;
+    std::vector<std::string> names;
     for (const auto &element : m_Elements) {
-        const std::string &name = element->GetComponent().GetName();
-        if (!name.starts_with(prefix)) {
-            continue;
-        }
-        int number = 0;
-        const char *digits_end = name.data() + name.size();
-        const auto [end, error] = std::from_chars(name.data() + prefix.size(), digits_end, number);
-        if (error == std::errc{} && end == digits_end) {
-            highest = std::max(highest, number);
-        }
+        names.push_back(element->GetComponent().GetName());
     }
-    component.SetName(std::format("{}{}", prefix, highest + 1));
+    component.SetName(Core::NextComponentName(prefix, names));
 }
 
 void Editor::StartPlacing(const Core::ComponentType type) {
@@ -392,7 +582,7 @@ void Editor::HandlePlacement(ImDrawList *draw_list, const ViewTransform &view, c
     if (ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
         AssignName(preview->GetComponent());
         m_Elements.push_back(std::move(preview));
-        m_Connectivity.reset();
+        MarkModified();
     }
 }
 
@@ -469,7 +659,7 @@ void Editor::StopWire() {
 void Editor::AddWire(const GridPoint start, const GridPoint end) {
     if (start != end) {
         m_Wires.emplace_back(start, end);
-        m_Connectivity.reset();
+        MarkModified();
     }
 }
 
@@ -500,7 +690,12 @@ void Editor::HandleSelection(const ViewTransform &view, const bool hovered) {
     if (m_Drag) {
         if (ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
             UIElement &element = *m_Elements[*m_SelectedElement];
-            element.SetPosition(m_Drag->StartPosition + (Snap(cursor_world) - m_Drag->StartCursor));
+            const GridPoint position = m_Drag->StartPosition + (Snap(cursor_world) - m_Drag->StartCursor);
+            if (position != element.GetPosition()) {
+                element.SetPosition(position);
+                MarkModified();
+            }
+            // Rebuilt every frame, not only on moves, so a rotation during the drag is followed too
             m_Wires = FollowTerminals(m_Drag->StartWires, m_Drag->StartTerminals, element.GetTerminals());
             m_Connectivity.reset();
         } else {
@@ -561,6 +756,7 @@ void Editor::RotateSelectedElement() {
     UIElement &element = *m_Elements[*m_SelectedElement];
     const std::vector<GridPoint> old_terminals = element.GetTerminals();
     element.SetRotation(NextRotation(element.GetRotation()));
+    MarkModified();
     if (m_Drag) {
         return;
     }
@@ -578,7 +774,7 @@ void Editor::DeleteSelection() {
         return;
     }
     ClearSelection();
-    m_Connectivity.reset();
+    MarkModified();
 }
 
 // Simplifying merges and removes wires, so wire indices are no longer valid afterwards

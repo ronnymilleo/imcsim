@@ -105,6 +105,45 @@ Rotation InverseRotation(const Rotation rotation) {
 }
 
 /**
+ * @brief   Converts an orientation to clockwise degrees.
+ * @param[in] rotation  Orientation to convert.
+ * @return  0, 90, 180 or 270.
+ */
+int ToDegrees(const Rotation rotation) {
+    switch (rotation) {
+    case Rotation::R0:
+        return 0;
+    case Rotation::R90:
+        return 90;
+    case Rotation::R180:
+        return 180;
+    case Rotation::R270:
+        return 270;
+    }
+    return 0;
+}
+
+/**
+ * @brief   Converts clockwise degrees to an orientation.
+ * @param[in] degrees  Angle in degrees.
+ * @return  The orientation for 0, 90, 180 or 270, or no value for any other angle.
+ */
+std::optional<Rotation> RotationFromDegrees(const int degrees) {
+    switch (degrees) {
+    case 0:
+        return Rotation::R0;
+    case 90:
+        return Rotation::R90;
+    case 180:
+        return Rotation::R180;
+    case 270:
+        return Rotation::R270;
+    default:
+        return std::nullopt;
+    }
+}
+
+/**
  * @brief   Rotates a point around the origin.
  * @param[in] point     Point in local grid units.
  * @param[in] rotation  Orientation to apply.

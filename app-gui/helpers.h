@@ -9,6 +9,7 @@
 #include "imgui.h"
 #include <compare>
 #include <cstdint>
+#include <optional>
 
 namespace GUI {
 
@@ -60,6 +61,8 @@ GridPoint operator-(GridPoint first, GridPoint second);
 ImVec2 ToVec2(GridPoint point);
 Rotation NextRotation(Rotation rotation);
 Rotation InverseRotation(Rotation rotation);
+int ToDegrees(Rotation rotation);
+std::optional<Rotation> RotationFromDegrees(int degrees);
 ImVec2 Rotate(ImVec2 point, Rotation rotation);
 GridPoint Rotate(GridPoint point, Rotation rotation);
 GridPoint Snap(ImVec2 world_pos);

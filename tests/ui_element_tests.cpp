@@ -1,0 +1,55 @@
+/**
+ * @file    ui_element_tests.cpp
+ * @brief   Tests for terminal positions and picking of schematic elements.
+ */
+
+#include "test_printers.h"
+#include "ui_elements/ui_ground.h"
+#include "ui_elements/ui_resistor.h"
+#include "ui_elements/ui_vcc.h"
+#include <catch2/catch_test_macros.hpp>
+#include <vector>
+
+TEST_CASE("Two-terminal elements have terminals two units each side, after rotation", "[ui_element]") {
+    GUI::UIResistor resistor({5, 5}, GUI::Rotation::R0);
+    CHECK(resistor.GetTerminals() == std::vector<GUI::GridPoint>{{3, 5}, {7, 5}});
+
+    resistor.SetRotation(GUI::Rotation::R90);
+    CHECK(resistor.GetTerminals() == std::vector<GUI::GridPoint>{{5, 3}, {5, 7}});
+
+    resistor.SetPosition({0, 0});
+    CHECK(resistor.GetTerminals() == std::vector<GUI::GridPoint>{{0, -2}, {0, 2}});
+}
+
+TEST_CASE("Ground and VCC have a single terminal at their position", "[ui_element]") {
+    const GUI::UIGround ground({2, 3}, GUI::Rotation::R180);
+    CHECK(ground.GetTerminals() == std::vector<GUI::GridPoint>{{2, 3}});
+
+    const GUI::UIVCC supply({-1, 4}, GUI::Rotation::R90);
+    CHECK(supply.GetTerminals() == std::vector<GUI::GridPoint>{{-1, 4}});
+}
+
+TEST_CASE("Elements own a component of their type", "[ui_element]") {
+    const GUI::UIResistor resistor({0, 0}, GUI::Rotation::R0);
+    CHECK(resistor.GetComponent().GetType() == Core::ComponentType::Resistor);
+
+    const GUI::UIGround ground({0, 0}, GUI::Rotation::R0);
+    CHECK(ground.GetComponent().GetType() == Core::ComponentType::Ground);
+}
+
+TEST_CASE("Contains follows the element rotation", "[ui_element]") {
+    GUI::UIResistor resistor({0, 0}, GUI::Rotation::R0);
+    CHECK(resistor.Contains({0.0f, 0.0f}));
+    CHECK(resistor.Contains({1.9f, 0.5f}));
+    CHECK_FALSE(resistor.Contains({0.0f, 1.5f}));
+
+    resistor.SetRotation(GUI::Rotation::R90);
+    CHECK(resistor.Contains({0.5f, 1.9f}));
+    CHECK_FALSE(resistor.Contains({1.9f, 0.0f}));
+}
+
+TEST_CASE("Ground is picked below its terminal", "[ui_element]") {
+    const GUI::UIGround ground({0, 0}, GUI::Rotation::R0);
+    CHECK(ground.Contains({0.0f, 1.2f}));
+    CHECK_FALSE(ground.Contains({0.0f, -0.5f}));
+}

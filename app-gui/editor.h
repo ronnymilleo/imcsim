@@ -12,9 +12,13 @@
 #include "imgui.h"
 #include "ui_elements/ui_element.h"
 #include "ui_elements/ui_wire.h"
+#include <SDL3/SDL_dialog.h>
 #include <array>
+#include <filesystem>
 #include <memory>
+#include <mutex>
 #include <optional>
+#include <string>
 #include <vector>
 
 namespace GUI {
@@ -24,7 +28,8 @@ namespace GUI {
  * @brief   Schematic editor window where circuit components are placed and wired on a grid.
  * @details Positions are stored in world units (one unit per grid cell) and converted to screen pixels
  *          using the current pan offset and zoom factor. The editor is either selecting (the default), placing
- *          a component or drawing wires; starting one mode leaves the other.
+ *          a component or drawing wires; starting one mode leaves the other. Schematics are saved to and opened
+ *          from JSON files through the native file dialogs of SDL.
  */
 class Editor {
 public:
@@ -43,6 +48,24 @@ private:
         GridPoint StartPosition;
         std::vector<GridPoint> StartTerminals;
         std::vector<UIWire> StartWires;
+    };
+
+    /**
+     * @enum    FileAction
+     * @brief   File operation waiting for a file dialog or for the user to confirm discarding changes.
+     */
+    enum class FileAction {
+        New,
+        Open,
+        Save
+    };
+
+    /**
+     * @struct  DialogResult
+     * @brief   What the file dialog returned: a path, or no value when it was canceled or failed.
+     */
+    struct DialogResult {
+        std::optional<std::filesystem::path> Path;
     };
 
     std::vector<std::unique_ptr<UIElement>> m_Elements;
@@ -66,8 +89,33 @@ private:
     SymbolStyle m_SymbolStyle = SymbolStyle::IEC;
     ImVec2 m_Pan = {0, 0};
     float m_Zoom = 20.0f;
+    std::optional<std::filesystem::path> m_FilePath;
+    bool m_Modified = false;
+    std::optional<FileAction> m_ActionToConfirm;
+    // The dialog in progress, touched only by the main thread
+    std::optional<FileAction> m_DialogAction;
+    std::string m_DialogLocation;
+    // Written by the dialog callback, which SDL may call from another thread
+    std::mutex m_DialogMutex;
+    std::optional<DialogResult> m_DialogResult;
+    std::string m_FileMessagesTitle;
+    std::vector<std::string> m_FileMessages;
 
     void DrawToolbar();
+    void DrawFileButtons();
+    void HandleFileShortcuts();
+    void DrawFilePopups();
+    void RequestNew();
+    void RequestOpen();
+    void Save();
+    void ShowFileDialog(FileAction action);
+    static void SDLCALL HandleFileDialogResult(void *userdata, const char *const *file_list, int filter);
+    void ProcessDialogResult();
+    void NewSchematic();
+    void OpenFile(const std::filesystem::path &path);
+    void SaveFile(std::filesystem::path path);
+    void ShowFileMessages(std::string title, std::vector<std::string> messages);
+    void MarkModified();
     void DrawWires(ImDrawList *draw_list, const ViewTransform &view);
     void DrawNetlistWindow();
     void DrawPropertiesWindow();

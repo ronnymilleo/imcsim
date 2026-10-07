@@ -5,9 +5,26 @@
 
 #include "component.h"
 
+#include <algorithm>
+#include <array>
+#include <cctype>
+#include <charconv>
+#include <format>
 #include <utility>
 
 namespace Core {
+
+namespace {
+
+constexpr auto AllTypes = std::to_array<ComponentType>({
+    ComponentType::Resistor,
+    ComponentType::Capacitor,
+    ComponentType::Inductor,
+    ComponentType::Ground,
+    ComponentType::VCC,
+});
+
+} // namespace
 
 /**
  * @brief   Creates a component of the given kind.
@@ -30,19 +47,7 @@ ComponentType Component::GetType() const {
  * @return  The component type as text, such as "Resistor".
  */
 const char *Component::GetTypeName() const {
-    switch (m_Type) {
-    case ComponentType::Resistor:
-        return "Resistor";
-    case ComponentType::Capacitor:
-        return "Capacitor";
-    case ComponentType::Inductor:
-        return "Inductor";
-    case ComponentType::Ground:
-        return "Ground";
-    case ComponentType::VCC:
-        return "VCC";
-    }
-    return "Unknown";
+    return Core::GetTypeName(m_Type);
 }
 
 /**
@@ -143,6 +148,79 @@ double Component::GetValue() const {
  */
 void Component::SetValue(const double value) {
     m_Value = value;
+}
+
+/**
+ * @brief   Returns a readable name for a kind of component.
+ * @param[in] type  Kind of component.
+ * @return  The type as text, such as "Resistor"; ParseComponentType() reads it back.
+ */
+const char *GetTypeName(const ComponentType type) {
+    switch (type) {
+    case ComponentType::Resistor:
+        return "Resistor";
+    case ComponentType::Capacitor:
+        return "Capacitor";
+    case ComponentType::Inductor:
+        return "Inductor";
+    case ComponentType::Ground:
+        return "Ground";
+    case ComponentType::VCC:
+        return "VCC";
+    }
+    return "Unknown";
+}
+
+/**
+ * @brief   Finds the kind of component named by a text.
+ * @param[in] text  A type name as written by GetTypeName(), case sensitive.
+ * @return  The matching type, or no value for an unknown name.
+ */
+std::optional<ComponentType> ParseComponentType(const std::string_view text) {
+    for (const ComponentType type : AllTypes) {
+        if (text == GetTypeName(type)) {
+            return type;
+        }
+    }
+    return std::nullopt;
+}
+
+/**
+ * @brief   Checks whether a name can identify a component in a SPICE netlist.
+ * @param[in] name    Candidate name, such as "R1" or "Rload".
+ * @param[in] prefix  SPICE letter the name must start with, from Component::GetNamePrefix().
+ * @return  True when the name starts with the prefix and goes on with at least one letter, digit or underscore.
+ */
+bool IsValidName(const std::string_view name, const std::string_view prefix) {
+    if (prefix.empty() || name.size() <= prefix.size() || !name.starts_with(prefix)) {
+        return false;
+    }
+    return std::ranges::all_of(name.substr(prefix.size()), [](const char character) {
+        return std::isalnum(static_cast<unsigned char>(character)) != 0 || character == '_';
+    });
+}
+
+/**
+ * @brief   Builds the next free numbered name for a prefix: R1, R2, R3...
+ * @param[in] prefix          SPICE letter of the component kind.
+ * @param[in] existing_names  Names already in use, of any kind.
+ * @return  The prefix followed by one more than the highest number used with it, so names stay unique even
+ *          after deletions. Names that are not the prefix plus a number, such as "Rload", are ignored.
+ */
+std::string NextComponentName(const std::string_view prefix, const std::vector<std::string> &existing_names) {
+    int highest = 0;
+    for (const std::string &name : existing_names) {
+        if (!name.starts_with(prefix)) {
+            continue;
+        }
+        int number = 0;
+        const char *digits_end = name.data() + name.size();
+        const auto [end, error] = std::from_chars(name.data() + prefix.size(), digits_end, number);
+        if (error == std::errc{} && end == digits_end) {
+            highest = std::max(highest, number);
+        }
+    }
+    return std::format("{}{}", prefix, highest + 1);
 }
 
 } // namespace Core

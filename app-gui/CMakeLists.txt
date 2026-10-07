@@ -7,7 +7,9 @@ add_library(imcsim-gui-lib
             application.cpp
             connectivity.cpp
             editor.cpp
+            element_factory.cpp
             helpers.cpp
+            schematic_file.cpp
             ui_elements/ui_capacitor.cpp
             ui_elements/ui_element.cpp
             ui_elements/ui_ground.cpp
@@ -29,4 +31,6 @@ target_link_libraries(imcsim-gui-lib
         PUBLIC
             imcsim-core-lib
             imgui
+        PRIVATE
+            nlohmann_json::nlohmann_json
 )

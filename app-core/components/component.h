@@ -6,7 +6,10 @@
 #ifndef IMCSIM_COMPONENT_H
 #define IMCSIM_COMPONENT_H
 
+#include <optional>
 #include <string>
+#include <string_view>
+#include <vector>
 
 namespace Core {
 
@@ -50,6 +53,11 @@ protected:
     std::string m_Name;
     double m_Value = 0.0;
 };
+
+const char *GetTypeName(ComponentType type);
+std::optional<ComponentType> ParseComponentType(std::string_view text);
+bool IsValidName(std::string_view name, std::string_view prefix);
+std::string NextComponentName(std::string_view prefix, const std::vector<std::string> &existing_names);
 
 } // namespace Core
 
