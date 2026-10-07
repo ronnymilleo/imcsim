@@ -1,6 +1,7 @@
 # imcsim
 
-Immediate Mode Circuit Simulator, built with Dear ImGui, SDL3 and Vulkan.
+Immediate Mode Circuit Simulator, built with Dear ImGui, SDL3 and Vulkan. Circuits are simulated with
+[ngspice](https://ngspice.sourceforge.io/).
 
 ## Requirements
 
@@ -10,15 +11,32 @@ Immediate Mode Circuit Simulator, built with Dear ImGui, SDL3 and Vulkan.
 - Ninja (or another CMake generator)
 - SDL3 development files
 - Vulkan headers and loader (the Vulkan SDK is not required)
-- Git (the `vendor/imgui` submodule tracks the `docking` branch)
+- ngspice built as a shared library (`libngspice` and its `sharedspice.h` header; tested with ngspice 47)
+- pkg-config, which CMake uses to find ngspice
+- Git, for the submodules in `vendor/`: Dear ImGui (`docking` branch), nlohmann/json and Catch2
 
 On Arch Linux:
 
 ```
-sudo pacman -S cmake ninja gcc sdl3 vulkan-headers vulkan-icd-loader
+sudo pacman -S cmake ninja gcc pkgconf sdl3 vulkan-headers vulkan-icd-loader ngspice
 ```
 
-Also install the Vulkan driver for your GPU (for example `vulkan-radeon`).
+The Arch `ngspice` package already includes the shared library. Also install the Vulkan driver for your GPU
+(for example `vulkan-radeon`).
+
+On Ubuntu 25.04 or newer (older releases do not package SDL3):
+
+```
+sudo apt install ninja-build g++ pkgconf libsdl3-dev libvulkan-dev mesa-vulkan-drivers libngspice0-dev
+sudo snap install cmake --classic
+```
+
+Ubuntu's own `cmake` package is older than 4.3, hence the snap. The default `g++` must support C++23; if the build
+fails on missing standard library features, install a newer one (for example `g++-15`) and configure with
+`-DCMAKE_CXX_COMPILER=g++-15`. These Ubuntu instructions are not tested regularly; please report what differs.
+
+Other distributions usually split ngspice into a development package, such as `libngspice-devel` on Fedora.
+If CMake reports `No package 'ngspice' found`, the shared library or its `ngspice.pc` file is missing.
 
 ## Build and run
 
@@ -32,7 +50,17 @@ cmake --build build
 
 If you already cloned without submodules, run `git submodule update --init`.
 
-The binary is written to `out/<build-type>/bin/`. Add `-DBUILD_TESTS=ON` to build the tests.
+The binary is written to `out/<build-type>/bin/`.
+
+## Tests
+
+The tests use Catch2 and run some circuits through ngspice, so they need the same libraries as the application:
+
+```
+cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug -DBUILD_TESTS=ON
+cmake --build build
+ctest --test-dir build --output-on-failure
+```
 
 ## Optional
 
