@@ -12,6 +12,7 @@
 #include "windows/editor_window.h"
 #include "windows/netlist_window.h"
 #include "windows/properties_window.h"
+#include "windows/simulation_window.h"
 
 #include <SDL3/SDL_video.h>
 #include <string>
@@ -52,6 +53,7 @@ private:
     EditorWindow m_EditorWindow{m_Schematic};
     PropertiesWindow m_PropertiesWindow{m_Schematic};
     NetlistWindow m_NetlistWindow{m_Schematic};
+    SimulationWindow m_SimulationWindow{m_Schematic};
 
     // Errors
     void AddError(const std::string &message);

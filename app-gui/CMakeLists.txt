@@ -22,6 +22,7 @@ add_library(imcsim-gui-lib
             windows/editor_window.cpp
             windows/netlist_window.cpp
             windows/properties_window.cpp
+            windows/simulation_window.cpp
             wire_editing.cpp
 )
 

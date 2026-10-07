@@ -23,6 +23,8 @@ public:
 
     void Draw(ImDrawList *draw_list, const ViewTransform &view, ImU32 color) const;
 
+    bool operator==(const UIWire &) const = default;
+
     GridPoint GetStart() const;
     GridPoint GetEnd() const;
     bool PassesThrough(GridPoint point) const;

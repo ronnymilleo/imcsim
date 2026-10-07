@@ -100,6 +100,7 @@ private:
     void Draw() override;
     void DrawToolbar();
     void DrawWires(ImDrawList *draw_list, const ViewTransform &view);
+    void DrawNodeVoltages(ImDrawList *draw_list, const ViewTransform &view);
     void HandlePanAndZoom(ImVec2 origin, bool hovered, bool active);
 
     // Modes

@@ -11,6 +11,7 @@ add_library(imcsim-core-lib
             components/inductor.cpp
             components/resistor.cpp
             components/vcc.cpp
+            simulator.cpp
             spice_value.cpp
 )
 
@@ -20,7 +21,10 @@ target_include_directories(imcsim-core-lib
             ${CMAKE_CURRENT_SOURCE_DIR}/components
 )
 
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(NGSPICE REQUIRED IMPORTED_TARGET ngspice)
+
 target_link_libraries(imcsim-core-lib
-        PUBLIC
-            #
+        PRIVATE
+            PkgConfig::NGSPICE
 )

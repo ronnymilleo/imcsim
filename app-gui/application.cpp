@@ -192,6 +192,7 @@ void Application::Render() {
     m_EditorWindow.Render();
     m_PropertiesWindow.Render();
     m_NetlistWindow.Render();
+    m_SimulationWindow.Render();
     ImGui::Render();
 }
 
@@ -201,7 +202,8 @@ void Application::DrawMainMenuBar() {
     }
     if (ImGui::BeginMenu("View")) {
         // The editor cannot be closed, so only the side windows are listed
-        const std::array<AppWindow *, 2> closable_windows = {&m_PropertiesWindow, &m_NetlistWindow};
+        const std::array<AppWindow *, 3> closable_windows = {&m_PropertiesWindow, &m_NetlistWindow,
+                                                             &m_SimulationWindow};
         for (AppWindow *window : closable_windows) {
             bool open = window->IsOpen();
             if (ImGui::MenuItem(window->GetWindowTitle().c_str(), nullptr, &open)) {
@@ -221,8 +223,8 @@ void Application::DrawMainMenuBar() {
     ImGui::EndMainMenuBar();
 }
 
-// Editor on top, Properties and Netlist side by side below it. Must run before the windows are drawn.
-// Each split returns the new node in the given direction and leaves the rest in its last argument
+// Editor on top, Properties below it on the left and Netlist and Simulation as tabs on the right. Must run before the
+// windows are drawn. Each split returns the new node in the given direction and leaves the rest in its last argument
 void Application::SetupDefaultLayout(ImGuiID dockspace_id) {
     ImGui::DockBuilderSetNodeSize(dockspace_id, ImGui::GetMainViewport()->WorkSize);
     ImGuiID editor_id = dockspace_id;
@@ -232,6 +234,7 @@ void Application::SetupDefaultLayout(ImGuiID dockspace_id) {
     ImGui::DockBuilderDockWindow(m_EditorWindow.GetWindowTitle().c_str(), editor_id);
     ImGui::DockBuilderDockWindow(m_PropertiesWindow.GetWindowTitle().c_str(), properties_id);
     ImGui::DockBuilderDockWindow(m_NetlistWindow.GetWindowTitle().c_str(), netlist_id);
+    ImGui::DockBuilderDockWindow(m_SimulationWindow.GetWindowTitle().c_str(), netlist_id);
     ImGui::DockBuilderFinish(dockspace_id);
 }
 

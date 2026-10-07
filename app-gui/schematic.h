@@ -8,6 +8,7 @@
 
 #include "connectivity.h"
 #include "helpers.h"
+#include "simulator.h"
 #include "ui_elements/ui_element.h"
 #include "ui_elements/ui_wire.h"
 #include <cstddef>
@@ -25,8 +26,9 @@ namespace GUI {
  * @details Adding and deleting mark the schematic as modified. Geometry updates that may be undone within the
  *          same gesture, such as wires following a dragged element, only invalidate the nodes; the caller
  *          decides when the gesture counts as a change and calls MarkModified(). Nodes are computed lazily and
- *          cached until the next change. Indices returned by the selection stay valid until an element or wire
- *          is added, deleted or the wires are replaced.
+ *          cached until the next change, and so is the last simulation result, which no longer matches the
+ *          circuit once it changes. Indices returned by the selection stay valid until an element or wire is
+ *          added, deleted or the wires are replaced.
  */
 class Schematic {
 public:
@@ -63,7 +65,10 @@ public:
 
     // Derived data
     const Connectivity &GetConnectivity();
+    Core::Circuit BuildCircuit();
     std::string BuildSpiceNetlist();
+    void SetOperatingPoint(std::optional<Core::OperatingPoint> operating_point);
+    const std::optional<Core::OperatingPoint> &GetOperatingPoint() const;
 
 private:
     // Content
@@ -79,8 +84,11 @@ private:
     bool m_Modified = false;
     std::optional<std::filesystem::path> m_FilePath;
 
-    // Derived data, rebuilt on first use after a change
+    // Derived data, dropped on every change: nodes are rebuilt on first use, results by the next simulation
     std::optional<Connectivity> m_Connectivity;
+    std::optional<Core::OperatingPoint> m_OperatingPoint;
+
+    void InvalidateDerivedData();
 };
 
 } // namespace GUI

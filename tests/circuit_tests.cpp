@@ -49,3 +49,24 @@ TEST_CASE("ToSpiceNetlist writes one line per component and leaves ground out", 
                                       "L1 2 0 1m\n"
                                       ".end\n");
 }
+
+TEST_CASE("ToSpiceNetlist writes the analysis right before .end", "[circuit]") {
+    Core::Resistor resistor;
+    resistor.SetName("R1");
+    Core::Circuit circuit;
+    circuit.Add(resistor, {1, 0});
+    CHECK(circuit.ToSpiceNetlist(".op") == "* imcsim netlist\n"
+                                           "R1 1 0 1k\n"
+                                           ".op\n"
+                                           ".end\n");
+}
+
+TEST_CASE("HasGround looks for a ground component", "[circuit]") {
+    Core::Resistor resistor;
+    const Core::Ground ground;
+    Core::Circuit circuit;
+    circuit.Add(resistor, {1, 0});
+    CHECK_FALSE(circuit.HasGround());
+    circuit.Add(ground, {0});
+    CHECK(circuit.HasGround());
+}

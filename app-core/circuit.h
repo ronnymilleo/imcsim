@@ -8,6 +8,7 @@
 
 #include "components/component.h"
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace Core {
@@ -33,7 +34,8 @@ public:
 
     const std::vector<CircuitEntry> &GetEntries() const;
     int GetNodeCount() const;
-    std::string ToSpiceNetlist() const;
+    bool HasGround() const;
+    std::string ToSpiceNetlist(std::string_view analysis = "") const;
 
 private:
     std::vector<CircuitEntry> m_Entries;

@@ -7,6 +7,7 @@
 
 #include "element_factory.h"
 #include "schematic_file.h"
+#include "spice_value.h"
 #include "wire_editing.h"
 #include <algorithm>
 #include <array>
@@ -38,6 +39,9 @@ constexpr float WirePickDistance = 5.0f;
 constexpr float JunctionRadiusScale = 0.15f;
 constexpr float MinJunctionRadius = 2.5f;
 constexpr ImU32 NodeLabelColor = IM_COL32(255, 255, 255, 255);
+constexpr ImU32 VoltageLabelColor = IM_COL32(255, 220, 120, 255);
+// Voltage labels sit just above and right of their point, clear of the line
+constexpr ImVec2 VoltageLabelOffset = {4.0f, -16.0f};
 // Debug colors for "Nodes": ground (node 0) uses the first one, the others cycle through the rest
 constexpr auto NodeColors = std::to_array<ImU32>({
     IM_COL32(160, 160, 160, 255),
@@ -140,6 +144,7 @@ void EditorWindow::Draw() {
         const ImU32 color = index == m_Schematic.GetSelectedElementIndex() ? SelectedColor : ElementColor;
         elements[index]->Draw(draw_list, view, color, m_SymbolStyle);
     }
+    DrawNodeVoltages(draw_list, view);
 
     if (ImGui::IsWindowFocused() && ImGui::IsKeyPressed(ImGuiKey_W)) {
         StartDrawingWires();
@@ -213,6 +218,40 @@ void EditorWindow::DrawWires(ImDrawList *draw_list, const ViewTransform &view) {
         const int node = connectivity.GetNode(wire.GetStart()).value_or(0);
         const ImVec2 middle = view.ToScreen((ToVec2(wire.GetStart()) + ToVec2(wire.GetEnd())) / 2.0f);
         draw_list->AddText(middle, NodeLabelColor, std::format("{}", node).c_str());
+    }
+}
+
+// One label per node, on its first wire or, for terminals joined without wires, on a terminal. Ground is
+// always 0 V, so it is left out
+void EditorWindow::DrawNodeVoltages(ImDrawList *draw_list, const ViewTransform &view) {
+    const auto &operating_point = m_Schematic.GetOperatingPoint();
+    if (!operating_point) {
+        return;
+    }
+    const Connectivity &connectivity = m_Schematic.GetConnectivity();
+    const std::vector<double> &voltages = operating_point->NodeVoltages;
+    std::vector<bool> labeled(voltages.size(), false);
+    const auto draw_label = [&](const GridPoint point, const ImVec2 world_pos) {
+        const std::optional<int> node = connectivity.GetNode(point);
+        if (!node || *node <= 0 || static_cast<std::size_t>(*node) >= voltages.size()) {
+            return;
+        }
+        const auto index = static_cast<std::size_t>(*node);
+        if (labeled[index]) {
+            return;
+        }
+        labeled[index] = true;
+        const std::string text = std::format("{}V", Core::FormatValue(voltages[index]));
+        draw_list->AddText(view.ToScreen(world_pos) + VoltageLabelOffset, VoltageLabelColor, text.c_str());
+    };
+
+    for (const UIWire &wire : m_Schematic.GetWires()) {
+        draw_label(wire.GetStart(), (ToVec2(wire.GetStart()) + ToVec2(wire.GetEnd())) / 2.0f);
+    }
+    for (const auto &element : m_Schematic.GetElements()) {
+        for (const GridPoint terminal : element->GetTerminals()) {
+            draw_label(terminal, ToVec2(terminal));
+        }
     }
 }
 

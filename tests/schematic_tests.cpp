@@ -167,3 +167,33 @@ TEST_CASE("BuildSpiceNetlist reflects value changes made through MarkModified", 
     schematic.MarkModified();
     CHECK(schematic.BuildSpiceNetlist().find("R1 1 0 4.7k") != std::string::npos);
 }
+
+TEST_CASE("Simulation results are dropped when the circuit changes", "[schematic]") {
+    GUI::Schematic schematic;
+    schematic.AddWire({0, 0}, {4, 0});
+    schematic.SetOperatingPoint(Core::OperatingPoint{{0.0, 5.0}});
+    REQUIRE(schematic.GetOperatingPoint());
+
+    SECTION("but not when the wires are set to what they already are, as during a drag that did not move") {
+        schematic.SetWires(schematic.GetWires());
+        schematic.SimplifyAllWires();
+        CHECK(schematic.GetOperatingPoint());
+    }
+    SECTION("when the wires really change") {
+        schematic.SetWires({{{0, 0}, {0, 4}}});
+        CHECK_FALSE(schematic.GetOperatingPoint());
+    }
+    SECTION("when a value or anything else is edited") {
+        schematic.MarkModified();
+        CHECK_FALSE(schematic.GetOperatingPoint());
+    }
+}
+
+TEST_CASE("Selecting does not drop simulation results", "[schematic]") {
+    GUI::Schematic schematic;
+    schematic.AddElement(MakeResistor({0, 0}));
+    schematic.SetOperatingPoint(Core::OperatingPoint{{0.0, 5.0}});
+    schematic.SelectElement(0);
+    schematic.ClearSelection();
+    CHECK(schematic.GetOperatingPoint());
+}

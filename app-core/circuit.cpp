@@ -41,12 +41,22 @@ int Circuit::GetNodeCount() const {
 }
 
 /**
+ * @brief   Tells whether the circuit has a ground reference.
+ * @return  True when it contains at least one ground component; without one, node voltages are undefined.
+ */
+bool Circuit::HasGround() const {
+    return std::ranges::any_of(
+        m_Entries, [](const CircuitEntry &entry) { return entry.Part->GetType() == ComponentType::Ground; });
+}
+
+/**
  * @brief   Writes the circuit as a SPICE netlist, ready to hand to ngspice.
+ * @param[in] analysis  Optional analysis command, such as ".op", written right before ".end".
  * @return  One line per component, with node numbers as SPICE node names (0 is ground), ending in ".end".
  * @note    Ground components produce no line; they only make their node 0. A supply rail becomes a DC voltage
- *          source from its node to ground. Analysis commands are left to the caller.
+ *          source from its node to ground.
  */
-std::string Circuit::ToSpiceNetlist() const {
+std::string Circuit::ToSpiceNetlist(const std::string_view analysis) const {
     std::string netlist = "* imcsim netlist\n";
     for (const CircuitEntry &entry : m_Entries) {
         const Component &component = *entry.Part;
@@ -63,6 +73,9 @@ std::string Circuit::ToSpiceNetlist() const {
         case ComponentType::Ground:
             break;
         }
+    }
+    if (!analysis.empty()) {
+        netlist += std::format("{}\n", analysis);
     }
     netlist += ".end\n";
     return netlist;

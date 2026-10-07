@@ -96,23 +96,32 @@ void Schematic::AddWire(const GridPoint start, const GridPoint end) {
 /**
  * @brief   Replaces every wire, for example while wires follow a dragged element.
  * @param[in] wires  New wires.
- * @note    Only the nodes are invalidated: call MarkModified() once the gesture counts as a change.
+ * @note    Only the derived data is invalidated, and only when the wires differ: call MarkModified() once the
+ *          gesture counts as a change.
  */
 void Schematic::SetWires(std::vector<UIWire> wires) {
+    // Drags call this every frame, so unchanged wires must not throw away the nodes and the results
+    if (wires == m_Wires) {
+        return;
+    }
     m_Wires = std::move(wires);
-    m_Connectivity.reset();
+    InvalidateDerivedData();
 }
 
 /**
  * @brief   Joins and deduplicates wire segments without changing the circuit.
- * @note    Wires are merged and removed, so a selected wire is deselected.
+ * @note    When something changes, wires are merged and removed, so a selected wire is deselected.
  */
 void Schematic::SimplifyAllWires() {
-    m_Wires = SimplifyWires(m_Wires, CollectTerminals());
+    std::vector<UIWire> simplified = SimplifyWires(m_Wires, CollectTerminals());
+    if (simplified == m_Wires) {
+        return;
+    }
+    m_Wires = std::move(simplified);
     if (m_SelectedWire) {
         ClearSelection();
     }
-    m_Connectivity.reset();
+    InvalidateDerivedData();
 }
 
 /**
@@ -149,7 +158,7 @@ void Schematic::Replace(std::vector<std::unique_ptr<UIElement>> elements, std::v
     ClearSelection();
     m_Elements = std::move(elements);
     m_Wires = std::move(wires);
-    m_Connectivity.reset();
+    InvalidateDerivedData();
     m_Modified = false;
 }
 
@@ -226,7 +235,7 @@ bool Schematic::IsModified() const {
  */
 void Schematic::MarkModified() {
     m_Modified = true;
-    m_Connectivity.reset();
+    InvalidateDerivedData();
 }
 
 /**
@@ -259,11 +268,41 @@ const Connectivity &Schematic::GetConnectivity() {
 }
 
 /**
+ * @brief   Builds the circuit topology of the schematic, for the simulator.
+ * @return  The circuit; it points at the components of this schematic, so use it before the next change.
+ */
+Core::Circuit Schematic::BuildCircuit() {
+    return GUI::BuildCircuit(m_Elements, GetConnectivity());
+}
+
+/**
  * @brief   Builds the SPICE netlist of the schematic.
- * @return  The netlist text, as handed to ngspice.
+ * @return  The netlist text, without analysis commands.
  */
 std::string Schematic::BuildSpiceNetlist() {
-    return BuildCircuit(m_Elements, GetConnectivity()).ToSpiceNetlist();
+    return BuildCircuit().ToSpiceNetlist();
+}
+
+/**
+ * @brief   Stores the result of an operating point simulation of the current schematic.
+ * @param[in] operating_point  Node voltages, numbered like GetConnectivity(), or no value to clear them.
+ * @note    The result is dropped on the next change, since it no longer matches the circuit.
+ */
+void Schematic::SetOperatingPoint(std::optional<Core::OperatingPoint> operating_point) {
+    m_OperatingPoint = std::move(operating_point);
+}
+
+/**
+ * @brief   Returns the last operating point simulated for the current schematic.
+ * @return  The node voltages, or no value when there was no simulation since the last change.
+ */
+const std::optional<Core::OperatingPoint> &Schematic::GetOperatingPoint() const {
+    return m_OperatingPoint;
+}
+
+void Schematic::InvalidateDerivedData() {
+    m_Connectivity.reset();
+    m_OperatingPoint.reset();
 }
 
 } // namespace GUI
