@@ -8,6 +8,7 @@
 
 #include "circuit.h"
 #include <expected>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -108,6 +109,60 @@ struct ACSweep {
 };
 
 /**
+ * @struct  SweepRange
+ * @brief   A source and the values a DC sweep takes it through, in the unit of the source (volts or amperes).
+ * @details Source is the name of a voltage source, a current source or a VCC rail. The values go from Start to
+ *          Stop in steps of Step, which may be negative to sweep downward.
+ */
+struct SweepRange {
+    std::string Source;
+    double Start = 0.0;
+    double Stop = 5.0;
+    double Step = 0.1;
+};
+
+/**
+ * @struct  DCSweepSettings
+ * @brief   The source a DC sweep runs through its values and, optionally, a second source stepped once per curve.
+ * @details With a second source, the whole sweep repeats for each of its values, which draws a family of curves,
+ *          such as the collector characteristics of a transistor for several base currents.
+ */
+struct DCSweepSettings {
+    SweepRange Swept;
+    std::optional<SweepRange> Stepped;
+};
+
+/**
+ * @struct  DCSweepCurve
+ * @brief   Node voltages and component currents along a DC sweep, for one value of the stepped source.
+ */
+struct DCSweepCurve {
+    // Value of the stepped source for this curve; 0 when there is no stepped source
+    double StepValue = 0.0;
+    // Indexed by node number, then by swept value; node 0 is ground and always 0 V
+    std::vector<std::vector<double>> NodeVoltages;
+    // One per current, as in Transient, with a value per swept value
+    std::vector<ComponentTrace> Currents;
+};
+
+/**
+ * @struct  DCSweep
+ * @brief   Operating points of a circuit while one source sweeps through its values, as one curve or a family.
+ * @details Currents are signed as in OperatingPoint. Units are "V" or "A", after the kind of each source.
+ */
+struct DCSweep {
+    std::string SweptSource;
+    std::string SweptUnit;
+    // The X axis of every curve
+    std::vector<double> SweptValues;
+    // Empty when no source is stepped
+    std::string SteppedSource;
+    std::string SteppedUnit;
+    // One per value of the stepped source, or a single curve
+    std::vector<DCSweepCurve> Curves;
+};
+
+/**
  * @struct  SimulationRun
  * @brief   Outcome of a simulation, with everything ngspice printed.
  */
@@ -119,10 +174,15 @@ template <typename Data> struct SimulationRun {
 using OperatingPointRun = SimulationRun<OperatingPoint>;
 using TransientRun = SimulationRun<Transient>;
 using ACSweepRun = SimulationRun<ACSweep>;
+using DCSweepRun = SimulationRun<DCSweep>;
 
 OperatingPointRun RunOperatingPoint(const Circuit &circuit);
 TransientRun RunTransient(const Circuit &circuit, const TransientSettings &settings);
 ACSweepRun RunACSweep(const Circuit &circuit, const ACSweepSettings &settings);
+DCSweepRun RunDCSweep(const Circuit &circuit, const DCSweepSettings &settings);
+
+// Sources
+std::vector<std::string> GetSweepableSources(const Circuit &circuit);
 
 } // namespace Core
 
