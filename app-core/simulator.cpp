@@ -7,6 +7,7 @@
 
 #include "simulator.h"
 
+#include "components/diode.h"
 #include "components/source.h"
 #include "spice_value.h"
 #include <algorithm>
@@ -193,6 +194,12 @@ std::string ToLower(std::string text) {
     return text;
 }
 
+// The branch current of a voltage source, or of an inductor, or of the probe in series with a diode
+std::string BranchVectorName(const Component &component) {
+    const std::string source = IsDiode(component.GetType()) ? GetCurrentProbeName(component) : component.GetName();
+    return std::format("{}#branch", ToLower(source));
+}
+
 // The vector where ngspice saves the current through a component in .op and .tran, with .options savecurrents.
 // Every one of them is positive from the first terminal to the second, through the component
 std::optional<std::string> CurrentVectorName(const Component &component) {
@@ -204,7 +211,10 @@ std::optional<std::string> CurrentVectorName(const Component &component) {
         return std::format("@{}[i]", name);
     case ComponentType::VCC:
     case ComponentType::VoltageSource:
-        return std::format("{}#branch", name);
+    case ComponentType::Diode:
+    case ComponentType::ZenerDiode:
+    case ComponentType::LED:
+        return BranchVectorName(component);
     case ComponentType::CurrentSource:
         return std::format("@{}[current]", name);
     case ComponentType::Ground:
@@ -220,6 +230,22 @@ double ToDecibels(const std::complex<double> value) {
 
 double ToDegrees(const std::complex<double> value) {
     return std::arg(value) * 180.0 / std::numbers::pi;
+}
+
+// Zeners work in breakdown, but other diodes only reach it when the circuit exceeds their rating, which ngspice
+// simulates without complaint
+std::optional<std::string> BreakdownWarning(const CircuitEntry &entry, const double highest_reverse_voltage) {
+    if (entry.Part->GetType() == ComponentType::ZenerDiode) {
+        return std::nullopt;
+    }
+    const auto &diode = static_cast<const Diode &>(*entry.Part);
+    const double breakdown_voltage = diode.GetParameters().BreakdownVoltage;
+    if (highest_reverse_voltage < breakdown_voltage) {
+        return std::nullopt;
+    }
+    return std::format("{} ({}) goes into reverse breakdown: it sees up to {}V in reverse but is rated for {}V",
+                       diode.GetName(), diode.GetModelName(), FormatValue(highest_reverse_voltage),
+                       FormatValue(breakdown_voltage));
 }
 
 std::expected<OperatingPoint, std::string> ReadOperatingPoint(const Circuit &circuit) {
@@ -242,6 +268,16 @@ std::expected<OperatingPoint, std::string> ReadOperatingPoint(const Circuit &cir
             return std::unexpected(std::format("ngspice returned no current for {}", entry.Part->GetName()));
         }
         result.Currents.push_back({entry.Part->GetName(), vector->v_realdata[0]});
+    }
+    for (const CircuitEntry &entry : circuit.GetEntries()) {
+        if (!IsDiode(entry.Part->GetType())) {
+            continue;
+        }
+        const double reverse_voltage = result.NodeVoltages[static_cast<std::size_t>(entry.Nodes[1])] -
+                                       result.NodeVoltages[static_cast<std::size_t>(entry.Nodes[0])];
+        if (std::optional<std::string> warning = BreakdownWarning(entry, reverse_voltage)) {
+            result.Warnings.push_back(std::move(*warning));
+        }
     }
     return result;
 }
@@ -273,11 +309,26 @@ std::expected<Transient, std::string> ReadTransient(const Circuit &circuit) {
         }
         result.Currents.push_back({entry.Part->GetName(), RealPart(*vector)});
     }
+    for (const CircuitEntry &entry : circuit.GetEntries()) {
+        if (!IsDiode(entry.Part->GetType())) {
+            continue;
+        }
+        const std::vector<double> &anode = result.NodeVoltages[static_cast<std::size_t>(entry.Nodes[0])];
+        const std::vector<double> &cathode = result.NodeVoltages[static_cast<std::size_t>(entry.Nodes[1])];
+        double highest_reverse_voltage = cathode[0] - anode[0];
+        for (std::size_t index = 1; index < result.Times.size(); ++index) {
+            highest_reverse_voltage = std::max(highest_reverse_voltage, cathode[index] - anode[index]);
+        }
+        if (std::optional<std::string> warning = BreakdownWarning(entry, highest_reverse_voltage)) {
+            result.Warnings.push_back(std::move(*warning));
+        }
+    }
     return result;
 }
 
 // ngspice computes no device currents in .ac, so resistors, capacitors and current sources are worked out from
-// their node voltages and values; inductors and voltage sources have their branch current in the results
+// their node voltages and values; inductors, voltage sources and diode probes have their branch current in the
+// results
 std::expected<std::vector<std::complex<double>>, std::string>
 ACCurrent(const CircuitEntry &entry, const std::vector<double> &frequencies,
           const std::vector<std::vector<std::complex<double>>> &node_voltages) {
@@ -305,8 +356,11 @@ ACCurrent(const CircuitEntry &entry, const std::vector<double> &frequencies,
     }
     case ComponentType::Inductor:
     case ComponentType::VCC:
-    case ComponentType::VoltageSource: {
-        const pvector_info vector = FindVector(std::format("{}#branch", ToLower(component.GetName())));
+    case ComponentType::VoltageSource:
+    case ComponentType::Diode:
+    case ComponentType::ZenerDiode:
+    case ComponentType::LED: {
+        const pvector_info vector = FindVector(BranchVectorName(component));
         if (vector == nullptr || static_cast<std::size_t>(vector->v_length) != frequencies.size()) {
             return std::unexpected(std::format("ngspice returned no currents for {}", component.GetName()));
         }
@@ -377,8 +431,9 @@ SimulationRun<Data> Simulate(const Circuit &circuit, const std::string_view anal
 
     NgspiceState &state = GetState();
     state.Messages = &run.Messages;
-    // savecurrents makes ngspice keep the current through every component, not only through voltage sources
-    LoadCircuit(circuit.ToSpiceNetlist(std::format(".options savecurrents\n{}", analysis)));
+    // savecurrents makes ngspice keep the current through every component, not only through voltage sources;
+    // diodes get probes instead, since ngspice saves no usable diode current in .ac
+    LoadCircuit(circuit.ToSpiceNetlist(std::format(".options savecurrents\n{}", analysis), true));
     SendCommand("run");
     const char *plot = ngSpice_CurPlot();
     if (plot == nullptr || !std::string_view(plot).starts_with(plot_prefix) || HasErrorLine(run.Messages)) {

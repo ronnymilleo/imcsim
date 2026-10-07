@@ -6,6 +6,7 @@
 #include "circuit.h"
 #include "components/capacitor.h"
 #include "components/current_source.h"
+#include "components/diode.h"
 #include "components/ground.h"
 #include "components/resistor.h"
 #include "components/vcc.h"
@@ -13,6 +14,7 @@
 #include "simulator.h"
 #include <algorithm>
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/generators/catch_generators.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 #include <cmath>
 #include <complex>
@@ -63,6 +65,35 @@ struct LowPass {
         Circuit.Add(Source, {1, 0});
         Circuit.Add(Series, {1, 2});
         Circuit.Add(Shunt, {2, 0});
+        Circuit.Add(Reference, {0});
+    }
+};
+
+/**
+ * @struct  DiodeLoop
+ * @brief   A supply on node 1 feeding a resistor to node 2, where a diode part connects to ground.
+ * @details The diode is forward biased from node 2 to ground, except a Zener, which is reversed into breakdown.
+ */
+struct DiodeLoop {
+    Core::VCC Supply;
+    Core::Resistor Series;
+    Core::Diode Part;
+    Core::Ground Reference;
+    Core::Circuit Circuit;
+
+    DiodeLoop(const Core::ComponentType type, const double supply, const double resistance) : Part(type) {
+        Supply.SetName("V1");
+        Supply.SetValue(supply);
+        Series.SetName("R1");
+        Series.SetValue(resistance);
+        Part.SetName("D1");
+        Circuit.Add(Supply, {1});
+        Circuit.Add(Series, {1, 2});
+        if (type == Core::ComponentType::ZenerDiode) {
+            Circuit.Add(Part, {0, 2});
+        } else {
+            Circuit.Add(Part, {2, 0});
+        }
         Circuit.Add(Reference, {0});
     }
 };
@@ -355,4 +386,212 @@ TEST_CASE("An AC current source excites an AC sweep", "[simulator]") {
         CHECK_THAT(FindCurrent(run.Result->CurrentMagnitudesDecibels, "R1").Values[index],
                    Catch::Matchers::WithinAbs(-60.0, 1e-6));
     }
+}
+
+TEST_CASE("A forward biased diode drops its forward voltage and carries the loop current", "[simulator]") {
+    const DiodeLoop loop(Core::ComponentType::Diode, 5.0, 1e3);
+    const Core::OperatingPointRun run = Core::RunOperatingPoint(loop.Circuit);
+    if (!run.Result) {
+        FAIL(run.Result.error());
+    }
+    const double forward_voltage = run.Result->NodeVoltages[2];
+    CHECK(forward_voltage > 0.6);
+    CHECK(forward_voltage < 0.8);
+    // The diode current flows from anode to cathode, the same as through the resistor
+    const double resistor_current = FindCurrent(run.Result->Currents, "R1").Current;
+    CHECK_THAT(resistor_current, Catch::Matchers::WithinRel((5.0 - forward_voltage) / 1e3, 1e-6));
+    CHECK_THAT(FindCurrent(run.Result->Currents, "D1").Current, Catch::Matchers::WithinRel(resistor_current, 1e-6));
+}
+
+TEST_CASE("A Zener diode in breakdown holds its voltage", "[simulator]") {
+    const DiodeLoop loop(Core::ComponentType::ZenerDiode, 12.0, 1e3);
+    const Core::OperatingPointRun run = Core::RunOperatingPoint(loop.Circuit);
+    if (!run.Result) {
+        FAIL(run.Result.error());
+    }
+    CHECK_THAT(run.Result->NodeVoltages[2], Catch::Matchers::WithinAbs(5.1, 0.05));
+    // The breakdown current flows from cathode to anode, against the forward direction
+    CHECK(FindCurrent(run.Result->Currents, "D1").Current < 0.0);
+    // Breakdown is how a Zener works, so it is not a problem
+    CHECK(run.Result->Warnings.empty());
+}
+
+TEST_CASE("Each LED model drops its rated forward voltage at 20 mA", "[simulator]") {
+    struct Rating {
+        const char *Model;
+        double ForwardVoltage;
+    };
+    const Rating rating = GENERATE(Rating{"Red", 1.8}, Rating{"Green", 2.1}, Rating{"Blue", 3.0});
+    CAPTURE(rating.Model);
+    // The resistor sets 20 mA when the LED drops its rated voltage
+    DiodeLoop loop(Core::ComponentType::LED, 5.0, (5.0 - rating.ForwardVoltage) / 20e-3);
+    const Core::DiodeModel *model = Core::FindDiodeModel(Core::ComponentType::LED, rating.Model);
+    REQUIRE(model != nullptr);
+    loop.Part.SetModel(*model);
+
+    const Core::OperatingPointRun run = Core::RunOperatingPoint(loop.Circuit);
+    if (!run.Result) {
+        FAIL(run.Result.error());
+    }
+    CHECK_THAT(run.Result->NodeVoltages[2], Catch::Matchers::WithinAbs(rating.ForwardVoltage, 0.02));
+}
+
+TEST_CASE("A half-wave rectifier passes only the positive half of a sine", "[simulator]") {
+    Core::VoltageSource source;
+    source.SetName("Vin1");
+    source.SetSourceType(Core::VoltageSource::SourceType::AC);
+    source.SetAC({.Amplitude = 5.0, .Frequency = 1e3, .Offset = 0.0});
+    Core::Diode rectifier(Core::ComponentType::Diode);
+    rectifier.SetName("D1");
+    rectifier.SetModel(*Core::FindDiodeModel(Core::ComponentType::Diode, "1N4007"));
+    Core::Resistor load;
+    load.SetName("R1");
+    const Core::Ground reference;
+    Core::Circuit circuit;
+    circuit.Add(source, {1, 0});
+    circuit.Add(rectifier, {1, 2});
+    circuit.Add(load, {2, 0});
+    circuit.Add(reference, {0});
+
+    const Core::TransientRun run = Core::RunTransient(circuit, {.StopTime = 2e-3, .TimeStep = 1e-6});
+    if (!run.Result) {
+        FAIL(run.Result.error());
+    }
+    const std::vector<double> &output = run.Result->NodeVoltages[2];
+    // Only leakage reaches the load in the negative half; the positive peak loses one forward drop
+    CHECK(std::ranges::min(output) > -1e-3);
+    CHECK(std::ranges::max(output) > 4.0);
+    CHECK(std::ranges::max(output) < 4.5);
+    CHECK(run.Result->Warnings.empty());
+    const std::vector<double> &diode_current = FindCurrent(run.Result->Currents, "D1").Values;
+    const std::vector<double> &load_current = FindCurrent(run.Result->Currents, "R1").Values;
+    for (std::size_t index = 0; index < diode_current.size(); ++index) {
+        CHECK_THAT(diode_current[index], Catch::Matchers::WithinAbs(load_current[index], 1e-9));
+    }
+}
+
+TEST_CASE("An AC sweep has the small-signal current of a biased diode", "[simulator]") {
+    Core::VoltageSource source;
+    source.SetName("Vin1");
+    source.SetSourceType(Core::VoltageSource::SourceType::AC);
+    // The offset biases the diode, so it conducts around its operating point
+    source.SetAC({.Amplitude = 1.0, .Frequency = 1e3, .Offset = 5.0});
+    Core::Resistor series;
+    series.SetName("R1");
+    Core::Diode diode(Core::ComponentType::Diode);
+    diode.SetName("D1");
+    const Core::Ground reference;
+    Core::Circuit circuit;
+    circuit.Add(source, {1, 0});
+    circuit.Add(series, {1, 2});
+    circuit.Add(diode, {2, 0});
+    circuit.Add(reference, {0});
+
+    const Core::ACSweepRun run = Core::RunACSweep(circuit, {.StartFrequency = 1e3, .StopFrequency = 1e6});
+    if (!run.Result) {
+        FAIL(run.Result.error());
+    }
+    const std::vector<double> &diode_magnitudes = FindCurrent(run.Result->CurrentMagnitudesDecibels, "D1").Values;
+    const std::vector<double> &diode_phases = FindCurrent(run.Result->CurrentPhasesDegrees, "D1").Values;
+    const std::vector<double> &resistor_magnitudes = FindCurrent(run.Result->CurrentMagnitudesDecibels, "R1").Values;
+    const std::vector<double> &resistor_phases = FindCurrent(run.Result->CurrentPhasesDegrees, "R1").Values;
+    for (std::size_t index = 0; index < run.Result->Frequencies.size(); ++index) {
+        // Nearly all of the 1 mA per volt goes through the conducting diode, which is in series with the resistor
+        CHECK(diode_magnitudes[index] > -61.0);
+        CHECK_THAT(diode_magnitudes[index], Catch::Matchers::WithinAbs(resistor_magnitudes[index], 1e-6));
+        CHECK_THAT(diode_phases[index], Catch::Matchers::WithinAbs(resistor_phases[index], 1e-6));
+    }
+}
+
+TEST_CASE("A reversed LED past its rating is reported in reverse breakdown", "[simulator]") {
+    Core::VCC supply;
+    supply.SetName("V1");
+    supply.SetValue(12.0);
+    Core::Resistor series;
+    series.SetName("R1");
+    Core::Diode led(Core::ComponentType::LED);
+    led.SetName("D1");
+    const Core::Ground reference;
+    Core::Circuit circuit;
+    circuit.Add(supply, {1});
+    circuit.Add(series, {1, 2});
+    circuit.Add(led, {0, 2});
+    circuit.Add(reference, {0});
+
+    const Core::OperatingPointRun run = Core::RunOperatingPoint(circuit);
+    if (!run.Result) {
+        FAIL(run.Result.error());
+    }
+    REQUIRE(run.Result->Warnings.size() == 1);
+    CAPTURE(run.Result->Warnings[0]);
+    CHECK(run.Result->Warnings[0].starts_with("D1 (Red) goes into reverse breakdown"));
+    CHECK(run.Result->Warnings[0].ends_with("rated for 5V"));
+}
+
+TEST_CASE("A transient reports a diode that breaks down at any time point", "[simulator]") {
+    Core::VoltageSource source;
+    source.SetName("Vin1");
+    source.SetSourceType(Core::VoltageSource::SourceType::AC);
+    source.SetAC({.Amplitude = 150.0, .Frequency = 1e3, .Offset = 0.0});
+    Core::Diode rectifier(Core::ComponentType::Diode);
+    rectifier.SetName("D1");
+    Core::Resistor load;
+    load.SetName("R1");
+    const Core::Ground reference;
+    Core::Circuit circuit;
+    circuit.Add(source, {1, 0});
+    circuit.Add(rectifier, {1, 2});
+    circuit.Add(load, {2, 0});
+    circuit.Add(reference, {0});
+
+    // The negative half of the sine puts 150 V across a 1N4148 rated for 100 V
+    const Core::TransientRun run = Core::RunTransient(circuit, {.StopTime = 2e-3, .TimeStep = 1e-6});
+    if (!run.Result) {
+        FAIL(run.Result.error());
+    }
+    REQUIRE(run.Result->Warnings.size() == 1);
+    CAPTURE(run.Result->Warnings[0]);
+    CHECK(run.Result->Warnings[0].starts_with("D1 (1N4148) goes into reverse breakdown"));
+}
+
+TEST_CASE("A custom Zener regulates at its own breakdown voltage", "[simulator]") {
+    DiodeLoop loop(Core::ComponentType::ZenerDiode, 20.0, 1e3);
+    loop.Part.SetCustom();
+    Core::DiodeParameters parameters = loop.Part.GetParameters();
+    parameters.BreakdownVoltage = 9.1;
+    loop.Part.SetCustomParameters(parameters);
+
+    const Core::OperatingPointRun run = Core::RunOperatingPoint(loop.Circuit);
+    if (!run.Result) {
+        FAIL(run.Result.error());
+    }
+    CHECK_THAT(run.Result->NodeVoltages[2], Catch::Matchers::WithinAbs(9.1, 0.05));
+}
+
+TEST_CASE("The breakdown warning uses the voltage of a custom diode", "[simulator]") {
+    // 12 V across a 1N4148 is fine, but not once its custom BV drops to 10 V
+    DiodeLoop loop(Core::ComponentType::Diode, 12.0, 1e3);
+    Core::Circuit reversed;
+    reversed.Add(loop.Supply, {1});
+    reversed.Add(loop.Series, {1, 2});
+    reversed.Add(loop.Part, {0, 2});
+    reversed.Add(loop.Reference, {0});
+
+    const Core::OperatingPointRun rated = Core::RunOperatingPoint(reversed);
+    if (!rated.Result) {
+        FAIL(rated.Result.error());
+    }
+    CHECK(rated.Result->Warnings.empty());
+
+    Core::DiodeParameters parameters = loop.Part.GetParameters();
+    parameters.BreakdownVoltage = 10.0;
+    loop.Part.SetCustomParameters(parameters);
+    const Core::OperatingPointRun custom = Core::RunOperatingPoint(reversed);
+    if (!custom.Result) {
+        FAIL(custom.Result.error());
+    }
+    REQUIRE(custom.Result->Warnings.size() == 1);
+    CAPTURE(custom.Result->Warnings[0]);
+    CHECK(custom.Result->Warnings[0].starts_with("D1 (Custom) goes into reverse breakdown"));
+    CHECK(custom.Result->Warnings[0].ends_with("rated for 10V"));
 }

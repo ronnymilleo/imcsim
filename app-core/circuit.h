@@ -36,12 +36,14 @@ public:
     int GetNodeCount() const;
     bool HasGround() const;
     bool HasACSource() const;
-    std::string ToSpiceNetlist(std::string_view analysis = "") const;
+    std::string ToSpiceNetlist(std::string_view analysis = "", bool add_current_probes = false) const;
 
 private:
     std::vector<CircuitEntry> m_Entries;
     int m_NodeCount = 0;
 };
+
+std::string GetCurrentProbeName(const Component &diode);
 
 } // namespace Core
 

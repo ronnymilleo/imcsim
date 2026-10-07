@@ -24,6 +24,9 @@ constexpr auto AllTypes = std::to_array<ComponentType>({
     ComponentType::VCC,
     ComponentType::VoltageSource,
     ComponentType::CurrentSource,
+    ComponentType::Diode,
+    ComponentType::ZenerDiode,
+    ComponentType::LED,
 });
 
 } // namespace
@@ -54,7 +57,7 @@ const char *Component::GetTypeName() const {
 
 /**
  * @brief   Returns the SPICE letter that starts the name of this kind of component.
- * @return  "R", "C", "L", "V", "Vin" or "I", or an empty string for ground, which is not named.
+ * @return  "R", "C", "L", "V", "Vin", "I" or "D", or an empty string for ground, which is not named.
  */
 const char *Component::GetNamePrefix() const {
     switch (m_Type) {
@@ -71,6 +74,10 @@ const char *Component::GetNamePrefix() const {
         return "Vin";
     case ComponentType::CurrentSource:
         return "I";
+    case ComponentType::Diode:
+    case ComponentType::ZenerDiode:
+    case ComponentType::LED:
+        return "D";
     case ComponentType::Ground:
         return "";
     }
@@ -79,7 +86,7 @@ const char *Component::GetNamePrefix() const {
 
 /**
  * @brief   Returns the unit of the component value.
- * @return  "Ohm", "F", "H" or "V", or an empty string when the component has no value.
+ * @return  "Ohm", "F", "H", "V" or "A", or an empty string when the component has no value.
  */
 const char *Component::GetUnit() const {
     switch (m_Type) {
@@ -95,17 +102,34 @@ const char *Component::GetUnit() const {
     case ComponentType::CurrentSource:
         return "A";
     case ComponentType::Ground:
+    case ComponentType::Diode:
+    case ComponentType::ZenerDiode:
+    case ComponentType::LED:
         return "";
     }
     return "";
 }
 
 /**
- * @brief   Tells whether the component carries a value.
- * @return  False for ground, true for everything else.
+ * @brief   Tells whether the component carries a numeric value.
+ * @return  False for ground and for diodes, whose model sets their behavior; true for everything else.
  */
 bool Component::HasValue() const {
-    return m_Type != ComponentType::Ground;
+    switch (m_Type) {
+    case ComponentType::Ground:
+    case ComponentType::Diode:
+    case ComponentType::ZenerDiode:
+    case ComponentType::LED:
+        return false;
+    case ComponentType::Resistor:
+    case ComponentType::Capacitor:
+    case ComponentType::Inductor:
+    case ComponentType::VCC:
+    case ComponentType::VoltageSource:
+    case ComponentType::CurrentSource:
+        return true;
+    }
+    return false;
 }
 
 /**
@@ -124,6 +148,9 @@ bool Component::IsValidValue(const double value) const {
     case ComponentType::CurrentSource:
         return true;
     case ComponentType::Ground:
+    case ComponentType::Diode:
+    case ComponentType::ZenerDiode:
+    case ComponentType::LED:
         return false;
     }
     return false;
@@ -182,6 +209,12 @@ const char *GetTypeName(const ComponentType type) {
         return "VoltageSource";
     case ComponentType::CurrentSource:
         return "CurrentSource";
+    case ComponentType::Diode:
+        return "Diode";
+    case ComponentType::ZenerDiode:
+        return "ZenerDiode";
+    case ComponentType::LED:
+        return "LED";
     }
     return "Unknown";
 }

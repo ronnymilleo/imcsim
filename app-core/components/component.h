@@ -25,13 +25,17 @@ enum class ComponentType {
     VCC,
     VoltageSource,
     CurrentSource,
+    Diode,
+    ZenerDiode,
+    LED,
 };
 
 /**
  * @class   Component
  * @brief   A circuit component in the simulation model.
  * @details Polymorphic base: store derived components through pointers to avoid slicing. Names follow SPICE,
- *          where the first letter tells the element kind (R1, C1, L1, V1, I1). Ground has no name and no value.
+ *          where the first letter tells the element kind (R1, C1, L1, V1, I1, D1). Ground has no name and no
+ *          value, and diodes have a model instead of a value.
  */
 class Component {
 public:

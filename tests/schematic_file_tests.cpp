@@ -4,6 +4,7 @@
  */
 
 #include "components/current_source.h"
+#include "components/diode.h"
 #include "components/voltage_source.h"
 #include "element_factory.h"
 #include "schematic_file.h"
@@ -11,6 +12,7 @@
 #include <catch2/catch_test_macros.hpp>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace {
@@ -205,4 +207,75 @@ TEST_CASE("A current source keeps its value, type and waveforms", "[schematic_fi
     CHECK(copy.GetSourceType() == Core::CurrentSource::SourceType::AC);
     CHECK(copy.GetAC().Amplitude == 5e-3);
     CHECK(copy.GetPulse().High == 1e-3);
+}
+
+TEST_CASE("A diode part keeps its model", "[schematic_file]") {
+    std::vector<std::unique_ptr<GUI::UIElement>> elements;
+    elements.push_back(GUI::CreateElement(Core::ComponentType::ZenerDiode, {2, 4}, GUI::Rotation::R90));
+    auto &zener = static_cast<Core::Diode &>(elements.back()->GetComponent());
+    zener.SetName("D1");
+    zener.SetModel(*Core::FindDiodeModel(Core::ComponentType::ZenerDiode, "12V"));
+
+    const std::string saved = GUI::SaveSchematic(elements, {});
+    CHECK(saved.find(R"("value")") == std::string::npos);
+    const GUI::LoadedSchematic loaded = LoadOrFail(saved);
+    CHECK(loaded.Warnings.empty());
+    REQUIRE(loaded.Elements.size() == 1);
+    const auto &copy = static_cast<const Core::Diode &>(loaded.Elements[0]->GetComponent());
+    CHECK(copy.GetType() == Core::ComponentType::ZenerDiode);
+    CHECK(copy.GetName() == "D1");
+    CHECK(std::string_view(copy.GetModelName()) == "12V");
+}
+
+TEST_CASE("A diode part without a model of its kind is skipped", "[schematic_file]") {
+    const GUI::LoadedSchematic loaded = LoadOrFail(Document(
+        R"({"type": "Diode", "name": "D1", "x": 0, "y": 0, "rotation": 0},
+           {"type": "LED", "name": "D2", "model": "1N4148", "x": 0, "y": 0, "rotation": 0},
+           {"type": "LED", "name": "D3", "model": "Green", "x": 0, "y": 0, "rotation": 0})",
+        ""));
+
+    REQUIRE(loaded.Elements.size() == 1);
+    CHECK(loaded.Elements[0]->GetComponent().GetName() == "D3");
+    CAPTURE(loaded.Warnings);
+    CHECK(loaded.Warnings.size() == 2);
+}
+
+TEST_CASE("A custom diode keeps its parameters", "[schematic_file]") {
+    std::vector<std::unique_ptr<GUI::UIElement>> elements;
+    elements.push_back(GUI::CreateElement(Core::ComponentType::LED, {0, 0}, GUI::Rotation::R0));
+    auto &led = static_cast<Core::Diode &>(elements.back()->GetComponent());
+    led.SetName("D1");
+    led.SetCustom();
+    Core::DiodeParameters parameters = led.GetParameters();
+    parameters.SaturationCurrent = 1.5e-21;
+    parameters.TransitTime = 5e-9;
+    led.SetCustomParameters(parameters);
+
+    const GUI::LoadedSchematic loaded = LoadOrFail(GUI::SaveSchematic(elements, {}));
+    CHECK(loaded.Warnings.empty());
+    REQUIRE(loaded.Elements.size() == 1);
+    const auto &copy = static_cast<const Core::Diode &>(loaded.Elements[0]->GetComponent());
+    CHECK(copy.IsCustom());
+    CHECK(copy.GetParameters().SaturationCurrent == 1.5e-21);
+    CHECK(copy.GetParameters().TransitTime == 5e-9);
+    CHECK(copy.GetParameters().EmissionCoefficient == parameters.EmissionCoefficient);
+}
+
+TEST_CASE("Custom diode parameters fill in from the default model and are checked", "[schematic_file]") {
+    const GUI::LoadedSchematic loaded = LoadOrFail(Document(
+        R"({"type": "ZenerDiode", "name": "D1", "model": "Custom", "parameters": {"bv": 9.1}, "x": 0, "y": 0,
+            "rotation": 0},
+           {"type": "Diode", "name": "D2", "model": "Custom", "parameters": {"is": -1}, "x": 0, "y": 0, "rotation": 0},
+           {"type": "Diode", "name": "D3", "model": "Custom", "parameters": {"n": "two"}, "x": 0, "y": 0,
+            "rotation": 0})",
+        ""));
+
+    REQUIRE(loaded.Elements.size() == 1);
+    const auto &zener = static_cast<const Core::Diode &>(loaded.Elements[0]->GetComponent());
+    CHECK(zener.IsCustom());
+    CHECK(zener.GetParameters().BreakdownVoltage == 9.1);
+    // The rest comes from 5V1, the default Zener
+    CHECK(zener.GetParameters().BreakdownCurrent == 5e-3);
+    CAPTURE(loaded.Warnings);
+    CHECK(loaded.Warnings.size() == 2);
 }

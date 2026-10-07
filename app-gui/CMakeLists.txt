@@ -14,6 +14,7 @@ add_library(imcsim-gui-lib
             theme.cpp
             ui_elements/ui_capacitor.cpp
             ui_elements/ui_current_source.cpp
+            ui_elements/ui_diode.cpp
             ui_elements/ui_element.cpp
             ui_elements/ui_ground.cpp
             ui_elements/ui_inductor.cpp

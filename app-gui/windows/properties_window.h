@@ -7,6 +7,7 @@
 #define IMCSIM_PROPERTIES_WINDOW_H
 
 #include "components/component.h"
+#include "components/diode.h"
 #include "components/source.h"
 #include "schematic.h"
 #include "value_field.h"
@@ -36,10 +37,13 @@ private:
     // One per member of Core::ACParameters and Core::PulseParameters, in the order the window lists them
     std::array<ValueField, 3> m_ACFields;
     std::array<ValueField, 7> m_PulseFields;
+    // One per member of Core::DiodeParameters, for custom diodes
+    std::array<ValueField, 9> m_DiodeFields;
 
     void Draw() override;
     void LoadFields(const Core::Component &component);
     void DrawValue(Core::Component &component);
+    void DrawDiode(Core::Diode &diode);
     void DrawSource(Core::Source &source);
     void DrawSine(Core::Source &source);
     void DrawPulse(Core::Source &source);

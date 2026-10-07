@@ -43,6 +43,14 @@ bool DrawRunStatus(const std::optional<std::string> &error, const std::vector<Co
     return true;
 }
 
+void DrawResultWarnings(const std::vector<std::string> &warnings) {
+    ImGui::PushTextWrapPos(0.0f);
+    for (const std::string &warning : warnings) {
+        ImGui::TextColored(GetWarningTextColor(), "%s", warning.c_str());
+    }
+    ImGui::PopTextWrapPos();
+}
+
 void DrawOutput(const std::vector<Core::SimulatorMessage> &messages) {
     if (messages.empty() || !ImGui::CollapsingHeader("ngspice output")) {
         return;
@@ -94,6 +102,7 @@ void SimulationWindow::DrawOperatingPointTab() {
     }
     const auto &operating_point = m_Schematic.GetOperatingPoint();
     if (DrawRunStatus(m_OperatingPointStatus.Error, m_OperatingPointStatus.Messages, operating_point.has_value())) {
+        DrawResultWarnings(operating_point->Warnings);
         DrawNodeVoltages(*operating_point);
         DrawCurrents(*operating_point);
     }
@@ -113,6 +122,7 @@ void SimulationWindow::DrawTransientTab() {
     }
     const auto &transient = m_Schematic.GetTransient();
     if (DrawRunStatus(m_TransientStatus.Error, m_TransientStatus.Messages, transient.has_value())) {
+        DrawResultWarnings(transient->Warnings);
         ImGui::TextUnformatted("Done; the voltages and currents are in the Output window");
     }
     DrawOutput(m_TransientStatus.Messages);
