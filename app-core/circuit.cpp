@@ -5,7 +5,7 @@
 
 #include "circuit.h"
 
-#include "components/voltage_source.h"
+#include "components/source.h"
 #include "spice_value.h"
 #include <algorithm>
 #include <format>
@@ -16,24 +16,25 @@ namespace Core {
 namespace {
 
 bool IsACSource(const Component &component) {
-    return component.GetType() == ComponentType::VoltageSource &&
-           static_cast<const VoltageSource &>(component).GetSourceType() == VoltageSource::SourceType::AC;
+    return IsSource(component.GetType()) &&
+           static_cast<const Source &>(component).GetSourceType() == Source::SourceType::AC;
 }
 
 // One line serves every analysis: .op reads the DC value, .ac the AC magnitude and .tran the waveform. A pulse
-// starts at its low level, so that is its DC value
-std::string FormatVoltageSource(const VoltageSource &source, const std::vector<int> &nodes) {
+// starts at its low level, so that is its DC value. The name tells SPICE whether it is a voltage or current source
+std::string FormatSource(const Source &source, const std::vector<int> &nodes) {
     const std::string start = std::format("{} {} {}", source.GetName(), nodes[0], nodes[1]);
     switch (source.GetSourceType()) {
-    case VoltageSource::SourceType::DC:
+    case Source::SourceType::DC:
         return std::format("{} DC {}\n", start, FormatSpiceValue(source.GetValue()));
-    case VoltageSource::SourceType::AC: {
-        const std::string offset = FormatSpiceValue(source.GetOffset());
-        const std::string amplitude = FormatSpiceValue(source.GetAmplitude());
+    case Source::SourceType::AC: {
+        const ACParameters &ac = source.GetAC();
+        const std::string offset = FormatSpiceValue(ac.Offset);
+        const std::string amplitude = FormatSpiceValue(ac.Amplitude);
         return std::format("{} DC {} AC {} SIN({} {} {})\n", start, offset, amplitude, offset, amplitude,
-                           FormatSpiceValue(source.GetFrequency()));
+                           FormatSpiceValue(ac.Frequency));
     }
-    case VoltageSource::SourceType::Pulse: {
+    case Source::SourceType::Pulse: {
         const PulseParameters &pulse = source.GetPulse();
         const std::string low = FormatSpiceValue(pulse.Low);
         return std::format("{} DC {} PULSE({} {} {} {} {} {} {})\n", start, low, low, FormatSpiceValue(pulse.High),
@@ -86,7 +87,7 @@ bool Circuit::HasGround() const {
 
 /**
  * @brief   Tells whether the circuit has a source that an AC sweep can excite.
- * @return  True when it contains at least one voltage source set to AC.
+ * @return  True when it contains at least one voltage or current source set to AC.
  */
 bool Circuit::HasACSource() const {
     return std::ranges::any_of(m_Entries, [](const CircuitEntry &entry) { return IsACSource(*entry.Part); });
@@ -115,7 +116,8 @@ std::string Circuit::ToSpiceNetlist(const std::string_view analysis) const {
             netlist += std::format("{} {} 0 DC {}\n", component.GetName(), entry.Nodes[0], value);
             break;
         case ComponentType::VoltageSource:
-            netlist += FormatVoltageSource(static_cast<const VoltageSource &>(component), entry.Nodes);
+        case ComponentType::CurrentSource:
+            netlist += FormatSource(static_cast<const Source &>(component), entry.Nodes);
             break;
         case ComponentType::Ground:
             break;

@@ -5,7 +5,7 @@
 
 #include "schematic_file.h"
 
-#include "components/voltage_source.h"
+#include "components/source.h"
 #include "element_factory.h"
 #include "nlohmann/json.hpp"
 #include <array>
@@ -23,15 +23,22 @@ constexpr std::string_view FormatName = "imcsim-schematic";
 constexpr int FormatVersion = 1;
 
 /**
- * @struct  PulseKey
- * @brief   JSON key of one pulse parameter and the member it is read into.
+ * @struct  ParameterKey
+ * @brief   JSON key of one member of a parameter set, such as Core::PulseParameters, and the member itself.
  */
-struct PulseKey {
+template <typename Parameters> struct ParameterKey {
     const char *Name;
-    double Core::PulseParameters::*Value;
+    double Parameters::*Value;
 };
 
-constexpr auto PulseKeys = std::to_array<PulseKey>({
+// The sine keys sit in the element object itself, where the first files with AC sources put them
+constexpr auto ACKeys = std::to_array<ParameterKey<Core::ACParameters>>({
+    {"amplitude", &Core::ACParameters::Amplitude},
+    {"frequency", &Core::ACParameters::Frequency},
+    {"offset", &Core::ACParameters::Offset},
+});
+
+constexpr auto PulseKeys = std::to_array<ParameterKey<Core::PulseParameters>>({
     {"low", &Core::PulseParameters::Low},
     {"high", &Core::PulseParameters::High},
     {"delay", &Core::PulseParameters::Delay},
@@ -75,6 +82,31 @@ std::optional<GridPoint> ReadPoint(const nlohmann::json &object, const char *key
     return GridPoint{(*entry)[0].get<int>(), (*entry)[1].get<int>()};
 }
 
+template <typename Parameters, std::size_t Count>
+void WriteParameters(const std::array<ParameterKey<Parameters>, Count> &keys, const Parameters &parameters,
+                     nlohmann::json &object) {
+    for (const ParameterKey<Parameters> &key : keys) {
+        object[key.Name] = parameters.*key.Value;
+    }
+}
+
+// Missing keys keep the value the parameters already have; a key with something other than a number is an error
+template <typename Parameters, std::size_t Count>
+std::expected<void, std::string> ReadParameters(const std::array<ParameterKey<Parameters>, Count> &keys,
+                                                const nlohmann::json &object, Parameters &parameters) {
+    for (const ParameterKey<Parameters> &key : keys) {
+        if (!object.contains(key.Name)) {
+            continue;
+        }
+        const std::optional<double> value = ReadNumber(object, key.Name);
+        if (!value) {
+            return std::unexpected(std::format("has no valid {}", key.Name));
+        }
+        parameters.*key.Value = *value;
+    }
+    return {};
+}
+
 nlohmann::json WriteElement(const UIElement &element) {
     const Core::Component &component = element.GetComponent();
     nlohmann::json object = {
@@ -90,67 +122,44 @@ nlohmann::json WriteElement(const UIElement &element) {
         object["value"] = component.GetValue();
     }
     // Every waveform is saved, so switching type after loading keeps the parameters of the others
-    if (component.GetType() == Core::ComponentType::VoltageSource) {
-        const auto &source = static_cast<const Core::VoltageSource &>(component);
+    if (Core::IsSource(component.GetType())) {
+        const auto &source = static_cast<const Core::Source &>(component);
         object["source"] = Core::GetSourceTypeName(source.GetSourceType());
-        object["amplitude"] = source.GetAmplitude();
-        object["frequency"] = source.GetFrequency();
-        object["offset"] = source.GetOffset();
+        WriteParameters(ACKeys, source.GetAC(), object);
         nlohmann::json pulse = nlohmann::json::object();
-        for (const PulseKey &key : PulseKeys) {
-            pulse[key.Name] = source.GetPulse().*key.Value;
-        }
+        WriteParameters(PulseKeys, source.GetPulse(), pulse);
         object["pulse"] = pulse;
     }
     return object;
 }
 
 // Every key is optional, so files saved before sources had a type load as DC with the default sine and pulse
-std::expected<void, std::string> ReadVoltageSource(const nlohmann::json &object, Core::VoltageSource &source) {
+std::expected<void, std::string> ReadSource(const nlohmann::json &object, Core::Source &source) {
     if (object.contains("source")) {
         const std::optional<std::string> type_name = ReadString(object, "source");
-        const std::optional<Core::VoltageSource::SourceType> type =
+        const std::optional<Core::Source::SourceType> type =
             type_name ? Core::ParseSourceType(*type_name) : std::nullopt;
         if (!type) {
-            return std::unexpected("has a source type other than DC or AC");
+            return std::unexpected("has a source type other than DC, AC or Pulse");
         }
         source.SetSourceType(*type);
     }
-    if (object.contains("amplitude")) {
-        const std::optional<double> amplitude = ReadNumber(object, "amplitude");
-        if (!amplitude) {
-            return std::unexpected("has no valid amplitude");
-        }
-        source.SetAmplitude(*amplitude);
+    Core::ACParameters ac = source.GetAC();
+    if (const auto read = ReadParameters(ACKeys, object, ac); !read) {
+        return read;
     }
-    if (object.contains("frequency")) {
-        const std::optional<double> frequency = ReadNumber(object, "frequency");
-        if (!frequency || !source.IsValidFrequency(*frequency)) {
-            return std::unexpected("has no valid frequency");
-        }
-        source.SetFrequency(*frequency);
+    if (!source.IsValidAC(ac)) {
+        return std::unexpected("has an AC frequency that is not positive");
     }
-    if (object.contains("offset")) {
-        const std::optional<double> offset = ReadNumber(object, "offset");
-        if (!offset) {
-            return std::unexpected("has no valid offset");
-        }
-        source.SetOffset(*offset);
-    }
+    source.SetAC(ac);
+
     if (const auto pulse_object = object.find("pulse"); pulse_object != object.end()) {
         if (!pulse_object->is_object()) {
             return std::unexpected("has a pulse that is not an object");
         }
         Core::PulseParameters pulse = source.GetPulse();
-        for (const PulseKey &key : PulseKeys) {
-            if (!pulse_object->contains(key.Name)) {
-                continue;
-            }
-            const std::optional<double> value = ReadNumber(*pulse_object, key.Name);
-            if (!value) {
-                return std::unexpected(std::format("has no valid pulse {}", key.Name));
-            }
-            pulse.*key.Value = *value;
+        if (const auto read = ReadParameters(PulseKeys, *pulse_object, pulse); !read) {
+            return read;
         }
         if (!source.IsValidPulse(pulse)) {
             return std::unexpected("has a pulse with a negative time or a period that is not positive");
@@ -193,9 +202,8 @@ std::expected<std::unique_ptr<UIElement>, std::string> ReadElement(const nlohman
         }
         component.SetValue(*value);
     }
-    if (component.GetType() == Core::ComponentType::VoltageSource) {
-        const std::expected<void, std::string> source =
-            ReadVoltageSource(object, static_cast<Core::VoltageSource &>(component));
+    if (Core::IsSource(component.GetType())) {
+        const std::expected<void, std::string> source = ReadSource(object, static_cast<Core::Source &>(component));
         if (!source) {
             return std::unexpected(source.error());
         }

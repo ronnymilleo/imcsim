@@ -7,9 +7,11 @@ add_library(imcsim-core-lib
             circuit.cpp
             components/capacitor.cpp
             components/component.cpp
+            components/current_source.cpp
             components/ground.cpp
             components/inductor.cpp
             components/resistor.cpp
+            components/source.cpp
             components/vcc.cpp
             components/voltage_source.cpp
             simulator.cpp

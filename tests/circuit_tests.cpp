@@ -5,6 +5,7 @@
 
 #include "circuit.h"
 #include "components/capacitor.h"
+#include "components/current_source.h"
 #include "components/ground.h"
 #include "components/inductor.h"
 #include "components/resistor.h"
@@ -68,9 +69,7 @@ TEST_CASE("ToSpiceNetlist writes an AC source for every analysis at once", "[cir
     Core::VoltageSource source;
     source.SetName("Vin1");
     source.SetSourceType(Core::VoltageSource::SourceType::AC);
-    source.SetAmplitude(2.0);
-    source.SetFrequency(50.0);
-    source.SetOffset(0.5);
+    source.SetAC({.Amplitude = 2.0, .Frequency = 50.0, .Offset = 0.5});
 
     Core::Circuit circuit;
     circuit.Add(source, {1, 0});
@@ -97,6 +96,21 @@ TEST_CASE("ToSpiceNetlist writes a pulse source starting at its low level", "[ci
 
     CHECK(circuit.ToSpiceNetlist() == "* imcsim netlist\n"
                                       "Vin1 1 0 DC -1 PULSE(-1 3.3 1m 10n 20n 500u 2m)\n"
+                                      ".end\n");
+}
+
+TEST_CASE("ToSpiceNetlist writes a current source like a voltage source, under its own name", "[circuit]") {
+    Core::CurrentSource source;
+    source.SetName("I1");
+    Core::Circuit circuit;
+    circuit.Add(source, {0, 3});
+    CHECK(circuit.ToSpiceNetlist() == "* imcsim netlist\n"
+                                      "I1 0 3 DC 1m\n"
+                                      ".end\n");
+
+    source.SetSourceType(Core::CurrentSource::SourceType::AC);
+    CHECK(circuit.ToSpiceNetlist() == "* imcsim netlist\n"
+                                      "I1 0 3 DC 0 AC 1m SIN(0 1m 1k)\n"
                                       ".end\n");
 }
 

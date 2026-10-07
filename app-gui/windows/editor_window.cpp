@@ -59,6 +59,7 @@ constexpr auto ToolbarComponents = std::to_array<ToolbarItem>({
     {"Ground", Core::ComponentType::Ground},
     {"VCC", Core::ComponentType::VCC},
     {"VSource", Core::ComponentType::VoltageSource},
+    {"ISource", Core::ComponentType::CurrentSource},
 });
 
 constexpr const char *DiscardPopup = "Discard changes?";

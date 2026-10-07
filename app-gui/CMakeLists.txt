@@ -12,10 +12,12 @@ add_library(imcsim-gui-lib
             schematic.cpp
             schematic_file.cpp
             ui_elements/ui_capacitor.cpp
+            ui_elements/ui_current_source.cpp
             ui_elements/ui_element.cpp
             ui_elements/ui_ground.cpp
             ui_elements/ui_inductor.cpp
             ui_elements/ui_resistor.cpp
+            ui_elements/ui_source.cpp
             ui_elements/ui_vcc.cpp
             ui_elements/ui_voltage_source.cpp
             ui_elements/ui_wire.cpp

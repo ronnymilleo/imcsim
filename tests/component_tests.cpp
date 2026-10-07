@@ -4,6 +4,7 @@
  */
 
 #include "components/capacitor.h"
+#include "components/current_source.h"
 #include "components/ground.h"
 #include "components/inductor.h"
 #include "components/resistor.h"
@@ -38,6 +39,14 @@ TEST_CASE("Components start with SPICE prefixes, units and default values", "[co
     CHECK(std::string_view(source.GetUnit()) == "V");
     CHECK(source.GetValue() == 5.0);
     CHECK(source.GetSourceType() == Core::VoltageSource::SourceType::DC);
+
+    const Core::CurrentSource current_source;
+    CHECK(std::string_view(current_source.GetNamePrefix()) == "I");
+    CHECK(std::string_view(current_source.GetUnit()) == "A");
+    CHECK(current_source.GetValue() == 1e-3);
+    CHECK(current_source.GetAC().Amplitude == 1e-3);
+    CHECK(current_source.GetPulse().High == 1e-3);
+    CHECK(current_source.GetSourceType() == Core::CurrentSource::SourceType::DC);
 }
 
 TEST_CASE("Ground has no name prefix and no value", "[component]") {
@@ -65,7 +74,8 @@ TEST_CASE("IsValidValue requires positive passive values but allows any source v
 TEST_CASE("Type names convert both ways", "[component]") {
     for (const Core::ComponentType type :
          {Core::ComponentType::Resistor, Core::ComponentType::Capacitor, Core::ComponentType::Inductor,
-          Core::ComponentType::Ground, Core::ComponentType::VCC, Core::ComponentType::VoltageSource}) {
+          Core::ComponentType::Ground, Core::ComponentType::VCC, Core::ComponentType::VoltageSource,
+          Core::ComponentType::CurrentSource}) {
         CHECK(Core::ParseComponentType(Core::GetTypeName(type)) == type);
     }
     CHECK_FALSE(Core::ParseComponentType("resistor"));
@@ -90,19 +100,19 @@ TEST_CASE("NextComponentName continues after the highest number for the prefix",
 
 TEST_CASE("A voltage source keeps its sine parameters while switching type", "[component]") {
     Core::VoltageSource source;
-    CHECK(source.GetAmplitude() == 1.0);
-    CHECK(source.GetFrequency() == 1e3);
-    CHECK(source.GetOffset() == 0.0);
+    CHECK(source.GetAC().Amplitude == 1.0);
+    CHECK(source.GetAC().Frequency == 1e3);
+    CHECK(source.GetAC().Offset == 0.0);
 
-    source.SetAmplitude(3.0);
+    source.SetAC({.Amplitude = 3.0});
     source.SetSourceType(Core::VoltageSource::SourceType::AC);
     source.SetSourceType(Core::VoltageSource::SourceType::DC);
-    CHECK(source.GetAmplitude() == 3.0);
+    CHECK(source.GetAC().Amplitude == 3.0);
     CHECK(source.GetValue() == 5.0);
 
-    CHECK(source.IsValidFrequency(50.0));
-    CHECK_FALSE(source.IsValidFrequency(0.0));
-    CHECK_FALSE(source.IsValidFrequency(-1.0));
+    CHECK(source.IsValidAC({.Amplitude = -2.0, .Frequency = 50.0}));
+    CHECK_FALSE(source.IsValidAC({.Frequency = 0.0}));
+    CHECK_FALSE(source.IsValidAC({.Frequency = -1.0}));
 }
 
 TEST_CASE("Source type names convert both ways", "[component]") {
@@ -129,4 +139,11 @@ TEST_CASE("A pulse needs non-negative times and a positive period", "[component]
     invalid = pulse;
     invalid.Period = 0.0;
     CHECK_FALSE(source.IsValidPulse(invalid));
+}
+
+TEST_CASE("IsSource covers voltage and current sources but not the supply rail", "[component]") {
+    CHECK(Core::IsSource(Core::ComponentType::VoltageSource));
+    CHECK(Core::IsSource(Core::ComponentType::CurrentSource));
+    CHECK_FALSE(Core::IsSource(Core::ComponentType::VCC));
+    CHECK_FALSE(Core::IsSource(Core::ComponentType::Resistor));
 }

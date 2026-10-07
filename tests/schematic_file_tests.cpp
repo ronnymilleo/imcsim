@@ -3,6 +3,7 @@
  * @brief   Tests for saving schematics to JSON and loading them back.
  */
 
+#include "components/current_source.h"
 #include "components/voltage_source.h"
 #include "element_factory.h"
 #include "schematic_file.h"
@@ -130,18 +131,16 @@ TEST_CASE("A voltage source keeps its type and sine parameters", "[schematic_fil
     auto &source = static_cast<Core::VoltageSource &>(elements.back()->GetComponent());
     source.SetName("Vin1");
     source.SetSourceType(Core::VoltageSource::SourceType::AC);
-    source.SetAmplitude(2.5);
-    source.SetFrequency(60.0);
-    source.SetOffset(-1.0);
+    source.SetAC({.Amplitude = 2.5, .Frequency = 60.0, .Offset = -1.0});
 
     const GUI::LoadedSchematic loaded = LoadOrFail(GUI::SaveSchematic(elements, {}));
     CHECK(loaded.Warnings.empty());
     REQUIRE(loaded.Elements.size() == 1);
     const auto &copy = static_cast<const Core::VoltageSource &>(loaded.Elements[0]->GetComponent());
     CHECK(copy.GetSourceType() == Core::VoltageSource::SourceType::AC);
-    CHECK(copy.GetAmplitude() == 2.5);
-    CHECK(copy.GetFrequency() == 60.0);
-    CHECK(copy.GetOffset() == -1.0);
+    CHECK(copy.GetAC().Amplitude == 2.5);
+    CHECK(copy.GetAC().Frequency == 60.0);
+    CHECK(copy.GetAC().Offset == -1.0);
 }
 
 TEST_CASE("A voltage source without a type loads as DC, and an invalid one is skipped", "[schematic_file]") {
@@ -185,4 +184,25 @@ TEST_CASE("A pulse source keeps its pulse, and an invalid pulse is skipped", "[s
         ""));
     CHECK(invalid.Elements.empty());
     CHECK(invalid.Warnings.size() == 1);
+}
+
+TEST_CASE("A current source keeps its value, type and waveforms", "[schematic_file]") {
+    std::vector<std::unique_ptr<GUI::UIElement>> elements;
+    elements.push_back(GUI::CreateElement(Core::ComponentType::CurrentSource, {0, 0}, GUI::Rotation::R270));
+    auto &source = static_cast<Core::CurrentSource &>(elements.back()->GetComponent());
+    source.SetName("I1");
+    source.SetValue(-2e-3);
+    source.SetSourceType(Core::CurrentSource::SourceType::AC);
+    source.SetAC({.Amplitude = 5e-3});
+
+    const GUI::LoadedSchematic loaded = LoadOrFail(GUI::SaveSchematic(elements, {}));
+    CHECK(loaded.Warnings.empty());
+    REQUIRE(loaded.Elements.size() == 1);
+    const auto &copy = static_cast<const Core::CurrentSource &>(loaded.Elements[0]->GetComponent());
+    CHECK(copy.GetType() == Core::ComponentType::CurrentSource);
+    CHECK(copy.GetName() == "I1");
+    CHECK(copy.GetValue() == -2e-3);
+    CHECK(copy.GetSourceType() == Core::CurrentSource::SourceType::AC);
+    CHECK(copy.GetAC().Amplitude == 5e-3);
+    CHECK(copy.GetPulse().High == 1e-3);
 }

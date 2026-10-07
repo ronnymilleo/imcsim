@@ -5,6 +5,7 @@
 
 #include "circuit.h"
 #include "components/capacitor.h"
+#include "components/current_source.h"
 #include "components/ground.h"
 #include "components/resistor.h"
 #include "components/vcc.h"
@@ -14,6 +15,7 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 #include <cmath>
+#include <complex>
 #include <numbers>
 
 namespace {
@@ -64,6 +66,13 @@ struct LowPass {
         Circuit.Add(Reference, {0});
     }
 };
+
+// Finds a current by component name, failing the test when it is missing
+template <typename Current> const Current &FindCurrent(const std::vector<Current> &currents, const std::string &name) {
+    const auto found = std::ranges::find_if(currents, [&name](const Current &current) { return current.Name == name; });
+    REQUIRE(found != currents.end());
+    return *found;
+}
 
 } // namespace
 
@@ -135,8 +144,7 @@ TEST_CASE("A transient run follows the sine of an AC source", "[simulator]") {
     Core::VoltageSource source;
     source.SetName("Vin1");
     source.SetSourceType(Core::VoltageSource::SourceType::AC);
-    source.SetAmplitude(2.0);
-    source.SetOffset(1.0);
+    source.SetAC({.Amplitude = 2.0, .Frequency = 1e3, .Offset = 1.0});
     Core::Resistor load;
     load.SetName("R1");
     const Core::Ground reference;
@@ -231,5 +239,120 @@ TEST_CASE("Invalid analysis settings are rejected before reaching ngspice", "[si
             CHECK_FALSE(run.Result);
             CHECK(run.Messages.empty());
         }
+    }
+}
+
+TEST_CASE("The operating point has the current through every component, signed as in SPICE", "[simulator]") {
+    const Divider divider;
+    const Core::OperatingPointRun run = Core::RunOperatingPoint(divider.Circuit);
+    if (!run.Result) {
+        FAIL(run.Result.error());
+    }
+    const std::vector<Core::ComponentCurrent> &currents = run.Result->Currents;
+    // Ground carries no current
+    CHECK(currents.size() == 3);
+    CHECK_THAT(FindCurrent(currents, "R1").Current, Catch::Matchers::WithinRel(2.5e-3, 1e-9));
+    CHECK_THAT(FindCurrent(currents, "R2").Current, Catch::Matchers::WithinRel(2.5e-3, 1e-9));
+    // The supply delivers the current, so it flows through it from ground to its terminal
+    CHECK_THAT(FindCurrent(currents, "V1").Current, Catch::Matchers::WithinRel(-2.5e-3, 1e-9));
+}
+
+TEST_CASE("A current source pushes its current into the node at its second terminal", "[simulator]") {
+    Core::CurrentSource source;
+    source.SetName("I1");
+    source.SetValue(2e-3);
+    Core::Resistor load;
+    load.SetName("R1");
+    const Core::Ground reference;
+    Core::Circuit circuit;
+    circuit.Add(source, {0, 1});
+    circuit.Add(load, {1, 0});
+    circuit.Add(reference, {0});
+
+    const Core::OperatingPointRun run = Core::RunOperatingPoint(circuit);
+    if (!run.Result) {
+        FAIL(run.Result.error());
+    }
+    CHECK_THAT(run.Result->NodeVoltages[1], Catch::Matchers::WithinRel(2.0, 1e-9));
+    CHECK_THAT(FindCurrent(run.Result->Currents, "I1").Current, Catch::Matchers::WithinRel(2e-3, 1e-9));
+    CHECK_THAT(FindCurrent(run.Result->Currents, "R1").Current, Catch::Matchers::WithinRel(2e-3, 1e-9));
+}
+
+TEST_CASE("A transient has the charging current of an RC low-pass", "[simulator]") {
+    LowPass low_pass;
+    low_pass.Source.SetSourceType(Core::VoltageSource::SourceType::Pulse);
+    low_pass.Source.SetPulse(
+        {.Low = 0.0, .High = 1.0, .RiseTime = 1e-9, .FallTime = 1e-9, .Width = 1.0, .Period = 2.0});
+
+    const Core::TransientRun run = Core::RunTransient(low_pass.Circuit, {.StopTime = 5e-3, .TimeStep = 10e-6});
+    if (!run.Result) {
+        FAIL(run.Result.error());
+    }
+    const Core::Transient &transient = *run.Result;
+    const std::vector<double> &capacitor = FindCurrent(transient.Currents, "C1").Values;
+    const std::vector<double> &source = FindCurrent(transient.Currents, "Vin1").Values;
+    REQUIRE(capacitor.size() == transient.Times.size());
+    for (std::size_t index = 0; index < transient.Times.size(); ++index) {
+        // The first points sit on the step itself, where the current jumps from 0 to 1 mA
+        if (transient.Times[index] < 20e-6) {
+            continue;
+        }
+        const double expected = 1e-3 * std::exp(-transient.Times[index] / 1e-3);
+        CHECK_THAT(capacitor[index], Catch::Matchers::WithinAbs(expected, 1e-5));
+        CHECK_THAT(source[index], Catch::Matchers::WithinAbs(-expected, 1e-5));
+    }
+}
+
+TEST_CASE("An AC sweep has the current through every component", "[simulator]") {
+    const LowPass low_pass;
+    const Core::ACSweepRun run =
+        Core::RunACSweep(low_pass.Circuit, {.StartFrequency = 1.0, .StopFrequency = 1e6, .PointsPerDecade = 10});
+    if (!run.Result) {
+        FAIL(run.Result.error());
+    }
+    const Core::ACSweep &sweep = *run.Result;
+    const std::vector<double> &resistor_magnitudes = FindCurrent(sweep.CurrentMagnitudesDecibels, "R1").Values;
+    const std::vector<double> &resistor_phases = FindCurrent(sweep.CurrentPhasesDegrees, "R1").Values;
+    const std::vector<double> &capacitor_magnitudes = FindCurrent(sweep.CurrentMagnitudesDecibels, "C1").Values;
+    const std::vector<double> &source_magnitudes = FindCurrent(sweep.CurrentMagnitudesDecibels, "Vin1").Values;
+    const std::vector<double> &source_phases = FindCurrent(sweep.CurrentPhasesDegrees, "Vin1").Values;
+    for (std::size_t index = 0; index < sweep.Frequencies.size(); ++index) {
+        const double omega = 2.0 * std::numbers::pi * sweep.Frequencies[index];
+        const std::complex<double> current = 1.0 / std::complex<double>(1e3, -1.0 / (omega * 1e-6));
+        const double magnitude = 20.0 * std::log10(std::abs(current));
+        const double phase = std::arg(current) * 180.0 / std::numbers::pi;
+        CHECK_THAT(resistor_magnitudes[index], Catch::Matchers::WithinAbs(magnitude, 1e-6));
+        CHECK_THAT(resistor_phases[index], Catch::Matchers::WithinAbs(phase, 1e-6));
+        CHECK_THAT(capacitor_magnitudes[index], Catch::Matchers::WithinAbs(magnitude, 1e-6));
+        // The source carries the same current the other way, half a turn apart
+        CHECK_THAT(source_magnitudes[index], Catch::Matchers::WithinAbs(magnitude, 1e-6));
+        CHECK_THAT(std::abs(std::remainder(source_phases[index] - phase, 360.0)),
+                   Catch::Matchers::WithinAbs(180.0, 1e-6));
+    }
+}
+
+TEST_CASE("An AC current source excites an AC sweep", "[simulator]") {
+    Core::CurrentSource source;
+    source.SetName("I1");
+    source.SetSourceType(Core::CurrentSource::SourceType::AC);
+    Core::Resistor load;
+    load.SetName("R1");
+    const Core::Ground reference;
+    Core::Circuit circuit;
+    circuit.Add(source, {0, 1});
+    circuit.Add(load, {1, 0});
+    circuit.Add(reference, {0});
+
+    const Core::ACSweepRun run = Core::RunACSweep(circuit, {.StartFrequency = 1.0, .StopFrequency = 1e3});
+    if (!run.Result) {
+        FAIL(run.Result.error());
+    }
+    // 1 mA into 1k is 1 V, which is 0 dB; the source current is 1 mA, which is -60 dB relative to 1 A
+    for (std::size_t index = 0; index < run.Result->Frequencies.size(); ++index) {
+        CHECK_THAT(run.Result->NodeMagnitudesDecibels[1][index], Catch::Matchers::WithinAbs(0.0, 1e-6));
+        CHECK_THAT(FindCurrent(run.Result->CurrentMagnitudesDecibels, "I1").Values[index],
+                   Catch::Matchers::WithinAbs(-60.0, 1e-6));
+        CHECK_THAT(FindCurrent(run.Result->CurrentMagnitudesDecibels, "R1").Values[index],
+                   Catch::Matchers::WithinAbs(-60.0, 1e-6));
     }
 }

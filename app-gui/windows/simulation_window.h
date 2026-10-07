@@ -20,9 +20,9 @@ namespace GUI {
  * @class   SimulationWindow
  * @brief   Runs the operating point, transient and AC sweep analyses, one tab each, with their settings.
  * @details The results live in the Schematic, so they disappear as soon as the circuit changes. The node
- *          voltages of the operating point are listed here and drawn by the editor; transients and AC sweeps
- *          are drawn by the Output window. The error and the output belong to the last run of each analysis
- *          and stay until its next run.
+ *          voltages and component currents of the operating point are listed here, and the voltages are also
+ *          drawn by the editor; transients and AC sweeps are drawn by the Output window. The error and the
+ *          output belong to the last run of each analysis and stay until its next run.
  */
 class SimulationWindow : public AppWindow {
 public:
@@ -70,6 +70,7 @@ private:
 
     // Results
     void DrawNodeVoltages(const Core::OperatingPoint &operating_point) const;
+    void DrawCurrents(const Core::OperatingPoint &operating_point) const;
 };
 
 } // namespace GUI

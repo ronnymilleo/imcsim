@@ -25,12 +25,34 @@ struct SimulatorMessage {
 };
 
 /**
+ * @struct  ComponentCurrent
+ * @brief   The current through one component at the operating point.
+ */
+struct ComponentCurrent {
+    std::string Name;
+    double Current = 0.0;
+};
+
+/**
+ * @struct  ComponentTrace
+ * @brief   Values of one component at every point of an analysis, such as its current over time.
+ */
+struct ComponentTrace {
+    std::string Name;
+    std::vector<double> Values;
+};
+
+/**
  * @struct  OperatingPoint
- * @brief   DC operating point of a circuit: the voltage of every node.
+ * @brief   DC operating point of a circuit: the voltage of every node and the current through every component.
+ * @details Currents follow SPICE: positive when flowing through the component from its first terminal to its
+ *          second. A voltage source that delivers power therefore shows a negative current.
  */
 struct OperatingPoint {
     // Indexed by node number; node 0 is ground and always 0 V
     std::vector<double> NodeVoltages;
+    // One per named component, in circuit order; ground carries none
+    std::vector<ComponentCurrent> Currents;
 };
 
 /**
@@ -45,12 +67,14 @@ struct TransientSettings {
 
 /**
  * @struct  Transient
- * @brief   Node voltages over time.
+ * @brief   Node voltages and component currents over time, with currents signed as in OperatingPoint.
  */
 struct Transient {
     std::vector<double> Times;
     // Indexed by node number, then by time point; node 0 is ground and always 0 V
     std::vector<std::vector<double>> NodeVoltages;
+    // One per named component, in circuit order, with a value per time point
+    std::vector<ComponentTrace> Currents;
 };
 
 /**
@@ -65,13 +89,18 @@ struct ACSweepSettings {
 
 /**
  * @struct  ACSweep
- * @brief   Small-signal response of every node across frequency, relative to the AC sources.
+ * @brief   Small-signal response of every node and component across frequency, relative to the AC sources.
+ * @details Voltages are in dB relative to 1 V and currents in dB relative to 1 A; currents are signed as in
+ *          OperatingPoint, which shows in their phase.
  */
 struct ACSweep {
     std::vector<double> Frequencies;
     // Indexed by node number, then by frequency point; node 0 is ground and stays empty
     std::vector<std::vector<double>> NodeMagnitudesDecibels;
     std::vector<std::vector<double>> NodePhasesDegrees;
+    // One per named component, in circuit order, with a value per frequency point
+    std::vector<ComponentTrace> CurrentMagnitudesDecibels;
+    std::vector<ComponentTrace> CurrentPhasesDegrees;
 };
 
 /**

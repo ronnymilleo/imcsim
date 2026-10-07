@@ -23,6 +23,7 @@ constexpr auto AllTypes = std::to_array<ComponentType>({
     ComponentType::Ground,
     ComponentType::VCC,
     ComponentType::VoltageSource,
+    ComponentType::CurrentSource,
 });
 
 } // namespace
@@ -53,7 +54,7 @@ const char *Component::GetTypeName() const {
 
 /**
  * @brief   Returns the SPICE letter that starts the name of this kind of component.
- * @return  "R", "C", "L", "V" or "Vin", or an empty string for ground, which is not named.
+ * @return  "R", "C", "L", "V", "Vin" or "I", or an empty string for ground, which is not named.
  */
 const char *Component::GetNamePrefix() const {
     switch (m_Type) {
@@ -68,6 +69,8 @@ const char *Component::GetNamePrefix() const {
         return "V";
     case ComponentType::VoltageSource:
         return "Vin";
+    case ComponentType::CurrentSource:
+        return "I";
     case ComponentType::Ground:
         return "";
     }
@@ -89,6 +92,8 @@ const char *Component::GetUnit() const {
     case ComponentType::VCC:
     case ComponentType::VoltageSource:
         return "V";
+    case ComponentType::CurrentSource:
+        return "A";
     case ComponentType::Ground:
         return "";
     }
@@ -116,6 +121,7 @@ bool Component::IsValidValue(const double value) const {
         return value > 0.0;
     case ComponentType::VCC:
     case ComponentType::VoltageSource:
+    case ComponentType::CurrentSource:
         return true;
     case ComponentType::Ground:
         return false;
@@ -174,6 +180,8 @@ const char *GetTypeName(const ComponentType type) {
         return "VCC";
     case ComponentType::VoltageSource:
         return "VoltageSource";
+    case ComponentType::CurrentSource:
+        return "CurrentSource";
     }
     return "Unknown";
 }

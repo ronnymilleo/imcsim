@@ -7,11 +7,14 @@
 
 #include "simulator.h"
 
+#include "components/source.h"
 #include "spice_value.h"
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <complex>
 #include <format>
+#include <iterator>
 #include <ngspice/sharedspice.h>
 #include <numbers>
 #include <optional>
@@ -151,7 +154,7 @@ std::optional<std::string> CheckACSweepSettings(const Circuit &circuit, const AC
         return std::format("The points per decade must be between 1 and {}", MaxPointsPerDecade);
     }
     if (!circuit.HasACSource()) {
-        return "An AC sweep needs an AC source; select a voltage source and set it to AC";
+        return "An AC sweep needs an AC source; select a voltage or current source and set it to AC";
     }
     return std::nullopt;
 }
@@ -184,6 +187,41 @@ std::vector<std::complex<double>> ComplexValues(const vector_info &vector) {
     return values;
 }
 
+// ngspice stores vector names in lower case
+std::string ToLower(std::string text) {
+    std::ranges::transform(text, text.begin(), [](const unsigned char character) { return std::tolower(character); });
+    return text;
+}
+
+// The vector where ngspice saves the current through a component in .op and .tran, with .options savecurrents.
+// Every one of them is positive from the first terminal to the second, through the component
+std::optional<std::string> CurrentVectorName(const Component &component) {
+    const std::string name = ToLower(component.GetName());
+    switch (component.GetType()) {
+    case ComponentType::Resistor:
+    case ComponentType::Capacitor:
+    case ComponentType::Inductor:
+        return std::format("@{}[i]", name);
+    case ComponentType::VCC:
+    case ComponentType::VoltageSource:
+        return std::format("{}#branch", name);
+    case ComponentType::CurrentSource:
+        return std::format("@{}[current]", name);
+    case ComponentType::Ground:
+        break;
+    }
+    return std::nullopt;
+}
+
+// 20 log10 of the magnitude, with a floor that keeps a value the AC sources do not reach finite for plotting
+double ToDecibels(const std::complex<double> value) {
+    return 20.0 * std::log10(std::max(std::abs(value), MinMagnitude));
+}
+
+double ToDegrees(const std::complex<double> value) {
+    return std::arg(value) * 180.0 / std::numbers::pi;
+}
+
 std::expected<OperatingPoint, std::string> ReadOperatingPoint(const Circuit &circuit) {
     OperatingPoint result;
     result.NodeVoltages.assign(static_cast<std::size_t>(circuit.GetNodeCount()), 0.0);
@@ -193,6 +231,17 @@ std::expected<OperatingPoint, std::string> ReadOperatingPoint(const Circuit &cir
             return std::unexpected(std::format("ngspice returned no voltage for node {}", node));
         }
         result.NodeVoltages[static_cast<std::size_t>(node)] = vector->v_realdata[0];
+    }
+    for (const CircuitEntry &entry : circuit.GetEntries()) {
+        const std::optional<std::string> vector_name = CurrentVectorName(*entry.Part);
+        if (!vector_name) {
+            continue;
+        }
+        const pvector_info vector = FindVector(*vector_name);
+        if (vector == nullptr || vector->v_realdata == nullptr) {
+            return std::unexpected(std::format("ngspice returned no current for {}", entry.Part->GetName()));
+        }
+        result.Currents.push_back({entry.Part->GetName(), vector->v_realdata[0]});
     }
     return result;
 }
@@ -213,7 +262,60 @@ std::expected<Transient, std::string> ReadTransient(const Circuit &circuit) {
         }
         result.NodeVoltages[static_cast<std::size_t>(node)] = RealPart(*vector);
     }
+    for (const CircuitEntry &entry : circuit.GetEntries()) {
+        const std::optional<std::string> vector_name = CurrentVectorName(*entry.Part);
+        if (!vector_name) {
+            continue;
+        }
+        const pvector_info vector = FindVector(*vector_name);
+        if (vector == nullptr || vector->v_length != time->v_length) {
+            return std::unexpected(std::format("ngspice returned no currents for {}", entry.Part->GetName()));
+        }
+        result.Currents.push_back({entry.Part->GetName(), RealPart(*vector)});
+    }
     return result;
+}
+
+// ngspice computes no device currents in .ac, so resistors, capacitors and current sources are worked out from
+// their node voltages and values; inductors and voltage sources have their branch current in the results
+std::expected<std::vector<std::complex<double>>, std::string>
+ACCurrent(const CircuitEntry &entry, const std::vector<double> &frequencies,
+          const std::vector<std::vector<std::complex<double>>> &node_voltages) {
+    const Component &component = *entry.Part;
+    std::vector<std::complex<double>> currents(frequencies.size());
+    switch (component.GetType()) {
+    case ComponentType::Resistor:
+    case ComponentType::Capacitor:
+        for (std::size_t index = 0; index < frequencies.size(); ++index) {
+            const std::complex<double> voltage = node_voltages[static_cast<std::size_t>(entry.Nodes[0])][index] -
+                                                 node_voltages[static_cast<std::size_t>(entry.Nodes[1])][index];
+            const std::complex<double> admittance =
+                component.GetType() == ComponentType::Resistor
+                    ? std::complex<double>(1.0 / component.GetValue(), 0.0)
+                    : std::complex<double>(0.0, 2.0 * std::numbers::pi * frequencies[index] * component.GetValue());
+            currents[index] = voltage * admittance;
+        }
+        return currents;
+    case ComponentType::CurrentSource: {
+        // The source drives its AC magnitude at zero phase, and nothing when it is not AC
+        const auto &source = static_cast<const Source &>(component);
+        const double magnitude = source.GetSourceType() == Source::SourceType::AC ? source.GetAC().Amplitude : 0.0;
+        std::ranges::fill(currents, std::complex<double>(magnitude, 0.0));
+        return currents;
+    }
+    case ComponentType::Inductor:
+    case ComponentType::VCC:
+    case ComponentType::VoltageSource: {
+        const pvector_info vector = FindVector(std::format("{}#branch", ToLower(component.GetName())));
+        if (vector == nullptr || static_cast<std::size_t>(vector->v_length) != frequencies.size()) {
+            return std::unexpected(std::format("ngspice returned no currents for {}", component.GetName()));
+        }
+        return ComplexValues(*vector);
+    }
+    case ComponentType::Ground:
+        break;
+    }
+    return std::unexpected(std::format("{} carries no current", component.GetName()));
 }
 
 std::expected<ACSweep, std::string> ReadACSweep(const Circuit &circuit) {
@@ -223,20 +325,41 @@ std::expected<ACSweep, std::string> ReadACSweep(const Circuit &circuit) {
     }
     ACSweep result;
     result.Frequencies = RealPart(*frequency);
-    result.NodeMagnitudesDecibels.resize(static_cast<std::size_t>(circuit.GetNodeCount()));
-    result.NodePhasesDegrees.resize(static_cast<std::size_t>(circuit.GetNodeCount()));
-    for (int node = 1; node < circuit.GetNodeCount(); ++node) {
+    const std::size_t point_count = result.Frequencies.size();
+
+    // Ground stays at zero, which the current of a component connected to it needs
+    std::vector<std::vector<std::complex<double>>> node_voltages(static_cast<std::size_t>(circuit.GetNodeCount()));
+    node_voltages[0].assign(point_count, 0.0);
+    result.NodeMagnitudesDecibels.resize(node_voltages.size());
+    result.NodePhasesDegrees.resize(node_voltages.size());
+    for (std::size_t node = 1; node < node_voltages.size(); ++node) {
         const pvector_info vector = FindVector(std::format("v({})", node));
-        if (vector == nullptr || vector->v_length != frequency->v_length) {
+        if (vector == nullptr || static_cast<std::size_t>(vector->v_length) != point_count) {
             return std::unexpected(std::format("ngspice returned no response for node {}", node));
         }
-        std::vector<double> &magnitudes = result.NodeMagnitudesDecibels[static_cast<std::size_t>(node)];
-        std::vector<double> &phases = result.NodePhasesDegrees[static_cast<std::size_t>(node)];
-        for (const std::complex<double> value : ComplexValues(*vector)) {
-            // A node the AC sources do not reach has no response; the floor keeps it finite for plotting
-            magnitudes.push_back(20.0 * std::log10(std::max(std::abs(value), MinMagnitude)));
-            phases.push_back(std::arg(value) * 180.0 / std::numbers::pi);
+        node_voltages[node] = ComplexValues(*vector);
+        std::ranges::transform(node_voltages[node], std::back_inserter(result.NodeMagnitudesDecibels[node]),
+                               ToDecibels);
+        std::ranges::transform(node_voltages[node], std::back_inserter(result.NodePhasesDegrees[node]), ToDegrees);
+    }
+
+    for (const CircuitEntry &entry : circuit.GetEntries()) {
+        if (!CurrentVectorName(*entry.Part)) {
+            continue;
         }
+        // A supply rail has one terminal; its other side is ground
+        CircuitEntry two_terminal = entry;
+        two_terminal.Nodes.resize(2, 0);
+        const auto currents = ACCurrent(two_terminal, result.Frequencies, node_voltages);
+        if (!currents) {
+            return std::unexpected(currents.error());
+        }
+        ComponentTrace magnitudes{entry.Part->GetName(), {}};
+        ComponentTrace phases{entry.Part->GetName(), {}};
+        std::ranges::transform(*currents, std::back_inserter(magnitudes.Values), ToDecibels);
+        std::ranges::transform(*currents, std::back_inserter(phases.Values), ToDegrees);
+        result.CurrentMagnitudesDecibels.push_back(std::move(magnitudes));
+        result.CurrentPhasesDegrees.push_back(std::move(phases));
     }
     return result;
 }
@@ -254,7 +377,8 @@ SimulationRun<Data> Simulate(const Circuit &circuit, const std::string_view anal
 
     NgspiceState &state = GetState();
     state.Messages = &run.Messages;
-    LoadCircuit(circuit.ToSpiceNetlist(analysis));
+    // savecurrents makes ngspice keep the current through every component, not only through voltage sources
+    LoadCircuit(circuit.ToSpiceNetlist(std::format(".options savecurrents\n{}", analysis)));
     SendCommand("run");
     const char *plot = ngSpice_CurPlot();
     if (plot == nullptr || !std::string_view(plot).starts_with(plot_prefix) || HasErrorLine(run.Messages)) {

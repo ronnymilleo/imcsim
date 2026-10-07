@@ -96,6 +96,7 @@ void SimulationWindow::DrawOperatingPointTab() {
     const auto &operating_point = m_Schematic.GetOperatingPoint();
     if (DrawRunStatus(m_OperatingPointStatus.Error, m_OperatingPointStatus.Messages, operating_point.has_value())) {
         DrawNodeVoltages(*operating_point);
+        DrawCurrents(*operating_point);
     }
     DrawOutput(m_OperatingPointStatus.Messages);
 }
@@ -113,7 +114,7 @@ void SimulationWindow::DrawTransientTab() {
     }
     const auto &transient = m_Schematic.GetTransient();
     if (DrawRunStatus(m_TransientStatus.Error, m_TransientStatus.Messages, transient.has_value())) {
-        ImGui::TextUnformatted("Done; the voltages are in the Output window");
+        ImGui::TextUnformatted("Done; the voltages and currents are in the Output window");
     }
     DrawOutput(m_TransientStatus.Messages);
 }
@@ -192,6 +193,25 @@ void SimulationWindow::DrawNodeVoltages(const Core::OperatingPoint &operating_po
         ImGui::TextUnformatted(std::format("{}V", Core::FormatValue(operating_point.NodeVoltages[node])).c_str());
     }
     ImGui::EndTable();
+}
+
+void SimulationWindow::DrawCurrents(const Core::OperatingPoint &operating_point) const {
+    if (operating_point.Currents.empty() ||
+        !ImGui::BeginTable("currents", 2, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg)) {
+        return;
+    }
+    ImGui::TableSetupColumn("Component");
+    ImGui::TableSetupColumn("Current");
+    ImGui::TableHeadersRow();
+    for (const Core::ComponentCurrent &current : operating_point.Currents) {
+        ImGui::TableNextRow();
+        ImGui::TableNextColumn();
+        ImGui::TextUnformatted(current.Name.c_str());
+        ImGui::TableNextColumn();
+        ImGui::TextUnformatted(std::format("{}A", Core::FormatValue(current.Current)).c_str());
+    }
+    ImGui::EndTable();
+    ImGui::TextDisabled("Positive through the component from its first terminal to its second, as in SPICE");
 }
 
 } // namespace GUI

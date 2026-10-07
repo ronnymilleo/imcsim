@@ -6,22 +6,21 @@
 #ifndef IMCSIM_UI_VOLTAGE_SOURCE_H
 #define IMCSIM_UI_VOLTAGE_SOURCE_H
 
-#include "ui_element.h"
+#include "ui_source.h"
 
 namespace GUI {
 
 /**
  * @class   UIVoltageSource
- * @brief   Schematic symbol of an independent voltage source.
+ * @brief   Schematic symbol of an independent voltage source, marked with its polarity.
  */
-class UIVoltageSource : public UIElement {
+class UIVoltageSource : public UISource {
 public:
     UIVoltageSource(GridPoint position, Rotation rotation);
     ~UIVoltageSource() override = default;
 
 protected:
     void DrawSymbol(ImDrawList *draw_list, const ViewTransform &view, ImU32 color, SymbolStyle style) const override;
-    void DrawLabels(ImDrawList *draw_list, const ViewTransform &view, ImU32 color) const override;
 };
 
 } // namespace GUI

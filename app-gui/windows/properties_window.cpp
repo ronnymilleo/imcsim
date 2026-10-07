@@ -7,9 +7,10 @@
 
 #include "spice_value.h"
 #include <array>
+#include <cstddef>
 #include <format>
+#include <optional>
 #include <string>
-#include <tuple>
 
 namespace GUI {
 
@@ -22,24 +23,62 @@ bool AnyValue(double /*value*/) {
 }
 
 /**
- * @struct  PulseField
- * @brief   One pulse parameter in the Properties window: its label, its unit and the member it edits.
+ * @struct  ParameterField
+ * @brief   One member of a parameter set, such as Core::PulseParameters, as a field of the Properties window.
  */
-struct PulseField {
+template <typename Parameters> struct ParameterField {
     const char *Label;
+    double Parameters::*Value;
+    // No unit means the unit of the source, volts or amperes
     const char *Unit;
-    double Core::PulseParameters::*Value;
 };
 
-constexpr auto PulseFields = std::to_array<PulseField>({
-    {"Low", "V", &Core::PulseParameters::Low},
-    {"High", "V", &Core::PulseParameters::High},
-    {"Delay", "s", &Core::PulseParameters::Delay},
-    {"Rise", "s", &Core::PulseParameters::RiseTime},
-    {"Fall", "s", &Core::PulseParameters::FallTime},
-    {"Width", "s", &Core::PulseParameters::Width},
-    {"Period", "s", &Core::PulseParameters::Period},
+constexpr auto ACFields = std::to_array<ParameterField<Core::ACParameters>>({
+    {"Amplitude", &Core::ACParameters::Amplitude, nullptr},
+    {"Frequency", &Core::ACParameters::Frequency, "Hz"},
+    {"Offset", &Core::ACParameters::Offset, nullptr},
 });
+
+constexpr auto PulseFields = std::to_array<ParameterField<Core::PulseParameters>>({
+    {"Low", &Core::PulseParameters::Low, nullptr},
+    {"High", &Core::PulseParameters::High, nullptr},
+    {"Delay", &Core::PulseParameters::Delay, "s"},
+    {"Rise", &Core::PulseParameters::RiseTime, "s"},
+    {"Fall", &Core::PulseParameters::FallTime, "s"},
+    {"Width", &Core::PulseParameters::Width, "s"},
+    {"Period", &Core::PulseParameters::Period, "s"},
+});
+
+template <typename Parameters, std::size_t Count>
+void LoadParameterFields(const std::array<ParameterField<Parameters>, Count> &fields,
+                         std::array<ValueField, Count> &value_fields, const Parameters &parameters) {
+    for (std::size_t index = 0; index < Count; ++index) {
+        value_fields[index].Load(parameters.*fields[index].Value);
+    }
+}
+
+// Draws one field per member and applies a valid edit to the parameters; each value is checked by trying it in a
+// copy of the whole set, since some limits depend on several members. Returns whether a value changed
+template <typename Parameters, std::size_t Count>
+bool DrawParameterFields(const std::array<ParameterField<Parameters>, Count> &fields,
+                         std::array<ValueField, Count> &value_fields, const char *source_unit, const auto &is_valid,
+                         Parameters &parameters) {
+    bool changed = false;
+    for (std::size_t index = 0; index < Count; ++index) {
+        const ParameterField<Parameters> &field = fields[index];
+        const auto is_valid_value = [&](const double value) {
+            Parameters candidate = parameters;
+            candidate.*field.Value = value;
+            return is_valid(candidate);
+        };
+        const char *unit = field.Unit != nullptr ? field.Unit : source_unit;
+        if (const std::optional<double> value = value_fields[index].Draw(field.Label, unit, is_valid_value)) {
+            parameters.*field.Value = *value;
+            changed = true;
+        }
+    }
+    return changed;
+}
 
 } // namespace
 
@@ -73,8 +112,8 @@ void PropertiesWindow::Draw() {
     if (m_LoadedSelection != m_Schematic.GetSelectionVersion()) {
         LoadFields(component);
     }
-    if (component.GetType() == Core::ComponentType::VoltageSource) {
-        DrawVoltageSource(static_cast<Core::VoltageSource &>(component));
+    if (Core::IsSource(component.GetType())) {
+        DrawSource(static_cast<Core::Source &>(component));
     } else {
         DrawValue(component);
     }
@@ -83,15 +122,10 @@ void PropertiesWindow::Draw() {
 
 void PropertiesWindow::LoadFields(const Core::Component &component) {
     m_Value.Load(component.GetValue());
-    if (component.GetType() == Core::ComponentType::VoltageSource) {
-        const auto &source = static_cast<const Core::VoltageSource &>(component);
-        m_Amplitude.Load(source.GetAmplitude());
-        m_Frequency.Load(source.GetFrequency());
-        m_Offset.Load(source.GetOffset());
-        static_assert(PulseFields.size() == std::tuple_size_v<decltype(m_PulseFields)>);
-        for (std::size_t index = 0; index < PulseFields.size(); ++index) {
-            m_PulseFields[index].Load(source.GetPulse().*PulseFields[index].Value);
-        }
+    if (Core::IsSource(component.GetType())) {
+        const auto &source = static_cast<const Core::Source &>(component);
+        LoadParameterFields(ACFields, m_ACFields, source.GetAC());
+        LoadParameterFields(PulseFields, m_PulseFields, source.GetPulse());
     }
     m_LoadedSelection = m_Schematic.GetSelectionVersion();
 }
@@ -104,8 +138,8 @@ void PropertiesWindow::DrawValue(Core::Component &component) {
     }
 }
 
-void PropertiesWindow::DrawVoltageSource(Core::VoltageSource &source) {
-    using SourceType = Core::VoltageSource::SourceType;
+void PropertiesWindow::DrawSource(Core::Source &source) {
+    using SourceType = Core::Source::SourceType;
     for (const SourceType type : {SourceType::DC, SourceType::AC, SourceType::Pulse}) {
         if (type != SourceType::DC) {
             ImGui::SameLine();
@@ -118,12 +152,14 @@ void PropertiesWindow::DrawVoltageSource(Core::VoltageSource &source) {
     }
 
     switch (source.GetSourceType()) {
-    case SourceType::DC:
-        if (const std::optional<double> value = m_Value.Draw("Voltage", "V", AnyValue)) {
+    case SourceType::DC: {
+        const char *label = source.GetType() == Core::ComponentType::CurrentSource ? "Current" : "Voltage";
+        if (const std::optional<double> value = m_Value.Draw(label, source.GetUnit(), AnyValue)) {
             source.SetValue(*value);
             m_Schematic.MarkModified();
         }
         break;
+    }
     case SourceType::AC:
         DrawSine(source);
         break;
@@ -133,41 +169,25 @@ void PropertiesWindow::DrawVoltageSource(Core::VoltageSource &source) {
     }
 }
 
-void PropertiesWindow::DrawSine(Core::VoltageSource &source) {
-    if (const std::optional<double> amplitude = m_Amplitude.Draw("Amplitude", "V", AnyValue)) {
-        source.SetAmplitude(*amplitude);
-        m_Schematic.MarkModified();
-    }
-    const auto is_valid_frequency = [&source](const double frequency) { return source.IsValidFrequency(frequency); };
-    if (const std::optional<double> frequency = m_Frequency.Draw("Frequency", "Hz", is_valid_frequency)) {
-        source.SetFrequency(*frequency);
-        m_Schematic.MarkModified();
-    }
-    if (const std::optional<double> offset = m_Offset.Draw("Offset", "V", AnyValue)) {
-        source.SetOffset(*offset);
+void PropertiesWindow::DrawSine(Core::Source &source) {
+    Core::ACParameters ac = source.GetAC();
+    const auto is_valid = [&source](const Core::ACParameters &candidate) { return source.IsValidAC(candidate); };
+    if (DrawParameterFields(ACFields, m_ACFields, source.GetUnit(), is_valid, ac)) {
+        source.SetAC(ac);
         m_Schematic.MarkModified();
     }
     ImGui::TextDisabled("The amplitude is the peak; it is also the AC sweep magnitude");
 }
 
-// Each field is checked by trying its value in a copy of the whole pulse
-void PropertiesWindow::DrawPulse(Core::VoltageSource &source) {
-    for (std::size_t index = 0; index < PulseFields.size(); ++index) {
-        const PulseField &field = PulseFields[index];
-        const auto is_valid = [&source, &field](const double value) {
-            Core::PulseParameters candidate = source.GetPulse();
-            candidate.*field.Value = value;
-            return source.IsValidPulse(candidate);
-        };
-        if (const std::optional<double> value = m_PulseFields[index].Draw(field.Label, field.Unit, is_valid)) {
-            Core::PulseParameters pulse = source.GetPulse();
-            pulse.*field.Value = *value;
-            source.SetPulse(pulse);
-            m_Schematic.MarkModified();
-        }
+void PropertiesWindow::DrawPulse(Core::Source &source) {
+    Core::PulseParameters pulse = source.GetPulse();
+    const auto is_valid = [&source](const Core::PulseParameters &candidate) { return source.IsValidPulse(candidate); };
+    if (DrawParameterFields(PulseFields, m_PulseFields, source.GetUnit(), is_valid, pulse)) {
+        source.SetPulse(pulse);
+        m_Schematic.MarkModified();
     }
 
-    const Core::PulseParameters &pulse = source.GetPulse();
+    ImGui::TextDisabled("%s", std::format("Repeats at {}Hz", Core::FormatValue(1.0 / pulse.Period)).c_str());
     ImGui::TextDisabled("%s", std::format("Repeats at {}Hz", Core::FormatValue(1.0 / pulse.Period)).c_str());
     if (pulse.RiseTime + pulse.Width + pulse.FallTime > pulse.Period) {
         ImGui::TextColored(WarningTextColor, "Rise, width and fall add up to more than the period");
