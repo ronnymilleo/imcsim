@@ -78,31 +78,34 @@ constexpr auto Themes = std::to_array<ThemePalette>({
      .CanvasText = Col(240, 244, 248),
      .VoltageLabel = Col(255, 220, 120),
      .HeatStops = {Rgb(70, 78, 92), Rgb(36, 92, 176), Rgb(96, 160, 255), Rgb(205, 235, 255)}},
-    // An oscilloscope screen: green phosphor on near black, with an amber accent
+    // A green monochrome CRT, after the P39 I variant of the Green Monochrome Monitor CRT Phosphor theme for Zed
+    // (MIT): pure black, one green (#00B400) at several intensities over it, and a brighter one (#00FF66) for what
+    // stands out. Node and trace colors keep their hues, so plots stay readable
     {.Name = "Phosphor",
      .Light = false,
-     .Background = Rgb(12, 15, 12),
-     .Surface = Rgb(18, 22, 18),
-     .Raised = Rgb(28, 35, 28),
-     .RaisedHot = Rgb(38, 48, 38),
-     .Border = Rgb(44, 56, 44),
-     .Text = Rgb(200, 235, 200),
-     .TextMuted = Rgb(120, 150, 120),
-     .Accent = Rgb(214, 148, 28),
-     .AccentHot = Rgb(255, 186, 64),
-     .AccentDim = Rgb(150, 100, 18),
-     .ErrorText = Rgb(255, 96, 76),
-     .WarningText = Rgb(255, 226, 120),
-     .PlotGrid = Rgb(120, 255, 120, 0.10f),
-     .CanvasBackground = Col(8, 11, 8),
-     .GridDot = Col(34, 58, 34),
-     .Element = Col(140, 235, 150),
-     // Wires are cyan so they stand apart from the green parts and the amber accent
-     .Wire = Col(110, 195, 210),
-     .Selected = Col(255, 255, 255),
-     .CanvasText = Col(220, 255, 220),
-     .VoltageLabel = Col(255, 186, 64),
-     .HeatStops = {Rgb(30, 60, 35), Rgb(60, 140, 60), Rgb(140, 230, 120), Rgb(230, 255, 200)}},
+     .Background = Rgb(0, 0, 0),
+     .Surface = Rgb(0, 34, 0),
+     .Raised = Rgb(0, 45, 0),
+     .RaisedHot = Rgb(0, 68, 0),
+     .Border = Rgb(0, 68, 0),
+     .Text = Rgb(0, 180, 0),
+     .TextMuted = Rgb(0, 145, 0),
+     .Accent = Rgb(0, 135, 0),
+     .AccentHot = Rgb(0, 255, 102),
+     .AccentDim = Rgb(0, 90, 0),
+     // Brightness tells problems apart, as on a monochrome screen
+     .ErrorText = Rgb(0, 255, 102),
+     .WarningText = Rgb(150, 255, 150),
+     .PlotGrid = Rgb(0, 180, 0, 0.15f),
+     .CanvasBackground = Col(0, 0, 0),
+     .GridDot = Col(0, 56, 0),
+     .Element = Col(0, 180, 0),
+     .Wire = Col(0, 255, 102),
+     .Selected = Col(200, 255, 200),
+     .CanvasText = Col(0, 180, 0),
+     .VoltageLabel = Col(0, 255, 102),
+     .HeatStops = {Rgb(0, 45, 0), Rgb(0, 110, 0), Rgb(0, 180, 0), Rgb(0, 255, 102)},
+     .BrightTraces = true},
     // Off-white paper with dark ink and a blue accent, like a printed datasheet; the accent fills stay light so
     // dark text reads on them
     {.Name = "Paper",
@@ -368,10 +371,20 @@ const ThemePalette &GetPalette() {
 /**
  * @brief   Makes a trace or probe color readable on the background of the current theme.
  * @param[in] color  Color picked for a dark background, such as a node or trace color.
- * @return  The same color on a dark theme; on a light one, darkened as for print.
+ * @return  The same color on a dark theme, scaled up until its strongest channel is full on a theme with
+ *          BrightTraces; on a light theme, darkened as for print.
  */
 ImU32 AdaptToBackground(const ImU32 color) {
-    if (!GetPalette().Light) {
+    const ThemePalette &palette = GetPalette();
+    if (palette.BrightTraces) {
+        const ImVec4 rgba = ImGui::ColorConvertU32ToFloat4(color);
+        const float strongest = std::max({rgba.x, rgba.y, rgba.z});
+        if (strongest <= 0.0f) {
+            return color;
+        }
+        return ImGui::ColorConvertFloat4ToU32({rgba.x / strongest, rgba.y / strongest, rgba.z / strongest, rgba.w});
+    }
+    if (!palette.Light) {
         return color;
     }
     const ExportColor adjusted = AdjustColorForPrint({static_cast<std::uint8_t>((color >> IM_COL32_R_SHIFT) & 0xFF),

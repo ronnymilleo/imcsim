@@ -86,6 +86,7 @@ GridPoint Rotate(GridPoint point, Rotation rotation);
 
 // Framing
 ViewFrame FramePoints(std::span<const GridPoint> points, ImVec2 canvas_size, float min_zoom, float max_zoom);
+ViewFrame FrameBounds(ImVec2 min, ImVec2 max, ImVec2 canvas_size, float min_zoom, float max_zoom);
 
 } // namespace GUI
 

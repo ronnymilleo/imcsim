@@ -31,7 +31,7 @@ How to read what imcsim measures, plots and exports. The [README](../README.md) 
   View (fit, wire colors, symbol style, terminal numbers, theme, and the windows). The View choices are kept between
   sessions.
 - **Themes**: View > Theme switches between Ember (warm charcoal and red, the default), Graphite (cool gray and
-  blue), Phosphor (an oscilloscope screen, green and amber) and Paper (light, like a printed datasheet). Node and
+  blue), Phosphor (a green monochrome CRT, after a Zed theme) and Paper (light, like a printed datasheet). Node and
   trace colors are the same in every theme; Paper darkens them so they read on its light background.
 - **Output window**: hidden until an analysis runs; it then opens on the tab of the new result. The operating point
   tab lists the node voltages and part currents, which also show on the schematic. Reopen it from View.

@@ -12,6 +12,7 @@
 #include "schematic_canvas.h"
 #include "ui_elements/ui_element.h"
 #include <expected>
+#include <optional>
 #include <string>
 
 namespace GUI {
@@ -24,6 +25,18 @@ inline constexpr float ScreenTerminalRingScale = 0.2f;
 void DrawMeasurementMarkers(SchematicCanvas &canvas, const ViewTransform &view, Schematic &schematic);
 void DrawTerminalNumbers(SchematicCanvas &canvas, const ViewTransform &view, const Schematic &schematic,
                          float ring_scale);
+
+/**
+ * @struct  SchematicBounds
+ * @brief   The area a schematic covers when drawn, labels and probe markers included, in grid units.
+ */
+struct SchematicBounds {
+    ImVec2 Min;
+    ImVec2 Max;
+};
+
+// Extent
+std::optional<SchematicBounds> MeasureSchematic(Schematic &schematic, SymbolStyle style, bool terminal_numbers);
 
 // Export
 std::expected<std::string, std::string> RenderSchematicSvg(Schematic &schematic, SymbolStyle style,

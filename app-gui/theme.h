@@ -19,7 +19,7 @@ namespace GUI {
  * @details Surfaces go from Background, the darkest on a dark theme, through Surface and Raised to RaisedHot, the
  *          hovered state. The accent marks the active and primary items; AccentDim fills them, Accent and AccentHot
  *          are their hovered and pressed states. Node, current and math trace colors are shared by every theme;
- *          a light theme darkens them through AdaptToBackground().
+ *          AdaptToBackground() darkens them on a light theme and brightens them when BrightTraces is set.
  */
 struct ThemePalette {
     const char *Name;
@@ -50,6 +50,8 @@ struct ThemePalette {
     ImU32 VoltageLabel;
     // Heat scale of voltages and currents, from the lowest value to the highest
     std::array<ImVec4, 4> HeatStops;
+    // Raises node and trace colors to full brightness, for a theme whose background is pure black
+    bool BrightTraces = false;
 };
 
 // Setup

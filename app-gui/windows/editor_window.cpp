@@ -1069,17 +1069,12 @@ void EditorWindow::HandlePanAndZoom(const ImVec2 origin, const bool hovered, con
     }
 }
 
-// Shows the whole schematic centered, never zoomed in past max_zoom, so a small circuit is not blown up
+// Shows the whole schematic centered, labels included, never zoomed in past max_zoom, so a small circuit is not
+// blown up
 void EditorWindow::FrameSchematic(const ImVec2 canvas_size, const float max_zoom) {
-    std::vector<GridPoint> points = m_Schematic.CollectTerminals();
-    for (const auto &element : m_Schematic.GetElements()) {
-        points.push_back(element->GetPosition());
-    }
-    for (const UIWire &wire : m_Schematic.GetWires()) {
-        points.push_back(wire.GetStart());
-        points.push_back(wire.GetEnd());
-    }
-    const ViewFrame frame = FramePoints(points, canvas_size, MinZoom, max_zoom);
+    const std::optional<SchematicBounds> bounds = MeasureSchematic(m_Schematic, m_SymbolStyle, m_ShowTerminalNumbers);
+    const ViewFrame frame = bounds ? FrameBounds(bounds->Min, bounds->Max, canvas_size, MinZoom, max_zoom)
+                                   : FramePoints({}, canvas_size, MinZoom, max_zoom);
     m_Pan = frame.Pan;
     m_Zoom = frame.Zoom;
 }

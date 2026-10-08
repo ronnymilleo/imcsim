@@ -57,6 +57,25 @@ ExportColor ToExportColor(const ImU32 color) {
             static_cast<std::uint8_t>((color >> IM_COL32_B_SHIFT) & 0xFF)};
 }
 
+// Wires, junctions, parts with their labels, terminal numbers and probes, at the export zoom from the origin
+void DrawWholeSchematic(SvgCanvas &canvas, Schematic &schematic, const SymbolStyle style, const bool terminal_numbers,
+                        const ImU32 element_color, const ImU32 wire_color) {
+    const ViewTransform view({0.0f, 0.0f}, {0.0f, 0.0f}, ExportZoom);
+    for (const UIWire &wire : schematic.GetWires()) {
+        wire.Draw(canvas, view, wire_color);
+    }
+    for (const GridPoint junction : schematic.GetConnectivity().GetJunctions()) {
+        canvas.AddCircleFilled(view.ToScreen(ToVec2(junction)), JunctionRadius, wire_color);
+    }
+    for (const auto &element : schematic.GetElements()) {
+        element->Draw(canvas, view, element_color, style);
+    }
+    if (terminal_numbers) {
+        DrawTerminalNumbers(canvas, view, schematic, ExportTerminalRingScale);
+    }
+    DrawMeasurementMarkers(canvas, view, schematic);
+}
+
 // Pixels per grid unit
 float GetZoom(const ViewTransform &view) {
     return view.ToScreen({1.0f, 0.0f}).x - view.ToScreen({0.0f, 0.0f}).x;
@@ -177,6 +196,26 @@ void DrawTerminalNumbers(SchematicCanvas &canvas, const ViewTransform &view, con
 }
 
 /**
+ * @brief   Measures the area a schematic covers when drawn, so a view can frame its labels too.
+ * @param[in] schematic         Schematic to measure.
+ * @param[in] style             Drawing standard of the symbols, as the editor shows them.
+ * @param[in] terminal_numbers  Whether the terminal numbers are shown.
+ * @return  The area in grid units, or no value for an empty schematic.
+ * @note    Labels scale with the zoom, so the area holds at any zoom where they are drawn. Needs ImGui and ImPlot
+ *          contexts, as RenderSchematicSvg() does.
+ */
+std::optional<SchematicBounds> MeasureSchematic(Schematic &schematic, const SymbolStyle style,
+                                                const bool terminal_numbers) {
+    if (schematic.GetElements().empty() && schematic.GetWires().empty()) {
+        return std::nullopt;
+    }
+    SvgWriter svg;
+    SvgCanvas canvas(svg, false);
+    DrawWholeSchematic(canvas, schematic, style, terminal_numbers, IM_COL32_WHITE, IM_COL32_WHITE);
+    return SchematicBounds{.Min = canvas.GetMin() / ExportZoom, .Max = canvas.GetMax() / ExportZoom};
+}
+
+/**
  * @brief   Draws the schematic as an SVG image, to go next to its exported plots.
  * @param[in] schematic Schematic to draw: parts with their names and values, wires, junctions and probes.
  * @param[in] style     Drawing standard of the symbols, as the editor shows them.
@@ -192,26 +231,11 @@ std::expected<std::string, std::string> RenderSchematicSvg(Schematic &schematic,
     if (schematic.GetElements().empty() && schematic.GetWires().empty()) {
         return std::unexpected("The schematic is empty");
     }
-    const ViewTransform view({0.0f, 0.0f}, {0.0f, 0.0f}, ExportZoom);
     const ThemePalette &palette = GetPalette();
-    const ImU32 element_color = dark ? palette.Element : PrintLineColor;
-    const ImU32 wire_color = dark ? palette.Wire : PrintLineColor;
     SvgWriter svg;
     SvgCanvas canvas(svg, !dark);
-
-    for (const UIWire &wire : schematic.GetWires()) {
-        wire.Draw(canvas, view, wire_color);
-    }
-    for (const GridPoint junction : schematic.GetConnectivity().GetJunctions()) {
-        canvas.AddCircleFilled(view.ToScreen(ToVec2(junction)), JunctionRadius, wire_color);
-    }
-    for (const auto &element : schematic.GetElements()) {
-        element->Draw(canvas, view, element_color, style);
-    }
-    if (terminal_numbers) {
-        DrawTerminalNumbers(canvas, view, schematic, ExportTerminalRingScale);
-    }
-    DrawMeasurementMarkers(canvas, view, schematic);
+    DrawWholeSchematic(canvas, schematic, style, terminal_numbers, dark ? palette.Element : PrintLineColor,
+                       dark ? palette.Wire : PrintLineColor);
 
     const ImVec2 min = canvas.GetMin() - ImVec2(ExportMargin, ExportMargin);
     const ImVec2 max = canvas.GetMax() + ImVec2(ExportMargin, ExportMargin);
