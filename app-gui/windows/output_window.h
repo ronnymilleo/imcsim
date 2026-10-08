@@ -11,6 +11,7 @@
 #include "windows/app_window.h"
 #include <cstddef>
 #include <optional>
+#include <string>
 #include <vector>
 
 namespace GUI {
@@ -24,7 +25,8 @@ namespace GUI {
  *          editor or in the list beside the plots; voltages take the colors the editor gives the nodes, and
  *          currents are dashed on the secondary Y axis on the right. Hovering a plot reads every shown trace at
  *          the nearest sample. The axes of each analysis fit its new results, and keep zoom and pan until the
- *          next one. The window floats instead of being docked, so the plots can be as large as needed.
+ *          next one; the voltage and current axes also fit whenever their measured traces change. The window floats
+ * instead of being docked, so the plots can be as large as needed.
  */
 class OutputWindow : public AppWindow {
 public:
@@ -37,10 +39,13 @@ private:
     std::optional<std::size_t> m_FittedTransient;
     std::optional<std::size_t> m_FittedACSweep;
     std::optional<std::size_t> m_FittedDCSweep;
-    // Whether each analysis showed its current axis last frame; the axis is fitted when it appears again
-    bool m_TransientShowedCurrents = false;
-    bool m_ACSweepShowedCurrents = false;
-    bool m_DCSweepShowedCurrents = false;
+    // Nodes and currents each analysis plotted last frame; the axis of each fits whenever they change
+    std::vector<int> m_TransientShownNodes;
+    std::vector<int> m_ACSweepShownNodes;
+    std::vector<int> m_DCSweepShownNodes;
+    std::vector<std::string> m_TransientShownCurrents;
+    std::vector<std::string> m_ACSweepShownCurrents;
+    std::vector<std::string> m_DCSweepShownCurrents;
 
     void Draw() override;
     void DrawTraceList(std::size_t node_count, const std::vector<Core::ComponentTrace> &currents);

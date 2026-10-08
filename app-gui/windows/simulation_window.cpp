@@ -90,30 +90,39 @@ void LoadSweepFields(const Core::SweepRange &range, std::array<ValueField, 3> &f
     fields[2].Load(range.Step);
 }
 
+// The stepped source defaults to the second one, so a transistor curve family needs no picking
+constexpr std::size_t SweptSourceIndex = 0;
+constexpr std::size_t SteppedSourceIndex = 1;
+
 bool IsNonZero(const double value) {
     return value != 0.0;
 }
 
-// Draws the source picker and the start, stop and step of one range. A range without a source, or with one that
-// left the circuit, takes the source at preferred_index, so a new schematic is ready to run
+// A range without a source, or with one that left the circuit, uses the source at preferred_index, so a new
+// schematic is ready to run. The stored name is kept, so the choice comes back with its source
+const std::string &ResolveSweepSource(const Core::SweepRange &range, const std::vector<SweepSource> &sources,
+                                      const std::size_t preferred_index) {
+    if (std::ranges::contains(sources, range.Source, &SweepSource::Name)) {
+        return range.Source;
+    }
+    return sources[std::min(preferred_index, sources.size() - 1)].Name;
+}
+
+// Draws the source picker and the start, stop and step of one range; sources must not be empty
 void DrawSweepRange(const char *id, const char *source_label, const std::vector<SweepSource> &sources,
                     const std::size_t preferred_index, Core::SweepRange &range, std::array<ValueField, 3> &fields) {
     ImGui::PushID(id);
-    const auto selected = std::ranges::find(sources, range.Source, &SweepSource::Name);
-    if (selected == sources.end() && !sources.empty()) {
-        range.Source = sources[std::min(preferred_index, sources.size() - 1)].Name;
-    }
+    const std::string shown_source = ResolveSweepSource(range, sources, preferred_index);
     DrawFieldLabel(source_label);
-    if (ImGui::BeginCombo("##source", range.Source.empty() ? "(no source)" : range.Source.c_str())) {
+    if (ImGui::BeginCombo("##source", shown_source.c_str())) {
         for (const SweepSource &source : sources) {
-            if (ImGui::Selectable(source.Name.c_str(), source.Name == range.Source)) {
+            if (ImGui::Selectable(source.Name.c_str(), source.Name == shown_source)) {
                 range.Source = source.Name;
             }
         }
         ImGui::EndCombo();
     }
-    const auto current = std::ranges::find(sources, range.Source, &SweepSource::Name);
-    const char *unit = current != sources.end() ? current->Unit : "V";
+    const char *unit = std::ranges::find(sources, shown_source, &SweepSource::Name)->Unit;
     if (const std::optional<double> start = fields[0].Draw("Start", unit, AnyValue)) {
         range.Start = *start;
     }
@@ -133,35 +142,47 @@ void DrawSweepRange(const char *id, const char *source_label, const std::vector<
  * @param[in] schematic  Schematic to simulate; it must outlive the window.
  */
 SimulationWindow::SimulationWindow(Schematic &schematic) : AppWindow("Simulation", true), m_Schematic(schematic) {
-    m_StopTime.Load(m_TransientSettings.StopTime);
-    m_TimeStep.Load(m_TransientSettings.TimeStep);
-    m_StartFrequency.Load(m_ACSweepSettings.StartFrequency);
-    m_StopFrequency.Load(m_ACSweepSettings.StopFrequency);
-    LoadSweepFields(m_SweptRange, m_SweptFields);
-    LoadSweepFields(m_SteppedRange, m_SteppedFields);
+    LoadSettingsFields();
 }
 
+// The tabs edit a copy of the settings, which goes back to the schematic once, at the end of the frame
 void SimulationWindow::Draw() {
+    if (m_LoadedSettingsVersion != m_Schematic.GetSimulationSettingsVersion()) {
+        LoadSettingsFields();
+    }
     if (!ImGui::BeginTabBar("analyses")) {
         return;
     }
+    SimulationSettings settings = m_Schematic.GetSimulationSettings();
     if (ImGui::BeginTabItem("Operating point")) {
         DrawOperatingPointTab();
         ImGui::EndTabItem();
     }
     if (ImGui::BeginTabItem("Transient")) {
-        DrawTransientTab();
+        DrawTransientTab(settings.Transient);
         ImGui::EndTabItem();
     }
     if (ImGui::BeginTabItem("AC sweep")) {
-        DrawACSweepTab();
+        DrawACSweepTab(settings.ACSweep);
         ImGui::EndTabItem();
     }
     if (ImGui::BeginTabItem("DC sweep")) {
-        DrawDCSweepTab();
+        DrawDCSweepTab(settings);
         ImGui::EndTabItem();
     }
     ImGui::EndTabBar();
+    m_Schematic.SetSimulationSettings(settings);
+}
+
+void SimulationWindow::LoadSettingsFields() {
+    const SimulationSettings &settings = m_Schematic.GetSimulationSettings();
+    m_StopTime.Load(settings.Transient.StopTime);
+    m_TimeStep.Load(settings.Transient.TimeStep);
+    m_StartFrequency.Load(settings.ACSweep.StartFrequency);
+    m_StopFrequency.Load(settings.ACSweep.StopFrequency);
+    LoadSweepFields(settings.SweptRange, m_SweptFields);
+    LoadSweepFields(settings.SteppedRange, m_SteppedFields);
+    m_LoadedSettingsVersion = m_Schematic.GetSimulationSettingsVersion();
 }
 
 void SimulationWindow::DrawOperatingPointTab() {
@@ -178,15 +199,15 @@ void SimulationWindow::DrawOperatingPointTab() {
 }
 
 // Settings change as soon as a field is valid; ngspice checks how they relate only when the analysis runs
-void SimulationWindow::DrawTransientTab() {
+void SimulationWindow::DrawTransientTab(Core::TransientSettings &settings) {
     if (const std::optional<double> stop_time = m_StopTime.Draw("Stop time", "s", IsPositive)) {
-        m_TransientSettings.StopTime = *stop_time;
+        settings.StopTime = *stop_time;
     }
     if (const std::optional<double> time_step = m_TimeStep.Draw("Time step", "s", IsPositive)) {
-        m_TransientSettings.TimeStep = *time_step;
+        settings.TimeStep = *time_step;
     }
     if (PrimaryButton("Run transient (.tran)")) {
-        RunTransient();
+        RunTransient(settings);
     }
     const auto &transient = m_Schematic.GetTransient();
     if (DrawRunStatus(m_TransientStatus.Error, m_TransientStatus.Messages, transient.has_value())) {
@@ -196,17 +217,20 @@ void SimulationWindow::DrawTransientTab() {
     DrawOutput(m_TransientStatus.Messages);
 }
 
-void SimulationWindow::DrawACSweepTab() {
+void SimulationWindow::DrawACSweepTab(Core::ACSweepSettings &settings) {
     if (const std::optional<double> start = m_StartFrequency.Draw("Start", "Hz", IsPositive)) {
-        m_ACSweepSettings.StartFrequency = *start;
+        settings.StartFrequency = *start;
     }
     if (const std::optional<double> stop = m_StopFrequency.Draw("Stop", "Hz", IsPositive)) {
-        m_ACSweepSettings.StopFrequency = *stop;
+        settings.StopFrequency = *stop;
     }
     DrawFieldLabel("Points");
-    ImGui::InputInt("per decade", &m_ACSweepSettings.PointsPerDecade);
+    // Files reject fewer than one point, so the field never produces a value that would not load back
+    if (ImGui::InputInt("per decade", &settings.PointsPerDecade)) {
+        settings.PointsPerDecade = std::max(settings.PointsPerDecade, 1);
+    }
     if (PrimaryButton("Run AC sweep (.ac)")) {
-        RunACSweep();
+        RunACSweep(settings);
     }
     const auto &sweep = m_Schematic.GetACSweep();
     if (DrawRunStatus(m_ACSweepStatus.Error, m_ACSweepStatus.Messages, sweep.has_value())) {
@@ -216,21 +240,26 @@ void SimulationWindow::DrawACSweepTab() {
 }
 
 // A rejected run also clears the previous result, so stale numbers never sit next to an error
-// The stepped source defaults to the second one, so a transistor curve family needs no picking
-void SimulationWindow::DrawDCSweepTab() {
+void SimulationWindow::DrawDCSweepTab(SimulationSettings &settings) {
     const std::vector<SweepSource> sources = ListSweepSources(m_Schematic.BuildCircuit());
     if (sources.empty()) {
         ImGui::TextDisabled("Add a voltage source, current source or VCC to sweep");
         return;
     }
-    DrawSweepRange("swept", "Sweep", sources, 0, m_SweptRange, m_SweptFields);
-    ImGui::Checkbox("Step a second source, one curve per value", &m_StepSource);
-    if (m_StepSource) {
-        DrawSweepRange("stepped", "Step", sources, 1, m_SteppedRange, m_SteppedFields);
+    DrawSweepRange("swept", "Sweep", sources, SweptSourceIndex, settings.SweptRange, m_SweptFields);
+    ImGui::Checkbox("Step a second source, one curve per value", &settings.StepSource);
+    if (settings.StepSource) {
+        DrawSweepRange("stepped", "Step", sources, SteppedSourceIndex, settings.SteppedRange, m_SteppedFields);
     }
     ImGui::TextDisabled("AC and pulse sources are swept through their DC value");
     if (PrimaryButton("Run DC sweep (.dc)")) {
-        RunDCSweep();
+        Core::DCSweepSettings run_settings{.Swept = settings.SweptRange};
+        run_settings.Swept.Source = ResolveSweepSource(settings.SweptRange, sources, SweptSourceIndex);
+        if (settings.StepSource) {
+            run_settings.Stepped = settings.SteppedRange;
+            run_settings.Stepped->Source = ResolveSweepSource(settings.SteppedRange, sources, SteppedSourceIndex);
+        }
+        RunDCSweep(run_settings);
     }
     const auto &sweep = m_Schematic.GetDCSweep();
     if (DrawRunStatus(m_DCSweepStatus.Error, m_DCSweepStatus.Messages, sweep.has_value())) {
@@ -251,8 +280,8 @@ void SimulationWindow::RunOperatingPoint() {
     }
 }
 
-void SimulationWindow::RunTransient() {
-    Core::TransientRun run = Core::RunTransient(m_Schematic.BuildCircuit(), m_TransientSettings);
+void SimulationWindow::RunTransient(const Core::TransientSettings &settings) {
+    Core::TransientRun run = Core::RunTransient(m_Schematic.BuildCircuit(), settings);
     m_TransientStatus.Messages = std::move(run.Messages);
     if (run.Result) {
         m_TransientStatus.Error.reset();
@@ -263,8 +292,8 @@ void SimulationWindow::RunTransient() {
     }
 }
 
-void SimulationWindow::RunACSweep() {
-    Core::ACSweepRun run = Core::RunACSweep(m_Schematic.BuildCircuit(), m_ACSweepSettings);
+void SimulationWindow::RunACSweep(const Core::ACSweepSettings &settings) {
+    Core::ACSweepRun run = Core::RunACSweep(m_Schematic.BuildCircuit(), settings);
     m_ACSweepStatus.Messages = std::move(run.Messages);
     if (run.Result) {
         m_ACSweepStatus.Error.reset();
@@ -275,11 +304,7 @@ void SimulationWindow::RunACSweep() {
     }
 }
 
-void SimulationWindow::RunDCSweep() {
-    Core::DCSweepSettings settings{.Swept = m_SweptRange};
-    if (m_StepSource) {
-        settings.Stepped = m_SteppedRange;
-    }
+void SimulationWindow::RunDCSweep(const Core::DCSweepSettings &settings) {
     Core::DCSweepRun run = Core::RunDCSweep(m_Schematic.BuildCircuit(), settings);
     m_DCSweepStatus.Messages = std::move(run.Messages);
     if (run.Result) {

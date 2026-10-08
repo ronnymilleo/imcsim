@@ -218,11 +218,22 @@ bool EditorWindow::IsQuitConfirmed() const {
     return m_QuitConfirmed;
 }
 
+/**
+ * @brief   Asks to open an example, as when the user picks one from the menu.
+ * @param[in] example  One of GetExamples().
+ * @note    Like quitting, the next frame opens it, after asking the user to discard unsaved changes if there are
+ *          any. The example opens untitled, so saving it asks for a file.
+ */
+void EditorWindow::RequestExample(const Example &example) {
+    m_RequestedExample = example;
+}
+
 // Window content only: AppWindow::Render() wraps it in Begin/End
 void EditorWindow::Draw() {
     // File results and the quit request open popups, which must belong to this window
     ProcessDialogResult();
     HandleQuitRequest();
+    HandleExampleRequest();
     HandleFileShortcuts();
     DrawToolbar();
 
@@ -955,6 +966,20 @@ void EditorWindow::HandleQuitRequest() {
     }
 }
 
+void EditorWindow::HandleExampleRequest() {
+    const std::optional<Example> example = std::exchange(m_RequestedExample, std::nullopt);
+    if (!example) {
+        return;
+    }
+    if (m_Schematic.IsModified()) {
+        m_ExampleToOpen = example;
+        m_ActionToConfirm = FileAction::Example;
+        ImGui::OpenPopup(DiscardPopup);
+    } else {
+        OpenExample(*example);
+    }
+}
+
 void EditorWindow::Save() {
     if (const auto &file_path = m_Schematic.GetFilePath()) {
         SaveFile(*file_path);
@@ -986,7 +1011,7 @@ void EditorWindow::OpenFile(const std::filesystem::path &path) {
     }
 
     NewSchematic();
-    m_Schematic.Replace(std::move(loaded->Elements), std::move(loaded->Wires));
+    m_Schematic.Replace(std::move(loaded->Elements), std::move(loaded->Wires), std::move(loaded->Settings));
     m_Schematic.MarkSaved(path);
     if (!loaded->Warnings.empty()) {
         m_Schematic.MarkModified();
@@ -995,12 +1020,27 @@ void EditorWindow::OpenFile(const std::filesystem::path &path) {
     }
 }
 
+// The view goes back to its default, where the examples are drawn, in case the user had panned or zoomed away
+void EditorWindow::OpenExample(const Example &example) {
+    auto loaded = LoadExample(example);
+    if (!loaded) {
+        ShowFileMessages(std::format("Could not open the example {}", example.Title), {loaded.error()});
+        return;
+    }
+
+    NewSchematic();
+    m_Schematic.Replace(std::move(loaded->Elements), std::move(loaded->Wires), std::move(loaded->Settings));
+    m_Pan = {0, 0};
+    m_Zoom = DefaultZoom;
+}
+
 // Dialogs do not always add the extension, so it is added here when missing
 void EditorWindow::SaveFile(std::filesystem::path path) {
     if (path.extension() != SchematicExtension) {
         path += SchematicExtension;
     }
-    const auto written = WriteTextFile(path, SaveSchematic(m_Schematic.GetElements(), m_Schematic.GetWires()));
+    const auto written = WriteTextFile(
+        path, SaveSchematic(m_Schematic.GetElements(), m_Schematic.GetWires(), m_Schematic.GetSimulationSettings()));
     if (!written) {
         ShowFileMessages("Could not save the schematic", {written.error()});
         return;
@@ -1073,6 +1113,8 @@ void EditorWindow::DrawFilePopups() {
                 ShowFileDialog(FileAction::Open);
             } else if (m_ActionToConfirm == FileAction::Quit) {
                 m_QuitConfirmed = true;
+            } else if (m_ActionToConfirm == FileAction::Example) {
+                OpenExample(*m_ExampleToOpen);
             }
             m_ActionToConfirm.reset();
             ImGui::CloseCurrentPopup();

@@ -161,7 +161,7 @@ void Schematic::DeleteSelection() {
  * @brief   Empties the schematic, leaving it untitled and unmodified.
  */
 void Schematic::Clear() {
-    Replace({}, {});
+    Replace({}, {}, {});
     m_FilePath.reset();
 }
 
@@ -169,12 +169,16 @@ void Schematic::Clear() {
  * @brief   Replaces the whole content, for example with a schematic read from a file.
  * @param[in] elements  New elements, with names already set.
  * @param[in] wires     New wires.
+ * @param[in] settings  New simulation settings.
  * @note    The schematic becomes unmodified and the undo history starts over; the file path is kept.
  */
-void Schematic::Replace(std::vector<std::unique_ptr<UIElement>> elements, std::vector<UIWire> wires) {
+void Schematic::Replace(std::vector<std::unique_ptr<UIElement>> elements, std::vector<UIWire> wires,
+                        SimulationSettings settings) {
     ClearSelection();
     m_Elements = std::move(elements);
     m_Wires = std::move(wires);
+    m_SimulationSettings = std::move(settings);
+    ++m_SimulationSettingsVersion;
     InvalidateDerivedData();
     m_Modified = false;
     ResetHistory();
@@ -289,6 +293,37 @@ void Schematic::SetCurrentMeasured(const std::string &name, const bool measured)
 void Schematic::ClearMeasurements() {
     m_MeasuredNodes.clear();
     m_MeasuredCurrents.clear();
+}
+
+/**
+ * @brief   Returns how each analysis runs.
+ * @return  The settings, saved with the schematic.
+ */
+const SimulationSettings &Schematic::GetSimulationSettings() const {
+    return m_SimulationSettings;
+}
+
+/**
+ * @brief   Changes how the analyses run, as the user edits the settings.
+ * @param[in] settings  New settings; when they equal the current ones, nothing changes.
+ * @note    A change counts as unsaved and is undone like an edit, but keeps the results and the version.
+ */
+void Schematic::SetSimulationSettings(const SimulationSettings &settings) {
+    if (settings == m_SimulationSettings) {
+        return;
+    }
+    m_SimulationSettings = settings;
+    m_Modified = true;
+    m_ChangedSinceCommit = true;
+}
+
+/**
+ * @brief   Returns a number that changes whenever the settings are replaced by something other than
+ *          SetSimulationSettings(), such as opening a file, starting a new schematic, undoing or redoing.
+ * @return  The settings version; compare it with a stored one to know whether to reload the settings.
+ */
+std::size_t Schematic::GetSimulationSettingsVersion() const {
+    return m_SimulationSettingsVersion;
 }
 
 /**
@@ -528,7 +563,7 @@ void Schematic::InvalidateDerivedData() {
 }
 
 std::string Schematic::TakeSnapshot() const {
-    return SaveSchematic(m_Elements, m_Wires);
+    return SaveSchematic(m_Elements, m_Wires, m_SimulationSettings);
 }
 
 // Snapshots come from TakeSnapshot(), so they always load back without warnings
@@ -540,6 +575,10 @@ void Schematic::RestoreSnapshot(const std::string &snapshot) {
     ClearSelection();
     m_Elements = std::move(loaded->Elements);
     m_Wires = std::move(loaded->Wires);
+    if (loaded->Settings != m_SimulationSettings) {
+        m_SimulationSettings = std::move(loaded->Settings);
+        ++m_SimulationSettingsVersion;
+    }
     m_ChangedSinceCommit = false;
     m_Modified = m_CurrentSnapshot != m_SavedSnapshot;
     InvalidateDerivedData();

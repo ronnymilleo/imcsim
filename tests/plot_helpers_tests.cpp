@@ -7,6 +7,7 @@
 #include <array>
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
+#include <limits>
 #include <vector>
 
 namespace {
@@ -15,6 +16,18 @@ void CheckPoint(const ImVec2 actual, const ImVec2 expected) {
     CHECK_THAT(actual.x, Catch::Matchers::WithinAbs(expected.x, 1e-4));
     CHECK_THAT(actual.y, Catch::Matchers::WithinAbs(expected.y, 1e-4));
 }
+
+/**
+ * @struct  ClipArea
+ * @brief   Corners of the visible area handed to SplitIntoDashes.
+ */
+struct ClipArea {
+    ImVec2 Min;
+    ImVec2 Max;
+};
+
+// Large enough that the tests of the dash pattern clip nothing
+constexpr ClipArea WideArea = {{-1000.0f, -1000.0f}, {1000.0f, 1000.0f}};
 
 } // namespace
 
@@ -40,7 +53,7 @@ TEST_CASE("FindNearestSample compares decades on a logarithmic axis", "[plot_hel
 
 TEST_CASE("SplitIntoDashes alternates dashes and gaps along a straight line", "[plot_helpers]") {
     const std::array<ImVec2, 2> line = {ImVec2(0.0f, 0.0f), ImVec2(10.0f, 0.0f)};
-    const std::vector<GUI::LineSegment> dashes = GUI::SplitIntoDashes(line, 3.0f, 2.0f);
+    const std::vector<GUI::LineSegment> dashes = GUI::SplitIntoDashes(line, 3.0f, 2.0f, WideArea.Min, WideArea.Max);
     REQUIRE(dashes.size() == 2);
     CheckPoint(dashes[0].Start, {0.0f, 0.0f});
     CheckPoint(dashes[0].End, {3.0f, 0.0f});
@@ -51,7 +64,7 @@ TEST_CASE("SplitIntoDashes alternates dashes and gaps along a straight line", "[
 TEST_CASE("SplitIntoDashes keeps the pattern going around bends", "[plot_helpers]") {
     // 2 pixels right, then 4 down: the first dash turns the corner, a 1 pixel gap follows, then the last dash
     const std::array<ImVec2, 3> polyline = {ImVec2(0.0f, 0.0f), ImVec2(2.0f, 0.0f), ImVec2(2.0f, 4.0f)};
-    const std::vector<GUI::LineSegment> dashes = GUI::SplitIntoDashes(polyline, 3.0f, 1.0f);
+    const std::vector<GUI::LineSegment> dashes = GUI::SplitIntoDashes(polyline, 3.0f, 1.0f, WideArea.Min, WideArea.Max);
     REQUIRE(dashes.size() == 3);
     CheckPoint(dashes[0].End, {2.0f, 0.0f});
     CheckPoint(dashes[1].Start, {2.0f, 0.0f});
@@ -62,7 +75,32 @@ TEST_CASE("SplitIntoDashes keeps the pattern going around bends", "[plot_helpers
 
 TEST_CASE("SplitIntoDashes skips repeated points", "[plot_helpers]") {
     const std::array<ImVec2, 3> polyline = {ImVec2(0.0f, 0.0f), ImVec2(0.0f, 0.0f), ImVec2(1.0f, 0.0f)};
-    const std::vector<GUI::LineSegment> dashes = GUI::SplitIntoDashes(polyline, 3.0f, 1.0f);
+    const std::vector<GUI::LineSegment> dashes = GUI::SplitIntoDashes(polyline, 3.0f, 1.0f, WideArea.Min, WideArea.Max);
     REQUIRE(dashes.size() == 1);
     CheckPoint(dashes[0].End, {1.0f, 0.0f});
+}
+
+TEST_CASE("SplitIntoDashes keeps only the visible part of a segment that runs far off screen", "[plot_helpers]") {
+    // A zoomed-in plot can put a sample a billion pixels away; dashing the whole segment would never finish
+    const std::array<ImVec2, 2> line = {ImVec2(5.0f, 0.0f), ImVec2(5.0f, 1e9f)};
+    const std::vector<GUI::LineSegment> dashes = GUI::SplitIntoDashes(line, 3.0f, 2.0f, {0.0f, 0.0f}, {10.0f, 10.0f});
+    REQUIRE(dashes.size() == 2);
+    CheckPoint(dashes[0].Start, {5.0f, 0.0f});
+    CheckPoint(dashes[1].End, {5.0f, 8.0f});
+}
+
+TEST_CASE("SplitIntoDashes keeps the pattern in step across a clipped part", "[plot_helpers]") {
+    // The first 6 pixels are clipped: one whole dash and gap, then 1 pixel into the next dash
+    const std::array<ImVec2, 2> line = {ImVec2(-6.0f, 5.0f), ImVec2(10.0f, 5.0f)};
+    const std::vector<GUI::LineSegment> dashes = GUI::SplitIntoDashes(line, 3.0f, 2.0f, {0.0f, 0.0f}, {10.0f, 10.0f});
+    REQUIRE(dashes.size() == 3);
+    CheckPoint(dashes[0].Start, {0.0f, 5.0f});
+    CheckPoint(dashes[0].End, {2.0f, 5.0f});
+    CheckPoint(dashes[1].Start, {4.0f, 5.0f});
+}
+
+TEST_CASE("SplitIntoDashes skips segments outside the area or with infinite coordinates", "[plot_helpers]") {
+    const float infinity = std::numeric_limits<float>::infinity();
+    const std::array<ImVec2, 3> polyline = {ImVec2(20.0f, 0.0f), ImVec2(20.0f, 5.0f), ImVec2(5.0f, infinity)};
+    CHECK(GUI::SplitIntoDashes(polyline, 3.0f, 2.0f, {0.0f, 0.0f}, {10.0f, 10.0f}).empty());
 }

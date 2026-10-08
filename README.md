@@ -21,7 +21,9 @@ netlist](docs/screenshot.png)
 - Operating point results on the schematic: values on hover, and wires colored by node, by voltage or by a current
   heat map that shows the path of the current
 - IEC or ANSI symbols, parts rotated (R) and mirrored left to right (M) or top to bottom (Shift+M), undo and
-  redo, and schematics saved as JSON
+  redo, and schematics saved as JSON together with the settings of every analysis
+- Example circuits, each with its analyses set up: an RC low-pass filter, a full-bridge rectifier, an LED driver
+  and the output characteristics of a BJT
 
 On Wayland, the windows cannot be dragged out of the main window. Run with `SDL_VIDEODRIVER=x11` to allow it.
 

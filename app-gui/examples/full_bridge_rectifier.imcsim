@@ -1,0 +1,309 @@
+{
+  "elements": [
+    {
+      "model": "1N4007",
+      "name": "D1",
+      "rotation": 270,
+      "type": "Diode",
+      "x": 4,
+      "y": 7
+    },
+    {
+      "model": "1N4007",
+      "name": "D2",
+      "rotation": 270,
+      "type": "Diode",
+      "x": 12,
+      "y": 15
+    },
+    {
+      "model": "1N4007",
+      "name": "D3",
+      "rotation": 270,
+      "type": "Diode",
+      "x": 12,
+      "y": 7
+    },
+    {
+      "model": "1N4007",
+      "name": "D4",
+      "rotation": 270,
+      "type": "Diode",
+      "x": 4,
+      "y": 15
+    },
+    {
+      "amplitude": 17.0,
+      "frequency": 60.0,
+      "name": "Vin1",
+      "offset": 0.0,
+      "pulse": {
+        "delay": 0.0,
+        "fall": 1e-06,
+        "high": 5.0,
+        "low": 0.0,
+        "period": 0.001,
+        "rise": 1e-06,
+        "width": 0.0005
+      },
+      "rotation": 180,
+      "source": "AC",
+      "type": "VoltageSource",
+      "value": 5.0,
+      "x": 8,
+      "y": 11
+    },
+    {
+      "name": "R1",
+      "rotation": 270,
+      "type": "Resistor",
+      "value": 1000.0,
+      "x": 20,
+      "y": 11
+    },
+    {
+      "name": "C1",
+      "rotation": 270,
+      "type": "Capacitor",
+      "value": 0.0001,
+      "x": 26,
+      "y": 11
+    },
+    {
+      "rotation": 0,
+      "type": "Ground",
+      "x": 23,
+      "y": 14
+    }
+  ],
+  "format": "imcsim-schematic",
+  "simulation": {
+    "ac_sweep": {
+      "points_per_decade": 20,
+      "start": 1.0,
+      "stop": 1000000.0
+    },
+    "dc_sweep": {
+      "step_source": false,
+      "stepped": {
+        "source": "",
+        "start": 0.0,
+        "step": 1.0,
+        "stop": 5.0
+      },
+      "swept": {
+        "source": "",
+        "start": 0.0,
+        "step": 0.1,
+        "stop": 5.0
+      }
+    },
+    "transient": {
+      "step": 1e-05,
+      "stop": 0.05
+    }
+  },
+  "version": 1,
+  "wires": [
+    {
+      "end": [
+        4,
+        13
+      ],
+      "start": [
+        4,
+        9
+      ]
+    },
+    {
+      "end": [
+        12,
+        13
+      ],
+      "start": [
+        12,
+        9
+      ]
+    },
+    {
+      "end": [
+        4,
+        18
+      ],
+      "start": [
+        4,
+        17
+      ]
+    },
+    {
+      "end": [
+        12,
+        18
+      ],
+      "start": [
+        4,
+        18
+      ]
+    },
+    {
+      "end": [
+        12,
+        17
+      ],
+      "start": [
+        12,
+        18
+      ]
+    },
+    {
+      "end": [
+        4,
+        4
+      ],
+      "start": [
+        4,
+        5
+      ]
+    },
+    {
+      "end": [
+        12,
+        4
+      ],
+      "start": [
+        4,
+        4
+      ]
+    },
+    {
+      "end": [
+        12,
+        5
+      ],
+      "start": [
+        12,
+        4
+      ]
+    },
+    {
+      "end": [
+        4,
+        11
+      ],
+      "start": [
+        6,
+        11
+      ]
+    },
+    {
+      "end": [
+        12,
+        11
+      ],
+      "start": [
+        10,
+        11
+      ]
+    },
+    {
+      "end": [
+        20,
+        14
+      ],
+      "start": [
+        20,
+        13
+      ]
+    },
+    {
+      "end": [
+        26,
+        14
+      ],
+      "start": [
+        20,
+        14
+      ]
+    },
+    {
+      "end": [
+        26,
+        13
+      ],
+      "start": [
+        26,
+        14
+      ]
+    },
+    {
+      "end": [
+        20,
+        8
+      ],
+      "start": [
+        20,
+        9
+      ]
+    },
+    {
+      "end": [
+        26,
+        8
+      ],
+      "start": [
+        20,
+        8
+      ]
+    },
+    {
+      "end": [
+        26,
+        9
+      ],
+      "start": [
+        26,
+        8
+      ]
+    },
+    {
+      "end": [
+        20,
+        18
+      ],
+      "start": [
+        12,
+        18
+      ]
+    },
+    {
+      "end": [
+        20,
+        14
+      ],
+      "start": [
+        20,
+        18
+      ]
+    },
+    {
+      "end": [
+        20,
+        4
+      ],
+      "start": [
+        12,
+        4
+      ]
+    },
+    {
+      "end": [
+        20,
+        8
+      ],
+      "start": [
+        20,
+        4
+      ]
+    }
+  ]
+}

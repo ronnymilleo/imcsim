@@ -66,6 +66,8 @@ struct TransientSettings {
     double StopTime = 10e-3;
     // Largest step between output points; ngspice may take smaller ones where the signals change fast
     double TimeStep = 10e-6;
+
+    bool operator==(const TransientSettings &) const = default;
 };
 
 /**
@@ -90,6 +92,8 @@ struct ACSweepSettings {
     double StartFrequency = 1.0;
     double StopFrequency = 1e6;
     int PointsPerDecade = 20;
+
+    bool operator==(const ACSweepSettings &) const = default;
 };
 
 /**
@@ -119,6 +123,8 @@ struct SweepRange {
     double Start = 0.0;
     double Stop = 5.0;
     double Step = 0.1;
+
+    bool operator==(const SweepRange &) const = default;
 };
 
 /**

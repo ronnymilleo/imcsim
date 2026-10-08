@@ -150,7 +150,7 @@ TEST_CASE("Replace swaps the content but keeps the file", "[schematic]") {
     std::vector<std::unique_ptr<GUI::UIElement>> elements;
     elements.push_back(MakeResistor({0, 0}));
 
-    schematic.Replace(std::move(elements), {{{2, 0}, {2, 3}}});
+    schematic.Replace(std::move(elements), {{{2, 0}, {2, 3}}}, {});
     CHECK(schematic.GetElements().size() == 1);
     CHECK(schematic.GetWires().size() == 1);
     CHECK(schematic.GetFilePath().has_value());
@@ -335,4 +335,47 @@ TEST_CASE("The history keeps the last 100 steps", "[schematic]") {
     }
     CHECK(undone == 100);
     CHECK(schematic.GetWires().size() == 5);
+}
+
+TEST_CASE("Changing the simulation settings is an unsaved change that keeps the results", "[schematic]") {
+    GUI::Schematic schematic;
+    schematic.SetOperatingPoint(Core::OperatingPoint{{0.0}});
+    const std::size_t version = schematic.GetSimulationSettingsVersion();
+
+    GUI::SimulationSettings settings;
+    settings.Transient.StopTime = 1.0;
+    schematic.SetSimulationSettings(settings);
+    CHECK(schematic.IsModified());
+    CHECK(schematic.GetSimulationSettings() == settings);
+    CHECK(schematic.GetOperatingPoint());
+    CHECK(schematic.GetSimulationSettingsVersion() == version);
+}
+
+TEST_CASE("Undo restores the simulation settings and changes their version", "[schematic]") {
+    GUI::Schematic schematic;
+    GUI::SimulationSettings settings;
+    settings.StepSource = true;
+    schematic.SetSimulationSettings(settings);
+    schematic.CommitUndoStep();
+    const std::size_t version = schematic.GetSimulationSettingsVersion();
+
+    schematic.Undo();
+    CHECK(schematic.GetSimulationSettings() == GUI::SimulationSettings{});
+    CHECK(schematic.GetSimulationSettingsVersion() != version);
+    CHECK_FALSE(schematic.IsModified());
+}
+
+TEST_CASE("Replace and Clear swap the simulation settings and change their version", "[schematic]") {
+    GUI::Schematic schematic;
+    GUI::SimulationSettings settings;
+    settings.ACSweep.PointsPerDecade = 5;
+    const std::size_t version = schematic.GetSimulationSettingsVersion();
+
+    schematic.Replace({}, {}, settings);
+    CHECK(schematic.GetSimulationSettings() == settings);
+    CHECK(schematic.GetSimulationSettingsVersion() != version);
+    CHECK_FALSE(schematic.IsModified());
+
+    schematic.Clear();
+    CHECK(schematic.GetSimulationSettings() == GUI::SimulationSettings{});
 }

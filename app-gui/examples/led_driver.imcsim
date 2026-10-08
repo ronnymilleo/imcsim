@@ -1,0 +1,201 @@
+{
+  "elements": [
+    {
+      "model": "2N2222A",
+      "name": "Q1",
+      "rotation": 0,
+      "type": "NPN",
+      "x": 14,
+      "y": 17
+    },
+    {
+      "amplitude": 1.0,
+      "frequency": 1000.0,
+      "name": "Vin1",
+      "offset": 0.0,
+      "pulse": {
+        "delay": 0.0,
+        "fall": 1e-06,
+        "high": 5.0,
+        "low": 0.0,
+        "period": 0.001,
+        "rise": 1e-06,
+        "width": 0.0005
+      },
+      "rotation": 90,
+      "source": "Pulse",
+      "type": "VoltageSource",
+      "value": 5.0,
+      "x": 4,
+      "y": 20
+    },
+    {
+      "name": "R1",
+      "rotation": 0,
+      "type": "Resistor",
+      "value": 10000.0,
+      "x": 8,
+      "y": 17
+    },
+    {
+      "name": "R2",
+      "rotation": 90,
+      "type": "Resistor",
+      "value": 220.0,
+      "x": 15,
+      "y": 12
+    },
+    {
+      "name": "V1",
+      "rotation": 0,
+      "type": "VCC",
+      "value": 5.0,
+      "x": 15,
+      "y": 4
+    },
+    {
+      "rotation": 0,
+      "type": "Ground",
+      "x": 10,
+      "y": 23
+    },
+    {
+      "model": "Red",
+      "name": "D1",
+      "rotation": 90,
+      "type": "LED",
+      "x": 15,
+      "y": 7
+    }
+  ],
+  "format": "imcsim-schematic",
+  "simulation": {
+    "ac_sweep": {
+      "points_per_decade": 20,
+      "start": 1.0,
+      "stop": 1000000.0
+    },
+    "dc_sweep": {
+      "step_source": false,
+      "stepped": {
+        "source": "",
+        "start": 0.0,
+        "step": 1.0,
+        "stop": 5.0
+      },
+      "swept": {
+        "source": "",
+        "start": 0.0,
+        "step": 0.1,
+        "stop": 5.0
+      }
+    },
+    "transient": {
+      "step": 1e-06,
+      "stop": 0.003
+    }
+  },
+  "version": 1,
+  "wires": [
+    {
+      "end": [
+        15,
+        15
+      ],
+      "start": [
+        15,
+        14
+      ]
+    },
+    {
+      "end": [
+        12,
+        17
+      ],
+      "start": [
+        10,
+        17
+      ]
+    },
+    {
+      "end": [
+        15,
+        22
+      ],
+      "start": [
+        15,
+        19
+      ]
+    },
+    {
+      "end": [
+        15,
+        5
+      ],
+      "start": [
+        15,
+        4
+      ]
+    },
+    {
+      "end": [
+        15,
+        10
+      ],
+      "start": [
+        15,
+        9
+      ]
+    },
+    {
+      "end": [
+        4,
+        17
+      ],
+      "start": [
+        6,
+        17
+      ]
+    },
+    {
+      "end": [
+        4,
+        18
+      ],
+      "start": [
+        4,
+        17
+      ]
+    },
+    {
+      "end": [
+        4,
+        23
+      ],
+      "start": [
+        4,
+        22
+      ]
+    },
+    {
+      "end": [
+        15,
+        23
+      ],
+      "start": [
+        4,
+        23
+      ]
+    },
+    {
+      "end": [
+        15,
+        22
+      ],
+      "start": [
+        15,
+        23
+      ]
+    }
+  ]
+}

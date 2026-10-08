@@ -1,0 +1,58 @@
+/**
+ * @file    examples_tests.cpp
+ * @brief   Tests that every example circuit opens cleanly and simulates with its own settings.
+ */
+
+#include "examples.h"
+#include "schematic.h"
+#include "simulator.h"
+#include "test_printers.h"
+#include <algorithm>
+#include <catch2/catch_test_macros.hpp>
+#include <string>
+#include <string_view>
+
+namespace {
+
+// Loads an example into a schematic, as the editor does
+void OpenOrFail(const GUI::Example &example, GUI::Schematic &schematic) {
+    auto loaded = GUI::LoadExample(example);
+    if (!loaded) {
+        FAIL(loaded.error());
+    }
+    CHECK(loaded->Warnings.empty());
+    schematic.Replace(std::move(loaded->Elements), std::move(loaded->Wires), std::move(loaded->Settings));
+}
+
+} // namespace
+
+TEST_CASE("Every example opens without warnings and runs its operating point and transient", "[examples]") {
+    REQUIRE_FALSE(GUI::GetExamples().empty());
+    for (const GUI::Example &example : GUI::GetExamples()) {
+        INFO(example.Title);
+        GUI::Schematic schematic;
+        OpenOrFail(example, schematic);
+        CHECK_FALSE(schematic.GetElements().empty());
+
+        const Core::OperatingPointRun operating_point = Core::RunOperatingPoint(schematic.BuildCircuit());
+        CHECK(operating_point.Result.has_value());
+        const Core::TransientRun transient =
+            Core::RunTransient(schematic.BuildCircuit(), schematic.GetSimulationSettings().Transient);
+        CHECK(transient.Result.has_value());
+    }
+}
+
+TEST_CASE("The BJT example draws one collector curve per base current", "[examples]") {
+    const auto example = std::ranges::find(GUI::GetExamples(), std::string_view("bjt_output_characteristics.imcsim"),
+                                           &GUI::Example::FileName);
+    REQUIRE(example != GUI::GetExamples().end());
+    GUI::Schematic schematic;
+    OpenOrFail(*example, schematic);
+
+    const GUI::SimulationSettings &settings = schematic.GetSimulationSettings();
+    REQUIRE(settings.StepSource);
+    const Core::DCSweepRun run =
+        Core::RunDCSweep(schematic.BuildCircuit(), {.Swept = settings.SweptRange, .Stepped = settings.SteppedRange});
+    REQUIRE(run.Result.has_value());
+    CHECK(run.Result->Curves.size() == 5);
+}
