@@ -39,7 +39,8 @@ netlist](docs/screenshot.png)
   an LED driver, an op-amp inverting amplifier, an ideal transformer made of controlled sources, the output
   characteristics of a BJT and its small-signal model
 
-The [user guide](docs/user_guide.md) explains terminal numbers, current signs, probes, plots and exports.
+The [user guide](docs/user_guide.md) explains terminal numbers, current signs, probes, plots and exports, and
+[Simulation models](docs/models.md) describes the model behind every part and what it leaves out.
 
 On Wayland, the windows cannot be dragged out of the main window. Run with `SDL_VIDEODRIVER=x11` to allow it.
 

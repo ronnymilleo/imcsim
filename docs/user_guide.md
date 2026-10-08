@@ -1,6 +1,7 @@
 # imcsim user guide
 
-How to read what imcsim measures, plots and exports. The [README](../README.md) covers building and running.
+How to read what imcsim measures, plots and exports. The [README](../README.md) covers building and running, and
+[Simulation models](models.md) the model behind every part.
 
 ## Terminals
 
