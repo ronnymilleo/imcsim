@@ -7,8 +7,11 @@
 #include "schematic.h"
 #include "simulator.h"
 #include "test_printers.h"
+#include "trace_statistics.h"
 #include <algorithm>
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/matchers/catch_matchers_floating_point.hpp>
+#include <numbers>
 #include <string>
 #include <string_view>
 
@@ -64,4 +67,26 @@ TEST_CASE("The BJT example draws one collector curve per base current", "[exampl
         Core::RunDCSweep(schematic.BuildCircuit(), {.Swept = settings.SweptRange, .Stepped = settings.SteppedRange});
     REQUIRE(run.Result.has_value());
     CHECK(run.Result->Curves.size() == 5);
+}
+
+TEST_CASE("The RC example measures its corner frequency over the whole sweep", "[examples]") {
+    const auto example =
+        std::ranges::find(GUI::GetExamples(), std::string_view("rc_low_pass_filter.imcsim"), &GUI::Example::FileName);
+    REQUIRE(example != GUI::GetExamples().end());
+    GUI::Schematic schematic;
+    OpenOrFail(*example, schematic);
+
+    const Core::ACSweepRun run = Core::RunACSweep(schematic.BuildCircuit(), schematic.GetSimulationSettings().ACSweep);
+    REQUIRE(run.Result.has_value());
+    const Core::ACSweep &sweep = *run.Result;
+    // Node 2 is the capacitor, the output of the filter
+    REQUIRE(sweep.NodeMagnitudesDecibels.size() > 2);
+    const auto statistics =
+        GUI::ComputeBodeStatistics(sweep.Frequencies, sweep.NodeMagnitudesDecibels[2], sweep.NodePhasesDegrees[2],
+                                   sweep.Frequencies.front(), sweep.Frequencies.back());
+    REQUIRE(statistics);
+    REQUIRE(statistics->UpperCutoff);
+    const double corner = 1.0 / (2.0 * std::numbers::pi * 1e3 * 100e-9);
+    CHECK_THAT(*statistics->UpperCutoff, Catch::Matchers::WithinRel(corner, 2e-2));
+    CHECK_FALSE(statistics->LowerCutoff);
 }

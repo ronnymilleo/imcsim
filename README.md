@@ -18,6 +18,8 @@ netlist](docs/screenshot.png)
 - Operating point, transient, AC sweep and DC sweep analyses, with node voltages and component currents
 - Plots of transients, Bode diagrams and DC sweeps (including curve families, such as transistor characteristics):
   pick what to measure with the Probe tool, read every trace under the cursor, currents dashed apart from voltages
+- Oscilloscope-style measurements beside the transient and Bode plots: two draggable cursors, peak-to-peak, mean,
+  RMS and frequency of every trace, and peak, -3 dB band, unity gain frequency and phase margin of a response
 - Operating point results on the schematic: values on hover, and wires colored by node, by voltage or by a current
   heat map that shows the path of the current
 - IEC or ANSI symbols, parts rotated (R) and mirrored left to right (M) or top to bottom (Shift+M), undo and

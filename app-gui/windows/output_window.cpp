@@ -10,6 +10,7 @@
 #include "node_colors.h"
 #include "plot_helpers.h"
 #include "spice_value.h"
+#include "trace_statistics.h"
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
@@ -25,7 +26,7 @@ namespace {
 // In font sizes, so the layout follows the DPI scale
 constexpr float MinPlotHeight = 12.0f;
 constexpr float TraceListWidth = 7.0f;
-constexpr ImVec2 InitialSize = {50.0f, 35.0f};
+constexpr ImVec2 InitialSize = {65.0f, 35.0f};
 // ImPlot adds half of it on each side, so 0.4 leaves 20% of the data range above and below the curves
 constexpr ImVec2 FitPadding = {0.0f, 0.4f};
 // Current dashes, in font sizes
@@ -33,6 +34,13 @@ constexpr float DashLength = 0.5f;
 constexpr float DashGap = 0.3f;
 constexpr float DashWeight = 1.5f;
 constexpr ImU32 CursorLineColor = IM_COL32(255, 255, 255, 90);
+// Width of the statistics panel, in font sizes
+constexpr float StatisticsWidth = 15.0f;
+// Cursors A and B are placed at these fractions of the visible range when turned on
+constexpr double CursorAPlacement = 1.0 / 3.0;
+constexpr double CursorBPlacement = 2.0 / 3.0;
+constexpr ImVec4 CursorAColor = {1.0f, 0.78f, 0.3f, 1.0f};
+constexpr ImVec4 CursorBColor = {0.45f, 0.8f, 1.0f, 1.0f};
 
 /**
  * @struct  PlottedTrace
@@ -264,6 +272,102 @@ std::optional<bool> DrawAllNoneButtons(const char *id) {
     return measure_all;
 }
 
+// Every measured trace of a result, voltages first, with the labels and colors of the plots
+std::vector<PlottedTrace> ListTraces(const std::vector<std::vector<double>> &node_values,
+                                     const std::vector<Core::ComponentTrace> &currents, const Schematic &schematic,
+                                     const char *voltage_unit, const char *current_unit) {
+    std::vector<PlottedTrace> traces;
+    for (std::size_t node = 1; node < node_values.size(); ++node) {
+        if (schematic.IsVoltageMeasured(static_cast<int>(node))) {
+            traces.push_back(
+                {std::format("V({})", node), &node_values[node], voltage_unit, GetNodeColor(static_cast<int>(node))});
+        }
+    }
+    for (std::size_t index = 0; index < currents.size(); ++index) {
+        if (schematic.IsCurrentMeasured(currents[index].Name)) {
+            traces.push_back({std::format("I({})", currents[index].Name), &currents[index].Values, current_unit,
+                              GetCurrentColor(index)});
+        }
+    }
+    return traces;
+}
+
+// Draws the cursors in the current plot, placing them in the visible range the first frame they are shown. On a
+// logarithmic axis they are placed by decades, as the axis shows them
+void DrawCursors(PlotCursors &cursors, const bool logarithmic) {
+    if (!cursors.Shown) {
+        return;
+    }
+    if (!std::exchange(cursors.Placed, true)) {
+        const ImPlotRange range = ImPlot::GetPlotLimits().X;
+        const auto place = [&range, logarithmic](const double fraction) {
+            if (logarithmic) {
+                return std::pow(10.0, std::lerp(std::log10(range.Min), std::log10(range.Max), fraction));
+            }
+            return std::lerp(range.Min, range.Max, fraction);
+        };
+        cursors.A = place(CursorAPlacement);
+        cursors.B = place(CursorBPlacement);
+    }
+    ImPlot::DragLineX(0, &cursors.A, CursorAColor, 1.0f, ImPlotDragToolFlags_NoFit);
+    ImPlot::TagX(cursors.A, CursorAColor, "A");
+    ImPlot::DragLineX(1, &cursors.B, CursorBColor, 1.0f, ImPlotDragToolFlags_NoFit);
+    ImPlot::TagX(cursors.B, CursorBColor, "B");
+}
+
+// Turning the cursors on places them again in the current view, so they are never lost off screen
+void DrawCursorToggle(PlotCursors &cursors) {
+    if (ImGui::Checkbox("Cursors A and B", &cursors.Shown) && cursors.Shown) {
+        cursors.Placed = false;
+    }
+}
+
+// The statistics cover the span between the cursors while they are shown, otherwise what the plot shows
+PlotSpan MeasuredSpan(const PlotCursors &cursors, const PlotSpan &view) {
+    return cursors.Shown ? PlotSpan{.From = cursors.A, .To = cursors.B} : view;
+}
+
+std::string FormatQuantity(const double value, const char *unit) {
+    return std::format("{}{}", Core::FormatValue(value), unit);
+}
+
+// Decibels and degrees read better with fixed decimals than with SPICE suffixes, which would show 500m dB
+std::string FormatFixed(const double value, const char *unit) {
+    return std::format("{:.2f}{}", value, unit);
+}
+
+std::string FormatOptionalQuantity(const std::optional<double> value, const char *unit) {
+    return value ? FormatQuantity(*value, unit) : "-";
+}
+
+// Two-column rows of a statistics table: what is measured and its value
+void DrawStatistic(const char *name, const std::string &value) {
+    ImGui::TableNextRow();
+    ImGui::TableNextColumn();
+    ImGui::TextDisabled("%s", name);
+    ImGui::TableNextColumn();
+    ImGui::TextUnformatted(value.c_str());
+}
+
+bool BeginStatisticsTable(const std::string &id) {
+    return ImGui::BeginTable(id.c_str(), 2, ImGuiTableFlags_SizingStretchProp);
+}
+
+// Splits a tab into the plots and the statistics panel on their right
+template <typename DrawPlots, typename DrawStatistics>
+void DrawWithStatistics(const DrawPlots &draw_plots, const DrawStatistics &draw_statistics) {
+    const float statistics_width = ImGui::GetFontSize() * StatisticsWidth;
+    if (ImGui::BeginChild("plots_column", ImVec2(-statistics_width - ImGui::GetStyle().ItemSpacing.x, 0.0f))) {
+        draw_plots();
+    }
+    ImGui::EndChild();
+    ImGui::SameLine();
+    if (ImGui::BeginChild("statistics", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Borders)) {
+        draw_statistics();
+    }
+    ImGui::EndChild();
+}
+
 } // namespace
 
 /**
@@ -309,10 +413,14 @@ void OutputWindow::Draw() {
     ImPlot::PushStyleVar(ImPlotStyleVar_FitPadding, FitPadding);
     if (ImGui::BeginTabItem("Transient")) {
         if (transient) {
-            if (!anything_measured) {
-                ImGui::TextDisabled("%s", nothing_measured);
-            }
-            DrawTransient(*transient);
+            DrawWithStatistics(
+                [&] {
+                    if (!anything_measured) {
+                        ImGui::TextDisabled("%s", nothing_measured);
+                    }
+                    DrawTransient(*transient);
+                },
+                [&] { DrawTransientStatistics(*transient); });
         } else {
             ImGui::TextDisabled("No transient for the current circuit; run one in the Simulation window");
         }
@@ -320,10 +428,14 @@ void OutputWindow::Draw() {
     }
     if (ImGui::BeginTabItem("AC sweep")) {
         if (sweep) {
-            ImGui::TextDisabled("%s", anything_measured
-                                          ? "Relative to the AC sources: an amplitude of 1 V reads as gain"
-                                          : nothing_measured);
-            DrawACSweep(*sweep);
+            DrawWithStatistics(
+                [&] {
+                    ImGui::TextDisabled("%s", anything_measured
+                                                  ? "Relative to the AC sources: an amplitude of 1 V reads as gain"
+                                                  : nothing_measured);
+                    DrawACSweep(*sweep);
+                },
+                [&] { DrawACSweepStatistics(*sweep); });
         } else {
             ImGui::TextDisabled("No AC sweep for the current circuit; run one in the Simulation window");
         }
@@ -405,12 +517,16 @@ void OutputWindow::DrawTransient(const Core::Transient &transient) {
     if (show_currents) {
         PlotCurrents(transient.Times, transient.Currents, m_Schematic, "A", "", plotted);
     }
+    DrawCursors(m_TransientCursors, false);
     DrawCursorReadout(transient.Times, "s", false, plotted);
+    const ImPlotRange view = ImPlot::GetPlotLimits().X;
+    m_TransientView = {.From = view.Min, .To = view.Max};
     ImPlot::EndPlot();
 }
 
 // Currents go on the secondary axis of both plots: their magnitudes are relative to 1 A instead of 1 V, and
-// their phases follow so each current stays on the same side in both plots
+// their phases follow so each current stays on the same side in both plots. Both plots share their frequency
+// range and cursors, so zooming one zooms the other
 void OutputWindow::DrawACSweep(const Core::ACSweep &sweep) {
     const bool fit = TakeFit(m_FittedACSweep, m_Schematic.GetACSweepVersion());
     std::vector<std::string> measured_currents = ListMeasuredCurrents(sweep.CurrentMagnitudesDecibels, m_Schematic);
@@ -423,6 +539,7 @@ void OutputWindow::DrawACSweep(const Core::ACSweep &sweep) {
     if (ImPlot::BeginPlot("Magnitude##ac", ImVec2(-1.0f, height))) {
         ImPlot::SetupAxes("Frequency", "Voltage (dB)");
         ImPlot::SetupAxisScale(ImAxis_X1, ImPlotScale_Log10);
+        ImPlot::SetupAxisLinks(ImAxis_X1, &m_ACSweepView.From, &m_ACSweepView.To);
         ImPlot::SetupAxisFormat(ImAxis_X1, FormatAxisValue, const_cast<char *>("Hz"));
         if (show_currents) {
             ImPlot::SetupAxis(ImAxis_Y2, "Current (dB)", ImPlotAxisFlags_AuxDefault);
@@ -432,6 +549,7 @@ void OutputWindow::DrawACSweep(const Core::ACSweep &sweep) {
         if (show_currents) {
             PlotCurrents(sweep.Frequencies, sweep.CurrentMagnitudesDecibels, m_Schematic, " dB", "", plotted);
         }
+        DrawCursors(m_ACSweepCursors, true);
         DrawCursorReadout(sweep.Frequencies, "Hz", true, plotted);
         ImPlot::EndPlot();
     }
@@ -439,6 +557,7 @@ void OutputWindow::DrawACSweep(const Core::ACSweep &sweep) {
     if (ImPlot::BeginPlot("Phase##ac", ImVec2(-1.0f, height))) {
         ImPlot::SetupAxes("Frequency", "Phase (deg)");
         ImPlot::SetupAxisScale(ImAxis_X1, ImPlotScale_Log10);
+        ImPlot::SetupAxisLinks(ImAxis_X1, &m_ACSweepView.From, &m_ACSweepView.To);
         ImPlot::SetupAxisFormat(ImAxis_X1, FormatAxisValue, const_cast<char *>("Hz"));
         if (show_currents) {
             ImPlot::SetupAxis(ImAxis_Y2, "Current phase (deg)", ImPlotAxisFlags_AuxDefault);
@@ -448,6 +567,7 @@ void OutputWindow::DrawACSweep(const Core::ACSweep &sweep) {
         if (show_currents) {
             PlotCurrents(sweep.Frequencies, sweep.CurrentPhasesDegrees, m_Schematic, " deg", "", plotted);
         }
+        DrawCursors(m_ACSweepCursors, true);
         DrawCursorReadout(sweep.Frequencies, "Hz", true, plotted);
         ImPlot::EndPlot();
     }
@@ -492,6 +612,108 @@ void OutputWindow::DrawDCSweep(const Core::DCSweep &sweep) {
     }
     DrawCursorReadout(sweep.SweptValues, sweep.SweptUnit.c_str(), false, plotted);
     ImPlot::EndPlot();
+}
+
+// Like the measurements of an oscilloscope, for every shown trace; with the cursors, also the value of each
+// trace at both and their difference, and the time between them with its frequency
+void OutputWindow::DrawTransientStatistics(const Core::Transient &transient) {
+    DrawCursorToggle(m_TransientCursors);
+    const PlotCursors &cursors = m_TransientCursors;
+    if (cursors.Shown && BeginStatisticsTable("cursors")) {
+        DrawStatistic("A", FormatQuantity(cursors.A, "s"));
+        DrawStatistic("B", FormatQuantity(cursors.B, "s"));
+        DrawStatistic("B-A", FormatQuantity(cursors.B - cursors.A, "s"));
+        DrawStatistic("1/(B-A)",
+                      cursors.B != cursors.A ? FormatQuantity(1.0 / std::abs(cursors.B - cursors.A), "Hz") : "-");
+        ImGui::EndTable();
+    }
+    const std::vector<PlottedTrace> traces =
+        ListTraces(transient.NodeVoltages, transient.Currents, m_Schematic, "V", "A");
+    if (traces.empty()) {
+        ImGui::TextDisabled("Measure a trace to see its statistics");
+        return;
+    }
+    ImGui::TextDisabled("%s", cursors.Shown ? "Between the cursors" : "Over the visible time");
+    const PlotSpan span = MeasuredSpan(cursors, m_TransientView);
+    for (const PlottedTrace &trace : traces) {
+        ImGui::Separator();
+        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(trace.Color), "%s", trace.Label.c_str());
+        if (!BeginStatisticsTable(trace.Label)) {
+            continue;
+        }
+        if (const auto statistics = ComputeTraceStatistics(transient.Times, *trace.Values, span.From, span.To)) {
+            DrawStatistic("Pk-Pk", FormatQuantity(statistics->PeakToPeak, trace.Unit));
+            DrawStatistic("Max", FormatQuantity(statistics->Maximum, trace.Unit));
+            DrawStatistic("Min", FormatQuantity(statistics->Minimum, trace.Unit));
+            DrawStatistic("Mean", FormatQuantity(statistics->Mean, trace.Unit));
+            DrawStatistic("RMS", FormatQuantity(statistics->RMS, trace.Unit));
+            DrawStatistic("Freq", FormatOptionalQuantity(statistics->Frequency, "Hz"));
+            DrawStatistic("Period", statistics->Frequency ? FormatQuantity(1.0 / *statistics->Frequency, "s") : "-");
+        }
+        if (cursors.Shown) {
+            const double at_a = InterpolateAt(transient.Times, *trace.Values, cursors.A, false);
+            const double at_b = InterpolateAt(transient.Times, *trace.Values, cursors.B, false);
+            DrawStatistic("At A", FormatQuantity(at_a, trace.Unit));
+            DrawStatistic("At B", FormatQuantity(at_b, trace.Unit));
+            DrawStatistic("B-A", FormatQuantity(at_b - at_a, trace.Unit));
+        }
+        ImGui::EndTable();
+    }
+}
+
+// Like the measurements of a network analyzer: peak, -3 dB band, unity gain and phase margin for every shown
+// trace, always over the whole sweep, since they describe the response and a narrower span would move the peak
+// that the -3 dB points refer to; the cursors only read the gain and phase at two frequencies
+void OutputWindow::DrawACSweepStatistics(const Core::ACSweep &sweep) {
+    DrawCursorToggle(m_ACSweepCursors);
+    const PlotCursors &cursors = m_ACSweepCursors;
+    if (cursors.Shown && BeginStatisticsTable("cursors")) {
+        DrawStatistic("A", FormatQuantity(cursors.A, "Hz"));
+        DrawStatistic("B", FormatQuantity(cursors.B, "Hz"));
+        DrawStatistic("B/A", cursors.A > 0.0 ? FormatFixed(std::log10(cursors.B / cursors.A), " dec") : "-");
+        ImGui::EndTable();
+    }
+    const std::vector<PlottedTrace> magnitudes =
+        ListTraces(sweep.NodeMagnitudesDecibels, sweep.CurrentMagnitudesDecibels, m_Schematic, " dB", " dB");
+    const std::vector<PlottedTrace> phases =
+        ListTraces(sweep.NodePhasesDegrees, sweep.CurrentPhasesDegrees, m_Schematic, " deg", " deg");
+    if (magnitudes.empty()) {
+        ImGui::TextDisabled("Measure a trace to see its statistics");
+        return;
+    }
+    ImGui::TextDisabled("Response over the whole sweep");
+    for (std::size_t index = 0; index < magnitudes.size(); ++index) {
+        const PlottedTrace &magnitude = magnitudes[index];
+        const std::vector<double> &phase = *phases[index].Values;
+        ImGui::Separator();
+        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(magnitude.Color), "%s", magnitude.Label.c_str());
+        if (!BeginStatisticsTable(magnitude.Label)) {
+            continue;
+        }
+        if (const auto statistics = ComputeBodeStatistics(sweep.Frequencies, *magnitude.Values, phase,
+                                                          sweep.Frequencies.front(), sweep.Frequencies.back())) {
+            DrawStatistic("Peak", FormatFixed(statistics->PeakGain, " dB"));
+            DrawStatistic("at", FormatQuantity(statistics->PeakFrequency, "Hz"));
+            DrawStatistic("-3 dB low", FormatOptionalQuantity(statistics->LowerCutoff, "Hz"));
+            DrawStatistic("-3 dB high", FormatOptionalQuantity(statistics->UpperCutoff, "Hz"));
+            DrawStatistic("0 dB at", FormatOptionalQuantity(statistics->UnityGainFrequency, "Hz"));
+            DrawStatistic("Phase margin",
+                          statistics->PhaseMargin ? FormatFixed(*statistics->PhaseMargin, " deg") : "-");
+        }
+        if (cursors.Shown) {
+            const double gain_a = InterpolateAt(sweep.Frequencies, *magnitude.Values, cursors.A, true);
+            const double gain_b = InterpolateAt(sweep.Frequencies, *magnitude.Values, cursors.B, true);
+            const double phase_a = InterpolateAt(sweep.Frequencies, phase, cursors.A, true);
+            const double phase_b = InterpolateAt(sweep.Frequencies, phase, cursors.B, true);
+            DrawStatistic("Gain at A", FormatFixed(gain_a, " dB"));
+            DrawStatistic("Gain at B", FormatFixed(gain_b, " dB"));
+            DrawStatistic("Gain B-A", FormatFixed(gain_b - gain_a, " dB"));
+            DrawStatistic("Phase at A", FormatFixed(phase_a, " deg"));
+            DrawStatistic("Phase at B", FormatFixed(phase_b, " deg"));
+            DrawStatistic("Phase B-A", FormatFixed(phase_b - phase_a, " deg"));
+        }
+        ImGui::EndTable();
+    }
 }
 
 } // namespace GUI
