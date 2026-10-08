@@ -63,6 +63,7 @@ constexpr auto MathOperators = std::to_array<MathOperator>({
     MathOperator::Multiply,
     MathOperator::Divide,
 });
+constexpr const char *ExportLabel = "Export...";
 constexpr const char *ExportPopup = "export";
 constexpr const char *ExportErrorPopup = "Could not export the plot";
 // Width of the size fields of the export popup, in font sizes
@@ -573,6 +574,25 @@ bool DrawOperandCombo(const char *id, std::string &operand, const std::vector<st
     return changed;
 }
 
+// Like ImGui::BeginTabBar(), but the bar and the line under it stop short of the right edge by the given width,
+// leaving room for a button there. Mirrors BeginTabBar() in imgui_widgets.cpp, which takes no width
+bool BeginTabBarBefore(const char *id, const float reserved_width) {
+    ImGuiContext &context = *ImGui::GetCurrentContext();
+    ImGuiWindow *window = context.CurrentWindow;
+    if (window->SkipItems) {
+        return false;
+    }
+    const ImGuiID tab_bar_id = window->GetID(id);
+    ImGuiTabBar *tab_bar = context.TabBars.GetOrAddByKey(tab_bar_id);
+    const ImVec2 start = window->DC.CursorPos;
+    const ImRect bounds(start.x, start.y, window->WorkRect.Max.x - reserved_width,
+                        start.y + context.FontSize + context.Style.FramePadding.y * 2.0f);
+    tab_bar->ID = tab_bar_id;
+    tab_bar->SeparatorMinX = bounds.Min.x - IM_TRUNC(window->WindowPadding.x * 0.5f);
+    tab_bar->SeparatorMaxX = bounds.Max.x;
+    return ImGui::BeginTabBarEx(tab_bar, bounds, ImGuiTabBarFlags_IsFocused);
+}
+
 ExportColor ToExportColor(const ImU32 color) {
     return {static_cast<std::uint8_t>((color >> IM_COL32_R_SHIFT) & 0xFF),
             static_cast<std::uint8_t>((color >> IM_COL32_G_SHIFT) & 0xFF),
@@ -737,7 +757,15 @@ void OutputWindow::Draw() {
         ImGui::SameLine();
     }
 
-    if (!ImGui::BeginChild("plots") || !ImGui::BeginTabBar("plots")) {
+    if (!ImGui::BeginChild("plots")) {
+        ImGui::EndChild();
+        return;
+    }
+    // The Export button goes on the right of the tab row, drawn once the tabs are done
+    const ImVec2 tab_row = ImGui::GetCursorScreenPos();
+    const float tab_row_width = ImGui::GetContentRegionAvail().x;
+    const float export_width = ImGui::CalcTextSize(ExportLabel).x + ImGui::GetStyle().FramePadding.x * 2.0f;
+    if (!BeginTabBarBefore("plots", export_width + ImGui::GetStyle().ItemSpacing.x)) {
         ImGui::EndChild();
         return;
     }
@@ -819,10 +847,16 @@ void OutputWindow::Draw() {
     }
     ImPlot::PopStyleVar();
 
-    if (ImGui::TabItemButton("Export", ImGuiTabItemFlags_Trailing)) {
+    ImGui::EndTabBar();
+    // A plain button apart from the tabs, so it does not read as another page
+    ImGui::SetCursorScreenPos({tab_row.x + tab_row_width - export_width, tab_row.y});
+    if (ImGui::Button(ExportLabel)) {
         ImGui::OpenPopup(ExportPopup);
     }
     ImGui::SetItemTooltip("Save the plot of this tab as an SVG image or a CSV table");
+    // The popup hangs below the button, aligned to its right edge, so it stays inside the window
+    const ImVec2 export_corner = {ImGui::GetItemRectMax().x, ImGui::GetItemRectMax().y};
+    ImGui::SetNextWindowPos(export_corner, ImGuiCond_Appearing, ImVec2(1.0f, 0.0f));
     bool can_export = false;
     switch (m_ShownTab) {
     case PlotTab::Transient:
@@ -844,7 +878,6 @@ void OutputWindow::Draw() {
             StartExport(BuildDCSweepFigure(*dc_sweep, dc_sweep_math), *format);
         }
     }
-    ImGui::EndTabBar();
     ImGui::EndChild();
 }
 
