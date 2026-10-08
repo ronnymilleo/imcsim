@@ -5,9 +5,10 @@
 Immediate Mode Circuit Simulator, built with Dear ImGui, SDL3 and Vulkan. Circuits are simulated with
 [ngspice](https://ngspice.sourceforge.io/).
 
-![imcsim showing an RC low-pass driven by a 1 kHz sine source, with its nodes colored in the schematic, the
-transient voltages and currents plotted in the Output window, and the simulation settings and SPICE
-netlist](docs/screenshot.png)
+![imcsim with an RC low-pass filter driven by a 1 kHz sine: the schematic with its probed nodes on the left, and the
+transient of both nodes with their statistics in the Output window on the right](docs/screenshot.png)
+
+New to imcsim? The [tutorial](docs/tutorial.md) builds, simulates and exports a first circuit in about ten minutes.
 
 ## Features
 
@@ -32,10 +33,12 @@ netlist](docs/screenshot.png)
   heat map that shows the path of the current
 - Exports for reports: plots as SVG images (light for print or dark, at any size) or CSV tables, and the schematic
   as an SVG image with its probes, so the two figures can be shown side by side
-- Four color themes (Ember, Graphite, Phosphor and the light Paper), switched from the View menu
+- Four color themes (Graphite, Ember, Phosphor and the light Paper), switched from the View menu
 - IEC or ANSI symbols, optional terminal numbers, parts rotated (R) and mirrored left to right (M) or top to bottom
   (Shift+M), undo and redo, and schematics saved as JSON together with the settings of every analysis and the
   measured traces
+- Dockable windows: the schematic, plots, properties, analysis settings and netlist float or dock beside, above,
+  below or as tabs of each other, and the layout is kept between sessions
 - A toolbar of part icons drawn from the symbols themselves, a part search (Space), menus with shortcuts, a status
   bar with the keys of the current mode, and the Output window opening on each new result
 - Part properties in a popover beside the part (double click or Enter), values typed straight onto a selected
@@ -46,10 +49,28 @@ netlist](docs/screenshot.png)
   an LED driver, an op-amp inverting amplifier, an ideal transformer made of controlled sources, the output
   characteristics of a BJT and its small-signal model
 
-The [user guide](docs/user_guide.md) explains the editor, terminal numbers, current signs, probes, plots and exports, and
+## Screenshots
+
+Bode plot of a common-emitter stage next to its hybrid-pi model, with the -3 dB band and the peak of each response:
+
+![The small-signal example: a 2N3904 stage and its hybrid-pi model, and their magnitude and phase from 1 Hz to
+100 MHz](docs/images/bode.png)
+
+Output characteristics of a 2N3904 from a stepped DC sweep, one curve per base current:
+
+![A DC sweep of the collector voltage for five base currents, each curve labeled with its current](docs/images/dc_sweep.png)
+
+The four themes: Graphite (the default), Ember, Phosphor and the light Paper:
+
+![The same circuit and transient in the Graphite, Ember, Phosphor and Paper themes](docs/images/themes.png)
+
+## Documentation
+
+The [tutorial](docs/tutorial.md) walks through a first circuit step by step. The [user guide](docs/user_guide.md)
+explains the editor, terminal numbers, current signs, probes, plots and exports, and
 [Simulation models](docs/models.md) describes the model behind every part and what it leaves out.
 
-On Wayland, the windows cannot be dragged out of the main window. Run with `SDL_VIDEODRIVER=x11` to allow it.
+On Wayland, the windows cannot be dragged out of the main window, though they still float and dock inside it. Run with `SDL_VIDEODRIVER=x11` to allow it.
 
 ## Requirements
 
