@@ -6,7 +6,9 @@
 #ifndef IMCSIM_OUTPUT_WINDOW_H
 #define IMCSIM_OUTPUT_WINDOW_H
 
+#include "file_dialog.h"
 #include "implot.h"
+#include "plot_export.h"
 #include "schematic.h"
 #include "simulator.h"
 #include "trace_math.h"
@@ -72,6 +74,25 @@ struct MathTrace {
 };
 
 /**
+ * @enum    PlotTab
+ * @brief   The tabs of the Output window, one per analysis.
+ */
+enum class PlotTab {
+    Transient,
+    ACSweep,
+    DCSweep
+};
+
+/**
+ * @enum    ExportFormat
+ * @brief   File types a plot is exported to: an SVG image of the plot, or a CSV table of its samples.
+ */
+enum class ExportFormat {
+    SVG,
+    CSV
+};
+
+/**
  * @class   OutputWindow
  * @brief   Plots the node voltages and component currents of the last transient over time, the last AC sweep as
  *          a Bode plot, and the last DC sweep against its swept source.
@@ -85,8 +106,9 @@ struct MathTrace {
  *          measures every shown trace: the transient between the cursors or over what is visible, the Bode plot
  *          over the whole sweep. Math channels add traces computed from the others, such as V(1)-V(2) or
  *          V(1)*I(R1), to the transient and DC sweep plots: voltages and currents keep their axes, and any other
- *          unit, or none, goes on a third axis. The window floats instead of being docked, so the plots can be as
- *          large as needed.
+ *          unit, or none, goes on a third axis. Export saves the plot of the current tab as an SVG image, redrawn
+ *          from its data at a chosen size and theme over the visible X range, or as a CSV table of every sample.
+ *          The window floats instead of being docked, so the plots can be as large as needed.
  */
 class OutputWindow : public AppWindow {
 public:
@@ -116,6 +138,14 @@ private:
     int m_NextMathNumber = 1;
     std::vector<std::string> m_TransientShownMath;
     std::vector<std::string> m_DCSweepShownMath;
+    // Export: the tab shown this frame, the image settings, and the figure waiting for the save dialog
+    PlotTab m_ShownTab = PlotTab::Transient;
+    PlotSpan m_DCSweepView;
+    ExportStyle m_ExportStyle;
+    FileDialog m_ExportDialog;
+    std::optional<ExportFigure> m_PendingFigure;
+    ExportFormat m_PendingFormat = ExportFormat::SVG;
+    std::string m_ExportError;
 
     void Draw() override;
     void DrawTraceList(std::size_t node_count, const std::vector<Core::ComponentTrace> &currents);
@@ -134,6 +164,15 @@ private:
                                         const std::vector<std::vector<double>> &node_voltages,
                                         const std::vector<Core::ComponentTrace> &currents,
                                         std::vector<std::string> &errors) const;
+
+    // Export
+    std::optional<ExportFormat> DrawExportPopup(bool can_export);
+    ExportFigure BuildTransientFigure(const Core::Transient &transient, const std::vector<MathTrace> &math) const;
+    ExportFigure BuildACSweepFigure(const Core::ACSweep &sweep) const;
+    ExportFigure BuildDCSweepFigure(const Core::DCSweep &sweep, const std::vector<std::vector<MathTrace>> &math) const;
+    void StartExport(ExportFigure figure, ExportFormat format);
+    void ProcessExportDialog();
+    void DrawExportError();
 };
 
 } // namespace GUI

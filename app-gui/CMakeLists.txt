@@ -9,8 +9,10 @@ add_library(imcsim-gui-lib
             current_flow.cpp
             element_factory.cpp
             examples.cpp
+            file_dialog.cpp
             helpers.cpp
             node_colors.cpp
+            plot_export.cpp
             plot_helpers.cpp
             probing.cpp
             schematic.cpp

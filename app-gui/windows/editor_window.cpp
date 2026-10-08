@@ -1070,56 +1070,32 @@ void EditorWindow::SaveFile(std::filesystem::path path) {
 
 // The dialog runs asynchronously: its result is picked up by ProcessDialogResult() on a later frame
 void EditorWindow::ShowFileDialog(const FileAction action) {
-    if (m_DialogAction) {
+    if (m_FileDialog.IsPending()) {
         return;
     }
     m_DialogAction = action;
     const auto &file_path = m_Schematic.GetFilePath();
-    m_DialogLocation = file_path ? file_path->string() : "";
-    const char *location = m_DialogLocation.empty() ? nullptr : m_DialogLocation.c_str();
-    const int filter_count = static_cast<int>(SchematicFilters.size());
-    // The callback owns this copy of the channel and deletes it, so the channel outlives the editor if needed
-    auto *channel = new std::shared_ptr<DialogChannel>(m_DialogChannel);
+    std::string location = file_path ? file_path->string() : "";
     if (action == FileAction::Open) {
-        SDL_ShowOpenFileDialog(HandleFileDialogResult, channel, nullptr, SchematicFilters.data(), filter_count,
-                               location, false);
+        m_FileDialog.ShowOpen(SchematicFilters, std::move(location));
     } else {
-        SDL_ShowSaveFileDialog(HandleFileDialogResult, channel, nullptr, SchematicFilters.data(), filter_count,
-                               location);
+        m_FileDialog.ShowSave(SchematicFilters, std::move(location));
     }
-}
-
-// SDL may call this from another thread, and after the editor is gone, so it only stores the result in the
-// channel for the main thread to handle. SDL calls it exactly once per dialog
-void SDLCALL EditorWindow::HandleFileDialogResult(void *userdata, const char *const *file_list, int /*filter*/) {
-    const std::unique_ptr<std::shared_ptr<DialogChannel>> channel(
-        static_cast<std::shared_ptr<DialogChannel> *>(userdata));
-    DialogResult result;
-    // A null list means an error and an empty list means the user canceled
-    if (file_list != nullptr && file_list[0] != nullptr) {
-        result.Path = std::filesystem::path(file_list[0]);
-    }
-    const std::scoped_lock lock((*channel)->Mutex);
-    (*channel)->Result = std::move(result);
 }
 
 void EditorWindow::ProcessDialogResult() {
-    std::optional<DialogResult> result;
-    {
-        const std::scoped_lock lock(m_DialogChannel->Mutex);
-        result = std::exchange(m_DialogChannel->Result, std::nullopt);
-    }
+    const std::optional<std::optional<std::filesystem::path>> result = m_FileDialog.TakeResult();
     if (!result) {
         return;
     }
     const std::optional<FileAction> action = std::exchange(m_DialogAction, std::nullopt);
-    if (!result->Path) {
+    if (!*result) {
         return;
     }
     if (action == FileAction::Open) {
-        OpenFile(*result->Path);
+        OpenFile(**result);
     } else if (action == FileAction::Save) {
-        SaveFile(*result->Path);
+        SaveFile(**result);
     }
 }
 
