@@ -142,4 +142,18 @@ std::string FormatSpiceValue(const double value) {
     return std::format("{:.4g}{}", value / suffix.Factor, suffix.SpiceText);
 }
 
+/**
+ * @brief   Formats a value with a fixed number of decimals, for readouts such as decibels and degrees.
+ * @param[in] value     Value to format.
+ * @param[in] decimals  Digits after the decimal point.
+ * @return  Text such as "-3.01"; a negative value that rounds to zero reads "0.00", never "-0.00".
+ */
+std::string FormatFixed(const double value, const int decimals) {
+    std::string text = std::format("{:.{}f}", value, decimals);
+    if (text.starts_with('-') && text.find_first_not_of("-0.") == std::string::npos) {
+        text.erase(0, 1);
+    }
+    return text;
+}
+
 } // namespace Core

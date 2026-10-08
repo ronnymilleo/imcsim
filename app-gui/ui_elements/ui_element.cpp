@@ -8,16 +8,13 @@
 #include "spice_value.h"
 #include <cfloat>
 #include <cmath>
+#include <cstdlib>
 #include <utility>
 
 namespace GUI {
 
 namespace {
 
-// Label font size relative to the zoom (pixels per grid unit)
-constexpr float LabelScale = 0.7f;
-// Below this font size labels are unreadable, so they are skipped
-constexpr float MinLabelSize = 6.0f;
 // Labels sit just outside the tallest two-terminal symbol, which spans y = -0.8 to 0.8
 constexpr float LabelOffset = 1.0f;
 
@@ -35,16 +32,16 @@ UIElement::UIElement(std::unique_ptr<Core::Component> component, const GridPoint
 
 /**
  * @brief   Draws the terminals, the component symbol and its name and value labels.
- * @param[in] draw_list  Draw list of the editor window.
+ * @param[in,out] canvas Where it is drawn: the editor window or an exported image.
  * @param[in] view       Transform of the current frame.
  * @param[in] color      Line color, so the same element can be drawn as a placement preview.
  * @param[in] style      Drawing standard for the symbol.
  */
-void UIElement::Draw(ImDrawList *draw_list, const ViewTransform &view, const ImU32 color,
+void UIElement::Draw(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color,
                      const SymbolStyle style) const {
-    DrawTerminals(draw_list, view, color);
-    DrawSymbol(draw_list, view, color, style);
-    DrawLabels(draw_list, view, color);
+    DrawTerminals(canvas, view, color);
+    DrawSymbol(canvas, view, color, style);
+    DrawLabels(canvas, view, color);
 }
 
 /**
@@ -127,6 +124,19 @@ std::vector<GridPoint> UIElement::GetTerminals() const {
 }
 
 /**
+ * @brief   Returns the direction from a terminal into the part, along its lead, in world units.
+ * @param[in] terminal  Index in GetTerminals().
+ * @return  A unit step along the X or Y axis, mirrored and rotated with the element.
+ */
+GridPoint UIElement::GetTerminalInward(const std::size_t terminal) const {
+    GridPoint inward = GetLocalTerminalInward(terminal);
+    if (m_Mirrored) {
+        inward.X = -inward.X;
+    }
+    return Rotate(inward, m_Rotation);
+}
+
+/**
  * @brief   Checks whether a world position falls on the element, for picking it with the mouse.
  * @param[in] world_pos  Position in world units, usually the cursor.
  * @return  True when the position is inside the symbol bounds, terminals included.
@@ -142,26 +152,25 @@ bool UIElement::Contains(const ImVec2 world_pos) const {
 
 /**
  * @brief   Draws the leads of a two-terminal component, from x = -2 to -1 and from x = 1 to 2.
- * @param[in] draw_list  Draw list of the editor window.
+ * @param[in,out] canvas Where it is drawn: the editor window or an exported image.
  * @param[in] view       Transform of the current frame.
  * @param[in] color      Line color.
  */
-void UIElement::DrawTerminals(ImDrawList *draw_list, const ViewTransform &view, const ImU32 color) const {
-    draw_list->AddLine(LocalToScreen(view, -2, 0), LocalToScreen(view, -1, 0), color, LineThickness);
-    draw_list->AddLine(LocalToScreen(view, 1, 0), LocalToScreen(view, 2, 0), color, LineThickness);
+void UIElement::DrawTerminals(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color) const {
+    canvas.AddLine(LocalToScreen(view, -2, 0), LocalToScreen(view, -1, 0), color, LineThickness);
+    canvas.AddLine(LocalToScreen(view, 1, 0), LocalToScreen(view, 2, 0), color, LineThickness);
 }
 
 /**
  * @brief   Draws the component name above the symbol and its value below, in local orientation.
- * @param[in] draw_list  Draw list of the editor window.
+ * @param[in,out] canvas Where it is drawn: the editor window or an exported image.
  * @param[in] view       Transform of the current frame.
  * @param[in] color      Text color.
  */
-void UIElement::DrawLabels(ImDrawList *draw_list, const ViewTransform &view, const ImU32 color) const {
-    DrawLabel(draw_list, view, {0.0f, -LabelOffset}, {0.0f, -1.0f}, m_Component->GetName(), color);
+void UIElement::DrawLabels(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color) const {
+    DrawLabel(canvas, view, {0.0f, -LabelOffset}, {0.0f, -1.0f}, m_Component->GetName(), color);
     if (m_Component->HasValue()) {
-        DrawLabel(draw_list, view, {0.0f, LabelOffset}, {0.0f, 1.0f}, Core::FormatValue(m_Component->GetValue()),
-                  color);
+        DrawLabel(canvas, view, {0.0f, LabelOffset}, {0.0f, 1.0f}, Core::FormatValue(m_Component->GetValue()), color);
     }
 }
 
@@ -174,6 +183,21 @@ std::vector<GridPoint> UIElement::GetLocalTerminals() const {
 }
 
 /**
+ * @brief   Returns the direction from a terminal into the part, before rotation.
+ * @param[in] terminal  Index in GetLocalTerminals().
+ * @return  A unit step from the terminal toward the middle of the symbol, along the axis the terminal is furthest
+ *          on, which is the axis of its lead for every symbol whose terminals are away from its middle.
+ */
+GridPoint UIElement::GetLocalTerminalInward(const std::size_t terminal) const {
+    const GridPoint position = GetLocalTerminals()[terminal];
+    const auto step_toward_zero = [](const int value) { return value > 0 ? -1 : value < 0 ? 1 : 0; };
+    if (std::abs(position.X) >= std::abs(position.Y)) {
+        return {step_toward_zero(position.X), 0};
+    }
+    return {0, step_toward_zero(position.Y)};
+}
+
+/**
  * @brief   Returns the pick area of a two-terminal component, in local grid units before rotation.
  * @return  A box from terminal to terminal, as tall as the tallest symbol.
  */
@@ -183,7 +207,7 @@ LocalBounds UIElement::GetLocalBounds() const {
 
 // ImGui text cannot rotate, so the text stays upright and is pushed from the anchor along the rotated direction
 // until it no longer overlaps the anchor, whatever the element rotation
-void UIElement::DrawLabel(ImDrawList *draw_list, const ViewTransform &view, const ImVec2 local_anchor,
+void UIElement::DrawLabel(SchematicCanvas &canvas, const ViewTransform &view, const ImVec2 local_anchor,
                           const ImVec2 local_direction, const std::string &text, const ImU32 color) const {
     if (text.empty()) {
         return;
@@ -203,7 +227,7 @@ void UIElement::DrawLabel(ImDrawList *draw_list, const ViewTransform &view, cons
     const ImVec2 text_size = font->CalcTextSizeA(font_size, FLT_MAX, 0.0f, text.c_str());
     const float half_extent = (std::abs(direction.x) * text_size.x + std::abs(direction.y) * text_size.y) / 2.0f;
     const ImVec2 center = anchor + direction * half_extent;
-    draw_list->AddText(font, font_size, center - text_size / 2.0f, color, text.c_str());
+    canvas.AddText(font, font_size, center - text_size / 2.0f, color, text.c_str());
 }
 
 /**

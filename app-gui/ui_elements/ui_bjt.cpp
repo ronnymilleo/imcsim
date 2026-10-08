@@ -32,24 +32,24 @@ UIBJT::UIBJT(const Core::ComponentType type, const GridPoint position, const Rot
     : UITransistor(std::make_unique<Core::BJT>(type), position, rotation) {
 }
 
-void UIBJT::DrawSymbol(ImDrawList *draw_list, const ViewTransform &view, const ImU32 color,
+void UIBJT::DrawSymbol(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color,
                        SymbolStyle /*style*/) const {
-    draw_list->AddLine(LocalToScreen(view, -1, 0), LocalToScreen(view, BarX, 0), color, LineThickness);
-    draw_list->AddLine(LocalToScreen(view, BarX, -BarHalfHeight), LocalToScreen(view, BarX, BarHalfHeight), color,
-                       LineThickness);
-    draw_list->AddLine(LocalToScreen(view, BarX, -JunctionY), LocalToScreen(view, 1, -1), color, LineThickness);
-    draw_list->AddLine(LocalToScreen(view, BarX, JunctionY), LocalToScreen(view, 1, 1), color, LineThickness);
+    canvas.AddLine(LocalToScreen(view, -1, 0), LocalToScreen(view, BarX, 0), color, LineThickness);
+    canvas.AddLine(LocalToScreen(view, BarX, -BarHalfHeight), LocalToScreen(view, BarX, BarHalfHeight), color,
+                   LineThickness);
+    canvas.AddLine(LocalToScreen(view, BarX, -JunctionY), LocalToScreen(view, 1, -1), color, LineThickness);
+    canvas.AddLine(LocalToScreen(view, BarX, JunctionY), LocalToScreen(view, 1, 1), color, LineThickness);
 
     const ImVec2 emitter_start = {BarX, JunctionY};
     const ImVec2 emitter = {1.0f - BarX, 1.0f - JunctionY};
     if (GetComponent().GetType() == Core::ComponentType::NPN) {
         const ImVec2 tip = {emitter_start.x + emitter.x * NPNArrowPosition,
                             emitter_start.y + emitter.y * NPNArrowPosition};
-        DrawArrowHead(draw_list, view, tip, emitter, color);
+        DrawArrowHead(canvas, view, tip, emitter, color);
     } else {
         const ImVec2 tip = {emitter_start.x + emitter.x * PNPArrowPosition,
                             emitter_start.y + emitter.y * PNPArrowPosition};
-        DrawArrowHead(draw_list, view, tip, {-emitter.x, -emitter.y}, color);
+        DrawArrowHead(canvas, view, tip, {-emitter.x, -emitter.y}, color);
     }
 }
 

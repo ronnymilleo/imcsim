@@ -12,12 +12,15 @@ add_executable(imcsim-tests
             current_flow_tests.cpp
             examples_tests.cpp
             helpers_tests.cpp
+            plot_export_tests.cpp
             plot_helpers_tests.cpp
             probing_tests.cpp
+            schematic_canvas_tests.cpp
             schematic_file_tests.cpp
             schematic_tests.cpp
             simulator_tests.cpp
             spice_value_tests.cpp
+            svg_writer_tests.cpp
             trace_math_tests.cpp
             trace_statistics_tests.cpp
             ui_element_tests.cpp

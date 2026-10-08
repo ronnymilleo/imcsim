@@ -15,6 +15,10 @@
 namespace GUI {
 
 inline constexpr float LineThickness = 2.0f;
+// Label font size relative to the zoom (pixels per grid unit)
+inline constexpr float LabelScale = 0.7f;
+// Below this font size labels are unreadable
+inline constexpr float MinLabelSize = 6.0f;
 
 /**
  * @struct  GridPoint

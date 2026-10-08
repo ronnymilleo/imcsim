@@ -21,11 +21,12 @@ public:
     ~UIVCC() override = default;
 
 protected:
-    void DrawTerminals(ImDrawList *draw_list, const ViewTransform &view, ImU32 color) const override;
-    void DrawSymbol(ImDrawList *draw_list, const ViewTransform &view, ImU32 color, SymbolStyle style) const override;
-    void DrawLabels(ImDrawList *draw_list, const ViewTransform &view, ImU32 color) const override;
+    void DrawTerminals(SchematicCanvas &canvas, const ViewTransform &view, ImU32 color) const override;
+    void DrawSymbol(SchematicCanvas &canvas, const ViewTransform &view, ImU32 color, SymbolStyle style) const override;
+    void DrawLabels(SchematicCanvas &canvas, const ViewTransform &view, ImU32 color) const override;
 
     std::vector<GridPoint> GetLocalTerminals() const override;
+    GridPoint GetLocalTerminalInward(std::size_t terminal) const override;
     LocalBounds GetLocalBounds() const override;
 };
 

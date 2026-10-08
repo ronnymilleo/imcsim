@@ -8,16 +8,14 @@
 
 #include "components/component.h"
 #include "examples.h"
+#include "file_dialog.h"
 #include "helpers.h"
 #include "imgui.h"
 #include "schematic.h"
 #include "ui_elements/ui_element.h"
 #include "ui_elements/ui_wire.h"
 #include "windows/app_window.h"
-#include <SDL3/SDL_dialog.h>
 #include <filesystem>
-#include <memory>
-#include <mutex>
 #include <optional>
 #include <string>
 #include <vector>
@@ -78,27 +76,8 @@ private:
         Open,
         Save,
         Quit,
-        Example
-    };
-
-    /**
-     * @struct  DialogResult
-     * @brief   What the file dialog returned: a path, or no value when it was canceled or failed.
-     */
-    struct DialogResult {
-        std::optional<std::filesystem::path> Path;
-    };
-
-    /**
-     * @struct  DialogChannel
-     * @brief   Where the file dialog callback leaves its result for the main thread.
-     * @details Shared between the editor and each pending dialog, so a dialog that answers after the editor is
-     *          gone, such as when the application quits with a dialog open, writes to memory that still exists.
-     */
-    struct DialogChannel {
-        // SDL may call the dialog callback from another thread
-        std::mutex Mutex;
-        std::optional<DialogResult> Result;
+        Example,
+        ExportSchematic
     };
 
     Schematic &m_Schematic;
@@ -109,6 +88,7 @@ private:
     ImVec2 m_Pan = {0, 0};
     float m_Zoom = DefaultZoom;
     SymbolStyle m_SymbolStyle = SymbolStyle::IEC;
+    bool m_ShowTerminalNumbers = false;
     WireColoring m_WireColoring = WireColoring::Plain;
     // Set when a schematic is opened; the next Draw() frames it, once the canvas size is known
     bool m_FrameRequested = false;
@@ -140,21 +120,21 @@ private:
     // Files: the dialog in progress and the confirmation are touched only by the main thread
     std::optional<FileAction> m_ActionToConfirm;
     std::optional<FileAction> m_DialogAction;
-    std::string m_DialogLocation;
-    std::shared_ptr<DialogChannel> m_DialogChannel = std::make_shared<DialogChannel>();
+    FileDialog m_FileDialog;
     std::string m_FileMessagesTitle;
     std::vector<std::string> m_FileMessages;
+    // Export: dark keeps the colors of the editor, light suits print
+    bool m_ExportDark = false;
 
     // Frame
     void Draw() override;
     void DrawToolbar();
-    void DrawWires(ImDrawList *draw_list, const ViewTransform &view);
-    void DrawWireCurrents(ImDrawList *draw_list, const ViewTransform &view,
+    void DrawWires(SchematicCanvas &canvas, const ViewTransform &view);
+    void DrawWireCurrents(SchematicCanvas &canvas, const ViewTransform &view,
                           const Core::OperatingPoint &operating_point);
     ImU32 GetElementColor(std::size_t index) const;
     void DrawColorLegend(ImDrawList *draw_list, ImVec2 origin, ImVec2 size) const;
     void DrawNodeVoltages(ImDrawList *draw_list, const ViewTransform &view);
-    void DrawMeasurements(ImDrawList *draw_list, const ViewTransform &view);
     void DrawHoveredValue(const ViewTransform &view, bool hovered);
     void HandlePanAndZoom(ImVec2 origin, bool hovered, bool active);
     void FrameSchematic(ImVec2 canvas_size);
@@ -165,7 +145,7 @@ private:
     void StartProbing();
 
     // Placement
-    void HandlePlacement(ImDrawList *draw_list, const ViewTransform &view, bool hovered);
+    void HandlePlacement(SchematicCanvas &canvas, const ViewTransform &view, bool hovered);
 
     // Wiring
     void HandleWireDrawing(ImDrawList *draw_list, const ViewTransform &view, bool hovered);
@@ -198,9 +178,10 @@ private:
 
     // File dialogs and messages
     void ShowFileDialog(FileAction action);
-    static void SDLCALL HandleFileDialogResult(void *userdata, const char *const *file_list, int filter);
     void ProcessDialogResult();
     void DrawFilePopups();
+    void DrawExportPopup();
+    void ExportSchematic(std::filesystem::path path);
     void ShowFileMessages(std::string title, std::vector<std::string> messages);
 };
 

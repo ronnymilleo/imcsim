@@ -20,7 +20,7 @@ public:
     ~UIVoltageSource() override = default;
 
 protected:
-    void DrawSymbol(ImDrawList *draw_list, const ViewTransform &view, ImU32 color, SymbolStyle style) const override;
+    void DrawSymbol(SchematicCanvas &canvas, const ViewTransform &view, ImU32 color, SymbolStyle style) const override;
 };
 
 } // namespace GUI

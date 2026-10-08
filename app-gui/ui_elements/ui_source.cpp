@@ -24,8 +24,9 @@ constexpr float WaveHalfWidth = 0.5f;
 constexpr float WaveAmplitude = 0.3f;
 // The pulse stays high for the middle half of the box the waves are drawn in
 constexpr float PulseHalfWidth = 0.25f;
-// Same distance as the default labels of two-terminal symbols
-constexpr float LabelOffset = 1.0f;
+// The circle reaches 0.8 from the center, so the labels start a little further out than those of other
+// two-terminal symbols, which would touch it
+constexpr float LabelOffset = 1.25f;
 
 } // namespace
 
@@ -40,13 +41,13 @@ UISource::UISource(std::unique_ptr<Core::Source> source, const GridPoint positio
 }
 
 // AC and pulse sources ignore their DC value, so they are labeled by their waveform instead
-void UISource::DrawLabels(ImDrawList *draw_list, const ViewTransform &view, const ImU32 color) const {
+void UISource::DrawLabels(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color) const {
     const Core::Source &source = GetSource();
     const std::string unit = source.GetUnit();
     std::string waveform;
     switch (source.GetSourceType()) {
     case Core::Source::SourceType::DC:
-        UIElement::DrawLabels(draw_list, view, color);
+        UIElement::DrawLabels(canvas, view, color);
         return;
     case Core::Source::SourceType::AC:
         waveform = std::format("{}{} {}Hz", Core::FormatValue(source.GetAC().Amplitude), unit,
@@ -59,8 +60,8 @@ void UISource::DrawLabels(ImDrawList *draw_list, const ViewTransform &view, cons
         break;
     }
     }
-    DrawLabel(draw_list, view, {0.0f, -LabelOffset}, {0.0f, -1.0f}, source.GetName(), color);
-    DrawLabel(draw_list, view, {0.0f, LabelOffset}, {0.0f, 1.0f}, waveform, color);
+    DrawLabel(canvas, view, {0.0f, -LabelOffset}, {0.0f, -1.0f}, source.GetName(), color);
+    DrawLabel(canvas, view, {0.0f, LabelOffset}, {0.0f, 1.0f}, waveform, color);
 }
 
 /**
@@ -73,27 +74,27 @@ const Core::Source &UISource::GetSource() const {
 
 /**
  * @brief   Draws the circle and joins it to the default leads.
- * @param[in] draw_list  Draw list of the editor window.
+ * @param[in,out] canvas Where it is drawn: the editor window or an exported image.
  * @param[in] view       Transform of the current frame.
  * @param[in] color      Line color.
  */
-void UISource::DrawCircle(ImDrawList *draw_list, const ViewTransform &view, const ImU32 color) const {
+void UISource::DrawCircle(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color) const {
     const ImVec2 center = LocalToScreen(view, 0, 0);
     const ImVec2 radius_offset = LocalToScreen(view, CircleRadius, 0) - center;
     const float radius = std::hypot(radius_offset.x, radius_offset.y);
-    draw_list->AddCircle(center, radius, color, 0, LineThickness);
-    draw_list->AddLine(LocalToScreen(view, -LeadEnd, 0), LocalToScreen(view, -CircleRadius, 0), color, LineThickness);
-    draw_list->AddLine(LocalToScreen(view, CircleRadius, 0), LocalToScreen(view, LeadEnd, 0), color, LineThickness);
+    canvas.AddCircle(center, radius, color, 0, LineThickness);
+    canvas.AddLine(LocalToScreen(view, -LeadEnd, 0), LocalToScreen(view, -CircleRadius, 0), color, LineThickness);
+    canvas.AddLine(LocalToScreen(view, CircleRadius, 0), LocalToScreen(view, LeadEnd, 0), color, LineThickness);
 }
 
 /**
  * @brief   Draws one period of the waveform inside the circle, when the source has one.
- * @param[in] draw_list  Draw list of the editor window.
+ * @param[in,out] canvas Where it is drawn: the editor window or an exported image.
  * @param[in] view       Transform of the current frame.
  * @param[in] color      Line color.
  * @return  True for AC and pulse sources; false for DC, which leaves the inside to the derived symbol.
  */
-bool UISource::DrawWaveform(ImDrawList *draw_list, const ViewTransform &view, const ImU32 color) const {
+bool UISource::DrawWaveform(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color) const {
     switch (GetSource().GetSourceType()) {
     case Core::Source::SourceType::DC:
         return false;
@@ -105,7 +106,7 @@ bool UISource::DrawWaveform(ImDrawList *draw_list, const ViewTransform &view, co
             const float y = -WaveAmplitude * std::sin(2.0f * std::numbers::pi_v<float> * fraction);
             sine[point] = LocalToScreen(view, x, y);
         }
-        draw_list->AddPolyline(sine.data(), static_cast<int>(sine.size()), color, ImDrawFlags_None, LineThickness);
+        canvas.AddPolyline(sine.data(), static_cast<int>(sine.size()), color, ImDrawFlags_None, LineThickness);
         return true;
     }
     case Core::Source::SourceType::Pulse: {
@@ -114,7 +115,7 @@ bool UISource::DrawWaveform(ImDrawList *draw_list, const ViewTransform &view, co
             LocalToScreen(view, -WaveHalfWidth, WaveAmplitude),   LocalToScreen(view, -PulseHalfWidth, WaveAmplitude),
             LocalToScreen(view, -PulseHalfWidth, -WaveAmplitude), LocalToScreen(view, PulseHalfWidth, -WaveAmplitude),
             LocalToScreen(view, PulseHalfWidth, WaveAmplitude),   LocalToScreen(view, WaveHalfWidth, WaveAmplitude)};
-        draw_list->AddPolyline(pulse.data(), static_cast<int>(pulse.size()), color, ImDrawFlags_None, LineThickness);
+        canvas.AddPolyline(pulse.data(), static_cast<int>(pulse.size()), color, ImDrawFlags_None, LineThickness);
         return true;
     }
     }

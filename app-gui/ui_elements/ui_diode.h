@@ -22,13 +22,13 @@ public:
     ~UIDiode() override = default;
 
 protected:
-    void DrawSymbol(ImDrawList *draw_list, const ViewTransform &view, ImU32 color, SymbolStyle style) const override;
-    void DrawLabels(ImDrawList *draw_list, const ViewTransform &view, ImU32 color) const override;
+    void DrawSymbol(SchematicCanvas &canvas, const ViewTransform &view, ImU32 color, SymbolStyle style) const override;
+    void DrawLabels(SchematicCanvas &canvas, const ViewTransform &view, ImU32 color) const override;
 
     LocalBounds GetLocalBounds() const override;
 
 private:
-    void DrawArrow(ImDrawList *draw_list, const ViewTransform &view, ImVec2 start, ImU32 color) const;
+    void DrawArrow(SchematicCanvas &canvas, const ViewTransform &view, ImVec2 start, ImU32 color) const;
 };
 
 } // namespace GUI

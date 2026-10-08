@@ -9,12 +9,17 @@ add_library(imcsim-gui-lib
             current_flow.cpp
             element_factory.cpp
             examples.cpp
+            file_dialog.cpp
             helpers.cpp
             node_colors.cpp
+            plot_export.cpp
             plot_helpers.cpp
             probing.cpp
             schematic.cpp
+            schematic_canvas.cpp
+            schematic_drawing.cpp
             schematic_file.cpp
+            svg_writer.cpp
             theme.cpp
             trace_math.cpp
             trace_statistics.cpp

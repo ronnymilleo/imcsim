@@ -23,15 +23,15 @@ public:
     ~UITransistor() override = default;
 
 protected:
-    void DrawTerminals(ImDrawList *draw_list, const ViewTransform &view, ImU32 color) const override;
-    void DrawLabels(ImDrawList *draw_list, const ViewTransform &view, ImU32 color) const override;
+    void DrawTerminals(SchematicCanvas &canvas, const ViewTransform &view, ImU32 color) const override;
+    void DrawLabels(SchematicCanvas &canvas, const ViewTransform &view, ImU32 color) const override;
 
     std::vector<GridPoint> GetLocalTerminals() const override;
     LocalBounds GetLocalBounds() const override;
 
     // Helpers for derived classes
     virtual const char *GetModelName() const = 0;
-    void DrawArrowHead(ImDrawList *draw_list, const ViewTransform &view, ImVec2 tip, ImVec2 direction,
+    void DrawArrowHead(SchematicCanvas &canvas, const ViewTransform &view, ImVec2 tip, ImVec2 direction,
                        ImU32 color) const;
 };
 
