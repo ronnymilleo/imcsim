@@ -6,11 +6,15 @@
 #ifndef IMCSIM_OUTPUT_WINDOW_H
 #define IMCSIM_OUTPUT_WINDOW_H
 
+#include "implot.h"
 #include "schematic.h"
 #include "simulator.h"
+#include "trace_math.h"
 #include "windows/app_window.h"
 #include <cstddef>
+#include <expected>
 #include <optional>
+#include <span>
 #include <string>
 #include <vector>
 
@@ -38,6 +42,36 @@ struct PlotSpan {
 };
 
 /**
+ * @struct  MathChannel
+ * @brief   A trace computed from others, like the math channel of an oscilloscope.
+ * @details Either an operation between two traces, picked with buttons, or a typed expression; both compile to
+ *          the same program. Channels belong to the window for now and are not saved with the schematic.
+ */
+struct MathChannel {
+    std::string Name;
+    bool Shown = true;
+    bool UsesExpression = false;
+    std::string First;
+    MathOperator Operator = MathOperator::Subtract;
+    std::string Second;
+    std::string Expression;
+    // Compiled from the operation or the expression, whichever is in use
+    std::expected<MathProgram, std::string> Program = std::unexpected("Not compiled yet");
+};
+
+/**
+ * @struct  MathTrace
+ * @brief   A math channel evaluated over one result, ready to plot and measure.
+ */
+struct MathTrace {
+    std::string Label;
+    std::vector<double> Values;
+    std::string Unit;
+    ImAxis Axis = ImAxis_Y1;
+    ImU32 Color = 0;
+};
+
+/**
  * @class   OutputWindow
  * @brief   Plots the node voltages and component currents of the last transient over time, the last AC sweep as
  *          a Bode plot, and the last DC sweep against its swept source.
@@ -49,8 +83,10 @@ struct PlotSpan {
  *          next one; the voltage and current axes also fit whenever their measured traces change. Like an
  *          oscilloscope, the transient and the Bode plots have two cursors and a panel on their right that
  *          measures every shown trace: the transient between the cursors or over what is visible, the Bode plot
- *          over the whole sweep. The window floats instead of being docked, so the plots can be as large as
- *          needed.
+ *          over the whole sweep. Math channels add traces computed from the others, such as V(1)-V(2) or
+ *          V(1)*I(R1), to the transient and DC sweep plots: voltages and currents keep their axes, and any other
+ *          unit, or none, goes on a third axis. The window floats instead of being docked, so the plots can be as
+ *          large as needed.
  */
 class OutputWindow : public AppWindow {
 public:
@@ -75,16 +111,29 @@ private:
     PlotCursors m_ACSweepCursors;
     PlotSpan m_TransientView;
     PlotSpan m_ACSweepView{.From = 1.0, .To = 1e6};
+    // Math channels, and the labels each analysis plotted last frame, so the axes fit when they change
+    std::vector<MathChannel> m_MathChannels;
+    int m_NextMathNumber = 1;
+    std::vector<std::string> m_TransientShownMath;
+    std::vector<std::string> m_DCSweepShownMath;
 
     void Draw() override;
     void DrawTraceList(std::size_t node_count, const std::vector<Core::ComponentTrace> &currents);
-    void DrawTransient(const Core::Transient &transient);
+    void DrawTransient(const Core::Transient &transient, const std::vector<MathTrace> &math);
     void DrawACSweep(const Core::ACSweep &sweep);
-    void DrawDCSweep(const Core::DCSweep &sweep);
+    void DrawDCSweep(const Core::DCSweep &sweep, const std::vector<std::vector<MathTrace>> &math);
 
     // Statistics
-    void DrawTransientStatistics(const Core::Transient &transient);
+    void DrawTransientStatistics(const Core::Transient &transient, const std::vector<MathTrace> &math);
     void DrawACSweepStatistics(const Core::ACSweep &sweep);
+
+    // Math channels
+    void DrawMathChannels(const std::vector<std::string> &operands);
+    bool DrawMathEditor(MathChannel &channel, const std::vector<std::string> &operands);
+    std::vector<MathTrace> EvaluateMath(std::span<const double> xs, Dimension x_unit,
+                                        const std::vector<std::vector<double>> &node_voltages,
+                                        const std::vector<Core::ComponentTrace> &currents,
+                                        std::vector<std::string> &errors) const;
 };
 
 } // namespace GUI

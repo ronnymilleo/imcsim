@@ -18,6 +18,8 @@ namespace {
 // counts, as the trigger hysteresis of an oscilloscope, so noise around the mean adds no cycles
 constexpr double FrequencyHysteresis = 0.1;
 constexpr double CutoffDrop = 3.0;
+// Values this small next to the size of their trace are floating point residue, such as 1e-46 W for a zero
+constexpr double NegligibleFraction = 1e-9;
 
 /**
  * @struct  Sample
@@ -136,6 +138,16 @@ std::optional<double> FindFallingFrequency(const std::vector<Sample> &samples, c
 }
 
 } // namespace
+
+/**
+ * @brief   Tells floating point residue apart from real values, such as 1.778e-46 W where the power is zero.
+ * @param[in] value  Value to show.
+ * @param[in] scale  Size of the trace the value belongs to, such as its largest magnitude.
+ * @return  True when the value is nonzero but negligible next to the scale, so it reads as about zero.
+ */
+bool IsNegligible(const double value, const double scale) {
+    return value != 0.0 && std::abs(value) < NegligibleFraction * std::abs(scale);
+}
 
 /**
  * @brief   Reads a trace at any X, between its samples, as a cursor does.

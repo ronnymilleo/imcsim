@@ -166,3 +166,14 @@ TEST_CASE("A band-pass shows both cutoffs around its peak", "[trace_statistics]"
     CHECK_THAT(*statistics->LowerCutoff, WithinRel(100.0, 3e-2));
     CHECK_THAT(*statistics->UpperCutoff, WithinRel(1e4, 3e-2));
 }
+
+TEST_CASE("Floating point residue is negligible, real small values and exact zeros are not", "[trace_statistics]") {
+    CHECK(GUI::IsNegligible(-1.778e-46, 0.242));
+    CHECK(GUI::IsNegligible(4.216e-22, 15.56));
+    CHECK_FALSE(GUI::IsNegligible(1e-6, 1e-3));
+    CHECK_FALSE(GUI::IsNegligible(-0.5, 0.5));
+    CHECK_FALSE(GUI::IsNegligible(0.0, 1.0));
+    // A trace that is all tiny keeps its values, since nothing larger shows they are residue
+    CHECK_FALSE(GUI::IsNegligible(1e-15, 1e-15));
+    CHECK_FALSE(GUI::IsNegligible(1e-15, 0.0));
+}

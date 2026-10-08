@@ -20,6 +20,9 @@ netlist](docs/screenshot.png)
   pick what to measure with the Probe tool, read every trace under the cursor, currents dashed apart from voltages
 - Oscilloscope-style measurements beside the transient and Bode plots: two draggable cursors, peak-to-peak, mean,
   RMS and frequency of every trace, and peak, -3 dB band, unity gain frequency and phase margin of a response
+- Math channels on transient and DC sweep plots, as on an oscilloscope: an operation between two traces picked
+  with buttons, or a typed expression such as `V(1,2)`, `V(3)*I(R1)` or `ddt(V(2))`, with units followed (W, Ohm,
+  V/s) and a third axis for any unit other than volts and amperes
 - Operating point results on the schematic: values on hover, and wires colored by node, by voltage or by a current
   heat map that shows the path of the current
 - IEC or ANSI symbols, parts rotated (R) and mirrored left to right (M) or top to bottom (Shift+M), undo and

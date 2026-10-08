@@ -18,6 +18,7 @@ add_executable(imcsim-tests
             schematic_tests.cpp
             simulator_tests.cpp
             spice_value_tests.cpp
+            trace_math_tests.cpp
             trace_statistics_tests.cpp
             ui_element_tests.cpp
             ui_wire_tests.cpp

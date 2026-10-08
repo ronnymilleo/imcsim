@@ -1,6 +1,6 @@
 /**
  * @file    plot_helpers.h
- * @brief   Plot geometry that needs no plotting library: nearest samples and dashed lines.
+ * @brief   Plot geometry that needs no plotting library: nearest samples, curve spread and dashed lines.
  */
 
 #ifndef IMCSIM_PLOT_HELPERS_H
@@ -23,6 +23,7 @@ struct LineSegment {
 };
 
 std::size_t FindNearestSample(std::span<const double> xs, double x, bool logarithmic);
+std::size_t FindWidestSpread(const std::vector<const std::vector<double> *> &curves);
 std::vector<LineSegment> SplitIntoDashes(std::span<const ImVec2> points, float dash_length, float gap_length,
                                          ImVec2 clip_min, ImVec2 clip_max);
 

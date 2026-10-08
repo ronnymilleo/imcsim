@@ -41,6 +41,7 @@ struct BodeStatistics {
     std::optional<double> PhaseMargin;
 };
 
+bool IsNegligible(double value, double scale);
 double InterpolateAt(std::span<const double> xs, std::span<const double> ys, double x, bool logarithmic);
 std::optional<TraceStatistics> ComputeTraceStatistics(std::span<const double> xs, std::span<const double> ys,
                                                       double from, double to);
