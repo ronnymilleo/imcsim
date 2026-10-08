@@ -4,6 +4,7 @@
 
 add_library(imcsim-gui-lib
         STATIC
+            analysis_controls.cpp
             application.cpp
             connectivity.cpp
             current_flow.cpp

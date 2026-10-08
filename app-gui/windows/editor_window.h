@@ -6,6 +6,7 @@
 #ifndef IMCSIM_EDITOR_WINDOW_H
 #define IMCSIM_EDITOR_WINDOW_H
 
+#include "analysis_controls.h"
 #include "components/component.h"
 #include "examples.h"
 #include "file_dialog.h"
@@ -34,7 +35,7 @@ namespace GUI {
  */
 class EditorWindow : public AppWindow {
 public:
-    explicit EditorWindow(Schematic &schematic);
+    EditorWindow(Schematic &schematic, AnalysisControls &controls);
     ~EditorWindow() override = default;
 
     // Quitting
@@ -108,6 +109,7 @@ private:
     };
 
     Schematic &m_Schematic;
+    AnalysisControls &m_Controls;
 
     static constexpr float DefaultZoom = 20.0f;
 
@@ -166,11 +168,13 @@ private:
     void DrawToolbar();
     void DrawPartButton(Core::ComponentType type);
     void DrawPartGroup(std::size_t index);
+    void DrawRunControls();
     void DrawWires(SchematicCanvas &canvas, const ViewTransform &view);
     void DrawWireCurrents(SchematicCanvas &canvas, const ViewTransform &view,
                           const Core::OperatingPoint &operating_point);
     ImU32 GetElementColor(std::size_t index) const;
     void DrawStatusBar(const ViewTransform &view, bool hovered);
+    float DrawRunStatus(float right_edge);
     void DrawColorLegend(ImDrawList *draw_list, ImVec2 origin, ImVec2 size) const;
     void DrawNodeVoltages(ImDrawList *draw_list, const ViewTransform &view);
     void DrawHoveredValue(const ViewTransform &view, bool hovered);

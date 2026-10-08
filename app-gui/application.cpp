@@ -283,12 +283,11 @@ void Application::DrawMainMenuBar() {
             }
         }
         ImGui::Separator();
-        // Render() applies it right after the menu, and the windows open by default are reopened so the whole layout
-        // shows up; Netlist stays as it is, and Output floats outside the layout and opens with the next result
+        // Render() applies it right after the menu, and Properties, the only side window open by default, is reopened
+        // so the whole layout shows up; Output floats outside the layout and opens with the next result
         if (ImGui::MenuItem("Reset Layout")) {
             m_ResetLayout = true;
             m_PropertiesWindow.SetOpen(true);
-            m_SimulationWindow.SetOpen(true);
         }
         ImGui::EndMenu();
     }
@@ -311,8 +310,8 @@ void Application::UpdateWindowTitle() {
     }
 }
 
-// A new transient, AC sweep or DC sweep opens the Output window on its tab, so running one is enough to see it.
-// Versions also change when results are dropped, which opens nothing
+// A new result of any analysis opens the Output window on its tab; the operating point also shows on the schematic, so
+// running one is enough to see it. Versions also change when results are dropped, which opens nothing
 void Application::ShowNewResults() {
     const auto show_if_new = [this](std::size_t &shown, const std::size_t version, const bool has_result,
                                     const PlotTab tab) {
@@ -320,6 +319,8 @@ void Application::ShowNewResults() {
             m_OutputWindow.ShowTab(tab);
         }
     };
+    show_if_new(m_ShownOperatingPointVersion, m_Schematic.GetOperatingPointVersion(),
+                m_Schematic.GetOperatingPoint().has_value(), PlotTab::OperatingPoint);
     show_if_new(m_ShownTransientVersion, m_Schematic.GetTransientVersion(), m_Schematic.GetTransient().has_value(),
                 PlotTab::Transient);
     show_if_new(m_ShownACSweepVersion, m_Schematic.GetACSweepVersion(), m_Schematic.GetACSweep().has_value(),
@@ -328,20 +329,18 @@ void Application::ShowNewResults() {
                 PlotTab::DCSweep);
 }
 
-// Editor on top, Properties below it on the left and Simulation on the right, where Netlist docks as a tab when
-// opened; Output floats.
-// Must run before the windows are drawn. Each split returns the new node in the given direction and leaves the
-// rest in its last argument
+// Editor on top and Properties below it; Analysis Settings and Netlist start closed and dock beside Properties
+// as tabs when opened, and Output floats.
+// Must run before the windows are drawn. A split returns the new node in the given direction and leaves the rest
+// in its last argument
 void Application::SetupDefaultLayout(ImGuiID dockspace_id) {
     ImGui::DockBuilderSetNodeSize(dockspace_id, ImGui::GetMainViewport()->WorkSize);
     ImGuiID editor_id = dockspace_id;
-    ImGuiID properties_id = ImGui::DockBuilderSplitNode(editor_id, ImGuiDir_Down, 0.3f, nullptr, &editor_id);
-    const ImGuiID netlist_id =
-        ImGui::DockBuilderSplitNode(properties_id, ImGuiDir_Right, 0.5f, nullptr, &properties_id);
+    const ImGuiID properties_id = ImGui::DockBuilderSplitNode(editor_id, ImGuiDir_Down, 0.25f, nullptr, &editor_id);
     ImGui::DockBuilderDockWindow(m_EditorWindow.GetWindowTitle().c_str(), editor_id);
     ImGui::DockBuilderDockWindow(m_PropertiesWindow.GetWindowTitle().c_str(), properties_id);
-    ImGui::DockBuilderDockWindow(m_NetlistWindow.GetWindowTitle().c_str(), netlist_id);
-    ImGui::DockBuilderDockWindow(m_SimulationWindow.GetWindowTitle().c_str(), netlist_id);
+    ImGui::DockBuilderDockWindow(m_SimulationWindow.GetWindowTitle().c_str(), properties_id);
+    ImGui::DockBuilderDockWindow(m_NetlistWindow.GetWindowTitle().c_str(), properties_id);
     ImGui::DockBuilderFinish(dockspace_id);
 }
 

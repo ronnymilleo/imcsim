@@ -705,6 +705,8 @@ void AddExportMath(PanelBuilder &builder, const std::vector<MathTrace> &math, co
 
 const char *GetTabFileSuffix(const PlotTab tab) {
     switch (tab) {
+    case PlotTab::OperatingPoint:
+        return "operating-point";
     case PlotTab::Transient:
         return "transient";
     case PlotTab::ACSweep:
@@ -717,6 +719,8 @@ const char *GetTabFileSuffix(const PlotTab tab) {
 
 const char *GetTabTitle(const PlotTab tab) {
     switch (tab) {
+    case PlotTab::OperatingPoint:
+        return "operating point";
     case PlotTab::Transient:
         return "transient";
     case PlotTab::ACSweep:
@@ -725,6 +729,53 @@ const char *GetTabTitle(const PlotTab tab) {
         return "DC sweep";
     }
     return "";
+}
+
+// The operating point is a table of DC values, one row per node and per current
+void DrawOperatingPoint(const Core::OperatingPoint &operating_point) {
+    ImGui::PushTextWrapPos(0.0f);
+    for (const std::string &warning : operating_point.Warnings) {
+        ImGui::TextColored(GetWarningTextColor(), "%s", warning.c_str());
+    }
+    ImGui::PopTextWrapPos();
+    constexpr ImGuiTableFlags TableFlags =
+        ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingStretchProp;
+    // Fixed widths, so the currents fit beside the voltages
+    const ImVec2 table_size = {ImGui::GetFontSize() * 14.0f, 0.0f};
+    if (ImGui::BeginTable("node_voltages", 2, TableFlags, table_size)) {
+        ImGui::TableSetupColumn("Node");
+        ImGui::TableSetupColumn("Voltage");
+        ImGui::TableHeadersRow();
+        for (std::size_t node = 0; node < operating_point.NodeVoltages.size(); ++node) {
+            ImGui::TableNextRow();
+            ImGui::TableNextColumn();
+            ImGui::TextUnformatted(node == 0 ? "0 (ground)" : std::format("{}", node).c_str());
+            ImGui::TableNextColumn();
+            ImGui::TextUnformatted(std::format("{}V", Core::FormatValue(operating_point.NodeVoltages[node])).c_str());
+        }
+        ImGui::EndTable();
+    }
+    if (operating_point.Currents.empty()) {
+        return;
+    }
+    ImGui::SameLine(0.0f, ImGui::GetFontSize() * 2.0f);
+    if (ImGui::BeginTable("currents", 2, TableFlags, table_size)) {
+        ImGui::TableSetupColumn("Component");
+        ImGui::TableSetupColumn("Current");
+        ImGui::TableHeadersRow();
+        for (const Core::ComponentCurrent &current : operating_point.Currents) {
+            ImGui::TableNextRow();
+            ImGui::TableNextColumn();
+            ImGui::TextUnformatted(current.Name.c_str());
+            ImGui::TableNextColumn();
+            ImGui::TextUnformatted(std::format("{}A", Core::FormatValue(current.Current)).c_str());
+        }
+        ImGui::EndTable();
+    }
+    ImGui::PushTextWrapPos(0.0f);
+    ImGui::TextDisabled("Currents as in SPICE: positive through a two-terminal part from its first terminal to its "
+                        "second, and into each terminal of a transistor");
+    ImGui::PopTextWrapPos();
 }
 
 std::string GetExtension(const ExportFormat format) {
@@ -819,6 +870,15 @@ void OutputWindow::Draw() {
     const auto tab_flags = [&tab_to_show](const PlotTab tab) {
         return tab_to_show == tab ? ImGuiTabItemFlags_SetSelected : ImGuiTabItemFlags_None;
     };
+    if (ImGui::BeginTabItem("Operating point", nullptr, tab_flags(PlotTab::OperatingPoint))) {
+        m_ShownTab = PlotTab::OperatingPoint;
+        if (const auto &operating_point = m_Schematic.GetOperatingPoint()) {
+            DrawOperatingPoint(*operating_point);
+        } else {
+            ImGui::TextDisabled("No operating point for the current circuit; pick it beside Run in the editor");
+        }
+        ImGui::EndTabItem();
+    }
     if (ImGui::BeginTabItem("Transient", nullptr, tab_flags(PlotTab::Transient))) {
         m_ShownTab = PlotTab::Transient;
         if (transient) {
@@ -832,7 +892,7 @@ void OutputWindow::Draw() {
                 },
                 [&] { DrawTransientStatistics(*transient, transient_math); });
         } else {
-            ImGui::TextDisabled("No transient for the current circuit; run one in the Simulation window");
+            ImGui::TextDisabled("No transient for the current circuit; pick it beside Run in the editor");
         }
         ImGui::EndTabItem();
     }
@@ -852,7 +912,7 @@ void OutputWindow::Draw() {
                 },
                 [&] { DrawACSweepStatistics(*sweep); });
         } else {
-            ImGui::TextDisabled("No AC sweep for the current circuit; run one in the Simulation window");
+            ImGui::TextDisabled("No AC sweep for the current circuit; pick it beside Run in the editor");
         }
         ImGui::EndTabItem();
     }
@@ -865,7 +925,7 @@ void OutputWindow::Draw() {
             DrawMathErrors(dc_sweep_errors);
             DrawDCSweep(*dc_sweep, dc_sweep_math);
         } else {
-            ImGui::TextDisabled("No DC sweep for the current circuit; run one in the Simulation window");
+            ImGui::TextDisabled("No DC sweep for the current circuit; pick it beside Run in the editor");
         }
         ImGui::EndTabItem();
     }
@@ -883,6 +943,8 @@ void OutputWindow::Draw() {
     ImGui::SetNextWindowPos(export_corner, ImGuiCond_Appearing, ImVec2(1.0f, 0.0f));
     bool can_export = false;
     switch (m_ShownTab) {
+    case PlotTab::OperatingPoint:
+        break;
     case PlotTab::Transient:
         can_export = transient && (anything_measured || !transient_math.empty());
         break;

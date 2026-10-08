@@ -474,6 +474,9 @@ nlohmann::json WriteSweepRange(const Core::SweepRange &range) {
     return object;
 }
 
+// File names of the analyses, in the order of the Analysis enum
+constexpr auto AnalysisKeys = std::to_array<std::string_view>({"operating_point", "transient", "ac_sweep", "dc_sweep"});
+
 nlohmann::json WriteSettings(const SimulationSettings &settings) {
     nlohmann::json transient = nlohmann::json::object();
     WriteParameters(TransientKeys, settings.Transient, transient);
@@ -481,6 +484,7 @@ nlohmann::json WriteSettings(const SimulationSettings &settings) {
     WriteParameters(ACSweepKeys, settings.ACSweep, ac_sweep);
     ac_sweep["points_per_decade"] = settings.ACSweep.PointsPerDecade;
     return {
+        {"analysis", AnalysisKeys[static_cast<std::size_t>(settings.Selected)]},
         {"transient", transient},
         {"ac_sweep", ac_sweep},
         {"dc_sweep",
@@ -588,6 +592,15 @@ SimulationSettings ReadSettings(const nlohmann::json &document, std::vector<std:
     if (!simulation->is_object()) {
         warnings.push_back("The simulation settings are not an object and were reset to the defaults");
         return settings;
+    }
+    if (const auto analysis = simulation->find("analysis"); analysis != simulation->end()) {
+        const auto key =
+            analysis->is_string() ? std::ranges::find(AnalysisKeys, analysis->get<std::string>()) : AnalysisKeys.end();
+        if (key != AnalysisKeys.end()) {
+            settings.Selected = static_cast<Analysis>(key - AnalysisKeys.begin());
+        } else {
+            warnings.push_back("The selected analysis is unknown and was reset to the transient");
+        }
     }
     for (const AnalysisReader &reader : AnalysisReaders) {
         const auto object = simulation->find(reader.Key);

@@ -496,6 +496,7 @@ std::string Schematic::BuildSpiceNetlist() {
  */
 void Schematic::SetOperatingPoint(std::optional<Core::OperatingPoint> operating_point) {
     m_OperatingPoint = std::move(operating_point);
+    ++m_OperatingPointVersion;
 }
 
 /**
@@ -559,6 +560,14 @@ void Schematic::SetDCSweep(std::optional<Core::DCSweep> sweep) {
  */
 const std::optional<Core::DCSweep> &Schematic::GetDCSweep() const {
     return m_DCSweep;
+}
+
+/**
+ * @brief   Returns a number that changes whenever an operating point result is stored.
+ * @return  The operating point version; compare it with a stored one to know whether the result was replaced.
+ */
+std::size_t Schematic::GetOperatingPointVersion() const {
+    return m_OperatingPointVersion;
 }
 
 /**

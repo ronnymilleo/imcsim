@@ -6,6 +6,7 @@
 #ifndef IMCSIM_APPLICATION_H
 #define IMCSIM_APPLICATION_H
 
+#include "analysis_controls.h"
 #include "imgui_impl_vulkan.h"
 #include "schematic.h"
 #include "vulkan_context.h"
@@ -51,16 +52,18 @@ private:
     // Last title given to the window, so it is only set again when the file or its state changes
     std::string m_WindowTitle;
     // Result versions already shown, so each new result opens the Output window once
+    std::size_t m_ShownOperatingPointVersion = 0;
     std::size_t m_ShownTransientVersion = 0;
     std::size_t m_ShownACSweepVersion = 0;
     std::size_t m_ShownDCSweepVersion = 0;
 
     // The schematic is declared first, so it exists when the windows that refer to it are built
     Schematic m_Schematic;
-    EditorWindow m_EditorWindow{m_Schematic};
+    AnalysisControls m_AnalysisControls{m_Schematic};
+    EditorWindow m_EditorWindow{m_Schematic, m_AnalysisControls};
     PropertiesWindow m_PropertiesWindow{m_Schematic};
     NetlistWindow m_NetlistWindow{m_Schematic};
-    SimulationWindow m_SimulationWindow{m_Schematic};
+    SimulationWindow m_SimulationWindow{m_Schematic, m_AnalysisControls};
     OutputWindow m_OutputWindow{m_Schematic};
 
     // Errors

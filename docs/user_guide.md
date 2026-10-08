@@ -10,16 +10,23 @@ How to read what imcsim measures, plots and exports. The [README](../README.md) 
   arrow beside it (or a right click) lists the others. Hover a button for its name and shortcut.
 - **Find a part**: press Space over the editor, type part of a name (`mos`, `zener`, `opamp`, `nmos`, `vcvs`), move
   with Up and Down, and press Enter to start placing it.
-- **Status bar**: below the schematic, the keys of the current mode on the left and the grid position of the cursor
-  on the right.
+- **Running**: the ▶ button at the end of the toolbar, or F5, runs the analysis named beside it. That button opens
+  the list of analyses (operating point, transient, AC sweep, DC sweep) and the settings of the one picked, saved
+  with the schematic. Suggest fills the transient times (five periods of the slowest sine or pulse source, 200
+  points in a period of the fastest) or the AC range (two decades past the RC, RL and LC corners and the op-amp
+  bandwidths). Nothing runs by itself: edit the circuit, then run again. View > Analysis Settings keeps the same
+  settings open in a window.
+- **Status bar**: below the schematic, the keys of the current mode on the left; on the right, the grid position of
+  the cursor and how the last run went ("Transient done", with warnings, or failed). Click the result for the
+  errors, the warnings and the ngspice output.
 - **Menus**: File (files, examples and the schematic export), Edit (undo, redo and changes to the selection) and
   View (wire colors, symbol style, terminal numbers, theme, and the windows). The View choices are kept between
   sessions.
 - **Themes**: View > Theme switches between Ember (warm charcoal and red, the default), Graphite (cool gray and
   blue), Phosphor (an oscilloscope screen, green and amber) and Paper (light, like a printed datasheet). Node and
   trace colors are the same in every theme; Paper darkens them so they read on its light background.
-- **Output window**: hidden until a transient, AC sweep or DC sweep runs; it then opens on the tab of the new
-  result. Reopen it from View.
+- **Output window**: hidden until an analysis runs; it then opens on the tab of the new result. The operating point
+  tab lists the node voltages and part currents, which also show on the schematic. Reopen it from View.
 
 ## Terminals
 

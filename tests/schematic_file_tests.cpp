@@ -356,6 +356,7 @@ TEST_CASE("A mirrored flag that is not a boolean skips the element", "[schematic
 
 TEST_CASE("Simulation settings load back unchanged", "[schematic_file]") {
     GUI::SimulationSettings settings;
+    settings.Selected = GUI::Analysis::DCSweep;
     settings.Transient = {.StopTime = 50e-3, .TimeStep = 20e-6};
     settings.ACSweep = {.StartFrequency = 10.0, .StopFrequency = 100e3, .PointsPerDecade = 50};
     settings.SweptRange = {.Source = "V1", .Start = 5.0, .Stop = 0.0, .Step = -0.05};
@@ -384,6 +385,15 @@ TEST_CASE("Invalid settings of one analysis fall back to its defaults with a war
     CHECK(loaded.Settings.ACSweep ==
           Core::ACSweepSettings{.StartFrequency = 10.0, .StopFrequency = 1e3, .PointsPerDecade = 5});
     CHECK(loaded.Settings.SweptRange == Core::SweepRange{});
+}
+
+TEST_CASE("An unknown selected analysis falls back to the transient with a warning", "[schematic_file]") {
+    const std::string text = R"({"format": "imcsim-schematic", "version": 1, "simulation": {)"
+                             R"("analysis": "noise", "ac_sweep": {"start": 10.0, "stop": 1e3}}})";
+    const GUI::LoadedSchematic loaded = LoadOrFail(text);
+    CHECK(loaded.Warnings.size() == 1);
+    CHECK(loaded.Settings.Selected == GUI::Analysis::Transient);
+    CHECK(loaded.Settings.ACSweep.StopFrequency == 1e3);
 }
 
 TEST_CASE("Measurements load back unchanged, and files without them leave the key out", "[schematic_file]") {

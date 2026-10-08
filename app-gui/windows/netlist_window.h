@@ -14,7 +14,7 @@ namespace GUI {
 /**
  * @class   NetlistWindow
  * @brief   Shows the SPICE netlist that will be handed to ngspice, with a button to copy it.
- * @details It starts closed and opens from the View menu, docked beside the Simulation window.
+ * @details It starts closed and opens from the View menu, docked beside the Properties window.
  */
 class NetlistWindow : public AppWindow {
 public:

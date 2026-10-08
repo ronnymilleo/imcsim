@@ -78,6 +78,7 @@ struct MathTrace {
  * @brief   The tabs of the Output window, one per analysis.
  */
 enum class PlotTab {
+    OperatingPoint,
     Transient,
     ACSweep,
     DCSweep
@@ -96,7 +97,7 @@ enum class ExportFormat {
  * @class   OutputWindow
  * @brief   Plots the node voltages and component currents of the last transient over time, the last AC sweep as
  *          a Bode plot, and the last DC sweep against its swept source.
- * @details The results come from the Schematic, which the Simulation window fills, so the plots disappear as
+ * @details The results come from the Schematic, which the analysis controls fill, so the plots disappear as
  *          soon as the circuit changes. Plots show only the measured traces, picked with the Probe tool of the
  *          editor or in the list beside the plots; voltages take the colors the editor gives the nodes, and
  *          currents are dashed on the secondary Y axis on the right. Hovering a plot reads every shown trace at

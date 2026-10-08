@@ -87,6 +87,7 @@
       "start": 1.0,
       "stop": 1000000.0
     },
+    "analysis": "transient",
     "dc_sweep": {
       "step_source": false,
       "stepped": {

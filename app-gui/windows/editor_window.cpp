@@ -152,6 +152,7 @@ constexpr float DropdownButtonScale = 0.6f;
  * @brief   Icons of the toolbar buttons that are not parts.
  */
 enum class ToolIcon {
+    Run,
     Select,
     Wire,
     Probe,
@@ -165,6 +166,10 @@ void DrawToolIcon(ImDrawList *draw_list, const ToolIcon icon, const ImVec2 cente
     const float flip = icon == ToolIcon::Redo ? -1.0f : 1.0f;
     const auto point = [&](const float x, const float y) { return center + ImVec2(x * flip, y) * size; };
     switch (icon) {
+    case ToolIcon::Run: {
+        draw_list->AddTriangleFilled(point(-0.25f, -0.35f), point(0.35f, 0.0f), point(-0.25f, 0.35f), color);
+        break;
+    }
     case ToolIcon::Select: {
         const std::array<ImVec2, 7> arrow = {point(-0.3f, -0.45f), point(-0.3f, 0.3f),  point(-0.12f, 0.13f),
                                              point(0.02f, 0.43f),  point(0.14f, 0.37f), point(0.0f, 0.08f),
@@ -208,6 +213,16 @@ void DrawToolIcon(ImDrawList *draw_list, const ToolIcon icon, const ImVec2 cente
 bool ToolButton(const char *id, const bool active) {
     const float side = ImGui::GetFrameHeight() * ToolButtonScale;
     return active ? PrimaryButton(id, {side, side}) : ImGui::Button(id, {side, side});
+}
+
+// The button that names the selected analysis, with room for its dropdown arrow
+float AnalysisButtonWidth() {
+    float widest = 0.0f;
+    for (const Analysis analysis :
+         {Analysis::OperatingPoint, Analysis::Transient, Analysis::ACSweep, Analysis::DCSweep}) {
+        widest = std::max(widest, ImGui::CalcTextSize(GetAnalysisName(analysis)).x);
+    }
+    return widest + ImGui::GetStyle().FramePadding.x * 2.0f + ImGui::GetFontSize();
 }
 
 // Middle and icon size of the last item, and the color its icon takes
@@ -339,7 +354,8 @@ float VoltageLevel(const double voltage, const std::vector<double> &voltages) {
  * @brief   Creates the editor for a schematic.
  * @param[in] schematic  Schematic to edit; it must outlive the window.
  */
-EditorWindow::EditorWindow(Schematic &schematic) : AppWindow("Schematic", false), m_Schematic(schematic) {
+EditorWindow::EditorWindow(Schematic &schematic, AnalysisControls &controls)
+    : AppWindow("Schematic", false), m_Schematic(schematic), m_Controls(controls) {
     for (const PartGroup &group : PartGroups) {
         m_PartGroupChoices.push_back(group.Types.front());
     }
@@ -619,6 +635,10 @@ void EditorWindow::DrawToolbar() {
     if (tool_button("##redo", ToolIcon::Redo, false, m_Schematic.CanRedo(), "Redo (Ctrl+Y)", 0.0f)) {
         Redo();
     }
+
+    // Simulation
+    row.Place(side + ImGui::GetStyle().ItemSpacing.x + AnalysisButtonWidth(), gap);
+    DrawRunControls();
 }
 
 void EditorWindow::DrawPartButton(const Core::ComponentType type) {
@@ -629,6 +649,50 @@ void EditorWindow::DrawPartButton(const Core::ComponentType type) {
     ImGui::PopID();
     DrawPartIcon(ImGui::GetWindowDrawList(), type, ItemCenter(), IconSize(), m_SymbolStyle);
     ImGui::SetItemTooltip("%s", GetPartName(type));
+}
+
+// Run starts the selected analysis; the button beside it names that analysis and opens its settings, where another
+// one can be picked
+void EditorWindow::DrawRunControls() {
+    const float side = ImGui::GetFrameHeight() * ToolButtonScale;
+    const Analysis selected = m_Schematic.GetSimulationSettings().Selected;
+    if (PrimaryButton("##run", {side, side})) {
+        m_Controls.RunSelected();
+    }
+    const float run_left = ImGui::GetItemRectMin().x;
+    DrawToolIcon(ImGui::GetWindowDrawList(), ToolIcon::Run, ItemCenter(), IconSize(), IconColor(true));
+    ImGui::SetItemTooltip("Run the %s (F5)", GetAnalysisName(selected));
+
+    ImGui::SameLine();
+    ImGui::PushStyleVar(ImGuiStyleVar_ButtonTextAlign, {0.0f, 0.5f});
+    const std::string label = std::format("{}##analysis", GetAnalysisName(selected));
+    const bool open = ImGui::Button(label.c_str(), {AnalysisButtonWidth(), side});
+    ImGui::PopStyleVar();
+    ImGui::SetItemTooltip("Pick the analysis and set it up");
+    const ImVec2 arrow_center = {ImGui::GetItemRectMax().x - ImGui::GetFontSize() * 0.75f, ItemCenter().y};
+    const float arrow = ImGui::GetFontSize() * 0.25f;
+    ImGui::GetWindowDrawList()->AddTriangleFilled(arrow_center + ImVec2(-arrow, -arrow * 0.5f),
+                                                  arrow_center + ImVec2(arrow, -arrow * 0.5f),
+                                                  arrow_center + ImVec2(0.0f, arrow * 0.5f), IconColor(true));
+    if (open) {
+        // Hangs below Run, moved left when the settings would not fit before the right edge of the editor
+        const float settings_width = ImGui::GetFontSize() * 20.0f;
+        const float right_edge = ImGui::GetWindowPos().x + ImGui::GetWindowWidth();
+        ImGui::SetNextWindowPos({std::min(run_left, right_edge - settings_width), ImGui::GetItemRectMax().y});
+        ImGui::OpenPopup("analysis");
+    }
+    if (ImGui::BeginPopup("analysis")) {
+        m_Controls.DrawAnalysisPicker();
+        ImGui::Separator();
+        m_Controls.DrawSettings();
+        ImGui::Separator();
+        // The popup has the focus, so F5 is checked here too
+        if (PrimaryButton("Run (F5)") || ImGui::IsKeyPressed(ImGuiKey_F5, false)) {
+            m_Controls.RunSelected();
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndPopup();
+    }
 }
 
 // The button places the part last picked in the group; the arrow beside it, or a right click, lists the others
@@ -786,14 +850,66 @@ void EditorWindow::DrawStatusBar(const ViewTransform &view, const bool hovered) 
         hint =
             "Click a part or wire to select it, middle drag to pan, wheel to zoom, Space find a part, W wire, P probe";
     }
-    ImGui::TextDisabled("%s", hint.c_str());
-    if (!hovered) {
-        return;
+    // The right end holds the result of the last run, which stays put, and the grid position before it; the hint is
+    // cut short before them
+    const ImVec2 line_start = ImGui::GetCursorScreenPos();
+    float right_edge = DrawRunStatus(line_start.x + ImGui::GetContentRegionAvail().x);
+    if (hovered) {
+        const GridPoint point = Snap(view.ToWorld(ImGui::GetIO().MousePos));
+        const std::string position = std::format("x {}, y {}", point.X, point.Y);
+        right_edge -= ImGui::CalcTextSize(position.c_str()).x;
+        ImGui::SetCursorScreenPos({right_edge, line_start.y});
+        ImGui::TextDisabled("%s", position.c_str());
+        right_edge -= ImGui::GetFontSize() * 1.5f;
     }
-    const GridPoint point = Snap(view.ToWorld(ImGui::GetIO().MousePos));
-    const std::string position = std::format("x {}, y {}", point.X, point.Y);
-    ImGui::SameLine(ImGui::GetWindowContentRegionMax().x - ImGui::CalcTextSize(position.c_str()).x);
-    ImGui::TextDisabled("%s", position.c_str());
+    ImGui::SetCursorScreenPos(line_start);
+    ImGui::PushClipRect(line_start, {right_edge, line_start.y + ImGui::GetTextLineHeightWithSpacing()}, true);
+    ImGui::TextDisabled("%s", hint.c_str());
+    ImGui::PopClipRect();
+}
+
+// "Transient done", in the warning color when something needs a look and in the error color after a failure; a click
+// opens the report of the run, with the ngspice output. Returns where the space left for the hint ends
+float EditorWindow::DrawRunStatus(float right_edge) {
+    const std::optional<Analysis> last_run = m_Controls.GetLastRun();
+    const RunOutcome outcome = last_run ? m_Controls.GetOutcome(*last_run) : RunOutcome::None;
+    std::string status;
+    ImVec4 color = ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled);
+    switch (outcome) {
+    case RunOutcome::None:
+        break;
+    case RunOutcome::Succeeded:
+        status = std::format("{} done", GetAnalysisName(*last_run));
+        break;
+    case RunOutcome::SucceededWithWarnings:
+        status = std::format("{} done, with warnings", GetAnalysisName(*last_run));
+        color = GetWarningTextColor();
+        break;
+    case RunOutcome::Failed:
+        status = std::format("{} failed", GetAnalysisName(*last_run));
+        color = GetErrorTextColor();
+        break;
+    }
+    const ImVec2 line_start = ImGui::GetCursorScreenPos();
+    if (!status.empty()) {
+        const ImVec2 status_size = ImGui::CalcTextSize(status.c_str());
+        right_edge -= status_size.x;
+        ImGui::SetCursorScreenPos({right_edge, line_start.y});
+        ImGui::PushStyleColor(ImGuiCol_Text, color);
+        if (ImGui::Selectable(status.c_str(), false, ImGuiSelectableFlags_None, status_size)) {
+            ImGui::OpenPopup("run_report");
+        }
+        ImGui::PopStyleColor();
+        ImGui::SetItemTooltip("Show what the run reported, with the ngspice output");
+        right_edge -= ImGui::GetFontSize() * 1.5f;
+    }
+    if (ImGui::BeginPopup("run_report")) {
+        if (last_run) {
+            m_Controls.DrawRunReport(*last_run);
+        }
+        ImGui::EndPopup();
+    }
+    return right_edge;
 }
 
 // A gradient with the values at its ends, or a reminder to run an operating point
@@ -1321,6 +1437,9 @@ void EditorWindow::HandleFileShortcuts() {
     }
     if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiMod_Shift | ImGuiKey_S, ImGuiInputFlags_RouteGlobal)) {
         ShowFileDialog(FileAction::Save);
+    }
+    if (ImGui::Shortcut(ImGuiKey_F5, ImGuiInputFlags_RouteGlobal)) {
+        m_Controls.RunSelected();
     }
     if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_Q, ImGuiInputFlags_RouteGlobal)) {
         RequestQuit();

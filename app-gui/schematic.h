@@ -109,6 +109,7 @@ public:
     const std::optional<Core::ACSweep> &GetACSweep() const;
     void SetDCSweep(std::optional<Core::DCSweep> sweep);
     const std::optional<Core::DCSweep> &GetDCSweep() const;
+    std::size_t GetOperatingPointVersion() const;
     std::size_t GetTransientVersion() const;
     std::size_t GetACSweepVersion() const;
     std::size_t GetDCSweepVersion() const;
@@ -127,7 +128,7 @@ private:
     std::set<int> m_MeasuredNodes;
     std::set<std::string> m_MeasuredCurrents;
 
-    // Simulation settings; the version changes only when they are replaced from outside the Simulation window,
+    // Simulation settings; the version changes only when they are replaced from outside the analysis settings,
     // such as by opening a file or undoing, so the window knows to reload its fields
     SimulationSettings m_SimulationSettings;
     std::size_t m_SimulationSettingsVersion = 0;
@@ -151,6 +152,7 @@ private:
     std::optional<Core::ACSweep> m_ACSweep;
     std::optional<Core::DCSweep> m_DCSweep;
     // Change with every new result, so windows can tell a rerun from the result they already showed
+    std::size_t m_OperatingPointVersion = 0;
     std::size_t m_TransientVersion = 0;
     std::size_t m_ACSweepVersion = 0;
     std::size_t m_DCSweepVersion = 0;
