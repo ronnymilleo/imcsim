@@ -5,15 +5,18 @@
 
 #include "components/bjt.h"
 #include "components/capacitor.h"
+#include "components/controlled_source.h"
 #include "components/current_source.h"
 #include "components/diode.h"
 #include "components/ground.h"
 #include "components/inductor.h"
 #include "components/mosfet.h"
+#include "components/op_amp.h"
 #include "components/resistor.h"
 #include "components/vcc.h"
 #include "components/voltage_source.h"
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/generators/catch_generators.hpp>
 #include <span>
 #include <string_view>
 
@@ -81,7 +84,8 @@ TEST_CASE("Type names convert both ways", "[component]") {
           Core::ComponentType::Ground, Core::ComponentType::VCC, Core::ComponentType::VoltageSource,
           Core::ComponentType::CurrentSource, Core::ComponentType::Diode, Core::ComponentType::ZenerDiode,
           Core::ComponentType::LED, Core::ComponentType::NPN, Core::ComponentType::PNP, Core::ComponentType::NMOS,
-          Core::ComponentType::PMOS}) {
+          Core::ComponentType::PMOS, Core::ComponentType::VCVS, Core::ComponentType::VCCS, Core::ComponentType::CCCS,
+          Core::ComponentType::CCVS, Core::ComponentType::OpAmp}) {
         CHECK(Core::ParseComponentType(Core::GetTypeName(type)) == type);
     }
     CHECK_FALSE(Core::ParseComponentType("resistor"));
@@ -320,4 +324,29 @@ TEST_CASE("Custom transistor parameters must be in the range ngspice simulates",
     CHECK_FALSE(mosfet.IsValidParameters({.Length = 0.0}));
     CHECK_FALSE(mosfet.IsValidParameters({.MaxGateSourceVoltage = 0.0}));
     CHECK_FALSE(mosfet.IsValidParameters({.MaxDrainCurrent = -1.0}));
+}
+
+TEST_CASE("Controlled sources have a gain in the unit of their output over their control", "[component]") {
+    const auto [type, prefix, unit] = GENERATE(table<Core::ComponentType, std::string_view, std::string_view>({
+        {Core::ComponentType::VCVS, "E", "V/V"},
+        {Core::ComponentType::VCCS, "G", "A/V"},
+        {Core::ComponentType::CCCS, "F", "A/A"},
+        {Core::ComponentType::CCVS, "H", "V/A"},
+    }));
+    const Core::ControlledSource source(type);
+    CHECK(std::string_view(source.GetNamePrefix()) == prefix);
+    CHECK(std::string_view(source.GetUnit()) == unit);
+    CHECK(source.HasValue());
+    // An inverting stage has a negative gain
+    CHECK(source.IsValidValue(-5.0));
+    CHECK(source.GetControllingCurrent().empty());
+    CHECK(Core::IsControlledSource(type));
+    CHECK(Core::IsCurrentControlled(type) == (prefix == "F" || prefix == "H"));
+}
+
+TEST_CASE("Op-amps are named U and have no value", "[component]") {
+    const Core::OpAmp op_amp;
+    CHECK(std::string_view(op_amp.GetNamePrefix()) == "U");
+    CHECK_FALSE(op_amp.HasValue());
+    CHECK_FALSE(Core::IsControlledSource(Core::ComponentType::OpAmp));
 }

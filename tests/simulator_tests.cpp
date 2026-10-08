@@ -6,10 +6,12 @@
 #include "circuit.h"
 #include "components/bjt.h"
 #include "components/capacitor.h"
+#include "components/controlled_source.h"
 #include "components/current_source.h"
 #include "components/diode.h"
 #include "components/ground.h"
 #include "components/mosfet.h"
+#include "components/op_amp.h"
 #include "components/resistor.h"
 #include "components/vcc.h"
 #include "components/voltage_source.h"
@@ -170,6 +172,75 @@ template <typename Current> const Current &FindCurrent(const std::vector<Current
     REQUIRE(found != currents.end());
     return *found;
 }
+
+/**
+ * @struct  ControlledStage
+ * @brief   A 1 V source on node 1 across a 1k resistor to ground, so 1 mA flows through R1, and a controlled source
+ *          driving a 1k load on node 2.
+ * @details A voltage-controlled source senses node 1; a current-controlled one follows I(R1).
+ */
+struct ControlledStage {
+    Core::VoltageSource Input;
+    Core::Resistor Sense;
+    Core::ControlledSource Source;
+    Core::Resistor Load;
+    Core::Ground Reference;
+    Core::Circuit Circuit;
+
+    explicit ControlledStage(const Core::ComponentType type) : Source(type) {
+        Input.SetName("Vin1");
+        Input.SetValue(1.0);
+        Sense.SetName("R1");
+        Source.SetName(std::string(Source.GetNamePrefix()) + "1");
+        Load.SetName("R2");
+        Circuit.Add(Input, {1, 0});
+        Circuit.Add(Sense, {1, 0});
+        if (Core::IsCurrentControlled(type)) {
+            Source.SetControllingCurrent("R1");
+            Circuit.Add(Source, {2, 0});
+        } else {
+            Circuit.Add(Source, {2, 0, 1, 0});
+        }
+        Circuit.Add(Load, {2, 0});
+        Circuit.Add(Reference, {0});
+    }
+};
+
+/**
+ * @struct  InvertingAmplifier
+ * @brief   An op-amp with 1k in and 10k of feedback, so a gain of -10, powered from +15 V and -15 V.
+ * @details Nodes: input 1, inverting input 2, output 3, V+ 4 and V- 5; the non-inverting input is grounded.
+ */
+struct InvertingAmplifier {
+    Core::VoltageSource Input;
+    Core::Resistor In;
+    Core::Resistor Feedback;
+    Core::OpAmp Amplifier;
+    Core::VCC Positive;
+    Core::VCC Negative;
+    Core::Ground Reference;
+    Core::Circuit Circuit;
+
+    explicit InvertingAmplifier(const double input) {
+        Input.SetName("Vin1");
+        Input.SetValue(input);
+        In.SetName("R1");
+        Feedback.SetName("R2");
+        Feedback.SetValue(10e3);
+        Amplifier.SetName("U1");
+        Positive.SetName("V1");
+        Positive.SetValue(15.0);
+        Negative.SetName("V2");
+        Negative.SetValue(-15.0);
+        Circuit.Add(Input, {1, 0});
+        Circuit.Add(In, {1, 2});
+        Circuit.Add(Feedback, {2, 3});
+        Circuit.Add(Amplifier, {3, 0, 2, 4, 5});
+        Circuit.Add(Positive, {4});
+        Circuit.Add(Negative, {5});
+        Circuit.Add(Reference, {0});
+    }
+};
 
 } // namespace
 
@@ -444,13 +515,13 @@ TEST_CASE("An AC current source excites an AC sweep", "[simulator]") {
     if (!run.Result) {
         FAIL(run.Result.error());
     }
-    // 1 mA into 1k is 1 V, which is 0 dB; the source current is 1 mA, which is -60 dB relative to 1 A
+    // The default magnitude of 1 A into 1k is 1000 V, or 60 dB: the transimpedance of the load in V/A
     for (std::size_t index = 0; index < run.Result->Frequencies.size(); ++index) {
-        CHECK_THAT(run.Result->NodeMagnitudesDecibels[1][index], Catch::Matchers::WithinAbs(0.0, 1e-6));
+        CHECK_THAT(run.Result->NodeMagnitudesDecibels[1][index], Catch::Matchers::WithinAbs(60.0, 1e-6));
         CHECK_THAT(FindCurrent(run.Result->CurrentMagnitudesDecibels, "I1").Values[index],
-                   Catch::Matchers::WithinAbs(-60.0, 1e-6));
+                   Catch::Matchers::WithinAbs(0.0, 1e-6));
         CHECK_THAT(FindCurrent(run.Result->CurrentMagnitudesDecibels, "R1").Values[index],
-                   Catch::Matchers::WithinAbs(-60.0, 1e-6));
+                   Catch::Matchers::WithinAbs(0.0, 1e-6));
     }
 }
 
@@ -1151,4 +1222,164 @@ TEST_CASE("Only supplies and independent sources can be swept", "[simulator]") {
     CHECK(Core::GetSweepableSources(divider.Circuit) == std::vector<std::string>{"V1"});
     const LowPass low_pass;
     CHECK(Core::GetSweepableSources(low_pass.Circuit) == std::vector<std::string>{"Vin1"});
+}
+
+TEST_CASE("Controlled sources apply their gain with the SPICE signs", "[simulator]") {
+    using Core::ComponentType;
+    // Output voltage on the 1k load, and the source current, positive into its first output terminal. A VCVS or
+    // CCVS sets the voltage and feeds the load; a VCCS or CCCS pushes its current from terminal 1 to terminal 2
+    // through itself, so it pulls the load node below ground
+    const auto [type, output, current] = GENERATE(table<ComponentType, double, double>({
+        {ComponentType::VCVS, 10.0, -10e-3},
+        {ComponentType::VCCS, -1.0, 1e-3},
+        {ComponentType::CCCS, -10.0, 10e-3},
+        {ComponentType::CCVS, 1.0, -1e-3},
+    }));
+    CAPTURE(Core::GetTypeName(type));
+    const ControlledStage stage(type);
+    const Core::OperatingPointRun run = Core::RunOperatingPoint(stage.Circuit);
+    if (!run.Result) {
+        FAIL(run.Result.error());
+    }
+    CHECK_THAT(run.Result->NodeVoltages[2], Catch::Matchers::WithinRel(output, 1e-9));
+    CHECK_THAT(FindCurrent(run.Result->Currents, stage.Source.GetName()).Current,
+               Catch::Matchers::WithinRel(current, 1e-9));
+    // The probe on the controlling resistor leaves its current as it was
+    CHECK_THAT(FindCurrent(run.Result->Currents, "R1").Current, Catch::Matchers::WithinRel(1e-3, 1e-9));
+}
+
+TEST_CASE("A current-controlled source can follow a voltage source or a probed terminal", "[simulator]") {
+    ControlledStage stage(Core::ComponentType::CCVS);
+    // The input source delivers its current, so it reports -1 mA and the CCVS sets -1 V
+    stage.Source.SetControllingCurrent("Vin1");
+    const Core::OperatingPointRun run = Core::RunOperatingPoint(stage.Circuit);
+    if (!run.Result) {
+        FAIL(run.Result.error());
+    }
+    CHECK_THAT(run.Result->NodeVoltages[2], Catch::Matchers::WithinRel(-1.0, 1e-9));
+}
+
+TEST_CASE("A current-controlled source needs a current of another part of the circuit", "[simulator]") {
+    ControlledStage stage(Core::ComponentType::CCCS);
+    const auto controlling = GENERATE(std::string(""), std::string("F1"), std::string("R9"));
+    CAPTURE(controlling);
+    stage.Source.SetControllingCurrent(controlling);
+    const Core::OperatingPointRun run = Core::RunOperatingPoint(stage.Circuit);
+    REQUIRE_FALSE(run.Result.has_value());
+    // Rejected before reaching ngspice, with a reason
+    CHECK(run.Messages.empty());
+    CHECK(run.Result.error().contains("F1"));
+}
+
+TEST_CASE("An inverting op-amp amplifier has the gain its resistors set", "[simulator]") {
+    const InvertingAmplifier amplifier(0.5);
+    const Core::OperatingPointRun run = Core::RunOperatingPoint(amplifier.Circuit);
+    if (!run.Result) {
+        FAIL(run.Result.error());
+    }
+    CHECK_THAT(run.Result->NodeVoltages[3], Catch::Matchers::WithinRel(-5.0, 1e-3));
+    // The inverting input is held at virtual ground
+    CHECK_THAT(run.Result->NodeVoltages[2], Catch::Matchers::WithinAbs(0.0, 1e-3));
+    // The output sinks the current of both resistors: 0.5 mA into the output terminal
+    CHECK_THAT(FindCurrent(run.Result->Currents, "U1").Current, Catch::Matchers::WithinRel(0.5e-3, 1e-3));
+}
+
+TEST_CASE("An op-amp output saturates at its supply pins", "[simulator]") {
+    const double input = GENERATE(2.0, -2.0);
+    CAPTURE(input);
+    const InvertingAmplifier amplifier(input);
+    const Core::OperatingPointRun run = Core::RunOperatingPoint(amplifier.Circuit);
+    if (!run.Result) {
+        FAIL(run.Result.error());
+    }
+    // The gain of -10 would ask for -20 V or +20 V; the output stops within a few millivolts of the rail
+    const double rail = input > 0.0 ? -15.0 : 15.0;
+    CHECK_THAT(run.Result->NodeVoltages[3], Catch::Matchers::WithinAbs(rail, 0.01));
+}
+
+TEST_CASE("An AC sweep of an op-amp amplifier has its closed-loop gain", "[simulator]") {
+    InvertingAmplifier amplifier(0.0);
+    amplifier.Input.SetSourceType(Core::VoltageSource::SourceType::AC);
+    const Core::ACSweepRun run =
+        Core::RunACSweep(amplifier.Circuit, {.StartFrequency = 10.0, .StopFrequency = 1e3, .PointsPerDecade = 2});
+    if (!run.Result) {
+        FAIL(run.Result.error());
+    }
+    for (std::size_t index = 0; index < run.Result->Frequencies.size(); ++index) {
+        // A gain of 10 is 20 dB, inverted by 180 degrees; up to 1 kHz, the 1 MHz gain-bandwidth product of the
+        // ideal op-amp shifts the phase by less than a degree
+        CHECK_THAT(run.Result->NodeMagnitudesDecibels[3][index], Catch::Matchers::WithinAbs(20.0, 0.01));
+        CHECK_THAT(std::abs(run.Result->NodePhasesDegrees[3][index]), Catch::Matchers::WithinAbs(180.0, 1.0));
+    }
+}
+
+TEST_CASE("An ideal op-amp rolls off at its gain-bandwidth product", "[simulator]") {
+    InvertingAmplifier amplifier(0.0);
+    amplifier.Input.SetSourceType(Core::VoltageSource::SourceType::AC);
+    // A noise gain of 11 leaves 1 MHz / 11 of closed-loop bandwidth
+    const double corner = 1e6 / 11.0;
+    const Core::ACSweepRun run = Core::RunACSweep(
+        amplifier.Circuit, {.StartFrequency = corner, .StopFrequency = corner * 10.0, .PointsPerDecade = 1});
+    if (!run.Result) {
+        FAIL(run.Result.error());
+    }
+    CHECK_THAT(run.Result->NodeMagnitudesDecibels[3][0], Catch::Matchers::WithinAbs(20.0 - 3.01, 0.1));
+}
+
+TEST_CASE("A uA741 macromodel amplifies like the ideal op-amp but swings 1 V short of its supplies", "[simulator]") {
+    const double input = GENERATE(0.5, 2.0, -2.0);
+    CAPTURE(input);
+    InvertingAmplifier amplifier(input);
+    amplifier.Amplifier.SetModel(*Core::FindOpAmpModel(Core::ComponentType::OpAmp, "uA741"));
+    const Core::OperatingPointRun run = Core::RunOperatingPoint(amplifier.Circuit);
+    if (!run.Result) {
+        FAIL(run.Result.error());
+    }
+    // The limits stop the output about 1 V from each 15 V supply, as the datasheet swing
+    const double expected = input == 0.5 ? -5.0 : (input > 0.0 ? -14.0 : 14.0);
+    CHECK_THAT(run.Result->NodeVoltages[3], Catch::Matchers::WithinAbs(expected, 0.1));
+}
+
+TEST_CASE("A uA741 macromodel slews at its datasheet rate", "[simulator]") {
+    // A unity-gain follower driven by a 10 V step, so the output can only follow at the slew rate
+    Core::VoltageSource input;
+    input.SetName("Vin1");
+    input.SetSourceType(Core::VoltageSource::SourceType::Pulse);
+    input.SetPulse(
+        {.Low = -5.0, .High = 5.0, .Delay = 1e-6, .RiseTime = 1e-9, .FallTime = 1e-9, .Width = 1.0, .Period = 2.0});
+    Core::OpAmp follower;
+    follower.SetName("U1");
+    follower.SetModel(*Core::FindOpAmpModel(Core::ComponentType::OpAmp, "uA741"));
+    Core::VCC positive;
+    positive.SetName("V1");
+    positive.SetValue(15.0);
+    Core::VCC negative;
+    negative.SetName("V2");
+    negative.SetValue(-15.0);
+    Core::Resistor load;
+    load.SetName("R1");
+    load.SetValue(10e3);
+    const Core::Ground reference;
+    Core::Circuit circuit;
+    circuit.Add(input, {1, 0});
+    circuit.Add(follower, {2, 1, 2, 3, 4});
+    circuit.Add(positive, {3});
+    circuit.Add(negative, {4});
+    circuit.Add(load, {2, 0});
+    circuit.Add(reference, {0});
+
+    const Core::TransientRun run = Core::RunTransient(circuit, {.StopTime = 40e-6, .TimeStep = 10e-9});
+    if (!run.Result) {
+        FAIL(run.Result.error());
+    }
+    // Time from -3 V to +3 V on the way up
+    const std::vector<double> &times = run.Result->Times;
+    const std::vector<double> &output = run.Result->NodeVoltages[2];
+    const auto crossing = [&](const double level) {
+        const auto index = std::ranges::find_if(output, [level](const double value) { return value >= level; });
+        REQUIRE(index != output.end());
+        return times[static_cast<std::size_t>(index - output.begin())];
+    };
+    const double slew_rate = 6.0 / (crossing(3.0) - crossing(-3.0));
+    CHECK_THAT(slew_rate, Catch::Matchers::WithinRel(0.5e6, 0.05));
 }

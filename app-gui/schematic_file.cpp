@@ -6,8 +6,10 @@
 #include "schematic_file.h"
 
 #include "components/bjt.h"
+#include "components/controlled_source.h"
 #include "components/diode.h"
 #include "components/mosfet.h"
+#include "components/op_amp.h"
 #include "components/source.h"
 #include "element_factory.h"
 #include "nlohmann/json.hpp"
@@ -39,6 +41,7 @@ constexpr auto ACKeys = std::to_array<ParameterKey<Core::ACParameters>>({
     {"amplitude", &Core::ACParameters::Amplitude},
     {"frequency", &Core::ACParameters::Frequency},
     {"offset", &Core::ACParameters::Offset},
+    {"ac_magnitude", &Core::ACParameters::Magnitude},
 });
 
 constexpr auto PulseKeys = std::to_array<ParameterKey<Core::PulseParameters>>({
@@ -97,6 +100,20 @@ constexpr auto MOSFETKeys = std::to_array<ParameterKey<Core::MOSFETParameters>>(
     {"vgsmax", &Core::MOSFETParameters::MaxGateSourceVoltage},
     {"idmax", &Core::MOSFETParameters::MaxDrainCurrent},
     {"pmax", &Core::MOSFETParameters::MaxPower},
+});
+
+constexpr auto OpAmpKeys = std::to_array<ParameterKey<Core::OpAmpParameters>>({
+    {"avol_db", &Core::OpAmpParameters::OpenLoopGainDecibels},
+    {"gbw", &Core::OpAmpParameters::GainBandwidth},
+    {"slew_v_per_us", &Core::OpAmpParameters::SlewRate},
+    {"phase_margin", &Core::OpAmpParameters::PhaseMarginDegrees},
+    {"ib", &Core::OpAmpParameters::InputBiasCurrent},
+    {"cmrr_db", &Core::OpAmpParameters::CommonModeRejectionDecibels},
+    {"rout", &Core::OpAmpParameters::OutputResistance},
+    {"isc", &Core::OpAmpParameters::ShortCircuitCurrent},
+    {"headroom_positive", &Core::OpAmpParameters::PositiveHeadroom},
+    {"headroom_negative", &Core::OpAmpParameters::NegativeHeadroom},
+    {"iq", &Core::OpAmpParameters::SupplyCurrent},
 });
 
 constexpr auto TransientKeys = std::to_array<ParameterKey<Core::TransientSettings>>({
@@ -235,6 +252,14 @@ nlohmann::json WriteElement(const UIElement &element) {
         WriteModelChoice(static_cast<const Core::BJT &>(component), BJTKeys, object);
     } else if (Core::IsMOSFET(type)) {
         WriteModelChoice(static_cast<const Core::MOSFET &>(component), MOSFETKeys, object);
+    } else if (Core::IsCurrentControlled(type)) {
+        object["control"] = static_cast<const Core::ControlledSource &>(component).GetControllingCurrent();
+    } else if (type == Core::ComponentType::OpAmp) {
+        const auto &op_amp = static_cast<const Core::OpAmp &>(component);
+        WriteModelChoice(op_amp, OpAmpKeys, object);
+        if (op_amp.IsIdeal()) {
+            object["gbw"] = op_amp.GetIdealBandwidth();
+        }
     }
     return object;
 }
@@ -253,6 +278,10 @@ std::expected<void, std::string> ReadSource(const nlohmann::json &object, Core::
     Core::ACParameters ac = source.GetAC();
     if (const auto read = ReadParameters(ACKeys, object, ac); !read) {
         return read;
+    }
+    // The AC sweep used the amplitude before the magnitude was apart, so older files keep their results
+    if (!object.contains("ac_magnitude")) {
+        ac.Magnitude = ac.Amplitude;
     }
     if (!source.IsValidAC(ac)) {
         return std::unexpected("has an AC frequency that is not positive");
@@ -324,6 +353,24 @@ std::expected<void, std::string> ReadModel(const nlohmann::json &object, Core::C
         return ReadModelChoice(object, static_cast<Core::MOSFET &>(component), &Core::FindMOSFETModel,
                                Core::CustomMOSFETModelName, MOSFETKeys);
     }
+    // Files saved before op-amps had models hold ideal ones
+    if (type == Core::ComponentType::OpAmp) {
+        auto &op_amp = static_cast<Core::OpAmp &>(component);
+        if (object.contains("model")) {
+            if (const auto read =
+                    ReadModelChoice(object, op_amp, &Core::FindOpAmpModel, Core::CustomOpAmpModelName, OpAmpKeys);
+                !read) {
+                return read;
+            }
+        }
+        if (object.contains("gbw")) {
+            const std::optional<double> bandwidth = ReadNumber(object, "gbw");
+            if (!bandwidth || !Core::IsValidIdealBandwidth(*bandwidth)) {
+                return std::unexpected("has a gain-bandwidth product that is not positive");
+            }
+            op_amp.SetIdealBandwidth(*bandwidth);
+        }
+    }
     return {};
 }
 
@@ -375,6 +422,14 @@ std::expected<std::unique_ptr<UIElement>, std::string> ReadElement(const nlohman
     }
     if (const std::expected<void, std::string> model = ReadModel(object, component); !model) {
         return std::unexpected(model.error());
+    }
+    // A missing controlling current loads as none; the simulation then asks for one
+    if (Core::IsCurrentControlled(component.GetType()) && object.contains("control")) {
+        const std::optional<std::string> current = ReadString(object, "control");
+        if (!current) {
+            return std::unexpected("has a controlling current that is not text");
+        }
+        static_cast<Core::ControlledSource &>(component).SetControllingCurrent(*current);
     }
     if (const std::optional<std::string> name = ReadString(object, "name")) {
         component.SetName(*name);

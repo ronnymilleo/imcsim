@@ -15,6 +15,9 @@ the editor toolbar to show the numbers, each beside a small ring at its terminal
 | Current source | tail of its arrow | head of its arrow | |
 | NPN or PNP transistor | collector | base | emitter |
 | N- or P-channel MOSFET | drain | gate | source |
+| VCVS or VCCS (E, G) | output, top of the diamond | output, bottom | control + (4: control -) |
+| CCCS or CCVS (F, H) | output, top of the diamond | output, bottom | |
+| Op-amp | output | non-inverting input (+) | inverting input (-) (4: V+, 5: V-) |
 
 Ground and the VCC rail have a single terminal and no number.
 
@@ -35,9 +38,48 @@ imcsim reports currents as ngspice computes them:
   2.5 mA into a circuit reports -2.5 mA.
 - **Transistors** report one current per terminal, `I(Q1.C)`, `I(Q1.B)` and `I(Q1.E)`, each positive into its
   terminal. The three always add up to zero.
+- **Controlled sources** report the current of their output like a two-terminal part; their control pins carry no
+  current. A VCCS or CCCS pushes its current from terminal 1 to terminal 2 through itself, as its arrow shows, so
+  into a load on terminal 1 it drives the load negative.
+- **Op-amps** report the current into their output, which returns through ground. An ideal op-amp draws no input
+  current, and its supply pins only carry a small current while the output saturates; a macromodel draws its bias
+  current at the inputs and its supply current at the supply pins.
 
 On the schematic, a measured current is an arrow on the lead of its terminal, pointing into the part: the direction
 the current flows when its trace is positive. If a trace comes out negative, the current flows against the arrow.
+
+## Controlled sources and op-amps
+
+A controlled source multiplies a voltage or a current elsewhere in the circuit by its gain, which may be negative:
+
+| Source | Output | Gain unit |
+|---|---|---|
+| VCVS (E) | voltage between its outputs = gain x voltage between its control pins | V/V |
+| VCCS (G) | current through it = gain x voltage between its control pins | A/V |
+| CCCS (F) | current through it = gain x a current of the circuit | A/A |
+| CCVS (H) | voltage between its outputs = gain x a current of the circuit | V/A |
+
+Two examples show them at work: **Small-signal model of a BJT** replaces a transistor stage by its hybrid-pi model, a
+resistor and a VCCS, and **Ideal transformer** builds a 1:2 transformer from a VCVS and a CCCS.
+
+A CCCS or CCVS follows a current picked in Properties among those the plots offer, such as `I(R1)` or `I(Q1.C)`,
+with the sign that current has in the results. Simulating one without a current, or with a current whose part was
+deleted, stops with a message.
+
+An op-amp starts **Ideal**: no input current, no output resistance and 100 dB of gain, so its feedback network sets
+the closed-loop gain. Its gain rolls off at the gain-bandwidth product (GBW, 1 MHz unless set in Properties): an
+amplifier with a gain of 10 keeps its gain up to about GBW / 11. Its output cannot go past the voltages of its V+
+and V- pins: connect them to supplies, and it clips within about 10 mV of them. It has no slew rate.
+
+The **uA741** model, or **Custom** specifications, make it a real part, simulated with the Boyle macromodel that
+SPICE simulators have used since 1974: a transistor input pair draws the bias current and limits the slew rate, the
+output swings short of the supplies by its headrooms and limits its current at the short-circuit current, and the
+part draws its supply current. The macromodel is built from datasheet values (open-loop gain, GBW, slew rate, phase
+margin, bias current, CMRR, output resistance, short-circuit current, headrooms and supply current), so a datasheet
+is enough to model another part; its GBW comes out about 10% low. It still leaves out offset voltage, noise,
+temperature, the common-mode input range and the supply rejection, and its output current returns through ground.
+
+The Examples menu has an inverting amplifier.
 
 ## Measuring
 
@@ -62,8 +104,9 @@ their statistics and the exports always agree.
 - Currents are dashed lines on the right axis.
 - Math channels are heavier lines; volts and amperes share the axes above, any other unit or none goes on a third
   axis.
-- The AC sweep is a Bode plot: magnitude in dB and phase in degrees, relative to the AC sources, so a source of
-  1 V amplitude reads as gain.
+- The AC sweep is a Bode plot: magnitude in dB and phase in degrees, relative to the AC magnitude of the sources.
+  That magnitude is set in Properties apart from the amplitude of the sine, as in SPICE, and is 1 by default, so
+  the plot reads as gain while a transient uses the small amplitude a real circuit would see.
 - A stepped DC sweep draws one curve per step, labeled with the step value where the curves part most.
 
 ## Exports

@@ -1,30 +1,8 @@
 {
   "elements": [
     {
-      "name": "R1",
-      "rotation": 0,
-      "type": "Resistor",
-      "value": 1000.0,
-      "x": 9,
-      "y": 4
-    },
-    {
-      "name": "C1",
-      "rotation": 90,
-      "type": "Capacitor",
-      "value": 1e-07,
-      "x": 14,
-      "y": 7
-    },
-    {
-      "rotation": 0,
-      "type": "Ground",
-      "x": 9,
-      "y": 11
-    },
-    {
       "ac_magnitude": 1.0,
-      "amplitude": 1.0,
+      "amplitude": 0.5,
       "frequency": 1000.0,
       "name": "Vin1",
       "offset": 0.0,
@@ -40,9 +18,62 @@
       "rotation": 90,
       "source": "AC",
       "type": "VoltageSource",
-      "value": 5.0,
+      "value": 0.0,
       "x": 4,
+      "y": 9
+    },
+    {
+      "name": "R1",
+      "rotation": 0,
+      "type": "Resistor",
+      "value": 1000.0,
+      "x": 7,
       "y": 7
+    },
+    {
+      "name": "R2",
+      "rotation": 0,
+      "type": "Resistor",
+      "value": 10000.0,
+      "x": 14,
+      "y": 1
+    },
+    {
+      "gbw": 1000000.0,
+      "model": "Ideal",
+      "name": "U1",
+      "rotation": 0,
+      "type": "OpAmp",
+      "x": 14,
+      "y": 8
+    },
+    {
+      "name": "V1",
+      "rotation": 0,
+      "type": "VCC",
+      "value": 15.0,
+      "x": 14,
+      "y": 6
+    },
+    {
+      "name": "V2",
+      "rotation": 180,
+      "type": "VCC",
+      "value": -15.0,
+      "x": 14,
+      "y": 10
+    },
+    {
+      "rotation": 0,
+      "type": "Ground",
+      "x": 4,
+      "y": 13
+    },
+    {
+      "rotation": 0,
+      "type": "Ground",
+      "x": 11,
+      "y": 11
     }
   ],
   "format": "imcsim-schematic",
@@ -51,11 +82,11 @@
     "voltages": [
       [
         4,
-        4
+        7
       ],
       [
-        11,
-        4
+        16,
+        1
       ]
     ]
   },
@@ -89,82 +120,102 @@
   "wires": [
     {
       "end": [
+        5,
+        7
+      ],
+      "start": [
+        4,
+        7
+      ]
+    },
+    {
+      "end": [
+        11,
+        7
+      ],
+      "start": [
         9,
+        7
+      ]
+    },
+    {
+      "end": [
+        10,
+        1
+      ],
+      "start": [
+        10,
+        7
+      ]
+    },
+    {
+      "end": [
+        12,
+        1
+      ],
+      "start": [
+        10,
+        1
+      ]
+    },
+    {
+      "end": [
+        18,
+        1
+      ],
+      "start": [
+        16,
+        1
+      ]
+    },
+    {
+      "end": [
+        18,
+        8
+      ],
+      "start": [
+        18,
+        1
+      ]
+    },
+    {
+      "end": [
+        18,
+        8
+      ],
+      "start": [
+        17,
+        8
+      ]
+    },
+    {
+      "end": [
+        20,
+        8
+      ],
+      "start": [
+        18,
+        8
+      ]
+    },
+    {
+      "end": [
+        11,
         11
       ],
       "start": [
-        9,
-        10
-      ]
-    },
-    {
-      "end": [
-        4,
-        10
-      ],
-      "start": [
-        4,
-        9
-      ]
-    },
-    {
-      "end": [
-        14,
-        10
-      ],
-      "start": [
-        14,
-        9
-      ]
-    },
-    {
-      "end": [
-        4,
-        10
-      ],
-      "start": [
-        14,
-        10
-      ]
-    },
-    {
-      "end": [
-        7,
-        4
-      ],
-      "start": [
-        4,
-        4
-      ]
-    },
-    {
-      "end": [
-        14,
-        4
-      ],
-      "start": [
         11,
-        4
+        9
       ]
     },
     {
       "end": [
         4,
-        4
+        13
       ],
       "start": [
         4,
-        5
-      ]
-    },
-    {
-      "end": [
-        14,
-        5
-      ],
-      "start": [
-        14,
-        4
+        11
       ]
     }
   ]

@@ -8,8 +8,10 @@
 
 #include "components/bjt.h"
 #include "components/component.h"
+#include "components/controlled_source.h"
 #include "components/diode.h"
 #include "components/mosfet.h"
+#include "components/op_amp.h"
 #include "components/source.h"
 #include "schematic.h"
 #include "value_field.h"
@@ -37,12 +39,13 @@ private:
     std::optional<std::size_t> m_LoadedSelection;
     ValueField m_Value;
     // One per member of Core::ACParameters and Core::PulseParameters, in the order the window lists them
-    std::array<ValueField, 3> m_ACFields;
+    std::array<ValueField, 4> m_ACFields;
     std::array<ValueField, 7> m_PulseFields;
     // One per member of the parameters of custom diodes and transistors
     std::array<ValueField, 9> m_DiodeFields;
     std::array<ValueField, 16> m_BJTFields;
     std::array<ValueField, 13> m_MOSFETFields;
+    std::array<ValueField, 11> m_OpAmpFields;
 
     void Draw() override;
     void LoadFields(const Core::Component &component);
@@ -50,9 +53,12 @@ private:
     void DrawDiode(Core::Diode &diode);
     void DrawBJT(Core::BJT &bjt);
     void DrawMOSFET(Core::MOSFET &mosfet);
+    void DrawOpAmp(Core::OpAmp &op_amp);
     void DrawSource(Core::Source &source);
     void DrawSine(Core::Source &source);
     void DrawPulse(Core::Source &source);
+    void DrawControlledSource(Core::ControlledSource &source);
+    void DrawControllingCurrent(Core::ControlledSource &source);
 };
 
 } // namespace GUI

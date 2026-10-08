@@ -7,6 +7,7 @@
 #define IMCSIM_CIRCUIT_H
 
 #include "components/component.h"
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -59,6 +60,7 @@ private:
 std::vector<CurrentProbe> GetCurrentProbes(const Component &component);
 std::string GetCurrentProbeName(const Component &component, std::string_view label);
 std::string GetCurrentName(const Component &component, std::string_view label);
+std::optional<std::string> FindControllingSource(const Circuit &circuit, std::string_view current);
 
 } // namespace Core
 

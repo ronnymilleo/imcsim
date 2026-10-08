@@ -89,3 +89,18 @@ TEST_CASE("Wires that close a loop inside a node carry the current on one path o
     CHECK_THAT(pieces[0].Current + pieces[1].Current, Catch::Matchers::WithinAbs(1e-3, 1e-12));
     CHECK((pieces[0].Current == 0.0 || pieces[1].Current == 0.0));
 }
+
+TEST_CASE("Control pins and the op-amp pins other than the output carry no current", "[current_flow]") {
+    const std::vector<Core::ComponentCurrent> currents = {{"E1", -3e-3}, {"U1", 2e-3}};
+    const auto source = Part(Core::ComponentType::VCVS, {0, 0}, "E1");
+    CHECK(GUI::GetTerminalCurrent(source->GetComponent(), 0, currents) == -3e-3);
+    CHECK(GUI::GetTerminalCurrent(source->GetComponent(), 1, currents) == 3e-3);
+    CHECK(GUI::GetTerminalCurrent(source->GetComponent(), 2, currents) == 0.0);
+    CHECK(GUI::GetTerminalCurrent(source->GetComponent(), 3, currents) == 0.0);
+    // The output current of an op-amp returns through ground, not through its other pins
+    const auto op_amp = Part(Core::ComponentType::OpAmp, {0, 0}, "U1");
+    CHECK(GUI::GetTerminalCurrent(op_amp->GetComponent(), 0, currents) == 2e-3);
+    for (std::size_t terminal = 1; terminal < 5; ++terminal) {
+        CHECK(GUI::GetTerminalCurrent(op_amp->GetComponent(), terminal, currents) == 0.0);
+    }
+}

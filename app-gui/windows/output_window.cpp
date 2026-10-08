@@ -825,9 +825,10 @@ void OutputWindow::Draw() {
         if (sweep) {
             DrawWithStatistics(
                 [&] {
-                    ImGui::TextDisabled("%s", anything_measured
-                                                  ? "Relative to the AC sources: an amplitude of 1 V reads as gain"
-                                                  : nothing_measured);
+                    ImGui::TextDisabled(
+                        "%s", anything_measured
+                                  ? "Relative to the AC magnitude of the sources: a magnitude of 1 reads as gain"
+                                  : nothing_measured);
                     if (!m_MathChannels.empty()) {
                         ImGui::TextDisabled("Math channels are not calculated for AC sweeps yet");
                     }

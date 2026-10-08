@@ -33,6 +33,7 @@
       "y": 15
     },
     {
+      "ac_magnitude": 1.0,
       "amplitude": 17.0,
       "frequency": 60.0,
       "name": "Vin1",
