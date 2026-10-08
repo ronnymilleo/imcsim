@@ -19,6 +19,7 @@
 #include <algorithm>
 #include <array>
 #include <cctype>
+#include <cfloat>
 #include <cmath>
 #include <format>
 #include <numbers>
@@ -34,6 +35,8 @@ constexpr float MinCanvasSize = 50.0f;
 constexpr float MinZoom = 4.0f;
 constexpr float MaxZoom = 200.0f;
 constexpr float ZoomStep = 1.1f;
+// Fit may zoom in this far on a small circuit; opening a file stops at the default zoom
+constexpr float FitMaxZoom = 50.0f;
 // Below this spacing the dots are thinned out, otherwise far zoom-out draws hundreds of thousands of them
 constexpr float MinDotSpacing = 8.0f;
 constexpr float WireCursorHalfSize = 4.0f;
@@ -157,7 +160,8 @@ enum class ToolIcon {
     Wire,
     Probe,
     Undo,
-    Redo
+    Redo,
+    Fit
 };
 
 // Line drawings on a unit square centered on the icon, y pointing down
@@ -190,6 +194,21 @@ void DrawToolIcon(ImDrawList *draw_list, const ToolIcon icon, const ImVec2 cente
         draw_list->AddLine(point(-0.12f, 0.12f), point(0.3f, -0.3f), color, size * 0.22f);
         draw_list->AddLine(point(0.3f, -0.3f), point(0.45f, -0.45f), color, LineThickness);
         break;
+    case ToolIcon::Fit: {
+        // Four corners of a frame
+        constexpr float Corner = 0.4f;
+        constexpr float Arm = 0.18f;
+        for (const float x : {-Corner, Corner}) {
+            for (const float y : {-Corner, Corner}) {
+                const float inward_x = x < 0.0f ? Arm : -Arm;
+                const float inward_y = y < 0.0f ? Arm : -Arm;
+                const std::array<ImVec2, 3> corner = {point(x + inward_x, y), point(x, y), point(x, y + inward_y)};
+                draw_list->AddPolyline(corner.data(), static_cast<int>(corner.size()), color, ImDrawFlags_None,
+                                       LineThickness);
+            }
+        }
+        break;
+    }
     case ToolIcon::Undo:
     case ToolIcon::Redo: {
         // An arc over the top that turns back, with the arrowhead at its left end, mirrored for Redo
@@ -225,6 +244,23 @@ float AnalysisButtonWidth() {
     return widest + ImGui::GetStyle().FramePadding.x * 2.0f + ImGui::GetFontSize();
 }
 
+// The character of a key that starts a value, from the main row or the keypad: a digit, a point or a minus
+std::optional<char> FindTypedValueStart() {
+    for (int digit = 0; digit <= 9; ++digit) {
+        if (ImGui::IsKeyPressed(static_cast<ImGuiKey>(ImGuiKey_0 + digit), false) ||
+            ImGui::IsKeyPressed(static_cast<ImGuiKey>(ImGuiKey_Keypad0 + digit), false)) {
+            return static_cast<char>('0' + digit);
+        }
+    }
+    if (ImGui::IsKeyPressed(ImGuiKey_Period, false) || ImGui::IsKeyPressed(ImGuiKey_KeypadDecimal, false)) {
+        return '.';
+    }
+    if (ImGui::IsKeyPressed(ImGuiKey_Minus, false) || ImGui::IsKeyPressed(ImGuiKey_KeypadSubtract, false)) {
+        return '-';
+    }
+    return std::nullopt;
+}
+
 // Middle and icon size of the last item, and the color its icon takes
 ImVec2 ItemCenter() {
     return (ImGui::GetItemRectMin() + ImGui::GetItemRectMax()) / 2.0f;
@@ -248,6 +284,11 @@ constexpr const char *DiscardPopup = "Discard changes?";
 constexpr const char *FileMessagesPopup = "File messages";
 constexpr const char *ExportPopup = "Export schematic";
 constexpr const char *PartPickerPopup = "Find a part";
+constexpr const char *PartPopover = "Part properties";
+constexpr const char *ContextMenu = "Schematic actions";
+// The properties popover opens this many grid units beside the part, and is about this many font sizes wide
+constexpr float PopoverMargin = 1.0f;
+constexpr float PopoverWidth = 18.0f;
 // The part picker shows this many matches at once, and its top sits this far down the editor, as a share of it
 constexpr std::size_t PartPickerRows = 5;
 constexpr float PartPickerTop = 0.3f;
@@ -288,14 +329,15 @@ public:
         if (std::exchange(m_First, false)) {
             return;
         }
-        const float spacing = ImGui::GetStyle().ItemSpacing.x + gap;
+        const float spacing = ButtonSpacing() + gap;
         if (ImGui::GetItemRectMax().x + spacing + width <= m_RightEdge) {
             ImGui::SameLine(0.0f, spacing);
         }
     }
 
-    // Space between groups, in font sizes
-    static float GroupGap() { return ImGui::GetFontSize(); }
+    // Space between buttons, and the extra space between groups, in font sizes
+    static float ButtonSpacing() { return ImGui::GetFontSize() * 0.25f; }
+    static float GroupGap() { return ImGui::GetFontSize() * 0.6f; }
 
 private:
     float m_RightEdge;
@@ -352,10 +394,12 @@ float VoltageLevel(const double voltage, const std::vector<double> &voltages) {
 
 /**
  * @brief   Creates the editor for a schematic.
- * @param[in] schematic  Schematic to edit; it must outlive the window.
+ * @param[in] schematic    Schematic to edit; it must outlive the window.
+ * @param[in] controls     Analysis settings and runs, for the Run button; they must outlive the window.
+ * @param[in] part_editor  Fields of the selected part, for the properties popover; it must outlive the window.
  */
-EditorWindow::EditorWindow(Schematic &schematic, AnalysisControls &controls)
-    : AppWindow("Schematic", false), m_Schematic(schematic), m_Controls(controls) {
+EditorWindow::EditorWindow(Schematic &schematic, AnalysisControls &controls, PartEditor &part_editor)
+    : AppWindow("Schematic", false), m_Schematic(schematic), m_Controls(controls), m_PartEditor(part_editor) {
     for (const PartGroup &group : PartGroups) {
         m_PartGroupChoices.push_back(group.Types.front());
     }
@@ -445,6 +489,10 @@ void EditorWindow::DrawEditMenuItems() {
  * @note    Call between BeginMenu() and EndMenu().
  */
 void EditorWindow::DrawViewMenuItems() {
+    if (ImGui::MenuItem("Fit Schematic", "Home")) {
+        m_FrameMaxZoom = FitMaxZoom;
+    }
+    ImGui::Separator();
     bool changed = false;
     if (ImGui::BeginMenu("Wire Colors")) {
         for (std::size_t index = 0; index < WireColoringNames.size(); ++index) {
@@ -535,8 +583,8 @@ void EditorWindow::Draw() {
     size.y -= ImGui::GetTextLineHeightWithSpacing();
     size.x = std::max(size.x, MinCanvasSize);
     size.y = std::max(size.y, MinCanvasSize);
-    if (std::exchange(m_FrameRequested, false)) {
-        FrameSchematic(size);
+    if (const std::optional<float> max_zoom = std::exchange(m_FrameMaxZoom, std::nullopt)) {
+        FrameSchematic(size, *max_zoom);
     }
 
     ImGui::InvisibleButton("canvas", size,
@@ -549,6 +597,8 @@ void EditorWindow::Draw() {
     const ViewTransform view(origin, m_Pan, m_Zoom);
     // Selection runs before drawing so a dragged element is drawn where the cursor is this frame
     HandleSelection(view, hovered);
+    HandleContextMenu(view, hovered);
+    HandleValueTyping(view);
     ImDrawList *draw_list = ImGui::GetWindowDrawList();
     draw_list->PushClipRect(origin, origin + size, true);
     draw_list->AddRectFilled(origin, origin + size, GetPalette().CanvasBackground);
@@ -580,7 +630,10 @@ void EditorWindow::Draw() {
 
     draw_list->PopClipRect();
     DrawStatusBar(view, hovered);
+    DrawContextMenu();
+    DrawPartPopover();
     DrawFilePopups();
+    m_PopupOpenLastFrame = ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId | ImGuiPopupFlags_AnyPopupLevel);
 }
 
 // One row of icon buttons, whose groups wrap onto new lines when the window is narrow instead of being cut off
@@ -600,7 +653,7 @@ void EditorWindow::DrawToolbar() {
         return clicked;
     };
 
-    // Tools
+    // Tools, history and view
     const bool selecting = !m_PlacingType && !m_DrawingWires && !m_Probing;
     if (tool_button("##select", ToolIcon::Select, selecting, true, "Select (Esc)", 0.0f)) {
         StartSelecting();
@@ -610,6 +663,15 @@ void EditorWindow::DrawToolbar() {
     }
     if (tool_button("##probe", ToolIcon::Probe, m_Probing, true, "Probe (P): pick what the plots measure", 0.0f)) {
         StartProbing();
+    }
+    if (tool_button("##undo", ToolIcon::Undo, false, m_Schematic.CanUndo(), "Undo (Ctrl+Z)", 0.0f)) {
+        Undo();
+    }
+    if (tool_button("##redo", ToolIcon::Redo, false, m_Schematic.CanRedo(), "Redo (Ctrl+Y)", 0.0f)) {
+        Redo();
+    }
+    if (tool_button("##fit", ToolIcon::Fit, false, true, "Fit the schematic in view (Home)", 0.0f)) {
+        m_FrameMaxZoom = FitMaxZoom;
     }
 
     // Parts
@@ -628,16 +690,8 @@ void EditorWindow::DrawToolbar() {
     row.Place(side);
     DrawPartButton(Core::ComponentType::OpAmp);
 
-    // History
-    if (tool_button("##undo", ToolIcon::Undo, false, m_Schematic.CanUndo(), "Undo (Ctrl+Z)", gap)) {
-        Undo();
-    }
-    if (tool_button("##redo", ToolIcon::Redo, false, m_Schematic.CanRedo(), "Redo (Ctrl+Y)", 0.0f)) {
-        Redo();
-    }
-
     // Simulation
-    row.Place(side + ImGui::GetStyle().ItemSpacing.x + AnalysisButtonWidth(), gap);
+    row.Place(side + ToolbarRow::ButtonSpacing() + AnalysisButtonWidth(), gap);
     DrawRunControls();
 }
 
@@ -661,9 +715,9 @@ void EditorWindow::DrawRunControls() {
     }
     const float run_left = ImGui::GetItemRectMin().x;
     DrawToolIcon(ImGui::GetWindowDrawList(), ToolIcon::Run, ItemCenter(), IconSize(), IconColor(true));
-    ImGui::SetItemTooltip("Run the %s (F5)", GetAnalysisName(selected));
+    ImGui::SetItemTooltip("Run %s (F5)", GetAnalysisName(selected));
 
-    ImGui::SameLine();
+    ImGui::SameLine(0.0f, ToolbarRow::ButtonSpacing());
     ImGui::PushStyleVar(ImGuiStyleVar_ButtonTextAlign, {0.0f, 0.5f});
     const std::string label = std::format("{}##analysis", GetAnalysisName(selected));
     const bool open = ImGui::Button(label.c_str(), {AnalysisButtonWidth(), side});
@@ -843,7 +897,9 @@ void EditorWindow::DrawStatusBar(const ViewTransform &view, const bool hovered) 
         const std::string name =
             component.GetName().empty() ? std::string(GetPartName(component.GetType())) : component.GetName();
         hint =
-            std::format("{} selected: drag to move, R rotate, M mirror, Shift+M flip, Del delete, Esc deselect", name);
+            std::format("{} selected: Enter or double click to edit, type a value, drag to move, R rotate, M mirror, "
+                        "Del delete, right click for more",
+                        name);
     } else if (m_Schematic.GetSelectedWireIndex()) {
         hint = "Wire selected: Del delete, Esc deselect";
     } else {
@@ -1013,8 +1069,8 @@ void EditorWindow::HandlePanAndZoom(const ImVec2 origin, const bool hovered, con
     }
 }
 
-// Shows the whole schematic centered, never zoomed in past the default, so a small circuit is not blown up
-void EditorWindow::FrameSchematic(const ImVec2 canvas_size) {
+// Shows the whole schematic centered, never zoomed in past max_zoom, so a small circuit is not blown up
+void EditorWindow::FrameSchematic(const ImVec2 canvas_size, const float max_zoom) {
     std::vector<GridPoint> points = m_Schematic.CollectTerminals();
     for (const auto &element : m_Schematic.GetElements()) {
         points.push_back(element->GetPosition());
@@ -1023,7 +1079,7 @@ void EditorWindow::FrameSchematic(const ImVec2 canvas_size) {
         points.push_back(wire.GetStart());
         points.push_back(wire.GetEnd());
     }
-    const ViewFrame frame = FramePoints(points, canvas_size, MinZoom, DefaultZoom);
+    const ViewFrame frame = FramePoints(points, canvas_size, MinZoom, max_zoom);
     m_Pan = frame.Pan;
     m_Zoom = frame.Zoom;
 }
@@ -1066,7 +1122,9 @@ void EditorWindow::StartProbing() {
  *          a click starts placing the highlighted part.
  */
 void EditorWindow::DrawPartPicker() {
-    if (ImGui::IsWindowFocused() && !ImGui::IsAnyItemActive() && ImGui::IsKeyPressed(ImGuiKey_Space, false)) {
+    const bool space_pressed =
+        ImGui::IsWindowFocused() && !ImGui::IsAnyItemActive() && ImGui::IsKeyPressed(ImGuiKey_Space, false);
+    if (std::exchange(m_PartPickerRequested, false) || space_pressed) {
         m_PartQuery.clear();
         m_PartPickerIndex = 0;
         ImGui::OpenPopup(PartPickerPopup);
@@ -1327,6 +1385,12 @@ void EditorWindow::HandleSelection(const ViewTransform &view, const bool hovered
         }
     }
 
+    if (hovered && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left) && m_Schematic.GetSelectedElement() != nullptr) {
+        EndDrag();
+        PlacePartPopover(view);
+        m_PartPopoverRequested = true;
+    }
+
     if (m_Drag) {
         if (ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
             UIElement &element = *m_Schematic.GetSelectedElement();
@@ -1346,6 +1410,12 @@ void EditorWindow::HandleSelection(const ViewTransform &view, const bool hovered
         if (ImGui::IsKeyPressed(ImGuiKey_R) && m_Schematic.GetSelectedElement() != nullptr) {
             RotateSelectedElement();
         }
+        const bool enter =
+            ImGui::IsKeyPressed(ImGuiKey_Enter, false) || ImGui::IsKeyPressed(ImGuiKey_KeypadEnter, false);
+        if (enter && m_Schematic.GetSelectedElement() != nullptr && !ImGui::IsAnyItemActive()) {
+            PlacePartPopover(view);
+            m_PartPopoverRequested = true;
+        }
         if (ImGui::IsKeyPressed(ImGuiKey_M) && m_Schematic.GetSelectedElement() != nullptr) {
             MirrorSelectedElement(ImGui::GetIO().KeyShift);
         }
@@ -1353,7 +1423,7 @@ void EditorWindow::HandleSelection(const ViewTransform &view, const bool hovered
         if (ImGui::IsKeyPressed(ImGuiKey_Delete) && !m_Drag) {
             m_Schematic.DeleteSelection();
         }
-        if (ImGui::IsKeyPressed(ImGuiKey_Escape)) {
+        if (ImGui::IsKeyPressed(ImGuiKey_Escape) && !m_PopupOpenLastFrame) {
             ClearSelection();
         }
     }
@@ -1424,6 +1494,148 @@ void EditorWindow::MirrorSelectedElement(const bool vertically) {
     m_Schematic.SimplifyAllWires();
 }
 
+// Beside the part, on its right, or on its left when the right side lacks room
+void EditorWindow::PlacePartPopover(const ViewTransform &view) {
+    const UIElement *element = m_Schematic.GetSelectedElement();
+    if (element == nullptr) {
+        return;
+    }
+    ImVec2 min = {FLT_MAX, FLT_MAX};
+    ImVec2 max = {-FLT_MAX, -FLT_MAX};
+    for (const GridPoint terminal : element->GetTerminals()) {
+        const ImVec2 point = view.ToScreen(ToVec2(terminal));
+        min = {std::min(min.x, point.x), std::min(min.y, point.y)};
+        max = {std::max(max.x, point.x), std::max(max.y, point.y)};
+    }
+    const float margin = m_Zoom * PopoverMargin;
+    const float right_edge = ImGui::GetWindowPos().x + ImGui::GetWindowWidth();
+    const bool fits_right = max.x + margin + ImGui::GetFontSize() * PopoverWidth <= right_edge;
+    m_PartPopoverAnchor = {fits_right ? max.x + margin : min.x - margin, min.y - margin};
+    m_PartPopoverPivotX = fits_right ? 0.0f : 1.0f;
+}
+
+// A digit, a point or a minus typed on a selected part starts editing its value, as in LTspice: "4k7" and Enter.
+// Keys are read rather than characters, since SDL sends characters only while a text field is active
+void EditorWindow::HandleValueTyping(const ViewTransform &view) {
+    const ImGuiIO &io = ImGui::GetIO();
+    if (!ImGui::IsWindowFocused() || ImGui::IsAnyItemActive() || io.KeyCtrl || io.KeyAlt || io.KeyShift ||
+        !m_PartEditor.CanTypeValue()) {
+        return;
+    }
+    const std::optional<char> first = FindTypedValueStart();
+    if (!first) {
+        return;
+    }
+    m_PartEditor.StartTypingValue(*first);
+    PlacePartPopover(view);
+    m_PartPopoverRequested = true;
+}
+
+/**
+ * @brief   Draws the properties of the selected part in a popover beside it. Edits apply as they are typed; Enter or
+ *          Esc closes it, and so does a click outside.
+ */
+void EditorWindow::DrawPartPopover() {
+    if (std::exchange(m_PartPopoverRequested, false)) {
+        ImGui::OpenPopup(PartPopover);
+    }
+    ImGui::SetNextWindowPos(m_PartPopoverAnchor, ImGuiCond_Appearing, {m_PartPopoverPivotX, 0.0f});
+    if (!ImGui::BeginPopup(PartPopover)) {
+        return;
+    }
+    // Undo or a deletion may take the part away while the popover is open
+    if (m_Schematic.GetSelectedElement() == nullptr) {
+        ImGui::CloseCurrentPopup();
+        ImGui::EndPopup();
+        return;
+    }
+    m_PartEditor.Draw();
+    // The Enter that opened it is ignored; Esc closes only the popover, not the selection below
+    const bool enter = ImGui::IsKeyPressed(ImGuiKey_Enter, false) || ImGui::IsKeyPressed(ImGuiKey_KeypadEnter, false);
+    if (enter && !ImGui::IsWindowAppearing()) {
+        ImGui::CloseCurrentPopup();
+    } else if (ImGui::IsKeyPressed(ImGuiKey_Escape)) {
+        ImGui::SetKeyOwner(ImGuiKey_Escape, ImGui::GetCurrentWindow()->ID, ImGuiInputFlags_LockThisFrame);
+        ImGui::CloseCurrentPopup();
+    }
+    ImGui::EndPopup();
+}
+
+// A right click while selecting selects what is under the cursor and opens the menu of what it can do
+void EditorWindow::HandleContextMenu(const ViewTransform &view, const bool hovered) {
+    if (m_PlacingType || m_DrawingWires || m_Probing || !hovered || !ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
+        return;
+    }
+    const ImVec2 cursor_world = view.ToWorld(ImGui::GetIO().MousePos);
+    SelectAt(cursor_world);
+    m_ContextTarget = FindMeasurementTarget(m_Schematic.GetElements(), m_Schematic.GetWires(),
+                                            m_Schematic.GetConnectivity(), cursor_world, WirePickDistance / m_Zoom);
+    PlacePartPopover(view);
+    ImGui::OpenPopup(ContextMenu);
+}
+
+/**
+ * @brief   Draws the context menu: properties, orientation, measuring and deletion for a part, measuring and
+ *          deletion for a wire, and finding a part, running and fitting the view on empty canvas.
+ */
+void EditorWindow::DrawContextMenu() {
+    if (!ImGui::BeginPopup(ContextMenu)) {
+        return;
+    }
+    const bool on_element = m_Schematic.GetSelectedElement() != nullptr;
+    const bool on_wire = m_Schematic.GetSelectedWireIndex().has_value();
+    if (on_element) {
+        if (ImGui::MenuItem("Properties...", "Enter")) {
+            m_PartPopoverRequested = true;
+        }
+        ImGui::Separator();
+        if (ImGui::MenuItem("Rotate", "R")) {
+            RotateSelectedElement();
+        }
+        if (ImGui::MenuItem("Mirror", "M")) {
+            MirrorSelectedElement(false);
+        }
+        if (ImGui::MenuItem("Flip", "Shift+M")) {
+            MirrorSelectedElement(true);
+        }
+    }
+    if ((on_element || on_wire) && m_ContextTarget) {
+        if (on_element) {
+            ImGui::Separator();
+        }
+        const MeasurementTarget &target = *m_ContextTarget;
+        const bool measured =
+            target.Node ? m_Schematic.IsVoltageMeasured(*target.Node) : m_Schematic.IsCurrentMeasured(target.Current);
+        const std::string label =
+            std::format("{} {}", measured ? "Stop measuring" : "Measure", GetMeasurementLabel(target));
+        if (ImGui::MenuItem(label.c_str())) {
+            if (target.Node) {
+                m_Schematic.SetVoltageMeasured(*target.Node, !measured);
+            } else {
+                m_Schematic.SetCurrentMeasured(target.Current, !measured);
+            }
+        }
+    }
+    if (on_element || on_wire) {
+        ImGui::Separator();
+        if (ImGui::MenuItem("Delete", "Del")) {
+            m_Schematic.DeleteSelection();
+        }
+    } else {
+        if (ImGui::MenuItem("Find a Part...", "Space")) {
+            m_PartPickerRequested = true;
+        }
+        if (ImGui::MenuItem(
+                std::format("Run {}", GetAnalysisName(m_Schematic.GetSimulationSettings().Selected)).c_str(), "F5")) {
+            m_Controls.RunSelected();
+        }
+        if (ImGui::MenuItem("Fit Schematic", "Home")) {
+            m_FrameMaxZoom = FitMaxZoom;
+        }
+    }
+    ImGui::EndPopup();
+}
+
 // Global routing makes the shortcuts work while another editor window, such as Properties, has focus
 void EditorWindow::HandleFileShortcuts() {
     if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_N, ImGuiInputFlags_RouteGlobal)) {
@@ -1437,6 +1649,10 @@ void EditorWindow::HandleFileShortcuts() {
     }
     if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiMod_Shift | ImGuiKey_S, ImGuiInputFlags_RouteGlobal)) {
         ShowFileDialog(FileAction::Save);
+    }
+    // Only while the editor has the focus, since text fields use Home
+    if (ImGui::Shortcut(ImGuiKey_Home)) {
+        m_FrameMaxZoom = FitMaxZoom;
     }
     if (ImGui::Shortcut(ImGuiKey_F5, ImGuiInputFlags_RouteGlobal)) {
         m_Controls.RunSelected();
@@ -1594,7 +1810,7 @@ void EditorWindow::OpenFile(const std::filesystem::path &path) {
     m_Schematic.Replace(std::move(loaded->Elements), std::move(loaded->Wires), std::move(loaded->Settings));
     m_Schematic.RestoreMeasurements(loaded->Measurements);
     m_Schematic.MarkSaved(path);
-    m_FrameRequested = true;
+    m_FrameMaxZoom = DefaultZoom;
     if (!loaded->Warnings.empty()) {
         m_Schematic.MarkModified();
         ShowFileMessages(std::format("{} was opened, but some parts were changed or skipped", path.filename().string()),
@@ -1612,7 +1828,7 @@ void EditorWindow::OpenExample(const Example &example) {
     NewSchematic();
     m_Schematic.Replace(std::move(loaded->Elements), std::move(loaded->Wires), std::move(loaded->Settings));
     m_Schematic.RestoreMeasurements(loaded->Measurements);
-    m_FrameRequested = true;
+    m_FrameMaxZoom = DefaultZoom;
 }
 
 // Dialogs do not always add the extension, so it is added here when missing

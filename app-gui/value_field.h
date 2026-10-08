@@ -22,11 +22,16 @@ namespace GUI {
 class ValueField {
 public:
     void Load(double value);
+    void StartTyping(char first);
     std::optional<double> Draw(const char *label, const std::string &unit, const std::function<bool(double)> &is_valid);
 
 private:
     std::array<char, 32> m_Text{};
     bool m_Invalid = false;
+    // A character typed elsewhere that the next Draw() focuses the input with, and whether the cursor still has to
+    // move after it once the input is active
+    std::optional<char> m_TypingStart;
+    bool m_CursorToEnd = false;
 };
 
 void DrawFieldLabel(const char *label);

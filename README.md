@@ -38,6 +38,8 @@ netlist](docs/screenshot.png)
   measured traces
 - A toolbar of part icons drawn from the symbols themselves, a part search (Space), menus with shortcuts, a status
   bar with the keys of the current mode, and the Output window opening on each new result
+- Part properties in a popover beside the part (double click or Enter), values typed straight onto a selected
+  part (`4k7`), a right-click menu, and Fit (Home)
 - Run (F5) from the toolbar, with the analysis and its settings beside it, settings suggested from the sources and
   parts, and the result of the last run in the status bar
 - Example circuits, each with its analyses and measurements set up: an RC low-pass filter, a full-bridge rectifier,

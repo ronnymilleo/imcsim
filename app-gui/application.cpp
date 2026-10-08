@@ -283,11 +283,10 @@ void Application::DrawMainMenuBar() {
             }
         }
         ImGui::Separator();
-        // Render() applies it right after the menu, and Properties, the only side window open by default, is reopened
-        // so the whole layout shows up; Output floats outside the layout and opens with the next result
+        // Render() applies it right after the menu; the side windows keep their open state and dock back in place,
+        // and Output floats outside the layout
         if (ImGui::MenuItem("Reset Layout")) {
             m_ResetLayout = true;
-            m_PropertiesWindow.SetOpen(true);
         }
         ImGui::EndMenu();
     }
@@ -329,8 +328,8 @@ void Application::ShowNewResults() {
                 PlotTab::DCSweep);
 }
 
-// Editor on top and Properties below it; Analysis Settings and Netlist start closed and dock beside Properties
-// as tabs when opened, and Output floats.
+// The editor fills the window; Properties, Analysis Settings and Netlist start closed and dock below it as tabs
+// when opened, and Output floats.
 // Must run before the windows are drawn. A split returns the new node in the given direction and leaves the rest
 // in its last argument
 void Application::SetupDefaultLayout(ImGuiID dockspace_id) {

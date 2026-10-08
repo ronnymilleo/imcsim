@@ -8,6 +8,7 @@
 
 #include "analysis_controls.h"
 #include "imgui_impl_vulkan.h"
+#include "part_editor.h"
 #include "schematic.h"
 #include "vulkan_context.h"
 #include "windows/editor_window.h"
@@ -60,8 +61,9 @@ private:
     // The schematic is declared first, so it exists when the windows that refer to it are built
     Schematic m_Schematic;
     AnalysisControls m_AnalysisControls{m_Schematic};
-    EditorWindow m_EditorWindow{m_Schematic, m_AnalysisControls};
-    PropertiesWindow m_PropertiesWindow{m_Schematic};
+    PartEditor m_PartEditor{m_Schematic};
+    EditorWindow m_EditorWindow{m_Schematic, m_AnalysisControls, m_PartEditor};
+    PropertiesWindow m_PropertiesWindow{m_PartEditor};
     NetlistWindow m_NetlistWindow{m_Schematic};
     SimulationWindow m_SimulationWindow{m_Schematic, m_AnalysisControls};
     OutputWindow m_OutputWindow{m_Schematic};

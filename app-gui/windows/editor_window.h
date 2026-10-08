@@ -12,6 +12,8 @@
 #include "file_dialog.h"
 #include "helpers.h"
 #include "imgui.h"
+#include "part_editor.h"
+#include "probing.h"
 #include "schematic.h"
 #include "ui_elements/ui_element.h"
 #include "ui_elements/ui_wire.h"
@@ -35,7 +37,7 @@ namespace GUI {
  */
 class EditorWindow : public AppWindow {
 public:
-    EditorWindow(Schematic &schematic, AnalysisControls &controls);
+    EditorWindow(Schematic &schematic, AnalysisControls &controls, PartEditor &part_editor);
     ~EditorWindow() override = default;
 
     // Quitting
@@ -110,6 +112,7 @@ private:
 
     Schematic &m_Schematic;
     AnalysisControls &m_Controls;
+    PartEditor &m_PartEditor;
 
     static constexpr float DefaultZoom = 20.0f;
 
@@ -119,8 +122,9 @@ private:
     SymbolStyle m_SymbolStyle = SymbolStyle::IEC;
     bool m_ShowTerminalNumbers = false;
     WireColoring m_WireColoring = WireColoring::Plain;
-    // Set when a schematic is opened; the next Draw() frames it, once the canvas size is known
-    bool m_FrameRequested = false;
+    // Largest zoom of a framing the next Draw() does, once the canvas size is known: the default when a schematic is
+    // opened, more for Fit
+    std::optional<float> m_FrameMaxZoom;
 
     // Placement
     std::optional<Core::ComponentType> m_PlacingType;
@@ -142,6 +146,16 @@ private:
 
     // Selection and dragging
     std::optional<ElementDrag> m_Drag;
+
+    // Properties popover: the corner it hangs from, which side of the part it opens on, and a request from a menu
+    ImVec2 m_PartPopoverAnchor = {0.0f, 0.0f};
+    float m_PartPopoverPivotX = 0.0f;
+    bool m_PartPopoverRequested = false;
+    // Context menu: what the right click was on, for its measure item; the part picker it can open
+    std::optional<MeasurementTarget> m_ContextTarget;
+    bool m_PartPickerRequested = false;
+    // ImGui closes a popup on Esc before the frame starts, so the editor checks the last frame to leave that Esc alone
+    bool m_PopupOpenLastFrame = false;
 
     // Quitting: requested by the application between frames, handled by the next Draw()
     bool m_QuitRequested = false;
@@ -179,7 +193,7 @@ private:
     void DrawNodeVoltages(ImDrawList *draw_list, const ViewTransform &view);
     void DrawHoveredValue(const ViewTransform &view, bool hovered);
     void HandlePanAndZoom(ImVec2 origin, bool hovered, bool active);
-    void FrameSchematic(ImVec2 canvas_size);
+    void FrameSchematic(ImVec2 canvas_size, float max_zoom);
 
     // Modes
     void StartSelecting();
@@ -205,6 +219,13 @@ private:
     void EndDrag();
     void RotateSelectedElement();
     void MirrorSelectedElement(bool vertically);
+
+    // Properties popover and context menu
+    void PlacePartPopover(const ViewTransform &view);
+    void HandleValueTyping(const ViewTransform &view);
+    void DrawPartPopover();
+    void HandleContextMenu(const ViewTransform &view, bool hovered);
+    void DrawContextMenu();
 
     // File and history commands
     void HandleFileShortcuts();

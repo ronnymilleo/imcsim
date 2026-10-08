@@ -8,6 +8,14 @@ How to read what imcsim measures, plots and exports. The [README](../README.md) 
 - **Toolbar**: Select, Wire (W) and Probe (P) on the left, then the parts, each button showing its symbol. Sources,
   diodes, transistors and controlled sources share one button per group: it places the part last picked, and the
   arrow beside it (or a right click) lists the others. Hover a button for its name and shortcut.
+- **Editing a part**: double-click it, or select it and press Enter, to open its properties beside it; edits
+  apply as you type, and Enter, Esc or a click outside closes them. With a part selected, typing a number starts
+  editing its main value right away: `4k7` and Enter make a resistor 4.7k. Values take SPICE suffixes, and a whole
+  number may put its decimals after the suffix, as resistor codes do (`4k7`, `2M2`, `3u3`). View > Properties keeps
+  the same fields in a docked window.
+- **Right click**: on a part, its properties, rotate, mirror, flip, measure its current and delete; on a wire,
+  measure its voltage and delete; on empty canvas, find a part, run and fit.
+- **Fit**: the frame button in the toolbar, or Home, shows the whole schematic.
 - **Find a part**: press Space over the editor, type part of a name (`mos`, `zener`, `opamp`, `nmos`, `vcvs`), move
   with Up and Down, and press Enter to start placing it.
 - **Running**: the ▶ button at the end of the toolbar, or F5, runs the analysis named beside it. That button opens
@@ -20,7 +28,7 @@ How to read what imcsim measures, plots and exports. The [README](../README.md) 
   the cursor and how the last run went ("Transient done", with warnings, or failed). Click the result for the
   errors, the warnings and the ngspice output.
 - **Menus**: File (files, examples and the schematic export), Edit (undo, redo and changes to the selection) and
-  View (wire colors, symbol style, terminal numbers, theme, and the windows). The View choices are kept between
+  View (fit, wire colors, symbol style, terminal numbers, theme, and the windows). The View choices are kept between
   sessions.
 - **Themes**: View > Theme switches between Ember (warm charcoal and red, the default), Graphite (cool gray and
   blue), Phosphor (an oscilloscope screen, green and amber) and Paper (light, like a printed datasheet). Node and
