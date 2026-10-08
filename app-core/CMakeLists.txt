@@ -4,6 +4,7 @@
 
 add_library(imcsim-core-lib
         STATIC
+            analysis_suggestions.cpp
             circuit.cpp
             components/bjt.cpp
             components/capacitor.cpp

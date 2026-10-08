@@ -38,14 +38,13 @@ constexpr ImVec2 FitPadding = {0.0f, 0.4f};
 constexpr float DashLength = 0.5f;
 constexpr float DashGap = 0.3f;
 constexpr float DashWeight = 1.5f;
-constexpr ImU32 CursorLineColor = IM_COL32(255, 255, 255, 90);
 // Width of the statistics panel, in font sizes
 constexpr float StatisticsWidth = 15.0f;
 // Cursors A and B are placed at these fractions of the visible range when turned on
 constexpr double CursorAPlacement = 1.0 / 3.0;
 constexpr double CursorBPlacement = 2.0 / 3.0;
-constexpr ImVec4 CursorAColor = {1.0f, 0.78f, 0.3f, 1.0f};
-constexpr ImVec4 CursorBColor = {0.45f, 0.8f, 1.0f, 1.0f};
+constexpr ImU32 CursorAColor = IM_COL32(255, 199, 77, 255);
+constexpr ImU32 CursorBColor = IM_COL32(115, 204, 255, 255);
 // Math channels take their own colors, apart from those of nodes and currents, and a heavier line
 constexpr auto MathColors = std::to_array<ImU32>({
     IM_COL32(230, 110, 230, 255),
@@ -199,7 +198,7 @@ void DrawCursorReadout(const std::vector<double> &xs, const char *x_unit, const 
     const ImVec2 plot_position = ImPlot::GetPlotPos();
     ImPlot::PushPlotClipRect();
     ImPlot::GetPlotDrawList()->AddLine({x, plot_position.y}, {x, plot_position.y + ImPlot::GetPlotSize().y},
-                                       CursorLineColor);
+                                       ImGui::GetColorU32(ImGuiCol_Text, 0.35f));
     ImPlot::PopPlotClipRect();
 
     ImGui::BeginTooltip();
@@ -403,10 +402,12 @@ void DrawCursors(PlotCursors &cursors, const bool logarithmic) {
         cursors.A = place(CursorAPlacement);
         cursors.B = place(CursorBPlacement);
     }
-    ImPlot::DragLineX(0, &cursors.A, CursorAColor, 1.0f, ImPlotDragToolFlags_NoFit);
-    ImPlot::TagX(cursors.A, CursorAColor, "A");
-    ImPlot::DragLineX(1, &cursors.B, CursorBColor, 1.0f, ImPlotDragToolFlags_NoFit);
-    ImPlot::TagX(cursors.B, CursorBColor, "B");
+    const ImVec4 color_a = ImGui::ColorConvertU32ToFloat4(AdaptToBackground(CursorAColor));
+    const ImVec4 color_b = ImGui::ColorConvertU32ToFloat4(AdaptToBackground(CursorBColor));
+    ImPlot::DragLineX(0, &cursors.A, color_a, 1.0f, ImPlotDragToolFlags_NoFit);
+    ImPlot::TagX(cursors.A, color_a, "A");
+    ImPlot::DragLineX(1, &cursors.B, color_b, 1.0f, ImPlotDragToolFlags_NoFit);
+    ImPlot::TagX(cursors.B, color_b, "B");
 }
 
 // Turning the cursors on places them again in the current view, so they are never lost off screen
@@ -704,6 +705,8 @@ void AddExportMath(PanelBuilder &builder, const std::vector<MathTrace> &math, co
 
 const char *GetTabFileSuffix(const PlotTab tab) {
     switch (tab) {
+    case PlotTab::OperatingPoint:
+        return "operating-point";
     case PlotTab::Transient:
         return "transient";
     case PlotTab::ACSweep:
@@ -716,6 +719,8 @@ const char *GetTabFileSuffix(const PlotTab tab) {
 
 const char *GetTabTitle(const PlotTab tab) {
     switch (tab) {
+    case PlotTab::OperatingPoint:
+        return "operating point";
     case PlotTab::Transient:
         return "transient";
     case PlotTab::ACSweep:
@@ -724,6 +729,53 @@ const char *GetTabTitle(const PlotTab tab) {
         return "DC sweep";
     }
     return "";
+}
+
+// The operating point is a table of DC values, one row per node and per current
+void DrawOperatingPoint(const Core::OperatingPoint &operating_point) {
+    ImGui::PushTextWrapPos(0.0f);
+    for (const std::string &warning : operating_point.Warnings) {
+        ImGui::TextColored(GetWarningTextColor(), "%s", warning.c_str());
+    }
+    ImGui::PopTextWrapPos();
+    constexpr ImGuiTableFlags TableFlags =
+        ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingStretchProp;
+    // Fixed widths, so the currents fit beside the voltages
+    const ImVec2 table_size = {ImGui::GetFontSize() * 14.0f, 0.0f};
+    if (ImGui::BeginTable("node_voltages", 2, TableFlags, table_size)) {
+        ImGui::TableSetupColumn("Node");
+        ImGui::TableSetupColumn("Voltage");
+        ImGui::TableHeadersRow();
+        for (std::size_t node = 0; node < operating_point.NodeVoltages.size(); ++node) {
+            ImGui::TableNextRow();
+            ImGui::TableNextColumn();
+            ImGui::TextUnformatted(node == 0 ? "0 (ground)" : std::format("{}", node).c_str());
+            ImGui::TableNextColumn();
+            ImGui::TextUnformatted(std::format("{}V", Core::FormatValue(operating_point.NodeVoltages[node])).c_str());
+        }
+        ImGui::EndTable();
+    }
+    if (operating_point.Currents.empty()) {
+        return;
+    }
+    ImGui::SameLine(0.0f, ImGui::GetFontSize() * 2.0f);
+    if (ImGui::BeginTable("currents", 2, TableFlags, table_size)) {
+        ImGui::TableSetupColumn("Component");
+        ImGui::TableSetupColumn("Current");
+        ImGui::TableHeadersRow();
+        for (const Core::ComponentCurrent &current : operating_point.Currents) {
+            ImGui::TableNextRow();
+            ImGui::TableNextColumn();
+            ImGui::TextUnformatted(current.Name.c_str());
+            ImGui::TableNextColumn();
+            ImGui::TextUnformatted(std::format("{}A", Core::FormatValue(current.Current)).c_str());
+        }
+        ImGui::EndTable();
+    }
+    ImGui::PushTextWrapPos(0.0f);
+    ImGui::TextDisabled("Currents as in SPICE: positive through a two-terminal part from its first terminal to its "
+                        "second, and into each terminal of a transistor");
+    ImGui::PopTextWrapPos();
 }
 
 std::string GetExtension(const ExportFormat format) {
@@ -738,6 +790,17 @@ std::string GetExtension(const ExportFormat format) {
  */
 OutputWindow::OutputWindow(Schematic &schematic) : AppWindow("Output", true), m_Schematic(schematic) {
     SetInitialSize(InitialSize);
+    // Nothing to plot yet; the first result opens it
+    SetOpen(false);
+}
+
+/**
+ * @brief   Opens the window, if closed, and brings a tab to the front on the next frame.
+ * @param[in] tab  Tab of the analysis whose result just arrived.
+ */
+void OutputWindow::ShowTab(const PlotTab tab) {
+    SetOpen(true);
+    m_TabToShow = tab;
 }
 
 void OutputWindow::Draw() {
@@ -803,7 +866,20 @@ void OutputWindow::Draw() {
         "Nothing is measured yet: pick nodes and parts with Probe in the editor, or check traces in the list";
     // Applies to the automatic fit of every new result and to the user's double-click fit
     ImPlot::PushStyleVar(ImPlotStyleVar_FitPadding, FitPadding);
-    if (ImGui::BeginTabItem("Transient")) {
+    const std::optional<PlotTab> tab_to_show = std::exchange(m_TabToShow, std::nullopt);
+    const auto tab_flags = [&tab_to_show](const PlotTab tab) {
+        return tab_to_show == tab ? ImGuiTabItemFlags_SetSelected : ImGuiTabItemFlags_None;
+    };
+    if (ImGui::BeginTabItem("Operating point", nullptr, tab_flags(PlotTab::OperatingPoint))) {
+        m_ShownTab = PlotTab::OperatingPoint;
+        if (const auto &operating_point = m_Schematic.GetOperatingPoint()) {
+            DrawOperatingPoint(*operating_point);
+        } else {
+            ImGui::TextDisabled("No operating point for the current circuit; pick it beside Run in the editor");
+        }
+        ImGui::EndTabItem();
+    }
+    if (ImGui::BeginTabItem("Transient", nullptr, tab_flags(PlotTab::Transient))) {
         m_ShownTab = PlotTab::Transient;
         if (transient) {
             DrawWithStatistics(
@@ -816,11 +892,11 @@ void OutputWindow::Draw() {
                 },
                 [&] { DrawTransientStatistics(*transient, transient_math); });
         } else {
-            ImGui::TextDisabled("No transient for the current circuit; run one in the Simulation window");
+            ImGui::TextDisabled("No transient for the current circuit; pick it beside Run in the editor");
         }
         ImGui::EndTabItem();
     }
-    if (ImGui::BeginTabItem("AC sweep")) {
+    if (ImGui::BeginTabItem("AC sweep", nullptr, tab_flags(PlotTab::ACSweep))) {
         m_ShownTab = PlotTab::ACSweep;
         if (sweep) {
             DrawWithStatistics(
@@ -836,11 +912,11 @@ void OutputWindow::Draw() {
                 },
                 [&] { DrawACSweepStatistics(*sweep); });
         } else {
-            ImGui::TextDisabled("No AC sweep for the current circuit; run one in the Simulation window");
+            ImGui::TextDisabled("No AC sweep for the current circuit; pick it beside Run in the editor");
         }
         ImGui::EndTabItem();
     }
-    if (ImGui::BeginTabItem("DC sweep")) {
+    if (ImGui::BeginTabItem("DC sweep", nullptr, tab_flags(PlotTab::DCSweep))) {
         m_ShownTab = PlotTab::DCSweep;
         if (dc_sweep) {
             if (!anything_measured && (dc_sweep_math.empty() || dc_sweep_math.front().empty())) {
@@ -849,7 +925,7 @@ void OutputWindow::Draw() {
             DrawMathErrors(dc_sweep_errors);
             DrawDCSweep(*dc_sweep, dc_sweep_math);
         } else {
-            ImGui::TextDisabled("No DC sweep for the current circuit; run one in the Simulation window");
+            ImGui::TextDisabled("No DC sweep for the current circuit; pick it beside Run in the editor");
         }
         ImGui::EndTabItem();
     }
@@ -867,6 +943,8 @@ void OutputWindow::Draw() {
     ImGui::SetNextWindowPos(export_corner, ImGuiCond_Appearing, ImVec2(1.0f, 0.0f));
     bool can_export = false;
     switch (m_ShownTab) {
+    case PlotTab::OperatingPoint:
+        break;
     case PlotTab::Transient:
         can_export = transient && (anything_measured || !transient_math.empty());
         break;
@@ -1206,7 +1284,7 @@ void OutputWindow::DrawMathChannels(const std::vector<std::string> &operands) {
     for (std::size_t index = 0; index < m_MathChannels.size(); ++index) {
         MathChannel &channel = m_MathChannels[index];
         ImGui::PushID(static_cast<int>(index));
-        ImGui::PushStyleColor(ImGuiCol_CheckMark, MathColors[index % MathColors.size()]);
+        ImGui::PushStyleColor(ImGuiCol_CheckMark, AdaptToBackground(MathColors[index % MathColors.size()]));
         ImGui::Checkbox(channel.Name.c_str(), &channel.Shown);
         ImGui::PopStyleColor();
         ImGui::SetItemTooltip("%s", GetChannelExpression(channel).c_str());
@@ -1303,7 +1381,7 @@ std::vector<MathTrace> OutputWindow::EvaluateMath(const std::span<const double> 
                           .Values = std::move(result->Values),
                           .Unit = FormatUnit(result->Unit),
                           .Axis = AxisForUnit(result->Unit),
-                          .Color = MathColors[index % MathColors.size()]});
+                          .Color = AdaptToBackground(MathColors[index % MathColors.size()])});
     }
     return traces;
 }
@@ -1321,7 +1399,7 @@ std::optional<ExportFormat> OutputWindow::DrawExportPopup(const bool can_export)
         m_ExportStyle.Dark = false;
     }
     ImGui::SameLine();
-    if (ImGui::RadioButton("Dark, as on screen", m_ExportStyle.Dark)) {
+    if (ImGui::RadioButton("Dark", m_ExportStyle.Dark)) {
         m_ExportStyle.Dark = true;
     }
     ImGui::SetNextItemWidth(ImGui::GetFontSize() * ExportSizeWidth);

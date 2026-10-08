@@ -38,6 +38,15 @@ TEST_CASE("ParseValue applies case-sensitive scale suffixes", "[spice_value]") {
     CHECK_THAT(ParseOrFail("3f", "F"), Catch::Matchers::WithinRel(3e-15));
 }
 
+TEST_CASE("ParseValue reads decimals written after the suffix, as resistor codes do", "[spice_value]") {
+    CHECK_THAT(ParseOrFail("4k7", "Ohm"), Catch::Matchers::WithinRel(4.7e3));
+    CHECK_THAT(ParseOrFail("1k2", "Ohm"), Catch::Matchers::WithinRel(1.2e3));
+    CHECK_THAT(ParseOrFail("2M2", "Ohm"), Catch::Matchers::WithinRel(2.2e6));
+    CHECK_THAT(ParseOrFail("3u3F", "F"), Catch::Matchers::WithinRel(3.3e-6));
+    CHECK_THAT(ParseOrFail("1k05", "Ohm"), Catch::Matchers::WithinRel(1.05e3));
+    CHECK_THAT(ParseOrFail("-1k5", "V"), Catch::Matchers::WithinRel(-1.5e3));
+}
+
 TEST_CASE("ParseValue accepts only the given unit after the suffix", "[spice_value]") {
     CHECK_THAT(ParseOrFail("10kOhm", "Ohm"), Catch::Matchers::WithinRel(1e4));
     CHECK_THAT(ParseOrFail("100nF", "F"), Catch::Matchers::WithinRel(100e-9));
@@ -59,7 +68,8 @@ TEST_CASE("ParseValue rejects malformed text", "[spice_value]") {
     CHECK_FALSE(Core::ParseValue("", "Ohm"));
     CHECK_FALSE(Core::ParseValue("abc", "Ohm"));
     CHECK_FALSE(Core::ParseValue("k10", "Ohm"));
-    CHECK_FALSE(Core::ParseValue("1k2", "Ohm"));
+    CHECK_FALSE(Core::ParseValue("4.7k7", "Ohm"));
+    CHECK_FALSE(Core::ParseValue("4k7x", "Ohm"));
 
     SECTION("a wrong-case suffix is rejected instead of being read as a plain number") {
         CHECK_FALSE(Core::ParseValue("10K", "Ohm"));

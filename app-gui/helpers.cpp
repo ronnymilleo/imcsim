@@ -216,12 +216,25 @@ ViewFrame FramePoints(const std::span<const GridPoint> points, const ImVec2 canv
     }
     const auto [min_x, max_x] = std::ranges::minmax(points, {}, &GridPoint::X);
     const auto [min_y, max_y] = std::ranges::minmax(points, {}, &GridPoint::Y);
-    const float width = static_cast<float>(max_x.X - min_x.X) + 2.0f * FrameMargin;
-    const float height = static_cast<float>(max_y.Y - min_y.Y) + 2.0f * FrameMargin;
+    return FrameBounds(ToVec2({min_x.X, min_y.Y}), ToVec2({max_x.X, max_y.Y}), canvas_size, min_zoom, max_zoom);
+}
+
+/**
+ * @brief   Finds the pan and zoom that center an area on a canvas, such as everything a schematic draws.
+ * @param[in] min          Top left corner of the area, in grid units.
+ * @param[in] max          Bottom right corner of the area, in grid units.
+ * @param[in] canvas_size  Size of the canvas in pixels.
+ * @param[in] min_zoom     Smallest zoom allowed, in pixels per grid unit.
+ * @param[in] max_zoom     Largest zoom to use; small areas are centered at it instead of filling the canvas.
+ * @return  The view frame, with a margin of two grid units around the area.
+ */
+ViewFrame FrameBounds(const ImVec2 min, const ImVec2 max, const ImVec2 canvas_size, const float min_zoom,
+                      const float max_zoom) {
+    const float width = max.x - min.x + 2.0f * FrameMargin;
+    const float height = max.y - min.y + 2.0f * FrameMargin;
     const float zoom = std::clamp(std::min(canvas_size.x / width, canvas_size.y / height), min_zoom, max_zoom);
-    const float center_x = static_cast<float>(min_x.X + max_x.X) / 2.0f;
-    const float center_y = static_cast<float>(min_y.Y + max_y.Y) / 2.0f;
-    return {.Pan = {canvas_size.x / 2.0f - center_x * zoom, canvas_size.y / 2.0f - center_y * zoom}, .Zoom = zoom};
+    const ImVec2 center = (min + max) / 2.0f;
+    return {.Pan = {canvas_size.x / 2.0f - center.x * zoom, canvas_size.y / 2.0f - center.y * zoom}, .Zoom = zoom};
 }
 
 } // namespace GUI

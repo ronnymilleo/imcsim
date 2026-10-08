@@ -78,6 +78,7 @@ struct MathTrace {
  * @brief   The tabs of the Output window, one per analysis.
  */
 enum class PlotTab {
+    OperatingPoint,
     Transient,
     ACSweep,
     DCSweep
@@ -96,7 +97,7 @@ enum class ExportFormat {
  * @class   OutputWindow
  * @brief   Plots the node voltages and component currents of the last transient over time, the last AC sweep as
  *          a Bode plot, and the last DC sweep against its swept source.
- * @details The results come from the Schematic, which the Simulation window fills, so the plots disappear as
+ * @details The results come from the Schematic, which the analysis controls fill, so the plots disappear as
  *          soon as the circuit changes. Plots show only the measured traces, picked with the Probe tool of the
  *          editor or in the list beside the plots; voltages take the colors the editor gives the nodes, and
  *          currents are dashed on the secondary Y axis on the right. Hovering a plot reads every shown trace at
@@ -108,12 +109,15 @@ enum class ExportFormat {
  *          V(1)*I(R1), to the transient and DC sweep plots: voltages and currents keep their axes, and any other
  *          unit, or none, goes on a third axis. Export saves the plot of the current tab as an SVG image, redrawn
  *          from its data at a chosen size and theme over the visible X range, or as a CSV table of every sample.
- *          The window floats instead of being docked, so the plots can be as large as needed.
+ *          The window floats instead of being docked, so the plots can be as large as needed. It starts closed and
+ *          opens on the tab of each new transient, AC sweep or DC sweep.
  */
 class OutputWindow : public AppWindow {
 public:
     explicit OutputWindow(Schematic &schematic);
     ~OutputWindow() override = default;
+
+    void ShowTab(PlotTab tab);
 
 private:
     Schematic &m_Schematic;
@@ -140,6 +144,8 @@ private:
     std::vector<std::string> m_DCSweepShownMath;
     // Export: the tab shown this frame, the image settings, and the figure waiting for the save dialog
     PlotTab m_ShownTab = PlotTab::Transient;
+    // Tab to bring to the front on the next frame, after a new result
+    std::optional<PlotTab> m_TabToShow;
     PlotSpan m_DCSweepView;
     ExportStyle m_ExportStyle;
     FileDialog m_ExportDialog;

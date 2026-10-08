@@ -3,10 +3,43 @@
 How to read what imcsim measures, plots and exports. The [README](../README.md) covers building and running, and
 [Simulation models](models.md) the model behind every part.
 
+## Editing
+
+- **Toolbar**: Select, Wire (W) and Probe (P) on the left, then the parts, each button showing its symbol. Sources,
+  diodes, transistors and controlled sources share one button per group: it places the part last picked, and the
+  arrow beside it (or a right click) lists the others. Hover a button for its name and shortcut.
+- **Editing a part**: double-click it, or select it and press Enter, to open its properties beside it; edits
+  apply as you type, and Enter, Esc or a click outside closes them. With a part selected, typing a number starts
+  editing its main value right away: `4k7` and Enter make a resistor 4.7k. Values take SPICE suffixes, and a whole
+  number may put its decimals after the suffix, as resistor codes do (`4k7`, `2M2`, `3u3`). View > Properties keeps
+  the same fields in a docked window.
+- **Right click**: on a part, its properties, rotate, mirror, flip, measure its current and delete; on a wire,
+  measure its voltage and delete; on empty canvas, find a part, run and fit.
+- **Fit**: the frame button in the toolbar, or Home, shows the whole schematic.
+- **Find a part**: press Space over the editor, type part of a name (`mos`, `zener`, `opamp`, `nmos`, `vcvs`), move
+  with Up and Down, and press Enter to start placing it.
+- **Running**: the ▶ button at the end of the toolbar, or F5, runs the analysis named beside it. That button opens
+  the list of analyses (operating point, transient, AC sweep, DC sweep) and the settings of the one picked, saved
+  with the schematic. Suggest fills the transient times (five periods of the slowest sine or pulse source, 200
+  points in a period of the fastest) or the AC range (two decades past the RC, RL and LC corners and the op-amp
+  bandwidths). Nothing runs by itself: edit the circuit, then run again. View > Analysis Settings keeps the same
+  settings open in a window.
+- **Status bar**: below the schematic, the keys of the current mode on the left; on the right, the grid position of
+  the cursor and how the last run went ("Transient done", with warnings, or failed). Click the result for the
+  errors, the warnings and the ngspice output.
+- **Menus**: File (files, examples and the schematic export), Edit (undo, redo and changes to the selection) and
+  View (fit, wire colors, symbol style, terminal numbers, theme, and the windows). The View choices are kept between
+  sessions.
+- **Themes**: View > Theme switches between Ember (warm charcoal and red, the default), Graphite (cool gray and
+  blue), Phosphor (a green monochrome CRT, after a Zed theme) and Paper (light, like a printed datasheet). Node and
+  trace colors are the same in every theme; Paper darkens them so they read on its light background.
+- **Output window**: hidden until an analysis runs; it then opens on the tab of the new result. The operating point
+  tab lists the node voltages and part currents, which also show on the schematic. Reopen it from View.
+
 ## Terminals
 
-Every part with more than one terminal numbers them in the order the SPICE netlist lists them. Check **Pins** in
-the editor toolbar to show the numbers, each beside a small ring at its terminal.
+Every part with more than one terminal numbers them in the order the SPICE netlist lists them. Turn on
+**View > Terminal Numbers** to show the numbers, each beside a small ring at its terminal.
 
 | Part | Terminal 1 | Terminal 2 | Terminal 3 |
 |---|---|---|---|
@@ -23,7 +56,7 @@ the editor toolbar to show the numbers, each beside a small ring at its terminal
 Ground and the VCC rail have a single terminal and no number.
 
 Rotating a part (R) or mirroring it (M, Shift+M) moves its terminals with it, so terminal 1 is not always on the
-left or at the top. Pins shows where it ended up.
+left or at the top. Terminal numbers show where it ended up.
 
 ## Current signs
 
@@ -86,7 +119,7 @@ The Examples menu has an inverting amplifier.
 
 Plots start empty; pick what to measure in either place:
 
-- **Probe tool** (Probe button or P): click a wire to measure the voltage of its node, a part to measure its current,
+- **Probe tool** (toolbar button or P): click a wire to measure the voltage of its node, a part to measure its current,
   or a transistor near one of its terminals to measure that terminal's current. Clicking a measured item again stops
   measuring it.
 - **Trace list** in the Output window: check voltages `V(n)` and currents `I(name)`, or use All and None.
@@ -116,15 +149,15 @@ their statistics and the exports always agree.
 
 - **SVG image**: redrawn from the data, not captured from the screen, so it stays sharp at any size. It shows the
   visible X range, so zoom in first to export a detail. Choose its size in pixels and its theme: light for print,
-  which darkens trace colors too light for white paper, or dark, as on screen.
+  which darkens trace colors too light for white paper, or dark, in the colors of the Ember theme.
 - **CSV table**: every sample of every measured trace, including math channels, whatever the zoom. The first column
   is the X axis; each header carries its unit, and on a Bode plot its panel (`Magnitude V(2) (dB)`). Missing
   samples, such as a division by zero in a math channel, are empty cells.
 
-**Schematic**: Export... in the editor toolbar saves the circuit as an SVG image, cropped around it, with the symbol
-style shown (IEC or ANSI), part names and values, terminal numbers when Pins is on, and the measured voltages and
-currents. Light and dark themes darken colors the same way as plot exports, so a probe and its trace keep matching
-colors across the two figures.
+**Schematic**: File > Export Schematic... saves the circuit as an SVG image, cropped around it, with the symbol
+style shown (IEC or ANSI), part names and values, terminal numbers when they are shown, and the measured voltages
+and currents. Light, for print, darkens colors the same way as plot exports, so a probe and its trace keep matching
+colors across the two figures; As on screen keeps the colors of the current theme.
 
 The save dialogs suggest a name after the schematic file and the tab, such as `rc_filter-transient.svg` or
 `rc_filter-schematic.svg`, next to the schematic.

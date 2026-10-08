@@ -74,7 +74,8 @@ const ScaleSuffix &ChooseSuffix(const double value) {
 /**
  * @brief   Parses a value typed by the user.
  * @param[in] text  A number, optionally followed by a case-sensitive scale suffix (T, G, M, k, m, u or the
- *                  micro sign, n, p, f) and then optionally by the unit, such as "4.7k", "1M" or "100nF".
+ *                  micro sign, n, p, f) and then optionally by the unit, such as "4.7k", "1M" or "100nF". A
+ *                  whole number may also put its decimals after the suffix, as resistor codes do: "4k7" is 4.7k.
  * @param[in] unit  The only unit accepted after the suffix, such as "Ohm"; anything else makes the text invalid,
  *                  so a wrong-case suffix like "10K" is rejected instead of silently read as 10.
  * @return  The value, or no value when the text is not valid.
@@ -87,20 +88,35 @@ std::optional<double> ParseValue(const std::string_view text, const std::string_
         return std::nullopt;
     }
 
+    const std::string_view number_text(trimmed.data(), rest_begin - trimmed.data());
     std::string_view rest(rest_begin, trimmed.data() + trimmed.size() - rest_begin);
     double factor = 1.0;
+    bool has_suffix = true;
     if (rest.starts_with(MicroSign)) {
         factor = 1e-6;
         rest.remove_prefix(MicroSign.size());
     } else {
+        has_suffix = false;
         for (const ScaleSuffix &suffix : Suffixes) {
             // Every text starts with the empty suffix, which stands for no scaling
             if (!suffix.Text.empty() && rest.starts_with(suffix.Text)) {
                 factor = suffix.Factor;
                 rest.remove_prefix(suffix.Text.size());
+                has_suffix = true;
                 break;
             }
         }
+    }
+
+    // Decimals after the suffix, as in "4k7", only follow a whole number, so "4.7k7" stays invalid
+    const std::size_t decimals_end = rest.find_first_not_of("0123456789");
+    const std::string_view decimals = rest.substr(0, decimals_end);
+    if (has_suffix && !decimals.empty() && number_text.find_first_not_of("-0123456789") == std::string_view::npos) {
+        double digits = 0.0;
+        std::from_chars(decimals.data(), decimals.data() + decimals.size(), digits);
+        const double fraction = digits / std::pow(10.0, static_cast<double>(decimals.size()));
+        number += number_text.starts_with('-') ? -fraction : fraction;
+        rest.remove_prefix(decimals.size());
     }
 
     if (!rest.empty() && rest != unit) {

@@ -12,14 +12,11 @@
 #include "schematic_canvas.h"
 #include "ui_elements/ui_element.h"
 #include <expected>
+#include <optional>
 #include <string>
 
 namespace GUI {
 
-// Warm tones that match the theme of the editor
-inline constexpr ImU32 SchematicBackgroundColor = IM_COL32(18, 15, 16, 255);
-inline constexpr ImU32 ElementColor = IM_COL32(220, 220, 220, 255);
-inline constexpr ImU32 WireColor = IM_COL32(158, 192, 120, 255);
 inline constexpr float MeasurementMarkerRadius = 4.0f;
 // Terminal rings on screen, relative to the zoom like junction dots: 4 pixels at the default zoom
 inline constexpr float ScreenTerminalRingScale = 0.2f;
@@ -28,6 +25,18 @@ inline constexpr float ScreenTerminalRingScale = 0.2f;
 void DrawMeasurementMarkers(SchematicCanvas &canvas, const ViewTransform &view, Schematic &schematic);
 void DrawTerminalNumbers(SchematicCanvas &canvas, const ViewTransform &view, const Schematic &schematic,
                          float ring_scale);
+
+/**
+ * @struct  SchematicBounds
+ * @brief   The area a schematic covers when drawn, labels and probe markers included, in grid units.
+ */
+struct SchematicBounds {
+    ImVec2 Min;
+    ImVec2 Max;
+};
+
+// Extent
+std::optional<SchematicBounds> MeasureSchematic(Schematic &schematic, SymbolStyle style, bool terminal_numbers);
 
 // Export
 std::expected<std::string, std::string> RenderSchematicSvg(Schematic &schematic, SymbolStyle style,

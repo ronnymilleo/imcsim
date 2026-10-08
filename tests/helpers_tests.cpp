@@ -80,6 +80,16 @@ TEST_CASE("FramePoints centers the points and fits them with a margin", "[helper
     CHECK_THAT(center.y, Catch::Matchers::WithinAbs(240.0, 1e-3));
 }
 
+TEST_CASE("FrameBounds centers an area between grid points", "[helpers]") {
+    // A label may reach past the grid: 2.5 to 17.5 is 15 units, plus a 2 unit margin on each side
+    const GUI::ViewFrame frame = GUI::FrameBounds({2.5f, 0.0f}, {17.5f, 5.0f}, {380.0f, 1000.0f}, 4.0f, 100.0f);
+    CHECK_THAT(frame.Zoom, Catch::Matchers::WithinAbs(20.0, 1e-4));
+    const GUI::ViewTransform view({0.0f, 0.0f}, frame.Pan, frame.Zoom);
+    const ImVec2 center = view.ToScreen({10.0f, 2.5f});
+    CHECK_THAT(center.x, Catch::Matchers::WithinAbs(190.0, 1e-3));
+    CHECK_THAT(center.y, Catch::Matchers::WithinAbs(500.0, 1e-3));
+}
+
 TEST_CASE("FramePoints keeps the zoom between its limits", "[helpers]") {
     const std::vector<GUI::GridPoint> small = {{3, 3}};
     CHECK(GUI::FramePoints(small, {800.0f, 600.0f}, 4.0f, 20.0f).Zoom == 20.0f);

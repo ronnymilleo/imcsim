@@ -4,6 +4,7 @@
 
 add_library(imcsim-gui-lib
         STATIC
+            analysis_controls.cpp
             application.cpp
             connectivity.cpp
             current_flow.cpp
@@ -12,6 +13,7 @@ add_library(imcsim-gui-lib
             file_dialog.cpp
             helpers.cpp
             node_colors.cpp
+            part_editor.cpp
             plot_export.cpp
             plot_helpers.cpp
             probing.cpp

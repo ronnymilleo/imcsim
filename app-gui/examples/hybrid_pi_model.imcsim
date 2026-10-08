@@ -149,6 +149,7 @@
       "start": 1.0,
       "stop": 100000000.0
     },
+    "analysis": "ac_sweep",
     "dc_sweep": {
       "step_source": false,
       "stepped": {

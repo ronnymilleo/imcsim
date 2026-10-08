@@ -8,6 +8,7 @@
 #include "imgui.h"
 #include "spice_value.h"
 #include "theme.h"
+#include <utility>
 
 namespace GUI {
 
@@ -31,6 +32,15 @@ void ValueField::Load(const double value) {
 }
 
 /**
+ * @brief   Makes the next Draw() focus the input, emptied, and type a character into it, as if the user had typed
+ *          it there.
+ * @param[in] first  Character typed before the field was shown, such as the first digit of a value.
+ */
+void ValueField::StartTyping(const char first) {
+    m_TypingStart = first;
+}
+
+/**
  * @brief   Draws the label, the text input and the unit on one line, and an error below when the text is invalid.
  * @param[in] label     Text before the input; it also gives the input its ImGui ID, so it must be unique in the
  *                      window.
@@ -43,7 +53,27 @@ std::optional<double> ValueField::Draw(const char *label, const std::string &uni
     DrawFieldLabel(label);
     ImGui::PushID(label);
     std::optional<double> edited;
-    if (ImGui::InputText("##value", m_Text.data(), m_Text.size())) {
+    // Focusing from code selects the whole text, so once the input is active the cursor moves after the character.
+    // The character counts as an edit, so a value typed as a single digit applies too
+    const std::optional<char> first = std::exchange(m_TypingStart, std::nullopt);
+    if (first) {
+        m_Text.fill('\0');
+        m_Text[0] = *first;
+        m_CursorToEnd = true;
+        ImGui::SetKeyboardFocusHere();
+    }
+    const auto place_cursor = [](ImGuiInputTextCallbackData *data) {
+        auto &cursor_to_end = *static_cast<bool *>(data->UserData);
+        if (std::exchange(cursor_to_end, false)) {
+            data->CursorPos = data->BufTextLen;
+            data->SelectionStart = data->BufTextLen;
+            data->SelectionEnd = data->BufTextLen;
+        }
+        return 0;
+    };
+    const bool changed = ImGui::InputText("##value", m_Text.data(), m_Text.size(), ImGuiInputTextFlags_CallbackAlways,
+                                          place_cursor, &m_CursorToEnd);
+    if (changed || first) {
         const std::optional<double> value = Core::ParseValue(m_Text.data(), unit);
         m_Invalid = !value || !is_valid(*value);
         if (!m_Invalid) {

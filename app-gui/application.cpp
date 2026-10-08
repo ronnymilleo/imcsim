@@ -15,6 +15,8 @@
 #include <SDL3/SDL.h>
 #include <array>
 #include <cstdio>
+#include <format>
+#include <utility>
 
 namespace GUI {
 
@@ -147,6 +149,8 @@ int Application::InitImGui() {
 
     ApplyTheme();
     LoadThemeFonts();
+    m_EditorWindow.RegisterSettingsHandler();
+    RegisterThemeSettingsHandler();
 
     ImGuiStyle &style = ImGui::GetStyle();
     style.ScaleAllSizes(m_SDLWindowScale);
@@ -192,6 +196,8 @@ void Application::NewFrame() {
 void Application::Render() {
     // The menu bar goes first so the dockspace fills the space left below it
     DrawMainMenuBar();
+    UpdateWindowTitle();
+    ShowNewResults();
 
     // A fixed ID lets the layout be rebuilt before the dockspace is submitted this frame
     const ImGuiID dockspace_id = ImGui::GetID("MainDockSpace");
@@ -226,23 +232,47 @@ void Application::DrawMainMenuBar() {
     if (!ImGui::BeginMainMenuBar()) {
         return;
     }
-    ImGui::Text("Version: %s", IMCSIM_VERSION);
-    ImGui::Separator();
-    if (ImGui::BeginMenu("Examples")) {
-        for (const Example &example : GetExamples()) {
-            if (ImGui::MenuItem(example.Title)) {
-                m_EditorWindow.RequestExample(example);
+    if (ImGui::BeginMenu("File")) {
+        m_EditorWindow.DrawFileMenuItems();
+        ImGui::Separator();
+        if (ImGui::BeginMenu("Examples")) {
+            for (const Example &example : GetExamples()) {
+                if (ImGui::MenuItem(example.Title)) {
+                    m_EditorWindow.RequestExample(example);
+                }
+                if (ImGui::BeginItemTooltip()) {
+                    ImGui::PushTextWrapPos(ImGui::GetFontSize() * ExampleTooltipWidth);
+                    ImGui::TextUnformatted(example.Description);
+                    ImGui::PopTextWrapPos();
+                    ImGui::EndTooltip();
+                }
             }
-            if (ImGui::BeginItemTooltip()) {
-                ImGui::PushTextWrapPos(ImGui::GetFontSize() * ExampleTooltipWidth);
-                ImGui::TextUnformatted(example.Description);
-                ImGui::PopTextWrapPos();
-                ImGui::EndTooltip();
-            }
+            ImGui::EndMenu();
+        }
+        ImGui::Separator();
+        // Quitting asks the editor first, like closing the window
+        if (ImGui::MenuItem("Quit", "Ctrl+Q")) {
+            m_EditorWindow.RequestQuit();
         }
         ImGui::EndMenu();
     }
+    if (ImGui::BeginMenu("Edit")) {
+        m_EditorWindow.DrawEditMenuItems();
+        ImGui::EndMenu();
+    }
     if (ImGui::BeginMenu("View")) {
+        m_EditorWindow.DrawViewMenuItems();
+        if (ImGui::BeginMenu("Theme")) {
+            const auto themes = GetThemes();
+            for (std::size_t index = 0; index < themes.size(); ++index) {
+                if (ImGui::MenuItem(themes[index].Name, nullptr, index == GetThemeIndex())) {
+                    SetTheme(index);
+                    ImGui::MarkIniSettingsDirty();
+                }
+            }
+            ImGui::EndMenu();
+        }
+        ImGui::Separator();
         // The editor cannot be closed, so only the side windows are listed
         const std::array<AppWindow *, 4> closable_windows = {&m_PropertiesWindow, &m_NetlistWindow, &m_SimulationWindow,
                                                              &m_OutputWindow};
@@ -253,31 +283,63 @@ void Application::DrawMainMenuBar() {
             }
         }
         ImGui::Separator();
-        // Render() applies it right after the menu, and closed windows are reopened so the whole layout shows up
+        // Render() applies it right after the menu; the side windows keep their open state and dock back in place,
+        // and Output floats outside the layout
         if (ImGui::MenuItem("Reset Layout")) {
             m_ResetLayout = true;
-            for (AppWindow *window : closable_windows) {
-                window->SetOpen(true);
-            }
         }
         ImGui::EndMenu();
     }
+    // The version sits at the right end of the bar, out of the way
+    const std::string version = std::format("imcsim {}", IMCSIM_VERSION);
+    ImGui::SameLine(ImGui::GetWindowWidth() - ImGui::CalcTextSize(version.c_str()).x -
+                    ImGui::GetStyle().ItemSpacing.x * 2.0f);
+    ImGui::TextDisabled("%s", version.c_str());
     ImGui::EndMainMenuBar();
 }
 
-// Editor on top, Properties below it on the left and Netlist and Simulation as tabs on the right; Output floats.
-// Must run before the windows are drawn. Each split returns the new node in the given direction and leaves the
-// rest in its last argument
+// The window title names the schematic, with an asterisk while it has unsaved changes, as editors do
+void Application::UpdateWindowTitle() {
+    const auto &file_path = m_Schematic.GetFilePath();
+    const std::string title = std::format("{}{} - imcsim", file_path ? file_path->filename().string() : "Untitled",
+                                          m_Schematic.IsModified() ? " *" : "");
+    if (title != m_WindowTitle) {
+        SDL_SetWindowTitle(m_SDLWindow, title.c_str());
+        m_WindowTitle = title;
+    }
+}
+
+// A new result of any analysis opens the Output window on its tab; the operating point also shows on the schematic, so
+// running one is enough to see it. Versions also change when results are dropped, which opens nothing
+void Application::ShowNewResults() {
+    const auto show_if_new = [this](std::size_t &shown, const std::size_t version, const bool has_result,
+                                    const PlotTab tab) {
+        if (std::exchange(shown, version) != version && has_result) {
+            m_OutputWindow.ShowTab(tab);
+        }
+    };
+    show_if_new(m_ShownOperatingPointVersion, m_Schematic.GetOperatingPointVersion(),
+                m_Schematic.GetOperatingPoint().has_value(), PlotTab::OperatingPoint);
+    show_if_new(m_ShownTransientVersion, m_Schematic.GetTransientVersion(), m_Schematic.GetTransient().has_value(),
+                PlotTab::Transient);
+    show_if_new(m_ShownACSweepVersion, m_Schematic.GetACSweepVersion(), m_Schematic.GetACSweep().has_value(),
+                PlotTab::ACSweep);
+    show_if_new(m_ShownDCSweepVersion, m_Schematic.GetDCSweepVersion(), m_Schematic.GetDCSweep().has_value(),
+                PlotTab::DCSweep);
+}
+
+// The editor fills the window; Properties, Analysis Settings and Netlist start closed and dock below it as tabs
+// when opened, and Output floats.
+// Must run before the windows are drawn. A split returns the new node in the given direction and leaves the rest
+// in its last argument
 void Application::SetupDefaultLayout(ImGuiID dockspace_id) {
     ImGui::DockBuilderSetNodeSize(dockspace_id, ImGui::GetMainViewport()->WorkSize);
     ImGuiID editor_id = dockspace_id;
-    ImGuiID properties_id = ImGui::DockBuilderSplitNode(editor_id, ImGuiDir_Down, 0.3f, nullptr, &editor_id);
-    const ImGuiID netlist_id =
-        ImGui::DockBuilderSplitNode(properties_id, ImGuiDir_Right, 0.5f, nullptr, &properties_id);
+    const ImGuiID properties_id = ImGui::DockBuilderSplitNode(editor_id, ImGuiDir_Down, 0.25f, nullptr, &editor_id);
     ImGui::DockBuilderDockWindow(m_EditorWindow.GetWindowTitle().c_str(), editor_id);
     ImGui::DockBuilderDockWindow(m_PropertiesWindow.GetWindowTitle().c_str(), properties_id);
-    ImGui::DockBuilderDockWindow(m_NetlistWindow.GetWindowTitle().c_str(), netlist_id);
-    ImGui::DockBuilderDockWindow(m_SimulationWindow.GetWindowTitle().c_str(), netlist_id);
+    ImGui::DockBuilderDockWindow(m_SimulationWindow.GetWindowTitle().c_str(), properties_id);
+    ImGui::DockBuilderDockWindow(m_NetlistWindow.GetWindowTitle().c_str(), properties_id);
     ImGui::DockBuilderFinish(dockspace_id);
 }
 
