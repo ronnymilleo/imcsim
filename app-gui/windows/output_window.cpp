@@ -738,6 +738,17 @@ std::string GetExtension(const ExportFormat format) {
  */
 OutputWindow::OutputWindow(Schematic &schematic) : AppWindow("Output", true), m_Schematic(schematic) {
     SetInitialSize(InitialSize);
+    // Nothing to plot yet; the first result opens it
+    SetOpen(false);
+}
+
+/**
+ * @brief   Opens the window, if closed, and brings a tab to the front on the next frame.
+ * @param[in] tab  Tab of the analysis whose result just arrived.
+ */
+void OutputWindow::ShowTab(const PlotTab tab) {
+    SetOpen(true);
+    m_TabToShow = tab;
 }
 
 void OutputWindow::Draw() {
@@ -803,7 +814,11 @@ void OutputWindow::Draw() {
         "Nothing is measured yet: pick nodes and parts with Probe in the editor, or check traces in the list";
     // Applies to the automatic fit of every new result and to the user's double-click fit
     ImPlot::PushStyleVar(ImPlotStyleVar_FitPadding, FitPadding);
-    if (ImGui::BeginTabItem("Transient")) {
+    const std::optional<PlotTab> tab_to_show = std::exchange(m_TabToShow, std::nullopt);
+    const auto tab_flags = [&tab_to_show](const PlotTab tab) {
+        return tab_to_show == tab ? ImGuiTabItemFlags_SetSelected : ImGuiTabItemFlags_None;
+    };
+    if (ImGui::BeginTabItem("Transient", nullptr, tab_flags(PlotTab::Transient))) {
         m_ShownTab = PlotTab::Transient;
         if (transient) {
             DrawWithStatistics(
@@ -820,7 +835,7 @@ void OutputWindow::Draw() {
         }
         ImGui::EndTabItem();
     }
-    if (ImGui::BeginTabItem("AC sweep")) {
+    if (ImGui::BeginTabItem("AC sweep", nullptr, tab_flags(PlotTab::ACSweep))) {
         m_ShownTab = PlotTab::ACSweep;
         if (sweep) {
             DrawWithStatistics(
@@ -840,7 +855,7 @@ void OutputWindow::Draw() {
         }
         ImGui::EndTabItem();
     }
-    if (ImGui::BeginTabItem("DC sweep")) {
+    if (ImGui::BeginTabItem("DC sweep", nullptr, tab_flags(PlotTab::DCSweep))) {
         m_ShownTab = PlotTab::DCSweep;
         if (dc_sweep) {
             if (!anything_measured && (dc_sweep_math.empty() || dc_sweep_math.front().empty())) {

@@ -223,13 +223,14 @@ ImVec4 GetWarningTextColor() {
 /**
  * @brief   Draws a button filled with the accent color, for the main action of a window or dialog.
  * @param[in] label  Button label, as in ImGui::Button().
+ * @param[in] size   Button size, as in ImGui::Button(); zero fits the label.
  * @return  Whether the button was clicked.
  */
-bool PrimaryButton(const char *label) {
+bool PrimaryButton(const char *label, const ImVec2 size) {
     ImGui::PushStyleColor(ImGuiCol_Button, AccentDim);
     ImGui::PushStyleColor(ImGuiCol_ButtonHovered, Accent);
     ImGui::PushStyleColor(ImGuiCol_ButtonActive, AccentHot);
-    const bool clicked = ImGui::Button(label);
+    const bool clicked = ImGui::Button(label, size);
     ImGui::PopStyleColor(3);
     return clicked;
 }

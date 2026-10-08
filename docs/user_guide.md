@@ -3,10 +3,24 @@
 How to read what imcsim measures, plots and exports. The [README](../README.md) covers building and running, and
 [Simulation models](models.md) the model behind every part.
 
+## Editing
+
+- **Toolbar**: Select, Wire (W) and Probe (P) on the left, then the parts, each button showing its symbol. Sources,
+  diodes, transistors and controlled sources share one button per group: it places the part last picked, and the
+  arrow beside it (or a right click) lists the others. Hover a button for its name and shortcut.
+- **Find a part**: press Space over the editor, type part of a name (`mos`, `zener`, `opamp`, `nmos`, `vcvs`), move
+  with Up and Down, and press Enter to start placing it.
+- **Status bar**: below the schematic, the keys of the current mode on the left and the grid position of the cursor
+  on the right.
+- **Menus**: File (files, examples and the schematic export), Edit (undo, redo and changes to the selection) and
+  View (wire colors, symbol style, terminal numbers, and the windows). The View choices are kept between sessions.
+- **Output window**: hidden until a transient, AC sweep or DC sweep runs; it then opens on the tab of the new
+  result. Reopen it from View.
+
 ## Terminals
 
-Every part with more than one terminal numbers them in the order the SPICE netlist lists them. Check **Pins** in
-the editor toolbar to show the numbers, each beside a small ring at its terminal.
+Every part with more than one terminal numbers them in the order the SPICE netlist lists them. Turn on
+**View > Terminal Numbers** to show the numbers, each beside a small ring at its terminal.
 
 | Part | Terminal 1 | Terminal 2 | Terminal 3 |
 |---|---|---|---|
@@ -23,7 +37,7 @@ the editor toolbar to show the numbers, each beside a small ring at its terminal
 Ground and the VCC rail have a single terminal and no number.
 
 Rotating a part (R) or mirroring it (M, Shift+M) moves its terminals with it, so terminal 1 is not always on the
-left or at the top. Pins shows where it ended up.
+left or at the top. Terminal numbers show where it ended up.
 
 ## Current signs
 
@@ -86,7 +100,7 @@ The Examples menu has an inverting amplifier.
 
 Plots start empty; pick what to measure in either place:
 
-- **Probe tool** (Probe button or P): click a wire to measure the voltage of its node, a part to measure its current,
+- **Probe tool** (toolbar button or P): click a wire to measure the voltage of its node, a part to measure its current,
   or a transistor near one of its terminals to measure that terminal's current. Clicking a measured item again stops
   measuring it.
 - **Trace list** in the Output window: check voltages `V(n)` and currents `I(name)`, or use All and None.
@@ -121,9 +135,9 @@ their statistics and the exports always agree.
   is the X axis; each header carries its unit, and on a Bode plot its panel (`Magnitude V(2) (dB)`). Missing
   samples, such as a division by zero in a math channel, are empty cells.
 
-**Schematic**: Export... in the editor toolbar saves the circuit as an SVG image, cropped around it, with the symbol
-style shown (IEC or ANSI), part names and values, terminal numbers when Pins is on, and the measured voltages and
-currents. Light and dark themes darken colors the same way as plot exports, so a probe and its trace keep matching
+**Schematic**: File > Export Schematic... saves the circuit as an SVG image, cropped around it, with the symbol
+style shown (IEC or ANSI), part names and values, terminal numbers when they are shown, and the measured voltages
+and currents. Light and dark themes darken colors the same way as plot exports, so a probe and its trace keep matching
 colors across the two figures.
 
 The save dialogs suggest a name after the schematic file and the tab, such as `rc_filter-transient.svg` or

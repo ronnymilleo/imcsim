@@ -27,9 +27,10 @@ namespace GUI {
  * @brief   Window where the schematic is drawn and edited: components are placed and wired on a grid.
  * @details Positions are stored in world units (one unit per grid cell) and converted to screen pixels
  *          using the current pan offset and zoom factor. The editor is either selecting (the default), placing
- *          a component or drawing wires; starting one mode leaves the other. Schematics are saved to and opened
- *          from JSON files through the native file dialogs of SDL. The schematic itself belongs to the
- *          application; this window only keeps interaction state such as the current mode, drag and view.
+ *          a component, drawing wires or probing; starting one mode leaves the others. Modes start from the icon
+ *          toolbar, their keys, or the part search that Space opens; a status bar lists the keys of each mode.
+ * Schematics are saved to and opened from JSON files through the native file dialogs of SDL. The schematic itself
+ * belongs to the application; this window only keeps interaction state such as the current mode, drag and view.
  */
 class EditorWindow : public AppWindow {
 public:
@@ -42,6 +43,14 @@ public:
 
     // Examples
     void RequestExample(const Example &example);
+
+    // Menus, drawn inside the main menu bar; their commands run on the next Draw()
+    void DrawFileMenuItems();
+    void DrawEditMenuItems();
+    void DrawViewMenuItems();
+
+    // Preferences, kept in imgui.ini; call once after the ImGui context exists and before the first frame
+    void RegisterSettingsHandler();
 
 private:
     /**
@@ -65,6 +74,24 @@ private:
         Nodes,
         Voltage,
         Current
+    };
+
+    /**
+     * @enum    EditorCommand
+     * @brief   A command picked in a menu, run by the next Draw() so its popups belong to the editor window.
+     */
+    enum class EditorCommand {
+        New,
+        Open,
+        Save,
+        SaveAs,
+        ExportSchematic,
+        Undo,
+        Redo,
+        Rotate,
+        Mirror,
+        Flip,
+        Delete
     };
 
     /**
@@ -97,6 +124,11 @@ private:
     std::optional<Core::ComponentType> m_PlacingType;
     Rotation m_PlacingRotation = Rotation::R0;
     bool m_PlacingMirrored = false;
+    // Part each toolbar group places, the last one picked from its list
+    std::vector<Core::ComponentType> m_PartGroupChoices;
+    // Part picker: the typed query and the highlighted match
+    std::string m_PartQuery;
+    std::size_t m_PartPickerIndex = 0;
 
     // Wiring
     bool m_DrawingWires = false;
@@ -112,6 +144,9 @@ private:
     // Quitting: requested by the application between frames, handled by the next Draw()
     bool m_QuitRequested = false;
     bool m_QuitConfirmed = false;
+
+    // Menu command waiting for the next Draw()
+    std::optional<EditorCommand> m_RequestedCommand;
 
     // Examples: requested from the menu and handled by the next Draw(), then kept while discarding is confirmed
     std::optional<Example> m_RequestedExample;
@@ -129,10 +164,13 @@ private:
     // Frame
     void Draw() override;
     void DrawToolbar();
+    void DrawPartButton(Core::ComponentType type);
+    void DrawPartGroup(std::size_t index);
     void DrawWires(SchematicCanvas &canvas, const ViewTransform &view);
     void DrawWireCurrents(SchematicCanvas &canvas, const ViewTransform &view,
                           const Core::OperatingPoint &operating_point);
     ImU32 GetElementColor(std::size_t index) const;
+    void DrawStatusBar(const ViewTransform &view, bool hovered);
     void DrawColorLegend(ImDrawList *draw_list, ImVec2 origin, ImVec2 size) const;
     void DrawNodeVoltages(ImDrawList *draw_list, const ViewTransform &view);
     void DrawHoveredValue(const ViewTransform &view, bool hovered);
@@ -140,11 +178,13 @@ private:
     void FrameSchematic(ImVec2 canvas_size);
 
     // Modes
+    void StartSelecting();
     void StartPlacing(Core::ComponentType type);
     void StartDrawingWires();
     void StartProbing();
 
     // Placement
+    void DrawPartPicker();
     void HandlePlacement(SchematicCanvas &canvas, const ViewTransform &view, bool hovered);
 
     // Wiring
@@ -170,6 +210,7 @@ private:
     void RequestOpen();
     void HandleQuitRequest();
     void HandleExampleRequest();
+    void HandleCommandRequest();
     void Save();
     void NewSchematic();
     void OpenFile(const std::filesystem::path &path);

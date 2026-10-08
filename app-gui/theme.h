@@ -21,7 +21,7 @@ ImVec4 GetErrorTextColor();
 ImVec4 GetWarningTextColor();
 
 // Widgets
-bool PrimaryButton(const char *label);
+bool PrimaryButton(const char *label, ImVec2 size = ImVec2(0.0f, 0.0f));
 
 } // namespace GUI
 

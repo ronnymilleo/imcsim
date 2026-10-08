@@ -48,6 +48,12 @@ private:
     std::vector<std::string> m_Errors;
     bool m_IsOpen{true};
     bool m_ResetLayout{false};
+    // Last title given to the window, so it is only set again when the file or its state changes
+    std::string m_WindowTitle;
+    // Result versions already shown, so each new result opens the Output window once
+    std::size_t m_ShownTransientVersion = 0;
+    std::size_t m_ShownACSweepVersion = 0;
+    std::size_t m_ShownDCSweepVersion = 0;
 
     // The schematic is declared first, so it exists when the windows that refer to it are built
     Schematic m_Schematic;
@@ -71,6 +77,8 @@ private:
     void NewFrame();
     void Render();
     void DrawMainMenuBar();
+    void UpdateWindowTitle();
+    void ShowNewResults();
     void SetupDefaultLayout(ImGuiID dockspace_id);
     void EndFrame();
 };

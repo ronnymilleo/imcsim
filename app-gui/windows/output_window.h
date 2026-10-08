@@ -108,12 +108,15 @@ enum class ExportFormat {
  *          V(1)*I(R1), to the transient and DC sweep plots: voltages and currents keep their axes, and any other
  *          unit, or none, goes on a third axis. Export saves the plot of the current tab as an SVG image, redrawn
  *          from its data at a chosen size and theme over the visible X range, or as a CSV table of every sample.
- *          The window floats instead of being docked, so the plots can be as large as needed.
+ *          The window floats instead of being docked, so the plots can be as large as needed. It starts closed and
+ *          opens on the tab of each new transient, AC sweep or DC sweep.
  */
 class OutputWindow : public AppWindow {
 public:
     explicit OutputWindow(Schematic &schematic);
     ~OutputWindow() override = default;
+
+    void ShowTab(PlotTab tab);
 
 private:
     Schematic &m_Schematic;
@@ -140,6 +143,8 @@ private:
     std::vector<std::string> m_DCSweepShownMath;
     // Export: the tab shown this frame, the image settings, and the figure waiting for the save dialog
     PlotTab m_ShownTab = PlotTab::Transient;
+    // Tab to bring to the front on the next frame, after a new result
+    std::optional<PlotTab> m_TabToShow;
     PlotSpan m_DCSweepView;
     ExportStyle m_ExportStyle;
     FileDialog m_ExportDialog;

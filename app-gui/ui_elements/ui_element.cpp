@@ -6,6 +6,7 @@
 #include "ui_element.h"
 
 #include "spice_value.h"
+#include <algorithm>
 #include <cfloat>
 #include <cmath>
 #include <cstdlib>
@@ -42,6 +43,26 @@ void UIElement::Draw(SchematicCanvas &canvas, const ViewTransform &view, const I
     DrawTerminals(canvas, view, color);
     DrawSymbol(canvas, view, color, style);
     DrawLabels(canvas, view, color);
+}
+
+/**
+ * @brief   Draws the symbol and its leads, without labels, scaled to fit a square, as an icon of its kind of part.
+ * @param[in,out] canvas Where it is drawn, such as a toolbar button.
+ * @param[in] center     Middle of the square, in screen pixels.
+ * @param[in] size       Side of the square, in pixels.
+ * @param[in] color      Line color.
+ * @param[in] style      Drawing standard for the symbol.
+ * @note    Meant for an unrotated, unmirrored element, such as a newly created one.
+ */
+void UIElement::DrawIcon(SchematicCanvas &canvas, const ImVec2 center, const float size, const ImU32 color,
+                         const SymbolStyle style) const {
+    const LocalBounds bounds = GetLocalBounds();
+    const ImVec2 extent = {bounds.Max.x - bounds.Min.x, bounds.Max.y - bounds.Min.y};
+    const float zoom = size / std::max(extent.x, extent.y);
+    const ImVec2 middle = ToVec2(m_Position) + (bounds.Min + bounds.Max) / 2.0f;
+    const ViewTransform view({0.0f, 0.0f}, center - middle * zoom, zoom);
+    DrawTerminals(canvas, view, color);
+    DrawSymbol(canvas, view, color, style);
 }
 
 /**
