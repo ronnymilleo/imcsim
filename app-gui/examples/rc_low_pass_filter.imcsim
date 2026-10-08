@@ -45,6 +45,19 @@
     }
   ],
   "format": "imcsim-schematic",
+  "measurements": {
+    "currents": [],
+    "voltages": [
+      [
+        4,
+        4
+      ],
+      [
+        11,
+        4
+      ]
+    ]
+  },
   "simulation": {
     "ac_sweep": {
       "points_per_decade": 20,

@@ -45,7 +45,7 @@ TEST_CASE("A saved schematic loads back unchanged", "[schematic_file]") {
     elements.push_back(GUI::CreateElement(Core::ComponentType::Ground, {0, 2}, GUI::Rotation::R0));
     const std::vector<GUI::UIWire> wires{{{0, 2}, {4, 2}}, {{4, 2}, {4, -2}}};
 
-    const GUI::LoadedSchematic loaded = LoadOrFail(GUI::SaveSchematic(elements, wires, {}));
+    const GUI::LoadedSchematic loaded = LoadOrFail(GUI::SaveSchematic(elements, wires, {}, {}));
     CHECK(loaded.Warnings.empty());
     REQUIRE(loaded.Elements.size() == elements.size());
     for (std::size_t index = 0; index < elements.size(); ++index) {
@@ -67,7 +67,7 @@ TEST_CASE("A saved schematic loads back unchanged", "[schematic_file]") {
 TEST_CASE("Saved files store ground without name or value", "[schematic_file]") {
     std::vector<std::unique_ptr<GUI::UIElement>> elements;
     elements.push_back(GUI::CreateElement(Core::ComponentType::Ground, {1, 2}, GUI::Rotation::R0));
-    const std::string text = GUI::SaveSchematic(elements, {}, {});
+    const std::string text = GUI::SaveSchematic(elements, {}, {}, {});
     CHECK(text.find("\"name\"") == std::string::npos);
     CHECK(text.find("\"value\"") == std::string::npos);
 }
@@ -137,7 +137,7 @@ TEST_CASE("A voltage source keeps its type and sine parameters", "[schematic_fil
     source.SetSourceType(Core::VoltageSource::SourceType::AC);
     source.SetAC({.Amplitude = 2.5, .Frequency = 60.0, .Offset = -1.0});
 
-    const GUI::LoadedSchematic loaded = LoadOrFail(GUI::SaveSchematic(elements, {}, {}));
+    const GUI::LoadedSchematic loaded = LoadOrFail(GUI::SaveSchematic(elements, {}, {}, {}));
     CHECK(loaded.Warnings.empty());
     REQUIRE(loaded.Elements.size() == 1);
     const auto &copy = static_cast<const Core::VoltageSource &>(loaded.Elements[0]->GetComponent());
@@ -170,7 +170,7 @@ TEST_CASE("A pulse source keeps its pulse, and an invalid pulse is skipped", "[s
         .Low = -2.0, .High = 3.3, .Delay = 1e-3, .RiseTime = 5e-9, .FallTime = 7e-9, .Width = 2e-3, .Period = 4e-3};
     source.SetPulse(pulse);
 
-    const GUI::LoadedSchematic loaded = LoadOrFail(GUI::SaveSchematic(elements, {}, {}));
+    const GUI::LoadedSchematic loaded = LoadOrFail(GUI::SaveSchematic(elements, {}, {}, {}));
     CHECK(loaded.Warnings.empty());
     REQUIRE(loaded.Elements.size() == 1);
     const auto &copy = static_cast<const Core::VoltageSource &>(loaded.Elements[0]->GetComponent());
@@ -199,7 +199,7 @@ TEST_CASE("A current source keeps its value, type and waveforms", "[schematic_fi
     source.SetSourceType(Core::CurrentSource::SourceType::AC);
     source.SetAC({.Amplitude = 5e-3});
 
-    const GUI::LoadedSchematic loaded = LoadOrFail(GUI::SaveSchematic(elements, {}, {}));
+    const GUI::LoadedSchematic loaded = LoadOrFail(GUI::SaveSchematic(elements, {}, {}, {}));
     CHECK(loaded.Warnings.empty());
     REQUIRE(loaded.Elements.size() == 1);
     const auto &copy = static_cast<const Core::CurrentSource &>(loaded.Elements[0]->GetComponent());
@@ -218,7 +218,7 @@ TEST_CASE("A diode part keeps its model", "[schematic_file]") {
     zener.SetName("D1");
     zener.SetModel(*Core::FindDiodeModel(Core::ComponentType::ZenerDiode, "12V"));
 
-    const std::string saved = GUI::SaveSchematic(elements, {}, {});
+    const std::string saved = GUI::SaveSchematic(elements, {}, {}, {});
     CHECK(saved.find(R"("value")") == std::string::npos);
     const GUI::LoadedSchematic loaded = LoadOrFail(saved);
     CHECK(loaded.Warnings.empty());
@@ -253,7 +253,7 @@ TEST_CASE("A custom diode keeps its parameters", "[schematic_file]") {
     parameters.TransitTime = 5e-9;
     led.SetCustomParameters(parameters);
 
-    const GUI::LoadedSchematic loaded = LoadOrFail(GUI::SaveSchematic(elements, {}, {}));
+    const GUI::LoadedSchematic loaded = LoadOrFail(GUI::SaveSchematic(elements, {}, {}, {}));
     CHECK(loaded.Warnings.empty());
     REQUIRE(loaded.Elements.size() == 1);
     const auto &copy = static_cast<const Core::Diode &>(loaded.Elements[0]->GetComponent());
@@ -297,7 +297,7 @@ TEST_CASE("Transistors keep their model or custom parameters", "[schematic_file]
     parameters.MaxPower = 1.5;
     nmos.SetCustomParameters(parameters);
 
-    const GUI::LoadedSchematic loaded = LoadOrFail(GUI::SaveSchematic(elements, {}, {}));
+    const GUI::LoadedSchematic loaded = LoadOrFail(GUI::SaveSchematic(elements, {}, {}, {}));
     CHECK(loaded.Warnings.empty());
     REQUIRE(loaded.Elements.size() == 2);
     const auto &pnp_copy = static_cast<const Core::BJT &>(loaded.Elements[0]->GetComponent());
@@ -330,7 +330,7 @@ TEST_CASE("Mirrored elements keep their mirroring, and only they carry the key",
     elements.push_back(GUI::CreateElement(Core::ComponentType::Resistor, {6, 0}, GUI::Rotation::R0));
     elements.back()->GetComponent().SetName("R1");
 
-    const std::string saved = GUI::SaveSchematic(elements, {}, {});
+    const std::string saved = GUI::SaveSchematic(elements, {}, {}, {});
     CHECK(saved.find(R"("mirrored": true)") != std::string::npos);
     CHECK(saved.find(R"("mirrored": false)") == std::string::npos);
     const GUI::LoadedSchematic loaded = LoadOrFail(saved);
@@ -359,7 +359,7 @@ TEST_CASE("Simulation settings load back unchanged", "[schematic_file]") {
     settings.SteppedRange = {.Source = "I1", .Start = 10e-6, .Stop = 50e-6, .Step = 10e-6};
     settings.StepSource = true;
 
-    const GUI::LoadedSchematic loaded = LoadOrFail(GUI::SaveSchematic({}, {}, settings));
+    const GUI::LoadedSchematic loaded = LoadOrFail(GUI::SaveSchematic({}, {}, settings, {}));
     CHECK(loaded.Warnings.empty());
     CHECK(loaded.Settings == settings);
 }
@@ -381,4 +381,22 @@ TEST_CASE("Invalid settings of one analysis fall back to its defaults with a war
     CHECK(loaded.Settings.ACSweep ==
           Core::ACSweepSettings{.StartFrequency = 10.0, .StopFrequency = 1e3, .PointsPerDecade = 5});
     CHECK(loaded.Settings.SweptRange == Core::SweepRange{});
+}
+
+TEST_CASE("Measurements load back unchanged, and files without them leave the key out", "[schematic_file]") {
+    const GUI::SavedMeasurements measurements{.Voltages = {{2, 3}, {-1, 0}}, .Currents = {"R1", "Q1.C"}};
+    const GUI::LoadedSchematic loaded = LoadOrFail(GUI::SaveSchematic({}, {}, {}, measurements));
+    CHECK(loaded.Warnings.empty());
+    CHECK(loaded.Measurements == measurements);
+
+    CHECK(GUI::SaveSchematic({}, {}, {}, {}).find("\"measurements\"") == std::string::npos);
+}
+
+TEST_CASE("Measurements that cannot be read are skipped with a warning", "[schematic_file]") {
+    const std::string text = R"({"format": "imcsim-schematic", "version": 1, "measurements": )"
+                             R"({"voltages": [[1, 2], [1.5, 2], "x"], "currents": ["R1", 3]}})";
+    const GUI::LoadedSchematic loaded = LoadOrFail(text);
+    CHECK(loaded.Warnings.size() == 2);
+    CHECK(loaded.Measurements.Voltages == std::vector<GUI::GridPoint>{{1, 2}});
+    CHECK(loaded.Measurements.Currents == std::vector<std::string>{"R1"});
 }

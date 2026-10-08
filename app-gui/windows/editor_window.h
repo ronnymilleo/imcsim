@@ -110,6 +110,8 @@ private:
     float m_Zoom = DefaultZoom;
     SymbolStyle m_SymbolStyle = SymbolStyle::IEC;
     WireColoring m_WireColoring = WireColoring::Plain;
+    // Set when a schematic is opened; the next Draw() frames it, once the canvas size is known
+    bool m_FrameRequested = false;
 
     // Placement
     std::optional<Core::ComponentType> m_PlacingType;
@@ -155,6 +157,7 @@ private:
     void DrawMeasurements(ImDrawList *draw_list, const ViewTransform &view);
     void DrawHoveredValue(const ViewTransform &view, bool hovered);
     void HandlePanAndZoom(ImVec2 origin, bool hovered, bool active);
+    void FrameSchematic(ImVec2 canvas_size);
 
     // Modes
     void StartPlacing(Core::ComponentType type);

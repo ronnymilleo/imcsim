@@ -17,27 +17,28 @@ namespace {
 constexpr auto Examples = std::to_array<Example>({
     {
         .Title = "RC low-pass filter",
-        .Description = "A 1k resistor and a 100n capacitor, with the corner at 1.6 kHz. Probe the input and the "
-                       "capacitor, then run the AC sweep for the Bode plot, or the transient to see a 1 kHz sine "
-                       "attenuated and delayed.",
+        .Description = "A 1k resistor and a 100n capacitor, with the corner at 1.6 kHz. Run the AC sweep for the "
+                       "Bode plot of the input and the capacitor, or the transient to see a 1 kHz sine attenuated "
+                       "and delayed.",
         .FileName = "rc_low_pass_filter.imcsim",
     },
     {
         .Title = "Full-bridge rectifier",
         .Description = "Four 1N4007 diodes turn a 60 Hz, 17 V peak sine into DC on a 100u reservoir capacitor. "
-                       "Probe the load and run the transient to see the ripple.",
+                       "Run the transient to see the ripple on the load and the short pulses that recharge it "
+                       "through D1.",
         .FileName = "full_bridge_rectifier.imcsim",
     },
     {
         .Title = "LED driver",
-        .Description = "A 2N2222A switches a red LED from a 1 kHz, 0 to 5 V pulse. Probe the LED and the base, "
-                       "then run the transient.",
+        .Description = "A 2N2222A switches a red LED from a 1 kHz, 0 to 5 V pulse. Run the transient to see the "
+                       "input and the LED current.",
         .FileName = "led_driver.imcsim",
     },
     {
         .Title = "BJT output characteristics",
         .Description = "Collector current of a 2N3904 against its collector voltage, one curve per base current "
-                       "from 10u to 50u. Probe the collector of Q1 and run the DC sweep.",
+                       "from 10u to 50u. Run the DC sweep.",
         .FileName = "bjt_output_characteristics.imcsim",
     },
 });

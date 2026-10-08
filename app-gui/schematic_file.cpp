@@ -149,13 +149,19 @@ std::optional<bool> ReadBool(const nlohmann::json &object, const char *key) {
     return entry->get<bool>();
 }
 
-std::optional<GridPoint> ReadPoint(const nlohmann::json &object, const char *key) {
-    const auto entry = object.find(key);
-    if (entry == object.end() || !entry->is_array() || entry->size() != 2 || !(*entry)[0].is_number_integer() ||
-        !(*entry)[1].is_number_integer()) {
+std::optional<GridPoint> ReadPointValue(const nlohmann::json &value) {
+    if (!value.is_array() || value.size() != 2 || !value[0].is_number_integer() || !value[1].is_number_integer()) {
         return std::nullopt;
     }
-    return GridPoint{(*entry)[0].get<int>(), (*entry)[1].get<int>()};
+    return GridPoint{value[0].get<int>(), value[1].get<int>()};
+}
+
+std::optional<GridPoint> ReadPoint(const nlohmann::json &object, const char *key) {
+    const auto entry = object.find(key);
+    if (entry == object.end()) {
+        return std::nullopt;
+    }
+    return ReadPointValue(*entry);
 }
 
 template <typename Parameters, std::size_t Count>
@@ -548,17 +554,75 @@ SimulationSettings ReadSettings(const nlohmann::json &document, std::vector<std:
     return settings;
 }
 
+nlohmann::json WriteMeasurements(const SavedMeasurements &measurements) {
+    nlohmann::json voltages = nlohmann::json::array();
+    for (const GridPoint point : measurements.Voltages) {
+        voltages.push_back({point.X, point.Y});
+    }
+    return {{"voltages", voltages}, {"currents", measurements.Currents}};
+}
+
+// Reads every entry of a list that read_entry accepts. Returns false when the key holds no list or some entry was
+// skipped; a missing key is an empty list
+template <typename Value, typename ReadEntry>
+bool ReadList(const nlohmann::json &object, const char *key, const ReadEntry &read_entry, std::vector<Value> &values) {
+    const auto list = object.find(key);
+    if (list == object.end()) {
+        return true;
+    }
+    if (!list->is_array()) {
+        return false;
+    }
+    bool complete = true;
+    for (const nlohmann::json &entry : *list) {
+        if (const std::optional<Value> value = read_entry(entry)) {
+            values.push_back(*value);
+        } else {
+            complete = false;
+        }
+    }
+    return complete;
+}
+
+std::optional<std::string> ReadStringValue(const nlohmann::json &value) {
+    if (!value.is_string()) {
+        return std::nullopt;
+    }
+    return value.get<std::string>();
+}
+
+// Entries that cannot be read are skipped with one warning per list, since a lost trace is easy to probe again
+SavedMeasurements ReadMeasurements(const nlohmann::json &document, std::vector<std::string> &warnings) {
+    SavedMeasurements measurements;
+    const auto object = document.find("measurements");
+    if (object == document.end()) {
+        return measurements;
+    }
+    if (!object->is_object()) {
+        warnings.push_back("The measurements are not an object and were skipped");
+        return measurements;
+    }
+    if (!ReadList(*object, "voltages", ReadPointValue, measurements.Voltages)) {
+        warnings.push_back("Some measured voltages are not integer points and were skipped");
+    }
+    if (!ReadList(*object, "currents", ReadStringValue, measurements.Currents)) {
+        warnings.push_back("Some measured currents are not names and were skipped");
+    }
+    return measurements;
+}
+
 } // namespace
 
 /**
  * @brief   Writes a schematic as JSON.
- * @param[in] elements  Components placed on the grid.
- * @param[in] wires     Wire segments.
- * @param[in] settings  Settings of the analyses.
+ * @param[in] elements      Components placed on the grid.
+ * @param[in] wires         Wire segments.
+ * @param[in] settings      Settings of the analyses.
+ * @param[in] measurements  Traces the plots show; the key is left out when there are none.
  * @return  The file contents, indented for reading and diffing. Values are plain numbers, never suffixed text.
  */
 std::string SaveSchematic(const std::vector<std::unique_ptr<UIElement>> &elements, const std::vector<UIWire> &wires,
-                          const SimulationSettings &settings) {
+                          const SimulationSettings &settings, const SavedMeasurements &measurements) {
     nlohmann::json element_list = nlohmann::json::array();
     for (const auto &element : elements) {
         element_list.push_back(WriteElement(*element));
@@ -570,13 +634,16 @@ std::string SaveSchematic(const std::vector<std::unique_ptr<UIElement>> &element
             {"end", {wire.GetEnd().X, wire.GetEnd().Y}},
         });
     }
-    const nlohmann::json document = {
+    nlohmann::json document = {
         {"format", FormatName},
         {"version", FormatVersion},
         {"elements", element_list},
         {"wires", wire_list},
         {"simulation", WriteSettings(settings)},
     };
+    if (!measurements.Voltages.empty() || !measurements.Currents.empty()) {
+        document["measurements"] = WriteMeasurements(measurements);
+    }
     return document.dump(2) + "\n";
 }
 
@@ -640,6 +707,7 @@ std::expected<LoadedSchematic, std::string> LoadSchematic(const std::string_view
         }
     }
     schematic.Settings = ReadSettings(document, schematic.Warnings);
+    schematic.Measurements = ReadMeasurements(document, schematic.Warnings);
     return schematic;
 }
 

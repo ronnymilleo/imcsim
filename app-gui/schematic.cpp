@@ -296,6 +296,37 @@ void Schematic::ClearMeasurements() {
 }
 
 /**
+ * @brief   Describes the measurements for a file, with each voltage as a point of its node.
+ * @return  The measured voltages and currents; nodes that no longer exist are left out.
+ */
+SavedMeasurements Schematic::SaveMeasurements() {
+    SavedMeasurements measurements;
+    for (const int node : m_MeasuredNodes) {
+        if (const std::optional<GridPoint> point = GetConnectivity().FindPointOfNode(node)) {
+            measurements.Voltages.push_back(*point);
+        }
+    }
+    measurements.Currents.assign(m_MeasuredCurrents.begin(), m_MeasuredCurrents.end());
+    return measurements;
+}
+
+/**
+ * @brief   Replaces the measurements with those read from a file.
+ * @param[in] measurements  Measured voltages and currents; call it after the content they refer to is in place.
+ * @note    Points that connect to nothing, or to ground, are skipped. Currents of parts that do not exist are kept
+ *          but plot nothing, like after deleting a measured part.
+ */
+void Schematic::RestoreMeasurements(const SavedMeasurements &measurements) {
+    ClearMeasurements();
+    for (const GridPoint point : measurements.Voltages) {
+        if (const std::optional<int> node = GetConnectivity().GetNode(point); node && *node != 0) {
+            m_MeasuredNodes.insert(*node);
+        }
+    }
+    m_MeasuredCurrents.insert(measurements.Currents.begin(), measurements.Currents.end());
+}
+
+/**
  * @brief   Returns how each analysis runs.
  * @return  The settings, saved with the schematic.
  */
@@ -562,8 +593,9 @@ void Schematic::InvalidateDerivedData() {
     m_DCSweep.reset();
 }
 
+// Measurements stay out of snapshots, so probing adds no undo step and does not count as a change
 std::string Schematic::TakeSnapshot() const {
-    return SaveSchematic(m_Elements, m_Wires, m_SimulationSettings);
+    return SaveSchematic(m_Elements, m_Wires, m_SimulationSettings, {});
 }
 
 // Snapshots come from TakeSnapshot(), so they always load back without warnings

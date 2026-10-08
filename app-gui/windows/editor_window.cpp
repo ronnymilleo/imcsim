@@ -241,6 +241,9 @@ void EditorWindow::Draw() {
     ImVec2 size = ImGui::GetContentRegionAvail();
     size.x = std::max(size.x, MinCanvasSize);
     size.y = std::max(size.y, MinCanvasSize);
+    if (std::exchange(m_FrameRequested, false)) {
+        FrameSchematic(size);
+    }
 
     ImGui::InvisibleButton("canvas", size,
                            ImGuiButtonFlags_MouseButtonLeft | ImGuiButtonFlags_MouseButtonRight |
@@ -594,6 +597,21 @@ void EditorWindow::HandlePanAndZoom(const ImVec2 origin, const bool hovered, con
         const ImVec2 after = ViewTransform(origin, m_Pan, m_Zoom).ToWorld(io.MousePos);
         m_Pan += (after - before) * m_Zoom;
     }
+}
+
+// Shows the whole schematic centered, never zoomed in past the default, so a small circuit is not blown up
+void EditorWindow::FrameSchematic(const ImVec2 canvas_size) {
+    std::vector<GridPoint> points = m_Schematic.CollectTerminals();
+    for (const auto &element : m_Schematic.GetElements()) {
+        points.push_back(element->GetPosition());
+    }
+    for (const UIWire &wire : m_Schematic.GetWires()) {
+        points.push_back(wire.GetStart());
+        points.push_back(wire.GetEnd());
+    }
+    const ViewFrame frame = FramePoints(points, canvas_size, MinZoom, DefaultZoom);
+    m_Pan = frame.Pan;
+    m_Zoom = frame.Zoom;
 }
 
 void EditorWindow::StartPlacing(const Core::ComponentType type) {
@@ -1012,7 +1030,9 @@ void EditorWindow::OpenFile(const std::filesystem::path &path) {
 
     NewSchematic();
     m_Schematic.Replace(std::move(loaded->Elements), std::move(loaded->Wires), std::move(loaded->Settings));
+    m_Schematic.RestoreMeasurements(loaded->Measurements);
     m_Schematic.MarkSaved(path);
+    m_FrameRequested = true;
     if (!loaded->Warnings.empty()) {
         m_Schematic.MarkModified();
         ShowFileMessages(std::format("{} was opened, but some parts were changed or skipped", path.filename().string()),
@@ -1020,7 +1040,6 @@ void EditorWindow::OpenFile(const std::filesystem::path &path) {
     }
 }
 
-// The view goes back to its default, where the examples are drawn, in case the user had panned or zoomed away
 void EditorWindow::OpenExample(const Example &example) {
     auto loaded = LoadExample(example);
     if (!loaded) {
@@ -1030,8 +1049,8 @@ void EditorWindow::OpenExample(const Example &example) {
 
     NewSchematic();
     m_Schematic.Replace(std::move(loaded->Elements), std::move(loaded->Wires), std::move(loaded->Settings));
-    m_Pan = {0, 0};
-    m_Zoom = DefaultZoom;
+    m_Schematic.RestoreMeasurements(loaded->Measurements);
+    m_FrameRequested = true;
 }
 
 // Dialogs do not always add the extension, so it is added here when missing
@@ -1039,8 +1058,9 @@ void EditorWindow::SaveFile(std::filesystem::path path) {
     if (path.extension() != SchematicExtension) {
         path += SchematicExtension;
     }
-    const auto written = WriteTextFile(
-        path, SaveSchematic(m_Schematic.GetElements(), m_Schematic.GetWires(), m_Schematic.GetSimulationSettings()));
+    const auto written =
+        WriteTextFile(path, SaveSchematic(m_Schematic.GetElements(), m_Schematic.GetWires(),
+                                          m_Schematic.GetSimulationSettings(), m_Schematic.SaveMeasurements()));
     if (!written) {
         ShowFileMessages("Could not save the schematic", {written.error()});
         return;

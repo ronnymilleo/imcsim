@@ -1,6 +1,6 @@
 /**
  * @file    helpers.h
- * @brief   Geometry helpers for the schematic editor: grid points, rotations, snapping and world/screen conversion.
+ * @brief   Geometry helpers for the schematic editor: grid points, rotations, snapping, view transform and framing.
  */
 
 #ifndef IMCSIM_HELPERS_H
@@ -10,6 +10,7 @@
 #include <compare>
 #include <cstdint>
 #include <optional>
+#include <span>
 
 namespace GUI {
 
@@ -56,6 +57,15 @@ private:
     float m_Zoom;
 };
 
+/**
+ * @struct  ViewFrame
+ * @brief   Pan and zoom of a canvas, as ViewTransform takes them.
+ */
+struct ViewFrame {
+    ImVec2 Pan;
+    float Zoom = 1.0f;
+};
+
 // Grid points
 GridPoint operator+(GridPoint first, GridPoint second);
 GridPoint operator-(GridPoint first, GridPoint second);
@@ -69,6 +79,9 @@ int ToDegrees(Rotation rotation);
 std::optional<Rotation> RotationFromDegrees(int degrees);
 ImVec2 Rotate(ImVec2 point, Rotation rotation);
 GridPoint Rotate(GridPoint point, Rotation rotation);
+
+// Framing
+ViewFrame FramePoints(std::span<const GridPoint> points, ImVec2 canvas_size, float min_zoom, float max_zoom);
 
 } // namespace GUI
 

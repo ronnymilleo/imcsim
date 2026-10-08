@@ -22,11 +22,14 @@ void OpenOrFail(const GUI::Example &example, GUI::Schematic &schematic) {
     }
     CHECK(loaded->Warnings.empty());
     schematic.Replace(std::move(loaded->Elements), std::move(loaded->Wires), std::move(loaded->Settings));
+    schematic.RestoreMeasurements(loaded->Measurements);
+    // Every saved voltage lands on a node, so none is dropped on the way in
+    CHECK(schematic.SaveMeasurements() == loaded->Measurements);
 }
 
 } // namespace
 
-TEST_CASE("Every example opens without warnings and runs its operating point and transient", "[examples]") {
+TEST_CASE("Every example opens without warnings, measures existing traces and runs", "[examples]") {
     REQUIRE_FALSE(GUI::GetExamples().empty());
     for (const GUI::Example &example : GUI::GetExamples()) {
         INFO(example.Title);
@@ -35,7 +38,13 @@ TEST_CASE("Every example opens without warnings and runs its operating point and
         CHECK_FALSE(schematic.GetElements().empty());
 
         const Core::OperatingPointRun operating_point = Core::RunOperatingPoint(schematic.BuildCircuit());
-        CHECK(operating_point.Result.has_value());
+        REQUIRE(operating_point.Result.has_value());
+        const GUI::SavedMeasurements measurements = schematic.SaveMeasurements();
+        CHECK_FALSE((measurements.Voltages.empty() && measurements.Currents.empty()));
+        for (const std::string &name : measurements.Currents) {
+            INFO(name);
+            CHECK(std::ranges::contains(operating_point.Result->Currents, name, &Core::ComponentCurrent::Name));
+        }
         const Core::TransientRun transient =
             Core::RunTransient(schematic.BuildCircuit(), schematic.GetSimulationSettings().Transient);
         CHECK(transient.Result.has_value());
