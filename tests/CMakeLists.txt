@@ -15,6 +15,7 @@ add_executable(imcsim-tests
             plot_export_tests.cpp
             plot_helpers_tests.cpp
             probing_tests.cpp
+            schematic_canvas_tests.cpp
             schematic_file_tests.cpp
             schematic_tests.cpp
             simulator_tests.cpp

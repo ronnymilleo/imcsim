@@ -9,6 +9,7 @@
 #include "element_factory.h"
 #include "node_colors.h"
 #include "probing.h"
+#include "schematic_drawing.h"
 #include "schematic_file.h"
 #include "spice_value.h"
 #include "theme.h"
@@ -17,7 +18,6 @@
 #include <array>
 #include <cmath>
 #include <format>
-#include <set>
 #include <string>
 #include <utility>
 
@@ -26,11 +26,8 @@ namespace GUI {
 namespace {
 
 // Warm tones that match the theme; selection stays amber so it is not mistaken for the salmon of node 1
-constexpr ImU32 BackgroundColor = IM_COL32(18, 15, 16, 255);
 constexpr ImU32 GridDotColor = IM_COL32(78, 63, 66, 255);
-constexpr ImU32 ElementColor = IM_COL32(220, 220, 220, 255);
 constexpr ImU32 PreviewColor = IM_COL32(236, 96, 100, 170);
-constexpr ImU32 WireColor = IM_COL32(158, 192, 120, 255);
 constexpr ImU32 SelectedColor = IM_COL32(255, 200, 80, 255);
 constexpr float MinCanvasSize = 50.0f;
 constexpr float MinZoom = 4.0f;
@@ -48,9 +45,6 @@ constexpr ImU32 NodeLabelColor = IM_COL32(255, 255, 255, 255);
 constexpr ImU32 VoltageLabelColor = IM_COL32(255, 220, 120, 255);
 // Voltage labels sit just above and right of their point, clear of the line
 constexpr ImVec2 VoltageLabelOffset = {4.0f, -16.0f};
-// Measurement markers sit below and right of their point, clear of the voltage labels
-constexpr ImVec2 MeasurementLabelOffset = {6.0f, 2.0f};
-constexpr float MeasurementMarkerRadius = 4.0f;
 constexpr ImU32 ProbeHighlightColor = IM_COL32(236, 96, 100, 255);
 // Currents span decades, so the heat scale is logarithmic and shows this many below the largest current
 constexpr double CurrentDecades = 4.0;
@@ -87,8 +81,10 @@ constexpr auto ToolbarComponents = std::to_array<ToolbarItem>({
 
 constexpr const char *DiscardPopup = "Discard changes?";
 constexpr const char *FileMessagesPopup = "File messages";
+constexpr const char *ExportPopup = "export_schematic";
 // Must stay valid until the dialog callback runs, so it lives for the whole program
 constexpr std::array<SDL_DialogFileFilter, 1> SchematicFilters = {{{"imcsim schematic", "imcsim"}}};
+constexpr std::array<SDL_DialogFileFilter, 1> SVGFilters = {{{"SVG image", "svg"}}};
 
 void DrawGrid(ImDrawList *draw_list, const ViewTransform &view, const ImVec2 origin, const ImVec2 size,
               const float zoom) {
@@ -257,16 +253,20 @@ void EditorWindow::Draw() {
     HandleSelection(view, hovered);
     ImDrawList *draw_list = ImGui::GetWindowDrawList();
     draw_list->PushClipRect(origin, origin + size, true);
-    draw_list->AddRectFilled(origin, origin + size, BackgroundColor);
+    draw_list->AddRectFilled(origin, origin + size, SchematicBackgroundColor);
     DrawGrid(draw_list, view, origin, size, m_Zoom);
 
-    DrawWires(draw_list, view);
+    DrawListCanvas canvas(draw_list);
+    DrawWires(canvas, view);
     const auto &elements = m_Schematic.GetElements();
     for (std::size_t index = 0; index < elements.size(); ++index) {
-        elements[index]->Draw(draw_list, view, GetElementColor(index), m_SymbolStyle);
+        elements[index]->Draw(canvas, view, GetElementColor(index), m_SymbolStyle);
+    }
+    if (m_ShowTerminalNumbers) {
+        DrawTerminalNumbers(canvas, view, m_Schematic, ScreenTerminalRingScale);
     }
     DrawNodeVoltages(draw_list, view);
-    DrawMeasurements(draw_list, view);
+    DrawMeasurementMarkers(canvas, view, m_Schematic);
 
     if (ImGui::IsWindowFocused() && ImGui::IsKeyPressed(ImGuiKey_W)) {
         StartDrawingWires();
@@ -274,7 +274,7 @@ void EditorWindow::Draw() {
     if (ImGui::IsWindowFocused() && ImGui::IsKeyPressed(ImGuiKey_P)) {
         StartProbing();
     }
-    HandlePlacement(draw_list, view, hovered);
+    HandlePlacement(canvas, view, hovered);
     HandleWireDrawing(draw_list, view, hovered);
     HandleProbing(draw_list, view, hovered);
     DrawHoveredValue(view, hovered);
@@ -306,6 +306,11 @@ void EditorWindow::DrawToolbar() {
     if (ImGui::Button("Save As")) {
         ShowFileDialog(FileAction::Save);
     }
+    row.Place(ToolbarRow::ButtonWidth("Export..."));
+    if (ImGui::Button("Export...")) {
+        ImGui::OpenPopup(ExportPopup);
+    }
+    ImGui::SetItemTooltip("Save the schematic as an SVG image, to show next to its plots");
 
     // History
     row.Place(ToolbarRow::ButtonWidth("Undo"), gap);
@@ -375,6 +380,9 @@ void EditorWindow::DrawToolbar() {
     if (ImGui::RadioButton("ANSI", m_SymbolStyle == SymbolStyle::ANSI)) {
         m_SymbolStyle = SymbolStyle::ANSI;
     }
+    row.Place(ToolbarRow::CheckWidth("Pins"), gap);
+    ImGui::Checkbox("Pins", &m_ShowTerminalNumbers);
+    ImGui::SetItemTooltip("Number the terminals of each part; terminal 1 is where a positive current enters");
 
     // Document
     const auto &file_path = m_Schematic.GetFilePath();
@@ -386,14 +394,14 @@ void EditorWindow::DrawToolbar() {
 }
 
 // Voltage and Current need an operating point; without one, wires stay plain and the legend asks for it
-void EditorWindow::DrawWires(ImDrawList *draw_list, const ViewTransform &view) {
+void EditorWindow::DrawWires(SchematicCanvas &canvas, const ViewTransform &view) {
     const Connectivity &connectivity = m_Schematic.GetConnectivity();
     const auto &operating_point = m_Schematic.GetOperatingPoint();
     const auto &wires = m_Schematic.GetWires();
     const bool by_nodes = m_WireColoring == WireColoring::Nodes;
     const bool by_voltage = m_WireColoring == WireColoring::Voltage && operating_point;
     if (m_WireColoring == WireColoring::Current && operating_point) {
-        DrawWireCurrents(draw_list, view, *operating_point);
+        DrawWireCurrents(canvas, view, *operating_point);
     }
     const auto node_color = [&](const int node) {
         if (by_nodes) {
@@ -415,13 +423,13 @@ void EditorWindow::DrawWires(ImDrawList *draw_list, const ViewTransform &view) {
         }
         // Every wire end is a connection point, so it always has a node
         const int node = connectivity.GetNode(wire.GetStart()).value_or(0);
-        wire.Draw(draw_list, view, selected ? SelectedColor : node_color(node));
+        wire.Draw(canvas, view, selected ? SelectedColor : node_color(node));
     }
 
     const float junction_radius = std::max(m_Zoom * JunctionRadiusScale, MinJunctionRadius);
     for (const GridPoint junction : connectivity.GetJunctions()) {
         const int node = connectivity.GetNode(junction).value_or(0);
-        draw_list->AddCircleFilled(view.ToScreen(ToVec2(junction)), junction_radius, node_color(node));
+        canvas.AddCircleFilled(view.ToScreen(ToVec2(junction)), junction_radius, node_color(node));
     }
 
     if (!by_nodes) {
@@ -430,17 +438,17 @@ void EditorWindow::DrawWires(ImDrawList *draw_list, const ViewTransform &view) {
     for (const UIWire &wire : wires) {
         const int node = connectivity.GetNode(wire.GetStart()).value_or(0);
         const ImVec2 middle = view.ToScreen((ToVec2(wire.GetStart()) + ToVec2(wire.GetEnd())) / 2.0f);
-        draw_list->AddText(middle, NodeLabelColor, std::format("{}", node).c_str());
+        canvas.AddText(middle, NodeLabelColor, std::format("{}", node).c_str());
     }
 }
 
 // Each piece of wire takes the heat color of its own current, so the path of the current shows along the wires
-void EditorWindow::DrawWireCurrents(ImDrawList *draw_list, const ViewTransform &view,
+void EditorWindow::DrawWireCurrents(SchematicCanvas &canvas, const ViewTransform &view,
                                     const Core::OperatingPoint &operating_point) {
     const double largest = LargestCurrent(operating_point);
     for (const WireCurrent &piece :
          ComputeWireCurrents(m_Schematic.GetElements(), m_Schematic.GetWires(), operating_point.Currents)) {
-        UIWire(piece.Start, piece.End).Draw(draw_list, view, GetHeatColor(CurrentLevel(piece.Current, largest)));
+        UIWire(piece.Start, piece.End).Draw(canvas, view, GetHeatColor(CurrentLevel(piece.Current, largest)));
     }
 }
 
@@ -538,39 +546,6 @@ void EditorWindow::DrawNodeVoltages(ImDrawList *draw_list, const ViewTransform &
     }
 }
 
-// A dot on the first wire of each measured node and a ring on each measured part (on the terminal, for a
-// transistor), in the colors of their plots
-void EditorWindow::DrawMeasurements(ImDrawList *draw_list, const ViewTransform &view) {
-    const Connectivity &connectivity = m_Schematic.GetConnectivity();
-    std::set<int> marked_nodes;
-    for (const UIWire &wire : m_Schematic.GetWires()) {
-        const int node = connectivity.GetNode(wire.GetStart()).value_or(0);
-        if (node == 0 || !m_Schematic.IsVoltageMeasured(node) || !marked_nodes.insert(node).second) {
-            continue;
-        }
-        const ImVec2 point = view.ToScreen((ToVec2(wire.GetStart()) + ToVec2(wire.GetEnd())) / 2.0f);
-        draw_list->AddCircleFilled(point, MeasurementMarkerRadius, GetNodeColor(node));
-        draw_list->AddText(point + MeasurementLabelOffset, GetNodeColor(node), std::format("V({})", node).c_str());
-    }
-
-    // Currents keep the colors of their plots, which follow their order in the circuit
-    std::size_t current_index = 0;
-    for (const auto &element : m_Schematic.GetElements()) {
-        const std::vector<std::string> currents = Core::GetCurrentNames(element->GetComponent());
-        const std::vector<GridPoint> terminals = element->GetTerminals();
-        for (std::size_t index = 0; index < currents.size(); ++index, ++current_index) {
-            if (!m_Schematic.IsCurrentMeasured(currents[index])) {
-                continue;
-            }
-            const GridPoint anchor = currents.size() == 1 ? element->GetPosition() : terminals[index];
-            const ImVec2 point = view.ToScreen(ToVec2(anchor));
-            const ImU32 color = GetCurrentColor(current_index);
-            draw_list->AddCircle(point, MeasurementMarkerRadius, color, 0, LineThickness);
-            draw_list->AddText(point + MeasurementLabelOffset, color, std::format("I({})", currents[index]).c_str());
-        }
-    }
-}
-
 // In selection mode, hovering a wire or a part shows its operating point value, once there is one
 void EditorWindow::DrawHoveredValue(const ViewTransform &view, const bool hovered) {
     const auto &operating_point = m_Schematic.GetOperatingPoint();
@@ -643,7 +618,7 @@ void EditorWindow::StartProbing() {
  * @brief   Handles placement mode: R rotates, M mirrors left to right and Shift+M top to bottom, Esc or right click
  *          cancels, left click places and keeps the mode active so several components can be placed in a row.
  */
-void EditorWindow::HandlePlacement(ImDrawList *draw_list, const ViewTransform &view, const bool hovered) {
+void EditorWindow::HandlePlacement(SchematicCanvas &canvas, const ViewTransform &view, const bool hovered) {
     if (!m_PlacingType) {
         return;
     }
@@ -675,7 +650,7 @@ void EditorWindow::HandlePlacement(ImDrawList *draw_list, const ViewTransform &v
     const GridPoint position = Snap(view.ToWorld(ImGui::GetIO().MousePos));
     auto preview = CreateElement(*m_PlacingType, position, m_PlacingRotation);
     preview->SetMirrored(m_PlacingMirrored);
-    preview->Draw(draw_list, view, PreviewColor, m_SymbolStyle);
+    preview->Draw(canvas, view, PreviewColor, m_SymbolStyle);
     if (ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
         m_Schematic.AddElement(std::move(preview));
     }
@@ -723,8 +698,9 @@ void EditorWindow::HandleWireDrawing(ImDrawList *draw_list, const ViewTransform 
 
     const GridPoint start = *m_WireStart;
     const GridPoint corner = m_WireVerticalFirst ? GridPoint{start.X, cursor.Y} : GridPoint{cursor.X, start.Y};
-    UIWire(start, corner).Draw(draw_list, view, PreviewColor);
-    UIWire(corner, cursor).Draw(draw_list, view, PreviewColor);
+    DrawListCanvas canvas(draw_list);
+    UIWire(start, corner).Draw(canvas, view, PreviewColor);
+    UIWire(corner, cursor).Draw(canvas, view, PreviewColor);
     if (!clicked) {
         return;
     }
@@ -1075,6 +1051,13 @@ void EditorWindow::ShowFileDialog(const FileAction action) {
     }
     m_DialogAction = action;
     const auto &file_path = m_Schematic.GetFilePath();
+    if (action == FileAction::ExportSchematic) {
+        // Next to the schematic and named after it, like the exported plots
+        const std::string stem = file_path ? file_path->stem().string() : "circuit";
+        const std::filesystem::path name = std::format("{}-schematic.svg", stem);
+        m_FileDialog.ShowSave(SVGFilters, (file_path ? file_path->parent_path() / name : name).string());
+        return;
+    }
     std::string location = file_path ? file_path->string() : "";
     if (action == FileAction::Open) {
         m_FileDialog.ShowOpen(SchematicFilters, std::move(location));
@@ -1096,10 +1079,13 @@ void EditorWindow::ProcessDialogResult() {
         OpenFile(**result);
     } else if (action == FileAction::Save) {
         SaveFile(**result);
+    } else if (action == FileAction::ExportSchematic) {
+        ExportSchematic(**result);
     }
 }
 
 void EditorWindow::DrawFilePopups() {
+    DrawExportPopup();
     if (ImGui::BeginPopupModal(DiscardPopup, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
         ImGui::TextUnformatted("The schematic has unsaved changes. Discard them?");
         if (ImGui::Button("Discard")) {
@@ -1133,6 +1119,48 @@ void EditorWindow::DrawFilePopups() {
             ImGui::CloseCurrentPopup();
         }
         ImGui::EndPopup();
+    }
+}
+
+// The image follows the editor: the symbol style chosen in the toolbar, names, values and probes
+void EditorWindow::DrawExportPopup() {
+    if (!ImGui::BeginPopup(ExportPopup)) {
+        return;
+    }
+    ImGui::TextUnformatted("Export the schematic");
+    ImGui::TextDisabled("As shown: symbols, names, values, pins and the probes of the plots");
+    ImGui::Separator();
+    if (ImGui::RadioButton("Light, for print", !m_ExportDark)) {
+        m_ExportDark = false;
+    }
+    ImGui::SameLine();
+    if (ImGui::RadioButton("Dark, as on screen", m_ExportDark)) {
+        m_ExportDark = true;
+    }
+    ImGui::Separator();
+    const bool empty = m_Schematic.GetElements().empty() && m_Schematic.GetWires().empty();
+    if (empty) {
+        ImGui::TextDisabled("Place some parts to export the schematic");
+    }
+    ImGui::BeginDisabled(empty || m_FileDialog.IsPending());
+    if (PrimaryButton("Save SVG...")) {
+        ShowFileDialog(FileAction::ExportSchematic);
+        ImGui::CloseCurrentPopup();
+    }
+    ImGui::EndDisabled();
+    ImGui::EndPopup();
+}
+
+// Dialogs do not always add the extension, so it is added here when missing
+void EditorWindow::ExportSchematic(std::filesystem::path path) {
+    if (path.extension() != ".svg") {
+        path += ".svg";
+    }
+    const auto svg = RenderSchematicSvg(m_Schematic, m_SymbolStyle, m_ShowTerminalNumbers, m_ExportDark);
+    const auto written =
+        svg ? WriteTextFile(path, *svg) : std::expected<void, std::string>(std::unexpected(svg.error()));
+    if (!written) {
+        ShowFileMessages("Could not export the schematic", {written.error()});
     }
 }
 

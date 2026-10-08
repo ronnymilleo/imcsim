@@ -37,42 +37,42 @@ UIDiode::UIDiode(const Core::ComponentType type, const GridPoint position, const
     : UIElement(std::make_unique<Core::Diode>(type), position, rotation) {
 }
 
-void UIDiode::DrawSymbol(ImDrawList *draw_list, const ViewTransform &view, const ImU32 color,
+void UIDiode::DrawSymbol(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color,
                          SymbolStyle /*style*/) const {
-    draw_list->AddLine(LocalToScreen(view, -1, 0), LocalToScreen(view, -BodyHalfLength, 0), color, LineThickness);
-    draw_list->AddLine(LocalToScreen(view, BodyHalfLength, 0), LocalToScreen(view, 1, 0), color, LineThickness);
-    draw_list->AddTriangle(LocalToScreen(view, -BodyHalfLength, -BodyHalfHeight),
-                           LocalToScreen(view, -BodyHalfLength, BodyHalfHeight), LocalToScreen(view, BodyHalfLength, 0),
-                           color, LineThickness);
-    draw_list->AddLine(LocalToScreen(view, BodyHalfLength, -BodyHalfHeight),
-                       LocalToScreen(view, BodyHalfLength, BodyHalfHeight), color, LineThickness);
+    canvas.AddLine(LocalToScreen(view, -1, 0), LocalToScreen(view, -BodyHalfLength, 0), color, LineThickness);
+    canvas.AddLine(LocalToScreen(view, BodyHalfLength, 0), LocalToScreen(view, 1, 0), color, LineThickness);
+    canvas.AddTriangle(LocalToScreen(view, -BodyHalfLength, -BodyHalfHeight),
+                       LocalToScreen(view, -BodyHalfLength, BodyHalfHeight), LocalToScreen(view, BodyHalfLength, 0),
+                       color, LineThickness);
+    canvas.AddLine(LocalToScreen(view, BodyHalfLength, -BodyHalfHeight),
+                   LocalToScreen(view, BodyHalfLength, BodyHalfHeight), color, LineThickness);
 
     const Core::ComponentType type = GetComponent().GetType();
     if (type == Core::ComponentType::ZenerDiode) {
         // The ends of the bar bend in opposite directions, like a Z
-        draw_list->AddLine(LocalToScreen(view, BodyHalfLength, -BodyHalfHeight),
-                           LocalToScreen(view, BodyHalfLength - ZenerWingSize, -BodyHalfHeight - ZenerWingSize), color,
-                           LineThickness);
-        draw_list->AddLine(LocalToScreen(view, BodyHalfLength, BodyHalfHeight),
-                           LocalToScreen(view, BodyHalfLength + ZenerWingSize, BodyHalfHeight + ZenerWingSize), color,
-                           LineThickness);
+        canvas.AddLine(LocalToScreen(view, BodyHalfLength, -BodyHalfHeight),
+                       LocalToScreen(view, BodyHalfLength - ZenerWingSize, -BodyHalfHeight - ZenerWingSize), color,
+                       LineThickness);
+        canvas.AddLine(LocalToScreen(view, BodyHalfLength, BodyHalfHeight),
+                       LocalToScreen(view, BodyHalfLength + ZenerWingSize, BodyHalfHeight + ZenerWingSize), color,
+                       LineThickness);
     } else if (type == Core::ComponentType::LED) {
-        DrawArrow(draw_list, view, FirstArrowStart, color);
-        DrawArrow(draw_list, view, SecondArrowStart, color);
+        DrawArrow(canvas, view, FirstArrowStart, color);
+        DrawArrow(canvas, view, SecondArrowStart, color);
     }
 }
 
 /**
  * @brief   Draws the diode name above the symbol and its model below, in local orientation.
- * @param[in] draw_list  Draw list of the editor window.
+ * @param[in,out] canvas Where it is drawn: the editor window or an exported image.
  * @param[in] view       Transform of the current frame.
  * @param[in] color      Text color.
  */
-void UIDiode::DrawLabels(ImDrawList *draw_list, const ViewTransform &view, const ImU32 color) const {
+void UIDiode::DrawLabels(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color) const {
     const auto &diode = static_cast<const Core::Diode &>(GetComponent());
     const float name_offset = diode.GetType() == Core::ComponentType::LED ? LEDNameOffset : LabelOffset;
-    DrawLabel(draw_list, view, {0.0f, -name_offset}, {0.0f, -1.0f}, diode.GetName(), color);
-    DrawLabel(draw_list, view, {0.0f, LabelOffset}, {0.0f, 1.0f}, diode.GetModelName(), color);
+    DrawLabel(canvas, view, {0.0f, -name_offset}, {0.0f, -1.0f}, diode.GetName(), color);
+    DrawLabel(canvas, view, {0.0f, LabelOffset}, {0.0f, 1.0f}, diode.GetModelName(), color);
 }
 
 /**
@@ -87,13 +87,14 @@ LocalBounds UIDiode::GetLocalBounds() const {
     return bounds;
 }
 
-void UIDiode::DrawArrow(ImDrawList *draw_list, const ViewTransform &view, const ImVec2 start, const ImU32 color) const {
+void UIDiode::DrawArrow(SchematicCanvas &canvas, const ViewTransform &view, const ImVec2 start,
+                        const ImU32 color) const {
     const ImVec2 tip = {start.x + ArrowLength, start.y - ArrowLength};
-    draw_list->AddLine(LocalToScreen(view, start.x, start.y), LocalToScreen(view, tip.x, tip.y), color, LineThickness);
-    draw_list->AddLine(LocalToScreen(view, tip.x, tip.y), LocalToScreen(view, tip.x - ArrowHeadSize, tip.y), color,
-                       LineThickness);
-    draw_list->AddLine(LocalToScreen(view, tip.x, tip.y), LocalToScreen(view, tip.x, tip.y + ArrowHeadSize), color,
-                       LineThickness);
+    canvas.AddLine(LocalToScreen(view, start.x, start.y), LocalToScreen(view, tip.x, tip.y), color, LineThickness);
+    canvas.AddLine(LocalToScreen(view, tip.x, tip.y), LocalToScreen(view, tip.x - ArrowHeadSize, tip.y), color,
+                   LineThickness);
+    canvas.AddLine(LocalToScreen(view, tip.x, tip.y), LocalToScreen(view, tip.x, tip.y + ArrowHeadSize), color,
+                   LineThickness);
 }
 
 } // namespace GUI

@@ -33,26 +33,26 @@ UICurrentSource::UICurrentSource(const GridPoint position, const Rotation rotati
 
 // The arrow points from the first terminal to the second, the way a positive current flows through the source.
 // ANSI draws it inside the circle; IEC, and any source showing its waveform, draw it outside
-void UICurrentSource::DrawSymbol(ImDrawList *draw_list, const ViewTransform &view, const ImU32 color,
+void UICurrentSource::DrawSymbol(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color,
                                  const SymbolStyle style) const {
     const auto draw_arrow = [&](const float start, const float end, const float height) {
-        draw_list->AddLine(LocalToScreen(view, start, height), LocalToScreen(view, end, height), color, LineThickness);
-        draw_list->AddLine(LocalToScreen(view, end - ArrowHeadLength, height - ArrowHeadHalfWidth),
-                           LocalToScreen(view, end, height), color, LineThickness);
-        draw_list->AddLine(LocalToScreen(view, end - ArrowHeadLength, height + ArrowHeadHalfWidth),
-                           LocalToScreen(view, end, height), color, LineThickness);
+        canvas.AddLine(LocalToScreen(view, start, height), LocalToScreen(view, end, height), color, LineThickness);
+        canvas.AddLine(LocalToScreen(view, end - ArrowHeadLength, height - ArrowHeadHalfWidth),
+                       LocalToScreen(view, end, height), color, LineThickness);
+        canvas.AddLine(LocalToScreen(view, end - ArrowHeadLength, height + ArrowHeadHalfWidth),
+                       LocalToScreen(view, end, height), color, LineThickness);
     };
 
-    DrawCircle(draw_list, view, color);
-    const bool has_waveform = DrawWaveform(draw_list, view, color);
+    DrawCircle(canvas, view, color);
+    const bool has_waveform = DrawWaveform(canvas, view, color);
     if (!has_waveform && style == SymbolStyle::ANSI) {
         draw_arrow(-InnerArrowHalfLength, InnerArrowHalfLength, 0.0f);
         return;
     }
     if (!has_waveform) {
         // IEC crosses the circle with a bar perpendicular to the conductor
-        draw_list->AddLine(LocalToScreen(view, 0, -CircleRadius), LocalToScreen(view, 0, CircleRadius), color,
-                           LineThickness);
+        canvas.AddLine(LocalToScreen(view, 0, -CircleRadius), LocalToScreen(view, 0, CircleRadius), color,
+                       LineThickness);
     }
     draw_arrow(OuterArrowStart, OuterArrowEnd, -OuterArrowHeight);
 }

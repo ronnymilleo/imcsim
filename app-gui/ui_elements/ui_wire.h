@@ -8,6 +8,7 @@
 
 #include "helpers.h"
 #include "imgui.h"
+#include "schematic_canvas.h"
 
 namespace GUI {
 
@@ -21,7 +22,7 @@ class UIWire {
 public:
     UIWire(GridPoint start, GridPoint end);
 
-    void Draw(ImDrawList *draw_list, const ViewTransform &view, ImU32 color) const;
+    void Draw(SchematicCanvas &canvas, const ViewTransform &view, ImU32 color) const;
 
     bool operator==(const UIWire &) const = default;
 

@@ -27,12 +27,12 @@ protected:
     // Same height as the capacitor plates, so the default labels and pick area still fit
     static constexpr float CircleRadius = 0.8f;
 
-    void DrawLabels(ImDrawList *draw_list, const ViewTransform &view, ImU32 color) const override;
+    void DrawLabels(SchematicCanvas &canvas, const ViewTransform &view, ImU32 color) const override;
 
     // Helpers for derived classes
     const Core::Source &GetSource() const;
-    void DrawCircle(ImDrawList *draw_list, const ViewTransform &view, ImU32 color) const;
-    bool DrawWaveform(ImDrawList *draw_list, const ViewTransform &view, ImU32 color) const;
+    void DrawCircle(SchematicCanvas &canvas, const ViewTransform &view, ImU32 color) const;
+    bool DrawWaveform(SchematicCanvas &canvas, const ViewTransform &view, ImU32 color) const;
 };
 
 } // namespace GUI

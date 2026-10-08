@@ -35,29 +35,27 @@ UIMOSFET::UIMOSFET(const Core::ComponentType type, const GridPoint position, con
     : UITransistor(std::make_unique<Core::MOSFET>(type), position, rotation) {
 }
 
-void UIMOSFET::DrawSymbol(ImDrawList *draw_list, const ViewTransform &view, const ImU32 color,
+void UIMOSFET::DrawSymbol(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color,
                           SymbolStyle /*style*/) const {
-    draw_list->AddLine(LocalToScreen(view, -1, 0), LocalToScreen(view, GateX, 0), color, LineThickness);
-    draw_list->AddLine(LocalToScreen(view, GateX, -PlateHalfHeight), LocalToScreen(view, GateX, PlateHalfHeight), color,
-                       LineThickness);
+    canvas.AddLine(LocalToScreen(view, -1, 0), LocalToScreen(view, GateX, 0), color, LineThickness);
+    canvas.AddLine(LocalToScreen(view, GateX, -PlateHalfHeight), LocalToScreen(view, GateX, PlateHalfHeight), color,
+                   LineThickness);
     for (const auto &[top, bottom] : ChannelSegments) {
-        draw_list->AddLine(LocalToScreen(view, ChannelX, top), LocalToScreen(view, ChannelX, bottom), color,
-                           LineThickness);
+        canvas.AddLine(LocalToScreen(view, ChannelX, top), LocalToScreen(view, ChannelX, bottom), color, LineThickness);
     }
 
     // Drain on top, source below, and the body joining the source
-    draw_list->AddLine(LocalToScreen(view, ChannelX, -ContactY), LocalToScreen(view, 1, -ContactY), color,
-                       LineThickness);
-    draw_list->AddLine(LocalToScreen(view, 1, -ContactY), LocalToScreen(view, 1, -1), color, LineThickness);
-    draw_list->AddLine(LocalToScreen(view, ChannelX, ContactY), LocalToScreen(view, 1, ContactY), color, LineThickness);
-    draw_list->AddLine(LocalToScreen(view, 1, ContactY), LocalToScreen(view, 1, 1), color, LineThickness);
-    draw_list->AddLine(LocalToScreen(view, ChannelX, 0), LocalToScreen(view, 1, 0), color, LineThickness);
-    draw_list->AddLine(LocalToScreen(view, 1, 0), LocalToScreen(view, 1, ContactY), color, LineThickness);
+    canvas.AddLine(LocalToScreen(view, ChannelX, -ContactY), LocalToScreen(view, 1, -ContactY), color, LineThickness);
+    canvas.AddLine(LocalToScreen(view, 1, -ContactY), LocalToScreen(view, 1, -1), color, LineThickness);
+    canvas.AddLine(LocalToScreen(view, ChannelX, ContactY), LocalToScreen(view, 1, ContactY), color, LineThickness);
+    canvas.AddLine(LocalToScreen(view, 1, ContactY), LocalToScreen(view, 1, 1), color, LineThickness);
+    canvas.AddLine(LocalToScreen(view, ChannelX, 0), LocalToScreen(view, 1, 0), color, LineThickness);
+    canvas.AddLine(LocalToScreen(view, 1, 0), LocalToScreen(view, 1, ContactY), color, LineThickness);
 
     if (GetComponent().GetType() == Core::ComponentType::NMOS) {
-        DrawArrowHead(draw_list, view, {NMOSArrowTipX, 0.0f}, {-1.0f, 0.0f}, color);
+        DrawArrowHead(canvas, view, {NMOSArrowTipX, 0.0f}, {-1.0f, 0.0f}, color);
     } else {
-        DrawArrowHead(draw_list, view, {PMOSArrowTipX, 0.0f}, {1.0f, 0.0f}, color);
+        DrawArrowHead(canvas, view, {PMOSArrowTipX, 0.0f}, {1.0f, 0.0f}, color);
     }
 }
 

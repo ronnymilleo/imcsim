@@ -9,6 +9,7 @@
 #include "components/component.h"
 #include "helpers.h"
 #include "imgui.h"
+#include "schematic_canvas.h"
 #include <memory>
 #include <string>
 #include <vector>
@@ -49,7 +50,7 @@ public:
     virtual ~UIElement() = default;
 
     // Drawing
-    void Draw(ImDrawList *draw_list, const ViewTransform &view, ImU32 color, SymbolStyle style) const;
+    void Draw(SchematicCanvas &canvas, const ViewTransform &view, ImU32 color, SymbolStyle style) const;
 
     // Component and placement
     const Core::Component &GetComponent() const;
@@ -63,20 +64,23 @@ public:
 
     // Geometry in world units
     std::vector<GridPoint> GetTerminals() const;
+    GridPoint GetTerminalInward(std::size_t terminal) const;
     bool Contains(ImVec2 world_pos) const;
 
 protected:
     // Parts of the symbol, in the order Draw() draws them
-    virtual void DrawTerminals(ImDrawList *draw_list, const ViewTransform &view, ImU32 color) const;
-    virtual void DrawSymbol(ImDrawList *draw_list, const ViewTransform &view, ImU32 color, SymbolStyle style) const = 0;
-    virtual void DrawLabels(ImDrawList *draw_list, const ViewTransform &view, ImU32 color) const;
+    virtual void DrawTerminals(SchematicCanvas &canvas, const ViewTransform &view, ImU32 color) const;
+    virtual void DrawSymbol(SchematicCanvas &canvas, const ViewTransform &view, ImU32 color,
+                            SymbolStyle style) const = 0;
+    virtual void DrawLabels(SchematicCanvas &canvas, const ViewTransform &view, ImU32 color) const;
 
     // Geometry in local grid units, before rotation and translation
     virtual std::vector<GridPoint> GetLocalTerminals() const;
+    virtual GridPoint GetLocalTerminalInward(std::size_t terminal) const;
     virtual LocalBounds GetLocalBounds() const;
 
     // Helpers for derived classes
-    void DrawLabel(ImDrawList *draw_list, const ViewTransform &view, ImVec2 local_anchor, ImVec2 local_direction,
+    void DrawLabel(SchematicCanvas &canvas, const ViewTransform &view, ImVec2 local_anchor, ImVec2 local_direction,
                    const std::string &text, ImU32 color) const;
     ImVec2 LocalToScreen(const ViewTransform &view, float x, float y) const;
 

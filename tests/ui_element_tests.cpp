@@ -121,3 +121,24 @@ TEST_CASE("Picking follows the mirrored outline", "[ui_element]") {
     CHECK(mosfet.Contains({1.5f, 0.0f}));
     CHECK_FALSE(mosfet.Contains({-1.5f, 0.0f}));
 }
+
+TEST_CASE("The inward direction of a terminal follows its lead into the part", "[ui_element]") {
+    GUI::UIResistor resistor({0, 0}, GUI::Rotation::R0);
+    CHECK(resistor.GetTerminalInward(0) == GUI::GridPoint{1, 0});
+    CHECK(resistor.GetTerminalInward(1) == GUI::GridPoint{-1, 0});
+    // A quarter turn puts the first terminal at the top, so its lead goes down into the part
+    resistor.SetRotation(GUI::Rotation::R90);
+    CHECK(resistor.GetTerminalInward(0) == GUI::GridPoint{0, 1});
+    resistor.SetMirrored(true);
+    CHECK(resistor.GetTerminalInward(0) == GUI::GridPoint{0, -1});
+
+    // Collector and emitter leads are vertical even though their terminals sit right of the middle
+    const GUI::UIBJT bjt(Core::ComponentType::NPN, {0, 0}, GUI::Rotation::R0);
+    CHECK(bjt.GetTerminalInward(0) == GUI::GridPoint{0, 1});
+    CHECK(bjt.GetTerminalInward(1) == GUI::GridPoint{1, 0});
+    CHECK(bjt.GetTerminalInward(2) == GUI::GridPoint{0, -1});
+
+    // The supply terminal is at its middle, and its lead goes up to the bar
+    const GUI::UIVCC supply({0, 0}, GUI::Rotation::R180);
+    CHECK(supply.GetTerminalInward(0) == GUI::GridPoint{0, 1});
+}

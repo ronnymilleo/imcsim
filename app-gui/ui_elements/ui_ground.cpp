@@ -27,22 +27,21 @@ UIGround::UIGround(const GridPoint position, const Rotation rotation)
     : UIElement(std::make_unique<Core::Ground>(), position, rotation) {
 }
 
-void UIGround::DrawTerminals(ImDrawList *draw_list, const ViewTransform &view, const ImU32 color) const {
-    draw_list->AddLine(LocalToScreen(view, 0, 0), LocalToScreen(view, 0, LeadLength), color, LineThickness);
+void UIGround::DrawTerminals(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color) const {
+    canvas.AddLine(LocalToScreen(view, 0, 0), LocalToScreen(view, 0, LeadLength), color, LineThickness);
 }
 
-void UIGround::DrawSymbol(ImDrawList *draw_list, const ViewTransform &view, const ImU32 color,
+void UIGround::DrawSymbol(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color,
                           SymbolStyle /*style*/) const {
     float y = LeadLength;
     for (const float half_width : BarHalfWidths) {
-        draw_list->AddLine(LocalToScreen(view, -half_width, y), LocalToScreen(view, half_width, y), color,
-                           LineThickness);
+        canvas.AddLine(LocalToScreen(view, -half_width, y), LocalToScreen(view, half_width, y), color, LineThickness);
         y += BarSpacing;
     }
 }
 
 // Ground has no name or value to show
-void UIGround::DrawLabels(ImDrawList * /*draw_list*/, const ViewTransform & /*view*/, ImU32 /*color*/) const {
+void UIGround::DrawLabels(SchematicCanvas & /*canvas*/, const ViewTransform & /*view*/, ImU32 /*color*/) const {
 }
 
 std::vector<GridPoint> UIGround::GetLocalTerminals() const {

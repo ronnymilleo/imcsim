@@ -16,7 +16,10 @@ add_library(imcsim-gui-lib
             plot_helpers.cpp
             probing.cpp
             schematic.cpp
+            schematic_canvas.cpp
+            schematic_drawing.cpp
             schematic_file.cpp
+            svg_writer.cpp
             theme.cpp
             trace_math.cpp
             trace_statistics.cpp

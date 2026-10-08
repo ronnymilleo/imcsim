@@ -58,10 +58,6 @@ constexpr ExportTheme LightTheme = {
     .MinorGridOpacity = 0.05,
 };
 
-// Trace colors are picked for the dark screen; on white, the lighter ones (yellow, pale gray) are darkened to this
-// relative luminance so they stay readable in print
-constexpr double MaxPrintLuminance = 0.5;
-
 // Sizes in pixels of a 1600x900 image
 constexpr double DesignWidth = 1600.0;
 constexpr double DesignHeight = 900.0;
@@ -118,145 +114,6 @@ constexpr auto Prefixes = std::to_array<Prefix>({
 double EstimateTextWidth(const std::string_view text, const double font_size) {
     return CharacterWidth * font_size * static_cast<double>(text.size());
 }
-
-// Two decimals at most, without trailing zeros, and never "-0"
-std::string FormatCoordinate(const double value) {
-    std::string text = std::format("{:.2f}", value);
-    while (text.back() == '0') {
-        text.pop_back();
-    }
-    if (text.back() == '.') {
-        text.pop_back();
-    }
-    return text == "-0" ? "0" : text;
-}
-
-std::string FormatColor(const ExportColor color) {
-    return std::format("#{:02x}{:02x}{:02x}", color.Red, color.Green, color.Blue);
-}
-
-std::string EscapeXml(const std::string_view text) {
-    std::string escaped;
-    for (const char character : text) {
-        switch (character) {
-        case '&':
-            escaped += "&amp;";
-            break;
-        case '<':
-            escaped += "&lt;";
-            break;
-        case '>':
-            escaped += "&gt;";
-            break;
-        case '"':
-            escaped += "&quot;";
-            break;
-        default:
-            escaped += character;
-        }
-    }
-    return escaped;
-}
-
-ExportColor AdjustForPrint(const ExportColor color) {
-    const double luminance = (0.2126 * color.Red + 0.7152 * color.Green + 0.0722 * color.Blue) / 255.0;
-    if (luminance <= MaxPrintLuminance) {
-        return color;
-    }
-    const double factor = MaxPrintLuminance / luminance;
-    const auto darken = [factor](const std::uint8_t channel) {
-        return static_cast<std::uint8_t>(std::lround(channel * factor));
-    };
-    return {darken(color.Red), darken(color.Green), darken(color.Blue)};
-}
-
-enum class TextAnchor {
-    Start,
-    Middle,
-    End
-};
-
-/**
- * @class   SvgWriter
- * @brief   Appends SVG elements to a document; coordinates are pixels with y down.
- */
-class SvgWriter {
-public:
-    SvgWriter(const int width, const int height) {
-        m_Document = std::format("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
-                                 "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"{0}\" height=\"{1}\" "
-                                 "viewBox=\"0 0 {0} {1}\" font-family=\"Inter, 'Noto Sans', 'DejaVu Sans', "
-                                 "'Liberation Sans', Helvetica, Arial, sans-serif\">\n",
-                                 width, height);
-    }
-
-    std::string Finish() { return m_Document + "</svg>\n"; }
-
-    void Rectangle(const double x, const double y, const double width, const double height, const ExportColor fill,
-                   const double opacity = 1.0) {
-        m_Document += std::format("<rect x=\"{}\" y=\"{}\" width=\"{}\" height=\"{}\" fill=\"{}\"{}/>\n",
-                                  FormatCoordinate(x), FormatCoordinate(y), FormatCoordinate(width),
-                                  FormatCoordinate(height), FormatColor(fill), Opacity("fill-opacity", opacity));
-    }
-
-    void Line(const double x1, const double y1, const double x2, const double y2, const ExportColor color,
-              const double width, const double opacity = 1.0) {
-        m_Document +=
-            std::format("<line x1=\"{}\" y1=\"{}\" x2=\"{}\" y2=\"{}\" stroke=\"{}\" stroke-width=\"{}\"{}/>\n",
-                        FormatCoordinate(x1), FormatCoordinate(y1), FormatCoordinate(x2), FormatCoordinate(y2),
-                        FormatColor(color), FormatCoordinate(width), Opacity("stroke-opacity", opacity));
-    }
-
-    // An empty dash pattern draws a solid line
-    void Polyline(const std::vector<std::array<double, 2>> &points, const ExportColor color, const double width,
-                  const std::string &dash_pattern = "") {
-        m_Document += std::format("<polyline fill=\"none\" stroke=\"{}\" stroke-width=\"{}\" stroke-linejoin=\"round\" "
-                                  "stroke-linecap=\"round\"",
-                                  FormatColor(color), FormatCoordinate(width));
-        if (!dash_pattern.empty()) {
-            m_Document += std::format(" stroke-dasharray=\"{}\"", dash_pattern);
-        }
-        m_Document += " points=\"";
-        for (std::size_t index = 0; index < points.size(); ++index) {
-            m_Document += std::format("{}{},{}", index == 0 ? "" : " ", FormatCoordinate(points[index][0]),
-                                      FormatCoordinate(points[index][1]));
-        }
-        m_Document += "\"/>\n";
-    }
-
-    // (x, y) is the baseline point; a vertical text reads bottom to top
-    void Text(const double x, const double y, const std::string_view text, const double font_size,
-              const ExportColor color, const TextAnchor anchor, const bool vertical = false) {
-        const char *anchor_name = anchor == TextAnchor::Start    ? "start"
-                                  : anchor == TextAnchor::Middle ? "middle"
-                                                                 : "end";
-        m_Document +=
-            std::format("<text x=\"{}\" y=\"{}\" font-size=\"{}\" fill=\"{}\" text-anchor=\"{}\"", FormatCoordinate(x),
-                        FormatCoordinate(y), FormatCoordinate(font_size), FormatColor(color), anchor_name);
-        if (vertical) {
-            m_Document += std::format(" transform=\"rotate(-90 {} {})\"", FormatCoordinate(x), FormatCoordinate(y));
-        }
-        m_Document += std::format(">{}</text>\n", EscapeXml(text));
-    }
-
-    void BeginClip(const double x, const double y, const double width, const double height) {
-        const std::string id = std::format("plot{}", m_NextClip++);
-        m_Document += std::format(
-            "<clipPath id=\"{}\"><rect x=\"{}\" y=\"{}\" width=\"{}\" height=\"{}\"/></clipPath>\n"
-            "<g clip-path=\"url(#{})\">\n",
-            id, FormatCoordinate(x), FormatCoordinate(y), FormatCoordinate(width), FormatCoordinate(height), id);
-    }
-
-    void EndClip() { m_Document += "</g>\n"; }
-
-private:
-    std::string m_Document;
-    int m_NextClip = 0;
-
-    static std::string Opacity(const char *name, const double opacity) {
-        return opacity >= 0.999 ? "" : std::format(" {}=\"{}\"", name, FormatCoordinate(opacity));
-    }
-};
 
 // endregion
 
@@ -485,9 +342,9 @@ std::vector<std::string> FormatXTicks(const std::vector<double> &ticks, const Ex
 
 // The visible part of a series in pixels, split where samples are missing; samples just outside the X range are
 // kept so the line reaches the edge of the plot
-std::vector<std::vector<std::array<double, 2>>> BuildRuns(const ExportFigure &figure, const ExportSeries &series,
-                                                          const Frame &frame, const ValueRange &y_range) {
-    std::vector<std::vector<std::array<double, 2>>> runs(1);
+std::vector<std::vector<SvgPoint>> BuildRuns(const ExportFigure &figure, const ExportSeries &series, const Frame &frame,
+                                             const ValueRange &y_range) {
+    std::vector<std::vector<SvgPoint>> runs(1);
     const std::size_t count = std::min(series.Values.size(), figure.Xs.size());
     const auto in_range = [&](const std::size_t index) {
         const double x = figure.Xs[index];
@@ -504,11 +361,11 @@ std::vector<std::vector<std::array<double, 2>>> BuildRuns(const ExportFigure &fi
             }
             continue;
         }
-        const std::array<double, 2> point = {frame.ToPixelX(x), frame.ToPixelY(y, y_range)};
-        std::vector<std::array<double, 2>> &run = runs.back();
+        const SvgPoint point = {frame.ToPixelX(x), frame.ToPixelY(y, y_range)};
+        std::vector<SvgPoint> &run = runs.back();
         const bool is_last = index + 1 == count;
-        if (run.size() >= 2 && !is_last && std::abs(point[0] - run.back()[0]) < MinPointDistance &&
-            std::abs(point[1] - run.back()[1]) < MinPointDistance) {
+        if (run.size() >= 2 && !is_last && std::abs(point.X - run.back().X) < MinPointDistance &&
+            std::abs(point.Y - run.back().Y) < MinPointDistance) {
             continue;
         }
         run.push_back(point);
@@ -539,9 +396,9 @@ void DrawNote(SvgWriter &svg, const ExportNote &note, const Frame &frame, const 
     const double padding = 3.0 * scale;
     const bool to_left = x + 4.0 * scale + width + 2.0 * padding > frame.Left + frame.Width;
     const double box_left = to_left ? x - 4.0 * scale - width - 2.0 * padding : x + 4.0 * scale;
-    svg.Rectangle(box_left, y - font_size * 0.7 - padding, width + 2.0 * padding, font_size * 1.4 + padding,
+    svg.Rectangle({box_left, y - font_size * 0.7 - padding}, width + 2.0 * padding, font_size * 1.4 + padding,
                   theme.Background, 0.85);
-    svg.Text(box_left + padding, y + font_size * 0.35, note.Text, font_size, theme.Text, TextAnchor::Start);
+    svg.Text({box_left + padding, y + font_size * 0.35}, note.Text, font_size, theme.Text, TextAnchor::Start);
 }
 
 void DrawLegend(SvgWriter &svg, const PanelLayout &layout, const Frame &frame, const ExportTheme &theme,
@@ -562,11 +419,11 @@ void DrawLegend(SvgWriter &svg, const PanelLayout &layout, const Frame &frame, c
                 continue;
             }
             const ExportSeries &series = *entry.Series;
-            const ExportColor color = dark ? series.Color : AdjustForPrint(series.Color);
+            const ExportColor color = dark ? series.Color : AdjustColorForPrint(series.Color);
             const double width = (series.Heavy ? HeavyLineWidth : LineWidth) * scale;
             svg.Polyline({{x, y}, {x + LegendSample * scale, y}}, color, width,
                          series.Dashed ? DashPattern(scale) : "");
-            svg.Text(x + (LegendSample + 6.0) * scale, y + LegendFont * scale * 0.35, series.LegendLabel,
+            svg.Text({x + (LegendSample + 6.0) * scale, y + LegendFont * scale * 0.35}, series.LegendLabel,
                      LegendFont * scale, theme.Text, TextAnchor::Start);
             x += entry.Width + LegendSpacing * scale;
         }
@@ -580,8 +437,8 @@ void DrawXAxis(SvgWriter &svg, const ExportFigure &figure, const Frame &frame, c
     const double bottom = frame.Top + frame.Height;
     for (std::size_t index = 0; index < ticks.size(); ++index) {
         const double x = frame.ToPixelX(ticks[index]);
-        svg.Line(x, bottom, x, bottom + TickLength * scale, theme.MutedText, scale);
-        svg.Text(x, bottom + (TickLength + TickGap) * scale + TickFont * scale * 0.8, labels[index], TickFont * scale,
+        svg.Line({x, bottom}, {x, bottom + TickLength * scale}, theme.MutedText, scale);
+        svg.Text({x, bottom + (TickLength + TickGap) * scale + TickFont * scale * 0.8}, labels[index], TickFont * scale,
                  theme.MutedText, TextAnchor::Middle);
     }
 }
@@ -598,23 +455,23 @@ void DrawYAxes(SvgWriter &svg, const ExportPanel &panel, const PanelLayout &layo
         const double edge = left ? frame.Left : right_edge;
         const double direction = left ? -1.0 : 1.0;
         if (!left) {
-            svg.Line(edge, frame.Top, edge, frame.Top + frame.Height, theme.Border, scale);
+            svg.Line({edge, frame.Top}, {edge, frame.Top + frame.Height}, theme.Border, scale);
         }
         for (std::size_t index = 0; index < axis_layout.Ticks.size(); ++index) {
             const double y = frame.ToPixelY(axis_layout.Ticks[index], axis_layout.Range);
-            svg.Line(edge, y, edge + direction * TickLength * scale, y, theme.MutedText, scale);
-            svg.Text(edge + direction * (TickLength + 3.0) * scale, y + TickFont * scale * 0.35,
+            svg.Line({edge, y}, {edge + direction * TickLength * scale, y}, theme.MutedText, scale);
+            svg.Text({edge + direction * (TickLength + 3.0) * scale, y + TickFont * scale * 0.35},
                      axis_layout.Labels[index], TickFont * scale, theme.MutedText,
                      left ? TextAnchor::End : TextAnchor::Start);
         }
         if (left) {
-            svg.Text(columns.LeftNameX, name_y, panel.YAxes[axis].Name, AxisNameFont * scale, theme.MutedText,
+            svg.Text({columns.LeftNameX, name_y}, panel.YAxes[axis].Name, AxisNameFont * scale, theme.MutedText,
                      TextAnchor::Middle, true);
             continue;
         }
         // A vertical name extends left of its baseline by about its ascent
         const double width = columns.RightWidths[axis - 1];
-        svg.Text(edge + width - AxisNameFont * scale * 0.4, name_y, panel.YAxes[axis].Name, AxisNameFont * scale,
+        svg.Text({edge + width - AxisNameFont * scale * 0.4, name_y}, panel.YAxes[axis].Name, AxisNameFont * scale,
                  theme.MutedText, TextAnchor::Middle, true);
         right_edge += width;
     }
@@ -625,7 +482,7 @@ void DrawGrid(SvgWriter &svg, const ExportFigure &figure, const PanelLayout &lay
     const std::vector<double> x_ticks = FindXTicks(frame.X, figure.XLogarithmic, frame.Width, scale);
     for (const double tick : x_ticks) {
         const double x = frame.ToPixelX(tick);
-        svg.Line(x, frame.Top, x, frame.Top + frame.Height, theme.Grid, scale, theme.GridOpacity);
+        svg.Line({x, frame.Top}, {x, frame.Top + frame.Height}, theme.Grid, scale, theme.GridOpacity);
     }
     // Minor lines at 2 to 9 times each decade, as on log paper, while there are few decades
     if (figure.XLogarithmic && std::log10(frame.X.High / frame.X.Low) <= 8.0) {
@@ -634,7 +491,7 @@ void DrawGrid(SvgWriter &svg, const ExportFigure &figure, const PanelLayout &lay
             for (int multiple = 2; multiple <= 9; ++multiple) {
                 const double x = decade * multiple;
                 if (x > frame.X.Low && x < frame.X.High) {
-                    svg.Line(frame.ToPixelX(x), frame.Top, frame.ToPixelX(x), frame.Top + frame.Height, theme.Grid,
+                    svg.Line({frame.ToPixelX(x), frame.Top}, {frame.ToPixelX(x), frame.Top + frame.Height}, theme.Grid,
                              scale, theme.MinorGridOpacity);
                 }
             }
@@ -644,7 +501,7 @@ void DrawGrid(SvgWriter &svg, const ExportFigure &figure, const PanelLayout &lay
         const YAxisLayout &first_axis = layout.YAxes.front();
         for (const double tick : first_axis.Ticks) {
             const double y = frame.ToPixelY(tick, first_axis.Range);
-            svg.Line(frame.Left, y, frame.Left + frame.Width, y, theme.Grid, scale, theme.GridOpacity);
+            svg.Line({frame.Left, y}, {frame.Left + frame.Width, y}, theme.Grid, scale, theme.GridOpacity);
         }
     }
 }
@@ -652,13 +509,13 @@ void DrawGrid(SvgWriter &svg, const ExportFigure &figure, const PanelLayout &lay
 void DrawPanel(SvgWriter &svg, const ExportFigure &figure, const ExportPanel &panel, const PanelLayout &layout,
                const Frame &frame, const AxisColumns &columns, const ExportStyle &style, const double scale) {
     const ExportTheme &theme = style.Dark ? DarkTheme : LightTheme;
-    svg.Rectangle(frame.Left, frame.Top, frame.Width, frame.Height, theme.PlotBackground);
+    svg.Rectangle({frame.Left, frame.Top}, frame.Width, frame.Height, theme.PlotBackground);
     DrawGrid(svg, figure, layout, frame, theme, scale);
-    svg.BeginClip(frame.Left, frame.Top, frame.Width, frame.Height);
+    svg.BeginClip({frame.Left, frame.Top}, frame.Width, frame.Height);
     for (const ExportSeries &series : panel.Series) {
         if (series.Axis < layout.YAxes.size()) {
             DrawSeries(svg, figure, series, frame, layout.YAxes[series.Axis].Range,
-                       style.Dark ? series.Color : AdjustForPrint(series.Color), scale);
+                       style.Dark ? series.Color : AdjustColorForPrint(series.Color), scale);
         }
     }
     svg.EndClip();
@@ -676,7 +533,7 @@ void DrawPanel(SvgWriter &svg, const ExportFigure &figure, const ExportPanel &pa
     DrawXAxis(svg, figure, frame, theme, scale);
     DrawYAxes(svg, panel, layout, frame, columns, theme, scale);
     if (!panel.Title.empty()) {
-        svg.Text(frame.Left, layout.Top + TitleFont * scale * 1.1, panel.Title, TitleFont * scale, theme.Text,
+        svg.Text({frame.Left, layout.Top + TitleFont * scale * 1.1}, panel.Title, TitleFont * scale, theme.Text,
                  TextAnchor::Start);
     }
     DrawLegend(svg, layout, frame, theme, style.Dark, scale);
@@ -797,8 +654,7 @@ std::expected<std::string, std::string> RenderSvg(const ExportFigure &figure, co
     const double plot_width = std::max(MinPlotSize * scale, width - left - right);
 
     const ExportTheme &theme = style.Dark ? DarkTheme : LightTheme;
-    SvgWriter svg(style.Width, style.Height);
-    svg.Rectangle(0.0, 0.0, width, height, theme.Background);
+    SvgWriter svg;
     double top = outer;
     Frame frame{left, 0.0, plot_width, plot_height, x_range, figure.XLogarithmic};
     for (std::size_t index = 0; index < figure.Panels.size(); ++index) {
@@ -808,9 +664,9 @@ std::expected<std::string, std::string> RenderSvg(const ExportFigure &figure, co
         DrawPanel(svg, figure, figure.Panels[index], layout, frame, columns, style, scale);
         top = frame.Top + plot_height + tick_row;
     }
-    svg.Text(left + plot_width / 2.0, top + AxisNameFont * scale * 1.1, figure.XAxis.Name, AxisNameFont * scale,
+    svg.Text({left + plot_width / 2.0, top + AxisNameFont * scale * 1.1}, figure.XAxis.Name, AxisNameFont * scale,
              theme.MutedText, TextAnchor::Middle);
-    return svg.Finish();
+    return svg.Finish({0.0, 0.0}, width, height, theme.Background);
 }
 
 /**

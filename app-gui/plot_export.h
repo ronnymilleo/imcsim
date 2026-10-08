@@ -8,24 +8,14 @@
 #ifndef IMCSIM_PLOT_EXPORT_H
 #define IMCSIM_PLOT_EXPORT_H
 
+#include "svg_writer.h"
 #include <cstddef>
-#include <cstdint>
 #include <expected>
 #include <optional>
 #include <string>
 #include <vector>
 
 namespace GUI {
-
-/**
- * @struct  ExportColor
- * @brief   An 8-bit sRGB color.
- */
-struct ExportColor {
-    std::uint8_t Red = 0;
-    std::uint8_t Green = 0;
-    std::uint8_t Blue = 0;
-};
 
 /**
  * @struct  ExportAxis

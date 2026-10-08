@@ -34,25 +34,25 @@ UITransistor::UITransistor(std::unique_ptr<Core::Component> component, const Gri
 
 /**
  * @brief   Draws the three leads, from each terminal one unit toward the body.
- * @param[in] draw_list  Draw list of the editor window.
+ * @param[in,out] canvas Where it is drawn: the editor window or an exported image.
  * @param[in] view       Transform of the current frame.
  * @param[in] color      Line color.
  */
-void UITransistor::DrawTerminals(ImDrawList *draw_list, const ViewTransform &view, const ImU32 color) const {
-    draw_list->AddLine(LocalToScreen(view, -2, 0), LocalToScreen(view, -1, 0), color, LineThickness);
-    draw_list->AddLine(LocalToScreen(view, 1, -2), LocalToScreen(view, 1, -1), color, LineThickness);
-    draw_list->AddLine(LocalToScreen(view, 1, 1), LocalToScreen(view, 1, 2), color, LineThickness);
+void UITransistor::DrawTerminals(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color) const {
+    canvas.AddLine(LocalToScreen(view, -2, 0), LocalToScreen(view, -1, 0), color, LineThickness);
+    canvas.AddLine(LocalToScreen(view, 1, -2), LocalToScreen(view, 1, -1), color, LineThickness);
+    canvas.AddLine(LocalToScreen(view, 1, 1), LocalToScreen(view, 1, 2), color, LineThickness);
 }
 
 /**
  * @brief   Draws the name and the model to the right of the body, in local orientation.
- * @param[in] draw_list  Draw list of the editor window.
+ * @param[in,out] canvas Where it is drawn: the editor window or an exported image.
  * @param[in] view       Transform of the current frame.
  * @param[in] color      Text color.
  */
-void UITransistor::DrawLabels(ImDrawList *draw_list, const ViewTransform &view, const ImU32 color) const {
-    DrawLabel(draw_list, view, {LabelOffsetX, -LabelOffsetY}, {1.0f, 0.0f}, GetComponent().GetName(), color);
-    DrawLabel(draw_list, view, {LabelOffsetX, LabelOffsetY}, {1.0f, 0.0f}, GetModelName(), color);
+void UITransistor::DrawLabels(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color) const {
+    DrawLabel(canvas, view, {LabelOffsetX, -LabelOffsetY}, {1.0f, 0.0f}, GetComponent().GetName(), color);
+    DrawLabel(canvas, view, {LabelOffsetX, LabelOffsetY}, {1.0f, 0.0f}, GetModelName(), color);
 }
 
 /**
@@ -73,19 +73,19 @@ LocalBounds UITransistor::GetLocalBounds() const {
 
 /**
  * @brief   Draws a filled arrow head, such as the one on an emitter.
- * @param[in] draw_list  Draw list of the editor window.
+ * @param[in,out] canvas Where it is drawn: the editor window or an exported image.
  * @param[in] view       Transform of the current frame.
  * @param[in] tip        Point of the arrow, in local grid units.
  * @param[in] direction  Direction the arrow points to, in local grid units; it does not need to be normalized.
  * @param[in] color      Fill color.
  */
-void UITransistor::DrawArrowHead(ImDrawList *draw_list, const ViewTransform &view, const ImVec2 tip,
+void UITransistor::DrawArrowHead(SchematicCanvas &canvas, const ViewTransform &view, const ImVec2 tip,
                                  const ImVec2 direction, const ImU32 color) const {
     const float length = std::hypot(direction.x, direction.y);
     const ImVec2 along = {direction.x / length, direction.y / length};
     const ImVec2 across = {-along.y, along.x};
     const ImVec2 base = {tip.x - along.x * ArrowHeadLength, tip.y - along.y * ArrowHeadLength};
-    draw_list->AddTriangleFilled(
+    canvas.AddTriangleFilled(
         LocalToScreen(view, tip.x, tip.y),
         LocalToScreen(view, base.x + across.x * ArrowHeadHalfWidth, base.y + across.y * ArrowHeadHalfWidth),
         LocalToScreen(view, base.x - across.x * ArrowHeadHalfWidth, base.y - across.y * ArrowHeadHalfWidth), color);

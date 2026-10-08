@@ -35,7 +35,7 @@ UIInductor::UIInductor(const GridPoint position, const Rotation rotation)
 // Each turn is sampled in local coordinates instead of using PathArcTo, so the arcs follow the element rotation.
 // Turns are separate polylines: joining them would put a near 180 degree corner where two turns meet, and ImGui
 // extends such miter joins into visible spikes
-void UIInductor::DrawSymbol(ImDrawList *draw_list, const ViewTransform &view, const ImU32 color,
+void UIInductor::DrawSymbol(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color,
                             SymbolStyle /*style*/) const {
     std::array<ImVec2, SegmentsPerTurn + 1> points;
     for (int turn = 0; turn < TurnCount; ++turn) {
@@ -48,7 +48,7 @@ void UIInductor::DrawSymbol(ImDrawList *draw_list, const ViewTransform &view, co
             const float y = -TurnRadius * std::sin(angle);
             points[segment] = LocalToScreen(view, x, y);
         }
-        draw_list->AddPolyline(points.data(), static_cast<int>(points.size()), color, ImDrawFlags_None, LineThickness);
+        canvas.AddPolyline(points.data(), static_cast<int>(points.size()), color, ImDrawFlags_None, LineThickness);
     }
 }
 

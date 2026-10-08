@@ -19,19 +19,19 @@ UIWire::UIWire(const GridPoint start, const GridPoint end) : m_Start(start), m_E
 
 /**
  * @brief   Draws the wire segment.
- * @param[in] draw_list  Draw list of the editor window.
+ * @param[in,out] canvas Where it is drawn: the editor window or an exported image.
  * @param[in] view       Transform of the current frame.
  * @param[in] color      Line color, so the same wire can be drawn as a preview.
  */
-void UIWire::Draw(ImDrawList *draw_list, const ViewTransform &view, const ImU32 color) const {
+void UIWire::Draw(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color) const {
     const ImVec2 start = view.ToScreen(ToVec2(m_Start));
     const ImVec2 end = view.ToScreen(ToVec2(m_End));
-    draw_list->AddLine(start, end, color, LineThickness);
+    canvas.AddLine(start, end, color, LineThickness);
 
     // Lines have flat ends, so two segments meeting at a corner leave a notch; a square on each end fills it
     const ImVec2 half_square = {LineThickness / 2.0f, LineThickness / 2.0f};
-    draw_list->AddRectFilled(start - half_square, start + half_square, color);
-    draw_list->AddRectFilled(end - half_square, end + half_square, color);
+    canvas.AddRectFilled(start - half_square, start + half_square, color);
+    canvas.AddRectFilled(end - half_square, end + half_square, color);
 }
 
 /**

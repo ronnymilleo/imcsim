@@ -28,12 +28,12 @@ UIResistor::UIResistor(const GridPoint position, const Rotation rotation)
     : UIElement(std::make_unique<Core::Resistor>(), position, rotation) {
 }
 
-void UIResistor::DrawSymbol(ImDrawList *draw_list, const ViewTransform &view, const ImU32 color,
+void UIResistor::DrawSymbol(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color,
                             const SymbolStyle style) const {
     if (style == SymbolStyle::IEC) {
         const ImVec2 rectangle[4] = {LocalToScreen(view, -1, -0.4f), LocalToScreen(view, 1, -0.4f),
                                      LocalToScreen(view, 1, 0.4f), LocalToScreen(view, -1, 0.4f)};
-        draw_list->AddPolyline(rectangle, 4, color, ImDrawFlags_Closed, LineThickness);
+        canvas.AddPolyline(rectangle, 4, color, ImDrawFlags_Closed, LineThickness);
         return;
     }
 
@@ -46,7 +46,7 @@ void UIResistor::DrawSymbol(ImDrawList *draw_list, const ViewTransform &view, co
         zig_zag[peak + 1] = LocalToScreen(view, x, y);
     }
     zig_zag.back() = LocalToScreen(view, 1, 0);
-    draw_list->AddPolyline(zig_zag.data(), static_cast<int>(zig_zag.size()), color, ImDrawFlags_None, LineThickness);
+    canvas.AddPolyline(zig_zag.data(), static_cast<int>(zig_zag.size()), color, ImDrawFlags_None, LineThickness);
 }
 
 } // namespace GUI
