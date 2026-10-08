@@ -8,6 +8,7 @@
 #include "simulator.h"
 
 #include "components/bjt.h"
+#include "components/controlled_source.h"
 #include "components/diode.h"
 #include "components/mosfet.h"
 #include "components/source.h"
@@ -126,6 +127,23 @@ std::optional<std::string> CheckCircuit(const Circuit &circuit) {
     }
     if (!circuit.HasGround()) {
         return "The circuit has no ground; add a Ground so node voltages have a reference";
+    }
+    // A current-controlled source needs a current that some other part reports
+    for (const CircuitEntry &entry : circuit.GetEntries()) {
+        if (!IsCurrentControlled(entry.Part->GetType())) {
+            continue;
+        }
+        const std::string &name = entry.Part->GetName();
+        const std::string &current = static_cast<const ControlledSource &>(*entry.Part).GetControllingCurrent();
+        if (current.empty()) {
+            return std::format("{} follows no current; pick its controlling current in Properties", name);
+        }
+        if (current == name) {
+            return std::format("{} cannot follow its own current", name);
+        }
+        if (!FindControllingSource(circuit, current)) {
+            return std::format("{} follows I({}), which is not in the circuit", name, current);
+        }
     }
     return std::nullopt;
 }
@@ -302,6 +320,11 @@ std::vector<CurrentVector> CurrentVectors(const Component &component) {
     case ComponentType::PNP:
     case ComponentType::NMOS:
     case ComponentType::PMOS:
+    case ComponentType::VCVS:
+    case ComponentType::VCCS:
+    case ComponentType::CCCS:
+    case ComponentType::CCVS:
+    case ComponentType::OpAmp:
         break;
     }
     return {};
@@ -573,7 +596,7 @@ ACCurrent(const CircuitEntry &entry, const std::vector<double> &frequencies,
     case ComponentType::CurrentSource: {
         // The source drives its AC magnitude at zero phase, and nothing when it is not AC
         const auto &source = static_cast<const Source &>(component);
-        const double magnitude = source.GetSourceType() == Source::SourceType::AC ? source.GetAC().Amplitude : 0.0;
+        const double magnitude = source.GetSourceType() == Source::SourceType::AC ? source.GetAC().Magnitude : 0.0;
         std::ranges::fill(currents, std::complex<double>(magnitude, 0.0));
         return currents;
     }
@@ -589,6 +612,11 @@ ACCurrent(const CircuitEntry &entry, const std::vector<double> &frequencies,
     case ComponentType::PNP:
     case ComponentType::NMOS:
     case ComponentType::PMOS:
+    case ComponentType::VCVS:
+    case ComponentType::VCCS:
+    case ComponentType::CCCS:
+    case ComponentType::CCVS:
+    case ComponentType::OpAmp:
         break;
     }
     return std::unexpected(std::format("{} carries no current", component.GetName()));

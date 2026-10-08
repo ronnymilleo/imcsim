@@ -17,20 +17,11 @@ namespace Core {
 namespace {
 
 constexpr auto AllTypes = std::to_array<ComponentType>({
-    ComponentType::Resistor,
-    ComponentType::Capacitor,
-    ComponentType::Inductor,
-    ComponentType::Ground,
-    ComponentType::VCC,
-    ComponentType::VoltageSource,
-    ComponentType::CurrentSource,
-    ComponentType::Diode,
-    ComponentType::ZenerDiode,
-    ComponentType::LED,
-    ComponentType::NPN,
-    ComponentType::PNP,
-    ComponentType::NMOS,
-    ComponentType::PMOS,
+    ComponentType::Resistor,   ComponentType::Capacitor,     ComponentType::Inductor,      ComponentType::Ground,
+    ComponentType::VCC,        ComponentType::VoltageSource, ComponentType::CurrentSource, ComponentType::Diode,
+    ComponentType::ZenerDiode, ComponentType::LED,           ComponentType::NPN,           ComponentType::PNP,
+    ComponentType::NMOS,       ComponentType::PMOS,          ComponentType::VCVS,          ComponentType::VCCS,
+    ComponentType::CCCS,       ComponentType::CCVS,          ComponentType::OpAmp,
 });
 
 } // namespace
@@ -61,7 +52,8 @@ const char *Component::GetTypeName() const {
 
 /**
  * @brief   Returns the SPICE letter that starts the name of this kind of component.
- * @return  "R", "C", "L", "V", "Vin", "I", "D", "Q" or "M", or an empty string for ground, which is not named.
+ * @return  "R", "C", "L", "V", "Vin", "I", "D", "Q", "M", "E", "G", "F", "H" or "U", or an empty string for
+ *          ground, which is not named.
  */
 const char *Component::GetNamePrefix() const {
     switch (m_Type) {
@@ -88,6 +80,16 @@ const char *Component::GetNamePrefix() const {
     case ComponentType::NMOS:
     case ComponentType::PMOS:
         return "M";
+    case ComponentType::VCVS:
+        return "E";
+    case ComponentType::VCCS:
+        return "G";
+    case ComponentType::CCCS:
+        return "F";
+    case ComponentType::CCVS:
+        return "H";
+    case ComponentType::OpAmp:
+        return "U";
     case ComponentType::Ground:
         return "";
     }
@@ -96,7 +98,8 @@ const char *Component::GetNamePrefix() const {
 
 /**
  * @brief   Returns the unit of the component value.
- * @return  "Ohm", "F", "H", "V" or "A", or an empty string when the component has no value.
+ * @return  "Ohm", "F", "H", "V" or "A"; the gain unit of a controlled source, such as "V/V"; or an empty string
+ *          when the component has no value.
  */
 const char *Component::GetUnit() const {
     switch (m_Type) {
@@ -111,6 +114,15 @@ const char *Component::GetUnit() const {
         return "V";
     case ComponentType::CurrentSource:
         return "A";
+    case ComponentType::VCVS:
+        return "V/V";
+    case ComponentType::VCCS:
+        return "A/V";
+    case ComponentType::CCCS:
+        return "A/A";
+    case ComponentType::CCVS:
+        return "V/A";
+    case ComponentType::OpAmp:
     case ComponentType::Ground:
     case ComponentType::Diode:
     case ComponentType::ZenerDiode:
@@ -126,7 +138,8 @@ const char *Component::GetUnit() const {
 
 /**
  * @brief   Tells whether the component carries a numeric value.
- * @return  False for ground and for diodes and transistors, whose model sets their behavior; true for the rest.
+ * @return  False for ground, for diodes and transistors, whose model sets their behavior, and for the ideal op-amp;
+ *          true for the rest.
  */
 bool Component::HasValue() const {
     switch (m_Type) {
@@ -138,6 +151,7 @@ bool Component::HasValue() const {
     case ComponentType::PNP:
     case ComponentType::NMOS:
     case ComponentType::PMOS:
+    case ComponentType::OpAmp:
         return false;
     case ComponentType::Resistor:
     case ComponentType::Capacitor:
@@ -145,6 +159,10 @@ bool Component::HasValue() const {
     case ComponentType::VCC:
     case ComponentType::VoltageSource:
     case ComponentType::CurrentSource:
+    case ComponentType::VCVS:
+    case ComponentType::VCCS:
+    case ComponentType::CCCS:
+    case ComponentType::CCVS:
         return true;
     }
     return false;
@@ -153,7 +171,8 @@ bool Component::HasValue() const {
 /**
  * @brief   Checks whether a value makes sense for this kind of component.
  * @param[in] value  Candidate value in the component unit.
- * @return  True when the value can be simulated: positive for R, C and L, any voltage for a supply.
+ * @return  True when the value can be simulated: positive for R, C and L, any voltage for a supply, and any gain,
+ *          negative included, for a controlled source.
  */
 bool Component::IsValidValue(const double value) const {
     switch (m_Type) {
@@ -164,6 +183,10 @@ bool Component::IsValidValue(const double value) const {
     case ComponentType::VCC:
     case ComponentType::VoltageSource:
     case ComponentType::CurrentSource:
+    case ComponentType::VCVS:
+    case ComponentType::VCCS:
+    case ComponentType::CCCS:
+    case ComponentType::CCVS:
         return true;
     case ComponentType::Ground:
     case ComponentType::Diode:
@@ -173,6 +196,7 @@ bool Component::IsValidValue(const double value) const {
     case ComponentType::PNP:
     case ComponentType::NMOS:
     case ComponentType::PMOS:
+    case ComponentType::OpAmp:
         return false;
     }
     return false;
@@ -245,6 +269,16 @@ const char *GetTypeName(const ComponentType type) {
         return "NMOS";
     case ComponentType::PMOS:
         return "PMOS";
+    case ComponentType::VCVS:
+        return "VCVS";
+    case ComponentType::VCCS:
+        return "VCCS";
+    case ComponentType::CCCS:
+        return "CCCS";
+    case ComponentType::CCVS:
+        return "CCVS";
+    case ComponentType::OpAmp:
+        return "OpAmp";
     }
     return "Unknown";
 }

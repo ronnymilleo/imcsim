@@ -11,9 +11,13 @@
 #include <algorithm>
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
+#include <cmath>
+#include <format>
 #include <numbers>
+#include <optional>
 #include <string>
 #include <string_view>
+#include <vector>
 
 namespace {
 
@@ -28,6 +32,24 @@ void OpenOrFail(const GUI::Example &example, GUI::Schematic &schematic) {
     schematic.RestoreMeasurements(loaded->Measurements);
     // Every saved voltage lands on a node, so none is dropped on the way in
     CHECK(schematic.SaveMeasurements() == loaded->Measurements);
+}
+
+// Opens the example saved in a file of the given name
+void OpenExample(const std::string_view file_name, GUI::Schematic &schematic) {
+    const auto example = std::ranges::find(GUI::GetExamples(), file_name, &GUI::Example::FileName);
+    REQUIRE(example != GUI::GetExamples().end());
+    OpenOrFail(*example, schematic);
+}
+
+std::size_t NodeAt(GUI::Schematic &schematic, const GUI::GridPoint point) {
+    const std::optional<int> node = schematic.GetConnectivity().GetNode(point);
+    REQUIRE(node);
+    return static_cast<std::size_t>(*node);
+}
+
+// Largest magnitude of a waveform, either sign
+double PeakOf(const std::vector<double> &values) {
+    return std::abs(std::ranges::max(values, {}, [](const double value) { return std::abs(value); }));
 }
 
 } // namespace
@@ -89,4 +111,45 @@ TEST_CASE("The RC example measures its corner frequency over the whole sweep", "
     const double corner = 1.0 / (2.0 * std::numbers::pi * 1e3 * 100e-9);
     CHECK_THAT(*statistics->UpperCutoff, Catch::Matchers::WithinRel(corner, 2e-2));
     CHECK_FALSE(statistics->LowerCutoff);
+}
+
+TEST_CASE("The hybrid-pi model has the gain of its transistor in the middle band only", "[examples]") {
+    GUI::Schematic schematic;
+    OpenExample("hybrid_pi_model.imcsim", schematic);
+    const Core::ACSweepRun run = Core::RunACSweep(schematic.BuildCircuit(), schematic.GetSimulationSettings().ACSweep);
+    REQUIRE(run.Result.has_value());
+    const Core::ACSweep &sweep = *run.Result;
+    const std::vector<double> &real = sweep.NodeMagnitudesDecibels[NodeAt(schematic, {13, 6})];
+    const std::vector<double> &model = sweep.NodeMagnitudesDecibels[NodeAt(schematic, {21, 18})];
+    const auto at = [&sweep](const double frequency) {
+        return static_cast<std::size_t>(std::ranges::lower_bound(sweep.Frequencies, frequency) -
+                                        sweep.Frequencies.begin());
+    };
+    // gm (RC || ro) = 227, or 47 dB, for both at 1 kHz
+    CHECK_THAT(real[at(1e3)], Catch::Matchers::WithinAbs(47.1, 0.2));
+    CHECK_THAT(model[at(1e3)], Catch::Matchers::WithinAbs(real[at(1e3)], 0.1));
+    // The junction capacitances of the real transistor cut its gain at high frequency; the model has none
+    INFO(std::format("At 50 MHz: real {} dB, model {} dB", real[at(50e6)], model[at(50e6)]));
+    CHECK(model[at(50e6)] - real[at(50e6)] > 10.0);
+}
+
+TEST_CASE("The ideal transformer doubles the voltage and halves the current", "[examples]") {
+    GUI::Schematic schematic;
+    OpenExample("ideal_transformer.imcsim", schematic);
+    const Core::TransientRun run =
+        Core::RunTransient(schematic.BuildCircuit(), schematic.GetSimulationSettings().Transient);
+    REQUIRE(run.Result.has_value());
+    const Core::Transient &transient = *run.Result;
+    const double primary = PeakOf(transient.NodeVoltages[NodeAt(schematic, {4, 6})]);
+    const double secondary = PeakOf(transient.NodeVoltages[NodeAt(schematic, {16, 6})]);
+    CHECK_THAT(primary, Catch::Matchers::WithinRel(5.0, 1e-3));
+    CHECK_THAT(secondary, Catch::Matchers::WithinRel(10.0, 1e-3));
+    const auto current = [&transient](const std::string &name) {
+        const auto trace = std::ranges::find(transient.Currents, name, &Core::ComponentTrace::Name);
+        REQUIRE(trace != transient.Currents.end());
+        return PeakOf(trace->Values);
+    };
+    // 10 V on 100 Ohm, and twice that drawn from the primary: the source sees 25 Ohm
+    CHECK_THAT(current("R1"), Catch::Matchers::WithinRel(0.1, 1e-3));
+    CHECK_THAT(current("F1"), Catch::Matchers::WithinRel(0.2, 1e-3));
 }

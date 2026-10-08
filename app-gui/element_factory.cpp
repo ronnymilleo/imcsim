@@ -7,11 +7,13 @@
 
 #include "ui_elements/ui_bjt.h"
 #include "ui_elements/ui_capacitor.h"
+#include "ui_elements/ui_controlled_source.h"
 #include "ui_elements/ui_current_source.h"
 #include "ui_elements/ui_diode.h"
 #include "ui_elements/ui_ground.h"
 #include "ui_elements/ui_inductor.h"
 #include "ui_elements/ui_mosfet.h"
+#include "ui_elements/ui_op_amp.h"
 #include "ui_elements/ui_resistor.h"
 #include "ui_elements/ui_vcc.h"
 #include "ui_elements/ui_voltage_source.h"
@@ -52,6 +54,13 @@ std::unique_ptr<UIElement> CreateElement(const Core::ComponentType type, const G
     case Core::ComponentType::NMOS:
     case Core::ComponentType::PMOS:
         return std::make_unique<UIMOSFET>(type, position, rotation);
+    case Core::ComponentType::VCVS:
+    case Core::ComponentType::VCCS:
+    case Core::ComponentType::CCCS:
+    case Core::ComponentType::CCVS:
+        return std::make_unique<UIControlledSource>(type, position, rotation);
+    case Core::ComponentType::OpAmp:
+        return std::make_unique<UIOpAmp>(position, rotation);
     }
     return nullptr;
 }

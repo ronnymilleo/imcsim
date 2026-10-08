@@ -5,6 +5,7 @@
 
 #include "properties_window.h"
 
+#include "simulator.h"
 #include "spice_value.h"
 #include "theme.h"
 #include <array>
@@ -37,6 +38,7 @@ constexpr auto ACFields = std::to_array<ParameterField<Core::ACParameters>>({
     {"Amplitude", &Core::ACParameters::Amplitude, nullptr},
     {"Frequency", &Core::ACParameters::Frequency, "Hz"},
     {"Offset", &Core::ACParameters::Offset, nullptr},
+    {"AC magnitude", &Core::ACParameters::Magnitude, nullptr},
 });
 
 constexpr auto PulseFields = std::to_array<ParameterField<Core::PulseParameters>>({
@@ -95,6 +97,21 @@ constexpr auto MOSFETFields = std::to_array<ParameterField<Core::MOSFETParameter
     {"VGS max", &Core::MOSFETParameters::MaxGateSourceVoltage, "V"},
     {"ID max", &Core::MOSFETParameters::MaxDrainCurrent, "A"},
     {"P max", &Core::MOSFETParameters::MaxPower, "W"},
+});
+
+// Datasheet specifications, from which the macromodel is built
+constexpr auto OpAmpFields = std::to_array<ParameterField<Core::OpAmpParameters>>({
+    {"Avol", &Core::OpAmpParameters::OpenLoopGainDecibels, "dB"},
+    {"GBW", &Core::OpAmpParameters::GainBandwidth, "Hz"},
+    {"Slew rate", &Core::OpAmpParameters::SlewRate, "V/us"},
+    {"Phase margin", &Core::OpAmpParameters::PhaseMarginDegrees, "deg"},
+    {"IB", &Core::OpAmpParameters::InputBiasCurrent, "A"},
+    {"CMRR", &Core::OpAmpParameters::CommonModeRejectionDecibels, "dB"},
+    {"Rout", &Core::OpAmpParameters::OutputResistance, "Ohm"},
+    {"Isc", &Core::OpAmpParameters::ShortCircuitCurrent, "A"},
+    {"V+ headroom", &Core::OpAmpParameters::PositiveHeadroom, "V"},
+    {"V- headroom", &Core::OpAmpParameters::NegativeHeadroom, "V"},
+    {"Supply current", &Core::OpAmpParameters::SupplyCurrent, "A"},
 });
 
 template <typename Parameters, std::size_t Count>
@@ -170,7 +187,7 @@ bool DrawModelChoice(Part &part, const std::span<const Model> models, const char
 }
 
 bool HasModel(const Core::ComponentType type) {
-    return Core::IsDiode(type) || Core::IsBJT(type) || Core::IsMOSFET(type);
+    return Core::IsDiode(type) || Core::IsBJT(type) || Core::IsMOSFET(type) || type == Core::ComponentType::OpAmp;
 }
 
 // Value fields show for parts with a value, and for parts with a model only while they are custom
@@ -184,6 +201,11 @@ bool ShowsValueFields(const Core::Component &component) {
     }
     if (Core::IsMOSFET(type)) {
         return static_cast<const Core::MOSFET &>(component).IsCustom();
+    }
+    // The ideal op-amp has its gain-bandwidth product to edit
+    if (type == Core::ComponentType::OpAmp) {
+        const auto &op_amp = static_cast<const Core::OpAmp &>(component);
+        return op_amp.IsCustom() || op_amp.IsIdeal();
     }
     return component.HasValue();
 }
@@ -227,8 +249,12 @@ void PropertiesWindow::Draw() {
         DrawBJT(static_cast<Core::BJT &>(component));
     } else if (Core::IsMOSFET(type)) {
         DrawMOSFET(static_cast<Core::MOSFET &>(component));
+    } else if (type == Core::ComponentType::OpAmp) {
+        DrawOpAmp(static_cast<Core::OpAmp &>(component));
     } else if (Core::IsSource(type)) {
         DrawSource(static_cast<Core::Source &>(component));
+    } else if (Core::IsControlledSource(type)) {
+        DrawControlledSource(static_cast<Core::ControlledSource &>(component));
     } else {
         DrawValue(component);
     }
@@ -256,6 +282,11 @@ void PropertiesWindow::LoadFields(const Core::Component &component) {
     if (Core::IsMOSFET(component.GetType())) {
         const auto &mosfet = static_cast<const Core::MOSFET &>(component);
         LoadParameterFields(MOSFETFields, m_MOSFETFields, mosfet.GetParameters());
+    }
+    if (component.GetType() == Core::ComponentType::OpAmp) {
+        const auto &op_amp = static_cast<const Core::OpAmp &>(component);
+        LoadParameterFields(OpAmpFields, m_OpAmpFields, op_amp.GetParameters());
+        m_Value.Load(op_amp.GetIdealBandwidth());
     }
     m_LoadedSelection = m_Schematic.GetSelectionVersion();
 }
@@ -301,6 +332,24 @@ void PropertiesWindow::DrawMOSFET(Core::MOSFET &mosfet) {
     }
 }
 
+// The ideal op-amp has only its gain-bandwidth product to set; a macromodel shows its specifications when custom
+void PropertiesWindow::DrawOpAmp(Core::OpAmp &op_amp) {
+    if (DrawModelChoice(op_amp, Core::GetOpAmpModels(op_amp.GetType()), Core::CustomOpAmpModelName, OpAmpFields,
+                        m_OpAmpFields)) {
+        m_Schematic.MarkModified();
+    }
+    if (op_amp.IsIdeal()) {
+        if (const std::optional<double> bandwidth = m_Value.Draw("GBW", "Hz", Core::IsValidIdealBandwidth)) {
+            op_amp.SetIdealBandwidth(*bandwidth);
+            m_Schematic.MarkModified();
+        }
+        ImGui::TextDisabled("The open-loop gain falls to 1 at the GBW");
+    } else if (op_amp.IsCustom()) {
+        ImGui::TextDisabled("Headrooms: how close the output gets to V+ and V-");
+        ImGui::TextDisabled("Built as a Boyle macromodel from these specs");
+    }
+}
+
 void PropertiesWindow::DrawSource(Core::Source &source) {
     using SourceType = Core::Source::SourceType;
     for (const SourceType type : {SourceType::DC, SourceType::AC, SourceType::Pulse}) {
@@ -339,7 +388,8 @@ void PropertiesWindow::DrawSine(Core::Source &source) {
         source.SetAC(ac);
         m_Schematic.MarkModified();
     }
-    ImGui::TextDisabled("The amplitude is the peak; it is also the AC sweep magnitude");
+    ImGui::TextDisabled("The amplitude is the peak of the sine in a transient");
+    ImGui::TextDisabled("The AC magnitude drives the AC sweep; 1 reads as gain");
 }
 
 void PropertiesWindow::DrawPulse(Core::Source &source) {
@@ -353,6 +403,53 @@ void PropertiesWindow::DrawPulse(Core::Source &source) {
     ImGui::TextDisabled("%s", std::format("Repeats at {}Hz", Core::FormatValue(1.0 / pulse.Period)).c_str());
     if (pulse.RiseTime + pulse.Width + pulse.FallTime > pulse.Period) {
         ImGui::TextColored(GetWarningTextColor(), "Rise, width and fall add up to more than the period");
+    }
+}
+
+// The gain is the ratio of output to control, so the line below spells out what it multiplies
+void PropertiesWindow::DrawControlledSource(Core::ControlledSource &source) {
+    if (const std::optional<double> value = m_Value.Draw("Gain", source.GetUnit(), AnyValue)) {
+        source.SetValue(*value);
+        m_Schematic.MarkModified();
+    }
+    const Core::ComponentType type = source.GetType();
+    if (Core::IsCurrentControlled(type)) {
+        DrawControllingCurrent(source);
+    }
+    if (type == Core::ComponentType::VCVS) {
+        ImGui::TextDisabled("V(1, 2) = gain x V(+, -) of the control pins");
+    } else if (type == Core::ComponentType::VCCS) {
+        ImGui::TextDisabled("Pushes gain x V(+, -) from terminal 1 to 2");
+    } else if (type == Core::ComponentType::CCCS) {
+        ImGui::TextDisabled("Pushes gain x I from terminal 1 to 2");
+    } else {
+        ImGui::TextDisabled("V(1, 2) = gain x I");
+    }
+    ImGui::TextDisabled("A negative gain inverts the output");
+}
+
+// Any current the results report can control the source, except its own; they read as the plots name them
+void PropertiesWindow::DrawControllingCurrent(Core::ControlledSource &source) {
+    const std::string &current = source.GetControllingCurrent();
+    const std::string preview = current.empty() ? "(none)" : std::format("I({})", current);
+    DrawFieldLabel("Follows");
+    if (ImGui::BeginCombo("##Follows", preview.c_str())) {
+        for (const auto &element : m_Schematic.GetElements()) {
+            if (&element->GetComponent() == &source) {
+                continue;
+            }
+            for (const std::string &name : Core::GetCurrentNames(element->GetComponent())) {
+                const bool selected = name == current;
+                if (ImGui::Selectable(std::format("I({})", name).c_str(), selected) && !selected) {
+                    source.SetControllingCurrent(name);
+                    m_Schematic.MarkModified();
+                }
+            }
+        }
+        ImGui::EndCombo();
+    }
+    if (current.empty()) {
+        ImGui::TextColored(GetWarningTextColor(), "Pick the current the source follows");
     }
 }
 

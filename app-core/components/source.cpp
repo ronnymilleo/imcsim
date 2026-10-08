@@ -46,7 +46,7 @@ const ACParameters &Source::GetAC() const {
 
 /**
  * @brief   Changes the sine of the source.
- * @param[in] ac  New amplitude, frequency and offset; check them with IsValidAC() first.
+ * @param[in] ac  New amplitude, frequency, offset and AC magnitude; check them with IsValidAC() first.
  */
 void Source::SetAC(const ACParameters &ac) {
     m_AC = ac;
@@ -54,8 +54,8 @@ void Source::SetAC(const ACParameters &ac) {
 
 /**
  * @brief   Checks whether a sine can be simulated.
- * @param[in] ac  Candidate amplitude, frequency and offset.
- * @return  True when the frequency is positive. The amplitude and offset can be any value; a negative
+ * @param[in] ac  Candidate amplitude, frequency, offset and AC magnitude.
+ * @return  True when the frequency is positive. The amplitude, offset and magnitude can be any value; a negative
  *          amplitude inverts the sine.
  */
 bool Source::IsValidAC(const ACParameters &ac) const {

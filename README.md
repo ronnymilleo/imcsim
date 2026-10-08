@@ -14,6 +14,9 @@ netlist](docs/screenshot.png)
 - Resistors, capacitors, inductors, ground, a VCC rail, and voltage and current sources (DC, sine or pulse)
 - Diodes, Zener diodes, LEDs, NPN and PNP bipolar transistors, and N- and P-channel MOSFETs, each with ready models
   or custom SPICE parameters
+- Controlled sources (VCVS, VCCS, CCCS, CCVS), and op-amps: ideal with a gain-bandwidth product and an output
+  limited by its supply pins, or a uA741 or custom part built as a Boyle macromodel from datasheet values (slew rate,
+  bias current, output swing, current limit)
 - Warnings when a diode goes into reverse breakdown or a transistor exceeds its voltage, current or power ratings
 - Operating point, transient, AC sweep and DC sweep analyses, with node voltages and component currents
 - Plots of transients, Bode diagrams and DC sweeps (including curve families, such as transistor characteristics):
@@ -32,10 +35,12 @@ netlist](docs/screenshot.png)
 - IEC or ANSI symbols, optional terminal numbers, parts rotated (R) and mirrored left to right (M) or top to bottom
   (Shift+M), undo and redo, and schematics saved as JSON together with the settings of every analysis and the
   measured traces
-- Example circuits, each with its analyses and measurements set up: an RC low-pass filter, a full-bridge rectifier, an LED driver
-  and the output characteristics of a BJT
+- Example circuits, each with its analyses and measurements set up: an RC low-pass filter, a full-bridge rectifier,
+  an LED driver, an op-amp inverting amplifier, an ideal transformer made of controlled sources, the output
+  characteristics of a BJT and its small-signal model
 
-The [user guide](docs/user_guide.md) explains terminal numbers, current signs, probes, plots and exports.
+The [user guide](docs/user_guide.md) explains terminal numbers, current signs, probes, plots and exports, and
+[Simulation models](docs/models.md) describes the model behind every part and what it leaves out.
 
 On Wayland, the windows cannot be dragged out of the main window. Run with `SDL_VIDEODRIVER=x11` to allow it.
 

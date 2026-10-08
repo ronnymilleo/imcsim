@@ -1,0 +1,435 @@
+{
+  "elements": [
+    {
+      "name": "V1",
+      "rotation": 0,
+      "type": "VCC",
+      "value": 12.0,
+      "x": 8,
+      "y": 2
+    },
+    {
+      "name": "R1",
+      "rotation": 90,
+      "type": "Resistor",
+      "value": 1200000.0,
+      "x": 8,
+      "y": 5
+    },
+    {
+      "name": "R2",
+      "rotation": 90,
+      "type": "Resistor",
+      "value": 4700.0,
+      "x": 13,
+      "y": 4
+    },
+    {
+      "model": "2N3904",
+      "name": "Q1",
+      "rotation": 0,
+      "type": "NPN",
+      "x": 12,
+      "y": 8
+    },
+    {
+      "name": "C1",
+      "rotation": 0,
+      "type": "Capacitor",
+      "value": 1e-05,
+      "x": 5,
+      "y": 8
+    },
+    {
+      "ac_magnitude": 1.0,
+      "amplitude": 0.01,
+      "frequency": 1000.0,
+      "name": "Vin1",
+      "offset": 0.0,
+      "pulse": {
+        "delay": 0.0,
+        "fall": 1e-06,
+        "high": 5.0,
+        "low": 0.0,
+        "period": 0.001,
+        "rise": 1e-06,
+        "width": 0.0005
+      },
+      "rotation": 90,
+      "source": "AC",
+      "type": "VoltageSource",
+      "value": 0.0,
+      "x": -1,
+      "y": 10
+    },
+    {
+      "rotation": 0,
+      "type": "Ground",
+      "x": -1,
+      "y": 13
+    },
+    {
+      "rotation": 0,
+      "type": "Ground",
+      "x": 13,
+      "y": 11
+    },
+    {
+      "name": "C2",
+      "rotation": 0,
+      "type": "Capacitor",
+      "value": 1e-05,
+      "x": 5,
+      "y": 18
+    },
+    {
+      "name": "R3",
+      "rotation": 90,
+      "type": "Resistor",
+      "value": 1200000.0,
+      "x": 9,
+      "y": 20
+    },
+    {
+      "name": "R4",
+      "rotation": 90,
+      "type": "Resistor",
+      "value": 3170.0,
+      "x": 15,
+      "y": 20
+    },
+    {
+      "name": "G1",
+      "rotation": 0,
+      "type": "VCCS",
+      "value": 0.0523,
+      "x": 21,
+      "y": 20
+    },
+    {
+      "name": "R5",
+      "rotation": 90,
+      "type": "Resistor",
+      "value": 4700.0,
+      "x": 29,
+      "y": 20
+    },
+    {
+      "name": "R6",
+      "rotation": 90,
+      "type": "Resistor",
+      "value": 57200.0,
+      "x": 35,
+      "y": 20
+    },
+    {
+      "rotation": 0,
+      "type": "Ground",
+      "x": 15,
+      "y": 23
+    }
+  ],
+  "format": "imcsim-schematic",
+  "measurements": {
+    "currents": [],
+    "voltages": [
+      [
+        13,
+        6
+      ],
+      [
+        21,
+        18
+      ]
+    ]
+  },
+  "simulation": {
+    "ac_sweep": {
+      "points_per_decade": 20,
+      "start": 1.0,
+      "stop": 100000000.0
+    },
+    "dc_sweep": {
+      "step_source": false,
+      "stepped": {
+        "source": "",
+        "start": 0.0,
+        "step": 1.0,
+        "stop": 5.0
+      },
+      "swept": {
+        "source": "",
+        "start": 0.0,
+        "step": 0.1,
+        "stop": 5.0
+      }
+    },
+    "transient": {
+      "step": 5e-06,
+      "stop": 0.005
+    }
+  },
+  "version": 1,
+  "wires": [
+    {
+      "end": [
+        13,
+        2
+      ],
+      "start": [
+        8,
+        2
+      ]
+    },
+    {
+      "end": [
+        8,
+        3
+      ],
+      "start": [
+        8,
+        2
+      ]
+    },
+    {
+      "end": [
+        8,
+        8
+      ],
+      "start": [
+        8,
+        7
+      ]
+    },
+    {
+      "end": [
+        8,
+        8
+      ],
+      "start": [
+        7,
+        8
+      ]
+    },
+    {
+      "end": [
+        10,
+        8
+      ],
+      "start": [
+        8,
+        8
+      ]
+    },
+    {
+      "end": [
+        16,
+        6
+      ],
+      "start": [
+        13,
+        6
+      ]
+    },
+    {
+      "end": [
+        13,
+        11
+      ],
+      "start": [
+        13,
+        10
+      ]
+    },
+    {
+      "end": [
+        2,
+        8
+      ],
+      "start": [
+        -1,
+        8
+      ]
+    },
+    {
+      "end": [
+        3,
+        8
+      ],
+      "start": [
+        2,
+        8
+      ]
+    },
+    {
+      "end": [
+        -1,
+        12
+      ],
+      "start": [
+        -1,
+        13
+      ]
+    },
+    {
+      "end": [
+        2,
+        18
+      ],
+      "start": [
+        2,
+        8
+      ]
+    },
+    {
+      "end": [
+        3,
+        18
+      ],
+      "start": [
+        2,
+        18
+      ]
+    },
+    {
+      "end": [
+        9,
+        18
+      ],
+      "start": [
+        7,
+        18
+      ]
+    },
+    {
+      "end": [
+        15,
+        18
+      ],
+      "start": [
+        9,
+        18
+      ]
+    },
+    {
+      "end": [
+        19,
+        18
+      ],
+      "start": [
+        15,
+        18
+      ]
+    },
+    {
+      "end": [
+        19,
+        19
+      ],
+      "start": [
+        19,
+        18
+      ]
+    },
+    {
+      "end": [
+        19,
+        22
+      ],
+      "start": [
+        19,
+        21
+      ]
+    },
+    {
+      "end": [
+        29,
+        18
+      ],
+      "start": [
+        21,
+        18
+      ]
+    },
+    {
+      "end": [
+        35,
+        18
+      ],
+      "start": [
+        29,
+        18
+      ]
+    },
+    {
+      "end": [
+        37,
+        18
+      ],
+      "start": [
+        35,
+        18
+      ]
+    },
+    {
+      "end": [
+        15,
+        22
+      ],
+      "start": [
+        9,
+        22
+      ]
+    },
+    {
+      "end": [
+        19,
+        22
+      ],
+      "start": [
+        15,
+        22
+      ]
+    },
+    {
+      "end": [
+        21,
+        22
+      ],
+      "start": [
+        19,
+        22
+      ]
+    },
+    {
+      "end": [
+        29,
+        22
+      ],
+      "start": [
+        21,
+        22
+      ]
+    },
+    {
+      "end": [
+        35,
+        22
+      ],
+      "start": [
+        29,
+        22
+      ]
+    },
+    {
+      "end": [
+        15,
+        23
+      ],
+      "start": [
+        15,
+        22
+      ]
+    }
+  ]
+}

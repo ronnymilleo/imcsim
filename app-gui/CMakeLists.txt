@@ -25,12 +25,14 @@ add_library(imcsim-gui-lib
             trace_statistics.cpp
             ui_elements/ui_bjt.cpp
             ui_elements/ui_capacitor.cpp
+            ui_elements/ui_controlled_source.cpp
             ui_elements/ui_current_source.cpp
             ui_elements/ui_diode.cpp
             ui_elements/ui_element.cpp
             ui_elements/ui_ground.cpp
             ui_elements/ui_inductor.cpp
             ui_elements/ui_mosfet.cpp
+            ui_elements/ui_op_amp.cpp
             ui_elements/ui_resistor.cpp
             ui_elements/ui_source.cpp
             ui_elements/ui_transistor.cpp

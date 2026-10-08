@@ -8,11 +8,13 @@ add_library(imcsim-core-lib
             components/bjt.cpp
             components/capacitor.cpp
             components/component.cpp
+            components/controlled_source.cpp
             components/current_source.cpp
             components/diode.cpp
             components/ground.cpp
             components/inductor.cpp
             components/mosfet.cpp
+            components/op_amp.cpp
             components/resistor.cpp
             components/source.cpp
             components/vcc.cpp

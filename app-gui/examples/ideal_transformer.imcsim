@@ -1,30 +1,8 @@
 {
   "elements": [
     {
-      "name": "R1",
-      "rotation": 0,
-      "type": "Resistor",
-      "value": 1000.0,
-      "x": 9,
-      "y": 4
-    },
-    {
-      "name": "C1",
-      "rotation": 90,
-      "type": "Capacitor",
-      "value": 1e-07,
-      "x": 14,
-      "y": 7
-    },
-    {
-      "rotation": 0,
-      "type": "Ground",
-      "x": 9,
-      "y": 11
-    },
-    {
       "ac_magnitude": 1.0,
-      "amplitude": 1.0,
+      "amplitude": 5.0,
       "frequency": 1000.0,
       "name": "Vin1",
       "offset": 0.0,
@@ -40,9 +18,40 @@
       "rotation": 90,
       "source": "AC",
       "type": "VoltageSource",
-      "value": 5.0,
+      "value": 0.0,
       "x": 4,
-      "y": 7
+      "y": 8
+    },
+    {
+      "control": "R1",
+      "name": "F1",
+      "rotation": 0,
+      "type": "CCCS",
+      "value": 2.0,
+      "x": 10,
+      "y": 8
+    },
+    {
+      "name": "E1",
+      "rotation": 0,
+      "type": "VCVS",
+      "value": 2.0,
+      "x": 16,
+      "y": 8
+    },
+    {
+      "name": "R1",
+      "rotation": 90,
+      "type": "Resistor",
+      "value": 100.0,
+      "x": 21,
+      "y": 8
+    },
+    {
+      "rotation": 0,
+      "type": "Ground",
+      "x": 10,
+      "y": 11
     }
   ],
   "format": "imcsim-schematic",
@@ -51,11 +60,11 @@
     "voltages": [
       [
         4,
-        4
+        6
       ],
       [
-        11,
-        4
+        16,
+        6
       ]
     ]
   },
@@ -89,82 +98,102 @@
   "wires": [
     {
       "end": [
-        9,
+        10,
+        6
+      ],
+      "start": [
+        4,
+        6
+      ]
+    },
+    {
+      "end": [
+        14,
+        6
+      ],
+      "start": [
+        10,
+        6
+      ]
+    },
+    {
+      "end": [
+        14,
+        7
+      ],
+      "start": [
+        14,
+        6
+      ]
+    },
+    {
+      "end": [
+        14,
+        10
+      ],
+      "start": [
+        14,
+        9
+      ]
+    },
+    {
+      "end": [
+        21,
+        6
+      ],
+      "start": [
+        16,
+        6
+      ]
+    },
+    {
+      "end": [
+        10,
+        10
+      ],
+      "start": [
+        4,
+        10
+      ]
+    },
+    {
+      "end": [
+        14,
+        10
+      ],
+      "start": [
+        10,
+        10
+      ]
+    },
+    {
+      "end": [
+        16,
+        10
+      ],
+      "start": [
+        14,
+        10
+      ]
+    },
+    {
+      "end": [
+        21,
+        10
+      ],
+      "start": [
+        16,
+        10
+      ]
+    },
+    {
+      "end": [
+        10,
         11
       ],
       "start": [
-        9,
+        10,
         10
-      ]
-    },
-    {
-      "end": [
-        4,
-        10
-      ],
-      "start": [
-        4,
-        9
-      ]
-    },
-    {
-      "end": [
-        14,
-        10
-      ],
-      "start": [
-        14,
-        9
-      ]
-    },
-    {
-      "end": [
-        4,
-        10
-      ],
-      "start": [
-        14,
-        10
-      ]
-    },
-    {
-      "end": [
-        7,
-        4
-      ],
-      "start": [
-        4,
-        4
-      ]
-    },
-    {
-      "end": [
-        14,
-        4
-      ],
-      "start": [
-        11,
-        4
-      ]
-    },
-    {
-      "end": [
-        4,
-        4
-      ],
-      "start": [
-        4,
-        5
-      ]
-    },
-    {
-      "end": [
-        14,
-        5
-      ],
-      "start": [
-        14,
-        4
       ]
     }
   ]

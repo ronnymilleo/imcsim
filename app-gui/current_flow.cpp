@@ -49,9 +49,10 @@ std::vector<WireCurrent> SplitWires(const std::vector<UIWire> &wires, const std:
  * @param[in] component  The part.
  * @param[in] terminal   Terminal index, in the order of UIElement::GetTerminals().
  * @param[in] currents   Currents by name, as an operating point reports them.
- * @return  The current into the terminal: the reported current for a transistor terminal; for a two-terminal part,
- *          its current into the first terminal and the opposite into the second; for a supply, its current. No
- *          value for ground, whose current is whatever its node leaves over, or for a current missing from the
+ * @return  The current into the terminal: the reported current for a transistor terminal; for a two-terminal part
+ *          or the output of a controlled source, its current into the first terminal and the opposite into the
+ *          second; for a supply or an op-amp output, its current; zero for control pins and the other op-amp pins.
+ *          No value for ground, whose current is whatever its node leaves over, or for a current missing from the
  *          results.
  */
 std::optional<double> GetTerminalCurrent(const Core::Component &component, const std::size_t terminal,
@@ -67,7 +68,15 @@ std::optional<double> GetTerminalCurrent(const Core::Component &component, const
     if (!current) {
         return std::nullopt;
     }
-    return terminal == 0 ? *current : -*current;
+    // A single current enters terminal 1 and leaves terminal 2. An op-amp's output current returns through ground
+    // instead, and the control pins of a controlled source and the other op-amp pins carry none
+    if (terminal == 0) {
+        return *current;
+    }
+    if (terminal == 1 && component.GetType() != Core::ComponentType::OpAmp) {
+        return -*current;
+    }
+    return 0.0;
 }
 
 /**

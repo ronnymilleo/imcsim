@@ -36,10 +36,36 @@ constexpr auto Examples = std::to_array<Example>({
         .FileName = "led_driver.imcsim",
     },
     {
+        .Title = "Op-amp inverting amplifier",
+        .Description = "An ideal op-amp amplifies a 0.5 V, 1 kHz sine by -10, set by its 1k input and 10k feedback "
+                       "resistors, between 15 V and -15 V supplies. Run the transient to see the inverted output; "
+                       "raise the input amplitude past 1.5 V to see it clip, then switch U1 to the uA741 model to see "
+                       "a real part clip 1 V short of the supplies.",
+        .FileName = "op_amp_inverting_amplifier.imcsim",
+    },
+    {
+        .Title = "Ideal transformer",
+        .Description = "A 1:2 transformer built from two controlled sources: E1 sets the secondary at twice the "
+                       "primary voltage, and F1 draws twice the load current from the primary. Run the transient: "
+                       "the 100 Ohm load gets 10 V from a 5 V source. Then measure only I(F1) and I(R1): the primary "
+                       "draws twice the load current, so the source sees 100 / 2^2 = 25 Ohm.",
+        .FileName = "ideal_transformer.imcsim",
+    },
+    {
         .Title = "BJT output characteristics",
         .Description = "Collector current of a 2N3904 against its collector voltage, one curve per base current "
                        "from 10u to 50u. Run the DC sweep.",
         .FileName = "bjt_output_characteristics.imcsim",
+    },
+    {
+        .Title = "Small-signal model of a BJT",
+        .Description = "A 2N3904 common-emitter stage on top and its hybrid-pi model below: rpi = 3.17k and a VCCS "
+                       "of gm = 52.3m A/V, worked out at its 1.38 mA operating point, with RC and ro = 57k. Run the "
+                       "AC sweep: both gains read 47 dB in the middle band, and only the real transistor rolls off "
+                       "at high frequency, since the model has no capacitances. The transient shows the same 2.3 V "
+                       "out of a 10 mV sine, around 5.5 V on the real collector and around 0 V on the model, which "
+                       "only holds the signal.",
+        .FileName = "hybrid_pi_model.imcsim",
     },
 });
 

@@ -12,14 +12,17 @@ namespace Core {
 
 /**
  * @struct  ACParameters
- * @brief   Sine of an AC source, as in the SPICE SIN source: amplitude and offset in the unit of the source,
- *          frequency in hertz.
- * @details The amplitude is the peak, and also the magnitude the source has in an AC sweep.
+ * @brief   An AC source: the sine it makes in a transient, as in the SPICE SIN source, and its magnitude in an AC
+ *          sweep, as the SPICE AC value; amplitude, offset and magnitude in the unit of the source, frequency in
+ *          hertz.
+ * @details The amplitude is the peak of the sine. The magnitude is apart from it, so a transient can use a small,
+ *          realistic signal while the AC sweep, which is linear, uses 1 and reads directly as gain.
  */
 struct ACParameters {
     double Amplitude = 1.0;
     double Frequency = 1e3;
     double Offset = 0.0;
+    double Magnitude = 1.0;
 };
 
 /**

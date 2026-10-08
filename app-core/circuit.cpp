@@ -6,8 +6,10 @@
 #include "circuit.h"
 
 #include "components/bjt.h"
+#include "components/controlled_source.h"
 #include "components/diode.h"
 #include "components/mosfet.h"
+#include "components/op_amp.h"
 #include "components/source.h"
 #include "spice_value.h"
 #include <algorithm>
@@ -33,9 +35,8 @@ std::string FormatSource(const Source &source, const std::vector<int> &nodes) {
     case Source::SourceType::AC: {
         const ACParameters &ac = source.GetAC();
         const std::string offset = FormatSpiceValue(ac.Offset);
-        const std::string amplitude = FormatSpiceValue(ac.Amplitude);
-        return std::format("{} DC {} AC {} SIN({} {} {})\n", start, offset, amplitude, offset, amplitude,
-                           FormatSpiceValue(ac.Frequency));
+        return std::format("{} DC {} AC {} SIN({} {} {})\n", start, offset, FormatSpiceValue(ac.Magnitude), offset,
+                           FormatSpiceValue(ac.Amplitude), FormatSpiceValue(ac.Frequency));
     }
     case Source::SourceType::Pulse: {
         const PulseParameters &pulse = source.GetPulse();
@@ -49,11 +50,51 @@ std::string FormatSource(const Source &source, const std::vector<int> &nodes) {
     return "";
 }
 
+// Supplies and voltage sources carry their own branch current, which a CCCS or CCVS can follow directly
+bool HasBranchCurrent(const ComponentType type) {
+    return type == ComponentType::VCC || type == ComponentType::VoltageSource;
+}
+
+// The currents that CCCS and CCVS sources of the circuit follow
+std::vector<std::string> ListControllingCurrents(const std::vector<CircuitEntry> &entries) {
+    std::vector<std::string> currents;
+    for (const CircuitEntry &entry : entries) {
+        if (IsCurrentControlled(entry.Part->GetType())) {
+            currents.push_back(static_cast<const ControlledSource &>(*entry.Part).GetControllingCurrent());
+        }
+    }
+    return currents;
+}
+
+// A current names its part, alone or followed by "." and a terminal label
+bool CarriesCurrent(const Component &component, const std::vector<std::string> &currents) {
+    const std::string &name = component.GetName();
+    return !name.empty() && std::ranges::any_of(currents, [&name](const std::string &current) {
+        return current == name ||
+               (current.starts_with(name) && current.size() > name.size() && current[name.size()] == '.');
+    });
+}
+
+// The probes of a part: those it always reports, when probes are asked for or when one of its currents controls a
+// source; a part without probes of its own gets one on its first terminal when it controls a source, unless it has
+// a branch current already
+std::vector<CurrentProbe> ProbesFor(const Component &component, const bool add_current_probes, const bool controlling) {
+    if (!add_current_probes && !controlling) {
+        return {};
+    }
+    std::vector<CurrentProbe> probes = GetCurrentProbes(component);
+    if (probes.empty() && controlling && !HasBranchCurrent(component.GetType())) {
+        probes.push_back({0, ""});
+    }
+    return probes;
+}
+
 // Moves every probed terminal onto a node of its own, joined to its circuit node by a 0 V source whose current
 // flows into the terminal, and returns the lines of those sources
-std::string ProbeTerminals(const Component &component, std::vector<int> &nodes, int &next_probe_node) {
+std::string ProbeTerminals(const Component &component, const std::vector<CurrentProbe> &probes, std::vector<int> &nodes,
+                           int &next_probe_node) {
     std::string lines;
-    for (const CurrentProbe &probe : GetCurrentProbes(component)) {
+    for (const CurrentProbe &probe : probes) {
         const auto terminal = static_cast<std::size_t>(probe.Terminal);
         lines += std::format("{} {} {} DC 0\n", GetCurrentProbeName(component, probe.Label), nodes[terminal],
                              next_probe_node);
@@ -128,34 +169,67 @@ bool Circuit::HasACSource() const {
  * @return  One line per component, plus its probes, with node numbers as SPICE node names (0 is ground), then one
  *          ".model" line per model in use, ending in ".end".
  * @note    Ground components produce no line; they only make their node 0. A supply rail becomes a DC voltage
- *          source from its node to ground. An AC source writes its offset, AC magnitude and sine together, and a
- *          pulse source its low level and pulse, so the same netlist works for .op, .ac and .tran. Probes connect
- *          through nodes numbered after GetNodeCount(), so the circuit nodes keep their numbers.
+ *          source from its node to ground. A part whose current controls a CCCS or CCVS gets a probe even without
+ *          add_current_probes, unless it is a voltage source itself, since ngspice follows currents through
+ *          voltage sources. An AC source writes its offset, AC magnitude and sine together, and a
+ *          pulse source its low level and pulse, so the same netlist works for .op, .ac and .tran. Probes and the gain
+ *          stage of each ideal op-amp use nodes numbered after GetNodeCount(), so the circuit nodes keep their
+ *          numbers. Op-amp macromodels are subcircuits, written after the models.
  */
 std::string Circuit::ToSpiceNetlist(const std::string_view analysis, const bool add_current_probes) const {
     std::string netlist = "* imcsim netlist\n";
+    const std::vector<std::string> controlling_currents = ListControllingCurrents(m_Entries);
     std::vector<std::string> model_names;
     std::string models;
-    int next_probe_node = m_NodeCount;
+    int next_extra_node = m_NodeCount;
     for (const CircuitEntry &entry : m_Entries) {
         const Component &component = *entry.Part;
         const std::string value = FormatSpiceValue(component.GetValue());
         // Probed parts connect through the probe nodes; the probe lines follow the part
         std::vector<int> nodes = entry.Nodes;
-        const std::string probes = add_current_probes ? ProbeTerminals(component, nodes, next_probe_node) : "";
+        const std::string probes = ProbeTerminals(
+            component, ProbesFor(component, add_current_probes, CarriesCurrent(component, controlling_currents)), nodes,
+            next_extra_node);
         switch (component.GetType()) {
         case ComponentType::Resistor:
         case ComponentType::Capacitor:
         case ComponentType::Inductor:
-            netlist += std::format("{} {} {} {}\n", component.GetName(), entry.Nodes[0], entry.Nodes[1], value);
+            netlist += std::format("{} {} {} {}\n", component.GetName(), nodes[0], nodes[1], value);
             break;
         case ComponentType::VCC:
-            netlist += std::format("{} {} 0 DC {}\n", component.GetName(), entry.Nodes[0], value);
+            netlist += std::format("{} {} 0 DC {}\n", component.GetName(), nodes[0], value);
             break;
         case ComponentType::VoltageSource:
         case ComponentType::CurrentSource:
-            netlist += FormatSource(static_cast<const Source &>(component), entry.Nodes);
+            netlist += FormatSource(static_cast<const Source &>(component), nodes);
             break;
+        case ComponentType::VCVS:
+        case ComponentType::VCCS:
+            netlist +=
+                std::format("{} {} {} {} {} {}\n", component.GetName(), nodes[0], nodes[1], nodes[2], nodes[3], value);
+            break;
+        case ComponentType::CCCS:
+        case ComponentType::CCVS: {
+            // ngspice follows the current through a voltage source: the controlling part's own, or its probe
+            const std::string &current = static_cast<const ControlledSource &>(component).GetControllingCurrent();
+            const std::string control = FindControllingSource(*this, current).value_or(current);
+            netlist += std::format("{} {} {} {} {}\n", component.GetName(), nodes[0], nodes[1], control, value);
+            break;
+        }
+        case ComponentType::OpAmp: {
+            // A macromodel is a subcircuit, written once for every op-amp of its model
+            const auto &op_amp = static_cast<const OpAmp &>(component);
+            if (op_amp.IsIdeal()) {
+                netlist += FormatIdealOpAmp(op_amp, nodes, next_extra_node++);
+                AddModelLine(GetIdealOpAmpModelName(), FormatIdealOpAmpModel(), model_names, models);
+                break;
+            }
+            std::string subcircuit = op_amp.GetSpiceModelName();
+            netlist += std::format("X-{} {} {} {} {} {} {}\n", op_amp.GetName(), nodes[0], nodes[1], nodes[2], nodes[3],
+                                   nodes[4], subcircuit);
+            AddModelLine(subcircuit, FormatOpAmpSubcircuit(subcircuit, op_amp.GetParameters()), model_names, models);
+            break;
+        }
         case ComponentType::Diode:
         case ComponentType::ZenerDiode:
         case ComponentType::LED: {
@@ -201,11 +275,12 @@ std::string Circuit::ToSpiceNetlist(const std::string_view analysis, const bool 
 /**
  * @brief   Lists the terminals of a component whose current is measured with a probe.
  * @param[in] component  Any component.
- * @return  The anode of a diode part, and every terminal of a transistor; nothing for the others, whose currents
- *          ngspice reports directly.
+ * @return  The anode of a diode part, every terminal of a transistor, and the first output terminal of a controlled
+ *          source or the output of an op-amp; nothing for the others, whose currents ngspice reports directly.
  */
 std::vector<CurrentProbe> GetCurrentProbes(const Component &component) {
-    if (IsDiode(component.GetType())) {
+    const ComponentType type = component.GetType();
+    if (IsDiode(type) || IsControlledSource(type) || type == ComponentType::OpAmp) {
         return {{0, ""}};
     }
     if (IsBJT(component.GetType())) {
@@ -242,6 +317,32 @@ std::string GetCurrentName(const Component &component, const std::string_view la
         return component.GetName();
     }
     return std::format("{}.{}", component.GetName(), label);
+}
+
+/**
+ * @brief   Finds the voltage source a CCCS or CCVS follows to get a current of the circuit.
+ * @param[in] circuit   Circuit the current belongs to.
+ * @param[in] current   A current as the results name it, such as "R1", "Vin1" or "Q1.C".
+ * @return  The supply or voltage source itself, or the probe on the part's terminal, which ToSpiceNetlist() adds
+ *          for every current a CCCS or CCVS follows; no value when no part reports that current.
+ */
+std::optional<std::string> FindControllingSource(const Circuit &circuit, const std::string_view current) {
+    for (const CircuitEntry &entry : circuit.GetEntries()) {
+        const Component &component = *entry.Part;
+        if (component.GetName().empty()) {
+            continue;
+        }
+        const std::vector<CurrentProbe> probes = GetCurrentProbes(component);
+        for (const CurrentProbe &probe : probes) {
+            if (current == GetCurrentName(component, probe.Label)) {
+                return GetCurrentProbeName(component, probe.Label);
+            }
+        }
+        if (probes.empty() && current == component.GetName()) {
+            return HasBranchCurrent(component.GetType()) ? component.GetName() : GetCurrentProbeName(component, "");
+        }
+    }
+    return std::nullopt;
 }
 
 } // namespace Core

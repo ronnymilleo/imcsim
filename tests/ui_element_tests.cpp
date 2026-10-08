@@ -5,9 +5,11 @@
 
 #include "test_printers.h"
 #include "ui_elements/ui_bjt.h"
+#include "ui_elements/ui_controlled_source.h"
 #include "ui_elements/ui_diode.h"
 #include "ui_elements/ui_ground.h"
 #include "ui_elements/ui_mosfet.h"
+#include "ui_elements/ui_op_amp.h"
 #include "ui_elements/ui_resistor.h"
 #include "ui_elements/ui_vcc.h"
 #include <catch2/catch_test_macros.hpp>
@@ -141,4 +143,25 @@ TEST_CASE("The inward direction of a terminal follows its lead into the part", "
     // The supply terminal is at its middle, and its lead goes up to the bar
     const GUI::UIVCC supply({0, 0}, GUI::Rotation::R180);
     CHECK(supply.GetTerminalInward(0) == GUI::GridPoint{0, 1});
+}
+
+TEST_CASE("Controlled sources have their output vertical and their control pins on the left", "[ui_element]") {
+    const GUI::UIControlledSource vcvs(Core::ComponentType::VCVS, {0, 0}, GUI::Rotation::R0);
+    CHECK(vcvs.GetTerminals() == std::vector<GUI::GridPoint>{{0, -2}, {0, 2}, {-2, -1}, {-2, 1}});
+    CHECK(vcvs.GetTerminalInward(2) == GUI::GridPoint{1, 0});
+    // A current-controlled source follows a current elsewhere, so it only has its output
+    const GUI::UIControlledSource cccs(Core::ComponentType::CCCS, {0, 0}, GUI::Rotation::R0);
+    CHECK(cccs.GetTerminals() == std::vector<GUI::GridPoint>{{0, -2}, {0, 2}});
+    CHECK(cccs.Contains({0.0f, 0.0f}));
+    CHECK_FALSE(cccs.Contains({-1.5f, 0.0f}));
+}
+
+TEST_CASE("Op-amps list the output, the inputs and the supply pins", "[ui_element]") {
+    GUI::UIOpAmp op_amp({0, 0}, GUI::Rotation::R0);
+    CHECK(op_amp.GetTerminals() == std::vector<GUI::GridPoint>{{3, 0}, {-3, 1}, {-3, -1}, {0, -2}, {0, 2}});
+    CHECK(op_amp.GetTerminalInward(0) == GUI::GridPoint{-1, 0});
+    CHECK(op_amp.GetTerminalInward(3) == GUI::GridPoint{0, 1});
+    // Mirroring left to right puts the inputs on the right
+    op_amp.SetMirrored(true);
+    CHECK(op_amp.GetTerminals()[1] == GUI::GridPoint{3, 1});
 }

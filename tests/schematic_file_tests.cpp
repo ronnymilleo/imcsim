@@ -4,14 +4,17 @@
  */
 
 #include "components/bjt.h"
+#include "components/controlled_source.h"
 #include "components/current_source.h"
 #include "components/diode.h"
 #include "components/mosfet.h"
+#include "components/op_amp.h"
 #include "components/voltage_source.h"
 #include "element_factory.h"
 #include "schematic_file.h"
 #include "test_printers.h"
 #include <catch2/catch_test_macros.hpp>
+#include <format>
 #include <memory>
 #include <string>
 #include <string_view>
@@ -399,4 +402,87 @@ TEST_CASE("Measurements that cannot be read are skipped with a warning", "[schem
     CHECK(loaded.Warnings.size() == 2);
     CHECK(loaded.Measurements.Voltages == std::vector<GUI::GridPoint>{{1, 2}});
     CHECK(loaded.Measurements.Currents == std::vector<std::string>{"R1"});
+}
+
+TEST_CASE("Controlled sources keep their gain and the current they follow", "[schematic_file]") {
+    std::vector<std::unique_ptr<GUI::UIElement>> elements;
+    elements.push_back(GUI::CreateElement(Core::ComponentType::CCVS, {0, 0}, GUI::Rotation::R90));
+    auto &ccvs = static_cast<Core::ControlledSource &>(elements.back()->GetComponent());
+    ccvs.SetName("H1");
+    ccvs.SetValue(-2.2e3);
+    ccvs.SetControllingCurrent("Q1.C");
+    elements.push_back(GUI::CreateElement(Core::ComponentType::VCCS, {6, 0}, GUI::Rotation::R0));
+    elements.back()->GetComponent().SetName("G1");
+    elements.push_back(GUI::CreateElement(Core::ComponentType::OpAmp, {12, 0}, GUI::Rotation::R0));
+    elements.back()->GetComponent().SetName("U1");
+
+    const GUI::LoadedSchematic loaded = LoadOrFail(GUI::SaveSchematic(elements, {}, {}, {}));
+    CHECK(loaded.Warnings.empty());
+    REQUIRE(loaded.Elements.size() == 3);
+    const auto &copy = static_cast<const Core::ControlledSource &>(loaded.Elements[0]->GetComponent());
+    CHECK(copy.GetType() == Core::ComponentType::CCVS);
+    CHECK(copy.GetValue() == -2.2e3);
+    CHECK(copy.GetControllingCurrent() == "Q1.C");
+    CHECK(loaded.Elements[1]->GetComponent().GetType() == Core::ComponentType::VCCS);
+    CHECK(loaded.Elements[2]->GetComponent().GetName() == "U1");
+}
+
+TEST_CASE("Op-amps keep their model, the bandwidth of an ideal one and custom specifications", "[schematic_file]") {
+    std::vector<std::unique_ptr<GUI::UIElement>> elements;
+    for (int index = 0; index < 3; ++index) {
+        elements.push_back(GUI::CreateElement(Core::ComponentType::OpAmp, {index * 8, 0}, GUI::Rotation::R0));
+        elements.back()->GetComponent().SetName(std::format("U{}", index + 1));
+    }
+    auto &ideal = static_cast<Core::OpAmp &>(elements[0]->GetComponent());
+    ideal.SetIdealBandwidth(10e6);
+    auto &ready = static_cast<Core::OpAmp &>(elements[1]->GetComponent());
+    ready.SetModel(*Core::FindOpAmpModel(Core::ComponentType::OpAmp, "uA741"));
+    auto &custom = static_cast<Core::OpAmp &>(elements[2]->GetComponent());
+    Core::OpAmpParameters parameters;
+    parameters.SlewRate = 13.0;
+    parameters.PositiveHeadroom = 0.05;
+    custom.SetCustomParameters(parameters);
+
+    const GUI::LoadedSchematic loaded = LoadOrFail(GUI::SaveSchematic(elements, {}, {}, {}));
+    CHECK(loaded.Warnings.empty());
+    REQUIRE(loaded.Elements.size() == 3);
+    const auto &ideal_copy = static_cast<const Core::OpAmp &>(loaded.Elements[0]->GetComponent());
+    CHECK(ideal_copy.IsIdeal());
+    CHECK(ideal_copy.GetIdealBandwidth() == 10e6);
+    CHECK(std::string_view(static_cast<const Core::OpAmp &>(loaded.Elements[1]->GetComponent()).GetModelName()) ==
+          "uA741");
+    const auto &custom_copy = static_cast<const Core::OpAmp &>(loaded.Elements[2]->GetComponent());
+    CHECK(custom_copy.IsCustom());
+    CHECK(custom_copy.GetParameters().SlewRate == 13.0);
+    CHECK(custom_copy.GetParameters().PositiveHeadroom == 0.05);
+}
+
+TEST_CASE("Op-amps saved before they had models load as ideal", "[schematic_file]") {
+    const GUI::LoadedSchematic loaded = LoadOrFail(R"({"format": "imcsim-schematic", "version": 1, "wires": [],
+        "elements": [{"type": "OpAmp", "name": "U1", "x": 0, "y": 0, "rotation": 0}]})");
+    CHECK(loaded.Warnings.empty());
+    REQUIRE(loaded.Elements.size() == 1);
+    CHECK(static_cast<const Core::OpAmp &>(loaded.Elements[0]->GetComponent()).IsIdeal());
+}
+
+TEST_CASE("The AC magnitude is saved apart from the amplitude, and older files take the amplitude",
+          "[schematic_file]") {
+    std::vector<std::unique_ptr<GUI::UIElement>> elements;
+    elements.push_back(GUI::CreateElement(Core::ComponentType::VoltageSource, {0, 0}, GUI::Rotation::R0));
+    auto &source = static_cast<Core::VoltageSource &>(elements.back()->GetComponent());
+    source.SetName("Vin1");
+    source.SetSourceType(Core::VoltageSource::SourceType::AC);
+    source.SetAC({.Amplitude = 10e-3, .Magnitude = 1.0});
+    const GUI::LoadedSchematic loaded = LoadOrFail(GUI::SaveSchematic(elements, {}, {}, {}));
+    REQUIRE(loaded.Elements.size() == 1);
+    const auto &copy = static_cast<const Core::VoltageSource &>(loaded.Elements[0]->GetComponent());
+    CHECK(copy.GetAC().Amplitude == 10e-3);
+    CHECK(copy.GetAC().Magnitude == 1.0);
+
+    // Before the magnitude was apart, the AC sweep used the amplitude, so the results stay the same
+    const GUI::LoadedSchematic older = LoadOrFail(R"({"format": "imcsim-schematic", "version": 1, "wires": [],
+        "elements": [{"type": "VoltageSource", "name": "Vin1", "x": 0, "y": 0, "rotation": 0, "value": 0,
+                      "source": "AC", "amplitude": 0.5, "frequency": 1000, "offset": 0}]})");
+    REQUIRE(older.Elements.size() == 1);
+    CHECK(static_cast<const Core::VoltageSource &>(older.Elements[0]->GetComponent()).GetAC().Magnitude == 0.5);
 }
