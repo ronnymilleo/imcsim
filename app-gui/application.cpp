@@ -6,6 +6,7 @@
 #include "application.h"
 
 #include "error_codes.h"
+#include "examples.h"
 #include "imgui.h"
 #include "imgui_impl_sdl3.h"
 #include "imgui_internal.h"
@@ -16,6 +17,13 @@
 #include <cstdio>
 
 namespace GUI {
+
+namespace {
+
+// Wrap width of the example descriptions, in characters of the current font size
+constexpr float ExampleTooltipWidth = 30.0f;
+
+} // namespace
 
 /**
  * @brief   Initializes SDL, Vulkan and Dear ImGui, in that order.
@@ -220,6 +228,20 @@ void Application::DrawMainMenuBar() {
     }
     ImGui::Text("Version: %s", IMCSIM_VERSION);
     ImGui::Separator();
+    if (ImGui::BeginMenu("Examples")) {
+        for (const Example &example : GetExamples()) {
+            if (ImGui::MenuItem(example.Title)) {
+                m_EditorWindow.RequestExample(example);
+            }
+            if (ImGui::BeginItemTooltip()) {
+                ImGui::PushTextWrapPos(ImGui::GetFontSize() * ExampleTooltipWidth);
+                ImGui::TextUnformatted(example.Description);
+                ImGui::PopTextWrapPos();
+                ImGui::EndTooltip();
+            }
+        }
+        ImGui::EndMenu();
+    }
     if (ImGui::BeginMenu("View")) {
         // The editor cannot be closed, so only the side windows are listed
         const std::array<AppWindow *, 4> closable_windows = {&m_PropertiesWindow, &m_NetlistWindow, &m_SimulationWindow,

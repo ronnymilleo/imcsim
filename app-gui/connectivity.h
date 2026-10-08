@@ -30,6 +30,7 @@ public:
     Connectivity(const std::vector<std::unique_ptr<UIElement>> &elements, const std::vector<UIWire> &wires);
 
     std::optional<int> GetNode(GridPoint point) const;
+    std::optional<GridPoint> FindPointOfNode(int node) const;
     const std::vector<GridPoint> &GetJunctions() const;
 
 private:

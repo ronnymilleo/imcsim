@@ -7,10 +7,12 @@
 #define IMCSIM_SIMULATION_WINDOW_H
 
 #include "schematic.h"
+#include "simulation_settings.h"
 #include "simulator.h"
 #include "value_field.h"
 #include "windows/app_window.h"
 #include <array>
+#include <cstddef>
 #include <optional>
 #include <string>
 #include <vector>
@@ -20,10 +22,11 @@ namespace GUI {
 /**
  * @class   SimulationWindow
  * @brief   Runs the operating point, transient and AC sweep analyses, one tab each, with their settings.
- * @details The results live in the Schematic, so they disappear as soon as the circuit changes. The node
- *          voltages and component currents of the operating point are listed here, and the voltages are also
- *          drawn by the editor; transients and AC sweeps are drawn by the Output window. The error and the
- *          output belong to the last run of each analysis and stay until its next run.
+ * @details The settings and the results live in the Schematic: the settings are saved with it, and the results
+ *          disappear as soon as the circuit changes. The node voltages and component currents of the operating
+ *          point are listed here, and the voltages are also drawn by the editor; transients and AC sweeps are
+ *          drawn by the Output window. The error and the output belong to the last run of each analysis and stay
+ *          until its next run.
  */
 class SimulationWindow : public AppWindow {
 public:
@@ -42,43 +45,36 @@ private:
 
     Schematic &m_Schematic;
 
-    // Operating point
-    RunStatus m_OperatingPointStatus;
-
-    // Transient
-    Core::TransientSettings m_TransientSettings;
+    // Settings fields, reloaded whenever the schematic replaces its settings
+    std::size_t m_LoadedSettingsVersion = 0;
     ValueField m_StopTime;
     ValueField m_TimeStep;
-    RunStatus m_TransientStatus;
-
-    // AC sweep
-    Core::ACSweepSettings m_ACSweepSettings;
     ValueField m_StartFrequency;
     ValueField m_StopFrequency;
-    RunStatus m_ACSweepStatus;
-
-    // DC sweep; the stepped range keeps its values while stepping is off
-    Core::SweepRange m_SweptRange;
-    Core::SweepRange m_SteppedRange{.Start = 0.0, .Stop = 5.0, .Step = 1.0};
-    bool m_StepSource = false;
-    // Start, stop and step of each range
+    // Start, stop and step of each DC sweep range
     std::array<ValueField, 3> m_SweptFields;
     std::array<ValueField, 3> m_SteppedFields;
+
+    // Last run of each analysis
+    RunStatus m_OperatingPointStatus;
+    RunStatus m_TransientStatus;
+    RunStatus m_ACSweepStatus;
     RunStatus m_DCSweepStatus;
 
     void Draw() override;
+    void LoadSettingsFields();
 
     // Tabs
     void DrawOperatingPointTab();
-    void DrawTransientTab();
-    void DrawACSweepTab();
-    void DrawDCSweepTab();
+    void DrawTransientTab(Core::TransientSettings &settings);
+    void DrawACSweepTab(Core::ACSweepSettings &settings);
+    void DrawDCSweepTab(SimulationSettings &settings);
 
     // Runs
     void RunOperatingPoint();
-    void RunTransient();
-    void RunACSweep();
-    void RunDCSweep();
+    void RunTransient(const Core::TransientSettings &settings);
+    void RunACSweep(const Core::ACSweepSettings &settings);
+    void RunDCSweep(const Core::DCSweepSettings &settings);
 
     // Results
     void DrawNodeVoltages(const Core::OperatingPoint &operating_point) const;

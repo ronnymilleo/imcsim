@@ -150,7 +150,7 @@ TEST_CASE("Replace swaps the content but keeps the file", "[schematic]") {
     std::vector<std::unique_ptr<GUI::UIElement>> elements;
     elements.push_back(MakeResistor({0, 0}));
 
-    schematic.Replace(std::move(elements), {{{2, 0}, {2, 3}}});
+    schematic.Replace(std::move(elements), {{{2, 0}, {2, 3}}}, {});
     CHECK(schematic.GetElements().size() == 1);
     CHECK(schematic.GetWires().size() == 1);
     CHECK(schematic.GetFilePath().has_value());
@@ -335,4 +335,81 @@ TEST_CASE("The history keeps the last 100 steps", "[schematic]") {
     }
     CHECK(undone == 100);
     CHECK(schematic.GetWires().size() == 5);
+}
+
+TEST_CASE("Changing the simulation settings is an unsaved change that keeps the results", "[schematic]") {
+    GUI::Schematic schematic;
+    schematic.SetOperatingPoint(Core::OperatingPoint{{0.0}});
+    const std::size_t version = schematic.GetSimulationSettingsVersion();
+
+    GUI::SimulationSettings settings;
+    settings.Transient.StopTime = 1.0;
+    schematic.SetSimulationSettings(settings);
+    CHECK(schematic.IsModified());
+    CHECK(schematic.GetSimulationSettings() == settings);
+    CHECK(schematic.GetOperatingPoint());
+    CHECK(schematic.GetSimulationSettingsVersion() == version);
+}
+
+TEST_CASE("Undo restores the simulation settings and changes their version", "[schematic]") {
+    GUI::Schematic schematic;
+    GUI::SimulationSettings settings;
+    settings.StepSource = true;
+    schematic.SetSimulationSettings(settings);
+    schematic.CommitUndoStep();
+    const std::size_t version = schematic.GetSimulationSettingsVersion();
+
+    schematic.Undo();
+    CHECK(schematic.GetSimulationSettings() == GUI::SimulationSettings{});
+    CHECK(schematic.GetSimulationSettingsVersion() != version);
+    CHECK_FALSE(schematic.IsModified());
+}
+
+TEST_CASE("Replace and Clear swap the simulation settings and change their version", "[schematic]") {
+    GUI::Schematic schematic;
+    GUI::SimulationSettings settings;
+    settings.ACSweep.PointsPerDecade = 5;
+    const std::size_t version = schematic.GetSimulationSettingsVersion();
+
+    schematic.Replace({}, {}, settings);
+    CHECK(schematic.GetSimulationSettings() == settings);
+    CHECK(schematic.GetSimulationSettingsVersion() != version);
+    CHECK_FALSE(schematic.IsModified());
+
+    schematic.Clear();
+    CHECK(schematic.GetSimulationSettings() == GUI::SimulationSettings{});
+}
+
+TEST_CASE("Measurements are saved by node point and restored by node", "[schematic]") {
+    GUI::Schematic schematic;
+    schematic.AddElement(MakeResistor({0, 0}));
+    schematic.AddElement(GUI::CreateElement(Core::ComponentType::Ground, {2, 0}, GUI::Rotation::R0));
+    schematic.AddWire({-2, 0}, {-2, 4});
+    const int node = *schematic.GetConnectivity().GetNode({-2, 4});
+    schematic.SetVoltageMeasured(node, true);
+    schematic.SetCurrentMeasured("R1", true);
+
+    const GUI::SavedMeasurements saved = schematic.SaveMeasurements();
+    REQUIRE(saved.Voltages.size() == 1);
+    CHECK(schematic.GetConnectivity().GetNode(saved.Voltages[0]) == node);
+    CHECK(saved.Currents == std::vector<std::string>{"R1"});
+
+    schematic.ClearMeasurements();
+    // Ground and points that connect to nothing are skipped
+    schematic.RestoreMeasurements({.Voltages = {saved.Voltages[0], {2, 0}, {50, 50}}, .Currents = saved.Currents});
+    CHECK(schematic.IsVoltageMeasured(node));
+    CHECK_FALSE(schematic.IsVoltageMeasured(0));
+    CHECK(schematic.IsCurrentMeasured("R1"));
+}
+
+TEST_CASE("Measuring is not an unsaved change and adds no undo step", "[schematic]") {
+    GUI::Schematic schematic;
+    schematic.AddElement(MakeResistor({0, 0}));
+    schematic.MarkSaved("circuit.imcsim");
+    schematic.SetCurrentMeasured("R1", true);
+    schematic.CommitUndoStep();
+    CHECK_FALSE(schematic.IsModified());
+    schematic.Undo();
+    CHECK(schematic.GetElements().empty());
+    CHECK(schematic.IsCurrentMeasured("R1"));
 }

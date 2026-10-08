@@ -218,11 +218,22 @@ bool EditorWindow::IsQuitConfirmed() const {
     return m_QuitConfirmed;
 }
 
+/**
+ * @brief   Asks to open an example, as when the user picks one from the menu.
+ * @param[in] example  One of GetExamples().
+ * @note    Like quitting, the next frame opens it, after asking the user to discard unsaved changes if there are
+ *          any. The example opens untitled, so saving it asks for a file.
+ */
+void EditorWindow::RequestExample(const Example &example) {
+    m_RequestedExample = example;
+}
+
 // Window content only: AppWindow::Render() wraps it in Begin/End
 void EditorWindow::Draw() {
     // File results and the quit request open popups, which must belong to this window
     ProcessDialogResult();
     HandleQuitRequest();
+    HandleExampleRequest();
     HandleFileShortcuts();
     DrawToolbar();
 
@@ -230,6 +241,9 @@ void EditorWindow::Draw() {
     ImVec2 size = ImGui::GetContentRegionAvail();
     size.x = std::max(size.x, MinCanvasSize);
     size.y = std::max(size.y, MinCanvasSize);
+    if (std::exchange(m_FrameRequested, false)) {
+        FrameSchematic(size);
+    }
 
     ImGui::InvisibleButton("canvas", size,
                            ImGuiButtonFlags_MouseButtonLeft | ImGuiButtonFlags_MouseButtonRight |
@@ -583,6 +597,21 @@ void EditorWindow::HandlePanAndZoom(const ImVec2 origin, const bool hovered, con
         const ImVec2 after = ViewTransform(origin, m_Pan, m_Zoom).ToWorld(io.MousePos);
         m_Pan += (after - before) * m_Zoom;
     }
+}
+
+// Shows the whole schematic centered, never zoomed in past the default, so a small circuit is not blown up
+void EditorWindow::FrameSchematic(const ImVec2 canvas_size) {
+    std::vector<GridPoint> points = m_Schematic.CollectTerminals();
+    for (const auto &element : m_Schematic.GetElements()) {
+        points.push_back(element->GetPosition());
+    }
+    for (const UIWire &wire : m_Schematic.GetWires()) {
+        points.push_back(wire.GetStart());
+        points.push_back(wire.GetEnd());
+    }
+    const ViewFrame frame = FramePoints(points, canvas_size, MinZoom, DefaultZoom);
+    m_Pan = frame.Pan;
+    m_Zoom = frame.Zoom;
 }
 
 void EditorWindow::StartPlacing(const Core::ComponentType type) {
@@ -955,6 +984,20 @@ void EditorWindow::HandleQuitRequest() {
     }
 }
 
+void EditorWindow::HandleExampleRequest() {
+    const std::optional<Example> example = std::exchange(m_RequestedExample, std::nullopt);
+    if (!example) {
+        return;
+    }
+    if (m_Schematic.IsModified()) {
+        m_ExampleToOpen = example;
+        m_ActionToConfirm = FileAction::Example;
+        ImGui::OpenPopup(DiscardPopup);
+    } else {
+        OpenExample(*example);
+    }
+}
+
 void EditorWindow::Save() {
     if (const auto &file_path = m_Schematic.GetFilePath()) {
         SaveFile(*file_path);
@@ -986,8 +1029,10 @@ void EditorWindow::OpenFile(const std::filesystem::path &path) {
     }
 
     NewSchematic();
-    m_Schematic.Replace(std::move(loaded->Elements), std::move(loaded->Wires));
+    m_Schematic.Replace(std::move(loaded->Elements), std::move(loaded->Wires), std::move(loaded->Settings));
+    m_Schematic.RestoreMeasurements(loaded->Measurements);
     m_Schematic.MarkSaved(path);
+    m_FrameRequested = true;
     if (!loaded->Warnings.empty()) {
         m_Schematic.MarkModified();
         ShowFileMessages(std::format("{} was opened, but some parts were changed or skipped", path.filename().string()),
@@ -995,12 +1040,27 @@ void EditorWindow::OpenFile(const std::filesystem::path &path) {
     }
 }
 
+void EditorWindow::OpenExample(const Example &example) {
+    auto loaded = LoadExample(example);
+    if (!loaded) {
+        ShowFileMessages(std::format("Could not open the example {}", example.Title), {loaded.error()});
+        return;
+    }
+
+    NewSchematic();
+    m_Schematic.Replace(std::move(loaded->Elements), std::move(loaded->Wires), std::move(loaded->Settings));
+    m_Schematic.RestoreMeasurements(loaded->Measurements);
+    m_FrameRequested = true;
+}
+
 // Dialogs do not always add the extension, so it is added here when missing
 void EditorWindow::SaveFile(std::filesystem::path path) {
     if (path.extension() != SchematicExtension) {
         path += SchematicExtension;
     }
-    const auto written = WriteTextFile(path, SaveSchematic(m_Schematic.GetElements(), m_Schematic.GetWires()));
+    const auto written =
+        WriteTextFile(path, SaveSchematic(m_Schematic.GetElements(), m_Schematic.GetWires(),
+                                          m_Schematic.GetSimulationSettings(), m_Schematic.SaveMeasurements()));
     if (!written) {
         ShowFileMessages("Could not save the schematic", {written.error()});
         return;
@@ -1073,6 +1133,8 @@ void EditorWindow::DrawFilePopups() {
                 ShowFileDialog(FileAction::Open);
             } else if (m_ActionToConfirm == FileAction::Quit) {
                 m_QuitConfirmed = true;
+            } else if (m_ActionToConfirm == FileAction::Example) {
+                OpenExample(*m_ExampleToOpen);
             }
             m_ActionToConfirm.reset();
             ImGui::CloseCurrentPopup();

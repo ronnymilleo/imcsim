@@ -8,6 +8,7 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
+#include <vector>
 
 TEST_CASE("GridPoint adds and subtracts component-wise", "[helpers]") {
     CHECK(GUI::GridPoint{1, 2} + GUI::GridPoint{3, -4} == GUI::GridPoint{4, -2});
@@ -66,4 +67,23 @@ TEST_CASE("Rotations convert to degrees and back", "[helpers]") {
     CHECK(GUI::ToDegrees(GUI::Rotation::R90) == 90);
     CHECK_FALSE(GUI::RotationFromDegrees(45));
     CHECK_FALSE(GUI::RotationFromDegrees(360));
+}
+
+TEST_CASE("FramePoints centers the points and fits them with a margin", "[helpers]") {
+    // 20 by 10 grid units plus a 2 unit margin on each side fit a 480 by 480 canvas at 20 pixels per unit
+    const std::vector<GUI::GridPoint> points = {{0, 0}, {20, 10}, {5, 3}};
+    const GUI::ViewFrame frame = GUI::FramePoints(points, {480.0f, 480.0f}, 4.0f, 100.0f);
+    CHECK_THAT(frame.Zoom, Catch::Matchers::WithinAbs(20.0, 1e-4));
+    const GUI::ViewTransform view({0.0f, 0.0f}, frame.Pan, frame.Zoom);
+    const ImVec2 center = view.ToScreen({10.0f, 5.0f});
+    CHECK_THAT(center.x, Catch::Matchers::WithinAbs(240.0, 1e-3));
+    CHECK_THAT(center.y, Catch::Matchers::WithinAbs(240.0, 1e-3));
+}
+
+TEST_CASE("FramePoints keeps the zoom between its limits", "[helpers]") {
+    const std::vector<GUI::GridPoint> small = {{3, 3}};
+    CHECK(GUI::FramePoints(small, {800.0f, 600.0f}, 4.0f, 20.0f).Zoom == 20.0f);
+    const std::vector<GUI::GridPoint> huge = {{0, 0}, {10000, 0}};
+    CHECK(GUI::FramePoints(huge, {800.0f, 600.0f}, 4.0f, 20.0f).Zoom == 4.0f);
+    CHECK(GUI::FramePoints({}, {800.0f, 600.0f}, 4.0f, 20.0f).Zoom == 20.0f);
 }

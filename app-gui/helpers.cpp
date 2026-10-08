@@ -1,13 +1,21 @@
 /**
  * @file    helpers.cpp
- * @brief   Geometry helpers for the schematic editor: grid points, rotations, snapping and world/screen conversion.
+ * @brief   Geometry helpers for the schematic editor: grid points, rotations, snapping, view transform and framing.
  */
 
 #include "helpers.h"
 
+#include <algorithm>
 #include <cmath>
 
 namespace GUI {
+
+namespace {
+
+// Grid units left around the framed points, since symbols reach a little past their terminals
+constexpr float FrameMargin = 2.0f;
+
+} // namespace
 
 /**
  * @brief   Creates the transform for the current canvas state.
@@ -191,6 +199,29 @@ GridPoint Rotate(const GridPoint point, const Rotation rotation) {
         return {point.Y, -point.X};
     }
     return point;
+}
+
+/**
+ * @brief   Finds the pan and zoom that center a set of points on a canvas, such as a schematic just opened.
+ * @param[in] points       Grid points to show, such as terminals and wire ends.
+ * @param[in] canvas_size  Size of the canvas in pixels.
+ * @param[in] min_zoom     Smallest zoom allowed, in pixels per grid unit.
+ * @param[in] max_zoom     Largest zoom to use; small circuits are centered at it instead of filling the canvas.
+ * @return  The view frame; with no points, the origin at the top-left corner and the largest zoom.
+ */
+ViewFrame FramePoints(const std::span<const GridPoint> points, const ImVec2 canvas_size, const float min_zoom,
+                      const float max_zoom) {
+    if (points.empty()) {
+        return {.Pan = {0.0f, 0.0f}, .Zoom = max_zoom};
+    }
+    const auto [min_x, max_x] = std::ranges::minmax(points, {}, &GridPoint::X);
+    const auto [min_y, max_y] = std::ranges::minmax(points, {}, &GridPoint::Y);
+    const float width = static_cast<float>(max_x.X - min_x.X) + 2.0f * FrameMargin;
+    const float height = static_cast<float>(max_y.Y - min_y.Y) + 2.0f * FrameMargin;
+    const float zoom = std::clamp(std::min(canvas_size.x / width, canvas_size.y / height), min_zoom, max_zoom);
+    const float center_x = static_cast<float>(min_x.X + max_x.X) / 2.0f;
+    const float center_y = static_cast<float>(min_y.Y + max_y.Y) / 2.0f;
+    return {.Pan = {canvas_size.x / 2.0f - center_x * zoom, canvas_size.y / 2.0f - center_y * zoom}, .Zoom = zoom};
 }
 
 } // namespace GUI

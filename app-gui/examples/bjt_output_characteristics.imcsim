@@ -1,0 +1,111 @@
+{
+  "elements": [
+    {
+      "model": "2N3904",
+      "name": "Q1",
+      "rotation": 0,
+      "type": "NPN",
+      "x": 9,
+      "y": 8
+    },
+    {
+      "name": "V1",
+      "rotation": 0,
+      "type": "VCC",
+      "value": 5.0,
+      "x": 10,
+      "y": 4
+    },
+    {
+      "name": "I1",
+      "rotation": 270,
+      "source": "DC",
+      "type": "CurrentSource",
+      "value": 2e-05,
+      "x": 4,
+      "y": 10
+    },
+    {
+      "rotation": 0,
+      "type": "Ground",
+      "x": 10,
+      "y": 12
+    }
+  ],
+  "format": "imcsim-schematic",
+  "measurements": {
+    "currents": [
+      "Q1.C"
+    ],
+    "voltages": []
+  },
+  "simulation": {
+    "ac_sweep": {
+      "points_per_decade": 20,
+      "start": 1.0,
+      "stop": 1000000.0
+    },
+    "dc_sweep": {
+      "step_source": true,
+      "stepped": {
+        "source": "I1",
+        "start": 1e-05,
+        "step": 1e-05,
+        "stop": 5e-05
+      },
+      "swept": {
+        "source": "V1",
+        "start": 0.0,
+        "step": 0.01,
+        "stop": 5.0
+      }
+    },
+    "transient": {
+      "step": 1e-05,
+      "stop": 0.01
+    }
+  },
+  "version": 1,
+  "wires": [
+    {
+      "end": [
+        10,
+        6
+      ],
+      "start": [
+        10,
+        4
+      ]
+    },
+    {
+      "end": [
+        7,
+        8
+      ],
+      "start": [
+        4,
+        8
+      ]
+    },
+    {
+      "end": [
+        10,
+        12
+      ],
+      "start": [
+        10,
+        10
+      ]
+    },
+    {
+      "end": [
+        10,
+        12
+      ],
+      "start": [
+        4,
+        12
+      ]
+    }
+  ]
+}

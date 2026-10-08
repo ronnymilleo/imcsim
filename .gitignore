@@ -5,3 +5,4 @@ cmake-build-debug
 compile_commands.json
 imgui.ini
 *.imcsim
+!app-gui/examples/*.imcsim

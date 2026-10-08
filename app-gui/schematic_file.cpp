@@ -99,6 +99,23 @@ constexpr auto MOSFETKeys = std::to_array<ParameterKey<Core::MOSFETParameters>>(
     {"pmax", &Core::MOSFETParameters::MaxPower},
 });
 
+constexpr auto TransientKeys = std::to_array<ParameterKey<Core::TransientSettings>>({
+    {"stop", &Core::TransientSettings::StopTime},
+    {"step", &Core::TransientSettings::TimeStep},
+});
+
+// The points per decade are an integer, so they are written and read apart
+constexpr auto ACSweepKeys = std::to_array<ParameterKey<Core::ACSweepSettings>>({
+    {"start", &Core::ACSweepSettings::StartFrequency},
+    {"stop", &Core::ACSweepSettings::StopFrequency},
+});
+
+constexpr auto SweepRangeKeys = std::to_array<ParameterKey<Core::SweepRange>>({
+    {"start", &Core::SweepRange::Start},
+    {"stop", &Core::SweepRange::Stop},
+    {"step", &Core::SweepRange::Step},
+});
+
 // Readers return no value when the key is missing or holds another type, so a damaged file never throws
 std::optional<int> ReadInt(const nlohmann::json &object, const char *key) {
     const auto entry = object.find(key);
@@ -132,13 +149,19 @@ std::optional<bool> ReadBool(const nlohmann::json &object, const char *key) {
     return entry->get<bool>();
 }
 
-std::optional<GridPoint> ReadPoint(const nlohmann::json &object, const char *key) {
-    const auto entry = object.find(key);
-    if (entry == object.end() || !entry->is_array() || entry->size() != 2 || !(*entry)[0].is_number_integer() ||
-        !(*entry)[1].is_number_integer()) {
+std::optional<GridPoint> ReadPointValue(const nlohmann::json &value) {
+    if (!value.is_array() || value.size() != 2 || !value[0].is_number_integer() || !value[1].is_number_integer()) {
         return std::nullopt;
     }
-    return GridPoint{(*entry)[0].get<int>(), (*entry)[1].get<int>()};
+    return GridPoint{value[0].get<int>(), value[1].get<int>()};
+}
+
+std::optional<GridPoint> ReadPoint(const nlohmann::json &object, const char *key) {
+    const auto entry = object.find(key);
+    if (entry == object.end()) {
+        return std::nullopt;
+    }
+    return ReadPointValue(*entry);
 }
 
 template <typename Parameters, std::size_t Count>
@@ -390,15 +413,216 @@ void FixNames(std::vector<std::unique_ptr<UIElement>> &elements, std::vector<std
     }
 }
 
+nlohmann::json WriteSweepRange(const Core::SweepRange &range) {
+    nlohmann::json object = {{"source", range.Source}};
+    WriteParameters(SweepRangeKeys, range, object);
+    return object;
+}
+
+nlohmann::json WriteSettings(const SimulationSettings &settings) {
+    nlohmann::json transient = nlohmann::json::object();
+    WriteParameters(TransientKeys, settings.Transient, transient);
+    nlohmann::json ac_sweep = nlohmann::json::object();
+    WriteParameters(ACSweepKeys, settings.ACSweep, ac_sweep);
+    ac_sweep["points_per_decade"] = settings.ACSweep.PointsPerDecade;
+    return {
+        {"transient", transient},
+        {"ac_sweep", ac_sweep},
+        {"dc_sweep",
+         {
+             {"swept", WriteSweepRange(settings.SweptRange)},
+             {"stepped", WriteSweepRange(settings.SteppedRange)},
+             {"step_source", settings.StepSource},
+         }},
+    };
+}
+
+// The analysis readers below change only their own part of the settings; missing keys keep its value
+std::expected<void, std::string> ReadTransientSettings(const nlohmann::json &object, SimulationSettings &settings) {
+    if (const auto read = ReadParameters(TransientKeys, object, settings.Transient); !read) {
+        return read;
+    }
+    if (settings.Transient.StopTime <= 0.0 || settings.Transient.TimeStep <= 0.0) {
+        return std::unexpected("have a time that is not positive");
+    }
+    return {};
+}
+
+std::expected<void, std::string> ReadACSweepSettings(const nlohmann::json &object, SimulationSettings &settings) {
+    if (const auto read = ReadParameters(ACSweepKeys, object, settings.ACSweep); !read) {
+        return read;
+    }
+    if (settings.ACSweep.StartFrequency <= 0.0 || settings.ACSweep.StopFrequency <= 0.0) {
+        return std::unexpected("have a frequency that is not positive");
+    }
+    if (object.contains("points_per_decade")) {
+        const std::optional<int> points = ReadInt(object, "points_per_decade");
+        if (!points || *points < 1) {
+            return std::unexpected("have no valid points_per_decade");
+        }
+        settings.ACSweep.PointsPerDecade = *points;
+    }
+    return {};
+}
+
+std::expected<void, std::string> ReadSweepRange(const nlohmann::json &object, Core::SweepRange &range) {
+    if (!object.is_object()) {
+        return std::unexpected("have a range that is not an object");
+    }
+    if (object.contains("source")) {
+        const std::optional<std::string> source = ReadString(object, "source");
+        if (!source) {
+            return std::unexpected("have no valid source");
+        }
+        range.Source = *source;
+    }
+    if (const auto read = ReadParameters(SweepRangeKeys, object, range); !read) {
+        return read;
+    }
+    if (range.Step == 0.0) {
+        return std::unexpected("have a step of zero");
+    }
+    return {};
+}
+
+std::expected<void, std::string> ReadDCSweepSettings(const nlohmann::json &object, SimulationSettings &settings) {
+    if (const auto swept = object.find("swept"); swept != object.end()) {
+        if (const auto read = ReadSweepRange(*swept, settings.SweptRange); !read) {
+            return read;
+        }
+    }
+    if (const auto stepped = object.find("stepped"); stepped != object.end()) {
+        if (const auto read = ReadSweepRange(*stepped, settings.SteppedRange); !read) {
+            return read;
+        }
+    }
+    if (object.contains("step_source")) {
+        const std::optional<bool> step_source = ReadBool(object, "step_source");
+        if (!step_source) {
+            return std::unexpected("have a step_source flag that is not true or false");
+        }
+        settings.StepSource = *step_source;
+    }
+    return {};
+}
+
+/**
+ * @struct  AnalysisReader
+ * @brief   JSON key of the settings of one analysis, its name in warnings and the function that reads them.
+ */
+struct AnalysisReader {
+    const char *Key;
+    const char *Label;
+    std::expected<void, std::string> (*Read)(const nlohmann::json &, SimulationSettings &);
+};
+
+constexpr auto AnalysisReaders = std::to_array<AnalysisReader>({
+    {"transient", "transient", &ReadTransientSettings},
+    {"ac_sweep", "AC sweep", &ReadACSweepSettings},
+    {"dc_sweep", "DC sweep", &ReadDCSweepSettings},
+});
+
+// Files saved before settings were stored have none and get the defaults; an analysis with invalid settings
+// falls back to its defaults without affecting the others
+SimulationSettings ReadSettings(const nlohmann::json &document, std::vector<std::string> &warnings) {
+    SimulationSettings settings;
+    const auto simulation = document.find("simulation");
+    if (simulation == document.end()) {
+        return settings;
+    }
+    if (!simulation->is_object()) {
+        warnings.push_back("The simulation settings are not an object and were reset to the defaults");
+        return settings;
+    }
+    for (const AnalysisReader &reader : AnalysisReaders) {
+        const auto object = simulation->find(reader.Key);
+        if (object == simulation->end()) {
+            continue;
+        }
+        SimulationSettings read_settings = settings;
+        std::expected<void, std::string> read = std::unexpected("are not an object");
+        if (object->is_object()) {
+            read = reader.Read(*object, read_settings);
+        }
+        if (read) {
+            settings = std::move(read_settings);
+        } else {
+            warnings.push_back(
+                std::format("The {} settings {} and were reset to the defaults", reader.Label, read.error()));
+        }
+    }
+    return settings;
+}
+
+nlohmann::json WriteMeasurements(const SavedMeasurements &measurements) {
+    nlohmann::json voltages = nlohmann::json::array();
+    for (const GridPoint point : measurements.Voltages) {
+        voltages.push_back({point.X, point.Y});
+    }
+    return {{"voltages", voltages}, {"currents", measurements.Currents}};
+}
+
+// Reads every entry of a list that read_entry accepts. Returns false when the key holds no list or some entry was
+// skipped; a missing key is an empty list
+template <typename Value, typename ReadEntry>
+bool ReadList(const nlohmann::json &object, const char *key, const ReadEntry &read_entry, std::vector<Value> &values) {
+    const auto list = object.find(key);
+    if (list == object.end()) {
+        return true;
+    }
+    if (!list->is_array()) {
+        return false;
+    }
+    bool complete = true;
+    for (const nlohmann::json &entry : *list) {
+        if (const std::optional<Value> value = read_entry(entry)) {
+            values.push_back(*value);
+        } else {
+            complete = false;
+        }
+    }
+    return complete;
+}
+
+std::optional<std::string> ReadStringValue(const nlohmann::json &value) {
+    if (!value.is_string()) {
+        return std::nullopt;
+    }
+    return value.get<std::string>();
+}
+
+// Entries that cannot be read are skipped with one warning per list, since a lost trace is easy to probe again
+SavedMeasurements ReadMeasurements(const nlohmann::json &document, std::vector<std::string> &warnings) {
+    SavedMeasurements measurements;
+    const auto object = document.find("measurements");
+    if (object == document.end()) {
+        return measurements;
+    }
+    if (!object->is_object()) {
+        warnings.push_back("The measurements are not an object and were skipped");
+        return measurements;
+    }
+    if (!ReadList(*object, "voltages", ReadPointValue, measurements.Voltages)) {
+        warnings.push_back("Some measured voltages are not integer points and were skipped");
+    }
+    if (!ReadList(*object, "currents", ReadStringValue, measurements.Currents)) {
+        warnings.push_back("Some measured currents are not names and were skipped");
+    }
+    return measurements;
+}
+
 } // namespace
 
 /**
  * @brief   Writes a schematic as JSON.
- * @param[in] elements  Components placed on the grid.
- * @param[in] wires     Wire segments.
+ * @param[in] elements      Components placed on the grid.
+ * @param[in] wires         Wire segments.
+ * @param[in] settings      Settings of the analyses.
+ * @param[in] measurements  Traces the plots show; the key is left out when there are none.
  * @return  The file contents, indented for reading and diffing. Values are plain numbers, never suffixed text.
  */
-std::string SaveSchematic(const std::vector<std::unique_ptr<UIElement>> &elements, const std::vector<UIWire> &wires) {
+std::string SaveSchematic(const std::vector<std::unique_ptr<UIElement>> &elements, const std::vector<UIWire> &wires,
+                          const SimulationSettings &settings, const SavedMeasurements &measurements) {
     nlohmann::json element_list = nlohmann::json::array();
     for (const auto &element : elements) {
         element_list.push_back(WriteElement(*element));
@@ -410,12 +634,16 @@ std::string SaveSchematic(const std::vector<std::unique_ptr<UIElement>> &element
             {"end", {wire.GetEnd().X, wire.GetEnd().Y}},
         });
     }
-    const nlohmann::json document = {
+    nlohmann::json document = {
         {"format", FormatName},
         {"version", FormatVersion},
         {"elements", element_list},
         {"wires", wire_list},
+        {"simulation", WriteSettings(settings)},
     };
+    if (!measurements.Voltages.empty() || !measurements.Currents.empty()) {
+        document["measurements"] = WriteMeasurements(measurements);
+    }
     return document.dump(2) + "\n";
 }
 
@@ -424,7 +652,8 @@ std::string SaveSchematic(const std::vector<std::unique_ptr<UIElement>> &element
  * @param[in] text  File contents.
  * @return  The schematic, or an error when the text is not a schematic this version can read. Elements and
  *          wires that cannot be read, such as diagonal wires, are skipped with a warning instead of failing
- *          the whole file, and so are repeated or missing names, which are replaced.
+ *          the whole file, and so are repeated or missing names, which are replaced. Invalid analysis settings
+ *          fall back to their defaults, also with a warning.
  */
 std::expected<LoadedSchematic, std::string> LoadSchematic(const std::string_view text) {
     const nlohmann::json document = nlohmann::json::parse(text, nullptr, false);
@@ -477,6 +706,8 @@ std::expected<LoadedSchematic, std::string> LoadSchematic(const std::string_view
             }
         }
     }
+    schematic.Settings = ReadSettings(document, schematic.Warnings);
+    schematic.Measurements = ReadMeasurements(document, schematic.Warnings);
     return schematic;
 }
 

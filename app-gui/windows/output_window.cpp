@@ -101,9 +101,12 @@ void PlotDashedLine(const std::string &label, const std::vector<double> &xs, con
         }
     }
     const float font_size = ImGui::GetFontSize();
+    const ImVec2 plot_min = ImPlot::GetPlotPos();
+    const ImVec2 plot_max = plot_min + ImPlot::GetPlotSize();
     ImDrawList *draw_list = ImPlot::GetPlotDrawList();
     ImPlot::PushPlotClipRect();
-    for (const LineSegment &dash : SplitIntoDashes(points, DashLength * font_size, DashGap * font_size)) {
+    for (const LineSegment &dash :
+         SplitIntoDashes(points, DashLength * font_size, DashGap * font_size, plot_min, plot_max)) {
         draw_list->AddLine(dash.Start, dash.End, color, DashWeight);
     }
     ImPlot::PopPlotClipRect();
@@ -193,10 +196,51 @@ void LabelCurveEnds(const Core::DCSweep &sweep, const Schematic &schematic, cons
     }
 }
 
-// Returns whether the current axis has just appeared: it did not exist when the axes last fitted, so its range
-// is meaningless until it is fitted too
-bool TakeCurrentAxisAppeared(bool &showed_currents, const bool show_currents) {
-    return show_currents && !std::exchange(showed_currents, show_currents);
+// Measured nodes of a result, ground excluded; empty when the plot shows no voltage
+std::vector<int> ListMeasuredNodes(const std::size_t node_count, const Schematic &schematic) {
+    std::vector<int> nodes;
+    for (std::size_t node = 1; node < node_count; ++node) {
+        if (schematic.IsVoltageMeasured(static_cast<int>(node))) {
+            nodes.push_back(static_cast<int>(node));
+        }
+    }
+    return nodes;
+}
+
+// Measured currents of a result, in result order; empty when the plot shows no current axis
+std::vector<std::string> ListMeasuredCurrents(const std::vector<Core::ComponentTrace> &currents,
+                                              const Schematic &schematic) {
+    std::vector<std::string> names;
+    for (const Core::ComponentTrace &current : currents) {
+        if (schematic.IsCurrentMeasured(current.Name)) {
+            names.push_back(current.Name);
+        }
+    }
+    return names;
+}
+
+// Returns whether the axis of some traces must fit because the measured ones changed: a new trace could otherwise
+// sit far off the scale of the old ones, and a new axis has no meaningful range yet. Removing every trace fits
+// nothing, since there is nothing left to fit to
+template <typename Key> bool TakeTracesChanged(std::vector<Key> &shown, std::vector<Key> measured) {
+    const bool changed = measured != shown;
+    shown = std::move(measured);
+    return changed && !shown.empty();
+}
+
+// Fits every axis for a new result; otherwise only the axes whose traces changed, so the zoom of the others stays.
+// Call it before each BeginPlot()
+void SetNextFits(const bool new_result, const bool voltages_changed, const bool currents_changed) {
+    if (new_result) {
+        ImPlot::SetNextAxesToFit();
+        return;
+    }
+    if (voltages_changed) {
+        ImPlot::SetNextAxisToFit(ImAxis_Y1);
+    }
+    if (currents_changed) {
+        ImPlot::SetNextAxisToFit(ImAxis_Y2);
+    }
 }
 
 // Returns whether the axes must fit, which is the case once for every new result
@@ -340,13 +384,12 @@ void OutputWindow::DrawTraceList(const std::size_t node_count, const std::vector
 }
 
 void OutputWindow::DrawTransient(const Core::Transient &transient) {
-    const bool show_currents = HasMeasuredCurrent(transient.Currents, m_Schematic);
-    const bool current_axis_appeared = TakeCurrentAxisAppeared(m_TransientShowedCurrents, show_currents);
-    if (TakeFit(m_FittedTransient, m_Schematic.GetTransientVersion())) {
-        ImPlot::SetNextAxesToFit();
-    } else if (current_axis_appeared) {
-        ImPlot::SetNextAxisToFit(ImAxis_Y2);
-    }
+    std::vector<std::string> measured_currents = ListMeasuredCurrents(transient.Currents, m_Schematic);
+    const bool show_currents = !measured_currents.empty();
+    const bool currents_changed = TakeTracesChanged(m_TransientShownCurrents, std::move(measured_currents));
+    const bool voltages_changed =
+        TakeTracesChanged(m_TransientShownNodes, ListMeasuredNodes(transient.NodeVoltages.size(), m_Schematic));
+    SetNextFits(TakeFit(m_FittedTransient, m_Schematic.GetTransientVersion()), voltages_changed, currents_changed);
     if (!ImPlot::BeginPlot("##transient", ImVec2(-1.0f, PlotHeight(1)))) {
         return;
     }
@@ -370,14 +413,13 @@ void OutputWindow::DrawTransient(const Core::Transient &transient) {
 // their phases follow so each current stays on the same side in both plots
 void OutputWindow::DrawACSweep(const Core::ACSweep &sweep) {
     const bool fit = TakeFit(m_FittedACSweep, m_Schematic.GetACSweepVersion());
-    const bool show_currents = HasMeasuredCurrent(sweep.CurrentMagnitudesDecibels, m_Schematic);
-    const bool current_axis_appeared = TakeCurrentAxisAppeared(m_ACSweepShowedCurrents, show_currents);
+    std::vector<std::string> measured_currents = ListMeasuredCurrents(sweep.CurrentMagnitudesDecibels, m_Schematic);
+    const bool show_currents = !measured_currents.empty();
+    const bool currents_changed = TakeTracesChanged(m_ACSweepShownCurrents, std::move(measured_currents));
+    const bool voltages_changed =
+        TakeTracesChanged(m_ACSweepShownNodes, ListMeasuredNodes(sweep.NodeMagnitudesDecibels.size(), m_Schematic));
     const float height = PlotHeight(2);
-    if (fit) {
-        ImPlot::SetNextAxesToFit();
-    } else if (current_axis_appeared) {
-        ImPlot::SetNextAxisToFit(ImAxis_Y2);
-    }
+    SetNextFits(fit, voltages_changed, currents_changed);
     if (ImPlot::BeginPlot("Magnitude##ac", ImVec2(-1.0f, height))) {
         ImPlot::SetupAxes("Frequency", "Voltage (dB)");
         ImPlot::SetupAxisScale(ImAxis_X1, ImPlotScale_Log10);
@@ -393,11 +435,7 @@ void OutputWindow::DrawACSweep(const Core::ACSweep &sweep) {
         DrawCursorReadout(sweep.Frequencies, "Hz", true, plotted);
         ImPlot::EndPlot();
     }
-    if (fit) {
-        ImPlot::SetNextAxesToFit();
-    } else if (current_axis_appeared) {
-        ImPlot::SetNextAxisToFit(ImAxis_Y2);
-    }
+    SetNextFits(fit, voltages_changed, currents_changed);
     if (ImPlot::BeginPlot("Phase##ac", ImVec2(-1.0f, height))) {
         ImPlot::SetupAxes("Frequency", "Phase (deg)");
         ImPlot::SetupAxisScale(ImAxis_X1, ImPlotScale_Log10);
@@ -418,13 +456,12 @@ void OutputWindow::DrawACSweep(const Core::ACSweep &sweep) {
 // Every curve of a family plots under the same label, so a trace keeps one color and one legend entry
 void OutputWindow::DrawDCSweep(const Core::DCSweep &sweep) {
     const Core::DCSweepCurve &first_curve = sweep.Curves.front();
-    const bool show_currents = HasMeasuredCurrent(first_curve.Currents, m_Schematic);
-    const bool current_axis_appeared = TakeCurrentAxisAppeared(m_DCSweepShowedCurrents, show_currents);
-    if (TakeFit(m_FittedDCSweep, m_Schematic.GetDCSweepVersion())) {
-        ImPlot::SetNextAxesToFit();
-    } else if (current_axis_appeared) {
-        ImPlot::SetNextAxisToFit(ImAxis_Y2);
-    }
+    std::vector<std::string> measured_currents = ListMeasuredCurrents(first_curve.Currents, m_Schematic);
+    const bool show_currents = !measured_currents.empty();
+    const bool currents_changed = TakeTracesChanged(m_DCSweepShownCurrents, std::move(measured_currents));
+    const bool voltages_changed =
+        TakeTracesChanged(m_DCSweepShownNodes, ListMeasuredNodes(first_curve.NodeVoltages.size(), m_Schematic));
+    SetNextFits(TakeFit(m_FittedDCSweep, m_Schematic.GetDCSweepVersion()), voltages_changed, currents_changed);
     const bool stepped = !sweep.SteppedSource.empty();
     if (stepped) {
         ImGui::TextDisabled("%s",

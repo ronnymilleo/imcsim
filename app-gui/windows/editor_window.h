@@ -7,6 +7,7 @@
 #define IMCSIM_EDITOR_WINDOW_H
 
 #include "components/component.h"
+#include "examples.h"
 #include "helpers.h"
 #include "imgui.h"
 #include "schematic.h"
@@ -41,6 +42,9 @@ public:
     void RequestQuit();
     bool IsQuitConfirmed() const;
 
+    // Examples
+    void RequestExample(const Example &example);
+
 private:
     /**
      * @struct  ElementDrag
@@ -73,7 +77,8 @@ private:
         New,
         Open,
         Save,
-        Quit
+        Quit,
+        Example
     };
 
     /**
@@ -98,11 +103,15 @@ private:
 
     Schematic &m_Schematic;
 
+    static constexpr float DefaultZoom = 20.0f;
+
     // View
     ImVec2 m_Pan = {0, 0};
-    float m_Zoom = 20.0f;
+    float m_Zoom = DefaultZoom;
     SymbolStyle m_SymbolStyle = SymbolStyle::IEC;
     WireColoring m_WireColoring = WireColoring::Plain;
+    // Set when a schematic is opened; the next Draw() frames it, once the canvas size is known
+    bool m_FrameRequested = false;
 
     // Placement
     std::optional<Core::ComponentType> m_PlacingType;
@@ -124,6 +133,10 @@ private:
     bool m_QuitRequested = false;
     bool m_QuitConfirmed = false;
 
+    // Examples: requested from the menu and handled by the next Draw(), then kept while discarding is confirmed
+    std::optional<Example> m_RequestedExample;
+    std::optional<Example> m_ExampleToOpen;
+
     // Files: the dialog in progress and the confirmation are touched only by the main thread
     std::optional<FileAction> m_ActionToConfirm;
     std::optional<FileAction> m_DialogAction;
@@ -144,6 +157,7 @@ private:
     void DrawMeasurements(ImDrawList *draw_list, const ViewTransform &view);
     void DrawHoveredValue(const ViewTransform &view, bool hovered);
     void HandlePanAndZoom(ImVec2 origin, bool hovered, bool active);
+    void FrameSchematic(ImVec2 canvas_size);
 
     // Modes
     void StartPlacing(Core::ComponentType type);
@@ -175,9 +189,11 @@ private:
     void RequestNew();
     void RequestOpen();
     void HandleQuitRequest();
+    void HandleExampleRequest();
     void Save();
     void NewSchematic();
     void OpenFile(const std::filesystem::path &path);
+    void OpenExample(const Example &example);
     void SaveFile(std::filesystem::path path);
 
     // File dialogs and messages

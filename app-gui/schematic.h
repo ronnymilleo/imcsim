@@ -8,6 +8,8 @@
 
 #include "connectivity.h"
 #include "helpers.h"
+#include "schematic_file.h"
+#include "simulation_settings.h"
 #include "simulator.h"
 #include "ui_elements/ui_element.h"
 #include "ui_elements/ui_wire.h"
@@ -32,8 +34,11 @@ namespace GUI {
  *          is added, deleted or the wires are replaced. Undo works on whole snapshots: changes pile up until
  *          CommitUndoStep(), which the application calls once the user finishes an interaction, so a whole drag
  *          or a typed value is undone in one step. Measurements, the traces the plots show, are view state
- *          shared by the editor and the plots: they stay out of the history and the file, and are kept by key
- *          (node number or current name) across edits, since small edits rarely renumber nodes.
+ *          shared by the editor and the plots: they are kept by key (node number or current name) across edits,
+ *          since small edits rarely renumber nodes, and are saved with the file so it opens ready to plot, but
+ *          they stay out of the history and changing them does not count as an unsaved change. The simulation
+ *          settings belong to the document: they are saved, undone and count as changes, but changing them keeps
+ *          the results, which still match the circuit.
  */
 class Schematic {
 public:
@@ -53,7 +58,8 @@ public:
     void SimplifyAllWires();
     void DeleteSelection();
     void Clear();
-    void Replace(std::vector<std::unique_ptr<UIElement>> elements, std::vector<UIWire> wires);
+    void Replace(std::vector<std::unique_ptr<UIElement>> elements, std::vector<UIWire> wires,
+                 SimulationSettings settings);
 
     // Selection
     void SelectElement(std::size_t index);
@@ -70,6 +76,13 @@ public:
     bool IsCurrentMeasured(const std::string &name) const;
     void SetCurrentMeasured(const std::string &name, bool measured);
     void ClearMeasurements();
+    SavedMeasurements SaveMeasurements();
+    void RestoreMeasurements(const SavedMeasurements &measurements);
+
+    // Simulation settings
+    const SimulationSettings &GetSimulationSettings() const;
+    void SetSimulationSettings(const SimulationSettings &settings);
+    std::size_t GetSimulationSettingsVersion() const;
 
     // Document state
     bool IsModified() const;
@@ -113,6 +126,11 @@ private:
     // Measurements: node numbers and current names, such as "R1" or "Q1.C"
     std::set<int> m_MeasuredNodes;
     std::set<std::string> m_MeasuredCurrents;
+
+    // Simulation settings; the version changes only when they are replaced from outside the Simulation window,
+    // such as by opening a file or undoing, so the window knows to reload its fields
+    SimulationSettings m_SimulationSettings;
+    std::size_t m_SimulationSettingsVersion = 0;
 
     // Document state
     bool m_Modified = false;

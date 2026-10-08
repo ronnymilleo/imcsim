@@ -12,8 +12,37 @@ namespace GUI {
 
 namespace {
 
-ImVec2 Lerp(const ImVec2 start, const ImVec2 end, const float fraction) {
-    return {start.x + (end.x - start.x) * fraction, start.y + (end.y - start.y) * fraction};
+/**
+ * @struct  PixelPoint
+ * @brief   A point in screen pixels kept in double precision, since off-screen samples can be very far away.
+ */
+struct PixelPoint {
+    double X;
+    double Y;
+};
+
+PixelPoint Lerp(const PixelPoint start, const PixelPoint end, const double fraction) {
+    return {start.X + (end.X - start.X) * fraction, start.Y + (end.Y - start.Y) * fraction};
+}
+
+ImVec2 ToVec2(const PixelPoint point) {
+    return {static_cast<float>(point.X), static_cast<float>(point.Y)};
+}
+
+// Narrows [first, last], the part of a segment still inside, by one edge of the rectangle (Liang-Barsky). The
+// segment is start + fraction * delta, and offset is how far start is inside the edge; returns false once nothing
+// is left
+bool ClipEdge(const double delta, const double offset, double &first, double &last) {
+    if (delta == 0.0) {
+        return offset >= 0.0;
+    }
+    const double fraction = -offset / delta;
+    if (delta > 0.0) {
+        first = std::max(first, fraction);
+    } else {
+        last = std::min(last, fraction);
+    }
+    return first <= last;
 }
 
 } // namespace
@@ -40,33 +69,58 @@ std::size_t FindNearestSample(const std::span<const double> xs, const double x, 
 }
 
 /**
- * @brief   Splits a polyline into the visible pieces of a dashed line.
+ * @brief   Splits a polyline into the dashes of a dashed line, keeping only what falls inside a rectangle.
  * @param[in] points       Polyline vertices in screen pixels.
  * @param[in] dash_length  Length of each dash, in pixels.
  * @param[in] gap_length   Length of each gap, in pixels.
- * @return  The dashes, in order. The pattern runs on across vertices, so dashes keep their length around bends.
+ * @param[in] clip_min     Top-left corner of the visible area, such as the plot.
+ * @param[in] clip_max     Bottom-right corner of the visible area.
+ * @return  The dashes, in order. The pattern runs on across vertices, so dashes keep their length around bends,
+ *          and across the clipped parts, so dashes do not shift while the view pans.
+ * @note    The work depends on the visible length only: a zoomed-in plot puts samples millions of pixels away,
+ *          and dashing those whole segments would take all the memory. Segments with a coordinate that is not
+ *          finite are skipped.
  */
 std::vector<LineSegment> SplitIntoDashes(const std::span<const ImVec2> points, const float dash_length,
-                                         const float gap_length) {
+                                         const float gap_length, const ImVec2 clip_min, const ImVec2 clip_max) {
     std::vector<LineSegment> dashes;
-    const float period = dash_length + gap_length;
+    const double period = static_cast<double>(dash_length) + gap_length;
     // Distance already covered in the current dash-and-gap period
-    float phase = 0.0f;
+    double phase = 0.0;
     for (std::size_t index = 1; index < points.size(); ++index) {
-        const ImVec2 start = points[index - 1];
-        const ImVec2 end = points[index];
-        const float length = std::hypot(end.x - start.x, end.y - start.y);
-        float covered = 0.0f;
-        while (covered < length) {
+        const PixelPoint start = {points[index - 1].x, points[index - 1].y};
+        const PixelPoint end = {points[index].x, points[index].y};
+        const double delta_x = end.X - start.X;
+        const double delta_y = end.Y - start.Y;
+        const double length = std::hypot(delta_x, delta_y);
+        if (!std::isfinite(length) || length == 0.0) {
+            continue;
+        }
+        double first = 0.0;
+        double last = 1.0;
+        const bool visible = ClipEdge(delta_x, start.X - clip_min.x, first, last) &&
+                             ClipEdge(-delta_x, clip_max.x - start.X, first, last) &&
+                             ClipEdge(delta_y, start.Y - clip_min.y, first, last) &&
+                             ClipEdge(-delta_y, clip_max.y - start.Y, first, last);
+        if (!visible) {
+            phase = std::fmod(phase + length, period);
+            continue;
+        }
+        phase = std::fmod(phase + first * length, period);
+        double covered = first * length;
+        const double visible_end = last * length;
+        while (covered < visible_end) {
             const bool in_dash = phase < dash_length;
-            const float left_in_part = in_dash ? dash_length - phase : period - phase;
-            const float step = std::min(left_in_part, length - covered);
+            const double left_in_part = in_dash ? dash_length - phase : period - phase;
+            const double step = std::min(left_in_part, visible_end - covered);
             if (in_dash) {
-                dashes.push_back({Lerp(start, end, covered / length), Lerp(start, end, (covered + step) / length)});
+                dashes.push_back(
+                    {ToVec2(Lerp(start, end, covered / length)), ToVec2(Lerp(start, end, (covered + step) / length))});
             }
             covered += step;
             phase = std::fmod(phase + step, period);
         }
+        phase = std::fmod(phase + (length - visible_end), period);
     }
     return dashes;
 }

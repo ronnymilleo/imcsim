@@ -6,6 +6,7 @@
 #include "connectivity.h"
 
 #include "components/component.h"
+#include <algorithm>
 #include <numeric>
 #include <utility>
 
@@ -114,6 +115,20 @@ std::optional<int> Connectivity::GetNode(const GridPoint point) const {
         return std::nullopt;
     }
     return entry->second;
+}
+
+/**
+ * @brief   Finds a connection point of a node, such as to save which node is measured independently of numbering.
+ * @param[in] node  Node number.
+ * @return  The top-left point of the node, so the same schematic always gives the same point, or no value when
+ *          no point has that number.
+ */
+std::optional<GridPoint> Connectivity::FindPointOfNode(const int node) const {
+    const auto entry = std::ranges::find(m_NodeOfPoint, node, &std::pair<const GridPoint, int>::second);
+    if (entry == m_NodeOfPoint.end()) {
+        return std::nullopt;
+    }
+    return entry->first;
 }
 
 /**
