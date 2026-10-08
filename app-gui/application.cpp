@@ -150,6 +150,7 @@ int Application::InitImGui() {
     ApplyTheme();
     LoadThemeFonts();
     m_EditorWindow.RegisterSettingsHandler();
+    RegisterThemeSettingsHandler();
 
     ImGuiStyle &style = ImGui::GetStyle();
     style.ScaleAllSizes(m_SDLWindowScale);
@@ -261,6 +262,16 @@ void Application::DrawMainMenuBar() {
     }
     if (ImGui::BeginMenu("View")) {
         m_EditorWindow.DrawViewMenuItems();
+        if (ImGui::BeginMenu("Theme")) {
+            const auto themes = GetThemes();
+            for (std::size_t index = 0; index < themes.size(); ++index) {
+                if (ImGui::MenuItem(themes[index].Name, nullptr, index == GetThemeIndex())) {
+                    SetTheme(index);
+                    ImGui::MarkIniSettingsDirty();
+                }
+            }
+            ImGui::EndMenu();
+        }
         ImGui::Separator();
         // The editor cannot be closed, so only the side windows are listed
         const std::array<AppWindow *, 4> closable_windows = {&m_PropertiesWindow, &m_NetlistWindow, &m_SimulationWindow,
@@ -272,15 +283,12 @@ void Application::DrawMainMenuBar() {
             }
         }
         ImGui::Separator();
-        // Render() applies it right after the menu, and closed docked windows are reopened so the whole layout shows
-        // up; Output floats outside the layout and opens with the next result
+        // Render() applies it right after the menu, and the windows open by default are reopened so the whole layout
+        // shows up; Netlist stays as it is, and Output floats outside the layout and opens with the next result
         if (ImGui::MenuItem("Reset Layout")) {
             m_ResetLayout = true;
-            for (AppWindow *window : closable_windows) {
-                if (window != &m_OutputWindow) {
-                    window->SetOpen(true);
-                }
-            }
+            m_PropertiesWindow.SetOpen(true);
+            m_SimulationWindow.SetOpen(true);
         }
         ImGui::EndMenu();
     }
@@ -320,7 +328,8 @@ void Application::ShowNewResults() {
                 PlotTab::DCSweep);
 }
 
-// Editor on top, Properties below it on the left and Netlist and Simulation as tabs on the right; Output floats.
+// Editor on top, Properties below it on the left and Simulation on the right, where Netlist docks as a tab when
+// opened; Output floats.
 // Must run before the windows are drawn. Each split returns the new node in the given direction and leaves the
 // rest in its last argument
 void Application::SetupDefaultLayout(ImGuiID dockspace_id) {

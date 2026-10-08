@@ -7,6 +7,7 @@
 
 #include "node_colors.h"
 #include "svg_writer.h"
+#include "theme.h"
 #include <algorithm>
 #include <cfloat>
 #include <cstdlib>
@@ -32,7 +33,6 @@ constexpr float ArrowHalfWidth = 0.25f;
 constexpr float TerminalNumberScale = 0.8f;
 constexpr float TerminalNumberOutside = 0.3f;
 constexpr float TerminalNumberGap = 3.0f;
-constexpr ImU32 TerminalNumberColor = IM_COL32(160, 142, 145, 255);
 // Each numbered terminal also gets a small open ring, the usual mark of a connection point; open so it does not read
 // as a junction or a voltage probe, which are filled dots. Exported images are usually viewed enlarged, so their ring
 // is smaller than the one on screen, relative to the zoom
@@ -158,6 +158,7 @@ void DrawTerminalNumbers(SchematicCanvas &canvas, const ViewTransform &view, con
     const float font_size = GetLabelFontSize(view) * TerminalNumberScale;
     const float ring_radius = std::max(GetZoom(view) * ring_scale, MinTerminalRingRadius);
     ImFont *font = ImGui::GetFont();
+    const ImU32 color = ImGui::ColorConvertFloat4ToU32(GetPalette().TextMuted);
     for (const auto &element : schematic.GetElements()) {
         const std::vector<GridPoint> terminals = element->GetTerminals();
         if (terminals.size() < 2) {
@@ -165,13 +166,12 @@ void DrawTerminalNumbers(SchematicCanvas &canvas, const ViewTransform &view, con
         }
         for (std::size_t index = 0; index < terminals.size(); ++index) {
             const ImVec2 inward = ToVec2(element->GetTerminalInward(index));
-            canvas.AddCircle(view.ToScreen(ToVec2(terminals[index])), ring_radius, TerminalNumberColor, 0,
-                             TerminalRingThickness);
+            canvas.AddCircle(view.ToScreen(ToVec2(terminals[index])), ring_radius, color, 0, TerminalRingThickness);
             const ImVec2 outside = view.ToScreen(ToVec2(terminals[index]) - inward * TerminalNumberOutside);
             const std::string text = std::to_string(index + 1);
             const ImVec2 size = font->CalcTextSizeA(font_size, FLT_MAX, 0.0f, text.c_str());
             const ImVec2 position = PlaceBesideLine(outside, size, inward.y == 0.0f, true, TerminalNumberGap);
-            canvas.AddText(font, font_size, position, TerminalNumberColor, text.c_str());
+            canvas.AddText(font, font_size, position, color, text.c_str());
         }
     }
 }
@@ -181,8 +181,8 @@ void DrawTerminalNumbers(SchematicCanvas &canvas, const ViewTransform &view, con
  * @param[in] schematic Schematic to draw: parts with their names and values, wires, junctions and probes.
  * @param[in] style     Drawing standard of the symbols, as the editor shows them.
  * @param[in] terminal_numbers  Numbers the terminals of each part, as the editor does when asked.
- * @param[in] dark      Uses the colors of the editor; otherwise black on white for print, with the probes darkened
- *                      the same way as the traces of exported plots, so both figures keep matching colors.
+ * @param[in] dark      Uses the colors of the editor in the current theme; otherwise black on white for print, with the
+ * probes darkened the same way as the traces of exported plots, so both figures keep matching colors.
  * @return  The SVG document, cropped to the circuit, or the reason it cannot be drawn.
  * @note    Needs ImGui and ImPlot contexts: labels are measured with the ImGui font, and current colors come from
  *          the ImPlot colormap. The grid, selection and operating point colors of the editor are left out.
@@ -193,8 +193,9 @@ std::expected<std::string, std::string> RenderSchematicSvg(Schematic &schematic,
         return std::unexpected("The schematic is empty");
     }
     const ViewTransform view({0.0f, 0.0f}, {0.0f, 0.0f}, ExportZoom);
-    const ImU32 element_color = dark ? ElementColor : PrintLineColor;
-    const ImU32 wire_color = dark ? WireColor : PrintLineColor;
+    const ThemePalette &palette = GetPalette();
+    const ImU32 element_color = dark ? palette.Element : PrintLineColor;
+    const ImU32 wire_color = dark ? palette.Wire : PrintLineColor;
     SvgWriter svg;
     SvgCanvas canvas(svg, !dark);
 
@@ -215,7 +216,7 @@ std::expected<std::string, std::string> RenderSchematicSvg(Schematic &schematic,
     const ImVec2 min = canvas.GetMin() - ImVec2(ExportMargin, ExportMargin);
     const ImVec2 max = canvas.GetMax() + ImVec2(ExportMargin, ExportMargin);
     return svg.Finish({min.x, min.y}, max.x - min.x, max.y - min.y,
-                      dark ? ToExportColor(SchematicBackgroundColor) : PrintBackground);
+                      dark ? ToExportColor(palette.CanvasBackground) : PrintBackground);
 }
 
 } // namespace GUI

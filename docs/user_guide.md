@@ -13,7 +13,11 @@ How to read what imcsim measures, plots and exports. The [README](../README.md) 
 - **Status bar**: below the schematic, the keys of the current mode on the left and the grid position of the cursor
   on the right.
 - **Menus**: File (files, examples and the schematic export), Edit (undo, redo and changes to the selection) and
-  View (wire colors, symbol style, terminal numbers, and the windows). The View choices are kept between sessions.
+  View (wire colors, symbol style, terminal numbers, theme, and the windows). The View choices are kept between
+  sessions.
+- **Themes**: View > Theme switches between Ember (warm charcoal and red, the default), Graphite (cool gray and
+  blue), Phosphor (an oscilloscope screen, green and amber) and Paper (light, like a printed datasheet). Node and
+  trace colors are the same in every theme; Paper darkens them so they read on its light background.
 - **Output window**: hidden until a transient, AC sweep or DC sweep runs; it then opens on the tab of the new
   result. Reopen it from View.
 
@@ -130,15 +134,15 @@ their statistics and the exports always agree.
 
 - **SVG image**: redrawn from the data, not captured from the screen, so it stays sharp at any size. It shows the
   visible X range, so zoom in first to export a detail. Choose its size in pixels and its theme: light for print,
-  which darkens trace colors too light for white paper, or dark, as on screen.
+  which darkens trace colors too light for white paper, or dark, in the colors of the Ember theme.
 - **CSV table**: every sample of every measured trace, including math channels, whatever the zoom. The first column
   is the X axis; each header carries its unit, and on a Bode plot its panel (`Magnitude V(2) (dB)`). Missing
   samples, such as a division by zero in a math channel, are empty cells.
 
 **Schematic**: File > Export Schematic... saves the circuit as an SVG image, cropped around it, with the symbol
 style shown (IEC or ANSI), part names and values, terminal numbers when they are shown, and the measured voltages
-and currents. Light and dark themes darken colors the same way as plot exports, so a probe and its trace keep matching
-colors across the two figures.
+and currents. Light, for print, darkens colors the same way as plot exports, so a probe and its trace keep matching
+colors across the two figures; As on screen keeps the colors of the current theme.
 
 The save dialogs suggest a name after the schematic file and the tab, such as `rc_filter-transient.svg` or
 `rc_filter-schematic.svg`, next to the schematic.

@@ -30,10 +30,6 @@ namespace GUI {
 
 namespace {
 
-// Warm tones that match the theme; selection stays amber so it is not mistaken for the salmon of node 1
-constexpr ImU32 GridDotColor = IM_COL32(78, 63, 66, 255);
-constexpr ImU32 PreviewColor = IM_COL32(236, 96, 100, 170);
-constexpr ImU32 SelectedColor = IM_COL32(255, 200, 80, 255);
 constexpr float MinCanvasSize = 50.0f;
 constexpr float MinZoom = 4.0f;
 constexpr float MaxZoom = 200.0f;
@@ -46,11 +42,8 @@ constexpr float WirePickDistance = 5.0f;
 // Junction dot radius relative to the zoom, with a minimum so it stays visible when zoomed out
 constexpr float JunctionRadiusScale = 0.15f;
 constexpr float MinJunctionRadius = 2.5f;
-constexpr ImU32 NodeLabelColor = IM_COL32(255, 255, 255, 255);
-constexpr ImU32 VoltageLabelColor = IM_COL32(255, 220, 120, 255);
 // Voltage labels sit just above and right of their point, clear of the line
 constexpr ImVec2 VoltageLabelOffset = {4.0f, -16.0f};
-constexpr ImU32 ProbeHighlightColor = IM_COL32(236, 96, 100, 255);
 // Currents span decades, so the heat scale is logarithmic and shows this many below the largest current
 constexpr double CurrentDecades = 4.0;
 // Heat legend, in font sizes, at the bottom left of the canvas
@@ -261,7 +254,7 @@ void DrawGrid(ImDrawList *draw_list, const ViewTransform &view, const ImVec2 ori
     for (float x = std::floor(world_min.x / step_size) * step_size; x <= world_max.x; x += step_size) {
         for (float y = std::floor(world_min.y / step_size) * step_size; y <= world_max.y; y += step_size) {
             const ImVec2 dot = view.ToScreen({x, y});
-            draw_list->AddRectFilled(dot - dot_half_size, dot + dot_half_size, GridDotColor);
+            draw_list->AddRectFilled(dot - dot_half_size, dot + dot_half_size, GetPalette().GridDot);
         }
     }
 }
@@ -542,7 +535,7 @@ void EditorWindow::Draw() {
     HandleSelection(view, hovered);
     ImDrawList *draw_list = ImGui::GetWindowDrawList();
     draw_list->PushClipRect(origin, origin + size, true);
-    draw_list->AddRectFilled(origin, origin + size, SchematicBackgroundColor);
+    draw_list->AddRectFilled(origin, origin + size, GetPalette().CanvasBackground);
     DrawGrid(draw_list, view, origin, size, m_Zoom);
 
     DrawListCanvas canvas(draw_list);
@@ -705,7 +698,7 @@ void EditorWindow::DrawWires(SchematicCanvas &canvas, const ViewTransform &view)
             const std::vector<double> &voltages = operating_point->NodeVoltages;
             return GetHeatColor(VoltageLevel(voltages[static_cast<std::size_t>(node)], voltages));
         }
-        return WireColor;
+        return GetPalette().Wire;
     };
 
     const bool drawn_by_current = m_WireColoring == WireColoring::Current && operating_point;
@@ -717,7 +710,7 @@ void EditorWindow::DrawWires(SchematicCanvas &canvas, const ViewTransform &view)
         }
         // Every wire end is a connection point, so it always has a node
         const int node = connectivity.GetNode(wire.GetStart()).value_or(0);
-        wire.Draw(canvas, view, selected ? SelectedColor : node_color(node));
+        wire.Draw(canvas, view, selected ? GetPalette().Selected : node_color(node));
     }
 
     const float junction_radius = std::max(m_Zoom * JunctionRadiusScale, MinJunctionRadius);
@@ -732,7 +725,7 @@ void EditorWindow::DrawWires(SchematicCanvas &canvas, const ViewTransform &view)
     for (const UIWire &wire : wires) {
         const int node = connectivity.GetNode(wire.GetStart()).value_or(0);
         const ImVec2 middle = view.ToScreen((ToVec2(wire.GetStart()) + ToVec2(wire.GetEnd())) / 2.0f);
-        canvas.AddText(middle, NodeLabelColor, std::format("{}", node).c_str());
+        canvas.AddText(middle, GetPalette().CanvasText, std::format("{}", node).c_str());
     }
 }
 
@@ -749,16 +742,16 @@ void EditorWindow::DrawWireCurrents(SchematicCanvas &canvas, const ViewTransform
 // Selection wins; coloring by current heats each part by the largest current through its terminals
 ImU32 EditorWindow::GetElementColor(const std::size_t index) const {
     if (index == m_Schematic.GetSelectedElementIndex()) {
-        return SelectedColor;
+        return GetPalette().Selected;
     }
     const auto &operating_point = m_Schematic.GetOperatingPoint();
     if (m_WireColoring != WireColoring::Current || !operating_point) {
-        return ElementColor;
+        return GetPalette().Element;
     }
     const UIElement &element = *m_Schematic.GetElements()[index];
     const Core::Component &component = element.GetComponent();
     if (component.GetType() == Core::ComponentType::Ground) {
-        return ElementColor;
+        return GetPalette().Element;
     }
     double current = 0.0;
     for (std::size_t terminal = 0; terminal < element.GetTerminals().size(); ++terminal) {
@@ -812,7 +805,8 @@ void EditorWindow::DrawColorLegend(ImDrawList *draw_list, const ImVec2 origin, c
     const ImVec2 corner = {origin.x + font_size, origin.y + size.y - font_size * 2.0f};
     const auto &operating_point = m_Schematic.GetOperatingPoint();
     if (!operating_point) {
-        draw_list->AddText(corner, NodeLabelColor, "Run an operating point (.op) to color by voltage or current");
+        draw_list->AddText(corner, GetPalette().CanvasText,
+                           "Run an operating point (.op) to color by voltage or current");
         return;
     }
 
@@ -836,9 +830,9 @@ void EditorWindow::DrawColorLegend(ImDrawList *draw_list, const ImVec2 origin, c
                                  GetHeatColor((static_cast<float>(step) + 0.5f) / Steps));
     }
     const float text_y = corner.y + bar_size.y + 2.0f;
-    draw_list->AddText({corner.x, text_y}, NodeLabelColor, low_label.c_str());
+    draw_list->AddText({corner.x, text_y}, GetPalette().CanvasText, low_label.c_str());
     const float high_width = ImGui::CalcTextSize(high_label.c_str()).x;
-    draw_list->AddText({corner.x + bar_size.x - high_width, text_y}, NodeLabelColor, high_label.c_str());
+    draw_list->AddText({corner.x + bar_size.x - high_width, text_y}, GetPalette().CanvasText, high_label.c_str());
 }
 
 // One label per node, on its first wire or, for terminals joined without wires, on a terminal. Ground is
@@ -862,7 +856,7 @@ void EditorWindow::DrawNodeVoltages(ImDrawList *draw_list, const ViewTransform &
         }
         labeled[index] = true;
         const std::string text = std::format("{}V", Core::FormatValue(voltages[index]));
-        draw_list->AddText(view.ToScreen(world_pos) + VoltageLabelOffset, VoltageLabelColor, text.c_str());
+        draw_list->AddText(view.ToScreen(world_pos) + VoltageLabelOffset, GetPalette().VoltageLabel, text.c_str());
     };
 
     for (const UIWire &wire : m_Schematic.GetWires()) {
@@ -1076,7 +1070,7 @@ void EditorWindow::HandlePlacement(SchematicCanvas &canvas, const ViewTransform 
     const GridPoint position = Snap(view.ToWorld(ImGui::GetIO().MousePos));
     auto preview = CreateElement(*m_PlacingType, position, m_PlacingRotation);
     preview->SetMirrored(m_PlacingMirrored);
-    preview->Draw(canvas, view, PreviewColor, m_SymbolStyle);
+    preview->Draw(canvas, view, GetPreviewColor(), m_SymbolStyle);
     if (ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
         m_Schematic.AddElement(std::move(preview));
     }
@@ -1115,7 +1109,7 @@ void EditorWindow::HandleWireDrawing(ImDrawList *draw_list, const ViewTransform 
     if (!m_WireStart) {
         const ImVec2 cursor_on_screen = view.ToScreen(ToVec2(cursor));
         const ImVec2 half_size = {WireCursorHalfSize, WireCursorHalfSize};
-        draw_list->AddRect(cursor_on_screen - half_size, cursor_on_screen + half_size, PreviewColor);
+        draw_list->AddRect(cursor_on_screen - half_size, cursor_on_screen + half_size, GetPreviewColor());
         if (clicked) {
             m_WireStart = cursor;
         }
@@ -1125,8 +1119,8 @@ void EditorWindow::HandleWireDrawing(ImDrawList *draw_list, const ViewTransform 
     const GridPoint start = *m_WireStart;
     const GridPoint corner = m_WireVerticalFirst ? GridPoint{start.X, cursor.Y} : GridPoint{cursor.X, start.Y};
     DrawListCanvas canvas(draw_list);
-    UIWire(start, corner).Draw(canvas, view, PreviewColor);
-    UIWire(corner, cursor).Draw(canvas, view, PreviewColor);
+    UIWire(start, corner).Draw(canvas, view, GetPreviewColor());
+    UIWire(corner, cursor).Draw(canvas, view, GetPreviewColor());
     if (!clicked) {
         return;
     }
@@ -1183,7 +1177,7 @@ void EditorWindow::HandleProbing(ImDrawList *draw_list, const ViewTransform &vie
     }
     const bool measured =
         target->Node ? m_Schematic.IsVoltageMeasured(*target->Node) : m_Schematic.IsCurrentMeasured(target->Current);
-    draw_list->AddCircle(cursor, MeasurementMarkerRadius * 2.0f, ProbeHighlightColor, 0, LineThickness);
+    draw_list->AddCircle(cursor, MeasurementMarkerRadius * 2.0f, GetHighlightColor(), 0, LineThickness);
     ImGui::SetTooltip("%s", std::format("{}\nClick to {} the plots",
                                         DescribeMeasurement(*target, m_Schematic.GetOperatingPoint()),
                                         measured ? "remove it from" : "add it to")
@@ -1607,7 +1601,7 @@ void EditorWindow::DrawExportPopup() {
         m_ExportDark = false;
     }
     ImGui::SameLine();
-    if (ImGui::RadioButton("Dark, as on screen", m_ExportDark)) {
+    if (ImGui::RadioButton("As on screen", m_ExportDark)) {
         m_ExportDark = true;
     }
     ImGui::Separator();

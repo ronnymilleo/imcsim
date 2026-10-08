@@ -6,6 +6,7 @@
 #include "node_colors.h"
 
 #include "implot.h"
+#include "theme.h"
 #include <algorithm>
 #include <array>
 
@@ -24,27 +25,20 @@ constexpr auto NodeColors = std::to_array<ImU32>({
     IM_COL32(240, 150, 200, 255),
 });
 
-// From a dim warm gray for the lowest values, through the accent red, to a pale yellow for the highest
-constexpr auto HeatStops = std::to_array<ImVec4>({
-    {96.0f / 255.0f, 80.0f / 255.0f, 84.0f / 255.0f, 1.0f},
-    {156.0f / 255.0f, 42.0f / 255.0f, 49.0f / 255.0f, 1.0f},
-    {236.0f / 255.0f, 96.0f / 255.0f, 100.0f / 255.0f, 1.0f},
-    {255.0f / 255.0f, 214.0f / 255.0f, 120.0f / 255.0f, 1.0f},
-});
-
 } // namespace
 
 /**
  * @brief   Returns the color of a node, so the same node looks the same in the editor and in the plots.
  * @param[in] node  Node number; 0 is ground.
- * @return  Gray for ground, and one of six colors for the other nodes, repeating after node 6.
+ * @return  Gray for ground, and one of six colors for the other nodes, repeating after node 6, darkened on a
+ *          light theme.
  */
 ImU32 GetNodeColor(const int node) {
     if (node == 0) {
-        return NodeColors[0];
+        return AdaptToBackground(NodeColors[0]);
     }
     const auto cycle_length = static_cast<int>(NodeColors.size()) - 1;
-    return NodeColors[1 + (node - 1) % cycle_length];
+    return AdaptToBackground(NodeColors[1 + (node - 1) % cycle_length]);
 }
 
 /**
@@ -55,20 +49,21 @@ ImU32 GetNodeColor(const int node) {
  * @note    Needs an ImPlot context.
  */
 ImU32 GetCurrentColor(const std::size_t index) {
-    return ImGui::ColorConvertFloat4ToU32(ImPlot::GetColormapColor(static_cast<int>(index)));
+    return AdaptToBackground(ImGui::ColorConvertFloat4ToU32(ImPlot::GetColormapColor(static_cast<int>(index))));
 }
 
 /**
  * @brief   Returns the color of a level on the heat scale the editor colors voltages and currents with.
  * @param[in] level  0 for the lowest value shown, 1 for the highest; values outside are clamped.
- * @return  A color from dim gray through red to pale yellow.
+ * @return  A color of the heat scale of the current theme, from faint for low values to bright for high ones.
  */
 ImU32 GetHeatColor(const float level) {
-    const float position = std::clamp(level, 0.0f, 1.0f) * static_cast<float>(HeatStops.size() - 1);
-    const auto stop = std::min(static_cast<std::size_t>(position), HeatStops.size() - 2);
+    const auto &heat_stops = GetPalette().HeatStops;
+    const float position = std::clamp(level, 0.0f, 1.0f) * static_cast<float>(heat_stops.size() - 1);
+    const auto stop = std::min(static_cast<std::size_t>(position), heat_stops.size() - 2);
     const float fraction = position - static_cast<float>(stop);
-    const ImVec4 &low = HeatStops[stop];
-    const ImVec4 &high = HeatStops[stop + 1];
+    const ImVec4 &low = heat_stops[stop];
+    const ImVec4 &high = heat_stops[stop + 1];
     return ImGui::ColorConvertFloat4ToU32({low.x + (high.x - low.x) * fraction, low.y + (high.y - low.y) * fraction,
                                            low.z + (high.z - low.z) * fraction, 1.0f});
 }

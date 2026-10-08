@@ -32,6 +32,7 @@ netlist](docs/screenshot.png)
   heat map that shows the path of the current
 - Exports for reports: plots as SVG images (light for print or dark, at any size) or CSV tables, and the schematic
   as an SVG image with its probes, so the two figures can be shown side by side
+- Four color themes (Ember, Graphite, Phosphor and the light Paper), switched from the View menu
 - IEC or ANSI symbols, optional terminal numbers, parts rotated (R) and mirrored left to right (M) or top to bottom
   (Shift+M), undo and redo, and schematics saved as JSON together with the settings of every analysis and the
   measured traces

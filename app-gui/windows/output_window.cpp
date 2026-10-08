@@ -38,14 +38,13 @@ constexpr ImVec2 FitPadding = {0.0f, 0.4f};
 constexpr float DashLength = 0.5f;
 constexpr float DashGap = 0.3f;
 constexpr float DashWeight = 1.5f;
-constexpr ImU32 CursorLineColor = IM_COL32(255, 255, 255, 90);
 // Width of the statistics panel, in font sizes
 constexpr float StatisticsWidth = 15.0f;
 // Cursors A and B are placed at these fractions of the visible range when turned on
 constexpr double CursorAPlacement = 1.0 / 3.0;
 constexpr double CursorBPlacement = 2.0 / 3.0;
-constexpr ImVec4 CursorAColor = {1.0f, 0.78f, 0.3f, 1.0f};
-constexpr ImVec4 CursorBColor = {0.45f, 0.8f, 1.0f, 1.0f};
+constexpr ImU32 CursorAColor = IM_COL32(255, 199, 77, 255);
+constexpr ImU32 CursorBColor = IM_COL32(115, 204, 255, 255);
 // Math channels take their own colors, apart from those of nodes and currents, and a heavier line
 constexpr auto MathColors = std::to_array<ImU32>({
     IM_COL32(230, 110, 230, 255),
@@ -199,7 +198,7 @@ void DrawCursorReadout(const std::vector<double> &xs, const char *x_unit, const 
     const ImVec2 plot_position = ImPlot::GetPlotPos();
     ImPlot::PushPlotClipRect();
     ImPlot::GetPlotDrawList()->AddLine({x, plot_position.y}, {x, plot_position.y + ImPlot::GetPlotSize().y},
-                                       CursorLineColor);
+                                       ImGui::GetColorU32(ImGuiCol_Text, 0.35f));
     ImPlot::PopPlotClipRect();
 
     ImGui::BeginTooltip();
@@ -403,10 +402,12 @@ void DrawCursors(PlotCursors &cursors, const bool logarithmic) {
         cursors.A = place(CursorAPlacement);
         cursors.B = place(CursorBPlacement);
     }
-    ImPlot::DragLineX(0, &cursors.A, CursorAColor, 1.0f, ImPlotDragToolFlags_NoFit);
-    ImPlot::TagX(cursors.A, CursorAColor, "A");
-    ImPlot::DragLineX(1, &cursors.B, CursorBColor, 1.0f, ImPlotDragToolFlags_NoFit);
-    ImPlot::TagX(cursors.B, CursorBColor, "B");
+    const ImVec4 color_a = ImGui::ColorConvertU32ToFloat4(AdaptToBackground(CursorAColor));
+    const ImVec4 color_b = ImGui::ColorConvertU32ToFloat4(AdaptToBackground(CursorBColor));
+    ImPlot::DragLineX(0, &cursors.A, color_a, 1.0f, ImPlotDragToolFlags_NoFit);
+    ImPlot::TagX(cursors.A, color_a, "A");
+    ImPlot::DragLineX(1, &cursors.B, color_b, 1.0f, ImPlotDragToolFlags_NoFit);
+    ImPlot::TagX(cursors.B, color_b, "B");
 }
 
 // Turning the cursors on places them again in the current view, so they are never lost off screen
@@ -1221,7 +1222,7 @@ void OutputWindow::DrawMathChannels(const std::vector<std::string> &operands) {
     for (std::size_t index = 0; index < m_MathChannels.size(); ++index) {
         MathChannel &channel = m_MathChannels[index];
         ImGui::PushID(static_cast<int>(index));
-        ImGui::PushStyleColor(ImGuiCol_CheckMark, MathColors[index % MathColors.size()]);
+        ImGui::PushStyleColor(ImGuiCol_CheckMark, AdaptToBackground(MathColors[index % MathColors.size()]));
         ImGui::Checkbox(channel.Name.c_str(), &channel.Shown);
         ImGui::PopStyleColor();
         ImGui::SetItemTooltip("%s", GetChannelExpression(channel).c_str());
@@ -1318,7 +1319,7 @@ std::vector<MathTrace> OutputWindow::EvaluateMath(const std::span<const double> 
                           .Values = std::move(result->Values),
                           .Unit = FormatUnit(result->Unit),
                           .Axis = AxisForUnit(result->Unit),
-                          .Color = MathColors[index % MathColors.size()]});
+                          .Color = AdaptToBackground(MathColors[index % MathColors.size()])});
     }
     return traces;
 }
@@ -1336,7 +1337,7 @@ std::optional<ExportFormat> OutputWindow::DrawExportPopup(const bool can_export)
         m_ExportStyle.Dark = false;
     }
     ImGui::SameLine();
-    if (ImGui::RadioButton("Dark, as on screen", m_ExportStyle.Dark)) {
+    if (ImGui::RadioButton("Dark", m_ExportStyle.Dark)) {
         m_ExportStyle.Dark = true;
     }
     ImGui::SetNextItemWidth(ImGui::GetFontSize() * ExportSizeWidth);
