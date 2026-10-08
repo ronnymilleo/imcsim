@@ -89,6 +89,16 @@ int FormatAxisValue(const double value, char *buffer, const int size, void *unit
     return std::snprintf(buffer, static_cast<std::size_t>(size), "%s", text.c_str());
 }
 
+// The legend only names the traces: clicking an entry would hide a curve from the plot alone, while the statistics
+// and the export still showed it. The trace list is the one place that picks what is shown
+bool BeginTracePlot(const char *id, const ImVec2 size) {
+    if (!ImPlot::BeginPlot(id, size)) {
+        return false;
+    }
+    ImPlot::SetupLegend(ImPlotLocation_NorthWest, ImPlotLegendFlags_NoButtons);
+    return true;
+}
+
 // Splits the room left in the window between the plots
 float PlotHeight(const int plot_count) {
     return std::max(ImGui::GetFontSize() * MinPlotHeight,
@@ -114,16 +124,13 @@ void PlotNodes(const std::vector<double> &xs, const std::vector<std::vector<doub
     }
 }
 
-// ImPlot draws no dashes, so the line is drawn by hand: a dummy item gives the legend entry, which can still hide
-// it, and an invisible line keeps the automatic fit of the axes
+// ImPlot draws no dashes, so the line is drawn by hand: a dummy item gives the legend entry, and an invisible line
+// keeps the automatic fit of the axes
 void PlotDashedLine(const std::string &label, const std::vector<double> &xs, const std::vector<double> &ys,
                     const ImU32 color) {
     ImPlotSpec legend_spec;
     legend_spec.LineColor = ImGui::ColorConvertU32ToFloat4(color);
     ImPlot::PlotDummy(label.c_str(), legend_spec);
-    if (const ImPlotItem *item = ImPlot::GetItem(label.c_str()); item != nullptr && !item->Show) {
-        return;
-    }
     ImPlotSpec fit_spec;
     fit_spec.LineColor = ImVec4(0.0f, 0.0f, 0.0f, 0.0f);
     ImPlot::PlotLine(std::format("##{}", label).c_str(), xs.data(), ys.data(), static_cast<int>(xs.size()), fit_spec);
@@ -938,7 +945,7 @@ void OutputWindow::DrawTransient(const Core::Transient &transient, const std::ve
     if (TakeTracesChanged(m_TransientShownMath, ListMathLabels(math))) {
         FitMathAxes(math);
     }
-    if (!ImPlot::BeginPlot("##transient", ImVec2(-1.0f, PlotHeight(1)))) {
+    if (!BeginTracePlot("##transient", ImVec2(-1.0f, PlotHeight(1)))) {
         return;
     }
     const bool has_voltages =
@@ -980,7 +987,7 @@ void OutputWindow::DrawACSweep(const Core::ACSweep &sweep) {
         VoltageAxisFlags(HasMeasuredVoltage(sweep.NodeMagnitudesDecibels.size(), m_Schematic), show_currents);
     const float height = PlotHeight(2);
     SetNextFits(fit, voltages_changed, currents_changed);
-    if (ImPlot::BeginPlot("Magnitude##ac", ImVec2(-1.0f, height))) {
+    if (BeginTracePlot("Magnitude##ac", ImVec2(-1.0f, height))) {
         ImPlot::SetupAxes("Frequency", "Voltage (dB)", ImPlotAxisFlags_None, voltage_axis_flags);
         ImPlot::SetupAxisScale(ImAxis_X1, ImPlotScale_Log10);
         ImPlot::SetupAxisLinks(ImAxis_X1, &m_ACSweepView.From, &m_ACSweepView.To);
@@ -998,7 +1005,7 @@ void OutputWindow::DrawACSweep(const Core::ACSweep &sweep) {
         ImPlot::EndPlot();
     }
     SetNextFits(fit, voltages_changed, currents_changed);
-    if (ImPlot::BeginPlot("Phase##ac", ImVec2(-1.0f, height))) {
+    if (BeginTracePlot("Phase##ac", ImVec2(-1.0f, height))) {
         ImPlot::SetupAxes("Frequency", "Phase (deg)", ImPlotAxisFlags_None, voltage_axis_flags);
         ImPlot::SetupAxisScale(ImAxis_X1, ImPlotScale_Log10);
         ImPlot::SetupAxisLinks(ImAxis_X1, &m_ACSweepView.From, &m_ACSweepView.To);
@@ -1037,7 +1044,7 @@ void OutputWindow::DrawDCSweep(const Core::DCSweep &sweep, const std::vector<std
             "%s",
             std::format("One curve per value of {}, labeled where the curves part most", sweep.SteppedSource).c_str());
     }
-    if (!ImPlot::BeginPlot("##dc", ImVec2(-1.0f, PlotHeight(1)))) {
+    if (!BeginTracePlot("##dc", ImVec2(-1.0f, PlotHeight(1)))) {
         return;
     }
     const bool has_voltages =
