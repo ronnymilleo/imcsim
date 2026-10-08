@@ -1,12 +1,13 @@
 /**
  * @file    plot_helpers.cpp
- * @brief   Plot geometry that needs no plotting library: nearest samples and dashed lines.
+ * @brief   Plot geometry that needs no plotting library: nearest samples, curve spread and dashed lines.
  */
 
 #include "plot_helpers.h"
 
 #include <algorithm>
 #include <cmath>
+#include <limits>
 
 namespace GUI {
 
@@ -66,6 +67,37 @@ std::size_t FindNearestSample(const std::span<const double> xs, const double x, 
         }
     }
     return nearest;
+}
+
+/**
+ * @brief   Finds where a family of curves is most spread apart, such as the best place to label each curve.
+ * @param[in] curves  Values of each curve, all sampled at the same X values.
+ * @return  Index of the sample where the highest and lowest curves are furthest apart; the last of the widest
+ *          when several tie, so curves that only part at the end are labeled there. Values that are not finite
+ *          are ignored, and an empty family gives 0.
+ */
+std::size_t FindWidestSpread(const std::vector<const std::vector<double> *> &curves) {
+    std::size_t sample_count = 0;
+    for (const std::vector<double> *curve : curves) {
+        sample_count = std::max(sample_count, curve->size());
+    }
+    std::size_t widest = sample_count == 0 ? 0 : sample_count - 1;
+    double widest_spread = -1.0;
+    for (std::size_t index = 0; index < sample_count; ++index) {
+        double lowest = std::numeric_limits<double>::infinity();
+        double highest = -std::numeric_limits<double>::infinity();
+        for (const std::vector<double> *curve : curves) {
+            if (index < curve->size() && std::isfinite((*curve)[index])) {
+                lowest = std::min(lowest, (*curve)[index]);
+                highest = std::max(highest, (*curve)[index]);
+            }
+        }
+        if (highest >= lowest && highest - lowest >= widest_spread) {
+            widest_spread = highest - lowest;
+            widest = index;
+        }
+    }
+    return widest;
 }
 
 /**

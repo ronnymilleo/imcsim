@@ -104,3 +104,24 @@ TEST_CASE("SplitIntoDashes skips segments outside the area or with infinite coor
     const std::array<ImVec2, 3> polyline = {ImVec2(20.0f, 0.0f), ImVec2(20.0f, 5.0f), ImVec2(5.0f, infinity)};
     CHECK(GUI::SplitIntoDashes(polyline, 3.0f, 2.0f, {0.0f, 0.0f}, {10.0f, 10.0f}).empty());
 }
+
+TEST_CASE("FindWidestSpread finds where a family of curves parts most", "[plot_helpers]") {
+    // Curves that grow apart toward the end are labeled at the end, as before
+    const std::vector<double> low = {0.0, 1.0, 2.0};
+    const std::vector<double> high = {0.0, 2.0, 4.0};
+    CHECK(GUI::FindWidestSpread({&low, &high}) == 2);
+
+    // Derivatives peak in the middle and all end near zero, so their labels go to the peak
+    const std::vector<double> small_peak = {0.0, 3.0, 0.0};
+    const std::vector<double> large_peak = {0.0, 9.0, 0.1};
+    CHECK(GUI::FindWidestSpread({&small_peak, &large_peak}) == 1);
+
+    // Ties keep the last sample, and values that are not finite are ignored
+    const std::vector<double> flat = {1.0, 1.0, 1.0};
+    const std::vector<double> parallel = {2.0, 2.0, 2.0};
+    CHECK(GUI::FindWidestSpread({&flat, &parallel}) == 2);
+    const std::vector<double> broken = {0.0, std::numeric_limits<double>::quiet_NaN(), 1.0};
+    const std::vector<double> zero = {0.0, 50.0, 0.0};
+    CHECK(GUI::FindWidestSpread({&broken, &zero}) == 2);
+    CHECK(GUI::FindWidestSpread({}) == 0);
+}

@@ -16,6 +16,8 @@ add_library(imcsim-gui-lib
             schematic.cpp
             schematic_file.cpp
             theme.cpp
+            trace_math.cpp
+            trace_statistics.cpp
             ui_elements/ui_bjt.cpp
             ui_elements/ui_capacitor.cpp
             ui_elements/ui_current_source.cpp
