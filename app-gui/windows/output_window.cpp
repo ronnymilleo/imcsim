@@ -427,7 +427,7 @@ std::string FormatQuantity(const double value, const char *unit) {
 
 // Decibels and degrees read better with fixed decimals than with SPICE suffixes, which would show 500m dB
 std::string FormatFixed(const double value, const char *unit) {
-    return std::format("{:.2f}{}", value, unit);
+    return Core::FormatFixed(value, 2) + unit;
 }
 
 std::string FormatOptionalQuantity(const std::optional<double> value, const char *unit) {

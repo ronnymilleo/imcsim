@@ -22,7 +22,7 @@
         "rise": 1e-06,
         "width": 0.0005
       },
-      "rotation": 270,
+      "rotation": 90,
       "source": "Pulse",
       "type": "VoltageSource",
       "value": 5.0,

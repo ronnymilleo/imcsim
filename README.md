@@ -17,7 +17,9 @@ netlist](docs/screenshot.png)
 - Warnings when a diode goes into reverse breakdown or a transistor exceeds its voltage, current or power ratings
 - Operating point, transient, AC sweep and DC sweep analyses, with node voltages and component currents
 - Plots of transients, Bode diagrams and DC sweeps (including curve families, such as transistor characteristics):
-  pick what to measure with the Probe tool, read every trace under the cursor, currents dashed apart from voltages
+  pick what to measure with the Probe tool, read every trace under the cursor, currents dashed apart from voltages;
+  measured voltages and currents are marked on the schematic in the colors of their traces, currents with an arrow
+  in the direction they flow when positive
 - Oscilloscope-style measurements beside the transient and Bode plots: two draggable cursors, peak-to-peak, mean,
   RMS and frequency of every trace, and peak, -3 dB band, unity gain frequency and phase margin of a response
 - Math channels on transient and DC sweep plots, as on an oscilloscope: an operation between two traces picked
@@ -25,10 +27,15 @@ netlist](docs/screenshot.png)
   V/s) and a third axis for any unit other than volts and amperes
 - Operating point results on the schematic: values on hover, and wires colored by node, by voltage or by a current
   heat map that shows the path of the current
-- IEC or ANSI symbols, parts rotated (R) and mirrored left to right (M) or top to bottom (Shift+M), undo and
-  redo, and schematics saved as JSON together with the settings of every analysis and the measured traces
+- Exports for reports: plots as SVG images (light for print or dark, at any size) or CSV tables, and the schematic
+  as an SVG image with its probes, so the two figures can be shown side by side
+- IEC or ANSI symbols, optional terminal numbers, parts rotated (R) and mirrored left to right (M) or top to bottom
+  (Shift+M), undo and redo, and schematics saved as JSON together with the settings of every analysis and the
+  measured traces
 - Example circuits, each with its analyses and measurements set up: an RC low-pass filter, a full-bridge rectifier, an LED driver
   and the output characteristics of a BJT
+
+The [user guide](docs/user_guide.md) explains terminal numbers, current signs, probes, plots and exports.
 
 On Wayland, the windows cannot be dragged out of the main window. Run with `SDL_VIDEODRIVER=x11` to allow it.
 

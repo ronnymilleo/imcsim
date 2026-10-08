@@ -93,3 +93,12 @@ TEST_CASE("FormatValue output parses back to the same value", "[spice_value]") {
     CAPTURE(value);
     CHECK_THAT(ParseOrFail(Core::FormatValue(value), ""), Catch::Matchers::WithinRel(value));
 }
+
+TEST_CASE("FormatFixed never shows a negative zero", "[spice_value]") {
+    CHECK(Core::FormatFixed(-3.0103, 2) == "-3.01");
+    CHECK(Core::FormatFixed(-0.004, 2) == "0.00");
+    CHECK(Core::FormatFixed(-1e-12, 2) == "0.00");
+    CHECK(Core::FormatFixed(-0.0, 1) == "0.0");
+    CHECK(Core::FormatFixed(-0.006, 2) == "-0.01");
+    CHECK(Core::FormatFixed(45.0, 0) == "45");
+}
