@@ -72,6 +72,11 @@ add_executable(imcsim main.cpp)
 if(WIN32)
     # The icon of the executable, which SDL also uses for its windows; packaging/windows/make_icon.py draws it
     target_sources(imcsim PRIVATE packaging/windows/imcsim.rc)
+    # The numeric version of the file properties, which imcsim.rc cannot split out of IMCSIM_VERSION
+    target_compile_definitions(imcsim PRIVATE
+            $<$<COMPILE_LANGUAGE:RC>:IMCSIM_VERSION_MAJOR=${PROJECT_VERSION_MAJOR}>
+            $<$<COMPILE_LANGUAGE:RC>:IMCSIM_VERSION_MINOR=${PROJECT_VERSION_MINOR}>
+            $<$<COMPILE_LANGUAGE:RC>:IMCSIM_VERSION_PATCH=${PROJECT_VERSION_PATCH}>)
     # Release builds open no console window behind the program, and keep main() as entry point; Debug builds keep
     # the console for the logs of SDL and the GPU validation layers
     if(MSVC)

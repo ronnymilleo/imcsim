@@ -77,12 +77,30 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      # The attestation signs with a Sigstore certificate from the workflow's OIDC token and stores the record
+      id-token: write
+      attestations: write
+      artifact-metadata: write
     steps:
       - name: Collect the AppImage and the zip
         uses: actions/download-artifact@v4
         with:
           path: release
           merge-multiple: true
+
+      # Users check a download with sha256sum -c SHA256SUMS on Linux, or certutil -hashfile <file> SHA256 on Windows
+      - name: Write the checksums
+        working-directory: release
+        run: sha256sum *.AppImage *.zip > SHA256SUMS
+
+      # Proves the files were built by this workflow from the tagged commit:
+      # gh attestation verify <file> --repo ronnymilleo/imcsim
+      - name: Attest the build provenance
+        uses: actions/attest@v4
+        with:
+          subject-path: |
+            release/*.AppImage
+            release/*.zip
 
       - name: Publish the release
         uses: softprops/action-gh-release@v3
