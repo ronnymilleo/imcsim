@@ -7,14 +7,17 @@
 # The release workflow runs the same script. The AppImage lands in out/appimage/.
 set -euo pipefail
 
-CMAKE_VERSION=4.3.5
-SDL_VERSION=3.4.16
-NGSPICE_VERSION=47
+SCRIPT_DIR=$(dirname "$(readlink -f "$0")")
+# shellcheck source=deps.env
+source "$SCRIPT_DIR/deps.env"
 LINUXDEPLOY_URL=https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
 
 SOURCE_DIR=$(pwd)
 WORK_DIR=/tmp/imcsim-appimage
+# CMake, SDL and ngspice are built here; a folder already holding them, such as the cache of the release workflow, is
+# reused as long as it was built from the same versions
 PREFIX=/opt/deps
+DEPS_STAMP="$PREFIX/.built-cmake-$CMAKE_VERSION-sdl-$SDL_VERSION-ngspice-$NGSPICE_VERSION"
 mkdir -p "$WORK_DIR" "$PREFIX"
 
 echo "== System packages"
@@ -34,31 +37,45 @@ ln -sf /usr/bin/gcc-14 /usr/local/bin/cc
 ln -sf /usr/bin/g++-14 /usr/local/bin/c++
 export CC=gcc CXX=g++
 
-echo "== CMake $CMAKE_VERSION (Ubuntu 24.04 ships 3.28)"
-wget -q "https://github.com/Kitware/CMake/releases/download/v$CMAKE_VERSION/cmake-$CMAKE_VERSION-linux-x86_64.tar.gz" \
-    -O "$WORK_DIR/cmake.tar.gz"
-tar -xzf "$WORK_DIR/cmake.tar.gz" -C "$WORK_DIR"
-export PATH="$WORK_DIR/cmake-$CMAKE_VERSION-linux-x86_64/bin:$PATH"
+build_dependencies() {
+    rm -rf "${PREFIX:?}"/*
+    echo "== CMake $CMAKE_VERSION (Ubuntu 24.04 ships 3.28)"
+    wget -q "https://github.com/Kitware/CMake/releases/download/v$CMAKE_VERSION/cmake-$CMAKE_VERSION-linux-x86_64.tar.gz" \
+        -O "$WORK_DIR/cmake.tar.gz"
+    mkdir -p "$PREFIX/cmake"
+    tar -xzf "$WORK_DIR/cmake.tar.gz" -C "$PREFIX/cmake" --strip-components=1
+    export PATH="$PREFIX/cmake/bin:$PATH"
 
-echo "== SDL $SDL_VERSION (Ubuntu 24.04 has no SDL3)"
-wget -q "https://github.com/libsdl-org/SDL/releases/download/release-$SDL_VERSION/SDL3-$SDL_VERSION.tar.gz" \
-    -O "$WORK_DIR/sdl.tar.gz"
-tar -xzf "$WORK_DIR/sdl.tar.gz" -C "$WORK_DIR"
-cmake -S "$WORK_DIR/SDL3-$SDL_VERSION" -B "$WORK_DIR/sdl-build" -G Ninja -DCMAKE_BUILD_TYPE=Release \
-    -DCMAKE_INSTALL_PREFIX="$PREFIX" -DSDL_TESTS=OFF -DSDL_EXAMPLES=OFF
-cmake --build "$WORK_DIR/sdl-build"
-cmake --install "$WORK_DIR/sdl-build"
+    echo "== SDL $SDL_VERSION (Ubuntu 24.04 has no SDL3)"
+    wget -q "https://github.com/libsdl-org/SDL/releases/download/release-$SDL_VERSION/SDL3-$SDL_VERSION.tar.gz" \
+        -O "$WORK_DIR/sdl.tar.gz"
+    tar -xzf "$WORK_DIR/sdl.tar.gz" -C "$WORK_DIR"
+    cmake -S "$WORK_DIR/SDL3-$SDL_VERSION" -B "$WORK_DIR/sdl-build" -G Ninja -DCMAKE_BUILD_TYPE=Release \
+        -DCMAKE_INSTALL_PREFIX="$PREFIX" -DSDL_TESTS=OFF -DSDL_EXAMPLES=OFF
+    cmake --build "$WORK_DIR/sdl-build"
+    cmake --install "$WORK_DIR/sdl-build"
 
-echo "== ngspice $NGSPICE_VERSION as a shared library (Ubuntu 24.04 ships 42; the project is tested with 47)"
-wget -q "https://downloads.sourceforge.net/project/ngspice/ng-spice-rework/$NGSPICE_VERSION/ngspice-$NGSPICE_VERSION.tar.gz" \
-    -O "$WORK_DIR/ngspice.tar.gz"
-tar -xzf "$WORK_DIR/ngspice.tar.gz" -C "$WORK_DIR"
-(
-    cd "$WORK_DIR/ngspice-$NGSPICE_VERSION"
-    ./configure --prefix="$PREFIX" --with-ngshared --enable-openmp --disable-debug --without-x
-    make -j"$(nproc)"
-    make install
-)
+    echo "== ngspice $NGSPICE_VERSION as a shared library (Ubuntu 24.04 ships 42; the project is tested with 47)"
+    wget -q "https://downloads.sourceforge.net/project/ngspice/ng-spice-rework/$NGSPICE_VERSION/ngspice-$NGSPICE_VERSION.tar.gz" \
+        -O "$WORK_DIR/ngspice.tar.gz"
+    tar -xzf "$WORK_DIR/ngspice.tar.gz" -C "$WORK_DIR"
+    (
+        cd "$WORK_DIR/ngspice-$NGSPICE_VERSION"
+        ./configure --prefix="$PREFIX" --with-ngshared --enable-openmp --disable-debug --without-x
+        make -j"$(nproc)"
+        make install
+    )
+    mkdir -p "$PREFIX/share/doc/ngspice"
+    cp "$WORK_DIR/ngspice-$NGSPICE_VERSION/COPYING" "$PREFIX/share/doc/ngspice/"
+    touch "$DEPS_STAMP"
+}
+
+if [ -f "$DEPS_STAMP" ]; then
+    echo "== Dependencies already built in $PREFIX"
+else
+    build_dependencies
+fi
+export PATH="$PREFIX/cmake/bin:$PATH"
 
 export PKG_CONFIG_PATH="$PREFIX/lib/pkgconfig:$PREFIX/lib/x86_64-linux-gnu/pkgconfig"
 export LD_LIBRARY_PATH="$PREFIX/lib:$PREFIX/lib/x86_64-linux-gnu"
@@ -72,8 +89,8 @@ cmake --build "$WORK_DIR/imcsim-build"
 rm -rf "$WORK_DIR/AppDir"
 DESTDIR="$WORK_DIR/AppDir" cmake --install "$WORK_DIR/imcsim-build"
 mkdir -p "$WORK_DIR/AppDir/usr/share/doc/ngspice" "$WORK_DIR/AppDir/usr/share/doc/sdl3"
-cp "$WORK_DIR/ngspice-$NGSPICE_VERSION/COPYING" "$WORK_DIR/AppDir/usr/share/doc/ngspice/"
-cp "$WORK_DIR/SDL3-$SDL_VERSION/LICENSE.txt" "$WORK_DIR/AppDir/usr/share/doc/sdl3/"
+cp "$PREFIX/share/doc/ngspice/COPYING" "$WORK_DIR/AppDir/usr/share/doc/ngspice/"
+cp "$PREFIX/share/licenses/SDL3/LICENSE.txt" "$WORK_DIR/AppDir/usr/share/doc/sdl3/"
 
 echo "== AppImage"
 wget -q "$LINUXDEPLOY_URL" -O "$WORK_DIR/linuxdeploy"

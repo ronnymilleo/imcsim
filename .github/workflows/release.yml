@@ -1,6 +1,7 @@
 name: Release
 
-# A version tag, such as v0.6.0, builds the AppImage and publishes it with a GitHub release of that tag
+# A version tag, such as v0.6.0, builds the AppImage and publishes it with a GitHub release of that tag; a tag with
+# a suffix, such as v0.6.0-rc1, publishes a pre-release
 on:
   push:
     tags:
@@ -24,11 +25,20 @@ jobs:
         with:
           submodules: recursive
 
+      # CMake, SDL and ngspice take most of the build and only change with their versions in deps.env
+      - name: Restore the built dependencies
+        uses: actions/cache@v6
+        with:
+          path: /opt/deps
+          key: appimage-deps-${{ hashFiles('packaging/appimage/deps.env') }}
+
       - name: Build the AppImage
         run: packaging/appimage/build.sh
 
       - name: Publish the release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: out/appimage/*.AppImage
           generate_release_notes: true
+          # A tag with a suffix, such as v0.5.0-rc1, is a test build and never becomes the latest release
+          prerelease: ${{ contains(github.ref_name, '-') }}
