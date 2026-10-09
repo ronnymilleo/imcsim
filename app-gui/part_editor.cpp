@@ -5,6 +5,7 @@
 
 #include "part_editor.h"
 
+#include "element_factory.h"
 #include "simulator.h"
 #include "spice_value.h"
 #include "theme.h"
@@ -244,7 +245,7 @@ void PartEditor::Draw() {
     }
 
     Core::Component &component = element->GetComponent();
-    ImGui::TextUnformatted(component.GetTypeName());
+    ImGui::TextUnformatted(GetPartName(component.GetType()));
     if (!component.GetName().empty()) {
         ImGui::TextUnformatted(std::format("Name: {}", component.GetName()).c_str());
     }

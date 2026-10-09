@@ -18,7 +18,6 @@
 #include "wire_editing.h"
 #include <algorithm>
 #include <array>
-#include <cctype>
 #include <cfloat>
 #include <cmath>
 #include <format>
@@ -56,66 +55,6 @@ constexpr float LegendHeight = 0.6f;
 constexpr auto WireColoringNames = std::to_array<std::string_view>({"Plain", "Nodes", "Voltage", "Current"});
 // Section of imgui.ini that keeps the View preferences
 constexpr const char *SettingsTypeName = "Editor";
-/**
- * @struct  PartInfo
- * @brief   How a kind of part is named to the user.
- */
-struct PartInfo {
-    Core::ComponentType Type;
-    const char *Name;
-};
-
-constexpr auto Parts = std::to_array<PartInfo>({
-    {Core::ComponentType::Resistor, "Resistor"},
-    {Core::ComponentType::Capacitor, "Capacitor"},
-    {Core::ComponentType::Inductor, "Inductor"},
-    {Core::ComponentType::Ground, "Ground"},
-    {Core::ComponentType::VCC, "VCC supply"},
-    {Core::ComponentType::VoltageSource, "Voltage source"},
-    {Core::ComponentType::CurrentSource, "Current source"},
-    {Core::ComponentType::Diode, "Diode"},
-    {Core::ComponentType::ZenerDiode, "Zener diode"},
-    {Core::ComponentType::LED, "LED"},
-    {Core::ComponentType::NPN, "NPN transistor"},
-    {Core::ComponentType::PNP, "PNP transistor"},
-    {Core::ComponentType::NMOS, "N-channel MOSFET"},
-    {Core::ComponentType::PMOS, "P-channel MOSFET"},
-    {Core::ComponentType::VCVS, "VCVS (E)"},
-    {Core::ComponentType::VCCS, "VCCS (G)"},
-    {Core::ComponentType::CCCS, "CCCS (F)"},
-    {Core::ComponentType::CCVS, "CCVS (H)"},
-    {Core::ComponentType::OpAmp, "Op-amp"},
-});
-
-const char *GetPartName(const Core::ComponentType type) {
-    const auto part = std::ranges::find(Parts, type, &PartInfo::Type);
-    return part != Parts.end() ? part->Name : Core::GetTypeName(type);
-}
-
-// Lowercase letters and digits only, so "opamp" finds "Op-amp" and "vcc" finds "VCC supply"
-std::string NormalizeSearchText(const std::string_view text) {
-    std::string normalized;
-    for (const char character : text) {
-        if (std::isalnum(static_cast<unsigned char>(character)) != 0) {
-            normalized += static_cast<char>(std::tolower(static_cast<unsigned char>(character)));
-        }
-    }
-    return normalized;
-}
-
-// Parts whose user name or type name contains the query, in table order
-std::vector<Core::ComponentType> FindParts(const std::string_view query) {
-    const std::string normalized_query = NormalizeSearchText(query);
-    std::vector<Core::ComponentType> found;
-    for (const PartInfo &part : Parts) {
-        if (NormalizeSearchText(part.Name).contains(normalized_query) ||
-            NormalizeSearchText(Core::GetTypeName(part.Type)).contains(normalized_query)) {
-            found.push_back(part.Type);
-        }
-    }
-    return found;
-}
-
 /**
  * @struct  PartGroup
  * @brief   Related parts that share one toolbar button, with a dropdown to pick among them.

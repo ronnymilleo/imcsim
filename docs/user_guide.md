@@ -30,11 +30,15 @@ How to read what imcsim measures, plots and exports. The [README](../README.md) 
 - **Menus**: File (files, examples and the schematic export), Edit (undo, redo and changes to the selection) and
   View (fit, wire colors, symbol style, terminal numbers, theme, and the windows). The View choices are kept between
   sessions.
-- **Themes**: View > Theme switches between Ember (warm charcoal and red, the default), Graphite (cool gray and
-  blue), Phosphor (a green monochrome CRT, after a Zed theme) and Paper (light, like a printed datasheet). Node and
+- **Themes**: View > Theme switches between Graphite (cool gray and blue, the default), Ember (warm charcoal
+  and red), Phosphor (a green monochrome CRT, after a Zed theme) and Paper (light, like a printed datasheet). Node and
   trace colors are the same in every theme; Paper darkens them so they read on its light background.
 - **Output window**: hidden until an analysis runs; it then opens on the tab of the new result. The operating point
   tab lists the node voltages and part currents, which also show on the schematic. Reopen it from View.
+- **Window layout**: every window floats or docks. Drag a window by its title (or a docked one by its tab) onto
+  the arrows that appear over another window to dock it on that side or as a tab; drop it anywhere else to let it
+  float. Output opens floating; Properties, Analysis Settings and Netlist dock below the editor. The layout is kept
+  between sessions, and View > Reset Layout restores the default.
 
 ## Terminals
 
@@ -149,7 +153,7 @@ their statistics and the exports always agree.
 
 - **SVG image**: redrawn from the data, not captured from the screen, so it stays sharp at any size. It shows the
   visible X range, so zoom in first to export a detail. Choose its size in pixels and its theme: light for print,
-  which darkens trace colors too light for white paper, or dark, in the colors of the Ember theme.
+  which darkens trace colors too light for white paper, or dark, in the colors of the Graphite theme.
 - **CSV table**: every sample of every measured trace, including math channels, whatever the zoom. The first column
   is the X axis; each header carries its unit, and on a Bode plot its panel (`Magnitude V(2) (dB)`). Missing
   samples, such as a division by zero in a math channel, are empty cells.
