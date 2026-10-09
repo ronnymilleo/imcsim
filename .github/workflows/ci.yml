@@ -13,11 +13,13 @@ concurrency:
   cancel-in-progress: true
 
 # The Linux jobs run in an archlinux container, the distribution the project is developed on: Ubuntu runners
-# lack CMake 4.3. SDL3 comes from its vendor submodule, but the sdl3 package carries the build dependencies of SDL
-# (X11, Wayland, libxkbcommon); the tests never open a GPU
+# lack CMake 4.3. SDL3 comes from its vendor submodule; its build dependencies are those of the Arch sdl3 package
+# (makedepends, without the audio ones), since SDL fails to configure when an X11 extension it enables is missing.
+# The tests never open a GPU
 env:
   PACKAGES: >-
-    git cmake ninja gcc clang python pkgconf sdl3 ngspice ccache
+    git cmake ninja gcc clang python pkgconf ngspice ccache
+    libxcursor libxi libxfixes libxinerama libxrandr libxss libxtst libxkbcommon wayland wayland-protocols libdecor mesa
   # Compiled objects are kept between runs, so a push only recompiles what changed
   CCACHE_MAXSIZE: 500M
   COMPILER_LAUNCHER: -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache

@@ -113,16 +113,19 @@ To build from source instead, read on.
 On Arch Linux:
 
 ```
-sudo pacman -S cmake ninja gcc pkgconf sdl3 vulkan-icd-loader ngspice
+sudo pacman -S cmake ninja gcc pkgconf vulkan-icd-loader ngspice \
+    libxcursor libxi libxfixes libxinerama libxrandr libxss libxtst libxkbcommon wayland wayland-protocols libdecor mesa
 ```
 
 The Arch `ngspice` package already includes the shared library. Also install the Vulkan driver for your GPU
 (for example `vulkan-radeon`).
 
-On Ubuntu 25.04 or newer (older releases do not package SDL3):
+On Ubuntu 25.04 or newer:
 
 ```
-sudo apt install ninja-build g++ pkgconf libsdl3-dev libvulkan1 mesa-vulkan-drivers libngspice0-dev
+sudo apt install ninja-build g++ pkgconf libvulkan1 mesa-vulkan-drivers libngspice0-dev \
+    libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxi-dev libxss-dev libxfixes-dev libxtst-dev \
+    libxkbcommon-dev libwayland-dev wayland-protocols libdecor-0-dev libegl-dev
 sudo snap install cmake --classic
 ```
 
