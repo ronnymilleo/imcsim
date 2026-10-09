@@ -1,14 +1,11 @@
 name: Release
 
-# A version tag, such as v0.6.0, builds the AppImage and publishes it with a GitHub release of that tag; a tag with
-# a suffix, such as v0.6.0-rc1, publishes a pre-release
+# A version tag, such as v0.6.0, builds the AppImage and the Windows zip and publishes them with a GitHub release of
+# that tag; a tag with a suffix, such as v0.6.0-rc1, publishes a pre-release
 on:
   push:
     tags:
       - 'v*'
-
-permissions:
-  contents: write
 
 jobs:
   appimage:
@@ -36,10 +33,61 @@ jobs:
       - name: Build the AppImage
         run: packaging/appimage/build.sh
 
+      - name: Keep the AppImage for the release
+        uses: actions/upload-artifact@v4
+        with:
+          name: appimage
+          path: out/appimage/*.AppImage
+
+  windows:
+    # windows-latest is the Windows Server 2025 image with Visual Studio 2026, CMake and Ninja; ngspice comes from
+    # vendor/ngspice-windows and the C++ runtime is linked statically, so the zip runs on any Windows 10 or newer
+    runs-on: windows-latest
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      # Ninja looks for cl in the environment, which vcvarsall sets up
+      - name: Set up the MSVC environment
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Build
+        run: |
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+          cmake --build build
+
+      # The install rules lay out the folder: the program, ngspice.dll, the notices and the licenses
+      - name: Build the zip
+        run: |
+          $Name = "imcsim-$('${{ github.ref_name }}'.TrimStart('v'))-windows-x64"
+          cmake --install build --prefix "out/zip/$Name"
+          Compress-Archive "out/zip/$Name" "out/zip/$Name.zip"
+
+      - name: Keep the zip for the release
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: out/zip/*.zip
+
+  # One job publishes both files, so the release is created once
+  publish:
+    needs: [appimage, windows]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Collect the AppImage and the zip
+        uses: actions/download-artifact@v4
+        with:
+          path: release
+          merge-multiple: true
+
       - name: Publish the release
         uses: softprops/action-gh-release@v3
         with:
-          files: out/appimage/*.AppImage
+          files: release/*
           generate_release_notes: true
           # A tag with a suffix, such as v0.5.0-rc1, is a test build and never becomes the latest release
           prerelease: ${{ contains(github.ref_name, '-') }}

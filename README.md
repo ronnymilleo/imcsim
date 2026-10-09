@@ -74,6 +74,9 @@ On Wayland, the windows cannot be dragged out of the main window, though they st
 
 ## Install
 
+- **Windows 10 or newer** (x64): download `imcsim-<version>-windows-x64.zip` from the
+  [releases](https://github.com/ronnymilleo/imcsim/releases), extract it anywhere and run `imcsim.exe`. It carries
+  ngspice; it needs nothing else installed.
 - **Any Linux distribution** with glibc 2.39 or newer (Ubuntu 24.04, Debian 13, Fedora 40 and later): download the
   AppImage from the [releases](https://github.com/ronnymilleo/imcsim/releases), make it executable and run it:
 
@@ -91,7 +94,8 @@ On Wayland, the windows cannot be dragged out of the main window, though they st
   makepkg -si
   ```
 
-The layout, theme and view preferences are kept in `~/.local/share/imcsim/imgui.ini`.
+The layout, theme and view preferences are kept in `imgui.ini`, in `~/.local/share/imcsim` on Linux and
+`%APPDATA%\imcsim` on Windows.
 
 To build from source instead, read on.
 
@@ -162,7 +166,8 @@ cmake --build build
 out\debug\bin\imcsim.exe
 ```
 
-The build copies the ngspice DLLs next to the executable, with the OpenMP runtime of your Visual Studio.
+The build copies `ngspice.dll` next to the executable. `cmake --install build --prefix <folder>` lays out the
+folder of the release zip.
 
 ## Tests
 

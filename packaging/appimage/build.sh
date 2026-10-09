@@ -80,9 +80,8 @@ cmake -S "$SOURCE_DIR" -B "$WORK_DIR/imcsim-build" -G Ninja -DCMAKE_BUILD_TYPE=R
 cmake --build "$WORK_DIR/imcsim-build"
 rm -rf "$WORK_DIR/AppDir"
 DESTDIR="$WORK_DIR/AppDir" cmake --install "$WORK_DIR/imcsim-build"
-mkdir -p "$WORK_DIR/AppDir/usr/share/doc/ngspice" "$WORK_DIR/AppDir/usr/share/doc/sdl3"
+mkdir -p "$WORK_DIR/AppDir/usr/share/doc/ngspice"
 cp "$PREFIX/share/doc/ngspice/COPYING" "$WORK_DIR/AppDir/usr/share/doc/ngspice/"
-cp "$SOURCE_DIR/vendor/SDL/LICENSE.txt" "$WORK_DIR/AppDir/usr/share/doc/sdl3/"
 
 echo "== AppImage"
 wget -q "$LINUXDEPLOY_URL" -O "$WORK_DIR/linuxdeploy"

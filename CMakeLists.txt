@@ -21,6 +21,8 @@ add_compile_definitions(IMCSIM_VERSION="${PROJECT_VERSION}")
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_CXX_SCAN_FOR_MODULES OFF)
+# Windows binaries carry the C++ runtime, so they run without the Visual C++ Redistributable
+set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)
 endif()
@@ -105,17 +107,28 @@ add_dependencies(imcsim copy_compile_commands)
 # Installation
 # =============================================================================
 
-# Standard Linux layout: the program, its desktop entry and icon, and the licenses of what it includes
-include(GNUInstallDirs)
-install(TARGETS imcsim RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
-install(FILES packaging/imcsim.desktop DESTINATION ${CMAKE_INSTALL_DATADIR}/applications)
-install(FILES packaging/imcsim.svg DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/scalable/apps)
-install(FILES LICENSE README.md THIRD_PARTY_NOTICES.md DESTINATION ${CMAKE_INSTALL_DOCDIR})
-install(FILES vendor/imgui/LICENSE.txt RENAME imgui-LICENSE.txt DESTINATION ${CMAKE_INSTALL_DOCDIR}/licenses)
-install(FILES vendor/implot/LICENSE RENAME implot-LICENSE.txt DESTINATION ${CMAKE_INSTALL_DOCDIR}/licenses)
-install(FILES vendor/json/LICENSE.MIT RENAME json-LICENSE.txt DESTINATION ${CMAKE_INSTALL_DOCDIR}/licenses)
+# Windows gets a folder to unzip anywhere, with ngspice next to the program; Linux the standard layout, with the
+# desktop entry and icon. Both carry the licenses of what the program includes
+if(WIN32)
+    set(IMCSIM_DOC_DIR .)
+    install(TARGETS imcsim RUNTIME DESTINATION .)
+    install(FILES vendor/ngspice-windows/bin/ngspice.dll DESTINATION .)
+    install(FILES vendor/ngspice-windows/licenses/ngspice-COPYING.txt RENAME ngspice-LICENSE.txt
+            DESTINATION licenses)
+else()
+    include(GNUInstallDirs)
+    set(IMCSIM_DOC_DIR ${CMAKE_INSTALL_DOCDIR})
+    install(TARGETS imcsim RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+    install(FILES packaging/imcsim.desktop DESTINATION ${CMAKE_INSTALL_DATADIR}/applications)
+    install(FILES packaging/imcsim.svg DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/scalable/apps)
+endif()
+install(FILES LICENSE README.md THIRD_PARTY_NOTICES.md DESTINATION ${IMCSIM_DOC_DIR})
+install(FILES vendor/imgui/LICENSE.txt RENAME imgui-LICENSE.txt DESTINATION ${IMCSIM_DOC_DIR}/licenses)
+install(FILES vendor/implot/LICENSE RENAME implot-LICENSE.txt DESTINATION ${IMCSIM_DOC_DIR}/licenses)
+install(FILES vendor/json/LICENSE.MIT RENAME json-LICENSE.txt DESTINATION ${IMCSIM_DOC_DIR}/licenses)
+install(FILES vendor/SDL/LICENSE.txt RENAME SDL-LICENSE.txt DESTINATION ${IMCSIM_DOC_DIR}/licenses)
 install(FILES assets/fonts/Inter-LICENSE.txt assets/fonts/JetBrainsMono-LICENSE.txt
-        DESTINATION ${CMAKE_INSTALL_DOCDIR}/licenses)
+        DESTINATION ${IMCSIM_DOC_DIR}/licenses)
 
 # =============================================================================
 

@@ -3,17 +3,15 @@
 ngspice 47 as a shared library for the MSVC build, so a Windows checkout builds without downloads. Linux takes
 ngspice from the system through pkg-config instead.
 
-| File | Origin |
-|---|---|
-| `bin/ngspice.dll`, `lib/ngspice.lib`, `include/ngspice/sharedspice.h` | `Spice64_dll` of [ngspice-47_dll_64.7z](https://sourceforge.net/projects/ngspice/files/ng-spice-rework/47/), the official MSVC build |
-| `bin/sndfile.dll` | `bin/` of [libsndfile-1.2.2-win64.zip](https://github.com/libsndfile/libsndfile/releases/tag/1.2.2) |
-| `bin/samplerate.dll` | `bin/` of [libsamplerate-0.2.2-win64.zip](https://github.com/libsndfile/libsamplerate/releases/tag/0.2.2) |
+`bin/ngspice.dll`, `lib/ngspice.lib` and `include/ngspice/sharedspice.h` come from `build.ps1`, which builds the
+[ngspice 47 sources](https://sourceforge.net/projects/ngspice/files/ng-spice-rework/47/) with the Visual Studio
+project they ship. It takes the `Release|x64` configuration, the official `ReleaseOMP` one without OpenMP, and
+turns off the sound support of its `config.h`. The official package needs three more DLLs: the OpenMP runtime of
+Visual Studio, which Microsoft does not allow redistributing, and libsndfile and libsamplerate, which only the
+`sndprint` command and voltage sources read from WAV files use, neither of them part of imcsim. This build loads
+none of them: only DLLs of Windows, and its C runtime is linked statically.
 
-`ngspice.dll` loads the last two, which its package leaves out. It also loads `libomp140.x86_64.dll`, the LLVM
-OpenMP runtime of Visual Studio: Microsoft does not allow redistributing it, so it stays out of this folder and the
-build copies it from the Visual Studio that compiles the project.
+ngspice keeps its modified BSD license, in `licenses/`.
 
-The licenses are in `licenses/`: ngspice keeps its modified BSD license, libsndfile the LGPL 2.1 (its source is
-at the link above) and libsamplerate the BSD 2-clause license.
-
-To update ngspice, replace the three ngspice files with the ones of the new package and run the tests.
+To update ngspice, set the new version and the SHA-256 of its source archive in `build.ps1`, run it from a
+Developer PowerShell of Visual Studio, and run the tests.
