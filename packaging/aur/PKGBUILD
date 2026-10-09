@@ -1,21 +1,28 @@
 # Maintainer: Ronny Milleo <ronnysrmilleo@gmail.com>
 
 pkgname=imcsim
-pkgver=0.5.0
+pkgver=0.6.0
 pkgrel=1
 pkgdesc="Circuit simulator with an immediate mode interface, powered by ngspice"
 arch=('x86_64')
 url="https://github.com/ronnymilleo/imcsim"
 license=('GPL-3.0-or-later')
-depends=('gcc-libs' 'glibc' 'ngspice' 'sdl3' 'vulkan-icd-loader' 'hicolor-icon-theme')
-makedepends=('cmake' 'git' 'ninja' 'pkgconf' 'vulkan-headers')
+# SDL is compiled into the program and opens the X11 libraries and the Vulkan loader when it starts, so they are
+# listed here rather than found by linking
+depends=('gcc-libs' 'glibc' 'ngspice' 'libx11' 'libxext' 'libxcursor' 'vulkan-icd-loader' 'hicolor-icon-theme')
+# The build dependencies of SDL, as in the Arch sdl3 package, without the audio ones
+makedepends=('cmake' 'git' 'ninja' 'pkgconf'
+             'libxcursor' 'libxi' 'libxfixes' 'libxinerama' 'libxrandr' 'libxss' 'libxtst'
+             'libxkbcommon' 'wayland' 'wayland-protocols' 'libdecor' 'mesa')
 optdepends=('vulkan-driver: Vulkan support for your GPU')
 # The release tarball lacks the submodules in vendor/, so the repository and each submodule are cloned
 source=("$pkgname::git+$url.git#tag=v$pkgver"
+        'SDL::git+https://github.com/libsdl-org/SDL.git'
         'imgui::git+https://github.com/ocornut/imgui.git'
         'implot::git+https://github.com/epezent/implot.git'
         'json::git+https://github.com/nlohmann/json.git')
 sha256sums=('SKIP'
+            'SKIP'
             'SKIP'
             'SKIP'
             'SKIP')
@@ -23,11 +30,11 @@ sha256sums=('SKIP'
 prepare() {
   cd "$pkgname"
   # Catch2 only builds the tests, which the package does not run
-  for module in imgui implot json; do
+  for module in SDL imgui implot json; do
     git submodule init "vendor/$module"
     git config "submodule.vendor/$module.url" "$srcdir/$module"
   done
-  git -c protocol.file.allow=always submodule update vendor/imgui vendor/implot vendor/json
+  git -c protocol.file.allow=always submodule update vendor/SDL vendor/imgui vendor/implot vendor/json
 }
 
 build() {
