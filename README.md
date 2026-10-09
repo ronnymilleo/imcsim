@@ -33,7 +33,7 @@ New to imcsim? The [tutorial](docs/tutorial.md) builds, simulates and exports a 
   heat map that shows the path of the current
 - Exports for reports: plots as SVG images (light for print or dark, at any size) or CSV tables, and the schematic
   as an SVG image with its probes, so the two figures can be shown side by side
-- Four color themes (Graphite, Ember, Phosphor and the light Paper), switched from the View menu
+- Nine color themes, seven dark and two light, switched from the View menu (see [Themes](docs/themes.md))
 - IEC or ANSI symbols, optional terminal numbers, parts rotated (R) and mirrored left to right (M) or top to bottom
   (Shift+M), undo and redo, and schematics saved as JSON together with the settings of every analysis and the
   measured traces
@@ -60,15 +60,12 @@ Output characteristics of a 2N3904 from a stepped DC sweep, one curve per base c
 
 ![A DC sweep of the collector voltage for five base currents, each curve labeled with its current](docs/images/dc_sweep.png)
 
-The four themes: Graphite (the default), Ember, Phosphor and the light Paper:
-
-![The same circuit and transient in the Graphite, Ember, Phosphor and Paper themes](docs/images/themes.png)
-
 ## Documentation
 
 The [tutorial](docs/tutorial.md) walks through a first circuit step by step. The [user guide](docs/user_guide.md)
 explains the editor, terminal numbers, current signs, probes, plots and exports, and
-[Simulation models](docs/models.md) describes the model behind every part and what it leaves out.
+[Simulation models](docs/models.md) describes the model behind every part and what it leaves out. [Themes](docs/themes.md)
+shows the same circuit and its plots in each color theme.
 
 ## Install
 
