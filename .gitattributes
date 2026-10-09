@@ -1,0 +1,10 @@
+# Every text file is checked out with LF on every platform: the Linux CI and the AppImage container run the
+# build scripts and the formatting checks on them
+* text=auto eol=lf
+
+# Binaries keep their bytes untouched
+*.png binary
+*.ttf binary
+*.ico binary
+*.dll binary
+*.lib binary

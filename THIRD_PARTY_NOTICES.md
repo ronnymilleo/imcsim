@@ -28,6 +28,21 @@ The AppImage also carries these libraries next to the program, unmodified, with 
 | SDL 3 | zlib license | https://github.com/libsdl-org/SDL |
 | GCC runtime libraries (libgomp, libgcc_s) | GPL 3 with the GCC Runtime Library Exception | https://gcc.gnu.org/ |
 
-The Vulkan loader and the GPU driver are not bundled; they come from the system.
+## Bundled with the Windows build
+
+`vendor/ngspice-windows` carries these libraries, unmodified, with their license texts in its `licenses/` folder;
+the Windows build copies them next to the program:
+
+| Component | License | Source |
+|---|---|---|
+| ngspice 47 (shared library) | Modified BSD license | https://ngspice.sourceforge.io/ |
+| libsndfile 1.2.2 | GNU LGPL 2.1 | https://github.com/libsndfile/libsndfile |
+| libsamplerate 0.2.2 | BSD 2-clause license | https://github.com/libsndfile/libsamplerate |
+
+SDL 3 is compiled into the Windows program, under the zlib license. The OpenMP runtime that ngspice loads
+(`libomp140.x86_64.dll`) is not in the repository: the build takes it from the Visual Studio that compiles it.
+
+The GPU driver and the graphics API (the Vulkan loader on Linux, Direct3D 12 on Windows) are not bundled; they come
+from the system.
 
 Catch2, in `vendor/Catch2`, only builds the tests and is not part of any binary.

@@ -67,6 +67,10 @@ add_subdirectory(app-core)
 add_subdirectory(app-gui)
 
 add_executable(imcsim main.cpp)
+if(WIN32)
+    # The icon of the executable, which SDL also uses for its windows; packaging/windows/make_icon.py draws it
+    target_sources(imcsim PRIVATE packaging/windows/imcsim.rc)
+endif()
 target_include_directories(imcsim PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(imcsim PRIVATE imcsim-gui-lib)
 add_dependencies(imcsim format)

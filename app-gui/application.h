@@ -1,22 +1,21 @@
 /**
  * @file    application.h
- * @brief   Top-level application: owns the window, the Vulkan context, Dear ImGui and the main loop.
+ * @brief   Top-level application: owns the window, the GPU device, Dear ImGui and the main loop.
  */
 
 #ifndef IMCSIM_APPLICATION_H
 #define IMCSIM_APPLICATION_H
 
 #include "analysis_controls.h"
-#include "imgui_impl_vulkan.h"
 #include "part_editor.h"
 #include "schematic.h"
-#include "vulkan_context.h"
 #include "windows/editor_window.h"
 #include "windows/netlist_window.h"
 #include "windows/output_window.h"
 #include "windows/properties_window.h"
 #include "windows/simulation_window.h"
 
+#include <SDL3/SDL_gpu.h>
 #include <SDL3/SDL_video.h>
 #include <string>
 #include <vector>
@@ -25,7 +24,7 @@ namespace GUI {
 
 /**
  * @class   Application
- * @brief   Owns the SDL window, the Vulkan context and Dear ImGui, and runs the main loop.
+ * @brief   Owns the SDL window, the SDL GPU device and Dear ImGui, and runs the main loop.
  * @details Call Init() once, then Run() if it succeeded, and always finish with Shutdown().
  *          Errors collected during the session are printed to stderr by Shutdown().
  */
@@ -43,8 +42,7 @@ private:
     float m_SDLWindowScale{};
     SDL_WindowFlags m_SDLWindowFlags{};
     SDL_Window *m_SDLWindow = nullptr;
-    VulkanContext m_Vulkan;
-    ImGui_ImplVulkan_InitInfo m_VulkanInitInfo{};
+    SDL_GPUDevice *m_GPUDevice = nullptr;
 
     // Application state
     std::vector<std::string> m_Errors;
@@ -76,7 +74,7 @@ private:
 
     // Initialization
     int InitSDL();
-    int InitVulkan();
+    int InitGPU();
     int InitImGui();
 
     // Frame

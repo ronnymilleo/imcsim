@@ -12,10 +12,12 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
-# Ubuntu runners lack SDL3 and CMake 4.3, so every job runs in the same distribution the project is developed on
+# The Linux jobs run in an archlinux container, the distribution the project is developed on: Ubuntu runners
+# lack CMake 4.3. SDL3 comes from its vendor submodule, but the sdl3 package carries the build dependencies of SDL
+# (X11, Wayland, libxkbcommon); the tests never open a GPU
 env:
   PACKAGES: >-
-    git cmake ninja gcc clang python pkgconf sdl3 vulkan-headers vulkan-icd-loader ngspice ccache
+    git cmake ninja gcc clang python pkgconf sdl3 ngspice ccache
   # Compiled objects are kept between runs, so a push only recompiles what changed
   CCACHE_MAXSIZE: 500M
   COMPILER_LAUNCHER: -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
@@ -99,6 +101,30 @@ jobs:
           cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug -DBUILD_TESTS=ON $COMPILER_LAUNCHER
           -DCMAKE_CXX_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer -fno-sanitize-recover=undefined"
           -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address,undefined"
+
+      - name: Build
+        run: cmake --build build
+
+      - name: Run tests
+        run: ctest --test-dir build --output-on-failure
+
+  windows:
+    # windows-latest is the Windows Server 2025 image with Visual Studio 2026, and comes with CMake 4.4 and
+    # Ninja; SDL3 comes from its vendor submodule and ngspice from vendor/ngspice-windows, and the build copies the
+    # DLLs next to the binaries
+    runs-on: windows-latest
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      # Ninja looks for cl in the environment, which vcvarsall sets up
+      - name: Set up the MSVC environment
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Configure
+        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug -DBUILD_TESTS=ON
 
       - name: Build
         run: cmake --build build

@@ -1,5 +1,6 @@
 out
 build
+build-windows
 cmake-build-debug
 .idea
 compile_commands.json

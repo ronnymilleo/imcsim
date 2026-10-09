@@ -14,10 +14,11 @@ LINUXDEPLOY_URL=https://github.com/linuxdeploy/linuxdeploy/releases/download/con
 
 SOURCE_DIR=$(pwd)
 WORK_DIR=/tmp/imcsim-appimage
-# CMake, SDL and ngspice are built here; a folder already holding them, such as the cache of the release workflow, is
-# reused as long as it was built from the same versions
+# CMake and ngspice are built here; a folder already holding them, such as the cache of the release workflow, is
+# reused as long as it was built from the same versions. SDL3 is compiled from the vendor submodule and opens
+# the Vulkan loader at run time, so neither needs a package
 PREFIX=/opt/deps
-DEPS_STAMP="$PREFIX/.built-cmake-$CMAKE_VERSION-sdl-$SDL_VERSION-ngspice-$NGSPICE_VERSION"
+DEPS_STAMP="$PREFIX/.built-cmake-$CMAKE_VERSION-ngspice-$NGSPICE_VERSION"
 mkdir -p "$WORK_DIR" "$PREFIX"
 
 echo "== System packages"
@@ -26,7 +27,7 @@ apt-get update
 apt-get install -y --no-install-recommends \
     ca-certificates wget file git ninja-build pkg-config g++-14 gcc-14 make \
     autoconf automake libtool bison flex \
-    libvulkan-dev libgomp1 \
+    libgomp1 \
     libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxi-dev libxss-dev libxfixes-dev libxtst-dev \
     libxkbcommon-dev libwayland-dev wayland-protocols libdecor-0-dev libegl-dev libdbus-1-dev libudev-dev \
     libgtk-3-0
@@ -45,15 +46,6 @@ build_dependencies() {
     mkdir -p "$PREFIX/cmake"
     tar -xzf "$WORK_DIR/cmake.tar.gz" -C "$PREFIX/cmake" --strip-components=1
     export PATH="$PREFIX/cmake/bin:$PATH"
-
-    echo "== SDL $SDL_VERSION (Ubuntu 24.04 has no SDL3)"
-    wget -q "https://github.com/libsdl-org/SDL/releases/download/release-$SDL_VERSION/SDL3-$SDL_VERSION.tar.gz" \
-        -O "$WORK_DIR/sdl.tar.gz"
-    tar -xzf "$WORK_DIR/sdl.tar.gz" -C "$WORK_DIR"
-    cmake -S "$WORK_DIR/SDL3-$SDL_VERSION" -B "$WORK_DIR/sdl-build" -G Ninja -DCMAKE_BUILD_TYPE=Release \
-        -DCMAKE_INSTALL_PREFIX="$PREFIX" -DSDL_TESTS=OFF -DSDL_EXAMPLES=OFF
-    cmake --build "$WORK_DIR/sdl-build"
-    cmake --install "$WORK_DIR/sdl-build"
 
     echo "== ngspice $NGSPICE_VERSION as a shared library (Ubuntu 24.04 ships 42; the project is tested with 47)"
     wget -q "https://downloads.sourceforge.net/project/ngspice/ng-spice-rework/$NGSPICE_VERSION/ngspice-$NGSPICE_VERSION.tar.gz" \
@@ -90,7 +82,7 @@ rm -rf "$WORK_DIR/AppDir"
 DESTDIR="$WORK_DIR/AppDir" cmake --install "$WORK_DIR/imcsim-build"
 mkdir -p "$WORK_DIR/AppDir/usr/share/doc/ngspice" "$WORK_DIR/AppDir/usr/share/doc/sdl3"
 cp "$PREFIX/share/doc/ngspice/COPYING" "$WORK_DIR/AppDir/usr/share/doc/ngspice/"
-cp "$PREFIX/share/licenses/SDL3/LICENSE.txt" "$WORK_DIR/AppDir/usr/share/doc/sdl3/"
+cp "$SOURCE_DIR/vendor/SDL/LICENSE.txt" "$WORK_DIR/AppDir/usr/share/doc/sdl3/"
 
 echo "== AppImage"
 wget -q "$LINUXDEPLOY_URL" -O "$WORK_DIR/linuxdeploy"
@@ -99,7 +91,8 @@ VERSION=$(sed -n 's/^ *VERSION \([0-9.]*\)$/\1/p' "$SOURCE_DIR/CMakeLists.txt" |
 mkdir -p "$SOURCE_DIR/out/appimage"
 cd "$SOURCE_DIR/out/appimage"
 # Containers have no FUSE, so linuxdeploy runs extracted. libngspice is opened at run time by the program's own
-# link, so it is found through the executable; the Vulkan loader stays on the host, next to its drivers
+# link, so it is found through the executable; SDL3 is linked statically, and the Vulkan loader stays on the host,
+# next to its drivers
 APPIMAGE_EXTRACT_AND_RUN=1 LINUXDEPLOY_OUTPUT_VERSION="$VERSION" "$WORK_DIR/linuxdeploy" \
     --appdir "$WORK_DIR/AppDir" \
     --executable "$WORK_DIR/AppDir/usr/bin/imcsim" \

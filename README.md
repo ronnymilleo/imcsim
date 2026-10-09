@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/ronnymilleo/imcsim/actions/workflows/ci.yml/badge.svg)](https://github.com/ronnymilleo/imcsim/actions/workflows/ci.yml)
 
-Immediate Mode Circuit Simulator, built with Dear ImGui, SDL3 and Vulkan. Circuits are simulated with
+Immediate Mode Circuit Simulator, built with Dear ImGui and SDL3. Circuits are simulated with
 [ngspice](https://ngspice.sourceforge.io/).
 
 ![imcsim with an RC low-pass filter driven by a 1 kHz sine: the schematic with its probed nodes on the left, and the
@@ -97,20 +97,23 @@ To build from source instead, read on.
 
 ## Requirements
 
-- Linux with a GPU and driver that support Vulkan
+- A GPU and driver that support Vulkan on Linux, or Direct3D 12 on Windows (see [below](#windows))
 - CMake 4.3 or newer
 - A C++23 compiler (tested with GCC 16)
 - Ninja (or another CMake generator)
-- SDL3 development files
-- Vulkan headers and loader (the Vulkan SDK is not required)
+- The build dependencies of SDL3 (X11, Wayland, libxkbcommon): SDL itself is a submodule in `vendor/`,
+  compiled and linked statically with the project, so every platform carries the same version
+- On Linux, the Vulkan loader at run time (`vulkan-icd-loader` on Arch, `libvulkan1` on Ubuntu), which SDL
+  opens when the program starts
 - ngspice built as a shared library (`libngspice` and its `sharedspice.h` header; tested with ngspice 47)
 - pkg-config, which CMake uses to find ngspice
-- Git, for the submodules in `vendor/`: Dear ImGui (`docking` branch), ImPlot, nlohmann/json and Catch2
+- Git, for the submodules in `vendor/`: SDL3, Dear ImGui (`docking` branch), ImPlot,
+  nlohmann/json and Catch2
 
 On Arch Linux:
 
 ```
-sudo pacman -S cmake ninja gcc pkgconf sdl3 vulkan-headers vulkan-icd-loader ngspice
+sudo pacman -S cmake ninja gcc pkgconf sdl3 vulkan-icd-loader ngspice
 ```
 
 The Arch `ngspice` package already includes the shared library. Also install the Vulkan driver for your GPU
@@ -119,7 +122,7 @@ The Arch `ngspice` package already includes the shared library. Also install the
 On Ubuntu 25.04 or newer (older releases do not package SDL3):
 
 ```
-sudo apt install ninja-build g++ pkgconf libsdl3-dev libvulkan-dev mesa-vulkan-drivers libngspice0-dev
+sudo apt install ninja-build g++ pkgconf libsdl3-dev libvulkan1 mesa-vulkan-drivers libngspice0-dev
 sudo snap install cmake --classic
 ```
 
@@ -144,6 +147,20 @@ If you already cloned without submodules, run `git submodule update --init`.
 
 The binary is written to `out/<build-type>/bin/`.
 
+### Windows
+
+Build with Visual Studio 2026 (the "Desktop development with C++" workload, which brings CMake and Ninja), from a
+Developer PowerShell. The program renders with Direct3D 12, part of Windows, and the repository carries the
+Windows build of ngspice in `vendor/ngspice-windows`, so nothing else is needed:
+
+```
+cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug
+cmake --build build
+out\debug\bin\imcsim.exe
+```
+
+The build copies the ngspice DLLs next to the executable, with the OpenMP runtime of your Visual Studio.
+
 ## Tests
 
 The tests use Catch2 and run some circuits through ngspice, so they need the same libraries as the application:
@@ -157,7 +174,8 @@ ctest --test-dir build --output-on-failure
 ## Optional
 
 - `clang-format`: if installed, the build formats the sources automatically.
-- `vulkan-validation-layers`: only needed if you enable Vulkan validation.
+- `vulkan-validation-layers` (Linux): Debug builds use them when they are installed; on Windows the Direct3D 12
+  debug layer comes with the system.
 
 ## License
 

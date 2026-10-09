@@ -1,0 +1,2 @@
+// The first icon of the executable: Explorer shows it, and SDL gives it to every window it creates
+1 ICON "imcsim.ico"

@@ -25,7 +25,8 @@ jobs:
         with:
           submodules: recursive
 
-      # CMake, SDL and ngspice take most of the build and only change with their versions in deps.env
+      # CMake and ngspice take most of the build and only change with their versions in deps.env; SDL3 comes
+      # from the vendor submodule and is built with the project
       - name: Restore the built dependencies
         uses: actions/cache@v6
         with:

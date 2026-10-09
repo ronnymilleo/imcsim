@@ -1,13 +1,22 @@
 # =============================================================================
+# SDL
+# =============================================================================
+
+# Built from the submodule, not taken from the system, and linked statically: every platform carries the same
+# version inside the executable, with no library to ship next to it. Its GPU API renders Dear ImGui (Direct3D 12 on
+# Windows, Vulkan on Linux), and its tests, examples and test library stay out
+set(SDL_SHARED OFF)
+set(SDL_STATIC ON)
+set(SDL_TEST_LIBRARY OFF)
+set(SDL_TESTS OFF)
+set(SDL_EXAMPLES OFF)
+add_subdirectory(SDL)
+
+# =============================================================================
 # imgui
 # =============================================================================
 
 set(IMGUI_DIR ${CMAKE_CURRENT_SOURCE_DIR}/imgui)
-find_package(Vulkan REQUIRED)
-find_package(SDL3 REQUIRED)
-message(STATUS "Vulkan include dirs: ${Vulkan_INCLUDE_DIRS}")
-message(STATUS "Vulkan libraries: ${Vulkan_LIBRARIES}")
-message(STATUS "Vulkan version: ${Vulkan_VERSION}")
 
 add_library(imgui
         STATIC
@@ -16,7 +25,7 @@ add_library(imgui
             ${IMGUI_DIR}/imgui_tables.cpp
             ${IMGUI_DIR}/imgui_widgets.cpp
             ${IMGUI_DIR}/imgui_demo.cpp
-            ${IMGUI_DIR}/backends/imgui_impl_vulkan.cpp
+            ${IMGUI_DIR}/backends/imgui_impl_sdlgpu3.cpp
             ${IMGUI_DIR}/backends/imgui_impl_sdl3.cpp
             ${IMGUI_DIR}/misc/cpp/imgui_stdlib.cpp
 )
@@ -30,7 +39,6 @@ target_include_directories(imgui
 target_link_libraries(imgui
         PUBLIC
             SDL3::SDL3
-            Vulkan::Vulkan
 )
 
 target_compile_definitions(imgui PUBLIC IMGUI_DEFINE_MATH_OPERATORS)

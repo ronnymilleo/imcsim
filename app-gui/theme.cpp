@@ -382,7 +382,7 @@ ImFont *GetMonospaceFont() {
 }
 
 /**
- * @brief   Returns the window background color, also used to clear the Vulkan frame.
+ * @brief   Returns the window background color, also used to clear the frame.
  * @return  Background color as RGBA.
  */
 ImVec4 GetThemeBackground() {
