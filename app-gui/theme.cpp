@@ -108,7 +108,7 @@ constexpr auto Themes = std::to_array<ThemePalette>({
      .HeatLow = Rgb(60, 120, 255),
      .HeatHigh = Rgb(235, 60, 50),
      .BrightTraces = true},
-    // An analog oscilloscope screen: green phosphor signals on near-black, with a warm amber accent for controls and cursors
+    // An analog oscilloscope screen: green phosphor signals on near-black, with a warm amber accent for controls
     {.Name = "Oscilloscope",
      .Light = false,
      .Background = Rgb(12, 16, 13),
