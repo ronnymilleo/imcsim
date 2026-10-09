@@ -33,6 +33,9 @@ void AppWindow::Render() {
         ImGui::SetNextWindowSize(*m_InitialSize * ImGui::GetFontSize(), ImGuiCond_FirstUseEver);
         ImGui::SetNextWindowPos(viewport->GetCenter(), ImGuiCond_FirstUseEver, ImVec2(0.5f, 0.5f));
     }
+    if (std::exchange(m_FocusRequested, false)) {
+        ImGui::SetNextWindowFocus();
+    }
     if (ImGui::Begin(m_WindowTitle.c_str(), m_Closable ? &m_IsOpen : nullptr, m_WindowFlags)) {
         Draw();
     }
@@ -53,6 +56,14 @@ bool AppWindow::IsOpen() const {
  */
 void AppWindow::SetOpen(const bool open) {
     m_IsOpen = open;
+}
+
+/**
+ * @brief   Brings the window to the front the next time it is drawn.
+ * @note    A docked window becomes the selected tab of its dock node.
+ */
+void AppWindow::Focus() {
+    m_FocusRequested = true;
 }
 
 /**

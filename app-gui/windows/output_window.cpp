@@ -795,11 +795,12 @@ OutputWindow::OutputWindow(Schematic &schematic) : AppWindow("Output", true), m_
 }
 
 /**
- * @brief   Opens the window, if closed, and brings a tab to the front on the next frame.
+ * @brief   Opens the window, if closed, and brings it and one of its tabs to the front on the next frame.
  * @param[in] tab  Tab of the analysis whose result just arrived.
  */
 void OutputWindow::ShowTab(const PlotTab tab) {
     SetOpen(true);
+    Focus();
     m_TabToShow = tab;
 }
 

@@ -55,15 +55,12 @@ ImU32 GetCurrentColor(const std::size_t index) {
 /**
  * @brief   Returns the color of a level on the heat scale the editor colors voltages and currents with.
  * @param[in] level  0 for the lowest value shown, 1 for the highest; values outside are clamped.
- * @return  A color of the heat scale of the current theme, from faint for low values to bright for high ones.
+ * @return  A color between the blue of low values and the red of high ones, in the tones of the current theme.
  */
 ImU32 GetHeatColor(const float level) {
-    const auto &heat_stops = GetPalette().HeatStops;
-    const float position = std::clamp(level, 0.0f, 1.0f) * static_cast<float>(heat_stops.size() - 1);
-    const auto stop = std::min(static_cast<std::size_t>(position), heat_stops.size() - 2);
-    const float fraction = position - static_cast<float>(stop);
-    const ImVec4 &low = heat_stops[stop];
-    const ImVec4 &high = heat_stops[stop + 1];
+    const ImVec4 &low = GetPalette().HeatLow;
+    const ImVec4 &high = GetPalette().HeatHigh;
+    const float fraction = std::clamp(level, 0.0f, 1.0f);
     return ImGui::ColorConvertFloat4ToU32({low.x + (high.x - low.x) * fraction, low.y + (high.y - low.y) * fraction,
                                            low.z + (high.z - low.z) * fraction, 1.0f});
 }

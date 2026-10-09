@@ -177,10 +177,9 @@ int Application::InitImGui() {
     }
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;
+    // Windows float and dock inside the main window only: multi-viewports (windows dragged out as OS windows)
+    // stall the main swap chain on Windows while a window moves across the edge of the screen
     io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
-
-    // On windows this config causes stuttering when dragging the window out of the main window
-    // io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
 
     ApplyTheme();
     LoadThemeFonts();
@@ -191,21 +190,11 @@ int Application::InitImGui() {
     style.ScaleAllSizes(m_SDLWindowScale);
     style.FontScaleDpi = m_SDLWindowScale;
     io.ConfigDpiScaleFonts = true;
-    io.ConfigDpiScaleViewports = true;
-
-    // With viewports enabled, platform windows should look identical to regular ones
-    if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
-        style.WindowRounding = 0.0f;
-        style.Colors[ImGuiCol_WindowBg].w = 1.0f;
-    }
 
     ImGui_ImplSDL3_InitForSDLGPU(m_SDLWindow);
     ImGui_ImplSDLGPU3_InitInfo init_info{};
     init_info.Device = m_GPUDevice;
     init_info.ColorTargetFormat = SDL_GetGPUSwapchainTextureFormat(m_GPUDevice, m_SDLWindow);
-    // The other platform windows get swap chains like the main one
-    init_info.SwapchainComposition = SDL_GPU_SWAPCHAINCOMPOSITION_SDR;
-    init_info.PresentMode = SDL_GPU_PRESENTMODE_VSYNC;
     ImGui_ImplSDLGPU3_Init(&init_info);
     return Core::ExitSuccess;
 }
@@ -252,6 +241,8 @@ void Application::Render() {
     }
     ImGui::DockSpaceOverViewport(dockspace_id, ImGui::GetMainViewport());
 
+    // Runs even while the editor tab is hidden, so quitting, the menus and the shortcuts work from any window
+    m_EditorWindow.Update();
     m_EditorWindow.Render();
     m_PropertiesWindow.Render();
     m_NetlistWindow.Render();
@@ -323,8 +314,7 @@ void Application::DrawMainMenuBar() {
             }
         }
         ImGui::Separator();
-        // Render() applies it right after the menu; the side windows keep their open state and dock back in place,
-        // and Output floats outside the layout
+        // Render() applies it right after the menu; the windows keep their open state and dock back in place
         if (ImGui::MenuItem("Reset Layout")) {
             m_ResetLayout = true;
         }
@@ -368,18 +358,22 @@ void Application::ShowNewResults() {
                 PlotTab::DCSweep);
 }
 
-// The editor fills the window; Properties, Analysis Settings and Netlist start closed and dock below it as tabs
-// when opened, and Output floats.
+// The editor, Output, Analysis Settings and Netlist share the main node as tabs, and Properties sits on the right.
+// Only the editor starts open: the View menu opens the others in their place, and each result brings Output to the
+// front.
 // Must run before the windows are drawn. A split returns the new node in the given direction and leaves the rest
 // in its last argument
 void Application::SetupDefaultLayout(ImGuiID dockspace_id) {
     ImGui::DockBuilderSetNodeSize(dockspace_id, ImGui::GetMainViewport()->WorkSize);
-    ImGuiID editor_id = dockspace_id;
-    const ImGuiID properties_id = ImGui::DockBuilderSplitNode(editor_id, ImGuiDir_Down, 0.25f, nullptr, &editor_id);
-    ImGui::DockBuilderDockWindow(m_EditorWindow.GetWindowTitle().c_str(), editor_id);
+    ImGuiID main_id = dockspace_id;
+    const ImGuiID properties_id = ImGui::DockBuilderSplitNode(main_id, ImGuiDir_Right, 0.25f, nullptr, &main_id);
+    // The other windows share the main node as tabs
+    const std::array<const AppWindow *, 4> tabbed_windows{&m_EditorWindow, &m_OutputWindow, &m_SimulationWindow,
+                                                          &m_NetlistWindow};
+    for (const AppWindow *window : tabbed_windows) {
+        ImGui::DockBuilderDockWindow(window->GetWindowTitle().c_str(), main_id);
+    }
     ImGui::DockBuilderDockWindow(m_PropertiesWindow.GetWindowTitle().c_str(), properties_id);
-    ImGui::DockBuilderDockWindow(m_SimulationWindow.GetWindowTitle().c_str(), properties_id);
-    ImGui::DockBuilderDockWindow(m_NetlistWindow.GetWindowTitle().c_str(), properties_id);
     ImGui::DockBuilderFinish(dockspace_id);
 }
 
@@ -407,11 +401,6 @@ void Application::EndFrame() {
         SDL_GPURenderPass *render_pass = SDL_BeginGPURenderPass(command_buffer, &target_info, 1, nullptr);
         ImGui_ImplSDLGPU3_RenderDrawData(draw_data, command_buffer, render_pass);
         SDL_EndGPURenderPass(render_pass);
-    }
-
-    if (ImGui::GetIO().ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
-        ImGui::UpdatePlatformWindows();
-        ImGui::RenderPlatformWindowsDefault();
     }
 
     SDL_SubmitGPUCommandBuffer(command_buffer);

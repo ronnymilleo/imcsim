@@ -26,6 +26,7 @@ public:
     void Render();
     bool IsOpen() const;
     void SetOpen(bool open);
+    void Focus();
     const std::string &GetWindowTitle() const;
 
 protected:
@@ -38,6 +39,8 @@ private:
     bool m_Closable;
     ImGuiWindowFlags m_WindowFlags;
     bool m_IsOpen = true;
+    // Brings the window to the front on its next Render(), as the selected tab when docked
+    bool m_FocusRequested = false;
     // In font sizes; only used the first time the window appears, before imgui.ini remembers it
     std::optional<ImVec2> m_InitialSize;
 };

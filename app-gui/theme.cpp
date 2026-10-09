@@ -51,7 +51,8 @@ constexpr auto Themes = std::to_array<ThemePalette>({
      .Selected = Col(255, 200, 80),
      .CanvasText = Col(240, 244, 248),
      .VoltageLabel = Col(255, 220, 120),
-     .HeatStops = {Rgb(70, 78, 92), Rgb(36, 92, 176), Rgb(96, 160, 255), Rgb(205, 235, 255)}},
+     .HeatLow = Rgb(60, 120, 255),
+     .HeatHigh = Rgb(235, 60, 50)},
     // Warm charcoal surfaces with a single red accent
     {.Name = "Ember",
      .Light = false,
@@ -77,7 +78,8 @@ constexpr auto Themes = std::to_array<ThemePalette>({
      .Selected = Col(255, 200, 80),
      .CanvasText = Col(255, 255, 255),
      .VoltageLabel = Col(255, 220, 120),
-     .HeatStops = {Rgb(96, 80, 84), Rgb(156, 42, 49), Rgb(236, 96, 100), Rgb(255, 214, 120)}},
+     .HeatLow = Rgb(60, 120, 255),
+     .HeatHigh = Rgb(235, 60, 50)},
     // A green monochrome CRT, after the P39 I variant of the Green Monochrome Monitor CRT Phosphor theme for Zed
     // (MIT): pure black, one green (#00B400) at several intensities over it, and a brighter one (#00FF66) for what
     // stands out. Node and trace colors keep their hues, so plots stay readable
@@ -104,7 +106,8 @@ constexpr auto Themes = std::to_array<ThemePalette>({
      .Selected = Col(200, 255, 200),
      .CanvasText = Col(0, 180, 0),
      .VoltageLabel = Col(0, 255, 102),
-     .HeatStops = {Rgb(0, 45, 0), Rgb(0, 110, 0), Rgb(0, 180, 0), Rgb(0, 255, 102)},
+     .HeatLow = Rgb(60, 120, 255),
+     .HeatHigh = Rgb(235, 60, 50),
      .BrightTraces = true},
     // Off-white paper with dark ink and a blue accent, like a printed datasheet; the accent fills stay light so
     // dark text reads on them
@@ -130,7 +133,8 @@ constexpr auto Themes = std::to_array<ThemePalette>({
      .Selected = Col(214, 120, 0),
      .CanvasText = Col(20, 20, 20),
      .VoltageLabel = Col(150, 90, 0),
-     .HeatStops = {Rgb(215, 210, 200), Rgb(120, 160, 225), Rgb(36, 99, 200), Rgb(20, 40, 110)}},
+     .HeatLow = Rgb(30, 80, 200),
+     .HeatHigh = Rgb(190, 35, 30)},
 });
 
 // Section of imgui.ini that keeps the chosen theme

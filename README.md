@@ -70,8 +70,6 @@ The [tutorial](docs/tutorial.md) walks through a first circuit step by step. The
 explains the editor, terminal numbers, current signs, probes, plots and exports, and
 [Simulation models](docs/models.md) describes the model behind every part and what it leaves out.
 
-On Wayland, the windows cannot be dragged out of the main window, though they still float and dock inside it. Run with `SDL_VIDEODRIVER=x11` to allow it.
-
 ## Install
 
 - **Windows 10 or newer** (x64): download `imcsim-<version>-windows-x64.zip` from the

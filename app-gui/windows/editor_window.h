@@ -40,6 +40,9 @@ public:
     EditorWindow(Schematic &schematic, AnalysisControls &controls, PartEditor &part_editor);
     ~EditorWindow() override = default;
 
+    // Requests, global shortcuts and file popups, whichever window is in front
+    void Update();
+
     // Quitting
     void RequestQuit();
     bool IsQuitConfirmed() const;
@@ -47,7 +50,7 @@ public:
     // Examples
     void RequestExample(const Example &example);
 
-    // Menus, drawn inside the main menu bar; their commands run on the next Draw()
+    // Menus, drawn inside the main menu bar; their commands run on the next Update()
     void DrawFileMenuItems();
     void DrawEditMenuItems();
     void DrawViewMenuItems();
@@ -228,7 +231,7 @@ private:
     void DrawContextMenu();
 
     // File and history commands
-    void HandleFileShortcuts();
+    void HandleGlobalShortcuts();
     void Undo();
     void Redo();
     void RequestNew();

@@ -100,7 +100,7 @@ of 5 µs.
 ![The analysis picker with the transient settings](images/tutorial_analysis.png)
 
 Click Run, or close the list and press F5. ngspice runs the circuit, the status bar reports "Transient done", and the
-Output window opens on the Transient tab. It floats over the editor. Every window can float or dock: drag it by its
+Output window opens on the Transient tab, as a tab beside the schematic. Every window can float or dock: drag it by its
 title and drop it on one of the arrows that appear, to place it beside, above or below another window or as a tab
 of it. The pictures here dock Output on the right of the schematic. The layout is kept for the next session, and
 View > Reset Layout brings back the default one.
