@@ -178,7 +178,9 @@ int Application::InitImGui() {
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;
     io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
-    io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
+
+    // On windows this config causes stuttering when dragging the window out of the main window
+    // io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
 
     ApplyTheme();
     LoadThemeFonts();
