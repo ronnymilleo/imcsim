@@ -15,7 +15,7 @@ concurrency:
 # Ubuntu runners lack SDL3 and CMake 4.3, so every job runs in the same distribution the project is developed on
 env:
   PACKAGES: >-
-    git cmake ninja gcc clang pkgconf sdl3 vulkan-headers vulkan-icd-loader ngspice ccache
+    git cmake ninja gcc clang python pkgconf sdl3 vulkan-headers vulkan-icd-loader ngspice ccache
   # Compiled objects are kept between runs, so a push only recompiles what changed
   CCACHE_MAXSIZE: 500M
   COMPILER_LAUNCHER: -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
