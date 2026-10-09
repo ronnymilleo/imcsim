@@ -109,9 +109,16 @@ void Application::AddError(const std::string &message) {
 }
 
 void Application::DumpErrors() {
+    if (m_Errors.empty()) {
+        return;
+    }
+    std::string message;
     for (const std::string &error : m_Errors) {
         fprintf(stderr, "[imcsim] Error: %s\n", error.c_str());
+        message += error + "\n";
     }
+    // A program started from a file manager or the Windows release build has no console to show stderr
+    SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "imcsim", message.c_str(), nullptr);
     m_Errors.clear();
 }
 

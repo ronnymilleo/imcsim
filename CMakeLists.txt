@@ -72,6 +72,11 @@ add_executable(imcsim main.cpp)
 if(WIN32)
     # The icon of the executable, which SDL also uses for its windows; packaging/windows/make_icon.py draws it
     target_sources(imcsim PRIVATE packaging/windows/imcsim.rc)
+    # Release builds open no console window behind the program, and keep main() as entry point; Debug builds keep
+    # the console for the logs of SDL and the GPU validation layers
+    if(MSVC)
+        target_link_options(imcsim PRIVATE $<$<NOT:$<CONFIG:Debug>>:/SUBSYSTEM:WINDOWS /ENTRY:mainCRTStartup>)
+    endif()
 endif()
 target_include_directories(imcsim PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(imcsim PRIVATE imcsim-gui-lib)
