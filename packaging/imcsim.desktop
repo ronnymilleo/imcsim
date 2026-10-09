@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=imcsim
+GenericName=Circuit Simulator
+Comment=Draw circuits and simulate them with ngspice
+Exec=imcsim
+Icon=imcsim
+Terminal=false
+Categories=Science;Electronics;Engineering;
+Keywords=circuit;spice;ngspice;electronics;schematic;simulation;

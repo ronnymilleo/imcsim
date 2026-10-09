@@ -50,6 +50,8 @@ private:
     std::vector<std::string> m_Errors;
     bool m_IsOpen{true};
     bool m_ResetLayout{false};
+    // imgui.ini in the user's data folder; ImGui keeps only the pointer, so the path lives here
+    std::string m_SettingsPath;
     // Last title given to the window, so it is only set again when the file or its state changes
     std::string m_WindowTitle;
     // Result versions already shown, so each new result opens the Output window once

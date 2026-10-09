@@ -72,6 +72,29 @@ explains the editor, terminal numbers, current signs, probes, plots and exports,
 
 On Wayland, the windows cannot be dragged out of the main window, though they still float and dock inside it. Run with `SDL_VIDEODRIVER=x11` to allow it.
 
+## Install
+
+- **Any Linux distribution** with glibc 2.39 or newer (Ubuntu 24.04, Debian 13, Fedora 40 and later): download the
+  AppImage from the [releases](https://github.com/ronnymilleo/imcsim/releases), make it executable and run it:
+
+  ```
+  chmod +x imcsim-*-x86_64.AppImage
+  ./imcsim-*-x86_64.AppImage
+  ```
+
+  It carries ngspice and SDL3; only a Vulkan driver for your GPU is needed.
+- **Arch Linux**: the package is not on the AUR yet, since AUR registrations are paused for now. Until it is, build
+  it from the PKGBUILD in this repository, which builds the release it names:
+
+  ```
+  cd packaging/aur
+  makepkg -si
+  ```
+
+The layout, theme and view preferences are kept in `~/.local/share/imcsim/imgui.ini`.
+
+To build from source instead, read on.
+
 ## Requirements
 
 - Linux with a GPU and driver that support Vulkan

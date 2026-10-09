@@ -142,6 +142,13 @@ int Application::InitImGui() {
     ImPlot::CreateContext();
 
     ImGuiIO &io = ImGui::GetIO();
+    // The layout and preferences go to the user's data folder (~/.local/share/imcsim on Linux, or under
+    // XDG_DATA_HOME), so they do not depend on where the program starts or need a writable install folder
+    if (char *pref_path = SDL_GetPrefPath(nullptr, "imcsim")) {
+        m_SettingsPath = std::string(pref_path) + "imgui.ini";
+        SDL_free(pref_path);
+        io.IniFilename = m_SettingsPath.c_str();
+    }
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;
     io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;

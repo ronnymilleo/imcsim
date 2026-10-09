@@ -98,6 +98,22 @@ add_dependencies(imcsim copy_compile_commands)
 # =============================================================================
 # Project Summary
 # =============================================================================
+# Installation
+# =============================================================================
+
+# Standard Linux layout: the program, its desktop entry and icon, and the licenses of what it includes
+include(GNUInstallDirs)
+install(TARGETS imcsim RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+install(FILES packaging/imcsim.desktop DESTINATION ${CMAKE_INSTALL_DATADIR}/applications)
+install(FILES packaging/imcsim.svg DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/scalable/apps)
+install(FILES LICENSE README.md THIRD_PARTY_NOTICES.md DESTINATION ${CMAKE_INSTALL_DOCDIR})
+install(FILES vendor/imgui/LICENSE.txt RENAME imgui-LICENSE.txt DESTINATION ${CMAKE_INSTALL_DOCDIR}/licenses)
+install(FILES vendor/implot/LICENSE RENAME implot-LICENSE.txt DESTINATION ${CMAKE_INSTALL_DOCDIR}/licenses)
+install(FILES vendor/json/LICENSE.MIT RENAME json-LICENSE.txt DESTINATION ${CMAKE_INSTALL_DOCDIR}/licenses)
+install(FILES assets/fonts/Inter-LICENSE.txt assets/fonts/JetBrainsMono-LICENSE.txt
+        DESTINATION ${CMAKE_INSTALL_DOCDIR}/licenses)
+
+# =============================================================================
 
 message(STATUS "")
 message(STATUS "==================== Summary ====================")

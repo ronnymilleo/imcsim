@@ -5,12 +5,12 @@
 
 #include "theme.h"
 
+#include "font_files.h"
 #include "imgui_internal.h"
 #include "implot.h"
 #include "svg_writer.h"
 #include <algorithm>
 #include <array>
-#include <filesystem>
 #include <span>
 #include <string_view>
 
@@ -140,43 +140,15 @@ std::size_t current_theme = 0;
 
 constexpr float FontSize = 17.0f;
 
-// Debian/Ubuntu and Arch install the same fonts under different folders
-constexpr auto FontCandidates = std::to_array<const char *>({
-    "/usr/share/fonts/truetype/inter/Inter-Regular.ttf",
-    "/usr/share/fonts/inter/Inter-Regular.ttf",
-    "/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf",
-    "/usr/share/fonts/noto/NotoSans-Regular.ttf",
-    "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-    "/usr/share/fonts/TTF/DejaVuSans.ttf",
-    "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
-    "/usr/share/fonts/liberation/LiberationSans-Regular.ttf",
-});
-
-constexpr auto MonospaceFontCandidates = std::to_array<const char *>({
-    "/usr/share/fonts/truetype/jetbrains-mono/JetBrainsMono-Regular.ttf",
-    "/usr/share/fonts/TTF/JetBrainsMono-Regular.ttf",
-    "/usr/share/fonts/TTF/JetBrainsMonoNerdFont-Regular.ttf",
-    "/usr/share/fonts/truetype/noto/NotoSansMono-Regular.ttf",
-    "/usr/share/fonts/noto/NotoSansMono-Regular.ttf",
-    "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf",
-    "/usr/share/fonts/TTF/DejaVuSansMono.ttf",
-    "/usr/share/fonts/truetype/liberation/LiberationMono-Regular.ttf",
-    "/usr/share/fonts/liberation/LiberationMono-Regular.ttf",
-});
-
 ImFont *monospace_font = nullptr;
 
-ImFont *AddFirstFont(const std::span<const char *const> candidates) {
-    ImGuiIO &io = ImGui::GetIO();
-    for (const char *path : candidates) {
-        if (!std::filesystem::exists(path)) {
-            continue;
-        }
-        if (ImFont *font = io.Fonts->AddFontFromFileTTF(path, FontSize)) {
-            return font;
-        }
-    }
-    return nullptr;
+// The atlas only reads the bytes, which live for the whole program
+ImFont *AddBundledFont(const std::span<const unsigned char> bytes) {
+    ImFontConfig config;
+    config.FontDataOwnedByAtlas = false;
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-const-cast): ImGui takes a mutable pointer it does not write through
+    void *data = const_cast<unsigned char *>(bytes.data());
+    return ImGui::GetIO().Fonts->AddFontFromMemoryTTF(data, static_cast<int>(bytes.size()), FontSize, &config);
 }
 
 void ApplyImGuiSizes() {
@@ -394,19 +366,16 @@ ImU32 AdaptToBackground(const ImU32 color) {
 }
 
 /**
- * @brief   Loads the first system UI font and monospace font found.
- * @note    Without a UI font, ImGui's built-in font is added first so it stays the default.
+ * @brief   Loads the bundled fonts: Inter for the interface, the default, and JetBrains Mono for code-like text.
  */
 void LoadThemeFonts() {
-    if (AddFirstFont(FontCandidates) == nullptr) {
-        ImGui::GetIO().Fonts->AddFontDefault();
-    }
-    monospace_font = AddFirstFont(MonospaceFontCandidates);
+    AddBundledFont(InterFont);
+    monospace_font = AddBundledFont(MonospaceFont);
 }
 
 /**
  * @brief   Returns the monospace font loaded by LoadThemeFonts(), for code-like text.
- * @return  The font, or nullptr when none is installed; PushFont(nullptr, ...) keeps the current one.
+ * @return  The font; nullptr only if it failed to load, and PushFont(nullptr, ...) keeps the current one.
  */
 ImFont *GetMonospaceFont() {
     return monospace_font;
