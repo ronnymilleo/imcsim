@@ -1,0 +1,29 @@
+pkgbase = imcsim
+	pkgdesc = Circuit simulator with an immediate mode interface, powered by ngspice
+	pkgver = 0.5.0
+	pkgrel = 1
+	url = https://github.com/ronnymilleo/imcsim
+	arch = x86_64
+	license = GPL-3.0-or-later
+	makedepends = cmake
+	makedepends = git
+	makedepends = ninja
+	makedepends = pkgconf
+	makedepends = vulkan-headers
+	depends = gcc-libs
+	depends = glibc
+	depends = ngspice
+	depends = sdl3
+	depends = vulkan-icd-loader
+	depends = hicolor-icon-theme
+	optdepends = vulkan-driver: Vulkan support for your GPU
+	source = imcsim::git+https://github.com/ronnymilleo/imcsim.git#tag=v0.5.0
+	source = imgui::git+https://github.com/ocornut/imgui.git
+	source = implot::git+https://github.com/epezent/implot.git
+	source = json::git+https://github.com/nlohmann/json.git
+	sha256sums = SKIP
+	sha256sums = SKIP
+	sha256sums = SKIP
+	sha256sums = SKIP
+
+pkgname = imcsim

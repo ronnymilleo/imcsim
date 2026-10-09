@@ -124,7 +124,8 @@ int VulkanContext::InitWindow(SDL_Window *window) {
  * @param[out] info  Structure passed to ImGui_ImplVulkan_Init().
  */
 void VulkanContext::FillImGuiInitInfo(ImGui_ImplVulkan_InitInfo &info) {
-    info.ApiVersion = VK_API_VERSION_1_4;
+    // The instance is created without VkApplicationInfo, so it is Vulkan 1.0, the version ImGui must be told
+    info.ApiVersion = VK_API_VERSION_1_0;
     info.Instance = m_Instance;
     info.PhysicalDevice = m_PhysicalDevice;
     info.Device = m_Device;
