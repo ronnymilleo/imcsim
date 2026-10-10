@@ -34,8 +34,9 @@ How to read what imcsim measures, plots and exports. The [README](../README.md) 
   Oscilloscope, Cyber Slate, Blueprint and Amber) and two light (Paper and Vintage); [Themes](themes.md) shows each
   one. Node and trace colors keep their hues in every theme: the light themes darken them to read on their
   background, and Phosphor, Oscilloscope, Cyber Slate, Blueprint and Amber brighten them.
-- **Output window**: hidden until an analysis runs; it then comes to the front on the tab of the new result. The
-  operating point tab lists the node voltages and part currents, which also show on the schematic. Reopen it from View.
+- **Output window**: hidden until an analysis runs; it then comes to the front on the tab of the new result. Turn
+  off View > Bring Output to Front on Results to keep the schematic in front: a dot on the Output tab then tells a
+  new result is waiting. The operating point tab lists the node voltages and part currents, which also show on the schematic. Reopen it from View.
 - **Window layout**: every window floats or docks. Drag a window by its title (or a docked one by its tab) onto
   the arrows that appear over another window to dock it on that side or as a tab; drop it anywhere else to let it
   float. By default the editor, Output, Analysis Settings and Netlist are tabs of the main area and Properties sits

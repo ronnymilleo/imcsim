@@ -130,7 +130,11 @@ sine comes out of the capacitor at about 0.16 V peak. The next plots use this tr
 
 - **Operating point**: the DC voltages of every node, shown on the schematic and, with the currents, in the Output
   window. View > Wire Colors colors the wires by node, by voltage or by a current heat map that follows the path of
-  the current. For this circuit, with a sine source and no offset, everything is 0 V.
+  the current. For this circuit, with a sine source and no offset, everything is 0 V; a divider of four equal
+  resistors shows the voltage colors better, from blue at ground to red at the source:
+
+  ![Wires colored by voltage along a resistor divider, with the scale at the bottom left](images/tutorial_heat_map.png)
+
 - **AC sweep of a larger circuit**: the Small-signal model of a BJT example compares a transistor stage with its
   hybrid-pi model:
 
