@@ -72,6 +72,8 @@ add_executable(imcsim main.cpp)
 if(WIN32)
     # The icon of the executable, which SDL also uses for its windows; packaging/windows/make_icon.py draws it
     target_sources(imcsim PRIVATE packaging/windows/imcsim.rc)
+    # Merged by the linker into the manifest it embeds
+    target_sources(imcsim PRIVATE packaging/windows/imcsim.manifest)
     # The numeric version of the file properties, which imcsim.rc cannot split out of IMCSIM_VERSION
     target_compile_definitions(imcsim PRIVATE
             $<$<COMPILE_LANGUAGE:RC>:IMCSIM_VERSION_MAJOR=${PROJECT_VERSION_MAJOR}>

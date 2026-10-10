@@ -7,9 +7,10 @@ pkgdesc="Circuit simulator with an immediate mode interface, powered by ngspice"
 arch=('x86_64')
 url="https://github.com/ronnymilleo/imcsim"
 license=('GPL-3.0-or-later')
-# SDL is compiled into the program and opens the X11 libraries and the Vulkan loader when it starts, so they are
-# listed here rather than found by linking
-depends=('gcc-libs' 'glibc' 'ngspice' 'libx11' 'libxext' 'libxcursor' 'vulkan-icd-loader' 'hicolor-icon-theme')
+# SDL is compiled into the program and opens the X11 and Wayland libraries and the Vulkan loader when it starts, so
+# they are listed here rather than found by linking
+depends=('gcc-libs' 'glibc' 'ngspice' 'libx11' 'libxext' 'libxcursor' 'wayland' 'libxkbcommon' 'libdecor'
+         'vulkan-icd-loader' 'hicolor-icon-theme')
 # The build dependencies of SDL, as in the Arch sdl3 package, without the audio ones
 makedepends=('cmake' 'git' 'ninja' 'pkgconf'
              'libxcursor' 'libxi' 'libxfixes' 'libxinerama' 'libxrandr' 'libxss' 'libxtst'

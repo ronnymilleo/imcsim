@@ -10,6 +10,14 @@ set(SDL_STATIC ON)
 set(SDL_TEST_LIBRARY OFF)
 set(SDL_TESTS OFF)
 set(SDL_EXAMPLES OFF)
+# Subsystems the program never uses stay out, so the build does not depend on which of their libraries the machine
+# has installed; video, GPU, dialogs and the gamepad (navigation in Dear ImGui) stay in
+set(SDL_AUDIO OFF)
+set(SDL_CAMERA OFF)
+set(SDL_RENDER OFF)
+set(SDL_HAPTIC OFF)
+set(SDL_POWER OFF)
+set(SDL_SENSOR OFF)
 add_subdirectory(SDL)
 
 # =============================================================================
