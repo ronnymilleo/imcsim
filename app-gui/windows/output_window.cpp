@@ -5,6 +5,7 @@
 
 #include "output_window.h"
 
+#include "imgui_internal.h"
 #include "implot.h"
 #include "implot_internal.h"
 #include "misc/cpp/imgui_stdlib.h"
@@ -21,12 +22,16 @@
 #include <filesystem>
 #include <format>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
 namespace GUI {
 
 namespace {
+
+// Section of imgui.ini that keeps the View preference of the window
+constexpr const char *SettingsTypeName = "Output";
 
 // In font sizes, so the layout follows the DPI scale
 constexpr float MinPlotHeight = 12.0f;
@@ -795,16 +800,65 @@ OutputWindow::OutputWindow(Schematic &schematic) : AppWindow("Output", true), m_
 }
 
 /**
- * @brief   Opens the window, if closed, and brings it and one of its tabs to the front on the next frame.
+ * @brief   Opens the window, if closed, on one of its tabs, and brings it to the front on the next frame.
  * @param[in] tab  Tab of the analysis whose result just arrived.
+ * @note    When the user turned off bringing it to the front, the window marks its title or tab with a dot
+ *          instead, until it is shown.
  */
 void OutputWindow::ShowTab(const PlotTab tab) {
-    SetOpen(true);
-    Focus();
     m_TabToShow = tab;
+    if (m_FrontOnNewResult) {
+        SetOpen(true);
+        Focus();
+    } else {
+        OpenBehind();
+        SetNewContentMarker(true);
+    }
+}
+
+/**
+ * @brief   Draws the View menu items of the window, inside the main menu bar.
+ */
+void OutputWindow::DrawViewMenuItems() {
+    if (ImGui::MenuItem("Bring Output to Front on Results", nullptr, &m_FrontOnNewResult)) {
+        ImGui::MarkIniSettingsDirty();
+    }
+    ImGui::SetItemTooltip("Otherwise a new result leaves the current tab in front and marks Output with a dot");
+}
+
+/**
+ * @brief   Keeps the View preference of the window in imgui.ini, next to the window layout, so it survives a
+ *          restart.
+ */
+void OutputWindow::RegisterSettingsHandler() {
+    ImGuiSettingsHandler handler;
+    handler.TypeName = SettingsTypeName;
+    handler.TypeHash = ImHashStr(SettingsTypeName);
+    handler.UserData = this;
+    handler.ReadOpenFn = [](ImGuiContext *, ImGuiSettingsHandler *settings, const char *) -> void * {
+        return settings->UserData;
+    };
+    handler.ReadLineFn = [](ImGuiContext *, ImGuiSettingsHandler *, void *entry, const char *line) {
+        constexpr std::string_view FrontKey = "FrontOnNewResult=";
+        const std::string_view text(line);
+        if (text.starts_with(FrontKey)) {
+            static_cast<OutputWindow *>(entry)->m_FrontOnNewResult = text.substr(FrontKey.size()) == "1";
+        }
+    };
+    handler.WriteAllFn = [](ImGuiContext *, ImGuiSettingsHandler *settings, ImGuiTextBuffer *buffer) {
+        const auto *output = static_cast<const OutputWindow *>(settings->UserData);
+        buffer->appendf("[%s][Preferences]\n", SettingsTypeName);
+        buffer->appendf("FrontOnNewResult=%d\n\n", output->m_FrontOnNewResult ? 1 : 0);
+    };
+    ImGui::AddSettingsHandler(&handler);
 }
 
 void OutputWindow::Draw() {
+    // Drawn means shown, so the new result is seen; a window that just appeared behind another tab may be drawn
+    // once before it is hidden
+    if (!ImGui::IsWindowAppearing()) {
+        SetNewContentMarker(false);
+    }
     ProcessExportDialog();
     DrawExportError();
     const auto &transient = m_Schematic.GetTransient();

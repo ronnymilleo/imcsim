@@ -50,9 +50,7 @@ constexpr auto Themes = std::to_array<ThemePalette>({
      .Wire = Col(120, 190, 150),
      .Selected = Col(255, 200, 80),
      .CanvasText = Col(240, 244, 248),
-     .VoltageLabel = Col(255, 220, 120),
-     .HeatLow = Rgb(60, 120, 255),
-     .HeatHigh = Rgb(235, 60, 50)},
+     .VoltageLabel = Col(255, 220, 120)},
     // Warm charcoal surfaces with a glowing ember-orange accent
     {.Name = "Ember",
      .Light = false,
@@ -78,9 +76,7 @@ constexpr auto Themes = std::to_array<ThemePalette>({
      // Selection stays bright warm gold
      .Selected = Col(255, 210, 75),
      .CanvasText = Col(248, 242, 240),
-     .VoltageLabel = Col(255, 205, 95),
-     .HeatLow = Rgb(60, 120, 255),
-     .HeatHigh = Rgb(235, 60, 50)},
+     .VoltageLabel = Col(255, 205, 95)},
     // A green monochrome CRT, balanced for eye comfort: deep charcoal-emerald base, luminous P31 mint text,
     // and bright electric green for traces and wires
     {.Name = "Phosphor",
@@ -105,8 +101,6 @@ constexpr auto Themes = std::to_array<ThemePalette>({
      .Selected = Col(235, 255, 240),
      .CanvasText = Col(180, 235, 200),
      .VoltageLabel = Col(240, 255, 140),
-     .HeatLow = Rgb(60, 120, 255),
-     .HeatHigh = Rgb(235, 60, 50),
      .BrightTraces = true},
     // An analog oscilloscope screen: green phosphor signals on near-black, with a warm amber accent for controls
     {.Name = "Oscilloscope",
@@ -131,8 +125,6 @@ constexpr auto Themes = std::to_array<ThemePalette>({
      .Selected = Col(255, 195, 60),
      .CanvasText = Col(200, 240, 210),
      .VoltageLabel = Col(255, 190, 60),
-     .HeatLow = Rgb(60, 120, 255),
-     .HeatHigh = Rgb(235, 60, 50),
      .BrightTraces = true},
     // Cool dark slate interface with a glowing neon phosphor canvas
     {.Name = "Cyber Slate",
@@ -157,8 +149,6 @@ constexpr auto Themes = std::to_array<ThemePalette>({
      .Selected = Col(255, 230, 100),
      .CanvasText = Col(220, 245, 230),
      .VoltageLabel = Col(255, 215, 80),
-     .HeatLow = Rgb(60, 120, 255),
-     .HeatHigh = Rgb(235, 60, 50),
      .BrightTraces = true},
     // Classic engineering blueprint: Prussian navy, crisp chalk-white parts, cyan wires and accent, drafting gold
     // selection
@@ -184,8 +174,6 @@ constexpr auto Themes = std::to_array<ThemePalette>({
      .Selected = Col(250, 204, 21),
      .CanvasText = Col(215, 238, 255),
      .VoltageLabel = Col(250, 204, 21),
-     .HeatLow = Rgb(60, 120, 255),
-     .HeatHigh = Rgb(235, 60, 50),
      .BrightTraces = true},
     // Monochrome amber CRT / plasma monitor: zero blue light, rich charcoal with golden phosphor glow
     {.Name = "Amber",
@@ -210,8 +198,6 @@ constexpr auto Themes = std::to_array<ThemePalette>({
      .Selected = Col(255, 245, 140),
      .CanvasText = Col(250, 212, 165),
      .VoltageLabel = Col(255, 240, 120),
-     .HeatLow = Rgb(60, 120, 255),
-     .HeatHigh = Rgb(235, 60, 50),
      .BrightTraces = true},
     // Off-white paper with dark ink and a blue accent, like a printed datasheet; the accent fills stay light so
     // dark text reads on them
@@ -236,9 +222,7 @@ constexpr auto Themes = std::to_array<ThemePalette>({
      .Wire = Col(40, 110, 60),
      .Selected = Col(214, 120, 0),
      .CanvasText = Col(20, 20, 20),
-     .VoltageLabel = Col(150, 90, 0),
-     .HeatLow = Rgb(30, 80, 200),
-     .HeatHigh = Rgb(190, 35, 30)},
+     .VoltageLabel = Col(150, 90, 0)},
     // Aged parchment with sepia ink, forest green wires and a wax-red accent, like a mid-century vacuum-tube manual
     {.Name = "Vintage",
      .Light = true,
@@ -261,9 +245,7 @@ constexpr auto Themes = std::to_array<ThemePalette>({
      .Wire = Col(35, 105, 65),
      .Selected = Col(195, 70, 30),
      .CanvasText = Col(36, 28, 22),
-     .VoltageLabel = Col(175, 80, 20),
-     .HeatLow = Rgb(30, 80, 200),
-     .HeatHigh = Rgb(190, 35, 30)},
+     .VoltageLabel = Col(175, 80, 20)},
 });
 
 // Section of imgui.ini that keeps the chosen theme

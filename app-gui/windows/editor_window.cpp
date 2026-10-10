@@ -1674,7 +1674,7 @@ void EditorWindow::HandleExampleRequest() {
     }
 }
 
-// Menu commands run here, inside the editor window, where their popups and file dialogs belong
+// Menu commands run here, from Update(), where their popups are opened and drawn whichever window is in front
 void EditorWindow::HandleCommandRequest() {
     const std::optional<EditorCommand> command = std::exchange(m_RequestedCommand, std::nullopt);
     if (!command) {

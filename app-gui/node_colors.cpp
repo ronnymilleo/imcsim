@@ -25,6 +25,16 @@ constexpr auto NodeColors = std::to_array<ImU32>({
     IM_COL32(240, 150, 200, 255),
 });
 
+// Heat scale, the same in every theme, from the lowest value to the highest: blue, cyan, yellow, red. Each
+// neighbor pair blends without passing through gray or a dark purple, and every stop stays clear on dark and light
+// canvases alike
+constexpr auto HeatStops = std::to_array<ImVec4>({
+    {60.0f / 255.0f, 120.0f / 255.0f, 255.0f / 255.0f, 1.0f},
+    {0.0f / 255.0f, 190.0f / 255.0f, 210.0f / 255.0f, 1.0f},
+    {240.0f / 255.0f, 200.0f / 255.0f, 40.0f / 255.0f, 1.0f},
+    {235.0f / 255.0f, 60.0f / 255.0f, 50.0f / 255.0f, 1.0f},
+});
+
 } // namespace
 
 /**
@@ -55,12 +65,14 @@ ImU32 GetCurrentColor(const std::size_t index) {
 /**
  * @brief   Returns the color of a level on the heat scale the editor colors voltages and currents with.
  * @param[in] level  0 for the lowest value shown, 1 for the highest; values outside are clamped.
- * @return  A color between the blue of low values and the red of high ones, in the tones of the current theme.
+ * @return  A color from the blue of low values through cyan and yellow to the red of high ones.
  */
 ImU32 GetHeatColor(const float level) {
-    const ImVec4 &low = GetPalette().HeatLow;
-    const ImVec4 &high = GetPalette().HeatHigh;
-    const float fraction = std::clamp(level, 0.0f, 1.0f);
+    const float position = std::clamp(level, 0.0f, 1.0f) * static_cast<float>(HeatStops.size() - 1);
+    const auto stop = std::min(static_cast<std::size_t>(position), HeatStops.size() - 2);
+    const float fraction = position - static_cast<float>(stop);
+    const ImVec4 &low = HeatStops[stop];
+    const ImVec4 &high = HeatStops[stop + 1];
     return ImGui::ColorConvertFloat4ToU32({low.x + (high.x - low.x) * fraction, low.y + (high.y - low.y) * fraction,
                                            low.z + (high.z - low.z) * fraction, 1.0f});
 }

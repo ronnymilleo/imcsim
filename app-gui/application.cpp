@@ -184,6 +184,7 @@ int Application::InitImGui() {
     ApplyTheme();
     LoadThemeFonts();
     m_EditorWindow.RegisterSettingsHandler();
+    m_OutputWindow.RegisterSettingsHandler();
     RegisterThemeSettingsHandler();
 
     ImGuiStyle &style = ImGui::GetStyle();
@@ -313,6 +314,7 @@ void Application::DrawMainMenuBar() {
                 window->SetOpen(open);
             }
         }
+        m_OutputWindow.DrawViewMenuItems();
         ImGui::Separator();
         // Render() applies it right after the menu; the windows keep their open state and dock back in place
         if (ImGui::MenuItem("Reset Layout")) {
@@ -339,8 +341,9 @@ void Application::UpdateWindowTitle() {
     }
 }
 
-// A new result of any analysis opens the Output window on its tab; the operating point also shows on the schematic, so
-// running one is enough to see it. Versions also change when results are dropped, which opens nothing
+// A new result of any analysis opens the Output window on its tab, in front unless the user turned that off; the
+// operating point also shows on the schematic, so running one is enough to see it. Versions also change when results
+// are dropped, which opens nothing
 void Application::ShowNewResults() {
     const auto show_if_new = [this](std::size_t &shown, const std::size_t version, const bool has_result,
                                     const PlotTab tab) {
