@@ -1,6 +1,6 @@
 /**
  * @file    application.cpp
- * @brief   Top-level application: owns the window, the Vulkan context, Dear ImGui and the main loop.
+ * @brief   Top-level application: owns the window, the GPU device, Dear ImGui and the main loop.
  */
 
 #include "application.h"
@@ -9,6 +9,7 @@
 #include "examples.h"
 #include "imgui.h"
 #include "imgui_impl_sdl3.h"
+#include "imgui_impl_sdlgpu3.h"
 #include "imgui_internal.h"
 #include "implot.h"
 #include "theme.h"
@@ -25,17 +26,24 @@ namespace {
 // Wrap width of the example descriptions, in characters of the current font size
 constexpr float ExampleTooltipWidth = 30.0f;
 
+// Debug builds ask for the validation layers of the GPU API; SDL runs without them when they are not installed
+#ifdef NDEBUG
+constexpr bool GPUDebugMode = false;
+#else
+constexpr bool GPUDebugMode = true;
+#endif
+
 } // namespace
 
 /**
- * @brief   Initializes SDL, Vulkan and Dear ImGui, in that order.
+ * @brief   Initializes SDL, the GPU device and Dear ImGui, in that order.
  * @return  Core::ExitSuccess on success, Core::ExitFailure if any step fails.
  */
 int Application::Init() {
     if (InitSDL() != Core::ExitSuccess) {
         return Core::ExitFailure;
     }
-    if (InitVulkan() != Core::ExitSuccess) {
+    if (InitGPU() != Core::ExitSuccess) {
         return Core::ExitFailure;
     }
     if (InitImGui() != Core::ExitSuccess) {
@@ -57,8 +65,6 @@ int Application::Run() {
             continue;
         }
 
-        m_Vulkan.ResizeIfNeeded(m_SDLWindow);
-
         NewFrame();
         Render();
         EndFrame();
@@ -72,16 +78,22 @@ int Application::Run() {
  * @note    Safe to call after a partial Init().
  */
 void Application::Shutdown() {
-    m_Vulkan.WaitIdle();
+    if (m_GPUDevice != nullptr) {
+        SDL_WaitForGPUIdle(m_GPUDevice);
+    }
 
     if (ImGui::GetCurrentContext() != nullptr) {
-        ImGui_ImplVulkan_Shutdown();
+        ImGui_ImplSDLGPU3_Shutdown();
         ImGui_ImplSDL3_Shutdown();
         ImPlot::DestroyContext();
         ImGui::DestroyContext();
     }
 
-    m_Vulkan.Shutdown();
+    if (m_GPUDevice != nullptr) {
+        SDL_ReleaseWindowFromGPUDevice(m_GPUDevice, m_SDLWindow);
+        SDL_DestroyGPUDevice(m_GPUDevice);
+        m_GPUDevice = nullptr;
+    }
 
     if (m_SDLWindow != nullptr) {
         SDL_DestroyWindow(m_SDLWindow);
@@ -97,9 +109,16 @@ void Application::AddError(const std::string &message) {
 }
 
 void Application::DumpErrors() {
+    if (m_Errors.empty()) {
+        return;
+    }
+    std::string message;
     for (const std::string &error : m_Errors) {
         fprintf(stderr, "[imcsim] Error: %s\n", error.c_str());
+        message += error + "\n";
     }
+    // A program started from a file manager or the Windows release build has no console to show stderr
+    SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "imcsim", message.c_str(), nullptr);
     m_Errors.clear();
 }
 
@@ -110,7 +129,7 @@ int Application::InitSDL() {
     }
 
     m_SDLWindowScale = SDL_GetDisplayContentScale(SDL_GetPrimaryDisplay());
-    m_SDLWindowFlags = SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIDDEN | SDL_WINDOW_HIGH_PIXEL_DENSITY;
+    m_SDLWindowFlags = SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIDDEN | SDL_WINDOW_HIGH_PIXEL_DENSITY;
     m_SDLWindow = SDL_CreateWindow("imcsim", static_cast<int>(1280 * m_SDLWindowScale),
                                    static_cast<int>(800 * m_SDLWindowScale), m_SDLWindowFlags);
     if (m_SDLWindow == nullptr) {
@@ -121,15 +140,22 @@ int Application::InitSDL() {
     return Core::ExitSuccess;
 }
 
-int Application::InitVulkan() {
-    if (m_Vulkan.Init() != Core::ExitSuccess) {
-        AddError(m_Vulkan.LastError());
+// SDL picks the native API of the system (Direct3D 12 on Windows, Vulkan on Linux) among the shader formats the
+// Dear ImGui backend ships
+int Application::InitGPU() {
+    m_GPUDevice = SDL_CreateGPUDevice(SDL_GPU_SHADERFORMAT_SPIRV | SDL_GPU_SHADERFORMAT_DXIL |
+                                          SDL_GPU_SHADERFORMAT_MSL | SDL_GPU_SHADERFORMAT_METALLIB,
+                                      GPUDebugMode, nullptr);
+    if (m_GPUDevice == nullptr) {
+        AddError(std::string("SDL_CreateGPUDevice(): ") + SDL_GetError());
         return Core::ExitFailure;
     }
-    if (m_Vulkan.InitWindow(m_SDLWindow) != Core::ExitSuccess) {
-        AddError(m_Vulkan.LastError());
+    if (!SDL_ClaimWindowForGPUDevice(m_GPUDevice, m_SDLWindow)) {
+        AddError(std::string("SDL_ClaimWindowForGPUDevice(): ") + SDL_GetError());
         return Core::ExitFailure;
     }
+    SDL_SetGPUSwapchainParameters(m_GPUDevice, m_SDLWindow, SDL_GPU_SWAPCHAINCOMPOSITION_SDR,
+                                  SDL_GPU_PRESENTMODE_VSYNC);
 
     SDL_SetWindowPosition(m_SDLWindow, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
     SDL_ShowWindow(m_SDLWindow);
@@ -151,29 +177,26 @@ int Application::InitImGui() {
     }
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;
+    // Windows float and dock inside the main window only: multi-viewports (windows dragged out as OS windows)
+    // stall the main swap chain on Windows while a window moves across the edge of the screen
     io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
-    io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
 
     ApplyTheme();
     LoadThemeFonts();
     m_EditorWindow.RegisterSettingsHandler();
+    m_OutputWindow.RegisterSettingsHandler();
     RegisterThemeSettingsHandler();
 
     ImGuiStyle &style = ImGui::GetStyle();
     style.ScaleAllSizes(m_SDLWindowScale);
     style.FontScaleDpi = m_SDLWindowScale;
     io.ConfigDpiScaleFonts = true;
-    io.ConfigDpiScaleViewports = true;
 
-    // With viewports enabled, platform windows should look identical to regular ones
-    if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
-        style.WindowRounding = 0.0f;
-        style.Colors[ImGuiCol_WindowBg].w = 1.0f;
-    }
-
-    ImGui_ImplSDL3_InitForVulkan(m_SDLWindow);
-    m_Vulkan.FillImGuiInitInfo(m_VulkanInitInfo);
-    ImGui_ImplVulkan_Init(&m_VulkanInitInfo);
+    ImGui_ImplSDL3_InitForSDLGPU(m_SDLWindow);
+    ImGui_ImplSDLGPU3_InitInfo init_info{};
+    init_info.Device = m_GPUDevice;
+    init_info.ColorTargetFormat = SDL_GetGPUSwapchainTextureFormat(m_GPUDevice, m_SDLWindow);
+    ImGui_ImplSDLGPU3_Init(&init_info);
     return Core::ExitSuccess;
 }
 
@@ -195,7 +218,7 @@ void Application::PollEvents() {
 }
 
 void Application::NewFrame() {
-    ImGui_ImplVulkan_NewFrame();
+    ImGui_ImplSDLGPU3_NewFrame();
     ImGui_ImplSDL3_NewFrame();
     ImGui::NewFrame();
 }
@@ -219,6 +242,8 @@ void Application::Render() {
     }
     ImGui::DockSpaceOverViewport(dockspace_id, ImGui::GetMainViewport());
 
+    // Runs even while the editor tab is hidden, so quitting, the menus and the shortcuts work from any window
+    m_EditorWindow.Update();
     m_EditorWindow.Render();
     m_PropertiesWindow.Render();
     m_NetlistWindow.Render();
@@ -289,9 +314,9 @@ void Application::DrawMainMenuBar() {
                 window->SetOpen(open);
             }
         }
+        m_OutputWindow.DrawViewMenuItems();
         ImGui::Separator();
-        // Render() applies it right after the menu; the side windows keep their open state and dock back in place,
-        // and Output floats outside the layout
+        // Render() applies it right after the menu; the windows keep their open state and dock back in place
         if (ImGui::MenuItem("Reset Layout")) {
             m_ResetLayout = true;
         }
@@ -316,8 +341,9 @@ void Application::UpdateWindowTitle() {
     }
 }
 
-// A new result of any analysis opens the Output window on its tab; the operating point also shows on the schematic, so
-// running one is enough to see it. Versions also change when results are dropped, which opens nothing
+// A new result of any analysis opens the Output window on its tab, in front unless the user turned that off; the
+// operating point also shows on the schematic, so running one is enough to see it. Versions also change when results
+// are dropped, which opens nothing
 void Application::ShowNewResults() {
     const auto show_if_new = [this](std::size_t &shown, const std::size_t version, const bool has_result,
                                     const PlotTab tab) {
@@ -335,39 +361,52 @@ void Application::ShowNewResults() {
                 PlotTab::DCSweep);
 }
 
-// The editor fills the window; Properties, Analysis Settings and Netlist start closed and dock below it as tabs
-// when opened, and Output floats.
+// The editor, Output, Analysis Settings and Netlist share the main node as tabs, and Properties sits on the right.
+// Only the editor starts open: the View menu opens the others in their place, and each result brings Output to the
+// front.
 // Must run before the windows are drawn. A split returns the new node in the given direction and leaves the rest
 // in its last argument
 void Application::SetupDefaultLayout(ImGuiID dockspace_id) {
     ImGui::DockBuilderSetNodeSize(dockspace_id, ImGui::GetMainViewport()->WorkSize);
-    ImGuiID editor_id = dockspace_id;
-    const ImGuiID properties_id = ImGui::DockBuilderSplitNode(editor_id, ImGuiDir_Down, 0.25f, nullptr, &editor_id);
-    ImGui::DockBuilderDockWindow(m_EditorWindow.GetWindowTitle().c_str(), editor_id);
+    ImGuiID main_id = dockspace_id;
+    const ImGuiID properties_id = ImGui::DockBuilderSplitNode(main_id, ImGuiDir_Right, 0.25f, nullptr, &main_id);
+    // The other windows share the main node as tabs
+    const std::array<const AppWindow *, 4> tabbed_windows{&m_EditorWindow, &m_OutputWindow, &m_SimulationWindow,
+                                                          &m_NetlistWindow};
+    for (const AppWindow *window : tabbed_windows) {
+        ImGui::DockBuilderDockWindow(window->GetWindowTitle().c_str(), main_id);
+    }
     ImGui::DockBuilderDockWindow(m_PropertiesWindow.GetWindowTitle().c_str(), properties_id);
-    ImGui::DockBuilderDockWindow(m_SimulationWindow.GetWindowTitle().c_str(), properties_id);
-    ImGui::DockBuilderDockWindow(m_NetlistWindow.GetWindowTitle().c_str(), properties_id);
     ImGui::DockBuilderFinish(dockspace_id);
 }
 
 void Application::EndFrame() {
-    const ImGuiIO &io = ImGui::GetIO();
-
-    ImDrawData *main_draw_data = ImGui::GetDrawData();
-    const bool main_is_minimized = (main_draw_data->DisplaySize.x <= 0.0f || main_draw_data->DisplaySize.y <= 0.0f);
-    m_Vulkan.SetClearColor(GetThemeBackground());
-    if (!main_is_minimized) {
-        m_Vulkan.FrameRender(main_draw_data);
+    SDL_GPUCommandBuffer *command_buffer = SDL_AcquireGPUCommandBuffer(m_GPUDevice);
+    if (command_buffer == nullptr) {
+        return;
     }
 
-    if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
-        ImGui::UpdatePlatformWindows();
-        ImGui::RenderPlatformWindowsDefault();
+    ImDrawData *draw_data = ImGui::GetDrawData();
+    SDL_GPUTexture *swapchain_texture = nullptr;
+    const bool is_minimized = draw_data->DisplaySize.x <= 0.0f || draw_data->DisplaySize.y <= 0.0f;
+    if (!is_minimized &&
+        SDL_WaitAndAcquireGPUSwapchainTexture(command_buffer, m_SDLWindow, &swapchain_texture, nullptr, nullptr) &&
+        swapchain_texture != nullptr) {
+        // Uploads the vertex and index buffers, which cannot happen inside a render pass
+        ImGui_ImplSDLGPU3_PrepareDrawData(draw_data, command_buffer);
+
+        const ImVec4 background = GetThemeBackground();
+        SDL_GPUColorTargetInfo target_info{};
+        target_info.texture = swapchain_texture;
+        target_info.clear_color = SDL_FColor{background.x, background.y, background.z, background.w};
+        target_info.load_op = SDL_GPU_LOADOP_CLEAR;
+        target_info.store_op = SDL_GPU_STOREOP_STORE;
+        SDL_GPURenderPass *render_pass = SDL_BeginGPURenderPass(command_buffer, &target_info, 1, nullptr);
+        ImGui_ImplSDLGPU3_RenderDrawData(draw_data, command_buffer, render_pass);
+        SDL_EndGPURenderPass(render_pass);
     }
 
-    if (!main_is_minimized) {
-        m_Vulkan.FramePresent();
-    }
+    SDL_SubmitGPUCommandBuffer(command_buffer);
 }
 
 } // namespace GUI

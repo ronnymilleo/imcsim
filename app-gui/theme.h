@@ -7,7 +7,6 @@
 #define IMCSIM_THEME_H
 
 #include "imgui.h"
-#include <array>
 #include <cstddef>
 #include <span>
 
@@ -48,9 +47,8 @@ struct ThemePalette {
     ImU32 Selected;
     ImU32 CanvasText;
     ImU32 VoltageLabel;
-    // Heat scale of voltages and currents, from the lowest value to the highest
-    std::array<ImVec4, 4> HeatStops;
-    // Raises node and trace colors to full brightness, for a theme whose background is pure black
+    // Raises node and trace colors to full brightness, for a theme whose canvas is so dark that their usual tones
+    // look dim on it
     bool BrightTraces = false;
 };
 

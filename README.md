@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/ronnymilleo/imcsim/actions/workflows/ci.yml/badge.svg)](https://github.com/ronnymilleo/imcsim/actions/workflows/ci.yml)
 
-Immediate Mode Circuit Simulator, built with Dear ImGui, SDL3 and Vulkan. Circuits are simulated with
+Immediate Mode Circuit Simulator, built with Dear ImGui and SDL3. Circuits are simulated with
 [ngspice](https://ngspice.sourceforge.io/).
 
 ![imcsim with an RC low-pass filter driven by a 1 kHz sine: the schematic with its probed nodes on the left, and the
@@ -33,7 +33,7 @@ New to imcsim? The [tutorial](docs/tutorial.md) builds, simulates and exports a 
   heat map that shows the path of the current
 - Exports for reports: plots as SVG images (light for print or dark, at any size) or CSV tables, and the schematic
   as an SVG image with its probes, so the two figures can be shown side by side
-- Four color themes (Graphite, Ember, Phosphor and the light Paper), switched from the View menu
+- Nine color themes, seven dark and two light, switched from the View menu (see [Themes](docs/themes.md))
 - IEC or ANSI symbols, optional terminal numbers, parts rotated (R) and mirrored left to right (M) or top to bottom
   (Shift+M), undo and redo, and schematics saved as JSON together with the settings of every analysis and the
   measured traces
@@ -60,20 +60,18 @@ Output characteristics of a 2N3904 from a stepped DC sweep, one curve per base c
 
 ![A DC sweep of the collector voltage for five base currents, each curve labeled with its current](docs/images/dc_sweep.png)
 
-The four themes: Graphite (the default), Ember, Phosphor and the light Paper:
-
-![The same circuit and transient in the Graphite, Ember, Phosphor and Paper themes](docs/images/themes.png)
-
 ## Documentation
 
 The [tutorial](docs/tutorial.md) walks through a first circuit step by step. The [user guide](docs/user_guide.md)
 explains the editor, terminal numbers, current signs, probes, plots and exports, and
-[Simulation models](docs/models.md) describes the model behind every part and what it leaves out.
-
-On Wayland, the windows cannot be dragged out of the main window, though they still float and dock inside it. Run with `SDL_VIDEODRIVER=x11` to allow it.
+[Simulation models](docs/models.md) describes the model behind every part and what it leaves out. [Themes](docs/themes.md)
+shows the same circuit and its plots in each color theme.
 
 ## Install
 
+- **Windows 10 version 1903 or newer** (x64): download `imcsim-<version>-windows-x64.zip` from the
+  [releases](https://github.com/ronnymilleo/imcsim/releases), extract it anywhere and run `imcsim.exe`. It carries
+  ngspice; it needs nothing else installed.
 - **Any Linux distribution** with glibc 2.39 or newer (Ubuntu 24.04, Debian 13, Fedora 40 and later): download the
   AppImage from the [releases](https://github.com/ronnymilleo/imcsim/releases), make it executable and run it:
 
@@ -91,35 +89,42 @@ On Wayland, the windows cannot be dragged out of the main window, though they st
   makepkg -si
   ```
 
-The layout, theme and view preferences are kept in `~/.local/share/imcsim/imgui.ini`.
+The layout, theme and view preferences are kept in `imgui.ini`, in `~/.local/share/imcsim` on Linux and
+`%APPDATA%\imcsim` on Windows.
 
 To build from source instead, read on.
 
 ## Requirements
 
-- Linux with a GPU and driver that support Vulkan
+- A GPU and driver that support Vulkan on Linux, or Direct3D 12 on Windows (see [below](#windows))
 - CMake 4.3 or newer
 - A C++23 compiler (tested with GCC 16)
 - Ninja (or another CMake generator)
-- SDL3 development files
-- Vulkan headers and loader (the Vulkan SDK is not required)
+- The build dependencies of SDL3 (X11, Wayland, libxkbcommon): SDL itself is a submodule in `vendor/`,
+  compiled and linked statically with the project, so every platform carries the same version
+- On Linux, the Vulkan loader at run time (`vulkan-icd-loader` on Arch, `libvulkan1` on Ubuntu), which SDL
+  opens when the program starts
 - ngspice built as a shared library (`libngspice` and its `sharedspice.h` header; tested with ngspice 47)
 - pkg-config, which CMake uses to find ngspice
-- Git, for the submodules in `vendor/`: Dear ImGui (`docking` branch), ImPlot, nlohmann/json and Catch2
+- Git, for the submodules in `vendor/`: SDL3, Dear ImGui (`docking` branch), ImPlot,
+  nlohmann/json and Catch2
 
 On Arch Linux:
 
 ```
-sudo pacman -S cmake ninja gcc pkgconf sdl3 vulkan-headers vulkan-icd-loader ngspice
+sudo pacman -S cmake ninja gcc pkgconf vulkan-icd-loader ngspice \
+    libxcursor libxi libxfixes libxinerama libxrandr libxss libxtst libxkbcommon wayland wayland-protocols libdecor mesa
 ```
 
 The Arch `ngspice` package already includes the shared library. Also install the Vulkan driver for your GPU
 (for example `vulkan-radeon`).
 
-On Ubuntu 25.04 or newer (older releases do not package SDL3):
+On Ubuntu 25.04 or newer:
 
 ```
-sudo apt install ninja-build g++ pkgconf libsdl3-dev libvulkan-dev mesa-vulkan-drivers libngspice0-dev
+sudo apt install ninja-build g++ pkgconf libvulkan1 mesa-vulkan-drivers libngspice0-dev \
+    libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxi-dev libxss-dev libxfixes-dev libxtst-dev \
+    libxkbcommon-dev libwayland-dev wayland-protocols libdecor-0-dev libegl-dev
 sudo snap install cmake --classic
 ```
 
@@ -144,6 +149,21 @@ If you already cloned without submodules, run `git submodule update --init`.
 
 The binary is written to `out/<build-type>/bin/`.
 
+### Windows
+
+Build with Visual Studio 2026 (the "Desktop development with C++" workload, which brings CMake and Ninja), from a
+Developer PowerShell. The program renders with Direct3D 12, part of Windows, and the repository carries the
+Windows build of ngspice in `vendor/ngspice-windows`, so nothing else is needed:
+
+```
+cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug
+cmake --build build
+out\debug\bin\imcsim.exe
+```
+
+The build copies `ngspice.dll` next to the executable. `cmake --install build --prefix <folder>` lays out the
+folder of the release zip.
+
 ## Tests
 
 The tests use Catch2 and run some circuits through ngspice, so they need the same libraries as the application:
@@ -157,7 +177,8 @@ ctest --test-dir build --output-on-failure
 ## Optional
 
 - `clang-format`: if installed, the build formats the sources automatically.
-- `vulkan-validation-layers`: only needed if you enable Vulkan validation.
+- `vulkan-validation-layers` (Linux): Debug builds use them when they are installed; on Windows the Direct3D 12
+  debug layer comes with the system.
 
 ## License
 

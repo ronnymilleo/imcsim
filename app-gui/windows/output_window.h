@@ -109,8 +109,8 @@ enum class ExportFormat {
  *          V(1)*I(R1), to the transient and DC sweep plots: voltages and currents keep their axes, and any other
  *          unit, or none, goes on a third axis. Export saves the plot of the current tab as an SVG image, redrawn
  *          from its data at a chosen size and theme over the visible X range, or as a CSV table of every sample.
- *          The window floats instead of being docked, so the plots can be as large as needed. It starts closed and
- *          opens on the tab of each new transient, AC sweep or DC sweep.
+ *          It starts closed and opens on the tab of each new result. It also comes to the front then, unless the
+ *          user turned that off in the View menu: a dot on its title or tab then tells a new result is waiting.
  */
 class OutputWindow : public AppWindow {
 public:
@@ -118,6 +118,8 @@ public:
     ~OutputWindow() override = default;
 
     void ShowTab(PlotTab tab);
+    void DrawViewMenuItems();
+    void RegisterSettingsHandler();
 
 private:
     Schematic &m_Schematic;
@@ -146,6 +148,8 @@ private:
     PlotTab m_ShownTab = PlotTab::Transient;
     // Tab to bring to the front on the next frame, after a new result
     std::optional<PlotTab> m_TabToShow;
+    // View preference, kept in imgui.ini: whether a new result brings the window to the front
+    bool m_FrontOnNewResult = true;
     PlotSpan m_DCSweepView;
     ExportStyle m_ExportStyle;
     FileDialog m_ExportDialog;

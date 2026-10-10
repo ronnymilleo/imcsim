@@ -345,6 +345,21 @@ EditorWindow::EditorWindow(Schematic &schematic, AnalysisControls &controls, Par
 }
 
 /**
+ * @brief   Runs what does not depend on the editor being shown: file dialog results, quit, example and menu
+ *          requests, the global shortcuts and the file popups.
+ * @note    Call it every frame before Render() and outside any window: a docked editor behind another tab skips
+ *          Draw(), and the popups opened here are drawn here too, so they show whichever window is in front.
+ */
+void EditorWindow::Update() {
+    ProcessDialogResult();
+    HandleQuitRequest();
+    HandleExampleRequest();
+    HandleCommandRequest();
+    HandleGlobalShortcuts();
+    DrawFilePopups();
+}
+
+/**
  * @brief   Asks to quit, as when the user closes the main window. Call it between frames.
  * @note    Quitting is confirmed right away when there is nothing to lose; otherwise the next frame asks the user
  *          to discard the changes. Check IsQuitConfirmed() after drawing the frame.
@@ -507,12 +522,10 @@ void EditorWindow::RegisterSettingsHandler() {
 
 // Window content only: AppWindow::Render() wraps it in Begin/End
 void EditorWindow::Draw() {
-    // File results and the quit request open popups, which must belong to this window
-    ProcessDialogResult();
-    HandleQuitRequest();
-    HandleExampleRequest();
-    HandleCommandRequest();
-    HandleFileShortcuts();
+    // Only while the editor has the focus, since text fields use Home
+    if (ImGui::Shortcut(ImGuiKey_Home)) {
+        m_FrameMaxZoom = FitMaxZoom;
+    }
     DrawPartPicker();
     DrawToolbar();
 
@@ -571,7 +584,6 @@ void EditorWindow::Draw() {
     DrawStatusBar(view, hovered);
     DrawContextMenu();
     DrawPartPopover();
-    DrawFilePopups();
     m_PopupOpenLastFrame = ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId | ImGuiPopupFlags_AnyPopupLevel);
 }
 
@@ -1571,7 +1583,7 @@ void EditorWindow::DrawContextMenu() {
 }
 
 // Global routing makes the shortcuts work while another editor window, such as Properties, has focus
-void EditorWindow::HandleFileShortcuts() {
+void EditorWindow::HandleGlobalShortcuts() {
     if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_N, ImGuiInputFlags_RouteGlobal)) {
         RequestNew();
     }
@@ -1583,10 +1595,6 @@ void EditorWindow::HandleFileShortcuts() {
     }
     if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiMod_Shift | ImGuiKey_S, ImGuiInputFlags_RouteGlobal)) {
         ShowFileDialog(FileAction::Save);
-    }
-    // Only while the editor has the focus, since text fields use Home
-    if (ImGui::Shortcut(ImGuiKey_Home)) {
-        m_FrameMaxZoom = FitMaxZoom;
     }
     if (ImGui::Shortcut(ImGuiKey_F5, ImGuiInputFlags_RouteGlobal)) {
         m_Controls.RunSelected();
@@ -1666,7 +1674,7 @@ void EditorWindow::HandleExampleRequest() {
     }
 }
 
-// Menu commands run here, inside the editor window, where their popups and file dialogs belong
+// Menu commands run here, from Update(), where their popups are opened and drawn whichever window is in front
 void EditorWindow::HandleCommandRequest() {
     const std::optional<EditorCommand> command = std::exchange(m_RequestedCommand, std::nullopt);
     if (!command) {
@@ -1822,6 +1830,9 @@ void EditorWindow::ProcessDialogResult() {
 
 void EditorWindow::DrawFilePopups() {
     DrawExportPopup();
+    // Centered each time they appear, like the export popup, instead of where imgui.ini remembers them
+    const ImVec2 center = ImGui::GetMainViewport()->GetCenter();
+    ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
     if (ImGui::BeginPopupModal(DiscardPopup, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
         ImGui::TextUnformatted("The schematic has unsaved changes. Discard them?");
         if (ImGui::Button("Discard")) {
@@ -1845,6 +1856,7 @@ void EditorWindow::DrawFilePopups() {
         ImGui::EndPopup();
     }
 
+    ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
     if (ImGui::BeginPopupModal(FileMessagesPopup, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
         ImGui::TextUnformatted(m_FileMessagesTitle.c_str());
         ImGui::Separator();

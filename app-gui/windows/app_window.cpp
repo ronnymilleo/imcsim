@@ -5,9 +5,26 @@
 
 #include "app_window.h"
 
+#include "imgui_internal.h"
 #include <utility>
 
 namespace GUI {
+
+namespace {
+
+// A dock node selects every tab added to it on its next update. Adding the tab of the current window now, in the
+// frame it docks, leaves nothing new for that update, so the selected tab stays in front
+void KeepTabBehind() {
+    ImGuiWindow *window = ImGui::GetCurrentWindow();
+    ImGuiDockNode *node = window->DockNode;
+    if (node == nullptr || node->TabBar == nullptr ||
+        ImGui::TabBarFindTabByID(node->TabBar, window->TabId) != nullptr) {
+        return;
+    }
+    ImGui::TabBarAddTab(node->TabBar, ImGuiTabItemFlags_Unsorted, window);
+}
+
+} // namespace
 
 /**
  * @brief   Creates an open window.
@@ -33,8 +50,19 @@ void AppWindow::Render() {
         ImGui::SetNextWindowSize(*m_InitialSize * ImGui::GetFontSize(), ImGuiCond_FirstUseEver);
         ImGui::SetNextWindowPos(viewport->GetCenter(), ImGuiCond_FirstUseEver, ImVec2(0.5f, 0.5f));
     }
-    if (ImGui::Begin(m_WindowTitle.c_str(), m_Closable ? &m_IsOpen : nullptr, m_WindowFlags)) {
+    if (std::exchange(m_FocusRequested, false)) {
+        ImGui::SetNextWindowFocus();
+    }
+    const bool appear_behind = std::exchange(m_AppearBehind, false);
+    ImGuiWindowFlags flags = m_WindowFlags | (m_NewContentMarker ? ImGuiWindowFlags_UnsavedDocument : 0);
+    if (appear_behind) {
+        flags |= ImGuiWindowFlags_NoFocusOnAppearing;
+    }
+    if (ImGui::Begin(m_WindowTitle.c_str(), m_Closable ? &m_IsOpen : nullptr, flags)) {
         Draw();
+    }
+    if (appear_behind) {
+        KeepTabBehind();
     }
     ImGui::End();
 }
@@ -56,6 +84,26 @@ void AppWindow::SetOpen(const bool open) {
 }
 
 /**
+ * @brief   Opens the window, if closed, without bringing it to the front.
+ * @note    A docked window joins its dock node as a tab behind the selected one; a floating window appears
+ *          without taking the keyboard focus.
+ */
+void AppWindow::OpenBehind() {
+    if (!m_IsOpen) {
+        m_IsOpen = true;
+        m_AppearBehind = true;
+    }
+}
+
+/**
+ * @brief   Brings the window to the front the next time it is drawn.
+ * @note    A docked window becomes the selected tab of its dock node.
+ */
+void AppWindow::Focus() {
+    m_FocusRequested = true;
+}
+
+/**
  * @brief   Returns the window title.
  * @return  The title, which is also the ImGui ID used by the docking layout.
  */
@@ -70,6 +118,14 @@ const std::string &AppWindow::GetWindowTitle() const {
  */
 void AppWindow::SetInitialSize(const ImVec2 size) {
     m_InitialSize = size;
+}
+
+/**
+ * @brief   Shows or hides a dot beside the window title, or beside its tab when docked.
+ * @param[in] shown  True while the window holds something new the user has not seen.
+ */
+void AppWindow::SetNewContentMarker(const bool shown) {
+    m_NewContentMarker = shown;
 }
 
 } // namespace GUI

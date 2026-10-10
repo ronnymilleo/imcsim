@@ -30,15 +30,17 @@ How to read what imcsim measures, plots and exports. The [README](../README.md) 
 - **Menus**: File (files, examples and the schematic export), Edit (undo, redo and changes to the selection) and
   View (fit, wire colors, symbol style, terminal numbers, theme, and the windows). The View choices are kept between
   sessions.
-- **Themes**: View > Theme switches between Graphite (cool gray and blue, the default), Ember (warm charcoal
-  and red), Phosphor (a green monochrome CRT, after a Zed theme) and Paper (light, like a printed datasheet). Node and
-  trace colors are the same in every theme; Paper darkens them so they read on its light background.
-- **Output window**: hidden until an analysis runs; it then opens on the tab of the new result. The operating point
-  tab lists the node voltages and part currents, which also show on the schematic. Reopen it from View.
+- **Themes**: View > Theme switches between nine themes, seven dark (Graphite, the default, Ember, Phosphor,
+  Oscilloscope, Cyber Slate, Blueprint and Amber) and two light (Paper and Vintage); [Themes](themes.md) shows each
+  one. Node and trace colors keep their hues in every theme: the light themes darken them to read on their
+  background, and Phosphor, Oscilloscope, Cyber Slate, Blueprint and Amber brighten them.
+- **Output window**: hidden until an analysis runs; it then comes to the front on the tab of the new result. Turn
+  off View > Bring Output to Front on Results to keep the schematic in front: a dot on the Output tab then tells a
+  new result is waiting. The operating point tab lists the node voltages and part currents, which also show on the schematic. Reopen it from View.
 - **Window layout**: every window floats or docks. Drag a window by its title (or a docked one by its tab) onto
   the arrows that appear over another window to dock it on that side or as a tab; drop it anywhere else to let it
-  float. Output opens floating; Properties, Analysis Settings and Netlist dock below the editor. The layout is kept
-  between sessions, and View > Reset Layout restores the default.
+  float. By default the editor, Output, Analysis Settings and Netlist are tabs of the main area and Properties sits
+  on its right. The layout is kept between sessions, and View > Reset Layout restores the default.
 
 ## Terminals
 
