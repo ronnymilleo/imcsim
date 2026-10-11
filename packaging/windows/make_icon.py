@@ -56,13 +56,14 @@ def over(dst, color, alpha):
     return (mix(color[0], r), mix(color[1], g), mix(color[2], b), out_a)
 
 
-def render(size):
-    scale = size / 256
+def render(size, padding=0):
+    """Draws the icon as a PNG of size pixels, with padding units of the 256-unit drawing left empty on each side."""
+    scale = size / (256 + 2 * padding)
     rows = []
     for row in range(size):
         line = bytearray([0])
         for column in range(size):
-            px, py = (column + 0.5) / scale, (row + 0.5) / scale
+            px, py = (column + 0.5) / scale - padding, (row + 0.5) / scale - padding
             pixel = (0, 0, 0, 0)
             # Distances become pixels, so each edge fades over one pixel at every size
             layers = [

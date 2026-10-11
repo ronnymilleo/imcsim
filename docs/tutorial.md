@@ -9,8 +9,8 @@ The filter is a 1 kΩ resistor in series with a 100 nF capacitor, driven by a 1 
 
 ## 1. Draw a circuit
 
-Start with File > New (Ctrl+N). The window is the schematic editor: a toolbar on top, the grid in the middle and a
-status bar at the bottom that always lists the keys of what you are doing.
+Start with File > New (Ctrl+N; on macOS, every Ctrl shortcut is Cmd). The window is the schematic editor: a toolbar
+on top, the grid in the middle and a status bar at the bottom that always lists the keys of what you are doing.
 
 The toolbar groups its buttons:
 

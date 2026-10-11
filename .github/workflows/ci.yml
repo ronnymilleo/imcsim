@@ -25,7 +25,7 @@ env:
   COMPILER_LAUNCHER: -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
 
 jobs:
-  build-and-test:
+  linux:
     runs-on: ubuntu-latest
     container: archlinux:latest
     steps:
@@ -76,7 +76,7 @@ jobs:
       - name: Compiler cache statistics
         run: ccache --show-stats
 
-  sanitizers:
+  linux-sanitizers:
     runs-on: ubuntu-latest
     container: archlinux:latest
     steps:
@@ -124,6 +124,28 @@ jobs:
       # Ninja looks for cl in the environment, which vcvarsall sets up
       - name: Set up the MSVC environment
         uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Configure
+        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug -DBUILD_TESTS=ON
+
+      - name: Build
+        run: cmake --build build
+
+      - name: Run tests
+        run: ctest --test-dir build --output-on-failure
+
+  macos:
+    # macos-26 is an Apple silicon image with Xcode 26, whose SDK the macOS 26 deployment target of the project needs.
+    # ngspice is Homebrew's shared library and SDL3 comes from its vendor submodule
+    runs-on: macos-26
+    steps:
+      - name: Install build dependencies
+        run: brew install cmake ninja pkgconf libngspice
+
+      - name: Check out the repository
+        uses: actions/checkout@v7
+        with:
+          submodules: recursive
 
       - name: Configure
         run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug -DBUILD_TESTS=ON

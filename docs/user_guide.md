@@ -29,7 +29,7 @@ How to read what imcsim measures, plots and exports. The [README](../README.md) 
   errors, the warnings and the ngspice output.
 - **Menus**: File (files, examples and the schematic export), Edit (undo, redo and changes to the selection) and
   View (fit, wire colors, symbol style, terminal numbers, theme, and the windows). The View choices are kept between
-  sessions.
+  sessions. On macOS the shortcuts use Cmd where this guide says Ctrl: Cmd+S saves, Cmd+Z undoes.
 - **Themes**: View > Theme switches between nine themes, seven dark (Graphite, the default, Ember, Phosphor,
   Oscilloscope, Cyber Slate, Blueprint and Amber) and two light (Paper and Vintage); [Themes](themes.md) shows each
   one. Node and trace colors keep their hues in every theme: the light themes darken them to read on their
