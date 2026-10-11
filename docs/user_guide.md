@@ -42,6 +42,15 @@ How to read what imcsim measures, plots and exports. The [README](../README.md) 
   float. By default the editor, Output, Analysis Settings and Netlist are tabs of the main area and Properties sits
   on its right. The layout is kept between sessions, and View > Reset Layout restores the default.
 
+## Wire colors
+
+**View > Wire Colors** picks what the wires show. **Plain** keeps them in the theme color and **Nodes** colors each
+wire by its node, numbered on the canvas. **Voltage** and **Current** color the wires, and by current also the parts,
+on a heat scale from the last operating point, with a legend at the bottom left. **Current Flow** keeps the wires
+plain and slides arrows along them in the direction each current goes: the arrows all look and move the same, so they
+show the direction at a glance, and each takes the heat color of its current, which carries the magnitude. Voltage,
+Current and Current Flow need an operating point; run one first or they have nothing to show.
+
 ## Terminals
 
 Every part with more than one terminal numbers them in the order the SPICE netlist lists them. Turn on

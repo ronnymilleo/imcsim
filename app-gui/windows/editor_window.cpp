@@ -47,13 +47,12 @@ constexpr float JunctionRadiusScale = 0.15f;
 constexpr float MinJunctionRadius = 2.5f;
 // Voltage labels sit just above and right of their point, clear of the line
 constexpr ImVec2 VoltageLabelOffset = {4.0f, -16.0f};
-// Currents span decades, so the heat scale is logarithmic and shows this many below the largest current
-constexpr double CurrentDecades = 4.0;
 // Heat legend, in font sizes, at the bottom left of the canvas
 constexpr float LegendWidth = 10.0f;
 constexpr float LegendHeight = 0.6f;
 // Null-terminated literals, so data() can go to ImGui
-constexpr auto WireColoringNames = std::to_array<std::string_view>({"Plain", "Nodes", "Voltage", "Current"});
+constexpr auto WireColoringNames =
+    std::to_array<std::string_view>({"Plain", "Nodes", "Voltage", "Current", "Current Flow"});
 // Section of imgui.ini that keeps the View preferences
 constexpr const char *SettingsTypeName = "Editor";
 /**
@@ -305,23 +304,6 @@ std::string DescribeMeasurement(const MeasurementTarget &target,
         return GetMeasurementLabel(target);
     }
     return std::format("{} = {}{}", GetMeasurementLabel(target), Core::FormatValue(*value), target.Node ? "V" : "A");
-}
-
-// Heat level of a current: 1 for the largest in the circuit, 0 for those CurrentDecades below it or less
-float CurrentLevel(const double current, const double largest_current) {
-    if (current == 0.0 || largest_current <= 0.0) {
-        return 0.0f;
-    }
-    return static_cast<float>((std::log10(std::abs(current)) - std::log10(largest_current) + CurrentDecades) /
-                              CurrentDecades);
-}
-
-double LargestCurrent(const Core::OperatingPoint &operating_point) {
-    double largest = 0.0;
-    for (const Core::ComponentCurrent &current : operating_point.Currents) {
-        largest = std::max(largest, std::abs(current.Current));
-    }
-    return largest;
 }
 
 // Heat level of a node voltage, between the lowest and the highest node of the circuit, ground included
@@ -789,6 +771,11 @@ void EditorWindow::DrawWires(SchematicCanvas &canvas, const ViewTransform &view)
         canvas.AddCircleFilled(view.ToScreen(ToVec2(junction)), junction_radius, node_color(node));
     }
 
+    // The plain wires are already down, so the flowing arrows ride on top of them
+    if (m_WireColoring == WireColoring::CurrentFlow && operating_point) {
+        DrawLiveCurrent(canvas, view, m_Schematic, ImGui::GetTime());
+    }
+
     if (!by_nodes) {
         return;
     }
@@ -922,7 +909,8 @@ float EditorWindow::DrawRunStatus(float right_edge) {
 
 // A gradient with the values at its ends, or a reminder to run an operating point
 void EditorWindow::DrawColorLegend(ImDrawList *draw_list, const ImVec2 origin, const ImVec2 size) const {
-    if (m_WireColoring != WireColoring::Voltage && m_WireColoring != WireColoring::Current) {
+    if (m_WireColoring != WireColoring::Voltage && m_WireColoring != WireColoring::Current &&
+        m_WireColoring != WireColoring::CurrentFlow) {
         return;
     }
     const float font_size = ImGui::GetFontSize();

@@ -29,8 +29,13 @@ struct WireCurrent {
     double Current = 0.0;
 };
 
+// Currents span decades, so the heat scale is logarithmic and shows this many below the largest current
+inline constexpr double CurrentDecades = 4.0;
+
 std::optional<double> GetTerminalCurrent(const Core::Component &component, std::size_t terminal,
                                          const std::vector<Core::ComponentCurrent> &currents);
+double LargestCurrent(const Core::OperatingPoint &operating_point);
+float CurrentLevel(double current, double largest_current);
 std::vector<WireCurrent> ComputeWireCurrents(const std::vector<std::unique_ptr<UIElement>> &elements,
                                              const std::vector<UIWire> &wires,
                                              const std::vector<Core::ComponentCurrent> &currents);

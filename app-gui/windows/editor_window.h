@@ -73,13 +73,15 @@ private:
     /**
      * @enum    WireColoring
      * @brief   What the colors of wires (and, by current, of parts) show.
-     * @details Voltage and Current color by the last operating point, on a heat scale with a legend.
+     * @details Voltage and Current color by the last operating point, on a heat scale with a legend; CurrentFlow keeps
+     *          the wires plain and animates arrows along them in the direction the current goes.
      */
     enum class WireColoring {
         Plain,
         Nodes,
         Voltage,
-        Current
+        Current,
+        CurrentFlow
     };
 
     /**

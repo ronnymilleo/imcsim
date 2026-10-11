@@ -5,11 +5,13 @@
 
 #include "schematic_drawing.h"
 
+#include "current_flow.h"
 #include "node_colors.h"
 #include "svg_writer.h"
 #include "theme.h"
 #include <algorithm>
 #include <cfloat>
+#include <cmath>
 #include <cstdlib>
 #include <format>
 #include <set>
@@ -28,6 +30,13 @@ constexpr float MinVoltageDotRadius = 2.5f;
 constexpr float ArrowStart = 0.2f;
 constexpr float ArrowTip = 0.75f;
 constexpr float ArrowHalfWidth = 0.25f;
+// Flowing-current arrows: equal heads spaced this far apart along the wires, in grid units, so they follow the zoom.
+// The arrows only show direction, so they all have the same size and scroll at one speed; the magnitude stays on the
+// heat color. The speed is in grid units per second
+constexpr float FlowArrowSpacing = 0.60f;
+constexpr float FlowArrowLength = 0.20f;
+constexpr float FlowArrowHalfWidth = 0.10f;
+constexpr float FlowSpeed = 1.5f;
 // Terminal numbers are smaller than part labels and muted, so they do not compete with names and values. They sit
 // just outside the terminal, in grid units along the line of its lead, where neither the symbol nor probes draw
 constexpr float TerminalNumberScale = 0.8f;
@@ -191,6 +200,61 @@ void DrawTerminalNumbers(SchematicCanvas &canvas, const ViewTransform &view, con
             const ImVec2 size = font->CalcTextSizeA(font_size, FLT_MAX, 0.0f, text.c_str());
             const ImVec2 position = PlaceBesideLine(outside, size, inward.y == 0.0f, true, TerminalNumberGap);
             canvas.AddText(font, font_size, position, color, text.c_str());
+        }
+    }
+}
+
+/**
+ * @brief   Draws the live current as arrows flowing along every piece of wire, in the direction the current goes.
+ * @param[in,out] canvas     Where the arrows are drawn: the editor window or an exported image.
+ * @param[in] view           Transform from world units to the canvas.
+ * @param[in] schematic      Schematic whose operating point and wires are shown.
+ * @param[in] time           Seconds since an arbitrary start; the arrows scroll with it, so a caller that does not
+ *                           animate, such as an export, passes a fixed value.
+ * @details Arrows are spaced along each wire and scroll with time; they all look alike, since they only show the
+ *          direction, and their color follows the heat scale of the current. Their positions are anchored to the
+ *          grid, so arrows line up across collinear pieces instead of jumping where wires join. Pieces with no
+ *          current at all are left out, since they have no direction to show.
+ */
+void DrawLiveCurrent(SchematicCanvas &canvas, const ViewTransform &view, Schematic &schematic, const double time) {
+    const auto &operating_point = schematic.GetOperatingPoint();
+    if (!operating_point) {
+        return;
+    }
+    const double largest = LargestCurrent(*operating_point);
+    if (largest <= 0.0) {
+        return;
+    }
+    for (const WireCurrent &piece :
+         ComputeWireCurrents(schematic.GetElements(), schematic.GetWires(), operating_point->Currents)) {
+        const ImVec2 start = ToVec2(piece.Start);
+        const ImVec2 end = ToVec2(piece.End);
+        const ImVec2 delta = end - start;
+        const float length = std::sqrt(delta.x * delta.x + delta.y * delta.y);
+        if (piece.Current == 0.0 || length < FlowArrowLength) {
+            continue;
+        }
+        // Unit vector along the wire, turned to point the way the current goes
+        const ImVec2 along = delta / length;
+        const ImVec2 flow = piece.Current >= 0.0 ? along : -along;
+        const ImVec2 across = {-flow.y, flow.x};
+        // Projection of a point onto the flow direction: an arrow sits wherever it is the scrolling phase plus a
+        // multiple of the spacing, so the arrows stay aligned to the grid across the whole schematic. Both ends are
+        // projected so the arrows stay on the wire whether the current runs with its start-to-end order or against it
+        const float phase = std::fmod(static_cast<float>(time) * FlowSpeed, FlowArrowSpacing);
+        const float start_projection = start.x * flow.x + start.y * flow.y;
+        const float end_projection = end.x * flow.x + end.y * flow.y;
+        const float low = std::min(start_projection, end_projection) + FlowArrowLength * 0.5f;
+        const float high = std::max(start_projection, end_projection) - FlowArrowLength * 0.5f;
+        const ImU32 color = GetHeatColor(std::clamp(CurrentLevel(piece.Current, largest), 0.0f, 1.0f));
+        for (int arrow = static_cast<int>(std::ceil((low - phase) / FlowArrowSpacing));
+             arrow <= static_cast<int>(std::floor((high - phase) / FlowArrowSpacing)); ++arrow) {
+            const float distance = phase + static_cast<float>(arrow) * FlowArrowSpacing - start_projection;
+            const ImVec2 center = start + flow * distance;
+            const ImVec2 tip = center + flow * (FlowArrowLength * 0.5f);
+            const ImVec2 back = center - flow * (FlowArrowLength * 0.5f);
+            canvas.AddTriangleFilled(view.ToScreen(tip), view.ToScreen(back + across * FlowArrowHalfWidth),
+                                     view.ToScreen(back - across * FlowArrowHalfWidth), color);
         }
     }
 }
