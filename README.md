@@ -69,52 +69,80 @@ shows the same circuit and its plots in each color theme.
 
 ## Install
 
-- **Windows 10 version 1903 or newer** (x64): download `imcsim-<version>-windows-x64.zip` from the
-  [releases](https://github.com/ronnymilleo/imcsim/releases), extract it anywhere and run `imcsim.exe`. It carries
-  ngspice; it needs nothing else installed.
-- **Any Linux distribution** with glibc 2.39 or newer (Ubuntu 24.04, Debian 13, Fedora 40 and later): download the
-  AppImage from the [releases](https://github.com/ronnymilleo/imcsim/releases), make it executable and run it:
+Every release on the [releases](https://github.com/ronnymilleo/imcsim/releases) page carries ngspice, so nothing
+else needs to be installed beyond what each system lists below. To build from source instead, see [Build](#build).
 
-  ```
-  chmod +x imcsim-*-x86_64.AppImage
-  ./imcsim-*-x86_64.AppImage
-  ```
+### Linux
 
-  It carries ngspice and SDL3; only a Vulkan driver for your GPU is needed.
-- **macOS 26 or newer** (Apple silicon): download `imcsim-<version>-macos-arm64.dmg` from the
-  [releases](https://github.com/ronnymilleo/imcsim/releases), open it and drag imcsim into Applications. It carries
-  ngspice; it needs nothing else installed. The app is not notarized, so the first time it is opened macOS blocks
-  it: allow it in System Settings > Privacy & Security > Open Anyway, or run
-  `xattr -dr com.apple.quarantine /Applications/imcsim.app`. On an Intel Mac, build it with
-  `packaging/macos/build.sh` (see [macOS](#macos)).
-- **Arch Linux**: the package is not on the AUR yet, since AUR registrations are paused for now. Until it is, build
-  it from the PKGBUILD in this repository, which builds the release it names:
+Any distribution with glibc 2.39 or newer (Ubuntu 24.04, Debian 13, Fedora 40 and later): download the AppImage,
+make it executable and run it:
 
-  ```
-  cd packaging/aur
-  makepkg -si
-  ```
+```
+chmod +x imcsim-*-x86_64.AppImage
+./imcsim-*-x86_64.AppImage
+```
+
+It carries ngspice and SDL3; only a Vulkan driver for your GPU is needed.
+
+On Arch Linux, the package is not on the AUR yet, since AUR registrations are paused for now. Until it is, build
+it from the PKGBUILD in this repository, which builds the release it names:
+
+```
+cd packaging/aur
+makepkg -si
+```
+
+### macOS
+
+macOS 26 or newer, Apple silicon: download `imcsim-<version>-macos-arm64.dmg`, open it and drag imcsim into
+Applications. The app is not notarized, so the first time it is opened macOS blocks it: allow it in System
+Settings > Privacy & Security > Open Anyway, or remove the quarantine flag:
+
+```
+xattr -dr com.apple.quarantine /Applications/imcsim.app
+```
+
+On an Intel Mac, build it with `packaging/macos/build.sh` (see [Build › macOS](#macos-1)).
+
+### Windows
+
+Windows 10 version 1903 or newer, x64: download `imcsim-<version>-windows-x64.zip`, extract it anywhere and run
+`imcsim.exe`.
+
+### Settings
 
 The layout, theme and view preferences are kept in `imgui.ini`, in `~/.local/share/imcsim` on Linux,
 `~/Library/Application Support/imcsim` on macOS and `%APPDATA%\imcsim` on Windows.
 
-To build from source instead, read on.
+## Build
 
-## Requirements
+On every system the build needs:
 
-- A GPU and driver that support Vulkan on Linux, Direct3D 12 on Windows (see [below](#windows)) or Metal on
-  macOS (see [below](#macos))
 - CMake 4.3 or newer
-- A C++23 compiler (tested with GCC 16 and Apple Clang 21)
+- A C++23 compiler (tested with GCC 16, Apple Clang 21 and Visual Studio 2026)
 - Ninja (or another CMake generator)
-- On Linux, the build dependencies of SDL3 (X11, Wayland, libxkbcommon): SDL itself is a submodule in `vendor/`,
-  compiled and linked statically with the project, so every platform carries the same version
-- On Linux, the Vulkan loader at run time (`vulkan-icd-loader` on Arch, `libvulkan1` on Ubuntu), which SDL
-  opens when the program starts
+- Git, for the submodules in `vendor/`: SDL3, Dear ImGui (`docking` branch), ImPlot, nlohmann/json and Catch2.
+  SDL is compiled and linked statically with the project, so every platform carries the same version
+
+Clone with the submodules:
+
+```
+git clone --recurse-submodules <repository-url>
+cd imcsim
+```
+
+If you already cloned without submodules, run `git submodule update --init`. The binary is written to
+`out/<build-type>/bin/`.
+
+### Linux
+
+The program renders with Vulkan. Besides the common tools, it needs:
+
+- the build dependencies of SDL3 (X11, Wayland, libxkbcommon)
+- the Vulkan loader at run time (`vulkan-icd-loader` on Arch, `libvulkan1` on Ubuntu), which SDL opens when the
+  program starts, and the Vulkan driver for your GPU
 - ngspice built as a shared library (`libngspice` and its `sharedspice.h` header; tested with ngspice 47)
 - pkg-config, which CMake uses to find ngspice
-- Git, for the submodules in `vendor/`: SDL3, Dear ImGui (`docking` branch), ImPlot,
-  nlohmann/json and Catch2
 
 On Arch Linux:
 
@@ -142,7 +170,19 @@ fails on missing standard library features, install a newer one (for example `g+
 Other distributions usually split ngspice into a development package, such as `libngspice-devel` on Fedora.
 If CMake reports `No package 'ngspice' found`, the shared library or its `ngspice.pc` file is missing.
 
-On macOS 26 or newer, with the Xcode Command Line Tools (`xcode-select --install`) and [Homebrew](https://brew.sh):
+Build and run:
+
+```
+cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug
+cmake --build build
+./out/debug/bin/imcsim
+```
+
+### macOS
+
+The program renders with Metal, part of macOS. It needs macOS 26 or newer, the first whose C++ library parses
+floating-point numbers with `std::from_chars`. Install the Xcode Command Line Tools (`xcode-select --install`),
+then, with [Homebrew](https://brew.sh):
 
 ```
 brew install cmake ninja pkgconf libngspice
@@ -151,40 +191,7 @@ brew install cmake ninja pkgconf libngspice
 `libngspice` is the shared library alone; the `ngspice` formula is the command-line program, which also pulls in
 X11. If CMake reports `Could NOT find PkgConfig`, `pkgconf` is missing.
 
-## Build and run
-
-```
-git clone --recurse-submodules <repository-url>
-cd imcsim
-cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug
-cmake --build build
-./out/debug/bin/imcsim
-```
-
-If you already cloned without submodules, run `git submodule update --init`.
-
-The binary is written to `out/<build-type>/bin/`.
-
-### Windows
-
-Build with Visual Studio 2026 (the "Desktop development with C++" workload, which brings CMake and Ninja), from a
-Developer PowerShell. The program renders with Direct3D 12, part of Windows, and the repository carries the
-Windows build of ngspice in `vendor/ngspice-windows`, so nothing else is needed:
-
-```
-cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug
-cmake --build build
-out\debug\bin\imcsim.exe
-```
-
-The build copies `ngspice.dll` next to the executable. `cmake --install build --prefix <folder>` lays out the
-folder of the release zip.
-
-### macOS
-
-The program renders with Metal, part of macOS. It needs macOS 26 or newer, the first whose C++ library parses
-floating-point numbers with `std::from_chars`. The build makes an application bundle, which runs from Finder or
-the terminal:
+The build makes an application bundle, which runs from Finder or the terminal:
 
 ```
 cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug
@@ -205,12 +212,23 @@ packaging/macos/build.sh
 
 The script builds ngspice from its sources for macOS 26: the Homebrew library only runs on the macOS version it was
 built for. It then builds imcsim against it, and writes `out/macos/imcsim-<version>-macos-<arch>.dmg`, for the
-architecture of the Mac it runs on. The app is not notarized, so macOS blocks it the first time it is opened from a
-download. Allow it in System Settings > Privacy & Security > Open Anyway, or remove the quarantine flag:
+architecture of the Mac it runs on. Like the release, this app is not notarized; see [Install › macOS](#macos) to
+open it the first time.
+
+### Windows
+
+Build with Visual Studio 2026 (the "Desktop development with C++" workload, which brings CMake and Ninja), from a
+Developer PowerShell. The program renders with Direct3D 12, part of Windows, and the repository carries the
+Windows build of ngspice in `vendor/ngspice-windows`, so nothing else is needed:
 
 ```
-xattr -dr com.apple.quarantine /Applications/imcsim.app
+cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug
+cmake --build build
+out\debug\bin\imcsim.exe
 ```
+
+The build copies `ngspice.dll` next to the executable. `cmake --install build --prefix <folder>` lays out the
+folder of the release zip.
 
 ## Tests
 
