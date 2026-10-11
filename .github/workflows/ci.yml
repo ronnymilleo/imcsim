@@ -25,7 +25,7 @@ env:
   COMPILER_LAUNCHER: -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
 
 jobs:
-  build-and-test:
+  linux:
     runs-on: ubuntu-latest
     container: archlinux:latest
     steps:
@@ -76,7 +76,7 @@ jobs:
       - name: Compiler cache statistics
         run: ccache --show-stats
 
-  sanitizers:
+  linux-sanitizers:
     runs-on: ubuntu-latest
     container: archlinux:latest
     steps:
