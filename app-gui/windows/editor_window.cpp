@@ -13,6 +13,7 @@
 #include "probing.h"
 #include "schematic_drawing.h"
 #include "schematic_file.h"
+#include "shortcuts.h"
 #include "spice_value.h"
 #include "theme.h"
 #include "wire_editing.h"
@@ -391,16 +392,16 @@ void EditorWindow::RequestExample(const Example &example) {
  * @note    Call between BeginMenu() and EndMenu(); the command runs on the next frame of the editor.
  */
 void EditorWindow::DrawFileMenuItems() {
-    if (ImGui::MenuItem("New", "Ctrl+N")) {
+    if (ImGui::MenuItem("New", IMCSIM_SHORTCUT "N")) {
         m_RequestedCommand = EditorCommand::New;
     }
-    if (ImGui::MenuItem("Open...", "Ctrl+O")) {
+    if (ImGui::MenuItem("Open...", IMCSIM_SHORTCUT "O")) {
         m_RequestedCommand = EditorCommand::Open;
     }
-    if (ImGui::MenuItem("Save", "Ctrl+S")) {
+    if (ImGui::MenuItem("Save", IMCSIM_SHORTCUT "S")) {
         m_RequestedCommand = EditorCommand::Save;
     }
-    if (ImGui::MenuItem("Save As...", "Ctrl+Shift+S")) {
+    if (ImGui::MenuItem("Save As...", IMCSIM_SHORTCUT "Shift+S")) {
         m_RequestedCommand = EditorCommand::SaveAs;
     }
     ImGui::Separator();
@@ -415,10 +416,10 @@ void EditorWindow::DrawFileMenuItems() {
  * @note    Call between BeginMenu() and EndMenu(); the command runs on the next frame of the editor.
  */
 void EditorWindow::DrawEditMenuItems() {
-    if (ImGui::MenuItem("Undo", "Ctrl+Z", false, m_Schematic.CanUndo())) {
+    if (ImGui::MenuItem("Undo", IMCSIM_SHORTCUT "Z", false, m_Schematic.CanUndo())) {
         m_RequestedCommand = EditorCommand::Undo;
     }
-    if (ImGui::MenuItem("Redo", "Ctrl+Y", false, m_Schematic.CanRedo())) {
+    if (ImGui::MenuItem("Redo", IMCSIM_SHORTCUT "Y", false, m_Schematic.CanRedo())) {
         m_RequestedCommand = EditorCommand::Redo;
     }
     ImGui::Separator();
@@ -615,10 +616,10 @@ void EditorWindow::DrawToolbar() {
     if (tool_button("##probe", ToolIcon::Probe, m_Probing, true, "Probe (P): pick what the plots measure", 0.0f)) {
         StartProbing();
     }
-    if (tool_button("##undo", ToolIcon::Undo, false, m_Schematic.CanUndo(), "Undo (Ctrl+Z)", 0.0f)) {
+    if (tool_button("##undo", ToolIcon::Undo, false, m_Schematic.CanUndo(), "Undo (" IMCSIM_SHORTCUT "Z)", 0.0f)) {
         Undo();
     }
-    if (tool_button("##redo", ToolIcon::Redo, false, m_Schematic.CanRedo(), "Redo (Ctrl+Y)", 0.0f)) {
+    if (tool_button("##redo", ToolIcon::Redo, false, m_Schematic.CanRedo(), "Redo (" IMCSIM_SHORTCUT "Y)", 0.0f)) {
         Redo();
     }
     if (tool_button("##fit", ToolIcon::Fit, false, true, "Fit the schematic in view (Home)", 0.0f)) {

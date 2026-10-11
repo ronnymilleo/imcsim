@@ -81,6 +81,12 @@ shows the same circuit and its plots in each color theme.
   ```
 
   It carries ngspice and SDL3; only a Vulkan driver for your GPU is needed.
+- **macOS 26 or newer** (Apple silicon): download `imcsim-<version>-macos-arm64.dmg` from the
+  [releases](https://github.com/ronnymilleo/imcsim/releases), open it and drag imcsim into Applications. It carries
+  ngspice; it needs nothing else installed. The app is not notarized, so the first time it is opened macOS blocks
+  it: allow it in System Settings > Privacy & Security > Open Anyway, or run
+  `xattr -dr com.apple.quarantine /Applications/imcsim.app`. On an Intel Mac, build it with
+  `packaging/macos/build.sh` (see [macOS](#macos)).
 - **Arch Linux**: the package is not on the AUR yet, since AUR registrations are paused for now. Until it is, build
   it from the PKGBUILD in this repository, which builds the release it names:
 
@@ -89,18 +95,19 @@ shows the same circuit and its plots in each color theme.
   makepkg -si
   ```
 
-The layout, theme and view preferences are kept in `imgui.ini`, in `~/.local/share/imcsim` on Linux and
-`%APPDATA%\imcsim` on Windows.
+The layout, theme and view preferences are kept in `imgui.ini`, in `~/.local/share/imcsim` on Linux,
+`~/Library/Application Support/imcsim` on macOS and `%APPDATA%\imcsim` on Windows.
 
 To build from source instead, read on.
 
 ## Requirements
 
-- A GPU and driver that support Vulkan on Linux, or Direct3D 12 on Windows (see [below](#windows))
+- A GPU and driver that support Vulkan on Linux, Direct3D 12 on Windows (see [below](#windows)) or Metal on
+  macOS (see [below](#macos))
 - CMake 4.3 or newer
-- A C++23 compiler (tested with GCC 16)
+- A C++23 compiler (tested with GCC 16 and Apple Clang 21)
 - Ninja (or another CMake generator)
-- The build dependencies of SDL3 (X11, Wayland, libxkbcommon): SDL itself is a submodule in `vendor/`,
+- On Linux, the build dependencies of SDL3 (X11, Wayland, libxkbcommon): SDL itself is a submodule in `vendor/`,
   compiled and linked statically with the project, so every platform carries the same version
 - On Linux, the Vulkan loader at run time (`vulkan-icd-loader` on Arch, `libvulkan1` on Ubuntu), which SDL
   opens when the program starts
@@ -135,6 +142,15 @@ fails on missing standard library features, install a newer one (for example `g+
 Other distributions usually split ngspice into a development package, such as `libngspice-devel` on Fedora.
 If CMake reports `No package 'ngspice' found`, the shared library or its `ngspice.pc` file is missing.
 
+On macOS 26 or newer, with the Xcode Command Line Tools (`xcode-select --install`) and [Homebrew](https://brew.sh):
+
+```
+brew install cmake ninja pkgconf libngspice
+```
+
+`libngspice` is the shared library alone; the `ngspice` formula is the command-line program, which also pulls in
+X11. If CMake reports `Could NOT find PkgConfig`, `pkgconf` is missing.
+
 ## Build and run
 
 ```
@@ -163,6 +179,38 @@ out\debug\bin\imcsim.exe
 
 The build copies `ngspice.dll` next to the executable. `cmake --install build --prefix <folder>` lays out the
 folder of the release zip.
+
+### macOS
+
+The program renders with Metal, part of macOS. It needs macOS 26 or newer, the first whose C++ library parses
+floating-point numbers with `std::from_chars`. The build makes an application bundle, which runs from Finder or
+the terminal:
+
+```
+cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug
+cmake --build build
+open out/debug/bin/imcsim.app
+```
+
+Run `./out/debug/bin/imcsim.app/Contents/MacOS/imcsim` instead to see the logs in the terminal. On macOS the
+shortcuts use Cmd where this documentation says Ctrl, and the menus show them so.
+
+This bundle loads ngspice from Homebrew. `cmake --install build --prefix <folder>` lays out a standalone
+`imcsim.app`, with `libngspice` copied into `Contents/Frameworks` and the bundle signed again ad hoc. To share
+the app, build it with the packaging script instead:
+
+```
+packaging/macos/build.sh
+```
+
+The script builds ngspice from its sources for macOS 26: the Homebrew library only runs on the macOS version it was
+built for. It then builds imcsim against it, and writes `out/macos/imcsim-<version>-macos-<arch>.dmg`, for the
+architecture of the Mac it runs on. The app is not notarized, so macOS blocks it the first time it is opened from a
+download. Allow it in System Settings > Privacy & Security > Open Anyway, or remove the quarantine flag:
+
+```
+xattr -dr com.apple.quarantine /Applications/imcsim.app
+```
 
 ## Tests
 

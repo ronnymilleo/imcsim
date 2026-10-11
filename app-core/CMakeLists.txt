@@ -30,8 +30,8 @@ target_include_directories(imcsim-core-lib
             ${CMAKE_CURRENT_SOURCE_DIR}/components
 )
 
-# ngspice runs as a shared library: pkg-config finds it on Linux, and on Windows the build of vendor/ngspice-windows
-# (see the README there) is linked, and its DLL copied next to the binaries on every build
+# ngspice runs as a shared library: pkg-config finds it on Linux and macOS, and on Windows the build of
+# vendor/ngspice-windows (see the README there) is linked, and its DLL copied next to the binaries on every build
 if(WIN32)
     set(NGSPICE_WINDOWS_DIR "${PROJECT_SOURCE_DIR}/vendor/ngspice-windows")
     add_library(ngspice UNKNOWN IMPORTED)
@@ -50,6 +50,13 @@ else()
     find_package(PkgConfig REQUIRED)
     pkg_check_modules(NGSPICE REQUIRED IMPORTED_TARGET ngspice)
     set(NGSPICE_LINK_TARGET PkgConfig::NGSPICE)
+    # The macOS bundle carries the library, so the install rules of the project need its file and prefix
+    if(APPLE)
+        set(ngspice_library ${NGSPICE_LINK_LIBRARIES})
+        list(FILTER ngspice_library INCLUDE REGEX "ngspice")
+        set(NGSPICE_LIBRARY_FILE ${ngspice_library} PARENT_SCOPE)
+        set(NGSPICE_PREFIX ${NGSPICE_PREFIX} PARENT_SCOPE)
+    endif()
 endif()
 
 target_link_libraries(imcsim-core-lib

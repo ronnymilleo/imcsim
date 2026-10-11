@@ -12,6 +12,7 @@
 #include "imgui_impl_sdlgpu3.h"
 #include "imgui_internal.h"
 #include "implot.h"
+#include "shortcuts.h"
 #include "theme.h"
 #include <SDL3/SDL.h>
 #include <array>
@@ -283,7 +284,7 @@ void Application::DrawMainMenuBar() {
         }
         ImGui::Separator();
         // Quitting asks the editor first, like closing the window
-        if (ImGui::MenuItem("Quit", "Ctrl+Q")) {
+        if (ImGui::MenuItem("Quit", IMCSIM_SHORTCUT "Q")) {
             m_EditorWindow.RequestQuit();
         }
         ImGui::EndMenu();

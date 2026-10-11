@@ -1,7 +1,7 @@
 name: Release
 
-# A version tag, such as v0.6.0, builds the AppImage and the Windows zip and publishes them with a GitHub release of
-# that tag; a tag with a suffix, such as v0.6.0-rc1, publishes a pre-release
+# A version tag, such as v0.6.0, builds the AppImage, the Windows zip and the macOS disk image and publishes them with
+# a GitHub release of that tag; a tag with a suffix, such as v0.6.0-rc1, publishes a pre-release
 on:
   push:
     tags:
@@ -71,9 +71,41 @@ jobs:
           name: windows
           path: out/zip/*.zip
 
-  # One job publishes both files, so the release is created once
+  macos:
+    # macos-26 is an Apple silicon image with Xcode 26, whose SDK the macOS 26 deployment target of the project
+    # needs; the disk image is for Apple silicon
+    runs-on: macos-26
+    steps:
+      - name: Install build tools
+        run: brew install cmake ninja pkgconf
+
+      - name: Check out the repository
+        uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      # ngspice takes most of the build and only changes with its version in deps.env, or with the deployment target
+      # of the project, which the script checks against the folder it restores
+      - name: Restore the built dependencies
+        uses: actions/cache@v6
+        with:
+          path: ${{ runner.temp }}/macos-deps
+          key: macos-deps-${{ runner.arch }}-${{ hashFiles('packaging/macos/deps.env') }}
+
+      - name: Build the disk image
+        run: packaging/macos/build.sh
+        env:
+          IMCSIM_MACOS_DEPS: ${{ runner.temp }}/macos-deps
+
+      - name: Keep the disk image for the release
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos
+          path: out/macos/*.dmg
+
+  # One job publishes every file, so the release is created once
   publish:
-    needs: [appimage, windows]
+    needs: [appimage, windows, macos]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -82,16 +114,17 @@ jobs:
       attestations: write
       artifact-metadata: write
     steps:
-      - name: Collect the AppImage and the zip
+      - name: Collect the AppImage, the zip and the disk image
         uses: actions/download-artifact@v4
         with:
           path: release
           merge-multiple: true
 
-      # Users check a download with sha256sum -c SHA256SUMS on Linux, or certutil -hashfile <file> SHA256 on Windows
+      # Users check a download with sha256sum -c SHA256SUMS on Linux, certutil -hashfile <file> SHA256 on Windows, or
+      # shasum -a 256 -c SHA256SUMS on macOS
       - name: Write the checksums
         working-directory: release
-        run: sha256sum *.AppImage *.zip > SHA256SUMS
+        run: sha256sum *.AppImage *.zip *.dmg > SHA256SUMS
 
       # Proves the files were built by this workflow from the tagged commit:
       # gh attestation verify <file> --repo ronnymilleo/imcsim
@@ -101,6 +134,7 @@ jobs:
           subject-path: |
             release/*.AppImage
             release/*.zip
+            release/*.dmg
 
       - name: Publish the release
         uses: softprops/action-gh-release@v3

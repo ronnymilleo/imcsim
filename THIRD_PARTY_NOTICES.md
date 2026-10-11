@@ -17,7 +17,7 @@ license.
 
 Their license texts are in `vendor/imgui/LICENSE.txt`, `vendor/implot/LICENSE`, `vendor/json/LICENSE.MIT`,
 `vendor/SDL/LICENSE.txt` and `assets/fonts/`, and are installed with the program under `share/doc/imcsim/licenses/`
-(Linux) or `licenses/` (the Windows zip).
+(Linux), `licenses/` (the Windows zip) or `imcsim.app/Contents/Resources/licenses/` (macOS).
 
 ## Bundled with the AppImage
 
@@ -40,7 +40,19 @@ The zip carries ngspice next to the program, as `ngspice.dll`, with its license 
 It is built from the ngspice sources by `vendor/ngspice-windows/build.ps1`, which changes only the build
 configuration (no OpenMP, no sound support), so it needs no other library.
 
-The GPU driver and the graphics API (the Vulkan loader on Linux, Direct3D 12 on Windows) are not bundled; they come
-from the system.
+## Bundled with the macOS app
+
+The app carries ngspice in `Contents/Frameworks`, as `libngspice.0.dylib`, with its license text in
+`Contents/Resources/licenses/`:
+
+| Component | License | Source |
+|---|---|---|
+| ngspice 47 (shared library) | Modified BSD license | https://ngspice.sourceforge.io/ |
+
+`packaging/macos/build.sh` builds it from the ngspice sources, without OpenMP, FFTW, readline or X11, so it needs no
+library other than those of macOS.
+
+The GPU driver and the graphics API (the Vulkan loader on Linux, Direct3D 12 on Windows, Metal on macOS) are not
+bundled; they come from the system.
 
 Catch2, in `vendor/Catch2`, only builds the tests and is not part of any binary.
