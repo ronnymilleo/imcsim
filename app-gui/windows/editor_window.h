@@ -18,6 +18,8 @@
 #include "ui_elements/ui_element.h"
 #include "ui_elements/ui_wire.h"
 #include "windows/app_window.h"
+#include <array>
+#include <cstddef>
 #include <filesystem>
 #include <optional>
 #include <string>
@@ -73,16 +75,27 @@ private:
     /**
      * @enum    WireColoring
      * @brief   What the colors of wires (and, by current, of parts) show.
-     * @details Voltage and Current color by the last operating point, on a heat scale with a legend; CurrentFlow keeps
-     *          the wires plain and animates arrows along them in the direction the current goes.
+     * @details Voltage and Current color by the last operating point, on a heat scale with a legend.
      */
     enum class WireColoring {
         Plain,
         Nodes,
         Voltage,
         Current,
-        CurrentFlow
     };
+
+    /**
+     * @enum    LiveEffect
+     * @brief   An animated effect that reads the last operating point and draws on top of the schematic.
+     * @details Each effect is turned on by itself, over any wire coloring.
+     */
+    enum class LiveEffect {
+        CurrentFlow,
+        LEDGlow,
+        Count
+    };
+
+    static constexpr std::size_t NumberOfEffects = static_cast<std::size_t>(LiveEffect::Count);
 
     /**
      * @enum    EditorCommand
@@ -127,6 +140,8 @@ private:
     SymbolStyle m_SymbolStyle = SymbolStyle::IEC;
     bool m_ShowTerminalNumbers = false;
     WireColoring m_WireColoring = WireColoring::Plain;
+    // Live effects by enum value, each on its own; all off until asked for
+    std::array<bool, NumberOfEffects> m_LiveEffects = {};
     // Largest zoom of a framing the next Draw() does, once the canvas size is known: the default when a schematic is
     // opened, more for Fit
     std::optional<float> m_FrameMaxZoom;

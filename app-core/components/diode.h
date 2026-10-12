@@ -32,6 +32,13 @@ struct DiodeParameters {
     double TransitTime = 0.0;
 };
 
+enum class LEDColor {
+    NONE,
+    RED,
+    GREEN,
+    BLUE,
+};
+
 /**
  * @struct  DiodeModel
  * @brief   A ready SPICE diode model, offered for one kind of diode part.
@@ -43,6 +50,7 @@ struct DiodeModel {
     const char *SpiceName;
     DiodeParameters Parameters;
     ComponentType Type;
+    LEDColor Color;
 };
 
 inline constexpr const char *CustomDiodeModelName = "Custom";

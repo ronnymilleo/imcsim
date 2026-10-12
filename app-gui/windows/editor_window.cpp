@@ -51,8 +51,8 @@ constexpr ImVec2 VoltageLabelOffset = {4.0f, -16.0f};
 constexpr float LegendWidth = 10.0f;
 constexpr float LegendHeight = 0.6f;
 // Null-terminated literals, so data() can go to ImGui
-constexpr auto WireColoringNames =
-    std::to_array<std::string_view>({"Plain", "Nodes", "Voltage", "Current", "Current Flow"});
+constexpr auto WireColoringNames = std::to_array<std::string_view>({"Plain", "Nodes", "Voltage", "Current"});
+constexpr auto LiveEffectsNames = std::to_array<std::string_view>({"Current Flow", "LED Glow"});
 // Section of imgui.ini that keeps the View preferences
 constexpr const char *SettingsTypeName = "Editor";
 /**
@@ -441,6 +441,16 @@ void EditorWindow::DrawViewMenuItems() {
         }
         ImGui::EndMenu();
     }
+    if (ImGui::BeginMenu("Live Effects")) {
+        for (std::size_t index = 0; index < LiveEffectsNames.size(); ++index) {
+            bool &enabled = m_LiveEffects[index];
+            if (ImGui::MenuItem(LiveEffectsNames[index].data(), nullptr, enabled)) {
+                enabled = !enabled;
+                changed = true;
+            }
+        }
+        ImGui::EndMenu();
+    }
     if (ImGui::BeginMenu("Symbols")) {
         if (ImGui::MenuItem("IEC", nullptr, m_SymbolStyle == SymbolStyle::IEC)) {
             m_SymbolStyle = SymbolStyle::IEC;
@@ -491,6 +501,10 @@ void EditorWindow::RegisterSettingsHandler() {
             editor->m_SymbolStyle = *symbols == "ANSI" ? SymbolStyle::ANSI : SymbolStyle::IEC;
         } else if (const auto numbers = value_of("TerminalNumbers")) {
             editor->m_ShowTerminalNumbers = *numbers == "1";
+        } else if (const auto effects = value_of("LiveEffects")) {
+            for (std::size_t index = 0; index < LiveEffectsNames.size(); ++index) {
+                editor->m_LiveEffects[index] = effects->find(LiveEffectsNames[index]) != std::string_view::npos;
+            }
         }
     };
     handler.WriteAllFn = [](ImGuiContext *, ImGuiSettingsHandler *settings, ImGuiTextBuffer *buffer) {
@@ -498,7 +512,18 @@ void EditorWindow::RegisterSettingsHandler() {
         buffer->appendf("[%s][Preferences]\n", SettingsTypeName);
         buffer->appendf("WireColors=%s\n", WireColoringNames[static_cast<std::size_t>(editor->m_WireColoring)].data());
         buffer->appendf("Symbols=%s\n", editor->m_SymbolStyle == SymbolStyle::ANSI ? "ANSI" : "IEC");
-        buffer->appendf("TerminalNumbers=%d\n\n", editor->m_ShowTerminalNumbers ? 1 : 0);
+        buffer->appendf("TerminalNumbers=%d\n", editor->m_ShowTerminalNumbers ? 1 : 0);
+        std::string live_effects;
+        for (std::size_t index = 0; index < LiveEffectsNames.size(); ++index) {
+            if (!editor->m_LiveEffects[index]) {
+                continue;
+            }
+            if (!live_effects.empty()) {
+                live_effects += ',';
+            }
+            live_effects += LiveEffectsNames[index];
+        }
+        buffer->appendf("LiveEffects=%s\n\n", live_effects.c_str());
     };
     ImGui::AddSettingsHandler(&handler);
 }
@@ -771,9 +796,12 @@ void EditorWindow::DrawWires(SchematicCanvas &canvas, const ViewTransform &view)
         canvas.AddCircleFilled(view.ToScreen(ToVec2(junction)), junction_radius, node_color(node));
     }
 
-    // The plain wires are already down, so the flowing arrows ride on top of them
-    if (m_WireColoring == WireColoring::CurrentFlow && operating_point) {
+    if (m_LiveEffects[static_cast<std::size_t>(LiveEffect::CurrentFlow)] && operating_point) {
         DrawLiveCurrent(canvas, view, m_Schematic, ImGui::GetTime());
+    }
+
+    if (m_LiveEffects[static_cast<std::size_t>(LiveEffect::LEDGlow)] && operating_point) {
+        DrawLEDGlow(canvas, view, m_Schematic);
     }
 
     if (!by_nodes) {
@@ -909,8 +937,7 @@ float EditorWindow::DrawRunStatus(float right_edge) {
 
 // A gradient with the values at its ends, or a reminder to run an operating point
 void EditorWindow::DrawColorLegend(ImDrawList *draw_list, const ImVec2 origin, const ImVec2 size) const {
-    if (m_WireColoring != WireColoring::Voltage && m_WireColoring != WireColoring::Current &&
-        m_WireColoring != WireColoring::CurrentFlow) {
+    if (m_WireColoring != WireColoring::Voltage && m_WireColoring != WireColoring::Current) {
         return;
     }
     const float font_size = ImGui::GetFontSize();

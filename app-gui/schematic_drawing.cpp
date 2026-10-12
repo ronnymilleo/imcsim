@@ -259,6 +259,10 @@ void DrawLiveCurrent(SchematicCanvas &canvas, const ViewTransform &view, Schemat
     }
 }
 
+void DrawLEDGlow(SchematicCanvas &canvas, const ViewTransform &view, Schematic &schematic) {
+
+}
+
 /**
  * @brief   Measures the area a schematic covers when drawn, so a view can frame its labels too.
  * @param[in] schematic         Schematic to measure.

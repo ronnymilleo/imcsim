@@ -28,6 +28,7 @@ void DrawTerminalNumbers(SchematicCanvas &canvas, const ViewTransform &view, con
 
 // Live effects (current, LEDs, etc...)
 void DrawLiveCurrent(SchematicCanvas &canvas, const ViewTransform &view, Schematic &schematic, double time);
+void DrawLEDGlow(SchematicCanvas &canvas, const ViewTransform &view, Schematic &schematic);
 
 /**
  * @struct  SchematicBounds
