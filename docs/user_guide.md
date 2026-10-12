@@ -46,10 +46,20 @@ How to read what imcsim measures, plots and exports. The [README](../README.md) 
 
 **View > Wire Colors** picks what the wires show. **Plain** keeps them in the theme color and **Nodes** colors each
 wire by its node, numbered on the canvas. **Voltage** and **Current** color the wires, and by current also the parts,
-on a heat scale from the last operating point, with a legend at the bottom left. **Current Flow** keeps the wires
-plain and slides arrows along them in the direction each current goes: the arrows all look and move the same, so they
-show the direction at a glance, and each takes the heat color of its current, which carries the magnitude. Voltage,
-Current and Current Flow need an operating point; run one first or they have nothing to show.
+on a heat scale from the last operating point, with a legend at the bottom left. Voltage and Current need an operating
+point; run one first or they have nothing to show.
+
+## Live effects
+
+**View > Live Effects** turns on effects drawn over any wire coloring, each on its own. Both read the last operating
+point, so they show nothing until one runs.
+
+- **Current Flow** slides arrows along the wires in the direction each current goes: the arrows all look and move the
+  same, so they show the direction at a glance, and each takes the heat color of its current, which carries the
+  magnitude.
+- **LED Glow** lights every LED with forward current in its color (an LED with custom parameters glows warm white). The
+  glow grows on a logarithmic scale, from faint around 50 µA to full at 20 mA, the rated current of the ready models.
+  On dark themes it adds light to the canvas, like a lit LED; on light themes it is a soft halo instead.
 
 ## Terminals
 

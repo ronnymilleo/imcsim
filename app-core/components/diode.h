@@ -32,11 +32,15 @@ struct DiodeParameters {
     double TransitTime = 0.0;
 };
 
+/**
+ * @enum    LEDColor
+ * @brief   Color an LED model emits, so the editor can light it up; None for the models of other diodes.
+ */
 enum class LEDColor {
-    NONE,
-    RED,
-    GREEN,
-    BLUE,
+    None,
+    Red,
+    Green,
+    Blue,
 };
 
 /**

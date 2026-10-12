@@ -10,6 +10,7 @@
 #include "components/component.h"
 #include "examples.h"
 #include "file_dialog.h"
+#include "glow_renderer.h"
 #include "helpers.h"
 #include "imgui.h"
 #include "part_editor.h"
@@ -39,7 +40,8 @@ namespace GUI {
  */
 class EditorWindow : public AppWindow {
 public:
-    EditorWindow(Schematic &schematic, AnalysisControls &controls, PartEditor &part_editor);
+    EditorWindow(Schematic &schematic, AnalysisControls &controls, PartEditor &part_editor,
+                 GlowRenderer &glow_renderer);
     ~EditorWindow() override = default;
 
     // Requests, global shortcuts and file popups, whichever window is in front
@@ -131,6 +133,7 @@ private:
     Schematic &m_Schematic;
     AnalysisControls &m_Controls;
     PartEditor &m_PartEditor;
+    GlowRenderer &m_GlowRenderer;
 
     static constexpr float DefaultZoom = 20.0f;
 
@@ -206,6 +209,7 @@ private:
     void DrawWires(SchematicCanvas &canvas, const ViewTransform &view);
     void DrawWireCurrents(SchematicCanvas &canvas, const ViewTransform &view,
                           const Core::OperatingPoint &operating_point);
+    void DrawLEDGlows(ImDrawList *draw_list, const ViewTransform &view);
     ImU32 GetElementColor(std::size_t index) const;
     void DrawStatusBar(const ViewTransform &view, bool hovered);
     float DrawRunStatus(float right_edge);

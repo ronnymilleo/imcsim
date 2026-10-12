@@ -8,6 +8,7 @@
 #include "current_flow.h"
 #include "element_factory.h"
 #include "imgui_internal.h"
+#include "led_glow.h"
 #include "misc/cpp/imgui_stdlib.h"
 #include "node_colors.h"
 #include "probing.h"
@@ -50,6 +51,12 @@ constexpr ImVec2 VoltageLabelOffset = {4.0f, -16.0f};
 // Heat legend, in font sizes, at the bottom left of the canvas
 constexpr float LegendWidth = 10.0f;
 constexpr float LegendHeight = 0.6f;
+// LED glows, in grid units: a dim LED glows over its symbol (4 units long) and a fully lit one beyond it. Additive
+// light can be stronger than a glow blended over a light background, which would hide the symbol
+constexpr float GlowMinRadius = 2.0f;
+constexpr float GlowMaxRadius = 3.5f;
+constexpr float AdditiveGlowIntensity = 0.9f;
+constexpr float BlendedGlowIntensity = 0.5f;
 // Null-terminated literals, so data() can go to ImGui
 constexpr auto WireColoringNames = std::to_array<std::string_view>({"Plain", "Nodes", "Voltage", "Current"});
 constexpr auto LiveEffectsNames = std::to_array<std::string_view>({"Current Flow", "LED Glow"});
@@ -306,6 +313,21 @@ std::string DescribeMeasurement(const MeasurementTarget &target,
     return std::format("{} = {}{}", GetMeasurementLabel(target), Core::FormatValue(*value), target.Node ? "V" : "A");
 }
 
+// Light of an LED color, kept bright so it reads on any background; an LED with custom parameters glows warm white
+ImVec4 GetLEDLight(const Core::LEDColor color) {
+    switch (color) {
+    case Core::LEDColor::Red:
+        return {1.0f, 0.15f, 0.08f, 1.0f};
+    case Core::LEDColor::Green:
+        return {0.2f, 1.0f, 0.25f, 1.0f};
+    case Core::LEDColor::Blue:
+        return {0.2f, 0.4f, 1.0f, 1.0f};
+    case Core::LEDColor::None:
+        break;
+    }
+    return {1.0f, 0.9f, 0.7f, 1.0f};
+}
+
 // Heat level of a node voltage, between the lowest and the highest node of the circuit, ground included
 float VoltageLevel(const double voltage, const std::vector<double> &voltages) {
     const auto [lowest, highest] = std::ranges::minmax(voltages);
@@ -319,9 +341,12 @@ float VoltageLevel(const double voltage, const std::vector<double> &voltages) {
  * @param[in] schematic    Schematic to edit; it must outlive the window.
  * @param[in] controls     Analysis settings and runs, for the Run button; they must outlive the window.
  * @param[in] part_editor  Fields of the selected part, for the properties popover; it must outlive the window.
+ * @param[in] glow_renderer  Draws the glow of lit LEDs; it must outlive the window.
  */
-EditorWindow::EditorWindow(Schematic &schematic, AnalysisControls &controls, PartEditor &part_editor)
-    : AppWindow("Schematic", false), m_Schematic(schematic), m_Controls(controls), m_PartEditor(part_editor) {
+EditorWindow::EditorWindow(Schematic &schematic, AnalysisControls &controls, PartEditor &part_editor,
+                           GlowRenderer &glow_renderer)
+    : AppWindow("Schematic", false), m_Schematic(schematic), m_Controls(controls), m_PartEditor(part_editor),
+      m_GlowRenderer(glow_renderer) {
     for (const PartGroup &group : PartGroups) {
         m_PartGroupChoices.push_back(group.Types.front());
     }
@@ -570,6 +595,10 @@ void EditorWindow::Draw() {
     for (std::size_t index = 0; index < elements.size(); ++index) {
         elements[index]->Draw(canvas, view, GetElementColor(index), m_SymbolStyle);
     }
+    // Over the symbols, so a lit LED looks lit through its own lines
+    if (m_LiveEffects[static_cast<std::size_t>(LiveEffect::LEDGlow)]) {
+        DrawLEDGlows(draw_list, view);
+    }
     if (m_ShowTerminalNumbers) {
         DrawTerminalNumbers(canvas, view, m_Schematic, ScreenTerminalRingScale);
     }
@@ -800,10 +829,6 @@ void EditorWindow::DrawWires(SchematicCanvas &canvas, const ViewTransform &view)
         DrawLiveCurrent(canvas, view, m_Schematic, ImGui::GetTime());
     }
 
-    if (m_LiveEffects[static_cast<std::size_t>(LiveEffect::LEDGlow)] && operating_point) {
-        DrawLEDGlow(canvas, view, m_Schematic);
-    }
-
     if (!by_nodes) {
         return;
     }
@@ -822,6 +847,25 @@ void EditorWindow::DrawWireCurrents(SchematicCanvas &canvas, const ViewTransform
          ComputeWireCurrents(m_Schematic.GetElements(), m_Schematic.GetWires(), operating_point.Currents)) {
         UIWire(piece.Start, piece.End).Draw(canvas, view, GetHeatColor(CurrentLevel(piece.Current, largest)));
     }
+}
+
+// Every lit LED glows in its color, bigger and stronger with its current. Additive light needs a dark background,
+// so light themes blend the glow instead
+void EditorWindow::DrawLEDGlows(ImDrawList *draw_list, const ViewTransform &view) {
+    const auto &operating_point = m_Schematic.GetOperatingPoint();
+    if (!operating_point) {
+        return;
+    }
+    const bool additive = !GetPalette().Light;
+    const float intensity = additive ? AdditiveGlowIntensity : BlendedGlowIntensity;
+    std::vector<Glow> glows;
+    for (const LEDGlow &led : ComputeLEDGlows(m_Schematic.GetElements(), operating_point->Currents)) {
+        ImVec4 light = GetLEDLight(led.Color);
+        light.w = intensity * led.Brightness;
+        const float radius = GlowMinRadius + (GlowMaxRadius - GlowMinRadius) * led.Brightness;
+        glows.push_back({view.ToScreen(ToVec2(led.Center)), radius * m_Zoom, ImGui::ColorConvertFloat4ToU32(light)});
+    }
+    m_GlowRenderer.AddGlows(draw_list, glows, additive);
 }
 
 // Selection wins; coloring by current heats each part by the largest current through its terminals

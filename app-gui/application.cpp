@@ -83,6 +83,7 @@ void Application::Shutdown() {
         SDL_WaitForGPUIdle(m_GPUDevice);
     }
 
+    m_GlowRenderer.Shutdown();
     if (ImGui::GetCurrentContext() != nullptr) {
         ImGui_ImplSDLGPU3_Shutdown();
         ImGui_ImplSDL3_Shutdown();
@@ -198,6 +199,10 @@ int Application::InitImGui() {
     init_info.Device = m_GPUDevice;
     init_info.ColorTargetFormat = SDL_GetGPUSwapchainTextureFormat(m_GPUDevice, m_SDLWindow);
     ImGui_ImplSDLGPU3_Init(&init_info);
+    // The glows are an effect the editor can do without, so a failure is reported but does not stop the program
+    if (m_GlowRenderer.Init(m_GPUDevice, init_info.ColorTargetFormat) != Core::ExitSuccess) {
+        AddError(std::string("Glow renderer: ") + SDL_GetError());
+    }
     return Core::ExitSuccess;
 }
 
@@ -403,7 +408,9 @@ void Application::EndFrame() {
         target_info.load_op = SDL_GPU_LOADOP_CLEAR;
         target_info.store_op = SDL_GPU_STOREOP_STORE;
         SDL_GPURenderPass *render_pass = SDL_BeginGPURenderPass(command_buffer, &target_info, 1, nullptr);
+        m_GlowRenderer.SetRenderPass(render_pass);
         ImGui_ImplSDLGPU3_RenderDrawData(draw_data, command_buffer, render_pass);
+        m_GlowRenderer.SetRenderPass(nullptr);
         SDL_EndGPURenderPass(render_pass);
     }
 

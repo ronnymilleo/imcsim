@@ -11,7 +11,9 @@ add_library(imcsim-gui-lib
             element_factory.cpp
             examples.cpp
             file_dialog.cpp
+            glow_renderer.cpp
             helpers.cpp
+            led_glow.cpp
             node_colors.cpp
             part_editor.cpp
             plot_export.cpp

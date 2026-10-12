@@ -26,9 +26,8 @@ void DrawMeasurementMarkers(SchematicCanvas &canvas, const ViewTransform &view, 
 void DrawTerminalNumbers(SchematicCanvas &canvas, const ViewTransform &view, const Schematic &schematic,
                          float ring_scale);
 
-// Live effects (current, LEDs, etc...)
+// Live effects
 void DrawLiveCurrent(SchematicCanvas &canvas, const ViewTransform &view, Schematic &schematic, double time);
-void DrawLEDGlow(SchematicCanvas &canvas, const ViewTransform &view, Schematic &schematic);
 
 /**
  * @struct  SchematicBounds
