@@ -63,3 +63,5 @@ target_link_libraries(imcsim-core-lib
         PRIVATE
             ${NGSPICE_LINK_TARGET}
 )
+
+imcsim_target_coverage(imcsim-core-lib)

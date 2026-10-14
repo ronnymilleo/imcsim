@@ -41,5 +41,7 @@ target_link_libraries(imcsim-tests
             Catch2::Catch2WithMain
 )
 
+imcsim_target_coverage(imcsim-tests)
+
 include(Catch)
 catch_discover_tests(imcsim-tests)

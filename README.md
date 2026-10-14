@@ -1,5 +1,9 @@
 # imcsim
 
+[![Release](https://img.shields.io/github/v/release/ronnymilleo/imcsim)](https://github.com/ronnymilleo/imcsim/releases)
+[![Release Date](https://img.shields.io/github/release-date/ronnymilleo/imcsim)](https://github.com/ronnymilleo/imcsim/releases)
+[![Coverage Status](https://coveralls.io/repos/github/ronnymilleo/imcsim/badge.svg?branch=main)](https://coveralls.io/github/ronnymilleo/imcsim?branch=main)
+[![CodeFactor](https://www.codefactor.io/repository/github/ronnymilleo/imcsim/badge)](https://www.codefactor.io/repository/github/ronnymilleo/imcsim)
 [![CI](https://github.com/ronnymilleo/imcsim/actions/workflows/ci.yml/badge.svg)](https://github.com/ronnymilleo/imcsim/actions/workflows/ci.yml)
 
 Immediate Mode Circuit Simulator, built with Dear ImGui and SDL3. Circuits are simulated with

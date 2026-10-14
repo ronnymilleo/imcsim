@@ -101,3 +101,5 @@ target_link_libraries(imcsim-gui-lib
         PRIVATE
             nlohmann_json::nlohmann_json
 )
+
+imcsim_target_coverage(imcsim-gui-lib)
