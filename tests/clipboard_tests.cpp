@@ -4,6 +4,7 @@
  */
 
 #include "clipboard.h"
+#include "components/net_label.h"
 #include "element_factory.h"
 #include "examples.h"
 #include "schematic.h"
@@ -136,4 +137,23 @@ TEST_CASE("Every example can be placed as a group", "[clipboard]") {
 
 TEST_CASE("A schematic with nothing in it cannot be placed", "[clipboard]") {
     CHECK_FALSE(GUI::MakePastedGroup({}));
+}
+
+TEST_CASE("A copied net label keeps its name and joins the net it is pasted into", "[clipboard]") {
+    GUI::Schematic schematic;
+    schematic.AddElement(GUI::CreateElement(Core::ComponentType::NetLabel, {0, 0}, GUI::Rotation::R0));
+    static_cast<Core::NetLabel &>(schematic.GetElement(0).GetComponent()).SetNet("OUT");
+
+    auto group = GUI::ParseCopiedSchematic(GUI::CopySelection(schematic.GetElements(), {}, {.Elements = {0}}));
+    REQUIRE(group);
+    GUI::MovePivotTo(*group, {30, 10});
+    for (auto &element : group->Elements) {
+        schematic.AddElement(std::move(element));
+    }
+    REQUIRE(schematic.GetElements().size() == 2);
+    CHECK(static_cast<const Core::NetLabel &>(schematic.GetElements()[1]->GetComponent()).GetNet() == "OUT");
+    // The pasted label is a second point of the same net
+    const GUI::Connectivity &nodes = schematic.GetConnectivity();
+    CHECK(nodes.GetNode(schematic.GetElements()[0]->GetTerminals()[0]) ==
+          nodes.GetNode(schematic.GetElements()[1]->GetTerminals()[0]));
 }

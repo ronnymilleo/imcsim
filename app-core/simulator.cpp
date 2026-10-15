@@ -313,6 +313,7 @@ std::vector<CurrentVector> CurrentVectors(const Component &component) {
     case ComponentType::CurrentSource:
         return {{component.GetName(), std::format("@{}[current]", name)}};
     case ComponentType::Ground:
+    case ComponentType::NetLabel:
     case ComponentType::Diode:
     case ComponentType::ZenerDiode:
     case ComponentType::LED:
@@ -605,6 +606,7 @@ ACCurrent(const CircuitEntry &entry, const std::vector<double> &frequencies,
     case ComponentType::VoltageSource:
         return ReadACCurrent(BranchVectorName(component.GetName()), component.GetName(), frequencies.size());
     case ComponentType::Ground:
+    case ComponentType::NetLabel:
     case ComponentType::Diode:
     case ComponentType::ZenerDiode:
     case ComponentType::LED:

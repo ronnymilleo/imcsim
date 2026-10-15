@@ -53,7 +53,10 @@ All three are ideal:
 - A current source pushes its current from terminal 1 to terminal 2 through itself, into the node at terminal 2.
 
 **VCC** is a DC voltage source from its terminal to ground, with the same limits. **Ground** is node 0, the
-reference of every voltage; it is not an element and carries no current of its own.
+reference of every voltage; it is not an element and carries no current of its own. A **net label** is no element
+either: it only joins the nodes of every point with the same name, compared without regard to case, so the netlist
+has no line for it and the nodes are numbered as if those points were wired together. A net named `0` or `GND` is ground, and one named `VCC` joins every VCC supply, so two supplies of different
+voltages must not share that name.
 
 ## Controlled sources
 

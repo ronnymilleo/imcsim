@@ -7,6 +7,7 @@
 
 #include "current_flow.h"
 #include "node_colors.h"
+#include "probing.h"
 #include "svg_writer.h"
 #include "theme.h"
 #include <algorithm>
@@ -141,7 +142,7 @@ void DrawMeasurementMarkers(SchematicCanvas &canvas, const ViewTransform &view, 
         const ImVec2 point = view.ToScreen((ToVec2(wire.GetStart()) + ToVec2(wire.GetEnd())) / 2.0f);
         canvas.AddCircleFilled(point, dot_radius, GetNodeColor(node));
         DrawMarkerLabel(canvas, view, point, wire.GetStart().Y == wire.GetEnd().Y, true, dot_radius,
-                        std::format("V({})", node), GetNodeColor(node));
+                        GetVoltageLabel(connectivity, node), GetNodeColor(node));
     }
 
     // Currents keep the colors of their plots, which follow their order in the circuit

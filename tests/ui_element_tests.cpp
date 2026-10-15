@@ -9,6 +9,7 @@
 #include "ui_elements/ui_diode.h"
 #include "ui_elements/ui_ground.h"
 #include "ui_elements/ui_mosfet.h"
+#include "ui_elements/ui_net_label.h"
 #include "ui_elements/ui_op_amp.h"
 #include "ui_elements/ui_resistor.h"
 #include "ui_elements/ui_vcc.h"
@@ -33,6 +34,20 @@ TEST_CASE("Ground and VCC have a single terminal at their position", "[ui_elemen
 
     const GUI::UIVCC supply({-1, 4}, GUI::Rotation::R90);
     CHECK(supply.GetTerminals() == std::vector<GUI::GridPoint>{{-1, 4}});
+}
+
+TEST_CASE("A net label has a single terminal at its position and leads upward before rotating", "[ui_element]") {
+    const GUI::UINetLabel label({5, 5}, GUI::Rotation::R0);
+    CHECK(label.GetComponent().GetType() == Core::ComponentType::NetLabel);
+    CHECK(label.GetTerminals() == std::vector<GUI::GridPoint>{{5, 5}});
+    CHECK(label.GetTerminalInward(0) == GUI::GridPoint{0, -1});
+    // The circle is above the terminal: picking it works there and not below
+    CHECK(label.Contains({5.0f, 4.2f}));
+    CHECK_FALSE(label.Contains({5.0f, 6.0f}));
+
+    const GUI::UINetLabel turned({5, 5}, GUI::Rotation::R90);
+    CHECK(turned.GetTerminals() == std::vector<GUI::GridPoint>{{5, 5}});
+    CHECK(turned.Contains({5.8f, 5.0f}));
 }
 
 TEST_CASE("Elements own a component of their type", "[ui_element]") {

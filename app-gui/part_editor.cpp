@@ -16,6 +16,7 @@
 #include <optional>
 #include <span>
 #include <string>
+#include <utility>
 
 namespace GUI {
 
@@ -246,7 +247,7 @@ void PartEditor::Draw() {
         ImGui::TextUnformatted(std::format("Name: {}", component.GetName()).c_str());
     }
     const Core::ComponentType type = component.GetType();
-    if (!component.HasValue() && !HasModel(type)) {
+    if (!component.HasValue() && !HasModel(type) && type != Core::ComponentType::NetLabel) {
         return;
     }
 
@@ -272,9 +273,13 @@ void PartEditor::DrawSelectionSummary() {
     }
 }
 
-// The fields of the kind of part: its model, its waveform, its gain or its value
+// The fields of the kind of part: its net name, model, waveform, gain or value
 void PartEditor::DrawFields(Core::Component &component) {
     const Core::ComponentType type = component.GetType();
+    if (type == Core::ComponentType::NetLabel) {
+        DrawNetLabel(static_cast<Core::NetLabel &>(component));
+        return;
+    }
     if (DrawModeledPart(component)) {
         return;
     }
@@ -334,8 +339,21 @@ void PartEditor::StartTypingValue(const char first) {
     m_Value.StartTyping(first);
 }
 
+/**
+ * @brief   Makes the next Draw() focus the name of the selected net label.
+ * @note    Call it when a label has just been placed, so the user can type its name at once.
+ */
+void PartEditor::FocusNetName() {
+    m_FocusNet = true;
+}
+
 void PartEditor::LoadFields(const Core::Component &component) {
     m_Value.Load(component.GetValue());
+    if (component.GetType() == Core::ComponentType::NetLabel) {
+        const std::string &net = static_cast<const Core::NetLabel &>(component).GetNet();
+        m_Net.fill('\0');
+        net.copy(m_Net.data(), m_Net.size() - 1);
+    }
     if (Core::IsSource(component.GetType())) {
         const auto &source = static_cast<const Core::Source &>(component);
         LoadParameterFields(ACFields, m_ACFields, source.GetAC());
@@ -359,6 +377,26 @@ void PartEditor::LoadFields(const Core::Component &component) {
         m_Value.Load(op_amp.GetIdealBandwidth());
     }
     m_LoadedSelection = m_Schematic.GetSelectionVersion();
+}
+
+// The name applies as soon as it is valid, or empty, which leaves the label unnamed
+void PartEditor::DrawNetLabel(Core::NetLabel &label) {
+    DrawFieldLabel("Net");
+    if (std::exchange(m_FocusNet, false)) {
+        ImGui::SetKeyboardFocusHere();
+    }
+    const bool changed = ImGui::InputText("##net", m_Net.data(), m_Net.size());
+    const std::string typed = m_Net.data();
+    const bool valid = typed.empty() || Core::NetLabel::IsValidNet(typed);
+    if (changed && valid && typed != label.GetNet()) {
+        label.SetNet(typed);
+        m_Schematic.MarkModified();
+    }
+    if (!valid) {
+        ImGui::TextColored(GetErrorTextColor(), "1 to 32 letters, digits, _, - or .");
+    } else {
+        ImGui::TextDisabled("Labels with the same name are one net; 0 and GND are ground, VCC is the supplies");
+    }
 }
 
 void PartEditor::DrawValue(Core::Component &component) {

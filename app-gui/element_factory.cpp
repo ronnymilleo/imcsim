@@ -13,6 +13,7 @@
 #include "ui_elements/ui_ground.h"
 #include "ui_elements/ui_inductor.h"
 #include "ui_elements/ui_mosfet.h"
+#include "ui_elements/ui_net_label.h"
 #include "ui_elements/ui_op_amp.h"
 #include "ui_elements/ui_resistor.h"
 #include "ui_elements/ui_vcc.h"
@@ -55,6 +56,7 @@ constexpr auto Parts = std::to_array<PartInfo>({
     {Core::ComponentType::CCCS, "CCCS (F)"},
     {Core::ComponentType::CCVS, "CCVS (H)"},
     {Core::ComponentType::OpAmp, "Op-amp"},
+    {Core::ComponentType::NetLabel, "Net label"},
 });
 
 // Lowercase letters and digits only, so "opamp" finds "Op-amp" and "vcc" finds "VCC supply"
@@ -111,6 +113,8 @@ std::unique_ptr<UIElement> CreateElement(const Core::ComponentType type, const G
         return std::make_unique<UIControlledSource>(type, position, rotation);
     case Core::ComponentType::OpAmp:
         return std::make_unique<UIOpAmp>(position, rotation);
+    case Core::ComponentType::NetLabel:
+        return std::make_unique<UINetLabel>(position, rotation);
     }
     return nullptr;
 }
