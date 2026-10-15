@@ -7,7 +7,9 @@
 #define IMCSIM_APPLICATION_H
 
 #include "analysis_controls.h"
+#include "glow_renderer.h"
 #include "part_editor.h"
+#include "playback.h"
 #include "schematic.h"
 #include "windows/editor_window.h"
 #include "windows/netlist_window.h"
@@ -43,6 +45,8 @@ private:
     SDL_WindowFlags m_SDLWindowFlags{};
     SDL_Window *m_SDLWindow = nullptr;
     SDL_GPUDevice *m_GPUDevice = nullptr;
+    // Declared before the editor, which draws with it
+    GlowRenderer m_GlowRenderer;
 
     // Application state
     std::vector<std::string> m_Errors;
@@ -62,11 +66,12 @@ private:
     Schematic m_Schematic;
     AnalysisControls m_AnalysisControls{m_Schematic};
     PartEditor m_PartEditor{m_Schematic};
-    EditorWindow m_EditorWindow{m_Schematic, m_AnalysisControls, m_PartEditor};
+    TransientPlayback m_Playback;
+    EditorWindow m_EditorWindow{m_Schematic, m_AnalysisControls, m_PartEditor, m_GlowRenderer, m_Playback};
     PropertiesWindow m_PropertiesWindow{m_PartEditor};
     NetlistWindow m_NetlistWindow{m_Schematic};
     SimulationWindow m_SimulationWindow{m_Schematic, m_AnalysisControls};
-    OutputWindow m_OutputWindow{m_Schematic};
+    OutputWindow m_OutputWindow{m_Schematic, m_Playback};
 
     // Errors
     void AddError(const std::string &message);

@@ -29,8 +29,8 @@ New to imcsim? The [tutorial](docs/tutorial.md) builds, simulates and exports a 
 - Math channels on transient and DC sweep plots, as on an oscilloscope: an operation between two traces picked
   with buttons, or a typed expression such as `V(1,2)`, `V(3)*I(R1)` or `ddt(V(2))`, with units followed (W, Ohm,
   V/s) and a third axis for any unit other than volts and amperes
-- Operating point results on the schematic: values on hover, and wires colored by node, by voltage or by a current
-  heat map that shows the path of the current
+- Operating point and transient results on the schematic: values on hover, wires colored by node, by voltage or by a
+  current heat map that shows the path of the current, parts colored by power, and a time bar to play a transient
 - Exports for reports: plots as SVG images (light for print or dark, at any size) or CSV tables, and the schematic
   as an SVG image with its probes, so the two figures can be shown side by side
 - Nine color themes, seven dark and two light, switched from the View menu (see [Themes](docs/themes.md))

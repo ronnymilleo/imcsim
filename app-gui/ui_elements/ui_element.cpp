@@ -7,6 +7,7 @@
 
 #include "spice_value.h"
 #include <algorithm>
+#include <array>
 #include <cfloat>
 #include <cmath>
 #include <cstdlib>
@@ -18,6 +19,8 @@ namespace {
 
 // Labels sit just outside the tallest two-terminal symbol, which spans y = -0.8 to 0.8
 constexpr float LabelOffset = 1.0f;
+// Room, in grid units, between the symbol bounds and the outline that marks it
+constexpr float OutlinePadding = 0.15f;
 
 } // namespace
 
@@ -63,6 +66,24 @@ void UIElement::DrawIcon(SchematicCanvas &canvas, const ImVec2 center, const flo
     const ViewTransform view({0.0f, 0.0f}, center - middle * zoom, zoom);
     DrawTerminals(canvas, view, color);
     DrawSymbol(canvas, view, color, style);
+}
+
+/**
+ * @brief   Draws a rectangle around the symbol, leads included, turned with the element.
+ * @param[in,out] canvas Where it is drawn: the editor window or an exported image.
+ * @param[in] view       Transform of the current frame.
+ * @param[in] color      Line color.
+ * @note    Marks a selected part without recoloring its symbol, so colors the symbol carries stay readable.
+ */
+void UIElement::DrawOutline(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color) const {
+    const LocalBounds bounds = GetLocalBounds();
+    const float left = bounds.Min.x - OutlinePadding;
+    const float top = bounds.Min.y - OutlinePadding;
+    const float right = bounds.Max.x + OutlinePadding;
+    const float bottom = bounds.Max.y + OutlinePadding;
+    const std::array<ImVec2, 4> corners = {LocalToScreen(view, left, top), LocalToScreen(view, right, top),
+                                           LocalToScreen(view, right, bottom), LocalToScreen(view, left, bottom)};
+    canvas.AddPolyline(corners.data(), static_cast<int>(corners.size()), color, ImDrawFlags_Closed, LineThickness);
 }
 
 /**

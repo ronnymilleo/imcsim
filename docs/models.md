@@ -16,6 +16,11 @@ elements, so the results are those of ngspice with the models below. Some things
   controlled sources and op-amp outputs. It does not change the circuit; the Netlist window leaves it out unless a
   current-controlled source needs it.
 
+- The power shown on the schematic is what a part absorbs: the sum over its terminals of the node voltage times the
+  current into the terminal, at the operating point or at one instant of a transient. It is positive when the part
+  dissipates power and negative when it delivers it. An op-amp reports a current only at its output, so its power is
+  that of its output stage and leaves out what its supply pins give or take.
+
 ## Passive parts
 
 | Part | SPICE element | Value |

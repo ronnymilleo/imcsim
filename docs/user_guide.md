@@ -42,6 +42,52 @@ How to read what imcsim measures, plots and exports. The [README](../README.md) 
   float. By default the editor, Output, Analysis Settings and Netlist are tabs of the main area and Properties sits
   on its right. The layout is kept between sessions, and View > Reset Layout restores the default.
 
+## Wire colors
+
+**View > Wire Colors** picks what the wires show. **Plain** keeps them in the theme color and **Nodes** colors each
+wire by its node, numbered on the canvas. **Voltage**, **Current** and **Power** color the wires (Power only the
+parts, since wires carry none) on a heat scale, with a legend at the bottom left. They need a result on the schematic:
+run an operating point or a transient first, or they have nothing to show.
+
+Over these colors a selected wire gets a halo and a selected part an outline in the selection color, instead of turning that color,
+and the voltage labels switch to the text color of the canvas, so neither passes for a value on the scale.
+
+- **Voltage** spreads the colors from the lowest to the highest node voltage, ground included.
+- **Current** colors wires and parts by the current through them, on a logarithmic scale that reaches four decades
+  below the largest current; the legend marks that floor with `<`.
+- **Power** colors each part by the power it absorbs, on a logarithmic scale of four decades as well. It adds up the
+  voltage of each terminal times the current into it, so a resistor shows its dissipation and a source that delivers
+  power shows it too: colors follow the size of the power, and the hover tooltip gives its sign (negative when the part
+  delivers power).
+
+## Transient on the schematic
+
+After a transient run, the schematic shows the circuit at one instant of it, with the same colors, labels and live
+effects as an operating point. A bar above the canvas moves that instant: **Play** plays the whole run in about five
+seconds (**Loop** starts it over), and the slider picks any instant and stops the playback where you drop it. In the
+Output window, the red line on the transient plot is the same instant: drag it to move the schematic, and it moves by
+itself while the schematic plays.
+
+The colors keep one scale for the whole run, from its lowest to its highest voltage and its largest current and power,
+so a value keeps its color from one instant to the next. A new result starts again at the beginning of the run, paused.
+The schematic shows the last of the operating point and the transient that ran; the bar is only there for a transient.
+
+## Live effects
+
+**View > Live Effects** turns on effects drawn over any wire coloring, each on its own. Both read what the schematic
+shows, an operating point or an instant of a transient, so they show nothing until one runs.
+
+- **Current Flow** slides arrows along the wires in the direction each current goes: the arrows all look and move the
+  same, so they show the direction at a glance, and each takes the heat color of its current, which carries the
+  magnitude. Wires whose current is below the heat scale (four decades under the largest) get no arrows, so leakage
+  does not draw noise, and in a transient the arrows turn around with the current.
+- **LED Glow** lights every LED with forward current in its color (an LED with custom parameters glows warm white). The
+  glow grows on a logarithmic scale, from faint around 50 µA to full at 20 mA, the rated current of the ready models.
+  On dark themes it adds light to the canvas, like a lit LED; on light themes it is a soft halo instead.
+- **Heat Glow** makes every resistor that dissipates power glow orange, bigger and stronger with its power. The
+  largest power of the circuit (of the whole run, for a transient) is full brightness, and the glow fades out two
+  decades below it, so it shows where the power is lost and, while a transient plays, when.
+
 ## Terminals
 
 Every part with more than one terminal numbers them in the order the SPICE netlist lists them. Turn on

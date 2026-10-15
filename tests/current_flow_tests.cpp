@@ -91,6 +91,19 @@ TEST_CASE("Wires that close a loop inside a node carry the current on one path o
     CHECK((pieces[0].Current == 0.0 || pieces[1].Current == 0.0));
 }
 
+TEST_CASE("The current level places currents on a logarithmic heat scale", "[current_flow]") {
+    Core::OperatingPoint operating_point;
+    operating_point.Currents = {{"R1", 1e-3}, {"R2", -1e-5}};
+    CHECK(GUI::LargestCurrent(operating_point) == 1e-3);
+    CHECK(GUI::CurrentLevel(1e-3, 1e-3) == 1.0f);
+    // CurrentDecades below the largest is the bottom of the scale, and half way up is half the level
+    CHECK(GUI::CurrentLevel(1e-7, 1e-3) == 0.0f);
+    CHECK_THAT(GUI::CurrentLevel(1e-5, 1e-3), Catch::Matchers::WithinAbs(0.5f, 1e-6));
+    // Zero current, and a circuit with no current at all, report no level
+    CHECK(GUI::CurrentLevel(0.0, 1e-3) == 0.0f);
+    CHECK(GUI::CurrentLevel(1e-3, 0.0) == 0.0f);
+}
+
 TEST_CASE("Control pins and the op-amp pins other than the output carry no current", "[current_flow]") {
     const std::vector<Core::ComponentCurrent> currents = {{"E1", -3e-3}, {"U1", 2e-3}};
     const auto source = Part(Core::ComponentType::VCVS, {0, 0}, "E1");

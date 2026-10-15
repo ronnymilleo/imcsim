@@ -52,6 +52,7 @@ public:
     // Drawing
     void Draw(SchematicCanvas &canvas, const ViewTransform &view, ImU32 color, SymbolStyle style) const;
     void DrawIcon(SchematicCanvas &canvas, ImVec2 center, float size, ImU32 color, SymbolStyle style) const;
+    void DrawOutline(SchematicCanvas &canvas, const ViewTransform &view, ImU32 color) const;
 
     // Component and placement
     const Core::Component &GetComponent() const;

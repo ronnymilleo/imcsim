@@ -6,6 +6,7 @@
 #include "current_flow.h"
 
 #include <algorithm>
+#include <cmath>
 #include <cstdlib>
 #include <map>
 #include <string>
@@ -77,6 +78,44 @@ std::optional<double> GetTerminalCurrent(const Core::Component &component, const
         return -*current;
     }
     return 0.0;
+}
+
+/**
+ * @brief   Returns the largest current in a circuit, in absolute value, to scale heat colors against.
+ * @param[in] operating_point  Currents of the circuit.
+ * @return  The largest of the reported currents, or zero when there are none.
+ */
+double LargestCurrent(const Core::OperatingPoint &operating_point) {
+    double largest = 0.0;
+    for (const Core::ComponentCurrent &current : operating_point.Currents) {
+        largest = std::max(largest, std::abs(current.Current));
+    }
+    return largest;
+}
+
+/**
+ * @brief   Returns where a value falls on a logarithmic heat scale, as the editor colors currents and powers.
+ * @param[in] value          Value to place, of either sign: only its size counts.
+ * @param[in] largest_value  Largest size of the scale, as the circuit or the whole simulation has it.
+ * @param[in] decades        How many decades below the largest value the scale reaches.
+ * @return  1 for the largest value, 0 for those `decades` below it or less, linear in between on a logarithmic
+ *          scale, and 0 when the value is zero or there is no largest value.
+ */
+float LogarithmicLevel(const double value, const double largest_value, const double decades) {
+    if (value == 0.0 || largest_value <= 0.0) {
+        return 0.0f;
+    }
+    return static_cast<float>((std::log10(std::abs(value)) - std::log10(largest_value) + decades) / decades);
+}
+
+/**
+ * @brief   Returns where a current falls on the heat scale the editor colors wires and parts with.
+ * @param[in] current          Current to place.
+ * @param[in] largest_current  Largest current of the circuit, as LargestCurrent() returns it.
+ * @return  The LogarithmicLevel() of the current over CurrentDecades.
+ */
+float CurrentLevel(const double current, const double largest_current) {
+    return LogarithmicLevel(current, largest_current, CurrentDecades);
 }
 
 /**
