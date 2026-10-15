@@ -50,59 +50,61 @@ private:
     std::vector<std::size_t> m_Parents;
 };
 
-} // namespace
+// What the terminals and wires of a schematic put on each grid point
+struct PointClasses {
+    // How many connections reach each point; a wire passing through a point counts twice
+    std::map<GridPoint, int> ConnectionCount;
+    std::vector<GridPoint> GroundPoints;
+    std::vector<GridPoint> SupplyPoints;
+    // Points of the named labels by the name they are compared with, and the name as typed on each point
+    std::map<std::string, std::vector<GridPoint>> LabeledPoints;
+    std::map<GridPoint, std::string> LabelText;
+};
 
-/**
- * @brief   Computes the nodes and junctions of a schematic.
- * @param[in] elements  Components placed on the grid.
- * @param[in] wires     Wire segments.
- * @note    Cost grows with points times wires, which is fine for hand-drawn schematics.
- */
-Connectivity::Connectivity(const std::vector<std::unique_ptr<UIElement>> &elements, const std::vector<UIWire> &wires) {
-    // Count how many connections reach each point; a wire passing through a point counts twice
-    std::map<GridPoint, int> connection_count;
-    std::vector<GridPoint> ground_points;
-    // Named labels by the name they are compared with, and as typed by grid point, for the name of the node
-    std::map<std::string, std::vector<GridPoint>> labeled_points;
-    std::map<GridPoint, std::string> label_text;
-    std::vector<GridPoint> supply_points;
-    for (const auto &element : elements) {
-        const Core::Component &component = element->GetComponent();
-        bool is_ground = component.GetType() == Core::ComponentType::Ground;
-        const bool is_label = component.GetType() == Core::ComponentType::NetLabel;
-        const std::string net = is_label ? static_cast<const Core::NetLabel &>(component).GetNet() : std::string();
-        const std::string compared = Core::NetLabel::NormalizeNet(net);
-        // A label named 0, as in SPICE, or GND is ground
-        is_ground = is_ground || (is_label && std::ranges::contains(GroundNets, compared));
-        const bool is_supply = component.GetType() == Core::ComponentType::VCC;
-        for (const GridPoint terminal : element->GetTerminals()) {
-            ++connection_count[terminal];
-            if (is_supply) {
-                supply_points.push_back(terminal);
-            }
-            if (is_ground) {
-                ground_points.push_back(terminal);
-            } else if (is_label && Core::NetLabel::IsValidNet(net)) {
-                labeled_points[compared].push_back(terminal);
-                label_text.emplace(terminal, net);
-            }
+void ClassifyElement(const UIElement &element, PointClasses &classes) {
+    const Core::Component &component = element.GetComponent();
+    const bool is_label = component.GetType() == Core::ComponentType::NetLabel;
+    const std::string net = is_label ? static_cast<const Core::NetLabel &>(component).GetNet() : std::string();
+    const std::string compared = Core::NetLabel::NormalizeNet(net);
+    // A label named 0, as in SPICE, or GND is ground
+    const bool is_ground =
+        component.GetType() == Core::ComponentType::Ground || (is_label && std::ranges::contains(GroundNets, compared));
+    const bool is_supply = component.GetType() == Core::ComponentType::VCC;
+    for (const GridPoint terminal : element.GetTerminals()) {
+        ++classes.ConnectionCount[terminal];
+        if (is_supply) {
+            classes.SupplyPoints.push_back(terminal);
+        }
+        if (is_ground) {
+            classes.GroundPoints.push_back(terminal);
+        } else if (is_label && Core::NetLabel::IsValidNet(net)) {
+            classes.LabeledPoints[compared].push_back(terminal);
+            classes.LabelText.emplace(terminal, net);
         }
     }
+}
+
+PointClasses ClassifyPoints(const std::vector<std::unique_ptr<UIElement>> &elements, const std::vector<UIWire> &wires) {
+    PointClasses classes;
+    for (const auto &element : elements) {
+        ClassifyElement(*element, classes);
+    }
     // A label named VCC joins every VCC supply, as one named GND joins every ground
-    if (const auto supply = labeled_points.find(std::string(SupplyNet)); supply != labeled_points.end()) {
-        supply->second.insert(supply->second.end(), supply_points.begin(), supply_points.end());
+    if (const auto supply = classes.LabeledPoints.find(std::string(SupplyNet)); supply != classes.LabeledPoints.end()) {
+        supply->second.insert(supply->second.end(), classes.SupplyPoints.begin(), classes.SupplyPoints.end());
     }
     for (const UIWire &wire : wires) {
-        ++connection_count[wire.GetStart()];
-        ++connection_count[wire.GetEnd()];
+        ++classes.ConnectionCount[wire.GetStart()];
+        ++classes.ConnectionCount[wire.GetEnd()];
     }
+    return classes;
+}
 
-    std::map<GridPoint, std::size_t> index_of_point;
-    for (const auto &[point, count] : connection_count) {
-        index_of_point.emplace(point, index_of_point.size());
-    }
-
-    DisjointSet nodes(index_of_point.size());
+// Joins the two ends of every wire, and the points a wire passes through; a point reached that way counts for the
+// junction dot, which returns the points where three or more connections meet
+std::vector<GridPoint> UniteWires(DisjointSet &nodes, const std::map<GridPoint, std::size_t> &index_of_point,
+                                  std::map<GridPoint, int> &connection_count, const std::vector<UIWire> &wires) {
+    std::vector<GridPoint> junctions;
     for (const UIWire &wire : wires) {
         nodes.Unite(index_of_point.at(wire.GetStart()), index_of_point.at(wire.GetEnd()));
     }
@@ -114,31 +116,62 @@ Connectivity::Connectivity(const std::vector<std::unique_ptr<UIElement>> &elemen
             }
         }
         if (count >= MinJunctionConnections) {
-            m_Junctions.push_back(point);
+            junctions.push_back(point);
         }
     }
+    return junctions;
+}
 
-    // Labels with one name are one node, with or without a wire between them
+// Labels with one name are one node, with or without a wire between them
+void UniteLabels(DisjointSet &nodes, const std::map<GridPoint, std::size_t> &index_of_point,
+                 const std::map<std::string, std::vector<GridPoint>> &labeled_points) {
     for (const auto &[name, points] : labeled_points) {
         for (const GridPoint point : points) {
             nodes.Unite(index_of_point.at(point), index_of_point.at(points.front()));
         }
     }
+}
 
-    // Number the groups: ground first as node 0, the rest in grid order from 1
+// Ground first as node 0, the rest in grid order from 1
+std::map<GridPoint, int> NumberNodes(DisjointSet &nodes, const std::map<GridPoint, std::size_t> &index_of_point,
+                                     const std::vector<GridPoint> &ground_points) {
     std::map<std::size_t, int> node_of_root;
     for (const GridPoint point : ground_points) {
         node_of_root.emplace(nodes.Find(index_of_point.at(point)), 0);
     }
+    std::map<GridPoint, int> node_of_point;
     int next_node = 1;
     for (const auto &[point, index] : index_of_point) {
         const auto [entry, inserted] = node_of_root.emplace(nodes.Find(index), next_node);
         if (inserted) {
             ++next_node;
         }
-        m_NodeOfPoint.emplace(point, entry->second);
+        node_of_point.emplace(point, entry->second);
     }
-    for (const auto &[point, text] : label_text) {
+    return node_of_point;
+}
+
+} // namespace
+
+/**
+ * @brief   Computes the nodes and junctions of a schematic.
+ * @param[in] elements  Components placed on the grid.
+ * @param[in] wires     Wire segments.
+ * @note    Cost grows with points times wires, which is fine for hand-drawn schematics.
+ */
+Connectivity::Connectivity(const std::vector<std::unique_ptr<UIElement>> &elements, const std::vector<UIWire> &wires) {
+    PointClasses classes = ClassifyPoints(elements, wires);
+
+    std::map<GridPoint, std::size_t> index_of_point;
+    for (const auto &[point, count] : classes.ConnectionCount) {
+        index_of_point.emplace(point, index_of_point.size());
+    }
+
+    DisjointSet nodes(index_of_point.size());
+    m_Junctions = UniteWires(nodes, index_of_point, classes.ConnectionCount, wires);
+    UniteLabels(nodes, index_of_point, classes.LabeledPoints);
+    m_NodeOfPoint = NumberNodes(nodes, index_of_point, classes.GroundPoints);
+    for (const auto &[point, text] : classes.LabelText) {
         m_NetOfNode.emplace(m_NodeOfPoint.at(point), text);
     }
 }
