@@ -460,3 +460,57 @@ TEST_CASE("Measuring is not an unsaved change and adds no undo step", "[schemati
     CHECK(schematic.GetElements().empty());
     CHECK(schematic.IsCurrentMeasured("R1"));
 }
+
+TEST_CASE("A measured node stays the same node when an edit renumbers the nodes", "[schematic]") {
+    GUI::Schematic schematic;
+    // Nodes are numbered by position, so the wire at x = 10 is node 1 until something appears to its left
+    schematic.AddWire({10, 0}, {14, 0});
+    schematic.AddWire({20, 0}, {24, 0});
+    const int measured = schematic.GetConnectivity().GetNode({20, 0}).value();
+    schematic.SetVoltageMeasured(measured, true);
+
+    schematic.AddWire({0, 0}, {4, 0});
+    const GUI::Connectivity &nodes = schematic.GetConnectivity();
+    CHECK(nodes.GetNode({20, 0}).value() != measured);
+    CHECK(schematic.IsVoltageMeasured(nodes.GetNode({20, 0}).value()));
+    CHECK_FALSE(schematic.IsVoltageMeasured(nodes.GetNode({0, 0}).value()));
+    CHECK_FALSE(schematic.IsVoltageMeasured(nodes.GetNode({10, 0}).value()));
+}
+
+TEST_CASE("A measured node survives changes that pile up before the nodes are asked for again", "[schematic]") {
+    GUI::Schematic schematic;
+    schematic.AddWire({10, 0}, {14, 0});
+    schematic.AddWire({20, 0}, {24, 0});
+    schematic.SetVoltageMeasured(schematic.GetConnectivity().GetNode({20, 0}).value(), true);
+
+    schematic.AddWire({0, 0}, {4, 0});
+    schematic.AddWire({5, 6}, {9, 6});
+    const GUI::Connectivity &nodes = schematic.GetConnectivity();
+    CHECK(schematic.IsVoltageMeasured(nodes.GetNode({20, 0}).value()));
+    CHECK(schematic.GetConnectivity().GetNode({10, 0}).value() != nodes.GetNode({20, 0}).value());
+}
+
+TEST_CASE("A measured node that loses all its wires is no longer measured", "[schematic]") {
+    GUI::Schematic schematic;
+    schematic.AddWire({10, 0}, {14, 0});
+    schematic.AddWire({20, 0}, {24, 0});
+    schematic.SetVoltageMeasured(schematic.GetConnectivity().GetNode({10, 0}).value(), true);
+
+    // The other wire becomes node 1, the number the deleted wire had, but it was not the one measured
+    schematic.SelectWire(0);
+    schematic.DeleteSelection();
+    const GUI::Connectivity &nodes = schematic.GetConnectivity();
+    CHECK_FALSE(schematic.IsVoltageMeasured(nodes.GetNode({20, 0}).value()));
+}
+
+TEST_CASE("A measured node follows its wires when part of them moves", "[schematic]") {
+    GUI::Schematic schematic;
+    schematic.AddWire({10, 0}, {14, 0});
+    schematic.AddWire({14, 0}, {14, 6});
+    schematic.SetVoltageMeasured(schematic.GetConnectivity().GetNode({10, 0}).value(), true);
+
+    // The horizontal piece slides away; the other piece still carries the node
+    schematic.SetWires({{{10, 2}, {14, 2}}, {{14, 2}, {14, 6}}});
+    const GUI::Connectivity &nodes = schematic.GetConnectivity();
+    CHECK(schematic.IsVoltageMeasured(nodes.GetNode({14, 6}).value()));
+}

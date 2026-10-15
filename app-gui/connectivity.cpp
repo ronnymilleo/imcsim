@@ -118,6 +118,21 @@ std::optional<int> Connectivity::GetNode(const GridPoint point) const {
 }
 
 /**
+ * @brief   Lists every connection point of a node, such as to find the node again after the numbering changes.
+ * @param[in] node  Node number.
+ * @return  The points in order, or an empty list when no point has that number.
+ */
+std::vector<GridPoint> Connectivity::GetPointsOfNode(const int node) const {
+    std::vector<GridPoint> points;
+    for (const auto &[point, point_node] : m_NodeOfPoint) {
+        if (point_node == node) {
+            points.push_back(point);
+        }
+    }
+    return points;
+}
+
+/**
  * @brief   Finds a connection point of a node, such as to save which node is measured independently of numbering.
  * @param[in] node  Node number.
  * @return  The top-left point of the node, so the same schematic always gives the same point, or no value when
