@@ -126,7 +126,8 @@ void Schematic::SetWires(std::vector<UIWire> wires) {
 
 /**
  * @brief   Joins and deduplicates wire segments without changing the circuit.
- * @note    When something changes, wires are merged and removed, so a selected wire is deselected.
+ * @note    When something changes, wires are merged and removed, so the selected wires are deselected; the selected
+ *          elements stay selected.
  */
 void Schematic::SimplifyAllWires() {
     std::vector<UIWire> simplified = SimplifyWires(m_Wires, CollectTerminals());
@@ -134,24 +135,27 @@ void Schematic::SimplifyAllWires() {
         return;
     }
     m_Wires = std::move(simplified);
-    if (m_SelectedWire) {
-        ClearSelection();
+    if (!m_SelectedWires.empty()) {
+        SetSelection(m_SelectedElements, {});
     }
     m_ChangedSinceCommit = true;
     InvalidateDerivedData();
 }
 
 /**
- * @brief   Deletes the selected element or wire, if any.
+ * @brief   Deletes every selected element and wire, if any.
  * @note    Wires attached to a deleted element stay in place, like in LTspice.
  */
 void Schematic::DeleteSelection() {
-    if (m_SelectedElement) {
-        m_Elements.erase(m_Elements.begin() + static_cast<std::ptrdiff_t>(*m_SelectedElement));
-    } else if (m_SelectedWire) {
-        m_Wires.erase(m_Wires.begin() + static_cast<std::ptrdiff_t>(*m_SelectedWire));
-    } else {
+    if (!HasSelection()) {
         return;
+    }
+    // Highest index first, so the indices still to erase stay valid
+    for (auto index = m_SelectedElements.rbegin(); index != m_SelectedElements.rend(); ++index) {
+        m_Elements.erase(m_Elements.begin() + static_cast<std::ptrdiff_t>(*index));
+    }
+    for (auto index = m_SelectedWires.rbegin(); index != m_SelectedWires.rend(); ++index) {
+        m_Wires.erase(m_Wires.begin() + static_cast<std::ptrdiff_t>(*index));
     }
     ClearSelection();
     MarkModified();
@@ -189,8 +193,7 @@ void Schematic::Replace(std::vector<std::unique_ptr<UIElement>> elements, std::v
  * @param[in] index  Index into GetElements().
  */
 void Schematic::SelectElement(const std::size_t index) {
-    ClearSelection();
-    m_SelectedElement = index;
+    SetSelection({index}, {});
 }
 
 /**
@@ -198,41 +201,79 @@ void Schematic::SelectElement(const std::size_t index) {
  * @param[in] index  Index into GetWires().
  */
 void Schematic::SelectWire(const std::size_t index) {
-    ClearSelection();
-    m_SelectedWire = index;
+    SetSelection({}, {index});
+}
+
+/**
+ * @brief   Replaces the selection.
+ * @param[in] elements  Indices into GetElements().
+ * @param[in] wires     Indices into GetWires().
+ */
+void Schematic::SetSelection(std::set<std::size_t> elements, std::set<std::size_t> wires) {
+    m_SelectedElements = std::move(elements);
+    m_SelectedWires = std::move(wires);
+    ++m_SelectionVersion;
 }
 
 /**
  * @brief   Deselects everything.
  */
 void Schematic::ClearSelection() {
-    m_SelectedElement.reset();
-    m_SelectedWire.reset();
-    ++m_SelectionVersion;
+    SetSelection({}, {});
 }
 
 /**
- * @brief   Returns the index of the selected element.
- * @return  The index into GetElements(), or no value when no element is selected.
+ * @brief   Tells whether an element is selected.
+ * @param[in] index  Index into GetElements().
+ * @return  True when the element is in the selection.
  */
-std::optional<std::size_t> Schematic::GetSelectedElementIndex() const {
-    return m_SelectedElement;
+bool Schematic::IsElementSelected(const std::size_t index) const {
+    return m_SelectedElements.contains(index);
 }
 
 /**
- * @brief   Returns the index of the selected wire.
- * @return  The index into GetWires(), or no value when no wire is selected.
+ * @brief   Tells whether a wire is selected.
+ * @param[in] index  Index into GetWires().
+ * @return  True when the wire is in the selection.
  */
-std::optional<std::size_t> Schematic::GetSelectedWireIndex() const {
-    return m_SelectedWire;
+bool Schematic::IsWireSelected(const std::size_t index) const {
+    return m_SelectedWires.contains(index);
 }
 
 /**
- * @brief   Returns the selected element.
- * @return  The element, or nullptr when no element is selected.
+ * @brief   Returns the indices of the selected elements.
+ * @return  Indices into GetElements(), in order.
+ */
+const std::set<std::size_t> &Schematic::GetSelectedElements() const {
+    return m_SelectedElements;
+}
+
+/**
+ * @brief   Returns the indices of the selected wires.
+ * @return  Indices into GetWires(), in order.
+ */
+const std::set<std::size_t> &Schematic::GetSelectedWires() const {
+    return m_SelectedWires;
+}
+
+/**
+ * @brief   Tells whether anything is selected.
+ * @return  True when at least one element or wire is selected.
+ */
+bool Schematic::HasSelection() const {
+    return !m_SelectedElements.empty() || !m_SelectedWires.empty();
+}
+
+/**
+ * @brief   Returns the selected element when it is the only thing selected.
+ * @return  The element, or nullptr when there is no selection, a wire is selected too, or there are several elements.
+ * @note    Editing a part, such as its value, applies to one part at a time, so this is what those edits ask for.
  */
 UIElement *Schematic::GetSelectedElement() {
-    return m_SelectedElement ? m_Elements[*m_SelectedElement].get() : nullptr;
+    if (m_SelectedElements.size() != 1 || !m_SelectedWires.empty()) {
+        return nullptr;
+    }
+    return m_Elements[*m_SelectedElements.begin()].get();
 }
 
 /**

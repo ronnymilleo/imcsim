@@ -53,6 +53,9 @@ private:
     std::array<ValueField, 11> m_OpAmpFields;
 
     void LoadFields(const Core::Component &component);
+    void DrawSelectionSummary();
+    void DrawFields(Core::Component &component);
+    bool DrawModeledPart(Core::Component &component);
     void DrawValue(Core::Component &component);
     void DrawDiode(Core::Diode &diode);
     void DrawBJT(Core::BJT &bjt);

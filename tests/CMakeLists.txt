@@ -14,6 +14,7 @@ add_executable(imcsim-tests
             element_factory_tests.cpp
             current_flow_tests.cpp
             examples_tests.cpp
+            group_editing_tests.cpp
             heat_glow_tests.cpp
             helpers_tests.cpp
             led_glow_tests.cpp
@@ -24,6 +25,7 @@ add_executable(imcsim-tests
             schematic_canvas_tests.cpp
             schematic_file_tests.cpp
             schematic_tests.cpp
+            selection_tests.cpp
             simulator_tests.cpp
             spice_value_tests.cpp
             svg_writer_tests.cpp

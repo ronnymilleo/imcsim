@@ -68,6 +68,7 @@ public:
     std::vector<GridPoint> GetTerminals() const;
     GridPoint GetTerminalInward(std::size_t terminal) const;
     bool Contains(ImVec2 world_pos) const;
+    bool Intersects(ImVec2 min, ImVec2 max) const;
 
 protected:
     // Parts of the symbol, in the order Draw() draws them

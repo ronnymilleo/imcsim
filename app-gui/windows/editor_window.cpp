@@ -8,6 +8,7 @@
 #include "circuit_snapshot.h"
 #include "current_flow.h"
 #include "element_factory.h"
+#include "group_editing.h"
 #include "heat_glow.h"
 #include "imgui_internal.h"
 #include "led_glow.h"
@@ -338,9 +339,18 @@ ImVec4 GetLEDLight(const Core::LEDColor color) {
 // A selected wire keeps its heat color and gets this much wider halo behind it, in pixels, partly see-through
 constexpr float SelectionHaloExtra = 6.0f;
 constexpr ImU32 SelectionHaloAlpha = 150;
+constexpr ImU32 SelectionBoxFillAlpha = 40;
 
 ImU32 WithAlpha(const ImU32 color, const ImU32 alpha) {
     return (color & ~IM_COL32_A_MASK) | (alpha << IM_COL32_A_SHIFT);
+}
+
+// The value of a "key=value" line when it has that key
+std::optional<std::string_view> ValueOf(const std::string_view line, const std::string_view key) {
+    if (!line.starts_with(key) || line.size() <= key.size() || line[key.size()] != '=') {
+        return std::nullopt;
+    }
+    return line.substr(key.size() + 1);
 }
 
 // Power a part absorbs, looked up by the name of the part; a current name such as "Q1.C" belongs to part "Q1"
@@ -451,7 +461,7 @@ void EditorWindow::DrawEditMenuItems() {
         m_RequestedCommand = EditorCommand::Redo;
     }
     ImGui::Separator();
-    const bool part_selected = m_Schematic.GetSelectedElement() != nullptr;
+    const bool part_selected = !m_Schematic.GetSelectedElements().empty();
     if (ImGui::MenuItem("Rotate", "R", false, part_selected)) {
         m_RequestedCommand = EditorCommand::Rotate;
     }
@@ -461,8 +471,23 @@ void EditorWindow::DrawEditMenuItems() {
     if (ImGui::MenuItem("Flip", "Shift+M", false, part_selected)) {
         m_RequestedCommand = EditorCommand::Flip;
     }
-    const bool anything_selected = part_selected || m_Schematic.GetSelectedWireIndex().has_value();
-    if (ImGui::MenuItem("Delete", "Del", false, anything_selected)) {
+    if (ImGui::BeginMenu("Keep Wires in Place", part_selected)) {
+        if (ImGui::MenuItem("Rotate", "Alt+R")) {
+            m_RequestedCommand = EditorCommand::RotateKeepWires;
+        }
+        if (ImGui::MenuItem("Mirror", "Alt+M")) {
+            m_RequestedCommand = EditorCommand::MirrorKeepWires;
+        }
+        if (ImGui::MenuItem("Flip", "Alt+Shift+M")) {
+            m_RequestedCommand = EditorCommand::FlipKeepWires;
+        }
+        ImGui::EndMenu();
+    }
+    ImGui::Separator();
+    if (ImGui::MenuItem("Select All", IMCSIM_SHORTCUT "A")) {
+        m_RequestedCommand = EditorCommand::SelectAll;
+    }
+    if (ImGui::MenuItem("Delete", "Del", false, m_Schematic.HasSelection())) {
         m_RequestedCommand = EditorCommand::Delete;
     }
 }
@@ -530,48 +555,48 @@ void EditorWindow::RegisterSettingsHandler() {
         return settings->UserData;
     };
     handler.ReadLineFn = [](ImGuiContext *, ImGuiSettingsHandler *, void *entry, const char *line) {
-        auto *editor = static_cast<EditorWindow *>(entry);
-        const std::string_view text(line);
-        const auto value_of = [&text](const std::string_view key) -> std::optional<std::string_view> {
-            if (!text.starts_with(key) || text.size() <= key.size() || text[key.size()] != '=') {
-                return std::nullopt;
-            }
-            return text.substr(key.size() + 1);
-        };
-        if (const auto colors = value_of("WireColors")) {
-            const auto found = std::ranges::find(WireColoringNames, *colors);
-            if (found != WireColoringNames.end()) {
-                editor->m_WireColoring = static_cast<WireColoring>(found - WireColoringNames.begin());
-            }
-        } else if (const auto symbols = value_of("Symbols")) {
-            editor->m_SymbolStyle = *symbols == "ANSI" ? SymbolStyle::ANSI : SymbolStyle::IEC;
-        } else if (const auto numbers = value_of("TerminalNumbers")) {
-            editor->m_ShowTerminalNumbers = *numbers == "1";
-        } else if (const auto effects = value_of("LiveEffects")) {
-            for (std::size_t index = 0; index < LiveEffectsNames.size(); ++index) {
-                editor->m_LiveEffects[index] = effects->find(LiveEffectsNames[index]) != std::string_view::npos;
-            }
-        }
+        static_cast<EditorWindow *>(entry)->ReadSetting(line);
     };
     handler.WriteAllFn = [](ImGuiContext *, ImGuiSettingsHandler *settings, ImGuiTextBuffer *buffer) {
-        const auto *editor = static_cast<const EditorWindow *>(settings->UserData);
-        buffer->appendf("[%s][Preferences]\n", SettingsTypeName);
-        buffer->appendf("WireColors=%s\n", WireColoringNames[static_cast<std::size_t>(editor->m_WireColoring)].data());
-        buffer->appendf("Symbols=%s\n", editor->m_SymbolStyle == SymbolStyle::ANSI ? "ANSI" : "IEC");
-        buffer->appendf("TerminalNumbers=%d\n", editor->m_ShowTerminalNumbers ? 1 : 0);
-        std::string live_effects;
-        for (std::size_t index = 0; index < LiveEffectsNames.size(); ++index) {
-            if (!editor->m_LiveEffects[index]) {
-                continue;
-            }
-            if (!live_effects.empty()) {
-                live_effects += ',';
-            }
-            live_effects += LiveEffectsNames[index];
-        }
-        buffer->appendf("LiveEffects=%s\n\n", live_effects.c_str());
+        static_cast<const EditorWindow *>(settings->UserData)->WriteSettings(*buffer);
     };
     ImGui::AddSettingsHandler(&handler);
+}
+
+// One "Key=value" line of the preferences; keys and values that are not known are ignored
+void EditorWindow::ReadSetting(const std::string_view line) {
+    if (const auto colors = ValueOf(line, "WireColors")) {
+        const auto found = std::ranges::find(WireColoringNames, *colors);
+        if (found != WireColoringNames.end()) {
+            m_WireColoring = static_cast<WireColoring>(found - WireColoringNames.begin());
+        }
+    } else if (const auto symbols = ValueOf(line, "Symbols")) {
+        m_SymbolStyle = *symbols == "ANSI" ? SymbolStyle::ANSI : SymbolStyle::IEC;
+    } else if (const auto numbers = ValueOf(line, "TerminalNumbers")) {
+        m_ShowTerminalNumbers = *numbers == "1";
+    } else if (const auto effects = ValueOf(line, "LiveEffects")) {
+        for (std::size_t index = 0; index < LiveEffectsNames.size(); ++index) {
+            m_LiveEffects[index] = effects->find(LiveEffectsNames[index]) != std::string_view::npos;
+        }
+    }
+}
+
+void EditorWindow::WriteSettings(ImGuiTextBuffer &buffer) const {
+    buffer.appendf("[%s][Preferences]\n", SettingsTypeName);
+    buffer.appendf("WireColors=%s\n", WireColoringNames[static_cast<std::size_t>(m_WireColoring)].data());
+    buffer.appendf("Symbols=%s\n", m_SymbolStyle == SymbolStyle::ANSI ? "ANSI" : "IEC");
+    buffer.appendf("TerminalNumbers=%d\n", m_ShowTerminalNumbers ? 1 : 0);
+    std::string live_effects;
+    for (std::size_t index = 0; index < LiveEffectsNames.size(); ++index) {
+        if (!m_LiveEffects[index]) {
+            continue;
+        }
+        if (!live_effects.empty()) {
+            live_effects += ',';
+        }
+        live_effects += LiveEffectsNames[index];
+    }
+    buffer.appendf("LiveEffects=%s\n\n", live_effects.c_str());
 }
 
 // Window content only: AppWindow::Render() wraps it in Begin/End
@@ -617,7 +642,7 @@ void EditorWindow::Draw() {
     const auto &elements = m_Schematic.GetElements();
     for (std::size_t index = 0; index < elements.size(); ++index) {
         elements[index]->Draw(canvas, view, GetElementColor(index), m_SymbolStyle);
-        if (index == m_Schematic.GetSelectedElementIndex() && ArePartsHeatColored()) {
+        if (m_Schematic.IsElementSelected(index) && ArePartsHeatColored()) {
             elements[index]->DrawOutline(canvas, view, GetPalette().Selected);
         }
     }
@@ -628,6 +653,7 @@ void EditorWindow::Draw() {
     }
     DrawNodeVoltages(draw_list, view);
     DrawMeasurementMarkers(canvas, view, m_Schematic);
+    DrawSelectionBox(draw_list, view);
 
     if (ImGui::IsWindowFocused() && ImGui::IsKeyPressed(ImGuiKey_W)) {
         StartDrawingWires();
@@ -876,58 +902,71 @@ void EditorWindow::DrawTimeBar() {
 void EditorWindow::DrawWires(SchematicCanvas &canvas, const ViewTransform &view) {
     const Connectivity &connectivity = m_Schematic.GetConnectivity();
     const auto &wires = m_Schematic.GetWires();
-    const bool by_nodes = m_WireColoring == WireColoring::Nodes;
-    const bool by_voltage = m_WireColoring == WireColoring::Voltage && m_Displayed;
     const bool drawn_by_current = m_WireColoring == WireColoring::Current && m_Displayed;
-    const std::optional<std::size_t> selected_wire = m_Schematic.GetSelectedWireIndex();
-    if (selected_wire && AreWiresHeatColored()) {
-        const UIWire &wire = wires[*selected_wire];
-        canvas.AddLine(view.ToScreen(ToVec2(wire.GetStart())), view.ToScreen(ToVec2(wire.GetEnd())),
-                       WithAlpha(GetPalette().Selected, SelectionHaloAlpha), LineThickness + SelectionHaloExtra);
-    }
+    DrawWireSelectionHalos(canvas, view);
     if (drawn_by_current) {
         DrawWireCurrents(canvas, view);
     }
-    const auto node_color = [&](const int node) {
-        if (by_nodes) {
-            return GetNodeColor(node);
-        }
-        if (by_voltage && static_cast<std::size_t>(node) < m_Displayed->Point.NodeVoltages.size()) {
-            const double voltage = m_Displayed->Point.NodeVoltages[static_cast<std::size_t>(node)];
-            return GetHeatColor(VoltageLevel(voltage, m_Displayed->Scale));
-        }
-        return GetPalette().Wire;
-    };
 
     for (std::size_t index = 0; index < wires.size(); ++index) {
         const UIWire &wire = wires[index];
-        const bool selected = index == selected_wire && !AreWiresHeatColored();
+        const bool selected = m_Schematic.IsWireSelected(index) && !AreWiresHeatColored();
         if (drawn_by_current && !selected) {
             continue;
         }
         // Every wire end is a connection point, so it always has a node
         const int node = connectivity.GetNode(wire.GetStart()).value_or(0);
-        wire.Draw(canvas, view, selected ? GetPalette().Selected : node_color(node));
+        wire.Draw(canvas, view, selected ? GetPalette().Selected : GetWireColor(node));
     }
 
     const float junction_radius = std::max(m_Zoom * JunctionRadiusScale, MinJunctionRadius);
     for (const GridPoint junction : connectivity.GetJunctions()) {
         const int node = connectivity.GetNode(junction).value_or(0);
-        canvas.AddCircleFilled(view.ToScreen(ToVec2(junction)), junction_radius, node_color(node));
+        canvas.AddCircleFilled(view.ToScreen(ToVec2(junction)), junction_radius, GetWireColor(node));
     }
 
     if (m_LiveEffects[static_cast<std::size_t>(LiveEffect::CurrentFlow)] && m_Displayed) {
         DrawLiveCurrent(canvas, view, m_Schematic, m_Displayed->Point, m_Displayed->Scale, ImGui::GetTime());
     }
 
-    if (!by_nodes) {
+    if (m_WireColoring == WireColoring::Nodes) {
+        DrawNodeNumbers(canvas, view);
+    }
+}
+
+// Over heat colors a selected wire has a halo behind it
+void EditorWindow::DrawWireSelectionHalos(SchematicCanvas &canvas, const ViewTransform &view) {
+    if (!AreWiresHeatColored()) {
         return;
     }
-    for (const UIWire &wire : wires) {
+    for (const std::size_t selected : m_Schematic.GetSelectedWires()) {
+        const UIWire &wire = m_Schematic.GetWires()[selected];
+        canvas.AddLine(view.ToScreen(ToVec2(wire.GetStart())), view.ToScreen(ToVec2(wire.GetEnd())),
+                       WithAlpha(GetPalette().Selected, SelectionHaloAlpha), LineThickness + SelectionHaloExtra);
+    }
+}
+
+// The number of the node on the middle of each wire
+void EditorWindow::DrawNodeNumbers(SchematicCanvas &canvas, const ViewTransform &view) {
+    const Connectivity &connectivity = m_Schematic.GetConnectivity();
+    for (const UIWire &wire : m_Schematic.GetWires()) {
         const int node = connectivity.GetNode(wire.GetStart()).value_or(0);
         const ImVec2 middle = view.ToScreen((ToVec2(wire.GetStart()) + ToVec2(wire.GetEnd())) / 2.0f);
         canvas.AddText(middle, GetPalette().CanvasText, std::format("{}", node).c_str());
     }
+}
+
+// The color of the wires of a node: its own by node, its heat color by voltage, otherwise the color of the theme
+ImU32 EditorWindow::GetWireColor(const int node) const {
+    if (m_WireColoring == WireColoring::Nodes) {
+        return GetNodeColor(node);
+    }
+    const bool by_voltage = m_WireColoring == WireColoring::Voltage && m_Displayed;
+    if (by_voltage && static_cast<std::size_t>(node) < m_Displayed->Point.NodeVoltages.size()) {
+        const double voltage = m_Displayed->Point.NodeVoltages[static_cast<std::size_t>(node)];
+        return GetHeatColor(VoltageLevel(voltage, m_Displayed->Scale));
+    }
+    return GetPalette().Wire;
 }
 
 // Each piece of wire takes the heat color of its own current, so the path of the current shows along the wires
@@ -973,7 +1012,7 @@ void EditorWindow::DrawGlows(ImDrawList *draw_list, const ViewTransform &view) {
 // Selection wins, unless the parts are heat colored, where an outline marks it instead; coloring by current heats each
 // part by the largest current through its terminals, and coloring by power by the power it absorbs
 ImU32 EditorWindow::GetElementColor(const std::size_t index) const {
-    if (index == m_Schematic.GetSelectedElementIndex() && !ArePartsHeatColored()) {
+    if (m_Schematic.IsElementSelected(index) && !ArePartsHeatColored()) {
         return GetPalette().Selected;
     }
     const bool by_current = m_WireColoring == WireColoring::Current;
@@ -1016,13 +1055,17 @@ void EditorWindow::DrawStatusBar(const ViewTransform &view, const bool hovered) 
             component.GetName().empty() ? std::string(GetPartName(component.GetType())) : component.GetName();
         hint =
             std::format("{} selected: Enter or double click to edit, type a value, drag to move, R rotate, M mirror, "
-                        "Del delete, right click for more",
+                        "Alt keeps the wires, Del delete, right click for more",
                         name);
-    } else if (m_Schematic.GetSelectedWireIndex()) {
-        hint = "Wire selected: Del delete, Esc deselect";
+    } else if (m_Schematic.HasSelection()) {
+        const std::size_t count = m_Schematic.GetSelectedElements().size() + m_Schematic.GetSelectedWires().size();
+        hint = count == 1 ? "Wire selected: drag to slide it, double click for its whole node, Del delete, Esc deselect"
+                          : std::format("{} items selected: drag to move, R rotate, M mirror, Alt keeps the wires, "
+                                        "Shift+click to add or remove, Del delete, Esc deselect",
+                                        count);
     } else {
-        hint =
-            "Click a part or wire to select it, middle drag to pan, wheel to zoom, Space find a part, W wire, P probe";
+        hint = "Click a part or wire to select it, drag to select an area, middle drag to pan, wheel to zoom, Space "
+               "find a part, W wire, P probe";
     }
     // The right end holds the result of the last run, which stays put, and the grid position before it; the hint is
     // cut short before them
@@ -1499,48 +1542,77 @@ void EditorWindow::HandleProbing(ImDrawList *draw_list, const ViewTransform &vie
 }
 
 /**
- * @brief   Handles selection mode, active while not placing, wiring or probing: click selects an element or a wire,
- *          dragging an element moves it with its wires following, R rotates the selected element, M mirrors it left
- *          to right and Shift+M top to bottom, Delete removes the selection and Esc clears it.
+ * @brief   Handles selection mode, active while not placing, wiring or probing: a click selects an element or a wire,
+ *          Shift+click adds or removes one, a drag on empty canvas selects what the box touches, and a double click on
+ *          a wire selects its whole node. Dragging the selection moves it, a single wire sliding across itself, with
+ *          the wires around it following. R rotates the selection, M mirrors it left to right and Shift+M top to
+ *          bottom, both about its center, and holding Alt leaves the wires where they are; Delete removes the
+ *          selection and Esc clears it.
  */
 void EditorWindow::HandleSelection(const ViewTransform &view, const bool hovered) {
     if (m_PlacingType || m_DrawingWires || m_Probing) {
+        m_Box.reset();
         return;
     }
 
     const ImVec2 cursor_world = view.ToWorld(ImGui::GetIO().MousePos);
+    const bool shift = ImGui::GetIO().KeyShift;
     if (hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
-        SelectAt(cursor_world);
-        if (const UIElement *element = m_Schematic.GetSelectedElement()) {
-            m_Drag = ElementDrag{Snap(cursor_world), element->GetPosition(), element->GetTerminals(),
-                                 m_Schematic.GetWires()};
+        const Selection picked =
+            PickAt(m_Schematic.GetElements(), m_Schematic.GetWires(), cursor_world, WirePickDistance / m_Zoom);
+        const Selection current = {m_Schematic.GetSelectedElements(), m_Schematic.GetSelectedWires()};
+        if (picked.Empty()) {
+            // Empty canvas starts a box; with Shift it adds to what is selected, otherwise it starts over
+            if (!shift) {
+                ClearSelection();
+            }
+            m_Box = SelectionBox{.Start = cursor_world, .Base = shift ? current : Selection{}};
+        } else if (shift) {
+            ApplySelection(Toggled(current, picked));
+        } else if (Joined(current, picked) == current) {
+            // Part of a group: keep the group so it can be dragged, and collapse to the item if it is only a click
+            m_Drag = MakeDrag(Snap(cursor_world), picked);
+        } else {
+            ApplySelection(picked);
+            m_Drag = MakeDrag(Snap(cursor_world), std::nullopt);
         }
     }
 
-    if (hovered && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left) && m_Schematic.GetSelectedElement() != nullptr) {
-        EndDrag();
-        PlacePartPopover(view);
-        m_PartPopoverRequested = true;
+    if (hovered && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
+        if (m_Schematic.GetSelectedElement() != nullptr) {
+            EndDrag();
+            PlacePartPopover(view);
+            m_PartPopoverRequested = true;
+        } else if (m_Schematic.GetSelectedElements().empty() && m_Schematic.GetSelectedWires().size() == 1) {
+            const Selection node = PickNode(m_Schematic.GetWires(), m_Schematic.GetConnectivity(),
+                                            *m_Schematic.GetSelectedWires().begin());
+            EndDrag();
+            ApplySelection(node);
+        }
+    }
+
+    if (m_Box) {
+        if (ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
+            const Selection inside =
+                PickInRectangle(m_Schematic.GetElements(), m_Schematic.GetWires(), m_Box->Start, cursor_world);
+            ApplySelection(Joined(m_Box->Base, inside));
+        } else {
+            m_Box.reset();
+        }
     }
 
     if (m_Drag) {
         if (ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
-            UIElement &element = *m_Schematic.GetSelectedElement();
-            const GridPoint position = m_Drag->StartPosition + (Snap(cursor_world) - m_Drag->StartCursor);
-            if (position != element.GetPosition()) {
-                element.SetPosition(position);
-                m_Schematic.MarkModified();
-            }
-            // Rebuilt every frame, not only on moves, so a rotation during the drag is followed too
-            m_Schematic.SetWires(FollowTerminals(m_Drag->StartWires, m_Drag->StartTerminals, element.GetTerminals()));
+            UpdateDrag(Snap(cursor_world));
         } else {
             EndDrag();
         }
     }
 
     if (ImGui::IsWindowFocused()) {
-        if (ImGui::IsKeyPressed(ImGuiKey_R) && m_Schematic.GetSelectedElement() != nullptr) {
-            RotateSelectedElement();
+        const bool keep_wires = ImGui::GetIO().KeyAlt;
+        if (ImGui::IsKeyPressed(ImGuiKey_R)) {
+            TransformSelection(PointTransform::Kind::QuarterTurn, keep_wires);
         }
         const bool enter =
             ImGui::IsKeyPressed(ImGuiKey_Enter, false) || ImGui::IsKeyPressed(ImGuiKey_KeypadEnter, false);
@@ -1548,10 +1620,11 @@ void EditorWindow::HandleSelection(const ViewTransform &view, const bool hovered
             PlacePartPopover(view);
             m_PartPopoverRequested = true;
         }
-        if (ImGui::IsKeyPressed(ImGuiKey_M) && m_Schematic.GetSelectedElement() != nullptr) {
-            MirrorSelectedElement(ImGui::GetIO().KeyShift);
+        if (ImGui::IsKeyPressed(ImGuiKey_M)) {
+            TransformSelection(shift ? PointTransform::Kind::MirrorTopBottom : PointTransform::Kind::MirrorLeftRight,
+                               keep_wires);
         }
-        // Deleting mid-drag would leave the drag pointing at a removed element
+        // Deleting mid-drag would leave the drag pointing at removed items
         if (ImGui::IsKeyPressed(ImGuiKey_Delete) && !m_Drag) {
             m_Schematic.DeleteSelection();
         }
@@ -1561,69 +1634,154 @@ void EditorWindow::HandleSelection(const ViewTransform &view, const bool hovered
     }
 }
 
-// Elements win over wires, and the most recently added item wins because it is drawn on top
-void EditorWindow::SelectAt(const ImVec2 world_pos) {
-    ClearSelection();
-    const auto &elements = m_Schematic.GetElements();
-    for (std::size_t index = elements.size(); index-- > 0;) {
-        if (elements[index]->Contains(world_pos)) {
-            m_Schematic.SelectElement(index);
-            return;
-        }
-    }
-    const float tolerance = WirePickDistance / m_Zoom;
-    const auto &wires = m_Schematic.GetWires();
-    for (std::size_t index = wires.size(); index-- > 0;) {
-        if (wires[index].IsNear(world_pos, tolerance)) {
-            m_Schematic.SelectWire(index);
-            return;
-        }
-    }
+// Replaces the selection; a drag belongs to the items it was started with, so it ends
+void EditorWindow::ApplySelection(const Selection &selection) {
+    EndDrag();
+    m_Schematic.SetSelection(selection.Elements, selection.Wires);
 }
 
-// A drag belongs to the selected element, so it ends with the selection
+// A drag belongs to the selection, so it ends with it, and so does a selection box
 void EditorWindow::ClearSelection() {
     EndDrag();
+    m_Box.reset();
     m_Schematic.ClearSelection();
 }
 
-// While dragging, wires are rebuilt from the snapshot every frame; the cleanup waits until the drop
+void EditorWindow::SelectAll() {
+    if (m_PlacingType || m_DrawingWires || m_Probing) {
+        return;
+    }
+    ApplySelection(PickAll(m_Schematic.GetElements(), m_Schematic.GetWires()));
+}
+
+// Captures what a drag of the current selection needs, so every frame can be computed from the start. A click on one
+// item of a group only keeps the group while the mouse moves: without a move it leaves just that item selected
+EditorWindow::GroupDrag EditorWindow::MakeDrag(const GridPoint cursor, std::optional<Selection> collapse_to) const {
+    GroupDrag drag;
+    drag.StartCursor = cursor;
+    drag.Elements = m_Schematic.GetSelectedElements();
+    drag.Wires = m_Schematic.GetSelectedWires();
+    drag.StartWires = m_Schematic.GetWires();
+    drag.CollapseTo = std::move(collapse_to);
+    const auto &elements = m_Schematic.GetElements();
+    for (std::size_t index = 0; index < elements.size(); ++index) {
+        const std::vector<GridPoint> terminals = elements[index]->GetTerminals();
+        if (drag.Elements.contains(index)) {
+            drag.StartPositions.push_back(elements[index]->GetPosition());
+            drag.StartTerminals.insert(drag.StartTerminals.end(), terminals.begin(), terminals.end());
+        } else {
+            drag.FixedTerminals.insert(drag.FixedTerminals.end(), terminals.begin(), terminals.end());
+        }
+    }
+    if (drag.Elements.empty() && drag.Wires.size() == 1) {
+        const UIWire &wire = drag.StartWires[*drag.Wires.begin()];
+        drag.SlidesVertically = wire.GetStart().Y == wire.GetEnd().Y;
+    }
+    return drag;
+}
+
+// Moves the selection by how far the cursor went from where the drag started, rebuilding the wires from the wires the
+// drag started with so moving back and forth does not pile up bends
+void EditorWindow::UpdateDrag(const GridPoint cursor) {
+    m_Drag->LastCursor = cursor;
+    GridPoint delta = cursor - m_Drag->StartCursor;
+    if (m_Drag->SlidesVertically) {
+        // A wire only slides across itself: along its own line, moving it would change nothing
+        (*m_Drag->SlidesVertically ? delta.X : delta.Y) = 0;
+    }
+    if (delta == m_Drag->LastDelta) {
+        return;
+    }
+    m_Drag->LastDelta = delta;
+    m_Drag->Moved = delta != GridPoint{};
+    if (m_Drag->Moved) {
+        m_Drag->CollapseTo.reset();
+    }
+
+    std::vector<GridPoint> new_terminals;
+    std::size_t position_index = 0;
+    for (const std::size_t index : m_Drag->Elements) {
+        UIElement &element = m_Schematic.GetElement(index);
+        element.SetPosition(m_Drag->StartPositions[position_index++] + delta);
+        const std::vector<GridPoint> terminals = element.GetTerminals();
+        new_terminals.insert(new_terminals.end(), terminals.begin(), terminals.end());
+    }
+    const PointTransform translation = {.Type = PointTransform::Kind::Translate, .Delta = delta, .Pivot = {}};
+    MovedWires moved = MoveGroup(m_Drag->StartWires, m_Drag->Wires, m_Drag->StartTerminals, new_terminals,
+                                 m_Drag->FixedTerminals, translation);
+    m_Schematic.SetWires(std::move(moved.Wires));
+    m_Schematic.SetSelection(m_Drag->Elements, std::move(moved.Selected));
+    m_Schematic.MarkModified();
+}
+
+// What the drag left selected: just the clicked item when the mouse never moved over a group. The cleanup of the
+// wires is done by every frame of the drag already, so it only matters when the drag changed nothing
 void EditorWindow::EndDrag() {
     if (!m_Drag) {
         return;
     }
+    const std::optional<Selection> collapse_to = std::move(m_Drag->CollapseTo);
     m_Drag.reset();
+    if (collapse_to) {
+        m_Schematic.SetSelection(collapse_to->Elements, collapse_to->Wires);
+    }
     m_Schematic.SimplifyAllWires();
 }
 
-// During a drag only the rotation changes here; the drag rebuilds the wires from its snapshot on the next frame
-void EditorWindow::RotateSelectedElement() {
-    UIElement &element = *m_Schematic.GetSelectedElement();
-    const std::vector<GridPoint> old_terminals = element.GetTerminals();
-    element.SetRotation(NextRotation(element.GetRotation()));
-    m_Schematic.MarkModified();
-    if (m_Drag) {
+// The box and the items it takes in, drawn over the schematic
+void EditorWindow::DrawSelectionBox(ImDrawList *draw_list, const ViewTransform &view) const {
+    if (!m_Box) {
         return;
     }
-    m_Schematic.SetWires(FollowTerminals(m_Schematic.GetWires(), old_terminals, element.GetTerminals()));
-    m_Schematic.SimplifyAllWires();
+    const ImVec2 start = view.ToScreen(m_Box->Start);
+    const ImVec2 end = ImGui::GetIO().MousePos;
+    const ImU32 color = GetPalette().Selected;
+    draw_list->AddRectFilled(start, end, WithAlpha(color, SelectionBoxFillAlpha));
+    draw_list->AddRect(start, end, color, 0.0f, 0, 1.0f);
 }
 
-// A vertical flip is a mirror plus half a turn, so it needs no state of its own. Like a rotation, the wires follow
-// the terminals, and a drag rebuilds them from its snapshot on the next frame
-void EditorWindow::MirrorSelectedElement(const bool vertically) {
-    UIElement &element = *m_Schematic.GetSelectedElement();
-    const std::vector<GridPoint> old_terminals = element.GetTerminals();
-    element.SetMirrored(!element.IsMirrored());
-    if (vertically) {
-        element.SetRotation(NextRotation(NextRotation(element.GetRotation())));
-    }
-    m_Schematic.MarkModified();
-    if (m_Drag) {
+// Turns or mirrors every selected part about the center of the selection, and the selected wires with them. The wires
+// that meet them follow, unless Alt is held: then the parts turn alone and every wire stays where it was. A turn
+// during a drag ends that move and goes on dragging from the new position
+void EditorWindow::TransformSelection(const PointTransform::Kind kind, const bool keep_wires) {
+    if (m_Schematic.GetSelectedElements().empty()) {
         return;
     }
-    m_Schematic.SetWires(FollowTerminals(m_Schematic.GetWires(), old_terminals, element.GetTerminals()));
-    m_Schematic.SimplifyAllWires();
+    const std::optional<GridPoint> drag_cursor = m_Drag ? std::optional(m_Drag->LastCursor) : std::nullopt;
+    EndDrag();
+
+    const auto &elements = m_Schematic.GetElements();
+    const std::set<std::size_t> selected_elements = m_Schematic.GetSelectedElements();
+    const std::set<std::size_t> selected_wires = m_Schematic.GetSelectedWires();
+    const PointTransform transform = {
+        .Type = kind,
+        .Delta = {},
+        .Pivot = FindPivot(elements, selected_elements, m_Schematic.GetWires(), selected_wires)};
+
+    std::vector<GridPoint> old_terminals;
+    std::vector<GridPoint> new_terminals;
+    std::vector<GridPoint> fixed_terminals;
+    for (std::size_t index = 0; index < elements.size(); ++index) {
+        const std::vector<GridPoint> before = elements[index]->GetTerminals();
+        if (!selected_elements.contains(index)) {
+            fixed_terminals.insert(fixed_terminals.end(), before.begin(), before.end());
+            continue;
+        }
+        old_terminals.insert(old_terminals.end(), before.begin(), before.end());
+        TransformElement(m_Schematic.GetElement(index), transform);
+        const std::vector<GridPoint> after = elements[index]->GetTerminals();
+        new_terminals.insert(new_terminals.end(), after.begin(), after.end());
+    }
+    if (!keep_wires) {
+        MovedWires moved =
+            MoveGroup(m_Schematic.GetWires(), selected_wires, old_terminals, new_terminals, fixed_terminals, transform);
+        m_Schematic.SetWires(std::move(moved.Wires));
+        m_Schematic.SetSelection(selected_elements, std::move(moved.Selected));
+    }
+    m_Schematic.MarkModified();
+    if (drag_cursor) {
+        m_Drag = MakeDrag(*drag_cursor, std::nullopt);
+    }
 }
 
 // Beside the part, on its right, or on its left when the right side lacks room
@@ -1699,7 +1857,13 @@ void EditorWindow::HandleContextMenu(const ViewTransform &view, const bool hover
         return;
     }
     const ImVec2 cursor_world = view.ToWorld(ImGui::GetIO().MousePos);
-    SelectAt(cursor_world);
+    // Right click keeps a group when it lands on one of its items; anywhere else it selects what is under the cursor
+    const Selection picked =
+        PickAt(m_Schematic.GetElements(), m_Schematic.GetWires(), cursor_world, WirePickDistance / m_Zoom);
+    const Selection current = {m_Schematic.GetSelectedElements(), m_Schematic.GetSelectedWires()};
+    if (picked.Empty() || Joined(current, picked) != current) {
+        ApplySelection(picked);
+    }
     m_ContextTarget = FindMeasurementTarget(m_Schematic.GetElements(), m_Schematic.GetWires(),
                                             m_Schematic.GetConnectivity(), cursor_world, WirePickDistance / m_Zoom);
     PlacePartPopover(view);
@@ -1714,24 +1878,39 @@ void EditorWindow::DrawContextMenu() {
     if (!ImGui::BeginPopup(ContextMenu)) {
         return;
     }
-    const bool on_element = m_Schematic.GetSelectedElement() != nullptr;
-    const bool on_wire = m_Schematic.GetSelectedWireIndex().has_value();
-    if (on_element) {
+    const bool on_element = !m_Schematic.GetSelectedElements().empty();
+    const bool on_wire = !m_Schematic.GetSelectedWires().empty();
+    const bool single = m_Schematic.GetSelectedElements().size() + m_Schematic.GetSelectedWires().size() == 1;
+    if (m_Schematic.GetSelectedElement() != nullptr) {
         if (ImGui::MenuItem("Properties...", "Enter")) {
             m_PartPopoverRequested = true;
         }
         ImGui::Separator();
+    }
+    if (on_element) {
         if (ImGui::MenuItem("Rotate", "R")) {
-            RotateSelectedElement();
+            TransformSelection(PointTransform::Kind::QuarterTurn, false);
         }
         if (ImGui::MenuItem("Mirror", "M")) {
-            MirrorSelectedElement(false);
+            TransformSelection(PointTransform::Kind::MirrorLeftRight, false);
         }
         if (ImGui::MenuItem("Flip", "Shift+M")) {
-            MirrorSelectedElement(true);
+            TransformSelection(PointTransform::Kind::MirrorTopBottom, false);
+        }
+        if (ImGui::BeginMenu("Keep Wires in Place")) {
+            if (ImGui::MenuItem("Rotate", "Alt+R")) {
+                TransformSelection(PointTransform::Kind::QuarterTurn, true);
+            }
+            if (ImGui::MenuItem("Mirror", "Alt+M")) {
+                TransformSelection(PointTransform::Kind::MirrorLeftRight, true);
+            }
+            if (ImGui::MenuItem("Flip", "Alt+Shift+M")) {
+                TransformSelection(PointTransform::Kind::MirrorTopBottom, true);
+            }
+            ImGui::EndMenu();
         }
     }
-    if ((on_element || on_wire) && m_ContextTarget) {
+    if (single && m_ContextTarget) {
         if (on_element) {
             ImGui::Separator();
         }
@@ -1791,6 +1970,9 @@ void EditorWindow::HandleGlobalShortcuts() {
     // A focused text field keeps Ctrl+Z for undoing its own typing
     if (ImGui::GetIO().WantTextInput) {
         return;
+    }
+    if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_A, ImGuiInputFlags_RouteGlobal)) {
+        SelectAll();
     }
     if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_Z, ImGuiInputFlags_RouteGlobal)) {
         Undo();
@@ -1863,43 +2045,80 @@ void EditorWindow::HandleExampleRequest() {
 // Menu commands run here, from Update(), where their popups are opened and drawn whichever window is in front
 void EditorWindow::HandleCommandRequest() {
     const std::optional<EditorCommand> command = std::exchange(m_RequestedCommand, std::nullopt);
-    if (!command) {
-        return;
+    if (command && !RunFileCommand(*command)) {
+        RunEditCommand(*command);
     }
-    switch (*command) {
+}
+
+// The commands of the File menu; false for any other
+bool EditorWindow::RunFileCommand(const EditorCommand command) {
+    switch (command) {
     case EditorCommand::New:
         RequestNew();
-        break;
+        return true;
     case EditorCommand::Open:
         RequestOpen();
-        break;
+        return true;
     case EditorCommand::Save:
         Save();
-        break;
+        return true;
     case EditorCommand::SaveAs:
         ShowFileDialog(FileAction::Save);
-        break;
+        return true;
     case EditorCommand::ExportSchematic:
         ImGui::OpenPopup(ExportPopup);
-        break;
+        return true;
+    default:
+        return false;
+    }
+}
+
+// The commands of the Edit menu: history, selecting all, deleting and turning the selection
+void EditorWindow::RunEditCommand(const EditorCommand command) {
+    switch (command) {
     case EditorCommand::Undo:
         Undo();
         break;
     case EditorCommand::Redo:
         Redo();
         break;
-    case EditorCommand::Rotate:
-        RotateSelectedElement();
-        break;
-    case EditorCommand::Mirror:
-    case EditorCommand::Flip:
-        MirrorSelectedElement(*command == EditorCommand::Flip);
+    case EditorCommand::SelectAll:
+        SelectAll();
         break;
     case EditorCommand::Delete:
         // Deleting mid-drag would leave the drag pointing at a removed element
         if (!m_Drag) {
             m_Schematic.DeleteSelection();
         }
+        break;
+    default:
+        RunTurnCommand(command);
+        break;
+    }
+}
+
+// Rotate, Mirror and Flip, and their variants that keep the wires where they are
+void EditorWindow::RunTurnCommand(const EditorCommand command) {
+    switch (command) {
+    case EditorCommand::Rotate:
+        TransformSelection(PointTransform::Kind::QuarterTurn, false);
+        break;
+    case EditorCommand::RotateKeepWires:
+        TransformSelection(PointTransform::Kind::QuarterTurn, true);
+        break;
+    case EditorCommand::Mirror:
+        TransformSelection(PointTransform::Kind::MirrorLeftRight, false);
+        break;
+    case EditorCommand::MirrorKeepWires:
+        TransformSelection(PointTransform::Kind::MirrorLeftRight, true);
+        break;
+    case EditorCommand::Flip:
+        TransformSelection(PointTransform::Kind::MirrorTopBottom, false);
+        break;
+    case EditorCommand::FlipKeepWires:
+        TransformSelection(PointTransform::Kind::MirrorTopBottom, true);
+        break;
+    default:
         break;
     }
 }

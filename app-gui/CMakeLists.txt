@@ -13,6 +13,7 @@ add_library(imcsim-gui-lib
             examples.cpp
             file_dialog.cpp
             glow_renderer.cpp
+            group_editing.cpp
             heat_glow.cpp
             helpers.cpp
             led_glow.cpp
@@ -26,6 +27,7 @@ add_library(imcsim-gui-lib
             schematic_canvas.cpp
             schematic_drawing.cpp
             schematic_file.cpp
+            selection.cpp
             svg_writer.cpp
             theme.cpp
             trace_math.cpp
