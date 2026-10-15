@@ -6,6 +6,7 @@
 #ifndef IMCSIM_SCHEMATIC_DRAWING_H
 #define IMCSIM_SCHEMATIC_DRAWING_H
 
+#include "circuit_snapshot.h"
 #include "helpers.h"
 #include "imgui.h"
 #include "schematic.h"
@@ -27,7 +28,8 @@ void DrawTerminalNumbers(SchematicCanvas &canvas, const ViewTransform &view, con
                          float ring_scale);
 
 // Live effects
-void DrawLiveCurrent(SchematicCanvas &canvas, const ViewTransform &view, Schematic &schematic, double time);
+void DrawLiveCurrent(SchematicCanvas &canvas, const ViewTransform &view, const Schematic &schematic,
+                     const Core::OperatingPoint &operating_point, const HeatScale &scale, double time);
 
 /**
  * @struct  SchematicBounds

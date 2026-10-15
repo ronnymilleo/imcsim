@@ -348,9 +348,12 @@ void Application::UpdateWindowTitle() {
 }
 
 // A new result of any analysis opens the Output window on its tab, in front unless the user turned that off; the
-// operating point also shows on the schematic, so running one is enough to see it. Versions also change when results
-// are dropped, which opens nothing
+// operating point and the transient also show on the schematic, so running one is enough to see it, and a new transient
+// plays from its start. Versions also change when results are dropped, which opens nothing
 void Application::ShowNewResults() {
+    if (m_Schematic.GetTransientVersion() != m_ShownTransientVersion) {
+        m_Playback.Reset();
+    }
     const auto show_if_new = [this](std::size_t &shown, const std::size_t version, const bool has_result,
                                     const PlotTab tab) {
         if (std::exchange(shown, version) != version && has_result) {

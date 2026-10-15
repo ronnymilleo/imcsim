@@ -94,18 +94,28 @@ double LargestCurrent(const Core::OperatingPoint &operating_point) {
 }
 
 /**
+ * @brief   Returns where a value falls on a logarithmic heat scale, as the editor colors currents and powers.
+ * @param[in] value          Value to place, of either sign: only its size counts.
+ * @param[in] largest_value  Largest size of the scale, as the circuit or the whole simulation has it.
+ * @param[in] decades        How many decades below the largest value the scale reaches.
+ * @return  1 for the largest value, 0 for those `decades` below it or less, linear in between on a logarithmic
+ *          scale, and 0 when the value is zero or there is no largest value.
+ */
+float LogarithmicLevel(const double value, const double largest_value, const double decades) {
+    if (value == 0.0 || largest_value <= 0.0) {
+        return 0.0f;
+    }
+    return static_cast<float>((std::log10(std::abs(value)) - std::log10(largest_value) + decades) / decades);
+}
+
+/**
  * @brief   Returns where a current falls on the heat scale the editor colors wires and parts with.
  * @param[in] current          Current to place.
  * @param[in] largest_current  Largest current of the circuit, as LargestCurrent() returns it.
- * @return  1 for the largest current, 0 for those CurrentDecades below it or less, linear in between on a
- *          logarithmic scale, and 0 when the current is zero or there is no largest current.
+ * @return  The LogarithmicLevel() of the current over CurrentDecades.
  */
 float CurrentLevel(const double current, const double largest_current) {
-    if (current == 0.0 || largest_current <= 0.0) {
-        return 0.0f;
-    }
-    return static_cast<float>((std::log10(std::abs(current)) - std::log10(largest_current) + CurrentDecades) /
-                              CurrentDecades);
+    return LogarithmicLevel(current, largest_current, CurrentDecades);
 }
 
 /**

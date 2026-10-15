@@ -50,6 +50,8 @@ constexpr double CursorAPlacement = 1.0 / 3.0;
 constexpr double CursorBPlacement = 2.0 / 3.0;
 constexpr ImU32 CursorAColor = IM_COL32(255, 199, 77, 255);
 constexpr ImU32 CursorBColor = IM_COL32(115, 204, 255, 255);
+// The instant of the transient shown on the schematic
+constexpr ImU32 PlayheadColor = IM_COL32(255, 96, 96, 255);
 // Math channels take their own colors, apart from those of nodes and currents, and a heavier line
 constexpr auto MathColors = std::to_array<ImU32>({
     IM_COL32(230, 110, 230, 255),
@@ -413,6 +415,17 @@ void DrawCursors(PlotCursors &cursors, const bool logarithmic) {
     ImPlot::TagX(cursors.A, color_a, "A");
     ImPlot::DragLineX(1, &cursors.B, color_b, 1.0f, ImPlotDragToolFlags_NoFit);
     ImPlot::TagX(cursors.B, color_b, "B");
+}
+
+// The instant of the transient shown on the schematic, as a line along the plot. Dragging it moves the instant and
+// stops the playback, so the line stays where it was dropped
+void DrawPlayhead(TransientPlayback &playback, const double stop_time) {
+    const ImVec4 color = ImGui::ColorConvertU32ToFloat4(AdaptToBackground(PlayheadColor));
+    double time = playback.Time;
+    if (ImPlot::DragLineX(2, &time, color, 1.5f, ImPlotDragToolFlags_NoFit)) {
+        playback.Time = std::clamp(time, 0.0, stop_time);
+        playback.Playing = false;
+    }
 }
 
 // Turning the cursors on places them again in the current view, so they are never lost off screen
@@ -792,8 +805,11 @@ std::string GetExtension(const ExportFormat format) {
 /**
  * @brief   Creates the window for a schematic.
  * @param[in] schematic  Schematic whose results are plotted; it must outlive the window.
+ * @param[in] playback   Instant of the transient shown on the schematic, drawn as a line in the transient plot that
+ *                       can be dragged; it must outlive the window.
  */
-OutputWindow::OutputWindow(Schematic &schematic) : AppWindow("Output", true), m_Schematic(schematic) {
+OutputWindow::OutputWindow(Schematic &schematic, TransientPlayback &playback)
+    : AppWindow("Output", true), m_Schematic(schematic), m_Playback(playback) {
     SetInitialSize(InitialSize);
     // Nothing to plot yet; the first result opens it
     SetOpen(false);
@@ -1101,6 +1117,7 @@ void OutputWindow::DrawTransient(const Core::Transient &transient, const std::ve
     }
     PlotMath(transient.Times, math, "", plotted);
     DrawCursors(m_TransientCursors, false);
+    DrawPlayhead(m_Playback, transient.Times.back());
     DrawCursorReadout(transient.Times, "s", false, plotted);
     const ImPlotRange view = ImPlot::GetPlotLimits().X;
     m_TransientView = {.From = view.Min, .To = view.Max};

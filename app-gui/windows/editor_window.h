@@ -7,6 +7,7 @@
 #define IMCSIM_EDITOR_WINDOW_H
 
 #include "analysis_controls.h"
+#include "circuit_snapshot.h"
 #include "components/component.h"
 #include "examples.h"
 #include "file_dialog.h"
@@ -14,6 +15,7 @@
 #include "helpers.h"
 #include "imgui.h"
 #include "part_editor.h"
+#include "playback.h"
 #include "probing.h"
 #include "schematic.h"
 #include "ui_elements/ui_element.h"
@@ -40,8 +42,8 @@ namespace GUI {
  */
 class EditorWindow : public AppWindow {
 public:
-    EditorWindow(Schematic &schematic, AnalysisControls &controls, PartEditor &part_editor,
-                 GlowRenderer &glow_renderer);
+    EditorWindow(Schematic &schematic, AnalysisControls &controls, PartEditor &part_editor, GlowRenderer &glow_renderer,
+                 TransientPlayback &playback);
     ~EditorWindow() override = default;
 
     // Requests, global shortcuts and file popups, whichever window is in front
@@ -76,19 +78,33 @@ private:
 
     /**
      * @enum    WireColoring
-     * @brief   What the colors of wires (and, by current, of parts) show.
-     * @details Voltage and Current color by the last operating point, on a heat scale with a legend.
+     * @brief   What the colors of wires (and, by current and power, of parts) show.
+     * @details Voltage, Current and Power color by the state on display, on a heat scale with a legend.
      */
     enum class WireColoring {
         Plain,
         Nodes,
         Voltage,
         Current,
+        Power,
+    };
+
+    /**
+     * @struct  DisplayedState
+     * @brief   The voltages, currents and powers the schematic shows this frame, and the scale their colors use.
+     * @details It is the last operating point, or the last transient read at the instant of the playback; the
+     *          drawing code does not tell them apart. Time is set for a transient only.
+     */
+    struct DisplayedState {
+        Core::OperatingPoint Point;
+        HeatScale Scale;
+        std::vector<ComponentPower> Powers;
+        std::optional<double> Time;
     };
 
     /**
      * @enum    LiveEffect
-     * @brief   An animated effect that reads the last operating point and draws on top of the schematic.
+     * @brief   An animated effect that reads the state on display and draws on top of the schematic.
      * @details Each effect is turned on by itself, over any wire coloring.
      */
     enum class LiveEffect {
@@ -134,6 +150,7 @@ private:
     AnalysisControls &m_Controls;
     PartEditor &m_PartEditor;
     GlowRenderer &m_GlowRenderer;
+    TransientPlayback &m_Playback;
 
     static constexpr float DefaultZoom = 20.0f;
 
@@ -145,6 +162,11 @@ private:
     WireColoring m_WireColoring = WireColoring::Plain;
     // Live effects by enum value, each on its own; all off until asked for
     std::array<bool, NumberOfEffects> m_LiveEffects = {};
+    // What the schematic shows, resolved at the start of each frame; the scale of a transient is worked out once per
+    // result and kept
+    std::optional<DisplayedState> m_Displayed;
+    std::optional<std::size_t> m_ScaledTransientVersion;
+    HeatScale m_TransientScale;
     // Largest zoom of a framing the next Draw() does, once the canvas size is known: the default when a schematic is
     // opened, more for Fit
     std::optional<float> m_FrameMaxZoom;
@@ -206,9 +228,10 @@ private:
     void DrawPartButton(Core::ComponentType type);
     void DrawPartGroup(std::size_t index);
     void DrawRunControls();
+    void UpdateDisplayedState();
+    void DrawTimeBar();
     void DrawWires(SchematicCanvas &canvas, const ViewTransform &view);
-    void DrawWireCurrents(SchematicCanvas &canvas, const ViewTransform &view,
-                          const Core::OperatingPoint &operating_point);
+    void DrawWireCurrents(SchematicCanvas &canvas, const ViewTransform &view);
     void DrawLEDGlows(ImDrawList *draw_list, const ViewTransform &view);
     ImU32 GetElementColor(std::size_t index) const;
     void DrawStatusBar(const ViewTransform &view, bool hovered);

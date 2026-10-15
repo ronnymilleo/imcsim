@@ -7,6 +7,7 @@ list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/vendor/Catch2/extras)
 
 add_executable(imcsim-tests
             analysis_suggestions_tests.cpp
+            circuit_snapshot_tests.cpp
             circuit_tests.cpp
             component_tests.cpp
             connectivity_tests.cpp
@@ -15,6 +16,7 @@ add_executable(imcsim-tests
             examples_tests.cpp
             helpers_tests.cpp
             led_glow_tests.cpp
+            playback_tests.cpp
             plot_export_tests.cpp
             plot_helpers_tests.cpp
             probing_tests.cpp

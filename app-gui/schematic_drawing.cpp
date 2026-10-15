@@ -208,30 +208,31 @@ void DrawTerminalNumbers(SchematicCanvas &canvas, const ViewTransform &view, con
  * @brief   Draws the live current as arrows flowing along every piece of wire, in the direction the current goes.
  * @param[in,out] canvas     Where the arrows are drawn: the editor window or an exported image.
  * @param[in] view           Transform from world units to the canvas.
- * @param[in] schematic      Schematic whose operating point and wires are shown.
+ * @param[in] schematic      Schematic whose parts and wires carry the currents.
+ * @param[in] operating_point  The currents to show: an operating point, or a transient read at one instant.
+ * @param[in] scale          Heat scale the colors of the arrows follow.
  * @param[in] time           Seconds since an arbitrary start; the arrows scroll with it, so a caller that does not
  *                           animate, such as an export, passes a fixed value.
  * @details Arrows are spaced along each wire and scroll with time; they all look alike, since they only show the
  *          direction, and their color follows the heat scale of the current. Their positions are anchored to the
- *          grid, so arrows line up across collinear pieces instead of jumping where wires join. Pieces with no
- *          current at all are left out, since they have no direction to show.
+ *          grid, so arrows line up across collinear pieces instead of jumping where wires join. Pieces whose
+ *          current is below the heat scale, down to none at all, are left out: they are noise next to the rest, and
+ *          in a transient their direction would flicker.
  */
-void DrawLiveCurrent(SchematicCanvas &canvas, const ViewTransform &view, Schematic &schematic, const double time) {
-    const auto &operating_point = schematic.GetOperatingPoint();
-    if (!operating_point) {
-        return;
-    }
-    const double largest = LargestCurrent(*operating_point);
+void DrawLiveCurrent(SchematicCanvas &canvas, const ViewTransform &view, const Schematic &schematic,
+                     const Core::OperatingPoint &operating_point, const HeatScale &scale, const double time) {
+    const double largest = scale.LargestCurrent;
     if (largest <= 0.0) {
         return;
     }
     for (const WireCurrent &piece :
-         ComputeWireCurrents(schematic.GetElements(), schematic.GetWires(), operating_point->Currents)) {
+         ComputeWireCurrents(schematic.GetElements(), schematic.GetWires(), operating_point.Currents)) {
         const ImVec2 start = ToVec2(piece.Start);
         const ImVec2 end = ToVec2(piece.End);
         const ImVec2 delta = end - start;
         const float length = std::sqrt(delta.x * delta.x + delta.y * delta.y);
-        if (piece.Current == 0.0 || length < FlowArrowLength) {
+        const float level = CurrentLevel(piece.Current, largest);
+        if (level < 0.0f || length < FlowArrowLength) {
             continue;
         }
         // Unit vector along the wire, turned to point the way the current goes
@@ -246,7 +247,7 @@ void DrawLiveCurrent(SchematicCanvas &canvas, const ViewTransform &view, Schemat
         const float end_projection = end.x * flow.x + end.y * flow.y;
         const float low = std::min(start_projection, end_projection) + FlowArrowLength * 0.5f;
         const float high = std::max(start_projection, end_projection) - FlowArrowLength * 0.5f;
-        const ImU32 color = GetHeatColor(std::clamp(CurrentLevel(piece.Current, largest), 0.0f, 1.0f));
+        const ImU32 color = GetHeatColor(std::min(level, 1.0f));
         for (int arrow = static_cast<int>(std::ceil((low - phase) / FlowArrowSpacing));
              arrow <= static_cast<int>(std::floor((high - phase) / FlowArrowSpacing)); ++arrow) {
             const float distance = phase + static_cast<float>(arrow) * FlowArrowSpacing - start_projection;

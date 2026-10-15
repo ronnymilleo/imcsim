@@ -8,6 +8,7 @@
 
 #include "file_dialog.h"
 #include "implot.h"
+#include "playback.h"
 #include "plot_export.h"
 #include "schematic.h"
 #include "simulator.h"
@@ -114,7 +115,7 @@ enum class ExportFormat {
  */
 class OutputWindow : public AppWindow {
 public:
-    explicit OutputWindow(Schematic &schematic);
+    OutputWindow(Schematic &schematic, TransientPlayback &playback);
     ~OutputWindow() override = default;
 
     void ShowTab(PlotTab tab);
@@ -123,6 +124,7 @@ public:
 
 private:
     Schematic &m_Schematic;
+    TransientPlayback &m_Playback;
     // Result versions the axes were last fitted to
     std::optional<std::size_t> m_FittedTransient;
     std::optional<std::size_t> m_FittedACSweep;

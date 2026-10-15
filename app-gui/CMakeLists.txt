@@ -6,6 +6,7 @@ add_library(imcsim-gui-lib
         STATIC
             analysis_controls.cpp
             application.cpp
+            circuit_snapshot.cpp
             connectivity.cpp
             current_flow.cpp
             element_factory.cpp
@@ -16,6 +17,7 @@ add_library(imcsim-gui-lib
             led_glow.cpp
             node_colors.cpp
             part_editor.cpp
+            playback.cpp
             plot_export.cpp
             plot_helpers.cpp
             probing.cpp
