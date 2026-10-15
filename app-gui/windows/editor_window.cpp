@@ -335,6 +335,14 @@ ImVec4 GetLEDLight(const Core::LEDColor color) {
     return {1.0f, 0.9f, 0.7f, 1.0f};
 }
 
+// A selected wire keeps its heat color and gets this much wider halo behind it, in pixels, partly see-through
+constexpr float SelectionHaloExtra = 6.0f;
+constexpr ImU32 SelectionHaloAlpha = 150;
+
+ImU32 WithAlpha(const ImU32 color, const ImU32 alpha) {
+    return (color & ~IM_COL32_A_MASK) | (alpha << IM_COL32_A_SHIFT);
+}
+
 // Power a part absorbs, looked up by the name of the part; a current name such as "Q1.C" belongs to part "Q1"
 std::optional<ComponentPower> FindPower(const std::vector<ComponentPower> &powers, const std::string &name) {
     const std::string part = name.substr(0, name.find('.'));
@@ -609,6 +617,9 @@ void EditorWindow::Draw() {
     const auto &elements = m_Schematic.GetElements();
     for (std::size_t index = 0; index < elements.size(); ++index) {
         elements[index]->Draw(canvas, view, GetElementColor(index), m_SymbolStyle);
+        if (index == m_Schematic.GetSelectedElementIndex() && ArePartsHeatColored()) {
+            elements[index]->DrawOutline(canvas, view, GetPalette().Selected);
+        }
     }
     // Over the symbols, so a lit LED looks lit through its own lines
     DrawGlows(draw_list, view);
@@ -860,13 +871,20 @@ void EditorWindow::DrawTimeBar() {
 }
 
 // Voltage, Current and Power need a result on display; without one, wires stay plain and the legend asks for it.
-// Wires carry no power, so they stay plain by power
+// Wires carry no power, so they stay plain by power. Over heat colors a selected wire is marked by a halo instead of
+// a color of its own, which could pass for a value on the scale
 void EditorWindow::DrawWires(SchematicCanvas &canvas, const ViewTransform &view) {
     const Connectivity &connectivity = m_Schematic.GetConnectivity();
     const auto &wires = m_Schematic.GetWires();
     const bool by_nodes = m_WireColoring == WireColoring::Nodes;
     const bool by_voltage = m_WireColoring == WireColoring::Voltage && m_Displayed;
     const bool drawn_by_current = m_WireColoring == WireColoring::Current && m_Displayed;
+    const std::optional<std::size_t> selected_wire = m_Schematic.GetSelectedWireIndex();
+    if (selected_wire && AreWiresHeatColored()) {
+        const UIWire &wire = wires[*selected_wire];
+        canvas.AddLine(view.ToScreen(ToVec2(wire.GetStart())), view.ToScreen(ToVec2(wire.GetEnd())),
+                       WithAlpha(GetPalette().Selected, SelectionHaloAlpha), LineThickness + SelectionHaloExtra);
+    }
     if (drawn_by_current) {
         DrawWireCurrents(canvas, view);
     }
@@ -883,7 +901,7 @@ void EditorWindow::DrawWires(SchematicCanvas &canvas, const ViewTransform &view)
 
     for (std::size_t index = 0; index < wires.size(); ++index) {
         const UIWire &wire = wires[index];
-        const bool selected = index == m_Schematic.GetSelectedWireIndex();
+        const bool selected = index == selected_wire && !AreWiresHeatColored();
         if (drawn_by_current && !selected) {
             continue;
         }
@@ -952,10 +970,10 @@ void EditorWindow::DrawGlows(ImDrawList *draw_list, const ViewTransform &view) {
     m_GlowRenderer.AddGlows(draw_list, glows, additive);
 }
 
-// Selection wins; coloring by current heats each part by the largest current through its terminals, and coloring by
-// power by the power it absorbs
+// Selection wins, unless the parts are heat colored, where an outline marks it instead; coloring by current heats each
+// part by the largest current through its terminals, and coloring by power by the power it absorbs
 ImU32 EditorWindow::GetElementColor(const std::size_t index) const {
-    if (index == m_Schematic.GetSelectedElementIndex()) {
+    if (index == m_Schematic.GetSelectedElementIndex() && !ArePartsHeatColored()) {
         return GetPalette().Selected;
     }
     const bool by_current = m_WireColoring == WireColoring::Current;
@@ -1068,6 +1086,16 @@ float EditorWindow::DrawRunStatus(float right_edge) {
     return right_edge;
 }
 
+// Voltage and Current color the wires with the heat scale, once there is a result to color them by
+bool EditorWindow::AreWiresHeatColored() const {
+    return m_Displayed && (m_WireColoring == WireColoring::Voltage || m_WireColoring == WireColoring::Current);
+}
+
+// Current and Power color the parts with the heat scale, once there is a result to color them by
+bool EditorWindow::ArePartsHeatColored() const {
+    return m_Displayed && (m_WireColoring == WireColoring::Current || m_WireColoring == WireColoring::Power);
+}
+
 // A gradient with the values at its ends, or a reminder to run an operating point or a transient
 void EditorWindow::DrawColorLegend(ImDrawList *draw_list, const ImVec2 origin, const ImVec2 size) const {
     if (m_WireColoring != WireColoring::Voltage && m_WireColoring != WireColoring::Current &&
@@ -1117,6 +1145,8 @@ void EditorWindow::DrawNodeVoltages(ImDrawList *draw_list, const ViewTransform &
     }
     const Connectivity &connectivity = m_Schematic.GetConnectivity();
     const std::vector<double> &voltages = m_Displayed->Point.NodeVoltages;
+    // The theme color of the labels is yellow, which gets lost over the yellow of the heat scale
+    const ImU32 label_color = AreWiresHeatColored() ? GetPalette().CanvasText : GetPalette().VoltageLabel;
     std::vector<bool> labeled(voltages.size(), false);
     const auto draw_label = [&](const GridPoint point, const ImVec2 world_pos) {
         const std::optional<int> node = connectivity.GetNode(point);
@@ -1129,7 +1159,7 @@ void EditorWindow::DrawNodeVoltages(ImDrawList *draw_list, const ViewTransform &
         }
         labeled[index] = true;
         const std::string text = std::format("{}V", Core::FormatValue(voltages[index]));
-        draw_list->AddText(view.ToScreen(world_pos) + VoltageLabelOffset, GetPalette().VoltageLabel, text.c_str());
+        draw_list->AddText(view.ToScreen(world_pos) + VoltageLabelOffset, label_color, text.c_str());
     };
 
     for (const UIWire &wire : m_Schematic.GetWires()) {

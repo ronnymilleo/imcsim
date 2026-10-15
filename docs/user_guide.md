@@ -49,6 +49,9 @@ wire by its node, numbered on the canvas. **Voltage**, **Current** and **Power**
 parts, since wires carry none) on a heat scale, with a legend at the bottom left. They need a result on the schematic:
 run an operating point or a transient first, or they have nothing to show.
 
+Over these colors a selected wire gets a halo and a selected part an outline in the selection color, instead of turning that color,
+and the voltage labels switch to the text color of the canvas, so neither passes for a value on the scale.
+
 - **Voltage** spreads the colors from the lowest to the highest node voltage, ground included.
 - **Current** colors wires and parts by the current through them, on a logarithmic scale that reaches four decades
   below the largest current; the legend marks that floor with `<`.
