@@ -5,6 +5,7 @@
 
 #include "clipboard.h"
 #include "element_factory.h"
+#include "examples.h"
 #include "schematic.h"
 #include "test_printers.h"
 #include <catch2/catch_test_macros.hpp>
@@ -92,6 +93,19 @@ TEST_CASE("Text that is not a schematic, or has nothing in it, cannot be pasted"
     CHECK_FALSE(GUI::ParseCopiedSchematic(GUI::CopySelection(elements, Wires, {})));
 }
 
+TEST_CASE("What cannot be read is left out and reported", "[clipboard]") {
+    const std::string text = R"({
+        "format": "imcsim-schematic", "version": 1,
+        "elements": [{"type": "NoSuchPart", "x": 0, "y": 0, "rotation": 0}],
+        "wires": [{"start": [0, 0], "end": [4, 0]}]
+    })";
+    auto group = GUI::ParseCopiedSchematic(text);
+    REQUIRE(group);
+    CHECK(group->Elements.empty());
+    CHECK(group->Wires.size() == 1);
+    CHECK(group->Warnings.size() == 1);
+}
+
 TEST_CASE("Pasted parts get the next free names of the schematic", "[clipboard]") {
     GUI::Schematic schematic;
     for (auto &element : Parts()) {
@@ -106,4 +120,20 @@ TEST_CASE("Pasted parts get the next free names of the schematic", "[clipboard]"
     REQUIRE(schematic.GetElements().size() == 5);
     CHECK(schematic.GetElements()[3]->GetComponent().GetName() == "R3");
     CHECK(schematic.GetElements()[4]->GetComponent().GetName() == "C2");
+}
+
+TEST_CASE("Every example can be placed as a group", "[clipboard]") {
+    for (const GUI::Example &example : GUI::GetExamples()) {
+        auto loaded = GUI::LoadExample(example);
+        REQUIRE(loaded);
+        auto group = GUI::MakePastedGroup(std::move(*loaded));
+        INFO(example.Title);
+        REQUIRE(group);
+        CHECK_FALSE(group->Elements.empty());
+        CHECK_FALSE(group->Wires.empty());
+    }
+}
+
+TEST_CASE("A schematic with nothing in it cannot be placed", "[clipboard]") {
+    CHECK_FALSE(GUI::MakePastedGroup({}));
 }

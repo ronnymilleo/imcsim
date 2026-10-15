@@ -57,23 +57,34 @@ bool LooksLikeCopiedSchematic(const std::string_view text) {
 }
 
 /**
- * @brief   Reads text from the clipboard as parts and wires to paste.
- * @param[in] text  Text of the clipboard.
- * @return  The group, held by the middle of its box, or the reason the text cannot be pasted: not a schematic, or a
- *          schematic with nothing in it. Settings and measurements in the text are ignored, as are parts and wires
- *          that cannot be read.
+ * @brief   Reads a schematic, from the clipboard or from a file, as parts and wires to place.
+ * @param[in] text  Text of the clipboard, or contents of a schematic file.
+ * @return  The group, held by the middle of its box, or the reason the text cannot be placed: not a schematic, or a
+ *          schematic with nothing in it. Settings and measurements in the text are ignored. Parts and wires that
+ *          cannot be read are left out and reported in the warnings of the group.
  */
 std::expected<PastedGroup, std::string> ParseCopiedSchematic(const std::string_view text) {
     auto loaded = LoadSchematic(text);
     if (!loaded) {
         return std::unexpected(loaded.error());
     }
-    if (loaded->Elements.empty() && loaded->Wires.empty()) {
-        return std::unexpected("There is nothing to paste");
+    return MakePastedGroup(std::move(*loaded));
+}
+
+/**
+ * @brief   Takes the parts and wires of a loaded schematic as a group to place, such as an example.
+ * @param[in] loaded  A schematic read by LoadSchematic() or LoadExample().
+ * @return  The group, held by the middle of its box, or an error when the schematic has no parts or wires. The
+ *          settings and measurements are dropped, and the warnings of the loader go with the group.
+ */
+std::expected<PastedGroup, std::string> MakePastedGroup(LoadedSchematic loaded) {
+    if (loaded.Elements.empty() && loaded.Wires.empty()) {
+        return std::unexpected("The schematic has no parts or wires");
     }
     PastedGroup group;
-    group.Elements = std::move(loaded->Elements);
-    group.Wires = std::move(loaded->Wires);
+    group.Elements = std::move(loaded.Elements);
+    group.Wires = std::move(loaded.Wires);
+    group.Warnings = std::move(loaded.Warnings);
     group.Pivot = FindGroupPivot(group);
     return group;
 }
