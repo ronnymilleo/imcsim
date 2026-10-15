@@ -260,6 +260,7 @@ std::string Circuit::ToSpiceNetlist(const std::string_view analysis, const bool 
             break;
         }
         case ComponentType::Ground:
+        case ComponentType::NetLabel:
             break;
         }
         netlist += probes;

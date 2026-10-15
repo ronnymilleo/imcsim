@@ -186,8 +186,8 @@ void Schematic::Replace(std::vector<std::unique_ptr<UIElement>> elements, std::v
     m_SimulationSettings = std::move(settings);
     ++m_SimulationSettingsVersion;
     InvalidateDerivedData();
-    // The measured nodes belong to the old content; whoever replaces it sets them again
-    m_MeasuredNodePoints.clear();
+    // The probes belong to the old content; whoever replaces it sets them again
+    m_VoltageProbes.clear();
     m_Modified = false;
     ResetHistory();
 }
@@ -294,7 +294,7 @@ std::size_t Schematic::GetSelectionVersion() const {
  * @return  True when the node is measured.
  */
 bool Schematic::IsVoltageMeasured(const int node) const {
-    return m_MeasuredNodes.contains(node);
+    return std::ranges::any_of(m_VoltageProbes, [node](const VoltageProbe &probe) { return probe.Node == node; });
 }
 
 /**
@@ -303,10 +303,10 @@ bool Schematic::IsVoltageMeasured(const int node) const {
  * @param[in] measured  Whether to show it.
  */
 void Schematic::SetVoltageMeasured(const int node, const bool measured) {
-    if (measured) {
-        m_MeasuredNodes.insert(node);
-    } else {
-        m_MeasuredNodes.erase(node);
+    if (!measured) {
+        std::erase_if(m_VoltageProbes, [node](const VoltageProbe &probe) { return probe.Node == node; });
+    } else if (!IsVoltageMeasured(node)) {
+        m_VoltageProbes.push_back({.Points = GetConnectivity().GetPointsOfNode(node), .Node = node});
     }
 }
 
@@ -336,8 +336,7 @@ void Schematic::SetCurrentMeasured(const std::string &name, const bool measured)
  * @brief   Removes every measurement, so the plots start empty; for a new or opened schematic.
  */
 void Schematic::ClearMeasurements() {
-    m_MeasuredNodePoints.clear();
-    m_MeasuredNodes.clear();
+    m_VoltageProbes.clear();
     m_MeasuredCurrents.clear();
 }
 
@@ -347,9 +346,12 @@ void Schematic::ClearMeasurements() {
  */
 SavedMeasurements Schematic::SaveMeasurements() {
     SavedMeasurements measurements;
-    for (const int node : m_MeasuredNodes) {
-        if (const std::optional<GridPoint> point = GetConnectivity().FindPointOfNode(node)) {
-            measurements.Voltages.push_back(*point);
+    GetConnectivity();
+    for (const VoltageProbe &probe : m_VoltageProbes) {
+        if (probe.Node) {
+            if (const std::optional<GridPoint> point = m_Connectivity->FindPointOfNode(*probe.Node)) {
+                measurements.Voltages.push_back(*point);
+            }
         }
     }
     measurements.Currents.assign(m_MeasuredCurrents.begin(), m_MeasuredCurrents.end());
@@ -366,7 +368,7 @@ void Schematic::RestoreMeasurements(const SavedMeasurements &measurements) {
     ClearMeasurements();
     for (const GridPoint point : measurements.Voltages) {
         if (const std::optional<int> node = GetConnectivity().GetNode(point); node && *node != 0) {
-            m_MeasuredNodes.insert(*node);
+            SetVoltageMeasured(*node, true);
         }
     }
     m_MeasuredCurrents.insert(measurements.Currents.begin(), measurements.Currents.end());
@@ -515,7 +517,7 @@ void Schematic::Redo() {
 const Connectivity &Schematic::GetConnectivity() {
     if (!m_Connectivity) {
         m_Connectivity.emplace(m_Elements, m_Wires);
-        FollowMeasuredNodes();
+        FollowVoltageProbes();
     }
     return *m_Connectivity;
 }
@@ -642,14 +644,6 @@ std::size_t Schematic::GetDCSweepVersion() const {
 }
 
 void Schematic::InvalidateDerivedData() {
-    // Several changes can pile up before the nodes are asked for again: the points remembered from the nodes as they
-    // were last numbered stay valid, so they are only taken when the nodes exist
-    if (m_Connectivity && !m_MeasuredNodes.empty()) {
-        m_MeasuredNodePoints.clear();
-        for (const int node : m_MeasuredNodes) {
-            m_MeasuredNodePoints.push_back(m_Connectivity->GetPointsOfNode(node));
-        }
-    }
     m_Connectivity.reset();
     m_OperatingPoint.reset();
     m_Transient.reset();
@@ -657,27 +651,31 @@ void Schematic::InvalidateDerivedData() {
     m_DCSweep.reset();
 }
 
-// A measured node is the one that most of its remembered points belong to now; one whose points no longer connect to
-// anything, such as after deleting its wires, is no longer measured. Two measured nodes joined into one stay one
-void Schematic::FollowMeasuredNodes() {
-    if (m_MeasuredNodePoints.empty()) {
-        return;
-    }
-    std::set<int> followed;
-    for (const std::vector<GridPoint> &points : m_MeasuredNodePoints) {
+// A probe is on the node most of its points belong to now, and takes the points of that node as its own. With no such
+// node, because its net is ground or its wires are gone, it waits with the points it had and comes back when they
+// belong to a node again. Two probes that end up on one node are one
+void Schematic::FollowVoltageProbes() {
+    std::set<int> taken;
+    std::vector<VoltageProbe> followed;
+    for (VoltageProbe &probe : m_VoltageProbes) {
         std::map<int, int> votes;
-        for (const GridPoint point : points) {
+        for (const GridPoint point : probe.Points) {
             if (const std::optional<int> node = m_Connectivity->GetNode(point); node && *node != 0) {
                 ++votes[*node];
             }
         }
         const auto best = std::ranges::max_element(votes, {}, &std::pair<const int, int>::second);
-        if (best != votes.end()) {
-            followed.insert(best->first);
+        if (best == votes.end()) {
+            probe.Node.reset();
+        } else if (taken.insert(best->first).second) {
+            probe.Node = best->first;
+            probe.Points = m_Connectivity->GetPointsOfNode(best->first);
+        } else {
+            continue;
         }
+        followed.push_back(std::move(probe));
     }
-    m_MeasuredNodes = std::move(followed);
-    m_MeasuredNodePoints.clear();
+    m_VoltageProbes = std::move(followed);
 }
 
 // Measurements stay out of snapshots, so probing adds no undo step and does not count as a change

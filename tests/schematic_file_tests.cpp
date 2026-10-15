@@ -8,6 +8,7 @@
 #include "components/current_source.h"
 #include "components/diode.h"
 #include "components/mosfet.h"
+#include "components/net_label.h"
 #include "components/op_amp.h"
 #include "components/voltage_source.h"
 #include "element_factory.h"
@@ -495,4 +496,33 @@ TEST_CASE("The AC magnitude is saved apart from the amplitude, and older files t
                       "source": "AC", "amplitude": 0.5, "frequency": 1000, "offset": 0}]})");
     REQUIRE(older.Elements.size() == 1);
     CHECK(static_cast<const Core::VoltageSource &>(older.Elements[0]->GetComponent()).GetAC().Magnitude == 0.5);
+}
+
+TEST_CASE("A net label keeps its name when saved and loaded", "[schematic_file]") {
+    std::vector<std::unique_ptr<GUI::UIElement>> elements;
+    elements.push_back(GUI::CreateElement(Core::ComponentType::NetLabel, {6, 2}, GUI::Rotation::R90));
+    static_cast<Core::NetLabel &>(elements.back()->GetComponent()).SetNet("Vout");
+    elements.push_back(GUI::CreateElement(Core::ComponentType::NetLabel, {12, 2}, GUI::Rotation::R0));
+
+    const std::string text = GUI::SaveSchematic(elements, {}, {}, {});
+    const GUI::LoadedSchematic loaded = LoadOrFail(text);
+    REQUIRE(loaded.Elements.size() == 2);
+    CHECK(loaded.Warnings.empty());
+    CHECK(loaded.Elements[0]->GetComponent().GetType() == Core::ComponentType::NetLabel);
+    CHECK(static_cast<const Core::NetLabel &>(loaded.Elements[0]->GetComponent()).GetNet() == "Vout");
+    CHECK(loaded.Elements[0]->GetRotation() == GUI::Rotation::R90);
+    // A label with no name yet is saved without the key and loads unnamed
+    CHECK(static_cast<const Core::NetLabel &>(loaded.Elements[1]->GetComponent()).GetNet().empty());
+    CHECK(text.find("\"name\"") == std::string::npos);
+}
+
+TEST_CASE("Two labels with one name both load, and an invalid net name skips the label", "[schematic_file]") {
+    const std::string elements = R"({"type": "NetLabel", "x": 0, "y": 0, "rotation": 0, "net": "OUT"},)"
+                                 R"({"type": "NetLabel", "x": 8, "y": 0, "rotation": 0, "net": "OUT"},)"
+                                 R"({"type": "NetLabel", "x": 16, "y": 0, "rotation": 0, "net": "no good"})";
+    const GUI::LoadedSchematic loaded = LoadOrFail(Document(elements, ""));
+    REQUIRE(loaded.Elements.size() == 2);
+    CHECK(static_cast<const Core::NetLabel &>(loaded.Elements[1]->GetComponent()).GetNet() == "OUT");
+    REQUIRE(loaded.Warnings.size() == 1);
+    CHECK(loaded.Warnings[0].find("net name") != std::string::npos);
 }

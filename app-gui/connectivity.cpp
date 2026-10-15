@@ -6,8 +6,12 @@
 #include "connectivity.h"
 
 #include "components/component.h"
+#include "components/net_label.h"
 #include <algorithm>
+#include <array>
 #include <numeric>
+#include <string>
+#include <string_view>
 #include <utility>
 
 namespace GUI {
@@ -16,6 +20,10 @@ namespace {
 
 // A dot is drawn where three or more connections meet, like in most schematic editors
 constexpr int MinJunctionConnections = 3;
+// The nets a label can name to mean ground, in the form nets are compared in
+constexpr std::array<std::string_view, 2> GroundNets = {"0", "gnd"};
+// The net that joins every VCC supply, in the form nets are compared in
+constexpr std::string_view SupplyNet = "vcc";
 
 /**
  * @class   DisjointSet
@@ -54,14 +62,35 @@ Connectivity::Connectivity(const std::vector<std::unique_ptr<UIElement>> &elemen
     // Count how many connections reach each point; a wire passing through a point counts twice
     std::map<GridPoint, int> connection_count;
     std::vector<GridPoint> ground_points;
+    // Named labels by the name they are compared with, and as typed by grid point, for the name of the node
+    std::map<std::string, std::vector<GridPoint>> labeled_points;
+    std::map<GridPoint, std::string> label_text;
+    std::vector<GridPoint> supply_points;
     for (const auto &element : elements) {
-        const bool is_ground = element->GetComponent().GetType() == Core::ComponentType::Ground;
+        const Core::Component &component = element->GetComponent();
+        bool is_ground = component.GetType() == Core::ComponentType::Ground;
+        const bool is_label = component.GetType() == Core::ComponentType::NetLabel;
+        const std::string net = is_label ? static_cast<const Core::NetLabel &>(component).GetNet() : std::string();
+        const std::string compared = Core::NetLabel::NormalizeNet(net);
+        // A label named 0, as in SPICE, or GND is ground
+        is_ground = is_ground || (is_label && std::ranges::contains(GroundNets, compared));
+        const bool is_supply = component.GetType() == Core::ComponentType::VCC;
         for (const GridPoint terminal : element->GetTerminals()) {
             ++connection_count[terminal];
+            if (is_supply) {
+                supply_points.push_back(terminal);
+            }
             if (is_ground) {
                 ground_points.push_back(terminal);
+            } else if (is_label && Core::NetLabel::IsValidNet(net)) {
+                labeled_points[compared].push_back(terminal);
+                label_text.emplace(terminal, net);
             }
         }
+    }
+    // A label named VCC joins every VCC supply, as one named GND joins every ground
+    if (const auto supply = labeled_points.find(std::string(SupplyNet)); supply != labeled_points.end()) {
+        supply->second.insert(supply->second.end(), supply_points.begin(), supply_points.end());
     }
     for (const UIWire &wire : wires) {
         ++connection_count[wire.GetStart()];
@@ -89,6 +118,13 @@ Connectivity::Connectivity(const std::vector<std::unique_ptr<UIElement>> &elemen
         }
     }
 
+    // Labels with one name are one node, with or without a wire between them
+    for (const auto &[name, points] : labeled_points) {
+        for (const GridPoint point : points) {
+            nodes.Unite(index_of_point.at(point), index_of_point.at(points.front()));
+        }
+    }
+
     // Number the groups: ground first as node 0, the rest in grid order from 1
     std::map<std::size_t, int> node_of_root;
     for (const GridPoint point : ground_points) {
@@ -101,6 +137,9 @@ Connectivity::Connectivity(const std::vector<std::unique_ptr<UIElement>> &elemen
             ++next_node;
         }
         m_NodeOfPoint.emplace(point, entry->second);
+    }
+    for (const auto &[point, text] : label_text) {
+        m_NetOfNode.emplace(m_NodeOfPoint.at(point), text);
     }
 }
 
@@ -147,6 +186,20 @@ std::optional<GridPoint> Connectivity::FindPointOfNode(const int node) const {
 }
 
 /**
+ * @brief   Returns the name a node was given by a net label.
+ * @param[in] node  Node number.
+ * @return  The name as typed on the first label of the node in grid order, or no value for ground, for a node
+ *          without a label and for a number that is not a node.
+ */
+std::optional<std::string> Connectivity::GetNetName(const int node) const {
+    const auto entry = m_NetOfNode.find(node);
+    if (node == 0 || entry == m_NetOfNode.end()) {
+        return std::nullopt;
+    }
+    return entry->second;
+}
+
+/**
  * @brief   Returns the points where three or more connections meet.
  * @return  Grid points that get a junction dot.
  */
@@ -163,6 +216,10 @@ const std::vector<GridPoint> &Connectivity::GetJunctions() const {
 Core::Circuit BuildCircuit(const std::vector<std::unique_ptr<UIElement>> &elements, const Connectivity &connectivity) {
     Core::Circuit circuit;
     for (const auto &element : elements) {
+        // A label only joins points; the simulator never sees it
+        if (element->GetComponent().GetType() == Core::ComponentType::NetLabel) {
+            continue;
+        }
         std::vector<int> nodes;
         for (const GridPoint terminal : element->GetTerminals()) {
             // Terminals are always connection points, so they always have a node

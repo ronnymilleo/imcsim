@@ -72,13 +72,27 @@ std::optional<MeasurementTarget> FindMeasurementTarget(const std::vector<std::un
 }
 
 /**
- * @brief   Names a measurement as the plots do.
- * @param[in] target  A node voltage or a current.
- * @return  "V(3)" for the voltage of node 3, "I(R1)" for the current of R1.
+ * @brief   Names the voltage of a node as the plots and the probes do.
+ * @param[in] connectivity  Nodes of the schematic, which know the names net labels gave them.
+ * @param[in] node          Node number.
+ * @return  "V(VOUT)" for a node a net label named VOUT, "V(3)" for the other nodes.
  */
-std::string GetMeasurementLabel(const MeasurementTarget &target) {
+std::string GetVoltageLabel(const Connectivity &connectivity, const int node) {
+    if (const std::optional<std::string> net = connectivity.GetNetName(node)) {
+        return std::format("V({})", *net);
+    }
+    return std::format("V({})", node);
+}
+
+/**
+ * @brief   Names a measurement as the plots do.
+ * @param[in] target        A node voltage or a current.
+ * @param[in] connectivity  Nodes of the schematic, for the names of nets.
+ * @return  "V(VOUT)" or "V(3)" for a voltage, "I(R1)" for the current of R1.
+ */
+std::string GetMeasurementLabel(const MeasurementTarget &target, const Connectivity &connectivity) {
     if (target.Node) {
-        return std::format("V({})", *target.Node);
+        return GetVoltageLabel(connectivity, *target.Node);
     }
     return std::format("I({})", target.Current);
 }

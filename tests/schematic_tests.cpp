@@ -3,9 +3,12 @@
  * @brief   Tests for the shared schematic document: content, names, selection and modified state.
  */
 
+#include "components/net_label.h"
 #include "element_factory.h"
+#include "examples.h"
 #include "schematic.h"
 #include "test_printers.h"
+#include <algorithm>
 #include <catch2/catch_test_macros.hpp>
 #include <memory>
 #include <set>
@@ -513,4 +516,94 @@ TEST_CASE("A measured node follows its wires when part of them moves", "[schemat
     schematic.SetWires({{{10, 2}, {14, 2}}, {{14, 2}, {14, 6}}});
     const GUI::Connectivity &nodes = schematic.GetConnectivity();
     CHECK(schematic.IsVoltageMeasured(nodes.GetNode({14, 6}).value()));
+}
+
+TEST_CASE("A measured node stays measured when a net label takes the place of a deleted wire", "[schematic]") {
+    GUI::Schematic schematic;
+    schematic.AddWire({10, 0}, {14, 0});
+    schematic.AddWire({14, 0}, {14, 6});
+    schematic.AddWire({14, 6}, {20, 6});
+    for (const GUI::GridPoint point : {GUI::GridPoint{10, 0}, GUI::GridPoint{20, 6}}) {
+        schematic.AddElement(GUI::CreateElement(Core::ComponentType::NetLabel, point, GUI::Rotation::R0));
+        static_cast<Core::NetLabel &>(schematic.GetElements().back()->GetComponent()).SetNet("OUT");
+    }
+    schematic.SetVoltageMeasured(schematic.GetConnectivity().GetNode({10, 0}).value(), true);
+
+    // The middle wire goes: the two halves are one node only through their labels
+    schematic.SelectWire(1);
+    schematic.DeleteSelection();
+    const GUI::Connectivity &nodes = schematic.GetConnectivity();
+    REQUIRE(nodes.GetNode({10, 0}) == nodes.GetNode({20, 6}));
+    CHECK(schematic.IsVoltageMeasured(nodes.GetNode({10, 0}).value()));
+}
+
+TEST_CASE("A measured node survives net labels being placed, named and moved", "[schematic]") {
+    const auto example = std::ranges::find_if(GUI::GetExamples(), [](const GUI::Example &candidate) {
+        return std::string_view(candidate.Title).contains("Full-bridge");
+    });
+    REQUIRE(example != GUI::GetExamples().end());
+    auto loaded = GUI::LoadExample(*example);
+    REQUIRE(loaded);
+    GUI::Schematic schematic;
+    schematic.Replace(std::move(loaded->Elements), std::move(loaded->Wires), std::move(loaded->Settings));
+    schematic.RestoreMeasurements(loaded->Measurements);
+    const auto measured_count = [&schematic] {
+        int count = 0;
+        const int nodes = 20;
+        for (int node = 1; node < nodes; ++node) {
+            count += schematic.IsVoltageMeasured(node) ? 1 : 0;
+        }
+        return count;
+    };
+    REQUIRE(measured_count() == 1);
+    schematic.GetConnectivity();
+
+    const GUI::GridPoint rail = schematic.GetWires().front().GetStart();
+    schematic.AddElement(GUI::CreateElement(Core::ComponentType::NetLabel, rail, GUI::Rotation::R0));
+    const std::size_t first = schematic.GetElements().size() - 1;
+    schematic.GetConnectivity();
+    CHECK(measured_count() == 1);
+
+    static_cast<Core::NetLabel &>(schematic.GetElement(first).GetComponent()).SetNet("OUT");
+    schematic.MarkModified();
+    schematic.GetConnectivity();
+    CHECK(measured_count() == 1);
+
+    schematic.AddElement(GUI::CreateElement(Core::ComponentType::NetLabel, {60, 60}, GUI::Rotation::R0));
+    const std::size_t second = schematic.GetElements().size() - 1;
+    static_cast<Core::NetLabel &>(schematic.GetElement(second).GetComponent()).SetNet("OUT");
+    schematic.MarkModified();
+    schematic.GetConnectivity();
+    CHECK(measured_count() == 1);
+
+    for (const GUI::GridPoint position : {GUI::GridPoint{50, 50}, GUI::GridPoint{40, 40}, GUI::GridPoint{20, 20}}) {
+        schematic.GetElement(second).SetPosition(position);
+        schematic.MarkModified();
+        schematic.GetConnectivity();
+        CHECK(measured_count() == 1);
+    }
+}
+
+TEST_CASE("A measured node that is joined to ground and then freed is measured again", "[schematic]") {
+    GUI::Schematic schematic;
+    schematic.AddElement(GUI::CreateElement(Core::ComponentType::Ground, {0, 0}, GUI::Rotation::R0));
+    schematic.AddWire({10, 10}, {14, 10});
+    schematic.AddElement(GUI::CreateElement(Core::ComponentType::NetLabel, {14, 10}, GUI::Rotation::R0));
+    static_cast<Core::NetLabel &>(schematic.GetElements().back()->GetComponent()).SetNet("OUT");
+    schematic.AddElement(GUI::CreateElement(Core::ComponentType::NetLabel, {30, 30}, GUI::Rotation::R0));
+    const std::size_t second = schematic.GetElements().size() - 1;
+    static_cast<Core::NetLabel &>(schematic.GetElement(second).GetComponent()).SetNet("OUT");
+    schematic.SetVoltageMeasured(schematic.GetConnectivity().GetNode({10, 10}).value(), true);
+
+    // The second label lands on the terminal of the ground: the whole net is ground, which cannot be measured
+    schematic.GetElement(second).SetPosition({0, 0});
+    schematic.MarkModified();
+    CHECK(schematic.GetConnectivity().GetNode({10, 10}) == 0);
+
+    // Moved away, the net is a node again and its probe comes back
+    schematic.GetElement(second).SetPosition({30, 30});
+    schematic.MarkModified();
+    const GUI::Connectivity &nodes = schematic.GetConnectivity();
+    CHECK(nodes.GetNode({10, 10}).value() > 0);
+    CHECK(schematic.IsVoltageMeasured(nodes.GetNode({10, 10}).value()));
 }

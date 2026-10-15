@@ -34,6 +34,16 @@ How to read what imcsim measures, plots and exports. The [README](../README.md) 
   the file are left behind, and parts that cannot be read are reported and skipped. File > Insert Example does the
   same with an example circuit, and dropping a `.imcsim` file on the window imports it, with nothing replaced and
   nothing to confirm.
+- **Net labels**: the circle button next to Ground and VCC, or L, places a label; its popover opens on the name, so you
+  type it and press Enter. Labels with the same name are one node even with no wire between them, which keeps a
+  large circuit readable: label the output `OUT` here and again where it is used. Names are 1 to 32 letters, digits,
+  `_`, `-` or `.`, are compared without regard to case, and a label named `0` or `GND` is ground, like a Ground symbol, and one named `VCC` joins every VCC supply, so a rail can be labeled
+  instead of wired. Do not use that name for supplies of different voltages. A new label starts with the
+  name of the last one, so another point of the same net is a click away. A label with no name shows a `?` and joins
+  nothing. A node with a label shows its name instead of its number where the plots and probes name it: `V(OUT)`
+  rather than `V(3)`, in the legends, the trace lists, the operating point table (as `OUT (3)`), the probe markers
+  and the hover. Math channel expressions still use node numbers. Labels are ordinary parts: they select, move,
+  turn, copy and paste like the others, and the netlist has no line for them.
 - **Rotating and mirroring**: R, M (left to right) and Shift+M (top to bottom) turn the selection about its center;
   with one part selected, that part turns in place. The wires that meet the selection follow it. Hold Alt (Alt+R,
   Alt+M, Alt+Shift+M, or Edit > Keep Wires in Place) to turn the parts and leave every wire where it is, so nothing
@@ -131,7 +141,7 @@ Every part with more than one terminal numbers them in the order the SPICE netli
 | CCCS or CCVS (F, H) | output, top of the diamond | output, bottom | |
 | Op-amp | output | non-inverting input (+) | inverting input (-) (4: V+, 5: V-) |
 
-Ground and the VCC rail have a single terminal and no number.
+Ground, the VCC rail and net labels have a single terminal and no number.
 
 Rotating a part (R) or mirroring it (M, Shift+M) moves its terminals with it, so terminal 1 is not always on the
 left or at the top. Terminal numbers show where it ended up.

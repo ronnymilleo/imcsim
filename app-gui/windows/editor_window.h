@@ -316,6 +316,7 @@ private:
     void StartPastingGroup(PastedGroup group);
     void HandlePasting(SchematicCanvas &canvas, const ViewTransform &view, bool hovered);
     bool IsSelecting() const;
+    std::string FindLastNet() const;
 
     // Selection and dragging
     void HandleSelection(const ViewTransform &view, bool hovered);

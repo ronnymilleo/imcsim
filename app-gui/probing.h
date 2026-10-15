@@ -30,7 +30,8 @@ std::optional<MeasurementTarget> FindMeasurementTarget(const std::vector<std::un
                                                        const std::vector<UIWire> &wires,
                                                        const Connectivity &connectivity, ImVec2 world_pos,
                                                        float wire_tolerance);
-std::string GetMeasurementLabel(const MeasurementTarget &target);
+std::string GetVoltageLabel(const Connectivity &connectivity, int node);
+std::string GetMeasurementLabel(const MeasurementTarget &target, const Connectivity &connectivity);
 
 } // namespace GUI
 

@@ -3,6 +3,7 @@
  * @brief   Tests for what the Probe tool measures at a point of the schematic.
  */
 
+#include "components/net_label.h"
 #include "element_factory.h"
 #include "probing.h"
 #include "test_printers.h"
@@ -46,7 +47,8 @@ TEST_CASE("Probing a part measures its current", "[probing]") {
     REQUIRE(target);
     CHECK_FALSE(target->Node);
     CHECK(target->Current == "R1");
-    CHECK(GUI::GetMeasurementLabel(*target) == "I(R1)");
+    const GUI::Connectivity connectivity(schematic.Elements, schematic.Wires);
+    CHECK(GUI::GetMeasurementLabel(*target, connectivity) == "I(R1)");
 }
 
 TEST_CASE("Probing a transistor measures the current of its nearest terminal", "[probing]") {
@@ -64,7 +66,8 @@ TEST_CASE("Probing a wire measures the voltage of its node", "[probing]") {
     REQUIRE(target->Node);
     CHECK(*target->Node > 0);
     CHECK(target->Current.empty());
-    CHECK(GUI::GetMeasurementLabel(*target) == std::format("V({})", *target->Node));
+    const GUI::Connectivity connectivity(schematic.Elements, schematic.Wires);
+    CHECK(GUI::GetMeasurementLabel(*target, connectivity) == std::format("V({})", *target->Node));
 }
 
 TEST_CASE("Probing ground, its wires or empty space measures nothing", "[probing]") {
@@ -72,4 +75,19 @@ TEST_CASE("Probing ground, its wires or empty space measures nothing", "[probing
     CHECK_FALSE(schematic.At({0.0f, 8.5f}));
     CHECK_FALSE(schematic.At({-2.0f, 8.0f}));
     CHECK_FALSE(schematic.At({20.0f, 20.0f}));
+}
+
+TEST_CASE("A node a net label named is measured and labeled by that name", "[probing]") {
+    ProbedSchematic schematic;
+    schematic.Elements.push_back(GUI::CreateElement(Core::ComponentType::NetLabel, {6, 0}, GUI::Rotation::R0));
+    static_cast<Core::NetLabel &>(schematic.Elements.back()->GetComponent()).SetNet("VOUT");
+
+    const GUI::Connectivity connectivity(schematic.Elements, schematic.Wires);
+    const auto target = schematic.At({4.0f, 0.1f});
+    REQUIRE(target);
+    REQUIRE(target->Node);
+    CHECK(GUI::GetMeasurementLabel(*target, connectivity) == "V(VOUT)");
+    CHECK(GUI::GetVoltageLabel(connectivity, *target->Node) == "V(VOUT)");
+    // The other nodes keep their numbers
+    CHECK(GUI::GetVoltageLabel(connectivity, *target->Node + 1) == std::format("V({})", *target->Node + 1));
 }

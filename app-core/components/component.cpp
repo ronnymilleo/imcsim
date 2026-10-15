@@ -21,7 +21,7 @@ constexpr auto AllTypes = std::to_array<ComponentType>({
     ComponentType::VCC,        ComponentType::VoltageSource, ComponentType::CurrentSource, ComponentType::Diode,
     ComponentType::ZenerDiode, ComponentType::LED,           ComponentType::NPN,           ComponentType::PNP,
     ComponentType::NMOS,       ComponentType::PMOS,          ComponentType::VCVS,          ComponentType::VCCS,
-    ComponentType::CCCS,       ComponentType::CCVS,          ComponentType::OpAmp,
+    ComponentType::CCCS,       ComponentType::CCVS,          ComponentType::OpAmp,         ComponentType::NetLabel,
 });
 
 } // namespace
@@ -91,6 +91,7 @@ const char *Component::GetNamePrefix() const {
     case ComponentType::OpAmp:
         return "U";
     case ComponentType::Ground:
+    case ComponentType::NetLabel:
         return "";
     }
     return "";
@@ -124,6 +125,7 @@ const char *Component::GetUnit() const {
         return "V/A";
     case ComponentType::OpAmp:
     case ComponentType::Ground:
+    case ComponentType::NetLabel:
     case ComponentType::Diode:
     case ComponentType::ZenerDiode:
     case ComponentType::LED:
@@ -144,6 +146,7 @@ const char *Component::GetUnit() const {
 bool Component::HasValue() const {
     switch (m_Type) {
     case ComponentType::Ground:
+    case ComponentType::NetLabel:
     case ComponentType::Diode:
     case ComponentType::ZenerDiode:
     case ComponentType::LED:
@@ -189,6 +192,7 @@ bool Component::IsValidValue(const double value) const {
     case ComponentType::CCVS:
         return true;
     case ComponentType::Ground:
+    case ComponentType::NetLabel:
     case ComponentType::Diode:
     case ComponentType::ZenerDiode:
     case ComponentType::LED:
@@ -279,6 +283,8 @@ const char *GetTypeName(const ComponentType type) {
         return "CCVS";
     case ComponentType::OpAmp:
         return "OpAmp";
+    case ComponentType::NetLabel:
+        return "NetLabel";
     }
     return "Unknown";
 }

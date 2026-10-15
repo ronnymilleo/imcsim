@@ -9,6 +9,7 @@
 #include "components/controlled_source.h"
 #include "components/diode.h"
 #include "components/mosfet.h"
+#include "components/net_label.h"
 #include "components/op_amp.h"
 #include "components/source.h"
 #include "element_factory.h"
@@ -254,6 +255,11 @@ nlohmann::json WriteElement(const UIElement &element) {
         WriteModelChoice(static_cast<const Core::MOSFET &>(component), MOSFETKeys, object);
     } else if (Core::IsCurrentControlled(type)) {
         object["control"] = static_cast<const Core::ControlledSource &>(component).GetControllingCurrent();
+    } else if (type == Core::ComponentType::NetLabel) {
+        // A label with no name yet is saved without the key
+        if (const std::string &net = static_cast<const Core::NetLabel &>(component).GetNet(); !net.empty()) {
+            object["net"] = net;
+        }
     } else if (type == Core::ComponentType::OpAmp) {
         const auto &op_amp = static_cast<const Core::OpAmp &>(component);
         WriteModelChoice(op_amp, OpAmpKeys, object);
@@ -430,6 +436,13 @@ std::expected<std::unique_ptr<UIElement>, std::string> ReadElement(const nlohman
             return std::unexpected("has a controlling current that is not text");
         }
         static_cast<Core::ControlledSource &>(component).SetControllingCurrent(*current);
+    }
+    if (component.GetType() == Core::ComponentType::NetLabel && object.contains("net")) {
+        const std::optional<std::string> net = ReadString(object, "net");
+        if (!net || !Core::NetLabel::IsValidNet(*net)) {
+            return std::unexpected("has a net name that is not 1 to 32 letters, digits, _, - or .");
+        }
+        static_cast<Core::NetLabel &>(component).SetNet(*net);
     }
     if (const std::optional<std::string> name = ReadString(object, "name")) {
         component.SetName(*name);

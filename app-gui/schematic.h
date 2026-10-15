@@ -128,12 +128,21 @@ private:
     std::set<std::size_t> m_SelectedWires;
     std::size_t m_SelectionVersion = 0;
 
-    // Measurements: node numbers and current names, such as "R1" or "Q1.C". Nodes are numbered by their position on the
-    // grid, so any edit can renumber them: before the nodes are dropped, each measured one is remembered by its points,
-    // and it is found again when the nodes are rebuilt
-    std::set<int> m_MeasuredNodes;
+    /**
+     * @struct  VoltageProbe
+     * @brief   A measured node, kept by the points of the node because its number changes with any edit.
+     * @details Node is the number the probe has in the nodes as last built, or none while the points belong to no
+     *          node a plot can show, such as while the net is joined to ground; the points stay, so the probe comes
+     *          back when they are a node again.
+     */
+    struct VoltageProbe {
+        std::vector<GridPoint> Points;
+        std::optional<int> Node;
+    };
+
+    // Measurements: probes on nodes, and current names such as "R1" or "Q1.C"
+    std::vector<VoltageProbe> m_VoltageProbes;
     std::set<std::string> m_MeasuredCurrents;
-    std::vector<std::vector<GridPoint>> m_MeasuredNodePoints;
 
     // Simulation settings; the version changes only when they are replaced from outside the analysis settings,
     // such as by opening a file or undoing, so the window knows to reload its fields
@@ -165,7 +174,7 @@ private:
     std::size_t m_DCSweepVersion = 0;
 
     void InvalidateDerivedData();
-    void FollowMeasuredNodes();
+    void FollowVoltageProbes();
     std::string TakeSnapshot() const;
     void RestoreSnapshot(const std::string &snapshot);
     void ResetHistory();

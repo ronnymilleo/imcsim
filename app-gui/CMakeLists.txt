@@ -42,6 +42,7 @@ add_library(imcsim-gui-lib
             ui_elements/ui_ground.cpp
             ui_elements/ui_inductor.cpp
             ui_elements/ui_mosfet.cpp
+            ui_elements/ui_net_label.cpp
             ui_elements/ui_op_amp.cpp
             ui_elements/ui_resistor.cpp
             ui_elements/ui_source.cpp

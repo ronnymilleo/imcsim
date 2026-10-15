@@ -11,6 +11,7 @@
 #include "components/ground.h"
 #include "components/inductor.h"
 #include "components/mosfet.h"
+#include "components/net_label.h"
 #include "components/op_amp.h"
 #include "components/resistor.h"
 #include "components/vcc.h"
@@ -18,6 +19,7 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators.hpp>
 #include <span>
+#include <string>
 #include <string_view>
 
 TEST_CASE("Components start with SPICE prefixes, units and default values", "[component]") {
@@ -61,6 +63,30 @@ TEST_CASE("Ground has no name prefix and no value", "[component]") {
     CHECK_FALSE(ground.HasValue());
     CHECK(std::string_view(ground.GetNamePrefix()).empty());
     CHECK_FALSE(ground.IsValidValue(0.0));
+}
+
+TEST_CASE("A net label has no prefix, value or unit and its name is kept as typed", "[component]") {
+    Core::NetLabel label;
+    CHECK_FALSE(label.HasValue());
+    CHECK(std::string_view(label.GetNamePrefix()).empty());
+    CHECK(std::string_view(label.GetUnit()).empty());
+    CHECK(std::string_view(label.GetTypeName()) == "NetLabel");
+    CHECK(Core::ParseComponentType("NetLabel") == Core::ComponentType::NetLabel);
+    CHECK(label.GetNet().empty());
+    label.SetNet("Vout");
+    CHECK(label.GetNet() == "Vout");
+}
+
+TEST_CASE("Net names are 1 to 32 letters, digits, underscores, hyphens and dots", "[component]") {
+    CHECK(Core::NetLabel::IsValidNet("VOUT"));
+    CHECK(Core::NetLabel::IsValidNet("out_1-a.b"));
+    CHECK(Core::NetLabel::IsValidNet("0"));
+    CHECK(Core::NetLabel::IsValidNet(std::string(32, 'a')));
+    CHECK_FALSE(Core::NetLabel::IsValidNet(""));
+    CHECK_FALSE(Core::NetLabel::IsValidNet(std::string(33, 'a')));
+    CHECK_FALSE(Core::NetLabel::IsValidNet("two words"));
+    CHECK_FALSE(Core::NetLabel::IsValidNet("a(b)"));
+    CHECK(Core::NetLabel::NormalizeNet("VoUt") == "vout");
 }
 
 TEST_CASE("IsValidValue requires positive passive values but allows any source voltage", "[component]") {

@@ -37,6 +37,7 @@ enum class ComponentType {
     CCCS,
     CCVS,
     OpAmp,
+    NetLabel,
 };
 
 /**

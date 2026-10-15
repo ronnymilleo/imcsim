@@ -11,6 +11,7 @@
 #include "components/controlled_source.h"
 #include "components/diode.h"
 #include "components/mosfet.h"
+#include "components/net_label.h"
 #include "components/op_amp.h"
 #include "components/source.h"
 #include "schematic.h"
@@ -38,11 +39,17 @@ public:
     bool CanTypeValue() const;
     void StartTypingValue(char first);
 
+    // The name of a selected net label gets the focus on the next Draw(), as for a label just placed
+    void FocusNetName();
+
 private:
     Schematic &m_Schematic;
     // Texts being edited, and the selection they were loaded from
     std::optional<std::size_t> m_LoadedSelection;
     ValueField m_Value;
+    // The net name being typed for a net label, and whether the next Draw() focuses it
+    std::array<char, 40> m_Net{};
+    bool m_FocusNet = false;
     // One per member of Core::ACParameters and Core::PulseParameters, in the order the window lists them
     std::array<ValueField, 4> m_ACFields;
     std::array<ValueField, 7> m_PulseFields;
@@ -57,6 +64,7 @@ private:
     void DrawFields(Core::Component &component);
     bool DrawModeledPart(Core::Component &component);
     void DrawValue(Core::Component &component);
+    void DrawNetLabel(Core::NetLabel &label);
     void DrawDiode(Core::Diode &diode);
     void DrawBJT(Core::BJT &bjt);
     void DrawMOSFET(Core::MOSFET &mosfet);

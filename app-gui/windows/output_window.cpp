@@ -11,6 +11,7 @@
 #include "misc/cpp/imgui_stdlib.h"
 #include "node_colors.h"
 #include "plot_helpers.h"
+#include "probing.h"
 #include "schematic_file.h"
 #include "spice_value.h"
 #include "theme.h"
@@ -114,9 +115,8 @@ float PlotHeight(const int plot_count) {
 
 // Ground is always 0 V, so plots start at node 1. Each node keeps its color whichever nodes are measured. The
 // suffix tells the curves of a DC sweep family apart in the cursor readout
-void PlotNodes(const std::vector<double> &xs, const std::vector<std::vector<double>> &node_values,
-               const Schematic &schematic, const char *unit, const std::string &suffix,
-               std::vector<PlottedTrace> &plotted) {
+void PlotNodes(const std::vector<double> &xs, const std::vector<std::vector<double>> &node_values, Schematic &schematic,
+               const char *unit, const std::string &suffix, std::vector<PlottedTrace> &plotted) {
     for (std::size_t node = 1; node < node_values.size(); ++node) {
         if (!schematic.IsVoltageMeasured(static_cast<int>(node))) {
             continue;
@@ -124,7 +124,7 @@ void PlotNodes(const std::vector<double> &xs, const std::vector<std::vector<doub
         const ImU32 color = GetNodeColor(static_cast<int>(node));
         ImPlotSpec spec;
         spec.LineColor = ImGui::ColorConvertU32ToFloat4(color);
-        const std::string label = std::format("V({})", node);
+        const std::string label = GetVoltageLabel(schematic.GetConnectivity(), static_cast<int>(node));
         ImPlot::PlotLine(label.c_str(), xs.data(), node_values[node].data(), static_cast<int>(xs.size()), spec);
         plotted.push_back({label + suffix, &node_values[node], unit, color});
     }
@@ -374,13 +374,13 @@ std::optional<bool> DrawAllNoneButtons(const char *id) {
 
 // Every measured trace of a result, voltages first, with the labels and colors of the plots
 std::vector<PlottedTrace> ListTraces(const std::vector<std::vector<double>> &node_values,
-                                     const std::vector<Core::ComponentTrace> &currents, const Schematic &schematic,
+                                     const std::vector<Core::ComponentTrace> &currents, Schematic &schematic,
                                      const char *voltage_unit, const char *current_unit) {
     std::vector<PlottedTrace> traces;
     for (std::size_t node = 1; node < node_values.size(); ++node) {
         if (schematic.IsVoltageMeasured(static_cast<int>(node))) {
-            traces.push_back(
-                {std::format("V({})", node), &node_values[node], voltage_unit, GetNodeColor(static_cast<int>(node))});
+            traces.push_back({GetVoltageLabel(schematic.GetConnectivity(), static_cast<int>(node)), &node_values[node],
+                              voltage_unit, GetNodeColor(static_cast<int>(node))});
         }
     }
     for (std::size_t index = 0; index < currents.size(); ++index) {
@@ -682,13 +682,13 @@ private:
 // Adds the measured voltages and currents of a result, as the plots draw them. The suffix tells the curves of a
 // DC sweep family apart in the CSV headers; only the first curve of a family has a legend entry
 void AddExportTraces(PanelBuilder &builder, const std::vector<std::vector<double>> &node_values,
-                     const std::vector<Core::ComponentTrace> &currents, const Schematic &schematic,
-                     const std::string &suffix, const bool in_legend) {
+                     const std::vector<Core::ComponentTrace> &currents, Schematic &schematic, const std::string &suffix,
+                     const bool in_legend) {
     for (std::size_t node = 1; node < node_values.size(); ++node) {
         if (!schematic.IsVoltageMeasured(static_cast<int>(node))) {
             continue;
         }
-        const std::string label = std::format("V({})", node);
+        const std::string label = GetVoltageLabel(schematic.GetConnectivity(), static_cast<int>(node));
         builder.Add({.Name = label + suffix,
                      .LegendLabel = in_legend ? label : "",
                      .Values = node_values[node],
@@ -750,7 +750,7 @@ const char *GetTabTitle(const PlotTab tab) {
 }
 
 // The operating point is a table of DC values, one row per node and per current
-void DrawOperatingPoint(const Core::OperatingPoint &operating_point) {
+void DrawOperatingPoint(const Core::OperatingPoint &operating_point, Schematic &schematic) {
     ImGui::PushTextWrapPos(0.0f);
     for (const std::string &warning : operating_point.Warnings) {
         ImGui::TextColored(GetWarningTextColor(), "%s", warning.c_str());
@@ -767,7 +767,15 @@ void DrawOperatingPoint(const Core::OperatingPoint &operating_point) {
         for (std::size_t node = 0; node < operating_point.NodeVoltages.size(); ++node) {
             ImGui::TableNextRow();
             ImGui::TableNextColumn();
-            ImGui::TextUnformatted(node == 0 ? "0 (ground)" : std::format("{}", node).c_str());
+            // A node a net label named shows its name before its number
+            const std::optional<std::string> net = schematic.GetConnectivity().GetNetName(static_cast<int>(node));
+            std::string name = std::format("{}", node);
+            if (node == 0) {
+                name = "0 (ground)";
+            } else if (net) {
+                name = std::format("{} ({})", *net, node);
+            }
+            ImGui::TextUnformatted(name.c_str());
             ImGui::TableNextColumn();
             ImGui::TextUnformatted(std::format("{}V", Core::FormatValue(operating_point.NodeVoltages[node])).c_str());
         }
@@ -944,7 +952,7 @@ void OutputWindow::Draw() {
     if (ImGui::BeginTabItem("Operating point", nullptr, tab_flags(PlotTab::OperatingPoint))) {
         m_ShownTab = PlotTab::OperatingPoint;
         if (const auto &operating_point = m_Schematic.GetOperatingPoint()) {
-            DrawOperatingPoint(*operating_point);
+            DrawOperatingPoint(*operating_point, m_Schematic);
         } else {
             ImGui::TextDisabled("No operating point for the current circuit; pick it beside Run in the editor");
         }
@@ -1050,7 +1058,7 @@ void OutputWindow::DrawTraceList(const std::size_t node_count, const std::vector
             }
             bool measured = m_Schematic.IsVoltageMeasured(node);
             ImGui::PushStyleColor(ImGuiCol_CheckMark, GetNodeColor(node));
-            if (ImGui::Checkbox(std::format("V({})", node).c_str(), &measured)) {
+            if (ImGui::Checkbox(GetVoltageLabel(m_Schematic.GetConnectivity(), node).c_str(), &measured)) {
                 m_Schematic.SetVoltageMeasured(node, measured);
             }
             ImGui::PopStyleColor();

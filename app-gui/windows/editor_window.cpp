@@ -6,6 +6,7 @@
 #include "editor_window.h"
 
 #include "circuit_snapshot.h"
+#include "components/net_label.h"
 #include "current_flow.h"
 #include "element_factory.h"
 #include "group_editing.h"
@@ -27,6 +28,7 @@
 #include <cmath>
 #include <format>
 #include <numbers>
+#include <ranges>
 #include <span>
 #include <string>
 #include <utility>
@@ -97,7 +99,8 @@ constexpr auto PartGroups = std::to_array<PartGroup>({
 // Parts with a button of their own, in toolbar groups
 constexpr auto PassiveParts =
     std::to_array({Core::ComponentType::Resistor, Core::ComponentType::Capacitor, Core::ComponentType::Inductor});
-constexpr auto SupplyParts = std::to_array({Core::ComponentType::Ground, Core::ComponentType::VCC});
+constexpr auto SupplyParts =
+    std::to_array({Core::ComponentType::Ground, Core::ComponentType::VCC, Core::ComponentType::NetLabel});
 
 // Toolbar buttons are square, this many frame heights wide; icons fill this share of them
 constexpr float ToolButtonScale = 1.4f;
@@ -311,14 +314,16 @@ std::optional<double> FindOperatingPointValue(const MeasurementTarget &target,
     return current != operating_point.Currents.end() ? std::optional(current->Current) : std::nullopt;
 }
 
-// "V(3) = 4.5V" once there is an operating point, or just "V(3)"
-std::string DescribeMeasurement(const MeasurementTarget &target, const Core::OperatingPoint *operating_point) {
+// "V(3) = 4.5V" once there is an operating point, or just "V(3)"; a node a net label named shows the name, V(VOUT)
+std::string DescribeMeasurement(const MeasurementTarget &target, const Connectivity &connectivity,
+                                const Core::OperatingPoint *operating_point) {
     const std::optional<double> value =
         operating_point != nullptr ? FindOperatingPointValue(target, *operating_point) : std::nullopt;
+    const std::string label = GetMeasurementLabel(target, connectivity);
     if (!value) {
-        return GetMeasurementLabel(target);
+        return label;
     }
-    return std::format("{} = {}{}", GetMeasurementLabel(target), Core::FormatValue(*value), target.Node ? "V" : "A");
+    return std::format("{} = {}{}", label, Core::FormatValue(*value), target.Node ? "V" : "A");
 }
 
 // Light of an LED color, kept bright so it reads on any background; an LED with custom parameters glows warm white
@@ -695,6 +700,9 @@ void EditorWindow::Draw() {
     if (ImGui::IsWindowFocused() && ImGui::IsKeyPressed(ImGuiKey_P)) {
         StartProbing();
     }
+    if (ImGui::IsWindowFocused() && ImGui::IsKeyPressed(ImGuiKey_L) && !ImGui::GetIO().KeyCtrl) {
+        StartPlacing(Core::ComponentType::NetLabel);
+    }
     HandlePlacement(canvas, view, hovered);
     HandlePasting(canvas, view, hovered);
     HandleWireDrawing(draw_list, view, hovered);
@@ -1057,7 +1065,8 @@ ImU32 EditorWindow::GetElementColor(const std::size_t index) const {
     }
     const UIElement &element = *m_Schematic.GetElements()[index];
     const Core::Component &component = element.GetComponent();
-    if (component.GetType() == Core::ComponentType::Ground) {
+    // Ground and net labels carry no current or power of their own
+    if (component.GetType() == Core::ComponentType::Ground || component.GetType() == Core::ComponentType::NetLabel) {
         return GetPalette().Element;
     }
     if (!by_current) {
@@ -1264,7 +1273,7 @@ void EditorWindow::DrawHoveredValue(const ViewTransform &view, const bool hovere
     if (!target || !FindOperatingPointValue(*target, m_Displayed->Point)) {
         return;
     }
-    std::string text = DescribeMeasurement(*target, &m_Displayed->Point);
+    std::string text = DescribeMeasurement(*target, m_Schematic.GetConnectivity(), &m_Displayed->Point);
     if (!target->Node) {
         if (const std::optional<ComponentPower> power = FindPower(m_Displayed->Powers, target->Current)) {
             text += std::format("\nP({}) = {}W", power->Name, Core::FormatValue(power->Power));
@@ -1461,10 +1470,38 @@ void EditorWindow::HandlePlacement(SchematicCanvas &canvas, const ViewTransform 
     const GridPoint position = Snap(view.ToWorld(ImGui::GetIO().MousePos));
     auto preview = CreateElement(*m_PlacingType, position, m_PlacingRotation);
     preview->SetMirrored(m_PlacingMirrored);
-    preview->Draw(canvas, view, GetPreviewColor(), m_SymbolStyle);
-    if (ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
-        m_Schematic.AddElement(std::move(preview));
+    const bool is_label = *m_PlacingType == Core::ComponentType::NetLabel;
+    if (is_label) {
+        // A new label starts with the name of the last one, so the same net is a click away
+        static_cast<Core::NetLabel &>(preview->GetComponent()).SetNet(FindLastNet());
     }
+    preview->Draw(canvas, view, GetPreviewColor(), m_SymbolStyle);
+    if (!ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+        return;
+    }
+    m_Schematic.AddElement(std::move(preview));
+    if (is_label) {
+        // The name is what a label needs next: placing ends and its popover opens on the name
+        m_PlacingType.reset();
+        m_Schematic.SelectElement(m_Schematic.GetElements().size() - 1);
+        m_PartEditor.FocusNetName();
+        PlacePartPopover(view);
+        m_PartPopoverRequested = true;
+    }
+}
+
+// The name of the newest label that has one, or none
+std::string EditorWindow::FindLastNet() const {
+    for (const auto &element : std::views::reverse(m_Schematic.GetElements())) {
+        if (element->GetComponent().GetType() != Core::ComponentType::NetLabel) {
+            continue;
+        }
+        if (const std::string &net = static_cast<const Core::NetLabel &>(element->GetComponent()).GetNet();
+            !net.empty()) {
+            return net;
+        }
+    }
+    return {};
 }
 
 // Selecting is the mode where clicks pick, drag and select: none of placing, pasting, wiring and probing is active
@@ -1696,7 +1733,8 @@ void EditorWindow::HandleProbing(ImDrawList *draw_list, const ViewTransform &vie
         target->Node ? m_Schematic.IsVoltageMeasured(*target->Node) : m_Schematic.IsCurrentMeasured(target->Current);
     draw_list->AddCircle(cursor, MeasurementMarkerRadius * 2.0f, GetHighlightColor(), 0, LineThickness);
     ImGui::SetTooltip("%s", std::format("{}\nClick to {} the plots",
-                                        DescribeMeasurement(*target, m_Displayed ? &m_Displayed->Point : nullptr),
+                                        DescribeMeasurement(*target, m_Schematic.GetConnectivity(),
+                                                            m_Displayed ? &m_Displayed->Point : nullptr),
                                         measured ? "remove it from" : "add it to")
                                 .c_str());
     if (!ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
@@ -2085,8 +2123,8 @@ void EditorWindow::DrawContextMenu() {
         const MeasurementTarget &target = *m_ContextTarget;
         const bool measured =
             target.Node ? m_Schematic.IsVoltageMeasured(*target.Node) : m_Schematic.IsCurrentMeasured(target.Current);
-        const std::string label =
-            std::format("{} {}", measured ? "Stop measuring" : "Measure", GetMeasurementLabel(target));
+        const std::string label = std::format("{} {}", measured ? "Stop measuring" : "Measure",
+                                              GetMeasurementLabel(target, m_Schematic.GetConnectivity()));
         if (ImGui::MenuItem(label.c_str())) {
             if (target.Node) {
                 m_Schematic.SetVoltageMeasured(*target.Node, !measured);
