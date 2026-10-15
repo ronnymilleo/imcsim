@@ -13,6 +13,7 @@
 #include <expected>
 #include <filesystem>
 #include <memory>
+#include <span>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -48,6 +49,7 @@ inline constexpr std::string_view SchematicExtension = ".imcsim";
 
 std::string SaveSchematic(const std::vector<std::unique_ptr<UIElement>> &elements, const std::vector<UIWire> &wires,
                           const SimulationSettings &settings, const SavedMeasurements &measurements);
+std::string SaveParts(std::span<const UIElement *const> elements, const std::vector<UIWire> &wires);
 std::expected<LoadedSchematic, std::string> LoadSchematic(std::string_view text);
 std::expected<std::string, std::string> ReadTextFile(const std::filesystem::path &path);
 std::expected<void, std::string> WriteTextFile(const std::filesystem::path &path, std::string_view text);

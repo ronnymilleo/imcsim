@@ -10,6 +10,8 @@
 #include "wire_editing.h"
 #include <algorithm>
 #include <iterator>
+#include <map>
+#include <set>
 #include <string_view>
 #include <utility>
 
@@ -184,6 +186,8 @@ void Schematic::Replace(std::vector<std::unique_ptr<UIElement>> elements, std::v
     m_SimulationSettings = std::move(settings);
     ++m_SimulationSettingsVersion;
     InvalidateDerivedData();
+    // The measured nodes belong to the old content; whoever replaces it sets them again
+    m_MeasuredNodePoints.clear();
     m_Modified = false;
     ResetHistory();
 }
@@ -332,6 +336,7 @@ void Schematic::SetCurrentMeasured(const std::string &name, const bool measured)
  * @brief   Removes every measurement, so the plots start empty; for a new or opened schematic.
  */
 void Schematic::ClearMeasurements() {
+    m_MeasuredNodePoints.clear();
     m_MeasuredNodes.clear();
     m_MeasuredCurrents.clear();
 }
@@ -510,6 +515,7 @@ void Schematic::Redo() {
 const Connectivity &Schematic::GetConnectivity() {
     if (!m_Connectivity) {
         m_Connectivity.emplace(m_Elements, m_Wires);
+        FollowMeasuredNodes();
     }
     return *m_Connectivity;
 }
@@ -636,11 +642,42 @@ std::size_t Schematic::GetDCSweepVersion() const {
 }
 
 void Schematic::InvalidateDerivedData() {
+    // Several changes can pile up before the nodes are asked for again: the points remembered from the nodes as they
+    // were last numbered stay valid, so they are only taken when the nodes exist
+    if (m_Connectivity && !m_MeasuredNodes.empty()) {
+        m_MeasuredNodePoints.clear();
+        for (const int node : m_MeasuredNodes) {
+            m_MeasuredNodePoints.push_back(m_Connectivity->GetPointsOfNode(node));
+        }
+    }
     m_Connectivity.reset();
     m_OperatingPoint.reset();
     m_Transient.reset();
     m_ACSweep.reset();
     m_DCSweep.reset();
+}
+
+// A measured node is the one that most of its remembered points belong to now; one whose points no longer connect to
+// anything, such as after deleting its wires, is no longer measured. Two measured nodes joined into one stay one
+void Schematic::FollowMeasuredNodes() {
+    if (m_MeasuredNodePoints.empty()) {
+        return;
+    }
+    std::set<int> followed;
+    for (const std::vector<GridPoint> &points : m_MeasuredNodePoints) {
+        std::map<int, int> votes;
+        for (const GridPoint point : points) {
+            if (const std::optional<int> node = m_Connectivity->GetNode(point); node && *node != 0) {
+                ++votes[*node];
+            }
+        }
+        const auto best = std::ranges::max_element(votes, {}, &std::pair<const int, int>::second);
+        if (best != votes.end()) {
+            followed.insert(best->first);
+        }
+    }
+    m_MeasuredNodes = std::move(followed);
+    m_MeasuredNodePoints.clear();
 }
 
 // Measurements stay out of snapshots, so probing adds no undo step and does not count as a change

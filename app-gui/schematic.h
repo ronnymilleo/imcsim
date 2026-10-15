@@ -128,9 +128,12 @@ private:
     std::set<std::size_t> m_SelectedWires;
     std::size_t m_SelectionVersion = 0;
 
-    // Measurements: node numbers and current names, such as "R1" or "Q1.C"
+    // Measurements: node numbers and current names, such as "R1" or "Q1.C". Nodes are numbered by their position on the
+    // grid, so any edit can renumber them: before the nodes are dropped, each measured one is remembered by its points,
+    // and it is found again when the nodes are rebuilt
     std::set<int> m_MeasuredNodes;
     std::set<std::string> m_MeasuredCurrents;
+    std::vector<std::vector<GridPoint>> m_MeasuredNodePoints;
 
     // Simulation settings; the version changes only when they are replaced from outside the analysis settings,
     // such as by opening a file or undoing, so the window knows to reload its fields
@@ -162,6 +165,7 @@ private:
     std::size_t m_DCSweepVersion = 0;
 
     void InvalidateDerivedData();
+    void FollowMeasuredNodes();
     std::string TakeSnapshot() const;
     void RestoreSnapshot(const std::string &snapshot);
     void ResetHistory();

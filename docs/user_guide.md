@@ -21,6 +21,13 @@ How to read what imcsim measures, plots and exports. The [README](../README.md) 
   drag a segment sideways and the wires that meet it stretch or bend to stay connected, as do the parts that touch
   its middle. If you drop a segment on another wire, the two join there, as when drawing a wire. Delete removes the
   whole selection in one step, and Undo brings it back the same way.
+- **Copy and paste**: Ctrl+C copies the selection, Ctrl+X cuts it and Ctrl+V pastes (Edit menu too). The copy goes to
+  the system clipboard as text in the format of the files, so it pastes into another window of imcsim as well. A paste
+  follows the cursor half see-through, held by the middle of the group; R, M and Shift+M turn it, a click places it
+  and selects what was placed, and Esc or a right click cancels. Pasted parts take the next free names (R3, C2), so
+  a part that points at another by name, such as a current-controlled source, still points at the original. A pasted
+  wire or terminal that lands on one already there joins it, as when drawing. Probes stay where they are: a copy
+  carries no measurements, and the probes of the schematic you paste into keep following their own nodes.
 - **Rotating and mirroring**: R, M (left to right) and Shift+M (top to bottom) turn the selection about its center;
   with one part selected, that part turns in place. The wires that meet the selection follow it. Hold Alt (Alt+R,
   Alt+M, Alt+Shift+M, or Edit > Keep Wires in Place) to turn the parts and leave every wire where it is, so nothing

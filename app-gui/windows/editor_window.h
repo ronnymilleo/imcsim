@@ -8,6 +8,7 @@
 
 #include "analysis_controls.h"
 #include "circuit_snapshot.h"
+#include "clipboard.h"
 #include "components/component.h"
 #include "examples.h"
 #include "file_dialog.h"
@@ -158,6 +159,9 @@ private:
         RotateKeepWires,
         MirrorKeepWires,
         FlipKeepWires,
+        Cut,
+        Copy,
+        Paste,
         SelectAll,
         Delete
     };
@@ -217,6 +221,9 @@ private:
 
     // Probing: picks what the plots measure
     bool m_Probing = false;
+
+    // Pasting: what was read from the clipboard, following the cursor until a click places it
+    std::optional<PastedGroup> m_Pasting;
 
     // Selection and dragging
     std::optional<GroupDrag> m_Drag;
@@ -294,6 +301,14 @@ private:
     // Probing
     void HandleProbing(ImDrawList *draw_list, const ViewTransform &view, bool hovered);
 
+    // Clipboard
+    void HandleClipboardShortcuts();
+    void CopySelected();
+    void CutSelected();
+    void StartPasting();
+    void HandlePasting(SchematicCanvas &canvas, const ViewTransform &view, bool hovered);
+    bool IsSelecting() const;
+
     // Selection and dragging
     void HandleSelection(const ViewTransform &view, bool hovered);
     void ApplySelection(const Selection &selection);
@@ -322,6 +337,7 @@ private:
     void HandleExampleRequest();
     void HandleCommandRequest();
     bool RunFileCommand(EditorCommand command);
+    bool RunClipboardCommand(EditorCommand command);
     void RunEditCommand(EditorCommand command);
     void RunTurnCommand(EditorCommand command);
     void ReadSetting(std::string_view line);

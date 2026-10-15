@@ -34,8 +34,8 @@ New to imcsim? The [tutorial](docs/tutorial.md) builds, simulates and exports a 
 - Exports for reports: plots as SVG images (light for print or dark, at any size) or CSV tables, and the schematic
   as an SVG image with its probes, so the two figures can be shown side by side
 - Nine color themes, seven dark and two light, switched from the View menu (see [Themes](docs/themes.md))
-- Multi-selection (Shift+click, selection box, whole node by double click), moving and turning groups, and sliding wire
-  segments, with an option to turn parts and leave their wires in place
+- Multi-selection (Shift+click, selection box, whole node by double click), moving and turning groups, sliding wire
+  segments, copy, cut and paste (also between windows), with an option to turn parts and leave their wires in place
 - IEC or ANSI symbols, optional terminal numbers, parts rotated (R) and mirrored left to right (M) or top to bottom
   (Shift+M), undo and redo, and schematics saved as JSON together with the settings of every analysis and the
   measured traces

@@ -31,6 +31,7 @@ public:
 
     std::optional<int> GetNode(GridPoint point) const;
     std::optional<GridPoint> FindPointOfNode(int node) const;
+    std::vector<GridPoint> GetPointsOfNode(int node) const;
     const std::vector<GridPoint> &GetJunctions() const;
 
 private:

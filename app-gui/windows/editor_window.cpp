@@ -484,6 +484,18 @@ void EditorWindow::DrawEditMenuItems() {
         ImGui::EndMenu();
     }
     ImGui::Separator();
+    if (ImGui::MenuItem("Cut", IMCSIM_SHORTCUT "X", false, m_Schematic.HasSelection())) {
+        m_RequestedCommand = EditorCommand::Cut;
+    }
+    if (ImGui::MenuItem("Copy", IMCSIM_SHORTCUT "C", false, m_Schematic.HasSelection())) {
+        m_RequestedCommand = EditorCommand::Copy;
+    }
+    const char *clipboard_text = ImGui::GetClipboardText();
+    const bool can_paste = clipboard_text != nullptr && LooksLikeCopiedSchematic(clipboard_text);
+    if (ImGui::MenuItem("Paste", IMCSIM_SHORTCUT "V", false, can_paste)) {
+        m_RequestedCommand = EditorCommand::Paste;
+    }
+    ImGui::Separator();
     if (ImGui::MenuItem("Select All", IMCSIM_SHORTCUT "A")) {
         m_RequestedCommand = EditorCommand::SelectAll;
     }
@@ -662,8 +674,10 @@ void EditorWindow::Draw() {
         StartProbing();
     }
     HandlePlacement(canvas, view, hovered);
+    HandlePasting(canvas, view, hovered);
     HandleWireDrawing(draw_list, view, hovered);
     HandleProbing(draw_list, view, hovered);
+    HandleClipboardShortcuts();
     DrawHoveredValue(view, hovered);
     DrawColorLegend(draw_list, origin, size);
 
@@ -692,7 +706,7 @@ void EditorWindow::DrawToolbar() {
     };
 
     // Tools, history and view
-    const bool selecting = !m_PlacingType && !m_DrawingWires && !m_Probing;
+    const bool selecting = IsSelecting();
     if (tool_button("##select", ToolIcon::Select, selecting, true, "Select (Esc)", 0.0f)) {
         StartSelecting();
     }
@@ -1040,7 +1054,9 @@ ImU32 EditorWindow::GetElementColor(const std::size_t index) const {
 // point under the cursor on the right
 void EditorWindow::DrawStatusBar(const ViewTransform &view, const bool hovered) {
     std::string hint;
-    if (m_PlacingType) {
+    if (m_Pasting) {
+        hint = "Pasting: click to place, R rotate, M mirror, Shift+M flip, Esc or right click to cancel";
+    } else if (m_PlacingType) {
         hint = std::format("Placing {}: click to place, R rotate, M mirror, Shift+M flip, Esc or right click to stop",
                            GetPartName(*m_PlacingType));
     } else if (m_DrawingWires) {
@@ -1217,7 +1233,7 @@ void EditorWindow::DrawNodeVoltages(ImDrawList *draw_list, const ViewTransform &
 
 // In selection mode, hovering a wire or a part shows its value on display, once there is one, and the power of a part
 void EditorWindow::DrawHoveredValue(const ViewTransform &view, const bool hovered) {
-    if (!hovered || !m_Displayed || m_PlacingType || m_DrawingWires || m_Probing || m_Drag) {
+    if (!hovered || !m_Displayed || !IsSelecting() || m_Drag) {
         return;
     }
     const std::optional<MeasurementTarget> target =
@@ -1261,6 +1277,7 @@ void EditorWindow::FrameSchematic(const ImVec2 canvas_size, const float max_zoom
 
 // Leaves every other mode, so clicks select and drag
 void EditorWindow::StartSelecting() {
+    m_Pasting.reset();
     m_PlacingType.reset();
     m_DrawingWires = false;
     m_WireStart.reset();
@@ -1269,6 +1286,7 @@ void EditorWindow::StartSelecting() {
 
 void EditorWindow::StartPlacing(const Core::ComponentType type) {
     ClearSelection();
+    m_Pasting.reset();
     m_Probing = false;
     m_DrawingWires = false;
     m_WireStart.reset();
@@ -1279,6 +1297,7 @@ void EditorWindow::StartPlacing(const Core::ComponentType type) {
 
 void EditorWindow::StartDrawingWires() {
     ClearSelection();
+    m_Pasting.reset();
     m_PlacingType.reset();
     m_Probing = false;
     m_DrawingWires = true;
@@ -1286,6 +1305,7 @@ void EditorWindow::StartDrawingWires() {
 
 void EditorWindow::StartProbing() {
     ClearSelection();
+    m_Pasting.reset();
     m_PlacingType.reset();
     m_DrawingWires = false;
     m_WireStart.reset();
@@ -1425,6 +1445,128 @@ void EditorWindow::HandlePlacement(SchematicCanvas &canvas, const ViewTransform 
     }
 }
 
+// Selecting is the mode where clicks pick, drag and select: none of placing, pasting, wiring and probing is active
+bool EditorWindow::IsSelecting() const {
+    return !m_PlacingType && !m_Pasting && !m_DrawingWires && !m_Probing;
+}
+
+// Ctrl+C, Ctrl+X and Ctrl+V while the editor has the focus and no text field wants the keys
+void EditorWindow::HandleClipboardShortcuts() {
+    if (!ImGui::IsWindowFocused() || ImGui::GetIO().WantTextInput) {
+        return;
+    }
+    if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_C)) {
+        CopySelected();
+    }
+    if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_X)) {
+        CutSelected();
+    }
+    if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_V)) {
+        StartPasting();
+    }
+}
+
+// The selection goes to the clipboard as text in the format of the files, so another copy of the program can paste it
+void EditorWindow::CopySelected() {
+    if (!IsSelecting() || !m_Schematic.HasSelection()) {
+        return;
+    }
+    const Selection selection = {m_Schematic.GetSelectedElements(), m_Schematic.GetSelectedWires()};
+    ImGui::SetClipboardText(CopySelection(m_Schematic.GetElements(), m_Schematic.GetWires(), selection).c_str());
+}
+
+// Deleting in the middle of a drag would leave the drag pointing at removed items
+void EditorWindow::CutSelected() {
+    if (m_Drag || !IsSelecting() || !m_Schematic.HasSelection()) {
+        return;
+    }
+    CopySelected();
+    m_Schematic.DeleteSelection();
+}
+
+// Reads the clipboard and, when it holds a schematic, leaves every other mode for the group to follow the cursor. Text
+// that is not a schematic is left alone
+void EditorWindow::StartPasting() {
+    const char *text = ImGui::GetClipboardText();
+    if (text == nullptr) {
+        return;
+    }
+    auto group = ParseCopiedSchematic(text);
+    if (!group) {
+        return;
+    }
+    ClearSelection();
+    m_PlacingType.reset();
+    m_DrawingWires = false;
+    m_WireStart.reset();
+    m_Probing = false;
+    m_Pasting = std::move(*group);
+}
+
+/**
+ * @brief   Handles paste mode: the pasted group follows the cursor, half see-through, R rotates it, M mirrors it left
+ *          to right and Shift+M top to bottom, Esc or right click cancels, and a left click places it and selects what
+ *          was placed. Parts get the next free names of the schematic.
+ */
+void EditorWindow::HandlePasting(SchematicCanvas &canvas, const ViewTransform &view, const bool hovered) {
+    if (!m_Pasting) {
+        return;
+    }
+    if (ImGui::IsWindowFocused()) {
+        if (ImGui::IsKeyPressed(ImGuiKey_R)) {
+            TransformGroup(*m_Pasting, {.Type = PointTransform::Kind::QuarterTurn, .Delta = {}, .Pivot = {}});
+        }
+        if (ImGui::IsKeyPressed(ImGuiKey_M)) {
+            const bool top_to_bottom = ImGui::GetIO().KeyShift;
+            TransformGroup(*m_Pasting, {.Type = top_to_bottom ? PointTransform::Kind::MirrorTopBottom
+                                                              : PointTransform::Kind::MirrorLeftRight,
+                                        .Delta = {},
+                                        .Pivot = {}});
+        }
+        if (ImGui::IsKeyPressed(ImGuiKey_Escape)) {
+            m_Pasting.reset();
+            return;
+        }
+    }
+    if (!hovered) {
+        return;
+    }
+    if (ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
+        m_Pasting.reset();
+        return;
+    }
+
+    MovePivotTo(*m_Pasting, Snap(view.ToWorld(ImGui::GetIO().MousePos)));
+    for (const UIWire &wire : m_Pasting->Wires) {
+        wire.Draw(canvas, view, GetPreviewColor());
+    }
+    for (const auto &element : m_Pasting->Elements) {
+        element->Draw(canvas, view, GetPreviewColor(), m_SymbolStyle);
+    }
+    if (!ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+        return;
+    }
+
+    const std::size_t first_element = m_Schematic.GetElements().size();
+    const std::size_t first_wire = m_Schematic.GetWires().size();
+    for (auto &element : m_Pasting->Elements) {
+        m_Schematic.AddElement(std::move(element));
+    }
+    for (const UIWire &wire : m_Pasting->Wires) {
+        m_Schematic.AddWire(wire.GetStart(), wire.GetEnd());
+    }
+    std::set<std::size_t> elements;
+    for (std::size_t index = first_element; index < m_Schematic.GetElements().size(); ++index) {
+        elements.insert(index);
+    }
+    std::set<std::size_t> wires;
+    for (std::size_t index = first_wire; index < m_Schematic.GetWires().size(); ++index) {
+        wires.insert(index);
+    }
+    m_Pasting.reset();
+    m_Schematic.SetSelection(std::move(elements), std::move(wires));
+}
+
 /**
  * @brief   Handles wire mode: the first click starts a wire, each following click adds an L-shaped bend up to the
  *          cursor and continues from there. F flips the bend, and the wire ends on a terminal, on a second click
@@ -1550,7 +1692,7 @@ void EditorWindow::HandleProbing(ImDrawList *draw_list, const ViewTransform &vie
  *          selection and Esc clears it.
  */
 void EditorWindow::HandleSelection(const ViewTransform &view, const bool hovered) {
-    if (m_PlacingType || m_DrawingWires || m_Probing) {
+    if (!IsSelecting()) {
         m_Box.reset();
         return;
     }
@@ -1648,7 +1790,7 @@ void EditorWindow::ClearSelection() {
 }
 
 void EditorWindow::SelectAll() {
-    if (m_PlacingType || m_DrawingWires || m_Probing) {
+    if (!IsSelecting()) {
         return;
     }
     ApplySelection(PickAll(m_Schematic.GetElements(), m_Schematic.GetWires()));
@@ -1853,7 +1995,7 @@ void EditorWindow::DrawPartPopover() {
 
 // A right click while selecting selects what is under the cursor and opens the menu of what it can do
 void EditorWindow::HandleContextMenu(const ViewTransform &view, const bool hovered) {
-    if (m_PlacingType || m_DrawingWires || m_Probing || !hovered || !ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
+    if (!IsSelecting() || !hovered || !ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
         return;
     }
     const ImVec2 cursor_world = view.ToWorld(ImGui::GetIO().MousePos);
@@ -2045,7 +2187,7 @@ void EditorWindow::HandleExampleRequest() {
 // Menu commands run here, from Update(), where their popups are opened and drawn whichever window is in front
 void EditorWindow::HandleCommandRequest() {
     const std::optional<EditorCommand> command = std::exchange(m_RequestedCommand, std::nullopt);
-    if (command && !RunFileCommand(*command)) {
+    if (command && !RunFileCommand(*command) && !RunClipboardCommand(*command)) {
         RunEditCommand(*command);
     }
 }
@@ -2067,6 +2209,23 @@ bool EditorWindow::RunFileCommand(const EditorCommand command) {
         return true;
     case EditorCommand::ExportSchematic:
         ImGui::OpenPopup(ExportPopup);
+        return true;
+    default:
+        return false;
+    }
+}
+
+// Cut, Copy and Paste; false for any other
+bool EditorWindow::RunClipboardCommand(const EditorCommand command) {
+    switch (command) {
+    case EditorCommand::Cut:
+        CutSelected();
+        return true;
+    case EditorCommand::Copy:
+        CopySelected();
+        return true;
+    case EditorCommand::Paste:
+        StartPasting();
         return true;
     default:
         return false;
@@ -2133,6 +2292,7 @@ void EditorWindow::Save() {
 
 void EditorWindow::NewSchematic() {
     EndDrag();
+    m_Pasting.reset();
     m_PlacingType.reset();
     m_DrawingWires = false;
     m_WireStart.reset();
