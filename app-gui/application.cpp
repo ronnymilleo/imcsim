@@ -17,6 +17,7 @@
 #include <SDL3/SDL.h>
 #include <array>
 #include <cstdio>
+#include <filesystem>
 #include <format>
 #include <utility>
 
@@ -212,6 +213,10 @@ void Application::PollEvents() {
         ImGui_ImplSDL3_ProcessEvent(&event);
         const bool main_window_closed =
             event.type == SDL_EVENT_WINDOW_CLOSE_REQUESTED && event.window.windowID == SDL_GetWindowID(m_SDLWindow);
+        // A schematic file dropped on the window joins the schematic, like File > Import
+        if (event.type == SDL_EVENT_DROP_FILE && event.drop.data != nullptr) {
+            m_EditorWindow.RequestImport(std::filesystem::path(event.drop.data));
+        }
         if (event.type == SDL_EVENT_QUIT || main_window_closed) {
             // The editor asks before unsaved changes are lost and Render() quits once it confirms. Minimized
             // windows draw no frames, so the window is restored for the question to show up
@@ -273,10 +278,15 @@ void Application::DrawMainMenuBar() {
     if (ImGui::BeginMenu("File")) {
         m_EditorWindow.DrawFileMenuItems();
         ImGui::Separator();
-        if (ImGui::BeginMenu("Examples")) {
+        // The same list twice: Examples opens one in place of the schematic, Insert Example adds one to it
+        const auto draw_examples = [this](const bool insert) {
             for (const Example &example : GetExamples()) {
                 if (ImGui::MenuItem(example.Title)) {
-                    m_EditorWindow.RequestExample(example);
+                    if (insert) {
+                        m_EditorWindow.RequestInsertExample(example);
+                    } else {
+                        m_EditorWindow.RequestExample(example);
+                    }
                 }
                 if (ImGui::BeginItemTooltip()) {
                     ImGui::PushTextWrapPos(ImGui::GetFontSize() * ExampleTooltipWidth);
@@ -285,6 +295,13 @@ void Application::DrawMainMenuBar() {
                     ImGui::EndTooltip();
                 }
             }
+        };
+        if (ImGui::BeginMenu("Examples")) {
+            draw_examples(false);
+            ImGui::EndMenu();
+        }
+        if (ImGui::BeginMenu("Insert Example")) {
+            draw_examples(true);
             ImGui::EndMenu();
         }
         ImGui::Separator();

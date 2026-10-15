@@ -7,6 +7,7 @@
 #define IMCSIM_CLIPBOARD_H
 
 #include "helpers.h"
+#include "schematic_file.h"
 #include "selection.h"
 #include "ui_elements/ui_element.h"
 #include "ui_elements/ui_wire.h"
@@ -36,6 +37,7 @@ std::string CopySelection(const std::vector<std::unique_ptr<UIElement>> &element
                           const Selection &selection);
 bool LooksLikeCopiedSchematic(std::string_view text);
 std::expected<PastedGroup, std::string> ParseCopiedSchematic(std::string_view text);
+std::expected<PastedGroup, std::string> MakePastedGroup(LoadedSchematic loaded);
 void MovePivotTo(PastedGroup &group, GridPoint target);
 void TransformGroup(PastedGroup &group, const PointTransform &transform);
 

@@ -68,13 +68,23 @@ std::expected<PastedGroup, std::string> ParseCopiedSchematic(const std::string_v
     if (!loaded) {
         return std::unexpected(loaded.error());
     }
-    if (loaded->Elements.empty() && loaded->Wires.empty()) {
+    return MakePastedGroup(std::move(*loaded));
+}
+
+/**
+ * @brief   Takes the parts and wires of a loaded schematic as a group to place, such as an example.
+ * @param[in] loaded  A schematic read by LoadSchematic() or LoadExample().
+ * @return  The group, held by the middle of its box, or an error when the schematic has no parts or wires. The
+ *          settings and measurements are dropped, and the warnings of the loader go with the group.
+ */
+std::expected<PastedGroup, std::string> MakePastedGroup(LoadedSchematic loaded) {
+    if (loaded.Elements.empty() && loaded.Wires.empty()) {
         return std::unexpected("The schematic has no parts or wires");
     }
     PastedGroup group;
-    group.Elements = std::move(loaded->Elements);
-    group.Wires = std::move(loaded->Wires);
-    group.Warnings = std::move(loaded->Warnings);
+    group.Elements = std::move(loaded.Elements);
+    group.Wires = std::move(loaded.Wires);
+    group.Warnings = std::move(loaded.Warnings);
     group.Pivot = FindGroupPivot(group);
     return group;
 }

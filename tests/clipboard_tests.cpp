@@ -5,6 +5,7 @@
 
 #include "clipboard.h"
 #include "element_factory.h"
+#include "examples.h"
 #include "schematic.h"
 #include "test_printers.h"
 #include <catch2/catch_test_macros.hpp>
@@ -119,4 +120,20 @@ TEST_CASE("Pasted parts get the next free names of the schematic", "[clipboard]"
     REQUIRE(schematic.GetElements().size() == 5);
     CHECK(schematic.GetElements()[3]->GetComponent().GetName() == "R3");
     CHECK(schematic.GetElements()[4]->GetComponent().GetName() == "C2");
+}
+
+TEST_CASE("Every example can be placed as a group", "[clipboard]") {
+    for (const GUI::Example &example : GUI::GetExamples()) {
+        auto loaded = GUI::LoadExample(example);
+        REQUIRE(loaded);
+        auto group = GUI::MakePastedGroup(std::move(*loaded));
+        INFO(example.Title);
+        REQUIRE(group);
+        CHECK_FALSE(group->Elements.empty());
+        CHECK_FALSE(group->Wires.empty());
+    }
+}
+
+TEST_CASE("A schematic with nothing in it cannot be placed", "[clipboard]") {
+    CHECK_FALSE(GUI::MakePastedGroup({}));
 }

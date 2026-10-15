@@ -60,6 +60,8 @@ public:
 
     // Examples
     void RequestExample(const Example &example);
+    void RequestInsertExample(const Example &example);
+    void RequestImport(std::filesystem::path path);
 
     // Menus, drawn inside the main menu bar; their commands run on the next Update()
     void DrawFileMenuItems();
@@ -250,6 +252,9 @@ private:
 
     // Examples: requested from the menu and handled by the next Draw(), then kept while discarding is confirmed
     std::optional<Example> m_RequestedExample;
+    // Insertions, which add to the schematic instead of replacing it, so they need no confirmation
+    std::optional<Example> m_RequestedInsertExample;
+    std::optional<std::filesystem::path> m_RequestedImport;
     std::optional<Example> m_ExampleToOpen;
 
     // Files: the dialog in progress and the confirmation are touched only by the main thread
@@ -350,6 +355,7 @@ private:
     void OpenFile(const std::filesystem::path &path);
     void OpenExample(const Example &example);
     void ImportFile(const std::filesystem::path &path);
+    void InsertExample(const Example &example);
     void SaveFile(std::filesystem::path path);
 
     // File dialogs and messages

@@ -426,6 +426,24 @@ void EditorWindow::RequestExample(const Example &example) {
 }
 
 /**
+ * @brief   Asks to insert an example into the schematic, as when the user picks it from the insert menu.
+ * @param[in] example  One of GetExamples().
+ * @note    The next frame starts placing it like an import. Nothing is replaced, so nothing is asked.
+ */
+void EditorWindow::RequestInsertExample(const Example &example) {
+    m_RequestedInsertExample = example;
+}
+
+/**
+ * @brief   Asks to import a file into the schematic, as when the user drops it on the window.
+ * @param[in] path  A schematic file.
+ * @note    The next frame starts placing it, as File > Import does after its dialog.
+ */
+void EditorWindow::RequestImport(std::filesystem::path path) {
+    m_RequestedImport = std::move(path);
+}
+
+/**
  * @brief   Draws the File menu items that act on the schematic, with their shortcuts.
  * @note    Call between BeginMenu() and EndMenu(); the command runs on the next frame of the editor.
  */
@@ -2179,6 +2197,12 @@ void EditorWindow::HandleQuitRequest() {
 }
 
 void EditorWindow::HandleExampleRequest() {
+    if (const std::optional<Example> insert = std::exchange(m_RequestedInsertExample, std::nullopt)) {
+        InsertExample(*insert);
+    }
+    if (const std::optional<std::filesystem::path> path = std::exchange(m_RequestedImport, std::nullopt)) {
+        ImportFile(*path);
+    }
     const std::optional<Example> example = std::exchange(m_RequestedExample, std::nullopt);
     if (!example) {
         return;
@@ -2353,6 +2377,21 @@ void EditorWindow::ImportFile(const std::filesystem::path &path) {
         ShowFileMessages(
             std::format("{} was imported, but some parts were changed or skipped", path.filename().string()),
             group->Warnings);
+    }
+    StartPastingGroup(std::move(*group));
+}
+
+// Like an import, the example follows the cursor until a click places it; its analysis settings stay behind
+void EditorWindow::InsertExample(const Example &example) {
+    auto loaded = LoadExample(example);
+    if (!loaded) {
+        ShowFileMessages(std::format("Could not insert the example {}", example.Title), {loaded.error()});
+        return;
+    }
+    auto group = MakePastedGroup(std::move(*loaded));
+    if (!group) {
+        ShowFileMessages(std::format("Could not insert the example {}", example.Title), {group.error()});
+        return;
     }
     StartPastingGroup(std::move(*group));
 }

@@ -31,7 +31,9 @@ How to read what imcsim measures, plots and exports. The [README](../README.md) 
 - **Import**: File > Import... adds the circuit of any `.imcsim` file to the schematic you have open, instead of
   replacing it as Open does. The circuit follows the cursor like a paste (R, M and Shift+M turn it, a click places it,
   Esc cancels), takes the next free part names and is selected once placed. The analysis settings and the probes of
-  the file are left behind, and parts that cannot be read are reported and skipped.
+  the file are left behind, and parts that cannot be read are reported and skipped. File > Insert Example does the
+  same with an example circuit, and dropping a `.imcsim` file on the window imports it, with nothing replaced and
+  nothing to confirm.
 - **Rotating and mirroring**: R, M (left to right) and Shift+M (top to bottom) turn the selection about its center;
   with one part selected, that part turns in place. The wires that meet the selection follow it. Hold Alt (Alt+R,
   Alt+M, Alt+Shift+M, or Edit > Keep Wires in Place) to turn the parts and leave every wire where it is, so nothing
