@@ -679,20 +679,10 @@ SavedMeasurements ReadMeasurements(const nlohmann::json &document, std::vector<s
     return measurements;
 }
 
-} // namespace
-
-/**
- * @brief   Writes a schematic as JSON.
- * @param[in] elements      Components placed on the grid.
- * @param[in] wires         Wire segments.
- * @param[in] settings      Settings of the analyses.
- * @param[in] measurements  Traces the plots show; the key is left out when there are none.
- * @return  The file contents, indented for reading and diffing. Values are plain numbers, never suffixed text.
- */
-std::string SaveSchematic(const std::vector<std::unique_ptr<UIElement>> &elements, const std::vector<UIWire> &wires,
+std::string WriteDocument(const std::span<const UIElement *const> elements, const std::vector<UIWire> &wires,
                           const SimulationSettings &settings, const SavedMeasurements &measurements) {
     nlohmann::json element_list = nlohmann::json::array();
-    for (const auto &element : elements) {
+    for (const UIElement *element : elements) {
         element_list.push_back(WriteElement(*element));
     }
     nlohmann::json wire_list = nlohmann::json::array();
@@ -713,6 +703,36 @@ std::string SaveSchematic(const std::vector<std::unique_ptr<UIElement>> &element
         document["measurements"] = WriteMeasurements(measurements);
     }
     return document.dump(2) + "\n";
+}
+
+} // namespace
+
+/**
+ * @brief   Writes a schematic as JSON.
+ * @param[in] elements      Components placed on the grid.
+ * @param[in] wires         Wire segments.
+ * @param[in] settings      Settings of the analyses.
+ * @param[in] measurements  Traces the plots show; the key is left out when there are none.
+ * @return  The file contents, indented for reading and diffing. Values are plain numbers, never suffixed text.
+ */
+std::string SaveSchematic(const std::vector<std::unique_ptr<UIElement>> &elements, const std::vector<UIWire> &wires,
+                          const SimulationSettings &settings, const SavedMeasurements &measurements) {
+    std::vector<const UIElement *> pointers;
+    for (const auto &element : elements) {
+        pointers.push_back(element.get());
+    }
+    return WriteDocument(pointers, wires, settings, measurements);
+}
+
+/**
+ * @brief   Writes some parts and wires as a schematic of their own, for the clipboard.
+ * @param[in] elements  Parts to write, which stay where they are.
+ * @param[in] wires     Wire segments to write.
+ * @return  The same JSON a file holds, with the default settings and no measurements, so it loads back with
+ *          LoadSchematic().
+ */
+std::string SaveParts(const std::span<const UIElement *const> elements, const std::vector<UIWire> &wires) {
+    return WriteDocument(elements, wires, {}, {});
 }
 
 /**

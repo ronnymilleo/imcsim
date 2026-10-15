@@ -7,6 +7,7 @@ add_library(imcsim-gui-lib
             analysis_controls.cpp
             application.cpp
             circuit_snapshot.cpp
+            clipboard.cpp
             connectivity.cpp
             current_flow.cpp
             element_factory.cpp
