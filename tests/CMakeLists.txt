@@ -14,6 +14,7 @@ add_executable(imcsim-tests
             element_factory_tests.cpp
             current_flow_tests.cpp
             examples_tests.cpp
+            heat_glow_tests.cpp
             helpers_tests.cpp
             led_glow_tests.cpp
             playback_tests.cpp

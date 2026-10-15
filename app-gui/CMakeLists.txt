@@ -13,6 +13,7 @@ add_library(imcsim-gui-lib
             examples.cpp
             file_dialog.cpp
             glow_renderer.cpp
+            heat_glow.cpp
             helpers.cpp
             led_glow.cpp
             node_colors.cpp

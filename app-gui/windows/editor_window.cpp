@@ -8,6 +8,7 @@
 #include "circuit_snapshot.h"
 #include "current_flow.h"
 #include "element_factory.h"
+#include "heat_glow.h"
 #include "imgui_internal.h"
 #include "led_glow.h"
 #include "misc/cpp/imgui_stdlib.h"
@@ -58,11 +59,15 @@ constexpr float LegendHeight = 0.6f;
 // light can be stronger than a glow blended over a light background, which would hide the symbol
 constexpr float GlowMinRadius = 2.0f;
 constexpr float GlowMaxRadius = 3.5f;
+// Hot resistors glow smaller than LEDs, around their symbol, in a warm orange
+constexpr float HeatGlowMinRadius = 1.5f;
+constexpr float HeatGlowMaxRadius = 2.5f;
+constexpr ImVec4 HeatLight = {1.0f, 0.45f, 0.1f, 1.0f};
 constexpr float AdditiveGlowIntensity = 0.9f;
 constexpr float BlendedGlowIntensity = 0.5f;
 // Null-terminated literals, so data() can go to ImGui
 constexpr auto WireColoringNames = std::to_array<std::string_view>({"Plain", "Nodes", "Voltage", "Current", "Power"});
-constexpr auto LiveEffectsNames = std::to_array<std::string_view>({"Current Flow", "LED Glow"});
+constexpr auto LiveEffectsNames = std::to_array<std::string_view>({"Current Flow", "LED Glow", "Heat Glow"});
 // Section of imgui.ini that keeps the View preferences
 constexpr const char *SettingsTypeName = "Editor";
 /**
@@ -606,9 +611,7 @@ void EditorWindow::Draw() {
         elements[index]->Draw(canvas, view, GetElementColor(index), m_SymbolStyle);
     }
     // Over the symbols, so a lit LED looks lit through its own lines
-    if (m_LiveEffects[static_cast<std::size_t>(LiveEffect::LEDGlow)]) {
-        DrawLEDGlows(draw_list, view);
-    }
+    DrawGlows(draw_list, view);
     if (m_ShowTerminalNumbers) {
         DrawTerminalNumbers(canvas, view, m_Schematic, ScreenTerminalRingScale);
     }
@@ -918,20 +921,33 @@ void EditorWindow::DrawWireCurrents(SchematicCanvas &canvas, const ViewTransform
     }
 }
 
-// Every lit LED glows in its color, bigger and stronger with its current. Additive light needs a dark background,
-// so light themes blend the glow instead
-void EditorWindow::DrawLEDGlows(ImDrawList *draw_list, const ViewTransform &view) {
-    if (!m_Displayed) {
+// Every lit LED glows in its color, bigger and stronger with its current, and every resistor that dissipates power
+// glows orange with it. Additive light needs a dark background, so light themes blend the glows instead
+void EditorWindow::DrawGlows(ImDrawList *draw_list, const ViewTransform &view) {
+    const bool leds = m_LiveEffects[static_cast<std::size_t>(LiveEffect::LEDGlow)];
+    const bool resistors = m_LiveEffects[static_cast<std::size_t>(LiveEffect::HeatGlow)];
+    if (!m_Displayed || (!leds && !resistors)) {
         return;
     }
     const bool additive = !GetPalette().Light;
     const float intensity = additive ? AdditiveGlowIntensity : BlendedGlowIntensity;
     std::vector<Glow> glows;
-    for (const LEDGlow &led : ComputeLEDGlows(m_Schematic.GetElements(), m_Displayed->Point.Currents)) {
-        ImVec4 light = GetLEDLight(led.Color);
-        light.w = intensity * led.Brightness;
-        const float radius = GlowMinRadius + (GlowMaxRadius - GlowMinRadius) * led.Brightness;
-        glows.push_back({view.ToScreen(ToVec2(led.Center)), radius * m_Zoom, ImGui::ColorConvertFloat4ToU32(light)});
+    const auto add_glow = [&](const GridPoint center, ImVec4 light, const float brightness, const float min_radius,
+                              const float max_radius) {
+        light.w = intensity * brightness;
+        const float radius = min_radius + (max_radius - min_radius) * brightness;
+        glows.push_back({view.ToScreen(ToVec2(center)), radius * m_Zoom, ImGui::ColorConvertFloat4ToU32(light)});
+    };
+    if (leds) {
+        for (const LEDGlow &led : ComputeLEDGlows(m_Schematic.GetElements(), m_Displayed->Point.Currents)) {
+            add_glow(led.Center, GetLEDLight(led.Color), led.Brightness, GlowMinRadius, GlowMaxRadius);
+        }
+    }
+    if (resistors) {
+        for (const HeatGlow &resistor :
+             ComputeHeatGlows(m_Schematic.GetElements(), m_Displayed->Powers, m_Displayed->Scale)) {
+            add_glow(resistor.Center, HeatLight, resistor.Brightness, HeatGlowMinRadius, HeatGlowMaxRadius);
+        }
     }
     m_GlowRenderer.AddGlows(draw_list, glows, additive);
 }

@@ -81,6 +81,9 @@ shows, an operating point or an instant of a transient, so they show nothing unt
 - **LED Glow** lights every LED with forward current in its color (an LED with custom parameters glows warm white). The
   glow grows on a logarithmic scale, from faint around 50 µA to full at 20 mA, the rated current of the ready models.
   On dark themes it adds light to the canvas, like a lit LED; on light themes it is a soft halo instead.
+- **Heat Glow** makes every resistor that dissipates power glow orange, bigger and stronger with its power. The
+  largest power of the circuit (of the whole run, for a transient) is full brightness, and the glow fades out two
+  decades below it, so it shows where the power is lost and, while a transient plays, when.
 
 ## Terminals
 
