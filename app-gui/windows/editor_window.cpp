@@ -443,6 +443,10 @@ void EditorWindow::DrawFileMenuItems() {
         m_RequestedCommand = EditorCommand::SaveAs;
     }
     ImGui::Separator();
+    if (ImGui::MenuItem("Import...")) {
+        m_RequestedCommand = EditorCommand::Import;
+    }
+    ImGui::SetItemTooltip("Add the circuit of a file to this schematic: it follows the cursor until a click places it");
     if (ImGui::MenuItem("Export Schematic...")) {
         m_RequestedCommand = EditorCommand::ExportSchematic;
     }
@@ -1484,8 +1488,7 @@ void EditorWindow::CutSelected() {
     m_Schematic.DeleteSelection();
 }
 
-// Reads the clipboard and, when it holds a schematic, leaves every other mode for the group to follow the cursor. Text
-// that is not a schematic is left alone
+// Reads the clipboard and, when it holds a schematic, places it. Text that is not a schematic is left alone
 void EditorWindow::StartPasting() {
     const char *text = ImGui::GetClipboardText();
     if (text == nullptr) {
@@ -1495,12 +1498,17 @@ void EditorWindow::StartPasting() {
     if (!group) {
         return;
     }
+    StartPastingGroup(std::move(*group));
+}
+
+// Leaves every other mode, so the group is the only thing to place
+void EditorWindow::StartPastingGroup(PastedGroup group) {
     ClearSelection();
     m_PlacingType.reset();
     m_DrawingWires = false;
     m_WireStart.reset();
     m_Probing = false;
-    m_Pasting = std::move(*group);
+    m_Pasting = std::move(group);
 }
 
 /**
@@ -2207,6 +2215,9 @@ bool EditorWindow::RunFileCommand(const EditorCommand command) {
     case EditorCommand::SaveAs:
         ShowFileDialog(FileAction::Save);
         return true;
+    case EditorCommand::Import:
+        ShowFileDialog(FileAction::Import);
+        return true;
     case EditorCommand::ExportSchematic:
         ImGui::OpenPopup(ExportPopup);
         return true;
@@ -2325,6 +2336,27 @@ void EditorWindow::OpenFile(const std::filesystem::path &path) {
     }
 }
 
+// The circuit of the file joins the schematic as a pasted group: it follows the cursor until a click places it, and
+// the settings and probes of the file are left behind. Skipped parts are reported, but the rest still comes in
+void EditorWindow::ImportFile(const std::filesystem::path &path) {
+    const auto text = ReadTextFile(path);
+    if (!text) {
+        ShowFileMessages("Could not import the schematic", {text.error()});
+        return;
+    }
+    auto group = ParseCopiedSchematic(*text);
+    if (!group) {
+        ShowFileMessages(std::format("Could not import {}", path.filename().string()), {group.error()});
+        return;
+    }
+    if (!group->Warnings.empty()) {
+        ShowFileMessages(
+            std::format("{} was imported, but some parts were changed or skipped", path.filename().string()),
+            group->Warnings);
+    }
+    StartPastingGroup(std::move(*group));
+}
+
 void EditorWindow::OpenExample(const Example &example) {
     auto loaded = LoadExample(example);
     if (!loaded) {
@@ -2368,7 +2400,7 @@ void EditorWindow::ShowFileDialog(const FileAction action) {
         return;
     }
     std::string location = file_path ? file_path->string() : "";
-    if (action == FileAction::Open) {
+    if (action == FileAction::Open || action == FileAction::Import) {
         m_FileDialog.ShowOpen(SchematicFilters, std::move(location));
     } else {
         m_FileDialog.ShowSave(SchematicFilters, std::move(location));
@@ -2390,6 +2422,8 @@ void EditorWindow::ProcessDialogResult() {
         SaveFile(**result);
     } else if (action == FileAction::ExportSchematic) {
         ExportSchematic(**result);
+    } else if (action == FileAction::Import) {
+        ImportFile(**result);
     }
 }
 

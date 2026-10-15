@@ -92,6 +92,19 @@ TEST_CASE("Text that is not a schematic, or has nothing in it, cannot be pasted"
     CHECK_FALSE(GUI::ParseCopiedSchematic(GUI::CopySelection(elements, Wires, {})));
 }
 
+TEST_CASE("What cannot be read is left out and reported", "[clipboard]") {
+    const std::string text = R"({
+        "format": "imcsim-schematic", "version": 1,
+        "elements": [{"type": "NoSuchPart", "x": 0, "y": 0, "rotation": 0}],
+        "wires": [{"start": [0, 0], "end": [4, 0]}]
+    })";
+    auto group = GUI::ParseCopiedSchematic(text);
+    REQUIRE(group);
+    CHECK(group->Elements.empty());
+    CHECK(group->Wires.size() == 1);
+    CHECK(group->Warnings.size() == 1);
+}
+
 TEST_CASE("Pasted parts get the next free names of the schematic", "[clipboard]") {
     GUI::Schematic schematic;
     for (auto &element : Parts()) {

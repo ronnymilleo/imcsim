@@ -28,6 +28,10 @@ How to read what imcsim measures, plots and exports. The [README](../README.md) 
   a part that points at another by name, such as a current-controlled source, still points at the original. A pasted
   wire or terminal that lands on one already there joins it, as when drawing. Probes stay where they are: a copy
   carries no measurements, and the probes of the schematic you paste into keep following their own nodes.
+- **Import**: File > Import... adds the circuit of any `.imcsim` file to the schematic you have open, instead of
+  replacing it as Open does. The circuit follows the cursor like a paste (R, M and Shift+M turn it, a click places it,
+  Esc cancels), takes the next free part names and is selected once placed. The analysis settings and the probes of
+  the file are left behind, and parts that cannot be read are reported and skipped.
 - **Rotating and mirroring**: R, M (left to right) and Shift+M (top to bottom) turn the selection about its center;
   with one part selected, that part turns in place. The wires that meet the selection follow it. Hold Alt (Alt+R,
   Alt+M, Alt+Shift+M, or Edit > Keep Wires in Place) to turn the parts and leave every wire where it is, so nothing
@@ -47,7 +51,7 @@ How to read what imcsim measures, plots and exports. The [README](../README.md) 
 - **Status bar**: below the schematic, the keys of the current mode on the left; on the right, the grid position of
   the cursor and how the last run went ("Transient done", with warnings, or failed). Click the result for the
   errors, the warnings and the ngspice output.
-- **Menus**: File (files, examples and the schematic export), Edit (undo, redo and changes to the selection) and
+- **Menus**: File (files, import, examples and the schematic export), Edit (undo, redo and changes to the selection) and
   View (fit, wire colors, symbol style, terminal numbers, theme, and the windows). The View choices are kept between
   sessions. On macOS the shortcuts use Cmd where this guide says Ctrl: Cmd+S saves, Cmd+Z undoes.
 - **Themes**: View > Theme switches between nine themes, seven dark (Graphite, the default, Ember, Phosphor,

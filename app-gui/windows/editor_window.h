@@ -150,6 +150,7 @@ private:
         Open,
         Save,
         SaveAs,
+        Import,
         ExportSchematic,
         Undo,
         Redo,
@@ -176,7 +177,8 @@ private:
         Save,
         Quit,
         Example,
-        ExportSchematic
+        ExportSchematic,
+        Import
     };
 
     Schematic &m_Schematic;
@@ -306,6 +308,7 @@ private:
     void CopySelected();
     void CutSelected();
     void StartPasting();
+    void StartPastingGroup(PastedGroup group);
     void HandlePasting(SchematicCanvas &canvas, const ViewTransform &view, bool hovered);
     bool IsSelecting() const;
 
@@ -346,6 +349,7 @@ private:
     void NewSchematic();
     void OpenFile(const std::filesystem::path &path);
     void OpenExample(const Example &example);
+    void ImportFile(const std::filesystem::path &path);
     void SaveFile(std::filesystem::path path);
 
     // File dialogs and messages
