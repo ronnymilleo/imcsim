@@ -193,6 +193,28 @@ bool UIElement::Contains(const ImVec2 world_pos) const {
 }
 
 /**
+ * @brief   Checks whether the element touches a rectangle in world space, for picking it with a selection box.
+ * @param[in] min  Corner of the rectangle with the lowest X and Y.
+ * @param[in] max  Corner with the highest X and Y.
+ * @return  True when the symbol bounds, terminals included, overlap the rectangle.
+ */
+bool UIElement::Intersects(const ImVec2 min, const ImVec2 max) const {
+    const LocalBounds bounds = GetLocalBounds();
+    ImVec2 low = {FLT_MAX, FLT_MAX};
+    ImVec2 high = {-FLT_MAX, -FLT_MAX};
+    for (ImVec2 corner :
+         {bounds.Min, ImVec2{bounds.Max.x, bounds.Min.y}, bounds.Max, ImVec2{bounds.Min.x, bounds.Max.y}}) {
+        if (m_Mirrored) {
+            corner.x = -corner.x;
+        }
+        const ImVec2 world = ToVec2(m_Position) + Rotate(corner, m_Rotation);
+        low = {std::min(low.x, world.x), std::min(low.y, world.y)};
+        high = {std::max(high.x, world.x), std::max(high.y, world.y)};
+    }
+    return low.x <= max.x && high.x >= min.x && low.y <= max.y && high.y >= min.y;
+}
+
+/**
  * @brief   Draws the leads of a two-terminal component, from x = -2 to -1 and from x = 1 to 2.
  * @param[in,out] canvas Where it is drawn: the editor window or an exported image.
  * @param[in] view       Transform of the current frame.

@@ -234,13 +234,16 @@ PartEditor::PartEditor(Schematic &schematic) : m_Schematic(schematic) {
  * @note    Edits apply as soon as a field holds a valid value, and mark the schematic modified.
  */
 void PartEditor::Draw() {
-    if (m_Schematic.GetSelectedWireIndex()) {
-        ImGui::TextUnformatted("Wire");
-        return;
-    }
     UIElement *element = m_Schematic.GetSelectedElement();
     if (element == nullptr) {
-        ImGui::TextDisabled("Select a component to edit it");
+        const std::size_t count = m_Schematic.GetSelectedElements().size() + m_Schematic.GetSelectedWires().size();
+        if (count > 1) {
+            ImGui::TextUnformatted(std::format("{} items selected", count).c_str());
+        } else if (count == 1) {
+            ImGui::TextUnformatted("Wire");
+        } else {
+            ImGui::TextDisabled("Select a component to edit it");
+        }
         return;
     }
 

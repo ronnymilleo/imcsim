@@ -13,8 +13,21 @@ How to read what imcsim measures, plots and exports. The [README](../README.md) 
   editing its main value right away: `4k7` and Enter make a resistor 4.7k. Values take SPICE suffixes, and a whole
   number may put its decimals after the suffix, as resistor codes do (`4k7`, `2M2`, `3u3`). View > Properties keeps
   the same fields in a docked window.
+- **Selecting**: click a part or a wire. Shift+click adds an item to the selection or removes it, and a drag on empty
+  canvas selects everything the box touches (with Shift, it adds to the selection). A double click on a wire selects
+  every wire of its node, and Ctrl+A (Edit > Select All) selects everything. Esc clears the selection.
+- **Moving**: drag any selected item and the whole selection moves, with the wires around it following; a click on
+  one item of a group without dragging leaves just that item selected. A single wire only slides across itself:
+  drag a segment sideways and the wires that meet it stretch or bend to stay connected, as do the parts that touch
+  its middle. If you drop a segment on another wire, the two join there, as when drawing a wire. Delete removes the
+  whole selection in one step, and Undo brings it back the same way.
+- **Rotating and mirroring**: R, M (left to right) and Shift+M (top to bottom) turn the selection about its center;
+  with one part selected, that part turns in place. The wires that meet the selection follow it. Hold Alt (Alt+R,
+  Alt+M, Alt+Shift+M, or Edit > Keep Wires in Place) to turn the parts and leave every wire where it is, so nothing
+  moves out of place; the terminals that no longer meet a wire stay open for you to rewire.
 - **Right click**: on a part, its properties, rotate, mirror, flip, measure its current and delete; on a wire,
-  measure its voltage and delete; on empty canvas, find a part, run and fit.
+  measure its voltage and delete; on empty canvas, find a part, run and fit. Right click on an item of a selected
+  group keeps the group, and the menu acts on all of it.
 - **Fit**: the frame button in the toolbar, or Home, shows the whole schematic.
 - **Find a part**: press Space over the editor, type part of a name (`mos`, `zener`, `opamp`, `nmos`, `vcvs`), move
   with Up and Down, and press Enter to start placing it.

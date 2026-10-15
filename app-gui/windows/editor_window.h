@@ -18,13 +18,16 @@
 #include "playback.h"
 #include "probing.h"
 #include "schematic.h"
+#include "selection.h"
 #include "ui_elements/ui_element.h"
 #include "ui_elements/ui_wire.h"
 #include "windows/app_window.h"
+#include "wire_editing.h"
 #include <array>
 #include <cstddef>
 #include <filesystem>
 #include <optional>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -66,14 +69,34 @@ public:
 
 private:
     /**
-     * @struct  ElementDrag
-     * @brief   Schematic state captured when an element drag starts; every frame of the drag is computed from it.
+     * @struct  GroupDrag
+     * @brief   Schematic state captured when a drag of the selection starts; every frame of the drag is computed from
+     * it.
+     * @details A single wire only slides across itself, so Slide tells which way it may go.
      */
-    struct ElementDrag {
+    struct GroupDrag {
         GridPoint StartCursor;
-        GridPoint StartPosition;
+        std::set<std::size_t> Elements;
+        std::set<std::size_t> Wires;
+        std::vector<GridPoint> StartPositions;
         std::vector<GridPoint> StartTerminals;
+        std::vector<GridPoint> FixedTerminals;
         std::vector<UIWire> StartWires;
+        std::optional<bool> SlidesVertically;
+        // Moved the mouse far enough to change something, and what a click without a move leaves selected
+        bool Moved = false;
+        GridPoint LastCursor;
+        GridPoint LastDelta;
+        std::optional<Selection> CollapseTo;
+    };
+
+    /**
+     * @struct  SelectionBox
+     * @brief   A selection box being dragged on empty canvas: where it started, and what was selected before it.
+     */
+    struct SelectionBox {
+        ImVec2 Start;
+        Selection Base;
     };
 
     /**
@@ -131,6 +154,10 @@ private:
         Rotate,
         Mirror,
         Flip,
+        RotateKeepWires,
+        MirrorKeepWires,
+        FlipKeepWires,
+        SelectAll,
         Delete
     };
 
@@ -191,7 +218,8 @@ private:
     bool m_Probing = false;
 
     // Selection and dragging
-    std::optional<ElementDrag> m_Drag;
+    std::optional<GroupDrag> m_Drag;
+    std::optional<SelectionBox> m_Box;
 
     // Properties popover: the corner it hangs from, which side of the part it opens on, and a request from a menu
     ImVec2 m_PartPopoverAnchor = {0.0f, 0.0f};
@@ -264,11 +292,14 @@ private:
 
     // Selection and dragging
     void HandleSelection(const ViewTransform &view, bool hovered);
-    void SelectAt(ImVec2 world_pos);
+    void ApplySelection(const Selection &selection);
     void ClearSelection();
+    void SelectAll();
+    GroupDrag MakeDrag(GridPoint cursor, std::optional<Selection> collapse_to) const;
+    void UpdateDrag(GridPoint cursor);
     void EndDrag();
-    void RotateSelectedElement();
-    void MirrorSelectedElement(bool vertically);
+    void DrawSelectionBox(ImDrawList *draw_list, const ViewTransform &view) const;
+    void TransformSelection(PointTransform::Kind kind, bool keep_wires);
 
     // Properties popover and context menu
     void PlacePartPopover(const ViewTransform &view);

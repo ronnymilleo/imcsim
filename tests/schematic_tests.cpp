@@ -8,6 +8,7 @@
 #include "test_printers.h"
 #include <catch2/catch_test_macros.hpp>
 #include <memory>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -76,8 +77,29 @@ TEST_CASE("Selecting replaces the previous selection and bumps the version", "[s
     const std::size_t element_version = schematic.GetSelectionVersion();
     schematic.SelectWire(0);
     CHECK(schematic.GetSelectedElement() == nullptr);
-    CHECK(schematic.GetSelectedWireIndex() == 0);
+    CHECK(schematic.IsWireSelected(0));
+    CHECK_FALSE(schematic.IsElementSelected(0));
     CHECK(schematic.GetSelectionVersion() != element_version);
+}
+
+TEST_CASE("The selection holds several elements and wires, and one element is edited only when alone", "[schematic]") {
+    GUI::Schematic schematic;
+    schematic.AddElement(MakeResistor({0, 0}));
+    schematic.AddElement(MakeResistor({8, 0}));
+    schematic.AddWire({2, 0}, {6, 0});
+    CHECK_FALSE(schematic.HasSelection());
+
+    schematic.SetSelection({0, 1}, {0});
+    CHECK(schematic.HasSelection());
+    CHECK(schematic.GetSelectedElements() == std::set<std::size_t>{0, 1});
+    CHECK(schematic.GetSelectedWires() == std::set<std::size_t>{0});
+    CHECK(schematic.GetSelectedElement() == nullptr);
+
+    schematic.SetSelection({1}, {});
+    CHECK(schematic.GetSelectedElement() == schematic.GetElements()[1].get());
+    // A wire selected beside the element makes it a group, which has no single part to edit
+    schematic.SetSelection({1}, {0});
+    CHECK(schematic.GetSelectedElement() == nullptr);
 }
 
 TEST_CASE("DeleteSelection removes the selected item and clears the selection", "[schematic]") {
@@ -97,8 +119,31 @@ TEST_CASE("DeleteSelection removes the selected item and clears the selection", 
         CHECK(schematic.GetElements().size() == 1);
         CHECK(schematic.GetWires().empty());
     }
-    CHECK_FALSE(schematic.GetSelectedElementIndex().has_value());
-    CHECK_FALSE(schematic.GetSelectedWireIndex().has_value());
+    CHECK_FALSE(schematic.HasSelection());
+}
+
+TEST_CASE("DeleteSelection removes every selected element and wire in one step", "[schematic]") {
+    GUI::Schematic schematic;
+    schematic.AddElement(MakeResistor({0, 0}));
+    schematic.AddElement(MakeResistor({8, 0}));
+    schematic.AddElement(MakeResistor({16, 0}));
+    schematic.AddWire({2, 0}, {6, 0});
+    schematic.AddWire({10, 0}, {14, 0});
+    schematic.AddWire({20, 0}, {24, 0});
+    schematic.CommitUndoStep();
+
+    schematic.SetSelection({0, 2}, {0, 2});
+    schematic.DeleteSelection();
+    REQUIRE(schematic.GetElements().size() == 1);
+    CHECK(schematic.GetElements()[0]->GetPosition() == GUI::GridPoint{8, 0});
+    REQUIRE(schematic.GetWires().size() == 1);
+    CHECK(schematic.GetWires()[0].GetStart() == GUI::GridPoint{10, 0});
+    CHECK_FALSE(schematic.HasSelection());
+
+    schematic.CommitUndoStep();
+    schematic.Undo();
+    CHECK(schematic.GetElements().size() == 3);
+    CHECK(schematic.GetWires().size() == 3);
 }
 
 TEST_CASE("SetWires invalidates the nodes without marking the schematic as modified", "[schematic]") {
@@ -112,15 +157,17 @@ TEST_CASE("SetWires invalidates the nodes without marking the schematic as modif
     CHECK(schematic.GetConnectivity().GetNode({0, 4}).has_value());
 }
 
-TEST_CASE("SimplifyAllWires deselects a wire because indices change", "[schematic]") {
+TEST_CASE("SimplifyAllWires deselects the wires because indices change, and keeps the elements", "[schematic]") {
     GUI::Schematic schematic;
+    schematic.AddElement(MakeResistor({0, 8}));
     schematic.AddWire({0, 0}, {3, 0});
     schematic.AddWire({3, 0}, {6, 0});
-    schematic.SelectWire(1);
+    schematic.SetSelection({0}, {1});
 
     schematic.SimplifyAllWires();
     CHECK(schematic.GetWires().size() == 1);
-    CHECK_FALSE(schematic.GetSelectedWireIndex().has_value());
+    CHECK(schematic.GetSelectedWires().empty());
+    CHECK(schematic.IsElementSelected(0));
 }
 
 TEST_CASE("MarkSaved records the file and clears the modified state", "[schematic]") {
