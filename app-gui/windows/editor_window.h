@@ -29,6 +29,7 @@
 #include <optional>
 #include <set>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace GUI {
@@ -260,6 +261,9 @@ private:
     void UpdateDisplayedState();
     void DrawTimeBar();
     void DrawWires(SchematicCanvas &canvas, const ViewTransform &view);
+    void DrawWireSelectionHalos(SchematicCanvas &canvas, const ViewTransform &view);
+    void DrawNodeNumbers(SchematicCanvas &canvas, const ViewTransform &view);
+    ImU32 GetWireColor(int node) const;
     void DrawWireCurrents(SchematicCanvas &canvas, const ViewTransform &view);
     void DrawGlows(ImDrawList *draw_list, const ViewTransform &view);
     ImU32 GetElementColor(std::size_t index) const;
@@ -317,6 +321,11 @@ private:
     void HandleQuitRequest();
     void HandleExampleRequest();
     void HandleCommandRequest();
+    bool RunFileCommand(EditorCommand command);
+    void RunEditCommand(EditorCommand command);
+    void RunTurnCommand(EditorCommand command);
+    void ReadSetting(std::string_view line);
+    void WriteSettings(ImGuiTextBuffer &buffer) const;
     void Save();
     void NewSchematic();
     void OpenFile(const std::filesystem::path &path);

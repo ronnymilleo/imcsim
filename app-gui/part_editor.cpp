@@ -236,14 +236,7 @@ PartEditor::PartEditor(Schematic &schematic) : m_Schematic(schematic) {
 void PartEditor::Draw() {
     UIElement *element = m_Schematic.GetSelectedElement();
     if (element == nullptr) {
-        const std::size_t count = m_Schematic.GetSelectedElements().size() + m_Schematic.GetSelectedWires().size();
-        if (count > 1) {
-            ImGui::TextUnformatted(std::format("{} items selected", count).c_str());
-        } else if (count == 1) {
-            ImGui::TextUnformatted("Wire");
-        } else {
-            ImGui::TextDisabled("Select a component to edit it");
-        }
+        DrawSelectionSummary();
         return;
     }
 
@@ -260,6 +253,43 @@ void PartEditor::Draw() {
     if (m_LoadedSelection != m_Schematic.GetSelectionVersion()) {
         LoadFields(component);
     }
+    DrawFields(component);
+    if (!ShowsValueFields(component)) {
+        return;
+    }
+    ImGui::TextDisabled("Suffixes: T G M k m u n p f (case sensitive)");
+}
+
+// What there is to edit when no single part is selected: how many items are, or a hint
+void PartEditor::DrawSelectionSummary() {
+    const std::size_t count = m_Schematic.GetSelectedElements().size() + m_Schematic.GetSelectedWires().size();
+    if (count > 1) {
+        ImGui::TextUnformatted(std::format("{} items selected", count).c_str());
+    } else if (count == 1) {
+        ImGui::TextUnformatted("Wire");
+    } else {
+        ImGui::TextDisabled("Select a component to edit it");
+    }
+}
+
+// The fields of the kind of part: its model, its waveform, its gain or its value
+void PartEditor::DrawFields(Core::Component &component) {
+    const Core::ComponentType type = component.GetType();
+    if (DrawModeledPart(component)) {
+        return;
+    }
+    if (Core::IsSource(type)) {
+        DrawSource(static_cast<Core::Source &>(component));
+    } else if (Core::IsControlledSource(type)) {
+        DrawControlledSource(static_cast<Core::ControlledSource &>(component));
+    } else {
+        DrawValue(component);
+    }
+}
+
+// Diodes, transistors and op-amps, which a model sets; false for the other parts
+bool PartEditor::DrawModeledPart(Core::Component &component) {
+    const Core::ComponentType type = component.GetType();
     if (Core::IsDiode(type)) {
         DrawDiode(static_cast<Core::Diode &>(component));
     } else if (Core::IsBJT(type)) {
@@ -268,17 +298,10 @@ void PartEditor::Draw() {
         DrawMOSFET(static_cast<Core::MOSFET &>(component));
     } else if (type == Core::ComponentType::OpAmp) {
         DrawOpAmp(static_cast<Core::OpAmp &>(component));
-    } else if (Core::IsSource(type)) {
-        DrawSource(static_cast<Core::Source &>(component));
-    } else if (Core::IsControlledSource(type)) {
-        DrawControlledSource(static_cast<Core::ControlledSource &>(component));
     } else {
-        DrawValue(component);
+        return false;
     }
-    if (!ShowsValueFields(component)) {
-        return;
-    }
-    ImGui::TextDisabled("Suffixes: T G M k m u n p f (case sensitive)");
+    return true;
 }
 
 /**

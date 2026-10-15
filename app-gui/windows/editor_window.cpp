@@ -345,6 +345,14 @@ ImU32 WithAlpha(const ImU32 color, const ImU32 alpha) {
     return (color & ~IM_COL32_A_MASK) | (alpha << IM_COL32_A_SHIFT);
 }
 
+// The value of a "key=value" line when it has that key
+std::optional<std::string_view> ValueOf(const std::string_view line, const std::string_view key) {
+    if (!line.starts_with(key) || line.size() <= key.size() || line[key.size()] != '=') {
+        return std::nullopt;
+    }
+    return line.substr(key.size() + 1);
+}
+
 // Power a part absorbs, looked up by the name of the part; a current name such as "Q1.C" belongs to part "Q1"
 std::optional<ComponentPower> FindPower(const std::vector<ComponentPower> &powers, const std::string &name) {
     const std::string part = name.substr(0, name.find('.'));
@@ -547,48 +555,48 @@ void EditorWindow::RegisterSettingsHandler() {
         return settings->UserData;
     };
     handler.ReadLineFn = [](ImGuiContext *, ImGuiSettingsHandler *, void *entry, const char *line) {
-        auto *editor = static_cast<EditorWindow *>(entry);
-        const std::string_view text(line);
-        const auto value_of = [&text](const std::string_view key) -> std::optional<std::string_view> {
-            if (!text.starts_with(key) || text.size() <= key.size() || text[key.size()] != '=') {
-                return std::nullopt;
-            }
-            return text.substr(key.size() + 1);
-        };
-        if (const auto colors = value_of("WireColors")) {
-            const auto found = std::ranges::find(WireColoringNames, *colors);
-            if (found != WireColoringNames.end()) {
-                editor->m_WireColoring = static_cast<WireColoring>(found - WireColoringNames.begin());
-            }
-        } else if (const auto symbols = value_of("Symbols")) {
-            editor->m_SymbolStyle = *symbols == "ANSI" ? SymbolStyle::ANSI : SymbolStyle::IEC;
-        } else if (const auto numbers = value_of("TerminalNumbers")) {
-            editor->m_ShowTerminalNumbers = *numbers == "1";
-        } else if (const auto effects = value_of("LiveEffects")) {
-            for (std::size_t index = 0; index < LiveEffectsNames.size(); ++index) {
-                editor->m_LiveEffects[index] = effects->find(LiveEffectsNames[index]) != std::string_view::npos;
-            }
-        }
+        static_cast<EditorWindow *>(entry)->ReadSetting(line);
     };
     handler.WriteAllFn = [](ImGuiContext *, ImGuiSettingsHandler *settings, ImGuiTextBuffer *buffer) {
-        const auto *editor = static_cast<const EditorWindow *>(settings->UserData);
-        buffer->appendf("[%s][Preferences]\n", SettingsTypeName);
-        buffer->appendf("WireColors=%s\n", WireColoringNames[static_cast<std::size_t>(editor->m_WireColoring)].data());
-        buffer->appendf("Symbols=%s\n", editor->m_SymbolStyle == SymbolStyle::ANSI ? "ANSI" : "IEC");
-        buffer->appendf("TerminalNumbers=%d\n", editor->m_ShowTerminalNumbers ? 1 : 0);
-        std::string live_effects;
-        for (std::size_t index = 0; index < LiveEffectsNames.size(); ++index) {
-            if (!editor->m_LiveEffects[index]) {
-                continue;
-            }
-            if (!live_effects.empty()) {
-                live_effects += ',';
-            }
-            live_effects += LiveEffectsNames[index];
-        }
-        buffer->appendf("LiveEffects=%s\n\n", live_effects.c_str());
+        static_cast<const EditorWindow *>(settings->UserData)->WriteSettings(*buffer);
     };
     ImGui::AddSettingsHandler(&handler);
+}
+
+// One "Key=value" line of the preferences; keys and values that are not known are ignored
+void EditorWindow::ReadSetting(const std::string_view line) {
+    if (const auto colors = ValueOf(line, "WireColors")) {
+        const auto found = std::ranges::find(WireColoringNames, *colors);
+        if (found != WireColoringNames.end()) {
+            m_WireColoring = static_cast<WireColoring>(found - WireColoringNames.begin());
+        }
+    } else if (const auto symbols = ValueOf(line, "Symbols")) {
+        m_SymbolStyle = *symbols == "ANSI" ? SymbolStyle::ANSI : SymbolStyle::IEC;
+    } else if (const auto numbers = ValueOf(line, "TerminalNumbers")) {
+        m_ShowTerminalNumbers = *numbers == "1";
+    } else if (const auto effects = ValueOf(line, "LiveEffects")) {
+        for (std::size_t index = 0; index < LiveEffectsNames.size(); ++index) {
+            m_LiveEffects[index] = effects->find(LiveEffectsNames[index]) != std::string_view::npos;
+        }
+    }
+}
+
+void EditorWindow::WriteSettings(ImGuiTextBuffer &buffer) const {
+    buffer.appendf("[%s][Preferences]\n", SettingsTypeName);
+    buffer.appendf("WireColors=%s\n", WireColoringNames[static_cast<std::size_t>(m_WireColoring)].data());
+    buffer.appendf("Symbols=%s\n", m_SymbolStyle == SymbolStyle::ANSI ? "ANSI" : "IEC");
+    buffer.appendf("TerminalNumbers=%d\n", m_ShowTerminalNumbers ? 1 : 0);
+    std::string live_effects;
+    for (std::size_t index = 0; index < LiveEffectsNames.size(); ++index) {
+        if (!m_LiveEffects[index]) {
+            continue;
+        }
+        if (!live_effects.empty()) {
+            live_effects += ',';
+        }
+        live_effects += LiveEffectsNames[index];
+    }
+    buffer.appendf("LiveEffects=%s\n\n", live_effects.c_str());
 }
 
 // Window content only: AppWindow::Render() wraps it in Begin/End
@@ -894,29 +902,11 @@ void EditorWindow::DrawTimeBar() {
 void EditorWindow::DrawWires(SchematicCanvas &canvas, const ViewTransform &view) {
     const Connectivity &connectivity = m_Schematic.GetConnectivity();
     const auto &wires = m_Schematic.GetWires();
-    const bool by_nodes = m_WireColoring == WireColoring::Nodes;
-    const bool by_voltage = m_WireColoring == WireColoring::Voltage && m_Displayed;
     const bool drawn_by_current = m_WireColoring == WireColoring::Current && m_Displayed;
-    if (AreWiresHeatColored()) {
-        for (const std::size_t selected : m_Schematic.GetSelectedWires()) {
-            const UIWire &wire = wires[selected];
-            canvas.AddLine(view.ToScreen(ToVec2(wire.GetStart())), view.ToScreen(ToVec2(wire.GetEnd())),
-                           WithAlpha(GetPalette().Selected, SelectionHaloAlpha), LineThickness + SelectionHaloExtra);
-        }
-    }
+    DrawWireSelectionHalos(canvas, view);
     if (drawn_by_current) {
         DrawWireCurrents(canvas, view);
     }
-    const auto node_color = [&](const int node) {
-        if (by_nodes) {
-            return GetNodeColor(node);
-        }
-        if (by_voltage && static_cast<std::size_t>(node) < m_Displayed->Point.NodeVoltages.size()) {
-            const double voltage = m_Displayed->Point.NodeVoltages[static_cast<std::size_t>(node)];
-            return GetHeatColor(VoltageLevel(voltage, m_Displayed->Scale));
-        }
-        return GetPalette().Wire;
-    };
 
     for (std::size_t index = 0; index < wires.size(); ++index) {
         const UIWire &wire = wires[index];
@@ -926,27 +916,57 @@ void EditorWindow::DrawWires(SchematicCanvas &canvas, const ViewTransform &view)
         }
         // Every wire end is a connection point, so it always has a node
         const int node = connectivity.GetNode(wire.GetStart()).value_or(0);
-        wire.Draw(canvas, view, selected ? GetPalette().Selected : node_color(node));
+        wire.Draw(canvas, view, selected ? GetPalette().Selected : GetWireColor(node));
     }
 
     const float junction_radius = std::max(m_Zoom * JunctionRadiusScale, MinJunctionRadius);
     for (const GridPoint junction : connectivity.GetJunctions()) {
         const int node = connectivity.GetNode(junction).value_or(0);
-        canvas.AddCircleFilled(view.ToScreen(ToVec2(junction)), junction_radius, node_color(node));
+        canvas.AddCircleFilled(view.ToScreen(ToVec2(junction)), junction_radius, GetWireColor(node));
     }
 
     if (m_LiveEffects[static_cast<std::size_t>(LiveEffect::CurrentFlow)] && m_Displayed) {
         DrawLiveCurrent(canvas, view, m_Schematic, m_Displayed->Point, m_Displayed->Scale, ImGui::GetTime());
     }
 
-    if (!by_nodes) {
+    if (m_WireColoring == WireColoring::Nodes) {
+        DrawNodeNumbers(canvas, view);
+    }
+}
+
+// Over heat colors a selected wire has a halo behind it
+void EditorWindow::DrawWireSelectionHalos(SchematicCanvas &canvas, const ViewTransform &view) {
+    if (!AreWiresHeatColored()) {
         return;
     }
-    for (const UIWire &wire : wires) {
+    for (const std::size_t selected : m_Schematic.GetSelectedWires()) {
+        const UIWire &wire = m_Schematic.GetWires()[selected];
+        canvas.AddLine(view.ToScreen(ToVec2(wire.GetStart())), view.ToScreen(ToVec2(wire.GetEnd())),
+                       WithAlpha(GetPalette().Selected, SelectionHaloAlpha), LineThickness + SelectionHaloExtra);
+    }
+}
+
+// The number of the node on the middle of each wire
+void EditorWindow::DrawNodeNumbers(SchematicCanvas &canvas, const ViewTransform &view) {
+    const Connectivity &connectivity = m_Schematic.GetConnectivity();
+    for (const UIWire &wire : m_Schematic.GetWires()) {
         const int node = connectivity.GetNode(wire.GetStart()).value_or(0);
         const ImVec2 middle = view.ToScreen((ToVec2(wire.GetStart()) + ToVec2(wire.GetEnd())) / 2.0f);
         canvas.AddText(middle, GetPalette().CanvasText, std::format("{}", node).c_str());
     }
+}
+
+// The color of the wires of a node: its own by node, its heat color by voltage, otherwise the color of the theme
+ImU32 EditorWindow::GetWireColor(const int node) const {
+    if (m_WireColoring == WireColoring::Nodes) {
+        return GetNodeColor(node);
+    }
+    const bool by_voltage = m_WireColoring == WireColoring::Voltage && m_Displayed;
+    if (by_voltage && static_cast<std::size_t>(node) < m_Displayed->Point.NodeVoltages.size()) {
+        const double voltage = m_Displayed->Point.NodeVoltages[static_cast<std::size_t>(node)];
+        return GetHeatColor(VoltageLevel(voltage, m_Displayed->Scale));
+    }
+    return GetPalette().Wire;
 }
 
 // Each piece of wire takes the heat color of its own current, so the path of the current shows along the wires
@@ -2025,42 +2045,42 @@ void EditorWindow::HandleExampleRequest() {
 // Menu commands run here, from Update(), where their popups are opened and drawn whichever window is in front
 void EditorWindow::HandleCommandRequest() {
     const std::optional<EditorCommand> command = std::exchange(m_RequestedCommand, std::nullopt);
-    if (!command) {
-        return;
+    if (command && !RunFileCommand(*command)) {
+        RunEditCommand(*command);
     }
-    switch (*command) {
+}
+
+// The commands of the File menu; false for any other
+bool EditorWindow::RunFileCommand(const EditorCommand command) {
+    switch (command) {
     case EditorCommand::New:
         RequestNew();
-        break;
+        return true;
     case EditorCommand::Open:
         RequestOpen();
-        break;
+        return true;
     case EditorCommand::Save:
         Save();
-        break;
+        return true;
     case EditorCommand::SaveAs:
         ShowFileDialog(FileAction::Save);
-        break;
+        return true;
     case EditorCommand::ExportSchematic:
         ImGui::OpenPopup(ExportPopup);
-        break;
+        return true;
+    default:
+        return false;
+    }
+}
+
+// The commands of the Edit menu: history, selecting all, deleting and turning the selection
+void EditorWindow::RunEditCommand(const EditorCommand command) {
+    switch (command) {
     case EditorCommand::Undo:
         Undo();
         break;
     case EditorCommand::Redo:
         Redo();
-        break;
-    case EditorCommand::Rotate:
-    case EditorCommand::RotateKeepWires:
-        TransformSelection(PointTransform::Kind::QuarterTurn, *command == EditorCommand::RotateKeepWires);
-        break;
-    case EditorCommand::Mirror:
-    case EditorCommand::MirrorKeepWires:
-        TransformSelection(PointTransform::Kind::MirrorLeftRight, *command == EditorCommand::MirrorKeepWires);
-        break;
-    case EditorCommand::Flip:
-    case EditorCommand::FlipKeepWires:
-        TransformSelection(PointTransform::Kind::MirrorTopBottom, *command == EditorCommand::FlipKeepWires);
         break;
     case EditorCommand::SelectAll:
         SelectAll();
@@ -2070,6 +2090,35 @@ void EditorWindow::HandleCommandRequest() {
         if (!m_Drag) {
             m_Schematic.DeleteSelection();
         }
+        break;
+    default:
+        RunTurnCommand(command);
+        break;
+    }
+}
+
+// Rotate, Mirror and Flip, and their variants that keep the wires where they are
+void EditorWindow::RunTurnCommand(const EditorCommand command) {
+    switch (command) {
+    case EditorCommand::Rotate:
+        TransformSelection(PointTransform::Kind::QuarterTurn, false);
+        break;
+    case EditorCommand::RotateKeepWires:
+        TransformSelection(PointTransform::Kind::QuarterTurn, true);
+        break;
+    case EditorCommand::Mirror:
+        TransformSelection(PointTransform::Kind::MirrorLeftRight, false);
+        break;
+    case EditorCommand::MirrorKeepWires:
+        TransformSelection(PointTransform::Kind::MirrorLeftRight, true);
+        break;
+    case EditorCommand::Flip:
+        TransformSelection(PointTransform::Kind::MirrorTopBottom, false);
+        break;
+    case EditorCommand::FlipKeepWires:
+        TransformSelection(PointTransform::Kind::MirrorTopBottom, true);
+        break;
+    default:
         break;
     }
 }
