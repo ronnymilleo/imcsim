@@ -13,13 +13,15 @@ namespace GUI {
 
 namespace {
 
-// A transistor reports one current per terminal, so the terminal nearest the point picks it
-std::size_t NearestTerminal(const UIElement &element, const ImVec2 world_pos) {
+// A part that reports one current per probed terminal, such as a transistor, gives the one whose terminal is nearest
+// the point; the result is the position among its currents
+std::size_t NearestCurrent(const UIElement &element, const std::vector<std::size_t> &current_terminals,
+                           const ImVec2 world_pos) {
     const std::vector<GridPoint> terminals = element.GetTerminals();
     std::size_t nearest = 0;
     float nearest_distance = INFINITY;
-    for (std::size_t index = 0; index < terminals.size(); ++index) {
-        const ImVec2 offset = ToVec2(terminals[index]) - world_pos;
+    for (std::size_t index = 0; index < current_terminals.size(); ++index) {
+        const ImVec2 offset = ToVec2(terminals[current_terminals[index]]) - world_pos;
         const float distance = std::hypot(offset.x, offset.y);
         if (distance < nearest_distance) {
             nearest = index;
@@ -39,8 +41,8 @@ std::size_t NearestTerminal(const UIElement &element, const ImVec2 world_pos) {
  * @param[in] connectivity    Nodes of the same parts and wires.
  * @param[in] world_pos       Point in world units, usually the cursor.
  * @param[in] wire_tolerance  How close to a wire the point must be, in world units.
- * @return  The current of a part (of the nearest terminal for a transistor), the voltage of the node of a wire, or
- *          no value over empty space, ground and wires on ground, which is always 0 V.
+ * @return  The current of a part (of the nearest probed terminal for a transistor), the voltage of the node of a wire,
+ * or no value over empty space, ground and wires on ground, which is always 0 V.
  */
 std::optional<MeasurementTarget> FindMeasurementTarget(const std::vector<std::unique_ptr<UIElement>> &elements,
                                                        const std::vector<UIWire> &wires,
@@ -55,7 +57,10 @@ std::optional<MeasurementTarget> FindMeasurementTarget(const std::vector<std::un
         if (currents.empty()) {
             continue;
         }
-        const std::size_t current = currents.size() == 1 ? 0 : NearestTerminal(element, world_pos);
+        const std::size_t current =
+            currents.size() == 1
+                ? 0
+                : NearestCurrent(element, Core::GetCurrentTerminals(element.GetComponent()), world_pos);
         return MeasurementTarget{.Node = std::nullopt, .Current = currents[current]};
     }
     for (std::size_t index = wires.size(); index-- > 0;) {

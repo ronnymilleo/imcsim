@@ -21,6 +21,7 @@
 #include "components/vcc.h"
 #include "components/voltage_controlled_switch.h"
 #include "components/voltage_source.h"
+#include "simulator.h"
 #include <catch2/catch_test_macros.hpp>
 #include <string>
 
@@ -521,4 +522,20 @@ TEST_CASE("A transformer probes the + terminal of each winding", "[circuit]") {
     CHECK(Core::GetCurrentName(transformer, probes[0].Label) == "T1.P");
     CHECK(probes[1].Terminal == 2);
     CHECK(Core::GetCurrentName(transformer, probes[1].Label) == "T1.S");
+}
+
+TEST_CASE("Each current of a part belongs to the terminal it flows into", "[circuit]") {
+    Core::Resistor named;
+    named.SetName("R1");
+    CHECK(Core::GetCurrentTerminals(named) == std::vector<std::size_t>{0});
+    Core::BJT transistor(Core::ComponentType::NPN);
+    transistor.SetName("Q1");
+    CHECK(Core::GetCurrentTerminals(transistor) == std::vector<std::size_t>{0, 1, 2});
+    Core::Relay relay;
+    relay.SetName("K1");
+    // The contact current enters terminal 1, and the coil current terminal 3
+    CHECK(Core::GetCurrentTerminals(relay) == std::vector<std::size_t>{0, 2});
+    Core::Transformer transformer;
+    transformer.SetName("T1");
+    CHECK(Core::GetCurrentTerminals(transformer) == std::vector<std::size_t>{0, 2});
 }

@@ -149,15 +149,16 @@ void DrawMeasurementMarkers(SchematicCanvas &canvas, const ViewTransform &view, 
     std::size_t current_index = 0;
     for (const auto &element : schematic.GetElements()) {
         const std::vector<std::string> currents = Core::GetCurrentNames(element->GetComponent());
+        const std::vector<std::size_t> current_terminals = Core::GetCurrentTerminals(element->GetComponent());
         const std::vector<GridPoint> terminals = element->GetTerminals();
         for (std::size_t index = 0; index < currents.size(); ++index, ++current_index) {
             if (!schematic.IsCurrentMeasured(currents[index])) {
                 continue;
             }
             // Results report a current as positive into a terminal: the first one of a two-terminal part or a
-            // supply, and its own terminal for each current of a transistor
-            const ImVec2 terminal = ToVec2(terminals[index]);
-            const ImVec2 inward = ToVec2(element->GetTerminalInward(index));
+            // supply, and its own terminal for each current of a transistor or another part with probes
+            const ImVec2 terminal = ToVec2(terminals[current_terminals[index]]);
+            const ImVec2 inward = ToVec2(element->GetTerminalInward(current_terminals[index]));
             const ImVec2 across = {-inward.y, inward.x};
             const ImVec2 base = terminal + inward * ArrowStart;
             const ImU32 color = GetCurrentColor(current_index);

@@ -50,7 +50,8 @@ std::vector<WireCurrent> SplitWires(const std::vector<UIWire> &wires, const std:
  * @param[in] component  The part.
  * @param[in] terminal   Terminal index, in the order of UIElement::GetTerminals().
  * @param[in] currents   Currents by name, as an operating point reports them.
- * @return  The current into the terminal: the reported current for a transistor terminal; for a two-terminal part
+ * @return  The current into the terminal: the reported current for a probed terminal, and for a relay or a
+ *          transformer the opposite of it at the other end of its contact or winding; for a two-terminal part
  *          or the output of a controlled source, its current into the first terminal and the opposite into the
  *          second; for a supply or an op-amp output, its current; zero for control pins and the other op-amp pins.
  *          No value for ground, whose current is whatever its node leaves over, or for a current missing from the
@@ -63,7 +64,23 @@ std::optional<double> GetTerminalCurrent(const Core::Component &component, const
         return std::nullopt;
     }
     if (names.size() > 1) {
-        return terminal < names.size() ? FindCurrent(currents, names[terminal]) : std::nullopt;
+        const std::vector<std::size_t> probed = Core::GetCurrentTerminals(component);
+        for (std::size_t index = 0; index < names.size(); ++index) {
+            if (probed[index] == terminal) {
+                return FindCurrent(currents, names[index]);
+            }
+        }
+        // The other end of a winding or of a contact takes what the probed end gives out
+        const Core::ComponentType type = component.GetType();
+        if ((type == Core::ComponentType::Relay || type == Core::ComponentType::Transformer) && terminal % 2 == 1) {
+            for (std::size_t index = 0; index < names.size(); ++index) {
+                if (probed[index] + 1 == terminal) {
+                    const std::optional<double> current = FindCurrent(currents, names[index]);
+                    return current ? std::optional(-*current) : std::nullopt;
+                }
+            }
+        }
+        return std::nullopt;
     }
     const std::optional<double> current = FindCurrent(currents, names.front());
     if (!current) {

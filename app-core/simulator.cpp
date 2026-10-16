@@ -901,4 +901,23 @@ std::vector<std::string> GetCurrentNames(const Component &component) {
     return names;
 }
 
+/**
+ * @brief   Tells which terminal each current of GetCurrentNames() flows into.
+ * @param[in] component  Any component.
+ * @return  One terminal index per current, in the same order: the probed terminal for a part with probes, and the
+ *          first terminal for a part whose single current enters there and leaves by the second.
+ */
+std::vector<std::size_t> GetCurrentTerminals(const Component &component) {
+    std::vector<std::size_t> terminals;
+    const std::vector<CurrentProbe> probes = GetCurrentProbes(component);
+    if (probes.empty()) {
+        terminals.assign(GetCurrentNames(component).size(), 0);
+        return terminals;
+    }
+    for (const CurrentProbe &probe : probes) {
+        terminals.push_back(static_cast<std::size_t>(probe.Terminal));
+    }
+    return terminals;
+}
+
 } // namespace Core
