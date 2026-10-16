@@ -172,6 +172,29 @@ TEST_CASE("Logarithmic X axes label each decade with its unit", "[plot_export]")
     CHECK_THAT(*svg, !ContainsSubstring("mdB"));
 }
 
+TEST_CASE("Logarithmic Y axes put their ticks at decades and skip values that are not positive", "[plot_export]") {
+    GUI::ExportFigure figure;
+    figure.XAxis = {.Name = "Frequency", .Unit = "Hz"};
+    figure.XLogarithmic = true;
+    GUI::ExportPanel panel;
+    panel.YAxes = {{.Name = "Noise", .Unit = "V/√Hz", .Logarithmic = true}};
+    GUI::ExportSeries density{.Name = "V(2)", .LegendLabel = "V(2)", .Color = {230, 120, 100}};
+    for (int exponent = 0; exponent <= 5; ++exponent) {
+        figure.Xs.push_back(std::pow(10.0, exponent));
+        density.Values.push_back(1e-6 * std::pow(10.0, -exponent / 2.0));
+    }
+    // A zero cannot sit on a logarithmic axis, so it breaks the line
+    density.Values[3] = 0.0;
+    panel.Series = {density};
+    figure.Panels = {panel};
+    const auto svg = GUI::RenderSvg(figure, {.Dark = true});
+    REQUIRE(svg);
+    CHECK_THAT(*svg, ContainsSubstring(">1uV/√Hz</text>"));
+    CHECK_THAT(*svg, ContainsSubstring(">10nV/√Hz</text>"));
+    // Two runs of the line, and the sample in the legend
+    CHECK(CountOccurrences(*svg, "<polyline fill=\"none\" stroke=\"#e67864\"") == 3);
+}
+
 TEST_CASE("Notes on a panel are drawn in the X range", "[plot_export]") {
     GUI::ExportFigure figure = MakeFigure();
     figure.Panels.front().Notes = {{.X = 5e-4, .Y = 2.5, .Axis = 0, .Text = "VB=1V"},

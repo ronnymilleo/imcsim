@@ -170,6 +170,52 @@ struct DCSweep {
 };
 
 /**
+ * @struct  NoiseSettings
+ * @brief   Where a noise analysis measures, what it refers the noise to, and its frequency range.
+ * @details The input source must be an independent source set to AC; ngspice only uses it to find the gain from it
+ *          to the output, whatever its AC magnitude. Points are spaced logarithmically, as in an AC sweep.
+ */
+struct NoiseSettings {
+    int OutputNode = 0;
+    std::string InputSource;
+    double StartFrequency = 10.0;
+    double StopFrequency = 100e3;
+    int PointsPerDecade = 20;
+
+    bool operator==(const NoiseSettings &) const = default;
+};
+
+/**
+ * @struct  NoiseContribution
+ * @brief   The share of one part in the noise at the output: its density at every frequency and its total.
+ * @details A part written as several elements, such as an op-amp macromodel, adds up the noise of all of them.
+ */
+struct NoiseContribution {
+    std::string Name;
+    std::vector<double> OutputDensities;
+    double OutputTotal = 0.0;
+};
+
+/**
+ * @struct  Noise
+ * @brief   The noise of a circuit at a node across frequency, and the same noise referred to its input source.
+ * @details Densities are RMS per root hertz: V/sqrt(Hz) at the output, and V/sqrt(Hz) or A/sqrt(Hz) at the input,
+ *          after the kind of the input source. Totals are RMS over the whole frequency range.
+ */
+struct Noise {
+    int OutputNode = 0;
+    std::string InputSource;
+    std::string InputUnit;
+    std::vector<double> Frequencies;
+    std::vector<double> OutputDensities;
+    std::vector<double> InputDensities;
+    double OutputTotal = 0.0;
+    double InputTotal = 0.0;
+    // Every part that adds noise, the largest total first
+    std::vector<NoiseContribution> Contributions;
+};
+
+/**
  * @struct  SimulationRun
  * @brief   Outcome of a simulation, with everything ngspice printed.
  */
@@ -182,17 +228,20 @@ using OperatingPointRun = SimulationRun<OperatingPoint>;
 using TransientRun = SimulationRun<Transient>;
 using ACSweepRun = SimulationRun<ACSweep>;
 using DCSweepRun = SimulationRun<DCSweep>;
+using NoiseRun = SimulationRun<Noise>;
 
 OperatingPointRun RunOperatingPoint(const Circuit &circuit);
 TransientRun RunTransient(const Circuit &circuit, const TransientSettings &settings);
 ACSweepRun RunACSweep(const Circuit &circuit, const ACSweepSettings &settings);
 DCSweepRun RunDCSweep(const Circuit &circuit, const DCSweepSettings &settings);
+NoiseRun RunNoise(const Circuit &circuit, const NoiseSettings &settings);
 
 void SetCodeModelDirectory(const std::filesystem::path &directory);
 bool AreDigitalModelsAvailable();
 
 // Names in the results
 std::vector<std::string> GetSweepableSources(const Circuit &circuit);
+std::vector<std::string> GetNoiseInputSources(const Circuit &circuit);
 std::vector<std::string> GetCurrentNames(const Component &component);
 std::vector<std::size_t> GetCurrentTerminals(const Component &component);
 

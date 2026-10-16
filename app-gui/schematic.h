@@ -113,10 +113,13 @@ public:
     const std::optional<Core::ACSweep> &GetACSweep() const;
     void SetDCSweep(std::optional<Core::DCSweep> sweep);
     const std::optional<Core::DCSweep> &GetDCSweep() const;
+    void SetNoise(std::optional<Core::Noise> noise);
+    const std::optional<Core::Noise> &GetNoise() const;
     std::size_t GetOperatingPointVersion() const;
     std::size_t GetTransientVersion() const;
     std::size_t GetACSweepVersion() const;
     std::size_t GetDCSweepVersion() const;
+    std::size_t GetNoiseVersion() const;
 
 private:
     // Content
@@ -167,11 +170,13 @@ private:
     std::optional<Core::Transient> m_Transient;
     std::optional<Core::ACSweep> m_ACSweep;
     std::optional<Core::DCSweep> m_DCSweep;
+    std::optional<Core::Noise> m_Noise;
     // Change with every new result, so windows can tell a rerun from the result they already showed
     std::size_t m_OperatingPointVersion = 0;
     std::size_t m_TransientVersion = 0;
     std::size_t m_ACSweepVersion = 0;
     std::size_t m_DCSweepVersion = 0;
+    std::size_t m_NoiseVersion = 0;
 
     void InvalidateDerivedData();
     void FollowVoltageProbes();

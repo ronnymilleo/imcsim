@@ -19,6 +19,7 @@
 #include <cstddef>
 #include <expected>
 #include <optional>
+#include <set>
 #include <span>
 #include <string>
 #include <vector>
@@ -118,7 +119,8 @@ enum class PlotTab {
     Transient,
     Spectrum,
     ACSweep,
-    DCSweep
+    DCSweep,
+    Noise
 };
 
 /**
@@ -144,7 +146,8 @@ enum class ExportFormat {
  *          measures every shown trace: the transient between the cursors or over what is visible, the Bode plot
  *          over the whole sweep. The Spectrum tab transforms the measured traces of the transient over the span its
  *          statistics measure, and reads the fundamental, the harmonics and the THD of each, as a spectrum
- *          analyzer would. Math channels add traces computed from the others, such as
+ *          analyzer would. The Noise tab plots the noise density at the output and referred to the input on
+ *          log-log axes, with the share of each part. Math channels add traces computed from the others, such as
  * V(1)-V(2) or V(1)*I(R1), to the transient and DC sweep plots: voltages and currents keep their axes, and any other
  *          unit, or none, goes on a third axis. Export saves the plot of the current tab as an SVG image, redrawn
  *          from its data at a chosen size and theme over the visible X range, or as a CSV table of every sample.
@@ -201,6 +204,11 @@ private:
     // View preference, kept in imgui.ini: whether a new result brings the window to the front
     bool m_FrontOnNewResult = true;
     PlotSpan m_DCSweepView;
+    // Noise: the result its axes were fitted to, its visible range and the parts whose share it plots
+    std::optional<std::size_t> m_FittedNoise;
+    PlotSpan m_NoiseView;
+    std::set<std::string> m_ShownNoiseContributions;
+    std::vector<std::string> m_PlottedNoiseContributions;
     ExportStyle m_ExportStyle;
     FileDialog m_ExportDialog;
     std::optional<ExportFigure> m_PendingFigure;
@@ -216,6 +224,7 @@ private:
     std::vector<LogicNode> FindMeasuredLanes(std::size_t node_count) const;
     void DrawACSweep(const Core::ACSweep &sweep);
     void DrawDCSweep(const Core::DCSweep &sweep, const std::vector<std::vector<MathTrace>> &math);
+    void DrawNoise(const Core::Noise &noise);
 
     // Spectrum
     PlotSpan GetSpectrumSpan(const Core::Transient &transient) const;
@@ -226,6 +235,7 @@ private:
     void DrawTransientStatistics(const Core::Transient &transient, const std::vector<MathTrace> &math);
     void DrawSpectrumStatistics();
     void DrawACSweepStatistics(const Core::ACSweep &sweep);
+    void DrawNoiseStatistics(const Core::Noise &noise);
 
     // Math channels
     void DrawMathChannels(const std::vector<std::string> &operands);
@@ -241,6 +251,7 @@ private:
     ExportFigure BuildSpectrumFigure() const;
     ExportFigure BuildACSweepFigure(const Core::ACSweep &sweep) const;
     ExportFigure BuildDCSweepFigure(const Core::DCSweep &sweep, const std::vector<std::vector<MathTrace>> &math) const;
+    ExportFigure BuildNoiseFigure(const Core::Noise &noise) const;
     void StartExport(ExportFigure figure, ExportFormat format);
     void ProcessExportDialog();
     void DrawExportError();

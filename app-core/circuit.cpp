@@ -20,6 +20,7 @@
 #include "spice_value.h"
 #include <algorithm>
 #include <format>
+#include <iterator>
 #include <utility>
 
 namespace Core {
@@ -518,6 +519,70 @@ std::optional<std::string> FindControllingSource(const Circuit &circuit, const s
         }
     }
     return std::nullopt;
+}
+
+/**
+ * @brief   Lists the elements ToSpiceNetlist() writes for a component, without its current probes.
+ * @param[in] component  Any component.
+ * @return  The component name for a part that is one element, such as "R1" or "Q1"; the elements of a part written
+ *          as several, such as "R-RV1a" and "R-RV1b" for a potentiometer or "X-U1" for an op-amp macromodel, whose
+ *          own elements ngspice names after it ("q.x-u1.q1"), and the model, bridges and resistors of a logic part;
+ *          nothing for ground and net labels.
+ */
+std::vector<std::string> GetElementNames(const Component &component) {
+    const std::string &name = component.GetName();
+    if (IsLogicGate(component.GetType()) || IsFlipFlop(component.GetType())) {
+        // The model, and a bridge and a resistor on every pin, as FormatLogicPart() writes them
+        std::vector<std::string> names{std::format("A-{}", name)};
+        std::vector<std::string> pins = GetLogicInputLabels(component.GetType());
+        std::ranges::move(GetLogicOutputLabels(component.GetType()), std::back_inserter(pins));
+        for (const std::string &pin : pins) {
+            names.push_back(std::format("A-{}-{}", name, pin));
+            names.push_back(std::format("R-{}-{}", name, pin));
+        }
+        return names;
+    }
+    switch (component.GetType()) {
+    case ComponentType::Ground:
+    case ComponentType::NetLabel:
+        return {};
+    case ComponentType::OpAmp:
+        if (static_cast<const OpAmp &>(component).IsIdeal()) {
+            return {std::format("G-{}", name),   std::format("R-{}", name),   std::format("C-{}", name),
+                    std::format("D-{}-P", name), std::format("D-{}-N", name), std::format("E-{}", name)};
+        }
+        return {std::format("X-{}", name)};
+    case ComponentType::Potentiometer:
+        return {std::format("R-{}a", name), std::format("R-{}b", name)};
+    case ComponentType::Switch:
+    case ComponentType::PushButton:
+        return {std::format("R-{}", name)};
+    case ComponentType::Relay:
+        return {std::format("R-{}coil", name), std::format("L-{}coil", name), std::format("S-{}", name)};
+    case ComponentType::Transformer:
+        return {std::format("R-{}p", name), std::format("L-{}p", name), std::format("R-{}s", name),
+                std::format("L-{}s", name), std::format("K-{}", name)};
+    case ComponentType::Resistor:
+    case ComponentType::Capacitor:
+    case ComponentType::Inductor:
+    case ComponentType::VCC:
+    case ComponentType::VoltageSource:
+    case ComponentType::CurrentSource:
+    case ComponentType::VCVS:
+    case ComponentType::VCCS:
+    case ComponentType::CCCS:
+    case ComponentType::CCVS:
+    case ComponentType::Diode:
+    case ComponentType::ZenerDiode:
+    case ComponentType::LED:
+    case ComponentType::NPN:
+    case ComponentType::PNP:
+    case ComponentType::NMOS:
+    case ComponentType::PMOS:
+    case ComponentType::VSwitch:
+        break;
+    }
+    return {name};
 }
 
 } // namespace Core

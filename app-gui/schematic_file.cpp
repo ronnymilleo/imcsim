@@ -636,7 +636,8 @@ nlohmann::json WriteSweepRange(const Core::SweepRange &range) {
 }
 
 // File names of the analyses, in the order of the Analysis enum
-constexpr auto AnalysisKeys = std::to_array<std::string_view>({"operating_point", "transient", "ac_sweep", "dc_sweep"});
+constexpr auto AnalysisKeys =
+    std::to_array<std::string_view>({"operating_point", "transient", "ac_sweep", "dc_sweep", "noise"});
 
 nlohmann::json WriteSettings(const SimulationSettings &settings) {
     nlohmann::json transient = nlohmann::json::object();
@@ -644,6 +645,12 @@ nlohmann::json WriteSettings(const SimulationSettings &settings) {
     nlohmann::json ac_sweep = nlohmann::json::object();
     WriteParameters(ACSweepKeys, settings.ACSweep, ac_sweep);
     ac_sweep["points_per_decade"] = settings.ACSweep.PointsPerDecade;
+    nlohmann::json noise = {{"source", settings.NoiseSource}};
+    WriteParameters(ACSweepKeys, settings.NoiseRange, noise);
+    noise["points_per_decade"] = settings.NoiseRange.PointsPerDecade;
+    if (settings.NoiseOutput) {
+        noise["output"] = {settings.NoiseOutput->X, settings.NoiseOutput->Y};
+    }
     return {
         {"analysis", AnalysisKeys[static_cast<std::size_t>(settings.Selected)]},
         {"transient", transient},
@@ -654,6 +661,7 @@ nlohmann::json WriteSettings(const SimulationSettings &settings) {
              {"stepped", WriteSweepRange(settings.SteppedRange)},
              {"step_source", settings.StepSource},
          }},
+        {"noise", noise},
     };
 }
 
@@ -668,11 +676,12 @@ std::expected<void, std::string> ReadTransientSettings(const nlohmann::json &obj
     return {};
 }
 
-std::expected<void, std::string> ReadACSweepSettings(const nlohmann::json &object, SimulationSettings &settings) {
-    if (const auto read = ReadParameters(ACSweepKeys, object, settings.ACSweep); !read) {
+// The AC sweep and the noise analysis share the form of their frequency range
+std::expected<void, std::string> ReadFrequencyRange(const nlohmann::json &object, Core::ACSweepSettings &range) {
+    if (const auto read = ReadParameters(ACSweepKeys, object, range); !read) {
         return read;
     }
-    if (settings.ACSweep.StartFrequency <= 0.0 || settings.ACSweep.StopFrequency <= 0.0) {
+    if (range.StartFrequency <= 0.0 || range.StopFrequency <= 0.0) {
         return std::unexpected("have a frequency that is not positive");
     }
     if (object.contains("points_per_decade")) {
@@ -680,9 +689,13 @@ std::expected<void, std::string> ReadACSweepSettings(const nlohmann::json &objec
         if (!points || *points < 1) {
             return std::unexpected("have no valid points_per_decade");
         }
-        settings.ACSweep.PointsPerDecade = *points;
+        range.PointsPerDecade = *points;
     }
     return {};
+}
+
+std::expected<void, std::string> ReadACSweepSettings(const nlohmann::json &object, SimulationSettings &settings) {
+    return ReadFrequencyRange(object, settings.ACSweep);
 }
 
 std::expected<void, std::string> ReadSweepRange(const nlohmann::json &object, Core::SweepRange &range) {
@@ -726,6 +739,27 @@ std::expected<void, std::string> ReadDCSweepSettings(const nlohmann::json &objec
     return {};
 }
 
+std::expected<void, std::string> ReadNoiseSettings(const nlohmann::json &object, SimulationSettings &settings) {
+    if (const auto read = ReadFrequencyRange(object, settings.NoiseRange); !read) {
+        return read;
+    }
+    if (object.contains("source")) {
+        const std::optional<std::string> source = ReadString(object, "source");
+        if (!source) {
+            return std::unexpected("have no valid source");
+        }
+        settings.NoiseSource = *source;
+    }
+    if (object.contains("output")) {
+        const std::optional<GridPoint> output = ReadPoint(object, "output");
+        if (!output) {
+            return std::unexpected("have no valid output point");
+        }
+        settings.NoiseOutput = *output;
+    }
+    return {};
+}
+
 /**
  * @struct  AnalysisReader
  * @brief   JSON key of the settings of one analysis, its name in warnings and the function that reads them.
@@ -740,6 +774,7 @@ constexpr auto AnalysisReaders = std::to_array<AnalysisReader>({
     {"transient", "transient", &ReadTransientSettings},
     {"ac_sweep", "AC sweep", &ReadACSweepSettings},
     {"dc_sweep", "DC sweep", &ReadDCSweepSettings},
+    {"noise", "noise", &ReadNoiseSettings},
 });
 
 // Files saved before settings were stored have none and get the defaults; an analysis with invalid settings

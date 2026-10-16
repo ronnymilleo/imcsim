@@ -2031,3 +2031,128 @@ TEST_CASE("An AC sweep runs with a gate in the circuit", "[simulator][digital]")
     const Core::ACSweepRun run = Core::RunACSweep(circuit, {.StartFrequency = 10.0, .StopFrequency = 1e3});
     CHECK(run.Result.has_value());
 }
+
+namespace {
+
+// Thermal noise density of a resistor at the 27 C ngspice simulates at, in V/sqrt(Hz)
+double ThermalNoise(const double resistance) {
+    constexpr double Boltzmann = 1.380649e-23;
+    constexpr double Temperature = 300.15;
+    return std::sqrt(4.0 * Boltzmann * Temperature * resistance);
+}
+
+const Core::NoiseContribution *FindContribution(const Core::Noise &noise, const std::string &name) {
+    const auto found = std::ranges::find(noise.Contributions, name, &Core::NoiseContribution::Name);
+    return found != noise.Contributions.end() ? &*found : nullptr;
+}
+
+} // namespace
+
+TEST_CASE("The noise of an RC divider is the thermal noise of its resistor, shaped by the capacitor", "[simulator]") {
+    LowPass low_pass;
+    const Core::NoiseRun run = Core::RunNoise(
+        low_pass.Circuit,
+        {.OutputNode = 2, .InputSource = "Vin1", .StartFrequency = 1.0, .StopFrequency = 10.0, .PointsPerDecade = 1});
+    if (!run.Result) {
+        FAIL(run.Result.error());
+    }
+    const Core::Noise &noise = *run.Result;
+    REQUIRE(noise.Frequencies.size() == 2);
+    CHECK(noise.InputSource == "Vin1");
+    CHECK(noise.InputUnit == "V");
+    // Far below the 159 Hz corner the capacitor is open, so the output sees all of R1 and the gain is 1
+    CHECK_THAT(noise.OutputDensities[0], Catch::Matchers::WithinRel(ThermalNoise(1e3), 1e-3));
+    CHECK_THAT(noise.InputDensities[0], Catch::Matchers::WithinRel(ThermalNoise(1e3), 1e-3));
+    CHECK_THAT(noise.OutputTotal, Catch::Matchers::WithinRel(ThermalNoise(1e3) * 3.0, 2e-2));
+    REQUIRE(noise.Contributions.size() == 1);
+    CHECK(noise.Contributions[0].Name == "R1");
+    CHECK_THAT(noise.Contributions[0].OutputTotal, Catch::Matchers::WithinRel(noise.OutputTotal, 1e-6));
+}
+
+TEST_CASE("The noise of an amplifier lists the share of each part, and the ideal op-amp adds next to none",
+          "[simulator]") {
+    InvertingAmplifier amplifier(0.0);
+    amplifier.Input.SetSourceType(Core::VoltageSource::SourceType::AC);
+    const Core::NoiseSettings settings{
+        .OutputNode = 3, .InputSource = "Vin1", .StartFrequency = 10.0, .StopFrequency = 100.0, .PointsPerDecade = 1};
+    const Core::NoiseRun run = Core::RunNoise(amplifier.Circuit, settings);
+    WARN(amplifier.Circuit.ToSpiceNetlist(".options savecurrents", true));
+    for (const auto &c : run.Result->Contributions) {
+        WARN(c.Name << " " << c.OutputDensities[0]);
+    }
+    if (!run.Result) {
+        FAIL(run.Result.error());
+    }
+    const Core::Noise &noise = *run.Result;
+    // R1 is amplified by the gain of 10, while R2 appears as it is
+    const double from_input = ThermalNoise(1e3) * 10.0;
+    const double from_feedback = ThermalNoise(10e3);
+    CHECK_THAT(noise.OutputDensities[0], Catch::Matchers::WithinRel(std::hypot(from_input, from_feedback), 1e-3));
+    CHECK_THAT(noise.InputDensities[0], Catch::Matchers::WithinRel(std::hypot(from_input, from_feedback) / 10.0, 1e-3));
+    REQUIRE(noise.Contributions.size() == 3);
+    CHECK(noise.Contributions[0].Name == "R1");
+    CHECK(noise.Contributions[1].Name == "R2");
+    CHECK_THAT(noise.Contributions[0].OutputDensities[0], Catch::Matchers::WithinRel(from_input, 1e-3));
+    // Only the leakage of its clamp diodes, a thousandth of the rest
+    const Core::NoiseContribution *ideal = FindContribution(noise, "U1");
+    REQUIRE(ideal != nullptr);
+    CHECK(ideal->OutputTotal < noise.OutputTotal * 1e-3);
+
+    SECTION("a macromodel adds the noise of its own transistors and resistors") {
+        amplifier.Amplifier.SetModel(*Core::FindOpAmpModel(Core::ComponentType::OpAmp, "uA741"));
+        const Core::NoiseRun macromodel_run = Core::RunNoise(amplifier.Circuit, settings);
+        if (!macromodel_run.Result) {
+            FAIL(macromodel_run.Result.error());
+        }
+        const Core::NoiseContribution *op_amp = FindContribution(*macromodel_run.Result, "U1");
+        REQUIRE(op_amp != nullptr);
+        CHECK(op_amp->OutputTotal > 0.0);
+        CHECK(macromodel_run.Result->OutputTotal > noise.OutputTotal);
+    }
+}
+
+TEST_CASE("A noise analysis refers its noise to a current source in A/sqrt(Hz)", "[simulator]") {
+    Core::CurrentSource source;
+    source.SetName("I1");
+    source.SetSourceType(Core::CurrentSource::SourceType::AC);
+    Core::Resistor load;
+    load.SetName("R1");
+    Core::Ground reference;
+    Core::Circuit circuit;
+    circuit.Add(source, {0, 1});
+    circuit.Add(load, {1, 0});
+    circuit.Add(reference, {0});
+    CHECK(Core::GetNoiseInputSources(circuit) == std::vector<std::string>{"I1"});
+    const Core::NoiseRun run = Core::RunNoise(
+        circuit,
+        {.OutputNode = 1, .InputSource = "I1", .StartFrequency = 1e3, .StopFrequency = 10e3, .PointsPerDecade = 1});
+    if (!run.Result) {
+        FAIL(run.Result.error());
+    }
+    CHECK(run.Result->InputUnit == "A");
+    // The transimpedance is 1k, so the input current noise is the voltage noise over 1k
+    CHECK_THAT(run.Result->InputDensities[0], Catch::Matchers::WithinRel(ThermalNoise(1e3) / 1e3, 1e-3));
+}
+
+TEST_CASE("RunNoise rejects a missing input source, ground as output and a bad range", "[simulator]") {
+    LowPass low_pass;
+    const Core::NoiseSettings settings{.OutputNode = 2, .InputSource = "Vin1"};
+    CHECK(Core::RunNoise(low_pass.Circuit, settings).Result);
+
+    Core::NoiseSettings no_input = settings;
+    no_input.InputSource.clear();
+    CHECK_FALSE(Core::RunNoise(low_pass.Circuit, no_input).Result);
+    Core::NoiseSettings ground_output = settings;
+    ground_output.OutputNode = 0;
+    CHECK_FALSE(Core::RunNoise(low_pass.Circuit, ground_output).Result);
+    Core::NoiseSettings reversed = settings;
+    reversed.StopFrequency = reversed.StartFrequency / 2.0;
+    CHECK_FALSE(Core::RunNoise(low_pass.Circuit, reversed).Result);
+
+    // A source that is not set to AC cannot be the input
+    low_pass.Source.SetSourceType(Core::VoltageSource::SourceType::DC);
+    CHECK(Core::GetNoiseInputSources(low_pass.Circuit).empty());
+    const Core::NoiseRun run = Core::RunNoise(low_pass.Circuit, settings);
+    REQUIRE_FALSE(run.Result);
+    CHECK(run.Result.error().contains("Vin1"));
+}

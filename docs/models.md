@@ -11,7 +11,11 @@ elements, so the results are those of ngspice with the models below. Some things
 
 - Everything is simulated at 27 °C. Models have no temperature dependence that you can change.
 - Values are exact: there are no tolerances, aging or Monte Carlo spread.
-- There is no noise analysis, so no part models noise.
+- In a noise analysis, resistors add thermal noise (4kTR); diodes and bipolar transistors the shot noise of their
+  currents, MOSFETs the thermal noise of their channel, and all three the thermal noise of their series
+  resistances. Flicker (1/f) noise is off, since no model sets KF.
+  Sources, controlled sources, capacitors, inductors and the ideal op-amp add none, and an op-amp macromodel adds
+  the noise of its internal parts, which does not follow its datasheet (see below).
 - To report terminal currents in every analysis, the netlist adds a 0 V source in series with diodes, transistors,
   potentiometers, switches, relays, transformers, controlled sources, op-amp outputs and the outputs of logic parts. It does not change the circuit; the Netlist window leaves it out unless a
   current-controlled source needs it.
@@ -250,7 +254,8 @@ A transconductance drives a resistor and a capacitor, then a unity-gain buffer d
   node. The supply pins carry only that clamp current, while the output saturates.
 
 It has no slew rate, offset or current limit, and its output current returns through ground rather than through
-the supply pins.
+the supply pins. It is noiseless: its internal resistor is marked `noisy=0`, and only the leakage of its clamp diodes
+remains, picovolts per root hertz, which the noise analysis lists at 0.00%.
 
 ### Boyle macromodel (uA741 and Custom)
 
@@ -292,8 +297,10 @@ Limitations:
 - Its GBW comes out about 10% low, since the equations leave out the second pole that sets the phase margin.
 - The input pair is NPN: parts with a PNP input (LM358, whose input range includes the negative supply) or a JFET
   input (TL072) are only approximated.
-- Not modeled: input offset voltage and current, noise, temperature, the common-mode input range, power supply
+- Not modeled: input offset voltage and current, temperature, the common-mode input range, power supply
   rejection, more than two poles, and an output current drawn from the supply pins (it returns through ground).
+- Noise comes from its input transistors and internal resistors, so it has the right shape (shot and thermal noise
+  of the input pair) but not the voltage and current noise densities of a datasheet.
 
 ## References
 

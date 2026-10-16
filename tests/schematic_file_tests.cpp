@@ -369,10 +369,28 @@ TEST_CASE("Simulation settings load back unchanged", "[schematic_file]") {
     settings.SweptRange = {.Source = "V1", .Start = 5.0, .Stop = 0.0, .Step = -0.05};
     settings.SteppedRange = {.Source = "I1", .Start = 10e-6, .Stop = 50e-6, .Step = 10e-6};
     settings.StepSource = true;
+    settings.NoiseRange = {.StartFrequency = 1.0, .StopFrequency = 20e3, .PointsPerDecade = 10};
+    settings.NoiseSource = "Vin1";
+    settings.NoiseOutput = GUI::GridPoint{12, -4};
 
     const GUI::LoadedSchematic loaded = LoadOrFail(GUI::SaveSchematic({}, {}, settings, {}));
     CHECK(loaded.Warnings.empty());
     CHECK(loaded.Settings == settings);
+
+    // Without an output point the key is left out and loads as none
+    settings.NoiseOutput.reset();
+    settings.Selected = GUI::Analysis::Noise;
+    CHECK(LoadOrFail(GUI::SaveSchematic({}, {}, settings, {})).Settings == settings);
+}
+
+TEST_CASE("Invalid noise settings fall back to their defaults with a warning", "[schematic_file]") {
+    const std::string text = R"({"format": "imcsim-schematic", "version": 1, "simulation": {)"
+                             R"("noise": {"start": 10.0, "stop": 1e3, "source": "V1", "output": [1.5, 2]}}})";
+    const GUI::LoadedSchematic loaded = LoadOrFail(text);
+    CHECK(loaded.Warnings.size() == 1);
+    CHECK(loaded.Settings.NoiseSource.empty());
+    CHECK_FALSE(loaded.Settings.NoiseOutput);
+    CHECK(loaded.Settings.NoiseRange == GUI::SimulationSettings{}.NoiseRange);
 }
 
 TEST_CASE("Files saved before settings were stored load with the default settings", "[schematic_file]") {
@@ -396,7 +414,7 @@ TEST_CASE("Invalid settings of one analysis fall back to its defaults with a war
 
 TEST_CASE("An unknown selected analysis falls back to the transient with a warning", "[schematic_file]") {
     const std::string text = R"({"format": "imcsim-schematic", "version": 1, "simulation": {)"
-                             R"("analysis": "noise", "ac_sweep": {"start": 10.0, "stop": 1e3}}})";
+                             R"("analysis": "pole_zero", "ac_sweep": {"start": 10.0, "stop": 1e3}}})";
     const GUI::LoadedSchematic loaded = LoadOrFail(text);
     CHECK(loaded.Warnings.size() == 1);
     CHECK(loaded.Settings.Selected == GUI::Analysis::Transient);

@@ -7,6 +7,7 @@
 
 #include "analysis_suggestions.h"
 #include "imgui.h"
+#include "probing.h"
 #include "theme.h"
 #include <algorithm>
 #include <expected>
@@ -16,7 +17,8 @@ namespace GUI {
 
 namespace {
 
-constexpr auto AnalysisNames = std::to_array<const char *>({"Operating point", "Transient", "AC sweep", "DC sweep"});
+constexpr auto AnalysisNames =
+    std::to_array<const char *>({"Operating point", "Transient", "AC sweep", "DC sweep", "Noise"});
 
 bool IsPositive(const double value) {
     return value > 0.0;
@@ -112,6 +114,49 @@ std::optional<std::string> StoreResult(std::expected<Result, std::string> result
     return std::move(result.error());
 }
 
+// A source that is empty, or that left the circuit or its AC setting, falls back to the first source that can be
+// the input; sources must not be empty
+const std::string &ResolveNoiseSource(const std::string &stored, const std::vector<std::string> &sources) {
+    return std::ranges::contains(sources, stored) ? stored : sources.front();
+}
+
+// The node the noise is measured at: the one under the stored point, or else the first measured voltage away from
+// the input source, which is most likely the output the user looks at, or else any measured voltage, or else the
+// last node. No value without a node to measure
+std::optional<int> ResolveNoiseOutput(const std::optional<GridPoint> &point, const std::string &input_source,
+                                      const Core::Circuit &circuit, Schematic &schematic) {
+    if (point) {
+        if (const std::optional<int> node = schematic.GetConnectivity().GetNode(*point); node && *node > 0) {
+            return node;
+        }
+    }
+    std::vector<int> input_nodes;
+    for (const Core::CircuitEntry &entry : circuit.GetEntries()) {
+        if (entry.Part->GetName() == input_source) {
+            input_nodes = entry.Nodes;
+        }
+    }
+    std::optional<int> any_measured;
+    for (int node = 1; node < circuit.GetNodeCount(); ++node) {
+        if (!schematic.IsVoltageMeasured(node)) {
+            continue;
+        }
+        if (!std::ranges::contains(input_nodes, node)) {
+            return node;
+        }
+        any_measured = any_measured.value_or(node);
+    }
+    if (any_measured) {
+        return any_measured;
+    }
+    return circuit.GetNodeCount() > 1 ? std::optional<int>(circuit.GetNodeCount() - 1) : std::nullopt;
+}
+
+// The input the noise analysis runs with, or an empty name when no source can be one
+std::string ResolveNoiseInput(const std::string &stored, const std::vector<std::string> &sources) {
+    return sources.empty() ? std::string() : ResolveNoiseSource(stored, sources);
+}
+
 // A Suggest button, disabled with the reason when the circuit gives nothing to base a suggestion on
 bool DrawSuggestButton(const bool available, const char *tooltip, const char *unavailable_reason) {
     ImGui::BeginDisabled(!available);
@@ -169,6 +214,9 @@ void AnalysisControls::DrawSettings() {
     case Analysis::DCSweep:
         DrawDCSweepSettings(settings);
         break;
+    case Analysis::Noise:
+        DrawNoiseSettings(settings);
+        break;
     }
     m_Schematic.SetSimulationSettings(settings);
 }
@@ -220,6 +268,30 @@ void AnalysisControls::RunSelected() {
         Core::DCSweepRun run = Core::RunDCSweep(circuit, run_settings);
         Finish(analysis,
                StoreResult(std::move(run.Result), [this](auto result) { m_Schematic.SetDCSweep(std::move(result)); }),
+               std::move(run.Messages));
+        break;
+    }
+    case Analysis::Noise: {
+        const std::vector<std::string> sources = Core::GetNoiseInputSources(circuit);
+        const std::string input = ResolveNoiseInput(settings.NoiseSource, sources);
+        const std::optional<int> output = ResolveNoiseOutput(settings.NoiseOutput, input, circuit, m_Schematic);
+        if (sources.empty() || !output) {
+            m_Schematic.SetNoise(std::nullopt);
+            Finish(analysis,
+                   sources.empty() ? "A noise analysis needs an AC source as its input; select a voltage or current "
+                                     "source and set it to AC"
+                                   : "Connect some parts: the noise needs a node to measure",
+                   {});
+            break;
+        }
+        const Core::NoiseSettings run_settings{.OutputNode = *output,
+                                               .InputSource = input,
+                                               .StartFrequency = settings.NoiseRange.StartFrequency,
+                                               .StopFrequency = settings.NoiseRange.StopFrequency,
+                                               .PointsPerDecade = settings.NoiseRange.PointsPerDecade};
+        Core::NoiseRun run = Core::RunNoise(circuit, run_settings);
+        Finish(analysis,
+               StoreResult(std::move(run.Result), [this](auto result) { m_Schematic.SetNoise(std::move(result)); }),
                std::move(run.Messages));
         break;
     }
@@ -306,6 +378,8 @@ void AnalysisControls::LoadSettingsFields() {
     m_StopFrequency.Load(settings.ACSweep.StopFrequency);
     LoadSweepFields(settings.SweptRange, m_SweptFields);
     LoadSweepFields(settings.SteppedRange, m_SteppedFields);
+    m_NoiseStartFrequency.Load(settings.NoiseRange.StartFrequency);
+    m_NoiseStopFrequency.Load(settings.NoiseRange.StopFrequency);
     m_LoadedSettingsVersion = m_Schematic.GetSimulationSettingsVersion();
 }
 
@@ -363,6 +437,59 @@ void AnalysisControls::DrawDCSweepSettings(SimulationSettings &settings) {
     ImGui::TextDisabled("AC and pulse sources are swept through their DC value");
 }
 
+// The output picker lists every node by the label the plots give it; picking one keeps a point of it, so the choice
+// follows the node through edits
+void AnalysisControls::DrawNoiseSettings(SimulationSettings &settings) {
+    const Core::Circuit circuit = m_Schematic.BuildCircuit();
+    const std::vector<std::string> sources = Core::GetNoiseInputSources(circuit);
+    const std::string input = ResolveNoiseInput(settings.NoiseSource, sources);
+    const std::optional<int> output = ResolveNoiseOutput(settings.NoiseOutput, input, circuit, m_Schematic);
+    if (!output) {
+        ImGui::TextDisabled("Connect some parts to measure their noise");
+        return;
+    }
+    const Connectivity &connectivity = m_Schematic.GetConnectivity();
+    DrawFieldLabel("Output");
+    if (ImGui::BeginCombo("##noise_output", GetVoltageLabel(connectivity, *output).c_str())) {
+        for (int node = 1; node < circuit.GetNodeCount(); ++node) {
+            if (ImGui::Selectable(GetVoltageLabel(connectivity, node).c_str(), node == *output)) {
+                settings.NoiseOutput = connectivity.FindPointOfNode(node);
+            }
+        }
+        ImGui::EndCombo();
+    }
+    DrawFieldLabel("Input");
+    if (sources.empty()) {
+        ImGui::TextDisabled("Set a voltage or current source to AC");
+    } else if (ImGui::BeginCombo("##noise_input", input.c_str())) {
+        for (const std::string &source : sources) {
+            if (ImGui::Selectable(source.c_str(), source == input)) {
+                settings.NoiseSource = source;
+            }
+        }
+        ImGui::EndCombo();
+    }
+    ImGui::SetItemTooltip("The noise is also referred to this source, as the noise it would need at its input");
+    if (const std::optional<double> start = m_NoiseStartFrequency.Draw("Start", "Hz", IsPositive)) {
+        settings.NoiseRange.StartFrequency = *start;
+    }
+    if (const std::optional<double> stop = m_NoiseStopFrequency.Draw("Stop", "Hz", IsPositive)) {
+        settings.NoiseRange.StopFrequency = *stop;
+    }
+    DrawFieldLabel("Points");
+    if (ImGui::InputInt("per decade##noise", &settings.NoiseRange.PointsPerDecade)) {
+        settings.NoiseRange.PointsPerDecade = std::max(settings.NoiseRange.PointsPerDecade, 1);
+    }
+    const auto suggested = Core::SuggestACSweepSettings(circuit);
+    if (DrawSuggestButton(suggested.has_value(), "Two decades past the RC, RL and LC corners and the op-amp bandwidths",
+                          "Needs a capacitor, an inductor or an op-amp")) {
+        settings.NoiseRange.StartFrequency = suggested->StartFrequency;
+        settings.NoiseRange.StopFrequency = suggested->StopFrequency;
+        m_NoiseStartFrequency.Load(suggested->StartFrequency);
+        m_NoiseStopFrequency.Load(suggested->StopFrequency);
+    }
+}
+
 void AnalysisControls::Finish(const Analysis analysis, std::optional<std::string> error,
                               std::vector<Core::SimulatorMessage> messages) {
     m_Statuses[ToIndex(analysis)] = {.Error = std::move(error), .Messages = std::move(messages)};
@@ -390,6 +517,8 @@ bool AnalysisControls::HasResult(const Analysis analysis) const {
         return m_Schematic.GetACSweep().has_value();
     case Analysis::DCSweep:
         return m_Schematic.GetDCSweep().has_value();
+    case Analysis::Noise:
+        return m_Schematic.GetNoise().has_value();
     }
     return false;
 }

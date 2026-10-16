@@ -62,6 +62,9 @@ std::string GetCurrentProbeName(const Component &component, std::string_view lab
 std::string GetCurrentName(const Component &component, std::string_view label);
 std::optional<std::string> FindControllingSource(const Circuit &circuit, std::string_view current);
 
+// Netlist elements
+std::vector<std::string> GetElementNames(const Component &component);
+
 } // namespace Core
 
 #endif // IMCSIM_CIRCUIT_H

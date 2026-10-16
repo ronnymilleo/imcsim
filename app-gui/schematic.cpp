@@ -612,6 +612,24 @@ const std::optional<Core::DCSweep> &Schematic::GetDCSweep() const {
 }
 
 /**
+ * @brief   Stores the result of a noise analysis of the current schematic.
+ * @param[in] noise  Noise densities, totals and contributions, or no value to clear them.
+ * @note    The result is dropped on the next change, since it no longer matches the circuit.
+ */
+void Schematic::SetNoise(std::optional<Core::Noise> noise) {
+    m_Noise = std::move(noise);
+    ++m_NoiseVersion;
+}
+
+/**
+ * @brief   Returns the last noise analysis simulated for the current schematic.
+ * @return  The noise result, or no value when there was no simulation since the last change.
+ */
+const std::optional<Core::Noise> &Schematic::GetNoise() const {
+    return m_Noise;
+}
+
+/**
  * @brief   Returns a number that changes whenever an operating point result is stored.
  * @return  The operating point version; compare it with a stored one to know whether the result was replaced.
  */
@@ -643,12 +661,21 @@ std::size_t Schematic::GetDCSweepVersion() const {
     return m_DCSweepVersion;
 }
 
+/**
+ * @brief   Returns a number that changes whenever a noise result is stored.
+ * @return  The noise version; compare it with a stored one to know whether the result was replaced.
+ */
+std::size_t Schematic::GetNoiseVersion() const {
+    return m_NoiseVersion;
+}
+
 void Schematic::InvalidateDerivedData() {
     m_Connectivity.reset();
     m_OperatingPoint.reset();
     m_Transient.reset();
     m_ACSweep.reset();
     m_DCSweep.reset();
+    m_Noise.reset();
 }
 
 // A probe is on the node most of its points belong to now, and takes the points of that node as its own. With no such

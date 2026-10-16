@@ -96,6 +96,10 @@ constexpr std::array<SDL_DialogFileFilter, 1> CSVFilters = {{{"CSV table", "csv"
 constexpr int HighestHarmonic = 10;
 constexpr float HarmonicMarkerSize = 3.0f;
 constexpr double MinShownDistortionPercent = 0.001;
+// The input-referred noise takes a color of its own, apart from the node colors the output uses
+constexpr ImU32 InputNoiseColor = IM_COL32(150, 230, 90, 255);
+// Six decades below the largest density, about where the share of a part stops mattering
+constexpr double DecadeFitFloor = 1e-6;
 // The first bins above 0 Hz, where the Hann window spreads the mean
 constexpr std::ptrdiff_t SpectrumSkirtBins = 2;
 
@@ -834,6 +838,8 @@ const char *GetTabFileSuffix(const PlotTab tab) {
         return "ac-sweep";
     case PlotTab::DCSweep:
         return "dc-sweep";
+    case PlotTab::Noise:
+        return "noise";
     }
     return "plot";
 }
@@ -850,6 +856,8 @@ const char *GetTabTitle(const PlotTab tab) {
         return "AC sweep";
     case PlotTab::DCSweep:
         return "DC sweep";
+    case PlotTab::Noise:
+        return "noise";
     }
     return "";
 }
@@ -907,6 +915,42 @@ void DrawOperatingPoint(const Core::OperatingPoint &operating_point, Schematic &
     ImGui::TextDisabled("Currents as in SPICE: positive through a two-terminal part from its first terminal to its "
                         "second, and into each terminal of a transistor");
     ImGui::PopTextWrapPos();
+}
+
+// The range a logarithmic axis fits to: the positive values of the traces, with a tenth of their decades, and at
+// least half a decade, of room above and below. Values far below the largest, such as the share of the ideal
+// op-amp, are left below the axis, so they do not squash the plot
+PlotSpan GetDecadeFitRange(const std::vector<std::span<const double>> &traces) {
+    double highest = 0.0;
+    for (const std::span<const double> trace : traces) {
+        for (const double value : trace) {
+            highest = std::max(highest, value);
+        }
+    }
+    if (highest <= 0.0) {
+        return {.From = 1e-12, .To = 1.0};
+    }
+    double lowest = highest;
+    for (const std::span<const double> trace : traces) {
+        for (const double value : trace) {
+            if (value > highest * DecadeFitFloor) {
+                lowest = std::min(lowest, value);
+            }
+        }
+    }
+    const double decades = std::log10(highest / lowest);
+    const double padding = std::max(decades * 0.1, 0.5);
+    return {.From = lowest / std::pow(10.0, padding), .To = highest * std::pow(10.0, padding)};
+}
+
+// Densities per root hertz, as noise is written: "V/√Hz" for volts
+std::string GetDensityUnit(const std::string &unit) {
+    return unit + "/√Hz";
+}
+
+std::string FormatFrequencyRange(const Core::Noise &noise) {
+    return std::format("{}Hz to {}Hz", Core::FormatValue(noise.Frequencies.front()),
+                       Core::FormatValue(noise.Frequencies.back()));
 }
 
 std::string GetExtension(const ExportFormat format) {
@@ -1175,6 +1219,15 @@ void OutputWindow::Draw() {
         }
         ImGui::EndTabItem();
     }
+    if (ImGui::BeginTabItem("Noise", nullptr, tab_flags(PlotTab::Noise))) {
+        m_ShownTab = PlotTab::Noise;
+        if (const auto &noise = m_Schematic.GetNoise()) {
+            DrawWithStatistics([&] { DrawNoise(*noise); }, [&] { DrawNoiseStatistics(*noise); });
+        } else {
+            ImGui::TextDisabled("No noise analysis for the current circuit; pick it beside Run in the editor");
+        }
+        ImGui::EndTabItem();
+    }
     ImPlot::PopStyleVar();
 
     ImGui::EndTabBar();
@@ -1205,6 +1258,9 @@ void OutputWindow::Draw() {
     case PlotTab::DCSweep:
         can_export = dc_sweep && (anything_measured || (!dc_sweep_math.empty() && !dc_sweep_math.front().empty()));
         break;
+    case PlotTab::Noise:
+        can_export = m_Schematic.GetNoise().has_value();
+        break;
     }
     if (const std::optional<ExportFormat> format = DrawExportPopup(can_export)) {
         if (m_ShownTab == PlotTab::Transient) {
@@ -1213,6 +1269,8 @@ void OutputWindow::Draw() {
             StartExport(BuildSpectrumFigure(), *format);
         } else if (m_ShownTab == PlotTab::ACSweep) {
             StartExport(BuildACSweepFigure(*sweep), *format);
+        } else if (m_ShownTab == PlotTab::Noise) {
+            StartExport(BuildNoiseFigure(*m_Schematic.GetNoise()), *format);
         } else {
             StartExport(BuildDCSweepFigure(*dc_sweep, dc_sweep_math), *format);
         }
@@ -1539,6 +1597,89 @@ void OutputWindow::DrawDCSweep(const Core::DCSweep &sweep, const std::vector<std
     DrawCursorReadout(sweep.SweptValues, sweep.SweptUnit.c_str(), false, plotted);
     const ImPlotRange view = ImPlot::GetPlotLimits().X;
     m_DCSweepView = {.From = view.Min, .To = view.Max};
+    ImPlot::EndPlot();
+}
+
+// Densities on log-log axes, as noise is read: the output in the color of its node, and the input-referred noise
+// dashed, on the same axis when the input is a voltage source and on the right one in amperes for a current source.
+// The parts checked in the panel add their share at the output
+void OutputWindow::DrawNoise(const Core::Noise &noise) {
+    // The padding of the other plots is linear, which would reach below zero on these logarithmic axes, so the fits
+    // are worked out in decades: every axis for a new result, and the output axis when the plotted shares change
+    const bool new_result = TakeFit(m_FittedNoise, m_Schematic.GetNoiseVersion());
+    const bool shares_changed =
+        TakeTracesChanged(m_PlottedNoiseContributions,
+                          std::vector<std::string>(m_ShownNoiseContributions.begin(), m_ShownNoiseContributions.end()));
+    // Referred to a voltage source, the input noise is in volts too and shares the axis of the output
+    const bool input_in_volts = noise.InputUnit == "V";
+    const ImAxis input_axis = input_in_volts ? ImAxis_Y1 : ImAxis_Y2;
+    std::vector<std::span<const double>> voltage_traces{noise.OutputDensities};
+    if (input_in_volts) {
+        voltage_traces.emplace_back(noise.InputDensities);
+    }
+    for (const Core::NoiseContribution &contribution : noise.Contributions) {
+        if (m_ShownNoiseContributions.contains(contribution.Name)) {
+            voltage_traces.emplace_back(contribution.OutputDensities);
+        }
+    }
+    if (!BeginTracePlot("##noise", ImVec2(-1.0f, PlotHeight(1)))) {
+        return;
+    }
+    const std::string output_unit = GetDensityUnit("V");
+    const std::string input_unit = GetDensityUnit(noise.InputUnit);
+    ImPlot::SetupAxes("Frequency", "Noise density", ImPlotAxisFlags_None, ImPlotAxisFlags_None);
+    ImPlot::SetupAxisScale(ImAxis_X1, ImPlotScale_Log10);
+    ImPlot::SetupAxisFormat(ImAxis_X1, FormatAxisValue, const_cast<char *>("Hz"));
+    ImPlot::SetupAxisScale(ImAxis_Y1, ImPlotScale_Log10);
+    ImPlot::SetupAxisFormat(ImAxis_Y1, FormatAxisValue, const_cast<char *>(output_unit.c_str()));
+    if (!input_in_volts) {
+        ImPlot::SetupAxis(ImAxis_Y2, "Input-referred noise", ImPlotAxisFlags_AuxDefault);
+        ImPlot::SetupAxisScale(ImAxis_Y2, ImPlotScale_Log10);
+        ImPlot::SetupAxisFormat(ImAxis_Y2, FormatAxisValue, const_cast<char *>(input_unit.c_str()));
+    }
+    // Set during the setup, since ImPlot fits an axis on its own the first frame it is shown
+    if (new_result) {
+        ImPlot::SetupAxisLimits(ImAxis_X1, noise.Frequencies.front(), noise.Frequencies.back(), ImPlotCond_Always);
+        if (!input_in_volts) {
+            const PlotSpan input_range = GetDecadeFitRange({noise.InputDensities});
+            ImPlot::SetupAxisLimits(ImAxis_Y2, input_range.From, input_range.To, ImPlotCond_Always);
+        }
+    }
+    if (new_result || shares_changed) {
+        const PlotSpan voltage_range = GetDecadeFitRange(voltage_traces);
+        ImPlot::SetupAxisLimits(ImAxis_Y1, voltage_range.From, voltage_range.To, ImPlotCond_Always);
+    }
+
+    std::vector<PlottedTrace> plotted;
+    const std::string output_label = GetVoltageLabel(m_Schematic.GetConnectivity(), noise.OutputNode);
+    const ImU32 output_color = GetNodeColor(noise.OutputNode);
+    ImPlotSpec output_spec;
+    output_spec.LineColor = ImGui::ColorConvertU32ToFloat4(output_color);
+    output_spec.LineWeight = MathLineWeight;
+    ImPlot::PlotLine(output_label.c_str(), noise.Frequencies.data(), noise.OutputDensities.data(),
+                     static_cast<int>(noise.Frequencies.size()), output_spec);
+    plotted.push_back({output_label, &noise.OutputDensities, output_unit.c_str(), output_color});
+    for (std::size_t index = 0; index < noise.Contributions.size(); ++index) {
+        const Core::NoiseContribution &contribution = noise.Contributions[index];
+        if (!m_ShownNoiseContributions.contains(contribution.Name)) {
+            continue;
+        }
+        ImPlotSpec spec;
+        spec.LineColor = ImGui::ColorConvertU32ToFloat4(GetCurrentColor(index));
+        ImPlot::PlotLine(contribution.Name.c_str(), noise.Frequencies.data(), contribution.OutputDensities.data(),
+                         static_cast<int>(noise.Frequencies.size()), spec);
+        plotted.push_back(
+            {contribution.Name, &contribution.OutputDensities, output_unit.c_str(), GetCurrentColor(index)});
+    }
+    const std::string input_label = std::format("Input-referred ({})", noise.InputSource);
+    const ImU32 input_color = AdaptToBackground(InputNoiseColor);
+    ImPlot::SetAxes(ImAxis_X1, input_axis);
+    PlotDashedLine(input_label, noise.Frequencies, noise.InputDensities, input_color);
+    ImPlot::SetAxes(ImAxis_X1, ImAxis_Y1);
+    plotted.push_back({input_label, &noise.InputDensities, input_unit.c_str(), input_color});
+    DrawCursorReadout(noise.Frequencies, "Hz", true, plotted);
+    const ImPlotRange view = ImPlot::GetPlotLimits().X;
+    m_NoiseView = {.From = view.Min, .To = view.Max};
     ImPlot::EndPlot();
 }
 
@@ -1901,6 +2042,64 @@ void OutputWindow::DrawACSweepStatistics(const Core::ACSweep &sweep) {
     }
 }
 
+// The RMS noise over the whole range, at the output and at the input, then the share of every part in the output
+// noise, largest first; checking a part plots its share
+void OutputWindow::DrawNoiseStatistics(const Core::Noise &noise) {
+    ImGui::PushTextWrapPos(0.0f);
+    ImGui::TextDisabled("%s", std::format("RMS from {}", FormatFrequencyRange(noise)).c_str());
+    ImGui::PopTextWrapPos();
+    if (BeginStatisticsTable("noise_totals")) {
+        const std::string output_name =
+            std::format("Output {}", GetVoltageLabel(m_Schematic.GetConnectivity(), noise.OutputNode));
+        DrawStatistic(output_name.c_str(), FormatQuantity(noise.OutputTotal, "V"));
+        const std::string input_name = std::format("Input {}", noise.InputSource);
+        DrawStatistic(input_name.c_str(), FormatQuantity(noise.InputTotal, noise.InputUnit.c_str()));
+        ImGui::SetItemTooltip("The noise a source at the input would need to cause the same noise at the output");
+        ImGui::EndTable();
+    }
+    ImGui::Separator();
+    ImGui::TextDisabled("Share of each part at the output");
+    if (noise.Contributions.empty()) {
+        ImGui::TextDisabled("No part adds noise");
+        return;
+    }
+    const std::optional<bool> show_all = DrawAllNoneButtons("contributions");
+    if (!ImGui::BeginTable("noise_contributions", 3, ImGuiTableFlags_SizingStretchProp)) {
+        return;
+    }
+    const double output_power = noise.OutputTotal * noise.OutputTotal;
+    for (std::size_t index = 0; index < noise.Contributions.size(); ++index) {
+        const Core::NoiseContribution &contribution = noise.Contributions[index];
+        if (show_all) {
+            if (*show_all) {
+                m_ShownNoiseContributions.insert(contribution.Name);
+            } else {
+                m_ShownNoiseContributions.erase(contribution.Name);
+            }
+        }
+        ImGui::TableNextRow();
+        ImGui::TableNextColumn();
+        bool shown = m_ShownNoiseContributions.contains(contribution.Name);
+        ImGui::PushStyleColor(ImGuiCol_CheckMark, GetCurrentColor(index));
+        if (ImGui::Checkbox(contribution.Name.c_str(), &shown)) {
+            if (shown) {
+                m_ShownNoiseContributions.insert(contribution.Name);
+            } else {
+                m_ShownNoiseContributions.erase(contribution.Name);
+            }
+        }
+        ImGui::PopStyleColor();
+        ImGui::TableNextColumn();
+        ImGui::TextUnformatted(FormatQuantity(contribution.OutputTotal, "V").c_str());
+        ImGui::TableNextColumn();
+        // Powers add up, so the shares of all parts make the whole
+        const double share =
+            output_power > 0.0 ? contribution.OutputTotal * contribution.OutputTotal / output_power : 0.0;
+        ImGui::TextUnformatted(FormatFixed(share * 100.0, "%").c_str());
+    }
+    ImGui::EndTable();
+}
+
 // Each channel shows its check box, an Edit button and, when its expression does not compile, a warning mark;
 // a new channel opens its editor right away
 void OutputWindow::DrawMathChannels(const std::vector<std::string> &operands) {
@@ -2168,6 +2367,46 @@ ExportFigure OutputWindow::BuildDCSweepFigure(const Core::DCSweep &sweep,
         }
     }
     figure.Panels.push_back(builder.Take());
+    return figure;
+}
+
+// The densities on logarithmic axes, as plotted, with the shares of the parts checked in the panel
+ExportFigure OutputWindow::BuildNoiseFigure(const Core::Noise &noise) const {
+    ExportFigure figure;
+    figure.XAxis = {.Name = "Frequency", .Unit = "Hz"};
+    figure.XLogarithmic = true;
+    figure.Xs = noise.Frequencies;
+    figure.XRange = ExportRange{.From = m_NoiseView.From, .To = m_NoiseView.To};
+    ExportPanel panel;
+    panel.YAxes = {{.Name = "Noise density", .Unit = GetDensityUnit("V"), .Logarithmic = true}};
+    const bool input_in_volts = noise.InputUnit == "V";
+    if (!input_in_volts) {
+        panel.YAxes.push_back(
+            {.Name = "Input-referred noise", .Unit = GetDensityUnit(noise.InputUnit), .Logarithmic = true});
+    }
+    const std::string output_label = GetVoltageLabel(m_Schematic.GetConnectivity(), noise.OutputNode);
+    panel.Series.push_back({.Name = output_label,
+                            .LegendLabel = output_label,
+                            .Values = noise.OutputDensities,
+                            .Color = ToExportColor(GetNodeColor(noise.OutputNode)),
+                            .Heavy = true});
+    for (std::size_t index = 0; index < noise.Contributions.size(); ++index) {
+        const Core::NoiseContribution &contribution = noise.Contributions[index];
+        if (m_ShownNoiseContributions.contains(contribution.Name)) {
+            panel.Series.push_back({.Name = contribution.Name,
+                                    .LegendLabel = contribution.Name,
+                                    .Values = contribution.OutputDensities,
+                                    .Color = ToExportColor(GetCurrentColor(index))});
+        }
+    }
+    const std::string input_label = std::format("Input-referred ({})", noise.InputSource);
+    panel.Series.push_back({.Name = input_label,
+                            .LegendLabel = input_label,
+                            .Values = noise.InputDensities,
+                            .Axis = input_in_volts ? 0U : 1U,
+                            .Color = ToExportColor(AdaptToBackground(InputNoiseColor)),
+                            .Dashed = true});
+    figure.Panels.push_back(std::move(panel));
     return figure;
 }
 

@@ -77,15 +77,18 @@ private:
     // Start, stop and step of each DC sweep range
     std::array<ValueField, 3> m_SweptFields;
     std::array<ValueField, 3> m_SteppedFields;
+    ValueField m_NoiseStartFrequency;
+    ValueField m_NoiseStopFrequency;
 
     // Last run of each analysis, in the order of the Analysis enum
-    std::array<RunStatus, 4> m_Statuses;
+    std::array<RunStatus, 5> m_Statuses;
     std::optional<Analysis> m_LastRun;
 
     void LoadSettingsFields();
     void DrawTransientSettings(SimulationSettings &settings);
     void DrawACSweepSettings(SimulationSettings &settings);
     void DrawDCSweepSettings(SimulationSettings &settings);
+    void DrawNoiseSettings(SimulationSettings &settings);
     void Finish(Analysis analysis, std::optional<std::string> error, std::vector<Core::SimulatorMessage> messages);
     std::vector<std::string> GetResultWarnings(Analysis analysis) const;
     bool HasResult(Analysis analysis) const;
