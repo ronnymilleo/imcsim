@@ -6,12 +6,16 @@
 #include "test_printers.h"
 #include "ui_elements/ui_bjt.h"
 #include "ui_elements/ui_controlled_source.h"
+#include "ui_elements/ui_controlled_switch.h"
 #include "ui_elements/ui_diode.h"
 #include "ui_elements/ui_ground.h"
 #include "ui_elements/ui_mosfet.h"
 #include "ui_elements/ui_net_label.h"
 #include "ui_elements/ui_op_amp.h"
+#include "ui_elements/ui_potentiometer.h"
 #include "ui_elements/ui_resistor.h"
+#include "ui_elements/ui_switch.h"
+#include "ui_elements/ui_transformer.h"
 #include "ui_elements/ui_vcc.h"
 #include <catch2/catch_test_macros.hpp>
 #include <cstdlib>
@@ -169,6 +173,57 @@ TEST_CASE("Controlled sources have their output vertical and their control pins 
     CHECK(cccs.GetTerminals() == std::vector<GUI::GridPoint>{{0, -2}, {0, 2}});
     CHECK(cccs.Contains({0.0f, 0.0f}));
     CHECK_FALSE(cccs.Contains({-1.5f, 0.0f}));
+}
+
+TEST_CASE("A potentiometer has its two ends on the sides and its wiper above, turning with it", "[ui_element]") {
+    GUI::UIPotentiometer pot({5, 5}, GUI::Rotation::R0);
+    CHECK(pot.GetComponent().GetType() == Core::ComponentType::Potentiometer);
+    CHECK(pot.GetTerminals() == std::vector<GUI::GridPoint>{{3, 5}, {7, 5}, {5, 3}});
+    CHECK(pot.GetTerminalInward(0) == GUI::GridPoint{1, 0});
+    CHECK(pot.GetTerminalInward(2) == GUI::GridPoint{0, 1});
+    // The wiper lead is part of what is picked, and the space below the body is not
+    CHECK(pot.Contains({5.0f, 3.5f}));
+    CHECK_FALSE(pot.Contains({5.0f, 7.0f}));
+    pot.SetRotation(GUI::Rotation::R90);
+    CHECK(pot.GetTerminals() == std::vector<GUI::GridPoint>{{5, 3}, {5, 7}, {7, 5}});
+}
+
+TEST_CASE("A switch has two terminals like a resistor, and a push button is picked up to its button", "[ui_element]") {
+    GUI::UISwitch toggle(Core::ComponentType::Switch, {5, 5}, GUI::Rotation::R0);
+    CHECK(toggle.GetComponent().GetType() == Core::ComponentType::Switch);
+    CHECK(toggle.GetTerminals() == std::vector<GUI::GridPoint>{{3, 5}, {7, 5}});
+    CHECK(toggle.Contains({5.0f, 4.3f}));
+    CHECK_FALSE(toggle.Contains({5.0f, 3.5f}));
+
+    const GUI::UISwitch button(Core::ComponentType::PushButton, {5, 5}, GUI::Rotation::R0);
+    CHECK(button.GetComponent().GetType() == Core::ComponentType::PushButton);
+    CHECK(button.GetTerminals() == std::vector<GUI::GridPoint>{{3, 5}, {7, 5}});
+    CHECK(button.Contains({5.0f, 3.8f}));
+    CHECK_FALSE(button.Contains({5.0f, 3.0f}));
+}
+
+TEST_CASE("A voltage-controlled switch and a relay have the contact vertical and the control on the left",
+          "[ui_element]") {
+    for (const Core::ComponentType type : {Core::ComponentType::VSwitch, Core::ComponentType::Relay}) {
+        const GUI::UIControlledSwitch part(type, {0, 0}, GUI::Rotation::R0);
+        CHECK(part.GetComponent().GetType() == type);
+        CHECK(part.GetTerminals() == std::vector<GUI::GridPoint>{{0, -2}, {0, 2}, {-2, -1}, {-2, 1}});
+        CHECK(part.GetTerminalInward(0) == GUI::GridPoint{0, 1});
+        CHECK(part.GetTerminalInward(2) == GUI::GridPoint{1, 0});
+        CHECK(part.Contains({-1.0f, 0.0f}));
+        CHECK_FALSE(part.Contains({1.5f, 0.0f}));
+    }
+}
+
+TEST_CASE("A transformer has the primary on the left and the secondary on the right", "[ui_element]") {
+    GUI::UITransformer transformer({5, 5}, GUI::Rotation::R0);
+    CHECK(transformer.GetComponent().GetType() == Core::ComponentType::Transformer);
+    CHECK(transformer.GetTerminals() == std::vector<GUI::GridPoint>{{3, 4}, {3, 6}, {7, 4}, {7, 6}});
+    CHECK(transformer.GetTerminalInward(0) == GUI::GridPoint{1, 0});
+    CHECK(transformer.GetTerminalInward(2) == GUI::GridPoint{-1, 0});
+    // Mirroring swaps the sides, and the dots stay with their windings
+    transformer.SetMirrored(true);
+    CHECK(transformer.GetTerminals() == std::vector<GUI::GridPoint>{{7, 4}, {7, 6}, {3, 4}, {3, 6}});
 }
 
 TEST_CASE("Op-amps list the output, the inputs and the supply pins", "[ui_element]") {

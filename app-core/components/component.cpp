@@ -17,11 +17,13 @@ namespace Core {
 namespace {
 
 constexpr auto AllTypes = std::to_array<ComponentType>({
-    ComponentType::Resistor,   ComponentType::Capacitor,     ComponentType::Inductor,      ComponentType::Ground,
-    ComponentType::VCC,        ComponentType::VoltageSource, ComponentType::CurrentSource, ComponentType::Diode,
-    ComponentType::ZenerDiode, ComponentType::LED,           ComponentType::NPN,           ComponentType::PNP,
-    ComponentType::NMOS,       ComponentType::PMOS,          ComponentType::VCVS,          ComponentType::VCCS,
-    ComponentType::CCCS,       ComponentType::CCVS,          ComponentType::OpAmp,         ComponentType::NetLabel,
+    ComponentType::Resistor,      ComponentType::Capacitor,     ComponentType::Inductor,      ComponentType::Ground,
+    ComponentType::VCC,           ComponentType::VoltageSource, ComponentType::CurrentSource, ComponentType::Diode,
+    ComponentType::ZenerDiode,    ComponentType::LED,           ComponentType::NPN,           ComponentType::PNP,
+    ComponentType::NMOS,          ComponentType::PMOS,          ComponentType::VCVS,          ComponentType::VCCS,
+    ComponentType::CCCS,          ComponentType::CCVS,          ComponentType::OpAmp,         ComponentType::NetLabel,
+    ComponentType::Potentiometer, ComponentType::Switch,        ComponentType::PushButton,    ComponentType::VSwitch,
+    ComponentType::Relay,         ComponentType::Transformer,
 });
 
 } // namespace
@@ -90,6 +92,18 @@ const char *Component::GetNamePrefix() const {
         return "H";
     case ComponentType::OpAmp:
         return "U";
+    case ComponentType::Potentiometer:
+        return "RV";
+    case ComponentType::Switch:
+        return "SW";
+    case ComponentType::PushButton:
+        return "PB";
+    case ComponentType::VSwitch:
+        return "S";
+    case ComponentType::Relay:
+        return "K";
+    case ComponentType::Transformer:
+        return "T";
     case ComponentType::Ground:
     case ComponentType::NetLabel:
         return "";
@@ -105,10 +119,12 @@ const char *Component::GetNamePrefix() const {
 const char *Component::GetUnit() const {
     switch (m_Type) {
     case ComponentType::Resistor:
+    case ComponentType::Potentiometer:
         return "Ohm";
     case ComponentType::Capacitor:
         return "F";
     case ComponentType::Inductor:
+    case ComponentType::Transformer:
         return "H";
     case ComponentType::VCC:
     case ComponentType::VoltageSource:
@@ -126,6 +142,10 @@ const char *Component::GetUnit() const {
     case ComponentType::OpAmp:
     case ComponentType::Ground:
     case ComponentType::NetLabel:
+    case ComponentType::Switch:
+    case ComponentType::PushButton:
+    case ComponentType::VSwitch:
+    case ComponentType::Relay:
     case ComponentType::Diode:
     case ComponentType::ZenerDiode:
     case ComponentType::LED:
@@ -147,6 +167,10 @@ bool Component::HasValue() const {
     switch (m_Type) {
     case ComponentType::Ground:
     case ComponentType::NetLabel:
+    case ComponentType::Switch:
+    case ComponentType::PushButton:
+    case ComponentType::VSwitch:
+    case ComponentType::Relay:
     case ComponentType::Diode:
     case ComponentType::ZenerDiode:
     case ComponentType::LED:
@@ -159,6 +183,8 @@ bool Component::HasValue() const {
     case ComponentType::Resistor:
     case ComponentType::Capacitor:
     case ComponentType::Inductor:
+    case ComponentType::Potentiometer:
+    case ComponentType::Transformer:
     case ComponentType::VCC:
     case ComponentType::VoltageSource:
     case ComponentType::CurrentSource:
@@ -182,6 +208,8 @@ bool Component::IsValidValue(const double value) const {
     case ComponentType::Resistor:
     case ComponentType::Capacitor:
     case ComponentType::Inductor:
+    case ComponentType::Potentiometer:
+    case ComponentType::Transformer:
         return value > 0.0;
     case ComponentType::VCC:
     case ComponentType::VoltageSource:
@@ -193,6 +221,10 @@ bool Component::IsValidValue(const double value) const {
         return true;
     case ComponentType::Ground:
     case ComponentType::NetLabel:
+    case ComponentType::Switch:
+    case ComponentType::PushButton:
+    case ComponentType::VSwitch:
+    case ComponentType::Relay:
     case ComponentType::Diode:
     case ComponentType::ZenerDiode:
     case ComponentType::LED:
@@ -285,6 +317,18 @@ const char *GetTypeName(const ComponentType type) {
         return "OpAmp";
     case ComponentType::NetLabel:
         return "NetLabel";
+    case ComponentType::Potentiometer:
+        return "Potentiometer";
+    case ComponentType::Switch:
+        return "Switch";
+    case ComponentType::PushButton:
+        return "PushButton";
+    case ComponentType::VSwitch:
+        return "VSwitch";
+    case ComponentType::Relay:
+        return "Relay";
+    case ComponentType::Transformer:
+        return "Transformer";
     }
     return "Unknown";
 }

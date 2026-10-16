@@ -118,3 +118,20 @@ TEST_CASE("Control pins and the op-amp pins other than the output carry no curre
         CHECK(GUI::GetTerminalCurrent(op_amp->GetComponent(), terminal, currents) == 0.0);
     }
 }
+
+TEST_CASE("A relay and a transformer have a current per pair of terminals, opposite at the two ends",
+          "[current_flow]") {
+    const std::vector<Core::ComponentCurrent> currents = {
+        {"K1.S", 2e-3}, {"K1.C", 7e-2}, {"T1.P", 0.5}, {"T1.S", -0.25}};
+    const auto relay = Part(Core::ComponentType::Relay, {0, 0}, "K1");
+    // Contact terminals 0 and 1, coil terminals 2 and 3
+    CHECK(GUI::GetTerminalCurrent(relay->GetComponent(), 0, currents) == 2e-3);
+    CHECK(GUI::GetTerminalCurrent(relay->GetComponent(), 1, currents) == -2e-3);
+    CHECK(GUI::GetTerminalCurrent(relay->GetComponent(), 2, currents) == 7e-2);
+    CHECK(GUI::GetTerminalCurrent(relay->GetComponent(), 3, currents) == -7e-2);
+    const auto transformer = Part(Core::ComponentType::Transformer, {0, 0}, "T1");
+    CHECK(GUI::GetTerminalCurrent(transformer->GetComponent(), 0, currents) == 0.5);
+    CHECK(GUI::GetTerminalCurrent(transformer->GetComponent(), 1, currents) == -0.5);
+    CHECK(GUI::GetTerminalCurrent(transformer->GetComponent(), 2, currents) == -0.25);
+    CHECK(GUI::GetTerminalCurrent(transformer->GetComponent(), 3, currents) == 0.25);
+}

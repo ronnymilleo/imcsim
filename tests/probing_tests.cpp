@@ -91,3 +91,31 @@ TEST_CASE("A node a net label named is measured and labeled by that name", "[pro
     // The other nodes keep their numbers
     CHECK(GUI::GetVoltageLabel(connectivity, *target->Node + 1) == std::format("V({})", *target->Node + 1));
 }
+
+TEST_CASE("Probing a relay or a transformer picks the current of the winding nearest the point", "[probing]") {
+    std::vector<std::unique_ptr<GUI::UIElement>> elements;
+    elements.push_back(GUI::CreateElement(Core::ComponentType::Relay, {0, 0}, GUI::Rotation::R0));
+    elements.back()->GetComponent().SetName("K1");
+    elements.push_back(GUI::CreateElement(Core::ComponentType::Transformer, {20, 0}, GUI::Rotation::R0));
+    elements.back()->GetComponent().SetName("T1");
+    const std::vector<GUI::UIWire> wires;
+    const GUI::Connectivity connectivity(elements, wires);
+    const auto at = [&](const ImVec2 position) {
+        return GUI::FindMeasurementTarget(elements, wires, connectivity, position, 0.25f);
+    };
+
+    // The contact terminals are at the top and bottom, and the coil pins on the left
+    const auto contact = at({0.0f, -1.5f});
+    REQUIRE(contact);
+    CHECK(contact->Current == "K1.S");
+    const auto coil = at({-1.5f, -1.0f});
+    REQUIRE(coil);
+    CHECK(coil->Current == "K1.C");
+    // The primary is on the left of a transformer and the secondary on the right
+    const auto primary = at({18.5f, 0.0f});
+    REQUIRE(primary);
+    CHECK(primary->Current == "T1.P");
+    const auto secondary = at({21.5f, 0.0f});
+    REQUIRE(secondary);
+    CHECK(secondary->Current == "T1.S");
+}

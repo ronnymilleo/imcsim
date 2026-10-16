@@ -13,9 +13,15 @@
 #include "components/inductor.h"
 #include "components/mosfet.h"
 #include "components/op_amp.h"
+#include "components/potentiometer.h"
+#include "components/relay.h"
 #include "components/resistor.h"
+#include "components/switch.h"
+#include "components/transformer.h"
 #include "components/vcc.h"
+#include "components/voltage_controlled_switch.h"
 #include "components/voltage_source.h"
+#include "simulator.h"
 #include <catch2/catch_test_macros.hpp>
 #include <string>
 
@@ -358,4 +364,178 @@ TEST_CASE("ToSpiceNetlist writes a macromodel op-amp as an instance of its subci
     CHECK(netlist.find(".subckt imcsim_uA741 6 3 2 7 4\n") == netlist.rfind(".subckt imcsim_uA741"));
     CHECK(netlist.contains(".subckt imcsim_opamp_U3 6 3 2 7 4\n"));
     CHECK(netlist.contains(".ends imcsim_uA741\n"));
+}
+
+TEST_CASE("ToSpiceNetlist writes a potentiometer as two resistors that meet at the wiper", "[circuit]") {
+    Core::Potentiometer pot;
+    pot.SetName("RV1");
+    pot.SetValue(10e3);
+    pot.SetWiper(0.25);
+    Core::Circuit circuit;
+    // End 1 on node 1, end 2 on node 2 and the wiper on node 3
+    circuit.Add(pot, {1, 2, 3});
+
+    const std::string netlist = circuit.ToSpiceNetlist();
+    CHECK(netlist.find("R-RV1a 1 3 2.5k\n") != std::string::npos);
+    CHECK(netlist.find("R-RV1b 3 2 7.5k\n") != std::string::npos);
+}
+
+TEST_CASE("A wiper at an end keeps a tiny resistor there, since SPICE rejects 0 Ohm", "[circuit]") {
+    Core::Potentiometer pot;
+    pot.SetName("RV1");
+    Core::Circuit circuit;
+    circuit.Add(pot, {1, 2, 3});
+
+    pot.SetWiper(0.0);
+    CHECK(circuit.ToSpiceNetlist().find("R-RV1a 1 3 1m\n") != std::string::npos);
+    pot.SetWiper(1.0);
+    CHECK(circuit.ToSpiceNetlist().find("R-RV1b 3 2 1m\n") != std::string::npos);
+}
+
+TEST_CASE("A potentiometer probes its three terminals, and the probes carry its currents", "[circuit]") {
+    Core::Potentiometer pot;
+    pot.SetName("RV1");
+    const std::vector<Core::CurrentProbe> probes = Core::GetCurrentProbes(pot);
+    REQUIRE(probes.size() == 3);
+    CHECK(probes[0].Terminal == 0);
+    CHECK(std::string(probes[0].Label) == "A");
+    CHECK(probes[1].Terminal == 1);
+    CHECK(std::string(probes[1].Label) == "B");
+    CHECK(probes[2].Terminal == 2);
+    CHECK(std::string(probes[2].Label) == "W");
+    CHECK(Core::GetCurrentName(pot, "W") == "RV1.W");
+
+    Core::Circuit circuit;
+    circuit.Add(pot, {1, 2, 3});
+    const std::string netlist = circuit.ToSpiceNetlist("", true);
+    CHECK(netlist.find("Vprobe-RV1-A 1 4 DC 0\n") != std::string::npos);
+    CHECK(netlist.find("Vprobe-RV1-W 3 6 DC 0\n") != std::string::npos);
+}
+
+TEST_CASE("ToSpiceNetlist writes a switch as a resistor that is nearly a wire closed and nearly nothing open",
+          "[circuit]") {
+    Core::Switch toggle(Core::ComponentType::Switch);
+    toggle.SetName("SW1");
+    Core::Switch button(Core::ComponentType::PushButton);
+    button.SetName("PB1");
+    Core::Circuit circuit;
+    circuit.Add(toggle, {1, 2});
+    circuit.Add(button, {2, 3});
+
+    std::string netlist = circuit.ToSpiceNetlist();
+    CHECK(netlist.find("R-SW1 1 2 1T\n") != std::string::npos);
+    CHECK(netlist.find("R-PB1 2 3 1T\n") != std::string::npos);
+    toggle.SetClosed(true);
+    button.SetClosed(true);
+    netlist = circuit.ToSpiceNetlist();
+    CHECK(netlist.find("R-SW1 1 2 1m\n") != std::string::npos);
+    CHECK(netlist.find("R-PB1 2 3 1m\n") != std::string::npos);
+}
+
+TEST_CASE("A switch has one current probe, on its first terminal, named after the part", "[circuit]") {
+    Core::Switch toggle(Core::ComponentType::Switch);
+    toggle.SetName("SW1");
+    const std::vector<Core::CurrentProbe> probes = Core::GetCurrentProbes(toggle);
+    REQUIRE(probes.size() == 1);
+    CHECK(probes[0].Terminal == 0);
+    CHECK(Core::GetCurrentName(toggle, probes[0].Label) == "SW1");
+
+    Core::Circuit circuit;
+    circuit.Add(toggle, {1, 2});
+    const std::string netlist = circuit.ToSpiceNetlist("", true);
+    CHECK(netlist.find("Vprobe-SW1 1 3 DC 0\n") != std::string::npos);
+    CHECK(netlist.find("R-SW1 3 2 1T\n") != std::string::npos);
+}
+
+TEST_CASE("ToSpiceNetlist writes a voltage-controlled switch with a model of its own", "[circuit]") {
+    Core::VoltageControlledSwitch controlled;
+    controlled.SetName("S1");
+    controlled.SetParameters({.Threshold = 1.5, .Hysteresis = 0.25, .OnResistance = 0.5, .OffResistance = 1e6});
+    Core::Circuit circuit;
+    // Switch between nodes 1 and 2, controlled by node 3 against node 0
+    circuit.Add(controlled, {1, 2, 3, 0});
+
+    const std::string netlist = circuit.ToSpiceNetlist();
+    CHECK(netlist.find("S1 1 2 3 0 SW-S1\n") != std::string::npos);
+    CHECK(netlist.find(".model SW-S1 SW(VT=1.5 VH=0.25 RON=0.5 ROFF=1e+06)\n") != std::string::npos);
+}
+
+TEST_CASE("ToSpiceNetlist writes a relay as a coil of a resistor and an inductor and a switch on the resistor",
+          "[circuit]") {
+    Core::Relay relay;
+    relay.SetName("K1");
+    Core::Circuit circuit;
+    // Contact between nodes 1 and 2, coil from node 3 to ground
+    circuit.Add(relay, {1, 2, 3, 0});
+
+    const std::string netlist = circuit.ToSpiceNetlist();
+    // The middle of the coil is the first node past the circuit ones, which are 0 to 3
+    CHECK(netlist.find("R-K1coil 3 4 70\n") != std::string::npos);
+    CHECK(netlist.find("L-K1coil 4 0 50m\n") != std::string::npos);
+    CHECK(netlist.find("S-K1 1 2 3 4 SW-K1\n") != std::string::npos);
+    // Closes at 3.5 V and opens at 1 V: threshold 2.25 V with 1.25 V of hysteresis
+    CHECK(netlist.find(".model SW-K1 SW(VT=2.25 VH=1.25 RON=0.05 ROFF=1e+09)\n") != std::string::npos);
+}
+
+TEST_CASE("Probes of the switches and the relay", "[circuit]") {
+    Core::VoltageControlledSwitch controlled;
+    controlled.SetName("S1");
+    const std::vector<Core::CurrentProbe> switch_probes = Core::GetCurrentProbes(controlled);
+    REQUIRE(switch_probes.size() == 1);
+    CHECK(switch_probes[0].Terminal == 0);
+
+    Core::Relay relay;
+    relay.SetName("K1");
+    const std::vector<Core::CurrentProbe> relay_probes = Core::GetCurrentProbes(relay);
+    REQUIRE(relay_probes.size() == 2);
+    CHECK(relay_probes[0].Terminal == 0);
+    CHECK(Core::GetCurrentName(relay, relay_probes[0].Label) == "K1.S");
+    CHECK(relay_probes[1].Terminal == 2);
+    CHECK(Core::GetCurrentName(relay, relay_probes[1].Label) == "K1.C");
+}
+
+TEST_CASE("ToSpiceNetlist writes a transformer as two inductors behind their winding resistances, coupled",
+          "[circuit]") {
+    Core::Transformer transformer;
+    transformer.SetName("T1");
+    transformer.SetValue(100e-3);
+    transformer.SetParameters({.TurnsRatio = 2.0, .Coupling = 0.98, .WindingResistance = 0.5});
+    Core::Circuit circuit;
+    // Primary on nodes 1 and 0, secondary on nodes 2 and 0
+    circuit.Add(transformer, {1, 0, 2, 0});
+
+    const std::string netlist = circuit.ToSpiceNetlist();
+    // The middles of the windings are the first nodes past the circuit ones, which are 0 to 2
+    CHECK(netlist.find("R-T1p 1 3 500m\n") != std::string::npos);
+    CHECK(netlist.find("L-T1p 3 0 100m\n") != std::string::npos);
+    CHECK(netlist.find("R-T1s 2 4 500m\n") != std::string::npos);
+    CHECK(netlist.find("L-T1s 4 0 25m\n") != std::string::npos);
+    CHECK(netlist.find("K-T1 L-T1p L-T1s 980m\n") != std::string::npos);
+}
+
+TEST_CASE("A transformer probes the + terminal of each winding", "[circuit]") {
+    Core::Transformer transformer;
+    transformer.SetName("T1");
+    const std::vector<Core::CurrentProbe> probes = Core::GetCurrentProbes(transformer);
+    REQUIRE(probes.size() == 2);
+    CHECK(probes[0].Terminal == 0);
+    CHECK(Core::GetCurrentName(transformer, probes[0].Label) == "T1.P");
+    CHECK(probes[1].Terminal == 2);
+    CHECK(Core::GetCurrentName(transformer, probes[1].Label) == "T1.S");
+}
+
+TEST_CASE("Each current of a part belongs to the terminal it flows into", "[circuit]") {
+    Core::Resistor named;
+    named.SetName("R1");
+    CHECK(Core::GetCurrentTerminals(named) == std::vector<std::size_t>{0});
+    Core::BJT transistor(Core::ComponentType::NPN);
+    transistor.SetName("Q1");
+    CHECK(Core::GetCurrentTerminals(transistor) == std::vector<std::size_t>{0, 1, 2});
+    Core::Relay relay;
+    relay.SetName("K1");
+    // The contact current enters terminal 1, and the coil current terminal 3
+    CHECK(Core::GetCurrentTerminals(relay) == std::vector<std::size_t>{0, 2});
+    Core::Transformer transformer;
+    transformer.SetName("T1");
+    CHECK(Core::GetCurrentTerminals(transformer) == std::vector<std::size_t>{0, 2});
 }

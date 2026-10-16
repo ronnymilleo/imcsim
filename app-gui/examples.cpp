@@ -32,6 +32,25 @@ constexpr auto Examples = std::to_array<Example>({
         .FileName = "rc_low_pass_filter.imcsim",
     },
     {
+        .Title = "LED dimmer with a potentiometer",
+        .Group = "Basics",
+        .Description =
+            "A 10k potentiometer wired as a rheostat, its wiper tied to its second end, in series with a 220 Ohm "
+            "resistor and a red LED on 5 V. Select RV1 and move its wiper in the properties, then run the "
+            "operating point: with the wiper at 30% the rheostat is 3k and the LED gets about 1 mA, and "
+            "toward 0% the current grows to about 14 mA.",
+        .FileName = "potentiometer_led_dimmer.imcsim",
+    },
+    {
+        .Title = "Switches as AND and OR",
+        .Group = "Basics",
+        .Description =
+            "Two switches in series light the red LED only when both are closed, and two in parallel light the "
+            "green one when either is. Select a switch, tick Closed in its properties, and run the operating "
+            "point to see the LED currents: 9 to 10 mA when lit and almost nothing when not.",
+        .FileName = "switches_and_or.imcsim",
+    },
+    {
         .Title = "Series RLC resonance",
         .Group = "Basics",
         .Description =
@@ -187,8 +206,39 @@ constexpr auto Examples = std::to_array<Example>({
         .FileName = "sallen_key_low_pass.imcsim",
     },
     {
+        .Title = "Buck converter",
+        .Group = "Switching",
+        .Description =
+            "A voltage-controlled switch, driven by a 10 kHz pulse at 50% duty, chops a 12 V supply. A 1N5819 "
+            "keeps the inductor current flowing while the switch is open, and L1 (1 mH) with C1 (100u) "
+            "average it into about 5.8 V on a 10 Ohm load. Run the transient: the output overshoots to "
+            "about 9 V, rings at the LC resonance near 500 Hz and settles with a ripple of 0.2 V.",
+        .FileName = "buck_converter.imcsim",
+    },
+    {
+        .Title = "Relay driver",
+        .Group = "Switching",
+        .Description =
+            "A 2N2222A switches the coil of a 5 V relay (70 Ohm, 50 mH) from a 5 V, 50 Hz pulse, and the contact "
+            "switches 12 V into a 100 Ohm load. Run the transient: the contact closes about 0.9 ms after "
+            "the base goes high, the time the coil current takes to build up, and opens about 0.85 ms "
+            "after it falls, while the 1N4007 across the coil carries the current that is left and holds "
+            "the collector a diode drop above 5 V.",
+        .FileName = "relay_driver.imcsim",
+    },
+    {
+        .Title = "Transformer power supply",
+        .Group = "Transformers",
+        .Description = "A 2:1 transformer (100 mH primary, 0.999 coupling, 0.1 Ohm windings) steps a 34 V peak, 60 Hz "
+                       "sine down to about 16 V. Four 1N4007 and a 470u capacitor turn that into about 15 V of DC, "
+                       "with a volt of ripple, across 220 Ohm; the two SB net labels join the bridge to the secondary "
+                       "with no wire between them. Run the transient and read the primary current: the capacitor "
+                       "recharges in short pulses of about 1.8 A.",
+        .FileName = "transformer_power_supply.imcsim",
+    },
+    {
         .Title = "Ideal transformer",
-        .Group = "Controlled sources",
+        .Group = "Transformers",
         .Description = "A 1:2 transformer built from two controlled sources: E1 sets the secondary at twice the "
                        "primary voltage, and F1 draws twice the load current from the primary. Run the transient: "
                        "the 100 Ohm load gets 10 V from a 5 V source. Then measure only I(F1) and I(R1): the primary "

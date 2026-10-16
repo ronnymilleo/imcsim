@@ -12,8 +12,13 @@
 #include "components/ground.h"
 #include "components/mosfet.h"
 #include "components/op_amp.h"
+#include "components/potentiometer.h"
+#include "components/relay.h"
 #include "components/resistor.h"
+#include "components/switch.h"
+#include "components/transformer.h"
 #include "components/vcc.h"
+#include "components/voltage_controlled_switch.h"
 #include "components/voltage_source.h"
 #include "simulator.h"
 #include <algorithm>
@@ -1382,4 +1387,300 @@ TEST_CASE("A uA741 macromodel slews at its datasheet rate", "[simulator]") {
     };
     const double slew_rate = 6.0 / (crossing(3.0) - crossing(-3.0));
     CHECK_THAT(slew_rate, Catch::Matchers::WithinRel(0.5e6, 0.05));
+}
+
+TEST_CASE("A potentiometer divides its supply by the position of its wiper", "[simulator]") {
+    Core::VCC supply;
+    supply.SetName("V1");
+    supply.SetValue(10.0);
+    Core::Potentiometer pot;
+    pot.SetName("RV1");
+    pot.SetWiper(0.25);
+    const Core::Ground reference;
+    // End 1 on the supply, end 2 on ground, the wiper on node 2
+    Core::Circuit circuit;
+    circuit.Add(supply, {1});
+    circuit.Add(pot, {1, 0, 2});
+    circuit.Add(reference, {0});
+
+    const Core::OperatingPointRun run = Core::RunOperatingPoint(circuit);
+    REQUIRE(run.Result.has_value());
+    // A quarter of the way from the supply: 2.5k above the wiper and 7.5k below it
+    CHECK_THAT(run.Result->NodeVoltages[2], Catch::Matchers::WithinAbs(7.5, 1e-6));
+    const auto current = [&run](const std::string &name) {
+        const auto found = std::ranges::find(run.Result->Currents, name, &Core::ComponentCurrent::Name);
+        REQUIRE(found != run.Result->Currents.end());
+        return found->Current;
+    };
+    // Positive into each terminal: 1 mA goes in at end 1 and out at end 2, and the unloaded wiper carries none
+    CHECK_THAT(current("RV1.A"), Catch::Matchers::WithinAbs(1e-3, 1e-9));
+    CHECK_THAT(current("RV1.B"), Catch::Matchers::WithinAbs(-1e-3, 1e-9));
+    CHECK_THAT(current("RV1.W"), Catch::Matchers::WithinAbs(0.0, 1e-9));
+}
+
+TEST_CASE("A load on the wiper pulls its voltage down and takes its current", "[simulator]") {
+    Core::VCC supply;
+    supply.SetName("V1");
+    supply.SetValue(10.0);
+    Core::Potentiometer pot;
+    pot.SetName("RV1");
+    pot.SetValue(10e3);
+    pot.SetWiper(0.5);
+    Core::Resistor load;
+    load.SetName("R1");
+    load.SetValue(10e3);
+    const Core::Ground reference;
+    Core::Circuit circuit;
+    circuit.Add(supply, {1});
+    circuit.Add(pot, {1, 0, 2});
+    circuit.Add(load, {2, 0});
+    circuit.Add(reference, {0});
+
+    const Core::OperatingPointRun run = Core::RunOperatingPoint(circuit);
+    REQUIRE(run.Result.has_value());
+    // 5k above the wiper, and 5k in parallel with the 10k load below it: 10 * (10/3) / (5 + 10/3)
+    CHECK_THAT(run.Result->NodeVoltages[2], Catch::Matchers::WithinAbs(4.0, 1e-6));
+    const auto wiper = std::ranges::find(run.Result->Currents, "RV1.W", &Core::ComponentCurrent::Name);
+    REQUIRE(wiper != run.Result->Currents.end());
+    // 0.4 mA out of the wiper into the load
+    CHECK_THAT(wiper->Current, Catch::Matchers::WithinAbs(-0.4e-3, 1e-9));
+}
+
+TEST_CASE("A potentiometer's wiper moves its output in an AC sweep too", "[simulator]") {
+    Core::VoltageSource source;
+    source.SetName("Vin1");
+    source.SetSourceType(Core::VoltageSource::SourceType::AC);
+    Core::Potentiometer pot;
+    pot.SetName("RV1");
+    pot.SetWiper(0.8);
+    const Core::Ground reference;
+    Core::Circuit circuit;
+    circuit.Add(source, {1, 0});
+    circuit.Add(pot, {1, 0, 2});
+    circuit.Add(reference, {0});
+
+    const Core::ACSweepRun run = Core::RunACSweep(circuit, {.StartFrequency = 1e3, .StopFrequency = 1e4});
+    REQUIRE(run.Result.has_value());
+    // 20% of the input is left at the wiper, which is -13.98 dB
+    CHECK_THAT(run.Result->NodeMagnitudesDecibels[2].front(), Catch::Matchers::WithinAbs(20.0 * std::log10(0.2), 1e-3));
+}
+
+TEST_CASE("A closed switch passes the current of its circuit and an open one stops it", "[simulator]") {
+    Core::VCC supply;
+    supply.SetName("V1");
+    supply.SetValue(10.0);
+    Core::Switch contact(Core::ComponentType::Switch);
+    contact.SetName("SW1");
+    Core::Resistor load;
+    load.SetName("R1");
+    load.SetValue(1e3);
+    const Core::Ground reference;
+    Core::Circuit circuit;
+    circuit.Add(supply, {1});
+    circuit.Add(contact, {1, 2});
+    circuit.Add(load, {2, 0});
+    circuit.Add(reference, {0});
+    const auto switch_current = [](const Core::OperatingPointRun &run) {
+        REQUIRE(run.Result.has_value());
+        const auto found = std::ranges::find(run.Result->Currents, "SW1", &Core::ComponentCurrent::Name);
+        REQUIRE(found != run.Result->Currents.end());
+        return found->Current;
+    };
+
+    SECTION("open") {
+        const Core::OperatingPointRun run = Core::RunOperatingPoint(circuit);
+        CHECK_THAT(run.Result->NodeVoltages[2], Catch::Matchers::WithinAbs(0.0, 1e-6));
+        CHECK_THAT(switch_current(run), Catch::Matchers::WithinAbs(0.0, 1e-9));
+    }
+    SECTION("closed") {
+        contact.SetClosed(true);
+        const Core::OperatingPointRun run = Core::RunOperatingPoint(circuit);
+        // 1 mOhm in series with 1k: the load gets all but a millionth of the supply
+        CHECK_THAT(run.Result->NodeVoltages[2], Catch::Matchers::WithinAbs(10.0, 1e-4));
+        CHECK_THAT(switch_current(run), Catch::Matchers::WithinAbs(10e-3, 1e-6));
+    }
+}
+
+TEST_CASE("A voltage-controlled switch closes above its threshold and opens below it", "[simulator]") {
+    Core::VCC supply;
+    supply.SetName("V1");
+    supply.SetValue(10.0);
+    Core::VCC control;
+    control.SetName("V2");
+    Core::VoltageControlledSwitch contact;
+    contact.SetName("S1");
+    Core::Resistor load;
+    load.SetName("R1");
+    load.SetValue(1e3);
+    const Core::Ground reference;
+    // The supply on node 1 reaches the load on node 3 through the switch, which node 2 controls
+    Core::Circuit circuit;
+    circuit.Add(supply, {1});
+    circuit.Add(control, {2});
+    circuit.Add(contact, {1, 3, 2, 0});
+    circuit.Add(load, {3, 0});
+    circuit.Add(reference, {0});
+
+    control.SetValue(5.0);
+    const Core::OperatingPointRun above = Core::RunOperatingPoint(circuit);
+    REQUIRE(above.Result.has_value());
+    // 10 mOhm in series with 1k
+    CHECK_THAT(above.Result->NodeVoltages[3], Catch::Matchers::WithinAbs(10.0, 1e-3));
+
+    control.SetValue(0.0);
+    const Core::OperatingPointRun below = Core::RunOperatingPoint(circuit);
+    REQUIRE(below.Result.has_value());
+    CHECK_THAT(below.Result->NodeVoltages[3], Catch::Matchers::WithinAbs(0.0, 1e-4));
+}
+
+TEST_CASE("A voltage-controlled switch follows a pulse in a transient", "[simulator]") {
+    Core::VCC supply;
+    supply.SetName("V1");
+    supply.SetValue(10.0);
+    Core::VoltageSource control;
+    control.SetName("Vin1");
+    control.SetSourceType(Core::VoltageSource::SourceType::Pulse);
+    control.SetPulse(
+        {.Low = 0.0, .High = 5.0, .Delay = 0.0, .RiseTime = 1e-6, .FallTime = 1e-6, .Width = 0.5e-3, .Period = 1e-3});
+    Core::VoltageControlledSwitch contact;
+    contact.SetName("S1");
+    Core::Resistor load;
+    load.SetName("R1");
+    load.SetValue(1e3);
+    const Core::Ground reference;
+    Core::Circuit circuit;
+    circuit.Add(supply, {1});
+    circuit.Add(control, {2, 0});
+    circuit.Add(contact, {1, 3, 2, 0});
+    circuit.Add(load, {3, 0});
+    circuit.Add(reference, {0});
+
+    const Core::TransientRun run = Core::RunTransient(circuit, {.StopTime = 2e-3, .TimeStep = 5e-6});
+    REQUIRE(run.Result.has_value());
+    const Core::Transient &transient = *run.Result;
+    const auto voltage_at = [&transient](const double time) {
+        const auto index =
+            static_cast<std::size_t>(std::ranges::lower_bound(transient.Times, time) - transient.Times.begin());
+        return transient.NodeVoltages[3][index];
+    };
+    // On for the first half of each millisecond, off for the second
+    CHECK_THAT(voltage_at(0.25e-3), Catch::Matchers::WithinAbs(10.0, 1e-2));
+    CHECK_THAT(voltage_at(0.75e-3), Catch::Matchers::WithinAbs(0.0, 1e-2));
+    CHECK_THAT(voltage_at(1.25e-3), Catch::Matchers::WithinAbs(10.0, 1e-2));
+    CHECK_THAT(voltage_at(1.75e-3), Catch::Matchers::WithinAbs(0.0, 1e-2));
+}
+
+TEST_CASE("A relay closes its contact once its coil current is high enough, and takes L over R to get there",
+          "[simulator]") {
+    Core::VCC supply;
+    supply.SetName("V1");
+    supply.SetValue(10.0);
+    Core::VoltageSource coil_drive;
+    coil_drive.SetName("Vin1");
+    coil_drive.SetSourceType(Core::VoltageSource::SourceType::Pulse);
+    coil_drive.SetPulse(
+        {.Low = 0.0, .High = 5.0, .Delay = 0.0, .RiseTime = 1e-6, .FallTime = 1e-6, .Width = 5e-3, .Period = 10e-3});
+    Core::Relay relay;
+    relay.SetName("K1");
+    Core::Resistor load;
+    load.SetName("R1");
+    load.SetValue(1e3);
+    const Core::Ground reference;
+    // The contact between the supply on node 1 and the load on node 3; the coil from node 2 to ground
+    Core::Circuit circuit;
+    circuit.Add(supply, {1});
+    circuit.Add(coil_drive, {2, 0});
+    circuit.Add(relay, {1, 3, 2, 0});
+    circuit.Add(load, {3, 0});
+    circuit.Add(reference, {0});
+
+    const Core::TransientRun run = Core::RunTransient(circuit, {.StopTime = 3e-3, .TimeStep = 5e-6});
+    REQUIRE(run.Result.has_value());
+    const Core::Transient &transient = *run.Result;
+    const std::vector<double> &output = transient.NodeVoltages[3];
+    double closing_time = -1.0;
+    for (std::size_t index = 0; index < output.size(); ++index) {
+        if (output[index] > 5.0) {
+            closing_time = transient.Times[index];
+            break;
+        }
+    }
+    // The resistance of the coil sees 5 V (1 - exp(-t / tau)) with tau = 50 mH / 70 Ohm, and the contact closes at 3.5
+    // V
+    const double tau = 50e-3 / 70.0;
+    const double expected = -tau * std::log(1.0 - 3.5 / 5.0);
+    INFO(std::format("The contact closed at {} s, against {} s expected", closing_time, expected));
+    REQUIRE(closing_time > 0.0);
+    CHECK_THAT(closing_time, Catch::Matchers::WithinRel(expected, 0.05));
+    // Closed, the contact passes nearly all of the supply
+    CHECK_THAT(output.back(), Catch::Matchers::WithinAbs(10.0, 0.1));
+}
+
+namespace {
+
+/**
+ * @struct  SteppedDown
+ * @brief   An AC source on node 1 across the primary of a 2:1 transformer, with a load on its secondary on node 2.
+ */
+struct SteppedDown {
+    Core::VoltageSource Source;
+    Core::Transformer Transformer;
+    Core::Resistor Load;
+    Core::Ground Reference;
+    Core::Circuit Circuit;
+
+    explicit SteppedDown(const double load_resistance) {
+        Source.SetName("Vin1");
+        Source.SetSourceType(Core::VoltageSource::SourceType::AC);
+        Source.SetAC({.Amplitude = 10.0, .Frequency = 1e3, .Offset = 0.0, .Magnitude = 1.0});
+        Transformer.SetName("T1");
+        Transformer.SetParameters({.TurnsRatio = 2.0, .Coupling = 0.999, .WindingResistance = 0.01});
+        Load.SetName("R1");
+        Load.SetValue(load_resistance);
+        Circuit.Add(Source, {1, 0});
+        Circuit.Add(Transformer, {1, 0, 2, 0});
+        Circuit.Add(Load, {2, 0});
+        Circuit.Add(Reference, {0});
+    }
+};
+
+} // namespace
+
+TEST_CASE("A 2:1 transformer halves the voltage of its primary on an open secondary", "[simulator]") {
+    SteppedDown circuit(1e9);
+    const Core::ACSweepRun run = Core::RunACSweep(circuit.Circuit, {.StartFrequency = 1e3, .StopFrequency = 1e4});
+    REQUIRE(run.Result.has_value());
+    // The coupling takes a little more: 0.999 / 2
+    CHECK_THAT(run.Result->NodeMagnitudesDecibels[2].front(),
+               Catch::Matchers::WithinAbs(20.0 * std::log10(0.4995), 1e-2));
+    // The two windings are in phase through the dots
+    CHECK_THAT(run.Result->NodePhasesDegrees[2].front(), Catch::Matchers::WithinAbs(0.0, 0.5));
+}
+
+TEST_CASE("A loaded 2:1 transformer draws twice the secondary current from its primary", "[simulator]") {
+    SteppedDown circuit(10.0);
+    const Core::TransientRun run = Core::RunTransient(circuit.Circuit, {.StopTime = 5e-3, .TimeStep = 5e-6});
+    REQUIRE(run.Result.has_value());
+    const Core::Transient &transient = *run.Result;
+    const auto peak = [](const std::vector<double> &values) {
+        return std::max(std::abs(std::ranges::min(values)), std::ranges::max(values));
+    };
+    const auto current = [&transient](const std::string &name) {
+        const auto trace = std::ranges::find(transient.Currents, name, &Core::ComponentTrace::Name);
+        REQUIRE(trace != transient.Currents.end());
+        return trace->Values;
+    };
+    // Look at the last cycle, once the transient of the magnetizing current has settled
+    const auto last_cycle = [&transient](const std::vector<double> &values) {
+        const auto first =
+            static_cast<std::size_t>(std::ranges::lower_bound(transient.Times, 4e-3) - transient.Times.begin());
+        return std::vector<double>(values.begin() + static_cast<std::ptrdiff_t>(first), values.end());
+    };
+    const double secondary_voltage = peak(last_cycle(transient.NodeVoltages[2]));
+    const double secondary_current = peak(last_cycle(current("T1.S")));
+    const double primary_current = peak(last_cycle(current("T1.P")));
+    // 10 V in, about 5 V out across 10 Ohm: 0.5 A in the secondary and about 0.25 A in the primary
+    CHECK_THAT(secondary_voltage, Catch::Matchers::WithinRel(5.0, 0.05));
+    CHECK_THAT(secondary_current, Catch::Matchers::WithinRel(0.5, 0.05));
+    CHECK_THAT(primary_current, Catch::Matchers::WithinRel(0.25, 0.1));
 }

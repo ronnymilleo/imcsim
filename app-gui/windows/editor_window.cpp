@@ -20,6 +20,7 @@
 #include "schematic_file.h"
 #include "shortcuts.h"
 #include "spice_value.h"
+#include "standard_values.h"
 #include "theme.h"
 #include "wire_editing.h"
 #include <algorithm>
@@ -89,11 +90,16 @@ constexpr auto TransistorParts = std::to_array(
     {Core::ComponentType::NPN, Core::ComponentType::PNP, Core::ComponentType::NMOS, Core::ComponentType::PMOS});
 constexpr auto ControlledParts = std::to_array(
     {Core::ComponentType::VCVS, Core::ComponentType::VCCS, Core::ComponentType::CCCS, Core::ComponentType::CCVS});
+constexpr auto AdjustableParts = std::to_array({Core::ComponentType::Potentiometer, Core::ComponentType::Transformer});
+constexpr auto SwitchParts = std::to_array({Core::ComponentType::Switch, Core::ComponentType::PushButton,
+                                            Core::ComponentType::VSwitch, Core::ComponentType::Relay});
 constexpr auto PartGroups = std::to_array<PartGroup>({
     {"Sources", SourceParts},
     {"Diodes", DiodeParts},
     {"Transistors", TransistorParts},
     {"Controlled sources", ControlledParts},
+    {"Adjustable parts", AdjustableParts},
+    {"Switches", SwitchParts},
 });
 
 // Parts with a button of their own, in toolbar groups
@@ -576,14 +582,39 @@ void EditorWindow::DrawViewMenuItems() {
         changed = true;
     }
     ImGui::SetItemTooltip("Number the terminals of each part; terminal 1 is where a positive current enters");
+    if (ImGui::BeginMenu("Component Values")) {
+        changed |= DrawValueSeriesItems();
+        ImGui::EndMenu();
+    }
     if (changed) {
         ImGui::MarkIniSettingsDirty();
     }
 }
 
+// The choice of standard values for resistors, capacitors and inductors; true when it changed
+bool EditorWindow::DrawValueSeriesItems() {
+    bool changed = false;
+    constexpr auto Choices =
+        std::to_array({Core::ValueSeries::Free, Core::ValueSeries::E6, Core::ValueSeries::E12, Core::ValueSeries::E24,
+                       Core::ValueSeries::E48, Core::ValueSeries::E96, Core::ValueSeries::E192});
+    for (const Core::ValueSeries series : Choices) {
+        const std::string label =
+            series == Core::ValueSeries::Free
+                ? "Any value"
+                : std::format("{} ({:g}%)", Core::GetSeriesName(series), Core::GetSeriesTolerancePercent(series));
+        if (ImGui::MenuItem(label.c_str(), nullptr, m_PartEditor.GetValueSeries() == series)) {
+            m_PartEditor.SetValueSeries(series);
+            changed = true;
+        }
+    }
+    ImGui::Separator();
+    ImGui::TextDisabled("Resistors, capacitors and inductors take the nearest value of the series");
+    return changed;
+}
+
 /**
- * @brief   Keeps the View preferences (wire colors, symbol style, terminal numbers) in imgui.ini, next to the
- *          window layout, so they survive a restart.
+ * @brief   Keeps the View preferences (wire colors, symbol style, terminal numbers, standard values) in imgui.ini,
+ *          next to the window layout, so they survive a restart.
  */
 void EditorWindow::RegisterSettingsHandler() {
     ImGuiSettingsHandler handler;
@@ -613,6 +644,10 @@ void EditorWindow::ReadSetting(const std::string_view line) {
         m_SymbolStyle = *symbols == "ANSI" ? SymbolStyle::ANSI : SymbolStyle::IEC;
     } else if (const auto numbers = ValueOf(line, "TerminalNumbers")) {
         m_ShowTerminalNumbers = *numbers == "1";
+    } else if (const auto series = ValueOf(line, "ValueSeries")) {
+        if (const auto parsed = Core::ParseSeriesName(*series)) {
+            m_PartEditor.SetValueSeries(*parsed);
+        }
     } else if (const auto effects = ValueOf(line, "LiveEffects")) {
         for (std::size_t index = 0; index < LiveEffectsNames.size(); ++index) {
             m_LiveEffects[index] = effects->find(LiveEffectsNames[index]) != std::string_view::npos;
@@ -625,6 +660,7 @@ void EditorWindow::WriteSettings(ImGuiTextBuffer &buffer) const {
     buffer.appendf("WireColors=%s\n", WireColoringNames[static_cast<std::size_t>(m_WireColoring)].data());
     buffer.appendf("Symbols=%s\n", m_SymbolStyle == SymbolStyle::ANSI ? "ANSI" : "IEC");
     buffer.appendf("TerminalNumbers=%d\n", m_ShowTerminalNumbers ? 1 : 0);
+    buffer.appendf("ValueSeries=%s\n", Core::GetSeriesName(m_PartEditor.GetValueSeries()));
     std::string live_effects;
     for (std::size_t index = 0; index < LiveEffectsNames.size(); ++index) {
         if (!m_LiveEffects[index]) {

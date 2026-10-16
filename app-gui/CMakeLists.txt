@@ -36,6 +36,7 @@ add_library(imcsim-gui-lib
             ui_elements/ui_bjt.cpp
             ui_elements/ui_capacitor.cpp
             ui_elements/ui_controlled_source.cpp
+            ui_elements/ui_controlled_switch.cpp
             ui_elements/ui_current_source.cpp
             ui_elements/ui_diode.cpp
             ui_elements/ui_element.cpp
@@ -44,8 +45,11 @@ add_library(imcsim-gui-lib
             ui_elements/ui_mosfet.cpp
             ui_elements/ui_net_label.cpp
             ui_elements/ui_op_amp.cpp
+            ui_elements/ui_potentiometer.cpp
             ui_elements/ui_resistor.cpp
             ui_elements/ui_source.cpp
+            ui_elements/ui_switch.cpp
+            ui_elements/ui_transformer.cpp
             ui_elements/ui_transistor.cpp
             ui_elements/ui_vcc.cpp
             ui_elements/ui_voltage_source.cpp

@@ -13,7 +13,7 @@ elements, so the results are those of ngspice with the models below. Some things
 - Values are exact: there are no tolerances, aging or Monte Carlo spread.
 - There is no noise analysis, so no part models noise.
 - To report terminal currents in every analysis, the netlist adds a 0 V source in series with diodes, transistors,
-  controlled sources and op-amp outputs. It does not change the circuit; the Netlist window leaves it out unless a
+  potentiometers, switches, relays, transformers, controlled sources and op-amp outputs. It does not change the circuit; the Netlist window leaves it out unless a
   current-controlled source needs it.
 
 - The power shown on the schematic is what a part absorbs: the sum over its terminals of the node voltage times the
@@ -28,13 +28,64 @@ elements, so the results are those of ngspice with the models below. Some things
 | Resistor | `R` | resistance, positive |
 | Capacitor | `C` | capacitance, positive |
 | Inductor | `L` | inductance, positive |
+| Potentiometer | two `R` | resistance between its ends, positive |
 
 All three are ideal:
 
 - A resistor has no parasitic inductance or capacitance, no temperature coefficient and no power rating.
 - A capacitor has no series resistance (ESR), leakage, voltage rating or dielectric effects. A transient starts
   from the DC operating point, so a capacitor starts charged to its voltage there.
-- An inductor has no winding resistance, core losses, saturation or coupling to other inductors.
+- An inductor has no winding resistance, core losses or saturation, and is not coupled to other inductors; the
+  transformer part below is.
+- A potentiometer is two resistors that meet at the wiper, terminal 3: the first end to the wiper is the value times the
+  wiper position, and the wiper to the second end is the rest. Position 0 puts the wiper on terminal 1 and position 1
+  on terminal 2; at an end the nearest half is 1 mOhm, since SPICE rejects 0 Ohm. The track is linear, so there is
+  no log taper, no wiper resistance and no power rating, and the wiper moves only by editing the part, not during a
+  run.
+
+## Switches and push buttons
+
+A switch and a push button are the same part for the simulation: a resistor, `R-SW1` in the netlist, of 1 mOhm when
+closed and 1 TOhm when open. A push button is closed while it is pressed. Both start open.
+
+- The state is set in the properties and holds for the whole run; nothing opens or closes a contact during a
+  transient. A contact that follows a voltage is a part of its own.
+- The open resistance is high but not infinite, so an open switch leaks a few picoamperes at a few volts. There is
+  no bounce, contact capacitance or voltage rating.
+
+## Voltage-controlled switches and relays
+
+A voltage-controlled switch is the SPICE `S` element, with its own `.model` line. It closes when the voltage between its
+control pins, terminals 3 (+) and 4 (-), rises past the threshold plus the hysteresis, and opens when it falls below the
+threshold minus the hysteresis. The parameters are the threshold (2.5 V), the hysteresis (0.1 V), the closed resistance
+(10 mOhm) and the open resistance (1 GOhm); the control pins carry no current.
+
+A relay is a coil and a normally open contact. The coil is its resistance in series with its inductance, written as
+`R-K1coil` and `L-K1coil`, and the contact is an `S` element controlled by the voltage on the resistance, which is
+the coil current times the resistance. So the contact closes when the current has built up to the pull-in value and
+opens when it has died away to the drop-out value, a time of about L over R after the coil is switched, and a flyback
+diode across the coil makes the opening later. The figures are the coil resistance (70 Ohm), the coil inductance
+(50 mH), the pull-in voltage (3.5 V), the drop-out voltage (1 V) and the contact resistance (50 mOhm); the open
+contact is 1 GOhm.
+
+- A relay is a model of the coil and the contact, not of the mechanism: there is no contact bounce, travel time or
+  coil heating, and the pull-in and drop-out voltages are steady-state ones.
+- A switch or a relay that is open or closed at the operating point stays so in an AC sweep, since the sweep is
+  linear around it. Fast switching can fail to converge in a transient; a smaller time step helps.
+
+## Transformers
+
+A transformer is two inductors coupled by a SPICE `K` element: `L-T1p` and `L-T1s`, each behind a resistor for its
+winding (`R-T1p`, `R-T1s`). Its value is the primary inductance; the secondary's is that divided by the square of the
+turns ratio, primary turns over secondary turns, so a 100 mH primary at 2:1 has a 25 mH secondary. The other figures are
+the turns ratio (1), the coupling (0.999) and the resistance of each winding (0.1 Ohm). The dotted terminals, the +
+ones, move together.
+
+- The coupling must stay below 1, which SPICE rejects. The leakage inductance that a coupling under 1 gives is what
+  makes the secondary sag under load.
+- There is no core: no saturation, hysteresis, core loss, capacitance between windings or isolation rating. The
+  magnetizing current is that of the primary inductance, so a small value draws a large no-load current.
+- A DC source across a primary is only limited by the winding resistance, since an inductor passes DC.
 
 ## Independent sources
 

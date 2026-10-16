@@ -326,6 +326,12 @@ std::vector<CurrentVector> CurrentVectors(const Component &component) {
     case ComponentType::CCCS:
     case ComponentType::CCVS:
     case ComponentType::OpAmp:
+    case ComponentType::Potentiometer:
+    case ComponentType::Switch:
+    case ComponentType::PushButton:
+    case ComponentType::VSwitch:
+    case ComponentType::Relay:
+    case ComponentType::Transformer:
         break;
     }
     return {};
@@ -619,6 +625,12 @@ ACCurrent(const CircuitEntry &entry, const std::vector<double> &frequencies,
     case ComponentType::CCCS:
     case ComponentType::CCVS:
     case ComponentType::OpAmp:
+    case ComponentType::Potentiometer:
+    case ComponentType::Switch:
+    case ComponentType::PushButton:
+    case ComponentType::VSwitch:
+    case ComponentType::Relay:
+    case ComponentType::Transformer:
         break;
     }
     return std::unexpected(std::format("{} carries no current", component.GetName()));
@@ -887,6 +899,25 @@ std::vector<std::string> GetCurrentNames(const Component &component) {
         names.push_back(current.TraceName);
     }
     return names;
+}
+
+/**
+ * @brief   Tells which terminal each current of GetCurrentNames() flows into.
+ * @param[in] component  Any component.
+ * @return  One terminal index per current, in the same order: the probed terminal for a part with probes, and the
+ *          first terminal for a part whose single current enters there and leaves by the second.
+ */
+std::vector<std::size_t> GetCurrentTerminals(const Component &component) {
+    std::vector<std::size_t> terminals;
+    const std::vector<CurrentProbe> probes = GetCurrentProbes(component);
+    if (probes.empty()) {
+        terminals.assign(GetCurrentNames(component).size(), 0);
+        return terminals;
+    }
+    for (const CurrentProbe &probe : probes) {
+        terminals.push_back(static_cast<std::size_t>(probe.Terminal));
+    }
+    return terminals;
 }
 
 } // namespace Core

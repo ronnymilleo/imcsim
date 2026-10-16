@@ -190,6 +190,7 @@ DCSweepRun RunDCSweep(const Circuit &circuit, const DCSweepSettings &settings);
 // Names in the results
 std::vector<std::string> GetSweepableSources(const Circuit &circuit);
 std::vector<std::string> GetCurrentNames(const Component &component);
+std::vector<std::size_t> GetCurrentTerminals(const Component &component);
 
 } // namespace Core
 

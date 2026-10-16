@@ -120,6 +120,27 @@ constexpr auto OpAmpFields = std::to_array<ParameterField<Core::OpAmpParameters>
     {"Supply current", &Core::OpAmpParameters::SupplyCurrent, "A"},
 });
 
+constexpr auto SwitchFields = std::to_array<ParameterField<Core::SwitchParameters>>({
+    {"Threshold", &Core::SwitchParameters::Threshold, "V"},
+    {"Hysteresis", &Core::SwitchParameters::Hysteresis, "V"},
+    {"On resistance", &Core::SwitchParameters::OnResistance, "Ohm"},
+    {"Off resistance", &Core::SwitchParameters::OffResistance, "Ohm"},
+});
+
+constexpr auto RelayFields = std::to_array<ParameterField<Core::RelayParameters>>({
+    {"Coil R", &Core::RelayParameters::CoilResistance, "Ohm"},
+    {"Coil L", &Core::RelayParameters::CoilInductance, "H"},
+    {"Pull-in", &Core::RelayParameters::PullInVoltage, "V"},
+    {"Drop-out", &Core::RelayParameters::DropOutVoltage, "V"},
+    {"Contact R", &Core::RelayParameters::ContactResistance, "Ohm"},
+});
+
+constexpr auto TransformerFields = std::to_array<ParameterField<Core::TransformerParameters>>({
+    {"Turns ratio", &Core::TransformerParameters::TurnsRatio, ":1"},
+    {"Coupling", &Core::TransformerParameters::Coupling, ""},
+    {"Winding R", &Core::TransformerParameters::WindingResistance, "Ohm"},
+});
+
 template <typename Parameters, std::size_t Count>
 void LoadParameterFields(const std::array<ParameterField<Parameters>, Count> &fields,
                          std::array<ValueField, Count> &value_fields, const Parameters &parameters) {
@@ -218,6 +239,10 @@ bool ShowsValueFields(const Core::Component &component) {
         const auto &op_amp = static_cast<const Core::OpAmp &>(component);
         return op_amp.IsCustom() || op_amp.IsIdeal();
     }
+    // The switches that follow a voltage have only their parameters
+    if (type == Core::ComponentType::VSwitch || type == Core::ComponentType::Relay) {
+        return true;
+    }
     return component.HasValue();
 }
 
@@ -247,7 +272,8 @@ void PartEditor::Draw() {
         ImGui::TextUnformatted(std::format("Name: {}", component.GetName()).c_str());
     }
     const Core::ComponentType type = component.GetType();
-    if (!component.HasValue() && !HasModel(type) && type != Core::ComponentType::NetLabel) {
+    if (!component.HasValue() && !HasModel(type) && type != Core::ComponentType::NetLabel && !Core::IsSwitch(type) &&
+        type != Core::ComponentType::VSwitch && type != Core::ComponentType::Relay) {
         return;
     }
 
@@ -287,8 +313,20 @@ void PartEditor::DrawFields(Core::Component &component) {
         DrawSource(static_cast<Core::Source &>(component));
     } else if (Core::IsControlledSource(type)) {
         DrawControlledSource(static_cast<Core::ControlledSource &>(component));
+    } else if (Core::IsSwitch(type)) {
+        DrawSwitch(static_cast<Core::Switch &>(component));
+    } else if (type == Core::ComponentType::VSwitch) {
+        DrawControlledSwitch(static_cast<Core::VoltageControlledSwitch &>(component));
+    } else if (type == Core::ComponentType::Relay) {
+        DrawRelay(static_cast<Core::Relay &>(component));
+    } else if (type == Core::ComponentType::Transformer) {
+        DrawValue(component);
+        DrawTransformer(static_cast<Core::Transformer &>(component));
     } else {
         DrawValue(component);
+        if (type == Core::ComponentType::Potentiometer) {
+            DrawWiper(static_cast<Core::Potentiometer &>(component));
+        }
     }
 }
 
@@ -347,6 +385,23 @@ void PartEditor::FocusNetName() {
     m_FocusNet = true;
 }
 
+/**
+ * @brief   Returns the standard series the values of resistors, capacitors and inductors are taken from.
+ * @return  The series, or Core::ValueSeries::Free when any value is allowed.
+ */
+Core::ValueSeries PartEditor::GetValueSeries() const {
+    return m_ValueSeries;
+}
+
+/**
+ * @brief   Chooses the standard series for resistors, capacitors and inductors.
+ * @param[in] series  The series, or Core::ValueSeries::Free to allow any value.
+ * @note    Parts that already have a value outside the series keep it until the user edits it.
+ */
+void PartEditor::SetValueSeries(const Core::ValueSeries series) {
+    m_ValueSeries = series;
+}
+
 void PartEditor::LoadFields(const Core::Component &component) {
     m_Value.Load(component.GetValue());
     if (component.GetType() == Core::ComponentType::NetLabel) {
@@ -376,6 +431,17 @@ void PartEditor::LoadFields(const Core::Component &component) {
         LoadParameterFields(OpAmpFields, m_OpAmpFields, op_amp.GetParameters());
         m_Value.Load(op_amp.GetIdealBandwidth());
     }
+    if (component.GetType() == Core::ComponentType::VSwitch) {
+        LoadParameterFields(SwitchFields, m_SwitchFields,
+                            static_cast<const Core::VoltageControlledSwitch &>(component).GetParameters());
+    }
+    if (component.GetType() == Core::ComponentType::Relay) {
+        LoadParameterFields(RelayFields, m_RelayFields, static_cast<const Core::Relay &>(component).GetParameters());
+    }
+    if (component.GetType() == Core::ComponentType::Transformer) {
+        LoadParameterFields(TransformerFields, m_TransformerFields,
+                            static_cast<const Core::Transformer &>(component).GetParameters());
+    }
     m_LoadedSelection = m_Schematic.GetSelectionVersion();
 }
 
@@ -401,10 +467,81 @@ void PartEditor::DrawNetLabel(Core::NetLabel &label) {
 
 void PartEditor::DrawValue(Core::Component &component) {
     const auto is_valid = [&component](const double value) { return component.IsValidValue(value); };
-    if (const std::optional<double> value = m_Value.Draw("Value", component.GetUnit(), is_valid)) {
+    // Standard values are for the passive parts; the value of a source or a gain is whatever the circuit needs
+    const Core::ComponentType type = component.GetType();
+    const bool passive = type == Core::ComponentType::Resistor || type == Core::ComponentType::Capacitor ||
+                         type == Core::ComponentType::Inductor;
+    const Core::ValueSeries series = passive ? m_ValueSeries : Core::ValueSeries::Free;
+    if (const std::optional<double> value = m_Value.Draw("Value", component.GetUnit(), is_valid, series)) {
         component.SetValue(*value);
         m_Schematic.MarkModified();
     }
+    if (series != Core::ValueSeries::Free) {
+        ImGui::TextDisabled("Standard values: %s, %g%%", Core::GetSeriesName(series),
+                            Core::GetSeriesTolerancePercent(series));
+    }
+}
+
+// The switch closes above the threshold plus the hysteresis, and opens below the threshold minus it
+void PartEditor::DrawControlledSwitch(Core::VoltageControlledSwitch &controlled) {
+    Core::SwitchParameters parameters = controlled.GetParameters();
+    const auto is_valid = [](const Core::SwitchParameters &candidate) {
+        return Core::VoltageControlledSwitch::IsValidParameters(candidate);
+    };
+    if (DrawParameterFields(SwitchFields, m_SwitchFields, "", is_valid, parameters)) {
+        controlled.SetParameters(parameters);
+        m_Schematic.MarkModified();
+    }
+    ImGui::TextDisabled("Closes above threshold + hysteresis, opens below threshold - hysteresis");
+}
+
+// The contact closes when the coil voltage reaches the pull-in value and opens when it falls to the drop-out one
+void PartEditor::DrawRelay(Core::Relay &relay) {
+    Core::RelayParameters parameters = relay.GetParameters();
+    const auto is_valid = [](const Core::RelayParameters &candidate) {
+        return Core::Relay::IsValidParameters(candidate);
+    };
+    if (DrawParameterFields(RelayFields, m_RelayFields, "", is_valid, parameters)) {
+        relay.SetParameters(parameters);
+        m_Schematic.MarkModified();
+    }
+    ImGui::TextDisabled("The contact follows the coil current, so it lags by L over R");
+}
+
+// The value is the primary inductance; the secondary's follows from the turns ratio
+void PartEditor::DrawTransformer(Core::Transformer &transformer) {
+    Core::TransformerParameters parameters = transformer.GetParameters();
+    const auto is_valid = [](const Core::TransformerParameters &candidate) {
+        return Core::Transformer::IsValidParameters(candidate);
+    };
+    if (DrawParameterFields(TransformerFields, m_TransformerFields, "", is_valid, parameters)) {
+        transformer.SetParameters(parameters);
+        m_Schematic.MarkModified();
+    }
+    ImGui::TextDisabled("Value is the primary inductance; the secondary is %s",
+                        Core::FormatValue(transformer.GetSecondaryInductance()).c_str());
+}
+
+// A closed switch conducts; a push button is pressed when closed
+void PartEditor::DrawSwitch(Core::Switch &contact) {
+    bool closed = contact.IsClosed();
+    const bool is_button = contact.GetType() == Core::ComponentType::PushButton;
+    if (ImGui::Checkbox(is_button ? "Pressed" : "Closed", &closed)) {
+        contact.SetClosed(closed);
+        m_Schematic.MarkModified();
+    }
+    ImGui::TextDisabled("It is a %s while the circuit is simulated", closed ? "wire" : "gap");
+}
+
+// The wiper as a share of the track, counted from terminal 1
+void PartEditor::DrawWiper(Core::Potentiometer &pot) {
+    DrawFieldLabel("Wiper");
+    auto percent = static_cast<float>(pot.GetWiper() * 100.0);
+    if (ImGui::SliderFloat("##wiper", &percent, 0.0f, 100.0f, "%.0f%%")) {
+        pot.SetWiper(static_cast<double>(percent) / 100.0);
+        m_Schematic.MarkModified();
+    }
+    ImGui::TextDisabled("0%% is terminal 1 and 100%% is terminal 2");
 }
 
 void PartEditor::DrawDiode(Core::Diode &diode) {

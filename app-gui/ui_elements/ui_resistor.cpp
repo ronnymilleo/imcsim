@@ -8,6 +8,7 @@
 #include "components/resistor.h"
 #include <array>
 #include <memory>
+#include <utility>
 
 namespace GUI {
 
@@ -26,6 +27,10 @@ constexpr float ZigZagAmplitude = 0.4f;
  */
 UIResistor::UIResistor(const GridPoint position, const Rotation rotation)
     : UIElement(std::make_unique<Core::Resistor>(), position, rotation) {
+}
+
+UIResistor::UIResistor(std::unique_ptr<Core::Component> component, const GridPoint position, const Rotation rotation)
+    : UIElement(std::move(component), position, rotation) {
 }
 
 void UIResistor::DrawSymbol(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color,

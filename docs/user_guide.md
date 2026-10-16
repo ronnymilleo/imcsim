@@ -6,13 +6,31 @@ How to read what imcsim measures, plots and exports. The [README](../README.md) 
 ## Editing
 
 - **Toolbar**: Select, Wire (W) and Probe (P) on the left, then the parts, each button showing its symbol. Sources,
-  diodes, transistors and controlled sources share one button per group: it places the part last picked, and the
+  diodes, transistors, controlled sources and the adjustable parts share one button per group: it places the part last picked, and the
   arrow beside it (or a right click) lists the others. Hover a button for its name and shortcut.
 - **Editing a part**: double-click it, or select it and press Enter, to open its properties beside it; edits
   apply as you type, and Enter, Esc or a click outside closes them. With a part selected, typing a number starts
   editing its main value right away: `4k7` and Enter make a resistor 4.7k. Values take SPICE suffixes, and a whole
   number may put its decimals after the suffix, as resistor codes do (`4k7`, `2M2`, `3u3`). View > Properties keeps
   the same fields in a docked window.
+- **Potentiometer**: its properties hold the resistance between its ends and the wiper, a slider from 0% at terminal 1
+  to 100% at terminal 2. Move the wiper and run again to see the output change; the wiper does not move during a run.
+- **Switches**: a switch and a push button have a Closed (or Pressed) box in their properties, and the symbol and a
+  label under it show the state. Both start open. The state holds for the whole run, so a switch cannot open in the
+  middle of a transient.
+- **Switches that follow a voltage**: a voltage-controlled switch has its threshold, hysteresis and resistances in its
+  properties, and a relay its coil and contact figures. Both are drawn open, since they open and close during a run.
+  The Switching examples use them: a buck converter and a relay driver with a flyback diode.
+- **Transformers**: the value of a transformer is its primary inductance, and its properties set the turns ratio, the
+  coupling and the resistance of the windings. The secondary needs a path to ground, such as the bridge of the
+  Transformers examples.
+- **Standard values**: View > Component Values restricts resistors, capacitors and inductors to one of the E series
+  (E6, E12, E24, E48, E96 or E192, with their tolerances of 20% down to 0.5%), or leaves any value allowed, which is
+  the default. With a series chosen, a typed value becomes the nearest one of the series on a log scale (`5000` is
+  4.7k in E12), and the arrow buttons beside the value, the up and down keys and the mouse wheel over the field step
+  to the next or previous standard value, into the next decade at the ends. A part keeps a value outside the series
+  until you edit it, and the sources, gains and parameters of the other parts are never restricted. The choice is a
+  preference kept between sessions, not part of the schematic file.
 - **Selecting**: click a part or a wire. Shift+click adds an item to the selection or removes it, and a drag on empty
   canvas selects everything the box touches (with Shift, it adds to the selection). A double click on a wire selects
   every wire of its node, and Ctrl+A (Edit > Select All) selects everything. Esc clears the selection.
@@ -132,6 +150,11 @@ Every part with more than one terminal numbers them in the order the SPICE netli
 | Part | Terminal 1 | Terminal 2 | Terminal 3 |
 |---|---|---|---|
 | Resistor, capacitor, inductor | left end, before rotating | right end | |
+| Potentiometer | end at the left, before rotating | end at the right | wiper, on top |
+| Switch, push button | left contact, before rotating | right contact | |
+| Voltage-controlled switch (S) | contact, top | contact, bottom | control + (4: control -) |
+| Relay (K) | contact, top | contact, bottom | coil + (4: coil -) |
+| Transformer (T) | primary +, upper left | primary -, lower left | secondary + (4: secondary -), on the right |
 | Diode, Zener diode, LED | anode | cathode | |
 | Voltage source | positive (+) | negative (-) | |
 | Current source | tail of its arrow | head of its arrow | |
@@ -160,6 +183,14 @@ imcsim reports currents as ngspice computes them:
   2.5 mA into a circuit reports -2.5 mA.
 - **Transistors** report one current per terminal, `I(Q1.C)`, `I(Q1.B)` and `I(Q1.E)`, each positive into its
   terminal. The three always add up to zero.
+- **Potentiometers** report one current per terminal, `I(RV1.A)` for the first end, `I(RV1.B)` for the second and
+  `I(RV1.W)` for the wiper, each positive into its terminal. The three always add up to zero.
+- **Switches and push buttons** report one current like a two-terminal part, positive from terminal 1 to terminal 2;
+  an open one carries picoamperes.
+- **Relays** report two currents, `I(K1.S)` into the first contact terminal and `I(K1.C)` into the coil +. A
+  voltage-controlled switch reports the current into its first contact terminal, like a two-terminal part.
+- **Transformers** report `I(T1.P)` into the primary + and `I(T1.S)` into the secondary +, each positive into its
+  terminal. With a load on the secondary the two have opposite signs, in the ratio of the turns.
 - **Controlled sources** report the current of their output like a two-terminal part; their control pins carry no
   current. A VCCS or CCCS pushes its current from terminal 1 to terminal 2 through itself, as its arrow shows, so
   into a load on terminal 1 it drives the load negative.

@@ -8,6 +8,7 @@
 #include "ui_elements/ui_bjt.h"
 #include "ui_elements/ui_capacitor.h"
 #include "ui_elements/ui_controlled_source.h"
+#include "ui_elements/ui_controlled_switch.h"
 #include "ui_elements/ui_current_source.h"
 #include "ui_elements/ui_diode.h"
 #include "ui_elements/ui_ground.h"
@@ -15,7 +16,10 @@
 #include "ui_elements/ui_mosfet.h"
 #include "ui_elements/ui_net_label.h"
 #include "ui_elements/ui_op_amp.h"
+#include "ui_elements/ui_potentiometer.h"
 #include "ui_elements/ui_resistor.h"
+#include "ui_elements/ui_switch.h"
+#include "ui_elements/ui_transformer.h"
 #include "ui_elements/ui_vcc.h"
 #include "ui_elements/ui_voltage_source.h"
 #include <algorithm>
@@ -57,6 +61,12 @@ constexpr auto Parts = std::to_array<PartInfo>({
     {Core::ComponentType::CCVS, "CCVS (H)"},
     {Core::ComponentType::OpAmp, "Op-amp"},
     {Core::ComponentType::NetLabel, "Net label"},
+    {Core::ComponentType::Potentiometer, "Potentiometer"},
+    {Core::ComponentType::Switch, "Switch"},
+    {Core::ComponentType::PushButton, "Push button"},
+    {Core::ComponentType::VSwitch, "Voltage-controlled switch"},
+    {Core::ComponentType::Relay, "Relay"},
+    {Core::ComponentType::Transformer, "Transformer"},
 });
 
 // Lowercase letters and digits only, so "opamp" finds "Op-amp" and "vcc" finds "VCC supply"
@@ -115,6 +125,16 @@ std::unique_ptr<UIElement> CreateElement(const Core::ComponentType type, const G
         return std::make_unique<UIOpAmp>(position, rotation);
     case Core::ComponentType::NetLabel:
         return std::make_unique<UINetLabel>(position, rotation);
+    case Core::ComponentType::Potentiometer:
+        return std::make_unique<UIPotentiometer>(position, rotation);
+    case Core::ComponentType::Switch:
+    case Core::ComponentType::PushButton:
+        return std::make_unique<UISwitch>(type, position, rotation);
+    case Core::ComponentType::VSwitch:
+    case Core::ComponentType::Relay:
+        return std::make_unique<UIControlledSwitch>(type, position, rotation);
+    case Core::ComponentType::Transformer:
+        return std::make_unique<UITransformer>(position, rotation);
     }
     return nullptr;
 }

@@ -3,6 +3,8 @@
  * @brief   Tests that every example circuit opens cleanly and simulates with its own settings.
  */
 
+#include "components/potentiometer.h"
+#include "components/switch.h"
 #include "examples.h"
 #include "schematic.h"
 #include "simulator.h"
@@ -483,4 +485,155 @@ TEST_CASE("Every example is in a group, and the examples of a group are listed t
         CHECK(index >= current);
         current = index;
     }
+}
+
+TEST_CASE("The LED dimmer lights the LED more as the potentiometer is turned toward its supply end", "[examples]") {
+    GUI::Schematic schematic;
+    OpenExample("potentiometer_led_dimmer.imcsim", schematic);
+    const auto pot = std::ranges::find_if(schematic.GetElements(), [](const auto &element) {
+        return element->GetComponent().GetType() == Core::ComponentType::Potentiometer;
+    });
+    REQUIRE(pot != schematic.GetElements().end());
+    auto &potentiometer = static_cast<Core::Potentiometer &>((*pot)->GetComponent());
+    const auto led_current = [&schematic] {
+        const Core::OperatingPointRun run = Core::RunOperatingPoint(schematic.BuildCircuit());
+        REQUIRE(run.Result.has_value());
+        const auto led = std::ranges::find(run.Result->Currents, "D1", &Core::ComponentCurrent::Name);
+        REQUIRE(led != run.Result->Currents.end());
+        return led->Current;
+    };
+    // The wiper sits at 30% when the example opens: a 3k rheostat
+    CHECK_THAT(potentiometer.GetWiper(), Catch::Matchers::WithinAbs(0.3, 1e-12));
+    CHECK_THAT(led_current(), Catch::Matchers::WithinAbs(1e-3, 0.3e-3));
+    potentiometer.SetWiper(0.0);
+    CHECK_THAT(led_current(), Catch::Matchers::WithinAbs(14e-3, 2e-3));
+    potentiometer.SetWiper(1.0);
+    CHECK(led_current() < 0.5e-3);
+}
+
+TEST_CASE("The series switches light their LED only when both are closed, and the parallel ones when either is",
+          "[examples]") {
+    GUI::Schematic schematic;
+    OpenExample("switches_and_or.imcsim", schematic);
+    const auto set_closed = [&schematic](const std::string &name, const bool closed) {
+        const auto element = std::ranges::find_if(
+            schematic.GetElements(), [&name](const auto &part) { return part->GetComponent().GetName() == name; });
+        REQUIRE(element != schematic.GetElements().end());
+        static_cast<Core::Switch &>((*element)->GetComponent()).SetClosed(closed);
+    };
+    const auto lit = [&schematic](const std::string &led) {
+        const Core::OperatingPointRun run = Core::RunOperatingPoint(schematic.BuildCircuit());
+        REQUIRE(run.Result.has_value());
+        const auto found = std::ranges::find(run.Result->Currents, led, &Core::ComponentCurrent::Name);
+        REQUIRE(found != run.Result->Currents.end());
+        return found->Current > 5e-3;
+    };
+    for (const bool first : {false, true}) {
+        for (const bool second : {false, true}) {
+            INFO(std::format("First switch {}, second {}", first ? "closed" : "open", second ? "closed" : "open"));
+            set_closed("SW1", first);
+            set_closed("SW2", second);
+            set_closed("SW3", first);
+            set_closed("SW4", second);
+            CHECK(lit("D1") == (first && second));
+            CHECK(lit("D2") == (first || second));
+        }
+    }
+}
+
+TEST_CASE("The buck converter settles near its duty cycle times the supply, after ringing at the LC resonance",
+          "[examples]") {
+    GUI::Schematic schematic;
+    OpenExample("buck_converter.imcsim", schematic);
+    const Core::TransientRun run =
+        Core::RunTransient(schematic.BuildCircuit(), schematic.GetSimulationSettings().Transient);
+    REQUIRE(run.Result.has_value());
+    const Core::Transient &transient = *run.Result;
+    const std::vector<double> &output = transient.NodeVoltages[NodeAt(schematic, {18, 10})];
+    double settled_low = 1e9;
+    double settled_high = -1e9;
+    double highest = 0.0;
+    for (std::size_t index = 0; index < output.size(); ++index) {
+        highest = std::max(highest, output[index]);
+        if (transient.Times[index] > 6e-3) {
+            settled_low = std::min(settled_low, output[index]);
+            settled_high = std::max(settled_high, output[index]);
+        }
+    }
+    INFO(std::format("Settled between {} and {} V, peak {} V", settled_low, settled_high, highest));
+    // 50% of 12 V, less the drops of the switch and the diode
+    CHECK_THAT((settled_low + settled_high) / 2.0, Catch::Matchers::WithinAbs(5.8, 0.3));
+    CHECK(settled_high - settled_low < 0.5);
+    // The LC filter overshoots on the way up
+    CHECK(highest > 8.0);
+}
+
+TEST_CASE("The relay contact closes and opens a coil time constant after the transistor does", "[examples]") {
+    GUI::Schematic schematic;
+    OpenExample("relay_driver.imcsim", schematic);
+    const Core::TransientRun run =
+        Core::RunTransient(schematic.BuildCircuit(), schematic.GetSimulationSettings().Transient);
+    REQUIRE(run.Result.has_value());
+    const Core::Transient &transient = *run.Result;
+    const std::vector<double> &load = transient.NodeVoltages[NodeAt(schematic, {16, 12})];
+    const std::vector<double> &collector = transient.NodeVoltages[NodeAt(schematic, {8, 12})];
+    double closing = -1.0;
+    double opening = -1.0;
+    for (std::size_t index = 0; index < load.size(); ++index) {
+        const double time = transient.Times[index];
+        if (closing < 0.0 && load[index] > 6.0) {
+            closing = time;
+        }
+        // The base drive falls at 10 ms
+        if (closing > 0.0 && opening < 0.0 && time > 10e-3 && load[index] < 6.0) {
+            opening = time;
+        }
+    }
+    INFO(std::format("Closed at {} s and opened at {} s", closing, opening));
+    // The coil current takes about L / R = 0.7 ms to build up to the pull-in value, and to die away to the drop-out one
+    REQUIRE(closing > 0.0);
+    CHECK_THAT(closing, Catch::Matchers::WithinAbs(0.9e-3, 0.15e-3));
+    REQUIRE(opening > 0.0);
+    CHECK_THAT(opening - 10e-3, Catch::Matchers::WithinAbs(0.85e-3, 0.3e-3));
+    // The flyback diode holds the collector a diode drop above the coil supply
+    CHECK(PeakOf(collector) < 6.5);
+    CHECK(PeakOf(load) > 11.5);
+}
+
+TEST_CASE("The transformer steps 34 V down to about half, and the bridge and capacitor make DC of it", "[examples]") {
+    GUI::Schematic schematic;
+    OpenExample("transformer_power_supply.imcsim", schematic);
+    const Core::TransientRun run =
+        Core::RunTransient(schematic.BuildCircuit(), schematic.GetSimulationSettings().Transient);
+    REQUIRE(run.Result.has_value());
+    const Core::Transient &transient = *run.Result;
+    const std::vector<double> &input = transient.NodeVoltages[NodeAt(schematic, {3, 9})];
+    const std::vector<double> &secondary = transient.NodeVoltages[NodeAt(schematic, {11, 9})];
+    const std::vector<double> &output = transient.NodeVoltages[NodeAt(schematic, {15, 6})];
+    // Past the first cycles, when the reservoir capacitor has charged
+    double output_low = 1e9;
+    double output_high = -1e9;
+    double input_peak = 0.0;
+    double secondary_peak = 0.0;
+    for (std::size_t index = 0; index < output.size(); ++index) {
+        if (transient.Times[index] < 30e-3) {
+            continue;
+        }
+        output_low = std::min(output_low, output[index]);
+        output_high = std::max(output_high, output[index]);
+        input_peak = std::max(input_peak, std::abs(input[index]));
+        secondary_peak = std::max(secondary_peak, std::abs(secondary[index]));
+    }
+    INFO(std::format("Output between {} and {} V, secondary peak {} V", output_low, output_high, secondary_peak));
+    CHECK_THAT(input_peak, Catch::Matchers::WithinRel(34.0, 1e-3));
+    // Half of 34 V, less what the winding resistances and the current pulses take
+    CHECK_THAT(secondary_peak, Catch::Matchers::WithinAbs(16.0, 1.0));
+    // The peak of the secondary less two diode drops, with a ripple of about a volt
+    CHECK_THAT(output_high, Catch::Matchers::WithinAbs(15.4, 1.0));
+    CHECK(output_high - output_low < 1.6);
+    CHECK(output_low > 13.0);
+    const auto primary = std::ranges::find(transient.Currents, "T1.P", &Core::ComponentTrace::Name);
+    REQUIRE(primary != transient.Currents.end());
+    // The capacitor takes its charge in short pulses, which the primary feeds at half the current
+    CHECK(PeakOf(primary->Values) > 1.0);
 }

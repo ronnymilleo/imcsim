@@ -13,8 +13,14 @@
 #include "components/mosfet.h"
 #include "components/net_label.h"
 #include "components/op_amp.h"
+#include "components/potentiometer.h"
+#include "components/relay.h"
 #include "components/source.h"
+#include "components/switch.h"
+#include "components/transformer.h"
+#include "components/voltage_controlled_switch.h"
 #include "schematic.h"
+#include "standard_values.h"
 #include "value_field.h"
 #include <array>
 #include <cstddef>
@@ -42,8 +48,13 @@ public:
     // The name of a selected net label gets the focus on the next Draw(), as for a label just placed
     void FocusNetName();
 
+    // Standard values for resistors, capacitors and inductors, or any value
+    Core::ValueSeries GetValueSeries() const;
+    void SetValueSeries(Core::ValueSeries series);
+
 private:
     Schematic &m_Schematic;
+    Core::ValueSeries m_ValueSeries = Core::ValueSeries::Free;
     // Texts being edited, and the selection they were loaded from
     std::optional<std::size_t> m_LoadedSelection;
     ValueField m_Value;
@@ -58,12 +69,22 @@ private:
     std::array<ValueField, 16> m_BJTFields;
     std::array<ValueField, 13> m_MOSFETFields;
     std::array<ValueField, 11> m_OpAmpFields;
+    // One per member of Core::SwitchParameters and Core::RelayParameters
+    std::array<ValueField, 4> m_SwitchFields;
+    std::array<ValueField, 5> m_RelayFields;
+    // One per member of Core::TransformerParameters
+    std::array<ValueField, 3> m_TransformerFields;
 
     void LoadFields(const Core::Component &component);
     void DrawSelectionSummary();
     void DrawFields(Core::Component &component);
     bool DrawModeledPart(Core::Component &component);
     void DrawValue(Core::Component &component);
+    void DrawWiper(Core::Potentiometer &pot);
+    void DrawSwitch(Core::Switch &contact);
+    void DrawControlledSwitch(Core::VoltageControlledSwitch &controlled);
+    void DrawRelay(Core::Relay &relay);
+    void DrawTransformer(Core::Transformer &transformer);
     void DrawNetLabel(Core::NetLabel &label);
     void DrawDiode(Core::Diode &diode);
     void DrawBJT(Core::BJT &bjt);

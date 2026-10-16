@@ -10,7 +10,12 @@
 #include "components/diode.h"
 #include "components/mosfet.h"
 #include "components/op_amp.h"
+#include "components/potentiometer.h"
+#include "components/relay.h"
 #include "components/source.h"
+#include "components/switch.h"
+#include "components/transformer.h"
+#include "components/voltage_controlled_switch.h"
 #include "spice_value.h"
 #include <algorithm>
 #include <format>
@@ -24,6 +29,13 @@ bool IsACSource(const Component &component) {
     return IsSource(component.GetType()) &&
            static_cast<const Source &>(component).GetSourceType() == Source::SourceType::AC;
 }
+
+// The two halves of a potentiometer track never get to 0 Ohm, which SPICE rejects, however close to an end the wiper is
+constexpr double MinTrackResistance = 1e-3;
+
+// A switch is a resistor, which closed is nearly a wire and open nearly nothing at all
+constexpr double ClosedSwitchResistance = 1e-3;
+constexpr double OpenSwitchResistance = 1e12;
 
 // One line serves every analysis: .op reads the DC value, .ac the AC magnitude and .tran the waveform. A pulse
 // starts at its low level, so that is its DC value. The name tells SPICE whether it is a voltage or current source
@@ -259,6 +271,61 @@ std::string Circuit::ToSpiceNetlist(const std::string_view analysis, const bool 
             AddModelLine(model_name, FormatMOSFETModel(mosfet.GetType(), model_name, parameters), model_names, models);
             break;
         }
+        case ComponentType::Potentiometer: {
+            // The wiper, terminal 3, splits the track into two resistors
+            const auto &pot = static_cast<const Potentiometer &>(component);
+            const std::string first = FormatSpiceValue(std::max(pot.GetValue() * pot.GetWiper(), MinTrackResistance));
+            const std::string second =
+                FormatSpiceValue(std::max(pot.GetValue() * (1.0 - pot.GetWiper()), MinTrackResistance));
+            netlist += std::format("R-{}a {} {} {}\n", pot.GetName(), nodes[0], nodes[2], first);
+            netlist += std::format("R-{}b {} {} {}\n", pot.GetName(), nodes[2], nodes[1], second);
+            break;
+        }
+        case ComponentType::Switch:
+        case ComponentType::PushButton: {
+            const bool closed = static_cast<const Switch &>(component).IsClosed();
+            netlist += std::format("R-{} {} {} {}\n", component.GetName(), nodes[0], nodes[1],
+                                   FormatSpiceValue(closed ? ClosedSwitchResistance : OpenSwitchResistance));
+            break;
+        }
+        case ComponentType::VSwitch: {
+            const auto &controlled = static_cast<const VoltageControlledSwitch &>(component);
+            const std::string model_name = std::format("SW-{}", controlled.GetName());
+            netlist += std::format("{} {} {} {} {} {}\n", controlled.GetName(), nodes[0], nodes[1], nodes[2], nodes[3],
+                                   model_name);
+            AddModelLine(model_name, FormatSwitchModel(model_name, controlled.GetParameters()), model_names, models);
+            break;
+        }
+        case ComponentType::Relay: {
+            // The coil is its resistance and its inductance in series, and the contact follows the voltage on the
+            // resistance, which is the coil current, so it closes and opens as the current builds and dies away
+            const auto &relay = static_cast<const Relay &>(component);
+            const RelayParameters &figures = relay.GetParameters();
+            const int coil_middle = next_extra_node++;
+            const std::string model_name = std::format("SW-{}", relay.GetName());
+            netlist += std::format("R-{0}coil {1} {2} {3}\nL-{0}coil {2} {4} {5}\n", relay.GetName(), nodes[2],
+                                   coil_middle, FormatSpiceValue(figures.CoilResistance), nodes[3],
+                                   FormatSpiceValue(figures.CoilInductance));
+            netlist += std::format("S-{} {} {} {} {} {}\n", relay.GetName(), nodes[0], nodes[1], nodes[2], coil_middle,
+                                   model_name);
+            AddModelLine(model_name, FormatSwitchModel(model_name, relay.GetContactParameters()), model_names, models);
+            break;
+        }
+        case ComponentType::Transformer: {
+            // Two inductors, each behind the resistance of its winding, coupled by a K element
+            const auto &transformer = static_cast<const Transformer &>(component);
+            const std::string resistance = FormatSpiceValue(transformer.GetParameters().WindingResistance);
+            const int primary_middle = next_extra_node++;
+            const int secondary_middle = next_extra_node++;
+            const std::string &name = transformer.GetName();
+            netlist += std::format("R-{0}p {1} {2} {3}\nL-{0}p {2} {4} {5}\n", name, nodes[0], primary_middle,
+                                   resistance, nodes[1], FormatSpiceValue(transformer.GetValue()));
+            netlist += std::format("R-{0}s {1} {2} {3}\nL-{0}s {2} {4} {5}\n", name, nodes[2], secondary_middle,
+                                   resistance, nodes[3], FormatSpiceValue(transformer.GetSecondaryInductance()));
+            netlist +=
+                std::format("K-{0} L-{0}p L-{0}s {1}\n", name, FormatSpiceValue(transformer.GetParameters().Coupling));
+            break;
+        }
         case ComponentType::Ground:
         case ComponentType::NetLabel:
             break;
@@ -276,19 +343,31 @@ std::string Circuit::ToSpiceNetlist(const std::string_view analysis, const bool 
 /**
  * @brief   Lists the terminals of a component whose current is measured with a probe.
  * @param[in] component  Any component.
- * @return  The anode of a diode part, every terminal of a transistor, and the first output terminal of a controlled
- *          source or the output of an op-amp; nothing for the others, whose currents ngspice reports directly.
+ * @return  The anode of a diode part, the first terminal of a switch, every terminal of a transistor or a
+ *          potentiometer, the contact and the coil of a relay, the two windings of a transformer, and the first output
+ * terminal of a controlled source or the output of an op-amp; nothing for the others, whose currents ngspice reports
+ * directly.
  */
 std::vector<CurrentProbe> GetCurrentProbes(const Component &component) {
     const ComponentType type = component.GetType();
-    if (IsDiode(type) || IsControlledSource(type) || type == ComponentType::OpAmp) {
+    if (IsDiode(type) || IsControlledSource(type) || IsSwitch(type) || type == ComponentType::VSwitch ||
+        type == ComponentType::OpAmp) {
         return {{0, ""}};
+    }
+    if (type == ComponentType::Relay) {
+        return {{0, "S"}, {2, "C"}};
+    }
+    if (type == ComponentType::Transformer) {
+        return {{0, "P"}, {2, "S"}};
     }
     if (IsBJT(component.GetType())) {
         return {{0, "C"}, {1, "B"}, {2, "E"}};
     }
     if (IsMOSFET(component.GetType())) {
         return {{0, "D"}, {1, "G"}, {2, "S"}};
+    }
+    if (component.GetType() == ComponentType::Potentiometer) {
+        return {{0, "A"}, {1, "B"}, {2, "W"}};
     }
     return {};
 }
