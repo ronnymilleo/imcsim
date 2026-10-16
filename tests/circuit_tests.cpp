@@ -14,9 +14,11 @@
 #include "components/mosfet.h"
 #include "components/op_amp.h"
 #include "components/potentiometer.h"
+#include "components/relay.h"
 #include "components/resistor.h"
 #include "components/switch.h"
 #include "components/vcc.h"
+#include "components/voltage_controlled_switch.h"
 #include "components/voltage_source.h"
 #include <catch2/catch_test_macros.hpp>
 #include <string>
@@ -441,4 +443,51 @@ TEST_CASE("A switch has one current probe, on its first terminal, named after th
     const std::string netlist = circuit.ToSpiceNetlist("", true);
     CHECK(netlist.find("Vprobe-SW1 1 3 DC 0\n") != std::string::npos);
     CHECK(netlist.find("R-SW1 3 2 1T\n") != std::string::npos);
+}
+
+TEST_CASE("ToSpiceNetlist writes a voltage-controlled switch with a model of its own", "[circuit]") {
+    Core::VoltageControlledSwitch controlled;
+    controlled.SetName("S1");
+    controlled.SetParameters({.Threshold = 1.5, .Hysteresis = 0.25, .OnResistance = 0.5, .OffResistance = 1e6});
+    Core::Circuit circuit;
+    // Switch between nodes 1 and 2, controlled by node 3 against node 0
+    circuit.Add(controlled, {1, 2, 3, 0});
+
+    const std::string netlist = circuit.ToSpiceNetlist();
+    CHECK(netlist.find("S1 1 2 3 0 SW-S1\n") != std::string::npos);
+    CHECK(netlist.find(".model SW-S1 SW(VT=1.5 VH=0.25 RON=0.5 ROFF=1e+06)\n") != std::string::npos);
+}
+
+TEST_CASE("ToSpiceNetlist writes a relay as a coil of a resistor and an inductor and a switch on the resistor",
+          "[circuit]") {
+    Core::Relay relay;
+    relay.SetName("K1");
+    Core::Circuit circuit;
+    // Contact between nodes 1 and 2, coil from node 3 to ground
+    circuit.Add(relay, {1, 2, 3, 0});
+
+    const std::string netlist = circuit.ToSpiceNetlist();
+    // The middle of the coil is the first node past the circuit ones, which are 0 to 3
+    CHECK(netlist.find("R-K1coil 3 4 70\n") != std::string::npos);
+    CHECK(netlist.find("L-K1coil 4 0 50m\n") != std::string::npos);
+    CHECK(netlist.find("S-K1 1 2 3 4 SW-K1\n") != std::string::npos);
+    // Closes at 3.5 V and opens at 1 V: threshold 2.25 V with 1.25 V of hysteresis
+    CHECK(netlist.find(".model SW-K1 SW(VT=2.25 VH=1.25 RON=0.05 ROFF=1e+09)\n") != std::string::npos);
+}
+
+TEST_CASE("Probes of the switches and the relay", "[circuit]") {
+    Core::VoltageControlledSwitch controlled;
+    controlled.SetName("S1");
+    const std::vector<Core::CurrentProbe> switch_probes = Core::GetCurrentProbes(controlled);
+    REQUIRE(switch_probes.size() == 1);
+    CHECK(switch_probes[0].Terminal == 0);
+
+    Core::Relay relay;
+    relay.SetName("K1");
+    const std::vector<Core::CurrentProbe> relay_probes = Core::GetCurrentProbes(relay);
+    REQUIRE(relay_probes.size() == 2);
+    CHECK(relay_probes[0].Terminal == 0);
+    CHECK(Core::GetCurrentName(relay, relay_probes[0].Label) == "K1.S");
+    CHECK(relay_probes[1].Terminal == 2);
+    CHECK(Core::GetCurrentName(relay, relay_probes[1].Label) == "K1.C");
 }

@@ -11,7 +11,9 @@
 #include "components/net_label.h"
 #include "components/op_amp.h"
 #include "components/potentiometer.h"
+#include "components/relay.h"
 #include "components/switch.h"
+#include "components/voltage_controlled_switch.h"
 #include "components/voltage_source.h"
 #include "element_factory.h"
 #include "schematic_file.h"
@@ -584,6 +586,67 @@ TEST_CASE("A switch and a push button keep their state, and load open when the f
 
     const std::string bad_state = R"({"type": "Switch", "x": 1, "y": 1, "rotation": 0, "name": "SW1", "closed": 3})";
     const GUI::LoadedSchematic skipped = LoadOrFail(Document(bad_state, ""));
+    CHECK(skipped.Elements.empty());
+    CHECK(skipped.Warnings.size() == 1);
+}
+
+TEST_CASE("A voltage-controlled switch keeps its parameters, and loads with the defaults when it has none",
+          "[schematic_file]") {
+    std::vector<std::unique_ptr<GUI::UIElement>> elements;
+    elements.push_back(GUI::CreateElement(Core::ComponentType::VSwitch, {3, 3}, GUI::Rotation::R270));
+    auto &controlled = static_cast<Core::VoltageControlledSwitch &>(elements.back()->GetComponent());
+    controlled.SetName("S1");
+    controlled.SetParameters({.Threshold = 1.8, .Hysteresis = 0.3, .OnResistance = 2.0, .OffResistance = 1e7});
+
+    const GUI::LoadedSchematic loaded = LoadOrFail(GUI::SaveSchematic(elements, {}, {}, {}));
+    CHECK(loaded.Warnings.empty());
+    REQUIRE(loaded.Elements.size() == 1);
+    const auto &copy = static_cast<const Core::VoltageControlledSwitch &>(loaded.Elements[0]->GetComponent());
+    CHECK(copy.GetParameters().Threshold == 1.8);
+    CHECK(copy.GetParameters().Hysteresis == 0.3);
+    CHECK(copy.GetParameters().OnResistance == 2.0);
+    CHECK(copy.GetParameters().OffResistance == 1e7);
+
+    const std::string plain = R"({"type": "VSwitch", "x": 1, "y": 1, "rotation": 0, "name": "S1"})";
+    const GUI::LoadedSchematic defaults = LoadOrFail(Document(plain, ""));
+    REQUIRE(defaults.Elements.size() == 1);
+    CHECK(static_cast<const Core::VoltageControlledSwitch &>(defaults.Elements[0]->GetComponent())
+              .GetParameters()
+              .Threshold == 2.5);
+
+    const std::string backwards =
+        R"({"type": "VSwitch", "x": 1, "y": 1, "rotation": 0, "name": "S1", "parameters": {"on_resistance": 5.0, "off_resistance": 1.0}})";
+    const GUI::LoadedSchematic skipped = LoadOrFail(Document(backwards, ""));
+    CHECK(skipped.Elements.empty());
+    CHECK(skipped.Warnings.size() == 1);
+}
+
+TEST_CASE("A relay keeps its coil and contact figures", "[schematic_file]") {
+    std::vector<std::unique_ptr<GUI::UIElement>> elements;
+    elements.push_back(GUI::CreateElement(Core::ComponentType::Relay, {6, 6}, GUI::Rotation::R0));
+    auto &relay = static_cast<Core::Relay &>(elements.back()->GetComponent());
+    relay.SetName("K1");
+    relay.SetParameters({.CoilResistance = 400.0,
+                         .CoilInductance = 0.2,
+                         .PullInVoltage = 9.0,
+                         .DropOutVoltage = 1.5,
+                         .ContactResistance = 0.1});
+
+    const GUI::LoadedSchematic loaded = LoadOrFail(GUI::SaveSchematic(elements, {}, {}, {}));
+    CHECK(loaded.Warnings.empty());
+    REQUIRE(loaded.Elements.size() == 1);
+    const auto &copy = static_cast<const Core::Relay &>(loaded.Elements[0]->GetComponent());
+    CHECK(copy.GetName() == "K1");
+    CHECK(copy.GetParameters().CoilResistance == 400.0);
+    CHECK(copy.GetParameters().CoilInductance == 0.2);
+    CHECK(copy.GetParameters().PullInVoltage == 9.0);
+    CHECK(copy.GetParameters().DropOutVoltage == 1.5);
+    CHECK(copy.GetParameters().ContactResistance == 0.1);
+
+    // A pull-in voltage that is not above the drop-out one cannot be a relay
+    const std::string inverted =
+        R"({"type": "Relay", "x": 1, "y": 1, "rotation": 0, "name": "K1", "parameters": {"pull_in": 1.0, "drop_out": 2.0}})";
+    const GUI::LoadedSchematic skipped = LoadOrFail(Document(inverted, ""));
     CHECK(skipped.Elements.empty());
     CHECK(skipped.Warnings.size() == 1);
 }

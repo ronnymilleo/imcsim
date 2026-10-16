@@ -22,7 +22,8 @@ constexpr auto AllTypes = std::to_array<ComponentType>({
     ComponentType::ZenerDiode,    ComponentType::LED,           ComponentType::NPN,           ComponentType::PNP,
     ComponentType::NMOS,          ComponentType::PMOS,          ComponentType::VCVS,          ComponentType::VCCS,
     ComponentType::CCCS,          ComponentType::CCVS,          ComponentType::OpAmp,         ComponentType::NetLabel,
-    ComponentType::Potentiometer, ComponentType::Switch,        ComponentType::PushButton,
+    ComponentType::Potentiometer, ComponentType::Switch,        ComponentType::PushButton,    ComponentType::VSwitch,
+    ComponentType::Relay,
 });
 
 } // namespace
@@ -97,6 +98,10 @@ const char *Component::GetNamePrefix() const {
         return "SW";
     case ComponentType::PushButton:
         return "PB";
+    case ComponentType::VSwitch:
+        return "S";
+    case ComponentType::Relay:
+        return "K";
     case ComponentType::Ground:
     case ComponentType::NetLabel:
         return "";
@@ -136,6 +141,8 @@ const char *Component::GetUnit() const {
     case ComponentType::NetLabel:
     case ComponentType::Switch:
     case ComponentType::PushButton:
+    case ComponentType::VSwitch:
+    case ComponentType::Relay:
     case ComponentType::Diode:
     case ComponentType::ZenerDiode:
     case ComponentType::LED:
@@ -159,6 +166,8 @@ bool Component::HasValue() const {
     case ComponentType::NetLabel:
     case ComponentType::Switch:
     case ComponentType::PushButton:
+    case ComponentType::VSwitch:
+    case ComponentType::Relay:
     case ComponentType::Diode:
     case ComponentType::ZenerDiode:
     case ComponentType::LED:
@@ -209,6 +218,8 @@ bool Component::IsValidValue(const double value) const {
     case ComponentType::NetLabel:
     case ComponentType::Switch:
     case ComponentType::PushButton:
+    case ComponentType::VSwitch:
+    case ComponentType::Relay:
     case ComponentType::Diode:
     case ComponentType::ZenerDiode:
     case ComponentType::LED:
@@ -307,6 +318,10 @@ const char *GetTypeName(const ComponentType type) {
         return "Switch";
     case ComponentType::PushButton:
         return "PushButton";
+    case ComponentType::VSwitch:
+        return "VSwitch";
+    case ComponentType::Relay:
+        return "Relay";
     }
     return "Unknown";
 }

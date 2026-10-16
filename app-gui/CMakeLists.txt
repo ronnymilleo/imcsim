@@ -36,6 +36,7 @@ add_library(imcsim-gui-lib
             ui_elements/ui_bjt.cpp
             ui_elements/ui_capacitor.cpp
             ui_elements/ui_controlled_source.cpp
+            ui_elements/ui_controlled_switch.cpp
             ui_elements/ui_current_source.cpp
             ui_elements/ui_diode.cpp
             ui_elements/ui_element.cpp

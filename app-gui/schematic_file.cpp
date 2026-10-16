@@ -12,8 +12,10 @@
 #include "components/net_label.h"
 #include "components/op_amp.h"
 #include "components/potentiometer.h"
+#include "components/relay.h"
 #include "components/source.h"
 #include "components/switch.h"
+#include "components/voltage_controlled_switch.h"
 #include "element_factory.h"
 #include "nlohmann/json.hpp"
 #include <array>
@@ -45,6 +47,21 @@ constexpr auto ACKeys = std::to_array<ParameterKey<Core::ACParameters>>({
     {"frequency", &Core::ACParameters::Frequency},
     {"offset", &Core::ACParameters::Offset},
     {"ac_magnitude", &Core::ACParameters::Magnitude},
+});
+
+constexpr auto SwitchKeys = std::to_array<ParameterKey<Core::SwitchParameters>>({
+    {"threshold", &Core::SwitchParameters::Threshold},
+    {"hysteresis", &Core::SwitchParameters::Hysteresis},
+    {"on_resistance", &Core::SwitchParameters::OnResistance},
+    {"off_resistance", &Core::SwitchParameters::OffResistance},
+});
+
+constexpr auto RelayKeys = std::to_array<ParameterKey<Core::RelayParameters>>({
+    {"coil_resistance", &Core::RelayParameters::CoilResistance},
+    {"coil_inductance", &Core::RelayParameters::CoilInductance},
+    {"pull_in", &Core::RelayParameters::PullInVoltage},
+    {"drop_out", &Core::RelayParameters::DropOutVoltage},
+    {"contact_resistance", &Core::RelayParameters::ContactResistance},
 });
 
 constexpr auto PulseKeys = std::to_array<ParameterKey<Core::PulseParameters>>({
@@ -209,6 +226,35 @@ std::expected<void, std::string> ReadParameters(const std::array<ParameterKey<Pa
     return {};
 }
 
+// Parts whose parameters are all there is to them save them as one object
+template <typename Part, typename Parameters, std::size_t Count>
+void WritePartParameters(const Part &part, const std::array<ParameterKey<Parameters>, Count> &keys,
+                         nlohmann::json &object) {
+    nlohmann::json parameters = nlohmann::json::object();
+    WriteParameters(keys, part.GetParameters(), parameters);
+    object["parameters"] = parameters;
+}
+
+// Missing parameters keep those the part starts with
+template <typename Part, typename Parameters, std::size_t Count>
+std::expected<void, std::string> ReadPartParameters(const nlohmann::json &object, Part &part,
+                                                    const std::array<ParameterKey<Parameters>, Count> &keys) {
+    Parameters parameters = part.GetParameters();
+    if (const auto parameters_object = object.find("parameters"); parameters_object != object.end()) {
+        if (!parameters_object->is_object()) {
+            return std::unexpected("has parameters that are not an object");
+        }
+        if (const auto read = ReadParameters(keys, *parameters_object, parameters); !read) {
+            return read;
+        }
+    }
+    if (!Part::IsValidParameters(parameters)) {
+        return std::unexpected("has parameters out of range");
+    }
+    part.SetParameters(parameters);
+    return {};
+}
+
 // Parts with a model save its name, plus their parameters when custom
 template <typename Part, typename Parameters, std::size_t Count>
 void WriteModelChoice(const Part &part, const std::array<ParameterKey<Parameters>, Count> &keys,
@@ -264,6 +310,10 @@ nlohmann::json WriteElement(const UIElement &element) {
         }
     } else if (Core::IsSwitch(type)) {
         object["closed"] = static_cast<const Core::Switch &>(component).IsClosed();
+    } else if (type == Core::ComponentType::VSwitch) {
+        WritePartParameters(static_cast<const Core::VoltageControlledSwitch &>(component), SwitchKeys, object);
+    } else if (type == Core::ComponentType::Relay) {
+        WritePartParameters(static_cast<const Core::Relay &>(component), RelayKeys, object);
     } else if (type == Core::ComponentType::Potentiometer) {
         object["wiper"] = static_cast<const Core::Potentiometer &>(component).GetWiper();
     } else if (type == Core::ComponentType::OpAmp) {
@@ -457,6 +507,18 @@ std::expected<std::unique_ptr<UIElement>, std::string> ReadElement(const nlohman
             return std::unexpected("has a closed flag that is not true or false");
         }
         static_cast<Core::Switch &>(component).SetClosed(*closed);
+    }
+    if (component.GetType() == Core::ComponentType::VSwitch) {
+        if (const auto read =
+                ReadPartParameters(object, static_cast<Core::VoltageControlledSwitch &>(component), SwitchKeys);
+            !read) {
+            return std::unexpected(read.error());
+        }
+    }
+    if (component.GetType() == Core::ComponentType::Relay) {
+        if (const auto read = ReadPartParameters(object, static_cast<Core::Relay &>(component), RelayKeys); !read) {
+            return std::unexpected(read.error());
+        }
     }
     // A potentiometer saved without a wiper keeps it in the middle
     if (component.GetType() == Core::ComponentType::Potentiometer && object.contains("wiper")) {

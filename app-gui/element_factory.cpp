@@ -8,6 +8,7 @@
 #include "ui_elements/ui_bjt.h"
 #include "ui_elements/ui_capacitor.h"
 #include "ui_elements/ui_controlled_source.h"
+#include "ui_elements/ui_controlled_switch.h"
 #include "ui_elements/ui_current_source.h"
 #include "ui_elements/ui_diode.h"
 #include "ui_elements/ui_ground.h"
@@ -62,6 +63,8 @@ constexpr auto Parts = std::to_array<PartInfo>({
     {Core::ComponentType::Potentiometer, "Potentiometer"},
     {Core::ComponentType::Switch, "Switch"},
     {Core::ComponentType::PushButton, "Push button"},
+    {Core::ComponentType::VSwitch, "Voltage-controlled switch"},
+    {Core::ComponentType::Relay, "Relay"},
 });
 
 // Lowercase letters and digits only, so "opamp" finds "Op-amp" and "vcc" finds "VCC supply"
@@ -125,6 +128,9 @@ std::unique_ptr<UIElement> CreateElement(const Core::ComponentType type, const G
     case Core::ComponentType::Switch:
     case Core::ComponentType::PushButton:
         return std::make_unique<UISwitch>(type, position, rotation);
+    case Core::ComponentType::VSwitch:
+    case Core::ComponentType::Relay:
+        return std::make_unique<UIControlledSwitch>(type, position, rotation);
     }
     return nullptr;
 }

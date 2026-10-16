@@ -18,10 +18,12 @@ add_library(imcsim-core-lib
             components/net_label.cpp
             components/op_amp.cpp
             components/potentiometer.cpp
+            components/relay.cpp
             components/resistor.cpp
             components/source.cpp
             components/switch.cpp
             components/vcc.cpp
+            components/voltage_controlled_switch.cpp
             components/voltage_source.cpp
             simulator.cpp
             spice_value.cpp

@@ -91,7 +91,8 @@ constexpr auto TransistorParts = std::to_array(
 constexpr auto ControlledParts = std::to_array(
     {Core::ComponentType::VCVS, Core::ComponentType::VCCS, Core::ComponentType::CCCS, Core::ComponentType::CCVS});
 constexpr auto AdjustableParts = std::to_array({Core::ComponentType::Potentiometer});
-constexpr auto SwitchParts = std::to_array({Core::ComponentType::Switch, Core::ComponentType::PushButton});
+constexpr auto SwitchParts = std::to_array({Core::ComponentType::Switch, Core::ComponentType::PushButton,
+                                            Core::ComponentType::VSwitch, Core::ComponentType::Relay});
 constexpr auto PartGroups = std::to_array<PartGroup>({
     {"Sources", SourceParts},
     {"Diodes", DiodeParts},

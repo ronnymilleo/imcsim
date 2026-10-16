@@ -14,9 +14,11 @@
 #include "components/net_label.h"
 #include "components/op_amp.h"
 #include "components/potentiometer.h"
+#include "components/relay.h"
 #include "components/resistor.h"
 #include "components/switch.h"
 #include "components/vcc.h"
+#include "components/voltage_controlled_switch.h"
 #include "components/voltage_source.h"
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators.hpp>
@@ -110,6 +112,55 @@ TEST_CASE("A switch and a push button start open, with no value", "[component]")
     CHECK(Core::IsSwitch(Core::ComponentType::PushButton));
     CHECK_FALSE(Core::IsSwitch(Core::ComponentType::Resistor));
     CHECK(Core::ParseComponentType("PushButton") == Core::ComponentType::PushButton);
+}
+
+TEST_CASE("A voltage-controlled switch and a relay have their own prefixes and no value", "[component]") {
+    const Core::VoltageControlledSwitch controlled;
+    CHECK(std::string_view(controlled.GetNamePrefix()) == "S");
+    CHECK(std::string_view(controlled.GetTypeName()) == "VSwitch");
+    CHECK_FALSE(controlled.HasValue());
+    CHECK(controlled.GetParameters().Threshold == 2.5);
+    CHECK(controlled.GetParameters().Hysteresis == 0.1);
+    CHECK(Core::ParseComponentType("VSwitch") == Core::ComponentType::VSwitch);
+
+    const Core::Relay relay;
+    CHECK(std::string_view(relay.GetNamePrefix()) == "K");
+    CHECK(std::string_view(relay.GetTypeName()) == "Relay");
+    CHECK_FALSE(relay.HasValue());
+    CHECK(Core::ParseComponentType("Relay") == Core::ComponentType::Relay);
+}
+
+TEST_CASE("Switch and relay parameters must make a contact that can open and close", "[component]") {
+    Core::SwitchParameters switch_parameters;
+    CHECK(Core::VoltageControlledSwitch::IsValidParameters(switch_parameters));
+    switch_parameters.Hysteresis = -0.1;
+    CHECK_FALSE(Core::VoltageControlledSwitch::IsValidParameters(switch_parameters));
+    switch_parameters = {};
+    switch_parameters.OnResistance = switch_parameters.OffResistance;
+    CHECK_FALSE(Core::VoltageControlledSwitch::IsValidParameters(switch_parameters));
+
+    Core::RelayParameters relay_parameters;
+    CHECK(Core::Relay::IsValidParameters(relay_parameters));
+    relay_parameters.DropOutVoltage = relay_parameters.PullInVoltage;
+    CHECK_FALSE(Core::Relay::IsValidParameters(relay_parameters));
+    relay_parameters = {};
+    relay_parameters.CoilInductance = 0.0;
+    CHECK_FALSE(Core::Relay::IsValidParameters(relay_parameters));
+}
+
+TEST_CASE("A relay contact closes at the pull-in voltage and opens at the drop-out voltage", "[component]") {
+    Core::Relay relay;
+    relay.SetParameters({.CoilResistance = 100.0,
+                         .CoilInductance = 0.1,
+                         .PullInVoltage = 4.0,
+                         .DropOutVoltage = 2.0,
+                         .ContactResistance = 0.2});
+    const Core::SwitchParameters contact = relay.GetContactParameters();
+    // Closes above threshold + hysteresis and opens below threshold - hysteresis
+    CHECK(contact.Threshold + contact.Hysteresis == 4.0);
+    CHECK(contact.Threshold - contact.Hysteresis == 2.0);
+    CHECK(contact.OnResistance == 0.2);
+    CHECK(contact.OffResistance == 1e9);
 }
 
 TEST_CASE("Ground has no name prefix and no value", "[component]") {

@@ -540,3 +540,62 @@ TEST_CASE("The series switches light their LED only when both are closed, and th
         }
     }
 }
+
+TEST_CASE("The buck converter settles near its duty cycle times the supply, after ringing at the LC resonance",
+          "[examples]") {
+    GUI::Schematic schematic;
+    OpenExample("buck_converter.imcsim", schematic);
+    const Core::TransientRun run =
+        Core::RunTransient(schematic.BuildCircuit(), schematic.GetSimulationSettings().Transient);
+    REQUIRE(run.Result.has_value());
+    const Core::Transient &transient = *run.Result;
+    const std::vector<double> &output = transient.NodeVoltages[NodeAt(schematic, {18, 10})];
+    double settled_low = 1e9;
+    double settled_high = -1e9;
+    double highest = 0.0;
+    for (std::size_t index = 0; index < output.size(); ++index) {
+        highest = std::max(highest, output[index]);
+        if (transient.Times[index] > 6e-3) {
+            settled_low = std::min(settled_low, output[index]);
+            settled_high = std::max(settled_high, output[index]);
+        }
+    }
+    INFO(std::format("Settled between {} and {} V, peak {} V", settled_low, settled_high, highest));
+    // 50% of 12 V, less the drops of the switch and the diode
+    CHECK_THAT((settled_low + settled_high) / 2.0, Catch::Matchers::WithinAbs(5.8, 0.3));
+    CHECK(settled_high - settled_low < 0.5);
+    // The LC filter overshoots on the way up
+    CHECK(highest > 8.0);
+}
+
+TEST_CASE("The relay contact closes and opens a coil time constant after the transistor does", "[examples]") {
+    GUI::Schematic schematic;
+    OpenExample("relay_driver.imcsim", schematic);
+    const Core::TransientRun run =
+        Core::RunTransient(schematic.BuildCircuit(), schematic.GetSimulationSettings().Transient);
+    REQUIRE(run.Result.has_value());
+    const Core::Transient &transient = *run.Result;
+    const std::vector<double> &load = transient.NodeVoltages[NodeAt(schematic, {16, 12})];
+    const std::vector<double> &collector = transient.NodeVoltages[NodeAt(schematic, {8, 12})];
+    double closing = -1.0;
+    double opening = -1.0;
+    for (std::size_t index = 0; index < load.size(); ++index) {
+        const double time = transient.Times[index];
+        if (closing < 0.0 && load[index] > 6.0) {
+            closing = time;
+        }
+        // The base drive falls at 10 ms
+        if (closing > 0.0 && opening < 0.0 && time > 10e-3 && load[index] < 6.0) {
+            opening = time;
+        }
+    }
+    INFO(std::format("Closed at {} s and opened at {} s", closing, opening));
+    // The coil current takes about L / R = 0.7 ms to build up to the pull-in value, and to die away to the drop-out one
+    REQUIRE(closing > 0.0);
+    CHECK_THAT(closing, Catch::Matchers::WithinAbs(0.9e-3, 0.15e-3));
+    REQUIRE(opening > 0.0);
+    CHECK_THAT(opening - 10e-3, Catch::Matchers::WithinAbs(0.85e-3, 0.3e-3));
+    // The flyback diode holds the collector a diode drop above the coil supply
+    CHECK(PeakOf(collector) < 6.5);
+    CHECK(PeakOf(load) > 11.5);
+}

@@ -40,6 +40,8 @@ double DefaultGain(const ComponentType type) {
     case ComponentType::Potentiometer:
     case ComponentType::Switch:
     case ComponentType::PushButton:
+    case ComponentType::VSwitch:
+    case ComponentType::Relay:
         break;
     }
     return 1.0;

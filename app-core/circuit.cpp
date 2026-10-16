@@ -11,8 +11,10 @@
 #include "components/mosfet.h"
 #include "components/op_amp.h"
 #include "components/potentiometer.h"
+#include "components/relay.h"
 #include "components/source.h"
 #include "components/switch.h"
+#include "components/voltage_controlled_switch.h"
 #include "spice_value.h"
 #include <algorithm>
 #include <format>
@@ -285,6 +287,29 @@ std::string Circuit::ToSpiceNetlist(const std::string_view analysis, const bool 
                                    FormatSpiceValue(closed ? ClosedSwitchResistance : OpenSwitchResistance));
             break;
         }
+        case ComponentType::VSwitch: {
+            const auto &controlled = static_cast<const VoltageControlledSwitch &>(component);
+            const std::string model_name = std::format("SW-{}", controlled.GetName());
+            netlist += std::format("{} {} {} {} {} {}\n", controlled.GetName(), nodes[0], nodes[1], nodes[2], nodes[3],
+                                   model_name);
+            AddModelLine(model_name, FormatSwitchModel(model_name, controlled.GetParameters()), model_names, models);
+            break;
+        }
+        case ComponentType::Relay: {
+            // The coil is its resistance and its inductance in series, and the contact follows the voltage on the
+            // resistance, which is the coil current, so it closes and opens as the current builds and dies away
+            const auto &relay = static_cast<const Relay &>(component);
+            const RelayParameters &figures = relay.GetParameters();
+            const int coil_middle = next_extra_node++;
+            const std::string model_name = std::format("SW-{}", relay.GetName());
+            netlist += std::format("R-{0}coil {1} {2} {3}\nL-{0}coil {2} {4} {5}\n", relay.GetName(), nodes[2],
+                                   coil_middle, FormatSpiceValue(figures.CoilResistance), nodes[3],
+                                   FormatSpiceValue(figures.CoilInductance));
+            netlist += std::format("S-{} {} {} {} {} {}\n", relay.GetName(), nodes[0], nodes[1], nodes[2], coil_middle,
+                                   model_name);
+            AddModelLine(model_name, FormatSwitchModel(model_name, relay.GetContactParameters()), model_names, models);
+            break;
+        }
         case ComponentType::Ground:
         case ComponentType::NetLabel:
             break;
@@ -303,13 +328,17 @@ std::string Circuit::ToSpiceNetlist(const std::string_view analysis, const bool 
  * @brief   Lists the terminals of a component whose current is measured with a probe.
  * @param[in] component  Any component.
  * @return  The anode of a diode part, the first terminal of a switch, every terminal of a transistor or a
- *          potentiometer, and the first output terminal of a controlled source or the output of an op-amp; nothing
- *          for the others, whose currents ngspice reports directly.
+ *          potentiometer, the contact and the coil of a relay, and the first output terminal of a controlled source
+ *          or the output of an op-amp; nothing for the others, whose currents ngspice reports directly.
  */
 std::vector<CurrentProbe> GetCurrentProbes(const Component &component) {
     const ComponentType type = component.GetType();
-    if (IsDiode(type) || IsControlledSource(type) || IsSwitch(type) || type == ComponentType::OpAmp) {
+    if (IsDiode(type) || IsControlledSource(type) || IsSwitch(type) || type == ComponentType::VSwitch ||
+        type == ComponentType::OpAmp) {
         return {{0, ""}};
+    }
+    if (type == ComponentType::Relay) {
+        return {{0, "S"}, {2, "C"}};
     }
     if (IsBJT(component.GetType())) {
         return {{0, "C"}, {1, "B"}, {2, "E"}};

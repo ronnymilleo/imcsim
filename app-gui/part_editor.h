@@ -14,8 +14,10 @@
 #include "components/net_label.h"
 #include "components/op_amp.h"
 #include "components/potentiometer.h"
+#include "components/relay.h"
 #include "components/source.h"
 #include "components/switch.h"
+#include "components/voltage_controlled_switch.h"
 #include "schematic.h"
 #include "standard_values.h"
 #include "value_field.h"
@@ -66,6 +68,9 @@ private:
     std::array<ValueField, 16> m_BJTFields;
     std::array<ValueField, 13> m_MOSFETFields;
     std::array<ValueField, 11> m_OpAmpFields;
+    // One per member of Core::SwitchParameters and Core::RelayParameters
+    std::array<ValueField, 4> m_SwitchFields;
+    std::array<ValueField, 5> m_RelayFields;
 
     void LoadFields(const Core::Component &component);
     void DrawSelectionSummary();
@@ -74,6 +79,8 @@ private:
     void DrawValue(Core::Component &component);
     void DrawWiper(Core::Potentiometer &pot);
     void DrawSwitch(Core::Switch &contact);
+    void DrawControlledSwitch(Core::VoltageControlledSwitch &controlled);
+    void DrawRelay(Core::Relay &relay);
     void DrawNetLabel(Core::NetLabel &label);
     void DrawDiode(Core::Diode &diode);
     void DrawBJT(Core::BJT &bjt);

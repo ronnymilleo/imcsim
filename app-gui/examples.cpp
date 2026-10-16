@@ -206,6 +206,27 @@ constexpr auto Examples = std::to_array<Example>({
         .FileName = "sallen_key_low_pass.imcsim",
     },
     {
+        .Title = "Buck converter",
+        .Group = "Switching",
+        .Description =
+            "A voltage-controlled switch, driven by a 10 kHz pulse at 50% duty, chops a 12 V supply. A 1N5819 "
+            "keeps the inductor current flowing while the switch is open, and L1 (1 mH) with C1 (100u) "
+            "average it into about 5.8 V on a 10 Ohm load. Run the transient: the output overshoots to "
+            "about 9 V, rings at the LC resonance near 500 Hz and settles with a ripple of 0.2 V.",
+        .FileName = "buck_converter.imcsim",
+    },
+    {
+        .Title = "Relay driver",
+        .Group = "Switching",
+        .Description =
+            "A 2N2222A switches the coil of a 5 V relay (70 Ohm, 50 mH) from a 5 V, 50 Hz pulse, and the contact "
+            "switches 12 V into a 100 Ohm load. Run the transient: the contact closes about 0.9 ms after "
+            "the base goes high, the time the coil current takes to build up, and opens about 0.85 ms "
+            "after it falls, while the 1N4007 across the coil carries the current that is left and holds "
+            "the collector a diode drop above 5 V.",
+        .FileName = "relay_driver.imcsim",
+    },
+    {
         .Title = "Ideal transformer",
         .Group = "Controlled sources",
         .Description = "A 1:2 transformer built from two controlled sources: E1 sets the secondary at twice the "

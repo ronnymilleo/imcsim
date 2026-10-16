@@ -120,6 +120,21 @@ constexpr auto OpAmpFields = std::to_array<ParameterField<Core::OpAmpParameters>
     {"Supply current", &Core::OpAmpParameters::SupplyCurrent, "A"},
 });
 
+constexpr auto SwitchFields = std::to_array<ParameterField<Core::SwitchParameters>>({
+    {"Threshold", &Core::SwitchParameters::Threshold, "V"},
+    {"Hysteresis", &Core::SwitchParameters::Hysteresis, "V"},
+    {"On resistance", &Core::SwitchParameters::OnResistance, "Ohm"},
+    {"Off resistance", &Core::SwitchParameters::OffResistance, "Ohm"},
+});
+
+constexpr auto RelayFields = std::to_array<ParameterField<Core::RelayParameters>>({
+    {"Coil R", &Core::RelayParameters::CoilResistance, "Ohm"},
+    {"Coil L", &Core::RelayParameters::CoilInductance, "H"},
+    {"Pull-in", &Core::RelayParameters::PullInVoltage, "V"},
+    {"Drop-out", &Core::RelayParameters::DropOutVoltage, "V"},
+    {"Contact R", &Core::RelayParameters::ContactResistance, "Ohm"},
+});
+
 template <typename Parameters, std::size_t Count>
 void LoadParameterFields(const std::array<ParameterField<Parameters>, Count> &fields,
                          std::array<ValueField, Count> &value_fields, const Parameters &parameters) {
@@ -218,6 +233,10 @@ bool ShowsValueFields(const Core::Component &component) {
         const auto &op_amp = static_cast<const Core::OpAmp &>(component);
         return op_amp.IsCustom() || op_amp.IsIdeal();
     }
+    // The switches that follow a voltage have only their parameters
+    if (type == Core::ComponentType::VSwitch || type == Core::ComponentType::Relay) {
+        return true;
+    }
     return component.HasValue();
 }
 
@@ -247,7 +266,8 @@ void PartEditor::Draw() {
         ImGui::TextUnformatted(std::format("Name: {}", component.GetName()).c_str());
     }
     const Core::ComponentType type = component.GetType();
-    if (!component.HasValue() && !HasModel(type) && type != Core::ComponentType::NetLabel && !Core::IsSwitch(type)) {
+    if (!component.HasValue() && !HasModel(type) && type != Core::ComponentType::NetLabel && !Core::IsSwitch(type) &&
+        type != Core::ComponentType::VSwitch && type != Core::ComponentType::Relay) {
         return;
     }
 
@@ -289,6 +309,10 @@ void PartEditor::DrawFields(Core::Component &component) {
         DrawControlledSource(static_cast<Core::ControlledSource &>(component));
     } else if (Core::IsSwitch(type)) {
         DrawSwitch(static_cast<Core::Switch &>(component));
+    } else if (type == Core::ComponentType::VSwitch) {
+        DrawControlledSwitch(static_cast<Core::VoltageControlledSwitch &>(component));
+    } else if (type == Core::ComponentType::Relay) {
+        DrawRelay(static_cast<Core::Relay &>(component));
     } else {
         DrawValue(component);
         if (type == Core::ComponentType::Potentiometer) {
@@ -398,6 +422,13 @@ void PartEditor::LoadFields(const Core::Component &component) {
         LoadParameterFields(OpAmpFields, m_OpAmpFields, op_amp.GetParameters());
         m_Value.Load(op_amp.GetIdealBandwidth());
     }
+    if (component.GetType() == Core::ComponentType::VSwitch) {
+        LoadParameterFields(SwitchFields, m_SwitchFields,
+                            static_cast<const Core::VoltageControlledSwitch &>(component).GetParameters());
+    }
+    if (component.GetType() == Core::ComponentType::Relay) {
+        LoadParameterFields(RelayFields, m_RelayFields, static_cast<const Core::Relay &>(component).GetParameters());
+    }
     m_LoadedSelection = m_Schematic.GetSelectionVersion();
 }
 
@@ -436,6 +467,32 @@ void PartEditor::DrawValue(Core::Component &component) {
         ImGui::TextDisabled("Standard values: %s, %g%%", Core::GetSeriesName(series),
                             Core::GetSeriesTolerancePercent(series));
     }
+}
+
+// The switch closes above the threshold plus the hysteresis, and opens below the threshold minus it
+void PartEditor::DrawControlledSwitch(Core::VoltageControlledSwitch &controlled) {
+    Core::SwitchParameters parameters = controlled.GetParameters();
+    const auto is_valid = [](const Core::SwitchParameters &candidate) {
+        return Core::VoltageControlledSwitch::IsValidParameters(candidate);
+    };
+    if (DrawParameterFields(SwitchFields, m_SwitchFields, "", is_valid, parameters)) {
+        controlled.SetParameters(parameters);
+        m_Schematic.MarkModified();
+    }
+    ImGui::TextDisabled("Closes above threshold + hysteresis, opens below threshold - hysteresis");
+}
+
+// The contact closes when the coil voltage reaches the pull-in value and opens when it falls to the drop-out one
+void PartEditor::DrawRelay(Core::Relay &relay) {
+    Core::RelayParameters parameters = relay.GetParameters();
+    const auto is_valid = [](const Core::RelayParameters &candidate) {
+        return Core::Relay::IsValidParameters(candidate);
+    };
+    if (DrawParameterFields(RelayFields, m_RelayFields, "", is_valid, parameters)) {
+        relay.SetParameters(parameters);
+        m_Schematic.MarkModified();
+    }
+    ImGui::TextDisabled("The contact follows the coil current, so it lags by L over R");
 }
 
 // A closed switch conducts; a push button is pressed when closed

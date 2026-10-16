@@ -6,6 +6,7 @@
 #include "test_printers.h"
 #include "ui_elements/ui_bjt.h"
 #include "ui_elements/ui_controlled_source.h"
+#include "ui_elements/ui_controlled_switch.h"
 #include "ui_elements/ui_diode.h"
 #include "ui_elements/ui_ground.h"
 #include "ui_elements/ui_mosfet.h"
@@ -198,6 +199,19 @@ TEST_CASE("A switch has two terminals like a resistor, and a push button is pick
     CHECK(button.GetTerminals() == std::vector<GUI::GridPoint>{{3, 5}, {7, 5}});
     CHECK(button.Contains({5.0f, 3.8f}));
     CHECK_FALSE(button.Contains({5.0f, 3.0f}));
+}
+
+TEST_CASE("A voltage-controlled switch and a relay have the contact vertical and the control on the left",
+          "[ui_element]") {
+    for (const Core::ComponentType type : {Core::ComponentType::VSwitch, Core::ComponentType::Relay}) {
+        const GUI::UIControlledSwitch part(type, {0, 0}, GUI::Rotation::R0);
+        CHECK(part.GetComponent().GetType() == type);
+        CHECK(part.GetTerminals() == std::vector<GUI::GridPoint>{{0, -2}, {0, 2}, {-2, -1}, {-2, 1}});
+        CHECK(part.GetTerminalInward(0) == GUI::GridPoint{0, 1});
+        CHECK(part.GetTerminalInward(2) == GUI::GridPoint{1, 0});
+        CHECK(part.Contains({-1.0f, 0.0f}));
+        CHECK_FALSE(part.Contains({1.5f, 0.0f}));
+    }
 }
 
 TEST_CASE("Op-amps list the output, the inputs and the supply pins", "[ui_element]") {

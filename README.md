@@ -38,7 +38,8 @@ New to imcsim? The [tutorial](docs/tutorial.md) builds, simulates and exports a 
   segments, copy, cut and paste (also between windows), importing a file or an example into the schematic (also by dropping
   the file on the window), net labels that join distant points by name, and an option to turn parts and leave their
   wires in place
-- Potentiometers, with the wiper set in the properties, and switches and push buttons that are open or closed
+- Potentiometers, with the wiper set in the properties, and switches and push buttons that are open or closed,
+  voltage-controlled switches and relays whose coil current sets when the contact closes
 - Standard values: an option to take resistors, capacitors and inductors from the E6 to E192 series, typed or stepped
   with the arrows, keys or mouse wheel
 - IEC or ANSI symbols, optional terminal numbers, parts rotated (R) and mirrored left to right (M) or top to bottom

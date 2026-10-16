@@ -13,7 +13,7 @@ elements, so the results are those of ngspice with the models below. Some things
 - Values are exact: there are no tolerances, aging or Monte Carlo spread.
 - There is no noise analysis, so no part models noise.
 - To report terminal currents in every analysis, the netlist adds a 0 V source in series with diodes, transistors,
-  potentiometers, switches, controlled sources and op-amp outputs. It does not change the circuit; the Netlist window leaves it out unless a
+  potentiometers, switches, relays, controlled sources and op-amp outputs. It does not change the circuit; the Netlist window leaves it out unless a
   current-controlled source needs it.
 
 - The power shown on the schematic is what a part absorbs: the sum over its terminals of the node voltage times the
@@ -51,6 +51,26 @@ closed and 1 TOhm when open. A push button is closed while it is pressed. Both s
   transient. A contact that follows a voltage is a part of its own.
 - The open resistance is high but not infinite, so an open switch leaks a few picoamperes at a few volts. There is
   no bounce, contact capacitance or voltage rating.
+
+## Voltage-controlled switches and relays
+
+A voltage-controlled switch is the SPICE `S` element, with its own `.model` line. It closes when the voltage between its
+control pins, terminals 3 (+) and 4 (-), rises past the threshold plus the hysteresis, and opens when it falls below the
+threshold minus the hysteresis. The parameters are the threshold (2.5 V), the hysteresis (0.1 V), the closed resistance
+(10 mOhm) and the open resistance (1 GOhm); the control pins carry no current.
+
+A relay is a coil and a normally open contact. The coil is its resistance in series with its inductance, written as
+`R-K1coil` and `L-K1coil`, and the contact is an `S` element controlled by the voltage on the resistance, which is
+the coil current times the resistance. So the contact closes when the current has built up to the pull-in value and
+opens when it has died away to the drop-out value, a time of about L over R after the coil is switched, and a flyback
+diode across the coil makes the opening later. The figures are the coil resistance (70 Ohm), the coil inductance
+(50 mH), the pull-in voltage (3.5 V), the drop-out voltage (1 V) and the contact resistance (50 mOhm); the open
+contact is 1 GOhm.
+
+- A relay is a model of the coil and the contact, not of the mechanism: there is no contact bounce, travel time or
+  coil heating, and the pull-in and drop-out voltages are steady-state ones.
+- A switch or a relay that is open or closed at the operating point stays so in an AC sweep, since the sweep is
+  linear around it. Fast switching can fail to converge in a transient; a smaller time step helps.
 
 ## Independent sources
 
