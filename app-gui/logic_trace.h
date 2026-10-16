@@ -8,6 +8,7 @@
 #define IMCSIM_LOGIC_TRACE_H
 
 #include "circuit.h"
+#include <span>
 #include <vector>
 
 namespace GUI {
@@ -31,6 +32,16 @@ struct LogicNode {
     double LogicLevel = 5.0;
 };
 
+/**
+ * @struct  LogicSegment
+ * @brief   A stretch of a signal that keeps one logic state.
+ */
+struct LogicSegment {
+    double From = 0.0;
+    double To = 0.0;
+    LogicState State = LogicState::Low;
+};
+
 // Height of one lane, and the offsets of the three states inside it; lanes are stacked from the bottom
 inline constexpr double LaneStride = 1.5;
 inline constexpr double LaneLowOffset = 0.0;
@@ -41,6 +52,8 @@ LogicState ReadLogicState(double voltage, double logic_level);
 const char *GetLogicStateName(LogicState state);
 std::vector<double> BuildLane(const std::vector<double> &voltages, double logic_level, std::size_t lane);
 std::vector<LogicNode> FindLogicNodes(const Core::Circuit &circuit);
+std::vector<LogicSegment> FindLogicSegments(std::span<const double> times, std::span<const double> voltages,
+                                            double logic_level);
 
 } // namespace GUI
 

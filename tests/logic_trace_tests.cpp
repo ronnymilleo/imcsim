@@ -81,3 +81,34 @@ TEST_CASE("A circuit with no logic part has no logic nodes", "[logic_trace]") {
     circuit.Add(resistor, {1, 0});
     CHECK(GUI::FindLogicNodes(circuit).empty());
 }
+
+TEST_CASE("A signal splits into the stretches that keep one logic state", "[logic_trace]") {
+    const std::vector<double> times = {0.0, 1.0, 2.0, 3.0, 4.0, 5.0};
+    const std::vector<double> voltages = {0.0, 0.0, 5.0, 5.0, 2.5, 0.0};
+    const std::vector<GUI::LogicSegment> segments = GUI::FindLogicSegments(times, voltages, 5.0);
+    REQUIRE(segments.size() == 4);
+    // Each stretch runs to where the next starts, so together they cover the whole time
+    CHECK(segments[0].From == 0.0);
+    CHECK(segments[0].To == 2.0);
+    CHECK(segments[0].State == GUI::LogicState::Low);
+    CHECK(segments[1].From == 2.0);
+    CHECK(segments[1].To == 4.0);
+    CHECK(segments[1].State == GUI::LogicState::High);
+    CHECK(segments[2].From == 4.0);
+    CHECK(segments[2].To == 5.0);
+    CHECK(segments[2].State == GUI::LogicState::Unknown);
+    CHECK(segments[3].From == 5.0);
+    CHECK(segments[3].To == 5.0);
+    CHECK(segments[3].State == GUI::LogicState::Low);
+}
+
+TEST_CASE("A signal that never changes is one segment, and no samples give none", "[logic_trace]") {
+    const std::vector<double> times = {0.0, 1e-3, 2e-3};
+    const std::vector<double> voltages = {4.6, 4.6, 4.6};
+    const std::vector<GUI::LogicSegment> segments = GUI::FindLogicSegments(times, voltages, 5.0);
+    REQUIRE(segments.size() == 1);
+    CHECK(segments[0].From == 0.0);
+    CHECK(segments[0].To == 2e-3);
+    CHECK(segments[0].State == GUI::LogicState::High);
+    CHECK(GUI::FindLogicSegments({}, {}, 5.0).empty());
+}

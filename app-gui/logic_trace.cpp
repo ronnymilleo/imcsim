@@ -98,4 +98,30 @@ std::vector<LogicNode> FindLogicNodes(const Core::Circuit &circuit) {
     return nodes;
 }
 
+/**
+ * @brief   Splits a signal into the stretches that keep one logic state, as a logic analyzer labels its lanes.
+ * @param[in] times        Time of every sample, ascending.
+ * @param[in] voltages     Voltage at every sample; samples beyond the shorter of the two are ignored.
+ * @param[in] logic_level  Logic level the signal swings to.
+ * @return  Segments in time order that follow one another: each starts at the first sample of its state and ends where
+ *          the next begins, and the last ends at the last sample. Empty for no samples.
+ */
+std::vector<LogicSegment> FindLogicSegments(const std::span<const double> times, const std::span<const double> voltages,
+                                            const double logic_level) {
+    std::vector<LogicSegment> segments;
+    const std::size_t count = std::min(times.size(), voltages.size());
+    for (std::size_t index = 0; index < count; ++index) {
+        const LogicState state = ReadLogicState(voltages[index], logic_level);
+        if (!segments.empty() && segments.back().State == state) {
+            segments.back().To = times[index];
+            continue;
+        }
+        if (!segments.empty()) {
+            segments.back().To = times[index];
+        }
+        segments.push_back({.From = times[index], .To = times[index], .State = state});
+    }
+    return segments;
+}
+
 } // namespace GUI
