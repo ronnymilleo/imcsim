@@ -14,6 +14,7 @@
 #include "components/op_amp.h"
 #include "components/potentiometer.h"
 #include "components/resistor.h"
+#include "components/switch.h"
 #include "components/vcc.h"
 #include "components/voltage_source.h"
 #include "simulator.h"
@@ -1459,4 +1460,40 @@ TEST_CASE("A potentiometer's wiper moves its output in an AC sweep too", "[simul
     REQUIRE(run.Result.has_value());
     // 20% of the input is left at the wiper, which is -13.98 dB
     CHECK_THAT(run.Result->NodeMagnitudesDecibels[2].front(), Catch::Matchers::WithinAbs(20.0 * std::log10(0.2), 1e-3));
+}
+
+TEST_CASE("A closed switch passes the current of its circuit and an open one stops it", "[simulator]") {
+    Core::VCC supply;
+    supply.SetName("V1");
+    supply.SetValue(10.0);
+    Core::Switch contact(Core::ComponentType::Switch);
+    contact.SetName("SW1");
+    Core::Resistor load;
+    load.SetName("R1");
+    load.SetValue(1e3);
+    const Core::Ground reference;
+    Core::Circuit circuit;
+    circuit.Add(supply, {1});
+    circuit.Add(contact, {1, 2});
+    circuit.Add(load, {2, 0});
+    circuit.Add(reference, {0});
+    const auto switch_current = [](const Core::OperatingPointRun &run) {
+        REQUIRE(run.Result.has_value());
+        const auto found = std::ranges::find(run.Result->Currents, "SW1", &Core::ComponentCurrent::Name);
+        REQUIRE(found != run.Result->Currents.end());
+        return found->Current;
+    };
+
+    SECTION("open") {
+        const Core::OperatingPointRun run = Core::RunOperatingPoint(circuit);
+        CHECK_THAT(run.Result->NodeVoltages[2], Catch::Matchers::WithinAbs(0.0, 1e-6));
+        CHECK_THAT(switch_current(run), Catch::Matchers::WithinAbs(0.0, 1e-9));
+    }
+    SECTION("closed") {
+        contact.SetClosed(true);
+        const Core::OperatingPointRun run = Core::RunOperatingPoint(circuit);
+        // 1 mOhm in series with 1k: the load gets all but a millionth of the supply
+        CHECK_THAT(run.Result->NodeVoltages[2], Catch::Matchers::WithinAbs(10.0, 1e-4));
+        CHECK_THAT(switch_current(run), Catch::Matchers::WithinAbs(10e-3, 1e-6));
+    }
 }

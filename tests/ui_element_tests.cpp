@@ -13,6 +13,7 @@
 #include "ui_elements/ui_op_amp.h"
 #include "ui_elements/ui_potentiometer.h"
 #include "ui_elements/ui_resistor.h"
+#include "ui_elements/ui_switch.h"
 #include "ui_elements/ui_vcc.h"
 #include <catch2/catch_test_macros.hpp>
 #include <cstdlib>
@@ -183,6 +184,20 @@ TEST_CASE("A potentiometer has its two ends on the sides and its wiper above, tu
     CHECK_FALSE(pot.Contains({5.0f, 7.0f}));
     pot.SetRotation(GUI::Rotation::R90);
     CHECK(pot.GetTerminals() == std::vector<GUI::GridPoint>{{5, 3}, {5, 7}, {7, 5}});
+}
+
+TEST_CASE("A switch has two terminals like a resistor, and a push button is picked up to its button", "[ui_element]") {
+    GUI::UISwitch toggle(Core::ComponentType::Switch, {5, 5}, GUI::Rotation::R0);
+    CHECK(toggle.GetComponent().GetType() == Core::ComponentType::Switch);
+    CHECK(toggle.GetTerminals() == std::vector<GUI::GridPoint>{{3, 5}, {7, 5}});
+    CHECK(toggle.Contains({5.0f, 4.3f}));
+    CHECK_FALSE(toggle.Contains({5.0f, 3.5f}));
+
+    const GUI::UISwitch button(Core::ComponentType::PushButton, {5, 5}, GUI::Rotation::R0);
+    CHECK(button.GetComponent().GetType() == Core::ComponentType::PushButton);
+    CHECK(button.GetTerminals() == std::vector<GUI::GridPoint>{{3, 5}, {7, 5}});
+    CHECK(button.Contains({5.0f, 3.8f}));
+    CHECK_FALSE(button.Contains({5.0f, 3.0f}));
 }
 
 TEST_CASE("Op-amps list the output, the inputs and the supply pins", "[ui_element]") {

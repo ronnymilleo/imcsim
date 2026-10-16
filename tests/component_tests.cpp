@@ -15,6 +15,7 @@
 #include "components/op_amp.h"
 #include "components/potentiometer.h"
 #include "components/resistor.h"
+#include "components/switch.h"
 #include "components/vcc.h"
 #include "components/voltage_source.h"
 #include <catch2/catch_test_macros.hpp>
@@ -87,6 +88,28 @@ TEST_CASE("A potentiometer is a resistor of 10k with its wiper in the middle", "
         CHECK(Core::IsValidName("RV1", pot.GetNamePrefix()));
         CHECK(Core::NextComponentName(pot.GetNamePrefix(), {"RV1", "R7"}) == "RV2");
     }
+}
+
+TEST_CASE("A switch and a push button start open, with no value", "[component]") {
+    Core::Switch toggle(Core::ComponentType::Switch);
+    CHECK(std::string_view(toggle.GetNamePrefix()) == "SW");
+    CHECK(std::string_view(toggle.GetTypeName()) == "Switch");
+    CHECK(std::string_view(toggle.GetUnit()).empty());
+    CHECK_FALSE(toggle.HasValue());
+    CHECK_FALSE(toggle.IsValidValue(1.0));
+    CHECK_FALSE(toggle.IsClosed());
+
+    Core::Switch button(Core::ComponentType::PushButton);
+    CHECK(std::string_view(button.GetNamePrefix()) == "PB");
+    CHECK(std::string_view(button.GetTypeName()) == "PushButton");
+    CHECK_FALSE(button.IsClosed());
+
+    toggle.SetClosed(true);
+    CHECK(toggle.IsClosed());
+    CHECK(Core::IsSwitch(Core::ComponentType::Switch));
+    CHECK(Core::IsSwitch(Core::ComponentType::PushButton));
+    CHECK_FALSE(Core::IsSwitch(Core::ComponentType::Resistor));
+    CHECK(Core::ParseComponentType("PushButton") == Core::ComponentType::PushButton);
 }
 
 TEST_CASE("Ground has no name prefix and no value", "[component]") {

@@ -327,6 +327,8 @@ std::vector<CurrentVector> CurrentVectors(const Component &component) {
     case ComponentType::CCVS:
     case ComponentType::OpAmp:
     case ComponentType::Potentiometer:
+    case ComponentType::Switch:
+    case ComponentType::PushButton:
         break;
     }
     return {};
@@ -621,6 +623,8 @@ ACCurrent(const CircuitEntry &entry, const std::vector<double> &frequencies,
     case ComponentType::CCVS:
     case ComponentType::OpAmp:
     case ComponentType::Potentiometer:
+    case ComponentType::Switch:
+    case ComponentType::PushButton:
         break;
     }
     return std::unexpected(std::format("{} carries no current", component.GetName()));

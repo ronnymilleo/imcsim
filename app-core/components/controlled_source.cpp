@@ -38,6 +38,8 @@ double DefaultGain(const ComponentType type) {
     case ComponentType::PMOS:
     case ComponentType::OpAmp:
     case ComponentType::Potentiometer:
+    case ComponentType::Switch:
+    case ComponentType::PushButton:
         break;
     }
     return 1.0;

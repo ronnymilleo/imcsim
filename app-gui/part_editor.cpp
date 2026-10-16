@@ -247,7 +247,7 @@ void PartEditor::Draw() {
         ImGui::TextUnformatted(std::format("Name: {}", component.GetName()).c_str());
     }
     const Core::ComponentType type = component.GetType();
-    if (!component.HasValue() && !HasModel(type) && type != Core::ComponentType::NetLabel) {
+    if (!component.HasValue() && !HasModel(type) && type != Core::ComponentType::NetLabel && !Core::IsSwitch(type)) {
         return;
     }
 
@@ -287,6 +287,8 @@ void PartEditor::DrawFields(Core::Component &component) {
         DrawSource(static_cast<Core::Source &>(component));
     } else if (Core::IsControlledSource(type)) {
         DrawControlledSource(static_cast<Core::ControlledSource &>(component));
+    } else if (Core::IsSwitch(type)) {
+        DrawSwitch(static_cast<Core::Switch &>(component));
     } else {
         DrawValue(component);
         if (type == Core::ComponentType::Potentiometer) {
@@ -434,6 +436,17 @@ void PartEditor::DrawValue(Core::Component &component) {
         ImGui::TextDisabled("Standard values: %s, %g%%", Core::GetSeriesName(series),
                             Core::GetSeriesTolerancePercent(series));
     }
+}
+
+// A closed switch conducts; a push button is pressed when closed
+void PartEditor::DrawSwitch(Core::Switch &contact) {
+    bool closed = contact.IsClosed();
+    const bool is_button = contact.GetType() == Core::ComponentType::PushButton;
+    if (ImGui::Checkbox(is_button ? "Pressed" : "Closed", &closed)) {
+        contact.SetClosed(closed);
+        m_Schematic.MarkModified();
+    }
+    ImGui::TextDisabled("It is a %s while the circuit is simulated", closed ? "wire" : "gap");
 }
 
 // The wiper as a share of the track, counted from terminal 1

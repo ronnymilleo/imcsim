@@ -12,6 +12,7 @@ TEST_CASE("GetPartName names parts as the user reads them", "[element_factory]")
     CHECK(std::string(GUI::GetPartName(Core::ComponentType::VoltageSource)) == "Voltage source");
     CHECK(std::string(GUI::GetPartName(Core::ComponentType::NMOS)) == "N-channel MOSFET");
     CHECK(std::string(GUI::GetPartName(Core::ComponentType::OpAmp)) == "Op-amp");
+    CHECK(std::string(GUI::GetPartName(Core::ComponentType::PushButton)) == "Push button");
 }
 
 TEST_CASE("FindParts ignores case, spaces and punctuation", "[element_factory]") {
@@ -26,7 +27,7 @@ TEST_CASE("FindParts ignores case, spaces and punctuation", "[element_factory]")
     }
     SECTION("an empty query lists every part") {
         const std::vector<ComponentType> all = GUI::FindParts("");
-        CHECK(all.size() == 21);
+        CHECK(all.size() == 23);
         CHECK(std::ranges::contains(all, ComponentType::Resistor));
     }
 }

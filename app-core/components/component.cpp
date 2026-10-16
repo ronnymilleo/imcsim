@@ -22,7 +22,7 @@ constexpr auto AllTypes = std::to_array<ComponentType>({
     ComponentType::ZenerDiode,    ComponentType::LED,           ComponentType::NPN,           ComponentType::PNP,
     ComponentType::NMOS,          ComponentType::PMOS,          ComponentType::VCVS,          ComponentType::VCCS,
     ComponentType::CCCS,          ComponentType::CCVS,          ComponentType::OpAmp,         ComponentType::NetLabel,
-    ComponentType::Potentiometer,
+    ComponentType::Potentiometer, ComponentType::Switch,        ComponentType::PushButton,
 });
 
 } // namespace
@@ -93,6 +93,10 @@ const char *Component::GetNamePrefix() const {
         return "U";
     case ComponentType::Potentiometer:
         return "RV";
+    case ComponentType::Switch:
+        return "SW";
+    case ComponentType::PushButton:
+        return "PB";
     case ComponentType::Ground:
     case ComponentType::NetLabel:
         return "";
@@ -130,6 +134,8 @@ const char *Component::GetUnit() const {
     case ComponentType::OpAmp:
     case ComponentType::Ground:
     case ComponentType::NetLabel:
+    case ComponentType::Switch:
+    case ComponentType::PushButton:
     case ComponentType::Diode:
     case ComponentType::ZenerDiode:
     case ComponentType::LED:
@@ -151,6 +157,8 @@ bool Component::HasValue() const {
     switch (m_Type) {
     case ComponentType::Ground:
     case ComponentType::NetLabel:
+    case ComponentType::Switch:
+    case ComponentType::PushButton:
     case ComponentType::Diode:
     case ComponentType::ZenerDiode:
     case ComponentType::LED:
@@ -199,6 +207,8 @@ bool Component::IsValidValue(const double value) const {
         return true;
     case ComponentType::Ground:
     case ComponentType::NetLabel:
+    case ComponentType::Switch:
+    case ComponentType::PushButton:
     case ComponentType::Diode:
     case ComponentType::ZenerDiode:
     case ComponentType::LED:
@@ -293,6 +303,10 @@ const char *GetTypeName(const ComponentType type) {
         return "NetLabel";
     case ComponentType::Potentiometer:
         return "Potentiometer";
+    case ComponentType::Switch:
+        return "Switch";
+    case ComponentType::PushButton:
+        return "PushButton";
     }
     return "Unknown";
 }

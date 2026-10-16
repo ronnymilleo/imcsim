@@ -4,6 +4,7 @@
  */
 
 #include "components/potentiometer.h"
+#include "components/switch.h"
 #include "examples.h"
 #include "schematic.h"
 #include "simulator.h"
@@ -508,4 +509,34 @@ TEST_CASE("The LED dimmer lights the LED more as the potentiometer is turned tow
     CHECK_THAT(led_current(), Catch::Matchers::WithinAbs(14e-3, 2e-3));
     potentiometer.SetWiper(1.0);
     CHECK(led_current() < 0.5e-3);
+}
+
+TEST_CASE("The series switches light their LED only when both are closed, and the parallel ones when either is",
+          "[examples]") {
+    GUI::Schematic schematic;
+    OpenExample("switches_and_or.imcsim", schematic);
+    const auto set_closed = [&schematic](const std::string &name, const bool closed) {
+        const auto element = std::ranges::find_if(
+            schematic.GetElements(), [&name](const auto &part) { return part->GetComponent().GetName() == name; });
+        REQUIRE(element != schematic.GetElements().end());
+        static_cast<Core::Switch &>((*element)->GetComponent()).SetClosed(closed);
+    };
+    const auto lit = [&schematic](const std::string &led) {
+        const Core::OperatingPointRun run = Core::RunOperatingPoint(schematic.BuildCircuit());
+        REQUIRE(run.Result.has_value());
+        const auto found = std::ranges::find(run.Result->Currents, led, &Core::ComponentCurrent::Name);
+        REQUIRE(found != run.Result->Currents.end());
+        return found->Current > 5e-3;
+    };
+    for (const bool first : {false, true}) {
+        for (const bool second : {false, true}) {
+            INFO(std::format("First switch {}, second {}", first ? "closed" : "open", second ? "closed" : "open"));
+            set_closed("SW1", first);
+            set_closed("SW2", second);
+            set_closed("SW3", first);
+            set_closed("SW4", second);
+            CHECK(lit("D1") == (first && second));
+            CHECK(lit("D2") == (first || second));
+        }
+    }
 }

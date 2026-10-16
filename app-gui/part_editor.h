@@ -15,6 +15,7 @@
 #include "components/op_amp.h"
 #include "components/potentiometer.h"
 #include "components/source.h"
+#include "components/switch.h"
 #include "schematic.h"
 #include "standard_values.h"
 #include "value_field.h"
@@ -72,6 +73,7 @@ private:
     bool DrawModeledPart(Core::Component &component);
     void DrawValue(Core::Component &component);
     void DrawWiper(Core::Potentiometer &pot);
+    void DrawSwitch(Core::Switch &contact);
     void DrawNetLabel(Core::NetLabel &label);
     void DrawDiode(Core::Diode &diode);
     void DrawBJT(Core::BJT &bjt);

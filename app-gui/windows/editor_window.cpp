@@ -91,12 +91,14 @@ constexpr auto TransistorParts = std::to_array(
 constexpr auto ControlledParts = std::to_array(
     {Core::ComponentType::VCVS, Core::ComponentType::VCCS, Core::ComponentType::CCCS, Core::ComponentType::CCVS});
 constexpr auto AdjustableParts = std::to_array({Core::ComponentType::Potentiometer});
+constexpr auto SwitchParts = std::to_array({Core::ComponentType::Switch, Core::ComponentType::PushButton});
 constexpr auto PartGroups = std::to_array<PartGroup>({
     {"Sources", SourceParts},
     {"Diodes", DiodeParts},
     {"Transistors", TransistorParts},
     {"Controlled sources", ControlledParts},
     {"Adjustable parts", AdjustableParts},
+    {"Switches", SwitchParts},
 });
 
 // Parts with a button of their own, in toolbar groups

@@ -13,6 +13,7 @@
 #include "components/op_amp.h"
 #include "components/potentiometer.h"
 #include "components/source.h"
+#include "components/switch.h"
 #include "element_factory.h"
 #include "nlohmann/json.hpp"
 #include <array>
@@ -261,6 +262,8 @@ nlohmann::json WriteElement(const UIElement &element) {
         if (const std::string &net = static_cast<const Core::NetLabel &>(component).GetNet(); !net.empty()) {
             object["net"] = net;
         }
+    } else if (Core::IsSwitch(type)) {
+        object["closed"] = static_cast<const Core::Switch &>(component).IsClosed();
     } else if (type == Core::ComponentType::Potentiometer) {
         object["wiper"] = static_cast<const Core::Potentiometer &>(component).GetWiper();
     } else if (type == Core::ComponentType::OpAmp) {
@@ -446,6 +449,14 @@ std::expected<std::unique_ptr<UIElement>, std::string> ReadElement(const nlohman
             return std::unexpected("has a net name that is not 1 to 32 letters, digits, _, - or .");
         }
         static_cast<Core::NetLabel &>(component).SetNet(*net);
+    }
+    // A switch saved without a state stays open
+    if (Core::IsSwitch(component.GetType()) && object.contains("closed")) {
+        const std::optional<bool> closed = ReadBool(object, "closed");
+        if (!closed) {
+            return std::unexpected("has a closed flag that is not true or false");
+        }
+        static_cast<Core::Switch &>(component).SetClosed(*closed);
     }
     // A potentiometer saved without a wiper keeps it in the middle
     if (component.GetType() == Core::ComponentType::Potentiometer && object.contains("wiper")) {

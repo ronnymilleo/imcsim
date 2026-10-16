@@ -20,6 +20,7 @@ add_library(imcsim-core-lib
             components/potentiometer.cpp
             components/resistor.cpp
             components/source.cpp
+            components/switch.cpp
             components/vcc.cpp
             components/voltage_source.cpp
             simulator.cpp

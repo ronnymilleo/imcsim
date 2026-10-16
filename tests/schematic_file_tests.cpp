@@ -11,6 +11,7 @@
 #include "components/net_label.h"
 #include "components/op_amp.h"
 #include "components/potentiometer.h"
+#include "components/switch.h"
 #include "components/voltage_source.h"
 #include "element_factory.h"
 #include "schematic_file.h"
@@ -557,6 +558,32 @@ TEST_CASE("A potentiometer saved without a wiper has it in the middle, and a wip
     const std::string off_track =
         R"({"type": "Potentiometer", "x": 1, "y": 1, "rotation": 0, "name": "RV1", "value": 1000.0, "wiper": 1.5})";
     const GUI::LoadedSchematic skipped = LoadOrFail(Document(off_track, ""));
+    CHECK(skipped.Elements.empty());
+    CHECK(skipped.Warnings.size() == 1);
+}
+
+TEST_CASE("A switch and a push button keep their state, and load open when the file does not say", "[schematic_file]") {
+    std::vector<std::unique_ptr<GUI::UIElement>> elements;
+    elements.push_back(GUI::CreateElement(Core::ComponentType::Switch, {2, 2}, GUI::Rotation::R0));
+    static_cast<Core::Switch &>(elements.back()->GetComponent()).SetName("SW1");
+    static_cast<Core::Switch &>(elements.back()->GetComponent()).SetClosed(true);
+    elements.push_back(GUI::CreateElement(Core::ComponentType::PushButton, {8, 2}, GUI::Rotation::R90));
+    static_cast<Core::Switch &>(elements.back()->GetComponent()).SetName("PB1");
+
+    const GUI::LoadedSchematic loaded = LoadOrFail(GUI::SaveSchematic(elements, {}, {}, {}));
+    CHECK(loaded.Warnings.empty());
+    REQUIRE(loaded.Elements.size() == 2);
+    CHECK(static_cast<const Core::Switch &>(loaded.Elements[0]->GetComponent()).IsClosed());
+    CHECK_FALSE(static_cast<const Core::Switch &>(loaded.Elements[1]->GetComponent()).IsClosed());
+    CHECK(loaded.Elements[1]->GetComponent().GetType() == Core::ComponentType::PushButton);
+
+    const std::string without_state = R"({"type": "Switch", "x": 1, "y": 1, "rotation": 0, "name": "SW1"})";
+    const GUI::LoadedSchematic plain = LoadOrFail(Document(without_state, ""));
+    REQUIRE(plain.Elements.size() == 1);
+    CHECK_FALSE(static_cast<const Core::Switch &>(plain.Elements[0]->GetComponent()).IsClosed());
+
+    const std::string bad_state = R"({"type": "Switch", "x": 1, "y": 1, "rotation": 0, "name": "SW1", "closed": 3})";
+    const GUI::LoadedSchematic skipped = LoadOrFail(Document(bad_state, ""));
     CHECK(skipped.Elements.empty());
     CHECK(skipped.Warnings.size() == 1);
 }

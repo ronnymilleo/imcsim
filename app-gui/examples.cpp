@@ -42,6 +42,15 @@ constexpr auto Examples = std::to_array<Example>({
         .FileName = "potentiometer_led_dimmer.imcsim",
     },
     {
+        .Title = "Switches as AND and OR",
+        .Group = "Basics",
+        .Description =
+            "Two switches in series light the red LED only when both are closed, and two in parallel light the "
+            "green one when either is. Select a switch, tick Closed in its properties, and run the operating "
+            "point to see the LED currents: 9 to 10 mA when lit and almost nothing when not.",
+        .FileName = "switches_and_or.imcsim",
+    },
+    {
         .Title = "Series RLC resonance",
         .Group = "Basics",
         .Description =

@@ -17,6 +17,7 @@
 #include "ui_elements/ui_op_amp.h"
 #include "ui_elements/ui_potentiometer.h"
 #include "ui_elements/ui_resistor.h"
+#include "ui_elements/ui_switch.h"
 #include "ui_elements/ui_vcc.h"
 #include "ui_elements/ui_voltage_source.h"
 #include <algorithm>
@@ -59,6 +60,8 @@ constexpr auto Parts = std::to_array<PartInfo>({
     {Core::ComponentType::OpAmp, "Op-amp"},
     {Core::ComponentType::NetLabel, "Net label"},
     {Core::ComponentType::Potentiometer, "Potentiometer"},
+    {Core::ComponentType::Switch, "Switch"},
+    {Core::ComponentType::PushButton, "Push button"},
 });
 
 // Lowercase letters and digits only, so "opamp" finds "Op-amp" and "vcc" finds "VCC supply"
@@ -119,6 +122,9 @@ std::unique_ptr<UIElement> CreateElement(const Core::ComponentType type, const G
         return std::make_unique<UINetLabel>(position, rotation);
     case Core::ComponentType::Potentiometer:
         return std::make_unique<UIPotentiometer>(position, rotation);
+    case Core::ComponentType::Switch:
+    case Core::ComponentType::PushButton:
+        return std::make_unique<UISwitch>(type, position, rotation);
     }
     return nullptr;
 }

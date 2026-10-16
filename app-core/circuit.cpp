@@ -12,6 +12,7 @@
 #include "components/op_amp.h"
 #include "components/potentiometer.h"
 #include "components/source.h"
+#include "components/switch.h"
 #include "spice_value.h"
 #include <algorithm>
 #include <format>
@@ -28,6 +29,10 @@ bool IsACSource(const Component &component) {
 
 // The two halves of a potentiometer track never get to 0 Ohm, which SPICE rejects, however close to an end the wiper is
 constexpr double MinTrackResistance = 1e-3;
+
+// A switch is a resistor, which closed is nearly a wire and open nearly nothing at all
+constexpr double ClosedSwitchResistance = 1e-3;
+constexpr double OpenSwitchResistance = 1e12;
 
 // One line serves every analysis: .op reads the DC value, .ac the AC magnitude and .tran the waveform. A pulse
 // starts at its low level, so that is its DC value. The name tells SPICE whether it is a voltage or current source
@@ -273,6 +278,13 @@ std::string Circuit::ToSpiceNetlist(const std::string_view analysis, const bool 
             netlist += std::format("R-{}b {} {} {}\n", pot.GetName(), nodes[2], nodes[1], second);
             break;
         }
+        case ComponentType::Switch:
+        case ComponentType::PushButton: {
+            const bool closed = static_cast<const Switch &>(component).IsClosed();
+            netlist += std::format("R-{} {} {} {}\n", component.GetName(), nodes[0], nodes[1],
+                                   FormatSpiceValue(closed ? ClosedSwitchResistance : OpenSwitchResistance));
+            break;
+        }
         case ComponentType::Ground:
         case ComponentType::NetLabel:
             break;
@@ -290,13 +302,13 @@ std::string Circuit::ToSpiceNetlist(const std::string_view analysis, const bool 
 /**
  * @brief   Lists the terminals of a component whose current is measured with a probe.
  * @param[in] component  Any component.
- * @return  The anode of a diode part, every terminal of a transistor or a potentiometer, and the first output
- *          terminal of a controlled source or the output of an op-amp; nothing for the others, whose currents ngspice
- *          reports directly.
+ * @return  The anode of a diode part, the first terminal of a switch, every terminal of a transistor or a
+ *          potentiometer, and the first output terminal of a controlled source or the output of an op-amp; nothing
+ *          for the others, whose currents ngspice reports directly.
  */
 std::vector<CurrentProbe> GetCurrentProbes(const Component &component) {
     const ComponentType type = component.GetType();
-    if (IsDiode(type) || IsControlledSource(type) || type == ComponentType::OpAmp) {
+    if (IsDiode(type) || IsControlledSource(type) || IsSwitch(type) || type == ComponentType::OpAmp) {
         return {{0, ""}};
     }
     if (IsBJT(component.GetType())) {

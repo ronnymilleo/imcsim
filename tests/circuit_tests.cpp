@@ -15,6 +15,7 @@
 #include "components/op_amp.h"
 #include "components/potentiometer.h"
 #include "components/resistor.h"
+#include "components/switch.h"
 #include "components/vcc.h"
 #include "components/voltage_source.h"
 #include <catch2/catch_test_macros.hpp>
@@ -405,4 +406,39 @@ TEST_CASE("A potentiometer probes its three terminals, and the probes carry its 
     const std::string netlist = circuit.ToSpiceNetlist("", true);
     CHECK(netlist.find("Vprobe-RV1-A 1 4 DC 0\n") != std::string::npos);
     CHECK(netlist.find("Vprobe-RV1-W 3 6 DC 0\n") != std::string::npos);
+}
+
+TEST_CASE("ToSpiceNetlist writes a switch as a resistor that is nearly a wire closed and nearly nothing open",
+          "[circuit]") {
+    Core::Switch toggle(Core::ComponentType::Switch);
+    toggle.SetName("SW1");
+    Core::Switch button(Core::ComponentType::PushButton);
+    button.SetName("PB1");
+    Core::Circuit circuit;
+    circuit.Add(toggle, {1, 2});
+    circuit.Add(button, {2, 3});
+
+    std::string netlist = circuit.ToSpiceNetlist();
+    CHECK(netlist.find("R-SW1 1 2 1T\n") != std::string::npos);
+    CHECK(netlist.find("R-PB1 2 3 1T\n") != std::string::npos);
+    toggle.SetClosed(true);
+    button.SetClosed(true);
+    netlist = circuit.ToSpiceNetlist();
+    CHECK(netlist.find("R-SW1 1 2 1m\n") != std::string::npos);
+    CHECK(netlist.find("R-PB1 2 3 1m\n") != std::string::npos);
+}
+
+TEST_CASE("A switch has one current probe, on its first terminal, named after the part", "[circuit]") {
+    Core::Switch toggle(Core::ComponentType::Switch);
+    toggle.SetName("SW1");
+    const std::vector<Core::CurrentProbe> probes = Core::GetCurrentProbes(toggle);
+    REQUIRE(probes.size() == 1);
+    CHECK(probes[0].Terminal == 0);
+    CHECK(Core::GetCurrentName(toggle, probes[0].Label) == "SW1");
+
+    Core::Circuit circuit;
+    circuit.Add(toggle, {1, 2});
+    const std::string netlist = circuit.ToSpiceNetlist("", true);
+    CHECK(netlist.find("Vprobe-SW1 1 3 DC 0\n") != std::string::npos);
+    CHECK(netlist.find("R-SW1 3 2 1T\n") != std::string::npos);
 }

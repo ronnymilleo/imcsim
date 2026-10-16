@@ -13,7 +13,7 @@ elements, so the results are those of ngspice with the models below. Some things
 - Values are exact: there are no tolerances, aging or Monte Carlo spread.
 - There is no noise analysis, so no part models noise.
 - To report terminal currents in every analysis, the netlist adds a 0 V source in series with diodes, transistors,
-  potentiometers, controlled sources and op-amp outputs. It does not change the circuit; the Netlist window leaves it out unless a
+  potentiometers, switches, controlled sources and op-amp outputs. It does not change the circuit; the Netlist window leaves it out unless a
   current-controlled source needs it.
 
 - The power shown on the schematic is what a part absorbs: the sum over its terminals of the node voltage times the
@@ -41,6 +41,16 @@ All three are ideal:
   on terminal 2; at an end the nearest half is 1 mOhm, since SPICE rejects 0 Ohm. The track is linear, so there is
   no log taper, no wiper resistance and no power rating, and the wiper moves only by editing the part, not during a
   run.
+
+## Switches and push buttons
+
+A switch and a push button are the same part for the simulation: a resistor, `R-SW1` in the netlist, of 1 mOhm when
+closed and 1 TOhm when open. A push button is closed while it is pressed. Both start open.
+
+- The state is set in the properties and holds for the whole run; nothing opens or closes a contact during a
+  transient. A contact that follows a voltage is a part of its own.
+- The open resistance is high but not infinite, so an open switch leaks a few picoamperes at a few volts. There is
+  no bounce, contact capacitance or voltage rating.
 
 ## Independent sources
 
