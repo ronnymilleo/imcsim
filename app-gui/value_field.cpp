@@ -76,6 +76,70 @@ void ValueField::StartTyping(const char first) {
 }
 
 /**
+ * @brief   Focuses the input when the user started typing elsewhere or a step rewrote its text.
+ * @return  The character typed before the field was shown, which the input starts with.
+ */
+std::optional<char> ValueField::FocusInput() {
+    // Focusing from code selects the whole text, so once the input is active the cursor moves after the character.
+    // The character counts as an edit, so a value typed as a single digit applies too
+    const std::optional<char> first = std::exchange(m_TypingStart, std::nullopt);
+    if (first) {
+        m_Text.fill('\0');
+        m_Text[0] = *first;
+        m_CursorToEnd = true;
+        ImGui::SetKeyboardFocusHere();
+    } else if (std::exchange(m_RefocusInput, false)) {
+        // A step rewrote the text, which an active input only takes up when it is focused again
+        ImGui::SetKeyboardFocusHere();
+    }
+    return first;
+}
+
+/**
+ * @brief   Draws the text input, with the cursor after a character typed from outside.
+ * @return  Whether the user changed the text this frame.
+ */
+bool ValueField::DrawInput() {
+    const auto place_cursor = [](ImGuiInputTextCallbackData *data) {
+        auto &cursor_to_end = *static_cast<bool *>(data->UserData);
+        if (std::exchange(cursor_to_end, false)) {
+            data->CursorPos = data->BufTextLen;
+            data->SelectionStart = data->BufTextLen;
+            data->SelectionEnd = data->BufTextLen;
+        }
+        return 0;
+    };
+    return ImGui::InputText("##value", m_Text.data(), m_Text.size(), ImGuiInputTextFlags_CallbackAlways, place_cursor,
+                            &m_CursorToEnd);
+}
+
+/**
+ * @brief   Moves the value a number of steps through a series and loads it as the new text.
+ * @param[in] unit      Unit the text may carry.
+ * @param[in] is_valid  Tells whether a value is acceptable; the value does not move when the next one is not.
+ * @param[in] series    Standard series to step through.
+ * @param[in] step      Number of steps, negative for down.
+ * @return  The new value, or no value when the text cannot be read or the stepped value is not valid.
+ */
+std::optional<double> ValueField::ApplyStep(const std::string &unit, const std::function<bool(double)> &is_valid,
+                                            const Core::ValueSeries series, const int step) {
+    const std::optional<double> current = Core::ParseValue(m_Text.data(), unit);
+    if (!current) {
+        return std::nullopt;
+    }
+    const double stepped = Core::StepStandardValue(series, *current, step);
+    if (!is_valid(stepped)) {
+        return std::nullopt;
+    }
+    // While active, the input keeps its own text over the one loaded here, so it lets go and takes the focus again
+    // next frame
+    ImGui::ClearActiveID();
+    Load(stepped);
+    m_RefocusInput = true;
+    return stepped;
+}
+
+/**
  * @brief   Draws the label, the text input and the unit on one line, and an error below when the text is invalid.
  * @param[in] label     Text before the input; it also gives the input its ImGui ID, so it must be unique in the
  *                      window.
@@ -90,29 +154,8 @@ std::optional<double> ValueField::Draw(const char *label, const std::string &uni
     DrawFieldLabel(label);
     ImGui::PushID(label);
     std::optional<double> edited;
-    // Focusing from code selects the whole text, so once the input is active the cursor moves after the character.
-    // The character counts as an edit, so a value typed as a single digit applies too
-    const std::optional<char> first = std::exchange(m_TypingStart, std::nullopt);
-    if (first) {
-        m_Text.fill('\0');
-        m_Text[0] = *first;
-        m_CursorToEnd = true;
-        ImGui::SetKeyboardFocusHere();
-    } else if (std::exchange(m_RefocusInput, false)) {
-        // A step rewrote the text, which an active input only takes up when it is focused again
-        ImGui::SetKeyboardFocusHere();
-    }
-    const auto place_cursor = [](ImGuiInputTextCallbackData *data) {
-        auto &cursor_to_end = *static_cast<bool *>(data->UserData);
-        if (std::exchange(cursor_to_end, false)) {
-            data->CursorPos = data->BufTextLen;
-            data->SelectionStart = data->BufTextLen;
-            data->SelectionEnd = data->BufTextLen;
-        }
-        return 0;
-    };
-    const bool changed = ImGui::InputText("##value", m_Text.data(), m_Text.size(), ImGuiInputTextFlags_CallbackAlways,
-                                          place_cursor, &m_CursorToEnd);
+    const std::optional<char> first = FocusInput();
+    const bool changed = DrawInput();
     const bool steps = series != Core::ValueSeries::Free;
     int step = 0;
     if (steps) {
@@ -147,16 +190,8 @@ std::optional<double> ValueField::Draw(const char *label, const std::string &uni
     }
     ImGui::PopID();
     if (step != 0) {
-        if (const std::optional<double> current = Core::ParseValue(m_Text.data(), unit)) {
-            const double stepped = Core::StepStandardValue(series, *current, step);
-            if (is_valid(stepped)) {
-                // While active, the input keeps its own text over the one loaded here, so it lets go and takes
-                // the focus again next frame
-                ImGui::ClearActiveID();
-                Load(stepped);
-                m_RefocusInput = true;
-                edited = stepped;
-            }
+        if (const std::optional<double> stepped = ApplyStep(unit, is_valid, series, step)) {
+            edited = stepped;
         }
     }
     if (m_Invalid) {

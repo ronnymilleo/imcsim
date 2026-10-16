@@ -29,6 +29,11 @@ public:
                                Core::ValueSeries series = Core::ValueSeries::Free);
 
 private:
+    std::optional<char> FocusInput();
+    bool DrawInput();
+    std::optional<double> ApplyStep(const std::string &unit, const std::function<bool(double)> &is_valid,
+                                    Core::ValueSeries series, int step);
+
     std::array<char, 32> m_Text{};
     bool m_Invalid = false;
     // A character typed elsewhere that the next Draw() focuses the input with, and whether the cursor still has to

@@ -274,6 +274,47 @@ void WriteModelChoice(const Part &part, const std::array<ParameterKey<Parameters
     }
 }
 
+// Parts with a ready model or custom parameters; the ideal op-amp also keeps its bandwidth
+void WriteModelFields(const Core::Component &component, nlohmann::json &object) {
+    const Core::ComponentType type = component.GetType();
+    if (Core::IsDiode(type)) {
+        WriteModelChoice(static_cast<const Core::Diode &>(component), DiodeKeys, object);
+    } else if (Core::IsBJT(type)) {
+        WriteModelChoice(static_cast<const Core::BJT &>(component), BJTKeys, object);
+    } else if (Core::IsMOSFET(type)) {
+        WriteModelChoice(static_cast<const Core::MOSFET &>(component), MOSFETKeys, object);
+    } else if (type == Core::ComponentType::OpAmp) {
+        const auto &op_amp = static_cast<const Core::OpAmp &>(component);
+        WriteModelChoice(op_amp, OpAmpKeys, object);
+        if (op_amp.IsIdeal()) {
+            object["gbw"] = op_amp.GetIdealBandwidth();
+        }
+    }
+}
+
+// The state or figures of the other parts that have any
+void WriteKindFields(const Core::Component &component, nlohmann::json &object) {
+    const Core::ComponentType type = component.GetType();
+    if (Core::IsCurrentControlled(type)) {
+        object["control"] = static_cast<const Core::ControlledSource &>(component).GetControllingCurrent();
+    } else if (type == Core::ComponentType::NetLabel) {
+        // A label with no name yet is saved without the key
+        if (const std::string &net = static_cast<const Core::NetLabel &>(component).GetNet(); !net.empty()) {
+            object["net"] = net;
+        }
+    } else if (Core::IsSwitch(type)) {
+        object["closed"] = static_cast<const Core::Switch &>(component).IsClosed();
+    } else if (type == Core::ComponentType::VSwitch) {
+        WritePartParameters(static_cast<const Core::VoltageControlledSwitch &>(component), SwitchKeys, object);
+    } else if (type == Core::ComponentType::Relay) {
+        WritePartParameters(static_cast<const Core::Relay &>(component), RelayKeys, object);
+    } else if (type == Core::ComponentType::Transformer) {
+        WritePartParameters(static_cast<const Core::Transformer &>(component), TransformerKeys, object);
+    } else if (type == Core::ComponentType::Potentiometer) {
+        object["wiper"] = static_cast<const Core::Potentiometer &>(component).GetWiper();
+    }
+}
+
 nlohmann::json WriteElement(const UIElement &element) {
     const Core::Component &component = element.GetComponent();
     nlohmann::json object = {
@@ -301,37 +342,8 @@ nlohmann::json WriteElement(const UIElement &element) {
         WriteParameters(PulseKeys, source.GetPulse(), pulse);
         object["pulse"] = pulse;
     }
-    const Core::ComponentType type = component.GetType();
-    if (Core::IsDiode(type)) {
-        WriteModelChoice(static_cast<const Core::Diode &>(component), DiodeKeys, object);
-    } else if (Core::IsBJT(type)) {
-        WriteModelChoice(static_cast<const Core::BJT &>(component), BJTKeys, object);
-    } else if (Core::IsMOSFET(type)) {
-        WriteModelChoice(static_cast<const Core::MOSFET &>(component), MOSFETKeys, object);
-    } else if (Core::IsCurrentControlled(type)) {
-        object["control"] = static_cast<const Core::ControlledSource &>(component).GetControllingCurrent();
-    } else if (type == Core::ComponentType::NetLabel) {
-        // A label with no name yet is saved without the key
-        if (const std::string &net = static_cast<const Core::NetLabel &>(component).GetNet(); !net.empty()) {
-            object["net"] = net;
-        }
-    } else if (Core::IsSwitch(type)) {
-        object["closed"] = static_cast<const Core::Switch &>(component).IsClosed();
-    } else if (type == Core::ComponentType::VSwitch) {
-        WritePartParameters(static_cast<const Core::VoltageControlledSwitch &>(component), SwitchKeys, object);
-    } else if (type == Core::ComponentType::Relay) {
-        WritePartParameters(static_cast<const Core::Relay &>(component), RelayKeys, object);
-    } else if (type == Core::ComponentType::Transformer) {
-        WritePartParameters(static_cast<const Core::Transformer &>(component), TransformerKeys, object);
-    } else if (type == Core::ComponentType::Potentiometer) {
-        object["wiper"] = static_cast<const Core::Potentiometer &>(component).GetWiper();
-    } else if (type == Core::ComponentType::OpAmp) {
-        const auto &op_amp = static_cast<const Core::OpAmp &>(component);
-        WriteModelChoice(op_amp, OpAmpKeys, object);
-        if (op_amp.IsIdeal()) {
-            object["gbw"] = op_amp.GetIdealBandwidth();
-        }
-    }
+    WriteModelFields(component, object);
+    WriteKindFields(component, object);
     return object;
 }
 
