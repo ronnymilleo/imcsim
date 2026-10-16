@@ -1,0 +1,279 @@
+{
+  "format": "imcsim-schematic",
+  "version": 1,
+  "elements": [
+    {
+      "type": "VoltageSource",
+      "rotation": 90,
+      "x": 2,
+      "y": 11,
+      "source": "AC",
+      "value": 0,
+      "amplitude": 1,
+      "frequency": 1000,
+      "offset": 0,
+      "ac_magnitude": 1,
+      "pulse": {
+        "delay": 0,
+        "fall": 0.000001,
+        "high": 5,
+        "low": 0,
+        "period": 0.001,
+        "rise": 0.000001,
+        "width": 0.0005
+      },
+      "name": "Vin1"
+    },
+    {
+      "type": "Resistor",
+      "rotation": 0,
+      "x": 6,
+      "y": 9,
+      "value": 10000,
+      "name": "R1"
+    },
+    {
+      "type": "Resistor",
+      "rotation": 0,
+      "x": 10,
+      "y": 9,
+      "value": 10000,
+      "name": "R2"
+    },
+    {
+      "type": "Capacitor",
+      "rotation": 0,
+      "x": 12,
+      "y": 21,
+      "value": 2.2e-8,
+      "name": "C1"
+    },
+    {
+      "type": "Capacitor",
+      "rotation": 90,
+      "x": 13,
+      "y": 12,
+      "value": 1e-8,
+      "name": "C2"
+    },
+    {
+      "type": "OpAmp",
+      "rotation": 0,
+      "x": 18,
+      "y": 8,
+      "model": "Ideal",
+      "gbw": 1000000,
+      "name": "U1"
+    },
+    {
+      "type": "VCC",
+      "rotation": 0,
+      "x": 18,
+      "y": 6,
+      "value": 15,
+      "name": "V1"
+    },
+    {
+      "type": "VCC",
+      "rotation": 180,
+      "x": 18,
+      "y": 10,
+      "value": -15,
+      "name": "V2"
+    },
+    {
+      "type": "Ground",
+      "rotation": 0,
+      "x": 2,
+      "y": 15
+    },
+    {
+      "type": "Ground",
+      "rotation": 0,
+      "x": 13,
+      "y": 16
+    }
+  ],
+  "wires": [
+    {
+      "start": [
+        2,
+        13
+      ],
+      "end": [
+        2,
+        15
+      ]
+    },
+    {
+      "start": [
+        2,
+        9
+      ],
+      "end": [
+        4,
+        9
+      ]
+    },
+    {
+      "start": [
+        12,
+        9
+      ],
+      "end": [
+        15,
+        9
+      ]
+    },
+    {
+      "start": [
+        13,
+        9
+      ],
+      "end": [
+        13,
+        10
+      ]
+    },
+    {
+      "start": [
+        13,
+        14
+      ],
+      "end": [
+        13,
+        16
+      ]
+    },
+    {
+      "start": [
+        8,
+        9
+      ],
+      "end": [
+        8,
+        21
+      ]
+    },
+    {
+      "start": [
+        8,
+        21
+      ],
+      "end": [
+        10,
+        21
+      ]
+    },
+    {
+      "start": [
+        14,
+        21
+      ],
+      "end": [
+        23,
+        21
+      ]
+    },
+    {
+      "start": [
+        23,
+        21
+      ],
+      "end": [
+        23,
+        8
+      ]
+    },
+    {
+      "start": [
+        23,
+        8
+      ],
+      "end": [
+        21,
+        8
+      ]
+    },
+    {
+      "start": [
+        15,
+        7
+      ],
+      "end": [
+        15,
+        2
+      ]
+    },
+    {
+      "start": [
+        15,
+        2
+      ],
+      "end": [
+        23,
+        2
+      ]
+    },
+    {
+      "start": [
+        23,
+        2
+      ],
+      "end": [
+        23,
+        8
+      ]
+    },
+    {
+      "start": [
+        23,
+        8
+      ],
+      "end": [
+        25,
+        8
+      ]
+    }
+  ],
+  "simulation": {
+    "analysis": "ac_sweep",
+    "transient": {
+      "step": 0.000005,
+      "stop": 0.005
+    },
+    "ac_sweep": {
+      "start": 10,
+      "stop": 100000,
+      "points_per_decade": 50
+    },
+    "dc_sweep": {
+      "step_source": false,
+      "swept": {
+        "source": "",
+        "start": 0,
+        "step": 0.1,
+        "stop": 5
+      },
+      "stepped": {
+        "source": "",
+        "start": 0,
+        "step": 0.1,
+        "stop": 5
+      }
+    }
+  },
+  "measurements": {
+    "voltages": [
+      [
+        2,
+        9
+      ],
+      [
+        14,
+        21
+      ]
+    ],
+    "currents": []
+  }
+}

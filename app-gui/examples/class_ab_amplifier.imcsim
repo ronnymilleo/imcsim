@@ -1,0 +1,521 @@
+{
+  "format": "imcsim-schematic",
+  "version": 1,
+  "elements": [
+    {
+      "type": "VCC",
+      "rotation": 0,
+      "x": 4,
+      "y": 4,
+      "value": 12,
+      "name": "V1"
+    },
+    {
+      "type": "VCC",
+      "rotation": 180,
+      "x": 4,
+      "y": 36,
+      "value": -12,
+      "name": "V2"
+    },
+    {
+      "type": "VoltageSource",
+      "rotation": 90,
+      "x": 2,
+      "y": 22,
+      "source": "AC",
+      "value": 0,
+      "amplitude": 1.5,
+      "frequency": 1000,
+      "offset": 0,
+      "ac_magnitude": 1,
+      "pulse": {
+        "delay": 0,
+        "fall": 0.000001,
+        "high": 5,
+        "low": 0,
+        "period": 0.001,
+        "rise": 0.000001,
+        "width": 0.0005
+      },
+      "name": "Vin1"
+    },
+    {
+      "type": "Ground",
+      "rotation": 0,
+      "x": 2,
+      "y": 26
+    },
+    {
+      "type": "NetLabel",
+      "rotation": 0,
+      "x": 2,
+      "y": 18,
+      "net": "IN"
+    },
+    {
+      "type": "NetLabel",
+      "rotation": 0,
+      "x": 26,
+      "y": 17,
+      "net": "IN"
+    },
+    {
+      "type": "NetLabel",
+      "rotation": 0,
+      "x": 22,
+      "y": 18,
+      "net": "OUT_B"
+    },
+    {
+      "type": "NetLabel",
+      "rotation": 0,
+      "x": 46,
+      "y": 18,
+      "net": "OUT_AB"
+    },
+    {
+      "type": "NPN",
+      "rotation": 0,
+      "x": 14,
+      "y": 12,
+      "model": "2N3904",
+      "name": "Q1"
+    },
+    {
+      "type": "PNP",
+      "rotation": 180,
+      "x": 14,
+      "y": 24,
+      "model": "2N3906",
+      "mirrored": true,
+      "name": "Q2"
+    },
+    {
+      "type": "Resistor",
+      "rotation": 90,
+      "x": 15,
+      "y": 16,
+      "value": 1,
+      "name": "R1"
+    },
+    {
+      "type": "Resistor",
+      "rotation": 90,
+      "x": 15,
+      "y": 20,
+      "value": 1,
+      "name": "R2"
+    },
+    {
+      "type": "Resistor",
+      "rotation": 90,
+      "x": 22,
+      "y": 21,
+      "value": 16,
+      "name": "R3"
+    },
+    {
+      "type": "Ground",
+      "rotation": 0,
+      "x": 22,
+      "y": 26
+    },
+    {
+      "type": "Capacitor",
+      "rotation": 0,
+      "x": 28,
+      "y": 17,
+      "value": 0.00001,
+      "name": "C2"
+    },
+    {
+      "type": "Resistor",
+      "rotation": 90,
+      "x": 32,
+      "y": 10,
+      "value": 1000,
+      "name": "R7"
+    },
+    {
+      "type": "Diode",
+      "rotation": 90,
+      "x": 32,
+      "y": 15,
+      "model": "1N4148",
+      "name": "D1"
+    },
+    {
+      "type": "Diode",
+      "rotation": 90,
+      "x": 32,
+      "y": 19,
+      "model": "1N4148",
+      "name": "D2"
+    },
+    {
+      "type": "Resistor",
+      "rotation": 90,
+      "x": 32,
+      "y": 26,
+      "value": 1000,
+      "name": "R8"
+    },
+    {
+      "type": "NPN",
+      "rotation": 0,
+      "x": 38,
+      "y": 12,
+      "model": "2N3904",
+      "name": "Q3"
+    },
+    {
+      "type": "PNP",
+      "rotation": 180,
+      "x": 38,
+      "y": 24,
+      "model": "2N3906",
+      "mirrored": true,
+      "name": "Q4"
+    },
+    {
+      "type": "Resistor",
+      "rotation": 90,
+      "x": 39,
+      "y": 16,
+      "value": 1,
+      "name": "R4"
+    },
+    {
+      "type": "Resistor",
+      "rotation": 90,
+      "x": 39,
+      "y": 20,
+      "value": 1,
+      "name": "R5"
+    },
+    {
+      "type": "Resistor",
+      "rotation": 90,
+      "x": 46,
+      "y": 21,
+      "value": 16,
+      "name": "R6"
+    },
+    {
+      "type": "Ground",
+      "rotation": 0,
+      "x": 46,
+      "y": 26
+    }
+  ],
+  "wires": [
+    {
+      "start": [
+        2,
+        24
+      ],
+      "end": [
+        2,
+        26
+      ]
+    },
+    {
+      "start": [
+        4,
+        4
+      ],
+      "end": [
+        39,
+        4
+      ]
+    },
+    {
+      "start": [
+        4,
+        36
+      ],
+      "end": [
+        39,
+        36
+      ]
+    },
+    {
+      "start": [
+        2,
+        20
+      ],
+      "end": [
+        2,
+        18
+      ]
+    },
+    {
+      "start": [
+        2,
+        18
+      ],
+      "end": [
+        4,
+        18
+      ]
+    },
+    {
+      "start": [
+        4,
+        18
+      ],
+      "end": [
+        10,
+        18
+      ]
+    },
+    {
+      "start": [
+        12,
+        12
+      ],
+      "end": [
+        10,
+        12
+      ]
+    },
+    {
+      "start": [
+        10,
+        12
+      ],
+      "end": [
+        10,
+        24
+      ]
+    },
+    {
+      "start": [
+        10,
+        24
+      ],
+      "end": [
+        12,
+        24
+      ]
+    },
+    {
+      "start": [
+        15,
+        10
+      ],
+      "end": [
+        15,
+        4
+      ]
+    },
+    {
+      "start": [
+        15,
+        26
+      ],
+      "end": [
+        15,
+        36
+      ]
+    },
+    {
+      "start": [
+        15,
+        18
+      ],
+      "end": [
+        22,
+        18
+      ]
+    },
+    {
+      "start": [
+        22,
+        18
+      ],
+      "end": [
+        22,
+        19
+      ]
+    },
+    {
+      "start": [
+        22,
+        23
+      ],
+      "end": [
+        22,
+        26
+      ]
+    },
+    {
+      "start": [
+        30,
+        17
+      ],
+      "end": [
+        32,
+        17
+      ]
+    },
+    {
+      "start": [
+        32,
+        8
+      ],
+      "end": [
+        32,
+        4
+      ]
+    },
+    {
+      "start": [
+        32,
+        12
+      ],
+      "end": [
+        36,
+        12
+      ]
+    },
+    {
+      "start": [
+        32,
+        12
+      ],
+      "end": [
+        32,
+        13
+      ]
+    },
+    {
+      "start": [
+        32,
+        21
+      ],
+      "end": [
+        32,
+        24
+      ]
+    },
+    {
+      "start": [
+        32,
+        24
+      ],
+      "end": [
+        36,
+        24
+      ]
+    },
+    {
+      "start": [
+        32,
+        28
+      ],
+      "end": [
+        32,
+        36
+      ]
+    },
+    {
+      "start": [
+        39,
+        10
+      ],
+      "end": [
+        39,
+        4
+      ]
+    },
+    {
+      "start": [
+        39,
+        26
+      ],
+      "end": [
+        39,
+        36
+      ]
+    },
+    {
+      "start": [
+        39,
+        18
+      ],
+      "end": [
+        46,
+        18
+      ]
+    },
+    {
+      "start": [
+        46,
+        18
+      ],
+      "end": [
+        46,
+        19
+      ]
+    },
+    {
+      "start": [
+        46,
+        23
+      ],
+      "end": [
+        46,
+        26
+      ]
+    }
+  ],
+  "simulation": {
+    "analysis": "transient",
+    "transient": {
+      "step": 0.000005,
+      "stop": 0.003
+    },
+    "ac_sweep": {
+      "start": 10,
+      "stop": 1000000,
+      "points_per_decade": 20
+    },
+    "dc_sweep": {
+      "step_source": false,
+      "swept": {
+        "source": "",
+        "start": 0,
+        "step": 0.1,
+        "stop": 5
+      },
+      "stepped": {
+        "source": "",
+        "start": 0,
+        "step": 0.1,
+        "stop": 5
+      }
+    }
+  },
+  "measurements": {
+    "voltages": [
+      [
+        2,
+        18
+      ],
+      [
+        15,
+        18
+      ],
+      [
+        39,
+        18
+      ]
+    ],
+    "currents": [
+      "R3",
+      "R6"
+    ]
+  }
+}

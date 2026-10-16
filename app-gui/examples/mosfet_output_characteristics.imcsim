@@ -1,0 +1,101 @@
+{
+  "format": "imcsim-schematic",
+  "version": 1,
+  "elements": [
+    {
+      "type": "NMOS",
+      "rotation": 0,
+      "x": 9,
+      "y": 8,
+      "model": "2N7000",
+      "name": "M1"
+    },
+    {
+      "type": "VCC",
+      "rotation": 0,
+      "x": 10,
+      "y": 4,
+      "value": 5,
+      "name": "V1"
+    },
+    {
+      "type": "VCC",
+      "rotation": 0,
+      "x": 5,
+      "y": 8,
+      "value": 3,
+      "name": "V2"
+    },
+    {
+      "type": "Ground",
+      "rotation": 0,
+      "x": 10,
+      "y": 12
+    }
+  ],
+  "wires": [
+    {
+      "start": [
+        10,
+        4
+      ],
+      "end": [
+        10,
+        6
+      ]
+    },
+    {
+      "start": [
+        5,
+        8
+      ],
+      "end": [
+        7,
+        8
+      ]
+    },
+    {
+      "start": [
+        10,
+        10
+      ],
+      "end": [
+        10,
+        12
+      ]
+    }
+  ],
+  "simulation": {
+    "analysis": "dc_sweep",
+    "transient": {
+      "step": 0.000001,
+      "stop": 0.001
+    },
+    "ac_sweep": {
+      "start": 10,
+      "stop": 1000000,
+      "points_per_decade": 20
+    },
+    "dc_sweep": {
+      "step_source": true,
+      "swept": {
+        "source": "V1",
+        "start": 0,
+        "step": 0.05,
+        "stop": 5
+      },
+      "stepped": {
+        "source": "V2",
+        "start": 2.5,
+        "step": 0.25,
+        "stop": 3.5
+      }
+    }
+  },
+  "measurements": {
+    "voltages": [],
+    "currents": [
+      "M1.D"
+    ]
+  }
+}
