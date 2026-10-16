@@ -242,3 +242,16 @@ TEST_CASE("CSV lists the samples a series stands for instead of the values it dr
     CHECK_THAT(csv, ContainsSubstring("0.001,5,0\n"));
     CHECK_THAT(csv, !ContainsSubstring("2.5"));
 }
+
+TEST_CASE("A centered note is drawn over its point, a plain one beside it", "[plot_export]") {
+    GUI::ExportFigure figure = MakeLaneFigure();
+    figure.Panels[0].Notes = {{.X = 1.5e-3, .Y = 0.5, .Text = "1", .Centered = true}};
+    const auto centered = GUI::RenderSvg(figure, {});
+    figure.Panels[0].Notes[0].Centered = false;
+    const auto beside = GUI::RenderSvg(figure, {});
+    REQUIRE(centered.has_value());
+    REQUIRE(beside.has_value());
+    CHECK_THAT(*centered, ContainsSubstring(">1</text>"));
+    // The two place the label at different x
+    CHECK(*centered != *beside);
+}

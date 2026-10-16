@@ -268,9 +268,11 @@ their statistics and the exports always agree.
 - The transient plots the measured nodes that gates and flip-flops are connected to as lanes of their own, in a plot
   under the analog traces with the same time axis, cursors and playhead. Each lane is named at its left, high is the
   upper level and low the lower, and a voltage between 30% and 70% of the logic level, which a gate reads as unknown,
-  is drawn halfway. Hovering a lane reads its state and voltage, such as `1 (4.72V)`. The Logic lanes box beside the
-  statistics turns this off, which draws every voltage on the analog axis again. The plot is left out when only
-  logic signals are measured, and the SVG export has the same panels; the CSV lists the voltages.
+  is drawn halfway. Hovering a lane reads its state and voltage, such as `1 (4.72V)`. The Bit values box, off by
+  default, writes 0, 1 or X in a box at the middle of every steady stretch of a lane that has room for it at the
+  current zoom. The Logic lanes box beside the statistics turns the lanes off, which draws every voltage on the analog
+  axis again. The plot is left out when only logic signals are measured. The SVG export has the same panels and bit
+  labels; the CSV lists the voltages.
 - Math channels are heavier lines; volts and amperes share the axes above, any other unit or none goes on a third
   axis.
 - The AC sweep is a Bode plot: magnitude in dB and phase in degrees, relative to the AC magnitude of the sources.

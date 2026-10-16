@@ -70,6 +70,8 @@ constexpr float MaxLaneShare = 0.6f;
 // Bit labels: the room around the digit, in font sizes, and the corner rounding of its box
 constexpr float BitBoxPadding = 0.25f;
 constexpr float BitBoxRounding = 3.0f;
+// The share of the time an export shows that a steady stretch needs for its bit label
+constexpr double MinBitLabelShare = 0.03;
 // Room above and below the stack of lanes, in lane units
 constexpr double LaneMargin = 0.3;
 // Widths in the math editor, in font sizes
@@ -754,8 +756,8 @@ void AddExportTraces(PanelBuilder &builder, const std::vector<std::vector<double
 
 // The lanes as a panel of their own: each trace is drawn at the height of its lane, and its axis names the lanes,
 // while the CSV lists the voltages. The first lane is on top, as in the plot
-ExportPanel BuildLanePanel(const Core::Transient &transient, const std::vector<LogicNode> &lanes,
-                           Schematic &schematic) {
+ExportPanel BuildLanePanel(const Core::Transient &transient, const std::vector<LogicNode> &lanes, Schematic &schematic,
+                           const bool bit_values, const PlotSpan &view) {
     ExportPanel panel;
     ExportAxis axis{.Name = "", .Unit = "V", .UsesPrefixes = false};
     for (std::size_t lane = 0; lane < lanes.size(); ++lane) {
@@ -768,6 +770,21 @@ ExportPanel BuildLanePanel(const Core::Transient &transient, const std::vector<L
                                 .Values = BuildLane(voltages, lanes[lane].LogicLevel, position),
                                 .Samples = voltages,
                                 .Color = ToExportColor(GetNodeColor(lanes[lane].Node))});
+        if (!bit_values) {
+            continue;
+        }
+        // Each steady stretch that is wide enough for its label in what the image shows, which has no pixels to
+        // measure it with, so a share of the span stands for the width of the box
+        for (const LogicSegment &segment : FindLogicSegments(transient.Times, voltages, lanes[lane].LogicLevel)) {
+            const double from = std::max(segment.From, view.From);
+            const double to = std::min(segment.To, view.To);
+            if (to - from >= (view.To - view.From) * MinBitLabelShare) {
+                panel.Notes.push_back({.X = (from + to) / 2.0,
+                                       .Y = static_cast<double>(position) * LaneStride + LaneHighOffset / 2.0,
+                                       .Text = GetLogicStateName(segment.State),
+                                       .Centered = true});
+            }
+        }
     }
     axis.Range = ExportRange{.From = LaneLowOffset - LaneMargin,
                              .To = static_cast<double>(lanes.size() - 1) * LaneStride + LaneHighOffset + LaneMargin};
@@ -1726,7 +1743,7 @@ ExportFigure OutputWindow::BuildTransientFigure(const Core::Transient &transient
         figure.Panels.push_back(std::move(analog));
     }
     if (!lanes.empty()) {
-        figure.Panels.push_back(BuildLanePanel(transient, lanes, m_Schematic));
+        figure.Panels.push_back(BuildLanePanel(transient, lanes, m_Schematic, m_ShowBitValues, m_TransientView));
     }
     return figure;
 }

@@ -81,6 +81,8 @@ struct ExportNote {
     double Y = 0.0;
     std::size_t Axis = 0;
     std::string Text;
+    // Centered on its point instead of beside it, as the bit labels of a logic lane are
+    bool Centered = false;
 };
 
 /**

@@ -386,7 +386,7 @@ void DrawSeries(SvgWriter &svg, const ExportFigure &figure, const ExportSeries &
     }
 }
 
-// Notes sit right of their point, or left of it when they would leave the plot
+// Notes sit right of their point, or left of it when they would leave the plot; a centered one is over it
 void DrawNote(SvgWriter &svg, const ExportNote &note, const Frame &frame, const ValueRange &y_range,
               const ExportTheme &theme, const double scale) {
     const double x = frame.ToPixelX(note.X);
@@ -395,7 +395,10 @@ void DrawNote(SvgWriter &svg, const ExportNote &note, const Frame &frame, const 
     const double width = EstimateTextWidth(note.Text, font_size);
     const double padding = 3.0 * scale;
     const bool to_left = x + 4.0 * scale + width + 2.0 * padding > frame.Left + frame.Width;
-    const double box_left = to_left ? x - 4.0 * scale - width - 2.0 * padding : x + 4.0 * scale;
+    double box_left = to_left ? x - 4.0 * scale - width - 2.0 * padding : x + 4.0 * scale;
+    if (note.Centered) {
+        box_left = x - width / 2.0 - padding;
+    }
     svg.Rectangle({box_left, y - font_size * 0.7 - padding}, width + 2.0 * padding, font_size * 1.4 + padding,
                   theme.Background, 0.85);
     svg.Text({box_left + padding, y + font_size * 0.35}, note.Text, font_size, theme.Text, TextAnchor::Start);
