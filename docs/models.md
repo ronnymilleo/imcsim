@@ -9,8 +9,11 @@ imcsim writes the circuit as a SPICE netlist (shown in the Netlist window) and r
 [ngspice](https://ngspice.sourceforge.io/), the open-source successor of Berkeley SPICE. Every part maps to SPICE
 elements, so the results are those of ngspice with the models below. Some things hold for every part:
 
-- Everything is simulated at 27 °C. Models have no temperature dependence that you can change.
-- Values are exact: there are no tolerances, aging or Monte Carlo spread.
+- Everything is simulated at 27 °C, unless a stepped analysis steps the temperature: ngspice then adjusts diodes and
+  transistors (saturation currents, junction voltages) by their built-in laws, while resistors, capacitors and
+  inductors keep their values, since no part sets a temperature coefficient.
+- Values are exact: there are no tolerances, aging or Monte Carlo spread; a stepped analysis can try a list of
+  values instead.
 - In a noise analysis, resistors add thermal noise (4kTR); diodes and bipolar transistors the shot noise of their
   currents, MOSFETs the thermal noise of their channel, and all three the thermal noise of their series
   resistances. Flicker (1/f) noise is off, since no model sets KF.

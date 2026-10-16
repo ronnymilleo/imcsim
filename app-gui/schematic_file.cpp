@@ -160,6 +160,12 @@ constexpr auto ACSweepKeys = std::to_array<ParameterKey<Core::ACSweepSettings>>(
     {"stop", &Core::ACSweepSettings::StopFrequency},
 });
 
+constexpr auto ParameterStepKeys = std::to_array<ParameterKey<ParameterStepSettings>>({
+    {"start", &ParameterStepSettings::Start},
+    {"stop", &ParameterStepSettings::Stop},
+    {"step", &ParameterStepSettings::Step},
+});
+
 constexpr auto SweepRangeKeys = std::to_array<ParameterKey<Core::SweepRange>>({
     {"start", &Core::SweepRange::Start},
     {"stop", &Core::SweepRange::Stop},
@@ -651,6 +657,10 @@ nlohmann::json WriteSettings(const SimulationSettings &settings) {
     if (settings.NoiseOutput) {
         noise["output"] = {settings.NoiseOutput->X, settings.NoiseOutput->Y};
     }
+    const ParameterStepSettings &step = settings.ParameterStep;
+    nlohmann::json parameter_step = {
+        {"enabled", step.Enabled}, {"part", step.Part}, {"uses_list", step.UsesList}, {"list", step.List}};
+    WriteParameters(ParameterStepKeys, step, parameter_step);
     return {
         {"analysis", AnalysisKeys[static_cast<std::size_t>(settings.Selected)]},
         {"transient", transient},
@@ -662,6 +672,7 @@ nlohmann::json WriteSettings(const SimulationSettings &settings) {
              {"step_source", settings.StepSource},
          }},
         {"noise", noise},
+        {"parameter_step", parameter_step},
     };
 }
 
@@ -760,6 +771,32 @@ std::expected<void, std::string> ReadNoiseSettings(const nlohmann::json &object,
     return {};
 }
 
+std::expected<void, std::string> ReadParameterStepSettings(const nlohmann::json &object, SimulationSettings &settings) {
+    ParameterStepSettings &step = settings.ParameterStep;
+    if (const auto read = ReadParameters(ParameterStepKeys, object, step); !read) {
+        return read;
+    }
+    for (const auto &[key, flag] : {std::pair{"enabled", &step.Enabled}, std::pair{"uses_list", &step.UsesList}}) {
+        if (object.contains(key)) {
+            const std::optional<bool> value = ReadBool(object, key);
+            if (!value) {
+                return std::unexpected(std::format("have a {} flag that is not true or false", key));
+            }
+            *flag = *value;
+        }
+    }
+    for (const auto &[key, text] : {std::pair{"part", &step.Part}, std::pair{"list", &step.List}}) {
+        if (object.contains(key)) {
+            const std::optional<std::string> value = ReadString(object, key);
+            if (!value) {
+                return std::unexpected(std::format("have no valid {}", key));
+            }
+            *text = *value;
+        }
+    }
+    return {};
+}
+
 /**
  * @struct  AnalysisReader
  * @brief   JSON key of the settings of one analysis, its name in warnings and the function that reads them.
@@ -775,6 +812,7 @@ constexpr auto AnalysisReaders = std::to_array<AnalysisReader>({
     {"ac_sweep", "AC sweep", &ReadACSweepSettings},
     {"dc_sweep", "DC sweep", &ReadDCSweepSettings},
     {"noise", "noise", &ReadNoiseSettings},
+    {"parameter_step", "parameter step", &ReadParameterStepSettings},
 });
 
 // Files saved before settings were stored have none and get the defaults; an analysis with invalid settings

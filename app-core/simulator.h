@@ -170,6 +170,17 @@ struct DCSweep {
 };
 
 /**
+ * @struct  ParameterValue
+ * @brief   The value a stepped analysis gives its parameter for one run: the value of a part, or the temperature.
+ * @details Part names a resistor, a capacitor or an inductor, whose value becomes Value for the run; empty, Value is
+ *          the temperature of the run in degrees Celsius instead of the 27 C ngspice simulates at.
+ */
+struct ParameterValue {
+    std::string Part;
+    double Value = 27.0;
+};
+
+/**
  * @struct  NoiseSettings
  * @brief   Where a noise analysis measures, what it refers the noise to, and its frequency range.
  * @details The input source must be an independent source set to AC; ngspice only uses it to find the gain from it
@@ -231,9 +242,12 @@ using DCSweepRun = SimulationRun<DCSweep>;
 using NoiseRun = SimulationRun<Noise>;
 
 OperatingPointRun RunOperatingPoint(const Circuit &circuit);
-TransientRun RunTransient(const Circuit &circuit, const TransientSettings &settings);
-ACSweepRun RunACSweep(const Circuit &circuit, const ACSweepSettings &settings);
-DCSweepRun RunDCSweep(const Circuit &circuit, const DCSweepSettings &settings);
+TransientRun RunTransient(const Circuit &circuit, const TransientSettings &settings,
+                          const std::optional<ParameterValue> &parameter = std::nullopt);
+ACSweepRun RunACSweep(const Circuit &circuit, const ACSweepSettings &settings,
+                      const std::optional<ParameterValue> &parameter = std::nullopt);
+DCSweepRun RunDCSweep(const Circuit &circuit, const DCSweepSettings &settings,
+                      const std::optional<ParameterValue> &parameter = std::nullopt);
 NoiseRun RunNoise(const Circuit &circuit, const NoiseSettings &settings);
 
 void SetCodeModelDirectory(const std::filesystem::path &directory);
@@ -242,6 +256,7 @@ bool AreDigitalModelsAvailable();
 // Names in the results
 std::vector<std::string> GetSweepableSources(const Circuit &circuit);
 std::vector<std::string> GetNoiseInputSources(const Circuit &circuit);
+std::vector<std::string> GetSteppableParts(const Circuit &circuit);
 std::vector<std::string> GetCurrentNames(const Component &component);
 std::vector<std::size_t> GetCurrentTerminals(const Component &component);
 

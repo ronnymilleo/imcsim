@@ -7,7 +7,9 @@
 
 #include "analysis_suggestions.h"
 #include "imgui.h"
+#include "misc/cpp/imgui_stdlib.h"
 #include "probing.h"
+#include "spice_value.h"
 #include "theme.h"
 #include <algorithm>
 #include <expected>
@@ -157,6 +159,59 @@ std::string ResolveNoiseInput(const std::string &stored, const std::vector<std::
     return sources.empty() ? std::string() : ResolveNoiseSource(stored, sources);
 }
 
+// The unit of the stepped parameter: that of the part, or degrees Celsius for the temperature. A part that left the
+// circuit has none; the run then reports it
+std::string GetParameterUnit(const Core::Circuit &circuit, const std::string &part) {
+    if (part.empty()) {
+        return "°C";
+    }
+    for (const Core::CircuitEntry &entry : circuit.GetEntries()) {
+        if (entry.Part->GetName() == part) {
+            return entry.Part->GetUnit();
+        }
+    }
+    return "";
+}
+
+/**
+ * @struct  SteppedRuns
+ * @brief   The results of an analysis run once per step, or why a step failed, and what ngspice printed in all.
+ */
+template <typename Result> struct SteppedRuns {
+    std::expected<StepFamily<Result>, std::string> Family;
+    std::vector<Core::SimulatorMessage> Messages;
+};
+
+// Runs once per value and stops at the first step that fails; the output of each step is headed by its value, so
+// a warning can be traced to the step that printed it
+template <typename Result, typename RunStep>
+SteppedRuns<Result> RunSteps(const ParameterStepSettings &step, const std::string &unit,
+                             const std::vector<double> &values, const RunStep &run_step) {
+    StepFamily<Result> family{.Parameter = GetParameterLabel(step), .Unit = unit, .Values = values, .Results = {}};
+    std::vector<Core::SimulatorMessage> messages;
+    for (const double value : values) {
+        const std::string label = FormatStepValue(family.Parameter, value, unit);
+        auto run = run_step(Core::ParameterValue{step.Part, value});
+        messages.push_back({std::format("Step {}", label), false});
+        std::ranges::move(run.Messages, std::back_inserter(messages));
+        if (!run.Result) {
+            return {std::unexpected(std::format("At {}: {}", label, run.Result.error())), std::move(messages)};
+        }
+        family.Results.push_back(std::move(*run.Result));
+    }
+    return {std::move(family), std::move(messages)};
+}
+
+// Hands the steps to the schematic, or reports the step that failed; the old result is cleared before the steps run
+template <typename Result, typename Store>
+std::optional<std::string> StoreSteps(std::expected<StepFamily<Result>, std::string> family, Store store) {
+    if (!family) {
+        return std::move(family.error());
+    }
+    store(std::move(*family));
+    return std::nullopt;
+}
+
 // A Suggest button, disabled with the reason when the circuit gives nothing to base a suggestion on
 bool DrawSuggestButton(const bool available, const char *tooltip, const char *unavailable_reason) {
     ImGui::BeginDisabled(!available);
@@ -218,6 +273,10 @@ void AnalysisControls::DrawSettings() {
         DrawNoiseSettings(settings);
         break;
     }
+    if (settings.Selected == Analysis::Transient || settings.Selected == Analysis::ACSweep ||
+        settings.Selected == Analysis::DCSweep) {
+        DrawParameterStepSettings(settings);
+    }
     m_Schematic.SetSimulationSettings(settings);
 }
 
@@ -229,6 +288,22 @@ void AnalysisControls::RunSelected() {
     const SimulationSettings &settings = m_Schematic.GetSimulationSettings();
     const Analysis analysis = settings.Selected;
     const Core::Circuit circuit = m_Schematic.BuildCircuit();
+    // The operating point and the noise analysis run once, whatever the step settings
+    const ParameterStepSettings &step = settings.ParameterStep;
+    const bool stepped = step.Enabled && (analysis == Analysis::Transient || analysis == Analysis::ACSweep ||
+                                          analysis == Analysis::DCSweep);
+    const std::string step_unit = GetParameterUnit(circuit, step.Part);
+    std::vector<double> step_values;
+    if (stepped) {
+        auto values = ListStepValues(step, step_unit);
+        if (!values) {
+            ClearResult(analysis);
+            Finish(analysis, std::move(values.error()), {});
+            return;
+        }
+        step_values = std::move(*values);
+        ClearResult(analysis);
+    }
     switch (analysis) {
     case Analysis::OperatingPoint: {
         Core::OperatingPointRun run = Core::RunOperatingPoint(circuit);
@@ -239,6 +314,16 @@ void AnalysisControls::RunSelected() {
         break;
     }
     case Analysis::Transient: {
+        if (stepped) {
+            auto runs = RunSteps<Core::Transient>(step, step_unit, step_values, [&](const Core::ParameterValue &value) {
+                return Core::RunTransient(circuit, settings.Transient, value);
+            });
+            Finish(analysis,
+                   StoreSteps(std::move(runs.Family),
+                              [this](auto steps) { m_Schematic.SetTransientSteps(std::move(steps)); }),
+                   std::move(runs.Messages));
+            break;
+        }
         Core::TransientRun run = Core::RunTransient(circuit, settings.Transient);
         Finish(analysis,
                StoreResult(std::move(run.Result), [this](auto result) { m_Schematic.SetTransient(std::move(result)); }),
@@ -246,6 +331,16 @@ void AnalysisControls::RunSelected() {
         break;
     }
     case Analysis::ACSweep: {
+        if (stepped) {
+            auto runs = RunSteps<Core::ACSweep>(step, step_unit, step_values, [&](const Core::ParameterValue &value) {
+                return Core::RunACSweep(circuit, settings.ACSweep, value);
+            });
+            Finish(analysis,
+                   StoreSteps(std::move(runs.Family),
+                              [this](auto steps) { m_Schematic.SetACSweepSteps(std::move(steps)); }),
+                   std::move(runs.Messages));
+            break;
+        }
         Core::ACSweepRun run = Core::RunACSweep(circuit, settings.ACSweep);
         Finish(analysis,
                StoreResult(std::move(run.Result), [this](auto result) { m_Schematic.SetACSweep(std::move(result)); }),
@@ -264,6 +359,21 @@ void AnalysisControls::RunSelected() {
         if (settings.StepSource) {
             run_settings.Stepped = settings.SteppedRange;
             run_settings.Stepped->Source = ResolveSweepSource(settings.SteppedRange, sources, SteppedSourceIndex);
+        }
+        if (stepped && settings.StepSource) {
+            m_Schematic.SetDCSweep(std::nullopt);
+            Finish(analysis, "Step either a second source or a parameter, not both", {});
+            break;
+        }
+        if (stepped) {
+            auto runs = RunSteps<Core::DCSweep>(step, step_unit, step_values, [&](const Core::ParameterValue &value) {
+                return Core::RunDCSweep(circuit, run_settings, value);
+            });
+            Finish(analysis,
+                   StoreSteps(std::move(runs.Family),
+                              [this](auto steps) { m_Schematic.SetDCSweep(JoinDCSweepSteps(std::move(steps))); }),
+                   std::move(runs.Messages));
+            break;
         }
         Core::DCSweepRun run = Core::RunDCSweep(circuit, run_settings);
         Finish(analysis,
@@ -380,6 +490,7 @@ void AnalysisControls::LoadSettingsFields() {
     LoadSweepFields(settings.SteppedRange, m_SteppedFields);
     m_NoiseStartFrequency.Load(settings.NoiseRange.StartFrequency);
     m_NoiseStopFrequency.Load(settings.NoiseRange.StopFrequency);
+    LoadParameterStepFields(settings.ParameterStep);
     m_LoadedSettingsVersion = m_Schematic.GetSimulationSettingsVersion();
 }
 
@@ -430,7 +541,13 @@ void AnalysisControls::DrawDCSweepSettings(SimulationSettings &settings) {
         return;
     }
     DrawSweepRange("swept", "Sweep", sources, SweptSourceIndex, settings.SweptRange, m_SweptFields);
+    // A second source and a stepped parameter would both make the family of curves, so only one is on at a time
+    ImGui::BeginDisabled(settings.ParameterStep.Enabled && !settings.StepSource);
     ImGui::Checkbox("Step a second source, one curve per value", &settings.StepSource);
+    ImGui::EndDisabled();
+    if (settings.ParameterStep.Enabled && !settings.StepSource) {
+        ImGui::SetItemTooltip("Turn off the stepped parameter below to step a second source");
+    }
     if (settings.StepSource) {
         DrawSweepRange("stepped", "Step", sources, SteppedSourceIndex, settings.SteppedRange, m_SteppedFields);
     }
@@ -487,6 +604,128 @@ void AnalysisControls::DrawNoiseSettings(SimulationSettings &settings) {
         settings.NoiseRange.StopFrequency = suggested->StopFrequency;
         m_NoiseStartFrequency.Load(suggested->StartFrequency);
         m_NoiseStopFrequency.Load(suggested->StopFrequency);
+    }
+}
+
+// Below the settings of the transient, the AC sweep and the DC sweep: the part or the temperature, and its values
+// as a range or a typed list. Picking a part starts its range around its value
+void AnalysisControls::DrawParameterStepSettings(SimulationSettings &settings) {
+    ParameterStepSettings &step = settings.ParameterStep;
+    ImGui::Separator();
+    // The range fields share their labels with those of the analysis above
+    ImGui::PushID("parameter_step");
+    DrawParameterStepFields(settings);
+    ImGui::PopID();
+}
+
+void AnalysisControls::DrawParameterStepFields(SimulationSettings &settings) {
+    ParameterStepSettings &step = settings.ParameterStep;
+    const bool blocked = settings.Selected == Analysis::DCSweep && settings.StepSource && !step.Enabled;
+    ImGui::BeginDisabled(blocked);
+    ImGui::Checkbox("Step a parameter, one run per value", &step.Enabled);
+    ImGui::EndDisabled();
+    if (blocked) {
+        ImGui::SetItemTooltip("Turn off the second stepped source above to step a parameter");
+    }
+    if (!step.Enabled) {
+        return;
+    }
+    const Core::Circuit circuit = m_Schematic.BuildCircuit();
+    const std::string unit = GetParameterUnit(circuit, step.Part);
+    DrawFieldLabel("Parameter");
+    const std::string shown = step.Part.empty() ? std::string("Temperature") : step.Part;
+    if (ImGui::BeginCombo("##step_parameter", shown.c_str())) {
+        if (ImGui::Selectable("Temperature", step.Part.empty()) && !step.Part.empty()) {
+            step.Part.clear();
+            step.Start = 0.0;
+            step.Stop = 100.0;
+            step.Step = 25.0;
+            LoadParameterStepFields(step);
+        }
+        for (const std::string &part : Core::GetSteppableParts(circuit)) {
+            const auto entry = std::ranges::find_if(circuit.GetEntries(), [&part](const Core::CircuitEntry &candidate) {
+                return candidate.Part->GetName() == part;
+            });
+            const double value = entry->Part->GetValue();
+            const std::string label = std::format("{} ({}{})", part, Core::FormatValue(value), entry->Part->GetUnit());
+            if (ImGui::Selectable(label.c_str(), step.Part == part) && step.Part != part) {
+                step.Part = part;
+                step.Start = value / 2.0;
+                step.Stop = value * 2.0;
+                step.Step = value / 2.0;
+                LoadParameterStepFields(step);
+            }
+        }
+        ImGui::EndCombo();
+    }
+    if (ImGui::RadioButton("Range", !step.UsesList)) {
+        step.UsesList = false;
+    }
+    ImGui::SameLine();
+    // A list starts from the values of the range, so it can be edited from there
+    if (ImGui::RadioButton("List", step.UsesList) && !step.UsesList) {
+        step.UsesList = true;
+        if (step.List.empty()) {
+            ParameterStepSettings range = step;
+            range.UsesList = false;
+            if (const auto values = ListStepValues(range, unit)) {
+                for (const double value : *values) {
+                    step.List += (step.List.empty() ? "" : ", ") + Core::FormatValue(value);
+                }
+            }
+        }
+    }
+    if (step.UsesList) {
+        ImGui::SetNextItemWidth(ImGui::GetFontSize() * 16.0f);
+        ImGui::InputTextWithHint("##step_list", "1k, 2.2k, 4.7k", &step.List);
+    } else {
+        if (const std::optional<double> start = m_ParameterFields[0].Draw("Start", unit, AnyValue)) {
+            step.Start = *start;
+        }
+        if (const std::optional<double> stop = m_ParameterFields[1].Draw("Stop", unit, AnyValue)) {
+            step.Stop = *stop;
+        }
+        if (const std::optional<double> step_size = m_ParameterFields[2].Draw("Step", unit, IsNonZero)) {
+            step.Step = *step_size;
+        }
+    }
+    const auto values = ListStepValues(step, unit);
+    ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + ImGui::GetFontSize() * 20.0f);
+    if (!values) {
+        ImGui::TextColored(GetErrorTextColor(), "%s", values.error().c_str());
+    } else {
+        const std::string parameter = GetParameterLabel(step);
+        ImGui::TextDisabled("%s", std::format("{} runs, {} to {}", values->size(),
+                                              FormatStepValue(parameter, values->front(), unit),
+                                              FormatStepValue(parameter, values->back(), unit))
+                                      .c_str());
+    }
+    ImGui::PopTextWrapPos();
+}
+
+void AnalysisControls::LoadParameterStepFields(const ParameterStepSettings &step) {
+    m_ParameterFields[0].Load(step.Start);
+    m_ParameterFields[1].Load(step.Stop);
+    m_ParameterFields[2].Load(step.Step);
+}
+
+void AnalysisControls::ClearResult(const Analysis analysis) {
+    switch (analysis) {
+    case Analysis::OperatingPoint:
+        m_Schematic.SetOperatingPoint(std::nullopt);
+        break;
+    case Analysis::Transient:
+        m_Schematic.SetTransient(std::nullopt);
+        break;
+    case Analysis::ACSweep:
+        m_Schematic.SetACSweep(std::nullopt);
+        break;
+    case Analysis::DCSweep:
+        m_Schematic.SetDCSweep(std::nullopt);
+        break;
+    case Analysis::Noise:
+        m_Schematic.SetNoise(std::nullopt);
+        break;
     }
 }
 

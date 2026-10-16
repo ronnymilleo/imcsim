@@ -2156,3 +2156,73 @@ TEST_CASE("RunNoise rejects a missing input source, ground as output and a bad r
     REQUIRE_FALSE(run.Result);
     CHECK(run.Result.error().contains("Vin1"));
 }
+
+TEST_CASE("A stepped part runs at its step value, in the netlist and in the readings", "[simulator]") {
+    LowPass low_pass;
+    const Core::ACSweepSettings settings{.StartFrequency = 159.155, .StopFrequency = 1591.55, .PointsPerDecade = 1};
+    const Core::ACSweepRun stepped = Core::RunACSweep(low_pass.Circuit, settings, Core::ParameterValue{"R1", 10e3});
+    if (!stepped.Result) {
+        FAIL(stepped.Result.error());
+    }
+    // With 10k the corner moves from 159 Hz to 15.9 Hz, so 159 Hz is a decade above it
+    CHECK_THAT(stepped.Result->NodeMagnitudesDecibels[2][0], Catch::Matchers::WithinAbs(-20.04, 0.05));
+    // The current of R1 is worked out from its value, which must be the stepped one: 1 V over about 10k
+    CHECK_THAT(stepped.Result->CurrentMagnitudesDecibels[0].Values[0], Catch::Matchers::WithinAbs(-80.0, 0.1));
+    // The part itself keeps its value
+    CHECK(low_pass.Series.GetValue() == 1e3);
+    CHECK(Core::GetSteppableParts(low_pass.Circuit) == std::vector<std::string>{"R1", "C1"});
+}
+
+TEST_CASE("A stepped temperature changes the forward voltage of a diode", "[simulator]") {
+    Core::VCC supply;
+    supply.SetName("V1");
+    supply.SetValue(5.0);
+    Core::Resistor series;
+    series.SetName("R1");
+    Core::Diode diode(Core::ComponentType::Diode);
+    diode.SetName("D1");
+    Core::Ground reference;
+    Core::Circuit circuit;
+    circuit.Add(supply, {1});
+    circuit.Add(series, {1, 2});
+    circuit.Add(diode, {2, 0});
+    circuit.Add(reference, {0});
+    const Core::DCSweepSettings settings{.Swept = {.Source = "V1", .Start = 4.0, .Stop = 5.0, .Step = 1.0}};
+    const auto forward_voltage = [&](const double temperature) {
+        const Core::DCSweepRun run = Core::RunDCSweep(circuit, settings, Core::ParameterValue{"", temperature});
+        REQUIRE(run.Result);
+        return run.Result->Curves.front().NodeVoltages[2].back();
+    };
+    // About -2 mV per degree, as for any silicon junction
+    const double cold = forward_voltage(0.0);
+    const double hot = forward_voltage(100.0);
+    CHECK(cold - hot > 0.1);
+    CHECK(cold - hot < 0.3);
+}
+
+TEST_CASE("A stepped parameter rejects a part that cannot step and values out of range", "[simulator]") {
+    LowPass low_pass;
+    const Core::TransientSettings settings{.StopTime = 1e-3, .TimeStep = 1e-5};
+    CHECK(Core::RunTransient(low_pass.Circuit, settings, Core::ParameterValue{"C1", 2e-6}).Result);
+    CHECK_FALSE(Core::RunTransient(low_pass.Circuit, settings, Core::ParameterValue{"Vin1", 2.0}).Result);
+    CHECK_FALSE(Core::RunTransient(low_pass.Circuit, settings, Core::ParameterValue{"R1", 0.0}).Result);
+    CHECK_FALSE(Core::RunTransient(low_pass.Circuit, settings, Core::ParameterValue{"", -300.0}).Result);
+}
+
+TEST_CASE("A noise analysis runs beside logic parts, which add only the noise of their resistors", "[simulator]") {
+    SKIP_WITHOUT_DIGITAL_MODELS();
+    LowPass low_pass;
+    Core::LogicPart gate(Core::ComponentType::Not);
+    gate.SetName("U1");
+    low_pass.Circuit.Add(gate, {2, 3});
+    const Core::NoiseRun run = Core::RunNoise(
+        low_pass.Circuit,
+        {.OutputNode = 2, .InputSource = "Vin1", .StartFrequency = 1.0, .StopFrequency = 10.0, .PointsPerDecade = 1});
+    if (!run.Result) {
+        FAIL(run.Result.error());
+    }
+    // R1 still makes nearly all the noise; the gate adds that of its input pull-down, a thousandth of it
+    CHECK_THAT(run.Result->OutputDensities[0], Catch::Matchers::WithinRel(ThermalNoise(1e3), 1e-2));
+    REQUIRE_FALSE(run.Result->Contributions.empty());
+    CHECK(run.Result->Contributions.front().Name == "R1");
+}

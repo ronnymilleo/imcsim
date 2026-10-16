@@ -8,10 +8,13 @@
 #include "simulator.h"
 
 #include "components/bjt.h"
+#include "components/capacitor.h"
 #include "components/controlled_source.h"
 #include "components/diode.h"
+#include "components/inductor.h"
 #include "components/logic_part.h"
 #include "components/mosfet.h"
+#include "components/resistor.h"
 #include "components/source.h"
 #include "spice_value.h"
 #include <algorithm>
@@ -20,6 +23,7 @@
 #include <complex>
 #include <format>
 #include <iterator>
+#include <memory>
 #include <ngspice/sharedspice.h>
 #include <numbers>
 #include <optional>
@@ -37,6 +41,7 @@ constexpr std::string_view ErrorPrefix = "stderr ";
 constexpr int MaxTransientPoints = 1000000;
 constexpr int MaxPointsPerDecade = 1000;
 constexpr int MaxDCSweepPoints = 100000;
+constexpr double AbsoluteZero = -273.15;
 // 1e-15 V is -300 dB
 constexpr double MinMagnitude = 1e-15;
 
@@ -1047,6 +1052,72 @@ std::string FormatSweepRange(const SweepRange &range) {
                        FormatSpiceValue(range.Step));
 }
 
+// Parts a stepped analysis can change: those written as one element whose value is all there is to them
+bool IsSteppable(const ComponentType type) {
+    return type == ComponentType::Resistor || type == ComponentType::Capacitor || type == ComponentType::Inductor;
+}
+
+std::unique_ptr<Component> CopyWithValue(const Component &part, const double value) {
+    std::unique_ptr<Component> copy;
+    switch (part.GetType()) {
+    case ComponentType::Resistor:
+        copy = std::make_unique<Resistor>(static_cast<const Resistor &>(part));
+        break;
+    case ComponentType::Capacitor:
+        copy = std::make_unique<Capacitor>(static_cast<const Capacitor &>(part));
+        break;
+    default:
+        copy = std::make_unique<Inductor>(static_cast<const Inductor &>(part));
+        break;
+    }
+    copy->SetValue(value);
+    return copy;
+}
+
+/**
+ * @struct  ParameterCircuit
+ * @brief   A circuit as one run of a stepped analysis simulates it, and the netlist card that sets its temperature.
+ * @details Simulated refers to Part, the copy of the stepped part at its value, so both live together.
+ */
+struct ParameterCircuit {
+    std::unique_ptr<Component> Part;
+    Circuit Simulated;
+    std::string Card;
+};
+
+// The stepped part is replaced by a copy at its value rather than changed in ngspice, so every reading that uses
+// the value of a part, such as the AC current of a resistor, sees the value the run had
+std::expected<ParameterCircuit, std::string> ApplyParameter(const Circuit &circuit,
+                                                            const std::optional<ParameterValue> &parameter) {
+    ParameterCircuit applied{nullptr, circuit, ""};
+    if (!parameter) {
+        return applied;
+    }
+    if (parameter->Part.empty()) {
+        if (parameter->Value <= AbsoluteZero) {
+            return std::unexpected("The temperature must be above absolute zero, -273.15 C");
+        }
+        applied.Card = std::format(".temp {}\n", FormatSpiceValue(parameter->Value));
+        return applied;
+    }
+    const auto entry = std::ranges::find_if(circuit.GetEntries(), [&parameter](const CircuitEntry &candidate) {
+        return candidate.Part->GetName() == parameter->Part && IsSteppable(candidate.Part->GetType());
+    });
+    if (entry == circuit.GetEntries().end()) {
+        return std::unexpected(std::format(
+            "The stepped part {} is not a resistor, capacitor or inductor in the circuit", parameter->Part));
+    }
+    if (parameter->Value <= 0.0) {
+        return std::unexpected(std::format("{} must stay positive in every step", parameter->Part));
+    }
+    applied.Part = CopyWithValue(*entry->Part, parameter->Value);
+    applied.Simulated = Circuit();
+    for (const CircuitEntry &original : circuit.GetEntries()) {
+        applied.Simulated.Add(original.Part == entry->Part ? *applied.Part : *original.Part, original.Nodes);
+    }
+    return applied;
+}
+
 // Runs one analysis on a clean library. Return codes stay 0 even when the netlist is rejected, so success is
 // told by the plot the run created, whose name starts with the analysis (op1, tran1, ac1)
 template <typename Data, typename Reader>
@@ -1098,11 +1169,14 @@ OperatingPointRun RunOperatingPoint(const Circuit &circuit) {
  * @brief   Simulates how the node voltages of a circuit change over time, starting from its operating point.
  * @param[in] circuit   Circuit to simulate; it needs a ground component.
  * @param[in] settings  Stop time and time step.
+ * @param[in] parameter Value of the stepped parameter for this run, a part value or the temperature; none runs the
+ *                      circuit as it is.
  * @return  The voltages at every time point or an error, plus every line ngspice printed. Invalid settings
  *          are rejected before reaching ngspice.
  * @note    Not thread-safe: ngspice is a single global library instance.
  */
-TransientRun RunTransient(const Circuit &circuit, const TransientSettings &settings) {
+TransientRun RunTransient(const Circuit &circuit, const TransientSettings &settings,
+                          const std::optional<ParameterValue> &parameter) {
     std::optional<std::string> error = CheckCircuit(circuit);
     if (!error) {
         error = CheckTransientSettings(settings);
@@ -1110,20 +1184,28 @@ TransientRun RunTransient(const Circuit &circuit, const TransientSettings &setti
     if (error) {
         return {std::unexpected(*error), {}};
     }
-    const std::string analysis =
-        std::format(".tran {} {}", FormatSpiceValue(settings.TimeStep), FormatSpiceValue(settings.StopTime));
-    return Simulate<Transient>(circuit, analysis, "tran", [&circuit] { return ReadTransient(circuit); });
+    const auto applied = ApplyParameter(circuit, parameter);
+    if (!applied) {
+        return {std::unexpected(applied.error()), {}};
+    }
+    const std::string analysis = std::format("{}.tran {} {}", applied->Card, FormatSpiceValue(settings.TimeStep),
+                                             FormatSpiceValue(settings.StopTime));
+    return Simulate<Transient>(applied->Simulated, analysis, "tran",
+                               [&applied] { return ReadTransient(applied->Simulated); });
 }
 
 /**
  * @brief   Sweeps the small-signal response of a circuit across frequency, excited by its AC sources.
  * @param[in] circuit   Circuit to simulate; it needs a ground component and at least one AC source.
  * @param[in] settings  Frequency range and points per decade.
+ * @param[in] parameter Value of the stepped parameter for this run, a part value or the temperature; none runs the
+ *                      circuit as it is.
  * @return  The magnitude and phase of every node at every frequency or an error, plus every line ngspice
  *          printed. Invalid settings and circuits without an AC source are rejected before reaching ngspice.
  * @note    Not thread-safe: ngspice is a single global library instance.
  */
-ACSweepRun RunACSweep(const Circuit &circuit, const ACSweepSettings &settings) {
+ACSweepRun RunACSweep(const Circuit &circuit, const ACSweepSettings &settings,
+                      const std::optional<ParameterValue> &parameter) {
     std::optional<std::string> error = CheckCircuit(circuit);
     if (!error) {
         error = CheckACSweepSettings(circuit, settings);
@@ -1131,22 +1213,30 @@ ACSweepRun RunACSweep(const Circuit &circuit, const ACSweepSettings &settings) {
     if (error) {
         return {std::unexpected(*error), {}};
     }
+    const auto applied = ApplyParameter(circuit, parameter);
+    if (!applied) {
+        return {std::unexpected(applied.error()), {}};
+    }
     const std::string analysis =
-        std::format(".ac dec {} {} {}", settings.PointsPerDecade, FormatSpiceValue(settings.StartFrequency),
-                    FormatSpiceValue(settings.StopFrequency));
-    return Simulate<ACSweep>(circuit, analysis, "ac", [&circuit] { return ReadACSweep(circuit); });
+        std::format("{}.ac dec {} {} {}", applied->Card, settings.PointsPerDecade,
+                    FormatSpiceValue(settings.StartFrequency), FormatSpiceValue(settings.StopFrequency));
+    return Simulate<ACSweep>(applied->Simulated, analysis, "ac",
+                             [&applied] { return ReadACSweep(applied->Simulated); });
 }
 
 /**
  * @brief   Sweeps a source through a range of DC values and finds the operating point at each one.
  * @param[in] circuit   Circuit to simulate; it needs a ground component.
  * @param[in] settings  Swept source and range, and optionally a second source stepped once per curve.
+ * @param[in] parameter Value of the stepped parameter for this run, a part value or the temperature; none runs the
+ *                      circuit as it is.
  * @return  The node voltages and currents along the sweep, one curve per stepped value, or an error, plus every
  *          line ngspice printed. Invalid settings are rejected before reaching ngspice.
  * @note    AC and pulse sources are swept through their DC value. Not thread-safe: ngspice is a single global
  *          library instance.
  */
-DCSweepRun RunDCSweep(const Circuit &circuit, const DCSweepSettings &settings) {
+DCSweepRun RunDCSweep(const Circuit &circuit, const DCSweepSettings &settings,
+                      const std::optional<ParameterValue> &parameter) {
     std::optional<std::string> error = CheckCircuit(circuit);
     if (!error) {
         error = CheckDCSweepSettings(circuit, settings);
@@ -1154,11 +1244,16 @@ DCSweepRun RunDCSweep(const Circuit &circuit, const DCSweepSettings &settings) {
     if (error) {
         return {std::unexpected(*error), {}};
     }
-    std::string analysis = std::format(".dc {}", FormatSweepRange(settings.Swept));
+    const auto applied = ApplyParameter(circuit, parameter);
+    if (!applied) {
+        return {std::unexpected(applied.error()), {}};
+    }
+    std::string analysis = std::format("{}.dc {}", applied->Card, FormatSweepRange(settings.Swept));
     if (settings.Stepped) {
         analysis += std::format(" {}", FormatSweepRange(*settings.Stepped));
     }
-    return Simulate<DCSweep>(circuit, analysis, "dc", [&circuit, &settings] { return ReadDCSweep(circuit, settings); });
+    return Simulate<DCSweep>(applied->Simulated, analysis, "dc",
+                             [&applied, &settings] { return ReadDCSweep(applied->Simulated, settings); });
 }
 
 /**
@@ -1229,6 +1324,21 @@ std::vector<std::string> GetNoiseInputSources(const Circuit &circuit) {
     std::vector<std::string> names;
     for (const CircuitEntry &entry : circuit.GetEntries()) {
         if (IsNoiseInput(*entry.Part)) {
+            names.push_back(entry.Part->GetName());
+        }
+    }
+    return names;
+}
+
+/**
+ * @brief   Lists the parts whose value a stepped analysis can change.
+ * @param[in] circuit  Circuit to look in.
+ * @return  Names of its resistors, capacitors and inductors, in circuit order.
+ */
+std::vector<std::string> GetSteppableParts(const Circuit &circuit) {
+    std::vector<std::string> names;
+    for (const CircuitEntry &entry : circuit.GetEntries()) {
+        if (IsSteppable(entry.Part->GetType())) {
             names.push_back(entry.Part->GetName());
         }
     }

@@ -562,6 +562,7 @@ const std::optional<Core::OperatingPoint> &Schematic::GetOperatingPoint() const 
  * @note    The result is dropped on the next change, since it no longer matches the circuit.
  */
 void Schematic::SetTransient(std::optional<Core::Transient> transient) {
+    m_TransientSteps.reset();
     m_Transient = std::move(transient);
     ++m_TransientVersion;
 }
@@ -580,6 +581,7 @@ const std::optional<Core::Transient> &Schematic::GetTransient() const {
  * @note    The result is dropped on the next change, since it no longer matches the circuit.
  */
 void Schematic::SetACSweep(std::optional<Core::ACSweep> sweep) {
+    m_ACSweepSteps.reset();
     m_ACSweep = std::move(sweep);
     ++m_ACSweepVersion;
 }
@@ -590,6 +592,73 @@ void Schematic::SetACSweep(std::optional<Core::ACSweep> sweep) {
  */
 const std::optional<Core::ACSweep> &Schematic::GetACSweep() const {
     return m_ACSweep;
+}
+
+/**
+ * @brief   Stores the transients of a stepped run, one per value of its parameter.
+ * @param[in] steps  Every step, with at least one result, and the selected one, which GetTransient() returns.
+ * @note    The results are dropped on the next change, like those of a single run.
+ */
+void Schematic::SetTransientSteps(StepFamily<Core::Transient> steps) {
+    steps.Selected = std::min(steps.Selected, steps.Results.size() - 1);
+    m_Transient = steps.Results[steps.Selected];
+    m_TransientSteps = std::move(steps);
+    ++m_TransientVersion;
+}
+
+/**
+ * @brief   Returns every step of the last stepped transient.
+ * @return  The steps, or no value when the last transient was a single run or there is none.
+ */
+const std::optional<StepFamily<Core::Transient>> &Schematic::GetTransientSteps() const {
+    return m_TransientSteps;
+}
+
+/**
+ * @brief   Shows another step of the stepped transient wherever one result is shown: the schematic, the statistics
+ *          and the spectrum.
+ * @param[in] step  Index of the step; ignored when out of range or without steps.
+ */
+void Schematic::SelectTransientStep(const std::size_t step) {
+    if (!m_TransientSteps || step >= m_TransientSteps->Results.size() || step == m_TransientSteps->Selected) {
+        return;
+    }
+    m_TransientSteps->Selected = step;
+    m_Transient = m_TransientSteps->Results[step];
+    ++m_TransientVersion;
+}
+
+/**
+ * @brief   Stores the AC sweeps of a stepped run, one per value of its parameter.
+ * @param[in] steps  Every step, with at least one result, and the selected one, which GetACSweep() returns.
+ * @note    The results are dropped on the next change, like those of a single run.
+ */
+void Schematic::SetACSweepSteps(StepFamily<Core::ACSweep> steps) {
+    steps.Selected = std::min(steps.Selected, steps.Results.size() - 1);
+    m_ACSweep = steps.Results[steps.Selected];
+    m_ACSweepSteps = std::move(steps);
+    ++m_ACSweepVersion;
+}
+
+/**
+ * @brief   Returns every step of the last stepped AC sweep.
+ * @return  The steps, or no value when the last AC sweep was a single run or there is none.
+ */
+const std::optional<StepFamily<Core::ACSweep>> &Schematic::GetACSweepSteps() const {
+    return m_ACSweepSteps;
+}
+
+/**
+ * @brief   Measures another step of the stepped AC sweep in the statistics.
+ * @param[in] step  Index of the step; ignored when out of range or without steps.
+ */
+void Schematic::SelectACSweepStep(const std::size_t step) {
+    if (!m_ACSweepSteps || step >= m_ACSweepSteps->Results.size() || step == m_ACSweepSteps->Selected) {
+        return;
+    }
+    m_ACSweepSteps->Selected = step;
+    m_ACSweep = m_ACSweepSteps->Results[step];
+    ++m_ACSweepVersion;
 }
 
 /**
@@ -673,7 +742,9 @@ void Schematic::InvalidateDerivedData() {
     m_Connectivity.reset();
     m_OperatingPoint.reset();
     m_Transient.reset();
+    m_TransientSteps.reset();
     m_ACSweep.reset();
+    m_ACSweepSteps.reset();
     m_DCSweep.reset();
     m_Noise.reset();
 }

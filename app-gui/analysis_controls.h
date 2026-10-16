@@ -79,6 +79,8 @@ private:
     std::array<ValueField, 3> m_SteppedFields;
     ValueField m_NoiseStartFrequency;
     ValueField m_NoiseStopFrequency;
+    // Start, stop and step of the stepped parameter
+    std::array<ValueField, 3> m_ParameterFields;
 
     // Last run of each analysis, in the order of the Analysis enum
     std::array<RunStatus, 5> m_Statuses;
@@ -89,6 +91,10 @@ private:
     void DrawACSweepSettings(SimulationSettings &settings);
     void DrawDCSweepSettings(SimulationSettings &settings);
     void DrawNoiseSettings(SimulationSettings &settings);
+    void DrawParameterStepSettings(SimulationSettings &settings);
+    void DrawParameterStepFields(SimulationSettings &settings);
+    void LoadParameterStepFields(const ParameterStepSettings &step);
+    void ClearResult(Analysis analysis);
     void Finish(Analysis analysis, std::optional<std::string> error, std::vector<Core::SimulatorMessage> messages);
     std::vector<std::string> GetResultWarnings(Analysis analysis) const;
     bool HasResult(Analysis analysis) const;

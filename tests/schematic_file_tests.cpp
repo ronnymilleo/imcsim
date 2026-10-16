@@ -372,6 +372,8 @@ TEST_CASE("Simulation settings load back unchanged", "[schematic_file]") {
     settings.NoiseRange = {.StartFrequency = 1.0, .StopFrequency = 20e3, .PointsPerDecade = 10};
     settings.NoiseSource = "Vin1";
     settings.NoiseOutput = GUI::GridPoint{12, -4};
+    settings.ParameterStep = {
+        .Enabled = true, .Part = "R2", .UsesList = true, .Start = 1e3, .Stop = 4e3, .Step = 1e3, .List = "1k, 2.2k"};
 
     const GUI::LoadedSchematic loaded = LoadOrFail(GUI::SaveSchematic({}, {}, settings, {}));
     CHECK(loaded.Warnings.empty());

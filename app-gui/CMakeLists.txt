@@ -20,6 +20,7 @@ add_library(imcsim-gui-lib
             led_glow.cpp
             logic_trace.cpp
             node_colors.cpp
+            parameter_step.cpp
             part_editor.cpp
             playback.cpp
             plot_export.cpp

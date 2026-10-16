@@ -282,6 +282,29 @@ their statistics and the exports always agree.
   the plot reads as gain while a transient uses the small amplitude a real circuit would see.
 - A stepped DC sweep draws one curve per step, labeled with the step value where the curves part most.
 
+## Stepping a parameter
+
+The transient, the AC sweep and the DC sweep can run once per value of a parameter, as SPICE's `.step`: check
+**Step a parameter** under their settings, then pick:
+
+- **Parameter**: the temperature, or a resistor, capacitor or inductor (shown with its value). Picking a part starts
+  the range at half its value and ends it at twice its value.
+- **Range** (start, stop and step, which may be negative to step downward) or **List** (values such as
+  `1k, 2.2k, 4.7k`). A list starts from the values of the range. Up to 50 values; the line below tells how many runs
+  that makes.
+
+The part keeps its value in the schematic and in the Netlist window; each run simulates a copy at the step value.
+
+Results:
+
+- The transient and the AC sweep plot every step: one **shown step** in full colors, picked above the plot, and the
+  others faint. Each trace the steps change is labeled with the step values. The statistics, the spectrum, the
+  schematic and its playback read the shown step. The AC export includes every step (`V(4) at C1=22nF` columns);
+  the transient export has the shown step only, since each step has its own time points.
+- The DC sweep draws one curve per step, as when stepping a second source, so only one of the two can be on.
+- ngspice's output lists each step under a `Step R1=10kOhm` line. A step that fails stops the run and names the
+  step.
+
 ## Spectrum
 
 The Spectrum tab shows the frequency content of the measured transient traces, as a spectrum analyzer would, and

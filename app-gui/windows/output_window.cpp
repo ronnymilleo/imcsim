@@ -96,6 +96,8 @@ constexpr std::array<SDL_DialogFileFilter, 1> CSVFilters = {{{"CSV table", "csv"
 constexpr int HighestHarmonic = 10;
 constexpr float HarmonicMarkerSize = 3.0f;
 constexpr double MinShownDistortionPercent = 0.001;
+// The other steps of a stepped run are drawn this opaque, behind the shown step
+constexpr float OtherStepAlpha = 0.35f;
 // The input-referred noise takes a color of its own, apart from the node colors the output uses
 constexpr ImU32 InputNoiseColor = IM_COL32(150, 230, 90, 255);
 // Six decades below the largest density, about where the share of a part stops mattering
@@ -300,6 +302,150 @@ std::vector<CurveFamily> ListCurveFamilies(const Core::DCSweep &sweep, const Sch
         }
     }
     return families;
+}
+
+/**
+ * @struct  StepTraces
+ * @brief   The X values, node values and currents of one step of a stepped transient or AC sweep, as plotted.
+ */
+struct StepTraces {
+    const std::vector<double> *Xs;
+    const std::vector<std::vector<double>> *Nodes;
+    const std::vector<Core::ComponentTrace> *Currents;
+};
+
+// The other steps of a stepped run, faint behind the shown one and without legend entries, so the family shows its
+// spread while the shown step stays readable; currents are thin solid lines on their axis, since dashes would
+// clutter a family. Nodes drawn as logic lanes are skipped, as PlotNodes() skips them. Call it before plotting the
+// shown step
+void PlotOtherSteps(const std::vector<StepTraces> &steps, const std::size_t selected, const Schematic &schematic,
+                    const bool show_currents, const std::vector<int> &lane_nodes) {
+    for (std::size_t step = 0; step < steps.size(); ++step) {
+        if (step == selected) {
+            continue;
+        }
+        const StepTraces &traces = steps[step];
+        const int count = static_cast<int>(traces.Xs->size());
+        for (std::size_t node = 1; node < traces.Nodes->size(); ++node) {
+            if (!schematic.IsVoltageMeasured(static_cast<int>(node)) ||
+                std::ranges::contains(lane_nodes, static_cast<int>(node))) {
+                continue;
+            }
+            ImPlotSpec spec;
+            spec.LineColor = ImGui::ColorConvertU32ToFloat4(GetNodeColor(static_cast<int>(node)));
+            spec.LineColor.w = OtherStepAlpha;
+            ImPlot::PlotLine(std::format("##step{}v{}", step, node).c_str(), traces.Xs->data(),
+                             (*traces.Nodes)[node].data(), count, spec);
+        }
+        if (!show_currents) {
+            continue;
+        }
+        ImPlot::SetAxes(ImAxis_X1, ImAxis_Y2);
+        for (std::size_t index = 0; index < traces.Currents->size(); ++index) {
+            const Core::ComponentTrace &current = (*traces.Currents)[index];
+            if (!schematic.IsCurrentMeasured(current.Name)) {
+                continue;
+            }
+            ImPlotSpec spec;
+            spec.LineColor = ImGui::ColorConvertU32ToFloat4(GetCurrentColor(index));
+            spec.LineColor.w = OtherStepAlpha;
+            ImPlot::PlotLine(std::format("##step{}i{}", step, index).c_str(), traces.Xs->data(), current.Values.data(),
+                             count, spec);
+        }
+        ImPlot::SetAxes(ImAxis_X1, ImAxis_Y1);
+    }
+}
+
+// Labels each step of every measured trace with its value, where its curves part most when the steps share their X
+// values (an AC sweep), or at their ends otherwise (each transient has its own time points). A trace the steps
+// leave unchanged, such as the input, gets no labels, which would only pile up on one line
+void LabelSteps(const std::vector<StepTraces> &steps, const std::vector<std::string> &labels,
+                const Schematic &schematic, const bool show_currents, const bool shared_xs,
+                const std::vector<int> &lane_nodes) {
+    const ImVec4 color = ImGui::GetStyleColorVec4(ImGuiCol_PopupBg);
+    const auto label_family = [&](const std::vector<const std::vector<double> *> &curves) {
+        const std::size_t shared_sample = shared_xs ? FindWidestSpread(curves) : 0;
+        std::vector<std::pair<double, double>> points;
+        for (std::size_t step = 0; step < steps.size(); ++step) {
+            const std::vector<double> &xs = *steps[step].Xs;
+            const std::size_t sample = shared_xs ? shared_sample : xs.size() - 1;
+            if (xs.empty() || sample >= xs.size() || sample >= curves[step]->size()) {
+                return;
+            }
+            points.emplace_back(xs[sample], (*curves[step])[sample]);
+        }
+        const auto [lowest, highest] = std::ranges::minmax(points, {}, &std::pair<double, double>::second);
+        const double scale = std::max(std::abs(lowest.second), std::abs(highest.second));
+        if (highest.second - lowest.second <= scale * 1e-6) {
+            return;
+        }
+        // Labels closer than a line of text to one already drawn are skipped, so none is drawn over another
+        std::vector<float> drawn;
+        for (std::size_t step = 0; step < steps.size(); ++step) {
+            const float y = ImPlot::PlotToPixels(points[step].first, points[step].second).y;
+            if (std::ranges::any_of(drawn,
+                                    [y](const float other) { return std::abs(other - y) < ImGui::GetFontSize(); })) {
+                continue;
+            }
+            drawn.push_back(y);
+            ImPlot::Annotation(points[step].first, points[step].second, color, ImVec2(-4.0f, 0.0f), true, "%s",
+                               labels[step].c_str());
+        }
+    };
+    const StepTraces &first = steps.front();
+    for (std::size_t node = 1; node < first.Nodes->size(); ++node) {
+        if (!schematic.IsVoltageMeasured(static_cast<int>(node)) ||
+            std::ranges::contains(lane_nodes, static_cast<int>(node))) {
+            continue;
+        }
+        std::vector<const std::vector<double> *> curves;
+        for (const StepTraces &traces : steps) {
+            curves.push_back(&(*traces.Nodes)[node]);
+        }
+        label_family(curves);
+    }
+    if (!show_currents) {
+        return;
+    }
+    ImPlot::SetAxes(ImAxis_X1, ImAxis_Y2);
+    for (std::size_t index = 0; index < first.Currents->size(); ++index) {
+        if (!schematic.IsCurrentMeasured((*first.Currents)[index].Name)) {
+            continue;
+        }
+        std::vector<const std::vector<double> *> curves;
+        for (const StepTraces &traces : steps) {
+            curves.push_back(&(*traces.Currents)[index].Values);
+        }
+        label_family(curves);
+    }
+    ImPlot::SetAxes(ImAxis_X1, ImAxis_Y1);
+}
+
+// Picks the step the statistics, the spectrum and the schematic read. Returns the step the user picked, if any
+template <typename Result> std::optional<std::size_t> DrawStepSelector(const StepFamily<Result> &steps) {
+    std::optional<std::size_t> picked;
+    DrawFieldLabel("Shown step");
+    const std::string shown = FormatStepValue(steps.Parameter, steps.Values[steps.Selected], steps.Unit);
+    ImGui::SetNextItemWidth(ImGui::GetFontSize() * 10.0f);
+    if (ImGui::BeginCombo("##shown_step", shown.c_str())) {
+        for (std::size_t step = 0; step < steps.Values.size(); ++step) {
+            const std::string label = FormatStepValue(steps.Parameter, steps.Values[step], steps.Unit);
+            if (ImGui::Selectable(label.c_str(), step == steps.Selected)) {
+                picked = step;
+            }
+        }
+        ImGui::EndCombo();
+    }
+    ImGui::SetItemTooltip("The statistics, the spectrum and the schematic read this step; the others are faint");
+    return picked;
+}
+
+template <typename Result> std::vector<std::string> ListStepLabels(const StepFamily<Result> &steps) {
+    std::vector<std::string> labels;
+    for (const double value : steps.Values) {
+        labels.push_back(FormatStepValue(steps.Parameter, value, steps.Unit));
+    }
+    return labels;
 }
 
 std::string FormatStepLabel(const Core::DCSweep &sweep, const Core::DCSweepCurve &curve) {
@@ -1156,6 +1302,11 @@ void OutputWindow::Draw() {
         if (transient) {
             DrawWithStatistics(
                 [&] {
+                    if (const auto &steps = m_Schematic.GetTransientSteps()) {
+                        if (const std::optional<std::size_t> picked = DrawStepSelector(*steps)) {
+                            m_Schematic.SelectTransientStep(*picked);
+                        }
+                    }
                     if (!anything_measured && transient_math.empty()) {
                         ImGui::TextDisabled("%s", nothing_measured);
                     }
@@ -1197,6 +1348,11 @@ void OutputWindow::Draw() {
                                   : nothing_measured);
                     if (!m_MathChannels.empty()) {
                         ImGui::TextDisabled("Math channels are not calculated for AC sweeps yet");
+                    }
+                    if (const auto &steps = m_Schematic.GetACSweepSteps()) {
+                        if (const std::optional<std::size_t> picked = DrawStepSelector(*steps)) {
+                            m_Schematic.SelectACSweepStep(*picked);
+                        }
                     }
                     DrawACSweep(*sweep);
                 },
@@ -1382,12 +1538,23 @@ void OutputWindow::DrawTransientAnalog(const Core::Transient &transient, const s
     }
     const std::string third_unit = ThirdAxisUnit(math);
     SetupMathAxes(math, show_currents, third_unit);
+    const auto &steps = m_Schematic.GetTransientSteps();
+    std::vector<StepTraces> step_traces;
+    if (steps) {
+        for (const Core::Transient &step : steps->Results) {
+            step_traces.push_back({&step.Times, &step.NodeVoltages, &step.Currents});
+        }
+        PlotOtherSteps(step_traces, steps->Selected, m_Schematic, show_currents, lane_nodes);
+    }
     std::vector<PlottedTrace> plotted;
     PlotNodes(transient.Times, transient.NodeVoltages, m_Schematic, "V", "", plotted, lane_nodes);
     if (show_currents) {
         PlotCurrents(transient.Times, transient.Currents, m_Schematic, "A", "", plotted);
     }
     PlotMath(transient.Times, math, "", plotted);
+    if (steps) {
+        LabelSteps(step_traces, ListStepLabels(*steps), m_Schematic, show_currents, false, lane_nodes);
+    }
     DrawCursors(m_TransientCursors, false);
     DrawPlayhead(m_Playback, transient.Times.back());
     DrawCursorReadout(transient.Times, "s", false, plotted);
@@ -1498,6 +1665,7 @@ void OutputWindow::DrawLogicLanes(const Core::Transient &transient, const std::v
 // range and cursors, so zooming one zooms the other
 void OutputWindow::DrawACSweep(const Core::ACSweep &sweep) {
     const bool fit = TakeFit(m_FittedACSweep, m_Schematic.GetACSweepVersion());
+    const auto &steps = m_Schematic.GetACSweepSteps();
     std::vector<std::string> measured_currents = ListMeasuredCurrents(sweep.CurrentMagnitudesDecibels, m_Schematic);
     const bool show_currents = !measured_currents.empty();
     const bool currents_changed = TakeTracesChanged(m_ACSweepShownCurrents, std::move(measured_currents));
@@ -1515,10 +1683,21 @@ void OutputWindow::DrawACSweep(const Core::ACSweep &sweep) {
         if (show_currents) {
             ImPlot::SetupAxis(ImAxis_Y2, "Current (dB)", ImPlotAxisFlags_AuxDefault);
         }
+        std::vector<StepTraces> step_traces;
+        if (steps) {
+            for (const Core::ACSweep &step : steps->Results) {
+                step_traces.push_back(
+                    {&step.Frequencies, &step.NodeMagnitudesDecibels, &step.CurrentMagnitudesDecibels});
+            }
+            PlotOtherSteps(step_traces, steps->Selected, m_Schematic, show_currents, {});
+        }
         std::vector<PlottedTrace> plotted;
         PlotNodes(sweep.Frequencies, sweep.NodeMagnitudesDecibels, m_Schematic, " dB", "", plotted);
         if (show_currents) {
             PlotCurrents(sweep.Frequencies, sweep.CurrentMagnitudesDecibels, m_Schematic, " dB", "", plotted);
+        }
+        if (steps) {
+            LabelSteps(step_traces, ListStepLabels(*steps), m_Schematic, show_currents, true, {});
         }
         DrawCursors(m_ACSweepCursors, true);
         DrawCursorReadout(sweep.Frequencies, "Hz", true, plotted);
@@ -1532,6 +1711,13 @@ void OutputWindow::DrawACSweep(const Core::ACSweep &sweep) {
         ImPlot::SetupAxisFormat(ImAxis_X1, FormatAxisValue, const_cast<char *>("Hz"));
         if (show_currents) {
             ImPlot::SetupAxis(ImAxis_Y2, "Current phase (deg)", ImPlotAxisFlags_AuxDefault);
+        }
+        if (steps) {
+            std::vector<StepTraces> step_traces;
+            for (const Core::ACSweep &step : steps->Results) {
+                step_traces.push_back({&step.Frequencies, &step.NodePhasesDegrees, &step.CurrentPhasesDegrees});
+            }
+            PlotOtherSteps(step_traces, steps->Selected, m_Schematic, show_currents, {});
         }
         std::vector<PlottedTrace> plotted;
         PlotNodes(sweep.Frequencies, sweep.NodePhasesDegrees, m_Schematic, " deg", "", plotted);
@@ -2267,7 +2453,8 @@ std::optional<ExportFormat> OutputWindow::DrawExportPopup(const bool can_export)
     return format;
 }
 
-// The image shows the X range the plot shows, so zooming in before exporting crops the image as well
+// The image shows the X range the plot shows, so zooming in before exporting crops the image as well. A stepped
+// transient exports its shown step, since every step has its own time points
 ExportFigure OutputWindow::BuildTransientFigure(const Core::Transient &transient,
                                                 const std::vector<MathTrace> &math) const {
     ExportFigure figure;
@@ -2311,7 +2498,7 @@ ExportFigure OutputWindow::BuildSpectrumFigure() const {
     return figure;
 }
 
-// Both panels list the same traces, as the two Bode plots do
+// Both panels list the same traces, as the two Bode plots do, with every step of a stepped sweep
 ExportFigure OutputWindow::BuildACSweepFigure(const Core::ACSweep &sweep) const {
     ExportFigure figure;
     figure.XAxis = {.Name = "Frequency", .Unit = "Hz"};
@@ -2326,6 +2513,19 @@ ExportFigure OutputWindow::BuildACSweepFigure(const Core::ACSweep &sweep) const 
                                  .Current = {.Name = "Current phase (deg)", .Unit = "deg", .UsesPrefixes = false},
                                  .Third = {}});
     AddExportTraces(phase, sweep.NodePhasesDegrees, sweep.CurrentPhasesDegrees, m_Schematic, "", true);
+    // The other steps share the frequencies, so they go in as more columns, without legend entries
+    if (const auto &steps = m_Schematic.GetACSweepSteps()) {
+        for (std::size_t step = 0; step < steps->Results.size(); ++step) {
+            if (step == steps->Selected) {
+                continue;
+            }
+            const Core::ACSweep &other = steps->Results[step];
+            const std::string suffix = " at " + FormatStepValue(steps->Parameter, steps->Values[step], steps->Unit);
+            AddExportTraces(magnitude, other.NodeMagnitudesDecibels, other.CurrentMagnitudesDecibels, m_Schematic,
+                            suffix, false);
+            AddExportTraces(phase, other.NodePhasesDegrees, other.CurrentPhasesDegrees, m_Schematic, suffix, false);
+        }
+    }
     figure.Panels.push_back(magnitude.Take());
     figure.Panels.push_back(phase.Take());
     return figure;

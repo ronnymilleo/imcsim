@@ -7,6 +7,7 @@
 #define IMCSIM_SIMULATION_SETTINGS_H
 
 #include "helpers.h"
+#include "parameter_step.h"
 #include "simulator.h"
 #include <optional>
 #include <string>
@@ -45,6 +46,8 @@ struct SimulationSettings {
     Core::ACSweepSettings NoiseRange{.StartFrequency = 10.0, .StopFrequency = 100e3, .PointsPerDecade = 20};
     std::string NoiseSource;
     std::optional<GridPoint> NoiseOutput;
+    // Runs the transient, AC sweep or DC sweep once per value of a part or of the temperature
+    ParameterStepSettings ParameterStep;
 
     bool operator==(const SimulationSettings &) const = default;
 };
