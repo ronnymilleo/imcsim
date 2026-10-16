@@ -19,6 +19,7 @@ add_executable(imcsim-tests
             heat_glow_tests.cpp
             helpers_tests.cpp
             led_glow_tests.cpp
+            logic_trace_tests.cpp
             playback_tests.cpp
             plot_export_tests.cpp
             plot_helpers_tests.cpp

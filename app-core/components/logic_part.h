@@ -12,6 +12,10 @@
 
 namespace Core {
 
+// Where a voltage reads as 0 and as 1, as fractions of the logic level; between them it is unknown
+inline constexpr double LogicLowFraction = 0.3;
+inline constexpr double LogicHighFraction = 0.7;
+
 /**
  * @struct  LogicParameters
  * @brief   The logic family of a gate or flip-flop.

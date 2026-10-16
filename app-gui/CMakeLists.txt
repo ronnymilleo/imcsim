@@ -18,6 +18,7 @@ add_library(imcsim-gui-lib
             heat_glow.cpp
             helpers.cpp
             led_glow.cpp
+            logic_trace.cpp
             node_colors.cpp
             part_editor.cpp
             playback.cpp

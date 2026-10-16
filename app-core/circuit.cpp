@@ -121,8 +121,6 @@ std::string ProbeTerminals(const Component &component, const std::vector<Current
 // resistance of the family. Every input also gets a resistor to ground, so one left unconnected reads 0
 constexpr double LogicOutputResistance = 50.0;
 constexpr double LogicInputPullDown = 1e9;
-constexpr double LogicLowFraction = 0.3;
-constexpr double LogicHighFraction = 0.7;
 
 std::string FormatLogicModels(const LogicPart &part) {
     const LogicParameters &family = part.GetParameters();
