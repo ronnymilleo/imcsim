@@ -282,6 +282,26 @@ their statistics and the exports always agree.
   the plot reads as gain while a transient uses the small amplitude a real circuit would see.
 - A stepped DC sweep draws one curve per step, labeled with the step value where the curves part most.
 
+## Spectrum
+
+The Spectrum tab shows the frequency content of the measured transient traces, as a spectrum analyzer would, and
+measures their harmonic distortion.
+
+- It covers the same stretch as the transient statistics: between cursors A and B when they are on, otherwise the
+  time the transient plot shows. Zoom past the start-up of the circuit, or place the cursors on the steady state,
+  before reading distortion.
+- Amplitudes are peaks in dB relative to 1 V (dBV) or 1 A (dBA), on the axes the traces use in the transient; a
+  sine of 1 V peak reads 0 dBV. The mean is left out of the plot and shown in the panel instead.
+- The panel gives, for each trace, its mean, the frequency and peak amplitude of its fundamental (its strongest
+  tone), the THD (total harmonic distortion: the root sum of squares of harmonics 2 to 10 over the fundamental), and
+  each harmonic in dB below the fundamental (dBc). Dots on the plot mark the harmonics.
+- **Hann** window (default): suits any stretch, but needs at least 5 periods of the fundamental in it.
+  **Rectangular**: sharper peaks, and works from 3 periods, but only reads right over a whole number of periods,
+  such as cursors placed exactly some periods apart; otherwise each tone leaks across the spectrum.
+- The resolution is one over the stretch: 10 ms resolves 100 Hz. The transient is read between its points by
+  straight lines, which leaves a floor around -130 dB for a sine at 200 points per period; a smaller time step
+  lowers it.
+
 ## Exports
 
 **Plots**: Export... on the right of the Output window tabs saves the plot of the current tab.

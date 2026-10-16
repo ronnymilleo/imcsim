@@ -17,6 +17,7 @@
 #include "spice_value.h"
 #include "theme.h"
 #include "trace_statistics.h"
+#include "value_field.h"
 #include <algorithm>
 #include <array>
 #include <cmath>
@@ -90,6 +91,13 @@ constexpr const char *ExportErrorPopup = "Could not export the plot";
 constexpr float ExportSizeWidth = 7.0f;
 constexpr std::array<SDL_DialogFileFilter, 1> SVGFilters = {{{"SVG image", "svg"}}};
 constexpr std::array<SDL_DialogFileFilter, 1> CSVFilters = {{{"CSV table", "csv"}}};
+// The harmonics the spectrum measures, and how many the plot shows when it fits: a linear axis spans them, plus one
+// harmonic of room, from 0 Hz
+constexpr int HighestHarmonic = 10;
+constexpr float HarmonicMarkerSize = 3.0f;
+constexpr double MinShownDistortionPercent = 0.001;
+// The first bins above 0 Hz, where the Hann window spreads the mean
+constexpr std::ptrdiff_t SpectrumSkirtBins = 2;
 
 /**
  * @struct  PlottedTrace
@@ -820,6 +828,8 @@ const char *GetTabFileSuffix(const PlotTab tab) {
         return "operating-point";
     case PlotTab::Transient:
         return "transient";
+    case PlotTab::Spectrum:
+        return "spectrum";
     case PlotTab::ACSweep:
         return "ac-sweep";
     case PlotTab::DCSweep:
@@ -834,6 +844,8 @@ const char *GetTabTitle(const PlotTab tab) {
         return "operating point";
     case PlotTab::Transient:
         return "transient";
+    case PlotTab::Spectrum:
+        return "spectrum";
     case PlotTab::ACSweep:
         return "AC sweep";
     case PlotTab::DCSweep:
@@ -899,6 +911,50 @@ void DrawOperatingPoint(const Core::OperatingPoint &operating_point, Schematic &
 
 std::string GetExtension(const ExportFormat format) {
     return format == ExportFormat::SVG ? ".svg" : ".csv";
+}
+
+// Decibels relative to 1 of the unit of the trace, as spectrum analyzers write dBV
+std::string GetDecibelUnit(const SpectrumTrace &trace) {
+    return trace.Unit.empty() ? " dB" : std::format(" dB{}", trace.Unit);
+}
+
+ExportAxes GetSpectrumExportAxes() {
+    return {.Voltage = {.Name = "Voltage (dBV)", .Unit = "dBV", .UsesPrefixes = false},
+            .Current = {.Name = "Current (dBA)", .Unit = "dBA", .UsesPrefixes = false},
+            .Third = {.Name = "Math (dB)", .Unit = "dB", .UsesPrefixes = false}};
+}
+
+// Distortion reads as a percentage with three significant digits, down to the floor the interpolation of the
+// transient leaves; the decibels give the exact figure below it
+std::string FormatDistortionPercent(const double ratio) {
+    const double percent = ratio * 100.0;
+    return percent < MinShownDistortionPercent ? std::format("<{}%", MinShownDistortionPercent)
+                                               : std::format("{:.3g}%", percent);
+}
+
+// The frequency range a new spectrum opens on: the fundamental and its harmonics on a linear axis, so they spread
+// across the plot, and every frequency on a logarithmic one
+PlotSpan GetSpectrumFitRange(const TransientSpectra &spectra, const bool logarithmic) {
+    const PlotSpan whole{.From = spectra.Frequencies.front(), .To = spectra.Frequencies.back()};
+    if (logarithmic) {
+        return whole;
+    }
+    for (const SpectrumTrace &trace : spectra.Traces) {
+        if (!trace.Harmonics.Harmonics.empty()) {
+            const double fundamental = trace.Harmonics.Harmonics.front().Frequency;
+            return {.From = 0.0, .To = std::min(fundamental * (HighestHarmonic + 1), whole.To)};
+        }
+    }
+    // Without a measured fundamental, as in a stretch of too few periods, the strongest bin past the skirt of the
+    // mean stands in for it
+    for (const SpectrumTrace &trace : spectra.Traces) {
+        if (trace.Decibels && trace.Decibels->size() > static_cast<std::size_t>(SpectrumSkirtBins)) {
+            const auto strongest = std::max_element(trace.Decibels->begin() + SpectrumSkirtBins, trace.Decibels->end());
+            const double frequency = spectra.Frequencies[static_cast<std::size_t>(strongest - trace.Decibels->begin())];
+            return {.From = 0.0, .To = std::min(frequency * (HighestHarmonic + 1), whole.To)};
+        }
+    }
+    return {.From = 0.0, .To = whole.To};
 }
 
 } // namespace
@@ -1068,6 +1124,24 @@ void OutputWindow::Draw() {
         }
         ImGui::EndTabItem();
     }
+    if (ImGui::BeginTabItem("Spectrum", nullptr, tab_flags(PlotTab::Spectrum))) {
+        m_ShownTab = PlotTab::Spectrum;
+        if (transient) {
+            UpdateSpectra(*transient, transient_math);
+            DrawWithStatistics(
+                [&] {
+                    if (!anything_measured && transient_math.empty()) {
+                        ImGui::TextDisabled("%s", nothing_measured);
+                    }
+                    DrawMathErrors(transient_errors);
+                    DrawSpectrum();
+                },
+                [&] { DrawSpectrumStatistics(); });
+        } else {
+            ImGui::TextDisabled("No transient for the current circuit; the spectrum transforms its measured traces");
+        }
+        ImGui::EndTabItem();
+    }
     if (ImGui::BeginTabItem("AC sweep", nullptr, tab_flags(PlotTab::ACSweep))) {
         m_ShownTab = PlotTab::ACSweep;
         if (sweep) {
@@ -1120,6 +1194,11 @@ void OutputWindow::Draw() {
     case PlotTab::Transient:
         can_export = transient && (anything_measured || !transient_math.empty());
         break;
+    case PlotTab::Spectrum:
+        can_export = transient && m_Spectra && std::ranges::any_of(m_Spectra->Traces, [](const SpectrumTrace &trace) {
+                         return trace.Decibels.has_value();
+                     });
+        break;
     case PlotTab::ACSweep:
         can_export = sweep && anything_measured;
         break;
@@ -1130,6 +1209,8 @@ void OutputWindow::Draw() {
     if (const std::optional<ExportFormat> format = DrawExportPopup(can_export)) {
         if (m_ShownTab == PlotTab::Transient) {
             StartExport(BuildTransientFigure(*transient, transient_math), *format);
+        } else if (m_ShownTab == PlotTab::Spectrum) {
+            StartExport(BuildSpectrumFigure(), *format);
         } else if (m_ShownTab == PlotTab::ACSweep) {
             StartExport(BuildACSweepFigure(*sweep), *format);
         } else {
@@ -1461,6 +1542,166 @@ void OutputWindow::DrawDCSweep(const Core::DCSweep &sweep, const std::vector<std
     ImPlot::EndPlot();
 }
 
+// The span the transient statistics measure: between its cursors, or what its plot shows, or the whole run before
+// the plot was first drawn. Clipped to the run, from the earlier end
+PlotSpan OutputWindow::GetSpectrumSpan(const Core::Transient &transient) const {
+    const PlotSpan measured = MeasuredSpan(m_TransientCursors, m_TransientView);
+    const double run_start = transient.Times.front();
+    const double run_stop = transient.Times.back();
+    const double from = std::max(std::min(measured.From, measured.To), run_start);
+    const double to = std::min(std::max(measured.From, measured.To), run_stop);
+    if (!(from < to)) {
+        return {.From = run_start, .To = run_stop};
+    }
+    return {.From = from, .To = to};
+}
+
+// Transforms the measured traces again only when the result, the span, the window or the traces changed. Every trace
+// shares one even grid, so the spectra share their frequencies
+void OutputWindow::UpdateSpectra(const Core::Transient &transient, const std::vector<MathTrace> &math) {
+    std::vector<PlottedTrace> sources = ListTraces(transient.NodeVoltages, transient.Currents, m_Schematic, "V", "A");
+    std::vector<SpectrumTrace> traces;
+    for (const PlottedTrace &source : sources) {
+        const bool current = std::string_view(source.Unit) == "A";
+        traces.push_back({.Label = source.Label,
+                          .Unit = source.Unit,
+                          .Axis = current ? ImAxis_Y2 : ImAxis_Y1,
+                          .Color = source.Color,
+                          .Dashed = current,
+                          .Decibels = std::nullopt,
+                          .LargestAmplitude = 0.0,
+                          .Harmonics = {}});
+    }
+    for (const MathTrace &trace : math) {
+        sources.push_back({trace.Label, &trace.Values, trace.Unit.c_str(), trace.Color});
+        traces.push_back({.Label = trace.Label,
+                          .Unit = trace.Unit,
+                          .Axis = trace.Axis,
+                          .Color = trace.Color,
+                          .Dashed = false,
+                          .Decibels = std::nullopt,
+                          .LargestAmplitude = 0.0,
+                          .Harmonics = {}});
+    }
+    std::vector<std::string> labels;
+    for (const SpectrumTrace &trace : traces) {
+        labels.push_back(trace.Label + trace.Unit);
+    }
+    const PlotSpan span = GetSpectrumSpan(transient);
+    const std::size_t version = m_Schematic.GetTransientVersion();
+    if (m_Spectra && m_Spectra->TransientVersion == version && m_Spectra->Span.From == span.From &&
+        m_Spectra->Span.To == span.To && m_Spectra->Window == m_SpectrumWindow && m_Spectra->Labels == labels) {
+        return;
+    }
+
+    TransientSpectra spectra{.TransientVersion = version,
+                             .Span = span,
+                             .Window = m_SpectrumWindow,
+                             .Labels = std::move(labels),
+                             .Frequencies = {},
+                             .Traces = {}};
+    const std::size_t sample_count = ChooseSpectrumSampleCount(transient.Times, span.From, span.To);
+    for (std::size_t index = 0; index < traces.size(); ++index) {
+        SpectrumTrace &trace = traces[index];
+        const std::optional<Spectrum> spectrum = ComputeSpectrum(transient.Times, *sources[index].Values, span.From,
+                                                                 span.To, sample_count, m_SpectrumWindow);
+        if (!spectrum) {
+            continue;
+        }
+        // The mean has no place on a logarithmic axis; the statistics show it instead
+        const std::span<const double> above_zero = std::span(spectrum->Amplitudes).subspan(1);
+        trace.Decibels = ToDecibels(above_zero);
+        for (const double amplitude : spectrum->Amplitudes) {
+            trace.LargestAmplitude = std::max(trace.LargestAmplitude, std::abs(amplitude));
+        }
+        trace.Harmonics = AnalyzeHarmonics(*spectrum, HighestHarmonic);
+        if (spectra.Frequencies.empty()) {
+            spectra.Frequencies.assign(spectrum->Frequencies.begin() + 1, spectrum->Frequencies.end());
+        }
+    }
+    spectra.Traces = std::move(traces);
+    m_Spectra = std::move(spectra);
+    m_SpectraChanged = true;
+}
+
+// Voltages, currents and math channels keep the axes they have in the transient, in decibels; each trace marks its
+// harmonics. A new spectrum fits its axes, and a linear one opens on the harmonics of the first trace that has some
+void OutputWindow::DrawSpectrum() {
+    const TransientSpectra &spectra = *m_Spectra;
+    ImGui::PushTextWrapPos(0.0f);
+    ImGui::TextDisabled("%s", std::format("From {}s to {}s of the transient: zoom its plot or place its cursors to "
+                                          "pick the stretch, such as the steady state",
+                                          Core::FormatValue(spectra.Span.From), Core::FormatValue(spectra.Span.To))
+                                  .c_str());
+    ImGui::PopTextWrapPos();
+    if (spectra.Frequencies.empty()) {
+        return;
+    }
+    const bool fit = std::exchange(m_SpectraChanged, false);
+    if (fit) {
+        const PlotSpan range = GetSpectrumFitRange(spectra, m_SpectrumLogarithmic);
+        ImPlot::SetNextAxisLimits(ImAxis_X1, range.From, range.To, ImPlotCond_Always);
+        for (const ImAxis axis : {ImAxis_Y1, ImAxis_Y2, ImAxis_Y3}) {
+            ImPlot::SetNextAxisToFit(axis);
+        }
+    }
+    if (!BeginTracePlot("##spectrum", ImVec2(-1.0f, PlotHeight(1)))) {
+        return;
+    }
+    const auto uses_axis = [&spectra](const ImAxis axis) {
+        return std::ranges::any_of(spectra.Traces,
+                                   [axis](const SpectrumTrace &trace) { return trace.Decibels && trace.Axis == axis; });
+    };
+    ImPlot::SetupAxes("Frequency", "Voltage (dBV)", ImPlotAxisFlags_None,
+                      VoltageAxisFlags(uses_axis(ImAxis_Y1), uses_axis(ImAxis_Y2) || uses_axis(ImAxis_Y3)));
+    ImPlot::SetupAxisFormat(ImAxis_X1, FormatAxisValue, const_cast<char *>("Hz"));
+    if (m_SpectrumLogarithmic) {
+        ImPlot::SetupAxisScale(ImAxis_X1, ImPlotScale_Log10);
+    }
+    if (uses_axis(ImAxis_Y2)) {
+        ImPlot::SetupAxis(ImAxis_Y2, "Current (dBA)", ImPlotAxisFlags_AuxDefault);
+    }
+    if (uses_axis(ImAxis_Y3)) {
+        ImPlot::SetupAxis(ImAxis_Y3, "Math (dB)", ImPlotAxisFlags_AuxDefault);
+    }
+    std::vector<PlottedTrace> plotted;
+    std::vector<std::string> units;
+    units.reserve(spectra.Traces.size());
+    for (const SpectrumTrace &trace : spectra.Traces) {
+        if (!trace.Decibels) {
+            continue;
+        }
+        ImPlot::SetAxes(ImAxis_X1, trace.Axis);
+        if (trace.Dashed) {
+            PlotDashedLine(trace.Label, spectra.Frequencies, *trace.Decibels, trace.Color);
+        } else {
+            ImPlotSpec spec;
+            spec.LineColor = ImGui::ColorConvertU32ToFloat4(trace.Color);
+            ImPlot::PlotLine(trace.Label.c_str(), spectra.Frequencies.data(), trace.Decibels->data(),
+                             static_cast<int>(spectra.Frequencies.size()), spec);
+        }
+        std::vector<double> harmonic_frequencies;
+        std::vector<double> harmonic_levels;
+        for (const Harmonic &harmonic : trace.Harmonics.Harmonics) {
+            harmonic_frequencies.push_back(harmonic.Frequency);
+            harmonic_levels.push_back(20.0 * std::log10(std::max(harmonic.Amplitude, 1e-15)));
+        }
+        ImPlotSpec marker_spec;
+        marker_spec.LineColor = ImGui::ColorConvertU32ToFloat4(trace.Color);
+        marker_spec.Marker = ImPlotMarker_Circle;
+        marker_spec.MarkerSize = HarmonicMarkerSize;
+        ImPlot::PlotScatter(std::format("##{} harmonics", trace.Label).c_str(), harmonic_frequencies.data(),
+                            harmonic_levels.data(), static_cast<int>(harmonic_frequencies.size()), marker_spec);
+        units.push_back(GetDecibelUnit(trace));
+        plotted.push_back({trace.Label, &*trace.Decibels, units.back().c_str(), trace.Color});
+    }
+    ImPlot::SetAxes(ImAxis_X1, ImAxis_Y1);
+    DrawCursorReadout(spectra.Frequencies, "Hz", m_SpectrumLogarithmic, plotted);
+    const ImPlotRange view = ImPlot::GetPlotLimits().X;
+    m_SpectrumView = {.From = view.Min, .To = view.Max};
+    ImPlot::EndPlot();
+}
+
 // Like the measurements of an oscilloscope, for every shown trace; with the cursors, also the value of each
 // trace at both and their difference, and the time between them with its frequency
 void OutputWindow::DrawTransientStatistics(const Core::Transient &transient, const std::vector<MathTrace> &math) {
@@ -1517,6 +1758,89 @@ void OutputWindow::DrawTransientStatistics(const Core::Transient &transient, con
             DrawMeasuredValue("At A", at_a, scale, trace.Unit);
             DrawMeasuredValue("At B", at_b, scale, trace.Unit);
             DrawMeasuredValue("B-A", at_b - at_a, scale, trace.Unit);
+        }
+        ImGui::EndTable();
+    }
+}
+
+// Like the harmonic readout of a spectrum analyzer: the mean, the fundamental and the THD of every shown trace,
+// then each harmonic relative to the fundamental, in dBc
+void OutputWindow::DrawSpectrumStatistics() {
+    DrawFieldLabel("Window");
+    const char *window_name = m_SpectrumWindow == SpectrumWindow::Hann ? "Hann" : "Rectangular";
+    if (ImGui::BeginCombo("##window", window_name)) {
+        if (ImGui::Selectable("Hann", m_SpectrumWindow == SpectrumWindow::Hann)) {
+            m_SpectrumWindow = SpectrumWindow::Hann;
+        }
+        ImGui::SetItemTooltip("Suits any stretch, with wider peaks");
+        if (ImGui::Selectable("Rectangular", m_SpectrumWindow == SpectrumWindow::Rectangular)) {
+            m_SpectrumWindow = SpectrumWindow::Rectangular;
+        }
+        ImGui::SetItemTooltip("Sharpest peaks, but only for a whole number of periods, such as between cursors one "
+                              "period apart");
+        ImGui::EndCombo();
+    }
+    if (ImGui::Checkbox("Logarithmic frequency", &m_SpectrumLogarithmic)) {
+        m_SpectraChanged = true;
+    }
+    const TransientSpectra &spectra = *m_Spectra;
+    if (spectra.Traces.empty()) {
+        ImGui::TextDisabled("Measure a trace to see its harmonics");
+        return;
+    }
+    if (spectra.Frequencies.size() > 1) {
+        ImGui::TextDisabled("%s",
+                            std::format("Resolution {}Hz", Core::FormatValue(spectra.Frequencies.front())).c_str());
+    }
+    // Every trace shares the span and the window, so one warning covers them all
+    const auto short_trace = std::ranges::find_if(
+        spectra.Traces, [](const SpectrumTrace &trace) { return trace.Harmonics.PeriodsNeeded.has_value(); });
+    if (short_trace != spectra.Traces.end()) {
+        ImGui::PushTextWrapPos(0.0f);
+        ImGui::TextColored(GetWarningTextColor(), "%s",
+                           std::format("The stretch needs {} periods to tell the harmonics apart: widen it, or pick "
+                                       "the Rectangular window over whole periods",
+                                       *short_trace->Harmonics.PeriodsNeeded)
+                               .c_str());
+        ImGui::PopTextWrapPos();
+    }
+    for (const SpectrumTrace &trace : spectra.Traces) {
+        ImGui::Separator();
+        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(trace.Color), "%s", trace.Label.c_str());
+        if (!trace.Decibels) {
+            ImGui::TextDisabled("Undefined in the stretch");
+            continue;
+        }
+        if (!BeginStatisticsTable(trace.Label)) {
+            continue;
+        }
+        const HarmonicAnalysis &analysis = trace.Harmonics;
+        const char *unit = trace.Unit.c_str();
+        DrawMeasuredValue("Mean", analysis.Mean, trace.LargestAmplitude, unit);
+        if (analysis.Harmonics.empty()) {
+            DrawStatistic("Freq", "-");
+            ImGui::EndTable();
+            continue;
+        }
+        const Harmonic &fundamental = analysis.Harmonics.front();
+        DrawStatistic("Freq", FormatQuantity(fundamental.Frequency, "Hz"));
+        ImGui::SetItemTooltip("Frequency of the fundamental, the strongest tone");
+        DrawStatistic("Amplitude", FormatQuantity(fundamental.Amplitude, unit));
+        ImGui::SetItemTooltip("Peak amplitude of the fundamental");
+        if (analysis.TotalDistortion) {
+            DrawStatistic("THD", FormatDistortionPercent(*analysis.TotalDistortion));
+            DrawStatistic("THD dB", FormatFixed(20.0 * std::log10(std::max(*analysis.TotalDistortion, 1e-15)), " dB"));
+        } else {
+            DrawStatistic("THD", "-");
+        }
+        for (std::size_t index = 1; index < analysis.Harmonics.size(); ++index) {
+            const Harmonic &harmonic = analysis.Harmonics[index];
+            const std::string name = std::format("H{}", harmonic.Order);
+            const double relative = harmonic.Amplitude / fundamental.Amplitude;
+            DrawStatistic(name.c_str(), FormatFixed(20.0 * std::log10(std::max(relative, 1e-15)), " dBc"));
+            ImGui::SetItemTooltip("%s", std::format("{}Hz, {}{}", Core::FormatValue(harmonic.Frequency),
+                                                    Core::FormatValue(harmonic.Amplitude), unit)
+                                            .c_str());
         }
         ImGui::EndTable();
     }
@@ -1763,6 +2087,28 @@ ExportFigure OutputWindow::BuildTransientFigure(const Core::Transient &transient
     if (!lanes.empty()) {
         figure.Panels.push_back(BuildLanePanel(transient, lanes, m_Schematic, m_ShowBitValues, m_TransientView));
     }
+    return figure;
+}
+
+// The spectra as plotted, over the frequencies the plot shows
+ExportFigure OutputWindow::BuildSpectrumFigure() const {
+    ExportFigure figure;
+    figure.XAxis = {.Name = "Frequency", .Unit = "Hz"};
+    figure.XLogarithmic = m_SpectrumLogarithmic;
+    figure.Xs = m_Spectra->Frequencies;
+    figure.XRange = ExportRange{.From = m_SpectrumView.From, .To = m_SpectrumView.To};
+    PanelBuilder builder("", GetSpectrumExportAxes());
+    for (const SpectrumTrace &trace : m_Spectra->Traces) {
+        if (trace.Decibels) {
+            builder.Add({.Name = trace.Label,
+                         .LegendLabel = trace.Label,
+                         .Values = *trace.Decibels,
+                         .Color = ToExportColor(trace.Color),
+                         .Dashed = trace.Dashed},
+                        trace.Axis);
+        }
+    }
+    figure.Panels.push_back(builder.Take());
     return figure;
 }
 

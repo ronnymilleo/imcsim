@@ -13,6 +13,7 @@
 #include "plot_export.h"
 #include "schematic.h"
 #include "simulator.h"
+#include "spectrum.h"
 #include "trace_math.h"
 #include "windows/app_window.h"
 #include <cstddef>
@@ -76,12 +77,46 @@ struct MathTrace {
 };
 
 /**
+ * @struct  SpectrumTrace
+ * @brief   The spectrum of one measured trace of the transient, in decibels, and its harmonics.
+ */
+struct SpectrumTrace {
+    std::string Label;
+    // Unit of the trace, such as "V"; the spectrum reads in decibels relative to 1 of it
+    std::string Unit;
+    ImAxis Axis = ImAxis_Y1;
+    ImU32 Color = 0;
+    bool Dashed = false;
+    // No value when the trace is undefined somewhere in the span, as a math channel dividing by zero
+    std::optional<std::vector<double>> Decibels;
+    // Of the mean and every frequency, so a negligible mean reads as about zero
+    double LargestAmplitude = 0.0;
+    HarmonicAnalysis Harmonics;
+};
+
+/**
+ * @struct  TransientSpectra
+ * @brief   The spectra of the measured traces of a transient over one span, and what they were computed from.
+ * @details Transforms take long enough to keep for as long as their inputs stay the same.
+ */
+struct TransientSpectra {
+    std::size_t TransientVersion = 0;
+    PlotSpan Span;
+    SpectrumWindow Window = SpectrumWindow::Hann;
+    std::vector<std::string> Labels;
+    // From the first frequency above 0 Hz to half the sampling rate, shared by every trace
+    std::vector<double> Frequencies;
+    std::vector<SpectrumTrace> Traces;
+};
+
+/**
  * @enum    PlotTab
- * @brief   The tabs of the Output window, one per analysis.
+ * @brief   The tabs of the Output window, one per analysis, and the spectrum of the transient.
  */
 enum class PlotTab {
     OperatingPoint,
     Transient,
+    Spectrum,
     ACSweep,
     DCSweep
 };
@@ -107,8 +142,10 @@ enum class ExportFormat {
  *          next one; the voltage and current axes also fit whenever their measured traces change. Like an
  *          oscilloscope, the transient and the Bode plots have two cursors and a panel on their right that
  *          measures every shown trace: the transient between the cursors or over what is visible, the Bode plot
- *          over the whole sweep. Math channels add traces computed from the others, such as V(1)-V(2) or
- *          V(1)*I(R1), to the transient and DC sweep plots: voltages and currents keep their axes, and any other
+ *          over the whole sweep. The Spectrum tab transforms the measured traces of the transient over the span its
+ *          statistics measure, and reads the fundamental, the harmonics and the THD of each, as a spectrum
+ *          analyzer would. Math channels add traces computed from the others, such as
+ * V(1)-V(2) or V(1)*I(R1), to the transient and DC sweep plots: voltages and currents keep their axes, and any other
  *          unit, or none, goes on a third axis. Export saves the plot of the current tab as an SVG image, redrawn
  *          from its data at a chosen size and theme over the visible X range, or as a CSV table of every sample.
  *          It starts closed and opens on the tab of each new result. It also comes to the front then, unless the
@@ -146,6 +183,12 @@ private:
     // Whether each steady stretch of a lane is labeled 0, 1 or X
     bool m_ShowBitValues = false;
     PlotSpan m_ACSweepView{.From = 1.0, .To = 1e6};
+    // Spectrum of the transient: its window and frequency scale, its visible range and the last spectra computed
+    SpectrumWindow m_SpectrumWindow = SpectrumWindow::Hann;
+    bool m_SpectrumLogarithmic = false;
+    PlotSpan m_SpectrumView;
+    std::optional<TransientSpectra> m_Spectra;
+    bool m_SpectraChanged = false;
     // Math channels, and the labels each analysis plotted last frame, so the axes fit when they change
     std::vector<MathChannel> m_MathChannels;
     int m_NextMathNumber = 1;
@@ -174,8 +217,14 @@ private:
     void DrawACSweep(const Core::ACSweep &sweep);
     void DrawDCSweep(const Core::DCSweep &sweep, const std::vector<std::vector<MathTrace>> &math);
 
+    // Spectrum
+    PlotSpan GetSpectrumSpan(const Core::Transient &transient) const;
+    void UpdateSpectra(const Core::Transient &transient, const std::vector<MathTrace> &math);
+    void DrawSpectrum();
+
     // Statistics
     void DrawTransientStatistics(const Core::Transient &transient, const std::vector<MathTrace> &math);
+    void DrawSpectrumStatistics();
     void DrawACSweepStatistics(const Core::ACSweep &sweep);
 
     // Math channels
@@ -189,6 +238,7 @@ private:
     // Export
     std::optional<ExportFormat> DrawExportPopup(bool can_export);
     ExportFigure BuildTransientFigure(const Core::Transient &transient, const std::vector<MathTrace> &math) const;
+    ExportFigure BuildSpectrumFigure() const;
     ExportFigure BuildACSweepFigure(const Core::ACSweep &sweep) const;
     ExportFigure BuildDCSweepFigure(const Core::DCSweep &sweep, const std::vector<std::vector<MathTrace>> &math) const;
     void StartExport(ExportFigure figure, ExportFormat format);
