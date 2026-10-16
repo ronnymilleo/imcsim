@@ -44,6 +44,43 @@ std::vector<WireCurrent> SplitWires(const std::vector<UIWire> &wires, const std:
     return pieces;
 }
 
+// A part with several currents, each at the terminal it was probed on; the other end of a winding or of a contact
+// takes what the probed end gives out
+std::optional<double> GetProbedTerminalCurrent(const Core::Component &component, const std::vector<std::string> &names,
+                                               const std::size_t terminal,
+                                               const std::vector<Core::ComponentCurrent> &currents) {
+    const std::vector<std::size_t> probed = Core::GetCurrentTerminals(component);
+    for (std::size_t index = 0; index < names.size(); ++index) {
+        if (probed[index] == terminal) {
+            return FindCurrent(currents, names[index]);
+        }
+    }
+    const Core::ComponentType type = component.GetType();
+    if ((type != Core::ComponentType::Relay && type != Core::ComponentType::Transformer) || terminal % 2 == 0) {
+        return std::nullopt;
+    }
+    for (std::size_t index = 0; index < names.size(); ++index) {
+        if (probed[index] + 1 == terminal) {
+            const std::optional<double> current = FindCurrent(currents, names[index]);
+            return current ? std::optional(-*current) : std::nullopt;
+        }
+    }
+    return std::nullopt;
+}
+
+// The output current of an op-amp or a gate returns through ground or the supply, and their other pins carry none.
+// Any other single current enters terminal 1 and leaves terminal 2, and the control pins of a controlled source
+// carry none
+double GetSingleCurrentAt(const Core::Component &component, const double current, const std::size_t terminal) {
+    if (component.GetType() == Core::ComponentType::OpAmp || Core::IsLogicGate(component.GetType())) {
+        return terminal == Core::GetCurrentTerminals(component).front() ? current : 0.0;
+    }
+    if (terminal == 0) {
+        return current;
+    }
+    return terminal == 1 ? -current : 0.0;
+}
+
 } // namespace
 
 /**
@@ -66,40 +103,13 @@ std::optional<double> GetTerminalCurrent(const Core::Component &component, const
         return std::nullopt;
     }
     if (names.size() > 1) {
-        const std::vector<std::size_t> probed = Core::GetCurrentTerminals(component);
-        for (std::size_t index = 0; index < names.size(); ++index) {
-            if (probed[index] == terminal) {
-                return FindCurrent(currents, names[index]);
-            }
-        }
-        // The other end of a winding or of a contact takes what the probed end gives out
-        const Core::ComponentType type = component.GetType();
-        if ((type == Core::ComponentType::Relay || type == Core::ComponentType::Transformer) && terminal % 2 == 1) {
-            for (std::size_t index = 0; index < names.size(); ++index) {
-                if (probed[index] + 1 == terminal) {
-                    const std::optional<double> current = FindCurrent(currents, names[index]);
-                    return current ? std::optional(-*current) : std::nullopt;
-                }
-            }
-        }
-        return std::nullopt;
+        return GetProbedTerminalCurrent(component, names, terminal, currents);
     }
     const std::optional<double> current = FindCurrent(currents, names.front());
     if (!current) {
         return std::nullopt;
     }
-    // The output current of an op-amp or a gate returns through ground or the supply, and their other pins carry none
-    if (component.GetType() == Core::ComponentType::OpAmp || Core::IsLogicGate(component.GetType())) {
-        return terminal == Core::GetCurrentTerminals(component).front() ? *current : 0.0;
-    }
-    // A single current enters terminal 1 and leaves terminal 2, and the control pins of a controlled source carry none
-    if (terminal == 0) {
-        return *current;
-    }
-    if (terminal == 1) {
-        return -*current;
-    }
-    return 0.0;
+    return GetSingleCurrentAt(component, *current, terminal);
 }
 
 /**
