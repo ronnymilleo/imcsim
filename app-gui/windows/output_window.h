@@ -8,6 +8,7 @@
 
 #include "file_dialog.h"
 #include "implot.h"
+#include "logic_trace.h"
 #include "playback.h"
 #include "plot_export.h"
 #include "schematic.h"
@@ -140,6 +141,8 @@ private:
     PlotCursors m_TransientCursors;
     PlotCursors m_ACSweepCursors;
     PlotSpan m_TransientView;
+    // Whether the signals of logic parts get a lane each, in a plot of their own under the analog one
+    bool m_ShowLogicLanes = true;
     PlotSpan m_ACSweepView{.From = 1.0, .To = 1e6};
     // Math channels, and the labels each analysis plotted last frame, so the axes fit when they change
     std::vector<MathChannel> m_MathChannels;
@@ -162,6 +165,9 @@ private:
     void Draw() override;
     void DrawTraceList(std::size_t node_count, const std::vector<Core::ComponentTrace> &currents);
     void DrawTransient(const Core::Transient &transient, const std::vector<MathTrace> &math);
+    void DrawTransientAnalog(const Core::Transient &transient, const std::vector<MathTrace> &math,
+                             const std::vector<int> &lane_nodes, bool show_currents, bool has_voltages, float height);
+    void DrawLogicLanes(const Core::Transient &transient, const std::vector<LogicNode> &lanes, float height);
     void DrawACSweep(const Core::ACSweep &sweep);
     void DrawDCSweep(const Core::DCSweep &sweep, const std::vector<std::vector<MathTrace>> &math);
 
