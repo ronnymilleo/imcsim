@@ -143,6 +143,8 @@ private:
     PlotSpan m_TransientView;
     // Whether the signals of logic parts get a lane each, in a plot of their own under the analog one
     bool m_ShowLogicLanes = true;
+    // Whether each steady stretch of a lane is labeled 0, 1 or X
+    bool m_ShowBitValues = false;
     PlotSpan m_ACSweepView{.From = 1.0, .To = 1e6};
     // Math channels, and the labels each analysis plotted last frame, so the axes fit when they change
     std::vector<MathChannel> m_MathChannels;

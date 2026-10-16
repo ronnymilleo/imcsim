@@ -67,6 +67,9 @@ constexpr float MathLineWeight = 2.0f;
 constexpr float LanePlotMargin = 3.5f;
 constexpr float LaneRowHeight = 2.2f;
 constexpr float MaxLaneShare = 0.6f;
+// Bit labels: the room around the digit, in font sizes, and the corner rounding of its box
+constexpr float BitBoxPadding = 0.25f;
+constexpr float BitBoxRounding = 3.0f;
 // Room above and below the stack of lanes, in lane units
 constexpr double LaneMargin = 0.3;
 // Widths in the math editor, in font sizes
@@ -1235,6 +1238,38 @@ std::vector<LogicNode> OutputWindow::FindMeasuredLanes(const std::size_t node_co
     return ListMeasuredLogicNodes(FindLogicNodes(m_Schematic.BuildCircuit()), node_count, m_Schematic);
 }
 
+// Writes 0, 1 or X in a box at the middle of every steady stretch of a lane that has room for it, within what the
+// plot shows, so zooming out drops the labels that no longer fit
+void DrawBitValues(const std::vector<double> &times, const std::vector<double> &voltages, const LogicNode &node,
+                   const std::size_t lane_position, const ImU32 color) {
+    const ImPlotRange view = ImPlot::GetPlotLimits().X;
+    const double middle = static_cast<double>(lane_position) * LaneStride + LaneHighOffset / 2.0;
+    const float pixel_y = ImPlot::PlotToPixels(view.Min, middle).y;
+    const float padding = ImGui::GetFontSize() * BitBoxPadding;
+    ImDrawList *draw_list = ImPlot::GetPlotDrawList();
+    ImPlot::PushPlotClipRect();
+    for (const LogicSegment &segment : FindLogicSegments(times, voltages, node.LogicLevel)) {
+        const double from = std::max(segment.From, view.Min);
+        const double to = std::min(segment.To, view.Max);
+        if (to <= from) {
+            continue;
+        }
+        const char *text = GetLogicStateName(segment.State);
+        const ImVec2 text_size = ImGui::CalcTextSize(text);
+        const float left = ImPlot::PlotToPixels(from, middle).x;
+        const float right = ImPlot::PlotToPixels(to, middle).x;
+        const ImVec2 box_size = text_size + ImVec2(padding, padding) * 2.0f;
+        if (right - left < box_size.x + padding) {
+            continue;
+        }
+        const ImVec2 box_min((left + right - box_size.x) / 2.0f, pixel_y - box_size.y / 2.0f);
+        draw_list->AddRectFilled(box_min, box_min + box_size, ImGui::GetColorU32(ImGuiCol_FrameBg), BitBoxRounding);
+        draw_list->AddRect(box_min, box_min + box_size, color, BitBoxRounding);
+        draw_list->AddText(box_min + ImVec2(padding, padding), ImGui::GetColorU32(ImGuiCol_Text), text);
+    }
+    ImPlot::PopPlotClipRect();
+}
+
 // Each lane is a trace between its low and high levels, named on the axis, with a state read at the cursor. A lane
 // the circuit drives to a voltage between the thresholds is drawn halfway between low and high
 void OutputWindow::DrawLogicLanes(const Core::Transient &transient, const std::vector<LogicNode> &lanes,
@@ -1273,6 +1308,9 @@ void OutputWindow::DrawLogicLanes(const Core::Transient &transient, const std::v
         ImPlot::PlotLine(names[lane].c_str(), transient.Times.data(), heights.data(), static_cast<int>(heights.size()),
                          spec);
         plotted.push_back({names[lane], &voltages, "V", color, node.LogicLevel});
+        if (m_ShowBitValues) {
+            DrawBitValues(transient.Times, voltages, node, lanes.size() - 1 - lane, color);
+        }
     }
     DrawCursors(m_TransientCursors, false);
     DrawPlayhead(m_Playback, transient.Times.back());
@@ -1396,6 +1434,10 @@ void OutputWindow::DrawTransientStatistics(const Core::Transient &transient, con
     if (!FindLogicNodes(m_Schematic.BuildCircuit()).empty()) {
         ImGui::Checkbox("Logic lanes", &m_ShowLogicLanes);
         ImGui::SetItemTooltip("Plot the signals of gates and flip-flops as lanes under the analog traces");
+        if (m_ShowLogicLanes) {
+            ImGui::Checkbox("Bit values", &m_ShowBitValues);
+            ImGui::SetItemTooltip("Write 0, 1 or X on every steady stretch of a lane that has room for it");
+        }
     }
     const PlotCursors &cursors = m_TransientCursors;
     if (cursors.Shown && BeginStatisticsTable("cursors")) {
