@@ -173,7 +173,8 @@ constexpr auto Examples = std::to_array<Example>({
         .Description = "An op-amp with positive feedback, 1k to ground and 10k from the output, flips its output "
                        "between about 15 V and -15 V only when the input passes +-1.36 V, the output swing over 11, "
                        "and not at 0 V. Run the transient: a 3 V, 1 kHz sine at the inverting input gives a square "
-                       "wave, and the voltage on the other input steps between the two thresholds.",
+                       "wave, and the voltage on the other input steps between the two thresholds. At rest the "
+                       "circuit has two stable states, so the output may start on either supply.",
         .FileName = "schmitt_trigger.imcsim",
     },
     {
