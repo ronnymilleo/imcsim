@@ -460,3 +460,25 @@ TEST_CASE("The current mirror copies the reference current while Q2 is out of sa
         CHECK(trace->Values[index_of(10.0)] > trace->Values[index_of(2.0)]);
     }
 }
+
+TEST_CASE("Every example is in a group, and the examples of a group are listed together", "[examples]") {
+    const std::vector<const char *> groups = GUI::GetExampleGroups();
+    REQUIRE_FALSE(groups.empty());
+    // Each group once
+    for (std::size_t i = 0; i < groups.size(); ++i) {
+        for (std::size_t j = i + 1; j < groups.size(); ++j) {
+            CHECK(std::string_view(groups[i]) != std::string_view(groups[j]));
+        }
+    }
+    // Walking the list never comes back to an earlier group, so the menu shows each in one run
+    std::size_t current = 0;
+    for (const GUI::Example &example : GUI::GetExamples()) {
+        INFO(example.Title);
+        const auto group = std::ranges::find_if(
+            groups, [&example](const char *name) { return std::string_view(name) == example.Group; });
+        REQUIRE(group != groups.end());
+        const auto index = static_cast<std::size_t>(group - groups.begin());
+        CHECK(index >= current);
+        current = index;
+    }
+}

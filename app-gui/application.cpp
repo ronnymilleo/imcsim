@@ -19,6 +19,7 @@
 #include <cstdio>
 #include <filesystem>
 #include <format>
+#include <string_view>
 #include <utility>
 
 namespace GUI {
@@ -280,20 +281,29 @@ void Application::DrawMainMenuBar() {
         ImGui::Separator();
         // The same list twice: Examples opens one in place of the schematic, Insert Example adds one to it
         const auto draw_examples = [this](const bool insert) {
-            for (const Example &example : GetExamples()) {
-                if (ImGui::MenuItem(example.Title)) {
-                    if (insert) {
-                        m_EditorWindow.RequestInsertExample(example);
-                    } else {
-                        m_EditorWindow.RequestExample(example);
+            for (const char *group : GetExampleGroups()) {
+                if (!ImGui::BeginMenu(group)) {
+                    continue;
+                }
+                for (const Example &example : GetExamples()) {
+                    if (std::string_view(example.Group) != group) {
+                        continue;
+                    }
+                    if (ImGui::MenuItem(example.Title)) {
+                        if (insert) {
+                            m_EditorWindow.RequestInsertExample(example);
+                        } else {
+                            m_EditorWindow.RequestExample(example);
+                        }
+                    }
+                    if (ImGui::BeginItemTooltip()) {
+                        ImGui::PushTextWrapPos(ImGui::GetFontSize() * ExampleTooltipWidth);
+                        ImGui::TextUnformatted(example.Description);
+                        ImGui::PopTextWrapPos();
+                        ImGui::EndTooltip();
                     }
                 }
-                if (ImGui::BeginItemTooltip()) {
-                    ImGui::PushTextWrapPos(ImGui::GetFontSize() * ExampleTooltipWidth);
-                    ImGui::TextUnformatted(example.Description);
-                    ImGui::PopTextWrapPos();
-                    ImGui::EndTooltip();
-                }
+                ImGui::EndMenu();
             }
         };
         if (ImGui::BeginMenu("Examples")) {

@@ -32,8 +32,8 @@ How to read what imcsim measures, plots and exports. The [README](../README.md) 
   replacing it as Open does. The circuit follows the cursor like a paste (R, M and Shift+M turn it, a click places it,
   Esc cancels), takes the next free part names and is selected once placed. The analysis settings and the probes of
   the file are left behind, and parts that cannot be read are reported and skipped. File > Insert Example does the
-  same with an example circuit, and dropping a `.imcsim` file on the window imports it, with nothing replaced and
-  nothing to confirm.
+  same with an example circuit (both menus sort the examples into submenus by topic), and dropping a `.imcsim` file
+  on the window imports it, with nothing replaced and nothing to confirm.
 - **Net labels**: the circle button next to Ground and VCC, or L, places a label; its popover opens on the name, so you
   type it and press Enter. Labels with the same name are one node even with no wire between them, which keeps a
   large circuit readable: label the output `OUT` here and again where it is used. Names are 1 to 32 letters, digits,
@@ -201,7 +201,8 @@ margin, bias current, CMRR, output resistance, short-circuit current, headrooms 
 is enough to model another part; its GBW comes out about 10% low. It still leaves out offset voltage, noise,
 temperature, the common-mode input range and the supply rejection, and its output current returns through ground.
 
-The Examples menu has an inverting amplifier.
+The Op-amps examples are an inverting and a non-inverting amplifier, an integrator, a Schmitt trigger and a
+Sallen-Key low-pass filter.
 
 ## Measuring
 

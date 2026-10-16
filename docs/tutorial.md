@@ -59,9 +59,9 @@ m (milli), u, n, p and f.
 
 ## 4. Open the example
 
-The rest of the tutorial uses File > Examples > RC low-pass filter, the filter described at the top: Vin1 is an AC
-source of 1 V at 1 kHz, R1 is 1k and C1 is 100n. Since the schematic has unsaved changes, imcsim asks to discard
-them first.
+The rest of the tutorial uses File > Examples > Basics > RC low-pass filter, the filter described at the top: Vin1 is
+an AC source of 1 V at 1 kHz, R1 is 1k and C1 is 100n. Since the schematic has unsaved changes, imcsim asks to
+discard them first.
 
 The source properties hold both of its AC values: the amplitude is the peak of the sine in a transient, and the AC
 magnitude is what an AC sweep uses, where 1 reads as gain. Both are explained in the user guide.
@@ -165,7 +165,8 @@ analysis, and the measured nodes and currents, so reopening it is one F5 away fr
 
 ## Where to go next
 
-- Open the other examples in File > Examples; each has its analyses and measurements set up.
+- Open the other examples in File > Examples, sorted into Basics, Diodes, Transistors, Op-amps and Controlled
+  sources; each has its analyses and measurements set up.
 - Try the transistors, diodes and op-amps: each takes a ready model or custom SPICE parameters in its properties.
 - View > Theme switches between nine color themes, shown side by side in [Themes](themes.md).
 - Read the [user guide](user_guide.md) for terminal order, current signs and the details of each plot, and
