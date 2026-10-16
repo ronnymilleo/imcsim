@@ -17,6 +17,7 @@
 #include "components/relay.h"
 #include "components/resistor.h"
 #include "components/switch.h"
+#include "components/transformer.h"
 #include "components/vcc.h"
 #include "components/voltage_controlled_switch.h"
 #include "components/voltage_source.h"
@@ -490,4 +491,34 @@ TEST_CASE("Probes of the switches and the relay", "[circuit]") {
     CHECK(Core::GetCurrentName(relay, relay_probes[0].Label) == "K1.S");
     CHECK(relay_probes[1].Terminal == 2);
     CHECK(Core::GetCurrentName(relay, relay_probes[1].Label) == "K1.C");
+}
+
+TEST_CASE("ToSpiceNetlist writes a transformer as two inductors behind their winding resistances, coupled",
+          "[circuit]") {
+    Core::Transformer transformer;
+    transformer.SetName("T1");
+    transformer.SetValue(100e-3);
+    transformer.SetParameters({.TurnsRatio = 2.0, .Coupling = 0.98, .WindingResistance = 0.5});
+    Core::Circuit circuit;
+    // Primary on nodes 1 and 0, secondary on nodes 2 and 0
+    circuit.Add(transformer, {1, 0, 2, 0});
+
+    const std::string netlist = circuit.ToSpiceNetlist();
+    // The middles of the windings are the first nodes past the circuit ones, which are 0 to 2
+    CHECK(netlist.find("R-T1p 1 3 500m\n") != std::string::npos);
+    CHECK(netlist.find("L-T1p 3 0 100m\n") != std::string::npos);
+    CHECK(netlist.find("R-T1s 2 4 500m\n") != std::string::npos);
+    CHECK(netlist.find("L-T1s 4 0 25m\n") != std::string::npos);
+    CHECK(netlist.find("K-T1 L-T1p L-T1s 980m\n") != std::string::npos);
+}
+
+TEST_CASE("A transformer probes the + terminal of each winding", "[circuit]") {
+    Core::Transformer transformer;
+    transformer.SetName("T1");
+    const std::vector<Core::CurrentProbe> probes = Core::GetCurrentProbes(transformer);
+    REQUIRE(probes.size() == 2);
+    CHECK(probes[0].Terminal == 0);
+    CHECK(Core::GetCurrentName(transformer, probes[0].Label) == "T1.P");
+    CHECK(probes[1].Terminal == 2);
+    CHECK(Core::GetCurrentName(transformer, probes[1].Label) == "T1.S");
 }

@@ -15,6 +15,7 @@
 #include "components/relay.h"
 #include "components/source.h"
 #include "components/switch.h"
+#include "components/transformer.h"
 #include "components/voltage_controlled_switch.h"
 #include "element_factory.h"
 #include "nlohmann/json.hpp"
@@ -62,6 +63,12 @@ constexpr auto RelayKeys = std::to_array<ParameterKey<Core::RelayParameters>>({
     {"pull_in", &Core::RelayParameters::PullInVoltage},
     {"drop_out", &Core::RelayParameters::DropOutVoltage},
     {"contact_resistance", &Core::RelayParameters::ContactResistance},
+});
+
+constexpr auto TransformerKeys = std::to_array<ParameterKey<Core::TransformerParameters>>({
+    {"turns_ratio", &Core::TransformerParameters::TurnsRatio},
+    {"coupling", &Core::TransformerParameters::Coupling},
+    {"winding_resistance", &Core::TransformerParameters::WindingResistance},
 });
 
 constexpr auto PulseKeys = std::to_array<ParameterKey<Core::PulseParameters>>({
@@ -314,6 +321,8 @@ nlohmann::json WriteElement(const UIElement &element) {
         WritePartParameters(static_cast<const Core::VoltageControlledSwitch &>(component), SwitchKeys, object);
     } else if (type == Core::ComponentType::Relay) {
         WritePartParameters(static_cast<const Core::Relay &>(component), RelayKeys, object);
+    } else if (type == Core::ComponentType::Transformer) {
+        WritePartParameters(static_cast<const Core::Transformer &>(component), TransformerKeys, object);
     } else if (type == Core::ComponentType::Potentiometer) {
         object["wiper"] = static_cast<const Core::Potentiometer &>(component).GetWiper();
     } else if (type == Core::ComponentType::OpAmp) {
@@ -517,6 +526,12 @@ std::expected<std::unique_ptr<UIElement>, std::string> ReadElement(const nlohman
     }
     if (component.GetType() == Core::ComponentType::Relay) {
         if (const auto read = ReadPartParameters(object, static_cast<Core::Relay &>(component), RelayKeys); !read) {
+            return std::unexpected(read.error());
+        }
+    }
+    if (component.GetType() == Core::ComponentType::Transformer) {
+        if (const auto read = ReadPartParameters(object, static_cast<Core::Transformer &>(component), TransformerKeys);
+            !read) {
             return std::unexpected(read.error());
         }
     }

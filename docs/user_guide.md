@@ -21,6 +21,9 @@ How to read what imcsim measures, plots and exports. The [README](../README.md) 
 - **Switches that follow a voltage**: a voltage-controlled switch has its threshold, hysteresis and resistances in its
   properties, and a relay its coil and contact figures. Both are drawn open, since they open and close during a run.
   The Switching examples use them: a buck converter and a relay driver with a flyback diode.
+- **Transformers**: the value of a transformer is its primary inductance, and its properties set the turns ratio, the
+  coupling and the resistance of the windings. The secondary needs a path to ground, such as the bridge of the
+  Transformers examples.
 - **Standard values**: View > Component Values restricts resistors, capacitors and inductors to one of the E series
   (E6, E12, E24, E48, E96 or E192, with their tolerances of 20% down to 0.5%), or leaves any value allowed, which is
   the default. With a series chosen, a typed value becomes the nearest one of the series on a log scale (`5000` is
@@ -151,6 +154,7 @@ Every part with more than one terminal numbers them in the order the SPICE netli
 | Switch, push button | left contact, before rotating | right contact | |
 | Voltage-controlled switch (S) | contact, top | contact, bottom | control + (4: control -) |
 | Relay (K) | contact, top | contact, bottom | coil + (4: coil -) |
+| Transformer (T) | primary +, upper left | primary -, lower left | secondary + (4: secondary -), on the right |
 | Diode, Zener diode, LED | anode | cathode | |
 | Voltage source | positive (+) | negative (-) | |
 | Current source | tail of its arrow | head of its arrow | |
@@ -185,6 +189,8 @@ imcsim reports currents as ngspice computes them:
   an open one carries picoamperes.
 - **Relays** report two currents, `I(K1.S)` into the first contact terminal and `I(K1.C)` into the coil +. A
   voltage-controlled switch reports the current into its first contact terminal, like a two-terminal part.
+- **Transformers** report `I(T1.P)` into the primary + and `I(T1.S)` into the secondary +, each positive into its
+  terminal. With a load on the secondary the two have opposite signs, in the ratio of the turns.
 - **Controlled sources** report the current of their output like a two-terminal part; their control pins carry no
   current. A VCCS or CCCS pushes its current from terminal 1 to terminal 2 through itself, as its arrow shows, so
   into a load on terminal 1 it drives the load negative.

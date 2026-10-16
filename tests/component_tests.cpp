@@ -17,6 +17,7 @@
 #include "components/relay.h"
 #include "components/resistor.h"
 #include "components/switch.h"
+#include "components/transformer.h"
 #include "components/vcc.h"
 #include "components/voltage_controlled_switch.h"
 #include "components/voltage_source.h"
@@ -161,6 +162,41 @@ TEST_CASE("A relay contact closes at the pull-in voltage and opens at the drop-o
     CHECK(contact.Threshold - contact.Hysteresis == 2.0);
     CHECK(contact.OnResistance == 0.2);
     CHECK(contact.OffResistance == 1e9);
+}
+
+TEST_CASE("A transformer is a 100 mH primary with a 1:1 secondary, and the value is the primary", "[component]") {
+    Core::Transformer transformer;
+    CHECK(std::string_view(transformer.GetNamePrefix()) == "T");
+    CHECK(std::string_view(transformer.GetTypeName()) == "Transformer");
+    CHECK(std::string_view(transformer.GetUnit()) == "H");
+    CHECK(transformer.HasValue());
+    CHECK(transformer.GetValue() == 100e-3);
+    CHECK(transformer.IsValidValue(1e-3));
+    CHECK_FALSE(transformer.IsValidValue(0.0));
+    CHECK(transformer.GetSecondaryInductance() == 100e-3);
+    CHECK(Core::ParseComponentType("Transformer") == Core::ComponentType::Transformer);
+
+    SECTION("the secondary follows from the square of the turns ratio") {
+        transformer.SetParameters({.TurnsRatio = 2.0, .Coupling = 0.99, .WindingResistance = 0.5});
+        CHECK(transformer.GetSecondaryInductance() == 25e-3);
+        transformer.SetValue(1.0);
+        CHECK(transformer.GetSecondaryInductance() == 0.25);
+    }
+    SECTION("the figures must keep the coupling below 1 and the resistance positive") {
+        Core::TransformerParameters parameters;
+        CHECK(Core::Transformer::IsValidParameters(parameters));
+        parameters.Coupling = 1.0;
+        CHECK_FALSE(Core::Transformer::IsValidParameters(parameters));
+        parameters = {};
+        parameters.Coupling = 0.0;
+        CHECK_FALSE(Core::Transformer::IsValidParameters(parameters));
+        parameters = {};
+        parameters.TurnsRatio = 0.0;
+        CHECK_FALSE(Core::Transformer::IsValidParameters(parameters));
+        parameters = {};
+        parameters.WindingResistance = 0.0;
+        CHECK_FALSE(Core::Transformer::IsValidParameters(parameters));
+    }
 }
 
 TEST_CASE("Ground has no name prefix and no value", "[component]") {

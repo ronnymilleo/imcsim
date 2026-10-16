@@ -15,6 +15,7 @@
 #include "ui_elements/ui_potentiometer.h"
 #include "ui_elements/ui_resistor.h"
 #include "ui_elements/ui_switch.h"
+#include "ui_elements/ui_transformer.h"
 #include "ui_elements/ui_vcc.h"
 #include <catch2/catch_test_macros.hpp>
 #include <cstdlib>
@@ -212,6 +213,17 @@ TEST_CASE("A voltage-controlled switch and a relay have the contact vertical and
         CHECK(part.Contains({-1.0f, 0.0f}));
         CHECK_FALSE(part.Contains({1.5f, 0.0f}));
     }
+}
+
+TEST_CASE("A transformer has the primary on the left and the secondary on the right", "[ui_element]") {
+    GUI::UITransformer transformer({5, 5}, GUI::Rotation::R0);
+    CHECK(transformer.GetComponent().GetType() == Core::ComponentType::Transformer);
+    CHECK(transformer.GetTerminals() == std::vector<GUI::GridPoint>{{3, 4}, {3, 6}, {7, 4}, {7, 6}});
+    CHECK(transformer.GetTerminalInward(0) == GUI::GridPoint{1, 0});
+    CHECK(transformer.GetTerminalInward(2) == GUI::GridPoint{-1, 0});
+    // Mirroring swaps the sides, and the dots stay with their windings
+    transformer.SetMirrored(true);
+    CHECK(transformer.GetTerminals() == std::vector<GUI::GridPoint>{{7, 4}, {7, 6}, {3, 4}, {3, 6}});
 }
 
 TEST_CASE("Op-amps list the output, the inputs and the supply pins", "[ui_element]") {

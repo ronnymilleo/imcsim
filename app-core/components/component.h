@@ -43,6 +43,7 @@ enum class ComponentType {
     PushButton,
     VSwitch,
     Relay,
+    Transformer,
 };
 
 /**
@@ -53,7 +54,8 @@ enum class ComponentType {
  *          are named U1, U2... Ground has no name and no value, diodes and transistors have a model instead of a
  *          value, and controlled sources have a gain as their value. A potentiometer is RV1, RV2..., its value the
  *          resistance between its ends; a switch is SW1 and a push button PB1, with no value;
- *          a voltage-controlled switch is S1 and a relay K1, with no value either.
+ *          a voltage-controlled switch is S1 and a relay K1, with no value either;
+ *          a transformer is T1, its value the inductance of its primary.
  */
 class Component {
 public:

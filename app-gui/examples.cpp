@@ -227,8 +227,18 @@ constexpr auto Examples = std::to_array<Example>({
         .FileName = "relay_driver.imcsim",
     },
     {
+        .Title = "Transformer power supply",
+        .Group = "Transformers",
+        .Description = "A 2:1 transformer (100 mH primary, 0.999 coupling, 0.1 Ohm windings) steps a 34 V peak, 60 Hz "
+                       "sine down to about 16 V. Four 1N4007 and a 470u capacitor turn that into about 15 V of DC, "
+                       "with a volt of ripple, across 220 Ohm; the two SB net labels join the bridge to the secondary "
+                       "with no wire between them. Run the transient and read the primary current: the capacitor "
+                       "recharges in short pulses of about 1.8 A.",
+        .FileName = "transformer_power_supply.imcsim",
+    },
+    {
         .Title = "Ideal transformer",
-        .Group = "Controlled sources",
+        .Group = "Transformers",
         .Description = "A 1:2 transformer built from two controlled sources: E1 sets the secondary at twice the "
                        "primary voltage, and F1 draws twice the load current from the primary. Run the transient: "
                        "the 100 Ohm load gets 10 V from a 5 V source. Then measure only I(F1) and I(R1): the primary "

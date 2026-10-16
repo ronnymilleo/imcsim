@@ -14,6 +14,7 @@
 #include "components/relay.h"
 #include "components/source.h"
 #include "components/switch.h"
+#include "components/transformer.h"
 #include "components/voltage_controlled_switch.h"
 #include "spice_value.h"
 #include <algorithm>
@@ -310,6 +311,21 @@ std::string Circuit::ToSpiceNetlist(const std::string_view analysis, const bool 
             AddModelLine(model_name, FormatSwitchModel(model_name, relay.GetContactParameters()), model_names, models);
             break;
         }
+        case ComponentType::Transformer: {
+            // Two inductors, each behind the resistance of its winding, coupled by a K element
+            const auto &transformer = static_cast<const Transformer &>(component);
+            const std::string resistance = FormatSpiceValue(transformer.GetParameters().WindingResistance);
+            const int primary_middle = next_extra_node++;
+            const int secondary_middle = next_extra_node++;
+            const std::string &name = transformer.GetName();
+            netlist += std::format("R-{0}p {1} {2} {3}\nL-{0}p {2} {4} {5}\n", name, nodes[0], primary_middle,
+                                   resistance, nodes[1], FormatSpiceValue(transformer.GetValue()));
+            netlist += std::format("R-{0}s {1} {2} {3}\nL-{0}s {2} {4} {5}\n", name, nodes[2], secondary_middle,
+                                   resistance, nodes[3], FormatSpiceValue(transformer.GetSecondaryInductance()));
+            netlist +=
+                std::format("K-{0} L-{0}p L-{0}s {1}\n", name, FormatSpiceValue(transformer.GetParameters().Coupling));
+            break;
+        }
         case ComponentType::Ground:
         case ComponentType::NetLabel:
             break;
@@ -328,8 +344,9 @@ std::string Circuit::ToSpiceNetlist(const std::string_view analysis, const bool 
  * @brief   Lists the terminals of a component whose current is measured with a probe.
  * @param[in] component  Any component.
  * @return  The anode of a diode part, the first terminal of a switch, every terminal of a transistor or a
- *          potentiometer, the contact and the coil of a relay, and the first output terminal of a controlled source
- *          or the output of an op-amp; nothing for the others, whose currents ngspice reports directly.
+ *          potentiometer, the contact and the coil of a relay, the two windings of a transformer, and the first output
+ * terminal of a controlled source or the output of an op-amp; nothing for the others, whose currents ngspice reports
+ * directly.
  */
 std::vector<CurrentProbe> GetCurrentProbes(const Component &component) {
     const ComponentType type = component.GetType();
@@ -339,6 +356,9 @@ std::vector<CurrentProbe> GetCurrentProbes(const Component &component) {
     }
     if (type == ComponentType::Relay) {
         return {{0, "S"}, {2, "C"}};
+    }
+    if (type == ComponentType::Transformer) {
+        return {{0, "P"}, {2, "S"}};
     }
     if (IsBJT(component.GetType())) {
         return {{0, "C"}, {1, "B"}, {2, "E"}};

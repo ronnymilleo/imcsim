@@ -49,6 +49,7 @@ add_library(imcsim-gui-lib
             ui_elements/ui_resistor.cpp
             ui_elements/ui_source.cpp
             ui_elements/ui_switch.cpp
+            ui_elements/ui_transformer.cpp
             ui_elements/ui_transistor.cpp
             ui_elements/ui_vcc.cpp
             ui_elements/ui_voltage_source.cpp

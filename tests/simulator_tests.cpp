@@ -16,6 +16,7 @@
 #include "components/relay.h"
 #include "components/resistor.h"
 #include "components/switch.h"
+#include "components/transformer.h"
 #include "components/vcc.h"
 #include "components/voltage_controlled_switch.h"
 #include "components/voltage_source.h"
@@ -1613,4 +1614,73 @@ TEST_CASE("A relay closes its contact once its coil current is high enough, and 
     CHECK_THAT(closing_time, Catch::Matchers::WithinRel(expected, 0.05));
     // Closed, the contact passes nearly all of the supply
     CHECK_THAT(output.back(), Catch::Matchers::WithinAbs(10.0, 0.1));
+}
+
+namespace {
+
+/**
+ * @struct  SteppedDown
+ * @brief   An AC source on node 1 across the primary of a 2:1 transformer, with a load on its secondary on node 2.
+ */
+struct SteppedDown {
+    Core::VoltageSource Source;
+    Core::Transformer Transformer;
+    Core::Resistor Load;
+    Core::Ground Reference;
+    Core::Circuit Circuit;
+
+    explicit SteppedDown(const double load_resistance) {
+        Source.SetName("Vin1");
+        Source.SetSourceType(Core::VoltageSource::SourceType::AC);
+        Source.SetAC({.Amplitude = 10.0, .Frequency = 1e3, .Offset = 0.0, .Magnitude = 1.0});
+        Transformer.SetName("T1");
+        Transformer.SetParameters({.TurnsRatio = 2.0, .Coupling = 0.999, .WindingResistance = 0.01});
+        Load.SetName("R1");
+        Load.SetValue(load_resistance);
+        Circuit.Add(Source, {1, 0});
+        Circuit.Add(Transformer, {1, 0, 2, 0});
+        Circuit.Add(Load, {2, 0});
+        Circuit.Add(Reference, {0});
+    }
+};
+
+} // namespace
+
+TEST_CASE("A 2:1 transformer halves the voltage of its primary on an open secondary", "[simulator]") {
+    SteppedDown circuit(1e9);
+    const Core::ACSweepRun run = Core::RunACSweep(circuit.Circuit, {.StartFrequency = 1e3, .StopFrequency = 1e4});
+    REQUIRE(run.Result.has_value());
+    // The coupling takes a little more: 0.999 / 2
+    CHECK_THAT(run.Result->NodeMagnitudesDecibels[2].front(),
+               Catch::Matchers::WithinAbs(20.0 * std::log10(0.4995), 1e-2));
+    // The two windings are in phase through the dots
+    CHECK_THAT(run.Result->NodePhasesDegrees[2].front(), Catch::Matchers::WithinAbs(0.0, 0.5));
+}
+
+TEST_CASE("A loaded 2:1 transformer draws twice the secondary current from its primary", "[simulator]") {
+    SteppedDown circuit(10.0);
+    const Core::TransientRun run = Core::RunTransient(circuit.Circuit, {.StopTime = 5e-3, .TimeStep = 5e-6});
+    REQUIRE(run.Result.has_value());
+    const Core::Transient &transient = *run.Result;
+    const auto peak = [](const std::vector<double> &values) {
+        return std::max(std::abs(std::ranges::min(values)), std::ranges::max(values));
+    };
+    const auto current = [&transient](const std::string &name) {
+        const auto trace = std::ranges::find(transient.Currents, name, &Core::ComponentTrace::Name);
+        REQUIRE(trace != transient.Currents.end());
+        return trace->Values;
+    };
+    // Look at the last cycle, once the transient of the magnetizing current has settled
+    const auto last_cycle = [&transient](const std::vector<double> &values) {
+        const auto first =
+            static_cast<std::size_t>(std::ranges::lower_bound(transient.Times, 4e-3) - transient.Times.begin());
+        return std::vector<double>(values.begin() + static_cast<std::ptrdiff_t>(first), values.end());
+    };
+    const double secondary_voltage = peak(last_cycle(transient.NodeVoltages[2]));
+    const double secondary_current = peak(last_cycle(current("T1.S")));
+    const double primary_current = peak(last_cycle(current("T1.P")));
+    // 10 V in, about 5 V out across 10 Ohm: 0.5 A in the secondary and about 0.25 A in the primary
+    CHECK_THAT(secondary_voltage, Catch::Matchers::WithinRel(5.0, 0.05));
+    CHECK_THAT(secondary_current, Catch::Matchers::WithinRel(0.5, 0.05));
+    CHECK_THAT(primary_current, Catch::Matchers::WithinRel(0.25, 0.1));
 }

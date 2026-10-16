@@ -17,6 +17,7 @@
 #include "components/relay.h"
 #include "components/source.h"
 #include "components/switch.h"
+#include "components/transformer.h"
 #include "components/voltage_controlled_switch.h"
 #include "schematic.h"
 #include "standard_values.h"
@@ -71,6 +72,8 @@ private:
     // One per member of Core::SwitchParameters and Core::RelayParameters
     std::array<ValueField, 4> m_SwitchFields;
     std::array<ValueField, 5> m_RelayFields;
+    // One per member of Core::TransformerParameters
+    std::array<ValueField, 3> m_TransformerFields;
 
     void LoadFields(const Core::Component &component);
     void DrawSelectionSummary();
@@ -81,6 +84,7 @@ private:
     void DrawSwitch(Core::Switch &contact);
     void DrawControlledSwitch(Core::VoltageControlledSwitch &controlled);
     void DrawRelay(Core::Relay &relay);
+    void DrawTransformer(Core::Transformer &transformer);
     void DrawNetLabel(Core::NetLabel &label);
     void DrawDiode(Core::Diode &diode);
     void DrawBJT(Core::BJT &bjt);

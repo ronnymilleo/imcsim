@@ -22,6 +22,7 @@ add_library(imcsim-core-lib
             components/resistor.cpp
             components/source.cpp
             components/switch.cpp
+            components/transformer.cpp
             components/vcc.cpp
             components/voltage_controlled_switch.cpp
             components/voltage_source.cpp

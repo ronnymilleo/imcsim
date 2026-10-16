@@ -599,3 +599,41 @@ TEST_CASE("The relay contact closes and opens a coil time constant after the tra
     CHECK(PeakOf(collector) < 6.5);
     CHECK(PeakOf(load) > 11.5);
 }
+
+TEST_CASE("The transformer steps 34 V down to about half, and the bridge and capacitor make DC of it", "[examples]") {
+    GUI::Schematic schematic;
+    OpenExample("transformer_power_supply.imcsim", schematic);
+    const Core::TransientRun run =
+        Core::RunTransient(schematic.BuildCircuit(), schematic.GetSimulationSettings().Transient);
+    REQUIRE(run.Result.has_value());
+    const Core::Transient &transient = *run.Result;
+    const std::vector<double> &input = transient.NodeVoltages[NodeAt(schematic, {3, 9})];
+    const std::vector<double> &secondary = transient.NodeVoltages[NodeAt(schematic, {11, 9})];
+    const std::vector<double> &output = transient.NodeVoltages[NodeAt(schematic, {15, 6})];
+    // Past the first cycles, when the reservoir capacitor has charged
+    double output_low = 1e9;
+    double output_high = -1e9;
+    double input_peak = 0.0;
+    double secondary_peak = 0.0;
+    for (std::size_t index = 0; index < output.size(); ++index) {
+        if (transient.Times[index] < 30e-3) {
+            continue;
+        }
+        output_low = std::min(output_low, output[index]);
+        output_high = std::max(output_high, output[index]);
+        input_peak = std::max(input_peak, std::abs(input[index]));
+        secondary_peak = std::max(secondary_peak, std::abs(secondary[index]));
+    }
+    INFO(std::format("Output between {} and {} V, secondary peak {} V", output_low, output_high, secondary_peak));
+    CHECK_THAT(input_peak, Catch::Matchers::WithinRel(34.0, 1e-3));
+    // Half of 34 V, less what the winding resistances and the current pulses take
+    CHECK_THAT(secondary_peak, Catch::Matchers::WithinAbs(16.0, 1.0));
+    // The peak of the secondary less two diode drops, with a ripple of about a volt
+    CHECK_THAT(output_high, Catch::Matchers::WithinAbs(15.4, 1.0));
+    CHECK(output_high - output_low < 1.6);
+    CHECK(output_low > 13.0);
+    const auto primary = std::ranges::find(transient.Currents, "T1.P", &Core::ComponentTrace::Name);
+    REQUIRE(primary != transient.Currents.end());
+    // The capacitor takes its charge in short pulses, which the primary feeds at half the current
+    CHECK(PeakOf(primary->Values) > 1.0);
+}

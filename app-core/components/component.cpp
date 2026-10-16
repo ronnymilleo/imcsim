@@ -23,7 +23,7 @@ constexpr auto AllTypes = std::to_array<ComponentType>({
     ComponentType::NMOS,          ComponentType::PMOS,          ComponentType::VCVS,          ComponentType::VCCS,
     ComponentType::CCCS,          ComponentType::CCVS,          ComponentType::OpAmp,         ComponentType::NetLabel,
     ComponentType::Potentiometer, ComponentType::Switch,        ComponentType::PushButton,    ComponentType::VSwitch,
-    ComponentType::Relay,
+    ComponentType::Relay,         ComponentType::Transformer,
 });
 
 } // namespace
@@ -102,6 +102,8 @@ const char *Component::GetNamePrefix() const {
         return "S";
     case ComponentType::Relay:
         return "K";
+    case ComponentType::Transformer:
+        return "T";
     case ComponentType::Ground:
     case ComponentType::NetLabel:
         return "";
@@ -122,6 +124,7 @@ const char *Component::GetUnit() const {
     case ComponentType::Capacitor:
         return "F";
     case ComponentType::Inductor:
+    case ComponentType::Transformer:
         return "H";
     case ComponentType::VCC:
     case ComponentType::VoltageSource:
@@ -181,6 +184,7 @@ bool Component::HasValue() const {
     case ComponentType::Capacitor:
     case ComponentType::Inductor:
     case ComponentType::Potentiometer:
+    case ComponentType::Transformer:
     case ComponentType::VCC:
     case ComponentType::VoltageSource:
     case ComponentType::CurrentSource:
@@ -205,6 +209,7 @@ bool Component::IsValidValue(const double value) const {
     case ComponentType::Capacitor:
     case ComponentType::Inductor:
     case ComponentType::Potentiometer:
+    case ComponentType::Transformer:
         return value > 0.0;
     case ComponentType::VCC:
     case ComponentType::VoltageSource:
@@ -322,6 +327,8 @@ const char *GetTypeName(const ComponentType type) {
         return "VSwitch";
     case ComponentType::Relay:
         return "Relay";
+    case ComponentType::Transformer:
+        return "Transformer";
     }
     return "Unknown";
 }

@@ -42,6 +42,7 @@ double DefaultGain(const ComponentType type) {
     case ComponentType::PushButton:
     case ComponentType::VSwitch:
     case ComponentType::Relay:
+    case ComponentType::Transformer:
         break;
     }
     return 1.0;

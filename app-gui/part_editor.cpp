@@ -135,6 +135,12 @@ constexpr auto RelayFields = std::to_array<ParameterField<Core::RelayParameters>
     {"Contact R", &Core::RelayParameters::ContactResistance, "Ohm"},
 });
 
+constexpr auto TransformerFields = std::to_array<ParameterField<Core::TransformerParameters>>({
+    {"Turns ratio", &Core::TransformerParameters::TurnsRatio, ":1"},
+    {"Coupling", &Core::TransformerParameters::Coupling, ""},
+    {"Winding R", &Core::TransformerParameters::WindingResistance, "Ohm"},
+});
+
 template <typename Parameters, std::size_t Count>
 void LoadParameterFields(const std::array<ParameterField<Parameters>, Count> &fields,
                          std::array<ValueField, Count> &value_fields, const Parameters &parameters) {
@@ -313,6 +319,9 @@ void PartEditor::DrawFields(Core::Component &component) {
         DrawControlledSwitch(static_cast<Core::VoltageControlledSwitch &>(component));
     } else if (type == Core::ComponentType::Relay) {
         DrawRelay(static_cast<Core::Relay &>(component));
+    } else if (type == Core::ComponentType::Transformer) {
+        DrawValue(component);
+        DrawTransformer(static_cast<Core::Transformer &>(component));
     } else {
         DrawValue(component);
         if (type == Core::ComponentType::Potentiometer) {
@@ -429,6 +438,10 @@ void PartEditor::LoadFields(const Core::Component &component) {
     if (component.GetType() == Core::ComponentType::Relay) {
         LoadParameterFields(RelayFields, m_RelayFields, static_cast<const Core::Relay &>(component).GetParameters());
     }
+    if (component.GetType() == Core::ComponentType::Transformer) {
+        LoadParameterFields(TransformerFields, m_TransformerFields,
+                            static_cast<const Core::Transformer &>(component).GetParameters());
+    }
     m_LoadedSelection = m_Schematic.GetSelectionVersion();
 }
 
@@ -493,6 +506,20 @@ void PartEditor::DrawRelay(Core::Relay &relay) {
         m_Schematic.MarkModified();
     }
     ImGui::TextDisabled("The contact follows the coil current, so it lags by L over R");
+}
+
+// The value is the primary inductance; the secondary's follows from the turns ratio
+void PartEditor::DrawTransformer(Core::Transformer &transformer) {
+    Core::TransformerParameters parameters = transformer.GetParameters();
+    const auto is_valid = [](const Core::TransformerParameters &candidate) {
+        return Core::Transformer::IsValidParameters(candidate);
+    };
+    if (DrawParameterFields(TransformerFields, m_TransformerFields, "", is_valid, parameters)) {
+        transformer.SetParameters(parameters);
+        m_Schematic.MarkModified();
+    }
+    ImGui::TextDisabled("Value is the primary inductance; the secondary is %s",
+                        Core::FormatValue(transformer.GetSecondaryInductance()).c_str());
 }
 
 // A closed switch conducts; a push button is pressed when closed

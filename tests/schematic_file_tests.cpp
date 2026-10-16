@@ -13,6 +13,7 @@
 #include "components/potentiometer.h"
 #include "components/relay.h"
 #include "components/switch.h"
+#include "components/transformer.h"
 #include "components/voltage_controlled_switch.h"
 #include "components/voltage_source.h"
 #include "element_factory.h"
@@ -647,6 +648,31 @@ TEST_CASE("A relay keeps its coil and contact figures", "[schematic_file]") {
     const std::string inverted =
         R"({"type": "Relay", "x": 1, "y": 1, "rotation": 0, "name": "K1", "parameters": {"pull_in": 1.0, "drop_out": 2.0}})";
     const GUI::LoadedSchematic skipped = LoadOrFail(Document(inverted, ""));
+    CHECK(skipped.Elements.empty());
+    CHECK(skipped.Warnings.size() == 1);
+}
+
+TEST_CASE("A transformer keeps its primary inductance and its figures", "[schematic_file]") {
+    std::vector<std::unique_ptr<GUI::UIElement>> elements;
+    elements.push_back(GUI::CreateElement(Core::ComponentType::Transformer, {5, 5}, GUI::Rotation::R180));
+    auto &transformer = static_cast<Core::Transformer &>(elements.back()->GetComponent());
+    transformer.SetName("T1");
+    transformer.SetValue(0.5);
+    transformer.SetParameters({.TurnsRatio = 4.0, .Coupling = 0.95, .WindingResistance = 2.0});
+
+    const GUI::LoadedSchematic loaded = LoadOrFail(GUI::SaveSchematic(elements, {}, {}, {}));
+    CHECK(loaded.Warnings.empty());
+    REQUIRE(loaded.Elements.size() == 1);
+    const auto &copy = static_cast<const Core::Transformer &>(loaded.Elements[0]->GetComponent());
+    CHECK(copy.GetValue() == 0.5);
+    CHECK(copy.GetParameters().TurnsRatio == 4.0);
+    CHECK(copy.GetParameters().Coupling == 0.95);
+    CHECK(copy.GetParameters().WindingResistance == 2.0);
+
+    // A coupling of 1 is not allowed
+    const std::string perfect =
+        R"({"type": "Transformer", "x": 1, "y": 1, "rotation": 0, "name": "T1", "value": 0.1, "parameters": {"coupling": 1.0}})";
+    const GUI::LoadedSchematic skipped = LoadOrFail(Document(perfect, ""));
     CHECK(skipped.Elements.empty());
     CHECK(skipped.Warnings.size() == 1);
 }
