@@ -15,6 +15,7 @@
 #include "components/op_amp.h"
 #include "components/source.h"
 #include "schematic.h"
+#include "standard_values.h"
 #include "value_field.h"
 #include <array>
 #include <cstddef>
@@ -42,8 +43,13 @@ public:
     // The name of a selected net label gets the focus on the next Draw(), as for a label just placed
     void FocusNetName();
 
+    // Standard values for resistors, capacitors and inductors, or any value
+    Core::ValueSeries GetValueSeries() const;
+    void SetValueSeries(Core::ValueSeries series);
+
 private:
     Schematic &m_Schematic;
+    Core::ValueSeries m_ValueSeries = Core::ValueSeries::Free;
     // Texts being edited, and the selection they were loaded from
     std::optional<std::size_t> m_LoadedSelection;
     ValueField m_Value;

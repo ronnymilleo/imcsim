@@ -347,6 +347,23 @@ void PartEditor::FocusNetName() {
     m_FocusNet = true;
 }
 
+/**
+ * @brief   Returns the standard series the values of resistors, capacitors and inductors are taken from.
+ * @return  The series, or Core::ValueSeries::Free when any value is allowed.
+ */
+Core::ValueSeries PartEditor::GetValueSeries() const {
+    return m_ValueSeries;
+}
+
+/**
+ * @brief   Chooses the standard series for resistors, capacitors and inductors.
+ * @param[in] series  The series, or Core::ValueSeries::Free to allow any value.
+ * @note    Parts that already have a value outside the series keep it until the user edits it.
+ */
+void PartEditor::SetValueSeries(const Core::ValueSeries series) {
+    m_ValueSeries = series;
+}
+
 void PartEditor::LoadFields(const Core::Component &component) {
     m_Value.Load(component.GetValue());
     if (component.GetType() == Core::ComponentType::NetLabel) {
@@ -401,9 +418,18 @@ void PartEditor::DrawNetLabel(Core::NetLabel &label) {
 
 void PartEditor::DrawValue(Core::Component &component) {
     const auto is_valid = [&component](const double value) { return component.IsValidValue(value); };
-    if (const std::optional<double> value = m_Value.Draw("Value", component.GetUnit(), is_valid)) {
+    // Standard values are for the passive parts; the value of a source or a gain is whatever the circuit needs
+    const Core::ComponentType type = component.GetType();
+    const bool passive = type == Core::ComponentType::Resistor || type == Core::ComponentType::Capacitor ||
+                         type == Core::ComponentType::Inductor;
+    const Core::ValueSeries series = passive ? m_ValueSeries : Core::ValueSeries::Free;
+    if (const std::optional<double> value = m_Value.Draw("Value", component.GetUnit(), is_valid, series)) {
         component.SetValue(*value);
         m_Schematic.MarkModified();
+    }
+    if (series != Core::ValueSeries::Free) {
+        ImGui::TextDisabled("Standard values: %s, %g%%", Core::GetSeriesName(series),
+                            Core::GetSeriesTolerancePercent(series));
     }
 }
 

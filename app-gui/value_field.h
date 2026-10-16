@@ -6,6 +6,7 @@
 #ifndef IMCSIM_VALUE_FIELD_H
 #define IMCSIM_VALUE_FIELD_H
 
+#include "standard_values.h"
 #include <array>
 #include <functional>
 #include <optional>
@@ -17,13 +18,15 @@ namespace GUI {
  * @class   ValueField
  * @brief   Keeps the text being typed for one value and reports the value once the text is valid.
  * @details Values are applied as soon as they are valid instead of when the field loses focus, because a click
- *          elsewhere may change what the field edits before a deferred edit was applied.
+ *          elsewhere may change what the field edits before a deferred edit was applied. With a standard series the
+ *          value is the nearest one of the series, and the field steps through the series.
  */
 class ValueField {
 public:
     void Load(double value);
     void StartTyping(char first);
-    std::optional<double> Draw(const char *label, const std::string &unit, const std::function<bool(double)> &is_valid);
+    std::optional<double> Draw(const char *label, const std::string &unit, const std::function<bool(double)> &is_valid,
+                               Core::ValueSeries series = Core::ValueSeries::Free);
 
 private:
     std::array<char, 32> m_Text{};
@@ -32,6 +35,8 @@ private:
     // move after it once the input is active
     std::optional<char> m_TypingStart;
     bool m_CursorToEnd = false;
+    // Whether the next Draw() focuses the input again, after a step rewrote its text
+    bool m_RefocusInput = false;
 };
 
 void DrawFieldLabel(const char *label);

@@ -23,6 +23,7 @@ add_library(imcsim-core-lib
             components/voltage_source.cpp
             simulator.cpp
             spice_value.cpp
+            standard_values.cpp
 )
 
 target_include_directories(imcsim-core-lib

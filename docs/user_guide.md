@@ -13,6 +13,13 @@ How to read what imcsim measures, plots and exports. The [README](../README.md) 
   editing its main value right away: `4k7` and Enter make a resistor 4.7k. Values take SPICE suffixes, and a whole
   number may put its decimals after the suffix, as resistor codes do (`4k7`, `2M2`, `3u3`). View > Properties keeps
   the same fields in a docked window.
+- **Standard values**: View > Component Values restricts resistors, capacitors and inductors to one of the E series
+  (E6, E12, E24, E48, E96 or E192, with their tolerances of 20% down to 0.5%), or leaves any value allowed, which is
+  the default. With a series chosen, a typed value becomes the nearest one of the series on a log scale (`5000` is
+  4.7k in E12), and the arrow buttons beside the value, the up and down keys and the mouse wheel over the field step
+  to the next or previous standard value, into the next decade at the ends. A part keeps a value outside the series
+  until you edit it, and the sources, gains and parameters of the other parts are never restricted. The choice is a
+  preference kept between sessions, not part of the schematic file.
 - **Selecting**: click a part or a wire. Shift+click adds an item to the selection or removes it, and a drag on empty
   canvas selects everything the box touches (with Shift, it adds to the selection). A double click on a wire selects
   every wire of its node, and Ctrl+A (Edit > Select All) selects everything. Esc clears the selection.

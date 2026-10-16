@@ -6,6 +6,7 @@
 #include "value_field.h"
 
 #include "imgui.h"
+#include "imgui_internal.h"
 #include "spice_value.h"
 #include "theme.h"
 #include <utility>
@@ -17,6 +18,40 @@ namespace {
 // In font sizes, so the layout follows the DPI scale
 constexpr float LabelWidth = 6.0f;
 constexpr float InputWidth = 8.0f;
+
+// +1 for one standard value up and -1 for one down, from the arrow keys while the input is active and from the mouse
+// wheel over it; 0 when the user did neither this frame. Call right after the input
+int ReadStepFromInput() {
+    if (ImGui::IsItemActive()) {
+        if (ImGui::IsKeyPressed(ImGuiKey_UpArrow)) {
+            return 1;
+        }
+        if (ImGui::IsKeyPressed(ImGuiKey_DownArrow)) {
+            return -1;
+        }
+    }
+    const float wheel = ImGui::GetIO().MouseWheel;
+    if (ImGui::IsItemHovered() && wheel != 0.0f) {
+        return wheel > 0.0f ? 1 : -1;
+    }
+    return 0;
+}
+
+// The two buttons that step through the series: +1 for the up one and -1 for the down one, 0 when none was clicked
+int DrawStepButtons() {
+    int step = 0;
+    ImGui::SameLine();
+    if (ImGui::ArrowButton("##previous", ImGuiDir_Down)) {
+        step = -1;
+    }
+    ImGui::SetItemTooltip("Previous standard value");
+    ImGui::SameLine();
+    if (ImGui::ArrowButton("##next", ImGuiDir_Up)) {
+        step = 1;
+    }
+    ImGui::SetItemTooltip("Next standard value");
+    return step;
+}
 
 } // namespace
 
@@ -46,10 +81,12 @@ void ValueField::StartTyping(const char first) {
  *                      window.
  * @param[in] unit      Unit shown after the input, which the user may also type after the suffix.
  * @param[in] is_valid  Tells whether a parsed value is acceptable, such as a positive frequency.
+ * @param[in] series    Standard series the value must be in; with one, a typed value becomes the nearest value of
+ *                      the series, and two buttons, the arrow keys and the mouse wheel step through the series.
  * @return  The new value when the text was changed this frame and is valid, so the caller can apply it.
  */
 std::optional<double> ValueField::Draw(const char *label, const std::string &unit,
-                                       const std::function<bool(double)> &is_valid) {
+                                       const std::function<bool(double)> &is_valid, const Core::ValueSeries series) {
     DrawFieldLabel(label);
     ImGui::PushID(label);
     std::optional<double> edited;
@@ -60,6 +97,9 @@ std::optional<double> ValueField::Draw(const char *label, const std::string &uni
         m_Text.fill('\0');
         m_Text[0] = *first;
         m_CursorToEnd = true;
+        ImGui::SetKeyboardFocusHere();
+    } else if (std::exchange(m_RefocusInput, false)) {
+        // A step rewrote the text, which an active input only takes up when it is focused again
         ImGui::SetKeyboardFocusHere();
     }
     const auto place_cursor = [](ImGuiInputTextCallbackData *data) {
@@ -73,8 +113,20 @@ std::optional<double> ValueField::Draw(const char *label, const std::string &uni
     };
     const bool changed = ImGui::InputText("##value", m_Text.data(), m_Text.size(), ImGuiInputTextFlags_CallbackAlways,
                                           place_cursor, &m_CursorToEnd);
-    if (changed || first) {
+    const bool steps = series != Core::ValueSeries::Free;
+    int step = 0;
+    if (steps) {
+        // The wheel over the input steps the value, so the window behind it must not scroll too
+        ImGui::SetItemKeyOwner(ImGuiKey_MouseWheelY);
+        step = ReadStepFromInput();
+    }
+    // What the user typed, moved to the series
+    const auto typed_value = [&] {
         const std::optional<double> value = Core::ParseValue(m_Text.data(), unit);
+        return value ? std::optional(Core::NearestStandardValue(series, *value)) : std::nullopt;
+    };
+    if (changed || first) {
+        const std::optional<double> value = typed_value();
         m_Invalid = !value || !is_valid(*value);
         if (!m_Invalid) {
             edited = value;
@@ -82,13 +134,31 @@ std::optional<double> ValueField::Draw(const char *label, const std::string &uni
     }
     if (ImGui::IsItemDeactivatedAfterEdit() && !m_Invalid) {
         // Rewrite the text in canonical form, so "4700" becomes "4.7k"
-        if (const std::optional<double> value = Core::ParseValue(m_Text.data(), unit)) {
+        if (const std::optional<double> value = typed_value()) {
             Load(*value);
         }
     }
-    ImGui::PopID();
     ImGui::SameLine();
     ImGui::TextUnformatted(unit.c_str());
+    if (steps) {
+        if (const int clicked = DrawStepButtons(); clicked != 0) {
+            step = clicked;
+        }
+    }
+    ImGui::PopID();
+    if (step != 0) {
+        if (const std::optional<double> current = Core::ParseValue(m_Text.data(), unit)) {
+            const double stepped = Core::StepStandardValue(series, *current, step);
+            if (is_valid(stepped)) {
+                // While active, the input keeps its own text over the one loaded here, so it lets go and takes
+                // the focus again next frame
+                ImGui::ClearActiveID();
+                Load(stepped);
+                m_RefocusInput = true;
+                edited = stepped;
+            }
+        }
+    }
     if (m_Invalid) {
         ImGui::TextColored(GetErrorTextColor(), "Invalid value");
     }

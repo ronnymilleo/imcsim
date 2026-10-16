@@ -349,6 +349,7 @@ private:
     bool RunClipboardCommand(EditorCommand command);
     void RunEditCommand(EditorCommand command);
     void RunTurnCommand(EditorCommand command);
+    bool DrawValueSeriesItems();
     void ReadSetting(std::string_view line);
     void WriteSettings(ImGuiTextBuffer &buffer) const;
     void Save();

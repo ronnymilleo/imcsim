@@ -29,6 +29,7 @@ add_executable(imcsim-tests
             selection_tests.cpp
             simulator_tests.cpp
             spice_value_tests.cpp
+            standard_values_tests.cpp
             svg_writer_tests.cpp
             trace_math_tests.cpp
             trace_statistics_tests.cpp
