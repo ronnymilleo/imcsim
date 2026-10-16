@@ -168,6 +168,7 @@ private:
     void DrawTransientAnalog(const Core::Transient &transient, const std::vector<MathTrace> &math,
                              const std::vector<int> &lane_nodes, bool show_currents, bool has_voltages, float height);
     void DrawLogicLanes(const Core::Transient &transient, const std::vector<LogicNode> &lanes, float height);
+    std::vector<LogicNode> FindMeasuredLanes(std::size_t node_count) const;
     void DrawACSweep(const Core::ACSweep &sweep);
     void DrawDCSweep(const Core::DCSweep &sweep, const std::vector<std::vector<MathTrace>> &math);
 

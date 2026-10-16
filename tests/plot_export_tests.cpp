@@ -204,3 +204,41 @@ TEST_CASE("CSV headers name the panel when there are several and quote separator
     figure.Panels = {magnitude, phase};
     CHECK(GUI::RenderCsv(figure) == "Frequency (Hz),Magnitude V(2) (dB),\"Phase M1: V(1,2) (deg)\"\n1,-3,-45\n");
 }
+
+namespace {
+
+// Two lanes of logic signals standing for a clock and its inverse, over four samples
+GUI::ExportFigure MakeLaneFigure() {
+    GUI::ExportFigure figure;
+    figure.XAxis = {.Name = "Time", .Unit = "s"};
+    figure.Xs = {0.0, 1e-3, 2e-3, 3e-3};
+    GUI::ExportPanel panel;
+    panel.YAxes = {{.Name = "",
+                    .Unit = "V",
+                    .UsesPrefixes = false,
+                    .Ticks = {{.Value = 1.5, .Label = "V(CLK)"}, {.Value = 0.5, .Label = "V(QN)"}},
+                    .Range = GUI::ExportRange{.From = -0.3, .To = 2.8}}};
+    panel.Series = {
+        {.Name = "V(CLK)", .Values = {1.5, 2.5, 1.5, 2.5}, .Samples = {0.0, 5.0, 0.0, 5.0}, .Color = {230, 120, 100}},
+        {.Name = "V(QN)", .Values = {1.0, 0.0, 1.0, 0.0}, .Samples = {5.0, 0.0, 5.0, 0.0}}};
+    figure.Panels.push_back(panel);
+    return figure;
+}
+
+} // namespace
+
+TEST_CASE("An axis with named ticks labels them with their names, not with values", "[plot_export]") {
+    const auto svg = GUI::RenderSvg(MakeLaneFigure(), {});
+    REQUIRE(svg.has_value());
+    CHECK_THAT(*svg, ContainsSubstring(">V(CLK)</text>"));
+    CHECK_THAT(*svg, ContainsSubstring(">V(QN)</text>"));
+    // No round tick of the heights, which are not voltages
+    CHECK_THAT(*svg, !ContainsSubstring(">1.5</text>"));
+}
+
+TEST_CASE("CSV lists the samples a series stands for instead of the values it draws", "[plot_export]") {
+    const std::string csv = GUI::RenderCsv(MakeLaneFigure());
+    CHECK_THAT(csv, ContainsSubstring("Time (s),V(CLK) (V),V(QN) (V)\n"));
+    CHECK_THAT(csv, ContainsSubstring("0.001,5,0\n"));
+    CHECK_THAT(csv, !ContainsSubstring("2.5"));
+}

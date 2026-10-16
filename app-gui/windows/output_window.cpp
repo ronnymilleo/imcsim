@@ -346,6 +346,14 @@ std::vector<LogicNode> ListMeasuredLogicNodes(const std::vector<LogicNode> &logi
     return measured;
 }
 
+std::vector<int> ListNodes(const std::vector<LogicNode> &lanes) {
+    std::vector<int> nodes;
+    for (const LogicNode &lane : lanes) {
+        nodes.push_back(lane.Node);
+    }
+    return nodes;
+}
+
 // Measured currents of a result, in result order; empty when the plot shows no current axis
 std::vector<std::string> ListMeasuredCurrents(const std::vector<Core::ComponentTrace> &currents,
                                               const Schematic &schematic) {
@@ -714,9 +722,10 @@ private:
 // DC sweep family apart in the CSV headers; only the first curve of a family has a legend entry
 void AddExportTraces(PanelBuilder &builder, const std::vector<std::vector<double>> &node_values,
                      const std::vector<Core::ComponentTrace> &currents, Schematic &schematic, const std::string &suffix,
-                     const bool in_legend) {
+                     const bool in_legend, const std::vector<int> &excluded = {}) {
     for (std::size_t node = 1; node < node_values.size(); ++node) {
-        if (!schematic.IsVoltageMeasured(static_cast<int>(node))) {
+        if (!schematic.IsVoltageMeasured(static_cast<int>(node)) ||
+            std::ranges::contains(excluded, static_cast<int>(node))) {
             continue;
         }
         const std::string label = GetVoltageLabel(schematic.GetConnectivity(), static_cast<int>(node));
@@ -738,6 +747,29 @@ void AddExportTraces(PanelBuilder &builder, const std::vector<std::vector<double
                      .Dashed = true},
                     ImAxis_Y2);
     }
+}
+
+// The lanes as a panel of their own: each trace is drawn at the height of its lane, and its axis names the lanes,
+// while the CSV lists the voltages. The first lane is on top, as in the plot
+ExportPanel BuildLanePanel(const Core::Transient &transient, const std::vector<LogicNode> &lanes,
+                           Schematic &schematic) {
+    ExportPanel panel;
+    ExportAxis axis{.Name = "", .Unit = "V", .UsesPrefixes = false};
+    for (std::size_t lane = 0; lane < lanes.size(); ++lane) {
+        const std::size_t position = lanes.size() - 1 - lane;
+        const std::string label = GetVoltageLabel(schematic.GetConnectivity(), lanes[lane].Node);
+        const std::vector<double> &voltages = transient.NodeVoltages[static_cast<std::size_t>(lanes[lane].Node)];
+        axis.Ticks.push_back(
+            {.Value = static_cast<double>(position) * LaneStride + LaneHighOffset / 2.0, .Label = label});
+        panel.Series.push_back({.Name = label,
+                                .Values = BuildLane(voltages, lanes[lane].LogicLevel, position),
+                                .Samples = voltages,
+                                .Color = ToExportColor(GetNodeColor(lanes[lane].Node))});
+    }
+    axis.Range = ExportRange{.From = LaneLowOffset - LaneMargin,
+                             .To = static_cast<double>(lanes.size() - 1) * LaneStride + LaneHighOffset + LaneMargin};
+    panel.YAxes.push_back(std::move(axis));
+    return panel;
 }
 
 void AddExportMath(PanelBuilder &builder, const std::vector<MathTrace> &math, const std::string &suffix,
@@ -1127,14 +1159,8 @@ void OutputWindow::DrawTraceList(const std::size_t node_count, const std::vector
 // The signals of logic parts are drawn as lanes in a plot under the analog traces, which share its time axis. The
 // analog plot is left out when it would be empty, so a circuit measured only at logic nodes shows the lanes alone
 void OutputWindow::DrawTransient(const Core::Transient &transient, const std::vector<MathTrace> &math) {
-    const std::vector<LogicNode> lanes = m_ShowLogicLanes
-                                             ? ListMeasuredLogicNodes(FindLogicNodes(m_Schematic.BuildCircuit()),
-                                                                      transient.NodeVoltages.size(), m_Schematic)
-                                             : std::vector<LogicNode>{};
-    std::vector<int> lane_nodes;
-    for (const LogicNode &lane : lanes) {
-        lane_nodes.push_back(lane.Node);
-    }
+    const std::vector<LogicNode> lanes = FindMeasuredLanes(transient.NodeVoltages.size());
+    const std::vector<int> lane_nodes = ListNodes(lanes);
     std::vector<int> analog_nodes = ListMeasuredNodes(transient.NodeVoltages.size(), m_Schematic, lane_nodes);
     const bool has_voltages = !analog_nodes.empty() || UsesAxis(math, ImAxis_Y1);
     std::vector<std::string> measured_currents = ListMeasuredCurrents(transient.Currents, m_Schematic);
@@ -1199,6 +1225,14 @@ void OutputWindow::DrawTransientAnalog(const Core::Transient &transient, const s
     const ImPlotRange view = ImPlot::GetPlotLimits().X;
     m_TransientView = {.From = view.Min, .To = view.Max};
     ImPlot::EndPlot();
+}
+
+// The logic signals the plot shows as lanes: the measured nodes of logic parts, unless lanes are turned off
+std::vector<LogicNode> OutputWindow::FindMeasuredLanes(const std::size_t node_count) const {
+    if (!m_ShowLogicLanes) {
+        return {};
+    }
+    return ListMeasuredLogicNodes(FindLogicNodes(m_Schematic.BuildCircuit()), node_count, m_Schematic);
 }
 
 // Each lane is a trace between its low and high levels, named on the axis, with a state read at the cursor. A lane
@@ -1640,10 +1674,18 @@ ExportFigure OutputWindow::BuildTransientFigure(const Core::Transient &transient
     figure.XAxis = {.Name = "Time", .Unit = "s"};
     figure.Xs = transient.Times;
     figure.XRange = ExportRange{.From = m_TransientView.From, .To = m_TransientView.To};
+    const std::vector<LogicNode> lanes = FindMeasuredLanes(transient.NodeVoltages.size());
     PanelBuilder builder("", GetLinearExportAxes(ThirdAxisUnit(math)));
-    AddExportTraces(builder, transient.NodeVoltages, transient.Currents, m_Schematic, "", true);
+    AddExportTraces(builder, transient.NodeVoltages, transient.Currents, m_Schematic, "", true, ListNodes(lanes));
     AddExportMath(builder, math, "", true);
-    figure.Panels.push_back(builder.Take());
+    ExportPanel analog = builder.Take();
+    // As on screen, the analog plot is left out when only logic signals are measured
+    if (!analog.Series.empty() || lanes.empty()) {
+        figure.Panels.push_back(std::move(analog));
+    }
+    if (!lanes.empty()) {
+        figure.Panels.push_back(BuildLanePanel(transient, lanes, m_Schematic));
+    }
     return figure;
 }
 
