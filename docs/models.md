@@ -13,7 +13,7 @@ elements, so the results are those of ngspice with the models below. Some things
 - Values are exact: there are no tolerances, aging or Monte Carlo spread.
 - There is no noise analysis, so no part models noise.
 - To report terminal currents in every analysis, the netlist adds a 0 V source in series with diodes, transistors,
-  controlled sources and op-amp outputs. It does not change the circuit; the Netlist window leaves it out unless a
+  potentiometers, controlled sources and op-amp outputs. It does not change the circuit; the Netlist window leaves it out unless a
   current-controlled source needs it.
 
 - The power shown on the schematic is what a part absorbs: the sum over its terminals of the node voltage times the
@@ -28,6 +28,7 @@ elements, so the results are those of ngspice with the models below. Some things
 | Resistor | `R` | resistance, positive |
 | Capacitor | `C` | capacitance, positive |
 | Inductor | `L` | inductance, positive |
+| Potentiometer | two `R` | resistance between its ends, positive |
 
 All three are ideal:
 
@@ -35,6 +36,11 @@ All three are ideal:
 - A capacitor has no series resistance (ESR), leakage, voltage rating or dielectric effects. A transient starts
   from the DC operating point, so a capacitor starts charged to its voltage there.
 - An inductor has no winding resistance, core losses, saturation or coupling to other inductors.
+- A potentiometer is two resistors that meet at the wiper, terminal 3: the first end to the wiper is the value times the
+  wiper position, and the wiper to the second end is the rest. Position 0 puts the wiper on terminal 1 and position 1
+  on terminal 2; at an end the nearest half is 1 mOhm, since SPICE rejects 0 Ohm. The track is linear, so there is
+  no log taper, no wiper resistance and no power rating, and the wiper moves only by editing the part, not during a
+  run.
 
 ## Independent sources
 

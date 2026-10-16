@@ -289,6 +289,9 @@ void PartEditor::DrawFields(Core::Component &component) {
         DrawControlledSource(static_cast<Core::ControlledSource &>(component));
     } else {
         DrawValue(component);
+        if (type == Core::ComponentType::Potentiometer) {
+            DrawWiper(static_cast<Core::Potentiometer &>(component));
+        }
     }
 }
 
@@ -431,6 +434,17 @@ void PartEditor::DrawValue(Core::Component &component) {
         ImGui::TextDisabled("Standard values: %s, %g%%", Core::GetSeriesName(series),
                             Core::GetSeriesTolerancePercent(series));
     }
+}
+
+// The wiper as a share of the track, counted from terminal 1
+void PartEditor::DrawWiper(Core::Potentiometer &pot) {
+    DrawFieldLabel("Wiper");
+    auto percent = static_cast<float>(pot.GetWiper() * 100.0);
+    if (ImGui::SliderFloat("##wiper", &percent, 0.0f, 100.0f, "%.0f%%")) {
+        pot.SetWiper(static_cast<double>(percent) / 100.0);
+        m_Schematic.MarkModified();
+    }
+    ImGui::TextDisabled("0%% is terminal 1 and 100%% is terminal 2");
 }
 
 void PartEditor::DrawDiode(Core::Diode &diode) {

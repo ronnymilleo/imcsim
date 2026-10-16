@@ -13,6 +13,7 @@
 #include "components/mosfet.h"
 #include "components/net_label.h"
 #include "components/op_amp.h"
+#include "components/potentiometer.h"
 #include "components/resistor.h"
 #include "components/vcc.h"
 #include "components/voltage_source.h"
@@ -56,6 +57,36 @@ TEST_CASE("Components start with SPICE prefixes, units and default values", "[co
     CHECK(current_source.GetAC().Amplitude == 1e-3);
     CHECK(current_source.GetPulse().High == 1e-3);
     CHECK(current_source.GetSourceType() == Core::CurrentSource::SourceType::DC);
+}
+
+TEST_CASE("A potentiometer is a resistor of 10k with its wiper in the middle", "[component]") {
+    Core::Potentiometer pot;
+    CHECK(pot.GetType() == Core::ComponentType::Potentiometer);
+    CHECK(std::string_view(pot.GetTypeName()) == "Potentiometer");
+    CHECK(std::string_view(pot.GetNamePrefix()) == "RV");
+    CHECK(std::string_view(pot.GetUnit()) == "Ohm");
+    CHECK(pot.HasValue());
+    CHECK(pot.GetValue() == 10e3);
+    CHECK(pot.GetWiper() == 0.5);
+    CHECK(Core::ParseComponentType("Potentiometer") == Core::ComponentType::Potentiometer);
+
+    SECTION("its value must be positive, and its wiper on the track") {
+        CHECK(pot.IsValidValue(1.0));
+        CHECK_FALSE(pot.IsValidValue(0.0));
+        CHECK_FALSE(pot.IsValidValue(-5.0));
+        CHECK(Core::Potentiometer::IsValidWiper(0.0));
+        CHECK(Core::Potentiometer::IsValidWiper(1.0));
+        CHECK_FALSE(Core::Potentiometer::IsValidWiper(-0.01));
+        CHECK_FALSE(Core::Potentiometer::IsValidWiper(1.01));
+    }
+    SECTION("the wiper moves") {
+        pot.SetWiper(0.2);
+        CHECK(pot.GetWiper() == 0.2);
+    }
+    SECTION("names are RV and a number") {
+        CHECK(Core::IsValidName("RV1", pot.GetNamePrefix()));
+        CHECK(Core::NextComponentName(pot.GetNamePrefix(), {"RV1", "R7"}) == "RV2");
+    }
 }
 
 TEST_CASE("Ground has no name prefix and no value", "[component]") {

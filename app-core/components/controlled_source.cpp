@@ -37,6 +37,7 @@ double DefaultGain(const ComponentType type) {
     case ComponentType::NMOS:
     case ComponentType::PMOS:
     case ComponentType::OpAmp:
+    case ComponentType::Potentiometer:
         break;
     }
     return 1.0;

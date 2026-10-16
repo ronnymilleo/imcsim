@@ -13,6 +13,7 @@
 #include "components/mosfet.h"
 #include "components/net_label.h"
 #include "components/op_amp.h"
+#include "components/potentiometer.h"
 #include "components/source.h"
 #include "schematic.h"
 #include "standard_values.h"
@@ -70,6 +71,7 @@ private:
     void DrawFields(Core::Component &component);
     bool DrawModeledPart(Core::Component &component);
     void DrawValue(Core::Component &component);
+    void DrawWiper(Core::Potentiometer &pot);
     void DrawNetLabel(Core::NetLabel &label);
     void DrawDiode(Core::Diode &diode);
     void DrawBJT(Core::BJT &bjt);

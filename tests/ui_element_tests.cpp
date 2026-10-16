@@ -11,6 +11,7 @@
 #include "ui_elements/ui_mosfet.h"
 #include "ui_elements/ui_net_label.h"
 #include "ui_elements/ui_op_amp.h"
+#include "ui_elements/ui_potentiometer.h"
 #include "ui_elements/ui_resistor.h"
 #include "ui_elements/ui_vcc.h"
 #include <catch2/catch_test_macros.hpp>
@@ -169,6 +170,19 @@ TEST_CASE("Controlled sources have their output vertical and their control pins 
     CHECK(cccs.GetTerminals() == std::vector<GUI::GridPoint>{{0, -2}, {0, 2}});
     CHECK(cccs.Contains({0.0f, 0.0f}));
     CHECK_FALSE(cccs.Contains({-1.5f, 0.0f}));
+}
+
+TEST_CASE("A potentiometer has its two ends on the sides and its wiper above, turning with it", "[ui_element]") {
+    GUI::UIPotentiometer pot({5, 5}, GUI::Rotation::R0);
+    CHECK(pot.GetComponent().GetType() == Core::ComponentType::Potentiometer);
+    CHECK(pot.GetTerminals() == std::vector<GUI::GridPoint>{{3, 5}, {7, 5}, {5, 3}});
+    CHECK(pot.GetTerminalInward(0) == GUI::GridPoint{1, 0});
+    CHECK(pot.GetTerminalInward(2) == GUI::GridPoint{0, 1});
+    // The wiper lead is part of what is picked, and the space below the body is not
+    CHECK(pot.Contains({5.0f, 3.5f}));
+    CHECK_FALSE(pot.Contains({5.0f, 7.0f}));
+    pot.SetRotation(GUI::Rotation::R90);
+    CHECK(pot.GetTerminals() == std::vector<GUI::GridPoint>{{5, 3}, {5, 7}, {7, 5}});
 }
 
 TEST_CASE("Op-amps list the output, the inputs and the supply pins", "[ui_element]") {

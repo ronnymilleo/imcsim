@@ -17,6 +17,7 @@ add_library(imcsim-core-lib
             components/mosfet.cpp
             components/net_label.cpp
             components/op_amp.cpp
+            components/potentiometer.cpp
             components/resistor.cpp
             components/source.cpp
             components/vcc.cpp

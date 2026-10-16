@@ -11,6 +11,7 @@
 #include "components/mosfet.h"
 #include "components/net_label.h"
 #include "components/op_amp.h"
+#include "components/potentiometer.h"
 #include "components/source.h"
 #include "element_factory.h"
 #include "nlohmann/json.hpp"
@@ -260,6 +261,8 @@ nlohmann::json WriteElement(const UIElement &element) {
         if (const std::string &net = static_cast<const Core::NetLabel &>(component).GetNet(); !net.empty()) {
             object["net"] = net;
         }
+    } else if (type == Core::ComponentType::Potentiometer) {
+        object["wiper"] = static_cast<const Core::Potentiometer &>(component).GetWiper();
     } else if (type == Core::ComponentType::OpAmp) {
         const auto &op_amp = static_cast<const Core::OpAmp &>(component);
         WriteModelChoice(op_amp, OpAmpKeys, object);
@@ -443,6 +446,14 @@ std::expected<std::unique_ptr<UIElement>, std::string> ReadElement(const nlohman
             return std::unexpected("has a net name that is not 1 to 32 letters, digits, _, - or .");
         }
         static_cast<Core::NetLabel &>(component).SetNet(*net);
+    }
+    // A potentiometer saved without a wiper keeps it in the middle
+    if (component.GetType() == Core::ComponentType::Potentiometer && object.contains("wiper")) {
+        const std::optional<double> wiper = ReadNumber(object, "wiper");
+        if (!wiper || !Core::Potentiometer::IsValidWiper(*wiper)) {
+            return std::unexpected("has a wiper that is not a number from 0 to 1");
+        }
+        static_cast<Core::Potentiometer &>(component).SetWiper(*wiper);
     }
     if (const std::optional<std::string> name = ReadString(object, "name")) {
         component.SetName(*name);

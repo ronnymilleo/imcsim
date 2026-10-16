@@ -17,11 +17,12 @@ namespace Core {
 namespace {
 
 constexpr auto AllTypes = std::to_array<ComponentType>({
-    ComponentType::Resistor,   ComponentType::Capacitor,     ComponentType::Inductor,      ComponentType::Ground,
-    ComponentType::VCC,        ComponentType::VoltageSource, ComponentType::CurrentSource, ComponentType::Diode,
-    ComponentType::ZenerDiode, ComponentType::LED,           ComponentType::NPN,           ComponentType::PNP,
-    ComponentType::NMOS,       ComponentType::PMOS,          ComponentType::VCVS,          ComponentType::VCCS,
-    ComponentType::CCCS,       ComponentType::CCVS,          ComponentType::OpAmp,         ComponentType::NetLabel,
+    ComponentType::Resistor,      ComponentType::Capacitor,     ComponentType::Inductor,      ComponentType::Ground,
+    ComponentType::VCC,           ComponentType::VoltageSource, ComponentType::CurrentSource, ComponentType::Diode,
+    ComponentType::ZenerDiode,    ComponentType::LED,           ComponentType::NPN,           ComponentType::PNP,
+    ComponentType::NMOS,          ComponentType::PMOS,          ComponentType::VCVS,          ComponentType::VCCS,
+    ComponentType::CCCS,          ComponentType::CCVS,          ComponentType::OpAmp,         ComponentType::NetLabel,
+    ComponentType::Potentiometer,
 });
 
 } // namespace
@@ -90,6 +91,8 @@ const char *Component::GetNamePrefix() const {
         return "H";
     case ComponentType::OpAmp:
         return "U";
+    case ComponentType::Potentiometer:
+        return "RV";
     case ComponentType::Ground:
     case ComponentType::NetLabel:
         return "";
@@ -105,6 +108,7 @@ const char *Component::GetNamePrefix() const {
 const char *Component::GetUnit() const {
     switch (m_Type) {
     case ComponentType::Resistor:
+    case ComponentType::Potentiometer:
         return "Ohm";
     case ComponentType::Capacitor:
         return "F";
@@ -159,6 +163,7 @@ bool Component::HasValue() const {
     case ComponentType::Resistor:
     case ComponentType::Capacitor:
     case ComponentType::Inductor:
+    case ComponentType::Potentiometer:
     case ComponentType::VCC:
     case ComponentType::VoltageSource:
     case ComponentType::CurrentSource:
@@ -182,6 +187,7 @@ bool Component::IsValidValue(const double value) const {
     case ComponentType::Resistor:
     case ComponentType::Capacitor:
     case ComponentType::Inductor:
+    case ComponentType::Potentiometer:
         return value > 0.0;
     case ComponentType::VCC:
     case ComponentType::VoltageSource:
@@ -285,6 +291,8 @@ const char *GetTypeName(const ComponentType type) {
         return "OpAmp";
     case ComponentType::NetLabel:
         return "NetLabel";
+    case ComponentType::Potentiometer:
+        return "Potentiometer";
     }
     return "Unknown";
 }

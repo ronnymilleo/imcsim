@@ -12,6 +12,7 @@
 #include "components/ground.h"
 #include "components/mosfet.h"
 #include "components/op_amp.h"
+#include "components/potentiometer.h"
 #include "components/resistor.h"
 #include "components/vcc.h"
 #include "components/voltage_source.h"
@@ -1382,4 +1383,80 @@ TEST_CASE("A uA741 macromodel slews at its datasheet rate", "[simulator]") {
     };
     const double slew_rate = 6.0 / (crossing(3.0) - crossing(-3.0));
     CHECK_THAT(slew_rate, Catch::Matchers::WithinRel(0.5e6, 0.05));
+}
+
+TEST_CASE("A potentiometer divides its supply by the position of its wiper", "[simulator]") {
+    Core::VCC supply;
+    supply.SetName("V1");
+    supply.SetValue(10.0);
+    Core::Potentiometer pot;
+    pot.SetName("RV1");
+    pot.SetWiper(0.25);
+    const Core::Ground reference;
+    // End 1 on the supply, end 2 on ground, the wiper on node 2
+    Core::Circuit circuit;
+    circuit.Add(supply, {1});
+    circuit.Add(pot, {1, 0, 2});
+    circuit.Add(reference, {0});
+
+    const Core::OperatingPointRun run = Core::RunOperatingPoint(circuit);
+    REQUIRE(run.Result.has_value());
+    // A quarter of the way from the supply: 2.5k above the wiper and 7.5k below it
+    CHECK_THAT(run.Result->NodeVoltages[2], Catch::Matchers::WithinAbs(7.5, 1e-6));
+    const auto current = [&run](const std::string &name) {
+        const auto found = std::ranges::find(run.Result->Currents, name, &Core::ComponentCurrent::Name);
+        REQUIRE(found != run.Result->Currents.end());
+        return found->Current;
+    };
+    // Positive into each terminal: 1 mA goes in at end 1 and out at end 2, and the unloaded wiper carries none
+    CHECK_THAT(current("RV1.A"), Catch::Matchers::WithinAbs(1e-3, 1e-9));
+    CHECK_THAT(current("RV1.B"), Catch::Matchers::WithinAbs(-1e-3, 1e-9));
+    CHECK_THAT(current("RV1.W"), Catch::Matchers::WithinAbs(0.0, 1e-9));
+}
+
+TEST_CASE("A load on the wiper pulls its voltage down and takes its current", "[simulator]") {
+    Core::VCC supply;
+    supply.SetName("V1");
+    supply.SetValue(10.0);
+    Core::Potentiometer pot;
+    pot.SetName("RV1");
+    pot.SetValue(10e3);
+    pot.SetWiper(0.5);
+    Core::Resistor load;
+    load.SetName("R1");
+    load.SetValue(10e3);
+    const Core::Ground reference;
+    Core::Circuit circuit;
+    circuit.Add(supply, {1});
+    circuit.Add(pot, {1, 0, 2});
+    circuit.Add(load, {2, 0});
+    circuit.Add(reference, {0});
+
+    const Core::OperatingPointRun run = Core::RunOperatingPoint(circuit);
+    REQUIRE(run.Result.has_value());
+    // 5k above the wiper, and 5k in parallel with the 10k load below it: 10 * (10/3) / (5 + 10/3)
+    CHECK_THAT(run.Result->NodeVoltages[2], Catch::Matchers::WithinAbs(4.0, 1e-6));
+    const auto wiper = std::ranges::find(run.Result->Currents, "RV1.W", &Core::ComponentCurrent::Name);
+    REQUIRE(wiper != run.Result->Currents.end());
+    // 0.4 mA out of the wiper into the load
+    CHECK_THAT(wiper->Current, Catch::Matchers::WithinAbs(-0.4e-3, 1e-9));
+}
+
+TEST_CASE("A potentiometer's wiper moves its output in an AC sweep too", "[simulator]") {
+    Core::VoltageSource source;
+    source.SetName("Vin1");
+    source.SetSourceType(Core::VoltageSource::SourceType::AC);
+    Core::Potentiometer pot;
+    pot.SetName("RV1");
+    pot.SetWiper(0.8);
+    const Core::Ground reference;
+    Core::Circuit circuit;
+    circuit.Add(source, {1, 0});
+    circuit.Add(pot, {1, 0, 2});
+    circuit.Add(reference, {0});
+
+    const Core::ACSweepRun run = Core::RunACSweep(circuit, {.StartFrequency = 1e3, .StopFrequency = 1e4});
+    REQUIRE(run.Result.has_value());
+    // 20% of the input is left at the wiper, which is -13.98 dB
+    CHECK_THAT(run.Result->NodeMagnitudesDecibels[2].front(), Catch::Matchers::WithinAbs(20.0 * std::log10(0.2), 1e-3));
 }

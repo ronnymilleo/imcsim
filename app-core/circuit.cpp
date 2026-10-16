@@ -10,6 +10,7 @@
 #include "components/diode.h"
 #include "components/mosfet.h"
 #include "components/op_amp.h"
+#include "components/potentiometer.h"
 #include "components/source.h"
 #include "spice_value.h"
 #include <algorithm>
@@ -24,6 +25,9 @@ bool IsACSource(const Component &component) {
     return IsSource(component.GetType()) &&
            static_cast<const Source &>(component).GetSourceType() == Source::SourceType::AC;
 }
+
+// The two halves of a potentiometer track never get to 0 Ohm, which SPICE rejects, however close to an end the wiper is
+constexpr double MinTrackResistance = 1e-3;
 
 // One line serves every analysis: .op reads the DC value, .ac the AC magnitude and .tran the waveform. A pulse
 // starts at its low level, so that is its DC value. The name tells SPICE whether it is a voltage or current source
@@ -259,6 +263,16 @@ std::string Circuit::ToSpiceNetlist(const std::string_view analysis, const bool 
             AddModelLine(model_name, FormatMOSFETModel(mosfet.GetType(), model_name, parameters), model_names, models);
             break;
         }
+        case ComponentType::Potentiometer: {
+            // The wiper, terminal 3, splits the track into two resistors
+            const auto &pot = static_cast<const Potentiometer &>(component);
+            const std::string first = FormatSpiceValue(std::max(pot.GetValue() * pot.GetWiper(), MinTrackResistance));
+            const std::string second =
+                FormatSpiceValue(std::max(pot.GetValue() * (1.0 - pot.GetWiper()), MinTrackResistance));
+            netlist += std::format("R-{}a {} {} {}\n", pot.GetName(), nodes[0], nodes[2], first);
+            netlist += std::format("R-{}b {} {} {}\n", pot.GetName(), nodes[2], nodes[1], second);
+            break;
+        }
         case ComponentType::Ground:
         case ComponentType::NetLabel:
             break;
@@ -276,8 +290,9 @@ std::string Circuit::ToSpiceNetlist(const std::string_view analysis, const bool 
 /**
  * @brief   Lists the terminals of a component whose current is measured with a probe.
  * @param[in] component  Any component.
- * @return  The anode of a diode part, every terminal of a transistor, and the first output terminal of a controlled
- *          source or the output of an op-amp; nothing for the others, whose currents ngspice reports directly.
+ * @return  The anode of a diode part, every terminal of a transistor or a potentiometer, and the first output
+ *          terminal of a controlled source or the output of an op-amp; nothing for the others, whose currents ngspice
+ *          reports directly.
  */
 std::vector<CurrentProbe> GetCurrentProbes(const Component &component) {
     const ComponentType type = component.GetType();
@@ -289,6 +304,9 @@ std::vector<CurrentProbe> GetCurrentProbes(const Component &component) {
     }
     if (IsMOSFET(component.GetType())) {
         return {{0, "D"}, {1, "G"}, {2, "S"}};
+    }
+    if (component.GetType() == ComponentType::Potentiometer) {
+        return {{0, "A"}, {1, "B"}, {2, "W"}};
     }
     return {};
 }

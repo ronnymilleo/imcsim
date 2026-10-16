@@ -15,6 +15,7 @@
 #include "ui_elements/ui_mosfet.h"
 #include "ui_elements/ui_net_label.h"
 #include "ui_elements/ui_op_amp.h"
+#include "ui_elements/ui_potentiometer.h"
 #include "ui_elements/ui_resistor.h"
 #include "ui_elements/ui_vcc.h"
 #include "ui_elements/ui_voltage_source.h"
@@ -57,6 +58,7 @@ constexpr auto Parts = std::to_array<PartInfo>({
     {Core::ComponentType::CCVS, "CCVS (H)"},
     {Core::ComponentType::OpAmp, "Op-amp"},
     {Core::ComponentType::NetLabel, "Net label"},
+    {Core::ComponentType::Potentiometer, "Potentiometer"},
 });
 
 // Lowercase letters and digits only, so "opamp" finds "Op-amp" and "vcc" finds "VCC supply"
@@ -115,6 +117,8 @@ std::unique_ptr<UIElement> CreateElement(const Core::ComponentType type, const G
         return std::make_unique<UIOpAmp>(position, rotation);
     case Core::ComponentType::NetLabel:
         return std::make_unique<UINetLabel>(position, rotation);
+    case Core::ComponentType::Potentiometer:
+        return std::make_unique<UIPotentiometer>(position, rotation);
     }
     return nullptr;
 }

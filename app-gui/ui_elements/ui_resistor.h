@@ -20,6 +20,9 @@ public:
     ~UIResistor() override = default;
 
 protected:
+    // For parts that draw a resistor and add to it, with a component of their own
+    UIResistor(std::unique_ptr<Core::Component> component, GridPoint position, Rotation rotation);
+
     void DrawSymbol(SchematicCanvas &canvas, const ViewTransform &view, ImU32 color, SymbolStyle style) const override;
 };
 

@@ -1,0 +1,145 @@
+{
+  "format": "imcsim-schematic",
+  "version": 1,
+  "elements": [
+    {
+      "type": "VCC",
+      "rotation": 0,
+      "x": 10,
+      "y": 4,
+      "value": 5,
+      "name": "V1"
+    },
+    {
+      "type": "Potentiometer",
+      "rotation": 90,
+      "x": 10,
+      "y": 9,
+      "value": 10000,
+      "wiper": 0.3,
+      "name": "RV1"
+    },
+    {
+      "type": "Resistor",
+      "rotation": 0,
+      "x": 15,
+      "y": 9,
+      "value": 220,
+      "name": "R1"
+    },
+    {
+      "type": "LED",
+      "rotation": 90,
+      "x": 17,
+      "y": 12,
+      "model": "Red",
+      "name": "D1"
+    },
+    {
+      "type": "Ground",
+      "rotation": 0,
+      "x": 17,
+      "y": 16
+    }
+  ],
+  "wires": [
+    {
+      "start": [
+        10,
+        4
+      ],
+      "end": [
+        10,
+        7
+      ]
+    },
+    {
+      "start": [
+        12,
+        9
+      ],
+      "end": [
+        12,
+        11
+      ]
+    },
+    {
+      "start": [
+        12,
+        11
+      ],
+      "end": [
+        10,
+        11
+      ]
+    },
+    {
+      "start": [
+        12,
+        9
+      ],
+      "end": [
+        13,
+        9
+      ]
+    },
+    {
+      "start": [
+        17,
+        9
+      ],
+      "end": [
+        17,
+        10
+      ]
+    },
+    {
+      "start": [
+        17,
+        14
+      ],
+      "end": [
+        17,
+        16
+      ]
+    }
+  ],
+  "simulation": {
+    "analysis": "operating_point",
+    "transient": {
+      "step": 0.000001,
+      "stop": 0.001
+    },
+    "ac_sweep": {
+      "start": 10,
+      "stop": 1000000,
+      "points_per_decade": 20
+    },
+    "dc_sweep": {
+      "step_source": false,
+      "swept": {
+        "source": "",
+        "start": 0,
+        "step": 0.1,
+        "stop": 5
+      },
+      "stepped": {
+        "source": "",
+        "start": 0,
+        "step": 0.1,
+        "stop": 5
+      }
+    }
+  },
+  "measurements": {
+    "voltages": [
+      [
+        10,
+        11
+      ]
+    ],
+    "currents": [
+      "D1"
+    ]
+  }
+}

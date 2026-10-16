@@ -13,6 +13,7 @@
 #include "components/inductor.h"
 #include "components/mosfet.h"
 #include "components/op_amp.h"
+#include "components/potentiometer.h"
 #include "components/resistor.h"
 #include "components/vcc.h"
 #include "components/voltage_source.h"
@@ -358,4 +359,50 @@ TEST_CASE("ToSpiceNetlist writes a macromodel op-amp as an instance of its subci
     CHECK(netlist.find(".subckt imcsim_uA741 6 3 2 7 4\n") == netlist.rfind(".subckt imcsim_uA741"));
     CHECK(netlist.contains(".subckt imcsim_opamp_U3 6 3 2 7 4\n"));
     CHECK(netlist.contains(".ends imcsim_uA741\n"));
+}
+
+TEST_CASE("ToSpiceNetlist writes a potentiometer as two resistors that meet at the wiper", "[circuit]") {
+    Core::Potentiometer pot;
+    pot.SetName("RV1");
+    pot.SetValue(10e3);
+    pot.SetWiper(0.25);
+    Core::Circuit circuit;
+    // End 1 on node 1, end 2 on node 2 and the wiper on node 3
+    circuit.Add(pot, {1, 2, 3});
+
+    const std::string netlist = circuit.ToSpiceNetlist();
+    CHECK(netlist.find("R-RV1a 1 3 2.5k\n") != std::string::npos);
+    CHECK(netlist.find("R-RV1b 3 2 7.5k\n") != std::string::npos);
+}
+
+TEST_CASE("A wiper at an end keeps a tiny resistor there, since SPICE rejects 0 Ohm", "[circuit]") {
+    Core::Potentiometer pot;
+    pot.SetName("RV1");
+    Core::Circuit circuit;
+    circuit.Add(pot, {1, 2, 3});
+
+    pot.SetWiper(0.0);
+    CHECK(circuit.ToSpiceNetlist().find("R-RV1a 1 3 1m\n") != std::string::npos);
+    pot.SetWiper(1.0);
+    CHECK(circuit.ToSpiceNetlist().find("R-RV1b 3 2 1m\n") != std::string::npos);
+}
+
+TEST_CASE("A potentiometer probes its three terminals, and the probes carry its currents", "[circuit]") {
+    Core::Potentiometer pot;
+    pot.SetName("RV1");
+    const std::vector<Core::CurrentProbe> probes = Core::GetCurrentProbes(pot);
+    REQUIRE(probes.size() == 3);
+    CHECK(probes[0].Terminal == 0);
+    CHECK(std::string(probes[0].Label) == "A");
+    CHECK(probes[1].Terminal == 1);
+    CHECK(std::string(probes[1].Label) == "B");
+    CHECK(probes[2].Terminal == 2);
+    CHECK(std::string(probes[2].Label) == "W");
+    CHECK(Core::GetCurrentName(pot, "W") == "RV1.W");
+
+    Core::Circuit circuit;
+    circuit.Add(pot, {1, 2, 3});
+    const std::string netlist = circuit.ToSpiceNetlist("", true);
+    CHECK(netlist.find("Vprobe-RV1-A 1 4 DC 0\n") != std::string::npos);
+    CHECK(netlist.find("Vprobe-RV1-W 3 6 DC 0\n") != std::string::npos);
 }

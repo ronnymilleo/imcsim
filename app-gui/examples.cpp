@@ -32,6 +32,16 @@ constexpr auto Examples = std::to_array<Example>({
         .FileName = "rc_low_pass_filter.imcsim",
     },
     {
+        .Title = "LED dimmer with a potentiometer",
+        .Group = "Basics",
+        .Description =
+            "A 10k potentiometer wired as a rheostat, its wiper tied to its second end, in series with a 220 Ohm "
+            "resistor and a red LED on 5 V. Select RV1 and move its wiper in the properties, then run the "
+            "operating point: with the wiper at 30% the rheostat is 3k and the LED gets about 1 mA, and "
+            "toward 0% the current grows to about 14 mA.",
+        .FileName = "potentiometer_led_dimmer.imcsim",
+    },
+    {
         .Title = "Series RLC resonance",
         .Group = "Basics",
         .Description =

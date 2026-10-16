@@ -10,6 +10,7 @@
 #include "components/mosfet.h"
 #include "components/net_label.h"
 #include "components/op_amp.h"
+#include "components/potentiometer.h"
 #include "components/voltage_source.h"
 #include "element_factory.h"
 #include "schematic_file.h"
@@ -525,4 +526,37 @@ TEST_CASE("Two labels with one name both load, and an invalid net name skips the
     CHECK(static_cast<const Core::NetLabel &>(loaded.Elements[1]->GetComponent()).GetNet() == "OUT");
     REQUIRE(loaded.Warnings.size() == 1);
     CHECK(loaded.Warnings[0].find("net name") != std::string::npos);
+}
+
+TEST_CASE("A potentiometer keeps its value and wiper", "[schematic_file]") {
+    std::vector<std::unique_ptr<GUI::UIElement>> elements;
+    elements.push_back(GUI::CreateElement(Core::ComponentType::Potentiometer, {4, 6}, GUI::Rotation::R90));
+    auto &pot = static_cast<Core::Potentiometer &>(elements.back()->GetComponent());
+    pot.SetName("RV1");
+    pot.SetValue(47e3);
+    pot.SetWiper(0.3);
+
+    const GUI::LoadedSchematic loaded = LoadOrFail(GUI::SaveSchematic(elements, {}, {}, {}));
+    CHECK(loaded.Warnings.empty());
+    REQUIRE(loaded.Elements.size() == 1);
+    CHECK(loaded.Elements[0]->GetRotation() == GUI::Rotation::R90);
+    const auto &copy = static_cast<const Core::Potentiometer &>(loaded.Elements[0]->GetComponent());
+    CHECK(copy.GetName() == "RV1");
+    CHECK(copy.GetValue() == 47e3);
+    CHECK(copy.GetWiper() == 0.3);
+}
+
+TEST_CASE("A potentiometer saved without a wiper has it in the middle, and a wiper off the track is skipped",
+          "[schematic_file]") {
+    const std::string without_wiper =
+        R"({"type": "Potentiometer", "x": 1, "y": 1, "rotation": 0, "name": "RV1", "value": 1000.0})";
+    const GUI::LoadedSchematic loaded = LoadOrFail(Document(without_wiper, ""));
+    REQUIRE(loaded.Elements.size() == 1);
+    CHECK(static_cast<const Core::Potentiometer &>(loaded.Elements[0]->GetComponent()).GetWiper() == 0.5);
+
+    const std::string off_track =
+        R"({"type": "Potentiometer", "x": 1, "y": 1, "rotation": 0, "name": "RV1", "value": 1000.0, "wiper": 1.5})";
+    const GUI::LoadedSchematic skipped = LoadOrFail(Document(off_track, ""));
+    CHECK(skipped.Elements.empty());
+    CHECK(skipped.Warnings.size() == 1);
 }

@@ -3,6 +3,7 @@
  * @brief   Tests that every example circuit opens cleanly and simulates with its own settings.
  */
 
+#include "components/potentiometer.h"
 #include "examples.h"
 #include "schematic.h"
 #include "simulator.h"
@@ -483,4 +484,28 @@ TEST_CASE("Every example is in a group, and the examples of a group are listed t
         CHECK(index >= current);
         current = index;
     }
+}
+
+TEST_CASE("The LED dimmer lights the LED more as the potentiometer is turned toward its supply end", "[examples]") {
+    GUI::Schematic schematic;
+    OpenExample("potentiometer_led_dimmer.imcsim", schematic);
+    const auto pot = std::ranges::find_if(schematic.GetElements(), [](const auto &element) {
+        return element->GetComponent().GetType() == Core::ComponentType::Potentiometer;
+    });
+    REQUIRE(pot != schematic.GetElements().end());
+    auto &potentiometer = static_cast<Core::Potentiometer &>((*pot)->GetComponent());
+    const auto led_current = [&schematic] {
+        const Core::OperatingPointRun run = Core::RunOperatingPoint(schematic.BuildCircuit());
+        REQUIRE(run.Result.has_value());
+        const auto led = std::ranges::find(run.Result->Currents, "D1", &Core::ComponentCurrent::Name);
+        REQUIRE(led != run.Result->Currents.end());
+        return led->Current;
+    };
+    // The wiper sits at 30% when the example opens: a 3k rheostat
+    CHECK_THAT(potentiometer.GetWiper(), Catch::Matchers::WithinAbs(0.3, 1e-12));
+    CHECK_THAT(led_current(), Catch::Matchers::WithinAbs(1e-3, 0.3e-3));
+    potentiometer.SetWiper(0.0);
+    CHECK_THAT(led_current(), Catch::Matchers::WithinAbs(14e-3, 2e-3));
+    potentiometer.SetWiper(1.0);
+    CHECK(led_current() < 0.5e-3);
 }

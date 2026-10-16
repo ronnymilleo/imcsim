@@ -6,13 +6,15 @@ How to read what imcsim measures, plots and exports. The [README](../README.md) 
 ## Editing
 
 - **Toolbar**: Select, Wire (W) and Probe (P) on the left, then the parts, each button showing its symbol. Sources,
-  diodes, transistors and controlled sources share one button per group: it places the part last picked, and the
+  diodes, transistors, controlled sources and the adjustable parts share one button per group: it places the part last picked, and the
   arrow beside it (or a right click) lists the others. Hover a button for its name and shortcut.
 - **Editing a part**: double-click it, or select it and press Enter, to open its properties beside it; edits
   apply as you type, and Enter, Esc or a click outside closes them. With a part selected, typing a number starts
   editing its main value right away: `4k7` and Enter make a resistor 4.7k. Values take SPICE suffixes, and a whole
   number may put its decimals after the suffix, as resistor codes do (`4k7`, `2M2`, `3u3`). View > Properties keeps
   the same fields in a docked window.
+- **Potentiometer**: its properties hold the resistance between its ends and the wiper, a slider from 0% at terminal 1
+  to 100% at terminal 2. Move the wiper and run again to see the output change; the wiper does not move during a run.
 - **Standard values**: View > Component Values restricts resistors, capacitors and inductors to one of the E series
   (E6, E12, E24, E48, E96 or E192, with their tolerances of 20% down to 0.5%), or leaves any value allowed, which is
   the default. With a series chosen, a typed value becomes the nearest one of the series on a log scale (`5000` is
@@ -139,6 +141,7 @@ Every part with more than one terminal numbers them in the order the SPICE netli
 | Part | Terminal 1 | Terminal 2 | Terminal 3 |
 |---|---|---|---|
 | Resistor, capacitor, inductor | left end, before rotating | right end | |
+| Potentiometer | end at the left, before rotating | end at the right | wiper, on top |
 | Diode, Zener diode, LED | anode | cathode | |
 | Voltage source | positive (+) | negative (-) | |
 | Current source | tail of its arrow | head of its arrow | |
@@ -167,6 +170,8 @@ imcsim reports currents as ngspice computes them:
   2.5 mA into a circuit reports -2.5 mA.
 - **Transistors** report one current per terminal, `I(Q1.C)`, `I(Q1.B)` and `I(Q1.E)`, each positive into its
   terminal. The three always add up to zero.
+- **Potentiometers** report one current per terminal, `I(RV1.A)` for the first end, `I(RV1.B)` for the second and
+  `I(RV1.W)` for the wiper, each positive into its terminal. The three always add up to zero.
 - **Controlled sources** report the current of their output like a two-terminal part; their control pins carry no
   current. A VCCS or CCCS pushes its current from terminal 1 to terminal 2 through itself, as its arrow shows, so
   into a load on terminal 1 it drives the load negative.
