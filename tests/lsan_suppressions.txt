@@ -1,0 +1,3 @@
+# XSPICE keeps a few small allocations of its digital event data after a circuit with logic parts is removed, which
+# LeakSanitizer reports when the tests exit; they come from libngspice, not from imcsim
+leak:libngspice
