@@ -1,0 +1,186 @@
+{
+  "format": "imcsim-schematic",
+  "version": 1,
+  "elements": [
+    {
+      "type": "VCC",
+      "rotation": 0,
+      "x": 12,
+      "y": 4,
+      "value": 12,
+      "name": "V1"
+    },
+    {
+      "type": "Resistor",
+      "rotation": 90,
+      "x": 12,
+      "y": 7,
+      "value": 100,
+      "name": "R2"
+    },
+    {
+      "type": "NMOS",
+      "rotation": 0,
+      "x": 11,
+      "y": 12,
+      "model": "2N7000",
+      "name": "M1"
+    },
+    {
+      "type": "Resistor",
+      "rotation": 0,
+      "x": 6,
+      "y": 12,
+      "value": 100,
+      "name": "R1"
+    },
+    {
+      "type": "VoltageSource",
+      "rotation": 90,
+      "x": 2,
+      "y": 15,
+      "source": "Pulse",
+      "value": 5,
+      "amplitude": 1,
+      "frequency": 1000,
+      "offset": 0,
+      "ac_magnitude": 1,
+      "pulse": {
+        "delay": 0,
+        "fall": 0.000001,
+        "high": 5,
+        "low": 0,
+        "period": 0.001,
+        "rise": 0.000001,
+        "width": 0.0005
+      },
+      "name": "Vin1"
+    },
+    {
+      "type": "Ground",
+      "rotation": 0,
+      "x": 12,
+      "y": 16
+    },
+    {
+      "type": "Ground",
+      "rotation": 0,
+      "x": 2,
+      "y": 19
+    }
+  ],
+  "wires": [
+    {
+      "start": [
+        12,
+        4
+      ],
+      "end": [
+        12,
+        5
+      ]
+    },
+    {
+      "start": [
+        12,
+        9
+      ],
+      "end": [
+        12,
+        10
+      ]
+    },
+    {
+      "start": [
+        8,
+        12
+      ],
+      "end": [
+        9,
+        12
+      ]
+    },
+    {
+      "start": [
+        2,
+        13
+      ],
+      "end": [
+        2,
+        12
+      ]
+    },
+    {
+      "start": [
+        2,
+        12
+      ],
+      "end": [
+        4,
+        12
+      ]
+    },
+    {
+      "start": [
+        12,
+        14
+      ],
+      "end": [
+        12,
+        16
+      ]
+    },
+    {
+      "start": [
+        2,
+        17
+      ],
+      "end": [
+        2,
+        19
+      ]
+    }
+  ],
+  "simulation": {
+    "analysis": "transient",
+    "transient": {
+      "step": 0.000001,
+      "stop": 0.003
+    },
+    "ac_sweep": {
+      "start": 10,
+      "stop": 1000000,
+      "points_per_decade": 20
+    },
+    "dc_sweep": {
+      "step_source": false,
+      "swept": {
+        "source": "",
+        "start": 0,
+        "step": 0.1,
+        "stop": 5
+      },
+      "stepped": {
+        "source": "",
+        "start": 0,
+        "step": 0.1,
+        "stop": 5
+      }
+    }
+  },
+  "measurements": {
+    "voltages": [
+      [
+        2,
+        12
+      ],
+      [
+        12,
+        9
+      ]
+    ],
+    "currents": [
+      "R2"
+    ]
+  }
+}

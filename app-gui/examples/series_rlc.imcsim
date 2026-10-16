@@ -1,0 +1,176 @@
+{
+  "format": "imcsim-schematic",
+  "version": 1,
+  "elements": [
+    {
+      "type": "VoltageSource",
+      "rotation": 90,
+      "x": 4,
+      "y": 8,
+      "source": "AC",
+      "value": 1,
+      "amplitude": 1,
+      "frequency": 5000,
+      "offset": 0,
+      "ac_magnitude": 1,
+      "pulse": {
+        "delay": 0,
+        "fall": 0.000001,
+        "high": 5,
+        "low": 0,
+        "period": 0.001,
+        "rise": 0.000001,
+        "width": 0.0005
+      },
+      "name": "Vin1"
+    },
+    {
+      "type": "Inductor",
+      "rotation": 0,
+      "x": 9,
+      "y": 4,
+      "value": 0.01,
+      "name": "L1"
+    },
+    {
+      "type": "Capacitor",
+      "rotation": 0,
+      "x": 15,
+      "y": 4,
+      "value": 1e-7,
+      "name": "C1"
+    },
+    {
+      "type": "Resistor",
+      "rotation": 90,
+      "x": 20,
+      "y": 7,
+      "value": 100,
+      "name": "R1"
+    },
+    {
+      "type": "Ground",
+      "rotation": 0,
+      "x": 4,
+      "y": 12
+    },
+    {
+      "type": "Ground",
+      "rotation": 0,
+      "x": 20,
+      "y": 11
+    }
+  ],
+  "wires": [
+    {
+      "start": [
+        4,
+        6
+      ],
+      "end": [
+        4,
+        4
+      ]
+    },
+    {
+      "start": [
+        4,
+        4
+      ],
+      "end": [
+        7,
+        4
+      ]
+    },
+    {
+      "start": [
+        11,
+        4
+      ],
+      "end": [
+        13,
+        4
+      ]
+    },
+    {
+      "start": [
+        17,
+        4
+      ],
+      "end": [
+        20,
+        4
+      ]
+    },
+    {
+      "start": [
+        20,
+        4
+      ],
+      "end": [
+        20,
+        5
+      ]
+    },
+    {
+      "start": [
+        4,
+        10
+      ],
+      "end": [
+        4,
+        12
+      ]
+    },
+    {
+      "start": [
+        20,
+        9
+      ],
+      "end": [
+        20,
+        11
+      ]
+    }
+  ],
+  "simulation": {
+    "analysis": "ac_sweep",
+    "transient": {
+      "step": 0.000002,
+      "stop": 0.002
+    },
+    "ac_sweep": {
+      "start": 100,
+      "stop": 100000,
+      "points_per_decade": 50
+    },
+    "dc_sweep": {
+      "step_source": false,
+      "swept": {
+        "source": "",
+        "start": 0,
+        "step": 0.1,
+        "stop": 5
+      },
+      "stepped": {
+        "source": "",
+        "start": 0,
+        "step": 0.1,
+        "stop": 5
+      }
+    }
+  },
+  "measurements": {
+    "voltages": [
+      [
+        4,
+        4
+      ],
+      [
+        17,
+        4
+      ]
+    ],
+    "currents": []
+  }
+}
