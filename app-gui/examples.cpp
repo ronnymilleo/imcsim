@@ -253,8 +253,8 @@ constexpr auto Examples = std::to_array<Example>({
             "AND, an OR, a NAND and an XOR gate each drive a LED through 330 Ohm. Run the transient: AND is high "
             "only for 11, OR for all but 00, NAND for all but 11 and XOR when the inputs differ. A high reads "
             "about 4.6 V at the output, since the 50 Ohm output resistance of the gate and the LED take the rest "
-            "of 5 V. The net labels A and B reach every gate with no wires between them; show a few traces at a "
-            "time, since they all swing between 0 V and 5 V.",
+            "of 5 V. The net labels A and B reach every gate with no wires between them. The Output window stacks "
+            "the logic signals as lanes.",
         .FileName = "logic_gates.imcsim",
     },
     {
@@ -284,8 +284,8 @@ constexpr auto Examples = std::to_array<Example>({
             "Each D flip-flop has QN fed back to D, so it halves the frequency of its clock, and the next stage "
             "is clocked by that QN. From the 1 kHz clock, Q0 is 500 Hz, Q1 250 Hz and Q2 125 Hz, and Q2 Q1 Q0 "
             "count the rising edges of the clock in binary, the first at 0.5 ms. SET and RESET are left "
-            "unconnected and read 0. Show the traces one or two at a time, since they all swing between 0 V and 5 "
-            "V.",
+            "unconnected and read 0. The Output window stacks CLK, Q0, Q1 and Q2 as lanes, so the binary count "
+            "reads down the edges.",
         .FileName = "ripple_counter.imcsim",
     },
 });

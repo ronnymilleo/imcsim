@@ -27,8 +27,8 @@ How to read what imcsim measures, plots and exports. The [README](../README.md) 
 - **Logic gates and flip-flops**: the toolbar has a button for the gates and one for the flip-flops, and Space finds
   them by name (`nand`, `flip`). A part has a logic level and a delay in its properties; it reads 1 above 70% of
   its level and 0 below 30%, and an input left unconnected reads 0. The Digital examples show a table of gates, a half
-  adder, an SR latch and a ripple counter. A logic signal plots as a voltage between 0 V and the logic level, so with
-  several of them, show a few traces at a time.
+  adder, an SR latch and a ripple counter. In the Output window the signals of logic parts
+  plot as lanes, like a logic analyzer's, under the analog traces (see Plots).
 - **Standard values**: View > Component Values restricts resistors, capacitors and inductors to one of the E series
   (E6, E12, E24, E48, E96 or E192, with their tolerances of 20% down to 0.5%), or leaves any value allowed, which is
   the default. With a series chosen, a typed value becomes the nearest one of the series on a log scale (`5000` is
@@ -265,6 +265,12 @@ their statistics and the exports always agree.
 
 - Voltages are solid lines on the left axis, in the color of their node, the same color as in the editor.
 - Currents are dashed lines on the right axis.
+- The transient plots the measured nodes that gates and flip-flops are connected to as lanes of their own, in a plot
+  under the analog traces with the same time axis, cursors and playhead. Each lane is named at its left, high is the
+  upper level and low the lower, and a voltage between 30% and 70% of the logic level, which a gate reads as unknown,
+  is drawn halfway. Hovering a lane reads its state and voltage, such as `1 (4.72V)`. The Logic lanes box beside the
+  statistics turns this off, which draws every voltage on the analog axis again. The plot is left out when only
+  logic signals are measured, and the SVG export has the same panels; the CSV lists the voltages.
 - Math channels are heavier lines; volts and amperes share the axes above, any other unit or none goes on a third
   axis.
 - The AC sweep is a Bode plot: magnitude in dB and phase in degrees, relative to the AC magnitude of the sources.

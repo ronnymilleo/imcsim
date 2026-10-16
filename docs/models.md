@@ -109,7 +109,8 @@ reports a negative current.
 - The levels come from the part, not from a supply pin: a gate has no VCC or ground terminal, and drawing power from a
   supply is not modeled. Connecting parts of different logic levels works as the thresholds above say.
 - The digital nodes inside a part are not shown. Only the outputs, which are analog voltages, appear in the plots and
-  can be probed, so a logic signal is a trace that swings between 0 V and the logic level.
+  can be probed, so a logic signal is a trace that swings between 0 V and the logic level. The transient plot of the Output window
+  stacks them as lanes.
 - The parts need the `digital.cm` code model library of ngspice. A system ngspice loads it by itself; a build that
   ships it next to the program is loaded from there. Without it, simulating a circuit with a logic part stops with a
   message.
