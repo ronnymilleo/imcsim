@@ -8,6 +8,8 @@
 #include "components/resistor.h"
 #include "logic_trace.h"
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/matchers/catch_matchers_floating_point.hpp>
+#include <string>
 #include <string_view>
 
 TEST_CASE("A voltage reads 1 above 70% of the logic level, 0 below 30% of it, and unknown between", "[logic_trace]") {
@@ -111,4 +113,102 @@ TEST_CASE("A signal that never changes is one segment, and no samples give none"
     CHECK(segments[0].To == 2e-3);
     CHECK(segments[0].State == GUI::LogicState::High);
     CHECK(GUI::FindLogicSegments({}, {}, 5.0).empty());
+}
+
+namespace {
+
+// A clock of 1 ms halves, high from 1 to 2 ms and 3 to 4 ms, and a signal that is high from 1 to 3 ms, over 0 to 4 ms
+// sampled every 0.01 ms
+struct Cells {
+    std::vector<double> Times;
+    std::vector<double> Clock;
+    std::vector<double> Slow;
+
+    Cells() {
+        for (int index = 0; index <= 400; ++index) {
+            const double time = static_cast<double>(index) * 0.01e-3;
+            Times.push_back(time);
+            const bool clock_high = (index >= 100 && index < 200) || index >= 300;
+            Clock.push_back(clock_high ? 5.0 : 0.0);
+            Slow.push_back(index >= 100 && index < 300 ? 5.0 : 0.0);
+        }
+    }
+};
+
+std::string Read(const std::vector<GUI::LogicSegment> &cells) {
+    std::string text;
+    for (const GUI::LogicSegment &cell : cells) {
+        text += GUI::GetLogicStateName(cell.State);
+    }
+    return text;
+}
+
+} // namespace
+
+TEST_CASE("Cells are as wide as the shortest steady stretch, so a long stretch gives several", "[logic_trace]") {
+    const Cells signals;
+    const std::vector<GUI::LogicSignal> list = {{signals.Clock, 5.0}, {signals.Slow, 5.0}};
+    const auto cells = GUI::FindBitCells(signals.Times, list, 0.0, 4e-3);
+    REQUIRE(cells.size() == 2);
+    // The clock reads 0 1 0 1 and the slow signal 0 1 1 0, one reading per millisecond cell
+    CHECK(Read(cells[0]) == "0101");
+    CHECK(Read(cells[1]) == "0110");
+    REQUIRE(cells[0].size() == 4);
+    CHECK_THAT(cells[0][1].From, Catch::Matchers::WithinAbs(1e-3, 1e-9));
+    CHECK_THAT(cells[0][1].To, Catch::Matchers::WithinAbs(2e-3, 1e-9));
+}
+
+TEST_CASE("Cells list only what overlaps the time asked for, and do not move with it", "[logic_trace]") {
+    const Cells signals;
+    const std::vector<GUI::LogicSignal> list = {{signals.Clock, 5.0}, {signals.Slow, 5.0}};
+    const auto part = GUI::FindBitCells(signals.Times, list, 1.5e-3, 2.5e-3);
+    // The cells of 1 to 2 ms and 2 to 3 ms, kept whole so a label can be centered on what shows of them
+    CHECK(Read(part[0]) == "10");
+    CHECK(Read(part[1]) == "11");
+    CHECK_THAT(part[0][0].From, Catch::Matchers::WithinAbs(1e-3, 1e-9));
+}
+
+TEST_CASE("A glitch inside a cell does not show, and does not set the cell width", "[logic_trace]") {
+    Cells signals;
+    // A pulse of one sample just after the clock falls at 2 ms, as a hazard of a gate follows its inputs
+    signals.Clock[201] = 5.0;
+    const std::vector<GUI::LogicSignal> list = {{signals.Clock, 5.0}, {signals.Slow, 5.0}};
+    const auto cells = GUI::FindBitCells(signals.Times, list, 0.0, 4e-3);
+    CHECK(Read(cells[0]) == "0101");
+}
+
+TEST_CASE("A signal that never changes is one cell, and too few samples give none", "[logic_trace]") {
+    const std::vector<double> times = {0.0, 1e-3, 2e-3};
+    const std::vector<double> flat = {5.0, 5.0, 5.0};
+    const std::vector<GUI::LogicSignal> list = {{flat, 5.0}};
+    const auto cells = GUI::FindBitCells(times, list, 0.0, 2e-3);
+    REQUIRE(cells[0].size() == 1);
+    CHECK(cells[0][0].State == GUI::LogicState::High);
+    CHECK(GUI::FindBitCells(std::vector<double>{0.0}, list, 0.0, 1.0)[0].empty());
+}
+
+TEST_CASE("Samples in the unknown band at the edges do not set the width of a cell", "[logic_trace]") {
+    Cells signals;
+    // The clock and the slow signal pass through 2.5 V for one sample at each edge, as a real edge does
+    for (const std::size_t index : {100U, 200U, 300U}) {
+        signals.Clock[index] = 2.5;
+        signals.Slow[index] = index == 200U ? 5.0 : 2.5;
+    }
+    signals.Slow[300] = 2.5;
+    const std::vector<GUI::LogicSignal> list = {{signals.Clock, 5.0}, {signals.Slow, 5.0}};
+    const auto cells = GUI::FindBitCells(signals.Times, list, 0.0, 4e-3);
+    CHECK(Read(cells[0]) == "0101");
+    CHECK(Read(cells[1]) == "0110");
+}
+
+TEST_CASE("A change just after the start does not leave a sliver of a cell at the start", "[logic_trace]") {
+    Cells signals;
+    // The clock is already high for the first sample, then low: a start-up change, 0.01 ms in
+    signals.Clock[0] = 5.0;
+    signals.Slow[0] = 5.0;
+    const std::vector<GUI::LogicSignal> list = {{signals.Clock, 5.0}, {signals.Slow, 5.0}};
+    const auto cells = GUI::FindBitCells(signals.Times, list, 0.0, 4e-3);
+    REQUIRE(cells[0].size() == 4);
+    CHECK_THAT(cells[0][0].From, Catch::Matchers::WithinAbs(0.0, 1e-12));
+    CHECK(Read(cells[0]) == "0101");
 }

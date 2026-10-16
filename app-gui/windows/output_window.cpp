@@ -70,7 +70,7 @@ constexpr float MaxLaneShare = 0.6f;
 // Bit labels: the room around the digit, in font sizes, and the corner rounding of its box
 constexpr float BitBoxPadding = 0.25f;
 constexpr float BitBoxRounding = 3.0f;
-// The share of the time an export shows that a steady stretch needs for its bit label
+// The share of the time an export shows that a cell needs for its bit label
 constexpr double MinBitLabelShare = 0.03;
 // Room above and below the stack of lanes, in lane units
 constexpr double LaneMargin = 0.3;
@@ -754,6 +754,28 @@ void AddExportTraces(PanelBuilder &builder, const std::vector<std::vector<double
     }
 }
 
+// A note for each cell that is wide enough for its label in what the image shows, which has no pixels to measure it
+// with, so a share of the span stands for the width of the box
+void AddBitNotes(ExportPanel &panel, const Core::Transient &transient, const std::vector<LogicNode> &lanes,
+                 const PlotSpan &view) {
+    std::vector<LogicSignal> signals;
+    for (const LogicNode &node : lanes) {
+        signals.push_back({transient.NodeVoltages[static_cast<std::size_t>(node.Node)], node.LogicLevel});
+    }
+    const auto cells = FindBitCells(transient.Times, signals, view.From, view.To);
+    for (std::size_t lane = 0; lane < lanes.size(); ++lane) {
+        const double middle = static_cast<double>(lanes.size() - 1 - lane) * LaneStride + LaneHighOffset / 2.0;
+        for (const LogicSegment &cell : cells[lane]) {
+            const double from = std::max(cell.From, view.From);
+            const double to = std::min(cell.To, view.To);
+            if (to - from >= (view.To - view.From) * MinBitLabelShare) {
+                panel.Notes.push_back(
+                    {.X = (from + to) / 2.0, .Y = middle, .Text = GetLogicStateName(cell.State), .Centered = true});
+            }
+        }
+    }
+}
+
 // The lanes as a panel of their own: each trace is drawn at the height of its lane, and its axis names the lanes,
 // while the CSV lists the voltages. The first lane is on top, as in the plot
 ExportPanel BuildLanePanel(const Core::Transient &transient, const std::vector<LogicNode> &lanes, Schematic &schematic,
@@ -770,21 +792,9 @@ ExportPanel BuildLanePanel(const Core::Transient &transient, const std::vector<L
                                 .Values = BuildLane(voltages, lanes[lane].LogicLevel, position),
                                 .Samples = voltages,
                                 .Color = ToExportColor(GetNodeColor(lanes[lane].Node))});
-        if (!bit_values) {
-            continue;
-        }
-        // Each steady stretch that is wide enough for its label in what the image shows, which has no pixels to
-        // measure it with, so a share of the span stands for the width of the box
-        for (const LogicSegment &segment : FindLogicSegments(transient.Times, voltages, lanes[lane].LogicLevel)) {
-            const double from = std::max(segment.From, view.From);
-            const double to = std::min(segment.To, view.To);
-            if (to - from >= (view.To - view.From) * MinBitLabelShare) {
-                panel.Notes.push_back({.X = (from + to) / 2.0,
-                                       .Y = static_cast<double>(position) * LaneStride + LaneHighOffset / 2.0,
-                                       .Text = GetLogicStateName(segment.State),
-                                       .Centered = true});
-            }
-        }
+    }
+    if (bit_values) {
+        AddBitNotes(panel, transient, lanes, view);
     }
     axis.Range = ExportRange{.From = LaneLowOffset - LaneMargin,
                              .To = static_cast<double>(lanes.size() - 1) * LaneStride + LaneHighOffset + LaneMargin};
@@ -1255,23 +1265,22 @@ std::vector<LogicNode> OutputWindow::FindMeasuredLanes(const std::size_t node_co
     return ListMeasuredLogicNodes(FindLogicNodes(m_Schematic.BuildCircuit()), node_count, m_Schematic);
 }
 
-// Writes 0, 1 or X in a box at the middle of every steady stretch of a lane that has room for it, within what the
-// plot shows, so zooming out drops the labels that no longer fit
-void DrawBitValues(const std::vector<double> &times, const std::vector<double> &voltages, const LogicNode &node,
-                   const std::size_t lane_position, const ImU32 color) {
+// Writes 0, 1 or X in a box at the middle of every cell of a lane that has room for it, within what the plot shows,
+// so zooming out drops the labels that no longer fit
+void DrawBitValues(const std::vector<LogicSegment> &cells, const std::size_t lane_position, const ImU32 color) {
     const ImPlotRange view = ImPlot::GetPlotLimits().X;
     const double middle = static_cast<double>(lane_position) * LaneStride + LaneHighOffset / 2.0;
     const float pixel_y = ImPlot::PlotToPixels(view.Min, middle).y;
     const float padding = ImGui::GetFontSize() * BitBoxPadding;
     ImDrawList *draw_list = ImPlot::GetPlotDrawList();
     ImPlot::PushPlotClipRect();
-    for (const LogicSegment &segment : FindLogicSegments(times, voltages, node.LogicLevel)) {
-        const double from = std::max(segment.From, view.Min);
-        const double to = std::min(segment.To, view.Max);
+    for (const LogicSegment &cell : cells) {
+        const double from = std::max(cell.From, view.Min);
+        const double to = std::min(cell.To, view.Max);
         if (to <= from) {
             continue;
         }
-        const char *text = GetLogicStateName(segment.State);
+        const char *text = GetLogicStateName(cell.State);
         const ImVec2 text_size = ImGui::CalcTextSize(text);
         const float left = ImPlot::PlotToPixels(from, middle).x;
         const float right = ImPlot::PlotToPixels(to, middle).x;
@@ -1325,8 +1334,16 @@ void OutputWindow::DrawLogicLanes(const Core::Transient &transient, const std::v
         ImPlot::PlotLine(names[lane].c_str(), transient.Times.data(), heights.data(), static_cast<int>(heights.size()),
                          spec);
         plotted.push_back({names[lane], &voltages, "V", color, node.LogicLevel});
-        if (m_ShowBitValues) {
-            DrawBitValues(transient.Times, voltages, node, lanes.size() - 1 - lane, color);
+    }
+    if (m_ShowBitValues) {
+        std::vector<LogicSignal> signals;
+        for (const LogicNode &node : lanes) {
+            signals.push_back({transient.NodeVoltages[static_cast<std::size_t>(node.Node)], node.LogicLevel});
+        }
+        const ImPlotRange view = ImPlot::GetPlotLimits().X;
+        const auto cells = FindBitCells(transient.Times, signals, view.Min, view.Max);
+        for (std::size_t lane = 0; lane < lanes.size(); ++lane) {
+            DrawBitValues(cells[lane], lanes.size() - 1 - lane, GetNodeColor(lanes[lane].Node));
         }
     }
     DrawCursors(m_TransientCursors, false);
@@ -1453,7 +1470,8 @@ void OutputWindow::DrawTransientStatistics(const Core::Transient &transient, con
         ImGui::SetItemTooltip("Plot the signals of gates and flip-flops as lanes under the analog traces");
         if (m_ShowLogicLanes) {
             ImGui::Checkbox("Bit values", &m_ShowBitValues);
-            ImGui::SetItemTooltip("Write 0, 1 or X on every steady stretch of a lane that has room for it");
+            ImGui::SetItemTooltip("Write 0, 1 or X in every cell of a lane, a cell being as wide as the shortest "
+                                  "steady stretch, such as half a clock period");
         }
     }
     const PlotCursors &cursors = m_TransientCursors;

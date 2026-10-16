@@ -269,8 +269,10 @@ their statistics and the exports always agree.
   under the analog traces with the same time axis, cursors and playhead. Each lane is named at its left, high is the
   upper level and low the lower, and a voltage between 30% and 70% of the logic level, which a gate reads as unknown,
   is drawn halfway. Hovering a lane reads its state and voltage, such as `1 (4.72V)`. The Bit values box, off by
-  default, writes 0, 1 or X in a box at the middle of every steady stretch of a lane that has room for it at the
-  current zoom. The Logic lanes box beside the statistics turns the lanes off, which draws every voltage on the analog
+  default, divides the lanes into cells as wide as the shortest steady stretch of any of them, which is half a period
+  when there is a clock, starting at the first change, and writes 0, 1 or X in a box at the middle of each cell that has
+  room for it at the current zoom. A stretch that lasts several cells reads `1 1 1`, and a glitch inside a cell does not
+  show. The Logic lanes box beside the statistics turns the lanes off, which draws every voltage on the analog
   axis again. The plot is left out when only logic signals are measured. The SVG export has the same panels and bit
   labels; the CSV lists the voltages.
 - Math channels are heavier lines; volts and amperes share the axes above, any other unit or none goes on a third

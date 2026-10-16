@@ -42,6 +42,15 @@ struct LogicSegment {
     LogicState State = LogicState::Low;
 };
 
+/**
+ * @struct  LogicSignal
+ * @brief   The voltages of one logic signal and the logic level it swings to.
+ */
+struct LogicSignal {
+    std::span<const double> Voltages;
+    double LogicLevel = 5.0;
+};
+
 // Height of one lane, and the offsets of the three states inside it; lanes are stacked from the bottom
 inline constexpr double LaneStride = 1.5;
 inline constexpr double LaneLowOffset = 0.0;
@@ -54,6 +63,8 @@ std::vector<double> BuildLane(const std::vector<double> &voltages, double logic_
 std::vector<LogicNode> FindLogicNodes(const Core::Circuit &circuit);
 std::vector<LogicSegment> FindLogicSegments(std::span<const double> times, std::span<const double> voltages,
                                             double logic_level);
+std::vector<std::vector<LogicSegment>> FindBitCells(std::span<const double> times, std::span<const LogicSignal> signals,
+                                                    double from, double to);
 
 } // namespace GUI
 
