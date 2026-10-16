@@ -23,7 +23,10 @@ constexpr auto AllTypes = std::to_array<ComponentType>({
     ComponentType::NMOS,          ComponentType::PMOS,          ComponentType::VCVS,          ComponentType::VCCS,
     ComponentType::CCCS,          ComponentType::CCVS,          ComponentType::OpAmp,         ComponentType::NetLabel,
     ComponentType::Potentiometer, ComponentType::Switch,        ComponentType::PushButton,    ComponentType::VSwitch,
-    ComponentType::Relay,         ComponentType::Transformer,
+    ComponentType::Relay,         ComponentType::Transformer,   ComponentType::And,           ComponentType::Or,
+    ComponentType::Not,           ComponentType::Nand,          ComponentType::Nor,           ComponentType::Xor,
+    ComponentType::Xnor,          ComponentType::Buffer,        ComponentType::DFlipFlop,     ComponentType::JKFlipFlop,
+    ComponentType::TFlipFlop,     ComponentType::SRFlipFlop,
 });
 
 } // namespace
@@ -91,6 +94,18 @@ const char *Component::GetNamePrefix() const {
     case ComponentType::CCVS:
         return "H";
     case ComponentType::OpAmp:
+    case ComponentType::And:
+    case ComponentType::Or:
+    case ComponentType::Not:
+    case ComponentType::Nand:
+    case ComponentType::Nor:
+    case ComponentType::Xor:
+    case ComponentType::Xnor:
+    case ComponentType::Buffer:
+    case ComponentType::DFlipFlop:
+    case ComponentType::JKFlipFlop:
+    case ComponentType::TFlipFlop:
+    case ComponentType::SRFlipFlop:
         return "U";
     case ComponentType::Potentiometer:
         return "RV";
@@ -140,6 +155,18 @@ const char *Component::GetUnit() const {
     case ComponentType::CCVS:
         return "V/A";
     case ComponentType::OpAmp:
+    case ComponentType::And:
+    case ComponentType::Or:
+    case ComponentType::Not:
+    case ComponentType::Nand:
+    case ComponentType::Nor:
+    case ComponentType::Xor:
+    case ComponentType::Xnor:
+    case ComponentType::Buffer:
+    case ComponentType::DFlipFlop:
+    case ComponentType::JKFlipFlop:
+    case ComponentType::TFlipFlop:
+    case ComponentType::SRFlipFlop:
     case ComponentType::Ground:
     case ComponentType::NetLabel:
     case ComponentType::Switch:
@@ -179,6 +206,18 @@ bool Component::HasValue() const {
     case ComponentType::NMOS:
     case ComponentType::PMOS:
     case ComponentType::OpAmp:
+    case ComponentType::And:
+    case ComponentType::Or:
+    case ComponentType::Not:
+    case ComponentType::Nand:
+    case ComponentType::Nor:
+    case ComponentType::Xor:
+    case ComponentType::Xnor:
+    case ComponentType::Buffer:
+    case ComponentType::DFlipFlop:
+    case ComponentType::JKFlipFlop:
+    case ComponentType::TFlipFlop:
+    case ComponentType::SRFlipFlop:
         return false;
     case ComponentType::Resistor:
     case ComponentType::Capacitor:
@@ -233,6 +272,18 @@ bool Component::IsValidValue(const double value) const {
     case ComponentType::NMOS:
     case ComponentType::PMOS:
     case ComponentType::OpAmp:
+    case ComponentType::And:
+    case ComponentType::Or:
+    case ComponentType::Not:
+    case ComponentType::Nand:
+    case ComponentType::Nor:
+    case ComponentType::Xor:
+    case ComponentType::Xnor:
+    case ComponentType::Buffer:
+    case ComponentType::DFlipFlop:
+    case ComponentType::JKFlipFlop:
+    case ComponentType::TFlipFlop:
+    case ComponentType::SRFlipFlop:
         return false;
     }
     return false;
@@ -329,6 +380,30 @@ const char *GetTypeName(const ComponentType type) {
         return "Relay";
     case ComponentType::Transformer:
         return "Transformer";
+    case ComponentType::And:
+        return "And";
+    case ComponentType::Or:
+        return "Or";
+    case ComponentType::Not:
+        return "Not";
+    case ComponentType::Nand:
+        return "Nand";
+    case ComponentType::Nor:
+        return "Nor";
+    case ComponentType::Xor:
+        return "Xor";
+    case ComponentType::Xnor:
+        return "Xnor";
+    case ComponentType::Buffer:
+        return "Buffer";
+    case ComponentType::DFlipFlop:
+        return "DFlipFlop";
+    case ComponentType::JKFlipFlop:
+        return "JKFlipFlop";
+    case ComponentType::TFlipFlop:
+        return "TFlipFlop";
+    case ComponentType::SRFlipFlop:
+        return "SRFlipFlop";
     }
     return "Unknown";
 }

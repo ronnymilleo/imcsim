@@ -5,6 +5,7 @@
 
 #include "current_flow.h"
 
+#include "components/logic_part.h"
 #include <algorithm>
 #include <cmath>
 #include <cstdlib>
@@ -53,7 +54,8 @@ std::vector<WireCurrent> SplitWires(const std::vector<UIWire> &wires, const std:
  * @return  The current into the terminal: the reported current for a probed terminal, and for a relay or a
  *          transformer the opposite of it at the other end of its contact or winding; for a two-terminal part
  *          or the output of a controlled source, its current into the first terminal and the opposite into the
- *          second; for a supply or an op-amp output, its current; zero for control pins and the other op-amp pins.
+ *          second; for a supply, an op-amp output or a gate output, its current; zero for control pins and the other
+ *          op-amp and gate pins.
  *          No value for ground, whose current is whatever its node leaves over, or for a current missing from the
  *          results.
  */
@@ -86,12 +88,15 @@ std::optional<double> GetTerminalCurrent(const Core::Component &component, const
     if (!current) {
         return std::nullopt;
     }
-    // A single current enters terminal 1 and leaves terminal 2. An op-amp's output current returns through ground
-    // instead, and the control pins of a controlled source and the other op-amp pins carry none
+    // The output current of an op-amp or a gate returns through ground or the supply, and their other pins carry none
+    if (component.GetType() == Core::ComponentType::OpAmp || Core::IsLogicGate(component.GetType())) {
+        return terminal == Core::GetCurrentTerminals(component).front() ? *current : 0.0;
+    }
+    // A single current enters terminal 1 and leaves terminal 2, and the control pins of a controlled source carry none
     if (terminal == 0) {
         return *current;
     }
-    if (terminal == 1 && component.GetType() != Core::ComponentType::OpAmp) {
+    if (terminal == 1) {
         return -*current;
     }
     return 0.0;

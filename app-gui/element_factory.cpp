@@ -13,6 +13,7 @@
 #include "ui_elements/ui_diode.h"
 #include "ui_elements/ui_ground.h"
 #include "ui_elements/ui_inductor.h"
+#include "ui_elements/ui_logic_part.h"
 #include "ui_elements/ui_mosfet.h"
 #include "ui_elements/ui_net_label.h"
 #include "ui_elements/ui_op_amp.h"
@@ -67,6 +68,18 @@ constexpr auto Parts = std::to_array<PartInfo>({
     {Core::ComponentType::VSwitch, "Voltage-controlled switch"},
     {Core::ComponentType::Relay, "Relay"},
     {Core::ComponentType::Transformer, "Transformer"},
+    {Core::ComponentType::And, "AND gate"},
+    {Core::ComponentType::Or, "OR gate"},
+    {Core::ComponentType::Not, "NOT gate (inverter)"},
+    {Core::ComponentType::Nand, "NAND gate"},
+    {Core::ComponentType::Nor, "NOR gate"},
+    {Core::ComponentType::Xor, "XOR gate"},
+    {Core::ComponentType::Xnor, "XNOR gate"},
+    {Core::ComponentType::Buffer, "Buffer"},
+    {Core::ComponentType::DFlipFlop, "D flip-flop"},
+    {Core::ComponentType::JKFlipFlop, "JK flip-flop"},
+    {Core::ComponentType::TFlipFlop, "T flip-flop"},
+    {Core::ComponentType::SRFlipFlop, "SR flip-flop"},
 });
 
 // Lowercase letters and digits only, so "opamp" finds "Op-amp" and "vcc" finds "VCC supply"
@@ -135,6 +148,19 @@ std::unique_ptr<UIElement> CreateElement(const Core::ComponentType type, const G
         return std::make_unique<UIControlledSwitch>(type, position, rotation);
     case Core::ComponentType::Transformer:
         return std::make_unique<UITransformer>(position, rotation);
+    case Core::ComponentType::And:
+    case Core::ComponentType::Or:
+    case Core::ComponentType::Not:
+    case Core::ComponentType::Nand:
+    case Core::ComponentType::Nor:
+    case Core::ComponentType::Xor:
+    case Core::ComponentType::Xnor:
+    case Core::ComponentType::Buffer:
+    case Core::ComponentType::DFlipFlop:
+    case Core::ComponentType::JKFlipFlop:
+    case Core::ComponentType::TFlipFlop:
+    case Core::ComponentType::SRFlipFlop:
+        return std::make_unique<UILogicPart>(type, position, rotation);
     }
     return nullptr;
 }

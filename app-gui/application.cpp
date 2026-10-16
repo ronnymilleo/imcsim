@@ -13,6 +13,7 @@
 #include "imgui_internal.h"
 #include "implot.h"
 #include "shortcuts.h"
+#include "simulator.h"
 #include "theme.h"
 #include <SDL3/SDL.h>
 #include <array>
@@ -41,10 +42,14 @@ constexpr bool GPUDebugMode = true;
 /**
  * @brief   Initializes SDL, the GPU device and Dear ImGui, in that order.
  * @return  Core::ExitSuccess on success, Core::ExitFailure if any step fails.
+ * @note    The simulator is told to look for the digital code models next to the program, for a build that ships them.
  */
 int Application::Init() {
     if (InitSDL() != Core::ExitSuccess) {
         return Core::ExitFailure;
+    }
+    if (const char *base_path = SDL_GetBasePath()) {
+        Core::SetCodeModelDirectory(base_path);
     }
     if (InitGPU() != Core::ExitSuccess) {
         return Core::ExitFailure;

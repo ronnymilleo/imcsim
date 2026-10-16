@@ -3,12 +3,14 @@
  * @brief   Tests for terminal positions and picking of schematic elements.
  */
 
+#include "components/logic_part.h"
 #include "test_printers.h"
 #include "ui_elements/ui_bjt.h"
 #include "ui_elements/ui_controlled_source.h"
 #include "ui_elements/ui_controlled_switch.h"
 #include "ui_elements/ui_diode.h"
 #include "ui_elements/ui_ground.h"
+#include "ui_elements/ui_logic_part.h"
 #include "ui_elements/ui_mosfet.h"
 #include "ui_elements/ui_net_label.h"
 #include "ui_elements/ui_op_amp.h"
@@ -234,4 +236,42 @@ TEST_CASE("Op-amps list the output, the inputs and the supply pins", "[ui_elemen
     // Mirroring left to right puts the inputs on the right
     op_amp.SetMirrored(true);
     CHECK(op_amp.GetTerminals()[1] == GUI::GridPoint{3, 1});
+}
+
+TEST_CASE("A gate has its inputs on the left and its output on the right", "[ui_element]") {
+    const GUI::UILogicPart gate(Core::ComponentType::And, {10, 10}, GUI::Rotation::R0);
+    CHECK(gate.GetComponent().GetType() == Core::ComponentType::And);
+    CHECK(gate.GetTerminals() == std::vector<GUI::GridPoint>{{7, 9}, {7, 11}, {13, 10}});
+    CHECK(gate.GetTerminalInward(0) == GUI::GridPoint{1, 0});
+    CHECK(gate.GetTerminalInward(2) == GUI::GridPoint{-1, 0});
+    CHECK(gate.Contains({10.0f, 10.0f}));
+    CHECK_FALSE(gate.Contains({10.0f, 12.0f}));
+
+    const GUI::UILogicPart inverter(Core::ComponentType::Not, {0, 0}, GUI::Rotation::R0);
+    CHECK(inverter.GetTerminals() == std::vector<GUI::GridPoint>{{-3, 0}, {3, 0}});
+}
+
+TEST_CASE("A flip-flop has its data and clock on the left, SET and RESET above and below, and Q and QN on the right",
+          "[ui_element]") {
+    const GUI::UILogicPart d_type(Core::ComponentType::DFlipFlop, {0, 0}, GUI::Rotation::R0);
+    CHECK(d_type.GetTerminals() == std::vector<GUI::GridPoint>{{-3, -1}, {-3, 1}, {0, -3}, {0, 3}, {3, -1}, {3, 1}});
+    CHECK(d_type.GetTerminalInward(2) == GUI::GridPoint{0, 1});
+    CHECK(d_type.GetTerminalInward(3) == GUI::GridPoint{0, -1});
+
+    const GUI::UILogicPart jk(Core::ComponentType::JKFlipFlop, {0, 0}, GUI::Rotation::R0);
+    CHECK(jk.GetTerminals() ==
+          std::vector<GUI::GridPoint>{{-3, -2}, {-3, 2}, {-3, 0}, {0, -4}, {0, 4}, {3, -2}, {3, 2}});
+}
+
+TEST_CASE("Every gate and flip-flop has one terminal for each input and each output", "[ui_element]") {
+    for (const Core::ComponentType type :
+         {Core::ComponentType::And, Core::ComponentType::Or, Core::ComponentType::Not, Core::ComponentType::Nand,
+          Core::ComponentType::Nor, Core::ComponentType::Xor, Core::ComponentType::Xnor, Core::ComponentType::Buffer,
+          Core::ComponentType::DFlipFlop, Core::ComponentType::JKFlipFlop, Core::ComponentType::TFlipFlop,
+          Core::ComponentType::SRFlipFlop}) {
+        const GUI::UILogicPart part(type, {0, 0}, GUI::Rotation::R0);
+        INFO(part.GetComponent().GetTypeName());
+        CHECK(part.GetTerminals().size() ==
+              Core::GetLogicInputLabels(type).size() + Core::GetLogicOutputLabels(type).size());
+    }
 }

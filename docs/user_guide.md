@@ -24,6 +24,11 @@ How to read what imcsim measures, plots and exports. The [README](../README.md) 
 - **Transformers**: the value of a transformer is its primary inductance, and its properties set the turns ratio, the
   coupling and the resistance of the windings. The secondary needs a path to ground, such as the bridge of the
   Transformers examples.
+- **Logic gates and flip-flops**: the toolbar has a button for the gates and one for the flip-flops, and Space finds
+  them by name (`nand`, `flip`). A part has a logic level and a delay in its properties; it reads 1 above 70% of
+  its level and 0 below 30%, and an input left unconnected reads 0. The Digital examples show a table of gates, a half
+  adder, an SR latch and a ripple counter. A logic signal plots as a voltage between 0 V and the logic level, so with
+  several of them, show a few traces at a time.
 - **Standard values**: View > Component Values restricts resistors, capacitors and inductors to one of the E series
   (E6, E12, E24, E48, E96 or E192, with their tolerances of 20% down to 0.5%), or leaves any value allowed, which is
   the default. With a series chosen, a typed value becomes the nearest one of the series on a log scale (`5000` is
@@ -163,6 +168,10 @@ Every part with more than one terminal numbers them in the order the SPICE netli
 | VCVS or VCCS (E, G) | output, top of the diamond | output, bottom | control + (4: control -) |
 | CCCS or CCVS (F, H) | output, top of the diamond | output, bottom | |
 | Op-amp | output | non-inverting input (+) | inverting input (-) (4: V+, 5: V-) |
+| Gate (AND, OR, NAND, NOR, XOR, XNOR) | input A, upper left | input B, lower left | output Y, on the right |
+| NOT, buffer | input A, on the left | output Y, on the right | |
+| D or T flip-flop | D or T, upper left | CLK, lower left | SET, top (4: RESET, bottom; 5: Q; 6: QN) |
+| JK or SR flip-flop | J or S, upper left | K or R, lower left | CLK, middle left (4: SET; 5: RESET; 6: Q; 7: QN) |
 
 Ground, the VCC rail and net labels have a single terminal and no number.
 

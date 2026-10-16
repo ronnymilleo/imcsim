@@ -245,6 +245,49 @@ constexpr auto Examples = std::to_array<Example>({
                        "draws twice the load current, so the source sees 100 / 2^2 = 25 Ohm.",
         .FileName = "ideal_transformer.imcsim",
     },
+    {
+        .Title = "Logic gates",
+        .Group = "Digital",
+        .Description =
+            "Pulses A (250 Hz) and B (500 Hz) go through the four input pairs 10, 11, 00 and 01 in 4 ms, and an "
+            "AND, an OR, a NAND and an XOR gate each drive a LED through 330 Ohm. Run the transient: AND is high "
+            "only for 11, OR for all but 00, NAND for all but 11 and XOR when the inputs differ. A high reads "
+            "about 4.6 V at the output, since the 50 Ohm output resistance of the gate and the LED take the rest "
+            "of 5 V. The net labels A and B reach every gate with no wires between them; show a few traces at a "
+            "time, since they all swing between 0 V and 5 V.",
+        .FileName = "logic_gates.imcsim",
+    },
+    {
+        .Title = "Half adder",
+        .Group = "Digital",
+        .Description =
+            "An XOR gate gives the sum of two bits and an AND gate their carry. Run the transient through the "
+            "pairs 10, 11, 00 and 01: 1 + 0 lights the sum LED, 1 + 1 lights the carry LED alone (10 in binary), "
+            "0 + 0 lights neither and 0 + 1 lights the sum again.",
+        .FileName = "half_adder.imcsim",
+    },
+    {
+        .Title = "SR latch from NAND gates",
+        .Group = "Digital",
+        .Description =
+            "Two NAND gates, each fed by the output of the other through the Q and QN net labels, remember one "
+            "bit. The inputs are active low: S_BAR low sets Q, R_BAR low resets it, and with both high the latch "
+            "holds. Run the transient: S_BAR starts low, so Q is high from the start, R_BAR low at 3 ms resets "
+            "it, and S_BAR low again at 6 ms sets it. Both inputs idle at the start would give the latch no state "
+            "to begin from, and ngspice gives up on it.",
+        .FileName = "sr_latch.imcsim",
+    },
+    {
+        .Title = "3-bit ripple counter",
+        .Group = "Digital",
+        .Description =
+            "Each D flip-flop has QN fed back to D, so it halves the frequency of its clock, and the next stage "
+            "is clocked by that QN. From the 1 kHz clock, Q0 is 500 Hz, Q1 250 Hz and Q2 125 Hz, and Q2 Q1 Q0 "
+            "count the rising edges of the clock in binary, the first at 0.5 ms. SET and RESET are left "
+            "unconnected and read 0. Show the traces one or two at a time, since they all swing between 0 V and 5 "
+            "V.",
+        .FileName = "ripple_counter.imcsim",
+    },
 });
 
 } // namespace

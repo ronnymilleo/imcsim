@@ -10,6 +10,7 @@
 #include "components/bjt.h"
 #include "components/controlled_source.h"
 #include "components/diode.h"
+#include "components/logic_part.h"
 #include "components/mosfet.h"
 #include "components/source.h"
 #include "spice_value.h"
@@ -49,6 +50,10 @@ struct NgspiceState {
     bool Exited = false;
     // Where the callbacks store printed lines; only set while a run is in progress
     std::vector<SimulatorMessage> *Messages = nullptr;
+    // Where a build that ships the digital code models keeps digital.cm, when the system ngspice does not load them
+    std::filesystem::path CodeModelDirectory;
+    // Whether the digital code models are loaded, which the logic parts need; known once ngspice is initialized
+    bool HasDigitalModels = false;
 };
 
 NgspiceState &GetState() {
@@ -84,18 +89,40 @@ int HandleExit(int /*status*/, NG_BOOL /*immediate*/, NG_BOOL /*quit*/, int /*id
     return 0;
 }
 
+// ngspice takes non-const strings and keeps no reference to them after the call
+int SendCommand(std::string command) {
+    return ngSpice_Command(command.data());
+}
+
+// The help of a code model is printed only when the model is loaded
+bool AskForDigitalModels() {
+    std::vector<SimulatorMessage> messages;
+    std::vector<SimulatorMessage> *const printing = std::exchange(GetState().Messages, &messages);
+    SendCommand("devhelp d_and");
+    GetState().Messages = printing;
+    return std::ranges::any_of(messages,
+                               [](const SimulatorMessage &message) { return message.Text.starts_with("d_and"); });
+}
+
+// A system ngspice loads digital.cm through its spinit file, and loading it a second time crashes ngspice, so the
+// copy shipped with the program is loaded only when the digital models are missing
+void LoadDigitalModels() {
+    const std::filesystem::path library = GetState().CodeModelDirectory / "digital.cm";
+    std::error_code error;
+    if (!AskForDigitalModels() && !GetState().CodeModelDirectory.empty() && std::filesystem::exists(library, error)) {
+        SendCommand(std::format("codemodel \"{}\"", library.string()));
+    }
+    GetState().HasDigitalModels = AskForDigitalModels();
+}
+
 bool EnsureInitialized() {
     NgspiceState &state = GetState();
     if (!state.Initialized) {
         ngSpice_Init(HandleOutput, HandleStatus, HandleExit, nullptr, nullptr, nullptr, nullptr);
         state.Initialized = true;
+        LoadDigitalModels();
     }
     return !state.Exited;
-}
-
-// ngspice takes non-const strings and keeps no reference to them after the call
-int SendCommand(std::string command) {
-    return ngSpice_Command(command.data());
 }
 
 void LoadCircuit(const std::string &netlist) {
@@ -119,6 +146,33 @@ bool HasErrorLine(const std::vector<SimulatorMessage> &messages) {
         }
     }
     return false;
+}
+
+bool HasLogicPart(const Circuit &circuit) {
+    return std::ranges::any_of(circuit.GetEntries(),
+                               [](const CircuitEntry &entry) { return IsLogicPart(entry.Part->GetType()); });
+}
+
+// ngspice only warns when the analog and digital solutions keep alternating, and then leaves the results empty
+bool NeverSettled(const std::vector<SimulatorMessage> &messages) {
+    return std::ranges::any_of(messages, [](const SimulatorMessage &message) {
+        return message.Text.contains("event-driven solution alternations");
+    });
+}
+
+// What to tell the user when ngspice rejected a circuit: the logic parts have two failures of their own
+std::string DescribeFailure(const Circuit &circuit, const std::vector<SimulatorMessage> &messages) {
+    if (HasLogicPart(circuit)) {
+        if (!GetState().HasDigitalModels) {
+            return "This ngspice has no digital models (digital.cm), which the logic gates and flip-flops need";
+        }
+        // A latch with both inputs idle has no state to start from, so the digital loop never settles
+        if (NeverSettled(messages)) {
+            return "The logic parts never settle; a loop such as a latch needs one input at a defined level when the "
+                   "simulation starts";
+        }
+    }
+    return "ngspice could not simulate the circuit; see its output for details";
 }
 
 std::optional<std::string> CheckCircuit(const Circuit &circuit) {
@@ -332,6 +386,18 @@ std::vector<CurrentVector> CurrentVectors(const Component &component) {
     case ComponentType::VSwitch:
     case ComponentType::Relay:
     case ComponentType::Transformer:
+    case ComponentType::And:
+    case ComponentType::Or:
+    case ComponentType::Not:
+    case ComponentType::Nand:
+    case ComponentType::Nor:
+    case ComponentType::Xor:
+    case ComponentType::Xnor:
+    case ComponentType::Buffer:
+    case ComponentType::DFlipFlop:
+    case ComponentType::JKFlipFlop:
+    case ComponentType::TFlipFlop:
+    case ComponentType::SRFlipFlop:
         break;
     }
     return {};
@@ -631,6 +697,18 @@ ACCurrent(const CircuitEntry &entry, const std::vector<double> &frequencies,
     case ComponentType::VSwitch:
     case ComponentType::Relay:
     case ComponentType::Transformer:
+    case ComponentType::And:
+    case ComponentType::Or:
+    case ComponentType::Not:
+    case ComponentType::Nand:
+    case ComponentType::Nor:
+    case ComponentType::Xor:
+    case ComponentType::Xnor:
+    case ComponentType::Buffer:
+    case ComponentType::DFlipFlop:
+    case ComponentType::JKFlipFlop:
+    case ComponentType::TFlipFlop:
+    case ComponentType::SRFlipFlop:
         break;
     }
     return std::unexpected(std::format("{} carries no current", component.GetName()));
@@ -777,8 +855,9 @@ SimulationRun<Data> Simulate(const Circuit &circuit, const std::string_view anal
     LoadCircuit(circuit.ToSpiceNetlist(std::format(".options savecurrents\n{}", analysis), true));
     SendCommand("run");
     const char *plot = ngSpice_CurPlot();
-    if (plot == nullptr || !std::string_view(plot).starts_with(plot_prefix) || HasErrorLine(run.Messages)) {
-        run.Result = std::unexpected("ngspice could not simulate the circuit; see its output for details");
+    if (plot == nullptr || !std::string_view(plot).starts_with(plot_prefix) || HasErrorLine(run.Messages) ||
+        NeverSettled(run.Messages)) {
+        run.Result = std::unexpected(DescribeFailure(circuit, run.Messages));
     } else {
         run.Result = read_result();
     }
@@ -870,6 +949,25 @@ DCSweepRun RunDCSweep(const Circuit &circuit, const DCSweepSettings &settings) {
         analysis += std::format(" {}", FormatSweepRange(*settings.Stepped));
     }
     return Simulate<DCSweep>(circuit, analysis, "dc", [&circuit, &settings] { return ReadDCSweep(circuit, settings); });
+}
+
+/**
+ * @brief   Tells the simulator where the program keeps the digital code models, for a build that ships them.
+ * @param[in] directory  Folder that may hold digital.cm; the library is loaded from it when ngspice has not loaded
+ *                       the digital models itself, as the system ngspice does through its spinit file.
+ * @note    Call it before the first simulation; the library is looked for once, when ngspice starts.
+ */
+void SetCodeModelDirectory(const std::filesystem::path &directory) {
+    GetState().CodeModelDirectory = directory;
+}
+
+/**
+ * @brief   Tells whether the digital code models of ngspice are loaded, which the logic gates and flip-flops need.
+ * @return  True when ngspice has them, from the system or from the code model directory; false when it has not,
+ *          or when ngspice has stopped.
+ */
+bool AreDigitalModelsAvailable() {
+    return EnsureInitialized() && GetState().HasDigitalModels;
 }
 
 /**

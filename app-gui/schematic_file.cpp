@@ -8,6 +8,7 @@
 #include "components/bjt.h"
 #include "components/controlled_source.h"
 #include "components/diode.h"
+#include "components/logic_part.h"
 #include "components/mosfet.h"
 #include "components/net_label.h"
 #include "components/op_amp.h"
@@ -69,6 +70,11 @@ constexpr auto TransformerKeys = std::to_array<ParameterKey<Core::TransformerPar
     {"turns_ratio", &Core::TransformerParameters::TurnsRatio},
     {"coupling", &Core::TransformerParameters::Coupling},
     {"winding_resistance", &Core::TransformerParameters::WindingResistance},
+});
+
+constexpr auto LogicKeys = std::to_array<ParameterKey<Core::LogicParameters>>({
+    {"logic_level", &Core::LogicParameters::LogicLevel},
+    {"propagation_delay", &Core::LogicParameters::PropagationDelay},
 });
 
 constexpr auto PulseKeys = std::to_array<ParameterKey<Core::PulseParameters>>({
@@ -304,14 +310,23 @@ void WriteKindFields(const Core::Component &component, nlohmann::json &object) {
         }
     } else if (Core::IsSwitch(type)) {
         object["closed"] = static_cast<const Core::Switch &>(component).IsClosed();
-    } else if (type == Core::ComponentType::VSwitch) {
+    } else if (type == Core::ComponentType::Potentiometer) {
+        object["wiper"] = static_cast<const Core::Potentiometer &>(component).GetWiper();
+    }
+}
+
+// Parts whose figures are all there is to them: the switch that follows a voltage, the relay, the transformer, and
+// the gates and flip-flops with their logic family
+void WriteFigureFields(const Core::Component &component, nlohmann::json &object) {
+    const Core::ComponentType type = component.GetType();
+    if (type == Core::ComponentType::VSwitch) {
         WritePartParameters(static_cast<const Core::VoltageControlledSwitch &>(component), SwitchKeys, object);
     } else if (type == Core::ComponentType::Relay) {
         WritePartParameters(static_cast<const Core::Relay &>(component), RelayKeys, object);
     } else if (type == Core::ComponentType::Transformer) {
         WritePartParameters(static_cast<const Core::Transformer &>(component), TransformerKeys, object);
-    } else if (type == Core::ComponentType::Potentiometer) {
-        object["wiper"] = static_cast<const Core::Potentiometer &>(component).GetWiper();
+    } else if (Core::IsLogicPart(type)) {
+        WritePartParameters(static_cast<const Core::LogicPart &>(component), LogicKeys, object);
     }
 }
 
@@ -344,6 +359,7 @@ nlohmann::json WriteElement(const UIElement &element) {
     }
     WriteModelFields(component, object);
     WriteKindFields(component, object);
+    WriteFigureFields(component, object);
     return object;
 }
 
@@ -457,6 +473,70 @@ std::expected<void, std::string> ReadModel(const nlohmann::json &object, Core::C
     return {};
 }
 
+// What only some kinds of part carry: the current a controlled source follows, a net name, a switch state and a wiper
+std::expected<void, std::string> ReadStateFields(const nlohmann::json &object, Core::Component &component) {
+    // A missing controlling current loads as none; the simulation then asks for one
+    if (Core::IsCurrentControlled(component.GetType()) && object.contains("control")) {
+        const std::optional<std::string> current = ReadString(object, "control");
+        if (!current) {
+            return std::unexpected("has a controlling current that is not text");
+        }
+        static_cast<Core::ControlledSource &>(component).SetControllingCurrent(*current);
+    }
+    if (component.GetType() == Core::ComponentType::NetLabel && object.contains("net")) {
+        const std::optional<std::string> net = ReadString(object, "net");
+        if (!net || !Core::NetLabel::IsValidNet(*net)) {
+            return std::unexpected("has a net name that is not 1 to 32 letters, digits, _, - or .");
+        }
+        static_cast<Core::NetLabel &>(component).SetNet(*net);
+    }
+    // A switch saved without a state stays open
+    if (Core::IsSwitch(component.GetType()) && object.contains("closed")) {
+        const std::optional<bool> closed = ReadBool(object, "closed");
+        if (!closed) {
+            return std::unexpected("has a closed flag that is not true or false");
+        }
+        static_cast<Core::Switch &>(component).SetClosed(*closed);
+    }
+    // A potentiometer saved without a wiper keeps it in the middle
+    if (component.GetType() == Core::ComponentType::Potentiometer && object.contains("wiper")) {
+        const std::optional<double> wiper = ReadNumber(object, "wiper");
+        if (!wiper || !Core::Potentiometer::IsValidWiper(*wiper)) {
+            return std::unexpected("has a wiper that is not a number from 0 to 1");
+        }
+        static_cast<Core::Potentiometer &>(component).SetWiper(*wiper);
+    }
+    return {};
+}
+
+// Parts whose figures are all there is to them, which missing keys leave as the part starts
+std::expected<void, std::string> ReadFigureFields(const nlohmann::json &object, Core::Component &component) {
+    if (component.GetType() == Core::ComponentType::VSwitch) {
+        if (const auto read =
+                ReadPartParameters(object, static_cast<Core::VoltageControlledSwitch &>(component), SwitchKeys);
+            !read) {
+            return std::unexpected(read.error());
+        }
+    }
+    if (component.GetType() == Core::ComponentType::Relay) {
+        if (const auto read = ReadPartParameters(object, static_cast<Core::Relay &>(component), RelayKeys); !read) {
+            return std::unexpected(read.error());
+        }
+    }
+    if (component.GetType() == Core::ComponentType::Transformer) {
+        if (const auto read = ReadPartParameters(object, static_cast<Core::Transformer &>(component), TransformerKeys);
+            !read) {
+            return std::unexpected(read.error());
+        }
+    }
+    if (Core::IsLogicPart(component.GetType())) {
+        if (const auto read = ReadPartParameters(object, static_cast<Core::LogicPart &>(component), LogicKeys); !read) {
+            return std::unexpected(read.error());
+        }
+    }
+    return {};
+}
+
 // Names are checked separately, once every element is read, so duplicates can be found
 std::expected<std::unique_ptr<UIElement>, std::string> ReadElement(const nlohmann::json &object) {
     if (!object.is_object()) {
@@ -506,54 +586,11 @@ std::expected<std::unique_ptr<UIElement>, std::string> ReadElement(const nlohman
     if (const std::expected<void, std::string> model = ReadModel(object, component); !model) {
         return std::unexpected(model.error());
     }
-    // A missing controlling current loads as none; the simulation then asks for one
-    if (Core::IsCurrentControlled(component.GetType()) && object.contains("control")) {
-        const std::optional<std::string> current = ReadString(object, "control");
-        if (!current) {
-            return std::unexpected("has a controlling current that is not text");
-        }
-        static_cast<Core::ControlledSource &>(component).SetControllingCurrent(*current);
+    if (const std::expected<void, std::string> state = ReadStateFields(object, component); !state) {
+        return std::unexpected(state.error());
     }
-    if (component.GetType() == Core::ComponentType::NetLabel && object.contains("net")) {
-        const std::optional<std::string> net = ReadString(object, "net");
-        if (!net || !Core::NetLabel::IsValidNet(*net)) {
-            return std::unexpected("has a net name that is not 1 to 32 letters, digits, _, - or .");
-        }
-        static_cast<Core::NetLabel &>(component).SetNet(*net);
-    }
-    // A switch saved without a state stays open
-    if (Core::IsSwitch(component.GetType()) && object.contains("closed")) {
-        const std::optional<bool> closed = ReadBool(object, "closed");
-        if (!closed) {
-            return std::unexpected("has a closed flag that is not true or false");
-        }
-        static_cast<Core::Switch &>(component).SetClosed(*closed);
-    }
-    if (component.GetType() == Core::ComponentType::VSwitch) {
-        if (const auto read =
-                ReadPartParameters(object, static_cast<Core::VoltageControlledSwitch &>(component), SwitchKeys);
-            !read) {
-            return std::unexpected(read.error());
-        }
-    }
-    if (component.GetType() == Core::ComponentType::Relay) {
-        if (const auto read = ReadPartParameters(object, static_cast<Core::Relay &>(component), RelayKeys); !read) {
-            return std::unexpected(read.error());
-        }
-    }
-    if (component.GetType() == Core::ComponentType::Transformer) {
-        if (const auto read = ReadPartParameters(object, static_cast<Core::Transformer &>(component), TransformerKeys);
-            !read) {
-            return std::unexpected(read.error());
-        }
-    }
-    // A potentiometer saved without a wiper keeps it in the middle
-    if (component.GetType() == Core::ComponentType::Potentiometer && object.contains("wiper")) {
-        const std::optional<double> wiper = ReadNumber(object, "wiper");
-        if (!wiper || !Core::Potentiometer::IsValidWiper(*wiper)) {
-            return std::unexpected("has a wiper that is not a number from 0 to 1");
-        }
-        static_cast<Core::Potentiometer &>(component).SetWiper(*wiper);
+    if (const std::expected<void, std::string> figures = ReadFigureFields(object, component); !figures) {
+        return std::unexpected(figures.error());
     }
     if (const std::optional<std::string> name = ReadString(object, "name")) {
         component.SetName(*name);

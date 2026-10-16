@@ -10,6 +10,7 @@
 #include "components/component.h"
 #include "components/controlled_source.h"
 #include "components/diode.h"
+#include "components/logic_part.h"
 #include "components/mosfet.h"
 #include "components/net_label.h"
 #include "components/op_amp.h"
@@ -74,6 +75,8 @@ private:
     std::array<ValueField, 5> m_RelayFields;
     // One per member of Core::TransformerParameters
     std::array<ValueField, 3> m_TransformerFields;
+    // One per member of Core::LogicParameters
+    std::array<ValueField, 2> m_LogicFields;
 
     void LoadFields(const Core::Component &component);
     void DrawSelectionSummary();
@@ -85,6 +88,7 @@ private:
     void DrawControlledSwitch(Core::VoltageControlledSwitch &controlled);
     void DrawRelay(Core::Relay &relay);
     void DrawTransformer(Core::Transformer &transformer);
+    void DrawLogicPart(Core::LogicPart &part);
     void DrawNetLabel(Core::NetLabel &label);
     void DrawDiode(Core::Diode &diode);
     void DrawBJT(Core::BJT &bjt);
