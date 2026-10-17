@@ -122,34 +122,43 @@ const std::string &ResolveNoiseSource(const std::string &stored, const std::vect
     return std::ranges::contains(sources, stored) ? stored : sources.front();
 }
 
-// The node the noise is measured at: the one under the stored point, or else the first measured voltage away from
-// the input source, which is most likely the output the user looks at, or else any measured voltage, or else the
-// last node. No value without a node to measure
-std::optional<int> ResolveNoiseOutput(const std::optional<GridPoint> &point, const std::string &input_source,
-                                      const Core::Circuit &circuit, Schematic &schematic) {
+// Nodes an ideal voltage source holds against ground, such as a supply rail or the output of a source, where no
+// noise can show
+std::vector<int> ListHeldNodes(const Core::Circuit &circuit) {
+    std::vector<int> nodes;
+    for (const Core::CircuitEntry &entry : circuit.GetEntries()) {
+        const Core::ComponentType type = entry.Part->GetType();
+        if (type == Core::ComponentType::VCC) {
+            nodes.push_back(entry.Nodes[0]);
+        } else if (type == Core::ComponentType::VoltageSource && entry.Nodes[1] == 0) {
+            nodes.push_back(entry.Nodes[0]);
+        } else if (type == Core::ComponentType::VoltageSource && entry.Nodes[0] == 0) {
+            nodes.push_back(entry.Nodes[1]);
+        }
+    }
+    return nodes;
+}
+
+// The node the noise is measured at: the one under the stored point, or else the first measured voltage that no
+// voltage source holds, which is most likely the output the user looks at, or else the last such node. No value
+// without a node to measure
+std::optional<int> ResolveNoiseOutput(const std::optional<GridPoint> &point, const Core::Circuit &circuit,
+                                      Schematic &schematic) {
     if (point) {
         if (const std::optional<int> node = schematic.GetConnectivity().GetNode(*point); node && *node > 0) {
             return node;
         }
     }
-    std::vector<int> input_nodes;
-    for (const Core::CircuitEntry &entry : circuit.GetEntries()) {
-        if (entry.Part->GetName() == input_source) {
-            input_nodes = entry.Nodes;
-        }
-    }
-    std::optional<int> any_measured;
+    const std::vector<int> held = ListHeldNodes(circuit);
     for (int node = 1; node < circuit.GetNodeCount(); ++node) {
-        if (!schematic.IsVoltageMeasured(node)) {
-            continue;
-        }
-        if (!std::ranges::contains(input_nodes, node)) {
+        if (schematic.IsVoltageMeasured(node) && !std::ranges::contains(held, node)) {
             return node;
         }
-        any_measured = any_measured.value_or(node);
     }
-    if (any_measured) {
-        return any_measured;
+    for (int node = circuit.GetNodeCount() - 1; node > 0; --node) {
+        if (!std::ranges::contains(held, node)) {
+            return node;
+        }
     }
     return circuit.GetNodeCount() > 1 ? std::optional<int>(circuit.GetNodeCount() - 1) : std::nullopt;
 }
@@ -384,7 +393,7 @@ void AnalysisControls::RunSelected() {
     case Analysis::Noise: {
         const std::vector<std::string> sources = Core::GetNoiseInputSources(circuit);
         const std::string input = ResolveNoiseInput(settings.NoiseSource, sources);
-        const std::optional<int> output = ResolveNoiseOutput(settings.NoiseOutput, input, circuit, m_Schematic);
+        const std::optional<int> output = ResolveNoiseOutput(settings.NoiseOutput, circuit, m_Schematic);
         if (sources.empty() || !output) {
             m_Schematic.SetNoise(std::nullopt);
             Finish(analysis,
@@ -560,7 +569,7 @@ void AnalysisControls::DrawNoiseSettings(SimulationSettings &settings) {
     const Core::Circuit circuit = m_Schematic.BuildCircuit();
     const std::vector<std::string> sources = Core::GetNoiseInputSources(circuit);
     const std::string input = ResolveNoiseInput(settings.NoiseSource, sources);
-    const std::optional<int> output = ResolveNoiseOutput(settings.NoiseOutput, input, circuit, m_Schematic);
+    const std::optional<int> output = ResolveNoiseOutput(settings.NoiseOutput, circuit, m_Schematic);
     if (!output) {
         ImGui::TextDisabled("Connect some parts to measure their noise");
         return;

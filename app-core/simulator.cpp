@@ -961,7 +961,8 @@ std::expected<double, std::string> ReadNoiseTotal(const std::string &name) {
     return vector->v_realdata[0];
 }
 
-// Each part adds up the power of its devices, at every frequency and in total; parts without noise are left out
+// Each part adds up the power of its devices, at every frequency and in total; parts whose noise does not reach the
+// output are left out
 std::expected<std::vector<NoiseContribution>, std::string>
 ReadNoiseContributions(const Circuit &circuit, const NoisePlots &plots, const std::size_t point_count) {
     SendCommand(std::format("setplot {}", plots.Totals));
@@ -996,7 +997,8 @@ ReadNoiseContributions(const Circuit &circuit, const NoisePlots &plots, const st
             contribution.OutputTotal += device_totals[index] * device_totals[index];
             has_noise = true;
         }
-        if (!has_noise) {
+        // A part whose noise does not reach the output, as behind an ideal source, has no share
+        if (!has_noise || contribution.OutputTotal <= 0.0) {
             continue;
         }
         std::ranges::transform(contribution.OutputDensities, contribution.OutputDensities.begin(),
