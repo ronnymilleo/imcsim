@@ -680,8 +680,6 @@ TEST_CASE("The SR latch is set at the start, and reported as having no state to 
     }
     const Core::OperatingPointRun idle = Core::RunOperatingPoint(schematic.BuildCircuit());
     REQUIRE_FALSE(idle.Result.has_value());
-    for (const auto &m : idle.Messages) {
-    }
     CHECK(idle.Result.error().find("needs one input at a defined level") != std::string::npos);
 }
 

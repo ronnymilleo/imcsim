@@ -1,3 +1,6 @@
-# XSPICE keeps a few small allocations of its digital event data after a circuit with logic parts is removed, which
-# LeakSanitizer reports when the tests exit; they come from libngspice, not from imcsim
+# Two leaks of ngspice 47 itself, which LeakSanitizer reports when the tests exit:
+# - remcirc clears the pending XSPICE output events without freeing their values (EVTsetup_queues, evtsetup.c)
+# - an operating point that fails returns without closing its plot (DCop, dcop.c), as the idle latch example does
+# Reported with fixes in https://sourceforge.net/p/ngspice/bugs/881/; drop this file once a release includes them.
+# The system library has no symbols, so only its name can be matched
 leak:libngspice
