@@ -1,6 +1,6 @@
 pkgbase = imcsim
 	pkgdesc = Circuit simulator with an immediate mode interface, powered by ngspice
-	pkgver = 0.6.0
+	pkgver = 0.7.0
 	pkgrel = 1
 	url = https://github.com/ronnymilleo/imcsim
 	arch = x86_64

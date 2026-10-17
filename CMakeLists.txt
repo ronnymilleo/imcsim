@@ -13,7 +13,7 @@ cmake_minimum_required(VERSION 4.3)
 set(CMAKE_OSX_DEPLOYMENT_TARGET 26.0 CACHE STRING "Oldest macOS the program runs on")
 
 project(imcsim
-    VERSION 0.6.0
+    VERSION 0.7.0
 )
 
 add_compile_definitions(IMCSIM_VERSION="${PROJECT_VERSION}")
