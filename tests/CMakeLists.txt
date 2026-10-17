@@ -19,6 +19,7 @@ add_executable(imcsim-tests
             heat_glow_tests.cpp
             helpers_tests.cpp
             led_glow_tests.cpp
+            logic_trace_tests.cpp
             playback_tests.cpp
             plot_export_tests.cpp
             plot_helpers_tests.cpp
@@ -50,4 +51,8 @@ target_link_libraries(imcsim-tests
 )
 
 include(Catch)
-catch_discover_tests(imcsim-tests)
+# Under LeakSanitizer, the suppression file hides the leaks of libngspice itself; other builds ignore the variable
+catch_discover_tests(imcsim-tests
+        PROPERTIES
+            ENVIRONMENT "LSAN_OPTIONS=suppressions=${CMAKE_CURRENT_SOURCE_DIR}/lsan_suppressions.txt"
+)

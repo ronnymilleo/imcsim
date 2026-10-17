@@ -93,6 +93,11 @@ constexpr auto ControlledParts = std::to_array(
 constexpr auto AdjustableParts = std::to_array({Core::ComponentType::Potentiometer, Core::ComponentType::Transformer});
 constexpr auto SwitchParts = std::to_array({Core::ComponentType::Switch, Core::ComponentType::PushButton,
                                             Core::ComponentType::VSwitch, Core::ComponentType::Relay});
+constexpr auto GateParts = std::to_array({Core::ComponentType::And, Core::ComponentType::Or, Core::ComponentType::Not,
+                                          Core::ComponentType::Nand, Core::ComponentType::Nor, Core::ComponentType::Xor,
+                                          Core::ComponentType::Xnor, Core::ComponentType::Buffer});
+constexpr auto FlipFlopParts = std::to_array({Core::ComponentType::DFlipFlop, Core::ComponentType::JKFlipFlop,
+                                              Core::ComponentType::TFlipFlop, Core::ComponentType::SRFlipFlop});
 constexpr auto PartGroups = std::to_array<PartGroup>({
     {"Sources", SourceParts},
     {"Diodes", DiodeParts},
@@ -100,6 +105,8 @@ constexpr auto PartGroups = std::to_array<PartGroup>({
     {"Controlled sources", ControlledParts},
     {"Adjustable parts", AdjustableParts},
     {"Switches", SwitchParts},
+    {"Logic gates", GateParts},
+    {"Flip-flops", FlipFlopParts},
 });
 
 // Parts with a button of their own, in toolbar groups

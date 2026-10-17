@@ -31,6 +31,7 @@ New to imcsim? The [tutorial](docs/tutorial.md) builds, simulates and exports a 
   V/s) and a third axis for any unit other than volts and amperes
 - Operating point and transient results on the schematic: values on hover, wires colored by node, by voltage or by a
   current heat map that shows the path of the current, parts colored by power, and a time bar to play a transient
+- Logic signals plot as stacked lanes under the analog traces, like a logic analyzer
 - Exports for reports: plots as SVG images (light for print or dark, at any size) or CSV tables, and the schematic
   as an SVG image with its probes, so the two figures can be shown side by side
 - Nine color themes, seven dark and two light, switched from the View menu (see [Themes](docs/themes.md))
@@ -41,6 +42,8 @@ New to imcsim? The [tutorial](docs/tutorial.md) builds, simulates and exports a 
 - Potentiometers, with the wiper set in the properties, and switches and push buttons that are open or closed,
   voltage-controlled switches and relays whose coil current sets when the contact closes, and transformers of two
   coupled inductors with a turns ratio
+- Logic gates (AND, OR, NOT, NAND, NOR, XOR, XNOR, buffer) and D, JK, T and SR flip-flops, simulated with the digital
+  code models of ngspice behind analog bridges, so their outputs are voltages that plot and probe like any other
 - Standard values: an option to take resistors, capacitors and inductors from the E6 to E192 series, typed or stepped
   with the arrows, keys or mouse wheel
 - IEC or ANSI symbols, optional terminal numbers, parts rotated (R) and mirrored left to right (M) or top to bottom
@@ -54,10 +57,11 @@ New to imcsim? The [tutorial](docs/tutorial.md) builds, simulates and exports a 
   part (`4k7`), a right-click menu, and Fit (Home)
 - Run (F5) from the toolbar, with the analysis and its settings beside it, settings suggested from the sources and
   parts, and the result of the last run in the status bar
-- 20 example circuits sorted by topic, each with its analyses and measurements set up: dividers, RC and RLC
+- 29 example circuits sorted by topic, each with its analyses and measurements set up: dividers, RC and RLC
   filters, diode curves, a Zener regulator and a rectifier, BJT and MOSFET switches and characteristics, a current
   mirror, common-emitter and class AB amplifiers, op-amp amplifiers, an integrator, a Schmitt trigger and a Sallen-Key
-  filter, and an ideal transformer made of controlled sources
+  filter, an ideal transformer made of controlled sources, switching circuits, and digital ones: gates, a half
+  adder, an SR latch and a ripple counter
 
 ## Screenshots
 

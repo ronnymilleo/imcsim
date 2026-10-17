@@ -10,6 +10,7 @@
 #include "components/current_source.h"
 #include "components/diode.h"
 #include "components/ground.h"
+#include "components/logic_part.h"
 #include "components/mosfet.h"
 #include "components/op_amp.h"
 #include "components/potentiometer.h"
@@ -20,6 +21,7 @@
 #include "components/vcc.h"
 #include "components/voltage_controlled_switch.h"
 #include "components/voltage_source.h"
+#include "digital_models.h"
 #include "simulator.h"
 #include <algorithm>
 #include <catch2/catch_test_macros.hpp>
@@ -1683,4 +1685,349 @@ TEST_CASE("A loaded 2:1 transformer draws twice the secondary current from its p
     CHECK_THAT(secondary_voltage, Catch::Matchers::WithinRel(5.0, 0.05));
     CHECK_THAT(secondary_current, Catch::Matchers::WithinRel(0.5, 0.05));
     CHECK_THAT(primary_current, Catch::Matchers::WithinRel(0.25, 0.1));
+}
+
+namespace {
+
+/**
+ * @struct  GateTruthRow
+ * @brief   One row of a truth table: the inputs of a two-input gate and the output it must give.
+ */
+struct GateTruthRow {
+    Core::ComponentType Type;
+    bool A;
+    bool B;
+    bool Expected;
+};
+
+} // namespace
+
+TEST_CASE("Each logic gate gives its truth table at the operating point", "[simulator][digital]") {
+    SKIP_WITHOUT_DIGITAL_MODELS();
+    const auto row = GENERATE(GateTruthRow{Core::ComponentType::And, false, false, false},
+                              GateTruthRow{Core::ComponentType::And, true, false, false},
+                              GateTruthRow{Core::ComponentType::And, true, true, true},
+                              GateTruthRow{Core::ComponentType::Or, false, false, false},
+                              GateTruthRow{Core::ComponentType::Or, true, false, true},
+                              GateTruthRow{Core::ComponentType::Or, true, true, true},
+                              GateTruthRow{Core::ComponentType::Nand, true, true, false},
+                              GateTruthRow{Core::ComponentType::Nand, false, true, true},
+                              GateTruthRow{Core::ComponentType::Nor, false, false, true},
+                              GateTruthRow{Core::ComponentType::Nor, true, false, false},
+                              GateTruthRow{Core::ComponentType::Xor, true, false, true},
+                              GateTruthRow{Core::ComponentType::Xor, true, true, false},
+                              GateTruthRow{Core::ComponentType::Xnor, true, true, true},
+                              GateTruthRow{Core::ComponentType::Xnor, false, true, false});
+    Core::VoltageSource input_a;
+    input_a.SetName("Vin1");
+    input_a.SetValue(row.A ? 5.0 : 0.0);
+    Core::VoltageSource input_b;
+    input_b.SetName("Vin2");
+    input_b.SetValue(row.B ? 5.0 : 0.0);
+    Core::LogicPart gate(row.Type);
+    gate.SetName("U1");
+    const Core::Ground reference;
+    // The inputs on nodes 1 and 2, the output on node 3
+    Core::Circuit circuit;
+    circuit.Add(input_a, {1, 0});
+    circuit.Add(input_b, {2, 0});
+    circuit.Add(gate, {1, 2, 3});
+    circuit.Add(reference, {0});
+
+    const Core::OperatingPointRun run = Core::RunOperatingPoint(circuit);
+    REQUIRE(run.Result.has_value());
+    INFO(std::format("{} with A = {} and B = {}", Core::GetTypeName(row.Type), row.A, row.B));
+    CHECK_THAT(run.Result->NodeVoltages[3], Catch::Matchers::WithinAbs(row.Expected ? 5.0 : 0.0, 0.05));
+}
+
+TEST_CASE("NOT inverts and the buffer repeats its input", "[simulator][digital]") {
+    SKIP_WITHOUT_DIGITAL_MODELS();
+    const auto type = GENERATE(Core::ComponentType::Not, Core::ComponentType::Buffer);
+    const bool input_high = GENERATE(false, true);
+    Core::VoltageSource input;
+    input.SetName("Vin1");
+    input.SetValue(input_high ? 5.0 : 0.0);
+    Core::LogicPart gate(type);
+    gate.SetName("U1");
+    const Core::Ground reference;
+    Core::Circuit circuit;
+    circuit.Add(input, {1, 0});
+    circuit.Add(gate, {1, 2});
+    circuit.Add(reference, {0});
+
+    const Core::OperatingPointRun run = Core::RunOperatingPoint(circuit);
+    REQUIRE(run.Result.has_value());
+    const bool expected = type == Core::ComponentType::Not ? !input_high : input_high;
+    CHECK_THAT(run.Result->NodeVoltages[2], Catch::Matchers::WithinAbs(expected ? 5.0 : 0.0, 0.05));
+}
+
+TEST_CASE("A logic input left unconnected reads as 0", "[simulator][digital]") {
+    SKIP_WITHOUT_DIGITAL_MODELS();
+    Core::VoltageSource input;
+    input.SetName("Vin1");
+    input.SetValue(5.0);
+    Core::LogicPart or_gate(Core::ComponentType::Or);
+    or_gate.SetName("U1");
+    Core::LogicPart and_gate(Core::ComponentType::And);
+    and_gate.SetName("U2");
+    const Core::Ground reference;
+    // Input A of both gates on node 1 at 5 V, input B of each alone on nodes 2 and 3; outputs on nodes 4 and 5
+    Core::Circuit circuit;
+    circuit.Add(input, {1, 0});
+    circuit.Add(or_gate, {1, 2, 4});
+    circuit.Add(and_gate, {1, 3, 5});
+    circuit.Add(reference, {0});
+
+    const Core::OperatingPointRun run = Core::RunOperatingPoint(circuit);
+    REQUIRE(run.Result.has_value());
+    CHECK_THAT(run.Result->NodeVoltages[4], Catch::Matchers::WithinAbs(5.0, 0.05));
+    CHECK_THAT(run.Result->NodeVoltages[5], Catch::Matchers::WithinAbs(0.0, 0.05));
+}
+
+TEST_CASE("A gate output carries the current of its load through its output resistance", "[simulator][digital]") {
+    SKIP_WITHOUT_DIGITAL_MODELS();
+    Core::VoltageSource input;
+    input.SetName("Vin1");
+    input.SetValue(5.0);
+    Core::LogicPart buffer(Core::ComponentType::Buffer);
+    buffer.SetName("U1");
+    Core::Resistor load;
+    load.SetName("R1");
+    load.SetValue(950.0);
+    const Core::Ground reference;
+    Core::Circuit circuit;
+    circuit.Add(input, {1, 0});
+    circuit.Add(buffer, {1, 2});
+    circuit.Add(load, {2, 0});
+    circuit.Add(reference, {0});
+
+    const Core::OperatingPointRun run = Core::RunOperatingPoint(circuit);
+    REQUIRE(run.Result.has_value());
+    // 5 V across 50 Ohm of the output and 950 Ohm of the load
+    CHECK_THAT(run.Result->NodeVoltages[2], Catch::Matchers::WithinAbs(4.75, 0.01));
+    // Positive into the output terminal, so a part that drives its load reports a negative current
+    CHECK_THAT(FindCurrent(run.Result->Currents, "U1").Current, Catch::Matchers::WithinAbs(-5e-3, 1e-5));
+}
+
+namespace {
+
+/**
+ * @struct  ClockedFlipFlop
+ * @brief   A flip-flop of any kind with its clock on node 2 and its outputs on nodes 5 (Q) and 6 (QN).
+ * @details The clock is a 1 ms pulse train with its first rising edge at 0.25 ms. The other inputs are on nodes 1, 3
+ *          and 4, driven by what the test adds; for a type with two data inputs the second data input is on node 7.
+ */
+struct ClockedFlipFlop {
+    Core::VoltageSource Clock;
+    Core::LogicPart FlipFlop;
+    Core::Ground Reference;
+    Core::Circuit Circuit;
+
+    explicit ClockedFlipFlop(const Core::ComponentType type, std::vector<int> terminals) : FlipFlop(type) {
+        Clock.SetName("Vin1");
+        Clock.SetSourceType(Core::VoltageSource::SourceType::Pulse);
+        Clock.SetPulse({.Low = 0.0,
+                        .High = 5.0,
+                        .Delay = 0.25e-3,
+                        .RiseTime = 1e-6,
+                        .FallTime = 1e-6,
+                        .Width = 0.5e-3,
+                        .Period = 1e-3});
+        FlipFlop.SetName("U1");
+        Circuit.Add(Clock, {2, 0});
+        Circuit.Add(FlipFlop, std::move(terminals));
+        Circuit.Add(Reference, {0});
+    }
+};
+
+std::size_t CountRisingEdges(const std::vector<double> &values, const double threshold) {
+    std::size_t edges = 0;
+    for (std::size_t index = 1; index < values.size(); ++index) {
+        if (values[index - 1] < threshold && values[index] >= threshold) {
+            ++edges;
+        }
+    }
+    return edges;
+}
+
+double ValueAt(const Core::Transient &transient, const std::vector<double> &values, const double time) {
+    const auto index =
+        static_cast<std::size_t>(std::ranges::lower_bound(transient.Times, time) - transient.Times.begin());
+    return values[index];
+}
+
+} // namespace
+
+TEST_CASE("A D flip-flop takes its input only on the rising edge of the clock", "[simulator][digital]") {
+    SKIP_WITHOUT_DIGITAL_MODELS();
+    Core::VoltageSource data;
+    data.SetName("Vin2");
+    data.SetValue(5.0);
+    ClockedFlipFlop circuit(Core::ComponentType::DFlipFlop, {1, 2, 3, 4, 5, 6});
+    circuit.Circuit.Add(data, {1, 0});
+
+    const Core::TransientRun run = Core::RunTransient(circuit.Circuit, {.StopTime = 1e-3, .TimeStep = 5e-6});
+    REQUIRE(run.Result.has_value());
+    const Core::Transient &transient = *run.Result;
+    // D is high from the start, but Q waits for the edge, and QN is its opposite
+    CHECK_THAT(ValueAt(transient, transient.NodeVoltages[5], 0.2e-3), Catch::Matchers::WithinAbs(0.0, 0.05));
+    CHECK_THAT(ValueAt(transient, transient.NodeVoltages[6], 0.2e-3), Catch::Matchers::WithinAbs(5.0, 0.05));
+    CHECK_THAT(ValueAt(transient, transient.NodeVoltages[5], 0.4e-3), Catch::Matchers::WithinAbs(5.0, 0.05));
+    CHECK_THAT(ValueAt(transient, transient.NodeVoltages[6], 0.4e-3), Catch::Matchers::WithinAbs(0.0, 0.05));
+}
+
+TEST_CASE("A D flip-flop with QN fed back divides the clock by two", "[simulator][digital]") {
+    SKIP_WITHOUT_DIGITAL_MODELS();
+    ClockedFlipFlop circuit(Core::ComponentType::DFlipFlop, {1, 2, 3, 4, 5, 1});
+
+    const Core::TransientRun run = Core::RunTransient(circuit.Circuit, {.StopTime = 8e-3, .TimeStep = 5e-6});
+    REQUIRE(run.Result.has_value());
+    const Core::Transient &transient = *run.Result;
+    // Eight rising edges of the clock, so four of Q
+    CHECK(CountRisingEdges(transient.NodeVoltages[2], 2.5) == 8);
+    CHECK(CountRisingEdges(transient.NodeVoltages[5], 2.5) == 4);
+}
+
+TEST_CASE("The set and reset inputs of a flip-flop act without the clock", "[simulator][digital]") {
+    SKIP_WITHOUT_DIGITAL_MODELS();
+    Core::VoltageSource set;
+    set.SetName("Vin2");
+    set.SetSourceType(Core::VoltageSource::SourceType::Pulse);
+    // SET high from 0.1 ms to 0.3 ms, before the first edge of the clock
+    set.SetPulse({.Low = 0.0,
+                  .High = 5.0,
+                  .Delay = 0.1e-3,
+                  .RiseTime = 1e-6,
+                  .FallTime = 1e-6,
+                  .Width = 0.2e-3,
+                  .Period = 10e-3});
+    ClockedFlipFlop circuit(Core::ComponentType::DFlipFlop, {1, 2, 3, 4, 5, 6});
+    circuit.Circuit.Add(set, {3, 0});
+
+    const Core::TransientRun run = Core::RunTransient(circuit.Circuit, {.StopTime = 0.6e-3, .TimeStep = 5e-6});
+    REQUIRE(run.Result.has_value());
+    const Core::Transient &transient = *run.Result;
+    CHECK_THAT(ValueAt(transient, transient.NodeVoltages[5], 0.05e-3), Catch::Matchers::WithinAbs(0.0, 0.05));
+    CHECK_THAT(ValueAt(transient, transient.NodeVoltages[5], 0.2e-3), Catch::Matchers::WithinAbs(5.0, 0.05));
+    // D is low, so Q falls back at the first edge of the clock after SET let go
+    CHECK_THAT(ValueAt(transient, transient.NodeVoltages[5], 0.5e-3), Catch::Matchers::WithinAbs(5.0, 0.05));
+}
+
+TEST_CASE("A T flip-flop toggles at each clock edge while T is high", "[simulator][digital]") {
+    SKIP_WITHOUT_DIGITAL_MODELS();
+    Core::VoltageSource toggle;
+    toggle.SetName("Vin2");
+    toggle.SetValue(5.0);
+    ClockedFlipFlop circuit(Core::ComponentType::TFlipFlop, {1, 2, 3, 4, 5, 6});
+    circuit.Circuit.Add(toggle, {1, 0});
+
+    const Core::TransientRun run = Core::RunTransient(circuit.Circuit, {.StopTime = 8e-3, .TimeStep = 5e-6});
+    REQUIRE(run.Result.has_value());
+    CHECK(CountRisingEdges(run.Result->NodeVoltages[5], 2.5) == 4);
+}
+
+TEST_CASE("A JK flip-flop with J and K high toggles, and with J high alone it sets", "[simulator][digital]") {
+    SKIP_WITHOUT_DIGITAL_MODELS();
+    Core::VoltageSource high;
+    high.SetName("Vin2");
+    high.SetValue(5.0);
+    SECTION("J and K high") {
+        ClockedFlipFlop circuit(Core::ComponentType::JKFlipFlop, {1, 7, 2, 3, 4, 5, 6});
+        circuit.Circuit.Add(high, {1, 0});
+        Core::VoltageSource second;
+        second.SetName("Vin3");
+        second.SetValue(5.0);
+        circuit.Circuit.Add(second, {7, 0});
+        const Core::TransientRun run = Core::RunTransient(circuit.Circuit, {.StopTime = 8e-3, .TimeStep = 5e-6});
+        REQUIRE(run.Result.has_value());
+        CHECK(CountRisingEdges(run.Result->NodeVoltages[5], 2.5) == 4);
+    }
+    SECTION("J high alone") {
+        ClockedFlipFlop circuit(Core::ComponentType::JKFlipFlop, {1, 7, 2, 3, 4, 5, 6});
+        circuit.Circuit.Add(high, {1, 0});
+        const Core::TransientRun run = Core::RunTransient(circuit.Circuit, {.StopTime = 3.5e-3, .TimeStep = 5e-6});
+        REQUIRE(run.Result.has_value());
+        CHECK_THAT(run.Result->NodeVoltages[5].back(), Catch::Matchers::WithinAbs(5.0, 0.05));
+        CHECK(CountRisingEdges(run.Result->NodeVoltages[5], 2.5) == 1);
+    }
+}
+
+TEST_CASE("An SR flip-flop sets with S, and resets with R, on the clock edge", "[simulator][digital]") {
+    SKIP_WITHOUT_DIGITAL_MODELS();
+    Core::VoltageSource set_input;
+    set_input.SetName("Vin2");
+    set_input.SetSourceType(Core::VoltageSource::SourceType::Pulse);
+    // S high for the first clock edge only, R high for the third
+    set_input.SetPulse(
+        {.Low = 0.0, .High = 5.0, .Delay = 0.0, .RiseTime = 1e-6, .FallTime = 1e-6, .Width = 1.0e-3, .Period = 10e-3});
+    Core::VoltageSource reset_input;
+    reset_input.SetName("Vin3");
+    reset_input.SetSourceType(Core::VoltageSource::SourceType::Pulse);
+    reset_input.SetPulse({.Low = 0.0,
+                          .High = 5.0,
+                          .Delay = 2.0e-3,
+                          .RiseTime = 1e-6,
+                          .FallTime = 1e-6,
+                          .Width = 1.0e-3,
+                          .Period = 10e-3});
+    ClockedFlipFlop circuit(Core::ComponentType::SRFlipFlop, {1, 7, 2, 3, 4, 5, 6});
+    circuit.Circuit.Add(set_input, {1, 0});
+    circuit.Circuit.Add(reset_input, {7, 0});
+
+    const Core::TransientRun run = Core::RunTransient(circuit.Circuit, {.StopTime = 4e-3, .TimeStep = 5e-6});
+    REQUIRE(run.Result.has_value());
+    const Core::Transient &transient = *run.Result;
+    CHECK_THAT(ValueAt(transient, transient.NodeVoltages[5], 0.2e-3), Catch::Matchers::WithinAbs(0.0, 0.05));
+    CHECK_THAT(ValueAt(transient, transient.NodeVoltages[5], 0.5e-3), Catch::Matchers::WithinAbs(5.0, 0.05));
+    // Both inputs low at the second edge: Q holds
+    CHECK_THAT(ValueAt(transient, transient.NodeVoltages[5], 1.5e-3), Catch::Matchers::WithinAbs(5.0, 0.05));
+    // R high at the third edge, at 2.25 ms
+    CHECK_THAT(ValueAt(transient, transient.NodeVoltages[5], 2.4e-3), Catch::Matchers::WithinAbs(0.0, 0.05));
+}
+
+TEST_CASE("A DC sweep of an inverter input flips its output through an undefined band between 30% and 70% of the level",
+          "[simulator][digital]") {
+    SKIP_WITHOUT_DIGITAL_MODELS();
+    Core::VoltageSource input;
+    input.SetName("Vin1");
+    Core::LogicPart inverter(Core::ComponentType::Not);
+    inverter.SetName("U1");
+    const Core::Ground reference;
+    Core::Circuit circuit;
+    circuit.Add(input, {1, 0});
+    circuit.Add(inverter, {1, 2});
+    circuit.Add(reference, {0});
+
+    const Core::DCSweepRun run =
+        Core::RunDCSweep(circuit, {.Swept = {.Source = "Vin1", .Start = 0.0, .Stop = 5.0, .Step = 0.1}});
+    REQUIRE(run.Result.has_value());
+    const Core::DCSweepCurve &curve = run.Result->Curves.front();
+    const std::vector<double> &output = curve.NodeVoltages[2];
+    REQUIRE(output.size() == 51);
+    CHECK_THAT(output.front(), Catch::Matchers::WithinAbs(5.0, 0.05));
+    // 1 V reads as 0 and 4 V as 1; between 30% and 70% of the level the input is undefined, and so is the output
+    CHECK_THAT(output[10], Catch::Matchers::WithinAbs(5.0, 0.05));
+    CHECK_THAT(output[30], Catch::Matchers::WithinAbs(2.5, 0.05));
+    CHECK_THAT(output[40], Catch::Matchers::WithinAbs(0.0, 0.05));
+}
+
+TEST_CASE("An AC sweep runs with a gate in the circuit", "[simulator][digital]") {
+    SKIP_WITHOUT_DIGITAL_MODELS();
+    Core::VoltageSource input;
+    input.SetName("Vin1");
+    input.SetSourceType(Core::VoltageSource::SourceType::AC);
+    Core::LogicPart buffer(Core::ComponentType::Buffer);
+    buffer.SetName("U1");
+    Core::Resistor load;
+    load.SetName("R1");
+    load.SetValue(1e3);
+    const Core::Ground reference;
+    Core::Circuit circuit;
+    circuit.Add(input, {1, 0});
+    circuit.Add(buffer, {1, 2});
+    circuit.Add(load, {2, 0});
+    circuit.Add(reference, {0});
+
+    const Core::ACSweepRun run = Core::RunACSweep(circuit, {.StartFrequency = 10.0, .StopFrequency = 1e3});
+    CHECK(run.Result.has_value());
 }

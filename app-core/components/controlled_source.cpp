@@ -43,6 +43,18 @@ double DefaultGain(const ComponentType type) {
     case ComponentType::VSwitch:
     case ComponentType::Relay:
     case ComponentType::Transformer:
+    case ComponentType::And:
+    case ComponentType::Or:
+    case ComponentType::Not:
+    case ComponentType::Nand:
+    case ComponentType::Nor:
+    case ComponentType::Xor:
+    case ComponentType::Xnor:
+    case ComponentType::Buffer:
+    case ComponentType::DFlipFlop:
+    case ComponentType::JKFlipFlop:
+    case ComponentType::TFlipFlop:
+    case ComponentType::SRFlipFlop:
         break;
     }
     return 1.0;

@@ -7,6 +7,7 @@
 #include "components/controlled_source.h"
 #include "components/current_source.h"
 #include "components/diode.h"
+#include "components/logic_part.h"
 #include "components/mosfet.h"
 #include "components/net_label.h"
 #include "components/op_amp.h"
@@ -673,6 +674,35 @@ TEST_CASE("A transformer keeps its primary inductance and its figures", "[schema
     const std::string perfect =
         R"({"type": "Transformer", "x": 1, "y": 1, "rotation": 0, "name": "T1", "value": 0.1, "parameters": {"coupling": 1.0}})";
     const GUI::LoadedSchematic skipped = LoadOrFail(Document(perfect, ""));
+    CHECK(skipped.Elements.empty());
+    CHECK(skipped.Warnings.size() == 1);
+}
+
+TEST_CASE("Gates and flip-flops keep their logic family", "[schematic_file]") {
+    std::vector<std::unique_ptr<GUI::UIElement>> elements;
+    elements.push_back(GUI::CreateElement(Core::ComponentType::Nand, {4, 4}, GUI::Rotation::R90));
+    auto &gate = static_cast<Core::LogicPart &>(elements.back()->GetComponent());
+    gate.SetName("U1");
+    gate.SetParameters({.LogicLevel = 3.3, .PropagationDelay = 2e-9});
+    elements.push_back(GUI::CreateElement(Core::ComponentType::JKFlipFlop, {12, 4}, GUI::Rotation::R0));
+    elements.back()->GetComponent().SetName("U2");
+
+    const GUI::LoadedSchematic loaded = LoadOrFail(GUI::SaveSchematic(elements, {}, {}, {}));
+    CHECK(loaded.Warnings.empty());
+    REQUIRE(loaded.Elements.size() == 2);
+    const auto &nand = static_cast<const Core::LogicPart &>(loaded.Elements[0]->GetComponent());
+    CHECK(nand.GetType() == Core::ComponentType::Nand);
+    CHECK(nand.GetName() == "U1");
+    CHECK(nand.GetParameters().LogicLevel == 3.3);
+    CHECK(nand.GetParameters().PropagationDelay == 2e-9);
+    const auto &flip_flop = static_cast<const Core::LogicPart &>(loaded.Elements[1]->GetComponent());
+    CHECK(flip_flop.GetType() == Core::ComponentType::JKFlipFlop);
+    // Left out of the file, the figures are those a new part starts with
+    CHECK(flip_flop.GetParameters().LogicLevel == 5.0);
+
+    const std::string no_level =
+        R"({"type": "And", "x": 1, "y": 1, "rotation": 0, "name": "U1", "parameters": {"logic_level": 0.0}})";
+    const GUI::LoadedSchematic skipped = LoadOrFail(Document(no_level, ""));
     CHECK(skipped.Elements.empty());
     CHECK(skipped.Warnings.size() == 1);
 }

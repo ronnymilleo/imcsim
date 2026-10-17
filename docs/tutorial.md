@@ -165,8 +165,8 @@ analysis, and the measured nodes and currents, so reopening it is one F5 away fr
 
 ## Where to go next
 
-- Open the other examples in File > Examples, sorted into Basics, Diodes, Transistors, Op-amps, Switching and
-  Transformers; each has its analyses and measurements set up.
+- Open the other examples in File > Examples, sorted into Basics, Diodes, Transistors, Op-amps, Switching,
+  Transformers and Digital; each has its analyses and measurements set up.
 - Try the transistors, diodes and op-amps: each takes a ready model or custom SPICE parameters in its properties.
 - View > Theme switches between nine color themes, shown side by side in [Themes](themes.md).
 - Read the [user guide](user_guide.md) for terminal order, current signs and the details of each plot, and

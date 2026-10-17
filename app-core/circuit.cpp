@@ -8,6 +8,7 @@
 #include "components/bjt.h"
 #include "components/controlled_source.h"
 #include "components/diode.h"
+#include "components/logic_part.h"
 #include "components/mosfet.h"
 #include "components/op_amp.h"
 #include "components/potentiometer.h"
@@ -111,6 +112,76 @@ std::string ProbeTerminals(const Component &component, const std::vector<Current
         lines += std::format("{} {} {} DC 0\n", GetCurrentProbeName(component, probe.Label), nodes[terminal],
                              next_probe_node);
         nodes[terminal] = next_probe_node++;
+    }
+    return lines;
+}
+
+// A gate or flip-flop is a digital code model, which only meets digital nodes: each input reaches it through an
+// analog-to-digital bridge, and each output leaves through a digital-to-analog bridge and a resistor, the output
+// resistance of the family. Every input also gets a resistor to ground, so one left unconnected reads 0
+constexpr double LogicOutputResistance = 50.0;
+constexpr double LogicInputPullDown = 1e9;
+
+std::string FormatLogicModels(const LogicPart &part) {
+    const LogicParameters &family = part.GetParameters();
+    const std::string name = part.GetName();
+    const std::string delay = FormatSpiceValue(family.PropagationDelay);
+    std::string models = std::format(".model ADC-{} adc_bridge(in_low={} in_high={})\n", name,
+                                     FormatSpiceValue(family.LogicLevel * LogicLowFraction),
+                                     FormatSpiceValue(family.LogicLevel * LogicHighFraction));
+    models += std::format(".model DAC-{} dac_bridge(out_low=0 out_high={} out_undef={})\n", name,
+                          FormatSpiceValue(family.LogicLevel), FormatSpiceValue(family.LogicLevel / 2.0));
+    if (IsFlipFlop(part.GetType())) {
+        models +=
+            std::format(".model LOGIC-{} {}(clk_delay={} set_delay={} reset_delay={} rise_delay={} fall_delay={})\n",
+                        name, GetLogicModelKind(part.GetType()), delay, delay, delay, delay, delay);
+    } else {
+        models += std::format(".model LOGIC-{} {}(rise_delay={} fall_delay={})\n", name,
+                              GetLogicModelKind(part.GetType()), delay, delay);
+    }
+    return models;
+}
+
+// The terminal nodes are in the order of GetLogicInputLabels() and GetLogicOutputLabels(); the digital nodes and the
+// analog nodes behind the output resistors are numbered from next_extra_node
+std::string FormatLogicPart(const LogicPart &part, const std::vector<int> &nodes, int &next_extra_node) {
+    const std::string &name = part.GetName();
+    const std::vector<std::string> inputs = GetLogicInputLabels(part.GetType());
+    const std::vector<std::string> outputs = GetLogicOutputLabels(part.GetType());
+    std::string lines;
+    std::vector<int> digital_inputs;
+    for (std::size_t input = 0; input < inputs.size(); ++input) {
+        const int digital = next_extra_node++;
+        digital_inputs.push_back(digital);
+        lines += std::format("A-{0}-{1} [{2}] [{3}] ADC-{0}\n", name, inputs[input], nodes[input], digital);
+        lines +=
+            std::format("R-{}-{} {} 0 {}\n", name, inputs[input], nodes[input], FormatSpiceValue(LogicInputPullDown));
+    }
+    std::vector<int> digital_outputs;
+    for (std::size_t output = 0; output < outputs.size(); ++output) {
+        digital_outputs.push_back(next_extra_node++);
+    }
+    // A single-input gate takes its input as a scalar, the others as a vector
+    std::string ports;
+    if (IsLogicGate(part.GetType()) && inputs.size() == 1) {
+        ports = std::to_string(digital_inputs[0]);
+    } else if (IsLogicGate(part.GetType())) {
+        ports = std::format("[{} {}]", digital_inputs[0], digital_inputs[1]);
+    } else {
+        for (const int digital : digital_inputs) {
+            ports += std::format("{} ", digital);
+        }
+        ports.pop_back();
+    }
+    for (const int digital : digital_outputs) {
+        ports += std::format(" {}", digital);
+    }
+    lines += std::format("A-{0} {1} LOGIC-{0}\n", name, ports);
+    for (std::size_t output = 0; output < outputs.size(); ++output) {
+        const int analog = next_extra_node++;
+        lines += std::format("A-{0}-{1} [{2}] [{3}] DAC-{0}\n", name, outputs[output], digital_outputs[output], analog);
+        lines += std::format("R-{}-{} {} {} {}\n", name, outputs[output], analog, nodes[inputs.size() + output],
+                             FormatSpiceValue(LogicOutputResistance));
     }
     return lines;
 }
@@ -296,6 +367,23 @@ std::string Circuit::ToSpiceNetlist(const std::string_view analysis, const bool 
             AddModelLine(model_name, FormatSwitchModel(model_name, controlled.GetParameters()), model_names, models);
             break;
         }
+        case ComponentType::And:
+        case ComponentType::Or:
+        case ComponentType::Not:
+        case ComponentType::Nand:
+        case ComponentType::Nor:
+        case ComponentType::Xor:
+        case ComponentType::Xnor:
+        case ComponentType::Buffer:
+        case ComponentType::DFlipFlop:
+        case ComponentType::JKFlipFlop:
+        case ComponentType::TFlipFlop:
+        case ComponentType::SRFlipFlop: {
+            const auto &logic = static_cast<const LogicPart &>(component);
+            netlist += FormatLogicPart(logic, nodes, next_extra_node);
+            models += FormatLogicModels(logic);
+            break;
+        }
         case ComponentType::Relay: {
             // The coil is its resistance and its inductance in series, and the contact follows the voltage on the
             // resistance, which is the coil current, so it closes and opens as the current builds and dies away
@@ -353,6 +441,13 @@ std::vector<CurrentProbe> GetCurrentProbes(const Component &component) {
     if (IsDiode(type) || IsControlledSource(type) || IsSwitch(type) || type == ComponentType::VSwitch ||
         type == ComponentType::OpAmp) {
         return {{0, ""}};
+    }
+    if (IsLogicGate(type)) {
+        return {{static_cast<int>(GetLogicInputLabels(type).size()), ""}};
+    }
+    if (IsFlipFlop(type)) {
+        const auto outputs = static_cast<int>(GetLogicInputLabels(type).size());
+        return {{outputs, "Q"}, {outputs + 1, "QN"}};
     }
     if (type == ComponentType::Relay) {
         return {{0, "S"}, {2, "C"}};

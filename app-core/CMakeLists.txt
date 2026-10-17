@@ -14,6 +14,7 @@ add_library(imcsim-core-lib
             components/diode.cpp
             components/ground.cpp
             components/inductor.cpp
+            components/logic_part.cpp
             components/mosfet.cpp
             components/net_label.cpp
             components/op_amp.cpp

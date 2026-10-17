@@ -10,6 +10,7 @@
 #include "components/diode.h"
 #include "components/ground.h"
 #include "components/inductor.h"
+#include "components/logic_part.h"
 #include "components/mosfet.h"
 #include "components/net_label.h"
 #include "components/op_amp.h"
@@ -516,4 +517,51 @@ TEST_CASE("Op-amps are named U and have no value", "[component]") {
     CHECK(std::string_view(op_amp.GetNamePrefix()) == "U");
     CHECK_FALSE(op_amp.HasValue());
     CHECK_FALSE(Core::IsControlledSource(Core::ComponentType::OpAmp));
+}
+
+TEST_CASE("Gates and flip-flops are U parts with no value, and their type names round-trip", "[component]") {
+    for (const Core::ComponentType type :
+         {Core::ComponentType::And, Core::ComponentType::Or, Core::ComponentType::Not, Core::ComponentType::Nand,
+          Core::ComponentType::Nor, Core::ComponentType::Xor, Core::ComponentType::Xnor, Core::ComponentType::Buffer,
+          Core::ComponentType::DFlipFlop, Core::ComponentType::JKFlipFlop, Core::ComponentType::TFlipFlop,
+          Core::ComponentType::SRFlipFlop}) {
+        const Core::LogicPart part(type);
+        INFO(part.GetTypeName());
+        CHECK(std::string_view(part.GetNamePrefix()) == "U");
+        CHECK_FALSE(part.HasValue());
+        CHECK(Core::IsLogicPart(type));
+        CHECK(Core::ParseComponentType(part.GetTypeName()) == type);
+        CHECK(std::string_view(Core::GetLogicModelKind(type)).starts_with("d_"));
+    }
+    CHECK(Core::IsLogicGate(Core::ComponentType::Xor));
+    CHECK_FALSE(Core::IsLogicGate(Core::ComponentType::DFlipFlop));
+    CHECK(Core::IsFlipFlop(Core::ComponentType::TFlipFlop));
+    CHECK_FALSE(Core::IsLogicPart(Core::ComponentType::OpAmp));
+}
+
+TEST_CASE("The terminals of a gate or flip-flop are its inputs, then its outputs", "[component]") {
+    CHECK(Core::GetLogicInputLabels(Core::ComponentType::Or) == std::vector<std::string>{"A", "B"});
+    CHECK(Core::GetLogicInputLabels(Core::ComponentType::Buffer) == std::vector<std::string>{"A"});
+    CHECK(Core::GetLogicOutputLabels(Core::ComponentType::Nor) == std::vector<std::string>{"Y"});
+    CHECK(Core::GetLogicInputLabels(Core::ComponentType::DFlipFlop) ==
+          std::vector<std::string>{"D", "CLK", "SET", "RESET"});
+    CHECK(Core::GetLogicInputLabels(Core::ComponentType::JKFlipFlop) ==
+          std::vector<std::string>{"J", "K", "CLK", "SET", "RESET"});
+    CHECK(Core::GetLogicInputLabels(Core::ComponentType::TFlipFlop) ==
+          std::vector<std::string>{"T", "CLK", "SET", "RESET"});
+    CHECK(Core::GetLogicInputLabels(Core::ComponentType::SRFlipFlop) ==
+          std::vector<std::string>{"S", "R", "CLK", "SET", "RESET"});
+    CHECK(Core::GetLogicOutputLabels(Core::ComponentType::SRFlipFlop) == std::vector<std::string>{"Q", "QN"});
+}
+
+TEST_CASE("Logic figures need a positive level and a delay that is not negative", "[component]") {
+    Core::LogicParameters parameters;
+    CHECK(Core::LogicPart::IsValidParameters(parameters));
+    parameters.PropagationDelay = 0.0;
+    CHECK(Core::LogicPart::IsValidParameters(parameters));
+    parameters.PropagationDelay = -1e-9;
+    CHECK_FALSE(Core::LogicPart::IsValidParameters(parameters));
+    parameters = {};
+    parameters.LogicLevel = 0.0;
+    CHECK_FALSE(Core::LogicPart::IsValidParameters(parameters));
 }

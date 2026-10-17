@@ -8,6 +8,7 @@
 #include "imgui_internal.h"
 #include "implot.h"
 #include "implot_internal.h"
+#include "logic_trace.h"
 #include "misc/cpp/imgui_stdlib.h"
 #include "node_colors.h"
 #include "plot_helpers.h"
@@ -61,6 +62,18 @@ constexpr auto MathColors = std::to_array<ImU32>({
     IM_COL32(90, 220, 190, 255),
 });
 constexpr float MathLineWeight = 2.0f;
+// The plot of logic lanes: its height is a margin for the axis and a row per lane, in font sizes, and at most this
+// share of the room
+constexpr float LanePlotMargin = 3.5f;
+constexpr float LaneRowHeight = 2.2f;
+constexpr float MaxLaneShare = 0.6f;
+// Bit labels: the room around the digit, in font sizes, and the corner rounding of its box
+constexpr float BitBoxPadding = 0.25f;
+constexpr float BitBoxRounding = 3.0f;
+// The share of the time an export shows that a cell needs for its bit label
+constexpr double MinBitLabelShare = 0.03;
+// Room above and below the stack of lanes, in lane units
+constexpr double LaneMargin = 0.3;
 // Widths in the math editor, in font sizes
 constexpr float OperandWidth = 10.0f;
 constexpr float ExpressionWidth = 20.0f;
@@ -87,6 +100,8 @@ struct PlottedTrace {
     const std::vector<double> *Values;
     const char *Unit;
     ImU32 Color;
+    // Set for the lane of a logic signal, whose readout gives its logic state too
+    std::optional<double> LogicLevel = std::nullopt;
 };
 
 // Axis ticks use the same suffixes as the values the user types, such as "10m" or "1k", followed by the unit.
@@ -116,9 +131,11 @@ float PlotHeight(const int plot_count) {
 // Ground is always 0 V, so plots start at node 1. Each node keeps its color whichever nodes are measured. The
 // suffix tells the curves of a DC sweep family apart in the cursor readout
 void PlotNodes(const std::vector<double> &xs, const std::vector<std::vector<double>> &node_values, Schematic &schematic,
-               const char *unit, const std::string &suffix, std::vector<PlottedTrace> &plotted) {
+               const char *unit, const std::string &suffix, std::vector<PlottedTrace> &plotted,
+               const std::vector<int> &excluded = {}) {
     for (std::size_t node = 1; node < node_values.size(); ++node) {
-        if (!schematic.IsVoltageMeasured(static_cast<int>(node))) {
+        if (!schematic.IsVoltageMeasured(static_cast<int>(node)) ||
+            std::ranges::contains(excluded, static_cast<int>(node))) {
             continue;
         }
         const ImU32 color = GetNodeColor(static_cast<int>(node));
@@ -211,8 +228,13 @@ void DrawCursorReadout(const std::vector<double> &xs, const char *x_unit, const 
     ImGui::BeginTooltip();
     ImGui::TextDisabled("%s", std::format("at {}{}", Core::FormatValue(xs[sample]), x_unit).c_str());
     for (const PlottedTrace &trace : plotted) {
-        const std::string text =
-            std::format("{}: {}{}", trace.Label, Core::FormatValue((*trace.Values)[sample]), trace.Unit);
+        const double value = (*trace.Values)[sample];
+        std::string text = std::format("{}: {}{}", trace.Label, Core::FormatValue(value), trace.Unit);
+        if (trace.LogicLevel) {
+            text =
+                std::format("{}: {} ({}{})", trace.Label, GetLogicStateName(ReadLogicState(value, *trace.LogicLevel)),
+                            Core::FormatValue(value), trace.Unit);
+        }
         ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(trace.Color), "%s", text.c_str());
     }
     ImGui::EndTooltip();
@@ -305,12 +327,34 @@ ImPlotAxisFlags VoltageAxisFlags(const bool has_voltages, const bool has_other_t
 }
 
 // Measured nodes of a result, ground excluded; empty when the plot shows no voltage
-std::vector<int> ListMeasuredNodes(const std::size_t node_count, const Schematic &schematic) {
+std::vector<int> ListMeasuredNodes(const std::size_t node_count, const Schematic &schematic,
+                                   const std::vector<int> &excluded = {}) {
     std::vector<int> nodes;
     for (std::size_t node = 1; node < node_count; ++node) {
-        if (schematic.IsVoltageMeasured(static_cast<int>(node))) {
+        if (schematic.IsVoltageMeasured(static_cast<int>(node)) &&
+            !std::ranges::contains(excluded, static_cast<int>(node))) {
             nodes.push_back(static_cast<int>(node));
         }
+    }
+    return nodes;
+}
+
+// The measured nodes of a result that logic parts are connected to, which the transient plots as lanes
+std::vector<LogicNode> ListMeasuredLogicNodes(const std::vector<LogicNode> &logic_nodes, const std::size_t node_count,
+                                              const Schematic &schematic) {
+    std::vector<LogicNode> measured;
+    for (const LogicNode &logic_node : logic_nodes) {
+        if (static_cast<std::size_t>(logic_node.Node) < node_count && schematic.IsVoltageMeasured(logic_node.Node)) {
+            measured.push_back(logic_node);
+        }
+    }
+    return measured;
+}
+
+std::vector<int> ListNodes(const std::vector<LogicNode> &lanes) {
+    std::vector<int> nodes;
+    for (const LogicNode &lane : lanes) {
+        nodes.push_back(lane.Node);
     }
     return nodes;
 }
@@ -683,9 +727,10 @@ private:
 // DC sweep family apart in the CSV headers; only the first curve of a family has a legend entry
 void AddExportTraces(PanelBuilder &builder, const std::vector<std::vector<double>> &node_values,
                      const std::vector<Core::ComponentTrace> &currents, Schematic &schematic, const std::string &suffix,
-                     const bool in_legend) {
+                     const bool in_legend, const std::vector<int> &excluded = {}) {
     for (std::size_t node = 1; node < node_values.size(); ++node) {
-        if (!schematic.IsVoltageMeasured(static_cast<int>(node))) {
+        if (!schematic.IsVoltageMeasured(static_cast<int>(node)) ||
+            std::ranges::contains(excluded, static_cast<int>(node))) {
             continue;
         }
         const std::string label = GetVoltageLabel(schematic.GetConnectivity(), static_cast<int>(node));
@@ -707,6 +752,54 @@ void AddExportTraces(PanelBuilder &builder, const std::vector<std::vector<double
                      .Dashed = true},
                     ImAxis_Y2);
     }
+}
+
+// A note for each cell that is wide enough for its label in what the image shows, which has no pixels to measure it
+// with, so a share of the span stands for the width of the box
+void AddBitNotes(ExportPanel &panel, const Core::Transient &transient, const std::vector<LogicNode> &lanes,
+                 const PlotSpan &view) {
+    std::vector<LogicSignal> signals;
+    for (const LogicNode &node : lanes) {
+        signals.push_back({transient.NodeVoltages[static_cast<std::size_t>(node.Node)], node.LogicLevel});
+    }
+    const auto cells = FindBitCells(transient.Times, signals, view.From, view.To);
+    for (std::size_t lane = 0; lane < lanes.size(); ++lane) {
+        const double middle = static_cast<double>(lanes.size() - 1 - lane) * LaneStride + LaneHighOffset / 2.0;
+        for (const LogicSegment &cell : cells[lane]) {
+            const double from = std::max(cell.From, view.From);
+            const double to = std::min(cell.To, view.To);
+            if (to - from >= (view.To - view.From) * MinBitLabelShare) {
+                panel.Notes.push_back(
+                    {.X = (from + to) / 2.0, .Y = middle, .Text = GetLogicStateName(cell.State), .Centered = true});
+            }
+        }
+    }
+}
+
+// The lanes as a panel of their own: each trace is drawn at the height of its lane, and its axis names the lanes,
+// while the CSV lists the voltages. The first lane is on top, as in the plot
+ExportPanel BuildLanePanel(const Core::Transient &transient, const std::vector<LogicNode> &lanes, Schematic &schematic,
+                           const bool bit_values, const PlotSpan &view) {
+    ExportPanel panel;
+    ExportAxis axis{.Name = "", .Unit = "V", .UsesPrefixes = false};
+    for (std::size_t lane = 0; lane < lanes.size(); ++lane) {
+        const std::size_t position = lanes.size() - 1 - lane;
+        const std::string label = GetVoltageLabel(schematic.GetConnectivity(), lanes[lane].Node);
+        const std::vector<double> &voltages = transient.NodeVoltages[static_cast<std::size_t>(lanes[lane].Node)];
+        axis.Ticks.push_back(
+            {.Value = static_cast<double>(position) * LaneStride + LaneHighOffset / 2.0, .Label = label});
+        panel.Series.push_back({.Name = label,
+                                .Values = BuildLane(voltages, lanes[lane].LogicLevel, position),
+                                .Samples = voltages,
+                                .Color = ToExportColor(GetNodeColor(lanes[lane].Node))});
+    }
+    if (bit_values) {
+        AddBitNotes(panel, transient, lanes, view);
+    }
+    axis.Range = ExportRange{.From = LaneLowOffset - LaneMargin,
+                             .To = static_cast<double>(lanes.size() - 1) * LaneStride + LaneHighOffset + LaneMargin};
+    panel.YAxes.push_back(std::move(axis));
+    return panel;
 }
 
 void AddExportMath(PanelBuilder &builder, const std::vector<MathTrace> &math, const std::string &suffix,
@@ -1093,23 +1186,55 @@ void OutputWindow::DrawTraceList(const std::size_t node_count, const std::vector
     ImGui::EndChild();
 }
 
+// The signals of logic parts are drawn as lanes in a plot under the analog traces, which share its time axis. The
+// analog plot is left out when it would be empty, so a circuit measured only at logic nodes shows the lanes alone
 void OutputWindow::DrawTransient(const Core::Transient &transient, const std::vector<MathTrace> &math) {
+    const std::vector<LogicNode> lanes = FindMeasuredLanes(transient.NodeVoltages.size());
+    const std::vector<int> lane_nodes = ListNodes(lanes);
+    std::vector<int> analog_nodes = ListMeasuredNodes(transient.NodeVoltages.size(), m_Schematic, lane_nodes);
+    const bool has_voltages = !analog_nodes.empty() || UsesAxis(math, ImAxis_Y1);
     std::vector<std::string> measured_currents = ListMeasuredCurrents(transient.Currents, m_Schematic);
     const bool show_currents = !measured_currents.empty();
+    const bool has_analog_plot = has_voltages || show_currents || !math.empty() || lanes.empty();
     const bool currents_changed = TakeTracesChanged(m_TransientShownCurrents, std::move(measured_currents));
-    const bool voltages_changed =
-        TakeTracesChanged(m_TransientShownNodes, ListMeasuredNodes(transient.NodeVoltages.size(), m_Schematic));
-    SetNextFits(TakeFit(m_FittedTransient, m_Schematic.GetTransientVersion()), voltages_changed, currents_changed);
+    const bool voltages_changed = TakeTracesChanged(m_TransientShownNodes, std::move(analog_nodes));
+    const bool new_result = TakeFit(m_FittedTransient, m_Schematic.GetTransientVersion());
+    SetNextFits(new_result, voltages_changed, currents_changed);
     if (TakeTracesChanged(m_TransientShownMath, ListMathLabels(math))) {
         FitMathAxes(math);
     }
-    if (!BeginTracePlot("##transient", ImVec2(-1.0f, PlotHeight(1)))) {
+    float analog_height = PlotHeight(1);
+    float lane_height = analog_height;
+    if (!lanes.empty() && has_analog_plot) {
+        const float font_size = ImGui::GetFontSize();
+        const float available = ImGui::GetContentRegionAvail().y;
+        lane_height = std::clamp(font_size * (LanePlotMargin + static_cast<float>(lanes.size()) * LaneRowHeight),
+                                 font_size * MinPlotHeight, available * MaxLaneShare);
+        analog_height =
+            std::max(font_size * MinPlotHeight, available - lane_height - ImGui::GetStyle().ItemSpacing.y * 2.0f);
+    }
+    if (has_analog_plot) {
+        DrawTransientAnalog(transient, math, lane_nodes, show_currents, has_voltages, analog_height);
+    }
+    if (!lanes.empty()) {
+        if (new_result) {
+            ImPlot::SetNextAxisToFit(ImAxis_X1);
+        }
+        DrawLogicLanes(transient, lanes, lane_height);
+    }
+}
+
+void OutputWindow::DrawTransientAnalog(const Core::Transient &transient, const std::vector<MathTrace> &math,
+                                       const std::vector<int> &lane_nodes, const bool show_currents,
+                                       const bool has_voltages, const float height) {
+    if (!BeginTracePlot("##transient", ImVec2(-1.0f, height))) {
         return;
     }
-    const bool has_voltages =
-        HasMeasuredVoltage(transient.NodeVoltages.size(), m_Schematic) || UsesAxis(math, ImAxis_Y1);
     ImPlot::SetupAxes("Time", "Voltage", ImPlotAxisFlags_None,
                       VoltageAxisFlags(has_voltages, show_currents || !math.empty()));
+    if (!lane_nodes.empty()) {
+        ImPlot::SetupAxisLinks(ImAxis_X1, &m_TransientView.From, &m_TransientView.To);
+    }
     ImPlot::SetupAxisFormat(ImAxis_X1, FormatAxisValue, const_cast<char *>("s"));
     ImPlot::SetupAxisFormat(ImAxis_Y1, FormatAxisValue, const_cast<char *>("V"));
     if (show_currents) {
@@ -1119,11 +1244,108 @@ void OutputWindow::DrawTransient(const Core::Transient &transient, const std::ve
     const std::string third_unit = ThirdAxisUnit(math);
     SetupMathAxes(math, show_currents, third_unit);
     std::vector<PlottedTrace> plotted;
-    PlotNodes(transient.Times, transient.NodeVoltages, m_Schematic, "V", "", plotted);
+    PlotNodes(transient.Times, transient.NodeVoltages, m_Schematic, "V", "", plotted, lane_nodes);
     if (show_currents) {
         PlotCurrents(transient.Times, transient.Currents, m_Schematic, "A", "", plotted);
     }
     PlotMath(transient.Times, math, "", plotted);
+    DrawCursors(m_TransientCursors, false);
+    DrawPlayhead(m_Playback, transient.Times.back());
+    DrawCursorReadout(transient.Times, "s", false, plotted);
+    const ImPlotRange view = ImPlot::GetPlotLimits().X;
+    m_TransientView = {.From = view.Min, .To = view.Max};
+    ImPlot::EndPlot();
+}
+
+// The logic signals the plot shows as lanes: the measured nodes of logic parts, unless lanes are turned off
+std::vector<LogicNode> OutputWindow::FindMeasuredLanes(const std::size_t node_count) const {
+    if (!m_ShowLogicLanes) {
+        return {};
+    }
+    return ListMeasuredLogicNodes(FindLogicNodes(m_Schematic.BuildCircuit()), node_count, m_Schematic);
+}
+
+// Writes 0, 1 or X in a box at the middle of every cell of a lane that has room for it, within what the plot shows,
+// so zooming out drops the labels that no longer fit
+void DrawBitValues(const std::vector<LogicSegment> &cells, const std::size_t lane_position, const ImU32 color) {
+    const ImPlotRange view = ImPlot::GetPlotLimits().X;
+    const double middle = static_cast<double>(lane_position) * LaneStride + LaneHighOffset / 2.0;
+    const float pixel_y = ImPlot::PlotToPixels(view.Min, middle).y;
+    const float padding = ImGui::GetFontSize() * BitBoxPadding;
+    ImDrawList *draw_list = ImPlot::GetPlotDrawList();
+    ImPlot::PushPlotClipRect();
+    for (const LogicSegment &cell : cells) {
+        const double from = std::max(cell.From, view.Min);
+        const double to = std::min(cell.To, view.Max);
+        if (to <= from) {
+            continue;
+        }
+        const char *text = GetLogicStateName(cell.State);
+        const ImVec2 text_size = ImGui::CalcTextSize(text);
+        const float left = ImPlot::PlotToPixels(from, middle).x;
+        const float right = ImPlot::PlotToPixels(to, middle).x;
+        const ImVec2 box_size = text_size + ImVec2(padding, padding) * 2.0f;
+        if (right - left < box_size.x + padding) {
+            continue;
+        }
+        const ImVec2 box_min((left + right - box_size.x) / 2.0f, pixel_y - box_size.y / 2.0f);
+        draw_list->AddRectFilled(box_min, box_min + box_size, ImGui::GetColorU32(ImGuiCol_FrameBg), BitBoxRounding);
+        draw_list->AddRect(box_min, box_min + box_size, color, BitBoxRounding);
+        draw_list->AddText(box_min + ImVec2(padding, padding), ImGui::GetColorU32(ImGuiCol_Text), text);
+    }
+    ImPlot::PopPlotClipRect();
+}
+
+// Each lane is a trace between its low and high levels, named on the axis, with a state read at the cursor. A lane
+// the circuit drives to a voltage between the thresholds is drawn halfway between low and high
+void OutputWindow::DrawLogicLanes(const Core::Transient &transient, const std::vector<LogicNode> &lanes,
+                                  const float height) {
+    if (!ImPlot::BeginPlot("##transient_logic", ImVec2(-1.0f, height),
+                           ImPlotFlags_NoLegend | ImPlotFlags_NoMouseText)) {
+        return;
+    }
+    const auto top = static_cast<double>(lanes.size() - 1) * LaneStride + LaneHighOffset + LaneMargin;
+    ImPlot::SetupAxes("Time", "", ImPlotAxisFlags_None,
+                      ImPlotAxisFlags_Lock | ImPlotAxisFlags_NoGridLines | ImPlotAxisFlags_NoTickMarks);
+    ImPlot::SetupAxisLimits(ImAxis_Y1, LaneLowOffset - LaneMargin, top, ImPlotCond_Always);
+    ImPlot::SetupAxisLinks(ImAxis_X1, &m_TransientView.From, &m_TransientView.To);
+    ImPlot::SetupAxisFormat(ImAxis_X1, FormatAxisValue, const_cast<char *>("s"));
+    // The first lane is on top, and each is named at its middle
+    std::vector<double> positions;
+    std::vector<std::string> names;
+    for (std::size_t lane = 0; lane < lanes.size(); ++lane) {
+        const std::size_t height_index = lanes.size() - 1 - lane;
+        positions.push_back(static_cast<double>(height_index) * LaneStride + LaneHighOffset / 2.0);
+        names.push_back(GetVoltageLabel(m_Schematic.GetConnectivity(), lanes[lane].Node));
+    }
+    std::vector<const char *> labels;
+    for (const std::string &name : names) {
+        labels.push_back(name.c_str());
+    }
+    ImPlot::SetupAxisTicks(ImAxis_Y1, positions.data(), static_cast<int>(positions.size()), labels.data());
+    std::vector<PlottedTrace> plotted;
+    for (std::size_t lane = 0; lane < lanes.size(); ++lane) {
+        const LogicNode &node = lanes[lane];
+        const std::vector<double> &voltages = transient.NodeVoltages[static_cast<std::size_t>(node.Node)];
+        const std::vector<double> heights = BuildLane(voltages, node.LogicLevel, lanes.size() - 1 - lane);
+        const ImU32 color = GetNodeColor(node.Node);
+        ImPlotSpec spec;
+        spec.LineColor = ImGui::ColorConvertU32ToFloat4(color);
+        ImPlot::PlotLine(names[lane].c_str(), transient.Times.data(), heights.data(), static_cast<int>(heights.size()),
+                         spec);
+        plotted.push_back({names[lane], &voltages, "V", color, node.LogicLevel});
+    }
+    if (m_ShowBitValues) {
+        std::vector<LogicSignal> signals;
+        for (const LogicNode &node : lanes) {
+            signals.push_back({transient.NodeVoltages[static_cast<std::size_t>(node.Node)], node.LogicLevel});
+        }
+        const ImPlotRange view = ImPlot::GetPlotLimits().X;
+        const auto cells = FindBitCells(transient.Times, signals, view.Min, view.Max);
+        for (std::size_t lane = 0; lane < lanes.size(); ++lane) {
+            DrawBitValues(cells[lane], lanes.size() - 1 - lane, GetNodeColor(lanes[lane].Node));
+        }
+    }
     DrawCursors(m_TransientCursors, false);
     DrawPlayhead(m_Playback, transient.Times.back());
     DrawCursorReadout(transient.Times, "s", false, plotted);
@@ -1243,6 +1465,15 @@ void OutputWindow::DrawDCSweep(const Core::DCSweep &sweep, const std::vector<std
 // trace at both and their difference, and the time between them with its frequency
 void OutputWindow::DrawTransientStatistics(const Core::Transient &transient, const std::vector<MathTrace> &math) {
     DrawCursorToggle(m_TransientCursors);
+    if (!FindLogicNodes(m_Schematic.BuildCircuit()).empty()) {
+        ImGui::Checkbox("Logic lanes", &m_ShowLogicLanes);
+        ImGui::SetItemTooltip("Plot the signals of gates and flip-flops as lanes under the analog traces");
+        if (m_ShowLogicLanes) {
+            ImGui::Checkbox("Bit values", &m_ShowBitValues);
+            ImGui::SetItemTooltip("Write 0, 1 or X in every cell of a lane, a cell being as wide as the shortest "
+                                  "steady stretch, such as half a clock period");
+        }
+    }
     const PlotCursors &cursors = m_TransientCursors;
     if (cursors.Shown && BeginStatisticsTable("cursors")) {
         DrawStatistic("A", FormatQuantity(cursors.A, "s"));
@@ -1520,10 +1751,18 @@ ExportFigure OutputWindow::BuildTransientFigure(const Core::Transient &transient
     figure.XAxis = {.Name = "Time", .Unit = "s"};
     figure.Xs = transient.Times;
     figure.XRange = ExportRange{.From = m_TransientView.From, .To = m_TransientView.To};
+    const std::vector<LogicNode> lanes = FindMeasuredLanes(transient.NodeVoltages.size());
     PanelBuilder builder("", GetLinearExportAxes(ThirdAxisUnit(math)));
-    AddExportTraces(builder, transient.NodeVoltages, transient.Currents, m_Schematic, "", true);
+    AddExportTraces(builder, transient.NodeVoltages, transient.Currents, m_Schematic, "", true, ListNodes(lanes));
     AddExportMath(builder, math, "", true);
-    figure.Panels.push_back(builder.Take());
+    ExportPanel analog = builder.Take();
+    // As on screen, the analog plot is left out when only logic signals are measured
+    if (!analog.Series.empty() || lanes.empty()) {
+        figure.Panels.push_back(std::move(analog));
+    }
+    if (!lanes.empty()) {
+        figure.Panels.push_back(BuildLanePanel(transient, lanes, m_Schematic, m_ShowBitValues, m_TransientView));
+    }
     return figure;
 }
 

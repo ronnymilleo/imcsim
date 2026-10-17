@@ -8,6 +8,7 @@
 
 #include "circuit.h"
 #include <expected>
+#include <filesystem>
 #include <optional>
 #include <string>
 #include <vector>
@@ -186,6 +187,9 @@ OperatingPointRun RunOperatingPoint(const Circuit &circuit);
 TransientRun RunTransient(const Circuit &circuit, const TransientSettings &settings);
 ACSweepRun RunACSweep(const Circuit &circuit, const ACSweepSettings &settings);
 DCSweepRun RunDCSweep(const Circuit &circuit, const DCSweepSettings &settings);
+
+void SetCodeModelDirectory(const std::filesystem::path &directory);
+bool AreDigitalModelsAvailable();
 
 // Names in the results
 std::vector<std::string> GetSweepableSources(const Circuit &circuit);

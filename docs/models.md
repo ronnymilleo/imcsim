@@ -13,7 +13,7 @@ elements, so the results are those of ngspice with the models below. Some things
 - Values are exact: there are no tolerances, aging or Monte Carlo spread.
 - There is no noise analysis, so no part models noise.
 - To report terminal currents in every analysis, the netlist adds a 0 V source in series with diodes, transistors,
-  potentiometers, switches, relays, transformers, controlled sources and op-amp outputs. It does not change the circuit; the Netlist window leaves it out unless a
+  potentiometers, switches, relays, transformers, controlled sources, op-amp outputs and the outputs of logic parts. It does not change the circuit; the Netlist window leaves it out unless a
   current-controlled source needs it.
 
 - The power shown on the schematic is what a part absorbs: the sum over its terminals of the node voltage times the
@@ -86,6 +86,40 @@ ones, move together.
 - There is no core: no saturation, hysteresis, core loss, capacitance between windings or isolation rating. The
   magnetizing current is that of the primary inductance, so a small value draws a large no-load current.
 - A DC source across a primary is only limited by the winding resistance, since an inductor passes DC.
+
+## Logic gates and flip-flops
+
+The gates are AND, OR, NOT, NAND, NOR, XOR, XNOR and a buffer, with two inputs each (one for NOT and the buffer), and
+the flip-flops are D, JK, T and SR, each with a clock, asynchronous SET and RESET inputs (active high), a Q output
+and its inverse QN. They run as the digital code models of ngspice's XSPICE (`d_and`, `d_dff` and the like), which only
+meet digital nodes, so each part is written with bridges around it:
+
+- each input goes through an analog-to-digital bridge (`adc_bridge`) that reads a voltage above 70% of the part's
+  logic level as 1 and one below 30% as 0, and a voltage between them as unknown;
+- each output leaves through a digital-to-analog bridge (`dac_bridge`) that swings between 0 V and the logic level,
+  or to half of it while the output is unknown, behind a 50 Ohm resistor that is the output resistance of the family;
+- each input also has a 1 GOhm resistor to ground, so an unconnected input, such as the SET and RESET of a flip-flop
+  that uses neither, reads 0.
+
+The figures of a part are its logic level (5 V) and its propagation delay (10 ns), from every input to every output.
+A flip-flop changes on the rising edge of its clock and starts with Q at 0. The currents reported are those of the
+outputs: a gate's `U1`, and `U1.Q` and `U1.QN` of a flip-flop, positive into the output, so a part that drives its load
+reports a negative current.
+
+- The levels come from the part, not from a supply pin: a gate has no VCC or ground terminal, and drawing power from a
+  supply is not modeled. Connecting parts of different logic levels works as the thresholds above say.
+- The digital nodes inside a part are not shown. Only the outputs, which are analog voltages, appear in the plots and
+  can be probed, so a logic signal is a trace that swings between 0 V and the logic level. The transient plot of the Output window
+  stacks them as lanes.
+- The parts need the `digital.cm` code model library of ngspice. A system ngspice loads it by itself; a build that
+  ships it next to the program is loaded from there. Without it, simulating a circuit with a logic part stops with a
+  message.
+- A loop that holds two states, such as a latch, has no state to start from while both of its inputs are idle: ngspice
+  gives up with "Too many analog/event-driven solution alternations", which imcsim reports as a message. Start with
+  one input asserted, as the SR latch example does with its S input.
+- Delays are fixed per part: there is no spread between the rise and fall delays, no setup or hold time, and no
+  metastability. Operating point and DC sweep results read the digital outputs as they settle, and an AC sweep treats
+  them as constants.
 
 ## Independent sources
 

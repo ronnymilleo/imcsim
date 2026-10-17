@@ -18,6 +18,7 @@ add_library(imcsim-gui-lib
             heat_glow.cpp
             helpers.cpp
             led_glow.cpp
+            logic_trace.cpp
             node_colors.cpp
             part_editor.cpp
             playback.cpp
@@ -42,6 +43,7 @@ add_library(imcsim-gui-lib
             ui_elements/ui_element.cpp
             ui_elements/ui_ground.cpp
             ui_elements/ui_inductor.cpp
+            ui_elements/ui_logic_part.cpp
             ui_elements/ui_mosfet.cpp
             ui_elements/ui_net_label.cpp
             ui_elements/ui_op_amp.cpp

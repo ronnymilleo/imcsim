@@ -11,6 +11,7 @@
 #include "components/diode.h"
 #include "components/ground.h"
 #include "components/inductor.h"
+#include "components/logic_part.h"
 #include "components/mosfet.h"
 #include "components/op_amp.h"
 #include "components/potentiometer.h"
@@ -538,4 +539,79 @@ TEST_CASE("Each current of a part belongs to the terminal it flows into", "[circ
     Core::Transformer transformer;
     transformer.SetName("T1");
     CHECK(Core::GetCurrentTerminals(transformer) == std::vector<std::size_t>{0, 2});
+}
+
+TEST_CASE("ToSpiceNetlist writes a gate behind bridges, with a pull-down on each input", "[circuit]") {
+    Core::LogicPart gate(Core::ComponentType::Nand);
+    gate.SetName("U1");
+    Core::Circuit circuit;
+    // Inputs on nodes 1 and 2, output on node 3
+    circuit.Add(gate, {1, 2, 3});
+
+    const std::string netlist = circuit.ToSpiceNetlist();
+    // Digital nodes are numbered past the circuit ones, 0 to 3: 4 and 5 for the inputs, 6 for the output, 7 behind
+    // its resistor
+    CHECK(netlist.find("A-U1-A [1] [4] ADC-U1\n") != std::string::npos);
+    CHECK(netlist.find("A-U1-B [2] [5] ADC-U1\n") != std::string::npos);
+    CHECK(netlist.find("R-U1-A 1 0 1G\n") != std::string::npos);
+    CHECK(netlist.find("R-U1-B 2 0 1G\n") != std::string::npos);
+    CHECK(netlist.find("A-U1 [4 5] 6 LOGIC-U1\n") != std::string::npos);
+    CHECK(netlist.find("A-U1-Y [6] [7] DAC-U1\n") != std::string::npos);
+    CHECK(netlist.find("R-U1-Y 7 3 50\n") != std::string::npos);
+    // The inputs read 0 below 30% of the logic level and 1 above 70%
+    CHECK(netlist.find(".model ADC-U1 adc_bridge(in_low=1.5 in_high=3.5)\n") != std::string::npos);
+    CHECK(netlist.find(".model DAC-U1 dac_bridge(out_low=0 out_high=5 out_undef=2.5)\n") != std::string::npos);
+    CHECK(netlist.find(".model LOGIC-U1 d_nand(rise_delay=10n fall_delay=10n)\n") != std::string::npos);
+}
+
+TEST_CASE("ToSpiceNetlist gives a single-input gate scalar ports and follows the logic level", "[circuit]") {
+    Core::LogicPart inverter(Core::ComponentType::Not);
+    inverter.SetName("U1");
+    inverter.SetParameters({.LogicLevel = 3.3, .PropagationDelay = 2e-9});
+    Core::Circuit circuit;
+    circuit.Add(inverter, {1, 2});
+
+    const std::string netlist = circuit.ToSpiceNetlist();
+    CHECK(netlist.find("A-U1 3 4 LOGIC-U1\n") != std::string::npos);
+    CHECK(netlist.find(".model ADC-U1 adc_bridge(in_low=990m in_high=2.31)\n") != std::string::npos);
+    CHECK(netlist.find(".model DAC-U1 dac_bridge(out_low=0 out_high=3.3 out_undef=1.65)\n") != std::string::npos);
+    CHECK(netlist.find(".model LOGIC-U1 d_inverter(rise_delay=2n fall_delay=2n)\n") != std::string::npos);
+}
+
+TEST_CASE("ToSpiceNetlist writes a flip-flop with its inputs in order and both outputs", "[circuit]") {
+    Core::LogicPart flip_flop(Core::ComponentType::JKFlipFlop);
+    flip_flop.SetName("U1");
+    Core::Circuit circuit;
+    // J, K, CLK, SET and RESET on nodes 1 to 5, Q on node 6 and QN on node 7
+    circuit.Add(flip_flop, {1, 2, 3, 4, 5, 6, 7});
+
+    const std::string netlist = circuit.ToSpiceNetlist();
+    // Digital nodes 8 to 12 for the inputs, 13 and 14 for the outputs
+    CHECK(netlist.find("A-U1 8 9 10 11 12 13 14 LOGIC-U1\n") != std::string::npos);
+    CHECK(netlist.find("A-U1-CLK [3] [10] ADC-U1\n") != std::string::npos);
+    CHECK(netlist.find("R-U1-QN 16 7 50\n") != std::string::npos);
+    CHECK(netlist.find(".model LOGIC-U1 d_jkff(clk_delay=10n set_delay=10n reset_delay=10n rise_delay=10n "
+                       "fall_delay=10n)\n") != std::string::npos);
+}
+
+TEST_CASE("Probes of the logic parts", "[circuit]") {
+    Core::LogicPart gate(Core::ComponentType::And);
+    gate.SetName("U1");
+    const std::vector<Core::CurrentProbe> gate_probes = Core::GetCurrentProbes(gate);
+    REQUIRE(gate_probes.size() == 1);
+    CHECK(gate_probes[0].Terminal == 2);
+    CHECK(Core::GetCurrentName(gate, gate_probes[0].Label) == "U1");
+
+    Core::LogicPart inverter(Core::ComponentType::Not);
+    inverter.SetName("U2");
+    CHECK(Core::GetCurrentProbes(inverter)[0].Terminal == 1);
+
+    Core::LogicPart flip_flop(Core::ComponentType::DFlipFlop);
+    flip_flop.SetName("U3");
+    const std::vector<Core::CurrentProbe> flip_flop_probes = Core::GetCurrentProbes(flip_flop);
+    REQUIRE(flip_flop_probes.size() == 2);
+    CHECK(flip_flop_probes[0].Terminal == 4);
+    CHECK(Core::GetCurrentName(flip_flop, flip_flop_probes[0].Label) == "U3.Q");
+    CHECK(flip_flop_probes[1].Terminal == 5);
+    CHECK(Core::GetCurrentName(flip_flop, flip_flop_probes[1].Label) == "U3.QN");
 }

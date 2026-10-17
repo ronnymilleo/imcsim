@@ -44,6 +44,18 @@ enum class ComponentType {
     VSwitch,
     Relay,
     Transformer,
+    And,
+    Or,
+    Not,
+    Nand,
+    Nor,
+    Xor,
+    Xnor,
+    Buffer,
+    DFlipFlop,
+    JKFlipFlop,
+    TFlipFlop,
+    SRFlipFlop,
 };
 
 /**
@@ -55,7 +67,8 @@ enum class ComponentType {
  *          value, and controlled sources have a gain as their value. A potentiometer is RV1, RV2..., its value the
  *          resistance between its ends; a switch is SW1 and a push button PB1, with no value;
  *          a voltage-controlled switch is S1 and a relay K1, with no value either;
- *          a transformer is T1, its value the inductance of its primary.
+ *          a transformer is T1, its value the inductance of its primary;
+ *          logic gates and flip-flops are U1, U2... like op-amps, with no value.
  */
 class Component {
 public:

@@ -1,0 +1,326 @@
+{
+  "format": "imcsim-schematic",
+  "version": 1,
+  "elements": [
+    {
+      "type": "VoltageSource",
+      "rotation": 90,
+      "x": 6,
+      "y": 10,
+      "source": "Pulse",
+      "value": 0,
+      "amplitude": 1,
+      "frequency": 1000,
+      "offset": 0,
+      "ac_magnitude": 1,
+      "pulse": {
+        "delay": 0.0005,
+        "fall": 1e-7,
+        "high": 5,
+        "low": 0,
+        "period": 0.001,
+        "rise": 1e-7,
+        "width": 0.0005
+      },
+      "name": "Vin1"
+    },
+    {
+      "type": "NetLabel",
+      "rotation": 0,
+      "x": 6,
+      "y": 8,
+      "net": "CLK"
+    },
+    {
+      "type": "Ground",
+      "rotation": 0,
+      "x": 6,
+      "y": 14
+    },
+    {
+      "type": "DFlipFlop",
+      "rotation": 0,
+      "x": 18,
+      "y": 10,
+      "name": "U1"
+    },
+    {
+      "type": "NetLabel",
+      "rotation": 270,
+      "x": 14,
+      "y": 9,
+      "net": "QN0"
+    },
+    {
+      "type": "NetLabel",
+      "rotation": 270,
+      "x": 14,
+      "y": 11,
+      "net": "CLK"
+    },
+    {
+      "type": "NetLabel",
+      "rotation": 90,
+      "x": 22,
+      "y": 9,
+      "net": "Q0"
+    },
+    {
+      "type": "NetLabel",
+      "rotation": 90,
+      "x": 22,
+      "y": 11,
+      "net": "QN0"
+    },
+    {
+      "type": "DFlipFlop",
+      "rotation": 0,
+      "x": 32,
+      "y": 10,
+      "name": "U2"
+    },
+    {
+      "type": "NetLabel",
+      "rotation": 270,
+      "x": 28,
+      "y": 9,
+      "net": "QN1"
+    },
+    {
+      "type": "NetLabel",
+      "rotation": 270,
+      "x": 28,
+      "y": 11,
+      "net": "QN0"
+    },
+    {
+      "type": "NetLabel",
+      "rotation": 90,
+      "x": 36,
+      "y": 9,
+      "net": "Q1"
+    },
+    {
+      "type": "NetLabel",
+      "rotation": 90,
+      "x": 36,
+      "y": 11,
+      "net": "QN1"
+    },
+    {
+      "type": "DFlipFlop",
+      "rotation": 0,
+      "x": 46,
+      "y": 10,
+      "name": "U3"
+    },
+    {
+      "type": "NetLabel",
+      "rotation": 270,
+      "x": 42,
+      "y": 9,
+      "net": "QN2"
+    },
+    {
+      "type": "NetLabel",
+      "rotation": 270,
+      "x": 42,
+      "y": 11,
+      "net": "QN1"
+    },
+    {
+      "type": "NetLabel",
+      "rotation": 90,
+      "x": 50,
+      "y": 9,
+      "net": "Q2"
+    },
+    {
+      "type": "NetLabel",
+      "rotation": 90,
+      "x": 50,
+      "y": 11,
+      "net": "QN2"
+    }
+  ],
+  "wires": [
+    {
+      "start": [
+        6,
+        12
+      ],
+      "end": [
+        6,
+        14
+      ]
+    },
+    {
+      "start": [
+        15,
+        9
+      ],
+      "end": [
+        14,
+        9
+      ]
+    },
+    {
+      "start": [
+        15,
+        11
+      ],
+      "end": [
+        14,
+        11
+      ]
+    },
+    {
+      "start": [
+        21,
+        9
+      ],
+      "end": [
+        22,
+        9
+      ]
+    },
+    {
+      "start": [
+        21,
+        11
+      ],
+      "end": [
+        22,
+        11
+      ]
+    },
+    {
+      "start": [
+        29,
+        9
+      ],
+      "end": [
+        28,
+        9
+      ]
+    },
+    {
+      "start": [
+        29,
+        11
+      ],
+      "end": [
+        28,
+        11
+      ]
+    },
+    {
+      "start": [
+        35,
+        9
+      ],
+      "end": [
+        36,
+        9
+      ]
+    },
+    {
+      "start": [
+        35,
+        11
+      ],
+      "end": [
+        36,
+        11
+      ]
+    },
+    {
+      "start": [
+        43,
+        9
+      ],
+      "end": [
+        42,
+        9
+      ]
+    },
+    {
+      "start": [
+        43,
+        11
+      ],
+      "end": [
+        42,
+        11
+      ]
+    },
+    {
+      "start": [
+        49,
+        9
+      ],
+      "end": [
+        50,
+        9
+      ]
+    },
+    {
+      "start": [
+        49,
+        11
+      ],
+      "end": [
+        50,
+        11
+      ]
+    }
+  ],
+  "simulation": {
+    "analysis": "transient",
+    "transient": {
+      "step": 0.00001,
+      "stop": 0.009
+    },
+    "ac_sweep": {
+      "start": 10,
+      "stop": 1000000,
+      "points_per_decade": 20
+    },
+    "dc_sweep": {
+      "step_source": false,
+      "swept": {
+        "source": "",
+        "start": 0,
+        "step": 0.1,
+        "stop": 5
+      },
+      "stepped": {
+        "source": "",
+        "start": 0,
+        "step": 0.1,
+        "stop": 5
+      }
+    }
+  },
+  "measurements": {
+    "voltages": [
+      [
+        6,
+        8
+      ],
+      [
+        21,
+        9
+      ],
+      [
+        35,
+        9
+      ],
+      [
+        49,
+        9
+      ]
+    ],
+    "currents": []
+  }
+}

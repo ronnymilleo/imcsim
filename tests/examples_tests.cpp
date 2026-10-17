@@ -4,13 +4,16 @@
  */
 
 #include "components/potentiometer.h"
+#include "components/source.h"
 #include "components/switch.h"
+#include "digital_models.h"
 #include "examples.h"
 #include "schematic.h"
 #include "simulator.h"
 #include "test_printers.h"
 #include "trace_statistics.h"
 #include <algorithm>
+#include <array>
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 #include <cmath>
@@ -63,6 +66,10 @@ TEST_CASE("Every example opens without warnings, measures existing traces and ru
         GUI::Schematic schematic;
         OpenOrFail(example, schematic);
         CHECK_FALSE(schematic.GetElements().empty());
+        // The digital examples open everywhere, but run only where ngspice has the digital models
+        if (std::string_view(example.Group) == "Digital" && !Core::AreDigitalModelsAvailable()) {
+            continue;
+        }
 
         const Core::OperatingPointRun operating_point = Core::RunOperatingPoint(schematic.BuildCircuit());
         REQUIRE(operating_point.Result.has_value());
@@ -636,4 +643,127 @@ TEST_CASE("The transformer steps 34 V down to about half, and the bridge and cap
     REQUIRE(primary != transient.Currents.end());
     // The capacitor takes its charge in short pulses, which the primary feeds at half the current
     CHECK(PeakOf(primary->Values) > 1.0);
+}
+
+TEST_CASE("The SR latch is set at the start, and reported as having no state to start from when both inputs idle",
+          "[examples]") {
+    SKIP_WITHOUT_DIGITAL_MODELS();
+    GUI::Schematic schematic;
+    OpenExample("sr_latch.imcsim", schematic);
+    const Core::TransientRun run =
+        Core::RunTransient(schematic.BuildCircuit(), schematic.GetSimulationSettings().Transient);
+    REQUIRE(run.Result.has_value());
+    const Core::Transient &transient = *run.Result;
+    const std::vector<double> &q = transient.NodeVoltages[NodeAt(schematic, {24, 17})];
+    const std::vector<double> &qn = transient.NodeVoltages[NodeAt(schematic, {24, 7})];
+    const auto at = [&transient](const std::vector<double> &values, const double time) {
+        return values[static_cast<std::size_t>(std::ranges::lower_bound(transient.Times, time) -
+                                               transient.Times.begin())];
+    };
+    // S_BAR low from 0 to 1 ms sets Q, which holds with both inputs high; R_BAR low from 3 to 4 ms resets it
+    CHECK(at(q, 0.5e-3) > 4.0);
+    CHECK(at(qn, 0.5e-3) < 0.1);
+    CHECK(at(q, 2.0e-3) > 4.0);
+    CHECK(at(q, 3.5e-3) < 0.1);
+    CHECK(at(qn, 3.5e-3) > 4.0);
+    CHECK(at(qn, 5.0e-3) > 4.0);
+    // The second set at 6 ms
+    CHECK(at(q, 6.5e-3) > 4.0);
+
+    // Held high on both inputs from the start, the latch has no state to start from
+    for (const std::unique_ptr<GUI::UIElement> &element : schematic.GetElements()) {
+        if (Core::IsSource(element->GetComponent().GetType())) {
+            auto &source = static_cast<Core::Source &>(element->GetComponent());
+            source.SetSourceType(Core::Source::SourceType::DC);
+            source.SetValue(5.0);
+        }
+    }
+    const Core::OperatingPointRun idle = Core::RunOperatingPoint(schematic.BuildCircuit());
+    REQUIRE_FALSE(idle.Result.has_value());
+    CHECK(idle.Result.error().find("needs one input at a defined level") != std::string::npos);
+}
+
+namespace {
+
+// The voltage of a node at one instant of a transient
+double VoltageAt(const Core::Transient &transient, const std::size_t node, const double time) {
+    const auto index =
+        static_cast<std::size_t>(std::ranges::lower_bound(transient.Times, time) - transient.Times.begin());
+    return transient.NodeVoltages[node][index];
+}
+
+// A logic output reads high above 4 V and low below 0.1 V, which a LED load pulls from the full 5 V to about 4.6 V
+void CheckLevel(const Core::Transient &transient, const std::size_t node, const double time, const bool high) {
+    INFO(std::format("at {} s", time));
+    const double voltage = VoltageAt(transient, node, time);
+    CHECK((high ? voltage > 4.0 : voltage < 0.1));
+}
+
+Core::TransientRun RunExampleTransient(GUI::Schematic &schematic) {
+    Core::TransientRun run = Core::RunTransient(schematic.BuildCircuit(), schematic.GetSimulationSettings().Transient);
+    REQUIRE(run.Result.has_value());
+    return run;
+}
+
+} // namespace
+
+TEST_CASE("The four gates follow their truth tables through the four input combinations", "[examples]") {
+    SKIP_WITHOUT_DIGITAL_MODELS();
+    GUI::Schematic schematic;
+    OpenExample("logic_gates.imcsim", schematic);
+    const Core::TransientRun run = RunExampleTransient(schematic);
+    const Core::Transient &transient = *run.Result;
+    const std::size_t and_node = NodeAt(schematic, {31, 6});
+    const std::size_t or_node = NodeAt(schematic, {31, 14});
+    const std::size_t nand_node = NodeAt(schematic, {31, 22});
+    const std::size_t xor_node = NodeAt(schematic, {31, 30});
+    // A is high for the first 2 ms and B for 1 to 2 ms and 3 to 4 ms, so the pairs (A, B) are 10, 11, 00 and 01
+    const std::array<double, 4> times = {0.5e-3, 1.5e-3, 2.5e-3, 3.5e-3};
+    const std::array<bool, 4> and_expected = {false, true, false, false};
+    const std::array<bool, 4> or_expected = {true, true, false, true};
+    const std::array<bool, 4> xor_expected = {true, false, false, true};
+    for (std::size_t row = 0; row < times.size(); ++row) {
+        CheckLevel(transient, and_node, times[row], and_expected[row]);
+        CheckLevel(transient, or_node, times[row], or_expected[row]);
+        CheckLevel(transient, nand_node, times[row], !and_expected[row]);
+        CheckLevel(transient, xor_node, times[row], xor_expected[row]);
+    }
+}
+
+TEST_CASE("The half adder adds two bits: XOR is the sum and AND the carry", "[examples]") {
+    SKIP_WITHOUT_DIGITAL_MODELS();
+    GUI::Schematic schematic;
+    OpenExample("half_adder.imcsim", schematic);
+    const Core::TransientRun run = RunExampleTransient(schematic);
+    const Core::Transient &transient = *run.Result;
+    const std::size_t sum = NodeAt(schematic, {31, 6});
+    const std::size_t carry = NodeAt(schematic, {31, 14});
+    // 1 + 0 = 01, 1 + 1 = 10, 0 + 0 = 00, 0 + 1 = 01
+    const std::array<double, 4> times = {0.5e-3, 1.5e-3, 2.5e-3, 3.5e-3};
+    const std::array<bool, 4> sum_expected = {true, false, false, true};
+    const std::array<bool, 4> carry_expected = {false, true, false, false};
+    for (std::size_t row = 0; row < times.size(); ++row) {
+        CheckLevel(transient, sum, times[row], sum_expected[row]);
+        CheckLevel(transient, carry, times[row], carry_expected[row]);
+    }
+}
+
+TEST_CASE("The ripple counter counts the edges of its clock in binary", "[examples]") {
+    SKIP_WITHOUT_DIGITAL_MODELS();
+    GUI::Schematic schematic;
+    OpenExample("ripple_counter.imcsim", schematic);
+    const Core::TransientRun run = RunExampleTransient(schematic);
+    const Core::Transient &transient = *run.Result;
+    const std::array<std::size_t, 3> bits = {NodeAt(schematic, {21, 9}), NodeAt(schematic, {35, 9}),
+                                             NodeAt(schematic, {49, 9})};
+    // The clock rises at 0.5 ms and every millisecond after, so after n edges the count is n modulo 8
+    for (int edges = 0; edges <= 8; ++edges) {
+        const double time = edges == 0 ? 0.2e-3 : (0.5e-3 + static_cast<double>(edges - 1) * 1e-3 + 0.3e-3);
+        for (std::size_t bit = 0; bit < bits.size(); ++bit) {
+            const bool expected = ((edges % 8) >> bit) % 2 == 1;
+            INFO(std::format("count {} bit {}", edges, bit));
+            CHECK(
+                (expected ? VoltageAt(transient, bits[bit], time) > 4.0 : VoltageAt(transient, bits[bit], time) < 0.5));
+        }
+    }
 }

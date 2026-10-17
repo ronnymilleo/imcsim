@@ -141,6 +141,11 @@ constexpr auto TransformerFields = std::to_array<ParameterField<Core::Transforme
     {"Winding R", &Core::TransformerParameters::WindingResistance, "Ohm"},
 });
 
+constexpr auto LogicFields = std::to_array<ParameterField<Core::LogicParameters>>({
+    {"Logic level", &Core::LogicParameters::LogicLevel, "V"},
+    {"Delay", &Core::LogicParameters::PropagationDelay, "s"},
+});
+
 template <typename Parameters, std::size_t Count>
 void LoadParameterFields(const std::array<ParameterField<Parameters>, Count> &fields,
                          std::array<ValueField, Count> &value_fields, const Parameters &parameters) {
@@ -240,7 +245,7 @@ bool ShowsValueFields(const Core::Component &component) {
         return op_amp.IsCustom() || op_amp.IsIdeal();
     }
     // The switches that follow a voltage have only their parameters
-    if (type == Core::ComponentType::VSwitch || type == Core::ComponentType::Relay) {
+    if (type == Core::ComponentType::VSwitch || type == Core::ComponentType::Relay || Core::IsLogicPart(type)) {
         return true;
     }
     return component.HasValue();
@@ -273,7 +278,7 @@ void PartEditor::Draw() {
     }
     const Core::ComponentType type = component.GetType();
     if (!component.HasValue() && !HasModel(type) && type != Core::ComponentType::NetLabel && !Core::IsSwitch(type) &&
-        type != Core::ComponentType::VSwitch && type != Core::ComponentType::Relay) {
+        type != Core::ComponentType::VSwitch && type != Core::ComponentType::Relay && !Core::IsLogicPart(type)) {
         return;
     }
 
@@ -319,6 +324,8 @@ void PartEditor::DrawFields(Core::Component &component) {
         DrawControlledSwitch(static_cast<Core::VoltageControlledSwitch &>(component));
     } else if (type == Core::ComponentType::Relay) {
         DrawRelay(static_cast<Core::Relay &>(component));
+    } else if (Core::IsLogicPart(type)) {
+        DrawLogicPart(static_cast<Core::LogicPart &>(component));
     } else if (type == Core::ComponentType::Transformer) {
         DrawValue(component);
         DrawTransformer(static_cast<Core::Transformer &>(component));
@@ -438,6 +445,10 @@ void PartEditor::LoadFields(const Core::Component &component) {
     if (component.GetType() == Core::ComponentType::Relay) {
         LoadParameterFields(RelayFields, m_RelayFields, static_cast<const Core::Relay &>(component).GetParameters());
     }
+    if (Core::IsLogicPart(component.GetType())) {
+        LoadParameterFields(LogicFields, m_LogicFields,
+                            static_cast<const Core::LogicPart &>(component).GetParameters());
+    }
     if (component.GetType() == Core::ComponentType::Transformer) {
         LoadParameterFields(TransformerFields, m_TransformerFields,
                             static_cast<const Core::Transformer &>(component).GetParameters());
@@ -520,6 +531,19 @@ void PartEditor::DrawTransformer(Core::Transformer &transformer) {
     }
     ImGui::TextDisabled("Value is the primary inductance; the secondary is %s",
                         Core::FormatValue(transformer.GetSecondaryInductance()).c_str());
+}
+
+// The levels the part swaps at follow from the logic level: it reads 1 above 70% of it and 0 below 30%
+void PartEditor::DrawLogicPart(Core::LogicPart &part) {
+    Core::LogicParameters parameters = part.GetParameters();
+    const auto is_valid = [](const Core::LogicParameters &candidate) {
+        return Core::LogicPart::IsValidParameters(candidate);
+    };
+    if (DrawParameterFields(LogicFields, m_LogicFields, "", is_valid, parameters)) {
+        part.SetParameters(parameters);
+        m_Schematic.MarkModified();
+    }
+    ImGui::TextDisabled("Inputs read 1 above 70%% of the level and 0 below 30%%; an open input reads 0");
 }
 
 // A closed switch conducts; a push button is pressed when closed
