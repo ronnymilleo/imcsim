@@ -330,8 +330,8 @@ measures their harmonic distortion.
 The Noise analysis computes the random noise of the circuit at one node across frequency, as ngspice's `.noise`
 does. Pick it beside Run, then set:
 
-- **Output**: the node whose noise is measured. It starts on the first measured voltage away from the input source,
-  and follows its node through edits.
+- **Output**: the node whose noise is measured. It starts on the first measured voltage that no voltage source holds
+  (a node a source holds has no noise), and follows its node through edits.
 - **Input**: a voltage or current source set to AC. Its AC magnitude does not matter: it only defines the gain from
   the input to the output.
 - **Start**, **Stop** and **Points per decade**, as in an AC sweep; Suggest picks the same range.
@@ -345,7 +345,11 @@ The Noise tab of the Output window plots, on logarithmic axes:
 
 The panel gives the RMS noise over the whole range at the output and at the input, then the share of every part in
 the output noise, largest first, as RMS and as a percentage of the noise power (the percentages add up to 100).
-Check a part to plot its share. [Simulation models](models.md) lists which parts add noise.
+Check a part to plot its share; parts whose noise does not reach the output are left out.
+
+When the input source hardly reaches the output (a gain under -120 dB, as through a logic gate), its input-referred
+noise would only grow without meaning, so it is left out and the tab says why. When no noise reaches the output at
+all, as on a node an ideal source holds, the tab says so instead of an empty plot. [Simulation models](models.md) lists which parts add noise.
 
 ## Exports
 
