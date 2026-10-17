@@ -164,6 +164,20 @@ public:
     void RegisterSettingsHandler();
 
 private:
+    /**
+     * @struct  FrameResults
+     * @brief   What the tabs read in one frame: the math channels evaluated once over each result, their errors,
+     *          and whether any trace is measured.
+     */
+    struct FrameResults {
+        std::vector<MathTrace> TransientMath;
+        std::vector<std::string> TransientErrors;
+        // One list of channels per curve of the DC sweep
+        std::vector<std::vector<MathTrace>> DCSweepMath;
+        std::vector<std::string> DCSweepErrors;
+        bool AnythingMeasured = false;
+    };
+
     Schematic &m_Schematic;
     TransientPlayback &m_Playback;
     // Result versions the axes were last fitted to
@@ -216,7 +230,20 @@ private:
     std::string m_ExportError;
 
     void Draw() override;
+    const std::vector<Core::ComponentTrace> &GetListedCurrents() const;
+    std::size_t GetListedNodeCount() const;
+    FrameResults EvaluateFrame(std::size_t node_count, const std::vector<Core::ComponentTrace> &currents) const;
     void DrawTraceList(std::size_t node_count, const std::vector<Core::ComponentTrace> &currents);
+
+    // Tabs
+    void DrawTabs(const FrameResults &frame);
+    void DrawTransientTab(const FrameResults &frame);
+    void DrawSpectrumTab(const FrameResults &frame);
+    void DrawACSweepTab(const FrameResults &frame);
+    void DrawDCSweepTab(const FrameResults &frame);
+    void DrawNoiseTab();
+
+    // Plots
     void DrawTransient(const Core::Transient &transient, const std::vector<MathTrace> &math);
     void DrawTransientAnalog(const Core::Transient &transient, const std::vector<MathTrace> &math,
                              const std::vector<int> &lane_nodes, bool show_currents, bool has_voltages, float height);
@@ -225,6 +252,8 @@ private:
     void DrawACSweep(const Core::ACSweep &sweep);
     void DrawDCSweep(const Core::DCSweep &sweep, const std::vector<std::vector<MathTrace>> &math);
     void DrawNoise(const Core::Noise &noise);
+    void SetupNoiseAxes(const Core::Noise &noise, bool input_shown, const std::string &output_unit,
+                        const std::string &input_unit);
 
     // Spectrum
     PlotSpan GetSpectrumSpan(const Core::Transient &transient) const;
@@ -234,6 +263,7 @@ private:
     // Statistics
     void DrawTransientStatistics(const Core::Transient &transient, const std::vector<MathTrace> &math);
     void DrawSpectrumStatistics();
+    void DrawSpectrumControls();
     void DrawACSweepStatistics(const Core::ACSweep &sweep);
     void DrawNoiseStatistics(const Core::Noise &noise);
 
@@ -246,6 +276,9 @@ private:
                                         std::vector<std::string> &errors) const;
 
     // Export
+    void DrawExportButton(ImVec2 tab_row, float tab_row_width, float export_width, const FrameResults &frame);
+    bool CanExport(const FrameResults &frame) const;
+    ExportFigure BuildShownFigure(const FrameResults &frame) const;
     std::optional<ExportFormat> DrawExportPopup(bool can_export);
     ExportFigure BuildTransientFigure(const Core::Transient &transient, const std::vector<MathTrace> &math) const;
     ExportFigure BuildSpectrumFigure() const;

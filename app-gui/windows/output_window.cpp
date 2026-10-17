@@ -86,6 +86,9 @@ constexpr auto MathOperators = std::to_array<MathOperator>({
     MathOperator::Divide,
 });
 constexpr const char *ExportLabel = "Export...";
+// A new result starts with empty plots until the user picks what to measure
+constexpr const char *NothingMeasured =
+    "Nothing is measured yet: pick nodes and parts with Probe in the editor, or check traces in the list";
 constexpr const char *ExportPopup = "export";
 constexpr const char *ExportErrorPopup = "Could not export the plot";
 // Width of the size fields of the export popup, in font sizes
@@ -1205,6 +1208,41 @@ std::string FormatFrequencyRange(const Core::Noise &noise) {
                        Core::FormatValue(noise.Frequencies.back()));
 }
 
+// The output in the color of its node, the shares checked in the panel, and the input-referred noise dashed
+void PlotNoiseTraces(const Core::Noise &noise, const Connectivity &connectivity, const std::set<std::string> &shown,
+                     const bool input_shown, const std::string &output_unit, const std::string &input_unit,
+                     std::vector<PlottedTrace> &plotted) {
+    const std::string output_label = GetVoltageLabel(connectivity, noise.OutputNode);
+    const ImU32 output_color = GetNodeColor(noise.OutputNode);
+    ImPlotSpec output_spec;
+    output_spec.LineColor = ImGui::ColorConvertU32ToFloat4(output_color);
+    output_spec.LineWeight = MathLineWeight;
+    ImPlot::PlotLine(output_label.c_str(), noise.Frequencies.data(), noise.OutputDensities.data(),
+                     static_cast<int>(noise.Frequencies.size()), output_spec);
+    plotted.push_back({output_label, &noise.OutputDensities, output_unit.c_str(), output_color});
+    for (std::size_t index = 0; index < noise.Contributions.size(); ++index) {
+        const Core::NoiseContribution &contribution = noise.Contributions[index];
+        if (!shown.contains(contribution.Name)) {
+            continue;
+        }
+        ImPlotSpec spec;
+        spec.LineColor = ImGui::ColorConvertU32ToFloat4(GetCurrentColor(index));
+        ImPlot::PlotLine(contribution.Name.c_str(), noise.Frequencies.data(), contribution.OutputDensities.data(),
+                         static_cast<int>(noise.Frequencies.size()), spec);
+        plotted.push_back(
+            {contribution.Name, &contribution.OutputDensities, output_unit.c_str(), GetCurrentColor(index)});
+    }
+    if (!input_shown) {
+        return;
+    }
+    const std::string input_label = std::format("Input-referred ({})", noise.InputSource);
+    const ImU32 input_color = AdaptToBackground(InputNoiseColor);
+    ImPlot::SetAxes(ImAxis_X1, noise.InputUnit == "V" ? ImAxis_Y1 : ImAxis_Y2);
+    PlotDashedLine(input_label, noise.Frequencies, noise.InputDensities, input_color);
+    ImPlot::SetAxes(ImAxis_X1, ImAxis_Y1);
+    plotted.push_back({input_label, &noise.InputDensities, input_unit.c_str(), input_color});
+}
+
 std::string GetExtension(const ExportFormat format) {
     return format == ExportFormat::SVG ? ".svg" : ".csv";
 }
@@ -1226,6 +1264,54 @@ std::string FormatDistortionPercent(const double ratio) {
     const double percent = ratio * 100.0;
     return percent < MinShownDistortionPercent ? std::format("<{}%", MinShownDistortionPercent)
                                                : std::format("{:.3g}%", percent);
+}
+
+// Every trace of a spectrum shares the span and the window, so one warning covers them all when the span holds too
+// few periods to tell the harmonics apart
+void DrawPeriodsWarning(const TransientSpectra &spectra) {
+    const auto short_trace = std::ranges::find_if(
+        spectra.Traces, [](const SpectrumTrace &trace) { return trace.Harmonics.PeriodsNeeded.has_value(); });
+    if (short_trace == spectra.Traces.end()) {
+        return;
+    }
+    ImGui::PushTextWrapPos(0.0f);
+    ImGui::TextColored(GetWarningTextColor(), "%s",
+                       std::format("The stretch needs {} periods to tell the harmonics apart: widen it, or pick the "
+                                   "Rectangular window over whole periods",
+                                   *short_trace->Harmonics.PeriodsNeeded)
+                           .c_str());
+    ImGui::PopTextWrapPos();
+}
+
+// The rows of one trace in its statistics table: its mean, its fundamental and THD, then each harmonic in dBc
+void DrawHarmonics(const SpectrumTrace &trace) {
+    const HarmonicAnalysis &analysis = trace.Harmonics;
+    const char *unit = trace.Unit.c_str();
+    DrawMeasuredValue("Mean", analysis.Mean, trace.LargestAmplitude, unit);
+    if (analysis.Harmonics.empty()) {
+        DrawStatistic("Freq", "-");
+        return;
+    }
+    const Harmonic &fundamental = analysis.Harmonics.front();
+    DrawStatistic("Freq", FormatQuantity(fundamental.Frequency, "Hz"));
+    ImGui::SetItemTooltip("Frequency of the fundamental, the strongest tone");
+    DrawStatistic("Amplitude", FormatQuantity(fundamental.Amplitude, unit));
+    ImGui::SetItemTooltip("Peak amplitude of the fundamental");
+    if (analysis.TotalDistortion) {
+        DrawStatistic("THD", FormatDistortionPercent(*analysis.TotalDistortion));
+        DrawStatistic("THD dB", FormatFixed(20.0 * std::log10(std::max(*analysis.TotalDistortion, 1e-15)), " dB"));
+    } else {
+        DrawStatistic("THD", "-");
+    }
+    for (std::size_t index = 1; index < analysis.Harmonics.size(); ++index) {
+        const Harmonic &harmonic = analysis.Harmonics[index];
+        const std::string name = std::format("H{}", harmonic.Order);
+        const double relative = harmonic.Amplitude / fundamental.Amplitude;
+        DrawStatistic(name.c_str(), FormatFixed(20.0 * std::log10(std::max(relative, 1e-15)), " dBc"));
+        ImGui::SetItemTooltip("%s", std::format("{}Hz, {}{}", Core::FormatValue(harmonic.Frequency),
+                                                Core::FormatValue(harmonic.Amplitude), unit)
+                                        .c_str());
+    }
 }
 
 // The frequency range a new spectrum opens on: the fundamental and its harmonics on a linear axis, so they spread
@@ -1330,24 +1416,10 @@ void OutputWindow::Draw() {
     }
     ProcessExportDialog();
     DrawExportError();
-    const auto &transient = m_Schematic.GetTransient();
-    const auto &sweep = m_Schematic.GetACSweep();
-    const auto &dc_sweep = m_Schematic.GetDCSweep();
-    // Every result comes from the same circuit, so they have the same nodes and components
-    const std::size_t node_count =
-        std::max({transient ? transient->NodeVoltages.size() : 0, sweep ? sweep->NodeMagnitudesDecibels.size() : 0,
-                  dc_sweep ? dc_sweep->Curves.front().NodeVoltages.size() : 0});
-    static const std::vector<Core::ComponentTrace> no_currents;
-    const std::vector<Core::ComponentTrace> *currents = &no_currents;
-    if (transient) {
-        currents = &transient->Currents;
-    } else if (sweep) {
-        currents = &sweep->CurrentMagnitudesDecibels;
-    } else if (dc_sweep) {
-        currents = &dc_sweep->Curves.front().Currents;
-    }
-    if (node_count > 1 || !currents->empty()) {
-        DrawTraceList(node_count, *currents);
+    const std::size_t node_count = GetListedNodeCount();
+    const std::vector<Core::ComponentTrace> &currents = GetListedCurrents();
+    if (node_count > 1 || !currents.empty()) {
+        DrawTraceList(node_count, currents);
         ImGui::SameLine();
     }
 
@@ -1363,197 +1435,62 @@ void OutputWindow::Draw() {
         ImGui::EndChild();
         return;
     }
-    // Math channels are evaluated once per frame and result, for both the plot and its statistics
-    std::vector<std::string> transient_errors;
-    const std::vector<MathTrace> transient_math =
-        transient ? EvaluateMath(transient->Times, {.Seconds = 1}, transient->NodeVoltages, transient->Currents,
-                                 transient_errors)
-                  : std::vector<MathTrace>{};
-    std::vector<std::string> dc_sweep_errors;
-    std::vector<std::vector<MathTrace>> dc_sweep_math;
-    if (dc_sweep) {
-        const Dimension swept_unit = dc_sweep->SweptUnit == "A" ? Dimension{.Amperes = 1} : Dimension{.Volts = 1};
-        for (const Core::DCSweepCurve &curve : dc_sweep->Curves) {
-            // Every curve has the same nodes and currents, so the first one reports the errors of all
-            std::vector<std::string> curve_errors;
-            dc_sweep_math.push_back(
-                EvaluateMath(dc_sweep->SweptValues, swept_unit, curve.NodeVoltages, curve.Currents, curve_errors));
-            if (dc_sweep_math.size() == 1) {
-                dc_sweep_errors = std::move(curve_errors);
-            }
-        }
-    }
-    // A new result starts with empty plots until the user picks what to measure
-    const bool anything_measured =
-        HasMeasuredVoltage(node_count, m_Schematic) || HasMeasuredCurrent(*currents, m_Schematic);
-    const char *nothing_measured =
-        "Nothing is measured yet: pick nodes and parts with Probe in the editor, or check traces in the list";
+    const FrameResults frame = EvaluateFrame(node_count, currents);
     // Applies to the automatic fit of every new result and to the user's double-click fit
     ImPlot::PushStyleVar(ImPlotStyleVar_FitPadding, FitPadding);
-    const std::optional<PlotTab> tab_to_show = std::exchange(m_TabToShow, std::nullopt);
-    const auto tab_flags = [&tab_to_show](const PlotTab tab) {
-        return tab_to_show == tab ? ImGuiTabItemFlags_SetSelected : ImGuiTabItemFlags_None;
-    };
-    if (ImGui::BeginTabItem("Operating point", nullptr, tab_flags(PlotTab::OperatingPoint))) {
-        m_ShownTab = PlotTab::OperatingPoint;
-        if (const auto &operating_point = m_Schematic.GetOperatingPoint()) {
-            DrawOperatingPoint(*operating_point, m_Schematic);
-        } else {
-            ImGui::TextDisabled("No operating point for the current circuit; pick it beside Run in the editor");
-        }
-        ImGui::EndTabItem();
-    }
-    if (ImGui::BeginTabItem("Transient", nullptr, tab_flags(PlotTab::Transient))) {
-        m_ShownTab = PlotTab::Transient;
-        if (transient) {
-            DrawWithStatistics(
-                [&] {
-                    if (const auto &steps = m_Schematic.GetTransientSteps()) {
-                        if (const std::optional<std::size_t> picked = DrawStepSelector(*steps)) {
-                            m_Schematic.SelectTransientStep(*picked);
-                        }
-                    }
-                    if (!anything_measured && transient_math.empty()) {
-                        ImGui::TextDisabled("%s", nothing_measured);
-                    }
-                    DrawMathErrors(transient_errors);
-                    DrawTransient(*transient, transient_math);
-                },
-                [&] { DrawTransientStatistics(*transient, transient_math); });
-        } else {
-            ImGui::TextDisabled("No transient for the current circuit; pick it beside Run in the editor");
-        }
-        ImGui::EndTabItem();
-    }
-    if (ImGui::BeginTabItem("Spectrum", nullptr, tab_flags(PlotTab::Spectrum))) {
-        m_ShownTab = PlotTab::Spectrum;
-        if (transient) {
-            UpdateSpectra(*transient, transient_math);
-            DrawWithStatistics(
-                [&] {
-                    if (!anything_measured && transient_math.empty()) {
-                        ImGui::TextDisabled("%s", nothing_measured);
-                    }
-                    DrawMathErrors(transient_errors);
-                    DrawSpectrum();
-                },
-                [&] { DrawSpectrumStatistics(); });
-        } else {
-            ImGui::TextDisabled("No transient for the current circuit; the spectrum transforms its measured traces");
-        }
-        ImGui::EndTabItem();
-    }
-    if (ImGui::BeginTabItem("AC sweep", nullptr, tab_flags(PlotTab::ACSweep))) {
-        m_ShownTab = PlotTab::ACSweep;
-        if (sweep) {
-            DrawWithStatistics(
-                [&] {
-                    ImGui::TextDisabled(
-                        "%s", anything_measured
-                                  ? "Relative to the AC magnitude of the sources: a magnitude of 1 reads as gain"
-                                  : nothing_measured);
-                    if (!m_MathChannels.empty()) {
-                        ImGui::TextDisabled("Math channels are not calculated for AC sweeps yet");
-                    }
-                    if (const auto &steps = m_Schematic.GetACSweepSteps()) {
-                        if (const std::optional<std::size_t> picked = DrawStepSelector(*steps)) {
-                            m_Schematic.SelectACSweepStep(*picked);
-                        }
-                    }
-                    DrawACSweep(*sweep);
-                },
-                [&] { DrawACSweepStatistics(*sweep); });
-        } else {
-            ImGui::TextDisabled("No AC sweep for the current circuit; pick it beside Run in the editor");
-        }
-        ImGui::EndTabItem();
-    }
-    if (ImGui::BeginTabItem("DC sweep", nullptr, tab_flags(PlotTab::DCSweep))) {
-        m_ShownTab = PlotTab::DCSweep;
-        if (dc_sweep) {
-            if (!anything_measured && (dc_sweep_math.empty() || dc_sweep_math.front().empty())) {
-                ImGui::TextDisabled("%s", nothing_measured);
-            }
-            DrawMathErrors(dc_sweep_errors);
-            DrawDCSweep(*dc_sweep, dc_sweep_math);
-        } else {
-            ImGui::TextDisabled("No DC sweep for the current circuit; pick it beside Run in the editor");
-        }
-        ImGui::EndTabItem();
-    }
-    if (ImGui::BeginTabItem("Noise", nullptr, tab_flags(PlotTab::Noise))) {
-        m_ShownTab = PlotTab::Noise;
-        if (const auto &noise = m_Schematic.GetNoise()) {
-            DrawWithStatistics(
-                [&] {
-                    // An output held by an ideal source, or cut off from every noisy part, has nothing to plot
-                    if (noise->OutputTotal <= 0.0) {
-                        ImGui::PushTextWrapPos(0.0f);
-                        ImGui::TextColored(
-                            GetWarningTextColor(), "%s",
-                            std::format("No noise reaches {}: an ideal source holds it, or no part "
-                                        "that adds noise drives it. Pick another output beside Run",
-                                        GetVoltageLabel(m_Schematic.GetConnectivity(), noise->OutputNode))
-                                .c_str());
-                        ImGui::PopTextWrapPos();
-                        return;
-                    }
-                    DrawNoise(*noise);
-                },
-                [&] { DrawNoiseStatistics(*noise); });
-        } else {
-            ImGui::TextDisabled("No noise analysis for the current circuit; pick it beside Run in the editor");
-        }
-        ImGui::EndTabItem();
-    }
+    DrawTabs(frame);
     ImPlot::PopStyleVar();
-
     ImGui::EndTabBar();
-    // A plain button apart from the tabs, so it does not read as another page
-    ImGui::SetCursorScreenPos({tab_row.x + tab_row_width - export_width, tab_row.y});
-    if (ImGui::Button(ExportLabel)) {
-        ImGui::OpenPopup(ExportPopup);
+    DrawExportButton(tab_row, tab_row_width, export_width, frame);
+    ImGui::EndChild();
+}
+
+// Every result comes from the same circuit, so they have the same components; the first result there is lists them
+const std::vector<Core::ComponentTrace> &OutputWindow::GetListedCurrents() const {
+    static const std::vector<Core::ComponentTrace> no_currents;
+    if (const auto &transient = m_Schematic.GetTransient()) {
+        return transient->Currents;
     }
-    ImGui::SetItemTooltip("Save the plot of this tab as an SVG image or a CSV table");
-    // The popup hangs below the button, aligned to its right edge, so it stays inside the window
-    const ImVec2 export_corner = {ImGui::GetItemRectMax().x, ImGui::GetItemRectMax().y};
-    ImGui::SetNextWindowPos(export_corner, ImGuiCond_Appearing, ImVec2(1.0f, 0.0f));
-    bool can_export = false;
-    switch (m_ShownTab) {
-    case PlotTab::OperatingPoint:
-        break;
-    case PlotTab::Transient:
-        can_export = transient && (anything_measured || !transient_math.empty());
-        break;
-    case PlotTab::Spectrum:
-        can_export = transient && m_Spectra && std::ranges::any_of(m_Spectra->Traces, [](const SpectrumTrace &trace) {
-                         return trace.Decibels.has_value();
-                     });
-        break;
-    case PlotTab::ACSweep:
-        can_export = sweep && anything_measured;
-        break;
-    case PlotTab::DCSweep:
-        can_export = dc_sweep && (anything_measured || (!dc_sweep_math.empty() && !dc_sweep_math.front().empty()));
-        break;
-    case PlotTab::Noise:
-        can_export = m_Schematic.GetNoise().has_value();
-        break;
+    if (const auto &sweep = m_Schematic.GetACSweep()) {
+        return sweep->CurrentMagnitudesDecibels;
     }
-    if (const std::optional<ExportFormat> format = DrawExportPopup(can_export)) {
-        if (m_ShownTab == PlotTab::Transient) {
-            StartExport(BuildTransientFigure(*transient, transient_math), *format);
-        } else if (m_ShownTab == PlotTab::Spectrum) {
-            StartExport(BuildSpectrumFigure(), *format);
-        } else if (m_ShownTab == PlotTab::ACSweep) {
-            StartExport(BuildACSweepFigure(*sweep), *format);
-        } else if (m_ShownTab == PlotTab::Noise) {
-            StartExport(BuildNoiseFigure(*m_Schematic.GetNoise()), *format);
-        } else {
-            StartExport(BuildDCSweepFigure(*dc_sweep, dc_sweep_math), *format);
+    if (const auto &dc_sweep = m_Schematic.GetDCSweep()) {
+        return dc_sweep->Curves.front().Currents;
+    }
+    return no_currents;
+}
+
+// The nodes of the results, which share them as they share the components
+std::size_t OutputWindow::GetListedNodeCount() const {
+    const auto &transient = m_Schematic.GetTransient();
+    const auto &sweep = m_Schematic.GetACSweep();
+    const auto &dc_sweep = m_Schematic.GetDCSweep();
+    return std::max({transient ? transient->NodeVoltages.size() : 0, sweep ? sweep->NodeMagnitudesDecibels.size() : 0,
+                     dc_sweep ? dc_sweep->Curves.front().NodeVoltages.size() : 0});
+}
+
+// Math channels are evaluated once per frame and result, for both the plot and its statistics. Every curve of a DC
+// sweep has the same nodes and currents, so the first one reports the errors of all
+OutputWindow::FrameResults OutputWindow::EvaluateFrame(const std::size_t node_count,
+                                                       const std::vector<Core::ComponentTrace> &currents) const {
+    FrameResults frame;
+    if (const auto &transient = m_Schematic.GetTransient()) {
+        frame.TransientMath = EvaluateMath(transient->Times, {.Seconds = 1}, transient->NodeVoltages,
+                                           transient->Currents, frame.TransientErrors);
+    }
+    if (const auto &dc_sweep = m_Schematic.GetDCSweep()) {
+        const Dimension swept_unit = dc_sweep->SweptUnit == "A" ? Dimension{.Amperes = 1} : Dimension{.Volts = 1};
+        for (const Core::DCSweepCurve &curve : dc_sweep->Curves) {
+            std::vector<std::string> curve_errors;
+            frame.DCSweepMath.push_back(
+                EvaluateMath(dc_sweep->SweptValues, swept_unit, curve.NodeVoltages, curve.Currents, curve_errors));
+            if (frame.DCSweepMath.size() == 1) {
+                frame.DCSweepErrors = std::move(curve_errors);
+            }
         }
     }
-    ImGui::EndChild();
+    frame.AnythingMeasured = HasMeasuredVoltage(node_count, m_Schematic) || HasMeasuredCurrent(currents, m_Schematic);
+    return frame;
 }
 
 // The check marks take the colors of the curves, which match the probes in the editor
@@ -1601,6 +1538,149 @@ void OutputWindow::DrawTraceList(const std::size_t node_count, const std::vector
     }
     DrawMathChannels(operands);
     ImGui::EndChild();
+}
+
+// One tab per analysis, and the spectrum of the transient; a new result brings its tab to the front once
+void OutputWindow::DrawTabs(const FrameResults &frame) {
+    const std::optional<PlotTab> tab_to_show = std::exchange(m_TabToShow, std::nullopt);
+    const auto begin_tab = [this, &tab_to_show](const char *label, const PlotTab tab) {
+        if (!ImGui::BeginTabItem(label, nullptr,
+                                 tab_to_show == tab ? ImGuiTabItemFlags_SetSelected : ImGuiTabItemFlags_None)) {
+            return false;
+        }
+        m_ShownTab = tab;
+        return true;
+    };
+    if (begin_tab("Operating point", PlotTab::OperatingPoint)) {
+        if (const auto &operating_point = m_Schematic.GetOperatingPoint()) {
+            DrawOperatingPoint(*operating_point, m_Schematic);
+        } else {
+            ImGui::TextDisabled("No operating point for the current circuit; pick it beside Run in the editor");
+        }
+        ImGui::EndTabItem();
+    }
+    if (begin_tab("Transient", PlotTab::Transient)) {
+        DrawTransientTab(frame);
+        ImGui::EndTabItem();
+    }
+    if (begin_tab("Spectrum", PlotTab::Spectrum)) {
+        DrawSpectrumTab(frame);
+        ImGui::EndTabItem();
+    }
+    if (begin_tab("AC sweep", PlotTab::ACSweep)) {
+        DrawACSweepTab(frame);
+        ImGui::EndTabItem();
+    }
+    if (begin_tab("DC sweep", PlotTab::DCSweep)) {
+        DrawDCSweepTab(frame);
+        ImGui::EndTabItem();
+    }
+    if (begin_tab("Noise", PlotTab::Noise)) {
+        DrawNoiseTab();
+        ImGui::EndTabItem();
+    }
+}
+
+void OutputWindow::DrawTransientTab(const FrameResults &frame) {
+    const auto &transient = m_Schematic.GetTransient();
+    if (!transient) {
+        ImGui::TextDisabled("No transient for the current circuit; pick it beside Run in the editor");
+        return;
+    }
+    DrawWithStatistics(
+        [&] {
+            if (const auto &steps = m_Schematic.GetTransientSteps()) {
+                if (const std::optional<std::size_t> picked = DrawStepSelector(*steps)) {
+                    m_Schematic.SelectTransientStep(*picked);
+                }
+            }
+            if (!frame.AnythingMeasured && frame.TransientMath.empty()) {
+                ImGui::TextDisabled("%s", NothingMeasured);
+            }
+            DrawMathErrors(frame.TransientErrors);
+            DrawTransient(*transient, frame.TransientMath);
+        },
+        [&] { DrawTransientStatistics(*transient, frame.TransientMath); });
+}
+
+void OutputWindow::DrawSpectrumTab(const FrameResults &frame) {
+    const auto &transient = m_Schematic.GetTransient();
+    if (!transient) {
+        ImGui::TextDisabled("No transient for the current circuit; the spectrum transforms its measured traces");
+        return;
+    }
+    UpdateSpectra(*transient, frame.TransientMath);
+    DrawWithStatistics(
+        [&] {
+            if (!frame.AnythingMeasured && frame.TransientMath.empty()) {
+                ImGui::TextDisabled("%s", NothingMeasured);
+            }
+            DrawMathErrors(frame.TransientErrors);
+            DrawSpectrum();
+        },
+        [&] { DrawSpectrumStatistics(); });
+}
+
+void OutputWindow::DrawACSweepTab(const FrameResults &frame) {
+    const auto &sweep = m_Schematic.GetACSweep();
+    if (!sweep) {
+        ImGui::TextDisabled("No AC sweep for the current circuit; pick it beside Run in the editor");
+        return;
+    }
+    DrawWithStatistics(
+        [&] {
+            ImGui::TextDisabled("%s",
+                                frame.AnythingMeasured
+                                    ? "Relative to the AC magnitude of the sources: a magnitude of 1 reads as gain"
+                                    : NothingMeasured);
+            if (!m_MathChannels.empty()) {
+                ImGui::TextDisabled("Math channels are not calculated for AC sweeps yet");
+            }
+            if (const auto &steps = m_Schematic.GetACSweepSteps()) {
+                if (const std::optional<std::size_t> picked = DrawStepSelector(*steps)) {
+                    m_Schematic.SelectACSweepStep(*picked);
+                }
+            }
+            DrawACSweep(*sweep);
+        },
+        [&] { DrawACSweepStatistics(*sweep); });
+}
+
+void OutputWindow::DrawDCSweepTab(const FrameResults &frame) {
+    const auto &dc_sweep = m_Schematic.GetDCSweep();
+    if (!dc_sweep) {
+        ImGui::TextDisabled("No DC sweep for the current circuit; pick it beside Run in the editor");
+        return;
+    }
+    if (!frame.AnythingMeasured && (frame.DCSweepMath.empty() || frame.DCSweepMath.front().empty())) {
+        ImGui::TextDisabled("%s", NothingMeasured);
+    }
+    DrawMathErrors(frame.DCSweepErrors);
+    DrawDCSweep(*dc_sweep, frame.DCSweepMath);
+}
+
+// An output held by an ideal source, or cut off from every noisy part, has nothing to plot, so the tab says why
+void OutputWindow::DrawNoiseTab() {
+    const auto &noise = m_Schematic.GetNoise();
+    if (!noise) {
+        ImGui::TextDisabled("No noise analysis for the current circuit; pick it beside Run in the editor");
+        return;
+    }
+    DrawWithStatistics(
+        [&] {
+            if (noise->OutputTotal > 0.0) {
+                DrawNoise(*noise);
+                return;
+            }
+            ImGui::PushTextWrapPos(0.0f);
+            ImGui::TextColored(GetWarningTextColor(), "%s",
+                               std::format("No noise reaches {}: an ideal source holds it, or no part that adds "
+                                           "noise drives it. Pick another output beside Run",
+                                           GetVoltageLabel(m_Schematic.GetConnectivity(), noise->OutputNode))
+                                   .c_str());
+            ImGui::PopTextWrapPos();
+        },
+        [&] { DrawNoiseStatistics(*noise); });
 }
 
 // The signals of logic parts are drawn as lanes in a plot under the analog traces, which share its time axis. The
@@ -1912,20 +1992,7 @@ void OutputWindow::DrawDCSweep(const Core::DCSweep &sweep, const std::vector<std
 // dashed, on the same axis when the input is a voltage source and on the right one in amperes for a current source.
 // The parts checked in the panel add their share at the output
 void OutputWindow::DrawNoise(const Core::Noise &noise) {
-    // The padding of the other plots is linear, which would reach below zero on these logarithmic axes, so the fits
-    // are worked out in decades: every axis for a new result, and the output axis when the plotted shares change
-    const bool new_result = TakeFit(m_FittedNoise, m_Schematic.GetNoiseVersion());
-    const bool shares_changed =
-        TakeTracesChanged(m_PlottedNoiseContributions,
-                          std::vector<std::string>(m_ShownNoiseContributions.begin(), m_ShownNoiseContributions.end()));
-    // Referred to a voltage source, the input noise is in volts too and shares the axis of the output
     const bool input_shown = HasInputGain(noise);
-    const bool input_in_volts = noise.InputUnit == "V";
-    const ImAxis input_axis = input_in_volts ? ImAxis_Y1 : ImAxis_Y2;
-    std::vector<std::span<const double>> voltage_traces{noise.OutputDensities};
-    if (input_shown && input_in_volts) {
-        voltage_traces.emplace_back(noise.InputDensities);
-    }
     if (!input_shown) {
         ImGui::PushTextWrapPos(0.0f);
         ImGui::TextDisabled("%s", std::format("{} hardly reaches {} (under -120 dB, as through a logic gate), so its "
@@ -1935,16 +2002,33 @@ void OutputWindow::DrawNoise(const Core::Noise &noise) {
                                       .c_str());
         ImGui::PopTextWrapPos();
     }
-    for (const Core::NoiseContribution &contribution : noise.Contributions) {
-        if (m_ShownNoiseContributions.contains(contribution.Name)) {
-            voltage_traces.emplace_back(contribution.OutputDensities);
-        }
-    }
     if (!BeginTracePlot("##noise", ImVec2(-1.0f, PlotHeight(1)))) {
         return;
     }
+    // ImPlot keeps the format strings until the plot ends
     const std::string output_unit = GetDensityUnit("V");
     const std::string input_unit = GetDensityUnit(noise.InputUnit);
+    SetupNoiseAxes(noise, input_shown, output_unit, input_unit);
+    std::vector<PlottedTrace> plotted;
+    PlotNoiseTraces(noise, m_Schematic.GetConnectivity(), m_ShownNoiseContributions, input_shown, output_unit,
+                    input_unit, plotted);
+    DrawCursorReadout(noise.Frequencies, "Hz", true, plotted);
+    const ImPlotRange view = ImPlot::GetPlotLimits().X;
+    m_NoiseView = {.From = view.Min, .To = view.Max};
+    ImPlot::EndPlot();
+}
+
+// Logarithmic axes, fitted in decades, since the padding of the other plots is linear and would reach below zero:
+// every axis for a new result, and the output axis when the plotted shares change. Referred to a voltage source,
+// the input noise is in volts too and shares the axis of the output; referred to a current source, it has its own.
+// The limits are set during the setup, since ImPlot fits an axis on its own the first frame it is shown
+void OutputWindow::SetupNoiseAxes(const Core::Noise &noise, const bool input_shown, const std::string &output_unit,
+                                  const std::string &input_unit) {
+    const bool new_result = TakeFit(m_FittedNoise, m_Schematic.GetNoiseVersion());
+    const bool shares_changed =
+        TakeTracesChanged(m_PlottedNoiseContributions,
+                          std::vector<std::string>(m_ShownNoiseContributions.begin(), m_ShownNoiseContributions.end()));
+    const bool input_in_volts = noise.InputUnit == "V";
     ImPlot::SetupAxes("Frequency", "Noise density", ImPlotAxisFlags_None, ImPlotAxisFlags_None);
     ImPlot::SetupAxisScale(ImAxis_X1, ImPlotScale_Log10);
     ImPlot::SetupAxisFormat(ImAxis_X1, FormatAxisValue, const_cast<char *>("Hz"));
@@ -1955,7 +2039,6 @@ void OutputWindow::DrawNoise(const Core::Noise &noise) {
         ImPlot::SetupAxisScale(ImAxis_Y2, ImPlotScale_Log10);
         ImPlot::SetupAxisFormat(ImAxis_Y2, FormatAxisValue, const_cast<char *>(input_unit.c_str()));
     }
-    // Set during the setup, since ImPlot fits an axis on its own the first frame it is shown
     if (new_result) {
         ImPlot::SetupAxisLimits(ImAxis_X1, noise.Frequencies.front(), noise.Frequencies.back(), ImPlotCond_Always);
         if (input_shown && !input_in_volts) {
@@ -1963,44 +2046,20 @@ void OutputWindow::DrawNoise(const Core::Noise &noise) {
             ImPlot::SetupAxisLimits(ImAxis_Y2, input_range.From, input_range.To, ImPlotCond_Always);
         }
     }
-    if (new_result || shares_changed) {
-        const PlotSpan voltage_range = GetDecadeFitRange(voltage_traces);
-        ImPlot::SetupAxisLimits(ImAxis_Y1, voltage_range.From, voltage_range.To, ImPlotCond_Always);
+    if (!new_result && !shares_changed) {
+        return;
     }
-
-    std::vector<PlottedTrace> plotted;
-    const std::string output_label = GetVoltageLabel(m_Schematic.GetConnectivity(), noise.OutputNode);
-    const ImU32 output_color = GetNodeColor(noise.OutputNode);
-    ImPlotSpec output_spec;
-    output_spec.LineColor = ImGui::ColorConvertU32ToFloat4(output_color);
-    output_spec.LineWeight = MathLineWeight;
-    ImPlot::PlotLine(output_label.c_str(), noise.Frequencies.data(), noise.OutputDensities.data(),
-                     static_cast<int>(noise.Frequencies.size()), output_spec);
-    plotted.push_back({output_label, &noise.OutputDensities, output_unit.c_str(), output_color});
-    for (std::size_t index = 0; index < noise.Contributions.size(); ++index) {
-        const Core::NoiseContribution &contribution = noise.Contributions[index];
-        if (!m_ShownNoiseContributions.contains(contribution.Name)) {
-            continue;
+    std::vector<std::span<const double>> voltage_traces{noise.OutputDensities};
+    if (input_shown && input_in_volts) {
+        voltage_traces.emplace_back(noise.InputDensities);
+    }
+    for (const Core::NoiseContribution &contribution : noise.Contributions) {
+        if (m_ShownNoiseContributions.contains(contribution.Name)) {
+            voltage_traces.emplace_back(contribution.OutputDensities);
         }
-        ImPlotSpec spec;
-        spec.LineColor = ImGui::ColorConvertU32ToFloat4(GetCurrentColor(index));
-        ImPlot::PlotLine(contribution.Name.c_str(), noise.Frequencies.data(), contribution.OutputDensities.data(),
-                         static_cast<int>(noise.Frequencies.size()), spec);
-        plotted.push_back(
-            {contribution.Name, &contribution.OutputDensities, output_unit.c_str(), GetCurrentColor(index)});
     }
-    if (input_shown) {
-        const std::string input_label = std::format("Input-referred ({})", noise.InputSource);
-        const ImU32 input_color = AdaptToBackground(InputNoiseColor);
-        ImPlot::SetAxes(ImAxis_X1, input_axis);
-        PlotDashedLine(input_label, noise.Frequencies, noise.InputDensities, input_color);
-        ImPlot::SetAxes(ImAxis_X1, ImAxis_Y1);
-        plotted.push_back({input_label, &noise.InputDensities, input_unit.c_str(), input_color});
-    }
-    DrawCursorReadout(noise.Frequencies, "Hz", true, plotted);
-    const ImPlotRange view = ImPlot::GetPlotLimits().X;
-    m_NoiseView = {.From = view.Min, .To = view.Max};
-    ImPlot::EndPlot();
+    const PlotSpan voltage_range = GetDecadeFitRange(voltage_traces);
+    ImPlot::SetupAxisLimits(ImAxis_Y1, voltage_range.From, voltage_range.To, ImPlotCond_Always);
 }
 
 // The span the transient statistics measure: between its cursors, or what its plot shows, or the whole run before
@@ -2227,6 +2286,31 @@ void OutputWindow::DrawTransientStatistics(const Core::Transient &transient, con
 // Like the harmonic readout of a spectrum analyzer: the mean, the fundamental and the THD of every shown trace,
 // then each harmonic relative to the fundamental, in dBc
 void OutputWindow::DrawSpectrumStatistics() {
+    DrawSpectrumControls();
+    const TransientSpectra &spectra = *m_Spectra;
+    if (spectra.Traces.empty()) {
+        ImGui::TextDisabled("Measure a trace to see its harmonics");
+        return;
+    }
+    if (spectra.Frequencies.size() > 1) {
+        ImGui::TextDisabled("%s",
+                            std::format("Resolution {}Hz", Core::FormatValue(spectra.Frequencies.front())).c_str());
+    }
+    DrawPeriodsWarning(spectra);
+    for (const SpectrumTrace &trace : spectra.Traces) {
+        ImGui::Separator();
+        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(trace.Color), "%s", trace.Label.c_str());
+        if (!trace.Decibels) {
+            ImGui::TextDisabled("Undefined in the stretch");
+        } else if (BeginStatisticsTable(trace.Label)) {
+            DrawHarmonics(trace);
+            ImGui::EndTable();
+        }
+    }
+}
+
+// The window of the transform and the scale of the frequency axis, which refits the plot when it changes
+void OutputWindow::DrawSpectrumControls() {
     DrawFieldLabel("Window");
     const char *window_name = m_SpectrumWindow == SpectrumWindow::Hann ? "Hann" : "Rectangular";
     if (ImGui::BeginCombo("##window", window_name)) {
@@ -2243,67 +2327,6 @@ void OutputWindow::DrawSpectrumStatistics() {
     }
     if (ImGui::Checkbox("Logarithmic frequency", &m_SpectrumLogarithmic)) {
         m_SpectraChanged = true;
-    }
-    const TransientSpectra &spectra = *m_Spectra;
-    if (spectra.Traces.empty()) {
-        ImGui::TextDisabled("Measure a trace to see its harmonics");
-        return;
-    }
-    if (spectra.Frequencies.size() > 1) {
-        ImGui::TextDisabled("%s",
-                            std::format("Resolution {}Hz", Core::FormatValue(spectra.Frequencies.front())).c_str());
-    }
-    // Every trace shares the span and the window, so one warning covers them all
-    const auto short_trace = std::ranges::find_if(
-        spectra.Traces, [](const SpectrumTrace &trace) { return trace.Harmonics.PeriodsNeeded.has_value(); });
-    if (short_trace != spectra.Traces.end()) {
-        ImGui::PushTextWrapPos(0.0f);
-        ImGui::TextColored(GetWarningTextColor(), "%s",
-                           std::format("The stretch needs {} periods to tell the harmonics apart: widen it, or pick "
-                                       "the Rectangular window over whole periods",
-                                       *short_trace->Harmonics.PeriodsNeeded)
-                               .c_str());
-        ImGui::PopTextWrapPos();
-    }
-    for (const SpectrumTrace &trace : spectra.Traces) {
-        ImGui::Separator();
-        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(trace.Color), "%s", trace.Label.c_str());
-        if (!trace.Decibels) {
-            ImGui::TextDisabled("Undefined in the stretch");
-            continue;
-        }
-        if (!BeginStatisticsTable(trace.Label)) {
-            continue;
-        }
-        const HarmonicAnalysis &analysis = trace.Harmonics;
-        const char *unit = trace.Unit.c_str();
-        DrawMeasuredValue("Mean", analysis.Mean, trace.LargestAmplitude, unit);
-        if (analysis.Harmonics.empty()) {
-            DrawStatistic("Freq", "-");
-            ImGui::EndTable();
-            continue;
-        }
-        const Harmonic &fundamental = analysis.Harmonics.front();
-        DrawStatistic("Freq", FormatQuantity(fundamental.Frequency, "Hz"));
-        ImGui::SetItemTooltip("Frequency of the fundamental, the strongest tone");
-        DrawStatistic("Amplitude", FormatQuantity(fundamental.Amplitude, unit));
-        ImGui::SetItemTooltip("Peak amplitude of the fundamental");
-        if (analysis.TotalDistortion) {
-            DrawStatistic("THD", FormatDistortionPercent(*analysis.TotalDistortion));
-            DrawStatistic("THD dB", FormatFixed(20.0 * std::log10(std::max(*analysis.TotalDistortion, 1e-15)), " dB"));
-        } else {
-            DrawStatistic("THD", "-");
-        }
-        for (std::size_t index = 1; index < analysis.Harmonics.size(); ++index) {
-            const Harmonic &harmonic = analysis.Harmonics[index];
-            const std::string name = std::format("H{}", harmonic.Order);
-            const double relative = harmonic.Amplitude / fundamental.Amplitude;
-            DrawStatistic(name.c_str(), FormatFixed(20.0 * std::log10(std::max(relative, 1e-15)), " dBc"));
-            ImGui::SetItemTooltip("%s", std::format("{}Hz, {}{}", Core::FormatValue(harmonic.Frequency),
-                                                    Core::FormatValue(harmonic.Amplitude), unit)
-                                            .c_str());
-        }
-        ImGui::EndTable();
     }
 }
 
@@ -2539,6 +2562,63 @@ std::vector<MathTrace> OutputWindow::EvaluateMath(const std::span<const double> 
                           .Color = AdaptToBackground(MathColors[index % MathColors.size()])});
     }
     return traces;
+}
+
+// A plain button apart from the tabs, so it does not read as another page; its popup hangs below it, aligned to its
+// right edge, so it stays inside the window
+void OutputWindow::DrawExportButton(const ImVec2 tab_row, const float tab_row_width, const float export_width,
+                                    const FrameResults &frame) {
+    ImGui::SetCursorScreenPos({tab_row.x + tab_row_width - export_width, tab_row.y});
+    if (ImGui::Button(ExportLabel)) {
+        ImGui::OpenPopup(ExportPopup);
+    }
+    ImGui::SetItemTooltip("Save the plot of this tab as an SVG image or a CSV table");
+    ImGui::SetNextWindowPos({ImGui::GetItemRectMax().x, ImGui::GetItemRectMax().y}, ImGuiCond_Appearing,
+                            ImVec2(1.0f, 0.0f));
+    if (const std::optional<ExportFormat> format = DrawExportPopup(CanExport(frame))) {
+        StartExport(BuildShownFigure(frame), *format);
+    }
+}
+
+// Whether the shown tab has something to export: a result with a measured trace or a math channel
+bool OutputWindow::CanExport(const FrameResults &frame) const {
+    switch (m_ShownTab) {
+    case PlotTab::OperatingPoint:
+        return false;
+    case PlotTab::Transient:
+        return m_Schematic.GetTransient() && (frame.AnythingMeasured || !frame.TransientMath.empty());
+    case PlotTab::Spectrum:
+        return m_Schematic.GetTransient() && m_Spectra &&
+               std::ranges::any_of(m_Spectra->Traces,
+                                   [](const SpectrumTrace &trace) { return trace.Decibels.has_value(); });
+    case PlotTab::ACSweep:
+        return m_Schematic.GetACSweep() && frame.AnythingMeasured;
+    case PlotTab::DCSweep:
+        return m_Schematic.GetDCSweep() &&
+               (frame.AnythingMeasured || (!frame.DCSweepMath.empty() && !frame.DCSweepMath.front().empty()));
+    case PlotTab::Noise:
+        return m_Schematic.GetNoise().has_value();
+    }
+    return false;
+}
+
+// The figure of the shown tab, which CanExport() has found something to export in
+ExportFigure OutputWindow::BuildShownFigure(const FrameResults &frame) const {
+    switch (m_ShownTab) {
+    case PlotTab::Transient:
+        return BuildTransientFigure(*m_Schematic.GetTransient(), frame.TransientMath);
+    case PlotTab::Spectrum:
+        return BuildSpectrumFigure();
+    case PlotTab::ACSweep:
+        return BuildACSweepFigure(*m_Schematic.GetACSweep());
+    case PlotTab::DCSweep:
+        return BuildDCSweepFigure(*m_Schematic.GetDCSweep(), frame.DCSweepMath);
+    case PlotTab::Noise:
+        return BuildNoiseFigure(*m_Schematic.GetNoise());
+    case PlotTab::OperatingPoint:
+        break;
+    }
+    return {};
 }
 
 // Like the export dialog of a scope: the image follows the plot as shown, at the size and theme chosen here.

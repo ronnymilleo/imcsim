@@ -187,6 +187,19 @@ std::string FormatLogicPart(const LogicPart &part, const std::vector<int> &nodes
     return lines;
 }
 
+// The model of a logic part, and a bridge and a resistor on every pin, as FormatLogicPart() writes them
+std::vector<std::string> GetLogicElementNames(const Component &part) {
+    const std::string &name = part.GetName();
+    std::vector<std::string> names{std::format("A-{}", name)};
+    std::vector<std::string> pins = GetLogicInputLabels(part.GetType());
+    std::ranges::move(GetLogicOutputLabels(part.GetType()), std::back_inserter(pins));
+    for (const std::string &pin : pins) {
+        names.push_back(std::format("A-{}-{}", name, pin));
+        names.push_back(std::format("R-{}-{}", name, pin));
+    }
+    return names;
+}
+
 // Parts that share a ready model share its line, written the first time the model comes up
 void AddModelLine(std::string spice_name, const std::string &line, std::vector<std::string> &written_names,
                   std::string &models) {
@@ -531,57 +544,34 @@ std::optional<std::string> FindControllingSource(const Circuit &circuit, const s
  */
 std::vector<std::string> GetElementNames(const Component &component) {
     const std::string &name = component.GetName();
-    if (IsLogicGate(component.GetType()) || IsFlipFlop(component.GetType())) {
-        // The model, and a bridge and a resistor on every pin, as FormatLogicPart() writes them
-        std::vector<std::string> names{std::format("A-{}", name)};
-        std::vector<std::string> pins = GetLogicInputLabels(component.GetType());
-        std::ranges::move(GetLogicOutputLabels(component.GetType()), std::back_inserter(pins));
-        for (const std::string &pin : pins) {
-            names.push_back(std::format("A-{}-{}", name, pin));
-            names.push_back(std::format("R-{}-{}", name, pin));
-        }
-        return names;
-    }
-    switch (component.GetType()) {
-    case ComponentType::Ground:
-    case ComponentType::NetLabel:
+    const ComponentType type = component.GetType();
+    if (type == ComponentType::Ground || type == ComponentType::NetLabel) {
         return {};
-    case ComponentType::OpAmp:
-        if (static_cast<const OpAmp &>(component).IsIdeal()) {
-            return {std::format("G-{}", name),   std::format("R-{}", name),   std::format("C-{}", name),
-                    std::format("D-{}-P", name), std::format("D-{}-N", name), std::format("E-{}", name)};
-        }
+    }
+    if (IsLogicGate(type) || IsFlipFlop(type)) {
+        return GetLogicElementNames(component);
+    }
+    if (type == ComponentType::OpAmp && static_cast<const OpAmp &>(component).IsIdeal()) {
+        return {std::format("G-{}", name),   std::format("R-{}", name),   std::format("C-{}", name),
+                std::format("D-{}-P", name), std::format("D-{}-N", name), std::format("E-{}", name)};
+    }
+    if (type == ComponentType::OpAmp) {
         return {std::format("X-{}", name)};
-    case ComponentType::Potentiometer:
+    }
+    if (type == ComponentType::Potentiometer) {
         return {std::format("R-{}a", name), std::format("R-{}b", name)};
-    case ComponentType::Switch:
-    case ComponentType::PushButton:
+    }
+    if (IsSwitch(type)) {
         return {std::format("R-{}", name)};
-    case ComponentType::Relay:
+    }
+    if (type == ComponentType::Relay) {
         return {std::format("R-{}coil", name), std::format("L-{}coil", name), std::format("S-{}", name)};
-    case ComponentType::Transformer:
+    }
+    if (type == ComponentType::Transformer) {
         return {std::format("R-{}p", name), std::format("L-{}p", name), std::format("R-{}s", name),
                 std::format("L-{}s", name), std::format("K-{}", name)};
-    case ComponentType::Resistor:
-    case ComponentType::Capacitor:
-    case ComponentType::Inductor:
-    case ComponentType::VCC:
-    case ComponentType::VoltageSource:
-    case ComponentType::CurrentSource:
-    case ComponentType::VCVS:
-    case ComponentType::VCCS:
-    case ComponentType::CCCS:
-    case ComponentType::CCVS:
-    case ComponentType::Diode:
-    case ComponentType::ZenerDiode:
-    case ComponentType::LED:
-    case ComponentType::NPN:
-    case ComponentType::PNP:
-    case ComponentType::NMOS:
-    case ComponentType::PMOS:
-    case ComponentType::VSwitch:
-        break;
     }
+    // Every other part is one element named after it
     return {name};
 }
 
