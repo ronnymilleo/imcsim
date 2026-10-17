@@ -8,6 +8,8 @@
 #include "spice_value.h"
 #include <cmath>
 #include <format>
+#include <optional>
+#include <utility>
 
 namespace GUI {
 

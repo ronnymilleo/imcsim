@@ -13,6 +13,8 @@
 #include "theme.h"
 #include <algorithm>
 #include <expected>
+#include <format>
+#include <iterator>
 #include <utility>
 
 namespace GUI {

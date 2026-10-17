@@ -25,6 +25,7 @@
 #include "simulator.h"
 #include <catch2/catch_test_macros.hpp>
 #include <string>
+#include <vector>
 
 TEST_CASE("Circuit counts nodes including ground", "[circuit]") {
     Core::Circuit circuit;
