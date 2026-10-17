@@ -25,6 +25,7 @@
 #include "simulator.h"
 #include <catch2/catch_test_macros.hpp>
 #include <string>
+#include <vector>
 
 TEST_CASE("Circuit counts nodes including ground", "[circuit]") {
     Core::Circuit circuit;
@@ -337,7 +338,7 @@ TEST_CASE("ToSpiceNetlist writes an ideal op-amp as a gain stage with a pole, cl
     circuit.Add(second, {1, 0, 1, 4, 0});
     const std::string netlist = circuit.ToSpiceNetlist();
     // The gain stage takes the first node after the circuit's; 1 MHz over 100 dB puts the pole at 10 Hz
-    CHECK(netlist.contains("G-U1 0 6 1 2 0.001\nR-U1 6 0 1e+08\nC-U1 6 0 1.59155e-10\n"
+    CHECK(netlist.contains("G-U1 0 6 1 2 0.001\nR-U1 6 0 1e+08 noisy=0\nC-U1 6 0 1.59155e-10\n"
                            "D-U1-P 6 4 imcsim_opamp_clamp\nD-U1-N 5 6 imcsim_opamp_clamp\nE-U1 3 0 6 0 1\n"));
     CHECK(netlist.contains("C-U2 7 0 1.59155e-11\n"));
     // Both share one model
@@ -614,4 +615,49 @@ TEST_CASE("Probes of the logic parts", "[circuit]") {
     CHECK(Core::GetCurrentName(flip_flop, flip_flop_probes[0].Label) == "U3.Q");
     CHECK(flip_flop_probes[1].Terminal == 5);
     CHECK(Core::GetCurrentName(flip_flop, flip_flop_probes[1].Label) == "U3.QN");
+}
+
+TEST_CASE("GetElementNames lists the elements the netlist writes for each part", "[circuit]") {
+    Core::Resistor resistor;
+    resistor.SetName("R1");
+    Core::Potentiometer pot;
+    pot.SetName("RV1");
+    Core::OpAmp ideal;
+    ideal.SetName("U1");
+    Core::OpAmp macromodel;
+    macromodel.SetName("U2");
+    macromodel.SetModel(*Core::FindOpAmpModel(Core::ComponentType::OpAmp, "uA741"));
+    Core::Switch toggle(Core::ComponentType::Switch);
+    toggle.SetName("SW1");
+    Core::Relay relay;
+    relay.SetName("K1");
+    Core::Transformer transformer;
+    transformer.SetName("T1");
+    Core::LogicPart gate(Core::ComponentType::Nand);
+    gate.SetName("U3");
+    Core::Ground ground;
+    Core::Circuit circuit;
+    circuit.Add(resistor, {1, 0});
+    circuit.Add(pot, {1, 2, 3});
+    circuit.Add(gate, {1, 2, 3});
+    circuit.Add(ideal, {3, 1, 2, 4, 5});
+    circuit.Add(macromodel, {6, 1, 2, 4, 5});
+    circuit.Add(toggle, {1, 2});
+    circuit.Add(relay, {1, 2, 3, 0});
+    circuit.Add(transformer, {1, 0, 2, 0});
+    circuit.Add(ground, {0});
+
+    // Every name starts a line of the netlist, and every part line is covered
+    const std::string netlist = "\n" + circuit.ToSpiceNetlist();
+    std::size_t element_count = 0;
+    for (const Core::CircuitEntry &entry : circuit.GetEntries()) {
+        for (const std::string &name : Core::GetElementNames(*entry.Part)) {
+            CHECK(netlist.contains("\n" + name + " "));
+            ++element_count;
+        }
+    }
+    // A NAND gate has its model, and a bridge and a resistor on each of its two inputs and its output
+    CHECK(element_count == 1 + 2 + 6 + 1 + 1 + 3 + 5 + 7);
+    CHECK(Core::GetElementNames(ground).empty());
+    CHECK(Core::GetElementNames(macromodel) == std::vector<std::string>{"X-U2"});
 }

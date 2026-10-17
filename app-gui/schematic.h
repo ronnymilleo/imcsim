@@ -8,6 +8,7 @@
 
 #include "connectivity.h"
 #include "helpers.h"
+#include "parameter_step.h"
 #include "schematic_file.h"
 #include "simulation_settings.h"
 #include "simulator.h"
@@ -30,7 +31,8 @@ namespace GUI {
  *          same gesture, such as wires following a dragged element, only invalidate the nodes; the caller
  *          decides when the gesture counts as a change and calls MarkModified(). Nodes are computed lazily and
  *          cached until the next change, and so is the last result of each analysis, which no longer matches
- *          the circuit once it changes. The selection is a set of elements and a set of wires, by index; the
+ *          the circuit once it changes; a stepped transient or AC sweep keeps every step, and hands its selected step
+ *          to the views that read one result. The selection is a set of elements and a set of wires, by index; the
  *          indices stay valid until an element or wire is added, deleted or the wires are replaced. Undo works on whole
  * snapshots: changes pile up until CommitUndoStep(), which the application calls once the user finishes an interaction,
  * so a whole drag or a typed value is undone in one step. Measurements, the traces the plots show, are view state
@@ -109,14 +111,23 @@ public:
     const std::optional<Core::OperatingPoint> &GetOperatingPoint() const;
     void SetTransient(std::optional<Core::Transient> transient);
     const std::optional<Core::Transient> &GetTransient() const;
+    void SetTransientSteps(StepFamily<Core::Transient> steps);
+    const std::optional<StepFamily<Core::Transient>> &GetTransientSteps() const;
+    void SelectTransientStep(std::size_t step);
     void SetACSweep(std::optional<Core::ACSweep> sweep);
     const std::optional<Core::ACSweep> &GetACSweep() const;
+    void SetACSweepSteps(StepFamily<Core::ACSweep> steps);
+    const std::optional<StepFamily<Core::ACSweep>> &GetACSweepSteps() const;
+    void SelectACSweepStep(std::size_t step);
     void SetDCSweep(std::optional<Core::DCSweep> sweep);
     const std::optional<Core::DCSweep> &GetDCSweep() const;
+    void SetNoise(std::optional<Core::Noise> noise);
+    const std::optional<Core::Noise> &GetNoise() const;
     std::size_t GetOperatingPointVersion() const;
     std::size_t GetTransientVersion() const;
     std::size_t GetACSweepVersion() const;
     std::size_t GetDCSweepVersion() const;
+    std::size_t GetNoiseVersion() const;
 
 private:
     // Content
@@ -164,14 +175,19 @@ private:
     // Derived data, dropped on every change: nodes are rebuilt on first use, results by the next simulation
     std::optional<Connectivity> m_Connectivity;
     std::optional<Core::OperatingPoint> m_OperatingPoint;
+    // A stepped transient or AC sweep keeps every step, and its selected step as the result the other views read
     std::optional<Core::Transient> m_Transient;
+    std::optional<StepFamily<Core::Transient>> m_TransientSteps;
     std::optional<Core::ACSweep> m_ACSweep;
+    std::optional<StepFamily<Core::ACSweep>> m_ACSweepSteps;
     std::optional<Core::DCSweep> m_DCSweep;
+    std::optional<Core::Noise> m_Noise;
     // Change with every new result, so windows can tell a rerun from the result they already showed
     std::size_t m_OperatingPointVersion = 0;
     std::size_t m_TransientVersion = 0;
     std::size_t m_ACSweepVersion = 0;
     std::size_t m_DCSweepVersion = 0;
+    std::size_t m_NoiseVersion = 0;
 
     void InvalidateDerivedData();
     void FollowVoltageProbes();

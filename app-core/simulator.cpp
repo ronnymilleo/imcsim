@@ -8,10 +8,13 @@
 #include "simulator.h"
 
 #include "components/bjt.h"
+#include "components/capacitor.h"
 #include "components/controlled_source.h"
 #include "components/diode.h"
+#include "components/inductor.h"
 #include "components/logic_part.h"
 #include "components/mosfet.h"
+#include "components/resistor.h"
 #include "components/source.h"
 #include "spice_value.h"
 #include <algorithm>
@@ -20,6 +23,7 @@
 #include <complex>
 #include <format>
 #include <iterator>
+#include <memory>
 #include <ngspice/sharedspice.h>
 #include <numbers>
 #include <optional>
@@ -37,6 +41,7 @@ constexpr std::string_view ErrorPrefix = "stderr ";
 constexpr int MaxTransientPoints = 1000000;
 constexpr int MaxPointsPerDecade = 1000;
 constexpr int MaxDCSweepPoints = 100000;
+constexpr double AbsoluteZero = -273.15;
 // 1e-15 V is -300 dB
 constexpr double MinMagnitude = 1e-15;
 
@@ -219,15 +224,24 @@ std::optional<std::string> CheckTransientSettings(const TransientSettings &setti
     return std::nullopt;
 }
 
-std::optional<std::string> CheckACSweepSettings(const Circuit &circuit, const ACSweepSettings &settings) {
-    if (settings.StartFrequency <= 0.0) {
+std::optional<std::string> CheckFrequencyRange(const double start_frequency, const double stop_frequency,
+                                               const int points_per_decade) {
+    if (start_frequency <= 0.0) {
         return "The start frequency must be positive";
     }
-    if (settings.StopFrequency <= settings.StartFrequency) {
+    if (stop_frequency <= start_frequency) {
         return "The stop frequency must be higher than the start frequency";
     }
-    if (settings.PointsPerDecade < 1 || settings.PointsPerDecade > MaxPointsPerDecade) {
+    if (points_per_decade < 1 || points_per_decade > MaxPointsPerDecade) {
         return std::format("The points per decade must be between 1 and {}", MaxPointsPerDecade);
+    }
+    return std::nullopt;
+}
+
+std::optional<std::string> CheckACSweepSettings(const Circuit &circuit, const ACSweepSettings &settings) {
+    if (std::optional<std::string> error =
+            CheckFrequencyRange(settings.StartFrequency, settings.StopFrequency, settings.PointsPerDecade)) {
+        return error;
     }
     if (!circuit.HasACSource()) {
         return "An AC sweep needs an AC source; select a voltage or current source and set it to AC";
@@ -290,6 +304,37 @@ std::optional<std::string> CheckDCSweepSettings(const Circuit &circuit, const DC
     if (point_count > MaxDCSweepPoints) {
         return std::format("The steps are too small for the ranges: they would produce more than {} points",
                            MaxDCSweepPoints);
+    }
+    return std::nullopt;
+}
+
+// Independent sources set to AC, which ngspice accepts as the input of a noise analysis
+bool IsNoiseInput(const Component &component) {
+    const ComponentType type = component.GetType();
+    return (type == ComponentType::VoltageSource || type == ComponentType::CurrentSource) &&
+           static_cast<const Source &>(component).GetSourceType() == Source::SourceType::AC;
+}
+
+const Component *FindNoiseInput(const Circuit &circuit, const std::string_view name) {
+    const auto entry = std::ranges::find_if(circuit.GetEntries(), [name](const CircuitEntry &candidate) {
+        return candidate.Part->GetName() == name && IsNoiseInput(*candidate.Part);
+    });
+    return entry != circuit.GetEntries().end() ? entry->Part : nullptr;
+}
+
+std::optional<std::string> CheckNoiseSettings(const Circuit &circuit, const NoiseSettings &settings) {
+    if (std::optional<std::string> error =
+            CheckFrequencyRange(settings.StartFrequency, settings.StopFrequency, settings.PointsPerDecade)) {
+        return error;
+    }
+    if (settings.OutputNode < 1 || settings.OutputNode >= circuit.GetNodeCount()) {
+        return "Pick the output node; ground has no noise to measure";
+    }
+    if (settings.InputSource.empty()) {
+        return "A noise analysis needs an AC source as its input; select a voltage or current source and set it to AC";
+    }
+    if (FindNoiseInput(circuit, settings.InputSource) == nullptr) {
+        return std::format("The input source {} is not a voltage or current source set to AC", settings.InputSource);
     }
     return std::nullopt;
 }
@@ -832,9 +877,247 @@ std::expected<DCSweep, std::string> ReadDCSweep(const Circuit &circuit, const DC
     return result;
 }
 
+// ngspice saves the vector names of a plot in lower case; the plot name itself is kept as listed
+std::vector<std::string> ListVectors(std::string plot) {
+    std::vector<std::string> names;
+    char **vectors = ngSpice_AllVecs(plot.data());
+    for (; vectors != nullptr && *vectors != nullptr; ++vectors) {
+        names.emplace_back(*vectors);
+    }
+    return names;
+}
+
+/**
+ * @struct  NoisePlots
+ * @brief   The two plots a noise analysis leaves: the densities across frequency, and the totals over the range.
+ */
+struct NoisePlots {
+    std::string Densities;
+    std::string Totals;
+};
+
+// The densities are the plot with a frequency scale; the totals have a single point and no scale
+std::optional<NoisePlots> FindNoisePlots() {
+    NoisePlots plots;
+    char **names = ngSpice_AllPlots();
+    for (; names != nullptr && *names != nullptr; ++names) {
+        const std::string name(*names);
+        if (!name.starts_with("noise")) {
+            continue;
+        }
+        const std::vector<std::string> vectors = ListVectors(name);
+        (std::ranges::contains(vectors, "frequency") ? plots.Densities : plots.Totals) = name;
+    }
+    if (plots.Densities.empty() || plots.Totals.empty()) {
+        return std::nullopt;
+    }
+    return plots;
+}
+
+// The devices with noise in a plot, from the names of their vectors after prefix. ngspice also saves each noise
+// source of a device under the device name and a suffix, such as "onoise_q1_ib" next to "onoise_q1", so a name
+// that extends another one by "_" is a source, not a device
+std::vector<std::string> ListNoiseDevices(const std::vector<std::string> &vectors, const std::string_view prefix) {
+    std::vector<std::string> names;
+    for (const std::string &vector : vectors) {
+        if (vector.starts_with(prefix) && vector.size() > prefix.size()) {
+            names.push_back(vector.substr(prefix.size()));
+        }
+    }
+    std::vector<std::string> devices;
+    for (const std::string &name : names) {
+        const bool is_source = std::ranges::any_of(names, [&name](const std::string &other) {
+            return name.size() > other.size() + 1 && name.starts_with(other) && name[other.size()] == '_';
+        });
+        if (!is_source && name != "spectrum") {
+            devices.push_back(name);
+        }
+    }
+    return devices;
+}
+
+// A device is an element of the part, or one inside the subcircuit of one, which ngspice names after the instance
+// between dots, such as "q.x-u1.q1"
+bool IsDeviceOf(const std::string_view device, const std::vector<std::string> &elements) {
+    return std::ranges::any_of(elements, [device](const std::string &element) {
+        return device == element || device.contains(std::format(".{}.", element));
+    });
+}
+
+// ngspice describes every vector in the same static record, so the values are copied before the next lookup
+std::optional<std::vector<double>> ReadRealVector(const std::string &name) {
+    const pvector_info vector = FindVector(name);
+    if (vector == nullptr) {
+        return std::nullopt;
+    }
+    return RealPart(*vector);
+}
+
+std::expected<double, std::string> ReadNoiseTotal(const std::string &name) {
+    const pvector_info vector = FindVector(name);
+    if (vector == nullptr || vector->v_realdata == nullptr) {
+        return std::unexpected(std::format("ngspice returned no {}", name));
+    }
+    return vector->v_realdata[0];
+}
+
+// Each part adds up the power of its devices, at every frequency and in total; parts whose noise does not reach the
+// output are left out
+std::expected<std::vector<NoiseContribution>, std::string>
+ReadNoiseContributions(const Circuit &circuit, const NoisePlots &plots, const std::size_t point_count) {
+    SendCommand(std::format("setplot {}", plots.Totals));
+    const std::vector<std::string> total_devices = ListNoiseDevices(ListVectors(plots.Totals), "onoise_total_");
+    std::vector<double> device_totals;
+    for (const std::string &device : total_devices) {
+        const auto total = ReadNoiseTotal(std::format("onoise_total_{}", device));
+        if (!total) {
+            return std::unexpected(total.error());
+        }
+        device_totals.push_back(*total);
+    }
+    SendCommand(std::format("setplot {}", plots.Densities));
+    std::vector<NoiseContribution> contributions;
+    for (const CircuitEntry &entry : circuit.GetEntries()) {
+        std::vector<std::string> elements = GetElementNames(*entry.Part);
+        std::ranges::transform(elements, elements.begin(), ToLower);
+        NoiseContribution contribution{entry.Part->GetName(), std::vector<double>(point_count, 0.0), 0.0};
+        bool has_noise = false;
+        for (std::size_t index = 0; index < total_devices.size(); ++index) {
+            const std::string &device = total_devices[index];
+            if (!IsDeviceOf(device, elements)) {
+                continue;
+            }
+            const std::optional<std::vector<double>> densities = ReadRealVector(std::format("onoise_{}", device));
+            if (!densities || densities->size() != point_count) {
+                return std::unexpected(std::format("ngspice returned no noise for {}", device));
+            }
+            for (std::size_t point = 0; point < point_count; ++point) {
+                contribution.OutputDensities[point] += (*densities)[point] * (*densities)[point];
+            }
+            contribution.OutputTotal += device_totals[index] * device_totals[index];
+            has_noise = true;
+        }
+        // A part whose noise does not reach the output, as behind an ideal source, has no share
+        if (!has_noise || contribution.OutputTotal <= 0.0) {
+            continue;
+        }
+        std::ranges::transform(contribution.OutputDensities, contribution.OutputDensities.begin(),
+                               [](const double power) { return std::sqrt(power); });
+        contribution.OutputTotal = std::sqrt(contribution.OutputTotal);
+        contributions.push_back(std::move(contribution));
+    }
+    std::ranges::stable_sort(contributions, std::ranges::greater{}, &NoiseContribution::OutputTotal);
+    return contributions;
+}
+
+std::expected<Noise, std::string> ReadNoise(const Circuit &circuit, const NoiseSettings &settings) {
+    const std::optional<NoisePlots> plots = FindNoisePlots();
+    if (!plots) {
+        return std::unexpected("ngspice returned no noise plots");
+    }
+    Noise result;
+    result.OutputNode = settings.OutputNode;
+    result.InputSource = settings.InputSource;
+    result.InputUnit = SourceUnit(*FindNoiseInput(circuit, settings.InputSource));
+
+    SendCommand(std::format("setplot {}", plots->Totals));
+    const auto output_total = ReadNoiseTotal("onoise_total");
+    const auto input_total = ReadNoiseTotal("inoise_total");
+    if (!output_total || !input_total) {
+        return std::unexpected(!output_total ? output_total.error() : input_total.error());
+    }
+    result.OutputTotal = *output_total;
+    result.InputTotal = *input_total;
+
+    SendCommand(std::format("setplot {}", plots->Densities));
+    const std::optional<std::vector<double>> frequencies = ReadRealVector("frequency");
+    const std::optional<std::vector<double>> output = ReadRealVector("onoise_spectrum");
+    const std::optional<std::vector<double>> input = ReadRealVector("inoise_spectrum");
+    if (!frequencies || !output || !input || output->size() != frequencies->size() ||
+        input->size() != frequencies->size()) {
+        return std::unexpected("ngspice returned no noise densities");
+    }
+    result.Frequencies = *frequencies;
+    result.OutputDensities = *output;
+    result.InputDensities = *input;
+
+    auto contributions = ReadNoiseContributions(circuit, *plots, result.Frequencies.size());
+    if (!contributions) {
+        return std::unexpected(contributions.error());
+    }
+    result.Contributions = std::move(*contributions);
+    return result;
+}
+
 std::string FormatSweepRange(const SweepRange &range) {
     return std::format("{} {} {} {}", range.Source, FormatSpiceValue(range.Start), FormatSpiceValue(range.Stop),
                        FormatSpiceValue(range.Step));
+}
+
+// Parts a stepped analysis can change: those written as one element whose value is all there is to them
+bool IsSteppable(const ComponentType type) {
+    return type == ComponentType::Resistor || type == ComponentType::Capacitor || type == ComponentType::Inductor;
+}
+
+std::unique_ptr<Component> CopyWithValue(const Component &part, const double value) {
+    std::unique_ptr<Component> copy;
+    switch (part.GetType()) {
+    case ComponentType::Resistor:
+        copy = std::make_unique<Resistor>(static_cast<const Resistor &>(part));
+        break;
+    case ComponentType::Capacitor:
+        copy = std::make_unique<Capacitor>(static_cast<const Capacitor &>(part));
+        break;
+    default:
+        copy = std::make_unique<Inductor>(static_cast<const Inductor &>(part));
+        break;
+    }
+    copy->SetValue(value);
+    return copy;
+}
+
+/**
+ * @struct  ParameterCircuit
+ * @brief   A circuit as one run of a stepped analysis simulates it, and the netlist card that sets its temperature.
+ * @details Simulated refers to Part, the copy of the stepped part at its value, so both live together.
+ */
+struct ParameterCircuit {
+    std::unique_ptr<Component> Part;
+    Circuit Simulated;
+    std::string Card;
+};
+
+// The stepped part is replaced by a copy at its value rather than changed in ngspice, so every reading that uses
+// the value of a part, such as the AC current of a resistor, sees the value the run had
+std::expected<ParameterCircuit, std::string> ApplyParameter(const Circuit &circuit,
+                                                            const std::optional<ParameterValue> &parameter) {
+    ParameterCircuit applied{nullptr, circuit, ""};
+    if (!parameter) {
+        return applied;
+    }
+    if (parameter->Part.empty()) {
+        if (parameter->Value <= AbsoluteZero) {
+            return std::unexpected("The temperature must be above absolute zero, -273.15 C");
+        }
+        applied.Card = std::format(".temp {}\n", FormatSpiceValue(parameter->Value));
+        return applied;
+    }
+    const auto entry = std::ranges::find_if(circuit.GetEntries(), [&parameter](const CircuitEntry &candidate) {
+        return candidate.Part->GetName() == parameter->Part && IsSteppable(candidate.Part->GetType());
+    });
+    if (entry == circuit.GetEntries().end()) {
+        return std::unexpected(std::format(
+            "The stepped part {} is not a resistor, capacitor or inductor in the circuit", parameter->Part));
+    }
+    if (parameter->Value <= 0.0) {
+        return std::unexpected(std::format("{} must stay positive in every step", parameter->Part));
+    }
+    applied.Part = CopyWithValue(*entry->Part, parameter->Value);
+    applied.Simulated = Circuit();
+    for (const CircuitEntry &original : circuit.GetEntries()) {
+        applied.Simulated.Add(original.Part == entry->Part ? *applied.Part : *original.Part, original.Nodes);
+    }
+    return applied;
 }
 
 // Runs one analysis on a clean library. Return codes stay 0 even when the netlist is rejected, so success is
@@ -888,11 +1171,14 @@ OperatingPointRun RunOperatingPoint(const Circuit &circuit) {
  * @brief   Simulates how the node voltages of a circuit change over time, starting from its operating point.
  * @param[in] circuit   Circuit to simulate; it needs a ground component.
  * @param[in] settings  Stop time and time step.
+ * @param[in] parameter Value of the stepped parameter for this run, a part value or the temperature; none runs the
+ *                      circuit as it is.
  * @return  The voltages at every time point or an error, plus every line ngspice printed. Invalid settings
  *          are rejected before reaching ngspice.
  * @note    Not thread-safe: ngspice is a single global library instance.
  */
-TransientRun RunTransient(const Circuit &circuit, const TransientSettings &settings) {
+TransientRun RunTransient(const Circuit &circuit, const TransientSettings &settings,
+                          const std::optional<ParameterValue> &parameter) {
     std::optional<std::string> error = CheckCircuit(circuit);
     if (!error) {
         error = CheckTransientSettings(settings);
@@ -900,20 +1186,28 @@ TransientRun RunTransient(const Circuit &circuit, const TransientSettings &setti
     if (error) {
         return {std::unexpected(*error), {}};
     }
-    const std::string analysis =
-        std::format(".tran {} {}", FormatSpiceValue(settings.TimeStep), FormatSpiceValue(settings.StopTime));
-    return Simulate<Transient>(circuit, analysis, "tran", [&circuit] { return ReadTransient(circuit); });
+    const auto applied = ApplyParameter(circuit, parameter);
+    if (!applied) {
+        return {std::unexpected(applied.error()), {}};
+    }
+    const std::string analysis = std::format("{}.tran {} {}", applied->Card, FormatSpiceValue(settings.TimeStep),
+                                             FormatSpiceValue(settings.StopTime));
+    return Simulate<Transient>(applied->Simulated, analysis, "tran",
+                               [&applied] { return ReadTransient(applied->Simulated); });
 }
 
 /**
  * @brief   Sweeps the small-signal response of a circuit across frequency, excited by its AC sources.
  * @param[in] circuit   Circuit to simulate; it needs a ground component and at least one AC source.
  * @param[in] settings  Frequency range and points per decade.
+ * @param[in] parameter Value of the stepped parameter for this run, a part value or the temperature; none runs the
+ *                      circuit as it is.
  * @return  The magnitude and phase of every node at every frequency or an error, plus every line ngspice
  *          printed. Invalid settings and circuits without an AC source are rejected before reaching ngspice.
  * @note    Not thread-safe: ngspice is a single global library instance.
  */
-ACSweepRun RunACSweep(const Circuit &circuit, const ACSweepSettings &settings) {
+ACSweepRun RunACSweep(const Circuit &circuit, const ACSweepSettings &settings,
+                      const std::optional<ParameterValue> &parameter) {
     std::optional<std::string> error = CheckCircuit(circuit);
     if (!error) {
         error = CheckACSweepSettings(circuit, settings);
@@ -921,22 +1215,30 @@ ACSweepRun RunACSweep(const Circuit &circuit, const ACSweepSettings &settings) {
     if (error) {
         return {std::unexpected(*error), {}};
     }
+    const auto applied = ApplyParameter(circuit, parameter);
+    if (!applied) {
+        return {std::unexpected(applied.error()), {}};
+    }
     const std::string analysis =
-        std::format(".ac dec {} {} {}", settings.PointsPerDecade, FormatSpiceValue(settings.StartFrequency),
-                    FormatSpiceValue(settings.StopFrequency));
-    return Simulate<ACSweep>(circuit, analysis, "ac", [&circuit] { return ReadACSweep(circuit); });
+        std::format("{}.ac dec {} {} {}", applied->Card, settings.PointsPerDecade,
+                    FormatSpiceValue(settings.StartFrequency), FormatSpiceValue(settings.StopFrequency));
+    return Simulate<ACSweep>(applied->Simulated, analysis, "ac",
+                             [&applied] { return ReadACSweep(applied->Simulated); });
 }
 
 /**
  * @brief   Sweeps a source through a range of DC values and finds the operating point at each one.
  * @param[in] circuit   Circuit to simulate; it needs a ground component.
  * @param[in] settings  Swept source and range, and optionally a second source stepped once per curve.
+ * @param[in] parameter Value of the stepped parameter for this run, a part value or the temperature; none runs the
+ *                      circuit as it is.
  * @return  The node voltages and currents along the sweep, one curve per stepped value, or an error, plus every
  *          line ngspice printed. Invalid settings are rejected before reaching ngspice.
  * @note    AC and pulse sources are swept through their DC value. Not thread-safe: ngspice is a single global
  *          library instance.
  */
-DCSweepRun RunDCSweep(const Circuit &circuit, const DCSweepSettings &settings) {
+DCSweepRun RunDCSweep(const Circuit &circuit, const DCSweepSettings &settings,
+                      const std::optional<ParameterValue> &parameter) {
     std::optional<std::string> error = CheckCircuit(circuit);
     if (!error) {
         error = CheckDCSweepSettings(circuit, settings);
@@ -944,11 +1246,41 @@ DCSweepRun RunDCSweep(const Circuit &circuit, const DCSweepSettings &settings) {
     if (error) {
         return {std::unexpected(*error), {}};
     }
-    std::string analysis = std::format(".dc {}", FormatSweepRange(settings.Swept));
+    const auto applied = ApplyParameter(circuit, parameter);
+    if (!applied) {
+        return {std::unexpected(applied.error()), {}};
+    }
+    std::string analysis = std::format("{}.dc {}", applied->Card, FormatSweepRange(settings.Swept));
     if (settings.Stepped) {
         analysis += std::format(" {}", FormatSweepRange(*settings.Stepped));
     }
-    return Simulate<DCSweep>(circuit, analysis, "dc", [&circuit, &settings] { return ReadDCSweep(circuit, settings); });
+    return Simulate<DCSweep>(applied->Simulated, analysis, "dc",
+                             [&applied, &settings] { return ReadDCSweep(applied->Simulated, settings); });
+}
+
+/**
+ * @brief   Computes the noise of a circuit at a node across frequency, and refers it to an input source.
+ * @param[in] circuit   Circuit to simulate; it needs a ground component.
+ * @param[in] settings  Output node, input source (a voltage or current source set to AC) and frequency range.
+ * @return  The output and input-referred noise densities, their totals over the range and the share of every part,
+ *          or an error, plus every line ngspice printed. Invalid settings are rejected before reaching ngspice.
+ * @note    Resistors add thermal noise, and diodes and transistors shot and flicker noise as their models give;
+ *          ideal sources, controlled sources and the ideal op-amp add none. Not thread-safe: ngspice is a single
+ *          global library instance.
+ */
+NoiseRun RunNoise(const Circuit &circuit, const NoiseSettings &settings) {
+    std::optional<std::string> error = CheckCircuit(circuit);
+    if (!error) {
+        error = CheckNoiseSettings(circuit, settings);
+    }
+    if (error) {
+        return {std::unexpected(*error), {}};
+    }
+    // The last 1 asks for the share of every device in the results
+    const std::string analysis = std::format(
+        ".noise v({}) {} dec {} {} {} 1", settings.OutputNode, settings.InputSource, settings.PointsPerDecade,
+        FormatSpiceValue(settings.StartFrequency), FormatSpiceValue(settings.StopFrequency));
+    return Simulate<Noise>(circuit, analysis, "noise", [&circuit, &settings] { return ReadNoise(circuit, settings); });
 }
 
 /**
@@ -979,6 +1311,36 @@ std::vector<std::string> GetSweepableSources(const Circuit &circuit) {
     std::vector<std::string> names;
     for (const CircuitEntry &entry : circuit.GetEntries()) {
         if (IsSweepable(entry.Part->GetType())) {
+            names.push_back(entry.Part->GetName());
+        }
+    }
+    return names;
+}
+
+/**
+ * @brief   Lists the sources a noise analysis can refer its noise to.
+ * @param[in] circuit  Circuit to look in.
+ * @return  Names of its voltage and current sources set to AC, in circuit order.
+ */
+std::vector<std::string> GetNoiseInputSources(const Circuit &circuit) {
+    std::vector<std::string> names;
+    for (const CircuitEntry &entry : circuit.GetEntries()) {
+        if (IsNoiseInput(*entry.Part)) {
+            names.push_back(entry.Part->GetName());
+        }
+    }
+    return names;
+}
+
+/**
+ * @brief   Lists the parts whose value a stepped analysis can change.
+ * @param[in] circuit  Circuit to look in.
+ * @return  Names of its resistors, capacitors and inductors, in circuit order.
+ */
+std::vector<std::string> GetSteppableParts(const Circuit &circuit) {
+    std::vector<std::string> names;
+    for (const CircuitEntry &entry : circuit.GetEntries()) {
+        if (IsSteppable(entry.Part->GetType())) {
             names.push_back(entry.Part->GetName());
         }
     }

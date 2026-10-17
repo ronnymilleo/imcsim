@@ -282,6 +282,75 @@ their statistics and the exports always agree.
   the plot reads as gain while a transient uses the small amplitude a real circuit would see.
 - A stepped DC sweep draws one curve per step, labeled with the step value where the curves part most.
 
+## Stepping a parameter
+
+The transient, the AC sweep and the DC sweep can run once per value of a parameter, as SPICE's `.step`: check
+**Step a parameter** under their settings, then pick:
+
+- **Parameter**: the temperature, or a resistor, capacitor or inductor (shown with its value). Picking a part starts
+  the range at half its value and ends it at twice its value.
+- **Range** (start, stop and step, which may be negative to step downward) or **List** (values such as
+  `1k, 2.2k, 4.7k`). A list starts from the values of the range. Up to 50 values; the line below tells how many runs
+  that makes.
+
+The part keeps its value in the schematic and in the Netlist window; each run simulates a copy at the step value.
+
+Results:
+
+- The transient and the AC sweep plot every step: one **shown step** in full colors, picked above the plot, and the
+  others faint. Each trace the steps change is labeled with the step values. The statistics, the spectrum, the
+  schematic and its playback read the shown step. The AC export includes every step (`V(4) at C1=22nF` columns);
+  the transient export has the shown step only, since each step has its own time points.
+- The DC sweep draws one curve per step, as when stepping a second source, so only one of the two can be on.
+- ngspice's output lists each step under a `Step R1=10kOhm` line. A step that fails stops the run and names the
+  step.
+
+## Spectrum
+
+The Spectrum tab shows the frequency content of the measured transient traces, as a spectrum analyzer would, and
+measures their harmonic distortion.
+
+- It covers the same stretch as the transient statistics: between cursors A and B when they are on, otherwise the
+  time the transient plot shows. Zoom past the start-up of the circuit, or place the cursors on the steady state,
+  before reading distortion.
+- Amplitudes are peaks in dB relative to 1 V (dBV) or 1 A (dBA), on the axes the traces use in the transient; a
+  sine of 1 V peak reads 0 dBV. The mean is left out of the plot and shown in the panel instead.
+- The panel gives, for each trace, its mean, the frequency and peak amplitude of its fundamental (its strongest
+  tone), the THD (total harmonic distortion: the root sum of squares of harmonics 2 to 10 over the fundamental), and
+  each harmonic in dB below the fundamental (dBc). Dots on the plot mark the harmonics.
+- **Hann** window (default): suits any stretch, but needs at least 5 periods of the fundamental in it.
+  **Rectangular**: sharper peaks, and works from 3 periods, but only reads right over a whole number of periods,
+  such as cursors placed exactly some periods apart; otherwise each tone leaks across the spectrum.
+- The resolution is one over the stretch: 10 ms resolves 100 Hz. The transient is read between its points by
+  straight lines, which leaves a floor around -130 dB for a sine at 200 points per period; a smaller time step
+  lowers it.
+
+## Noise
+
+The Noise analysis computes the random noise of the circuit at one node across frequency, as ngspice's `.noise`
+does. Pick it beside Run, then set:
+
+- **Output**: the node whose noise is measured. It starts on the first measured voltage that no voltage source holds
+  (a node a source holds has no noise), and follows its node through edits.
+- **Input**: a voltage or current source set to AC. Its AC magnitude does not matter: it only defines the gain from
+  the input to the output.
+- **Start**, **Stop** and **Points per decade**, as in an AC sweep; Suggest picks the same range.
+
+The Noise tab of the Output window plots, on logarithmic axes:
+
+- the noise density at the output in V/√Hz, in the color of the output node;
+- the input-referred noise, dashed: the output noise divided by the gain from the input source, so the noise a
+  source at the input would need to cause it. It shares the axis with the output for a voltage source and has its
+  own axis in A/√Hz for a current source. It climbs where the gain falls, as above the corner of a filter.
+
+The panel gives the RMS noise over the whole range at the output and at the input, then the share of every part in
+the output noise, largest first, as RMS and as a percentage of the noise power (the percentages add up to 100).
+Check a part to plot its share; parts whose noise does not reach the output are left out.
+
+When the input source hardly reaches the output (a gain under -120 dB, as through a logic gate), its input-referred
+noise would only grow without meaning, so it is left out and the tab says why. When no noise reaches the output at
+all, as on a node an ideal source holds, the tab says so instead of an empty plot. [Simulation models](models.md) lists which parts add noise.
+
 ## Exports
 
 **Plots**: Export... on the right of the Output window tabs saves the plot of the current tab.

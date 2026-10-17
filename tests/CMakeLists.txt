@@ -20,6 +20,7 @@ add_executable(imcsim-tests
             helpers_tests.cpp
             led_glow_tests.cpp
             logic_trace_tests.cpp
+            parameter_step_tests.cpp
             playback_tests.cpp
             plot_export_tests.cpp
             plot_helpers_tests.cpp
@@ -29,6 +30,7 @@ add_executable(imcsim-tests
             schematic_tests.cpp
             selection_tests.cpp
             simulator_tests.cpp
+            spectrum_tests.cpp
             spice_value_tests.cpp
             standard_values_tests.cpp
             svg_writer_tests.cpp

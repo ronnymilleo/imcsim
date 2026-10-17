@@ -39,14 +39,17 @@ struct ExportTick {
  * @struct  ExportAxis
  * @brief   Name and unit of an axis, and how its ticks are written.
  * @details With prefixes, ticks read like the values the user types followed by the unit ("10ms", "1kHz");
- *          decibels and degrees read better as plain numbers, so their unit is left to the name. An axis may
- *          instead hold named ticks and a fixed range, as the lanes of logic signals do.
+ *          decibels and degrees read better as plain numbers, so their unit is left to the name. A logarithmic Y
+ *          axis, as for noise densities, has its ticks at decades and leaves out values that are not positive; the X
+ *          axis takes its scale from the figure instead. An axis may also hold named ticks and a fixed range, as the
+ *          lanes of logic signals do.
  */
 struct ExportAxis {
     std::string Name;
     std::string Unit;
     bool UsesPrefixes = true;
-    // Empty: round ticks across the range of the samples
+    bool Logarithmic = false;
+    // Empty: round ticks across the range of the samples, or decades on a logarithmic axis
     std::vector<ExportTick> Ticks;
     // Empty: the range of the samples, with some room
     std::optional<ExportRange> Range;

@@ -6,7 +6,11 @@
 #ifndef IMCSIM_SIMULATION_SETTINGS_H
 #define IMCSIM_SIMULATION_SETTINGS_H
 
+#include "helpers.h"
+#include "parameter_step.h"
 #include "simulator.h"
+#include <optional>
+#include <string>
 
 namespace GUI {
 
@@ -18,15 +22,18 @@ enum class Analysis {
     OperatingPoint,
     Transient,
     ACSweep,
-    DCSweep
+    DCSweep,
+    Noise
 };
 
 /**
  * @struct  SimulationSettings
- * @brief   Which analysis Run starts, and how each one runs: transient times, AC range and DC sweep sources and
- *          ranges.
- * @details The operating point has no settings. A sweep source that is empty, or that left the circuit, is
- *          replaced by a default when the sweep runs, so the stored name is never rewritten behind the user.
+ * @brief   Which analysis Run starts, and how each one runs: transient times, AC range, DC sweep sources and
+ *          ranges, and the range, input source and output node of the noise analysis.
+ * @details The operating point has no settings. A sweep or noise source that is empty, or that left the circuit,
+ *          is replaced by a default when the analysis runs, so the stored name is never rewritten behind the user.
+ *          The noise output is kept as a point of its node, as the voltage probes are, since node numbers change
+ *          with any edit; one that no longer lies on a node also falls back to a default.
  */
 struct SimulationSettings {
     Analysis Selected = Analysis::Transient;
@@ -36,6 +43,11 @@ struct SimulationSettings {
     // Keeps its values while stepping is off
     Core::SweepRange SteppedRange{.Start = 0.0, .Stop = 5.0, .Step = 1.0};
     bool StepSource = false;
+    Core::ACSweepSettings NoiseRange{.StartFrequency = 10.0, .StopFrequency = 100e3, .PointsPerDecade = 20};
+    std::string NoiseSource;
+    std::optional<GridPoint> NoiseOutput;
+    // Runs the transient, AC sweep or DC sweep once per value of a part or of the temperature
+    ParameterStepSettings ParameterStep;
 
     bool operator==(const SimulationSettings &) const = default;
 };

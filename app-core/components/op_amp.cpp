@@ -230,7 +230,8 @@ bool IsValidIdealBandwidth(const double bandwidth) {
  * @return  A transconductance driving a resistor and a capacitor from the input difference, which sets the gain
  *          and its roll-off; two diodes that clamp that node to the supply pins; and a unity-gain buffer from it to
  *          the output. Element names join the kind letter, a dash and the op-amp name, such as "G-U1", so they
- *          never clash with a name the user can give.
+ *          never clash with a name the user can give. The resistor adds no noise, so the op-amp is ideal in a noise
+ *          analysis too.
  * @note    ngspice converges on this where a behavioral source with a smooth limit does not: its Newton iterations
  *          start with every node at 0 V, supplies included, and a limit that depends on the supply voltages then
  *          starts saturated and swings from rail to rail. Diodes are what its solver handles best.
@@ -240,7 +241,7 @@ std::string FormatIdealOpAmp(const OpAmp &op_amp, const std::vector<int> &nodes,
     // The pole sits at the gain-bandwidth product over the open-loop gain
     const double capacitance = IdealGain / (2.0 * std::numbers::pi * IdealResistance * op_amp.GetIdealBandwidth());
     return std::format("G-{0} 0 {1} {2} {3} {4}\n"
-                       "R-{0} {1} 0 {5}\n"
+                       "R-{0} {1} 0 {5} noisy=0\n"
                        "C-{0} {1} 0 {6}\n"
                        "D-{0}-P {1} {7} {8}\n"
                        "D-{0}-N {9} {1} {8}\n"

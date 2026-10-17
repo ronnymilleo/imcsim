@@ -20,6 +20,7 @@ add_library(imcsim-gui-lib
             led_glow.cpp
             logic_trace.cpp
             node_colors.cpp
+            parameter_step.cpp
             part_editor.cpp
             playback.cpp
             plot_export.cpp
@@ -30,6 +31,7 @@ add_library(imcsim-gui-lib
             schematic_drawing.cpp
             schematic_file.cpp
             selection.cpp
+            spectrum.cpp
             svg_writer.cpp
             theme.cpp
             trace_math.cpp
