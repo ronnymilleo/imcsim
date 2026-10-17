@@ -24,6 +24,7 @@
 #include <cstdio>
 #include <filesystem>
 #include <format>
+#include <limits>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -98,6 +99,12 @@ constexpr float HarmonicMarkerSize = 3.0f;
 constexpr double MinShownDistortionPercent = 0.001;
 // The other steps of a stepped run are drawn this opaque, behind the shown step
 constexpr float OtherStepAlpha = 0.35f;
+// Samples on each side of a step label over which the curves must stay apart
+constexpr std::size_t SteadySamples = 2;
+// Spread between the curves of a family, against their size, below which they count as one and get no labels
+constexpr double NegligibleSpread = 1e-6;
+// Below a femtovolt or a femtoampere a value is the rounding residue of the solver, such as 1e-170 V for a node at 0 V
+constexpr double ResidueLevel = 1e-15;
 // The input-referred noise takes a color of its own, apart from the node colors the output uses
 constexpr ImU32 InputNoiseColor = IM_COL32(150, 230, 90, 255);
 // Six decades below the largest density, about where the share of a part stops mattering
@@ -254,6 +261,26 @@ void DrawCursorReadout(const std::vector<double> &xs, const char *x_unit, const 
     ImGui::EndTooltip();
 }
 
+// Whether the curves of a family differ at a sample by more than residue next to their size, so labeling each one
+// tells something; a trace the stepped value leaves unchanged would only pile its labels up on one line
+bool CurvesDiffer(const std::vector<const std::vector<double> *> &curves, const std::size_t sample) {
+    double largest = 0.0;
+    double lowest = std::numeric_limits<double>::infinity();
+    double highest = -std::numeric_limits<double>::infinity();
+    for (const std::vector<double> *curve : curves) {
+        for (const double value : *curve) {
+            if (std::isfinite(value)) {
+                largest = std::max(largest, std::abs(value));
+            }
+        }
+        if (sample < curve->size() && std::isfinite((*curve)[sample])) {
+            lowest = std::min(lowest, (*curve)[sample]);
+            highest = std::max(highest, (*curve)[sample]);
+        }
+    }
+    return highest > lowest && highest - lowest > std::max(largest * NegligibleSpread, ResidueLevel);
+}
+
 /**
  * @struct  CurveFamily
  * @brief   The curves of one trace across the steps of a DC sweep, and the axis they are plotted on.
@@ -356,40 +383,98 @@ void PlotOtherSteps(const std::vector<StepTraces> &steps, const std::size_t sele
     }
 }
 
-// Labels each step of every measured trace with its value, where its curves part most when the steps share their X
-// values (an AC sweep), or at their ends otherwise (each transient has its own time points). A trace the steps
-// leave unchanged, such as the input, gets no labels, which would only pile up on one line
-void LabelSteps(const std::vector<StepTraces> &steps, const std::vector<std::string> &labels,
-                const Schematic &schematic, const bool show_currents, const bool shared_xs,
+// A curve read at other X values, by straight lines between its samples and held at its ends; both X lists rise, so
+// one walk along each does it
+std::vector<double> ResampleOnto(const std::vector<double> &xs, const std::vector<double> &ys,
+                                 const std::vector<double> &targets) {
+    std::vector<double> values;
+    values.reserve(targets.size());
+    std::size_t index = 0;
+    for (const double target : targets) {
+        while (index + 1 < xs.size() && xs[index + 1] < target) {
+            ++index;
+        }
+        if (xs.empty()) {
+            values.push_back(0.0);
+        } else if (target <= xs.front() || index + 1 >= xs.size()) {
+            values.push_back(target <= xs.front() ? ys.front() : ys.back());
+        } else {
+            const double span = xs[index + 1] - xs[index];
+            const double fraction = span > 0.0 ? (target - xs[index]) / span : 0.0;
+            values.push_back(ys[index] + (ys[index + 1] - ys[index]) * fraction);
+        }
+    }
+    return values;
+}
+
+// The sample where curves of equal length part most and stay apart for a few samples around it, so an edge that
+// one step crosses before the others, as in a pulse, does not take the labels
+std::size_t FindSteadySpread(const std::vector<std::vector<double>> &curves) {
+    const std::size_t count = curves.empty() ? 0 : curves.front().size();
+    std::vector<double> spreads(count, 0.0);
+    for (std::size_t index = 0; index < count; ++index) {
+        double lowest = std::numeric_limits<double>::infinity();
+        double highest = -std::numeric_limits<double>::infinity();
+        for (const std::vector<double> &curve : curves) {
+            if (std::isfinite(curve[index])) {
+                lowest = std::min(lowest, curve[index]);
+                highest = std::max(highest, curve[index]);
+            }
+        }
+        spreads[index] = highest >= lowest ? highest - lowest : 0.0;
+    }
+    std::size_t widest = count == 0 ? 0 : count - 1;
+    double widest_spread = -1.0;
+    for (std::size_t index = 0; index < count; ++index) {
+        const std::size_t first = index > SteadySamples ? index - SteadySamples : 0;
+        const std::size_t last = std::min(index + SteadySamples, count - 1);
+        const double steady = *std::min_element(spreads.begin() + static_cast<std::ptrdiff_t>(first),
+                                                spreads.begin() + static_cast<std::ptrdiff_t>(last) + 1);
+        if (steady >= widest_spread) {
+            widest_spread = steady;
+            widest = index;
+        }
+    }
+    return widest;
+}
+
+// Labels each step of every measured trace with its value, where its curves part most. Every step is read at the X
+// values of the shown one, since each transient has its own time points. A trace the steps leave unchanged, such
+// as the input, gets no labels, which would only pile up on one line
+void LabelSteps(const std::vector<StepTraces> &steps, const std::size_t selected,
+                const std::vector<std::string> &labels, const Schematic &schematic, const bool show_currents,
                 const std::vector<int> &lane_nodes) {
     const ImVec4 color = ImGui::GetStyleColorVec4(ImGuiCol_PopupBg);
+    const std::vector<double> &xs = *steps[selected].Xs;
     const auto label_family = [&](const std::vector<const std::vector<double> *> &curves) {
-        const std::size_t shared_sample = shared_xs ? FindWidestSpread(curves) : 0;
-        std::vector<std::pair<double, double>> points;
+        std::vector<std::vector<double>> resampled;
+        double largest = 0.0;
         for (std::size_t step = 0; step < steps.size(); ++step) {
-            const std::vector<double> &xs = *steps[step].Xs;
-            const std::size_t sample = shared_xs ? shared_sample : xs.size() - 1;
-            if (xs.empty() || sample >= xs.size() || sample >= curves[step]->size()) {
-                return;
+            resampled.push_back(ResampleOnto(*steps[step].Xs, *curves[step], xs));
+            for (const double value : resampled.back()) {
+                largest = std::max(largest, std::abs(value));
             }
-            points.emplace_back(xs[sample], (*curves[step])[sample]);
         }
-        const auto [lowest, highest] = std::ranges::minmax(points, {}, &std::pair<double, double>::second);
-        const double scale = std::max(std::abs(lowest.second), std::abs(highest.second));
-        if (highest.second - lowest.second <= scale * 1e-6) {
+        const std::size_t sample = FindSteadySpread(resampled);
+        if (sample >= xs.size()) {
+            return;
+        }
+        const auto [lowest, highest] = std::ranges::minmax_element(
+            resampled, {}, [sample](const std::vector<double> &curve) { return curve[sample]; });
+        if ((*highest)[sample] - (*lowest)[sample] <= std::max(largest * NegligibleSpread, ResidueLevel)) {
             return;
         }
         // Labels closer than a line of text to one already drawn are skipped, so none is drawn over another
         std::vector<float> drawn;
         for (std::size_t step = 0; step < steps.size(); ++step) {
-            const float y = ImPlot::PlotToPixels(points[step].first, points[step].second).y;
-            if (std::ranges::any_of(drawn,
-                                    [y](const float other) { return std::abs(other - y) < ImGui::GetFontSize(); })) {
+            const double y = resampled[step][sample];
+            const float pixel_y = ImPlot::PlotToPixels(xs[sample], y).y;
+            if (std::ranges::any_of(
+                    drawn, [pixel_y](const float other) { return std::abs(other - pixel_y) < ImGui::GetFontSize(); })) {
                 continue;
             }
-            drawn.push_back(y);
-            ImPlot::Annotation(points[step].first, points[step].second, color, ImVec2(-4.0f, 0.0f), true, "%s",
-                               labels[step].c_str());
+            drawn.push_back(pixel_y);
+            ImPlot::Annotation(xs[sample], y, color, ImVec2(4.0f, 0.0f), true, "%s", labels[step].c_str());
         }
     };
     const StepTraces &first = steps.front();
@@ -460,16 +545,25 @@ void LabelCurves(const Core::DCSweep &sweep, const Schematic &schematic, const b
     const ImVec4 color = ImGui::GetStyleColorVec4(ImGuiCol_PopupBg);
     for (const CurveFamily &family : ListCurveFamilies(sweep, schematic, show_currents, math)) {
         const std::size_t sample = FindWidestSpread(family.Curves);
-        if (sample >= sweep.SweptValues.size()) {
+        if (sample >= sweep.SweptValues.size() || !CurvesDiffer(family.Curves, sample)) {
             continue;
         }
         ImPlot::SetAxes(ImAxis_X1, family.Axis);
+        // Labels closer than a line of text to one already drawn are skipped, so none is drawn over another
+        std::vector<float> drawn;
         for (std::size_t curve = 0; curve < family.Curves.size(); ++curve) {
             const double y = (*family.Curves[curve])[sample];
-            if (std::isfinite(y)) {
-                ImPlot::Annotation(sweep.SweptValues[sample], y, color, ImVec2(4.0f, 0.0f), true, "%s",
-                                   FormatStepLabel(sweep, sweep.Curves[curve]).c_str());
+            if (!std::isfinite(y)) {
+                continue;
             }
+            const float pixel_y = ImPlot::PlotToPixels(sweep.SweptValues[sample], y).y;
+            if (std::ranges::any_of(
+                    drawn, [pixel_y](const float other) { return std::abs(other - pixel_y) < ImGui::GetFontSize(); })) {
+                continue;
+            }
+            drawn.push_back(pixel_y);
+            ImPlot::Annotation(sweep.SweptValues[sample], y, color, ImVec2(4.0f, 0.0f), true, "%s",
+                               FormatStepLabel(sweep, sweep.Curves[curve]).c_str());
         }
     }
     ImPlot::SetAxes(ImAxis_X1, ImAxis_Y1);
@@ -1553,7 +1647,7 @@ void OutputWindow::DrawTransientAnalog(const Core::Transient &transient, const s
     }
     PlotMath(transient.Times, math, "", plotted);
     if (steps) {
-        LabelSteps(step_traces, ListStepLabels(*steps), m_Schematic, show_currents, false, lane_nodes);
+        LabelSteps(step_traces, steps->Selected, ListStepLabels(*steps), m_Schematic, show_currents, lane_nodes);
     }
     DrawCursors(m_TransientCursors, false);
     DrawPlayhead(m_Playback, transient.Times.back());
@@ -1697,7 +1791,7 @@ void OutputWindow::DrawACSweep(const Core::ACSweep &sweep) {
             PlotCurrents(sweep.Frequencies, sweep.CurrentMagnitudesDecibels, m_Schematic, " dB", "", plotted);
         }
         if (steps) {
-            LabelSteps(step_traces, ListStepLabels(*steps), m_Schematic, show_currents, true, {});
+            LabelSteps(step_traces, steps->Selected, ListStepLabels(*steps), m_Schematic, show_currents, {});
         }
         DrawCursors(m_ACSweepCursors, true);
         DrawCursorReadout(sweep.Frequencies, "Hz", true, plotted);
@@ -2553,7 +2647,7 @@ ExportFigure OutputWindow::BuildDCSweepFigure(const Core::DCSweep &sweep,
         const bool show_currents = HasMeasuredCurrent(sweep.Curves.front().Currents, m_Schematic);
         for (const CurveFamily &family : ListCurveFamilies(sweep, m_Schematic, show_currents, math)) {
             const std::size_t sample = FindWidestSpread(family.Curves);
-            if (sample >= sweep.SweptValues.size()) {
+            if (sample >= sweep.SweptValues.size() || !CurvesDiffer(family.Curves, sample)) {
                 continue;
             }
             for (std::size_t curve = 0; curve < family.Curves.size(); ++curve) {
