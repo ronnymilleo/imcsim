@@ -6,10 +6,12 @@ add_library(imcsim-gui-lib
         STATIC
             analysis_controls.cpp
             application.cpp
+            canvas_view.cpp
             circuit_snapshot.cpp
             clipboard.cpp
             connectivity.cpp
             current_flow.cpp
+            editor_preferences.cpp
             element_factory.cpp
             examples.cpp
             file_dialog.cpp
@@ -30,6 +32,7 @@ add_library(imcsim-gui-lib
             schematic_canvas.cpp
             schematic_drawing.cpp
             schematic_file.cpp
+            schematic_file_actions.cpp
             selection.cpp
             spectrum.cpp
             svg_writer.cpp

@@ -17,10 +17,8 @@
 #include "node_colors.h"
 #include "probing.h"
 #include "schematic_drawing.h"
-#include "schematic_file.h"
 #include "shortcuts.h"
 #include "spice_value.h"
-#include "standard_values.h"
 #include "theme.h"
 #include "wire_editing.h"
 #include <algorithm>
@@ -39,11 +37,6 @@ namespace GUI {
 namespace {
 
 constexpr float MinCanvasSize = 50.0f;
-constexpr float MinZoom = 4.0f;
-constexpr float MaxZoom = 200.0f;
-constexpr float ZoomStep = 1.1f;
-// Fit may zoom in this far on a small circuit; opening a file stops at the default zoom
-constexpr float FitMaxZoom = 50.0f;
 // Below this spacing the dots are thinned out, otherwise far zoom-out draws hundreds of thousands of them
 constexpr float MinDotSpacing = 8.0f;
 constexpr float WireCursorHalfSize = 4.0f;
@@ -69,11 +62,6 @@ constexpr float HeatGlowMaxRadius = 2.5f;
 constexpr ImVec4 HeatLight = {1.0f, 0.45f, 0.1f, 1.0f};
 constexpr float AdditiveGlowIntensity = 0.9f;
 constexpr float BlendedGlowIntensity = 0.5f;
-// Null-terminated literals, so data() can go to ImGui
-constexpr auto WireColoringNames = std::to_array<std::string_view>({"Plain", "Nodes", "Voltage", "Current", "Power"});
-constexpr auto LiveEffectsNames = std::to_array<std::string_view>({"Current Flow", "LED Glow", "Heat Glow"});
-// Section of imgui.ini that keeps the View preferences
-constexpr const char *SettingsTypeName = "Editor";
 /**
  * @struct  PartGroup
  * @brief   Related parts that share one toolbar button, with a dropdown to pick among them.
@@ -251,9 +239,6 @@ void DrawPartIcon(ImDrawList *draw_list, const Core::ComponentType type, const I
     CreateElement(type, {0, 0}, Rotation::R0)->DrawIcon(canvas, center, size, IconColor(true), style);
 }
 
-constexpr const char *DiscardPopup = "Discard changes?";
-constexpr const char *FileMessagesPopup = "File messages";
-constexpr const char *ExportPopup = "Export schematic";
 constexpr const char *PartPickerPopup = "Find a part";
 constexpr const char *PartPopover = "Part properties";
 constexpr const char *ContextMenu = "Schematic actions";
@@ -263,9 +248,6 @@ constexpr float PopoverWidth = 18.0f;
 // The part picker shows this many matches at once, and its top sits this far down the editor, as a share of it
 constexpr std::size_t PartPickerRows = 5;
 constexpr float PartPickerTop = 0.3f;
-// Must stay valid until the dialog callback runs, so it lives for the whole program
-constexpr std::array<SDL_DialogFileFilter, 1> SchematicFilters = {{{"imcsim schematic", "imcsim"}}};
-constexpr std::array<SDL_DialogFileFilter, 1> SVGFilters = {{{"SVG image", "svg"}}};
 
 void DrawGrid(ImDrawList *draw_list, const ViewTransform &view, const ImVec2 origin, const ImVec2 size,
               const float zoom) {
@@ -363,14 +345,6 @@ ImU32 WithAlpha(const ImU32 color, const ImU32 alpha) {
     return (color & ~IM_COL32_A_MASK) | (alpha << IM_COL32_A_SHIFT);
 }
 
-// The value of a "key=value" line when it has that key
-std::optional<std::string_view> ValueOf(const std::string_view line, const std::string_view key) {
-    if (!line.starts_with(key) || line.size() <= key.size() || line[key.size()] != '=') {
-        return std::nullopt;
-    }
-    return line.substr(key.size() + 1);
-}
-
 // Power a part absorbs, looked up by the name of the part; a current name such as "Q1.C" belongs to part "Q1"
 std::optional<ComponentPower> FindPower(const std::vector<ComponentPower> &powers, const std::string &name) {
     const std::string part = name.substr(0, name.find('.'));
@@ -391,7 +365,11 @@ std::optional<ComponentPower> FindPower(const std::vector<ComponentPower> &power
 EditorWindow::EditorWindow(Schematic &schematic, AnalysisControls &controls, PartEditor &part_editor,
                            GlowRenderer &glow_renderer, TransientPlayback &playback)
     : AppWindow("Schematic", false), m_Schematic(schematic), m_Controls(controls), m_PartEditor(part_editor),
-      m_GlowRenderer(glow_renderer), m_Playback(playback) {
+      m_GlowRenderer(glow_renderer), m_Playback(playback), m_Preferences(part_editor),
+      m_Files(schematic, m_Preferences,
+              {.StopEditing = [this] { StopEditing(); },
+               .FrameSchematic = [this] { m_View.RequestDefaultFrame(); },
+               .PlaceGroup = [this](PastedGroup group) { StartPastingGroup(std::move(group)); }}) {
     for (const PartGroup &group : PartGroups) {
         m_PartGroupChoices.push_back(group.Types.front());
     }
@@ -408,12 +386,10 @@ void EditorWindow::Update() {
     if (const auto &transient = m_Schematic.GetTransient(); transient && !transient->Times.empty()) {
         m_Playback.Advance(ImGui::GetIO().DeltaTime, transient->Times.back());
     }
-    ProcessDialogResult();
-    HandleQuitRequest();
-    HandleExampleRequest();
+    m_Files.Update();
     HandleCommandRequest();
     HandleGlobalShortcuts();
-    DrawFilePopups();
+    m_Files.DrawPopups();
 }
 
 /**
@@ -422,7 +398,7 @@ void EditorWindow::Update() {
  *          to discard the changes. Check IsQuitConfirmed() after drawing the frame.
  */
 void EditorWindow::RequestQuit() {
-    m_QuitRequested = true;
+    m_Files.RequestQuit();
 }
 
 /**
@@ -430,7 +406,7 @@ void EditorWindow::RequestQuit() {
  * @return  True once a quit request was confirmed, by the user or because there were no unsaved changes.
  */
 bool EditorWindow::IsQuitConfirmed() const {
-    return m_QuitConfirmed;
+    return m_Files.IsQuitConfirmed();
 }
 
 /**
@@ -440,7 +416,7 @@ bool EditorWindow::IsQuitConfirmed() const {
  *          any. The example opens untitled, so saving it asks for a file.
  */
 void EditorWindow::RequestExample(const Example &example) {
-    m_RequestedExample = example;
+    m_Files.RequestExample(example);
 }
 
 /**
@@ -449,7 +425,7 @@ void EditorWindow::RequestExample(const Example &example) {
  * @note    The next frame starts placing it like an import. Nothing is replaced, so nothing is asked.
  */
 void EditorWindow::RequestInsertExample(const Example &example) {
-    m_RequestedInsertExample = example;
+    m_Files.RequestInsertExample(example);
 }
 
 /**
@@ -458,7 +434,7 @@ void EditorWindow::RequestInsertExample(const Example &example) {
  * @note    The next frame starts placing it, as File > Import does after its dialog.
  */
 void EditorWindow::RequestImport(std::filesystem::path path) {
-    m_RequestedImport = std::move(path);
+    m_Files.RequestImport(std::move(path));
 }
 
 /**
@@ -550,73 +526,10 @@ void EditorWindow::DrawEditMenuItems() {
  */
 void EditorWindow::DrawViewMenuItems() {
     if (ImGui::MenuItem("Fit Schematic", "Home")) {
-        m_FrameMaxZoom = FitMaxZoom;
+        m_View.RequestFit();
     }
     ImGui::Separator();
-    bool changed = false;
-    if (ImGui::BeginMenu("Wire Colors")) {
-        for (std::size_t index = 0; index < WireColoringNames.size(); ++index) {
-            const auto coloring = static_cast<WireColoring>(index);
-            if (ImGui::MenuItem(WireColoringNames[index].data(), nullptr, m_WireColoring == coloring)) {
-                m_WireColoring = coloring;
-                changed = true;
-            }
-        }
-        ImGui::EndMenu();
-    }
-    if (ImGui::BeginMenu("Live Effects")) {
-        for (std::size_t index = 0; index < LiveEffectsNames.size(); ++index) {
-            bool &enabled = m_LiveEffects[index];
-            if (ImGui::MenuItem(LiveEffectsNames[index].data(), nullptr, enabled)) {
-                enabled = !enabled;
-                changed = true;
-            }
-        }
-        ImGui::EndMenu();
-    }
-    if (ImGui::BeginMenu("Symbols")) {
-        if (ImGui::MenuItem("IEC", nullptr, m_SymbolStyle == SymbolStyle::IEC)) {
-            m_SymbolStyle = SymbolStyle::IEC;
-            changed = true;
-        }
-        if (ImGui::MenuItem("ANSI", nullptr, m_SymbolStyle == SymbolStyle::ANSI)) {
-            m_SymbolStyle = SymbolStyle::ANSI;
-            changed = true;
-        }
-        ImGui::EndMenu();
-    }
-    if (ImGui::MenuItem("Terminal Numbers", nullptr, &m_ShowTerminalNumbers)) {
-        changed = true;
-    }
-    ImGui::SetItemTooltip("Number the terminals of each part; terminal 1 is where a positive current enters");
-    if (ImGui::BeginMenu("Component Values")) {
-        changed |= DrawValueSeriesItems();
-        ImGui::EndMenu();
-    }
-    if (changed) {
-        ImGui::MarkIniSettingsDirty();
-    }
-}
-
-// The choice of standard values for resistors, capacitors and inductors; true when it changed
-bool EditorWindow::DrawValueSeriesItems() {
-    bool changed = false;
-    constexpr auto Choices =
-        std::to_array({Core::ValueSeries::Free, Core::ValueSeries::E6, Core::ValueSeries::E12, Core::ValueSeries::E24,
-                       Core::ValueSeries::E48, Core::ValueSeries::E96, Core::ValueSeries::E192});
-    for (const Core::ValueSeries series : Choices) {
-        const std::string label =
-            series == Core::ValueSeries::Free
-                ? "Any value"
-                : std::format("{} ({:g}%)", Core::GetSeriesName(series), Core::GetSeriesTolerancePercent(series));
-        if (ImGui::MenuItem(label.c_str(), nullptr, m_PartEditor.GetValueSeries() == series)) {
-            m_PartEditor.SetValueSeries(series);
-            changed = true;
-        }
-    }
-    ImGui::Separator();
-    ImGui::TextDisabled("Resistors, capacitors and inductors take the nearest value of the series");
-    return changed;
+    m_Preferences.DrawMenuItems();
 }
 
 /**
@@ -624,68 +537,14 @@ bool EditorWindow::DrawValueSeriesItems() {
  *          next to the window layout, so they survive a restart.
  */
 void EditorWindow::RegisterSettingsHandler() {
-    ImGuiSettingsHandler handler;
-    handler.TypeName = SettingsTypeName;
-    handler.TypeHash = ImHashStr(SettingsTypeName);
-    handler.UserData = this;
-    handler.ReadOpenFn = [](ImGuiContext *, ImGuiSettingsHandler *settings, const char *) -> void * {
-        return settings->UserData;
-    };
-    handler.ReadLineFn = [](ImGuiContext *, ImGuiSettingsHandler *, void *entry, const char *line) {
-        static_cast<EditorWindow *>(entry)->ReadSetting(line);
-    };
-    handler.WriteAllFn = [](ImGuiContext *, ImGuiSettingsHandler *settings, ImGuiTextBuffer *buffer) {
-        static_cast<const EditorWindow *>(settings->UserData)->WriteSettings(*buffer);
-    };
-    ImGui::AddSettingsHandler(&handler);
-}
-
-// One "Key=value" line of the preferences; keys and values that are not known are ignored
-void EditorWindow::ReadSetting(const std::string_view line) {
-    if (const auto colors = ValueOf(line, "WireColors")) {
-        const auto found = std::ranges::find(WireColoringNames, *colors);
-        if (found != WireColoringNames.end()) {
-            m_WireColoring = static_cast<WireColoring>(found - WireColoringNames.begin());
-        }
-    } else if (const auto symbols = ValueOf(line, "Symbols")) {
-        m_SymbolStyle = *symbols == "ANSI" ? SymbolStyle::ANSI : SymbolStyle::IEC;
-    } else if (const auto numbers = ValueOf(line, "TerminalNumbers")) {
-        m_ShowTerminalNumbers = *numbers == "1";
-    } else if (const auto series = ValueOf(line, "ValueSeries")) {
-        if (const auto parsed = Core::ParseSeriesName(*series)) {
-            m_PartEditor.SetValueSeries(*parsed);
-        }
-    } else if (const auto effects = ValueOf(line, "LiveEffects")) {
-        for (std::size_t index = 0; index < LiveEffectsNames.size(); ++index) {
-            m_LiveEffects[index] = effects->find(LiveEffectsNames[index]) != std::string_view::npos;
-        }
-    }
-}
-
-void EditorWindow::WriteSettings(ImGuiTextBuffer &buffer) const {
-    buffer.appendf("[%s][Preferences]\n", SettingsTypeName);
-    buffer.appendf("WireColors=%s\n", WireColoringNames[static_cast<std::size_t>(m_WireColoring)].data());
-    buffer.appendf("Symbols=%s\n", m_SymbolStyle == SymbolStyle::ANSI ? "ANSI" : "IEC");
-    buffer.appendf("TerminalNumbers=%d\n", m_ShowTerminalNumbers ? 1 : 0);
-    buffer.appendf("ValueSeries=%s\n", Core::GetSeriesName(m_PartEditor.GetValueSeries()));
-    std::string live_effects;
-    for (std::size_t index = 0; index < LiveEffectsNames.size(); ++index) {
-        if (!m_LiveEffects[index]) {
-            continue;
-        }
-        if (!live_effects.empty()) {
-            live_effects += ',';
-        }
-        live_effects += LiveEffectsNames[index];
-    }
-    buffer.appendf("LiveEffects=%s\n\n", live_effects.c_str());
+    m_Preferences.RegisterSettingsHandler();
 }
 
 // Window content only: AppWindow::Render() wraps it in Begin/End
 void EditorWindow::Draw() {
     // Only while the editor has the focus, since text fields use Home
     if (ImGui::Shortcut(ImGuiKey_Home)) {
-        m_FrameMaxZoom = FitMaxZoom;
+        m_View.RequestFit();
     }
     DrawPartPicker();
     DrawToolbar();
@@ -698,18 +557,16 @@ void EditorWindow::Draw() {
     size.y -= ImGui::GetTextLineHeightWithSpacing();
     size.x = std::max(size.x, MinCanvasSize);
     size.y = std::max(size.y, MinCanvasSize);
-    if (const std::optional<float> max_zoom = std::exchange(m_FrameMaxZoom, std::nullopt)) {
-        FrameSchematic(size, *max_zoom);
-    }
+    m_View.FrameIfRequested(m_Schematic, size, m_Preferences.GetSymbolStyle(), m_Preferences.ShowsTerminalNumbers());
 
     ImGui::InvisibleButton("canvas", size,
                            ImGuiButtonFlags_MouseButtonLeft | ImGuiButtonFlags_MouseButtonRight |
                                ImGuiButtonFlags_MouseButtonMiddle);
     const bool hovered = ImGui::IsItemHovered();
     const bool active = ImGui::IsItemActive();
-    HandlePanAndZoom(origin, hovered, active);
+    m_View.HandlePanAndZoom(origin, hovered, active);
 
-    const ViewTransform view(origin, m_Pan, m_Zoom);
+    const ViewTransform view = m_View.GetTransform(origin);
     // Selection runs before drawing so a dragged element is drawn where the cursor is this frame
     HandleSelection(view, hovered);
     HandleContextMenu(view, hovered);
@@ -717,20 +574,20 @@ void EditorWindow::Draw() {
     ImDrawList *draw_list = ImGui::GetWindowDrawList();
     draw_list->PushClipRect(origin, origin + size, true);
     draw_list->AddRectFilled(origin, origin + size, GetPalette().CanvasBackground);
-    DrawGrid(draw_list, view, origin, size, m_Zoom);
+    DrawGrid(draw_list, view, origin, size, m_View.GetZoom());
 
     DrawListCanvas canvas(draw_list);
     DrawWires(canvas, view);
     const auto &elements = m_Schematic.GetElements();
     for (std::size_t index = 0; index < elements.size(); ++index) {
-        elements[index]->Draw(canvas, view, GetElementColor(index), m_SymbolStyle);
+        elements[index]->Draw(canvas, view, GetElementColor(index), m_Preferences.GetSymbolStyle());
         if (m_Schematic.IsElementSelected(index) && ArePartsHeatColored()) {
             elements[index]->DrawOutline(canvas, view, GetPalette().Selected);
         }
     }
     // Over the symbols, so a lit LED looks lit through its own lines
     DrawGlows(draw_list, view);
-    if (m_ShowTerminalNumbers) {
+    if (m_Preferences.ShowsTerminalNumbers()) {
         DrawTerminalNumbers(canvas, view, m_Schematic, ScreenTerminalRingScale);
     }
     DrawNodeVoltages(draw_list, view);
@@ -796,7 +653,7 @@ void EditorWindow::DrawToolbar() {
         Redo();
     }
     if (tool_button("##fit", ToolIcon::Fit, false, true, "Fit the schematic in view (Home)", 0.0f)) {
-        m_FrameMaxZoom = FitMaxZoom;
+        m_View.RequestFit();
     }
 
     // Parts
@@ -826,7 +683,7 @@ void EditorWindow::DrawPartButton(const Core::ComponentType type) {
         StartPlacing(type);
     }
     ImGui::PopID();
-    DrawPartIcon(ImGui::GetWindowDrawList(), type, ItemCenter(), IconSize(), m_SymbolStyle);
+    DrawPartIcon(ImGui::GetWindowDrawList(), type, ItemCenter(), IconSize(), m_Preferences.GetSymbolStyle());
     ImGui::SetItemTooltip("%s", GetPartName(type));
 }
 
@@ -913,7 +770,7 @@ void EditorWindow::DrawPartGroup(const std::size_t index) {
             ImGui::PopID();
             ImDrawList *draw_list = ImGui::GetWindowDrawList();
             DrawPartIcon(draw_list, type, start + ImVec2(row_height, row_height) / 2.0f, row_height * IconScale,
-                         m_SymbolStyle);
+                         m_Preferences.GetSymbolStyle());
             const float text_y = (row_height - ImGui::GetTextLineHeight()) / 2.0f;
             draw_list->AddText(start + ImVec2(row_height + ImGui::GetStyle().ItemSpacing.x, text_y), IconColor(true),
                                GetPartName(type));
@@ -989,7 +846,7 @@ void EditorWindow::DrawTimeBar() {
 void EditorWindow::DrawWires(SchematicCanvas &canvas, const ViewTransform &view) {
     const Connectivity &connectivity = m_Schematic.GetConnectivity();
     const auto &wires = m_Schematic.GetWires();
-    const bool drawn_by_current = m_WireColoring == WireColoring::Current && m_Displayed;
+    const bool drawn_by_current = m_Preferences.GetWireColoring() == WireColoring::Current && m_Displayed;
     DrawWireSelectionHalos(canvas, view);
     if (drawn_by_current) {
         DrawWireCurrents(canvas, view);
@@ -1006,17 +863,17 @@ void EditorWindow::DrawWires(SchematicCanvas &canvas, const ViewTransform &view)
         wire.Draw(canvas, view, selected ? GetPalette().Selected : GetWireColor(node));
     }
 
-    const float junction_radius = std::max(m_Zoom * JunctionRadiusScale, MinJunctionRadius);
+    const float junction_radius = std::max(m_View.GetZoom() * JunctionRadiusScale, MinJunctionRadius);
     for (const GridPoint junction : connectivity.GetJunctions()) {
         const int node = connectivity.GetNode(junction).value_or(0);
         canvas.AddCircleFilled(view.ToScreen(ToVec2(junction)), junction_radius, GetWireColor(node));
     }
 
-    if (m_LiveEffects[static_cast<std::size_t>(LiveEffect::CurrentFlow)] && m_Displayed) {
+    if (m_Preferences.IsEffectOn(LiveEffect::CurrentFlow) && m_Displayed) {
         DrawLiveCurrent(canvas, view, m_Schematic, m_Displayed->Point, m_Displayed->Scale, ImGui::GetTime());
     }
 
-    if (m_WireColoring == WireColoring::Nodes) {
+    if (m_Preferences.GetWireColoring() == WireColoring::Nodes) {
         DrawNodeNumbers(canvas, view);
     }
 }
@@ -1045,10 +902,10 @@ void EditorWindow::DrawNodeNumbers(SchematicCanvas &canvas, const ViewTransform 
 
 // The color of the wires of a node: its own by node, its heat color by voltage, otherwise the color of the theme
 ImU32 EditorWindow::GetWireColor(const int node) const {
-    if (m_WireColoring == WireColoring::Nodes) {
+    if (m_Preferences.GetWireColoring() == WireColoring::Nodes) {
         return GetNodeColor(node);
     }
-    const bool by_voltage = m_WireColoring == WireColoring::Voltage && m_Displayed;
+    const bool by_voltage = m_Preferences.GetWireColoring() == WireColoring::Voltage && m_Displayed;
     if (by_voltage && static_cast<std::size_t>(node) < m_Displayed->Point.NodeVoltages.size()) {
         const double voltage = m_Displayed->Point.NodeVoltages[static_cast<std::size_t>(node)];
         return GetHeatColor(VoltageLevel(voltage, m_Displayed->Scale));
@@ -1068,8 +925,8 @@ void EditorWindow::DrawWireCurrents(SchematicCanvas &canvas, const ViewTransform
 // Every lit LED glows in its color, bigger and stronger with its current, and every resistor that dissipates power
 // glows orange with it. Additive light needs a dark background, so light themes blend the glows instead
 void EditorWindow::DrawGlows(ImDrawList *draw_list, const ViewTransform &view) {
-    const bool leds = m_LiveEffects[static_cast<std::size_t>(LiveEffect::LEDGlow)];
-    const bool resistors = m_LiveEffects[static_cast<std::size_t>(LiveEffect::HeatGlow)];
+    const bool leds = m_Preferences.IsEffectOn(LiveEffect::LEDGlow);
+    const bool resistors = m_Preferences.IsEffectOn(LiveEffect::HeatGlow);
     if (!m_Displayed || (!leds && !resistors)) {
         return;
     }
@@ -1080,7 +937,8 @@ void EditorWindow::DrawGlows(ImDrawList *draw_list, const ViewTransform &view) {
                               const float max_radius) {
         light.w = intensity * brightness;
         const float radius = min_radius + (max_radius - min_radius) * brightness;
-        glows.push_back({view.ToScreen(ToVec2(center)), radius * m_Zoom, ImGui::ColorConvertFloat4ToU32(light)});
+        glows.push_back(
+            {view.ToScreen(ToVec2(center)), radius * m_View.GetZoom(), ImGui::ColorConvertFloat4ToU32(light)});
     };
     if (leds) {
         for (const LEDGlow &led : ComputeLEDGlows(m_Schematic.GetElements(), m_Displayed->Point.Currents)) {
@@ -1102,8 +960,8 @@ ImU32 EditorWindow::GetElementColor(const std::size_t index) const {
     if (m_Schematic.IsElementSelected(index) && !ArePartsHeatColored()) {
         return GetPalette().Selected;
     }
-    const bool by_current = m_WireColoring == WireColoring::Current;
-    if ((!by_current && m_WireColoring != WireColoring::Power) || !m_Displayed) {
+    const bool by_current = m_Preferences.GetWireColoring() == WireColoring::Current;
+    if ((!by_current && m_Preferences.GetWireColoring() != WireColoring::Power) || !m_Displayed) {
         return GetPalette().Element;
     }
     const UIElement &element = *m_Schematic.GetElements()[index];
@@ -1221,18 +1079,21 @@ float EditorWindow::DrawRunStatus(float right_edge) {
 
 // Voltage and Current color the wires with the heat scale, once there is a result to color them by
 bool EditorWindow::AreWiresHeatColored() const {
-    return m_Displayed && (m_WireColoring == WireColoring::Voltage || m_WireColoring == WireColoring::Current);
+    return m_Displayed && (m_Preferences.GetWireColoring() == WireColoring::Voltage ||
+                           m_Preferences.GetWireColoring() == WireColoring::Current);
 }
 
 // Current and Power color the parts with the heat scale, once there is a result to color them by
 bool EditorWindow::ArePartsHeatColored() const {
-    return m_Displayed && (m_WireColoring == WireColoring::Current || m_WireColoring == WireColoring::Power);
+    return m_Displayed && (m_Preferences.GetWireColoring() == WireColoring::Current ||
+                           m_Preferences.GetWireColoring() == WireColoring::Power);
 }
 
 // A gradient with the values at its ends, or a reminder to run an operating point or a transient
 void EditorWindow::DrawColorLegend(ImDrawList *draw_list, const ImVec2 origin, const ImVec2 size) const {
-    if (m_WireColoring != WireColoring::Voltage && m_WireColoring != WireColoring::Current &&
-        m_WireColoring != WireColoring::Power) {
+    if (m_Preferences.GetWireColoring() != WireColoring::Voltage &&
+        m_Preferences.GetWireColoring() != WireColoring::Current &&
+        m_Preferences.GetWireColoring() != WireColoring::Power) {
         return;
     }
     const float font_size = ImGui::GetFontSize();
@@ -1246,10 +1107,10 @@ void EditorWindow::DrawColorLegend(ImDrawList *draw_list, const ImVec2 origin, c
     const HeatScale &scale = m_Displayed->Scale;
     std::string low_label;
     std::string high_label;
-    if (m_WireColoring == WireColoring::Voltage) {
+    if (m_Preferences.GetWireColoring() == WireColoring::Voltage) {
         low_label = std::format("{}V", Core::FormatValue(scale.LowestVoltage));
         high_label = std::format("{}V", Core::FormatValue(scale.HighestVoltage));
-    } else if (m_WireColoring == WireColoring::Current) {
+    } else if (m_Preferences.GetWireColoring() == WireColoring::Current) {
         low_label = std::format("<{}A", Core::FormatValue(scale.LargestCurrent * std::pow(10.0, -CurrentDecades)));
         high_label = std::format("{}A", Core::FormatValue(scale.LargestCurrent));
     } else {
@@ -1312,7 +1173,7 @@ void EditorWindow::DrawHoveredValue(const ViewTransform &view, const bool hovere
     }
     const std::optional<MeasurementTarget> target =
         FindMeasurementTarget(m_Schematic.GetElements(), m_Schematic.GetWires(), m_Schematic.GetConnectivity(),
-                              view.ToWorld(ImGui::GetIO().MousePos), WirePickDistance / m_Zoom);
+                              view.ToWorld(ImGui::GetIO().MousePos), WirePickDistance / m_View.GetZoom());
     if (!target || !FindOperatingPointValue(*target, m_Displayed->Point)) {
         return;
     }
@@ -1323,30 +1184,6 @@ void EditorWindow::DrawHoveredValue(const ViewTransform &view, const bool hovere
         }
     }
     ImGui::SetTooltip("%s", text.c_str());
-}
-
-void EditorWindow::HandlePanAndZoom(const ImVec2 origin, const bool hovered, const bool active) {
-    const ImGuiIO &io = ImGui::GetIO();
-    if (active && ImGui::IsMouseDragging(ImGuiMouseButton_Middle)) {
-        m_Pan += io.MouseDelta;
-    }
-    if (hovered && io.MouseWheel != 0.0f) {
-        // Keep the world point under the cursor fixed while zooming
-        const ImVec2 before = ViewTransform(origin, m_Pan, m_Zoom).ToWorld(io.MousePos);
-        m_Zoom = std::clamp(m_Zoom * (io.MouseWheel > 0 ? ZoomStep : 1 / ZoomStep), MinZoom, MaxZoom);
-        const ImVec2 after = ViewTransform(origin, m_Pan, m_Zoom).ToWorld(io.MousePos);
-        m_Pan += (after - before) * m_Zoom;
-    }
-}
-
-// Shows the whole schematic centered, labels included, never zoomed in past max_zoom, so a small circuit is not
-// blown up
-void EditorWindow::FrameSchematic(const ImVec2 canvas_size, const float max_zoom) {
-    const std::optional<SchematicBounds> bounds = MeasureSchematic(m_Schematic, m_SymbolStyle, m_ShowTerminalNumbers);
-    const ViewFrame frame = bounds ? FrameBounds(bounds->Min, bounds->Max, canvas_size, MinZoom, max_zoom)
-                                   : FramePoints({}, canvas_size, MinZoom, max_zoom);
-    m_Pan = frame.Pan;
-    m_Zoom = frame.Zoom;
 }
 
 // Leaves every other mode, so clicks select and drag
@@ -1384,6 +1221,15 @@ void EditorWindow::StartProbing() {
     m_DrawingWires = false;
     m_WireStart.reset();
     m_Probing = true;
+}
+
+// Before the schematic is cleared or replaced: a drag or paste in progress would point at parts that are gone
+void EditorWindow::StopEditing() {
+    EndDrag();
+    m_Pasting.reset();
+    m_PlacingType.reset();
+    m_DrawingWires = false;
+    m_WireStart.reset();
 }
 
 /**
@@ -1457,7 +1303,7 @@ void EditorWindow::DrawPartPicker() {
         }
         ImDrawList *draw_list = ImGui::GetWindowDrawList();
         DrawPartIcon(draw_list, type, start + ImVec2(row_height, row_height) / 2.0f, row_height * IconScale,
-                     m_SymbolStyle);
+                     m_Preferences.GetSymbolStyle());
         const float text_y = (row_height - ImGui::GetTextLineHeight()) / 2.0f;
         draw_list->AddText(start + ImVec2(row_height + ImGui::GetStyle().ItemSpacing.x, text_y), IconColor(true),
                            GetPartName(type));
@@ -1518,7 +1364,7 @@ void EditorWindow::HandlePlacement(SchematicCanvas &canvas, const ViewTransform 
         // A new label starts with the name of the last one, so the same net is a click away
         static_cast<Core::NetLabel &>(preview->GetComponent()).SetNet(FindLastNet());
     }
-    preview->Draw(canvas, view, GetPreviewColor(), m_SymbolStyle);
+    preview->Draw(canvas, view, GetPreviewColor(), m_Preferences.GetSymbolStyle());
     if (!ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
         return;
     }
@@ -1647,7 +1493,7 @@ void EditorWindow::HandlePasting(SchematicCanvas &canvas, const ViewTransform &v
         wire.Draw(canvas, view, GetPreviewColor());
     }
     for (const auto &element : m_Pasting->Elements) {
-        element->Draw(canvas, view, GetPreviewColor(), m_SymbolStyle);
+        element->Draw(canvas, view, GetPreviewColor(), m_Preferences.GetSymbolStyle());
     }
     if (!ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
         return;
@@ -1767,7 +1613,7 @@ void EditorWindow::HandleProbing(ImDrawList *draw_list, const ViewTransform &vie
     const ImVec2 cursor = ImGui::GetIO().MousePos;
     const std::optional<MeasurementTarget> target =
         FindMeasurementTarget(m_Schematic.GetElements(), m_Schematic.GetWires(), m_Schematic.GetConnectivity(),
-                              view.ToWorld(cursor), WirePickDistance / m_Zoom);
+                              view.ToWorld(cursor), WirePickDistance / m_View.GetZoom());
     if (!target) {
         ImGui::SetTooltip("Click a wire for its voltage, or a part for its current");
         return;
@@ -1807,8 +1653,8 @@ void EditorWindow::HandleSelection(const ViewTransform &view, const bool hovered
     const ImVec2 cursor_world = view.ToWorld(ImGui::GetIO().MousePos);
     const bool shift = ImGui::GetIO().KeyShift;
     if (hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
-        const Selection picked =
-            PickAt(m_Schematic.GetElements(), m_Schematic.GetWires(), cursor_world, WirePickDistance / m_Zoom);
+        const Selection picked = PickAt(m_Schematic.GetElements(), m_Schematic.GetWires(), cursor_world,
+                                        WirePickDistance / m_View.GetZoom());
         const Selection current = {m_Schematic.GetSelectedElements(), m_Schematic.GetSelectedWires()};
         if (picked.Empty()) {
             // Empty canvas starts a box; with Shift it adds to what is selected, otherwise it starts over
@@ -2046,7 +1892,7 @@ void EditorWindow::PlacePartPopover(const ViewTransform &view) {
         min = {std::min(min.x, point.x), std::min(min.y, point.y)};
         max = {std::max(max.x, point.x), std::max(max.y, point.y)};
     }
-    const float margin = m_Zoom * PopoverMargin;
+    const float margin = m_View.GetZoom() * PopoverMargin;
     const float right_edge = ImGui::GetWindowPos().x + ImGui::GetWindowWidth();
     const bool fits_right = max.x + margin + ImGui::GetFontSize() * PopoverWidth <= right_edge;
     m_PartPopoverAnchor = {fits_right ? max.x + margin : min.x - margin, min.y - margin};
@@ -2108,13 +1954,14 @@ void EditorWindow::HandleContextMenu(const ViewTransform &view, const bool hover
     const ImVec2 cursor_world = view.ToWorld(ImGui::GetIO().MousePos);
     // Right click keeps a group when it lands on one of its items; anywhere else it selects what is under the cursor
     const Selection picked =
-        PickAt(m_Schematic.GetElements(), m_Schematic.GetWires(), cursor_world, WirePickDistance / m_Zoom);
+        PickAt(m_Schematic.GetElements(), m_Schematic.GetWires(), cursor_world, WirePickDistance / m_View.GetZoom());
     const Selection current = {m_Schematic.GetSelectedElements(), m_Schematic.GetSelectedWires()};
     if (picked.Empty() || Joined(current, picked) != current) {
         ApplySelection(picked);
     }
-    m_ContextTarget = FindMeasurementTarget(m_Schematic.GetElements(), m_Schematic.GetWires(),
-                                            m_Schematic.GetConnectivity(), cursor_world, WirePickDistance / m_Zoom);
+    m_ContextTarget =
+        FindMeasurementTarget(m_Schematic.GetElements(), m_Schematic.GetWires(), m_Schematic.GetConnectivity(),
+                              cursor_world, WirePickDistance / m_View.GetZoom());
     PlacePartPopover(view);
     ImGui::OpenPopup(ContextMenu);
 }
@@ -2190,7 +2037,7 @@ void EditorWindow::DrawContextMenu() {
             m_Controls.RunSelected();
         }
         if (ImGui::MenuItem("Fit Schematic", "Home")) {
-            m_FrameMaxZoom = FitMaxZoom;
+            m_View.RequestFit();
         }
     }
     ImGui::EndPopup();
@@ -2199,16 +2046,16 @@ void EditorWindow::DrawContextMenu() {
 // Global routing makes the shortcuts work while another editor window, such as Properties, has focus
 void EditorWindow::HandleGlobalShortcuts() {
     if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_N, ImGuiInputFlags_RouteGlobal)) {
-        RequestNew();
+        m_Files.RequestNew();
     }
     if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_O, ImGuiInputFlags_RouteGlobal)) {
-        RequestOpen();
+        m_Files.RequestOpen();
     }
     if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_S, ImGuiInputFlags_RouteGlobal)) {
-        Save();
+        m_Files.Save();
     }
     if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiMod_Shift | ImGuiKey_S, ImGuiInputFlags_RouteGlobal)) {
-        ShowFileDialog(FileAction::Save);
+        m_Files.SaveAs();
     }
     if (ImGui::Shortcut(ImGuiKey_F5, ImGuiInputFlags_RouteGlobal)) {
         m_Controls.RunSelected();
@@ -2247,56 +2094,6 @@ void EditorWindow::Redo() {
     m_Schematic.Redo();
 }
 
-void EditorWindow::RequestNew() {
-    if (m_Schematic.IsModified()) {
-        m_ActionToConfirm = FileAction::New;
-        ImGui::OpenPopup(DiscardPopup);
-    } else {
-        NewSchematic();
-    }
-}
-
-void EditorWindow::RequestOpen() {
-    if (m_Schematic.IsModified()) {
-        m_ActionToConfirm = FileAction::Open;
-        ImGui::OpenPopup(DiscardPopup);
-    } else {
-        ShowFileDialog(FileAction::Open);
-    }
-}
-
-void EditorWindow::HandleQuitRequest() {
-    if (!std::exchange(m_QuitRequested, false)) {
-        return;
-    }
-    if (m_Schematic.IsModified()) {
-        m_ActionToConfirm = FileAction::Quit;
-        ImGui::OpenPopup(DiscardPopup);
-    } else {
-        m_QuitConfirmed = true;
-    }
-}
-
-void EditorWindow::HandleExampleRequest() {
-    if (const std::optional<Example> insert = std::exchange(m_RequestedInsertExample, std::nullopt)) {
-        InsertExample(*insert);
-    }
-    if (const std::optional<std::filesystem::path> path = std::exchange(m_RequestedImport, std::nullopt)) {
-        ImportFile(*path);
-    }
-    const std::optional<Example> example = std::exchange(m_RequestedExample, std::nullopt);
-    if (!example) {
-        return;
-    }
-    if (m_Schematic.IsModified()) {
-        m_ExampleToOpen = example;
-        m_ActionToConfirm = FileAction::Example;
-        ImGui::OpenPopup(DiscardPopup);
-    } else {
-        OpenExample(*example);
-    }
-}
-
 // Menu commands run here, from Update(), where their popups are opened and drawn whichever window is in front
 void EditorWindow::HandleCommandRequest() {
     const std::optional<EditorCommand> command = std::exchange(m_RequestedCommand, std::nullopt);
@@ -2309,22 +2106,22 @@ void EditorWindow::HandleCommandRequest() {
 bool EditorWindow::RunFileCommand(const EditorCommand command) {
     switch (command) {
     case EditorCommand::New:
-        RequestNew();
+        m_Files.RequestNew();
         return true;
     case EditorCommand::Open:
-        RequestOpen();
+        m_Files.RequestOpen();
         return true;
     case EditorCommand::Save:
-        Save();
+        m_Files.Save();
         return true;
     case EditorCommand::SaveAs:
-        ShowFileDialog(FileAction::Save);
+        m_Files.SaveAs();
         return true;
     case EditorCommand::Import:
-        ShowFileDialog(FileAction::Import);
+        m_Files.Import();
         return true;
     case EditorCommand::ExportSchematic:
-        ImGui::OpenPopup(ExportPopup);
+        m_Files.OpenExportPopup();
         return true;
     default:
         return false;
@@ -2396,249 +2193,6 @@ void EditorWindow::RunTurnCommand(const EditorCommand command) {
     default:
         break;
     }
-}
-
-void EditorWindow::Save() {
-    if (const auto &file_path = m_Schematic.GetFilePath()) {
-        SaveFile(*file_path);
-    } else {
-        ShowFileDialog(FileAction::Save);
-    }
-}
-
-void EditorWindow::NewSchematic() {
-    EndDrag();
-    m_Pasting.reset();
-    m_PlacingType.reset();
-    m_DrawingWires = false;
-    m_WireStart.reset();
-    m_Schematic.Clear();
-    m_Schematic.ClearMeasurements();
-}
-
-// Skipped parts are reported, and the schematic counts as modified because saving it would drop them
-void EditorWindow::OpenFile(const std::filesystem::path &path) {
-    const auto text = ReadTextFile(path);
-    if (!text) {
-        ShowFileMessages("Could not open the schematic", {text.error()});
-        return;
-    }
-    auto loaded = LoadSchematic(*text);
-    if (!loaded) {
-        ShowFileMessages(std::format("Could not open {}", path.filename().string()), {loaded.error()});
-        return;
-    }
-
-    NewSchematic();
-    m_Schematic.Replace(std::move(loaded->Elements), std::move(loaded->Wires), std::move(loaded->Settings));
-    m_Schematic.RestoreMeasurements(loaded->Measurements);
-    m_Schematic.MarkSaved(path);
-    m_FrameMaxZoom = DefaultZoom;
-    if (!loaded->Warnings.empty()) {
-        m_Schematic.MarkModified();
-        ShowFileMessages(std::format("{} was opened, but some parts were changed or skipped", path.filename().string()),
-                         std::move(loaded->Warnings));
-    }
-}
-
-// The circuit of the file joins the schematic as a pasted group: it follows the cursor until a click places it, and
-// the settings and probes of the file are left behind. Skipped parts are reported, but the rest still comes in
-void EditorWindow::ImportFile(const std::filesystem::path &path) {
-    const auto text = ReadTextFile(path);
-    if (!text) {
-        ShowFileMessages("Could not import the schematic", {text.error()});
-        return;
-    }
-    auto group = ParseCopiedSchematic(*text);
-    if (!group) {
-        ShowFileMessages(std::format("Could not import {}", path.filename().string()), {group.error()});
-        return;
-    }
-    if (!group->Warnings.empty()) {
-        ShowFileMessages(
-            std::format("{} was imported, but some parts were changed or skipped", path.filename().string()),
-            group->Warnings);
-    }
-    StartPastingGroup(std::move(*group));
-}
-
-// Like an import, the example follows the cursor until a click places it; its analysis settings stay behind
-void EditorWindow::InsertExample(const Example &example) {
-    auto loaded = LoadExample(example);
-    if (!loaded) {
-        ShowFileMessages(std::format("Could not insert the example {}", example.Title), {loaded.error()});
-        return;
-    }
-    auto group = MakePastedGroup(std::move(*loaded));
-    if (!group) {
-        ShowFileMessages(std::format("Could not insert the example {}", example.Title), {group.error()});
-        return;
-    }
-    StartPastingGroup(std::move(*group));
-}
-
-void EditorWindow::OpenExample(const Example &example) {
-    auto loaded = LoadExample(example);
-    if (!loaded) {
-        ShowFileMessages(std::format("Could not open the example {}", example.Title), {loaded.error()});
-        return;
-    }
-
-    NewSchematic();
-    m_Schematic.Replace(std::move(loaded->Elements), std::move(loaded->Wires), std::move(loaded->Settings));
-    m_Schematic.RestoreMeasurements(loaded->Measurements);
-    m_FrameMaxZoom = DefaultZoom;
-}
-
-// Dialogs do not always add the extension, so it is added here when missing
-void EditorWindow::SaveFile(std::filesystem::path path) {
-    if (path.extension() != SchematicExtension) {
-        path += SchematicExtension;
-    }
-    const auto written =
-        WriteTextFile(path, SaveSchematic(m_Schematic.GetElements(), m_Schematic.GetWires(),
-                                          m_Schematic.GetSimulationSettings(), m_Schematic.SaveMeasurements()));
-    if (!written) {
-        ShowFileMessages("Could not save the schematic", {written.error()});
-        return;
-    }
-    m_Schematic.MarkSaved(std::move(path));
-}
-
-// The dialog runs asynchronously: its result is picked up by ProcessDialogResult() on a later frame
-void EditorWindow::ShowFileDialog(const FileAction action) {
-    if (m_FileDialog.IsPending()) {
-        return;
-    }
-    m_DialogAction = action;
-    const auto &file_path = m_Schematic.GetFilePath();
-    if (action == FileAction::ExportSchematic) {
-        // Next to the schematic and named after it, like the exported plots
-        const std::string stem = file_path ? file_path->stem().string() : "circuit";
-        const std::filesystem::path name = std::format("{}-schematic.svg", stem);
-        m_FileDialog.ShowSave(SVGFilters, (file_path ? file_path->parent_path() / name : name).string());
-        return;
-    }
-    std::string location = file_path ? file_path->string() : "";
-    if (action == FileAction::Open || action == FileAction::Import) {
-        m_FileDialog.ShowOpen(SchematicFilters, std::move(location));
-    } else {
-        m_FileDialog.ShowSave(SchematicFilters, std::move(location));
-    }
-}
-
-void EditorWindow::ProcessDialogResult() {
-    const std::optional<std::optional<std::filesystem::path>> result = m_FileDialog.TakeResult();
-    if (!result) {
-        return;
-    }
-    const std::optional<FileAction> action = std::exchange(m_DialogAction, std::nullopt);
-    if (!*result) {
-        return;
-    }
-    if (action == FileAction::Open) {
-        OpenFile(**result);
-    } else if (action == FileAction::Save) {
-        SaveFile(**result);
-    } else if (action == FileAction::ExportSchematic) {
-        ExportSchematic(**result);
-    } else if (action == FileAction::Import) {
-        ImportFile(**result);
-    }
-}
-
-void EditorWindow::DrawFilePopups() {
-    DrawExportPopup();
-    // Centered each time they appear, like the export popup, instead of where imgui.ini remembers them
-    const ImVec2 center = ImGui::GetMainViewport()->GetCenter();
-    ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-    if (ImGui::BeginPopupModal(DiscardPopup, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
-        ImGui::TextUnformatted("The schematic has unsaved changes. Discard them?");
-        if (ImGui::Button("Discard")) {
-            if (m_ActionToConfirm == FileAction::New) {
-                NewSchematic();
-            } else if (m_ActionToConfirm == FileAction::Open) {
-                ShowFileDialog(FileAction::Open);
-            } else if (m_ActionToConfirm == FileAction::Quit) {
-                m_QuitConfirmed = true;
-            } else if (m_ActionToConfirm == FileAction::Example) {
-                OpenExample(*m_ExampleToOpen);
-            }
-            m_ActionToConfirm.reset();
-            ImGui::CloseCurrentPopup();
-        }
-        ImGui::SameLine();
-        if (ImGui::Button("Cancel")) {
-            m_ActionToConfirm.reset();
-            ImGui::CloseCurrentPopup();
-        }
-        ImGui::EndPopup();
-    }
-
-    ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-    if (ImGui::BeginPopupModal(FileMessagesPopup, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
-        ImGui::TextUnformatted(m_FileMessagesTitle.c_str());
-        ImGui::Separator();
-        for (const std::string &message : m_FileMessages) {
-            ImGui::BulletText("%s", message.c_str());
-        }
-        if (PrimaryButton("OK")) {
-            ImGui::CloseCurrentPopup();
-        }
-        ImGui::EndPopup();
-    }
-}
-
-// The image follows the editor: the symbol style chosen in the View menu, names, values and probes
-void EditorWindow::DrawExportPopup() {
-    ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-    if (!ImGui::BeginPopupModal(ExportPopup, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
-        return;
-    }
-    ImGui::TextDisabled("As shown: symbols, names, values, terminal numbers and the probes of the plots");
-    ImGui::Separator();
-    if (ImGui::RadioButton("Light, for print", !m_ExportDark)) {
-        m_ExportDark = false;
-    }
-    ImGui::SameLine();
-    if (ImGui::RadioButton("As on screen", m_ExportDark)) {
-        m_ExportDark = true;
-    }
-    ImGui::Separator();
-    const bool empty = m_Schematic.GetElements().empty() && m_Schematic.GetWires().empty();
-    if (empty) {
-        ImGui::TextDisabled("Place some parts to export the schematic");
-    }
-    ImGui::BeginDisabled(empty || m_FileDialog.IsPending());
-    if (PrimaryButton("Save SVG...")) {
-        ShowFileDialog(FileAction::ExportSchematic);
-        ImGui::CloseCurrentPopup();
-    }
-    ImGui::EndDisabled();
-    ImGui::SameLine();
-    if (ImGui::Button("Cancel")) {
-        ImGui::CloseCurrentPopup();
-    }
-    ImGui::EndPopup();
-}
-
-// Dialogs do not always add the extension, so it is added here when missing
-void EditorWindow::ExportSchematic(std::filesystem::path path) {
-    if (path.extension() != ".svg") {
-        path += ".svg";
-    }
-    const auto svg = RenderSchematicSvg(m_Schematic, m_SymbolStyle, m_ShowTerminalNumbers, m_ExportDark);
-    const auto written =
-        svg ? WriteTextFile(path, *svg) : std::expected<void, std::string>(std::unexpected(svg.error()));
-    if (!written) {
-        ShowFileMessages("Could not export the schematic", {written.error()});
-    }
-}
-
-void EditorWindow::ShowFileMessages(std::string title, std::vector<std::string> messages) {
-    m_FileMessagesTitle = std::move(title);
-    m_FileMessages = std::move(messages);
-    ImGui::OpenPopup(FileMessagesPopup);
 }
 
 } // namespace GUI
