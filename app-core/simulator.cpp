@@ -631,11 +631,13 @@ std::expected<Transient, std::string> ReadTransient(const Circuit &circuit) {
     }
     Transient result;
     result.Times = RealPart(*time);
+    // time points to the record that the next lookup overwrites, so later vectors are checked against this count
+    const std::size_t point_count = result.Times.size();
     result.NodeVoltages.resize(static_cast<std::size_t>(circuit.GetNodeCount()));
-    result.NodeVoltages[0].assign(result.Times.size(), 0.0);
+    result.NodeVoltages[0].assign(point_count, 0.0);
     for (int node = 1; node < circuit.GetNodeCount(); ++node) {
         const pvector_info vector = FindVector(std::format("v({})", node));
-        if (vector == nullptr || vector->v_length != time->v_length) {
+        if (vector == nullptr || static_cast<std::size_t>(vector->v_length) != point_count) {
             return std::unexpected(std::format("ngspice returned no voltages for node {}", node));
         }
         result.NodeVoltages[static_cast<std::size_t>(node)] = RealPart(*vector);
@@ -643,7 +645,7 @@ std::expected<Transient, std::string> ReadTransient(const Circuit &circuit) {
     for (const CircuitEntry &entry : circuit.GetEntries()) {
         for (const CurrentVector &current : CurrentVectors(*entry.Part)) {
             const pvector_info vector = FindVector(current.VectorName);
-            if (vector == nullptr || vector->v_length != time->v_length) {
+            if (vector == nullptr || static_cast<std::size_t>(vector->v_length) != point_count) {
                 return std::unexpected(std::format("ngspice returned no currents for {}", current.TraceName));
             }
             result.Currents.push_back({current.TraceName, RealPart(*vector)});
@@ -854,7 +856,7 @@ std::expected<DCSweep, std::string> ReadDCSweep(const Circuit &circuit, const DC
         std::vector<double> voltages(all_values.size(), 0.0);
         if (node > 0) {
             const pvector_info vector = FindVector(std::format("v({})", node));
-            if (vector == nullptr || vector->v_length != scale->v_length) {
+            if (vector == nullptr || static_cast<std::size_t>(vector->v_length) != all_values.size()) {
                 return std::unexpected(std::format("ngspice returned no voltages for node {}", node));
             }
             voltages = RealPart(*vector);
@@ -866,7 +868,7 @@ std::expected<DCSweep, std::string> ReadDCSweep(const Circuit &circuit, const DC
     for (const CircuitEntry &entry : circuit.GetEntries()) {
         for (const CurrentVector &current : CurrentVectors(*entry.Part)) {
             const pvector_info vector = FindVector(current.VectorName);
-            if (vector == nullptr || vector->v_length != scale->v_length) {
+            if (vector == nullptr || static_cast<std::size_t>(vector->v_length) != all_values.size()) {
                 return std::unexpected(std::format("ngspice returned no currents for {}", current.TraceName));
             }
             split(RealPart(*vector), [&current](DCSweepCurve &curve, std::vector<double> values) {
