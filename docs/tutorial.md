@@ -16,8 +16,10 @@ The toolbar groups its buttons:
 
 - Select, Wire and Probe, then Undo, Redo and Fit;
 - resistor, capacitor and inductor;
-- ground and VCC;
-- sources, diodes, transistors and controlled sources, each a button with a dropdown arrow beside it;
+- ground, VCC and the net label;
+- sources, diodes, transistors, controlled sources, adjustable parts (potentiometer and transformer), switches (switch,
+  push button, voltage-controlled switch and relay), logic gates and flip-flops, each a button with a dropdown arrow
+  beside it that picks the part it places;
 - the op-amp;
 - Run, with the analysis it runs.
 
@@ -130,7 +132,7 @@ sine comes out of the capacitor at about 0.16 V peak. The next plots use this tr
 
 - **Operating point**: the DC voltages of every node, shown on the schematic and, with the currents, in the Output
   window. View > Wire Colors colors the wires by node, by voltage or by a current heat map that follows the path of
-  the current. For this circuit, with a sine source and no offset, everything is 0 V; a divider of four equal
+  the current, and Power colors the parts by the power they take. For this circuit, with a sine source and no offset, everything is 0 V; a divider of four equal
   resistors shows the voltage colors better, from blue at ground to red at the source:
 
   ![Wires colored by voltage along a resistor divider, with the scale at the bottom left](images/tutorial_heat_map.png)
@@ -145,6 +147,16 @@ sine comes out of the capacitor at about 0.16 V peak. The next plots use this tr
   currents:
 
   ![Output characteristics of a 2N3904 from a DC sweep](images/dc_sweep.png)
+
+- **Spectrum**: the Spectrum tab of the Output window transforms the measured transient traces, as a spectrum analyzer
+  would, and reads the fundamental, the harmonics and the THD of each, over the stretch the transient statistics
+  measure.
+- **Noise**: the random noise at one node across frequency, at the output and referred to the input, with the share
+  of each part, so you see which resistor or transistor dominates.
+- **Stepping a parameter**: the transient, AC sweep and DC sweep can run once per value of a resistor, capacitor,
+  inductor or the temperature (Step a parameter, under their settings), and plot every step as a family of curves.
+
+The [user guide](user_guide.md) explains each of them in detail.
 
 View > Analysis Settings keeps the settings of the selected analysis open in a window, if you prefer them in view.
 
