@@ -56,6 +56,8 @@ inline constexpr double LaneStride = 1.5;
 inline constexpr double LaneLowOffset = 0.0;
 inline constexpr double LaneUnknownOffset = 0.5;
 inline constexpr double LaneHighOffset = 1.0;
+// Room above and below the stack of lanes, in lane units
+inline constexpr double LaneMargin = 0.3;
 
 LogicState ReadLogicState(double voltage, double logic_level);
 const char *GetLogicStateName(LogicState state);

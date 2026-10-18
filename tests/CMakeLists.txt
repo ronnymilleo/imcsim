@@ -34,6 +34,7 @@ add_executable(imcsim-tests
             spice_value_tests.cpp
             standard_values_tests.cpp
             svg_writer_tests.cpp
+            trace_fit_state_tests.cpp
             trace_math_tests.cpp
             trace_statistics_tests.cpp
             ui_element_tests.cpp

@@ -6,109 +6,24 @@
 #ifndef IMCSIM_OUTPUT_WINDOW_H
 #define IMCSIM_OUTPUT_WINDOW_H
 
-#include "file_dialog.h"
 #include "implot.h"
 #include "logic_trace.h"
+#include "math_channels.h"
 #include "playback.h"
 #include "plot_export.h"
+#include "plot_exporter.h"
+#include "plot_types.h"
 #include "schematic.h"
 #include "simulator.h"
-#include "spectrum.h"
-#include "trace_math.h"
+#include "trace_fit_state.h"
 #include "windows/app_window.h"
 #include <cstddef>
-#include <expected>
 #include <optional>
 #include <set>
-#include <span>
 #include <string>
 #include <vector>
 
 namespace GUI {
-
-/**
- * @struct  PlotCursors
- * @brief   The two vertical cursors of a plot, A and B, as on an oscilloscope.
- * @details They are placed in the visible range when turned on, and the user drags them from there.
- */
-struct PlotCursors {
-    bool Shown = false;
-    bool Placed = false;
-    double A = 0.0;
-    double B = 0.0;
-};
-
-/**
- * @struct  PlotSpan
- * @brief   A range of the X axis of a plot, such as what it shows.
- */
-struct PlotSpan {
-    double From = 0.0;
-    double To = 0.0;
-};
-
-/**
- * @struct  MathChannel
- * @brief   A trace computed from others, like the math channel of an oscilloscope.
- * @details Either an operation between two traces, picked with buttons, or a typed expression; both compile to
- *          the same program. Channels belong to the window for now and are not saved with the schematic.
- */
-struct MathChannel {
-    std::string Name;
-    bool Shown = true;
-    bool UsesExpression = false;
-    std::string First;
-    MathOperator Operator = MathOperator::Subtract;
-    std::string Second;
-    std::string Expression;
-    // Compiled from the operation or the expression, whichever is in use
-    std::expected<MathProgram, std::string> Program = std::unexpected("Not compiled yet");
-};
-
-/**
- * @struct  MathTrace
- * @brief   A math channel evaluated over one result, ready to plot and measure.
- */
-struct MathTrace {
-    std::string Label;
-    std::vector<double> Values;
-    std::string Unit;
-    ImAxis Axis = ImAxis_Y1;
-    ImU32 Color = 0;
-};
-
-/**
- * @struct  SpectrumTrace
- * @brief   The spectrum of one measured trace of the transient, in decibels, and its harmonics.
- */
-struct SpectrumTrace {
-    std::string Label;
-    // Unit of the trace, such as "V"; the spectrum reads in decibels relative to 1 of it
-    std::string Unit;
-    ImAxis Axis = ImAxis_Y1;
-    ImU32 Color = 0;
-    bool Dashed = false;
-    // No value when the trace is undefined somewhere in the span, as a math channel dividing by zero
-    std::optional<std::vector<double>> Decibels;
-    // Of the mean and every frequency, so a negligible mean reads as about zero
-    double LargestAmplitude = 0.0;
-    HarmonicAnalysis Harmonics;
-};
-
-/**
- * @struct  TransientSpectra
- * @brief   The spectra of the measured traces of a transient over one span, and what they were computed from.
- * @details Transforms take long enough to keep for as long as their inputs stay the same.
- */
-struct TransientSpectra {
-    std::size_t TransientVersion = 0;
-    PlotSpan Span;
-    SpectrumWindow Window = SpectrumWindow::Hann;
-    std::vector<std::string> Labels;
-    // From the first frequency above 0 Hz to half the sampling rate, shared by every trace
-    std::vector<double> Frequencies;
-    std::vector<SpectrumTrace> Traces;
-};
 
 /**
  * @enum    PlotTab
@@ -121,15 +36,6 @@ enum class PlotTab {
     ACSweep,
     DCSweep,
     Noise
-};
-
-/**
- * @enum    ExportFormat
- * @brief   File types a plot is exported to: an SVG image of the plot, or a CSV table of its samples.
- */
-enum class ExportFormat {
-    SVG,
-    CSV
 };
 
 /**
@@ -180,17 +86,10 @@ private:
 
     Schematic &m_Schematic;
     TransientPlayback &m_Playback;
-    // Result versions the axes were last fitted to
-    std::optional<std::size_t> m_FittedTransient;
-    std::optional<std::size_t> m_FittedACSweep;
-    std::optional<std::size_t> m_FittedDCSweep;
-    // Nodes and currents each analysis plotted last frame; the axis of each fits whenever they change
-    std::vector<int> m_TransientShownNodes;
-    std::vector<int> m_ACSweepShownNodes;
-    std::vector<int> m_DCSweepShownNodes;
-    std::vector<std::string> m_TransientShownCurrents;
-    std::vector<std::string> m_ACSweepShownCurrents;
-    std::vector<std::string> m_DCSweepShownCurrents;
+    // What each plot showed last frame, so its axes fit for a new result and when its traces change
+    TraceFitState m_TransientFit;
+    TraceFitState m_ACSweepFit;
+    TraceFitState m_DCSweepFit;
     // Cursors and visible X range of the transient and the Bode plots; both Bode plots share theirs
     PlotCursors m_TransientCursors;
     PlotCursors m_ACSweepCursors;
@@ -206,12 +105,8 @@ private:
     PlotSpan m_SpectrumView;
     std::optional<TransientSpectra> m_Spectra;
     bool m_SpectraChanged = false;
-    // Math channels, and the labels each analysis plotted last frame, so the axes fit when they change
-    std::vector<MathChannel> m_MathChannels;
-    int m_NextMathNumber = 1;
-    std::vector<std::string> m_TransientShownMath;
-    std::vector<std::string> m_DCSweepShownMath;
-    // Export: the tab shown this frame, the image settings, and the figure waiting for the save dialog
+    MathChannels m_MathChannels;
+    // The tab shown this frame, which Export saves
     PlotTab m_ShownTab = PlotTab::Transient;
     // Tab to bring to the front on the next frame, after a new result
     std::optional<PlotTab> m_TabToShow;
@@ -219,15 +114,11 @@ private:
     bool m_FrontOnNewResult = true;
     PlotSpan m_DCSweepView;
     // Noise: the result its axes were fitted to, its visible range and the parts whose share it plots
-    std::optional<std::size_t> m_FittedNoise;
+    TraceFitState m_NoiseFit;
     PlotSpan m_NoiseView;
     std::set<std::string> m_ShownNoiseContributions;
     std::vector<std::string> m_PlottedNoiseContributions;
-    ExportStyle m_ExportStyle;
-    FileDialog m_ExportDialog;
-    std::optional<ExportFigure> m_PendingFigure;
-    ExportFormat m_PendingFormat = ExportFormat::SVG;
-    std::string m_ExportError;
+    PlotExporter m_Exporter;
 
     void Draw() override;
     const std::vector<Core::ComponentTrace> &GetListedCurrents() const;
@@ -267,27 +158,10 @@ private:
     void DrawACSweepStatistics(const Core::ACSweep &sweep);
     void DrawNoiseStatistics(const Core::Noise &noise);
 
-    // Math channels
-    void DrawMathChannels(const std::vector<std::string> &operands);
-    bool DrawMathEditor(MathChannel &channel, const std::vector<std::string> &operands);
-    std::vector<MathTrace> EvaluateMath(std::span<const double> xs, Dimension x_unit,
-                                        const std::vector<std::vector<double>> &node_voltages,
-                                        const std::vector<Core::ComponentTrace> &currents,
-                                        std::vector<std::string> &errors) const;
-
     // Export
     void DrawExportButton(ImVec2 tab_row, float tab_row_width, float export_width, const FrameResults &frame);
     bool CanExport(const FrameResults &frame) const;
     ExportFigure BuildShownFigure(const FrameResults &frame) const;
-    std::optional<ExportFormat> DrawExportPopup(bool can_export);
-    ExportFigure BuildTransientFigure(const Core::Transient &transient, const std::vector<MathTrace> &math) const;
-    ExportFigure BuildSpectrumFigure() const;
-    ExportFigure BuildACSweepFigure(const Core::ACSweep &sweep) const;
-    ExportFigure BuildDCSweepFigure(const Core::DCSweep &sweep, const std::vector<std::vector<MathTrace>> &math) const;
-    ExportFigure BuildNoiseFigure(const Core::Noise &noise) const;
-    void StartExport(ExportFigure figure, ExportFormat format);
-    void ProcessExportDialog();
-    void DrawExportError();
 };
 
 } // namespace GUI

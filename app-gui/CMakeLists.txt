@@ -21,11 +21,14 @@ add_library(imcsim-gui-lib
             helpers.cpp
             led_glow.cpp
             logic_trace.cpp
+            math_channels.cpp
             node_colors.cpp
             parameter_step.cpp
             part_editor.cpp
             playback.cpp
             plot_export.cpp
+            plot_exporter.cpp
+            plot_figures.cpp
             plot_helpers.cpp
             probing.cpp
             schematic.cpp
@@ -37,6 +40,7 @@ add_library(imcsim-gui-lib
             spectrum.cpp
             svg_writer.cpp
             theme.cpp
+            trace_fit_state.cpp
             trace_math.cpp
             trace_statistics.cpp
             ui_elements/ui_bjt.cpp
