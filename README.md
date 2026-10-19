@@ -5,8 +5,9 @@
 Immediate Mode Circuit Simulator, built with Dear ImGui and SDL3. Circuits are simulated with
 [ngspice](https://ngspice.sourceforge.io/).
 
-![imcsim with an RC low-pass filter driven by a 1 kHz sine: the schematic with its probed nodes on the left, and the
-transient of both nodes with their statistics in the Output window on the right](docs/screenshot.png)
+![imcsim with an RC low-pass filter driven by a 1 kHz sine: the schematic with its probed nodes and their voltages at
+the playhead on the left, and the transient of both nodes with their statistics in the Output window on the
+right](docs/images/screenshot.png)
 
 New to imcsim? The [tutorial](docs/tutorial.md) builds, simulates and exports a first circuit in about ten minutes.
 
