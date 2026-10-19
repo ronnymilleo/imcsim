@@ -109,13 +109,27 @@ bool AskForDigitalModels() {
                                [](const SimulatorMessage &message) { return message.Text.starts_with("d_and"); });
 }
 
+// The codemodel command keeps quotes as part of the file name and splits it at spaces, so the library is named
+// relative to its folder, made the working directory for the call; on Windows ngspice resolves a relative name
+// against the program's folder instead, which is where the Windows build keeps it
+void LoadLibraryFrom(const std::filesystem::path &directory) {
+    std::error_code error;
+    const std::filesystem::path previous = std::filesystem::current_path(error);
+    std::filesystem::current_path(directory, error);
+    if (error) {
+        return;
+    }
+    SendCommand("codemodel ./digital.cm");
+    std::filesystem::current_path(previous, error);
+}
+
 // A system ngspice loads digital.cm through its spinit file, and loading it a second time crashes ngspice, so the
 // copy shipped with the program is loaded only when the digital models are missing
 void LoadDigitalModels() {
-    const std::filesystem::path library = GetState().CodeModelDirectory / "digital.cm";
+    const std::filesystem::path &directory = GetState().CodeModelDirectory;
     std::error_code error;
-    if (!AskForDigitalModels() && !GetState().CodeModelDirectory.empty() && std::filesystem::exists(library, error)) {
-        SendCommand(std::format("codemodel \"{}\"", library.string()));
+    if (!AskForDigitalModels() && !directory.empty() && std::filesystem::exists(directory / "digital.cm", error)) {
+        LoadLibraryFrom(directory);
     }
     GetState().HasDigitalModels = AskForDigitalModels();
 }

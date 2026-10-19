@@ -48,8 +48,22 @@ if ($LASTEXITCODE -ne 0) {
     throw 'The ngspice build failed'
 }
 
+# The digital code models, which the logic parts need: cmpp generates their C sources in the pre-build step of the
+# digital project, which builds them as digital64.cm with the C runtime linked statically, like ngspice.dll
+msbuild "$VisualC\xspice\cmpp\cmpp.vcxproj" /m /v:minimal /p:Configuration=Release /p:Platform=x64 `
+    /p:PlatformToolset=$Toolset
+if ($LASTEXITCODE -ne 0) {
+    throw 'The cmpp build failed'
+}
+msbuild "$VisualC\xspice\digital.vcxproj" /m /v:minimal /p:Configuration=Release /p:Platform=x64 `
+    /p:PlatformToolset=$Toolset /p:SolutionDir="$VisualC\"
+if ($LASTEXITCODE -ne 0) {
+    throw 'The digital code model build failed'
+}
+
 $Built = "$VisualC\sharedspice\Release.x64"
 Copy-Item "$Built\ngspice.dll" "$PSScriptRoot\bin\" -Force
+Copy-Item "$VisualC\codemodels\x64\Release\digital64.cm" "$PSScriptRoot\bin\digital.cm" -Force
 Copy-Item "$Built\ngspice.lib" "$PSScriptRoot\lib\" -Force
 Copy-Item "$Work\ngspice-$NgspiceVersion\src\include\ngspice\sharedspice.h" "$PSScriptRoot\include\ngspice\" -Force
 Remove-Item -Recurse -Force $Work

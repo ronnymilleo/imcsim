@@ -68,6 +68,8 @@ rm -rf "$WORK_DIR/stage"
 # The install rules lay out the bundle: the program, ngspice in Frameworks, the notices and the licenses
 cmake --install "$WORK_DIR/imcsim-build" --prefix "$WORK_DIR/stage"
 codesign --verify --deep --strict "$WORK_DIR/stage/imcsim.app"
+# The logic parts need the digital code models, which the install rules bundle when this ngspice has them
+test -f "$WORK_DIR/stage/imcsim.app/Contents/PlugIns/digital.cm"
 
 echo "== Disk image"
 # The image opens on the bundle next to a link to Applications, to drag it into

@@ -9,7 +9,7 @@
 #include "simulator.h"
 #include <catch2/catch_test_macros.hpp>
 
-// The Windows build of ngspice ships without digital.cm, so its tests run only where the library is found
+// The tests run only where ngspice has the digital models: its own, or the digital.cm the Windows build copies
 #define SKIP_WITHOUT_DIGITAL_MODELS()                                                                                  \
     do {                                                                                                               \
         if (!Core::AreDigitalModelsAvailable()) {                                                                      \

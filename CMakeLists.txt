@@ -139,7 +139,7 @@ add_dependencies(imcsim copy_compile_commands)
 if(WIN32)
     set(IMCSIM_DOC_DIR .)
     install(TARGETS imcsim RUNTIME DESTINATION .)
-    install(FILES vendor/ngspice-windows/bin/ngspice.dll DESTINATION .)
+    install(FILES vendor/ngspice-windows/bin/ngspice.dll vendor/ngspice-windows/bin/digital.cm DESTINATION .)
     install(FILES vendor/ngspice-windows/licenses/ngspice-COPYING.txt RENAME ngspice-LICENSE.txt
             DESTINATION licenses)
 elseif(APPLE)
