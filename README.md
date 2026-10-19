@@ -9,8 +9,9 @@
 Immediate Mode Circuit Simulator, built with Dear ImGui and SDL3. Circuits are simulated with
 [ngspice](https://ngspice.sourceforge.io/).
 
-![imcsim with an RC low-pass filter driven by a 1 kHz sine: the schematic with its probed nodes on the left, and the
-transient of both nodes with their statistics in the Output window on the right](docs/screenshot.png)
+![imcsim with an RC low-pass filter driven by a 1 kHz sine: the schematic with its probed nodes and their voltages at
+the playhead on the left, and the transient of both nodes with their statistics in the Output window on the
+right](docs/images/screenshot.png)
 
 New to imcsim? The [tutorial](docs/tutorial.md) builds, simulates and exports a first circuit in about ten minutes.
 
@@ -23,21 +24,38 @@ New to imcsim? The [tutorial](docs/tutorial.md) builds, simulates and exports a 
   limited by its supply pins, or a uA741 or custom part built as a Boyle macromodel from datasheet values (slew rate,
   bias current, output swing, current limit)
 - Warnings when a diode goes into reverse breakdown or a transistor exceeds its voltage, current or power ratings
-- Operating point, transient, AC sweep and DC sweep analyses, with node voltages and component currents
+- Operating point, transient, AC sweep, DC sweep and noise analyses, with node voltages and component currents
+- Stepping a resistor, capacitor, inductor or the temperature over a range or a list, as SPICE's `.step`: the
+  transient, AC sweep and DC sweep plot every step as a family of curves
 - Plots of transients, Bode diagrams and DC sweeps (including curve families, such as transistor characteristics):
   pick what to measure with the Probe tool, read every trace under the cursor, currents dashed apart from voltages;
   measured voltages and currents are marked on the schematic in the colors of their traces, currents with an arrow
   in the direction they flow when positive
 - Oscilloscope-style measurements beside the transient and Bode plots: two draggable cursors, peak-to-peak, mean,
   RMS and frequency of every trace, and peak, -3 dB band, unity gain frequency and phase margin of a response
+- A spectrum of the transient traces, as on a spectrum analyzer, with the fundamental, the harmonics and the THD of
+  each, over a Hann or rectangular window
+- Noise at one node across frequency, at the output and referred to the input, with the share of each part
 - Math channels on transient and DC sweep plots, as on an oscilloscope: an operation between two traces picked
   with buttons, or a typed expression such as `V(1,2)`, `V(3)*I(R1)` or `ddt(V(2))`, with units followed (W, Ohm,
   V/s) and a third axis for any unit other than volts and amperes
-- Operating point results on the schematic: values on hover, and wires colored by node, by voltage or by a current
-  heat map that shows the path of the current
+- Operating point and transient results on the schematic: values on hover, wires colored by node, by voltage or by a
+  current heat map that shows the path of the current, parts colored by power, and a time bar to play a transient
+- Logic signals plot as stacked lanes under the analog traces, like a logic analyzer
 - Exports for reports: plots as SVG images (light for print or dark, at any size) or CSV tables, and the schematic
   as an SVG image with its probes, so the two figures can be shown side by side
 - Nine color themes, seven dark and two light, switched from the View menu (see [Themes](docs/themes.md))
+- Multi-selection (Shift+click, selection box, whole node by double click), moving and turning groups, sliding wire
+  segments, copy, cut and paste (also between windows), importing a file or an example into the schematic (also by dropping
+  the file on the window), net labels that join distant points by name, and an option to turn parts and leave their
+  wires in place
+- Potentiometers, with the wiper set in the properties, and switches and push buttons that are open or closed,
+  voltage-controlled switches and relays whose coil current sets when the contact closes, and transformers of two
+  coupled inductors with a turns ratio
+- Logic gates (AND, OR, NOT, NAND, NOR, XOR, XNOR, buffer) and D, JK, T and SR flip-flops, simulated with the digital
+  code models of ngspice behind analog bridges, so their outputs are voltages that plot and probe like any other
+- Standard values: an option to take resistors, capacitors and inductors from the E6 to E192 series, typed or stepped
+  with the arrows, keys or mouse wheel
 - IEC or ANSI symbols, optional terminal numbers, parts rotated (R) and mirrored left to right (M) or top to bottom
   (Shift+M), undo and redo, and schematics saved as JSON together with the settings of every analysis and the
   measured traces
@@ -49,9 +67,11 @@ New to imcsim? The [tutorial](docs/tutorial.md) builds, simulates and exports a 
   part (`4k7`), a right-click menu, and Fit (Home)
 - Run (F5) from the toolbar, with the analysis and its settings beside it, settings suggested from the sources and
   parts, and the result of the last run in the status bar
-- Example circuits, each with its analyses and measurements set up: an RC low-pass filter, a full-bridge rectifier,
-  an LED driver, an op-amp inverting amplifier, an ideal transformer made of controlled sources, the output
-  characteristics of a BJT and its small-signal model
+- 29 example circuits sorted by topic, each with its analyses and measurements set up: dividers, RC and RLC
+  filters, diode curves, a Zener regulator and a rectifier, BJT and MOSFET switches and characteristics, a current
+  mirror, common-emitter and class AB amplifiers, op-amp amplifiers, an integrator, a Schmitt trigger and a Sallen-Key
+  filter, an ideal transformer made of controlled sources, switching circuits, and digital ones: gates, a half
+  adder, an SR latch and a ripple counter
 
 ## Screenshots
 

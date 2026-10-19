@@ -6,6 +6,7 @@
 #ifndef IMCSIM_SCHEMATIC_DRAWING_H
 #define IMCSIM_SCHEMATIC_DRAWING_H
 
+#include "circuit_snapshot.h"
 #include "helpers.h"
 #include "imgui.h"
 #include "schematic.h"
@@ -21,10 +22,14 @@ inline constexpr float MeasurementMarkerRadius = 4.0f;
 // Terminal rings on screen, relative to the zoom like junction dots: 4 pixels at the default zoom
 inline constexpr float ScreenTerminalRingScale = 0.2f;
 
-// Annotations
+// Static annotations
 void DrawMeasurementMarkers(SchematicCanvas &canvas, const ViewTransform &view, Schematic &schematic);
 void DrawTerminalNumbers(SchematicCanvas &canvas, const ViewTransform &view, const Schematic &schematic,
                          float ring_scale);
+
+// Live effects
+void DrawLiveCurrent(SchematicCanvas &canvas, const ViewTransform &view, const Schematic &schematic,
+                     const Core::OperatingPoint &operating_point, const HeatScale &scale, double time);
 
 /**
  * @struct  SchematicBounds

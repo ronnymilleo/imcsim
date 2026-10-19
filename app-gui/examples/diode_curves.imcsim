@@ -1,0 +1,165 @@
+{
+  "format": "imcsim-schematic",
+  "version": 1,
+  "elements": [
+    {
+      "type": "VCC",
+      "rotation": 0,
+      "x": 4,
+      "y": 6,
+      "value": 1,
+      "name": "V1"
+    },
+    {
+      "type": "Resistor",
+      "rotation": 90,
+      "x": 8,
+      "y": 9,
+      "value": 100,
+      "name": "R1"
+    },
+    {
+      "type": "Diode",
+      "rotation": 90,
+      "x": 8,
+      "y": 13,
+      "model": "1N4148",
+      "name": "D1"
+    },
+    {
+      "type": "Resistor",
+      "rotation": 90,
+      "x": 14,
+      "y": 9,
+      "value": 100,
+      "name": "R2"
+    },
+    {
+      "type": "Diode",
+      "rotation": 90,
+      "x": 14,
+      "y": 13,
+      "model": "1N4007",
+      "name": "D2"
+    },
+    {
+      "type": "Resistor",
+      "rotation": 90,
+      "x": 20,
+      "y": 9,
+      "value": 100,
+      "name": "R3"
+    },
+    {
+      "type": "Diode",
+      "rotation": 90,
+      "x": 20,
+      "y": 13,
+      "model": "1N5819",
+      "name": "D3"
+    },
+    {
+      "type": "Ground",
+      "rotation": 0,
+      "x": 8,
+      "y": 17
+    }
+  ],
+  "wires": [
+    {
+      "start": [
+        8,
+        6
+      ],
+      "end": [
+        8,
+        7
+      ]
+    },
+    {
+      "start": [
+        14,
+        6
+      ],
+      "end": [
+        14,
+        7
+      ]
+    },
+    {
+      "start": [
+        20,
+        6
+      ],
+      "end": [
+        20,
+        7
+      ]
+    },
+    {
+      "start": [
+        4,
+        6
+      ],
+      "end": [
+        20,
+        6
+      ]
+    },
+    {
+      "start": [
+        8,
+        15
+      ],
+      "end": [
+        20,
+        15
+      ]
+    },
+    {
+      "start": [
+        8,
+        15
+      ],
+      "end": [
+        8,
+        17
+      ]
+    }
+  ],
+  "simulation": {
+    "analysis": "dc_sweep",
+    "transient": {
+      "step": 0.000001,
+      "stop": 0.001
+    },
+    "ac_sweep": {
+      "start": 10,
+      "stop": 1000000,
+      "points_per_decade": 20
+    },
+    "dc_sweep": {
+      "step_source": false,
+      "swept": {
+        "source": "V1",
+        "start": 0,
+        "step": 0.01,
+        "stop": 2
+      },
+      "stepped": {
+        "source": "",
+        "start": 0,
+        "step": 0.1,
+        "stop": 5
+      }
+    }
+  },
+  "measurements": {
+    "voltages": [],
+    "currents": [
+      "D1",
+      "D2",
+      "D3"
+    ]
+  }
+}

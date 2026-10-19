@@ -1,0 +1,374 @@
+{
+  "elements": [
+    {
+      "ac_magnitude": 1.0,
+      "amplitude": 1.0,
+      "frequency": 1000.0,
+      "name": "Vin1",
+      "offset": 0.0,
+      "pulse": {
+        "delay": 0.001,
+        "fall": 1e-07,
+        "high": 5.0,
+        "low": 0.0,
+        "period": 0.006,
+        "rise": 1e-07,
+        "width": 0.005
+      },
+      "rotation": 90,
+      "source": "Pulse",
+      "type": "VoltageSource",
+      "value": 0.0,
+      "x": 8,
+      "y": 6
+    },
+    {
+      "net": "S_BAR",
+      "rotation": 0,
+      "type": "NetLabel",
+      "x": 8,
+      "y": 4
+    },
+    {
+      "rotation": 0,
+      "type": "Ground",
+      "x": 8,
+      "y": 10
+    },
+    {
+      "ac_magnitude": 1.0,
+      "amplitude": 1.0,
+      "frequency": 1000.0,
+      "name": "Vin2",
+      "offset": 0.0,
+      "pulse": {
+        "delay": 0.003,
+        "fall": 1e-07,
+        "high": 0.0,
+        "low": 5.0,
+        "period": 0.006,
+        "rise": 1e-07,
+        "width": 0.001
+      },
+      "rotation": 90,
+      "source": "Pulse",
+      "type": "VoltageSource",
+      "value": 0.0,
+      "x": 16,
+      "y": 6
+    },
+    {
+      "net": "R_BAR",
+      "rotation": 0,
+      "type": "NetLabel",
+      "x": 16,
+      "y": 4
+    },
+    {
+      "rotation": 0,
+      "type": "Ground",
+      "x": 16,
+      "y": 10
+    },
+    {
+      "name": "U1",
+      "parameters": {
+        "logic_level": 5.0,
+        "propagation_delay": 1e-08
+      },
+      "rotation": 0,
+      "type": "Nand",
+      "x": 28,
+      "y": 6
+    },
+    {
+      "net": "S_BAR",
+      "rotation": 270,
+      "type": "NetLabel",
+      "x": 24,
+      "y": 5
+    },
+    {
+      "net": "QN",
+      "rotation": 270,
+      "type": "NetLabel",
+      "x": 24,
+      "y": 7
+    },
+    {
+      "net": "Q",
+      "rotation": 180,
+      "type": "NetLabel",
+      "x": 32,
+      "y": 6
+    },
+    {
+      "name": "R1",
+      "rotation": 0,
+      "type": "Resistor",
+      "value": 330.0,
+      "x": 35,
+      "y": 6
+    },
+    {
+      "model": "Green",
+      "name": "D1",
+      "rotation": 0,
+      "type": "LED",
+      "x": 41,
+      "y": 6
+    },
+    {
+      "rotation": 0,
+      "type": "Ground",
+      "x": 43,
+      "y": 8
+    },
+    {
+      "name": "U2",
+      "parameters": {
+        "logic_level": 5.0,
+        "propagation_delay": 1e-08
+      },
+      "rotation": 0,
+      "type": "Nand",
+      "x": 28,
+      "y": 16
+    },
+    {
+      "net": "R_BAR",
+      "rotation": 270,
+      "type": "NetLabel",
+      "x": 24,
+      "y": 15
+    },
+    {
+      "net": "Q",
+      "rotation": 270,
+      "type": "NetLabel",
+      "x": 24,
+      "y": 17
+    },
+    {
+      "net": "QN",
+      "rotation": 180,
+      "type": "NetLabel",
+      "x": 32,
+      "y": 16
+    },
+    {
+      "name": "R2",
+      "rotation": 0,
+      "type": "Resistor",
+      "value": 330.0,
+      "x": 35,
+      "y": 16
+    },
+    {
+      "model": "Red",
+      "name": "D2",
+      "rotation": 0,
+      "type": "LED",
+      "x": 41,
+      "y": 16
+    },
+    {
+      "rotation": 0,
+      "type": "Ground",
+      "x": 43,
+      "y": 18
+    }
+  ],
+  "format": "imcsim-schematic",
+  "measurements": {
+    "currents": [],
+    "voltages": [
+      [
+        8,
+        4
+      ],
+      [
+        16,
+        4
+      ],
+      [
+        24,
+        7
+      ],
+      [
+        24,
+        17
+      ]
+    ]
+  },
+  "simulation": {
+    "ac_sweep": {
+      "points_per_decade": 20,
+      "start": 10.0,
+      "stop": 1000000.0
+    },
+    "analysis": "transient",
+    "dc_sweep": {
+      "step_source": false,
+      "stepped": {
+        "source": "",
+        "start": 0.0,
+        "step": 0.1,
+        "stop": 5.0
+      },
+      "swept": {
+        "source": "",
+        "start": 0.0,
+        "step": 0.1,
+        "stop": 5.0
+      }
+    },
+    "transient": {
+      "step": 1e-05,
+      "stop": 0.012
+    }
+  },
+  "version": 1,
+  "wires": [
+    {
+      "end": [
+        8,
+        10
+      ],
+      "start": [
+        8,
+        8
+      ]
+    },
+    {
+      "end": [
+        16,
+        10
+      ],
+      "start": [
+        16,
+        8
+      ]
+    },
+    {
+      "end": [
+        24,
+        5
+      ],
+      "start": [
+        25,
+        5
+      ]
+    },
+    {
+      "end": [
+        24,
+        7
+      ],
+      "start": [
+        25,
+        7
+      ]
+    },
+    {
+      "end": [
+        32,
+        6
+      ],
+      "start": [
+        31,
+        6
+      ]
+    },
+    {
+      "end": [
+        33,
+        6
+      ],
+      "start": [
+        32,
+        6
+      ]
+    },
+    {
+      "end": [
+        39,
+        6
+      ],
+      "start": [
+        37,
+        6
+      ]
+    },
+    {
+      "end": [
+        43,
+        8
+      ],
+      "start": [
+        43,
+        6
+      ]
+    },
+    {
+      "end": [
+        24,
+        15
+      ],
+      "start": [
+        25,
+        15
+      ]
+    },
+    {
+      "end": [
+        24,
+        17
+      ],
+      "start": [
+        25,
+        17
+      ]
+    },
+    {
+      "end": [
+        32,
+        16
+      ],
+      "start": [
+        31,
+        16
+      ]
+    },
+    {
+      "end": [
+        33,
+        16
+      ],
+      "start": [
+        32,
+        16
+      ]
+    },
+    {
+      "end": [
+        39,
+        16
+      ],
+      "start": [
+        37,
+        16
+      ]
+    },
+    {
+      "end": [
+        43,
+        18
+      ],
+      "start": [
+        43,
+        16
+      ]
+    }
+  ]
+}

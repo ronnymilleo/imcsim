@@ -6,37 +6,61 @@ add_library(imcsim-gui-lib
         STATIC
             analysis_controls.cpp
             application.cpp
+            canvas_view.cpp
+            circuit_snapshot.cpp
+            clipboard.cpp
             connectivity.cpp
             current_flow.cpp
+            editor_preferences.cpp
             element_factory.cpp
             examples.cpp
             file_dialog.cpp
+            glow_renderer.cpp
+            group_editing.cpp
+            heat_glow.cpp
             helpers.cpp
+            led_glow.cpp
+            logic_trace.cpp
+            math_channels.cpp
             node_colors.cpp
+            parameter_step.cpp
             part_editor.cpp
+            playback.cpp
             plot_export.cpp
+            plot_exporter.cpp
+            plot_figures.cpp
             plot_helpers.cpp
             probing.cpp
             schematic.cpp
             schematic_canvas.cpp
             schematic_drawing.cpp
             schematic_file.cpp
+            schematic_file_actions.cpp
+            selection.cpp
+            spectrum.cpp
             svg_writer.cpp
             theme.cpp
+            trace_fit_state.cpp
             trace_math.cpp
             trace_statistics.cpp
             ui_elements/ui_bjt.cpp
             ui_elements/ui_capacitor.cpp
             ui_elements/ui_controlled_source.cpp
+            ui_elements/ui_controlled_switch.cpp
             ui_elements/ui_current_source.cpp
             ui_elements/ui_diode.cpp
             ui_elements/ui_element.cpp
             ui_elements/ui_ground.cpp
             ui_elements/ui_inductor.cpp
+            ui_elements/ui_logic_part.cpp
             ui_elements/ui_mosfet.cpp
+            ui_elements/ui_net_label.cpp
             ui_elements/ui_op_amp.cpp
+            ui_elements/ui_potentiometer.cpp
             ui_elements/ui_resistor.cpp
             ui_elements/ui_source.cpp
+            ui_elements/ui_switch.cpp
+            ui_elements/ui_transformer.cpp
             ui_elements/ui_transistor.cpp
             ui_elements/ui_vcc.cpp
             ui_elements/ui_voltage_source.cpp

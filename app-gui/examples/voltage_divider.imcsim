@@ -1,0 +1,115 @@
+{
+  "format": "imcsim-schematic",
+  "version": 1,
+  "elements": [
+    {
+      "type": "VCC",
+      "rotation": 0,
+      "x": 6,
+      "y": 4,
+      "value": 10,
+      "name": "V1"
+    },
+    {
+      "type": "Resistor",
+      "rotation": 90,
+      "x": 6,
+      "y": 8,
+      "value": 10000,
+      "name": "R1"
+    },
+    {
+      "type": "Resistor",
+      "rotation": 90,
+      "x": 6,
+      "y": 12,
+      "value": 10000,
+      "name": "R2"
+    },
+    {
+      "type": "Resistor",
+      "rotation": 90,
+      "x": 12,
+      "y": 12,
+      "value": 10000,
+      "name": "R3"
+    },
+    {
+      "type": "Ground",
+      "rotation": 0,
+      "x": 6,
+      "y": 14
+    }
+  ],
+  "wires": [
+    {
+      "start": [
+        6,
+        4
+      ],
+      "end": [
+        6,
+        6
+      ]
+    },
+    {
+      "start": [
+        6,
+        10
+      ],
+      "end": [
+        12,
+        10
+      ]
+    },
+    {
+      "start": [
+        12,
+        14
+      ],
+      "end": [
+        6,
+        14
+      ]
+    }
+  ],
+  "simulation": {
+    "analysis": "operating_point",
+    "transient": {
+      "step": 0.000001,
+      "stop": 0.001
+    },
+    "ac_sweep": {
+      "start": 10,
+      "stop": 1000000,
+      "points_per_decade": 20
+    },
+    "dc_sweep": {
+      "step_source": false,
+      "swept": {
+        "source": "",
+        "start": 0,
+        "step": 0.1,
+        "stop": 5
+      },
+      "stepped": {
+        "source": "",
+        "start": 0,
+        "step": 0.1,
+        "stop": 5
+      }
+    }
+  },
+  "measurements": {
+    "voltages": [
+      [
+        6,
+        10
+      ]
+    ],
+    "currents": [
+      "R1",
+      "R3"
+    ]
+  }
+}

@@ -1,0 +1,154 @@
+{
+  "format": "imcsim-schematic",
+  "version": 1,
+  "elements": [
+    {
+      "type": "VCC",
+      "rotation": 0,
+      "x": 6,
+      "y": 6,
+      "value": 12,
+      "name": "V1"
+    },
+    {
+      "type": "Resistor",
+      "rotation": 0,
+      "x": 10,
+      "y": 6,
+      "value": 330,
+      "name": "R1"
+    },
+    {
+      "type": "ZenerDiode",
+      "rotation": 270,
+      "x": 14,
+      "y": 9,
+      "model": "5V1",
+      "name": "D1"
+    },
+    {
+      "type": "Resistor",
+      "rotation": 90,
+      "x": 18,
+      "y": 9,
+      "value": 1000,
+      "name": "R2"
+    },
+    {
+      "type": "Ground",
+      "rotation": 0,
+      "x": 14,
+      "y": 13
+    }
+  ],
+  "wires": [
+    {
+      "start": [
+        6,
+        6
+      ],
+      "end": [
+        8,
+        6
+      ]
+    },
+    {
+      "start": [
+        12,
+        6
+      ],
+      "end": [
+        18,
+        6
+      ]
+    },
+    {
+      "start": [
+        18,
+        6
+      ],
+      "end": [
+        18,
+        7
+      ]
+    },
+    {
+      "start": [
+        14,
+        6
+      ],
+      "end": [
+        14,
+        7
+      ]
+    },
+    {
+      "start": [
+        14,
+        11
+      ],
+      "end": [
+        14,
+        13
+      ]
+    },
+    {
+      "start": [
+        18,
+        11
+      ],
+      "end": [
+        18,
+        12
+      ]
+    },
+    {
+      "start": [
+        18,
+        12
+      ],
+      "end": [
+        14,
+        12
+      ]
+    }
+  ],
+  "simulation": {
+    "analysis": "dc_sweep",
+    "transient": {
+      "step": 0.000001,
+      "stop": 0.001
+    },
+    "ac_sweep": {
+      "start": 10,
+      "stop": 1000000,
+      "points_per_decade": 20
+    },
+    "dc_sweep": {
+      "step_source": false,
+      "swept": {
+        "source": "V1",
+        "start": 0,
+        "step": 0.1,
+        "stop": 20
+      },
+      "stepped": {
+        "source": "",
+        "start": 0,
+        "step": 0.1,
+        "stop": 5
+      }
+    }
+  },
+  "measurements": {
+    "voltages": [
+      [
+        12,
+        6
+      ]
+    ],
+    "currents": [
+      "D1"
+    ]
+  }
+}

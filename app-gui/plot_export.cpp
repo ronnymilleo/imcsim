@@ -170,9 +170,11 @@ ValueRange FindXRange(const ExportFigure &figure) {
     return Widen(range);
 }
 
-// Range of the samples of an axis whose X is shown, with some room above and below
+// Range of the samples of an axis whose X is shown, with some room above and below; a logarithmic axis pads by
+// a share of its decades
 ValueRange FindYRange(const ExportFigure &figure, const ExportPanel &panel, const std::size_t axis,
                       const ValueRange x_range) {
+    const bool logarithmic = panel.YAxes[axis].Logarithmic;
     ValueRange range{std::numeric_limits<double>::infinity(), -std::numeric_limits<double>::infinity()};
     for (const ExportSeries &series : panel.Series) {
         if (series.Axis != axis) {
@@ -182,14 +184,20 @@ ValueRange FindYRange(const ExportFigure &figure, const ExportPanel &panel, cons
         for (std::size_t index = 0; index < count; ++index) {
             const double x = figure.Xs[index];
             const double y = series.Values[index];
-            if (std::isfinite(y) && x >= x_range.Low && x <= x_range.High) {
+            if (IsShownOnAxis(y, logarithmic) && x >= x_range.Low && x <= x_range.High) {
                 range.Low = std::min(range.Low, y);
                 range.High = std::max(range.High, y);
             }
         }
     }
     if (!(range.Low <= range.High)) {
-        return {0.0, 1.0};
+        return logarithmic ? ValueRange{1.0, 10.0} : ValueRange{0.0, 1.0};
+    }
+    if (logarithmic) {
+        const double low = std::log10(range.Low);
+        const double high = std::max(std::log10(range.High), low + 1.0);
+        const double padding = (high - low) * YPadding;
+        return {std::pow(10.0, low - padding), std::pow(10.0, high + padding)};
     }
     range = Widen(range);
     const double padding = (range.High - range.Low) * YPadding;
@@ -233,10 +241,11 @@ std::vector<std::string> FormatLinearTicks(const std::vector<double> &ticks, con
 
 /**
  * @struct  YAxisLayout
- * @brief   Range, ticks and tick labels of one Y axis of a panel.
+ * @brief   Range, scale, ticks and tick labels of one Y axis of a panel.
  */
 struct YAxisLayout {
     ValueRange Range;
+    bool Logarithmic = false;
     std::vector<double> Ticks;
     std::vector<std::string> Labels;
     double LabelWidth = 0.0;
@@ -294,8 +303,10 @@ struct Frame {
         return Left + (ToAxis(x, XLogarithmic) - low) / (high - low) * Width;
     }
 
-    double ToPixelY(const double y, const ValueRange &range) const {
-        return Top + Height - (y - range.Low) / (range.High - range.Low) * Height;
+    double ToPixelY(const double y, const YAxisLayout &axis) const {
+        const double low = ToAxis(axis.Range.Low, axis.Logarithmic);
+        const double high = ToAxis(axis.Range.High, axis.Logarithmic);
+        return Top + Height - (ToAxis(y, axis.Logarithmic) - low) / (high - low) * Height;
     }
 };
 
@@ -325,15 +336,17 @@ std::vector<double> FindXTicks(const ValueRange range, const bool logarithmic, c
     return logarithmic ? FindDecadeTicks(range.Low, range.High, count) : FindNiceTicks(range.Low, range.High, count);
 }
 
-std::vector<std::string> FormatXTicks(const std::vector<double> &ticks, const ExportFigure &figure) {
-    if (!figure.XLogarithmic) {
-        return FormatLinearTicks(ticks, figure.XAxis);
-    }
+// Decades read with their prefix, as the values the user types ("1k", "10m"), followed by the unit
+std::vector<std::string> FormatDecadeTicks(const std::vector<double> &ticks, const ExportAxis &axis) {
     std::vector<std::string> labels;
     for (const double tick : ticks) {
-        labels.push_back(Core::FormatValue(tick) + figure.XAxis.Unit);
+        labels.push_back(Core::FormatValue(tick) + axis.Unit);
     }
     return labels;
+}
+
+std::vector<std::string> FormatXTicks(const std::vector<double> &ticks, const ExportFigure &figure) {
+    return figure.XLogarithmic ? FormatDecadeTicks(ticks, figure.XAxis) : FormatLinearTicks(ticks, figure.XAxis);
 }
 
 // endregion
@@ -343,7 +356,7 @@ std::vector<std::string> FormatXTicks(const std::vector<double> &ticks, const Ex
 // The visible part of a series in pixels, split where samples are missing; samples just outside the X range are
 // kept so the line reaches the edge of the plot
 std::vector<std::vector<SvgPoint>> BuildRuns(const ExportFigure &figure, const ExportSeries &series, const Frame &frame,
-                                             const ValueRange &y_range) {
+                                             const YAxisLayout &y_axis) {
     std::vector<std::vector<SvgPoint>> runs(1);
     const std::size_t count = std::min(series.Values.size(), figure.Xs.size());
     const auto in_range = [&](const std::size_t index) {
@@ -355,13 +368,13 @@ std::vector<std::vector<SvgPoint>> BuildRuns(const ExportFigure &figure, const E
         const double y = series.Values[index];
         const bool near_range =
             in_range(index) || (index > 0 && in_range(index - 1)) || (index + 1 < count && in_range(index + 1));
-        if (!near_range || !IsShownOnAxis(x, figure.XLogarithmic) || !std::isfinite(y)) {
+        if (!near_range || !IsShownOnAxis(x, figure.XLogarithmic) || !IsShownOnAxis(y, y_axis.Logarithmic)) {
             if (!runs.back().empty()) {
                 runs.emplace_back();
             }
             continue;
         }
-        const SvgPoint point = {frame.ToPixelX(x), frame.ToPixelY(y, y_range)};
+        const SvgPoint point = {frame.ToPixelX(x), frame.ToPixelY(y, y_axis)};
         std::vector<SvgPoint> &run = runs.back();
         const bool is_last = index + 1 == count;
         if (run.size() >= 2 && !is_last && std::abs(point.X - run.back().X) < MinPointDistance &&
@@ -379,23 +392,26 @@ std::string DashPattern(const double scale) {
 }
 
 void DrawSeries(SvgWriter &svg, const ExportFigure &figure, const ExportSeries &series, const Frame &frame,
-                const ValueRange &y_range, const ExportColor color, const double scale) {
+                const YAxisLayout &y_axis, const ExportColor color, const double scale) {
     const double width = (series.Heavy ? HeavyLineWidth : LineWidth) * scale;
-    for (const auto &run : BuildRuns(figure, series, frame, y_range)) {
+    for (const auto &run : BuildRuns(figure, series, frame, y_axis)) {
         svg.Polyline(run, color, width, series.Dashed ? DashPattern(scale) : "");
     }
 }
 
-// Notes sit right of their point, or left of it when they would leave the plot
-void DrawNote(SvgWriter &svg, const ExportNote &note, const Frame &frame, const ValueRange &y_range,
+// Notes sit right of their point, or left of it when they would leave the plot; a centered one is over it
+void DrawNote(SvgWriter &svg, const ExportNote &note, const Frame &frame, const YAxisLayout &y_axis,
               const ExportTheme &theme, const double scale) {
     const double x = frame.ToPixelX(note.X);
-    const double y = frame.ToPixelY(note.Y, y_range);
+    const double y = frame.ToPixelY(note.Y, y_axis);
     const double font_size = NoteFont * scale;
     const double width = EstimateTextWidth(note.Text, font_size);
     const double padding = 3.0 * scale;
     const bool to_left = x + 4.0 * scale + width + 2.0 * padding > frame.Left + frame.Width;
-    const double box_left = to_left ? x - 4.0 * scale - width - 2.0 * padding : x + 4.0 * scale;
+    double box_left = to_left ? x - 4.0 * scale - width - 2.0 * padding : x + 4.0 * scale;
+    if (note.Centered) {
+        box_left = x - width / 2.0 - padding;
+    }
     svg.Rectangle({box_left, y - font_size * 0.7 - padding}, width + 2.0 * padding, font_size * 1.4 + padding,
                   theme.Background, 0.85);
     svg.Text({box_left + padding, y + font_size * 0.35}, note.Text, font_size, theme.Text, TextAnchor::Start);
@@ -458,7 +474,7 @@ void DrawYAxes(SvgWriter &svg, const ExportPanel &panel, const PanelLayout &layo
             svg.Line({edge, frame.Top}, {edge, frame.Top + frame.Height}, theme.Border, scale);
         }
         for (std::size_t index = 0; index < axis_layout.Ticks.size(); ++index) {
-            const double y = frame.ToPixelY(axis_layout.Ticks[index], axis_layout.Range);
+            const double y = frame.ToPixelY(axis_layout.Ticks[index], axis_layout);
             svg.Line({edge, y}, {edge + direction * TickLength * scale, y}, theme.MutedText, scale);
             svg.Text({edge + direction * (TickLength + 3.0) * scale, y + TickFont * scale * 0.35},
                      axis_layout.Labels[index], TickFont * scale, theme.MutedText,
@@ -500,7 +516,7 @@ void DrawGrid(SvgWriter &svg, const ExportFigure &figure, const PanelLayout &lay
     if (!layout.YAxes.empty()) {
         const YAxisLayout &first_axis = layout.YAxes.front();
         for (const double tick : first_axis.Ticks) {
-            const double y = frame.ToPixelY(tick, first_axis.Range);
+            const double y = frame.ToPixelY(tick, first_axis);
             svg.Line({frame.Left, y}, {frame.Left + frame.Width, y}, theme.Grid, scale, theme.GridOpacity);
         }
     }
@@ -514,14 +530,14 @@ void DrawPanel(SvgWriter &svg, const ExportFigure &figure, const ExportPanel &pa
     svg.BeginClip({frame.Left, frame.Top}, frame.Width, frame.Height);
     for (const ExportSeries &series : panel.Series) {
         if (series.Axis < layout.YAxes.size()) {
-            DrawSeries(svg, figure, series, frame, layout.YAxes[series.Axis].Range,
+            DrawSeries(svg, figure, series, frame, layout.YAxes[series.Axis],
                        style.Dark ? series.Color : AdjustColorForPrint(series.Color), scale);
         }
     }
     svg.EndClip();
     for (const ExportNote &note : panel.Notes) {
         if (note.Axis < layout.YAxes.size() && note.X >= frame.X.Low && note.X <= frame.X.High) {
-            DrawNote(svg, note, frame, layout.YAxes[note.Axis].Range, theme, scale);
+            DrawNote(svg, note, frame, layout.YAxes[note.Axis], theme, scale);
         }
     }
     svg.Polyline({{frame.Left, frame.Top},
@@ -625,10 +641,22 @@ std::expected<std::string, std::string> RenderSvg(const ExportFigure &figure, co
         layout.PlotHeight = plot_height;
         const int tick_count = std::clamp(static_cast<int>(plot_height / (60.0 * scale)), 2, 10);
         for (std::size_t axis = 0; axis < panel.YAxes.size(); ++axis) {
+            const ExportAxis &export_axis = panel.YAxes[axis];
             YAxisLayout axis_layout;
-            axis_layout.Range = FindYRange(figure, panel, axis, x_range);
-            axis_layout.Ticks = FindNiceTicks(axis_layout.Range.Low, axis_layout.Range.High, tick_count);
-            axis_layout.Labels = FormatLinearTicks(axis_layout.Ticks, panel.YAxes[axis]);
+            axis_layout.Range = export_axis.Range ? ValueRange{export_axis.Range->From, export_axis.Range->To}
+                                                  : FindYRange(figure, panel, axis, x_range);
+            axis_layout.Logarithmic = export_axis.Logarithmic;
+            if (export_axis.Ticks.empty() && export_axis.Logarithmic) {
+                axis_layout.Ticks = FindDecadeTicks(axis_layout.Range.Low, axis_layout.Range.High, tick_count);
+                axis_layout.Labels = FormatDecadeTicks(axis_layout.Ticks, export_axis);
+            } else if (export_axis.Ticks.empty()) {
+                axis_layout.Ticks = FindNiceTicks(axis_layout.Range.Low, axis_layout.Range.High, tick_count);
+                axis_layout.Labels = FormatLinearTicks(axis_layout.Ticks, export_axis);
+            }
+            for (const ExportTick &tick : export_axis.Ticks) {
+                axis_layout.Ticks.push_back(tick.Value);
+                axis_layout.Labels.push_back(tick.Label);
+            }
             for (const std::string &label : axis_layout.Labels) {
                 axis_layout.LabelWidth = std::max(axis_layout.LabelWidth, EstimateTextWidth(label, TickFont * scale));
             }
@@ -694,8 +722,9 @@ std::string RenderCsv(const ExportFigure &figure) {
         text += FormatCsvValue(figure.Xs[row]);
         for (const ExportSeries *series : columns) {
             text += ",";
-            if (row < series->Values.size()) {
-                text += FormatCsvValue(series->Values[row]);
+            const std::vector<double> &samples = series->Samples.empty() ? series->Values : series->Samples;
+            if (row < samples.size()) {
+                text += FormatCsvValue(samples[row]);
             }
         }
         text += "\n";

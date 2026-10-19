@@ -52,6 +52,7 @@ public:
     // Drawing
     void Draw(SchematicCanvas &canvas, const ViewTransform &view, ImU32 color, SymbolStyle style) const;
     void DrawIcon(SchematicCanvas &canvas, ImVec2 center, float size, ImU32 color, SymbolStyle style) const;
+    void DrawOutline(SchematicCanvas &canvas, const ViewTransform &view, ImU32 color) const;
 
     // Component and placement
     const Core::Component &GetComponent() const;
@@ -67,6 +68,7 @@ public:
     std::vector<GridPoint> GetTerminals() const;
     GridPoint GetTerminalInward(std::size_t terminal) const;
     bool Contains(ImVec2 world_pos) const;
+    bool Intersects(ImVec2 min, ImVec2 max) const;
 
 protected:
     // Parts of the symbol, in the order Draw() draws them

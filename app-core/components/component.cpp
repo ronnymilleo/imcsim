@@ -17,11 +17,16 @@ namespace Core {
 namespace {
 
 constexpr auto AllTypes = std::to_array<ComponentType>({
-    ComponentType::Resistor,   ComponentType::Capacitor,     ComponentType::Inductor,      ComponentType::Ground,
-    ComponentType::VCC,        ComponentType::VoltageSource, ComponentType::CurrentSource, ComponentType::Diode,
-    ComponentType::ZenerDiode, ComponentType::LED,           ComponentType::NPN,           ComponentType::PNP,
-    ComponentType::NMOS,       ComponentType::PMOS,          ComponentType::VCVS,          ComponentType::VCCS,
-    ComponentType::CCCS,       ComponentType::CCVS,          ComponentType::OpAmp,
+    ComponentType::Resistor,      ComponentType::Capacitor,     ComponentType::Inductor,      ComponentType::Ground,
+    ComponentType::VCC,           ComponentType::VoltageSource, ComponentType::CurrentSource, ComponentType::Diode,
+    ComponentType::ZenerDiode,    ComponentType::LED,           ComponentType::NPN,           ComponentType::PNP,
+    ComponentType::NMOS,          ComponentType::PMOS,          ComponentType::VCVS,          ComponentType::VCCS,
+    ComponentType::CCCS,          ComponentType::CCVS,          ComponentType::OpAmp,         ComponentType::NetLabel,
+    ComponentType::Potentiometer, ComponentType::Switch,        ComponentType::PushButton,    ComponentType::VSwitch,
+    ComponentType::Relay,         ComponentType::Transformer,   ComponentType::And,           ComponentType::Or,
+    ComponentType::Not,           ComponentType::Nand,          ComponentType::Nor,           ComponentType::Xor,
+    ComponentType::Xnor,          ComponentType::Buffer,        ComponentType::DFlipFlop,     ComponentType::JKFlipFlop,
+    ComponentType::TFlipFlop,     ComponentType::SRFlipFlop,
 });
 
 } // namespace
@@ -89,8 +94,33 @@ const char *Component::GetNamePrefix() const {
     case ComponentType::CCVS:
         return "H";
     case ComponentType::OpAmp:
+    case ComponentType::And:
+    case ComponentType::Or:
+    case ComponentType::Not:
+    case ComponentType::Nand:
+    case ComponentType::Nor:
+    case ComponentType::Xor:
+    case ComponentType::Xnor:
+    case ComponentType::Buffer:
+    case ComponentType::DFlipFlop:
+    case ComponentType::JKFlipFlop:
+    case ComponentType::TFlipFlop:
+    case ComponentType::SRFlipFlop:
         return "U";
+    case ComponentType::Potentiometer:
+        return "RV";
+    case ComponentType::Switch:
+        return "SW";
+    case ComponentType::PushButton:
+        return "PB";
+    case ComponentType::VSwitch:
+        return "S";
+    case ComponentType::Relay:
+        return "K";
+    case ComponentType::Transformer:
+        return "T";
     case ComponentType::Ground:
+    case ComponentType::NetLabel:
         return "";
     }
     return "";
@@ -104,10 +134,12 @@ const char *Component::GetNamePrefix() const {
 const char *Component::GetUnit() const {
     switch (m_Type) {
     case ComponentType::Resistor:
+    case ComponentType::Potentiometer:
         return "Ohm";
     case ComponentType::Capacitor:
         return "F";
     case ComponentType::Inductor:
+    case ComponentType::Transformer:
         return "H";
     case ComponentType::VCC:
     case ComponentType::VoltageSource:
@@ -123,7 +155,24 @@ const char *Component::GetUnit() const {
     case ComponentType::CCVS:
         return "V/A";
     case ComponentType::OpAmp:
+    case ComponentType::And:
+    case ComponentType::Or:
+    case ComponentType::Not:
+    case ComponentType::Nand:
+    case ComponentType::Nor:
+    case ComponentType::Xor:
+    case ComponentType::Xnor:
+    case ComponentType::Buffer:
+    case ComponentType::DFlipFlop:
+    case ComponentType::JKFlipFlop:
+    case ComponentType::TFlipFlop:
+    case ComponentType::SRFlipFlop:
     case ComponentType::Ground:
+    case ComponentType::NetLabel:
+    case ComponentType::Switch:
+    case ComponentType::PushButton:
+    case ComponentType::VSwitch:
+    case ComponentType::Relay:
     case ComponentType::Diode:
     case ComponentType::ZenerDiode:
     case ComponentType::LED:
@@ -144,6 +193,11 @@ const char *Component::GetUnit() const {
 bool Component::HasValue() const {
     switch (m_Type) {
     case ComponentType::Ground:
+    case ComponentType::NetLabel:
+    case ComponentType::Switch:
+    case ComponentType::PushButton:
+    case ComponentType::VSwitch:
+    case ComponentType::Relay:
     case ComponentType::Diode:
     case ComponentType::ZenerDiode:
     case ComponentType::LED:
@@ -152,10 +206,24 @@ bool Component::HasValue() const {
     case ComponentType::NMOS:
     case ComponentType::PMOS:
     case ComponentType::OpAmp:
+    case ComponentType::And:
+    case ComponentType::Or:
+    case ComponentType::Not:
+    case ComponentType::Nand:
+    case ComponentType::Nor:
+    case ComponentType::Xor:
+    case ComponentType::Xnor:
+    case ComponentType::Buffer:
+    case ComponentType::DFlipFlop:
+    case ComponentType::JKFlipFlop:
+    case ComponentType::TFlipFlop:
+    case ComponentType::SRFlipFlop:
         return false;
     case ComponentType::Resistor:
     case ComponentType::Capacitor:
     case ComponentType::Inductor:
+    case ComponentType::Potentiometer:
+    case ComponentType::Transformer:
     case ComponentType::VCC:
     case ComponentType::VoltageSource:
     case ComponentType::CurrentSource:
@@ -179,6 +247,8 @@ bool Component::IsValidValue(const double value) const {
     case ComponentType::Resistor:
     case ComponentType::Capacitor:
     case ComponentType::Inductor:
+    case ComponentType::Potentiometer:
+    case ComponentType::Transformer:
         return value > 0.0;
     case ComponentType::VCC:
     case ComponentType::VoltageSource:
@@ -189,6 +259,11 @@ bool Component::IsValidValue(const double value) const {
     case ComponentType::CCVS:
         return true;
     case ComponentType::Ground:
+    case ComponentType::NetLabel:
+    case ComponentType::Switch:
+    case ComponentType::PushButton:
+    case ComponentType::VSwitch:
+    case ComponentType::Relay:
     case ComponentType::Diode:
     case ComponentType::ZenerDiode:
     case ComponentType::LED:
@@ -197,6 +272,18 @@ bool Component::IsValidValue(const double value) const {
     case ComponentType::NMOS:
     case ComponentType::PMOS:
     case ComponentType::OpAmp:
+    case ComponentType::And:
+    case ComponentType::Or:
+    case ComponentType::Not:
+    case ComponentType::Nand:
+    case ComponentType::Nor:
+    case ComponentType::Xor:
+    case ComponentType::Xnor:
+    case ComponentType::Buffer:
+    case ComponentType::DFlipFlop:
+    case ComponentType::JKFlipFlop:
+    case ComponentType::TFlipFlop:
+    case ComponentType::SRFlipFlop:
         return false;
     }
     return false;
@@ -279,6 +366,44 @@ const char *GetTypeName(const ComponentType type) {
         return "CCVS";
     case ComponentType::OpAmp:
         return "OpAmp";
+    case ComponentType::NetLabel:
+        return "NetLabel";
+    case ComponentType::Potentiometer:
+        return "Potentiometer";
+    case ComponentType::Switch:
+        return "Switch";
+    case ComponentType::PushButton:
+        return "PushButton";
+    case ComponentType::VSwitch:
+        return "VSwitch";
+    case ComponentType::Relay:
+        return "Relay";
+    case ComponentType::Transformer:
+        return "Transformer";
+    case ComponentType::And:
+        return "And";
+    case ComponentType::Or:
+        return "Or";
+    case ComponentType::Not:
+        return "Not";
+    case ComponentType::Nand:
+        return "Nand";
+    case ComponentType::Nor:
+        return "Nor";
+    case ComponentType::Xor:
+        return "Xor";
+    case ComponentType::Xnor:
+        return "Xnor";
+    case ComponentType::Buffer:
+        return "Buffer";
+    case ComponentType::DFlipFlop:
+        return "DFlipFlop";
+    case ComponentType::JKFlipFlop:
+        return "JKFlipFlop";
+    case ComponentType::TFlipFlop:
+        return "TFlipFlop";
+    case ComponentType::SRFlipFlop:
+        return "SRFlipFlop";
     }
     return "Unknown";
 }

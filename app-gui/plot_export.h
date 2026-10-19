@@ -18,15 +18,41 @@
 namespace GUI {
 
 /**
+ * @struct  ExportRange
+ * @brief   The part of an axis that the image shows.
+ */
+struct ExportRange {
+    double From = 0.0;
+    double To = 0.0;
+};
+
+/**
+ * @struct  ExportTick
+ * @brief   A tick of an axis with a name in place of its value, such as a lane of logic signals.
+ */
+struct ExportTick {
+    double Value = 0.0;
+    std::string Label;
+};
+
+/**
  * @struct  ExportAxis
  * @brief   Name and unit of an axis, and how its ticks are written.
  * @details With prefixes, ticks read like the values the user types followed by the unit ("10ms", "1kHz");
- *          decibels and degrees read better as plain numbers, so their unit is left to the name.
+ *          decibels and degrees read better as plain numbers, so their unit is left to the name. A logarithmic Y
+ *          axis, as for noise densities, has its ticks at decades and leaves out values that are not positive; the X
+ *          axis takes its scale from the figure instead. An axis may also hold named ticks and a fixed range, as the
+ *          lanes of logic signals do.
  */
 struct ExportAxis {
     std::string Name;
     std::string Unit;
     bool UsesPrefixes = true;
+    bool Logarithmic = false;
+    // Empty: round ticks across the range of the samples, or decades on a logarithmic axis
+    std::vector<ExportTick> Ticks;
+    // Empty: the range of the samples, with some room
+    std::optional<ExportRange> Range;
 };
 
 /**
@@ -39,6 +65,9 @@ struct ExportSeries {
     // Empty: no legend entry, as for the second and later curves of a DC sweep family
     std::string LegendLabel;
     std::vector<double> Values;
+    // Empty: the CSV lists the values. Otherwise it lists these, for values that only stand for something, such as
+    // the heights of a logic signal in its lane standing for its voltages
+    std::vector<double> Samples;
     // Index in the Y axes of the panel
     std::size_t Axis = 0;
     ExportColor Color;
@@ -55,6 +84,8 @@ struct ExportNote {
     double Y = 0.0;
     std::size_t Axis = 0;
     std::string Text;
+    // Centered on its point instead of beside it, as the bit labels of a logic lane are
+    bool Centered = false;
 };
 
 /**
@@ -66,15 +97,6 @@ struct ExportPanel {
     std::vector<ExportAxis> YAxes;
     std::vector<ExportSeries> Series;
     std::vector<ExportNote> Notes;
-};
-
-/**
- * @struct  ExportRange
- * @brief   The part of the X axis that the image shows.
- */
-struct ExportRange {
-    double From = 0.0;
-    double To = 0.0;
 };
 
 /**

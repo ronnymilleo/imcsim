@@ -1,0 +1,206 @@
+{
+  "format": "imcsim-schematic",
+  "version": 1,
+  "elements": [
+    {
+      "type": "VCC",
+      "rotation": 0,
+      "x": 12,
+      "y": 4,
+      "value": 5,
+      "name": "V1"
+    },
+    {
+      "type": "Switch",
+      "rotation": 90,
+      "x": 8,
+      "y": 8,
+      "closed": true,
+      "name": "SW1"
+    },
+    {
+      "type": "Switch",
+      "rotation": 90,
+      "x": 8,
+      "y": 12,
+      "closed": false,
+      "name": "SW2"
+    },
+    {
+      "type": "Resistor",
+      "rotation": 90,
+      "x": 8,
+      "y": 16,
+      "value": 330,
+      "name": "R1"
+    },
+    {
+      "type": "LED",
+      "rotation": 90,
+      "x": 8,
+      "y": 20,
+      "model": "Red",
+      "name": "D1"
+    },
+    {
+      "type": "Switch",
+      "rotation": 90,
+      "x": 13,
+      "y": 8,
+      "closed": false,
+      "name": "SW3"
+    },
+    {
+      "type": "Switch",
+      "rotation": 90,
+      "x": 21,
+      "y": 8,
+      "closed": true,
+      "name": "SW4"
+    },
+    {
+      "type": "Resistor",
+      "rotation": 90,
+      "x": 17,
+      "y": 14,
+      "value": 330,
+      "name": "R2"
+    },
+    {
+      "type": "LED",
+      "rotation": 90,
+      "x": 17,
+      "y": 18,
+      "model": "Green",
+      "name": "D2"
+    },
+    {
+      "type": "Ground",
+      "rotation": 0,
+      "x": 8,
+      "y": 24
+    },
+    {
+      "type": "Ground",
+      "rotation": 0,
+      "x": 17,
+      "y": 22
+    }
+  ],
+  "wires": [
+    {
+      "start": [
+        8,
+        4
+      ],
+      "end": [
+        21,
+        4
+      ]
+    },
+    {
+      "start": [
+        8,
+        4
+      ],
+      "end": [
+        8,
+        6
+      ]
+    },
+    {
+      "start": [
+        13,
+        4
+      ],
+      "end": [
+        13,
+        6
+      ]
+    },
+    {
+      "start": [
+        21,
+        4
+      ],
+      "end": [
+        21,
+        6
+      ]
+    },
+    {
+      "start": [
+        13,
+        10
+      ],
+      "end": [
+        21,
+        10
+      ]
+    },
+    {
+      "start": [
+        17,
+        10
+      ],
+      "end": [
+        17,
+        12
+      ]
+    },
+    {
+      "start": [
+        8,
+        22
+      ],
+      "end": [
+        8,
+        24
+      ]
+    },
+    {
+      "start": [
+        17,
+        20
+      ],
+      "end": [
+        17,
+        22
+      ]
+    }
+  ],
+  "simulation": {
+    "analysis": "operating_point",
+    "transient": {
+      "step": 0.000001,
+      "stop": 0.001
+    },
+    "ac_sweep": {
+      "start": 10,
+      "stop": 1000000,
+      "points_per_decade": 20
+    },
+    "dc_sweep": {
+      "step_source": false,
+      "swept": {
+        "source": "",
+        "start": 0,
+        "step": 0.1,
+        "stop": 5
+      },
+      "stepped": {
+        "source": "",
+        "start": 0,
+        "step": 0.1,
+        "stop": 5
+      }
+    }
+  },
+  "measurements": {
+    "voltages": [],
+    "currents": [
+      "D1",
+      "D2"
+    ]
+  }
+}

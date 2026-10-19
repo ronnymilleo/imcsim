@@ -25,6 +25,7 @@ double DefaultGain(const ComponentType type) {
     case ComponentType::Capacitor:
     case ComponentType::Inductor:
     case ComponentType::Ground:
+    case ComponentType::NetLabel:
     case ComponentType::VCC:
     case ComponentType::VoltageSource:
     case ComponentType::CurrentSource:
@@ -36,6 +37,24 @@ double DefaultGain(const ComponentType type) {
     case ComponentType::NMOS:
     case ComponentType::PMOS:
     case ComponentType::OpAmp:
+    case ComponentType::Potentiometer:
+    case ComponentType::Switch:
+    case ComponentType::PushButton:
+    case ComponentType::VSwitch:
+    case ComponentType::Relay:
+    case ComponentType::Transformer:
+    case ComponentType::And:
+    case ComponentType::Or:
+    case ComponentType::Not:
+    case ComponentType::Nand:
+    case ComponentType::Nor:
+    case ComponentType::Xor:
+    case ComponentType::Xnor:
+    case ComponentType::Buffer:
+    case ComponentType::DFlipFlop:
+    case ComponentType::JKFlipFlop:
+    case ComponentType::TFlipFlop:
+    case ComponentType::SRFlipFlop:
         break;
     }
     return 1.0;

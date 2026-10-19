@@ -91,6 +91,19 @@ TEST_CASE("Wires that close a loop inside a node carry the current on one path o
     CHECK((pieces[0].Current == 0.0 || pieces[1].Current == 0.0));
 }
 
+TEST_CASE("The current level places currents on a logarithmic heat scale", "[current_flow]") {
+    Core::OperatingPoint operating_point;
+    operating_point.Currents = {{"R1", 1e-3}, {"R2", -1e-5}};
+    CHECK(GUI::LargestCurrent(operating_point) == 1e-3);
+    CHECK(GUI::CurrentLevel(1e-3, 1e-3) == 1.0f);
+    // CurrentDecades below the largest is the bottom of the scale, and half way up is half the level
+    CHECK(GUI::CurrentLevel(1e-7, 1e-3) == 0.0f);
+    CHECK_THAT(GUI::CurrentLevel(1e-5, 1e-3), Catch::Matchers::WithinAbs(0.5f, 1e-6));
+    // Zero current, and a circuit with no current at all, report no level
+    CHECK(GUI::CurrentLevel(0.0, 1e-3) == 0.0f);
+    CHECK(GUI::CurrentLevel(1e-3, 0.0) == 0.0f);
+}
+
 TEST_CASE("Control pins and the op-amp pins other than the output carry no current", "[current_flow]") {
     const std::vector<Core::ComponentCurrent> currents = {{"E1", -3e-3}, {"U1", 2e-3}};
     const auto source = Part(Core::ComponentType::VCVS, {0, 0}, "E1");
@@ -104,4 +117,21 @@ TEST_CASE("Control pins and the op-amp pins other than the output carry no curre
     for (std::size_t terminal = 1; terminal < 5; ++terminal) {
         CHECK(GUI::GetTerminalCurrent(op_amp->GetComponent(), terminal, currents) == 0.0);
     }
+}
+
+TEST_CASE("A relay and a transformer have a current per pair of terminals, opposite at the two ends",
+          "[current_flow]") {
+    const std::vector<Core::ComponentCurrent> currents = {
+        {"K1.S", 2e-3}, {"K1.C", 7e-2}, {"T1.P", 0.5}, {"T1.S", -0.25}};
+    const auto relay = Part(Core::ComponentType::Relay, {0, 0}, "K1");
+    // Contact terminals 0 and 1, coil terminals 2 and 3
+    CHECK(GUI::GetTerminalCurrent(relay->GetComponent(), 0, currents) == 2e-3);
+    CHECK(GUI::GetTerminalCurrent(relay->GetComponent(), 1, currents) == -2e-3);
+    CHECK(GUI::GetTerminalCurrent(relay->GetComponent(), 2, currents) == 7e-2);
+    CHECK(GUI::GetTerminalCurrent(relay->GetComponent(), 3, currents) == -7e-2);
+    const auto transformer = Part(Core::ComponentType::Transformer, {0, 0}, "T1");
+    CHECK(GUI::GetTerminalCurrent(transformer->GetComponent(), 0, currents) == 0.5);
+    CHECK(GUI::GetTerminalCurrent(transformer->GetComponent(), 1, currents) == -0.5);
+    CHECK(GUI::GetTerminalCurrent(transformer->GetComponent(), 2, currents) == -0.25);
+    CHECK(GUI::GetTerminalCurrent(transformer->GetComponent(), 3, currents) == 0.25);
 }

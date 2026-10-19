@@ -7,8 +7,15 @@
 #include "components/controlled_source.h"
 #include "components/current_source.h"
 #include "components/diode.h"
+#include "components/logic_part.h"
 #include "components/mosfet.h"
+#include "components/net_label.h"
 #include "components/op_amp.h"
+#include "components/potentiometer.h"
+#include "components/relay.h"
+#include "components/switch.h"
+#include "components/transformer.h"
+#include "components/voltage_controlled_switch.h"
 #include "components/voltage_source.h"
 #include "element_factory.h"
 #include "schematic_file.h"
@@ -362,10 +369,30 @@ TEST_CASE("Simulation settings load back unchanged", "[schematic_file]") {
     settings.SweptRange = {.Source = "V1", .Start = 5.0, .Stop = 0.0, .Step = -0.05};
     settings.SteppedRange = {.Source = "I1", .Start = 10e-6, .Stop = 50e-6, .Step = 10e-6};
     settings.StepSource = true;
+    settings.NoiseRange = {.StartFrequency = 1.0, .StopFrequency = 20e3, .PointsPerDecade = 10};
+    settings.NoiseSource = "Vin1";
+    settings.NoiseOutput = GUI::GridPoint{12, -4};
+    settings.ParameterStep = {
+        .Enabled = true, .Part = "R2", .UsesList = true, .Start = 1e3, .Stop = 4e3, .Step = 1e3, .List = "1k, 2.2k"};
 
     const GUI::LoadedSchematic loaded = LoadOrFail(GUI::SaveSchematic({}, {}, settings, {}));
     CHECK(loaded.Warnings.empty());
     CHECK(loaded.Settings == settings);
+
+    // Without an output point the key is left out and loads as none
+    settings.NoiseOutput.reset();
+    settings.Selected = GUI::Analysis::Noise;
+    CHECK(LoadOrFail(GUI::SaveSchematic({}, {}, settings, {})).Settings == settings);
+}
+
+TEST_CASE("Invalid noise settings fall back to their defaults with a warning", "[schematic_file]") {
+    const std::string text = R"({"format": "imcsim-schematic", "version": 1, "simulation": {)"
+                             R"("noise": {"start": 10.0, "stop": 1e3, "source": "V1", "output": [1.5, 2]}}})";
+    const GUI::LoadedSchematic loaded = LoadOrFail(text);
+    CHECK(loaded.Warnings.size() == 1);
+    CHECK(loaded.Settings.NoiseSource.empty());
+    CHECK_FALSE(loaded.Settings.NoiseOutput);
+    CHECK(loaded.Settings.NoiseRange == GUI::SimulationSettings{}.NoiseRange);
 }
 
 TEST_CASE("Files saved before settings were stored load with the default settings", "[schematic_file]") {
@@ -389,7 +416,7 @@ TEST_CASE("Invalid settings of one analysis fall back to its defaults with a war
 
 TEST_CASE("An unknown selected analysis falls back to the transient with a warning", "[schematic_file]") {
     const std::string text = R"({"format": "imcsim-schematic", "version": 1, "simulation": {)"
-                             R"("analysis": "noise", "ac_sweep": {"start": 10.0, "stop": 1e3}}})";
+                             R"("analysis": "pole_zero", "ac_sweep": {"start": 10.0, "stop": 1e3}}})";
     const GUI::LoadedSchematic loaded = LoadOrFail(text);
     CHECK(loaded.Warnings.size() == 1);
     CHECK(loaded.Settings.Selected == GUI::Analysis::Transient);
@@ -495,4 +522,207 @@ TEST_CASE("The AC magnitude is saved apart from the amplitude, and older files t
                       "source": "AC", "amplitude": 0.5, "frequency": 1000, "offset": 0}]})");
     REQUIRE(older.Elements.size() == 1);
     CHECK(static_cast<const Core::VoltageSource &>(older.Elements[0]->GetComponent()).GetAC().Magnitude == 0.5);
+}
+
+TEST_CASE("A net label keeps its name when saved and loaded", "[schematic_file]") {
+    std::vector<std::unique_ptr<GUI::UIElement>> elements;
+    elements.push_back(GUI::CreateElement(Core::ComponentType::NetLabel, {6, 2}, GUI::Rotation::R90));
+    static_cast<Core::NetLabel &>(elements.back()->GetComponent()).SetNet("Vout");
+    elements.push_back(GUI::CreateElement(Core::ComponentType::NetLabel, {12, 2}, GUI::Rotation::R0));
+
+    const std::string text = GUI::SaveSchematic(elements, {}, {}, {});
+    const GUI::LoadedSchematic loaded = LoadOrFail(text);
+    REQUIRE(loaded.Elements.size() == 2);
+    CHECK(loaded.Warnings.empty());
+    CHECK(loaded.Elements[0]->GetComponent().GetType() == Core::ComponentType::NetLabel);
+    CHECK(static_cast<const Core::NetLabel &>(loaded.Elements[0]->GetComponent()).GetNet() == "Vout");
+    CHECK(loaded.Elements[0]->GetRotation() == GUI::Rotation::R90);
+    // A label with no name yet is saved without the key and loads unnamed
+    CHECK(static_cast<const Core::NetLabel &>(loaded.Elements[1]->GetComponent()).GetNet().empty());
+    CHECK(text.find("\"name\"") == std::string::npos);
+}
+
+TEST_CASE("Two labels with one name both load, and an invalid net name skips the label", "[schematic_file]") {
+    const std::string elements = R"({"type": "NetLabel", "x": 0, "y": 0, "rotation": 0, "net": "OUT"},)"
+                                 R"({"type": "NetLabel", "x": 8, "y": 0, "rotation": 0, "net": "OUT"},)"
+                                 R"({"type": "NetLabel", "x": 16, "y": 0, "rotation": 0, "net": "no good"})";
+    const GUI::LoadedSchematic loaded = LoadOrFail(Document(elements, ""));
+    REQUIRE(loaded.Elements.size() == 2);
+    CHECK(static_cast<const Core::NetLabel &>(loaded.Elements[1]->GetComponent()).GetNet() == "OUT");
+    REQUIRE(loaded.Warnings.size() == 1);
+    CHECK(loaded.Warnings[0].find("net name") != std::string::npos);
+}
+
+TEST_CASE("A potentiometer keeps its value and wiper", "[schematic_file]") {
+    std::vector<std::unique_ptr<GUI::UIElement>> elements;
+    elements.push_back(GUI::CreateElement(Core::ComponentType::Potentiometer, {4, 6}, GUI::Rotation::R90));
+    auto &pot = static_cast<Core::Potentiometer &>(elements.back()->GetComponent());
+    pot.SetName("RV1");
+    pot.SetValue(47e3);
+    pot.SetWiper(0.3);
+
+    const GUI::LoadedSchematic loaded = LoadOrFail(GUI::SaveSchematic(elements, {}, {}, {}));
+    CHECK(loaded.Warnings.empty());
+    REQUIRE(loaded.Elements.size() == 1);
+    CHECK(loaded.Elements[0]->GetRotation() == GUI::Rotation::R90);
+    const auto &copy = static_cast<const Core::Potentiometer &>(loaded.Elements[0]->GetComponent());
+    CHECK(copy.GetName() == "RV1");
+    CHECK(copy.GetValue() == 47e3);
+    CHECK(copy.GetWiper() == 0.3);
+}
+
+TEST_CASE("A potentiometer saved without a wiper has it in the middle, and a wiper off the track is skipped",
+          "[schematic_file]") {
+    const std::string without_wiper =
+        R"({"type": "Potentiometer", "x": 1, "y": 1, "rotation": 0, "name": "RV1", "value": 1000.0})";
+    const GUI::LoadedSchematic loaded = LoadOrFail(Document(without_wiper, ""));
+    REQUIRE(loaded.Elements.size() == 1);
+    CHECK(static_cast<const Core::Potentiometer &>(loaded.Elements[0]->GetComponent()).GetWiper() == 0.5);
+
+    const std::string off_track =
+        R"({"type": "Potentiometer", "x": 1, "y": 1, "rotation": 0, "name": "RV1", "value": 1000.0, "wiper": 1.5})";
+    const GUI::LoadedSchematic skipped = LoadOrFail(Document(off_track, ""));
+    CHECK(skipped.Elements.empty());
+    CHECK(skipped.Warnings.size() == 1);
+}
+
+TEST_CASE("A switch and a push button keep their state, and load open when the file does not say", "[schematic_file]") {
+    std::vector<std::unique_ptr<GUI::UIElement>> elements;
+    elements.push_back(GUI::CreateElement(Core::ComponentType::Switch, {2, 2}, GUI::Rotation::R0));
+    static_cast<Core::Switch &>(elements.back()->GetComponent()).SetName("SW1");
+    static_cast<Core::Switch &>(elements.back()->GetComponent()).SetClosed(true);
+    elements.push_back(GUI::CreateElement(Core::ComponentType::PushButton, {8, 2}, GUI::Rotation::R90));
+    static_cast<Core::Switch &>(elements.back()->GetComponent()).SetName("PB1");
+
+    const GUI::LoadedSchematic loaded = LoadOrFail(GUI::SaveSchematic(elements, {}, {}, {}));
+    CHECK(loaded.Warnings.empty());
+    REQUIRE(loaded.Elements.size() == 2);
+    CHECK(static_cast<const Core::Switch &>(loaded.Elements[0]->GetComponent()).IsClosed());
+    CHECK_FALSE(static_cast<const Core::Switch &>(loaded.Elements[1]->GetComponent()).IsClosed());
+    CHECK(loaded.Elements[1]->GetComponent().GetType() == Core::ComponentType::PushButton);
+
+    const std::string without_state = R"({"type": "Switch", "x": 1, "y": 1, "rotation": 0, "name": "SW1"})";
+    const GUI::LoadedSchematic plain = LoadOrFail(Document(without_state, ""));
+    REQUIRE(plain.Elements.size() == 1);
+    CHECK_FALSE(static_cast<const Core::Switch &>(plain.Elements[0]->GetComponent()).IsClosed());
+
+    const std::string bad_state = R"({"type": "Switch", "x": 1, "y": 1, "rotation": 0, "name": "SW1", "closed": 3})";
+    const GUI::LoadedSchematic skipped = LoadOrFail(Document(bad_state, ""));
+    CHECK(skipped.Elements.empty());
+    CHECK(skipped.Warnings.size() == 1);
+}
+
+TEST_CASE("A voltage-controlled switch keeps its parameters, and loads with the defaults when it has none",
+          "[schematic_file]") {
+    std::vector<std::unique_ptr<GUI::UIElement>> elements;
+    elements.push_back(GUI::CreateElement(Core::ComponentType::VSwitch, {3, 3}, GUI::Rotation::R270));
+    auto &controlled = static_cast<Core::VoltageControlledSwitch &>(elements.back()->GetComponent());
+    controlled.SetName("S1");
+    controlled.SetParameters({.Threshold = 1.8, .Hysteresis = 0.3, .OnResistance = 2.0, .OffResistance = 1e7});
+
+    const GUI::LoadedSchematic loaded = LoadOrFail(GUI::SaveSchematic(elements, {}, {}, {}));
+    CHECK(loaded.Warnings.empty());
+    REQUIRE(loaded.Elements.size() == 1);
+    const auto &copy = static_cast<const Core::VoltageControlledSwitch &>(loaded.Elements[0]->GetComponent());
+    CHECK(copy.GetParameters().Threshold == 1.8);
+    CHECK(copy.GetParameters().Hysteresis == 0.3);
+    CHECK(copy.GetParameters().OnResistance == 2.0);
+    CHECK(copy.GetParameters().OffResistance == 1e7);
+
+    const std::string plain = R"({"type": "VSwitch", "x": 1, "y": 1, "rotation": 0, "name": "S1"})";
+    const GUI::LoadedSchematic defaults = LoadOrFail(Document(plain, ""));
+    REQUIRE(defaults.Elements.size() == 1);
+    CHECK(static_cast<const Core::VoltageControlledSwitch &>(defaults.Elements[0]->GetComponent())
+              .GetParameters()
+              .Threshold == 2.5);
+
+    const std::string backwards =
+        R"({"type": "VSwitch", "x": 1, "y": 1, "rotation": 0, "name": "S1", "parameters": {"on_resistance": 5.0, "off_resistance": 1.0}})";
+    const GUI::LoadedSchematic skipped = LoadOrFail(Document(backwards, ""));
+    CHECK(skipped.Elements.empty());
+    CHECK(skipped.Warnings.size() == 1);
+}
+
+TEST_CASE("A relay keeps its coil and contact figures", "[schematic_file]") {
+    std::vector<std::unique_ptr<GUI::UIElement>> elements;
+    elements.push_back(GUI::CreateElement(Core::ComponentType::Relay, {6, 6}, GUI::Rotation::R0));
+    auto &relay = static_cast<Core::Relay &>(elements.back()->GetComponent());
+    relay.SetName("K1");
+    relay.SetParameters({.CoilResistance = 400.0,
+                         .CoilInductance = 0.2,
+                         .PullInVoltage = 9.0,
+                         .DropOutVoltage = 1.5,
+                         .ContactResistance = 0.1});
+
+    const GUI::LoadedSchematic loaded = LoadOrFail(GUI::SaveSchematic(elements, {}, {}, {}));
+    CHECK(loaded.Warnings.empty());
+    REQUIRE(loaded.Elements.size() == 1);
+    const auto &copy = static_cast<const Core::Relay &>(loaded.Elements[0]->GetComponent());
+    CHECK(copy.GetName() == "K1");
+    CHECK(copy.GetParameters().CoilResistance == 400.0);
+    CHECK(copy.GetParameters().CoilInductance == 0.2);
+    CHECK(copy.GetParameters().PullInVoltage == 9.0);
+    CHECK(copy.GetParameters().DropOutVoltage == 1.5);
+    CHECK(copy.GetParameters().ContactResistance == 0.1);
+
+    // A pull-in voltage that is not above the drop-out one cannot be a relay
+    const std::string inverted =
+        R"({"type": "Relay", "x": 1, "y": 1, "rotation": 0, "name": "K1", "parameters": {"pull_in": 1.0, "drop_out": 2.0}})";
+    const GUI::LoadedSchematic skipped = LoadOrFail(Document(inverted, ""));
+    CHECK(skipped.Elements.empty());
+    CHECK(skipped.Warnings.size() == 1);
+}
+
+TEST_CASE("A transformer keeps its primary inductance and its figures", "[schematic_file]") {
+    std::vector<std::unique_ptr<GUI::UIElement>> elements;
+    elements.push_back(GUI::CreateElement(Core::ComponentType::Transformer, {5, 5}, GUI::Rotation::R180));
+    auto &transformer = static_cast<Core::Transformer &>(elements.back()->GetComponent());
+    transformer.SetName("T1");
+    transformer.SetValue(0.5);
+    transformer.SetParameters({.TurnsRatio = 4.0, .Coupling = 0.95, .WindingResistance = 2.0});
+
+    const GUI::LoadedSchematic loaded = LoadOrFail(GUI::SaveSchematic(elements, {}, {}, {}));
+    CHECK(loaded.Warnings.empty());
+    REQUIRE(loaded.Elements.size() == 1);
+    const auto &copy = static_cast<const Core::Transformer &>(loaded.Elements[0]->GetComponent());
+    CHECK(copy.GetValue() == 0.5);
+    CHECK(copy.GetParameters().TurnsRatio == 4.0);
+    CHECK(copy.GetParameters().Coupling == 0.95);
+    CHECK(copy.GetParameters().WindingResistance == 2.0);
+
+    // A coupling of 1 is not allowed
+    const std::string perfect =
+        R"({"type": "Transformer", "x": 1, "y": 1, "rotation": 0, "name": "T1", "value": 0.1, "parameters": {"coupling": 1.0}})";
+    const GUI::LoadedSchematic skipped = LoadOrFail(Document(perfect, ""));
+    CHECK(skipped.Elements.empty());
+    CHECK(skipped.Warnings.size() == 1);
+}
+
+TEST_CASE("Gates and flip-flops keep their logic family", "[schematic_file]") {
+    std::vector<std::unique_ptr<GUI::UIElement>> elements;
+    elements.push_back(GUI::CreateElement(Core::ComponentType::Nand, {4, 4}, GUI::Rotation::R90));
+    auto &gate = static_cast<Core::LogicPart &>(elements.back()->GetComponent());
+    gate.SetName("U1");
+    gate.SetParameters({.LogicLevel = 3.3, .PropagationDelay = 2e-9});
+    elements.push_back(GUI::CreateElement(Core::ComponentType::JKFlipFlop, {12, 4}, GUI::Rotation::R0));
+    elements.back()->GetComponent().SetName("U2");
+
+    const GUI::LoadedSchematic loaded = LoadOrFail(GUI::SaveSchematic(elements, {}, {}, {}));
+    CHECK(loaded.Warnings.empty());
+    REQUIRE(loaded.Elements.size() == 2);
+    const auto &nand = static_cast<const Core::LogicPart &>(loaded.Elements[0]->GetComponent());
+    CHECK(nand.GetType() == Core::ComponentType::Nand);
+    CHECK(nand.GetName() == "U1");
+    CHECK(nand.GetParameters().LogicLevel == 3.3);
+    CHECK(nand.GetParameters().PropagationDelay == 2e-9);
+    const auto &flip_flop = static_cast<const Core::LogicPart &>(loaded.Elements[1]->GetComponent());
+    CHECK(flip_flop.GetType() == Core::ComponentType::JKFlipFlop);
+    // Left out of the file, the figures are those a new part starts with
+    CHECK(flip_flop.GetParameters().LogicLevel == 5.0);
+
+    const std::string no_level =
+        R"({"type": "And", "x": 1, "y": 1, "rotation": 0, "name": "U1", "parameters": {"logic_level": 0.0}})";
+    const GUI::LoadedSchematic skipped = LoadOrFail(Document(no_level, ""));
+    CHECK(skipped.Elements.empty());
+    CHECK(skipped.Warnings.size() == 1);
 }

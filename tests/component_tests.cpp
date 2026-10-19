@@ -10,14 +10,22 @@
 #include "components/diode.h"
 #include "components/ground.h"
 #include "components/inductor.h"
+#include "components/logic_part.h"
 #include "components/mosfet.h"
+#include "components/net_label.h"
 #include "components/op_amp.h"
+#include "components/potentiometer.h"
+#include "components/relay.h"
 #include "components/resistor.h"
+#include "components/switch.h"
+#include "components/transformer.h"
 #include "components/vcc.h"
+#include "components/voltage_controlled_switch.h"
 #include "components/voltage_source.h"
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators.hpp>
 #include <span>
+#include <string>
 #include <string_view>
 
 TEST_CASE("Components start with SPICE prefixes, units and default values", "[component]") {
@@ -56,11 +64,171 @@ TEST_CASE("Components start with SPICE prefixes, units and default values", "[co
     CHECK(current_source.GetSourceType() == Core::CurrentSource::SourceType::DC);
 }
 
+TEST_CASE("A potentiometer is a resistor of 10k with its wiper in the middle", "[component]") {
+    Core::Potentiometer pot;
+    CHECK(pot.GetType() == Core::ComponentType::Potentiometer);
+    CHECK(std::string_view(pot.GetTypeName()) == "Potentiometer");
+    CHECK(std::string_view(pot.GetNamePrefix()) == "RV");
+    CHECK(std::string_view(pot.GetUnit()) == "Ohm");
+    CHECK(pot.HasValue());
+    CHECK(pot.GetValue() == 10e3);
+    CHECK(pot.GetWiper() == 0.5);
+    CHECK(Core::ParseComponentType("Potentiometer") == Core::ComponentType::Potentiometer);
+
+    SECTION("its value must be positive, and its wiper on the track") {
+        CHECK(pot.IsValidValue(1.0));
+        CHECK_FALSE(pot.IsValidValue(0.0));
+        CHECK_FALSE(pot.IsValidValue(-5.0));
+        CHECK(Core::Potentiometer::IsValidWiper(0.0));
+        CHECK(Core::Potentiometer::IsValidWiper(1.0));
+        CHECK_FALSE(Core::Potentiometer::IsValidWiper(-0.01));
+        CHECK_FALSE(Core::Potentiometer::IsValidWiper(1.01));
+    }
+    SECTION("the wiper moves") {
+        pot.SetWiper(0.2);
+        CHECK(pot.GetWiper() == 0.2);
+    }
+    SECTION("names are RV and a number") {
+        CHECK(Core::IsValidName("RV1", pot.GetNamePrefix()));
+        CHECK(Core::NextComponentName(pot.GetNamePrefix(), {"RV1", "R7"}) == "RV2");
+    }
+}
+
+TEST_CASE("A switch and a push button start open, with no value", "[component]") {
+    Core::Switch toggle(Core::ComponentType::Switch);
+    CHECK(std::string_view(toggle.GetNamePrefix()) == "SW");
+    CHECK(std::string_view(toggle.GetTypeName()) == "Switch");
+    CHECK(std::string_view(toggle.GetUnit()).empty());
+    CHECK_FALSE(toggle.HasValue());
+    CHECK_FALSE(toggle.IsValidValue(1.0));
+    CHECK_FALSE(toggle.IsClosed());
+
+    Core::Switch button(Core::ComponentType::PushButton);
+    CHECK(std::string_view(button.GetNamePrefix()) == "PB");
+    CHECK(std::string_view(button.GetTypeName()) == "PushButton");
+    CHECK_FALSE(button.IsClosed());
+
+    toggle.SetClosed(true);
+    CHECK(toggle.IsClosed());
+    CHECK(Core::IsSwitch(Core::ComponentType::Switch));
+    CHECK(Core::IsSwitch(Core::ComponentType::PushButton));
+    CHECK_FALSE(Core::IsSwitch(Core::ComponentType::Resistor));
+    CHECK(Core::ParseComponentType("PushButton") == Core::ComponentType::PushButton);
+}
+
+TEST_CASE("A voltage-controlled switch and a relay have their own prefixes and no value", "[component]") {
+    const Core::VoltageControlledSwitch controlled;
+    CHECK(std::string_view(controlled.GetNamePrefix()) == "S");
+    CHECK(std::string_view(controlled.GetTypeName()) == "VSwitch");
+    CHECK_FALSE(controlled.HasValue());
+    CHECK(controlled.GetParameters().Threshold == 2.5);
+    CHECK(controlled.GetParameters().Hysteresis == 0.1);
+    CHECK(Core::ParseComponentType("VSwitch") == Core::ComponentType::VSwitch);
+
+    const Core::Relay relay;
+    CHECK(std::string_view(relay.GetNamePrefix()) == "K");
+    CHECK(std::string_view(relay.GetTypeName()) == "Relay");
+    CHECK_FALSE(relay.HasValue());
+    CHECK(Core::ParseComponentType("Relay") == Core::ComponentType::Relay);
+}
+
+TEST_CASE("Switch and relay parameters must make a contact that can open and close", "[component]") {
+    Core::SwitchParameters switch_parameters;
+    CHECK(Core::VoltageControlledSwitch::IsValidParameters(switch_parameters));
+    switch_parameters.Hysteresis = -0.1;
+    CHECK_FALSE(Core::VoltageControlledSwitch::IsValidParameters(switch_parameters));
+    switch_parameters = {};
+    switch_parameters.OnResistance = switch_parameters.OffResistance;
+    CHECK_FALSE(Core::VoltageControlledSwitch::IsValidParameters(switch_parameters));
+
+    Core::RelayParameters relay_parameters;
+    CHECK(Core::Relay::IsValidParameters(relay_parameters));
+    relay_parameters.DropOutVoltage = relay_parameters.PullInVoltage;
+    CHECK_FALSE(Core::Relay::IsValidParameters(relay_parameters));
+    relay_parameters = {};
+    relay_parameters.CoilInductance = 0.0;
+    CHECK_FALSE(Core::Relay::IsValidParameters(relay_parameters));
+}
+
+TEST_CASE("A relay contact closes at the pull-in voltage and opens at the drop-out voltage", "[component]") {
+    Core::Relay relay;
+    relay.SetParameters({.CoilResistance = 100.0,
+                         .CoilInductance = 0.1,
+                         .PullInVoltage = 4.0,
+                         .DropOutVoltage = 2.0,
+                         .ContactResistance = 0.2});
+    const Core::SwitchParameters contact = relay.GetContactParameters();
+    // Closes above threshold + hysteresis and opens below threshold - hysteresis
+    CHECK(contact.Threshold + contact.Hysteresis == 4.0);
+    CHECK(contact.Threshold - contact.Hysteresis == 2.0);
+    CHECK(contact.OnResistance == 0.2);
+    CHECK(contact.OffResistance == 1e9);
+}
+
+TEST_CASE("A transformer is a 100 mH primary with a 1:1 secondary, and the value is the primary", "[component]") {
+    Core::Transformer transformer;
+    CHECK(std::string_view(transformer.GetNamePrefix()) == "T");
+    CHECK(std::string_view(transformer.GetTypeName()) == "Transformer");
+    CHECK(std::string_view(transformer.GetUnit()) == "H");
+    CHECK(transformer.HasValue());
+    CHECK(transformer.GetValue() == 100e-3);
+    CHECK(transformer.IsValidValue(1e-3));
+    CHECK_FALSE(transformer.IsValidValue(0.0));
+    CHECK(transformer.GetSecondaryInductance() == 100e-3);
+    CHECK(Core::ParseComponentType("Transformer") == Core::ComponentType::Transformer);
+
+    SECTION("the secondary follows from the square of the turns ratio") {
+        transformer.SetParameters({.TurnsRatio = 2.0, .Coupling = 0.99, .WindingResistance = 0.5});
+        CHECK(transformer.GetSecondaryInductance() == 25e-3);
+        transformer.SetValue(1.0);
+        CHECK(transformer.GetSecondaryInductance() == 0.25);
+    }
+    SECTION("the figures must keep the coupling below 1 and the resistance positive") {
+        Core::TransformerParameters parameters;
+        CHECK(Core::Transformer::IsValidParameters(parameters));
+        parameters.Coupling = 1.0;
+        CHECK_FALSE(Core::Transformer::IsValidParameters(parameters));
+        parameters = {};
+        parameters.Coupling = 0.0;
+        CHECK_FALSE(Core::Transformer::IsValidParameters(parameters));
+        parameters = {};
+        parameters.TurnsRatio = 0.0;
+        CHECK_FALSE(Core::Transformer::IsValidParameters(parameters));
+        parameters = {};
+        parameters.WindingResistance = 0.0;
+        CHECK_FALSE(Core::Transformer::IsValidParameters(parameters));
+    }
+}
+
 TEST_CASE("Ground has no name prefix and no value", "[component]") {
     const Core::Ground ground;
     CHECK_FALSE(ground.HasValue());
     CHECK(std::string_view(ground.GetNamePrefix()).empty());
     CHECK_FALSE(ground.IsValidValue(0.0));
+}
+
+TEST_CASE("A net label has no prefix, value or unit and its name is kept as typed", "[component]") {
+    Core::NetLabel label;
+    CHECK_FALSE(label.HasValue());
+    CHECK(std::string_view(label.GetNamePrefix()).empty());
+    CHECK(std::string_view(label.GetUnit()).empty());
+    CHECK(std::string_view(label.GetTypeName()) == "NetLabel");
+    CHECK(Core::ParseComponentType("NetLabel") == Core::ComponentType::NetLabel);
+    CHECK(label.GetNet().empty());
+    label.SetNet("Vout");
+    CHECK(label.GetNet() == "Vout");
+}
+
+TEST_CASE("Net names are 1 to 32 letters, digits, underscores, hyphens and dots", "[component]") {
+    CHECK(Core::NetLabel::IsValidNet("VOUT"));
+    CHECK(Core::NetLabel::IsValidNet("out_1-a.b"));
+    CHECK(Core::NetLabel::IsValidNet("0"));
+    CHECK(Core::NetLabel::IsValidNet(std::string(32, 'a')));
+    CHECK_FALSE(Core::NetLabel::IsValidNet(""));
+    CHECK_FALSE(Core::NetLabel::IsValidNet(std::string(33, 'a')));
+    CHECK_FALSE(Core::NetLabel::IsValidNet("two words"));
+    CHECK_FALSE(Core::NetLabel::IsValidNet("a(b)"));
+    CHECK(Core::NetLabel::NormalizeNet("VoUt") == "vout");
 }
 
 TEST_CASE("IsValidValue requires positive passive values but allows any source voltage", "[component]") {
@@ -349,4 +517,51 @@ TEST_CASE("Op-amps are named U and have no value", "[component]") {
     CHECK(std::string_view(op_amp.GetNamePrefix()) == "U");
     CHECK_FALSE(op_amp.HasValue());
     CHECK_FALSE(Core::IsControlledSource(Core::ComponentType::OpAmp));
+}
+
+TEST_CASE("Gates and flip-flops are U parts with no value, and their type names round-trip", "[component]") {
+    for (const Core::ComponentType type :
+         {Core::ComponentType::And, Core::ComponentType::Or, Core::ComponentType::Not, Core::ComponentType::Nand,
+          Core::ComponentType::Nor, Core::ComponentType::Xor, Core::ComponentType::Xnor, Core::ComponentType::Buffer,
+          Core::ComponentType::DFlipFlop, Core::ComponentType::JKFlipFlop, Core::ComponentType::TFlipFlop,
+          Core::ComponentType::SRFlipFlop}) {
+        const Core::LogicPart part(type);
+        INFO(part.GetTypeName());
+        CHECK(std::string_view(part.GetNamePrefix()) == "U");
+        CHECK_FALSE(part.HasValue());
+        CHECK(Core::IsLogicPart(type));
+        CHECK(Core::ParseComponentType(part.GetTypeName()) == type);
+        CHECK(std::string_view(Core::GetLogicModelKind(type)).starts_with("d_"));
+    }
+    CHECK(Core::IsLogicGate(Core::ComponentType::Xor));
+    CHECK_FALSE(Core::IsLogicGate(Core::ComponentType::DFlipFlop));
+    CHECK(Core::IsFlipFlop(Core::ComponentType::TFlipFlop));
+    CHECK_FALSE(Core::IsLogicPart(Core::ComponentType::OpAmp));
+}
+
+TEST_CASE("The terminals of a gate or flip-flop are its inputs, then its outputs", "[component]") {
+    CHECK(Core::GetLogicInputLabels(Core::ComponentType::Or) == std::vector<std::string>{"A", "B"});
+    CHECK(Core::GetLogicInputLabels(Core::ComponentType::Buffer) == std::vector<std::string>{"A"});
+    CHECK(Core::GetLogicOutputLabels(Core::ComponentType::Nor) == std::vector<std::string>{"Y"});
+    CHECK(Core::GetLogicInputLabels(Core::ComponentType::DFlipFlop) ==
+          std::vector<std::string>{"D", "CLK", "SET", "RESET"});
+    CHECK(Core::GetLogicInputLabels(Core::ComponentType::JKFlipFlop) ==
+          std::vector<std::string>{"J", "K", "CLK", "SET", "RESET"});
+    CHECK(Core::GetLogicInputLabels(Core::ComponentType::TFlipFlop) ==
+          std::vector<std::string>{"T", "CLK", "SET", "RESET"});
+    CHECK(Core::GetLogicInputLabels(Core::ComponentType::SRFlipFlop) ==
+          std::vector<std::string>{"S", "R", "CLK", "SET", "RESET"});
+    CHECK(Core::GetLogicOutputLabels(Core::ComponentType::SRFlipFlop) == std::vector<std::string>{"Q", "QN"});
+}
+
+TEST_CASE("Logic figures need a positive level and a delay that is not negative", "[component]") {
+    Core::LogicParameters parameters;
+    CHECK(Core::LogicPart::IsValidParameters(parameters));
+    parameters.PropagationDelay = 0.0;
+    CHECK(Core::LogicPart::IsValidParameters(parameters));
+    parameters.PropagationDelay = -1e-9;
+    CHECK_FALSE(Core::LogicPart::IsValidParameters(parameters));
+    parameters = {};
+    parameters.LogicLevel = 0.0;
+    CHECK_FALSE(Core::LogicPart::IsValidParameters(parameters));
 }

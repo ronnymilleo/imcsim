@@ -8,13 +8,19 @@
 #include "ui_elements/ui_bjt.h"
 #include "ui_elements/ui_capacitor.h"
 #include "ui_elements/ui_controlled_source.h"
+#include "ui_elements/ui_controlled_switch.h"
 #include "ui_elements/ui_current_source.h"
 #include "ui_elements/ui_diode.h"
 #include "ui_elements/ui_ground.h"
 #include "ui_elements/ui_inductor.h"
+#include "ui_elements/ui_logic_part.h"
 #include "ui_elements/ui_mosfet.h"
+#include "ui_elements/ui_net_label.h"
 #include "ui_elements/ui_op_amp.h"
+#include "ui_elements/ui_potentiometer.h"
 #include "ui_elements/ui_resistor.h"
+#include "ui_elements/ui_switch.h"
+#include "ui_elements/ui_transformer.h"
 #include "ui_elements/ui_vcc.h"
 #include "ui_elements/ui_voltage_source.h"
 #include <algorithm>
@@ -55,6 +61,25 @@ constexpr auto Parts = std::to_array<PartInfo>({
     {Core::ComponentType::CCCS, "CCCS (F)"},
     {Core::ComponentType::CCVS, "CCVS (H)"},
     {Core::ComponentType::OpAmp, "Op-amp"},
+    {Core::ComponentType::NetLabel, "Net label"},
+    {Core::ComponentType::Potentiometer, "Potentiometer"},
+    {Core::ComponentType::Switch, "Switch"},
+    {Core::ComponentType::PushButton, "Push button"},
+    {Core::ComponentType::VSwitch, "Voltage-controlled switch"},
+    {Core::ComponentType::Relay, "Relay"},
+    {Core::ComponentType::Transformer, "Transformer"},
+    {Core::ComponentType::And, "AND gate"},
+    {Core::ComponentType::Or, "OR gate"},
+    {Core::ComponentType::Not, "NOT gate (inverter)"},
+    {Core::ComponentType::Nand, "NAND gate"},
+    {Core::ComponentType::Nor, "NOR gate"},
+    {Core::ComponentType::Xor, "XOR gate"},
+    {Core::ComponentType::Xnor, "XNOR gate"},
+    {Core::ComponentType::Buffer, "Buffer"},
+    {Core::ComponentType::DFlipFlop, "D flip-flop"},
+    {Core::ComponentType::JKFlipFlop, "JK flip-flop"},
+    {Core::ComponentType::TFlipFlop, "T flip-flop"},
+    {Core::ComponentType::SRFlipFlop, "SR flip-flop"},
 });
 
 // Lowercase letters and digits only, so "opamp" finds "Op-amp" and "vcc" finds "VCC supply"
@@ -111,6 +136,31 @@ std::unique_ptr<UIElement> CreateElement(const Core::ComponentType type, const G
         return std::make_unique<UIControlledSource>(type, position, rotation);
     case Core::ComponentType::OpAmp:
         return std::make_unique<UIOpAmp>(position, rotation);
+    case Core::ComponentType::NetLabel:
+        return std::make_unique<UINetLabel>(position, rotation);
+    case Core::ComponentType::Potentiometer:
+        return std::make_unique<UIPotentiometer>(position, rotation);
+    case Core::ComponentType::Switch:
+    case Core::ComponentType::PushButton:
+        return std::make_unique<UISwitch>(type, position, rotation);
+    case Core::ComponentType::VSwitch:
+    case Core::ComponentType::Relay:
+        return std::make_unique<UIControlledSwitch>(type, position, rotation);
+    case Core::ComponentType::Transformer:
+        return std::make_unique<UITransformer>(position, rotation);
+    case Core::ComponentType::And:
+    case Core::ComponentType::Or:
+    case Core::ComponentType::Not:
+    case Core::ComponentType::Nand:
+    case Core::ComponentType::Nor:
+    case Core::ComponentType::Xor:
+    case Core::ComponentType::Xnor:
+    case Core::ComponentType::Buffer:
+    case Core::ComponentType::DFlipFlop:
+    case Core::ComponentType::JKFlipFlop:
+    case Core::ComponentType::TFlipFlop:
+    case Core::ComponentType::SRFlipFlop:
+        return std::make_unique<UILogicPart>(type, position, rotation);
     }
     return nullptr;
 }

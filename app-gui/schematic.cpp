@@ -10,6 +10,8 @@
 #include "wire_editing.h"
 #include <algorithm>
 #include <iterator>
+#include <map>
+#include <set>
 #include <string_view>
 #include <utility>
 
@@ -126,7 +128,8 @@ void Schematic::SetWires(std::vector<UIWire> wires) {
 
 /**
  * @brief   Joins and deduplicates wire segments without changing the circuit.
- * @note    When something changes, wires are merged and removed, so a selected wire is deselected.
+ * @note    When something changes, wires are merged and removed, so the selected wires are deselected; the selected
+ *          elements stay selected.
  */
 void Schematic::SimplifyAllWires() {
     std::vector<UIWire> simplified = SimplifyWires(m_Wires, CollectTerminals());
@@ -134,24 +137,27 @@ void Schematic::SimplifyAllWires() {
         return;
     }
     m_Wires = std::move(simplified);
-    if (m_SelectedWire) {
-        ClearSelection();
+    if (!m_SelectedWires.empty()) {
+        SetSelection(m_SelectedElements, {});
     }
     m_ChangedSinceCommit = true;
     InvalidateDerivedData();
 }
 
 /**
- * @brief   Deletes the selected element or wire, if any.
+ * @brief   Deletes every selected element and wire, if any.
  * @note    Wires attached to a deleted element stay in place, like in LTspice.
  */
 void Schematic::DeleteSelection() {
-    if (m_SelectedElement) {
-        m_Elements.erase(m_Elements.begin() + static_cast<std::ptrdiff_t>(*m_SelectedElement));
-    } else if (m_SelectedWire) {
-        m_Wires.erase(m_Wires.begin() + static_cast<std::ptrdiff_t>(*m_SelectedWire));
-    } else {
+    if (!HasSelection()) {
         return;
+    }
+    // Highest index first, so the indices still to erase stay valid
+    for (auto index = m_SelectedElements.rbegin(); index != m_SelectedElements.rend(); ++index) {
+        m_Elements.erase(m_Elements.begin() + static_cast<std::ptrdiff_t>(*index));
+    }
+    for (auto index = m_SelectedWires.rbegin(); index != m_SelectedWires.rend(); ++index) {
+        m_Wires.erase(m_Wires.begin() + static_cast<std::ptrdiff_t>(*index));
     }
     ClearSelection();
     MarkModified();
@@ -180,6 +186,8 @@ void Schematic::Replace(std::vector<std::unique_ptr<UIElement>> elements, std::v
     m_SimulationSettings = std::move(settings);
     ++m_SimulationSettingsVersion;
     InvalidateDerivedData();
+    // The probes belong to the old content; whoever replaces it sets them again
+    m_VoltageProbes.clear();
     m_Modified = false;
     ResetHistory();
 }
@@ -189,8 +197,7 @@ void Schematic::Replace(std::vector<std::unique_ptr<UIElement>> elements, std::v
  * @param[in] index  Index into GetElements().
  */
 void Schematic::SelectElement(const std::size_t index) {
-    ClearSelection();
-    m_SelectedElement = index;
+    SetSelection({index}, {});
 }
 
 /**
@@ -198,41 +205,79 @@ void Schematic::SelectElement(const std::size_t index) {
  * @param[in] index  Index into GetWires().
  */
 void Schematic::SelectWire(const std::size_t index) {
-    ClearSelection();
-    m_SelectedWire = index;
+    SetSelection({}, {index});
+}
+
+/**
+ * @brief   Replaces the selection.
+ * @param[in] elements  Indices into GetElements().
+ * @param[in] wires     Indices into GetWires().
+ */
+void Schematic::SetSelection(std::set<std::size_t> elements, std::set<std::size_t> wires) {
+    m_SelectedElements = std::move(elements);
+    m_SelectedWires = std::move(wires);
+    ++m_SelectionVersion;
 }
 
 /**
  * @brief   Deselects everything.
  */
 void Schematic::ClearSelection() {
-    m_SelectedElement.reset();
-    m_SelectedWire.reset();
-    ++m_SelectionVersion;
+    SetSelection({}, {});
 }
 
 /**
- * @brief   Returns the index of the selected element.
- * @return  The index into GetElements(), or no value when no element is selected.
+ * @brief   Tells whether an element is selected.
+ * @param[in] index  Index into GetElements().
+ * @return  True when the element is in the selection.
  */
-std::optional<std::size_t> Schematic::GetSelectedElementIndex() const {
-    return m_SelectedElement;
+bool Schematic::IsElementSelected(const std::size_t index) const {
+    return m_SelectedElements.contains(index);
 }
 
 /**
- * @brief   Returns the index of the selected wire.
- * @return  The index into GetWires(), or no value when no wire is selected.
+ * @brief   Tells whether a wire is selected.
+ * @param[in] index  Index into GetWires().
+ * @return  True when the wire is in the selection.
  */
-std::optional<std::size_t> Schematic::GetSelectedWireIndex() const {
-    return m_SelectedWire;
+bool Schematic::IsWireSelected(const std::size_t index) const {
+    return m_SelectedWires.contains(index);
 }
 
 /**
- * @brief   Returns the selected element.
- * @return  The element, or nullptr when no element is selected.
+ * @brief   Returns the indices of the selected elements.
+ * @return  Indices into GetElements(), in order.
+ */
+const std::set<std::size_t> &Schematic::GetSelectedElements() const {
+    return m_SelectedElements;
+}
+
+/**
+ * @brief   Returns the indices of the selected wires.
+ * @return  Indices into GetWires(), in order.
+ */
+const std::set<std::size_t> &Schematic::GetSelectedWires() const {
+    return m_SelectedWires;
+}
+
+/**
+ * @brief   Tells whether anything is selected.
+ * @return  True when at least one element or wire is selected.
+ */
+bool Schematic::HasSelection() const {
+    return !m_SelectedElements.empty() || !m_SelectedWires.empty();
+}
+
+/**
+ * @brief   Returns the selected element when it is the only thing selected.
+ * @return  The element, or nullptr when there is no selection, a wire is selected too, or there are several elements.
+ * @note    Editing a part, such as its value, applies to one part at a time, so this is what those edits ask for.
  */
 UIElement *Schematic::GetSelectedElement() {
-    return m_SelectedElement ? m_Elements[*m_SelectedElement].get() : nullptr;
+    if (m_SelectedElements.size() != 1 || !m_SelectedWires.empty()) {
+        return nullptr;
+    }
+    return m_Elements[*m_SelectedElements.begin()].get();
 }
 
 /**
@@ -249,7 +294,7 @@ std::size_t Schematic::GetSelectionVersion() const {
  * @return  True when the node is measured.
  */
 bool Schematic::IsVoltageMeasured(const int node) const {
-    return m_MeasuredNodes.contains(node);
+    return std::ranges::any_of(m_VoltageProbes, [node](const VoltageProbe &probe) { return probe.Node == node; });
 }
 
 /**
@@ -258,10 +303,10 @@ bool Schematic::IsVoltageMeasured(const int node) const {
  * @param[in] measured  Whether to show it.
  */
 void Schematic::SetVoltageMeasured(const int node, const bool measured) {
-    if (measured) {
-        m_MeasuredNodes.insert(node);
-    } else {
-        m_MeasuredNodes.erase(node);
+    if (!measured) {
+        std::erase_if(m_VoltageProbes, [node](const VoltageProbe &probe) { return probe.Node == node; });
+    } else if (!IsVoltageMeasured(node)) {
+        m_VoltageProbes.push_back({.Points = GetConnectivity().GetPointsOfNode(node), .Node = node});
     }
 }
 
@@ -291,7 +336,7 @@ void Schematic::SetCurrentMeasured(const std::string &name, const bool measured)
  * @brief   Removes every measurement, so the plots start empty; for a new or opened schematic.
  */
 void Schematic::ClearMeasurements() {
-    m_MeasuredNodes.clear();
+    m_VoltageProbes.clear();
     m_MeasuredCurrents.clear();
 }
 
@@ -301,9 +346,12 @@ void Schematic::ClearMeasurements() {
  */
 SavedMeasurements Schematic::SaveMeasurements() {
     SavedMeasurements measurements;
-    for (const int node : m_MeasuredNodes) {
-        if (const std::optional<GridPoint> point = GetConnectivity().FindPointOfNode(node)) {
-            measurements.Voltages.push_back(*point);
+    GetConnectivity();
+    for (const VoltageProbe &probe : m_VoltageProbes) {
+        if (probe.Node) {
+            if (const std::optional<GridPoint> point = m_Connectivity->FindPointOfNode(*probe.Node)) {
+                measurements.Voltages.push_back(*point);
+            }
         }
     }
     measurements.Currents.assign(m_MeasuredCurrents.begin(), m_MeasuredCurrents.end());
@@ -320,7 +368,7 @@ void Schematic::RestoreMeasurements(const SavedMeasurements &measurements) {
     ClearMeasurements();
     for (const GridPoint point : measurements.Voltages) {
         if (const std::optional<int> node = GetConnectivity().GetNode(point); node && *node != 0) {
-            m_MeasuredNodes.insert(*node);
+            SetVoltageMeasured(*node, true);
         }
     }
     m_MeasuredCurrents.insert(measurements.Currents.begin(), measurements.Currents.end());
@@ -469,6 +517,7 @@ void Schematic::Redo() {
 const Connectivity &Schematic::GetConnectivity() {
     if (!m_Connectivity) {
         m_Connectivity.emplace(m_Elements, m_Wires);
+        FollowVoltageProbes();
     }
     return *m_Connectivity;
 }
@@ -513,6 +562,7 @@ const std::optional<Core::OperatingPoint> &Schematic::GetOperatingPoint() const 
  * @note    The result is dropped on the next change, since it no longer matches the circuit.
  */
 void Schematic::SetTransient(std::optional<Core::Transient> transient) {
+    m_TransientSteps.reset();
     m_Transient = std::move(transient);
     ++m_TransientVersion;
 }
@@ -531,6 +581,7 @@ const std::optional<Core::Transient> &Schematic::GetTransient() const {
  * @note    The result is dropped on the next change, since it no longer matches the circuit.
  */
 void Schematic::SetACSweep(std::optional<Core::ACSweep> sweep) {
+    m_ACSweepSteps.reset();
     m_ACSweep = std::move(sweep);
     ++m_ACSweepVersion;
 }
@@ -541,6 +592,73 @@ void Schematic::SetACSweep(std::optional<Core::ACSweep> sweep) {
  */
 const std::optional<Core::ACSweep> &Schematic::GetACSweep() const {
     return m_ACSweep;
+}
+
+/**
+ * @brief   Stores the transients of a stepped run, one per value of its parameter.
+ * @param[in] steps  Every step, with at least one result, and the selected one, which GetTransient() returns.
+ * @note    The results are dropped on the next change, like those of a single run.
+ */
+void Schematic::SetTransientSteps(StepFamily<Core::Transient> steps) {
+    steps.Selected = std::min(steps.Selected, steps.Results.size() - 1);
+    m_Transient = steps.Results[steps.Selected];
+    m_TransientSteps = std::move(steps);
+    ++m_TransientVersion;
+}
+
+/**
+ * @brief   Returns every step of the last stepped transient.
+ * @return  The steps, or no value when the last transient was a single run or there is none.
+ */
+const std::optional<StepFamily<Core::Transient>> &Schematic::GetTransientSteps() const {
+    return m_TransientSteps;
+}
+
+/**
+ * @brief   Shows another step of the stepped transient wherever one result is shown: the schematic, the statistics
+ *          and the spectrum.
+ * @param[in] step  Index of the step; ignored when out of range or without steps.
+ */
+void Schematic::SelectTransientStep(const std::size_t step) {
+    if (!m_TransientSteps || step >= m_TransientSteps->Results.size() || step == m_TransientSteps->Selected) {
+        return;
+    }
+    m_TransientSteps->Selected = step;
+    m_Transient = m_TransientSteps->Results[step];
+    ++m_TransientVersion;
+}
+
+/**
+ * @brief   Stores the AC sweeps of a stepped run, one per value of its parameter.
+ * @param[in] steps  Every step, with at least one result, and the selected one, which GetACSweep() returns.
+ * @note    The results are dropped on the next change, like those of a single run.
+ */
+void Schematic::SetACSweepSteps(StepFamily<Core::ACSweep> steps) {
+    steps.Selected = std::min(steps.Selected, steps.Results.size() - 1);
+    m_ACSweep = steps.Results[steps.Selected];
+    m_ACSweepSteps = std::move(steps);
+    ++m_ACSweepVersion;
+}
+
+/**
+ * @brief   Returns every step of the last stepped AC sweep.
+ * @return  The steps, or no value when the last AC sweep was a single run or there is none.
+ */
+const std::optional<StepFamily<Core::ACSweep>> &Schematic::GetACSweepSteps() const {
+    return m_ACSweepSteps;
+}
+
+/**
+ * @brief   Measures another step of the stepped AC sweep in the statistics.
+ * @param[in] step  Index of the step; ignored when out of range or without steps.
+ */
+void Schematic::SelectACSweepStep(const std::size_t step) {
+    if (!m_ACSweepSteps || step >= m_ACSweepSteps->Results.size() || step == m_ACSweepSteps->Selected) {
+        return;
+    }
+    m_ACSweepSteps->Selected = step;
+    m_ACSweep = m_ACSweepSteps->Results[step];
+    ++m_ACSweepVersion;
 }
 
 /**
@@ -560,6 +678,24 @@ void Schematic::SetDCSweep(std::optional<Core::DCSweep> sweep) {
  */
 const std::optional<Core::DCSweep> &Schematic::GetDCSweep() const {
     return m_DCSweep;
+}
+
+/**
+ * @brief   Stores the result of a noise analysis of the current schematic.
+ * @param[in] noise  Noise densities, totals and contributions, or no value to clear them.
+ * @note    The result is dropped on the next change, since it no longer matches the circuit.
+ */
+void Schematic::SetNoise(std::optional<Core::Noise> noise) {
+    m_Noise = std::move(noise);
+    ++m_NoiseVersion;
+}
+
+/**
+ * @brief   Returns the last noise analysis simulated for the current schematic.
+ * @return  The noise result, or no value when there was no simulation since the last change.
+ */
+const std::optional<Core::Noise> &Schematic::GetNoise() const {
+    return m_Noise;
 }
 
 /**
@@ -594,12 +730,50 @@ std::size_t Schematic::GetDCSweepVersion() const {
     return m_DCSweepVersion;
 }
 
+/**
+ * @brief   Returns a number that changes whenever a noise result is stored.
+ * @return  The noise version; compare it with a stored one to know whether the result was replaced.
+ */
+std::size_t Schematic::GetNoiseVersion() const {
+    return m_NoiseVersion;
+}
+
 void Schematic::InvalidateDerivedData() {
     m_Connectivity.reset();
     m_OperatingPoint.reset();
     m_Transient.reset();
+    m_TransientSteps.reset();
     m_ACSweep.reset();
+    m_ACSweepSteps.reset();
     m_DCSweep.reset();
+    m_Noise.reset();
+}
+
+// A probe is on the node most of its points belong to now, and takes the points of that node as its own. With no such
+// node, because its net is ground or its wires are gone, it waits with the points it had and comes back when they
+// belong to a node again. Two probes that end up on one node are one
+void Schematic::FollowVoltageProbes() {
+    std::set<int> taken;
+    std::vector<VoltageProbe> followed;
+    for (VoltageProbe &probe : m_VoltageProbes) {
+        std::map<int, int> votes;
+        for (const GridPoint point : probe.Points) {
+            if (const std::optional<int> node = m_Connectivity->GetNode(point); node && *node != 0) {
+                ++votes[*node];
+            }
+        }
+        const auto best = std::ranges::max_element(votes, {}, &std::pair<const int, int>::second);
+        if (best == votes.end()) {
+            probe.Node.reset();
+        } else if (taken.insert(best->first).second) {
+            probe.Node = best->first;
+            probe.Points = m_Connectivity->GetPointsOfNode(best->first);
+        } else {
+            continue;
+        }
+        followed.push_back(std::move(probe));
+    }
+    m_VoltageProbes = std::move(followed);
 }
 
 // Measurements stay out of snapshots, so probing adds no undo step and does not count as a change

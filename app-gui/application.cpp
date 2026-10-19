@@ -13,11 +13,14 @@
 #include "imgui_internal.h"
 #include "implot.h"
 #include "shortcuts.h"
+#include "simulator.h"
 #include "theme.h"
 #include <SDL3/SDL.h>
 #include <array>
 #include <cstdio>
+#include <filesystem>
 #include <format>
+#include <string_view>
 #include <utility>
 
 namespace GUI {
@@ -39,10 +42,14 @@ constexpr bool GPUDebugMode = true;
 /**
  * @brief   Initializes SDL, the GPU device and Dear ImGui, in that order.
  * @return  Core::ExitSuccess on success, Core::ExitFailure if any step fails.
+ * @note    The simulator is told to look for the digital code models next to the program, for a build that ships them.
  */
 int Application::Init() {
     if (InitSDL() != Core::ExitSuccess) {
         return Core::ExitFailure;
+    }
+    if (const char *base_path = SDL_GetBasePath()) {
+        Core::SetCodeModelDirectory(base_path);
     }
     if (InitGPU() != Core::ExitSuccess) {
         return Core::ExitFailure;
@@ -83,6 +90,7 @@ void Application::Shutdown() {
         SDL_WaitForGPUIdle(m_GPUDevice);
     }
 
+    m_GlowRenderer.Shutdown();
     if (ImGui::GetCurrentContext() != nullptr) {
         ImGui_ImplSDLGPU3_Shutdown();
         ImGui_ImplSDL3_Shutdown();
@@ -198,6 +206,10 @@ int Application::InitImGui() {
     init_info.Device = m_GPUDevice;
     init_info.ColorTargetFormat = SDL_GetGPUSwapchainTextureFormat(m_GPUDevice, m_SDLWindow);
     ImGui_ImplSDLGPU3_Init(&init_info);
+    // The glows are an effect the editor can do without, so a failure is reported but does not stop the program
+    if (m_GlowRenderer.Init(m_GPUDevice, init_info.ColorTargetFormat) != Core::ExitSuccess) {
+        AddError(std::string("Glow renderer: ") + SDL_GetError());
+    }
     return Core::ExitSuccess;
 }
 
@@ -207,6 +219,10 @@ void Application::PollEvents() {
         ImGui_ImplSDL3_ProcessEvent(&event);
         const bool main_window_closed =
             event.type == SDL_EVENT_WINDOW_CLOSE_REQUESTED && event.window.windowID == SDL_GetWindowID(m_SDLWindow);
+        // A schematic file dropped on the window joins the schematic, like File > Import
+        if (event.type == SDL_EVENT_DROP_FILE && event.drop.data != nullptr) {
+            m_EditorWindow.RequestImport(std::filesystem::path(event.drop.data));
+        }
         if (event.type == SDL_EVENT_QUIT || main_window_closed) {
             // The editor asks before unsaved changes are lost and Render() quits once it confirms. Minimized
             // windows draw no frames, so the window is restored for the question to show up
@@ -268,18 +284,39 @@ void Application::DrawMainMenuBar() {
     if (ImGui::BeginMenu("File")) {
         m_EditorWindow.DrawFileMenuItems();
         ImGui::Separator();
-        if (ImGui::BeginMenu("Examples")) {
-            for (const Example &example : GetExamples()) {
-                if (ImGui::MenuItem(example.Title)) {
-                    m_EditorWindow.RequestExample(example);
+        // The same list twice: Examples opens one in place of the schematic, Insert Example adds one to it
+        const auto draw_examples = [this](const bool insert) {
+            for (const char *group : GetExampleGroups()) {
+                if (!ImGui::BeginMenu(group)) {
+                    continue;
                 }
-                if (ImGui::BeginItemTooltip()) {
-                    ImGui::PushTextWrapPos(ImGui::GetFontSize() * ExampleTooltipWidth);
-                    ImGui::TextUnformatted(example.Description);
-                    ImGui::PopTextWrapPos();
-                    ImGui::EndTooltip();
+                for (const Example &example : GetExamples()) {
+                    if (std::string_view(example.Group) != group) {
+                        continue;
+                    }
+                    if (ImGui::MenuItem(example.Title)) {
+                        if (insert) {
+                            m_EditorWindow.RequestInsertExample(example);
+                        } else {
+                            m_EditorWindow.RequestExample(example);
+                        }
+                    }
+                    if (ImGui::BeginItemTooltip()) {
+                        ImGui::PushTextWrapPos(ImGui::GetFontSize() * ExampleTooltipWidth);
+                        ImGui::TextUnformatted(example.Description);
+                        ImGui::PopTextWrapPos();
+                        ImGui::EndTooltip();
+                    }
                 }
+                ImGui::EndMenu();
             }
+        };
+        if (ImGui::BeginMenu("Examples")) {
+            draw_examples(false);
+            ImGui::EndMenu();
+        }
+        if (ImGui::BeginMenu("Insert Example")) {
+            draw_examples(true);
             ImGui::EndMenu();
         }
         ImGui::Separator();
@@ -343,9 +380,12 @@ void Application::UpdateWindowTitle() {
 }
 
 // A new result of any analysis opens the Output window on its tab, in front unless the user turned that off; the
-// operating point also shows on the schematic, so running one is enough to see it. Versions also change when results
-// are dropped, which opens nothing
+// operating point and the transient also show on the schematic, so running one is enough to see it, and a new transient
+// plays from its start. Versions also change when results are dropped, which opens nothing
 void Application::ShowNewResults() {
+    if (m_Schematic.GetTransientVersion() != m_ShownTransientVersion) {
+        m_Playback.Reset();
+    }
     const auto show_if_new = [this](std::size_t &shown, const std::size_t version, const bool has_result,
                                     const PlotTab tab) {
         if (std::exchange(shown, version) != version && has_result) {
@@ -360,6 +400,7 @@ void Application::ShowNewResults() {
                 PlotTab::ACSweep);
     show_if_new(m_ShownDCSweepVersion, m_Schematic.GetDCSweepVersion(), m_Schematic.GetDCSweep().has_value(),
                 PlotTab::DCSweep);
+    show_if_new(m_ShownNoiseVersion, m_Schematic.GetNoiseVersion(), m_Schematic.GetNoise().has_value(), PlotTab::Noise);
 }
 
 // The editor, Output, Analysis Settings and Netlist share the main node as tabs, and Properties sits on the right.
@@ -403,7 +444,9 @@ void Application::EndFrame() {
         target_info.load_op = SDL_GPU_LOADOP_CLEAR;
         target_info.store_op = SDL_GPU_STOREOP_STORE;
         SDL_GPURenderPass *render_pass = SDL_BeginGPURenderPass(command_buffer, &target_info, 1, nullptr);
+        m_GlowRenderer.SetRenderPass(render_pass);
         ImGui_ImplSDLGPU3_RenderDrawData(draw_data, command_buffer, render_pass);
+        m_GlowRenderer.SetRenderPass(nullptr);
         SDL_EndGPURenderPass(render_pass);
     }
 

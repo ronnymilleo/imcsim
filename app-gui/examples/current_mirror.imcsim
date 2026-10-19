@@ -1,0 +1,168 @@
+{
+  "format": "imcsim-schematic",
+  "version": 1,
+  "elements": [
+    {
+      "type": "VCC",
+      "rotation": 0,
+      "x": 9,
+      "y": 4,
+      "value": 5,
+      "name": "V1"
+    },
+    {
+      "type": "Resistor",
+      "rotation": 90,
+      "x": 9,
+      "y": 6,
+      "value": 10000,
+      "name": "R1"
+    },
+    {
+      "type": "NPN",
+      "rotation": 0,
+      "x": 10,
+      "y": 12,
+      "model": "2N3904",
+      "mirrored": true,
+      "name": "Q1"
+    },
+    {
+      "type": "NPN",
+      "rotation": 0,
+      "x": 14,
+      "y": 12,
+      "model": "2N3904",
+      "name": "Q2"
+    },
+    {
+      "type": "VCC",
+      "rotation": 0,
+      "x": 15,
+      "y": 8,
+      "value": 5,
+      "name": "V2"
+    },
+    {
+      "type": "Ground",
+      "rotation": 0,
+      "x": 12,
+      "y": 18
+    }
+  ],
+  "wires": [
+    {
+      "start": [
+        9,
+        10
+      ],
+      "end": [
+        9,
+        8
+      ]
+    },
+    {
+      "start": [
+        9,
+        8
+      ],
+      "end": [
+        12,
+        8
+      ]
+    },
+    {
+      "start": [
+        12,
+        8
+      ],
+      "end": [
+        12,
+        12
+      ]
+    },
+    {
+      "start": [
+        15,
+        8
+      ],
+      "end": [
+        15,
+        10
+      ]
+    },
+    {
+      "start": [
+        9,
+        14
+      ],
+      "end": [
+        9,
+        16
+      ]
+    },
+    {
+      "start": [
+        9,
+        16
+      ],
+      "end": [
+        15,
+        16
+      ]
+    },
+    {
+      "start": [
+        15,
+        16
+      ],
+      "end": [
+        15,
+        14
+      ]
+    },
+    {
+      "start": [
+        12,
+        16
+      ],
+      "end": [
+        12,
+        18
+      ]
+    }
+  ],
+  "simulation": {
+    "analysis": "dc_sweep",
+    "transient": {
+      "step": 0.000001,
+      "stop": 0.001
+    },
+    "ac_sweep": {
+      "start": 10,
+      "stop": 1000000,
+      "points_per_decade": 20
+    },
+    "dc_sweep": {
+      "step_source": true,
+      "swept": {
+        "source": "V2",
+        "start": 0,
+        "step": 0.05,
+        "stop": 10
+      },
+      "stepped": {
+        "source": "V1",
+        "start": 3,
+        "step": 2,
+        "stop": 11
+      }
+    }
+  },
+  "measurements": {
+    "voltages": [],
+    "currents": [
+      "Q2.C"
+    ]
+  }
+}

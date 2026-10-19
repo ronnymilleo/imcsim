@@ -13,6 +13,7 @@
 #include <map>
 #include <memory>
 #include <optional>
+#include <string>
 #include <vector>
 
 namespace GUI {
@@ -22,8 +23,10 @@ namespace GUI {
  * @brief   Groups the connection points of a schematic into circuit nodes.
  * @details Connection points are terminals and wire ends. Two points share a node when a wire joins them, when
  *          one lies on the middle of a wire (T-junction) or when they are the same grid point. Wires that only
- *          cross do not connect. The node that contains a ground terminal is node 0; the others are numbered
- *          from 1. Build it again whenever the schematic changes.
+ *          cross do not connect. Net labels with the same name, compared without regard to case, are joined too, wire
+ *          or not, and a label named 0 or GND joins ground and one named VCC
+ *          joins every VCC supply. The node that contains a ground terminal is node 0; the
+ * others are numbered from 1. Build it again whenever the schematic changes.
  */
 class Connectivity {
 public:
@@ -31,10 +34,14 @@ public:
 
     std::optional<int> GetNode(GridPoint point) const;
     std::optional<GridPoint> FindPointOfNode(int node) const;
+    std::optional<std::string> GetNetName(int node) const;
+    std::vector<GridPoint> GetPointsOfNode(int node) const;
     const std::vector<GridPoint> &GetJunctions() const;
 
 private:
     std::map<GridPoint, int> m_NodeOfPoint;
+    // Name of the first label, in grid order, on each labeled node
+    std::map<int, std::string> m_NetOfNode;
     std::vector<GridPoint> m_Junctions;
 };
 

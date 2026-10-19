@@ -8,6 +8,7 @@
 
 #include "connectivity.h"
 #include "helpers.h"
+#include "parameter_step.h"
 #include "schematic_file.h"
 #include "simulation_settings.h"
 #include "simulator.h"
@@ -30,10 +31,11 @@ namespace GUI {
  *          same gesture, such as wires following a dragged element, only invalidate the nodes; the caller
  *          decides when the gesture counts as a change and calls MarkModified(). Nodes are computed lazily and
  *          cached until the next change, and so is the last result of each analysis, which no longer matches
- *          the circuit once it changes. Indices returned by the selection stay valid until an element or wire
- *          is added, deleted or the wires are replaced. Undo works on whole snapshots: changes pile up until
- *          CommitUndoStep(), which the application calls once the user finishes an interaction, so a whole drag
- *          or a typed value is undone in one step. Measurements, the traces the plots show, are view state
+ *          the circuit once it changes; a stepped transient or AC sweep keeps every step, and hands its selected step
+ *          to the views that read one result. The selection is a set of elements and a set of wires, by index; the
+ *          indices stay valid until an element or wire is added, deleted or the wires are replaced. Undo works on whole
+ * snapshots: changes pile up until CommitUndoStep(), which the application calls once the user finishes an interaction,
+ * so a whole drag or a typed value is undone in one step. Measurements, the traces the plots show, are view state
  *          shared by the editor and the plots: they are kept by key (node number or current name) across edits,
  *          since small edits rarely renumber nodes, and are saved with the file so it opens ready to plot, but
  *          they stay out of the history and changing them does not count as an unsaved change. The simulation
@@ -64,9 +66,13 @@ public:
     // Selection
     void SelectElement(std::size_t index);
     void SelectWire(std::size_t index);
+    void SetSelection(std::set<std::size_t> elements, std::set<std::size_t> wires);
     void ClearSelection();
-    std::optional<std::size_t> GetSelectedElementIndex() const;
-    std::optional<std::size_t> GetSelectedWireIndex() const;
+    bool IsElementSelected(std::size_t index) const;
+    bool IsWireSelected(std::size_t index) const;
+    const std::set<std::size_t> &GetSelectedElements() const;
+    const std::set<std::size_t> &GetSelectedWires() const;
+    bool HasSelection() const;
     UIElement *GetSelectedElement();
     std::size_t GetSelectionVersion() const;
 
@@ -105,14 +111,23 @@ public:
     const std::optional<Core::OperatingPoint> &GetOperatingPoint() const;
     void SetTransient(std::optional<Core::Transient> transient);
     const std::optional<Core::Transient> &GetTransient() const;
+    void SetTransientSteps(StepFamily<Core::Transient> steps);
+    const std::optional<StepFamily<Core::Transient>> &GetTransientSteps() const;
+    void SelectTransientStep(std::size_t step);
     void SetACSweep(std::optional<Core::ACSweep> sweep);
     const std::optional<Core::ACSweep> &GetACSweep() const;
+    void SetACSweepSteps(StepFamily<Core::ACSweep> steps);
+    const std::optional<StepFamily<Core::ACSweep>> &GetACSweepSteps() const;
+    void SelectACSweepStep(std::size_t step);
     void SetDCSweep(std::optional<Core::DCSweep> sweep);
     const std::optional<Core::DCSweep> &GetDCSweep() const;
+    void SetNoise(std::optional<Core::Noise> noise);
+    const std::optional<Core::Noise> &GetNoise() const;
     std::size_t GetOperatingPointVersion() const;
     std::size_t GetTransientVersion() const;
     std::size_t GetACSweepVersion() const;
     std::size_t GetDCSweepVersion() const;
+    std::size_t GetNoiseVersion() const;
 
 private:
     // Content
@@ -120,12 +135,24 @@ private:
     std::vector<UIWire> m_Wires;
 
     // Selection; the version changes with every change, so windows can tell even when an index is reused
-    std::optional<std::size_t> m_SelectedElement;
-    std::optional<std::size_t> m_SelectedWire;
+    std::set<std::size_t> m_SelectedElements;
+    std::set<std::size_t> m_SelectedWires;
     std::size_t m_SelectionVersion = 0;
 
-    // Measurements: node numbers and current names, such as "R1" or "Q1.C"
-    std::set<int> m_MeasuredNodes;
+    /**
+     * @struct  VoltageProbe
+     * @brief   A measured node, kept by the points of the node because its number changes with any edit.
+     * @details Node is the number the probe has in the nodes as last built, or none while the points belong to no
+     *          node a plot can show, such as while the net is joined to ground; the points stay, so the probe comes
+     *          back when they are a node again.
+     */
+    struct VoltageProbe {
+        std::vector<GridPoint> Points;
+        std::optional<int> Node;
+    };
+
+    // Measurements: probes on nodes, and current names such as "R1" or "Q1.C"
+    std::vector<VoltageProbe> m_VoltageProbes;
     std::set<std::string> m_MeasuredCurrents;
 
     // Simulation settings; the version changes only when they are replaced from outside the analysis settings,
@@ -148,16 +175,22 @@ private:
     // Derived data, dropped on every change: nodes are rebuilt on first use, results by the next simulation
     std::optional<Connectivity> m_Connectivity;
     std::optional<Core::OperatingPoint> m_OperatingPoint;
+    // A stepped transient or AC sweep keeps every step, and its selected step as the result the other views read
     std::optional<Core::Transient> m_Transient;
+    std::optional<StepFamily<Core::Transient>> m_TransientSteps;
     std::optional<Core::ACSweep> m_ACSweep;
+    std::optional<StepFamily<Core::ACSweep>> m_ACSweepSteps;
     std::optional<Core::DCSweep> m_DCSweep;
+    std::optional<Core::Noise> m_Noise;
     // Change with every new result, so windows can tell a rerun from the result they already showed
     std::size_t m_OperatingPointVersion = 0;
     std::size_t m_TransientVersion = 0;
     std::size_t m_ACSweepVersion = 0;
     std::size_t m_DCSweepVersion = 0;
+    std::size_t m_NoiseVersion = 0;
 
     void InvalidateDerivedData();
+    void FollowVoltageProbes();
     std::string TakeSnapshot() const;
     void RestoreSnapshot(const std::string &snapshot);
     void ResetHistory();

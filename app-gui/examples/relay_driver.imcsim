@@ -1,0 +1,299 @@
+{
+  "format": "imcsim-schematic",
+  "version": 1,
+  "elements": [
+    {
+      "type": "VCC",
+      "rotation": 0,
+      "x": 10,
+      "y": 4,
+      "value": 5,
+      "name": "V1"
+    },
+    {
+      "type": "Diode",
+      "rotation": 270,
+      "x": 8,
+      "y": 10,
+      "model": "1N4007",
+      "name": "D1"
+    },
+    {
+      "type": "Relay",
+      "rotation": 0,
+      "x": 16,
+      "y": 10,
+      "name": "K1"
+    },
+    {
+      "type": "VCC",
+      "rotation": 0,
+      "x": 16,
+      "y": 5,
+      "value": 12,
+      "name": "V2"
+    },
+    {
+      "type": "Resistor",
+      "rotation": 90,
+      "x": 18,
+      "y": 15,
+      "value": 100,
+      "name": "R3"
+    },
+    {
+      "type": "NPN",
+      "rotation": 0,
+      "x": 13,
+      "y": 16,
+      "model": "2N2222A",
+      "name": "Q1"
+    },
+    {
+      "type": "Resistor",
+      "rotation": 0,
+      "x": 7,
+      "y": 16,
+      "value": 1000,
+      "name": "R2"
+    },
+    {
+      "type": "VoltageSource",
+      "rotation": 90,
+      "x": 2,
+      "y": 19,
+      "source": "Pulse",
+      "value": 0,
+      "amplitude": 1,
+      "frequency": 1000,
+      "offset": 0,
+      "ac_magnitude": 1,
+      "pulse": {
+        "delay": 0,
+        "fall": 1e-7,
+        "high": 5,
+        "low": 0,
+        "period": 0.02,
+        "rise": 1e-7,
+        "width": 0.01
+      },
+      "name": "Vin1"
+    },
+    {
+      "type": "Ground",
+      "rotation": 0,
+      "x": 14,
+      "y": 20
+    },
+    {
+      "type": "Ground",
+      "rotation": 0,
+      "x": 2,
+      "y": 23
+    },
+    {
+      "type": "Ground",
+      "rotation": 0,
+      "x": 18,
+      "y": 19
+    }
+  ],
+  "wires": [
+    {
+      "start": [
+        8,
+        4
+      ],
+      "end": [
+        14,
+        4
+      ]
+    },
+    {
+      "start": [
+        8,
+        4
+      ],
+      "end": [
+        8,
+        8
+      ]
+    },
+    {
+      "start": [
+        14,
+        9
+      ],
+      "end": [
+        14,
+        4
+      ]
+    },
+    {
+      "start": [
+        14,
+        11
+      ],
+      "end": [
+        14,
+        14
+      ]
+    },
+    {
+      "start": [
+        8,
+        12
+      ],
+      "end": [
+        8,
+        13
+      ]
+    },
+    {
+      "start": [
+        8,
+        13
+      ],
+      "end": [
+        14,
+        13
+      ]
+    },
+    {
+      "start": [
+        9,
+        16
+      ],
+      "end": [
+        11,
+        16
+      ]
+    },
+    {
+      "start": [
+        2,
+        17
+      ],
+      "end": [
+        2,
+        16
+      ]
+    },
+    {
+      "start": [
+        2,
+        16
+      ],
+      "end": [
+        5,
+        16
+      ]
+    },
+    {
+      "start": [
+        2,
+        21
+      ],
+      "end": [
+        2,
+        23
+      ]
+    },
+    {
+      "start": [
+        14,
+        18
+      ],
+      "end": [
+        14,
+        20
+      ]
+    },
+    {
+      "start": [
+        16,
+        5
+      ],
+      "end": [
+        16,
+        8
+      ]
+    },
+    {
+      "start": [
+        16,
+        12
+      ],
+      "end": [
+        18,
+        12
+      ]
+    },
+    {
+      "start": [
+        18,
+        12
+      ],
+      "end": [
+        18,
+        13
+      ]
+    },
+    {
+      "start": [
+        18,
+        17
+      ],
+      "end": [
+        18,
+        19
+      ]
+    }
+  ],
+  "simulation": {
+    "analysis": "transient",
+    "transient": {
+      "step": 0.00001,
+      "stop": 0.02
+    },
+    "ac_sweep": {
+      "start": 10,
+      "stop": 1000000,
+      "points_per_decade": 20
+    },
+    "dc_sweep": {
+      "step_source": false,
+      "swept": {
+        "source": "",
+        "start": 0,
+        "step": 0.1,
+        "stop": 5
+      },
+      "stepped": {
+        "source": "",
+        "start": 0,
+        "step": 0.1,
+        "stop": 5
+      }
+    }
+  },
+  "measurements": {
+    "voltages": [
+      [
+        2,
+        16
+      ],
+      [
+        8,
+        12
+      ],
+      [
+        16,
+        12
+      ]
+    ],
+    "currents": [
+      "K1.C"
+    ]
+  }
+}

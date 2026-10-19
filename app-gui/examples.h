@@ -11,21 +11,25 @@
 #include <span>
 #include <string>
 #include <string_view>
+#include <vector>
 
 namespace GUI {
 
 /**
  * @struct  Example
- * @brief   One example circuit: its name in the menu, what it shows and the file it is read from.
- * @details Files live in app-gui/examples and are compiled into the application.
+ * @brief   One example circuit: its name and submenu, what it shows and the file it is read from.
+ * @details Files live in app-gui/examples and are compiled into the application. Examples of the same group sit
+ *          together in the list, in the order of the submenu.
  */
 struct Example {
     const char *Title;
+    const char *Group;
     const char *Description;
     std::string_view FileName;
 };
 
 std::span<const Example> GetExamples();
+std::vector<const char *> GetExampleGroups();
 std::expected<LoadedSchematic, std::string> LoadExample(const Example &example);
 
 } // namespace GUI

@@ -33,6 +33,17 @@ struct DiodeParameters {
 };
 
 /**
+ * @enum    LEDColor
+ * @brief   Color an LED model emits, so the editor can light it up; None for the models of other diodes.
+ */
+enum class LEDColor {
+    None,
+    Red,
+    Green,
+    Blue,
+};
+
+/**
  * @struct  DiodeModel
  * @brief   A ready SPICE diode model, offered for one kind of diode part.
  * @details Name identifies the model in files and in the editor; SpiceName names its ".model" line.
@@ -43,6 +54,7 @@ struct DiodeModel {
     const char *SpiceName;
     DiodeParameters Parameters;
     ComponentType Type;
+    LEDColor Color;
 };
 
 inline constexpr const char *CustomDiodeModelName = "Custom";

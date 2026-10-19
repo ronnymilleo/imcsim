@@ -11,13 +11,21 @@
 #include "components/diode.h"
 #include "components/ground.h"
 #include "components/inductor.h"
+#include "components/logic_part.h"
 #include "components/mosfet.h"
 #include "components/op_amp.h"
+#include "components/potentiometer.h"
+#include "components/relay.h"
 #include "components/resistor.h"
+#include "components/switch.h"
+#include "components/transformer.h"
 #include "components/vcc.h"
+#include "components/voltage_controlled_switch.h"
 #include "components/voltage_source.h"
+#include "simulator.h"
 #include <catch2/catch_test_macros.hpp>
 #include <string>
+#include <vector>
 
 TEST_CASE("Circuit counts nodes including ground", "[circuit]") {
     Core::Circuit circuit;
@@ -330,7 +338,7 @@ TEST_CASE("ToSpiceNetlist writes an ideal op-amp as a gain stage with a pole, cl
     circuit.Add(second, {1, 0, 1, 4, 0});
     const std::string netlist = circuit.ToSpiceNetlist();
     // The gain stage takes the first node after the circuit's; 1 MHz over 100 dB puts the pole at 10 Hz
-    CHECK(netlist.contains("G-U1 0 6 1 2 0.001\nR-U1 6 0 1e+08\nC-U1 6 0 1.59155e-10\n"
+    CHECK(netlist.contains("G-U1 0 6 1 2 0.001\nR-U1 6 0 1e+08 noisy=0\nC-U1 6 0 1.59155e-10\n"
                            "D-U1-P 6 4 imcsim_opamp_clamp\nD-U1-N 5 6 imcsim_opamp_clamp\nE-U1 3 0 6 0 1\n"));
     CHECK(netlist.contains("C-U2 7 0 1.59155e-11\n"));
     // Both share one model
@@ -358,4 +366,298 @@ TEST_CASE("ToSpiceNetlist writes a macromodel op-amp as an instance of its subci
     CHECK(netlist.find(".subckt imcsim_uA741 6 3 2 7 4\n") == netlist.rfind(".subckt imcsim_uA741"));
     CHECK(netlist.contains(".subckt imcsim_opamp_U3 6 3 2 7 4\n"));
     CHECK(netlist.contains(".ends imcsim_uA741\n"));
+}
+
+TEST_CASE("ToSpiceNetlist writes a potentiometer as two resistors that meet at the wiper", "[circuit]") {
+    Core::Potentiometer pot;
+    pot.SetName("RV1");
+    pot.SetValue(10e3);
+    pot.SetWiper(0.25);
+    Core::Circuit circuit;
+    // End 1 on node 1, end 2 on node 2 and the wiper on node 3
+    circuit.Add(pot, {1, 2, 3});
+
+    const std::string netlist = circuit.ToSpiceNetlist();
+    CHECK(netlist.find("R-RV1a 1 3 2.5k\n") != std::string::npos);
+    CHECK(netlist.find("R-RV1b 3 2 7.5k\n") != std::string::npos);
+}
+
+TEST_CASE("A wiper at an end keeps a tiny resistor there, since SPICE rejects 0 Ohm", "[circuit]") {
+    Core::Potentiometer pot;
+    pot.SetName("RV1");
+    Core::Circuit circuit;
+    circuit.Add(pot, {1, 2, 3});
+
+    pot.SetWiper(0.0);
+    CHECK(circuit.ToSpiceNetlist().find("R-RV1a 1 3 1m\n") != std::string::npos);
+    pot.SetWiper(1.0);
+    CHECK(circuit.ToSpiceNetlist().find("R-RV1b 3 2 1m\n") != std::string::npos);
+}
+
+TEST_CASE("A potentiometer probes its three terminals, and the probes carry its currents", "[circuit]") {
+    Core::Potentiometer pot;
+    pot.SetName("RV1");
+    const std::vector<Core::CurrentProbe> probes = Core::GetCurrentProbes(pot);
+    REQUIRE(probes.size() == 3);
+    CHECK(probes[0].Terminal == 0);
+    CHECK(std::string(probes[0].Label) == "A");
+    CHECK(probes[1].Terminal == 1);
+    CHECK(std::string(probes[1].Label) == "B");
+    CHECK(probes[2].Terminal == 2);
+    CHECK(std::string(probes[2].Label) == "W");
+    CHECK(Core::GetCurrentName(pot, "W") == "RV1.W");
+
+    Core::Circuit circuit;
+    circuit.Add(pot, {1, 2, 3});
+    const std::string netlist = circuit.ToSpiceNetlist("", true);
+    CHECK(netlist.find("Vprobe-RV1-A 1 4 DC 0\n") != std::string::npos);
+    CHECK(netlist.find("Vprobe-RV1-W 3 6 DC 0\n") != std::string::npos);
+}
+
+TEST_CASE("ToSpiceNetlist writes a switch as a resistor that is nearly a wire closed and nearly nothing open",
+          "[circuit]") {
+    Core::Switch toggle(Core::ComponentType::Switch);
+    toggle.SetName("SW1");
+    Core::Switch button(Core::ComponentType::PushButton);
+    button.SetName("PB1");
+    Core::Circuit circuit;
+    circuit.Add(toggle, {1, 2});
+    circuit.Add(button, {2, 3});
+
+    std::string netlist = circuit.ToSpiceNetlist();
+    CHECK(netlist.find("R-SW1 1 2 1T\n") != std::string::npos);
+    CHECK(netlist.find("R-PB1 2 3 1T\n") != std::string::npos);
+    toggle.SetClosed(true);
+    button.SetClosed(true);
+    netlist = circuit.ToSpiceNetlist();
+    CHECK(netlist.find("R-SW1 1 2 1m\n") != std::string::npos);
+    CHECK(netlist.find("R-PB1 2 3 1m\n") != std::string::npos);
+}
+
+TEST_CASE("A switch has one current probe, on its first terminal, named after the part", "[circuit]") {
+    Core::Switch toggle(Core::ComponentType::Switch);
+    toggle.SetName("SW1");
+    const std::vector<Core::CurrentProbe> probes = Core::GetCurrentProbes(toggle);
+    REQUIRE(probes.size() == 1);
+    CHECK(probes[0].Terminal == 0);
+    CHECK(Core::GetCurrentName(toggle, probes[0].Label) == "SW1");
+
+    Core::Circuit circuit;
+    circuit.Add(toggle, {1, 2});
+    const std::string netlist = circuit.ToSpiceNetlist("", true);
+    CHECK(netlist.find("Vprobe-SW1 1 3 DC 0\n") != std::string::npos);
+    CHECK(netlist.find("R-SW1 3 2 1T\n") != std::string::npos);
+}
+
+TEST_CASE("ToSpiceNetlist writes a voltage-controlled switch with a model of its own", "[circuit]") {
+    Core::VoltageControlledSwitch controlled;
+    controlled.SetName("S1");
+    controlled.SetParameters({.Threshold = 1.5, .Hysteresis = 0.25, .OnResistance = 0.5, .OffResistance = 1e6});
+    Core::Circuit circuit;
+    // Switch between nodes 1 and 2, controlled by node 3 against node 0
+    circuit.Add(controlled, {1, 2, 3, 0});
+
+    const std::string netlist = circuit.ToSpiceNetlist();
+    CHECK(netlist.find("S1 1 2 3 0 SW-S1\n") != std::string::npos);
+    CHECK(netlist.find(".model SW-S1 SW(VT=1.5 VH=0.25 RON=0.5 ROFF=1e+06)\n") != std::string::npos);
+}
+
+TEST_CASE("ToSpiceNetlist writes a relay as a coil of a resistor and an inductor and a switch on the resistor",
+          "[circuit]") {
+    Core::Relay relay;
+    relay.SetName("K1");
+    Core::Circuit circuit;
+    // Contact between nodes 1 and 2, coil from node 3 to ground
+    circuit.Add(relay, {1, 2, 3, 0});
+
+    const std::string netlist = circuit.ToSpiceNetlist();
+    // The middle of the coil is the first node past the circuit ones, which are 0 to 3
+    CHECK(netlist.find("R-K1coil 3 4 70\n") != std::string::npos);
+    CHECK(netlist.find("L-K1coil 4 0 50m\n") != std::string::npos);
+    CHECK(netlist.find("S-K1 1 2 3 4 SW-K1\n") != std::string::npos);
+    // Closes at 3.5 V and opens at 1 V: threshold 2.25 V with 1.25 V of hysteresis
+    CHECK(netlist.find(".model SW-K1 SW(VT=2.25 VH=1.25 RON=0.05 ROFF=1e+09)\n") != std::string::npos);
+}
+
+TEST_CASE("Probes of the switches and the relay", "[circuit]") {
+    Core::VoltageControlledSwitch controlled;
+    controlled.SetName("S1");
+    const std::vector<Core::CurrentProbe> switch_probes = Core::GetCurrentProbes(controlled);
+    REQUIRE(switch_probes.size() == 1);
+    CHECK(switch_probes[0].Terminal == 0);
+
+    Core::Relay relay;
+    relay.SetName("K1");
+    const std::vector<Core::CurrentProbe> relay_probes = Core::GetCurrentProbes(relay);
+    REQUIRE(relay_probes.size() == 2);
+    CHECK(relay_probes[0].Terminal == 0);
+    CHECK(Core::GetCurrentName(relay, relay_probes[0].Label) == "K1.S");
+    CHECK(relay_probes[1].Terminal == 2);
+    CHECK(Core::GetCurrentName(relay, relay_probes[1].Label) == "K1.C");
+}
+
+TEST_CASE("ToSpiceNetlist writes a transformer as two inductors behind their winding resistances, coupled",
+          "[circuit]") {
+    Core::Transformer transformer;
+    transformer.SetName("T1");
+    transformer.SetValue(100e-3);
+    transformer.SetParameters({.TurnsRatio = 2.0, .Coupling = 0.98, .WindingResistance = 0.5});
+    Core::Circuit circuit;
+    // Primary on nodes 1 and 0, secondary on nodes 2 and 0
+    circuit.Add(transformer, {1, 0, 2, 0});
+
+    const std::string netlist = circuit.ToSpiceNetlist();
+    // The middles of the windings are the first nodes past the circuit ones, which are 0 to 2
+    CHECK(netlist.find("R-T1p 1 3 500m\n") != std::string::npos);
+    CHECK(netlist.find("L-T1p 3 0 100m\n") != std::string::npos);
+    CHECK(netlist.find("R-T1s 2 4 500m\n") != std::string::npos);
+    CHECK(netlist.find("L-T1s 4 0 25m\n") != std::string::npos);
+    CHECK(netlist.find("K-T1 L-T1p L-T1s 980m\n") != std::string::npos);
+}
+
+TEST_CASE("A transformer probes the + terminal of each winding", "[circuit]") {
+    Core::Transformer transformer;
+    transformer.SetName("T1");
+    const std::vector<Core::CurrentProbe> probes = Core::GetCurrentProbes(transformer);
+    REQUIRE(probes.size() == 2);
+    CHECK(probes[0].Terminal == 0);
+    CHECK(Core::GetCurrentName(transformer, probes[0].Label) == "T1.P");
+    CHECK(probes[1].Terminal == 2);
+    CHECK(Core::GetCurrentName(transformer, probes[1].Label) == "T1.S");
+}
+
+TEST_CASE("Each current of a part belongs to the terminal it flows into", "[circuit]") {
+    Core::Resistor named;
+    named.SetName("R1");
+    CHECK(Core::GetCurrentTerminals(named) == std::vector<std::size_t>{0});
+    Core::BJT transistor(Core::ComponentType::NPN);
+    transistor.SetName("Q1");
+    CHECK(Core::GetCurrentTerminals(transistor) == std::vector<std::size_t>{0, 1, 2});
+    Core::Relay relay;
+    relay.SetName("K1");
+    // The contact current enters terminal 1, and the coil current terminal 3
+    CHECK(Core::GetCurrentTerminals(relay) == std::vector<std::size_t>{0, 2});
+    Core::Transformer transformer;
+    transformer.SetName("T1");
+    CHECK(Core::GetCurrentTerminals(transformer) == std::vector<std::size_t>{0, 2});
+}
+
+TEST_CASE("ToSpiceNetlist writes a gate behind bridges, with a pull-down on each input", "[circuit]") {
+    Core::LogicPart gate(Core::ComponentType::Nand);
+    gate.SetName("U1");
+    Core::Circuit circuit;
+    // Inputs on nodes 1 and 2, output on node 3
+    circuit.Add(gate, {1, 2, 3});
+
+    const std::string netlist = circuit.ToSpiceNetlist();
+    // Digital nodes are numbered past the circuit ones, 0 to 3: 4 and 5 for the inputs, 6 for the output, 7 behind
+    // its resistor
+    CHECK(netlist.find("A-U1-A [1] [4] ADC-U1\n") != std::string::npos);
+    CHECK(netlist.find("A-U1-B [2] [5] ADC-U1\n") != std::string::npos);
+    CHECK(netlist.find("R-U1-A 1 0 1G\n") != std::string::npos);
+    CHECK(netlist.find("R-U1-B 2 0 1G\n") != std::string::npos);
+    CHECK(netlist.find("A-U1 [4 5] 6 LOGIC-U1\n") != std::string::npos);
+    CHECK(netlist.find("A-U1-Y [6] [7] DAC-U1\n") != std::string::npos);
+    CHECK(netlist.find("R-U1-Y 7 3 50\n") != std::string::npos);
+    // The inputs read 0 below 30% of the logic level and 1 above 70%
+    CHECK(netlist.find(".model ADC-U1 adc_bridge(in_low=1.5 in_high=3.5)\n") != std::string::npos);
+    CHECK(netlist.find(".model DAC-U1 dac_bridge(out_low=0 out_high=5 out_undef=2.5)\n") != std::string::npos);
+    CHECK(netlist.find(".model LOGIC-U1 d_nand(rise_delay=10n fall_delay=10n)\n") != std::string::npos);
+}
+
+TEST_CASE("ToSpiceNetlist gives a single-input gate scalar ports and follows the logic level", "[circuit]") {
+    Core::LogicPart inverter(Core::ComponentType::Not);
+    inverter.SetName("U1");
+    inverter.SetParameters({.LogicLevel = 3.3, .PropagationDelay = 2e-9});
+    Core::Circuit circuit;
+    circuit.Add(inverter, {1, 2});
+
+    const std::string netlist = circuit.ToSpiceNetlist();
+    CHECK(netlist.find("A-U1 3 4 LOGIC-U1\n") != std::string::npos);
+    CHECK(netlist.find(".model ADC-U1 adc_bridge(in_low=990m in_high=2.31)\n") != std::string::npos);
+    CHECK(netlist.find(".model DAC-U1 dac_bridge(out_low=0 out_high=3.3 out_undef=1.65)\n") != std::string::npos);
+    CHECK(netlist.find(".model LOGIC-U1 d_inverter(rise_delay=2n fall_delay=2n)\n") != std::string::npos);
+}
+
+TEST_CASE("ToSpiceNetlist writes a flip-flop with its inputs in order and both outputs", "[circuit]") {
+    Core::LogicPart flip_flop(Core::ComponentType::JKFlipFlop);
+    flip_flop.SetName("U1");
+    Core::Circuit circuit;
+    // J, K, CLK, SET and RESET on nodes 1 to 5, Q on node 6 and QN on node 7
+    circuit.Add(flip_flop, {1, 2, 3, 4, 5, 6, 7});
+
+    const std::string netlist = circuit.ToSpiceNetlist();
+    // Digital nodes 8 to 12 for the inputs, 13 and 14 for the outputs
+    CHECK(netlist.find("A-U1 8 9 10 11 12 13 14 LOGIC-U1\n") != std::string::npos);
+    CHECK(netlist.find("A-U1-CLK [3] [10] ADC-U1\n") != std::string::npos);
+    CHECK(netlist.find("R-U1-QN 16 7 50\n") != std::string::npos);
+    CHECK(netlist.find(".model LOGIC-U1 d_jkff(clk_delay=10n set_delay=10n reset_delay=10n rise_delay=10n "
+                       "fall_delay=10n)\n") != std::string::npos);
+}
+
+TEST_CASE("Probes of the logic parts", "[circuit]") {
+    Core::LogicPart gate(Core::ComponentType::And);
+    gate.SetName("U1");
+    const std::vector<Core::CurrentProbe> gate_probes = Core::GetCurrentProbes(gate);
+    REQUIRE(gate_probes.size() == 1);
+    CHECK(gate_probes[0].Terminal == 2);
+    CHECK(Core::GetCurrentName(gate, gate_probes[0].Label) == "U1");
+
+    Core::LogicPart inverter(Core::ComponentType::Not);
+    inverter.SetName("U2");
+    CHECK(Core::GetCurrentProbes(inverter)[0].Terminal == 1);
+
+    Core::LogicPart flip_flop(Core::ComponentType::DFlipFlop);
+    flip_flop.SetName("U3");
+    const std::vector<Core::CurrentProbe> flip_flop_probes = Core::GetCurrentProbes(flip_flop);
+    REQUIRE(flip_flop_probes.size() == 2);
+    CHECK(flip_flop_probes[0].Terminal == 4);
+    CHECK(Core::GetCurrentName(flip_flop, flip_flop_probes[0].Label) == "U3.Q");
+    CHECK(flip_flop_probes[1].Terminal == 5);
+    CHECK(Core::GetCurrentName(flip_flop, flip_flop_probes[1].Label) == "U3.QN");
+}
+
+TEST_CASE("GetElementNames lists the elements the netlist writes for each part", "[circuit]") {
+    Core::Resistor resistor;
+    resistor.SetName("R1");
+    Core::Potentiometer pot;
+    pot.SetName("RV1");
+    Core::OpAmp ideal;
+    ideal.SetName("U1");
+    Core::OpAmp macromodel;
+    macromodel.SetName("U2");
+    macromodel.SetModel(*Core::FindOpAmpModel(Core::ComponentType::OpAmp, "uA741"));
+    Core::Switch toggle(Core::ComponentType::Switch);
+    toggle.SetName("SW1");
+    Core::Relay relay;
+    relay.SetName("K1");
+    Core::Transformer transformer;
+    transformer.SetName("T1");
+    Core::LogicPart gate(Core::ComponentType::Nand);
+    gate.SetName("U3");
+    Core::Ground ground;
+    Core::Circuit circuit;
+    circuit.Add(resistor, {1, 0});
+    circuit.Add(pot, {1, 2, 3});
+    circuit.Add(gate, {1, 2, 3});
+    circuit.Add(ideal, {3, 1, 2, 4, 5});
+    circuit.Add(macromodel, {6, 1, 2, 4, 5});
+    circuit.Add(toggle, {1, 2});
+    circuit.Add(relay, {1, 2, 3, 0});
+    circuit.Add(transformer, {1, 0, 2, 0});
+    circuit.Add(ground, {0});
+
+    // Every name starts a line of the netlist, and every part line is covered
+    const std::string netlist = "\n" + circuit.ToSpiceNetlist();
+    std::size_t element_count = 0;
+    for (const Core::CircuitEntry &entry : circuit.GetEntries()) {
+        for (const std::string &name : Core::GetElementNames(*entry.Part)) {
+            CHECK(netlist.contains("\n" + name + " "));
+            ++element_count;
+        }
+    }
+    // A NAND gate has its model, and a bridge and a resistor on each of its two inputs and its output
+    CHECK(element_count == 1 + 2 + 6 + 1 + 1 + 3 + 5 + 7);
+    CHECK(Core::GetElementNames(ground).empty());
+    CHECK(Core::GetElementNames(macromodel) == std::vector<std::string>{"X-U2"});
 }

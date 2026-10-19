@@ -9,12 +9,24 @@ imcsim writes the circuit as a SPICE netlist (shown in the Netlist window) and r
 [ngspice](https://ngspice.sourceforge.io/), the open-source successor of Berkeley SPICE. Every part maps to SPICE
 elements, so the results are those of ngspice with the models below. Some things hold for every part:
 
-- Everything is simulated at 27 °C. Models have no temperature dependence that you can change.
-- Values are exact: there are no tolerances, aging or Monte Carlo spread.
-- There is no noise analysis, so no part models noise.
+- Everything is simulated at 27 °C, unless a stepped analysis steps the temperature: ngspice then adjusts diodes and
+  transistors (saturation currents, junction voltages) by their built-in laws, while resistors, capacitors and
+  inductors keep their values, since no part sets a temperature coefficient.
+- Values are exact: there are no tolerances, aging or Monte Carlo spread; a stepped analysis can try a list of
+  values instead.
+- In a noise analysis, resistors add thermal noise (4kTR); diodes and bipolar transistors the shot noise of their
+  currents, MOSFETs the thermal noise of their channel, and all three the thermal noise of their series
+  resistances. Flicker (1/f) noise is off, since no model sets KF.
+  Sources, controlled sources, capacitors, inductors and the ideal op-amp add none, and an op-amp macromodel adds
+  the noise of its internal parts, which does not follow its datasheet (see below).
 - To report terminal currents in every analysis, the netlist adds a 0 V source in series with diodes, transistors,
-  controlled sources and op-amp outputs. It does not change the circuit; the Netlist window leaves it out unless a
+  potentiometers, switches, relays, transformers, controlled sources, op-amp outputs and the outputs of logic parts. It does not change the circuit; the Netlist window leaves it out unless a
   current-controlled source needs it.
+
+- The power shown on the schematic is what a part absorbs: the sum over its terminals of the node voltage times the
+  current into the terminal, at the operating point or at one instant of a transient. It is positive when the part
+  dissipates power and negative when it delivers it. An op-amp reports a current only at its output, so its power is
+  that of its output stage and leaves out what its supply pins give or take.
 
 ## Passive parts
 
@@ -23,13 +35,98 @@ elements, so the results are those of ngspice with the models below. Some things
 | Resistor | `R` | resistance, positive |
 | Capacitor | `C` | capacitance, positive |
 | Inductor | `L` | inductance, positive |
+| Potentiometer | two `R` | resistance between its ends, positive |
 
 All three are ideal:
 
 - A resistor has no parasitic inductance or capacitance, no temperature coefficient and no power rating.
 - A capacitor has no series resistance (ESR), leakage, voltage rating or dielectric effects. A transient starts
   from the DC operating point, so a capacitor starts charged to its voltage there.
-- An inductor has no winding resistance, core losses, saturation or coupling to other inductors.
+- An inductor has no winding resistance, core losses or saturation, and is not coupled to other inductors; the
+  transformer part below is.
+- A potentiometer is two resistors that meet at the wiper, terminal 3: the first end to the wiper is the value times the
+  wiper position, and the wiper to the second end is the rest. Position 0 puts the wiper on terminal 1 and position 1
+  on terminal 2; at an end the nearest half is 1 mOhm, since SPICE rejects 0 Ohm. The track is linear, so there is
+  no log taper, no wiper resistance and no power rating, and the wiper moves only by editing the part, not during a
+  run.
+
+## Switches and push buttons
+
+A switch and a push button are the same part for the simulation: a resistor, `R-SW1` in the netlist, of 1 mOhm when
+closed and 1 TOhm when open. A push button is closed while it is pressed. Both start open.
+
+- The state is set in the properties and holds for the whole run; nothing opens or closes a contact during a
+  transient. A contact that follows a voltage is a part of its own.
+- The open resistance is high but not infinite, so an open switch leaks a few picoamperes at a few volts. There is
+  no bounce, contact capacitance or voltage rating.
+
+## Voltage-controlled switches and relays
+
+A voltage-controlled switch is the SPICE `S` element, with its own `.model` line. It closes when the voltage between its
+control pins, terminals 3 (+) and 4 (-), rises past the threshold plus the hysteresis, and opens when it falls below the
+threshold minus the hysteresis. The parameters are the threshold (2.5 V), the hysteresis (0.1 V), the closed resistance
+(10 mOhm) and the open resistance (1 GOhm); the control pins carry no current.
+
+A relay is a coil and a normally open contact. The coil is its resistance in series with its inductance, written as
+`R-K1coil` and `L-K1coil`, and the contact is an `S` element controlled by the voltage on the resistance, which is
+the coil current times the resistance. So the contact closes when the current has built up to the pull-in value and
+opens when it has died away to the drop-out value, a time of about L over R after the coil is switched, and a flyback
+diode across the coil makes the opening later. The figures are the coil resistance (70 Ohm), the coil inductance
+(50 mH), the pull-in voltage (3.5 V), the drop-out voltage (1 V) and the contact resistance (50 mOhm); the open
+contact is 1 GOhm.
+
+- A relay is a model of the coil and the contact, not of the mechanism: there is no contact bounce, travel time or
+  coil heating, and the pull-in and drop-out voltages are steady-state ones.
+- A switch or a relay that is open or closed at the operating point stays so in an AC sweep, since the sweep is
+  linear around it. Fast switching can fail to converge in a transient; a smaller time step helps.
+
+## Transformers
+
+A transformer is two inductors coupled by a SPICE `K` element: `L-T1p` and `L-T1s`, each behind a resistor for its
+winding (`R-T1p`, `R-T1s`). Its value is the primary inductance; the secondary's is that divided by the square of the
+turns ratio, primary turns over secondary turns, so a 100 mH primary at 2:1 has a 25 mH secondary. The other figures are
+the turns ratio (1), the coupling (0.999) and the resistance of each winding (0.1 Ohm). The dotted terminals, the +
+ones, move together.
+
+- The coupling must stay below 1, which SPICE rejects. The leakage inductance that a coupling under 1 gives is what
+  makes the secondary sag under load.
+- There is no core: no saturation, hysteresis, core loss, capacitance between windings or isolation rating. The
+  magnetizing current is that of the primary inductance, so a small value draws a large no-load current.
+- A DC source across a primary is only limited by the winding resistance, since an inductor passes DC.
+
+## Logic gates and flip-flops
+
+The gates are AND, OR, NOT, NAND, NOR, XOR, XNOR and a buffer, with two inputs each (one for NOT and the buffer), and
+the flip-flops are D, JK, T and SR, each with a clock, asynchronous SET and RESET inputs (active high), a Q output
+and its inverse QN. They run as the digital code models of ngspice's XSPICE (`d_and`, `d_dff` and the like), which only
+meet digital nodes, so each part is written with bridges around it:
+
+- each input goes through an analog-to-digital bridge (`adc_bridge`) that reads a voltage above 70% of the part's
+  logic level as 1 and one below 30% as 0, and a voltage between them as unknown;
+- each output leaves through a digital-to-analog bridge (`dac_bridge`) that swings between 0 V and the logic level,
+  or to half of it while the output is unknown, behind a 50 Ohm resistor that is the output resistance of the family;
+- each input also has a 1 GOhm resistor to ground, so an unconnected input, such as the SET and RESET of a flip-flop
+  that uses neither, reads 0.
+
+The figures of a part are its logic level (5 V) and its propagation delay (10 ns), from every input to every output.
+A flip-flop changes on the rising edge of its clock and starts with Q at 0. The currents reported are those of the
+outputs: a gate's `U1`, and `U1.Q` and `U1.QN` of a flip-flop, positive into the output, so a part that drives its load
+reports a negative current.
+
+- The levels come from the part, not from a supply pin: a gate has no VCC or ground terminal, and drawing power from a
+  supply is not modeled. Connecting parts of different logic levels works as the thresholds above say.
+- The digital nodes inside a part are not shown. Only the outputs, which are analog voltages, appear in the plots and
+  can be probed, so a logic signal is a trace that swings between 0 V and the logic level. The transient plot of the Output window
+  stacks them as lanes.
+- The parts need the `digital.cm` code model library of ngspice. A system ngspice loads it by itself; a build that
+  ships it next to the program is loaded from there. Without it, simulating a circuit with a logic part stops with a
+  message.
+- A loop that holds two states, such as a latch, has no state to start from while both of its inputs are idle: ngspice
+  gives up with "Too many analog/event-driven solution alternations", which imcsim reports as a message. Start with
+  one input asserted, as the SR latch example does with its S input.
+- Delays are fixed per part: there is no spread between the rise and fall delays, no setup or hold time, and no
+  metastability. Operating point and DC sweep results read the digital outputs as they settle, and an AC sweep treats
+  them as constants.
 
 ## Independent sources
 
@@ -48,7 +145,10 @@ All three are ideal:
 - A current source pushes its current from terminal 1 to terminal 2 through itself, into the node at terminal 2.
 
 **VCC** is a DC voltage source from its terminal to ground, with the same limits. **Ground** is node 0, the
-reference of every voltage; it is not an element and carries no current of its own.
+reference of every voltage; it is not an element and carries no current of its own. A **net label** is no element
+either: it only joins the nodes of every point with the same name, compared without regard to case, so the netlist
+has no line for it and the nodes are numbered as if those points were wired together. A net named `0` or `GND` is ground, and one named `VCC` joins every VCC supply, so two supplies of different
+voltages must not share that name.
 
 ## Controlled sources
 
@@ -157,7 +257,8 @@ A transconductance drives a resistor and a capacitor, then a unity-gain buffer d
   node. The supply pins carry only that clamp current, while the output saturates.
 
 It has no slew rate, offset or current limit, and its output current returns through ground rather than through
-the supply pins.
+the supply pins. It is noiseless: its internal resistor is marked `noisy=0`, and only the leakage of its clamp diodes
+remains, picovolts per root hertz, which the noise analysis lists at 0.00%.
 
 ### Boyle macromodel (uA741 and Custom)
 
@@ -199,8 +300,10 @@ Limitations:
 - Its GBW comes out about 10% low, since the equations leave out the second pole that sets the phase margin.
 - The input pair is NPN: parts with a PNP input (LM358, whose input range includes the negative supply) or a JFET
   input (TL072) are only approximated.
-- Not modeled: input offset voltage and current, noise, temperature, the common-mode input range, power supply
+- Not modeled: input offset voltage and current, temperature, the common-mode input range, power supply
   rejection, more than two poles, and an output current drawn from the supply pins (it returns through ground).
+- Noise comes from its input transistors and internal resistors, so it has the right shape (shot and thermal noise
+  of the input pair) but not the voltage and current noise densities of a datasheet.
 
 ## References
 

@@ -5,7 +5,9 @@
 
 #include "current_flow.h"
 
+#include "components/logic_part.h"
 #include <algorithm>
+#include <cmath>
 #include <cstdlib>
 #include <map>
 #include <string>
@@ -42,6 +44,43 @@ std::vector<WireCurrent> SplitWires(const std::vector<UIWire> &wires, const std:
     return pieces;
 }
 
+// A part with several currents, each at the terminal it was probed on; the other end of a winding or of a contact
+// takes what the probed end gives out
+std::optional<double> GetProbedTerminalCurrent(const Core::Component &component, const std::vector<std::string> &names,
+                                               const std::size_t terminal,
+                                               const std::vector<Core::ComponentCurrent> &currents) {
+    const std::vector<std::size_t> probed = Core::GetCurrentTerminals(component);
+    for (std::size_t index = 0; index < names.size(); ++index) {
+        if (probed[index] == terminal) {
+            return FindCurrent(currents, names[index]);
+        }
+    }
+    const Core::ComponentType type = component.GetType();
+    if ((type != Core::ComponentType::Relay && type != Core::ComponentType::Transformer) || terminal % 2 == 0) {
+        return std::nullopt;
+    }
+    for (std::size_t index = 0; index < names.size(); ++index) {
+        if (probed[index] + 1 == terminal) {
+            const std::optional<double> current = FindCurrent(currents, names[index]);
+            return current ? std::optional(-*current) : std::nullopt;
+        }
+    }
+    return std::nullopt;
+}
+
+// The output current of an op-amp or a gate returns through ground or the supply, and their other pins carry none.
+// Any other single current enters terminal 1 and leaves terminal 2, and the control pins of a controlled source
+// carry none
+double GetSingleCurrentAt(const Core::Component &component, const double current, const std::size_t terminal) {
+    if (component.GetType() == Core::ComponentType::OpAmp || Core::IsLogicGate(component.GetType())) {
+        return terminal == Core::GetCurrentTerminals(component).front() ? current : 0.0;
+    }
+    if (terminal == 0) {
+        return current;
+    }
+    return terminal == 1 ? -current : 0.0;
+}
+
 } // namespace
 
 /**
@@ -49,9 +88,11 @@ std::vector<WireCurrent> SplitWires(const std::vector<UIWire> &wires, const std:
  * @param[in] component  The part.
  * @param[in] terminal   Terminal index, in the order of UIElement::GetTerminals().
  * @param[in] currents   Currents by name, as an operating point reports them.
- * @return  The current into the terminal: the reported current for a transistor terminal; for a two-terminal part
+ * @return  The current into the terminal: the reported current for a probed terminal, and for a relay or a
+ *          transformer the opposite of it at the other end of its contact or winding; for a two-terminal part
  *          or the output of a controlled source, its current into the first terminal and the opposite into the
- *          second; for a supply or an op-amp output, its current; zero for control pins and the other op-amp pins.
+ *          second; for a supply, an op-amp output or a gate output, its current; zero for control pins and the other
+ *          op-amp and gate pins.
  *          No value for ground, whose current is whatever its node leaves over, or for a current missing from the
  *          results.
  */
@@ -62,21 +103,51 @@ std::optional<double> GetTerminalCurrent(const Core::Component &component, const
         return std::nullopt;
     }
     if (names.size() > 1) {
-        return terminal < names.size() ? FindCurrent(currents, names[terminal]) : std::nullopt;
+        return GetProbedTerminalCurrent(component, names, terminal, currents);
     }
     const std::optional<double> current = FindCurrent(currents, names.front());
     if (!current) {
         return std::nullopt;
     }
-    // A single current enters terminal 1 and leaves terminal 2. An op-amp's output current returns through ground
-    // instead, and the control pins of a controlled source and the other op-amp pins carry none
-    if (terminal == 0) {
-        return *current;
+    return GetSingleCurrentAt(component, *current, terminal);
+}
+
+/**
+ * @brief   Returns the largest current in a circuit, in absolute value, to scale heat colors against.
+ * @param[in] operating_point  Currents of the circuit.
+ * @return  The largest of the reported currents, or zero when there are none.
+ */
+double LargestCurrent(const Core::OperatingPoint &operating_point) {
+    double largest = 0.0;
+    for (const Core::ComponentCurrent &current : operating_point.Currents) {
+        largest = std::max(largest, std::abs(current.Current));
     }
-    if (terminal == 1 && component.GetType() != Core::ComponentType::OpAmp) {
-        return -*current;
+    return largest;
+}
+
+/**
+ * @brief   Returns where a value falls on a logarithmic heat scale, as the editor colors currents and powers.
+ * @param[in] value          Value to place, of either sign: only its size counts.
+ * @param[in] largest_value  Largest size of the scale, as the circuit or the whole simulation has it.
+ * @param[in] decades        How many decades below the largest value the scale reaches.
+ * @return  1 for the largest value, 0 for those `decades` below it or less, linear in between on a logarithmic
+ *          scale, and 0 when the value is zero or there is no largest value.
+ */
+float LogarithmicLevel(const double value, const double largest_value, const double decades) {
+    if (value == 0.0 || largest_value <= 0.0) {
+        return 0.0f;
     }
-    return 0.0;
+    return static_cast<float>((std::log10(std::abs(value)) - std::log10(largest_value) + decades) / decades);
+}
+
+/**
+ * @brief   Returns where a current falls on the heat scale the editor colors wires and parts with.
+ * @param[in] current          Current to place.
+ * @param[in] largest_current  Largest current of the circuit, as LargestCurrent() returns it.
+ * @return  The LogarithmicLevel() of the current over CurrentDecades.
+ */
+float CurrentLevel(const double current, const double largest_current) {
+    return LogarithmicLevel(current, largest_current, CurrentDecades);
 }
 
 /**

@@ -1,2 +1,4 @@
 CompileFlags:
   Remove: [-fmodules-ts, -fmodule-mapper=*, -fdeps-format=*]
+Diagnostics:
+  Suppress: [invalid_consteval_call]

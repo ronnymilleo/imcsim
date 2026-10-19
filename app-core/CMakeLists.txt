@@ -14,14 +14,22 @@ add_library(imcsim-core-lib
             components/diode.cpp
             components/ground.cpp
             components/inductor.cpp
+            components/logic_part.cpp
             components/mosfet.cpp
+            components/net_label.cpp
             components/op_amp.cpp
+            components/potentiometer.cpp
+            components/relay.cpp
             components/resistor.cpp
             components/source.cpp
+            components/switch.cpp
+            components/transformer.cpp
             components/vcc.cpp
+            components/voltage_controlled_switch.cpp
             components/voltage_source.cpp
             simulator.cpp
             spice_value.cpp
+            standard_values.cpp
 )
 
 target_include_directories(imcsim-core-lib

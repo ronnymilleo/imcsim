@@ -8,12 +8,19 @@
 #include "components/bjt.h"
 #include "components/controlled_source.h"
 #include "components/diode.h"
+#include "components/logic_part.h"
 #include "components/mosfet.h"
 #include "components/op_amp.h"
+#include "components/potentiometer.h"
+#include "components/relay.h"
 #include "components/source.h"
+#include "components/switch.h"
+#include "components/transformer.h"
+#include "components/voltage_controlled_switch.h"
 #include "spice_value.h"
 #include <algorithm>
 #include <format>
+#include <iterator>
 #include <utility>
 
 namespace Core {
@@ -24,6 +31,13 @@ bool IsACSource(const Component &component) {
     return IsSource(component.GetType()) &&
            static_cast<const Source &>(component).GetSourceType() == Source::SourceType::AC;
 }
+
+// The two halves of a potentiometer track never get to 0 Ohm, which SPICE rejects, however close to an end the wiper is
+constexpr double MinTrackResistance = 1e-3;
+
+// A switch is a resistor, which closed is nearly a wire and open nearly nothing at all
+constexpr double ClosedSwitchResistance = 1e-3;
+constexpr double OpenSwitchResistance = 1e12;
 
 // One line serves every analysis: .op reads the DC value, .ac the AC magnitude and .tran the waveform. A pulse
 // starts at its low level, so that is its DC value. The name tells SPICE whether it is a voltage or current source
@@ -101,6 +115,89 @@ std::string ProbeTerminals(const Component &component, const std::vector<Current
         nodes[terminal] = next_probe_node++;
     }
     return lines;
+}
+
+// A gate or flip-flop is a digital code model, which only meets digital nodes: each input reaches it through an
+// analog-to-digital bridge, and each output leaves through a digital-to-analog bridge and a resistor, the output
+// resistance of the family. Every input also gets a resistor to ground, so one left unconnected reads 0
+constexpr double LogicOutputResistance = 50.0;
+constexpr double LogicInputPullDown = 1e9;
+
+std::string FormatLogicModels(const LogicPart &part) {
+    const LogicParameters &family = part.GetParameters();
+    const std::string name = part.GetName();
+    const std::string delay = FormatSpiceValue(family.PropagationDelay);
+    std::string models = std::format(".model ADC-{} adc_bridge(in_low={} in_high={})\n", name,
+                                     FormatSpiceValue(family.LogicLevel * LogicLowFraction),
+                                     FormatSpiceValue(family.LogicLevel * LogicHighFraction));
+    models += std::format(".model DAC-{} dac_bridge(out_low=0 out_high={} out_undef={})\n", name,
+                          FormatSpiceValue(family.LogicLevel), FormatSpiceValue(family.LogicLevel / 2.0));
+    if (IsFlipFlop(part.GetType())) {
+        models +=
+            std::format(".model LOGIC-{} {}(clk_delay={} set_delay={} reset_delay={} rise_delay={} fall_delay={})\n",
+                        name, GetLogicModelKind(part.GetType()), delay, delay, delay, delay, delay);
+    } else {
+        models += std::format(".model LOGIC-{} {}(rise_delay={} fall_delay={})\n", name,
+                              GetLogicModelKind(part.GetType()), delay, delay);
+    }
+    return models;
+}
+
+// The terminal nodes are in the order of GetLogicInputLabels() and GetLogicOutputLabels(); the digital nodes and the
+// analog nodes behind the output resistors are numbered from next_extra_node
+std::string FormatLogicPart(const LogicPart &part, const std::vector<int> &nodes, int &next_extra_node) {
+    const std::string &name = part.GetName();
+    const std::vector<std::string> inputs = GetLogicInputLabels(part.GetType());
+    const std::vector<std::string> outputs = GetLogicOutputLabels(part.GetType());
+    std::string lines;
+    std::vector<int> digital_inputs;
+    for (std::size_t input = 0; input < inputs.size(); ++input) {
+        const int digital = next_extra_node++;
+        digital_inputs.push_back(digital);
+        lines += std::format("A-{0}-{1} [{2}] [{3}] ADC-{0}\n", name, inputs[input], nodes[input], digital);
+        lines +=
+            std::format("R-{}-{} {} 0 {}\n", name, inputs[input], nodes[input], FormatSpiceValue(LogicInputPullDown));
+    }
+    std::vector<int> digital_outputs;
+    for (std::size_t output = 0; output < outputs.size(); ++output) {
+        digital_outputs.push_back(next_extra_node++);
+    }
+    // A single-input gate takes its input as a scalar, the others as a vector
+    std::string ports;
+    if (IsLogicGate(part.GetType()) && inputs.size() == 1) {
+        ports = std::to_string(digital_inputs[0]);
+    } else if (IsLogicGate(part.GetType())) {
+        ports = std::format("[{} {}]", digital_inputs[0], digital_inputs[1]);
+    } else {
+        for (const int digital : digital_inputs) {
+            ports += std::format("{} ", digital);
+        }
+        ports.pop_back();
+    }
+    for (const int digital : digital_outputs) {
+        ports += std::format(" {}", digital);
+    }
+    lines += std::format("A-{0} {1} LOGIC-{0}\n", name, ports);
+    for (std::size_t output = 0; output < outputs.size(); ++output) {
+        const int analog = next_extra_node++;
+        lines += std::format("A-{0}-{1} [{2}] [{3}] DAC-{0}\n", name, outputs[output], digital_outputs[output], analog);
+        lines += std::format("R-{}-{} {} {} {}\n", name, outputs[output], analog, nodes[inputs.size() + output],
+                             FormatSpiceValue(LogicOutputResistance));
+    }
+    return lines;
+}
+
+// The model of a logic part, and a bridge and a resistor on every pin, as FormatLogicPart() writes them
+std::vector<std::string> GetLogicElementNames(const Component &part) {
+    const std::string &name = part.GetName();
+    std::vector<std::string> names{std::format("A-{}", name)};
+    std::vector<std::string> pins = GetLogicInputLabels(part.GetType());
+    std::ranges::move(GetLogicOutputLabels(part.GetType()), std::back_inserter(pins));
+    for (const std::string &pin : pins) {
+        names.push_back(std::format("A-{}-{}", name, pin));
+        names.push_back(std::format("R-{}-{}", name, pin));
+    }
+    return names;
 }
 
 // Parts that share a ready model share its line, written the first time the model comes up
@@ -259,7 +356,80 @@ std::string Circuit::ToSpiceNetlist(const std::string_view analysis, const bool 
             AddModelLine(model_name, FormatMOSFETModel(mosfet.GetType(), model_name, parameters), model_names, models);
             break;
         }
+        case ComponentType::Potentiometer: {
+            // The wiper, terminal 3, splits the track into two resistors
+            const auto &pot = static_cast<const Potentiometer &>(component);
+            const std::string first = FormatSpiceValue(std::max(pot.GetValue() * pot.GetWiper(), MinTrackResistance));
+            const std::string second =
+                FormatSpiceValue(std::max(pot.GetValue() * (1.0 - pot.GetWiper()), MinTrackResistance));
+            netlist += std::format("R-{}a {} {} {}\n", pot.GetName(), nodes[0], nodes[2], first);
+            netlist += std::format("R-{}b {} {} {}\n", pot.GetName(), nodes[2], nodes[1], second);
+            break;
+        }
+        case ComponentType::Switch:
+        case ComponentType::PushButton: {
+            const bool closed = static_cast<const Switch &>(component).IsClosed();
+            netlist += std::format("R-{} {} {} {}\n", component.GetName(), nodes[0], nodes[1],
+                                   FormatSpiceValue(closed ? ClosedSwitchResistance : OpenSwitchResistance));
+            break;
+        }
+        case ComponentType::VSwitch: {
+            const auto &controlled = static_cast<const VoltageControlledSwitch &>(component);
+            const std::string model_name = std::format("SW-{}", controlled.GetName());
+            netlist += std::format("{} {} {} {} {} {}\n", controlled.GetName(), nodes[0], nodes[1], nodes[2], nodes[3],
+                                   model_name);
+            AddModelLine(model_name, FormatSwitchModel(model_name, controlled.GetParameters()), model_names, models);
+            break;
+        }
+        case ComponentType::And:
+        case ComponentType::Or:
+        case ComponentType::Not:
+        case ComponentType::Nand:
+        case ComponentType::Nor:
+        case ComponentType::Xor:
+        case ComponentType::Xnor:
+        case ComponentType::Buffer:
+        case ComponentType::DFlipFlop:
+        case ComponentType::JKFlipFlop:
+        case ComponentType::TFlipFlop:
+        case ComponentType::SRFlipFlop: {
+            const auto &logic = static_cast<const LogicPart &>(component);
+            netlist += FormatLogicPart(logic, nodes, next_extra_node);
+            models += FormatLogicModels(logic);
+            break;
+        }
+        case ComponentType::Relay: {
+            // The coil is its resistance and its inductance in series, and the contact follows the voltage on the
+            // resistance, which is the coil current, so it closes and opens as the current builds and dies away
+            const auto &relay = static_cast<const Relay &>(component);
+            const RelayParameters &figures = relay.GetParameters();
+            const int coil_middle = next_extra_node++;
+            const std::string model_name = std::format("SW-{}", relay.GetName());
+            netlist += std::format("R-{0}coil {1} {2} {3}\nL-{0}coil {2} {4} {5}\n", relay.GetName(), nodes[2],
+                                   coil_middle, FormatSpiceValue(figures.CoilResistance), nodes[3],
+                                   FormatSpiceValue(figures.CoilInductance));
+            netlist += std::format("S-{} {} {} {} {} {}\n", relay.GetName(), nodes[0], nodes[1], nodes[2], coil_middle,
+                                   model_name);
+            AddModelLine(model_name, FormatSwitchModel(model_name, relay.GetContactParameters()), model_names, models);
+            break;
+        }
+        case ComponentType::Transformer: {
+            // Two inductors, each behind the resistance of its winding, coupled by a K element
+            const auto &transformer = static_cast<const Transformer &>(component);
+            const std::string resistance = FormatSpiceValue(transformer.GetParameters().WindingResistance);
+            const int primary_middle = next_extra_node++;
+            const int secondary_middle = next_extra_node++;
+            const std::string &name = transformer.GetName();
+            netlist += std::format("R-{0}p {1} {2} {3}\nL-{0}p {2} {4} {5}\n", name, nodes[0], primary_middle,
+                                   resistance, nodes[1], FormatSpiceValue(transformer.GetValue()));
+            netlist += std::format("R-{0}s {1} {2} {3}\nL-{0}s {2} {4} {5}\n", name, nodes[2], secondary_middle,
+                                   resistance, nodes[3], FormatSpiceValue(transformer.GetSecondaryInductance()));
+            netlist +=
+                std::format("K-{0} L-{0}p L-{0}s {1}\n", name, FormatSpiceValue(transformer.GetParameters().Coupling));
+            break;
+        }
         case ComponentType::Ground:
+        case ComponentType::NetLabel:
             break;
         }
         netlist += probes;
@@ -275,19 +445,38 @@ std::string Circuit::ToSpiceNetlist(const std::string_view analysis, const bool 
 /**
  * @brief   Lists the terminals of a component whose current is measured with a probe.
  * @param[in] component  Any component.
- * @return  The anode of a diode part, every terminal of a transistor, and the first output terminal of a controlled
- *          source or the output of an op-amp; nothing for the others, whose currents ngspice reports directly.
+ * @return  The anode of a diode part, the first terminal of a switch, every terminal of a transistor or a
+ *          potentiometer, the contact and the coil of a relay, the two windings of a transformer, and the first output
+ * terminal of a controlled source or the output of an op-amp; nothing for the others, whose currents ngspice reports
+ * directly.
  */
 std::vector<CurrentProbe> GetCurrentProbes(const Component &component) {
     const ComponentType type = component.GetType();
-    if (IsDiode(type) || IsControlledSource(type) || type == ComponentType::OpAmp) {
+    if (IsDiode(type) || IsControlledSource(type) || IsSwitch(type) || type == ComponentType::VSwitch ||
+        type == ComponentType::OpAmp) {
         return {{0, ""}};
+    }
+    if (IsLogicGate(type)) {
+        return {{static_cast<int>(GetLogicInputLabels(type).size()), ""}};
+    }
+    if (IsFlipFlop(type)) {
+        const auto outputs = static_cast<int>(GetLogicInputLabels(type).size());
+        return {{outputs, "Q"}, {outputs + 1, "QN"}};
+    }
+    if (type == ComponentType::Relay) {
+        return {{0, "S"}, {2, "C"}};
+    }
+    if (type == ComponentType::Transformer) {
+        return {{0, "P"}, {2, "S"}};
     }
     if (IsBJT(component.GetType())) {
         return {{0, "C"}, {1, "B"}, {2, "E"}};
     }
     if (IsMOSFET(component.GetType())) {
         return {{0, "D"}, {1, "G"}, {2, "S"}};
+    }
+    if (component.GetType() == ComponentType::Potentiometer) {
+        return {{0, "A"}, {1, "B"}, {2, "W"}};
     }
     return {};
 }
@@ -343,6 +532,47 @@ std::optional<std::string> FindControllingSource(const Circuit &circuit, const s
         }
     }
     return std::nullopt;
+}
+
+/**
+ * @brief   Lists the elements ToSpiceNetlist() writes for a component, without its current probes.
+ * @param[in] component  Any component.
+ * @return  The component name for a part that is one element, such as "R1" or "Q1"; the elements of a part written
+ *          as several, such as "R-RV1a" and "R-RV1b" for a potentiometer or "X-U1" for an op-amp macromodel, whose
+ *          own elements ngspice names after it ("q.x-u1.q1"), and the model, bridges and resistors of a logic part;
+ *          nothing for ground and net labels.
+ */
+std::vector<std::string> GetElementNames(const Component &component) {
+    const std::string &name = component.GetName();
+    const ComponentType type = component.GetType();
+    if (type == ComponentType::Ground || type == ComponentType::NetLabel) {
+        return {};
+    }
+    if (IsLogicGate(type) || IsFlipFlop(type)) {
+        return GetLogicElementNames(component);
+    }
+    if (type == ComponentType::OpAmp && static_cast<const OpAmp &>(component).IsIdeal()) {
+        return {std::format("G-{}", name),   std::format("R-{}", name),   std::format("C-{}", name),
+                std::format("D-{}-P", name), std::format("D-{}-N", name), std::format("E-{}", name)};
+    }
+    if (type == ComponentType::OpAmp) {
+        return {std::format("X-{}", name)};
+    }
+    if (type == ComponentType::Potentiometer) {
+        return {std::format("R-{}a", name), std::format("R-{}b", name)};
+    }
+    if (IsSwitch(type)) {
+        return {std::format("R-{}", name)};
+    }
+    if (type == ComponentType::Relay) {
+        return {std::format("R-{}coil", name), std::format("L-{}coil", name), std::format("S-{}", name)};
+    }
+    if (type == ComponentType::Transformer) {
+        return {std::format("R-{}p", name), std::format("L-{}p", name), std::format("R-{}s", name),
+                std::format("L-{}s", name), std::format("K-{}", name)};
+    }
+    // Every other part is one element named after it
+    return {name};
 }
 
 } // namespace Core

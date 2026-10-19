@@ -8,9 +8,16 @@
 #include "components/bjt.h"
 #include "components/controlled_source.h"
 #include "components/diode.h"
+#include "components/logic_part.h"
 #include "components/mosfet.h"
+#include "components/net_label.h"
 #include "components/op_amp.h"
+#include "components/potentiometer.h"
+#include "components/relay.h"
 #include "components/source.h"
+#include "components/switch.h"
+#include "components/transformer.h"
+#include "components/voltage_controlled_switch.h"
 #include "element_factory.h"
 #include "nlohmann/json.hpp"
 #include <array>
@@ -42,6 +49,32 @@ constexpr auto ACKeys = std::to_array<ParameterKey<Core::ACParameters>>({
     {"frequency", &Core::ACParameters::Frequency},
     {"offset", &Core::ACParameters::Offset},
     {"ac_magnitude", &Core::ACParameters::Magnitude},
+});
+
+constexpr auto SwitchKeys = std::to_array<ParameterKey<Core::SwitchParameters>>({
+    {"threshold", &Core::SwitchParameters::Threshold},
+    {"hysteresis", &Core::SwitchParameters::Hysteresis},
+    {"on_resistance", &Core::SwitchParameters::OnResistance},
+    {"off_resistance", &Core::SwitchParameters::OffResistance},
+});
+
+constexpr auto RelayKeys = std::to_array<ParameterKey<Core::RelayParameters>>({
+    {"coil_resistance", &Core::RelayParameters::CoilResistance},
+    {"coil_inductance", &Core::RelayParameters::CoilInductance},
+    {"pull_in", &Core::RelayParameters::PullInVoltage},
+    {"drop_out", &Core::RelayParameters::DropOutVoltage},
+    {"contact_resistance", &Core::RelayParameters::ContactResistance},
+});
+
+constexpr auto TransformerKeys = std::to_array<ParameterKey<Core::TransformerParameters>>({
+    {"turns_ratio", &Core::TransformerParameters::TurnsRatio},
+    {"coupling", &Core::TransformerParameters::Coupling},
+    {"winding_resistance", &Core::TransformerParameters::WindingResistance},
+});
+
+constexpr auto LogicKeys = std::to_array<ParameterKey<Core::LogicParameters>>({
+    {"logic_level", &Core::LogicParameters::LogicLevel},
+    {"propagation_delay", &Core::LogicParameters::PropagationDelay},
 });
 
 constexpr auto PulseKeys = std::to_array<ParameterKey<Core::PulseParameters>>({
@@ -127,6 +160,12 @@ constexpr auto ACSweepKeys = std::to_array<ParameterKey<Core::ACSweepSettings>>(
     {"stop", &Core::ACSweepSettings::StopFrequency},
 });
 
+constexpr auto ParameterStepKeys = std::to_array<ParameterKey<ParameterStepSettings>>({
+    {"start", &ParameterStepSettings::Start},
+    {"stop", &ParameterStepSettings::Stop},
+    {"step", &ParameterStepSettings::Step},
+});
+
 constexpr auto SweepRangeKeys = std::to_array<ParameterKey<Core::SweepRange>>({
     {"start", &Core::SweepRange::Start},
     {"stop", &Core::SweepRange::Stop},
@@ -206,6 +245,35 @@ std::expected<void, std::string> ReadParameters(const std::array<ParameterKey<Pa
     return {};
 }
 
+// Parts whose parameters are all there is to them save them as one object
+template <typename Part, typename Parameters, std::size_t Count>
+void WritePartParameters(const Part &part, const std::array<ParameterKey<Parameters>, Count> &keys,
+                         nlohmann::json &object) {
+    nlohmann::json parameters = nlohmann::json::object();
+    WriteParameters(keys, part.GetParameters(), parameters);
+    object["parameters"] = parameters;
+}
+
+// Missing parameters keep those the part starts with
+template <typename Part, typename Parameters, std::size_t Count>
+std::expected<void, std::string> ReadPartParameters(const nlohmann::json &object, Part &part,
+                                                    const std::array<ParameterKey<Parameters>, Count> &keys) {
+    Parameters parameters = part.GetParameters();
+    if (const auto parameters_object = object.find("parameters"); parameters_object != object.end()) {
+        if (!parameters_object->is_object()) {
+            return std::unexpected("has parameters that are not an object");
+        }
+        if (const auto read = ReadParameters(keys, *parameters_object, parameters); !read) {
+            return read;
+        }
+    }
+    if (!Part::IsValidParameters(parameters)) {
+        return std::unexpected("has parameters out of range");
+    }
+    part.SetParameters(parameters);
+    return {};
+}
+
 // Parts with a model save its name, plus their parameters when custom
 template <typename Part, typename Parameters, std::size_t Count>
 void WriteModelChoice(const Part &part, const std::array<ParameterKey<Parameters>, Count> &keys,
@@ -215,6 +283,56 @@ void WriteModelChoice(const Part &part, const std::array<ParameterKey<Parameters
         nlohmann::json parameters = nlohmann::json::object();
         WriteParameters(keys, part.GetParameters(), parameters);
         object["parameters"] = parameters;
+    }
+}
+
+// Parts with a ready model or custom parameters; the ideal op-amp also keeps its bandwidth
+void WriteModelFields(const Core::Component &component, nlohmann::json &object) {
+    const Core::ComponentType type = component.GetType();
+    if (Core::IsDiode(type)) {
+        WriteModelChoice(static_cast<const Core::Diode &>(component), DiodeKeys, object);
+    } else if (Core::IsBJT(type)) {
+        WriteModelChoice(static_cast<const Core::BJT &>(component), BJTKeys, object);
+    } else if (Core::IsMOSFET(type)) {
+        WriteModelChoice(static_cast<const Core::MOSFET &>(component), MOSFETKeys, object);
+    } else if (type == Core::ComponentType::OpAmp) {
+        const auto &op_amp = static_cast<const Core::OpAmp &>(component);
+        WriteModelChoice(op_amp, OpAmpKeys, object);
+        if (op_amp.IsIdeal()) {
+            object["gbw"] = op_amp.GetIdealBandwidth();
+        }
+    }
+}
+
+// The state or figures of the other parts that have any
+void WriteKindFields(const Core::Component &component, nlohmann::json &object) {
+    const Core::ComponentType type = component.GetType();
+    if (Core::IsCurrentControlled(type)) {
+        object["control"] = static_cast<const Core::ControlledSource &>(component).GetControllingCurrent();
+    } else if (type == Core::ComponentType::NetLabel) {
+        // A label with no name yet is saved without the key
+        if (const std::string &net = static_cast<const Core::NetLabel &>(component).GetNet(); !net.empty()) {
+            object["net"] = net;
+        }
+    } else if (Core::IsSwitch(type)) {
+        object["closed"] = static_cast<const Core::Switch &>(component).IsClosed();
+    } else if (type == Core::ComponentType::Potentiometer) {
+        object["wiper"] = static_cast<const Core::Potentiometer &>(component).GetWiper();
+    }
+}
+
+// Parts whose figures are all there is to them: the switch that follows a voltage, the relay, the transformer, and
+// the gates and flip-flops with their logic family
+void WriteFigureFields(const Core::Component &component, nlohmann::json &object) {
+    const Core::ComponentType type = component.GetType();
+    if (type == Core::ComponentType::VSwitch) {
+        WritePartParameters(static_cast<const Core::VoltageControlledSwitch &>(component), SwitchKeys, object);
+    } else if (type == Core::ComponentType::Relay) {
+        WritePartParameters(static_cast<const Core::Relay &>(component), RelayKeys, object);
+    } else if (type == Core::ComponentType::Transformer) {
+        WritePartParameters(static_cast<const Core::Transformer &>(component), TransformerKeys, object);
+    } else if (Core::IsLogicPart(type)) {
+        WritePartParameters(static_cast<const Core::LogicPart &>(component), LogicKeys, object);
     }
 }
 
@@ -245,22 +363,9 @@ nlohmann::json WriteElement(const UIElement &element) {
         WriteParameters(PulseKeys, source.GetPulse(), pulse);
         object["pulse"] = pulse;
     }
-    const Core::ComponentType type = component.GetType();
-    if (Core::IsDiode(type)) {
-        WriteModelChoice(static_cast<const Core::Diode &>(component), DiodeKeys, object);
-    } else if (Core::IsBJT(type)) {
-        WriteModelChoice(static_cast<const Core::BJT &>(component), BJTKeys, object);
-    } else if (Core::IsMOSFET(type)) {
-        WriteModelChoice(static_cast<const Core::MOSFET &>(component), MOSFETKeys, object);
-    } else if (Core::IsCurrentControlled(type)) {
-        object["control"] = static_cast<const Core::ControlledSource &>(component).GetControllingCurrent();
-    } else if (type == Core::ComponentType::OpAmp) {
-        const auto &op_amp = static_cast<const Core::OpAmp &>(component);
-        WriteModelChoice(op_amp, OpAmpKeys, object);
-        if (op_amp.IsIdeal()) {
-            object["gbw"] = op_amp.GetIdealBandwidth();
-        }
-    }
+    WriteModelFields(component, object);
+    WriteKindFields(component, object);
+    WriteFigureFields(component, object);
     return object;
 }
 
@@ -374,6 +479,70 @@ std::expected<void, std::string> ReadModel(const nlohmann::json &object, Core::C
     return {};
 }
 
+// What only some kinds of part carry: the current a controlled source follows, a net name, a switch state and a wiper
+std::expected<void, std::string> ReadStateFields(const nlohmann::json &object, Core::Component &component) {
+    // A missing controlling current loads as none; the simulation then asks for one
+    if (Core::IsCurrentControlled(component.GetType()) && object.contains("control")) {
+        const std::optional<std::string> current = ReadString(object, "control");
+        if (!current) {
+            return std::unexpected("has a controlling current that is not text");
+        }
+        static_cast<Core::ControlledSource &>(component).SetControllingCurrent(*current);
+    }
+    if (component.GetType() == Core::ComponentType::NetLabel && object.contains("net")) {
+        const std::optional<std::string> net = ReadString(object, "net");
+        if (!net || !Core::NetLabel::IsValidNet(*net)) {
+            return std::unexpected("has a net name that is not 1 to 32 letters, digits, _, - or .");
+        }
+        static_cast<Core::NetLabel &>(component).SetNet(*net);
+    }
+    // A switch saved without a state stays open
+    if (Core::IsSwitch(component.GetType()) && object.contains("closed")) {
+        const std::optional<bool> closed = ReadBool(object, "closed");
+        if (!closed) {
+            return std::unexpected("has a closed flag that is not true or false");
+        }
+        static_cast<Core::Switch &>(component).SetClosed(*closed);
+    }
+    // A potentiometer saved without a wiper keeps it in the middle
+    if (component.GetType() == Core::ComponentType::Potentiometer && object.contains("wiper")) {
+        const std::optional<double> wiper = ReadNumber(object, "wiper");
+        if (!wiper || !Core::Potentiometer::IsValidWiper(*wiper)) {
+            return std::unexpected("has a wiper that is not a number from 0 to 1");
+        }
+        static_cast<Core::Potentiometer &>(component).SetWiper(*wiper);
+    }
+    return {};
+}
+
+// Parts whose figures are all there is to them, which missing keys leave as the part starts
+std::expected<void, std::string> ReadFigureFields(const nlohmann::json &object, Core::Component &component) {
+    if (component.GetType() == Core::ComponentType::VSwitch) {
+        if (const auto read =
+                ReadPartParameters(object, static_cast<Core::VoltageControlledSwitch &>(component), SwitchKeys);
+            !read) {
+            return std::unexpected(read.error());
+        }
+    }
+    if (component.GetType() == Core::ComponentType::Relay) {
+        if (const auto read = ReadPartParameters(object, static_cast<Core::Relay &>(component), RelayKeys); !read) {
+            return std::unexpected(read.error());
+        }
+    }
+    if (component.GetType() == Core::ComponentType::Transformer) {
+        if (const auto read = ReadPartParameters(object, static_cast<Core::Transformer &>(component), TransformerKeys);
+            !read) {
+            return std::unexpected(read.error());
+        }
+    }
+    if (Core::IsLogicPart(component.GetType())) {
+        if (const auto read = ReadPartParameters(object, static_cast<Core::LogicPart &>(component), LogicKeys); !read) {
+            return std::unexpected(read.error());
+        }
+    }
+    return {};
+}
+
 // Names are checked separately, once every element is read, so duplicates can be found
 std::expected<std::unique_ptr<UIElement>, std::string> ReadElement(const nlohmann::json &object) {
     if (!object.is_object()) {
@@ -423,13 +592,11 @@ std::expected<std::unique_ptr<UIElement>, std::string> ReadElement(const nlohman
     if (const std::expected<void, std::string> model = ReadModel(object, component); !model) {
         return std::unexpected(model.error());
     }
-    // A missing controlling current loads as none; the simulation then asks for one
-    if (Core::IsCurrentControlled(component.GetType()) && object.contains("control")) {
-        const std::optional<std::string> current = ReadString(object, "control");
-        if (!current) {
-            return std::unexpected("has a controlling current that is not text");
-        }
-        static_cast<Core::ControlledSource &>(component).SetControllingCurrent(*current);
+    if (const std::expected<void, std::string> state = ReadStateFields(object, component); !state) {
+        return std::unexpected(state.error());
+    }
+    if (const std::expected<void, std::string> figures = ReadFigureFields(object, component); !figures) {
+        return std::unexpected(figures.error());
     }
     if (const std::optional<std::string> name = ReadString(object, "name")) {
         component.SetName(*name);
@@ -475,7 +642,8 @@ nlohmann::json WriteSweepRange(const Core::SweepRange &range) {
 }
 
 // File names of the analyses, in the order of the Analysis enum
-constexpr auto AnalysisKeys = std::to_array<std::string_view>({"operating_point", "transient", "ac_sweep", "dc_sweep"});
+constexpr auto AnalysisKeys =
+    std::to_array<std::string_view>({"operating_point", "transient", "ac_sweep", "dc_sweep", "noise"});
 
 nlohmann::json WriteSettings(const SimulationSettings &settings) {
     nlohmann::json transient = nlohmann::json::object();
@@ -483,6 +651,16 @@ nlohmann::json WriteSettings(const SimulationSettings &settings) {
     nlohmann::json ac_sweep = nlohmann::json::object();
     WriteParameters(ACSweepKeys, settings.ACSweep, ac_sweep);
     ac_sweep["points_per_decade"] = settings.ACSweep.PointsPerDecade;
+    nlohmann::json noise = {{"source", settings.NoiseSource}};
+    WriteParameters(ACSweepKeys, settings.NoiseRange, noise);
+    noise["points_per_decade"] = settings.NoiseRange.PointsPerDecade;
+    if (settings.NoiseOutput) {
+        noise["output"] = {settings.NoiseOutput->X, settings.NoiseOutput->Y};
+    }
+    const ParameterStepSettings &step = settings.ParameterStep;
+    nlohmann::json parameter_step = {
+        {"enabled", step.Enabled}, {"part", step.Part}, {"uses_list", step.UsesList}, {"list", step.List}};
+    WriteParameters(ParameterStepKeys, step, parameter_step);
     return {
         {"analysis", AnalysisKeys[static_cast<std::size_t>(settings.Selected)]},
         {"transient", transient},
@@ -493,6 +671,8 @@ nlohmann::json WriteSettings(const SimulationSettings &settings) {
              {"stepped", WriteSweepRange(settings.SteppedRange)},
              {"step_source", settings.StepSource},
          }},
+        {"noise", noise},
+        {"parameter_step", parameter_step},
     };
 }
 
@@ -507,11 +687,12 @@ std::expected<void, std::string> ReadTransientSettings(const nlohmann::json &obj
     return {};
 }
 
-std::expected<void, std::string> ReadACSweepSettings(const nlohmann::json &object, SimulationSettings &settings) {
-    if (const auto read = ReadParameters(ACSweepKeys, object, settings.ACSweep); !read) {
+// The AC sweep and the noise analysis share the form of their frequency range
+std::expected<void, std::string> ReadFrequencyRange(const nlohmann::json &object, Core::ACSweepSettings &range) {
+    if (const auto read = ReadParameters(ACSweepKeys, object, range); !read) {
         return read;
     }
-    if (settings.ACSweep.StartFrequency <= 0.0 || settings.ACSweep.StopFrequency <= 0.0) {
+    if (range.StartFrequency <= 0.0 || range.StopFrequency <= 0.0) {
         return std::unexpected("have a frequency that is not positive");
     }
     if (object.contains("points_per_decade")) {
@@ -519,9 +700,13 @@ std::expected<void, std::string> ReadACSweepSettings(const nlohmann::json &objec
         if (!points || *points < 1) {
             return std::unexpected("have no valid points_per_decade");
         }
-        settings.ACSweep.PointsPerDecade = *points;
+        range.PointsPerDecade = *points;
     }
     return {};
+}
+
+std::expected<void, std::string> ReadACSweepSettings(const nlohmann::json &object, SimulationSettings &settings) {
+    return ReadFrequencyRange(object, settings.ACSweep);
 }
 
 std::expected<void, std::string> ReadSweepRange(const nlohmann::json &object, Core::SweepRange &range) {
@@ -565,6 +750,53 @@ std::expected<void, std::string> ReadDCSweepSettings(const nlohmann::json &objec
     return {};
 }
 
+std::expected<void, std::string> ReadNoiseSettings(const nlohmann::json &object, SimulationSettings &settings) {
+    if (const auto read = ReadFrequencyRange(object, settings.NoiseRange); !read) {
+        return read;
+    }
+    if (object.contains("source")) {
+        const std::optional<std::string> source = ReadString(object, "source");
+        if (!source) {
+            return std::unexpected("have no valid source");
+        }
+        settings.NoiseSource = *source;
+    }
+    if (object.contains("output")) {
+        const std::optional<GridPoint> output = ReadPoint(object, "output");
+        if (!output) {
+            return std::unexpected("have no valid output point");
+        }
+        settings.NoiseOutput = *output;
+    }
+    return {};
+}
+
+std::expected<void, std::string> ReadParameterStepSettings(const nlohmann::json &object, SimulationSettings &settings) {
+    ParameterStepSettings &step = settings.ParameterStep;
+    if (const auto read = ReadParameters(ParameterStepKeys, object, step); !read) {
+        return read;
+    }
+    for (const auto &[key, flag] : {std::pair{"enabled", &step.Enabled}, std::pair{"uses_list", &step.UsesList}}) {
+        if (object.contains(key)) {
+            const std::optional<bool> value = ReadBool(object, key);
+            if (!value) {
+                return std::unexpected(std::format("have a {} flag that is not true or false", key));
+            }
+            *flag = *value;
+        }
+    }
+    for (const auto &[key, text] : {std::pair{"part", &step.Part}, std::pair{"list", &step.List}}) {
+        if (object.contains(key)) {
+            const std::optional<std::string> value = ReadString(object, key);
+            if (!value) {
+                return std::unexpected(std::format("have no valid {}", key));
+            }
+            *text = *value;
+        }
+    }
+    return {};
+}
+
 /**
  * @struct  AnalysisReader
  * @brief   JSON key of the settings of one analysis, its name in warnings and the function that reads them.
@@ -579,6 +811,8 @@ constexpr auto AnalysisReaders = std::to_array<AnalysisReader>({
     {"transient", "transient", &ReadTransientSettings},
     {"ac_sweep", "AC sweep", &ReadACSweepSettings},
     {"dc_sweep", "DC sweep", &ReadDCSweepSettings},
+    {"noise", "noise", &ReadNoiseSettings},
+    {"parameter_step", "parameter step", &ReadParameterStepSettings},
 });
 
 // Files saved before settings were stored have none and get the defaults; an analysis with invalid settings
@@ -679,20 +913,10 @@ SavedMeasurements ReadMeasurements(const nlohmann::json &document, std::vector<s
     return measurements;
 }
 
-} // namespace
-
-/**
- * @brief   Writes a schematic as JSON.
- * @param[in] elements      Components placed on the grid.
- * @param[in] wires         Wire segments.
- * @param[in] settings      Settings of the analyses.
- * @param[in] measurements  Traces the plots show; the key is left out when there are none.
- * @return  The file contents, indented for reading and diffing. Values are plain numbers, never suffixed text.
- */
-std::string SaveSchematic(const std::vector<std::unique_ptr<UIElement>> &elements, const std::vector<UIWire> &wires,
+std::string WriteDocument(const std::span<const UIElement *const> elements, const std::vector<UIWire> &wires,
                           const SimulationSettings &settings, const SavedMeasurements &measurements) {
     nlohmann::json element_list = nlohmann::json::array();
-    for (const auto &element : elements) {
+    for (const UIElement *element : elements) {
         element_list.push_back(WriteElement(*element));
     }
     nlohmann::json wire_list = nlohmann::json::array();
@@ -713,6 +937,36 @@ std::string SaveSchematic(const std::vector<std::unique_ptr<UIElement>> &element
         document["measurements"] = WriteMeasurements(measurements);
     }
     return document.dump(2) + "\n";
+}
+
+} // namespace
+
+/**
+ * @brief   Writes a schematic as JSON.
+ * @param[in] elements      Components placed on the grid.
+ * @param[in] wires         Wire segments.
+ * @param[in] settings      Settings of the analyses.
+ * @param[in] measurements  Traces the plots show; the key is left out when there are none.
+ * @return  The file contents, indented for reading and diffing. Values are plain numbers, never suffixed text.
+ */
+std::string SaveSchematic(const std::vector<std::unique_ptr<UIElement>> &elements, const std::vector<UIWire> &wires,
+                          const SimulationSettings &settings, const SavedMeasurements &measurements) {
+    std::vector<const UIElement *> pointers;
+    for (const auto &element : elements) {
+        pointers.push_back(element.get());
+    }
+    return WriteDocument(pointers, wires, settings, measurements);
+}
+
+/**
+ * @brief   Writes some parts and wires as a schematic of their own, for the clipboard.
+ * @param[in] elements  Parts to write, which stay where they are.
+ * @param[in] wires     Wire segments to write.
+ * @return  The same JSON a file holds, with the default settings and no measurements, so it loads back with
+ *          LoadSchematic().
+ */
+std::string SaveParts(const std::span<const UIElement *const> elements, const std::vector<UIWire> &wires) {
+    return WriteDocument(elements, wires, {}, {});
 }
 
 /**
