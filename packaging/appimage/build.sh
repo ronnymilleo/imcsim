@@ -80,6 +80,10 @@ cmake -S "$SOURCE_DIR" -B "$WORK_DIR/imcsim-build" -G Ninja -DCMAKE_BUILD_TYPE=R
 cmake --build "$WORK_DIR/imcsim-build"
 rm -rf "$WORK_DIR/AppDir"
 DESTDIR="$WORK_DIR/AppDir" cmake --install "$WORK_DIR/imcsim-build"
+# The spinit of this ngspice names the build folder, so the program loads the digital code models itself, from
+# usr/lib/imcsim; they need only libc and libm
+mkdir -p "$WORK_DIR/AppDir/usr/lib/imcsim"
+cp "$PREFIX/lib/ngspice/digital.cm" "$WORK_DIR/AppDir/usr/lib/imcsim/"
 mkdir -p "$WORK_DIR/AppDir/usr/share/doc/ngspice"
 cp "$PREFIX/share/doc/ngspice/COPYING" "$WORK_DIR/AppDir/usr/share/doc/ngspice/"
 

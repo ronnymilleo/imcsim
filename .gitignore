@@ -7,3 +7,4 @@ imgui.ini
 *.imcsim
 !app-gui/examples/*.imcsim
 /graphify-out/
+.vs

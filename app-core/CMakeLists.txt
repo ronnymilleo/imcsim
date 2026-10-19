@@ -48,9 +48,10 @@ if(WIN32)
             INTERFACE_INCLUDE_DIRECTORIES "${NGSPICE_WINDOWS_DIR}/include"
     )
     set(NGSPICE_LINK_TARGET ngspice)
+    # ngspice opens the digital code models by a name relative to the program, so they sit next to it as well
     add_custom_target(ngspice-runtime
             COMMAND ${CMAKE_COMMAND} -E copy_if_different "${NGSPICE_WINDOWS_DIR}/bin/ngspice.dll"
-                    "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/ngspice.dll"
+                    "${NGSPICE_WINDOWS_DIR}/bin/digital.cm" "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}"
             VERBATIM
     )
     add_dependencies(imcsim-core-lib ngspice-runtime)

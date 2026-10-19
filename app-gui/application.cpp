@@ -37,19 +37,31 @@ constexpr bool GPUDebugMode = false;
 constexpr bool GPUDebugMode = true;
 #endif
 
+// Where a build that ships digital.cm keeps it: beside the program on Windows, in the PlugIns folder of the macOS
+// bundle (SDL gives its Resources folder), and in lib/imcsim of the Linux layout, as the AppImage does
+std::filesystem::path GetCodeModelDirectory(const std::filesystem::path &base_path) {
+#if defined(_WIN32)
+    return base_path;
+#elif defined(__APPLE__)
+    return base_path / ".." / "PlugIns";
+#else
+    return base_path / ".." / "lib" / "imcsim";
+#endif
+}
+
 } // namespace
 
 /**
  * @brief   Initializes SDL, the GPU device and Dear ImGui, in that order.
  * @return  Core::ExitSuccess on success, Core::ExitFailure if any step fails.
- * @note    The simulator is told to look for the digital code models next to the program, for a build that ships them.
+ * @note    The simulator is told where the program keeps the digital code models, for a build that ships them.
  */
 int Application::Init() {
     if (InitSDL() != Core::ExitSuccess) {
         return Core::ExitFailure;
     }
     if (const char *base_path = SDL_GetBasePath()) {
-        Core::SetCodeModelDirectory(base_path);
+        Core::SetCodeModelDirectory(GetCodeModelDirectory(base_path));
     }
     if (InitGPU() != Core::ExitSuccess) {
         return Core::ExitFailure;
