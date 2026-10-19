@@ -645,7 +645,7 @@ TEST_CASE("The transformer steps 34 V down to about half, and the bridge and cap
     CHECK(PeakOf(primary->Values) > 1.0);
 }
 
-TEST_CASE("The SR latch is set at the start, and reported as having no state to start from when both inputs idle",
+TEST_CASE("The SR latch is set at the start, and with both inputs idle has no operating point but powers up",
           "[examples]") {
     SKIP_WITHOUT_DIGITAL_MODELS();
     GUI::Schematic schematic;
@@ -681,6 +681,16 @@ TEST_CASE("The SR latch is set at the start, and reported as having no state to 
     const Core::OperatingPointRun idle = Core::RunOperatingPoint(schematic.BuildCircuit());
     REQUIRE_FALSE(idle.Result.has_value());
     CHECK(idle.Result.error().find("needs one input at a defined level") != std::string::npos);
+
+    // A transient starts the idle latch from 0 V instead, and it settles into one of its two states
+    const Core::TransientRun power_up =
+        Core::RunTransient(schematic.BuildCircuit(), schematic.GetSimulationSettings().Transient);
+    REQUIRE(power_up.Result.has_value());
+    CHECK(power_up.Result->Warnings.size() == 1);
+    const std::vector<double> &idle_q = power_up.Result->NodeVoltages[NodeAt(schematic, {24, 17})];
+    const std::vector<double> &idle_qn = power_up.Result->NodeVoltages[NodeAt(schematic, {24, 7})];
+    INFO(std::format("Q = {} V, Q bar = {} V at the end", idle_q.back(), idle_qn.back()));
+    CHECK(std::abs(idle_q.back() - idle_qn.back()) > 4.0);
 }
 
 namespace {
@@ -727,6 +737,33 @@ TEST_CASE("The four gates follow their truth tables through the four input combi
         CheckLevel(transient, or_node, times[row], or_expected[row]);
         CheckLevel(transient, nand_node, times[row], !and_expected[row]);
         CheckLevel(transient, xor_node, times[row], xor_expected[row]);
+    }
+}
+
+// ctest runs each test in a process of its own, where ngspice used to let only the first gate follow a DC sweep
+TEST_CASE("Every gate follows a DC sweep of its input, with no transient run before", "[examples]") {
+    SKIP_WITHOUT_DIGITAL_MODELS();
+    GUI::Schematic schematic;
+    OpenExample("logic_gates.imcsim", schematic);
+    Core::DCSweepSettings settings;
+    settings.Swept = {.Source = "Vin1", .Start = 0.0, .Stop = 5.0, .Step = 0.5};
+    const Core::DCSweepRun run = Core::RunDCSweep(schematic.BuildCircuit(), settings);
+    REQUIRE(run.Result.has_value());
+    const Core::DCSweep &sweep = *run.Result;
+    const Core::DCSweepCurve &curve = sweep.Curves.front();
+    const std::size_t or_node = NodeAt(schematic, {31, 14});
+    const std::size_t xor_node = NodeAt(schematic, {31, 30});
+    // B stays at the 0 V of its pulse, so OR and XOR follow A: low below 1.5 V and high from 3.5 V
+    for (std::size_t index = 0; index < sweep.SweptValues.size(); ++index) {
+        const double input = sweep.SweptValues[index];
+        INFO(std::format("Vin1 = {} V", input));
+        if (input <= 1.5) {
+            CHECK(curve.NodeVoltages[or_node][index] < 0.1);
+            CHECK(curve.NodeVoltages[xor_node][index] < 0.1);
+        } else if (input >= 3.5) {
+            CHECK(curve.NodeVoltages[or_node][index] > 4.0);
+            CHECK(curve.NodeVoltages[xor_node][index] > 4.0);
+        }
     }
 }
 

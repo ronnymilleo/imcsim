@@ -9,6 +9,7 @@ add_executable(imcsim-tests
             analysis_suggestions_tests.cpp
             circuit_snapshot_tests.cpp
             clipboard_tests.cpp
+            code_models.cpp
             circuit_tests.cpp
             component_tests.cpp
             connectivity_tests.cpp

@@ -11,6 +11,11 @@ Visual Studio, which Microsoft does not allow redistributing, and libsndfile and
 `sndprint` command and voltage sources read from WAV files use, neither of them part of imcsim. This build loads
 none of them: only DLLs of Windows, and its C runtime is linked statically.
 
+`bin/digital.cm` holds the digital code models the logic gates and flip-flops run on, built by the `digital` project
+of the same sources (as `digital64.cm`, after the `cmpp` tool that generates its C files). The build copies it next
+to the program, where ngspice looks for a code model given by a relative name, and the program loads it when ngspice
+starts.
+
 ngspice keeps its modified BSD license, in `licenses/`.
 
 To update ngspice, set the new version and the SHA-256 of its source archive in `build.ps1`, run it from a

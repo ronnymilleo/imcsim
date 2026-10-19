@@ -17,7 +17,7 @@ makedepends=('cmake' 'git' 'ninja' 'pkgconf'
              'libxkbcommon' 'wayland' 'wayland-protocols' 'libdecor' 'mesa')
 optdepends=('vulkan-driver: Vulkan support for your GPU')
 # The release tarball lacks the submodules in vendor/, so the repository and each submodule are cloned
-source=("$pkgname::git+$url.git#tag=v$pkgver".6
+source=("$pkgname::git+$url.git#tag=v$pkgver"
         'SDL::git+https://github.com/libsdl-org/SDL.git'
         'imgui::git+https://github.com/ocornut/imgui.git'
         'implot::git+https://github.com/epezent/implot.git'

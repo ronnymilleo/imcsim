@@ -109,13 +109,27 @@ bool AskForDigitalModels() {
                                [](const SimulatorMessage &message) { return message.Text.starts_with("d_and"); });
 }
 
+// The codemodel command keeps quotes as part of the file name and splits it at spaces, so the library is named
+// relative to its folder, made the working directory for the call; on Windows ngspice resolves a relative name
+// against the program's folder instead, which is where the Windows build keeps it
+void LoadLibraryFrom(const std::filesystem::path &directory) {
+    std::error_code error;
+    const std::filesystem::path previous = std::filesystem::current_path(error);
+    std::filesystem::current_path(directory, error);
+    if (error) {
+        return;
+    }
+    SendCommand("codemodel ./digital.cm");
+    std::filesystem::current_path(previous, error);
+}
+
 // A system ngspice loads digital.cm through its spinit file, and loading it a second time crashes ngspice, so the
 // copy shipped with the program is loaded only when the digital models are missing
 void LoadDigitalModels() {
-    const std::filesystem::path library = GetState().CodeModelDirectory / "digital.cm";
+    const std::filesystem::path &directory = GetState().CodeModelDirectory;
     std::error_code error;
-    if (!AskForDigitalModels() && !GetState().CodeModelDirectory.empty() && std::filesystem::exists(library, error)) {
-        SendCommand(std::format("codemodel \"{}\"", library.string()));
+    if (!AskForDigitalModels() && !directory.empty() && std::filesystem::exists(directory / "digital.cm", error)) {
+        LoadLibraryFrom(directory);
     }
     GetState().HasDigitalModels = AskForDigitalModels();
 }
@@ -173,8 +187,8 @@ std::string DescribeFailure(const Circuit &circuit, const std::vector<SimulatorM
         }
         // A latch with both inputs idle has no state to start from, so the digital loop never settles
         if (NeverSettled(messages)) {
-            return "The logic parts never settle; a loop such as a latch needs one input at a defined level when the "
-                   "simulation starts";
+            return "The logic parts never settle; a loop such as a latch needs one input at a defined level to have "
+                   "an operating point, while a transient starts it from 0 V";
         }
     }
     return "ngspice could not simulate the circuit; see its output for details";
@@ -1122,6 +1136,17 @@ std::expected<ParameterCircuit, std::string> ApplyParameter(const Circuit &circu
     return applied;
 }
 
+// A DC sweep keeps the swept value in the simulation time, and the event-driven code of ngspice stops calling the
+// logic inputs, after the first one, at any time past a breakpoint that only a transient raises (to 1e30) and that
+// starts at 0 in a new process: only one gate would follow the sweep. A transient of a circuit with no code model
+// raises it and leaves it there
+void RaiseEventBreakpoint() {
+    LoadCircuit("* event breakpoint\nV1 1 0 0\nR1 1 0 1\n.tran 1n 1n\n.end");
+    SendCommand("run");
+    SendCommand("destroy all");
+    SendCommand("remcirc");
+}
+
 // Runs one analysis on a clean library. Return codes stay 0 even when the netlist is rejected, so success is
 // told by the plot the run created, whose name starts with the analysis (op1, tran1, ac1)
 template <typename Data, typename Reader>
@@ -1177,7 +1202,8 @@ OperatingPointRun RunOperatingPoint(const Circuit &circuit) {
  *                      circuit as it is.
  * @return  The voltages at every time point or an error, plus every line ngspice printed. Invalid settings
  *          are rejected before reaching ngspice.
- * @note    Not thread-safe: ngspice is a single global library instance.
+ * @note    Logic parts that never settle into an operating point, such as a latch with both inputs idle, start from
+ *          0 V instead, with a warning in the result. Not thread-safe: ngspice is a single global library instance.
  */
 TransientRun RunTransient(const Circuit &circuit, const TransientSettings &settings,
                           const std::optional<ParameterValue> &parameter) {
@@ -1194,8 +1220,21 @@ TransientRun RunTransient(const Circuit &circuit, const TransientSettings &setti
     }
     const std::string analysis = std::format("{}.tran {} {}", applied->Card, FormatSpiceValue(settings.TimeStep),
                                              FormatSpiceValue(settings.StopTime));
-    return Simulate<Transient>(applied->Simulated, analysis, "tran",
-                               [&applied] { return ReadTransient(applied->Simulated); });
+    const auto read_result = [&applied] { return ReadTransient(applied->Simulated); };
+    TransientRun run = Simulate<Transient>(applied->Simulated, analysis, "tran", read_result);
+    if (run.Result || !HasLogicPart(applied->Simulated) || !NeverSettled(run.Messages)) {
+        return run;
+    }
+    // A logic loop with no state to start from, such as a latch with both inputs idle, has no operating point, so
+    // the run starts from 0 V (uic), as a circuit does at power-up, and the loop settles into one state on its way
+    TransientRun from_zero = Simulate<Transient>(applied->Simulated, analysis + " uic", "tran", read_result);
+    if (from_zero.Result) {
+        from_zero.Result->Warnings.emplace_back(
+            "The logic parts had no state to start from, so the transient starts with every node at 0 V instead of "
+            "the operating point, and loops such as latches pick their state as they would at power-up");
+    }
+    from_zero.Messages.insert(from_zero.Messages.begin(), run.Messages.begin(), run.Messages.end());
+    return from_zero;
 }
 
 /**
@@ -1255,6 +1294,9 @@ DCSweepRun RunDCSweep(const Circuit &circuit, const DCSweepSettings &settings,
     std::string analysis = std::format("{}.dc {}", applied->Card, FormatSweepRange(settings.Swept));
     if (settings.Stepped) {
         analysis += std::format(" {}", FormatSweepRange(*settings.Stepped));
+    }
+    if (HasLogicPart(applied->Simulated) && EnsureInitialized()) {
+        RaiseEventBreakpoint();
     }
     return Simulate<DCSweep>(applied->Simulated, analysis, "dc",
                              [&applied, &settings] { return ReadDCSweep(applied->Simulated, settings); });

@@ -118,14 +118,16 @@ reports a negative current.
 - The digital nodes inside a part are not shown. Only the outputs, which are analog voltages, appear in the plots and
   can be probed, so a logic signal is a trace that swings between 0 V and the logic level. The transient plot of the Output window
   stacks them as lanes.
-- The parts need the `digital.cm` code model library of ngspice. A system ngspice loads it by itself; a build that
-  ships it next to the program is loaded from there. Without it, simulating a circuit with a logic part stops with a
-  message.
-- A loop that holds two states, such as a latch, has no state to start from while both of its inputs are idle: ngspice
-  gives up with "Too many analog/event-driven solution alternations", which imcsim reports as a message. Start with
-  one input asserted, as the SR latch example does with its S input.
+- The parts need the `digital.cm` code model library of ngspice. The Windows zip, the macOS app and the AppImage carry
+  it, and a system ngspice loads its own. Without it, simulating a circuit with a logic part stops with a message.
+- A loop that holds two states, such as a latch, has no state to start from while both of its inputs are idle, so it
+  has no operating point: ngspice gives up with "Too many analog/event-driven solution alternations", which imcsim
+  reports as a message. A transient then starts from 0 V on every node instead of the operating point, as a circuit
+  does at power-up, and says so with a warning: the loop toggles for a moment and settles into the state that small
+  differences in its loads favor. To start it in a known state, assert one input at first, as the SR latch example
+  does with its S input.
 - Delays are fixed per part: there is no spread between the rise and fall delays, no setup or hold time, and no
-  metastability. Operating point and DC sweep results read the digital outputs as they settle, and an AC sweep treats
+  metastability from violating them. Operating point and DC sweep results read the digital outputs as they settle, and an AC sweep treats
   them as constants.
 
 ## Independent sources
