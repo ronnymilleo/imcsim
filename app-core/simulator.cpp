@@ -1136,6 +1136,17 @@ std::expected<ParameterCircuit, std::string> ApplyParameter(const Circuit &circu
     return applied;
 }
 
+// A DC sweep keeps the swept value in the simulation time, and the event-driven code of ngspice stops calling the
+// logic inputs, after the first one, at any time past a breakpoint that only a transient raises (to 1e30) and that
+// starts at 0 in a new process: only one gate would follow the sweep. A transient of a circuit with no code model
+// raises it and leaves it there
+void RaiseEventBreakpoint() {
+    LoadCircuit("* event breakpoint\nV1 1 0 0\nR1 1 0 1\n.tran 1n 1n\n.end");
+    SendCommand("run");
+    SendCommand("destroy all");
+    SendCommand("remcirc");
+}
+
 // Runs one analysis on a clean library. Return codes stay 0 even when the netlist is rejected, so success is
 // told by the plot the run created, whose name starts with the analysis (op1, tran1, ac1)
 template <typename Data, typename Reader>
@@ -1269,6 +1280,9 @@ DCSweepRun RunDCSweep(const Circuit &circuit, const DCSweepSettings &settings,
     std::string analysis = std::format("{}.dc {}", applied->Card, FormatSweepRange(settings.Swept));
     if (settings.Stepped) {
         analysis += std::format(" {}", FormatSweepRange(*settings.Stepped));
+    }
+    if (HasLogicPart(applied->Simulated) && EnsureInitialized()) {
+        RaiseEventBreakpoint();
     }
     return Simulate<DCSweep>(applied->Simulated, analysis, "dc",
                              [&applied, &settings] { return ReadDCSweep(applied->Simulated, settings); });

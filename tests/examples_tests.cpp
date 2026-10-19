@@ -730,6 +730,33 @@ TEST_CASE("The four gates follow their truth tables through the four input combi
     }
 }
 
+// ctest runs each test in a process of its own, where ngspice used to let only the first gate follow a DC sweep
+TEST_CASE("Every gate follows a DC sweep of its input, with no transient run before", "[examples]") {
+    SKIP_WITHOUT_DIGITAL_MODELS();
+    GUI::Schematic schematic;
+    OpenExample("logic_gates.imcsim", schematic);
+    Core::DCSweepSettings settings;
+    settings.Swept = {.Source = "Vin1", .Start = 0.0, .Stop = 5.0, .Step = 0.5};
+    const Core::DCSweepRun run = Core::RunDCSweep(schematic.BuildCircuit(), settings);
+    REQUIRE(run.Result.has_value());
+    const Core::DCSweep &sweep = *run.Result;
+    const Core::DCSweepCurve &curve = sweep.Curves.front();
+    const std::size_t or_node = NodeAt(schematic, {31, 14});
+    const std::size_t xor_node = NodeAt(schematic, {31, 30});
+    // B stays at the 0 V of its pulse, so OR and XOR follow A: low below 1.5 V and high from 3.5 V
+    for (std::size_t index = 0; index < sweep.SweptValues.size(); ++index) {
+        const double input = sweep.SweptValues[index];
+        INFO(std::format("Vin1 = {} V", input));
+        if (input <= 1.5) {
+            CHECK(curve.NodeVoltages[or_node][index] < 0.1);
+            CHECK(curve.NodeVoltages[xor_node][index] < 0.1);
+        } else if (input >= 3.5) {
+            CHECK(curve.NodeVoltages[or_node][index] > 4.0);
+            CHECK(curve.NodeVoltages[xor_node][index] > 4.0);
+        }
+    }
+}
+
 TEST_CASE("The half adder adds two bits: XOR is the sum and AND the carry", "[examples]") {
     SKIP_WITHOUT_DIGITAL_MODELS();
     GUI::Schematic schematic;
