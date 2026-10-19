@@ -645,7 +645,7 @@ TEST_CASE("The transformer steps 34 V down to about half, and the bridge and cap
     CHECK(PeakOf(primary->Values) > 1.0);
 }
 
-TEST_CASE("The SR latch is set at the start, and reported as having no state to start from when both inputs idle",
+TEST_CASE("The SR latch is set at the start, and with both inputs idle has no operating point but powers up",
           "[examples]") {
     SKIP_WITHOUT_DIGITAL_MODELS();
     GUI::Schematic schematic;
@@ -681,6 +681,16 @@ TEST_CASE("The SR latch is set at the start, and reported as having no state to 
     const Core::OperatingPointRun idle = Core::RunOperatingPoint(schematic.BuildCircuit());
     REQUIRE_FALSE(idle.Result.has_value());
     CHECK(idle.Result.error().find("needs one input at a defined level") != std::string::npos);
+
+    // A transient starts the idle latch from 0 V instead, and it settles into one of its two states
+    const Core::TransientRun power_up =
+        Core::RunTransient(schematic.BuildCircuit(), schematic.GetSimulationSettings().Transient);
+    REQUIRE(power_up.Result.has_value());
+    CHECK(power_up.Result->Warnings.size() == 1);
+    const std::vector<double> &idle_q = power_up.Result->NodeVoltages[NodeAt(schematic, {24, 17})];
+    const std::vector<double> &idle_qn = power_up.Result->NodeVoltages[NodeAt(schematic, {24, 7})];
+    INFO(std::format("Q = {} V, Q bar = {} V at the end", idle_q.back(), idle_qn.back()));
+    CHECK(std::abs(idle_q.back() - idle_qn.back()) > 4.0);
 }
 
 namespace {

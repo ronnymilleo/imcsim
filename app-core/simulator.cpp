@@ -187,8 +187,8 @@ std::string DescribeFailure(const Circuit &circuit, const std::vector<SimulatorM
         }
         // A latch with both inputs idle has no state to start from, so the digital loop never settles
         if (NeverSettled(messages)) {
-            return "The logic parts never settle; a loop such as a latch needs one input at a defined level when the "
-                   "simulation starts";
+            return "The logic parts never settle; a loop such as a latch needs one input at a defined level to have "
+                   "an operating point, while a transient starts it from 0 V";
         }
     }
     return "ngspice could not simulate the circuit; see its output for details";
@@ -1202,7 +1202,8 @@ OperatingPointRun RunOperatingPoint(const Circuit &circuit) {
  *                      circuit as it is.
  * @return  The voltages at every time point or an error, plus every line ngspice printed. Invalid settings
  *          are rejected before reaching ngspice.
- * @note    Not thread-safe: ngspice is a single global library instance.
+ * @note    Logic parts that never settle into an operating point, such as a latch with both inputs idle, start from
+ *          0 V instead, with a warning in the result. Not thread-safe: ngspice is a single global library instance.
  */
 TransientRun RunTransient(const Circuit &circuit, const TransientSettings &settings,
                           const std::optional<ParameterValue> &parameter) {
@@ -1219,8 +1220,21 @@ TransientRun RunTransient(const Circuit &circuit, const TransientSettings &setti
     }
     const std::string analysis = std::format("{}.tran {} {}", applied->Card, FormatSpiceValue(settings.TimeStep),
                                              FormatSpiceValue(settings.StopTime));
-    return Simulate<Transient>(applied->Simulated, analysis, "tran",
-                               [&applied] { return ReadTransient(applied->Simulated); });
+    const auto read_result = [&applied] { return ReadTransient(applied->Simulated); };
+    TransientRun run = Simulate<Transient>(applied->Simulated, analysis, "tran", read_result);
+    if (run.Result || !HasLogicPart(applied->Simulated) || !NeverSettled(run.Messages)) {
+        return run;
+    }
+    // A logic loop with no state to start from, such as a latch with both inputs idle, has no operating point, so
+    // the run starts from 0 V (uic), as a circuit does at power-up, and the loop settles into one state on its way
+    TransientRun from_zero = Simulate<Transient>(applied->Simulated, analysis + " uic", "tran", read_result);
+    if (from_zero.Result) {
+        from_zero.Result->Warnings.emplace_back(
+            "The logic parts had no state to start from, so the transient starts with every node at 0 V instead of "
+            "the operating point, and loops such as latches pick their state as they would at power-up");
+    }
+    from_zero.Messages.insert(from_zero.Messages.begin(), run.Messages.begin(), run.Messages.end());
+    return from_zero;
 }
 
 /**
