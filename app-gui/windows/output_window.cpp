@@ -9,20 +9,17 @@
 #include "implot.h"
 #include "implot_internal.h"
 #include "logic_trace.h"
-#include "misc/cpp/imgui_stdlib.h"
 #include "node_colors.h"
+#include "plot_figures.h"
 #include "plot_helpers.h"
 #include "probing.h"
-#include "schematic_file.h"
 #include "spice_value.h"
 #include "theme.h"
 #include "trace_statistics.h"
 #include "value_field.h"
 #include <algorithm>
-#include <array>
 #include <cmath>
 #include <cstdio>
-#include <filesystem>
 #include <format>
 #include <limits>
 #include <string>
@@ -56,13 +53,7 @@ constexpr ImU32 CursorAColor = IM_COL32(255, 199, 77, 255);
 constexpr ImU32 CursorBColor = IM_COL32(115, 204, 255, 255);
 // The instant of the transient shown on the schematic
 constexpr ImU32 PlayheadColor = IM_COL32(255, 96, 96, 255);
-// Math channels take their own colors, apart from those of nodes and currents, and a heavier line
-constexpr auto MathColors = std::to_array<ImU32>({
-    IM_COL32(230, 110, 230, 255),
-    IM_COL32(150, 230, 90, 255),
-    IM_COL32(235, 235, 235, 255),
-    IM_COL32(90, 220, 190, 255),
-});
+// Math channels are drawn with a heavier line than the traces they come from
 constexpr float MathLineWeight = 2.0f;
 // The plot of logic lanes: its height is a margin for the axis and a row per lane, in font sizes, and at most this
 // share of the room
@@ -72,29 +63,10 @@ constexpr float MaxLaneShare = 0.6f;
 // Bit labels: the room around the digit, in font sizes, and the corner rounding of its box
 constexpr float BitBoxPadding = 0.25f;
 constexpr float BitBoxRounding = 3.0f;
-// The share of the time an export shows that a cell needs for its bit label
-constexpr double MinBitLabelShare = 0.03;
-// Room above and below the stack of lanes, in lane units
-constexpr double LaneMargin = 0.3;
-// Widths in the math editor, in font sizes
-constexpr float OperandWidth = 10.0f;
-constexpr float ExpressionWidth = 20.0f;
-constexpr auto MathOperators = std::to_array<MathOperator>({
-    MathOperator::Add,
-    MathOperator::Subtract,
-    MathOperator::Multiply,
-    MathOperator::Divide,
-});
 constexpr const char *ExportLabel = "Export...";
 // A new result starts with empty plots until the user picks what to measure
 constexpr const char *NothingMeasured =
     "Nothing is measured yet: pick nodes and parts with Probe in the editor, or check traces in the list";
-constexpr const char *ExportPopup = "export";
-constexpr const char *ExportErrorPopup = "Could not export the plot";
-// Width of the size fields of the export popup, in font sizes
-constexpr float ExportSizeWidth = 7.0f;
-constexpr std::array<SDL_DialogFileFilter, 1> SVGFilters = {{{"SVG image", "svg"}}};
-constexpr std::array<SDL_DialogFileFilter, 1> CSVFilters = {{{"CSV table", "csv"}}};
 // The harmonics the spectrum measures, and how many the plot shows when it fits: a linear axis spans them, plus one
 // harmonic of room, from 0 Hz
 constexpr int HighestHarmonic = 10;
@@ -104,16 +76,8 @@ constexpr double MinShownDistortionPercent = 0.001;
 constexpr float OtherStepAlpha = 0.35f;
 // Samples on each side of a step label over which the curves must stay apart
 constexpr std::size_t SteadySamples = 2;
-// Spread between the curves of a family, against their size, below which they count as one and get no labels
-constexpr double NegligibleSpread = 1e-6;
-// Below a femtovolt or a femtoampere a value is the rounding residue of the solver, such as 1e-170 V for a node at 0 V
-constexpr double ResidueLevel = 1e-15;
-// The input-referred noise takes a color of its own, apart from the node colors the output uses
-constexpr ImU32 InputNoiseColor = IM_COL32(150, 230, 90, 255);
 // Six decades below the largest density, about where the share of a part stops mattering
 constexpr double DecadeFitFloor = 1e-6;
-// Gain from the input source to the output below which the input-referred noise is left out: -120 dB
-constexpr double MinInputGain = 1e-6;
 // The first bins above 0 Hz, where the Hann window spreads the mean
 constexpr std::ptrdiff_t SpectrumSkirtBins = 2;
 
@@ -222,12 +186,6 @@ void PlotCurrents(const std::vector<double> &xs, const std::vector<Core::Compone
     ImPlot::SetAxes(ImAxis_X1, ImAxis_Y1);
 }
 
-bool HasMeasuredCurrent(const std::vector<Core::ComponentTrace> &currents, const Schematic &schematic) {
-    return std::ranges::any_of(currents, [&schematic](const Core::ComponentTrace &current) {
-        return schematic.IsCurrentMeasured(current.Name);
-    });
-}
-
 bool HasMeasuredVoltage(const std::size_t node_count, const Schematic &schematic) {
     for (std::size_t node = 1; node < node_count; ++node) {
         if (schematic.IsVoltageMeasured(static_cast<int>(node))) {
@@ -264,76 +222,6 @@ void DrawCursorReadout(const std::vector<double> &xs, const char *x_unit, const 
         ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(trace.Color), "%s", text.c_str());
     }
     ImGui::EndTooltip();
-}
-
-// Whether the curves of a family differ at a sample by more than residue next to their size, so labeling each one
-// tells something; a trace the stepped value leaves unchanged would only pile its labels up on one line
-bool CurvesDiffer(const std::vector<const std::vector<double> *> &curves, const std::size_t sample) {
-    double largest = 0.0;
-    double lowest = std::numeric_limits<double>::infinity();
-    double highest = -std::numeric_limits<double>::infinity();
-    for (const std::vector<double> *curve : curves) {
-        for (const double value : *curve) {
-            if (std::isfinite(value)) {
-                largest = std::max(largest, std::abs(value));
-            }
-        }
-        if (sample < curve->size() && std::isfinite((*curve)[sample])) {
-            lowest = std::min(lowest, (*curve)[sample]);
-            highest = std::max(highest, (*curve)[sample]);
-        }
-    }
-    return highest > lowest && highest - lowest > std::max(largest * NegligibleSpread, ResidueLevel);
-}
-
-/**
- * @struct  CurveFamily
- * @brief   The curves of one trace across the steps of a DC sweep, and the axis they are plotted on.
- */
-struct CurveFamily {
-    ImAxis Axis;
-    std::vector<const std::vector<double> *> Curves;
-};
-
-// Every shown trace of a stepped DC sweep, with one curve per step
-std::vector<CurveFamily> ListCurveFamilies(const Core::DCSweep &sweep, const Schematic &schematic,
-                                           const bool show_currents, const std::vector<std::vector<MathTrace>> &math) {
-    std::vector<CurveFamily> families;
-    const Core::DCSweepCurve &first_curve = sweep.Curves.front();
-    for (std::size_t node = 1; node < first_curve.NodeVoltages.size(); ++node) {
-        if (!schematic.IsVoltageMeasured(static_cast<int>(node))) {
-            continue;
-        }
-        CurveFamily family{.Axis = ImAxis_Y1, .Curves = {}};
-        for (const Core::DCSweepCurve &curve : sweep.Curves) {
-            family.Curves.push_back(&curve.NodeVoltages[node]);
-        }
-        families.push_back(std::move(family));
-    }
-    for (std::size_t current = 0; show_currents && current < first_curve.Currents.size(); ++current) {
-        if (!schematic.IsCurrentMeasured(first_curve.Currents[current].Name)) {
-            continue;
-        }
-        CurveFamily family{.Axis = ImAxis_Y2, .Curves = {}};
-        for (const Core::DCSweepCurve &curve : sweep.Curves) {
-            family.Curves.push_back(&curve.Currents[current].Values);
-        }
-        families.push_back(std::move(family));
-    }
-    // Every curve evaluates the same channels, so the traces of one channel share an index across curves
-    const std::size_t math_count = math.size() == sweep.Curves.size() ? math.front().size() : 0;
-    for (std::size_t trace = 0; trace < math_count; ++trace) {
-        CurveFamily family{.Axis = math.front()[trace].Axis, .Curves = {}};
-        for (const std::vector<MathTrace> &curve_math : math) {
-            if (trace < curve_math.size()) {
-                family.Curves.push_back(&curve_math[trace].Values);
-            }
-        }
-        if (family.Curves.size() == sweep.Curves.size()) {
-            families.push_back(std::move(family));
-        }
-    }
-    return families;
 }
 
 /**
@@ -538,10 +426,6 @@ template <typename Result> std::vector<std::string> ListStepLabels(const StepFam
     return labels;
 }
 
-std::string FormatStepLabel(const Core::DCSweep &sweep, const Core::DCSweepCurve &curve) {
-    return std::format("{}={}{}", sweep.SteppedSource, Core::FormatValue(curve.StepValue), sweep.SteppedUnit);
-}
-
 // Labels every curve of each shown trace with the value of the stepped source, so the curves of a family tell
 // apart. The labels of a trace go where its curves are furthest apart, which is the end for most traces but the
 // peak for a derivative, whose curves all end near zero. Each label sits on the axis of its curve
@@ -608,14 +492,6 @@ std::vector<LogicNode> ListMeasuredLogicNodes(const std::vector<LogicNode> &logi
     return measured;
 }
 
-std::vector<int> ListNodes(const std::vector<LogicNode> &lanes) {
-    std::vector<int> nodes;
-    for (const LogicNode &lane : lanes) {
-        nodes.push_back(lane.Node);
-    }
-    return nodes;
-}
-
 // Measured currents of a result, in result order; empty when the plot shows no current axis
 std::vector<std::string> ListMeasuredCurrents(const std::vector<Core::ComponentTrace> &currents,
                                               const Schematic &schematic) {
@@ -626,15 +502,6 @@ std::vector<std::string> ListMeasuredCurrents(const std::vector<Core::ComponentT
         }
     }
     return names;
-}
-
-// Returns whether the axis of some traces must fit because the measured ones changed: a new trace could otherwise
-// sit far off the scale of the old ones, and a new axis has no meaningful range yet. Removing every trace fits
-// nothing, since there is nothing left to fit to
-template <typename Key> bool TakeTracesChanged(std::vector<Key> &shown, std::vector<Key> measured) {
-    const bool changed = measured != shown;
-    shown = std::move(measured);
-    return changed && !shown.empty();
 }
 
 // Fits every axis for a new result; otherwise only the axes whose traces changed, so the zoom of the others stays.
@@ -650,11 +517,6 @@ void SetNextFits(const bool new_result, const bool voltages_changed, const bool 
     if (currents_changed) {
         ImPlot::SetNextAxisToFit(ImAxis_Y2);
     }
-}
-
-// Returns whether the axes must fit, which is the case once for every new result
-bool TakeFit(std::optional<std::size_t> &fitted_version, const std::size_t version) {
-    return std::exchange(fitted_version, version) != version;
 }
 
 // Toggles every trace of a section at once; the ID keeps the buttons of each section apart. Returns the new state
@@ -793,44 +655,6 @@ void DrawWithStatistics(const DrawPlots &draw_plots, const DrawStatistics &draw_
     ImGui::EndChild();
 }
 
-// Voltages and currents share the axes of the probed traces; any other unit, or none, goes on the third axis
-ImAxis AxisForUnit(const Dimension unit) {
-    if (unit == Dimension{.Volts = 1}) {
-        return ImAxis_Y1;
-    }
-    if (unit == Dimension{.Amperes = 1}) {
-        return ImAxis_Y2;
-    }
-    return ImAxis_Y3;
-}
-
-bool UsesAxis(const std::vector<MathTrace> &math, const ImAxis axis) {
-    return std::ranges::contains(math, axis, &MathTrace::Axis);
-}
-
-// Unit of the third axis: the one its traces share, or none when they differ or have none
-std::string ThirdAxisUnit(const std::vector<MathTrace> &math) {
-    std::optional<std::string> unit;
-    for (const MathTrace &trace : math) {
-        if (trace.Axis != ImAxis_Y3) {
-            continue;
-        }
-        if (unit && *unit != trace.Unit) {
-            return "";
-        }
-        unit = trace.Unit;
-    }
-    return unit.value_or("");
-}
-
-std::vector<std::string> ListMathLabels(const std::vector<MathTrace> &math) {
-    std::vector<std::string> labels;
-    for (const MathTrace &trace : math) {
-        labels.push_back(trace.Label + trace.Unit);
-    }
-    return labels;
-}
-
 // The current axis may already be set up for probed currents; the third axis is labeled with its unit, which
 // must outlive the plot because ImPlot formats the ticks when it ends
 void SetupMathAxes(const std::vector<MathTrace> &math, const bool current_axis_ready, const std::string &third_unit) {
@@ -874,33 +698,6 @@ void DrawMathErrors(const std::vector<std::string> &errors) {
     }
 }
 
-std::string GetChannelExpression(const MathChannel &channel) {
-    if (channel.UsesExpression) {
-        return channel.Expression;
-    }
-    return BuildOperatorExpression(channel.First, channel.Operator, channel.Second);
-}
-
-void CompileChannel(MathChannel &channel) {
-    channel.Program = CompileExpression(GetChannelExpression(channel));
-}
-
-// Returns whether the user picked another trace
-bool DrawOperandCombo(const char *id, std::string &operand, const std::vector<std::string> &operands) {
-    bool changed = false;
-    ImGui::SetNextItemWidth(ImGui::GetFontSize() * OperandWidth);
-    if (ImGui::BeginCombo(id, operand.empty() ? "(none)" : operand.c_str())) {
-        for (const std::string &candidate : operands) {
-            if (ImGui::Selectable(candidate.c_str(), candidate == operand)) {
-                operand = candidate;
-                changed = true;
-            }
-        }
-        ImGui::EndCombo();
-    }
-    return changed;
-}
-
 // Like ImGui::BeginTabBar(), but the bar and the line under it stop short of the right edge by the given width,
 // leaving room for a button there. Mirrors BeginTabBar() in imgui_widgets.cpp, which takes no width
 bool BeginTabBarBefore(const char *id, const float reserved_width) {
@@ -918,157 +715,6 @@ bool BeginTabBarBefore(const char *id, const float reserved_width) {
     tab_bar->SeparatorMinX = bounds.Min.x - IM_TRUNC(window->WindowPadding.x * 0.5f);
     tab_bar->SeparatorMaxX = bounds.Max.x;
     return ImGui::BeginTabBarEx(tab_bar, bounds, ImGuiTabBarFlags_IsFocused);
-}
-
-ExportColor ToExportColor(const ImU32 color) {
-    return {static_cast<std::uint8_t>((color >> IM_COL32_R_SHIFT) & 0xFF),
-            static_cast<std::uint8_t>((color >> IM_COL32_G_SHIFT) & 0xFF),
-            static_cast<std::uint8_t>((color >> IM_COL32_B_SHIFT) & 0xFF)};
-}
-
-/**
- * @struct  ExportAxes
- * @brief   How the voltage, current and third axes of a plot are described in an exported figure.
- */
-struct ExportAxes {
-    ExportAxis Voltage;
-    ExportAxis Current;
-    ExportAxis Third;
-};
-
-ExportAxes GetLinearExportAxes(const std::string &third_unit) {
-    return {.Voltage = {.Name = "Voltage", .Unit = "V"},
-            .Current = {.Name = "Current", .Unit = "A"},
-            .Third = {.Name = third_unit.empty() ? "Math" : third_unit, .Unit = third_unit}};
-}
-
-/**
- * @class   PanelBuilder
- * @brief   Fills an exported panel, adding each Y axis the first time a trace is plotted on it.
- * @details The axes keep the order in which traces first need them, so the first one, drawn on the left, is the
- *          voltage axis whenever a voltage is shown.
- */
-class PanelBuilder {
-public:
-    PanelBuilder(std::string title, ExportAxes axes) : m_Axes(std::move(axes)) { m_Panel.Title = std::move(title); }
-
-    std::size_t UseAxis(const ImAxis axis) {
-        const auto found = std::ranges::find(m_UsedAxes, axis);
-        if (found != m_UsedAxes.end()) {
-            return static_cast<std::size_t>(found - m_UsedAxes.begin());
-        }
-        m_UsedAxes.push_back(axis);
-        m_Panel.YAxes.push_back(axis == ImAxis_Y1 ? m_Axes.Voltage : axis == ImAxis_Y2 ? m_Axes.Current : m_Axes.Third);
-        return m_UsedAxes.size() - 1;
-    }
-
-    void Add(ExportSeries series, const ImAxis axis) {
-        series.Axis = UseAxis(axis);
-        m_Panel.Series.push_back(std::move(series));
-    }
-
-    void AddNote(ExportNote note, const ImAxis axis) {
-        note.Axis = UseAxis(axis);
-        m_Panel.Notes.push_back(std::move(note));
-    }
-
-    ExportPanel Take() { return std::move(m_Panel); }
-
-private:
-    ExportPanel m_Panel;
-    ExportAxes m_Axes;
-    std::vector<ImAxis> m_UsedAxes;
-};
-
-// Adds the measured voltages and currents of a result, as the plots draw them. The suffix tells the curves of a
-// DC sweep family apart in the CSV headers; only the first curve of a family has a legend entry
-void AddExportTraces(PanelBuilder &builder, const std::vector<std::vector<double>> &node_values,
-                     const std::vector<Core::ComponentTrace> &currents, Schematic &schematic, const std::string &suffix,
-                     const bool in_legend, const std::vector<int> &excluded = {}) {
-    for (std::size_t node = 1; node < node_values.size(); ++node) {
-        if (!schematic.IsVoltageMeasured(static_cast<int>(node)) ||
-            std::ranges::contains(excluded, static_cast<int>(node))) {
-            continue;
-        }
-        const std::string label = GetVoltageLabel(schematic.GetConnectivity(), static_cast<int>(node));
-        builder.Add({.Name = label + suffix,
-                     .LegendLabel = in_legend ? label : "",
-                     .Values = node_values[node],
-                     .Color = ToExportColor(GetNodeColor(static_cast<int>(node)))},
-                    ImAxis_Y1);
-    }
-    for (std::size_t index = 0; index < currents.size(); ++index) {
-        if (!schematic.IsCurrentMeasured(currents[index].Name)) {
-            continue;
-        }
-        const std::string label = std::format("I({})", currents[index].Name);
-        builder.Add({.Name = label + suffix,
-                     .LegendLabel = in_legend ? label : "",
-                     .Values = currents[index].Values,
-                     .Color = ToExportColor(GetCurrentColor(index)),
-                     .Dashed = true},
-                    ImAxis_Y2);
-    }
-}
-
-// A note for each cell that is wide enough for its label in what the image shows, which has no pixels to measure it
-// with, so a share of the span stands for the width of the box
-void AddBitNotes(ExportPanel &panel, const Core::Transient &transient, const std::vector<LogicNode> &lanes,
-                 const PlotSpan &view) {
-    std::vector<LogicSignal> signals;
-    for (const LogicNode &node : lanes) {
-        signals.push_back({transient.NodeVoltages[static_cast<std::size_t>(node.Node)], node.LogicLevel});
-    }
-    const auto cells = FindBitCells(transient.Times, signals, view.From, view.To);
-    for (std::size_t lane = 0; lane < lanes.size(); ++lane) {
-        const double middle = static_cast<double>(lanes.size() - 1 - lane) * LaneStride + LaneHighOffset / 2.0;
-        for (const LogicSegment &cell : cells[lane]) {
-            const double from = std::max(cell.From, view.From);
-            const double to = std::min(cell.To, view.To);
-            if (to - from >= (view.To - view.From) * MinBitLabelShare) {
-                panel.Notes.push_back(
-                    {.X = (from + to) / 2.0, .Y = middle, .Text = GetLogicStateName(cell.State), .Centered = true});
-            }
-        }
-    }
-}
-
-// The lanes as a panel of their own: each trace is drawn at the height of its lane, and its axis names the lanes,
-// while the CSV lists the voltages. The first lane is on top, as in the plot
-ExportPanel BuildLanePanel(const Core::Transient &transient, const std::vector<LogicNode> &lanes, Schematic &schematic,
-                           const bool bit_values, const PlotSpan &view) {
-    ExportPanel panel;
-    ExportAxis axis{.Name = "", .Unit = "V", .UsesPrefixes = false};
-    for (std::size_t lane = 0; lane < lanes.size(); ++lane) {
-        const std::size_t position = lanes.size() - 1 - lane;
-        const std::string label = GetVoltageLabel(schematic.GetConnectivity(), lanes[lane].Node);
-        const std::vector<double> &voltages = transient.NodeVoltages[static_cast<std::size_t>(lanes[lane].Node)];
-        axis.Ticks.push_back(
-            {.Value = static_cast<double>(position) * LaneStride + LaneHighOffset / 2.0, .Label = label});
-        panel.Series.push_back({.Name = label,
-                                .Values = BuildLane(voltages, lanes[lane].LogicLevel, position),
-                                .Samples = voltages,
-                                .Color = ToExportColor(GetNodeColor(lanes[lane].Node))});
-    }
-    if (bit_values) {
-        AddBitNotes(panel, transient, lanes, view);
-    }
-    axis.Range = ExportRange{.From = LaneLowOffset - LaneMargin,
-                             .To = static_cast<double>(lanes.size() - 1) * LaneStride + LaneHighOffset + LaneMargin};
-    panel.YAxes.push_back(std::move(axis));
-    return panel;
-}
-
-void AddExportMath(PanelBuilder &builder, const std::vector<MathTrace> &math, const std::string &suffix,
-                   const bool in_legend) {
-    for (const MathTrace &trace : math) {
-        builder.Add({.Name = trace.Label + suffix,
-                     .LegendLabel = in_legend ? trace.Label : "",
-                     .Values = trace.Values,
-                     .Color = ToExportColor(trace.Color),
-                     .Heavy = true},
-                    trace.Axis);
-    }
 }
 
 const char *GetTabFileSuffix(const PlotTab tab) {
@@ -1192,17 +838,6 @@ PlotSpan GetDecadeFitRange(const std::vector<std::span<const double>> &traces) {
     return {.From = lowest / std::pow(10.0, padding), .To = highest * std::pow(10.0, padding)};
 }
 
-// Whether the input source reaches the output at all: through a logic gate, or behind an ideal source, the gain is
-// next to nothing and the noise referred to the input grows without meaning
-bool HasInputGain(const Core::Noise &noise) {
-    return noise.InputTotal > 0.0 && noise.OutputTotal >= noise.InputTotal * MinInputGain;
-}
-
-// Densities per root hertz, as noise is written: "V/√Hz" for volts
-std::string GetDensityUnit(const std::string &unit) {
-    return unit + "/√Hz";
-}
-
 std::string FormatFrequencyRange(const Core::Noise &noise) {
     return std::format("{}Hz to {}Hz", Core::FormatValue(noise.Frequencies.front()),
                        Core::FormatValue(noise.Frequencies.back()));
@@ -1243,19 +878,9 @@ void PlotNoiseTraces(const Core::Noise &noise, const Connectivity &connectivity,
     plotted.push_back({input_label, &noise.InputDensities, input_unit.c_str(), input_color});
 }
 
-std::string GetExtension(const ExportFormat format) {
-    return format == ExportFormat::SVG ? ".svg" : ".csv";
-}
-
 // Decibels relative to 1 of the unit of the trace, as spectrum analyzers write dBV
 std::string GetDecibelUnit(const SpectrumTrace &trace) {
     return trace.Unit.empty() ? " dB" : std::format(" dB{}", trace.Unit);
-}
-
-ExportAxes GetSpectrumExportAxes() {
-    return {.Voltage = {.Name = "Voltage (dBV)", .Unit = "dBV", .UsesPrefixes = false},
-            .Current = {.Name = "Current (dBA)", .Unit = "dBA", .UsesPrefixes = false},
-            .Third = {.Name = "Math (dB)", .Unit = "dB", .UsesPrefixes = false}};
 }
 
 // Distortion reads as a percentage with three significant digits, down to the floor the interpolation of the
@@ -1414,8 +1039,8 @@ void OutputWindow::Draw() {
     if (!ImGui::IsWindowAppearing()) {
         SetNewContentMarker(false);
     }
-    ProcessExportDialog();
-    DrawExportError();
+    m_Exporter.Update();
+    m_Exporter.DrawError();
     const std::size_t node_count = GetListedNodeCount();
     const std::vector<Core::ComponentTrace> &currents = GetListedCurrents();
     if (node_count > 1 || !currents.empty()) {
@@ -1475,15 +1100,15 @@ OutputWindow::FrameResults OutputWindow::EvaluateFrame(const std::size_t node_co
                                                        const std::vector<Core::ComponentTrace> &currents) const {
     FrameResults frame;
     if (const auto &transient = m_Schematic.GetTransient()) {
-        frame.TransientMath = EvaluateMath(transient->Times, {.Seconds = 1}, transient->NodeVoltages,
-                                           transient->Currents, frame.TransientErrors);
+        frame.TransientMath = m_MathChannels.Evaluate(transient->Times, {.Seconds = 1}, transient->NodeVoltages,
+                                                      transient->Currents, frame.TransientErrors);
     }
     if (const auto &dc_sweep = m_Schematic.GetDCSweep()) {
         const Dimension swept_unit = dc_sweep->SweptUnit == "A" ? Dimension{.Amperes = 1} : Dimension{.Volts = 1};
         for (const Core::DCSweepCurve &curve : dc_sweep->Curves) {
             std::vector<std::string> curve_errors;
-            frame.DCSweepMath.push_back(
-                EvaluateMath(dc_sweep->SweptValues, swept_unit, curve.NodeVoltages, curve.Currents, curve_errors));
+            frame.DCSweepMath.push_back(m_MathChannels.Evaluate(dc_sweep->SweptValues, swept_unit, curve.NodeVoltages,
+                                                                curve.Currents, curve_errors));
             if (frame.DCSweepMath.size() == 1) {
                 frame.DCSweepErrors = std::move(curve_errors);
             }
@@ -1536,7 +1161,7 @@ void OutputWindow::DrawTraceList(const std::size_t node_count, const std::vector
     for (const Core::ComponentTrace &current : currents) {
         operands.push_back(std::format("I({})", current.Name));
     }
-    DrawMathChannels(operands);
+    m_MathChannels.Draw(operands);
     ImGui::EndChild();
 }
 
@@ -1633,7 +1258,7 @@ void OutputWindow::DrawACSweepTab(const FrameResults &frame) {
                                 frame.AnythingMeasured
                                     ? "Relative to the AC magnitude of the sources: a magnitude of 1 reads as gain"
                                     : NothingMeasured);
-            if (!m_MathChannels.empty()) {
+            if (!m_MathChannels.IsEmpty()) {
                 ImGui::TextDisabled("Math channels are not calculated for AC sweeps yet");
             }
             if (const auto &steps = m_Schematic.GetACSweepSteps()) {
@@ -1693,11 +1318,11 @@ void OutputWindow::DrawTransient(const Core::Transient &transient, const std::ve
     std::vector<std::string> measured_currents = ListMeasuredCurrents(transient.Currents, m_Schematic);
     const bool show_currents = !measured_currents.empty();
     const bool has_analog_plot = has_voltages || show_currents || !math.empty() || lanes.empty();
-    const bool currents_changed = TakeTracesChanged(m_TransientShownCurrents, std::move(measured_currents));
-    const bool voltages_changed = TakeTracesChanged(m_TransientShownNodes, std::move(analog_nodes));
-    const bool new_result = TakeFit(m_FittedTransient, m_Schematic.GetTransientVersion());
+    const bool currents_changed = m_TransientFit.TakeCurrentsChanged(std::move(measured_currents));
+    const bool voltages_changed = m_TransientFit.TakeNodesChanged(std::move(analog_nodes));
+    const bool new_result = m_TransientFit.TakeNewResult(m_Schematic.GetTransientVersion());
     SetNextFits(new_result, voltages_changed, currents_changed);
-    if (TakeTracesChanged(m_TransientShownMath, ListMathLabels(math))) {
+    if (m_TransientFit.TakeMathChanged(ListMathLabels(math))) {
         FitMathAxes(math);
     }
     float analog_height = PlotHeight(1);
@@ -1866,13 +1491,13 @@ void OutputWindow::DrawLogicLanes(const Core::Transient &transient, const std::v
 // their phases follow so each current stays on the same side in both plots. Both plots share their frequency
 // range and cursors, so zooming one zooms the other
 void OutputWindow::DrawACSweep(const Core::ACSweep &sweep) {
-    const bool fit = TakeFit(m_FittedACSweep, m_Schematic.GetACSweepVersion());
+    const bool fit = m_ACSweepFit.TakeNewResult(m_Schematic.GetACSweepVersion());
     const auto &steps = m_Schematic.GetACSweepSteps();
     std::vector<std::string> measured_currents = ListMeasuredCurrents(sweep.CurrentMagnitudesDecibels, m_Schematic);
     const bool show_currents = !measured_currents.empty();
-    const bool currents_changed = TakeTracesChanged(m_ACSweepShownCurrents, std::move(measured_currents));
+    const bool currents_changed = m_ACSweepFit.TakeCurrentsChanged(std::move(measured_currents));
     const bool voltages_changed =
-        TakeTracesChanged(m_ACSweepShownNodes, ListMeasuredNodes(sweep.NodeMagnitudesDecibels.size(), m_Schematic));
+        m_ACSweepFit.TakeNodesChanged(ListMeasuredNodes(sweep.NodeMagnitudesDecibels.size(), m_Schematic));
     const ImPlotAxisFlags voltage_axis_flags =
         VoltageAxisFlags(HasMeasuredVoltage(sweep.NodeMagnitudesDecibels.size(), m_Schematic), show_currents);
     const float height = PlotHeight(2);
@@ -1939,11 +1564,11 @@ void OutputWindow::DrawDCSweep(const Core::DCSweep &sweep, const std::vector<std
     const Core::DCSweepCurve &first_curve = sweep.Curves.front();
     std::vector<std::string> measured_currents = ListMeasuredCurrents(first_curve.Currents, m_Schematic);
     const bool show_currents = !measured_currents.empty();
-    const bool currents_changed = TakeTracesChanged(m_DCSweepShownCurrents, std::move(measured_currents));
+    const bool currents_changed = m_DCSweepFit.TakeCurrentsChanged(std::move(measured_currents));
     const bool voltages_changed =
-        TakeTracesChanged(m_DCSweepShownNodes, ListMeasuredNodes(first_curve.NodeVoltages.size(), m_Schematic));
-    SetNextFits(TakeFit(m_FittedDCSweep, m_Schematic.GetDCSweepVersion()), voltages_changed, currents_changed);
-    if (TakeTracesChanged(m_DCSweepShownMath, ListMathLabels(first_math))) {
+        m_DCSweepFit.TakeNodesChanged(ListMeasuredNodes(first_curve.NodeVoltages.size(), m_Schematic));
+    SetNextFits(m_DCSweepFit.TakeNewResult(m_Schematic.GetDCSweepVersion()), voltages_changed, currents_changed);
+    if (m_DCSweepFit.TakeMathChanged(ListMathLabels(first_math))) {
         FitMathAxes(first_math);
     }
     const bool stepped = !sweep.SteppedSource.empty();
@@ -2024,7 +1649,7 @@ void OutputWindow::DrawNoise(const Core::Noise &noise) {
 // The limits are set during the setup, since ImPlot fits an axis on its own the first frame it is shown
 void OutputWindow::SetupNoiseAxes(const Core::Noise &noise, const bool input_shown, const std::string &output_unit,
                                   const std::string &input_unit) {
-    const bool new_result = TakeFit(m_FittedNoise, m_Schematic.GetNoiseVersion());
+    const bool new_result = m_NoiseFit.TakeNewResult(m_Schematic.GetNoiseVersion());
     const bool shares_changed =
         TakeTracesChanged(m_PlottedNoiseContributions,
                           std::vector<std::string>(m_ShownNoiseContributions.begin(), m_ShownNoiseContributions.end()));
@@ -2444,139 +2069,19 @@ void OutputWindow::DrawNoiseStatistics(const Core::Noise &noise) {
     ImGui::EndTable();
 }
 
-// Each channel shows its check box, an Edit button and, when its expression does not compile, a warning mark;
-// a new channel opens its editor right away
-void OutputWindow::DrawMathChannels(const std::vector<std::string> &operands) {
-    ImGui::TextDisabled("Math");
-    bool open_new_editor = false;
-    if (ImGui::SmallButton("Add")) {
-        MathChannel channel;
-        channel.Name = std::format("M{}", m_NextMathNumber++);
-        channel.First = operands.empty() ? "" : operands.front();
-        channel.Second = operands.size() > 1 ? operands[1] : channel.First;
-        CompileChannel(channel);
-        m_MathChannels.push_back(std::move(channel));
-        open_new_editor = true;
-    }
-    std::optional<std::size_t> removed;
-    for (std::size_t index = 0; index < m_MathChannels.size(); ++index) {
-        MathChannel &channel = m_MathChannels[index];
-        ImGui::PushID(static_cast<int>(index));
-        ImGui::PushStyleColor(ImGuiCol_CheckMark, AdaptToBackground(MathColors[index % MathColors.size()]));
-        ImGui::Checkbox(channel.Name.c_str(), &channel.Shown);
-        ImGui::PopStyleColor();
-        ImGui::SetItemTooltip("%s", GetChannelExpression(channel).c_str());
-        ImGui::SameLine();
-        if (ImGui::SmallButton("Edit") || (open_new_editor && index + 1 == m_MathChannels.size())) {
-            ImGui::OpenPopup("math_editor");
-        }
-        if (!channel.Program) {
-            ImGui::SameLine();
-            ImGui::TextColored(GetErrorTextColor(), "!");
-            ImGui::SetItemTooltip("%s", channel.Program.error().c_str());
-        }
-        if (ImGui::BeginPopup("math_editor")) {
-            if (!DrawMathEditor(channel, operands)) {
-                removed = index;
-            }
-            ImGui::EndPopup();
-        }
-        ImGui::PopID();
-    }
-    if (removed) {
-        m_MathChannels.erase(m_MathChannels.begin() + static_cast<std::ptrdiff_t>(*removed));
-    }
-}
-
-// Like the math menu of an oscilloscope: two traces and an operator button, or a typed expression. Switching to
-// an expression starts from the operation, so it can be extended. Returns false when the channel is removed
-bool OutputWindow::DrawMathEditor(MathChannel &channel, const std::vector<std::string> &operands) {
-    ImGui::TextUnformatted(channel.Name.c_str());
-    bool changed = false;
-    if (ImGui::RadioButton("Operation", !channel.UsesExpression)) {
-        channel.UsesExpression = false;
-        changed = true;
-    }
-    ImGui::SameLine();
-    if (ImGui::RadioButton("Expression", channel.UsesExpression) && !channel.UsesExpression) {
-        channel.Expression = GetChannelExpression(channel);
-        channel.UsesExpression = true;
-        changed = true;
-    }
-
-    if (channel.UsesExpression) {
-        ImGui::SetNextItemWidth(ImGui::GetFontSize() * ExpressionWidth);
-        changed |= ImGui::InputText("##expression", &channel.Expression);
-        ImGui::TextDisabled("V(2), V(1,2), I(R1), I(Q1.C), numbers such as 1k");
-        ImGui::TextDisabled("+ - * / ( ), abs(), sqrt(), ddt() and integ()");
-    } else {
-        changed |= DrawOperandCombo("##first", channel.First, operands);
-        for (std::size_t index = 0; index < MathOperators.size(); ++index) {
-            const MathOperator math_operator = MathOperators[index];
-            if (index > 0) {
-                ImGui::SameLine();
-            }
-            const char *symbol = GetOperatorSymbol(math_operator);
-            if (channel.Operator == math_operator ? PrimaryButton(symbol) : ImGui::Button(symbol)) {
-                channel.Operator = math_operator;
-                changed = true;
-            }
-        }
-        changed |= DrawOperandCombo("##second", channel.Second, operands);
-    }
-    if (changed) {
-        CompileChannel(channel);
-    }
-    if (!channel.Program) {
-        ImGui::TextColored(GetErrorTextColor(), "%s", channel.Program.error().c_str());
-    }
-    ImGui::Separator();
-    if (ImGui::Button("Remove")) {
-        ImGui::CloseCurrentPopup();
-        return false;
-    }
-    return true;
-}
-
-// Channels that are hidden or do not compile are left out; those that name a node or part the result lacks add
-// an error instead of a trace
-std::vector<MathTrace> OutputWindow::EvaluateMath(const std::span<const double> xs, const Dimension x_unit,
-                                                  const std::vector<std::vector<double>> &node_voltages,
-                                                  const std::vector<Core::ComponentTrace> &currents,
-                                                  std::vector<std::string> &errors) const {
-    std::vector<MathTrace> traces;
-    for (std::size_t index = 0; index < m_MathChannels.size(); ++index) {
-        const MathChannel &channel = m_MathChannels[index];
-        if (!channel.Shown || !channel.Program) {
-            continue;
-        }
-        auto result = EvaluateExpression(*channel.Program, xs, x_unit, node_voltages, currents);
-        if (!result) {
-            errors.push_back(std::format("{}: {}", channel.Name, result.error()));
-            continue;
-        }
-        traces.push_back({.Label = std::format("{}: {}", channel.Name, GetChannelExpression(channel)),
-                          .Values = std::move(result->Values),
-                          .Unit = FormatUnit(result->Unit),
-                          .Axis = AxisForUnit(result->Unit),
-                          .Color = AdaptToBackground(MathColors[index % MathColors.size()])});
-    }
-    return traces;
-}
-
 // A plain button apart from the tabs, so it does not read as another page; its popup hangs below it, aligned to its
 // right edge, so it stays inside the window
 void OutputWindow::DrawExportButton(const ImVec2 tab_row, const float tab_row_width, const float export_width,
                                     const FrameResults &frame) {
     ImGui::SetCursorScreenPos({tab_row.x + tab_row_width - export_width, tab_row.y});
     if (ImGui::Button(ExportLabel)) {
-        ImGui::OpenPopup(ExportPopup);
+        m_Exporter.OpenPopup();
     }
     ImGui::SetItemTooltip("Save the plot of this tab as an SVG image or a CSV table");
     ImGui::SetNextWindowPos({ImGui::GetItemRectMax().x, ImGui::GetItemRectMax().y}, ImGuiCond_Appearing,
                             ImVec2(1.0f, 0.0f));
-    if (const std::optional<ExportFormat> format = DrawExportPopup(CanExport(frame))) {
-        StartExport(BuildShownFigure(frame), *format);
+    if (const std::optional<ExportFormat> format = m_Exporter.DrawPopup(GetTabTitle(m_ShownTab), CanExport(frame))) {
+        m_Exporter.Start(BuildShownFigure(frame), *format, m_Schematic.GetFilePath(), GetTabFileSuffix(m_ShownTab));
     }
 }
 
@@ -2605,283 +2110,23 @@ bool OutputWindow::CanExport(const FrameResults &frame) const {
 // The figure of the shown tab, which CanExport() has found something to export in
 ExportFigure OutputWindow::BuildShownFigure(const FrameResults &frame) const {
     switch (m_ShownTab) {
-    case PlotTab::Transient:
-        return BuildTransientFigure(*m_Schematic.GetTransient(), frame.TransientMath);
+    case PlotTab::Transient: {
+        const Core::Transient &transient = *m_Schematic.GetTransient();
+        return BuildTransientFigure(transient, frame.TransientMath, FindMeasuredLanes(transient.NodeVoltages.size()),
+                                    m_Schematic, m_ShowBitValues, m_TransientView);
+    }
     case PlotTab::Spectrum:
-        return BuildSpectrumFigure();
+        return BuildSpectrumFigure(*m_Spectra, m_SpectrumLogarithmic, m_SpectrumView);
     case PlotTab::ACSweep:
-        return BuildACSweepFigure(*m_Schematic.GetACSweep());
+        return BuildACSweepFigure(*m_Schematic.GetACSweep(), m_Schematic, m_ACSweepView);
     case PlotTab::DCSweep:
-        return BuildDCSweepFigure(*m_Schematic.GetDCSweep(), frame.DCSweepMath);
+        return BuildDCSweepFigure(*m_Schematic.GetDCSweep(), frame.DCSweepMath, m_Schematic, m_DCSweepView);
     case PlotTab::Noise:
-        return BuildNoiseFigure(*m_Schematic.GetNoise());
+        return BuildNoiseFigure(*m_Schematic.GetNoise(), m_Schematic, m_ShownNoiseContributions, m_NoiseView);
     case PlotTab::OperatingPoint:
         break;
     }
     return {};
-}
-
-// Like the export dialog of a scope: the image follows the plot as shown, at the size and theme chosen here.
-// Returns the format to save once the user picks one
-std::optional<ExportFormat> OutputWindow::DrawExportPopup(const bool can_export) {
-    if (!ImGui::BeginPopup(ExportPopup)) {
-        return std::nullopt;
-    }
-    ImGui::TextUnformatted(std::format("Export the {} plot", GetTabTitle(m_ShownTab)).c_str());
-    ImGui::TextDisabled("The measured traces: the image shows the visible range, the table every sample");
-    ImGui::Separator();
-    if (ImGui::RadioButton("Light, for print", !m_ExportStyle.Dark)) {
-        m_ExportStyle.Dark = false;
-    }
-    ImGui::SameLine();
-    if (ImGui::RadioButton("Dark", m_ExportStyle.Dark)) {
-        m_ExportStyle.Dark = true;
-    }
-    ImGui::SetNextItemWidth(ImGui::GetFontSize() * ExportSizeWidth);
-    ImGui::InputInt("##width", &m_ExportStyle.Width, 100, 500);
-    ImGui::SameLine();
-    ImGui::TextUnformatted("x");
-    ImGui::SameLine();
-    ImGui::SetNextItemWidth(ImGui::GetFontSize() * ExportSizeWidth);
-    ImGui::InputInt("pixels##height", &m_ExportStyle.Height, 100, 500);
-    m_ExportStyle.Width = std::clamp(m_ExportStyle.Width, MinExportSize, MaxExportSize);
-    m_ExportStyle.Height = std::clamp(m_ExportStyle.Height, MinExportSize, MaxExportSize);
-    ImGui::Separator();
-
-    std::optional<ExportFormat> format;
-    if (!can_export) {
-        ImGui::TextDisabled("Run the analysis and measure a trace to export it");
-    }
-    ImGui::BeginDisabled(!can_export || m_ExportDialog.IsPending());
-    if (PrimaryButton("Save SVG...")) {
-        format = ExportFormat::SVG;
-    }
-    ImGui::SameLine();
-    if (ImGui::Button("Save CSV...")) {
-        format = ExportFormat::CSV;
-    }
-    ImGui::EndDisabled();
-    if (format) {
-        ImGui::CloseCurrentPopup();
-    }
-    ImGui::EndPopup();
-    return format;
-}
-
-// The image shows the X range the plot shows, so zooming in before exporting crops the image as well. A stepped
-// transient exports its shown step, since every step has its own time points
-ExportFigure OutputWindow::BuildTransientFigure(const Core::Transient &transient,
-                                                const std::vector<MathTrace> &math) const {
-    ExportFigure figure;
-    figure.XAxis = {.Name = "Time", .Unit = "s"};
-    figure.Xs = transient.Times;
-    figure.XRange = ExportRange{.From = m_TransientView.From, .To = m_TransientView.To};
-    const std::vector<LogicNode> lanes = FindMeasuredLanes(transient.NodeVoltages.size());
-    PanelBuilder builder("", GetLinearExportAxes(ThirdAxisUnit(math)));
-    AddExportTraces(builder, transient.NodeVoltages, transient.Currents, m_Schematic, "", true, ListNodes(lanes));
-    AddExportMath(builder, math, "", true);
-    ExportPanel analog = builder.Take();
-    // As on screen, the analog plot is left out when only logic signals are measured
-    if (!analog.Series.empty() || lanes.empty()) {
-        figure.Panels.push_back(std::move(analog));
-    }
-    if (!lanes.empty()) {
-        figure.Panels.push_back(BuildLanePanel(transient, lanes, m_Schematic, m_ShowBitValues, m_TransientView));
-    }
-    return figure;
-}
-
-// The spectra as plotted, over the frequencies the plot shows
-ExportFigure OutputWindow::BuildSpectrumFigure() const {
-    ExportFigure figure;
-    figure.XAxis = {.Name = "Frequency", .Unit = "Hz"};
-    figure.XLogarithmic = m_SpectrumLogarithmic;
-    figure.Xs = m_Spectra->Frequencies;
-    figure.XRange = ExportRange{.From = m_SpectrumView.From, .To = m_SpectrumView.To};
-    PanelBuilder builder("", GetSpectrumExportAxes());
-    for (const SpectrumTrace &trace : m_Spectra->Traces) {
-        if (trace.Decibels) {
-            builder.Add({.Name = trace.Label,
-                         .LegendLabel = trace.Label,
-                         .Values = *trace.Decibels,
-                         .Color = ToExportColor(trace.Color),
-                         .Dashed = trace.Dashed},
-                        trace.Axis);
-        }
-    }
-    figure.Panels.push_back(builder.Take());
-    return figure;
-}
-
-// Both panels list the same traces, as the two Bode plots do, with every step of a stepped sweep
-ExportFigure OutputWindow::BuildACSweepFigure(const Core::ACSweep &sweep) const {
-    ExportFigure figure;
-    figure.XAxis = {.Name = "Frequency", .Unit = "Hz"};
-    figure.XLogarithmic = true;
-    figure.Xs = sweep.Frequencies;
-    figure.XRange = ExportRange{.From = m_ACSweepView.From, .To = m_ACSweepView.To};
-    PanelBuilder magnitude("Magnitude", {.Voltage = {.Name = "Voltage (dB)", .Unit = "dB", .UsesPrefixes = false},
-                                         .Current = {.Name = "Current (dB)", .Unit = "dB", .UsesPrefixes = false},
-                                         .Third = {}});
-    AddExportTraces(magnitude, sweep.NodeMagnitudesDecibels, sweep.CurrentMagnitudesDecibels, m_Schematic, "", true);
-    PanelBuilder phase("Phase", {.Voltage = {.Name = "Phase (deg)", .Unit = "deg", .UsesPrefixes = false},
-                                 .Current = {.Name = "Current phase (deg)", .Unit = "deg", .UsesPrefixes = false},
-                                 .Third = {}});
-    AddExportTraces(phase, sweep.NodePhasesDegrees, sweep.CurrentPhasesDegrees, m_Schematic, "", true);
-    // The other steps share the frequencies, so they go in as more columns, without legend entries
-    if (const auto &steps = m_Schematic.GetACSweepSteps()) {
-        for (std::size_t step = 0; step < steps->Results.size(); ++step) {
-            if (step == steps->Selected) {
-                continue;
-            }
-            const Core::ACSweep &other = steps->Results[step];
-            const std::string suffix = " at " + FormatStepValue(steps->Parameter, steps->Values[step], steps->Unit);
-            AddExportTraces(magnitude, other.NodeMagnitudesDecibels, other.CurrentMagnitudesDecibels, m_Schematic,
-                            suffix, false);
-            AddExportTraces(phase, other.NodePhasesDegrees, other.CurrentPhasesDegrees, m_Schematic, suffix, false);
-        }
-    }
-    figure.Panels.push_back(magnitude.Take());
-    figure.Panels.push_back(phase.Take());
-    return figure;
-}
-
-// A stepped sweep exports every curve, labeled with its step where the curves part most, as in the plot
-ExportFigure OutputWindow::BuildDCSweepFigure(const Core::DCSweep &sweep,
-                                              const std::vector<std::vector<MathTrace>> &math) const {
-    static const std::vector<MathTrace> no_math;
-    ExportFigure figure;
-    figure.XAxis = {.Name = sweep.SweptSource, .Unit = sweep.SweptUnit};
-    figure.Xs = sweep.SweptValues;
-    figure.XRange = ExportRange{.From = m_DCSweepView.From, .To = m_DCSweepView.To};
-    const bool stepped = !sweep.SteppedSource.empty();
-    PanelBuilder builder("", GetLinearExportAxes(ThirdAxisUnit(math.empty() ? no_math : math.front())));
-    for (std::size_t curve_index = 0; curve_index < sweep.Curves.size(); ++curve_index) {
-        const Core::DCSweepCurve &curve = sweep.Curves[curve_index];
-        const std::string suffix = stepped ? " at " + FormatStepLabel(sweep, curve) : "";
-        AddExportTraces(builder, curve.NodeVoltages, curve.Currents, m_Schematic, suffix, curve_index == 0);
-        if (curve_index < math.size()) {
-            AddExportMath(builder, math[curve_index], suffix, curve_index == 0);
-        }
-    }
-    if (stepped) {
-        const bool show_currents = HasMeasuredCurrent(sweep.Curves.front().Currents, m_Schematic);
-        for (const CurveFamily &family : ListCurveFamilies(sweep, m_Schematic, show_currents, math)) {
-            const std::size_t sample = FindWidestSpread(family.Curves);
-            if (sample >= sweep.SweptValues.size() || !CurvesDiffer(family.Curves, sample)) {
-                continue;
-            }
-            for (std::size_t curve = 0; curve < family.Curves.size(); ++curve) {
-                const double y = (*family.Curves[curve])[sample];
-                if (std::isfinite(y)) {
-                    builder.AddNote(
-                        {.X = sweep.SweptValues[sample], .Y = y, .Text = FormatStepLabel(sweep, sweep.Curves[curve])},
-                        family.Axis);
-                }
-            }
-        }
-    }
-    figure.Panels.push_back(builder.Take());
-    return figure;
-}
-
-// The densities on logarithmic axes, as plotted, with the shares of the parts checked in the panel
-ExportFigure OutputWindow::BuildNoiseFigure(const Core::Noise &noise) const {
-    ExportFigure figure;
-    figure.XAxis = {.Name = "Frequency", .Unit = "Hz"};
-    figure.XLogarithmic = true;
-    figure.Xs = noise.Frequencies;
-    figure.XRange = ExportRange{.From = m_NoiseView.From, .To = m_NoiseView.To};
-    ExportPanel panel;
-    panel.YAxes = {{.Name = "Noise density", .Unit = GetDensityUnit("V"), .Logarithmic = true}};
-    const bool input_shown = HasInputGain(noise);
-    const bool input_in_volts = noise.InputUnit == "V";
-    if (input_shown && !input_in_volts) {
-        panel.YAxes.push_back(
-            {.Name = "Input-referred noise", .Unit = GetDensityUnit(noise.InputUnit), .Logarithmic = true});
-    }
-    const std::string output_label = GetVoltageLabel(m_Schematic.GetConnectivity(), noise.OutputNode);
-    panel.Series.push_back({.Name = output_label,
-                            .LegendLabel = output_label,
-                            .Values = noise.OutputDensities,
-                            .Color = ToExportColor(GetNodeColor(noise.OutputNode)),
-                            .Heavy = true});
-    for (std::size_t index = 0; index < noise.Contributions.size(); ++index) {
-        const Core::NoiseContribution &contribution = noise.Contributions[index];
-        if (m_ShownNoiseContributions.contains(contribution.Name)) {
-            panel.Series.push_back({.Name = contribution.Name,
-                                    .LegendLabel = contribution.Name,
-                                    .Values = contribution.OutputDensities,
-                                    .Color = ToExportColor(GetCurrentColor(index))});
-        }
-    }
-    if (input_shown) {
-        const std::string input_label = std::format("Input-referred ({})", noise.InputSource);
-        panel.Series.push_back({.Name = input_label,
-                                .LegendLabel = input_label,
-                                .Values = noise.InputDensities,
-                                .Axis = input_in_volts ? 0U : 1U,
-                                .Color = ToExportColor(AdaptToBackground(InputNoiseColor)),
-                                .Dashed = true});
-    }
-    figure.Panels.push_back(std::move(panel));
-    return figure;
-}
-
-// The figure is captured now, so the file holds what the plot showed when the user asked, whatever happens while
-// the dialog is open. The dialog starts next to the schematic, with a name after it and the tab
-void OutputWindow::StartExport(ExportFigure figure, const ExportFormat format) {
-    if (m_ExportDialog.IsPending()) {
-        return;
-    }
-    m_PendingFigure = std::move(figure);
-    m_PendingFormat = format;
-    const auto &schematic_path = m_Schematic.GetFilePath();
-    const std::string stem = schematic_path ? schematic_path->stem().string() : "circuit";
-    const std::string file_name = std::format("{}-{}{}", stem, GetTabFileSuffix(m_ShownTab), GetExtension(format));
-    const std::filesystem::path location =
-        schematic_path ? schematic_path->parent_path() / file_name : std::filesystem::path(file_name);
-    if (format == ExportFormat::SVG) {
-        m_ExportDialog.ShowSave(SVGFilters, location.string());
-    } else {
-        m_ExportDialog.ShowSave(CSVFilters, location.string());
-    }
-}
-
-// Dialogs do not always add the extension, so it is added here when missing
-void OutputWindow::ProcessExportDialog() {
-    const std::optional<std::optional<std::filesystem::path>> result = m_ExportDialog.TakeResult();
-    if (!result) {
-        return;
-    }
-    const std::optional<ExportFigure> figure = std::exchange(m_PendingFigure, std::nullopt);
-    if (!*result || !figure) {
-        return;
-    }
-    std::filesystem::path path = **result;
-    const std::string extension = GetExtension(m_PendingFormat);
-    if (path.extension() != extension) {
-        path += extension;
-    }
-    std::expected<std::string, std::string> text =
-        m_PendingFormat == ExportFormat::SVG ? RenderSvg(*figure, m_ExportStyle) : RenderCsv(*figure);
-    std::expected<void, std::string> written =
-        text ? WriteTextFile(path, *text) : std::expected<void, std::string>(std::unexpected(text.error()));
-    if (!written) {
-        m_ExportError = written.error();
-        ImGui::OpenPopup(ExportErrorPopup);
-    }
-}
-
-void OutputWindow::DrawExportError() {
-    if (!ImGui::BeginPopupModal(ExportErrorPopup, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
-        return;
-    }
-    ImGui::TextColored(GetErrorTextColor(), "%s", m_ExportError.c_str());
-    if (ImGui::Button("OK")) {
-        ImGui::CloseCurrentPopup();
-    }
-    ImGui::EndPopup();
 }
 
 } // namespace GUI

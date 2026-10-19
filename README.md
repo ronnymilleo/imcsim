@@ -5,8 +5,9 @@
 Immediate Mode Circuit Simulator, built with Dear ImGui and SDL3. Circuits are simulated with
 [ngspice](https://ngspice.sourceforge.io/).
 
-![imcsim with an RC low-pass filter driven by a 1 kHz sine: the schematic with its probed nodes on the left, and the
-transient of both nodes with their statistics in the Output window on the right](docs/screenshot.png)
+![imcsim with an RC low-pass filter driven by a 1 kHz sine: the schematic with its probed nodes and their voltages at
+the playhead on the left, and the transient of both nodes with their statistics in the Output window on the
+right](docs/images/screenshot.png)
 
 New to imcsim? The [tutorial](docs/tutorial.md) builds, simulates and exports a first circuit in about ten minutes.
 
@@ -19,13 +20,18 @@ New to imcsim? The [tutorial](docs/tutorial.md) builds, simulates and exports a 
   limited by its supply pins, or a uA741 or custom part built as a Boyle macromodel from datasheet values (slew rate,
   bias current, output swing, current limit)
 - Warnings when a diode goes into reverse breakdown or a transistor exceeds its voltage, current or power ratings
-- Operating point, transient, AC sweep and DC sweep analyses, with node voltages and component currents
+- Operating point, transient, AC sweep, DC sweep and noise analyses, with node voltages and component currents
+- Stepping a resistor, capacitor, inductor or the temperature over a range or a list, as SPICE's `.step`: the
+  transient, AC sweep and DC sweep plot every step as a family of curves
 - Plots of transients, Bode diagrams and DC sweeps (including curve families, such as transistor characteristics):
   pick what to measure with the Probe tool, read every trace under the cursor, currents dashed apart from voltages;
   measured voltages and currents are marked on the schematic in the colors of their traces, currents with an arrow
   in the direction they flow when positive
 - Oscilloscope-style measurements beside the transient and Bode plots: two draggable cursors, peak-to-peak, mean,
   RMS and frequency of every trace, and peak, -3 dB band, unity gain frequency and phase margin of a response
+- A spectrum of the transient traces, as on a spectrum analyzer, with the fundamental, the harmonics and the THD of
+  each, over a Hann or rectangular window
+- Noise at one node across frequency, at the output and referred to the input, with the share of each part
 - Math channels on transient and DC sweep plots, as on an oscilloscope: an operation between two traces picked
   with buttons, or a typed expression such as `V(1,2)`, `V(3)*I(R1)` or `ddt(V(2))`, with units followed (W, Ohm,
   V/s) and a third axis for any unit other than volts and amperes

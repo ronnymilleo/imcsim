@@ -6,10 +6,12 @@ add_library(imcsim-gui-lib
         STATIC
             analysis_controls.cpp
             application.cpp
+            canvas_view.cpp
             circuit_snapshot.cpp
             clipboard.cpp
             connectivity.cpp
             current_flow.cpp
+            editor_preferences.cpp
             element_factory.cpp
             examples.cpp
             file_dialog.cpp
@@ -19,21 +21,26 @@ add_library(imcsim-gui-lib
             helpers.cpp
             led_glow.cpp
             logic_trace.cpp
+            math_channels.cpp
             node_colors.cpp
             parameter_step.cpp
             part_editor.cpp
             playback.cpp
             plot_export.cpp
+            plot_exporter.cpp
+            plot_figures.cpp
             plot_helpers.cpp
             probing.cpp
             schematic.cpp
             schematic_canvas.cpp
             schematic_drawing.cpp
             schematic_file.cpp
+            schematic_file_actions.cpp
             selection.cpp
             spectrum.cpp
             svg_writer.cpp
             theme.cpp
+            trace_fit_state.cpp
             trace_math.cpp
             trace_statistics.cpp
             ui_elements/ui_bjt.cpp
