@@ -183,11 +183,11 @@ std::string FormatLogicModels(const LogicPart &part) {
     return models;
 }
 
-// The terminal nodes are in the order of GetLogicInputLabels() and GetLogicOutputLabels(); the digital nodes and the
+// The terminal nodes are in the order of GetInputLabels() and GetLogicOutputLabels(); the digital nodes and the
 // analog nodes behind the output resistors are numbered from next_extra_node
 std::string FormatLogicPart(const LogicPart &part, const std::vector<int> &nodes, int &next_extra_node) {
     const std::string &name = part.GetName();
-    const std::vector<std::string> inputs = GetLogicInputLabels(part.GetType());
+    const std::vector<std::string> inputs = part.GetInputLabels();
     const std::vector<std::string> outputs = GetLogicOutputLabels(part.GetType());
     std::string lines;
     std::vector<int> digital_inputs;
@@ -207,7 +207,11 @@ std::string FormatLogicPart(const LogicPart &part, const std::vector<int> &nodes
     if (IsLogicGate(part.GetType()) && inputs.size() == 1) {
         ports = std::to_string(digital_inputs[0]);
     } else if (IsLogicGate(part.GetType())) {
-        ports = std::format("[{} {}]", digital_inputs[0], digital_inputs[1]);
+        ports = "[";
+        for (const int digital : digital_inputs) {
+            ports += std::format("{} ", digital);
+        }
+        ports.back() = ']';
     } else {
         for (const int digital : digital_inputs) {
             ports += std::format("{} ", digital);
@@ -231,7 +235,7 @@ std::string FormatLogicPart(const LogicPart &part, const std::vector<int> &nodes
 std::vector<std::string> GetLogicElementNames(const Component &part) {
     const std::string &name = part.GetName();
     std::vector<std::string> names{std::format("A-{}", name)};
-    std::vector<std::string> pins = GetLogicInputLabels(part.GetType());
+    std::vector<std::string> pins = static_cast<const LogicPart &>(part).GetInputLabels();
     std::ranges::move(GetLogicOutputLabels(part.GetType()), std::back_inserter(pins));
     for (const std::string &pin : pins) {
         names.push_back(std::format("A-{}-{}", name, pin));
@@ -538,7 +542,7 @@ std::vector<CurrentProbe> GetCurrentProbes(const Component &component) {
         return {{0, ""}};
     }
     if (IsLogicGate(type)) {
-        return {{static_cast<int>(GetLogicInputLabels(type).size()), ""}};
+        return {{static_cast<const LogicPart &>(component).GetInputCount(), ""}};
     }
     if (IsFlipFlop(type)) {
         const auto outputs = static_cast<int>(GetLogicInputLabels(type).size());

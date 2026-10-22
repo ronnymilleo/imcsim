@@ -40,6 +40,42 @@ bool LogicPart::IsValidParameters(const LogicParameters &parameters) {
 }
 
 /**
+ * @brief   Returns how many inputs the part has.
+ * @return  The chosen count for a gate that takes several inputs, and the fixed count of any other part.
+ */
+int LogicPart::GetInputCount() const {
+    return HasVariableInputs(m_Type) ? m_InputCount : static_cast<int>(GetLogicInputLabels(m_Type).size());
+}
+
+/**
+ * @brief   Sets how many inputs a gate has.
+ * @param[in] count  New count; check it with IsValidInputCount() first.
+ * @note    Parts other than the AND, OR, NAND, NOR, XOR and XNOR gates keep their inputs, so the call does nothing.
+ */
+void LogicPart::SetInputCount(const int count) {
+    if (HasVariableInputs(m_Type)) {
+        m_InputCount = count;
+    }
+}
+
+/**
+ * @brief   Checks whether a gate can have a number of inputs.
+ * @param[in] count  Candidate count.
+ * @return  True from 2 to 8.
+ */
+bool LogicPart::IsValidInputCount(const int count) {
+    return count >= MinLogicInputs && count <= MaxLogicInputs;
+}
+
+/**
+ * @brief   Names the input terminals of this part, in terminal order.
+ * @return  What GetLogicInputLabels() gives for the type and the input count of the part.
+ */
+std::vector<std::string> LogicPart::GetInputLabels() const {
+    return GetLogicInputLabels(m_Type, GetInputCount());
+}
+
+/**
  * @brief   Tells whether a kind of component is a logic gate.
  * @param[in] type  Kind of component.
  * @return  True for AND, OR, NOT, NAND, NOR, XOR, XNOR and the buffer.
@@ -80,12 +116,40 @@ bool IsLogicPart(const ComponentType type) {
 }
 
 /**
- * @brief   Names the input terminals of a gate or flip-flop, in terminal order.
+ * @brief   Tells whether a gate can have more than two inputs.
+ * @param[in] type  Kind of component.
+ * @return  True for AND, OR, NAND, NOR, XOR and XNOR.
+ */
+bool HasVariableInputs(const ComponentType type) {
+    return type == ComponentType::And || type == ComponentType::Or || type == ComponentType::Nand ||
+           type == ComponentType::Nor || type == ComponentType::Xor || type == ComponentType::Xnor;
+}
+
+/**
+ * @brief   Names the input terminals of a gate or flip-flop with its usual number of inputs, in terminal order.
  * @param[in] type  A type for which IsLogicPart() is true.
  * @return  "A" and "B" for a gate, or "A" alone for NOT and the buffer; for a flip-flop its data inputs, the clock
  *          "CLK", then the asynchronous "SET" and "RESET", which are active high.
  */
 std::vector<std::string> GetLogicInputLabels(const ComponentType type) {
+    return GetLogicInputLabels(type, MinLogicInputs);
+}
+
+/**
+ * @brief   Names the input terminals of a gate or flip-flop, in terminal order.
+ * @param[in] type         A type for which IsLogicPart() is true.
+ * @param[in] input_count  Number of inputs of a gate that takes several; the other parts ignore it.
+ * @return  "A", "B", "C"... for a gate that takes several inputs, "A" alone for NOT and the buffer; for a flip-flop
+ *          its data inputs, the clock "CLK", then the asynchronous "SET" and "RESET", which are active high.
+ */
+std::vector<std::string> GetLogicInputLabels(const ComponentType type, const int input_count) {
+    if (HasVariableInputs(type)) {
+        std::vector<std::string> labels;
+        for (int input = 0; input < input_count; ++input) {
+            labels.emplace_back(1, static_cast<char>('A' + input));
+        }
+        return labels;
+    }
     switch (type) {
     case ComponentType::Not:
     case ComponentType::Buffer:
