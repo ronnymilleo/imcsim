@@ -353,6 +353,35 @@ std::optional<std::string> CheckNoiseSettings(const Circuit &circuit, const Nois
     return std::nullopt;
 }
 
+// Independent sources a transfer function analysis can drive, whatever their waveform: voltage and current sources
+// and supply rails, as a DC sweep can
+bool IsTransferFunctionInput(const Component &component) {
+    const ComponentType type = component.GetType();
+    return type == ComponentType::VCC || type == ComponentType::VoltageSource || type == ComponentType::CurrentSource;
+}
+
+const Component *FindTransferFunctionInput(const Circuit &circuit, const std::string_view name) {
+    const auto entry = std::ranges::find_if(circuit.GetEntries(), [name](const CircuitEntry &candidate) {
+        return candidate.Part->GetName() == name && IsTransferFunctionInput(*candidate.Part);
+    });
+    return entry != circuit.GetEntries().end() ? entry->Part : nullptr;
+}
+
+std::optional<std::string> CheckTransferFunctionSettings(const Circuit &circuit,
+                                                         const TransferFunctionSettings &settings) {
+    if (settings.OutputNode < 1 || settings.OutputNode >= circuit.GetNodeCount()) {
+        return "Pick the output node; ground has no transfer function";
+    }
+    if (settings.InputSource.empty()) {
+        return "A transfer function analysis needs an input source; select a voltage source, current source or VCC";
+    }
+    if (FindTransferFunctionInput(circuit, settings.InputSource) == nullptr) {
+        return std::format("The input source {} is not a voltage source, current source or VCC in the circuit",
+                           settings.InputSource);
+    }
+    return std::nullopt;
+}
+
 // ngspice keeps no reference to the name after the call
 pvector_info FindVector(std::string name) {
     const pvector_info vector = ngGet_Vec_Info(name.data());
@@ -1065,6 +1094,65 @@ std::expected<Noise, std::string> ReadNoise(const Circuit &circuit, const NoiseS
     return result;
 }
 
+// The plot a transfer function analysis leaves; its name starts with "tf" and it holds one row
+std::optional<std::string> FindTransferFunctionPlot() {
+    char **names = ngSpice_AllPlots();
+    for (; names != nullptr && *names != nullptr; ++names) {
+        const std::string name(*names);
+        if (name.starts_with("tf")) {
+            return name;
+        }
+    }
+    return std::nullopt;
+}
+
+// One of the three single-value vectors of a transfer function; ngspice names them after the source and the output
+std::expected<double, std::string> ReadTransferFunctionValue(const std::string &name) {
+    const pvector_info vector = FindVector(name);
+    if (vector == nullptr || vector->v_realdata == nullptr) {
+        return std::unexpected(std::format("ngspice returned no {}", name));
+    }
+    return vector->v_realdata[0];
+}
+
+std::expected<TransferFunction, std::string> ReadTransferFunction(const Circuit &circuit,
+                                                                  const TransferFunctionSettings &settings) {
+    const std::optional<std::string> plot = FindTransferFunctionPlot();
+    if (!plot) {
+        return std::unexpected("ngspice returned no transfer function plot");
+    }
+    SendCommand(std::format("setplot {}", *plot));
+    // The vectors are named after the input source and the output expression, in lower case
+    const auto gain = ReadTransferFunctionValue("transfer_function");
+    const auto input_impedance =
+        ReadTransferFunctionValue(std::format("{}#input_impedance", ToLower(settings.InputSource)));
+    const auto output_impedance =
+        ReadTransferFunctionValue(std::format("output_impedance_at_v({})", settings.OutputNode));
+    if (!gain) {
+        return std::unexpected(gain.error());
+    }
+    if (!input_impedance) {
+        return std::unexpected(input_impedance.error());
+    }
+    if (!output_impedance) {
+        return std::unexpected(output_impedance.error());
+    }
+    TransferFunction result;
+    result.OutputNode = settings.OutputNode;
+    result.InputSource = settings.InputSource;
+    result.InputUnit = SourceUnit(*FindTransferFunctionInput(circuit, settings.InputSource));
+    result.Gain = *gain;
+    result.InputImpedance = *input_impedance;
+    result.OutputImpedance = *output_impedance;
+    // An infinite value would format as nan or inf, which reads as a broken number; an open path is instead reported
+    // around 1e20 ohm, which stays finite and the views turn into an open circuit
+    if (!std::isfinite(result.Gain) || !std::isfinite(result.InputImpedance) ||
+        !std::isfinite(result.OutputImpedance)) {
+        return std::unexpected("ngspice returned a transfer function that is not a number");
+    }
+    return result;
+}
+
 std::string FormatSweepRange(const SweepRange &range) {
     return std::format("{} {} {} {}", range.Source, FormatSpiceValue(range.Start), FormatSpiceValue(range.Stop),
                        FormatSpiceValue(range.Step));
@@ -1346,6 +1434,29 @@ NoiseRun RunNoise(const Circuit &circuit, const NoiseSettings &settings) {
 }
 
 /**
+ * @brief   Finds the small-signal DC transfer function from an input source to an output, with both impedances.
+ * @param[in] circuit   Circuit to simulate; it needs a ground component.
+ * @param[in] settings  Output node and input source (an independent voltage source, current source or VCC rail).
+ * @return  The DC gain, the input impedance and the output impedance, or an error, plus every line ngspice printed.
+ *          Invalid settings are rejected before reaching ngspice.
+ * @note    The gain is dimensionless for a voltage source input and a transimpedance for a current source; ngspice
+ *          linearizes the circuit at its DC operating point, so the input source only defines the gain, whatever its
+ *          value or waveform. Not thread-safe: ngspice is a single global library instance.
+ */
+TransferFunctionRun RunTransferFunction(const Circuit &circuit, const TransferFunctionSettings &settings) {
+    std::optional<std::string> error = CheckCircuit(circuit);
+    if (!error) {
+        error = CheckTransferFunctionSettings(circuit, settings);
+    }
+    if (error) {
+        return {std::unexpected(*error), {}};
+    }
+    const std::string analysis = std::format(".tf v({}) {}", settings.OutputNode, settings.InputSource);
+    return Simulate<TransferFunction>(circuit, analysis, "tf",
+                                      [&circuit, &settings] { return ReadTransferFunction(circuit, settings); });
+}
+
+/**
  * @brief   Tells the simulator where the program keeps the digital code models, for a build that ships them.
  * @param[in] directory  Folder that may hold digital.cm; the library is loaded from it when ngspice has not loaded
  *                       the digital models itself, as the system ngspice does through its spinit file.
@@ -1388,6 +1499,21 @@ std::vector<std::string> GetNoiseInputSources(const Circuit &circuit) {
     std::vector<std::string> names;
     for (const CircuitEntry &entry : circuit.GetEntries()) {
         if (IsNoiseInput(*entry.Part)) {
+            names.push_back(entry.Part->GetName());
+        }
+    }
+    return names;
+}
+
+/**
+ * @brief   Lists the sources a transfer function analysis can drive.
+ * @param[in] circuit  Circuit to look in.
+ * @return  Names of its voltage sources, current sources and VCC rails, of any waveform, in circuit order.
+ */
+std::vector<std::string> GetTransferFunctionInputSources(const Circuit &circuit) {
+    std::vector<std::string> names;
+    for (const CircuitEntry &entry : circuit.GetEntries()) {
+        if (IsTransferFunctionInput(*entry.Part)) {
             names.push_back(entry.Part->GetName());
         }
     }

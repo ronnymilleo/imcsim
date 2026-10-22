@@ -2456,3 +2456,128 @@ TEST_CASE("A noise analysis runs beside logic parts, which add only the noise of
     REQUIRE_FALSE(run.Result->Contributions.empty());
     CHECK(run.Result->Contributions.front().Name == "R1");
 }
+
+namespace {
+
+/**
+ * @struct  ResistiveDivider
+ * @brief   A DC voltage source on node 1 feeding 1k and 2k resistors in series to ground, with the middle on node 2.
+ */
+struct ResistiveDivider {
+    Core::VoltageSource Source;
+    Core::Resistor Top;
+    Core::Resistor Bottom;
+    Core::Ground Reference;
+    Core::Circuit Circuit;
+
+    ResistiveDivider() {
+        Source.SetName("V1");
+        Source.SetValue(5.0);
+        Top.SetName("R1");
+        Top.SetValue(1e3);
+        Bottom.SetName("R2");
+        Bottom.SetValue(2e3);
+        Circuit.Add(Source, {1, 0});
+        Circuit.Add(Top, {1, 2});
+        Circuit.Add(Bottom, {2, 0});
+        Circuit.Add(Reference, {0});
+    }
+};
+
+} // namespace
+
+TEST_CASE("The transfer function of a voltage divider matches its closed-form gain and resistances", "[simulator]") {
+    ResistiveDivider divider;
+    // A transfer function drives the circuit from an independent source of any waveform, not only an AC one
+    CHECK(Core::GetTransferFunctionInputSources(divider.Circuit) == std::vector<std::string>{"V1"});
+    const Core::TransferFunctionRun run =
+        Core::RunTransferFunction(divider.Circuit, {.OutputNode = 2, .InputSource = "V1"});
+    if (!run.Result) {
+        FAIL(run.Result.error());
+    }
+    const Core::TransferFunction &transfer = *run.Result;
+    CHECK(transfer.InputSource == "V1");
+    CHECK(transfer.InputUnit == "V");
+    // The divider: gain R2/(R1+R2), input resistance R1+R2, output resistance R1 parallel R2
+    CHECK_THAT(transfer.Gain, Catch::Matchers::WithinRel(2.0 / 3.0, 1e-6));
+    CHECK_THAT(transfer.InputImpedance, Catch::Matchers::WithinRel(3e3, 1e-6));
+    CHECK_THAT(transfer.OutputImpedance, Catch::Matchers::WithinRel(1e3 * 2e3 / (1e3 + 2e3), 1e-6));
+}
+
+TEST_CASE("A VCC supply rail is a transfer function input", "[simulator]") {
+    // The Divider helper is a 10 V VCC feeding 1k and 3k resistors, with the middle on node 2
+    Divider divider;
+    CHECK(Core::GetTransferFunctionInputSources(divider.Circuit) == std::vector<std::string>{"V1"});
+    const Core::TransferFunctionRun run =
+        Core::RunTransferFunction(divider.Circuit, {.OutputNode = 2, .InputSource = "V1"});
+    if (!run.Result) {
+        FAIL(run.Result.error());
+    }
+    const Core::TransferFunction &transfer = *run.Result;
+    CHECK(transfer.InputUnit == "V");
+    // The 1k/3k divider: gain 3k/(1k+3k), input 1k+3k, output 1k parallel 3k
+    CHECK_THAT(transfer.Gain, Catch::Matchers::WithinRel(3e3 / (1e3 + 3e3), 1e-6));
+    CHECK_THAT(transfer.InputImpedance, Catch::Matchers::WithinRel(4e3, 1e-6));
+    CHECK_THAT(transfer.OutputImpedance, Catch::Matchers::WithinRel(1e3 * 3e3 / (1e3 + 3e3), 1e-6));
+}
+
+TEST_CASE("The transfer function from a current source is a transimpedance in V/A", "[simulator]") {
+    Core::CurrentSource source;
+    source.SetName("I1");
+    source.SetValue(1e-3);
+    Core::Resistor load;
+    load.SetName("R1");
+    load.SetValue(1e3);
+    Core::Ground reference;
+    Core::Circuit circuit;
+    circuit.Add(source, {0, 1});
+    circuit.Add(load, {1, 0});
+    circuit.Add(reference, {0});
+    CHECK(Core::GetTransferFunctionInputSources(circuit) == std::vector<std::string>{"I1"});
+    const Core::TransferFunctionRun run = Core::RunTransferFunction(circuit, {.OutputNode = 1, .InputSource = "I1"});
+    if (!run.Result) {
+        FAIL(run.Result.error());
+    }
+    const Core::TransferFunction &transfer = *run.Result;
+    CHECK(transfer.InputUnit == "A");
+    // A current I into R1 makes V = I*R1, so the gain is R1 (V/A) and both impedances are R1
+    CHECK_THAT(transfer.Gain, Catch::Matchers::WithinRel(1e3, 1e-6));
+    CHECK_THAT(transfer.InputImpedance, Catch::Matchers::WithinRel(1e3, 1e-6));
+    CHECK_THAT(transfer.OutputImpedance, Catch::Matchers::WithinRel(1e3, 1e-6));
+}
+
+TEST_CASE("RunTransferFunction rejects a missing input source and an unknown output", "[simulator]") {
+    ResistiveDivider divider;
+    CHECK(Core::RunTransferFunction(divider.Circuit, {.OutputNode = 2, .InputSource = "V1"}).Result);
+
+    // An input source that is not in the circuit, and one that cannot drive it, are named back
+    const Core::TransferFunctionRun no_input =
+        Core::RunTransferFunction(divider.Circuit, {.OutputNode = 2, .InputSource = "V9"});
+    REQUIRE_FALSE(no_input.Result);
+    CHECK(no_input.Result.error().contains("V9"));
+
+    // Ground and a node past the circuit are not outputs
+    CHECK_FALSE(Core::RunTransferFunction(divider.Circuit, {.OutputNode = 0, .InputSource = "V1"}).Result);
+    CHECK_FALSE(Core::RunTransferFunction(divider.Circuit, {.OutputNode = 42, .InputSource = "V1"}).Result);
+}
+
+TEST_CASE("The impedances of an ideal source are finite, so the views can show them sensibly", "[simulator]") {
+    Core::VoltageSource source;
+    source.SetName("V1");
+    source.SetValue(5.0);
+    Core::Ground reference;
+    Core::Circuit circuit;
+    circuit.Add(source, {1, 0});
+    circuit.Add(reference, {0});
+    const Core::TransferFunctionRun run = Core::RunTransferFunction(circuit, {.OutputNode = 1, .InputSource = "V1"});
+    if (!run.Result) {
+        FAIL(run.Result.error());
+    }
+    // The source drives an open load, which ngspice reports around 1e20 ohm; it stays finite so it reads as an open
+    // circuit rather than nan or inf
+    CHECK(std::isfinite(run.Result->InputImpedance));
+    CHECK(run.Result->InputImpedance > 1e15);
+    // The output sits on the ideal source, which holds it at 0 ohm
+    CHECK(run.Result->OutputImpedance == 0.0);
+    CHECK_THAT(run.Result->Gain, Catch::Matchers::WithinRel(1.0, 1e-9));
+}
