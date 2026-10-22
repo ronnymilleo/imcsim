@@ -5,12 +5,12 @@
 
 #include "glow_renderer.h"
 
-#include "error_codes.h"
 #include "imgui_impl_sdlgpu3_shaders.h"
 #include <algorithm>
 #include <array>
 #include <cmath>
 #include <cstdint>
+#include <cstdlib>
 #include <cstring>
 #include <string_view>
 
@@ -19,12 +19,12 @@ namespace GUI {
 namespace {
 
 // Side of the falloff texture, in texels; the glow is smooth, so a small texture scales up without steps
-constexpr std::uint32_t TextureSize = 64;
+constexpr std::uint32_t TEXTURE_SIZE = 64;
 // The falloff is a broad halo plus a narrow core, so a glow looks hot in the middle. The core width is a fraction of
 // the radius and the weights add up to 1, the alpha at the center
-constexpr float HaloWeight = 0.65f;
-constexpr float CoreWeight = 0.35f;
-constexpr float CoreWidth = 0.2f;
+constexpr float HALO_WEIGHT = 0.65f;
+constexpr float CORE_WEIGHT = 0.35f;
+constexpr float CORE_WIDTH = 0.2f;
 
 // Alpha of the glow at a distance from its center, as a fraction of its radius
 float Falloff(const float distance) {
@@ -32,8 +32,8 @@ float Falloff(const float distance) {
         return 0.0f;
     }
     const float halo = (1.0f - distance) * (1.0f - distance);
-    const float core = std::exp(-(distance / CoreWidth) * (distance / CoreWidth));
-    return HaloWeight * halo + CoreWeight * core;
+    const float core = std::exp(-(distance / CORE_WIDTH) * (distance / CORE_WIDTH));
+    return HALO_WEIGHT * halo + CORE_WEIGHT * core;
 }
 
 } // namespace
@@ -42,14 +42,14 @@ float Falloff(const float distance) {
  * @brief   Creates the additive pipeline and the falloff texture.
  * @param[in] device         GPU device the ImGui backend renders with.
  * @param[in] target_format  Format of the texture the frame is drawn to, the one the ImGui backend was given.
- * @return  Core::ExitSuccess on success, Core::ExitFailure if a GPU object cannot be created; SDL_GetError() tells
+ * @return  EXIT_SUCCESS on success, EXIT_FAILURE if a GPU object cannot be created; SDL_GetError() tells
  *          why. Shutdown() releases what was created either way.
  * @note    Call it after the ImGui backend is initialized; the pipeline matches its sample count of one.
  */
 int GlowRenderer::Init(SDL_GPUDevice *device, const SDL_GPUTextureFormat target_format) {
     m_Device = device;
-    if (CreatePipeline(target_format) != Core::ExitSuccess) {
-        return Core::ExitFailure;
+    if (CreatePipeline(target_format) != EXIT_SUCCESS) {
+        return EXIT_FAILURE;
     }
     return CreateTexture();
 }
@@ -169,7 +169,7 @@ int GlowRenderer::CreatePipeline(const SDL_GPUTextureFormat target_format) {
                 SDL_ReleaseGPUShader(m_Device, shader);
             }
         }
-        return Core::ExitFailure;
+        return EXIT_FAILURE;
     }
 
     SDL_GPUVertexBufferDescription buffer_description{};
@@ -215,19 +215,19 @@ int GlowRenderer::CreatePipeline(const SDL_GPUTextureFormat target_format) {
     // The pipeline keeps what it needs from the shaders
     SDL_ReleaseGPUShader(m_Device, vertex_shader);
     SDL_ReleaseGPUShader(m_Device, fragment_shader);
-    return m_Pipeline != nullptr ? Core::ExitSuccess : Core::ExitFailure;
+    return m_Pipeline != nullptr ? EXIT_SUCCESS : EXIT_FAILURE;
 }
 
 // White texels whose alpha falls off from the center, so the vertex color of each glow tints it
 int GlowRenderer::CreateTexture() {
-    std::array<std::uint8_t, TextureSize * TextureSize * 4> texels{};
-    for (std::uint32_t row = 0; row < TextureSize; ++row) {
-        for (std::uint32_t column = 0; column < TextureSize; ++column) {
+    std::array<std::uint8_t, TEXTURE_SIZE * TEXTURE_SIZE * 4> texels{};
+    for (std::uint32_t row = 0; row < TEXTURE_SIZE; ++row) {
+        for (std::uint32_t column = 0; column < TEXTURE_SIZE; ++column) {
             // Texel centers, from -1 to 1 across the texture
-            const float x = (static_cast<float>(column) + 0.5f) / TextureSize * 2.0f - 1.0f;
-            const float y = (static_cast<float>(row) + 0.5f) / TextureSize * 2.0f - 1.0f;
+            const float x = (static_cast<float>(column) + 0.5f) / TEXTURE_SIZE * 2.0f - 1.0f;
+            const float y = (static_cast<float>(row) + 0.5f) / TEXTURE_SIZE * 2.0f - 1.0f;
             const float alpha = std::clamp(Falloff(std::sqrt(x * x + y * y)), 0.0f, 1.0f);
-            std::uint8_t *texel = &texels[(row * TextureSize + column) * 4];
+            std::uint8_t *texel = &texels[(row * TEXTURE_SIZE + column) * 4];
             texel[0] = texel[1] = texel[2] = 255;
             texel[3] = static_cast<std::uint8_t>(std::lround(alpha * 255.0f));
         }
@@ -237,14 +237,14 @@ int GlowRenderer::CreateTexture() {
     texture_info.type = SDL_GPU_TEXTURETYPE_2D;
     texture_info.format = SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM;
     texture_info.usage = SDL_GPU_TEXTUREUSAGE_SAMPLER;
-    texture_info.width = TextureSize;
-    texture_info.height = TextureSize;
+    texture_info.width = TEXTURE_SIZE;
+    texture_info.height = TEXTURE_SIZE;
     texture_info.layer_count_or_depth = 1;
     texture_info.num_levels = 1;
     texture_info.sample_count = SDL_GPU_SAMPLECOUNT_1;
     m_Texture = SDL_CreateGPUTexture(m_Device, &texture_info);
     if (m_Texture == nullptr) {
-        return Core::ExitFailure;
+        return EXIT_FAILURE;
     }
 
     SDL_GPUTransferBufferCreateInfo transfer_info{};
@@ -252,12 +252,12 @@ int GlowRenderer::CreateTexture() {
     transfer_info.size = static_cast<Uint32>(texels.size());
     SDL_GPUTransferBuffer *transfer_buffer = SDL_CreateGPUTransferBuffer(m_Device, &transfer_info);
     if (transfer_buffer == nullptr) {
-        return Core::ExitFailure;
+        return EXIT_FAILURE;
     }
     void *mapped = SDL_MapGPUTransferBuffer(m_Device, transfer_buffer, false);
     if (mapped == nullptr) {
         SDL_ReleaseGPUTransferBuffer(m_Device, transfer_buffer);
-        return Core::ExitFailure;
+        return EXIT_FAILURE;
     }
     std::memcpy(mapped, texels.data(), texels.size());
     SDL_UnmapGPUTransferBuffer(m_Device, transfer_buffer);
@@ -265,22 +265,22 @@ int GlowRenderer::CreateTexture() {
     SDL_GPUCommandBuffer *command_buffer = SDL_AcquireGPUCommandBuffer(m_Device);
     if (command_buffer == nullptr) {
         SDL_ReleaseGPUTransferBuffer(m_Device, transfer_buffer);
-        return Core::ExitFailure;
+        return EXIT_FAILURE;
     }
     SDL_GPUCopyPass *copy_pass = SDL_BeginGPUCopyPass(command_buffer);
     SDL_GPUTextureTransferInfo source{};
     source.transfer_buffer = transfer_buffer;
     SDL_GPUTextureRegion destination{};
     destination.texture = m_Texture;
-    destination.w = TextureSize;
-    destination.h = TextureSize;
+    destination.w = TEXTURE_SIZE;
+    destination.h = TEXTURE_SIZE;
     destination.d = 1;
     SDL_UploadToGPUTexture(copy_pass, &source, &destination, false);
     SDL_EndGPUCopyPass(copy_pass);
     const bool submitted = SDL_SubmitGPUCommandBuffer(command_buffer);
     // A released transfer buffer lives until the copy that uses it is done
     SDL_ReleaseGPUTransferBuffer(m_Device, transfer_buffer);
-    return submitted ? Core::ExitSuccess : Core::ExitFailure;
+    return submitted ? EXIT_SUCCESS : EXIT_FAILURE;
 }
 
 // Draw callback that switches to the additive pipeline. The backend keeps its buffers, viewport and uniforms bound

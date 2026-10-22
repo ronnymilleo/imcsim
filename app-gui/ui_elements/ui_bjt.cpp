@@ -12,13 +12,13 @@ namespace GUI {
 
 namespace {
 
-constexpr float BarX = -0.4f;
-constexpr float BarHalfHeight = 0.6f;
+constexpr float BAR_X = -0.4f;
+constexpr float BAR_HALF_HEIGHT = 0.6f;
 // Where the collector and emitter leave the bar
-constexpr float JunctionY = 0.3f;
+constexpr float JUNCTION_Y = 0.3f;
 // How far along the emitter, from the bar, the arrow tip sits
-constexpr float NPNArrowPosition = 0.8f;
-constexpr float PNPArrowPosition = 0.3f;
+constexpr float NPN_ARROW_POSITION = 0.8f;
+constexpr float PNP_ARROW_POSITION = 0.3f;
 
 } // namespace
 
@@ -34,21 +34,21 @@ UIBJT::UIBJT(const Core::ComponentType type, const GridPoint position, const Rot
 
 void UIBJT::DrawSymbol(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color,
                        SymbolStyle /*style*/) const {
-    canvas.AddLine(LocalToScreen(view, -1, 0), LocalToScreen(view, BarX, 0), color, LineThickness);
-    canvas.AddLine(LocalToScreen(view, BarX, -BarHalfHeight), LocalToScreen(view, BarX, BarHalfHeight), color,
-                   LineThickness);
-    canvas.AddLine(LocalToScreen(view, BarX, -JunctionY), LocalToScreen(view, 1, -1), color, LineThickness);
-    canvas.AddLine(LocalToScreen(view, BarX, JunctionY), LocalToScreen(view, 1, 1), color, LineThickness);
+    canvas.AddLine(LocalToScreen(view, -1, 0), LocalToScreen(view, BAR_X, 0), color, LINE_THICKNESS);
+    canvas.AddLine(LocalToScreen(view, BAR_X, -BAR_HALF_HEIGHT), LocalToScreen(view, BAR_X, BAR_HALF_HEIGHT), color,
+                   LINE_THICKNESS);
+    canvas.AddLine(LocalToScreen(view, BAR_X, -JUNCTION_Y), LocalToScreen(view, 1, -1), color, LINE_THICKNESS);
+    canvas.AddLine(LocalToScreen(view, BAR_X, JUNCTION_Y), LocalToScreen(view, 1, 1), color, LINE_THICKNESS);
 
-    const ImVec2 emitter_start = {BarX, JunctionY};
-    const ImVec2 emitter = {1.0f - BarX, 1.0f - JunctionY};
+    const ImVec2 emitter_start = {BAR_X, JUNCTION_Y};
+    const ImVec2 emitter = {1.0f - BAR_X, 1.0f - JUNCTION_Y};
     if (GetComponent().GetType() == Core::ComponentType::NPN) {
-        const ImVec2 tip = {emitter_start.x + emitter.x * NPNArrowPosition,
-                            emitter_start.y + emitter.y * NPNArrowPosition};
+        const ImVec2 tip = {emitter_start.x + emitter.x * NPN_ARROW_POSITION,
+                            emitter_start.y + emitter.y * NPN_ARROW_POSITION};
         DrawArrowHead(canvas, view, tip, emitter, color);
     } else {
-        const ImVec2 tip = {emitter_start.x + emitter.x * PNPArrowPosition,
-                            emitter_start.y + emitter.y * PNPArrowPosition};
+        const ImVec2 tip = {emitter_start.x + emitter.x * PNP_ARROW_POSITION,
+                            emitter_start.y + emitter.y * PNP_ARROW_POSITION};
         DrawArrowHead(canvas, view, tip, {-emitter.x, -emitter.y}, color);
     }
 }

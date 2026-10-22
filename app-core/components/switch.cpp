@@ -36,7 +36,7 @@ void Switch::SetClosed(const bool closed) {
  * @return  True for a switch and a push button.
  */
 bool IsSwitch(const ComponentType type) {
-    return type == ComponentType::Switch || type == ComponentType::PushButton;
+    return type == ComponentType::SWITCH || type == ComponentType::PUSH_BUTTON;
 }
 
 } // namespace Core

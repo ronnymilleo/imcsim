@@ -16,12 +16,12 @@ namespace GUI {
 
 namespace {
 
-constexpr const char *DiscardPopup = "Discard changes?";
-constexpr const char *MessagesPopup = "File messages";
-constexpr const char *ExportPopup = "Export schematic";
+constexpr const char *DISCARD_POPUP = "Discard changes?";
+constexpr const char *MESSAGES_POPUP = "File messages";
+constexpr const char *EXPORT_POPUP = "Export schematic";
 // Must stay valid until the dialog callback runs, so it lives for the whole program
-constexpr std::array<SDL_DialogFileFilter, 1> SchematicFilters = {{{"imcsim schematic", "imcsim"}}};
-constexpr std::array<SDL_DialogFileFilter, 1> SVGFilters = {{{"SVG image", "svg"}}};
+constexpr std::array<SDL_DialogFileFilter, 1> SCHEMATIC_FILTERS = {{{"imcsim schematic", "imcsim"}}};
+constexpr std::array<SDL_DialogFileFilter, 1> SVG_FILTERS = {{{"SVG image", "svg"}}};
 
 } // namespace
 
@@ -58,16 +58,16 @@ void SchematicFileActions::DrawPopups() {
     // Centered each time they appear, like the export popup, instead of where imgui.ini remembers them
     const ImVec2 center = ImGui::GetMainViewport()->GetCenter();
     ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-    if (ImGui::BeginPopupModal(DiscardPopup, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+    if (ImGui::BeginPopupModal(DISCARD_POPUP, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
         ImGui::TextUnformatted("The schematic has unsaved changes. Discard them?");
         if (ImGui::Button("Discard")) {
-            if (m_ActionToConfirm == FileAction::New) {
+            if (m_ActionToConfirm == FileAction::NEW) {
                 NewSchematic();
-            } else if (m_ActionToConfirm == FileAction::Open) {
-                ShowFileDialog(FileAction::Open);
-            } else if (m_ActionToConfirm == FileAction::Quit) {
+            } else if (m_ActionToConfirm == FileAction::OPEN) {
+                ShowFileDialog(FileAction::OPEN);
+            } else if (m_ActionToConfirm == FileAction::QUIT) {
                 m_QuitConfirmed = true;
-            } else if (m_ActionToConfirm == FileAction::Example) {
+            } else if (m_ActionToConfirm == FileAction::EXAMPLE) {
                 OpenExample(*m_ExampleToOpen);
             }
             m_ActionToConfirm.reset();
@@ -82,7 +82,7 @@ void SchematicFileActions::DrawPopups() {
     }
 
     ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-    if (ImGui::BeginPopupModal(MessagesPopup, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+    if (ImGui::BeginPopupModal(MESSAGES_POPUP, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
         ImGui::TextUnformatted(m_MessagesTitle.c_str());
         ImGui::Separator();
         for (const std::string &message : m_Messages) {
@@ -145,8 +145,8 @@ void SchematicFileActions::RequestImport(std::filesystem::path path) {
  */
 void SchematicFileActions::RequestNew() {
     if (m_Schematic.IsModified()) {
-        m_ActionToConfirm = FileAction::New;
-        ImGui::OpenPopup(DiscardPopup);
+        m_ActionToConfirm = FileAction::NEW;
+        ImGui::OpenPopup(DISCARD_POPUP);
     } else {
         NewSchematic();
     }
@@ -157,10 +157,10 @@ void SchematicFileActions::RequestNew() {
  */
 void SchematicFileActions::RequestOpen() {
     if (m_Schematic.IsModified()) {
-        m_ActionToConfirm = FileAction::Open;
-        ImGui::OpenPopup(DiscardPopup);
+        m_ActionToConfirm = FileAction::OPEN;
+        ImGui::OpenPopup(DISCARD_POPUP);
     } else {
-        ShowFileDialog(FileAction::Open);
+        ShowFileDialog(FileAction::OPEN);
     }
 }
 
@@ -171,7 +171,7 @@ void SchematicFileActions::Save() {
     if (const auto &file_path = m_Schematic.GetFilePath()) {
         SaveFile(*file_path);
     } else {
-        ShowFileDialog(FileAction::Save);
+        ShowFileDialog(FileAction::SAVE);
     }
 }
 
@@ -179,14 +179,14 @@ void SchematicFileActions::Save() {
  * @brief   Shows the dialog to save the schematic to a new file.
  */
 void SchematicFileActions::SaveAs() {
-    ShowFileDialog(FileAction::Save);
+    ShowFileDialog(FileAction::SAVE);
 }
 
 /**
  * @brief   Shows the dialog to pick a file whose circuit joins the schematic.
  */
 void SchematicFileActions::Import() {
-    ShowFileDialog(FileAction::Import);
+    ShowFileDialog(FileAction::IMPORT);
 }
 
 /**
@@ -194,7 +194,7 @@ void SchematicFileActions::Import() {
  * @note    Call it from where DrawPopups() runs, so ImGui finds the popup in the same ID stack.
  */
 void SchematicFileActions::OpenExportPopup() {
-    ImGui::OpenPopup(ExportPopup);
+    ImGui::OpenPopup(EXPORT_POPUP);
 }
 
 void SchematicFileActions::HandleQuitRequest() {
@@ -202,8 +202,8 @@ void SchematicFileActions::HandleQuitRequest() {
         return;
     }
     if (m_Schematic.IsModified()) {
-        m_ActionToConfirm = FileAction::Quit;
-        ImGui::OpenPopup(DiscardPopup);
+        m_ActionToConfirm = FileAction::QUIT;
+        ImGui::OpenPopup(DISCARD_POPUP);
     } else {
         m_QuitConfirmed = true;
     }
@@ -222,8 +222,8 @@ void SchematicFileActions::HandleExampleRequest() {
     }
     if (m_Schematic.IsModified()) {
         m_ExampleToOpen = example;
-        m_ActionToConfirm = FileAction::Example;
-        ImGui::OpenPopup(DiscardPopup);
+        m_ActionToConfirm = FileAction::EXAMPLE;
+        ImGui::OpenPopup(DISCARD_POPUP);
     } else {
         OpenExample(*example);
     }
@@ -310,8 +310,8 @@ void SchematicFileActions::InsertExample(const Example &example) {
 
 // Dialogs do not always add the extension, so it is added here when missing
 void SchematicFileActions::SaveFile(std::filesystem::path path) {
-    if (path.extension() != SchematicExtension) {
-        path += SchematicExtension;
+    if (path.extension() != SCHEMATIC_EXTENSION) {
+        path += SCHEMATIC_EXTENSION;
     }
     const auto written =
         WriteTextFile(path, SaveSchematic(m_Schematic.GetElements(), m_Schematic.GetWires(),
@@ -330,18 +330,18 @@ void SchematicFileActions::ShowFileDialog(const FileAction action) {
     }
     m_DialogAction = action;
     const auto &file_path = m_Schematic.GetFilePath();
-    if (action == FileAction::ExportSchematic) {
+    if (action == FileAction::EXPORT_SCHEMATIC) {
         // Next to the schematic and named after it, like the exported plots
         const std::string stem = file_path ? file_path->stem().string() : "circuit";
         const std::filesystem::path name = std::format("{}-schematic.svg", stem);
-        m_FileDialog.ShowSave(SVGFilters, (file_path ? file_path->parent_path() / name : name).string());
+        m_FileDialog.ShowSave(SVG_FILTERS, (file_path ? file_path->parent_path() / name : name).string());
         return;
     }
     std::string location = file_path ? file_path->string() : "";
-    if (action == FileAction::Open || action == FileAction::Import) {
-        m_FileDialog.ShowOpen(SchematicFilters, std::move(location));
+    if (action == FileAction::OPEN || action == FileAction::IMPORT) {
+        m_FileDialog.ShowOpen(SCHEMATIC_FILTERS, std::move(location));
     } else {
-        m_FileDialog.ShowSave(SchematicFilters, std::move(location));
+        m_FileDialog.ShowSave(SCHEMATIC_FILTERS, std::move(location));
     }
 }
 
@@ -354,13 +354,13 @@ void SchematicFileActions::ProcessDialogResult() {
     if (!*result) {
         return;
     }
-    if (action == FileAction::Open) {
+    if (action == FileAction::OPEN) {
         OpenFile(**result);
-    } else if (action == FileAction::Save) {
+    } else if (action == FileAction::SAVE) {
         SaveFile(**result);
-    } else if (action == FileAction::ExportSchematic) {
+    } else if (action == FileAction::EXPORT_SCHEMATIC) {
         ExportSchematic(**result);
-    } else if (action == FileAction::Import) {
+    } else if (action == FileAction::IMPORT) {
         ImportFile(**result);
     }
 }
@@ -368,7 +368,7 @@ void SchematicFileActions::ProcessDialogResult() {
 // The image follows the editor: the symbol style chosen in the View menu, names, values and probes
 void SchematicFileActions::DrawExportPopup() {
     ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-    if (!ImGui::BeginPopupModal(ExportPopup, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+    if (!ImGui::BeginPopupModal(EXPORT_POPUP, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
         return;
     }
     ImGui::TextDisabled("As shown: symbols, names, values, terminal numbers and the probes of the plots");
@@ -387,7 +387,7 @@ void SchematicFileActions::DrawExportPopup() {
     }
     ImGui::BeginDisabled(empty || m_FileDialog.IsPending());
     if (PrimaryButton("Save SVG...")) {
-        ShowFileDialog(FileAction::ExportSchematic);
+        ShowFileDialog(FileAction::EXPORT_SCHEMATIC);
         ImGui::CloseCurrentPopup();
     }
     ImGui::EndDisabled();
@@ -415,7 +415,7 @@ void SchematicFileActions::ExportSchematic(std::filesystem::path path) {
 void SchematicFileActions::ShowMessages(std::string title, std::vector<std::string> messages) {
     m_MessagesTitle = std::move(title);
     m_Messages = std::move(messages);
-    ImGui::OpenPopup(MessagesPopup);
+    ImGui::OpenPopup(MESSAGES_POPUP);
 }
 
 } // namespace GUI

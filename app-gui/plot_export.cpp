@@ -37,7 +37,7 @@ struct ExportTheme {
 };
 
 // Dark follows Graphite, the default theme of the application; light is plain black on white for print
-constexpr ExportTheme DarkTheme = {
+constexpr ExportTheme DARK_THEME = {
     .Background = {30, 34, 41},
     .PlotBackground = {22, 25, 30},
     .Text = {225, 230, 237},
@@ -47,7 +47,7 @@ constexpr ExportTheme DarkTheme = {
     .GridOpacity = 0.08,
     .MinorGridOpacity = 0.035,
 };
-constexpr ExportTheme LightTheme = {
+constexpr ExportTheme LIGHT_THEME = {
     .Background = {255, 255, 255},
     .PlotBackground = {255, 255, 255},
     .Text = {30, 30, 30},
@@ -59,31 +59,31 @@ constexpr ExportTheme LightTheme = {
 };
 
 // Sizes in pixels of a 1600x900 image
-constexpr double DesignWidth = 1600.0;
-constexpr double DesignHeight = 900.0;
-constexpr double MinScale = 0.45;
-constexpr double MaxScale = 3.0;
-constexpr double OuterMargin = 18.0;
-constexpr double TickFont = 14.0;
-constexpr double AxisNameFont = 16.0;
-constexpr double TitleFont = 16.0;
-constexpr double LegendFont = 14.0;
-constexpr double NoteFont = 13.0;
-constexpr double TickLength = 5.0;
-constexpr double TickGap = 8.0;
-constexpr double LineWidth = 2.0;
-constexpr double HeavyLineWidth = 2.6;
-constexpr double DashLength = 8.0;
-constexpr double DashGap = 5.0;
-constexpr double LegendSample = 26.0;
-constexpr double LegendSpacing = 20.0;
-constexpr double MinPlotSize = 40.0;
+constexpr double DESIGN_WIDTH = 1600.0;
+constexpr double DESIGN_HEIGHT = 900.0;
+constexpr double MIN_SCALE = 0.45;
+constexpr double MAX_SCALE = 3.0;
+constexpr double OUTER_MARGIN = 18.0;
+constexpr double TICK_FONT = 14.0;
+constexpr double AXIS_NAME_FONT = 16.0;
+constexpr double TITLE_FONT = 16.0;
+constexpr double LEGEND_FONT = 14.0;
+constexpr double NOTE_FONT = 13.0;
+constexpr double TICK_LENGTH = 5.0;
+constexpr double TICK_GAP = 8.0;
+constexpr double LINE_WIDTH = 2.0;
+constexpr double HEAVY_LINE_WIDTH = 2.6;
+constexpr double DASH_LENGTH = 8.0;
+constexpr double DASH_GAP = 5.0;
+constexpr double LEGEND_SAMPLE = 26.0;
+constexpr double LEGEND_SPACING = 20.0;
+constexpr double MIN_PLOT_SIZE = 40.0;
 // Average advance of a sans-serif character, in font sizes
-constexpr double CharacterWidth = 0.56;
+constexpr double CHARACTER_WIDTH = 0.56;
 // Data range added above and below the traces, as a fraction of it
-constexpr double YPadding = 0.08;
+constexpr double Y_PADDING = 0.08;
 // Samples closer than this to the last one drawn, in pixels, add nothing to the line
-constexpr double MinPointDistance = 0.5;
+constexpr double MIN_POINT_DISTANCE = 0.5;
 
 /**
  * @struct  Prefix
@@ -94,7 +94,7 @@ struct Prefix {
     double Factor;
 };
 
-constexpr auto Prefixes = std::to_array<Prefix>({
+constexpr auto PREFIXES = std::to_array<Prefix>({
     {"T", 1e12},
     {"G", 1e9},
     {"M", 1e6},
@@ -112,7 +112,7 @@ constexpr auto Prefixes = std::to_array<Prefix>({
 // region Text and SVG helpers
 
 double EstimateTextWidth(const std::string_view text, const double font_size) {
-    return CharacterWidth * font_size * static_cast<double>(text.size());
+    return CHARACTER_WIDTH * font_size * static_cast<double>(text.size());
 }
 
 // endregion
@@ -196,11 +196,11 @@ ValueRange FindYRange(const ExportFigure &figure, const ExportPanel &panel, cons
     if (logarithmic) {
         const double low = std::log10(range.Low);
         const double high = std::max(std::log10(range.High), low + 1.0);
-        const double padding = (high - low) * YPadding;
+        const double padding = (high - low) * Y_PADDING;
         return {std::pow(10.0, low - padding), std::pow(10.0, high + padding)};
     }
     range = Widen(range);
-    const double padding = (range.High - range.Low) * YPadding;
+    const double padding = (range.High - range.Low) * Y_PADDING;
     return {range.Low - padding, range.High + padding};
 }
 
@@ -210,12 +210,12 @@ const Prefix &ChoosePrefix(const std::vector<double> &ticks) {
     for (const double tick : ticks) {
         largest = std::max(largest, std::abs(tick));
     }
-    for (const Prefix &prefix : Prefixes) {
+    for (const Prefix &prefix : PREFIXES) {
         if (largest >= prefix.Factor) {
             return prefix;
         }
     }
-    return Prefixes.back();
+    return PREFIXES.back();
 }
 
 std::vector<std::string> FormatLinearTicks(const std::vector<double> &ticks, const ExportAxis &axis) {
@@ -319,12 +319,12 @@ std::size_t PlaceLegend(const ExportPanel &panel, const double max_width, const 
         if (series.LegendLabel.empty()) {
             continue;
         }
-        const double width = (LegendSample + 6.0) * scale + EstimateTextWidth(series.LegendLabel, LegendFont * scale);
-        if (row_width > 0.0 && row_width + LegendSpacing * scale + width > max_width) {
+        const double width = (LEGEND_SAMPLE + 6.0) * scale + EstimateTextWidth(series.LegendLabel, LEGEND_FONT * scale);
+        if (row_width > 0.0 && row_width + LEGEND_SPACING * scale + width > max_width) {
             ++row;
             row_width = 0.0;
         }
-        row_width += (row_width > 0.0 ? LegendSpacing * scale : 0.0) + width;
+        row_width += (row_width > 0.0 ? LEGEND_SPACING * scale : 0.0) + width;
         entries.push_back({&series, row, width});
     }
     return entries.empty() ? 0 : row + 1;
@@ -377,8 +377,8 @@ std::vector<std::vector<SvgPoint>> BuildRuns(const ExportFigure &figure, const E
         const SvgPoint point = {frame.ToPixelX(x), frame.ToPixelY(y, y_axis)};
         std::vector<SvgPoint> &run = runs.back();
         const bool is_last = index + 1 == count;
-        if (run.size() >= 2 && !is_last && std::abs(point.X - run.back().X) < MinPointDistance &&
-            std::abs(point.Y - run.back().Y) < MinPointDistance) {
+        if (run.size() >= 2 && !is_last && std::abs(point.X - run.back().X) < MIN_POINT_DISTANCE &&
+            std::abs(point.Y - run.back().Y) < MIN_POINT_DISTANCE) {
             continue;
         }
         run.push_back(point);
@@ -388,12 +388,12 @@ std::vector<std::vector<SvgPoint>> BuildRuns(const ExportFigure &figure, const E
 }
 
 std::string DashPattern(const double scale) {
-    return std::format("{} {}", FormatCoordinate(DashLength * scale), FormatCoordinate(DashGap * scale));
+    return std::format("{} {}", FormatCoordinate(DASH_LENGTH * scale), FormatCoordinate(DASH_GAP * scale));
 }
 
 void DrawSeries(SvgWriter &svg, const ExportFigure &figure, const ExportSeries &series, const Frame &frame,
                 const YAxisLayout &y_axis, const ExportColor color, const double scale) {
-    const double width = (series.Heavy ? HeavyLineWidth : LineWidth) * scale;
+    const double width = (series.Heavy ? HEAVY_LINE_WIDTH : LINE_WIDTH) * scale;
     for (const auto &run : BuildRuns(figure, series, frame, y_axis)) {
         svg.Polyline(run, color, width, series.Dashed ? DashPattern(scale) : "");
     }
@@ -404,7 +404,7 @@ void DrawNote(SvgWriter &svg, const ExportNote &note, const Frame &frame, const 
               const ExportTheme &theme, const double scale) {
     const double x = frame.ToPixelX(note.X);
     const double y = frame.ToPixelY(note.Y, y_axis);
-    const double font_size = NoteFont * scale;
+    const double font_size = NOTE_FONT * scale;
     const double width = EstimateTextWidth(note.Text, font_size);
     const double padding = 3.0 * scale;
     const bool to_left = x + 4.0 * scale + width + 2.0 * padding > frame.Left + frame.Width;
@@ -414,18 +414,18 @@ void DrawNote(SvgWriter &svg, const ExportNote &note, const Frame &frame, const 
     }
     svg.Rectangle({box_left, y - font_size * 0.7 - padding}, width + 2.0 * padding, font_size * 1.4 + padding,
                   theme.Background, 0.85);
-    svg.Text({box_left + padding, y + font_size * 0.35}, note.Text, font_size, theme.Text, TextAnchor::Start);
+    svg.Text({box_left + padding, y + font_size * 0.35}, note.Text, font_size, theme.Text, TextAnchor::START);
 }
 
 void DrawLegend(SvgWriter &svg, const PanelLayout &layout, const Frame &frame, const ExportTheme &theme,
                 const bool dark, const double scale) {
-    const double row_height = LegendFont * scale * 1.6;
+    const double row_height = LEGEND_FONT * scale * 1.6;
     const double first_row_y = layout.Top + layout.HeaderHeight - static_cast<double>(layout.LegendRows) * row_height;
     for (std::size_t row = 0; row < layout.LegendRows; ++row) {
         double row_width = 0.0;
         for (const LegendEntry &entry : layout.Legend) {
             if (entry.Row == row) {
-                row_width += (row_width > 0.0 ? LegendSpacing * scale : 0.0) + entry.Width;
+                row_width += (row_width > 0.0 ? LEGEND_SPACING * scale : 0.0) + entry.Width;
             }
         }
         double x = frame.Left + frame.Width - row_width;
@@ -436,12 +436,12 @@ void DrawLegend(SvgWriter &svg, const PanelLayout &layout, const Frame &frame, c
             }
             const ExportSeries &series = *entry.Series;
             const ExportColor color = dark ? series.Color : AdjustColorForPrint(series.Color);
-            const double width = (series.Heavy ? HeavyLineWidth : LineWidth) * scale;
-            svg.Polyline({{x, y}, {x + LegendSample * scale, y}}, color, width,
+            const double width = (series.Heavy ? HEAVY_LINE_WIDTH : LINE_WIDTH) * scale;
+            svg.Polyline({{x, y}, {x + LEGEND_SAMPLE * scale, y}}, color, width,
                          series.Dashed ? DashPattern(scale) : "");
-            svg.Text({x + (LegendSample + 6.0) * scale, y + LegendFont * scale * 0.35}, series.LegendLabel,
-                     LegendFont * scale, theme.Text, TextAnchor::Start);
-            x += entry.Width + LegendSpacing * scale;
+            svg.Text({x + (LEGEND_SAMPLE + 6.0) * scale, y + LEGEND_FONT * scale * 0.35}, series.LegendLabel,
+                     LEGEND_FONT * scale, theme.Text, TextAnchor::START);
+            x += entry.Width + LEGEND_SPACING * scale;
         }
     }
 }
@@ -453,9 +453,9 @@ void DrawXAxis(SvgWriter &svg, const ExportFigure &figure, const Frame &frame, c
     const double bottom = frame.Top + frame.Height;
     for (std::size_t index = 0; index < ticks.size(); ++index) {
         const double x = frame.ToPixelX(ticks[index]);
-        svg.Line({x, bottom}, {x, bottom + TickLength * scale}, theme.MutedText, scale);
-        svg.Text({x, bottom + (TickLength + TickGap) * scale + TickFont * scale * 0.8}, labels[index], TickFont * scale,
-                 theme.MutedText, TextAnchor::Middle);
+        svg.Line({x, bottom}, {x, bottom + TICK_LENGTH * scale}, theme.MutedText, scale);
+        svg.Text({x, bottom + (TICK_LENGTH + TICK_GAP) * scale + TICK_FONT * scale * 0.8}, labels[index],
+                 TICK_FONT * scale, theme.MutedText, TextAnchor::MIDDLE);
     }
 }
 
@@ -475,20 +475,20 @@ void DrawYAxes(SvgWriter &svg, const ExportPanel &panel, const PanelLayout &layo
         }
         for (std::size_t index = 0; index < axis_layout.Ticks.size(); ++index) {
             const double y = frame.ToPixelY(axis_layout.Ticks[index], axis_layout);
-            svg.Line({edge, y}, {edge + direction * TickLength * scale, y}, theme.MutedText, scale);
-            svg.Text({edge + direction * (TickLength + 3.0) * scale, y + TickFont * scale * 0.35},
-                     axis_layout.Labels[index], TickFont * scale, theme.MutedText,
-                     left ? TextAnchor::End : TextAnchor::Start);
+            svg.Line({edge, y}, {edge + direction * TICK_LENGTH * scale, y}, theme.MutedText, scale);
+            svg.Text({edge + direction * (TICK_LENGTH + 3.0) * scale, y + TICK_FONT * scale * 0.35},
+                     axis_layout.Labels[index], TICK_FONT * scale, theme.MutedText,
+                     left ? TextAnchor::END : TextAnchor::START);
         }
         if (left) {
-            svg.Text({columns.LeftNameX, name_y}, panel.YAxes[axis].Name, AxisNameFont * scale, theme.MutedText,
-                     TextAnchor::Middle, true);
+            svg.Text({columns.LeftNameX, name_y}, panel.YAxes[axis].Name, AXIS_NAME_FONT * scale, theme.MutedText,
+                     TextAnchor::MIDDLE, true);
             continue;
         }
         // A vertical name extends left of its baseline by about its ascent
         const double width = columns.RightWidths[axis - 1];
-        svg.Text({edge + width - AxisNameFont * scale * 0.4, name_y}, panel.YAxes[axis].Name, AxisNameFont * scale,
-                 theme.MutedText, TextAnchor::Middle, true);
+        svg.Text({edge + width - AXIS_NAME_FONT * scale * 0.4, name_y}, panel.YAxes[axis].Name, AXIS_NAME_FONT * scale,
+                 theme.MutedText, TextAnchor::MIDDLE, true);
         right_edge += width;
     }
 }
@@ -524,7 +524,7 @@ void DrawGrid(SvgWriter &svg, const ExportFigure &figure, const PanelLayout &lay
 
 void DrawPanel(SvgWriter &svg, const ExportFigure &figure, const ExportPanel &panel, const PanelLayout &layout,
                const Frame &frame, const AxisColumns &columns, const ExportStyle &style, const double scale) {
-    const ExportTheme &theme = style.Dark ? DarkTheme : LightTheme;
+    const ExportTheme &theme = style.Dark ? DARK_THEME : LIGHT_THEME;
     svg.Rectangle({frame.Left, frame.Top}, frame.Width, frame.Height, theme.PlotBackground);
     DrawGrid(svg, figure, layout, frame, theme, scale);
     svg.BeginClip({frame.Left, frame.Top}, frame.Width, frame.Height);
@@ -549,8 +549,8 @@ void DrawPanel(SvgWriter &svg, const ExportFigure &figure, const ExportPanel &pa
     DrawXAxis(svg, figure, frame, theme, scale);
     DrawYAxes(svg, panel, layout, frame, columns, theme, scale);
     if (!panel.Title.empty()) {
-        svg.Text({frame.Left, layout.Top + TitleFont * scale * 1.1}, panel.Title, TitleFont * scale, theme.Text,
-                 TextAnchor::Start);
+        svg.Text({frame.Left, layout.Top + TITLE_FONT * scale * 1.1}, panel.Title, TITLE_FONT * scale, theme.Text,
+                 TextAnchor::START);
     }
     DrawLegend(svg, layout, frame, theme, style.Dark, scale);
 }
@@ -596,10 +596,10 @@ std::string FormatCsvValue(const double value) {
  *          samples (NaN) break the lines, and dense ones closer than half a pixel are merged.
  */
 std::expected<std::string, std::string> RenderSvg(const ExportFigure &figure, const ExportStyle &style) {
-    if (style.Width < MinExportSize || style.Height < MinExportSize || style.Width > MaxExportSize ||
-        style.Height > MaxExportSize) {
+    if (style.Width < MIN_EXPORT_SIZE || style.Height < MIN_EXPORT_SIZE || style.Width > MAX_EXPORT_SIZE ||
+        style.Height > MAX_EXPORT_SIZE) {
         return std::unexpected(
-            std::format("Width and height must be between {} and {} pixels", MinExportSize, MaxExportSize));
+            std::format("Width and height must be between {} and {} pixels", MIN_EXPORT_SIZE, MAX_EXPORT_SIZE));
     }
     if (figure.Panels.empty() || figure.Xs.empty()) {
         return std::unexpected("There is nothing to export");
@@ -607,29 +607,29 @@ std::expected<std::string, std::string> RenderSvg(const ExportFigure &figure, co
 
     const auto width = static_cast<double>(style.Width);
     const auto height = static_cast<double>(style.Height);
-    const double scale = std::clamp(std::min(width / DesignWidth, height / DesignHeight), MinScale, MaxScale);
-    const double outer = OuterMargin * scale;
+    const double scale = std::clamp(std::min(width / DESIGN_WIDTH, height / DESIGN_HEIGHT), MIN_SCALE, MAX_SCALE);
+    const double outer = OUTER_MARGIN * scale;
     const ValueRange x_range = FindXRange(figure);
 
     // Heights: each panel has a header with its title and legend, and a row of X tick labels below; the last
     // panel also has the name of the X axis. The plots share the rest equally
     std::vector<PanelLayout> layouts(figure.Panels.size());
-    const double legend_row = LegendFont * scale * 1.6;
-    const double tick_row = (TickLength + TickGap) * scale + TickFont * scale * 1.2;
-    const double axis_name_row = AxisNameFont * scale * 1.8;
+    const double legend_row = LEGEND_FONT * scale * 1.6;
+    const double tick_row = (TICK_LENGTH + TICK_GAP) * scale + TICK_FONT * scale * 1.2;
+    const double axis_name_row = AXIS_NAME_FONT * scale * 1.8;
     double fixed_height = 2.0 * outer + axis_name_row;
     for (std::size_t index = 0; index < figure.Panels.size(); ++index) {
         const ExportPanel &panel = figure.Panels[index];
         PanelLayout &layout = layouts[index];
         // The legend wraps before it reaches the title, or most of the width when there is none
-        const double title_width = panel.Title.empty() ? 0.0 : EstimateTextWidth(panel.Title, TitleFont * scale);
+        const double title_width = panel.Title.empty() ? 0.0 : EstimateTextWidth(panel.Title, TITLE_FONT * scale);
         layout.LegendRows = PlaceLegend(panel, (width - 2.0 * outer) * 0.75 - title_width, scale, layout.Legend);
-        const double title_height = panel.Title.empty() ? 0.0 : TitleFont * scale * 1.6;
+        const double title_height = panel.Title.empty() ? 0.0 : TITLE_FONT * scale * 1.6;
         layout.HeaderHeight = std::max(title_height, static_cast<double>(layout.LegendRows) * legend_row) + 6.0 * scale;
         fixed_height += layout.HeaderHeight + tick_row;
     }
     const double plot_height =
-        std::max(MinPlotSize * scale, (height - fixed_height) / static_cast<double>(figure.Panels.size()));
+        std::max(MIN_PLOT_SIZE * scale, (height - fixed_height) / static_cast<double>(figure.Panels.size()));
 
     // Y axes, and from their tick labels the margins: the left axis on the left, the others outwards on the right
     double left_label_width = 0.0;
@@ -658,30 +658,31 @@ std::expected<std::string, std::string> RenderSvg(const ExportFigure &figure, co
                 axis_layout.Labels.push_back(tick.Label);
             }
             for (const std::string &label : axis_layout.Labels) {
-                axis_layout.LabelWidth = std::max(axis_layout.LabelWidth, EstimateTextWidth(label, TickFont * scale));
+                axis_layout.LabelWidth = std::max(axis_layout.LabelWidth, EstimateTextWidth(label, TICK_FONT * scale));
             }
             if (axis == 0) {
                 left_label_width = std::max(left_label_width, axis_layout.LabelWidth);
             } else {
                 const double axis_width =
-                    (TickLength + 3.0 + TickGap) * scale + axis_layout.LabelWidth + AxisNameFont * scale * 1.4;
+                    (TICK_LENGTH + 3.0 + TICK_GAP) * scale + axis_layout.LabelWidth + AXIS_NAME_FONT * scale * 1.4;
                 right_widths.resize(std::max(right_widths.size(), axis));
                 right_widths[axis - 1] = std::max(right_widths[axis - 1], axis_width);
             }
             layout.YAxes.push_back(std::move(axis_layout));
         }
     }
-    const double left = outer + AxisNameFont * scale * 1.4 + (TickLength + 3.0 + TickGap) * scale + left_label_width;
-    columns.LeftNameX = outer + AxisNameFont * scale;
+    const double left =
+        outer + AXIS_NAME_FONT * scale * 1.4 + (TICK_LENGTH + 3.0 + TICK_GAP) * scale + left_label_width;
+    columns.LeftNameX = outer + AXIS_NAME_FONT * scale;
     double right = outer;
     for (const double axis_width : right_widths) {
         right += axis_width;
     }
     // Room for half of the last X tick label when no axis is on the right
     right = std::max(right, outer + 30.0 * scale);
-    const double plot_width = std::max(MinPlotSize * scale, width - left - right);
+    const double plot_width = std::max(MIN_PLOT_SIZE * scale, width - left - right);
 
-    const ExportTheme &theme = style.Dark ? DarkTheme : LightTheme;
+    const ExportTheme &theme = style.Dark ? DARK_THEME : LIGHT_THEME;
     SvgWriter svg;
     double top = outer;
     Frame frame{left, 0.0, plot_width, plot_height, x_range, figure.XLogarithmic};
@@ -692,8 +693,8 @@ std::expected<std::string, std::string> RenderSvg(const ExportFigure &figure, co
         DrawPanel(svg, figure, figure.Panels[index], layout, frame, columns, style, scale);
         top = frame.Top + plot_height + tick_row;
     }
-    svg.Text({left + plot_width / 2.0, top + AxisNameFont * scale * 1.1}, figure.XAxis.Name, AxisNameFont * scale,
-             theme.MutedText, TextAnchor::Middle);
+    svg.Text({left + plot_width / 2.0, top + AXIS_NAME_FONT * scale * 1.1}, figure.XAxis.Name, AXIS_NAME_FONT * scale,
+             theme.MutedText, TextAnchor::MIDDLE);
     return svg.Finish({0.0, 0.0}, width, height, theme.Background);
 }
 

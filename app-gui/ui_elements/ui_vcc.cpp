@@ -15,10 +15,10 @@ namespace GUI {
 
 namespace {
 
-constexpr float LeadLength = 1.0f;
-constexpr float BarHalfWidth = 0.6f;
+constexpr float LEAD_LENGTH = 1.0f;
+constexpr float BAR_HALF_WIDTH = 0.6f;
 // The label starts a little past the bar
-constexpr float LabelOffset = 1.2f;
+constexpr float LABEL_OFFSET = 1.2f;
 
 } // namespace
 
@@ -32,19 +32,19 @@ UIVCC::UIVCC(const GridPoint position, const Rotation rotation)
 }
 
 void UIVCC::DrawTerminals(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color) const {
-    canvas.AddLine(LocalToScreen(view, 0, 0), LocalToScreen(view, 0, -LeadLength), color, LineThickness);
+    canvas.AddLine(LocalToScreen(view, 0, 0), LocalToScreen(view, 0, -LEAD_LENGTH), color, LINE_THICKNESS);
 }
 
 void UIVCC::DrawSymbol(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color,
                        SymbolStyle /*style*/) const {
-    canvas.AddLine(LocalToScreen(view, -BarHalfWidth, -LeadLength), LocalToScreen(view, BarHalfWidth, -LeadLength),
-                   color, LineThickness);
+    canvas.AddLine(LocalToScreen(view, -BAR_HALF_WIDTH, -LEAD_LENGTH),
+                   LocalToScreen(view, BAR_HALF_WIDTH, -LEAD_LENGTH), color, LINE_THICKNESS);
 }
 
 // The rail is labeled by its role and voltage past the bar; the SPICE name (V1) only matters in the netlist
 void UIVCC::DrawLabels(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color) const {
     const std::string label = std::format("VCC {}V", Core::FormatValue(GetComponent().GetValue()));
-    DrawLabel(canvas, view, {0.0f, -LabelOffset}, {0.0f, -1.0f}, label, color);
+    DrawLabel(canvas, view, {0.0f, -LABEL_OFFSET}, {0.0f, -1.0f}, label, color);
 }
 
 std::vector<GridPoint> UIVCC::GetLocalTerminals() const {

@@ -29,10 +29,10 @@ namespace Core {
 
 namespace {
 
-constexpr std::string_view OutputPrefix = "stdout ";
-constexpr std::string_view ErrorPrefix = "stderr ";
+constexpr std::string_view OUTPUT_PREFIX = "stdout ";
+constexpr std::string_view ERROR_PREFIX = "stderr ";
 // 1e-15 V is -300 dB
-constexpr double MinMagnitude = 1e-15;
+constexpr double MIN_MAGNITUDE = 1e-15;
 
 /**
  * @struct  NgspiceState
@@ -62,11 +62,11 @@ int HandleOutput(char *text, int /*id*/, void * /*user_data*/) {
         return 0;
     }
     std::string_view line(text);
-    const bool from_error_stream = line.starts_with(ErrorPrefix);
+    const bool from_error_stream = line.starts_with(ERROR_PREFIX);
     if (from_error_stream) {
-        line.remove_prefix(ErrorPrefix.size());
-    } else if (line.starts_with(OutputPrefix)) {
-        line.remove_prefix(OutputPrefix.size());
+        line.remove_prefix(ERROR_PREFIX.size());
+    } else if (line.starts_with(OUTPUT_PREFIX)) {
+        line.remove_prefix(OUTPUT_PREFIX.size());
     }
     if (!line.empty()) {
         messages->push_back({std::string(line), from_error_stream});
@@ -246,21 +246,21 @@ std::vector<CurrentVector> CurrentVectors(const Component &component) {
     }
     const std::string name = ToLower(component.GetName());
     switch (component.GetType()) {
-    case ComponentType::Resistor:
-    case ComponentType::Capacitor:
-    case ComponentType::Inductor:
+    case ComponentType::RESISTOR:
+    case ComponentType::CAPACITOR:
+    case ComponentType::INDUCTOR:
         return {{component.GetName(), std::format("@{}[i]", name)}};
     case ComponentType::VCC:
-    case ComponentType::VoltageSource:
-    case ComponentType::Clock:
-    case ComponentType::LogicInput:
+    case ComponentType::VOLTAGE_SOURCE:
+    case ComponentType::CLOCK:
+    case ComponentType::LOGIC_INPUT:
         return {{component.GetName(), BranchVectorName(name)}};
-    case ComponentType::CurrentSource:
+    case ComponentType::CURRENT_SOURCE:
         return {{component.GetName(), std::format("@{}[current]", name)}};
-    case ComponentType::Ground:
-    case ComponentType::NetLabel:
-    case ComponentType::Diode:
-    case ComponentType::ZenerDiode:
+    case ComponentType::GROUND:
+    case ComponentType::NET_LABEL:
+    case ComponentType::DIODE:
+    case ComponentType::ZENER_DIODE:
     case ComponentType::LED:
     case ComponentType::NPN:
     case ComponentType::PNP:
@@ -270,25 +270,25 @@ std::vector<CurrentVector> CurrentVectors(const Component &component) {
     case ComponentType::VCCS:
     case ComponentType::CCCS:
     case ComponentType::CCVS:
-    case ComponentType::OpAmp:
-    case ComponentType::Potentiometer:
-    case ComponentType::Switch:
-    case ComponentType::PushButton:
-    case ComponentType::VSwitch:
-    case ComponentType::Relay:
-    case ComponentType::Transformer:
-    case ComponentType::And:
-    case ComponentType::Or:
-    case ComponentType::Not:
-    case ComponentType::Nand:
-    case ComponentType::Nor:
-    case ComponentType::Xor:
-    case ComponentType::Xnor:
-    case ComponentType::Buffer:
-    case ComponentType::DFlipFlop:
-    case ComponentType::JKFlipFlop:
-    case ComponentType::TFlipFlop:
-    case ComponentType::SRFlipFlop:
+    case ComponentType::OP_AMP:
+    case ComponentType::POTENTIOMETER:
+    case ComponentType::SWITCH:
+    case ComponentType::PUSH_BUTTON:
+    case ComponentType::V_SWITCH:
+    case ComponentType::RELAY:
+    case ComponentType::TRANSFORMER:
+    case ComponentType::AND:
+    case ComponentType::OR:
+    case ComponentType::NOT:
+    case ComponentType::NAND:
+    case ComponentType::NOR:
+    case ComponentType::XOR:
+    case ComponentType::XNOR:
+    case ComponentType::BUFFER:
+    case ComponentType::D_FLIP_FLOP:
+    case ComponentType::JK_FLIP_FLOP:
+    case ComponentType::T_FLIP_FLOP:
+    case ComponentType::SR_FLIP_FLOP:
         break;
     }
     return {};
@@ -296,7 +296,7 @@ std::vector<CurrentVector> CurrentVectors(const Component &component) {
 
 // 20 log10 of the magnitude, with a floor that keeps a value the AC sources do not reach finite for plotting
 double ToDecibels(const std::complex<double> value) {
-    return 20.0 * std::log10(std::max(std::abs(value), MinMagnitude));
+    return 20.0 * std::log10(std::max(std::abs(value), MIN_MAGNITUDE));
 }
 
 double ToDegrees(const std::complex<double> value) {
@@ -384,35 +384,35 @@ ACCurrent(const CircuitEntry &entry, const std::vector<double> &frequencies,
     const Component &component = *entry.Part;
     std::vector<std::complex<double>> currents(frequencies.size());
     switch (component.GetType()) {
-    case ComponentType::Resistor:
-    case ComponentType::Capacitor:
+    case ComponentType::RESISTOR:
+    case ComponentType::CAPACITOR:
         for (std::size_t index = 0; index < frequencies.size(); ++index) {
             const std::complex<double> voltage = node_voltages[static_cast<std::size_t>(entry.Nodes[0])][index] -
                                                  node_voltages[static_cast<std::size_t>(entry.Nodes[1])][index];
             const std::complex<double> admittance =
-                component.GetType() == ComponentType::Resistor
+                component.GetType() == ComponentType::RESISTOR
                     ? std::complex<double>(1.0 / component.GetValue(), 0.0)
                     : std::complex<double>(0.0, 2.0 * std::numbers::pi * frequencies[index] * component.GetValue());
             currents[index] = voltage * admittance;
         }
         return currents;
-    case ComponentType::CurrentSource: {
+    case ComponentType::CURRENT_SOURCE: {
         // The source drives its AC magnitude at zero phase, and nothing when it is not AC
         const auto &source = static_cast<const Source &>(component);
         const double magnitude = source.GetSourceType() == Source::SourceType::AC ? source.GetAC().Magnitude : 0.0;
         std::ranges::fill(currents, std::complex<double>(magnitude, 0.0));
         return currents;
     }
-    case ComponentType::Inductor:
+    case ComponentType::INDUCTOR:
     case ComponentType::VCC:
-    case ComponentType::VoltageSource:
-    case ComponentType::Clock:
-    case ComponentType::LogicInput:
+    case ComponentType::VOLTAGE_SOURCE:
+    case ComponentType::CLOCK:
+    case ComponentType::LOGIC_INPUT:
         return ReadACCurrent(BranchVectorName(component.GetName()), component.GetName(), frequencies.size());
-    case ComponentType::Ground:
-    case ComponentType::NetLabel:
-    case ComponentType::Diode:
-    case ComponentType::ZenerDiode:
+    case ComponentType::GROUND:
+    case ComponentType::NET_LABEL:
+    case ComponentType::DIODE:
+    case ComponentType::ZENER_DIODE:
     case ComponentType::LED:
     case ComponentType::NPN:
     case ComponentType::PNP:
@@ -422,25 +422,25 @@ ACCurrent(const CircuitEntry &entry, const std::vector<double> &frequencies,
     case ComponentType::VCCS:
     case ComponentType::CCCS:
     case ComponentType::CCVS:
-    case ComponentType::OpAmp:
-    case ComponentType::Potentiometer:
-    case ComponentType::Switch:
-    case ComponentType::PushButton:
-    case ComponentType::VSwitch:
-    case ComponentType::Relay:
-    case ComponentType::Transformer:
-    case ComponentType::And:
-    case ComponentType::Or:
-    case ComponentType::Not:
-    case ComponentType::Nand:
-    case ComponentType::Nor:
-    case ComponentType::Xor:
-    case ComponentType::Xnor:
-    case ComponentType::Buffer:
-    case ComponentType::DFlipFlop:
-    case ComponentType::JKFlipFlop:
-    case ComponentType::TFlipFlop:
-    case ComponentType::SRFlipFlop:
+    case ComponentType::OP_AMP:
+    case ComponentType::POTENTIOMETER:
+    case ComponentType::SWITCH:
+    case ComponentType::PUSH_BUTTON:
+    case ComponentType::V_SWITCH:
+    case ComponentType::RELAY:
+    case ComponentType::TRANSFORMER:
+    case ComponentType::AND:
+    case ComponentType::OR:
+    case ComponentType::NOT:
+    case ComponentType::NAND:
+    case ComponentType::NOR:
+    case ComponentType::XOR:
+    case ComponentType::XNOR:
+    case ComponentType::BUFFER:
+    case ComponentType::D_FLIP_FLOP:
+    case ComponentType::JK_FLIP_FLOP:
+    case ComponentType::T_FLIP_FLOP:
+    case ComponentType::SR_FLIP_FLOP:
         break;
     }
     return std::unexpected(std::format("{} carries no current", component.GetName()));
@@ -501,7 +501,7 @@ std::expected<ACSweep, std::string> ReadACSweep(const Circuit &circuit) {
 // The swept values repeat once per value of the stepped source, so the curves are the stretches between repeats
 std::expected<DCSweep, std::string> ReadDCSweep(const Circuit &circuit, const DCSweepSettings &settings) {
     const Component &swept = *FindSweepableSource(circuit, settings.Swept.Source);
-    const pvector_info scale = FindVector(swept.GetType() == ComponentType::CurrentSource ? "i-sweep" : "v-sweep");
+    const pvector_info scale = FindVector(swept.GetType() == ComponentType::CURRENT_SOURCE ? "i-sweep" : "v-sweep");
     if (scale == nullptr) {
         return std::unexpected("ngspice returned no swept values");
     }
@@ -1087,7 +1087,7 @@ TruthTableRun RunTruthTable(const Circuit &circuit, const TruthTableSettings &se
     Circuit simulated;
     for (const CircuitEntry &entry : circuit.GetEntries()) {
         const auto chosen = std::ranges::find(settings.Inputs, entry.Part->GetName());
-        const bool is_chosen = chosen != settings.Inputs.end() && entry.Part->GetType() == ComponentType::LogicInput;
+        const bool is_chosen = chosen != settings.Inputs.end() && entry.Part->GetType() == ComponentType::LOGIC_INPUT;
         simulated.Add(is_chosen ? inputs[static_cast<std::size_t>(chosen - settings.Inputs.begin())] : *entry.Part,
                       entry.Nodes);
     }

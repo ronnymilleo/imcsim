@@ -21,7 +21,7 @@ GUI::PointTransform Transform(const GUI::PointTransform::Kind kind) {
 TEST_CASE("A part ends up where the transform puts each of its terminals", "[group_editing]") {
     using Kind = GUI::PointTransform::Kind;
     // A transistor has terminals that are not symmetric, so every orientation and flip of it is told apart
-    for (const Kind kind : {Kind::Translate, Kind::QuarterTurn, Kind::MirrorLeftRight, Kind::MirrorTopBottom}) {
+    for (const Kind kind : {Kind::TRANSLATE, Kind::QUARTER_TURN, Kind::MIRROR_LEFT_RIGHT, Kind::MIRROR_TOP_BOTTOM}) {
         for (const GUI::Rotation rotation :
              {GUI::Rotation::R0, GUI::Rotation::R90, GUI::Rotation::R180, GUI::Rotation::R270}) {
             for (const bool mirrored : {false, true}) {
@@ -44,8 +44,8 @@ TEST_CASE("A part ends up where the transform puts each of its terminals", "[gro
 
 TEST_CASE("A single part turns about its own position, a group about the middle of its box", "[group_editing]") {
     std::vector<std::unique_ptr<GUI::UIElement>> elements;
-    elements.push_back(GUI::CreateElement(Core::ComponentType::Resistor, {2, 2}, GUI::Rotation::R0));
-    elements.push_back(GUI::CreateElement(Core::ComponentType::Resistor, {10, 6}, GUI::Rotation::R0));
+    elements.push_back(GUI::CreateElement(Core::ComponentType::RESISTOR, {2, 2}, GUI::Rotation::R0));
+    elements.push_back(GUI::CreateElement(Core::ComponentType::RESISTOR, {10, 6}, GUI::Rotation::R0));
     const std::vector<GUI::UIWire> wires = {{{12, 6}, {12, 12}}};
 
     CHECK(GUI::FindPivot(elements, {1}, wires, {}) == GUI::GridPoint{10, 6});

@@ -14,7 +14,7 @@ namespace GUI {
 
 namespace {
 
-constexpr auto Examples = std::to_array<Example>({
+constexpr auto EXAMPLES = std::to_array<Example>({
     {
         .Title = "Voltage divider with a load",
         .Group = "Basics",
@@ -321,7 +321,7 @@ constexpr auto Examples = std::to_array<Example>({
  * @return  Every example, grouped by topic, each group from the simplest circuit to the most involved.
  */
 std::span<const Example> GetExamples() {
-    return Examples;
+    return EXAMPLES;
 }
 
 /**
@@ -330,7 +330,7 @@ std::span<const Example> GetExamples() {
  */
 std::vector<const char *> GetExampleGroups() {
     std::vector<const char *> groups;
-    for (const Example &example : Examples) {
+    for (const Example &example : EXAMPLES) {
         if (std::ranges::none_of(groups,
                                  [&example](const char *group) { return std::string_view(group) == example.Group; })) {
             groups.push_back(example.Group);
@@ -346,8 +346,8 @@ std::vector<const char *> GetExampleGroups() {
  */
 std::expected<LoadedSchematic, std::string> LoadExample(const Example &example) {
     const auto file =
-        std::ranges::find(ExampleFiles, example.FileName, &std::pair<std::string_view, std::string_view>::first);
-    if (file == ExampleFiles.end()) {
+        std::ranges::find(EXAMPLE_FILES, example.FileName, &std::pair<std::string_view, std::string_view>::first);
+    if (file == EXAMPLE_FILES.end()) {
         return std::unexpected(std::format("The example {} is missing from this build", example.FileName));
     }
     return LoadSchematic(file->second);

@@ -13,7 +13,7 @@ namespace Core {
 
 namespace {
 
-constexpr std::size_t MaxNetLength = 32;
+constexpr std::size_t MAX_NET_LENGTH = 32;
 
 bool IsNetCharacter(const char character) {
     const auto byte = static_cast<unsigned char>(character);
@@ -25,7 +25,7 @@ bool IsNetCharacter(const char character) {
 /**
  * @brief   Creates a label with no name, which joins nothing until it is named.
  */
-NetLabel::NetLabel() : Component(ComponentType::NetLabel, 0.0) {
+NetLabel::NetLabel() : Component(ComponentType::NET_LABEL, 0.0) {
 }
 
 /**
@@ -50,7 +50,7 @@ void NetLabel::SetNet(std::string net) {
  * @return  True for 1 to 32 letters, digits, underscores, hyphens and dots, so the name is safe as a SPICE node.
  */
 bool NetLabel::IsValidNet(const std::string_view net) {
-    return !net.empty() && net.size() <= MaxNetLength && std::ranges::all_of(net, IsNetCharacter);
+    return !net.empty() && net.size() <= MAX_NET_LENGTH && std::ranges::all_of(net, IsNetCharacter);
 }
 
 /**

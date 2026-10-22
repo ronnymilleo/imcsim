@@ -44,7 +44,7 @@ TEST_CASE("Ground and VCC have a single terminal at their position", "[ui_elemen
 
 TEST_CASE("A net label has a single terminal at its position and leads upward before rotating", "[ui_element]") {
     const GUI::UINetLabel label({5, 5}, GUI::Rotation::R0);
-    CHECK(label.GetComponent().GetType() == Core::ComponentType::NetLabel);
+    CHECK(label.GetComponent().GetType() == Core::ComponentType::NET_LABEL);
     CHECK(label.GetTerminals() == std::vector<GUI::GridPoint>{{5, 5}});
     CHECK(label.GetTerminalInward(0) == GUI::GridPoint{0, -1});
     // The circle is above the terminal: picking it works there and not below
@@ -58,10 +58,10 @@ TEST_CASE("A net label has a single terminal at its position and leads upward be
 
 TEST_CASE("Elements own a component of their type", "[ui_element]") {
     const GUI::UIResistor resistor({0, 0}, GUI::Rotation::R0);
-    CHECK(resistor.GetComponent().GetType() == Core::ComponentType::Resistor);
+    CHECK(resistor.GetComponent().GetType() == Core::ComponentType::RESISTOR);
 
     const GUI::UIGround ground({0, 0}, GUI::Rotation::R0);
-    CHECK(ground.GetComponent().GetType() == Core::ComponentType::Ground);
+    CHECK(ground.GetComponent().GetType() == Core::ComponentType::GROUND);
 }
 
 TEST_CASE("Contains follows the element rotation", "[ui_element]") {
@@ -83,7 +83,7 @@ TEST_CASE("Ground is picked below its terminal", "[ui_element]") {
 
 TEST_CASE("Diode parts run from the anode at x = -2 to the cathode at x = +2", "[ui_element]") {
     for (const Core::ComponentType type :
-         {Core::ComponentType::Diode, Core::ComponentType::ZenerDiode, Core::ComponentType::LED}) {
+         {Core::ComponentType::DIODE, Core::ComponentType::ZENER_DIODE, Core::ComponentType::LED}) {
         const GUI::UIDiode diode(type, {1, 1}, GUI::Rotation::R180);
         CHECK(diode.GetComponent().GetType() == type);
         CHECK(diode.GetTerminals() == std::vector<GUI::GridPoint>{{3, 1}, {-1, 1}});
@@ -91,7 +91,7 @@ TEST_CASE("Diode parts run from the anode at x = -2 to the cathode at x = +2", "
 }
 
 TEST_CASE("An LED is also picked on its arrows", "[ui_element]") {
-    const GUI::UIDiode diode(Core::ComponentType::Diode, {0, 0}, GUI::Rotation::R0);
+    const GUI::UIDiode diode(Core::ComponentType::DIODE, {0, 0}, GUI::Rotation::R0);
     const GUI::UIDiode led(Core::ComponentType::LED, {0, 0}, GUI::Rotation::R0);
     CHECK_FALSE(diode.Contains({0.3f, -1.0f}));
     CHECK(led.Contains({0.3f, -1.0f}));
@@ -179,7 +179,7 @@ TEST_CASE("Controlled sources have their output vertical and their control pins 
 
 TEST_CASE("A potentiometer has its two ends on the sides and its wiper above, turning with it", "[ui_element]") {
     GUI::UIPotentiometer pot({5, 5}, GUI::Rotation::R0);
-    CHECK(pot.GetComponent().GetType() == Core::ComponentType::Potentiometer);
+    CHECK(pot.GetComponent().GetType() == Core::ComponentType::POTENTIOMETER);
     CHECK(pot.GetTerminals() == std::vector<GUI::GridPoint>{{3, 5}, {7, 5}, {5, 3}});
     CHECK(pot.GetTerminalInward(0) == GUI::GridPoint{1, 0});
     CHECK(pot.GetTerminalInward(2) == GUI::GridPoint{0, 1});
@@ -191,14 +191,14 @@ TEST_CASE("A potentiometer has its two ends on the sides and its wiper above, tu
 }
 
 TEST_CASE("A switch has two terminals like a resistor, and a push button is picked up to its button", "[ui_element]") {
-    GUI::UISwitch toggle(Core::ComponentType::Switch, {5, 5}, GUI::Rotation::R0);
-    CHECK(toggle.GetComponent().GetType() == Core::ComponentType::Switch);
+    GUI::UISwitch toggle(Core::ComponentType::SWITCH, {5, 5}, GUI::Rotation::R0);
+    CHECK(toggle.GetComponent().GetType() == Core::ComponentType::SWITCH);
     CHECK(toggle.GetTerminals() == std::vector<GUI::GridPoint>{{3, 5}, {7, 5}});
     CHECK(toggle.Contains({5.0f, 4.3f}));
     CHECK_FALSE(toggle.Contains({5.0f, 3.5f}));
 
-    const GUI::UISwitch button(Core::ComponentType::PushButton, {5, 5}, GUI::Rotation::R0);
-    CHECK(button.GetComponent().GetType() == Core::ComponentType::PushButton);
+    const GUI::UISwitch button(Core::ComponentType::PUSH_BUTTON, {5, 5}, GUI::Rotation::R0);
+    CHECK(button.GetComponent().GetType() == Core::ComponentType::PUSH_BUTTON);
     CHECK(button.GetTerminals() == std::vector<GUI::GridPoint>{{3, 5}, {7, 5}});
     CHECK(button.Contains({5.0f, 3.8f}));
     CHECK_FALSE(button.Contains({5.0f, 3.0f}));
@@ -206,7 +206,7 @@ TEST_CASE("A switch has two terminals like a resistor, and a push button is pick
 
 TEST_CASE("A voltage-controlled switch and a relay have the contact vertical and the control on the left",
           "[ui_element]") {
-    for (const Core::ComponentType type : {Core::ComponentType::VSwitch, Core::ComponentType::Relay}) {
+    for (const Core::ComponentType type : {Core::ComponentType::V_SWITCH, Core::ComponentType::RELAY}) {
         const GUI::UIControlledSwitch part(type, {0, 0}, GUI::Rotation::R0);
         CHECK(part.GetComponent().GetType() == type);
         CHECK(part.GetTerminals() == std::vector<GUI::GridPoint>{{0, -2}, {0, 2}, {-2, -1}, {-2, 1}});
@@ -219,7 +219,7 @@ TEST_CASE("A voltage-controlled switch and a relay have the contact vertical and
 
 TEST_CASE("A transformer has the primary on the left and the secondary on the right", "[ui_element]") {
     GUI::UITransformer transformer({5, 5}, GUI::Rotation::R0);
-    CHECK(transformer.GetComponent().GetType() == Core::ComponentType::Transformer);
+    CHECK(transformer.GetComponent().GetType() == Core::ComponentType::TRANSFORMER);
     CHECK(transformer.GetTerminals() == std::vector<GUI::GridPoint>{{3, 4}, {3, 6}, {7, 4}, {7, 6}});
     CHECK(transformer.GetTerminalInward(0) == GUI::GridPoint{1, 0});
     CHECK(transformer.GetTerminalInward(2) == GUI::GridPoint{-1, 0});
@@ -239,21 +239,21 @@ TEST_CASE("Op-amps list the output, the inputs and the supply pins", "[ui_elemen
 }
 
 TEST_CASE("A gate has its inputs on the left and its output on the right", "[ui_element]") {
-    const GUI::UILogicPart gate(Core::ComponentType::And, {10, 10}, GUI::Rotation::R0);
-    CHECK(gate.GetComponent().GetType() == Core::ComponentType::And);
+    const GUI::UILogicPart gate(Core::ComponentType::AND, {10, 10}, GUI::Rotation::R0);
+    CHECK(gate.GetComponent().GetType() == Core::ComponentType::AND);
     CHECK(gate.GetTerminals() == std::vector<GUI::GridPoint>{{7, 9}, {7, 11}, {13, 10}});
     CHECK(gate.GetTerminalInward(0) == GUI::GridPoint{1, 0});
     CHECK(gate.GetTerminalInward(2) == GUI::GridPoint{-1, 0});
     CHECK(gate.Contains({10.0f, 10.0f}));
     CHECK_FALSE(gate.Contains({10.0f, 12.0f}));
 
-    const GUI::UILogicPart inverter(Core::ComponentType::Not, {0, 0}, GUI::Rotation::R0);
+    const GUI::UILogicPart inverter(Core::ComponentType::NOT, {0, 0}, GUI::Rotation::R0);
     CHECK(inverter.GetTerminals() == std::vector<GUI::GridPoint>{{-3, 0}, {3, 0}});
 }
 
 TEST_CASE("A gate with more inputs keeps A and B in place, adds the others below and centers the output",
           "[ui_element]") {
-    GUI::UILogicPart gate(Core::ComponentType::Nand, {0, 0}, GUI::Rotation::R0);
+    GUI::UILogicPart gate(Core::ComponentType::NAND, {0, 0}, GUI::Rotation::R0);
     auto &part = static_cast<Core::LogicPart &>(gate.GetComponent());
     part.SetInputCount(3);
     // The body runs from y = -1.5 to 3.5, so its middle, where the output is, is at y = 1
@@ -278,22 +278,22 @@ TEST_CASE("A gate with more inputs keeps A and B in place, adds the others below
 
 TEST_CASE("A flip-flop has its data and clock on the left, SET and RESET above and below, and Q and QN on the right",
           "[ui_element]") {
-    const GUI::UILogicPart d_type(Core::ComponentType::DFlipFlop, {0, 0}, GUI::Rotation::R0);
+    const GUI::UILogicPart d_type(Core::ComponentType::D_FLIP_FLOP, {0, 0}, GUI::Rotation::R0);
     CHECK(d_type.GetTerminals() == std::vector<GUI::GridPoint>{{-3, -1}, {-3, 1}, {0, -3}, {0, 3}, {3, -1}, {3, 1}});
     CHECK(d_type.GetTerminalInward(2) == GUI::GridPoint{0, 1});
     CHECK(d_type.GetTerminalInward(3) == GUI::GridPoint{0, -1});
 
-    const GUI::UILogicPart jk(Core::ComponentType::JKFlipFlop, {0, 0}, GUI::Rotation::R0);
+    const GUI::UILogicPart jk(Core::ComponentType::JK_FLIP_FLOP, {0, 0}, GUI::Rotation::R0);
     CHECK(jk.GetTerminals() ==
           std::vector<GUI::GridPoint>{{-3, -2}, {-3, 2}, {-3, 0}, {0, -4}, {0, 4}, {3, -2}, {3, 2}});
 }
 
 TEST_CASE("Every gate and flip-flop has one terminal for each input and each output", "[ui_element]") {
     for (const Core::ComponentType type :
-         {Core::ComponentType::And, Core::ComponentType::Or, Core::ComponentType::Not, Core::ComponentType::Nand,
-          Core::ComponentType::Nor, Core::ComponentType::Xor, Core::ComponentType::Xnor, Core::ComponentType::Buffer,
-          Core::ComponentType::DFlipFlop, Core::ComponentType::JKFlipFlop, Core::ComponentType::TFlipFlop,
-          Core::ComponentType::SRFlipFlop}) {
+         {Core::ComponentType::AND, Core::ComponentType::OR, Core::ComponentType::NOT, Core::ComponentType::NAND,
+          Core::ComponentType::NOR, Core::ComponentType::XOR, Core::ComponentType::XNOR, Core::ComponentType::BUFFER,
+          Core::ComponentType::D_FLIP_FLOP, Core::ComponentType::JK_FLIP_FLOP, Core::ComponentType::T_FLIP_FLOP,
+          Core::ComponentType::SR_FLIP_FLOP}) {
         const GUI::UILogicPart part(type, {0, 0}, GUI::Rotation::R0);
         INFO(part.GetComponent().GetTypeName());
         CHECK(part.GetTerminals().size() ==

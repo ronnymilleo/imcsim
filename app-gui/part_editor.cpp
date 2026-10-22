@@ -28,7 +28,7 @@ bool AnyValue(double /*value*/) {
 }
 
 // Custom model parameters beyond this many scroll
-constexpr float MaxVisibleParameters = 10.0f;
+constexpr float MAX_VISIBLE_PARAMETERS = 10.0f;
 
 /**
  * @struct  ParameterField
@@ -43,14 +43,14 @@ template <typename Parameters> struct ParameterField {
     double Scale = 1.0;
 };
 
-constexpr auto ACFields = std::to_array<ParameterField<Core::ACParameters>>({
+constexpr auto AC_FIELDS = std::to_array<ParameterField<Core::ACParameters>>({
     {"Amplitude", &Core::ACParameters::Amplitude, nullptr},
     {"Frequency", &Core::ACParameters::Frequency, "Hz"},
     {"Offset", &Core::ACParameters::Offset, nullptr},
     {"AC magnitude", &Core::ACParameters::Magnitude, nullptr},
 });
 
-constexpr auto PulseFields = std::to_array<ParameterField<Core::PulseParameters>>({
+constexpr auto PULSE_FIELDS = std::to_array<ParameterField<Core::PulseParameters>>({
     {"Low", &Core::PulseParameters::Low, nullptr},
     {"High", &Core::PulseParameters::High, nullptr},
     {"Delay", &Core::PulseParameters::Delay, "s"},
@@ -60,7 +60,7 @@ constexpr auto PulseFields = std::to_array<ParameterField<Core::PulseParameters>
     {"Period", &Core::PulseParameters::Period, "s"},
 });
 
-constexpr auto EXPFields = std::to_array<ParameterField<Core::EXPParameters>>({
+constexpr auto EXP_FIELDS = std::to_array<ParameterField<Core::EXPParameters>>({
     {"Start", &Core::EXPParameters::InitialValue, nullptr},
     {"Peak", &Core::EXPParameters::PeakValue, nullptr},
     {"Rise delay", &Core::EXPParameters::RiseDelay, "s"},
@@ -69,7 +69,7 @@ constexpr auto EXPFields = std::to_array<ParameterField<Core::EXPParameters>>({
     {"Fall tau", &Core::EXPParameters::FallTimeConstant, "s"},
 });
 
-constexpr auto SFFMFields = std::to_array<ParameterField<Core::SFFMParameters>>({
+constexpr auto SFFM_FIELDS = std::to_array<ParameterField<Core::SFFMParameters>>({
     {"Offset", &Core::SFFMParameters::Offset, nullptr},
     {"Amplitude", &Core::SFFMParameters::Amplitude, nullptr},
     {"Carrier", &Core::SFFMParameters::CarrierFrequency, "Hz"},
@@ -77,7 +77,7 @@ constexpr auto SFFMFields = std::to_array<ParameterField<Core::SFFMParameters>>(
     {"Signal", &Core::SFFMParameters::SignalFrequency, "Hz"},
 });
 
-constexpr auto AMFields = std::to_array<ParameterField<Core::AMParameters>>({
+constexpr auto AM_FIELDS = std::to_array<ParameterField<Core::AMParameters>>({
     {"Amplitude", &Core::AMParameters::Amplitude, nullptr},
     {"Offset", &Core::AMParameters::Offset, nullptr},
     {"Mod freq", &Core::AMParameters::ModulatingFrequency, "Hz"},
@@ -86,7 +86,7 @@ constexpr auto AMFields = std::to_array<ParameterField<Core::AMParameters>>({
 });
 
 // Labeled with the SPICE parameter names, as datasheet models list them
-constexpr auto DiodeFields = std::to_array<ParameterField<Core::DiodeParameters>>({
+constexpr auto DIODE_FIELDS = std::to_array<ParameterField<Core::DiodeParameters>>({
     {"IS", &Core::DiodeParameters::SaturationCurrent, "A"},
     {"N", &Core::DiodeParameters::EmissionCoefficient, ""},
     {"RS", &Core::DiodeParameters::SeriesResistance, "Ohm"},
@@ -98,7 +98,7 @@ constexpr auto DiodeFields = std::to_array<ParameterField<Core::DiodeParameters>
     {"TT", &Core::DiodeParameters::TransitTime, "s"},
 });
 
-constexpr auto BJTFields = std::to_array<ParameterField<Core::BJTParameters>>({
+constexpr auto BJT_FIELDS = std::to_array<ParameterField<Core::BJTParameters>>({
     {"IS", &Core::BJTParameters::SaturationCurrent, "A"},
     {"BF", &Core::BJTParameters::ForwardBeta, ""},
     {"BR", &Core::BJTParameters::ReverseBeta, ""},
@@ -117,7 +117,7 @@ constexpr auto BJTFields = std::to_array<ParameterField<Core::BJTParameters>>({
     {"P max", &Core::BJTParameters::MaxPower, "W"},
 });
 
-constexpr auto MOSFETFields = std::to_array<ParameterField<Core::MOSFETParameters>>({
+constexpr auto MOSFET_FIELDS = std::to_array<ParameterField<Core::MOSFETParameters>>({
     {"VTO", &Core::MOSFETParameters::ThresholdVoltage, "V"},
     {"KP", &Core::MOSFETParameters::Transconductance, "A/V2"},
     {"LAMBDA", &Core::MOSFETParameters::ChannelModulation, "1/V"},
@@ -134,7 +134,7 @@ constexpr auto MOSFETFields = std::to_array<ParameterField<Core::MOSFETParameter
 });
 
 // Datasheet specifications, from which the macromodel is built
-constexpr auto OpAmpFields = std::to_array<ParameterField<Core::OpAmpParameters>>({
+constexpr auto OP_AMP_FIELDS = std::to_array<ParameterField<Core::OpAmpParameters>>({
     {"Avol", &Core::OpAmpParameters::OpenLoopGainDecibels, "dB"},
     {"GBW", &Core::OpAmpParameters::GainBandwidth, "Hz"},
     {"Slew rate", &Core::OpAmpParameters::SlewRate, "V/us"},
@@ -148,14 +148,14 @@ constexpr auto OpAmpFields = std::to_array<ParameterField<Core::OpAmpParameters>
     {"Supply current", &Core::OpAmpParameters::SupplyCurrent, "A"},
 });
 
-constexpr auto SwitchFields = std::to_array<ParameterField<Core::SwitchParameters>>({
+constexpr auto SWITCH_FIELDS = std::to_array<ParameterField<Core::SwitchParameters>>({
     {"Threshold", &Core::SwitchParameters::Threshold, "V"},
     {"Hysteresis", &Core::SwitchParameters::Hysteresis, "V"},
     {"On resistance", &Core::SwitchParameters::OnResistance, "Ohm"},
     {"Off resistance", &Core::SwitchParameters::OffResistance, "Ohm"},
 });
 
-constexpr auto RelayFields = std::to_array<ParameterField<Core::RelayParameters>>({
+constexpr auto RELAY_FIELDS = std::to_array<ParameterField<Core::RelayParameters>>({
     {"Coil R", &Core::RelayParameters::CoilResistance, "Ohm"},
     {"Coil L", &Core::RelayParameters::CoilInductance, "H"},
     {"Pull-in", &Core::RelayParameters::PullInVoltage, "V"},
@@ -163,26 +163,26 @@ constexpr auto RelayFields = std::to_array<ParameterField<Core::RelayParameters>
     {"Contact R", &Core::RelayParameters::ContactResistance, "Ohm"},
 });
 
-constexpr auto TransformerFields = std::to_array<ParameterField<Core::TransformerParameters>>({
+constexpr auto TRANSFORMER_FIELDS = std::to_array<ParameterField<Core::TransformerParameters>>({
     {"Turns ratio", &Core::TransformerParameters::TurnsRatio, ":1"},
     {"Coupling", &Core::TransformerParameters::Coupling, ""},
     {"Winding R", &Core::TransformerParameters::WindingResistance, "Ohm"},
 });
 
-constexpr auto LogicFields = std::to_array<ParameterField<Core::LogicParameters>>({
+constexpr auto LOGIC_FIELDS = std::to_array<ParameterField<Core::LogicParameters>>({
     {"Logic level", &Core::LogicParameters::LogicLevel, "V"},
     {"Delay", &Core::LogicParameters::PropagationDelay, "s"},
 });
 
 // A clock picks its own rise and fall times, so the user sets only these figures
-constexpr auto ClockFields = std::to_array<ParameterField<Core::ClockParameters>>({
+constexpr auto CLOCK_FIELDS = std::to_array<ParameterField<Core::ClockParameters>>({
     {"Frequency", &Core::ClockParameters::Frequency, "Hz"},
     {"Duty", &Core::ClockParameters::DutyCycle, "%", 100.0},
     {"Logic level", &Core::ClockParameters::LogicLevel, "V"},
     {"Start delay", &Core::ClockParameters::StartDelay, "s"},
 });
 
-constexpr auto LogicInputFields = std::to_array<ParameterField<Core::LogicInputParameters>>({
+constexpr auto LOGIC_INPUT_FIELDS = std::to_array<ParameterField<Core::LogicInputParameters>>({
     {"Logic level", &Core::LogicInputParameters::LogicLevel, "V"},
 });
 
@@ -253,7 +253,7 @@ bool DrawModelChoice(Part &part, const std::span<const Model> models, const char
     const auto is_valid = [&part](const Parameters &candidate) { return part.IsValidParameters(candidate); };
     // A long list scrolls, so the editor stays small enough for a popover
     ImGui::SetNextWindowSizeConstraints({0.0f, 0.0f},
-                                        {FLT_MAX, ImGui::GetFrameHeightWithSpacing() * MaxVisibleParameters});
+                                        {FLT_MAX, ImGui::GetFrameHeightWithSpacing() * MAX_VISIBLE_PARAMETERS});
     ImGui::BeginChild("parameters", {0.0f, 0.0f}, ImGuiChildFlags_AutoResizeX | ImGuiChildFlags_AutoResizeY);
     if (DrawParameterFields(fields, value_fields, "", is_valid, parameters)) {
         part.SetCustomParameters(parameters);
@@ -264,7 +264,7 @@ bool DrawModelChoice(Part &part, const std::span<const Model> models, const char
 }
 
 bool HasModel(const Core::ComponentType type) {
-    return Core::IsDiode(type) || Core::IsBJT(type) || Core::IsMOSFET(type) || type == Core::ComponentType::OpAmp;
+    return Core::IsDiode(type) || Core::IsBJT(type) || Core::IsMOSFET(type) || type == Core::ComponentType::OP_AMP;
 }
 
 // Value fields show for parts with a value, and for parts with a model only while they are custom
@@ -280,13 +280,13 @@ bool ShowsValueFields(const Core::Component &component) {
         return static_cast<const Core::MOSFET &>(component).IsCustom();
     }
     // The ideal op-amp has its gain-bandwidth product to edit
-    if (type == Core::ComponentType::OpAmp) {
+    if (type == Core::ComponentType::OP_AMP) {
         const auto &op_amp = static_cast<const Core::OpAmp &>(component);
         return op_amp.IsCustom() || op_amp.IsIdeal();
     }
     // The switches that follow a voltage, the logic parts, a clock and a logic input have only their parameters
-    if (type == Core::ComponentType::VSwitch || type == Core::ComponentType::Relay || Core::IsLogicPart(type) ||
-        type == Core::ComponentType::Clock || type == Core::ComponentType::LogicInput) {
+    if (type == Core::ComponentType::V_SWITCH || type == Core::ComponentType::RELAY || Core::IsLogicPart(type) ||
+        type == Core::ComponentType::CLOCK || type == Core::ComponentType::LOGIC_INPUT) {
         return true;
     }
     return component.HasValue();
@@ -318,9 +318,9 @@ void PartEditor::Draw() {
         ImGui::TextUnformatted(std::format("Name: {}", component.GetName()).c_str());
     }
     const Core::ComponentType type = component.GetType();
-    if (!component.HasValue() && !HasModel(type) && type != Core::ComponentType::NetLabel && !Core::IsSwitch(type) &&
-        type != Core::ComponentType::VSwitch && type != Core::ComponentType::Relay && !Core::IsLogicPart(type) &&
-        type != Core::ComponentType::Clock && type != Core::ComponentType::LogicInput) {
+    if (!component.HasValue() && !HasModel(type) && type != Core::ComponentType::NET_LABEL && !Core::IsSwitch(type) &&
+        type != Core::ComponentType::V_SWITCH && type != Core::ComponentType::RELAY && !Core::IsLogicPart(type) &&
+        type != Core::ComponentType::CLOCK && type != Core::ComponentType::LOGIC_INPUT) {
         return;
     }
 
@@ -349,7 +349,7 @@ void PartEditor::DrawSelectionSummary() {
 // The fields of the kind of part: its net name, model, waveform, gain or value
 void PartEditor::DrawFields(Core::Component &component) {
     const Core::ComponentType type = component.GetType();
-    if (type == Core::ComponentType::NetLabel) {
+    if (type == Core::ComponentType::NET_LABEL) {
         DrawNetLabel(static_cast<Core::NetLabel &>(component));
         return;
     }
@@ -362,22 +362,22 @@ void PartEditor::DrawFields(Core::Component &component) {
         DrawControlledSource(static_cast<Core::ControlledSource &>(component));
     } else if (Core::IsSwitch(type)) {
         DrawSwitch(static_cast<Core::Switch &>(component));
-    } else if (type == Core::ComponentType::VSwitch) {
+    } else if (type == Core::ComponentType::V_SWITCH) {
         DrawControlledSwitch(static_cast<Core::VoltageControlledSwitch &>(component));
-    } else if (type == Core::ComponentType::Relay) {
+    } else if (type == Core::ComponentType::RELAY) {
         DrawRelay(static_cast<Core::Relay &>(component));
     } else if (Core::IsLogicPart(type)) {
         DrawLogicPart(static_cast<Core::LogicPart &>(component));
-    } else if (type == Core::ComponentType::Clock) {
+    } else if (type == Core::ComponentType::CLOCK) {
         DrawClock(static_cast<Core::Clock &>(component));
-    } else if (type == Core::ComponentType::LogicInput) {
+    } else if (type == Core::ComponentType::LOGIC_INPUT) {
         DrawLogicInput(static_cast<Core::LogicInput &>(component));
-    } else if (type == Core::ComponentType::Transformer) {
+    } else if (type == Core::ComponentType::TRANSFORMER) {
         DrawValue(component);
         DrawTransformer(static_cast<Core::Transformer &>(component));
     } else {
         DrawValue(component);
-        if (type == Core::ComponentType::Potentiometer) {
+        if (type == Core::ComponentType::POTENTIOMETER) {
             DrawWiper(static_cast<Core::Potentiometer &>(component));
         } else if (component.SupportsInitialCondition()) {
             DrawInitialCondition(component);
@@ -394,7 +394,7 @@ bool PartEditor::DrawModeledPart(Core::Component &component) {
         DrawBJT(static_cast<Core::BJT &>(component));
     } else if (Core::IsMOSFET(type)) {
         DrawMOSFET(static_cast<Core::MOSFET &>(component));
-    } else if (type == Core::ComponentType::OpAmp) {
+    } else if (type == Core::ComponentType::OP_AMP) {
         DrawOpAmp(static_cast<Core::OpAmp &>(component));
     } else {
         return false;
@@ -417,7 +417,7 @@ bool PartEditor::CanTypeValue() const {
     if (Core::IsSource(type)) {
         return static_cast<const Core::Source &>(component).GetSourceType() == Core::Source::SourceType::DC;
     }
-    if (type == Core::ComponentType::OpAmp) {
+    if (type == Core::ComponentType::OP_AMP) {
         return static_cast<const Core::OpAmp &>(component).IsIdeal();
     }
     return component.HasValue() && !HasModel(type);
@@ -460,57 +460,57 @@ void PartEditor::SetValueSeries(const Core::ValueSeries series) {
 void PartEditor::LoadFields(const Core::Component &component) {
     m_Value.Load(component.GetValue());
     m_InitialCondition.LoadOptional(component.GetInitialCondition());
-    if (component.GetType() == Core::ComponentType::NetLabel) {
+    if (component.GetType() == Core::ComponentType::NET_LABEL) {
         const std::string &net = static_cast<const Core::NetLabel &>(component).GetNet();
         m_Net.fill('\0');
         net.copy(m_Net.data(), m_Net.size() - 1);
     }
     if (Core::IsSource(component.GetType())) {
         const auto &source = static_cast<const Core::Source &>(component);
-        LoadParameterFields(ACFields, m_ACFields, source.GetAC());
-        LoadParameterFields(PulseFields, m_PulseFields, source.GetPulse());
-        LoadParameterFields(EXPFields, m_EXPFields, source.GetEXP());
-        LoadParameterFields(SFFMFields, m_SFFMFields, source.GetSFFM());
-        LoadParameterFields(AMFields, m_AMFields, source.GetAM());
+        LoadParameterFields(AC_FIELDS, m_ACFields, source.GetAC());
+        LoadParameterFields(PULSE_FIELDS, m_PulseFields, source.GetPulse());
+        LoadParameterFields(EXP_FIELDS, m_EXPFields, source.GetEXP());
+        LoadParameterFields(SFFM_FIELDS, m_SFFMFields, source.GetSFFM());
+        LoadParameterFields(AM_FIELDS, m_AMFields, source.GetAM());
         m_PWLText = Core::FormatPWLPoints(source.GetPWL().Points);
     }
     if (Core::IsDiode(component.GetType())) {
         const auto &diode = static_cast<const Core::Diode &>(component);
-        LoadParameterFields(DiodeFields, m_DiodeFields, diode.GetParameters());
+        LoadParameterFields(DIODE_FIELDS, m_DiodeFields, diode.GetParameters());
     }
     if (Core::IsBJT(component.GetType())) {
         const auto &bjt = static_cast<const Core::BJT &>(component);
-        LoadParameterFields(BJTFields, m_BJTFields, bjt.GetParameters());
+        LoadParameterFields(BJT_FIELDS, m_BJTFields, bjt.GetParameters());
     }
     if (Core::IsMOSFET(component.GetType())) {
         const auto &mosfet = static_cast<const Core::MOSFET &>(component);
-        LoadParameterFields(MOSFETFields, m_MOSFETFields, mosfet.GetParameters());
+        LoadParameterFields(MOSFET_FIELDS, m_MOSFETFields, mosfet.GetParameters());
     }
-    if (component.GetType() == Core::ComponentType::OpAmp) {
+    if (component.GetType() == Core::ComponentType::OP_AMP) {
         const auto &op_amp = static_cast<const Core::OpAmp &>(component);
-        LoadParameterFields(OpAmpFields, m_OpAmpFields, op_amp.GetParameters());
+        LoadParameterFields(OP_AMP_FIELDS, m_OpAmpFields, op_amp.GetParameters());
         m_Value.Load(op_amp.GetIdealBandwidth());
     }
-    if (component.GetType() == Core::ComponentType::VSwitch) {
-        LoadParameterFields(SwitchFields, m_SwitchFields,
+    if (component.GetType() == Core::ComponentType::V_SWITCH) {
+        LoadParameterFields(SWITCH_FIELDS, m_SwitchFields,
                             static_cast<const Core::VoltageControlledSwitch &>(component).GetParameters());
     }
-    if (component.GetType() == Core::ComponentType::Relay) {
-        LoadParameterFields(RelayFields, m_RelayFields, static_cast<const Core::Relay &>(component).GetParameters());
+    if (component.GetType() == Core::ComponentType::RELAY) {
+        LoadParameterFields(RELAY_FIELDS, m_RelayFields, static_cast<const Core::Relay &>(component).GetParameters());
     }
     if (Core::IsLogicPart(component.GetType())) {
-        LoadParameterFields(LogicFields, m_LogicFields,
+        LoadParameterFields(LOGIC_FIELDS, m_LogicFields,
                             static_cast<const Core::LogicPart &>(component).GetParameters());
     }
-    if (component.GetType() == Core::ComponentType::Clock) {
-        LoadParameterFields(ClockFields, m_ClockFields, static_cast<const Core::Clock &>(component).GetParameters());
+    if (component.GetType() == Core::ComponentType::CLOCK) {
+        LoadParameterFields(CLOCK_FIELDS, m_ClockFields, static_cast<const Core::Clock &>(component).GetParameters());
     }
-    if (component.GetType() == Core::ComponentType::LogicInput) {
-        LoadParameterFields(LogicInputFields, m_LogicInputFields,
+    if (component.GetType() == Core::ComponentType::LOGIC_INPUT) {
+        LoadParameterFields(LOGIC_INPUT_FIELDS, m_LogicInputFields,
                             static_cast<const Core::LogicInput &>(component).GetParameters());
     }
-    if (component.GetType() == Core::ComponentType::Transformer) {
-        LoadParameterFields(TransformerFields, m_TransformerFields,
+    if (component.GetType() == Core::ComponentType::TRANSFORMER) {
+        LoadParameterFields(TRANSFORMER_FIELDS, m_TransformerFields,
                             static_cast<const Core::Transformer &>(component).GetParameters());
     }
     m_LoadedSelection = m_Schematic.GetSelectionVersion();
@@ -540,14 +540,14 @@ void PartEditor::DrawValue(Core::Component &component) {
     const auto is_valid = [&component](const double value) { return component.IsValidValue(value); };
     // Standard values are for the passive parts; the value of a source or a gain is whatever the circuit needs
     const Core::ComponentType type = component.GetType();
-    const bool passive = type == Core::ComponentType::Resistor || type == Core::ComponentType::Capacitor ||
-                         type == Core::ComponentType::Inductor;
-    const Core::ValueSeries series = passive ? m_ValueSeries : Core::ValueSeries::Free;
+    const bool passive = type == Core::ComponentType::RESISTOR || type == Core::ComponentType::CAPACITOR ||
+                         type == Core::ComponentType::INDUCTOR;
+    const Core::ValueSeries series = passive ? m_ValueSeries : Core::ValueSeries::FREE;
     if (const std::optional<double> value = m_Value.Draw("Value", component.GetUnit(), is_valid, series)) {
         component.SetValue(*value);
         m_Schematic.MarkModified();
     }
-    if (series != Core::ValueSeries::Free) {
+    if (series != Core::ValueSeries::FREE) {
         ImGui::TextDisabled("Standard values: %s, %g%%", Core::GetSeriesName(series),
                             Core::GetSeriesTolerancePercent(series));
     }
@@ -556,7 +556,7 @@ void PartEditor::DrawValue(Core::Component &component) {
 // A capacitor's initial condition is a voltage and an inductor's a current; leaving the field empty means no initial
 // condition, but once any part has one the whole transient runs with uic and an empty part starts at zero
 void PartEditor::DrawInitialCondition(Core::Component &component) {
-    const bool is_capacitor = component.GetType() == Core::ComponentType::Capacitor;
+    const bool is_capacitor = component.GetType() == Core::ComponentType::CAPACITOR;
     const GUI::OptionalValueEdit edit = m_InitialCondition.DrawOptional("Initial", is_capacitor ? "V" : "A", AnyValue);
     if (edit.Changed) {
         if (edit.Value) {
@@ -575,7 +575,7 @@ void PartEditor::DrawControlledSwitch(Core::VoltageControlledSwitch &controlled)
     const auto is_valid = [](const Core::SwitchParameters &candidate) {
         return Core::VoltageControlledSwitch::IsValidParameters(candidate);
     };
-    if (DrawParameterFields(SwitchFields, m_SwitchFields, "", is_valid, parameters)) {
+    if (DrawParameterFields(SWITCH_FIELDS, m_SwitchFields, "", is_valid, parameters)) {
         controlled.SetParameters(parameters);
         m_Schematic.MarkModified();
     }
@@ -588,7 +588,7 @@ void PartEditor::DrawRelay(Core::Relay &relay) {
     const auto is_valid = [](const Core::RelayParameters &candidate) {
         return Core::Relay::IsValidParameters(candidate);
     };
-    if (DrawParameterFields(RelayFields, m_RelayFields, "", is_valid, parameters)) {
+    if (DrawParameterFields(RELAY_FIELDS, m_RelayFields, "", is_valid, parameters)) {
         relay.SetParameters(parameters);
         m_Schematic.MarkModified();
     }
@@ -601,7 +601,7 @@ void PartEditor::DrawTransformer(Core::Transformer &transformer) {
     const auto is_valid = [](const Core::TransformerParameters &candidate) {
         return Core::Transformer::IsValidParameters(candidate);
     };
-    if (DrawParameterFields(TransformerFields, m_TransformerFields, "", is_valid, parameters)) {
+    if (DrawParameterFields(TRANSFORMER_FIELDS, m_TransformerFields, "", is_valid, parameters)) {
         transformer.SetParameters(parameters);
         m_Schematic.MarkModified();
     }
@@ -615,7 +615,7 @@ void PartEditor::DrawLogicPart(Core::LogicPart &part) {
     const auto is_valid = [](const Core::LogicParameters &candidate) {
         return Core::LogicPart::IsValidParameters(candidate);
     };
-    if (DrawParameterFields(LogicFields, m_LogicFields, "", is_valid, parameters)) {
+    if (DrawParameterFields(LOGIC_FIELDS, m_LogicFields, "", is_valid, parameters)) {
         part.SetParameters(parameters);
         m_Schematic.MarkModified();
     }
@@ -624,7 +624,7 @@ void PartEditor::DrawLogicPart(Core::LogicPart &part) {
         const int input_count = part.GetInputCount();
         DrawFieldLabel("Inputs");
         if (ImGui::BeginCombo("##inputs", std::to_string(input_count).c_str())) {
-            for (int candidate = Core::MinLogicInputs; candidate <= Core::MaxLogicInputs; ++candidate) {
+            for (int candidate = Core::MIN_LOGIC_INPUTS; candidate <= Core::MAX_LOGIC_INPUTS; ++candidate) {
                 if (ImGui::Selectable(std::to_string(candidate).c_str(), candidate == input_count) &&
                     candidate != input_count) {
                     part.SetInputCount(candidate);
@@ -643,7 +643,7 @@ void PartEditor::DrawClock(Core::Clock &clock) {
     const auto is_valid = [](const Core::ClockParameters &candidate) {
         return Core::Clock::IsValidParameters(candidate);
     };
-    if (DrawParameterFields(ClockFields, m_ClockFields, "", is_valid, parameters)) {
+    if (DrawParameterFields(CLOCK_FIELDS, m_ClockFields, "", is_valid, parameters)) {
         clock.SetParameters(parameters);
         m_Schematic.MarkModified();
     }
@@ -662,7 +662,7 @@ void PartEditor::DrawLogicInput(Core::LogicInput &input) {
     const auto is_valid = [](const Core::LogicInputParameters &candidate) {
         return Core::LogicInput::IsValidParameters(candidate);
     };
-    if (DrawParameterFields(LogicInputFields, m_LogicInputFields, "", is_valid, parameters)) {
+    if (DrawParameterFields(LOGIC_INPUT_FIELDS, m_LogicInputFields, "", is_valid, parameters)) {
         input.SetParameters(parameters);
         m_Schematic.MarkModified();
     }
@@ -672,7 +672,7 @@ void PartEditor::DrawLogicInput(Core::LogicInput &input) {
 // A closed switch conducts; a push button is pressed when closed
 void PartEditor::DrawSwitch(Core::Switch &contact) {
     bool closed = contact.IsClosed();
-    const bool is_button = contact.GetType() == Core::ComponentType::PushButton;
+    const bool is_button = contact.GetType() == Core::ComponentType::PUSH_BUTTON;
     if (ImGui::Checkbox(is_button ? "Pressed" : "Closed", &closed)) {
         contact.SetClosed(closed);
         m_Schematic.MarkModified();
@@ -692,19 +692,19 @@ void PartEditor::DrawWiper(Core::Potentiometer &pot) {
 }
 
 void PartEditor::DrawDiode(Core::Diode &diode) {
-    if (DrawModelChoice(diode, Core::GetDiodeModels(diode.GetType()), Core::CustomDiodeModelName, DiodeFields,
+    if (DrawModelChoice(diode, Core::GetDiodeModels(diode.GetType()), Core::CUSTOM_DIODE_MODEL_NAME, DIODE_FIELDS,
                         m_DiodeFields)) {
         m_Schematic.MarkModified();
     }
     if (diode.IsCustom()) {
-        ImGui::TextDisabled("%s", diode.GetType() == Core::ComponentType::ZenerDiode
+        ImGui::TextDisabled("%s", diode.GetType() == Core::ComponentType::ZENER_DIODE
                                       ? "BV is the voltage the Zener regulates at"
                                       : "BV is the reverse voltage the diode is rated for");
     }
 }
 
 void PartEditor::DrawBJT(Core::BJT &bjt) {
-    if (DrawModelChoice(bjt, Core::GetBJTModels(bjt.GetType()), Core::CustomBJTModelName, BJTFields, m_BJTFields)) {
+    if (DrawModelChoice(bjt, Core::GetBJTModels(bjt.GetType()), Core::CUSTOM_BJT_MODEL_NAME, BJT_FIELDS, m_BJTFields)) {
         m_Schematic.MarkModified();
     }
     if (bjt.IsCustom()) {
@@ -714,7 +714,7 @@ void PartEditor::DrawBJT(Core::BJT &bjt) {
 }
 
 void PartEditor::DrawMOSFET(Core::MOSFET &mosfet) {
-    if (DrawModelChoice(mosfet, Core::GetMOSFETModels(mosfet.GetType()), Core::CustomMOSFETModelName, MOSFETFields,
+    if (DrawModelChoice(mosfet, Core::GetMOSFETModels(mosfet.GetType()), Core::CUSTOM_MOSFET_MODEL_NAME, MOSFET_FIELDS,
                         m_MOSFETFields)) {
         m_Schematic.MarkModified();
     }
@@ -726,7 +726,7 @@ void PartEditor::DrawMOSFET(Core::MOSFET &mosfet) {
 
 // The ideal op-amp has only its gain-bandwidth product to set; a macromodel shows its specifications when custom
 void PartEditor::DrawOpAmp(Core::OpAmp &op_amp) {
-    if (DrawModelChoice(op_amp, Core::GetOpAmpModels(op_amp.GetType()), Core::CustomOpAmpModelName, OpAmpFields,
+    if (DrawModelChoice(op_amp, Core::GetOpAmpModels(op_amp.GetType()), Core::CUSTOM_OP_AMP_MODEL_NAME, OP_AMP_FIELDS,
                         m_OpAmpFields)) {
         m_Schematic.MarkModified();
     }
@@ -744,7 +744,7 @@ void PartEditor::DrawOpAmp(Core::OpAmp &op_amp) {
 
 void PartEditor::DrawSource(Core::Source &source) {
     using SourceType = Core::Source::SourceType;
-    for (const SourceType type : {SourceType::DC, SourceType::AC, SourceType::Pulse, SourceType::EXP, SourceType::SFFM,
+    for (const SourceType type : {SourceType::DC, SourceType::AC, SourceType::PULSE, SourceType::EXP, SourceType::SFFM,
                                   SourceType::AM, SourceType::PWL}) {
         if (type != SourceType::DC) {
             ImGui::SameLine();
@@ -758,7 +758,7 @@ void PartEditor::DrawSource(Core::Source &source) {
 
     switch (source.GetSourceType()) {
     case SourceType::DC: {
-        const char *label = source.GetType() == Core::ComponentType::CurrentSource ? "Current" : "Voltage";
+        const char *label = source.GetType() == Core::ComponentType::CURRENT_SOURCE ? "Current" : "Voltage";
         if (const std::optional<double> value = m_Value.Draw(label, source.GetUnit(), AnyValue)) {
             source.SetValue(*value);
             m_Schematic.MarkModified();
@@ -768,7 +768,7 @@ void PartEditor::DrawSource(Core::Source &source) {
     case SourceType::AC:
         DrawSine(source);
         break;
-    case SourceType::Pulse:
+    case SourceType::PULSE:
         DrawPulse(source);
         break;
     case SourceType::EXP:
@@ -789,7 +789,7 @@ void PartEditor::DrawSource(Core::Source &source) {
 void PartEditor::DrawSine(Core::Source &source) {
     Core::ACParameters ac = source.GetAC();
     const auto is_valid = [&source](const Core::ACParameters &candidate) { return source.IsValidAC(candidate); };
-    if (DrawParameterFields(ACFields, m_ACFields, source.GetUnit(), is_valid, ac)) {
+    if (DrawParameterFields(AC_FIELDS, m_ACFields, source.GetUnit(), is_valid, ac)) {
         source.SetAC(ac);
         m_Schematic.MarkModified();
     }
@@ -800,7 +800,7 @@ void PartEditor::DrawSine(Core::Source &source) {
 void PartEditor::DrawPulse(Core::Source &source) {
     Core::PulseParameters pulse = source.GetPulse();
     const auto is_valid = [&source](const Core::PulseParameters &candidate) { return source.IsValidPulse(candidate); };
-    if (DrawParameterFields(PulseFields, m_PulseFields, source.GetUnit(), is_valid, pulse)) {
+    if (DrawParameterFields(PULSE_FIELDS, m_PulseFields, source.GetUnit(), is_valid, pulse)) {
         source.SetPulse(pulse);
         m_Schematic.MarkModified();
     }
@@ -814,7 +814,7 @@ void PartEditor::DrawPulse(Core::Source &source) {
 void PartEditor::DrawEXP(Core::Source &source) {
     Core::EXPParameters exp = source.GetEXP();
     const auto is_valid = [&source](const Core::EXPParameters &candidate) { return source.IsValidEXP(candidate); };
-    if (DrawParameterFields(EXPFields, m_EXPFields, source.GetUnit(), is_valid, exp)) {
+    if (DrawParameterFields(EXP_FIELDS, m_EXPFields, source.GetUnit(), is_valid, exp)) {
         source.SetEXP(exp);
         m_Schematic.MarkModified();
     }
@@ -824,7 +824,7 @@ void PartEditor::DrawEXP(Core::Source &source) {
 void PartEditor::DrawSFFM(Core::Source &source) {
     Core::SFFMParameters sffm = source.GetSFFM();
     const auto is_valid = [&source](const Core::SFFMParameters &candidate) { return source.IsValidSFFM(candidate); };
-    if (DrawParameterFields(SFFMFields, m_SFFMFields, source.GetUnit(), is_valid, sffm)) {
+    if (DrawParameterFields(SFFM_FIELDS, m_SFFMFields, source.GetUnit(), is_valid, sffm)) {
         source.SetSFFM(sffm);
         m_Schematic.MarkModified();
     }
@@ -834,7 +834,7 @@ void PartEditor::DrawSFFM(Core::Source &source) {
 void PartEditor::DrawAM(Core::Source &source) {
     Core::AMParameters am = source.GetAM();
     const auto is_valid = [&source](const Core::AMParameters &candidate) { return source.IsValidAM(candidate); };
-    if (DrawParameterFields(AMFields, m_AMFields, source.GetUnit(), is_valid, am)) {
+    if (DrawParameterFields(AM_FIELDS, m_AMFields, source.GetUnit(), is_valid, am)) {
         source.SetAM(am);
         m_Schematic.MarkModified();
     }

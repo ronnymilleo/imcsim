@@ -16,7 +16,7 @@
 namespace GUI {
 
 // Powers span decades like currents, so the heat scale is logarithmic and shows this many below the largest power
-inline constexpr double PowerDecades = 4.0;
+inline constexpr double POWER_DECADES = 4.0;
 
 /**
  * @struct  HeatScale

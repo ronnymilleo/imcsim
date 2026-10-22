@@ -21,40 +21,40 @@ double DefaultGain(const ComponentType type) {
         return 1e-3;
     case ComponentType::CCVS:
         return 1e3;
-    case ComponentType::Resistor:
-    case ComponentType::Capacitor:
-    case ComponentType::Inductor:
-    case ComponentType::Ground:
-    case ComponentType::NetLabel:
+    case ComponentType::RESISTOR:
+    case ComponentType::CAPACITOR:
+    case ComponentType::INDUCTOR:
+    case ComponentType::GROUND:
+    case ComponentType::NET_LABEL:
     case ComponentType::VCC:
-    case ComponentType::VoltageSource:
-    case ComponentType::CurrentSource:
-    case ComponentType::Diode:
-    case ComponentType::ZenerDiode:
+    case ComponentType::VOLTAGE_SOURCE:
+    case ComponentType::CURRENT_SOURCE:
+    case ComponentType::DIODE:
+    case ComponentType::ZENER_DIODE:
     case ComponentType::LED:
     case ComponentType::NPN:
     case ComponentType::PNP:
     case ComponentType::NMOS:
     case ComponentType::PMOS:
-    case ComponentType::OpAmp:
-    case ComponentType::Potentiometer:
-    case ComponentType::Switch:
-    case ComponentType::PushButton:
-    case ComponentType::VSwitch:
-    case ComponentType::Relay:
-    case ComponentType::Transformer:
-    case ComponentType::And:
-    case ComponentType::Or:
-    case ComponentType::Not:
-    case ComponentType::Nand:
-    case ComponentType::Nor:
-    case ComponentType::Xor:
-    case ComponentType::Xnor:
-    case ComponentType::Buffer:
-    case ComponentType::DFlipFlop:
-    case ComponentType::JKFlipFlop:
-    case ComponentType::TFlipFlop:
-    case ComponentType::SRFlipFlop:
+    case ComponentType::OP_AMP:
+    case ComponentType::POTENTIOMETER:
+    case ComponentType::SWITCH:
+    case ComponentType::PUSH_BUTTON:
+    case ComponentType::V_SWITCH:
+    case ComponentType::RELAY:
+    case ComponentType::TRANSFORMER:
+    case ComponentType::AND:
+    case ComponentType::OR:
+    case ComponentType::NOT:
+    case ComponentType::NAND:
+    case ComponentType::NOR:
+    case ComponentType::XOR:
+    case ComponentType::XNOR:
+    case ComponentType::BUFFER:
+    case ComponentType::D_FLIP_FLOP:
+    case ComponentType::JK_FLIP_FLOP:
+    case ComponentType::T_FLIP_FLOP:
+    case ComponentType::SR_FLIP_FLOP:
         break;
     }
     return 1.0;

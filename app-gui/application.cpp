@@ -5,7 +5,6 @@
 
 #include "application.h"
 
-#include "error_codes.h"
 #include "examples.h"
 #include "imgui.h"
 #include "imgui_impl_sdl3.h"
@@ -18,6 +17,7 @@
 #include <SDL3/SDL.h>
 #include <array>
 #include <cstdio>
+#include <cstdlib>
 #include <filesystem>
 #include <format>
 #include <string_view>
@@ -28,13 +28,13 @@ namespace GUI {
 namespace {
 
 // Wrap width of the example descriptions, in characters of the current font size
-constexpr float ExampleTooltipWidth = 30.0f;
+constexpr float EXAMPLE_TOOLTIP_WIDTH = 30.0f;
 
 // Debug builds ask for the validation layers of the GPU API; SDL runs without them when they are not installed
 #ifdef NDEBUG
 constexpr bool GPUDebugMode = false;
 #else
-constexpr bool GPUDebugMode = true;
+constexpr bool GPU_DEBUG_MODE = true;
 #endif
 
 // Where a build that ships digital.cm keeps it: beside the program on Windows, in the PlugIns folder of the macOS
@@ -53,28 +53,28 @@ std::filesystem::path GetCodeModelDirectory(const std::filesystem::path &base_pa
 
 /**
  * @brief   Initializes SDL, the GPU device and Dear ImGui, in that order.
- * @return  Core::ExitSuccess on success, Core::ExitFailure if any step fails.
+ * @return  EXIT_SUCCESS on success, EXIT_FAILURE if any step fails.
  * @note    The simulator is told where the program keeps the digital code models, for a build that ships them.
  */
 int Application::Init() {
-    if (InitSDL() != Core::ExitSuccess) {
-        return Core::ExitFailure;
+    if (InitSDL() != EXIT_SUCCESS) {
+        return EXIT_FAILURE;
     }
     if (const char *base_path = SDL_GetBasePath()) {
         Core::SetCodeModelDirectory(GetCodeModelDirectory(base_path));
     }
-    if (InitGPU() != Core::ExitSuccess) {
-        return Core::ExitFailure;
+    if (InitGPU() != EXIT_SUCCESS) {
+        return EXIT_FAILURE;
     }
-    if (InitImGui() != Core::ExitSuccess) {
-        return Core::ExitFailure;
+    if (InitImGui() != EXIT_SUCCESS) {
+        return EXIT_FAILURE;
     }
-    return Core::ExitSuccess;
+    return EXIT_SUCCESS;
 }
 
 /**
  * @brief   Runs the main loop until the user closes the window.
- * @return  Core::ExitSuccess when the loop ends normally.
+ * @return  EXIT_SUCCESS when the loop ends normally.
  */
 int Application::Run() {
     while (m_IsOpen) {
@@ -90,7 +90,7 @@ int Application::Run() {
         EndFrame();
     }
 
-    return Core::ExitSuccess;
+    return EXIT_SUCCESS;
 }
 
 /**
@@ -146,7 +146,7 @@ void Application::DumpErrors() {
 int Application::InitSDL() {
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMEPAD)) {
         AddError(std::string("SDL_Init(): ") + SDL_GetError());
-        return Core::ExitFailure;
+        return EXIT_FAILURE;
     }
 
     m_SDLWindowScale = SDL_GetDisplayContentScale(SDL_GetPrimaryDisplay());
@@ -155,10 +155,10 @@ int Application::InitSDL() {
                                    static_cast<int>(800 * m_SDLWindowScale), m_SDLWindowFlags);
     if (m_SDLWindow == nullptr) {
         AddError(std::string("SDL_CreateWindow(): ") + SDL_GetError());
-        return Core::ExitFailure;
+        return EXIT_FAILURE;
     }
 
-    return Core::ExitSuccess;
+    return EXIT_SUCCESS;
 }
 
 // SDL picks the native API of the system (Direct3D 12 on Windows, Vulkan on Linux) among the shader formats the
@@ -166,21 +166,21 @@ int Application::InitSDL() {
 int Application::InitGPU() {
     m_GPUDevice = SDL_CreateGPUDevice(SDL_GPU_SHADERFORMAT_SPIRV | SDL_GPU_SHADERFORMAT_DXIL |
                                           SDL_GPU_SHADERFORMAT_MSL | SDL_GPU_SHADERFORMAT_METALLIB,
-                                      GPUDebugMode, nullptr);
+                                      GPU_DEBUG_MODE, nullptr);
     if (m_GPUDevice == nullptr) {
         AddError(std::string("SDL_CreateGPUDevice(): ") + SDL_GetError());
-        return Core::ExitFailure;
+        return EXIT_FAILURE;
     }
     if (!SDL_ClaimWindowForGPUDevice(m_GPUDevice, m_SDLWindow)) {
         AddError(std::string("SDL_ClaimWindowForGPUDevice(): ") + SDL_GetError());
-        return Core::ExitFailure;
+        return EXIT_FAILURE;
     }
     SDL_SetGPUSwapchainParameters(m_GPUDevice, m_SDLWindow, SDL_GPU_SWAPCHAINCOMPOSITION_SDR,
                                   SDL_GPU_PRESENTMODE_VSYNC);
 
     SDL_SetWindowPosition(m_SDLWindow, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
     SDL_ShowWindow(m_SDLWindow);
-    return Core::ExitSuccess;
+    return EXIT_SUCCESS;
 }
 
 int Application::InitImGui() {
@@ -219,10 +219,10 @@ int Application::InitImGui() {
     init_info.ColorTargetFormat = SDL_GetGPUSwapchainTextureFormat(m_GPUDevice, m_SDLWindow);
     ImGui_ImplSDLGPU3_Init(&init_info);
     // The glows are an effect the editor can do without, so a failure is reported but does not stop the program
-    if (m_GlowRenderer.Init(m_GPUDevice, init_info.ColorTargetFormat) != Core::ExitSuccess) {
+    if (m_GlowRenderer.Init(m_GPUDevice, init_info.ColorTargetFormat) != EXIT_SUCCESS) {
         AddError(std::string("Glow renderer: ") + SDL_GetError());
     }
-    return Core::ExitSuccess;
+    return EXIT_SUCCESS;
 }
 
 void Application::PollEvents() {
@@ -314,7 +314,7 @@ void Application::DrawMainMenuBar() {
                         }
                     }
                     if (ImGui::BeginItemTooltip()) {
-                        ImGui::PushTextWrapPos(ImGui::GetFontSize() * ExampleTooltipWidth);
+                        ImGui::PushTextWrapPos(ImGui::GetFontSize() * EXAMPLE_TOOLTIP_WIDTH);
                         ImGui::TextUnformatted(example.Description);
                         ImGui::PopTextWrapPos();
                         ImGui::EndTooltip();
@@ -405,18 +405,18 @@ void Application::ShowNewResults() {
         }
     };
     show_if_new(m_ShownOperatingPointVersion, m_Schematic.GetOperatingPointVersion(),
-                m_Schematic.GetOperatingPoint().has_value(), PlotTab::OperatingPoint);
+                m_Schematic.GetOperatingPoint().has_value(), PlotTab::OPERATING_POINT);
     show_if_new(m_ShownTransientVersion, m_Schematic.GetTransientVersion(), m_Schematic.GetTransient().has_value(),
-                PlotTab::Transient);
+                PlotTab::TRANSIENT);
     show_if_new(m_ShownACSweepVersion, m_Schematic.GetACSweepVersion(), m_Schematic.GetACSweep().has_value(),
-                PlotTab::ACSweep);
+                PlotTab::AC_SWEEP);
     show_if_new(m_ShownDCSweepVersion, m_Schematic.GetDCSweepVersion(), m_Schematic.GetDCSweep().has_value(),
-                PlotTab::DCSweep);
-    show_if_new(m_ShownNoiseVersion, m_Schematic.GetNoiseVersion(), m_Schematic.GetNoise().has_value(), PlotTab::Noise);
+                PlotTab::DC_SWEEP);
+    show_if_new(m_ShownNoiseVersion, m_Schematic.GetNoiseVersion(), m_Schematic.GetNoise().has_value(), PlotTab::NOISE);
     show_if_new(m_ShownTransferFunctionVersion, m_Schematic.GetTransferFunctionVersion(),
-                m_Schematic.GetTransferFunction().has_value(), PlotTab::TransferFunction);
+                m_Schematic.GetTransferFunction().has_value(), PlotTab::TRANSFER_FUNCTION);
     show_if_new(m_ShownTruthTableVersion, m_Schematic.GetTruthTableVersion(), m_Schematic.GetTruthTable().has_value(),
-                PlotTab::TruthTable);
+                PlotTab::TRUTH_TABLE);
 }
 
 // The editor, Output, Analysis Settings and Netlist share the main node as tabs, and Properties sits on the right.

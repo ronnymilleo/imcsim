@@ -34,10 +34,10 @@ struct Dimension {
  * @brief   The operations of the math channel of an oscilloscope, between two traces.
  */
 enum class MathOperator {
-    Add,
-    Subtract,
-    Multiply,
-    Divide
+    ADD,
+    SUBTRACT,
+    MULTIPLY,
+    DIVIDE
 };
 
 /**
@@ -46,21 +46,21 @@ enum class MathOperator {
  */
 struct MathInstruction {
     enum class Kind {
-        Number,
-        Voltage,
-        Current,
-        Negate,
-        Add,
-        Subtract,
-        Multiply,
-        Divide,
-        Absolute,
-        SquareRoot,
-        Derivative,
-        Integral
+        NUMBER,
+        VOLTAGE,
+        CURRENT,
+        NEGATE,
+        ADD,
+        SUBTRACT,
+        MULTIPLY,
+        DIVIDE,
+        ABS,
+        SQUARE_ROOT,
+        DERIVATIVE,
+        INTEGRAL
     };
 
-    Kind Type = Kind::Number;
+    Kind Type = Kind::NUMBER;
     double Number = 0.0;
     int Node = 0;
     std::string Current;

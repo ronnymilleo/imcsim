@@ -20,13 +20,13 @@ namespace GUI {
  * @brief   The analyses imcsim runs, one at a time.
  */
 enum class Analysis {
-    OperatingPoint,
-    Transient,
-    ACSweep,
-    DCSweep,
-    Noise,
-    TransferFunction,
-    TruthTable
+    OPERATING_POINT,
+    TRANSIENT,
+    AC_SWEEP,
+    DC_SWEEP,
+    NOISE,
+    TRANSFER_FUNCTION,
+    TRUTH_TABLE
 };
 
 /**
@@ -41,7 +41,7 @@ enum class Analysis {
  *          a default. The truth table reads the voltages the schematic measures, so it keeps no outputs of its own.
  */
 struct SimulationSettings {
-    Analysis Selected = Analysis::Transient;
+    Analysis Selected = Analysis::TRANSIENT;
     Core::TransientSettings Transient;
     Core::ACSweepSettings ACSweep;
     Core::SweepRange SweptRange;

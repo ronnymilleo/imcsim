@@ -9,15 +9,15 @@ namespace Core {
 
 namespace {
 
-constexpr double DefaultResistance = 10e3;
-constexpr double DefaultWiper = 0.5;
+constexpr double DEFAULT_RESISTANCE = 10e3;
+constexpr double DEFAULT_WIPER = 0.5;
 
 } // namespace
 
 /**
  * @brief   Creates a potentiometer of 10 kOhm with its wiper in the middle.
  */
-Potentiometer::Potentiometer() : Component(ComponentType::Potentiometer, DefaultResistance), m_Wiper(DefaultWiper) {
+Potentiometer::Potentiometer() : Component(ComponentType::POTENTIOMETER, DEFAULT_RESISTANCE), m_Wiper(DEFAULT_WIPER) {
 }
 
 /**

@@ -12,7 +12,7 @@ namespace Core {
 /**
  * @brief   Creates a switch that closes above 2.5 V, with 0.1 V of hysteresis, 10 mOhm closed and 1 GOhm open.
  */
-VoltageControlledSwitch::VoltageControlledSwitch() : Component(ComponentType::VSwitch, 0.0) {
+VoltageControlledSwitch::VoltageControlledSwitch() : Component(ComponentType::V_SWITCH, 0.0) {
 }
 
 /**

@@ -15,11 +15,11 @@ namespace GUI {
 
 namespace {
 
-constexpr int TurnCount = 4;
-constexpr int SegmentsPerTurn = 8;
-constexpr float SymbolStart = -1.0f;
-constexpr float TurnWidth = 2.0f / TurnCount;
-constexpr float TurnRadius = TurnWidth / 2.0f;
+constexpr int TURN_COUNT = 4;
+constexpr int SEGMENTS_PER_TURN = 8;
+constexpr float SYMBOL_START = -1.0f;
+constexpr float TURN_WIDTH = 2.0f / TURN_COUNT;
+constexpr float TURN_RADIUS = TURN_WIDTH / 2.0f;
 
 } // namespace
 
@@ -37,18 +37,18 @@ UIInductor::UIInductor(const GridPoint position, const Rotation rotation)
 // extends such miter joins into visible spikes
 void UIInductor::DrawSymbol(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color,
                             SymbolStyle /*style*/) const {
-    std::array<ImVec2, SegmentsPerTurn + 1> points;
-    for (int turn = 0; turn < TurnCount; ++turn) {
-        const float center_x = SymbolStart + TurnRadius + TurnWidth * static_cast<float>(turn);
-        for (int segment = 0; segment <= SegmentsPerTurn; ++segment) {
+    std::array<ImVec2, SEGMENTS_PER_TURN + 1> points;
+    for (int turn = 0; turn < TURN_COUNT; ++turn) {
+        const float center_x = SYMBOL_START + TURN_RADIUS + TURN_WIDTH * static_cast<float>(turn);
+        for (int segment = 0; segment <= SEGMENTS_PER_TURN; ++segment) {
             // Sweep from the left end of the turn (angle pi) to the right end (angle 0), bulging toward -Y
-            const float angle =
-                std::numbers::pi_v<float> * (1.0f - static_cast<float>(segment) / static_cast<float>(SegmentsPerTurn));
-            const float x = center_x + TurnRadius * std::cos(angle);
-            const float y = -TurnRadius * std::sin(angle);
+            const float angle = std::numbers::pi_v<float> *
+                                (1.0f - static_cast<float>(segment) / static_cast<float>(SEGMENTS_PER_TURN));
+            const float x = center_x + TURN_RADIUS * std::cos(angle);
+            const float y = -TURN_RADIUS * std::sin(angle);
             points[segment] = LocalToScreen(view, x, y);
         }
-        canvas.AddPolyline(points.data(), static_cast<int>(points.size()), color, ImDrawFlags_None, LineThickness);
+        canvas.AddPolyline(points.data(), static_cast<int>(points.size()), color, ImDrawFlags_None, LINE_THICKNESS);
     }
 }
 

@@ -33,7 +33,7 @@ TEST_CASE("A stepped range rejects a step the wrong way and too many runs", "[pa
     CHECK_FALSE(GUI::ListStepValues(settings, "°C"));
     settings.Step = 1.0;
     CHECK_FALSE(GUI::ListStepValues(settings, "°C"));
-    settings.Step = 100.0 / (GUI::MaxParameterSteps - 1);
+    settings.Step = 100.0 / (GUI::MAX_PARAMETER_STEPS - 1);
     CHECK(GUI::ListStepValues(settings, "°C"));
 }
 

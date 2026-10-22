@@ -125,15 +125,15 @@ TEST_CASE("A parabola's slope at a point follows its derivative", "[trace_statis
     // y = x^2 sampled evenly; the central difference (f(x+d)-f(x-d)) / 2d is exactly the derivative 2x
     std::vector<double> xs;
     std::vector<double> ys;
-    constexpr double Step = 1e-3;
-    for (double x = 0.0; x <= 2.0; x += Step) {
+    constexpr double STEP = 1e-3;
+    for (double x = 0.0; x <= 2.0; x += STEP) {
         xs.push_back(x);
         ys.push_back(x * x);
     }
-    REQUIRE(GUI::ComputeSlope(xs, ys, 1.0 - Step, 1.0 + Step));
-    REQUIRE(GUI::ComputeSlope(xs, ys, 1.5 - Step, 1.5 + Step));
-    CHECK_THAT(*GUI::ComputeSlope(xs, ys, 1.0 - Step, 1.0 + Step), WithinRel(2.0, 1e-9));
-    CHECK_THAT(*GUI::ComputeSlope(xs, ys, 1.5 - Step, 1.5 + Step), WithinRel(3.0, 1e-9));
+    REQUIRE(GUI::ComputeSlope(xs, ys, 1.0 - STEP, 1.0 + STEP));
+    REQUIRE(GUI::ComputeSlope(xs, ys, 1.5 - STEP, 1.5 + STEP));
+    CHECK_THAT(*GUI::ComputeSlope(xs, ys, 1.0 - STEP, 1.0 + STEP), WithinRel(2.0, 1e-9));
+    CHECK_THAT(*GUI::ComputeSlope(xs, ys, 1.5 - STEP, 1.5 + STEP), WithinRel(3.0, 1e-9));
     // The secant over a wider span is the average slope, here (9-1)/(3-1)
     const std::vector<double> few_xs = {0.0, 1.0, 2.0, 3.0};
     const std::vector<double> few_ys = {0.0, 1.0, 4.0, 9.0};

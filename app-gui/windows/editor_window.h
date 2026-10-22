@@ -122,25 +122,25 @@ private:
      * @brief   A command picked in a menu, run by the next Draw() so its popups belong to the editor window.
      */
     enum class EditorCommand {
-        New,
-        Open,
-        Save,
-        SaveAs,
-        Import,
-        ExportSchematic,
-        Undo,
-        Redo,
-        Rotate,
-        Mirror,
-        Flip,
-        RotateKeepWires,
-        MirrorKeepWires,
-        FlipKeepWires,
-        Cut,
-        Copy,
-        Paste,
-        SelectAll,
-        Delete
+        NEW,
+        OPEN,
+        SAVE,
+        SAVE_AS,
+        IMPORT,
+        EXPORT_SCHEMATIC,
+        UNDO,
+        REDO,
+        ROTATE,
+        MIRROR,
+        FLIP,
+        ROTATE_KEEP_WIRES,
+        MIRROR_KEEP_WIRES,
+        FLIP_KEEP_WIRES,
+        CUT,
+        COPY,
+        PASTE,
+        SELECT_ALL,
+        DELETE_SELECTION
     };
 
     Schematic &m_Schematic;

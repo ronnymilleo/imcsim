@@ -35,10 +35,10 @@ TEST_CASE("Heat brightness grows on a logarithmic scale up to the largest power"
 
 TEST_CASE("Only resistors that dissipate power glow", "[heat_glow]") {
     std::vector<std::unique_ptr<GUI::UIElement>> elements;
-    elements.push_back(Part(Core::ComponentType::Resistor, {0, 0}, "R1"));
-    elements.push_back(Part(Core::ComponentType::Resistor, {10, 0}, "R2"));
-    elements.push_back(Part(Core::ComponentType::Resistor, {20, 0}, "R3"));
-    elements.push_back(Part(Core::ComponentType::Resistor, {30, 0}, "R4"));
+    elements.push_back(Part(Core::ComponentType::RESISTOR, {0, 0}, "R1"));
+    elements.push_back(Part(Core::ComponentType::RESISTOR, {10, 0}, "R2"));
+    elements.push_back(Part(Core::ComponentType::RESISTOR, {20, 0}, "R3"));
+    elements.push_back(Part(Core::ComponentType::RESISTOR, {30, 0}, "R4"));
     elements.push_back(Part(Core::ComponentType::VCC, {40, 0}, "V1"));
     // R3 is nearly cold and R4 has no power in the results; the supply delivers power and is no resistor
     const std::vector<GUI::ComponentPower> powers = {{"R1", 1.0}, {"R2", 0.1}, {"R3", 1e-4}, {"V1", -1.0}};

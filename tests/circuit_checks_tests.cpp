@@ -48,7 +48,7 @@ TEST_CASE("A circuit needs parts, and a ground unless it is only digital", "[cir
     // Logic inputs and logic parts refer to node 0 themselves, so a circuit of only those needs no Ground part
     Core::LogicInput input;
     input.SetName("V1");
-    Core::LogicPart gate(Core::ComponentType::And);
+    Core::LogicPart gate(Core::ComponentType::AND);
     gate.SetName("U1");
     Core::Circuit digital;
     digital.Add(input, {1});

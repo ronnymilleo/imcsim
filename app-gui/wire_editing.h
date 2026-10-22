@@ -27,13 +27,13 @@ struct PointTransform {
      *          about the pivot.
      */
     enum class Kind {
-        Translate,
-        QuarterTurn,
-        MirrorLeftRight,
-        MirrorTopBottom
+        TRANSLATE,
+        QUARTER_TURN,
+        MIRROR_LEFT_RIGHT,
+        MIRROR_TOP_BOTTOM
     };
 
-    Kind Type = Kind::Translate;
+    Kind Type = Kind::TRANSLATE;
     // How far a translation moves points
     GridPoint Delta;
     // The point the other kinds turn or mirror about

@@ -116,7 +116,7 @@ struct TruthTableSettings {
 };
 
 // Most inputs a truth table varies; each one doubles the number of runs
-inline constexpr std::size_t MaxTruthTableInputs = 10;
+inline constexpr std::size_t MAX_TRUTH_TABLE_INPUTS = 10;
 
 } // namespace Core
 

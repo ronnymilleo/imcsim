@@ -15,20 +15,20 @@ namespace Core {
 
 namespace {
 
-constexpr double AbsoluteZero = -273.15;
+constexpr double ABSOLUTE_ZERO = -273.15;
 
 // Parts a stepped analysis can change: those written as one element whose value is all there is to them
 bool IsSteppable(const ComponentType type) {
-    return type == ComponentType::Resistor || type == ComponentType::Capacitor || type == ComponentType::Inductor;
+    return type == ComponentType::RESISTOR || type == ComponentType::CAPACITOR || type == ComponentType::INDUCTOR;
 }
 
 std::unique_ptr<Component> CopyWithValue(const Component &part, const double value) {
     std::unique_ptr<Component> copy;
     switch (part.GetType()) {
-    case ComponentType::Resistor:
+    case ComponentType::RESISTOR:
         copy = std::make_unique<Resistor>(static_cast<const Resistor &>(part));
         break;
-    case ComponentType::Capacitor:
+    case ComponentType::CAPACITOR:
         copy = std::make_unique<Capacitor>(static_cast<const Capacitor &>(part));
         break;
     default:
@@ -57,7 +57,7 @@ std::expected<ParameterCircuit, std::string> ApplyParameter(const Circuit &circu
         return applied;
     }
     if (parameter->Part.empty()) {
-        if (parameter->Value <= AbsoluteZero) {
+        if (parameter->Value <= ABSOLUTE_ZERO) {
             return std::unexpected("The temperature must be above absolute zero, -273.15 C");
         }
         applied.Temperature = parameter->Value;

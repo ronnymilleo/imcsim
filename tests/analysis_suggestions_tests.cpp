@@ -38,7 +38,7 @@ TEST_CASE("SuggestTransientSettings shows five periods of the slowest source", "
 
     SECTION("a slower pulse with a delay sets the stop time, the faster sine the step") {
         Core::CurrentSource pulse;
-        pulse.SetSourceType(Core::Source::SourceType::Pulse);
+        pulse.SetSourceType(Core::Source::SourceType::PULSE);
         Core::PulseParameters parameters;
         parameters.Period = 16e-3;
         parameters.Width = 8e-3;

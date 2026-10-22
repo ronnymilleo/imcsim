@@ -25,10 +25,10 @@ namespace GUI {
  *          until the next run.
  */
 enum class RunOutcome {
-    None,
-    Succeeded,
-    SucceededWithWarnings,
-    Failed
+    NONE,
+    SUCCEEDED,
+    SUCCEEDED_WITH_WARNINGS,
+    FAILED
 };
 
 /**

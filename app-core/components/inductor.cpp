@@ -9,14 +9,14 @@ namespace Core {
 
 namespace {
 
-constexpr double DefaultInductance = 1e-3;
+constexpr double DEFAULT_INDUCTANCE = 1e-3;
 
 } // namespace
 
 /**
  * @brief   Creates an inductor of 1 mH.
  */
-Inductor::Inductor() : Component(ComponentType::Inductor, DefaultInductance) {
+Inductor::Inductor() : Component(ComponentType::INDUCTOR, DEFAULT_INDUCTANCE) {
 }
 
 } // namespace Core

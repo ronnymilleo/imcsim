@@ -20,7 +20,7 @@ namespace GUI {
 namespace {
 
 // Older steps are dropped beyond this, so a long session does not keep growing
-constexpr std::size_t MaxUndoSteps = 100;
+constexpr std::size_t MAX_UNDO_STEPS = 100;
 
 } // namespace
 
@@ -458,7 +458,7 @@ void Schematic::CommitUndoStep() {
         return;
     }
     m_UndoSnapshots.push_back(std::move(m_CurrentSnapshot));
-    if (m_UndoSnapshots.size() > MaxUndoSteps) {
+    if (m_UndoSnapshots.size() > MAX_UNDO_STEPS) {
         m_UndoSnapshots.erase(m_UndoSnapshots.begin());
     }
     m_CurrentSnapshot = std::move(snapshot);

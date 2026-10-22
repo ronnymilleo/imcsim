@@ -9,14 +9,14 @@ namespace Core {
 
 namespace {
 
-constexpr double DefaultResistance = 1e3;
+constexpr double DEFAULT_RESISTANCE = 1e3;
 
 } // namespace
 
 /**
  * @brief   Creates a resistor of 1 kOhm.
  */
-Resistor::Resistor() : Component(ComponentType::Resistor, DefaultResistance) {
+Resistor::Resistor() : Component(ComponentType::RESISTOR, DEFAULT_RESISTANCE) {
 }
 
 } // namespace Core

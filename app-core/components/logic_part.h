@@ -13,12 +13,12 @@
 namespace Core {
 
 // Where a voltage reads as 0 and as 1, as fractions of the logic level; between them it is unknown
-inline constexpr double LogicLowFraction = 0.3;
-inline constexpr double LogicHighFraction = 0.7;
+inline constexpr double LOGIC_LOW_FRACTION = 0.3;
+inline constexpr double LOGIC_HIGH_FRACTION = 0.7;
 
 // A gate with several inputs takes from 2 to 8 of them
-inline constexpr int MinLogicInputs = 2;
-inline constexpr int MaxLogicInputs = 8;
+inline constexpr int MIN_LOGIC_INPUTS = 2;
+inline constexpr int MAX_LOGIC_INPUTS = 8;
 
 /**
  * @struct  LogicParameters
@@ -56,7 +56,7 @@ public:
 
 private:
     LogicParameters m_Parameters;
-    int m_InputCount = MinLogicInputs;
+    int m_InputCount = MIN_LOGIC_INPUTS;
 };
 
 bool IsLogicGate(ComponentType type);

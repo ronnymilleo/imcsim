@@ -498,7 +498,7 @@ TEST_CASE("The LED dimmer lights the LED more as the potentiometer is turned tow
     GUI::Schematic schematic;
     OpenExample("potentiometer_led_dimmer.imcsim", schematic);
     const auto pot = std::ranges::find_if(schematic.GetElements(), [](const auto &element) {
-        return element->GetComponent().GetType() == Core::ComponentType::Potentiometer;
+        return element->GetComponent().GetType() == Core::ComponentType::POTENTIOMETER;
     });
     REQUIRE(pot != schematic.GetElements().end());
     auto &potentiometer = static_cast<Core::Potentiometer &>((*pot)->GetComponent());
@@ -810,7 +810,7 @@ TEST_CASE("The truth table example lists the table of each basic gate", "[exampl
     GUI::Schematic schematic;
     OpenExample("logic_truth_table.imcsim", schematic);
     const GUI::SimulationSettings &settings = schematic.GetSimulationSettings();
-    CHECK(settings.Selected == GUI::Analysis::TruthTable);
+    CHECK(settings.Selected == GUI::Analysis::TRUTH_TABLE);
 
     // The example is made only of digital parts, so it runs with no Ground part
     const Core::Circuit circuit = schematic.BuildCircuit();
@@ -829,16 +829,16 @@ TEST_CASE("The truth table example lists the table of each basic gate", "[exampl
     REQUIRE(table.Rows.size() == 4);
     REQUIRE(table.OutputNodes.size() == 6);
     // AND, OR, NAND, NOR, XOR and XNOR for 00, 01, 10 and 11 (the first input is the most significant bit)
-    constexpr std::array<std::array<bool, 6>, 4> Expected = {{{false, false, true, true, false, true},
+    constexpr std::array<std::array<bool, 6>, 4> EXPECTED = {{{false, false, true, true, false, true},
                                                               {false, true, true, false, true, false},
                                                               {false, true, true, false, true, false},
                                                               {true, true, false, false, false, true}}};
-    for (std::size_t row = 0; row < Expected.size(); ++row) {
+    for (std::size_t row = 0; row < EXPECTED.size(); ++row) {
         REQUIRE(table.Rows[row].HasOperatingPoint());
-        for (std::size_t gate = 0; gate < Expected[row].size(); ++gate) {
+        for (std::size_t gate = 0; gate < EXPECTED[row].size(); ++gate) {
             INFO(std::format("row {} gate {}", row, gate));
             const double voltage = table.Rows[row].OutputVoltages[gate];
-            CHECK((Expected[row][gate] ? voltage > 4.0 : voltage < 0.5));
+            CHECK((EXPECTED[row][gate] ? voltage > 4.0 : voltage < 0.5));
         }
     }
 }
@@ -847,7 +847,7 @@ TEST_CASE("The full adder example adds three bits in its truth table", "[example
     SKIP_WITHOUT_DIGITAL_MODELS();
     GUI::Schematic schematic;
     OpenExample("full_adder.imcsim", schematic);
-    CHECK(schematic.GetSimulationSettings().Selected == GUI::Analysis::TruthTable);
+    CHECK(schematic.GetSimulationSettings().Selected == GUI::Analysis::TRUTH_TABLE);
 
     const Core::Circuit circuit = schematic.BuildCircuit();
     REQUIRE_FALSE(circuit.HasGround());

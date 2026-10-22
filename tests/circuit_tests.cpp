@@ -132,7 +132,7 @@ TEST_CASE("ToSpiceNetlist writes an AC source for every analysis at once", "[cir
 TEST_CASE("ToSpiceNetlist writes a pulse source starting at its low level", "[circuit]") {
     Core::VoltageSource source;
     source.SetName("Vin1");
-    source.SetSourceType(Core::VoltageSource::SourceType::Pulse);
+    source.SetSourceType(Core::VoltageSource::SourceType::PULSE);
     source.SetPulse({.Low = -1.0,
                      .High = 3.3,
                      .Delay = 1e-3,
@@ -282,7 +282,7 @@ TEST_CASE("HasACSource looks for a voltage source set to AC", "[circuit]") {
     circuit.Add(source, {1, 0});
     CHECK_FALSE(circuit.HasACSource());
 
-    source.SetSourceType(Core::VoltageSource::SourceType::Pulse);
+    source.SetSourceType(Core::VoltageSource::SourceType::PULSE);
     CHECK_FALSE(circuit.HasACSource());
 
     source.SetSourceType(Core::VoltageSource::SourceType::AC);
@@ -311,9 +311,9 @@ TEST_CASE("HasGround looks for a ground component", "[circuit]") {
 }
 
 TEST_CASE("ToSpiceNetlist writes diodes from anode to cathode and each model once", "[circuit]") {
-    Core::Diode first(Core::ComponentType::Diode);
+    Core::Diode first(Core::ComponentType::DIODE);
     first.SetName("D1");
-    Core::Diode second(Core::ComponentType::Diode);
+    Core::Diode second(Core::ComponentType::DIODE);
     second.SetName("D2");
     Core::Diode led(Core::ComponentType::LED);
     led.SetName("D3");
@@ -334,9 +334,9 @@ TEST_CASE("ToSpiceNetlist writes diodes from anode to cathode and each model onc
 }
 
 TEST_CASE("ToSpiceNetlist puts a probe source on each diode anode only when asked", "[circuit]") {
-    Core::Diode first(Core::ComponentType::ZenerDiode);
+    Core::Diode first(Core::ComponentType::ZENER_DIODE);
     first.SetName("D1");
-    Core::Diode second(Core::ComponentType::ZenerDiode);
+    Core::Diode second(Core::ComponentType::ZENER_DIODE);
     second.SetName("Dclamp");
     Core::Circuit circuit;
     circuit.Add(first, {0, 1});
@@ -357,10 +357,10 @@ TEST_CASE("ToSpiceNetlist puts a probe source on each diode anode only when aske
 }
 
 TEST_CASE("ToSpiceNetlist gives each custom diode a model of its own", "[circuit]") {
-    Core::Diode first(Core::ComponentType::Diode);
+    Core::Diode first(Core::ComponentType::DIODE);
     first.SetName("D1");
     first.SetCustomParameters({.SaturationCurrent = 1e-12, .BreakdownVoltage = 50.0});
-    Core::Diode second(Core::ComponentType::Diode);
+    Core::Diode second(Core::ComponentType::DIODE);
     second.SetName("D2");
     second.SetCustomParameters({.SaturationCurrent = 1e-12, .BreakdownVoltage = 50.0});
     Core::Circuit circuit;
@@ -494,10 +494,10 @@ TEST_CASE("ToSpiceNetlist writes an ideal op-amp as a gain stage with a pole, cl
 TEST_CASE("ToSpiceNetlist writes a macromodel op-amp as an instance of its subcircuit", "[circuit]") {
     Core::OpAmp first;
     first.SetName("U1");
-    first.SetModel(*Core::FindOpAmpModel(Core::ComponentType::OpAmp, "uA741"));
+    first.SetModel(*Core::FindOpAmpModel(Core::ComponentType::OP_AMP, "uA741"));
     Core::OpAmp second;
     second.SetName("U2");
-    second.SetModel(*Core::FindOpAmpModel(Core::ComponentType::OpAmp, "uA741"));
+    second.SetModel(*Core::FindOpAmpModel(Core::ComponentType::OP_AMP, "uA741"));
     Core::OpAmp custom;
     custom.SetName("U3");
     custom.SetCustom();
@@ -562,9 +562,9 @@ TEST_CASE("A potentiometer probes its three terminals, and the probes carry its 
 
 TEST_CASE("ToSpiceNetlist writes a switch as a resistor that is nearly a wire closed and nearly nothing open",
           "[circuit]") {
-    Core::Switch toggle(Core::ComponentType::Switch);
+    Core::Switch toggle(Core::ComponentType::SWITCH);
     toggle.SetName("SW1");
-    Core::Switch button(Core::ComponentType::PushButton);
+    Core::Switch button(Core::ComponentType::PUSH_BUTTON);
     button.SetName("PB1");
     Core::Circuit circuit;
     circuit.Add(toggle, {1, 2});
@@ -581,7 +581,7 @@ TEST_CASE("ToSpiceNetlist writes a switch as a resistor that is nearly a wire cl
 }
 
 TEST_CASE("A switch has one current probe, on its first terminal, named after the part", "[circuit]") {
-    Core::Switch toggle(Core::ComponentType::Switch);
+    Core::Switch toggle(Core::ComponentType::SWITCH);
     toggle.SetName("SW1");
     const std::vector<Core::CurrentProbe> probes = Core::GetCurrentProbes(toggle);
     REQUIRE(probes.size() == 1);
@@ -689,7 +689,7 @@ TEST_CASE("Each current of a part belongs to the terminal it flows into", "[circ
 }
 
 TEST_CASE("ToSpiceNetlist writes a gate behind bridges, with a pull-down on each input", "[circuit]") {
-    Core::LogicPart gate(Core::ComponentType::Nand);
+    Core::LogicPart gate(Core::ComponentType::NAND);
     gate.SetName("U1");
     Core::Circuit circuit;
     // Inputs on nodes 1 and 2, output on node 3
@@ -712,7 +712,7 @@ TEST_CASE("ToSpiceNetlist writes a gate behind bridges, with a pull-down on each
 }
 
 TEST_CASE("ToSpiceNetlist writes a gate with three inputs as a vector of three digital nodes", "[circuit]") {
-    Core::LogicPart gate(Core::ComponentType::Xor);
+    Core::LogicPart gate(Core::ComponentType::XOR);
     gate.SetName("U1");
     gate.SetInputCount(3);
     Core::Circuit circuit;
@@ -735,7 +735,7 @@ TEST_CASE("ToSpiceNetlist writes a gate with three inputs as a vector of three d
 }
 
 TEST_CASE("ToSpiceNetlist gives a single-input gate scalar ports and follows the logic level", "[circuit]") {
-    Core::LogicPart inverter(Core::ComponentType::Not);
+    Core::LogicPart inverter(Core::ComponentType::NOT);
     inverter.SetName("U1");
     inverter.SetParameters({.LogicLevel = 3.3, .PropagationDelay = 2e-9});
     Core::Circuit circuit;
@@ -749,7 +749,7 @@ TEST_CASE("ToSpiceNetlist gives a single-input gate scalar ports and follows the
 }
 
 TEST_CASE("ToSpiceNetlist writes a flip-flop with its inputs in order and both outputs", "[circuit]") {
-    Core::LogicPart flip_flop(Core::ComponentType::JKFlipFlop);
+    Core::LogicPart flip_flop(Core::ComponentType::JK_FLIP_FLOP);
     flip_flop.SetName("U1");
     Core::Circuit circuit;
     // J, K, CLK, SET and RESET on nodes 1 to 5, Q on node 6 and QN on node 7
@@ -765,18 +765,18 @@ TEST_CASE("ToSpiceNetlist writes a flip-flop with its inputs in order and both o
 }
 
 TEST_CASE("Probes of the logic parts", "[circuit]") {
-    Core::LogicPart gate(Core::ComponentType::And);
+    Core::LogicPart gate(Core::ComponentType::AND);
     gate.SetName("U1");
     const std::vector<Core::CurrentProbe> gate_probes = Core::GetCurrentProbes(gate);
     REQUIRE(gate_probes.size() == 1);
     CHECK(gate_probes[0].Terminal == 2);
     CHECK(Core::GetCurrentName(gate, gate_probes[0].Label) == "U1");
 
-    Core::LogicPart inverter(Core::ComponentType::Not);
+    Core::LogicPart inverter(Core::ComponentType::NOT);
     inverter.SetName("U2");
     CHECK(Core::GetCurrentProbes(inverter)[0].Terminal == 1);
 
-    Core::LogicPart flip_flop(Core::ComponentType::DFlipFlop);
+    Core::LogicPart flip_flop(Core::ComponentType::D_FLIP_FLOP);
     flip_flop.SetName("U3");
     const std::vector<Core::CurrentProbe> flip_flop_probes = Core::GetCurrentProbes(flip_flop);
     REQUIRE(flip_flop_probes.size() == 2);
@@ -795,14 +795,14 @@ TEST_CASE("GetElementNames lists the elements the netlist writes for each part",
     ideal.SetName("U1");
     Core::OpAmp macromodel;
     macromodel.SetName("U2");
-    macromodel.SetModel(*Core::FindOpAmpModel(Core::ComponentType::OpAmp, "uA741"));
-    Core::Switch toggle(Core::ComponentType::Switch);
+    macromodel.SetModel(*Core::FindOpAmpModel(Core::ComponentType::OP_AMP, "uA741"));
+    Core::Switch toggle(Core::ComponentType::SWITCH);
     toggle.SetName("SW1");
     Core::Relay relay;
     relay.SetName("K1");
     Core::Transformer transformer;
     transformer.SetName("T1");
-    Core::LogicPart gate(Core::ComponentType::Nand);
+    Core::LogicPart gate(Core::ComponentType::NAND);
     gate.SetName("U3");
     Core::Ground ground;
     Core::Circuit circuit;

@@ -39,7 +39,7 @@ TEST_CASE("Only LEDs with forward current glow, in the color of their model", "[
     elements.push_back(Part(Core::ComponentType::LED, {10, 0}, "D2"));
     elements.push_back(Part(Core::ComponentType::LED, {20, 0}, "D3"));
     elements.push_back(Part(Core::ComponentType::LED, {30, 0}, "D4"));
-    elements.push_back(Part(Core::ComponentType::Diode, {40, 0}, "D5"));
+    elements.push_back(Part(Core::ComponentType::DIODE, {40, 0}, "D5"));
     auto &green = static_cast<Core::Diode &>(elements[1]->GetComponent());
     green.SetModel(*Core::FindDiodeModel(Core::ComponentType::LED, "Green"));
     static_cast<Core::Diode &>(elements[2]->GetComponent()).SetCustom();
@@ -50,12 +50,12 @@ TEST_CASE("Only LEDs with forward current glow, in the color of their model", "[
     const std::vector<GUI::LEDGlow> glows = GUI::ComputeLEDGlows(elements, currents);
     REQUIRE(glows.size() == 3);
     CHECK(glows[0].Center == GUI::GridPoint{0, 0});
-    CHECK(glows[0].Color == Core::LEDColor::Red);
+    CHECK(glows[0].Color == Core::LEDColor::RED);
     CHECK(glows[0].Brightness == 1.0f);
     CHECK(glows[1].Center == GUI::GridPoint{10, 0});
-    CHECK(glows[1].Color == Core::LEDColor::Green);
+    CHECK(glows[1].Color == Core::LEDColor::GREEN);
     CHECK(glows[1].Brightness < 1.0f);
-    CHECK(glows[2].Color == Core::LEDColor::None);
+    CHECK(glows[2].Color == Core::LEDColor::NONE);
 }
 
 TEST_CASE("LEDs missing from the results stay dark", "[led_glow]") {

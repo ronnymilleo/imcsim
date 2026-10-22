@@ -9,14 +9,14 @@ namespace Core {
 
 namespace {
 
-constexpr double DefaultCapacitance = 1e-6;
+constexpr double DEFAULT_CAPACITANCE = 1e-6;
 
 } // namespace
 
 /**
  * @brief   Creates a capacitor of 1 uF.
  */
-Capacitor::Capacitor() : Component(ComponentType::Capacitor, DefaultCapacitance) {
+Capacitor::Capacitor() : Component(ComponentType::CAPACITOR, DEFAULT_CAPACITANCE) {
 }
 
 } // namespace Core

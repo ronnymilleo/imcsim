@@ -21,7 +21,7 @@ namespace GUI {
 
 namespace {
 
-constexpr auto AnalysisNames = std::to_array<const char *>(
+constexpr auto ANALYSIS_NAMES = std::to_array<const char *>(
     {"Operating point", "Transient", "AC sweep", "DC sweep", "Noise", "Transfer function", "Truth table"});
 
 bool IsPositive(const double value) {
@@ -55,7 +55,7 @@ std::vector<SweepSource> ListSweepSources(const Core::Circuit &circuit) {
         const auto entry = std::ranges::find_if(circuit.GetEntries(), [&name](const Core::CircuitEntry &candidate) {
             return candidate.Part->GetName() == name;
         });
-        sources.push_back({name, entry->Part->GetType() == Core::ComponentType::CurrentSource ? "A" : "V"});
+        sources.push_back({name, entry->Part->GetType() == Core::ComponentType::CURRENT_SOURCE ? "A" : "V"});
     }
     return sources;
 }
@@ -67,8 +67,8 @@ void LoadSweepFields(const Core::SweepRange &range, std::array<ValueField, 3> &f
 }
 
 // The stepped source defaults to the second one, so a transistor curve family needs no picking
-constexpr std::size_t SweptSourceIndex = 0;
-constexpr std::size_t SteppedSourceIndex = 1;
+constexpr std::size_t SWEPT_SOURCE_INDEX = 0;
+constexpr std::size_t STEPPED_SOURCE_INDEX = 1;
 
 // A range without a source, or with one that left the circuit, uses the source at preferred_index, so a new
 // schematic is ready to run. The stored name is kept, so the choice comes back with its source
@@ -130,12 +130,12 @@ std::vector<int> ListHeldNodes(const Core::Circuit &circuit) {
     std::vector<int> nodes;
     for (const Core::CircuitEntry &entry : circuit.GetEntries()) {
         const Core::ComponentType type = entry.Part->GetType();
-        if (type == Core::ComponentType::VCC || type == Core::ComponentType::LogicInput ||
-            type == Core::ComponentType::Clock) {
+        if (type == Core::ComponentType::VCC || type == Core::ComponentType::LOGIC_INPUT ||
+            type == Core::ComponentType::CLOCK) {
             nodes.push_back(entry.Nodes[0]);
-        } else if (type == Core::ComponentType::VoltageSource && entry.Nodes[1] == 0) {
+        } else if (type == Core::ComponentType::VOLTAGE_SOURCE && entry.Nodes[1] == 0) {
             nodes.push_back(entry.Nodes[0]);
-        } else if (type == Core::ComponentType::VoltageSource && entry.Nodes[0] == 0) {
+        } else if (type == Core::ComponentType::VOLTAGE_SOURCE && entry.Nodes[0] == 0) {
             nodes.push_back(entry.Nodes[1]);
         }
     }
@@ -300,8 +300,8 @@ AnalysisControls::AnalysisControls(Schematic &schematic) : m_Schematic(schematic
  */
 void AnalysisControls::DrawAnalysisPicker() {
     SimulationSettings settings = m_Schematic.GetSimulationSettings();
-    for (std::size_t index = 0; index < AnalysisNames.size(); ++index) {
-        if (ImGui::RadioButton(AnalysisNames[index], ToIndex(settings.Selected) == index)) {
+    for (std::size_t index = 0; index < ANALYSIS_NAMES.size(); ++index) {
+        if (ImGui::RadioButton(ANALYSIS_NAMES[index], ToIndex(settings.Selected) == index)) {
             settings.Selected = static_cast<Analysis>(index);
         }
     }
@@ -318,33 +318,33 @@ void AnalysisControls::DrawSettings() {
     }
     SimulationSettings settings = m_Schematic.GetSimulationSettings();
     switch (settings.Selected) {
-    case Analysis::OperatingPoint:
+    case Analysis::OPERATING_POINT:
         ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + ImGui::GetFontSize() * 20.0f);
         ImGui::TextDisabled("No settings: the DC voltages show on the schematic and, with the currents, in the "
                             "Output window");
         ImGui::PopTextWrapPos();
         break;
-    case Analysis::Transient:
+    case Analysis::TRANSIENT:
         DrawTransientSettings(settings);
         break;
-    case Analysis::ACSweep:
+    case Analysis::AC_SWEEP:
         DrawACSweepSettings(settings);
         break;
-    case Analysis::DCSweep:
+    case Analysis::DC_SWEEP:
         DrawDCSweepSettings(settings);
         break;
-    case Analysis::Noise:
+    case Analysis::NOISE:
         DrawNoiseSettings(settings);
         break;
-    case Analysis::TransferFunction:
+    case Analysis::TRANSFER_FUNCTION:
         DrawTransferFunctionSettings(settings);
         break;
-    case Analysis::TruthTable:
+    case Analysis::TRUTH_TABLE:
         DrawTruthTableSettings(settings);
         break;
     }
-    if (settings.Selected == Analysis::Transient || settings.Selected == Analysis::ACSweep ||
-        settings.Selected == Analysis::DCSweep) {
+    if (settings.Selected == Analysis::TRANSIENT || settings.Selected == Analysis::AC_SWEEP ||
+        settings.Selected == Analysis::DC_SWEEP) {
         DrawParameterStepSettings(settings);
     }
     m_Schematic.SetSimulationSettings(settings);
@@ -361,7 +361,7 @@ void AnalysisControls::RunSelected() {
     // The operating point, the noise and the transfer function analyses run once, whatever the step settings
     std::optional<StepPlan> steps;
     if (settings.ParameterStep.Enabled &&
-        (analysis == Analysis::Transient || analysis == Analysis::ACSweep || analysis == Analysis::DCSweep)) {
+        (analysis == Analysis::TRANSIENT || analysis == Analysis::AC_SWEEP || analysis == Analysis::DC_SWEEP)) {
         ClearResult(analysis);
         const std::string unit = GetParameterUnit(circuit, settings.ParameterStep.Part);
         auto values = ListStepValues(settings.ParameterStep, unit);
@@ -372,7 +372,7 @@ void AnalysisControls::RunSelected() {
         steps = StepPlan{.Settings = settings.ParameterStep, .Unit = unit, .Values = std::move(*values)};
     }
     switch (analysis) {
-    case Analysis::OperatingPoint: {
+    case Analysis::OPERATING_POINT: {
         Core::OperatingPointRun run = Core::RunOperatingPoint(circuit);
         Finish(analysis,
                StoreResult(std::move(run.Result),
@@ -380,22 +380,22 @@ void AnalysisControls::RunSelected() {
                std::move(run.Messages));
         break;
     }
-    case Analysis::Transient:
+    case Analysis::TRANSIENT:
         RunTransientAnalysis(circuit, steps);
         break;
-    case Analysis::ACSweep:
+    case Analysis::AC_SWEEP:
         RunACSweepAnalysis(circuit, steps);
         break;
-    case Analysis::DCSweep:
+    case Analysis::DC_SWEEP:
         RunDCSweepAnalysis(circuit, steps);
         break;
-    case Analysis::Noise:
+    case Analysis::NOISE:
         RunNoiseAnalysis(circuit);
         break;
-    case Analysis::TransferFunction:
+    case Analysis::TRANSFER_FUNCTION:
         RunTransferFunctionAnalysis(circuit);
         break;
-    case Analysis::TruthTable:
+    case Analysis::TRUTH_TABLE:
         RunTruthTableAnalysis(circuit);
         break;
     }
@@ -418,15 +418,15 @@ std::optional<Analysis> AnalysisControls::GetLastRun() const {
 RunOutcome AnalysisControls::GetOutcome(const Analysis analysis) const {
     const RunStatus &status = m_Statuses[ToIndex(analysis)];
     if (status.Error) {
-        return RunOutcome::Failed;
+        return RunOutcome::FAILED;
     }
     if (!HasResult(analysis)) {
-        return RunOutcome::None;
+        return RunOutcome::NONE;
     }
     const bool ngspice_warned = std::ranges::any_of(
         status.Messages, [](const Core::SimulatorMessage &message) { return message.FromErrorStream; });
-    return ngspice_warned || !GetResultWarnings(analysis).empty() ? RunOutcome::SucceededWithWarnings
-                                                                  : RunOutcome::Succeeded;
+    return ngspice_warned || !GetResultWarnings(analysis).empty() ? RunOutcome::SUCCEEDED_WITH_WARNINGS
+                                                                  : RunOutcome::SUCCEEDED;
 }
 
 /**
@@ -479,14 +479,14 @@ void AnalysisControls::RunTransientAnalysis(const Core::Circuit &circuit, const 
         auto runs = RunSteps<Core::Transient>(
             steps->Settings, steps->Unit, steps->Values,
             [&](const Core::ParameterValue &value) { return Core::RunTransient(circuit, settings, value); });
-        Finish(Analysis::Transient,
+        Finish(Analysis::TRANSIENT,
                StoreSteps(std::move(runs.Family),
                           [this](auto family) { m_Schematic.SetTransientSteps(std::move(family)); }),
                std::move(runs.Messages));
         return;
     }
     Core::TransientRun run = Core::RunTransient(circuit, settings);
-    Finish(Analysis::Transient,
+    Finish(Analysis::TRANSIENT,
            StoreResult(std::move(run.Result), [this](auto result) { m_Schematic.SetTransient(std::move(result)); }),
            std::move(run.Messages));
 }
@@ -498,13 +498,13 @@ void AnalysisControls::RunACSweepAnalysis(const Core::Circuit &circuit, const st
             steps->Settings, steps->Unit, steps->Values,
             [&](const Core::ParameterValue &value) { return Core::RunACSweep(circuit, settings, value); });
         Finish(
-            Analysis::ACSweep,
+            Analysis::AC_SWEEP,
             StoreSteps(std::move(runs.Family), [this](auto family) { m_Schematic.SetACSweepSteps(std::move(family)); }),
             std::move(runs.Messages));
         return;
     }
     Core::ACSweepRun run = Core::RunACSweep(circuit, settings);
-    Finish(Analysis::ACSweep,
+    Finish(Analysis::AC_SWEEP,
            StoreResult(std::move(run.Result), [this](auto result) { m_Schematic.SetACSweep(std::move(result)); }),
            std::move(run.Messages));
 }
@@ -516,30 +516,30 @@ void AnalysisControls::RunDCSweepAnalysis(const Core::Circuit &circuit, const st
     const std::vector<SweepSource> sources = ListSweepSources(circuit);
     if (sources.empty() || (steps && settings.StepSource)) {
         m_Schematic.SetDCSweep(std::nullopt);
-        Finish(Analysis::DCSweep,
+        Finish(Analysis::DC_SWEEP,
                sources.empty() ? "Add a voltage source, current source or VCC to sweep"
                                : "Step either a second source or a parameter, not both",
                {});
         return;
     }
     Core::DCSweepSettings run_settings{.Swept = settings.SweptRange};
-    run_settings.Swept.Source = ResolveSweepSource(settings.SweptRange, sources, SweptSourceIndex);
+    run_settings.Swept.Source = ResolveSweepSource(settings.SweptRange, sources, SWEPT_SOURCE_INDEX);
     if (settings.StepSource) {
         run_settings.Stepped = settings.SteppedRange;
-        run_settings.Stepped->Source = ResolveSweepSource(settings.SteppedRange, sources, SteppedSourceIndex);
+        run_settings.Stepped->Source = ResolveSweepSource(settings.SteppedRange, sources, STEPPED_SOURCE_INDEX);
     }
     if (steps) {
         auto runs = RunSteps<Core::DCSweep>(
             steps->Settings, steps->Unit, steps->Values,
             [&](const Core::ParameterValue &value) { return Core::RunDCSweep(circuit, run_settings, value); });
-        Finish(Analysis::DCSweep,
+        Finish(Analysis::DC_SWEEP,
                StoreSteps(std::move(runs.Family),
                           [this](auto family) { m_Schematic.SetDCSweep(JoinDCSweepSteps(std::move(family))); }),
                std::move(runs.Messages));
         return;
     }
     Core::DCSweepRun run = Core::RunDCSweep(circuit, run_settings);
-    Finish(Analysis::DCSweep,
+    Finish(Analysis::DC_SWEEP,
            StoreResult(std::move(run.Result), [this](auto result) { m_Schematic.SetDCSweep(std::move(result)); }),
            std::move(run.Messages));
 }
@@ -550,7 +550,7 @@ void AnalysisControls::RunNoiseAnalysis(const Core::Circuit &circuit) {
     const std::optional<int> output = ResolveOutputNode(settings.NoiseOutput, circuit, m_Schematic);
     if (sources.empty() || !output) {
         m_Schematic.SetNoise(std::nullopt);
-        Finish(Analysis::Noise,
+        Finish(Analysis::NOISE,
                sources.empty() ? "A noise analysis needs an AC source as its input; select a voltage or current "
                                  "source and set it to AC"
                                : "Connect some parts: the noise needs a node to measure",
@@ -563,7 +563,7 @@ void AnalysisControls::RunNoiseAnalysis(const Core::Circuit &circuit) {
                                            .StopFrequency = settings.NoiseRange.StopFrequency,
                                            .PointsPerDecade = settings.NoiseRange.PointsPerDecade};
     Core::NoiseRun run = Core::RunNoise(circuit, run_settings);
-    Finish(Analysis::Noise,
+    Finish(Analysis::NOISE,
            StoreResult(std::move(run.Result), [this](auto result) { m_Schematic.SetNoise(std::move(result)); }),
            std::move(run.Messages));
 }
@@ -574,7 +574,7 @@ void AnalysisControls::RunTransferFunctionAnalysis(const Core::Circuit &circuit)
     const std::optional<int> output = ResolveOutputNode(settings.TransferFunctionOutput, circuit, m_Schematic);
     if (sources.empty() || !output) {
         m_Schematic.SetTransferFunction(std::nullopt);
-        Finish(Analysis::TransferFunction,
+        Finish(Analysis::TRANSFER_FUNCTION,
                sources.empty()
                    ? "A transfer function analysis needs an input source; add a voltage source, current source or VCC"
                    : "Connect some parts: the transfer function needs a node to measure",
@@ -585,7 +585,7 @@ void AnalysisControls::RunTransferFunctionAnalysis(const Core::Circuit &circuit)
         .OutputNode = *output, .InputSource = ResolveOptionalInput(settings.TransferFunctionSource, sources)};
     Core::TransferFunctionRun run = Core::RunTransferFunction(circuit, run_settings);
     Finish(
-        Analysis::TransferFunction,
+        Analysis::TRANSFER_FUNCTION,
         StoreResult(std::move(run.Result), [this](auto result) { m_Schematic.SetTransferFunction(std::move(result)); }),
         std::move(run.Messages));
 }
@@ -595,7 +595,7 @@ void AnalysisControls::RunTruthTableAnalysis(const Core::Circuit &circuit) {
     const std::vector<int> outputs = ListMeasuredNodes(circuit, m_Schematic);
     if (available.empty() || outputs.empty()) {
         m_Schematic.SetTruthTable(std::nullopt);
-        Finish(Analysis::TruthTable,
+        Finish(Analysis::TRUTH_TABLE,
                available.empty() ? "A truth table needs a logic input to vary; add a Logic input"
                                  : "Measure a voltage with the Probe tool: the truth table reads the measured nodes",
                {});
@@ -605,7 +605,7 @@ void AnalysisControls::RunTruthTableAnalysis(const Core::Circuit &circuit) {
         .Inputs = ResolveTruthTableInputs(m_Schematic.GetSimulationSettings().TruthTableInputs, available),
         .OutputNodes = outputs};
     Core::TruthTableRun run = Core::RunTruthTable(circuit, run_settings);
-    Finish(Analysis::TruthTable,
+    Finish(Analysis::TRUTH_TABLE,
            StoreResult(std::move(run.Result), [this](auto result) { m_Schematic.SetTruthTable(std::move(result)); }),
            std::move(run.Messages));
 }
@@ -670,7 +670,7 @@ void AnalysisControls::DrawDCSweepSettings(SimulationSettings &settings) {
         ImGui::TextDisabled("Add a voltage source, current source or VCC to sweep");
         return;
     }
-    DrawSweepRange("swept", "Sweep", sources, SweptSourceIndex, settings.SweptRange, m_SweptFields);
+    DrawSweepRange("swept", "Sweep", sources, SWEPT_SOURCE_INDEX, settings.SweptRange, m_SweptFields);
     // A second source and a stepped parameter would both make the family of curves, so only one is on at a time
     ImGui::BeginDisabled(settings.ParameterStep.Enabled && !settings.StepSource);
     ImGui::Checkbox("Step a second source, one curve per value", &settings.StepSource);
@@ -679,7 +679,7 @@ void AnalysisControls::DrawDCSweepSettings(SimulationSettings &settings) {
         ImGui::SetItemTooltip("Turn off the stepped parameter below to step a second source");
     }
     if (settings.StepSource) {
-        DrawSweepRange("stepped", "Step", sources, SteppedSourceIndex, settings.SteppedRange, m_SteppedFields);
+        DrawSweepRange("stepped", "Step", sources, STEPPED_SOURCE_INDEX, settings.SteppedRange, m_SteppedFields);
     }
     ImGui::TextDisabled("AC and pulse sources are swept through their DC value");
 }
@@ -801,8 +801,8 @@ void AnalysisControls::DrawTruthTableSettings(SimulationSettings &settings) {
         settings.TruthTableInputs = std::move(changed);
     }
     chosen = ResolveTruthTableInputs(settings.TruthTableInputs, available);
-    if (chosen.size() > Core::MaxTruthTableInputs) {
-        ImGui::TextColored(GetErrorTextColor(), "At most %zu inputs; clear some", Core::MaxTruthTableInputs);
+    if (chosen.size() > Core::MAX_TRUTH_TABLE_INPUTS) {
+        ImGui::TextColored(GetErrorTextColor(), "At most %zu inputs; clear some", Core::MAX_TRUTH_TABLE_INPUTS);
     } else {
         ImGui::TextDisabled("%zu combinations", std::size_t{1} << chosen.size());
     }
@@ -829,7 +829,7 @@ void AnalysisControls::DrawParameterStepSettings(SimulationSettings &settings) {
     ImGui::Separator();
     ImGui::PushID("parameter_step");
     // A second stepped source of the DC sweep would also make the family of curves, so only one is on at a time
-    const bool blocked = settings.Selected == Analysis::DCSweep && settings.StepSource && !step.Enabled;
+    const bool blocked = settings.Selected == Analysis::DC_SWEEP && settings.StepSource && !step.Enabled;
     ImGui::BeginDisabled(blocked);
     ImGui::Checkbox("Step a parameter, one run per value", &step.Enabled);
     ImGui::EndDisabled();
@@ -916,25 +916,25 @@ void AnalysisControls::LoadParameterStepFields(const ParameterStepSettings &step
 
 void AnalysisControls::ClearResult(const Analysis analysis) {
     switch (analysis) {
-    case Analysis::OperatingPoint:
+    case Analysis::OPERATING_POINT:
         m_Schematic.SetOperatingPoint(std::nullopt);
         break;
-    case Analysis::Transient:
+    case Analysis::TRANSIENT:
         m_Schematic.SetTransient(std::nullopt);
         break;
-    case Analysis::ACSweep:
+    case Analysis::AC_SWEEP:
         m_Schematic.SetACSweep(std::nullopt);
         break;
-    case Analysis::DCSweep:
+    case Analysis::DC_SWEEP:
         m_Schematic.SetDCSweep(std::nullopt);
         break;
-    case Analysis::Noise:
+    case Analysis::NOISE:
         m_Schematic.SetNoise(std::nullopt);
         break;
-    case Analysis::TransferFunction:
+    case Analysis::TRANSFER_FUNCTION:
         m_Schematic.SetTransferFunction(std::nullopt);
         break;
-    case Analysis::TruthTable:
+    case Analysis::TRUTH_TABLE:
         m_Schematic.SetTruthTable(std::nullopt);
         break;
     }
@@ -949,13 +949,13 @@ void AnalysisControls::Finish(const Analysis analysis, std::optional<std::string
 // Rating warnings, such as a transistor past its maximum voltage, which the operating point and the transient check,
 // and the combinations of a truth table that have no operating point
 std::vector<std::string> AnalysisControls::GetResultWarnings(const Analysis analysis) const {
-    if (analysis == Analysis::OperatingPoint && m_Schematic.GetOperatingPoint()) {
+    if (analysis == Analysis::OPERATING_POINT && m_Schematic.GetOperatingPoint()) {
         return m_Schematic.GetOperatingPoint()->Warnings;
     }
-    if (analysis == Analysis::Transient && m_Schematic.GetTransient()) {
+    if (analysis == Analysis::TRANSIENT && m_Schematic.GetTransient()) {
         return m_Schematic.GetTransient()->Warnings;
     }
-    if (analysis == Analysis::TruthTable && m_Schematic.GetTruthTable()) {
+    if (analysis == Analysis::TRUTH_TABLE && m_Schematic.GetTruthTable()) {
         return m_Schematic.GetTruthTable()->Warnings;
     }
     return {};
@@ -963,19 +963,19 @@ std::vector<std::string> AnalysisControls::GetResultWarnings(const Analysis anal
 
 bool AnalysisControls::HasResult(const Analysis analysis) const {
     switch (analysis) {
-    case Analysis::OperatingPoint:
+    case Analysis::OPERATING_POINT:
         return m_Schematic.GetOperatingPoint().has_value();
-    case Analysis::Transient:
+    case Analysis::TRANSIENT:
         return m_Schematic.GetTransient().has_value();
-    case Analysis::ACSweep:
+    case Analysis::AC_SWEEP:
         return m_Schematic.GetACSweep().has_value();
-    case Analysis::DCSweep:
+    case Analysis::DC_SWEEP:
         return m_Schematic.GetDCSweep().has_value();
-    case Analysis::Noise:
+    case Analysis::NOISE:
         return m_Schematic.GetNoise().has_value();
-    case Analysis::TransferFunction:
+    case Analysis::TRANSFER_FUNCTION:
         return m_Schematic.GetTransferFunction().has_value();
-    case Analysis::TruthTable:
+    case Analysis::TRUTH_TABLE:
         return m_Schematic.GetTruthTable().has_value();
     }
     return false;
@@ -987,7 +987,7 @@ bool AnalysisControls::HasResult(const Analysis analysis) const {
  * @return  Such as "Operating point" or "AC sweep".
  */
 const char *GetAnalysisName(const Analysis analysis) {
-    return AnalysisNames[ToIndex(analysis)];
+    return ANALYSIS_NAMES[ToIndex(analysis)];
 }
 
 } // namespace GUI

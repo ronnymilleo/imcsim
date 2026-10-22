@@ -60,7 +60,7 @@ std::vector<LogicState> ReadTruthTableOutputs(const Core::TruthTable &table, con
     states.reserve(table.OutputNodes.size());
     for (std::size_t output = 0; output < table.OutputNodes.size(); ++output) {
         if (!entry.HasOperatingPoint()) {
-            states.push_back(LogicState::Unknown);
+            states.push_back(LogicState::UNKNOWN);
             continue;
         }
         const double level = GetOutputLogicLevel(table, table.OutputNodes[output], logic_nodes);

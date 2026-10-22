@@ -15,11 +15,11 @@ namespace GUI {
 namespace {
 
 // The arrow points down at the body, whose top edge is at y = -0.4
-constexpr float ArrowTipY = -0.45f;
-constexpr float ArrowHeadLength = 0.3f;
-constexpr float ArrowHeadHalfWidth = 0.15f;
+constexpr float ARROW_TIP_Y = -0.45f;
+constexpr float ARROW_HEAD_LENGTH = 0.3f;
+constexpr float ARROW_HEAD_HALF_WIDTH = 0.15f;
 // The label hangs below the body
-constexpr float LabelOffsetY = 0.7f;
+constexpr float LABEL_OFFSET_Y = 0.7f;
 
 } // namespace
 
@@ -36,17 +36,19 @@ UIPotentiometer::UIPotentiometer(const GridPoint position, const Rotation rotati
 void UIPotentiometer::DrawSymbol(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color,
                                  const SymbolStyle style) const {
     UIResistor::DrawSymbol(canvas, view, color, style);
-    const ImVec2 tip = LocalToScreen(view, 0, ArrowTipY);
-    canvas.AddLine(LocalToScreen(view, 0, -2), tip, color, LineThickness);
-    canvas.AddLine(LocalToScreen(view, -ArrowHeadHalfWidth, ArrowTipY - ArrowHeadLength), tip, color, LineThickness);
-    canvas.AddLine(LocalToScreen(view, ArrowHeadHalfWidth, ArrowTipY - ArrowHeadLength), tip, color, LineThickness);
+    const ImVec2 tip = LocalToScreen(view, 0, ARROW_TIP_Y);
+    canvas.AddLine(LocalToScreen(view, 0, -2), tip, color, LINE_THICKNESS);
+    canvas.AddLine(LocalToScreen(view, -ARROW_HEAD_HALF_WIDTH, ARROW_TIP_Y - ARROW_HEAD_LENGTH), tip, color,
+                   LINE_THICKNESS);
+    canvas.AddLine(LocalToScreen(view, ARROW_HEAD_HALF_WIDTH, ARROW_TIP_Y - ARROW_HEAD_LENGTH), tip, color,
+                   LINE_THICKNESS);
 }
 
 // One line with the name, the value and the position of the wiper, such as "RV1 10k 25%", so that the parts of the
 // label never overlap whichever way the part is turned
 void UIPotentiometer::DrawLabels(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color) const {
     const auto &pot = static_cast<const Core::Potentiometer &>(GetComponent());
-    DrawLabel(canvas, view, {0.0f, LabelOffsetY}, {0.0f, 1.0f},
+    DrawLabel(canvas, view, {0.0f, LABEL_OFFSET_Y}, {0.0f, 1.0f},
               std::format("{} {} {:.0f}%", pot.GetName(), Core::FormatValue(pot.GetValue()), pot.GetWiper() * 100.0),
               color);
 }

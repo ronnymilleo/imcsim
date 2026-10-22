@@ -19,20 +19,20 @@ namespace GUI {
 namespace {
 
 // Math channels take their own colors, apart from those of nodes and currents
-constexpr auto MathColors = std::to_array<ImU32>({
+constexpr auto MATH_COLORS = std::to_array<ImU32>({
     IM_COL32(230, 110, 230, 255),
     IM_COL32(150, 230, 90, 255),
     IM_COL32(235, 235, 235, 255),
     IM_COL32(90, 220, 190, 255),
 });
 // Widths in the math editor, in font sizes
-constexpr float OperandWidth = 10.0f;
-constexpr float ExpressionWidth = 20.0f;
-constexpr auto MathOperators = std::to_array<MathOperator>({
-    MathOperator::Add,
-    MathOperator::Subtract,
-    MathOperator::Multiply,
-    MathOperator::Divide,
+constexpr float OPERAND_WIDTH = 10.0f;
+constexpr float EXPRESSION_WIDTH = 20.0f;
+constexpr auto MATH_OPERATORS = std::to_array<MathOperator>({
+    MathOperator::ADD,
+    MathOperator::SUBTRACT,
+    MathOperator::MULTIPLY,
+    MathOperator::DIVIDE,
 });
 
 // Voltages and currents share the axes of the probed traces; any other unit, or none, goes on the third axis
@@ -60,7 +60,7 @@ void CompileChannel(MathChannel &channel) {
 // Returns whether the user picked another trace
 bool DrawOperandCombo(const char *id, std::string &operand, const std::vector<std::string> &operands) {
     bool changed = false;
-    ImGui::SetNextItemWidth(ImGui::GetFontSize() * OperandWidth);
+    ImGui::SetNextItemWidth(ImGui::GetFontSize() * OPERAND_WIDTH);
     if (ImGui::BeginCombo(id, operand.empty() ? "(none)" : operand.c_str())) {
         for (const std::string &candidate : operands) {
             if (ImGui::Selectable(candidate.c_str(), candidate == operand)) {
@@ -96,7 +96,7 @@ void MathChannels::Draw(const std::vector<std::string> &operands) {
     for (std::size_t index = 0; index < m_Channels.size(); ++index) {
         MathChannel &channel = m_Channels[index];
         ImGui::PushID(static_cast<int>(index));
-        ImGui::PushStyleColor(ImGuiCol_CheckMark, AdaptToBackground(MathColors[index % MathColors.size()]));
+        ImGui::PushStyleColor(ImGuiCol_CheckMark, AdaptToBackground(MATH_COLORS[index % MATH_COLORS.size()]));
         ImGui::Checkbox(channel.Name.c_str(), &channel.Shown);
         ImGui::PopStyleColor();
         ImGui::SetItemTooltip("%s", GetChannelExpression(channel).c_str());
@@ -158,7 +158,7 @@ std::vector<MathTrace> MathChannels::Evaluate(const std::span<const double> xs, 
                           .Values = std::move(result->Values),
                           .Unit = FormatUnit(result->Unit),
                           .Axis = AxisForUnit(result->Unit),
-                          .Color = AdaptToBackground(MathColors[index % MathColors.size()])});
+                          .Color = AdaptToBackground(MATH_COLORS[index % MATH_COLORS.size()])});
     }
     return traces;
 }
@@ -180,14 +180,14 @@ bool MathChannels::DrawEditor(MathChannel &channel, const std::vector<std::strin
     }
 
     if (channel.UsesExpression) {
-        ImGui::SetNextItemWidth(ImGui::GetFontSize() * ExpressionWidth);
+        ImGui::SetNextItemWidth(ImGui::GetFontSize() * EXPRESSION_WIDTH);
         changed |= ImGui::InputText("##expression", &channel.Expression);
         ImGui::TextDisabled("V(2), V(1,2), I(R1), I(Q1.C), numbers such as 1k");
         ImGui::TextDisabled("+ - * / ( ), abs(), sqrt(), ddt() and integ()");
     } else {
         changed |= DrawOperandCombo("##first", channel.First, operands);
-        for (std::size_t index = 0; index < MathOperators.size(); ++index) {
-            const MathOperator math_operator = MathOperators[index];
+        for (std::size_t index = 0; index < MATH_OPERATORS.size(); ++index) {
+            const MathOperator math_operator = MATH_OPERATORS[index];
             if (index > 0) {
                 ImGui::SameLine();
             }

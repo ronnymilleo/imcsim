@@ -30,11 +30,11 @@ struct FunctionName {
     Kind Type;
 };
 
-constexpr auto Functions = std::to_array<FunctionName>({
-    {"abs", Kind::Absolute},
-    {"sqrt", Kind::SquareRoot},
-    {"ddt", Kind::Derivative},
-    {"integ", Kind::Integral},
+constexpr auto FUNCTIONS = std::to_array<FunctionName>({
+    {"abs", Kind::ABS},
+    {"sqrt", Kind::SQUARE_ROOT},
+    {"ddt", Kind::DERIVATIVE},
+    {"integ", Kind::INTEGRAL},
 });
 
 /**
@@ -105,7 +105,7 @@ private:
             if (const Step step = ParseProduct(); !step) {
                 return step;
             }
-            Emit(add ? Kind::Add : Kind::Subtract);
+            Emit(add ? Kind::ADD : Kind::SUBTRACT);
         }
     }
 
@@ -121,7 +121,7 @@ private:
             if (const Step step = ParseUnary(); !step) {
                 return step;
             }
-            Emit(multiply ? Kind::Multiply : Kind::Divide);
+            Emit(multiply ? Kind::MULTIPLY : Kind::DIVIDE);
         }
     }
 
@@ -130,7 +130,7 @@ private:
             if (const Step step = ParseUnary(); !step) {
                 return step;
             }
-            Emit(Kind::Negate);
+            Emit(Kind::NEGATE);
             return {};
         }
         return ParsePrimary();
@@ -162,8 +162,8 @@ private:
         if (lower == "i") {
             return ParseCurrent();
         }
-        const auto function = std::ranges::find(Functions, std::string_view(lower), &FunctionName::Name);
-        if (function == Functions.end()) {
+        const auto function = std::ranges::find(FUNCTIONS, std::string_view(lower), &FunctionName::Name);
+        if (function == FUNCTIONS.end()) {
             return std::unexpected(std::format("Unknown name \"{}\"; use V(node), I(part) or a function", name));
         }
         if (const Step step = Expect('('); !step) {
@@ -197,7 +197,7 @@ private:
         if (!value) {
             return std::unexpected(std::format("\"{}\" is not a number", text));
         }
-        m_Program.Instructions.push_back({.Type = Kind::Number, .Number = *value});
+        m_Program.Instructions.push_back({.Type = Kind::NUMBER, .Number = *value});
         return {};
     }
 
@@ -210,14 +210,14 @@ private:
         if (!node) {
             return std::unexpected("V() takes a node number, such as V(2)");
         }
-        m_Program.Instructions.push_back({.Type = Kind::Voltage, .Node = *node});
+        m_Program.Instructions.push_back({.Type = Kind::VOLTAGE, .Node = *node});
         if (Accept(',')) {
             const std::optional<int> second = ReadNode();
             if (!second) {
                 return std::unexpected("V(a, b) takes two node numbers");
             }
-            m_Program.Instructions.push_back({.Type = Kind::Voltage, .Node = *second});
-            Emit(Kind::Subtract);
+            m_Program.Instructions.push_back({.Type = Kind::VOLTAGE, .Node = *second});
+            Emit(Kind::SUBTRACT);
         }
         return Expect(')');
     }
@@ -236,7 +236,7 @@ private:
             return std::unexpected("I() takes the name of a part, such as I(R1) or I(Q1.C)");
         }
         m_Program.Instructions.push_back(
-            {.Type = Kind::Current, .Current = std::string(m_Text.substr(start, m_Position - start))});
+            {.Type = Kind::CURRENT, .Current = std::string(m_Text.substr(start, m_Position - start))});
         return Expect(')');
     }
 
@@ -360,16 +360,16 @@ std::expected<MathResult, std::string> EvaluateExpression(const MathProgram &pro
     std::vector<StackEntry> stack;
     for (const MathInstruction &instruction : program.Instructions) {
         switch (instruction.Type) {
-        case Kind::Number:
+        case Kind::NUMBER:
             stack.push_back({std::vector<double>(count, instruction.Number), {}, true});
             continue;
-        case Kind::Voltage:
+        case Kind::VOLTAGE:
             if (instruction.Node < 0 || static_cast<std::size_t>(instruction.Node) >= node_voltages.size()) {
                 return std::unexpected(std::format("The circuit has no node {}", instruction.Node));
             }
             stack.push_back({node_voltages[static_cast<std::size_t>(instruction.Node)], {.Volts = 1}, false});
             continue;
-        case Kind::Current: {
+        case Kind::CURRENT: {
             const auto current = std::ranges::find_if(currents, [&instruction](const Core::ComponentTrace &trace) {
                 return trace.Name == instruction.Current;
             });
@@ -387,24 +387,24 @@ std::expected<MathResult, std::string> EvaluateExpression(const MathProgram &pro
         StackEntry operand = std::move(stack.back());
         stack.pop_back();
         switch (instruction.Type) {
-        case Kind::Negate:
+        case Kind::NEGATE:
             std::ranges::transform(operand.Values, operand.Values.begin(), [](const double value) { return -value; });
             break;
-        case Kind::Absolute:
+        case Kind::ABS:
             std::ranges::transform(operand.Values, operand.Values.begin(),
                                    [](const double value) { return std::abs(value); });
             break;
-        case Kind::SquareRoot:
+        case Kind::SQUARE_ROOT:
             std::ranges::transform(operand.Values, operand.Values.begin(),
                                    [](const double value) { return std::sqrt(value); });
             operand.Unit = {.Known = operand.Unit == Dimension{}};
             break;
-        case Kind::Derivative:
+        case Kind::DERIVATIVE:
             operand.Values = Differentiate(xs, operand.Values);
             operand.Unit = Combine(operand.Unit, x_unit, -1);
             operand.IsNumber = false;
             break;
-        case Kind::Integral:
+        case Kind::INTEGRAL:
             operand.Values = Integrate(xs, operand.Values);
             operand.Unit = Combine(operand.Unit, x_unit, 1);
             operand.IsNumber = false;
@@ -415,15 +415,15 @@ std::expected<MathResult, std::string> EvaluateExpression(const MathProgram &pro
             const Dimension first_unit = first.Unit;
             const bool first_is_number = first.IsNumber;
             switch (instruction.Type) {
-            case Kind::Add:
+            case Kind::ADD:
                 operand = ApplyBinary(std::move(first), operand, std::plus<>(),
                                       AddUnits(first_unit, first_is_number, operand.Unit, operand.IsNumber));
                 break;
-            case Kind::Subtract:
+            case Kind::SUBTRACT:
                 operand = ApplyBinary(std::move(first), operand, std::minus<>(),
                                       AddUnits(first_unit, first_is_number, operand.Unit, operand.IsNumber));
                 break;
-            case Kind::Multiply:
+            case Kind::MULTIPLY:
                 operand =
                     ApplyBinary(std::move(first), operand, std::multiplies<>(), Combine(first_unit, operand.Unit, 1));
                 break;
@@ -505,13 +505,13 @@ std::string FormatUnit(const Dimension unit) {
  */
 const char *GetOperatorSymbol(const MathOperator math_operator) {
     switch (math_operator) {
-    case MathOperator::Add:
+    case MathOperator::ADD:
         return "+";
-    case MathOperator::Subtract:
+    case MathOperator::SUBTRACT:
         return "-";
-    case MathOperator::Multiply:
+    case MathOperator::MULTIPLY:
         return "*";
-    case MathOperator::Divide:
+    case MathOperator::DIVIDE:
         return "/";
     }
     return "+";

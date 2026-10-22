@@ -52,9 +52,9 @@ std::expected<std::vector<double>, std::string> ListRange(const ParameterStepSet
     }
     // Values from start to stop, both included, as the DC sweep counts them
     const double count = std::floor((settings.Stop - settings.Start) / settings.Step + 1e-9) + 1.0;
-    if (count > static_cast<double>(MaxParameterSteps)) {
+    if (count > static_cast<double>(MAX_PARAMETER_STEPS)) {
         return std::unexpected(
-            std::format("The step is too small: it would take more than {} runs", MaxParameterSteps));
+            std::format("The step is too small: it would take more than {} runs", MAX_PARAMETER_STEPS));
     }
     std::vector<double> values;
     for (int index = 0; index < static_cast<int>(count); ++index) {
@@ -76,8 +76,8 @@ std::expected<std::vector<double>, std::string> ListRange(const ParameterStepSet
 std::expected<std::vector<double>, std::string> ListStepValues(const ParameterStepSettings &settings,
                                                                const std::string &unit) {
     auto values = settings.UsesList ? ParseList(settings.List, unit) : ListRange(settings);
-    if (values && values->size() > MaxParameterSteps) {
-        return std::unexpected(std::format("Step through at most {} values", MaxParameterSteps));
+    if (values && values->size() > MAX_PARAMETER_STEPS) {
+        return std::unexpected(std::format("Step through at most {} values", MAX_PARAMETER_STEPS));
     }
     return values;
 }

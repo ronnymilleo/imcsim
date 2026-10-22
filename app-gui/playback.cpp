@@ -24,7 +24,7 @@ void TransientPlayback::Advance(const double elapsed, const double stop_time) {
         return;
     }
     if (Playing) {
-        Time += elapsed * stop_time / PlaybackSeconds;
+        Time += elapsed * stop_time / PLAYBACK_SECONDS;
     }
     if (Time < stop_time) {
         Time = std::max(Time, 0.0);

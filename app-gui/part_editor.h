@@ -58,7 +58,7 @@ public:
 
 private:
     Schematic &m_Schematic;
-    Core::ValueSeries m_ValueSeries = Core::ValueSeries::Free;
+    Core::ValueSeries m_ValueSeries = Core::ValueSeries::FREE;
     // Texts being edited, and the selection they were loaded from
     std::optional<std::size_t> m_LoadedSelection;
     ValueField m_Value;

@@ -16,22 +16,22 @@ namespace GUI {
 namespace {
 
 // The lead runs from the terminal up to the box, and the square wave sits in the middle of the box
-constexpr float LeadLength = 0.6f;
-constexpr float BoxHalfWidth = 1.0f;
-constexpr float BoxHeight = 1.6f;
-constexpr float BoxTop = -(LeadLength + BoxHeight);
-constexpr float BoxBottom = -LeadLength;
-constexpr float BoxMiddle = (BoxTop + BoxBottom) / 2.0f;
-constexpr float WaveHalfHeight = 0.35f;
-constexpr float WaveLow = BoxMiddle + WaveHalfHeight;
-constexpr float WaveHigh = BoxMiddle - WaveHalfHeight;
+constexpr float LEAD_LENGTH = 0.6f;
+constexpr float BOX_HALF_WIDTH = 1.0f;
+constexpr float BOX_HEIGHT = 1.6f;
+constexpr float BOX_TOP = -(LEAD_LENGTH + BOX_HEIGHT);
+constexpr float BOX_BOTTOM = -LEAD_LENGTH;
+constexpr float BOX_MIDDLE = (BOX_TOP + BOX_BOTTOM) / 2.0f;
+constexpr float WAVE_HALF_HEIGHT = 0.35f;
+constexpr float WAVE_LOW = BOX_MIDDLE + WAVE_HALF_HEIGHT;
+constexpr float WAVE_HIGH = BOX_MIDDLE - WAVE_HALF_HEIGHT;
 // The high and low halves of one cycle of the wave inside the box
-constexpr float FirstRise = -0.2f;
-constexpr float FirstFall = 0.3f;
+constexpr float FIRST_RISE = -0.2f;
+constexpr float FIRST_FALL = 0.3f;
 // The wave starts and ends on the low level, a little inside the box
-constexpr float WaveLeft = -0.7f;
-constexpr float WaveRight = 0.7f;
-constexpr float LabelOffset = 0.3f;
+constexpr float WAVE_LEFT = -0.7f;
+constexpr float WAVE_RIGHT = 0.7f;
+constexpr float LABEL_OFFSET = 0.3f;
 
 } // namespace
 
@@ -45,29 +45,29 @@ UIClock::UIClock(const GridPoint position, const Rotation rotation)
 }
 
 void UIClock::DrawTerminals(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color) const {
-    canvas.AddLine(LocalToScreen(view, 0, 0), LocalToScreen(view, 0, BoxBottom), color, LineThickness);
+    canvas.AddLine(LocalToScreen(view, 0, 0), LocalToScreen(view, 0, BOX_BOTTOM), color, LINE_THICKNESS);
 }
 
 void UIClock::DrawSymbol(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color,
                          const SymbolStyle /*style*/) const {
     const std::array<ImVec2, 4> box = {
-        LocalToScreen(view, -BoxHalfWidth, BoxTop), LocalToScreen(view, BoxHalfWidth, BoxTop),
-        LocalToScreen(view, BoxHalfWidth, BoxBottom), LocalToScreen(view, -BoxHalfWidth, BoxBottom)};
-    canvas.AddPolyline(box.data(), static_cast<int>(box.size()), color, ImDrawFlags_Closed, LineThickness);
+        LocalToScreen(view, -BOX_HALF_WIDTH, BOX_TOP), LocalToScreen(view, BOX_HALF_WIDTH, BOX_TOP),
+        LocalToScreen(view, BOX_HALF_WIDTH, BOX_BOTTOM), LocalToScreen(view, -BOX_HALF_WIDTH, BOX_BOTTOM)};
+    canvas.AddPolyline(box.data(), static_cast<int>(box.size()), color, ImDrawFlags_Closed, LINE_THICKNESS);
     const std::array<ImVec2, 6> wave = {
-        LocalToScreen(view, WaveLeft, WaveLow),   LocalToScreen(view, FirstRise, WaveLow),
-        LocalToScreen(view, FirstRise, WaveHigh), LocalToScreen(view, FirstFall, WaveHigh),
-        LocalToScreen(view, FirstFall, WaveLow),  LocalToScreen(view, WaveRight, WaveLow)};
-    canvas.AddPolyline(wave.data(), static_cast<int>(wave.size()), color, ImDrawFlags_None, LineThickness);
+        LocalToScreen(view, WAVE_LEFT, WAVE_LOW),   LocalToScreen(view, FIRST_RISE, WAVE_LOW),
+        LocalToScreen(view, FIRST_RISE, WAVE_HIGH), LocalToScreen(view, FIRST_FALL, WAVE_HIGH),
+        LocalToScreen(view, FIRST_FALL, WAVE_LOW),  LocalToScreen(view, WAVE_RIGHT, WAVE_LOW)};
+    canvas.AddPolyline(wave.data(), static_cast<int>(wave.size()), color, ImDrawFlags_None, LINE_THICKNESS);
 }
 
 // The name above the box and the frequency with the duty cycle beside it
 void UIClock::DrawLabels(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color) const {
     const Core::ClockParameters &figures = static_cast<const Core::Clock &>(GetComponent()).GetParameters();
-    DrawLabel(canvas, view, {0.0f, BoxTop - LabelOffset}, {0.0f, -1.0f}, GetComponent().GetName(), color);
+    DrawLabel(canvas, view, {0.0f, BOX_TOP - LABEL_OFFSET}, {0.0f, -1.0f}, GetComponent().GetName(), color);
     const std::string description =
         std::format("{}Hz {}%", Core::FormatValue(figures.Frequency), Core::FormatValue(figures.DutyCycle * 100.0));
-    DrawLabel(canvas, view, {BoxHalfWidth + LabelOffset, BoxMiddle}, {1.0f, 0.0f}, description, color);
+    DrawLabel(canvas, view, {BOX_HALF_WIDTH + LABEL_OFFSET, BOX_MIDDLE}, {1.0f, 0.0f}, description, color);
 }
 
 std::vector<GridPoint> UIClock::GetLocalTerminals() const {
@@ -80,7 +80,7 @@ GridPoint UIClock::GetLocalTerminalInward(std::size_t /*terminal*/) const {
 }
 
 LocalBounds UIClock::GetLocalBounds() const {
-    return {{-BoxHalfWidth, BoxTop}, {BoxHalfWidth, 0.0f}};
+    return {{-BOX_HALF_WIDTH, BOX_TOP}, {BOX_HALF_WIDTH, 0.0f}};
 }
 
 } // namespace GUI

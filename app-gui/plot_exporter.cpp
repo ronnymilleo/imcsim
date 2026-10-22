@@ -18,13 +18,13 @@ namespace GUI {
 
 namespace {
 
-constexpr const char *ExportPopup = "export";
-constexpr const char *ExportErrorPopup = "Could not export the plot";
+constexpr const char *EXPORT_POPUP = "export";
+constexpr const char *EXPORT_ERROR_POPUP = "Could not export the plot";
 // Width of the size fields of the export popup, in font sizes
-constexpr float ExportSizeWidth = 7.0f;
+constexpr float EXPORT_SIZE_WIDTH = 7.0f;
 // Must stay valid until the dialog callback runs, so they live for the whole program
-constexpr std::array<SDL_DialogFileFilter, 1> SVGFilters = {{{"SVG image", "svg"}}};
-constexpr std::array<SDL_DialogFileFilter, 1> CSVFilters = {{{"CSV table", "csv"}}};
+constexpr std::array<SDL_DialogFileFilter, 1> SVG_FILTERS = {{{"SVG image", "svg"}}};
+constexpr std::array<SDL_DialogFileFilter, 1> CSV_FILTERS = {{{"CSV table", "csv"}}};
 
 std::string GetExtension(const ExportFormat format) {
     return format == ExportFormat::SVG ? ".svg" : ".csv";
@@ -37,7 +37,7 @@ std::string GetExtension(const ExportFormat format) {
  * @note    Call it where DrawPopup() is called, so ImGui finds the popup in the same ID stack.
  */
 void PlotExporter::OpenPopup() {
-    ImGui::OpenPopup(ExportPopup);
+    ImGui::OpenPopup(EXPORT_POPUP);
 }
 
 /**
@@ -48,7 +48,7 @@ void PlotExporter::OpenPopup() {
  * @return  The format to save once the user picks one.
  */
 std::optional<ExportFormat> PlotExporter::DrawPopup(const std::string &plot_name, const bool can_export) {
-    if (!ImGui::BeginPopup(ExportPopup)) {
+    if (!ImGui::BeginPopup(EXPORT_POPUP)) {
         return std::nullopt;
     }
     ImGui::TextUnformatted(std::format("Export the {} plot", plot_name).c_str());
@@ -61,15 +61,15 @@ std::optional<ExportFormat> PlotExporter::DrawPopup(const std::string &plot_name
     if (ImGui::RadioButton("Dark", m_Style.Dark)) {
         m_Style.Dark = true;
     }
-    ImGui::SetNextItemWidth(ImGui::GetFontSize() * ExportSizeWidth);
+    ImGui::SetNextItemWidth(ImGui::GetFontSize() * EXPORT_SIZE_WIDTH);
     ImGui::InputInt("##width", &m_Style.Width, 100, 500);
     ImGui::SameLine();
     ImGui::TextUnformatted("x");
     ImGui::SameLine();
-    ImGui::SetNextItemWidth(ImGui::GetFontSize() * ExportSizeWidth);
+    ImGui::SetNextItemWidth(ImGui::GetFontSize() * EXPORT_SIZE_WIDTH);
     ImGui::InputInt("pixels##height", &m_Style.Height, 100, 500);
-    m_Style.Width = std::clamp(m_Style.Width, MinExportSize, MaxExportSize);
-    m_Style.Height = std::clamp(m_Style.Height, MinExportSize, MaxExportSize);
+    m_Style.Width = std::clamp(m_Style.Width, MIN_EXPORT_SIZE, MAX_EXPORT_SIZE);
+    m_Style.Height = std::clamp(m_Style.Height, MIN_EXPORT_SIZE, MAX_EXPORT_SIZE);
     ImGui::Separator();
 
     std::optional<ExportFormat> format;
@@ -112,9 +112,9 @@ void PlotExporter::Start(ExportFigure figure, const ExportFormat format,
     const std::filesystem::path location =
         schematic_path ? schematic_path->parent_path() / file_name : std::filesystem::path(file_name);
     if (format == ExportFormat::SVG) {
-        m_Dialog.ShowSave(SVGFilters, location.string());
+        m_Dialog.ShowSave(SVG_FILTERS, location.string());
     } else {
-        m_Dialog.ShowSave(CSVFilters, location.string());
+        m_Dialog.ShowSave(CSV_FILTERS, location.string());
     }
 }
 
@@ -143,7 +143,7 @@ void PlotExporter::Update() {
         text ? WriteTextFile(path, *text) : std::expected<void, std::string>(std::unexpected(text.error()));
     if (!written) {
         m_Error = written.error();
-        ImGui::OpenPopup(ExportErrorPopup);
+        ImGui::OpenPopup(EXPORT_ERROR_POPUP);
     }
 }
 
@@ -151,7 +151,7 @@ void PlotExporter::Update() {
  * @brief   Draws the popup that tells why the last export failed, while it is open.
  */
 void PlotExporter::DrawError() {
-    if (!ImGui::BeginPopupModal(ExportErrorPopup, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+    if (!ImGui::BeginPopupModal(EXPORT_ERROR_POPUP, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
         return;
     }
     ImGui::TextColored(GetErrorTextColor(), "%s", m_Error.c_str());

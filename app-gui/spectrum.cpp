@@ -18,28 +18,28 @@ namespace GUI {
 namespace {
 
 // Powers of two, so the transform halves at every stage; the upper bound keeps it well under a millisecond per trace
-constexpr std::size_t MinSampleCount = 1024;
-constexpr std::size_t MaxSampleCount = 65536;
+constexpr std::size_t MIN_SAMPLE_COUNT = 1024;
+constexpr std::size_t MAX_SAMPLE_COUNT = 65536;
 // -200 dB next to the strongest bin, and 1e-15 (-300 dB) for a trace of zeros, as in the AC sweep
-constexpr double DecibelFloor = 1e-10;
-constexpr double MinAmplitude = 1e-15;
+constexpr double DECIBEL_FLOOR = 1e-10;
+constexpr double MIN_AMPLITUDE = 1e-15;
 
 // Bins on each side of a peak that still belong to its tone: the main lobe of the Hann window spans two bins each
 // way, while a rectangular window keeps a coherent tone in one bin and spreads an incoherent one too widely for a
 // lobe to hold it
 std::size_t LobeHalfWidth(const SpectrumWindow window) {
-    return window == SpectrumWindow::Hann ? 2 : 1;
+    return window == SpectrumWindow::HANN ? 2 : 1;
 }
 
 // Equivalent noise bandwidth of the window, in bins: the power of a tone summed over its lobe, against the square of
 // its amplitude
 double NoiseBandwidth(const SpectrumWindow window) {
-    return window == SpectrumWindow::Hann ? 1.5 : 1.0;
+    return window == SpectrumWindow::HANN ? 1.5 : 1.0;
 }
 
 // The periodic form, which leaves the sample after the span out, as the transform repeats the span
 double WindowWeight(const SpectrumWindow window, const std::size_t index, const std::size_t count) {
-    if (window == SpectrumWindow::Rectangular) {
+    if (window == SpectrumWindow::RECTANGULAR) {
         return 1.0;
     }
     return 0.5 * (1.0 - std::cos(2.0 * std::numbers::pi * static_cast<double>(index) / static_cast<double>(count)));
@@ -102,7 +102,7 @@ std::size_t ChooseSpectrumSampleCount(const std::span<const double> xs, double f
     const auto first = std::ranges::lower_bound(xs, from);
     const auto last = std::ranges::upper_bound(xs, to);
     const auto inside = static_cast<std::size_t>(std::max<std::ptrdiff_t>(last - first, 0));
-    return std::clamp(std::bit_ceil(std::max<std::size_t>(inside, 1)), MinSampleCount, MaxSampleCount);
+    return std::clamp(std::bit_ceil(std::max<std::size_t>(inside, 1)), MIN_SAMPLE_COUNT, MAX_SAMPLE_COUNT);
 }
 
 /**
@@ -242,7 +242,7 @@ std::vector<double> ToDecibels(const std::span<const double> amplitudes) {
     for (const double amplitude : amplitudes) {
         largest = std::max(largest, std::abs(amplitude));
     }
-    const double floor = std::max(largest * DecibelFloor, MinAmplitude);
+    const double floor = std::max(largest * DECIBEL_FLOOR, MIN_AMPLITUDE);
     std::vector<double> decibels;
     decibels.reserve(amplitudes.size());
     for (const double amplitude : amplitudes) {

@@ -15,8 +15,8 @@ namespace {
 
 std::vector<std::unique_ptr<GUI::UIElement>> TwoResistors() {
     std::vector<std::unique_ptr<GUI::UIElement>> elements;
-    elements.push_back(GUI::CreateElement(Core::ComponentType::Resistor, {0, 0}, GUI::Rotation::R0));
-    elements.push_back(GUI::CreateElement(Core::ComponentType::Resistor, {12, 0}, GUI::Rotation::R0));
+    elements.push_back(GUI::CreateElement(Core::ComponentType::RESISTOR, {0, 0}, GUI::Rotation::R0));
+    elements.push_back(GUI::CreateElement(Core::ComponentType::RESISTOR, {12, 0}, GUI::Rotation::R0));
     return elements;
 }
 
@@ -24,7 +24,7 @@ std::vector<std::unique_ptr<GUI::UIElement>> TwoResistors() {
 
 TEST_CASE("A click picks an element before a wire, and the newest of two on top of each other", "[selection]") {
     auto elements = TwoResistors();
-    elements.push_back(GUI::CreateElement(Core::ComponentType::Resistor, {0, 0}, GUI::Rotation::R0));
+    elements.push_back(GUI::CreateElement(Core::ComponentType::RESISTOR, {0, 0}, GUI::Rotation::R0));
     const std::vector<GUI::UIWire> wires = {{{-2, 0}, {-2, 6}}};
 
     CHECK(GUI::PickAt(elements, wires, {0.0f, 0.0f}, 0.2f) == GUI::Selection{.Elements = {2}, .Wires = {}});
@@ -50,7 +50,7 @@ TEST_CASE("A selection box picks what it touches, whichever way it is dragged", 
 
 TEST_CASE("A selection box finds a part turned a quarter", "[selection]") {
     std::vector<std::unique_ptr<GUI::UIElement>> elements;
-    elements.push_back(GUI::CreateElement(Core::ComponentType::Resistor, {0, 0}, GUI::Rotation::R90));
+    elements.push_back(GUI::CreateElement(Core::ComponentType::RESISTOR, {0, 0}, GUI::Rotation::R90));
     // Turned, the part runs from y = -2 to 2 and is narrow in x
     CHECK(GUI::PickInRectangle(elements, {}, {1.5f, -0.5f}, {3.0f, 0.5f}).Empty());
     CHECK(GUI::PickInRectangle(elements, {}, {-0.5f, 1.5f}, {0.5f, 3.0f}).Elements == std::set<std::size_t>{0});
