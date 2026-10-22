@@ -6,7 +6,7 @@
 #ifndef IMCSIM_DIGITAL_MODELS_H
 #define IMCSIM_DIGITAL_MODELS_H
 
-#include "simulator.h"
+#include "ngspice_library.h"
 #include <catch2/catch_test_macros.hpp>
 
 // The tests run only where ngspice has the digital models: its own, or the digital.cm the Windows build copies

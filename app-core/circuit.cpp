@@ -594,6 +594,97 @@ std::string GetCurrentName(const Component &component, const std::string_view la
 }
 
 /**
+ * @brief   Tells whether a part with no probes reports one current, through its two terminals.
+ * @param[in] type  Type of the part.
+ * @return  True for resistors, capacitors, inductors and every source; false for ground, net labels and the parts that
+ *          report their currents through probes or not at all, such as the logic parts.
+ */
+bool HasSingleCurrent(const ComponentType type) {
+    switch (type) {
+    case ComponentType::RESISTOR:
+    case ComponentType::CAPACITOR:
+    case ComponentType::INDUCTOR:
+    case ComponentType::VCC:
+    case ComponentType::VOLTAGE_SOURCE:
+    case ComponentType::CLOCK:
+    case ComponentType::LOGIC_INPUT:
+    case ComponentType::CURRENT_SOURCE:
+        return true;
+    case ComponentType::GROUND:
+    case ComponentType::NET_LABEL:
+    case ComponentType::DIODE:
+    case ComponentType::ZENER_DIODE:
+    case ComponentType::LED:
+    case ComponentType::NPN:
+    case ComponentType::PNP:
+    case ComponentType::NMOS:
+    case ComponentType::PMOS:
+    case ComponentType::VCVS:
+    case ComponentType::VCCS:
+    case ComponentType::CCCS:
+    case ComponentType::CCVS:
+    case ComponentType::OP_AMP:
+    case ComponentType::POTENTIOMETER:
+    case ComponentType::SWITCH:
+    case ComponentType::PUSH_BUTTON:
+    case ComponentType::V_SWITCH:
+    case ComponentType::RELAY:
+    case ComponentType::TRANSFORMER:
+    case ComponentType::AND:
+    case ComponentType::OR:
+    case ComponentType::NOT:
+    case ComponentType::NAND:
+    case ComponentType::NOR:
+    case ComponentType::XOR:
+    case ComponentType::XNOR:
+    case ComponentType::BUFFER:
+    case ComponentType::D_FLIP_FLOP:
+    case ComponentType::JK_FLIP_FLOP:
+    case ComponentType::T_FLIP_FLOP:
+    case ComponentType::SR_FLIP_FLOP:
+    default:
+        return false;
+    }
+}
+
+/**
+ * @brief   Lists the currents a component reports in simulation results, in the order they appear.
+ * @param[in] component  Any component.
+ * @return  The component name for a two-terminal part or a supply, one name per terminal for a transistor
+ *          (such as "Q1.C"), and nothing for ground.
+ */
+std::vector<std::string> GetCurrentNames(const Component &component) {
+    std::vector<std::string> names;
+    const std::vector<CurrentProbe> probes = GetCurrentProbes(component);
+    for (const CurrentProbe &probe : probes) {
+        names.push_back(GetCurrentName(component, probe.Label));
+    }
+    if (probes.empty() && HasSingleCurrent(component.GetType())) {
+        names.push_back(component.GetName());
+    }
+    return names;
+}
+
+/**
+ * @brief   Tells which terminal each current of GetCurrentNames() flows into.
+ * @param[in] component  Any component.
+ * @return  One terminal index per current, in the same order: the probed terminal for a part with probes, and the
+ *          first terminal for a part whose single current enters there and leaves by the second.
+ */
+std::vector<std::size_t> GetCurrentTerminals(const Component &component) {
+    std::vector<std::size_t> terminals;
+    const std::vector<CurrentProbe> probes = GetCurrentProbes(component);
+    if (probes.empty()) {
+        terminals.assign(GetCurrentNames(component).size(), 0);
+        return terminals;
+    }
+    for (const CurrentProbe &probe : probes) {
+        terminals.push_back(static_cast<std::size_t>(probe.Terminal));
+    }
+    return terminals;
+}
+
+/**
  * @brief   Finds the voltage source a CCCS or CCVS follows to get a current of the circuit.
  * @param[in] circuit   Circuit the current belongs to.
  * @param[in] current   A current as the results name it, such as "R1", "Vin1" or "Q1.C".

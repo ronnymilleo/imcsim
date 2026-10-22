@@ -11,6 +11,7 @@
 #include "imgui_impl_sdlgpu3.h"
 #include "imgui_internal.h"
 #include "implot.h"
+#include "ngspice_library.h"
 #include "shortcuts.h"
 #include "simulator.h"
 #include "theme.h"

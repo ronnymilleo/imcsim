@@ -1,862 +1,36 @@
 /**
  * @file    simulator.cpp
- * @brief   Runs circuits through the ngspice shared library and returns their results.
- * @details ngspice keeps global state, so this module talks to one library instance for the whole process.
- *          Runs are synchronous and must happen on one thread; the callbacks fire on that same thread.
+ * @brief   Checks a request and runs it on the simulation backend, then returns the results.
  */
 
 #include "simulator.h"
 
+#include "circuit_checks.h"
 #include "components/logic_input.h"
-#include "components/logic_part.h"
-#include "components/source.h"
-#include "ratings.h"
-#include "spice_value.h"
+#include "simulation_backend.h"
+#include "stepped_circuit.h"
 #include <algorithm>
-#include <cctype>
-#include <cmath>
-#include <complex>
 #include <format>
-#include <iterator>
-#include <ngspice/sharedspice.h>
-#include <numbers>
-#include <optional>
-#include <sstream>
-#include <string_view>
 #include <utility>
 
 namespace Core {
 
 namespace {
 
-constexpr std::string_view OUTPUT_PREFIX = "stdout ";
-constexpr std::string_view ERROR_PREFIX = "stderr ";
-// 1e-15 V is -300 dB
-constexpr double MIN_MAGNITUDE = 1e-15;
-
-/**
- * @struct  NgspiceState
- * @brief   Library-wide state shared with the ngspice callbacks.
- */
-struct NgspiceState {
-    bool Initialized = false;
-    // Set when ngspice asks to quit; the library cannot be used again in this process
-    bool Exited = false;
-    // Where the callbacks store printed lines; only set while a run is in progress
-    std::vector<SimulatorMessage> *Messages = nullptr;
-    // Where a build that ships the digital code models keeps digital.cm, when the system ngspice does not load them
-    std::filesystem::path CodeModelDirectory;
-    // Whether the digital code models are loaded, which the logic parts need; known once ngspice is initialized
-    bool HasDigitalModels = false;
-};
-
-NgspiceState &GetState() {
-    static NgspiceState state;
-    return state;
-}
-
-// ngspice prefixes every line with the stream it was printed to
-int HandleOutput(char *text, int /*id*/, void * /*user_data*/) {
-    std::vector<SimulatorMessage> *messages = GetState().Messages;
-    if (messages == nullptr || text == nullptr) {
-        return 0;
+// What stops a run before it reaches the backend: the circuit, the settings the analysis takes, and a part or an
+// analysis the backend does not run
+std::optional<std::string> FindProblem(const Circuit &circuit, const std::optional<std::string> &settings_error,
+                                       const AnalysisKind kind) {
+    if (const std::optional<std::string> error = CheckCircuit(circuit)) {
+        return error;
     }
-    std::string_view line(text);
-    const bool from_error_stream = line.starts_with(ERROR_PREFIX);
-    if (from_error_stream) {
-        line.remove_prefix(ERROR_PREFIX.size());
-    } else if (line.starts_with(OUTPUT_PREFIX)) {
-        line.remove_prefix(OUTPUT_PREFIX.size());
+    if (settings_error) {
+        return settings_error;
     }
-    if (!line.empty()) {
-        messages->push_back({std::string(line), from_error_stream});
-    }
-    return 0;
-}
-
-int HandleStatus(char * /*status*/, int /*id*/, void * /*user_data*/) {
-    return 0;
-}
-
-int HandleExit(int /*status*/, NG_BOOL /*immediate*/, NG_BOOL /*quit*/, int /*id*/, void * /*user_data*/) {
-    GetState().Exited = true;
-    return 0;
-}
-
-// ngspice takes non-const strings and keeps no reference to them after the call
-int SendCommand(std::string command) {
-    return ngSpice_Command(command.data());
-}
-
-// The help of a code model is printed only when the model is loaded
-bool AskForDigitalModels() {
-    std::vector<SimulatorMessage> messages;
-    std::vector<SimulatorMessage> *const printing = std::exchange(GetState().Messages, &messages);
-    SendCommand("devhelp d_and");
-    GetState().Messages = printing;
-    return std::ranges::any_of(messages,
-                               [](const SimulatorMessage &message) { return message.Text.starts_with("d_and"); });
-}
-
-// The codemodel command keeps quotes as part of the file name and splits it at spaces, so the library is named
-// relative to its folder, made the working directory for the call; on Windows ngspice resolves a relative name
-// against the program's folder instead, which is where the Windows build keeps it
-void LoadLibraryFrom(const std::filesystem::path &directory) {
-    std::error_code error;
-    const std::filesystem::path previous = std::filesystem::current_path(error);
-    std::filesystem::current_path(directory, error);
-    if (error) {
-        return;
-    }
-    SendCommand("codemodel ./digital.cm");
-    std::filesystem::current_path(previous, error);
-}
-
-// A system ngspice loads digital.cm through its spinit file, and loading it a second time crashes ngspice, so the
-// copy shipped with the program is loaded only when the digital models are missing
-void LoadDigitalModels() {
-    const std::filesystem::path &directory = GetState().CodeModelDirectory;
-    std::error_code error;
-    if (!AskForDigitalModels() && !directory.empty() && std::filesystem::exists(directory / "digital.cm", error)) {
-        LoadLibraryFrom(directory);
-    }
-    GetState().HasDigitalModels = AskForDigitalModels();
-}
-
-bool EnsureInitialized() {
-    NgspiceState &state = GetState();
-    if (!state.Initialized) {
-        ngSpice_Init(HandleOutput, HandleStatus, HandleExit, nullptr, nullptr, nullptr, nullptr);
-        state.Initialized = true;
-        LoadDigitalModels();
-    }
-    return !state.Exited;
-}
-
-void LoadCircuit(const std::string &netlist) {
-    std::vector<std::string> lines;
-    std::istringstream stream(netlist);
-    for (std::string line; std::getline(stream, line);) {
-        lines.push_back(std::move(line));
-    }
-    std::vector<char *> pointers;
-    for (std::string &line : lines) {
-        pointers.push_back(line.data());
-    }
-    pointers.push_back(nullptr);
-    ngSpice_Circ(pointers.data());
-}
-
-bool HasErrorLine(const std::vector<SimulatorMessage> &messages) {
-    for (const SimulatorMessage &message : messages) {
-        if (message.FromErrorStream && message.Text.starts_with("Error")) {
-            return true;
-        }
-    }
-    return false;
-}
-
-bool HasLogicPart(const Circuit &circuit) {
-    return std::ranges::any_of(circuit.GetEntries(),
-                               [](const CircuitEntry &entry) { return IsLogicPart(entry.Part->GetType()); });
-}
-
-// ngspice only warns when the analog and digital solutions keep alternating, and then leaves the results empty
-bool NeverSettled(const std::vector<SimulatorMessage> &messages) {
-    return std::ranges::any_of(messages, [](const SimulatorMessage &message) {
-        return message.Text.contains("event-driven solution alternations");
-    });
-}
-
-// What to tell the user when ngspice rejected a circuit: the logic parts have two failures of their own
-std::string DescribeFailure(const Circuit &circuit, const std::vector<SimulatorMessage> &messages) {
-    if (HasLogicPart(circuit)) {
-        if (!GetState().HasDigitalModels) {
-            return "This ngspice has no digital models (digital.cm), which the logic gates and flip-flops need";
-        }
-        // A latch with both inputs idle has no state to start from, so the digital loop never settles
-        if (NeverSettled(messages)) {
-            return "The logic parts never settle; a loop such as a latch needs one input at a defined level to have "
-                   "an operating point, while a transient starts it from 0 V";
-        }
-    }
-    return "ngspice could not simulate the circuit; see its output for details";
-}
-
-// ngspice keeps no reference to the name after the call
-pvector_info FindVector(std::string name) {
-    const pvector_info vector = ngGet_Vec_Info(name.data());
-    if (vector == nullptr || vector->v_length < 1 || (vector->v_realdata == nullptr && vector->v_compdata == nullptr)) {
-        return nullptr;
-    }
-    return vector;
-}
-
-// Analyses with complex results, such as .ac, also store their scale (the frequency) as complex numbers
-std::vector<double> RealPart(const vector_info &vector) {
-    std::vector<double> values(static_cast<std::size_t>(vector.v_length));
-    for (std::size_t index = 0; index < values.size(); ++index) {
-        values[index] = vector.v_realdata != nullptr ? vector.v_realdata[index] : vector.v_compdata[index].cx_real;
-    }
-    return values;
-}
-
-std::vector<std::complex<double>> ComplexValues(const vector_info &vector) {
-    std::vector<std::complex<double>> values(static_cast<std::size_t>(vector.v_length));
-    for (std::size_t index = 0; index < values.size(); ++index) {
-        values[index] = vector.v_compdata != nullptr
-                            ? std::complex<double>(vector.v_compdata[index].cx_real, vector.v_compdata[index].cx_imag)
-                            : std::complex<double>(vector.v_realdata[index], 0.0);
-    }
-    return values;
-}
-
-// ngspice stores vector names in lower case
-std::string ToLower(std::string text) {
-    std::ranges::transform(text, text.begin(), [](const unsigned char character) { return std::tolower(character); });
-    return text;
-}
-
-// The branch current of a voltage source, an inductor or a current probe
-std::string BranchVectorName(const std::string &element_name) {
-    return std::format("{}#branch", ToLower(element_name));
-}
-
-/**
- * @struct  CurrentVector
- * @brief   A current the results report, and the ngspice vector it is read from.
- */
-struct CurrentVector {
-    std::string TraceName;
-    std::string VectorName;
-};
-
-// Where ngspice saves the currents of a component, with .options savecurrents and the current probes. Two-terminal
-// parts report one current, positive from their first terminal to their second; probed parts one per probed
-// terminal, positive into it
-std::vector<CurrentVector> CurrentVectors(const Component &component) {
-    const std::vector<CurrentProbe> probes = GetCurrentProbes(component);
-    if (!probes.empty()) {
-        std::vector<CurrentVector> vectors;
-        for (const CurrentProbe &probe : probes) {
-            vectors.push_back({GetCurrentName(component, probe.Label),
-                               BranchVectorName(GetCurrentProbeName(component, probe.Label))});
-        }
-        return vectors;
-    }
-    const std::string name = ToLower(component.GetName());
-    switch (component.GetType()) {
-    case ComponentType::RESISTOR:
-    case ComponentType::CAPACITOR:
-    case ComponentType::INDUCTOR:
-        return {{component.GetName(), std::format("@{}[i]", name)}};
-    case ComponentType::VCC:
-    case ComponentType::VOLTAGE_SOURCE:
-    case ComponentType::CLOCK:
-    case ComponentType::LOGIC_INPUT:
-        return {{component.GetName(), BranchVectorName(name)}};
-    case ComponentType::CURRENT_SOURCE:
-        return {{component.GetName(), std::format("@{}[current]", name)}};
-    case ComponentType::GROUND:
-    case ComponentType::NET_LABEL:
-    case ComponentType::DIODE:
-    case ComponentType::ZENER_DIODE:
-    case ComponentType::LED:
-    case ComponentType::NPN:
-    case ComponentType::PNP:
-    case ComponentType::NMOS:
-    case ComponentType::PMOS:
-    case ComponentType::VCVS:
-    case ComponentType::VCCS:
-    case ComponentType::CCCS:
-    case ComponentType::CCVS:
-    case ComponentType::OP_AMP:
-    case ComponentType::POTENTIOMETER:
-    case ComponentType::SWITCH:
-    case ComponentType::PUSH_BUTTON:
-    case ComponentType::V_SWITCH:
-    case ComponentType::RELAY:
-    case ComponentType::TRANSFORMER:
-    case ComponentType::AND:
-    case ComponentType::OR:
-    case ComponentType::NOT:
-    case ComponentType::NAND:
-    case ComponentType::NOR:
-    case ComponentType::XOR:
-    case ComponentType::XNOR:
-    case ComponentType::BUFFER:
-    case ComponentType::D_FLIP_FLOP:
-    case ComponentType::JK_FLIP_FLOP:
-    case ComponentType::T_FLIP_FLOP:
-    case ComponentType::SR_FLIP_FLOP:
-        break;
-    }
-    return {};
-}
-
-// 20 log10 of the magnitude, with a floor that keeps a value the AC sources do not reach finite for plotting
-double ToDecibels(const std::complex<double> value) {
-    return 20.0 * std::log10(std::max(std::abs(value), MIN_MAGNITUDE));
-}
-
-double ToDegrees(const std::complex<double> value) {
-    return std::arg(value) * 180.0 / std::numbers::pi;
-}
-
-std::expected<OperatingPoint, std::string> ReadOperatingPoint(const Circuit &circuit) {
-    OperatingPoint result;
-    result.NodeVoltages.assign(static_cast<std::size_t>(circuit.GetNodeCount()), 0.0);
-    for (int node = 1; node < circuit.GetNodeCount(); ++node) {
-        const pvector_info vector = FindVector(std::format("v({})", node));
-        if (vector == nullptr || vector->v_realdata == nullptr) {
-            return std::unexpected(std::format("ngspice returned no voltage for node {}", node));
-        }
-        result.NodeVoltages[static_cast<std::size_t>(node)] = vector->v_realdata[0];
-    }
-    for (const CircuitEntry &entry : circuit.GetEntries()) {
-        for (const CurrentVector &current : CurrentVectors(*entry.Part)) {
-            const pvector_info vector = FindVector(current.VectorName);
-            if (vector == nullptr || vector->v_realdata == nullptr) {
-                return std::unexpected(std::format("ngspice returned no current for {}", current.TraceName));
-            }
-            result.Currents.push_back({current.TraceName, vector->v_realdata[0]});
-        }
-    }
-    AddRatingWarnings(circuit, result);
-    return result;
-}
-
-std::expected<Transient, std::string> ReadTransient(const Circuit &circuit) {
-    const pvector_info time = FindVector("time");
-    if (time == nullptr) {
-        return std::unexpected("ngspice returned no time points");
-    }
-    Transient result;
-    result.Times = RealPart(*time);
-    // time points to the record that the next lookup overwrites, so later vectors are checked against this count
-    const std::size_t point_count = result.Times.size();
-    result.NodeVoltages.resize(static_cast<std::size_t>(circuit.GetNodeCount()));
-    result.NodeVoltages[0].assign(point_count, 0.0);
-    for (int node = 1; node < circuit.GetNodeCount(); ++node) {
-        const pvector_info vector = FindVector(std::format("v({})", node));
-        if (vector == nullptr || static_cast<std::size_t>(vector->v_length) != point_count) {
-            return std::unexpected(std::format("ngspice returned no voltages for node {}", node));
-        }
-        result.NodeVoltages[static_cast<std::size_t>(node)] = RealPart(*vector);
-    }
-    for (const CircuitEntry &entry : circuit.GetEntries()) {
-        for (const CurrentVector &current : CurrentVectors(*entry.Part)) {
-            const pvector_info vector = FindVector(current.VectorName);
-            if (vector == nullptr || static_cast<std::size_t>(vector->v_length) != point_count) {
-                return std::unexpected(std::format("ngspice returned no currents for {}", current.TraceName));
-            }
-            result.Currents.push_back({current.TraceName, RealPart(*vector)});
-        }
-    }
-    AddRatingWarnings(circuit, result);
-    return result;
-}
-
-// ngspice computes no device currents in .ac, so resistors, capacitors and current sources are worked out from
-// their node voltages and values; inductors and voltage sources have their branch current in the results. Probed
-// parts are read from their probes instead
-std::expected<std::vector<std::complex<double>>, std::string>
-ReadACCurrent(const std::string &vector_name, const std::string &trace_name, const std::size_t point_count) {
-    const pvector_info vector = FindVector(vector_name);
-    if (vector == nullptr || static_cast<std::size_t>(vector->v_length) != point_count) {
-        return std::unexpected(std::format("ngspice returned no currents for {}", trace_name));
-    }
-    return ComplexValues(*vector);
-}
-
-void AddACCurrent(std::string name, const std::vector<std::complex<double>> &currents, ACSweep &result) {
-    ComponentTrace magnitudes{name, {}};
-    ComponentTrace phases{std::move(name), {}};
-    std::ranges::transform(currents, std::back_inserter(magnitudes.Values), ToDecibels);
-    std::ranges::transform(currents, std::back_inserter(phases.Values), ToDegrees);
-    result.CurrentMagnitudesDecibels.push_back(std::move(magnitudes));
-    result.CurrentPhasesDegrees.push_back(std::move(phases));
-}
-
-std::expected<std::vector<std::complex<double>>, std::string>
-ACCurrent(const CircuitEntry &entry, const std::vector<double> &frequencies,
-          const std::vector<std::vector<std::complex<double>>> &node_voltages) {
-    const Component &component = *entry.Part;
-    std::vector<std::complex<double>> currents(frequencies.size());
-    switch (component.GetType()) {
-    case ComponentType::RESISTOR:
-    case ComponentType::CAPACITOR:
-        for (std::size_t index = 0; index < frequencies.size(); ++index) {
-            const std::complex<double> voltage = node_voltages[static_cast<std::size_t>(entry.Nodes[0])][index] -
-                                                 node_voltages[static_cast<std::size_t>(entry.Nodes[1])][index];
-            const std::complex<double> admittance =
-                component.GetType() == ComponentType::RESISTOR
-                    ? std::complex<double>(1.0 / component.GetValue(), 0.0)
-                    : std::complex<double>(0.0, 2.0 * std::numbers::pi * frequencies[index] * component.GetValue());
-            currents[index] = voltage * admittance;
-        }
-        return currents;
-    case ComponentType::CURRENT_SOURCE: {
-        // The source drives its AC magnitude at zero phase, and nothing when it is not AC
-        const auto &source = static_cast<const Source &>(component);
-        const double magnitude = source.GetSourceType() == Source::SourceType::AC ? source.GetAC().Magnitude : 0.0;
-        std::ranges::fill(currents, std::complex<double>(magnitude, 0.0));
-        return currents;
-    }
-    case ComponentType::INDUCTOR:
-    case ComponentType::VCC:
-    case ComponentType::VOLTAGE_SOURCE:
-    case ComponentType::CLOCK:
-    case ComponentType::LOGIC_INPUT:
-        return ReadACCurrent(BranchVectorName(component.GetName()), component.GetName(), frequencies.size());
-    case ComponentType::GROUND:
-    case ComponentType::NET_LABEL:
-    case ComponentType::DIODE:
-    case ComponentType::ZENER_DIODE:
-    case ComponentType::LED:
-    case ComponentType::NPN:
-    case ComponentType::PNP:
-    case ComponentType::NMOS:
-    case ComponentType::PMOS:
-    case ComponentType::VCVS:
-    case ComponentType::VCCS:
-    case ComponentType::CCCS:
-    case ComponentType::CCVS:
-    case ComponentType::OP_AMP:
-    case ComponentType::POTENTIOMETER:
-    case ComponentType::SWITCH:
-    case ComponentType::PUSH_BUTTON:
-    case ComponentType::V_SWITCH:
-    case ComponentType::RELAY:
-    case ComponentType::TRANSFORMER:
-    case ComponentType::AND:
-    case ComponentType::OR:
-    case ComponentType::NOT:
-    case ComponentType::NAND:
-    case ComponentType::NOR:
-    case ComponentType::XOR:
-    case ComponentType::XNOR:
-    case ComponentType::BUFFER:
-    case ComponentType::D_FLIP_FLOP:
-    case ComponentType::JK_FLIP_FLOP:
-    case ComponentType::T_FLIP_FLOP:
-    case ComponentType::SR_FLIP_FLOP:
-        break;
-    }
-    return std::unexpected(std::format("{} carries no current", component.GetName()));
-}
-
-std::expected<ACSweep, std::string> ReadACSweep(const Circuit &circuit) {
-    const pvector_info frequency = FindVector("frequency");
-    if (frequency == nullptr) {
-        return std::unexpected("ngspice returned no frequency points");
-    }
-    ACSweep result;
-    result.Frequencies = RealPart(*frequency);
-    const std::size_t point_count = result.Frequencies.size();
-
-    // Ground stays at zero, which the current of a component connected to it needs
-    std::vector<std::vector<std::complex<double>>> node_voltages(static_cast<std::size_t>(circuit.GetNodeCount()));
-    node_voltages[0].assign(point_count, 0.0);
-    result.NodeMagnitudesDecibels.resize(node_voltages.size());
-    result.NodePhasesDegrees.resize(node_voltages.size());
-    for (std::size_t node = 1; node < node_voltages.size(); ++node) {
-        const pvector_info vector = FindVector(std::format("v({})", node));
-        if (vector == nullptr || static_cast<std::size_t>(vector->v_length) != point_count) {
-            return std::unexpected(std::format("ngspice returned no response for node {}", node));
-        }
-        node_voltages[node] = ComplexValues(*vector);
-        std::ranges::transform(node_voltages[node], std::back_inserter(result.NodeMagnitudesDecibels[node]),
-                               ToDecibels);
-        std::ranges::transform(node_voltages[node], std::back_inserter(result.NodePhasesDegrees[node]), ToDegrees);
-    }
-
-    for (const CircuitEntry &entry : circuit.GetEntries()) {
-        const std::vector<CurrentVector> vectors = CurrentVectors(*entry.Part);
-        if (!GetCurrentProbes(*entry.Part).empty()) {
-            for (const CurrentVector &current : vectors) {
-                const auto currents = ReadACCurrent(current.VectorName, current.TraceName, point_count);
-                if (!currents) {
-                    return std::unexpected(currents.error());
-                }
-                AddACCurrent(current.TraceName, *currents, result);
-            }
-            continue;
-        }
-        if (vectors.empty()) {
-            continue;
-        }
-        // A supply rail has one terminal; its other side is ground
-        CircuitEntry two_terminal = entry;
-        two_terminal.Nodes.resize(2, 0);
-        const auto currents = ACCurrent(two_terminal, result.Frequencies, node_voltages);
-        if (!currents) {
-            return std::unexpected(currents.error());
-        }
-        AddACCurrent(entry.Part->GetName(), *currents, result);
-    }
-    return result;
-}
-
-// The swept values repeat once per value of the stepped source, so the curves are the stretches between repeats
-std::expected<DCSweep, std::string> ReadDCSweep(const Circuit &circuit, const DCSweepSettings &settings) {
-    const Component &swept = *FindSweepableSource(circuit, settings.Swept.Source);
-    const pvector_info scale = FindVector(swept.GetType() == ComponentType::CURRENT_SOURCE ? "i-sweep" : "v-sweep");
-    if (scale == nullptr) {
-        return std::unexpected("ngspice returned no swept values");
-    }
-    const std::vector<double> all_values = RealPart(*scale);
-    const auto repeat = std::ranges::find(all_values.begin() + 1, all_values.end(), all_values.front());
-    const auto curve_length = static_cast<std::size_t>(repeat - all_values.begin());
-    if (all_values.size() % curve_length != 0) {
-        return std::unexpected("ngspice returned curves of different lengths");
-    }
-
-    DCSweep result;
-    result.SweptSource = swept.GetName();
-    result.SweptUnit = SourceUnit(swept);
-    result.SweptValues.assign(all_values.begin(), repeat);
-    if (settings.Stepped) {
-        result.SteppedSource = settings.Stepped->Source;
-        result.SteppedUnit = SourceUnit(*FindSweepableSource(circuit, settings.Stepped->Source));
-    }
-    const std::size_t curve_count = all_values.size() / curve_length;
-    result.Curves.resize(curve_count);
-    for (std::size_t curve = 0; curve < curve_count; ++curve) {
-        if (settings.Stepped) {
-            result.Curves[curve].StepValue =
-                settings.Stepped->Start + static_cast<double>(curve) * settings.Stepped->Step;
-        }
-        result.Curves[curve].NodeVoltages.resize(static_cast<std::size_t>(circuit.GetNodeCount()));
-    }
-
-    // Splits a vector that holds every curve back to back
-    const auto split = [&](const std::vector<double> &values, const auto &store) {
-        for (std::size_t curve = 0; curve < curve_count; ++curve) {
-            const auto begin = values.begin() + static_cast<std::ptrdiff_t>(curve * curve_length);
-            store(result.Curves[curve], std::vector<double>(begin, begin + static_cast<std::ptrdiff_t>(curve_length)));
-        }
-    };
-    for (int node = 0; node < circuit.GetNodeCount(); ++node) {
-        std::vector<double> voltages(all_values.size(), 0.0);
-        if (node > 0) {
-            const pvector_info vector = FindVector(std::format("v({})", node));
-            if (vector == nullptr || static_cast<std::size_t>(vector->v_length) != all_values.size()) {
-                return std::unexpected(std::format("ngspice returned no voltages for node {}", node));
-            }
-            voltages = RealPart(*vector);
-        }
-        split(voltages, [node](DCSweepCurve &curve, std::vector<double> values) {
-            curve.NodeVoltages[static_cast<std::size_t>(node)] = std::move(values);
-        });
-    }
-    for (const CircuitEntry &entry : circuit.GetEntries()) {
-        for (const CurrentVector &current : CurrentVectors(*entry.Part)) {
-            const pvector_info vector = FindVector(current.VectorName);
-            if (vector == nullptr || static_cast<std::size_t>(vector->v_length) != all_values.size()) {
-                return std::unexpected(std::format("ngspice returned no currents for {}", current.TraceName));
-            }
-            split(RealPart(*vector), [&current](DCSweepCurve &curve, std::vector<double> values) {
-                curve.Currents.push_back({current.TraceName, std::move(values)});
-            });
-        }
-    }
-    return result;
-}
-
-// ngspice saves the vector names of a plot in lower case; the plot name itself is kept as listed
-std::vector<std::string> ListVectors(std::string plot) {
-    std::vector<std::string> names;
-    char *const *vectors = ngSpice_AllVecs(plot.data());
-    for (; vectors != nullptr && *vectors != nullptr; ++vectors) {
-        names.emplace_back(*vectors);
-    }
-    return names;
-}
-
-/**
- * @struct  NoisePlots
- * @brief   The two plots a noise analysis leaves: the densities across frequency, and the totals over the range.
- */
-struct NoisePlots {
-    std::string Densities;
-    std::string Totals;
-};
-
-// The densities are the plot with a frequency scale; the totals have a single point and no scale
-std::optional<NoisePlots> FindNoisePlots() {
-    NoisePlots plots;
-    char *const *names = ngSpice_AllPlots();
-    for (; names != nullptr && *names != nullptr; ++names) {
-        const std::string name(*names);
-        if (!name.starts_with("noise")) {
-            continue;
-        }
-        const std::vector<std::string> vectors = ListVectors(name);
-        (std::ranges::contains(vectors, "frequency") ? plots.Densities : plots.Totals) = name;
-    }
-    if (plots.Densities.empty() || plots.Totals.empty()) {
-        return std::nullopt;
-    }
-    return plots;
-}
-
-// The devices with noise in a plot, from the names of their vectors after prefix. ngspice also saves each noise
-// source of a device under the device name and a suffix, such as "onoise_q1_ib" next to "onoise_q1", so a name
-// that extends another one by "_" is a source, not a device
-std::vector<std::string> ListNoiseDevices(const std::vector<std::string> &vectors, const std::string_view prefix) {
-    std::vector<std::string> names;
-    for (const std::string &vector : vectors) {
-        if (vector.starts_with(prefix) && vector.size() > prefix.size()) {
-            names.push_back(vector.substr(prefix.size()));
-        }
-    }
-    std::vector<std::string> devices;
-    for (const std::string &name : names) {
-        const bool is_source = std::ranges::any_of(names, [&name](const std::string &other) {
-            return name.size() > other.size() + 1 && name.starts_with(other) && name[other.size()] == '_';
-        });
-        if (!is_source && name != "spectrum") {
-            devices.push_back(name);
-        }
-    }
-    return devices;
-}
-
-// A device is an element of the part, or one inside the subcircuit of one, which ngspice names after the instance
-// between dots, such as "q.x-u1.q1"
-bool IsDeviceOf(const std::string_view device, const std::vector<std::string> &elements) {
-    return std::ranges::any_of(elements, [device](const std::string &element) {
-        return device == element || device.contains(std::format(".{}.", element));
-    });
-}
-
-// ngspice describes every vector in the same static record, so the values are copied before the next lookup
-std::optional<std::vector<double>> ReadRealVector(const std::string &name) {
-    const pvector_info vector = FindVector(name);
-    if (vector == nullptr) {
-        return std::nullopt;
-    }
-    return RealPart(*vector);
-}
-
-std::expected<double, std::string> ReadNoiseTotal(const std::string &name) {
-    const pvector_info vector = FindVector(name);
-    if (vector == nullptr || vector->v_realdata == nullptr) {
-        return std::unexpected(std::format("ngspice returned no {}", name));
-    }
-    return vector->v_realdata[0];
-}
-
-// Each part adds up the power of its devices, at every frequency and in total; parts whose noise does not reach the
-// output are left out
-std::expected<std::vector<NoiseContribution>, std::string>
-ReadNoiseContributions(const Circuit &circuit, const NoisePlots &plots, const std::size_t point_count) {
-    SendCommand(std::format("setplot {}", plots.Totals));
-    const std::vector<std::string> total_devices = ListNoiseDevices(ListVectors(plots.Totals), "onoise_total_");
-    std::vector<double> device_totals;
-    for (const std::string &device : total_devices) {
-        const auto total = ReadNoiseTotal(std::format("onoise_total_{}", device));
-        if (!total) {
-            return std::unexpected(total.error());
-        }
-        device_totals.push_back(*total);
-    }
-    SendCommand(std::format("setplot {}", plots.Densities));
-    std::vector<NoiseContribution> contributions;
-    for (const CircuitEntry &entry : circuit.GetEntries()) {
-        std::vector<std::string> elements = GetElementNames(*entry.Part);
-        std::ranges::transform(elements, elements.begin(), ToLower);
-        NoiseContribution contribution{entry.Part->GetName(), std::vector<double>(point_count, 0.0), 0.0};
-        bool has_noise = false;
-        for (std::size_t index = 0; index < total_devices.size(); ++index) {
-            const std::string &device = total_devices[index];
-            if (!IsDeviceOf(device, elements)) {
-                continue;
-            }
-            const std::optional<std::vector<double>> densities = ReadRealVector(std::format("onoise_{}", device));
-            if (!densities || densities->size() != point_count) {
-                return std::unexpected(std::format("ngspice returned no noise for {}", device));
-            }
-            for (std::size_t point = 0; point < point_count; ++point) {
-                contribution.OutputDensities[point] += (*densities)[point] * (*densities)[point];
-            }
-            contribution.OutputTotal += device_totals[index] * device_totals[index];
-            has_noise = true;
-        }
-        // A part whose noise does not reach the output, as behind an ideal source, has no share
-        if (!has_noise || contribution.OutputTotal <= 0.0) {
-            continue;
-        }
-        std::ranges::transform(contribution.OutputDensities, contribution.OutputDensities.begin(),
-                               [](const double power) { return std::sqrt(power); });
-        contribution.OutputTotal = std::sqrt(contribution.OutputTotal);
-        contributions.push_back(std::move(contribution));
-    }
-    std::ranges::stable_sort(contributions, std::ranges::greater{}, &NoiseContribution::OutputTotal);
-    return contributions;
-}
-
-std::expected<Noise, std::string> ReadNoise(const Circuit &circuit, const NoiseSettings &settings) {
-    const std::optional<NoisePlots> plots = FindNoisePlots();
-    if (!plots) {
-        return std::unexpected("ngspice returned no noise plots");
-    }
-    Noise result;
-    result.OutputNode = settings.OutputNode;
-    result.InputSource = settings.InputSource;
-    result.InputUnit = SourceUnit(*FindNoiseInput(circuit, settings.InputSource));
-
-    SendCommand(std::format("setplot {}", plots->Totals));
-    const auto output_total = ReadNoiseTotal("onoise_total");
-    const auto input_total = ReadNoiseTotal("inoise_total");
-    if (!output_total || !input_total) {
-        return std::unexpected(!output_total ? output_total.error() : input_total.error());
-    }
-    result.OutputTotal = *output_total;
-    result.InputTotal = *input_total;
-
-    SendCommand(std::format("setplot {}", plots->Densities));
-    const std::optional<std::vector<double>> frequencies = ReadRealVector("frequency");
-    const std::optional<std::vector<double>> output = ReadRealVector("onoise_spectrum");
-    const std::optional<std::vector<double>> input = ReadRealVector("inoise_spectrum");
-    if (!frequencies || !output || !input || output->size() != frequencies->size() ||
-        input->size() != frequencies->size()) {
-        return std::unexpected("ngspice returned no noise densities");
-    }
-    result.Frequencies = *frequencies;
-    result.OutputDensities = *output;
-    result.InputDensities = *input;
-
-    auto contributions = ReadNoiseContributions(circuit, *plots, result.Frequencies.size());
-    if (!contributions) {
-        return std::unexpected(contributions.error());
-    }
-    result.Contributions = std::move(*contributions);
-    return result;
-}
-
-// The plot a transfer function analysis leaves; its name starts with "tf" and it holds one row
-std::optional<std::string> FindTransferFunctionPlot() {
-    char *const *names = ngSpice_AllPlots();
-    for (; names != nullptr && *names != nullptr; ++names) {
-        const std::string name(*names);
-        if (name.starts_with("tf")) {
-            return name;
-        }
-    }
-    return std::nullopt;
-}
-
-// One of the three single-value vectors of a transfer function; ngspice names them after the source and the output
-std::expected<double, std::string> ReadTransferFunctionValue(const std::string &name) {
-    const pvector_info vector = FindVector(name);
-    if (vector == nullptr || vector->v_realdata == nullptr) {
-        return std::unexpected(std::format("ngspice returned no {}", name));
-    }
-    return vector->v_realdata[0];
-}
-
-std::expected<TransferFunction, std::string> ReadTransferFunction(const Circuit &circuit,
-                                                                  const TransferFunctionSettings &settings) {
-    const std::optional<std::string> plot = FindTransferFunctionPlot();
-    if (!plot) {
-        return std::unexpected("ngspice returned no transfer function plot");
-    }
-    SendCommand(std::format("setplot {}", *plot));
-    // The vectors are named after the input source and the output expression, in lower case
-    const auto gain = ReadTransferFunctionValue("transfer_function");
-    const auto input_impedance =
-        ReadTransferFunctionValue(std::format("{}#input_impedance", ToLower(settings.InputSource)));
-    const auto output_impedance =
-        ReadTransferFunctionValue(std::format("output_impedance_at_v({})", settings.OutputNode));
-    if (!gain) {
-        return std::unexpected(gain.error());
-    }
-    if (!input_impedance) {
-        return std::unexpected(input_impedance.error());
-    }
-    if (!output_impedance) {
-        return std::unexpected(output_impedance.error());
-    }
-    TransferFunction result;
-    result.OutputNode = settings.OutputNode;
-    result.InputSource = settings.InputSource;
-    result.InputUnit = SourceUnit(*FindTransferFunctionInput(circuit, settings.InputSource));
-    result.Gain = *gain;
-    result.InputImpedance = *input_impedance;
-    result.OutputImpedance = *output_impedance;
-    // An infinite value would format as nan or inf, which reads as a broken number; an open path is instead reported
-    // around 1e20 ohm, which stays finite and the views turn into an open circuit
-    if (!std::isfinite(result.Gain) || !std::isfinite(result.InputImpedance) ||
-        !std::isfinite(result.OutputImpedance)) {
-        return std::unexpected("ngspice returned a transfer function that is not a number");
-    }
-    return result;
-}
-
-// The card that sets the temperature of a stepped run, or nothing when the run keeps the default one
-std::string TemperatureCard(const std::optional<double> temperature) {
-    return temperature ? std::format(".temp {}\n", FormatSpiceValue(*temperature)) : std::string();
-}
-
-std::string FormatSweepRange(const SweepRange &range) {
-    return std::format("{} {} {} {}", range.Source, FormatSpiceValue(range.Start), FormatSpiceValue(range.Stop),
-                       FormatSpiceValue(range.Step));
-}
-
-// A DC sweep keeps the swept value in the simulation time, and the event-driven code of ngspice stops calling the
-// logic inputs, after the first one, at any time past a breakpoint that only a transient raises (to 1e30) and that
-// starts at 0 in a new process: only one gate would follow the sweep. A transient of a circuit with no code model
-// raises it and leaves it there
-void RaiseEventBreakpoint() {
-    LoadCircuit("* event breakpoint\nV1 1 0 0\nR1 1 0 1\n.tran 1n 1n\n.end");
-    SendCommand("run");
-    SendCommand("destroy all");
-    SendCommand("remcirc");
-}
-
-// Runs one analysis on a clean library. Return codes stay 0 even when the netlist is rejected, so success is
-// told by the plot the run created, whose name starts with the analysis (op1, tran1, ac1)
-template <typename Data, typename Reader>
-SimulationRun<Data> Simulate(const Circuit &circuit, const std::string_view analysis,
-                             const std::string_view plot_prefix, Reader read_result) {
-    SimulationRun<Data> run;
-    if (!EnsureInitialized()) {
-        run.Result = std::unexpected("ngspice stopped after a fatal error; restart imcsim to simulate again");
-        return run;
-    }
-
-    NgspiceState &state = GetState();
-    state.Messages = &run.Messages;
-    // savecurrents makes ngspice keep the current through every component, not only through voltage sources;
-    // diodes get probes instead, since ngspice saves no usable diode current in .ac
-    LoadCircuit(circuit.ToSpiceNetlist(std::format(".options savecurrents\n{}", analysis), true));
-    SendCommand("run");
-    const char *plot = ngSpice_CurPlot();
-    if (plot == nullptr || !std::string_view(plot).starts_with(plot_prefix) || HasErrorLine(run.Messages) ||
-        NeverSettled(run.Messages)) {
-        run.Result = std::unexpected(DescribeFailure(circuit, run.Messages));
-    } else {
-        run.Result = read_result();
-    }
-    // Drop the results and the circuit, so every run starts from a clean library
-    SendCommand("destroy all");
-    SendCommand("remcirc");
-    state.Messages = nullptr;
-    return run;
+    return FindUnsupported(GetBackend(), circuit, kind);
 }
 
 } // namespace
-
-/**
- * @brief   Tells whether the combination has output voltages.
- * @return  True when ngspice found an operating point; false when it did not, as for a latch that depends on its
- *          history.
- */
-bool TruthTableRow::HasOperatingPoint() const {
-    return !OutputVoltages.empty();
-}
 
 /**
  * @brief   Computes the DC operating point of a circuit with ngspice.
@@ -864,13 +38,13 @@ bool TruthTableRow::HasOperatingPoint() const {
  * and supply rails.
  * @return  The node voltages or an error, plus every line ngspice printed. Warnings such as "singular matrix"
  *          can come with a successful result whose values are meaningless, so show the messages to the user.
- * @note    Not thread-safe: ngspice is a single global library instance.
+ * @note    Not thread-safe: the backend in use may be a single global instance, as ngspice is.
  */
 OperatingPointRun RunOperatingPoint(const Circuit &circuit) {
-    if (const std::optional<std::string> error = CheckCircuit(circuit)) {
+    if (const std::optional<std::string> error = FindProblem(circuit, std::nullopt, AnalysisKind::OPERATING_POINT)) {
         return {std::unexpected(*error), {}};
     }
-    return Simulate<OperatingPoint>(circuit, ".op", "op", [&circuit] { return ReadOperatingPoint(circuit); });
+    return GetBackend().RunOperatingPoint(circuit);
 }
 
 /**
@@ -882,7 +56,7 @@ OperatingPointRun RunOperatingPoint(const Circuit &circuit) {
  * @param[in] parameter Value of the stepped parameter for this run, a part value or the temperature; none runs the
  *                      circuit as it is.
  * @return  The voltages at every time point or an error, plus every line ngspice printed. Invalid settings
- *          are rejected before reaching ngspice.
+ *          are rejected before reaching the backend.
  * @note    A circuit with an initial condition runs with uic, so it starts from those values instead of the operating
  *          point, with a warning in the result; the same holds for logic parts that never settle into an operating
  *          point, such as a latch with both inputs idle, which start from 0 V. Not thread-safe: ngspice is a single
@@ -890,49 +64,15 @@ OperatingPointRun RunOperatingPoint(const Circuit &circuit) {
  */
 TransientRun RunTransient(const Circuit &circuit, const TransientSettings &settings,
                           const std::optional<ParameterValue> &parameter) {
-    std::optional<std::string> error = CheckCircuit(circuit);
-    if (!error) {
-        error = CheckTransientSettings(settings);
-    }
-    if (error) {
+    if (const std::optional<std::string> error =
+            FindProblem(circuit, CheckTransientSettings(settings), AnalysisKind::TRANSIENT)) {
         return {std::unexpected(*error), {}};
     }
     const auto applied = ApplyParameter(circuit, parameter);
     if (!applied) {
         return {std::unexpected(applied.error()), {}};
     }
-    // An initial condition needs uic, which skips the operating point and starts the capacitors and inductors from
-    // the IC= values written in the netlist
-    const bool has_initial_conditions = applied->Simulated.HasInitialConditions();
-    std::string analysis = std::format("{}.tran {} {}", TemperatureCard(applied->Temperature),
-                                       FormatSpiceValue(settings.TimeStep), FormatSpiceValue(settings.StopTime));
-    if (has_initial_conditions) {
-        analysis += " uic";
-    }
-    const auto read_result = [&applied] { return ReadTransient(applied->Simulated); };
-    TransientRun run = Simulate<Transient>(applied->Simulated, analysis, "tran", read_result);
-    if (run.Result && has_initial_conditions) {
-        run.Result->Warnings.emplace_back(
-            "The transient starts from the initial conditions (uic): the parts that have one start from it and the "
-            "other capacitors and inductors from zero, since the operating point is not computed first");
-    }
-    if (run.Result || !HasLogicPart(applied->Simulated) || !NeverSettled(run.Messages)) {
-        return run;
-    }
-    // The run already used uic, so rerunning it cannot give the logic loop a state to start from
-    if (has_initial_conditions) {
-        return run;
-    }
-    // A logic loop with no state to start from, such as a latch with both inputs idle, has no operating point, so
-    // the run starts from 0 V (uic), as a circuit does at power-up, and the loop settles into one state on its way
-    TransientRun from_zero = Simulate<Transient>(applied->Simulated, analysis + " uic", "tran", read_result);
-    if (from_zero.Result) {
-        from_zero.Result->Warnings.emplace_back(
-            "The logic parts had no state to start from, so the transient starts with every node at 0 V instead of "
-            "the operating point, and loops such as latches pick their state as they would at power-up");
-    }
-    from_zero.Messages.insert(from_zero.Messages.begin(), run.Messages.begin(), run.Messages.end());
-    return from_zero;
+    return GetBackend().RunTransient(applied->Simulated, settings, applied->Temperature);
 }
 
 /**
@@ -943,27 +83,20 @@ TransientRun RunTransient(const Circuit &circuit, const TransientSettings &setti
  * @param[in] parameter Value of the stepped parameter for this run, a part value or the temperature; none runs the
  *                      circuit as it is.
  * @return  The magnitude and phase of every node at every frequency or an error, plus every line ngspice
- *          printed. Invalid settings and circuits without an AC source are rejected before reaching ngspice.
- * @note    Not thread-safe: ngspice is a single global library instance.
+ *          printed. Invalid settings and circuits without an AC source are rejected before reaching the backend.
+ * @note    Not thread-safe: the backend in use may be a single global instance, as ngspice is.
  */
 ACSweepRun RunACSweep(const Circuit &circuit, const ACSweepSettings &settings,
                       const std::optional<ParameterValue> &parameter) {
-    std::optional<std::string> error = CheckCircuit(circuit);
-    if (!error) {
-        error = CheckACSweepSettings(circuit, settings);
-    }
-    if (error) {
+    if (const std::optional<std::string> error =
+            FindProblem(circuit, CheckACSweepSettings(circuit, settings), AnalysisKind::AC_SWEEP)) {
         return {std::unexpected(*error), {}};
     }
     const auto applied = ApplyParameter(circuit, parameter);
     if (!applied) {
         return {std::unexpected(applied.error()), {}};
     }
-    const std::string analysis =
-        std::format("{}.ac dec {} {} {}", TemperatureCard(applied->Temperature), settings.PointsPerDecade,
-                    FormatSpiceValue(settings.StartFrequency), FormatSpiceValue(settings.StopFrequency));
-    return Simulate<ACSweep>(applied->Simulated, analysis, "ac",
-                             [&applied] { return ReadACSweep(applied->Simulated); });
+    return GetBackend().RunACSweep(applied->Simulated, settings, applied->Temperature);
 }
 
 /**
@@ -974,33 +107,21 @@ ACSweepRun RunACSweep(const Circuit &circuit, const ACSweepSettings &settings,
  * @param[in] parameter Value of the stepped parameter for this run, a part value or the temperature; none runs the
  *                      circuit as it is.
  * @return  The node voltages and currents along the sweep, one curve per stepped value, or an error, plus every
- *          line ngspice printed. Invalid settings are rejected before reaching ngspice.
+ *          line ngspice printed. Invalid settings are rejected before reaching the backend.
  * @note    AC and pulse sources are swept through their DC value. Not thread-safe: ngspice is a single global
  *          library instance.
  */
 DCSweepRun RunDCSweep(const Circuit &circuit, const DCSweepSettings &settings,
                       const std::optional<ParameterValue> &parameter) {
-    std::optional<std::string> error = CheckCircuit(circuit);
-    if (!error) {
-        error = CheckDCSweepSettings(circuit, settings);
-    }
-    if (error) {
+    if (const std::optional<std::string> error =
+            FindProblem(circuit, CheckDCSweepSettings(circuit, settings), AnalysisKind::DC_SWEEP)) {
         return {std::unexpected(*error), {}};
     }
     const auto applied = ApplyParameter(circuit, parameter);
     if (!applied) {
         return {std::unexpected(applied.error()), {}};
     }
-    std::string analysis =
-        std::format("{}.dc {}", TemperatureCard(applied->Temperature), FormatSweepRange(settings.Swept));
-    if (settings.Stepped) {
-        analysis += std::format(" {}", FormatSweepRange(*settings.Stepped));
-    }
-    if (HasLogicPart(applied->Simulated) && EnsureInitialized()) {
-        RaiseEventBreakpoint();
-    }
-    return Simulate<DCSweep>(applied->Simulated, analysis, "dc",
-                             [&applied, &settings] { return ReadDCSweep(applied->Simulated, settings); });
+    return GetBackend().RunDCSweep(applied->Simulated, settings, applied->Temperature);
 }
 
 /**
@@ -1009,24 +130,17 @@ DCSweepRun RunDCSweep(const Circuit &circuit, const DCSweepSettings &settings,
  * and supply rails.
  * @param[in] settings  Output node, input source (a voltage or current source set to AC) and frequency range.
  * @return  The output and input-referred noise densities, their totals over the range and the share of every part,
- *          or an error, plus every line ngspice printed. Invalid settings are rejected before reaching ngspice.
+ *          or an error, plus every line ngspice printed. Invalid settings are rejected before reaching the backend.
  * @note    Resistors add thermal noise, and diodes and transistors shot and flicker noise as their models give;
  *          ideal sources, controlled sources and the ideal op-amp add none. Not thread-safe: ngspice is a single
  *          global library instance.
  */
 NoiseRun RunNoise(const Circuit &circuit, const NoiseSettings &settings) {
-    std::optional<std::string> error = CheckCircuit(circuit);
-    if (!error) {
-        error = CheckNoiseSettings(circuit, settings);
-    }
-    if (error) {
+    if (const std::optional<std::string> error =
+            FindProblem(circuit, CheckNoiseSettings(circuit, settings), AnalysisKind::NOISE)) {
         return {std::unexpected(*error), {}};
     }
-    // The last 1 asks for the share of every device in the results
-    const std::string analysis = std::format(
-        ".noise v({}) {} dec {} {} {} 1", settings.OutputNode, settings.InputSource, settings.PointsPerDecade,
-        FormatSpiceValue(settings.StartFrequency), FormatSpiceValue(settings.StopFrequency));
-    return Simulate<Noise>(circuit, analysis, "noise", [&circuit, &settings] { return ReadNoise(circuit, settings); });
+    return GetBackend().RunNoise(circuit, settings);
 }
 
 /**
@@ -1035,22 +149,17 @@ NoiseRun RunNoise(const Circuit &circuit, const NoiseSettings &settings) {
  * and supply rails.
  * @param[in] settings  Output node and input source (an independent voltage source, current source or VCC rail).
  * @return  The DC gain, the input impedance and the output impedance, or an error, plus every line ngspice printed.
- *          Invalid settings are rejected before reaching ngspice.
+ *          Invalid settings are rejected before reaching the backend.
  * @note    The gain is dimensionless for a voltage source input and a transimpedance for a current source; ngspice
  *          linearizes the circuit at its DC operating point, so the input source only defines the gain, whatever its
- *          value or waveform. Not thread-safe: ngspice is a single global library instance.
+ *          value or waveform. Not thread-safe: the backend in use may be a single global instance, as ngspice is.
  */
 TransferFunctionRun RunTransferFunction(const Circuit &circuit, const TransferFunctionSettings &settings) {
-    std::optional<std::string> error = CheckCircuit(circuit);
-    if (!error) {
-        error = CheckTransferFunctionSettings(circuit, settings);
-    }
-    if (error) {
+    if (const std::optional<std::string> error =
+            FindProblem(circuit, CheckTransferFunctionSettings(circuit, settings), AnalysisKind::TRANSFER_FUNCTION)) {
         return {std::unexpected(*error), {}};
     }
-    const std::string analysis = std::format(".tf v({}) {}", settings.OutputNode, settings.InputSource);
-    return Simulate<TransferFunction>(circuit, analysis, "tf",
-                                      [&circuit, &settings] { return ReadTransferFunction(circuit, settings); });
+    return GetBackend().RunTransferFunction(circuit, settings);
 }
 
 /**
@@ -1060,7 +169,7 @@ TransferFunctionRun RunTransferFunction(const Circuit &circuit, const TransferFu
  * @param[in] settings  The logic inputs to vary, the first as the most significant bit, and the nodes to read.
  * @return  One row per combination in binary counting order, with the voltage of each output node, or an error, plus
  *          the lines ngspice printed for the first combination that failed, or else for the first one. Invalid
- *          settings are rejected before reaching ngspice.
+ *          settings are rejected before reaching the backend.
  * @note    Each row is an operating point of a copy of the circuit with the inputs set, so a row is independent of the
  *          others. A combination without an operating point, as a latch left to its history has, stays in the table
  *          without voltages and a warning says how many; the call fails only when no combination has one. The other
@@ -1068,11 +177,8 @@ TransferFunctionRun RunTransferFunction(const Circuit &circuit, const TransferFu
  *          instance.
  */
 TruthTableRun RunTruthTable(const Circuit &circuit, const TruthTableSettings &settings) {
-    std::optional<std::string> error = CheckCircuit(circuit);
-    if (!error) {
-        error = CheckTruthTableSettings(circuit, settings);
-    }
-    if (error) {
+    if (const std::optional<std::string> error =
+            FindProblem(circuit, CheckTruthTableSettings(circuit, settings), AnalysisKind::TRUTH_TABLE)) {
         return {std::unexpected(*error), {}};
     }
 
@@ -1132,58 +238,6 @@ TruthTableRun RunTruthTable(const Circuit &circuit, const TruthTableSettings &se
     }
     run.Result = std::move(table);
     return run;
-}
-
-/**
- * @brief   Tells the simulator where the program keeps the digital code models, for a build that ships them.
- * @param[in] directory  Folder that may hold digital.cm; the library is loaded from it when ngspice has not loaded
- *                       the digital models itself, as the system ngspice does through its spinit file.
- * @note    Call it before the first simulation; the library is looked for once, when ngspice starts.
- */
-void SetCodeModelDirectory(const std::filesystem::path &directory) {
-    GetState().CodeModelDirectory = directory;
-}
-
-/**
- * @brief   Tells whether the digital code models of ngspice are loaded, which the logic gates and flip-flops need.
- * @return  True when ngspice has them, from the system or from the code model directory; false when it has not,
- *          or when ngspice has stopped.
- */
-bool AreDigitalModelsAvailable() {
-    return EnsureInitialized() && GetState().HasDigitalModels;
-}
-
-/**
- * @brief   Lists the currents a component reports in simulation results, in the order they appear.
- * @param[in] component  Any component.
- * @return  The component name for a two-terminal part or a supply, one name per terminal for a transistor
- *          (such as "Q1.C"), and nothing for ground.
- */
-std::vector<std::string> GetCurrentNames(const Component &component) {
-    std::vector<std::string> names;
-    for (const CurrentVector &current : CurrentVectors(component)) {
-        names.push_back(current.TraceName);
-    }
-    return names;
-}
-
-/**
- * @brief   Tells which terminal each current of GetCurrentNames() flows into.
- * @param[in] component  Any component.
- * @return  One terminal index per current, in the same order: the probed terminal for a part with probes, and the
- *          first terminal for a part whose single current enters there and leaves by the second.
- */
-std::vector<std::size_t> GetCurrentTerminals(const Component &component) {
-    std::vector<std::size_t> terminals;
-    const std::vector<CurrentProbe> probes = GetCurrentProbes(component);
-    if (probes.empty()) {
-        terminals.assign(GetCurrentNames(component).size(), 0);
-        return terminals;
-    }
-    for (const CurrentProbe &probe : probes) {
-        terminals.push_back(static_cast<std::size_t>(probe.Terminal));
-    }
-    return terminals;
 }
 
 } // namespace Core

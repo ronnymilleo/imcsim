@@ -3,7 +3,7 @@
  * @brief   Points the simulator at the digital code models the build copies next to the tests, before any test runs.
  */
 
-#include "simulator.h"
+#include "ngspice_library.h"
 #include <SDL3/SDL.h>
 #include <catch2/catch_test_run_info.hpp>
 #include <catch2/reporters/catch_reporter_event_listener.hpp>
