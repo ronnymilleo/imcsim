@@ -27,6 +27,18 @@ struct TraceStatistics {
 };
 
 /**
+ * @struct  SweepStatistics
+ * @brief   What a DC sweep reads of a trace over a span of its swept axis: its extremes and its mean.
+ * @details Unlike the oscilloscope measurements, the mean runs over the swept axis, since the sweep points are not
+ *          time, and a DC sweep has no frequency to measure.
+ */
+struct SweepStatistics {
+    double Minimum = 0.0;
+    double Maximum = 0.0;
+    double Mean = 0.0;
+};
+
+/**
  * @struct  BodeStatistics
  * @brief   What a Bode plot shows of a response: its peak, its -3 dB band and its unity gain point.
  */
@@ -43,6 +55,10 @@ struct BodeStatistics {
 
 bool IsNegligible(double value, double scale);
 double InterpolateAt(std::span<const double> xs, std::span<const double> ys, double x, bool logarithmic);
+std::optional<SweepStatistics> ComputeSweepStatistics(std::span<const double> xs, std::span<const double> ys,
+                                                      double from, double to);
+std::optional<double> ComputeSlope(std::span<const double> xs, std::span<const double> ys, double from, double to);
+std::optional<double> ResistanceFromConductance(double conductance);
 std::optional<TraceStatistics> ComputeTraceStatistics(std::span<const double> xs, std::span<const double> ys,
                                                       double from, double to);
 std::optional<BodeStatistics> ComputeBodeStatistics(std::span<const double> frequencies,

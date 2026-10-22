@@ -7,6 +7,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <functional>
 #include <utility>
 #include <vector>
 
@@ -46,7 +47,8 @@ double CrossingX(const Sample first, const Sample second, const double level) {
 }
 
 // The trace between from and to, with points interpolated at both ends, so measurements cover exactly the span.
-// xs must rise; on a logarithmic axis the X of every sample is its decade, so interpolation follows the plot
+// xs must be monotonic; a sweep that runs downward, as a negative .dc step, is reversed so it rises. On a
+// logarithmic axis the X of every sample is its decade, so interpolation follows the plot
 std::vector<Sample> ClipSamples(const std::span<const double> xs, const std::span<const double> ys, double from,
                                 double to, const bool logarithmic) {
     std::vector<Sample> all;
@@ -56,6 +58,9 @@ std::vector<Sample> ClipSamples(const std::span<const double> xs, const std::spa
     }
     if (all.empty()) {
         return {};
+    }
+    if (all.front().X > all.back().X) {
+        std::reverse(all.begin(), all.end());
     }
     if (logarithmic) {
         from = std::log10(from);
@@ -151,7 +156,7 @@ bool IsNegligible(const double value, const double scale) {
 
 /**
  * @brief   Reads a trace at any X, between its samples, as a cursor does.
- * @param[in] xs           X values of the samples, rising.
+ * @param[in] xs           X values of the samples, rising or falling, as a DC sweep may.
  * @param[in] ys           Y values of the samples.
  * @param[in] x            Where to read.
  * @param[in] logarithmic  Interpolates in decades, as a logarithmic axis draws the trace; X values must then be
@@ -164,16 +169,101 @@ double InterpolateAt(const std::span<const double> xs, const std::span<const dou
     if (count == 0) {
         return 0.0;
     }
-    if (x <= xs[0]) {
+    const bool ascending = count < 2 || xs[0] <= xs[count - 1];
+    const auto reaches_start = [ascending](const double value, const double first) {
+        return ascending ? value <= first : value >= first;
+    };
+    const auto reaches_end = [ascending](const double value, const double last) {
+        return ascending ? value >= last : value <= last;
+    };
+    if (reaches_start(x, xs[0])) {
         return ys[0];
     }
-    if (x >= xs[count - 1]) {
+    if (reaches_end(x, xs[count - 1])) {
         return ys[count - 1];
     }
-    const auto upper = std::upper_bound(xs.begin(), xs.begin() + static_cast<std::ptrdiff_t>(count), x);
-    const auto index = static_cast<std::size_t>(upper - xs.begin());
+    const auto begin = xs.begin();
+    const auto end = begin + static_cast<std::ptrdiff_t>(count);
+    // upper_bound finds the sample past x, whichever way the X values run: on a falling axis the first sample below it
+    const auto upper =
+        ascending ? std::upper_bound(begin, end, x) : std::upper_bound(begin, end, x, std::greater<double>{});
+    const auto index = static_cast<std::size_t>(upper - begin);
     const auto position = [logarithmic](const double value) { return logarithmic ? std::log10(value) : value; };
     return Lerp({position(xs[index - 1]), ys[index - 1]}, {position(xs[index]), ys[index]}, position(x));
+}
+
+/**
+ * @brief   Measures a trace between two swept values, as the DC sweep panel reads a range of its plot.
+ * @param[in] xs    X values of the samples, rising or falling, such as the swept values of a DC sweep.
+ * @param[in] ys    Y values of the samples.
+ * @param[in] from  One end of the span; the ends may come in any order and are clipped to the trace.
+ * @param[in] to    The other end.
+ * @return  The extremes and the mean over the span, or no value when it holds no length of the trace.
+ * @note    The mean is the integral of the trace over the swept axis divided by the span, so a straight line gives
+ *          the average of its ends; it is not weighted by time the way the oscilloscope mean of a transient is.
+ */
+std::optional<SweepStatistics> ComputeSweepStatistics(const std::span<const double> xs,
+                                                      const std::span<const double> ys, const double from,
+                                                      const double to) {
+    const std::vector<Sample> samples = ClipSamples(xs, ys, from, to, false);
+    if (samples.size() < 2) {
+        return std::nullopt;
+    }
+    SweepStatistics statistics;
+    const auto [lowest, highest] = std::ranges::minmax(samples, {}, &Sample::Y);
+    statistics.Minimum = lowest.Y;
+    statistics.Maximum = highest.Y;
+    // Exact integrals of the straight segments between samples
+    double area = 0.0;
+    for (std::size_t index = 1; index < samples.size(); ++index) {
+        const Sample first = samples[index - 1];
+        const Sample second = samples[index];
+        area += (first.Y + second.Y) / 2.0 * (second.X - first.X);
+    }
+    statistics.Mean = area / (samples.back().X - samples.front().X);
+    return statistics;
+}
+
+/**
+ * @brief   Reads the slope of a trace between two swept values, in the unit of the trace over that of the sweep.
+ * @param[in] xs    X values of the samples, rising or falling, such as the swept values of a DC sweep.
+ * @param[in] ys    Y values of the samples.
+ * @param[in] from  One end of the span; the ends may come in any order.
+ * @param[in] to    The other end.
+ * @return  The change of the trace over the change of the sweep, or no value when the trace holds fewer than two
+ *          samples or the span has no length within it.
+ * @note    An end beyond the trace clamps to its nearest sample, so a cursor outside the sweep still gives the slope
+ *          up to the edge.
+ */
+std::optional<double> ComputeSlope(const std::span<const double> xs, const std::span<const double> ys,
+                                   const double from, const double to) {
+    const std::size_t count = std::min(xs.size(), ys.size());
+    if (count < 2) {
+        return std::nullopt;
+    }
+    const double lowest = std::min(xs.front(), xs.back());
+    const double highest = std::max(xs.front(), xs.back());
+    const double start = std::clamp(from, lowest, highest);
+    const double end = std::clamp(to, lowest, highest);
+    if (start == end) {
+        return std::nullopt;
+    }
+    const double rise = InterpolateAt(xs, ys, end, false) - InterpolateAt(xs, ys, start, false);
+    return rise / (end - start);
+}
+
+/**
+ * @brief   Turns a conductance, such as the slope of a current over a swept voltage, into a resistance.
+ * @param[in] conductance  Slope in amperes per volt.
+ * @return  The resistance in ohms, or no value when the conductance is zero (an open path, whose resistance would
+ *          be infinite) or the resistance overflows.
+ */
+std::optional<double> ResistanceFromConductance(const double conductance) {
+    if (conductance == 0.0 || !std::isfinite(conductance)) {
+        return std::nullopt;
+    }
+    const double resistance = 1.0 / conductance;
+    return std::isfinite(resistance) ? std::optional(resistance) : std::nullopt;
 }
 
 /**
