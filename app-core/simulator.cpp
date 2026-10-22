@@ -7,16 +7,10 @@
 
 #include "simulator.h"
 
-#include "components/bjt.h"
-#include "components/capacitor.h"
-#include "components/controlled_source.h"
-#include "components/diode.h"
-#include "components/inductor.h"
 #include "components/logic_input.h"
 #include "components/logic_part.h"
-#include "components/mosfet.h"
-#include "components/resistor.h"
 #include "components/source.h"
+#include "ratings.h"
 #include "spice_value.h"
 #include <algorithm>
 #include <cctype>
@@ -24,7 +18,6 @@
 #include <complex>
 #include <format>
 #include <iterator>
-#include <memory>
 #include <ngspice/sharedspice.h>
 #include <numbers>
 #include <optional>
@@ -38,11 +31,6 @@ namespace {
 
 constexpr std::string_view OutputPrefix = "stdout ";
 constexpr std::string_view ErrorPrefix = "stderr ";
-// Limits that keep a mistyped setting from running for minutes or exhausting memory
-constexpr int MaxTransientPoints = 1000000;
-constexpr int MaxPointsPerDecade = 1000;
-constexpr int MaxDCSweepPoints = 100000;
-constexpr double AbsoluteZero = -273.15;
 // 1e-15 V is -300 dB
 constexpr double MinMagnitude = 1e-15;
 
@@ -195,239 +183,6 @@ std::string DescribeFailure(const Circuit &circuit, const std::vector<SimulatorM
     return "ngspice could not simulate the circuit; see its output for details";
 }
 
-// Clocks, logic inputs, supply rails and logic parts tie themselves to node 0 in the netlist, so a circuit made only of
-// them has its reference without a Ground part
-bool IsDigitalOnly(const Circuit &circuit) {
-    return std::ranges::all_of(circuit.GetEntries(), [](const CircuitEntry &entry) {
-        const ComponentType type = entry.Part->GetType();
-        return type == ComponentType::Clock || type == ComponentType::LogicInput || type == ComponentType::VCC ||
-               IsLogicPart(type);
-    });
-}
-
-std::optional<std::string> CheckCircuit(const Circuit &circuit) {
-    if (circuit.GetEntries().empty()) {
-        return "The schematic is empty";
-    }
-    if (!circuit.HasGround() && !IsDigitalOnly(circuit)) {
-        return "The circuit has no ground; add a Ground so node voltages have a reference";
-    }
-    // A current-controlled source needs a current that some other part reports
-    for (const CircuitEntry &entry : circuit.GetEntries()) {
-        if (!IsCurrentControlled(entry.Part->GetType())) {
-            continue;
-        }
-        const std::string &name = entry.Part->GetName();
-        const std::string &current = static_cast<const ControlledSource &>(*entry.Part).GetControllingCurrent();
-        if (current.empty()) {
-            return std::format("{} follows no current; pick its controlling current in Properties", name);
-        }
-        if (current == name) {
-            return std::format("{} cannot follow its own current", name);
-        }
-        if (!FindControllingSource(circuit, current)) {
-            return std::format("{} follows I({}), which is not in the circuit", name, current);
-        }
-    }
-    return std::nullopt;
-}
-
-std::optional<std::string> CheckTransientSettings(const TransientSettings &settings) {
-    if (settings.StopTime <= 0.0) {
-        return "The stop time must be positive";
-    }
-    if (settings.TimeStep <= 0.0) {
-        return "The time step must be positive";
-    }
-    if (settings.TimeStep > settings.StopTime) {
-        return "The time step must not be longer than the stop time";
-    }
-    if (settings.StopTime / settings.TimeStep > MaxTransientPoints) {
-        return std::format("The time step is too small for the stop time: it would produce more than {} points",
-                           MaxTransientPoints);
-    }
-    return std::nullopt;
-}
-
-std::optional<std::string> CheckFrequencyRange(const double start_frequency, const double stop_frequency,
-                                               const int points_per_decade) {
-    if (start_frequency <= 0.0) {
-        return "The start frequency must be positive";
-    }
-    if (stop_frequency <= start_frequency) {
-        return "The stop frequency must be higher than the start frequency";
-    }
-    if (points_per_decade < 1 || points_per_decade > MaxPointsPerDecade) {
-        return std::format("The points per decade must be between 1 and {}", MaxPointsPerDecade);
-    }
-    return std::nullopt;
-}
-
-std::optional<std::string> CheckACSweepSettings(const Circuit &circuit, const ACSweepSettings &settings) {
-    if (std::optional<std::string> error =
-            CheckFrequencyRange(settings.StartFrequency, settings.StopFrequency, settings.PointsPerDecade)) {
-        return error;
-    }
-    if (!circuit.HasACSource()) {
-        return "An AC sweep needs an AC source; select a voltage or current source and set it to AC";
-    }
-    return std::nullopt;
-}
-
-// The sources a DC sweep can drive: independent voltage and current sources, and supply rails
-bool IsSweepable(const ComponentType type) {
-    return type == ComponentType::VCC || type == ComponentType::VoltageSource || type == ComponentType::CurrentSource;
-}
-
-const Component *FindSweepableSource(const Circuit &circuit, const std::string_view name) {
-    const auto entry = std::ranges::find_if(circuit.GetEntries(), [name](const CircuitEntry &candidate) {
-        return candidate.Part->GetName() == name && IsSweepable(candidate.Part->GetType());
-    });
-    return entry != circuit.GetEntries().end() ? entry->Part : nullptr;
-}
-
-const char *SourceUnit(const Component &source) {
-    return source.GetType() == ComponentType::CurrentSource ? "A" : "V";
-}
-
-// Values from start to stop, both included, as ngspice counts them
-double SweepPointCount(const SweepRange &range) {
-    return std::floor((range.Stop - range.Start) / range.Step + 1e-9) + 1.0;
-}
-
-std::optional<std::string> CheckSweepRange(const Circuit &circuit, const SweepRange &range, const char *role) {
-    if (range.Source.empty()) {
-        return std::format("Pick the {} source", role);
-    }
-    if (FindSweepableSource(circuit, range.Source) == nullptr) {
-        return std::format("The {} source {} is not a voltage source, current source or VCC in the circuit", role,
-                           range.Source);
-    }
-    if (range.Start == range.Stop) {
-        return std::format("The start and stop values of the {} source must differ", role);
-    }
-    if (range.Step == 0.0 || (range.Stop - range.Start) / range.Step < 0.0) {
-        return std::format("The step of the {} source must go from its start value toward its stop value", role);
-    }
-    return std::nullopt;
-}
-
-std::optional<std::string> CheckDCSweepSettings(const Circuit &circuit, const DCSweepSettings &settings) {
-    if (std::optional<std::string> error = CheckSweepRange(circuit, settings.Swept, "swept")) {
-        return error;
-    }
-    double point_count = SweepPointCount(settings.Swept);
-    if (settings.Stepped) {
-        if (std::optional<std::string> error = CheckSweepRange(circuit, *settings.Stepped, "stepped")) {
-            return error;
-        }
-        if (settings.Stepped->Source == settings.Swept.Source) {
-            return "The stepped source must differ from the swept one";
-        }
-        point_count *= SweepPointCount(*settings.Stepped);
-    }
-    if (point_count > MaxDCSweepPoints) {
-        return std::format("The steps are too small for the ranges: they would produce more than {} points",
-                           MaxDCSweepPoints);
-    }
-    return std::nullopt;
-}
-
-// Independent sources set to AC, which ngspice accepts as the input of a noise analysis
-bool IsNoiseInput(const Component &component) {
-    const ComponentType type = component.GetType();
-    return (type == ComponentType::VoltageSource || type == ComponentType::CurrentSource) &&
-           static_cast<const Source &>(component).GetSourceType() == Source::SourceType::AC;
-}
-
-const Component *FindNoiseInput(const Circuit &circuit, const std::string_view name) {
-    const auto entry = std::ranges::find_if(circuit.GetEntries(), [name](const CircuitEntry &candidate) {
-        return candidate.Part->GetName() == name && IsNoiseInput(*candidate.Part);
-    });
-    return entry != circuit.GetEntries().end() ? entry->Part : nullptr;
-}
-
-std::optional<std::string> CheckNoiseSettings(const Circuit &circuit, const NoiseSettings &settings) {
-    if (std::optional<std::string> error =
-            CheckFrequencyRange(settings.StartFrequency, settings.StopFrequency, settings.PointsPerDecade)) {
-        return error;
-    }
-    if (settings.OutputNode < 1 || settings.OutputNode >= circuit.GetNodeCount()) {
-        return "Pick the output node; ground has no noise to measure";
-    }
-    if (settings.InputSource.empty()) {
-        return "A noise analysis needs an AC source as its input; select a voltage or current source and set it to AC";
-    }
-    if (FindNoiseInput(circuit, settings.InputSource) == nullptr) {
-        return std::format("The input source {} is not a voltage or current source set to AC", settings.InputSource);
-    }
-    return std::nullopt;
-}
-
-// Independent sources a transfer function analysis can drive, whatever their waveform: voltage and current sources
-// and supply rails, as a DC sweep can
-bool IsTransferFunctionInput(const Component &component) {
-    const ComponentType type = component.GetType();
-    return type == ComponentType::VCC || type == ComponentType::VoltageSource || type == ComponentType::CurrentSource;
-}
-
-const Component *FindTransferFunctionInput(const Circuit &circuit, const std::string_view name) {
-    const auto entry = std::ranges::find_if(circuit.GetEntries(), [name](const CircuitEntry &candidate) {
-        return candidate.Part->GetName() == name && IsTransferFunctionInput(*candidate.Part);
-    });
-    return entry != circuit.GetEntries().end() ? entry->Part : nullptr;
-}
-
-std::optional<std::string> CheckTransferFunctionSettings(const Circuit &circuit,
-                                                         const TransferFunctionSettings &settings) {
-    if (settings.OutputNode < 1 || settings.OutputNode >= circuit.GetNodeCount()) {
-        return "Pick the output node; ground has no transfer function";
-    }
-    if (settings.InputSource.empty()) {
-        return "A transfer function analysis needs an input source; select a voltage source, current source or VCC";
-    }
-    if (FindTransferFunctionInput(circuit, settings.InputSource) == nullptr) {
-        return std::format("The input source {} is not a voltage source, current source or VCC in the circuit",
-                           settings.InputSource);
-    }
-    return std::nullopt;
-}
-
-const Component *FindLogicInput(const Circuit &circuit, const std::string_view name) {
-    const auto entry = std::ranges::find_if(circuit.GetEntries(), [name](const CircuitEntry &candidate) {
-        return candidate.Part->GetType() == ComponentType::LogicInput && candidate.Part->GetName() == name;
-    });
-    return entry != circuit.GetEntries().end() ? entry->Part : nullptr;
-}
-
-std::optional<std::string> CheckTruthTableSettings(const Circuit &circuit, const TruthTableSettings &settings) {
-    if (settings.Inputs.empty()) {
-        return "A truth table needs at least one logic input to vary; add a Logic input";
-    }
-    if (settings.Inputs.size() > MaxTruthTableInputs) {
-        return std::format("A truth table varies at most {} inputs, which is {} runs; clear some", MaxTruthTableInputs,
-                           1u << MaxTruthTableInputs);
-    }
-    for (std::size_t index = 0; index < settings.Inputs.size(); ++index) {
-        const std::string &name = settings.Inputs[index];
-        if (FindLogicInput(circuit, name) == nullptr) {
-            return std::format("The input {} is not a logic input in the circuit", name);
-        }
-        if (std::ranges::count(settings.Inputs, name) > 1) {
-            return std::format("The input {} is listed twice", name);
-        }
-    }
-    if (settings.OutputNodes.empty()) {
-        return "Measure at least one node, so the truth table has an output to read";
-    }
-    for (const int node : settings.OutputNodes) {
-        if (node < 1 || node >= circuit.GetNodeCount()) {
-            return "Pick output nodes of the circuit; ground has no logic level to read";
-        }
-    }
-    return std::nullopt;
-}
-
 // ngspice keeps no reference to the name after the call
 pvector_info FindVector(std::string name) {
     const pvector_info vector = ngGet_Vec_Info(name.data());
@@ -548,135 +303,6 @@ double ToDegrees(const std::complex<double> value) {
     return std::arg(value) * 180.0 / std::numbers::pi;
 }
 
-// Zeners work in breakdown, but other diodes only reach it when the circuit exceeds their rating, which ngspice
-// simulates without complaint
-std::optional<std::string> BreakdownWarning(const CircuitEntry &entry, const double highest_reverse_voltage) {
-    if (entry.Part->GetType() == ComponentType::ZenerDiode) {
-        return std::nullopt;
-    }
-    const auto &diode = static_cast<const Diode &>(*entry.Part);
-    const double breakdown_voltage = diode.GetParameters().BreakdownVoltage;
-    if (highest_reverse_voltage < breakdown_voltage) {
-        return std::nullopt;
-    }
-    return std::format("{} ({}) goes into reverse breakdown: it sees up to {}V in reverse but is rated for {}V",
-                       diode.GetName(), diode.GetModelName(), FormatValue(highest_reverse_voltage),
-                       FormatValue(breakdown_voltage));
-}
-
-/**
- * @struct  TerminalWaveforms
- * @brief   Voltage and current of each terminal of a part at every point of a run, in terminal order.
- * @details Currents are positive into the terminal. An operating point has a single point.
- */
-struct TerminalWaveforms {
-    std::vector<std::vector<double>> Voltages;
-    std::vector<std::vector<double>> Currents;
-};
-
-double PeakVoltageBetween(const std::vector<double> &first, const std::vector<double> &second) {
-    double peak = 0.0;
-    for (std::size_t index = 0; index < first.size(); ++index) {
-        peak = std::max(peak, std::abs(first[index] - second[index]));
-    }
-    return peak;
-}
-
-double PeakMagnitude(const std::vector<double> &values) {
-    double peak = 0.0;
-    for (const double value : values) {
-        peak = std::max(peak, std::abs(value));
-    }
-    return peak;
-}
-
-// Power taken by a part, the sum of voltage times current over its terminals. Datasheet dissipation is continuous,
-// so a transient is averaged over its whole run; a single point, as in .op, is its own average
-double AveragePower(const std::vector<double> &times, const TerminalWaveforms &terminals) {
-    std::vector<double> power(times.size(), 0.0);
-    for (std::size_t terminal = 0; terminal < terminals.Voltages.size(); ++terminal) {
-        for (std::size_t index = 0; index < times.size(); ++index) {
-            power[index] += terminals.Voltages[terminal][index] * terminals.Currents[terminal][index];
-        }
-    }
-    if (times.size() < 2) {
-        return power.empty() ? 0.0 : power.front();
-    }
-    double energy = 0.0;
-    for (std::size_t index = 1; index < times.size(); ++index) {
-        energy += (power[index] + power[index - 1]) / 2.0 * (times[index] - times[index - 1]);
-    }
-    return energy / (times.back() - times.front());
-}
-
-void AddRatingWarning(const Component &part, const char *model_name, const std::string_view quantity,
-                      const double value, const double rating, const std::string_view unit,
-                      std::vector<std::string> &warnings) {
-    if (value <= rating) {
-        return;
-    }
-    warnings.push_back(std::format("{} ({}) exceeds its {} rating: {}{} against {}{}", part.GetName(), model_name,
-                                   quantity, FormatValue(value), unit, FormatValue(rating), unit));
-}
-
-// Checks a transistor against its datasheet ratings, which ngspice knows nothing about. Voltages and currents are
-// checked at their peak, and power on average
-std::vector<std::string> RatingWarnings(const Component &part, const std::vector<double> &times,
-                                        const TerminalWaveforms &terminals) {
-    std::vector<std::string> warnings;
-    const std::vector<std::vector<double>> &voltages = terminals.Voltages;
-    if (IsBJT(part.GetType())) {
-        const auto &bjt = static_cast<const BJT &>(part);
-        const BJTParameters &ratings = bjt.GetParameters();
-        const char *model = bjt.GetModelName();
-        AddRatingWarning(part, model, "VCE", PeakVoltageBetween(voltages[0], voltages[2]),
-                         ratings.MaxCollectorEmitterVoltage, "V", warnings);
-        AddRatingWarning(part, model, "IC", PeakMagnitude(terminals.Currents[0]), ratings.MaxCollectorCurrent, "A",
-                         warnings);
-        AddRatingWarning(part, model, "power", AveragePower(times, terminals), ratings.MaxPower, "W", warnings);
-    } else if (IsMOSFET(part.GetType())) {
-        const auto &mosfet = static_cast<const MOSFET &>(part);
-        const MOSFETParameters &ratings = mosfet.GetParameters();
-        const char *model = mosfet.GetModelName();
-        AddRatingWarning(part, model, "VDS", PeakVoltageBetween(voltages[0], voltages[2]),
-                         ratings.MaxDrainSourceVoltage, "V", warnings);
-        AddRatingWarning(part, model, "VGS", PeakVoltageBetween(voltages[1], voltages[2]), ratings.MaxGateSourceVoltage,
-                         "V", warnings);
-        AddRatingWarning(part, model, "ID", PeakMagnitude(terminals.Currents[0]), ratings.MaxDrainCurrent, "A",
-                         warnings);
-        AddRatingWarning(part, model, "power", AveragePower(times, terminals), ratings.MaxPower, "W", warnings);
-    }
-    return warnings;
-}
-
-// Terminal voltages and probed currents of a part, read back from results that list currents by name. Every probed
-// current is in the results, since they were read from the same circuit
-TerminalWaveforms OperatingPointTerminals(const CircuitEntry &entry, const OperatingPoint &result) {
-    TerminalWaveforms terminals;
-    for (const int node : entry.Nodes) {
-        terminals.Voltages.push_back({result.NodeVoltages[static_cast<std::size_t>(node)]});
-    }
-    for (const CurrentProbe &probe : GetCurrentProbes(*entry.Part)) {
-        const std::string name = GetCurrentName(*entry.Part, probe.Label);
-        const auto current = std::ranges::find(result.Currents, name, &ComponentCurrent::Name);
-        terminals.Currents.push_back({current->Current});
-    }
-    return terminals;
-}
-
-TerminalWaveforms TransientTerminals(const CircuitEntry &entry, const Transient &result) {
-    TerminalWaveforms terminals;
-    for (const int node : entry.Nodes) {
-        terminals.Voltages.push_back(result.NodeVoltages[static_cast<std::size_t>(node)]);
-    }
-    for (const CurrentProbe &probe : GetCurrentProbes(*entry.Part)) {
-        const std::string name = GetCurrentName(*entry.Part, probe.Label);
-        const auto current = std::ranges::find(result.Currents, name, &ComponentTrace::Name);
-        terminals.Currents.push_back(current->Values);
-    }
-    return terminals;
-}
-
 std::expected<OperatingPoint, std::string> ReadOperatingPoint(const Circuit &circuit) {
     OperatingPoint result;
     result.NodeVoltages.assign(static_cast<std::size_t>(circuit.GetNodeCount()), 0.0);
@@ -696,22 +322,7 @@ std::expected<OperatingPoint, std::string> ReadOperatingPoint(const Circuit &cir
             result.Currents.push_back({current.TraceName, vector->v_realdata[0]});
         }
     }
-    for (const CircuitEntry &entry : circuit.GetEntries()) {
-        if (!IsDiode(entry.Part->GetType())) {
-            continue;
-        }
-        const double reverse_voltage = result.NodeVoltages[static_cast<std::size_t>(entry.Nodes[1])] -
-                                       result.NodeVoltages[static_cast<std::size_t>(entry.Nodes[0])];
-        if (std::optional<std::string> warning = BreakdownWarning(entry, reverse_voltage)) {
-            result.Warnings.push_back(std::move(*warning));
-        }
-    }
-    for (const CircuitEntry &entry : circuit.GetEntries()) {
-        if (IsBJT(entry.Part->GetType()) || IsMOSFET(entry.Part->GetType())) {
-            std::ranges::move(RatingWarnings(*entry.Part, {0.0}, OperatingPointTerminals(entry, result)),
-                              std::back_inserter(result.Warnings));
-        }
-    }
+    AddRatingWarnings(circuit, result);
     return result;
 }
 
@@ -742,26 +353,7 @@ std::expected<Transient, std::string> ReadTransient(const Circuit &circuit) {
             result.Currents.push_back({current.TraceName, RealPart(*vector)});
         }
     }
-    for (const CircuitEntry &entry : circuit.GetEntries()) {
-        if (!IsDiode(entry.Part->GetType())) {
-            continue;
-        }
-        const std::vector<double> &anode = result.NodeVoltages[static_cast<std::size_t>(entry.Nodes[0])];
-        const std::vector<double> &cathode = result.NodeVoltages[static_cast<std::size_t>(entry.Nodes[1])];
-        double highest_reverse_voltage = cathode[0] - anode[0];
-        for (std::size_t index = 1; index < result.Times.size(); ++index) {
-            highest_reverse_voltage = std::max(highest_reverse_voltage, cathode[index] - anode[index]);
-        }
-        if (std::optional<std::string> warning = BreakdownWarning(entry, highest_reverse_voltage)) {
-            result.Warnings.push_back(std::move(*warning));
-        }
-    }
-    for (const CircuitEntry &entry : circuit.GetEntries()) {
-        if (IsBJT(entry.Part->GetType()) || IsMOSFET(entry.Part->GetType())) {
-            std::ranges::move(RatingWarnings(*entry.Part, result.Times, TransientTerminals(entry, result)),
-                              std::back_inserter(result.Warnings));
-        }
-    }
+    AddRatingWarnings(circuit, result);
     return result;
 }
 
@@ -1203,75 +795,14 @@ std::expected<TransferFunction, std::string> ReadTransferFunction(const Circuit 
     return result;
 }
 
+// The card that sets the temperature of a stepped run, or nothing when the run keeps the default one
+std::string TemperatureCard(const std::optional<double> temperature) {
+    return temperature ? std::format(".temp {}\n", FormatSpiceValue(*temperature)) : std::string();
+}
+
 std::string FormatSweepRange(const SweepRange &range) {
     return std::format("{} {} {} {}", range.Source, FormatSpiceValue(range.Start), FormatSpiceValue(range.Stop),
                        FormatSpiceValue(range.Step));
-}
-
-// Parts a stepped analysis can change: those written as one element whose value is all there is to them
-bool IsSteppable(const ComponentType type) {
-    return type == ComponentType::Resistor || type == ComponentType::Capacitor || type == ComponentType::Inductor;
-}
-
-std::unique_ptr<Component> CopyWithValue(const Component &part, const double value) {
-    std::unique_ptr<Component> copy;
-    switch (part.GetType()) {
-    case ComponentType::Resistor:
-        copy = std::make_unique<Resistor>(static_cast<const Resistor &>(part));
-        break;
-    case ComponentType::Capacitor:
-        copy = std::make_unique<Capacitor>(static_cast<const Capacitor &>(part));
-        break;
-    default:
-        copy = std::make_unique<Inductor>(static_cast<const Inductor &>(part));
-        break;
-    }
-    copy->SetValue(value);
-    return copy;
-}
-
-/**
- * @struct  ParameterCircuit
- * @brief   A circuit as one run of a stepped analysis simulates it, and the netlist card that sets its temperature.
- * @details Simulated refers to Part, the copy of the stepped part at its value, so both live together.
- */
-struct ParameterCircuit {
-    std::unique_ptr<Component> Part;
-    Circuit Simulated;
-    std::string Card;
-};
-
-// The stepped part is replaced by a copy at its value rather than changed in ngspice, so every reading that uses
-// the value of a part, such as the AC current of a resistor, sees the value the run had
-std::expected<ParameterCircuit, std::string> ApplyParameter(const Circuit &circuit,
-                                                            const std::optional<ParameterValue> &parameter) {
-    ParameterCircuit applied{nullptr, circuit, ""};
-    if (!parameter) {
-        return applied;
-    }
-    if (parameter->Part.empty()) {
-        if (parameter->Value <= AbsoluteZero) {
-            return std::unexpected("The temperature must be above absolute zero, -273.15 C");
-        }
-        applied.Card = std::format(".temp {}\n", FormatSpiceValue(parameter->Value));
-        return applied;
-    }
-    const auto entry = std::ranges::find_if(circuit.GetEntries(), [&parameter](const CircuitEntry &candidate) {
-        return candidate.Part->GetName() == parameter->Part && IsSteppable(candidate.Part->GetType());
-    });
-    if (entry == circuit.GetEntries().end()) {
-        return std::unexpected(std::format(
-            "The stepped part {} is not a resistor, capacitor or inductor in the circuit", parameter->Part));
-    }
-    if (parameter->Value <= 0.0) {
-        return std::unexpected(std::format("{} must stay positive in every step", parameter->Part));
-    }
-    applied.Part = CopyWithValue(*entry->Part, parameter->Value);
-    applied.Simulated = Circuit();
-    for (const CircuitEntry &original : circuit.GetEntries()) {
-        applied.Simulated.Add(original.Part == entry->Part ? *applied.Part : *original.Part, original.Nodes);
-    }
-    return applied;
 }
 
 // A DC sweep keeps the swept value in the simulation time, and the event-driven code of ngspice stops calling the
@@ -1373,8 +904,8 @@ TransientRun RunTransient(const Circuit &circuit, const TransientSettings &setti
     // An initial condition needs uic, which skips the operating point and starts the capacitors and inductors from
     // the IC= values written in the netlist
     const bool has_initial_conditions = applied->Simulated.HasInitialConditions();
-    std::string analysis = std::format("{}.tran {} {}", applied->Card, FormatSpiceValue(settings.TimeStep),
-                                       FormatSpiceValue(settings.StopTime));
+    std::string analysis = std::format("{}.tran {} {}", TemperatureCard(applied->Temperature),
+                                       FormatSpiceValue(settings.TimeStep), FormatSpiceValue(settings.StopTime));
     if (has_initial_conditions) {
         analysis += " uic";
     }
@@ -1429,7 +960,7 @@ ACSweepRun RunACSweep(const Circuit &circuit, const ACSweepSettings &settings,
         return {std::unexpected(applied.error()), {}};
     }
     const std::string analysis =
-        std::format("{}.ac dec {} {} {}", applied->Card, settings.PointsPerDecade,
+        std::format("{}.ac dec {} {} {}", TemperatureCard(applied->Temperature), settings.PointsPerDecade,
                     FormatSpiceValue(settings.StartFrequency), FormatSpiceValue(settings.StopFrequency));
     return Simulate<ACSweep>(applied->Simulated, analysis, "ac",
                              [&applied] { return ReadACSweep(applied->Simulated); });
@@ -1460,7 +991,8 @@ DCSweepRun RunDCSweep(const Circuit &circuit, const DCSweepSettings &settings,
     if (!applied) {
         return {std::unexpected(applied.error()), {}};
     }
-    std::string analysis = std::format("{}.dc {}", applied->Card, FormatSweepRange(settings.Swept));
+    std::string analysis =
+        std::format("{}.dc {}", TemperatureCard(applied->Temperature), FormatSweepRange(settings.Swept));
     if (settings.Stepped) {
         analysis += std::format(" {}", FormatSweepRange(*settings.Stepped));
     }
@@ -1619,81 +1151,6 @@ void SetCodeModelDirectory(const std::filesystem::path &directory) {
  */
 bool AreDigitalModelsAvailable() {
     return EnsureInitialized() && GetState().HasDigitalModels;
-}
-
-/**
- * @brief   Lists the sources a DC sweep can drive.
- * @param[in] circuit  Circuit to look in.
- * @return  Names of its voltage sources, current sources and VCC rails, in circuit order.
- */
-std::vector<std::string> GetSweepableSources(const Circuit &circuit) {
-    std::vector<std::string> names;
-    for (const CircuitEntry &entry : circuit.GetEntries()) {
-        if (IsSweepable(entry.Part->GetType())) {
-            names.push_back(entry.Part->GetName());
-        }
-    }
-    return names;
-}
-
-/**
- * @brief   Lists the sources a noise analysis can refer its noise to.
- * @param[in] circuit  Circuit to look in.
- * @return  Names of its voltage and current sources set to AC, in circuit order.
- */
-std::vector<std::string> GetNoiseInputSources(const Circuit &circuit) {
-    std::vector<std::string> names;
-    for (const CircuitEntry &entry : circuit.GetEntries()) {
-        if (IsNoiseInput(*entry.Part)) {
-            names.push_back(entry.Part->GetName());
-        }
-    }
-    return names;
-}
-
-/**
- * @brief   Lists the sources a transfer function analysis can drive.
- * @param[in] circuit  Circuit to look in.
- * @return  Names of its voltage sources, current sources and VCC rails, of any waveform, in circuit order.
- */
-std::vector<std::string> GetTransferFunctionInputSources(const Circuit &circuit) {
-    std::vector<std::string> names;
-    for (const CircuitEntry &entry : circuit.GetEntries()) {
-        if (IsTransferFunctionInput(*entry.Part)) {
-            names.push_back(entry.Part->GetName());
-        }
-    }
-    return names;
-}
-
-/**
- * @brief   Lists the logic inputs a truth table can vary.
- * @param[in] circuit  Circuit to look in.
- * @return  Names of its logic inputs, in circuit order.
- */
-std::vector<std::string> GetTruthTableInputs(const Circuit &circuit) {
-    std::vector<std::string> names;
-    for (const CircuitEntry &entry : circuit.GetEntries()) {
-        if (entry.Part->GetType() == ComponentType::LogicInput) {
-            names.push_back(entry.Part->GetName());
-        }
-    }
-    return names;
-}
-
-/**
- * @brief   Lists the parts whose value a stepped analysis can change.
- * @param[in] circuit  Circuit to look in.
- * @return  Names of its resistors, capacitors and inductors, in circuit order.
- */
-std::vector<std::string> GetSteppableParts(const Circuit &circuit) {
-    std::vector<std::string> names;
-    for (const CircuitEntry &entry : circuit.GetEntries()) {
-        if (IsSteppable(entry.Part->GetType())) {
-            names.push_back(entry.Part->GetName());
-        }
-    }
-    return names;
 }
 
 /**

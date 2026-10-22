@@ -6,6 +6,7 @@ add_library(imcsim-core-lib
         STATIC
             analysis_suggestions.cpp
             circuit.cpp
+            circuit_checks.cpp
             components/bjt.cpp
             components/capacitor.cpp
             components/clock.cpp
@@ -29,9 +30,11 @@ add_library(imcsim-core-lib
             components/vcc.cpp
             components/voltage_controlled_switch.cpp
             components/voltage_source.cpp
+            ratings.cpp
             simulator.cpp
             spice_value.cpp
             standard_values.cpp
+            stepped_circuit.cpp
 )
 
 target_include_directories(imcsim-core-lib
