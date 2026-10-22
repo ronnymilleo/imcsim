@@ -140,7 +140,8 @@ reports a negative current.
 
 ## Clock and logic input
 
-A **clock** drives a digital circuit and is written as a SPICE pulse source from its two terminals:
+A **clock** drives a digital circuit and is written as a SPICE pulse source from its terminal to ground, like a
+supply rail:
 
 ```
 V1 out 0 DC 0 PULSE(0 <level> <delay> <edge> <edge> <width> <period>)
@@ -164,10 +165,10 @@ A **logic input** is a constant voltage source from its terminal to ground, writ
 so an unconnected net reads 0. It is the natural way to give a gate or a latch a defined level to start from, such as
 the SET or RESET input of a flip-flop, and it holds that level for the whole run.
 
-A circuit made only of logic parts, logic inputs and VCC supplies needs no Ground: the inputs, the supplies and the
-bridges of the logic parts all refer to node 0 in the netlist, so the reference exists without the symbol, and the
-gate outputs need no load. Any other part brings the rule back: a resistor, a clock or an analog source would have
-no node to return to, so the run stops with "The circuit has no ground".
+A circuit made only of logic parts, clocks, logic inputs and VCC supplies needs no Ground: the clocks, the inputs,
+the supplies and the bridges of the logic parts all refer to node 0 in the netlist, so the reference exists without
+the symbol, and the gate outputs need no load. Any other part brings the rule back: a resistor or an analog source
+would have no node to return to, so the run stops with "The circuit has no ground".
 
 ## Independent sources
 

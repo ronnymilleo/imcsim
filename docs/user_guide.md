@@ -35,16 +35,16 @@ How to read what imcsim measures, plots and exports. The [README](../README.md) 
   its level and 0 below 30%, and an input left unconnected reads 0. The Digital examples show a table of gates, a half
   adder, an SR latch and a ripple counter. In the Output window the signals of logic parts
   plot as lanes, like a logic analyzer's, under the analog traces (see Plots).
-- **Clock**: the Sources group has a clock, a pulse source for digital circuits. Its properties hold a frequency, a
-  duty cycle (the share of each period that is high, typed in %), a logic level and a start delay; it picks its own
-  short rise and fall times, so they stay the same at every frequency. The start delay holds the clock low and the first rising edge
-  begins there, so a delay of 0 starts the first edge at t = 0 and a nonzero one keeps the clock quiet.
+- **Clock**: the Sources group has a clock, a pulse source for digital circuits with one terminal, like a supply rail.
+  Its properties hold a frequency, a duty cycle (the share of each period that is high, typed in %), a logic level and
+  a start delay; it picks its own short rise and fall times, so they stay the same at every frequency. The start delay
+  holds the clock low and the first rising edge begins there, so a delay of 0 starts the first edge at t = 0 and a
+  nonzero one keeps the clock quiet.
 - **Logic input**: a box in the supply row with Ground and VCC drives a net to a defined level. A High box in its
   properties drives the logic level (5 V by default, editable) and leaves it clear to drive 0 V; the symbol shows a 1
   while high and a 0 while low, and both start low. It is a source from its terminal to ground, so it gives a gate
-  input or a latch's SET or RESET a defined level to start from. A circuit of only logic parts, logic inputs and VCC
-  runs without a Ground symbol or a load on the outputs; add a Ground as soon as it has any other part, a clock
-  included.
+  input or a latch's SET or RESET a defined level to start from. A circuit of only logic parts, clocks, logic inputs and VCC
+  runs without a Ground symbol or a load on the outputs; add a Ground as soon as it has any other part.
 - **Standard values**: View > Component Values restricts resistors, capacitors and inductors to one of the E series
   (E6, E12, E24, E48, E96 or E192, with their tolerances of 20% down to 0.5%), or leaves any value allowed, which is
   the default. With a series chosen, a typed value becomes the nearest one of the series on a log scale (`5000` is
