@@ -221,6 +221,65 @@ TEST_CASE("A current source keeps its value, type and waveforms", "[schematic_fi
     CHECK(copy.GetPulse().High == 1e-3);
 }
 
+TEST_CASE("The extra source waveforms keep their parameters through a file", "[schematic_file]") {
+    std::vector<std::unique_ptr<GUI::UIElement>> elements;
+    elements.push_back(GUI::CreateElement(Core::ComponentType::VoltageSource, {0, 0}, GUI::Rotation::R0));
+    auto &source = static_cast<Core::VoltageSource &>(elements.back()->GetComponent());
+    source.SetName("Vin1");
+    const Core::EXPParameters exp{.InitialValue = -1.0,
+                                  .PeakValue = 3.3,
+                                  .RiseDelay = 1e-3,
+                                  .RiseTimeConstant = 10e-6,
+                                  .FallDelay = 5e-3,
+                                  .FallTimeConstant = 20e-6};
+    const Core::SFFMParameters sffm{
+        .Offset = 0.5, .Amplitude = 2.0, .CarrierFrequency = 1e3, .ModulationIndex = 5.0, .SignalFrequency = 100.0};
+    const Core::AMParameters am{
+        .Amplitude = 2.0, .Offset = 0.5, .ModulatingFrequency = 200.0, .CarrierFrequency = 10e3, .Delay = 1e-3};
+    const std::vector<Core::PWLPoint> points = {{0.0, 0.0}, {1e-3, 5.0}, {2e-3, 0.0}, {3e-3, -2.5}};
+    source.SetEXP(exp);
+    source.SetSFFM(sffm);
+    source.SetAM(am);
+    source.SetPWL({.Points = points});
+    source.SetSourceType(Core::VoltageSource::SourceType::PWL);
+
+    const GUI::LoadedSchematic loaded = LoadOrFail(GUI::SaveSchematic(elements, {}, {}, {}));
+    CHECK(loaded.Warnings.empty());
+    REQUIRE(loaded.Elements.size() == 1);
+    const auto &copy = static_cast<const Core::VoltageSource &>(loaded.Elements[0]->GetComponent());
+    CHECK(copy.GetSourceType() == Core::VoltageSource::SourceType::PWL);
+    CHECK(copy.GetEXP().InitialValue == exp.InitialValue);
+    CHECK(copy.GetEXP().PeakValue == exp.PeakValue);
+    CHECK(copy.GetEXP().RiseDelay == exp.RiseDelay);
+    CHECK(copy.GetEXP().RiseTimeConstant == exp.RiseTimeConstant);
+    CHECK(copy.GetEXP().FallDelay == exp.FallDelay);
+    CHECK(copy.GetEXP().FallTimeConstant == exp.FallTimeConstant);
+    CHECK(copy.GetSFFM().Offset == sffm.Offset);
+    CHECK(copy.GetSFFM().Amplitude == sffm.Amplitude);
+    CHECK(copy.GetSFFM().CarrierFrequency == sffm.CarrierFrequency);
+    CHECK(copy.GetSFFM().ModulationIndex == sffm.ModulationIndex);
+    CHECK(copy.GetSFFM().SignalFrequency == sffm.SignalFrequency);
+    CHECK(copy.GetAM().Amplitude == am.Amplitude);
+    CHECK(copy.GetAM().Offset == am.Offset);
+    CHECK(copy.GetAM().ModulatingFrequency == am.ModulatingFrequency);
+    CHECK(copy.GetAM().CarrierFrequency == am.CarrierFrequency);
+    CHECK(copy.GetAM().Delay == am.Delay);
+    REQUIRE(copy.GetPWL().Points.size() == points.size());
+    for (std::size_t index = 0; index < points.size(); ++index) {
+        CHECK(copy.GetPWL().Points[index].Time == points[index].Time);
+        CHECK(copy.GetPWL().Points[index].Value == points[index].Value);
+    }
+}
+
+TEST_CASE("Piecewise linear points that do not increase are skipped", "[schematic_file]") {
+    const GUI::LoadedSchematic loaded = LoadOrFail(Document(
+        R"({"type": "VoltageSource", "name": "Vin1", "x": 0, "y": 0, "rotation": 0, "value": 3, "source": "PWL",)"
+        R"("pwl": [{"time": 0, "value": 0}, {"time": 0, "value": 1}]})",
+        ""));
+    CHECK(loaded.Elements.empty());
+    CHECK(loaded.Warnings.size() == 1);
+}
+
 TEST_CASE("A diode part keeps its model", "[schematic_file]") {
     std::vector<std::unique_ptr<GUI::UIElement>> elements;
     elements.push_back(GUI::CreateElement(Core::ComponentType::ZenerDiode, {2, 4}, GUI::Rotation::R90));

@@ -87,6 +87,32 @@ constexpr auto PulseKeys = std::to_array<ParameterKey<Core::PulseParameters>>({
     {"period", &Core::PulseParameters::Period},
 });
 
+// Named after the SPICE EXP parameters
+constexpr auto EXPKeys = std::to_array<ParameterKey<Core::EXPParameters>>({
+    {"v1", &Core::EXPParameters::InitialValue},
+    {"v2", &Core::EXPParameters::PeakValue},
+    {"td1", &Core::EXPParameters::RiseDelay},
+    {"tau1", &Core::EXPParameters::RiseTimeConstant},
+    {"td2", &Core::EXPParameters::FallDelay},
+    {"tau2", &Core::EXPParameters::FallTimeConstant},
+});
+
+constexpr auto SFFMKeys = std::to_array<ParameterKey<Core::SFFMParameters>>({
+    {"offset", &Core::SFFMParameters::Offset},
+    {"amplitude", &Core::SFFMParameters::Amplitude},
+    {"carrier", &Core::SFFMParameters::CarrierFrequency},
+    {"mdi", &Core::SFFMParameters::ModulationIndex},
+    {"signal", &Core::SFFMParameters::SignalFrequency},
+});
+
+constexpr auto AMKeys = std::to_array<ParameterKey<Core::AMParameters>>({
+    {"amplitude", &Core::AMParameters::Amplitude},
+    {"offset", &Core::AMParameters::Offset},
+    {"mod_frequency", &Core::AMParameters::ModulatingFrequency},
+    {"carrier", &Core::AMParameters::CarrierFrequency},
+    {"delay", &Core::AMParameters::Delay},
+});
+
 // Named after the SPICE diode parameters
 constexpr auto DiodeKeys = std::to_array<ParameterKey<Core::DiodeParameters>>({
     {"is", &Core::DiodeParameters::SaturationCurrent},
@@ -228,6 +254,15 @@ void WriteParameters(const std::array<ParameterKey<Parameters>, Count> &keys, co
     }
 }
 
+// One waveform of a source, such as its pulse, under its own key so the sine keys in the element object stay apart
+template <typename Parameters, std::size_t Count>
+void WriteSourceParameters(const std::array<ParameterKey<Parameters>, Count> &keys, const Parameters &parameters,
+                           const char *name, nlohmann::json &object) {
+    nlohmann::json values = nlohmann::json::object();
+    WriteParameters(keys, parameters, values);
+    object[name] = values;
+}
+
 // Missing keys keep the value the parameters already have; a key with something other than a number is an error
 template <typename Parameters, std::size_t Count>
 std::expected<void, std::string> ReadParameters(const std::array<ParameterKey<Parameters>, Count> &keys,
@@ -243,6 +278,21 @@ std::expected<void, std::string> ReadParameters(const std::array<ParameterKey<Pa
         parameters.*key.Value = *value;
     }
     return {};
+}
+
+// One waveform of a source; nothing to read when the file has no key for it
+template <typename Parameters, std::size_t Count>
+std::expected<void, std::string> ReadSourceParameters(const nlohmann::json &object, const char *name,
+                                                      const std::array<ParameterKey<Parameters>, Count> &keys,
+                                                      Parameters &parameters) {
+    const auto entry = object.find(name);
+    if (entry == object.end()) {
+        return {};
+    }
+    if (!entry->is_object()) {
+        return std::unexpected(std::format("has a {} that is not an object", name));
+    }
+    return ReadParameters(keys, *entry, parameters);
 }
 
 // Parts whose parameters are all there is to them save them as one object
@@ -363,9 +413,15 @@ nlohmann::json WriteElement(const UIElement &element) {
         const auto &source = static_cast<const Core::Source &>(component);
         object["source"] = Core::GetSourceTypeName(source.GetSourceType());
         WriteParameters(ACKeys, source.GetAC(), object);
-        nlohmann::json pulse = nlohmann::json::object();
-        WriteParameters(PulseKeys, source.GetPulse(), pulse);
-        object["pulse"] = pulse;
+        WriteSourceParameters(PulseKeys, source.GetPulse(), "pulse", object);
+        WriteSourceParameters(EXPKeys, source.GetEXP(), "exp", object);
+        WriteSourceParameters(SFFMKeys, source.GetSFFM(), "sffm", object);
+        WriteSourceParameters(AMKeys, source.GetAM(), "am", object);
+        nlohmann::json pwl = nlohmann::json::array();
+        for (const Core::PWLPoint &point : source.GetPWL().Points) {
+            pwl.push_back({{"time", point.Time}, {"value", point.Value}});
+        }
+        object["pwl"] = pwl;
     }
     WriteModelFields(component, object);
     WriteKindFields(component, object);
@@ -373,14 +429,14 @@ nlohmann::json WriteElement(const UIElement &element) {
     return object;
 }
 
-// Every key is optional, so files saved before sources had a type load as DC with the default sine and pulse
+// Every waveform key is optional, so files saved before a waveform existed keep the default one of the source
 std::expected<void, std::string> ReadSource(const nlohmann::json &object, Core::Source &source) {
     if (object.contains("source")) {
         const std::optional<std::string> type_name = ReadString(object, "source");
         const std::optional<Core::Source::SourceType> type =
             type_name ? Core::ParseSourceType(*type_name) : std::nullopt;
         if (!type) {
-            return std::unexpected("has a source type other than DC, AC or Pulse");
+            return std::unexpected("has a source type other than DC, AC, Pulse, EXP, SFFM, AM or PWL");
         }
         source.SetSourceType(*type);
     }
@@ -397,18 +453,63 @@ std::expected<void, std::string> ReadSource(const nlohmann::json &object, Core::
     }
     source.SetAC(ac);
 
-    if (const auto pulse_object = object.find("pulse"); pulse_object != object.end()) {
-        if (!pulse_object->is_object()) {
-            return std::unexpected("has a pulse that is not an object");
+    Core::PulseParameters pulse = source.GetPulse();
+    if (const auto read = ReadSourceParameters(object, "pulse", PulseKeys, pulse); !read) {
+        return read;
+    }
+    if (!source.IsValidPulse(pulse)) {
+        return std::unexpected("has a pulse with a negative time or a period that is not positive");
+    }
+    source.SetPulse(pulse);
+
+    Core::EXPParameters exp = source.GetEXP();
+    if (const auto read = ReadSourceParameters(object, "exp", EXPKeys, exp); !read) {
+        return read;
+    }
+    if (!source.IsValidEXP(exp)) {
+        return std::unexpected("has an exponential with a negative delay, a fall before its rise or a time constant "
+                               "that is not positive");
+    }
+    source.SetEXP(exp);
+
+    Core::SFFMParameters sffm = source.GetSFFM();
+    if (const auto read = ReadSourceParameters(object, "sffm", SFFMKeys, sffm); !read) {
+        return read;
+    }
+    if (!source.IsValidSFFM(sffm)) {
+        return std::unexpected("has a single-frequency FM with a carrier or signal frequency that is not positive");
+    }
+    source.SetSFFM(sffm);
+
+    Core::AMParameters am = source.GetAM();
+    if (const auto read = ReadSourceParameters(object, "am", AMKeys, am); !read) {
+        return read;
+    }
+    if (!source.IsValidAM(am)) {
+        return std::unexpected("has an amplitude modulation with a negative delay or a frequency that is not "
+                               "positive");
+    }
+    source.SetAM(am);
+
+    if (const auto points = object.find("pwl"); points != object.end()) {
+        if (!points->is_array()) {
+            return std::unexpected("has piecewise linear points that are not a list");
         }
-        Core::PulseParameters pulse = source.GetPulse();
-        if (const auto read = ReadParameters(PulseKeys, *pulse_object, pulse); !read) {
-            return read;
+        Core::PWLParameters pwl;
+        pwl.Points.clear();
+        for (const nlohmann::json &point : *points) {
+            const std::optional<double> time = point.is_object() ? ReadNumber(point, "time") : std::nullopt;
+            const std::optional<double> value = point.is_object() ? ReadNumber(point, "value") : std::nullopt;
+            if (!time || !value) {
+                return std::unexpected("has a piecewise linear point without a numeric time and value");
+            }
+            pwl.Points.push_back({.Time = *time, .Value = *value});
         }
-        if (!source.IsValidPulse(pulse)) {
-            return std::unexpected("has a pulse with a negative time or a period that is not positive");
+        if (!source.IsValidPWL(pwl)) {
+            return std::unexpected("has piecewise linear points that are fewer than two, negative or not "
+                                   "increasing");
         }
-        source.SetPulse(pulse);
+        source.SetPWL(pwl);
     }
     return {};
 }

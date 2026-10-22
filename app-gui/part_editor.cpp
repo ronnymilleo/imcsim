@@ -6,6 +6,7 @@
 #include "part_editor.h"
 
 #include "element_factory.h"
+#include "misc/cpp/imgui_stdlib.h"
 #include "simulator.h"
 #include "spice_value.h"
 #include "theme.h"
@@ -55,6 +56,31 @@ constexpr auto PulseFields = std::to_array<ParameterField<Core::PulseParameters>
     {"Fall", &Core::PulseParameters::FallTime, "s"},
     {"Width", &Core::PulseParameters::Width, "s"},
     {"Period", &Core::PulseParameters::Period, "s"},
+});
+
+constexpr auto EXPFields = std::to_array<ParameterField<Core::EXPParameters>>({
+    {"Start", &Core::EXPParameters::InitialValue, nullptr},
+    {"Peak", &Core::EXPParameters::PeakValue, nullptr},
+    {"Rise delay", &Core::EXPParameters::RiseDelay, "s"},
+    {"Rise tau", &Core::EXPParameters::RiseTimeConstant, "s"},
+    {"Fall delay", &Core::EXPParameters::FallDelay, "s"},
+    {"Fall tau", &Core::EXPParameters::FallTimeConstant, "s"},
+});
+
+constexpr auto SFFMFields = std::to_array<ParameterField<Core::SFFMParameters>>({
+    {"Offset", &Core::SFFMParameters::Offset, nullptr},
+    {"Amplitude", &Core::SFFMParameters::Amplitude, nullptr},
+    {"Carrier", &Core::SFFMParameters::CarrierFrequency, "Hz"},
+    {"Mod index", &Core::SFFMParameters::ModulationIndex, ""},
+    {"Signal", &Core::SFFMParameters::SignalFrequency, "Hz"},
+});
+
+constexpr auto AMFields = std::to_array<ParameterField<Core::AMParameters>>({
+    {"Amplitude", &Core::AMParameters::Amplitude, nullptr},
+    {"Offset", &Core::AMParameters::Offset, nullptr},
+    {"Mod freq", &Core::AMParameters::ModulatingFrequency, "Hz"},
+    {"Carrier", &Core::AMParameters::CarrierFrequency, "Hz"},
+    {"Delay", &Core::AMParameters::Delay, "s"},
 });
 
 // Labeled with the SPICE parameter names, as datasheet models list them
@@ -423,6 +449,10 @@ void PartEditor::LoadFields(const Core::Component &component) {
         const auto &source = static_cast<const Core::Source &>(component);
         LoadParameterFields(ACFields, m_ACFields, source.GetAC());
         LoadParameterFields(PulseFields, m_PulseFields, source.GetPulse());
+        LoadParameterFields(EXPFields, m_EXPFields, source.GetEXP());
+        LoadParameterFields(SFFMFields, m_SFFMFields, source.GetSFFM());
+        LoadParameterFields(AMFields, m_AMFields, source.GetAM());
+        m_PWLText = Core::FormatPWLPoints(source.GetPWL().Points);
     }
     if (Core::IsDiode(component.GetType())) {
         const auto &diode = static_cast<const Core::Diode &>(component);
@@ -640,7 +670,8 @@ void PartEditor::DrawOpAmp(Core::OpAmp &op_amp) {
 
 void PartEditor::DrawSource(Core::Source &source) {
     using SourceType = Core::Source::SourceType;
-    for (const SourceType type : {SourceType::DC, SourceType::AC, SourceType::Pulse}) {
+    for (const SourceType type : {SourceType::DC, SourceType::AC, SourceType::Pulse, SourceType::EXP, SourceType::SFFM,
+                                  SourceType::AM, SourceType::PWL}) {
         if (type != SourceType::DC) {
             ImGui::SameLine();
         }
@@ -665,6 +696,18 @@ void PartEditor::DrawSource(Core::Source &source) {
         break;
     case SourceType::Pulse:
         DrawPulse(source);
+        break;
+    case SourceType::EXP:
+        DrawEXP(source);
+        break;
+    case SourceType::SFFM:
+        DrawSFFM(source);
+        break;
+    case SourceType::AM:
+        DrawAM(source);
+        break;
+    case SourceType::PWL:
+        DrawPWL(source);
         break;
     }
 }
@@ -691,6 +734,52 @@ void PartEditor::DrawPulse(Core::Source &source) {
     ImGui::TextDisabled("%s", std::format("Repeats at {}Hz", Core::FormatValue(1.0 / pulse.Period)).c_str());
     if (pulse.RiseTime + pulse.Width + pulse.FallTime > pulse.Period) {
         ImGui::TextColored(GetWarningTextColor(), "Rise, width and fall add up to more than the period");
+    }
+}
+
+void PartEditor::DrawEXP(Core::Source &source) {
+    Core::EXPParameters exp = source.GetEXP();
+    const auto is_valid = [&source](const Core::EXPParameters &candidate) { return source.IsValidEXP(candidate); };
+    if (DrawParameterFields(EXPFields, m_EXPFields, source.GetUnit(), is_valid, exp)) {
+        source.SetEXP(exp);
+        m_Schematic.MarkModified();
+    }
+    ImGui::TextDisabled("Rises towards the peak, then decays back towards the start");
+}
+
+void PartEditor::DrawSFFM(Core::Source &source) {
+    Core::SFFMParameters sffm = source.GetSFFM();
+    const auto is_valid = [&source](const Core::SFFMParameters &candidate) { return source.IsValidSFFM(candidate); };
+    if (DrawParameterFields(SFFMFields, m_SFFMFields, source.GetUnit(), is_valid, sffm)) {
+        source.SetSFFM(sffm);
+        m_Schematic.MarkModified();
+    }
+    ImGui::TextDisabled("A carrier whose phase swings with the signal");
+}
+
+void PartEditor::DrawAM(Core::Source &source) {
+    Core::AMParameters am = source.GetAM();
+    const auto is_valid = [&source](const Core::AMParameters &candidate) { return source.IsValidAM(candidate); };
+    if (DrawParameterFields(AMFields, m_AMFields, source.GetUnit(), is_valid, am)) {
+        source.SetAM(am);
+        m_Schematic.MarkModified();
+    }
+    ImGui::TextDisabled("The modulating and carrier sines multiply; the offset shifts the whole waveform");
+}
+
+// The points apply as soon as the text reads, so a half-typed field keeps the last valid shape
+void PartEditor::DrawPWL(Core::Source &source) {
+    DrawFieldLabel("Points");
+    const bool changed = ImGui::InputText("##pwl", &m_PWLText);
+    const std::optional<std::vector<Core::PWLPoint>> points = Core::ParsePWLPoints(m_PWLText);
+    if (changed && points) {
+        source.SetPWL({.Points = *points});
+        m_Schematic.MarkModified();
+    }
+    if (!points) {
+        ImGui::TextColored(GetErrorTextColor(), "At least two \"time value\" pairs, times increasing from zero");
+    } else {
+        ImGui::TextDisabled("For example: 0 0, 1m 5, 2m 0");
     }
 }
 

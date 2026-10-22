@@ -32,9 +32,10 @@ namespace GUI {
 /**
  * @class   PartEditor
  * @brief   Shows the type and name of the selected component and edits its values with SPICE suffixes.
- * @details Voltage and current sources also switch between DC, AC and pulse, and show the parameters of the
- *          chosen type. The Application owns one instance, which the Properties window and the editor popover both
- *          draw, so the texts being typed are the same in both.
+ * @details Voltage and current sources also switch between their waveforms and show the parameters of the chosen
+ *          one, edited as fields except the piecewise linear points, which are one text of "time value" pairs. The
+ *          Application owns one instance, which the Properties window and the editor popover both draw, so the
+ *          texts being typed are the same in both.
  */
 class PartEditor {
 public:
@@ -64,9 +65,15 @@ private:
     // The net name being typed for a net label, and whether the next Draw() focuses it
     std::array<char, 40> m_Net{};
     bool m_FocusNet = false;
-    // One per member of Core::ACParameters and Core::PulseParameters, in the order the window lists them
+    // One per member of Core::ACParameters, Core::PulseParameters, Core::EXPParameters, Core::SFFMParameters and
+    // Core::AMParameters, in the order the window lists them
     std::array<ValueField, 4> m_ACFields;
     std::array<ValueField, 7> m_PulseFields;
+    std::array<ValueField, 6> m_EXPFields;
+    std::array<ValueField, 5> m_SFFMFields;
+    std::array<ValueField, 5> m_AMFields;
+    // The "time value" points of a PWL source being typed, as long as the user wants them
+    std::string m_PWLText;
     // One per member of the parameters of custom diodes and transistors
     std::array<ValueField, 9> m_DiodeFields;
     std::array<ValueField, 16> m_BJTFields;
@@ -100,6 +107,10 @@ private:
     void DrawSource(Core::Source &source);
     void DrawSine(Core::Source &source);
     void DrawPulse(Core::Source &source);
+    void DrawEXP(Core::Source &source);
+    void DrawSFFM(Core::Source &source);
+    void DrawAM(Core::Source &source);
+    void DrawPWL(Core::Source &source);
     void DrawControlledSource(Core::ControlledSource &source);
     void DrawControllingCurrent(Core::ControlledSource &source);
 };
