@@ -842,3 +842,32 @@ TEST_CASE("The truth table example lists the table of each basic gate", "[exampl
         }
     }
 }
+
+TEST_CASE("The full adder example adds three bits in its truth table", "[examples]") {
+    SKIP_WITHOUT_DIGITAL_MODELS();
+    GUI::Schematic schematic;
+    OpenExample("full_adder.imcsim", schematic);
+    CHECK(schematic.GetSimulationSettings().Selected == GUI::Analysis::TruthTable);
+
+    const Core::Circuit circuit = schematic.BuildCircuit();
+    REQUIRE_FALSE(circuit.HasGround());
+    // SUM and COUT are the outputs of the second XOR (row 14) and the OR (row 38)
+    const int sum = static_cast<int>(NodeAt(schematic, {39, 14}));
+    const int carry = static_cast<int>(NodeAt(schematic, {39, 38}));
+    const Core::TruthTableRun run =
+        Core::RunTruthTable(circuit, {.Inputs = Core::GetTruthTableInputs(circuit), .OutputNodes = {sum, carry}});
+    if (!run.Result) {
+        FAIL(run.Result.error());
+    }
+    const Core::TruthTable &table = *run.Result;
+    REQUIRE(table.InputNames.size() == 3);
+    REQUIRE(table.Rows.size() == 8);
+    for (std::size_t row = 0; row < table.Rows.size(); ++row) {
+        INFO(std::format("row {}", row));
+        // The three inputs count the rows from 000 to 111, so the number of high ones is what the two outputs add up
+        const int total = static_cast<int>(std::ranges::count(table.Rows[row].InputsHigh, true));
+        REQUIRE(table.Rows[row].HasOperatingPoint());
+        CHECK(((table.Rows[row].OutputVoltages[0] > 4.0) == ((total & 1) != 0)));
+        CHECK(((table.Rows[row].OutputVoltages[1] > 4.0) == (total >= 2)));
+    }
+}

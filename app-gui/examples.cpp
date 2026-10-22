@@ -279,6 +279,18 @@ constexpr auto Examples = std::to_array<Example>({
         .FileName = "half_adder.imcsim",
     },
     {
+        .Title = "Full adder",
+        .Group = "Digital",
+        .Description =
+            "Two XOR gates add A, B and the carry in: the first gives P = A xor B and the second SUM = P xor CIN. "
+            "Two AND gates and an OR give the carry out, COUT = A and B, or P and CIN. The Truth table analysis is "
+            "already picked: press Run, and the Output window lists the eight combinations of A, B and CIN in "
+            "counting order with SUM and COUT, which read the number of high inputs in binary: 1 + 1 + 1 gives 11, "
+            "SUM and COUT both high. Only SUM and COUT are measured, so only they are columns of the table; "
+            "measure P, G1 or G2 with the Probe tool and run it again to see them too.",
+        .FileName = "full_adder.imcsim",
+    },
+    {
         .Title = "SR latch from NAND gates",
         .Group = "Digital",
         .Description =

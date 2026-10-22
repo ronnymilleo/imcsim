@@ -1,0 +1,400 @@
+{
+  "elements": [
+    {
+      "high": false,
+      "name": "VA",
+      "parameters": {
+        "logic_level": 5.0
+      },
+      "rotation": 180,
+      "type": "LogicInput",
+      "x": 8,
+      "y": 8
+    },
+    {
+      "net": "A",
+      "rotation": 0,
+      "type": "NetLabel",
+      "x": 8,
+      "y": 8
+    },
+    {
+      "high": false,
+      "name": "VB",
+      "parameters": {
+        "logic_level": 5.0
+      },
+      "rotation": 180,
+      "type": "LogicInput",
+      "x": 16,
+      "y": 8
+    },
+    {
+      "net": "B",
+      "rotation": 0,
+      "type": "NetLabel",
+      "x": 16,
+      "y": 8
+    },
+    {
+      "high": false,
+      "name": "Vcin",
+      "parameters": {
+        "logic_level": 5.0
+      },
+      "rotation": 180,
+      "type": "LogicInput",
+      "x": 24,
+      "y": 8
+    },
+    {
+      "net": "CIN",
+      "rotation": 0,
+      "type": "NetLabel",
+      "x": 24,
+      "y": 8
+    },
+    {
+      "name": "U1",
+      "parameters": {
+        "logic_level": 5.0,
+        "propagation_delay": 1e-08
+      },
+      "rotation": 0,
+      "type": "Xor",
+      "x": 36,
+      "y": 6
+    },
+    {
+      "net": "A",
+      "rotation": 270,
+      "type": "NetLabel",
+      "x": 32,
+      "y": 5
+    },
+    {
+      "net": "B",
+      "rotation": 270,
+      "type": "NetLabel",
+      "x": 32,
+      "y": 7
+    },
+    {
+      "net": "P",
+      "rotation": 180,
+      "type": "NetLabel",
+      "x": 40,
+      "y": 6
+    },
+    {
+      "name": "U2",
+      "parameters": {
+        "logic_level": 5.0,
+        "propagation_delay": 1e-08
+      },
+      "rotation": 0,
+      "type": "Xor",
+      "x": 36,
+      "y": 14
+    },
+    {
+      "net": "P",
+      "rotation": 270,
+      "type": "NetLabel",
+      "x": 32,
+      "y": 13
+    },
+    {
+      "net": "CIN",
+      "rotation": 270,
+      "type": "NetLabel",
+      "x": 32,
+      "y": 15
+    },
+    {
+      "net": "SUM",
+      "rotation": 180,
+      "type": "NetLabel",
+      "x": 40,
+      "y": 14
+    },
+    {
+      "name": "U3",
+      "parameters": {
+        "logic_level": 5.0,
+        "propagation_delay": 1e-08
+      },
+      "rotation": 0,
+      "type": "And",
+      "x": 36,
+      "y": 22
+    },
+    {
+      "net": "A",
+      "rotation": 270,
+      "type": "NetLabel",
+      "x": 32,
+      "y": 21
+    },
+    {
+      "net": "B",
+      "rotation": 270,
+      "type": "NetLabel",
+      "x": 32,
+      "y": 23
+    },
+    {
+      "net": "G1",
+      "rotation": 180,
+      "type": "NetLabel",
+      "x": 40,
+      "y": 22
+    },
+    {
+      "name": "U4",
+      "parameters": {
+        "logic_level": 5.0,
+        "propagation_delay": 1e-08
+      },
+      "rotation": 0,
+      "type": "And",
+      "x": 36,
+      "y": 30
+    },
+    {
+      "net": "P",
+      "rotation": 270,
+      "type": "NetLabel",
+      "x": 32,
+      "y": 29
+    },
+    {
+      "net": "CIN",
+      "rotation": 270,
+      "type": "NetLabel",
+      "x": 32,
+      "y": 31
+    },
+    {
+      "net": "G2",
+      "rotation": 180,
+      "type": "NetLabel",
+      "x": 40,
+      "y": 30
+    },
+    {
+      "name": "U5",
+      "parameters": {
+        "logic_level": 5.0,
+        "propagation_delay": 1e-08
+      },
+      "rotation": 0,
+      "type": "Or",
+      "x": 36,
+      "y": 38
+    },
+    {
+      "net": "G1",
+      "rotation": 270,
+      "type": "NetLabel",
+      "x": 32,
+      "y": 37
+    },
+    {
+      "net": "G2",
+      "rotation": 270,
+      "type": "NetLabel",
+      "x": 32,
+      "y": 39
+    },
+    {
+      "net": "COUT",
+      "rotation": 180,
+      "type": "NetLabel",
+      "x": 40,
+      "y": 38
+    }
+  ],
+  "format": "imcsim-schematic",
+  "measurements": {
+    "currents": [],
+    "voltages": [
+      [
+        39,
+        14
+      ],
+      [
+        39,
+        38
+      ]
+    ]
+  },
+  "simulation": {
+    "ac_sweep": {
+      "points_per_decade": 20,
+      "start": 10.0,
+      "stop": 1000000.0
+    },
+    "analysis": "truth_table",
+    "transient": {
+      "step": 1e-05,
+      "stop": 0.001
+    },
+    "truth_table": {
+      "inputs": []
+    }
+  },
+  "version": 1,
+  "wires": [
+    {
+      "end": [
+        32,
+        5
+      ],
+      "start": [
+        33,
+        5
+      ]
+    },
+    {
+      "end": [
+        32,
+        7
+      ],
+      "start": [
+        33,
+        7
+      ]
+    },
+    {
+      "end": [
+        40,
+        6
+      ],
+      "start": [
+        39,
+        6
+      ]
+    },
+    {
+      "end": [
+        32,
+        13
+      ],
+      "start": [
+        33,
+        13
+      ]
+    },
+    {
+      "end": [
+        32,
+        15
+      ],
+      "start": [
+        33,
+        15
+      ]
+    },
+    {
+      "end": [
+        40,
+        14
+      ],
+      "start": [
+        39,
+        14
+      ]
+    },
+    {
+      "end": [
+        32,
+        21
+      ],
+      "start": [
+        33,
+        21
+      ]
+    },
+    {
+      "end": [
+        32,
+        23
+      ],
+      "start": [
+        33,
+        23
+      ]
+    },
+    {
+      "end": [
+        40,
+        22
+      ],
+      "start": [
+        39,
+        22
+      ]
+    },
+    {
+      "end": [
+        32,
+        29
+      ],
+      "start": [
+        33,
+        29
+      ]
+    },
+    {
+      "end": [
+        32,
+        31
+      ],
+      "start": [
+        33,
+        31
+      ]
+    },
+    {
+      "end": [
+        40,
+        30
+      ],
+      "start": [
+        39,
+        30
+      ]
+    },
+    {
+      "end": [
+        32,
+        37
+      ],
+      "start": [
+        33,
+        37
+      ]
+    },
+    {
+      "end": [
+        32,
+        39
+      ],
+      "start": [
+        33,
+        39
+      ]
+    },
+    {
+      "end": [
+        40,
+        38
+      ],
+      "start": [
+        39,
+        38
+      ]
+    }
+  ]
+}
