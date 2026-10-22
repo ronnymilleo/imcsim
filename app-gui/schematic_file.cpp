@@ -23,7 +23,6 @@
 #include "element_factory.h"
 #include "nlohmann/json.hpp"
 #include <array>
-#include <cmath>
 #include <format>
 #include <fstream>
 #include <optional>
@@ -690,50 +689,73 @@ std::expected<void, std::string> ReadStateFields(const nlohmann::json &object, C
     return {};
 }
 
-// Parts whose figures are all there is to them, which missing keys leave as the part starts
+// Each reader fills the figures of one kind of part and does nothing for the others; missing keys leave the part as it
+// starts
+std::expected<void, std::string> ReadSwitchFigures(const nlohmann::json &object, Core::Component &component) {
+    if (component.GetType() != Core::ComponentType::VSwitch) {
+        return {};
+    }
+    return ReadPartParameters(object, static_cast<Core::VoltageControlledSwitch &>(component), SwitchKeys);
+}
+
+std::expected<void, std::string> ReadRelayFigures(const nlohmann::json &object, Core::Component &component) {
+    if (component.GetType() != Core::ComponentType::Relay) {
+        return {};
+    }
+    return ReadPartParameters(object, static_cast<Core::Relay &>(component), RelayKeys);
+}
+
+std::expected<void, std::string> ReadTransformerFigures(const nlohmann::json &object, Core::Component &component) {
+    if (component.GetType() != Core::ComponentType::Transformer) {
+        return {};
+    }
+    return ReadPartParameters(object, static_cast<Core::Transformer &>(component), TransformerKeys);
+}
+
+// A gate saved without a count has two inputs
+std::expected<void, std::string> ReadLogicFigures(const nlohmann::json &object, Core::Component &component) {
+    if (!Core::IsLogicPart(component.GetType())) {
+        return {};
+    }
+    auto &part = static_cast<Core::LogicPart &>(component);
+    if (const auto read = ReadPartParameters(object, part, LogicKeys); !read) {
+        return std::unexpected(read.error());
+    }
+    if (!Core::HasVariableInputs(component.GetType()) || !object.contains("inputs")) {
+        return {};
+    }
+    const std::optional<int> inputs = ReadInt(object, "inputs");
+    if (!inputs || !Core::LogicPart::IsValidInputCount(*inputs)) {
+        return std::unexpected(std::format("has a number of inputs that is not a whole number from {} to {}",
+                                           Core::MinLogicInputs, Core::MaxLogicInputs));
+    }
+    part.SetInputCount(*inputs);
+    return {};
+}
+
+std::expected<void, std::string> ReadClockFigures(const nlohmann::json &object, Core::Component &component) {
+    if (component.GetType() != Core::ComponentType::Clock) {
+        return {};
+    }
+    return ReadPartParameters(object, static_cast<Core::Clock &>(component), ClockKeys);
+}
+
+std::expected<void, std::string> ReadLogicInputFigures(const nlohmann::json &object, Core::Component &component) {
+    if (component.GetType() != Core::ComponentType::LogicInput) {
+        return {};
+    }
+    return ReadPartParameters(object, static_cast<Core::LogicInput &>(component), LogicInputKeys);
+}
+
+constexpr auto FigureReaders =
+    std::to_array<StateReader>({&ReadSwitchFigures, &ReadRelayFigures, &ReadTransformerFigures, &ReadLogicFigures,
+                                &ReadClockFigures, &ReadLogicInputFigures});
+
+// Parts whose figures are all there is to them: the switch that follows a voltage, the relay, the transformer, the
+// gates and flip-flops with their logic family, a clock and a logic input
 std::expected<void, std::string> ReadFigureFields(const nlohmann::json &object, Core::Component &component) {
-    if (component.GetType() == Core::ComponentType::VSwitch) {
-        if (const auto read =
-                ReadPartParameters(object, static_cast<Core::VoltageControlledSwitch &>(component), SwitchKeys);
-            !read) {
-            return std::unexpected(read.error());
-        }
-    }
-    if (component.GetType() == Core::ComponentType::Relay) {
-        if (const auto read = ReadPartParameters(object, static_cast<Core::Relay &>(component), RelayKeys); !read) {
-            return std::unexpected(read.error());
-        }
-    }
-    if (component.GetType() == Core::ComponentType::Transformer) {
-        if (const auto read = ReadPartParameters(object, static_cast<Core::Transformer &>(component), TransformerKeys);
-            !read) {
-            return std::unexpected(read.error());
-        }
-    }
-    if (Core::IsLogicPart(component.GetType())) {
-        auto &part = static_cast<Core::LogicPart &>(component);
-        if (const auto read = ReadPartParameters(object, part, LogicKeys); !read) {
-            return std::unexpected(read.error());
-        }
-        // A gate saved without a count has two inputs
-        if (Core::HasVariableInputs(component.GetType()) && object.contains("inputs")) {
-            const std::optional<double> inputs = ReadNumber(object, "inputs");
-            if (!inputs || *inputs != std::floor(*inputs) ||
-                !Core::LogicPart::IsValidInputCount(static_cast<int>(*inputs))) {
-                return std::unexpected(std::format("has a number of inputs that is not a whole number from {} to {}",
-                                                   Core::MinLogicInputs, Core::MaxLogicInputs));
-            }
-            part.SetInputCount(static_cast<int>(*inputs));
-        }
-    }
-    if (component.GetType() == Core::ComponentType::Clock) {
-        if (const auto read = ReadPartParameters(object, static_cast<Core::Clock &>(component), ClockKeys); !read) {
-            return std::unexpected(read.error());
-        }
-    }
-    if (component.GetType() == Core::ComponentType::LogicInput) {
-        if (const auto read = ReadPartParameters(object, static_cast<Core::LogicInput &>(component), LogicInputKeys);
-            !read) {
+    for (const StateReader reader : FigureReaders) {
+        if (const auto read = reader(object, component); !read) {
             return std::unexpected(read.error());
         }
     }
