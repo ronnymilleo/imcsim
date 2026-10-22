@@ -6,7 +6,10 @@
 #ifndef IMCSIM_SIMULATOR_H
 #define IMCSIM_SIMULATOR_H
 
+#include "analysis_settings.h"
 #include "circuit.h"
+#include "circuit_checks.h"
+#include "stepped_circuit.h"
 #include <expected>
 #include <filesystem>
 #include <optional>
@@ -60,18 +63,6 @@ struct OperatingPoint {
 };
 
 /**
- * @struct  TransientSettings
- * @brief   Time span and resolution of a transient simulation.
- */
-struct TransientSettings {
-    double StopTime = 10e-3;
-    // Largest step between output points; ngspice may take smaller ones where the signals change fast
-    double TimeStep = 10e-6;
-
-    bool operator==(const TransientSettings &) const = default;
-};
-
-/**
  * @struct  Transient
  * @brief   Node voltages and component currents over time, with currents signed as in OperatingPoint.
  */
@@ -83,18 +74,6 @@ struct Transient {
     std::vector<ComponentTrace> Currents;
     // Problems in the results that ngspice does not report, such as a diode in reverse breakdown
     std::vector<std::string> Warnings;
-};
-
-/**
- * @struct  ACSweepSettings
- * @brief   Frequency range and resolution of an AC sweep, with points spaced logarithmically.
- */
-struct ACSweepSettings {
-    double StartFrequency = 1.0;
-    double StopFrequency = 1e6;
-    int PointsPerDecade = 20;
-
-    bool operator==(const ACSweepSettings &) const = default;
 };
 
 /**
@@ -111,32 +90,6 @@ struct ACSweep {
     // One per named component, in circuit order, with a value per frequency point
     std::vector<ComponentTrace> CurrentMagnitudesDecibels;
     std::vector<ComponentTrace> CurrentPhasesDegrees;
-};
-
-/**
- * @struct  SweepRange
- * @brief   A source and the values a DC sweep takes it through, in the unit of the source (volts or amperes).
- * @details Source is the name of a voltage source, a current source or a VCC rail. The values go from Start to
- *          Stop in steps of Step, which may be negative to sweep downward.
- */
-struct SweepRange {
-    std::string Source;
-    double Start = 0.0;
-    double Stop = 5.0;
-    double Step = 0.1;
-
-    bool operator==(const SweepRange &) const = default;
-};
-
-/**
- * @struct  DCSweepSettings
- * @brief   The source a DC sweep runs through its values and, optionally, a second source stepped once per curve.
- * @details With a second source, the whole sweep repeats for each of its values, which draws a family of curves,
- *          such as the collector characteristics of a transistor for several base currents.
- */
-struct DCSweepSettings {
-    SweepRange Swept;
-    std::optional<SweepRange> Stepped;
 };
 
 /**
@@ -170,33 +123,6 @@ struct DCSweep {
 };
 
 /**
- * @struct  ParameterValue
- * @brief   The value a stepped analysis gives its parameter for one run: the value of a part, or the temperature.
- * @details Part names a resistor, a capacitor or an inductor, whose value becomes Value for the run; empty, Value is
- *          the temperature of the run in degrees Celsius instead of the 27 C ngspice simulates at.
- */
-struct ParameterValue {
-    std::string Part;
-    double Value = 27.0;
-};
-
-/**
- * @struct  NoiseSettings
- * @brief   Where a noise analysis measures, what it refers the noise to, and its frequency range.
- * @details The input source must be an independent source set to AC; ngspice only uses it to find the gain from it
- *          to the output, whatever its AC magnitude. Points are spaced logarithmically, as in an AC sweep.
- */
-struct NoiseSettings {
-    int OutputNode = 0;
-    std::string InputSource;
-    double StartFrequency = 10.0;
-    double StopFrequency = 100e3;
-    int PointsPerDecade = 20;
-
-    bool operator==(const NoiseSettings &) const = default;
-};
-
-/**
  * @struct  NoiseContribution
  * @brief   The share of one part in the noise at the output: its density at every frequency and its total.
  * @details A part written as several elements, such as an op-amp macromodel, adds up the noise of all of them.
@@ -227,19 +153,6 @@ struct Noise {
 };
 
 /**
- * @struct  TransferFunctionSettings
- * @brief   Where a transfer function analysis measures its output, and which source drives the circuit.
- * @details The input must be an independent source, a voltage source, current source or supply rail; ngspice uses
- *          it only to find the gain from it to the output, whatever its value or waveform.
- */
-struct TransferFunctionSettings {
-    int OutputNode = 0;
-    std::string InputSource;
-
-    bool operator==(const TransferFunctionSettings &) const = default;
-};
-
-/**
  * @struct  TransferFunction
  * @brief   Small-signal DC gain from an input source to an output, with the input and output impedances.
  * @details The gain is dimensionless (V/V) for a voltage source input and a transimpedance (V/A) for a current
@@ -254,18 +167,6 @@ struct TransferFunction {
     double Gain = 0.0;
     double InputImpedance = 0.0;
     double OutputImpedance = 0.0;
-};
-
-/**
- * @struct  TruthTableSettings
- * @brief   Which logic inputs a truth table varies and which nodes it reads.
- * @details Inputs are named logic inputs, the first being the most significant bit of the row number.
- */
-struct TruthTableSettings {
-    std::vector<std::string> Inputs;
-    std::vector<int> OutputNodes;
-
-    bool operator==(const TruthTableSettings &) const = default;
 };
 
 /**
@@ -295,9 +196,6 @@ struct TruthTable {
     std::vector<TruthTableRow> Rows;
     std::vector<std::string> Warnings;
 };
-
-// Most inputs a truth table varies; each one doubles the number of runs
-inline constexpr std::size_t MaxTruthTableInputs = 10;
 
 /**
  * @struct  SimulationRun
@@ -331,11 +229,6 @@ void SetCodeModelDirectory(const std::filesystem::path &directory);
 bool AreDigitalModelsAvailable();
 
 // Names in the results
-std::vector<std::string> GetSweepableSources(const Circuit &circuit);
-std::vector<std::string> GetNoiseInputSources(const Circuit &circuit);
-std::vector<std::string> GetTransferFunctionInputSources(const Circuit &circuit);
-std::vector<std::string> GetTruthTableInputs(const Circuit &circuit);
-std::vector<std::string> GetSteppableParts(const Circuit &circuit);
 std::vector<std::string> GetCurrentNames(const Component &component);
 std::vector<std::size_t> GetCurrentTerminals(const Component &component);
 
