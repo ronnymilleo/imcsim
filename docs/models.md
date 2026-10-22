@@ -136,16 +136,37 @@ reports a negative current.
 
 ## Independent sources
 
-**Voltage source** (`V`, named Vin) and **current source** (`I`) take one of three waveforms:
+**Voltage source** (`V`, named Vin) and **current source** (`I`) take one of seven waveforms:
 
 | Waveform | Transient | Operating point and DC sweep | AC sweep |
 |---|---|---|---|
 | DC | the value | the value | not excited |
 | AC | `SIN(offset amplitude frequency)` | the offset | the AC magnitude |
 | Pulse | `PULSE(low high delay rise fall width period)` | the low level | not excited |
+| EXP | `EXP(v1 v2 td1 tau1 td2 tau2)` | v1, the value it starts from | not excited |
+| SFFM | `SFFM(vo va fc mdi fs)` | vo, the offset | not excited |
+| AM | `AM(vo 0 va mf fc td)` | vo, the offset | not excited |
+| PWL | `PWL(t1 v1 t2 v2 ...)` | v1, the first point | not excited |
 
 - The AC magnitude is set apart from the sine amplitude, as in SPICE, and is 1 by default so a Bode plot reads as
   gain. The sine has no phase, delay or damping.
+- Every waveform writes the value it starts from as the DC value, so the operating point and a DC sweep match the
+  beginning of the transient, as the low level of a pulse does.
+- The exponential `EXP(v1 v2 td1 tau1 td2 tau2)` starts at v1, rises towards v2 with time constant tau1 from td1 on,
+  then decays back towards v1 with time constant tau2 from td2 on. It defaults to 5 V (1 mA for a current source),
+  rising from 1 ms to a 0.5 ms time constant and falling from 5 ms with a 1 ms time constant, all within the default
+  10 ms transient.
+- The single-frequency FM `SFFM(vo va fc mdi fs)` is vo plus va times a carrier at fc whose phase swings by mdi
+  times a sine at fs. It defaults to a 1 kHz carrier of 1 V (1 mA) with a modulation index of 5 and a 100 Hz signal.
+- The amplitude modulation `AM(vo 0 va mf fc td)` is vo plus va times a sine at mf times a sine at fc, both from td
+  on, and holds 0 until td. The `0` is the modulation offset of ngspice, so the carrier is suppressed and the
+  waveform is the offset plus the two sines; a nonzero offset vo shows the carrier on a level instead, and is also
+  the operating point value. It defaults to 0 V and 1 V (1 mA), a 100 Hz modulation on a 1 kHz carrier without
+  delay.
+- The piecewise linear `PWL(t1 v1 t2 v2 ...)` holds v1 before t1, joins the points with straight lines and holds the
+  last value after the last point. It defaults to `0 0, 1m 5, 2m 0` (1 mA instead of 5 for a current source). The
+  points are edited as one text of "time value" pairs in the part editor; at least two are needed, times are not
+  negative and strictly increase.
 - Both sources are ideal: a voltage source has no internal resistance and a current source no output resistance,
   so they deliver any current or voltage the circuit asks for.
 - A current source pushes its current from terminal 1 to terminal 2 through itself, into the node at terminal 2.

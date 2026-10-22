@@ -85,7 +85,7 @@ How to read what imcsim measures, plots and exports. The [README](../README.md) 
   with Up and Down, and press Enter to start placing it.
 - **Running**: the ▶ button at the end of the toolbar, or F5, runs the analysis named beside it. That button opens
   the list of analyses (operating point, transient, AC sweep, DC sweep) and the settings of the one picked, saved
-  with the schematic. Suggest fills the transient times (five periods of the slowest sine or pulse source, 200
+  with the schematic. Suggest fills the transient times (five periods of the slowest source with a waveform, 200
   points in a period of the fastest) or the AC range (two decades past the RC, RL and LC corners and the op-amp
   bandwidths). Nothing runs by itself: edit the circuit, then run again. View > Analysis Settings keeps the same
   settings open in a window.
