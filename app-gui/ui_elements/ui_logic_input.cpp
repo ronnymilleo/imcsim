@@ -7,16 +7,20 @@
 
 #include "components/logic_input.h"
 #include <array>
+#include <cfloat>
+#include <cmath>
 
 namespace GUI {
 
 namespace {
 
 constexpr float LeadLength = 0.6f;
-constexpr float BoxHalfWidth = 0.7f;
-constexpr float BoxTop = -1.7f;
+constexpr float BoxHalfWidth = 0.8f;
+constexpr float BoxTop = -2.0f;
 constexpr float BoxBottom = -LeadLength;
 constexpr float LabelOffset = 0.3f;
+// The digit is the state of the part, so it is larger than the labels, as tall as most of the box
+constexpr float DigitScale = 1.0f;
 
 } // namespace
 
@@ -40,8 +44,18 @@ void UILogicInput::DrawSymbol(SchematicCanvas &canvas, const ViewTransform &view
         LocalToScreen(view, -BoxHalfWidth, BoxTop), LocalToScreen(view, BoxHalfWidth, BoxTop),
         LocalToScreen(view, BoxHalfWidth, BoxBottom), LocalToScreen(view, -BoxHalfWidth, BoxBottom)};
     canvas.AddPolyline(box.data(), static_cast<int>(box.size()), color, ImDrawFlags_Closed, LineThickness);
-    const bool high = static_cast<const Core::LogicInput &>(GetComponent()).IsHigh();
-    DrawLabel(canvas, view, {0.0f, (BoxTop + BoxBottom) / 2.0f}, {0.0f, 1.0f}, high ? "1" : "0", color);
+    const char *digit = static_cast<const Core::LogicInput &>(GetComponent()).IsHigh() ? "1" : "0";
+    const float middle = (BoxTop + BoxBottom) / 2.0f;
+    const ImVec2 center = LocalToScreen(view, 0.0f, middle);
+    // One grid unit long in local space, so its length on screen is the current zoom
+    const ImVec2 unit = LocalToScreen(view, 0.0f, middle + 1.0f) - center;
+    const float font_size = std::hypot(unit.x, unit.y) * DigitScale;
+    if (font_size < MinLabelSize) {
+        return;
+    }
+    ImFont *font = ImGui::GetFont();
+    const ImVec2 text_size = font->CalcTextSizeA(font_size, FLT_MAX, 0.0f, digit);
+    canvas.AddText(font, font_size, center - text_size / 2.0f, color, digit);
 }
 
 // The name sits above the box
