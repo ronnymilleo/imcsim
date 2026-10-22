@@ -755,8 +755,8 @@ nlohmann::json WriteSweepRange(const Core::SweepRange &range) {
 }
 
 // File names of the analyses, in the order of the Analysis enum
-constexpr auto AnalysisKeys =
-    std::to_array<std::string_view>({"operating_point", "transient", "ac_sweep", "dc_sweep", "noise"});
+constexpr auto AnalysisKeys = std::to_array<std::string_view>(
+    {"operating_point", "transient", "ac_sweep", "dc_sweep", "noise", "transfer_function"});
 
 nlohmann::json WriteSettings(const SimulationSettings &settings) {
     nlohmann::json transient = nlohmann::json::object();
@@ -769,6 +769,10 @@ nlohmann::json WriteSettings(const SimulationSettings &settings) {
     noise["points_per_decade"] = settings.NoiseRange.PointsPerDecade;
     if (settings.NoiseOutput) {
         noise["output"] = {settings.NoiseOutput->X, settings.NoiseOutput->Y};
+    }
+    nlohmann::json transfer_function = {{"source", settings.TransferFunctionSource}};
+    if (settings.TransferFunctionOutput) {
+        transfer_function["output"] = {settings.TransferFunctionOutput->X, settings.TransferFunctionOutput->Y};
     }
     const ParameterStepSettings &step = settings.ParameterStep;
     nlohmann::json parameter_step = {
@@ -785,6 +789,7 @@ nlohmann::json WriteSettings(const SimulationSettings &settings) {
              {"step_source", settings.StepSource},
          }},
         {"noise", noise},
+        {"transfer_function", transfer_function},
         {"parameter_step", parameter_step},
     };
 }
@@ -884,6 +889,25 @@ std::expected<void, std::string> ReadNoiseSettings(const nlohmann::json &object,
     return {};
 }
 
+std::expected<void, std::string> ReadTransferFunctionSettings(const nlohmann::json &object,
+                                                              SimulationSettings &settings) {
+    if (object.contains("source")) {
+        const std::optional<std::string> source = ReadString(object, "source");
+        if (!source) {
+            return std::unexpected("have no valid source");
+        }
+        settings.TransferFunctionSource = *source;
+    }
+    if (object.contains("output")) {
+        const std::optional<GridPoint> output = ReadPoint(object, "output");
+        if (!output) {
+            return std::unexpected("have no valid output point");
+        }
+        settings.TransferFunctionOutput = *output;
+    }
+    return {};
+}
+
 std::expected<void, std::string> ReadParameterStepSettings(const nlohmann::json &object, SimulationSettings &settings) {
     ParameterStepSettings &step = settings.ParameterStep;
     if (const auto read = ReadParameters(ParameterStepKeys, object, step); !read) {
@@ -925,6 +949,7 @@ constexpr auto AnalysisReaders = std::to_array<AnalysisReader>({
     {"ac_sweep", "AC sweep", &ReadACSweepSettings},
     {"dc_sweep", "DC sweep", &ReadDCSweepSettings},
     {"noise", "noise", &ReadNoiseSettings},
+    {"transfer_function", "transfer function", &ReadTransferFunctionSettings},
     {"parameter_step", "parameter step", &ReadParameterStepSettings},
 });
 

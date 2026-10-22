@@ -35,7 +35,8 @@ enum class PlotTab {
     Spectrum,
     ACSweep,
     DCSweep,
-    Noise
+    Noise,
+    TransferFunction
 };
 
 /**
@@ -53,7 +54,8 @@ enum class PlotTab {
  *          over the whole sweep. The Spectrum tab transforms the measured traces of the transient over the span its
  *          statistics measure, and reads the fundamental, the harmonics and the THD of each, as a spectrum
  *          analyzer would. The Noise tab plots the noise density at the output and referred to the input on
- *          log-log axes, with the share of each part. Math channels add traces computed from the others, such as
+ *          log-log axes, with the share of each part, and the Transfer function tab lists its DC gain and its
+ *          input and output impedances. Math channels add traces computed from the others, such as
  * V(1)-V(2) or V(1)*I(R1), to the transient and DC sweep plots: voltages and currents keep their axes, and any other
  *          unit, or none, goes on a third axis. Export saves the plot of the current tab as an SVG image, redrawn
  *          from its data at a chosen size and theme over the visible X range, or as a CSV table of every sample.
@@ -133,6 +135,7 @@ private:
     void DrawACSweepTab(const FrameResults &frame);
     void DrawDCSweepTab(const FrameResults &frame);
     void DrawNoiseTab();
+    void DrawTransferFunctionTab();
 
     // Plots
     void DrawTransient(const Core::Transient &transient, const std::vector<MathTrace> &math);

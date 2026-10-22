@@ -699,6 +699,24 @@ const std::optional<Core::Noise> &Schematic::GetNoise() const {
 }
 
 /**
+ * @brief   Stores the result of a transfer function analysis of the current schematic.
+ * @param[in] transfer_function  Gain, input impedance and output impedance, or no value to clear them.
+ * @note    The result is dropped on the next change, since it no longer matches the circuit.
+ */
+void Schematic::SetTransferFunction(std::optional<Core::TransferFunction> transfer_function) {
+    m_TransferFunction = std::move(transfer_function);
+    ++m_TransferFunctionVersion;
+}
+
+/**
+ * @brief   Returns the last transfer function simulated for the current schematic.
+ * @return  The transfer function result, or no value when there was no simulation since the last change.
+ */
+const std::optional<Core::TransferFunction> &Schematic::GetTransferFunction() const {
+    return m_TransferFunction;
+}
+
+/**
  * @brief   Returns a number that changes whenever an operating point result is stored.
  * @return  The operating point version; compare it with a stored one to know whether the result was replaced.
  */
@@ -738,6 +756,14 @@ std::size_t Schematic::GetNoiseVersion() const {
     return m_NoiseVersion;
 }
 
+/**
+ * @brief   Returns a number that changes whenever a transfer function result is stored.
+ * @return  The transfer function version; compare it with a stored one to know whether the result was replaced.
+ */
+std::size_t Schematic::GetTransferFunctionVersion() const {
+    return m_TransferFunctionVersion;
+}
+
 void Schematic::InvalidateDerivedData() {
     m_Connectivity.reset();
     m_OperatingPoint.reset();
@@ -747,6 +773,7 @@ void Schematic::InvalidateDerivedData() {
     m_ACSweepSteps.reset();
     m_DCSweep.reset();
     m_Noise.reset();
+    m_TransferFunction.reset();
 }
 
 // A probe is on the node most of its points belong to now, and takes the points of that node as its own. With no such

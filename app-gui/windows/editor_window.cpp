@@ -196,8 +196,8 @@ bool ToolButton(const char *id, const bool active) {
 // The button that names the selected analysis, with room for its dropdown arrow
 float AnalysisButtonWidth() {
     float widest = 0.0f;
-    for (const Analysis analysis :
-         {Analysis::OperatingPoint, Analysis::Transient, Analysis::ACSweep, Analysis::DCSweep, Analysis::Noise}) {
+    for (const Analysis analysis : {Analysis::OperatingPoint, Analysis::Transient, Analysis::ACSweep, Analysis::DCSweep,
+                                    Analysis::Noise, Analysis::TransferFunction}) {
         widest = std::max(widest, ImGui::CalcTextSize(GetAnalysisName(analysis)).x);
     }
     return widest + ImGui::GetStyle().FramePadding.x * 2.0f + ImGui::GetFontSize();

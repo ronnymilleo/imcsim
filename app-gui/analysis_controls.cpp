@@ -22,7 +22,7 @@ namespace GUI {
 namespace {
 
 constexpr auto AnalysisNames =
-    std::to_array<const char *>({"Operating point", "Transient", "AC sweep", "DC sweep", "Noise"});
+    std::to_array<const char *>({"Operating point", "Transient", "AC sweep", "DC sweep", "Noise", "Transfer function"});
 
 bool IsPositive(const double value) {
     return value > 0.0;
@@ -120,7 +120,7 @@ std::optional<std::string> StoreResult(std::expected<Result, std::string> result
 
 // A source that is empty, or that left the circuit or its AC setting, falls back to the first source that can be
 // the input; sources must not be empty
-const std::string &ResolveNoiseSource(const std::string &stored, const std::vector<std::string> &sources) {
+const std::string &ResolveInputSource(const std::string &stored, const std::vector<std::string> &sources) {
     return std::ranges::contains(sources, stored) ? stored : sources.front();
 }
 
@@ -141,11 +141,11 @@ std::vector<int> ListHeldNodes(const Core::Circuit &circuit) {
     return nodes;
 }
 
-// The node the noise is measured at: the one under the stored point, or else the first measured voltage that no
+// The node an analysis measures at: the one under the stored point, or else the first measured voltage that no
 // voltage source holds, which is most likely the output the user looks at, or else the last such node. No value
 // without a node to measure
-std::optional<int> ResolveNoiseOutput(const std::optional<GridPoint> &point, const Core::Circuit &circuit,
-                                      Schematic &schematic) {
+std::optional<int> ResolveOutputNode(const std::optional<GridPoint> &point, const Core::Circuit &circuit,
+                                     Schematic &schematic) {
     if (point) {
         if (const std::optional<int> node = schematic.GetConnectivity().GetNode(*point); node && *node > 0) {
             return node;
@@ -165,9 +165,9 @@ std::optional<int> ResolveNoiseOutput(const std::optional<GridPoint> &point, con
     return circuit.GetNodeCount() > 1 ? std::optional<int>(circuit.GetNodeCount() - 1) : std::nullopt;
 }
 
-// The input the noise analysis runs with, or an empty name when no source can be one
-std::string ResolveNoiseInput(const std::string &stored, const std::vector<std::string> &sources) {
-    return sources.empty() ? std::string() : ResolveNoiseSource(stored, sources);
+// The input an analysis runs with, or an empty name when no source can be one
+std::string ResolveOptionalInput(const std::string &stored, const std::vector<std::string> &sources) {
+    return sources.empty() ? std::string() : ResolveInputSource(stored, sources);
 }
 
 // The unit of the stepped parameter: that of the part, or degrees Celsius for the temperature. A part that left the
@@ -311,6 +311,9 @@ void AnalysisControls::DrawSettings() {
     case Analysis::Noise:
         DrawNoiseSettings(settings);
         break;
+    case Analysis::TransferFunction:
+        DrawTransferFunctionSettings(settings);
+        break;
     }
     if (settings.Selected == Analysis::Transient || settings.Selected == Analysis::ACSweep ||
         settings.Selected == Analysis::DCSweep) {
@@ -327,7 +330,7 @@ void AnalysisControls::RunSelected() {
     const SimulationSettings &settings = m_Schematic.GetSimulationSettings();
     const Analysis analysis = settings.Selected;
     const Core::Circuit circuit = m_Schematic.BuildCircuit();
-    // The operating point and the noise analysis run once, whatever the step settings
+    // The operating point, the noise and the transfer function analyses run once, whatever the step settings
     std::optional<StepPlan> steps;
     if (settings.ParameterStep.Enabled &&
         (analysis == Analysis::Transient || analysis == Analysis::ACSweep || analysis == Analysis::DCSweep)) {
@@ -360,6 +363,9 @@ void AnalysisControls::RunSelected() {
         break;
     case Analysis::Noise:
         RunNoiseAnalysis(circuit);
+        break;
+    case Analysis::TransferFunction:
+        RunTransferFunctionAnalysis(circuit);
         break;
     }
 }
@@ -510,7 +516,7 @@ void AnalysisControls::RunDCSweepAnalysis(const Core::Circuit &circuit, const st
 void AnalysisControls::RunNoiseAnalysis(const Core::Circuit &circuit) {
     const SimulationSettings &settings = m_Schematic.GetSimulationSettings();
     const std::vector<std::string> sources = Core::GetNoiseInputSources(circuit);
-    const std::optional<int> output = ResolveNoiseOutput(settings.NoiseOutput, circuit, m_Schematic);
+    const std::optional<int> output = ResolveOutputNode(settings.NoiseOutput, circuit, m_Schematic);
     if (sources.empty() || !output) {
         m_Schematic.SetNoise(std::nullopt);
         Finish(Analysis::Noise,
@@ -521,7 +527,7 @@ void AnalysisControls::RunNoiseAnalysis(const Core::Circuit &circuit) {
         return;
     }
     const Core::NoiseSettings run_settings{.OutputNode = *output,
-                                           .InputSource = ResolveNoiseInput(settings.NoiseSource, sources),
+                                           .InputSource = ResolveOptionalInput(settings.NoiseSource, sources),
                                            .StartFrequency = settings.NoiseRange.StartFrequency,
                                            .StopFrequency = settings.NoiseRange.StopFrequency,
                                            .PointsPerDecade = settings.NoiseRange.PointsPerDecade};
@@ -529,6 +535,28 @@ void AnalysisControls::RunNoiseAnalysis(const Core::Circuit &circuit) {
     Finish(Analysis::Noise,
            StoreResult(std::move(run.Result), [this](auto result) { m_Schematic.SetNoise(std::move(result)); }),
            std::move(run.Messages));
+}
+
+void AnalysisControls::RunTransferFunctionAnalysis(const Core::Circuit &circuit) {
+    const SimulationSettings &settings = m_Schematic.GetSimulationSettings();
+    const std::vector<std::string> sources = Core::GetTransferFunctionInputSources(circuit);
+    const std::optional<int> output = ResolveOutputNode(settings.TransferFunctionOutput, circuit, m_Schematic);
+    if (sources.empty() || !output) {
+        m_Schematic.SetTransferFunction(std::nullopt);
+        Finish(Analysis::TransferFunction,
+               sources.empty()
+                   ? "A transfer function analysis needs an input source; add a voltage source, current source or VCC"
+                   : "Connect some parts: the transfer function needs a node to measure",
+               {});
+        return;
+    }
+    const Core::TransferFunctionSettings run_settings{
+        .OutputNode = *output, .InputSource = ResolveOptionalInput(settings.TransferFunctionSource, sources)};
+    Core::TransferFunctionRun run = Core::RunTransferFunction(circuit, run_settings);
+    Finish(
+        Analysis::TransferFunction,
+        StoreResult(std::move(run.Result), [this](auto result) { m_Schematic.SetTransferFunction(std::move(result)); }),
+        std::move(run.Messages));
 }
 
 void AnalysisControls::LoadSettingsFields() {
@@ -610,8 +638,8 @@ void AnalysisControls::DrawDCSweepSettings(SimulationSettings &settings) {
 void AnalysisControls::DrawNoiseSettings(SimulationSettings &settings) {
     const Core::Circuit circuit = m_Schematic.BuildCircuit();
     const std::vector<std::string> sources = Core::GetNoiseInputSources(circuit);
-    const std::string input = ResolveNoiseInput(settings.NoiseSource, sources);
-    const std::optional<int> output = ResolveNoiseOutput(settings.NoiseOutput, circuit, m_Schematic);
+    const std::string input = ResolveOptionalInput(settings.NoiseSource, sources);
+    const std::optional<int> output = ResolveOutputNode(settings.NoiseOutput, circuit, m_Schematic);
     if (!output) {
         ImGui::TextDisabled("Connect some parts to measure their noise");
         return;
@@ -656,6 +684,41 @@ void AnalysisControls::DrawNoiseSettings(SimulationSettings &settings) {
         m_NoiseStartFrequency.Load(suggested->StartFrequency);
         m_NoiseStopFrequency.Load(suggested->StopFrequency);
     }
+}
+
+// The output picker lists every node by the label the plots give it, as the noise one does; the input picker lists
+// every voltage source, current source and VCC rail, whatever its waveform
+void AnalysisControls::DrawTransferFunctionSettings(SimulationSettings &settings) {
+    const Core::Circuit circuit = m_Schematic.BuildCircuit();
+    const std::vector<std::string> sources = Core::GetTransferFunctionInputSources(circuit);
+    const std::string input = ResolveOptionalInput(settings.TransferFunctionSource, sources);
+    const std::optional<int> output = ResolveOutputNode(settings.TransferFunctionOutput, circuit, m_Schematic);
+    if (!output) {
+        ImGui::TextDisabled("Connect some parts to measure their transfer function");
+        return;
+    }
+    const Connectivity &connectivity = m_Schematic.GetConnectivity();
+    DrawFieldLabel("Output");
+    if (ImGui::BeginCombo("##tf_output", GetVoltageLabel(connectivity, *output).c_str())) {
+        for (int node = 1; node < circuit.GetNodeCount(); ++node) {
+            if (ImGui::Selectable(GetVoltageLabel(connectivity, node).c_str(), node == *output)) {
+                settings.TransferFunctionOutput = connectivity.FindPointOfNode(node);
+            }
+        }
+        ImGui::EndCombo();
+    }
+    DrawFieldLabel("Input");
+    if (sources.empty()) {
+        ImGui::TextDisabled("Add a voltage source, current source or VCC");
+    } else if (ImGui::BeginCombo("##tf_input", input.c_str())) {
+        for (const std::string &source : sources) {
+            if (ImGui::Selectable(source.c_str(), source == input)) {
+                settings.TransferFunctionSource = source;
+            }
+        }
+        ImGui::EndCombo();
+    }
+    ImGui::SetItemTooltip("The DC gain, the input impedance and the output impedance from this source to the output");
 }
 
 // Below the settings of the transient, the AC sweep and the DC sweep: the part or the temperature, and its values
@@ -768,6 +831,9 @@ void AnalysisControls::ClearResult(const Analysis analysis) {
     case Analysis::Noise:
         m_Schematic.SetNoise(std::nullopt);
         break;
+    case Analysis::TransferFunction:
+        m_Schematic.SetTransferFunction(std::nullopt);
+        break;
     }
 }
 
@@ -800,6 +866,8 @@ bool AnalysisControls::HasResult(const Analysis analysis) const {
         return m_Schematic.GetDCSweep().has_value();
     case Analysis::Noise:
         return m_Schematic.GetNoise().has_value();
+    case Analysis::TransferFunction:
+        return m_Schematic.GetTransferFunction().has_value();
     }
     return false;
 }

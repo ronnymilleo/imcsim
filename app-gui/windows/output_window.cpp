@@ -80,6 +80,9 @@ constexpr std::size_t SteadySamples = 2;
 constexpr double DecadeFitFloor = 1e-6;
 // The first bins above 0 Hz, where the Hann window spreads the mean
 constexpr std::ptrdiff_t SpectrumSkirtBins = 2;
+// ngspice reports an open path with a resistance around 1e20 ohm, which no readable suffix shows; it is drawn as an
+// open circuit instead
+constexpr double OpenResistance = 1e15;
 
 /**
  * @struct  PlottedTrace
@@ -731,6 +734,8 @@ const char *GetTabFileSuffix(const PlotTab tab) {
         return "dc-sweep";
     case PlotTab::Noise:
         return "noise";
+    case PlotTab::TransferFunction:
+        return "transfer-function";
     }
     return "plot";
 }
@@ -749,6 +754,8 @@ const char *GetTabTitle(const PlotTab tab) {
         return "DC sweep";
     case PlotTab::Noise:
         return "noise";
+    case PlotTab::TransferFunction:
+        return "transfer function";
     }
     return "";
 }
@@ -805,6 +812,46 @@ void DrawOperatingPoint(const Core::OperatingPoint &operating_point, Schematic &
     ImGui::PushTextWrapPos(0.0f);
     ImGui::TextDisabled("Currents as in SPICE: positive through a two-terminal part from its first terminal to its "
                         "second, and into each terminal of a transistor");
+    ImGui::PopTextWrapPos();
+}
+
+// The transfer function is a table of three small-signal DC values; an impedance that ngspice reports as practically
+// infinite, such as an input path held open, reads as an open circuit instead of a giant number
+void DrawTransferFunction(const Core::TransferFunction &transfer, Schematic &schematic) {
+    constexpr ImGuiTableFlags TableFlags =
+        ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingStretchProp;
+    if (ImGui::BeginTable("transfer_function", 3, TableFlags)) {
+        ImGui::TableSetupColumn("Quantity");
+        ImGui::TableSetupColumn("Value");
+        ImGui::TableSetupColumn("Unit");
+        ImGui::TableHeadersRow();
+        ImGui::TableNextRow();
+        ImGui::TableNextColumn();
+        ImGui::TextDisabled("Gain");
+        ImGui::TableNextColumn();
+        ImGui::TextUnformatted(Core::FormatValue(transfer.Gain).c_str());
+        ImGui::TableNextColumn();
+        // The gain is a ratio of like units for a voltage source and a transimpedance for a current source
+        ImGui::TextUnformatted(std::format("V/{}", transfer.InputUnit).c_str());
+        const auto draw_impedance = [](const char *name, const double ohms) {
+            ImGui::TableNextRow();
+            ImGui::TableNextColumn();
+            ImGui::TextDisabled("%s", name);
+            ImGui::TableNextColumn();
+            const bool open = !std::isfinite(ohms) || std::abs(ohms) >= OpenResistance;
+            ImGui::TextUnformatted(open ? "open" : Core::FormatValue(ohms).c_str());
+            ImGui::TableNextColumn();
+            if (!open) {
+                ImGui::TextUnformatted("Ohm");
+            }
+        };
+        draw_impedance("Input impedance", transfer.InputImpedance);
+        draw_impedance("Output impedance", transfer.OutputImpedance);
+        ImGui::EndTable();
+    }
+    ImGui::PushTextWrapPos(0.0f);
+    ImGui::TextDisabled("Small-signal DC gain from %s to %s", transfer.InputSource.c_str(),
+                        GetVoltageLabel(schematic.GetConnectivity(), transfer.OutputNode).c_str());
     ImGui::PopTextWrapPos();
 }
 
@@ -1204,6 +1251,10 @@ void OutputWindow::DrawTabs(const FrameResults &frame) {
         DrawNoiseTab();
         ImGui::EndTabItem();
     }
+    if (begin_tab("Transfer function", PlotTab::TransferFunction)) {
+        DrawTransferFunctionTab();
+        ImGui::EndTabItem();
+    }
 }
 
 void OutputWindow::DrawTransientTab(const FrameResults &frame) {
@@ -1306,6 +1357,16 @@ void OutputWindow::DrawNoiseTab() {
             ImGui::PopTextWrapPos();
         },
         [&] { DrawNoiseStatistics(*noise); });
+}
+
+// The transfer function is a table, not a plot, so the tab draws it alone
+void OutputWindow::DrawTransferFunctionTab() {
+    const auto &transfer = m_Schematic.GetTransferFunction();
+    if (!transfer) {
+        ImGui::TextDisabled("No transfer function for the current circuit; pick it beside Run in the editor");
+        return;
+    }
+    DrawTransferFunction(*transfer, m_Schematic);
 }
 
 // The signals of logic parts are drawn as lanes in a plot under the analog traces, which share its time axis. The
@@ -2103,6 +2164,8 @@ bool OutputWindow::CanExport(const FrameResults &frame) const {
                (frame.AnythingMeasured || (!frame.DCSweepMath.empty() && !frame.DCSweepMath.front().empty()));
     case PlotTab::Noise:
         return m_Schematic.GetNoise().has_value();
+    case PlotTab::TransferFunction:
+        return false;
     }
     return false;
 }
@@ -2124,6 +2187,7 @@ ExportFigure OutputWindow::BuildShownFigure(const FrameResults &frame) const {
     case PlotTab::Noise:
         return BuildNoiseFigure(*m_Schematic.GetNoise(), m_Schematic, m_ShownNoiseContributions, m_NoiseView);
     case PlotTab::OperatingPoint:
+    case PlotTab::TransferFunction:
         break;
     }
     return {};
