@@ -67,9 +67,12 @@ jobs:
       - name: Run tests
         run: ctest --test-dir build --output-on-failure
 
+      # gcov also reports the system headers that the sources instantiate (the standard library templates), named
+      # after their path with the slashes replaced by #; they are not project code, so they would drag the result down
       - name: Report coverage
         run: |
           find build -name "*.gcda" | while read -r gcda; do gcov -p -o "$gcda" "$gcda"; done > /dev/null 2>&1
+          rm -f '#usr#include#'*.gcov
           curl -sL https://coveralls.io/coveralls-linux.tar.gz | tar -xz && ./coveralls
         env:
           COVERALLS_REPO_TOKEN: ${{ secrets.GITHUB_TOKEN }}
