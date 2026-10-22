@@ -39,6 +39,8 @@ template <typename Parameters> struct ParameterField {
     double Parameters::*Value;
     // No unit means the unit of the source, volts or amperes
     const char *Unit;
+    // What the field shows is the stored value times this, such as 100 for a share kept as a fraction and typed in %
+    double Scale = 1.0;
 };
 
 constexpr auto ACFields = std::to_array<ParameterField<Core::ACParameters>>({
@@ -175,7 +177,7 @@ constexpr auto LogicFields = std::to_array<ParameterField<Core::LogicParameters>
 // A clock picks its own rise and fall times, so the user sets only these figures
 constexpr auto ClockFields = std::to_array<ParameterField<Core::ClockParameters>>({
     {"Frequency", &Core::ClockParameters::Frequency, "Hz"},
-    {"Duty", &Core::ClockParameters::DutyCycle, ""},
+    {"Duty", &Core::ClockParameters::DutyCycle, "%", 100.0},
     {"Logic level", &Core::ClockParameters::LogicLevel, "V"},
     {"Start delay", &Core::ClockParameters::StartDelay, "s"},
 });
@@ -188,7 +190,7 @@ template <typename Parameters, std::size_t Count>
 void LoadParameterFields(const std::array<ParameterField<Parameters>, Count> &fields,
                          std::array<ValueField, Count> &value_fields, const Parameters &parameters) {
     for (std::size_t index = 0; index < Count; ++index) {
-        value_fields[index].Load(parameters.*fields[index].Value);
+        value_fields[index].Load(parameters.*fields[index].Value * fields[index].Scale);
     }
 }
 
@@ -203,12 +205,12 @@ bool DrawParameterFields(const std::array<ParameterField<Parameters>, Count> &fi
         const ParameterField<Parameters> &field = fields[index];
         const auto is_valid_value = [&](const double value) {
             Parameters candidate = parameters;
-            candidate.*field.Value = value;
+            candidate.*field.Value = value / field.Scale;
             return is_valid(candidate);
         };
         const char *unit = field.Unit != nullptr ? field.Unit : source_unit;
         if (const std::optional<double> value = value_fields[index].Draw(field.Label, unit, is_valid_value)) {
-            parameters.*field.Value = *value;
+            parameters.*field.Value = *value / field.Scale;
             changed = true;
         }
     }
@@ -630,7 +632,7 @@ void PartEditor::DrawClock(Core::Clock &clock) {
         clock.SetParameters(parameters);
         m_Schematic.MarkModified();
     }
-    ImGui::TextDisabled("Duty is the share of the period above half the level, from 0 to 1");
+    ImGui::TextDisabled("Duty is the share of the period above half the level, from 0 to 100%%");
     ImGui::TextDisabled("The start delay holds the clock low; at 0 the first rising edge is at t = 0");
 }
 

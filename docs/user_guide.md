@@ -36,8 +36,8 @@ How to read what imcsim measures, plots and exports. The [README](../README.md) 
   adder, an SR latch and a ripple counter. In the Output window the signals of logic parts
   plot as lanes, like a logic analyzer's, under the analog traces (see Plots).
 - **Clock**: the Sources group has a clock, a pulse source for digital circuits. Its properties hold a frequency, a
-  duty cycle (the share of each period that is high), a logic level and a start delay; it picks its own short rise and
-  fall times, so they stay the same at every frequency. The start delay holds the clock low and the first rising edge
+  duty cycle (the share of each period that is high, typed in %), a logic level and a start delay; it picks its own
+  short rise and fall times, so they stay the same at every frequency. The start delay holds the clock low and the first rising edge
   begins there, so a delay of 0 starts the first edge at t = 0 and a nonzero one keeps the clock quiet.
 - **Logic input**: a box in the supply row with Ground and VCC drives a net to a defined level. A High box in its
   properties drives the logic level (5 V by default, editable) and leaves it clear to drive 0 V; the symbol shows a 1
