@@ -6,10 +6,12 @@
 #include "circuit.h"
 #include "components/bjt.h"
 #include "components/capacitor.h"
+#include "components/clock.h"
 #include "components/controlled_source.h"
 #include "components/current_source.h"
 #include "components/diode.h"
 #include "components/ground.h"
+#include "components/logic_input.h"
 #include "components/logic_part.h"
 #include "components/mosfet.h"
 #include "components/op_amp.h"
@@ -2580,4 +2582,139 @@ TEST_CASE("The impedances of an ideal source are finite, so the views can show t
     // The output sits on the ideal source, which holds it at 0 ohm
     CHECK(run.Result->OutputImpedance == 0.0);
     CHECK_THAT(run.Result->Gain, Catch::Matchers::WithinRel(1.0, 1e-9));
+}
+
+TEST_CASE("A clock is high for the share of the period its duty cycle gives", "[simulator]") {
+    Core::Clock clock;
+    clock.SetName("V1");
+    clock.SetParameters({.Frequency = 1e3, .DutyCycle = 0.25, .LogicLevel = 5.0, .StartDelay = 0.0});
+    Core::Resistor load;
+    load.SetName("R1");
+    load.SetValue(1e3);
+    const Core::Ground reference;
+    Core::Circuit circuit;
+    circuit.Add(clock, {1, 0});
+    circuit.Add(load, {1, 0});
+    circuit.Add(reference, {0});
+
+    // Four 1 ms periods sampled every 0.1 us; the short edges contribute well under one percent
+    const Core::TransientRun run = Core::RunTransient(circuit, {.StopTime = 4e-3, .TimeStep = 1e-7});
+    REQUIRE(run.Result.has_value());
+    const std::vector<double> &voltage = run.Result->NodeVoltages[1];
+    std::size_t high_samples = 0;
+    for (const double value : voltage) {
+        if (value > 2.5) {
+            ++high_samples;
+        }
+    }
+    const double high_fraction = static_cast<double>(high_samples) / static_cast<double>(voltage.size());
+    CHECK_THAT(high_fraction, Catch::Matchers::WithinAbs(0.25, 0.02));
+}
+
+TEST_CASE("A clock start delay holds it low until the first rising edge", "[simulator]") {
+    Core::Clock clock;
+    clock.SetName("V1");
+    // 50% at 1 kHz, but quiet for the first 2 ms
+    clock.SetParameters({.Frequency = 1e3, .DutyCycle = 0.5, .LogicLevel = 5.0, .StartDelay = 2e-3});
+    const Core::Ground reference;
+    Core::Circuit circuit;
+    circuit.Add(clock, {1, 0});
+    circuit.Add(reference, {0});
+
+    const Core::TransientRun run = Core::RunTransient(circuit, {.StopTime = 4e-3, .TimeStep = 1e-6});
+    REQUIRE(run.Result.has_value());
+    const Core::Transient &transient = *run.Result;
+    const std::vector<double> &voltage = transient.NodeVoltages[1];
+    const auto at = [&transient, &voltage](const double time) {
+        return voltage[static_cast<std::size_t>(std::ranges::lower_bound(transient.Times, time) -
+                                                transient.Times.begin())];
+    };
+    // Low through the delay, high in the first pulse at 2.25 ms, low again at 2.75 ms
+    CHECK_THAT(at(1.0e-3), Catch::Matchers::WithinAbs(0.0, 0.05));
+    CHECK_THAT(at(1.99e-3), Catch::Matchers::WithinAbs(0.0, 0.05));
+    CHECK_THAT(at(2.25e-3), Catch::Matchers::WithinAbs(5.0, 0.05));
+    CHECK_THAT(at(2.75e-3), Catch::Matchers::WithinAbs(0.0, 0.05));
+    CHECK_THAT(at(3.25e-3), Catch::Matchers::WithinAbs(5.0, 0.05));
+}
+
+TEST_CASE("A clock into a D flip-flop divides it by two", "[simulator][digital]") {
+    SKIP_WITHOUT_DIGITAL_MODELS();
+    Core::Clock clock;
+    clock.SetName("V1");
+    // The first rising edge at 0.25 ms, the same last rising edge the other flip-flop tests use
+    clock.SetParameters({.Frequency = 1e3, .DutyCycle = 0.5, .LogicLevel = 5.0, .StartDelay = 0.25e-3});
+    Core::LogicPart flip_flop(Core::ComponentType::DFlipFlop);
+    flip_flop.SetName("U1");
+    const Core::Ground reference;
+    Core::Circuit circuit;
+    // QN on node 1 feeds D on node 1; CLK on node 2, SET and RESET on nodes 3 and 4, Q on node 5
+    circuit.Add(clock, {2, 0});
+    circuit.Add(flip_flop, {1, 2, 3, 4, 5, 1});
+    circuit.Add(reference, {0});
+
+    const Core::TransientRun run = Core::RunTransient(circuit, {.StopTime = 4e-3, .TimeStep = 5e-6});
+    REQUIRE(run.Result.has_value());
+    const Core::Transient &transient = *run.Result;
+    // Four rising edges from 0.25 ms to 3.25 ms, each toggling Q, so two rising edges of Q
+    CHECK(CountRisingEdges(transient.NodeVoltages[2], 2.5) == 4);
+    CHECK(CountRisingEdges(transient.NodeVoltages[5], 2.5) == 2);
+}
+
+TEST_CASE("A logic input drives a gate to the output its truth table gives", "[simulator][digital]") {
+    SKIP_WITHOUT_DIGITAL_MODELS();
+    Core::LogicInput input;
+    input.SetName("V1");
+    Core::LogicPart gate(Core::ComponentType::Or);
+    gate.SetName("U1");
+    const Core::Ground reference;
+    Core::Circuit circuit;
+    // A on node 1, B left alone on node 2 (it reads 0), Y on node 3
+    circuit.Add(input, {1});
+    circuit.Add(gate, {1, 2, 3});
+    circuit.Add(reference, {0});
+
+    // Low with B low gives 0, High with B low gives 1
+    const Core::OperatingPointRun low = Core::RunOperatingPoint(circuit);
+    REQUIRE(low.Result.has_value());
+    CHECK_THAT(low.Result->NodeVoltages[3], Catch::Matchers::WithinAbs(0.0, 0.05));
+
+    input.SetHigh(true);
+    const Core::OperatingPointRun high = Core::RunOperatingPoint(circuit);
+    REQUIRE(high.Result.has_value());
+    CHECK_THAT(high.Result->NodeVoltages[3], Catch::Matchers::WithinAbs(5.0, 0.05));
+}
+
+TEST_CASE("A logic input gives a NAND latch a defined state", "[simulator][digital]") {
+    SKIP_WITHOUT_DIGITAL_MODELS();
+    Core::LogicInput set_bar;
+    set_bar.SetName("V1");
+    Core::LogicInput reset_bar;
+    reset_bar.SetName("V2");
+    reset_bar.SetHigh(true);
+    Core::LogicPart gate_q(Core::ComponentType::Nand);
+    gate_q.SetName("U1");
+    Core::LogicPart gate_qn(Core::ComponentType::Nand);
+    gate_qn.SetName("U2");
+    const Core::Ground reference;
+    Core::Circuit circuit;
+    // U1: A = S_BAR (1), B = QN (3), Y = Q (2); U2: A = R_BAR (4), B = Q (2), Y = QN (3)
+    circuit.Add(set_bar, {1});
+    circuit.Add(reset_bar, {4});
+    circuit.Add(gate_q, {1, 3, 2});
+    circuit.Add(gate_qn, {4, 2, 3});
+    circuit.Add(reference, {0});
+
+    // S_BAR low sets Q regardless of the other input, so the latch has a state from the start
+    const Core::OperatingPointRun set = Core::RunOperatingPoint(circuit);
+    REQUIRE(set.Result.has_value());
+    CHECK_THAT(set.Result->NodeVoltages[2], Catch::Matchers::WithinAbs(5.0, 0.05));
+    CHECK_THAT(set.Result->NodeVoltages[3], Catch::Matchers::WithinAbs(0.0, 0.05));
+
+    // Now R_BAR low resets it: Q low, QN high
+    set_bar.SetHigh(true);
+    reset_bar.SetHigh(false);
+    const Core::OperatingPointRun reset = Core::RunOperatingPoint(circuit);
+    REQUIRE(reset.Result.has_value());
+    CHECK_THAT(reset.Result->NodeVoltages[2], Catch::Matchers::WithinAbs(0.0, 0.05));
+    CHECK_THAT(reset.Result->NodeVoltages[3], Catch::Matchers::WithinAbs(5.0, 0.05));
 }

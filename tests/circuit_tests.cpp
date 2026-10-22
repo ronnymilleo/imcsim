@@ -6,11 +6,13 @@
 #include "circuit.h"
 #include "components/bjt.h"
 #include "components/capacitor.h"
+#include "components/clock.h"
 #include "components/controlled_source.h"
 #include "components/current_source.h"
 #include "components/diode.h"
 #include "components/ground.h"
 #include "components/inductor.h"
+#include "components/logic_input.h"
 #include "components/logic_part.h"
 #include "components/mosfet.h"
 #include "components/op_amp.h"
@@ -224,6 +226,53 @@ TEST_CASE("ToSpiceNetlist writes a current source like a voltage source, under i
     CHECK(circuit.ToSpiceNetlist() == "* imcsim netlist\n"
                                       "I1 0 3 DC 0 AC 1 SIN(0 1m 1k)\n"
                                       ".end\n");
+}
+
+TEST_CASE("ToSpiceNetlist writes a clock as a pulse with its own short edges", "[circuit]") {
+    Core::Clock clock;
+    clock.SetName("V1");
+    clock.SetParameters({.Frequency = 1e3, .DutyCycle = 0.25, .LogicLevel = 3.3, .StartDelay = 1e-3});
+    Core::Circuit circuit;
+    circuit.Add(clock, {1, 0});
+    // Period 1 ms, an edge of 1 us, and a flat top of 0.25 ms - 1 us = 249 us, so the duty reads as 0.25
+    CHECK(circuit.ToSpiceNetlist() == "* imcsim netlist\n"
+                                      "V1 1 0 DC 0 PULSE(0 3.3 1m 1u 1u 249u 1m)\n"
+                                      ".end\n");
+}
+
+TEST_CASE("ToSpiceNetlist writes a logic input as a DC source to ground", "[circuit]") {
+    Core::LogicInput input;
+    input.SetName("V1");
+    input.SetParameters({.LogicLevel = 3.3});
+    Core::Circuit circuit;
+    circuit.Add(input, {2});
+    CHECK(circuit.ToSpiceNetlist() == "* imcsim netlist\n"
+                                      "V1 2 0 DC 0\n"
+                                      ".end\n");
+    input.SetHigh(true);
+    CHECK(circuit.ToSpiceNetlist() == "* imcsim netlist\n"
+                                      "V1 2 0 DC 3.3\n"
+                                      ".end\n");
+}
+
+TEST_CASE("A clock and a logic input carry their branch current for a controlled source", "[circuit]") {
+    Core::Clock clock;
+    clock.SetName("V1");
+    Core::LogicInput input;
+    input.SetName("V2");
+    Core::ControlledSource cccs(Core::ComponentType::CCCS);
+    cccs.SetName("F1");
+    cccs.SetControllingCurrent("V1");
+    Core::Circuit circuit;
+    circuit.Add(clock, {1, 0});
+    circuit.Add(input, {2});
+    circuit.Add(cccs, {3, 0});
+    // Both are voltage sources, so ngspice follows their current with no probe
+    const std::string netlist = circuit.ToSpiceNetlist();
+    CHECK(netlist.contains("F1 3 0 V1 10\n"));
+    CHECK_FALSE(netlist.contains("Vprobe-V1"));
+    CHECK(Core::FindControllingSource(circuit, "V1") == "V1");
+    CHECK(Core::FindControllingSource(circuit, "V2") == "V2");
 }
 
 TEST_CASE("HasACSource looks for a voltage source set to AC", "[circuit]") {

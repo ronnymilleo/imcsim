@@ -451,6 +451,8 @@ std::vector<CurrentVector> CurrentVectors(const Component &component) {
         return {{component.GetName(), std::format("@{}[i]", name)}};
     case ComponentType::VCC:
     case ComponentType::VoltageSource:
+    case ComponentType::Clock:
+    case ComponentType::LogicInput:
         return {{component.GetName(), BranchVectorName(name)}};
     case ComponentType::CurrentSource:
         return {{component.GetName(), std::format("@{}[current]", name)}};
@@ -766,6 +768,8 @@ ACCurrent(const CircuitEntry &entry, const std::vector<double> &frequencies,
     case ComponentType::Inductor:
     case ComponentType::VCC:
     case ComponentType::VoltageSource:
+    case ComponentType::Clock:
+    case ComponentType::LogicInput:
         return ReadACCurrent(BranchVectorName(component.GetName()), component.GetName(), frequencies.size());
     case ComponentType::Ground:
     case ComponentType::NetLabel:

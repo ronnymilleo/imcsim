@@ -5,11 +5,13 @@
 
 #include "components/bjt.h"
 #include "components/capacitor.h"
+#include "components/clock.h"
 #include "components/controlled_source.h"
 #include "components/current_source.h"
 #include "components/diode.h"
 #include "components/ground.h"
 #include "components/inductor.h"
+#include "components/logic_input.h"
 #include "components/logic_part.h"
 #include "components/mosfet.h"
 #include "components/net_label.h"
@@ -272,12 +274,13 @@ TEST_CASE("IsValidValue requires positive passive values but allows any source v
 
 TEST_CASE("Type names convert both ways", "[component]") {
     for (const Core::ComponentType type :
-         {Core::ComponentType::Resistor, Core::ComponentType::Capacitor, Core::ComponentType::Inductor,
-          Core::ComponentType::Ground, Core::ComponentType::VCC, Core::ComponentType::VoltageSource,
-          Core::ComponentType::CurrentSource, Core::ComponentType::Diode, Core::ComponentType::ZenerDiode,
-          Core::ComponentType::LED, Core::ComponentType::NPN, Core::ComponentType::PNP, Core::ComponentType::NMOS,
-          Core::ComponentType::PMOS, Core::ComponentType::VCVS, Core::ComponentType::VCCS, Core::ComponentType::CCCS,
-          Core::ComponentType::CCVS, Core::ComponentType::OpAmp}) {
+         {Core::ComponentType::Resistor,      Core::ComponentType::Capacitor, Core::ComponentType::Inductor,
+          Core::ComponentType::Ground,        Core::ComponentType::VCC,       Core::ComponentType::VoltageSource,
+          Core::ComponentType::CurrentSource, Core::ComponentType::Diode,     Core::ComponentType::ZenerDiode,
+          Core::ComponentType::LED,           Core::ComponentType::NPN,       Core::ComponentType::PNP,
+          Core::ComponentType::NMOS,          Core::ComponentType::PMOS,      Core::ComponentType::VCVS,
+          Core::ComponentType::VCCS,          Core::ComponentType::CCCS,      Core::ComponentType::CCVS,
+          Core::ComponentType::OpAmp,         Core::ComponentType::Clock,     Core::ComponentType::LogicInput}) {
         CHECK(Core::ParseComponentType(Core::GetTypeName(type)) == type);
     }
     CHECK_FALSE(Core::ParseComponentType("resistor"));
@@ -671,4 +674,57 @@ TEST_CASE("Logic figures need a positive level and a delay that is not negative"
     parameters = {};
     parameters.LogicLevel = 0.0;
     CHECK_FALSE(Core::LogicPart::IsValidParameters(parameters));
+}
+
+TEST_CASE("A clock is a V part with no value that picks its own edges", "[component]") {
+    Core::Clock clock;
+    CHECK(clock.GetType() == Core::ComponentType::Clock);
+    CHECK(std::string_view(clock.GetTypeName()) == "Clock");
+    CHECK(std::string_view(clock.GetNamePrefix()) == "V");
+    CHECK(std::string_view(clock.GetUnit()) == "V");
+    CHECK_FALSE(clock.HasValue());
+    CHECK_FALSE(clock.IsValidValue(1.0));
+    CHECK_FALSE(Core::IsSource(Core::ComponentType::Clock));
+    CHECK(Core::ParseComponentType("Clock") == Core::ComponentType::Clock);
+
+    CHECK(clock.GetParameters().Frequency == 1e3);
+    CHECK(clock.GetParameters().DutyCycle == 0.5);
+    CHECK(clock.GetParameters().LogicLevel == 5.0);
+    CHECK(clock.GetParameters().StartDelay == 0.0);
+    // The edge is a small, named share of the period, never one of the user figures
+    CHECK(Core::ClockEdgeFraction > 0.0);
+    CHECK(Core::ClockEdgeFraction < 0.01);
+
+    CHECK(Core::Clock::IsValidParameters(clock.GetParameters()));
+    CHECK_FALSE(Core::Clock::IsValidParameters({.Frequency = 0.0}));
+    CHECK_FALSE(Core::Clock::IsValidParameters({.DutyCycle = 0.0}));
+    CHECK_FALSE(Core::Clock::IsValidParameters({.DutyCycle = 1.0}));
+    CHECK_FALSE(Core::Clock::IsValidParameters({.LogicLevel = 0.0}));
+    CHECK_FALSE(Core::Clock::IsValidParameters({.StartDelay = -1e-3}));
+
+    clock.SetParameters({.Frequency = 10e3, .DutyCycle = 0.25, .LogicLevel = 3.3, .StartDelay = 1e-3});
+    CHECK(clock.GetParameters().Frequency == 10e3);
+    CHECK(clock.GetParameters().DutyCycle == 0.25);
+    CHECK(clock.GetParameters().LogicLevel == 3.3);
+    CHECK(clock.GetParameters().StartDelay == 1e-3);
+}
+
+TEST_CASE("A logic input is a V part that drives 0 V or the logic level", "[component]") {
+    Core::LogicInput input;
+    CHECK(input.GetType() == Core::ComponentType::LogicInput);
+    CHECK(std::string_view(input.GetTypeName()) == "LogicInput");
+    CHECK(std::string_view(input.GetNamePrefix()) == "V");
+    CHECK(std::string_view(input.GetUnit()) == "V");
+    CHECK_FALSE(input.HasValue());
+    CHECK_FALSE(input.IsValidValue(5.0));
+    CHECK_FALSE(Core::IsSource(Core::ComponentType::LogicInput));
+    CHECK(Core::ParseComponentType("LogicInput") == Core::ComponentType::LogicInput);
+
+    // Both start low, so an unconnected input reads 0
+    CHECK_FALSE(input.IsHigh());
+    input.SetHigh(true);
+    CHECK(input.IsHigh());
+    CHECK(input.GetParameters().LogicLevel == 5.0);
+    CHECK(input.IsValidParameters(input.GetParameters()));
+    CHECK_FALSE(Core::LogicInput::IsValidParameters({.LogicLevel = 0.0}));
 }

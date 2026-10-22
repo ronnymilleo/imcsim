@@ -5,6 +5,7 @@
 
 #include "analysis_suggestions.h"
 #include "components/capacitor.h"
+#include "components/clock.h"
 #include "components/current_source.h"
 #include "components/op_amp.h"
 #include "components/resistor.h"
@@ -51,6 +52,19 @@ TEST_CASE("SuggestTransientSettings shows five periods of the slowest source", "
         CHECK(settings->StopTime == Catch::Approx(0.1));
         CHECK(settings->TimeStep == Catch::Approx(5e-6));
     }
+}
+
+TEST_CASE("SuggestTransientSettings reads a clock as a periodic source", "[suggestions]") {
+    Core::Clock clock;
+    clock.SetParameters({.Frequency = 1e3, .DutyCycle = 0.5, .LogicLevel = 5.0, .StartDelay = 2e-3});
+    Core::Circuit circuit;
+    circuit.Add(clock, {1, 0});
+
+    const auto settings = Core::SuggestTransientSettings(circuit);
+    REQUIRE(settings.has_value());
+    // The 2 ms start delay plus five 1 ms periods is 7 ms, rounded up to 10 ms, and a 200th of the period is the step
+    CHECK(settings->StopTime == Catch::Approx(10e-3));
+    CHECK(settings->TimeStep == Catch::Approx(5e-6));
 }
 
 TEST_CASE("SuggestTransientSettings rounds a 60 Hz period to readable times", "[suggestions]") {

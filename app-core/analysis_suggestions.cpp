@@ -5,6 +5,7 @@
 
 #include "analysis_suggestions.h"
 
+#include "components/clock.h"
 #include "components/op_amp.h"
 #include "components/source.h"
 #include <algorithm>
@@ -98,14 +99,21 @@ std::vector<double> ListCharacteristicFrequencies(const Circuit &circuit) {
  * @return  A stop time of five periods of the slowest source, after the longest pulse delay, and a step of a 200th
  *          of the period of the fastest, both rounded to 1, 2 or 5 times a power of ten; no value without a source
  *          with a waveform.
- * @note    A sine, pulse, SFFM or AM source sets a period. The exponential and piecewise linear waveforms happen
- *          once, so the stop time covers their span with a little room, and the step a 200th of it.
+ * @note    A sine, pulse, clock, SFFM or AM source sets a period. The exponential and piecewise linear waveforms
+ *          happen once, so the stop time covers their span with a little room, and the step a 200th of it.
  */
 std::optional<TransientSettings> SuggestTransientSettings(const Circuit &circuit) {
     std::vector<double> periods;
     std::vector<double> spans;
     double longest_delay = 0.0;
     for (const CircuitEntry &entry : circuit.GetEntries()) {
+        // A clock is a periodic source like a pulse one, with its period and its start delay
+        if (entry.Part->GetType() == ComponentType::Clock) {
+            const ClockParameters &clock = static_cast<const Clock &>(*entry.Part).GetParameters();
+            periods.push_back(1.0 / clock.Frequency);
+            longest_delay = std::max(longest_delay, clock.StartDelay);
+            continue;
+        }
         const auto *source = dynamic_cast<const Source *>(entry.Part);
         if (source == nullptr) {
             continue;

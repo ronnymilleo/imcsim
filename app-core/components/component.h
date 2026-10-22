@@ -56,6 +56,8 @@ enum class ComponentType {
     JKFlipFlop,
     TFlipFlop,
     SRFlipFlop,
+    Clock,
+    LogicInput,
 };
 
 /**
@@ -68,7 +70,8 @@ enum class ComponentType {
  *          resistance between its ends; a switch is SW1 and a push button PB1, with no value;
  *          a voltage-controlled switch is S1 and a relay K1, with no value either;
  *          a transformer is T1, its value the inductance of its primary;
- *          logic gates and flip-flops are U1, U2... like op-amps, with no value.
+ *          logic gates and flip-flops are U1, U2... like op-amps, with no value;
+ *          a clock and a logic input are voltage sources named V1, V2... to ground, with no value either.
  */
 class Component {
 public:

@@ -6,8 +6,10 @@
 #include "circuit.h"
 
 #include "components/bjt.h"
+#include "components/clock.h"
 #include "components/controlled_source.h"
 #include "components/diode.h"
+#include "components/logic_input.h"
 #include "components/logic_part.h"
 #include "components/mosfet.h"
 #include "components/op_amp.h"
@@ -103,7 +105,8 @@ std::string FormatSource(const Source &source, const std::vector<int> &nodes) {
 
 // Supplies and voltage sources carry their own branch current, which a CCCS or CCVS can follow directly
 bool HasBranchCurrent(const ComponentType type) {
-    return type == ComponentType::VCC || type == ComponentType::VoltageSource;
+    return type == ComponentType::VCC || type == ComponentType::VoltageSource || type == ComponentType::Clock ||
+           type == ComponentType::LogicInput;
 }
 
 // The currents that CCCS and CCVS sources of the circuit follow
@@ -314,8 +317,10 @@ bool Circuit::HasInitialConditions() const {
  *          source from its node to ground. A part whose current controls a CCCS or CCVS gets a probe even without
  *          add_current_probes, unless it is a voltage source itself, since ngspice follows currents through
  *          voltage sources. An AC source writes its offset, AC magnitude and sine together, and every other
- *          waveform its starting value and its shape, so the same netlist works for .op, .ac and .tran. A capacitor or
- *          inductor with an initial condition writes it as IC=, which only a transient with uic uses. Probes and the
+ *          waveform its starting value and its shape, so the same netlist works for .op, .ac and .tran. A clock
+ *          writes a pulse whose rise and fall times are a fixed share of its period, and a logic input a DC level
+ *          from its terminal to ground. A capacitor or inductor with an initial condition writes it as IC=, which
+ *          only a transient with uic uses. Probes and the
  *          gain stage of each ideal op-amp use nodes numbered after GetNodeCount(), so the circuit nodes keep their
  *          numbers. Op-amp macromodels are subcircuits, written after the models.
  */
@@ -355,6 +360,27 @@ std::string Circuit::ToSpiceNetlist(const std::string_view analysis, const bool 
         case ComponentType::CurrentSource:
             netlist += FormatSource(static_cast<const Source &>(component), nodes);
             break;
+        case ComponentType::Clock: {
+            // The part fixes its own rise and fall times, a small share of the period, so the user never sets them
+            const auto &clock = static_cast<const Clock &>(component);
+            const ClockParameters &figures = clock.GetParameters();
+            const double period = 1.0 / figures.Frequency;
+            const double edge = ClockEdgeFraction * period;
+            // Half of each edge lies above half the level, so the flat top is a whole edge shorter than the duty share
+            const double width = std::max(figures.DutyCycle * period - edge, 0.0);
+            netlist += std::format("{} {} {} DC 0 PULSE(0 {} {} {} {} {} {})\n", component.GetName(), nodes[0],
+                                   nodes[1], FormatSpiceValue(figures.LogicLevel), FormatSpiceValue(figures.StartDelay),
+                                   FormatSpiceValue(edge), FormatSpiceValue(edge), FormatSpiceValue(width),
+                                   FormatSpiceValue(period));
+            break;
+        }
+        case ComponentType::LogicInput: {
+            // A constant source from its terminal to ground: the logic level when high, 0 V when low
+            const auto &input = static_cast<const LogicInput &>(component);
+            const double level = input.IsHigh() ? input.GetParameters().LogicLevel : 0.0;
+            netlist += std::format("{} {} 0 DC {}\n", component.GetName(), nodes[0], FormatSpiceValue(level));
+            break;
+        }
         case ComponentType::VCVS:
         case ComponentType::VCCS:
             netlist +=

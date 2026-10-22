@@ -26,7 +26,7 @@ constexpr auto AllTypes = std::to_array<ComponentType>({
     ComponentType::Relay,         ComponentType::Transformer,   ComponentType::And,           ComponentType::Or,
     ComponentType::Not,           ComponentType::Nand,          ComponentType::Nor,           ComponentType::Xor,
     ComponentType::Xnor,          ComponentType::Buffer,        ComponentType::DFlipFlop,     ComponentType::JKFlipFlop,
-    ComponentType::TFlipFlop,     ComponentType::SRFlipFlop,
+    ComponentType::TFlipFlop,     ComponentType::SRFlipFlop,    ComponentType::Clock,         ComponentType::LogicInput,
 });
 
 } // namespace
@@ -70,6 +70,10 @@ const char *Component::GetNamePrefix() const {
         return "L";
     case ComponentType::VCC:
         // A supply rail is simulated as a voltage source to ground
+        return "V";
+    case ComponentType::Clock:
+    case ComponentType::LogicInput:
+        // A clock and a logic input are voltage sources to ground too
         return "V";
     case ComponentType::VoltageSource:
         return "Vin";
@@ -143,6 +147,9 @@ const char *Component::GetUnit() const {
         return "H";
     case ComponentType::VCC:
     case ComponentType::VoltageSource:
+        return "V";
+    case ComponentType::Clock:
+    case ComponentType::LogicInput:
         return "V";
     case ComponentType::CurrentSource:
         return "A";
@@ -218,6 +225,8 @@ bool Component::HasValue() const {
     case ComponentType::JKFlipFlop:
     case ComponentType::TFlipFlop:
     case ComponentType::SRFlipFlop:
+    case ComponentType::Clock:
+    case ComponentType::LogicInput:
         return false;
     case ComponentType::Resistor:
     case ComponentType::Capacitor:
@@ -284,6 +293,8 @@ bool Component::IsValidValue(const double value) const {
     case ComponentType::JKFlipFlop:
     case ComponentType::TFlipFlop:
     case ComponentType::SRFlipFlop:
+    case ComponentType::Clock:
+    case ComponentType::LogicInput:
         return false;
     }
     return false;
@@ -449,6 +460,10 @@ const char *GetTypeName(const ComponentType type) {
         return "TFlipFlop";
     case ComponentType::SRFlipFlop:
         return "SRFlipFlop";
+    case ComponentType::Clock:
+        return "Clock";
+    case ComponentType::LogicInput:
+        return "LogicInput";
     }
     return "Unknown";
 }
