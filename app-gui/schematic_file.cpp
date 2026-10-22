@@ -6,8 +6,10 @@
 #include "schematic_file.h"
 
 #include "components/bjt.h"
+#include "components/clock.h"
 #include "components/controlled_source.h"
 #include "components/diode.h"
+#include "components/logic_input.h"
 #include "components/logic_part.h"
 #include "components/mosfet.h"
 #include "components/net_label.h"
@@ -75,6 +77,17 @@ constexpr auto TransformerKeys = std::to_array<ParameterKey<Core::TransformerPar
 constexpr auto LogicKeys = std::to_array<ParameterKey<Core::LogicParameters>>({
     {"logic_level", &Core::LogicParameters::LogicLevel},
     {"propagation_delay", &Core::LogicParameters::PropagationDelay},
+});
+
+constexpr auto ClockKeys = std::to_array<ParameterKey<Core::ClockParameters>>({
+    {"frequency", &Core::ClockParameters::Frequency},
+    {"duty_cycle", &Core::ClockParameters::DutyCycle},
+    {"logic_level", &Core::ClockParameters::LogicLevel},
+    {"start_delay", &Core::ClockParameters::StartDelay},
+});
+
+constexpr auto LogicInputKeys = std::to_array<ParameterKey<Core::LogicInputParameters>>({
+    {"logic_level", &Core::LogicInputParameters::LogicLevel},
 });
 
 constexpr auto PulseKeys = std::to_array<ParameterKey<Core::PulseParameters>>({
@@ -366,13 +379,15 @@ void WriteKindFields(const Core::Component &component, nlohmann::json &object) {
         }
     } else if (Core::IsSwitch(type)) {
         object["closed"] = static_cast<const Core::Switch &>(component).IsClosed();
+    } else if (type == Core::ComponentType::LogicInput) {
+        object["high"] = static_cast<const Core::LogicInput &>(component).IsHigh();
     } else if (type == Core::ComponentType::Potentiometer) {
         object["wiper"] = static_cast<const Core::Potentiometer &>(component).GetWiper();
     }
 }
 
-// Parts whose figures are all there is to them: the switch that follows a voltage, the relay, the transformer, and
-// the gates and flip-flops with their logic family
+// Parts whose figures are all there is to them: the switch that follows a voltage, the relay, the transformer, the
+// gates and flip-flops with their logic family, a clock and a logic input
 void WriteFigureFields(const Core::Component &component, nlohmann::json &object) {
     const Core::ComponentType type = component.GetType();
     if (type == Core::ComponentType::VSwitch) {
@@ -383,6 +398,10 @@ void WriteFigureFields(const Core::Component &component, nlohmann::json &object)
         WritePartParameters(static_cast<const Core::Transformer &>(component), TransformerKeys, object);
     } else if (Core::IsLogicPart(type)) {
         WritePartParameters(static_cast<const Core::LogicPart &>(component), LogicKeys, object);
+    } else if (type == Core::ComponentType::Clock) {
+        WritePartParameters(static_cast<const Core::Clock &>(component), ClockKeys, object);
+    } else if (type == Core::ComponentType::LogicInput) {
+        WritePartParameters(static_cast<const Core::LogicInput &>(component), LogicInputKeys, object);
     }
 }
 
@@ -617,6 +636,14 @@ std::expected<void, std::string> ReadStateFields(const nlohmann::json &object, C
         }
         static_cast<Core::Potentiometer &>(component).SetWiper(*wiper);
     }
+    // A logic input saved without a state stays low
+    if (component.GetType() == Core::ComponentType::LogicInput && object.contains("high")) {
+        const std::optional<bool> high = ReadBool(object, "high");
+        if (!high) {
+            return std::unexpected("has a high flag that is not true or false");
+        }
+        static_cast<Core::LogicInput &>(component).SetHigh(*high);
+    }
     return {};
 }
 
@@ -642,6 +669,17 @@ std::expected<void, std::string> ReadFigureFields(const nlohmann::json &object, 
     }
     if (Core::IsLogicPart(component.GetType())) {
         if (const auto read = ReadPartParameters(object, static_cast<Core::LogicPart &>(component), LogicKeys); !read) {
+            return std::unexpected(read.error());
+        }
+    }
+    if (component.GetType() == Core::ComponentType::Clock) {
+        if (const auto read = ReadPartParameters(object, static_cast<Core::Clock &>(component), ClockKeys); !read) {
+            return std::unexpected(read.error());
+        }
+    }
+    if (component.GetType() == Core::ComponentType::LogicInput) {
+        if (const auto read = ReadPartParameters(object, static_cast<Core::LogicInput &>(component), LogicInputKeys);
+            !read) {
             return std::unexpected(read.error());
         }
     }

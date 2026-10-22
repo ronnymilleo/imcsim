@@ -71,7 +71,8 @@ struct PartGroup {
     std::span<const Core::ComponentType> Types;
 };
 
-constexpr auto SourceParts = std::to_array({Core::ComponentType::VoltageSource, Core::ComponentType::CurrentSource});
+constexpr auto SourceParts =
+    std::to_array({Core::ComponentType::VoltageSource, Core::ComponentType::CurrentSource, Core::ComponentType::Clock});
 constexpr auto DiodeParts =
     std::to_array({Core::ComponentType::Diode, Core::ComponentType::ZenerDiode, Core::ComponentType::LED});
 constexpr auto TransistorParts = std::to_array(
@@ -100,8 +101,8 @@ constexpr auto PartGroups = std::to_array<PartGroup>({
 // Parts with a button of their own, in toolbar groups
 constexpr auto PassiveParts =
     std::to_array({Core::ComponentType::Resistor, Core::ComponentType::Capacitor, Core::ComponentType::Inductor});
-constexpr auto SupplyParts =
-    std::to_array({Core::ComponentType::Ground, Core::ComponentType::VCC, Core::ComponentType::NetLabel});
+constexpr auto SupplyParts = std::to_array({Core::ComponentType::Ground, Core::ComponentType::VCC,
+                                            Core::ComponentType::NetLabel, Core::ComponentType::LogicInput});
 
 // Toolbar buttons are square, this many frame heights wide; icons fill this share of them
 constexpr float ToolButtonScale = 1.4f;

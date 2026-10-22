@@ -130,11 +130,13 @@ std::vector<int> ListHeldNodes(const Core::Circuit &circuit) {
     std::vector<int> nodes;
     for (const Core::CircuitEntry &entry : circuit.GetEntries()) {
         const Core::ComponentType type = entry.Part->GetType();
-        if (type == Core::ComponentType::VCC) {
+        if (type == Core::ComponentType::VCC || type == Core::ComponentType::LogicInput) {
             nodes.push_back(entry.Nodes[0]);
-        } else if (type == Core::ComponentType::VoltageSource && entry.Nodes[1] == 0) {
+        } else if ((type == Core::ComponentType::VoltageSource || type == Core::ComponentType::Clock) &&
+                   entry.Nodes[1] == 0) {
             nodes.push_back(entry.Nodes[0]);
-        } else if (type == Core::ComponentType::VoltageSource && entry.Nodes[0] == 0) {
+        } else if ((type == Core::ComponentType::VoltageSource || type == Core::ComponentType::Clock) &&
+                   entry.Nodes[0] == 0) {
             nodes.push_back(entry.Nodes[1]);
         }
     }
@@ -583,8 +585,8 @@ void AnalysisControls::DrawTransientSettings(SimulationSettings &settings) {
     }
     const auto suggested = Core::SuggestTransientSettings(m_Schematic.BuildCircuit());
     if (DrawSuggestButton(suggested.has_value(),
-                          "Five periods of the slowest source, 200 points in a period of the fastest",
-                          "Needs a sine or pulse source")) {
+                          "Five periods of the slowest source, or the whole span of a one-shot one",
+                          "Needs a source with a waveform")) {
         settings.Transient = *suggested;
         m_StopTime.Load(suggested->StopTime);
         m_TimeStep.Load(suggested->TimeStep);

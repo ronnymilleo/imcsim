@@ -4,6 +4,8 @@
  */
 
 #include "clipboard.h"
+#include "components/clock.h"
+#include "components/logic_input.h"
 #include "components/net_label.h"
 #include "element_factory.h"
 #include "examples.h"
@@ -137,6 +139,29 @@ TEST_CASE("Every example can be placed as a group", "[clipboard]") {
 
 TEST_CASE("A schematic with nothing in it cannot be placed", "[clipboard]") {
     CHECK_FALSE(GUI::MakePastedGroup({}));
+}
+
+TEST_CASE("A copied clock and logic input keep their figures", "[clipboard]") {
+    std::vector<std::unique_ptr<GUI::UIElement>> elements;
+    elements.push_back(GUI::CreateElement(Core::ComponentType::Clock, {0, 0}, GUI::Rotation::R0));
+    auto &clock = static_cast<Core::Clock &>(elements.back()->GetComponent());
+    clock.SetName("V1");
+    clock.SetParameters({.Frequency = 4e3, .DutyCycle = 0.75, .LogicLevel = 3.3, .StartDelay = 2e-3});
+    elements.push_back(GUI::CreateElement(Core::ComponentType::LogicInput, {8, 0}, GUI::Rotation::R0));
+    auto &input = static_cast<Core::LogicInput &>(elements.back()->GetComponent());
+    input.SetName("V2");
+    input.SetParameters({.LogicLevel = 3.3});
+    input.SetHigh(true);
+
+    auto group = GUI::ParseCopiedSchematic(GUI::CopySelection(elements, {}, {.Elements = {0, 1}}));
+    REQUIRE(group);
+    REQUIRE(group->Elements.size() == 2);
+    const auto &clock_copy = static_cast<const Core::Clock &>(group->Elements[0]->GetComponent());
+    CHECK(clock_copy.GetParameters().Frequency == 4e3);
+    CHECK(clock_copy.GetParameters().DutyCycle == 0.75);
+    CHECK(clock_copy.GetParameters().LogicLevel == 3.3);
+    CHECK(clock_copy.GetParameters().StartDelay == 2e-3);
+    CHECK(static_cast<const Core::LogicInput &>(group->Elements[1]->GetComponent()).IsHigh());
 }
 
 TEST_CASE("A copied net label keeps its name and joins the net it is pasted into", "[clipboard]") {

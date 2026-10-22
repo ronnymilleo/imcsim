@@ -45,6 +45,7 @@ add_library(imcsim-gui-lib
             trace_statistics.cpp
             ui_elements/ui_bjt.cpp
             ui_elements/ui_capacitor.cpp
+            ui_elements/ui_clock.cpp
             ui_elements/ui_controlled_source.cpp
             ui_elements/ui_controlled_switch.cpp
             ui_elements/ui_current_source.cpp
@@ -52,6 +53,7 @@ add_library(imcsim-gui-lib
             ui_elements/ui_element.cpp
             ui_elements/ui_ground.cpp
             ui_elements/ui_inductor.cpp
+            ui_elements/ui_logic_input.cpp
             ui_elements/ui_logic_part.cpp
             ui_elements/ui_mosfet.cpp
             ui_elements/ui_net_label.cpp

@@ -7,9 +7,11 @@
 #define IMCSIM_PART_EDITOR_H
 
 #include "components/bjt.h"
+#include "components/clock.h"
 #include "components/component.h"
 #include "components/controlled_source.h"
 #include "components/diode.h"
+#include "components/logic_input.h"
 #include "components/logic_part.h"
 #include "components/mosfet.h"
 #include "components/net_label.h"
@@ -86,6 +88,9 @@ private:
     std::array<ValueField, 3> m_TransformerFields;
     // One per member of Core::LogicParameters
     std::array<ValueField, 2> m_LogicFields;
+    // One per member of Core::ClockParameters and Core::LogicInputParameters
+    std::array<ValueField, 4> m_ClockFields;
+    std::array<ValueField, 1> m_LogicInputFields;
 
     void LoadFields(const Core::Component &component);
     void DrawSelectionSummary();
@@ -99,6 +104,8 @@ private:
     void DrawRelay(Core::Relay &relay);
     void DrawTransformer(Core::Transformer &transformer);
     void DrawLogicPart(Core::LogicPart &part);
+    void DrawClock(Core::Clock &clock);
+    void DrawLogicInput(Core::LogicInput &input);
     void DrawNetLabel(Core::NetLabel &label);
     void DrawDiode(Core::Diode &diode);
     void DrawBJT(Core::BJT &bjt);

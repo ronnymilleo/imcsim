@@ -4,9 +4,11 @@
  */
 
 #include "components/bjt.h"
+#include "components/clock.h"
 #include "components/controlled_source.h"
 #include "components/current_source.h"
 #include "components/diode.h"
+#include "components/logic_input.h"
 #include "components/logic_part.h"
 #include "components/mosfet.h"
 #include "components/net_label.h"
@@ -837,4 +839,55 @@ TEST_CASE("Gates and flip-flops keep their logic family", "[schematic_file]") {
     const GUI::LoadedSchematic skipped = LoadOrFail(Document(no_level, ""));
     CHECK(skipped.Elements.empty());
     CHECK(skipped.Warnings.size() == 1);
+}
+
+TEST_CASE("A clock keeps its figures and a logic input its state", "[schematic_file]") {
+    std::vector<std::unique_ptr<GUI::UIElement>> elements;
+    elements.push_back(GUI::CreateElement(Core::ComponentType::Clock, {4, 4}, GUI::Rotation::R90));
+    auto &clock = static_cast<Core::Clock &>(elements.back()->GetComponent());
+    clock.SetName("V1");
+    clock.SetParameters({.Frequency = 2e3, .DutyCycle = 0.25, .LogicLevel = 3.3, .StartDelay = 1e-3});
+    elements.push_back(GUI::CreateElement(Core::ComponentType::LogicInput, {12, 4}, GUI::Rotation::R0));
+    auto &input = static_cast<Core::LogicInput &>(elements.back()->GetComponent());
+    input.SetName("V2");
+    input.SetParameters({.LogicLevel = 3.3});
+    input.SetHigh(true);
+
+    const GUI::LoadedSchematic loaded = LoadOrFail(GUI::SaveSchematic(elements, {}, {}, {}));
+    CHECK(loaded.Warnings.empty());
+    REQUIRE(loaded.Elements.size() == 2);
+    const auto &clock_copy = static_cast<const Core::Clock &>(loaded.Elements[0]->GetComponent());
+    CHECK(clock_copy.GetType() == Core::ComponentType::Clock);
+    CHECK(clock_copy.GetName() == "V1");
+    CHECK(clock_copy.GetParameters().Frequency == 2e3);
+    CHECK(clock_copy.GetParameters().DutyCycle == 0.25);
+    CHECK(clock_copy.GetParameters().LogicLevel == 3.3);
+    CHECK(clock_copy.GetParameters().StartDelay == 1e-3);
+    const auto &input_copy = static_cast<const Core::LogicInput &>(loaded.Elements[1]->GetComponent());
+    CHECK(input_copy.GetType() == Core::ComponentType::LogicInput);
+    CHECK(input_copy.GetParameters().LogicLevel == 3.3);
+    CHECK(input_copy.IsHigh());
+}
+
+TEST_CASE("A clock and a logic input load with their defaults when the file leaves them out", "[schematic_file]") {
+    const GUI::LoadedSchematic loaded = LoadOrFail(Document(
+        R"({"type": "Clock", "name": "V1", "x": 0, "y": 0, "rotation": 0},
+           {"type": "Clock", "name": "V2", "x": 4, "y": 0, "rotation": 0, "parameters": {"frequency": 0}},
+           {"type": "LogicInput", "name": "V3", "x": 8, "y": 0, "rotation": 0})",
+        ""));
+    REQUIRE(loaded.Elements.size() == 2);
+    const auto &clock = static_cast<const Core::Clock &>(loaded.Elements[0]->GetComponent());
+    CHECK(clock.GetParameters().Frequency == 1e3);
+    CHECK(clock.GetParameters().DutyCycle == 0.5);
+    CHECK(clock.GetParameters().LogicLevel == 5.0);
+    CHECK(clock.GetParameters().StartDelay == 0.0);
+    // A logic input saved without a state stays low
+    CHECK_FALSE(static_cast<const Core::LogicInput &>(loaded.Elements[1]->GetComponent()).IsHigh());
+    CAPTURE(loaded.Warnings);
+    CHECK(loaded.Warnings.size() == 1);
+    // A file from before these parts existed still loads, with no warnings
+    const GUI::LoadedSchematic old =
+        LoadOrFail(Document(R"({"type": "Resistor", "name": "R1", "value": 10, "x": 0, "y": 0, "rotation": 0})", ""));
+    CHECK(old.Warnings.empty());
+    CHECK(old.Elements.size() == 1);
 }

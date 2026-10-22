@@ -172,6 +172,18 @@ constexpr auto LogicFields = std::to_array<ParameterField<Core::LogicParameters>
     {"Delay", &Core::LogicParameters::PropagationDelay, "s"},
 });
 
+// A clock picks its own rise and fall times, so the user sets only these figures
+constexpr auto ClockFields = std::to_array<ParameterField<Core::ClockParameters>>({
+    {"Frequency", &Core::ClockParameters::Frequency, "Hz"},
+    {"Duty", &Core::ClockParameters::DutyCycle, ""},
+    {"Logic level", &Core::ClockParameters::LogicLevel, "V"},
+    {"Start delay", &Core::ClockParameters::StartDelay, "s"},
+});
+
+constexpr auto LogicInputFields = std::to_array<ParameterField<Core::LogicInputParameters>>({
+    {"Logic level", &Core::LogicInputParameters::LogicLevel, "V"},
+});
+
 template <typename Parameters, std::size_t Count>
 void LoadParameterFields(const std::array<ParameterField<Parameters>, Count> &fields,
                          std::array<ValueField, Count> &value_fields, const Parameters &parameters) {
@@ -270,8 +282,9 @@ bool ShowsValueFields(const Core::Component &component) {
         const auto &op_amp = static_cast<const Core::OpAmp &>(component);
         return op_amp.IsCustom() || op_amp.IsIdeal();
     }
-    // The switches that follow a voltage have only their parameters
-    if (type == Core::ComponentType::VSwitch || type == Core::ComponentType::Relay || Core::IsLogicPart(type)) {
+    // The switches that follow a voltage, the logic parts, a clock and a logic input have only their parameters
+    if (type == Core::ComponentType::VSwitch || type == Core::ComponentType::Relay || Core::IsLogicPart(type) ||
+        type == Core::ComponentType::Clock || type == Core::ComponentType::LogicInput) {
         return true;
     }
     return component.HasValue();
@@ -304,7 +317,8 @@ void PartEditor::Draw() {
     }
     const Core::ComponentType type = component.GetType();
     if (!component.HasValue() && !HasModel(type) && type != Core::ComponentType::NetLabel && !Core::IsSwitch(type) &&
-        type != Core::ComponentType::VSwitch && type != Core::ComponentType::Relay && !Core::IsLogicPart(type)) {
+        type != Core::ComponentType::VSwitch && type != Core::ComponentType::Relay && !Core::IsLogicPart(type) &&
+        type != Core::ComponentType::Clock && type != Core::ComponentType::LogicInput) {
         return;
     }
 
@@ -352,6 +366,10 @@ void PartEditor::DrawFields(Core::Component &component) {
         DrawRelay(static_cast<Core::Relay &>(component));
     } else if (Core::IsLogicPart(type)) {
         DrawLogicPart(static_cast<Core::LogicPart &>(component));
+    } else if (type == Core::ComponentType::Clock) {
+        DrawClock(static_cast<Core::Clock &>(component));
+    } else if (type == Core::ComponentType::LogicInput) {
+        DrawLogicInput(static_cast<Core::LogicInput &>(component));
     } else if (type == Core::ComponentType::Transformer) {
         DrawValue(component);
         DrawTransformer(static_cast<Core::Transformer &>(component));
@@ -482,6 +500,13 @@ void PartEditor::LoadFields(const Core::Component &component) {
         LoadParameterFields(LogicFields, m_LogicFields,
                             static_cast<const Core::LogicPart &>(component).GetParameters());
     }
+    if (component.GetType() == Core::ComponentType::Clock) {
+        LoadParameterFields(ClockFields, m_ClockFields, static_cast<const Core::Clock &>(component).GetParameters());
+    }
+    if (component.GetType() == Core::ComponentType::LogicInput) {
+        LoadParameterFields(LogicInputFields, m_LogicInputFields,
+                            static_cast<const Core::LogicInput &>(component).GetParameters());
+    }
     if (component.GetType() == Core::ComponentType::Transformer) {
         LoadParameterFields(TransformerFields, m_TransformerFields,
                             static_cast<const Core::Transformer &>(component).GetParameters());
@@ -593,6 +618,38 @@ void PartEditor::DrawLogicPart(Core::LogicPart &part) {
         m_Schematic.MarkModified();
     }
     ImGui::TextDisabled("Inputs read 1 above 70%% of the level and 0 below 30%%; an open input reads 0");
+}
+
+// The clock picks its own rise and fall times; the frequency sets the period and the duty the share that is high
+void PartEditor::DrawClock(Core::Clock &clock) {
+    Core::ClockParameters parameters = clock.GetParameters();
+    const auto is_valid = [](const Core::ClockParameters &candidate) {
+        return Core::Clock::IsValidParameters(candidate);
+    };
+    if (DrawParameterFields(ClockFields, m_ClockFields, "", is_valid, parameters)) {
+        clock.SetParameters(parameters);
+        m_Schematic.MarkModified();
+    }
+    ImGui::TextDisabled("Duty is the share of the period above half the level, from 0 to 1");
+    ImGui::TextDisabled("The start delay holds the clock low; at 0 the first rising edge is at t = 0");
+}
+
+// A constant source from the part to ground: high drives the logic level and low 0 V, so a latch has a defined start
+void PartEditor::DrawLogicInput(Core::LogicInput &input) {
+    bool high = input.IsHigh();
+    if (ImGui::Checkbox("High", &high)) {
+        input.SetHigh(high);
+        m_Schematic.MarkModified();
+    }
+    Core::LogicInputParameters parameters = input.GetParameters();
+    const auto is_valid = [](const Core::LogicInputParameters &candidate) {
+        return Core::LogicInput::IsValidParameters(candidate);
+    };
+    if (DrawParameterFields(LogicInputFields, m_LogicInputFields, "", is_valid, parameters)) {
+        input.SetParameters(parameters);
+        m_Schematic.MarkModified();
+    }
+    ImGui::TextDisabled("A source from its terminal to ground, so it gives a gate a defined level");
 }
 
 // A closed switch conducts; a push button is pressed when closed
