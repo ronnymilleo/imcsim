@@ -258,6 +258,18 @@ constexpr auto Examples = std::to_array<Example>({
         .FileName = "logic_gates.imcsim",
     },
     {
+        .Title = "Truth table of the basic gates",
+        .Group = "Digital",
+        .Description =
+            "Two logic inputs, A and B, reach an AND, an OR, a NAND, a NOR, an XOR and an XNOR gate through the A and "
+            "B net labels, and the output of each gate is measured. The Truth table analysis is already picked: "
+            "press Run, and the Output window lists the four combinations of A and B in counting order with the 0 "
+            "or 1 every gate gives, so one table shows all six gates side by side. No Ground or load is needed, "
+            "since a circuit of only digital parts has its own reference. Untick A or B in the analysis popover to "
+            "vary one input only; the other keeps the High or Low it has in the schematic.",
+        .FileName = "logic_truth_table.imcsim",
+    },
+    {
         .Title = "Half adder",
         .Group = "Digital",
         .Description =
@@ -265,6 +277,18 @@ constexpr auto Examples = std::to_array<Example>({
             "pairs 10, 11, 00 and 01: 1 + 0 lights the sum LED, 1 + 1 lights the carry LED alone (10 in binary), "
             "0 + 0 lights neither and 0 + 1 lights the sum again.",
         .FileName = "half_adder.imcsim",
+    },
+    {
+        .Title = "Full adder",
+        .Group = "Digital",
+        .Description =
+            "Two XOR gates add A, B and the carry in: the first gives P = A xor B and the second SUM = P xor CIN. "
+            "Two AND gates and an OR give the carry out, COUT = A and B, or P and CIN. The Truth table analysis is "
+            "already picked: press Run, and the Output window lists the eight combinations of A, B and CIN in "
+            "counting order with SUM and COUT, which read the number of high inputs in binary: 1 + 1 + 1 gives 11, "
+            "SUM and COUT both high. Only SUM and COUT are measured, so only they are columns of the table; "
+            "measure P, G1 or G2 with the Probe tool and run it again to see them too.",
+        .FileName = "full_adder.imcsim",
     },
     {
         .Title = "SR latch from NAND gates",

@@ -717,6 +717,24 @@ const std::optional<Core::TransferFunction> &Schematic::GetTransferFunction() co
 }
 
 /**
+ * @brief   Stores the result of a truth table analysis of the current schematic.
+ * @param[in] truth_table  The rows of the table, or no value to clear it.
+ * @note    The result is dropped on the next change, since it no longer matches the circuit.
+ */
+void Schematic::SetTruthTable(std::optional<Core::TruthTable> truth_table) {
+    m_TruthTable = std::move(truth_table);
+    ++m_TruthTableVersion;
+}
+
+/**
+ * @brief   Returns the last truth table simulated for the current schematic.
+ * @return  The truth table, or no value when there was no simulation since the last change.
+ */
+const std::optional<Core::TruthTable> &Schematic::GetTruthTable() const {
+    return m_TruthTable;
+}
+
+/**
  * @brief   Returns a number that changes whenever an operating point result is stored.
  * @return  The operating point version; compare it with a stored one to know whether the result was replaced.
  */
@@ -764,6 +782,14 @@ std::size_t Schematic::GetTransferFunctionVersion() const {
     return m_TransferFunctionVersion;
 }
 
+/**
+ * @brief   Returns a number that changes whenever a truth table result is stored.
+ * @return  The truth table version; compare it with a stored one to know whether the result was replaced.
+ */
+std::size_t Schematic::GetTruthTableVersion() const {
+    return m_TruthTableVersion;
+}
+
 void Schematic::InvalidateDerivedData() {
     m_Connectivity.reset();
     m_OperatingPoint.reset();
@@ -774,6 +800,7 @@ void Schematic::InvalidateDerivedData() {
     m_DCSweep.reset();
     m_Noise.reset();
     m_TransferFunction.reset();
+    m_TruthTable.reset();
 }
 
 // A probe is on the node most of its points belong to now, and takes the points of that node as its own. With no such

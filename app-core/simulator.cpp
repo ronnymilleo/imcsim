@@ -12,6 +12,7 @@
 #include "components/controlled_source.h"
 #include "components/diode.h"
 #include "components/inductor.h"
+#include "components/logic_input.h"
 #include "components/logic_part.h"
 #include "components/mosfet.h"
 #include "components/resistor.h"
@@ -388,6 +389,41 @@ std::optional<std::string> CheckTransferFunctionSettings(const Circuit &circuit,
     if (FindTransferFunctionInput(circuit, settings.InputSource) == nullptr) {
         return std::format("The input source {} is not a voltage source, current source or VCC in the circuit",
                            settings.InputSource);
+    }
+    return std::nullopt;
+}
+
+const Component *FindLogicInput(const Circuit &circuit, const std::string_view name) {
+    const auto entry = std::ranges::find_if(circuit.GetEntries(), [name](const CircuitEntry &candidate) {
+        return candidate.Part->GetType() == ComponentType::LogicInput && candidate.Part->GetName() == name;
+    });
+    return entry != circuit.GetEntries().end() ? entry->Part : nullptr;
+}
+
+std::optional<std::string> CheckTruthTableSettings(const Circuit &circuit, const TruthTableSettings &settings) {
+    if (settings.Inputs.empty()) {
+        return "A truth table needs at least one logic input to vary; add a Logic input";
+    }
+    if (settings.Inputs.size() > MaxTruthTableInputs) {
+        return std::format("A truth table varies at most {} inputs, which is {} runs; clear some", MaxTruthTableInputs,
+                           1u << MaxTruthTableInputs);
+    }
+    for (std::size_t index = 0; index < settings.Inputs.size(); ++index) {
+        const std::string &name = settings.Inputs[index];
+        if (FindLogicInput(circuit, name) == nullptr) {
+            return std::format("The input {} is not a logic input in the circuit", name);
+        }
+        if (std::ranges::count(settings.Inputs, name) > 1) {
+            return std::format("The input {} is listed twice", name);
+        }
+    }
+    if (settings.OutputNodes.empty()) {
+        return "Measure at least one node, so the truth table has an output to read";
+    }
+    for (const int node : settings.OutputNodes) {
+        if (node < 1 || node >= circuit.GetNodeCount()) {
+            return "Pick output nodes of the circuit; ground has no logic level to read";
+        }
     }
     return std::nullopt;
 }
@@ -1283,6 +1319,15 @@ SimulationRun<Data> Simulate(const Circuit &circuit, const std::string_view anal
 } // namespace
 
 /**
+ * @brief   Tells whether the combination has output voltages.
+ * @return  True when ngspice found an operating point; false when it did not, as for a latch that depends on its
+ *          history.
+ */
+bool TruthTableRow::HasOperatingPoint() const {
+    return !OutputVoltages.empty();
+}
+
+/**
  * @brief   Computes the DC operating point of a circuit with ngspice.
  * @param[in] circuit  Circuit to simulate; it needs a ground component, unless it holds only logic parts, logic inputs
  * and supply rails.
@@ -1477,6 +1522,87 @@ TransferFunctionRun RunTransferFunction(const Circuit &circuit, const TransferFu
 }
 
 /**
+ * @brief   Runs every combination of some logic inputs and reads what the output nodes give.
+ * @param[in] circuit   Circuit to simulate; it needs a ground component, unless it holds only clocks, logic inputs,
+ *                      logic parts and supply rails.
+ * @param[in] settings  The logic inputs to vary, the first as the most significant bit, and the nodes to read.
+ * @return  One row per combination in binary counting order, with the voltage of each output node, or an error, plus
+ *          the lines ngspice printed for the first combination that failed, or else for the first one. Invalid
+ *          settings are rejected before reaching ngspice.
+ * @note    Each row is an operating point of a copy of the circuit with the inputs set, so a row is independent of the
+ *          others. A combination without an operating point, as a latch left to its history has, stays in the table
+ *          without voltages and a warning says how many; the call fails only when no combination has one. The other
+ *          logic inputs keep the state they have in the circuit. Not thread-safe: ngspice is a single global library
+ *          instance.
+ */
+TruthTableRun RunTruthTable(const Circuit &circuit, const TruthTableSettings &settings) {
+    std::optional<std::string> error = CheckCircuit(circuit);
+    if (!error) {
+        error = CheckTruthTableSettings(circuit, settings);
+    }
+    if (error) {
+        return {std::unexpected(*error), {}};
+    }
+
+    TruthTable table{.InputNames = settings.Inputs, .InputLevels = {}, .OutputNodes = settings.OutputNodes};
+    // The chosen inputs are copies that each row sets, and the simulated circuit points at them
+    std::vector<LogicInput> inputs;
+    inputs.reserve(settings.Inputs.size());
+    for (const std::string &name : settings.Inputs) {
+        inputs.push_back(static_cast<const LogicInput &>(*FindLogicInput(circuit, name)));
+        table.InputLevels.push_back(inputs.back().GetParameters().LogicLevel);
+    }
+    Circuit simulated;
+    for (const CircuitEntry &entry : circuit.GetEntries()) {
+        const auto chosen = std::ranges::find(settings.Inputs, entry.Part->GetName());
+        const bool is_chosen = chosen != settings.Inputs.end() && entry.Part->GetType() == ComponentType::LogicInput;
+        simulated.Add(is_chosen ? inputs[static_cast<std::size_t>(chosen - settings.Inputs.begin())] : *entry.Part,
+                      entry.Nodes);
+    }
+
+    TruthTableRun run;
+    std::optional<std::string> first_failure;
+    std::vector<SimulatorMessage> failure_messages;
+    const std::size_t row_count = std::size_t{1} << inputs.size();
+    for (std::size_t row_index = 0; row_index < row_count; ++row_index) {
+        TruthTableRow row;
+        for (std::size_t input = 0; input < inputs.size(); ++input) {
+            const bool is_high = ((row_index >> (inputs.size() - 1 - input)) & 1u) != 0;
+            inputs[input].SetHigh(is_high);
+            row.InputsHigh.push_back(is_high);
+        }
+        OperatingPointRun point = RunOperatingPoint(simulated);
+        if (point.Result) {
+            for (const int node : settings.OutputNodes) {
+                row.OutputVoltages.push_back(point.Result->NodeVoltages[static_cast<std::size_t>(node)]);
+            }
+        } else if (!first_failure) {
+            first_failure = point.Result.error();
+            failure_messages = point.Messages;
+        }
+        if (row_index == 0) {
+            run.Messages = std::move(point.Messages);
+        }
+        table.Rows.push_back(std::move(row));
+    }
+
+    const std::size_t missing = static_cast<std::size_t>(
+        std::ranges::count_if(table.Rows, [](const TruthTableRow &row) { return !row.HasOperatingPoint(); }));
+    if (missing == row_count) {
+        return {std::unexpected(*first_failure), std::move(failure_messages)};
+    }
+    if (missing > 0) {
+        table.Warnings.push_back(std::format(
+            "{} of {} combinations have no operating point, so their outputs read X; a circuit whose outputs depend on "
+            "its history, such as a latch, has none for the combinations that hold its state",
+            missing, row_count));
+        run.Messages = std::move(failure_messages);
+    }
+    run.Result = std::move(table);
+    return run;
+}
+
+/**
  * @brief   Tells the simulator where the program keeps the digital code models, for a build that ships them.
  * @param[in] directory  Folder that may hold digital.cm; the library is loaded from it when ngspice has not loaded
  *                       the digital models itself, as the system ngspice does through its spinit file.
@@ -1534,6 +1660,21 @@ std::vector<std::string> GetTransferFunctionInputSources(const Circuit &circuit)
     std::vector<std::string> names;
     for (const CircuitEntry &entry : circuit.GetEntries()) {
         if (IsTransferFunctionInput(*entry.Part)) {
+            names.push_back(entry.Part->GetName());
+        }
+    }
+    return names;
+}
+
+/**
+ * @brief   Lists the logic inputs a truth table can vary.
+ * @param[in] circuit  Circuit to look in.
+ * @return  Names of its logic inputs, in circuit order.
+ */
+std::vector<std::string> GetTruthTableInputs(const Circuit &circuit) {
+    std::vector<std::string> names;
+    for (const CircuitEntry &entry : circuit.GetEntries()) {
+        if (entry.Part->GetType() == ComponentType::LogicInput) {
             names.push_back(entry.Part->GetName());
         }
     }

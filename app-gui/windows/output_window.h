@@ -36,7 +36,8 @@ enum class PlotTab {
     ACSweep,
     DCSweep,
     Noise,
-    TransferFunction
+    TransferFunction,
+    TruthTable
 };
 
 /**
@@ -56,12 +57,13 @@ enum class PlotTab {
  *          statistics measure, and reads the fundamental, the harmonics and the THD of each, as a spectrum
  *          analyzer would. The Noise tab plots the noise density at the output and referred to the input on
  *          log-log axes, with the share of each part, and the Transfer function tab lists its DC gain and its
- *          input and output impedances. Math channels add traces computed from the others, such as
- * V(1)-V(2) or V(1)*I(R1), to the transient and DC sweep plots: voltages and currents keep their axes, and any other
- *          unit, or none, goes on a third axis. Export saves the plot of the current tab as an SVG image, redrawn
- *          from its data at a chosen size and theme over the visible X range, or as a CSV table of every sample.
- *          It starts closed and opens on the tab of each new result. It also comes to the front then, unless the
- *          user turned that off in the View menu: a dot on its title or tab then tells a new result is waiting.
+ *          input and output impedances, and the Truth table tab lists the outputs of every combination of some logic
+ * inputs. Math channels add traces computed from the others, such as V(1)-V(2) or V(1)*I(R1), to the transient and DC
+ * sweep plots: voltages and currents keep their axes, and any other unit, or none, goes on a third axis. Export saves
+ * the plot of the current tab as an SVG image, redrawn from its data at a chosen size and theme over the visible X
+ * range, or as a CSV table of every sample. It starts closed and opens on the tab of each new result. It also comes to
+ * the front then, unless the user turned that off in the View menu: a dot on its title or tab then tells a new result
+ * is waiting.
  */
 class OutputWindow : public AppWindow {
 public:
@@ -138,6 +140,7 @@ private:
     void DrawDCSweepTab(const FrameResults &frame);
     void DrawNoiseTab();
     void DrawTransferFunctionTab();
+    void DrawTruthTableTab();
 
     // Plots
     void DrawTransient(const Core::Transient &transient, const std::vector<MathTrace> &math);

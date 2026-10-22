@@ -23,6 +23,9 @@ elements, so the results are those of ngspice with the models below. Some things
   independent source to an output node, with the resistance seen by the source and the resistance looking back into
   the output. It is the same small-signal model an AC sweep uses, so the gain agrees with what the sweep would show
   at 0 Hz.
+- A truth table runs one operating point per combination of the chosen logic inputs, each on a copy of the circuit
+  with the inputs set, so a row never depends on the one before it. That describes combinational logic; a latch or
+  flip-flop that holds its state has no operating point for those combinations, and the row reads X.
 - To report terminal currents in every analysis, the netlist adds a 0 V source in series with diodes, transistors,
   potentiometers, switches, relays, transformers, controlled sources, op-amp outputs and the outputs of logic parts. It does not change the circuit; the Netlist window leaves it out unless a
   current-controlled source needs it.

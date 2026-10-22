@@ -38,6 +38,7 @@ add_executable(imcsim-tests
             trace_fit_state_tests.cpp
             trace_math_tests.cpp
             trace_statistics_tests.cpp
+            truth_table_tests.cpp
             ui_element_tests.cpp
             ui_wire_tests.cpp
             wire_editing_tests.cpp

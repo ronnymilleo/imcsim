@@ -43,6 +43,7 @@ add_library(imcsim-gui-lib
             trace_fit_state.cpp
             trace_math.cpp
             trace_statistics.cpp
+            truth_table.cpp
             ui_elements/ui_bjt.cpp
             ui_elements/ui_capacitor.cpp
             ui_elements/ui_clock.cpp
