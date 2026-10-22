@@ -237,7 +237,7 @@ OptionalValueEdit ValueField::DrawOptional(const char *label, const std::string 
             const std::optional<double> value = Core::ParseValue(m_Text.data(), unit);
             m_Invalid = !value || !is_valid(*value);
             if (!m_Invalid) {
-                edit.Value = *value;
+                edit.Value = value;
                 edit.Changed = true;
             }
         }

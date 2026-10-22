@@ -258,7 +258,7 @@ std::vector<std::vector<LogicSegment>> FindBitCells(const std::span<const double
     bool joins_next = false;
     for (double cell = first_cell;; cell += 1.0) {
         double cell_from = std::max(start + cell * width, first_time);
-        double cell_to = std::min(start + (cell + 1.0) * width, last_time);
+        const double cell_to = std::min(start + (cell + 1.0) * width, last_time);
         // What is left of a cell at either end of the samples is too narrow to read, so it joins its neighbor
         if (cell_to - cell_from < width * GLITCH_SHARE) {
             if (cell_to >= last_time) {

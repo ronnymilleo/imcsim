@@ -220,14 +220,14 @@ int GlowRenderer::CreatePipeline(const SDL_GPUTextureFormat target_format) {
 
 // White texels whose alpha falls off from the center, so the vertex color of each glow tints it
 int GlowRenderer::CreateTexture() {
-    std::array<std::uint8_t, TEXTURE_SIZE * TEXTURE_SIZE * 4> texels{};
+    std::array<std::uint8_t, std::size_t{TEXTURE_SIZE} * TEXTURE_SIZE * 4> texels{};
     for (std::uint32_t row = 0; row < TEXTURE_SIZE; ++row) {
         for (std::uint32_t column = 0; column < TEXTURE_SIZE; ++column) {
             // Texel centers, from -1 to 1 across the texture
             const float x = (static_cast<float>(column) + 0.5f) / TEXTURE_SIZE * 2.0f - 1.0f;
             const float y = (static_cast<float>(row) + 0.5f) / TEXTURE_SIZE * 2.0f - 1.0f;
             const float alpha = std::clamp(Falloff(std::sqrt(x * x + y * y)), 0.0f, 1.0f);
-            std::uint8_t *texel = &texels[(row * TEXTURE_SIZE + column) * 4];
+            std::uint8_t *texel = &texels[(std::size_t{row} * TEXTURE_SIZE + column) * 4];
             texel[0] = texel[1] = texel[2] = 255;
             texel[3] = static_cast<std::uint8_t>(std::lround(alpha * 255.0f));
         }

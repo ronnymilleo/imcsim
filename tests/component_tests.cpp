@@ -129,7 +129,7 @@ TEST_CASE("A switch and a push button start open, with no value", "[component]")
     CHECK_FALSE(toggle.IsValidValue(1.0));
     CHECK_FALSE(toggle.IsClosed());
 
-    Core::Switch button(Core::ComponentType::PUSH_BUTTON);
+    const Core::Switch button(Core::ComponentType::PUSH_BUTTON);
     CHECK(std::string_view(button.GetNamePrefix()) == "PB");
     CHECK(std::string_view(button.GetTypeName()) == "PushButton");
     CHECK_FALSE(button.IsClosed());

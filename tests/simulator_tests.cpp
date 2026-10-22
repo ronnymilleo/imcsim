@@ -1248,7 +1248,7 @@ TEST_CASE("A MOSFET above its power rating is reported, with its other ratings r
 }
 
 TEST_CASE("A MOSFET gate above its VGS rating is reported", "[simulator]") {
-    LowSideSwitch stage(Core::ComponentType::PMOS, 25.0);
+    const LowSideSwitch stage(Core::ComponentType::PMOS, 25.0);
     const Core::OperatingPointRun run = Core::RunOperatingPoint(stage.Circuit);
     if (!run.Result) {
         FAIL(run.Result.error());
@@ -1379,7 +1379,7 @@ TEST_CASE("A DC sweep can drive a current source", "[simulator]") {
 }
 
 TEST_CASE("A DC sweep traces the I-V curve of a diode", "[simulator]") {
-    DiodeLoop loop(Core::ComponentType::DIODE, 1.0, 10.0);
+    const DiodeLoop loop(Core::ComponentType::DIODE, 1.0, 10.0);
     const Core::DCSweepRun run =
         Core::RunDCSweep(loop.Circuit, {.Swept = {.Source = "V1", .Start = 0.0, .Stop = 1.0, .Step = 0.01}});
     if (!run.Result) {
@@ -1883,7 +1883,7 @@ struct SteppedDown {
 } // namespace
 
 TEST_CASE("A 2:1 transformer halves the voltage of its primary on an open secondary", "[simulator]") {
-    SteppedDown circuit(1e9);
+    const SteppedDown circuit(1e9);
     const Core::ACSweepRun run = Core::RunACSweep(circuit.Circuit, {.StartFrequency = 1e3, .StopFrequency = 1e4});
     REQUIRE(run.Result.has_value());
     // The coupling takes a little more: 0.999 / 2
@@ -1894,7 +1894,7 @@ TEST_CASE("A 2:1 transformer halves the voltage of its primary on an open second
 }
 
 TEST_CASE("A loaded 2:1 transformer draws twice the secondary current from its primary", "[simulator]") {
-    SteppedDown circuit(10.0);
+    const SteppedDown circuit(10.0);
     const Core::TransientRun run = Core::RunTransient(circuit.Circuit, {.StopTime = 5e-3, .TimeStep = 5e-6});
     REQUIRE(run.Result.has_value());
     const Core::Transient &transient = *run.Result;
@@ -2112,7 +2112,7 @@ TEST_CASE("A D flip-flop takes its input only on the rising edge of the clock", 
 
 TEST_CASE("A D flip-flop with QN fed back divides the clock by two", "[simulator][digital]") {
     SKIP_WITHOUT_DIGITAL_MODELS();
-    ClockedFlipFlop circuit(Core::ComponentType::D_FLIP_FLOP, {1, 2, 3, 4, 5, 1});
+    const ClockedFlipFlop circuit(Core::ComponentType::D_FLIP_FLOP, {1, 2, 3, 4, 5, 1});
 
     const Core::TransientRun run = Core::RunTransient(circuit.Circuit, {.StopTime = 8e-3, .TimeStep = 5e-6});
     REQUIRE(run.Result.has_value());
@@ -2283,7 +2283,7 @@ const Core::NoiseContribution *FindContribution(const Core::Noise &noise, const 
 } // namespace
 
 TEST_CASE("The noise of an RC divider is the thermal noise of its resistor, shaped by the capacitor", "[simulator]") {
-    LowPass low_pass;
+    const LowPass low_pass;
     const Core::NoiseRun run = Core::RunNoise(
         low_pass.Circuit,
         {.OutputNode = 2, .InputSource = "Vin1", .StartFrequency = 1.0, .StopFrequency = 10.0, .PointsPerDecade = 1});
@@ -2351,7 +2351,7 @@ TEST_CASE("A noise analysis refers its noise to a current source in A/sqrt(Hz)",
     source.SetSourceType(Core::CurrentSource::SourceType::AC);
     Core::Resistor load;
     load.SetName("R1");
-    Core::Ground reference;
+    const Core::Ground reference;
     Core::Circuit circuit;
     circuit.Add(source, {0, 1});
     circuit.Add(load, {1, 0});
@@ -2392,7 +2392,7 @@ TEST_CASE("RunNoise rejects a missing input source, ground as output and a bad r
 }
 
 TEST_CASE("A stepped part runs at its step value, in the netlist and in the readings", "[simulator]") {
-    LowPass low_pass;
+    const LowPass low_pass;
     const Core::ACSweepSettings settings{.StartFrequency = 159.155, .StopFrequency = 1591.55, .PointsPerDecade = 1};
     const Core::ACSweepRun stepped = Core::RunACSweep(low_pass.Circuit, settings, Core::ParameterValue{"R1", 10e3});
     if (!stepped.Result) {
@@ -2415,7 +2415,7 @@ TEST_CASE("A stepped temperature changes the forward voltage of a diode", "[simu
     series.SetName("R1");
     Core::Diode diode(Core::ComponentType::DIODE);
     diode.SetName("D1");
-    Core::Ground reference;
+    const Core::Ground reference;
     Core::Circuit circuit;
     circuit.Add(supply, {1});
     circuit.Add(series, {1, 2});
@@ -2435,7 +2435,7 @@ TEST_CASE("A stepped temperature changes the forward voltage of a diode", "[simu
 }
 
 TEST_CASE("A stepped parameter rejects a part that cannot step and values out of range", "[simulator]") {
-    LowPass low_pass;
+    const LowPass low_pass;
     const Core::TransientSettings settings{.StopTime = 1e-3, .TimeStep = 1e-5};
     CHECK(Core::RunTransient(low_pass.Circuit, settings, Core::ParameterValue{"C1", 2e-6}).Result);
     CHECK_FALSE(Core::RunTransient(low_pass.Circuit, settings, Core::ParameterValue{"Vin1", 2.0}).Result);
@@ -2491,7 +2491,7 @@ struct ResistiveDivider {
 } // namespace
 
 TEST_CASE("The transfer function of a voltage divider matches its closed-form gain and resistances", "[simulator]") {
-    ResistiveDivider divider;
+    const ResistiveDivider divider;
     // A transfer function drives the circuit from an independent source of any waveform, not only an AC one
     CHECK(Core::GetTransferFunctionInputSources(divider.Circuit) == std::vector<std::string>{"V1"});
     const Core::TransferFunctionRun run =
@@ -2510,7 +2510,7 @@ TEST_CASE("The transfer function of a voltage divider matches its closed-form ga
 
 TEST_CASE("A VCC supply rail is a transfer function input", "[simulator]") {
     // The Divider helper is a 10 V VCC feeding 1k and 3k resistors, with the middle on node 2
-    Divider divider;
+    const Divider divider;
     CHECK(Core::GetTransferFunctionInputSources(divider.Circuit) == std::vector<std::string>{"V1"});
     const Core::TransferFunctionRun run =
         Core::RunTransferFunction(divider.Circuit, {.OutputNode = 2, .InputSource = "V1"});
@@ -2532,7 +2532,7 @@ TEST_CASE("The transfer function from a current source is a transimpedance in V/
     Core::Resistor load;
     load.SetName("R1");
     load.SetValue(1e3);
-    Core::Ground reference;
+    const Core::Ground reference;
     Core::Circuit circuit;
     circuit.Add(source, {0, 1});
     circuit.Add(load, {1, 0});
@@ -2551,7 +2551,7 @@ TEST_CASE("The transfer function from a current source is a transimpedance in V/
 }
 
 TEST_CASE("RunTransferFunction rejects a missing input source and an unknown output", "[simulator]") {
-    ResistiveDivider divider;
+    const ResistiveDivider divider;
     CHECK(Core::RunTransferFunction(divider.Circuit, {.OutputNode = 2, .InputSource = "V1"}).Result);
 
     // An input source that is not in the circuit, and one that cannot drive it, are named back
@@ -2569,7 +2569,7 @@ TEST_CASE("The impedances of an ideal source are finite, so the views can show t
     Core::VoltageSource source;
     source.SetName("V1");
     source.SetValue(5.0);
-    Core::Ground reference;
+    const Core::Ground reference;
     Core::Circuit circuit;
     circuit.Add(source, {1, 0});
     circuit.Add(reference, {0});

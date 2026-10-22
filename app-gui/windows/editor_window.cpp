@@ -262,9 +262,14 @@ void DrawGrid(ImDrawList *draw_list, const ViewTransform &view, const ImVec2 ori
     const ImVec2 world_min = view.ToWorld(origin);
     const ImVec2 world_max = view.ToWorld(origin + size);
     const ImVec2 dot_half_size = {1.0f, 1.0f};
-    for (float x = std::floor(world_min.x / step_size) * step_size; x <= world_max.x; x += step_size) {
-        for (float y = std::floor(world_min.y / step_size) * step_size; y <= world_max.y; y += step_size) {
-            const ImVec2 dot = view.ToScreen({x, y});
+    const int first_column = static_cast<int>(std::floor(world_min.x / step_size));
+    const int last_column = static_cast<int>(std::floor(world_max.x / step_size));
+    const int first_row = static_cast<int>(std::floor(world_min.y / step_size));
+    const int last_row = static_cast<int>(std::floor(world_max.y / step_size));
+    for (int column = first_column; column <= last_column; ++column) {
+        for (int row = first_row; row <= last_row; ++row) {
+            const ImVec2 dot =
+                view.ToScreen({static_cast<float>(column) * step_size, static_cast<float>(row) * step_size});
             draw_list->AddRectFilled(dot - dot_half_size, dot + dot_half_size, GetPalette().GridDot);
         }
     }
@@ -818,7 +823,11 @@ void EditorWindow::DrawTimeBar() {
     if (!m_Displayed || !m_Displayed->Time) {
         return;
     }
-    const double stop_time = m_Schematic.GetTransient()->Times.back();
+    const std::optional<Core::Transient> &transient = m_Schematic.GetTransient();
+    if (!transient) {
+        return;
+    }
+    const double stop_time = transient->Times.back();
     if (ImGui::Button(m_Playback.Playing ? "Pause" : "Play")) {
         if (!m_Playback.Playing && m_Playback.Time >= stop_time) {
             m_Playback.Time = 0.0;
@@ -917,6 +926,9 @@ ImU32 EditorWindow::GetWireColor(const int node) const {
 
 // Each piece of wire takes the heat color of its own current, so the path of the current shows along the wires
 void EditorWindow::DrawWireCurrents(SchematicCanvas &canvas, const ViewTransform &view) {
+    if (!m_Displayed) {
+        return;
+    }
     for (const WireCurrent &piece :
          ComputeWireCurrents(m_Schematic.GetElements(), m_Schematic.GetWires(), m_Displayed->Point.Currents)) {
         UIWire(piece.Start, piece.End)
@@ -1040,20 +1052,21 @@ void EditorWindow::DrawStatusBar(const ViewTransform &view, const bool hovered) 
 float EditorWindow::DrawRunStatus(float right_edge) {
     const std::optional<Analysis> last_run = m_Controls.GetLastRun();
     const RunOutcome outcome = last_run ? m_Controls.GetOutcome(*last_run) : RunOutcome::NONE;
+    const std::string_view analysis_name = last_run ? GetAnalysisName(*last_run) : std::string_view();
     std::string status;
     ImVec4 color = ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled);
     switch (outcome) {
     case RunOutcome::NONE:
         break;
     case RunOutcome::SUCCEEDED:
-        status = std::format("{} done", GetAnalysisName(*last_run));
+        status = std::format("{} done", analysis_name);
         break;
     case RunOutcome::SUCCEEDED_WITH_WARNINGS:
-        status = std::format("{} done, with warnings", GetAnalysisName(*last_run));
+        status = std::format("{} done, with warnings", analysis_name);
         color = GetWarningTextColor();
         break;
     case RunOutcome::FAILED:
-        status = std::format("{} failed", GetAnalysisName(*last_run));
+        status = std::format("{} failed", analysis_name);
         color = GetErrorTextColor();
         break;
     }
@@ -1780,34 +1793,38 @@ EditorWindow::GroupDrag EditorWindow::MakeDrag(const GridPoint cursor, std::opti
 // Moves the selection by how far the cursor went from where the drag started, rebuilding the wires from the wires the
 // drag started with so moving back and forth does not pile up bends
 void EditorWindow::UpdateDrag(const GridPoint cursor) {
-    m_Drag->LastCursor = cursor;
-    GridPoint delta = cursor - m_Drag->StartCursor;
-    if (m_Drag->SlidesVertically) {
-        // A wire only slides across itself: along its own line, moving it would change nothing
-        (*m_Drag->SlidesVertically ? delta.X : delta.Y) = 0;
-    }
-    if (delta == m_Drag->LastDelta) {
+    if (!m_Drag) {
         return;
     }
-    m_Drag->LastDelta = delta;
-    m_Drag->Moved = delta != GridPoint{};
-    if (m_Drag->Moved) {
-        m_Drag->CollapseTo.reset();
+    GroupDrag &drag = *m_Drag;
+    drag.LastCursor = cursor;
+    GridPoint delta = cursor - drag.StartCursor;
+    if (drag.SlidesVertically) {
+        // A wire only slides across itself: along its own line, moving it would change nothing
+        (*drag.SlidesVertically ? delta.X : delta.Y) = 0;
+    }
+    if (delta == drag.LastDelta) {
+        return;
+    }
+    drag.LastDelta = delta;
+    drag.Moved = delta != GridPoint{};
+    if (drag.Moved) {
+        drag.CollapseTo.reset();
     }
 
     std::vector<GridPoint> new_terminals;
     std::size_t position_index = 0;
-    for (const std::size_t index : m_Drag->Elements) {
+    for (const std::size_t index : drag.Elements) {
         UIElement &element = m_Schematic.GetElement(index);
-        element.SetPosition(m_Drag->StartPositions[position_index++] + delta);
+        element.SetPosition(drag.StartPositions[position_index++] + delta);
         const std::vector<GridPoint> terminals = element.GetTerminals();
         new_terminals.insert(new_terminals.end(), terminals.begin(), terminals.end());
     }
     const PointTransform translation = {.Type = PointTransform::Kind::TRANSLATE, .Delta = delta, .Pivot = {}};
-    MovedWires moved = MoveGroup(m_Drag->StartWires, m_Drag->Wires, m_Drag->StartTerminals, new_terminals,
-                                 m_Drag->FixedTerminals, translation);
+    MovedWires moved =
+        MoveGroup(drag.StartWires, drag.Wires, drag.StartTerminals, new_terminals, drag.FixedTerminals, translation);
     m_Schematic.SetWires(std::move(moved.Wires));
-    m_Schematic.SetSelection(m_Drag->Elements, std::move(moved.Selected));
+    m_Schematic.SetSelection(drag.Elements, std::move(moved.Selected));
     m_Schematic.MarkModified();
 }
 

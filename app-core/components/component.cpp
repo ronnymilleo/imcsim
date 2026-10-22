@@ -99,11 +99,9 @@ const char *Component::GetNamePrefix() const {
     case ComponentType::INDUCTOR:
         return "L";
     case ComponentType::VCC:
-        // A supply rail is simulated as a voltage source to ground
-        return "V";
     case ComponentType::CLOCK:
     case ComponentType::LOGIC_INPUT:
-        // A clock and a logic input are voltage sources to ground too
+        // A supply rail, a clock and a logic input are simulated as voltage sources to ground
         return "V";
     case ComponentType::VOLTAGE_SOURCE:
         return "Vin";
@@ -177,7 +175,6 @@ const char *Component::GetUnit() const {
         return "H";
     case ComponentType::VCC:
     case ComponentType::VOLTAGE_SOURCE:
-        return "V";
     case ComponentType::CLOCK:
     case ComponentType::LOGIC_INPUT:
         return "V";

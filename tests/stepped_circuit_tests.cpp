@@ -58,7 +58,7 @@ TEST_CASE("A stepped part is replaced by a copy at its value, and the original i
 }
 
 TEST_CASE("A stepped temperature goes in the result and must be above absolute zero", "[stepped_circuit]") {
-    Ladder ladder;
+    const Ladder ladder;
     const auto hot = Core::ApplyParameter(ladder.Circuit, Core::ParameterValue{.Part = "", .Value = 85.0});
     REQUIRE(hot.has_value());
     CHECK(hot->Temperature == 85.0);
@@ -70,7 +70,7 @@ TEST_CASE("A stepped temperature goes in the result and must be above absolute z
 
 TEST_CASE("Only resistors, capacitors and inductors can be stepped, and never to a value that is not positive",
           "[stepped_circuit]") {
-    Ladder ladder;
+    const Ladder ladder;
     CHECK(Core::GetSteppableParts(ladder.Circuit) == std::vector<std::string>{"R1", "C1"});
     CHECK_FALSE(Core::ApplyParameter(ladder.Circuit, Core::ParameterValue{.Part = "V9", .Value = 1.0}).has_value());
     const auto negative = Core::ApplyParameter(ladder.Circuit, Core::ParameterValue{.Part = "C1", .Value = -1.0});

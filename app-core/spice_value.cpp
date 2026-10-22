@@ -88,8 +88,9 @@ std::optional<double> ParseValue(const std::string_view text, const std::string_
         return std::nullopt;
     }
 
-    const std::string_view number_text(trimmed.data(), rest_begin - trimmed.data());
-    std::string_view rest(rest_begin, trimmed.data() + trimmed.size() - rest_begin);
+    const auto number_length = static_cast<std::size_t>(rest_begin - trimmed.data());
+    const std::string_view number_text = trimmed.substr(0, number_length);
+    std::string_view rest = trimmed.substr(number_length);
     double factor = 1.0;
     bool has_suffix = true;
     if (rest.starts_with(MICRO_SIGN)) {

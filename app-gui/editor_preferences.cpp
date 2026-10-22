@@ -17,8 +17,8 @@ namespace GUI {
 namespace {
 
 // Null-terminated literals, so data() can go to ImGui
-constexpr auto WIRE_COLORING_NAMES = std::to_array<std::string_view>({"Plain", "Nodes", "Voltage", "Current", "Power"});
-constexpr auto LIVE_EFFECTS_NAMES = std::to_array<std::string_view>({"Current Flow", "LED Glow", "Heat Glow"});
+constexpr auto WIRE_COLORING_NAMES = std::to_array<const char *>({"Plain", "Nodes", "Voltage", "Current", "Power"});
+constexpr auto LIVE_EFFECTS_NAMES = std::to_array<const char *>({"Current Flow", "LED Glow", "Heat Glow"});
 // Section of imgui.ini that keeps the View preferences
 constexpr const char *SETTINGS_TYPE_NAME = "Editor";
 
@@ -49,7 +49,7 @@ void EditorPreferences::DrawMenuItems() {
     if (ImGui::BeginMenu("Wire Colors")) {
         for (std::size_t index = 0; index < WIRE_COLORING_NAMES.size(); ++index) {
             const auto coloring = static_cast<WireColoring>(index);
-            if (ImGui::MenuItem(WIRE_COLORING_NAMES[index].data(), nullptr, m_WireColoring == coloring)) {
+            if (ImGui::MenuItem(WIRE_COLORING_NAMES[index], nullptr, m_WireColoring == coloring)) {
                 m_WireColoring = coloring;
                 changed = true;
             }
@@ -59,7 +59,7 @@ void EditorPreferences::DrawMenuItems() {
     if (ImGui::BeginMenu("Live Effects")) {
         for (std::size_t index = 0; index < LIVE_EFFECTS_NAMES.size(); ++index) {
             bool &enabled = m_LiveEffects[index];
-            if (ImGui::MenuItem(LIVE_EFFECTS_NAMES[index].data(), nullptr, enabled)) {
+            if (ImGui::MenuItem(LIVE_EFFECTS_NAMES[index], nullptr, enabled)) {
                 enabled = !enabled;
                 changed = true;
             }
@@ -190,7 +190,7 @@ void EditorPreferences::ReadSetting(const std::string_view line) {
 
 void EditorPreferences::WriteSettings(ImGuiTextBuffer &buffer) const {
     buffer.appendf("[%s][Preferences]\n", SETTINGS_TYPE_NAME);
-    buffer.appendf("WireColors=%s\n", WIRE_COLORING_NAMES[static_cast<std::size_t>(m_WireColoring)].data());
+    buffer.appendf("WireColors=%s\n", WIRE_COLORING_NAMES[static_cast<std::size_t>(m_WireColoring)]);
     buffer.appendf("Symbols=%s\n", m_SymbolStyle == SymbolStyle::ANSI ? "ANSI" : "IEC");
     buffer.appendf("TerminalNumbers=%d\n", m_ShowTerminalNumbers ? 1 : 0);
     buffer.appendf("ValueSeries=%s\n", Core::GetSeriesName(m_PartEditor.GetValueSeries()));

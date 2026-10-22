@@ -502,10 +502,10 @@ void DrawGrid(SvgWriter &svg, const ExportFigure &figure, const PanelLayout &lay
     }
     // Minor lines at 2 to 9 times each decade, as on log paper, while there are few decades
     if (figure.XLogarithmic && std::log10(frame.X.High / frame.X.Low) <= 8.0) {
-        for (double decade = std::pow(10.0, std::floor(std::log10(frame.X.Low))); decade < frame.X.High;
-             decade *= 10.0) {
+        const int first_exponent = static_cast<int>(std::floor(std::log10(frame.X.Low)));
+        for (int exponent = first_exponent; std::pow(10.0, exponent) < frame.X.High; ++exponent) {
             for (int multiple = 2; multiple <= 9; ++multiple) {
-                const double x = decade * multiple;
+                const double x = std::pow(10.0, exponent) * multiple;
                 if (x > frame.X.Low && x < frame.X.High) {
                     svg.Line({frame.ToPixelX(x), frame.Top}, {frame.ToPixelX(x), frame.Top + frame.Height}, theme.Grid,
                              scale, theme.MinorGridOpacity);

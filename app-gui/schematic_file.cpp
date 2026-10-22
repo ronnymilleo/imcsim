@@ -1313,7 +1313,7 @@ std::expected<LoadedSchematic, std::string> LoadSchematic(const std::string_view
  * @return  The contents, or an error message naming the file.
  */
 std::expected<std::string, std::string> ReadTextFile(const std::filesystem::path &path) {
-    std::ifstream file(path, std::ios::binary);
+    const std::ifstream file(path, std::ios::binary);
     if (!file) {
         return std::unexpected(std::format("Could not open {}", path.string()));
     }

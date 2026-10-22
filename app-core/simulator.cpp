@@ -567,7 +567,7 @@ std::expected<DCSweep, std::string> ReadDCSweep(const Circuit &circuit, const DC
 // ngspice saves the vector names of a plot in lower case; the plot name itself is kept as listed
 std::vector<std::string> ListVectors(std::string plot) {
     std::vector<std::string> names;
-    char **vectors = ngSpice_AllVecs(plot.data());
+    char *const *vectors = ngSpice_AllVecs(plot.data());
     for (; vectors != nullptr && *vectors != nullptr; ++vectors) {
         names.emplace_back(*vectors);
     }
@@ -586,7 +586,7 @@ struct NoisePlots {
 // The densities are the plot with a frequency scale; the totals have a single point and no scale
 std::optional<NoisePlots> FindNoisePlots() {
     NoisePlots plots;
-    char **names = ngSpice_AllPlots();
+    char *const *names = ngSpice_AllPlots();
     for (; names != nullptr && *names != nullptr; ++names) {
         const std::string name(*names);
         if (!name.starts_with("noise")) {
@@ -738,7 +738,7 @@ std::expected<Noise, std::string> ReadNoise(const Circuit &circuit, const NoiseS
 
 // The plot a transfer function analysis leaves; its name starts with "tf" and it holds one row
 std::optional<std::string> FindTransferFunctionPlot() {
-    char **names = ngSpice_AllPlots();
+    char *const *names = ngSpice_AllPlots();
     for (; names != nullptr && *names != nullptr; ++names) {
         const std::string name(*names);
         if (name.starts_with("tf")) {
@@ -1120,7 +1120,7 @@ TruthTableRun RunTruthTable(const Circuit &circuit, const TruthTableSettings &se
 
     const std::size_t missing = static_cast<std::size_t>(
         std::ranges::count_if(table.Rows, [](const TruthTableRow &row) { return !row.HasOperatingPoint(); }));
-    if (missing == row_count) {
+    if (first_failure && missing == row_count) {
         return {std::unexpected(*first_failure), std::move(failure_messages)};
     }
     if (missing > 0) {

@@ -1022,16 +1022,22 @@ std::string FormatDistortionPercent(const double ratio) {
 // Every trace of a spectrum shares the span and the window, so one warning covers them all when the span holds too
 // few periods to tell the harmonics apart
 void DrawPeriodsWarning(const TransientSpectra &spectra) {
-    const auto short_trace = std::ranges::find_if(
-        spectra.Traces, [](const SpectrumTrace &trace) { return trace.Harmonics.PeriodsNeeded.has_value(); });
-    if (short_trace == spectra.Traces.end()) {
+    std::optional<int> periods_needed;
+    for (const SpectrumTrace &trace : spectra.Traces) {
+        if (trace.Harmonics.PeriodsNeeded) {
+            periods_needed = trace.Harmonics.PeriodsNeeded;
+            break;
+        }
+    }
+    if (!periods_needed) {
         return;
     }
+    const int periods = *periods_needed;
     ImGui::PushTextWrapPos(0.0f);
     ImGui::TextColored(GetWarningTextColor(), "%s",
                        std::format("The stretch needs {} periods to tell the harmonics apart: widen it, or pick the "
                                    "Rectangular window over whole periods",
-                                   *short_trace->Harmonics.PeriodsNeeded)
+                                   periods)
                            .c_str());
     ImGui::PopTextWrapPos();
 }
@@ -1934,6 +1940,9 @@ void OutputWindow::UpdateSpectra(const Core::Transient &transient, const std::ve
 // Voltages, currents and math channels keep the axes they have in the transient, in decibels; each trace marks its
 // harmonics. A new spectrum fits its axes, and a linear one opens on the harmonics of the first trace that has some
 void OutputWindow::DrawSpectrum() {
+    if (!m_Spectra) {
+        return;
+    }
     const TransientSpectra &spectra = *m_Spectra;
     ImGui::PushTextWrapPos(0.0f);
     ImGui::TextDisabled("%s", std::format("From {}s to {}s of the transient: zoom its plot or place its cursors to "
@@ -1978,13 +1987,14 @@ void OutputWindow::DrawSpectrum() {
         if (!trace.Decibels) {
             continue;
         }
+        const std::vector<double> &decibels = *trace.Decibels;
         ImPlot::SetAxes(ImAxis_X1, trace.Axis);
         if (trace.Dashed) {
-            PlotDashedLine(trace.Label, spectra.Frequencies, *trace.Decibels, trace.Color);
+            PlotDashedLine(trace.Label, spectra.Frequencies, decibels, trace.Color);
         } else {
             ImPlotSpec spec;
             spec.LineColor = ImGui::ColorConvertU32ToFloat4(trace.Color);
-            ImPlot::PlotLine(trace.Label.c_str(), spectra.Frequencies.data(), trace.Decibels->data(),
+            ImPlot::PlotLine(trace.Label.c_str(), spectra.Frequencies.data(), decibels.data(),
                              static_cast<int>(spectra.Frequencies.size()), spec);
         }
         std::vector<double> harmonic_frequencies;
@@ -2000,7 +2010,7 @@ void OutputWindow::DrawSpectrum() {
         ImPlot::PlotScatter(std::format("##{} harmonics", trace.Label).c_str(), harmonic_frequencies.data(),
                             harmonic_levels.data(), static_cast<int>(harmonic_frequencies.size()), marker_spec);
         units.push_back(GetDecibelUnit(trace));
-        plotted.push_back({trace.Label, &*trace.Decibels, units.back().c_str(), trace.Color});
+        plotted.push_back({trace.Label, &decibels, units.back().c_str(), trace.Color});
     }
     ImPlot::SetAxes(ImAxis_X1, ImAxis_Y1);
     DrawCursorReadout(spectra.Frequencies, "Hz", m_SpectrumLogarithmic, plotted);
@@ -2074,6 +2084,9 @@ void OutputWindow::DrawTransientStatistics(const Core::Transient &transient, con
 // then each harmonic relative to the fundamental, in dBc
 void OutputWindow::DrawSpectrumStatistics() {
     DrawSpectrumControls();
+    if (!m_Spectra) {
+        return;
+    }
     const TransientSpectra &spectra = *m_Spectra;
     if (spectra.Traces.empty()) {
         ImGui::TextDisabled("Measure a trace to see its harmonics");
@@ -2338,19 +2351,33 @@ bool OutputWindow::CanExport(const FrameResults &frame) const {
 // The figure of the shown tab, which CanExport() has found something to export in
 ExportFigure OutputWindow::BuildShownFigure(const FrameResults &frame) const {
     switch (m_ShownTab) {
-    case PlotTab::TRANSIENT: {
-        const Core::Transient &transient = *m_Schematic.GetTransient();
-        return BuildTransientFigure(transient, frame.TransientMath, FindMeasuredLanes(transient.NodeVoltages.size()),
-                                    m_Schematic, m_ShowBitValues, m_TransientView);
-    }
+    case PlotTab::TRANSIENT:
+        if (const std::optional<Core::Transient> &transient = m_Schematic.GetTransient()) {
+            return BuildTransientFigure(*transient, frame.TransientMath,
+                                        FindMeasuredLanes(transient->NodeVoltages.size()), m_Schematic, m_ShowBitValues,
+                                        m_TransientView);
+        }
+        break;
     case PlotTab::SPECTRUM:
-        return BuildSpectrumFigure(*m_Spectra, m_SpectrumLogarithmic, m_SpectrumView);
+        if (m_Spectra) {
+            return BuildSpectrumFigure(*m_Spectra, m_SpectrumLogarithmic, m_SpectrumView);
+        }
+        break;
     case PlotTab::AC_SWEEP:
-        return BuildACSweepFigure(*m_Schematic.GetACSweep(), m_Schematic, m_ACSweepView);
+        if (const std::optional<Core::ACSweep> &sweep = m_Schematic.GetACSweep()) {
+            return BuildACSweepFigure(*sweep, m_Schematic, m_ACSweepView);
+        }
+        break;
     case PlotTab::DC_SWEEP:
-        return BuildDCSweepFigure(*m_Schematic.GetDCSweep(), frame.DCSweepMath, m_Schematic, m_DCSweepView);
+        if (const std::optional<Core::DCSweep> &sweep = m_Schematic.GetDCSweep()) {
+            return BuildDCSweepFigure(*sweep, frame.DCSweepMath, m_Schematic, m_DCSweepView);
+        }
+        break;
     case PlotTab::NOISE:
-        return BuildNoiseFigure(*m_Schematic.GetNoise(), m_Schematic, m_ShownNoiseContributions, m_NoiseView);
+        if (const std::optional<Core::Noise> &noise = m_Schematic.GetNoise()) {
+            return BuildNoiseFigure(*noise, m_Schematic, m_ShownNoiseContributions, m_NoiseView);
+        }
+        break;
     case PlotTab::OPERATING_POINT:
     case PlotTab::TRANSFER_FUNCTION:
     case PlotTab::TRUTH_TABLE:

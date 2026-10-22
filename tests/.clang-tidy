@@ -1,0 +1,4 @@
+# Catch2 checks its optionals with REQUIRE before reading them and registers its test cases in static objects, which
+# these checks cannot follow
+InheritParentConfig: true
+Checks: '-bugprone-unchecked-optional-access,-bugprone-throwing-static-initialization'

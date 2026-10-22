@@ -137,7 +137,11 @@ void UIControlledSwitch::DrawSign(SchematicCanvas &canvas, const ViewTransform &
 
 void UIControlledSwitch::DrawDashedLine(SchematicCanvas &canvas, const ViewTransform &view, const float from_x,
                                         const float to_x, const float y, const ImU32 color) const {
-    for (float x = from_x + DASH_GAP; x + DASH_LENGTH <= to_x; x += DASH_LENGTH + DASH_GAP) {
+    for (int dash = 0;; ++dash) {
+        const float x = from_x + DASH_GAP + static_cast<float>(dash) * (DASH_LENGTH + DASH_GAP);
+        if (x + DASH_LENGTH > to_x) {
+            break;
+        }
         canvas.AddLine(LocalToScreen(view, x, y), LocalToScreen(view, x + DASH_LENGTH, y), color, LINE_THICKNESS);
     }
 }

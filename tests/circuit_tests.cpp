@@ -301,7 +301,7 @@ TEST_CASE("ToSpiceNetlist writes the analysis right before .end", "[circuit]") {
 }
 
 TEST_CASE("HasGround looks for a ground component", "[circuit]") {
-    Core::Resistor resistor;
+    const Core::Resistor resistor;
     const Core::Ground ground;
     Core::Circuit circuit;
     circuit.Add(resistor, {1, 0});
@@ -804,7 +804,7 @@ TEST_CASE("GetElementNames lists the elements the netlist writes for each part",
     transformer.SetName("T1");
     Core::LogicPart gate(Core::ComponentType::NAND);
     gate.SetName("U3");
-    Core::Ground ground;
+    const Core::Ground ground;
     Core::Circuit circuit;
     circuit.Add(resistor, {1, 0});
     circuit.Add(pot, {1, 2, 3});

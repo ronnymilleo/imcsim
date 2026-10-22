@@ -67,7 +67,7 @@ void SchematicFileActions::DrawPopups() {
                 ShowFileDialog(FileAction::OPEN);
             } else if (m_ActionToConfirm == FileAction::QUIT) {
                 m_QuitConfirmed = true;
-            } else if (m_ActionToConfirm == FileAction::EXAMPLE) {
+            } else if (m_ActionToConfirm == FileAction::EXAMPLE && m_ExampleToOpen) {
                 OpenExample(*m_ExampleToOpen);
             }
             m_ActionToConfirm.reset();

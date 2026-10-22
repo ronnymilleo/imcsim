@@ -120,7 +120,7 @@ std::optional<std::string> StoreResult(std::expected<Result, std::string> result
 
 // A source that is empty, or that left the circuit or its AC setting, falls back to the first source that can be
 // the input; sources must not be empty
-const std::string &ResolveInputSource(const std::string &stored, const std::vector<std::string> &sources) {
+std::string ResolveInputSource(const std::string &stored, const std::vector<std::string> &sources) {
     return std::ranges::contains(sources, stored) ? stored : sources.front();
 }
 
@@ -131,9 +131,8 @@ std::vector<int> ListHeldNodes(const Core::Circuit &circuit) {
     for (const Core::CircuitEntry &entry : circuit.GetEntries()) {
         const Core::ComponentType type = entry.Part->GetType();
         if (type == Core::ComponentType::VCC || type == Core::ComponentType::LOGIC_INPUT ||
-            type == Core::ComponentType::CLOCK) {
-            nodes.push_back(entry.Nodes[0]);
-        } else if (type == Core::ComponentType::VOLTAGE_SOURCE && entry.Nodes[1] == 0) {
+            type == Core::ComponentType::CLOCK ||
+            (type == Core::ComponentType::VOLTAGE_SOURCE && entry.Nodes[1] == 0)) {
             nodes.push_back(entry.Nodes[0]);
         } else if (type == Core::ComponentType::VOLTAGE_SOURCE && entry.Nodes[0] == 0) {
             nodes.push_back(entry.Nodes[1]);
@@ -635,7 +634,8 @@ void AnalysisControls::DrawTransientSettings(SimulationSettings &settings) {
     const auto suggested = Core::SuggestTransientSettings(m_Schematic.BuildCircuit());
     if (DrawSuggestButton(suggested.has_value(),
                           "Five periods of the slowest source, or the whole span of a one-shot one",
-                          "Needs a source with a waveform")) {
+                          "Needs a source with a waveform") &&
+        suggested) {
         settings.Transient = *suggested;
         m_StopTime.Load(suggested->StopTime);
         m_TimeStep.Load(suggested->TimeStep);
@@ -656,7 +656,8 @@ void AnalysisControls::DrawACSweepSettings(SimulationSettings &settings) {
     }
     const auto suggested = Core::SuggestACSweepSettings(m_Schematic.BuildCircuit());
     if (DrawSuggestButton(suggested.has_value(), "Two decades past the RC, RL and LC corners and the op-amp bandwidths",
-                          "Needs a capacitor, an inductor or an op-amp")) {
+                          "Needs a capacitor, an inductor or an op-amp") &&
+        suggested) {
         settings.ACSweep.StartFrequency = suggested->StartFrequency;
         settings.ACSweep.StopFrequency = suggested->StopFrequency;
         m_StartFrequency.Load(suggested->StartFrequency);
@@ -729,7 +730,8 @@ void AnalysisControls::DrawNoiseSettings(SimulationSettings &settings) {
     }
     const auto suggested = Core::SuggestACSweepSettings(circuit);
     if (DrawSuggestButton(suggested.has_value(), "Two decades past the RC, RL and LC corners and the op-amp bandwidths",
-                          "Needs a capacitor, an inductor or an op-amp")) {
+                          "Needs a capacitor, an inductor or an op-amp") &&
+        suggested) {
         settings.NoiseRange.StartFrequency = suggested->StartFrequency;
         settings.NoiseRange.StopFrequency = suggested->StopFrequency;
         m_NoiseStartFrequency.Load(suggested->StartFrequency);

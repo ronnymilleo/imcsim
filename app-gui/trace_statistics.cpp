@@ -119,7 +119,7 @@ std::optional<double> MeasureFrequency(const std::vector<Sample> &samples, const
             armed = false;
         }
     }
-    if (cycles == 0 || last_crossing <= *first_crossing) {
+    if (!first_crossing || cycles == 0 || last_crossing <= *first_crossing) {
         return std::nullopt;
     }
     return static_cast<double>(cycles) / (last_crossing - *first_crossing);
