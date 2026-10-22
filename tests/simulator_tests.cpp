@@ -2684,6 +2684,57 @@ TEST_CASE("A logic input drives a gate to the output its truth table gives", "[s
     CHECK_THAT(high.Result->NodeVoltages[3], Catch::Matchers::WithinAbs(5.0, 0.05));
 }
 
+TEST_CASE("A circuit of only digital parts runs without a ground", "[simulator][digital]") {
+    SKIP_WITHOUT_DIGITAL_MODELS();
+    Core::LogicInput input_a;
+    input_a.SetName("V1");
+    input_a.SetHigh(true);
+    Core::LogicInput input_b;
+    input_b.SetName("V2");
+    Core::LogicPart gate(Core::ComponentType::And);
+    gate.SetName("U1");
+    Core::Circuit circuit;
+    // A on node 1 and B on node 2, with Y on node 3 and no Ground part, resistor or load anywhere
+    circuit.Add(input_a, {1});
+    circuit.Add(input_b, {2});
+    circuit.Add(gate, {1, 2, 3});
+    REQUIRE_FALSE(circuit.HasGround());
+
+    // 1 AND 0 is 0, and 1 AND 1 is 1
+    const Core::OperatingPointRun low = Core::RunOperatingPoint(circuit);
+    REQUIRE(low.Result.has_value());
+    CHECK_THAT(low.Result->NodeVoltages[3], Catch::Matchers::WithinAbs(0.0, 0.05));
+
+    input_b.SetHigh(true);
+    const Core::OperatingPointRun high = Core::RunOperatingPoint(circuit);
+    REQUIRE(high.Result.has_value());
+    CHECK_THAT(high.Result->NodeVoltages[1], Catch::Matchers::WithinAbs(5.0, 0.05));
+    CHECK_THAT(high.Result->NodeVoltages[3], Catch::Matchers::WithinAbs(5.0, 0.05));
+}
+
+TEST_CASE("A circuit with an analog part or a clock still needs a ground", "[simulator][digital]") {
+    Core::LogicInput input;
+    input.SetName("V1");
+    Core::Resistor load;
+    load.SetName("R1");
+    load.SetValue(1e3);
+    Core::Circuit with_resistor;
+    with_resistor.Add(input, {1});
+    with_resistor.Add(load, {1, 2});
+    const Core::OperatingPointRun resistor_run = Core::RunOperatingPoint(with_resistor);
+    REQUIRE_FALSE(resistor_run.Result.has_value());
+    CHECK(resistor_run.Result.error().contains("no ground"));
+
+    // A clock has two terminals, and the second one needs a node to return to
+    Core::Clock clock;
+    clock.SetName("V1");
+    Core::Circuit with_clock;
+    with_clock.Add(clock, {1, 2});
+    const Core::OperatingPointRun clock_run = Core::RunOperatingPoint(with_clock);
+    REQUIRE_FALSE(clock_run.Result.has_value());
+    CHECK(clock_run.Result.error().contains("no ground"));
+}
+
 TEST_CASE("A logic input gives a NAND latch a defined state", "[simulator][digital]") {
     SKIP_WITHOUT_DIGITAL_MODELS();
     Core::LogicInput set_bar;

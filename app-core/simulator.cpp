@@ -194,11 +194,20 @@ std::string DescribeFailure(const Circuit &circuit, const std::vector<SimulatorM
     return "ngspice could not simulate the circuit; see its output for details";
 }
 
+// Logic inputs, supply rails and logic parts tie themselves to node 0 in the netlist, so a circuit made only of them
+// has its reference without a Ground part. A clock has two terminals and its second one needs a node to return to
+bool IsDigitalOnly(const Circuit &circuit) {
+    return std::ranges::all_of(circuit.GetEntries(), [](const CircuitEntry &entry) {
+        const ComponentType type = entry.Part->GetType();
+        return type == ComponentType::LogicInput || type == ComponentType::VCC || IsLogicPart(type);
+    });
+}
+
 std::optional<std::string> CheckCircuit(const Circuit &circuit) {
     if (circuit.GetEntries().empty()) {
         return "The schematic is empty";
     }
-    if (!circuit.HasGround()) {
+    if (!circuit.HasGround() && !IsDigitalOnly(circuit)) {
         return "The circuit has no ground; add a Ground so node voltages have a reference";
     }
     // A current-controlled source needs a current that some other part reports
@@ -1274,7 +1283,8 @@ SimulationRun<Data> Simulate(const Circuit &circuit, const std::string_view anal
 
 /**
  * @brief   Computes the DC operating point of a circuit with ngspice.
- * @param[in] circuit  Circuit to simulate; it needs a ground component.
+ * @param[in] circuit  Circuit to simulate; it needs a ground component, unless it holds only logic parts, logic inputs
+ * and supply rails.
  * @return  The node voltages or an error, plus every line ngspice printed. Warnings such as "singular matrix"
  *          can come with a successful result whose values are meaningless, so show the messages to the user.
  * @note    Not thread-safe: ngspice is a single global library instance.
@@ -1289,7 +1299,8 @@ OperatingPointRun RunOperatingPoint(const Circuit &circuit) {
 /**
  * @brief   Simulates how the node voltages of a circuit change over time, starting from its operating point or from
  *          the initial conditions of its capacitors and inductors.
- * @param[in] circuit   Circuit to simulate; it needs a ground component.
+ * @param[in] circuit   Circuit to simulate; it needs a ground component, unless it holds only logic parts, logic inputs
+ * and supply rails.
  * @param[in] settings  Stop time and time step.
  * @param[in] parameter Value of the stepped parameter for this run, a part value or the temperature; none runs the
  *                      circuit as it is.
@@ -1349,7 +1360,8 @@ TransientRun RunTransient(const Circuit &circuit, const TransientSettings &setti
 
 /**
  * @brief   Sweeps the small-signal response of a circuit across frequency, excited by its AC sources.
- * @param[in] circuit   Circuit to simulate; it needs a ground component and at least one AC source.
+ * @param[in] circuit   Circuit to simulate; it needs a ground component (unless it holds only logic parts, logic inputs
+ * and supply rails) and at least one AC source.
  * @param[in] settings  Frequency range and points per decade.
  * @param[in] parameter Value of the stepped parameter for this run, a part value or the temperature; none runs the
  *                      circuit as it is.
@@ -1379,7 +1391,8 @@ ACSweepRun RunACSweep(const Circuit &circuit, const ACSweepSettings &settings,
 
 /**
  * @brief   Sweeps a source through a range of DC values and finds the operating point at each one.
- * @param[in] circuit   Circuit to simulate; it needs a ground component.
+ * @param[in] circuit   Circuit to simulate; it needs a ground component, unless it holds only logic parts, logic inputs
+ * and supply rails.
  * @param[in] settings  Swept source and range, and optionally a second source stepped once per curve.
  * @param[in] parameter Value of the stepped parameter for this run, a part value or the temperature; none runs the
  *                      circuit as it is.
@@ -1414,7 +1427,8 @@ DCSweepRun RunDCSweep(const Circuit &circuit, const DCSweepSettings &settings,
 
 /**
  * @brief   Computes the noise of a circuit at a node across frequency, and refers it to an input source.
- * @param[in] circuit   Circuit to simulate; it needs a ground component.
+ * @param[in] circuit   Circuit to simulate; it needs a ground component, unless it holds only logic parts, logic inputs
+ * and supply rails.
  * @param[in] settings  Output node, input source (a voltage or current source set to AC) and frequency range.
  * @return  The output and input-referred noise densities, their totals over the range and the share of every part,
  *          or an error, plus every line ngspice printed. Invalid settings are rejected before reaching ngspice.
@@ -1439,7 +1453,8 @@ NoiseRun RunNoise(const Circuit &circuit, const NoiseSettings &settings) {
 
 /**
  * @brief   Finds the small-signal DC transfer function from an input source to an output, with both impedances.
- * @param[in] circuit   Circuit to simulate; it needs a ground component.
+ * @param[in] circuit   Circuit to simulate; it needs a ground component, unless it holds only logic parts, logic inputs
+ * and supply rails.
  * @param[in] settings  Output node and input source (an independent voltage source, current source or VCC rail).
  * @return  The DC gain, the input impedance and the output impedance, or an error, plus every line ngspice printed.
  *          Invalid settings are rejected before reaching ngspice.

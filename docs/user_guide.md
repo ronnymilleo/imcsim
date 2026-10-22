@@ -42,7 +42,9 @@ How to read what imcsim measures, plots and exports. The [README](../README.md) 
 - **Logic input**: a box in the supply row with Ground and VCC drives a net to a defined level. A High box in its
   properties drives the logic level (5 V by default, editable) and leaves it clear to drive 0 V; the symbol shows a 1
   while high and a 0 while low, and both start low. It is a source from its terminal to ground, so it gives a gate
-  input or a latch's SET or RESET a defined level to start from.
+  input or a latch's SET or RESET a defined level to start from. A circuit of only logic parts, logic inputs and VCC
+  runs without a Ground symbol or a load on the outputs; add a Ground as soon as it has any other part, a clock
+  included.
 - **Standard values**: View > Component Values restricts resistors, capacitors and inductors to one of the E series
   (E6, E12, E24, E48, E96 or E192, with their tolerances of 20% down to 0.5%), or leaves any value allowed, which is
   the default. With a series chosen, a typed value becomes the nearest one of the series on a log scale (`5000` is
