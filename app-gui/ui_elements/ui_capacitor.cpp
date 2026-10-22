@@ -21,10 +21,10 @@ UICapacitor::UICapacitor(const GridPoint position, const Rotation rotation)
 
 void UICapacitor::DrawSymbol(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color,
                              SymbolStyle /*style*/) const {
-    canvas.AddLine(LocalToScreen(view, -1, 0), LocalToScreen(view, -0.25f, 0), color, LineThickness);
-    canvas.AddLine(LocalToScreen(view, 0.25f, 0), LocalToScreen(view, 1, 0), color, LineThickness);
-    canvas.AddLine(LocalToScreen(view, -0.25f, -0.8f), LocalToScreen(view, -0.25f, 0.8f), color, LineThickness);
-    canvas.AddLine(LocalToScreen(view, 0.25f, -0.8f), LocalToScreen(view, 0.25f, 0.8f), color, LineThickness);
+    canvas.AddLine(LocalToScreen(view, -1, 0), LocalToScreen(view, -0.25f, 0), color, LINE_THICKNESS);
+    canvas.AddLine(LocalToScreen(view, 0.25f, 0), LocalToScreen(view, 1, 0), color, LINE_THICKNESS);
+    canvas.AddLine(LocalToScreen(view, -0.25f, -0.8f), LocalToScreen(view, -0.25f, 0.8f), color, LINE_THICKNESS);
+    canvas.AddLine(LocalToScreen(view, 0.25f, -0.8f), LocalToScreen(view, 0.25f, 0.8f), color, LINE_THICKNESS);
 }
 
 } // namespace GUI

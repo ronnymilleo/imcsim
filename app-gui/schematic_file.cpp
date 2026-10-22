@@ -33,8 +33,8 @@ namespace GUI {
 
 namespace {
 
-constexpr std::string_view FormatName = "imcsim-schematic";
-constexpr int FormatVersion = 1;
+constexpr std::string_view FORMAT_NAME = "imcsim-schematic";
+constexpr int FORMAT_VERSION = 1;
 
 /**
  * @struct  ParameterKey
@@ -46,21 +46,21 @@ template <typename Parameters> struct ParameterKey {
 };
 
 // The sine keys sit in the element object itself, where the first files with AC sources put them
-constexpr auto ACKeys = std::to_array<ParameterKey<Core::ACParameters>>({
+constexpr auto AC_KEYS = std::to_array<ParameterKey<Core::ACParameters>>({
     {"amplitude", &Core::ACParameters::Amplitude},
     {"frequency", &Core::ACParameters::Frequency},
     {"offset", &Core::ACParameters::Offset},
     {"ac_magnitude", &Core::ACParameters::Magnitude},
 });
 
-constexpr auto SwitchKeys = std::to_array<ParameterKey<Core::SwitchParameters>>({
+constexpr auto SWITCH_KEYS = std::to_array<ParameterKey<Core::SwitchParameters>>({
     {"threshold", &Core::SwitchParameters::Threshold},
     {"hysteresis", &Core::SwitchParameters::Hysteresis},
     {"on_resistance", &Core::SwitchParameters::OnResistance},
     {"off_resistance", &Core::SwitchParameters::OffResistance},
 });
 
-constexpr auto RelayKeys = std::to_array<ParameterKey<Core::RelayParameters>>({
+constexpr auto RELAY_KEYS = std::to_array<ParameterKey<Core::RelayParameters>>({
     {"coil_resistance", &Core::RelayParameters::CoilResistance},
     {"coil_inductance", &Core::RelayParameters::CoilInductance},
     {"pull_in", &Core::RelayParameters::PullInVoltage},
@@ -68,29 +68,29 @@ constexpr auto RelayKeys = std::to_array<ParameterKey<Core::RelayParameters>>({
     {"contact_resistance", &Core::RelayParameters::ContactResistance},
 });
 
-constexpr auto TransformerKeys = std::to_array<ParameterKey<Core::TransformerParameters>>({
+constexpr auto TRANSFORMER_KEYS = std::to_array<ParameterKey<Core::TransformerParameters>>({
     {"turns_ratio", &Core::TransformerParameters::TurnsRatio},
     {"coupling", &Core::TransformerParameters::Coupling},
     {"winding_resistance", &Core::TransformerParameters::WindingResistance},
 });
 
-constexpr auto LogicKeys = std::to_array<ParameterKey<Core::LogicParameters>>({
+constexpr auto LOGIC_KEYS = std::to_array<ParameterKey<Core::LogicParameters>>({
     {"logic_level", &Core::LogicParameters::LogicLevel},
     {"propagation_delay", &Core::LogicParameters::PropagationDelay},
 });
 
-constexpr auto ClockKeys = std::to_array<ParameterKey<Core::ClockParameters>>({
+constexpr auto CLOCK_KEYS = std::to_array<ParameterKey<Core::ClockParameters>>({
     {"frequency", &Core::ClockParameters::Frequency},
     {"duty_cycle", &Core::ClockParameters::DutyCycle},
     {"logic_level", &Core::ClockParameters::LogicLevel},
     {"start_delay", &Core::ClockParameters::StartDelay},
 });
 
-constexpr auto LogicInputKeys = std::to_array<ParameterKey<Core::LogicInputParameters>>({
+constexpr auto LOGIC_INPUT_KEYS = std::to_array<ParameterKey<Core::LogicInputParameters>>({
     {"logic_level", &Core::LogicInputParameters::LogicLevel},
 });
 
-constexpr auto PulseKeys = std::to_array<ParameterKey<Core::PulseParameters>>({
+constexpr auto PULSE_KEYS = std::to_array<ParameterKey<Core::PulseParameters>>({
     {"low", &Core::PulseParameters::Low},
     {"high", &Core::PulseParameters::High},
     {"delay", &Core::PulseParameters::Delay},
@@ -101,7 +101,7 @@ constexpr auto PulseKeys = std::to_array<ParameterKey<Core::PulseParameters>>({
 });
 
 // Named after the SPICE EXP parameters
-constexpr auto EXPKeys = std::to_array<ParameterKey<Core::EXPParameters>>({
+constexpr auto EXP_KEYS = std::to_array<ParameterKey<Core::EXPParameters>>({
     {"v1", &Core::EXPParameters::InitialValue},
     {"v2", &Core::EXPParameters::PeakValue},
     {"td1", &Core::EXPParameters::RiseDelay},
@@ -110,7 +110,7 @@ constexpr auto EXPKeys = std::to_array<ParameterKey<Core::EXPParameters>>({
     {"tau2", &Core::EXPParameters::FallTimeConstant},
 });
 
-constexpr auto SFFMKeys = std::to_array<ParameterKey<Core::SFFMParameters>>({
+constexpr auto SFFM_KEYS = std::to_array<ParameterKey<Core::SFFMParameters>>({
     {"offset", &Core::SFFMParameters::Offset},
     {"amplitude", &Core::SFFMParameters::Amplitude},
     {"carrier", &Core::SFFMParameters::CarrierFrequency},
@@ -118,7 +118,7 @@ constexpr auto SFFMKeys = std::to_array<ParameterKey<Core::SFFMParameters>>({
     {"signal", &Core::SFFMParameters::SignalFrequency},
 });
 
-constexpr auto AMKeys = std::to_array<ParameterKey<Core::AMParameters>>({
+constexpr auto AM_KEYS = std::to_array<ParameterKey<Core::AMParameters>>({
     {"amplitude", &Core::AMParameters::Amplitude},
     {"offset", &Core::AMParameters::Offset},
     {"mod_frequency", &Core::AMParameters::ModulatingFrequency},
@@ -127,7 +127,7 @@ constexpr auto AMKeys = std::to_array<ParameterKey<Core::AMParameters>>({
 });
 
 // Named after the SPICE diode parameters
-constexpr auto DiodeKeys = std::to_array<ParameterKey<Core::DiodeParameters>>({
+constexpr auto DIODE_KEYS = std::to_array<ParameterKey<Core::DiodeParameters>>({
     {"is", &Core::DiodeParameters::SaturationCurrent},
     {"n", &Core::DiodeParameters::EmissionCoefficient},
     {"rs", &Core::DiodeParameters::SeriesResistance},
@@ -139,7 +139,7 @@ constexpr auto DiodeKeys = std::to_array<ParameterKey<Core::DiodeParameters>>({
     {"tt", &Core::DiodeParameters::TransitTime},
 });
 
-constexpr auto BJTKeys = std::to_array<ParameterKey<Core::BJTParameters>>({
+constexpr auto BJT_KEYS = std::to_array<ParameterKey<Core::BJTParameters>>({
     {"is", &Core::BJTParameters::SaturationCurrent},
     {"bf", &Core::BJTParameters::ForwardBeta},
     {"br", &Core::BJTParameters::ReverseBeta},
@@ -158,7 +158,7 @@ constexpr auto BJTKeys = std::to_array<ParameterKey<Core::BJTParameters>>({
     {"pmax", &Core::BJTParameters::MaxPower},
 });
 
-constexpr auto MOSFETKeys = std::to_array<ParameterKey<Core::MOSFETParameters>>({
+constexpr auto MOSFET_KEYS = std::to_array<ParameterKey<Core::MOSFETParameters>>({
     {"vto", &Core::MOSFETParameters::ThresholdVoltage},
     {"kp", &Core::MOSFETParameters::Transconductance},
     {"lambda", &Core::MOSFETParameters::ChannelModulation},
@@ -174,7 +174,7 @@ constexpr auto MOSFETKeys = std::to_array<ParameterKey<Core::MOSFETParameters>>(
     {"pmax", &Core::MOSFETParameters::MaxPower},
 });
 
-constexpr auto OpAmpKeys = std::to_array<ParameterKey<Core::OpAmpParameters>>({
+constexpr auto OP_AMP_KEYS = std::to_array<ParameterKey<Core::OpAmpParameters>>({
     {"avol_db", &Core::OpAmpParameters::OpenLoopGainDecibels},
     {"gbw", &Core::OpAmpParameters::GainBandwidth},
     {"slew_v_per_us", &Core::OpAmpParameters::SlewRate},
@@ -188,24 +188,24 @@ constexpr auto OpAmpKeys = std::to_array<ParameterKey<Core::OpAmpParameters>>({
     {"iq", &Core::OpAmpParameters::SupplyCurrent},
 });
 
-constexpr auto TransientKeys = std::to_array<ParameterKey<Core::TransientSettings>>({
+constexpr auto TRANSIENT_KEYS = std::to_array<ParameterKey<Core::TransientSettings>>({
     {"stop", &Core::TransientSettings::StopTime},
     {"step", &Core::TransientSettings::TimeStep},
 });
 
 // The points per decade are an integer, so they are written and read apart
-constexpr auto ACSweepKeys = std::to_array<ParameterKey<Core::ACSweepSettings>>({
+constexpr auto AC_SWEEP_KEYS = std::to_array<ParameterKey<Core::ACSweepSettings>>({
     {"start", &Core::ACSweepSettings::StartFrequency},
     {"stop", &Core::ACSweepSettings::StopFrequency},
 });
 
-constexpr auto ParameterStepKeys = std::to_array<ParameterKey<ParameterStepSettings>>({
+constexpr auto PARAMETER_STEP_KEYS = std::to_array<ParameterKey<ParameterStepSettings>>({
     {"start", &ParameterStepSettings::Start},
     {"stop", &ParameterStepSettings::Stop},
     {"step", &ParameterStepSettings::Step},
 });
 
-constexpr auto SweepRangeKeys = std::to_array<ParameterKey<Core::SweepRange>>({
+constexpr auto SWEEP_RANGE_KEYS = std::to_array<ParameterKey<Core::SweepRange>>({
     {"start", &Core::SweepRange::Start},
     {"stop", &Core::SweepRange::Stop},
     {"step", &Core::SweepRange::Step},
@@ -353,14 +353,14 @@ void WriteModelChoice(const Part &part, const std::array<ParameterKey<Parameters
 void WriteModelFields(const Core::Component &component, nlohmann::json &object) {
     const Core::ComponentType type = component.GetType();
     if (Core::IsDiode(type)) {
-        WriteModelChoice(static_cast<const Core::Diode &>(component), DiodeKeys, object);
+        WriteModelChoice(static_cast<const Core::Diode &>(component), DIODE_KEYS, object);
     } else if (Core::IsBJT(type)) {
-        WriteModelChoice(static_cast<const Core::BJT &>(component), BJTKeys, object);
+        WriteModelChoice(static_cast<const Core::BJT &>(component), BJT_KEYS, object);
     } else if (Core::IsMOSFET(type)) {
-        WriteModelChoice(static_cast<const Core::MOSFET &>(component), MOSFETKeys, object);
-    } else if (type == Core::ComponentType::OpAmp) {
+        WriteModelChoice(static_cast<const Core::MOSFET &>(component), MOSFET_KEYS, object);
+    } else if (type == Core::ComponentType::OP_AMP) {
         const auto &op_amp = static_cast<const Core::OpAmp &>(component);
-        WriteModelChoice(op_amp, OpAmpKeys, object);
+        WriteModelChoice(op_amp, OP_AMP_KEYS, object);
         if (op_amp.IsIdeal()) {
             object["gbw"] = op_amp.GetIdealBandwidth();
         }
@@ -372,16 +372,16 @@ void WriteKindFields(const Core::Component &component, nlohmann::json &object) {
     const Core::ComponentType type = component.GetType();
     if (Core::IsCurrentControlled(type)) {
         object["control"] = static_cast<const Core::ControlledSource &>(component).GetControllingCurrent();
-    } else if (type == Core::ComponentType::NetLabel) {
+    } else if (type == Core::ComponentType::NET_LABEL) {
         // A label with no name yet is saved without the key
         if (const std::string &net = static_cast<const Core::NetLabel &>(component).GetNet(); !net.empty()) {
             object["net"] = net;
         }
     } else if (Core::IsSwitch(type)) {
         object["closed"] = static_cast<const Core::Switch &>(component).IsClosed();
-    } else if (type == Core::ComponentType::LogicInput) {
+    } else if (type == Core::ComponentType::LOGIC_INPUT) {
         object["high"] = static_cast<const Core::LogicInput &>(component).IsHigh();
-    } else if (type == Core::ComponentType::Potentiometer) {
+    } else if (type == Core::ComponentType::POTENTIOMETER) {
         object["wiper"] = static_cast<const Core::Potentiometer &>(component).GetWiper();
     }
 }
@@ -390,22 +390,22 @@ void WriteKindFields(const Core::Component &component, nlohmann::json &object) {
 // gates and flip-flops with their logic family, a clock and a logic input
 void WriteFigureFields(const Core::Component &component, nlohmann::json &object) {
     const Core::ComponentType type = component.GetType();
-    if (type == Core::ComponentType::VSwitch) {
-        WritePartParameters(static_cast<const Core::VoltageControlledSwitch &>(component), SwitchKeys, object);
-    } else if (type == Core::ComponentType::Relay) {
-        WritePartParameters(static_cast<const Core::Relay &>(component), RelayKeys, object);
-    } else if (type == Core::ComponentType::Transformer) {
-        WritePartParameters(static_cast<const Core::Transformer &>(component), TransformerKeys, object);
+    if (type == Core::ComponentType::V_SWITCH) {
+        WritePartParameters(static_cast<const Core::VoltageControlledSwitch &>(component), SWITCH_KEYS, object);
+    } else if (type == Core::ComponentType::RELAY) {
+        WritePartParameters(static_cast<const Core::Relay &>(component), RELAY_KEYS, object);
+    } else if (type == Core::ComponentType::TRANSFORMER) {
+        WritePartParameters(static_cast<const Core::Transformer &>(component), TRANSFORMER_KEYS, object);
     } else if (Core::IsLogicPart(type)) {
         const auto &part = static_cast<const Core::LogicPart &>(component);
-        WritePartParameters(part, LogicKeys, object);
+        WritePartParameters(part, LOGIC_KEYS, object);
         if (Core::HasVariableInputs(type)) {
             object["inputs"] = part.GetInputCount();
         }
-    } else if (type == Core::ComponentType::Clock) {
-        WritePartParameters(static_cast<const Core::Clock &>(component), ClockKeys, object);
-    } else if (type == Core::ComponentType::LogicInput) {
-        WritePartParameters(static_cast<const Core::LogicInput &>(component), LogicInputKeys, object);
+    } else if (type == Core::ComponentType::CLOCK) {
+        WritePartParameters(static_cast<const Core::Clock &>(component), CLOCK_KEYS, object);
+    } else if (type == Core::ComponentType::LOGIC_INPUT) {
+        WritePartParameters(static_cast<const Core::LogicInput &>(component), LOGIC_INPUT_KEYS, object);
     }
 }
 
@@ -435,11 +435,11 @@ nlohmann::json WriteElement(const UIElement &element) {
     if (Core::IsSource(component.GetType())) {
         const auto &source = static_cast<const Core::Source &>(component);
         object["source"] = Core::GetSourceTypeName(source.GetSourceType());
-        WriteParameters(ACKeys, source.GetAC(), object);
-        WriteSourceParameters(PulseKeys, source.GetPulse(), "pulse", object);
-        WriteSourceParameters(EXPKeys, source.GetEXP(), "exp", object);
-        WriteSourceParameters(SFFMKeys, source.GetSFFM(), "sffm", object);
-        WriteSourceParameters(AMKeys, source.GetAM(), "am", object);
+        WriteParameters(AC_KEYS, source.GetAC(), object);
+        WriteSourceParameters(PULSE_KEYS, source.GetPulse(), "pulse", object);
+        WriteSourceParameters(EXP_KEYS, source.GetEXP(), "exp", object);
+        WriteSourceParameters(SFFM_KEYS, source.GetSFFM(), "sffm", object);
+        WriteSourceParameters(AM_KEYS, source.GetAM(), "am", object);
         nlohmann::json pwl = nlohmann::json::array();
         for (const Core::PWLPoint &point : source.GetPWL().Points) {
             pwl.push_back({{"time", point.Time}, {"value", point.Value}});
@@ -464,7 +464,7 @@ std::expected<void, std::string> ReadSource(const nlohmann::json &object, Core::
         source.SetSourceType(*type);
     }
     Core::ACParameters ac = source.GetAC();
-    if (const auto read = ReadParameters(ACKeys, object, ac); !read) {
+    if (const auto read = ReadParameters(AC_KEYS, object, ac); !read) {
         return read;
     }
     // The AC sweep used the amplitude before the magnitude was apart, so older files keep their results
@@ -477,7 +477,7 @@ std::expected<void, std::string> ReadSource(const nlohmann::json &object, Core::
     source.SetAC(ac);
 
     Core::PulseParameters pulse = source.GetPulse();
-    if (const auto read = ReadSourceParameters(object, "pulse", PulseKeys, pulse); !read) {
+    if (const auto read = ReadSourceParameters(object, "pulse", PULSE_KEYS, pulse); !read) {
         return read;
     }
     if (!source.IsValidPulse(pulse)) {
@@ -486,7 +486,7 @@ std::expected<void, std::string> ReadSource(const nlohmann::json &object, Core::
     source.SetPulse(pulse);
 
     Core::EXPParameters exp = source.GetEXP();
-    if (const auto read = ReadSourceParameters(object, "exp", EXPKeys, exp); !read) {
+    if (const auto read = ReadSourceParameters(object, "exp", EXP_KEYS, exp); !read) {
         return read;
     }
     if (!source.IsValidEXP(exp)) {
@@ -496,7 +496,7 @@ std::expected<void, std::string> ReadSource(const nlohmann::json &object, Core::
     source.SetEXP(exp);
 
     Core::SFFMParameters sffm = source.GetSFFM();
-    if (const auto read = ReadSourceParameters(object, "sffm", SFFMKeys, sffm); !read) {
+    if (const auto read = ReadSourceParameters(object, "sffm", SFFM_KEYS, sffm); !read) {
         return read;
     }
     if (!source.IsValidSFFM(sffm)) {
@@ -505,7 +505,7 @@ std::expected<void, std::string> ReadSource(const nlohmann::json &object, Core::
     source.SetSFFM(sffm);
 
     Core::AMParameters am = source.GetAM();
-    if (const auto read = ReadSourceParameters(object, "am", AMKeys, am); !read) {
+    if (const auto read = ReadSourceParameters(object, "am", AM_KEYS, am); !read) {
         return read;
     }
     if (!source.IsValidAM(am)) {
@@ -576,22 +576,22 @@ std::expected<void, std::string> ReadModel(const nlohmann::json &object, Core::C
     const Core::ComponentType type = component.GetType();
     if (Core::IsDiode(type)) {
         return ReadModelChoice(object, static_cast<Core::Diode &>(component), &Core::FindDiodeModel,
-                               Core::CustomDiodeModelName, DiodeKeys);
+                               Core::CUSTOM_DIODE_MODEL_NAME, DIODE_KEYS);
     }
     if (Core::IsBJT(type)) {
         return ReadModelChoice(object, static_cast<Core::BJT &>(component), &Core::FindBJTModel,
-                               Core::CustomBJTModelName, BJTKeys);
+                               Core::CUSTOM_BJT_MODEL_NAME, BJT_KEYS);
     }
     if (Core::IsMOSFET(type)) {
         return ReadModelChoice(object, static_cast<Core::MOSFET &>(component), &Core::FindMOSFETModel,
-                               Core::CustomMOSFETModelName, MOSFETKeys);
+                               Core::CUSTOM_MOSFET_MODEL_NAME, MOSFET_KEYS);
     }
     // Files saved before op-amps had models hold ideal ones
-    if (type == Core::ComponentType::OpAmp) {
+    if (type == Core::ComponentType::OP_AMP) {
         auto &op_amp = static_cast<Core::OpAmp &>(component);
         if (object.contains("model")) {
             if (const auto read =
-                    ReadModelChoice(object, op_amp, &Core::FindOpAmpModel, Core::CustomOpAmpModelName, OpAmpKeys);
+                    ReadModelChoice(object, op_amp, &Core::FindOpAmpModel, Core::CUSTOM_OP_AMP_MODEL_NAME, OP_AMP_KEYS);
                 !read) {
                 return read;
             }
@@ -623,7 +623,7 @@ std::expected<void, std::string> ReadControllingCurrent(const nlohmann::json &ob
 }
 
 std::expected<void, std::string> ReadNetName(const nlohmann::json &object, Core::Component &component) {
-    if (component.GetType() != Core::ComponentType::NetLabel || !object.contains("net")) {
+    if (component.GetType() != Core::ComponentType::NET_LABEL || !object.contains("net")) {
         return {};
     }
     const std::optional<std::string> net = ReadString(object, "net");
@@ -649,7 +649,7 @@ std::expected<void, std::string> ReadSwitchState(const nlohmann::json &object, C
 
 // A potentiometer saved without a wiper keeps it in the middle
 std::expected<void, std::string> ReadWiper(const nlohmann::json &object, Core::Component &component) {
-    if (component.GetType() != Core::ComponentType::Potentiometer || !object.contains("wiper")) {
+    if (component.GetType() != Core::ComponentType::POTENTIOMETER || !object.contains("wiper")) {
         return {};
     }
     const std::optional<double> wiper = ReadNumber(object, "wiper");
@@ -662,7 +662,7 @@ std::expected<void, std::string> ReadWiper(const nlohmann::json &object, Core::C
 
 // A logic input saved without a state stays low
 std::expected<void, std::string> ReadLogicInputState(const nlohmann::json &object, Core::Component &component) {
-    if (component.GetType() != Core::ComponentType::LogicInput || !object.contains("high")) {
+    if (component.GetType() != Core::ComponentType::LOGIC_INPUT || !object.contains("high")) {
         return {};
     }
     const std::optional<bool> high = ReadBool(object, "high");
@@ -675,13 +675,13 @@ std::expected<void, std::string> ReadLogicInputState(const nlohmann::json &objec
 
 using StateReader = std::expected<void, std::string> (*)(const nlohmann::json &, Core::Component &);
 
-constexpr auto StateReaders = std::to_array<StateReader>(
+constexpr auto STATE_READERS = std::to_array<StateReader>(
     {&ReadControllingCurrent, &ReadNetName, &ReadSwitchState, &ReadWiper, &ReadLogicInputState});
 
 // What only some kinds of part carry: the current a controlled source follows, a net name, a switch state, a wiper
 // and the state of a logic input
 std::expected<void, std::string> ReadStateFields(const nlohmann::json &object, Core::Component &component) {
-    for (const StateReader reader : StateReaders) {
+    for (const StateReader reader : STATE_READERS) {
         if (const auto read = reader(object, component); !read) {
             return std::unexpected(read.error());
         }
@@ -692,24 +692,24 @@ std::expected<void, std::string> ReadStateFields(const nlohmann::json &object, C
 // Each reader fills the figures of one kind of part and does nothing for the others; missing keys leave the part as it
 // starts
 std::expected<void, std::string> ReadSwitchFigures(const nlohmann::json &object, Core::Component &component) {
-    if (component.GetType() != Core::ComponentType::VSwitch) {
+    if (component.GetType() != Core::ComponentType::V_SWITCH) {
         return {};
     }
-    return ReadPartParameters(object, static_cast<Core::VoltageControlledSwitch &>(component), SwitchKeys);
+    return ReadPartParameters(object, static_cast<Core::VoltageControlledSwitch &>(component), SWITCH_KEYS);
 }
 
 std::expected<void, std::string> ReadRelayFigures(const nlohmann::json &object, Core::Component &component) {
-    if (component.GetType() != Core::ComponentType::Relay) {
+    if (component.GetType() != Core::ComponentType::RELAY) {
         return {};
     }
-    return ReadPartParameters(object, static_cast<Core::Relay &>(component), RelayKeys);
+    return ReadPartParameters(object, static_cast<Core::Relay &>(component), RELAY_KEYS);
 }
 
 std::expected<void, std::string> ReadTransformerFigures(const nlohmann::json &object, Core::Component &component) {
-    if (component.GetType() != Core::ComponentType::Transformer) {
+    if (component.GetType() != Core::ComponentType::TRANSFORMER) {
         return {};
     }
-    return ReadPartParameters(object, static_cast<Core::Transformer &>(component), TransformerKeys);
+    return ReadPartParameters(object, static_cast<Core::Transformer &>(component), TRANSFORMER_KEYS);
 }
 
 // A gate saved without a count has two inputs
@@ -718,7 +718,7 @@ std::expected<void, std::string> ReadLogicFigures(const nlohmann::json &object, 
         return {};
     }
     auto &part = static_cast<Core::LogicPart &>(component);
-    if (const auto read = ReadPartParameters(object, part, LogicKeys); !read) {
+    if (const auto read = ReadPartParameters(object, part, LOGIC_KEYS); !read) {
         return std::unexpected(read.error());
     }
     if (!Core::HasVariableInputs(component.GetType()) || !object.contains("inputs")) {
@@ -727,34 +727,34 @@ std::expected<void, std::string> ReadLogicFigures(const nlohmann::json &object, 
     const std::optional<int> inputs = ReadInt(object, "inputs");
     if (!inputs || !Core::LogicPart::IsValidInputCount(*inputs)) {
         return std::unexpected(std::format("has a number of inputs that is not a whole number from {} to {}",
-                                           Core::MinLogicInputs, Core::MaxLogicInputs));
+                                           Core::MIN_LOGIC_INPUTS, Core::MAX_LOGIC_INPUTS));
     }
     part.SetInputCount(*inputs);
     return {};
 }
 
 std::expected<void, std::string> ReadClockFigures(const nlohmann::json &object, Core::Component &component) {
-    if (component.GetType() != Core::ComponentType::Clock) {
+    if (component.GetType() != Core::ComponentType::CLOCK) {
         return {};
     }
-    return ReadPartParameters(object, static_cast<Core::Clock &>(component), ClockKeys);
+    return ReadPartParameters(object, static_cast<Core::Clock &>(component), CLOCK_KEYS);
 }
 
 std::expected<void, std::string> ReadLogicInputFigures(const nlohmann::json &object, Core::Component &component) {
-    if (component.GetType() != Core::ComponentType::LogicInput) {
+    if (component.GetType() != Core::ComponentType::LOGIC_INPUT) {
         return {};
     }
-    return ReadPartParameters(object, static_cast<Core::LogicInput &>(component), LogicInputKeys);
+    return ReadPartParameters(object, static_cast<Core::LogicInput &>(component), LOGIC_INPUT_KEYS);
 }
 
-constexpr auto FigureReaders =
+constexpr auto FIGURE_READERS =
     std::to_array<StateReader>({&ReadSwitchFigures, &ReadRelayFigures, &ReadTransformerFigures, &ReadLogicFigures,
                                 &ReadClockFigures, &ReadLogicInputFigures});
 
 // Parts whose figures are all there is to them: the switch that follows a voltage, the relay, the transformer, the
 // gates and flip-flops with their logic family, a clock and a logic input
 std::expected<void, std::string> ReadFigureFields(const nlohmann::json &object, Core::Component &component) {
-    for (const StateReader reader : FigureReaders) {
+    for (const StateReader reader : FIGURE_READERS) {
         if (const auto read = reader(object, component); !read) {
             return std::unexpected(read.error());
         }
@@ -832,7 +832,7 @@ std::expected<std::unique_ptr<UIElement>, std::string> ReadElement(const nlohman
 }
 
 // Keeps valid, unique names and renames the rest, so the netlist never gets two components with one name
-void FixNames(std::vector<std::unique_ptr<UIElement>> &elements, std::vector<std::string> &warnings) {
+void FixNames(const std::vector<std::unique_ptr<UIElement>> &elements, std::vector<std::string> &warnings) {
     std::vector<std::string> used_names;
     std::vector<Core::Component *> to_rename;
     for (const auto &element : elements) {
@@ -864,22 +864,22 @@ void FixNames(std::vector<std::unique_ptr<UIElement>> &elements, std::vector<std
 
 nlohmann::json WriteSweepRange(const Core::SweepRange &range) {
     nlohmann::json object = {{"source", range.Source}};
-    WriteParameters(SweepRangeKeys, range, object);
+    WriteParameters(SWEEP_RANGE_KEYS, range, object);
     return object;
 }
 
 // File names of the analyses, in the order of the Analysis enum
-constexpr auto AnalysisKeys = std::to_array<std::string_view>(
+constexpr auto ANALYSIS_KEYS = std::to_array<std::string_view>(
     {"operating_point", "transient", "ac_sweep", "dc_sweep", "noise", "transfer_function", "truth_table"});
 
 nlohmann::json WriteSettings(const SimulationSettings &settings) {
     nlohmann::json transient = nlohmann::json::object();
-    WriteParameters(TransientKeys, settings.Transient, transient);
+    WriteParameters(TRANSIENT_KEYS, settings.Transient, transient);
     nlohmann::json ac_sweep = nlohmann::json::object();
-    WriteParameters(ACSweepKeys, settings.ACSweep, ac_sweep);
+    WriteParameters(AC_SWEEP_KEYS, settings.ACSweep, ac_sweep);
     ac_sweep["points_per_decade"] = settings.ACSweep.PointsPerDecade;
     nlohmann::json noise = {{"source", settings.NoiseSource}};
-    WriteParameters(ACSweepKeys, settings.NoiseRange, noise);
+    WriteParameters(AC_SWEEP_KEYS, settings.NoiseRange, noise);
     noise["points_per_decade"] = settings.NoiseRange.PointsPerDecade;
     if (settings.NoiseOutput) {
         noise["output"] = {settings.NoiseOutput->X, settings.NoiseOutput->Y};
@@ -892,9 +892,9 @@ nlohmann::json WriteSettings(const SimulationSettings &settings) {
     const ParameterStepSettings &step = settings.ParameterStep;
     nlohmann::json parameter_step = {
         {"enabled", step.Enabled}, {"part", step.Part}, {"uses_list", step.UsesList}, {"list", step.List}};
-    WriteParameters(ParameterStepKeys, step, parameter_step);
+    WriteParameters(PARAMETER_STEP_KEYS, step, parameter_step);
     return {
-        {"analysis", AnalysisKeys[static_cast<std::size_t>(settings.Selected)]},
+        {"analysis", ANALYSIS_KEYS[static_cast<std::size_t>(settings.Selected)]},
         {"transient", transient},
         {"ac_sweep", ac_sweep},
         {"dc_sweep",
@@ -912,7 +912,7 @@ nlohmann::json WriteSettings(const SimulationSettings &settings) {
 
 // The analysis readers below change only their own part of the settings; missing keys keep its value
 std::expected<void, std::string> ReadTransientSettings(const nlohmann::json &object, SimulationSettings &settings) {
-    if (const auto read = ReadParameters(TransientKeys, object, settings.Transient); !read) {
+    if (const auto read = ReadParameters(TRANSIENT_KEYS, object, settings.Transient); !read) {
         return read;
     }
     if (settings.Transient.StopTime <= 0.0 || settings.Transient.TimeStep <= 0.0) {
@@ -923,7 +923,7 @@ std::expected<void, std::string> ReadTransientSettings(const nlohmann::json &obj
 
 // The AC sweep and the noise analysis share the form of their frequency range
 std::expected<void, std::string> ReadFrequencyRange(const nlohmann::json &object, Core::ACSweepSettings &range) {
-    if (const auto read = ReadParameters(ACSweepKeys, object, range); !read) {
+    if (const auto read = ReadParameters(AC_SWEEP_KEYS, object, range); !read) {
         return read;
     }
     if (range.StartFrequency <= 0.0 || range.StopFrequency <= 0.0) {
@@ -954,7 +954,7 @@ std::expected<void, std::string> ReadSweepRange(const nlohmann::json &object, Co
         }
         range.Source = *source;
     }
-    if (const auto read = ReadParameters(SweepRangeKeys, object, range); !read) {
+    if (const auto read = ReadParameters(SWEEP_RANGE_KEYS, object, range); !read) {
         return read;
     }
     if (range.Step == 0.0) {
@@ -1045,7 +1045,7 @@ std::expected<void, std::string> ReadTruthTableSettings(const nlohmann::json &ob
 
 std::expected<void, std::string> ReadParameterStepSettings(const nlohmann::json &object, SimulationSettings &settings) {
     ParameterStepSettings &step = settings.ParameterStep;
-    if (const auto read = ReadParameters(ParameterStepKeys, object, step); !read) {
+    if (const auto read = ReadParameters(PARAMETER_STEP_KEYS, object, step); !read) {
         return read;
     }
     for (const auto &[key, flag] : {std::pair{"enabled", &step.Enabled}, std::pair{"uses_list", &step.UsesList}}) {
@@ -1079,7 +1079,7 @@ struct AnalysisReader {
     std::expected<void, std::string> (*Read)(const nlohmann::json &, SimulationSettings &);
 };
 
-constexpr auto AnalysisReaders = std::to_array<AnalysisReader>({
+constexpr auto ANALYSIS_READERS = std::to_array<AnalysisReader>({
     {"transient", "transient", &ReadTransientSettings},
     {"ac_sweep", "AC sweep", &ReadACSweepSettings},
     {"dc_sweep", "DC sweep", &ReadDCSweepSettings},
@@ -1102,15 +1102,15 @@ SimulationSettings ReadSettings(const nlohmann::json &document, std::vector<std:
         return settings;
     }
     if (const auto analysis = simulation->find("analysis"); analysis != simulation->end()) {
-        const auto key =
-            analysis->is_string() ? std::ranges::find(AnalysisKeys, analysis->get<std::string>()) : AnalysisKeys.end();
-        if (key != AnalysisKeys.end()) {
-            settings.Selected = static_cast<Analysis>(key - AnalysisKeys.begin());
+        const auto key = analysis->is_string() ? std::ranges::find(ANALYSIS_KEYS, analysis->get<std::string>())
+                                               : ANALYSIS_KEYS.end();
+        if (key != ANALYSIS_KEYS.end()) {
+            settings.Selected = static_cast<Analysis>(key - ANALYSIS_KEYS.begin());
         } else {
             warnings.push_back("The selected analysis is unknown and was reset to the transient");
         }
     }
-    for (const AnalysisReader &reader : AnalysisReaders) {
+    for (const AnalysisReader &reader : ANALYSIS_READERS) {
         const auto object = simulation->find(reader.Key);
         if (object == simulation->end()) {
             continue;
@@ -1201,8 +1201,8 @@ std::string WriteDocument(const std::span<const UIElement *const> elements, cons
         });
     }
     nlohmann::json document = {
-        {"format", FormatName},
-        {"version", FormatVersion},
+        {"format", FORMAT_NAME},
+        {"version", FORMAT_VERSION},
         {"elements", element_list},
         {"wires", wire_list},
         {"simulation", WriteSettings(settings)},
@@ -1256,16 +1256,16 @@ std::expected<LoadedSchematic, std::string> LoadSchematic(const std::string_view
     if (document.is_discarded() || !document.is_object()) {
         return std::unexpected("The file is not valid JSON");
     }
-    if (ReadString(document, "format") != FormatName) {
+    if (ReadString(document, "format") != FORMAT_NAME) {
         return std::unexpected("The file is not an imcsim schematic");
     }
     const std::optional<int> version = ReadInt(document, "version");
     if (!version || *version < 1) {
         return std::unexpected("The file has no valid format version");
     }
-    if (*version > FormatVersion) {
+    if (*version > FORMAT_VERSION) {
         return std::unexpected(std::format("The file uses format version {}, but this build only reads up to {}",
-                                           *version, FormatVersion));
+                                           *version, FORMAT_VERSION));
     }
 
     LoadedSchematic schematic;
@@ -1313,7 +1313,7 @@ std::expected<LoadedSchematic, std::string> LoadSchematic(const std::string_view
  * @return  The contents, or an error message naming the file.
  */
 std::expected<std::string, std::string> ReadTextFile(const std::filesystem::path &path) {
-    std::ifstream file(path, std::ios::binary);
+    const std::ifstream file(path, std::ios::binary);
     if (!file) {
         return std::unexpected(std::format("Could not open {}", path.string()));
     }

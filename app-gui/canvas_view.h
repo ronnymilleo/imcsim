@@ -34,10 +34,10 @@ public:
     float GetZoom() const;
 
 private:
-    static constexpr float DefaultZoom = 20.0f;
+    static constexpr float DEFAULT_ZOOM = 20.0f;
 
     ImVec2 m_Pan = {0, 0};
-    float m_Zoom = DefaultZoom;
+    float m_Zoom = DEFAULT_ZOOM;
     // Largest zoom of a framing the next frame does, once the canvas size is known: the default when a schematic is
     // opened, more for Fit
     std::optional<float> m_FrameMaxZoom;

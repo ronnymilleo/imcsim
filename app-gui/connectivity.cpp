@@ -19,11 +19,11 @@ namespace GUI {
 namespace {
 
 // A dot is drawn where three or more connections meet, like in most schematic editors
-constexpr int MinJunctionConnections = 3;
+constexpr int MIN_JUNCTION_CONNECTIONS = 3;
 // The nets a label can name to mean ground, in the form nets are compared in
-constexpr std::array<std::string_view, 2> GroundNets = {"0", "gnd"};
+constexpr std::array<std::string_view, 2> GROUND_NETS = {"0", "gnd"};
 // The net that joins every VCC supply, in the form nets are compared in
-constexpr std::string_view SupplyNet = "vcc";
+constexpr std::string_view SUPPLY_NET = "vcc";
 
 /**
  * @class   DisjointSet
@@ -63,12 +63,12 @@ struct PointClasses {
 
 void ClassifyElement(const UIElement &element, PointClasses &classes) {
     const Core::Component &component = element.GetComponent();
-    const bool is_label = component.GetType() == Core::ComponentType::NetLabel;
+    const bool is_label = component.GetType() == Core::ComponentType::NET_LABEL;
     const std::string net = is_label ? static_cast<const Core::NetLabel &>(component).GetNet() : std::string();
     const std::string compared = Core::NetLabel::NormalizeNet(net);
     // A label named 0, as in SPICE, or GND is ground
-    const bool is_ground =
-        component.GetType() == Core::ComponentType::Ground || (is_label && std::ranges::contains(GroundNets, compared));
+    const bool is_ground = component.GetType() == Core::ComponentType::GROUND ||
+                           (is_label && std::ranges::contains(GROUND_NETS, compared));
     const bool is_supply = component.GetType() == Core::ComponentType::VCC;
     for (const GridPoint terminal : element.GetTerminals()) {
         ++classes.ConnectionCount[terminal];
@@ -90,7 +90,8 @@ PointClasses ClassifyPoints(const std::vector<std::unique_ptr<UIElement>> &eleme
         ClassifyElement(*element, classes);
     }
     // A label named VCC joins every VCC supply, as one named GND joins every ground
-    if (const auto supply = classes.LabeledPoints.find(std::string(SupplyNet)); supply != classes.LabeledPoints.end()) {
+    if (const auto supply = classes.LabeledPoints.find(std::string(SUPPLY_NET));
+        supply != classes.LabeledPoints.end()) {
         supply->second.insert(supply->second.end(), classes.SupplyPoints.begin(), classes.SupplyPoints.end());
     }
     for (const UIWire &wire : wires) {
@@ -115,7 +116,7 @@ std::vector<GridPoint> UniteWires(DisjointSet &nodes, const std::map<GridPoint, 
                 count += 2;
             }
         }
-        if (count >= MinJunctionConnections) {
+        if (count >= MIN_JUNCTION_CONNECTIONS) {
             junctions.push_back(point);
         }
     }
@@ -250,7 +251,7 @@ Core::Circuit BuildCircuit(const std::vector<std::unique_ptr<UIElement>> &elemen
     Core::Circuit circuit;
     for (const auto &element : elements) {
         // A label only joins points; the simulator never sees it
-        if (element->GetComponent().GetType() == Core::ComponentType::NetLabel) {
+        if (element->GetComponent().GetType() == Core::ComponentType::NET_LABEL) {
             continue;
         }
         std::vector<int> nodes;

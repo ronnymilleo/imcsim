@@ -24,11 +24,11 @@ struct ProbedSchematic {
     std::vector<GUI::UIWire> Wires;
 
     ProbedSchematic() {
-        Elements.push_back(GUI::CreateElement(Core::ComponentType::Resistor, {0, 0}, GUI::Rotation::R0));
+        Elements.push_back(GUI::CreateElement(Core::ComponentType::RESISTOR, {0, 0}, GUI::Rotation::R0));
         Elements.back()->GetComponent().SetName("R1");
         Elements.push_back(GUI::CreateElement(Core::ComponentType::NPN, {10, 10}, GUI::Rotation::R0));
         Elements.back()->GetComponent().SetName("Q1");
-        Elements.push_back(GUI::CreateElement(Core::ComponentType::Ground, {0, 8}, GUI::Rotation::R0));
+        Elements.push_back(GUI::CreateElement(Core::ComponentType::GROUND, {0, 8}, GUI::Rotation::R0));
         Wires.emplace_back(GUI::GridPoint{2, 0}, GUI::GridPoint{6, 0});
         Wires.emplace_back(GUI::GridPoint{-4, 8}, GUI::GridPoint{0, 8});
     }
@@ -79,7 +79,7 @@ TEST_CASE("Probing ground, its wires or empty space measures nothing", "[probing
 
 TEST_CASE("A node a net label named is measured and labeled by that name", "[probing]") {
     ProbedSchematic schematic;
-    schematic.Elements.push_back(GUI::CreateElement(Core::ComponentType::NetLabel, {6, 0}, GUI::Rotation::R0));
+    schematic.Elements.push_back(GUI::CreateElement(Core::ComponentType::NET_LABEL, {6, 0}, GUI::Rotation::R0));
     static_cast<Core::NetLabel &>(schematic.Elements.back()->GetComponent()).SetNet("VOUT");
 
     const GUI::Connectivity connectivity(schematic.Elements, schematic.Wires);
@@ -94,9 +94,9 @@ TEST_CASE("A node a net label named is measured and labeled by that name", "[pro
 
 TEST_CASE("Probing a relay or a transformer picks the current of the winding nearest the point", "[probing]") {
     std::vector<std::unique_ptr<GUI::UIElement>> elements;
-    elements.push_back(GUI::CreateElement(Core::ComponentType::Relay, {0, 0}, GUI::Rotation::R0));
+    elements.push_back(GUI::CreateElement(Core::ComponentType::RELAY, {0, 0}, GUI::Rotation::R0));
     elements.back()->GetComponent().SetName("K1");
-    elements.push_back(GUI::CreateElement(Core::ComponentType::Transformer, {20, 0}, GUI::Rotation::R0));
+    elements.push_back(GUI::CreateElement(Core::ComponentType::TRANSFORMER, {20, 0}, GUI::Rotation::R0));
     elements.back()->GetComponent().SetName("T1");
     const std::vector<GUI::UIWire> wires;
     const GUI::Connectivity connectivity(elements, wires);

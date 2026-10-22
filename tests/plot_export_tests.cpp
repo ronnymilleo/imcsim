@@ -103,7 +103,7 @@ TEST_CASE("SVG export draws the traces, the legend and prefixed ticks", "[plot_e
 
 TEST_CASE("SVG export rejects bad sizes and empty figures", "[plot_export]") {
     CHECK_FALSE(GUI::RenderSvg(MakeFigure(), {.Width = 100, .Height = 900}));
-    CHECK_FALSE(GUI::RenderSvg(MakeFigure(), {.Width = 1600, .Height = GUI::MaxExportSize + 1}));
+    CHECK_FALSE(GUI::RenderSvg(MakeFigure(), {.Width = 1600, .Height = GUI::MAX_EXPORT_SIZE + 1}));
     CHECK_FALSE(GUI::RenderSvg(GUI::ExportFigure{}, {}));
 }
 

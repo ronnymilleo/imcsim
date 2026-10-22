@@ -16,7 +16,7 @@ namespace {
 // Grouped by part, default model first. Common vendor cards reduced to the parameters of BJTParameters; the gain
 // stays within the datasheet range at the test currents of each part. Ratings are the absolute maximum VCEO and
 // IC and the free-air dissipation
-constexpr auto BJTModels = std::to_array<BJTModel>({
+constexpr auto BJT_MODELS = std::to_array<BJTModel>({
     {"2N3904",
      "General-purpose NPN, 40 V 200 mA",
      "Q2N3904",
@@ -217,7 +217,7 @@ const BJTParameters &BJT::GetParameters() const {
  * @return  The ready model name, such as "2N3904", or CustomBJTModelName.
  */
 const char *BJT::GetModelName() const {
-    return m_Model != nullptr ? m_Model->Name : CustomBJTModelName;
+    return m_Model != nullptr ? m_Model->Name : CUSTOM_BJT_MODEL_NAME;
 }
 
 /**
@@ -244,9 +244,9 @@ bool IsBJT(const ComponentType type) {
  * @return  The models of that part, default first; empty for components that are not bipolar transistors.
  */
 std::span<const BJTModel> GetBJTModels(const ComponentType type) {
-    const auto first = std::ranges::find(BJTModels, type, &BJTModel::Type);
+    const auto first = std::ranges::find(BJT_MODELS, type, &BJTModel::Type);
     const auto last =
-        std::find_if(first, BJTModels.end(), [type](const BJTModel &model) { return model.Type != type; });
+        std::find_if(first, BJT_MODELS.end(), [type](const BJTModel &model) { return model.Type != type; });
     return {first, last};
 }
 

@@ -32,8 +32,8 @@ struct SeriesLoop {
 
     SeriesLoop() {
         Elements.push_back(Part(Core::ComponentType::VCC, {0, 0}, "V1"));
-        Elements.push_back(Part(Core::ComponentType::Resistor, {6, 0}, "R1"));
-        Elements.push_back(Part(Core::ComponentType::Ground, {8, 4}, ""));
+        Elements.push_back(Part(Core::ComponentType::RESISTOR, {6, 0}, "R1"));
+        Elements.push_back(Part(Core::ComponentType::GROUND, {8, 4}, ""));
     }
 };
 

@@ -122,8 +122,8 @@ struct ExportStyle {
     bool Dark = false;
 };
 
-constexpr int MinExportSize = 200;
-constexpr int MaxExportSize = 8192;
+constexpr int MIN_EXPORT_SIZE = 200;
+constexpr int MAX_EXPORT_SIZE = 8192;
 
 // Rendering
 std::expected<std::string, std::string> RenderSvg(const ExportFigure &figure, const ExportStyle &style);

@@ -15,7 +15,7 @@ namespace {
 
 // Grouped by part, default model first. LEDs are tuned for their forward voltage at 20 mA, Zeners break down at
 // their voltage at 5 mA
-constexpr auto DiodeModels = std::to_array<DiodeModel>({
+constexpr auto DIODE_MODELS = std::to_array<DiodeModel>({
     {"1N4148",
      "Small-signal switching diode, 100 V",
      "D1N4148",
@@ -27,8 +27,8 @@ constexpr auto DiodeModels = std::to_array<DiodeModel>({
       .JunctionCapacitance = 4e-12,
       .GradingCoefficient = 0.4,
       .TransitTime = 20e-9},
-     ComponentType::Diode,
-     LEDColor::None},
+     ComponentType::DIODE,
+     LEDColor::NONE},
     {"1N4007",
      "Rectifier diode, 1000 V 1 A",
      "D1N4007",
@@ -40,8 +40,8 @@ constexpr auto DiodeModels = std::to_array<DiodeModel>({
       .JunctionCapacitance = 10e-12,
       .JunctionPotential = 0.7,
       .TransitTime = 100e-9},
-     ComponentType::Diode,
-     LEDColor::None},
+     ComponentType::DIODE,
+     LEDColor::NONE},
     {"1N5819",
      "Schottky rectifier, 40 V 1 A",
      "D1N5819",
@@ -53,8 +53,8 @@ constexpr auto DiodeModels = std::to_array<DiodeModel>({
       .JunctionCapacitance = 110e-12,
       .JunctionPotential = 0.3,
       .GradingCoefficient = 0.35},
-     ComponentType::Diode,
-     LEDColor::None},
+     ComponentType::DIODE,
+     LEDColor::NONE},
     {"5V1",
      "Zener diode, 5.1 V",
      "DZ5V1",
@@ -64,8 +64,8 @@ constexpr auto DiodeModels = std::to_array<DiodeModel>({
       .BreakdownVoltage = 5.1,
       .BreakdownCurrent = 5e-3,
       .JunctionCapacitance = 100e-12},
-     ComponentType::ZenerDiode,
-     LEDColor::None},
+     ComponentType::ZENER_DIODE,
+     LEDColor::NONE},
     {"3V3",
      "Zener diode, 3.3 V",
      "DZ3V3",
@@ -75,8 +75,8 @@ constexpr auto DiodeModels = std::to_array<DiodeModel>({
       .BreakdownVoltage = 3.3,
       .BreakdownCurrent = 5e-3,
       .JunctionCapacitance = 100e-12},
-     ComponentType::ZenerDiode,
-     LEDColor::None},
+     ComponentType::ZENER_DIODE,
+     LEDColor::NONE},
     {"12V",
      "Zener diode, 12 V",
      "DZ12V",
@@ -86,8 +86,8 @@ constexpr auto DiodeModels = std::to_array<DiodeModel>({
       .BreakdownVoltage = 12.0,
       .BreakdownCurrent = 5e-3,
       .JunctionCapacitance = 100e-12},
-     ComponentType::ZenerDiode,
-     LEDColor::None},
+     ComponentType::ZENER_DIODE,
+     LEDColor::NONE},
     {"Red",
      "Red LED, 1.8 V at 20 mA",
      "DLEDRED",
@@ -98,7 +98,7 @@ constexpr auto DiodeModels = std::to_array<DiodeModel>({
       .BreakdownCurrent = 10e-6,
       .JunctionCapacitance = 40e-12},
      ComponentType::LED,
-     LEDColor::Red},
+     LEDColor::RED},
     {"Green",
      "Green LED, 2.1 V at 20 mA",
      "DLEDGREEN",
@@ -109,7 +109,7 @@ constexpr auto DiodeModels = std::to_array<DiodeModel>({
       .BreakdownCurrent = 10e-6,
       .JunctionCapacitance = 40e-12},
      ComponentType::LED,
-     LEDColor::Green},
+     LEDColor::GREEN},
     {"Blue",
      "Blue LED, 3.0 V at 20 mA",
      "DLEDBLUE",
@@ -120,7 +120,7 @@ constexpr auto DiodeModels = std::to_array<DiodeModel>({
       .BreakdownCurrent = 10e-6,
       .JunctionCapacitance = 40e-12},
      ComponentType::LED,
-     LEDColor::Blue},
+     LEDColor::BLUE},
 });
 
 } // namespace
@@ -205,7 +205,7 @@ const DiodeParameters &Diode::GetParameters() const {
  * @return  The ready model name, such as "1N4148", or CustomDiodeModelName.
  */
 const char *Diode::GetModelName() const {
-    return m_Model != nullptr ? m_Model->Name : CustomDiodeModelName;
+    return m_Model != nullptr ? m_Model->Name : CUSTOM_DIODE_MODEL_NAME;
 }
 
 /**
@@ -223,7 +223,7 @@ std::string Diode::GetSpiceModelName() const {
  * @return  True for diodes, Zener diodes and LEDs.
  */
 bool IsDiode(const ComponentType type) {
-    return type == ComponentType::Diode || type == ComponentType::ZenerDiode || type == ComponentType::LED;
+    return type == ComponentType::DIODE || type == ComponentType::ZENER_DIODE || type == ComponentType::LED;
 }
 
 /**
@@ -232,9 +232,9 @@ bool IsDiode(const ComponentType type) {
  * @return  The models of that part, default first; empty for components that are not diodes.
  */
 std::span<const DiodeModel> GetDiodeModels(const ComponentType type) {
-    const auto first = std::ranges::find(DiodeModels, type, &DiodeModel::Type);
+    const auto first = std::ranges::find(DIODE_MODELS, type, &DiodeModel::Type);
     const auto last =
-        std::find_if(first, DiodeModels.end(), [type](const DiodeModel &model) { return model.Type != type; });
+        std::find_if(first, DIODE_MODELS.end(), [type](const DiodeModel &model) { return model.Type != type; });
     return {first, last};
 }
 

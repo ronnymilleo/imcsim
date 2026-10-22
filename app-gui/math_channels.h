@@ -27,7 +27,7 @@ struct MathChannel {
     bool Shown = true;
     bool UsesExpression = false;
     std::string First;
-    MathOperator Operator = MathOperator::Subtract;
+    MathOperator Operator = MathOperator::SUBTRACT;
     std::string Second;
     std::string Expression;
     // Compiled from the operation or the expression, whichever is in use

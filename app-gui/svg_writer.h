@@ -38,9 +38,9 @@ struct SvgPoint {
  * @brief   Which point of a text its position gives: its start, its middle or its end.
  */
 enum class TextAnchor {
-    Start,
-    Middle,
-    End
+    START,
+    MIDDLE,
+    END
 };
 
 /**

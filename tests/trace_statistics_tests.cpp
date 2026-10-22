@@ -47,7 +47,8 @@ Trace Sine(const double amplitude, const double offset, const double frequency, 
 // Bode response of a first order low-pass with its corner at corner_frequency
 void LowPass(const double corner_frequency, std::vector<double> &frequencies, std::vector<double> &magnitudes,
              std::vector<double> &phases) {
-    for (double decade = 0.0; decade <= 6.0; decade += 0.01) {
+    for (int step = 0; step <= 600; ++step) {
+        const double decade = step * 0.01;
         const double frequency = std::pow(10.0, decade);
         const std::complex<double> response = 1.0 / std::complex<double>(1.0, frequency / corner_frequency);
         frequencies.push_back(frequency);
@@ -125,15 +126,16 @@ TEST_CASE("A parabola's slope at a point follows its derivative", "[trace_statis
     // y = x^2 sampled evenly; the central difference (f(x+d)-f(x-d)) / 2d is exactly the derivative 2x
     std::vector<double> xs;
     std::vector<double> ys;
-    constexpr double Step = 1e-3;
-    for (double x = 0.0; x <= 2.0; x += Step) {
+    constexpr double STEP = 1e-3;
+    for (int step = 0; step <= 2000; ++step) {
+        const double x = step * STEP;
         xs.push_back(x);
         ys.push_back(x * x);
     }
-    REQUIRE(GUI::ComputeSlope(xs, ys, 1.0 - Step, 1.0 + Step));
-    REQUIRE(GUI::ComputeSlope(xs, ys, 1.5 - Step, 1.5 + Step));
-    CHECK_THAT(*GUI::ComputeSlope(xs, ys, 1.0 - Step, 1.0 + Step), WithinRel(2.0, 1e-9));
-    CHECK_THAT(*GUI::ComputeSlope(xs, ys, 1.5 - Step, 1.5 + Step), WithinRel(3.0, 1e-9));
+    REQUIRE(GUI::ComputeSlope(xs, ys, 1.0 - STEP, 1.0 + STEP));
+    REQUIRE(GUI::ComputeSlope(xs, ys, 1.5 - STEP, 1.5 + STEP));
+    CHECK_THAT(*GUI::ComputeSlope(xs, ys, 1.0 - STEP, 1.0 + STEP), WithinRel(2.0, 1e-9));
+    CHECK_THAT(*GUI::ComputeSlope(xs, ys, 1.5 - STEP, 1.5 + STEP), WithinRel(3.0, 1e-9));
     // The secant over a wider span is the average slope, here (9-1)/(3-1)
     const std::vector<double> few_xs = {0.0, 1.0, 2.0, 3.0};
     const std::vector<double> few_ys = {0.0, 1.0, 4.0, 9.0};
@@ -233,7 +235,8 @@ TEST_CASE("A band-pass shows both cutoffs around its peak", "[trace_statistics]"
     // Gain rises 20 dB per decade up to 100 Hz, stays flat, and falls 20 dB per decade from 10 kHz
     std::vector<double> frequencies;
     std::vector<double> magnitudes;
-    for (double decade = 0.0; decade <= 6.0; decade += 0.01) {
+    for (int step = 0; step <= 600; ++step) {
+        const double decade = step * 0.01;
         const double frequency = std::pow(10.0, decade);
         const std::complex<double> high_pass =
             std::complex<double>(0.0, frequency / 100.0) / std::complex<double>(1.0, frequency / 100.0);

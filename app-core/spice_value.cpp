@@ -28,7 +28,7 @@ struct ScaleSuffix {
 };
 
 // Ordered from largest to smallest so formatting can pick the first one that fits
-constexpr auto Suffixes = std::to_array<ScaleSuffix>({
+constexpr auto SUFFIXES = std::to_array<ScaleSuffix>({
     {"T", "T", 1e12},
     {"G", "G", 1e9},
     {"M", "Meg", 1e6},
@@ -42,7 +42,7 @@ constexpr auto Suffixes = std::to_array<ScaleSuffix>({
 });
 
 // The micro sign, as typed on many keyboards, encoded in UTF-8
-constexpr std::string_view MicroSign = "\xC2\xB5";
+constexpr std::string_view MICRO_SIGN = "\xC2\xB5";
 
 std::string_view Trim(std::string_view text) {
     while (!text.empty() && std::isspace(static_cast<unsigned char>(text.front()))) {
@@ -56,17 +56,17 @@ std::string_view Trim(std::string_view text) {
 
 // Such a value would read like "9.9e-05f" with the smallest suffix, so it is written in exponent notation instead
 bool IsBelowSuffixes(const double value) {
-    return std::abs(value) < Suffixes.back().Factor;
+    return std::abs(value) < SUFFIXES.back().Factor;
 }
 
 const ScaleSuffix &ChooseSuffix(const double value) {
     const double magnitude = std::abs(value);
-    for (const ScaleSuffix &suffix : Suffixes) {
+    for (const ScaleSuffix &suffix : SUFFIXES) {
         if (magnitude >= suffix.Factor) {
             return suffix;
         }
     }
-    return Suffixes.back();
+    return SUFFIXES.back();
 }
 
 } // namespace
@@ -88,16 +88,17 @@ std::optional<double> ParseValue(const std::string_view text, const std::string_
         return std::nullopt;
     }
 
-    const std::string_view number_text(trimmed.data(), rest_begin - trimmed.data());
-    std::string_view rest(rest_begin, trimmed.data() + trimmed.size() - rest_begin);
+    const auto number_length = static_cast<std::size_t>(rest_begin - trimmed.data());
+    const std::string_view number_text = trimmed.substr(0, number_length);
+    std::string_view rest = trimmed.substr(number_length);
     double factor = 1.0;
     bool has_suffix = true;
-    if (rest.starts_with(MicroSign)) {
+    if (rest.starts_with(MICRO_SIGN)) {
         factor = 1e-6;
-        rest.remove_prefix(MicroSign.size());
+        rest.remove_prefix(MICRO_SIGN.size());
     } else {
         has_suffix = false;
-        for (const ScaleSuffix &suffix : Suffixes) {
+        for (const ScaleSuffix &suffix : SUFFIXES) {
             // Every text starts with the empty suffix, which stands for no scaling
             if (!suffix.Text.empty() && rest.starts_with(suffix.Text)) {
                 factor = suffix.Factor;

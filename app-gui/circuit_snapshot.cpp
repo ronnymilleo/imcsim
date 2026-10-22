@@ -169,7 +169,7 @@ float VoltageLevel(const double voltage, const HeatScale &scale) {
  * @return  The LogarithmicLevel() of the power over PowerDecades.
  */
 float PowerLevel(const double power, const HeatScale &scale) {
-    return LogarithmicLevel(power, scale.LargestPower, PowerDecades);
+    return LogarithmicLevel(power, scale.LargestPower, POWER_DECADES);
 }
 
 } // namespace GUI

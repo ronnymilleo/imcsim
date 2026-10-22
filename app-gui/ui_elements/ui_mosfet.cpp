@@ -13,15 +13,15 @@ namespace GUI {
 
 namespace {
 
-constexpr float GateX = -0.6f;
-constexpr float ChannelX = -0.3f;
-constexpr float PlateHalfHeight = 0.7f;
+constexpr float GATE_X = -0.6f;
+constexpr float CHANNEL_X = -0.3f;
+constexpr float PLATE_HALF_HEIGHT = 0.7f;
 // Drain and source connect to the ends of the channel
-constexpr float ContactY = 0.55f;
+constexpr float CONTACT_Y = 0.55f;
 // The channel is broken in three, the sign of an enhancement part
-constexpr std::array<std::array<float, 2>, 3> ChannelSegments = {{{-0.7f, -0.4f}, {-0.15f, 0.15f}, {0.4f, 0.7f}}};
-constexpr float NMOSArrowTipX = ChannelX + 0.05f;
-constexpr float PMOSArrowTipX = 0.55f;
+constexpr std::array<std::array<float, 2>, 3> CHANNEL_SEGMENTS = {{{-0.7f, -0.4f}, {-0.15f, 0.15f}, {0.4f, 0.7f}}};
+constexpr float NMOS_ARROW_TIP_X = CHANNEL_X + 0.05f;
+constexpr float PMOS_ARROW_TIP_X = 0.55f;
 
 } // namespace
 
@@ -37,25 +37,27 @@ UIMOSFET::UIMOSFET(const Core::ComponentType type, const GridPoint position, con
 
 void UIMOSFET::DrawSymbol(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color,
                           SymbolStyle /*style*/) const {
-    canvas.AddLine(LocalToScreen(view, -1, 0), LocalToScreen(view, GateX, 0), color, LineThickness);
-    canvas.AddLine(LocalToScreen(view, GateX, -PlateHalfHeight), LocalToScreen(view, GateX, PlateHalfHeight), color,
-                   LineThickness);
-    for (const auto &[top, bottom] : ChannelSegments) {
-        canvas.AddLine(LocalToScreen(view, ChannelX, top), LocalToScreen(view, ChannelX, bottom), color, LineThickness);
+    canvas.AddLine(LocalToScreen(view, -1, 0), LocalToScreen(view, GATE_X, 0), color, LINE_THICKNESS);
+    canvas.AddLine(LocalToScreen(view, GATE_X, -PLATE_HALF_HEIGHT), LocalToScreen(view, GATE_X, PLATE_HALF_HEIGHT),
+                   color, LINE_THICKNESS);
+    for (const auto &[top, bottom] : CHANNEL_SEGMENTS) {
+        canvas.AddLine(LocalToScreen(view, CHANNEL_X, top), LocalToScreen(view, CHANNEL_X, bottom), color,
+                       LINE_THICKNESS);
     }
 
     // Drain on top, source below, and the body joining the source
-    canvas.AddLine(LocalToScreen(view, ChannelX, -ContactY), LocalToScreen(view, 1, -ContactY), color, LineThickness);
-    canvas.AddLine(LocalToScreen(view, 1, -ContactY), LocalToScreen(view, 1, -1), color, LineThickness);
-    canvas.AddLine(LocalToScreen(view, ChannelX, ContactY), LocalToScreen(view, 1, ContactY), color, LineThickness);
-    canvas.AddLine(LocalToScreen(view, 1, ContactY), LocalToScreen(view, 1, 1), color, LineThickness);
-    canvas.AddLine(LocalToScreen(view, ChannelX, 0), LocalToScreen(view, 1, 0), color, LineThickness);
-    canvas.AddLine(LocalToScreen(view, 1, 0), LocalToScreen(view, 1, ContactY), color, LineThickness);
+    canvas.AddLine(LocalToScreen(view, CHANNEL_X, -CONTACT_Y), LocalToScreen(view, 1, -CONTACT_Y), color,
+                   LINE_THICKNESS);
+    canvas.AddLine(LocalToScreen(view, 1, -CONTACT_Y), LocalToScreen(view, 1, -1), color, LINE_THICKNESS);
+    canvas.AddLine(LocalToScreen(view, CHANNEL_X, CONTACT_Y), LocalToScreen(view, 1, CONTACT_Y), color, LINE_THICKNESS);
+    canvas.AddLine(LocalToScreen(view, 1, CONTACT_Y), LocalToScreen(view, 1, 1), color, LINE_THICKNESS);
+    canvas.AddLine(LocalToScreen(view, CHANNEL_X, 0), LocalToScreen(view, 1, 0), color, LINE_THICKNESS);
+    canvas.AddLine(LocalToScreen(view, 1, 0), LocalToScreen(view, 1, CONTACT_Y), color, LINE_THICKNESS);
 
     if (GetComponent().GetType() == Core::ComponentType::NMOS) {
-        DrawArrowHead(canvas, view, {NMOSArrowTipX, 0.0f}, {-1.0f, 0.0f}, color);
+        DrawArrowHead(canvas, view, {NMOS_ARROW_TIP_X, 0.0f}, {-1.0f, 0.0f}, color);
     } else {
-        DrawArrowHead(canvas, view, {PMOSArrowTipX, 0.0f}, {1.0f, 0.0f}, color);
+        DrawArrowHead(canvas, view, {PMOS_ARROW_TIP_X, 0.0f}, {1.0f, 0.0f}, color);
     }
 }
 

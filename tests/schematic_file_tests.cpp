@@ -48,13 +48,13 @@ std::string Document(const std::string &elements, const std::string &wires) {
 
 TEST_CASE("A saved schematic loads back unchanged", "[schematic_file]") {
     std::vector<std::unique_ptr<GUI::UIElement>> elements;
-    elements.push_back(GUI::CreateElement(Core::ComponentType::Resistor, {0, 0}, GUI::Rotation::R90));
+    elements.push_back(GUI::CreateElement(Core::ComponentType::RESISTOR, {0, 0}, GUI::Rotation::R90));
     elements.back()->GetComponent().SetName("R1");
     elements.back()->GetComponent().SetValue(4.7e3);
     elements.push_back(GUI::CreateElement(Core::ComponentType::VCC, {0, -2}, GUI::Rotation::R0));
     elements.back()->GetComponent().SetName("V1");
     elements.back()->GetComponent().SetValue(12.0);
-    elements.push_back(GUI::CreateElement(Core::ComponentType::Ground, {0, 2}, GUI::Rotation::R0));
+    elements.push_back(GUI::CreateElement(Core::ComponentType::GROUND, {0, 2}, GUI::Rotation::R0));
     const std::vector<GUI::UIWire> wires{{{0, 2}, {4, 2}}, {{4, 2}, {4, -2}}};
 
     const GUI::LoadedSchematic loaded = LoadOrFail(GUI::SaveSchematic(elements, wires, {}, {}));
@@ -78,7 +78,7 @@ TEST_CASE("A saved schematic loads back unchanged", "[schematic_file]") {
 
 TEST_CASE("Saved files store ground without name or value", "[schematic_file]") {
     std::vector<std::unique_ptr<GUI::UIElement>> elements;
-    elements.push_back(GUI::CreateElement(Core::ComponentType::Ground, {1, 2}, GUI::Rotation::R0));
+    elements.push_back(GUI::CreateElement(Core::ComponentType::GROUND, {1, 2}, GUI::Rotation::R0));
     const std::string text = GUI::SaveSchematic(elements, {}, {}, {});
     CHECK(text.find("\"name\"") == std::string::npos);
     CHECK(text.find("\"value\"") == std::string::npos);
@@ -143,7 +143,7 @@ TEST_CASE("Missing and repeated names are replaced with the next free number", "
 
 TEST_CASE("A voltage source keeps its type and sine parameters", "[schematic_file]") {
     std::vector<std::unique_ptr<GUI::UIElement>> elements;
-    elements.push_back(GUI::CreateElement(Core::ComponentType::VoltageSource, {0, 0}, GUI::Rotation::R90));
+    elements.push_back(GUI::CreateElement(Core::ComponentType::VOLTAGE_SOURCE, {0, 0}, GUI::Rotation::R90));
     auto &source = static_cast<Core::VoltageSource &>(elements.back()->GetComponent());
     source.SetName("Vin1");
     source.SetSourceType(Core::VoltageSource::SourceType::AC);
@@ -174,10 +174,10 @@ TEST_CASE("A voltage source without a type loads as DC, and an invalid one is sk
 
 TEST_CASE("A pulse source keeps its pulse, and an invalid pulse is skipped", "[schematic_file]") {
     std::vector<std::unique_ptr<GUI::UIElement>> elements;
-    elements.push_back(GUI::CreateElement(Core::ComponentType::VoltageSource, {0, 0}, GUI::Rotation::R0));
+    elements.push_back(GUI::CreateElement(Core::ComponentType::VOLTAGE_SOURCE, {0, 0}, GUI::Rotation::R0));
     auto &source = static_cast<Core::VoltageSource &>(elements.back()->GetComponent());
     source.SetName("Vin1");
-    source.SetSourceType(Core::VoltageSource::SourceType::Pulse);
+    source.SetSourceType(Core::VoltageSource::SourceType::PULSE);
     const Core::PulseParameters pulse{
         .Low = -2.0, .High = 3.3, .Delay = 1e-3, .RiseTime = 5e-9, .FallTime = 7e-9, .Width = 2e-3, .Period = 4e-3};
     source.SetPulse(pulse);
@@ -186,7 +186,7 @@ TEST_CASE("A pulse source keeps its pulse, and an invalid pulse is skipped", "[s
     CHECK(loaded.Warnings.empty());
     REQUIRE(loaded.Elements.size() == 1);
     const auto &copy = static_cast<const Core::VoltageSource &>(loaded.Elements[0]->GetComponent());
-    CHECK(copy.GetSourceType() == Core::VoltageSource::SourceType::Pulse);
+    CHECK(copy.GetSourceType() == Core::VoltageSource::SourceType::PULSE);
     CHECK(copy.GetPulse().Low == pulse.Low);
     CHECK(copy.GetPulse().High == pulse.High);
     CHECK(copy.GetPulse().Delay == pulse.Delay);
@@ -204,7 +204,7 @@ TEST_CASE("A pulse source keeps its pulse, and an invalid pulse is skipped", "[s
 
 TEST_CASE("A current source keeps its value, type and waveforms", "[schematic_file]") {
     std::vector<std::unique_ptr<GUI::UIElement>> elements;
-    elements.push_back(GUI::CreateElement(Core::ComponentType::CurrentSource, {0, 0}, GUI::Rotation::R270));
+    elements.push_back(GUI::CreateElement(Core::ComponentType::CURRENT_SOURCE, {0, 0}, GUI::Rotation::R270));
     auto &source = static_cast<Core::CurrentSource &>(elements.back()->GetComponent());
     source.SetName("I1");
     source.SetValue(-2e-3);
@@ -215,7 +215,7 @@ TEST_CASE("A current source keeps its value, type and waveforms", "[schematic_fi
     CHECK(loaded.Warnings.empty());
     REQUIRE(loaded.Elements.size() == 1);
     const auto &copy = static_cast<const Core::CurrentSource &>(loaded.Elements[0]->GetComponent());
-    CHECK(copy.GetType() == Core::ComponentType::CurrentSource);
+    CHECK(copy.GetType() == Core::ComponentType::CURRENT_SOURCE);
     CHECK(copy.GetName() == "I1");
     CHECK(copy.GetValue() == -2e-3);
     CHECK(copy.GetSourceType() == Core::CurrentSource::SourceType::AC);
@@ -225,7 +225,7 @@ TEST_CASE("A current source keeps its value, type and waveforms", "[schematic_fi
 
 TEST_CASE("The extra source waveforms keep their parameters through a file", "[schematic_file]") {
     std::vector<std::unique_ptr<GUI::UIElement>> elements;
-    elements.push_back(GUI::CreateElement(Core::ComponentType::VoltageSource, {0, 0}, GUI::Rotation::R0));
+    elements.push_back(GUI::CreateElement(Core::ComponentType::VOLTAGE_SOURCE, {0, 0}, GUI::Rotation::R0));
     auto &source = static_cast<Core::VoltageSource &>(elements.back()->GetComponent());
     source.SetName("Vin1");
     const Core::EXPParameters exp{.InitialValue = -1.0,
@@ -284,10 +284,10 @@ TEST_CASE("Piecewise linear points that do not increase are skipped", "[schemati
 
 TEST_CASE("A diode part keeps its model", "[schematic_file]") {
     std::vector<std::unique_ptr<GUI::UIElement>> elements;
-    elements.push_back(GUI::CreateElement(Core::ComponentType::ZenerDiode, {2, 4}, GUI::Rotation::R90));
+    elements.push_back(GUI::CreateElement(Core::ComponentType::ZENER_DIODE, {2, 4}, GUI::Rotation::R90));
     auto &zener = static_cast<Core::Diode &>(elements.back()->GetComponent());
     zener.SetName("D1");
-    zener.SetModel(*Core::FindDiodeModel(Core::ComponentType::ZenerDiode, "12V"));
+    zener.SetModel(*Core::FindDiodeModel(Core::ComponentType::ZENER_DIODE, "12V"));
 
     const std::string saved = GUI::SaveSchematic(elements, {}, {}, {});
     CHECK(saved.find(R"("value")") == std::string::npos);
@@ -295,7 +295,7 @@ TEST_CASE("A diode part keeps its model", "[schematic_file]") {
     CHECK(loaded.Warnings.empty());
     REQUIRE(loaded.Elements.size() == 1);
     const auto &copy = static_cast<const Core::Diode &>(loaded.Elements[0]->GetComponent());
-    CHECK(copy.GetType() == Core::ComponentType::ZenerDiode);
+    CHECK(copy.GetType() == Core::ComponentType::ZENER_DIODE);
     CHECK(copy.GetName() == "D1");
     CHECK(std::string_view(copy.GetModelName()) == "12V");
 }
@@ -398,7 +398,7 @@ TEST_CASE("Mirrored elements keep their mirroring, and only they carry the key",
     elements.push_back(GUI::CreateElement(Core::ComponentType::PNP, {0, 0}, GUI::Rotation::R180));
     elements.back()->GetComponent().SetName("Q1");
     elements.back()->SetMirrored(true);
-    elements.push_back(GUI::CreateElement(Core::ComponentType::Resistor, {6, 0}, GUI::Rotation::R0));
+    elements.push_back(GUI::CreateElement(Core::ComponentType::RESISTOR, {6, 0}, GUI::Rotation::R0));
     elements.back()->GetComponent().SetName("R1");
 
     const std::string saved = GUI::SaveSchematic(elements, {}, {}, {});
@@ -424,7 +424,7 @@ TEST_CASE("A mirrored flag that is not a boolean skips the element", "[schematic
 
 TEST_CASE("Simulation settings load back unchanged", "[schematic_file]") {
     GUI::SimulationSettings settings;
-    settings.Selected = GUI::Analysis::DCSweep;
+    settings.Selected = GUI::Analysis::DC_SWEEP;
     settings.Transient = {.StopTime = 50e-3, .TimeStep = 20e-6};
     settings.ACSweep = {.StartFrequency = 10.0, .StopFrequency = 100e3, .PointsPerDecade = 50};
     settings.SweptRange = {.Source = "V1", .Start = 5.0, .Stop = 0.0, .Step = -0.05};
@@ -446,10 +446,10 @@ TEST_CASE("Simulation settings load back unchanged", "[schematic_file]") {
     // Without an output point the key is left out and loads as none
     settings.NoiseOutput.reset();
     settings.TransferFunctionOutput.reset();
-    settings.Selected = GUI::Analysis::TransferFunction;
+    settings.Selected = GUI::Analysis::TRANSFER_FUNCTION;
     const GUI::LoadedSchematic without_output = LoadOrFail(GUI::SaveSchematic({}, {}, settings, {}));
     CHECK(without_output.Settings == settings);
-    CHECK(without_output.Settings.Selected == GUI::Analysis::TransferFunction);
+    CHECK(without_output.Settings.Selected == GUI::Analysis::TRANSFER_FUNCTION);
 }
 
 TEST_CASE("Invalid noise settings fall back to their defaults with a warning", "[schematic_file]") {
@@ -523,7 +523,7 @@ TEST_CASE("An unknown selected analysis falls back to the transient with a warni
                              R"("analysis": "pole_zero", "ac_sweep": {"start": 10.0, "stop": 1e3}}})";
     const GUI::LoadedSchematic loaded = LoadOrFail(text);
     CHECK(loaded.Warnings.size() == 1);
-    CHECK(loaded.Settings.Selected == GUI::Analysis::Transient);
+    CHECK(loaded.Settings.Selected == GUI::Analysis::TRANSIENT);
     CHECK(loaded.Settings.ACSweep.StopFrequency == 1e3);
 }
 
@@ -554,7 +554,7 @@ TEST_CASE("Controlled sources keep their gain and the current they follow", "[sc
     ccvs.SetControllingCurrent("Q1.C");
     elements.push_back(GUI::CreateElement(Core::ComponentType::VCCS, {6, 0}, GUI::Rotation::R0));
     elements.back()->GetComponent().SetName("G1");
-    elements.push_back(GUI::CreateElement(Core::ComponentType::OpAmp, {12, 0}, GUI::Rotation::R0));
+    elements.push_back(GUI::CreateElement(Core::ComponentType::OP_AMP, {12, 0}, GUI::Rotation::R0));
     elements.back()->GetComponent().SetName("U1");
 
     const GUI::LoadedSchematic loaded = LoadOrFail(GUI::SaveSchematic(elements, {}, {}, {}));
@@ -571,13 +571,13 @@ TEST_CASE("Controlled sources keep their gain and the current they follow", "[sc
 TEST_CASE("Op-amps keep their model, the bandwidth of an ideal one and custom specifications", "[schematic_file]") {
     std::vector<std::unique_ptr<GUI::UIElement>> elements;
     for (int index = 0; index < 3; ++index) {
-        elements.push_back(GUI::CreateElement(Core::ComponentType::OpAmp, {index * 8, 0}, GUI::Rotation::R0));
+        elements.push_back(GUI::CreateElement(Core::ComponentType::OP_AMP, {index * 8, 0}, GUI::Rotation::R0));
         elements.back()->GetComponent().SetName(std::format("U{}", index + 1));
     }
     auto &ideal = static_cast<Core::OpAmp &>(elements[0]->GetComponent());
     ideal.SetIdealBandwidth(10e6);
     auto &ready = static_cast<Core::OpAmp &>(elements[1]->GetComponent());
-    ready.SetModel(*Core::FindOpAmpModel(Core::ComponentType::OpAmp, "uA741"));
+    ready.SetModel(*Core::FindOpAmpModel(Core::ComponentType::OP_AMP, "uA741"));
     auto &custom = static_cast<Core::OpAmp &>(elements[2]->GetComponent());
     Core::OpAmpParameters parameters;
     parameters.SlewRate = 13.0;
@@ -609,7 +609,7 @@ TEST_CASE("Op-amps saved before they had models load as ideal", "[schematic_file
 TEST_CASE("The AC magnitude is saved apart from the amplitude, and older files take the amplitude",
           "[schematic_file]") {
     std::vector<std::unique_ptr<GUI::UIElement>> elements;
-    elements.push_back(GUI::CreateElement(Core::ComponentType::VoltageSource, {0, 0}, GUI::Rotation::R0));
+    elements.push_back(GUI::CreateElement(Core::ComponentType::VOLTAGE_SOURCE, {0, 0}, GUI::Rotation::R0));
     auto &source = static_cast<Core::VoltageSource &>(elements.back()->GetComponent());
     source.SetName("Vin1");
     source.SetSourceType(Core::VoltageSource::SourceType::AC);
@@ -630,15 +630,15 @@ TEST_CASE("The AC magnitude is saved apart from the amplitude, and older files t
 
 TEST_CASE("A net label keeps its name when saved and loaded", "[schematic_file]") {
     std::vector<std::unique_ptr<GUI::UIElement>> elements;
-    elements.push_back(GUI::CreateElement(Core::ComponentType::NetLabel, {6, 2}, GUI::Rotation::R90));
+    elements.push_back(GUI::CreateElement(Core::ComponentType::NET_LABEL, {6, 2}, GUI::Rotation::R90));
     static_cast<Core::NetLabel &>(elements.back()->GetComponent()).SetNet("Vout");
-    elements.push_back(GUI::CreateElement(Core::ComponentType::NetLabel, {12, 2}, GUI::Rotation::R0));
+    elements.push_back(GUI::CreateElement(Core::ComponentType::NET_LABEL, {12, 2}, GUI::Rotation::R0));
 
     const std::string text = GUI::SaveSchematic(elements, {}, {}, {});
     const GUI::LoadedSchematic loaded = LoadOrFail(text);
     REQUIRE(loaded.Elements.size() == 2);
     CHECK(loaded.Warnings.empty());
-    CHECK(loaded.Elements[0]->GetComponent().GetType() == Core::ComponentType::NetLabel);
+    CHECK(loaded.Elements[0]->GetComponent().GetType() == Core::ComponentType::NET_LABEL);
     CHECK(static_cast<const Core::NetLabel &>(loaded.Elements[0]->GetComponent()).GetNet() == "Vout");
     CHECK(loaded.Elements[0]->GetRotation() == GUI::Rotation::R90);
     // A label with no name yet is saved without the key and loads unnamed
@@ -659,7 +659,7 @@ TEST_CASE("Two labels with one name both load, and an invalid net name skips the
 
 TEST_CASE("A potentiometer keeps its value and wiper", "[schematic_file]") {
     std::vector<std::unique_ptr<GUI::UIElement>> elements;
-    elements.push_back(GUI::CreateElement(Core::ComponentType::Potentiometer, {4, 6}, GUI::Rotation::R90));
+    elements.push_back(GUI::CreateElement(Core::ComponentType::POTENTIOMETER, {4, 6}, GUI::Rotation::R90));
     auto &pot = static_cast<Core::Potentiometer &>(elements.back()->GetComponent());
     pot.SetName("RV1");
     pot.SetValue(47e3);
@@ -692,10 +692,10 @@ TEST_CASE("A potentiometer saved without a wiper has it in the middle, and a wip
 
 TEST_CASE("A switch and a push button keep their state, and load open when the file does not say", "[schematic_file]") {
     std::vector<std::unique_ptr<GUI::UIElement>> elements;
-    elements.push_back(GUI::CreateElement(Core::ComponentType::Switch, {2, 2}, GUI::Rotation::R0));
+    elements.push_back(GUI::CreateElement(Core::ComponentType::SWITCH, {2, 2}, GUI::Rotation::R0));
     static_cast<Core::Switch &>(elements.back()->GetComponent()).SetName("SW1");
     static_cast<Core::Switch &>(elements.back()->GetComponent()).SetClosed(true);
-    elements.push_back(GUI::CreateElement(Core::ComponentType::PushButton, {8, 2}, GUI::Rotation::R90));
+    elements.push_back(GUI::CreateElement(Core::ComponentType::PUSH_BUTTON, {8, 2}, GUI::Rotation::R90));
     static_cast<Core::Switch &>(elements.back()->GetComponent()).SetName("PB1");
 
     const GUI::LoadedSchematic loaded = LoadOrFail(GUI::SaveSchematic(elements, {}, {}, {}));
@@ -703,7 +703,7 @@ TEST_CASE("A switch and a push button keep their state, and load open when the f
     REQUIRE(loaded.Elements.size() == 2);
     CHECK(static_cast<const Core::Switch &>(loaded.Elements[0]->GetComponent()).IsClosed());
     CHECK_FALSE(static_cast<const Core::Switch &>(loaded.Elements[1]->GetComponent()).IsClosed());
-    CHECK(loaded.Elements[1]->GetComponent().GetType() == Core::ComponentType::PushButton);
+    CHECK(loaded.Elements[1]->GetComponent().GetType() == Core::ComponentType::PUSH_BUTTON);
 
     const std::string without_state = R"({"type": "Switch", "x": 1, "y": 1, "rotation": 0, "name": "SW1"})";
     const GUI::LoadedSchematic plain = LoadOrFail(Document(without_state, ""));
@@ -718,10 +718,10 @@ TEST_CASE("A switch and a push button keep their state, and load open when the f
 
 TEST_CASE("A capacitor and an inductor keep their initial condition, and load without one", "[schematic_file]") {
     std::vector<std::unique_ptr<GUI::UIElement>> elements;
-    elements.push_back(GUI::CreateElement(Core::ComponentType::Capacitor, {2, 4}, GUI::Rotation::R0));
+    elements.push_back(GUI::CreateElement(Core::ComponentType::CAPACITOR, {2, 4}, GUI::Rotation::R0));
     elements.back()->GetComponent().SetName("C1");
     elements.back()->GetComponent().SetInitialCondition(5.0);
-    elements.push_back(GUI::CreateElement(Core::ComponentType::Inductor, {6, 4}, GUI::Rotation::R0));
+    elements.push_back(GUI::CreateElement(Core::ComponentType::INDUCTOR, {6, 4}, GUI::Rotation::R0));
     elements.back()->GetComponent().SetName("L1");
     elements.back()->GetComponent().SetInitialCondition(2e-3);
 
@@ -747,7 +747,7 @@ TEST_CASE("A capacitor and an inductor keep their initial condition, and load wi
 TEST_CASE("A voltage-controlled switch keeps its parameters, and loads with the defaults when it has none",
           "[schematic_file]") {
     std::vector<std::unique_ptr<GUI::UIElement>> elements;
-    elements.push_back(GUI::CreateElement(Core::ComponentType::VSwitch, {3, 3}, GUI::Rotation::R270));
+    elements.push_back(GUI::CreateElement(Core::ComponentType::V_SWITCH, {3, 3}, GUI::Rotation::R270));
     auto &controlled = static_cast<Core::VoltageControlledSwitch &>(elements.back()->GetComponent());
     controlled.SetName("S1");
     controlled.SetParameters({.Threshold = 1.8, .Hysteresis = 0.3, .OnResistance = 2.0, .OffResistance = 1e7});
@@ -777,7 +777,7 @@ TEST_CASE("A voltage-controlled switch keeps its parameters, and loads with the 
 
 TEST_CASE("A relay keeps its coil and contact figures", "[schematic_file]") {
     std::vector<std::unique_ptr<GUI::UIElement>> elements;
-    elements.push_back(GUI::CreateElement(Core::ComponentType::Relay, {6, 6}, GUI::Rotation::R0));
+    elements.push_back(GUI::CreateElement(Core::ComponentType::RELAY, {6, 6}, GUI::Rotation::R0));
     auto &relay = static_cast<Core::Relay &>(elements.back()->GetComponent());
     relay.SetName("K1");
     relay.SetParameters({.CoilResistance = 400.0,
@@ -807,7 +807,7 @@ TEST_CASE("A relay keeps its coil and contact figures", "[schematic_file]") {
 
 TEST_CASE("A transformer keeps its primary inductance and its figures", "[schematic_file]") {
     std::vector<std::unique_ptr<GUI::UIElement>> elements;
-    elements.push_back(GUI::CreateElement(Core::ComponentType::Transformer, {5, 5}, GUI::Rotation::R180));
+    elements.push_back(GUI::CreateElement(Core::ComponentType::TRANSFORMER, {5, 5}, GUI::Rotation::R180));
     auto &transformer = static_cast<Core::Transformer &>(elements.back()->GetComponent());
     transformer.SetName("T1");
     transformer.SetValue(0.5);
@@ -832,23 +832,23 @@ TEST_CASE("A transformer keeps its primary inductance and its figures", "[schema
 
 TEST_CASE("Gates and flip-flops keep their logic family", "[schematic_file]") {
     std::vector<std::unique_ptr<GUI::UIElement>> elements;
-    elements.push_back(GUI::CreateElement(Core::ComponentType::Nand, {4, 4}, GUI::Rotation::R90));
+    elements.push_back(GUI::CreateElement(Core::ComponentType::NAND, {4, 4}, GUI::Rotation::R90));
     auto &gate = static_cast<Core::LogicPart &>(elements.back()->GetComponent());
     gate.SetName("U1");
     gate.SetParameters({.LogicLevel = 3.3, .PropagationDelay = 2e-9});
-    elements.push_back(GUI::CreateElement(Core::ComponentType::JKFlipFlop, {12, 4}, GUI::Rotation::R0));
+    elements.push_back(GUI::CreateElement(Core::ComponentType::JK_FLIP_FLOP, {12, 4}, GUI::Rotation::R0));
     elements.back()->GetComponent().SetName("U2");
 
     const GUI::LoadedSchematic loaded = LoadOrFail(GUI::SaveSchematic(elements, {}, {}, {}));
     CHECK(loaded.Warnings.empty());
     REQUIRE(loaded.Elements.size() == 2);
     const auto &nand = static_cast<const Core::LogicPart &>(loaded.Elements[0]->GetComponent());
-    CHECK(nand.GetType() == Core::ComponentType::Nand);
+    CHECK(nand.GetType() == Core::ComponentType::NAND);
     CHECK(nand.GetName() == "U1");
     CHECK(nand.GetParameters().LogicLevel == 3.3);
     CHECK(nand.GetParameters().PropagationDelay == 2e-9);
     const auto &flip_flop = static_cast<const Core::LogicPart &>(loaded.Elements[1]->GetComponent());
-    CHECK(flip_flop.GetType() == Core::ComponentType::JKFlipFlop);
+    CHECK(flip_flop.GetType() == Core::ComponentType::JK_FLIP_FLOP);
     // Left out of the file, the figures are those a new part starts with
     CHECK(flip_flop.GetParameters().LogicLevel == 5.0);
 
@@ -861,10 +861,10 @@ TEST_CASE("Gates and flip-flops keep their logic family", "[schematic_file]") {
 
 TEST_CASE("A gate keeps its number of inputs, and a file without one has two", "[schematic_file]") {
     std::vector<std::unique_ptr<GUI::UIElement>> elements;
-    elements.push_back(GUI::CreateElement(Core::ComponentType::Xor, {4, 4}, GUI::Rotation::R0));
+    elements.push_back(GUI::CreateElement(Core::ComponentType::XOR, {4, 4}, GUI::Rotation::R0));
     static_cast<Core::LogicPart &>(elements.back()->GetComponent()).SetInputCount(5);
     elements.back()->GetComponent().SetName("U1");
-    elements.push_back(GUI::CreateElement(Core::ComponentType::Not, {12, 4}, GUI::Rotation::R0));
+    elements.push_back(GUI::CreateElement(Core::ComponentType::NOT, {12, 4}, GUI::Rotation::R0));
     elements.back()->GetComponent().SetName("U2");
 
     const std::string text = GUI::SaveSchematic(elements, {}, {}, {});
@@ -896,11 +896,11 @@ TEST_CASE("A gate keeps its number of inputs, and a file without one has two", "
 
 TEST_CASE("A clock keeps its figures and a logic input its state", "[schematic_file]") {
     std::vector<std::unique_ptr<GUI::UIElement>> elements;
-    elements.push_back(GUI::CreateElement(Core::ComponentType::Clock, {4, 4}, GUI::Rotation::R90));
+    elements.push_back(GUI::CreateElement(Core::ComponentType::CLOCK, {4, 4}, GUI::Rotation::R90));
     auto &clock = static_cast<Core::Clock &>(elements.back()->GetComponent());
     clock.SetName("V1");
     clock.SetParameters({.Frequency = 2e3, .DutyCycle = 0.25, .LogicLevel = 3.3, .StartDelay = 1e-3});
-    elements.push_back(GUI::CreateElement(Core::ComponentType::LogicInput, {12, 4}, GUI::Rotation::R0));
+    elements.push_back(GUI::CreateElement(Core::ComponentType::LOGIC_INPUT, {12, 4}, GUI::Rotation::R0));
     auto &input = static_cast<Core::LogicInput &>(elements.back()->GetComponent());
     input.SetName("V2");
     input.SetParameters({.LogicLevel = 3.3});
@@ -910,14 +910,14 @@ TEST_CASE("A clock keeps its figures and a logic input its state", "[schematic_f
     CHECK(loaded.Warnings.empty());
     REQUIRE(loaded.Elements.size() == 2);
     const auto &clock_copy = static_cast<const Core::Clock &>(loaded.Elements[0]->GetComponent());
-    CHECK(clock_copy.GetType() == Core::ComponentType::Clock);
+    CHECK(clock_copy.GetType() == Core::ComponentType::CLOCK);
     CHECK(clock_copy.GetName() == "V1");
     CHECK(clock_copy.GetParameters().Frequency == 2e3);
     CHECK(clock_copy.GetParameters().DutyCycle == 0.25);
     CHECK(clock_copy.GetParameters().LogicLevel == 3.3);
     CHECK(clock_copy.GetParameters().StartDelay == 1e-3);
     const auto &input_copy = static_cast<const Core::LogicInput &>(loaded.Elements[1]->GetComponent());
-    CHECK(input_copy.GetType() == Core::ComponentType::LogicInput);
+    CHECK(input_copy.GetType() == Core::ComponentType::LOGIC_INPUT);
     CHECK(input_copy.GetParameters().LogicLevel == 3.3);
     CHECK(input_copy.IsHigh());
 }

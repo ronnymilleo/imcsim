@@ -27,7 +27,7 @@ struct ClipArea {
 };
 
 // Large enough that the tests of the dash pattern clip nothing
-constexpr ClipArea WideArea = {{-1000.0f, -1000.0f}, {1000.0f, 1000.0f}};
+constexpr ClipArea WIDE_AREA = {{-1000.0f, -1000.0f}, {1000.0f, 1000.0f}};
 
 } // namespace
 
@@ -53,7 +53,7 @@ TEST_CASE("FindNearestSample compares decades on a logarithmic axis", "[plot_hel
 
 TEST_CASE("SplitIntoDashes alternates dashes and gaps along a straight line", "[plot_helpers]") {
     const std::array<ImVec2, 2> line = {ImVec2(0.0f, 0.0f), ImVec2(10.0f, 0.0f)};
-    const std::vector<GUI::LineSegment> dashes = GUI::SplitIntoDashes(line, 3.0f, 2.0f, WideArea.Min, WideArea.Max);
+    const std::vector<GUI::LineSegment> dashes = GUI::SplitIntoDashes(line, 3.0f, 2.0f, WIDE_AREA.Min, WIDE_AREA.Max);
     REQUIRE(dashes.size() == 2);
     CheckPoint(dashes[0].Start, {0.0f, 0.0f});
     CheckPoint(dashes[0].End, {3.0f, 0.0f});
@@ -64,7 +64,8 @@ TEST_CASE("SplitIntoDashes alternates dashes and gaps along a straight line", "[
 TEST_CASE("SplitIntoDashes keeps the pattern going around bends", "[plot_helpers]") {
     // 2 pixels right, then 4 down: the first dash turns the corner, a 1 pixel gap follows, then the last dash
     const std::array<ImVec2, 3> polyline = {ImVec2(0.0f, 0.0f), ImVec2(2.0f, 0.0f), ImVec2(2.0f, 4.0f)};
-    const std::vector<GUI::LineSegment> dashes = GUI::SplitIntoDashes(polyline, 3.0f, 1.0f, WideArea.Min, WideArea.Max);
+    const std::vector<GUI::LineSegment> dashes =
+        GUI::SplitIntoDashes(polyline, 3.0f, 1.0f, WIDE_AREA.Min, WIDE_AREA.Max);
     REQUIRE(dashes.size() == 3);
     CheckPoint(dashes[0].End, {2.0f, 0.0f});
     CheckPoint(dashes[1].Start, {2.0f, 0.0f});
@@ -75,7 +76,8 @@ TEST_CASE("SplitIntoDashes keeps the pattern going around bends", "[plot_helpers
 
 TEST_CASE("SplitIntoDashes skips repeated points", "[plot_helpers]") {
     const std::array<ImVec2, 3> polyline = {ImVec2(0.0f, 0.0f), ImVec2(0.0f, 0.0f), ImVec2(1.0f, 0.0f)};
-    const std::vector<GUI::LineSegment> dashes = GUI::SplitIntoDashes(polyline, 3.0f, 1.0f, WideArea.Min, WideArea.Max);
+    const std::vector<GUI::LineSegment> dashes =
+        GUI::SplitIntoDashes(polyline, 3.0f, 1.0f, WIDE_AREA.Min, WIDE_AREA.Max);
     REQUIRE(dashes.size() == 1);
     CheckPoint(dashes[0].End, {1.0f, 0.0f});
 }

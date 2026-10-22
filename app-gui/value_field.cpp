@@ -16,8 +16,8 @@ namespace GUI {
 namespace {
 
 // In font sizes, so the layout follows the DPI scale
-constexpr float LabelWidth = 8.0f;
-constexpr float InputWidth = 8.0f;
+constexpr float LABEL_WIDTH = 8.0f;
+constexpr float INPUT_WIDTH = 8.0f;
 
 // +1 for one standard value up and -1 for one down, from the arrow keys while the input is active and from the mouse
 // wheel over it; 0 when the user did neither this frame. Call right after the input
@@ -169,7 +169,7 @@ std::optional<double> ValueField::Draw(const char *label, const std::string &uni
     std::optional<double> edited;
     const std::optional<char> first = FocusInput();
     const bool changed = DrawInput();
-    const bool steps = series != Core::ValueSeries::Free;
+    const bool steps = series != Core::ValueSeries::FREE;
     int step = 0;
     if (steps) {
         // The wheel over the input steps the value, so the window behind it must not scroll too
@@ -237,7 +237,7 @@ OptionalValueEdit ValueField::DrawOptional(const char *label, const std::string 
             const std::optional<double> value = Core::ParseValue(m_Text.data(), unit);
             m_Invalid = !value || !is_valid(*value);
             if (!m_Invalid) {
-                edit.Value = *value;
+                edit.Value = value;
                 edit.Changed = true;
             }
         }
@@ -264,8 +264,8 @@ OptionalValueEdit ValueField::DrawOptional(const char *label, const std::string 
 void DrawFieldLabel(const char *label) {
     ImGui::AlignTextToFramePadding();
     ImGui::TextUnformatted(label);
-    ImGui::SameLine(ImGui::GetFontSize() * LabelWidth);
-    ImGui::SetNextItemWidth(ImGui::GetFontSize() * InputWidth);
+    ImGui::SameLine(ImGui::GetFontSize() * LABEL_WIDTH);
+    ImGui::SetNextItemWidth(ImGui::GetFontSize() * INPUT_WIDTH);
 }
 
 } // namespace GUI

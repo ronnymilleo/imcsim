@@ -50,7 +50,7 @@ struct OpAmpModel {
     OpAmpParameters Parameters;
 };
 
-inline constexpr const char *CustomOpAmpModelName = "Custom";
+inline constexpr const char *CUSTOM_OP_AMP_MODEL_NAME = "Custom";
 
 /**
  * @class   OpAmp

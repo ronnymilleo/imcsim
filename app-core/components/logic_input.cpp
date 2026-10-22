@@ -10,7 +10,7 @@ namespace Core {
 /**
  * @brief   Creates a logic input that drives 0 V, with a 5 V logic level.
  */
-LogicInput::LogicInput() : Component(ComponentType::LogicInput, 0.0) {
+LogicInput::LogicInput() : Component(ComponentType::LOGIC_INPUT, 0.0) {
 }
 
 /**

@@ -20,7 +20,7 @@ namespace {
 // Zeners work in breakdown, but other diodes only reach it when the circuit exceeds their rating, which ngspice
 // simulates without complaint
 std::optional<std::string> BreakdownWarning(const CircuitEntry &entry, const double highest_reverse_voltage) {
-    if (entry.Part->GetType() == ComponentType::ZenerDiode) {
+    if (entry.Part->GetType() == ComponentType::ZENER_DIODE) {
         return std::nullopt;
     }
     const auto &diode = static_cast<const Diode &>(*entry.Part);

@@ -25,7 +25,7 @@ public:
 
 protected:
     // Same height as the capacitor plates, so the default labels and pick area still fit
-    static constexpr float CircleRadius = 0.8f;
+    static constexpr float CIRCLE_RADIUS = 0.8f;
 
     void DrawLabels(SchematicCanvas &canvas, const ViewTransform &view, ImU32 color) const override;
 

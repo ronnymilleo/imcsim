@@ -30,14 +30,14 @@ namespace GUI {
  * @brief   The tabs of the Output window, one per analysis, and the spectrum of the transient.
  */
 enum class PlotTab {
-    OperatingPoint,
-    Transient,
-    Spectrum,
-    ACSweep,
-    DCSweep,
-    Noise,
-    TransferFunction,
-    TruthTable
+    OPERATING_POINT,
+    TRANSIENT,
+    SPECTRUM,
+    AC_SWEEP,
+    DC_SWEEP,
+    NOISE,
+    TRANSFER_FUNCTION,
+    TRUTH_TABLE
 };
 
 /**
@@ -106,14 +106,14 @@ private:
     bool m_ShowBitValues = false;
     PlotSpan m_ACSweepView{.From = 1.0, .To = 1e6};
     // Spectrum of the transient: its window and frequency scale, its visible range and the last spectra computed
-    SpectrumWindow m_SpectrumWindow = SpectrumWindow::Hann;
+    SpectrumWindow m_SpectrumWindow = SpectrumWindow::HANN;
     bool m_SpectrumLogarithmic = false;
     PlotSpan m_SpectrumView;
     std::optional<TransientSpectra> m_Spectra;
     bool m_SpectraChanged = false;
     MathChannels m_MathChannels;
     // The tab shown this frame, which Export saves
-    PlotTab m_ShownTab = PlotTab::Transient;
+    PlotTab m_ShownTab = PlotTab::TRANSIENT;
     // Tab to bring to the front on the next frame, after a new result
     std::optional<PlotTab> m_TabToShow;
     // View preference, kept in imgui.ini: whether a new result brings the window to the front

@@ -9,14 +9,14 @@ namespace Core {
 
 namespace {
 
-constexpr double OpenContactResistance = 1e9;
+constexpr double OPEN_CONTACT_RESISTANCE = 1e9;
 
 } // namespace
 
 /**
  * @brief   Creates a relay for a 5 V coil of 70 Ohm and 50 mH that pulls in at 3.5 V and drops out at 1 V.
  */
-Relay::Relay() : Component(ComponentType::Relay, 0.0) {
+Relay::Relay() : Component(ComponentType::RELAY, 0.0) {
 }
 
 /**
@@ -55,7 +55,7 @@ SwitchParameters Relay::GetContactParameters() const {
     return {.Threshold = (m_Parameters.PullInVoltage + m_Parameters.DropOutVoltage) / 2.0,
             .Hysteresis = (m_Parameters.PullInVoltage - m_Parameters.DropOutVoltage) / 2.0,
             .OnResistance = m_Parameters.ContactResistance,
-            .OffResistance = OpenContactResistance};
+            .OffResistance = OPEN_CONTACT_RESISTANCE};
 }
 
 } // namespace Core

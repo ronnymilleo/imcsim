@@ -105,7 +105,7 @@ struct DiodeLoop {
         Part.SetName("D1");
         Circuit.Add(Supply, {1});
         Circuit.Add(Series, {1, 2});
-        if (type == Core::ComponentType::ZenerDiode) {
+        if (type == Core::ComponentType::ZENER_DIODE) {
             Circuit.Add(Part, {0, 2});
         } else {
             Circuit.Add(Part, {2, 0});
@@ -370,7 +370,7 @@ TEST_CASE("An AC sweep of an RC low-pass matches its transfer function", "[simul
 
 TEST_CASE("An AC sweep without an AC source is rejected before reaching ngspice", "[simulator]") {
     LowPass low_pass;
-    for (const auto type : {Core::VoltageSource::SourceType::DC, Core::VoltageSource::SourceType::Pulse}) {
+    for (const auto type : {Core::VoltageSource::SourceType::DC, Core::VoltageSource::SourceType::PULSE}) {
         low_pass.Source.SetSourceType(type);
         const Core::ACSweepRun run = Core::RunACSweep(low_pass.Circuit, {});
         REQUIRE_FALSE(run.Result);
@@ -381,7 +381,7 @@ TEST_CASE("An AC sweep without an AC source is rejected before reaching ngspice"
 
 TEST_CASE("A pulse charges an RC low-pass with its time constant", "[simulator]") {
     LowPass low_pass;
-    low_pass.Source.SetSourceType(Core::VoltageSource::SourceType::Pulse);
+    low_pass.Source.SetSourceType(Core::VoltageSource::SourceType::PULSE);
     // A single 1 V step at t = 0, far longer than the 1 ms time constant
     low_pass.Source.SetPulse(
         {.Low = 0.0, .High = 1.0, .RiseTime = 1e-9, .FallTime = 1e-9, .Width = 1.0, .Period = 2.0});
@@ -689,7 +689,7 @@ TEST_CASE("A current source pushes its current into the node at its second termi
 
 TEST_CASE("A transient has the charging current of an RC low-pass", "[simulator]") {
     LowPass low_pass;
-    low_pass.Source.SetSourceType(Core::VoltageSource::SourceType::Pulse);
+    low_pass.Source.SetSourceType(Core::VoltageSource::SourceType::PULSE);
     low_pass.Source.SetPulse(
         {.Low = 0.0, .High = 1.0, .RiseTime = 1e-9, .FallTime = 1e-9, .Width = 1.0, .Period = 2.0});
 
@@ -767,7 +767,7 @@ TEST_CASE("An AC current source excites an AC sweep", "[simulator]") {
 }
 
 TEST_CASE("A forward biased diode drops its forward voltage and carries the loop current", "[simulator]") {
-    const DiodeLoop loop(Core::ComponentType::Diode, 5.0, 1e3);
+    const DiodeLoop loop(Core::ComponentType::DIODE, 5.0, 1e3);
     const Core::OperatingPointRun run = Core::RunOperatingPoint(loop.Circuit);
     if (!run.Result) {
         FAIL(run.Result.error());
@@ -782,7 +782,7 @@ TEST_CASE("A forward biased diode drops its forward voltage and carries the loop
 }
 
 TEST_CASE("A Zener diode in breakdown holds its voltage", "[simulator]") {
-    const DiodeLoop loop(Core::ComponentType::ZenerDiode, 12.0, 1e3);
+    const DiodeLoop loop(Core::ComponentType::ZENER_DIODE, 12.0, 1e3);
     const Core::OperatingPointRun run = Core::RunOperatingPoint(loop.Circuit);
     if (!run.Result) {
         FAIL(run.Result.error());
@@ -819,9 +819,9 @@ TEST_CASE("A half-wave rectifier passes only the positive half of a sine", "[sim
     source.SetName("Vin1");
     source.SetSourceType(Core::VoltageSource::SourceType::AC);
     source.SetAC({.Amplitude = 5.0, .Frequency = 1e3, .Offset = 0.0});
-    Core::Diode rectifier(Core::ComponentType::Diode);
+    Core::Diode rectifier(Core::ComponentType::DIODE);
     rectifier.SetName("D1");
-    rectifier.SetModel(*Core::FindDiodeModel(Core::ComponentType::Diode, "1N4007"));
+    rectifier.SetModel(*Core::FindDiodeModel(Core::ComponentType::DIODE, "1N4007"));
     Core::Resistor load;
     load.SetName("R1");
     const Core::Ground reference;
@@ -856,7 +856,7 @@ TEST_CASE("An AC sweep has the small-signal current of a biased diode", "[simula
     source.SetAC({.Amplitude = 1.0, .Frequency = 1e3, .Offset = 5.0});
     Core::Resistor series;
     series.SetName("R1");
-    Core::Diode diode(Core::ComponentType::Diode);
+    Core::Diode diode(Core::ComponentType::DIODE);
     diode.SetName("D1");
     const Core::Ground reference;
     Core::Circuit circuit;
@@ -911,7 +911,7 @@ TEST_CASE("A transient reports a diode that breaks down at any time point", "[si
     source.SetName("Vin1");
     source.SetSourceType(Core::VoltageSource::SourceType::AC);
     source.SetAC({.Amplitude = 150.0, .Frequency = 1e3, .Offset = 0.0});
-    Core::Diode rectifier(Core::ComponentType::Diode);
+    Core::Diode rectifier(Core::ComponentType::DIODE);
     rectifier.SetName("D1");
     Core::Resistor load;
     load.SetName("R1");
@@ -933,7 +933,7 @@ TEST_CASE("A transient reports a diode that breaks down at any time point", "[si
 }
 
 TEST_CASE("A custom Zener regulates at its own breakdown voltage", "[simulator]") {
-    DiodeLoop loop(Core::ComponentType::ZenerDiode, 20.0, 1e3);
+    DiodeLoop loop(Core::ComponentType::ZENER_DIODE, 20.0, 1e3);
     loop.Part.SetCustom();
     Core::DiodeParameters parameters = loop.Part.GetParameters();
     parameters.BreakdownVoltage = 9.1;
@@ -948,7 +948,7 @@ TEST_CASE("A custom Zener regulates at its own breakdown voltage", "[simulator]"
 
 TEST_CASE("The breakdown warning uses the voltage of a custom diode", "[simulator]") {
     // 12 V across a 1N4148 is fine, but not once its custom BV drops to 10 V
-    DiodeLoop loop(Core::ComponentType::Diode, 12.0, 1e3);
+    DiodeLoop loop(Core::ComponentType::DIODE, 12.0, 1e3);
     Core::Circuit reversed;
     reversed.Add(loop.Supply, {1});
     reversed.Add(loop.Series, {1, 2});
@@ -1248,7 +1248,7 @@ TEST_CASE("A MOSFET above its power rating is reported, with its other ratings r
 }
 
 TEST_CASE("A MOSFET gate above its VGS rating is reported", "[simulator]") {
-    LowSideSwitch stage(Core::ComponentType::PMOS, 25.0);
+    const LowSideSwitch stage(Core::ComponentType::PMOS, 25.0);
     const Core::OperatingPointRun run = Core::RunOperatingPoint(stage.Circuit);
     if (!run.Result) {
         FAIL(run.Result.error());
@@ -1264,7 +1264,7 @@ TEST_CASE("A transient checks the average power, so short pulses above the ratin
     supply.SetValue(20.0);
     Core::VoltageSource gate;
     gate.SetName("Vin1");
-    gate.SetSourceType(Core::VoltageSource::SourceType::Pulse);
+    gate.SetSourceType(Core::VoltageSource::SourceType::PULSE);
     gate.SetPulse({.Low = 0.0, .High = 3.5, .Width = 0.1e-3, .Period = 1e-3});
     Core::Resistor load;
     load.SetName("R1");
@@ -1379,7 +1379,7 @@ TEST_CASE("A DC sweep can drive a current source", "[simulator]") {
 }
 
 TEST_CASE("A DC sweep traces the I-V curve of a diode", "[simulator]") {
-    DiodeLoop loop(Core::ComponentType::Diode, 1.0, 10.0);
+    const DiodeLoop loop(Core::ComponentType::DIODE, 1.0, 10.0);
     const Core::DCSweepRun run =
         Core::RunDCSweep(loop.Circuit, {.Swept = {.Source = "V1", .Start = 0.0, .Stop = 1.0, .Step = 0.01}});
     if (!run.Result) {
@@ -1571,7 +1571,7 @@ TEST_CASE("A uA741 macromodel amplifies like the ideal op-amp but swings 1 V sho
     const double input = GENERATE(0.5, 2.0, -2.0);
     CAPTURE(input);
     InvertingAmplifier amplifier(input);
-    amplifier.Amplifier.SetModel(*Core::FindOpAmpModel(Core::ComponentType::OpAmp, "uA741"));
+    amplifier.Amplifier.SetModel(*Core::FindOpAmpModel(Core::ComponentType::OP_AMP, "uA741"));
     const Core::OperatingPointRun run = Core::RunOperatingPoint(amplifier.Circuit);
     if (!run.Result) {
         FAIL(run.Result.error());
@@ -1585,12 +1585,12 @@ TEST_CASE("A uA741 macromodel slews at its datasheet rate", "[simulator]") {
     // A unity-gain follower driven by a 10 V step, so the output can only follow at the slew rate
     Core::VoltageSource input;
     input.SetName("Vin1");
-    input.SetSourceType(Core::VoltageSource::SourceType::Pulse);
+    input.SetSourceType(Core::VoltageSource::SourceType::PULSE);
     input.SetPulse(
         {.Low = -5.0, .High = 5.0, .Delay = 1e-6, .RiseTime = 1e-9, .FallTime = 1e-9, .Width = 1.0, .Period = 2.0});
     Core::OpAmp follower;
     follower.SetName("U1");
-    follower.SetModel(*Core::FindOpAmpModel(Core::ComponentType::OpAmp, "uA741"));
+    follower.SetModel(*Core::FindOpAmpModel(Core::ComponentType::OP_AMP, "uA741"));
     Core::VCC positive;
     positive.SetName("V1");
     positive.SetValue(15.0);
@@ -1705,7 +1705,7 @@ TEST_CASE("A closed switch passes the current of its circuit and an open one sto
     Core::VCC supply;
     supply.SetName("V1");
     supply.SetValue(10.0);
-    Core::Switch contact(Core::ComponentType::Switch);
+    Core::Switch contact(Core::ComponentType::SWITCH);
     contact.SetName("SW1");
     Core::Resistor load;
     load.SetName("R1");
@@ -1775,7 +1775,7 @@ TEST_CASE("A voltage-controlled switch follows a pulse in a transient", "[simula
     supply.SetValue(10.0);
     Core::VoltageSource control;
     control.SetName("Vin1");
-    control.SetSourceType(Core::VoltageSource::SourceType::Pulse);
+    control.SetSourceType(Core::VoltageSource::SourceType::PULSE);
     control.SetPulse(
         {.Low = 0.0, .High = 5.0, .Delay = 0.0, .RiseTime = 1e-6, .FallTime = 1e-6, .Width = 0.5e-3, .Period = 1e-3});
     Core::VoltageControlledSwitch contact;
@@ -1813,7 +1813,7 @@ TEST_CASE("A relay closes its contact once its coil current is high enough, and 
     supply.SetValue(10.0);
     Core::VoltageSource coil_drive;
     coil_drive.SetName("Vin1");
-    coil_drive.SetSourceType(Core::VoltageSource::SourceType::Pulse);
+    coil_drive.SetSourceType(Core::VoltageSource::SourceType::PULSE);
     coil_drive.SetPulse(
         {.Low = 0.0, .High = 5.0, .Delay = 0.0, .RiseTime = 1e-6, .FallTime = 1e-6, .Width = 5e-3, .Period = 10e-3});
     Core::Relay relay;
@@ -1883,7 +1883,7 @@ struct SteppedDown {
 } // namespace
 
 TEST_CASE("A 2:1 transformer halves the voltage of its primary on an open secondary", "[simulator]") {
-    SteppedDown circuit(1e9);
+    const SteppedDown circuit(1e9);
     const Core::ACSweepRun run = Core::RunACSweep(circuit.Circuit, {.StartFrequency = 1e3, .StopFrequency = 1e4});
     REQUIRE(run.Result.has_value());
     // The coupling takes a little more: 0.999 / 2
@@ -1894,7 +1894,7 @@ TEST_CASE("A 2:1 transformer halves the voltage of its primary on an open second
 }
 
 TEST_CASE("A loaded 2:1 transformer draws twice the secondary current from its primary", "[simulator]") {
-    SteppedDown circuit(10.0);
+    const SteppedDown circuit(10.0);
     const Core::TransientRun run = Core::RunTransient(circuit.Circuit, {.StopTime = 5e-3, .TimeStep = 5e-6});
     REQUIRE(run.Result.has_value());
     const Core::Transient &transient = *run.Result;
@@ -1938,20 +1938,20 @@ struct GateTruthRow {
 
 TEST_CASE("Each logic gate gives its truth table at the operating point", "[simulator][digital]") {
     SKIP_WITHOUT_DIGITAL_MODELS();
-    const auto row = GENERATE(GateTruthRow{Core::ComponentType::And, false, false, false},
-                              GateTruthRow{Core::ComponentType::And, true, false, false},
-                              GateTruthRow{Core::ComponentType::And, true, true, true},
-                              GateTruthRow{Core::ComponentType::Or, false, false, false},
-                              GateTruthRow{Core::ComponentType::Or, true, false, true},
-                              GateTruthRow{Core::ComponentType::Or, true, true, true},
-                              GateTruthRow{Core::ComponentType::Nand, true, true, false},
-                              GateTruthRow{Core::ComponentType::Nand, false, true, true},
-                              GateTruthRow{Core::ComponentType::Nor, false, false, true},
-                              GateTruthRow{Core::ComponentType::Nor, true, false, false},
-                              GateTruthRow{Core::ComponentType::Xor, true, false, true},
-                              GateTruthRow{Core::ComponentType::Xor, true, true, false},
-                              GateTruthRow{Core::ComponentType::Xnor, true, true, true},
-                              GateTruthRow{Core::ComponentType::Xnor, false, true, false});
+    const auto row = GENERATE(GateTruthRow{Core::ComponentType::AND, false, false, false},
+                              GateTruthRow{Core::ComponentType::AND, true, false, false},
+                              GateTruthRow{Core::ComponentType::AND, true, true, true},
+                              GateTruthRow{Core::ComponentType::OR, false, false, false},
+                              GateTruthRow{Core::ComponentType::OR, true, false, true},
+                              GateTruthRow{Core::ComponentType::OR, true, true, true},
+                              GateTruthRow{Core::ComponentType::NAND, true, true, false},
+                              GateTruthRow{Core::ComponentType::NAND, false, true, true},
+                              GateTruthRow{Core::ComponentType::NOR, false, false, true},
+                              GateTruthRow{Core::ComponentType::NOR, true, false, false},
+                              GateTruthRow{Core::ComponentType::XOR, true, false, true},
+                              GateTruthRow{Core::ComponentType::XOR, true, true, false},
+                              GateTruthRow{Core::ComponentType::XNOR, true, true, true},
+                              GateTruthRow{Core::ComponentType::XNOR, false, true, false});
     Core::VoltageSource input_a;
     input_a.SetName("Vin1");
     input_a.SetValue(row.A ? 5.0 : 0.0);
@@ -1976,7 +1976,7 @@ TEST_CASE("Each logic gate gives its truth table at the operating point", "[simu
 
 TEST_CASE("NOT inverts and the buffer repeats its input", "[simulator][digital]") {
     SKIP_WITHOUT_DIGITAL_MODELS();
-    const auto type = GENERATE(Core::ComponentType::Not, Core::ComponentType::Buffer);
+    const auto type = GENERATE(Core::ComponentType::NOT, Core::ComponentType::BUFFER);
     const bool input_high = GENERATE(false, true);
     Core::VoltageSource input;
     input.SetName("Vin1");
@@ -1991,7 +1991,7 @@ TEST_CASE("NOT inverts and the buffer repeats its input", "[simulator][digital]"
 
     const Core::OperatingPointRun run = Core::RunOperatingPoint(circuit);
     REQUIRE(run.Result.has_value());
-    const bool expected = type == Core::ComponentType::Not ? !input_high : input_high;
+    const bool expected = type == Core::ComponentType::NOT ? !input_high : input_high;
     CHECK_THAT(run.Result->NodeVoltages[2], Catch::Matchers::WithinAbs(expected ? 5.0 : 0.0, 0.05));
 }
 
@@ -2000,9 +2000,9 @@ TEST_CASE("A logic input left unconnected reads as 0", "[simulator][digital]") {
     Core::VoltageSource input;
     input.SetName("Vin1");
     input.SetValue(5.0);
-    Core::LogicPart or_gate(Core::ComponentType::Or);
+    Core::LogicPart or_gate(Core::ComponentType::OR);
     or_gate.SetName("U1");
-    Core::LogicPart and_gate(Core::ComponentType::And);
+    Core::LogicPart and_gate(Core::ComponentType::AND);
     and_gate.SetName("U2");
     const Core::Ground reference;
     // Input A of both gates on node 1 at 5 V, input B of each alone on nodes 2 and 3; outputs on nodes 4 and 5
@@ -2023,7 +2023,7 @@ TEST_CASE("A gate output carries the current of its load through its output resi
     Core::VoltageSource input;
     input.SetName("Vin1");
     input.SetValue(5.0);
-    Core::LogicPart buffer(Core::ComponentType::Buffer);
+    Core::LogicPart buffer(Core::ComponentType::BUFFER);
     buffer.SetName("U1");
     Core::Resistor load;
     load.SetName("R1");
@@ -2059,7 +2059,7 @@ struct ClockedFlipFlop {
 
     explicit ClockedFlipFlop(const Core::ComponentType type, std::vector<int> terminals) : FlipFlop(type) {
         Clock.SetName("Vin1");
-        Clock.SetSourceType(Core::VoltageSource::SourceType::Pulse);
+        Clock.SetSourceType(Core::VoltageSource::SourceType::PULSE);
         Clock.SetPulse({.Low = 0.0,
                         .High = 5.0,
                         .Delay = 0.25e-3,
@@ -2097,7 +2097,7 @@ TEST_CASE("A D flip-flop takes its input only on the rising edge of the clock", 
     Core::VoltageSource data;
     data.SetName("Vin2");
     data.SetValue(5.0);
-    ClockedFlipFlop circuit(Core::ComponentType::DFlipFlop, {1, 2, 3, 4, 5, 6});
+    ClockedFlipFlop circuit(Core::ComponentType::D_FLIP_FLOP, {1, 2, 3, 4, 5, 6});
     circuit.Circuit.Add(data, {1, 0});
 
     const Core::TransientRun run = Core::RunTransient(circuit.Circuit, {.StopTime = 1e-3, .TimeStep = 5e-6});
@@ -2112,7 +2112,7 @@ TEST_CASE("A D flip-flop takes its input only on the rising edge of the clock", 
 
 TEST_CASE("A D flip-flop with QN fed back divides the clock by two", "[simulator][digital]") {
     SKIP_WITHOUT_DIGITAL_MODELS();
-    ClockedFlipFlop circuit(Core::ComponentType::DFlipFlop, {1, 2, 3, 4, 5, 1});
+    const ClockedFlipFlop circuit(Core::ComponentType::D_FLIP_FLOP, {1, 2, 3, 4, 5, 1});
 
     const Core::TransientRun run = Core::RunTransient(circuit.Circuit, {.StopTime = 8e-3, .TimeStep = 5e-6});
     REQUIRE(run.Result.has_value());
@@ -2126,7 +2126,7 @@ TEST_CASE("The set and reset inputs of a flip-flop act without the clock", "[sim
     SKIP_WITHOUT_DIGITAL_MODELS();
     Core::VoltageSource set;
     set.SetName("Vin2");
-    set.SetSourceType(Core::VoltageSource::SourceType::Pulse);
+    set.SetSourceType(Core::VoltageSource::SourceType::PULSE);
     // SET high from 0.1 ms to 0.3 ms, before the first edge of the clock
     set.SetPulse({.Low = 0.0,
                   .High = 5.0,
@@ -2135,7 +2135,7 @@ TEST_CASE("The set and reset inputs of a flip-flop act without the clock", "[sim
                   .FallTime = 1e-6,
                   .Width = 0.2e-3,
                   .Period = 10e-3});
-    ClockedFlipFlop circuit(Core::ComponentType::DFlipFlop, {1, 2, 3, 4, 5, 6});
+    ClockedFlipFlop circuit(Core::ComponentType::D_FLIP_FLOP, {1, 2, 3, 4, 5, 6});
     circuit.Circuit.Add(set, {3, 0});
 
     const Core::TransientRun run = Core::RunTransient(circuit.Circuit, {.StopTime = 0.6e-3, .TimeStep = 5e-6});
@@ -2152,7 +2152,7 @@ TEST_CASE("A T flip-flop toggles at each clock edge while T is high", "[simulato
     Core::VoltageSource toggle;
     toggle.SetName("Vin2");
     toggle.SetValue(5.0);
-    ClockedFlipFlop circuit(Core::ComponentType::TFlipFlop, {1, 2, 3, 4, 5, 6});
+    ClockedFlipFlop circuit(Core::ComponentType::T_FLIP_FLOP, {1, 2, 3, 4, 5, 6});
     circuit.Circuit.Add(toggle, {1, 0});
 
     const Core::TransientRun run = Core::RunTransient(circuit.Circuit, {.StopTime = 8e-3, .TimeStep = 5e-6});
@@ -2166,7 +2166,7 @@ TEST_CASE("A JK flip-flop with J and K high toggles, and with J high alone it se
     high.SetName("Vin2");
     high.SetValue(5.0);
     SECTION("J and K high") {
-        ClockedFlipFlop circuit(Core::ComponentType::JKFlipFlop, {1, 7, 2, 3, 4, 5, 6});
+        ClockedFlipFlop circuit(Core::ComponentType::JK_FLIP_FLOP, {1, 7, 2, 3, 4, 5, 6});
         circuit.Circuit.Add(high, {1, 0});
         Core::VoltageSource second;
         second.SetName("Vin3");
@@ -2177,7 +2177,7 @@ TEST_CASE("A JK flip-flop with J and K high toggles, and with J high alone it se
         CHECK(CountRisingEdges(run.Result->NodeVoltages[5], 2.5) == 4);
     }
     SECTION("J high alone") {
-        ClockedFlipFlop circuit(Core::ComponentType::JKFlipFlop, {1, 7, 2, 3, 4, 5, 6});
+        ClockedFlipFlop circuit(Core::ComponentType::JK_FLIP_FLOP, {1, 7, 2, 3, 4, 5, 6});
         circuit.Circuit.Add(high, {1, 0});
         const Core::TransientRun run = Core::RunTransient(circuit.Circuit, {.StopTime = 3.5e-3, .TimeStep = 5e-6});
         REQUIRE(run.Result.has_value());
@@ -2190,13 +2190,13 @@ TEST_CASE("An SR flip-flop sets with S, and resets with R, on the clock edge", "
     SKIP_WITHOUT_DIGITAL_MODELS();
     Core::VoltageSource set_input;
     set_input.SetName("Vin2");
-    set_input.SetSourceType(Core::VoltageSource::SourceType::Pulse);
+    set_input.SetSourceType(Core::VoltageSource::SourceType::PULSE);
     // S high for the first clock edge only, R high for the third
     set_input.SetPulse(
         {.Low = 0.0, .High = 5.0, .Delay = 0.0, .RiseTime = 1e-6, .FallTime = 1e-6, .Width = 1.0e-3, .Period = 10e-3});
     Core::VoltageSource reset_input;
     reset_input.SetName("Vin3");
-    reset_input.SetSourceType(Core::VoltageSource::SourceType::Pulse);
+    reset_input.SetSourceType(Core::VoltageSource::SourceType::PULSE);
     reset_input.SetPulse({.Low = 0.0,
                           .High = 5.0,
                           .Delay = 2.0e-3,
@@ -2204,7 +2204,7 @@ TEST_CASE("An SR flip-flop sets with S, and resets with R, on the clock edge", "
                           .FallTime = 1e-6,
                           .Width = 1.0e-3,
                           .Period = 10e-3});
-    ClockedFlipFlop circuit(Core::ComponentType::SRFlipFlop, {1, 7, 2, 3, 4, 5, 6});
+    ClockedFlipFlop circuit(Core::ComponentType::SR_FLIP_FLOP, {1, 7, 2, 3, 4, 5, 6});
     circuit.Circuit.Add(set_input, {1, 0});
     circuit.Circuit.Add(reset_input, {7, 0});
 
@@ -2224,7 +2224,7 @@ TEST_CASE("A DC sweep of an inverter input flips its output through an undefined
     SKIP_WITHOUT_DIGITAL_MODELS();
     Core::VoltageSource input;
     input.SetName("Vin1");
-    Core::LogicPart inverter(Core::ComponentType::Not);
+    Core::LogicPart inverter(Core::ComponentType::NOT);
     inverter.SetName("U1");
     const Core::Ground reference;
     Core::Circuit circuit;
@@ -2250,7 +2250,7 @@ TEST_CASE("An AC sweep runs with a gate in the circuit", "[simulator][digital]")
     Core::VoltageSource input;
     input.SetName("Vin1");
     input.SetSourceType(Core::VoltageSource::SourceType::AC);
-    Core::LogicPart buffer(Core::ComponentType::Buffer);
+    Core::LogicPart buffer(Core::ComponentType::BUFFER);
     buffer.SetName("U1");
     Core::Resistor load;
     load.SetName("R1");
@@ -2270,9 +2270,9 @@ namespace {
 
 // Thermal noise density of a resistor at the 27 C ngspice simulates at, in V/sqrt(Hz)
 double ThermalNoise(const double resistance) {
-    constexpr double Boltzmann = 1.380649e-23;
-    constexpr double Temperature = 300.15;
-    return std::sqrt(4.0 * Boltzmann * Temperature * resistance);
+    constexpr double BOLTZMANN = 1.380649e-23;
+    constexpr double TEMPERATURE = 300.15;
+    return std::sqrt(4.0 * BOLTZMANN * TEMPERATURE * resistance);
 }
 
 const Core::NoiseContribution *FindContribution(const Core::Noise &noise, const std::string &name) {
@@ -2283,7 +2283,7 @@ const Core::NoiseContribution *FindContribution(const Core::Noise &noise, const 
 } // namespace
 
 TEST_CASE("The noise of an RC divider is the thermal noise of its resistor, shaped by the capacitor", "[simulator]") {
-    LowPass low_pass;
+    const LowPass low_pass;
     const Core::NoiseRun run = Core::RunNoise(
         low_pass.Circuit,
         {.OutputNode = 2, .InputSource = "Vin1", .StartFrequency = 1.0, .StopFrequency = 10.0, .PointsPerDecade = 1});
@@ -2333,7 +2333,7 @@ TEST_CASE("The noise of an amplifier lists the share of each part, and the ideal
     CHECK(ideal->OutputTotal < noise.OutputTotal * 1e-3);
 
     SECTION("a macromodel adds the noise of its own transistors and resistors") {
-        amplifier.Amplifier.SetModel(*Core::FindOpAmpModel(Core::ComponentType::OpAmp, "uA741"));
+        amplifier.Amplifier.SetModel(*Core::FindOpAmpModel(Core::ComponentType::OP_AMP, "uA741"));
         const Core::NoiseRun macromodel_run = Core::RunNoise(amplifier.Circuit, settings);
         if (!macromodel_run.Result) {
             FAIL(macromodel_run.Result.error());
@@ -2351,7 +2351,7 @@ TEST_CASE("A noise analysis refers its noise to a current source in A/sqrt(Hz)",
     source.SetSourceType(Core::CurrentSource::SourceType::AC);
     Core::Resistor load;
     load.SetName("R1");
-    Core::Ground reference;
+    const Core::Ground reference;
     Core::Circuit circuit;
     circuit.Add(source, {0, 1});
     circuit.Add(load, {1, 0});
@@ -2392,7 +2392,7 @@ TEST_CASE("RunNoise rejects a missing input source, ground as output and a bad r
 }
 
 TEST_CASE("A stepped part runs at its step value, in the netlist and in the readings", "[simulator]") {
-    LowPass low_pass;
+    const LowPass low_pass;
     const Core::ACSweepSettings settings{.StartFrequency = 159.155, .StopFrequency = 1591.55, .PointsPerDecade = 1};
     const Core::ACSweepRun stepped = Core::RunACSweep(low_pass.Circuit, settings, Core::ParameterValue{"R1", 10e3});
     if (!stepped.Result) {
@@ -2413,9 +2413,9 @@ TEST_CASE("A stepped temperature changes the forward voltage of a diode", "[simu
     supply.SetValue(5.0);
     Core::Resistor series;
     series.SetName("R1");
-    Core::Diode diode(Core::ComponentType::Diode);
+    Core::Diode diode(Core::ComponentType::DIODE);
     diode.SetName("D1");
-    Core::Ground reference;
+    const Core::Ground reference;
     Core::Circuit circuit;
     circuit.Add(supply, {1});
     circuit.Add(series, {1, 2});
@@ -2435,7 +2435,7 @@ TEST_CASE("A stepped temperature changes the forward voltage of a diode", "[simu
 }
 
 TEST_CASE("A stepped parameter rejects a part that cannot step and values out of range", "[simulator]") {
-    LowPass low_pass;
+    const LowPass low_pass;
     const Core::TransientSettings settings{.StopTime = 1e-3, .TimeStep = 1e-5};
     CHECK(Core::RunTransient(low_pass.Circuit, settings, Core::ParameterValue{"C1", 2e-6}).Result);
     CHECK_FALSE(Core::RunTransient(low_pass.Circuit, settings, Core::ParameterValue{"Vin1", 2.0}).Result);
@@ -2446,7 +2446,7 @@ TEST_CASE("A stepped parameter rejects a part that cannot step and values out of
 TEST_CASE("A noise analysis runs beside logic parts, which add only the noise of their resistors", "[simulator]") {
     SKIP_WITHOUT_DIGITAL_MODELS();
     LowPass low_pass;
-    Core::LogicPart gate(Core::ComponentType::Not);
+    Core::LogicPart gate(Core::ComponentType::NOT);
     gate.SetName("U1");
     low_pass.Circuit.Add(gate, {2, 3});
     const Core::NoiseRun run = Core::RunNoise(
@@ -2491,7 +2491,7 @@ struct ResistiveDivider {
 } // namespace
 
 TEST_CASE("The transfer function of a voltage divider matches its closed-form gain and resistances", "[simulator]") {
-    ResistiveDivider divider;
+    const ResistiveDivider divider;
     // A transfer function drives the circuit from an independent source of any waveform, not only an AC one
     CHECK(Core::GetTransferFunctionInputSources(divider.Circuit) == std::vector<std::string>{"V1"});
     const Core::TransferFunctionRun run =
@@ -2510,7 +2510,7 @@ TEST_CASE("The transfer function of a voltage divider matches its closed-form ga
 
 TEST_CASE("A VCC supply rail is a transfer function input", "[simulator]") {
     // The Divider helper is a 10 V VCC feeding 1k and 3k resistors, with the middle on node 2
-    Divider divider;
+    const Divider divider;
     CHECK(Core::GetTransferFunctionInputSources(divider.Circuit) == std::vector<std::string>{"V1"});
     const Core::TransferFunctionRun run =
         Core::RunTransferFunction(divider.Circuit, {.OutputNode = 2, .InputSource = "V1"});
@@ -2532,7 +2532,7 @@ TEST_CASE("The transfer function from a current source is a transimpedance in V/
     Core::Resistor load;
     load.SetName("R1");
     load.SetValue(1e3);
-    Core::Ground reference;
+    const Core::Ground reference;
     Core::Circuit circuit;
     circuit.Add(source, {0, 1});
     circuit.Add(load, {1, 0});
@@ -2551,7 +2551,7 @@ TEST_CASE("The transfer function from a current source is a transimpedance in V/
 }
 
 TEST_CASE("RunTransferFunction rejects a missing input source and an unknown output", "[simulator]") {
-    ResistiveDivider divider;
+    const ResistiveDivider divider;
     CHECK(Core::RunTransferFunction(divider.Circuit, {.OutputNode = 2, .InputSource = "V1"}).Result);
 
     // An input source that is not in the circuit, and one that cannot drive it, are named back
@@ -2569,7 +2569,7 @@ TEST_CASE("The impedances of an ideal source are finite, so the views can show t
     Core::VoltageSource source;
     source.SetName("V1");
     source.SetValue(5.0);
-    Core::Ground reference;
+    const Core::Ground reference;
     Core::Circuit circuit;
     circuit.Add(source, {1, 0});
     circuit.Add(reference, {0});
@@ -2645,7 +2645,7 @@ TEST_CASE("A clock into a D flip-flop divides it by two", "[simulator][digital]"
     clock.SetName("V1");
     // The first rising edge at 0.25 ms, the same last rising edge the other flip-flop tests use
     clock.SetParameters({.Frequency = 1e3, .DutyCycle = 0.5, .LogicLevel = 5.0, .StartDelay = 0.25e-3});
-    Core::LogicPart flip_flop(Core::ComponentType::DFlipFlop);
+    Core::LogicPart flip_flop(Core::ComponentType::D_FLIP_FLOP);
     flip_flop.SetName("U1");
     Core::Circuit circuit;
     // QN on node 1 feeds D on node 1; CLK on node 2, SET and RESET on nodes 3 and 4, Q on node 5. The clock returns
@@ -2666,7 +2666,7 @@ TEST_CASE("A logic input drives a gate to the output its truth table gives", "[s
     SKIP_WITHOUT_DIGITAL_MODELS();
     Core::LogicInput input;
     input.SetName("V1");
-    Core::LogicPart gate(Core::ComponentType::Or);
+    Core::LogicPart gate(Core::ComponentType::OR);
     gate.SetName("U1");
     const Core::Ground reference;
     Core::Circuit circuit;
@@ -2693,7 +2693,7 @@ TEST_CASE("A circuit of only digital parts runs without a ground", "[simulator][
     input_a.SetHigh(true);
     Core::LogicInput input_b;
     input_b.SetName("V2");
-    Core::LogicPart gate(Core::ComponentType::And);
+    Core::LogicPart gate(Core::ComponentType::AND);
     gate.SetName("U1");
     Core::Circuit circuit;
     // A on node 1 and B on node 2, with Y on node 3 and no Ground part, resistor or load anywhere
@@ -2721,7 +2721,7 @@ TEST_CASE("A truth table runs every combination of the chosen logic inputs in co
     input_a.SetHigh(true);
     Core::LogicInput input_b;
     input_b.SetName("V2");
-    Core::LogicPart gate(Core::ComponentType::And);
+    Core::LogicPart gate(Core::ComponentType::AND);
     gate.SetName("U1");
     Core::Circuit circuit;
     // A on node 1, B on node 2, Y on node 3
@@ -2739,12 +2739,12 @@ TEST_CASE("A truth table runs every combination of the chosen logic inputs in co
     CHECK(table.InputLevels == std::vector<double>{5.0, 5.0});
     REQUIRE(table.Rows.size() == 4);
     // The first input is the most significant bit, so the rows read 00, 01, 10 and 11, and an AND is high only on 11
-    constexpr std::array<std::array<bool, 2>, 4> Combinations = {
+    constexpr std::array<std::array<bool, 2>, 4> COMBINATIONS = {
         {{false, false}, {false, true}, {true, false}, {true, true}}};
     for (std::size_t row = 0; row < table.Rows.size(); ++row) {
-        CHECK(table.Rows[row].InputsHigh == std::vector<bool>{Combinations[row][0], Combinations[row][1]});
+        CHECK(table.Rows[row].InputsHigh == std::vector<bool>{COMBINATIONS[row][0], COMBINATIONS[row][1]});
         REQUIRE(table.Rows[row].HasOperatingPoint());
-        const double expected = Combinations[row][0] && Combinations[row][1] ? 5.0 : 0.0;
+        const double expected = COMBINATIONS[row][0] && COMBINATIONS[row][1] ? 5.0 : 0.0;
         CHECK_THAT(table.Rows[row].OutputVoltages[0], Catch::Matchers::WithinAbs(expected, 0.05));
     }
     CHECK(table.Warnings.empty());
@@ -2759,9 +2759,9 @@ TEST_CASE("A truth table reads several outputs, as a half adder gives its sum an
     input_a.SetName("V1");
     Core::LogicInput input_b;
     input_b.SetName("V2");
-    Core::LogicPart sum_gate(Core::ComponentType::Xor);
+    Core::LogicPart sum_gate(Core::ComponentType::XOR);
     sum_gate.SetName("U1");
-    Core::LogicPart carry_gate(Core::ComponentType::And);
+    Core::LogicPart carry_gate(Core::ComponentType::AND);
     carry_gate.SetName("U2");
     Core::Circuit circuit;
     // A on node 1, B on node 2, sum on node 3, carry on node 4
@@ -2776,11 +2776,11 @@ TEST_CASE("A truth table reads several outputs, as a half adder gives its sum an
     }
     REQUIRE(run.Result->Rows.size() == 4);
     // Sum is A xor B and carry is A and B: 00 gives 0 0, 01 gives 1 0, 10 gives 1 0 and 11 gives 0 1
-    constexpr std::array<std::array<double, 2>, 4> Expected = {{{0.0, 0.0}, {5.0, 0.0}, {5.0, 0.0}, {0.0, 5.0}}};
+    constexpr std::array<std::array<double, 2>, 4> EXPECTED = {{{0.0, 0.0}, {5.0, 0.0}, {5.0, 0.0}, {0.0, 5.0}}};
     for (std::size_t row = 0; row < 4; ++row) {
         REQUIRE(run.Result->Rows[row].OutputVoltages.size() == 2);
-        CHECK_THAT(run.Result->Rows[row].OutputVoltages[0], Catch::Matchers::WithinAbs(Expected[row][0], 0.05));
-        CHECK_THAT(run.Result->Rows[row].OutputVoltages[1], Catch::Matchers::WithinAbs(Expected[row][1], 0.05));
+        CHECK_THAT(run.Result->Rows[row].OutputVoltages[0], Catch::Matchers::WithinAbs(EXPECTED[row][0], 0.05));
+        CHECK_THAT(run.Result->Rows[row].OutputVoltages[1], Catch::Matchers::WithinAbs(EXPECTED[row][1], 0.05));
     }
 }
 
@@ -2790,9 +2790,9 @@ TEST_CASE("A truth table leaves a combination without an operating point empty a
     set_bar.SetName("V1");
     Core::LogicInput reset_bar;
     reset_bar.SetName("V2");
-    Core::LogicPart gate_q(Core::ComponentType::Nand);
+    Core::LogicPart gate_q(Core::ComponentType::NAND);
     gate_q.SetName("U1");
-    Core::LogicPart gate_qn(Core::ComponentType::Nand);
+    Core::LogicPart gate_qn(Core::ComponentType::NAND);
     gate_qn.SetName("U2");
     Core::Circuit circuit;
     // U1: A = S_BAR (1), B = QN (3), Y = Q (2); U2: A = R_BAR (4), B = Q (2), Y = QN (3)
@@ -2846,7 +2846,7 @@ TEST_CASE("RunTruthTable rejects inputs and outputs it cannot use", "[simulator]
     CHECK(message({.Inputs = {"V1"}, .OutputNodes = {0}}).contains("ground"));
     CHECK(message({.Inputs = {"V1"}, .OutputNodes = {7}}).contains("ground"));
     // More inputs than the limit would take thousands of runs
-    const std::vector<std::string> many(Core::MaxTruthTableInputs + 1, "V1");
+    const std::vector<std::string> many(Core::MAX_TRUTH_TABLE_INPUTS + 1, "V1");
     CHECK(message({.Inputs = many, .OutputNodes = {1}}).contains("at most"));
 }
 
@@ -2857,13 +2857,13 @@ TEST_CASE("Gates with three inputs follow their truth tables, an XOR giving odd 
         // Whether the output is high for 0, 1, 2 and 3 high inputs
         std::array<bool, 4> HighForCount;
     };
-    constexpr std::array<GateCase, 6> Cases = {{{Core::ComponentType::And, {false, false, false, true}},
-                                                {Core::ComponentType::Or, {false, true, true, true}},
-                                                {Core::ComponentType::Nand, {true, true, true, false}},
-                                                {Core::ComponentType::Nor, {true, false, false, false}},
-                                                {Core::ComponentType::Xor, {false, true, false, true}},
-                                                {Core::ComponentType::Xnor, {true, false, true, false}}}};
-    for (const GateCase &gate_case : Cases) {
+    constexpr std::array<GateCase, 6> CASES = {{{Core::ComponentType::AND, {false, false, false, true}},
+                                                {Core::ComponentType::OR, {false, true, true, true}},
+                                                {Core::ComponentType::NAND, {true, true, true, false}},
+                                                {Core::ComponentType::NOR, {true, false, false, false}},
+                                                {Core::ComponentType::XOR, {false, true, false, true}},
+                                                {Core::ComponentType::XNOR, {true, false, true, false}}}};
+    for (const GateCase &gate_case : CASES) {
         Core::LogicInput input_a;
         input_a.SetName("V1");
         Core::LogicInput input_b;
@@ -2899,7 +2899,7 @@ TEST_CASE("Gates with three inputs follow their truth tables, an XOR giving odd 
 TEST_CASE("An AND gate of eight inputs is high only when all of them are", "[simulator][digital]") {
     SKIP_WITHOUT_DIGITAL_MODELS();
     std::vector<Core::LogicInput> inputs(8);
-    Core::LogicPart gate(Core::ComponentType::And);
+    Core::LogicPart gate(Core::ComponentType::AND);
     gate.SetName("U1");
     gate.SetInputCount(8);
     Core::Circuit circuit;
@@ -2947,9 +2947,9 @@ TEST_CASE("A logic input gives a NAND latch a defined state", "[simulator][digit
     Core::LogicInput reset_bar;
     reset_bar.SetName("V2");
     reset_bar.SetHigh(true);
-    Core::LogicPart gate_q(Core::ComponentType::Nand);
+    Core::LogicPart gate_q(Core::ComponentType::NAND);
     gate_q.SetName("U1");
-    Core::LogicPart gate_qn(Core::ComponentType::Nand);
+    Core::LogicPart gate_qn(Core::ComponentType::NAND);
     gate_qn.SetName("U2");
     const Core::Ground reference;
     Core::Circuit circuit;

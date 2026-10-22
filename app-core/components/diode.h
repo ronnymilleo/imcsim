@@ -37,10 +37,10 @@ struct DiodeParameters {
  * @brief   Color an LED model emits, so the editor can light it up; None for the models of other diodes.
  */
 enum class LEDColor {
-    None,
-    Red,
-    Green,
-    Blue,
+    NONE,
+    RED,
+    GREEN,
+    BLUE,
 };
 
 /**
@@ -57,7 +57,7 @@ struct DiodeModel {
     LEDColor Color;
 };
 
-inline constexpr const char *CustomDiodeModelName = "Custom";
+inline constexpr const char *CUSTOM_DIODE_MODEL_NAME = "Custom";
 
 /**
  * @class   Diode

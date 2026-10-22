@@ -19,7 +19,7 @@ namespace Core {
  *          E192 0.5%. Free allows any value.
  */
 enum class ValueSeries {
-    Free,
+    FREE,
     E6,
     E12,
     E24,

@@ -20,7 +20,7 @@ namespace GUI {
 namespace {
 
 // Older steps are dropped beyond this, so a long session does not keep growing
-constexpr std::size_t MaxUndoSteps = 100;
+constexpr std::size_t MAX_UNDO_STEPS = 100;
 
 } // namespace
 
@@ -346,10 +346,10 @@ void Schematic::ClearMeasurements() {
  */
 SavedMeasurements Schematic::SaveMeasurements() {
     SavedMeasurements measurements;
-    GetConnectivity();
+    const Connectivity &connectivity = GetConnectivity();
     for (const VoltageProbe &probe : m_VoltageProbes) {
         if (probe.Node) {
-            if (const std::optional<GridPoint> point = m_Connectivity->FindPointOfNode(*probe.Node)) {
+            if (const std::optional<GridPoint> point = connectivity.FindPointOfNode(*probe.Node)) {
                 measurements.Voltages.push_back(*point);
             }
         }
@@ -458,7 +458,7 @@ void Schematic::CommitUndoStep() {
         return;
     }
     m_UndoSnapshots.push_back(std::move(m_CurrentSnapshot));
-    if (m_UndoSnapshots.size() > MaxUndoSteps) {
+    if (m_UndoSnapshots.size() > MAX_UNDO_STEPS) {
         m_UndoSnapshots.erase(m_UndoSnapshots.begin());
     }
     m_CurrentSnapshot = std::move(snapshot);
@@ -516,8 +516,9 @@ void Schematic::Redo() {
  */
 const Connectivity &Schematic::GetConnectivity() {
     if (!m_Connectivity) {
-        m_Connectivity.emplace(m_Elements, m_Wires);
+        const Connectivity &connectivity = m_Connectivity.emplace(m_Elements, m_Wires);
         FollowVoltageProbes();
+        return connectivity;
     }
     return *m_Connectivity;
 }
@@ -807,12 +808,13 @@ void Schematic::InvalidateDerivedData() {
 // node, because its net is ground or its wires are gone, it waits with the points it had and comes back when they
 // belong to a node again. Two probes that end up on one node are one
 void Schematic::FollowVoltageProbes() {
+    const Connectivity &connectivity = GetConnectivity();
     std::set<int> taken;
     std::vector<VoltageProbe> followed;
     for (VoltageProbe &probe : m_VoltageProbes) {
         std::map<int, int> votes;
         for (const GridPoint point : probe.Points) {
-            if (const std::optional<int> node = m_Connectivity->GetNode(point); node && *node != 0) {
+            if (const std::optional<int> node = connectivity.GetNode(point); node && *node != 0) {
                 ++votes[*node];
             }
         }
@@ -821,7 +823,7 @@ void Schematic::FollowVoltageProbes() {
             probe.Node.reset();
         } else if (taken.insert(best->first).second) {
             probe.Node = best->first;
-            probe.Points = m_Connectivity->GetPointsOfNode(best->first);
+            probe.Points = connectivity.GetPointsOfNode(best->first);
         } else {
             continue;
         }

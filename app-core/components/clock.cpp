@@ -10,7 +10,7 @@ namespace Core {
 /**
  * @brief   Creates a 1 kHz, 50% clock at 5 V with no start delay.
  */
-Clock::Clock() : Component(ComponentType::Clock, 0.0) {
+Clock::Clock() : Component(ComponentType::CLOCK, 0.0) {
 }
 
 /**

@@ -71,13 +71,13 @@ private:
      * @brief   File operation waiting for a file dialog or for the user to confirm discarding changes.
      */
     enum class FileAction {
-        New,
-        Open,
-        Save,
-        Quit,
-        Example,
-        ExportSchematic,
-        Import
+        NEW,
+        OPEN,
+        SAVE,
+        QUIT,
+        EXAMPLE,
+        EXPORT_SCHEMATIC,
+        IMPORT
     };
 
     Schematic &m_Schematic;

@@ -45,7 +45,7 @@ struct LoadedSchematic {
     std::vector<std::string> Warnings;
 };
 
-inline constexpr std::string_view SchematicExtension = ".imcsim";
+inline constexpr std::string_view SCHEMATIC_EXTENSION = ".imcsim";
 
 std::string SaveSchematic(const std::vector<std::unique_ptr<UIElement>> &elements, const std::vector<UIWire> &wires,
                           const SimulationSettings &settings, const SavedMeasurements &measurements);

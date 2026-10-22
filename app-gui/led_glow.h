@@ -21,7 +21,7 @@ namespace GUI {
  */
 struct LEDGlow {
     GridPoint Center;
-    Core::LEDColor Color = Core::LEDColor::None;
+    Core::LEDColor Color = Core::LEDColor::NONE;
     float Brightness = 0.0f;
 };
 

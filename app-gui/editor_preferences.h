@@ -21,11 +21,11 @@ namespace GUI {
  * @details Voltage, Current and Power color by the state on display, on a heat scale with a legend.
  */
 enum class WireColoring {
-    Plain,
-    Nodes,
-    Voltage,
-    Current,
-    Power,
+    PLAIN,
+    NODES,
+    VOLTAGE,
+    CURRENT,
+    POWER,
 };
 
 /**
@@ -34,10 +34,10 @@ enum class WireColoring {
  * @details Each effect is turned on by itself, over any wire coloring.
  */
 enum class LiveEffect {
-    CurrentFlow,
-    LEDGlow,
-    HeatGlow,
-    Count
+    CURRENT_FLOW,
+    LED_GLOW,
+    HEAT_GLOW,
+    COUNT
 };
 
 /**
@@ -64,12 +64,12 @@ public:
     bool ShowsTerminalNumbers() const;
 
 private:
-    static constexpr std::size_t NumberOfEffects = static_cast<std::size_t>(LiveEffect::Count);
+    static constexpr std::size_t NUMBER_OF_EFFECTS = static_cast<std::size_t>(LiveEffect::COUNT);
 
     PartEditor &m_PartEditor;
-    WireColoring m_WireColoring = WireColoring::Plain;
+    WireColoring m_WireColoring = WireColoring::PLAIN;
     // Live effects by enum value, each on its own; all off until asked for
-    std::array<bool, NumberOfEffects> m_LiveEffects = {};
+    std::array<bool, NUMBER_OF_EFFECTS> m_LiveEffects = {};
     SymbolStyle m_SymbolStyle = SymbolStyle::IEC;
     bool m_ShowTerminalNumbers = false;
 

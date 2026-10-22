@@ -17,10 +17,10 @@ namespace GUI {
 namespace {
 
 // Null-terminated literals, so data() can go to ImGui
-constexpr auto WireColoringNames = std::to_array<std::string_view>({"Plain", "Nodes", "Voltage", "Current", "Power"});
-constexpr auto LiveEffectsNames = std::to_array<std::string_view>({"Current Flow", "LED Glow", "Heat Glow"});
+constexpr auto WIRE_COLORING_NAMES = std::to_array<const char *>({"Plain", "Nodes", "Voltage", "Current", "Power"});
+constexpr auto LIVE_EFFECTS_NAMES = std::to_array<const char *>({"Current Flow", "LED Glow", "Heat Glow"});
 // Section of imgui.ini that keeps the View preferences
-constexpr const char *SettingsTypeName = "Editor";
+constexpr const char *SETTINGS_TYPE_NAME = "Editor";
 
 // The value of a "key=value" line when it has that key
 std::optional<std::string_view> ValueOf(const std::string_view line, const std::string_view key) {
@@ -47,9 +47,9 @@ EditorPreferences::EditorPreferences(PartEditor &part_editor) : m_PartEditor(par
 void EditorPreferences::DrawMenuItems() {
     bool changed = false;
     if (ImGui::BeginMenu("Wire Colors")) {
-        for (std::size_t index = 0; index < WireColoringNames.size(); ++index) {
+        for (std::size_t index = 0; index < WIRE_COLORING_NAMES.size(); ++index) {
             const auto coloring = static_cast<WireColoring>(index);
-            if (ImGui::MenuItem(WireColoringNames[index].data(), nullptr, m_WireColoring == coloring)) {
+            if (ImGui::MenuItem(WIRE_COLORING_NAMES[index], nullptr, m_WireColoring == coloring)) {
                 m_WireColoring = coloring;
                 changed = true;
             }
@@ -57,9 +57,9 @@ void EditorPreferences::DrawMenuItems() {
         ImGui::EndMenu();
     }
     if (ImGui::BeginMenu("Live Effects")) {
-        for (std::size_t index = 0; index < LiveEffectsNames.size(); ++index) {
+        for (std::size_t index = 0; index < LIVE_EFFECTS_NAMES.size(); ++index) {
             bool &enabled = m_LiveEffects[index];
-            if (ImGui::MenuItem(LiveEffectsNames[index].data(), nullptr, enabled)) {
+            if (ImGui::MenuItem(LIVE_EFFECTS_NAMES[index], nullptr, enabled)) {
                 enabled = !enabled;
                 changed = true;
             }
@@ -97,8 +97,8 @@ void EditorPreferences::DrawMenuItems() {
  */
 void EditorPreferences::RegisterSettingsHandler() {
     ImGuiSettingsHandler handler;
-    handler.TypeName = SettingsTypeName;
-    handler.TypeHash = ImHashStr(SettingsTypeName);
+    handler.TypeName = SETTINGS_TYPE_NAME;
+    handler.TypeHash = ImHashStr(SETTINGS_TYPE_NAME);
     handler.UserData = this;
     handler.ReadOpenFn = [](ImGuiContext *, ImGuiSettingsHandler *settings, const char *) -> void * {
         return settings->UserData;
@@ -148,12 +148,12 @@ bool EditorPreferences::ShowsTerminalNumbers() const {
 // The choice of standard values for resistors, capacitors and inductors; true when it changed
 bool EditorPreferences::DrawValueSeriesItems() {
     bool changed = false;
-    constexpr auto Choices =
-        std::to_array({Core::ValueSeries::Free, Core::ValueSeries::E6, Core::ValueSeries::E12, Core::ValueSeries::E24,
+    constexpr auto CHOICES =
+        std::to_array({Core::ValueSeries::FREE, Core::ValueSeries::E6, Core::ValueSeries::E12, Core::ValueSeries::E24,
                        Core::ValueSeries::E48, Core::ValueSeries::E96, Core::ValueSeries::E192});
-    for (const Core::ValueSeries series : Choices) {
+    for (const Core::ValueSeries series : CHOICES) {
         const std::string label =
-            series == Core::ValueSeries::Free
+            series == Core::ValueSeries::FREE
                 ? "Any value"
                 : std::format("{} ({:g}%)", Core::GetSeriesName(series), Core::GetSeriesTolerancePercent(series));
         if (ImGui::MenuItem(label.c_str(), nullptr, m_PartEditor.GetValueSeries() == series)) {
@@ -169,9 +169,9 @@ bool EditorPreferences::DrawValueSeriesItems() {
 // One "Key=value" line of the preferences; keys and values that are not known are ignored
 void EditorPreferences::ReadSetting(const std::string_view line) {
     if (const auto colors = ValueOf(line, "WireColors")) {
-        const auto found = std::ranges::find(WireColoringNames, *colors);
-        if (found != WireColoringNames.end()) {
-            m_WireColoring = static_cast<WireColoring>(found - WireColoringNames.begin());
+        const auto found = std::ranges::find(WIRE_COLORING_NAMES, *colors);
+        if (found != WIRE_COLORING_NAMES.end()) {
+            m_WireColoring = static_cast<WireColoring>(found - WIRE_COLORING_NAMES.begin());
         }
     } else if (const auto symbols = ValueOf(line, "Symbols")) {
         m_SymbolStyle = *symbols == "ANSI" ? SymbolStyle::ANSI : SymbolStyle::IEC;
@@ -182,27 +182,27 @@ void EditorPreferences::ReadSetting(const std::string_view line) {
             m_PartEditor.SetValueSeries(*parsed);
         }
     } else if (const auto effects = ValueOf(line, "LiveEffects")) {
-        for (std::size_t index = 0; index < LiveEffectsNames.size(); ++index) {
-            m_LiveEffects[index] = effects->find(LiveEffectsNames[index]) != std::string_view::npos;
+        for (std::size_t index = 0; index < LIVE_EFFECTS_NAMES.size(); ++index) {
+            m_LiveEffects[index] = effects->find(LIVE_EFFECTS_NAMES[index]) != std::string_view::npos;
         }
     }
 }
 
 void EditorPreferences::WriteSettings(ImGuiTextBuffer &buffer) const {
-    buffer.appendf("[%s][Preferences]\n", SettingsTypeName);
-    buffer.appendf("WireColors=%s\n", WireColoringNames[static_cast<std::size_t>(m_WireColoring)].data());
+    buffer.appendf("[%s][Preferences]\n", SETTINGS_TYPE_NAME);
+    buffer.appendf("WireColors=%s\n", WIRE_COLORING_NAMES[static_cast<std::size_t>(m_WireColoring)]);
     buffer.appendf("Symbols=%s\n", m_SymbolStyle == SymbolStyle::ANSI ? "ANSI" : "IEC");
     buffer.appendf("TerminalNumbers=%d\n", m_ShowTerminalNumbers ? 1 : 0);
     buffer.appendf("ValueSeries=%s\n", Core::GetSeriesName(m_PartEditor.GetValueSeries()));
     std::string live_effects;
-    for (std::size_t index = 0; index < LiveEffectsNames.size(); ++index) {
+    for (std::size_t index = 0; index < LIVE_EFFECTS_NAMES.size(); ++index) {
         if (!m_LiveEffects[index]) {
             continue;
         }
         if (!live_effects.empty()) {
             live_effects += ',';
         }
-        live_effects += LiveEffectsNames[index];
+        live_effects += LIVE_EFFECTS_NAMES[index];
     }
     buffer.appendf("LiveEffects=%s\n\n", live_effects.c_str());
 }

@@ -56,7 +56,7 @@ std::optional<double> GetProbedTerminalCurrent(const Core::Component &component,
         }
     }
     const Core::ComponentType type = component.GetType();
-    if ((type != Core::ComponentType::Relay && type != Core::ComponentType::Transformer) || terminal % 2 == 0) {
+    if ((type != Core::ComponentType::RELAY && type != Core::ComponentType::TRANSFORMER) || terminal % 2 == 0) {
         return std::nullopt;
     }
     for (std::size_t index = 0; index < names.size(); ++index) {
@@ -72,7 +72,7 @@ std::optional<double> GetProbedTerminalCurrent(const Core::Component &component,
 // Any other single current enters terminal 1 and leaves terminal 2, and the control pins of a controlled source
 // carry none
 double GetSingleCurrentAt(const Core::Component &component, const double current, const std::size_t terminal) {
-    if (component.GetType() == Core::ComponentType::OpAmp || Core::IsLogicGate(component.GetType())) {
+    if (component.GetType() == Core::ComponentType::OP_AMP || Core::IsLogicGate(component.GetType())) {
         return terminal == Core::GetCurrentTerminals(component).front() ? current : 0.0;
     }
     if (terminal == 0) {
@@ -147,7 +147,7 @@ float LogarithmicLevel(const double value, const double largest_value, const dou
  * @return  The LogarithmicLevel() of the current over CurrentDecades.
  */
 float CurrentLevel(const double current, const double largest_current) {
-    return LogarithmicLevel(current, largest_current, CurrentDecades);
+    return LogarithmicLevel(current, largest_current, CURRENT_DECADES);
 }
 
 /**
@@ -174,7 +174,7 @@ std::vector<WireCurrent> ComputeWireCurrents(const std::vector<std::unique_ptr<U
             points.push_back(terminals[index]);
             if (const std::optional<double> current = GetTerminalCurrent(element->GetComponent(), index, currents)) {
                 drawn_at[terminals[index]] += *current;
-            } else if (element->GetComponent().GetType() == Core::ComponentType::Ground) {
+            } else if (element->GetComponent().GetType() == Core::ComponentType::GROUND) {
                 grounded[terminals[index]] = true;
             }
         }

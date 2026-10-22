@@ -47,7 +47,7 @@ template <typename Result> struct StepFamily {
     std::size_t Selected = 0;
 };
 
-constexpr std::size_t MaxParameterSteps = 50;
+constexpr std::size_t MAX_PARAMETER_STEPS = 50;
 
 std::expected<std::vector<double>, std::string> ListStepValues(const ParameterStepSettings &settings,
                                                                const std::string &unit);

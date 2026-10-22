@@ -27,7 +27,7 @@ constexpr ImU32 Col(const int red, const int green, const int blue, const int al
     return IM_COL32(red, green, blue, alpha);
 }
 
-constexpr auto Themes = std::to_array<ThemePalette>({
+constexpr auto THEMES = std::to_array<ThemePalette>({
     // Cool blue-gray surfaces with a blue accent; errors stay red, apart from the accent
     {.Name = "Graphite",
      .Light = false,
@@ -249,13 +249,13 @@ constexpr auto Themes = std::to_array<ThemePalette>({
 });
 
 // Section of imgui.ini that keeps the chosen theme
-constexpr const char *SettingsTypeName = "Theme";
+constexpr const char *SETTINGS_TYPE_NAME = "Theme";
 
-std::size_t current_theme = 0;
+std::size_t g_current_theme = 0;
 
-constexpr float FontSize = 17.0f;
+constexpr float FONT_SIZE = 17.0f;
 
-ImFont *monospace_font = nullptr;
+ImFont *g_monospace_font = nullptr;
 
 // The atlas only reads the bytes, which live for the whole program
 ImFont *AddBundledFont(const std::span<const unsigned char> bytes) {
@@ -263,7 +263,7 @@ ImFont *AddBundledFont(const std::span<const unsigned char> bytes) {
     config.FontDataOwnedByAtlas = false;
     // NOLINTNEXTLINE(cppcoreguidelines-pro-type-const-cast): ImGui takes a mutable pointer it does not write through
     void *data = const_cast<unsigned char *>(bytes.data());
-    return ImGui::GetIO().Fonts->AddFontFromMemoryTTF(data, static_cast<int>(bytes.size()), FontSize, &config);
+    return ImGui::GetIO().Fonts->AddFontFromMemoryTTF(data, static_cast<int>(bytes.size()), FONT_SIZE, &config);
 }
 
 void ApplyImGuiSizes() {
@@ -393,26 +393,26 @@ void ApplyTheme() {
  */
 void RegisterThemeSettingsHandler() {
     ImGuiSettingsHandler handler;
-    handler.TypeName = SettingsTypeName;
-    handler.TypeHash = ImHashStr(SettingsTypeName);
+    handler.TypeName = SETTINGS_TYPE_NAME;
+    handler.TypeHash = ImHashStr(SETTINGS_TYPE_NAME);
     handler.ReadOpenFn = [](ImGuiContext *, ImGuiSettingsHandler *, const char *) -> void * {
         // Any non-null pointer tells ImGui to pass the lines of the section to ReadLineFn
-        return &current_theme;
+        return &g_current_theme;
     };
     handler.ReadLineFn = [](ImGuiContext *, ImGuiSettingsHandler *, void *, const char *line) {
         const std::string_view text = line;
-        constexpr std::string_view NameKey = "Name=";
-        if (!text.starts_with(NameKey)) {
+        constexpr std::string_view NAME_KEY = "Name=";
+        if (!text.starts_with(NAME_KEY)) {
             return;
         }
         const auto themes = GetThemes();
-        const auto theme = std::ranges::find(themes, text.substr(NameKey.size()), &ThemePalette::Name);
+        const auto theme = std::ranges::find(themes, text.substr(NAME_KEY.size()), &ThemePalette::Name);
         if (theme != themes.end()) {
             SetTheme(static_cast<std::size_t>(theme - themes.begin()));
         }
     };
     handler.WriteAllFn = [](ImGuiContext *, ImGuiSettingsHandler *, ImGuiTextBuffer *buffer) {
-        buffer->appendf("[%s][Current]\n", SettingsTypeName);
+        buffer->appendf("[%s][Current]\n", SETTINGS_TYPE_NAME);
         buffer->appendf("Name=%s\n\n", GetPalette().Name);
     };
     ImGui::AddSettingsHandler(&handler);
@@ -423,7 +423,7 @@ void RegisterThemeSettingsHandler() {
  * @return  Every theme, the default first.
  */
 std::span<const ThemePalette> GetThemes() {
-    return Themes;
+    return THEMES;
 }
 
 /**
@@ -431,7 +431,7 @@ std::span<const ThemePalette> GetThemes() {
  * @return  Index of the current theme.
  */
 std::size_t GetThemeIndex() {
-    return current_theme;
+    return g_current_theme;
 }
 
 /**
@@ -440,11 +440,11 @@ std::size_t GetThemeIndex() {
  * @note    Sizes are left alone, so it can be called while running, after the style was scaled for the display.
  */
 void SetTheme(const std::size_t index) {
-    if (index >= Themes.size()) {
+    if (index >= THEMES.size()) {
         return;
     }
-    current_theme = index;
-    ApplyColors(Themes[index]);
+    g_current_theme = index;
+    ApplyColors(THEMES[index]);
 }
 
 /**
@@ -452,7 +452,7 @@ void SetTheme(const std::size_t index) {
  * @return  The palette, valid for the whole program.
  */
 const ThemePalette &GetPalette() {
-    return Themes[current_theme];
+    return THEMES[g_current_theme];
 }
 
 /**
@@ -484,8 +484,8 @@ ImU32 AdaptToBackground(const ImU32 color) {
  * @brief   Loads the bundled fonts: Inter for the interface, the default, and JetBrains Mono for code-like text.
  */
 void LoadThemeFonts() {
-    AddBundledFont(InterFont);
-    monospace_font = AddBundledFont(MonospaceFont);
+    AddBundledFont(INTER_FONT);
+    g_monospace_font = AddBundledFont(MONOSPACE_FONT);
 }
 
 /**
@@ -493,7 +493,7 @@ void LoadThemeFonts() {
  * @return  The font; nullptr only if it failed to load, and PushFont(nullptr, ...) keeps the current one.
  */
 ImFont *GetMonospaceFont() {
-    return monospace_font;
+    return g_monospace_font;
 }
 
 /**

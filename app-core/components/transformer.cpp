@@ -9,14 +9,14 @@ namespace Core {
 
 namespace {
 
-constexpr double DefaultPrimaryInductance = 100e-3;
+constexpr double DEFAULT_PRIMARY_INDUCTANCE = 100e-3;
 
 } // namespace
 
 /**
  * @brief   Creates a 1:1 transformer with a primary of 100 mH, a coupling of 0.999 and windings of 0.1 Ohm.
  */
-Transformer::Transformer() : Component(ComponentType::Transformer, DefaultPrimaryInductance) {
+Transformer::Transformer() : Component(ComponentType::TRANSFORMER, DEFAULT_PRIMARY_INDUCTANCE) {
 }
 
 /**

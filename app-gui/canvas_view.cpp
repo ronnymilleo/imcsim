@@ -13,11 +13,11 @@ namespace GUI {
 
 namespace {
 
-constexpr float MinZoom = 4.0f;
-constexpr float MaxZoom = 200.0f;
-constexpr float ZoomStep = 1.1f;
+constexpr float MIN_ZOOM = 4.0f;
+constexpr float MAX_ZOOM = 200.0f;
+constexpr float ZOOM_STEP = 1.1f;
 // Fit may zoom in this far on a small circuit; opening a file stops at the default zoom
-constexpr float FitMaxZoom = 50.0f;
+constexpr float FIT_MAX_ZOOM = 50.0f;
 
 } // namespace
 
@@ -26,7 +26,7 @@ constexpr float FitMaxZoom = 50.0f;
  *          button and Home do.
  */
 void CanvasView::RequestFit() {
-    m_FrameMaxZoom = FitMaxZoom;
+    m_FrameMaxZoom = FIT_MAX_ZOOM;
 }
 
 /**
@@ -34,7 +34,7 @@ void CanvasView::RequestFit() {
  *          or an example opens.
  */
 void CanvasView::RequestDefaultFrame() {
-    m_FrameMaxZoom = DefaultZoom;
+    m_FrameMaxZoom = DEFAULT_ZOOM;
 }
 
 /**
@@ -52,8 +52,8 @@ void CanvasView::FrameIfRequested(Schematic &schematic, const ImVec2 canvas_size
         return;
     }
     const std::optional<SchematicBounds> bounds = MeasureSchematic(schematic, style, terminal_numbers);
-    const ViewFrame frame = bounds ? FrameBounds(bounds->Min, bounds->Max, canvas_size, MinZoom, *max_zoom)
-                                   : FramePoints({}, canvas_size, MinZoom, *max_zoom);
+    const ViewFrame frame = bounds ? FrameBounds(bounds->Min, bounds->Max, canvas_size, MIN_ZOOM, *max_zoom)
+                                   : FramePoints({}, canvas_size, MIN_ZOOM, *max_zoom);
     m_Pan = frame.Pan;
     m_Zoom = frame.Zoom;
 }
@@ -72,7 +72,7 @@ void CanvasView::HandlePanAndZoom(const ImVec2 origin, const bool hovered, const
     if (hovered && io.MouseWheel != 0.0f) {
         // Keep the world point under the cursor fixed while zooming
         const ImVec2 before = ViewTransform(origin, m_Pan, m_Zoom).ToWorld(io.MousePos);
-        m_Zoom = std::clamp(m_Zoom * (io.MouseWheel > 0 ? ZoomStep : 1 / ZoomStep), MinZoom, MaxZoom);
+        m_Zoom = std::clamp(m_Zoom * (io.MouseWheel > 0 ? ZOOM_STEP : 1 / ZOOM_STEP), MIN_ZOOM, MAX_ZOOM);
         const ImVec2 after = ViewTransform(origin, m_Pan, m_Zoom).ToWorld(io.MousePos);
         m_Pan += (after - before) * m_Zoom;
     }

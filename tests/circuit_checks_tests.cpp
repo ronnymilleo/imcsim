@@ -38,7 +38,7 @@ struct SourceAndResistor {
 TEST_CASE("A circuit needs parts, and a ground unless it is only digital", "[circuit_checks]") {
     CHECK(Core::CheckCircuit(Core::Circuit()).value_or("").contains("empty"));
 
-    SourceAndResistor valid;
+    const SourceAndResistor valid;
     CHECK_FALSE(Core::CheckCircuit(valid.Circuit).has_value());
 
     Core::Circuit without_ground;
@@ -48,7 +48,7 @@ TEST_CASE("A circuit needs parts, and a ground unless it is only digital", "[cir
     // Logic inputs and logic parts refer to node 0 themselves, so a circuit of only those needs no Ground part
     Core::LogicInput input;
     input.SetName("V1");
-    Core::LogicPart gate(Core::ComponentType::And);
+    Core::LogicPart gate(Core::ComponentType::AND);
     gate.SetName("U1");
     Core::Circuit digital;
     digital.Add(input, {1});
@@ -77,7 +77,7 @@ TEST_CASE("An AC sweep needs a frequency range and an AC source", "[circuit_chec
 
 TEST_CASE("A DC sweep needs real sources, a step that heads for the stop value and a bounded number of points",
           "[circuit_checks]") {
-    SourceAndResistor setup;
+    const SourceAndResistor setup;
     const Core::SweepRange swept{.Source = "Vin1", .Start = 0.0, .Stop = 5.0, .Step = 0.5};
     CHECK_FALSE(Core::CheckDCSweepSettings(setup.Circuit, {.Swept = swept}).has_value());
     CHECK(Core::CheckDCSweepSettings(setup.Circuit, {.Swept = {.Source = "V9", .Stop = 5.0}}).has_value());

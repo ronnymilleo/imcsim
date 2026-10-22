@@ -64,7 +64,7 @@ void LogicPart::SetInputCount(const int count) {
  * @return  True from 2 to 8.
  */
 bool LogicPart::IsValidInputCount(const int count) {
-    return count >= MinLogicInputs && count <= MaxLogicInputs;
+    return count >= MIN_LOGIC_INPUTS && count <= MAX_LOGIC_INPUTS;
 }
 
 /**
@@ -82,14 +82,14 @@ std::vector<std::string> LogicPart::GetInputLabels() const {
  */
 bool IsLogicGate(const ComponentType type) {
     switch (type) {
-    case ComponentType::And:
-    case ComponentType::Or:
-    case ComponentType::Not:
-    case ComponentType::Nand:
-    case ComponentType::Nor:
-    case ComponentType::Xor:
-    case ComponentType::Xnor:
-    case ComponentType::Buffer:
+    case ComponentType::AND:
+    case ComponentType::OR:
+    case ComponentType::NOT:
+    case ComponentType::NAND:
+    case ComponentType::NOR:
+    case ComponentType::XOR:
+    case ComponentType::XNOR:
+    case ComponentType::BUFFER:
         return true;
     default:
         return false;
@@ -102,8 +102,8 @@ bool IsLogicGate(const ComponentType type) {
  * @return  True for the D, JK, T and SR flip-flops.
  */
 bool IsFlipFlop(const ComponentType type) {
-    return type == ComponentType::DFlipFlop || type == ComponentType::JKFlipFlop || type == ComponentType::TFlipFlop ||
-           type == ComponentType::SRFlipFlop;
+    return type == ComponentType::D_FLIP_FLOP || type == ComponentType::JK_FLIP_FLOP ||
+           type == ComponentType::T_FLIP_FLOP || type == ComponentType::SR_FLIP_FLOP;
 }
 
 /**
@@ -121,8 +121,8 @@ bool IsLogicPart(const ComponentType type) {
  * @return  True for AND, OR, NAND, NOR, XOR and XNOR.
  */
 bool HasVariableInputs(const ComponentType type) {
-    return type == ComponentType::And || type == ComponentType::Or || type == ComponentType::Nand ||
-           type == ComponentType::Nor || type == ComponentType::Xor || type == ComponentType::Xnor;
+    return type == ComponentType::AND || type == ComponentType::OR || type == ComponentType::NAND ||
+           type == ComponentType::NOR || type == ComponentType::XOR || type == ComponentType::XNOR;
 }
 
 /**
@@ -132,7 +132,7 @@ bool HasVariableInputs(const ComponentType type) {
  *          "CLK", then the asynchronous "SET" and "RESET", which are active high.
  */
 std::vector<std::string> GetLogicInputLabels(const ComponentType type) {
-    return GetLogicInputLabels(type, MinLogicInputs);
+    return GetLogicInputLabels(type, MIN_LOGIC_INPUTS);
 }
 
 /**
@@ -151,16 +151,16 @@ std::vector<std::string> GetLogicInputLabels(const ComponentType type, const int
         return labels;
     }
     switch (type) {
-    case ComponentType::Not:
-    case ComponentType::Buffer:
+    case ComponentType::NOT:
+    case ComponentType::BUFFER:
         return {"A"};
-    case ComponentType::DFlipFlop:
+    case ComponentType::D_FLIP_FLOP:
         return {"D", "CLK", "SET", "RESET"};
-    case ComponentType::JKFlipFlop:
+    case ComponentType::JK_FLIP_FLOP:
         return {"J", "K", "CLK", "SET", "RESET"};
-    case ComponentType::TFlipFlop:
+    case ComponentType::T_FLIP_FLOP:
         return {"T", "CLK", "SET", "RESET"};
-    case ComponentType::SRFlipFlop:
+    case ComponentType::SR_FLIP_FLOP:
         return {"S", "R", "CLK", "SET", "RESET"};
     default:
         return {"A", "B"};
@@ -186,29 +186,29 @@ std::vector<std::string> GetLogicOutputLabels(const ComponentType type) {
  */
 const char *GetLogicModelKind(const ComponentType type) {
     switch (type) {
-    case ComponentType::And:
+    case ComponentType::AND:
         return "d_and";
-    case ComponentType::Or:
+    case ComponentType::OR:
         return "d_or";
-    case ComponentType::Not:
+    case ComponentType::NOT:
         return "d_inverter";
-    case ComponentType::Nand:
+    case ComponentType::NAND:
         return "d_nand";
-    case ComponentType::Nor:
+    case ComponentType::NOR:
         return "d_nor";
-    case ComponentType::Xor:
+    case ComponentType::XOR:
         return "d_xor";
-    case ComponentType::Xnor:
+    case ComponentType::XNOR:
         return "d_xnor";
-    case ComponentType::Buffer:
+    case ComponentType::BUFFER:
         return "d_buffer";
-    case ComponentType::DFlipFlop:
+    case ComponentType::D_FLIP_FLOP:
         return "d_dff";
-    case ComponentType::JKFlipFlop:
+    case ComponentType::JK_FLIP_FLOP:
         return "d_jkff";
-    case ComponentType::TFlipFlop:
+    case ComponentType::T_FLIP_FLOP:
         return "d_tff";
-    case ComponentType::SRFlipFlop:
+    case ComponentType::SR_FLIP_FLOP:
         return "d_srff";
     default:
         return "";

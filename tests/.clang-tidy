@@ -1,0 +1,3 @@
+# Catch2 checks its optionals with REQUIRE before reading them, which this check cannot follow
+InheritParentConfig: true
+Checks: '-bugprone-unchecked-optional-access'

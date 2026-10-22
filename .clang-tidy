@@ -1,11 +1,22 @@
-Checks: '-*,readability-identifier-naming'
+# The bugprone checks are listed one by one: the CI runs on a rolling distribution, and a wildcard picks up each check a
+# new clang-tidy adds, such as bugprone-signed-bitwise, which the flags of ImGui and SDL trip
+Checks: >-
+  -*,
+  bugprone-branch-clone,
+  bugprone-float-loop-counter,
+  bugprone-implicit-widening-of-multiplication-result,
+  bugprone-optional-value-conversion,
+  bugprone-return-const-ref-from-parameter,
+  bugprone-suspicious-stringview-data-usage,
+  bugprone-unchecked-optional-access,
+  readability-identifier-naming
 HeaderFilterRegex: '.*/(app-core|app-gui)/.*'
 CheckOptions:
   readability-identifier-naming.NamespaceCase: CamelCase
   readability-identifier-naming.ClassCase: CamelCase
   readability-identifier-naming.StructCase: CamelCase
   readability-identifier-naming.EnumCase: CamelCase
-  readability-identifier-naming.EnumConstantCase: CamelCase
+  readability-identifier-naming.EnumConstantCase: UPPER_CASE
   readability-identifier-naming.FunctionCase: CamelCase
   readability-identifier-naming.FunctionIgnoredRegexp: '^main$'
   readability-identifier-naming.MethodCase: CamelCase
@@ -17,6 +28,14 @@ CheckOptions:
   readability-identifier-naming.LocalVariableCase: lower_case
   readability-identifier-naming.LocalConstantCase: lower_case
   readability-identifier-naming.StaticVariableCase: lower_case
-  readability-identifier-naming.ConstexprVariableCase: CamelCase
-  readability-identifier-naming.GlobalConstantCase: CamelCase
+  readability-identifier-naming.ConstexprVariableCase: UPPER_CASE
+  readability-identifier-naming.GlobalConstantCase: UPPER_CASE
+  readability-identifier-naming.ClassConstantCase: UPPER_CASE
+  readability-identifier-naming.GlobalVariableCase: lower_case
+  readability-identifier-naming.GlobalVariablePrefix: 'g_'
+  readability-identifier-naming.PublicMemberCase: CamelCase
+  readability-identifier-naming.TypeAliasCase: CamelCase
+  readability-identifier-naming.TypedefCase: CamelCase
+  readability-identifier-naming.TemplateParameterCase: CamelCase
+  readability-identifier-naming.TemplateParameterIgnoredRegexp: '^T$'
   readability-identifier-naming.MacroDefinitionCase: UPPER_CASE

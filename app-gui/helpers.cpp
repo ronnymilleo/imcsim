@@ -13,7 +13,7 @@ namespace GUI {
 namespace {
 
 // Grid units left around the framed points, since symbols reach a little past their terminals
-constexpr float FrameMargin = 2.0f;
+constexpr float FRAME_MARGIN = 2.0f;
 
 } // namespace
 
@@ -230,8 +230,8 @@ ViewFrame FramePoints(const std::span<const GridPoint> points, const ImVec2 canv
  */
 ViewFrame FrameBounds(const ImVec2 min, const ImVec2 max, const ImVec2 canvas_size, const float min_zoom,
                       const float max_zoom) {
-    const float width = max.x - min.x + 2.0f * FrameMargin;
-    const float height = max.y - min.y + 2.0f * FrameMargin;
+    const float width = max.x - min.x + 2.0f * FRAME_MARGIN;
+    const float height = max.y - min.y + 2.0f * FRAME_MARGIN;
     const float zoom = std::clamp(std::min(canvas_size.x / width, canvas_size.y / height), min_zoom, max_zoom);
     const ImVec2 center = (min + max) / 2.0f;
     return {.Pan = {canvas_size.x / 2.0f - center.x * zoom, canvas_size.y / 2.0f - center.y * zoom}, .Zoom = zoom};

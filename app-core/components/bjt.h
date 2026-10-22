@@ -55,7 +55,7 @@ struct BJTModel {
     ComponentType Type;
 };
 
-inline constexpr const char *CustomBJTModelName = "Custom";
+inline constexpr const char *CUSTOM_BJT_MODEL_NAME = "Custom";
 
 /**
  * @class   BJT

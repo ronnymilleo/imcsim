@@ -39,10 +39,10 @@ TEST_CASE("The output of a row reads as 0, 1 or X with the thresholds of the log
     Core::TruthTable table = MakeTable();
     table.Rows[3].OutputVoltages = {4.9};
     const std::vector<GUI::LogicNode> none;
-    CHECK(GUI::ReadTruthTableOutputs(table, 0, none) == std::vector{GUI::LogicState::Low});
+    CHECK(GUI::ReadTruthTableOutputs(table, 0, none) == std::vector{GUI::LogicState::LOW});
     // Between 30% and 70% of 5 V is neither a 0 nor a 1
-    CHECK(GUI::ReadTruthTableOutputs(table, 2, none) == std::vector{GUI::LogicState::Unknown});
-    CHECK(GUI::ReadTruthTableOutputs(table, 3, none) == std::vector{GUI::LogicState::High});
+    CHECK(GUI::ReadTruthTableOutputs(table, 2, none) == std::vector{GUI::LogicState::UNKNOWN});
+    CHECK(GUI::ReadTruthTableOutputs(table, 3, none) == std::vector{GUI::LogicState::HIGH});
 }
 
 TEST_CASE("A row without an operating point reads X at every output", "[truth_table]") {
@@ -51,7 +51,7 @@ TEST_CASE("A row without an operating point reads X at every output", "[truth_ta
     table.Rows[3].OutputVoltages = {};
     const std::vector<GUI::LogicNode> none;
     CHECK(GUI::ReadTruthTableOutputs(table, 3, none) ==
-          std::vector{GUI::LogicState::Unknown, GUI::LogicState::Unknown});
+          std::vector{GUI::LogicState::UNKNOWN, GUI::LogicState::UNKNOWN});
 }
 
 TEST_CASE("An output node reads with the level of the logic part on it, else the highest input level",
@@ -62,8 +62,8 @@ TEST_CASE("An output node reads with the level of the logic part on it, else the
     CHECK(GUI::GetOutputLogicLevel(table, 3, logic_nodes) == 3.3);
     CHECK(GUI::GetOutputLogicLevel(table, 4, logic_nodes) == 5.0);
     // 2.5 V is a 1 for a 3.3 V part and unknown for a 5 V one
-    CHECK(GUI::ReadTruthTableOutputs(table, 2, logic_nodes) == std::vector{GUI::LogicState::High});
-    CHECK(GUI::ReadTruthTableOutputs(table, 2, {}) == std::vector{GUI::LogicState::Unknown});
+    CHECK(GUI::ReadTruthTableOutputs(table, 2, logic_nodes) == std::vector{GUI::LogicState::HIGH});
+    CHECK(GUI::ReadTruthTableOutputs(table, 2, {}) == std::vector{GUI::LogicState::UNKNOWN});
     table.InputLevels.clear();
     CHECK(GUI::GetOutputLogicLevel(table, 4, {}) == 5.0);
 }

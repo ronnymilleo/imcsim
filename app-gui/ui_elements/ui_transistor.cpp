@@ -12,12 +12,12 @@ namespace GUI {
 
 namespace {
 
-constexpr float LabelOffsetX = 1.3f;
-constexpr float LabelOffsetY = 0.5f;
+constexpr float LABEL_OFFSET_X = 1.3f;
+constexpr float LABEL_OFFSET_Y = 0.5f;
 // Bounds reach a little past the right-hand leads, where the terminals sit
-constexpr float BoundsRight = 1.2f;
-constexpr float ArrowHeadLength = 0.3f;
-constexpr float ArrowHeadHalfWidth = 0.15f;
+constexpr float BOUNDS_RIGHT = 1.2f;
+constexpr float ARROW_HEAD_LENGTH = 0.3f;
+constexpr float ARROW_HEAD_HALF_WIDTH = 0.15f;
 
 } // namespace
 
@@ -39,9 +39,9 @@ UITransistor::UITransistor(std::unique_ptr<Core::Component> component, const Gri
  * @param[in] color      Line color.
  */
 void UITransistor::DrawTerminals(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color) const {
-    canvas.AddLine(LocalToScreen(view, -2, 0), LocalToScreen(view, -1, 0), color, LineThickness);
-    canvas.AddLine(LocalToScreen(view, 1, -2), LocalToScreen(view, 1, -1), color, LineThickness);
-    canvas.AddLine(LocalToScreen(view, 1, 1), LocalToScreen(view, 1, 2), color, LineThickness);
+    canvas.AddLine(LocalToScreen(view, -2, 0), LocalToScreen(view, -1, 0), color, LINE_THICKNESS);
+    canvas.AddLine(LocalToScreen(view, 1, -2), LocalToScreen(view, 1, -1), color, LINE_THICKNESS);
+    canvas.AddLine(LocalToScreen(view, 1, 1), LocalToScreen(view, 1, 2), color, LINE_THICKNESS);
 }
 
 /**
@@ -51,8 +51,8 @@ void UITransistor::DrawTerminals(SchematicCanvas &canvas, const ViewTransform &v
  * @param[in] color      Text color.
  */
 void UITransistor::DrawLabels(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color) const {
-    DrawLabel(canvas, view, {LabelOffsetX, -LabelOffsetY}, {1.0f, 0.0f}, GetComponent().GetName(), color);
-    DrawLabel(canvas, view, {LabelOffsetX, LabelOffsetY}, {1.0f, 0.0f}, GetModelName(), color);
+    DrawLabel(canvas, view, {LABEL_OFFSET_X, -LABEL_OFFSET_Y}, {1.0f, 0.0f}, GetComponent().GetName(), color);
+    DrawLabel(canvas, view, {LABEL_OFFSET_X, LABEL_OFFSET_Y}, {1.0f, 0.0f}, GetModelName(), color);
 }
 
 /**
@@ -68,7 +68,7 @@ std::vector<GridPoint> UITransistor::GetLocalTerminals() const {
  * @return  A box around the body and the three terminals.
  */
 LocalBounds UITransistor::GetLocalBounds() const {
-    return {{-2.0f, -2.0f}, {BoundsRight, 2.0f}};
+    return {{-2.0f, -2.0f}, {BOUNDS_RIGHT, 2.0f}};
 }
 
 /**
@@ -84,11 +84,12 @@ void UITransistor::DrawArrowHead(SchematicCanvas &canvas, const ViewTransform &v
     const float length = std::hypot(direction.x, direction.y);
     const ImVec2 along = {direction.x / length, direction.y / length};
     const ImVec2 across = {-along.y, along.x};
-    const ImVec2 base = {tip.x - along.x * ArrowHeadLength, tip.y - along.y * ArrowHeadLength};
+    const ImVec2 base = {tip.x - along.x * ARROW_HEAD_LENGTH, tip.y - along.y * ARROW_HEAD_LENGTH};
     canvas.AddTriangleFilled(
         LocalToScreen(view, tip.x, tip.y),
-        LocalToScreen(view, base.x + across.x * ArrowHeadHalfWidth, base.y + across.y * ArrowHeadHalfWidth),
-        LocalToScreen(view, base.x - across.x * ArrowHeadHalfWidth, base.y - across.y * ArrowHeadHalfWidth), color);
+        LocalToScreen(view, base.x + across.x * ARROW_HEAD_HALF_WIDTH, base.y + across.y * ARROW_HEAD_HALF_WIDTH),
+        LocalToScreen(view, base.x - across.x * ARROW_HEAD_HALF_WIDTH, base.y - across.y * ARROW_HEAD_HALF_WIDTH),
+        color);
 }
 
 } // namespace GUI

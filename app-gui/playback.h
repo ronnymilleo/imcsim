@@ -9,7 +9,7 @@
 namespace GUI {
 
 // Seconds a whole transient takes to play, whatever its length
-inline constexpr double PlaybackSeconds = 5.0;
+inline constexpr double PLAYBACK_SECONDS = 5.0;
 
 /**
  * @struct  TransientPlayback

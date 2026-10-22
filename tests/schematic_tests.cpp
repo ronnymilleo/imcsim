@@ -18,7 +18,7 @@
 namespace {
 
 std::unique_ptr<GUI::UIElement> MakeResistor(const GUI::GridPoint position) {
-    return GUI::CreateElement(Core::ComponentType::Resistor, position, GUI::Rotation::R0);
+    return GUI::CreateElement(Core::ComponentType::RESISTOR, position, GUI::Rotation::R0);
 }
 
 } // namespace
@@ -35,7 +35,7 @@ TEST_CASE("Added elements get the next free name and mark the schematic as modif
     GUI::Schematic schematic;
     schematic.AddElement(MakeResistor({0, 0}));
     schematic.AddElement(MakeResistor({4, 0}));
-    schematic.AddElement(GUI::CreateElement(Core::ComponentType::Ground, {0, 2}, GUI::Rotation::R0));
+    schematic.AddElement(GUI::CreateElement(Core::ComponentType::GROUND, {0, 2}, GUI::Rotation::R0));
 
     REQUIRE(schematic.GetElements().size() == 3);
     CHECK(schematic.GetElements()[0]->GetComponent().GetName() == "R1");
@@ -210,7 +210,7 @@ TEST_CASE("Replace swaps the content but keeps the file", "[schematic]") {
 TEST_CASE("BuildSpiceNetlist reflects value changes made through MarkModified", "[schematic]") {
     GUI::Schematic schematic;
     schematic.AddElement(MakeResistor({0, 0}));
-    schematic.AddElement(GUI::CreateElement(Core::ComponentType::Ground, {2, 0}, GUI::Rotation::R0));
+    schematic.AddElement(GUI::CreateElement(Core::ComponentType::GROUND, {2, 0}, GUI::Rotation::R0));
     CHECK(schematic.BuildSpiceNetlist().find("R1 1 0 1k") != std::string::npos);
 
     schematic.GetElement(0).GetComponent().SetValue(4.7e3);
@@ -433,7 +433,7 @@ TEST_CASE("Replace and Clear swap the simulation settings and change their versi
 TEST_CASE("Measurements are saved by node point and restored by node", "[schematic]") {
     GUI::Schematic schematic;
     schematic.AddElement(MakeResistor({0, 0}));
-    schematic.AddElement(GUI::CreateElement(Core::ComponentType::Ground, {2, 0}, GUI::Rotation::R0));
+    schematic.AddElement(GUI::CreateElement(Core::ComponentType::GROUND, {2, 0}, GUI::Rotation::R0));
     schematic.AddWire({-2, 0}, {-2, 4});
     const int node = *schematic.GetConnectivity().GetNode({-2, 4});
     schematic.SetVoltageMeasured(node, true);
@@ -524,7 +524,7 @@ TEST_CASE("A measured node stays measured when a net label takes the place of a 
     schematic.AddWire({14, 0}, {14, 6});
     schematic.AddWire({14, 6}, {20, 6});
     for (const GUI::GridPoint point : {GUI::GridPoint{10, 0}, GUI::GridPoint{20, 6}}) {
-        schematic.AddElement(GUI::CreateElement(Core::ComponentType::NetLabel, point, GUI::Rotation::R0));
+        schematic.AddElement(GUI::CreateElement(Core::ComponentType::NET_LABEL, point, GUI::Rotation::R0));
         static_cast<Core::NetLabel &>(schematic.GetElements().back()->GetComponent()).SetNet("OUT");
     }
     schematic.SetVoltageMeasured(schematic.GetConnectivity().GetNode({10, 0}).value(), true);
@@ -559,7 +559,7 @@ TEST_CASE("A measured node survives net labels being placed, named and moved", "
     schematic.GetConnectivity();
 
     const GUI::GridPoint rail = schematic.GetWires().front().GetStart();
-    schematic.AddElement(GUI::CreateElement(Core::ComponentType::NetLabel, rail, GUI::Rotation::R0));
+    schematic.AddElement(GUI::CreateElement(Core::ComponentType::NET_LABEL, rail, GUI::Rotation::R0));
     const std::size_t first = schematic.GetElements().size() - 1;
     schematic.GetConnectivity();
     CHECK(measured_count() == 1);
@@ -569,7 +569,7 @@ TEST_CASE("A measured node survives net labels being placed, named and moved", "
     schematic.GetConnectivity();
     CHECK(measured_count() == 1);
 
-    schematic.AddElement(GUI::CreateElement(Core::ComponentType::NetLabel, {60, 60}, GUI::Rotation::R0));
+    schematic.AddElement(GUI::CreateElement(Core::ComponentType::NET_LABEL, {60, 60}, GUI::Rotation::R0));
     const std::size_t second = schematic.GetElements().size() - 1;
     static_cast<Core::NetLabel &>(schematic.GetElement(second).GetComponent()).SetNet("OUT");
     schematic.MarkModified();
@@ -586,11 +586,11 @@ TEST_CASE("A measured node survives net labels being placed, named and moved", "
 
 TEST_CASE("A measured node that is joined to ground and then freed is measured again", "[schematic]") {
     GUI::Schematic schematic;
-    schematic.AddElement(GUI::CreateElement(Core::ComponentType::Ground, {0, 0}, GUI::Rotation::R0));
+    schematic.AddElement(GUI::CreateElement(Core::ComponentType::GROUND, {0, 0}, GUI::Rotation::R0));
     schematic.AddWire({10, 10}, {14, 10});
-    schematic.AddElement(GUI::CreateElement(Core::ComponentType::NetLabel, {14, 10}, GUI::Rotation::R0));
+    schematic.AddElement(GUI::CreateElement(Core::ComponentType::NET_LABEL, {14, 10}, GUI::Rotation::R0));
     static_cast<Core::NetLabel &>(schematic.GetElements().back()->GetComponent()).SetNet("OUT");
-    schematic.AddElement(GUI::CreateElement(Core::ComponentType::NetLabel, {30, 30}, GUI::Rotation::R0));
+    schematic.AddElement(GUI::CreateElement(Core::ComponentType::NET_LABEL, {30, 30}, GUI::Rotation::R0));
     const std::size_t second = schematic.GetElements().size() - 1;
     static_cast<Core::NetLabel &>(schematic.GetElement(second).GetComponent()).SetNet("OUT");
     schematic.SetVoltageMeasured(schematic.GetConnectivity().GetNode({10, 10}).value(), true);

@@ -53,7 +53,7 @@ struct MOSFETModel {
     ComponentType Type;
 };
 
-inline constexpr const char *CustomMOSFETModelName = "Custom";
+inline constexpr const char *CUSTOM_MOSFET_MODEL_NAME = "Custom";
 
 /**
  * @class   MOSFET

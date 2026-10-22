@@ -13,17 +13,17 @@ namespace GUI {
 namespace {
 
 // The triangle spans x = -0.5 to 0.5 and the bar sits at its tip
-constexpr float BodyHalfLength = 0.5f;
-constexpr float BodyHalfHeight = 0.6f;
-constexpr float ZenerWingSize = 0.15f;
+constexpr float BODY_HALF_LENGTH = 0.5f;
+constexpr float BODY_HALF_HEIGHT = 0.6f;
+constexpr float ZENER_WING_SIZE = 0.15f;
 // LED arrows leave the upper side of the triangle at 45 degrees
-constexpr float ArrowLength = 0.4f;
-constexpr float ArrowHeadSize = 0.15f;
-constexpr ImVec2 FirstArrowStart = {-0.2f, -0.7f};
-constexpr ImVec2 SecondArrowStart = {0.15f, -0.7f};
+constexpr float ARROW_LENGTH = 0.4f;
+constexpr float ARROW_HEAD_SIZE = 0.15f;
+constexpr ImVec2 FIRST_ARROW_START = {-0.2f, -0.7f};
+constexpr ImVec2 SECOND_ARROW_START = {0.15f, -0.7f};
 // Labels clear the tallest part of the symbol, the arrows for an LED
-constexpr float LabelOffset = 1.0f;
-constexpr float LEDNameOffset = 1.3f;
+constexpr float LABEL_OFFSET = 1.0f;
+constexpr float LED_NAME_OFFSET = 1.3f;
 
 } // namespace
 
@@ -39,26 +39,26 @@ UIDiode::UIDiode(const Core::ComponentType type, const GridPoint position, const
 
 void UIDiode::DrawSymbol(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color,
                          SymbolStyle /*style*/) const {
-    canvas.AddLine(LocalToScreen(view, -1, 0), LocalToScreen(view, -BodyHalfLength, 0), color, LineThickness);
-    canvas.AddLine(LocalToScreen(view, BodyHalfLength, 0), LocalToScreen(view, 1, 0), color, LineThickness);
-    canvas.AddTriangle(LocalToScreen(view, -BodyHalfLength, -BodyHalfHeight),
-                       LocalToScreen(view, -BodyHalfLength, BodyHalfHeight), LocalToScreen(view, BodyHalfLength, 0),
-                       color, LineThickness);
-    canvas.AddLine(LocalToScreen(view, BodyHalfLength, -BodyHalfHeight),
-                   LocalToScreen(view, BodyHalfLength, BodyHalfHeight), color, LineThickness);
+    canvas.AddLine(LocalToScreen(view, -1, 0), LocalToScreen(view, -BODY_HALF_LENGTH, 0), color, LINE_THICKNESS);
+    canvas.AddLine(LocalToScreen(view, BODY_HALF_LENGTH, 0), LocalToScreen(view, 1, 0), color, LINE_THICKNESS);
+    canvas.AddTriangle(LocalToScreen(view, -BODY_HALF_LENGTH, -BODY_HALF_HEIGHT),
+                       LocalToScreen(view, -BODY_HALF_LENGTH, BODY_HALF_HEIGHT),
+                       LocalToScreen(view, BODY_HALF_LENGTH, 0), color, LINE_THICKNESS);
+    canvas.AddLine(LocalToScreen(view, BODY_HALF_LENGTH, -BODY_HALF_HEIGHT),
+                   LocalToScreen(view, BODY_HALF_LENGTH, BODY_HALF_HEIGHT), color, LINE_THICKNESS);
 
     const Core::ComponentType type = GetComponent().GetType();
-    if (type == Core::ComponentType::ZenerDiode) {
+    if (type == Core::ComponentType::ZENER_DIODE) {
         // The ends of the bar bend in opposite directions, like a Z
-        canvas.AddLine(LocalToScreen(view, BodyHalfLength, -BodyHalfHeight),
-                       LocalToScreen(view, BodyHalfLength - ZenerWingSize, -BodyHalfHeight - ZenerWingSize), color,
-                       LineThickness);
-        canvas.AddLine(LocalToScreen(view, BodyHalfLength, BodyHalfHeight),
-                       LocalToScreen(view, BodyHalfLength + ZenerWingSize, BodyHalfHeight + ZenerWingSize), color,
-                       LineThickness);
+        canvas.AddLine(LocalToScreen(view, BODY_HALF_LENGTH, -BODY_HALF_HEIGHT),
+                       LocalToScreen(view, BODY_HALF_LENGTH - ZENER_WING_SIZE, -BODY_HALF_HEIGHT - ZENER_WING_SIZE),
+                       color, LINE_THICKNESS);
+        canvas.AddLine(LocalToScreen(view, BODY_HALF_LENGTH, BODY_HALF_HEIGHT),
+                       LocalToScreen(view, BODY_HALF_LENGTH + ZENER_WING_SIZE, BODY_HALF_HEIGHT + ZENER_WING_SIZE),
+                       color, LINE_THICKNESS);
     } else if (type == Core::ComponentType::LED) {
-        DrawArrow(canvas, view, FirstArrowStart, color);
-        DrawArrow(canvas, view, SecondArrowStart, color);
+        DrawArrow(canvas, view, FIRST_ARROW_START, color);
+        DrawArrow(canvas, view, SECOND_ARROW_START, color);
     }
 }
 
@@ -70,9 +70,9 @@ void UIDiode::DrawSymbol(SchematicCanvas &canvas, const ViewTransform &view, con
  */
 void UIDiode::DrawLabels(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color) const {
     const auto &diode = static_cast<const Core::Diode &>(GetComponent());
-    const float name_offset = diode.GetType() == Core::ComponentType::LED ? LEDNameOffset : LabelOffset;
+    const float name_offset = diode.GetType() == Core::ComponentType::LED ? LED_NAME_OFFSET : LABEL_OFFSET;
     DrawLabel(canvas, view, {0.0f, -name_offset}, {0.0f, -1.0f}, diode.GetName(), color);
-    DrawLabel(canvas, view, {0.0f, LabelOffset}, {0.0f, 1.0f}, diode.GetModelName(), color);
+    DrawLabel(canvas, view, {0.0f, LABEL_OFFSET}, {0.0f, 1.0f}, diode.GetModelName(), color);
 }
 
 /**
@@ -82,19 +82,19 @@ void UIDiode::DrawLabels(SchematicCanvas &canvas, const ViewTransform &view, con
 LocalBounds UIDiode::GetLocalBounds() const {
     LocalBounds bounds = UIElement::GetLocalBounds();
     if (GetComponent().GetType() == Core::ComponentType::LED) {
-        bounds.Min.y = FirstArrowStart.y - ArrowLength;
+        bounds.Min.y = FIRST_ARROW_START.y - ARROW_LENGTH;
     }
     return bounds;
 }
 
 void UIDiode::DrawArrow(SchematicCanvas &canvas, const ViewTransform &view, const ImVec2 start,
                         const ImU32 color) const {
-    const ImVec2 tip = {start.x + ArrowLength, start.y - ArrowLength};
-    canvas.AddLine(LocalToScreen(view, start.x, start.y), LocalToScreen(view, tip.x, tip.y), color, LineThickness);
-    canvas.AddLine(LocalToScreen(view, tip.x, tip.y), LocalToScreen(view, tip.x - ArrowHeadSize, tip.y), color,
-                   LineThickness);
-    canvas.AddLine(LocalToScreen(view, tip.x, tip.y), LocalToScreen(view, tip.x, tip.y + ArrowHeadSize), color,
-                   LineThickness);
+    const ImVec2 tip = {start.x + ARROW_LENGTH, start.y - ARROW_LENGTH};
+    canvas.AddLine(LocalToScreen(view, start.x, start.y), LocalToScreen(view, tip.x, tip.y), color, LINE_THICKNESS);
+    canvas.AddLine(LocalToScreen(view, tip.x, tip.y), LocalToScreen(view, tip.x - ARROW_HEAD_SIZE, tip.y), color,
+                   LINE_THICKNESS);
+    canvas.AddLine(LocalToScreen(view, tip.x, tip.y), LocalToScreen(view, tip.x, tip.y + ARROW_HEAD_SIZE), color,
+                   LINE_THICKNESS);
 }
 
 } // namespace GUI

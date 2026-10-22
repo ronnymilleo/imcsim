@@ -17,16 +17,16 @@ namespace Core {
 namespace {
 
 // Limits that keep a mistyped setting from running for minutes or exhausting memory
-constexpr int MaxTransientPoints = 1000000;
-constexpr int MaxPointsPerDecade = 1000;
-constexpr int MaxDCSweepPoints = 100000;
+constexpr int MAX_TRANSIENT_POINTS = 1000000;
+constexpr int MAX_POINTS_PER_DECADE = 1000;
+constexpr int MAX_DC_SWEEP_POINTS = 100000;
 
 // Clocks, logic inputs, supply rails and logic parts tie themselves to node 0 in the netlist, so a circuit made only of
 // them has its reference without a Ground part
 bool IsDigitalOnly(const Circuit &circuit) {
     return std::ranges::all_of(circuit.GetEntries(), [](const CircuitEntry &entry) {
         const ComponentType type = entry.Part->GetType();
-        return type == ComponentType::Clock || type == ComponentType::LogicInput || type == ComponentType::VCC ||
+        return type == ComponentType::CLOCK || type == ComponentType::LOGIC_INPUT || type == ComponentType::VCC ||
                IsLogicPart(type);
     });
 }
@@ -39,15 +39,15 @@ std::optional<std::string> CheckFrequencyRange(const double start_frequency, con
     if (stop_frequency <= start_frequency) {
         return "The stop frequency must be higher than the start frequency";
     }
-    if (points_per_decade < 1 || points_per_decade > MaxPointsPerDecade) {
-        return std::format("The points per decade must be between 1 and {}", MaxPointsPerDecade);
+    if (points_per_decade < 1 || points_per_decade > MAX_POINTS_PER_DECADE) {
+        return std::format("The points per decade must be between 1 and {}", MAX_POINTS_PER_DECADE);
     }
     return std::nullopt;
 }
 
 // The sources a DC sweep can drive: independent voltage and current sources, and supply rails
 bool IsSweepable(const ComponentType type) {
-    return type == ComponentType::VCC || type == ComponentType::VoltageSource || type == ComponentType::CurrentSource;
+    return type == ComponentType::VCC || type == ComponentType::VOLTAGE_SOURCE || type == ComponentType::CURRENT_SOURCE;
 }
 
 // Values from start to stop, both included, as ngspice counts them
@@ -75,7 +75,7 @@ std::optional<std::string> CheckSweepRange(const Circuit &circuit, const SweepRa
 // Independent sources set to AC, which ngspice accepts as the input of a noise analysis
 bool IsNoiseInput(const Component &component) {
     const ComponentType type = component.GetType();
-    return (type == ComponentType::VoltageSource || type == ComponentType::CurrentSource) &&
+    return (type == ComponentType::VOLTAGE_SOURCE || type == ComponentType::CURRENT_SOURCE) &&
            static_cast<const Source &>(component).GetSourceType() == Source::SourceType::AC;
 }
 
@@ -83,7 +83,7 @@ bool IsNoiseInput(const Component &component) {
 // and supply rails, as a DC sweep can
 bool IsTransferFunctionInput(const Component &component) {
     const ComponentType type = component.GetType();
-    return type == ComponentType::VCC || type == ComponentType::VoltageSource || type == ComponentType::CurrentSource;
+    return type == ComponentType::VCC || type == ComponentType::VOLTAGE_SOURCE || type == ComponentType::CURRENT_SOURCE;
 }
 
 } // namespace
@@ -138,9 +138,9 @@ std::optional<std::string> CheckTransientSettings(const TransientSettings &setti
     if (settings.TimeStep > settings.StopTime) {
         return "The time step must not be longer than the stop time";
     }
-    if (settings.StopTime / settings.TimeStep > MaxTransientPoints) {
+    if (settings.StopTime / settings.TimeStep > MAX_TRANSIENT_POINTS) {
         return std::format("The time step is too small for the stop time: it would produce more than {} points",
-                           MaxTransientPoints);
+                           MAX_TRANSIENT_POINTS);
     }
     return std::nullopt;
 }
@@ -183,9 +183,9 @@ std::optional<std::string> CheckDCSweepSettings(const Circuit &circuit, const DC
         }
         point_count *= SweepPointCount(*settings.Stepped);
     }
-    if (point_count > MaxDCSweepPoints) {
+    if (point_count > MAX_DC_SWEEP_POINTS) {
         return std::format("The steps are too small for the ranges: they would produce more than {} points",
-                           MaxDCSweepPoints);
+                           MAX_DC_SWEEP_POINTS);
     }
     return std::nullopt;
 }
@@ -245,9 +245,9 @@ std::optional<std::string> CheckTruthTableSettings(const Circuit &circuit, const
     if (settings.Inputs.empty()) {
         return "A truth table needs at least one logic input to vary; add a Logic input";
     }
-    if (settings.Inputs.size() > MaxTruthTableInputs) {
-        return std::format("A truth table varies at most {} inputs, which is {} runs; clear some", MaxTruthTableInputs,
-                           1u << MaxTruthTableInputs);
+    if (settings.Inputs.size() > MAX_TRUTH_TABLE_INPUTS) {
+        return std::format("A truth table varies at most {} inputs, which is {} runs; clear some",
+                           MAX_TRUTH_TABLE_INPUTS, 1u << MAX_TRUTH_TABLE_INPUTS);
     }
     for (std::size_t index = 0; index < settings.Inputs.size(); ++index) {
         const std::string &name = settings.Inputs[index];
@@ -316,7 +316,7 @@ const Component *FindTransferFunctionInput(const Circuit &circuit, const std::st
  */
 const Component *FindLogicInput(const Circuit &circuit, const std::string_view name) {
     const auto entry = std::ranges::find_if(circuit.GetEntries(), [name](const CircuitEntry &candidate) {
-        return candidate.Part->GetType() == ComponentType::LogicInput && candidate.Part->GetName() == name;
+        return candidate.Part->GetType() == ComponentType::LOGIC_INPUT && candidate.Part->GetName() == name;
     });
     return entry != circuit.GetEntries().end() ? entry->Part : nullptr;
 }
@@ -327,7 +327,7 @@ const Component *FindLogicInput(const Circuit &circuit, const std::string_view n
  * @return  "A" for a current source and "V" for the others.
  */
 const char *SourceUnit(const Component &source) {
-    return source.GetType() == ComponentType::CurrentSource ? "A" : "V";
+    return source.GetType() == ComponentType::CURRENT_SOURCE ? "A" : "V";
 }
 
 /**
@@ -383,7 +383,7 @@ std::vector<std::string> GetTransferFunctionInputSources(const Circuit &circuit)
 std::vector<std::string> GetTruthTableInputs(const Circuit &circuit) {
     std::vector<std::string> names;
     for (const CircuitEntry &entry : circuit.GetEntries()) {
-        if (entry.Part->GetType() == ComponentType::LogicInput) {
+        if (entry.Part->GetType() == ComponentType::LOGIC_INPUT) {
             names.push_back(entry.Part->GetName());
         }
     }

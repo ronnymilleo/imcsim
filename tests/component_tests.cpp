@@ -92,14 +92,14 @@ TEST_CASE("An initial condition is only for a capacitor and an inductor", "[comp
 
 TEST_CASE("A potentiometer is a resistor of 10k with its wiper in the middle", "[component]") {
     Core::Potentiometer pot;
-    CHECK(pot.GetType() == Core::ComponentType::Potentiometer);
+    CHECK(pot.GetType() == Core::ComponentType::POTENTIOMETER);
     CHECK(std::string_view(pot.GetTypeName()) == "Potentiometer");
     CHECK(std::string_view(pot.GetNamePrefix()) == "RV");
     CHECK(std::string_view(pot.GetUnit()) == "Ohm");
     CHECK(pot.HasValue());
     CHECK(pot.GetValue() == 10e3);
     CHECK(pot.GetWiper() == 0.5);
-    CHECK(Core::ParseComponentType("Potentiometer") == Core::ComponentType::Potentiometer);
+    CHECK(Core::ParseComponentType("Potentiometer") == Core::ComponentType::POTENTIOMETER);
 
     SECTION("its value must be positive, and its wiper on the track") {
         CHECK(pot.IsValidValue(1.0));
@@ -121,7 +121,7 @@ TEST_CASE("A potentiometer is a resistor of 10k with its wiper in the middle", "
 }
 
 TEST_CASE("A switch and a push button start open, with no value", "[component]") {
-    Core::Switch toggle(Core::ComponentType::Switch);
+    Core::Switch toggle(Core::ComponentType::SWITCH);
     CHECK(std::string_view(toggle.GetNamePrefix()) == "SW");
     CHECK(std::string_view(toggle.GetTypeName()) == "Switch");
     CHECK(std::string_view(toggle.GetUnit()).empty());
@@ -129,17 +129,17 @@ TEST_CASE("A switch and a push button start open, with no value", "[component]")
     CHECK_FALSE(toggle.IsValidValue(1.0));
     CHECK_FALSE(toggle.IsClosed());
 
-    Core::Switch button(Core::ComponentType::PushButton);
+    const Core::Switch button(Core::ComponentType::PUSH_BUTTON);
     CHECK(std::string_view(button.GetNamePrefix()) == "PB");
     CHECK(std::string_view(button.GetTypeName()) == "PushButton");
     CHECK_FALSE(button.IsClosed());
 
     toggle.SetClosed(true);
     CHECK(toggle.IsClosed());
-    CHECK(Core::IsSwitch(Core::ComponentType::Switch));
-    CHECK(Core::IsSwitch(Core::ComponentType::PushButton));
-    CHECK_FALSE(Core::IsSwitch(Core::ComponentType::Resistor));
-    CHECK(Core::ParseComponentType("PushButton") == Core::ComponentType::PushButton);
+    CHECK(Core::IsSwitch(Core::ComponentType::SWITCH));
+    CHECK(Core::IsSwitch(Core::ComponentType::PUSH_BUTTON));
+    CHECK_FALSE(Core::IsSwitch(Core::ComponentType::RESISTOR));
+    CHECK(Core::ParseComponentType("PushButton") == Core::ComponentType::PUSH_BUTTON);
 }
 
 TEST_CASE("A voltage-controlled switch and a relay have their own prefixes and no value", "[component]") {
@@ -149,13 +149,13 @@ TEST_CASE("A voltage-controlled switch and a relay have their own prefixes and n
     CHECK_FALSE(controlled.HasValue());
     CHECK(controlled.GetParameters().Threshold == 2.5);
     CHECK(controlled.GetParameters().Hysteresis == 0.1);
-    CHECK(Core::ParseComponentType("VSwitch") == Core::ComponentType::VSwitch);
+    CHECK(Core::ParseComponentType("VSwitch") == Core::ComponentType::V_SWITCH);
 
     const Core::Relay relay;
     CHECK(std::string_view(relay.GetNamePrefix()) == "K");
     CHECK(std::string_view(relay.GetTypeName()) == "Relay");
     CHECK_FALSE(relay.HasValue());
-    CHECK(Core::ParseComponentType("Relay") == Core::ComponentType::Relay);
+    CHECK(Core::ParseComponentType("Relay") == Core::ComponentType::RELAY);
 }
 
 TEST_CASE("Switch and relay parameters must make a contact that can open and close", "[component]") {
@@ -201,7 +201,7 @@ TEST_CASE("A transformer is a 100 mH primary with a 1:1 secondary, and the value
     CHECK(transformer.IsValidValue(1e-3));
     CHECK_FALSE(transformer.IsValidValue(0.0));
     CHECK(transformer.GetSecondaryInductance() == 100e-3);
-    CHECK(Core::ParseComponentType("Transformer") == Core::ComponentType::Transformer);
+    CHECK(Core::ParseComponentType("Transformer") == Core::ComponentType::TRANSFORMER);
 
     SECTION("the secondary follows from the square of the turns ratio") {
         transformer.SetParameters({.TurnsRatio = 2.0, .Coupling = 0.99, .WindingResistance = 0.5});
@@ -239,7 +239,7 @@ TEST_CASE("A net label has no prefix, value or unit and its name is kept as type
     CHECK(std::string_view(label.GetNamePrefix()).empty());
     CHECK(std::string_view(label.GetUnit()).empty());
     CHECK(std::string_view(label.GetTypeName()) == "NetLabel");
-    CHECK(Core::ParseComponentType("NetLabel") == Core::ComponentType::NetLabel);
+    CHECK(Core::ParseComponentType("NetLabel") == Core::ComponentType::NET_LABEL);
     CHECK(label.GetNet().empty());
     label.SetNet("Vout");
     CHECK(label.GetNet() == "Vout");
@@ -273,14 +273,27 @@ TEST_CASE("IsValidValue requires positive passive values but allows any source v
 }
 
 TEST_CASE("Type names convert both ways", "[component]") {
-    for (const Core::ComponentType type :
-         {Core::ComponentType::Resistor,      Core::ComponentType::Capacitor, Core::ComponentType::Inductor,
-          Core::ComponentType::Ground,        Core::ComponentType::VCC,       Core::ComponentType::VoltageSource,
-          Core::ComponentType::CurrentSource, Core::ComponentType::Diode,     Core::ComponentType::ZenerDiode,
-          Core::ComponentType::LED,           Core::ComponentType::NPN,       Core::ComponentType::PNP,
-          Core::ComponentType::NMOS,          Core::ComponentType::PMOS,      Core::ComponentType::VCVS,
-          Core::ComponentType::VCCS,          Core::ComponentType::CCCS,      Core::ComponentType::CCVS,
-          Core::ComponentType::OpAmp,         Core::ComponentType::Clock,     Core::ComponentType::LogicInput}) {
+    for (const Core::ComponentType type : {Core::ComponentType::RESISTOR,
+                                           Core::ComponentType::CAPACITOR,
+                                           Core::ComponentType::INDUCTOR,
+                                           Core::ComponentType::GROUND,
+                                           Core::ComponentType::VCC,
+                                           Core::ComponentType::VOLTAGE_SOURCE,
+                                           Core::ComponentType::CURRENT_SOURCE,
+                                           Core::ComponentType::DIODE,
+                                           Core::ComponentType::ZENER_DIODE,
+                                           Core::ComponentType::LED,
+                                           Core::ComponentType::NPN,
+                                           Core::ComponentType::PNP,
+                                           Core::ComponentType::NMOS,
+                                           Core::ComponentType::PMOS,
+                                           Core::ComponentType::VCVS,
+                                           Core::ComponentType::VCCS,
+                                           Core::ComponentType::CCCS,
+                                           Core::ComponentType::CCVS,
+                                           Core::ComponentType::OP_AMP,
+                                           Core::ComponentType::CLOCK,
+                                           Core::ComponentType::LOGIC_INPUT}) {
         CHECK(Core::ParseComponentType(Core::GetTypeName(type)) == type);
     }
     CHECK_FALSE(Core::ParseComponentType("resistor"));
@@ -322,7 +335,7 @@ TEST_CASE("A voltage source keeps its sine parameters while switching type", "[c
 
 TEST_CASE("Source type names convert both ways", "[component]") {
     for (const auto type : {Core::VoltageSource::SourceType::DC, Core::VoltageSource::SourceType::AC,
-                            Core::VoltageSource::SourceType::Pulse, Core::VoltageSource::SourceType::EXP,
+                            Core::VoltageSource::SourceType::PULSE, Core::VoltageSource::SourceType::EXP,
                             Core::VoltageSource::SourceType::SFFM, Core::VoltageSource::SourceType::AM,
                             Core::VoltageSource::SourceType::PWL}) {
         CHECK(Core::ParseSourceType(Core::GetSourceTypeName(type)) == type);
@@ -430,15 +443,15 @@ TEST_CASE("Piecewise linear text parses and formats back", "[component]") {
 }
 
 TEST_CASE("IsSource covers voltage and current sources but not the supply rail", "[component]") {
-    CHECK(Core::IsSource(Core::ComponentType::VoltageSource));
-    CHECK(Core::IsSource(Core::ComponentType::CurrentSource));
+    CHECK(Core::IsSource(Core::ComponentType::VOLTAGE_SOURCE));
+    CHECK(Core::IsSource(Core::ComponentType::CURRENT_SOURCE));
     CHECK_FALSE(Core::IsSource(Core::ComponentType::VCC));
-    CHECK_FALSE(Core::IsSource(Core::ComponentType::Resistor));
+    CHECK_FALSE(Core::IsSource(Core::ComponentType::RESISTOR));
 }
 
 TEST_CASE("Diode parts have the D prefix, a model and no value", "[component]") {
     for (const Core::ComponentType type :
-         {Core::ComponentType::Diode, Core::ComponentType::ZenerDiode, Core::ComponentType::LED}) {
+         {Core::ComponentType::DIODE, Core::ComponentType::ZENER_DIODE, Core::ComponentType::LED}) {
         const Core::Diode diode(type);
         CAPTURE(diode.GetTypeName());
         CHECK(Core::IsDiode(type));
@@ -449,13 +462,13 @@ TEST_CASE("Diode parts have the D prefix, a model and no value", "[component]") 
         CHECK(diode.GetModel() == Core::GetDiodeModels(type).data());
         CHECK_FALSE(diode.IsCustom());
     }
-    CHECK_FALSE(Core::IsDiode(Core::ComponentType::Resistor));
-    CHECK(Core::GetDiodeModels(Core::ComponentType::Resistor).empty());
+    CHECK_FALSE(Core::IsDiode(Core::ComponentType::RESISTOR));
+    CHECK(Core::GetDiodeModels(Core::ComponentType::RESISTOR).empty());
 }
 
 TEST_CASE("Every diode model is found by name for its own part only", "[component]") {
     for (const Core::ComponentType type :
-         {Core::ComponentType::Diode, Core::ComponentType::ZenerDiode, Core::ComponentType::LED}) {
+         {Core::ComponentType::DIODE, Core::ComponentType::ZENER_DIODE, Core::ComponentType::LED}) {
         const std::span<const Core::DiodeModel> models = Core::GetDiodeModels(type);
         CHECK(models.size() == 3);
         for (const Core::DiodeModel &model : models) {
@@ -464,15 +477,15 @@ TEST_CASE("Every diode model is found by name for its own part only", "[componen
             CHECK(Core::FindDiodeModel(type, model.Name) == &model);
         }
     }
-    CHECK(Core::FindDiodeModel(Core::ComponentType::Diode, "1N4148") != nullptr);
+    CHECK(Core::FindDiodeModel(Core::ComponentType::DIODE, "1N4148") != nullptr);
     CHECK(Core::FindDiodeModel(Core::ComponentType::LED, "1N4148") == nullptr);
-    CHECK(Core::FindDiodeModel(Core::ComponentType::Diode, "1n4148") == nullptr);
+    CHECK(Core::FindDiodeModel(Core::ComponentType::DIODE, "1n4148") == nullptr);
 }
 
 TEST_CASE("A custom diode starts from the parameters of the model it replaces", "[component]") {
-    Core::Diode diode(Core::ComponentType::Diode);
+    Core::Diode diode(Core::ComponentType::DIODE);
     diode.SetName("D7");
-    const Core::DiodeModel *rectifier = Core::FindDiodeModel(Core::ComponentType::Diode, "1N4007");
+    const Core::DiodeModel *rectifier = Core::FindDiodeModel(Core::ComponentType::DIODE, "1N4007");
     REQUIRE(rectifier != nullptr);
     diode.SetModel(*rectifier);
     CHECK(std::string_view(diode.GetModelName()) == "1N4007");
@@ -626,15 +639,15 @@ TEST_CASE("Op-amps are named U and have no value", "[component]") {
     const Core::OpAmp op_amp;
     CHECK(std::string_view(op_amp.GetNamePrefix()) == "U");
     CHECK_FALSE(op_amp.HasValue());
-    CHECK_FALSE(Core::IsControlledSource(Core::ComponentType::OpAmp));
+    CHECK_FALSE(Core::IsControlledSource(Core::ComponentType::OP_AMP));
 }
 
 TEST_CASE("Gates and flip-flops are U parts with no value, and their type names round-trip", "[component]") {
     for (const Core::ComponentType type :
-         {Core::ComponentType::And, Core::ComponentType::Or, Core::ComponentType::Not, Core::ComponentType::Nand,
-          Core::ComponentType::Nor, Core::ComponentType::Xor, Core::ComponentType::Xnor, Core::ComponentType::Buffer,
-          Core::ComponentType::DFlipFlop, Core::ComponentType::JKFlipFlop, Core::ComponentType::TFlipFlop,
-          Core::ComponentType::SRFlipFlop}) {
+         {Core::ComponentType::AND, Core::ComponentType::OR, Core::ComponentType::NOT, Core::ComponentType::NAND,
+          Core::ComponentType::NOR, Core::ComponentType::XOR, Core::ComponentType::XNOR, Core::ComponentType::BUFFER,
+          Core::ComponentType::D_FLIP_FLOP, Core::ComponentType::JK_FLIP_FLOP, Core::ComponentType::T_FLIP_FLOP,
+          Core::ComponentType::SR_FLIP_FLOP}) {
         const Core::LogicPart part(type);
         INFO(part.GetTypeName());
         CHECK(std::string_view(part.GetNamePrefix()) == "U");
@@ -643,56 +656,56 @@ TEST_CASE("Gates and flip-flops are U parts with no value, and their type names 
         CHECK(Core::ParseComponentType(part.GetTypeName()) == type);
         CHECK(std::string_view(Core::GetLogicModelKind(type)).starts_with("d_"));
     }
-    CHECK(Core::IsLogicGate(Core::ComponentType::Xor));
-    CHECK_FALSE(Core::IsLogicGate(Core::ComponentType::DFlipFlop));
-    CHECK(Core::IsFlipFlop(Core::ComponentType::TFlipFlop));
-    CHECK_FALSE(Core::IsLogicPart(Core::ComponentType::OpAmp));
+    CHECK(Core::IsLogicGate(Core::ComponentType::XOR));
+    CHECK_FALSE(Core::IsLogicGate(Core::ComponentType::D_FLIP_FLOP));
+    CHECK(Core::IsFlipFlop(Core::ComponentType::T_FLIP_FLOP));
+    CHECK_FALSE(Core::IsLogicPart(Core::ComponentType::OP_AMP));
 }
 
 TEST_CASE("The terminals of a gate or flip-flop are its inputs, then its outputs", "[component]") {
-    CHECK(Core::GetLogicInputLabels(Core::ComponentType::Or) == std::vector<std::string>{"A", "B"});
-    CHECK(Core::GetLogicInputLabels(Core::ComponentType::Buffer) == std::vector<std::string>{"A"});
-    CHECK(Core::GetLogicOutputLabels(Core::ComponentType::Nor) == std::vector<std::string>{"Y"});
-    CHECK(Core::GetLogicInputLabels(Core::ComponentType::DFlipFlop) ==
+    CHECK(Core::GetLogicInputLabels(Core::ComponentType::OR) == std::vector<std::string>{"A", "B"});
+    CHECK(Core::GetLogicInputLabels(Core::ComponentType::BUFFER) == std::vector<std::string>{"A"});
+    CHECK(Core::GetLogicOutputLabels(Core::ComponentType::NOR) == std::vector<std::string>{"Y"});
+    CHECK(Core::GetLogicInputLabels(Core::ComponentType::D_FLIP_FLOP) ==
           std::vector<std::string>{"D", "CLK", "SET", "RESET"});
-    CHECK(Core::GetLogicInputLabels(Core::ComponentType::JKFlipFlop) ==
+    CHECK(Core::GetLogicInputLabels(Core::ComponentType::JK_FLIP_FLOP) ==
           std::vector<std::string>{"J", "K", "CLK", "SET", "RESET"});
-    CHECK(Core::GetLogicInputLabels(Core::ComponentType::TFlipFlop) ==
+    CHECK(Core::GetLogicInputLabels(Core::ComponentType::T_FLIP_FLOP) ==
           std::vector<std::string>{"T", "CLK", "SET", "RESET"});
-    CHECK(Core::GetLogicInputLabels(Core::ComponentType::SRFlipFlop) ==
+    CHECK(Core::GetLogicInputLabels(Core::ComponentType::SR_FLIP_FLOP) ==
           std::vector<std::string>{"S", "R", "CLK", "SET", "RESET"});
-    CHECK(Core::GetLogicOutputLabels(Core::ComponentType::SRFlipFlop) == std::vector<std::string>{"Q", "QN"});
+    CHECK(Core::GetLogicOutputLabels(Core::ComponentType::SR_FLIP_FLOP) == std::vector<std::string>{"Q", "QN"});
 }
 
 TEST_CASE("A gate takes from 2 to 8 inputs and names them A, B, C...", "[component]") {
     for (const Core::ComponentType type :
-         {Core::ComponentType::And, Core::ComponentType::Or, Core::ComponentType::Nand, Core::ComponentType::Nor,
-          Core::ComponentType::Xor, Core::ComponentType::Xnor}) {
+         {Core::ComponentType::AND, Core::ComponentType::OR, Core::ComponentType::NAND, Core::ComponentType::NOR,
+          Core::ComponentType::XOR, Core::ComponentType::XNOR}) {
         CHECK(Core::HasVariableInputs(type));
     }
     // The inverter, the buffer and the flip-flops keep the inputs they have
-    for (const Core::ComponentType type : {Core::ComponentType::Not, Core::ComponentType::Buffer,
-                                           Core::ComponentType::DFlipFlop, Core::ComponentType::JKFlipFlop}) {
+    for (const Core::ComponentType type : {Core::ComponentType::NOT, Core::ComponentType::BUFFER,
+                                           Core::ComponentType::D_FLIP_FLOP, Core::ComponentType::JK_FLIP_FLOP}) {
         CHECK_FALSE(Core::HasVariableInputs(type));
     }
 
-    Core::LogicPart gate(Core::ComponentType::And);
+    Core::LogicPart gate(Core::ComponentType::AND);
     CHECK(gate.GetInputCount() == 2);
     gate.SetInputCount(5);
     CHECK(gate.GetInputCount() == 5);
     CHECK(gate.GetInputLabels() == std::vector<std::string>{"A", "B", "C", "D", "E"});
-    CHECK(Core::GetLogicInputLabels(Core::ComponentType::Nor, 3) == std::vector<std::string>{"A", "B", "C"});
-    CHECK(Core::GetLogicInputLabels(Core::ComponentType::Nor) == std::vector<std::string>{"A", "B"});
+    CHECK(Core::GetLogicInputLabels(Core::ComponentType::NOR, 3) == std::vector<std::string>{"A", "B", "C"});
+    CHECK(Core::GetLogicInputLabels(Core::ComponentType::NOR) == std::vector<std::string>{"A", "B"});
 
     CHECK_FALSE(Core::LogicPart::IsValidInputCount(1));
-    CHECK(Core::LogicPart::IsValidInputCount(Core::MinLogicInputs));
-    CHECK(Core::LogicPart::IsValidInputCount(Core::MaxLogicInputs));
-    CHECK_FALSE(Core::LogicPart::IsValidInputCount(Core::MaxLogicInputs + 1));
+    CHECK(Core::LogicPart::IsValidInputCount(Core::MIN_LOGIC_INPUTS));
+    CHECK(Core::LogicPart::IsValidInputCount(Core::MAX_LOGIC_INPUTS));
+    CHECK_FALSE(Core::LogicPart::IsValidInputCount(Core::MAX_LOGIC_INPUTS + 1));
 
-    Core::LogicPart inverter(Core::ComponentType::Not);
+    Core::LogicPart inverter(Core::ComponentType::NOT);
     inverter.SetInputCount(4);
     CHECK(inverter.GetInputCount() == 1);
-    Core::LogicPart flip_flop(Core::ComponentType::DFlipFlop);
+    Core::LogicPart flip_flop(Core::ComponentType::D_FLIP_FLOP);
     flip_flop.SetInputCount(4);
     CHECK(flip_flop.GetInputLabels() == std::vector<std::string>{"D", "CLK", "SET", "RESET"});
 }
@@ -711,22 +724,22 @@ TEST_CASE("Logic figures need a positive level and a delay that is not negative"
 
 TEST_CASE("A clock is a V part with no value that picks its own edges", "[component]") {
     Core::Clock clock;
-    CHECK(clock.GetType() == Core::ComponentType::Clock);
+    CHECK(clock.GetType() == Core::ComponentType::CLOCK);
     CHECK(std::string_view(clock.GetTypeName()) == "Clock");
     CHECK(std::string_view(clock.GetNamePrefix()) == "V");
     CHECK(std::string_view(clock.GetUnit()) == "V");
     CHECK_FALSE(clock.HasValue());
     CHECK_FALSE(clock.IsValidValue(1.0));
-    CHECK_FALSE(Core::IsSource(Core::ComponentType::Clock));
-    CHECK(Core::ParseComponentType("Clock") == Core::ComponentType::Clock);
+    CHECK_FALSE(Core::IsSource(Core::ComponentType::CLOCK));
+    CHECK(Core::ParseComponentType("Clock") == Core::ComponentType::CLOCK);
 
     CHECK(clock.GetParameters().Frequency == 1e3);
     CHECK(clock.GetParameters().DutyCycle == 0.5);
     CHECK(clock.GetParameters().LogicLevel == 5.0);
     CHECK(clock.GetParameters().StartDelay == 0.0);
     // The edge is a small, named share of the period, never one of the user figures
-    CHECK(Core::ClockEdgeFraction > 0.0);
-    CHECK(Core::ClockEdgeFraction < 0.01);
+    CHECK(Core::CLOCK_EDGE_FRACTION > 0.0);
+    CHECK(Core::CLOCK_EDGE_FRACTION < 0.01);
 
     CHECK(Core::Clock::IsValidParameters(clock.GetParameters()));
     CHECK_FALSE(Core::Clock::IsValidParameters({.Frequency = 0.0}));
@@ -744,14 +757,14 @@ TEST_CASE("A clock is a V part with no value that picks its own edges", "[compon
 
 TEST_CASE("A logic input is a V part that drives 0 V or the logic level", "[component]") {
     Core::LogicInput input;
-    CHECK(input.GetType() == Core::ComponentType::LogicInput);
+    CHECK(input.GetType() == Core::ComponentType::LOGIC_INPUT);
     CHECK(std::string_view(input.GetTypeName()) == "LogicInput");
     CHECK(std::string_view(input.GetNamePrefix()) == "V");
     CHECK(std::string_view(input.GetUnit()) == "V");
     CHECK_FALSE(input.HasValue());
     CHECK_FALSE(input.IsValidValue(5.0));
-    CHECK_FALSE(Core::IsSource(Core::ComponentType::LogicInput));
-    CHECK(Core::ParseComponentType("LogicInput") == Core::ComponentType::LogicInput);
+    CHECK_FALSE(Core::IsSource(Core::ComponentType::LOGIC_INPUT));
+    CHECK(Core::ParseComponentType("LogicInput") == Core::ComponentType::LOGIC_INPUT);
 
     // Both start low, so an unconnected input reads 0
     CHECK_FALSE(input.IsHigh());

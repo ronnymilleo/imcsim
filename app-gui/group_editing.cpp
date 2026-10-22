@@ -20,16 +20,16 @@ namespace GUI {
 void TransformElement(UIElement &element, const PointTransform &transform) {
     element.SetPosition(transform.Apply(element.GetPosition()));
     switch (transform.Type) {
-    case PointTransform::Kind::Translate:
+    case PointTransform::Kind::TRANSLATE:
         break;
-    case PointTransform::Kind::QuarterTurn:
+    case PointTransform::Kind::QUARTER_TURN:
         element.SetRotation(NextRotation(element.GetRotation()));
         break;
-    case PointTransform::Kind::MirrorLeftRight:
+    case PointTransform::Kind::MIRROR_LEFT_RIGHT:
         element.SetMirrored(!element.IsMirrored());
         element.SetRotation(InverseRotation(element.GetRotation()));
         break;
-    case PointTransform::Kind::MirrorTopBottom:
+    case PointTransform::Kind::MIRROR_TOP_BOTTOM:
         element.SetMirrored(!element.IsMirrored());
         element.SetRotation(NextRotation(NextRotation(InverseRotation(element.GetRotation()))));
         break;
