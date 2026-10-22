@@ -194,12 +194,13 @@ std::string DescribeFailure(const Circuit &circuit, const std::vector<SimulatorM
     return "ngspice could not simulate the circuit; see its output for details";
 }
 
-// Logic inputs, supply rails and logic parts tie themselves to node 0 in the netlist, so a circuit made only of them
-// has its reference without a Ground part. A clock has two terminals and its second one needs a node to return to
+// Clocks, logic inputs, supply rails and logic parts tie themselves to node 0 in the netlist, so a circuit made only of
+// them has its reference without a Ground part
 bool IsDigitalOnly(const Circuit &circuit) {
     return std::ranges::all_of(circuit.GetEntries(), [](const CircuitEntry &entry) {
         const ComponentType type = entry.Part->GetType();
-        return type == ComponentType::LogicInput || type == ComponentType::VCC || IsLogicPart(type);
+        return type == ComponentType::Clock || type == ComponentType::LogicInput || type == ComponentType::VCC ||
+               IsLogicPart(type);
     });
 }
 

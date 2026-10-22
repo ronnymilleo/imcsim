@@ -318,11 +318,11 @@ bool Circuit::HasInitialConditions() const {
  *          add_current_probes, unless it is a voltage source itself, since ngspice follows currents through
  *          voltage sources. An AC source writes its offset, AC magnitude and sine together, and every other
  *          waveform its starting value and its shape, so the same netlist works for .op, .ac and .tran. A clock
- *          writes a pulse whose rise and fall times are a fixed share of its period, and a logic input a DC level
- *          from its terminal to ground. A capacitor or inductor with an initial condition writes it as IC=, which
- *          only a transient with uic uses. Probes and the
- *          gain stage of each ideal op-amp use nodes numbered after GetNodeCount(), so the circuit nodes keep their
- *          numbers. Op-amp macromodels are subcircuits, written after the models.
+ *          writes a pulse whose rise and fall times are a fixed share of its period, and a logic input a DC level,
+ *          both from their terminal to ground. A capacitor or inductor with an initial condition writes it as IC=,
+ * which only a transient with uic uses. Probes and the gain stage of each ideal op-amp use nodes numbered after
+ * GetNodeCount(), so the circuit nodes keep their numbers. Op-amp macromodels are subcircuits, written after the
+ * models.
  */
 std::string Circuit::ToSpiceNetlist(const std::string_view analysis, const bool add_current_probes) const {
     std::string netlist = "* imcsim netlist\n";
@@ -368,8 +368,8 @@ std::string Circuit::ToSpiceNetlist(const std::string_view analysis, const bool 
             const double edge = ClockEdgeFraction * period;
             // Half of each edge lies above half the level, so the flat top is a whole edge shorter than the duty share
             const double width = std::max(figures.DutyCycle * period - edge, 0.0);
-            netlist += std::format("{} {} {} DC 0 PULSE(0 {} {} {} {} {} {})\n", component.GetName(), nodes[0],
-                                   nodes[1], FormatSpiceValue(figures.LogicLevel), FormatSpiceValue(figures.StartDelay),
+            netlist += std::format("{} {} 0 DC 0 PULSE(0 {} {} {} {} {} {})\n", component.GetName(), nodes[0],
+                                   FormatSpiceValue(figures.LogicLevel), FormatSpiceValue(figures.StartDelay),
                                    FormatSpiceValue(edge), FormatSpiceValue(edge), FormatSpiceValue(width),
                                    FormatSpiceValue(period));
             break;

@@ -233,7 +233,7 @@ TEST_CASE("ToSpiceNetlist writes a clock as a pulse with its own short edges", "
     clock.SetName("V1");
     clock.SetParameters({.Frequency = 1e3, .DutyCycle = 0.25, .LogicLevel = 3.3, .StartDelay = 1e-3});
     Core::Circuit circuit;
-    circuit.Add(clock, {1, 0});
+    circuit.Add(clock, {1});
     // Period 1 ms, an edge of 1 us, and a flat top of 0.25 ms - 1 us = 249 us, so the duty reads as 0.25
     CHECK(circuit.ToSpiceNetlist() == "* imcsim netlist\n"
                                       "V1 1 0 DC 0 PULSE(0 3.3 1m 1u 1u 249u 1m)\n"
@@ -264,7 +264,7 @@ TEST_CASE("A clock and a logic input carry their branch current for a controlled
     cccs.SetName("F1");
     cccs.SetControllingCurrent("V1");
     Core::Circuit circuit;
-    circuit.Add(clock, {1, 0});
+    circuit.Add(clock, {1});
     circuit.Add(input, {2});
     circuit.Add(cccs, {3, 0});
     // Both are voltage sources, so ngspice follows their current with no probe

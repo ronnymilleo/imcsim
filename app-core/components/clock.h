@@ -27,7 +27,7 @@ struct ClockParameters {
 
 /**
  * @class   Clock
- * @brief   A voltage source that drives a digital clock, written as a SPICE pulse source between its two terminals.
+ * @brief   A voltage source from its terminal to ground that drives a digital clock, written as a SPICE pulse source.
  * @details The clock is low until its start delay, which is also its operating point value, and its first rising edge
  *          begins there; a start delay of 0 puts the first edge at the start. The user sets no rise or fall times.
  */

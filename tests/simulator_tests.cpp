@@ -2593,7 +2593,7 @@ TEST_CASE("A clock is high for the share of the period its duty cycle gives", "[
     load.SetValue(1e3);
     const Core::Ground reference;
     Core::Circuit circuit;
-    circuit.Add(clock, {1, 0});
+    circuit.Add(clock, {1});
     circuit.Add(load, {1, 0});
     circuit.Add(reference, {0});
 
@@ -2618,7 +2618,7 @@ TEST_CASE("A clock start delay holds it low until the first rising edge", "[simu
     clock.SetParameters({.Frequency = 1e3, .DutyCycle = 0.5, .LogicLevel = 5.0, .StartDelay = 2e-3});
     const Core::Ground reference;
     Core::Circuit circuit;
-    circuit.Add(clock, {1, 0});
+    circuit.Add(clock, {1});
     circuit.Add(reference, {0});
 
     const Core::TransientRun run = Core::RunTransient(circuit, {.StopTime = 4e-3, .TimeStep = 1e-6});
@@ -2645,12 +2645,12 @@ TEST_CASE("A clock into a D flip-flop divides it by two", "[simulator][digital]"
     clock.SetParameters({.Frequency = 1e3, .DutyCycle = 0.5, .LogicLevel = 5.0, .StartDelay = 0.25e-3});
     Core::LogicPart flip_flop(Core::ComponentType::DFlipFlop);
     flip_flop.SetName("U1");
-    const Core::Ground reference;
     Core::Circuit circuit;
-    // QN on node 1 feeds D on node 1; CLK on node 2, SET and RESET on nodes 3 and 4, Q on node 5
-    circuit.Add(clock, {2, 0});
+    // QN on node 1 feeds D on node 1; CLK on node 2, SET and RESET on nodes 3 and 4, Q on node 5. The clock returns
+    // to node 0 by itself, so the circuit needs no Ground part
+    circuit.Add(clock, {2});
     circuit.Add(flip_flop, {1, 2, 3, 4, 5, 1});
-    circuit.Add(reference, {0});
+    REQUIRE_FALSE(circuit.HasGround());
 
     const Core::TransientRun run = Core::RunTransient(circuit, {.StopTime = 4e-3, .TimeStep = 5e-6});
     REQUIRE(run.Result.has_value());
@@ -2712,27 +2712,18 @@ TEST_CASE("A circuit of only digital parts runs without a ground", "[simulator][
     CHECK_THAT(high.Result->NodeVoltages[3], Catch::Matchers::WithinAbs(5.0, 0.05));
 }
 
-TEST_CASE("A circuit with an analog part or a clock still needs a ground", "[simulator][digital]") {
+TEST_CASE("A circuit with an analog part still needs a ground", "[simulator][digital]") {
     Core::LogicInput input;
     input.SetName("V1");
     Core::Resistor load;
     load.SetName("R1");
     load.SetValue(1e3);
-    Core::Circuit with_resistor;
-    with_resistor.Add(input, {1});
-    with_resistor.Add(load, {1, 2});
-    const Core::OperatingPointRun resistor_run = Core::RunOperatingPoint(with_resistor);
-    REQUIRE_FALSE(resistor_run.Result.has_value());
-    CHECK(resistor_run.Result.error().contains("no ground"));
-
-    // A clock has two terminals, and the second one needs a node to return to
-    Core::Clock clock;
-    clock.SetName("V1");
-    Core::Circuit with_clock;
-    with_clock.Add(clock, {1, 2});
-    const Core::OperatingPointRun clock_run = Core::RunOperatingPoint(with_clock);
-    REQUIRE_FALSE(clock_run.Result.has_value());
-    CHECK(clock_run.Result.error().contains("no ground"));
+    Core::Circuit circuit;
+    circuit.Add(input, {1});
+    circuit.Add(load, {1, 2});
+    const Core::OperatingPointRun run = Core::RunOperatingPoint(circuit);
+    REQUIRE_FALSE(run.Result.has_value());
+    CHECK(run.Result.error().contains("no ground"));
 }
 
 TEST_CASE("A logic input gives a NAND latch a defined state", "[simulator][digital]") {

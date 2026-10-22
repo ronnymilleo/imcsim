@@ -58,7 +58,7 @@ TEST_CASE("SuggestTransientSettings reads a clock as a periodic source", "[sugge
     Core::Clock clock;
     clock.SetParameters({.Frequency = 1e3, .DutyCycle = 0.5, .LogicLevel = 5.0, .StartDelay = 2e-3});
     Core::Circuit circuit;
-    circuit.Add(clock, {1, 0});
+    circuit.Add(clock, {1});
 
     const auto settings = Core::SuggestTransientSettings(circuit);
     REQUIRE(settings.has_value());
