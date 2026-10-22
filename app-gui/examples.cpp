@@ -282,7 +282,7 @@ constexpr auto Examples = std::to_array<Example>({
         .Group = "Digital",
         .Description =
             "Each D flip-flop has QN fed back to D, so it halves the frequency of its clock, and the next stage "
-            "is clocked by that QN. From the 1 kHz clock, Q0 is 500 Hz, Q1 250 Hz and Q2 125 Hz, and Q2 Q1 Q0 "
+            "is clocked by that QN. From the 1 kHz Clock part, Q0 is 500 Hz, Q1 250 Hz and Q2 125 Hz, and Q2 Q1 Q0 "
             "count the rising edges of the clock in binary, the first at 0.5 ms. SET and RESET are left "
             "unconnected and read 0. The Output window stacks CLK, Q0, Q1 and Q2 as lanes, so the binary count "
             "reads down the edges.",

@@ -3,26 +3,17 @@
   "version": 1,
   "elements": [
     {
-      "type": "VoltageSource",
+      "type": "Clock",
       "rotation": 90,
       "x": 6,
       "y": 10,
-      "source": "Pulse",
-      "value": 0,
-      "amplitude": 1,
-      "frequency": 1000,
-      "offset": 0,
-      "ac_magnitude": 1,
-      "pulse": {
-        "delay": 0.0005,
-        "fall": 1e-7,
-        "high": 5,
-        "low": 0,
-        "period": 0.001,
-        "rise": 1e-7,
-        "width": 0.0005
+      "parameters": {
+        "duty_cycle": 0.5,
+        "frequency": 1000,
+        "logic_level": 5,
+        "start_delay": 0.0005
       },
-      "name": "Vin1"
+      "name": "V1"
     },
     {
       "type": "NetLabel",
