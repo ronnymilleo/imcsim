@@ -10,6 +10,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <limits>
 #include <numbers>
 #include <ranges>
 #include <vector>
@@ -21,6 +22,9 @@ namespace {
 // A transient shows this many periods of the slowest source, with this many points in a period of the fastest
 constexpr double SuggestedPeriods = 5.0;
 constexpr double PointsPerPeriod = 200.0;
+// A waveform that happens once, such as an exponential or piecewise linear one, shows its whole span with this much
+// room after it
+constexpr double OneShotMargin = 1.2;
 // The AC sweep reaches two decades past the lowest and the highest frequency the parts set
 constexpr double ACMarginDecades = 2.0;
 constexpr double MinACFrequency = 1e-3;
@@ -89,32 +93,72 @@ std::vector<double> ListCharacteristicFrequencies(const Circuit &circuit) {
 } // namespace
 
 /**
- * @brief   Suggests transient times from the sine and pulse sources of a circuit.
+ * @brief   Suggests transient times from the waveforms of the sources of a circuit.
  * @param[in] circuit  Circuit to simulate.
  * @return  A stop time of five periods of the slowest source, after the longest pulse delay, and a step of a 200th
- *          of the period of the fastest, both rounded to 1, 2 or 5 times a power of ten; no value without a sine
- *          or pulse source.
+ *          of the period of the fastest, both rounded to 1, 2 or 5 times a power of ten; no value without a source
+ *          with a waveform.
+ * @note    A sine, pulse, SFFM or AM source sets a period. The exponential and piecewise linear waveforms happen
+ *          once, so the stop time covers their span with a little room, and the step a 200th of it.
  */
 std::optional<TransientSettings> SuggestTransientSettings(const Circuit &circuit) {
     std::vector<double> periods;
+    std::vector<double> spans;
     double longest_delay = 0.0;
     for (const CircuitEntry &entry : circuit.GetEntries()) {
         const auto *source = dynamic_cast<const Source *>(entry.Part);
         if (source == nullptr) {
             continue;
         }
-        if (source->GetSourceType() == Source::SourceType::AC) {
+        switch (source->GetSourceType()) {
+        case Source::SourceType::DC:
+            break;
+        case Source::SourceType::AC:
             periods.push_back(1.0 / source->GetAC().Frequency);
-        } else if (source->GetSourceType() == Source::SourceType::Pulse) {
+            break;
+        case Source::SourceType::Pulse:
             periods.push_back(source->GetPulse().Period);
             longest_delay = std::max(longest_delay, source->GetPulse().Delay);
+            break;
+        case Source::SourceType::EXP: {
+            const EXPParameters &exp = source->GetEXP();
+            spans.push_back(exp.FallDelay + 5.0 * exp.FallTimeConstant);
+            break;
+        }
+        case Source::SourceType::SFFM:
+            periods.push_back(1.0 / source->GetSFFM().CarrierFrequency);
+            periods.push_back(1.0 / source->GetSFFM().SignalFrequency);
+            break;
+        case Source::SourceType::AM:
+            periods.push_back(1.0 / source->GetAM().CarrierFrequency);
+            periods.push_back(1.0 / source->GetAM().ModulatingFrequency);
+            longest_delay = std::max(longest_delay, source->GetAM().Delay);
+            break;
+        case Source::SourceType::PWL: {
+            const PWLParameters &pwl = source->GetPWL();
+            if (pwl.Points.size() >= 2) {
+                spans.push_back(pwl.Points.back().Time);
+            }
+            break;
+        }
         }
     }
-    if (periods.empty()) {
+    if (periods.empty() && spans.empty()) {
         return std::nullopt;
     }
-    const auto [shortest, longest] = std::ranges::minmax(periods);
-    return TransientSettings{.StopTime = RoundToNiceStep(longest_delay + SuggestedPeriods * longest, true),
+    double stop_time = 0.0;
+    double shortest = std::numeric_limits<double>::max();
+    if (!periods.empty()) {
+        const auto [shortest_period, longest_period] = std::ranges::minmax(periods);
+        stop_time = longest_delay + SuggestedPeriods * longest_period;
+        shortest = shortest_period;
+    }
+    if (!spans.empty()) {
+        const auto [shortest_span, longest_span] = std::ranges::minmax(spans);
+        stop_time = std::max(stop_time, OneShotMargin * longest_span);
+        shortest = std::min(shortest, shortest_span);
+    }
+    return TransientSettings{.StopTime = RoundToNiceStep(stop_time, true),
                              .TimeStep = RoundToNiceStep(shortest / PointsPerPeriod, false)};
 }
 

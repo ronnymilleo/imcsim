@@ -147,6 +147,70 @@ TEST_CASE("ToSpiceNetlist writes a pulse source starting at its low level", "[ci
                                       ".end\n");
 }
 
+TEST_CASE("ToSpiceNetlist writes an exponential source starting from its first value", "[circuit]") {
+    Core::VoltageSource source;
+    source.SetName("Vin1");
+    source.SetSourceType(Core::VoltageSource::SourceType::EXP);
+    source.SetEXP({.InitialValue = -1.0,
+                   .PeakValue = 3.3,
+                   .RiseDelay = 1e-3,
+                   .RiseTimeConstant = 10e-6,
+                   .FallDelay = 5e-3,
+                   .FallTimeConstant = 20e-6});
+
+    Core::Circuit circuit;
+    circuit.Add(source, {1, 0});
+
+    CHECK(circuit.ToSpiceNetlist() == "* imcsim netlist\n"
+                                      "Vin1 1 0 DC -1 EXP(-1 3.3 1m 10u 5m 20u)\n"
+                                      ".end\n");
+}
+
+TEST_CASE("ToSpiceNetlist writes a single-frequency FM source from its offset", "[circuit]") {
+    Core::VoltageSource source;
+    source.SetName("Vin1");
+    source.SetSourceType(Core::VoltageSource::SourceType::SFFM);
+    source.SetSFFM(
+        {.Offset = 0.5, .Amplitude = 2.0, .CarrierFrequency = 1e3, .ModulationIndex = 5.0, .SignalFrequency = 100.0});
+
+    Core::Circuit circuit;
+    circuit.Add(source, {1, 0});
+
+    CHECK(circuit.ToSpiceNetlist() == "* imcsim netlist\n"
+                                      "Vin1 1 0 DC 500m SFFM(500m 2 1k 5 100)\n"
+                                      ".end\n");
+}
+
+TEST_CASE("ToSpiceNetlist writes an amplitude-modulated source with a suppressed carrier", "[circuit]") {
+    Core::VoltageSource source;
+    source.SetName("Vin1");
+    source.SetSourceType(Core::VoltageSource::SourceType::AM);
+    source.SetAM(
+        {.Amplitude = 2.0, .Offset = 0.5, .ModulatingFrequency = 200.0, .CarrierFrequency = 10e3, .Delay = 1e-3});
+
+    Core::Circuit circuit;
+    circuit.Add(source, {1, 0});
+
+    // The modulation offset of ngspice stays 0, so the offset sits on the two multiplied sines
+    CHECK(circuit.ToSpiceNetlist() == "* imcsim netlist\n"
+                                      "Vin1 1 0 DC 500m AM(500m 0 2 200 10k 1m)\n"
+                                      ".end\n");
+}
+
+TEST_CASE("ToSpiceNetlist writes the piecewise linear points from its first value", "[circuit]") {
+    Core::CurrentSource source;
+    source.SetName("I1");
+    source.SetSourceType(Core::CurrentSource::SourceType::PWL);
+    source.SetPWL({.Points = {{0.0, 0.0}, {1e-3, 5e-3}, {2e-3, 0.0}}});
+
+    Core::Circuit circuit;
+    circuit.Add(source, {0, 3});
+
+    CHECK(circuit.ToSpiceNetlist() == "* imcsim netlist\n"
+                                      "I1 0 3 DC 0 PWL(0 0 1m 5m 2m 0)\n"
+                                      ".end\n");
+}
+
 TEST_CASE("ToSpiceNetlist writes a current source like a voltage source, under its own name", "[circuit]") {
     Core::CurrentSource source;
     source.SetName("I1");

@@ -39,8 +39,9 @@ constexpr double MinTrackResistance = 1e-3;
 constexpr double ClosedSwitchResistance = 1e-3;
 constexpr double OpenSwitchResistance = 1e12;
 
-// One line serves every analysis: .op reads the DC value, .ac the AC magnitude and .tran the waveform. A pulse
-// starts at its low level, so that is its DC value. The name tells SPICE whether it is a voltage or current source
+// One line serves every analysis: .op reads the DC value, .ac the AC magnitude and .tran the waveform. Every
+// waveform writes the value it starts from, so the operating point matches the beginning of the transient. The name
+// tells SPICE whether it is a voltage or current source
 std::string FormatSource(const Source &source, const std::vector<int> &nodes) {
     const std::string start = std::format("{} {} {}", source.GetName(), nodes[0], nodes[1]);
     switch (source.GetSourceType()) {
@@ -59,6 +60,42 @@ std::string FormatSource(const Source &source, const std::vector<int> &nodes) {
                            FormatSpiceValue(pulse.Delay), FormatSpiceValue(pulse.RiseTime),
                            FormatSpiceValue(pulse.FallTime), FormatSpiceValue(pulse.Width),
                            FormatSpiceValue(pulse.Period));
+    }
+    case Source::SourceType::EXP: {
+        const EXPParameters &exp = source.GetEXP();
+        const std::string initial = FormatSpiceValue(exp.InitialValue);
+        return std::format("{} DC {} EXP({} {} {} {} {} {})\n", start, initial, initial,
+                           FormatSpiceValue(exp.PeakValue), FormatSpiceValue(exp.RiseDelay),
+                           FormatSpiceValue(exp.RiseTimeConstant), FormatSpiceValue(exp.FallDelay),
+                           FormatSpiceValue(exp.FallTimeConstant));
+    }
+    case Source::SourceType::SFFM: {
+        const SFFMParameters &sffm = source.GetSFFM();
+        const std::string offset = FormatSpiceValue(sffm.Offset);
+        return std::format("{} DC {} SFFM({} {} {} {} {})\n", start, offset, offset, FormatSpiceValue(sffm.Amplitude),
+                           FormatSpiceValue(sffm.CarrierFrequency), FormatSpiceValue(sffm.ModulationIndex),
+                           FormatSpiceValue(sffm.SignalFrequency));
+    }
+    case Source::SourceType::AM: {
+        const AMParameters &am = source.GetAM();
+        const std::string offset = FormatSpiceValue(am.Offset);
+        // ngspice reads AM(offset mod_offset amplitude mod_frequency carrier_frequency delay); the modulation offset
+        // stays 0, so the source is the offset plus the amplitude times the two sines
+        return std::format("{} DC {} AM({} 0 {} {} {} {})\n", start, offset, offset, FormatSpiceValue(am.Amplitude),
+                           FormatSpiceValue(am.ModulatingFrequency), FormatSpiceValue(am.CarrierFrequency),
+                           FormatSpiceValue(am.Delay));
+    }
+    case Source::SourceType::PWL: {
+        const PWLParameters &pwl = source.GetPWL();
+        std::string points;
+        for (const PWLPoint &point : pwl.Points) {
+            if (!points.empty()) {
+                points += " ";
+            }
+            points += std::format("{} {}", FormatSpiceValue(point.Time), FormatSpiceValue(point.Value));
+        }
+        const std::string first = FormatSpiceValue(pwl.Points.front().Value);
+        return std::format("{} DC {} PWL({})\n", start, first, points);
     }
     }
     return "";
@@ -276,8 +313,8 @@ bool Circuit::HasInitialConditions() const {
  * @note    Ground components produce no line; they only make their node 0. A supply rail becomes a DC voltage
  *          source from its node to ground. A part whose current controls a CCCS or CCVS gets a probe even without
  *          add_current_probes, unless it is a voltage source itself, since ngspice follows currents through
- *          voltage sources. An AC source writes its offset, AC magnitude and sine together, and a
- *          pulse source its low level and pulse, so the same netlist works for .op, .ac and .tran. A capacitor or
+ *          voltage sources. An AC source writes its offset, AC magnitude and sine together, and every other
+ *          waveform its starting value and its shape, so the same netlist works for .op, .ac and .tran. A capacitor or
  *          inductor with an initial condition writes it as IC=, which only a transient with uic uses. Probes and the
  *          gain stage of each ideal op-amp use nodes numbered after GetNodeCount(), so the circuit nodes keep their
  *          numbers. Op-amp macromodels are subcircuits, written after the models.

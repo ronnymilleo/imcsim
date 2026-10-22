@@ -24,9 +24,11 @@
 #include "components/voltage_source.h"
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators.hpp>
+#include <optional>
 #include <span>
 #include <string>
 #include <string_view>
+#include <vector>
 
 TEST_CASE("Components start with SPICE prefixes, units and default values", "[component]") {
     const Core::Resistor resistor;
@@ -317,10 +319,13 @@ TEST_CASE("A voltage source keeps its sine parameters while switching type", "[c
 
 TEST_CASE("Source type names convert both ways", "[component]") {
     for (const auto type : {Core::VoltageSource::SourceType::DC, Core::VoltageSource::SourceType::AC,
-                            Core::VoltageSource::SourceType::Pulse}) {
+                            Core::VoltageSource::SourceType::Pulse, Core::VoltageSource::SourceType::EXP,
+                            Core::VoltageSource::SourceType::SFFM, Core::VoltageSource::SourceType::AM,
+                            Core::VoltageSource::SourceType::PWL}) {
         CHECK(Core::ParseSourceType(Core::GetSourceTypeName(type)) == type);
     }
     CHECK_FALSE(Core::ParseSourceType("ac"));
+    CHECK_FALSE(Core::ParseSourceType("pwl "));
 }
 
 TEST_CASE("A pulse needs non-negative times and a positive period", "[component]") {
@@ -339,6 +344,86 @@ TEST_CASE("A pulse needs non-negative times and a positive period", "[component]
     invalid = pulse;
     invalid.Period = 0.0;
     CHECK_FALSE(source.IsValidPulse(invalid));
+}
+
+TEST_CASE("A source keeps every waveform while switching type", "[component]") {
+    Core::VoltageSource source;
+    source.SetEXP({.InitialValue = -2.0,
+                   .PeakValue = 7.0,
+                   .RiseDelay = 2e-3,
+                   .RiseTimeConstant = 3e-3,
+                   .FallDelay = 4e-3,
+                   .FallTimeConstant = 5e-3});
+    source.SetSFFM(
+        {.Offset = 1.0, .Amplitude = 2.0, .CarrierFrequency = 3e3, .ModulationIndex = 4.0, .SignalFrequency = 5.0});
+    source.SetAM(
+        {.Amplitude = 6.0, .Offset = 7.0, .ModulatingFrequency = 8.0, .CarrierFrequency = 9e3, .Delay = 10e-3});
+    source.SetPWL({.Points = {{0.0, 0.0}, {1e-3, 2.0}}});
+
+    source.SetSourceType(Core::VoltageSource::SourceType::PWL);
+    source.SetSourceType(Core::VoltageSource::SourceType::DC);
+
+    CHECK(source.GetEXP().InitialValue == -2.0);
+    CHECK(source.GetEXP().PeakValue == 7.0);
+    CHECK(source.GetSFFM().CarrierFrequency == 3e3);
+    CHECK(source.GetSFFM().ModulationIndex == 4.0);
+    CHECK(source.GetAM().ModulatingFrequency == 8.0);
+    CHECK(source.GetAM().Delay == 10e-3);
+    REQUIRE(source.GetPWL().Points.size() == 2);
+    CHECK(source.GetPWL().Points[1].Value == 2.0);
+}
+
+TEST_CASE("An exponential, SFFM and AM check their limits", "[component]") {
+    const Core::VoltageSource source;
+    CHECK(source.IsValidEXP(Core::EXPParameters{}));
+    CHECK(source.IsValidSFFM(Core::SFFMParameters{}));
+    CHECK(source.IsValidAM(Core::AMParameters{}));
+
+    // A time constant of zero would make ngspice fall back to the time step
+    CHECK_FALSE(source.IsValidEXP({.RiseTimeConstant = 0.0}));
+    CHECK_FALSE(source.IsValidEXP({.PeakValue = 5.0, .FallDelay = 0.0}));
+    CHECK_FALSE(source.IsValidEXP({.RiseDelay = -1e-3}));
+    CHECK_FALSE(source.IsValidSFFM({.CarrierFrequency = 0.0}));
+    CHECK_FALSE(source.IsValidSFFM({.SignalFrequency = -1.0}));
+    CHECK_FALSE(source.IsValidAM({.ModulatingFrequency = 0.0}));
+    CHECK_FALSE(source.IsValidAM({.CarrierFrequency = 0.0}));
+    CHECK_FALSE(source.IsValidAM({.Delay = -1e-3}));
+}
+
+TEST_CASE("Piecewise linear points need two increasing times from zero", "[component]") {
+    const Core::VoltageSource source;
+    CHECK(source.IsValidPWL(Core::PWLParameters{}));
+
+    CHECK_FALSE(source.IsValidPWL({.Points = {{0.0, 0.0}}}));
+    CHECK_FALSE(source.IsValidPWL({.Points = {{-1e-3, 0.0}, {1e-3, 5.0}}}));
+    CHECK_FALSE(source.IsValidPWL({.Points = {{0.0, 0.0}, {0.0, 5.0}}}));
+    CHECK_FALSE(source.IsValidPWL({.Points = {{1e-3, 0.0}, {0.0, 5.0}}}));
+}
+
+TEST_CASE("Piecewise linear text parses and formats back", "[component]") {
+    const std::optional<std::vector<Core::PWLPoint>> points = Core::ParsePWLPoints("0 0, 1m 5, 2m -2.5");
+    REQUIRE(points.has_value());
+    REQUIRE(points->size() == 3);
+    CHECK(points->at(0).Time == 0.0);
+    CHECK(points->at(0).Value == 0.0);
+    CHECK(points->at(1).Time == 1e-3);
+    CHECK(points->at(1).Value == 5.0);
+    CHECK(points->at(2).Time == 2e-3);
+    CHECK(points->at(2).Value == -2.5);
+    CHECK(Core::FormatPWLPoints(*points) == "0 0, 1m 5, 2m -2.5");
+
+    // Commas are optional; any whitespace separates the pairs
+    CHECK(Core::ParsePWLPoints("0 0 1m 5").has_value());
+
+    // Fewer than two points, an odd number of numbers, a bad number, a negative time and times that
+    // do not strictly increase are all rejected
+    CHECK_FALSE(Core::ParsePWLPoints("0 0").has_value());
+    CHECK_FALSE(Core::ParsePWLPoints("0 0 1m").has_value());
+    CHECK_FALSE(Core::ParsePWLPoints("0 0, one 5").has_value());
+    CHECK_FALSE(Core::ParsePWLPoints("-1m 0, 1m 5").has_value());
+    CHECK_FALSE(Core::ParsePWLPoints("0 0, 0 5").has_value());
+    CHECK_FALSE(Core::ParsePWLPoints("1m 0, 0 5").has_value());
+    CHECK_FALSE(Core::ParsePWLPoints("").has_value());
 }
 
 TEST_CASE("IsSource covers voltage and current sources but not the supply rail", "[component]") {

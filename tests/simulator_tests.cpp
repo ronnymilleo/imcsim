@@ -30,6 +30,7 @@
 #include <cmath>
 #include <complex>
 #include <numbers>
+#include <vector>
 
 namespace {
 
@@ -390,6 +391,147 @@ TEST_CASE("A pulse charges an RC low-pass with its time constant", "[simulator]"
     for (std::size_t index = 0; index < transient.Times.size(); ++index) {
         const double expected = 1.0 - std::exp(-transient.Times[index] / 1e-3);
         CHECK_THAT(transient.NodeVoltages[2][index], Catch::Matchers::WithinAbs(expected, 5e-3));
+    }
+}
+
+TEST_CASE("A transient run follows the exponential of an EXP source", "[simulator]") {
+    Core::VoltageSource source;
+    source.SetName("Vin1");
+    source.SetSourceType(Core::VoltageSource::SourceType::EXP);
+    // Rise from 0 with a 0.5 ms time constant at 1 ms, then decay from 5 V at 5 ms with a 1 ms time constant
+    const Core::EXPParameters exp{.InitialValue = 0.0,
+                                  .PeakValue = 5.0,
+                                  .RiseDelay = 1e-3,
+                                  .RiseTimeConstant = 0.5e-3,
+                                  .FallDelay = 5e-3,
+                                  .FallTimeConstant = 1e-3};
+    source.SetEXP(exp);
+    Core::Resistor load;
+    load.SetName("R1");
+    const Core::Ground reference;
+    Core::Circuit circuit;
+    circuit.Add(source, {1, 0});
+    circuit.Add(load, {1, 0});
+    circuit.Add(reference, {0});
+
+    const Core::TransientRun run = Core::RunTransient(circuit, {.StopTime = 10e-3, .TimeStep = 10e-6});
+    if (!run.Result) {
+        FAIL(run.Result.error());
+    }
+    const Core::Transient &transient = *run.Result;
+    REQUIRE(transient.NodeVoltages[1].size() == transient.Times.size());
+    for (std::size_t index = 0; index < transient.Times.size(); ++index) {
+        const double t = transient.Times[index];
+        double expected = exp.InitialValue;
+        if (t > exp.RiseDelay) {
+            expected +=
+                (exp.PeakValue - exp.InitialValue) * (1.0 - std::exp(-(t - exp.RiseDelay) / exp.RiseTimeConstant));
+        }
+        if (t > exp.FallDelay) {
+            expected +=
+                (exp.InitialValue - exp.PeakValue) * (1.0 - std::exp(-(t - exp.FallDelay) / exp.FallTimeConstant));
+        }
+        CHECK_THAT(transient.NodeVoltages[1][index], Catch::Matchers::WithinAbs(expected, 5e-3));
+    }
+}
+
+TEST_CASE("A transient run follows the single-frequency FM of an SFFM source", "[simulator]") {
+    Core::VoltageSource source;
+    source.SetName("Vin1");
+    source.SetSourceType(Core::VoltageSource::SourceType::SFFM);
+    const Core::SFFMParameters sffm{
+        .Offset = 0.0, .Amplitude = 1.0, .CarrierFrequency = 1e3, .ModulationIndex = 5.0, .SignalFrequency = 100.0};
+    source.SetSFFM(sffm);
+    Core::Resistor load;
+    load.SetName("R1");
+    const Core::Ground reference;
+    Core::Circuit circuit;
+    circuit.Add(source, {1, 0});
+    circuit.Add(load, {1, 0});
+    circuit.Add(reference, {0});
+
+    const Core::TransientRun run = Core::RunTransient(circuit, {.StopTime = 5e-3, .TimeStep = 5e-6});
+    if (!run.Result) {
+        FAIL(run.Result.error());
+    }
+    const Core::Transient &transient = *run.Result;
+    REQUIRE(transient.NodeVoltages[1].size() == transient.Times.size());
+    for (std::size_t index = 0; index < transient.Times.size(); ++index) {
+        const double t = transient.Times[index];
+        // The carrier phase is swung by the modulation index times the signal sine
+        const double expected =
+            sffm.Offset + sffm.Amplitude * std::sin(2.0 * std::numbers::pi * sffm.CarrierFrequency * t +
+                                                    sffm.ModulationIndex *
+                                                        std::sin(2.0 * std::numbers::pi * sffm.SignalFrequency * t));
+        CHECK_THAT(transient.NodeVoltages[1][index], Catch::Matchers::WithinAbs(expected, 1e-3));
+    }
+}
+
+TEST_CASE("A transient run follows the amplitude modulation of an AM source", "[simulator]") {
+    Core::VoltageSource source;
+    source.SetName("Vin1");
+    source.SetSourceType(Core::VoltageSource::SourceType::AM);
+    // No offset, so the source at t = 0 matches the operating point, and no delay, so the sines start at once
+    const Core::AMParameters am{
+        .Amplitude = 1.0, .Offset = 0.0, .ModulatingFrequency = 100.0, .CarrierFrequency = 1e3, .Delay = 0.0};
+    source.SetAM(am);
+    Core::Resistor load;
+    load.SetName("R1");
+    const Core::Ground reference;
+    Core::Circuit circuit;
+    circuit.Add(source, {1, 0});
+    circuit.Add(load, {1, 0});
+    circuit.Add(reference, {0});
+
+    const Core::TransientRun run = Core::RunTransient(circuit, {.StopTime = 5e-3, .TimeStep = 5e-6});
+    if (!run.Result) {
+        FAIL(run.Result.error());
+    }
+    const Core::Transient &transient = *run.Result;
+    REQUIRE(transient.NodeVoltages[1].size() == transient.Times.size());
+    for (std::size_t index = 0; index < transient.Times.size(); ++index) {
+        const double shifted = transient.Times[index] - am.Delay;
+        const double expected =
+            shifted <= 0.0
+                ? 0.0
+                : am.Offset + am.Amplitude * std::sin(2.0 * std::numbers::pi * am.ModulatingFrequency * shifted) *
+                                  std::sin(2.0 * std::numbers::pi * am.CarrierFrequency * shifted);
+        CHECK_THAT(transient.NodeVoltages[1][index], Catch::Matchers::WithinAbs(expected, 1e-3));
+    }
+}
+
+TEST_CASE("A transient run follows the piecewise linear shape of a PWL source", "[simulator]") {
+    Core::VoltageSource source;
+    source.SetName("Vin1");
+    source.SetSourceType(Core::VoltageSource::SourceType::PWL);
+    const std::vector<Core::PWLPoint> points = {{0.0, 0.0}, {1e-3, 5.0}, {2e-3, 0.0}};
+    source.SetPWL({.Points = points});
+    Core::Resistor load;
+    load.SetName("R1");
+    const Core::Ground reference;
+    Core::Circuit circuit;
+    circuit.Add(source, {1, 0});
+    circuit.Add(load, {1, 0});
+    circuit.Add(reference, {0});
+
+    const Core::TransientRun run = Core::RunTransient(circuit, {.StopTime = 3e-3, .TimeStep = 5e-6});
+    if (!run.Result) {
+        FAIL(run.Result.error());
+    }
+    const Core::Transient &transient = *run.Result;
+    REQUIRE(transient.NodeVoltages[1].size() == transient.Times.size());
+    for (std::size_t index = 0; index < transient.Times.size(); ++index) {
+        const double t = transient.Times[index];
+        double expected = points.front().Value;
+        for (std::size_t point = 1; point < points.size(); ++point) {
+            if (t <= points[point].Time) {
+                const double fraction = (t - points[point - 1].Time) / (points[point].Time - points[point - 1].Time);
+                expected = points[point - 1].Value + fraction * (points[point].Value - points[point - 1].Value);
+                break;
+            }
+            expected = points[point].Value;
+        }
+        CHECK_THAT(transient.NodeVoltages[1][index], Catch::Matchers::WithinAbs(expected, 1e-4));
     }
 }
 
