@@ -5,6 +5,7 @@
 
 #include "output_window.h"
 
+#include "components/logic_input.h"
 #include "imgui_internal.h"
 #include "implot.h"
 #include "implot_internal.h"
@@ -16,6 +17,7 @@
 #include "spice_value.h"
 #include "theme.h"
 #include "trace_statistics.h"
+#include "truth_table.h"
 #include "value_field.h"
 #include <algorithm>
 #include <cmath>
@@ -736,6 +738,8 @@ const char *GetTabFileSuffix(const PlotTab tab) {
         return "noise";
     case PlotTab::TransferFunction:
         return "transfer-function";
+    case PlotTab::TruthTable:
+        return "truth-table";
     }
     return "plot";
 }
@@ -756,6 +760,8 @@ const char *GetTabTitle(const PlotTab tab) {
         return "noise";
     case PlotTab::TransferFunction:
         return "transfer function";
+    case PlotTab::TruthTable:
+        return "truth table";
     }
     return "";
 }
@@ -853,6 +859,81 @@ void DrawTransferFunction(const Core::TransferFunction &transfer, Schematic &sch
     ImGui::TextDisabled("Small-signal DC gain from %s to %s", transfer.InputSource.c_str(),
                         GetVoltageLabel(schematic.GetConnectivity(), transfer.OutputNode).c_str());
     ImGui::PopTextWrapPos();
+}
+
+// Whether each input of the table is high in the schematic as it is now, in the order of the table's inputs; an input
+// that left the circuit reads low
+std::vector<bool> ReadCurrentInputs(const Core::TruthTable &table, const Core::Circuit &circuit) {
+    std::vector<bool> inputs_high;
+    for (const std::string &name : table.InputNames) {
+        const auto entry = std::ranges::find_if(circuit.GetEntries(), [&name](const Core::CircuitEntry &candidate) {
+            return candidate.Part->GetType() == Core::ComponentType::LogicInput && candidate.Part->GetName() == name;
+        });
+        inputs_high.push_back(entry != circuit.GetEntries().end() &&
+                              static_cast<const Core::LogicInput &>(*entry->Part).IsHigh());
+    }
+    return inputs_high;
+}
+
+// One row per combination of the inputs, in counting order: 0 dimmed, 1 bright and X, which no operating point or a
+// voltage between the logic levels gives, in the warning color; the row the inputs are in now is highlighted
+void DrawTruthTable(const Core::TruthTable &table, Schematic &schematic) {
+    const Core::Circuit circuit = schematic.BuildCircuit();
+    const std::vector<LogicNode> logic_nodes = FindLogicNodes(circuit);
+    std::vector<std::string> output_labels;
+    for (const int node : table.OutputNodes) {
+        output_labels.push_back(GetVoltageLabel(schematic.GetConnectivity(), node));
+    }
+    if (ImGui::Button("Copy as Markdown")) {
+        ImGui::SetClipboardText(FormatTruthTableMarkdown(table, output_labels, logic_nodes).c_str());
+    }
+    ImGui::SetItemTooltip("Put the table on the clipboard, to paste into notes or documents");
+    ImGui::SameLine();
+    ImGui::TextDisabled("%zu combinations; X is a voltage between the logic levels, or no operating point",
+                        table.Rows.size());
+    for (const std::string &warning : table.Warnings) {
+        ImGui::PushTextWrapPos(0.0f);
+        ImGui::TextColored(GetWarningTextColor(), "%s", warning.c_str());
+        ImGui::PopTextWrapPos();
+    }
+
+    const std::optional<std::size_t> current = FindTruthTableRow(table, ReadCurrentInputs(table, circuit));
+    constexpr ImGuiTableFlags TableFlags = ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_ScrollY;
+    const int column_count = static_cast<int>(table.InputNames.size() + output_labels.size());
+    if (!ImGui::BeginTable("truth_table", column_count, TableFlags)) {
+        return;
+    }
+    for (const std::string &name : table.InputNames) {
+        ImGui::TableSetupColumn(name.c_str());
+    }
+    for (const std::string &label : output_labels) {
+        ImGui::TableSetupColumn(label.c_str());
+    }
+    ImGui::TableSetupScrollFreeze(0, 1);
+    ImGui::TableHeadersRow();
+    for (std::size_t row = 0; row < table.Rows.size(); ++row) {
+        ImGui::TableNextRow();
+        if (current == row) {
+            ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg1, ImGui::GetColorU32(ImGuiCol_TextSelectedBg));
+        }
+        for (const bool is_high : table.Rows[row].InputsHigh) {
+            ImGui::TableNextColumn();
+            if (is_high) {
+                ImGui::TextUnformatted("1");
+            } else {
+                ImGui::TextDisabled("0");
+            }
+        }
+        for (const LogicState state : ReadTruthTableOutputs(table, row, logic_nodes)) {
+            ImGui::TableNextColumn();
+            if (state == LogicState::Unknown) {
+                ImGui::TextColored(GetWarningTextColor(), "X");
+            } else {
+                ImGui::TextUnformatted(GetLogicStateName(state));
+            }
+        }
+    }
+    ImGui::EndTable();
 }
 
 // The range a logarithmic axis fits to: the positive values of the traces, with a tenth of their decades, and at
@@ -1255,6 +1336,10 @@ void OutputWindow::DrawTabs(const FrameResults &frame) {
         DrawTransferFunctionTab();
         ImGui::EndTabItem();
     }
+    if (begin_tab("Truth table", PlotTab::TruthTable)) {
+        DrawTruthTableTab();
+        ImGui::EndTabItem();
+    }
 }
 
 void OutputWindow::DrawTransientTab(const FrameResults &frame) {
@@ -1371,6 +1456,16 @@ void OutputWindow::DrawTransferFunctionTab() {
         return;
     }
     DrawTransferFunction(*transfer, m_Schematic);
+}
+
+// The truth table is a table too, so the tab draws it alone
+void OutputWindow::DrawTruthTableTab() {
+    const auto &truth_table = m_Schematic.GetTruthTable();
+    if (!truth_table) {
+        ImGui::TextDisabled("No truth table for the current circuit; pick it beside Run in the editor");
+        return;
+    }
+    DrawTruthTable(*truth_table, m_Schematic);
 }
 
 // The signals of logic parts are drawn as lanes in a plot under the analog traces, which share its time axis. The
@@ -2233,6 +2328,7 @@ bool OutputWindow::CanExport(const FrameResults &frame) const {
     case PlotTab::Noise:
         return m_Schematic.GetNoise().has_value();
     case PlotTab::TransferFunction:
+    case PlotTab::TruthTable:
         return false;
     }
     return false;
@@ -2256,6 +2352,7 @@ ExportFigure OutputWindow::BuildShownFigure(const FrameResults &frame) const {
         return BuildNoiseFigure(*m_Schematic.GetNoise(), m_Schematic, m_ShownNoiseContributions, m_NoiseView);
     case PlotTab::OperatingPoint:
     case PlotTab::TransferFunction:
+    case PlotTab::TruthTable:
         break;
     }
     return {};

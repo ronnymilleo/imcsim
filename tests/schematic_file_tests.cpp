@@ -435,6 +435,7 @@ TEST_CASE("Simulation settings load back unchanged", "[schematic_file]") {
     settings.NoiseOutput = GUI::GridPoint{12, -4};
     settings.TransferFunctionSource = "V2";
     settings.TransferFunctionOutput = GUI::GridPoint{6, 3};
+    settings.TruthTableInputs = {"V1", "V3"};
     settings.ParameterStep = {
         .Enabled = true, .Part = "R2", .UsesList = true, .Start = 1e3, .Stop = 4e3, .Step = 1e3, .List = "1k, 2.2k"};
 
@@ -468,6 +469,23 @@ TEST_CASE("Invalid transfer function settings fall back to their defaults with a
     CHECK(loaded.Warnings.size() == 1);
     CHECK(loaded.Settings.TransferFunctionSource.empty());
     CHECK_FALSE(loaded.Settings.TransferFunctionOutput);
+}
+
+TEST_CASE("Invalid truth table settings fall back to their defaults with a warning", "[schematic_file]") {
+    const std::string text = R"({"format": "imcsim-schematic", "version": 1, "simulation": {)"
+                             R"("truth_table": {"inputs": ["V1", 3]}}})";
+    const GUI::LoadedSchematic loaded = LoadOrFail(text);
+    CHECK(loaded.Warnings.size() == 1);
+    CHECK(loaded.Settings.TruthTableInputs.empty());
+}
+
+TEST_CASE("A file saved before the truth table analysis loads it with every logic input", "[schematic_file]") {
+    const std::string text = R"({"format": "imcsim-schematic", "version": 1, "simulation": {)"
+                             R"("analysis": "noise", "noise": {"source": "V1"}}})";
+    const GUI::LoadedSchematic loaded = LoadOrFail(text);
+    CHECK(loaded.Warnings.empty());
+    // No stored inputs means every logic input of the circuit
+    CHECK(loaded.Settings.TruthTableInputs.empty());
 }
 
 TEST_CASE("Files saved before settings were stored load with the default settings", "[schematic_file]") {

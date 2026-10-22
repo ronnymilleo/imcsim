@@ -21,8 +21,8 @@ namespace GUI {
 
 namespace {
 
-constexpr auto AnalysisNames =
-    std::to_array<const char *>({"Operating point", "Transient", "AC sweep", "DC sweep", "Noise", "Transfer function"});
+constexpr auto AnalysisNames = std::to_array<const char *>(
+    {"Operating point", "Transient", "AC sweep", "DC sweep", "Noise", "Transfer function", "Truth table"});
 
 bool IsPositive(const double value) {
     return value > 0.0;
@@ -164,6 +164,30 @@ std::optional<int> ResolveOutputNode(const std::optional<GridPoint> &point, cons
         }
     }
     return circuit.GetNodeCount() > 1 ? std::optional<int>(circuit.GetNodeCount() - 1) : std::nullopt;
+}
+
+// The logic inputs a truth table varies: the stored ones that are still in the circuit, in circuit order, or else every
+// logic input
+std::vector<std::string> ResolveTruthTableInputs(const std::vector<std::string> &stored,
+                                                 const std::vector<std::string> &available) {
+    std::vector<std::string> chosen;
+    for (const std::string &name : available) {
+        if (std::ranges::contains(stored, name)) {
+            chosen.push_back(name);
+        }
+    }
+    return chosen.empty() ? available : chosen;
+}
+
+// The nodes the truth table reads: the voltages the schematic measures, in node order
+std::vector<int> ListMeasuredNodes(const Core::Circuit &circuit, const Schematic &schematic) {
+    std::vector<int> nodes;
+    for (int node = 1; node < circuit.GetNodeCount(); ++node) {
+        if (schematic.IsVoltageMeasured(node)) {
+            nodes.push_back(node);
+        }
+    }
+    return nodes;
 }
 
 // The input an analysis runs with, or an empty name when no source can be one
@@ -315,6 +339,9 @@ void AnalysisControls::DrawSettings() {
     case Analysis::TransferFunction:
         DrawTransferFunctionSettings(settings);
         break;
+    case Analysis::TruthTable:
+        DrawTruthTableSettings(settings);
+        break;
     }
     if (settings.Selected == Analysis::Transient || settings.Selected == Analysis::ACSweep ||
         settings.Selected == Analysis::DCSweep) {
@@ -367,6 +394,9 @@ void AnalysisControls::RunSelected() {
         break;
     case Analysis::TransferFunction:
         RunTransferFunctionAnalysis(circuit);
+        break;
+    case Analysis::TruthTable:
+        RunTruthTableAnalysis(circuit);
         break;
     }
 }
@@ -560,6 +590,26 @@ void AnalysisControls::RunTransferFunctionAnalysis(const Core::Circuit &circuit)
         std::move(run.Messages));
 }
 
+void AnalysisControls::RunTruthTableAnalysis(const Core::Circuit &circuit) {
+    const std::vector<std::string> available = Core::GetTruthTableInputs(circuit);
+    const std::vector<int> outputs = ListMeasuredNodes(circuit, m_Schematic);
+    if (available.empty() || outputs.empty()) {
+        m_Schematic.SetTruthTable(std::nullopt);
+        Finish(Analysis::TruthTable,
+               available.empty() ? "A truth table needs a logic input to vary; add a Logic input"
+                                 : "Measure a voltage with the Probe tool: the truth table reads the measured nodes",
+               {});
+        return;
+    }
+    const Core::TruthTableSettings run_settings{
+        .Inputs = ResolveTruthTableInputs(m_Schematic.GetSimulationSettings().TruthTableInputs, available),
+        .OutputNodes = outputs};
+    Core::TruthTableRun run = Core::RunTruthTable(circuit, run_settings);
+    Finish(Analysis::TruthTable,
+           StoreResult(std::move(run.Result), [this](auto result) { m_Schematic.SetTruthTable(std::move(result)); }),
+           std::move(run.Messages));
+}
+
 void AnalysisControls::LoadSettingsFields() {
     const SimulationSettings &settings = m_Schematic.GetSimulationSettings();
     m_StopTime.Load(settings.Transient.StopTime);
@@ -722,6 +772,55 @@ void AnalysisControls::DrawTransferFunctionSettings(SimulationSettings &settings
     ImGui::SetItemTooltip("The DC gain, the input impedance and the output impedance from this source to the output");
 }
 
+// One checkbox per logic input, and the nodes the table reads, which are the voltages already measured. Nothing stored
+// means every input, and a change stores the whole list
+void AnalysisControls::DrawTruthTableSettings(SimulationSettings &settings) {
+    const Core::Circuit circuit = m_Schematic.BuildCircuit();
+    const std::vector<std::string> available = Core::GetTruthTableInputs(circuit);
+    if (available.empty()) {
+        ImGui::TextDisabled("Add a Logic input to vary");
+        return;
+    }
+    std::vector<std::string> chosen = ResolveTruthTableInputs(settings.TruthTableInputs, available);
+    ImGui::TextUnformatted("Inputs to vary");
+    for (const std::string &name : available) {
+        bool is_chosen = std::ranges::contains(chosen, name);
+        if (!ImGui::Checkbox(name.c_str(), &is_chosen)) {
+            continue;
+        }
+        // At least one input stays, since a table of none has no rows to show
+        if (!is_chosen && chosen.size() == 1) {
+            continue;
+        }
+        std::vector<std::string> changed;
+        for (const std::string &candidate : available) {
+            if (candidate == name ? is_chosen : std::ranges::contains(chosen, candidate)) {
+                changed.push_back(candidate);
+            }
+        }
+        settings.TruthTableInputs = std::move(changed);
+    }
+    chosen = ResolveTruthTableInputs(settings.TruthTableInputs, available);
+    if (chosen.size() > Core::MaxTruthTableInputs) {
+        ImGui::TextColored(GetErrorTextColor(), "At most %zu inputs; clear some", Core::MaxTruthTableInputs);
+    } else {
+        ImGui::TextDisabled("%zu combinations", std::size_t{1} << chosen.size());
+    }
+    const std::vector<int> outputs = ListMeasuredNodes(circuit, m_Schematic);
+    if (outputs.empty()) {
+        ImGui::TextDisabled("Measure a voltage with the Probe tool to read it");
+        return;
+    }
+    std::string labels;
+    for (const int node : outputs) {
+        labels += labels.empty() ? "" : ", ";
+        labels += GetVoltageLabel(m_Schematic.GetConnectivity(), node);
+    }
+    ImGui::TextDisabled("Reads %s", labels.c_str());
+    ImGui::SetItemTooltip("The nodes you measure with the Probe tool; every combination of the inputs is simulated and "
+                          "each of these is read as 0, 1 or X");
+}
+
 // Below the settings of the transient, the AC sweep and the DC sweep: the part or the temperature, and its values
 // as a range or a typed list. The range fields share their labels with those of the analysis above, so they get an
 // ID of their own
@@ -835,6 +934,9 @@ void AnalysisControls::ClearResult(const Analysis analysis) {
     case Analysis::TransferFunction:
         m_Schematic.SetTransferFunction(std::nullopt);
         break;
+    case Analysis::TruthTable:
+        m_Schematic.SetTruthTable(std::nullopt);
+        break;
     }
 }
 
@@ -844,13 +946,17 @@ void AnalysisControls::Finish(const Analysis analysis, std::optional<std::string
     m_LastRun = analysis;
 }
 
-// Rating warnings, such as a transistor past its maximum voltage; only the operating point and the transient check
+// Rating warnings, such as a transistor past its maximum voltage, which the operating point and the transient check,
+// and the combinations of a truth table that have no operating point
 std::vector<std::string> AnalysisControls::GetResultWarnings(const Analysis analysis) const {
     if (analysis == Analysis::OperatingPoint && m_Schematic.GetOperatingPoint()) {
         return m_Schematic.GetOperatingPoint()->Warnings;
     }
     if (analysis == Analysis::Transient && m_Schematic.GetTransient()) {
         return m_Schematic.GetTransient()->Warnings;
+    }
+    if (analysis == Analysis::TruthTable && m_Schematic.GetTruthTable()) {
+        return m_Schematic.GetTruthTable()->Warnings;
     }
     return {};
 }
@@ -869,6 +975,8 @@ bool AnalysisControls::HasResult(const Analysis analysis) const {
         return m_Schematic.GetNoise().has_value();
     case Analysis::TransferFunction:
         return m_Schematic.GetTransferFunction().has_value();
+    case Analysis::TruthTable:
+        return m_Schematic.GetTruthTable().has_value();
     }
     return false;
 }

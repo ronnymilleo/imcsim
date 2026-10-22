@@ -93,7 +93,7 @@ private:
     std::array<ValueField, 3> m_ParameterFields;
 
     // Last run of each analysis, in the order of the Analysis enum
-    std::array<RunStatus, 6> m_Statuses;
+    std::array<RunStatus, 7> m_Statuses;
     std::optional<Analysis> m_LastRun;
 
     // Runs of one analysis
@@ -102,6 +102,7 @@ private:
     void RunDCSweepAnalysis(const Core::Circuit &circuit, const std::optional<StepPlan> &steps);
     void RunNoiseAnalysis(const Core::Circuit &circuit);
     void RunTransferFunctionAnalysis(const Core::Circuit &circuit);
+    void RunTruthTableAnalysis(const Core::Circuit &circuit);
 
     // Settings fields
     void LoadSettingsFields();
@@ -110,6 +111,7 @@ private:
     void DrawDCSweepSettings(SimulationSettings &settings);
     void DrawNoiseSettings(SimulationSettings &settings);
     void DrawTransferFunctionSettings(SimulationSettings &settings);
+    void DrawTruthTableSettings(SimulationSettings &settings);
     void DrawParameterStepSettings(SimulationSettings &settings);
     void DrawParameterPicker(ParameterStepSettings &step, const Core::Circuit &circuit);
     void DrawStepValues(ParameterStepSettings &step, const std::string &unit);

@@ -415,6 +415,8 @@ void Application::ShowNewResults() {
     show_if_new(m_ShownNoiseVersion, m_Schematic.GetNoiseVersion(), m_Schematic.GetNoise().has_value(), PlotTab::Noise);
     show_if_new(m_ShownTransferFunctionVersion, m_Schematic.GetTransferFunctionVersion(),
                 m_Schematic.GetTransferFunction().has_value(), PlotTab::TransferFunction);
+    show_if_new(m_ShownTruthTableVersion, m_Schematic.GetTruthTableVersion(), m_Schematic.GetTruthTable().has_value(),
+                PlotTab::TruthTable);
 }
 
 // The editor, Output, Analysis Settings and Netlist share the main node as tabs, and Properties sits on the right.

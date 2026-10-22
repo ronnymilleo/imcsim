@@ -198,7 +198,7 @@ bool ToolButton(const char *id, const bool active) {
 float AnalysisButtonWidth() {
     float widest = 0.0f;
     for (const Analysis analysis : {Analysis::OperatingPoint, Analysis::Transient, Analysis::ACSweep, Analysis::DCSweep,
-                                    Analysis::Noise, Analysis::TransferFunction}) {
+                                    Analysis::Noise, Analysis::TransferFunction, Analysis::TruthTable}) {
         widest = std::max(widest, ImGui::CalcTextSize(GetAnalysisName(analysis)).x);
     }
     return widest + ImGui::GetStyle().FramePadding.x * 2.0f + ImGui::GetFontSize();
