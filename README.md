@@ -32,8 +32,10 @@ New to imcsim? The [tutorial](docs/tutorial.md) builds, simulates and exports a 
   pick what to measure with the Probe tool, read every trace under the cursor, currents dashed apart from voltages;
   measured voltages and currents are marked on the schematic in the colors of their traces, currents with an arrow
   in the direction they flow when positive
-- Oscilloscope-style measurements beside the transient and Bode plots: two draggable cursors, peak-to-peak, mean,
-  RMS and frequency of every trace, and peak, -3 dB band, unity gain frequency and phase margin of a response
+- Oscilloscope-style measurements beside the transient, Bode and DC sweep plots: two draggable cursors and a panel
+  that reads every trace at both, with its extremes and mean over the span and the slope between the cursors on a
+  DC sweep, peak-to-peak, RMS and frequency on a transient, and peak, -3 dB band, unity gain frequency and phase
+  margin on a response
 - A spectrum of the transient traces, as on a spectrum analyzer, with the fundamental, the harmonics and the THD of
   each, over a Hann or rectangular window
 - Noise at one node across frequency, at the output and referred to the input, with the share of each part

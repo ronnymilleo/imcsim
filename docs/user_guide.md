@@ -294,7 +294,16 @@ their statistics and the exports always agree.
 - The AC sweep is a Bode plot: magnitude in dB and phase in degrees, relative to the AC magnitude of the sources.
   That magnitude is set in Properties apart from the amplitude of the sine, as in SPICE, and is 1 by default, so
   the plot reads as gain while a transient uses the small amplitude a real circuit would see.
-- A stepped DC sweep draws one curve per step, labeled with the step value where the curves part most.
+- A stepped DC sweep draws one curve per step, labeled with the step value where the curves part most, and lists
+  every curve in the statistics, named by its step value.
+- The transient, AC sweep and DC sweep have **Cursors A and B** in the panel on their right. Turning them on places
+  two draggable vertical lines; the panel then measures every shown trace between them, or over the visible range
+  when they are off. The transient reads peak-to-peak, mean, RMS and frequency, and the value at each cursor with
+  the change and the time between them; the AC sweep reads the gain and phase at each cursor and its response over
+  the whole sweep; the DC sweep reads the value at each cursor, the change and the slope between them, and the
+  minimum, maximum and mean over the span. The slope is in the unit of the trace over that of the sweep: a voltage
+  over a swept voltage is a gain (V/V), and a current over a swept voltage a conductance (A/V), whose resistance
+  (the inverse) is shown beside it, as `open` rather than an infinite value when the slope is zero.
 
 ## Stepping a parameter
 
