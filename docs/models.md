@@ -107,8 +107,8 @@ ones, move together.
 
 ## Logic gates and flip-flops
 
-The gates are AND, OR, NOT, NAND, NOR, XOR, XNOR and a buffer, with two inputs each (one for NOT and the buffer), and
-the flip-flops are D, JK, T and SR, each with a clock, asynchronous SET and RESET inputs (active high), a Q output
+The gates are AND, OR, NOT, NAND, NOR, XOR, XNOR and a buffer, with two inputs each by default (one for NOT and the
+buffer; the others take from 2 to 8, set in the part's properties), and the flip-flops are D, JK, T and SR, each with a clock, asynchronous SET and RESET inputs (active high), a Q output
 and its inverse QN. They run as the digital code models of ngspice's XSPICE (`d_and`, `d_dff` and the like), which only
 meet digital nodes, so each part is written with bridges around it:
 
@@ -118,6 +118,10 @@ meet digital nodes, so each part is written with bridges around it:
   or to half of it while the output is unknown, behind a 50 Ohm resistor that is the output resistance of the family;
 - each input also has a 1 GOhm resistor to ground, so an unconnected input, such as the SET and RESET of a flip-flop
   that uses neither, reads 0.
+
+A gate of several inputs is the same code model with a longer input vector: AND is high when every input is, OR when
+any is, NAND and NOR are their inverses, XOR is high for an odd number of high inputs (the parity) and XNOR for an even
+number. Each input has its own bridge and pull-down, named after its letter (`A`, `B`, `C`...).
 
 The figures of a part are its logic level (5 V) and its propagation delay (10 ns), from every input to every output.
 A flip-flop changes on the rising edge of its clock and starts with Q at 0. The currents reported are those of the
