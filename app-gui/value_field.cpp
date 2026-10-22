@@ -16,7 +16,7 @@ namespace GUI {
 namespace {
 
 // In font sizes, so the layout follows the DPI scale
-constexpr float LabelWidth = 6.0f;
+constexpr float LabelWidth = 8.0f;
 constexpr float InputWidth = 8.0f;
 
 // +1 for one standard value up and -1 for one down, from the arrow keys while the input is active and from the mouse
