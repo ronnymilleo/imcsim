@@ -12,9 +12,10 @@ namespace GUI {
 
 /**
  * @class   UIClock
- * @brief   A box holding a square wave, between the two leads of the clock.
- * @details The terminals are at (-2, 0) and (2, 0), like a voltage source. The frequency and the duty cycle are
- *          written under the part, so the symbol stays the same at every setting.
+ * @brief   A box holding a square wave above its terminal, like a supply rail.
+ * @details The single terminal is the element position (local origin); the clock is a source from that terminal to
+ *          ground. The frequency and the duty cycle are written beside the box, so the symbol stays the same at every
+ *          setting.
  */
 class UIClock : public UIElement {
 public:
@@ -22,8 +23,13 @@ public:
     ~UIClock() override = default;
 
 protected:
+    void DrawTerminals(SchematicCanvas &canvas, const ViewTransform &view, ImU32 color) const override;
     void DrawSymbol(SchematicCanvas &canvas, const ViewTransform &view, ImU32 color, SymbolStyle style) const override;
     void DrawLabels(SchematicCanvas &canvas, const ViewTransform &view, ImU32 color) const override;
+
+    std::vector<GridPoint> GetLocalTerminals() const override;
+    GridPoint GetLocalTerminalInward(std::size_t terminal) const override;
+    LocalBounds GetLocalBounds() const override;
 };
 
 } // namespace GUI

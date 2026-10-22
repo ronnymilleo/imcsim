@@ -130,13 +130,12 @@ std::vector<int> ListHeldNodes(const Core::Circuit &circuit) {
     std::vector<int> nodes;
     for (const Core::CircuitEntry &entry : circuit.GetEntries()) {
         const Core::ComponentType type = entry.Part->GetType();
-        if (type == Core::ComponentType::VCC || type == Core::ComponentType::LogicInput) {
+        if (type == Core::ComponentType::VCC || type == Core::ComponentType::LogicInput ||
+            type == Core::ComponentType::Clock) {
             nodes.push_back(entry.Nodes[0]);
-        } else if ((type == Core::ComponentType::VoltageSource || type == Core::ComponentType::Clock) &&
-                   entry.Nodes[1] == 0) {
+        } else if (type == Core::ComponentType::VoltageSource && entry.Nodes[1] == 0) {
             nodes.push_back(entry.Nodes[0]);
-        } else if ((type == Core::ComponentType::VoltageSource || type == Core::ComponentType::Clock) &&
-                   entry.Nodes[0] == 0) {
+        } else if (type == Core::ComponentType::VoltageSource && entry.Nodes[0] == 0) {
             nodes.push_back(entry.Nodes[1]);
         }
     }
