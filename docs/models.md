@@ -138,6 +138,32 @@ reports a negative current.
   metastability from violating them. Operating point and DC sweep results read the digital outputs as they settle, and an AC sweep treats
   them as constants.
 
+## Clock and logic input
+
+A **clock** drives a digital circuit and is written as a SPICE pulse source from its two terminals:
+
+```
+V1 out 0 DC 0 PULSE(0 <level> <delay> <edge> <edge> <width> <period>)
+```
+
+- Its figures are a frequency, a duty cycle, a logic level (5 V) and a start delay. The period is 1 over the
+  frequency and the clock swings between 0 V and the logic level.
+- The part picks its own rise and fall times, each a fixed 0.1% of the period, so the user
+  never sets them and the shape is the same at every frequency. The flat top is the duty share of the period less one
+  edge, since half of the rising and half of the falling edge lie above half the level; a duty share smaller than one
+  edge is clamped, so the clock then only shows the edge itself. The duty cycle is therefore exactly the share of each
+  period the clock reads as high at half the logic level.
+- The start delay holds the clock at 0 V, which is also its operating point value, and the first rising edge begins
+  there: a delay of 0 puts the first edge at t = 0, while a nonzero one keeps the clock quiet until then. The delay is
+  an absolute time, so it does not change with the frequency.
+- It is an ideal voltage source: it has no output resistance and delivers any current the circuit asks for. It is not
+  an AC source, so an AC sweep is not excited by it and a noise analysis cannot refer to it.
+
+A **logic input** is a constant voltage source from its terminal to ground, written `V1 out 0 DC 5` when high and
+`V1 out 0 DC 0` when low. High drives the logic level (5 V by default, editable) and Low drives 0 V; both start low,
+so an unconnected net reads 0. It is the natural way to give a gate or a latch a defined level to start from, such as
+the SET or RESET input of a flip-flop, and it holds that level for the whole run.
+
 ## Independent sources
 
 **Voltage source** (`V`, named Vin) and **current source** (`I`) take one of seven waveforms:
