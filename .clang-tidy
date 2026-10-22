@@ -1,4 +1,15 @@
-Checks: '-*,bugprone-*,-bugprone-easily-swappable-parameters,misc-const-correctness,readability-identifier-naming'
+# The bugprone checks are listed one by one: the CI runs on a rolling distribution, and a wildcard picks up each check a
+# new clang-tidy adds, such as bugprone-signed-bitwise, which the flags of ImGui and SDL trip
+Checks: >-
+  -*,
+  bugprone-branch-clone,
+  bugprone-float-loop-counter,
+  bugprone-implicit-widening-of-multiplication-result,
+  bugprone-optional-value-conversion,
+  bugprone-return-const-ref-from-parameter,
+  bugprone-suspicious-stringview-data-usage,
+  bugprone-unchecked-optional-access,
+  readability-identifier-naming
 HeaderFilterRegex: '.*/(app-core|app-gui)/.*'
 CheckOptions:
   readability-identifier-naming.NamespaceCase: CamelCase

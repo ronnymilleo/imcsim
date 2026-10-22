@@ -832,7 +832,7 @@ std::expected<std::unique_ptr<UIElement>, std::string> ReadElement(const nlohman
 }
 
 // Keeps valid, unique names and renames the rest, so the netlist never gets two components with one name
-void FixNames(std::vector<std::unique_ptr<UIElement>> &elements, std::vector<std::string> &warnings) {
+void FixNames(const std::vector<std::unique_ptr<UIElement>> &elements, std::vector<std::string> &warnings) {
     std::vector<std::string> used_names;
     std::vector<Core::Component *> to_rename;
     for (const auto &element : elements) {
