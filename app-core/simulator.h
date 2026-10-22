@@ -227,6 +227,36 @@ struct Noise {
 };
 
 /**
+ * @struct  TransferFunctionSettings
+ * @brief   Where a transfer function analysis measures its output, and which source drives the circuit.
+ * @details The input must be an independent source, a voltage source, current source or supply rail; ngspice uses
+ *          it only to find the gain from it to the output, whatever its value or waveform.
+ */
+struct TransferFunctionSettings {
+    int OutputNode = 0;
+    std::string InputSource;
+
+    bool operator==(const TransferFunctionSettings &) const = default;
+};
+
+/**
+ * @struct  TransferFunction
+ * @brief   Small-signal DC gain from an input source to an output, with the input and output impedances.
+ * @details The gain is dimensionless (V/V) for a voltage source input and a transimpedance (V/A) for a current
+ *          source. Both impedances are in ohms: the input is the resistance seen by the source and the output the
+ *          resistance seen looking back into the output. An open path is reported around 1e20 ohm, as ngspice does.
+ */
+struct TransferFunction {
+    int OutputNode = 0;
+    std::string InputSource;
+    // Unit of the input source, "V" or "A", which sets the unit of the gain
+    std::string InputUnit;
+    double Gain = 0.0;
+    double InputImpedance = 0.0;
+    double OutputImpedance = 0.0;
+};
+
+/**
  * @struct  SimulationRun
  * @brief   Outcome of a simulation, with everything ngspice printed.
  */
@@ -240,6 +270,7 @@ using TransientRun = SimulationRun<Transient>;
 using ACSweepRun = SimulationRun<ACSweep>;
 using DCSweepRun = SimulationRun<DCSweep>;
 using NoiseRun = SimulationRun<Noise>;
+using TransferFunctionRun = SimulationRun<TransferFunction>;
 
 OperatingPointRun RunOperatingPoint(const Circuit &circuit);
 TransientRun RunTransient(const Circuit &circuit, const TransientSettings &settings,
@@ -249,6 +280,7 @@ ACSweepRun RunACSweep(const Circuit &circuit, const ACSweepSettings &settings,
 DCSweepRun RunDCSweep(const Circuit &circuit, const DCSweepSettings &settings,
                       const std::optional<ParameterValue> &parameter = std::nullopt);
 NoiseRun RunNoise(const Circuit &circuit, const NoiseSettings &settings);
+TransferFunctionRun RunTransferFunction(const Circuit &circuit, const TransferFunctionSettings &settings);
 
 void SetCodeModelDirectory(const std::filesystem::path &directory);
 bool AreDigitalModelsAvailable();
@@ -256,6 +288,7 @@ bool AreDigitalModelsAvailable();
 // Names in the results
 std::vector<std::string> GetSweepableSources(const Circuit &circuit);
 std::vector<std::string> GetNoiseInputSources(const Circuit &circuit);
+std::vector<std::string> GetTransferFunctionInputSources(const Circuit &circuit);
 std::vector<std::string> GetSteppableParts(const Circuit &circuit);
 std::vector<std::string> GetCurrentNames(const Component &component);
 std::vector<std::size_t> GetCurrentTerminals(const Component &component);

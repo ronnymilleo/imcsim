@@ -8,12 +8,14 @@ add_library(imcsim-core-lib
             circuit.cpp
             components/bjt.cpp
             components/capacitor.cpp
+            components/clock.cpp
             components/component.cpp
             components/controlled_source.cpp
             components/current_source.cpp
             components/diode.cpp
             components/ground.cpp
             components/inductor.cpp
+            components/logic_input.cpp
             components/logic_part.cpp
             components/mosfet.cpp
             components/net_label.cpp

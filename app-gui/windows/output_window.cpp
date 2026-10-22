@@ -80,6 +80,9 @@ constexpr std::size_t SteadySamples = 2;
 constexpr double DecadeFitFloor = 1e-6;
 // The first bins above 0 Hz, where the Hann window spreads the mean
 constexpr std::ptrdiff_t SpectrumSkirtBins = 2;
+// ngspice reports an open path with a resistance around 1e20 ohm, which no readable suffix shows; it is drawn as an
+// open circuit instead
+constexpr double OpenResistance = 1e15;
 
 /**
  * @struct  PlottedTrace
@@ -429,7 +432,7 @@ template <typename Result> std::vector<std::string> ListStepLabels(const StepFam
 // Labels every curve of each shown trace with the value of the stepped source, so the curves of a family tell
 // apart. The labels of a trace go where its curves are furthest apart, which is the end for most traces but the
 // peak for a derivative, whose curves all end near zero. Each label sits on the axis of its curve
-void LabelCurves(const Core::DCSweep &sweep, const Schematic &schematic, const bool show_currents,
+void LabelCurves(const Core::DCSweep &sweep, Schematic &schematic, const bool show_currents,
                  const std::vector<std::vector<MathTrace>> &math) {
     const ImVec4 color = ImGui::GetStyleColorVec4(ImGuiCol_PopupBg);
     for (const CurveFamily &family : ListCurveFamilies(sweep, schematic, show_currents, math)) {
@@ -731,6 +734,8 @@ const char *GetTabFileSuffix(const PlotTab tab) {
         return "dc-sweep";
     case PlotTab::Noise:
         return "noise";
+    case PlotTab::TransferFunction:
+        return "transfer-function";
     }
     return "plot";
 }
@@ -749,6 +754,8 @@ const char *GetTabTitle(const PlotTab tab) {
         return "DC sweep";
     case PlotTab::Noise:
         return "noise";
+    case PlotTab::TransferFunction:
+        return "transfer function";
     }
     return "";
 }
@@ -805,6 +812,46 @@ void DrawOperatingPoint(const Core::OperatingPoint &operating_point, Schematic &
     ImGui::PushTextWrapPos(0.0f);
     ImGui::TextDisabled("Currents as in SPICE: positive through a two-terminal part from its first terminal to its "
                         "second, and into each terminal of a transistor");
+    ImGui::PopTextWrapPos();
+}
+
+// The transfer function is a table of three small-signal DC values; an impedance that ngspice reports as practically
+// infinite, such as an input path held open, reads as an open circuit instead of a giant number
+void DrawTransferFunction(const Core::TransferFunction &transfer, Schematic &schematic) {
+    constexpr ImGuiTableFlags TableFlags =
+        ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingStretchProp;
+    if (ImGui::BeginTable("transfer_function", 3, TableFlags)) {
+        ImGui::TableSetupColumn("Quantity");
+        ImGui::TableSetupColumn("Value");
+        ImGui::TableSetupColumn("Unit");
+        ImGui::TableHeadersRow();
+        ImGui::TableNextRow();
+        ImGui::TableNextColumn();
+        ImGui::TextDisabled("Gain");
+        ImGui::TableNextColumn();
+        ImGui::TextUnformatted(Core::FormatValue(transfer.Gain).c_str());
+        ImGui::TableNextColumn();
+        // The gain is a ratio of like units for a voltage source and a transimpedance for a current source
+        ImGui::TextUnformatted(std::format("V/{}", transfer.InputUnit).c_str());
+        const auto draw_impedance = [](const char *name, const double ohms) {
+            ImGui::TableNextRow();
+            ImGui::TableNextColumn();
+            ImGui::TextDisabled("%s", name);
+            ImGui::TableNextColumn();
+            const bool open = !std::isfinite(ohms) || std::abs(ohms) >= OpenResistance;
+            ImGui::TextUnformatted(open ? "open" : Core::FormatValue(ohms).c_str());
+            ImGui::TableNextColumn();
+            if (!open) {
+                ImGui::TextUnformatted("Ohm");
+            }
+        };
+        draw_impedance("Input impedance", transfer.InputImpedance);
+        draw_impedance("Output impedance", transfer.OutputImpedance);
+        ImGui::EndTable();
+    }
+    ImGui::PushTextWrapPos(0.0f);
+    ImGui::TextDisabled("Small-signal DC gain from %s to %s", transfer.InputSource.c_str(),
+                        GetVoltageLabel(schematic.GetConnectivity(), transfer.OutputNode).c_str());
     ImGui::PopTextWrapPos();
 }
 
@@ -1204,6 +1251,10 @@ void OutputWindow::DrawTabs(const FrameResults &frame) {
         DrawNoiseTab();
         ImGui::EndTabItem();
     }
+    if (begin_tab("Transfer function", PlotTab::TransferFunction)) {
+        DrawTransferFunctionTab();
+        ImGui::EndTabItem();
+    }
 }
 
 void OutputWindow::DrawTransientTab(const FrameResults &frame) {
@@ -1277,11 +1328,15 @@ void OutputWindow::DrawDCSweepTab(const FrameResults &frame) {
         ImGui::TextDisabled("No DC sweep for the current circuit; pick it beside Run in the editor");
         return;
     }
-    if (!frame.AnythingMeasured && (frame.DCSweepMath.empty() || frame.DCSweepMath.front().empty())) {
-        ImGui::TextDisabled("%s", NothingMeasured);
-    }
-    DrawMathErrors(frame.DCSweepErrors);
-    DrawDCSweep(*dc_sweep, frame.DCSweepMath);
+    DrawWithStatistics(
+        [&] {
+            if (!frame.AnythingMeasured && (frame.DCSweepMath.empty() || frame.DCSweepMath.front().empty())) {
+                ImGui::TextDisabled("%s", NothingMeasured);
+            }
+            DrawMathErrors(frame.DCSweepErrors);
+            DrawDCSweep(*dc_sweep, frame.DCSweepMath);
+        },
+        [&] { DrawDCSweepStatistics(*dc_sweep, frame.DCSweepMath); });
 }
 
 // An output held by an ideal source, or cut off from every noisy part, has nothing to plot, so the tab says why
@@ -1306,6 +1361,16 @@ void OutputWindow::DrawNoiseTab() {
             ImGui::PopTextWrapPos();
         },
         [&] { DrawNoiseStatistics(*noise); });
+}
+
+// The transfer function is a table, not a plot, so the tab draws it alone
+void OutputWindow::DrawTransferFunctionTab() {
+    const auto &transfer = m_Schematic.GetTransferFunction();
+    if (!transfer) {
+        ImGui::TextDisabled("No transfer function for the current circuit; pick it beside Run in the editor");
+        return;
+    }
+    DrawTransferFunction(*transfer, m_Schematic);
 }
 
 // The signals of logic parts are drawn as lanes in a plot under the analog traces, which share its time axis. The
@@ -1607,6 +1672,7 @@ void OutputWindow::DrawDCSweep(const Core::DCSweep &sweep, const std::vector<std
     if (stepped) {
         LabelCurves(sweep, m_Schematic, show_currents, math);
     }
+    DrawCursors(m_DCSweepCursors, false);
     DrawCursorReadout(sweep.SweptValues, sweep.SweptUnit.c_str(), false, plotted);
     const ImPlotRange view = ImPlot::GetPlotLimits().X;
     m_DCSweepView = {.From = view.Min, .To = view.Max};
@@ -2010,6 +2076,69 @@ void OutputWindow::DrawACSweepStatistics(const Core::ACSweep &sweep) {
     }
 }
 
+// Like the measurements of a curve tracer: for every shown trace, its value at each cursor with the change and slope
+// between them, and its extremes and mean over the span. A stepped sweep lists every curve, named by its step value
+void OutputWindow::DrawDCSweepStatistics(const Core::DCSweep &sweep, const std::vector<std::vector<MathTrace>> &math) {
+    DrawCursorToggle(m_DCSweepCursors);
+    const PlotCursors &cursors = m_DCSweepCursors;
+    if (cursors.Shown && BeginStatisticsTable("cursors")) {
+        DrawStatistic("A", FormatQuantity(cursors.A, sweep.SweptUnit.c_str()));
+        DrawStatistic("B", FormatQuantity(cursors.B, sweep.SweptUnit.c_str()));
+        DrawStatistic("B-A", FormatQuantity(cursors.B - cursors.A, sweep.SweptUnit.c_str()));
+        ImGui::EndTable();
+    }
+    const bool show_currents = HasMeasuredCurrent(sweep.Curves.front().Currents, m_Schematic);
+    const std::vector<CurveFamily> families = ListCurveFamilies(sweep, m_Schematic, show_currents, math);
+    if (families.empty()) {
+        ImGui::TextDisabled("Measure a trace to see its statistics");
+        return;
+    }
+    ImGui::TextDisabled("%s", cursors.Shown ? "Between the cursors" : "Over the visible sweep");
+    const PlotSpan span = MeasuredSpan(cursors, m_DCSweepView);
+    const bool stepped = !sweep.SteppedSource.empty();
+    for (const CurveFamily &family : families) {
+        ImGui::Separator();
+        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(family.Color), "%s", family.Label.c_str());
+        for (std::size_t curve = 0; curve < family.Curves.size(); ++curve) {
+            if (stepped) {
+                ImGui::TextDisabled("%s", FormatStepLabel(sweep, sweep.Curves[curve]).c_str());
+            }
+            const std::vector<double> &values = *family.Curves[curve];
+            if (!BeginStatisticsTable(std::format("{} {}", family.Label, curve))) {
+                continue;
+            }
+            // The size of the trace in the span tells residue from real values in every readout
+            const auto statistics = ComputeSweepStatistics(sweep.SweptValues, values, span.From, span.To);
+            const double scale =
+                statistics ? std::max(std::abs(statistics->Maximum), std::abs(statistics->Minimum)) : 0.0;
+            if (cursors.Shown) {
+                const double at_a = InterpolateAt(sweep.SweptValues, values, cursors.A, false);
+                const double at_b = InterpolateAt(sweep.SweptValues, values, cursors.B, false);
+                DrawMeasuredValue("At A", at_a, scale, family.Unit);
+                DrawMeasuredValue("At B", at_b, scale, family.Unit);
+                DrawMeasuredValue("B-A", at_b - at_a, scale, family.Unit);
+                if (const std::optional<double> slope = ComputeSlope(sweep.SweptValues, values, cursors.A, cursors.B)) {
+                    DrawStatistic("Slope",
+                                  std::format("{}{}/{}", Core::FormatValue(*slope), family.Unit, sweep.SweptUnit));
+                    // A conductance, as a current over a swept voltage, is also a resistance, the inverse; a zero
+                    // slope is an open path, shown as such rather than as an infinite value
+                    if (std::string_view(family.Unit) == "A" && sweep.SweptUnit == "V") {
+                        const std::optional<double> resistance = ResistanceFromConductance(*slope);
+                        const bool open = !resistance || std::abs(*resistance) >= OpenResistance;
+                        DrawStatistic("Resistance", open ? "open" : FormatQuantity(*resistance, "Ohm"));
+                    }
+                }
+            }
+            if (statistics) {
+                DrawMeasuredValue("Min", statistics->Minimum, scale, family.Unit);
+                DrawMeasuredValue("Max", statistics->Maximum, scale, family.Unit);
+                DrawMeasuredValue("Mean", statistics->Mean, scale, family.Unit);
+            }
+            ImGui::EndTable();
+        }
+    }
+}
+
 // The RMS noise over the whole range, at the output and at the input, then the share of every part in the output
 // noise, largest first; checking a part plots its share
 void OutputWindow::DrawNoiseStatistics(const Core::Noise &noise) {
@@ -2103,6 +2232,8 @@ bool OutputWindow::CanExport(const FrameResults &frame) const {
                (frame.AnythingMeasured || (!frame.DCSweepMath.empty() && !frame.DCSweepMath.front().empty()));
     case PlotTab::Noise:
         return m_Schematic.GetNoise().has_value();
+    case PlotTab::TransferFunction:
+        return false;
     }
     return false;
 }
@@ -2124,6 +2255,7 @@ ExportFigure OutputWindow::BuildShownFigure(const FrameResults &frame) const {
     case PlotTab::Noise:
         return BuildNoiseFigure(*m_Schematic.GetNoise(), m_Schematic, m_ShownNoiseContributions, m_NoiseView);
     case PlotTab::OperatingPoint:
+    case PlotTab::TransferFunction:
         break;
     }
     return {};

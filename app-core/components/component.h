@@ -56,6 +56,8 @@ enum class ComponentType {
     JKFlipFlop,
     TFlipFlop,
     SRFlipFlop,
+    Clock,
+    LogicInput,
 };
 
 /**
@@ -68,7 +70,8 @@ enum class ComponentType {
  *          resistance between its ends; a switch is SW1 and a push button PB1, with no value;
  *          a voltage-controlled switch is S1 and a relay K1, with no value either;
  *          a transformer is T1, its value the inductance of its primary;
- *          logic gates and flip-flops are U1, U2... like op-amps, with no value.
+ *          logic gates and flip-flops are U1, U2... like op-amps, with no value;
+ *          a clock and a logic input are voltage sources named V1, V2... to ground, with no value either.
  */
 class Component {
 public:
@@ -89,10 +92,19 @@ public:
     double GetValue() const;
     void SetValue(double value);
 
+    // Initial condition
+    bool SupportsInitialCondition() const;
+    bool HasInitialCondition() const;
+    std::optional<double> GetInitialCondition() const;
+    void SetInitialCondition(double value);
+    void ClearInitialCondition();
+
 protected:
     ComponentType m_Type{};
     std::string m_Name;
     double m_Value = 0.0;
+    // Voltage a capacitor starts charged to or current an inductor starts carrying; only these kinds carry one
+    std::optional<double> m_InitialCondition;
 };
 
 // Type names

@@ -24,18 +24,22 @@ New to imcsim? The [tutorial](docs/tutorial.md) builds, simulates and exports a 
   limited by its supply pins, or a uA741 or custom part built as a Boyle macromodel from datasheet values (slew rate,
   bias current, output swing, current limit)
 - Warnings when a diode goes into reverse breakdown or a transistor exceeds its voltage, current or power ratings
-- Operating point, transient, AC sweep, DC sweep and noise analyses, with node voltages and component currents
+- Operating point, transient, AC sweep, DC sweep, noise and transfer function analyses, with node voltages and
+  component currents
 - Stepping a resistor, capacitor, inductor or the temperature over a range or a list, as SPICE's `.step`: the
   transient, AC sweep and DC sweep plot every step as a family of curves
 - Plots of transients, Bode diagrams and DC sweeps (including curve families, such as transistor characteristics):
   pick what to measure with the Probe tool, read every trace under the cursor, currents dashed apart from voltages;
   measured voltages and currents are marked on the schematic in the colors of their traces, currents with an arrow
   in the direction they flow when positive
-- Oscilloscope-style measurements beside the transient and Bode plots: two draggable cursors, peak-to-peak, mean,
-  RMS and frequency of every trace, and peak, -3 dB band, unity gain frequency and phase margin of a response
+- Oscilloscope-style measurements beside the transient, Bode and DC sweep plots: two draggable cursors and a panel
+  that reads every trace at both, with its extremes and mean over the span and the slope between the cursors on a
+  DC sweep, peak-to-peak, RMS and frequency on a transient, and peak, -3 dB band, unity gain frequency and phase
+  margin on a response
 - A spectrum of the transient traces, as on a spectrum analyzer, with the fundamental, the harmonics and the THD of
   each, over a Hann or rectangular window
 - Noise at one node across frequency, at the output and referred to the input, with the share of each part
+- A transfer function from an input source to an output: the DC gain, the input impedance and the output impedance
 - Math channels on transient and DC sweep plots, as on an oscilloscope: an operation between two traces picked
   with buttons, or a typed expression such as `V(1,2)`, `V(3)*I(R1)` or `ddt(V(2))`, with units followed (W, Ohm,
   V/s) and a third axis for any unit other than volts and amperes
@@ -52,7 +56,9 @@ New to imcsim? The [tutorial](docs/tutorial.md) builds, simulates and exports a 
 - Potentiometers, with the wiper set in the properties, and switches and push buttons that are open or closed,
   voltage-controlled switches and relays whose coil current sets when the contact closes, and transformers of two
   coupled inductors with a turns ratio
-- Logic gates (AND, OR, NOT, NAND, NOR, XOR, XNOR, buffer) and D, JK, T and SR flip-flops, simulated with the digital
+- Logic gates (AND, OR, NOT, NAND, NOR, XOR, XNOR, buffer) and D, JK, T and SR flip-flops, driven by a Clock source
+  (frequency, duty cycle, logic level and start delay, written as a pulse so there are no rise or fall times to set)
+  and a Logic input that drives a net high or low, and simulated with the digital
   code models of ngspice behind analog bridges, so their outputs are voltages that plot and probe like any other
 - Standard values: an option to take resistors, capacitors and inductors from the E6 to E192 series, typed or stepped
   with the arrows, keys or mouse wheel

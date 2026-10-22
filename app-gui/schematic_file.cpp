@@ -6,8 +6,10 @@
 #include "schematic_file.h"
 
 #include "components/bjt.h"
+#include "components/clock.h"
 #include "components/controlled_source.h"
 #include "components/diode.h"
+#include "components/logic_input.h"
 #include "components/logic_part.h"
 #include "components/mosfet.h"
 #include "components/net_label.h"
@@ -77,6 +79,17 @@ constexpr auto LogicKeys = std::to_array<ParameterKey<Core::LogicParameters>>({
     {"propagation_delay", &Core::LogicParameters::PropagationDelay},
 });
 
+constexpr auto ClockKeys = std::to_array<ParameterKey<Core::ClockParameters>>({
+    {"frequency", &Core::ClockParameters::Frequency},
+    {"duty_cycle", &Core::ClockParameters::DutyCycle},
+    {"logic_level", &Core::ClockParameters::LogicLevel},
+    {"start_delay", &Core::ClockParameters::StartDelay},
+});
+
+constexpr auto LogicInputKeys = std::to_array<ParameterKey<Core::LogicInputParameters>>({
+    {"logic_level", &Core::LogicInputParameters::LogicLevel},
+});
+
 constexpr auto PulseKeys = std::to_array<ParameterKey<Core::PulseParameters>>({
     {"low", &Core::PulseParameters::Low},
     {"high", &Core::PulseParameters::High},
@@ -85,6 +98,32 @@ constexpr auto PulseKeys = std::to_array<ParameterKey<Core::PulseParameters>>({
     {"fall", &Core::PulseParameters::FallTime},
     {"width", &Core::PulseParameters::Width},
     {"period", &Core::PulseParameters::Period},
+});
+
+// Named after the SPICE EXP parameters
+constexpr auto EXPKeys = std::to_array<ParameterKey<Core::EXPParameters>>({
+    {"v1", &Core::EXPParameters::InitialValue},
+    {"v2", &Core::EXPParameters::PeakValue},
+    {"td1", &Core::EXPParameters::RiseDelay},
+    {"tau1", &Core::EXPParameters::RiseTimeConstant},
+    {"td2", &Core::EXPParameters::FallDelay},
+    {"tau2", &Core::EXPParameters::FallTimeConstant},
+});
+
+constexpr auto SFFMKeys = std::to_array<ParameterKey<Core::SFFMParameters>>({
+    {"offset", &Core::SFFMParameters::Offset},
+    {"amplitude", &Core::SFFMParameters::Amplitude},
+    {"carrier", &Core::SFFMParameters::CarrierFrequency},
+    {"mdi", &Core::SFFMParameters::ModulationIndex},
+    {"signal", &Core::SFFMParameters::SignalFrequency},
+});
+
+constexpr auto AMKeys = std::to_array<ParameterKey<Core::AMParameters>>({
+    {"amplitude", &Core::AMParameters::Amplitude},
+    {"offset", &Core::AMParameters::Offset},
+    {"mod_frequency", &Core::AMParameters::ModulatingFrequency},
+    {"carrier", &Core::AMParameters::CarrierFrequency},
+    {"delay", &Core::AMParameters::Delay},
 });
 
 // Named after the SPICE diode parameters
@@ -228,6 +267,15 @@ void WriteParameters(const std::array<ParameterKey<Parameters>, Count> &keys, co
     }
 }
 
+// One waveform of a source, such as its pulse, under its own key so the sine keys in the element object stay apart
+template <typename Parameters, std::size_t Count>
+void WriteSourceParameters(const std::array<ParameterKey<Parameters>, Count> &keys, const Parameters &parameters,
+                           const char *name, nlohmann::json &object) {
+    nlohmann::json values = nlohmann::json::object();
+    WriteParameters(keys, parameters, values);
+    object[name] = values;
+}
+
 // Missing keys keep the value the parameters already have; a key with something other than a number is an error
 template <typename Parameters, std::size_t Count>
 std::expected<void, std::string> ReadParameters(const std::array<ParameterKey<Parameters>, Count> &keys,
@@ -243,6 +291,21 @@ std::expected<void, std::string> ReadParameters(const std::array<ParameterKey<Pa
         parameters.*key.Value = *value;
     }
     return {};
+}
+
+// One waveform of a source; nothing to read when the file has no key for it
+template <typename Parameters, std::size_t Count>
+std::expected<void, std::string> ReadSourceParameters(const nlohmann::json &object, const char *name,
+                                                      const std::array<ParameterKey<Parameters>, Count> &keys,
+                                                      Parameters &parameters) {
+    const auto entry = object.find(name);
+    if (entry == object.end()) {
+        return {};
+    }
+    if (!entry->is_object()) {
+        return std::unexpected(std::format("has a {} that is not an object", name));
+    }
+    return ReadParameters(keys, *entry, parameters);
 }
 
 // Parts whose parameters are all there is to them save them as one object
@@ -316,13 +379,15 @@ void WriteKindFields(const Core::Component &component, nlohmann::json &object) {
         }
     } else if (Core::IsSwitch(type)) {
         object["closed"] = static_cast<const Core::Switch &>(component).IsClosed();
+    } else if (type == Core::ComponentType::LogicInput) {
+        object["high"] = static_cast<const Core::LogicInput &>(component).IsHigh();
     } else if (type == Core::ComponentType::Potentiometer) {
         object["wiper"] = static_cast<const Core::Potentiometer &>(component).GetWiper();
     }
 }
 
-// Parts whose figures are all there is to them: the switch that follows a voltage, the relay, the transformer, and
-// the gates and flip-flops with their logic family
+// Parts whose figures are all there is to them: the switch that follows a voltage, the relay, the transformer, the
+// gates and flip-flops with their logic family, a clock and a logic input
 void WriteFigureFields(const Core::Component &component, nlohmann::json &object) {
     const Core::ComponentType type = component.GetType();
     if (type == Core::ComponentType::VSwitch) {
@@ -333,6 +398,10 @@ void WriteFigureFields(const Core::Component &component, nlohmann::json &object)
         WritePartParameters(static_cast<const Core::Transformer &>(component), TransformerKeys, object);
     } else if (Core::IsLogicPart(type)) {
         WritePartParameters(static_cast<const Core::LogicPart &>(component), LogicKeys, object);
+    } else if (type == Core::ComponentType::Clock) {
+        WritePartParameters(static_cast<const Core::Clock &>(component), ClockKeys, object);
+    } else if (type == Core::ComponentType::LogicInput) {
+        WritePartParameters(static_cast<const Core::LogicInput &>(component), LogicInputKeys, object);
     }
 }
 
@@ -354,14 +423,24 @@ nlohmann::json WriteElement(const UIElement &element) {
     if (component.HasValue()) {
         object["value"] = component.GetValue();
     }
+    // Only a capacitor or an inductor carries one, and only when it is set
+    if (const std::optional<double> initial = component.GetInitialCondition()) {
+        object["ic"] = *initial;
+    }
     // Every waveform is saved, so switching type after loading keeps the parameters of the others
     if (Core::IsSource(component.GetType())) {
         const auto &source = static_cast<const Core::Source &>(component);
         object["source"] = Core::GetSourceTypeName(source.GetSourceType());
         WriteParameters(ACKeys, source.GetAC(), object);
-        nlohmann::json pulse = nlohmann::json::object();
-        WriteParameters(PulseKeys, source.GetPulse(), pulse);
-        object["pulse"] = pulse;
+        WriteSourceParameters(PulseKeys, source.GetPulse(), "pulse", object);
+        WriteSourceParameters(EXPKeys, source.GetEXP(), "exp", object);
+        WriteSourceParameters(SFFMKeys, source.GetSFFM(), "sffm", object);
+        WriteSourceParameters(AMKeys, source.GetAM(), "am", object);
+        nlohmann::json pwl = nlohmann::json::array();
+        for (const Core::PWLPoint &point : source.GetPWL().Points) {
+            pwl.push_back({{"time", point.Time}, {"value", point.Value}});
+        }
+        object["pwl"] = pwl;
     }
     WriteModelFields(component, object);
     WriteKindFields(component, object);
@@ -369,14 +448,14 @@ nlohmann::json WriteElement(const UIElement &element) {
     return object;
 }
 
-// Every key is optional, so files saved before sources had a type load as DC with the default sine and pulse
+// Every waveform key is optional, so files saved before a waveform existed keep the default one of the source
 std::expected<void, std::string> ReadSource(const nlohmann::json &object, Core::Source &source) {
     if (object.contains("source")) {
         const std::optional<std::string> type_name = ReadString(object, "source");
         const std::optional<Core::Source::SourceType> type =
             type_name ? Core::ParseSourceType(*type_name) : std::nullopt;
         if (!type) {
-            return std::unexpected("has a source type other than DC, AC or Pulse");
+            return std::unexpected("has a source type other than DC, AC, Pulse, EXP, SFFM, AM or PWL");
         }
         source.SetSourceType(*type);
     }
@@ -393,18 +472,63 @@ std::expected<void, std::string> ReadSource(const nlohmann::json &object, Core::
     }
     source.SetAC(ac);
 
-    if (const auto pulse_object = object.find("pulse"); pulse_object != object.end()) {
-        if (!pulse_object->is_object()) {
-            return std::unexpected("has a pulse that is not an object");
+    Core::PulseParameters pulse = source.GetPulse();
+    if (const auto read = ReadSourceParameters(object, "pulse", PulseKeys, pulse); !read) {
+        return read;
+    }
+    if (!source.IsValidPulse(pulse)) {
+        return std::unexpected("has a pulse with a negative time or a period that is not positive");
+    }
+    source.SetPulse(pulse);
+
+    Core::EXPParameters exp = source.GetEXP();
+    if (const auto read = ReadSourceParameters(object, "exp", EXPKeys, exp); !read) {
+        return read;
+    }
+    if (!source.IsValidEXP(exp)) {
+        return std::unexpected("has an exponential with a negative delay, a fall before its rise or a time constant "
+                               "that is not positive");
+    }
+    source.SetEXP(exp);
+
+    Core::SFFMParameters sffm = source.GetSFFM();
+    if (const auto read = ReadSourceParameters(object, "sffm", SFFMKeys, sffm); !read) {
+        return read;
+    }
+    if (!source.IsValidSFFM(sffm)) {
+        return std::unexpected("has a single-frequency FM with a carrier or signal frequency that is not positive");
+    }
+    source.SetSFFM(sffm);
+
+    Core::AMParameters am = source.GetAM();
+    if (const auto read = ReadSourceParameters(object, "am", AMKeys, am); !read) {
+        return read;
+    }
+    if (!source.IsValidAM(am)) {
+        return std::unexpected("has an amplitude modulation with a negative delay or a frequency that is not "
+                               "positive");
+    }
+    source.SetAM(am);
+
+    if (const auto points = object.find("pwl"); points != object.end()) {
+        if (!points->is_array()) {
+            return std::unexpected("has piecewise linear points that are not a list");
         }
-        Core::PulseParameters pulse = source.GetPulse();
-        if (const auto read = ReadParameters(PulseKeys, *pulse_object, pulse); !read) {
-            return read;
+        Core::PWLParameters pwl;
+        pwl.Points.clear();
+        for (const nlohmann::json &point : *points) {
+            const std::optional<double> time = point.is_object() ? ReadNumber(point, "time") : std::nullopt;
+            const std::optional<double> value = point.is_object() ? ReadNumber(point, "value") : std::nullopt;
+            if (!time || !value) {
+                return std::unexpected("has a piecewise linear point without a numeric time and value");
+            }
+            pwl.Points.push_back({.Time = *time, .Value = *value});
         }
-        if (!source.IsValidPulse(pulse)) {
-            return std::unexpected("has a pulse with a negative time or a period that is not positive");
+        if (!source.IsValidPWL(pwl)) {
+            return std::unexpected("has piecewise linear points that are fewer than two, negative or not "
+                                   "increasing");
         }
-        source.SetPulse(pulse);
+        source.SetPWL(pwl);
     }
     return {};
 }
@@ -479,38 +603,84 @@ std::expected<void, std::string> ReadModel(const nlohmann::json &object, Core::C
     return {};
 }
 
-// What only some kinds of part carry: the current a controlled source follows, a net name, a switch state and a wiper
+// Each reader fills what one kind of part carries, and does nothing for the others; a missing key keeps the default
+
+// The current a controlled source follows; a missing one loads as none, and the simulation then asks for one
+std::expected<void, std::string> ReadControllingCurrent(const nlohmann::json &object, Core::Component &component) {
+    if (!Core::IsCurrentControlled(component.GetType()) || !object.contains("control")) {
+        return {};
+    }
+    const std::optional<std::string> current = ReadString(object, "control");
+    if (!current) {
+        return std::unexpected("has a controlling current that is not text");
+    }
+    static_cast<Core::ControlledSource &>(component).SetControllingCurrent(*current);
+    return {};
+}
+
+std::expected<void, std::string> ReadNetName(const nlohmann::json &object, Core::Component &component) {
+    if (component.GetType() != Core::ComponentType::NetLabel || !object.contains("net")) {
+        return {};
+    }
+    const std::optional<std::string> net = ReadString(object, "net");
+    if (!net || !Core::NetLabel::IsValidNet(*net)) {
+        return std::unexpected("has a net name that is not 1 to 32 letters, digits, _, - or .");
+    }
+    static_cast<Core::NetLabel &>(component).SetNet(*net);
+    return {};
+}
+
+// A switch saved without a state stays open
+std::expected<void, std::string> ReadSwitchState(const nlohmann::json &object, Core::Component &component) {
+    if (!Core::IsSwitch(component.GetType()) || !object.contains("closed")) {
+        return {};
+    }
+    const std::optional<bool> closed = ReadBool(object, "closed");
+    if (!closed) {
+        return std::unexpected("has a closed flag that is not true or false");
+    }
+    static_cast<Core::Switch &>(component).SetClosed(*closed);
+    return {};
+}
+
+// A potentiometer saved without a wiper keeps it in the middle
+std::expected<void, std::string> ReadWiper(const nlohmann::json &object, Core::Component &component) {
+    if (component.GetType() != Core::ComponentType::Potentiometer || !object.contains("wiper")) {
+        return {};
+    }
+    const std::optional<double> wiper = ReadNumber(object, "wiper");
+    if (!wiper || !Core::Potentiometer::IsValidWiper(*wiper)) {
+        return std::unexpected("has a wiper that is not a number from 0 to 1");
+    }
+    static_cast<Core::Potentiometer &>(component).SetWiper(*wiper);
+    return {};
+}
+
+// A logic input saved without a state stays low
+std::expected<void, std::string> ReadLogicInputState(const nlohmann::json &object, Core::Component &component) {
+    if (component.GetType() != Core::ComponentType::LogicInput || !object.contains("high")) {
+        return {};
+    }
+    const std::optional<bool> high = ReadBool(object, "high");
+    if (!high) {
+        return std::unexpected("has a high flag that is not true or false");
+    }
+    static_cast<Core::LogicInput &>(component).SetHigh(*high);
+    return {};
+}
+
+using StateReader = std::expected<void, std::string> (*)(const nlohmann::json &, Core::Component &);
+
+constexpr auto StateReaders = std::to_array<StateReader>(
+    {&ReadControllingCurrent, &ReadNetName, &ReadSwitchState, &ReadWiper, &ReadLogicInputState});
+
+// What only some kinds of part carry: the current a controlled source follows, a net name, a switch state, a wiper
+// and the state of a logic input
 std::expected<void, std::string> ReadStateFields(const nlohmann::json &object, Core::Component &component) {
-    // A missing controlling current loads as none; the simulation then asks for one
-    if (Core::IsCurrentControlled(component.GetType()) && object.contains("control")) {
-        const std::optional<std::string> current = ReadString(object, "control");
-        if (!current) {
-            return std::unexpected("has a controlling current that is not text");
+    for (const StateReader reader : StateReaders) {
+        if (const auto read = reader(object, component); !read) {
+            return std::unexpected(read.error());
         }
-        static_cast<Core::ControlledSource &>(component).SetControllingCurrent(*current);
-    }
-    if (component.GetType() == Core::ComponentType::NetLabel && object.contains("net")) {
-        const std::optional<std::string> net = ReadString(object, "net");
-        if (!net || !Core::NetLabel::IsValidNet(*net)) {
-            return std::unexpected("has a net name that is not 1 to 32 letters, digits, _, - or .");
-        }
-        static_cast<Core::NetLabel &>(component).SetNet(*net);
-    }
-    // A switch saved without a state stays open
-    if (Core::IsSwitch(component.GetType()) && object.contains("closed")) {
-        const std::optional<bool> closed = ReadBool(object, "closed");
-        if (!closed) {
-            return std::unexpected("has a closed flag that is not true or false");
-        }
-        static_cast<Core::Switch &>(component).SetClosed(*closed);
-    }
-    // A potentiometer saved without a wiper keeps it in the middle
-    if (component.GetType() == Core::ComponentType::Potentiometer && object.contains("wiper")) {
-        const std::optional<double> wiper = ReadNumber(object, "wiper");
-        if (!wiper || !Core::Potentiometer::IsValidWiper(*wiper)) {
-            return std::unexpected("has a wiper that is not a number from 0 to 1");
-        }
-        static_cast<Core::Potentiometer &>(component).SetWiper(*wiper);
     }
     return {};
 }
@@ -537,6 +707,17 @@ std::expected<void, std::string> ReadFigureFields(const nlohmann::json &object, 
     }
     if (Core::IsLogicPart(component.GetType())) {
         if (const auto read = ReadPartParameters(object, static_cast<Core::LogicPart &>(component), LogicKeys); !read) {
+            return std::unexpected(read.error());
+        }
+    }
+    if (component.GetType() == Core::ComponentType::Clock) {
+        if (const auto read = ReadPartParameters(object, static_cast<Core::Clock &>(component), ClockKeys); !read) {
+            return std::unexpected(read.error());
+        }
+    }
+    if (component.GetType() == Core::ComponentType::LogicInput) {
+        if (const auto read = ReadPartParameters(object, static_cast<Core::LogicInput &>(component), LogicInputKeys);
+            !read) {
             return std::unexpected(read.error());
         }
     }
@@ -582,6 +763,14 @@ std::expected<std::unique_ptr<UIElement>, std::string> ReadElement(const nlohman
             return std::unexpected("has no valid value");
         }
         component.SetValue(*value);
+    }
+    // A file saved before initial conditions had no key, so the part has none
+    if (component.SupportsInitialCondition() && object.contains("ic")) {
+        const std::optional<double> initial = ReadNumber(object, "ic");
+        if (!initial) {
+            return std::unexpected("has an initial condition that is not a number");
+        }
+        component.SetInitialCondition(*initial);
     }
     if (Core::IsSource(component.GetType())) {
         const std::expected<void, std::string> source = ReadSource(object, static_cast<Core::Source &>(component));
@@ -642,8 +831,8 @@ nlohmann::json WriteSweepRange(const Core::SweepRange &range) {
 }
 
 // File names of the analyses, in the order of the Analysis enum
-constexpr auto AnalysisKeys =
-    std::to_array<std::string_view>({"operating_point", "transient", "ac_sweep", "dc_sweep", "noise"});
+constexpr auto AnalysisKeys = std::to_array<std::string_view>(
+    {"operating_point", "transient", "ac_sweep", "dc_sweep", "noise", "transfer_function"});
 
 nlohmann::json WriteSettings(const SimulationSettings &settings) {
     nlohmann::json transient = nlohmann::json::object();
@@ -656,6 +845,10 @@ nlohmann::json WriteSettings(const SimulationSettings &settings) {
     noise["points_per_decade"] = settings.NoiseRange.PointsPerDecade;
     if (settings.NoiseOutput) {
         noise["output"] = {settings.NoiseOutput->X, settings.NoiseOutput->Y};
+    }
+    nlohmann::json transfer_function = {{"source", settings.TransferFunctionSource}};
+    if (settings.TransferFunctionOutput) {
+        transfer_function["output"] = {settings.TransferFunctionOutput->X, settings.TransferFunctionOutput->Y};
     }
     const ParameterStepSettings &step = settings.ParameterStep;
     nlohmann::json parameter_step = {
@@ -672,6 +865,7 @@ nlohmann::json WriteSettings(const SimulationSettings &settings) {
              {"step_source", settings.StepSource},
          }},
         {"noise", noise},
+        {"transfer_function", transfer_function},
         {"parameter_step", parameter_step},
     };
 }
@@ -771,6 +965,25 @@ std::expected<void, std::string> ReadNoiseSettings(const nlohmann::json &object,
     return {};
 }
 
+std::expected<void, std::string> ReadTransferFunctionSettings(const nlohmann::json &object,
+                                                              SimulationSettings &settings) {
+    if (object.contains("source")) {
+        const std::optional<std::string> source = ReadString(object, "source");
+        if (!source) {
+            return std::unexpected("have no valid source");
+        }
+        settings.TransferFunctionSource = *source;
+    }
+    if (object.contains("output")) {
+        const std::optional<GridPoint> output = ReadPoint(object, "output");
+        if (!output) {
+            return std::unexpected("have no valid output point");
+        }
+        settings.TransferFunctionOutput = *output;
+    }
+    return {};
+}
+
 std::expected<void, std::string> ReadParameterStepSettings(const nlohmann::json &object, SimulationSettings &settings) {
     ParameterStepSettings &step = settings.ParameterStep;
     if (const auto read = ReadParameters(ParameterStepKeys, object, step); !read) {
@@ -812,6 +1025,7 @@ constexpr auto AnalysisReaders = std::to_array<AnalysisReader>({
     {"ac_sweep", "AC sweep", &ReadACSweepSettings},
     {"dc_sweep", "DC sweep", &ReadDCSweepSettings},
     {"noise", "noise", &ReadNoiseSettings},
+    {"transfer_function", "transfer function", &ReadTransferFunctionSettings},
     {"parameter_step", "parameter step", &ReadParameterStepSettings},
 });
 

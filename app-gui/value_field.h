@@ -15,6 +15,18 @@
 namespace GUI {
 
 /**
+ * @struct  OptionalValueEdit
+ * @brief   Outcome of editing a field that may be left empty, such as an initial condition.
+ * @details An empty field means the value is not set; editing the field to empty clears it.
+ */
+struct OptionalValueEdit {
+    // New value; empty when the field was cleared
+    std::optional<double> Value;
+    // Whether the user edited the field this frame
+    bool Changed = false;
+};
+
+/**
  * @class   ValueField
  * @brief   Keeps the text being typed for one value and reports the value once the text is valid.
  * @details Values are applied as soon as they are valid instead of when the field loses focus, because a click
@@ -24,9 +36,12 @@ namespace GUI {
 class ValueField {
 public:
     void Load(double value);
+    void LoadOptional(const std::optional<double> &value);
     void StartTyping(char first);
     std::optional<double> Draw(const char *label, const std::string &unit, const std::function<bool(double)> &is_valid,
                                Core::ValueSeries series = Core::ValueSeries::Free);
+    OptionalValueEdit DrawOptional(const char *label, const std::string &unit,
+                                   const std::function<bool(double)> &is_valid);
 
 private:
     std::optional<char> FocusInput();

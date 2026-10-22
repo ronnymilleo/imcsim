@@ -8,6 +8,7 @@
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 #include <cmath>
 #include <complex>
+#include <limits>
 #include <numbers>
 #include <vector>
 
@@ -70,6 +71,88 @@ TEST_CASE("InterpolateAt reads between samples and holds the ends", "[trace_stat
     const std::vector<double> frequencies = {10.0, 1000.0};
     const std::vector<double> gains = {0.0, -40.0};
     CHECK_THAT(GUI::InterpolateAt(frequencies, gains, 100.0, true), WithinAbs(-20.0, 1e-9));
+}
+
+TEST_CASE("InterpolateAt reads a falling axis as well as a rising one", "[trace_statistics]") {
+    // The same straight line y = 2x, sampled upward and downward: a cursor between samples reads the same value
+    const std::vector<double> rising_xs = {0.0, 1.0, 2.0};
+    const std::vector<double> rising_ys = {0.0, 2.0, 4.0};
+    const std::vector<double> falling_xs = {2.0, 1.0, 0.0};
+    const std::vector<double> falling_ys = {4.0, 2.0, 0.0};
+    CHECK_THAT(GUI::InterpolateAt(rising_xs, rising_ys, 1.5, false), WithinAbs(3.0, 1e-12));
+    CHECK_THAT(GUI::InterpolateAt(falling_xs, falling_ys, 1.5, false), WithinAbs(3.0, 1e-12));
+    // A cursor beyond either end clamps to the nearest sample, whichever way the axis runs
+    CHECK(GUI::InterpolateAt(falling_xs, falling_ys, 5.0, false) == 4.0);
+    CHECK(GUI::InterpolateAt(falling_xs, falling_ys, -5.0, false) == 0.0);
+}
+
+TEST_CASE("A straight line has a constant slope and the mean of its ends", "[trace_statistics]") {
+    // y = 2x over a swept voltage; every span of it has slope 2
+    const std::vector<double> xs = {0.0, 1.0, 2.0, 3.0};
+    const std::vector<double> ys = {0.0, 2.0, 4.0, 6.0};
+    REQUIRE(GUI::ComputeSlope(xs, ys, 0.0, 3.0));
+    REQUIRE(GUI::ComputeSlope(xs, ys, 0.5, 2.5));
+    CHECK_THAT(*GUI::ComputeSlope(xs, ys, 0.0, 3.0), WithinAbs(2.0, 1e-12));
+    CHECK_THAT(*GUI::ComputeSlope(xs, ys, 0.5, 2.5), WithinAbs(2.0, 1e-12));
+    // The mean over the swept axis is the average of its ends, here 1 and 5
+    const auto statistics = GUI::ComputeSweepStatistics(xs, ys, 0.5, 2.5);
+    REQUIRE(statistics);
+    CHECK_THAT(statistics->Minimum, WithinAbs(1.0, 1e-12));
+    CHECK_THAT(statistics->Maximum, WithinAbs(5.0, 1e-12));
+    CHECK_THAT(statistics->Mean, WithinAbs(3.0, 1e-12));
+}
+
+TEST_CASE("A descending sweep reads the same slope and mean as an ascending one", "[trace_statistics]") {
+    // The same straight line y = 2x, swept from 3 down to 0: its slope keeps its sign
+    const std::vector<double> rising_xs = {0.0, 1.0, 2.0, 3.0};
+    const std::vector<double> rising_ys = {0.0, 2.0, 4.0, 6.0};
+    const std::vector<double> falling_xs = {3.0, 2.0, 1.0, 0.0};
+    const std::vector<double> falling_ys = {6.0, 4.0, 2.0, 0.0};
+    REQUIRE(GUI::ComputeSlope(rising_xs, rising_ys, 0.5, 2.5));
+    REQUIRE(GUI::ComputeSlope(falling_xs, falling_ys, 0.5, 2.5));
+    CHECK_THAT(*GUI::ComputeSlope(rising_xs, rising_ys, 0.5, 2.5), WithinAbs(2.0, 1e-12));
+    CHECK_THAT(*GUI::ComputeSlope(falling_xs, falling_ys, 0.5, 2.5), WithinAbs(2.0, 1e-12));
+    const auto rising = GUI::ComputeSweepStatistics(rising_xs, rising_ys, 0.5, 2.5);
+    const auto falling = GUI::ComputeSweepStatistics(falling_xs, falling_ys, 0.5, 2.5);
+    REQUIRE(rising);
+    REQUIRE(falling);
+    CHECK_THAT(falling->Mean, WithinAbs(rising->Mean, 1e-12));
+    CHECK_THAT(falling->Minimum, WithinAbs(rising->Minimum, 1e-12));
+    CHECK_THAT(falling->Maximum, WithinAbs(rising->Maximum, 1e-12));
+}
+
+TEST_CASE("A parabola's slope at a point follows its derivative", "[trace_statistics]") {
+    // y = x^2 sampled evenly; the central difference (f(x+d)-f(x-d)) / 2d is exactly the derivative 2x
+    std::vector<double> xs;
+    std::vector<double> ys;
+    constexpr double Step = 1e-3;
+    for (double x = 0.0; x <= 2.0; x += Step) {
+        xs.push_back(x);
+        ys.push_back(x * x);
+    }
+    REQUIRE(GUI::ComputeSlope(xs, ys, 1.0 - Step, 1.0 + Step));
+    REQUIRE(GUI::ComputeSlope(xs, ys, 1.5 - Step, 1.5 + Step));
+    CHECK_THAT(*GUI::ComputeSlope(xs, ys, 1.0 - Step, 1.0 + Step), WithinRel(2.0, 1e-9));
+    CHECK_THAT(*GUI::ComputeSlope(xs, ys, 1.5 - Step, 1.5 + Step), WithinRel(3.0, 1e-9));
+    // The secant over a wider span is the average slope, here (9-1)/(3-1)
+    const std::vector<double> few_xs = {0.0, 1.0, 2.0, 3.0};
+    const std::vector<double> few_ys = {0.0, 1.0, 4.0, 9.0};
+    REQUIRE(GUI::ComputeSlope(few_xs, few_ys, 1.0, 3.0));
+    CHECK_THAT(*GUI::ComputeSlope(few_xs, few_ys, 1.0, 3.0), WithinAbs(4.0, 1e-12));
+}
+
+TEST_CASE("A flat trace has a zero slope and no resistance", "[trace_statistics]") {
+    const std::vector<double> xs = {0.0, 1.0, 2.0};
+    const std::vector<double> flat = {5.0, 5.0, 5.0};
+    const auto slope = GUI::ComputeSlope(xs, flat, 0.0, 2.0);
+    REQUIRE(slope);
+    CHECK(*slope == 0.0);
+    // Zero conductance is an open path: no resistance, so the panel shows "open" instead of an infinite value
+    CHECK_FALSE(GUI::ResistanceFromConductance(*slope));
+    CHECK_FALSE(GUI::ResistanceFromConductance(0.0));
+    // 1 mS is 1 kOhm, and a value that overflows reads as open too
+    CHECK_THAT(*GUI::ResistanceFromConductance(1e-3), WithinRel(1e3, 1e-12));
+    CHECK_FALSE(GUI::ResistanceFromConductance(std::numeric_limits<double>::denorm_min()));
 }
 
 TEST_CASE("A sine measures its peak to peak, mean, RMS and frequency", "[trace_statistics]") {

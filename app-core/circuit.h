@@ -49,6 +49,7 @@ public:
     int GetNodeCount() const;
     bool HasGround() const;
     bool HasACSource() const;
+    bool HasInitialConditions() const;
     std::string ToSpiceNetlist(std::string_view analysis = "", bool add_current_probes = false) const;
 
 private:

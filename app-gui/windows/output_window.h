@@ -35,7 +35,8 @@ enum class PlotTab {
     Spectrum,
     ACSweep,
     DCSweep,
-    Noise
+    Noise,
+    TransferFunction
 };
 
 /**
@@ -48,12 +49,14 @@ enum class PlotTab {
  *          currents are dashed on the secondary Y axis on the right. Hovering a plot reads every shown trace at
  *          the nearest sample. The axes of each analysis fit its new results, and keep zoom and pan until the
  *          next one; the voltage and current axes also fit whenever their measured traces change. Like an
- *          oscilloscope, the transient and the Bode plots have two cursors and a panel on their right that
- *          measures every shown trace: the transient between the cursors or over what is visible, the Bode plot
- *          over the whole sweep. The Spectrum tab transforms the measured traces of the transient over the span its
+ *          oscilloscope, the transient, the Bode plots and the DC sweep have two cursors and a panel on their right
+ *          that measures every shown trace: the transient between the cursors or over what is visible, the DC sweep
+ *          the same way with the value, change and slope between its cursors, the Bode plot over the whole sweep.
+ *          The Spectrum tab transforms the measured traces of the transient over the span its
  *          statistics measure, and reads the fundamental, the harmonics and the THD of each, as a spectrum
  *          analyzer would. The Noise tab plots the noise density at the output and referred to the input on
- *          log-log axes, with the share of each part. Math channels add traces computed from the others, such as
+ *          log-log axes, with the share of each part, and the Transfer function tab lists its DC gain and its
+ *          input and output impedances. Math channels add traces computed from the others, such as
  * V(1)-V(2) or V(1)*I(R1), to the transient and DC sweep plots: voltages and currents keep their axes, and any other
  *          unit, or none, goes on a third axis. Export saves the plot of the current tab as an SVG image, redrawn
  *          from its data at a chosen size and theme over the visible X range, or as a CSV table of every sample.
@@ -90,9 +93,10 @@ private:
     TraceFitState m_TransientFit;
     TraceFitState m_ACSweepFit;
     TraceFitState m_DCSweepFit;
-    // Cursors and visible X range of the transient and the Bode plots; both Bode plots share theirs
+    // Cursors and visible X range of the transient, the Bode plots and the DC sweep; both Bode plots share theirs
     PlotCursors m_TransientCursors;
     PlotCursors m_ACSweepCursors;
+    PlotCursors m_DCSweepCursors;
     PlotSpan m_TransientView;
     // Whether the signals of logic parts get a lane each, in a plot of their own under the analog one
     bool m_ShowLogicLanes = true;
@@ -133,6 +137,7 @@ private:
     void DrawACSweepTab(const FrameResults &frame);
     void DrawDCSweepTab(const FrameResults &frame);
     void DrawNoiseTab();
+    void DrawTransferFunctionTab();
 
     // Plots
     void DrawTransient(const Core::Transient &transient, const std::vector<MathTrace> &math);
@@ -156,6 +161,7 @@ private:
     void DrawSpectrumStatistics();
     void DrawSpectrumControls();
     void DrawACSweepStatistics(const Core::ACSweep &sweep);
+    void DrawDCSweepStatistics(const Core::DCSweep &sweep, const std::vector<std::vector<MathTrace>> &math);
     void DrawNoiseStatistics(const Core::Noise &noise);
 
     // Export

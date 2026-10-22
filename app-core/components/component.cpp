@@ -26,7 +26,7 @@ constexpr auto AllTypes = std::to_array<ComponentType>({
     ComponentType::Relay,         ComponentType::Transformer,   ComponentType::And,           ComponentType::Or,
     ComponentType::Not,           ComponentType::Nand,          ComponentType::Nor,           ComponentType::Xor,
     ComponentType::Xnor,          ComponentType::Buffer,        ComponentType::DFlipFlop,     ComponentType::JKFlipFlop,
-    ComponentType::TFlipFlop,     ComponentType::SRFlipFlop,
+    ComponentType::TFlipFlop,     ComponentType::SRFlipFlop,    ComponentType::Clock,         ComponentType::LogicInput,
 });
 
 } // namespace
@@ -70,6 +70,10 @@ const char *Component::GetNamePrefix() const {
         return "L";
     case ComponentType::VCC:
         // A supply rail is simulated as a voltage source to ground
+        return "V";
+    case ComponentType::Clock:
+    case ComponentType::LogicInput:
+        // A clock and a logic input are voltage sources to ground too
         return "V";
     case ComponentType::VoltageSource:
         return "Vin";
@@ -143,6 +147,9 @@ const char *Component::GetUnit() const {
         return "H";
     case ComponentType::VCC:
     case ComponentType::VoltageSource:
+        return "V";
+    case ComponentType::Clock:
+    case ComponentType::LogicInput:
         return "V";
     case ComponentType::CurrentSource:
         return "A";
@@ -218,6 +225,8 @@ bool Component::HasValue() const {
     case ComponentType::JKFlipFlop:
     case ComponentType::TFlipFlop:
     case ComponentType::SRFlipFlop:
+    case ComponentType::Clock:
+    case ComponentType::LogicInput:
         return false;
     case ComponentType::Resistor:
     case ComponentType::Capacitor:
@@ -284,6 +293,8 @@ bool Component::IsValidValue(const double value) const {
     case ComponentType::JKFlipFlop:
     case ComponentType::TFlipFlop:
     case ComponentType::SRFlipFlop:
+    case ComponentType::Clock:
+    case ComponentType::LogicInput:
         return false;
     }
     return false;
@@ -319,6 +330,51 @@ double Component::GetValue() const {
  */
 void Component::SetValue(const double value) {
     m_Value = value;
+}
+
+/**
+ * @brief   Tells whether this kind of component can start from a value of its own.
+ * @return  True for a capacitor, whose initial condition is a voltage, and an inductor, whose is a current; false
+ *          for every other kind.
+ */
+bool Component::SupportsInitialCondition() const {
+    return m_Type == ComponentType::Capacitor || m_Type == ComponentType::Inductor;
+}
+
+/**
+ * @brief   Tells whether an initial condition is set.
+ * @return  True when SetInitialCondition() has been called and the condition has not been cleared.
+ */
+bool Component::HasInitialCondition() const {
+    return m_InitialCondition.has_value();
+}
+
+/**
+ * @brief   Returns the initial condition.
+ * @return  The voltage a capacitor starts charged to, or the current an inductor starts carrying, or no value when
+ *          none is set.
+ */
+std::optional<double> Component::GetInitialCondition() const {
+    return m_InitialCondition;
+}
+
+/**
+ * @brief   Sets the initial condition.
+ * @param[in] value  Voltage for a capacitor or current for an inductor; the sign is free.
+ * @note    Only a capacitor or an inductor takes one; the call does nothing for any other kind.
+ */
+void Component::SetInitialCondition(const double value) {
+    if (SupportsInitialCondition()) {
+        m_InitialCondition = value;
+    }
+}
+
+/**
+ * @brief   Clears the initial condition.
+ * @note    A transient that still has an initial condition elsewhere starts this part uncharged, at zero.
+ */
+void Component::ClearInitialCondition() {
+    m_InitialCondition.reset();
 }
 
 /**
@@ -404,6 +460,10 @@ const char *GetTypeName(const ComponentType type) {
         return "TFlipFlop";
     case ComponentType::SRFlipFlop:
         return "SRFlipFlop";
+    case ComponentType::Clock:
+        return "Clock";
+    case ComponentType::LogicInput:
+        return "LogicInput";
     }
     return "Unknown";
 }

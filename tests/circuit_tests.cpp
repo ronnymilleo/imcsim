@@ -6,11 +6,13 @@
 #include "circuit.h"
 #include "components/bjt.h"
 #include "components/capacitor.h"
+#include "components/clock.h"
 #include "components/controlled_source.h"
 #include "components/current_source.h"
 #include "components/diode.h"
 #include "components/ground.h"
 #include "components/inductor.h"
+#include "components/logic_input.h"
 #include "components/logic_part.h"
 #include "components/mosfet.h"
 #include "components/op_amp.h"
@@ -66,6 +68,39 @@ TEST_CASE("ToSpiceNetlist writes one line per component and leaves ground out", 
                                       ".end\n");
 }
 
+TEST_CASE("ToSpiceNetlist writes the initial condition of a capacitor and an inductor", "[circuit]") {
+    Core::Capacitor capacitor;
+    capacitor.SetName("C1");
+    capacitor.SetValue(100e-9);
+    capacitor.SetInitialCondition(5.0);
+    Core::Inductor inductor;
+    inductor.SetName("L1");
+    inductor.SetInitialCondition(2e-3);
+
+    Core::Circuit circuit;
+    circuit.Add(capacitor, {2, 0});
+    circuit.Add(inductor, {2, 0});
+
+    CHECK(circuit.ToSpiceNetlist() == "* imcsim netlist\n"
+                                      "C1 2 0 100n IC=5\n"
+                                      "L1 2 0 1m IC=2m\n"
+                                      ".end\n");
+}
+
+TEST_CASE("HasInitialConditions looks for a part with an initial condition", "[circuit]") {
+    Core::Capacitor capacitor;
+    capacitor.SetName("C1");
+    Core::Circuit circuit;
+    circuit.Add(capacitor, {1, 0});
+    CHECK_FALSE(circuit.HasInitialConditions());
+
+    capacitor.SetInitialCondition(3.0);
+    CHECK(circuit.HasInitialConditions());
+
+    capacitor.ClearInitialCondition();
+    CHECK_FALSE(circuit.HasInitialConditions());
+}
+
 TEST_CASE("ToSpiceNetlist writes a voltage source between its two nodes, positive first", "[circuit]") {
     Core::VoltageSource source;
     source.SetName("Vin1");
@@ -114,6 +149,70 @@ TEST_CASE("ToSpiceNetlist writes a pulse source starting at its low level", "[ci
                                       ".end\n");
 }
 
+TEST_CASE("ToSpiceNetlist writes an exponential source starting from its first value", "[circuit]") {
+    Core::VoltageSource source;
+    source.SetName("Vin1");
+    source.SetSourceType(Core::VoltageSource::SourceType::EXP);
+    source.SetEXP({.InitialValue = -1.0,
+                   .PeakValue = 3.3,
+                   .RiseDelay = 1e-3,
+                   .RiseTimeConstant = 10e-6,
+                   .FallDelay = 5e-3,
+                   .FallTimeConstant = 20e-6});
+
+    Core::Circuit circuit;
+    circuit.Add(source, {1, 0});
+
+    CHECK(circuit.ToSpiceNetlist() == "* imcsim netlist\n"
+                                      "Vin1 1 0 DC -1 EXP(-1 3.3 1m 10u 5m 20u)\n"
+                                      ".end\n");
+}
+
+TEST_CASE("ToSpiceNetlist writes a single-frequency FM source from its offset", "[circuit]") {
+    Core::VoltageSource source;
+    source.SetName("Vin1");
+    source.SetSourceType(Core::VoltageSource::SourceType::SFFM);
+    source.SetSFFM(
+        {.Offset = 0.5, .Amplitude = 2.0, .CarrierFrequency = 1e3, .ModulationIndex = 5.0, .SignalFrequency = 100.0});
+
+    Core::Circuit circuit;
+    circuit.Add(source, {1, 0});
+
+    CHECK(circuit.ToSpiceNetlist() == "* imcsim netlist\n"
+                                      "Vin1 1 0 DC 500m SFFM(500m 2 1k 5 100)\n"
+                                      ".end\n");
+}
+
+TEST_CASE("ToSpiceNetlist writes an amplitude-modulated source with a suppressed carrier", "[circuit]") {
+    Core::VoltageSource source;
+    source.SetName("Vin1");
+    source.SetSourceType(Core::VoltageSource::SourceType::AM);
+    source.SetAM(
+        {.Amplitude = 2.0, .Offset = 0.5, .ModulatingFrequency = 200.0, .CarrierFrequency = 10e3, .Delay = 1e-3});
+
+    Core::Circuit circuit;
+    circuit.Add(source, {1, 0});
+
+    // The modulation offset of ngspice stays 0, so the offset sits on the two multiplied sines
+    CHECK(circuit.ToSpiceNetlist() == "* imcsim netlist\n"
+                                      "Vin1 1 0 DC 500m AM(500m 0 2 200 10k 1m)\n"
+                                      ".end\n");
+}
+
+TEST_CASE("ToSpiceNetlist writes the piecewise linear points from its first value", "[circuit]") {
+    Core::CurrentSource source;
+    source.SetName("I1");
+    source.SetSourceType(Core::CurrentSource::SourceType::PWL);
+    source.SetPWL({.Points = {{0.0, 0.0}, {1e-3, 5e-3}, {2e-3, 0.0}}});
+
+    Core::Circuit circuit;
+    circuit.Add(source, {0, 3});
+
+    CHECK(circuit.ToSpiceNetlist() == "* imcsim netlist\n"
+                                      "I1 0 3 DC 0 PWL(0 0 1m 5m 2m 0)\n"
+                                      ".end\n");
+}
+
 TEST_CASE("ToSpiceNetlist writes a current source like a voltage source, under its own name", "[circuit]") {
     Core::CurrentSource source;
     source.SetName("I1");
@@ -127,6 +226,53 @@ TEST_CASE("ToSpiceNetlist writes a current source like a voltage source, under i
     CHECK(circuit.ToSpiceNetlist() == "* imcsim netlist\n"
                                       "I1 0 3 DC 0 AC 1 SIN(0 1m 1k)\n"
                                       ".end\n");
+}
+
+TEST_CASE("ToSpiceNetlist writes a clock as a pulse with its own short edges", "[circuit]") {
+    Core::Clock clock;
+    clock.SetName("V1");
+    clock.SetParameters({.Frequency = 1e3, .DutyCycle = 0.25, .LogicLevel = 3.3, .StartDelay = 1e-3});
+    Core::Circuit circuit;
+    circuit.Add(clock, {1});
+    // Period 1 ms, an edge of 1 us, and a flat top of 0.25 ms - 1 us = 249 us, so the duty reads as 0.25
+    CHECK(circuit.ToSpiceNetlist() == "* imcsim netlist\n"
+                                      "V1 1 0 DC 0 PULSE(0 3.3 1m 1u 1u 249u 1m)\n"
+                                      ".end\n");
+}
+
+TEST_CASE("ToSpiceNetlist writes a logic input as a DC source to ground", "[circuit]") {
+    Core::LogicInput input;
+    input.SetName("V1");
+    input.SetParameters({.LogicLevel = 3.3});
+    Core::Circuit circuit;
+    circuit.Add(input, {2});
+    CHECK(circuit.ToSpiceNetlist() == "* imcsim netlist\n"
+                                      "V1 2 0 DC 0\n"
+                                      ".end\n");
+    input.SetHigh(true);
+    CHECK(circuit.ToSpiceNetlist() == "* imcsim netlist\n"
+                                      "V1 2 0 DC 3.3\n"
+                                      ".end\n");
+}
+
+TEST_CASE("A clock and a logic input carry their branch current for a controlled source", "[circuit]") {
+    Core::Clock clock;
+    clock.SetName("V1");
+    Core::LogicInput input;
+    input.SetName("V2");
+    Core::ControlledSource cccs(Core::ComponentType::CCCS);
+    cccs.SetName("F1");
+    cccs.SetControllingCurrent("V1");
+    Core::Circuit circuit;
+    circuit.Add(clock, {1});
+    circuit.Add(input, {2});
+    circuit.Add(cccs, {3, 0});
+    // Both are voltage sources, so ngspice follows their current with no probe
+    const std::string netlist = circuit.ToSpiceNetlist();
+    CHECK(netlist.contains("F1 3 0 V1 10\n"));
+    CHECK_FALSE(netlist.contains("Vprobe-V1"));
+    CHECK(Core::FindControllingSource(circuit, "V1") == "V1");
+    CHECK(Core::FindControllingSource(circuit, "V2") == "V2");
 }
 
 TEST_CASE("HasACSource looks for a voltage source set to AC", "[circuit]") {
