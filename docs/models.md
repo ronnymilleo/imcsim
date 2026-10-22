@@ -19,6 +19,10 @@ elements, so the results are those of ngspice with the models below. Some things
   resistances. Flicker (1/f) noise is off, since no model sets KF.
   Sources, controlled sources, capacitors, inductors and the ideal op-amp add none, and an op-amp macromodel adds
   the noise of its internal parts, which does not follow its datasheet (see below).
+- A transfer function analysis linearizes the circuit at its DC operating point and reports the DC gain from an
+  independent source to an output node, with the resistance seen by the source and the resistance looking back into
+  the output. It is the same small-signal model an AC sweep uses, so the gain agrees with what the sweep would show
+  at 0 Hz.
 - To report terminal currents in every analysis, the netlist adds a 0 V source in series with diodes, transistors,
   potentiometers, switches, relays, transformers, controlled sources, op-amp outputs and the outputs of logic parts. It does not change the circuit; the Netlist window leaves it out unless a
   current-controlled source needs it.

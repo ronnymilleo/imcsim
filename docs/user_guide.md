@@ -84,8 +84,8 @@ How to read what imcsim measures, plots and exports. The [README](../README.md) 
 - **Find a part**: press Space over the editor, type part of a name (`mos`, `zener`, `opamp`, `nmos`, `vcvs`), move
   with Up and Down, and press Enter to start placing it.
 - **Running**: the ▶ button at the end of the toolbar, or F5, runs the analysis named beside it. That button opens
-  the list of analyses (operating point, transient, AC sweep, DC sweep) and the settings of the one picked, saved
-  with the schematic. Suggest fills the transient times (five periods of the slowest source with a waveform, 200
+  the list of analyses (operating point, transient, AC sweep, DC sweep, noise and transfer function) and the settings
+  of the one picked, saved with the schematic. Suggest fills the transient times (five periods of the slowest source with a waveform, 200
   points in a period of the fastest) or the AC range (two decades past the RC, RL and LC corners and the op-amp
   bandwidths). Nothing runs by itself: edit the circuit, then run again. View > Analysis Settings keeps the same
   settings open in a window.
@@ -356,6 +356,27 @@ Check a part to plot its share; parts whose noise does not reach the output are 
 When the input source hardly reaches the output (a gain under -120 dB, as through a logic gate), its input-referred
 noise would only grow without meaning, so it is left out and the tab says why. When no noise reaches the output at
 all, as on a node an ideal source holds, the tab says so instead of an empty plot. [Simulation models](models.md) lists which parts add noise.
+
+## Transfer function
+
+The Transfer function analysis reads the small-signal DC gain from one source to one node, and the resistances seen
+at both ends, as ngspice's `.tf` does. It is instructive for amplifiers: it gives the gain, the input impedance the
+source sees and the output impedance looking back into the output, without a frequency sweep. Pick it beside Run,
+then set:
+
+- **Output**: the node the gain is measured at, picked as in the noise analysis and kept by a point of its node.
+- **Input**: a voltage source, current source or VCC. It needs no AC setting and no particular value: ngspice only
+  uses it to define the gain from it to the output, so a plain DC source works.
+
+The Transfer function tab of the Output window is a table of three values:
+
+- **Gain**: the output over the input. It is dimensionless (V/V) for a voltage source and a transimpedance (V/A) for
+  a current source.
+- **Input impedance**: the resistance the source sees, in Ohm.
+- **Output impedance**: the resistance looking back into the output node, in Ohm.
+
+An output an ideal voltage source holds has an output impedance of 0 Ohm, and an input path held open reads as
+`open` rather than a giant number. The table is a readout like the operating point, so it is not exported.
 
 ## Exports
 

@@ -24,7 +24,8 @@ New to imcsim? The [tutorial](docs/tutorial.md) builds, simulates and exports a 
   limited by its supply pins, or a uA741 or custom part built as a Boyle macromodel from datasheet values (slew rate,
   bias current, output swing, current limit)
 - Warnings when a diode goes into reverse breakdown or a transistor exceeds its voltage, current or power ratings
-- Operating point, transient, AC sweep, DC sweep and noise analyses, with node voltages and component currents
+- Operating point, transient, AC sweep, DC sweep, noise and transfer function analyses, with node voltages and
+  component currents
 - Stepping a resistor, capacitor, inductor or the temperature over a range or a list, as SPICE's `.step`: the
   transient, AC sweep and DC sweep plot every step as a family of curves
 - Plots of transients, Bode diagrams and DC sweeps (including curve families, such as transistor characteristics):
@@ -36,6 +37,7 @@ New to imcsim? The [tutorial](docs/tutorial.md) builds, simulates and exports a 
 - A spectrum of the transient traces, as on a spectrum analyzer, with the fundamental, the harmonics and the THD of
   each, over a Hann or rectangular window
 - Noise at one node across frequency, at the output and referred to the input, with the share of each part
+- A transfer function from an input source to an output: the DC gain, the input impedance and the output impedance
 - Math channels on transient and DC sweep plots, as on an oscilloscope: an operation between two traces picked
   with buttons, or a typed expression such as `V(1,2)`, `V(3)*I(R1)` or `ddt(V(2))`, with units followed (W, Ohm,
   V/s) and a third axis for any unit other than volts and amperes
