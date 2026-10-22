@@ -32,6 +32,7 @@
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 #include <cmath>
 #include <complex>
+#include <format>
 #include <numbers>
 #include <vector>
 
@@ -2847,6 +2848,82 @@ TEST_CASE("RunTruthTable rejects inputs and outputs it cannot use", "[simulator]
     // More inputs than the limit would take thousands of runs
     const std::vector<std::string> many(Core::MaxTruthTableInputs + 1, "V1");
     CHECK(message({.Inputs = many, .OutputNodes = {1}}).contains("at most"));
+}
+
+TEST_CASE("Gates with three inputs follow their truth tables, an XOR giving odd parity", "[simulator][digital]") {
+    SKIP_WITHOUT_DIGITAL_MODELS();
+    struct GateCase {
+        Core::ComponentType Type;
+        // Whether the output is high for 0, 1, 2 and 3 high inputs
+        std::array<bool, 4> HighForCount;
+    };
+    constexpr std::array<GateCase, 6> Cases = {{{Core::ComponentType::And, {false, false, false, true}},
+                                                {Core::ComponentType::Or, {false, true, true, true}},
+                                                {Core::ComponentType::Nand, {true, true, true, false}},
+                                                {Core::ComponentType::Nor, {true, false, false, false}},
+                                                {Core::ComponentType::Xor, {false, true, false, true}},
+                                                {Core::ComponentType::Xnor, {true, false, true, false}}}};
+    for (const GateCase &gate_case : Cases) {
+        Core::LogicInput input_a;
+        input_a.SetName("V1");
+        Core::LogicInput input_b;
+        input_b.SetName("V2");
+        Core::LogicInput input_c;
+        input_c.SetName("V3");
+        Core::LogicPart gate(gate_case.Type);
+        gate.SetName("U1");
+        gate.SetInputCount(3);
+        Core::Circuit circuit;
+        // The three inputs on nodes 1, 2 and 3 and the output on node 4
+        circuit.Add(input_a, {1});
+        circuit.Add(input_b, {2});
+        circuit.Add(input_c, {3});
+        circuit.Add(gate, {1, 2, 3, 4});
+
+        const Core::TruthTableRun run =
+            Core::RunTruthTable(circuit, {.Inputs = {"V1", "V2", "V3"}, .OutputNodes = {4}});
+        INFO(gate.GetTypeName());
+        if (!run.Result) {
+            FAIL(run.Result.error());
+        }
+        REQUIRE(run.Result->Rows.size() == 8);
+        for (const Core::TruthTableRow &row : run.Result->Rows) {
+            const auto high_count = static_cast<std::size_t>(std::ranges::count(row.InputsHigh, true));
+            REQUIRE(row.HasOperatingPoint());
+            const double expected = gate_case.HighForCount[high_count] ? 5.0 : 0.0;
+            CHECK_THAT(row.OutputVoltages[0], Catch::Matchers::WithinAbs(expected, 0.05));
+        }
+    }
+}
+
+TEST_CASE("An AND gate of eight inputs is high only when all of them are", "[simulator][digital]") {
+    SKIP_WITHOUT_DIGITAL_MODELS();
+    std::vector<Core::LogicInput> inputs(8);
+    Core::LogicPart gate(Core::ComponentType::And);
+    gate.SetName("U1");
+    gate.SetInputCount(8);
+    Core::Circuit circuit;
+    std::vector<int> nodes;
+    for (std::size_t index = 0; index < inputs.size(); ++index) {
+        inputs[index].SetName(std::format("V{}", index + 1));
+        inputs[index].SetHigh(true);
+        circuit.Add(inputs[index], {static_cast<int>(index) + 1});
+        nodes.push_back(static_cast<int>(index) + 1);
+    }
+    nodes.push_back(9);
+    circuit.Add(gate, nodes);
+
+    const Core::OperatingPointRun all_high = Core::RunOperatingPoint(circuit);
+    REQUIRE(all_high.Result.has_value());
+    CHECK_THAT(all_high.Result->NodeVoltages[9], Catch::Matchers::WithinAbs(5.0, 0.05));
+    // The gate reports its output current, which is the last of its nine terminals
+    CHECK(Core::GetCurrentTerminals(gate) == std::vector<std::size_t>{8});
+
+    // The last input alone going low is enough to bring the output down
+    inputs[7].SetHigh(false);
+    const Core::OperatingPointRun one_low = Core::RunOperatingPoint(circuit);
+    REQUIRE(one_low.Result.has_value());
+    CHECK_THAT(one_low.Result->NodeVoltages[9], Catch::Matchers::WithinAbs(0.0, 0.05));
 }
 
 TEST_CASE("A circuit with an analog part still needs a ground", "[simulator][digital]") {

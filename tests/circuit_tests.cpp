@@ -711,6 +711,29 @@ TEST_CASE("ToSpiceNetlist writes a gate behind bridges, with a pull-down on each
     CHECK(netlist.find(".model LOGIC-U1 d_nand(rise_delay=10n fall_delay=10n)\n") != std::string::npos);
 }
 
+TEST_CASE("ToSpiceNetlist writes a gate with three inputs as a vector of three digital nodes", "[circuit]") {
+    Core::LogicPart gate(Core::ComponentType::Xor);
+    gate.SetName("U1");
+    gate.SetInputCount(3);
+    Core::Circuit circuit;
+    // Inputs on nodes 1, 2 and 3, output on node 4
+    circuit.Add(gate, {1, 2, 3, 4});
+
+    const std::string netlist = circuit.ToSpiceNetlist();
+    // Digital nodes start past the circuit ones, 0 to 4: 5, 6 and 7 for the inputs, 8 for the output, 9 behind its
+    // resistor
+    CHECK(netlist.contains("A-U1-A [1] [5] ADC-U1\n"));
+    CHECK(netlist.contains("A-U1-B [2] [6] ADC-U1\n"));
+    CHECK(netlist.contains("A-U1-C [3] [7] ADC-U1\n"));
+    CHECK(netlist.contains("R-U1-C 3 0 1G\n"));
+    CHECK(netlist.contains("A-U1 [5 6 7] 8 LOGIC-U1\n"));
+    CHECK(netlist.contains("A-U1-Y [8] [9] DAC-U1\n"));
+    CHECK(netlist.contains("R-U1-Y 9 4 50\n"));
+    CHECK(netlist.contains(".model LOGIC-U1 d_xor(rise_delay=10n fall_delay=10n)\n"));
+    // The current of the gate is measured at its output, which is the fourth terminal now
+    CHECK(Core::GetCurrentTerminals(gate) == std::vector<std::size_t>{3});
+}
+
 TEST_CASE("ToSpiceNetlist gives a single-input gate scalar ports and follows the logic level", "[circuit]") {
     Core::LogicPart inverter(Core::ComponentType::Not);
     inverter.SetName("U1");

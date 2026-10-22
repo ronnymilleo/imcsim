@@ -31,10 +31,14 @@ How to read what imcsim measures, plots and exports. The [README](../README.md) 
   coupling and the resistance of the windings. The secondary needs a path to ground, such as the bridge of the
   Transformers examples.
 - **Logic gates and flip-flops**: the toolbar has a button for the gates and one for the flip-flops, and Space finds
-  them by name (`nand`, `flip`). A part has a logic level and a delay in its properties; it reads 1 above 70% of
-  its level and 0 below 30%, and an input left unconnected reads 0. The Digital examples show a table of gates, the truth
-  table of the basic gates, half and full adders, an SR latch and a ripple counter. In the Output window the signals of logic parts
-  plot as lanes, like a logic analyzer's, under the analog traces (see Plots).
+  them by name (`nand`, `flip`). A part has a logic level and a delay in its properties; it reads 1 above 70% of its
+  level and 0 below 30%, and an input left unconnected reads 0. AND, OR, NAND, NOR, XOR and XNOR also have an
+  **Inputs** setting from 2 to 8. The body grows downward, one input at a time, and adding one leaves the wired inputs
+  where they are and moves only the output, which stays at the middle of the body, so its wire has to be drawn again.
+  Lowering the count removes the last pins and leaves their wires loose on the grid, so delete them or move them to a
+  pin that is left. A many-input XOR is high for an odd number of high inputs. The Digital examples show a table of
+  gates, the truth table of the basic gates, half and full adders, an SR latch and a ripple counter. In the Output
+  window the signals of logic parts plot as lanes, like a logic analyzer's, under the analog traces (see Plots).
 - **Clock**: the Sources group has a clock, a pulse source for digital circuits with one terminal, like a supply rail.
   Its properties hold a frequency, a duty cycle (the share of each period that is high, typed in %), a logic level and
   a start delay; it picks its own short rise and fall times, so they stay the same at every frequency. The start delay

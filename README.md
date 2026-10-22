@@ -58,9 +58,9 @@ New to imcsim? The [tutorial](docs/tutorial.md) builds, simulates and exports a 
 - Potentiometers, with the wiper set in the properties, and switches and push buttons that are open or closed,
   voltage-controlled switches and relays whose coil current sets when the contact closes, and transformers of two
   coupled inductors with a turns ratio
-- Logic gates (AND, OR, NOT, NAND, NOR, XOR, XNOR, buffer) and D, JK, T and SR flip-flops, driven by a Clock source
-  (frequency, duty cycle, logic level and start delay, written as a pulse so there are no rise or fall times to set)
-  and a Logic input that drives a net high or low, and simulated with the digital
+- Logic gates (AND, OR, NAND, NOR, XOR and XNOR with 2 to 8 inputs, NOT and a buffer) and D, JK, T and SR
+  flip-flops, driven by a Clock source (frequency, duty cycle, logic level and start delay, written as a pulse so there
+  are no rise or fall times to set) and a Logic input that drives a net high or low, and simulated with the digital
   code models of ngspice behind analog bridges, so their outputs are voltages that plot and probe like any other
 - Standard values: an option to take resistors, capacitors and inductors from the E6 to E192 series, typed or stepped
   with the arrows, keys or mouse wheel

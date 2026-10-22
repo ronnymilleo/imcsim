@@ -664,6 +664,39 @@ TEST_CASE("The terminals of a gate or flip-flop are its inputs, then its outputs
     CHECK(Core::GetLogicOutputLabels(Core::ComponentType::SRFlipFlop) == std::vector<std::string>{"Q", "QN"});
 }
 
+TEST_CASE("A gate takes from 2 to 8 inputs and names them A, B, C...", "[component]") {
+    for (const Core::ComponentType type :
+         {Core::ComponentType::And, Core::ComponentType::Or, Core::ComponentType::Nand, Core::ComponentType::Nor,
+          Core::ComponentType::Xor, Core::ComponentType::Xnor}) {
+        CHECK(Core::HasVariableInputs(type));
+    }
+    // The inverter, the buffer and the flip-flops keep the inputs they have
+    for (const Core::ComponentType type : {Core::ComponentType::Not, Core::ComponentType::Buffer,
+                                           Core::ComponentType::DFlipFlop, Core::ComponentType::JKFlipFlop}) {
+        CHECK_FALSE(Core::HasVariableInputs(type));
+    }
+
+    Core::LogicPart gate(Core::ComponentType::And);
+    CHECK(gate.GetInputCount() == 2);
+    gate.SetInputCount(5);
+    CHECK(gate.GetInputCount() == 5);
+    CHECK(gate.GetInputLabels() == std::vector<std::string>{"A", "B", "C", "D", "E"});
+    CHECK(Core::GetLogicInputLabels(Core::ComponentType::Nor, 3) == std::vector<std::string>{"A", "B", "C"});
+    CHECK(Core::GetLogicInputLabels(Core::ComponentType::Nor) == std::vector<std::string>{"A", "B"});
+
+    CHECK_FALSE(Core::LogicPart::IsValidInputCount(1));
+    CHECK(Core::LogicPart::IsValidInputCount(Core::MinLogicInputs));
+    CHECK(Core::LogicPart::IsValidInputCount(Core::MaxLogicInputs));
+    CHECK_FALSE(Core::LogicPart::IsValidInputCount(Core::MaxLogicInputs + 1));
+
+    Core::LogicPart inverter(Core::ComponentType::Not);
+    inverter.SetInputCount(4);
+    CHECK(inverter.GetInputCount() == 1);
+    Core::LogicPart flip_flop(Core::ComponentType::DFlipFlop);
+    flip_flop.SetInputCount(4);
+    CHECK(flip_flop.GetInputLabels() == std::vector<std::string>{"D", "CLK", "SET", "RESET"});
+}
+
 TEST_CASE("Logic figures need a positive level and a delay that is not negative", "[component]") {
     Core::LogicParameters parameters;
     CHECK(Core::LogicPart::IsValidParameters(parameters));

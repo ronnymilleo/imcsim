@@ -619,6 +619,21 @@ void PartEditor::DrawLogicPart(Core::LogicPart &part) {
         part.SetParameters(parameters);
         m_Schematic.MarkModified();
     }
+    if (Core::HasVariableInputs(part.GetType())) {
+        // The pins that go away when the count falls are left with the wires they had, which stay loose
+        const int input_count = part.GetInputCount();
+        DrawFieldLabel("Inputs");
+        if (ImGui::BeginCombo("##inputs", std::to_string(input_count).c_str())) {
+            for (int candidate = Core::MinLogicInputs; candidate <= Core::MaxLogicInputs; ++candidate) {
+                if (ImGui::Selectable(std::to_string(candidate).c_str(), candidate == input_count) &&
+                    candidate != input_count) {
+                    part.SetInputCount(candidate);
+                    m_Schematic.MarkModified();
+                }
+            }
+            ImGui::EndCombo();
+        }
+    }
     ImGui::TextDisabled("Inputs read 1 above 70%% of the level and 0 below 30%%; an open input reads 0");
 }
 
