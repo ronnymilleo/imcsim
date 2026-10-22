@@ -2,7 +2,7 @@
   "elements": [
     {
       "high": false,
-      "name": "V1",
+      "name": "VA",
       "parameters": {
         "logic_level": 5.0
       },
@@ -20,7 +20,7 @@
     },
     {
       "high": false,
-      "name": "V2",
+      "name": "VB",
       "parameters": {
         "logic_level": 5.0
       },
