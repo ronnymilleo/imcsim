@@ -257,6 +257,49 @@ struct TransferFunction {
 };
 
 /**
+ * @struct  TruthTableSettings
+ * @brief   Which logic inputs a truth table varies and which nodes it reads.
+ * @details Inputs are named logic inputs, the first being the most significant bit of the row number.
+ */
+struct TruthTableSettings {
+    std::vector<std::string> Inputs;
+    std::vector<int> OutputNodes;
+
+    bool operator==(const TruthTableSettings &) const = default;
+};
+
+/**
+ * @struct  TruthTableRow
+ * @brief   One combination of the inputs and the voltages it gives at the output nodes.
+ * @details The voltages are empty when ngspice found no operating point for the combination, as a latch whose
+ *          outputs depend on its history has none.
+ */
+struct TruthTableRow {
+    // Whether each input is high, in the order of TruthTable::InputNames
+    std::vector<bool> InputsHigh;
+    // One voltage per output node, in the order of TruthTable::OutputNodes
+    std::vector<double> OutputVoltages;
+
+    bool HasOperatingPoint() const;
+};
+
+/**
+ * @struct  TruthTable
+ * @brief   Every combination of the chosen logic inputs, in binary counting order, with the outputs it gives.
+ */
+struct TruthTable {
+    std::vector<std::string> InputNames;
+    // High voltage of each input, so a view can tell what level the signals swing to
+    std::vector<double> InputLevels;
+    std::vector<int> OutputNodes;
+    std::vector<TruthTableRow> Rows;
+    std::vector<std::string> Warnings;
+};
+
+// Most inputs a truth table varies; each one doubles the number of runs
+inline constexpr std::size_t MaxTruthTableInputs = 10;
+
+/**
  * @struct  SimulationRun
  * @brief   Outcome of a simulation, with everything ngspice printed.
  */
@@ -271,6 +314,7 @@ using ACSweepRun = SimulationRun<ACSweep>;
 using DCSweepRun = SimulationRun<DCSweep>;
 using NoiseRun = SimulationRun<Noise>;
 using TransferFunctionRun = SimulationRun<TransferFunction>;
+using TruthTableRun = SimulationRun<TruthTable>;
 
 OperatingPointRun RunOperatingPoint(const Circuit &circuit);
 TransientRun RunTransient(const Circuit &circuit, const TransientSettings &settings,
@@ -281,6 +325,7 @@ DCSweepRun RunDCSweep(const Circuit &circuit, const DCSweepSettings &settings,
                       const std::optional<ParameterValue> &parameter = std::nullopt);
 NoiseRun RunNoise(const Circuit &circuit, const NoiseSettings &settings);
 TransferFunctionRun RunTransferFunction(const Circuit &circuit, const TransferFunctionSettings &settings);
+TruthTableRun RunTruthTable(const Circuit &circuit, const TruthTableSettings &settings);
 
 void SetCodeModelDirectory(const std::filesystem::path &directory);
 bool AreDigitalModelsAvailable();
@@ -289,6 +334,7 @@ bool AreDigitalModelsAvailable();
 std::vector<std::string> GetSweepableSources(const Circuit &circuit);
 std::vector<std::string> GetNoiseInputSources(const Circuit &circuit);
 std::vector<std::string> GetTransferFunctionInputSources(const Circuit &circuit);
+std::vector<std::string> GetTruthTableInputs(const Circuit &circuit);
 std::vector<std::string> GetSteppableParts(const Circuit &circuit);
 std::vector<std::string> GetCurrentNames(const Component &component);
 std::vector<std::size_t> GetCurrentTerminals(const Component &component);

@@ -2712,6 +2712,142 @@ TEST_CASE("A circuit of only digital parts runs without a ground", "[simulator][
     CHECK_THAT(high.Result->NodeVoltages[3], Catch::Matchers::WithinAbs(5.0, 0.05));
 }
 
+TEST_CASE("A truth table runs every combination of the chosen logic inputs in counting order", "[simulator][digital]") {
+    SKIP_WITHOUT_DIGITAL_MODELS();
+    Core::LogicInput input_a;
+    input_a.SetName("V1");
+    input_a.SetHigh(true);
+    Core::LogicInput input_b;
+    input_b.SetName("V2");
+    Core::LogicPart gate(Core::ComponentType::And);
+    gate.SetName("U1");
+    Core::Circuit circuit;
+    // A on node 1, B on node 2, Y on node 3
+    circuit.Add(input_a, {1});
+    circuit.Add(input_b, {2});
+    circuit.Add(gate, {1, 2, 3});
+
+    CHECK(Core::GetTruthTableInputs(circuit) == std::vector<std::string>{"V1", "V2"});
+    const Core::TruthTableRun run = Core::RunTruthTable(circuit, {.Inputs = {"V1", "V2"}, .OutputNodes = {3}});
+    if (!run.Result) {
+        FAIL(run.Result.error());
+    }
+    const Core::TruthTable &table = *run.Result;
+    CHECK(table.InputNames == std::vector<std::string>{"V1", "V2"});
+    CHECK(table.InputLevels == std::vector<double>{5.0, 5.0});
+    REQUIRE(table.Rows.size() == 4);
+    // The first input is the most significant bit, so the rows read 00, 01, 10 and 11, and an AND is high only on 11
+    constexpr std::array<std::array<bool, 2>, 4> Combinations = {
+        {{false, false}, {false, true}, {true, false}, {true, true}}};
+    for (std::size_t row = 0; row < table.Rows.size(); ++row) {
+        CHECK(table.Rows[row].InputsHigh == std::vector<bool>{Combinations[row][0], Combinations[row][1]});
+        REQUIRE(table.Rows[row].HasOperatingPoint());
+        const double expected = Combinations[row][0] && Combinations[row][1] ? 5.0 : 0.0;
+        CHECK_THAT(table.Rows[row].OutputVoltages[0], Catch::Matchers::WithinAbs(expected, 0.05));
+    }
+    CHECK(table.Warnings.empty());
+    // The circuit itself is left as it was
+    CHECK(input_a.IsHigh());
+    CHECK_FALSE(input_b.IsHigh());
+}
+
+TEST_CASE("A truth table reads several outputs, as a half adder gives its sum and carry", "[simulator][digital]") {
+    SKIP_WITHOUT_DIGITAL_MODELS();
+    Core::LogicInput input_a;
+    input_a.SetName("V1");
+    Core::LogicInput input_b;
+    input_b.SetName("V2");
+    Core::LogicPart sum_gate(Core::ComponentType::Xor);
+    sum_gate.SetName("U1");
+    Core::LogicPart carry_gate(Core::ComponentType::And);
+    carry_gate.SetName("U2");
+    Core::Circuit circuit;
+    // A on node 1, B on node 2, sum on node 3, carry on node 4
+    circuit.Add(input_a, {1});
+    circuit.Add(input_b, {2});
+    circuit.Add(sum_gate, {1, 2, 3});
+    circuit.Add(carry_gate, {1, 2, 4});
+
+    const Core::TruthTableRun run = Core::RunTruthTable(circuit, {.Inputs = {"V1", "V2"}, .OutputNodes = {3, 4}});
+    if (!run.Result) {
+        FAIL(run.Result.error());
+    }
+    REQUIRE(run.Result->Rows.size() == 4);
+    // Sum is A xor B and carry is A and B: 00 gives 0 0, 01 gives 1 0, 10 gives 1 0 and 11 gives 0 1
+    constexpr std::array<std::array<double, 2>, 4> Expected = {{{0.0, 0.0}, {5.0, 0.0}, {5.0, 0.0}, {0.0, 5.0}}};
+    for (std::size_t row = 0; row < 4; ++row) {
+        REQUIRE(run.Result->Rows[row].OutputVoltages.size() == 2);
+        CHECK_THAT(run.Result->Rows[row].OutputVoltages[0], Catch::Matchers::WithinAbs(Expected[row][0], 0.05));
+        CHECK_THAT(run.Result->Rows[row].OutputVoltages[1], Catch::Matchers::WithinAbs(Expected[row][1], 0.05));
+    }
+}
+
+TEST_CASE("A truth table leaves a combination without an operating point empty and warns", "[simulator][digital]") {
+    SKIP_WITHOUT_DIGITAL_MODELS();
+    Core::LogicInput set_bar;
+    set_bar.SetName("V1");
+    Core::LogicInput reset_bar;
+    reset_bar.SetName("V2");
+    Core::LogicPart gate_q(Core::ComponentType::Nand);
+    gate_q.SetName("U1");
+    Core::LogicPart gate_qn(Core::ComponentType::Nand);
+    gate_qn.SetName("U2");
+    Core::Circuit circuit;
+    // U1: A = S_BAR (1), B = QN (3), Y = Q (2); U2: A = R_BAR (4), B = Q (2), Y = QN (3)
+    circuit.Add(set_bar, {1});
+    circuit.Add(reset_bar, {4});
+    circuit.Add(gate_q, {1, 3, 2});
+    circuit.Add(gate_qn, {4, 2, 3});
+
+    const Core::TruthTableRun run = Core::RunTruthTable(circuit, {.Inputs = {"V1", "V2"}, .OutputNodes = {2, 3}});
+    if (!run.Result) {
+        FAIL(run.Result.error());
+    }
+    const Core::TruthTable &table = *run.Result;
+    REQUIRE(table.Rows.size() == 4);
+    // S_BAR low sets Q and R_BAR low resets it; both low drives both outputs high
+    CHECK_THAT(table.Rows[0].OutputVoltages[0], Catch::Matchers::WithinAbs(5.0, 0.05));
+    CHECK_THAT(table.Rows[0].OutputVoltages[1], Catch::Matchers::WithinAbs(5.0, 0.05));
+    CHECK_THAT(table.Rows[1].OutputVoltages[0], Catch::Matchers::WithinAbs(5.0, 0.05));
+    CHECK_THAT(table.Rows[1].OutputVoltages[1], Catch::Matchers::WithinAbs(0.0, 0.05));
+    CHECK_THAT(table.Rows[2].OutputVoltages[0], Catch::Matchers::WithinAbs(0.0, 0.05));
+    CHECK_THAT(table.Rows[2].OutputVoltages[1], Catch::Matchers::WithinAbs(5.0, 0.05));
+    // Both high holds the state, so it depends on history and has no operating point
+    CHECK_FALSE(table.Rows[3].HasOperatingPoint());
+    REQUIRE(table.Warnings.size() == 1);
+    CHECK(table.Warnings.front().contains("1 of 4"));
+}
+
+TEST_CASE("RunTruthTable rejects inputs and outputs it cannot use", "[simulator]") {
+    Core::LogicInput input;
+    input.SetName("V1");
+    Core::Resistor load;
+    load.SetName("R1");
+    load.SetValue(1e3);
+    const Core::Ground reference;
+    Core::Circuit circuit;
+    circuit.Add(input, {1});
+    circuit.Add(load, {1, 0});
+    circuit.Add(reference, {0});
+
+    const auto message = [&circuit](const Core::TruthTableSettings &settings) {
+        const Core::TruthTableRun run = Core::RunTruthTable(circuit, settings);
+        REQUIRE_FALSE(run.Result.has_value());
+        return run.Result.error();
+    };
+    CHECK(message({.Inputs = {}, .OutputNodes = {1}}).contains("at least one logic input"));
+    CHECK(message({.Inputs = {"V9"}, .OutputNodes = {1}}).contains("V9"));
+    // A resistor is not a logic input, and an input cannot be listed twice
+    CHECK(message({.Inputs = {"R1"}, .OutputNodes = {1}}).contains("R1"));
+    CHECK(message({.Inputs = {"V1", "V1"}, .OutputNodes = {1}}).contains("twice"));
+    CHECK(message({.Inputs = {"V1"}, .OutputNodes = {}}).contains("at least one node"));
+    CHECK(message({.Inputs = {"V1"}, .OutputNodes = {0}}).contains("ground"));
+    CHECK(message({.Inputs = {"V1"}, .OutputNodes = {7}}).contains("ground"));
+    // More inputs than the limit would take thousands of runs
+    const std::vector<std::string> many(Core::MaxTruthTableInputs + 1, "V1");
+    CHECK(message({.Inputs = many, .OutputNodes = {1}}).contains("at most"));
+}
+
 TEST_CASE("A circuit with an analog part still needs a ground", "[simulator][digital]") {
     Core::LogicInput input;
     input.SetName("V1");
