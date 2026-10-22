@@ -79,7 +79,7 @@ New to imcsim? The [tutorial](docs/tutorial.md) builds, simulates and exports a 
   filters, diode curves, a Zener regulator and a rectifier, BJT and MOSFET switches and characteristics, a current
   mirror, common-emitter and class AB amplifiers, op-amp amplifiers, an integrator, a Schmitt trigger and a Sallen-Key
   filter, an ideal transformer made of controlled sources, switching circuits, and digital ones: gates, a truth
-  table of the basic gates, a half adder, an SR latch and a ripple counter
+  table of the basic gates, half and full adders, an SR latch and a ripple counter
 
 ## Screenshots
 
