@@ -227,6 +227,79 @@ struct Noise {
 };
 
 /**
+ * @struct  TransferFunctionSettings
+ * @brief   Where a transfer function analysis measures its output, and which source drives the circuit.
+ * @details The input must be an independent source, a voltage source, current source or supply rail; ngspice uses
+ *          it only to find the gain from it to the output, whatever its value or waveform.
+ */
+struct TransferFunctionSettings {
+    int OutputNode = 0;
+    std::string InputSource;
+
+    bool operator==(const TransferFunctionSettings &) const = default;
+};
+
+/**
+ * @struct  TransferFunction
+ * @brief   Small-signal DC gain from an input source to an output, with the input and output impedances.
+ * @details The gain is dimensionless (V/V) for a voltage source input and a transimpedance (V/A) for a current
+ *          source. Both impedances are in ohms: the input is the resistance seen by the source and the output the
+ *          resistance seen looking back into the output. An open path is reported around 1e20 ohm, as ngspice does.
+ */
+struct TransferFunction {
+    int OutputNode = 0;
+    std::string InputSource;
+    // Unit of the input source, "V" or "A", which sets the unit of the gain
+    std::string InputUnit;
+    double Gain = 0.0;
+    double InputImpedance = 0.0;
+    double OutputImpedance = 0.0;
+};
+
+/**
+ * @struct  TruthTableSettings
+ * @brief   Which logic inputs a truth table varies and which nodes it reads.
+ * @details Inputs are named logic inputs, the first being the most significant bit of the row number.
+ */
+struct TruthTableSettings {
+    std::vector<std::string> Inputs;
+    std::vector<int> OutputNodes;
+
+    bool operator==(const TruthTableSettings &) const = default;
+};
+
+/**
+ * @struct  TruthTableRow
+ * @brief   One combination of the inputs and the voltages it gives at the output nodes.
+ * @details The voltages are empty when ngspice found no operating point for the combination, as a latch whose
+ *          outputs depend on its history has none.
+ */
+struct TruthTableRow {
+    // Whether each input is high, in the order of TruthTable::InputNames
+    std::vector<bool> InputsHigh;
+    // One voltage per output node, in the order of TruthTable::OutputNodes
+    std::vector<double> OutputVoltages;
+
+    bool HasOperatingPoint() const;
+};
+
+/**
+ * @struct  TruthTable
+ * @brief   Every combination of the chosen logic inputs, in binary counting order, with the outputs it gives.
+ */
+struct TruthTable {
+    std::vector<std::string> InputNames;
+    // High voltage of each input, so a view can tell what level the signals swing to
+    std::vector<double> InputLevels;
+    std::vector<int> OutputNodes;
+    std::vector<TruthTableRow> Rows;
+    std::vector<std::string> Warnings;
+};
+
+// Most inputs a truth table varies; each one doubles the number of runs
+inline constexpr std::size_t MaxTruthTableInputs = 10;
+
+/**
  * @struct  SimulationRun
  * @brief   Outcome of a simulation, with everything ngspice printed.
  */
@@ -240,6 +313,8 @@ using TransientRun = SimulationRun<Transient>;
 using ACSweepRun = SimulationRun<ACSweep>;
 using DCSweepRun = SimulationRun<DCSweep>;
 using NoiseRun = SimulationRun<Noise>;
+using TransferFunctionRun = SimulationRun<TransferFunction>;
+using TruthTableRun = SimulationRun<TruthTable>;
 
 OperatingPointRun RunOperatingPoint(const Circuit &circuit);
 TransientRun RunTransient(const Circuit &circuit, const TransientSettings &settings,
@@ -249,6 +324,8 @@ ACSweepRun RunACSweep(const Circuit &circuit, const ACSweepSettings &settings,
 DCSweepRun RunDCSweep(const Circuit &circuit, const DCSweepSettings &settings,
                       const std::optional<ParameterValue> &parameter = std::nullopt);
 NoiseRun RunNoise(const Circuit &circuit, const NoiseSettings &settings);
+TransferFunctionRun RunTransferFunction(const Circuit &circuit, const TransferFunctionSettings &settings);
+TruthTableRun RunTruthTable(const Circuit &circuit, const TruthTableSettings &settings);
 
 void SetCodeModelDirectory(const std::filesystem::path &directory);
 bool AreDigitalModelsAvailable();
@@ -256,6 +333,8 @@ bool AreDigitalModelsAvailable();
 // Names in the results
 std::vector<std::string> GetSweepableSources(const Circuit &circuit);
 std::vector<std::string> GetNoiseInputSources(const Circuit &circuit);
+std::vector<std::string> GetTransferFunctionInputSources(const Circuit &circuit);
+std::vector<std::string> GetTruthTableInputs(const Circuit &circuit);
 std::vector<std::string> GetSteppableParts(const Circuit &circuit);
 std::vector<std::string> GetCurrentNames(const Component &component);
 std::vector<std::size_t> GetCurrentTerminals(const Component &component);

@@ -15,6 +15,12 @@ How to read what imcsim measures, plots and exports. The [README](../README.md) 
   the same fields in a docked window.
 - **Potentiometer**: its properties hold the resistance between its ends and the wiper, a slider from 0% at terminal 1
   to 100% at terminal 2. Move the wiper and run again to see the output change; the wiper does not move during a run.
+- **Initial conditions**: a capacitor and an inductor have an Initial field beside the value, for the voltage the
+  capacitor starts charged to or the current the inductor starts carrying; the sign is free. When any part has one,
+  the transient runs with `uic`, so the circuit starts from those values without an operating point first, and says so
+  as a warning. Capacitors and inductors left empty then start at zero, not at their operating point values, so set
+  every part that should start charged. The operating point, the AC sweep and the DC sweep ignore the initial
+  conditions.
 - **Switches**: a switch and a push button have a Closed (or Pressed) box in their properties, and the symbol and a
   label under it show the state. Both start open. The state holds for the whole run, so a switch cannot open in the
   middle of a transient.
@@ -25,10 +31,24 @@ How to read what imcsim measures, plots and exports. The [README](../README.md) 
   coupling and the resistance of the windings. The secondary needs a path to ground, such as the bridge of the
   Transformers examples.
 - **Logic gates and flip-flops**: the toolbar has a button for the gates and one for the flip-flops, and Space finds
-  them by name (`nand`, `flip`). A part has a logic level and a delay in its properties; it reads 1 above 70% of
-  its level and 0 below 30%, and an input left unconnected reads 0. The Digital examples show a table of gates, a half
-  adder, an SR latch and a ripple counter. In the Output window the signals of logic parts
-  plot as lanes, like a logic analyzer's, under the analog traces (see Plots).
+  them by name (`nand`, `flip`). A part has a logic level and a delay in its properties; it reads 1 above 70% of its
+  level and 0 below 30%, and an input left unconnected reads 0. AND, OR, NAND, NOR, XOR and XNOR also have an
+  **Inputs** setting from 2 to 8. The body grows downward, one input at a time, and adding one leaves the wired inputs
+  where they are and moves only the output, which stays at the middle of the body, so its wire has to be drawn again.
+  Lowering the count removes the last pins and leaves their wires loose on the grid, so delete them or move them to a
+  pin that is left. A many-input XOR is high for an odd number of high inputs. The Digital examples show a table of
+  gates, the truth table of the basic gates, half and full adders, an SR latch and a ripple counter. In the Output
+  window the signals of logic parts plot as lanes, like a logic analyzer's, under the analog traces (see Plots).
+- **Clock**: the Sources group has a clock, a pulse source for digital circuits with one terminal, like a supply rail.
+  Its properties hold a frequency, a duty cycle (the share of each period that is high, typed in %), a logic level and
+  a start delay; it picks its own short rise and fall times, so they stay the same at every frequency. The start delay
+  holds the clock low and the first rising edge begins there, so a delay of 0 starts the first edge at t = 0 and a
+  nonzero one keeps the clock quiet.
+- **Logic input**: a box in the supply row with Ground and VCC drives a net to a defined level. A High box in its
+  properties drives the logic level (5 V by default, editable) and leaves it clear to drive 0 V; the symbol shows a 1
+  while high and a 0 while low, and both start low. It is a source from its terminal to ground, so it gives a gate
+  input or a latch's SET or RESET a defined level to start from. A circuit of only logic parts, clocks, logic inputs and VCC
+  runs without a Ground symbol or a load on the outputs; add a Ground as soon as it has any other part.
 - **Standard values**: View > Component Values restricts resistors, capacitors and inductors to one of the E series
   (E6, E12, E24, E48, E96 or E192, with their tolerances of 20% down to 0.5%), or leaves any value allowed, which is
   the default. With a series chosen, a typed value becomes the nearest one of the series on a log scale (`5000` is
@@ -78,8 +98,8 @@ How to read what imcsim measures, plots and exports. The [README](../README.md) 
 - **Find a part**: press Space over the editor, type part of a name (`mos`, `zener`, `opamp`, `nmos`, `vcvs`), move
   with Up and Down, and press Enter to start placing it.
 - **Running**: the ▶ button at the end of the toolbar, or F5, runs the analysis named beside it. That button opens
-  the list of analyses (operating point, transient, AC sweep, DC sweep) and the settings of the one picked, saved
-  with the schematic. Suggest fills the transient times (five periods of the slowest sine or pulse source, 200
+  the list of analyses (operating point, transient, AC sweep, DC sweep, noise, transfer function and truth table) and the settings
+  of the one picked, saved with the schematic. Suggest fills the transient times (five periods of the slowest source with a waveform, 200
   points in a period of the fastest) or the AC range (two decades past the RC, RL and LC corners and the op-amp
   bandwidths). Nothing runs by itself: edit the circuit, then run again. View > Analysis Settings keeps the same
   settings open in a window.
@@ -280,7 +300,16 @@ their statistics and the exports always agree.
 - The AC sweep is a Bode plot: magnitude in dB and phase in degrees, relative to the AC magnitude of the sources.
   That magnitude is set in Properties apart from the amplitude of the sine, as in SPICE, and is 1 by default, so
   the plot reads as gain while a transient uses the small amplitude a real circuit would see.
-- A stepped DC sweep draws one curve per step, labeled with the step value where the curves part most.
+- A stepped DC sweep draws one curve per step, labeled with the step value where the curves part most, and lists
+  every curve in the statistics, named by its step value.
+- The transient, AC sweep and DC sweep have **Cursors A and B** in the panel on their right. Turning them on places
+  two draggable vertical lines; the panel then measures every shown trace between them, or over the visible range
+  when they are off. The transient reads peak-to-peak, mean, RMS and frequency, and the value at each cursor with
+  the change and the time between them; the AC sweep reads the gain and phase at each cursor and its response over
+  the whole sweep; the DC sweep reads the value at each cursor, the change and the slope between them, and the
+  minimum, maximum and mean over the span. The slope is in the unit of the trace over that of the sweep: a voltage
+  over a swept voltage is a gain (V/V), and a current over a swept voltage a conductance (A/V), whose resistance
+  (the inverse) is shown beside it, as `open` rather than an infinite value when the slope is zero.
 
 ## Stepping a parameter
 
@@ -350,6 +379,48 @@ Check a part to plot its share; parts whose noise does not reach the output are 
 When the input source hardly reaches the output (a gain under -120 dB, as through a logic gate), its input-referred
 noise would only grow without meaning, so it is left out and the tab says why. When no noise reaches the output at
 all, as on a node an ideal source holds, the tab says so instead of an empty plot. [Simulation models](models.md) lists which parts add noise.
+
+## Transfer function
+
+The Transfer function analysis reads the small-signal DC gain from one source to one node, and the resistances seen
+at both ends, as ngspice's `.tf` does. It is instructive for amplifiers: it gives the gain, the input impedance the
+source sees and the output impedance looking back into the output, without a frequency sweep. Pick it beside Run,
+then set:
+
+- **Output**: the node the gain is measured at, picked as in the noise analysis and kept by a point of its node.
+- **Input**: a voltage source, current source or VCC. It needs no AC setting and no particular value: ngspice only
+  uses it to define the gain from it to the output, so a plain DC source works.
+
+The Transfer function tab of the Output window is a table of three values:
+
+- **Gain**: the output over the input. It is dimensionless (V/V) for a voltage source and a transimpedance (V/A) for
+  a current source.
+- **Input impedance**: the resistance the source sees, in Ohm.
+- **Output impedance**: the resistance looking back into the output node, in Ohm.
+
+An output an ideal voltage source holds has an output impedance of 0 Ohm, and an input path held open reads as
+`open` rather than a giant number. The table is a readout like the operating point, so it is not exported.
+
+## Truth table
+
+The Truth table analysis builds the truth table of a digital circuit: it sets the logic inputs to every combination,
+runs an operating point for each and reads the outputs, so nobody has to flip the inputs by hand. Pick it beside Run,
+then choose:
+
+- **Inputs to vary**: a checkbox per Logic input, all of them by default. At least one stays, and at most 10 (1024
+  combinations) are allowed. A Logic input left unchecked keeps the High or Low it has in the schematic for every row.
+- **Outputs**: the voltages you already measure with the Probe tool; the popover lists them. The table needs at least
+  one.
+
+The Truth table tab of the Output window lists one row per combination in counting order, the first input being the
+most significant bit: the inputs as 0 and 1, then each output as 0, 1 or X. An output reads 1 above 70% of its logic
+level and 0 below 30% of it, as the logic parts do; between them, or when ngspice found no operating point for the
+combination, it reads X. The row the inputs have in the schematic right now is highlighted, and Copy as Markdown puts
+the table on the clipboard.
+
+Each row is an independent operating point, so the table describes combinational circuits. A latch or flip-flop whose
+outputs depend on its history has no operating point for the combinations that hold its state; those rows read X and
+the Run report says how many. The table is not exported as a figure, like the operating point.
 
 ## Exports
 

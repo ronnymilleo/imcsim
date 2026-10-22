@@ -18,7 +18,9 @@ namespace GUI {
 
 namespace {
 
-constexpr float GateHalfHeight = 1.5f;
+// The body of a gate reaches half a unit past its first and last input, so a gate of two inputs is 3 units high
+constexpr float TwoInputGateHalfHeight = 1.5f;
+constexpr float BodyMargin = 0.5f;
 constexpr float GateLeft = -2.0f;
 constexpr float GateRight = 2.0f;
 constexpr float BubbleRadius = 0.3f;
@@ -89,9 +91,15 @@ float OutputStart(const Core::ComponentType type) {
 }
 
 // Where the back of an OR gate is at a height, the curve its inputs touch
-float OrBackX(const float y) {
-    const float ratio = y / GateHalfHeight;
+float OrBackX(const float y, const float half_height) {
+    const float ratio = y / half_height;
     return GateLeft + OrBackDepth * (1.0f - ratio * ratio);
+}
+
+// The inputs go down the left side two units apart, A at y = -1, B at 1, C at 3 and so on, so adding an input leaves
+// the ones already wired where they are and the body only grows downward
+int GateInputY(const int input) {
+    return 2 * input - 1;
 }
 
 } // namespace
@@ -129,7 +137,7 @@ void UILogicPart::DrawSymbol(SchematicCanvas &canvas, const ViewTransform &view,
 void UILogicPart::DrawLabels(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color) const {
     const Core::ComponentType type = GetComponent().GetType();
     // A flip-flop's name stands above the end of its SET lead, which is a unit over the box
-    const float top = IsFlipFlop() ? -FlipFlopHalfHeight(type) - 1.0f : -GateHalfHeight;
+    const float top = IsFlipFlop() ? -FlipFlopHalfHeight(type) - 1.0f : GetGateCenterY() - GetGateHalfHeight();
     DrawLabel(canvas, view, {0.0f, top - NameOffsetY}, {0.0f, -1.0f}, GetComponent().GetName(), color);
     if (!IsFlipFlop()) {
         return;
@@ -169,12 +177,27 @@ std::vector<GridPoint> UILogicPart::GetLocalTerminals() const {
         if (HasOneInput(type)) {
             return {{-3, 0}, {3, 0}};
         }
-        return {{-3, -1}, {-3, 1}, {3, 0}};
+        std::vector<GridPoint> terminals;
+        const int input_count = static_cast<const Core::LogicPart &>(GetComponent()).GetInputCount();
+        for (int input = 0; input < input_count; ++input) {
+            terminals.push_back({-3, GateInputY(input)});
+        }
+        // The output sits at the middle of the body, which is a whole unit for every count
+        terminals.push_back({3, static_cast<int>(GetGateCenterY())});
+        return terminals;
     }
     if (HasTwoDataInputs(type)) {
         return {{-3, -2}, {-3, 2}, {-3, 0}, {0, -4}, {0, 4}, {3, -2}, {3, 2}};
     }
     return {{-3, -1}, {-3, 1}, {0, -3}, {0, 3}, {3, -1}, {3, 1}};
+}
+
+// The leads of a gate run along x, whichever input they are, and the default direction would follow the longer axis
+GridPoint UILogicPart::GetLocalTerminalInward(const std::size_t terminal) const {
+    if (IsFlipFlop()) {
+        return UIElement::GetLocalTerminalInward(terminal);
+    }
+    return GetLocalTerminals()[terminal].X < 0 ? GridPoint{1, 0} : GridPoint{-1, 0};
 }
 
 /**
@@ -187,30 +210,53 @@ LocalBounds UILogicPart::GetLocalBounds() const {
         const float height = FlipFlopHalfHeight(type) + 1.0f;
         return {{-3.0f, -height}, {3.0f, height}};
     }
-    return {{-3.0f, -GateHalfHeight}, {3.0f, GateHalfHeight}};
+    const float center = GetGateCenterY();
+    return {{-3.0f, center - GetGateHalfHeight()}, {3.0f, center + GetGateHalfHeight()}};
 }
 
 bool UILogicPart::IsFlipFlop() const {
     return Core::IsFlipFlop(GetComponent().GetType());
 }
 
+// The body of a gate goes from half a unit above its first input to half a unit below its last, so it grows downward
+// with the inputs and its middle, where the output is, moves down a unit with each one. A gate of one input is
+// as high as one of two
+float UILogicPart::GetGateHalfHeight() const {
+    if (HasOneInput(GetComponent().GetType())) {
+        return TwoInputGateHalfHeight;
+    }
+    const int input_count = static_cast<const Core::LogicPart &>(GetComponent()).GetInputCount();
+    return (static_cast<float>(GateInputY(input_count - 1) - GateInputY(0)) + 2.0f * BodyMargin) / 2.0f;
+}
+
+float UILogicPart::GetGateCenterY() const {
+    if (HasOneInput(GetComponent().GetType())) {
+        return 0.0f;
+    }
+    const int input_count = static_cast<const Core::LogicPart &>(GetComponent()).GetInputCount();
+    return static_cast<float>(GateInputY(0) + GateInputY(input_count - 1)) / 2.0f;
+}
+
 void UILogicPart::DrawGateTerminals(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color) const {
     const Core::ComponentType type = GetComponent().GetType();
     const std::vector<GridPoint> terminals = GetLocalTerminals();
     const bool ansi_or = IsOrFamily(type);
+    const float half_height = GetGateHalfHeight();
+    const float center = GetGateCenterY();
     for (std::size_t input = 0; input + 1 < terminals.size(); ++input) {
         const auto y = static_cast<float>(terminals[input].Y);
         // The inputs of an OR gate run to its curved back, and past it to the second curve of an XOR gate
         float end = HasOneInput(type) ? TriangleLeft : GateLeft;
         if (ansi_or) {
-            end = OrBackX(y);
+            end = OrBackX(y - center, half_height);
             if (type == Core::ComponentType::Xor || type == Core::ComponentType::Xnor) {
                 end -= XorGap;
             }
         }
         canvas.AddLine(LocalToScreen(view, -3, y), LocalToScreen(view, end, y), color, LineThickness);
     }
-    canvas.AddLine(LocalToScreen(view, OutputStart(type), 0), LocalToScreen(view, 3, 0), color, LineThickness);
+    canvas.AddLine(LocalToScreen(view, OutputStart(type), center), LocalToScreen(view, 3, center), color,
+                   LineThickness);
 }
 
 void UILogicPart::DrawFlipFlopTerminals(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color) const {
@@ -234,30 +280,32 @@ void UILogicPart::DrawFlipFlopTerminals(SchematicCanvas &canvas, const ViewTrans
 void UILogicPart::DrawAnsiGate(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color) const {
     const Core::ComponentType type = GetComponent().GetType();
     const float tip = OutputStart(type);
+    const float half_height = GetGateHalfHeight();
+    const float center = GetGateCenterY();
     std::vector<ImVec2> outline;
     if (HasOneInput(type)) {
         const ImVec2 triangle[3] = {LocalToScreen(view, TriangleLeft, -TriangleHalfHeight),
-                                    LocalToScreen(view, tip - (type == Core::ComponentType::Not ? 0.1f : 0.0f), 0),
+                                    LocalToScreen(view, tip - (type == Core::ComponentType::Not ? 0.1f : 0.0f), center),
                                     LocalToScreen(view, TriangleLeft, TriangleHalfHeight)};
         canvas.AddPolyline(triangle, 3, color, ImDrawFlags_Closed, LineThickness);
     } else if (type == Core::ComponentType::And || type == Core::ComponentType::Nand) {
         // The sides run straight to the middle and the front is half an ellipse reaching the tip
         const float arc_start = GateLeft + (tip - GateLeft) / 2.0f;
-        outline.push_back(LocalToScreen(view, GateLeft, GateHalfHeight));
-        outline.push_back(LocalToScreen(view, GateLeft, -GateHalfHeight));
-        outline.push_back(LocalToScreen(view, arc_start, -GateHalfHeight));
+        outline.push_back(LocalToScreen(view, GateLeft, center + half_height));
+        outline.push_back(LocalToScreen(view, GateLeft, center - half_height));
+        outline.push_back(LocalToScreen(view, arc_start, center - half_height));
         for (int step = 1; step < CurveSegments; ++step) {
             const float angle = std::numbers::pi_v<float> * (0.5f - static_cast<float>(step) / CurveSegments);
             outline.push_back(LocalToScreen(view, arc_start + (tip - arc_start) * std::cos(angle),
-                                            GateHalfHeight * -std::sin(angle)));
+                                            center + half_height * -std::sin(angle)));
         }
-        outline.push_back(LocalToScreen(view, arc_start, GateHalfHeight));
+        outline.push_back(LocalToScreen(view, arc_start, center + half_height));
         canvas.AddPolyline(outline.data(), static_cast<int>(outline.size()), color, ImDrawFlags_Closed, LineThickness);
     } else {
         // The top edge goes from the back corner to the tip, the bottom is its mirror, and the back curves in
-        const auto side = [tip](const float sign, const float ratio) {
+        const auto side = [tip, half_height, center](const float sign, const float ratio) {
             const float curve = 1.0f - std::pow(ratio, OrSideExponent);
-            return ImVec2{GateLeft + (tip - GateLeft) * ratio, sign * GateHalfHeight * curve};
+            return ImVec2{GateLeft + (tip - GateLeft) * ratio, center + sign * half_height * curve};
         };
         for (int step = 0; step <= CurveSegments; ++step) {
             const ImVec2 point = side(-1.0f, static_cast<float>(step) / CurveSegments);
@@ -268,15 +316,15 @@ void UILogicPart::DrawAnsiGate(SchematicCanvas &canvas, const ViewTransform &vie
             outline.push_back(LocalToScreen(view, point.x, point.y));
         }
         for (int step = 1; step < CurveSegments; ++step) {
-            const float y = GateHalfHeight * (1.0f - 2.0f * static_cast<float>(step) / CurveSegments);
-            outline.push_back(LocalToScreen(view, OrBackX(y), y));
+            const float y = half_height * (1.0f - 2.0f * static_cast<float>(step) / CurveSegments);
+            outline.push_back(LocalToScreen(view, OrBackX(y, half_height), center + y));
         }
         canvas.AddPolyline(outline.data(), static_cast<int>(outline.size()), color, ImDrawFlags_Closed, LineThickness);
         if (type == Core::ComponentType::Xor || type == Core::ComponentType::Xnor) {
             std::vector<ImVec2> second;
             for (int step = 0; step <= CurveSegments; ++step) {
-                const float y = GateHalfHeight * (-1.0f + 2.0f * static_cast<float>(step) / CurveSegments);
-                second.push_back(LocalToScreen(view, OrBackX(y) - XorGap, y));
+                const float y = half_height * (-1.0f + 2.0f * static_cast<float>(step) / CurveSegments);
+                second.push_back(LocalToScreen(view, OrBackX(y, half_height) - XorGap, center + y));
             }
             canvas.AddPolyline(second.data(), static_cast<int>(second.size()), color, ImDrawFlags_None, LineThickness);
         }
@@ -289,13 +337,16 @@ void UILogicPart::DrawAnsiGate(SchematicCanvas &canvas, const ViewTransform &vie
 void UILogicPart::DrawIECGate(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color) const {
     const Core::ComponentType type = GetComponent().GetType();
     const float tip = IsInverting(type) ? GateRight - 2.0f * BubbleRadius : GateRight;
-    const ImVec2 box[4] = {LocalToScreen(view, GateLeft, -GateHalfHeight), LocalToScreen(view, tip, -GateHalfHeight),
-                           LocalToScreen(view, tip, GateHalfHeight), LocalToScreen(view, GateLeft, GateHalfHeight)};
+    const float half_height = GetGateHalfHeight();
+    const float center = GetGateCenterY();
+    const ImVec2 box[4] = {
+        LocalToScreen(view, GateLeft, center - half_height), LocalToScreen(view, tip, center - half_height),
+        LocalToScreen(view, tip, center + half_height), LocalToScreen(view, GateLeft, center + half_height)};
     canvas.AddPolyline(box, 4, color, ImDrawFlags_Closed, LineThickness);
     if (IsInverting(type)) {
         DrawBubble(canvas, view, tip + BubbleRadius, color);
     }
-    DrawLabel(canvas, view, {(GateLeft + tip) / 2.0f, -0.4f}, {0.0f, 1.0f}, IECQualifier(type), color);
+    DrawLabel(canvas, view, {(GateLeft + tip) / 2.0f, center - 0.4f}, {0.0f, 1.0f}, IECQualifier(type), color);
 }
 
 void UILogicPart::DrawFlipFlop(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color) const {
@@ -319,8 +370,8 @@ void UILogicPart::DrawBubble(SchematicCanvas &canvas, const ViewTransform &view,
                              const ImU32 color) const {
     const ImVec2 origin = LocalToScreen(view, 0, 0);
     const ImVec2 unit = LocalToScreen(view, 1, 0) - origin;
-    canvas.AddCircle(LocalToScreen(view, center_x, 0), std::hypot(unit.x, unit.y) * BubbleRadius, color, 0,
-                     LineThickness);
+    canvas.AddCircle(LocalToScreen(view, center_x, GetGateCenterY()), std::hypot(unit.x, unit.y) * BubbleRadius, color,
+                     0, LineThickness);
 }
 
 } // namespace GUI

@@ -12,6 +12,7 @@
 #include "components/controlled_source.h"
 #include "components/diode.h"
 #include "components/inductor.h"
+#include "components/logic_input.h"
 #include "components/logic_part.h"
 #include "components/mosfet.h"
 #include "components/resistor.h"
@@ -194,11 +195,21 @@ std::string DescribeFailure(const Circuit &circuit, const std::vector<SimulatorM
     return "ngspice could not simulate the circuit; see its output for details";
 }
 
+// Clocks, logic inputs, supply rails and logic parts tie themselves to node 0 in the netlist, so a circuit made only of
+// them has its reference without a Ground part
+bool IsDigitalOnly(const Circuit &circuit) {
+    return std::ranges::all_of(circuit.GetEntries(), [](const CircuitEntry &entry) {
+        const ComponentType type = entry.Part->GetType();
+        return type == ComponentType::Clock || type == ComponentType::LogicInput || type == ComponentType::VCC ||
+               IsLogicPart(type);
+    });
+}
+
 std::optional<std::string> CheckCircuit(const Circuit &circuit) {
     if (circuit.GetEntries().empty()) {
         return "The schematic is empty";
     }
-    if (!circuit.HasGround()) {
+    if (!circuit.HasGround() && !IsDigitalOnly(circuit)) {
         return "The circuit has no ground; add a Ground so node voltages have a reference";
     }
     // A current-controlled source needs a current that some other part reports
@@ -353,6 +364,70 @@ std::optional<std::string> CheckNoiseSettings(const Circuit &circuit, const Nois
     return std::nullopt;
 }
 
+// Independent sources a transfer function analysis can drive, whatever their waveform: voltage and current sources
+// and supply rails, as a DC sweep can
+bool IsTransferFunctionInput(const Component &component) {
+    const ComponentType type = component.GetType();
+    return type == ComponentType::VCC || type == ComponentType::VoltageSource || type == ComponentType::CurrentSource;
+}
+
+const Component *FindTransferFunctionInput(const Circuit &circuit, const std::string_view name) {
+    const auto entry = std::ranges::find_if(circuit.GetEntries(), [name](const CircuitEntry &candidate) {
+        return candidate.Part->GetName() == name && IsTransferFunctionInput(*candidate.Part);
+    });
+    return entry != circuit.GetEntries().end() ? entry->Part : nullptr;
+}
+
+std::optional<std::string> CheckTransferFunctionSettings(const Circuit &circuit,
+                                                         const TransferFunctionSettings &settings) {
+    if (settings.OutputNode < 1 || settings.OutputNode >= circuit.GetNodeCount()) {
+        return "Pick the output node; ground has no transfer function";
+    }
+    if (settings.InputSource.empty()) {
+        return "A transfer function analysis needs an input source; select a voltage source, current source or VCC";
+    }
+    if (FindTransferFunctionInput(circuit, settings.InputSource) == nullptr) {
+        return std::format("The input source {} is not a voltage source, current source or VCC in the circuit",
+                           settings.InputSource);
+    }
+    return std::nullopt;
+}
+
+const Component *FindLogicInput(const Circuit &circuit, const std::string_view name) {
+    const auto entry = std::ranges::find_if(circuit.GetEntries(), [name](const CircuitEntry &candidate) {
+        return candidate.Part->GetType() == ComponentType::LogicInput && candidate.Part->GetName() == name;
+    });
+    return entry != circuit.GetEntries().end() ? entry->Part : nullptr;
+}
+
+std::optional<std::string> CheckTruthTableSettings(const Circuit &circuit, const TruthTableSettings &settings) {
+    if (settings.Inputs.empty()) {
+        return "A truth table needs at least one logic input to vary; add a Logic input";
+    }
+    if (settings.Inputs.size() > MaxTruthTableInputs) {
+        return std::format("A truth table varies at most {} inputs, which is {} runs; clear some", MaxTruthTableInputs,
+                           1u << MaxTruthTableInputs);
+    }
+    for (std::size_t index = 0; index < settings.Inputs.size(); ++index) {
+        const std::string &name = settings.Inputs[index];
+        if (FindLogicInput(circuit, name) == nullptr) {
+            return std::format("The input {} is not a logic input in the circuit", name);
+        }
+        if (std::ranges::count(settings.Inputs, name) > 1) {
+            return std::format("The input {} is listed twice", name);
+        }
+    }
+    if (settings.OutputNodes.empty()) {
+        return "Measure at least one node, so the truth table has an output to read";
+    }
+    for (const int node : settings.OutputNodes) {
+        if (node < 1 || node >= circuit.GetNodeCount()) {
+            return "Pick output nodes of the circuit; ground has no logic level to read";
+        }
+    }
+    return std::nullopt;
+}
+
 // ngspice keeps no reference to the name after the call
 pvector_info FindVector(std::string name) {
     const pvector_info vector = ngGet_Vec_Info(name.data());
@@ -422,6 +497,8 @@ std::vector<CurrentVector> CurrentVectors(const Component &component) {
         return {{component.GetName(), std::format("@{}[i]", name)}};
     case ComponentType::VCC:
     case ComponentType::VoltageSource:
+    case ComponentType::Clock:
+    case ComponentType::LogicInput:
         return {{component.GetName(), BranchVectorName(name)}};
     case ComponentType::CurrentSource:
         return {{component.GetName(), std::format("@{}[current]", name)}};
@@ -737,6 +814,8 @@ ACCurrent(const CircuitEntry &entry, const std::vector<double> &frequencies,
     case ComponentType::Inductor:
     case ComponentType::VCC:
     case ComponentType::VoltageSource:
+    case ComponentType::Clock:
+    case ComponentType::LogicInput:
         return ReadACCurrent(BranchVectorName(component.GetName()), component.GetName(), frequencies.size());
     case ComponentType::Ground:
     case ComponentType::NetLabel:
@@ -1065,6 +1144,65 @@ std::expected<Noise, std::string> ReadNoise(const Circuit &circuit, const NoiseS
     return result;
 }
 
+// The plot a transfer function analysis leaves; its name starts with "tf" and it holds one row
+std::optional<std::string> FindTransferFunctionPlot() {
+    char **names = ngSpice_AllPlots();
+    for (; names != nullptr && *names != nullptr; ++names) {
+        const std::string name(*names);
+        if (name.starts_with("tf")) {
+            return name;
+        }
+    }
+    return std::nullopt;
+}
+
+// One of the three single-value vectors of a transfer function; ngspice names them after the source and the output
+std::expected<double, std::string> ReadTransferFunctionValue(const std::string &name) {
+    const pvector_info vector = FindVector(name);
+    if (vector == nullptr || vector->v_realdata == nullptr) {
+        return std::unexpected(std::format("ngspice returned no {}", name));
+    }
+    return vector->v_realdata[0];
+}
+
+std::expected<TransferFunction, std::string> ReadTransferFunction(const Circuit &circuit,
+                                                                  const TransferFunctionSettings &settings) {
+    const std::optional<std::string> plot = FindTransferFunctionPlot();
+    if (!plot) {
+        return std::unexpected("ngspice returned no transfer function plot");
+    }
+    SendCommand(std::format("setplot {}", *plot));
+    // The vectors are named after the input source and the output expression, in lower case
+    const auto gain = ReadTransferFunctionValue("transfer_function");
+    const auto input_impedance =
+        ReadTransferFunctionValue(std::format("{}#input_impedance", ToLower(settings.InputSource)));
+    const auto output_impedance =
+        ReadTransferFunctionValue(std::format("output_impedance_at_v({})", settings.OutputNode));
+    if (!gain) {
+        return std::unexpected(gain.error());
+    }
+    if (!input_impedance) {
+        return std::unexpected(input_impedance.error());
+    }
+    if (!output_impedance) {
+        return std::unexpected(output_impedance.error());
+    }
+    TransferFunction result;
+    result.OutputNode = settings.OutputNode;
+    result.InputSource = settings.InputSource;
+    result.InputUnit = SourceUnit(*FindTransferFunctionInput(circuit, settings.InputSource));
+    result.Gain = *gain;
+    result.InputImpedance = *input_impedance;
+    result.OutputImpedance = *output_impedance;
+    // An infinite value would format as nan or inf, which reads as a broken number; an open path is instead reported
+    // around 1e20 ohm, which stays finite and the views turn into an open circuit
+    if (!std::isfinite(result.Gain) || !std::isfinite(result.InputImpedance) ||
+        !std::isfinite(result.OutputImpedance)) {
+        return std::unexpected("ngspice returned a transfer function that is not a number");
+    }
+    return result;
+}
+
 std::string FormatSweepRange(const SweepRange &range) {
     return std::format("{} {} {} {}", range.Source, FormatSpiceValue(range.Start), FormatSpiceValue(range.Stop),
                        FormatSpiceValue(range.Step));
@@ -1181,8 +1319,18 @@ SimulationRun<Data> Simulate(const Circuit &circuit, const std::string_view anal
 } // namespace
 
 /**
+ * @brief   Tells whether the combination has output voltages.
+ * @return  True when ngspice found an operating point; false when it did not, as for a latch that depends on its
+ *          history.
+ */
+bool TruthTableRow::HasOperatingPoint() const {
+    return !OutputVoltages.empty();
+}
+
+/**
  * @brief   Computes the DC operating point of a circuit with ngspice.
- * @param[in] circuit  Circuit to simulate; it needs a ground component.
+ * @param[in] circuit  Circuit to simulate; it needs a ground component, unless it holds only logic parts, logic inputs
+ * and supply rails.
  * @return  The node voltages or an error, plus every line ngspice printed. Warnings such as "singular matrix"
  *          can come with a successful result whose values are meaningless, so show the messages to the user.
  * @note    Not thread-safe: ngspice is a single global library instance.
@@ -1195,15 +1343,19 @@ OperatingPointRun RunOperatingPoint(const Circuit &circuit) {
 }
 
 /**
- * @brief   Simulates how the node voltages of a circuit change over time, starting from its operating point.
- * @param[in] circuit   Circuit to simulate; it needs a ground component.
+ * @brief   Simulates how the node voltages of a circuit change over time, starting from its operating point or from
+ *          the initial conditions of its capacitors and inductors.
+ * @param[in] circuit   Circuit to simulate; it needs a ground component, unless it holds only logic parts, logic inputs
+ * and supply rails.
  * @param[in] settings  Stop time and time step.
  * @param[in] parameter Value of the stepped parameter for this run, a part value or the temperature; none runs the
  *                      circuit as it is.
  * @return  The voltages at every time point or an error, plus every line ngspice printed. Invalid settings
  *          are rejected before reaching ngspice.
- * @note    Logic parts that never settle into an operating point, such as a latch with both inputs idle, start from
- *          0 V instead, with a warning in the result. Not thread-safe: ngspice is a single global library instance.
+ * @note    A circuit with an initial condition runs with uic, so it starts from those values instead of the operating
+ *          point, with a warning in the result; the same holds for logic parts that never settle into an operating
+ *          point, such as a latch with both inputs idle, which start from 0 V. Not thread-safe: ngspice is a single
+ *          global library instance.
  */
 TransientRun RunTransient(const Circuit &circuit, const TransientSettings &settings,
                           const std::optional<ParameterValue> &parameter) {
@@ -1218,11 +1370,26 @@ TransientRun RunTransient(const Circuit &circuit, const TransientSettings &setti
     if (!applied) {
         return {std::unexpected(applied.error()), {}};
     }
-    const std::string analysis = std::format("{}.tran {} {}", applied->Card, FormatSpiceValue(settings.TimeStep),
-                                             FormatSpiceValue(settings.StopTime));
+    // An initial condition needs uic, which skips the operating point and starts the capacitors and inductors from
+    // the IC= values written in the netlist
+    const bool has_initial_conditions = applied->Simulated.HasInitialConditions();
+    std::string analysis = std::format("{}.tran {} {}", applied->Card, FormatSpiceValue(settings.TimeStep),
+                                       FormatSpiceValue(settings.StopTime));
+    if (has_initial_conditions) {
+        analysis += " uic";
+    }
     const auto read_result = [&applied] { return ReadTransient(applied->Simulated); };
     TransientRun run = Simulate<Transient>(applied->Simulated, analysis, "tran", read_result);
+    if (run.Result && has_initial_conditions) {
+        run.Result->Warnings.emplace_back(
+            "The transient starts from the initial conditions (uic): the parts that have one start from it and the "
+            "other capacitors and inductors from zero, since the operating point is not computed first");
+    }
     if (run.Result || !HasLogicPart(applied->Simulated) || !NeverSettled(run.Messages)) {
+        return run;
+    }
+    // The run already used uic, so rerunning it cannot give the logic loop a state to start from
+    if (has_initial_conditions) {
         return run;
     }
     // A logic loop with no state to start from, such as a latch with both inputs idle, has no operating point, so
@@ -1239,7 +1406,8 @@ TransientRun RunTransient(const Circuit &circuit, const TransientSettings &setti
 
 /**
  * @brief   Sweeps the small-signal response of a circuit across frequency, excited by its AC sources.
- * @param[in] circuit   Circuit to simulate; it needs a ground component and at least one AC source.
+ * @param[in] circuit   Circuit to simulate; it needs a ground component (unless it holds only logic parts, logic inputs
+ * and supply rails) and at least one AC source.
  * @param[in] settings  Frequency range and points per decade.
  * @param[in] parameter Value of the stepped parameter for this run, a part value or the temperature; none runs the
  *                      circuit as it is.
@@ -1269,7 +1437,8 @@ ACSweepRun RunACSweep(const Circuit &circuit, const ACSweepSettings &settings,
 
 /**
  * @brief   Sweeps a source through a range of DC values and finds the operating point at each one.
- * @param[in] circuit   Circuit to simulate; it needs a ground component.
+ * @param[in] circuit   Circuit to simulate; it needs a ground component, unless it holds only logic parts, logic inputs
+ * and supply rails.
  * @param[in] settings  Swept source and range, and optionally a second source stepped once per curve.
  * @param[in] parameter Value of the stepped parameter for this run, a part value or the temperature; none runs the
  *                      circuit as it is.
@@ -1304,7 +1473,8 @@ DCSweepRun RunDCSweep(const Circuit &circuit, const DCSweepSettings &settings,
 
 /**
  * @brief   Computes the noise of a circuit at a node across frequency, and refers it to an input source.
- * @param[in] circuit   Circuit to simulate; it needs a ground component.
+ * @param[in] circuit   Circuit to simulate; it needs a ground component, unless it holds only logic parts, logic inputs
+ * and supply rails.
  * @param[in] settings  Output node, input source (a voltage or current source set to AC) and frequency range.
  * @return  The output and input-referred noise densities, their totals over the range and the share of every part,
  *          or an error, plus every line ngspice printed. Invalid settings are rejected before reaching ngspice.
@@ -1325,6 +1495,111 @@ NoiseRun RunNoise(const Circuit &circuit, const NoiseSettings &settings) {
         ".noise v({}) {} dec {} {} {} 1", settings.OutputNode, settings.InputSource, settings.PointsPerDecade,
         FormatSpiceValue(settings.StartFrequency), FormatSpiceValue(settings.StopFrequency));
     return Simulate<Noise>(circuit, analysis, "noise", [&circuit, &settings] { return ReadNoise(circuit, settings); });
+}
+
+/**
+ * @brief   Finds the small-signal DC transfer function from an input source to an output, with both impedances.
+ * @param[in] circuit   Circuit to simulate; it needs a ground component, unless it holds only logic parts, logic inputs
+ * and supply rails.
+ * @param[in] settings  Output node and input source (an independent voltage source, current source or VCC rail).
+ * @return  The DC gain, the input impedance and the output impedance, or an error, plus every line ngspice printed.
+ *          Invalid settings are rejected before reaching ngspice.
+ * @note    The gain is dimensionless for a voltage source input and a transimpedance for a current source; ngspice
+ *          linearizes the circuit at its DC operating point, so the input source only defines the gain, whatever its
+ *          value or waveform. Not thread-safe: ngspice is a single global library instance.
+ */
+TransferFunctionRun RunTransferFunction(const Circuit &circuit, const TransferFunctionSettings &settings) {
+    std::optional<std::string> error = CheckCircuit(circuit);
+    if (!error) {
+        error = CheckTransferFunctionSettings(circuit, settings);
+    }
+    if (error) {
+        return {std::unexpected(*error), {}};
+    }
+    const std::string analysis = std::format(".tf v({}) {}", settings.OutputNode, settings.InputSource);
+    return Simulate<TransferFunction>(circuit, analysis, "tf",
+                                      [&circuit, &settings] { return ReadTransferFunction(circuit, settings); });
+}
+
+/**
+ * @brief   Runs every combination of some logic inputs and reads what the output nodes give.
+ * @param[in] circuit   Circuit to simulate; it needs a ground component, unless it holds only clocks, logic inputs,
+ *                      logic parts and supply rails.
+ * @param[in] settings  The logic inputs to vary, the first as the most significant bit, and the nodes to read.
+ * @return  One row per combination in binary counting order, with the voltage of each output node, or an error, plus
+ *          the lines ngspice printed for the first combination that failed, or else for the first one. Invalid
+ *          settings are rejected before reaching ngspice.
+ * @note    Each row is an operating point of a copy of the circuit with the inputs set, so a row is independent of the
+ *          others. A combination without an operating point, as a latch left to its history has, stays in the table
+ *          without voltages and a warning says how many; the call fails only when no combination has one. The other
+ *          logic inputs keep the state they have in the circuit. Not thread-safe: ngspice is a single global library
+ *          instance.
+ */
+TruthTableRun RunTruthTable(const Circuit &circuit, const TruthTableSettings &settings) {
+    std::optional<std::string> error = CheckCircuit(circuit);
+    if (!error) {
+        error = CheckTruthTableSettings(circuit, settings);
+    }
+    if (error) {
+        return {std::unexpected(*error), {}};
+    }
+
+    TruthTable table{.InputNames = settings.Inputs, .InputLevels = {}, .OutputNodes = settings.OutputNodes};
+    // The chosen inputs are copies that each row sets, and the simulated circuit points at them
+    std::vector<LogicInput> inputs;
+    inputs.reserve(settings.Inputs.size());
+    for (const std::string &name : settings.Inputs) {
+        inputs.push_back(static_cast<const LogicInput &>(*FindLogicInput(circuit, name)));
+        table.InputLevels.push_back(inputs.back().GetParameters().LogicLevel);
+    }
+    Circuit simulated;
+    for (const CircuitEntry &entry : circuit.GetEntries()) {
+        const auto chosen = std::ranges::find(settings.Inputs, entry.Part->GetName());
+        const bool is_chosen = chosen != settings.Inputs.end() && entry.Part->GetType() == ComponentType::LogicInput;
+        simulated.Add(is_chosen ? inputs[static_cast<std::size_t>(chosen - settings.Inputs.begin())] : *entry.Part,
+                      entry.Nodes);
+    }
+
+    TruthTableRun run;
+    std::optional<std::string> first_failure;
+    std::vector<SimulatorMessage> failure_messages;
+    const std::size_t row_count = std::size_t{1} << inputs.size();
+    for (std::size_t row_index = 0; row_index < row_count; ++row_index) {
+        TruthTableRow row;
+        for (std::size_t input = 0; input < inputs.size(); ++input) {
+            const bool is_high = ((row_index >> (inputs.size() - 1 - input)) & 1u) != 0;
+            inputs[input].SetHigh(is_high);
+            row.InputsHigh.push_back(is_high);
+        }
+        OperatingPointRun point = RunOperatingPoint(simulated);
+        if (point.Result) {
+            for (const int node : settings.OutputNodes) {
+                row.OutputVoltages.push_back(point.Result->NodeVoltages[static_cast<std::size_t>(node)]);
+            }
+        } else if (!first_failure) {
+            first_failure = point.Result.error();
+            failure_messages = point.Messages;
+        }
+        if (row_index == 0) {
+            run.Messages = std::move(point.Messages);
+        }
+        table.Rows.push_back(std::move(row));
+    }
+
+    const std::size_t missing = static_cast<std::size_t>(
+        std::ranges::count_if(table.Rows, [](const TruthTableRow &row) { return !row.HasOperatingPoint(); }));
+    if (missing == row_count) {
+        return {std::unexpected(*first_failure), std::move(failure_messages)};
+    }
+    if (missing > 0) {
+        table.Warnings.push_back(std::format(
+            "{} of {} combinations have no operating point, so their outputs read X; a circuit whose outputs depend on "
+            "its history, such as a latch, has none for the combinations that hold its state",
+            missing, row_count));
+        run.Messages = std::move(failure_messages);
+    }
+    run.Result = std::move(table);
+    return run;
 }
 
 /**
@@ -1370,6 +1645,36 @@ std::vector<std::string> GetNoiseInputSources(const Circuit &circuit) {
     std::vector<std::string> names;
     for (const CircuitEntry &entry : circuit.GetEntries()) {
         if (IsNoiseInput(*entry.Part)) {
+            names.push_back(entry.Part->GetName());
+        }
+    }
+    return names;
+}
+
+/**
+ * @brief   Lists the sources a transfer function analysis can drive.
+ * @param[in] circuit  Circuit to look in.
+ * @return  Names of its voltage sources, current sources and VCC rails, of any waveform, in circuit order.
+ */
+std::vector<std::string> GetTransferFunctionInputSources(const Circuit &circuit) {
+    std::vector<std::string> names;
+    for (const CircuitEntry &entry : circuit.GetEntries()) {
+        if (IsTransferFunctionInput(*entry.Part)) {
+            names.push_back(entry.Part->GetName());
+        }
+    }
+    return names;
+}
+
+/**
+ * @brief   Lists the logic inputs a truth table can vary.
+ * @param[in] circuit  Circuit to look in.
+ * @return  Names of its logic inputs, in circuit order.
+ */
+std::vector<std::string> GetTruthTableInputs(const Circuit &circuit) {
+    std::vector<std::string> names;
+    for (const CircuitEntry &entry : circuit.GetEntries()) {
+        if (entry.Part->GetType() == ComponentType::LogicInput) {
             names.push_back(entry.Part->GetName());
         }
     }

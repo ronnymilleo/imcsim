@@ -7,12 +7,14 @@
 
 #include "ui_elements/ui_bjt.h"
 #include "ui_elements/ui_capacitor.h"
+#include "ui_elements/ui_clock.h"
 #include "ui_elements/ui_controlled_source.h"
 #include "ui_elements/ui_controlled_switch.h"
 #include "ui_elements/ui_current_source.h"
 #include "ui_elements/ui_diode.h"
 #include "ui_elements/ui_ground.h"
 #include "ui_elements/ui_inductor.h"
+#include "ui_elements/ui_logic_input.h"
 #include "ui_elements/ui_logic_part.h"
 #include "ui_elements/ui_mosfet.h"
 #include "ui_elements/ui_net_label.h"
@@ -80,6 +82,8 @@ constexpr auto Parts = std::to_array<PartInfo>({
     {Core::ComponentType::JKFlipFlop, "JK flip-flop"},
     {Core::ComponentType::TFlipFlop, "T flip-flop"},
     {Core::ComponentType::SRFlipFlop, "SR flip-flop"},
+    {Core::ComponentType::Clock, "Clock"},
+    {Core::ComponentType::LogicInput, "Logic input"},
 });
 
 // Lowercase letters and digits only, so "opamp" finds "Op-amp" and "vcc" finds "VCC supply"
@@ -161,6 +165,10 @@ std::unique_ptr<UIElement> CreateElement(const Core::ComponentType type, const G
     case Core::ComponentType::TFlipFlop:
     case Core::ComponentType::SRFlipFlop:
         return std::make_unique<UILogicPart>(type, position, rotation);
+    case Core::ComponentType::Clock:
+        return std::make_unique<UIClock>(position, rotation);
+    case Core::ComponentType::LogicInput:
+        return std::make_unique<UILogicInput>(position, rotation);
     }
     return nullptr;
 }

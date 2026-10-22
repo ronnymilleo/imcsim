@@ -4,9 +4,11 @@
  */
 
 #include "components/bjt.h"
+#include "components/clock.h"
 #include "components/controlled_source.h"
 #include "components/current_source.h"
 #include "components/diode.h"
+#include "components/logic_input.h"
 #include "components/logic_part.h"
 #include "components/mosfet.h"
 #include "components/net_label.h"
@@ -221,6 +223,65 @@ TEST_CASE("A current source keeps its value, type and waveforms", "[schematic_fi
     CHECK(copy.GetPulse().High == 1e-3);
 }
 
+TEST_CASE("The extra source waveforms keep their parameters through a file", "[schematic_file]") {
+    std::vector<std::unique_ptr<GUI::UIElement>> elements;
+    elements.push_back(GUI::CreateElement(Core::ComponentType::VoltageSource, {0, 0}, GUI::Rotation::R0));
+    auto &source = static_cast<Core::VoltageSource &>(elements.back()->GetComponent());
+    source.SetName("Vin1");
+    const Core::EXPParameters exp{.InitialValue = -1.0,
+                                  .PeakValue = 3.3,
+                                  .RiseDelay = 1e-3,
+                                  .RiseTimeConstant = 10e-6,
+                                  .FallDelay = 5e-3,
+                                  .FallTimeConstant = 20e-6};
+    const Core::SFFMParameters sffm{
+        .Offset = 0.5, .Amplitude = 2.0, .CarrierFrequency = 1e3, .ModulationIndex = 5.0, .SignalFrequency = 100.0};
+    const Core::AMParameters am{
+        .Amplitude = 2.0, .Offset = 0.5, .ModulatingFrequency = 200.0, .CarrierFrequency = 10e3, .Delay = 1e-3};
+    const std::vector<Core::PWLPoint> points = {{0.0, 0.0}, {1e-3, 5.0}, {2e-3, 0.0}, {3e-3, -2.5}};
+    source.SetEXP(exp);
+    source.SetSFFM(sffm);
+    source.SetAM(am);
+    source.SetPWL({.Points = points});
+    source.SetSourceType(Core::VoltageSource::SourceType::PWL);
+
+    const GUI::LoadedSchematic loaded = LoadOrFail(GUI::SaveSchematic(elements, {}, {}, {}));
+    CHECK(loaded.Warnings.empty());
+    REQUIRE(loaded.Elements.size() == 1);
+    const auto &copy = static_cast<const Core::VoltageSource &>(loaded.Elements[0]->GetComponent());
+    CHECK(copy.GetSourceType() == Core::VoltageSource::SourceType::PWL);
+    CHECK(copy.GetEXP().InitialValue == exp.InitialValue);
+    CHECK(copy.GetEXP().PeakValue == exp.PeakValue);
+    CHECK(copy.GetEXP().RiseDelay == exp.RiseDelay);
+    CHECK(copy.GetEXP().RiseTimeConstant == exp.RiseTimeConstant);
+    CHECK(copy.GetEXP().FallDelay == exp.FallDelay);
+    CHECK(copy.GetEXP().FallTimeConstant == exp.FallTimeConstant);
+    CHECK(copy.GetSFFM().Offset == sffm.Offset);
+    CHECK(copy.GetSFFM().Amplitude == sffm.Amplitude);
+    CHECK(copy.GetSFFM().CarrierFrequency == sffm.CarrierFrequency);
+    CHECK(copy.GetSFFM().ModulationIndex == sffm.ModulationIndex);
+    CHECK(copy.GetSFFM().SignalFrequency == sffm.SignalFrequency);
+    CHECK(copy.GetAM().Amplitude == am.Amplitude);
+    CHECK(copy.GetAM().Offset == am.Offset);
+    CHECK(copy.GetAM().ModulatingFrequency == am.ModulatingFrequency);
+    CHECK(copy.GetAM().CarrierFrequency == am.CarrierFrequency);
+    CHECK(copy.GetAM().Delay == am.Delay);
+    REQUIRE(copy.GetPWL().Points.size() == points.size());
+    for (std::size_t index = 0; index < points.size(); ++index) {
+        CHECK(copy.GetPWL().Points[index].Time == points[index].Time);
+        CHECK(copy.GetPWL().Points[index].Value == points[index].Value);
+    }
+}
+
+TEST_CASE("Piecewise linear points that do not increase are skipped", "[schematic_file]") {
+    const GUI::LoadedSchematic loaded = LoadOrFail(Document(
+        R"({"type": "VoltageSource", "name": "Vin1", "x": 0, "y": 0, "rotation": 0, "value": 3, "source": "PWL",)"
+        R"("pwl": [{"time": 0, "value": 0}, {"time": 0, "value": 1}]})",
+        ""));
+    CHECK(loaded.Elements.empty());
+    CHECK(loaded.Warnings.size() == 1);
+}
+
 TEST_CASE("A diode part keeps its model", "[schematic_file]") {
     std::vector<std::unique_ptr<GUI::UIElement>> elements;
     elements.push_back(GUI::CreateElement(Core::ComponentType::ZenerDiode, {2, 4}, GUI::Rotation::R90));
@@ -372,6 +433,9 @@ TEST_CASE("Simulation settings load back unchanged", "[schematic_file]") {
     settings.NoiseRange = {.StartFrequency = 1.0, .StopFrequency = 20e3, .PointsPerDecade = 10};
     settings.NoiseSource = "Vin1";
     settings.NoiseOutput = GUI::GridPoint{12, -4};
+    settings.TransferFunctionSource = "V2";
+    settings.TransferFunctionOutput = GUI::GridPoint{6, 3};
+    settings.TruthTableInputs = {"V1", "V3"};
     settings.ParameterStep = {
         .Enabled = true, .Part = "R2", .UsesList = true, .Start = 1e3, .Stop = 4e3, .Step = 1e3, .List = "1k, 2.2k"};
 
@@ -381,8 +445,11 @@ TEST_CASE("Simulation settings load back unchanged", "[schematic_file]") {
 
     // Without an output point the key is left out and loads as none
     settings.NoiseOutput.reset();
-    settings.Selected = GUI::Analysis::Noise;
-    CHECK(LoadOrFail(GUI::SaveSchematic({}, {}, settings, {})).Settings == settings);
+    settings.TransferFunctionOutput.reset();
+    settings.Selected = GUI::Analysis::TransferFunction;
+    const GUI::LoadedSchematic without_output = LoadOrFail(GUI::SaveSchematic({}, {}, settings, {}));
+    CHECK(without_output.Settings == settings);
+    CHECK(without_output.Settings.Selected == GUI::Analysis::TransferFunction);
 }
 
 TEST_CASE("Invalid noise settings fall back to their defaults with a warning", "[schematic_file]") {
@@ -395,10 +462,47 @@ TEST_CASE("Invalid noise settings fall back to their defaults with a warning", "
     CHECK(loaded.Settings.NoiseRange == GUI::SimulationSettings{}.NoiseRange);
 }
 
+TEST_CASE("Invalid transfer function settings fall back to their defaults with a warning", "[schematic_file]") {
+    const std::string text = R"({"format": "imcsim-schematic", "version": 1, "simulation": {)"
+                             R"("transfer_function": {"source": "V1", "output": "not a point"}}})";
+    const GUI::LoadedSchematic loaded = LoadOrFail(text);
+    CHECK(loaded.Warnings.size() == 1);
+    CHECK(loaded.Settings.TransferFunctionSource.empty());
+    CHECK_FALSE(loaded.Settings.TransferFunctionOutput);
+}
+
+TEST_CASE("Invalid truth table settings fall back to their defaults with a warning", "[schematic_file]") {
+    const std::string text = R"({"format": "imcsim-schematic", "version": 1, "simulation": {)"
+                             R"("truth_table": {"inputs": ["V1", 3]}}})";
+    const GUI::LoadedSchematic loaded = LoadOrFail(text);
+    CHECK(loaded.Warnings.size() == 1);
+    CHECK(loaded.Settings.TruthTableInputs.empty());
+}
+
+TEST_CASE("A file saved before the truth table analysis loads it with every logic input", "[schematic_file]") {
+    const std::string text = R"({"format": "imcsim-schematic", "version": 1, "simulation": {)"
+                             R"("analysis": "noise", "noise": {"source": "V1"}}})";
+    const GUI::LoadedSchematic loaded = LoadOrFail(text);
+    CHECK(loaded.Warnings.empty());
+    // No stored inputs means every logic input of the circuit
+    CHECK(loaded.Settings.TruthTableInputs.empty());
+}
+
 TEST_CASE("Files saved before settings were stored load with the default settings", "[schematic_file]") {
     const GUI::LoadedSchematic loaded = LoadOrFail(Document("", ""));
     CHECK(loaded.Warnings.empty());
     CHECK(loaded.Settings == GUI::SimulationSettings{});
+}
+
+TEST_CASE("A file saved before the transfer function analysis loads it as its defaults", "[schematic_file]") {
+    // A file from before this analysis has no transfer_function key; its settings stay at the defaults
+    const std::string text = R"({"format": "imcsim-schematic", "version": 1, "simulation": {)"
+                             R"("analysis": "noise", "noise": {"source": "V1"}}})";
+    const GUI::LoadedSchematic loaded = LoadOrFail(text);
+    CHECK(loaded.Warnings.empty());
+    CHECK(loaded.Settings.NoiseSource == "V1");
+    CHECK(loaded.Settings.TransferFunctionSource.empty());
+    CHECK_FALSE(loaded.Settings.TransferFunctionOutput);
 }
 
 TEST_CASE("Invalid settings of one analysis fall back to its defaults with a warning", "[schematic_file]") {
@@ -612,6 +716,34 @@ TEST_CASE("A switch and a push button keep their state, and load open when the f
     CHECK(skipped.Warnings.size() == 1);
 }
 
+TEST_CASE("A capacitor and an inductor keep their initial condition, and load without one", "[schematic_file]") {
+    std::vector<std::unique_ptr<GUI::UIElement>> elements;
+    elements.push_back(GUI::CreateElement(Core::ComponentType::Capacitor, {2, 4}, GUI::Rotation::R0));
+    elements.back()->GetComponent().SetName("C1");
+    elements.back()->GetComponent().SetInitialCondition(5.0);
+    elements.push_back(GUI::CreateElement(Core::ComponentType::Inductor, {6, 4}, GUI::Rotation::R0));
+    elements.back()->GetComponent().SetName("L1");
+    elements.back()->GetComponent().SetInitialCondition(2e-3);
+
+    const GUI::LoadedSchematic loaded = LoadOrFail(GUI::SaveSchematic(elements, {}, {}, {}));
+    CHECK(loaded.Warnings.empty());
+    REQUIRE(loaded.Elements.size() == 2);
+    CHECK(loaded.Elements[0]->GetComponent().GetInitialCondition() == 5.0);
+    CHECK(loaded.Elements[1]->GetComponent().GetInitialCondition() == 2e-3);
+
+    // A file saved before initial conditions had no key, so the part has none
+    const std::string old_file = R"({"type": "Capacitor", "x": 1, "y": 1, "rotation": 0, "name": "C1", "value": 1e-6})";
+    const GUI::LoadedSchematic plain = LoadOrFail(Document(old_file, ""));
+    REQUIRE(plain.Elements.size() == 1);
+    CHECK_FALSE(plain.Elements[0]->GetComponent().HasInitialCondition());
+
+    const std::string bad_ic =
+        R"({"type": "Capacitor", "x": 1, "y": 1, "rotation": 0, "name": "C1", "value": 1e-6, "ic": "high"})";
+    const GUI::LoadedSchematic skipped = LoadOrFail(Document(bad_ic, ""));
+    CHECK(skipped.Elements.empty());
+    CHECK(skipped.Warnings.size() == 1);
+}
+
 TEST_CASE("A voltage-controlled switch keeps its parameters, and loads with the defaults when it has none",
           "[schematic_file]") {
     std::vector<std::unique_ptr<GUI::UIElement>> elements;
@@ -725,4 +857,90 @@ TEST_CASE("Gates and flip-flops keep their logic family", "[schematic_file]") {
     const GUI::LoadedSchematic skipped = LoadOrFail(Document(no_level, ""));
     CHECK(skipped.Elements.empty());
     CHECK(skipped.Warnings.size() == 1);
+}
+
+TEST_CASE("A gate keeps its number of inputs, and a file without one has two", "[schematic_file]") {
+    std::vector<std::unique_ptr<GUI::UIElement>> elements;
+    elements.push_back(GUI::CreateElement(Core::ComponentType::Xor, {4, 4}, GUI::Rotation::R0));
+    static_cast<Core::LogicPart &>(elements.back()->GetComponent()).SetInputCount(5);
+    elements.back()->GetComponent().SetName("U1");
+    elements.push_back(GUI::CreateElement(Core::ComponentType::Not, {12, 4}, GUI::Rotation::R0));
+    elements.back()->GetComponent().SetName("U2");
+
+    const std::string text = GUI::SaveSchematic(elements, {}, {}, {});
+    // Only a gate that takes several inputs writes the count, so the inverter's single input is not written
+    CHECK(text.contains("\"inputs\": 5"));
+    CHECK_FALSE(text.contains("\"inputs\": 1"));
+    const GUI::LoadedSchematic loaded = LoadOrFail(text);
+    CHECK(loaded.Warnings.empty());
+    REQUIRE(loaded.Elements.size() == 2);
+    const auto &xor_gate = static_cast<const Core::LogicPart &>(loaded.Elements[0]->GetComponent());
+    CHECK(xor_gate.GetInputCount() == 5);
+    CHECK(loaded.Elements[0]->GetTerminals().size() == 6);
+    CHECK(static_cast<const Core::LogicPart &>(loaded.Elements[1]->GetComponent()).GetInputCount() == 1);
+
+    const std::string without_count = R"({"type": "And", "x": 1, "y": 1, "rotation": 0, "name": "U1"})";
+    const GUI::LoadedSchematic old_file = LoadOrFail(Document(without_count, ""));
+    REQUIRE(old_file.Elements.size() == 1);
+    CHECK(static_cast<const Core::LogicPart &>(old_file.Elements[0]->GetComponent()).GetInputCount() == 2);
+
+    for (const char *bad : {"1", "9", "2.5", "\"three\""}) {
+        const std::string element =
+            std::string(R"({"type": "And", "x": 1, "y": 1, "rotation": 0, "name": "U1", "inputs": )") + bad + "}";
+        const GUI::LoadedSchematic skipped = LoadOrFail(Document(element, ""));
+        INFO(bad);
+        CHECK(skipped.Elements.empty());
+        CHECK(skipped.Warnings.size() == 1);
+    }
+}
+
+TEST_CASE("A clock keeps its figures and a logic input its state", "[schematic_file]") {
+    std::vector<std::unique_ptr<GUI::UIElement>> elements;
+    elements.push_back(GUI::CreateElement(Core::ComponentType::Clock, {4, 4}, GUI::Rotation::R90));
+    auto &clock = static_cast<Core::Clock &>(elements.back()->GetComponent());
+    clock.SetName("V1");
+    clock.SetParameters({.Frequency = 2e3, .DutyCycle = 0.25, .LogicLevel = 3.3, .StartDelay = 1e-3});
+    elements.push_back(GUI::CreateElement(Core::ComponentType::LogicInput, {12, 4}, GUI::Rotation::R0));
+    auto &input = static_cast<Core::LogicInput &>(elements.back()->GetComponent());
+    input.SetName("V2");
+    input.SetParameters({.LogicLevel = 3.3});
+    input.SetHigh(true);
+
+    const GUI::LoadedSchematic loaded = LoadOrFail(GUI::SaveSchematic(elements, {}, {}, {}));
+    CHECK(loaded.Warnings.empty());
+    REQUIRE(loaded.Elements.size() == 2);
+    const auto &clock_copy = static_cast<const Core::Clock &>(loaded.Elements[0]->GetComponent());
+    CHECK(clock_copy.GetType() == Core::ComponentType::Clock);
+    CHECK(clock_copy.GetName() == "V1");
+    CHECK(clock_copy.GetParameters().Frequency == 2e3);
+    CHECK(clock_copy.GetParameters().DutyCycle == 0.25);
+    CHECK(clock_copy.GetParameters().LogicLevel == 3.3);
+    CHECK(clock_copy.GetParameters().StartDelay == 1e-3);
+    const auto &input_copy = static_cast<const Core::LogicInput &>(loaded.Elements[1]->GetComponent());
+    CHECK(input_copy.GetType() == Core::ComponentType::LogicInput);
+    CHECK(input_copy.GetParameters().LogicLevel == 3.3);
+    CHECK(input_copy.IsHigh());
+}
+
+TEST_CASE("A clock and a logic input load with their defaults when the file leaves them out", "[schematic_file]") {
+    const GUI::LoadedSchematic loaded = LoadOrFail(Document(
+        R"({"type": "Clock", "name": "V1", "x": 0, "y": 0, "rotation": 0},
+           {"type": "Clock", "name": "V2", "x": 4, "y": 0, "rotation": 0, "parameters": {"frequency": 0}},
+           {"type": "LogicInput", "name": "V3", "x": 8, "y": 0, "rotation": 0})",
+        ""));
+    REQUIRE(loaded.Elements.size() == 2);
+    const auto &clock = static_cast<const Core::Clock &>(loaded.Elements[0]->GetComponent());
+    CHECK(clock.GetParameters().Frequency == 1e3);
+    CHECK(clock.GetParameters().DutyCycle == 0.5);
+    CHECK(clock.GetParameters().LogicLevel == 5.0);
+    CHECK(clock.GetParameters().StartDelay == 0.0);
+    // A logic input saved without a state stays low
+    CHECK_FALSE(static_cast<const Core::LogicInput &>(loaded.Elements[1]->GetComponent()).IsHigh());
+    CAPTURE(loaded.Warnings);
+    CHECK(loaded.Warnings.size() == 1);
+    // A file from before these parts existed still loads, with no warnings
+    const GUI::LoadedSchematic old =
+        LoadOrFail(Document(R"({"type": "Resistor", "name": "R1", "value": 10, "x": 0, "y": 0, "rotation": 0})", ""));
+    CHECK(old.Warnings.empty());
+    CHECK(old.Elements.size() == 1);
 }

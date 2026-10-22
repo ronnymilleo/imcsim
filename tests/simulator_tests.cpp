@@ -6,10 +6,12 @@
 #include "circuit.h"
 #include "components/bjt.h"
 #include "components/capacitor.h"
+#include "components/clock.h"
 #include "components/controlled_source.h"
 #include "components/current_source.h"
 #include "components/diode.h"
 #include "components/ground.h"
+#include "components/logic_input.h"
 #include "components/logic_part.h"
 #include "components/mosfet.h"
 #include "components/op_amp.h"
@@ -24,12 +26,15 @@
 #include "digital_models.h"
 #include "simulator.h"
 #include <algorithm>
+#include <array>
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 #include <cmath>
 #include <complex>
+#include <format>
 #include <numbers>
+#include <vector>
 
 namespace {
 
@@ -391,6 +396,235 @@ TEST_CASE("A pulse charges an RC low-pass with its time constant", "[simulator]"
         const double expected = 1.0 - std::exp(-transient.Times[index] / 1e-3);
         CHECK_THAT(transient.NodeVoltages[2][index], Catch::Matchers::WithinAbs(expected, 5e-3));
     }
+}
+
+TEST_CASE("A transient run follows the exponential of an EXP source", "[simulator]") {
+    Core::VoltageSource source;
+    source.SetName("Vin1");
+    source.SetSourceType(Core::VoltageSource::SourceType::EXP);
+    // Rise from 0 with a 0.5 ms time constant at 1 ms, then decay from 5 V at 5 ms with a 1 ms time constant
+    const Core::EXPParameters exp{.InitialValue = 0.0,
+                                  .PeakValue = 5.0,
+                                  .RiseDelay = 1e-3,
+                                  .RiseTimeConstant = 0.5e-3,
+                                  .FallDelay = 5e-3,
+                                  .FallTimeConstant = 1e-3};
+    source.SetEXP(exp);
+    Core::Resistor load;
+    load.SetName("R1");
+    const Core::Ground reference;
+    Core::Circuit circuit;
+    circuit.Add(source, {1, 0});
+    circuit.Add(load, {1, 0});
+    circuit.Add(reference, {0});
+
+    const Core::TransientRun run = Core::RunTransient(circuit, {.StopTime = 10e-3, .TimeStep = 10e-6});
+    if (!run.Result) {
+        FAIL(run.Result.error());
+    }
+    const Core::Transient &transient = *run.Result;
+    REQUIRE(transient.NodeVoltages[1].size() == transient.Times.size());
+    for (std::size_t index = 0; index < transient.Times.size(); ++index) {
+        const double t = transient.Times[index];
+        double expected = exp.InitialValue;
+        if (t > exp.RiseDelay) {
+            expected +=
+                (exp.PeakValue - exp.InitialValue) * (1.0 - std::exp(-(t - exp.RiseDelay) / exp.RiseTimeConstant));
+        }
+        if (t > exp.FallDelay) {
+            expected +=
+                (exp.InitialValue - exp.PeakValue) * (1.0 - std::exp(-(t - exp.FallDelay) / exp.FallTimeConstant));
+        }
+        CHECK_THAT(transient.NodeVoltages[1][index], Catch::Matchers::WithinAbs(expected, 5e-3));
+    }
+}
+
+TEST_CASE("A transient run follows the single-frequency FM of an SFFM source", "[simulator]") {
+    Core::VoltageSource source;
+    source.SetName("Vin1");
+    source.SetSourceType(Core::VoltageSource::SourceType::SFFM);
+    const Core::SFFMParameters sffm{
+        .Offset = 0.0, .Amplitude = 1.0, .CarrierFrequency = 1e3, .ModulationIndex = 5.0, .SignalFrequency = 100.0};
+    source.SetSFFM(sffm);
+    Core::Resistor load;
+    load.SetName("R1");
+    const Core::Ground reference;
+    Core::Circuit circuit;
+    circuit.Add(source, {1, 0});
+    circuit.Add(load, {1, 0});
+    circuit.Add(reference, {0});
+
+    const Core::TransientRun run = Core::RunTransient(circuit, {.StopTime = 5e-3, .TimeStep = 5e-6});
+    if (!run.Result) {
+        FAIL(run.Result.error());
+    }
+    const Core::Transient &transient = *run.Result;
+    REQUIRE(transient.NodeVoltages[1].size() == transient.Times.size());
+    for (std::size_t index = 0; index < transient.Times.size(); ++index) {
+        const double t = transient.Times[index];
+        // The carrier phase is swung by the modulation index times the signal sine
+        const double expected =
+            sffm.Offset + sffm.Amplitude * std::sin(2.0 * std::numbers::pi * sffm.CarrierFrequency * t +
+                                                    sffm.ModulationIndex *
+                                                        std::sin(2.0 * std::numbers::pi * sffm.SignalFrequency * t));
+        CHECK_THAT(transient.NodeVoltages[1][index], Catch::Matchers::WithinAbs(expected, 1e-3));
+    }
+}
+
+TEST_CASE("A transient run follows the amplitude modulation of an AM source", "[simulator]") {
+    Core::VoltageSource source;
+    source.SetName("Vin1");
+    source.SetSourceType(Core::VoltageSource::SourceType::AM);
+    // No offset, so the source at t = 0 matches the operating point, and no delay, so the sines start at once
+    const Core::AMParameters am{
+        .Amplitude = 1.0, .Offset = 0.0, .ModulatingFrequency = 100.0, .CarrierFrequency = 1e3, .Delay = 0.0};
+    source.SetAM(am);
+    Core::Resistor load;
+    load.SetName("R1");
+    const Core::Ground reference;
+    Core::Circuit circuit;
+    circuit.Add(source, {1, 0});
+    circuit.Add(load, {1, 0});
+    circuit.Add(reference, {0});
+
+    const Core::TransientRun run = Core::RunTransient(circuit, {.StopTime = 5e-3, .TimeStep = 5e-6});
+    if (!run.Result) {
+        FAIL(run.Result.error());
+    }
+    const Core::Transient &transient = *run.Result;
+    REQUIRE(transient.NodeVoltages[1].size() == transient.Times.size());
+    for (std::size_t index = 0; index < transient.Times.size(); ++index) {
+        const double shifted = transient.Times[index] - am.Delay;
+        const double expected =
+            shifted <= 0.0
+                ? 0.0
+                : am.Offset + am.Amplitude * std::sin(2.0 * std::numbers::pi * am.ModulatingFrequency * shifted) *
+                                  std::sin(2.0 * std::numbers::pi * am.CarrierFrequency * shifted);
+        CHECK_THAT(transient.NodeVoltages[1][index], Catch::Matchers::WithinAbs(expected, 1e-3));
+    }
+}
+
+TEST_CASE("A transient run follows the piecewise linear shape of a PWL source", "[simulator]") {
+    Core::VoltageSource source;
+    source.SetName("Vin1");
+    source.SetSourceType(Core::VoltageSource::SourceType::PWL);
+    const std::vector<Core::PWLPoint> points = {{0.0, 0.0}, {1e-3, 5.0}, {2e-3, 0.0}};
+    source.SetPWL({.Points = points});
+    Core::Resistor load;
+    load.SetName("R1");
+    const Core::Ground reference;
+    Core::Circuit circuit;
+    circuit.Add(source, {1, 0});
+    circuit.Add(load, {1, 0});
+    circuit.Add(reference, {0});
+
+    const Core::TransientRun run = Core::RunTransient(circuit, {.StopTime = 3e-3, .TimeStep = 5e-6});
+    if (!run.Result) {
+        FAIL(run.Result.error());
+    }
+    const Core::Transient &transient = *run.Result;
+    REQUIRE(transient.NodeVoltages[1].size() == transient.Times.size());
+    for (std::size_t index = 0; index < transient.Times.size(); ++index) {
+        const double t = transient.Times[index];
+        double expected = points.front().Value;
+        for (std::size_t point = 1; point < points.size(); ++point) {
+            if (t <= points[point].Time) {
+                const double fraction = (t - points[point - 1].Time) / (points[point].Time - points[point - 1].Time);
+                expected = points[point - 1].Value + fraction * (points[point].Value - points[point - 1].Value);
+                break;
+            }
+            expected = points[point].Value;
+        }
+        CHECK_THAT(transient.NodeVoltages[1][index], Catch::Matchers::WithinAbs(expected, 1e-4));
+    }
+}
+
+TEST_CASE("A capacitor with an initial condition discharges through a resistor", "[simulator]") {
+    Core::Capacitor capacitor;
+    capacitor.SetName("C1");
+    capacitor.SetValue(1e-6);
+    capacitor.SetInitialCondition(5.0);
+    Core::Resistor resistor;
+    resistor.SetName("R1");
+    resistor.SetValue(1e3);
+    const Core::Ground reference;
+    Core::Circuit circuit;
+    circuit.Add(capacitor, {1, 0});
+    circuit.Add(resistor, {1, 0});
+    circuit.Add(reference, {0});
+
+    const Core::TransientRun run = Core::RunTransient(circuit, {.StopTime = 5e-3, .TimeStep = 5e-6});
+    if (!run.Result) {
+        FAIL(run.Result.error());
+    }
+    const Core::Transient &transient = *run.Result;
+    // uic skips the operating point, so the run says it started from the initial condition
+    CHECK(std::ranges::any_of(transient.Warnings, [](const std::string &warning) {
+        return warning.find("initial condition") != std::string::npos;
+    }));
+    for (std::size_t index = 0; index < transient.Times.size(); ++index) {
+        const double expected = 5.0 * std::exp(-transient.Times[index] / 1e-3);
+        CHECK_THAT(transient.NodeVoltages[1][index], Catch::Matchers::WithinAbs(expected, 5e-3));
+    }
+}
+
+TEST_CASE("With uic, a capacitor without an initial condition starts uncharged, not at its operating point",
+          "[simulator]") {
+    // R1 and C1 form a divider that the operating point would settle at 10 V; C2 only exists to give the run an
+    // initial condition, so uic applies to the whole circuit
+    Core::VoltageSource source;
+    source.SetName("V1");
+    source.SetValue(10.0);
+    Core::Resistor charging;
+    charging.SetName("R1");
+    charging.SetValue(1e3);
+    Core::Capacitor plain;
+    plain.SetName("C1");
+    plain.SetValue(1e-6);
+    Core::Capacitor charged;
+    charged.SetName("C2");
+    charged.SetValue(1e-6);
+    charged.SetInitialCondition(5.0);
+    Core::Resistor discharging;
+    discharging.SetName("R2");
+    discharging.SetValue(1e3);
+    const Core::Ground reference;
+    Core::Circuit circuit;
+    circuit.Add(source, {1, 0});
+    circuit.Add(charging, {1, 2});
+    circuit.Add(plain, {2, 0});
+    circuit.Add(charged, {3, 0});
+    circuit.Add(discharging, {3, 0});
+    circuit.Add(reference, {0});
+
+    const Core::TransientRun run = Core::RunTransient(circuit, {.StopTime = 5e-3, .TimeStep = 5e-6});
+    if (!run.Result) {
+        FAIL(run.Result.error());
+    }
+    const Core::Transient &transient = *run.Result;
+    // C1 charges from 0 V toward 10 V with R1*C1 = 1 ms, instead of sitting at 10 V from the start
+    for (std::size_t index = 0; index < transient.Times.size(); ++index) {
+        const double expected = 10.0 * (1.0 - std::exp(-transient.Times[index] / 1e-3));
+        CHECK_THAT(transient.NodeVoltages[2][index], Catch::Matchers::WithinAbs(expected, 5e-2));
+    }
+}
+
+TEST_CASE("A transient with no initial condition keeps the operating point", "[simulator]") {
+    Core::Capacitor capacitor;
+    capacitor.SetName("C1");
+    Core::Resistor resistor;
+    resistor.SetName("R1");
+    const Core::Ground reference;
+    Core::Circuit circuit;
+    circuit.Add(capacitor, {1, 0});
+    circuit.Add(resistor, {1, 0});
+    circuit.Add(reference, {0});
+
+    const Core::TransientRun run = Core::RunTransient(circuit, {.StopTime = 1e-3, .TimeStep = 5e-6});
+    if (!run.Result) {
+        FAIL(run.Result.error());
+    }
+    CHECK(run.Result->Warnings.empty());
 }
 
 TEST_CASE("Invalid analysis settings are rejected before reaching ngspice", "[simulator]") {
@@ -2225,4 +2459,518 @@ TEST_CASE("A noise analysis runs beside logic parts, which add only the noise of
     CHECK_THAT(run.Result->OutputDensities[0], Catch::Matchers::WithinRel(ThermalNoise(1e3), 1e-2));
     REQUIRE_FALSE(run.Result->Contributions.empty());
     CHECK(run.Result->Contributions.front().Name == "R1");
+}
+
+namespace {
+
+/**
+ * @struct  ResistiveDivider
+ * @brief   A DC voltage source on node 1 feeding 1k and 2k resistors in series to ground, with the middle on node 2.
+ */
+struct ResistiveDivider {
+    Core::VoltageSource Source;
+    Core::Resistor Top;
+    Core::Resistor Bottom;
+    Core::Ground Reference;
+    Core::Circuit Circuit;
+
+    ResistiveDivider() {
+        Source.SetName("V1");
+        Source.SetValue(5.0);
+        Top.SetName("R1");
+        Top.SetValue(1e3);
+        Bottom.SetName("R2");
+        Bottom.SetValue(2e3);
+        Circuit.Add(Source, {1, 0});
+        Circuit.Add(Top, {1, 2});
+        Circuit.Add(Bottom, {2, 0});
+        Circuit.Add(Reference, {0});
+    }
+};
+
+} // namespace
+
+TEST_CASE("The transfer function of a voltage divider matches its closed-form gain and resistances", "[simulator]") {
+    ResistiveDivider divider;
+    // A transfer function drives the circuit from an independent source of any waveform, not only an AC one
+    CHECK(Core::GetTransferFunctionInputSources(divider.Circuit) == std::vector<std::string>{"V1"});
+    const Core::TransferFunctionRun run =
+        Core::RunTransferFunction(divider.Circuit, {.OutputNode = 2, .InputSource = "V1"});
+    if (!run.Result) {
+        FAIL(run.Result.error());
+    }
+    const Core::TransferFunction &transfer = *run.Result;
+    CHECK(transfer.InputSource == "V1");
+    CHECK(transfer.InputUnit == "V");
+    // The divider: gain R2/(R1+R2), input resistance R1+R2, output resistance R1 parallel R2
+    CHECK_THAT(transfer.Gain, Catch::Matchers::WithinRel(2.0 / 3.0, 1e-6));
+    CHECK_THAT(transfer.InputImpedance, Catch::Matchers::WithinRel(3e3, 1e-6));
+    CHECK_THAT(transfer.OutputImpedance, Catch::Matchers::WithinRel(1e3 * 2e3 / (1e3 + 2e3), 1e-6));
+}
+
+TEST_CASE("A VCC supply rail is a transfer function input", "[simulator]") {
+    // The Divider helper is a 10 V VCC feeding 1k and 3k resistors, with the middle on node 2
+    Divider divider;
+    CHECK(Core::GetTransferFunctionInputSources(divider.Circuit) == std::vector<std::string>{"V1"});
+    const Core::TransferFunctionRun run =
+        Core::RunTransferFunction(divider.Circuit, {.OutputNode = 2, .InputSource = "V1"});
+    if (!run.Result) {
+        FAIL(run.Result.error());
+    }
+    const Core::TransferFunction &transfer = *run.Result;
+    CHECK(transfer.InputUnit == "V");
+    // The 1k/3k divider: gain 3k/(1k+3k), input 1k+3k, output 1k parallel 3k
+    CHECK_THAT(transfer.Gain, Catch::Matchers::WithinRel(3e3 / (1e3 + 3e3), 1e-6));
+    CHECK_THAT(transfer.InputImpedance, Catch::Matchers::WithinRel(4e3, 1e-6));
+    CHECK_THAT(transfer.OutputImpedance, Catch::Matchers::WithinRel(1e3 * 3e3 / (1e3 + 3e3), 1e-6));
+}
+
+TEST_CASE("The transfer function from a current source is a transimpedance in V/A", "[simulator]") {
+    Core::CurrentSource source;
+    source.SetName("I1");
+    source.SetValue(1e-3);
+    Core::Resistor load;
+    load.SetName("R1");
+    load.SetValue(1e3);
+    Core::Ground reference;
+    Core::Circuit circuit;
+    circuit.Add(source, {0, 1});
+    circuit.Add(load, {1, 0});
+    circuit.Add(reference, {0});
+    CHECK(Core::GetTransferFunctionInputSources(circuit) == std::vector<std::string>{"I1"});
+    const Core::TransferFunctionRun run = Core::RunTransferFunction(circuit, {.OutputNode = 1, .InputSource = "I1"});
+    if (!run.Result) {
+        FAIL(run.Result.error());
+    }
+    const Core::TransferFunction &transfer = *run.Result;
+    CHECK(transfer.InputUnit == "A");
+    // A current I into R1 makes V = I*R1, so the gain is R1 (V/A) and both impedances are R1
+    CHECK_THAT(transfer.Gain, Catch::Matchers::WithinRel(1e3, 1e-6));
+    CHECK_THAT(transfer.InputImpedance, Catch::Matchers::WithinRel(1e3, 1e-6));
+    CHECK_THAT(transfer.OutputImpedance, Catch::Matchers::WithinRel(1e3, 1e-6));
+}
+
+TEST_CASE("RunTransferFunction rejects a missing input source and an unknown output", "[simulator]") {
+    ResistiveDivider divider;
+    CHECK(Core::RunTransferFunction(divider.Circuit, {.OutputNode = 2, .InputSource = "V1"}).Result);
+
+    // An input source that is not in the circuit, and one that cannot drive it, are named back
+    const Core::TransferFunctionRun no_input =
+        Core::RunTransferFunction(divider.Circuit, {.OutputNode = 2, .InputSource = "V9"});
+    REQUIRE_FALSE(no_input.Result);
+    CHECK(no_input.Result.error().contains("V9"));
+
+    // Ground and a node past the circuit are not outputs
+    CHECK_FALSE(Core::RunTransferFunction(divider.Circuit, {.OutputNode = 0, .InputSource = "V1"}).Result);
+    CHECK_FALSE(Core::RunTransferFunction(divider.Circuit, {.OutputNode = 42, .InputSource = "V1"}).Result);
+}
+
+TEST_CASE("The impedances of an ideal source are finite, so the views can show them sensibly", "[simulator]") {
+    Core::VoltageSource source;
+    source.SetName("V1");
+    source.SetValue(5.0);
+    Core::Ground reference;
+    Core::Circuit circuit;
+    circuit.Add(source, {1, 0});
+    circuit.Add(reference, {0});
+    const Core::TransferFunctionRun run = Core::RunTransferFunction(circuit, {.OutputNode = 1, .InputSource = "V1"});
+    if (!run.Result) {
+        FAIL(run.Result.error());
+    }
+    // The source drives an open load, which ngspice reports around 1e20 ohm; it stays finite so it reads as an open
+    // circuit rather than nan or inf
+    CHECK(std::isfinite(run.Result->InputImpedance));
+    CHECK(run.Result->InputImpedance > 1e15);
+    // The output sits on the ideal source, which holds it at 0 ohm
+    CHECK(run.Result->OutputImpedance == 0.0);
+    CHECK_THAT(run.Result->Gain, Catch::Matchers::WithinRel(1.0, 1e-9));
+}
+
+TEST_CASE("A clock is high for the share of the period its duty cycle gives", "[simulator]") {
+    Core::Clock clock;
+    clock.SetName("V1");
+    clock.SetParameters({.Frequency = 1e3, .DutyCycle = 0.25, .LogicLevel = 5.0, .StartDelay = 0.0});
+    Core::Resistor load;
+    load.SetName("R1");
+    load.SetValue(1e3);
+    const Core::Ground reference;
+    Core::Circuit circuit;
+    circuit.Add(clock, {1});
+    circuit.Add(load, {1, 0});
+    circuit.Add(reference, {0});
+
+    // Four 1 ms periods sampled every 0.1 us; the short edges contribute well under one percent
+    const Core::TransientRun run = Core::RunTransient(circuit, {.StopTime = 4e-3, .TimeStep = 1e-7});
+    REQUIRE(run.Result.has_value());
+    const std::vector<double> &voltage = run.Result->NodeVoltages[1];
+    std::size_t high_samples = 0;
+    for (const double value : voltage) {
+        if (value > 2.5) {
+            ++high_samples;
+        }
+    }
+    const double high_fraction = static_cast<double>(high_samples) / static_cast<double>(voltage.size());
+    CHECK_THAT(high_fraction, Catch::Matchers::WithinAbs(0.25, 0.02));
+}
+
+TEST_CASE("A clock start delay holds it low until the first rising edge", "[simulator]") {
+    Core::Clock clock;
+    clock.SetName("V1");
+    // 50% at 1 kHz, but quiet for the first 2 ms
+    clock.SetParameters({.Frequency = 1e3, .DutyCycle = 0.5, .LogicLevel = 5.0, .StartDelay = 2e-3});
+    const Core::Ground reference;
+    Core::Circuit circuit;
+    circuit.Add(clock, {1});
+    circuit.Add(reference, {0});
+
+    const Core::TransientRun run = Core::RunTransient(circuit, {.StopTime = 4e-3, .TimeStep = 1e-6});
+    REQUIRE(run.Result.has_value());
+    const Core::Transient &transient = *run.Result;
+    const std::vector<double> &voltage = transient.NodeVoltages[1];
+    const auto at = [&transient, &voltage](const double time) {
+        return voltage[static_cast<std::size_t>(std::ranges::lower_bound(transient.Times, time) -
+                                                transient.Times.begin())];
+    };
+    // Low through the delay, high in the first pulse at 2.25 ms, low again at 2.75 ms
+    CHECK_THAT(at(1.0e-3), Catch::Matchers::WithinAbs(0.0, 0.05));
+    CHECK_THAT(at(1.99e-3), Catch::Matchers::WithinAbs(0.0, 0.05));
+    CHECK_THAT(at(2.25e-3), Catch::Matchers::WithinAbs(5.0, 0.05));
+    CHECK_THAT(at(2.75e-3), Catch::Matchers::WithinAbs(0.0, 0.05));
+    CHECK_THAT(at(3.25e-3), Catch::Matchers::WithinAbs(5.0, 0.05));
+}
+
+TEST_CASE("A clock into a D flip-flop divides it by two", "[simulator][digital]") {
+    SKIP_WITHOUT_DIGITAL_MODELS();
+    Core::Clock clock;
+    clock.SetName("V1");
+    // The first rising edge at 0.25 ms, the same last rising edge the other flip-flop tests use
+    clock.SetParameters({.Frequency = 1e3, .DutyCycle = 0.5, .LogicLevel = 5.0, .StartDelay = 0.25e-3});
+    Core::LogicPart flip_flop(Core::ComponentType::DFlipFlop);
+    flip_flop.SetName("U1");
+    Core::Circuit circuit;
+    // QN on node 1 feeds D on node 1; CLK on node 2, SET and RESET on nodes 3 and 4, Q on node 5. The clock returns
+    // to node 0 by itself, so the circuit needs no Ground part
+    circuit.Add(clock, {2});
+    circuit.Add(flip_flop, {1, 2, 3, 4, 5, 1});
+    REQUIRE_FALSE(circuit.HasGround());
+
+    const Core::TransientRun run = Core::RunTransient(circuit, {.StopTime = 4e-3, .TimeStep = 5e-6});
+    REQUIRE(run.Result.has_value());
+    const Core::Transient &transient = *run.Result;
+    // Four rising edges from 0.25 ms to 3.25 ms, each toggling Q, so two rising edges of Q
+    CHECK(CountRisingEdges(transient.NodeVoltages[2], 2.5) == 4);
+    CHECK(CountRisingEdges(transient.NodeVoltages[5], 2.5) == 2);
+}
+
+TEST_CASE("A logic input drives a gate to the output its truth table gives", "[simulator][digital]") {
+    SKIP_WITHOUT_DIGITAL_MODELS();
+    Core::LogicInput input;
+    input.SetName("V1");
+    Core::LogicPart gate(Core::ComponentType::Or);
+    gate.SetName("U1");
+    const Core::Ground reference;
+    Core::Circuit circuit;
+    // A on node 1, B left alone on node 2 (it reads 0), Y on node 3
+    circuit.Add(input, {1});
+    circuit.Add(gate, {1, 2, 3});
+    circuit.Add(reference, {0});
+
+    // Low with B low gives 0, High with B low gives 1
+    const Core::OperatingPointRun low = Core::RunOperatingPoint(circuit);
+    REQUIRE(low.Result.has_value());
+    CHECK_THAT(low.Result->NodeVoltages[3], Catch::Matchers::WithinAbs(0.0, 0.05));
+
+    input.SetHigh(true);
+    const Core::OperatingPointRun high = Core::RunOperatingPoint(circuit);
+    REQUIRE(high.Result.has_value());
+    CHECK_THAT(high.Result->NodeVoltages[3], Catch::Matchers::WithinAbs(5.0, 0.05));
+}
+
+TEST_CASE("A circuit of only digital parts runs without a ground", "[simulator][digital]") {
+    SKIP_WITHOUT_DIGITAL_MODELS();
+    Core::LogicInput input_a;
+    input_a.SetName("V1");
+    input_a.SetHigh(true);
+    Core::LogicInput input_b;
+    input_b.SetName("V2");
+    Core::LogicPart gate(Core::ComponentType::And);
+    gate.SetName("U1");
+    Core::Circuit circuit;
+    // A on node 1 and B on node 2, with Y on node 3 and no Ground part, resistor or load anywhere
+    circuit.Add(input_a, {1});
+    circuit.Add(input_b, {2});
+    circuit.Add(gate, {1, 2, 3});
+    REQUIRE_FALSE(circuit.HasGround());
+
+    // 1 AND 0 is 0, and 1 AND 1 is 1
+    const Core::OperatingPointRun low = Core::RunOperatingPoint(circuit);
+    REQUIRE(low.Result.has_value());
+    CHECK_THAT(low.Result->NodeVoltages[3], Catch::Matchers::WithinAbs(0.0, 0.05));
+
+    input_b.SetHigh(true);
+    const Core::OperatingPointRun high = Core::RunOperatingPoint(circuit);
+    REQUIRE(high.Result.has_value());
+    CHECK_THAT(high.Result->NodeVoltages[1], Catch::Matchers::WithinAbs(5.0, 0.05));
+    CHECK_THAT(high.Result->NodeVoltages[3], Catch::Matchers::WithinAbs(5.0, 0.05));
+}
+
+TEST_CASE("A truth table runs every combination of the chosen logic inputs in counting order", "[simulator][digital]") {
+    SKIP_WITHOUT_DIGITAL_MODELS();
+    Core::LogicInput input_a;
+    input_a.SetName("V1");
+    input_a.SetHigh(true);
+    Core::LogicInput input_b;
+    input_b.SetName("V2");
+    Core::LogicPart gate(Core::ComponentType::And);
+    gate.SetName("U1");
+    Core::Circuit circuit;
+    // A on node 1, B on node 2, Y on node 3
+    circuit.Add(input_a, {1});
+    circuit.Add(input_b, {2});
+    circuit.Add(gate, {1, 2, 3});
+
+    CHECK(Core::GetTruthTableInputs(circuit) == std::vector<std::string>{"V1", "V2"});
+    const Core::TruthTableRun run = Core::RunTruthTable(circuit, {.Inputs = {"V1", "V2"}, .OutputNodes = {3}});
+    if (!run.Result) {
+        FAIL(run.Result.error());
+    }
+    const Core::TruthTable &table = *run.Result;
+    CHECK(table.InputNames == std::vector<std::string>{"V1", "V2"});
+    CHECK(table.InputLevels == std::vector<double>{5.0, 5.0});
+    REQUIRE(table.Rows.size() == 4);
+    // The first input is the most significant bit, so the rows read 00, 01, 10 and 11, and an AND is high only on 11
+    constexpr std::array<std::array<bool, 2>, 4> Combinations = {
+        {{false, false}, {false, true}, {true, false}, {true, true}}};
+    for (std::size_t row = 0; row < table.Rows.size(); ++row) {
+        CHECK(table.Rows[row].InputsHigh == std::vector<bool>{Combinations[row][0], Combinations[row][1]});
+        REQUIRE(table.Rows[row].HasOperatingPoint());
+        const double expected = Combinations[row][0] && Combinations[row][1] ? 5.0 : 0.0;
+        CHECK_THAT(table.Rows[row].OutputVoltages[0], Catch::Matchers::WithinAbs(expected, 0.05));
+    }
+    CHECK(table.Warnings.empty());
+    // The circuit itself is left as it was
+    CHECK(input_a.IsHigh());
+    CHECK_FALSE(input_b.IsHigh());
+}
+
+TEST_CASE("A truth table reads several outputs, as a half adder gives its sum and carry", "[simulator][digital]") {
+    SKIP_WITHOUT_DIGITAL_MODELS();
+    Core::LogicInput input_a;
+    input_a.SetName("V1");
+    Core::LogicInput input_b;
+    input_b.SetName("V2");
+    Core::LogicPart sum_gate(Core::ComponentType::Xor);
+    sum_gate.SetName("U1");
+    Core::LogicPart carry_gate(Core::ComponentType::And);
+    carry_gate.SetName("U2");
+    Core::Circuit circuit;
+    // A on node 1, B on node 2, sum on node 3, carry on node 4
+    circuit.Add(input_a, {1});
+    circuit.Add(input_b, {2});
+    circuit.Add(sum_gate, {1, 2, 3});
+    circuit.Add(carry_gate, {1, 2, 4});
+
+    const Core::TruthTableRun run = Core::RunTruthTable(circuit, {.Inputs = {"V1", "V2"}, .OutputNodes = {3, 4}});
+    if (!run.Result) {
+        FAIL(run.Result.error());
+    }
+    REQUIRE(run.Result->Rows.size() == 4);
+    // Sum is A xor B and carry is A and B: 00 gives 0 0, 01 gives 1 0, 10 gives 1 0 and 11 gives 0 1
+    constexpr std::array<std::array<double, 2>, 4> Expected = {{{0.0, 0.0}, {5.0, 0.0}, {5.0, 0.0}, {0.0, 5.0}}};
+    for (std::size_t row = 0; row < 4; ++row) {
+        REQUIRE(run.Result->Rows[row].OutputVoltages.size() == 2);
+        CHECK_THAT(run.Result->Rows[row].OutputVoltages[0], Catch::Matchers::WithinAbs(Expected[row][0], 0.05));
+        CHECK_THAT(run.Result->Rows[row].OutputVoltages[1], Catch::Matchers::WithinAbs(Expected[row][1], 0.05));
+    }
+}
+
+TEST_CASE("A truth table leaves a combination without an operating point empty and warns", "[simulator][digital]") {
+    SKIP_WITHOUT_DIGITAL_MODELS();
+    Core::LogicInput set_bar;
+    set_bar.SetName("V1");
+    Core::LogicInput reset_bar;
+    reset_bar.SetName("V2");
+    Core::LogicPart gate_q(Core::ComponentType::Nand);
+    gate_q.SetName("U1");
+    Core::LogicPart gate_qn(Core::ComponentType::Nand);
+    gate_qn.SetName("U2");
+    Core::Circuit circuit;
+    // U1: A = S_BAR (1), B = QN (3), Y = Q (2); U2: A = R_BAR (4), B = Q (2), Y = QN (3)
+    circuit.Add(set_bar, {1});
+    circuit.Add(reset_bar, {4});
+    circuit.Add(gate_q, {1, 3, 2});
+    circuit.Add(gate_qn, {4, 2, 3});
+
+    const Core::TruthTableRun run = Core::RunTruthTable(circuit, {.Inputs = {"V1", "V2"}, .OutputNodes = {2, 3}});
+    if (!run.Result) {
+        FAIL(run.Result.error());
+    }
+    const Core::TruthTable &table = *run.Result;
+    REQUIRE(table.Rows.size() == 4);
+    // S_BAR low sets Q and R_BAR low resets it; both low drives both outputs high
+    CHECK_THAT(table.Rows[0].OutputVoltages[0], Catch::Matchers::WithinAbs(5.0, 0.05));
+    CHECK_THAT(table.Rows[0].OutputVoltages[1], Catch::Matchers::WithinAbs(5.0, 0.05));
+    CHECK_THAT(table.Rows[1].OutputVoltages[0], Catch::Matchers::WithinAbs(5.0, 0.05));
+    CHECK_THAT(table.Rows[1].OutputVoltages[1], Catch::Matchers::WithinAbs(0.0, 0.05));
+    CHECK_THAT(table.Rows[2].OutputVoltages[0], Catch::Matchers::WithinAbs(0.0, 0.05));
+    CHECK_THAT(table.Rows[2].OutputVoltages[1], Catch::Matchers::WithinAbs(5.0, 0.05));
+    // Both high holds the state, so it depends on history and has no operating point
+    CHECK_FALSE(table.Rows[3].HasOperatingPoint());
+    REQUIRE(table.Warnings.size() == 1);
+    CHECK(table.Warnings.front().contains("1 of 4"));
+}
+
+TEST_CASE("RunTruthTable rejects inputs and outputs it cannot use", "[simulator]") {
+    Core::LogicInput input;
+    input.SetName("V1");
+    Core::Resistor load;
+    load.SetName("R1");
+    load.SetValue(1e3);
+    const Core::Ground reference;
+    Core::Circuit circuit;
+    circuit.Add(input, {1});
+    circuit.Add(load, {1, 0});
+    circuit.Add(reference, {0});
+
+    const auto message = [&circuit](const Core::TruthTableSettings &settings) {
+        const Core::TruthTableRun run = Core::RunTruthTable(circuit, settings);
+        REQUIRE_FALSE(run.Result.has_value());
+        return run.Result.error();
+    };
+    CHECK(message({.Inputs = {}, .OutputNodes = {1}}).contains("at least one logic input"));
+    CHECK(message({.Inputs = {"V9"}, .OutputNodes = {1}}).contains("V9"));
+    // A resistor is not a logic input, and an input cannot be listed twice
+    CHECK(message({.Inputs = {"R1"}, .OutputNodes = {1}}).contains("R1"));
+    CHECK(message({.Inputs = {"V1", "V1"}, .OutputNodes = {1}}).contains("twice"));
+    CHECK(message({.Inputs = {"V1"}, .OutputNodes = {}}).contains("at least one node"));
+    CHECK(message({.Inputs = {"V1"}, .OutputNodes = {0}}).contains("ground"));
+    CHECK(message({.Inputs = {"V1"}, .OutputNodes = {7}}).contains("ground"));
+    // More inputs than the limit would take thousands of runs
+    const std::vector<std::string> many(Core::MaxTruthTableInputs + 1, "V1");
+    CHECK(message({.Inputs = many, .OutputNodes = {1}}).contains("at most"));
+}
+
+TEST_CASE("Gates with three inputs follow their truth tables, an XOR giving odd parity", "[simulator][digital]") {
+    SKIP_WITHOUT_DIGITAL_MODELS();
+    struct GateCase {
+        Core::ComponentType Type;
+        // Whether the output is high for 0, 1, 2 and 3 high inputs
+        std::array<bool, 4> HighForCount;
+    };
+    constexpr std::array<GateCase, 6> Cases = {{{Core::ComponentType::And, {false, false, false, true}},
+                                                {Core::ComponentType::Or, {false, true, true, true}},
+                                                {Core::ComponentType::Nand, {true, true, true, false}},
+                                                {Core::ComponentType::Nor, {true, false, false, false}},
+                                                {Core::ComponentType::Xor, {false, true, false, true}},
+                                                {Core::ComponentType::Xnor, {true, false, true, false}}}};
+    for (const GateCase &gate_case : Cases) {
+        Core::LogicInput input_a;
+        input_a.SetName("V1");
+        Core::LogicInput input_b;
+        input_b.SetName("V2");
+        Core::LogicInput input_c;
+        input_c.SetName("V3");
+        Core::LogicPart gate(gate_case.Type);
+        gate.SetName("U1");
+        gate.SetInputCount(3);
+        Core::Circuit circuit;
+        // The three inputs on nodes 1, 2 and 3 and the output on node 4
+        circuit.Add(input_a, {1});
+        circuit.Add(input_b, {2});
+        circuit.Add(input_c, {3});
+        circuit.Add(gate, {1, 2, 3, 4});
+
+        const Core::TruthTableRun run =
+            Core::RunTruthTable(circuit, {.Inputs = {"V1", "V2", "V3"}, .OutputNodes = {4}});
+        INFO(gate.GetTypeName());
+        if (!run.Result) {
+            FAIL(run.Result.error());
+        }
+        REQUIRE(run.Result->Rows.size() == 8);
+        for (const Core::TruthTableRow &row : run.Result->Rows) {
+            const auto high_count = static_cast<std::size_t>(std::ranges::count(row.InputsHigh, true));
+            REQUIRE(row.HasOperatingPoint());
+            const double expected = gate_case.HighForCount[high_count] ? 5.0 : 0.0;
+            CHECK_THAT(row.OutputVoltages[0], Catch::Matchers::WithinAbs(expected, 0.05));
+        }
+    }
+}
+
+TEST_CASE("An AND gate of eight inputs is high only when all of them are", "[simulator][digital]") {
+    SKIP_WITHOUT_DIGITAL_MODELS();
+    std::vector<Core::LogicInput> inputs(8);
+    Core::LogicPart gate(Core::ComponentType::And);
+    gate.SetName("U1");
+    gate.SetInputCount(8);
+    Core::Circuit circuit;
+    std::vector<int> nodes;
+    for (std::size_t index = 0; index < inputs.size(); ++index) {
+        inputs[index].SetName(std::format("V{}", index + 1));
+        inputs[index].SetHigh(true);
+        circuit.Add(inputs[index], {static_cast<int>(index) + 1});
+        nodes.push_back(static_cast<int>(index) + 1);
+    }
+    nodes.push_back(9);
+    circuit.Add(gate, nodes);
+
+    const Core::OperatingPointRun all_high = Core::RunOperatingPoint(circuit);
+    REQUIRE(all_high.Result.has_value());
+    CHECK_THAT(all_high.Result->NodeVoltages[9], Catch::Matchers::WithinAbs(5.0, 0.05));
+    // The gate reports its output current, which is the last of its nine terminals
+    CHECK(Core::GetCurrentTerminals(gate) == std::vector<std::size_t>{8});
+
+    // The last input alone going low is enough to bring the output down
+    inputs[7].SetHigh(false);
+    const Core::OperatingPointRun one_low = Core::RunOperatingPoint(circuit);
+    REQUIRE(one_low.Result.has_value());
+    CHECK_THAT(one_low.Result->NodeVoltages[9], Catch::Matchers::WithinAbs(0.0, 0.05));
+}
+
+TEST_CASE("A circuit with an analog part still needs a ground", "[simulator][digital]") {
+    Core::LogicInput input;
+    input.SetName("V1");
+    Core::Resistor load;
+    load.SetName("R1");
+    load.SetValue(1e3);
+    Core::Circuit circuit;
+    circuit.Add(input, {1});
+    circuit.Add(load, {1, 2});
+    const Core::OperatingPointRun run = Core::RunOperatingPoint(circuit);
+    REQUIRE_FALSE(run.Result.has_value());
+    CHECK(run.Result.error().contains("no ground"));
+}
+
+TEST_CASE("A logic input gives a NAND latch a defined state", "[simulator][digital]") {
+    SKIP_WITHOUT_DIGITAL_MODELS();
+    Core::LogicInput set_bar;
+    set_bar.SetName("V1");
+    Core::LogicInput reset_bar;
+    reset_bar.SetName("V2");
+    reset_bar.SetHigh(true);
+    Core::LogicPart gate_q(Core::ComponentType::Nand);
+    gate_q.SetName("U1");
+    Core::LogicPart gate_qn(Core::ComponentType::Nand);
+    gate_qn.SetName("U2");
+    const Core::Ground reference;
+    Core::Circuit circuit;
+    // U1: A = S_BAR (1), B = QN (3), Y = Q (2); U2: A = R_BAR (4), B = Q (2), Y = QN (3)
+    circuit.Add(set_bar, {1});
+    circuit.Add(reset_bar, {4});
+    circuit.Add(gate_q, {1, 3, 2});
+    circuit.Add(gate_qn, {4, 2, 3});
+    circuit.Add(reference, {0});
+
+    // S_BAR low sets Q regardless of the other input, so the latch has a state from the start
+    const Core::OperatingPointRun set = Core::RunOperatingPoint(circuit);
+    REQUIRE(set.Result.has_value());
+    CHECK_THAT(set.Result->NodeVoltages[2], Catch::Matchers::WithinAbs(5.0, 0.05));
+    CHECK_THAT(set.Result->NodeVoltages[3], Catch::Matchers::WithinAbs(0.0, 0.05));
+
+    // Now R_BAR low resets it: Q low, QN high
+    set_bar.SetHigh(true);
+    reset_bar.SetHigh(false);
+    const Core::OperatingPointRun reset = Core::RunOperatingPoint(circuit);
+    REQUIRE(reset.Result.has_value());
+    CHECK_THAT(reset.Result->NodeVoltages[2], Catch::Matchers::WithinAbs(0.0, 0.05));
+    CHECK_THAT(reset.Result->NodeVoltages[3], Catch::Matchers::WithinAbs(5.0, 0.05));
 }

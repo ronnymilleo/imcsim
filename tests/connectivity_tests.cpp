@@ -7,6 +7,7 @@
 #include "connectivity.h"
 #include "test_printers.h"
 #include "ui_elements/ui_ground.h"
+#include "ui_elements/ui_logic_input.h"
 #include "ui_elements/ui_net_label.h"
 #include "ui_elements/ui_resistor.h"
 #include "ui_elements/ui_vcc.h"
@@ -119,6 +120,18 @@ TEST_CASE("BuildCircuit lists the node of every terminal in order", "[connectivi
     CHECK(circuit.GetEntries()[0].Nodes == std::vector<int>{1, 0});
     CHECK(circuit.GetEntries()[1].Nodes == std::vector<int>{0});
     CHECK(circuit.GetNodeCount() == 2);
+}
+
+TEST_CASE("Without a ground part no node is numbered 0, so a digital circuit can run without one", "[connectivity]") {
+    Schematic schematic;
+    schematic.Elements.push_back(std::make_unique<GUI::UILogicInput>(GUI::GridPoint{0, 0}, GUI::Rotation::R0));
+
+    const GUI::Connectivity connectivity = schematic.Connect();
+    const Core::Circuit circuit = GUI::BuildCircuit(schematic.Elements, connectivity);
+    REQUIRE(circuit.GetEntries().size() == 1);
+    // The input ties itself to node 0 in the netlist, so its own terminal must not take that number
+    CHECK(circuit.GetEntries()[0].Nodes == std::vector<int>{1});
+    CHECK_FALSE(circuit.HasGround());
 }
 
 TEST_CASE("Net labels with the same name are one node without a wire between them", "[connectivity]") {

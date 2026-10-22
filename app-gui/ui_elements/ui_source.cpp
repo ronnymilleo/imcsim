@@ -28,6 +28,23 @@ constexpr float PulseHalfWidth = 0.25f;
 // two-terminal symbols, which would touch it
 constexpr float LabelOffset = 1.25f;
 
+// A generic exponential rise and decay over the box the waves are drawn in, the shape of an EXP source: nothing,
+// then a rise with a short time constant, then a decay with a longer one
+float ExponentialShape(const float fraction) {
+    constexpr float RiseStart = 0.3f;
+    constexpr float FallStart = 0.5f;
+    constexpr float RiseTau = 0.1f;
+    constexpr float FallTau = 0.15f;
+    if (fraction <= RiseStart) {
+        return 0.0f;
+    }
+    const float risen = 1.0f - std::exp(-(fraction - RiseStart) / RiseTau);
+    if (fraction <= FallStart) {
+        return risen;
+    }
+    return risen - (1.0f - std::exp(-(fraction - FallStart) / FallTau));
+}
+
 } // namespace
 
 /**
@@ -40,7 +57,7 @@ UISource::UISource(std::unique_ptr<Core::Source> source, const GridPoint positio
     : UIElement(std::move(source), position, rotation) {
 }
 
-// AC and pulse sources ignore their DC value, so they are labeled by their waveform instead
+// Every waveform but DC ignores the value of the source, so it is labeled by its main figures instead
 void UISource::DrawLabels(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color) const {
     const Core::Source &source = GetSource();
     const std::string unit = source.GetUnit();
@@ -59,6 +76,20 @@ void UISource::DrawLabels(SchematicCanvas &canvas, const ViewTransform &view, co
                                unit, Core::FormatValue(1.0 / pulse.Period));
         break;
     }
+    case Core::Source::SourceType::EXP:
+        waveform = std::format("{}{}", Core::FormatValue(source.GetEXP().PeakValue), unit);
+        break;
+    case Core::Source::SourceType::SFFM:
+        waveform = std::format("{}{} {}Hz", Core::FormatValue(source.GetSFFM().Amplitude), unit,
+                               Core::FormatValue(source.GetSFFM().CarrierFrequency));
+        break;
+    case Core::Source::SourceType::AM:
+        waveform = std::format("{}{} {}Hz", Core::FormatValue(source.GetAM().Amplitude), unit,
+                               Core::FormatValue(source.GetAM().CarrierFrequency));
+        break;
+    case Core::Source::SourceType::PWL:
+        waveform = std::format("{}pt", source.GetPWL().Points.size());
+        break;
     }
     DrawLabel(canvas, view, {0.0f, -LabelOffset}, {0.0f, -1.0f}, source.GetName(), color);
     DrawLabel(canvas, view, {0.0f, LabelOffset}, {0.0f, 1.0f}, waveform, color);
@@ -88,17 +119,18 @@ void UISource::DrawCircle(SchematicCanvas &canvas, const ViewTransform &view, co
 }
 
 /**
- * @brief   Draws one period of the waveform inside the circle, when the source has one.
+ * @brief   Draws a waveform inside the circle, when the source has one.
  * @param[in,out] canvas Where it is drawn: the editor window or an exported image.
  * @param[in] view       Transform of the current frame.
  * @param[in] color      Line color.
- * @return  True for AC and pulse sources; false for DC, which leaves the inside to the derived symbol.
+ * @return  True for every waveform but DC, which leaves the inside to the derived symbol.
  */
 bool UISource::DrawWaveform(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color) const {
     switch (GetSource().GetSourceType()) {
     case Core::Source::SourceType::DC:
         return false;
-    case Core::Source::SourceType::AC: {
+    case Core::Source::SourceType::AC:
+    case Core::Source::SourceType::SFFM: {
         std::array<ImVec2, SineSegmentCount + 1> sine;
         for (int point = 0; point <= SineSegmentCount; ++point) {
             const float fraction = static_cast<float>(point) / SineSegmentCount;
@@ -116,6 +148,37 @@ bool UISource::DrawWaveform(SchematicCanvas &canvas, const ViewTransform &view, 
             LocalToScreen(view, -PulseHalfWidth, -WaveAmplitude), LocalToScreen(view, PulseHalfWidth, -WaveAmplitude),
             LocalToScreen(view, PulseHalfWidth, WaveAmplitude),   LocalToScreen(view, WaveHalfWidth, WaveAmplitude)};
         canvas.AddPolyline(pulse.data(), static_cast<int>(pulse.size()), color, ImDrawFlags_None, LineThickness);
+        return true;
+    }
+    case Core::Source::SourceType::EXP: {
+        std::array<ImVec2, SineSegmentCount + 1> curve;
+        for (int point = 0; point <= SineSegmentCount; ++point) {
+            const float fraction = static_cast<float>(point) / SineSegmentCount;
+            const float x = -WaveHalfWidth + 2.0f * WaveHalfWidth * fraction;
+            curve[point] = LocalToScreen(view, x, -WaveAmplitude * ExponentialShape(fraction));
+        }
+        canvas.AddPolyline(curve.data(), static_cast<int>(curve.size()), color, ImDrawFlags_None, LineThickness);
+        return true;
+    }
+    case Core::Source::SourceType::AM: {
+        // A carrier inside an envelope: two carrier cycles under one modulation cycle
+        std::array<ImVec2, SineSegmentCount + 1> modulated;
+        for (int point = 0; point <= SineSegmentCount; ++point) {
+            const float fraction = static_cast<float>(point) / SineSegmentCount;
+            const float x = -WaveHalfWidth + 2.0f * WaveHalfWidth * fraction;
+            const float envelope = 0.5f + 0.5f * std::sin(2.0f * std::numbers::pi_v<float> * fraction);
+            const float y = -WaveAmplitude * envelope * std::sin(4.0f * std::numbers::pi_v<float> * fraction);
+            modulated[point] = LocalToScreen(view, x, y);
+        }
+        canvas.AddPolyline(modulated.data(), static_cast<int>(modulated.size()), color, ImDrawFlags_None,
+                           LineThickness);
+        return true;
+    }
+    case Core::Source::SourceType::PWL: {
+        const std::array<ImVec2, 3> points = {LocalToScreen(view, -WaveHalfWidth, WaveAmplitude),
+                                              LocalToScreen(view, 0.0f, -WaveAmplitude),
+                                              LocalToScreen(view, WaveHalfWidth, WaveAmplitude)};
+        canvas.AddPolyline(points.data(), static_cast<int>(points.size()), color, ImDrawFlags_None, LineThickness);
         return true;
     }
     }

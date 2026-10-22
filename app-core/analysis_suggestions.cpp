@@ -5,11 +5,13 @@
 
 #include "analysis_suggestions.h"
 
+#include "components/clock.h"
 #include "components/op_amp.h"
 #include "components/source.h"
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <limits>
 #include <numbers>
 #include <ranges>
 #include <vector>
@@ -21,6 +23,9 @@ namespace {
 // A transient shows this many periods of the slowest source, with this many points in a period of the fastest
 constexpr double SuggestedPeriods = 5.0;
 constexpr double PointsPerPeriod = 200.0;
+// A waveform that happens once, such as an exponential or piecewise linear one, shows its whole span with this much
+// room after it
+constexpr double OneShotMargin = 1.2;
 // The AC sweep reaches two decades past the lowest and the highest frequency the parts set
 constexpr double ACMarginDecades = 2.0;
 constexpr double MinACFrequency = 1e-3;
@@ -86,35 +91,94 @@ std::vector<double> ListCharacteristicFrequencies(const Circuit &circuit) {
     return frequencies;
 }
 
+// What the sources of a circuit say about time: the periods of the repeating waveforms, the spans of those that
+// happen once, and the longest delay before a waveform starts
+struct Waveforms {
+    std::vector<double> Periods;
+    std::vector<double> Spans;
+    double LongestDelay = 0.0;
+};
+
+void AddSourceWaveform(const Source &source, Waveforms &waveforms) {
+    switch (source.GetSourceType()) {
+    case Source::SourceType::DC:
+        break;
+    case Source::SourceType::AC:
+        waveforms.Periods.push_back(1.0 / source.GetAC().Frequency);
+        break;
+    case Source::SourceType::Pulse:
+        waveforms.Periods.push_back(source.GetPulse().Period);
+        waveforms.LongestDelay = std::max(waveforms.LongestDelay, source.GetPulse().Delay);
+        break;
+    case Source::SourceType::EXP: {
+        const EXPParameters &exp = source.GetEXP();
+        waveforms.Spans.push_back(exp.FallDelay + 5.0 * exp.FallTimeConstant);
+        break;
+    }
+    case Source::SourceType::SFFM:
+        waveforms.Periods.push_back(1.0 / source.GetSFFM().CarrierFrequency);
+        waveforms.Periods.push_back(1.0 / source.GetSFFM().SignalFrequency);
+        break;
+    case Source::SourceType::AM:
+        waveforms.Periods.push_back(1.0 / source.GetAM().CarrierFrequency);
+        waveforms.Periods.push_back(1.0 / source.GetAM().ModulatingFrequency);
+        waveforms.LongestDelay = std::max(waveforms.LongestDelay, source.GetAM().Delay);
+        break;
+    case Source::SourceType::PWL: {
+        const PWLParameters &pwl = source.GetPWL();
+        if (pwl.Points.size() >= 2) {
+            waveforms.Spans.push_back(pwl.Points.back().Time);
+        }
+        break;
+    }
+    }
+}
+
+// A clock is a periodic source like a pulse one, with its period and its start delay
+void AddWaveform(const Component &part, Waveforms &waveforms) {
+    if (part.GetType() == ComponentType::Clock) {
+        const ClockParameters &clock = static_cast<const Clock &>(part).GetParameters();
+        waveforms.Periods.push_back(1.0 / clock.Frequency);
+        waveforms.LongestDelay = std::max(waveforms.LongestDelay, clock.StartDelay);
+        return;
+    }
+    if (const auto *source = dynamic_cast<const Source *>(&part)) {
+        AddSourceWaveform(*source, waveforms);
+    }
+}
+
 } // namespace
 
 /**
- * @brief   Suggests transient times from the sine and pulse sources of a circuit.
+ * @brief   Suggests transient times from the waveforms of the sources of a circuit.
  * @param[in] circuit  Circuit to simulate.
  * @return  A stop time of five periods of the slowest source, after the longest pulse delay, and a step of a 200th
- *          of the period of the fastest, both rounded to 1, 2 or 5 times a power of ten; no value without a sine
- *          or pulse source.
+ *          of the period of the fastest, both rounded to 1, 2 or 5 times a power of ten; no value without a source
+ *          with a waveform.
+ * @note    A sine, pulse, clock, SFFM or AM source sets a period. The exponential and piecewise linear waveforms
+ *          happen once, so the stop time covers their span with a little room, and the step a 200th of it.
  */
 std::optional<TransientSettings> SuggestTransientSettings(const Circuit &circuit) {
-    std::vector<double> periods;
-    double longest_delay = 0.0;
+    Waveforms waveforms;
     for (const CircuitEntry &entry : circuit.GetEntries()) {
-        const auto *source = dynamic_cast<const Source *>(entry.Part);
-        if (source == nullptr) {
-            continue;
-        }
-        if (source->GetSourceType() == Source::SourceType::AC) {
-            periods.push_back(1.0 / source->GetAC().Frequency);
-        } else if (source->GetSourceType() == Source::SourceType::Pulse) {
-            periods.push_back(source->GetPulse().Period);
-            longest_delay = std::max(longest_delay, source->GetPulse().Delay);
-        }
+        AddWaveform(*entry.Part, waveforms);
     }
-    if (periods.empty()) {
+    if (waveforms.Periods.empty() && waveforms.Spans.empty()) {
         return std::nullopt;
     }
-    const auto [shortest, longest] = std::ranges::minmax(periods);
-    return TransientSettings{.StopTime = RoundToNiceStep(longest_delay + SuggestedPeriods * longest, true),
+    double stop_time = 0.0;
+    double shortest = std::numeric_limits<double>::max();
+    if (!waveforms.Periods.empty()) {
+        const auto [shortest_period, longest_period] = std::ranges::minmax(waveforms.Periods);
+        stop_time = waveforms.LongestDelay + SuggestedPeriods * longest_period;
+        shortest = shortest_period;
+    }
+    if (!waveforms.Spans.empty()) {
+        const auto [shortest_span, longest_span] = std::ranges::minmax(waveforms.Spans);
+        stop_time = std::max(stop_time, OneShotMargin * longest_span);
+        shortest = std::min(shortest, shortest_span);
+    }
+    return TransientSettings{.StopTime = RoundToNiceStep(stop_time, true),
                              .TimeStep = RoundToNiceStep(shortest / PointsPerPeriod, false)};
 }
 

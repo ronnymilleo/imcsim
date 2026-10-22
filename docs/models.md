@@ -19,6 +19,13 @@ elements, so the results are those of ngspice with the models below. Some things
   resistances. Flicker (1/f) noise is off, since no model sets KF.
   Sources, controlled sources, capacitors, inductors and the ideal op-amp add none, and an op-amp macromodel adds
   the noise of its internal parts, which does not follow its datasheet (see below).
+- A transfer function analysis linearizes the circuit at its DC operating point and reports the DC gain from an
+  independent source to an output node, with the resistance seen by the source and the resistance looking back into
+  the output. It is the same small-signal model an AC sweep uses, so the gain agrees with what the sweep would show
+  at 0 Hz.
+- A truth table runs one operating point per combination of the chosen logic inputs, each on a copy of the circuit
+  with the inputs set, so a row never depends on the one before it. That describes combinational logic; a latch or
+  flip-flop that holds its state has no operating point for those combinations, and the row reads X.
 - To report terminal currents in every analysis, the netlist adds a 0 V source in series with diodes, transistors,
   potentiometers, switches, relays, transformers, controlled sources, op-amp outputs and the outputs of logic parts. It does not change the circuit; the Netlist window leaves it out unless a
   current-controlled source needs it.
@@ -40,10 +47,14 @@ elements, so the results are those of ngspice with the models below. Some things
 All three are ideal:
 
 - A resistor has no parasitic inductance or capacitance, no temperature coefficient and no power rating.
-- A capacitor has no series resistance (ESR), leakage, voltage rating or dielectric effects. A transient starts
-  from the DC operating point, so a capacitor starts charged to its voltage there.
+- A capacitor has no series resistance (ESR), leakage, voltage rating or dielectric effects. It may carry an initial
+  voltage, written as `IC=` on its line: a transient then runs with `uic`, which skips the operating point and starts
+  the capacitor from that voltage, so an RC circuit discharges from it. The run applies to the whole circuit: every
+  capacitor and inductor without an initial condition then starts at zero. When no part has one, a transient starts
+  from the DC operating point and the capacitor is charged to its voltage there.
 - An inductor has no winding resistance, core losses or saturation, and is not coupled to other inductors; the
-  transformer part below is.
+  transformer part below is. It may carry an initial current the same way, which a transient with `uic` starts from; left
+  without one, it starts at zero in such a run and from the DC operating point otherwise.
 - A potentiometer is two resistors that meet at the wiper, terminal 3: the first end to the wiper is the value times the
   wiper position, and the wiper to the second end is the rest. Position 0 puts the wiper on terminal 1 and position 1
   on terminal 2; at an end the nearest half is 1 mOhm, since SPICE rejects 0 Ohm. The track is linear, so there is
@@ -96,8 +107,8 @@ ones, move together.
 
 ## Logic gates and flip-flops
 
-The gates are AND, OR, NOT, NAND, NOR, XOR, XNOR and a buffer, with two inputs each (one for NOT and the buffer), and
-the flip-flops are D, JK, T and SR, each with a clock, asynchronous SET and RESET inputs (active high), a Q output
+The gates are AND, OR, NOT, NAND, NOR, XOR, XNOR and a buffer, with two inputs each by default (one for NOT and the
+buffer; the others take from 2 to 8, set in the part's properties), and the flip-flops are D, JK, T and SR, each with a clock, asynchronous SET and RESET inputs (active high), a Q output
 and its inverse QN. They run as the digital code models of ngspice's XSPICE (`d_and`, `d_dff` and the like), which only
 meet digital nodes, so each part is written with bridges around it:
 
@@ -107,6 +118,10 @@ meet digital nodes, so each part is written with bridges around it:
   or to half of it while the output is unknown, behind a 50 Ohm resistor that is the output resistance of the family;
 - each input also has a 1 GOhm resistor to ground, so an unconnected input, such as the SET and RESET of a flip-flop
   that uses neither, reads 0.
+
+A gate of several inputs is the same code model with a longer input vector: AND is high when every input is, OR when
+any is, NAND and NOR are their inverses, XOR is high for an odd number of high inputs (the parity) and XNOR for an even
+number. Each input has its own bridge and pull-down, named after its letter (`A`, `B`, `C`...).
 
 The figures of a part are its logic level (5 V) and its propagation delay (10 ns), from every input to every output.
 A flip-flop changes on the rising edge of its clock and starts with Q at 0. The currents reported are those of the
@@ -130,18 +145,71 @@ reports a negative current.
   metastability from violating them. Operating point and DC sweep results read the digital outputs as they settle, and an AC sweep treats
   them as constants.
 
+## Clock and logic input
+
+A **clock** drives a digital circuit and is written as a SPICE pulse source from its terminal to ground, like a
+supply rail:
+
+```
+V1 out 0 DC 0 PULSE(0 <level> <delay> <edge> <edge> <width> <period>)
+```
+
+- Its figures are a frequency, a duty cycle, a logic level (5 V) and a start delay. The period is 1 over the
+  frequency and the clock swings between 0 V and the logic level.
+- The part picks its own rise and fall times, each a fixed 0.1% of the period, so the user
+  never sets them and the shape is the same at every frequency. The flat top is the duty share of the period less one
+  edge, since half of the rising and half of the falling edge lie above half the level; a duty share smaller than one
+  edge is clamped, so the clock then only shows the edge itself. The duty cycle is therefore exactly the share of each
+  period the clock reads as high at half the logic level.
+- The start delay holds the clock at 0 V, which is also its operating point value, and the first rising edge begins
+  there: a delay of 0 puts the first edge at t = 0, while a nonzero one keeps the clock quiet until then. The delay is
+  an absolute time, so it does not change with the frequency.
+- It is an ideal voltage source: it has no output resistance and delivers any current the circuit asks for. It is not
+  an AC source, so an AC sweep is not excited by it and a noise analysis cannot refer to it.
+
+A **logic input** is a constant voltage source from its terminal to ground, written `V1 out 0 DC 5` when high and
+`V1 out 0 DC 0` when low. High drives the logic level (5 V by default, editable) and Low drives 0 V; both start low,
+so an unconnected net reads 0. It is the natural way to give a gate or a latch a defined level to start from, such as
+the SET or RESET input of a flip-flop, and it holds that level for the whole run.
+
+A circuit made only of logic parts, clocks, logic inputs and VCC supplies needs no Ground: the clocks, the inputs,
+the supplies and the bridges of the logic parts all refer to node 0 in the netlist, so the reference exists without
+the symbol, and the gate outputs need no load. Any other part brings the rule back: a resistor or an analog source
+would have no node to return to, so the run stops with "The circuit has no ground".
+
 ## Independent sources
 
-**Voltage source** (`V`, named Vin) and **current source** (`I`) take one of three waveforms:
+**Voltage source** (`V`, named Vin) and **current source** (`I`) take one of seven waveforms:
 
 | Waveform | Transient | Operating point and DC sweep | AC sweep |
 |---|---|---|---|
 | DC | the value | the value | not excited |
 | AC | `SIN(offset amplitude frequency)` | the offset | the AC magnitude |
 | Pulse | `PULSE(low high delay rise fall width period)` | the low level | not excited |
+| EXP | `EXP(v1 v2 td1 tau1 td2 tau2)` | v1, the value it starts from | not excited |
+| SFFM | `SFFM(vo va fc mdi fs)` | vo, the offset | not excited |
+| AM | `AM(vo 0 va mf fc td)` | vo, the offset | not excited |
+| PWL | `PWL(t1 v1 t2 v2 ...)` | v1, the first point | not excited |
 
 - The AC magnitude is set apart from the sine amplitude, as in SPICE, and is 1 by default so a Bode plot reads as
   gain. The sine has no phase, delay or damping.
+- Every waveform writes the value it starts from as the DC value, so the operating point and a DC sweep match the
+  beginning of the transient, as the low level of a pulse does.
+- The exponential `EXP(v1 v2 td1 tau1 td2 tau2)` starts at v1, rises towards v2 with time constant tau1 from td1 on,
+  then decays back towards v1 with time constant tau2 from td2 on. It defaults to 5 V (1 mA for a current source),
+  rising from 1 ms to a 0.5 ms time constant and falling from 5 ms with a 1 ms time constant, all within the default
+  10 ms transient.
+- The single-frequency FM `SFFM(vo va fc mdi fs)` is vo plus va times a carrier at fc whose phase swings by mdi
+  times a sine at fs. It defaults to a 1 kHz carrier of 1 V (1 mA) with a modulation index of 5 and a 100 Hz signal.
+- The amplitude modulation `AM(vo 0 va mf fc td)` is vo plus va times a sine at mf times a sine at fc, both from td
+  on, and holds 0 until td. The `0` is the modulation offset of ngspice, so the carrier is suppressed and the
+  waveform is the offset plus the two sines; a nonzero offset vo shows the carrier on a level instead, and is also
+  the operating point value. It defaults to 0 V and 1 V (1 mA), a 100 Hz modulation on a 1 kHz carrier without
+  delay.
+- The piecewise linear `PWL(t1 v1 t2 v2 ...)` holds v1 before t1, joins the points with straight lines and holds the
+  last value after the last point. It defaults to `0 0, 1m 5, 2m 0` (1 mA instead of 5 for a current source). The
+  points are edited as one text of "time value" pairs in the part editor; at least two are needed, times are not
+  negative and strictly increase.
 - Both sources are ideal: a voltage source has no internal resistance and a current source no output resistance,
   so they deliver any current or voltage the circuit asks for.
 - A current source pushes its current from terminal 1 to terminal 2 through itself, into the node at terminal 2.

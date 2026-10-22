@@ -5,11 +5,13 @@
 
 #include "components/bjt.h"
 #include "components/capacitor.h"
+#include "components/clock.h"
 #include "components/controlled_source.h"
 #include "components/current_source.h"
 #include "components/diode.h"
 #include "components/ground.h"
 #include "components/inductor.h"
+#include "components/logic_input.h"
 #include "components/logic_part.h"
 #include "components/mosfet.h"
 #include "components/net_label.h"
@@ -24,9 +26,11 @@
 #include "components/voltage_source.h"
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators.hpp>
+#include <optional>
 #include <span>
 #include <string>
 #include <string_view>
+#include <vector>
 
 TEST_CASE("Components start with SPICE prefixes, units and default values", "[component]") {
     const Core::Resistor resistor;
@@ -62,6 +66,28 @@ TEST_CASE("Components start with SPICE prefixes, units and default values", "[co
     CHECK(current_source.GetAC().Amplitude == 1e-3);
     CHECK(current_source.GetPulse().High == 1e-3);
     CHECK(current_source.GetSourceType() == Core::CurrentSource::SourceType::DC);
+}
+
+TEST_CASE("An initial condition is only for a capacitor and an inductor", "[component]") {
+    Core::Resistor resistor;
+    resistor.SetInitialCondition(5.0);
+    CHECK_FALSE(resistor.SupportsInitialCondition());
+    CHECK_FALSE(resistor.HasInitialCondition());
+
+    Core::Capacitor capacitor;
+    CHECK(capacitor.SupportsInitialCondition());
+    CHECK_FALSE(capacitor.HasInitialCondition());
+    // The sign is free: a capacitor may start charged either way
+    capacitor.SetInitialCondition(-2.0);
+    REQUIRE(capacitor.HasInitialCondition());
+    CHECK(capacitor.GetInitialCondition() == -2.0);
+    capacitor.ClearInitialCondition();
+    CHECK_FALSE(capacitor.HasInitialCondition());
+
+    Core::Inductor inductor;
+    inductor.SetInitialCondition(1e-3);
+    CHECK(inductor.HasInitialCondition());
+    CHECK(inductor.GetInitialCondition() == 1e-3);
 }
 
 TEST_CASE("A potentiometer is a resistor of 10k with its wiper in the middle", "[component]") {
@@ -248,12 +274,13 @@ TEST_CASE("IsValidValue requires positive passive values but allows any source v
 
 TEST_CASE("Type names convert both ways", "[component]") {
     for (const Core::ComponentType type :
-         {Core::ComponentType::Resistor, Core::ComponentType::Capacitor, Core::ComponentType::Inductor,
-          Core::ComponentType::Ground, Core::ComponentType::VCC, Core::ComponentType::VoltageSource,
-          Core::ComponentType::CurrentSource, Core::ComponentType::Diode, Core::ComponentType::ZenerDiode,
-          Core::ComponentType::LED, Core::ComponentType::NPN, Core::ComponentType::PNP, Core::ComponentType::NMOS,
-          Core::ComponentType::PMOS, Core::ComponentType::VCVS, Core::ComponentType::VCCS, Core::ComponentType::CCCS,
-          Core::ComponentType::CCVS, Core::ComponentType::OpAmp}) {
+         {Core::ComponentType::Resistor,      Core::ComponentType::Capacitor, Core::ComponentType::Inductor,
+          Core::ComponentType::Ground,        Core::ComponentType::VCC,       Core::ComponentType::VoltageSource,
+          Core::ComponentType::CurrentSource, Core::ComponentType::Diode,     Core::ComponentType::ZenerDiode,
+          Core::ComponentType::LED,           Core::ComponentType::NPN,       Core::ComponentType::PNP,
+          Core::ComponentType::NMOS,          Core::ComponentType::PMOS,      Core::ComponentType::VCVS,
+          Core::ComponentType::VCCS,          Core::ComponentType::CCCS,      Core::ComponentType::CCVS,
+          Core::ComponentType::OpAmp,         Core::ComponentType::Clock,     Core::ComponentType::LogicInput}) {
         CHECK(Core::ParseComponentType(Core::GetTypeName(type)) == type);
     }
     CHECK_FALSE(Core::ParseComponentType("resistor"));
@@ -295,10 +322,13 @@ TEST_CASE("A voltage source keeps its sine parameters while switching type", "[c
 
 TEST_CASE("Source type names convert both ways", "[component]") {
     for (const auto type : {Core::VoltageSource::SourceType::DC, Core::VoltageSource::SourceType::AC,
-                            Core::VoltageSource::SourceType::Pulse}) {
+                            Core::VoltageSource::SourceType::Pulse, Core::VoltageSource::SourceType::EXP,
+                            Core::VoltageSource::SourceType::SFFM, Core::VoltageSource::SourceType::AM,
+                            Core::VoltageSource::SourceType::PWL}) {
         CHECK(Core::ParseSourceType(Core::GetSourceTypeName(type)) == type);
     }
     CHECK_FALSE(Core::ParseSourceType("ac"));
+    CHECK_FALSE(Core::ParseSourceType("pwl "));
 }
 
 TEST_CASE("A pulse needs non-negative times and a positive period", "[component]") {
@@ -317,6 +347,86 @@ TEST_CASE("A pulse needs non-negative times and a positive period", "[component]
     invalid = pulse;
     invalid.Period = 0.0;
     CHECK_FALSE(source.IsValidPulse(invalid));
+}
+
+TEST_CASE("A source keeps every waveform while switching type", "[component]") {
+    Core::VoltageSource source;
+    source.SetEXP({.InitialValue = -2.0,
+                   .PeakValue = 7.0,
+                   .RiseDelay = 2e-3,
+                   .RiseTimeConstant = 3e-3,
+                   .FallDelay = 4e-3,
+                   .FallTimeConstant = 5e-3});
+    source.SetSFFM(
+        {.Offset = 1.0, .Amplitude = 2.0, .CarrierFrequency = 3e3, .ModulationIndex = 4.0, .SignalFrequency = 5.0});
+    source.SetAM(
+        {.Amplitude = 6.0, .Offset = 7.0, .ModulatingFrequency = 8.0, .CarrierFrequency = 9e3, .Delay = 10e-3});
+    source.SetPWL({.Points = {{0.0, 0.0}, {1e-3, 2.0}}});
+
+    source.SetSourceType(Core::VoltageSource::SourceType::PWL);
+    source.SetSourceType(Core::VoltageSource::SourceType::DC);
+
+    CHECK(source.GetEXP().InitialValue == -2.0);
+    CHECK(source.GetEXP().PeakValue == 7.0);
+    CHECK(source.GetSFFM().CarrierFrequency == 3e3);
+    CHECK(source.GetSFFM().ModulationIndex == 4.0);
+    CHECK(source.GetAM().ModulatingFrequency == 8.0);
+    CHECK(source.GetAM().Delay == 10e-3);
+    REQUIRE(source.GetPWL().Points.size() == 2);
+    CHECK(source.GetPWL().Points[1].Value == 2.0);
+}
+
+TEST_CASE("An exponential, SFFM and AM check their limits", "[component]") {
+    const Core::VoltageSource source;
+    CHECK(source.IsValidEXP(Core::EXPParameters{}));
+    CHECK(source.IsValidSFFM(Core::SFFMParameters{}));
+    CHECK(source.IsValidAM(Core::AMParameters{}));
+
+    // A time constant of zero would make ngspice fall back to the time step
+    CHECK_FALSE(source.IsValidEXP({.RiseTimeConstant = 0.0}));
+    CHECK_FALSE(source.IsValidEXP({.PeakValue = 5.0, .FallDelay = 0.0}));
+    CHECK_FALSE(source.IsValidEXP({.RiseDelay = -1e-3}));
+    CHECK_FALSE(source.IsValidSFFM({.CarrierFrequency = 0.0}));
+    CHECK_FALSE(source.IsValidSFFM({.SignalFrequency = -1.0}));
+    CHECK_FALSE(source.IsValidAM({.ModulatingFrequency = 0.0}));
+    CHECK_FALSE(source.IsValidAM({.CarrierFrequency = 0.0}));
+    CHECK_FALSE(source.IsValidAM({.Delay = -1e-3}));
+}
+
+TEST_CASE("Piecewise linear points need two increasing times from zero", "[component]") {
+    const Core::VoltageSource source;
+    CHECK(source.IsValidPWL(Core::PWLParameters{}));
+
+    CHECK_FALSE(source.IsValidPWL({.Points = {{0.0, 0.0}}}));
+    CHECK_FALSE(source.IsValidPWL({.Points = {{-1e-3, 0.0}, {1e-3, 5.0}}}));
+    CHECK_FALSE(source.IsValidPWL({.Points = {{0.0, 0.0}, {0.0, 5.0}}}));
+    CHECK_FALSE(source.IsValidPWL({.Points = {{1e-3, 0.0}, {0.0, 5.0}}}));
+}
+
+TEST_CASE("Piecewise linear text parses and formats back", "[component]") {
+    const std::optional<std::vector<Core::PWLPoint>> points = Core::ParsePWLPoints("0 0, 1m 5, 2m -2.5");
+    REQUIRE(points.has_value());
+    REQUIRE(points->size() == 3);
+    CHECK(points->at(0).Time == 0.0);
+    CHECK(points->at(0).Value == 0.0);
+    CHECK(points->at(1).Time == 1e-3);
+    CHECK(points->at(1).Value == 5.0);
+    CHECK(points->at(2).Time == 2e-3);
+    CHECK(points->at(2).Value == -2.5);
+    CHECK(Core::FormatPWLPoints(*points) == "0 0, 1m 5, 2m -2.5");
+
+    // Commas are optional; any whitespace separates the pairs
+    CHECK(Core::ParsePWLPoints("0 0 1m 5").has_value());
+
+    // Fewer than two points, an odd number of numbers, a bad number, a negative time and times that
+    // do not strictly increase are all rejected
+    CHECK_FALSE(Core::ParsePWLPoints("0 0").has_value());
+    CHECK_FALSE(Core::ParsePWLPoints("0 0 1m").has_value());
+    CHECK_FALSE(Core::ParsePWLPoints("0 0, one 5").has_value());
+    CHECK_FALSE(Core::ParsePWLPoints("-1m 0, 1m 5").has_value());
+    CHECK_FALSE(Core::ParsePWLPoints("0 0, 0 5").has_value());
+    CHECK_FALSE(Core::ParsePWLPoints("1m 0, 0 5").has_value());
+    CHECK_FALSE(Core::ParsePWLPoints("").has_value());
 }
 
 TEST_CASE("IsSource covers voltage and current sources but not the supply rail", "[component]") {
@@ -554,6 +664,39 @@ TEST_CASE("The terminals of a gate or flip-flop are its inputs, then its outputs
     CHECK(Core::GetLogicOutputLabels(Core::ComponentType::SRFlipFlop) == std::vector<std::string>{"Q", "QN"});
 }
 
+TEST_CASE("A gate takes from 2 to 8 inputs and names them A, B, C...", "[component]") {
+    for (const Core::ComponentType type :
+         {Core::ComponentType::And, Core::ComponentType::Or, Core::ComponentType::Nand, Core::ComponentType::Nor,
+          Core::ComponentType::Xor, Core::ComponentType::Xnor}) {
+        CHECK(Core::HasVariableInputs(type));
+    }
+    // The inverter, the buffer and the flip-flops keep the inputs they have
+    for (const Core::ComponentType type : {Core::ComponentType::Not, Core::ComponentType::Buffer,
+                                           Core::ComponentType::DFlipFlop, Core::ComponentType::JKFlipFlop}) {
+        CHECK_FALSE(Core::HasVariableInputs(type));
+    }
+
+    Core::LogicPart gate(Core::ComponentType::And);
+    CHECK(gate.GetInputCount() == 2);
+    gate.SetInputCount(5);
+    CHECK(gate.GetInputCount() == 5);
+    CHECK(gate.GetInputLabels() == std::vector<std::string>{"A", "B", "C", "D", "E"});
+    CHECK(Core::GetLogicInputLabels(Core::ComponentType::Nor, 3) == std::vector<std::string>{"A", "B", "C"});
+    CHECK(Core::GetLogicInputLabels(Core::ComponentType::Nor) == std::vector<std::string>{"A", "B"});
+
+    CHECK_FALSE(Core::LogicPart::IsValidInputCount(1));
+    CHECK(Core::LogicPart::IsValidInputCount(Core::MinLogicInputs));
+    CHECK(Core::LogicPart::IsValidInputCount(Core::MaxLogicInputs));
+    CHECK_FALSE(Core::LogicPart::IsValidInputCount(Core::MaxLogicInputs + 1));
+
+    Core::LogicPart inverter(Core::ComponentType::Not);
+    inverter.SetInputCount(4);
+    CHECK(inverter.GetInputCount() == 1);
+    Core::LogicPart flip_flop(Core::ComponentType::DFlipFlop);
+    flip_flop.SetInputCount(4);
+    CHECK(flip_flop.GetInputLabels() == std::vector<std::string>{"D", "CLK", "SET", "RESET"});
+}
+
 TEST_CASE("Logic figures need a positive level and a delay that is not negative", "[component]") {
     Core::LogicParameters parameters;
     CHECK(Core::LogicPart::IsValidParameters(parameters));
@@ -564,4 +707,57 @@ TEST_CASE("Logic figures need a positive level and a delay that is not negative"
     parameters = {};
     parameters.LogicLevel = 0.0;
     CHECK_FALSE(Core::LogicPart::IsValidParameters(parameters));
+}
+
+TEST_CASE("A clock is a V part with no value that picks its own edges", "[component]") {
+    Core::Clock clock;
+    CHECK(clock.GetType() == Core::ComponentType::Clock);
+    CHECK(std::string_view(clock.GetTypeName()) == "Clock");
+    CHECK(std::string_view(clock.GetNamePrefix()) == "V");
+    CHECK(std::string_view(clock.GetUnit()) == "V");
+    CHECK_FALSE(clock.HasValue());
+    CHECK_FALSE(clock.IsValidValue(1.0));
+    CHECK_FALSE(Core::IsSource(Core::ComponentType::Clock));
+    CHECK(Core::ParseComponentType("Clock") == Core::ComponentType::Clock);
+
+    CHECK(clock.GetParameters().Frequency == 1e3);
+    CHECK(clock.GetParameters().DutyCycle == 0.5);
+    CHECK(clock.GetParameters().LogicLevel == 5.0);
+    CHECK(clock.GetParameters().StartDelay == 0.0);
+    // The edge is a small, named share of the period, never one of the user figures
+    CHECK(Core::ClockEdgeFraction > 0.0);
+    CHECK(Core::ClockEdgeFraction < 0.01);
+
+    CHECK(Core::Clock::IsValidParameters(clock.GetParameters()));
+    CHECK_FALSE(Core::Clock::IsValidParameters({.Frequency = 0.0}));
+    CHECK_FALSE(Core::Clock::IsValidParameters({.DutyCycle = 0.0}));
+    CHECK_FALSE(Core::Clock::IsValidParameters({.DutyCycle = 1.0}));
+    CHECK_FALSE(Core::Clock::IsValidParameters({.LogicLevel = 0.0}));
+    CHECK_FALSE(Core::Clock::IsValidParameters({.StartDelay = -1e-3}));
+
+    clock.SetParameters({.Frequency = 10e3, .DutyCycle = 0.25, .LogicLevel = 3.3, .StartDelay = 1e-3});
+    CHECK(clock.GetParameters().Frequency == 10e3);
+    CHECK(clock.GetParameters().DutyCycle == 0.25);
+    CHECK(clock.GetParameters().LogicLevel == 3.3);
+    CHECK(clock.GetParameters().StartDelay == 1e-3);
+}
+
+TEST_CASE("A logic input is a V part that drives 0 V or the logic level", "[component]") {
+    Core::LogicInput input;
+    CHECK(input.GetType() == Core::ComponentType::LogicInput);
+    CHECK(std::string_view(input.GetTypeName()) == "LogicInput");
+    CHECK(std::string_view(input.GetNamePrefix()) == "V");
+    CHECK(std::string_view(input.GetUnit()) == "V");
+    CHECK_FALSE(input.HasValue());
+    CHECK_FALSE(input.IsValidValue(5.0));
+    CHECK_FALSE(Core::IsSource(Core::ComponentType::LogicInput));
+    CHECK(Core::ParseComponentType("LogicInput") == Core::ComponentType::LogicInput);
+
+    // Both start low, so an unconnected input reads 0
+    CHECK_FALSE(input.IsHigh());
+    input.SetHigh(true);
+    CHECK(input.IsHigh());
+    CHECK(input.GetParameters().LogicLevel == 5.0);
+    CHECK(input.IsValidParameters(input.GetParameters()));
+    CHECK_FALSE(Core::LogicInput::IsValidParameters({.LogicLevel = 0.0}));
 }

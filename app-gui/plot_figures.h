@@ -22,10 +22,13 @@ namespace GUI {
 
 /**
  * @struct  CurveFamily
- * @brief   The curves of one trace across the steps of a DC sweep, and the axis they are plotted on.
+ * @brief   One trace of a DC sweep across the steps of its family: its name, unit, color, axis and its curve per step.
  */
 struct CurveFamily {
-    ImAxis Axis;
+    std::string Label;
+    const char *Unit = "";
+    ImU32 Color = 0;
+    ImAxis Axis = ImAxis_Y1;
     std::vector<const std::vector<double> *> Curves;
 };
 
@@ -40,7 +43,7 @@ inline constexpr ImU32 InputNoiseColor = IM_COL32(150, 230, 90, 255);
 bool HasMeasuredCurrent(const std::vector<Core::ComponentTrace> &currents, const Schematic &schematic);
 std::vector<int> ListNodes(const std::vector<LogicNode> &lanes);
 bool CurvesDiffer(const std::vector<const std::vector<double> *> &curves, std::size_t sample);
-std::vector<CurveFamily> ListCurveFamilies(const Core::DCSweep &sweep, const Schematic &schematic, bool show_currents,
+std::vector<CurveFamily> ListCurveFamilies(const Core::DCSweep &sweep, Schematic &schematic, bool show_currents,
                                            const std::vector<std::vector<MathTrace>> &math);
 std::string FormatStepLabel(const Core::DCSweep &sweep, const Core::DCSweepCurve &curve);
 bool HasInputGain(const Core::Noise &noise);

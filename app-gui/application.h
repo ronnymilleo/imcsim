@@ -62,6 +62,8 @@ private:
     std::size_t m_ShownACSweepVersion = 0;
     std::size_t m_ShownDCSweepVersion = 0;
     std::size_t m_ShownNoiseVersion = 0;
+    std::size_t m_ShownTransferFunctionVersion = 0;
+    std::size_t m_ShownTruthTableVersion = 0;
 
     // The schematic is declared first, so it exists when the windows that refer to it are built
     Schematic m_Schematic;

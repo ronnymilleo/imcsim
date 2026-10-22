@@ -16,6 +16,10 @@ namespace Core {
 inline constexpr double LogicLowFraction = 0.3;
 inline constexpr double LogicHighFraction = 0.7;
 
+// A gate with several inputs takes from 2 to 8 of them
+inline constexpr int MinLogicInputs = 2;
+inline constexpr int MaxLogicInputs = 8;
+
 /**
  * @struct  LogicParameters
  * @brief   The logic family of a gate or flip-flop.
@@ -30,8 +34,11 @@ struct LogicParameters {
 /**
  * @class   LogicPart
  * @brief   A logic gate or a flip-flop, which ngspice runs as digital code models behind analog bridges.
- * @details Terminals are the inputs in the order GetLogicInputLabels() gives, then the outputs. The part has no
- *          value and no supply pin: its logic level is a figure of the part. An unconnected input reads as 0.
+ * @details Terminals are the inputs in the order GetInputLabels() gives, then the outputs. The part has no
+ *          value and no supply pin: its logic level is a figure of the part. An unconnected input reads as 0. AND, OR,
+ *          NAND, NOR, XOR and XNOR gates take from 2 to 8 inputs; an XOR is high for an odd number of high inputs and
+ *          an XNOR for an even number. The count is not a figure of the logic family, so it stands apart from
+ *          LogicParameters.
  */
 class LogicPart : public Component {
 public:
@@ -42,14 +49,22 @@ public:
     void SetParameters(const LogicParameters &parameters);
     static bool IsValidParameters(const LogicParameters &parameters);
 
+    int GetInputCount() const;
+    void SetInputCount(int count);
+    static bool IsValidInputCount(int count);
+    std::vector<std::string> GetInputLabels() const;
+
 private:
     LogicParameters m_Parameters;
+    int m_InputCount = MinLogicInputs;
 };
 
 bool IsLogicGate(ComponentType type);
 bool IsFlipFlop(ComponentType type);
 bool IsLogicPart(ComponentType type);
+bool HasVariableInputs(ComponentType type);
 std::vector<std::string> GetLogicInputLabels(ComponentType type);
+std::vector<std::string> GetLogicInputLabels(ComponentType type, int input_count);
 std::vector<std::string> GetLogicOutputLabels(ComponentType type);
 const char *GetLogicModelKind(ComponentType type);
 
