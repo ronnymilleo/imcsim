@@ -251,6 +251,31 @@ TEST_CASE("A gate has its inputs on the left and its output on the right", "[ui_
     CHECK(inverter.GetTerminals() == std::vector<GUI::GridPoint>{{-3, 0}, {3, 0}});
 }
 
+TEST_CASE("A gate with more inputs keeps A and B in place, adds the others below and centers the output",
+          "[ui_element]") {
+    GUI::UILogicPart gate(Core::ComponentType::Nand, {0, 0}, GUI::Rotation::R0);
+    auto &part = static_cast<Core::LogicPart &>(gate.GetComponent());
+    part.SetInputCount(3);
+    // The body runs from y = -1.5 to 3.5, so its middle, where the output is, is at y = 1
+    CHECK(gate.GetTerminals() == std::vector<GUI::GridPoint>{{-3, -1}, {-3, 1}, {-3, 3}, {3, 1}});
+    part.SetInputCount(4);
+    CHECK(gate.GetTerminals() == std::vector<GUI::GridPoint>{{-3, -1}, {-3, 1}, {-3, 3}, {-3, 5}, {3, 2}});
+    part.SetInputCount(8);
+    const std::vector<GUI::GridPoint> terminals = gate.GetTerminals();
+    REQUIRE(terminals.size() == 9);
+    CHECK(terminals[7] == GUI::GridPoint{-3, 13});
+    CHECK(terminals[8] == GUI::GridPoint{3, 6});
+    // Every input leads in along x, however far from the middle, and the output leads back
+    for (std::size_t input = 0; input < 8; ++input) {
+        CHECK(gate.GetTerminalInward(input) == GUI::GridPoint{1, 0});
+    }
+    CHECK(gate.GetTerminalInward(8) == GUI::GridPoint{-1, 0});
+    // The body reaches the last input, so a click on it picks the gate, and nothing above the first one does
+    CHECK(gate.Contains({0.0f, 13.0f}));
+    CHECK_FALSE(gate.Contains({0.0f, 15.0f}));
+    CHECK_FALSE(gate.Contains({0.0f, -2.5f}));
+}
+
 TEST_CASE("A flip-flop has its data and clock on the left, SET and RESET above and below, and Q and QN on the right",
           "[ui_element]") {
     const GUI::UILogicPart d_type(Core::ComponentType::DFlipFlop, {0, 0}, GUI::Rotation::R0);

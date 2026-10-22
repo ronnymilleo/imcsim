@@ -23,6 +23,7 @@
 #include "element_factory.h"
 #include "nlohmann/json.hpp"
 #include <array>
+#include <cmath>
 #include <format>
 #include <fstream>
 #include <optional>
@@ -397,7 +398,11 @@ void WriteFigureFields(const Core::Component &component, nlohmann::json &object)
     } else if (type == Core::ComponentType::Transformer) {
         WritePartParameters(static_cast<const Core::Transformer &>(component), TransformerKeys, object);
     } else if (Core::IsLogicPart(type)) {
-        WritePartParameters(static_cast<const Core::LogicPart &>(component), LogicKeys, object);
+        const auto &part = static_cast<const Core::LogicPart &>(component);
+        WritePartParameters(part, LogicKeys, object);
+        if (Core::HasVariableInputs(type)) {
+            object["inputs"] = part.GetInputCount();
+        }
     } else if (type == Core::ComponentType::Clock) {
         WritePartParameters(static_cast<const Core::Clock &>(component), ClockKeys, object);
     } else if (type == Core::ComponentType::LogicInput) {
@@ -706,8 +711,19 @@ std::expected<void, std::string> ReadFigureFields(const nlohmann::json &object, 
         }
     }
     if (Core::IsLogicPart(component.GetType())) {
-        if (const auto read = ReadPartParameters(object, static_cast<Core::LogicPart &>(component), LogicKeys); !read) {
+        auto &part = static_cast<Core::LogicPart &>(component);
+        if (const auto read = ReadPartParameters(object, part, LogicKeys); !read) {
             return std::unexpected(read.error());
+        }
+        // A gate saved without a count has two inputs
+        if (Core::HasVariableInputs(component.GetType()) && object.contains("inputs")) {
+            const std::optional<double> inputs = ReadNumber(object, "inputs");
+            if (!inputs || *inputs != std::floor(*inputs) ||
+                !Core::LogicPart::IsValidInputCount(static_cast<int>(*inputs))) {
+                return std::unexpected(std::format("has a number of inputs that is not a whole number from {} to {}",
+                                                   Core::MinLogicInputs, Core::MaxLogicInputs));
+            }
+            part.SetInputCount(static_cast<int>(*inputs));
         }
     }
     if (component.GetType() == Core::ComponentType::Clock) {

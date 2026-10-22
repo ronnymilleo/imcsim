@@ -859,6 +859,41 @@ TEST_CASE("Gates and flip-flops keep their logic family", "[schematic_file]") {
     CHECK(skipped.Warnings.size() == 1);
 }
 
+TEST_CASE("A gate keeps its number of inputs, and a file without one has two", "[schematic_file]") {
+    std::vector<std::unique_ptr<GUI::UIElement>> elements;
+    elements.push_back(GUI::CreateElement(Core::ComponentType::Xor, {4, 4}, GUI::Rotation::R0));
+    static_cast<Core::LogicPart &>(elements.back()->GetComponent()).SetInputCount(5);
+    elements.back()->GetComponent().SetName("U1");
+    elements.push_back(GUI::CreateElement(Core::ComponentType::Not, {12, 4}, GUI::Rotation::R0));
+    elements.back()->GetComponent().SetName("U2");
+
+    const std::string text = GUI::SaveSchematic(elements, {}, {}, {});
+    // Only a gate that takes several inputs writes the count, so the inverter's single input is not written
+    CHECK(text.contains("\"inputs\": 5"));
+    CHECK_FALSE(text.contains("\"inputs\": 1"));
+    const GUI::LoadedSchematic loaded = LoadOrFail(text);
+    CHECK(loaded.Warnings.empty());
+    REQUIRE(loaded.Elements.size() == 2);
+    const auto &xor_gate = static_cast<const Core::LogicPart &>(loaded.Elements[0]->GetComponent());
+    CHECK(xor_gate.GetInputCount() == 5);
+    CHECK(loaded.Elements[0]->GetTerminals().size() == 6);
+    CHECK(static_cast<const Core::LogicPart &>(loaded.Elements[1]->GetComponent()).GetInputCount() == 1);
+
+    const std::string without_count = R"({"type": "And", "x": 1, "y": 1, "rotation": 0, "name": "U1"})";
+    const GUI::LoadedSchematic old_file = LoadOrFail(Document(without_count, ""));
+    REQUIRE(old_file.Elements.size() == 1);
+    CHECK(static_cast<const Core::LogicPart &>(old_file.Elements[0]->GetComponent()).GetInputCount() == 2);
+
+    for (const char *bad : {"1", "9", "2.5", "\"three\""}) {
+        const std::string element =
+            std::string(R"({"type": "And", "x": 1, "y": 1, "rotation": 0, "name": "U1", "inputs": )") + bad + "}";
+        const GUI::LoadedSchematic skipped = LoadOrFail(Document(element, ""));
+        INFO(bad);
+        CHECK(skipped.Elements.empty());
+        CHECK(skipped.Warnings.size() == 1);
+    }
+}
+
 TEST_CASE("A clock keeps its figures and a logic input its state", "[schematic_file]") {
     std::vector<std::unique_ptr<GUI::UIElement>> elements;
     elements.push_back(GUI::CreateElement(Core::ComponentType::Clock, {4, 4}, GUI::Rotation::R90));
