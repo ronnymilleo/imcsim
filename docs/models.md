@@ -40,10 +40,14 @@ elements, so the results are those of ngspice with the models below. Some things
 All three are ideal:
 
 - A resistor has no parasitic inductance or capacitance, no temperature coefficient and no power rating.
-- A capacitor has no series resistance (ESR), leakage, voltage rating or dielectric effects. A transient starts
-  from the DC operating point, so a capacitor starts charged to its voltage there.
+- A capacitor has no series resistance (ESR), leakage, voltage rating or dielectric effects. It may carry an initial
+  voltage, written as `IC=` on its line: a transient then runs with `uic`, which skips the operating point and starts
+  the capacitor from that voltage, so an RC circuit discharges from it. The run applies to the whole circuit: every
+  capacitor and inductor without an initial condition then starts at zero. When no part has one, a transient starts
+  from the DC operating point and the capacitor is charged to its voltage there.
 - An inductor has no winding resistance, core losses or saturation, and is not coupled to other inductors; the
-  transformer part below is.
+  transformer part below is. It may carry an initial current the same way, which a transient with `uic` starts from; left
+  without one, it starts at zero in such a run and from the DC operating point otherwise.
 - A potentiometer is two resistors that meet at the wiper, terminal 3: the first end to the wiper is the value times the
   wiper position, and the wiper to the second end is the rest. Position 0 puts the wiper on terminal 1 and position 1
   on terminal 2; at an end the nearest half is 1 mOhm, since SPICE rejects 0 Ohm. The track is linear, so there is
