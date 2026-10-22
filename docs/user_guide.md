@@ -94,7 +94,7 @@ How to read what imcsim measures, plots and exports. The [README](../README.md) 
 - **Find a part**: press Space over the editor, type part of a name (`mos`, `zener`, `opamp`, `nmos`, `vcvs`), move
   with Up and Down, and press Enter to start placing it.
 - **Running**: the ▶ button at the end of the toolbar, or F5, runs the analysis named beside it. That button opens
-  the list of analyses (operating point, transient, AC sweep, DC sweep, noise and transfer function) and the settings
+  the list of analyses (operating point, transient, AC sweep, DC sweep, noise, transfer function and truth table) and the settings
   of the one picked, saved with the schematic. Suggest fills the transient times (five periods of the slowest source with a waveform, 200
   points in a period of the fastest) or the AC range (two decades past the RC, RL and LC corners and the op-amp
   bandwidths). Nothing runs by itself: edit the circuit, then run again. View > Analysis Settings keeps the same
@@ -396,6 +396,27 @@ The Transfer function tab of the Output window is a table of three values:
 
 An output an ideal voltage source holds has an output impedance of 0 Ohm, and an input path held open reads as
 `open` rather than a giant number. The table is a readout like the operating point, so it is not exported.
+
+## Truth table
+
+The Truth table analysis builds the truth table of a digital circuit: it sets the logic inputs to every combination,
+runs an operating point for each and reads the outputs, so nobody has to flip the inputs by hand. Pick it beside Run,
+then choose:
+
+- **Inputs to vary**: a checkbox per Logic input, all of them by default. At least one stays, and at most 10 (1024
+  combinations) are allowed. A Logic input left unchecked keeps the High or Low it has in the schematic for every row.
+- **Outputs**: the voltages you already measure with the Probe tool; the popover lists them. The table needs at least
+  one.
+
+The Truth table tab of the Output window lists one row per combination in counting order, the first input being the
+most significant bit: the inputs as 0 and 1, then each output as 0, 1 or X. An output reads 1 above 70% of its logic
+level and 0 below 30% of it, as the logic parts do; between them, or when ngspice found no operating point for the
+combination, it reads X. The row the inputs have in the schematic right now is highlighted, and Copy as Markdown puts
+the table on the clipboard.
+
+Each row is an independent operating point, so the table describes combinational circuits. A latch or flip-flop whose
+outputs depend on its history has no operating point for the combinations that hold its state; those rows read X and
+the Run report says how many. The table is not exported as a figure, like the operating point.
 
 ## Exports
 
