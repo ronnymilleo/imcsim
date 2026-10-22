@@ -238,22 +238,26 @@ bool CurvesDiffer(const std::vector<const std::vector<double> *> &curves, const 
 }
 
 /**
- * @brief   Lists every shown trace of a stepped DC sweep, with one curve per step.
- * @param[in] sweep          A stepped DC sweep.
+ * @brief   Lists every shown trace of a DC sweep, with one curve per step, named and colored as the plot draws it.
+ * @param[in] sweep          A DC sweep, stepped or not.
  * @param[in] schematic      Schematic that keeps the measurements.
  * @param[in] show_currents  Whether the plot shows currents.
  * @param[in] math           Math traces of each curve, in the order of the curves.
  * @return  The families of the measured voltages, then currents, then math channels.
  */
-std::vector<CurveFamily> ListCurveFamilies(const Core::DCSweep &sweep, const Schematic &schematic,
-                                           const bool show_currents, const std::vector<std::vector<MathTrace>> &math) {
+std::vector<CurveFamily> ListCurveFamilies(const Core::DCSweep &sweep, Schematic &schematic, const bool show_currents,
+                                           const std::vector<std::vector<MathTrace>> &math) {
     std::vector<CurveFamily> families;
     const Core::DCSweepCurve &first_curve = sweep.Curves.front();
     for (std::size_t node = 1; node < first_curve.NodeVoltages.size(); ++node) {
         if (!schematic.IsVoltageMeasured(static_cast<int>(node))) {
             continue;
         }
-        CurveFamily family{.Axis = ImAxis_Y1, .Curves = {}};
+        CurveFamily family{.Label = GetVoltageLabel(schematic.GetConnectivity(), static_cast<int>(node)),
+                           .Unit = "V",
+                           .Color = GetNodeColor(static_cast<int>(node)),
+                           .Axis = ImAxis_Y1,
+                           .Curves = {}};
         for (const Core::DCSweepCurve &curve : sweep.Curves) {
             family.Curves.push_back(&curve.NodeVoltages[node]);
         }
@@ -263,7 +267,11 @@ std::vector<CurveFamily> ListCurveFamilies(const Core::DCSweep &sweep, const Sch
         if (!schematic.IsCurrentMeasured(first_curve.Currents[current].Name)) {
             continue;
         }
-        CurveFamily family{.Axis = ImAxis_Y2, .Curves = {}};
+        CurveFamily family{.Label = std::format("I({})", first_curve.Currents[current].Name),
+                           .Unit = "A",
+                           .Color = GetCurrentColor(current),
+                           .Axis = ImAxis_Y2,
+                           .Curves = {}};
         for (const Core::DCSweepCurve &curve : sweep.Curves) {
             family.Curves.push_back(&curve.Currents[current].Values);
         }
@@ -272,7 +280,11 @@ std::vector<CurveFamily> ListCurveFamilies(const Core::DCSweep &sweep, const Sch
     // Every curve evaluates the same channels, so the traces of one channel share an index across curves
     const std::size_t math_count = math.size() == sweep.Curves.size() ? math.front().size() : 0;
     for (std::size_t trace = 0; trace < math_count; ++trace) {
-        CurveFamily family{.Axis = math.front()[trace].Axis, .Curves = {}};
+        CurveFamily family{.Label = math.front()[trace].Label,
+                           .Unit = math.front()[trace].Unit.c_str(),
+                           .Color = math.front()[trace].Color,
+                           .Axis = math.front()[trace].Axis,
+                           .Curves = {}};
         for (const std::vector<MathTrace> &curve_math : math) {
             if (trace < curve_math.size()) {
                 family.Curves.push_back(&curve_math[trace].Values);

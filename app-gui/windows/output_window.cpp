@@ -432,7 +432,7 @@ template <typename Result> std::vector<std::string> ListStepLabels(const StepFam
 // Labels every curve of each shown trace with the value of the stepped source, so the curves of a family tell
 // apart. The labels of a trace go where its curves are furthest apart, which is the end for most traces but the
 // peak for a derivative, whose curves all end near zero. Each label sits on the axis of its curve
-void LabelCurves(const Core::DCSweep &sweep, const Schematic &schematic, const bool show_currents,
+void LabelCurves(const Core::DCSweep &sweep, Schematic &schematic, const bool show_currents,
                  const std::vector<std::vector<MathTrace>> &math) {
     const ImVec4 color = ImGui::GetStyleColorVec4(ImGuiCol_PopupBg);
     for (const CurveFamily &family : ListCurveFamilies(sweep, schematic, show_currents, math)) {
@@ -1328,11 +1328,15 @@ void OutputWindow::DrawDCSweepTab(const FrameResults &frame) {
         ImGui::TextDisabled("No DC sweep for the current circuit; pick it beside Run in the editor");
         return;
     }
-    if (!frame.AnythingMeasured && (frame.DCSweepMath.empty() || frame.DCSweepMath.front().empty())) {
-        ImGui::TextDisabled("%s", NothingMeasured);
-    }
-    DrawMathErrors(frame.DCSweepErrors);
-    DrawDCSweep(*dc_sweep, frame.DCSweepMath);
+    DrawWithStatistics(
+        [&] {
+            if (!frame.AnythingMeasured && (frame.DCSweepMath.empty() || frame.DCSweepMath.front().empty())) {
+                ImGui::TextDisabled("%s", NothingMeasured);
+            }
+            DrawMathErrors(frame.DCSweepErrors);
+            DrawDCSweep(*dc_sweep, frame.DCSweepMath);
+        },
+        [&] { DrawDCSweepStatistics(*dc_sweep, frame.DCSweepMath); });
 }
 
 // An output held by an ideal source, or cut off from every noisy part, has nothing to plot, so the tab says why
@@ -1668,6 +1672,7 @@ void OutputWindow::DrawDCSweep(const Core::DCSweep &sweep, const std::vector<std
     if (stepped) {
         LabelCurves(sweep, m_Schematic, show_currents, math);
     }
+    DrawCursors(m_DCSweepCursors, false);
     DrawCursorReadout(sweep.SweptValues, sweep.SweptUnit.c_str(), false, plotted);
     const ImPlotRange view = ImPlot::GetPlotLimits().X;
     m_DCSweepView = {.From = view.Min, .To = view.Max};
@@ -2068,6 +2073,69 @@ void OutputWindow::DrawACSweepStatistics(const Core::ACSweep &sweep) {
             DrawStatistic("Phase B-A", FormatFixed(phase_b - phase_a, " deg"));
         }
         ImGui::EndTable();
+    }
+}
+
+// Like the measurements of a curve tracer: for every shown trace, its value at each cursor with the change and slope
+// between them, and its extremes and mean over the span. A stepped sweep lists every curve, named by its step value
+void OutputWindow::DrawDCSweepStatistics(const Core::DCSweep &sweep, const std::vector<std::vector<MathTrace>> &math) {
+    DrawCursorToggle(m_DCSweepCursors);
+    const PlotCursors &cursors = m_DCSweepCursors;
+    if (cursors.Shown && BeginStatisticsTable("cursors")) {
+        DrawStatistic("A", FormatQuantity(cursors.A, sweep.SweptUnit.c_str()));
+        DrawStatistic("B", FormatQuantity(cursors.B, sweep.SweptUnit.c_str()));
+        DrawStatistic("B-A", FormatQuantity(cursors.B - cursors.A, sweep.SweptUnit.c_str()));
+        ImGui::EndTable();
+    }
+    const bool show_currents = HasMeasuredCurrent(sweep.Curves.front().Currents, m_Schematic);
+    const std::vector<CurveFamily> families = ListCurveFamilies(sweep, m_Schematic, show_currents, math);
+    if (families.empty()) {
+        ImGui::TextDisabled("Measure a trace to see its statistics");
+        return;
+    }
+    ImGui::TextDisabled("%s", cursors.Shown ? "Between the cursors" : "Over the visible sweep");
+    const PlotSpan span = MeasuredSpan(cursors, m_DCSweepView);
+    const bool stepped = !sweep.SteppedSource.empty();
+    for (const CurveFamily &family : families) {
+        ImGui::Separator();
+        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(family.Color), "%s", family.Label.c_str());
+        for (std::size_t curve = 0; curve < family.Curves.size(); ++curve) {
+            if (stepped) {
+                ImGui::TextDisabled("%s", FormatStepLabel(sweep, sweep.Curves[curve]).c_str());
+            }
+            const std::vector<double> &values = *family.Curves[curve];
+            if (!BeginStatisticsTable(std::format("{} {}", family.Label, curve))) {
+                continue;
+            }
+            // The size of the trace in the span tells residue from real values in every readout
+            const auto statistics = ComputeSweepStatistics(sweep.SweptValues, values, span.From, span.To);
+            const double scale =
+                statistics ? std::max(std::abs(statistics->Maximum), std::abs(statistics->Minimum)) : 0.0;
+            if (cursors.Shown) {
+                const double at_a = InterpolateAt(sweep.SweptValues, values, cursors.A, false);
+                const double at_b = InterpolateAt(sweep.SweptValues, values, cursors.B, false);
+                DrawMeasuredValue("At A", at_a, scale, family.Unit);
+                DrawMeasuredValue("At B", at_b, scale, family.Unit);
+                DrawMeasuredValue("B-A", at_b - at_a, scale, family.Unit);
+                if (const std::optional<double> slope = ComputeSlope(sweep.SweptValues, values, cursors.A, cursors.B)) {
+                    DrawStatistic("Slope",
+                                  std::format("{}{}/{}", Core::FormatValue(*slope), family.Unit, sweep.SweptUnit));
+                    // A conductance, as a current over a swept voltage, is also a resistance, the inverse; a zero
+                    // slope is an open path, shown as such rather than as an infinite value
+                    if (std::string_view(family.Unit) == "A" && sweep.SweptUnit == "V") {
+                        const std::optional<double> resistance = ResistanceFromConductance(*slope);
+                        const bool open = !resistance || std::abs(*resistance) >= OpenResistance;
+                        DrawStatistic("Resistance", open ? "open" : FormatQuantity(*resistance, "Ohm"));
+                    }
+                }
+            }
+            if (statistics) {
+                DrawMeasuredValue("Min", statistics->Minimum, scale, family.Unit);
+                DrawMeasuredValue("Max", statistics->Maximum, scale, family.Unit);
+                DrawMeasuredValue("Mean", statistics->Mean, scale, family.Unit);
+            }
+            ImGui::EndTable();
+        }
     }
 }
 
