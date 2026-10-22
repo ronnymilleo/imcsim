@@ -603,46 +603,84 @@ std::expected<void, std::string> ReadModel(const nlohmann::json &object, Core::C
     return {};
 }
 
-// What only some kinds of part carry: the current a controlled source follows, a net name, a switch state and a wiper
+// Each reader fills what one kind of part carries, and does nothing for the others; a missing key keeps the default
+
+// The current a controlled source follows; a missing one loads as none, and the simulation then asks for one
+std::expected<void, std::string> ReadControllingCurrent(const nlohmann::json &object, Core::Component &component) {
+    if (!Core::IsCurrentControlled(component.GetType()) || !object.contains("control")) {
+        return {};
+    }
+    const std::optional<std::string> current = ReadString(object, "control");
+    if (!current) {
+        return std::unexpected("has a controlling current that is not text");
+    }
+    static_cast<Core::ControlledSource &>(component).SetControllingCurrent(*current);
+    return {};
+}
+
+std::expected<void, std::string> ReadNetName(const nlohmann::json &object, Core::Component &component) {
+    if (component.GetType() != Core::ComponentType::NetLabel || !object.contains("net")) {
+        return {};
+    }
+    const std::optional<std::string> net = ReadString(object, "net");
+    if (!net || !Core::NetLabel::IsValidNet(*net)) {
+        return std::unexpected("has a net name that is not 1 to 32 letters, digits, _, - or .");
+    }
+    static_cast<Core::NetLabel &>(component).SetNet(*net);
+    return {};
+}
+
+// A switch saved without a state stays open
+std::expected<void, std::string> ReadSwitchState(const nlohmann::json &object, Core::Component &component) {
+    if (!Core::IsSwitch(component.GetType()) || !object.contains("closed")) {
+        return {};
+    }
+    const std::optional<bool> closed = ReadBool(object, "closed");
+    if (!closed) {
+        return std::unexpected("has a closed flag that is not true or false");
+    }
+    static_cast<Core::Switch &>(component).SetClosed(*closed);
+    return {};
+}
+
+// A potentiometer saved without a wiper keeps it in the middle
+std::expected<void, std::string> ReadWiper(const nlohmann::json &object, Core::Component &component) {
+    if (component.GetType() != Core::ComponentType::Potentiometer || !object.contains("wiper")) {
+        return {};
+    }
+    const std::optional<double> wiper = ReadNumber(object, "wiper");
+    if (!wiper || !Core::Potentiometer::IsValidWiper(*wiper)) {
+        return std::unexpected("has a wiper that is not a number from 0 to 1");
+    }
+    static_cast<Core::Potentiometer &>(component).SetWiper(*wiper);
+    return {};
+}
+
+// A logic input saved without a state stays low
+std::expected<void, std::string> ReadLogicInputState(const nlohmann::json &object, Core::Component &component) {
+    if (component.GetType() != Core::ComponentType::LogicInput || !object.contains("high")) {
+        return {};
+    }
+    const std::optional<bool> high = ReadBool(object, "high");
+    if (!high) {
+        return std::unexpected("has a high flag that is not true or false");
+    }
+    static_cast<Core::LogicInput &>(component).SetHigh(*high);
+    return {};
+}
+
+using StateReader = std::expected<void, std::string> (*)(const nlohmann::json &, Core::Component &);
+
+constexpr auto StateReaders = std::to_array<StateReader>(
+    {&ReadControllingCurrent, &ReadNetName, &ReadSwitchState, &ReadWiper, &ReadLogicInputState});
+
+// What only some kinds of part carry: the current a controlled source follows, a net name, a switch state, a wiper
+// and the state of a logic input
 std::expected<void, std::string> ReadStateFields(const nlohmann::json &object, Core::Component &component) {
-    // A missing controlling current loads as none; the simulation then asks for one
-    if (Core::IsCurrentControlled(component.GetType()) && object.contains("control")) {
-        const std::optional<std::string> current = ReadString(object, "control");
-        if (!current) {
-            return std::unexpected("has a controlling current that is not text");
+    for (const StateReader reader : StateReaders) {
+        if (const auto read = reader(object, component); !read) {
+            return std::unexpected(read.error());
         }
-        static_cast<Core::ControlledSource &>(component).SetControllingCurrent(*current);
-    }
-    if (component.GetType() == Core::ComponentType::NetLabel && object.contains("net")) {
-        const std::optional<std::string> net = ReadString(object, "net");
-        if (!net || !Core::NetLabel::IsValidNet(*net)) {
-            return std::unexpected("has a net name that is not 1 to 32 letters, digits, _, - or .");
-        }
-        static_cast<Core::NetLabel &>(component).SetNet(*net);
-    }
-    // A switch saved without a state stays open
-    if (Core::IsSwitch(component.GetType()) && object.contains("closed")) {
-        const std::optional<bool> closed = ReadBool(object, "closed");
-        if (!closed) {
-            return std::unexpected("has a closed flag that is not true or false");
-        }
-        static_cast<Core::Switch &>(component).SetClosed(*closed);
-    }
-    // A potentiometer saved without a wiper keeps it in the middle
-    if (component.GetType() == Core::ComponentType::Potentiometer && object.contains("wiper")) {
-        const std::optional<double> wiper = ReadNumber(object, "wiper");
-        if (!wiper || !Core::Potentiometer::IsValidWiper(*wiper)) {
-            return std::unexpected("has a wiper that is not a number from 0 to 1");
-        }
-        static_cast<Core::Potentiometer &>(component).SetWiper(*wiper);
-    }
-    // A logic input saved without a state stays low
-    if (component.GetType() == Core::ComponentType::LogicInput && object.contains("high")) {
-        const std::optional<bool> high = ReadBool(object, "high");
-        if (!high) {
-            return std::unexpected("has a high flag that is not true or false");
-        }
-        static_cast<Core::LogicInput &>(component).SetHigh(*high);
     }
     return {};
 }

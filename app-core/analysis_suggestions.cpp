@@ -91,6 +91,62 @@ std::vector<double> ListCharacteristicFrequencies(const Circuit &circuit) {
     return frequencies;
 }
 
+// What the sources of a circuit say about time: the periods of the repeating waveforms, the spans of those that
+// happen once, and the longest delay before a waveform starts
+struct Waveforms {
+    std::vector<double> Periods;
+    std::vector<double> Spans;
+    double LongestDelay = 0.0;
+};
+
+void AddSourceWaveform(const Source &source, Waveforms &waveforms) {
+    switch (source.GetSourceType()) {
+    case Source::SourceType::DC:
+        break;
+    case Source::SourceType::AC:
+        waveforms.Periods.push_back(1.0 / source.GetAC().Frequency);
+        break;
+    case Source::SourceType::Pulse:
+        waveforms.Periods.push_back(source.GetPulse().Period);
+        waveforms.LongestDelay = std::max(waveforms.LongestDelay, source.GetPulse().Delay);
+        break;
+    case Source::SourceType::EXP: {
+        const EXPParameters &exp = source.GetEXP();
+        waveforms.Spans.push_back(exp.FallDelay + 5.0 * exp.FallTimeConstant);
+        break;
+    }
+    case Source::SourceType::SFFM:
+        waveforms.Periods.push_back(1.0 / source.GetSFFM().CarrierFrequency);
+        waveforms.Periods.push_back(1.0 / source.GetSFFM().SignalFrequency);
+        break;
+    case Source::SourceType::AM:
+        waveforms.Periods.push_back(1.0 / source.GetAM().CarrierFrequency);
+        waveforms.Periods.push_back(1.0 / source.GetAM().ModulatingFrequency);
+        waveforms.LongestDelay = std::max(waveforms.LongestDelay, source.GetAM().Delay);
+        break;
+    case Source::SourceType::PWL: {
+        const PWLParameters &pwl = source.GetPWL();
+        if (pwl.Points.size() >= 2) {
+            waveforms.Spans.push_back(pwl.Points.back().Time);
+        }
+        break;
+    }
+    }
+}
+
+// A clock is a periodic source like a pulse one, with its period and its start delay
+void AddWaveform(const Component &part, Waveforms &waveforms) {
+    if (part.GetType() == ComponentType::Clock) {
+        const ClockParameters &clock = static_cast<const Clock &>(part).GetParameters();
+        waveforms.Periods.push_back(1.0 / clock.Frequency);
+        waveforms.LongestDelay = std::max(waveforms.LongestDelay, clock.StartDelay);
+        return;
+    }
+    if (const auto *source = dynamic_cast<const Source *>(&part)) {
+        AddSourceWaveform(*source, waveforms);
+    }
+}
+
 } // namespace
 
 /**
@@ -103,66 +159,22 @@ std::vector<double> ListCharacteristicFrequencies(const Circuit &circuit) {
  *          happen once, so the stop time covers their span with a little room, and the step a 200th of it.
  */
 std::optional<TransientSettings> SuggestTransientSettings(const Circuit &circuit) {
-    std::vector<double> periods;
-    std::vector<double> spans;
-    double longest_delay = 0.0;
+    Waveforms waveforms;
     for (const CircuitEntry &entry : circuit.GetEntries()) {
-        // A clock is a periodic source like a pulse one, with its period and its start delay
-        if (entry.Part->GetType() == ComponentType::Clock) {
-            const ClockParameters &clock = static_cast<const Clock &>(*entry.Part).GetParameters();
-            periods.push_back(1.0 / clock.Frequency);
-            longest_delay = std::max(longest_delay, clock.StartDelay);
-            continue;
-        }
-        const auto *source = dynamic_cast<const Source *>(entry.Part);
-        if (source == nullptr) {
-            continue;
-        }
-        switch (source->GetSourceType()) {
-        case Source::SourceType::DC:
-            break;
-        case Source::SourceType::AC:
-            periods.push_back(1.0 / source->GetAC().Frequency);
-            break;
-        case Source::SourceType::Pulse:
-            periods.push_back(source->GetPulse().Period);
-            longest_delay = std::max(longest_delay, source->GetPulse().Delay);
-            break;
-        case Source::SourceType::EXP: {
-            const EXPParameters &exp = source->GetEXP();
-            spans.push_back(exp.FallDelay + 5.0 * exp.FallTimeConstant);
-            break;
-        }
-        case Source::SourceType::SFFM:
-            periods.push_back(1.0 / source->GetSFFM().CarrierFrequency);
-            periods.push_back(1.0 / source->GetSFFM().SignalFrequency);
-            break;
-        case Source::SourceType::AM:
-            periods.push_back(1.0 / source->GetAM().CarrierFrequency);
-            periods.push_back(1.0 / source->GetAM().ModulatingFrequency);
-            longest_delay = std::max(longest_delay, source->GetAM().Delay);
-            break;
-        case Source::SourceType::PWL: {
-            const PWLParameters &pwl = source->GetPWL();
-            if (pwl.Points.size() >= 2) {
-                spans.push_back(pwl.Points.back().Time);
-            }
-            break;
-        }
-        }
+        AddWaveform(*entry.Part, waveforms);
     }
-    if (periods.empty() && spans.empty()) {
+    if (waveforms.Periods.empty() && waveforms.Spans.empty()) {
         return std::nullopt;
     }
     double stop_time = 0.0;
     double shortest = std::numeric_limits<double>::max();
-    if (!periods.empty()) {
-        const auto [shortest_period, longest_period] = std::ranges::minmax(periods);
-        stop_time = longest_delay + SuggestedPeriods * longest_period;
+    if (!waveforms.Periods.empty()) {
+        const auto [shortest_period, longest_period] = std::ranges::minmax(waveforms.Periods);
+        stop_time = waveforms.LongestDelay + SuggestedPeriods * longest_period;
         shortest = shortest_period;
     }
-    if (!spans.empty()) {
-        const auto [shortest_span, longest_span] = std::ranges::minmax(spans);
+    if (!waveforms.Spans.empty()) {
+        const auto [shortest_span, longest_span] = std::ranges::minmax(waveforms.Spans);
         stop_time = std::max(stop_time, OneShotMargin * longest_span);
         shortest = std::min(shortest, shortest_span);
     }
