@@ -68,6 +68,21 @@ endif()
 # Dependencies and targets
 # =============================================================================
 
+# Coverage instrumentation, applied per target through imcsim_target_coverage() so that nothing under vendor (SDL,
+# imgui, implot, Catch2...) is measured
+option(ENABLE_COVERAGE "Instrument the build for code coverage (GCC or Clang)" OFF)
+if(ENABLE_COVERAGE AND NOT CMAKE_CXX_COMPILER_ID MATCHES "^(GNU|Clang)$")
+    message(WARNING "ENABLE_COVERAGE needs GCC or Clang; ${CMAKE_CXX_COMPILER_ID} builds without coverage")
+endif()
+
+function(imcsim_target_coverage target)
+    if(ENABLE_COVERAGE AND CMAKE_CXX_COMPILER_ID MATCHES "^(GNU|Clang)$")
+        target_compile_options(${target} PRIVATE --coverage)
+        # PUBLIC carries the runtime requirement to consumers of static libraries
+        target_link_options(${target} PUBLIC --coverage)
+    endif()
+endfunction()
+
 add_subdirectory(vendor)
 add_subdirectory(app-core)
 add_subdirectory(app-gui)
@@ -101,6 +116,7 @@ elseif(APPLE)
 endif()
 target_include_directories(imcsim PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(imcsim PRIVATE imcsim-gui-lib)
+imcsim_target_coverage(imcsim)
 add_dependencies(imcsim format)
 
 # =============================================================================
@@ -182,5 +198,6 @@ message(STATUS "Version:      ${PROJECT_VERSION}")
 message(STATUS "Build type:   ${CMAKE_BUILD_TYPE}")
 message(STATUS "C++ standard: ${CMAKE_CXX_STANDARD}")
 message(STATUS "Compiler:     ${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}")
+message(STATUS "Coverage:     ${ENABLE_COVERAGE}")
 message(STATUS "=================================================")
 message(STATUS "")

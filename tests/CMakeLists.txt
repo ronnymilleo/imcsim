@@ -54,6 +54,8 @@ target_link_libraries(imcsim-tests
             Catch2::Catch2WithMain
 )
 
+imcsim_target_coverage(imcsim-tests)
+
 include(Catch)
 # Under LeakSanitizer, the suppression file hides the leaks of libngspice itself; other builds ignore the variable
 catch_discover_tests(imcsim-tests
