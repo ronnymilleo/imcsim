@@ -322,6 +322,51 @@ void Component::SetValue(const double value) {
 }
 
 /**
+ * @brief   Tells whether this kind of component can start from a value of its own.
+ * @return  True for a capacitor, whose initial condition is a voltage, and an inductor, whose is a current; false
+ *          for every other kind.
+ */
+bool Component::SupportsInitialCondition() const {
+    return m_Type == ComponentType::Capacitor || m_Type == ComponentType::Inductor;
+}
+
+/**
+ * @brief   Tells whether an initial condition is set.
+ * @return  True when SetInitialCondition() has been called and the condition has not been cleared.
+ */
+bool Component::HasInitialCondition() const {
+    return m_InitialCondition.has_value();
+}
+
+/**
+ * @brief   Returns the initial condition.
+ * @return  The voltage a capacitor starts charged to, or the current an inductor starts carrying, or no value when
+ *          none is set.
+ */
+std::optional<double> Component::GetInitialCondition() const {
+    return m_InitialCondition;
+}
+
+/**
+ * @brief   Sets the initial condition.
+ * @param[in] value  Voltage for a capacitor or current for an inductor; the sign is free.
+ * @note    Only a capacitor or an inductor takes one; the call does nothing for any other kind.
+ */
+void Component::SetInitialCondition(const double value) {
+    if (SupportsInitialCondition()) {
+        m_InitialCondition = value;
+    }
+}
+
+/**
+ * @brief   Clears the initial condition.
+ * @note    A transient that still has an initial condition elsewhere starts this part uncharged, at zero.
+ */
+void Component::ClearInitialCondition() {
+    m_InitialCondition.reset();
+}
+
+/**
  * @brief   Returns a readable name for a kind of component.
  * @param[in] type  Kind of component.
  * @return  The type as text, such as "Resistor"; ParseComponentType() reads it back.

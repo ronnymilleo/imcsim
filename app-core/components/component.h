@@ -89,10 +89,19 @@ public:
     double GetValue() const;
     void SetValue(double value);
 
+    // Initial condition
+    bool SupportsInitialCondition() const;
+    bool HasInitialCondition() const;
+    std::optional<double> GetInitialCondition() const;
+    void SetInitialCondition(double value);
+    void ClearInitialCondition();
+
 protected:
     ComponentType m_Type{};
     std::string m_Name;
     double m_Value = 0.0;
+    // Voltage a capacitor starts charged to or current an inductor starts carrying; only these kinds carry one
+    std::optional<double> m_InitialCondition;
 };
 
 // Type names

@@ -1195,15 +1195,18 @@ OperatingPointRun RunOperatingPoint(const Circuit &circuit) {
 }
 
 /**
- * @brief   Simulates how the node voltages of a circuit change over time, starting from its operating point.
+ * @brief   Simulates how the node voltages of a circuit change over time, starting from its operating point or from
+ *          the initial conditions of its capacitors and inductors.
  * @param[in] circuit   Circuit to simulate; it needs a ground component.
  * @param[in] settings  Stop time and time step.
  * @param[in] parameter Value of the stepped parameter for this run, a part value or the temperature; none runs the
  *                      circuit as it is.
  * @return  The voltages at every time point or an error, plus every line ngspice printed. Invalid settings
  *          are rejected before reaching ngspice.
- * @note    Logic parts that never settle into an operating point, such as a latch with both inputs idle, start from
- *          0 V instead, with a warning in the result. Not thread-safe: ngspice is a single global library instance.
+ * @note    A circuit with an initial condition runs with uic, so it starts from those values instead of the operating
+ *          point, with a warning in the result; the same holds for logic parts that never settle into an operating
+ *          point, such as a latch with both inputs idle, which start from 0 V. Not thread-safe: ngspice is a single
+ *          global library instance.
  */
 TransientRun RunTransient(const Circuit &circuit, const TransientSettings &settings,
                           const std::optional<ParameterValue> &parameter) {
@@ -1218,11 +1221,26 @@ TransientRun RunTransient(const Circuit &circuit, const TransientSettings &setti
     if (!applied) {
         return {std::unexpected(applied.error()), {}};
     }
-    const std::string analysis = std::format("{}.tran {} {}", applied->Card, FormatSpiceValue(settings.TimeStep),
-                                             FormatSpiceValue(settings.StopTime));
+    // An initial condition needs uic, which skips the operating point and starts the capacitors and inductors from
+    // the IC= values written in the netlist
+    const bool has_initial_conditions = applied->Simulated.HasInitialConditions();
+    std::string analysis = std::format("{}.tran {} {}", applied->Card, FormatSpiceValue(settings.TimeStep),
+                                       FormatSpiceValue(settings.StopTime));
+    if (has_initial_conditions) {
+        analysis += " uic";
+    }
     const auto read_result = [&applied] { return ReadTransient(applied->Simulated); };
     TransientRun run = Simulate<Transient>(applied->Simulated, analysis, "tran", read_result);
+    if (run.Result && has_initial_conditions) {
+        run.Result->Warnings.emplace_back(
+            "The transient starts from the initial conditions (uic): the parts that have one start from it and the "
+            "other capacitors and inductors from zero, since the operating point is not computed first");
+    }
     if (run.Result || !HasLogicPart(applied->Simulated) || !NeverSettled(run.Messages)) {
+        return run;
+    }
+    // The run already used uic, so rerunning it cannot give the logic loop a state to start from
+    if (has_initial_conditions) {
         return run;
     }
     // A logic loop with no state to start from, such as a latch with both inputs idle, has no operating point, so

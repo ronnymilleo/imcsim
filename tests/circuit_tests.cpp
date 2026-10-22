@@ -66,6 +66,39 @@ TEST_CASE("ToSpiceNetlist writes one line per component and leaves ground out", 
                                       ".end\n");
 }
 
+TEST_CASE("ToSpiceNetlist writes the initial condition of a capacitor and an inductor", "[circuit]") {
+    Core::Capacitor capacitor;
+    capacitor.SetName("C1");
+    capacitor.SetValue(100e-9);
+    capacitor.SetInitialCondition(5.0);
+    Core::Inductor inductor;
+    inductor.SetName("L1");
+    inductor.SetInitialCondition(2e-3);
+
+    Core::Circuit circuit;
+    circuit.Add(capacitor, {2, 0});
+    circuit.Add(inductor, {2, 0});
+
+    CHECK(circuit.ToSpiceNetlist() == "* imcsim netlist\n"
+                                      "C1 2 0 100n IC=5\n"
+                                      "L1 2 0 1m IC=2m\n"
+                                      ".end\n");
+}
+
+TEST_CASE("HasInitialConditions looks for a part with an initial condition", "[circuit]") {
+    Core::Capacitor capacitor;
+    capacitor.SetName("C1");
+    Core::Circuit circuit;
+    circuit.Add(capacitor, {1, 0});
+    CHECK_FALSE(circuit.HasInitialConditions());
+
+    capacitor.SetInitialCondition(3.0);
+    CHECK(circuit.HasInitialConditions());
+
+    capacitor.ClearInitialCondition();
+    CHECK_FALSE(circuit.HasInitialConditions());
+}
+
 TEST_CASE("ToSpiceNetlist writes a voltage source between its two nodes, positive first", "[circuit]") {
     Core::VoltageSource source;
     source.SetName("Vin1");

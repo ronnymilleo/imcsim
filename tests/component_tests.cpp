@@ -64,6 +64,28 @@ TEST_CASE("Components start with SPICE prefixes, units and default values", "[co
     CHECK(current_source.GetSourceType() == Core::CurrentSource::SourceType::DC);
 }
 
+TEST_CASE("An initial condition is only for a capacitor and an inductor", "[component]") {
+    Core::Resistor resistor;
+    resistor.SetInitialCondition(5.0);
+    CHECK_FALSE(resistor.SupportsInitialCondition());
+    CHECK_FALSE(resistor.HasInitialCondition());
+
+    Core::Capacitor capacitor;
+    CHECK(capacitor.SupportsInitialCondition());
+    CHECK_FALSE(capacitor.HasInitialCondition());
+    // The sign is free: a capacitor may start charged either way
+    capacitor.SetInitialCondition(-2.0);
+    REQUIRE(capacitor.HasInitialCondition());
+    CHECK(capacitor.GetInitialCondition() == -2.0);
+    capacitor.ClearInitialCondition();
+    CHECK_FALSE(capacitor.HasInitialCondition());
+
+    Core::Inductor inductor;
+    inductor.SetInitialCondition(1e-3);
+    CHECK(inductor.HasInitialCondition());
+    CHECK(inductor.GetInitialCondition() == 1e-3);
+}
+
 TEST_CASE("A potentiometer is a resistor of 10k with its wiper in the middle", "[component]") {
     Core::Potentiometer pot;
     CHECK(pot.GetType() == Core::ComponentType::Potentiometer);

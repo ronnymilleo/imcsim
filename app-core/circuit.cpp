@@ -258,6 +258,14 @@ bool Circuit::HasACSource() const {
 }
 
 /**
+ * @brief   Tells whether any part starts from an initial condition.
+ * @return  True when at least one capacitor or inductor has one set; a transient then runs with uic.
+ */
+bool Circuit::HasInitialConditions() const {
+    return std::ranges::any_of(m_Entries, [](const CircuitEntry &entry) { return entry.Part->HasInitialCondition(); });
+}
+
+/**
  * @brief   Writes the circuit as a SPICE netlist, ready to hand to ngspice.
  * @param[in] analysis            Optional analysis command, such as ".op", written right before ".end".
  * @param[in] add_current_probes  Adds a 0 V source in series with every terminal GetCurrentProbes() lists, named
@@ -269,8 +277,9 @@ bool Circuit::HasACSource() const {
  *          source from its node to ground. A part whose current controls a CCCS or CCVS gets a probe even without
  *          add_current_probes, unless it is a voltage source itself, since ngspice follows currents through
  *          voltage sources. An AC source writes its offset, AC magnitude and sine together, and a
- *          pulse source its low level and pulse, so the same netlist works for .op, .ac and .tran. Probes and the gain
- *          stage of each ideal op-amp use nodes numbered after GetNodeCount(), so the circuit nodes keep their
+ *          pulse source its low level and pulse, so the same netlist works for .op, .ac and .tran. A capacitor or
+ *          inductor with an initial condition writes it as IC=, which only a transient with uic uses. Probes and the
+ *          gain stage of each ideal op-amp use nodes numbered after GetNodeCount(), so the circuit nodes keep their
  *          numbers. Op-amp macromodels are subcircuits, written after the models.
  */
 std::string Circuit::ToSpiceNetlist(const std::string_view analysis, const bool add_current_probes) const {
@@ -289,10 +298,19 @@ std::string Circuit::ToSpiceNetlist(const std::string_view analysis, const bool 
             next_extra_node);
         switch (component.GetType()) {
         case ComponentType::Resistor:
-        case ComponentType::Capacitor:
-        case ComponentType::Inductor:
             netlist += std::format("{} {} {} {}\n", component.GetName(), nodes[0], nodes[1], value);
             break;
+        case ComponentType::Capacitor:
+        case ComponentType::Inductor: {
+            // A capacitor's initial condition is a voltage and an inductor's a current; ngspice reads both as IC=
+            // and only uses them in a transient with uic
+            netlist += std::format("{} {} {} {}", component.GetName(), nodes[0], nodes[1], value);
+            if (const std::optional<double> initial = component.GetInitialCondition()) {
+                netlist += std::format(" IC={}", FormatSpiceValue(*initial));
+            }
+            netlist += "\n";
+            break;
+        }
         case ComponentType::VCC:
             netlist += std::format("{} {} 0 DC {}\n", component.GetName(), nodes[0], value);
             break;

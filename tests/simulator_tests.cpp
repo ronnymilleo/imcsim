@@ -393,6 +393,94 @@ TEST_CASE("A pulse charges an RC low-pass with its time constant", "[simulator]"
     }
 }
 
+TEST_CASE("A capacitor with an initial condition discharges through a resistor", "[simulator]") {
+    Core::Capacitor capacitor;
+    capacitor.SetName("C1");
+    capacitor.SetValue(1e-6);
+    capacitor.SetInitialCondition(5.0);
+    Core::Resistor resistor;
+    resistor.SetName("R1");
+    resistor.SetValue(1e3);
+    const Core::Ground reference;
+    Core::Circuit circuit;
+    circuit.Add(capacitor, {1, 0});
+    circuit.Add(resistor, {1, 0});
+    circuit.Add(reference, {0});
+
+    const Core::TransientRun run = Core::RunTransient(circuit, {.StopTime = 5e-3, .TimeStep = 5e-6});
+    if (!run.Result) {
+        FAIL(run.Result.error());
+    }
+    const Core::Transient &transient = *run.Result;
+    // uic skips the operating point, so the run says it started from the initial condition
+    CHECK(std::ranges::any_of(transient.Warnings, [](const std::string &warning) {
+        return warning.find("initial condition") != std::string::npos;
+    }));
+    for (std::size_t index = 0; index < transient.Times.size(); ++index) {
+        const double expected = 5.0 * std::exp(-transient.Times[index] / 1e-3);
+        CHECK_THAT(transient.NodeVoltages[1][index], Catch::Matchers::WithinAbs(expected, 5e-3));
+    }
+}
+
+TEST_CASE("With uic, a capacitor without an initial condition starts uncharged, not at its operating point",
+          "[simulator]") {
+    // R1 and C1 form a divider that the operating point would settle at 10 V; C2 only exists to give the run an
+    // initial condition, so uic applies to the whole circuit
+    Core::VoltageSource source;
+    source.SetName("V1");
+    source.SetValue(10.0);
+    Core::Resistor charging;
+    charging.SetName("R1");
+    charging.SetValue(1e3);
+    Core::Capacitor plain;
+    plain.SetName("C1");
+    plain.SetValue(1e-6);
+    Core::Capacitor charged;
+    charged.SetName("C2");
+    charged.SetValue(1e-6);
+    charged.SetInitialCondition(5.0);
+    Core::Resistor discharging;
+    discharging.SetName("R2");
+    discharging.SetValue(1e3);
+    const Core::Ground reference;
+    Core::Circuit circuit;
+    circuit.Add(source, {1, 0});
+    circuit.Add(charging, {1, 2});
+    circuit.Add(plain, {2, 0});
+    circuit.Add(charged, {3, 0});
+    circuit.Add(discharging, {3, 0});
+    circuit.Add(reference, {0});
+
+    const Core::TransientRun run = Core::RunTransient(circuit, {.StopTime = 5e-3, .TimeStep = 5e-6});
+    if (!run.Result) {
+        FAIL(run.Result.error());
+    }
+    const Core::Transient &transient = *run.Result;
+    // C1 charges from 0 V toward 10 V with R1*C1 = 1 ms, instead of sitting at 10 V from the start
+    for (std::size_t index = 0; index < transient.Times.size(); ++index) {
+        const double expected = 10.0 * (1.0 - std::exp(-transient.Times[index] / 1e-3));
+        CHECK_THAT(transient.NodeVoltages[2][index], Catch::Matchers::WithinAbs(expected, 5e-2));
+    }
+}
+
+TEST_CASE("A transient with no initial condition keeps the operating point", "[simulator]") {
+    Core::Capacitor capacitor;
+    capacitor.SetName("C1");
+    Core::Resistor resistor;
+    resistor.SetName("R1");
+    const Core::Ground reference;
+    Core::Circuit circuit;
+    circuit.Add(capacitor, {1, 0});
+    circuit.Add(resistor, {1, 0});
+    circuit.Add(reference, {0});
+
+    const Core::TransientRun run = Core::RunTransient(circuit, {.StopTime = 1e-3, .TimeStep = 5e-6});
+    if (!run.Result) {
+        FAIL(run.Result.error());
+    }
+    CHECK(run.Result->Warnings.empty());
+}
+
 TEST_CASE("Invalid analysis settings are rejected before reaching ngspice", "[simulator]") {
     const LowPass low_pass;
     SECTION("transient") {
