@@ -258,6 +258,18 @@ constexpr auto Examples = std::to_array<Example>({
         .FileName = "logic_gates.imcsim",
     },
     {
+        .Title = "Truth table of the basic gates",
+        .Group = "Digital",
+        .Description =
+            "Two logic inputs, A and B, reach an AND, an OR, a NAND, a NOR, an XOR and an XNOR gate through the A and "
+            "B net labels, and the output of each gate is measured. The Truth table analysis is already picked: "
+            "press Run, and the Output window lists the four combinations of A and B in counting order with the 0 "
+            "or 1 every gate gives, so one table shows all six gates side by side. No Ground or load is needed, "
+            "since a circuit of only digital parts has its own reference. Untick A or B in the analysis popover to "
+            "vary one input only; the other keeps the High or Low it has in the schematic.",
+        .FileName = "logic_truth_table.imcsim",
+    },
+    {
         .Title = "Half adder",
         .Group = "Digital",
         .Description =

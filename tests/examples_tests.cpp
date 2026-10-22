@@ -804,3 +804,41 @@ TEST_CASE("The ripple counter counts the edges of its clock in binary", "[exampl
         }
     }
 }
+
+TEST_CASE("The truth table example lists the table of each basic gate", "[examples]") {
+    SKIP_WITHOUT_DIGITAL_MODELS();
+    GUI::Schematic schematic;
+    OpenExample("logic_truth_table.imcsim", schematic);
+    const GUI::SimulationSettings &settings = schematic.GetSimulationSettings();
+    CHECK(settings.Selected == GUI::Analysis::TruthTable);
+
+    // The example is made only of digital parts, so it runs with no Ground part
+    const Core::Circuit circuit = schematic.BuildCircuit();
+    REQUIRE_FALSE(circuit.HasGround());
+    // The outputs of the six gates sit on the grid points the example measures, one gate every eight rows
+    std::vector<int> outputs;
+    for (int gate = 0; gate < 6; ++gate) {
+        outputs.push_back(static_cast<int>(NodeAt(schematic, {31, 6 + 8 * gate})));
+    }
+    const Core::TruthTableRun run =
+        Core::RunTruthTable(circuit, {.Inputs = Core::GetTruthTableInputs(circuit), .OutputNodes = outputs});
+    if (!run.Result) {
+        FAIL(run.Result.error());
+    }
+    const Core::TruthTable &table = *run.Result;
+    REQUIRE(table.Rows.size() == 4);
+    REQUIRE(table.OutputNodes.size() == 6);
+    // AND, OR, NAND, NOR, XOR and XNOR for 00, 01, 10 and 11 (the first input is the most significant bit)
+    constexpr std::array<std::array<bool, 6>, 4> Expected = {{{false, false, true, true, false, true},
+                                                              {false, true, true, false, true, false},
+                                                              {false, true, true, false, true, false},
+                                                              {true, true, false, false, false, true}}};
+    for (std::size_t row = 0; row < Expected.size(); ++row) {
+        REQUIRE(table.Rows[row].HasOperatingPoint());
+        for (std::size_t gate = 0; gate < Expected[row].size(); ++gate) {
+            INFO(std::format("row {} gate {}", row, gate));
+            const double voltage = table.Rows[row].OutputVoltages[gate];
+            CHECK((Expected[row][gate] ? voltage > 4.0 : voltage < 0.5));
+        }
+    }
+}
