@@ -99,6 +99,31 @@ explains the editor, terminal numbers, current signs, probes, plots and exports,
 [Simulation models](docs/models.md) describes the model behind every part and what it leaves out. [Themes](docs/themes.md)
 shows the same circuit and its plots in each color theme.
 
+## Roadmap
+
+This is a possible roadmap, not a promise: what comes next depends on what users ask for and on the time available, and
+it can change at any time. The ideas below are tracked as tasks in the project's backlog and grouped here by theme,
+roughly in the order they are likely to come.
+
+- **Next**: an interactive mode, where flipping a switch or turning a potentiometer updates the transient at once,
+  built on background simulation with progress, a stop button and traces drawn while a run goes on; and subcircuits,
+  which group part of a schematic into a reusable block with pins, followed by importing vendor `.model`, `.subckt` and
+  `.lib` files
+- **Digital**: counters, shift registers, multiplexers, decoders and the 555 timer; bus and bit-value options for the
+  logic lanes; Verilog modules placed as parts and simulated together with the analog circuit
+- **Analyses**: poles and zeros with an s-plane view, sensitivity shown on the schematic, S-parameters with a Smith chart
+  and Touchstone export, transient noise sources, and Monte Carlo runs on top of the parameter step
+- **Sources, parts and models**: behavioral sources, XSPICE analog blocks, transmission lines, a circuit driven from a
+  WAV or CSV file, more ready op-amp macromodels, and a MOSFET body diode and higher-level MOSFET models
+- **Live effects and plots**: overload sparks, a capacitor charge bar, inductor field lines, an animated lamp, motor and
+  buzzer, a fuse that blows, safe operating area warnings, and math channels in AC sweeps and saved with the schematic
+- **Platform**: a Flatpak release, and a web version with sharing by link
+- **Longer term, a native simulation backend**: a solver written from published circuit theory that sits beside ngspice,
+  which stays available, tested against closed-form results and built to use modern CPUs well. It would come in steps:
+  a backend interface with a capability matrix, a linear core (operating point, DC and AC), small-signal and RF
+  analyses (noise, S-parameters, Touchstone blocks), harmonic balance, bipolar transistors with the transient analysis,
+  digital co-simulation, and extras. Nothing else on the roadmap depends on it
+
 ## Install
 
 Every release on the [releases](https://github.com/ronnymilleo/imcsim/releases) page carries ngspice, so nothing
