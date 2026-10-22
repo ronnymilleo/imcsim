@@ -59,6 +59,8 @@ private:
     // Texts being edited, and the selection they were loaded from
     std::optional<std::size_t> m_LoadedSelection;
     ValueField m_Value;
+    // Voltage a capacitor or current an inductor starts a transient from; empty when none is set
+    ValueField m_InitialCondition;
     // The net name being typed for a net label, and whether the next Draw() focuses it
     std::array<char, 40> m_Net{};
     bool m_FocusNet = false;
@@ -83,6 +85,7 @@ private:
     void DrawFields(Core::Component &component);
     bool DrawModeledPart(Core::Component &component);
     void DrawValue(Core::Component &component);
+    void DrawInitialCondition(Core::Component &component);
     void DrawWiper(Core::Potentiometer &pot);
     void DrawSwitch(Core::Switch &contact);
     void DrawControlledSwitch(Core::VoltageControlledSwitch &controlled);

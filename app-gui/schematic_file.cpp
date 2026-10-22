@@ -354,6 +354,10 @@ nlohmann::json WriteElement(const UIElement &element) {
     if (component.HasValue()) {
         object["value"] = component.GetValue();
     }
+    // Only a capacitor or an inductor carries one, and only when it is set
+    if (const std::optional<double> initial = component.GetInitialCondition()) {
+        object["ic"] = *initial;
+    }
     // Every waveform is saved, so switching type after loading keeps the parameters of the others
     if (Core::IsSource(component.GetType())) {
         const auto &source = static_cast<const Core::Source &>(component);
@@ -582,6 +586,14 @@ std::expected<std::unique_ptr<UIElement>, std::string> ReadElement(const nlohman
             return std::unexpected("has no valid value");
         }
         component.SetValue(*value);
+    }
+    // A file saved before initial conditions had no key, so the part has none
+    if (component.SupportsInitialCondition() && object.contains("ic")) {
+        const std::optional<double> initial = ReadNumber(object, "ic");
+        if (!initial) {
+            return std::unexpected("has an initial condition that is not a number");
+        }
+        component.SetInitialCondition(*initial);
     }
     if (Core::IsSource(component.GetType())) {
         const std::expected<void, std::string> source = ReadSource(object, static_cast<Core::Source &>(component));

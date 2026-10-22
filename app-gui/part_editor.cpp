@@ -333,6 +333,8 @@ void PartEditor::DrawFields(Core::Component &component) {
         DrawValue(component);
         if (type == Core::ComponentType::Potentiometer) {
             DrawWiper(static_cast<Core::Potentiometer &>(component));
+        } else if (component.SupportsInitialCondition()) {
+            DrawInitialCondition(component);
         }
     }
 }
@@ -411,6 +413,7 @@ void PartEditor::SetValueSeries(const Core::ValueSeries series) {
 
 void PartEditor::LoadFields(const Core::Component &component) {
     m_Value.Load(component.GetValue());
+    m_InitialCondition.LoadOptional(component.GetInitialCondition());
     if (component.GetType() == Core::ComponentType::NetLabel) {
         const std::string &net = static_cast<const Core::NetLabel &>(component).GetNet();
         m_Net.fill('\0');
@@ -491,6 +494,22 @@ void PartEditor::DrawValue(Core::Component &component) {
         ImGui::TextDisabled("Standard values: %s, %g%%", Core::GetSeriesName(series),
                             Core::GetSeriesTolerancePercent(series));
     }
+}
+
+// A capacitor's initial condition is a voltage and an inductor's a current; leaving the field empty means no initial
+// condition, but once any part has one the whole transient runs with uic and an empty part starts at zero
+void PartEditor::DrawInitialCondition(Core::Component &component) {
+    const bool is_capacitor = component.GetType() == Core::ComponentType::Capacitor;
+    const GUI::OptionalValueEdit edit = m_InitialCondition.DrawOptional("Initial", is_capacitor ? "V" : "A", AnyValue);
+    if (edit.Changed) {
+        if (edit.Value) {
+            component.SetInitialCondition(*edit.Value);
+        } else {
+            component.ClearInitialCondition();
+        }
+        m_Schematic.MarkModified();
+    }
+    ImGui::TextDisabled("Skips the operating point (uic); parts left empty start at zero");
 }
 
 // The switch closes above the threshold plus the hysteresis, and opens below the threshold minus it

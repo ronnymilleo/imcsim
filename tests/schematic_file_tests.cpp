@@ -612,6 +612,34 @@ TEST_CASE("A switch and a push button keep their state, and load open when the f
     CHECK(skipped.Warnings.size() == 1);
 }
 
+TEST_CASE("A capacitor and an inductor keep their initial condition, and load without one", "[schematic_file]") {
+    std::vector<std::unique_ptr<GUI::UIElement>> elements;
+    elements.push_back(GUI::CreateElement(Core::ComponentType::Capacitor, {2, 4}, GUI::Rotation::R0));
+    elements.back()->GetComponent().SetName("C1");
+    elements.back()->GetComponent().SetInitialCondition(5.0);
+    elements.push_back(GUI::CreateElement(Core::ComponentType::Inductor, {6, 4}, GUI::Rotation::R0));
+    elements.back()->GetComponent().SetName("L1");
+    elements.back()->GetComponent().SetInitialCondition(2e-3);
+
+    const GUI::LoadedSchematic loaded = LoadOrFail(GUI::SaveSchematic(elements, {}, {}, {}));
+    CHECK(loaded.Warnings.empty());
+    REQUIRE(loaded.Elements.size() == 2);
+    CHECK(loaded.Elements[0]->GetComponent().GetInitialCondition() == 5.0);
+    CHECK(loaded.Elements[1]->GetComponent().GetInitialCondition() == 2e-3);
+
+    // A file saved before initial conditions had no key, so the part has none
+    const std::string old_file = R"({"type": "Capacitor", "x": 1, "y": 1, "rotation": 0, "name": "C1", "value": 1e-6})";
+    const GUI::LoadedSchematic plain = LoadOrFail(Document(old_file, ""));
+    REQUIRE(plain.Elements.size() == 1);
+    CHECK_FALSE(plain.Elements[0]->GetComponent().HasInitialCondition());
+
+    const std::string bad_ic =
+        R"({"type": "Capacitor", "x": 1, "y": 1, "rotation": 0, "name": "C1", "value": 1e-6, "ic": "high"})";
+    const GUI::LoadedSchematic skipped = LoadOrFail(Document(bad_ic, ""));
+    CHECK(skipped.Elements.empty());
+    CHECK(skipped.Warnings.size() == 1);
+}
+
 TEST_CASE("A voltage-controlled switch keeps its parameters, and loads with the defaults when it has none",
           "[schematic_file]") {
     std::vector<std::unique_ptr<GUI::UIElement>> elements;

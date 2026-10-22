@@ -67,6 +67,19 @@ void ValueField::Load(const double value) {
 }
 
 /**
+ * @brief   Replaces the text with a value, or empties it when there is none.
+ * @param[in] value  Value to show, or no value for an unset field.
+ */
+void ValueField::LoadOptional(const std::optional<double> &value) {
+    if (!value) {
+        m_Text.fill('\0');
+        m_Invalid = false;
+        return;
+    }
+    Load(*value);
+}
+
+/**
  * @brief   Makes the next Draw() focus the input, emptied, and type a character into it, as if the user had typed
  *          it there.
  * @param[in] first  Character typed before the field was shown, such as the first digit of a value.
@@ -198,6 +211,50 @@ std::optional<double> ValueField::Draw(const char *label, const std::string &uni
         ImGui::TextColored(GetErrorTextColor(), "Invalid value");
     }
     return edited;
+}
+
+/**
+ * @brief   Draws the same input as Draw() for a value that may be left empty, such as an initial condition.
+ * @param[in] label     Text before the input; it also gives the input its ImGui ID, so it must be unique in the
+ *                      window.
+ * @param[in] unit      Unit shown after the input, which the user may also type after the suffix.
+ * @param[in] is_valid  Tells whether a parsed value is acceptable.
+ * @return  The edit of this frame: Changed tells whether the user edited the field, and Value holds the new value,
+ *          or is empty when the field was cleared. An empty field is not an error; the value is simply not set.
+ */
+OptionalValueEdit ValueField::DrawOptional(const char *label, const std::string &unit,
+                                           const std::function<bool(double)> &is_valid) {
+    DrawFieldLabel(label);
+    ImGui::PushID(label);
+    OptionalValueEdit edit;
+    const std::optional<char> first = FocusInput();
+    const bool changed = DrawInput();
+    if (changed || first) {
+        if (m_Text[0] == '\0') {
+            m_Invalid = false;
+            edit.Changed = true;
+        } else {
+            const std::optional<double> value = Core::ParseValue(m_Text.data(), unit);
+            m_Invalid = !value || !is_valid(*value);
+            if (!m_Invalid) {
+                edit.Value = *value;
+                edit.Changed = true;
+            }
+        }
+    }
+    if (ImGui::IsItemDeactivatedAfterEdit() && !m_Invalid && m_Text[0] != '\0') {
+        // Rewrite the text in canonical form, so "5000" becomes "5k"; an empty field stays empty
+        if (const std::optional<double> value = Core::ParseValue(m_Text.data(), unit)) {
+            Load(*value);
+        }
+    }
+    ImGui::SameLine();
+    ImGui::TextUnformatted(unit.c_str());
+    ImGui::PopID();
+    if (m_Invalid) {
+        ImGui::TextColored(GetErrorTextColor(), "Invalid value");
+    }
+    return edit;
 }
 
 /**
