@@ -78,8 +78,8 @@ New to imcsim? The [tutorial](docs/tutorial.md) builds, simulates and exports a 
 - 29 example circuits sorted by topic, each with its analyses and measurements set up: dividers, RC and RLC
   filters, diode curves, a Zener regulator and a rectifier, BJT and MOSFET switches and characteristics, a current
   mirror, common-emitter and class AB amplifiers, op-amp amplifiers, an integrator, a Schmitt trigger and a Sallen-Key
-  filter, an ideal transformer made of controlled sources, switching circuits, and digital ones: gates, a half
-  adder, an SR latch and a ripple counter
+  filter, an ideal transformer made of controlled sources, switching circuits, and digital ones: gates, a truth
+  table of the basic gates, a half adder, an SR latch and a ripple counter
 
 ## Screenshots
 
