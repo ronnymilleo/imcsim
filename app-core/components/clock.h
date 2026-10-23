@@ -7,6 +7,7 @@
 #define IMCSIM_CLOCK_H
 
 #include "component.h"
+#include <memory>
 
 namespace Core {
 
@@ -35,6 +36,8 @@ class Clock : public Component {
 public:
     Clock();
     ~Clock() override = default;
+
+    std::unique_ptr<Component> Clone() const override;
 
     const ClockParameters &GetParameters() const;
     void SetParameters(const ClockParameters &parameters);

@@ -13,6 +13,7 @@
 #include <array>
 #include <cmath>
 #include <format>
+#include <memory>
 #include <numbers>
 
 namespace Core {
@@ -71,6 +72,14 @@ std::string FormatNumber(const double value) {
 OpAmp::OpAmp()
     : Component(ComponentType::OP_AMP, 0.0), m_Model(MODELS.data()), m_CustomParameters(MODELS.front().Parameters),
       m_IdealBandwidth(DEFAULT_IDEAL_BANDWIDTH) {
+}
+
+/**
+ * @brief   Copies the component with its name, value and settings.
+ * @return  An independent component of the same kind.
+ */
+std::unique_ptr<Component> OpAmp::Clone() const {
+    return std::make_unique<OpAmp>(*this);
 }
 
 /**

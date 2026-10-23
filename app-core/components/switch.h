@@ -7,6 +7,7 @@
 #define IMCSIM_SWITCH_H
 
 #include "component.h"
+#include <memory>
 
 namespace Core {
 
@@ -20,6 +21,8 @@ class Switch : public Component {
 public:
     explicit Switch(ComponentType type);
     ~Switch() override = default;
+
+    std::unique_ptr<Component> Clone() const override;
 
     bool IsClosed() const;
     void SetClosed(bool closed);

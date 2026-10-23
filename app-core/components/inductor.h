@@ -7,6 +7,7 @@
 #define IMCSIM_INDUCTOR_H
 
 #include "component.h"
+#include <memory>
 
 namespace Core {
 
@@ -18,6 +19,8 @@ class Inductor : public Component {
 public:
     Inductor();
     ~Inductor() override = default;
+
+    std::unique_ptr<Component> Clone() const override;
 };
 
 } // namespace Core

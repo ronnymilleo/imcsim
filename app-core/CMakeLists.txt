@@ -7,6 +7,7 @@ add_library(imcsim-core-lib
             analysis_suggestions.cpp
             circuit.cpp
             circuit_checks.cpp
+            circuit_copy.cpp
             components/bjt.cpp
             components/capacitor.cpp
             components/clock.cpp

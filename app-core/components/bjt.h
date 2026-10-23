@@ -7,6 +7,7 @@
 #define IMCSIM_BJT_H
 
 #include "component.h"
+#include <memory>
 #include <span>
 #include <string>
 #include <string_view>
@@ -67,6 +68,9 @@ class BJT : public Component {
 public:
     explicit BJT(ComponentType type);
     ~BJT() override = default;
+
+    // Copying
+    std::unique_ptr<Component> Clone() const override;
 
     // Ready model
     const BJTModel *GetModel() const;

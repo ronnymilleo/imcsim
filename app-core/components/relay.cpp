@@ -4,6 +4,7 @@
  */
 
 #include "relay.h"
+#include <memory>
 
 namespace Core {
 
@@ -17,6 +18,14 @@ constexpr double OPEN_CONTACT_RESISTANCE = 1e9;
  * @brief   Creates a relay for a 5 V coil of 70 Ohm and 50 mH that pulls in at 3.5 V and drops out at 1 V.
  */
 Relay::Relay() : Component(ComponentType::RELAY, 0.0) {
+}
+
+/**
+ * @brief   Copies the component with its name, value and settings.
+ * @return  An independent component of the same kind.
+ */
+std::unique_ptr<Component> Relay::Clone() const {
+    return std::make_unique<Relay>(*this);
 }
 
 /**

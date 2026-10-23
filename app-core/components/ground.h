@@ -7,6 +7,7 @@
 #define IMCSIM_GROUND_H
 
 #include "component.h"
+#include <memory>
 
 namespace Core {
 
@@ -18,6 +19,8 @@ class Ground : public Component {
 public:
     Ground();
     ~Ground() override = default;
+
+    std::unique_ptr<Component> Clone() const override;
 };
 
 } // namespace Core

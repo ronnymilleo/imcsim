@@ -7,6 +7,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <memory>
 #include <utility>
 
 namespace Core {
@@ -26,6 +27,14 @@ bool IsNetCharacter(const char character) {
  * @brief   Creates a label with no name, which joins nothing until it is named.
  */
 NetLabel::NetLabel() : Component(ComponentType::NET_LABEL, 0.0) {
+}
+
+/**
+ * @brief   Copies the component with its name, value and settings.
+ * @return  An independent component of the same kind.
+ */
+std::unique_ptr<Component> NetLabel::Clone() const {
+    return std::make_unique<NetLabel>(*this);
 }
 
 /**

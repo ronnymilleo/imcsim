@@ -4,6 +4,7 @@
  */
 
 #include "logic_input.h"
+#include <memory>
 
 namespace Core {
 
@@ -11,6 +12,14 @@ namespace Core {
  * @brief   Creates a logic input that drives 0 V, with a 5 V logic level.
  */
 LogicInput::LogicInput() : Component(ComponentType::LOGIC_INPUT, 0.0) {
+}
+
+/**
+ * @brief   Copies the component with its name, value and settings.
+ * @return  An independent component of the same kind.
+ */
+std::unique_ptr<Component> LogicInput::Clone() const {
+    return std::make_unique<LogicInput>(*this);
 }
 
 /**

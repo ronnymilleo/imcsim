@@ -8,6 +8,7 @@
 
 #include "component.h"
 #include "voltage_controlled_switch.h"
+#include <memory>
 
 namespace Core {
 
@@ -35,6 +36,8 @@ class Relay : public Component {
 public:
     Relay();
     ~Relay() override = default;
+
+    std::unique_ptr<Component> Clone() const override;
 
     const RelayParameters &GetParameters() const;
     void SetParameters(const RelayParameters &parameters);

@@ -6,6 +6,7 @@
 #include "voltage_controlled_switch.h"
 
 #include <format>
+#include <memory>
 
 namespace Core {
 
@@ -13,6 +14,14 @@ namespace Core {
  * @brief   Creates a switch that closes above 2.5 V, with 0.1 V of hysteresis, 10 mOhm closed and 1 GOhm open.
  */
 VoltageControlledSwitch::VoltageControlledSwitch() : Component(ComponentType::V_SWITCH, 0.0) {
+}
+
+/**
+ * @brief   Copies the component with its name, value and settings.
+ * @return  An independent component of the same kind.
+ */
+std::unique_ptr<Component> VoltageControlledSwitch::Clone() const {
+    return std::make_unique<VoltageControlledSwitch>(*this);
 }
 
 /**

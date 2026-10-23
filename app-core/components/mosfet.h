@@ -7,6 +7,7 @@
 #define IMCSIM_MOSFET_H
 
 #include "component.h"
+#include <memory>
 #include <span>
 #include <string>
 #include <string_view>
@@ -66,6 +67,9 @@ class MOSFET : public Component {
 public:
     explicit MOSFET(ComponentType type);
     ~MOSFET() override = default;
+
+    // Copying
+    std::unique_ptr<Component> Clone() const override;
 
     // Ready model
     const MOSFETModel *GetModel() const;

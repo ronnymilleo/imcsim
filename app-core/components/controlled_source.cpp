@@ -5,6 +5,7 @@
 
 #include "controlled_source.h"
 
+#include <memory>
 #include <utility>
 
 namespace Core {
@@ -68,6 +69,14 @@ double DefaultGain(const ComponentType type) {
  * @param[in] type  VCVS, VCCS, CCCS or CCVS.
  */
 ControlledSource::ControlledSource(const ComponentType type) : Component(type, DefaultGain(type)) {
+}
+
+/**
+ * @brief   Copies the component with its name, value and settings.
+ * @return  An independent component of the same kind.
+ */
+std::unique_ptr<Component> ControlledSource::Clone() const {
+    return std::make_unique<ControlledSource>(*this);
 }
 
 /**

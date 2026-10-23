@@ -7,6 +7,7 @@
 #define IMCSIM_RESISTOR_H
 
 #include "component.h"
+#include <memory>
 
 namespace Core {
 
@@ -18,6 +19,8 @@ class Resistor : public Component {
 public:
     Resistor();
     ~Resistor() override = default;
+
+    std::unique_ptr<Component> Clone() const override;
 };
 
 } // namespace Core

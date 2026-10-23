@@ -4,6 +4,7 @@
  */
 
 #include "transformer.h"
+#include <memory>
 
 namespace Core {
 
@@ -17,6 +18,14 @@ constexpr double DEFAULT_PRIMARY_INDUCTANCE = 100e-3;
  * @brief   Creates a 1:1 transformer with a primary of 100 mH, a coupling of 0.999 and windings of 0.1 Ohm.
  */
 Transformer::Transformer() : Component(ComponentType::TRANSFORMER, DEFAULT_PRIMARY_INDUCTANCE) {
+}
+
+/**
+ * @brief   Copies the component with its name, value and settings.
+ * @return  An independent component of the same kind.
+ */
+std::unique_ptr<Component> Transformer::Clone() const {
+    return std::make_unique<Transformer>(*this);
 }
 
 /**

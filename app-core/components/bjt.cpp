@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <array>
 #include <format>
+#include <memory>
 
 namespace Core {
 
@@ -141,6 +142,14 @@ constexpr auto BJT_MODELS = std::to_array<BJTModel>({
  */
 BJT::BJT(const ComponentType type)
     : Component(type, 0.0), m_Model(GetBJTModels(type).data()), m_CustomParameters(m_Model->Parameters) {
+}
+
+/**
+ * @brief   Copies the component with its name, value and settings.
+ * @return  An independent component of the same kind.
+ */
+std::unique_ptr<Component> BJT::Clone() const {
+    return std::make_unique<BJT>(*this);
 }
 
 /**

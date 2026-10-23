@@ -4,6 +4,7 @@
  */
 
 #include "switch.h"
+#include <memory>
 
 namespace Core {
 
@@ -12,6 +13,14 @@ namespace Core {
  * @param[in] type  ComponentType::Switch or ComponentType::PushButton.
  */
 Switch::Switch(const ComponentType type) : Component(type, 0.0) {
+}
+
+/**
+ * @brief   Copies the component with its name, value and settings.
+ * @return  An independent component of the same kind.
+ */
+std::unique_ptr<Component> Switch::Clone() const {
+    return std::make_unique<Switch>(*this);
 }
 
 /**
