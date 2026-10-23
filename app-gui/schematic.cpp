@@ -532,6 +532,14 @@ Core::Circuit Schematic::BuildCircuit() {
 }
 
 /**
+ * @brief   Returns a number that changes whenever the circuit does.
+ * @return  A count of the edits that drop the results; it differs from an earlier value once the circuit was edited.
+ */
+std::size_t Schematic::GetCircuitVersion() const {
+    return m_CircuitVersion;
+}
+
+/**
  * @brief   Builds the SPICE netlist of the schematic.
  * @return  The netlist text, without analysis commands.
  */
@@ -792,6 +800,7 @@ std::size_t Schematic::GetTruthTableVersion() const {
 }
 
 void Schematic::InvalidateDerivedData() {
+    ++m_CircuitVersion;
     m_Connectivity.reset();
     m_OperatingPoint.reset();
     m_Transient.reset();

@@ -114,27 +114,26 @@ std::string_view NgspiceBackend::GetName() const {
 /**
  * @brief   Tells what ngspice can run.
  * @return  Every analysis, and the logic parts only when ngspice has loaded the digital code models (digital.cm).
- * @note    The first call starts ngspice, since the digital models are known only then.
+ * @note    The first call starts ngspice, since the digital models are known only then; it may come from any thread,
+ *          and the others wait for it.
  */
 const BackendCapabilities &NgspiceBackend::GetCapabilities() const {
-    if (!m_Capabilities) {
-        BackendCapabilities capabilities{.Analyses = {AnalysisKind::OPERATING_POINT, AnalysisKind::TRANSIENT,
-                                                      AnalysisKind::AC_SWEEP, AnalysisKind::DC_SWEEP,
-                                                      AnalysisKind::NOISE, AnalysisKind::TRANSFER_FUNCTION},
-                                         .UnsupportedParts = {}};
+    std::call_once(m_CapabilitiesReady, [this] {
+        m_Capabilities = {.Analyses = {AnalysisKind::OPERATING_POINT, AnalysisKind::TRANSIENT, AnalysisKind::AC_SWEEP,
+                                       AnalysisKind::DC_SWEEP, AnalysisKind::NOISE, AnalysisKind::TRANSFER_FUNCTION},
+                          .UnsupportedParts = {}};
         if (!AreDigitalModelsAvailable()) {
             // The parts are told apart by type, from the first to the last of the enumeration
             for (int index = 0; index <= static_cast<int>(ComponentType::LOGIC_INPUT); ++index) {
                 const auto type = static_cast<ComponentType>(index);
                 if (IsLogicPart(type)) {
-                    capabilities.UnsupportedParts[type] =
+                    m_Capabilities.UnsupportedParts[type] =
                         "This ngspice has no digital models (digital.cm), which the logic gates and flip-flops need";
                 }
             }
         }
-        m_Capabilities = std::move(capabilities);
-    }
-    return *m_Capabilities;
+    });
+    return m_Capabilities;
 }
 
 /**

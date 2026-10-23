@@ -6,8 +6,11 @@ add_subdirectory(${PROJECT_SOURCE_DIR}/vendor/Catch2 ${CMAKE_BINARY_DIR}/vendor/
 list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/vendor/Catch2/extras)
 
 add_executable(imcsim-tests
+            analysis_controls_tests.cpp
+            analysis_inputs_tests.cpp
             analysis_suggestions_tests.cpp
             circuit_checks_tests.cpp
+            circuit_copy_tests.cpp
             circuit_snapshot_tests.cpp
             clipboard_tests.cpp
             code_models.cpp
@@ -32,6 +35,7 @@ add_executable(imcsim-tests
             schematic_tests.cpp
             selection_tests.cpp
             simulation_backend_tests.cpp
+            simulation_service_tests.cpp
             simulator_tests.cpp
             spectrum_tests.cpp
             spice_value_tests.cpp

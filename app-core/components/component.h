@@ -6,6 +6,7 @@
 #ifndef IMCSIM_COMPONENT_H
 #define IMCSIM_COMPONENT_H
 
+#include <memory>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -77,6 +78,9 @@ class Component {
 public:
     Component(ComponentType type, double value);
     virtual ~Component() = default;
+
+    // Copying
+    virtual std::unique_ptr<Component> Clone() const = 0;
 
     // Kind of component
     ComponentType GetType() const;

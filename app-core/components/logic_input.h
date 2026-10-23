@@ -7,6 +7,7 @@
 #define IMCSIM_LOGIC_INPUT_H
 
 #include "component.h"
+#include <memory>
 
 namespace Core {
 
@@ -28,6 +29,8 @@ class LogicInput : public Component {
 public:
     LogicInput();
     ~LogicInput() override = default;
+
+    std::unique_ptr<Component> Clone() const override;
 
     const LogicInputParameters &GetParameters() const;
     void SetParameters(const LogicInputParameters &parameters);

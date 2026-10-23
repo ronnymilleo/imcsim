@@ -4,6 +4,7 @@
  */
 
 #include "potentiometer.h"
+#include <memory>
 
 namespace Core {
 
@@ -18,6 +19,14 @@ constexpr double DEFAULT_WIPER = 0.5;
  * @brief   Creates a potentiometer of 10 kOhm with its wiper in the middle.
  */
 Potentiometer::Potentiometer() : Component(ComponentType::POTENTIOMETER, DEFAULT_RESISTANCE), m_Wiper(DEFAULT_WIPER) {
+}
+
+/**
+ * @brief   Copies the component with its name, value and settings.
+ * @return  An independent component of the same kind.
+ */
+std::unique_ptr<Component> Potentiometer::Clone() const {
+    return std::make_unique<Potentiometer>(*this);
 }
 
 /**

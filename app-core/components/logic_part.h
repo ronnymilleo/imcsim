@@ -7,6 +7,7 @@
 #define IMCSIM_LOGIC_PART_H
 
 #include "component.h"
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -44,6 +45,8 @@ class LogicPart : public Component {
 public:
     explicit LogicPart(ComponentType type);
     ~LogicPart() override = default;
+
+    std::unique_ptr<Component> Clone() const override;
 
     const LogicParameters &GetParameters() const;
     void SetParameters(const LogicParameters &parameters);

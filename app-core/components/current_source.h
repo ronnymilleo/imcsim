@@ -7,6 +7,7 @@
 #define IMCSIM_CURRENT_SOURCE_H
 
 #include "source.h"
+#include <memory>
 
 namespace Core {
 
@@ -20,6 +21,8 @@ class CurrentSource : public Source {
 public:
     CurrentSource();
     ~CurrentSource() override = default;
+
+    std::unique_ptr<Component> Clone() const override;
 };
 
 } // namespace Core

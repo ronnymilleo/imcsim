@@ -4,6 +4,7 @@
  */
 
 #include "current_source.h"
+#include <memory>
 
 namespace Core {
 
@@ -21,6 +22,14 @@ constexpr double DEFAULT_PULSE_HIGH = 1e-3;
  */
 CurrentSource::CurrentSource()
     : Source(ComponentType::CURRENT_SOURCE, DEFAULT_CURRENT, DEFAULT_AMPLITUDE, DEFAULT_PULSE_HIGH) {
+}
+
+/**
+ * @brief   Copies the component with its name, value and settings.
+ * @return  An independent component of the same kind.
+ */
+std::unique_ptr<Component> CurrentSource::Clone() const {
+    return std::make_unique<CurrentSource>(*this);
 }
 
 } // namespace Core

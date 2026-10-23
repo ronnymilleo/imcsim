@@ -106,6 +106,7 @@ public:
     // Derived data
     const Connectivity &GetConnectivity();
     Core::Circuit BuildCircuit();
+    std::size_t GetCircuitVersion() const;
     std::string BuildSpiceNetlist();
     void SetOperatingPoint(std::optional<Core::OperatingPoint> operating_point);
     const std::optional<Core::OperatingPoint> &GetOperatingPoint() const;
@@ -165,6 +166,8 @@ private:
     // such as by opening a file or undoing, so the window knows to reload its fields
     SimulationSettings m_SimulationSettings;
     std::size_t m_SimulationSettingsVersion = 0;
+    // Counts the edits that drop the results, so a run that started before one knows its answer is stale
+    std::size_t m_CircuitVersion = 0;
 
     // Document state
     bool m_Modified = false;

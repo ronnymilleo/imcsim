@@ -7,6 +7,7 @@
 #define IMCSIM_POTENTIOMETER_H
 
 #include "component.h"
+#include <memory>
 
 namespace Core {
 
@@ -20,6 +21,8 @@ class Potentiometer : public Component {
 public:
     Potentiometer();
     ~Potentiometer() override = default;
+
+    std::unique_ptr<Component> Clone() const override;
 
     double GetWiper() const;
     void SetWiper(double position);

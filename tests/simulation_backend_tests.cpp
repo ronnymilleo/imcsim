@@ -12,6 +12,7 @@
 #include "components/voltage_source.h"
 #include "ngspice_backend.h"
 #include "ngspice_library.h"
+#include "run_control.h"
 #include "simulator.h"
 #include <catch2/catch_test_macros.hpp>
 #include <memory>
@@ -248,6 +249,32 @@ TEST_CASE("The truth table asks the backend for one operating point per combinat
     CHECK(run.Result->Rows[1].OutputVoltages == std::vector<double>{0.0});
     CHECK(run.Result->Rows[2].OutputVoltages == std::vector<double>{HIGH_LEVEL});
     CHECK(run.Result->Rows[3].OutputVoltages == std::vector<double>{HIGH_LEVEL});
+}
+
+TEST_CASE("The truth table reports its progress and stops between combinations when asked", "[simulation_backend]") {
+    BackendInUse backend(AllAnalysesWithoutLogicParts());
+    Core::LogicInput input;
+    input.SetName("V1");
+    Core::Resistor load;
+    load.SetName("R1");
+    Core::Ground ground;
+    Core::Circuit circuit;
+    circuit.Add(input, {1});
+    circuit.Add(load, {2, 0});
+    circuit.Add(ground, {0});
+    const Core::TruthTableSettings settings{.Inputs = {"V1"}, .OutputNodes = {2}};
+
+    Core::RunControl control;
+    CHECK(Core::RunTruthTable(circuit, settings, &control).Result.has_value());
+    // The last combination starts at half of the way, as the table has two
+    CHECK(control.GetProgress() == 0.5);
+    CHECK((*backend).OperatingPointRuns == 2);
+
+    control.Cancel();
+    const Core::TruthTableRun stopped = Core::RunTruthTable(circuit, settings, &control);
+    REQUIRE_FALSE(stopped.Result.has_value());
+    CHECK(stopped.Result.error() == "Stopped");
+    CHECK((*backend).OperatingPointRuns == 2);
 }
 
 TEST_CASE("ngspice is the backend until another one is set, and runs every analysis", "[simulation_backend]") {

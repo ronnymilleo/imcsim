@@ -7,6 +7,7 @@
 #define IMCSIM_DIODE_H
 
 #include "component.h"
+#include <memory>
 #include <span>
 #include <string>
 #include <string_view>
@@ -69,6 +70,9 @@ class Diode : public Component {
 public:
     explicit Diode(ComponentType type);
     ~Diode() override = default;
+
+    // Copying
+    std::unique_ptr<Component> Clone() const override;
 
     // Ready model
     const DiodeModel *GetModel() const;
