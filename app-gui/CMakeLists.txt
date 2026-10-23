@@ -32,6 +32,7 @@ add_library(imcsim-gui-lib
             plot_exporter.cpp
             plot_figures.cpp
             plot_helpers.cpp
+            point_window.cpp
             probing.cpp
             schematic.cpp
             schematic_canvas.cpp

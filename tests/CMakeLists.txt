@@ -29,6 +29,7 @@ add_executable(imcsim-tests
             playback_tests.cpp
             plot_export_tests.cpp
             plot_helpers_tests.cpp
+            point_window_tests.cpp
             probing_tests.cpp
             schematic_canvas_tests.cpp
             schematic_file_tests.cpp
