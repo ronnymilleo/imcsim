@@ -21,6 +21,7 @@
 #include "components/voltage_controlled_switch.h"
 #include "spice_value.h"
 #include <algorithm>
+#include <array>
 #include <format>
 #include <iterator>
 #include <utility>
@@ -591,6 +592,58 @@ std::string GetCurrentName(const Component &component, const std::string_view la
         return component.GetName();
     }
     return std::format("{}.{}", component.GetName(), label);
+}
+
+/**
+ * @brief   Tells whether a part with no probes reports one current, through its two terminals.
+ * @param[in] type  Type of the part.
+ * @return  True for resistors, capacitors, inductors and every source; false for ground, net labels and the parts that
+ *          report their currents through probes or not at all, such as the logic parts.
+ */
+bool HasSingleCurrent(const ComponentType type) {
+    static constexpr std::array SINGLE_CURRENT_TYPES = {
+        ComponentType::RESISTOR,    ComponentType::CAPACITOR,      ComponentType::INDUCTOR,
+        ComponentType::VCC,         ComponentType::VOLTAGE_SOURCE, ComponentType::CLOCK,
+        ComponentType::LOGIC_INPUT, ComponentType::CURRENT_SOURCE,
+    };
+    return std::ranges::contains(SINGLE_CURRENT_TYPES, type);
+}
+
+/**
+ * @brief   Lists the currents a component reports in simulation results, in the order they appear.
+ * @param[in] component  Any component.
+ * @return  The component name for a two-terminal part or a supply, one name per terminal for a transistor
+ *          (such as "Q1.C"), and nothing for ground.
+ */
+std::vector<std::string> GetCurrentNames(const Component &component) {
+    std::vector<std::string> names;
+    const std::vector<CurrentProbe> probes = GetCurrentProbes(component);
+    for (const CurrentProbe &probe : probes) {
+        names.push_back(GetCurrentName(component, probe.Label));
+    }
+    if (probes.empty() && HasSingleCurrent(component.GetType())) {
+        names.push_back(component.GetName());
+    }
+    return names;
+}
+
+/**
+ * @brief   Tells which terminal each current of GetCurrentNames() flows into.
+ * @param[in] component  Any component.
+ * @return  One terminal index per current, in the same order: the probed terminal for a part with probes, and the
+ *          first terminal for a part whose single current enters there and leaves by the second.
+ */
+std::vector<std::size_t> GetCurrentTerminals(const Component &component) {
+    std::vector<std::size_t> terminals;
+    const std::vector<CurrentProbe> probes = GetCurrentProbes(component);
+    if (probes.empty()) {
+        terminals.assign(GetCurrentNames(component).size(), 0);
+        return terminals;
+    }
+    for (const CurrentProbe &probe : probes) {
+        terminals.push_back(static_cast<std::size_t>(probe.Terminal));
+    }
+    return terminals;
 }
 
 /**

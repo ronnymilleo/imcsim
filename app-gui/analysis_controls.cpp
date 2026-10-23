@@ -9,12 +9,15 @@
 #include "imgui.h"
 #include "misc/cpp/imgui_stdlib.h"
 #include "probing.h"
+#include "simulation_backend.h"
 #include "spice_value.h"
 #include "theme.h"
 #include <algorithm>
 #include <expected>
 #include <format>
 #include <iterator>
+#include <memory>
+#include <set>
 #include <utility>
 
 namespace GUI {
@@ -38,6 +41,35 @@ bool IsNonZero(const double value) {
 
 std::size_t ToIndex(const Analysis analysis) {
     return static_cast<std::size_t>(analysis);
+}
+
+Core::AnalysisKind ToKind(const Analysis analysis) {
+    switch (analysis) {
+    case Analysis::OPERATING_POINT:
+        return Core::AnalysisKind::OPERATING_POINT;
+    case Analysis::TRANSIENT:
+        return Core::AnalysisKind::TRANSIENT;
+    case Analysis::AC_SWEEP:
+        return Core::AnalysisKind::AC_SWEEP;
+    case Analysis::DC_SWEEP:
+        return Core::AnalysisKind::DC_SWEEP;
+    case Analysis::NOISE:
+        return Core::AnalysisKind::NOISE;
+    case Analysis::TRANSFER_FUNCTION:
+        return Core::AnalysisKind::TRANSFER_FUNCTION;
+    case Analysis::TRUTH_TABLE:
+        return Core::AnalysisKind::TRUTH_TABLE;
+    default:
+        return Core::AnalysisKind::OPERATING_POINT;
+    }
+}
+
+std::set<Core::ComponentType> ListPartTypes(const Schematic &schematic) {
+    std::set<Core::ComponentType> types;
+    for (const std::unique_ptr<UIElement> &element : schematic.GetElements()) {
+        types.insert(element->GetComponent().GetType());
+    }
+    return types;
 }
 
 /**
@@ -296,12 +328,21 @@ AnalysisControls::AnalysisControls(Schematic &schematic) : m_Schematic(schematic
 
 /**
  * @brief   Draws one radio button per analysis, in a column, which picks the one Run starts.
+ * @note    An analysis the simulation backend cannot run on the circuit is disabled, with the reason as its tooltip.
  */
 void AnalysisControls::DrawAnalysisPicker() {
     SimulationSettings settings = m_Schematic.GetSimulationSettings();
+    const std::set<Core::ComponentType> parts = ListPartTypes(m_Schematic);
     for (std::size_t index = 0; index < ANALYSIS_NAMES.size(); ++index) {
+        const std::optional<std::string> unsupported =
+            Core::FindUnsupported(Core::GetBackend(), parts, ToKind(static_cast<Analysis>(index)));
+        ImGui::BeginDisabled(unsupported.has_value());
         if (ImGui::RadioButton(ANALYSIS_NAMES[index], ToIndex(settings.Selected) == index)) {
             settings.Selected = static_cast<Analysis>(index);
+        }
+        ImGui::EndDisabled();
+        if (unsupported) {
+            ImGui::SetItemTooltip("%s", unsupported->c_str());
         }
     }
     m_Schematic.SetSimulationSettings(settings);

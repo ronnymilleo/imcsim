@@ -8,6 +8,7 @@
 #include "components/switch.h"
 #include "digital_models.h"
 #include "examples.h"
+#include "ngspice_library.h"
 #include "schematic.h"
 #include "simulator.h"
 #include "test_printers.h"

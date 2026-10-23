@@ -30,7 +30,12 @@ add_library(imcsim-core-lib
             components/vcc.cpp
             components/voltage_controlled_switch.cpp
             components/voltage_source.cpp
+            ngspice_backend.cpp
+            ngspice_library.cpp
+            ngspice_readers.cpp
             ratings.cpp
+            simulation_backend.cpp
+            simulation_results.cpp
             simulator.cpp
             spice_value.cpp
             standard_values.cpp
