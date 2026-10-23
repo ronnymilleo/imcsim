@@ -130,22 +130,45 @@ HeatScale ScaleOf(const Core::OperatingPoint &operating_point, const std::vector
  * @param[in] transient     Result of a transient simulation.
  * @param[in] elements      Parts of the schematic, for their powers.
  * @param[in] connectivity  Nodes of the schematic.
- * @return  The lowest and highest node voltage, and the largest current and power in absolute value, over all the
- *          samples; an empty scale for a transient without samples.
+ * @return  The lowest and highest node voltage, and the largest current in absolute value, over all the samples; and
+ *          the largest power in absolute value over all of them too, up to MAX_POWER_SAMPLES of them, and over that
+ * many evenly spread samples, the last one included, in a longer transient. An empty scale for a transient without
+ *          samples.
  */
 HeatScale ScaleOf(const Core::Transient &transient, const std::vector<std::unique_ptr<UIElement>> &elements,
                   const Connectivity &connectivity) {
     HeatScale scale;
-    for (std::size_t index = 0; index < transient.Times.size(); ++index) {
-        const HeatScale sample = ScaleOf(SampleTransient(transient, transient.Times[index]), elements, connectivity);
-        if (index == 0) {
-            scale = sample;
+    if (transient.Times.empty()) {
+        return scale;
+    }
+    bool has_voltage = false;
+    for (const std::vector<double> &voltages : transient.NodeVoltages) {
+        if (voltages.empty()) {
             continue;
         }
-        scale.LowestVoltage = std::min(scale.LowestVoltage, sample.LowestVoltage);
-        scale.HighestVoltage = std::max(scale.HighestVoltage, sample.HighestVoltage);
-        scale.LargestCurrent = std::max(scale.LargestCurrent, sample.LargestCurrent);
-        scale.LargestPower = std::max(scale.LargestPower, sample.LargestPower);
+        const auto [lowest, highest] = std::ranges::minmax(voltages);
+        scale.LowestVoltage = has_voltage ? std::min(scale.LowestVoltage, lowest) : lowest;
+        scale.HighestVoltage = has_voltage ? std::max(scale.HighestVoltage, highest) : highest;
+        has_voltage = true;
+    }
+    for (const Core::ComponentTrace &current : transient.Currents) {
+        for (const double value : current.Values) {
+            scale.LargestCurrent = std::max(scale.LargestCurrent, std::abs(value));
+        }
+    }
+    const std::size_t count = transient.Times.size();
+    const std::size_t stride = (count + MAX_POWER_SAMPLES - 1) / MAX_POWER_SAMPLES;
+    for (std::size_t index = 0; index < count; index += stride) {
+        for (const ComponentPower &power :
+             ComputePowers(elements, connectivity, SampleTransient(transient, transient.Times[index]))) {
+            scale.LargestPower = std::max(scale.LargestPower, std::abs(power.Power));
+        }
+    }
+    if ((count - 1) % stride != 0) {
+        for (const ComponentPower &power :
+             ComputePowers(elements, connectivity, SampleTransient(transient, transient.Times.back()))) {
+            scale.LargestPower = std::max(scale.LargestPower, std::abs(power.Power));
+        }
     }
     return scale;
 }
