@@ -10,6 +10,7 @@
 #include "circuit.h"
 #include "circuit_checks.h"
 #include "run_control.h"
+#include "simulation_backend.h"
 #include "simulation_results.h"
 #include "stepped_circuit.h"
 #include <optional>
@@ -18,7 +19,8 @@ namespace Core {
 
 OperatingPointRun RunOperatingPoint(const Circuit &circuit);
 TransientRun RunTransient(const Circuit &circuit, const TransientSettings &settings,
-                          const std::optional<ParameterValue> &parameter = std::nullopt);
+                          const std::optional<ParameterValue> &parameter = std::nullopt,
+                          const RunMonitor &monitor = {});
 ACSweepRun RunACSweep(const Circuit &circuit, const ACSweepSettings &settings,
                       const std::optional<ParameterValue> &parameter = std::nullopt);
 DCSweepRun RunDCSweep(const Circuit &circuit, const DCSweepSettings &settings,

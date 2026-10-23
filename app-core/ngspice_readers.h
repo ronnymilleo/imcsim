@@ -9,13 +9,17 @@
 #include "analysis_settings.h"
 #include "circuit.h"
 #include "simulation_results.h"
+#include <cstddef>
 #include <expected>
+#include <optional>
 #include <string>
 
 namespace Core {
 
 std::expected<OperatingPoint, std::string> ReadOperatingPoint(const Circuit &circuit);
 std::expected<Transient, std::string> ReadTransient(const Circuit &circuit);
+std::expected<Transient, std::string> ReadTransientPoints(const Circuit &circuit, std::size_t first_point);
+std::optional<double> ReadTransientTime();
 std::expected<ACSweep, std::string> ReadACSweep(const Circuit &circuit);
 std::expected<DCSweep, std::string> ReadDCSweep(const Circuit &circuit, const DCSweepSettings &settings);
 std::expected<Noise, std::string> ReadNoise(const Circuit &circuit, const NoiseSettings &settings);

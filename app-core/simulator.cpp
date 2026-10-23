@@ -138,15 +138,18 @@ OperatingPointRun RunOperatingPoint(const Circuit &circuit) {
  * @param[in] settings  Stop time and time step.
  * @param[in] parameter Value of the stepped parameter for this run, a part value or the temperature; none runs the
  *                      circuit as it is.
+ * @param[in] monitor   Where the run looks for a stop request, reports its progress and hands over the points made so
+ *                      far; the default runs it in one piece.
  * @return  The voltages at every time point or an error, plus every line ngspice printed. Invalid settings
- *          are rejected before reaching the backend.
+ *          are rejected before reaching the backend. A run that was stopped returns the points made until then, with
+ *          IsComplete false.
  * @note    A circuit with an initial condition runs with uic, so it starts from those values instead of the operating
  *          point, with a warning in the result; the same holds for logic parts that never settle into an operating
  *          point, such as a latch with both inputs idle, which start from 0 V. Not thread-safe: ngspice is a single
  *          global library instance.
  */
 TransientRun RunTransient(const Circuit &circuit, const TransientSettings &settings,
-                          const std::optional<ParameterValue> &parameter) {
+                          const std::optional<ParameterValue> &parameter, const RunMonitor &monitor) {
     if (const std::optional<std::string> error =
             FindProblem(circuit, CheckTransientSettings(settings), AnalysisKind::TRANSIENT)) {
         return {std::unexpected(*error), {}};
@@ -155,7 +158,7 @@ TransientRun RunTransient(const Circuit &circuit, const TransientSettings &setti
     if (!applied) {
         return {std::unexpected(applied.error()), {}};
     }
-    return GetBackend().RunTransient(applied->Simulated, settings, applied->Temperature);
+    return GetBackend().RunTransient(applied->Simulated, settings, applied->Temperature, monitor);
 }
 
 /**
