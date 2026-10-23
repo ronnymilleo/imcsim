@@ -125,70 +125,107 @@ enum class ToolIcon {
     FIT
 };
 
+/**
+ * @struct  IconPlacement
+ * @brief   Where and how large a toolbar icon is drawn, and the points of its unit square in screen space.
+ */
+struct IconPlacement {
+    ImDrawList *DrawList;
+    ImVec2 Center;
+    float Size;
+    ImU32 Color;
+    // -1 mirrors the icon horizontally, for Redo
+    float Flip;
+
+    ImVec2 Point(const float x, const float y) const { return Center + ImVec2(x * Flip, y) * Size; }
+};
+
+void DrawSelectIcon(const IconPlacement &icon) {
+    const std::array<ImVec2, 7> arrow = {icon.Point(-0.3f, -0.45f), icon.Point(-0.3f, 0.3f),  icon.Point(-0.12f, 0.13f),
+                                         icon.Point(0.02f, 0.43f),  icon.Point(0.14f, 0.37f), icon.Point(0.0f, 0.08f),
+                                         icon.Point(0.22f, 0.08f)};
+    icon.DrawList->AddPolyline(arrow.data(), static_cast<int>(arrow.size()), icon.Color, ImDrawFlags_Closed,
+                               LINE_THICKNESS);
+}
+
+void DrawWireIcon(const IconPlacement &icon) {
+    const std::array<ImVec2, 4> wire = {icon.Point(-0.4f, 0.3f), icon.Point(0.0f, 0.3f), icon.Point(0.0f, -0.3f),
+                                        icon.Point(0.4f, -0.3f)};
+    icon.DrawList->AddPolyline(wire.data(), static_cast<int>(wire.size()), icon.Color, ImDrawFlags_None,
+                               LINE_THICKNESS);
+    icon.DrawList->AddCircleFilled(wire.front(), icon.Size * 0.08f, icon.Color);
+    icon.DrawList->AddCircleFilled(wire.back(), icon.Size * 0.08f, icon.Color);
+}
+
+void DrawProbeIcon(const IconPlacement &icon) {
+    icon.DrawList->AddLine(icon.Point(-0.45f, 0.45f), icon.Point(-0.12f, 0.12f), icon.Color, LINE_THICKNESS);
+    icon.DrawList->AddLine(icon.Point(-0.12f, 0.12f), icon.Point(0.3f, -0.3f), icon.Color, icon.Size * 0.22f);
+    icon.DrawList->AddLine(icon.Point(0.3f, -0.3f), icon.Point(0.45f, -0.45f), icon.Color, LINE_THICKNESS);
+}
+
+// Four corners of a frame
+void DrawFitIcon(const IconPlacement &icon) {
+    constexpr float CORNER = 0.4f;
+    constexpr float ARM = 0.18f;
+    for (const float x : {-CORNER, CORNER}) {
+        for (const float y : {-CORNER, CORNER}) {
+            const float inward_x = x < 0.0f ? ARM : -ARM;
+            const float inward_y = y < 0.0f ? ARM : -ARM;
+            const std::array<ImVec2, 3> corner = {icon.Point(x + inward_x, y), icon.Point(x, y),
+                                                  icon.Point(x, y + inward_y)};
+            icon.DrawList->AddPolyline(corner.data(), static_cast<int>(corner.size()), icon.Color, ImDrawFlags_None,
+                                       LINE_THICKNESS);
+        }
+    }
+}
+
+// An arc over the top that turns back, with the arrowhead at its left end, mirrored for Redo
+void DrawUndoIcon(const IconPlacement &icon) {
+    const float radius = 0.28f;
+    const ImVec2 middle = {0.05f, 0.05f};
+    for (int step = 0; step <= 12; ++step) {
+        const float angle = std::numbers::pi_v<float> * (1.0f + static_cast<float>(step) / 12.0f);
+        icon.DrawList->PathLineTo(icon.Point(middle.x + radius * std::cos(angle), middle.y + radius * std::sin(angle)));
+    }
+    icon.DrawList->PathLineTo(icon.Point(middle.x + radius, middle.y + 0.25f));
+    icon.DrawList->PathStroke(icon.Color, ImDrawFlags_None, LINE_THICKNESS);
+    icon.DrawList->AddTriangleFilled(icon.Point(middle.x - radius, middle.y + 0.22f),
+                                     icon.Point(middle.x - radius - 0.14f, middle.y - 0.02f),
+                                     icon.Point(middle.x - radius + 0.14f, middle.y - 0.02f), icon.Color);
+}
+
 // Line drawings on a unit square centered on the icon, y pointing down
 void DrawToolIcon(ImDrawList *draw_list, const ToolIcon icon, const ImVec2 center, const float size,
                   const ImU32 color) {
-    const float flip = icon == ToolIcon::REDO ? -1.0f : 1.0f;
-    const auto point = [&](const float x, const float y) { return center + ImVec2(x * flip, y) * size; };
+    const IconPlacement placement{.DrawList = draw_list,
+                                  .Center = center,
+                                  .Size = size,
+                                  .Color = color,
+                                  .Flip = icon == ToolIcon::REDO ? -1.0f : 1.0f};
     switch (icon) {
-    case ToolIcon::RUN: {
-        draw_list->AddTriangleFilled(point(-0.25f, -0.35f), point(0.35f, 0.0f), point(-0.25f, 0.35f), color);
+    case ToolIcon::RUN:
+        draw_list->AddTriangleFilled(placement.Point(-0.25f, -0.35f), placement.Point(0.35f, 0.0f),
+                                     placement.Point(-0.25f, 0.35f), color);
         break;
-    }
     case ToolIcon::STOP:
-        draw_list->AddRectFilled(point(-0.28f, -0.28f), point(0.28f, 0.28f), color);
+        draw_list->AddRectFilled(placement.Point(-0.28f, -0.28f), placement.Point(0.28f, 0.28f), color);
         break;
-    case ToolIcon::SELECT: {
-        const std::array<ImVec2, 7> arrow = {point(-0.3f, -0.45f), point(-0.3f, 0.3f),  point(-0.12f, 0.13f),
-                                             point(0.02f, 0.43f),  point(0.14f, 0.37f), point(0.0f, 0.08f),
-                                             point(0.22f, 0.08f)};
-        draw_list->AddPolyline(arrow.data(), static_cast<int>(arrow.size()), color, ImDrawFlags_Closed, LINE_THICKNESS);
+    case ToolIcon::SELECT:
+        DrawSelectIcon(placement);
         break;
-    }
-    case ToolIcon::WIRE: {
-        const std::array<ImVec2, 4> wire = {point(-0.4f, 0.3f), point(0.0f, 0.3f), point(0.0f, -0.3f),
-                                            point(0.4f, -0.3f)};
-        draw_list->AddPolyline(wire.data(), static_cast<int>(wire.size()), color, ImDrawFlags_None, LINE_THICKNESS);
-        draw_list->AddCircleFilled(wire.front(), size * 0.08f, color);
-        draw_list->AddCircleFilled(wire.back(), size * 0.08f, color);
+    case ToolIcon::WIRE:
+        DrawWireIcon(placement);
         break;
-    }
     case ToolIcon::PROBE:
-        draw_list->AddLine(point(-0.45f, 0.45f), point(-0.12f, 0.12f), color, LINE_THICKNESS);
-        draw_list->AddLine(point(-0.12f, 0.12f), point(0.3f, -0.3f), color, size * 0.22f);
-        draw_list->AddLine(point(0.3f, -0.3f), point(0.45f, -0.45f), color, LINE_THICKNESS);
+        DrawProbeIcon(placement);
         break;
-    case ToolIcon::FIT: {
-        // Four corners of a frame
-        constexpr float CORNER = 0.4f;
-        constexpr float ARM = 0.18f;
-        for (const float x : {-CORNER, CORNER}) {
-            for (const float y : {-CORNER, CORNER}) {
-                const float inward_x = x < 0.0f ? ARM : -ARM;
-                const float inward_y = y < 0.0f ? ARM : -ARM;
-                const std::array<ImVec2, 3> corner = {point(x + inward_x, y), point(x, y), point(x, y + inward_y)};
-                draw_list->AddPolyline(corner.data(), static_cast<int>(corner.size()), color, ImDrawFlags_None,
-                                       LINE_THICKNESS);
-            }
-        }
+    case ToolIcon::FIT:
+        DrawFitIcon(placement);
         break;
-    }
     case ToolIcon::UNDO:
-    case ToolIcon::REDO: {
-        // An arc over the top that turns back, with the arrowhead at its left end, mirrored for Redo
-        const float radius = 0.28f;
-        const ImVec2 middle = {0.05f, 0.05f};
-        for (int step = 0; step <= 12; ++step) {
-            const float angle = std::numbers::pi_v<float> * (1.0f + static_cast<float>(step) / 12.0f);
-            draw_list->PathLineTo(point(middle.x + radius * std::cos(angle), middle.y + radius * std::sin(angle)));
-        }
-        draw_list->PathLineTo(point(middle.x + radius, middle.y + 0.25f));
-        draw_list->PathStroke(color, ImDrawFlags_None, LINE_THICKNESS);
-        draw_list->AddTriangleFilled(point(middle.x - radius, middle.y + 0.22f),
-                                     point(middle.x - radius - 0.14f, middle.y - 0.02f),
-                                     point(middle.x - radius + 0.14f, middle.y - 0.02f), color);
+    case ToolIcon::REDO:
+        DrawUndoIcon(placement);
         break;
-    }
     }
 }
 
