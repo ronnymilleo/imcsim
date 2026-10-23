@@ -11,6 +11,7 @@
 #include <algorithm>
 #include <catch2/catch_test_macros.hpp>
 #include <chrono>
+#include <string>
 #include <thread>
 
 namespace {
@@ -56,6 +57,12 @@ bool UpdateUntilIdle(GUI::AnalysisControls &controls) {
         std::this_thread::sleep_for(1ms);
     }
     return false;
+}
+
+// Runs the selected analysis and takes its result in, as the frame loop does
+void RunAndWait(GUI::AnalysisControls &controls) {
+    controls.RunSelected();
+    REQUIRE(UpdateUntilIdle(controls));
 }
 
 } // namespace
@@ -138,4 +145,95 @@ TEST_CASE("A stepped run reports its progress and delivers one transient per val
     REQUIRE(UpdateUntilIdle(controls));
     REQUIRE(schematic.GetTransientSteps().has_value());
     CHECK(schematic.GetTransientSteps()->Results.size() == 3);
+}
+
+TEST_CASE("Every analysis runs on the worker and stores its result in the schematic", "[analysis_controls]") {
+    GUI::Schematic schematic;
+    OpenRCFilter(schematic);
+    GUI::AnalysisControls controls(schematic);
+
+    Select(schematic, GUI::Analysis::OPERATING_POINT);
+    RunAndWait(controls);
+    CHECK(schematic.GetOperatingPoint().has_value());
+
+    Select(schematic, GUI::Analysis::AC_SWEEP);
+    RunAndWait(controls);
+    CHECK(schematic.GetACSweep().has_value());
+
+    Select(schematic, GUI::Analysis::DC_SWEEP);
+    RunAndWait(controls);
+    CHECK(schematic.GetDCSweep().has_value());
+
+    Select(schematic, GUI::Analysis::NOISE);
+    RunAndWait(controls);
+    CHECK(schematic.GetNoise().has_value());
+
+    Select(schematic, GUI::Analysis::TRANSFER_FUNCTION);
+    RunAndWait(controls);
+    CHECK(schematic.GetTransferFunction().has_value());
+    CHECK(controls.GetLastRun() == GUI::Analysis::TRANSFER_FUNCTION);
+}
+
+TEST_CASE("A stepped AC sweep and a stepped DC sweep deliver one result per value", "[analysis_controls]") {
+    GUI::Schematic schematic;
+    OpenRCFilter(schematic);
+    GUI::AnalysisControls controls(schematic);
+    GUI::SimulationSettings settings = schematic.GetSimulationSettings();
+    settings.ParameterStep = {
+        .Enabled = true, .Part = "R1", .UsesList = true, .Start = 0.0, .Stop = 0.0, .Step = 0.0, .List = "1k, 2k"};
+
+    settings.Selected = GUI::Analysis::AC_SWEEP;
+    schematic.SetSimulationSettings(settings);
+    RunAndWait(controls);
+    REQUIRE(schematic.GetACSweepSteps().has_value());
+    CHECK(schematic.GetACSweepSteps()->Results.size() == 2);
+
+    settings.Selected = GUI::Analysis::DC_SWEEP;
+    schematic.SetSimulationSettings(settings);
+    RunAndWait(controls);
+    CHECK(schematic.GetDCSweep().has_value());
+}
+
+TEST_CASE("A run that cannot start says why, and a circuit that cannot run fails with the reason",
+          "[analysis_controls]") {
+    GUI::Schematic schematic;
+    OpenRCFilter(schematic);
+    GUI::AnalysisControls controls(schematic);
+
+    // The example has no logic input
+    Select(schematic, GUI::Analysis::TRUTH_TABLE);
+    controls.RunSelected();
+    CHECK_FALSE(controls.IsRunning());
+    CHECK(controls.GetOutcome(GUI::Analysis::TRUTH_TABLE) == GUI::RunOutcome::FAILED);
+    REQUIRE(controls.GetError(GUI::Analysis::TRUTH_TABLE).has_value());
+    CHECK(controls.GetError(GUI::Analysis::TRUTH_TABLE)->contains("Logic input"));
+
+    // A stepped parameter without values
+    GUI::SimulationSettings settings = schematic.GetSimulationSettings();
+    settings.Selected = GUI::Analysis::TRANSIENT;
+    settings.ParameterStep = {
+        .Enabled = true, .Part = "R1", .UsesList = true, .Start = 0.0, .Stop = 0.0, .Step = 0.0, .List = "abc"};
+    schematic.SetSimulationSettings(settings);
+    controls.RunSelected();
+    CHECK(controls.GetOutcome(GUI::Analysis::TRANSIENT) == GUI::RunOutcome::FAILED);
+
+    // A circuit without a source, or without even a ground
+    GUI::Schematic empty;
+    GUI::AnalysisControls empty_controls(empty);
+    for (const GUI::Analysis analysis :
+         {GUI::Analysis::DC_SWEEP, GUI::Analysis::NOISE, GUI::Analysis::TRANSFER_FUNCTION}) {
+        Select(empty, analysis);
+        empty_controls.RunSelected();
+        CHECK(empty_controls.GetOutcome(analysis) == GUI::RunOutcome::FAILED);
+    }
+    Select(empty, GUI::Analysis::OPERATING_POINT);
+    RunAndWait(empty_controls);
+    CHECK(empty_controls.GetOutcome(GUI::Analysis::OPERATING_POINT) == GUI::RunOutcome::FAILED);
+    CHECK_FALSE(empty.GetOperatingPoint().has_value());
+}
+
+TEST_CASE("Analyses have names, and all of them are counted", "[analysis_controls]") {
+    CHECK(std::string(GUI::GetAnalysisName(GUI::Analysis::AC_SWEEP)) == "AC sweep");
+    CHECK(std::string(GUI::GetAnalysisName(GUI::Analysis::TRUTH_TABLE)) == "Truth table");
+    CHECK(static_cast<std::size_t>(GUI::Analysis::TRUTH_TABLE) + 1 == GUI::ANALYSIS_COUNT);
 }
