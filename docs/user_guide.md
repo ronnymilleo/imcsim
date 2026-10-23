@@ -110,7 +110,9 @@ How to read what imcsim measures, plots and exports. The [README](../README.md) 
   530ms of 1s", and "Transient stopped" in the status bar). The transient plot shows a window of 2000 points at a time (a field
   at its top right sets 1000 to 10000), so a long run stays quick to draw and to measure: a scroll bar the width of the
   plot, with its time span written above it, moves the window along the run (the plot fits itself to every window), and
-  while the run goes on a Follow box keeps the window on the newest points. The statistics and the cursors work on the
+  while the run goes on a Follow box keeps the window on the newest points. The schematic plays the same window: its
+  time bar, its heat colors and the playhead of the plot all go over the window, and while the window follows a run the
+  schematic shows the newest point. The statistics and the cursors work on the
   points in the window. The SVG image is the window; a CSV table can be of the window or of the whole run, as Export
   asks. The math channels are worked out over the whole run, so an integral starts at the start of the simulation, and
   they wait, grayed out, for the end of a run that is still going on. The spectrum uses the whole run too. The other analyses stop between their steps (the values

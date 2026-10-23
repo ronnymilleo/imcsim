@@ -120,18 +120,8 @@ private:
     PlotSpan m_TransientView;
     // The data version of the transient drawn last frame, to fit the axes as a run that is still going on grows
     std::size_t m_DrawnTransientDataVersion = 0;
-    // The window of the transient the plot shows: where it starts, whether it follows the newest points of a run, and
-    // what was true last frame, so a new window fits the axes and a finished run keeps the place of the one that grew
-    std::size_t m_WindowFirst = 0;
-    bool m_FollowsRun = true;
-    std::size_t m_WindowedVersion = 0;
-    bool m_WasIncomplete = false;
-    std::size_t m_DrawnWindowFirst = 0;
-    std::size_t m_ShownWindowFirst = 0;
-    std::size_t m_DrawnWindowCount = 0;
-    // How many points the plot shows at most, which the user picks
-    int m_WindowPoints = DEFAULT_WINDOW_POINTS;
-    std::size_t m_WindowTotalPoints = 0;
+    // The window the plot drew last frame, so a window that moved or changed size fits the axes
+    PointWindow m_DrawnWindow;
     // Over the whole run, or none while it grows; the plot of a run in progress evaluates the window instead
     std::optional<FullMath> m_FullMath;
     // Whether the signals of logic parts get a lane each, in a plot of their own under the analog one
@@ -163,8 +153,6 @@ private:
     void Draw() override;
     const std::vector<Core::ComponentTrace> &GetListedCurrents() const;
     std::size_t GetListedNodeCount() const;
-    double GetRunEndTime() const;
-    void UpdateWindow();
     void UpdateFullMath();
     FrameResults EvaluateFrame(std::size_t node_count, const std::vector<Core::ComponentTrace> &currents) const;
     void DrawTraceList(std::size_t node_count, const std::vector<Core::ComponentTrace> &currents);

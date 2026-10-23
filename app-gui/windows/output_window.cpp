@@ -590,11 +590,11 @@ void DrawCursors(PlotCursors &cursors, const bool logarithmic) {
 
 // The instant of the transient shown on the schematic, as a line along the plot. Dragging it moves the instant and
 // stops the playback, so the line stays where it was dropped
-void DrawPlayhead(TransientPlayback &playback, const double stop_time) {
+void DrawPlayhead(TransientPlayback &playback, const double from, const double to) {
     const ImVec4 color = ImGui::ColorConvertU32ToFloat4(AdaptToBackground(PLAYHEAD_COLOR));
     double time = playback.Time;
     if (ImPlot::DragLineX(2, &time, color, 1.5f, ImPlotDragToolFlags_NoFit)) {
-        playback.Time = std::clamp(time, 0.0, stop_time);
+        playback.Time = std::clamp(time, from, to);
         playback.Playing = false;
     }
 }
@@ -1199,7 +1199,6 @@ void OutputWindow::Draw() {
         ImGui::EndChild();
         return;
     }
-    UpdateWindow();
     UpdateFullMath();
     const FrameResults frame = EvaluateFrame(node_count, currents);
     // Applies to the automatic fit of every new result and to the user's double-click fit
@@ -1235,39 +1234,6 @@ std::size_t OutputWindow::GetListedNodeCount() const {
                      dc_sweep ? dc_sweep->Curves.front().NodeVoltages.size() : 0});
 }
 
-// The time of the last point of the whole run, which the playhead can be dragged up to, whatever the window shows
-double OutputWindow::GetRunEndTime() const {
-    const auto &transient = m_Schematic.GetTransient();
-    return transient && !transient->Times.empty() ? transient->Times.back() : 0.0;
-}
-
-// Which points of the transient the plot shows. A new result starts at its beginning, unless it is the whole run that
-// replaces the chunks the plot was following, which stays where it was; a run that is going on can be followed to its
-// newest points
-void OutputWindow::UpdateWindow() {
-    const auto &transient = m_Schematic.GetTransient();
-    if (!transient) {
-        return;
-    }
-    const std::size_t total = transient->Times.size();
-    m_WindowPoints = std::clamp(m_WindowPoints, MIN_WINDOW_POINTS, MAX_WINDOW_POINTS);
-    const std::size_t window_points = static_cast<std::size_t>(m_WindowPoints);
-    if (m_Schematic.GetTransientVersion() != m_WindowedVersion) {
-        m_WindowedVersion = m_Schematic.GetTransientVersion();
-        if (!m_WasIncomplete) {
-            m_WindowFirst = 0;
-            m_FollowsRun = true;
-        }
-    }
-    m_WasIncomplete = !transient->IsComplete;
-    if (m_FollowsRun && m_Controls.IsRunning() && !transient->IsComplete) {
-        m_WindowFirst = GetEndWindow(total, window_points).First;
-    }
-    m_WindowFirst = ClampWindow(total, m_WindowFirst, window_points).First;
-    m_ShownWindowFirst = m_WindowFirst;
-    m_WindowTotalPoints = total;
-}
-
 // The math channels go over the whole run, so a derivative or an integral starts at the start of the simulation and not
 // at the edge of the window. It is done again only when the run or the channels change, and not at all while a run
 // grows, which waits for the end of the run
@@ -1296,8 +1262,7 @@ OutputWindow::FrameResults OutputWindow::EvaluateFrame(const std::size_t node_co
                                                        const std::vector<Core::ComponentTrace> &currents) const {
     FrameResults frame;
     if (const auto &transient = m_Schematic.GetTransient()) {
-        const PointWindow window =
-            ClampWindow(transient->Times.size(), m_WindowFirst, static_cast<std::size_t>(m_WindowPoints));
+        const PointWindow window = m_Playback.Window.GetWindow();
         frame.TransientWindow = SliceTransient(*transient, window);
         const Core::Transient &shown = *frame.TransientWindow;
         if (const auto &steps = m_Schematic.GetTransientSteps(); steps && !shown.Times.empty()) {
@@ -1588,18 +1553,22 @@ void OutputWindow::DrawIncompleteNote(const Core::Transient &transient) {
 
 // A run longer than the plot shows is seen through a window of a size the user picks, which a scroll bar the width of
 // the plot moves along the run, with a handle as large as the share of the run in view. While the run goes on, the
-// window can follow its newest points
+// window can follow its newest points. The schematic plays the same window
 void OutputWindow::DrawWindowControls(const Core::Transient &shown) {
-    if (m_WindowTotalPoints <= static_cast<std::size_t>(MIN_WINDOW_POINTS) || shown.Times.empty()) {
+    TransientWindow &window = m_Playback.Window;
+    const std::size_t total_points = window.GetTotalPoints();
+    if (total_points <= static_cast<std::size_t>(MIN_WINDOW_POINTS) || shown.Times.empty()) {
         return;
     }
     const float width = ImGui::GetContentRegionAvail().x;
-    const std::size_t window_points = static_cast<std::size_t>(m_WindowPoints);
     const std::string span =
         std::format("{}s to {}s", Core::FormatValue(shown.Times.front()), Core::FormatValue(shown.Times.back()));
     const ImVec2 row_start = ImGui::GetCursorPos();
     if (m_Controls.IsRunning()) {
-        ImGui::Checkbox("Follow", &m_FollowsRun);
+        bool follows = window.DoesFollow();
+        if (ImGui::Checkbox("Follow", &follows)) {
+            window.SetFollow(follows);
+        }
         ImGui::SetItemTooltip("Keep the window on the newest points of the run");
     }
     ImGui::SetCursorPos({row_start.x + (width - ImGui::CalcTextSize(span.c_str()).x) / 2.0f, row_start.y});
@@ -1607,24 +1576,26 @@ void OutputWindow::DrawWindowControls(const Core::Transient &shown) {
     const float size_width = ImGui::GetFontSize() * WINDOW_SIZE_WIDTH;
     ImGui::SetCursorPos({row_start.x + width - size_width, row_start.y});
     ImGui::SetNextItemWidth(size_width);
-    ImGui::DragInt("##window_points", &m_WindowPoints, WINDOW_SIZE_DRAG_SPEED, MIN_WINDOW_POINTS, MAX_WINDOW_POINTS,
-                   "%d points", ImGuiSliderFlags_AlwaysClamp);
-    ImGui::SetItemTooltip("%s", std::format("How many points the plot shows at a time, from {} to {}; drag, or "
-                                            "double-click to type. The run has {} points",
-                                            MIN_WINDOW_POINTS, MAX_WINDOW_POINTS, m_WindowTotalPoints)
+    int points = window.GetPoints();
+    if (ImGui::DragInt("##window_points", &points, WINDOW_SIZE_DRAG_SPEED, MIN_WINDOW_POINTS, MAX_WINDOW_POINTS,
+                       "%d points", ImGuiSliderFlags_AlwaysClamp)) {
+        window.SetPoints(points);
+    }
+    ImGui::SetItemTooltip("%s", std::format("How many points the plot and the schematic show at a time, from {} to "
+                                            "{}; drag, or double-click to type. The run has {} points",
+                                            MIN_WINDOW_POINTS, MAX_WINDOW_POINTS, total_points)
                                     .c_str());
-    if (m_WindowTotalPoints <= window_points) {
+    if (total_points <= static_cast<std::size_t>(window.GetPoints())) {
         return;
     }
 
     const ImRect bar(ImGui::GetCursorScreenPos(),
                      ImGui::GetCursorScreenPos() + ImVec2(width, ImGui::GetStyle().ScrollbarSize));
     ImGui::ItemSize(bar);
-    ImS64 first = static_cast<ImS64>(m_WindowFirst);
-    if (ImGui::ScrollbarEx(bar, ImGui::GetID("##window"), ImGuiAxis_X, &first, static_cast<ImS64>(window_points),
-                           static_cast<ImS64>(m_WindowTotalPoints))) {
-        m_WindowFirst = static_cast<std::size_t>(first);
-        m_FollowsRun = false;
+    ImS64 first = static_cast<ImS64>(window.GetWindow().First);
+    if (ImGui::ScrollbarEx(bar, ImGui::GetID("##window"), ImGuiAxis_X, &first,
+                           static_cast<ImS64>(window.GetWindow().Count), static_cast<ImS64>(total_points))) {
+        window.SetFirst(static_cast<std::size_t>(first));
     }
     ImGui::SetItemTooltip("Drag to move the window along the run");
 }
@@ -1652,8 +1623,9 @@ void OutputWindow::DrawTransient(const Core::Transient &transient, const std::ve
                                m_Schematic.GetTransientDataVersion() &&
                            !transient.IsComplete;
     // The window that moved is the one this frame's points come from, so the fit sees the points it moved to
-    const bool has_moved = std::exchange(m_DrawnWindowFirst, m_ShownWindowFirst) != m_ShownWindowFirst ||
-                           std::exchange(m_DrawnWindowCount, transient.Times.size()) != transient.Times.size();
+    const PointWindow window = m_Playback.Window.GetWindow();
+    const PointWindow previous = std::exchange(m_DrawnWindow, window);
+    const bool has_moved = previous.First != window.First || previous.Count != window.Count;
     const bool new_result = m_TransientFit.TakeNewResult(m_Schematic.GetTransientVersion()) || has_grown || has_moved;
     SetNextFits(new_result, voltages_changed, currents_changed);
     if (m_TransientFit.TakeMathChanged(ListMathLabels(math))) {
@@ -1717,7 +1689,7 @@ void OutputWindow::DrawTransientAnalog(const Core::Transient &transient, const s
         LabelSteps(step_traces, steps->Selected, ListStepLabels(*steps), m_Schematic, show_currents, lane_nodes);
     }
     DrawCursors(m_TransientCursors, false);
-    DrawPlayhead(m_Playback, GetRunEndTime());
+    DrawPlayhead(m_Playback, transient.Times.front(), transient.Times.back());
     DrawCursorReadout(transient.Times, "s", false, plotted);
     const ImPlotRange view = ImPlot::GetPlotLimits().X;
     m_TransientView = {.From = view.Min, .To = view.Max};
@@ -1814,7 +1786,7 @@ void OutputWindow::DrawLogicLanes(const Core::Transient &transient, const std::v
         }
     }
     DrawCursors(m_TransientCursors, false);
-    DrawPlayhead(m_Playback, GetRunEndTime());
+    DrawPlayhead(m_Playback, transient.Times.front(), transient.Times.back());
     DrawCursorReadout(transient.Times, "s", false, plotted);
     const ImPlotRange view = ImPlot::GetPlotLimits().X;
     m_TransientView = {.From = view.Min, .To = view.Max};
@@ -2523,7 +2495,7 @@ bool OutputWindow::CanExport(const FrameResults &frame) const {
 bool OutputWindow::HasLongerRun() const {
     const auto &transient = m_Schematic.GetTransient();
     return m_ShownTab == PlotTab::TRANSIENT && transient &&
-           transient->Times.size() > static_cast<std::size_t>(m_WindowPoints) && !m_Controls.IsRunning();
+           transient->Times.size() > static_cast<std::size_t>(m_Playback.Window.GetPoints()) && !m_Controls.IsRunning();
 }
 
 // The figure of the shown tab, which CanExport() has found something to export in. A CSV table of the whole run holds

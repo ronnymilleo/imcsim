@@ -259,6 +259,10 @@ void Application::Render() {
     UpdateWindowTitle();
     // Takes in the result of a run that ended, so ShowNewResults() sees it in the same frame
     m_AnalysisControls.Update();
+    // The window of points that the plot shows and the schematic plays follows a run whichever window is in front
+    const std::optional<Core::Transient> &transient = m_Schematic.GetTransient();
+    m_Playback.Window.Update(transient ? &*transient : nullptr, m_Schematic.GetTransientVersion(),
+                             m_AnalysisControls.IsRunning());
     ShowNewResults();
 
     // A fixed ID lets the layout be rebuilt before the dockspace is submitted this frame

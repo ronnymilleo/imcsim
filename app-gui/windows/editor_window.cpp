@@ -445,9 +445,15 @@ EditorWindow::EditorWindow(Schematic &schematic, AnalysisControls &controls, Ana
  *          Draw(), and the popups opened here are drawn here too, so they show whichever window is in front.
  */
 void EditorWindow::Update() {
-    // The playhead of the Output window moves with the time too, so playing goes on while this window is hidden
-    if (const auto &transient = m_Schematic.GetTransient(); transient && !transient->Times.empty()) {
-        m_Playback.Advance(ImGui::GetIO().DeltaTime, transient->Times.back());
+    // The playhead of the Output window moves with the time too, so playing goes on while this window is hidden. It
+    // plays the window of points that the plot shows; while the window follows a run, the schematic shows its newest
+    // point
+    if (const std::optional<TimeSpan> window = GetWindowSpan()) {
+        if (m_Playback.Window.IsLive()) {
+            m_Playback.Time = window->To;
+            m_Playback.Playing = false;
+        }
+        m_Playback.Advance(ImGui::GetIO().DeltaTime, window->From, window->To);
     }
     m_Files.Update();
     HandleCommandRequest();
@@ -872,12 +878,17 @@ void EditorWindow::UpdateDisplayedState() {
     const Connectivity &connectivity = m_Schematic.GetConnectivity();
     DisplayedState state;
     if (show_transient) {
-        // The scale goes over the whole run, so while chunks keep arriving it is refreshed a few times a second only
+        // The scale goes over the window that plays, so a window of any size costs the same; while chunks keep arriving
+        // it is refreshed a few times a second only
+        const PointWindow window = m_Playback.Window.GetWindow();
+        const bool is_stale = m_ScaledTransientVersion != m_Schematic.GetTransientDataVersion() ||
+                              m_ScaledWindow.First != window.First || m_ScaledWindow.Count != window.Count;
         const bool may_refresh = transient->IsComplete || !m_ScaledTransientVersion.has_value() ||
                                  ImGui::GetTime() - m_LastScaleTime >= SCALE_REFRESH_SECONDS;
-        if (m_ScaledTransientVersion != m_Schematic.GetTransientDataVersion() && may_refresh) {
-            m_TransientScale = ScaleOf(*transient, elements, connectivity);
+        if (is_stale && may_refresh) {
+            m_TransientScale = ScaleOf(SliceTransient(*transient, window), elements, connectivity);
             m_ScaledTransientVersion = m_Schematic.GetTransientDataVersion();
+            m_ScaledWindow = window;
             m_LastScaleTime = ImGui::GetTime();
         }
         state.Point = SampleTransient(*transient, m_Playback.Time);
@@ -891,8 +902,18 @@ void EditorWindow::UpdateDisplayedState() {
     m_Displayed = std::move(state);
 }
 
-// A row above the canvas with the playback of the transient on display: play, loop, a slider over the whole run and
-// the instant. Moving the slider stops the playback, so it holds where the user put it
+// The span of time of the window of the transient that plays, or none without a transient
+std::optional<EditorWindow::TimeSpan> EditorWindow::GetWindowSpan() const {
+    const auto &transient = m_Schematic.GetTransient();
+    const PointWindow window = m_Playback.Window.GetWindow();
+    if (!transient || window.Count == 0 || window.First + window.Count > transient->Times.size()) {
+        return std::nullopt;
+    }
+    return TimeSpan{.From = transient->Times[window.First], .To = transient->Times[window.First + window.Count - 1]};
+}
+
+// A row above the canvas with the playback of the transient on display: play, loop, a slider over the window and the
+// instant. Moving the slider stops the playback, so it holds where the user put it
 void EditorWindow::DrawTimeBar() {
     if (!m_Displayed || !m_Displayed->Time) {
         return;
@@ -901,10 +922,14 @@ void EditorWindow::DrawTimeBar() {
     if (!transient) {
         return;
     }
-    const double stop_time = transient->Times.back();
+    const std::optional<TimeSpan> window = GetWindowSpan();
+    if (!window) {
+        return;
+    }
+    const double stop_time = window->To;
     if (ImGui::Button(m_Playback.Playing ? "Pause" : "Play")) {
         if (!m_Playback.Playing && m_Playback.Time >= stop_time) {
-            m_Playback.Time = 0.0;
+            m_Playback.Time = window->From;
         }
         m_Playback.Playing = !m_Playback.Playing;
     }
@@ -915,8 +940,7 @@ void EditorWindow::DrawTimeBar() {
         std::format("t = {}s / {}s", Core::FormatValue(m_Playback.Time), Core::FormatValue(stop_time));
     const float readout_width = ImGui::CalcTextSize(readout.c_str()).x + ImGui::GetStyle().ItemSpacing.x;
     ImGui::SetNextItemWidth(std::max(ImGui::GetContentRegionAvail().x - readout_width, MIN_TIME_SLIDER_WIDTH));
-    constexpr double START = 0.0;
-    ImGui::SliderScalar("##time", ImGuiDataType_Double, &m_Playback.Time, &START, &stop_time, "");
+    ImGui::SliderScalar("##time", ImGuiDataType_Double, &m_Playback.Time, &window->From, &stop_time, "");
     if (ImGui::IsItemActive()) {
         m_Playback.Playing = false;
     }
