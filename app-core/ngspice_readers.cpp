@@ -39,10 +39,12 @@ pvector_info FindVector(std::string name) {
 }
 
 // Analyses with complex results, such as .ac, also store their scale (the frequency) as complex numbers
-std::vector<double> RealPart(const vector_info &vector) {
-    std::vector<double> values(static_cast<std::size_t>(vector.v_length));
+std::vector<double> RealPart(const vector_info &vector, const std::size_t first_point = 0) {
+    const std::size_t length = static_cast<std::size_t>(vector.v_length);
+    std::vector<double> values(length > first_point ? length - first_point : 0);
     for (std::size_t index = 0; index < values.size(); ++index) {
-        values[index] = vector.v_realdata != nullptr ? vector.v_realdata[index] : vector.v_compdata[index].cx_real;
+        const std::size_t point = first_point + index;
+        values[index] = vector.v_realdata != nullptr ? vector.v_realdata[point] : vector.v_compdata[point].cx_real;
     }
     return values;
 }
@@ -373,34 +375,61 @@ std::expected<OperatingPoint, std::string> ReadOperatingPoint(const Circuit &cir
  * @return  The transient, with rating warnings, or the error when a vector is missing.
  */
 std::expected<Transient, std::string> ReadTransient(const Circuit &circuit) {
+    std::expected<Transient, std::string> result = ReadTransientPoints(circuit, 0);
+    if (result) {
+        AddRatingWarnings(circuit, *result);
+    }
+    return result;
+}
+
+/**
+ * @brief   Reads the points of a transient from one on, as they stand while ngspice has the run suspended.
+ * @param[in] circuit      Circuit that is being simulated.
+ * @param[in] first_point  Index of the first point to read; the ones before it were read already.
+ * @return  The new points, none when there are no more, or the error when a vector is missing. It has no warnings,
+ *          since the ratings are judged over the whole run.
+ */
+std::expected<Transient, std::string> ReadTransientPoints(const Circuit &circuit, const std::size_t first_point) {
     const pvector_info time = FindVector("time");
     if (time == nullptr) {
         return std::unexpected("ngspice returned no time points");
     }
     Transient result;
-    result.Times = RealPart(*time);
-    // time points to the record that the next lookup overwrites, so later vectors are checked against this count
-    const std::size_t point_count = result.Times.size();
+    result.Times = RealPart(*time, first_point);
+    // time points to the record that the next lookup overwrites, so later vectors are checked against this length
+    const std::size_t length = static_cast<std::size_t>(time->v_length);
     result.NodeVoltages.resize(static_cast<std::size_t>(circuit.GetNodeCount()));
-    result.NodeVoltages[0].assign(point_count, 0.0);
+    result.NodeVoltages[0].assign(result.Times.size(), 0.0);
     for (int node = 1; node < circuit.GetNodeCount(); ++node) {
         const pvector_info vector = FindVector(std::format("v({})", node));
-        if (vector == nullptr || static_cast<std::size_t>(vector->v_length) != point_count) {
+        if (vector == nullptr || static_cast<std::size_t>(vector->v_length) != length) {
             return std::unexpected(std::format("ngspice returned no voltages for node {}", node));
         }
-        result.NodeVoltages[static_cast<std::size_t>(node)] = RealPart(*vector);
+        result.NodeVoltages[static_cast<std::size_t>(node)] = RealPart(*vector, first_point);
     }
     for (const CircuitEntry &entry : circuit.GetEntries()) {
         for (const CurrentVector &current : CurrentVectors(*entry.Part)) {
             const pvector_info vector = FindVector(current.VectorName);
-            if (vector == nullptr || static_cast<std::size_t>(vector->v_length) != point_count) {
+            if (vector == nullptr || static_cast<std::size_t>(vector->v_length) != length) {
                 return std::unexpected(std::format("ngspice returned no currents for {}", current.TraceName));
             }
-            result.Currents.push_back({current.TraceName, RealPart(*vector)});
+            result.Currents.push_back({current.TraceName, RealPart(*vector, first_point)});
         }
     }
-    AddRatingWarnings(circuit, result);
     return result;
+}
+
+/**
+ * @brief   Reads the time ngspice has reached in the transient it has in its current plot.
+ * @return  The time of the last point, or no value when there are no points.
+ */
+std::optional<double> ReadTransientTime() {
+    const pvector_info time = FindVector("time");
+    if (time == nullptr) {
+        return std::nullopt;
+    }
+    const std::size_t last = static_cast<std::size_t>(time->v_length) - 1;
+    return time->v_realdata != nullptr ? time->v_realdata[last] : time->v_compdata[last].cx_real;
 }
 
 /**

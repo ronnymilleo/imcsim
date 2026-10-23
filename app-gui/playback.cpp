@@ -12,29 +12,31 @@ namespace GUI {
 
 /**
  * @brief   Moves the instant forward while playing.
- * @param[in] elapsed    Real seconds since the last call.
- * @param[in] stop_time  Length of the transient in seconds.
- * @note    The whole run plays in PlaybackSeconds. At the end it starts over when Loop is on, and otherwise stops
- *          there. Outside playing, or without a run, the instant only stays within the run.
+ * @param[in] elapsed  Real seconds since the last call.
+ * @param[in] from     Start of the window to play, in seconds.
+ * @param[in] to       End of the window, in seconds.
+ * @note    The whole window plays in PlaybackSeconds. At the end it starts over from its start when Loop is on, and
+ *          otherwise stops there. Outside playing, or without a window, the instant only stays within it.
  */
-void TransientPlayback::Advance(const double elapsed, const double stop_time) {
-    if (stop_time <= 0.0) {
-        Time = 0.0;
+void TransientPlayback::Advance(const double elapsed, const double from, const double to) {
+    const double span = to - from;
+    if (span <= 0.0) {
+        Time = from;
         Playing = false;
         return;
     }
     if (Playing) {
-        Time += elapsed * stop_time / PLAYBACK_SECONDS;
+        Time += elapsed * span / PLAYBACK_SECONDS;
     }
-    if (Time < stop_time) {
-        Time = std::max(Time, 0.0);
+    if (Time < to) {
+        Time = std::max(Time, from);
         return;
     }
     if (Playing && Loop) {
-        Time = std::fmod(Time, stop_time);
+        Time = from + std::fmod(Time - from, span);
         return;
     }
-    Time = stop_time;
+    Time = to;
     Playing = false;
 }
 

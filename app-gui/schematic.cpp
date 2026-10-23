@@ -574,6 +574,39 @@ void Schematic::SetTransient(std::optional<Core::Transient> transient) {
     m_TransientSteps.reset();
     m_Transient = std::move(transient);
     ++m_TransientVersion;
+    ++m_TransientDataVersion;
+}
+
+/**
+ * @brief   Adds the points a transient has made since the last call to the one being made.
+ * @param[in] chunk  The new points, numbered like GetConnectivity(); the first chunk starts the result.
+ * @note    The result stays incomplete until SetTransient() stores the whole run. A chunk that does not fit the
+ *          result, because the circuit changed under it, is dropped.
+ */
+void Schematic::AppendTransient(Core::Transient chunk) {
+    if (!m_Transient) {
+        chunk.IsComplete = false;
+        SetTransient(std::move(chunk));
+        return;
+    }
+    Core::Transient &whole = *m_Transient;
+    const bool fits = whole.NodeVoltages.size() == chunk.NodeVoltages.size() &&
+                      std::ranges::equal(whole.Currents, chunk.Currents, {}, &Core::ComponentTrace::Name,
+                                         &Core::ComponentTrace::Name);
+    if (!fits) {
+        return;
+    }
+    whole.Times.insert(whole.Times.end(), chunk.Times.begin(), chunk.Times.end());
+    for (std::size_t node = 0; node < chunk.NodeVoltages.size(); ++node) {
+        whole.NodeVoltages[node].insert(whole.NodeVoltages[node].end(), chunk.NodeVoltages[node].begin(),
+                                        chunk.NodeVoltages[node].end());
+    }
+    for (std::size_t current = 0; current < chunk.Currents.size(); ++current) {
+        whole.Currents[current].Values.insert(whole.Currents[current].Values.end(),
+                                              chunk.Currents[current].Values.begin(),
+                                              chunk.Currents[current].Values.end());
+    }
+    ++m_TransientDataVersion;
 }
 
 /**
@@ -613,6 +646,7 @@ void Schematic::SetTransientSteps(StepFamily<Core::Transient> steps) {
     m_Transient = steps.Results[steps.Selected];
     m_TransientSteps = std::move(steps);
     ++m_TransientVersion;
+    ++m_TransientDataVersion;
 }
 
 /**
@@ -635,6 +669,7 @@ void Schematic::SelectTransientStep(const std::size_t step) {
     m_TransientSteps->Selected = step;
     m_Transient = m_TransientSteps->Results[step];
     ++m_TransientVersion;
+    ++m_TransientDataVersion;
 }
 
 /**
@@ -757,6 +792,14 @@ std::size_t Schematic::GetOperatingPointVersion() const {
  */
 std::size_t Schematic::GetTransientVersion() const {
     return m_TransientVersion;
+}
+
+/**
+ * @brief   Returns a number that changes whenever the transient result changes, as a chunk is added too.
+ * @return  The data version; compare it with a stored one to know whether the points to draw changed.
+ */
+std::size_t Schematic::GetTransientDataVersion() const {
+    return m_TransientDataVersion;
 }
 
 /**

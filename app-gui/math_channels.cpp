@@ -131,6 +131,19 @@ bool MathChannels::IsEmpty() const {
 }
 
 /**
+ * @brief   Describes the channels, so a result evaluated with them can tell whether they changed since.
+ * @return  A text that differs whenever a channel is added, removed, shown or hidden, renamed or edited.
+ */
+std::string MathChannels::GetSignature() const {
+    std::string signature;
+    for (const MathChannel &channel : m_Channels) {
+        signature += std::format("{}|{}|{}|{};", channel.Name, channel.Shown, GetChannelExpression(channel),
+                                 channel.Program.has_value());
+    }
+    return signature;
+}
+
+/**
  * @brief   Evaluates every shown channel over one result.
  * @param[in]  xs             X values of the result: times, or the swept values of a DC sweep.
  * @param[in]  x_unit         Unit of the X values, which ddt() and integ() take into the unit of their result.

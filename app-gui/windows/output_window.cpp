@@ -38,6 +38,9 @@ constexpr const char *SETTINGS_TYPE_NAME = "Output";
 
 // In font sizes, so the layout follows the DPI scale
 constexpr float MIN_PLOT_HEIGHT = 12.0f;
+// Width of the field for the size of the window, in font sizes, and how many points a pixel of dragging adds
+constexpr float WINDOW_SIZE_WIDTH = 8.0f;
+constexpr float WINDOW_SIZE_DRAG_SPEED = 20.0f;
 constexpr float TRACE_LIST_WIDTH = 8.0f;
 constexpr ImVec2 INITIAL_SIZE = {65.0f, 35.0f};
 // ImPlot adds half of it on each side, so 0.4 leaves 20% of the data range above and below the curves
@@ -587,11 +590,11 @@ void DrawCursors(PlotCursors &cursors, const bool logarithmic) {
 
 // The instant of the transient shown on the schematic, as a line along the plot. Dragging it moves the instant and
 // stops the playback, so the line stays where it was dropped
-void DrawPlayhead(TransientPlayback &playback, const double stop_time) {
+void DrawPlayhead(TransientPlayback &playback, const double from, const double to) {
     const ImVec4 color = ImGui::ColorConvertU32ToFloat4(AdaptToBackground(PLAYHEAD_COLOR));
     double time = playback.Time;
     if (ImPlot::DragLineX(2, &time, color, 1.5f, ImPlotDragToolFlags_NoFit)) {
-        playback.Time = std::clamp(time, 0.0, stop_time);
+        playback.Time = std::clamp(time, from, to);
         playback.Playing = false;
     }
 }
@@ -1104,11 +1107,12 @@ PlotSpan GetSpectrumFitRange(const TransientSpectra &spectra, const bool logarit
 /**
  * @brief   Creates the window for a schematic.
  * @param[in] schematic  Schematic whose results are plotted; it must outlive the window.
+ * @param[in] controls   Runs of the analyses, to stop one from here while its plot grows; they must outlive the window.
  * @param[in] playback   Instant of the transient shown on the schematic, drawn as a line in the transient plot that
  *                       can be dragged; it must outlive the window.
  */
-OutputWindow::OutputWindow(Schematic &schematic, TransientPlayback &playback)
-    : AppWindow("Output", true), m_Schematic(schematic), m_Playback(playback) {
+OutputWindow::OutputWindow(Schematic &schematic, AnalysisControls &controls, TransientPlayback &playback)
+    : AppWindow("Output", true), m_Schematic(schematic), m_Controls(controls), m_Playback(playback) {
     SetInitialSize(INITIAL_SIZE);
     // Nothing to plot yet; the first result opens it
     SetOpen(false);
@@ -1195,6 +1199,7 @@ void OutputWindow::Draw() {
         ImGui::EndChild();
         return;
     }
+    UpdateFullMath();
     const FrameResults frame = EvaluateFrame(node_count, currents);
     // Applies to the automatic fit of every new result and to the user's double-click fit
     ImPlot::PushStyleVar(ImPlotStyleVar_FitPadding, FIT_PADDING);
@@ -1229,14 +1234,53 @@ std::size_t OutputWindow::GetListedNodeCount() const {
                      dc_sweep ? dc_sweep->Curves.front().NodeVoltages.size() : 0});
 }
 
-// Math channels are evaluated once per frame and result, for both the plot and its statistics. Every curve of a DC
-// sweep has the same nodes and currents, so the first one reports the errors of all
+// The math channels go over the whole run, so a derivative or an integral starts at the start of the simulation and not
+// at the edge of the window. It is done again only when the run or the channels change, and not at all while a run
+// grows, which waits for the end of the run
+void OutputWindow::UpdateFullMath() {
+    const auto &transient = m_Schematic.GetTransient();
+    if (!transient || (m_Controls.IsRunning() && !transient->IsComplete)) {
+        m_FullMath.reset();
+        return;
+    }
+    const std::string signature = m_MathChannels.GetSignature();
+    if (m_FullMath && m_FullMath->DataVersion == m_Schematic.GetTransientDataVersion() &&
+        m_FullMath->Signature == signature) {
+        return;
+    }
+    FullMath math{
+        .DataVersion = m_Schematic.GetTransientDataVersion(), .Signature = signature, .Traces = {}, .Errors = {}};
+    math.Traces = m_MathChannels.Evaluate(transient->Times, {.Seconds = 1}, transient->NodeVoltages,
+                                          transient->Currents, math.Errors);
+    m_FullMath = std::move(math);
+}
+
+// The math channels of the plot are cut from those over the whole run, so a run of any length costs the same, and there
+// are none while a run grows. Every curve of a DC sweep has the same nodes and currents, so the first one reports the
+// errors of all
 OutputWindow::FrameResults OutputWindow::EvaluateFrame(const std::size_t node_count,
                                                        const std::vector<Core::ComponentTrace> &currents) const {
     FrameResults frame;
     if (const auto &transient = m_Schematic.GetTransient()) {
-        frame.TransientMath = m_MathChannels.Evaluate(transient->Times, {.Seconds = 1}, transient->NodeVoltages,
-                                                      transient->Currents, frame.TransientErrors);
+        const PointWindow window = m_Playback.Window.GetWindow();
+        frame.TransientWindow = SliceTransient(*transient, window);
+        const Core::Transient &shown = *frame.TransientWindow;
+        if (const auto &steps = m_Schematic.GetTransientSteps(); steps && !shown.Times.empty()) {
+            StepFamily<Core::Transient> windows{.Parameter = steps->Parameter,
+                                                .Unit = steps->Unit,
+                                                .Values = steps->Values,
+                                                .Results = {},
+                                                .Selected = steps->Selected};
+            for (const Core::Transient &step : steps->Results) {
+                windows.Results.push_back(SliceTransientByTime(step, shown.Times.front(), shown.Times.back()));
+            }
+            frame.StepWindows = std::move(windows);
+        }
+        // None while a run grows: the channels wait for its end, and the panel says so
+        if (m_FullMath) {
+            frame.TransientMath = SliceMathTraces(m_FullMath->Traces, window);
+            frame.TransientErrors = m_FullMath->Errors;
+        }
     }
     if (const auto &dc_sweep = m_Schematic.GetDCSweep()) {
         const Dimension swept_unit = dc_sweep->SweptUnit == "A" ? Dimension{.Amperes = 1} : Dimension{.Volts = 1};
@@ -1296,7 +1340,17 @@ void OutputWindow::DrawTraceList(const std::size_t node_count, const std::vector
     for (const Core::ComponentTrace &current : currents) {
         operands.push_back(std::format("I({})", current.Name));
     }
+    // The channels go over the whole run, so they wait for a run that is still going on
+    const auto &growing = m_Schematic.GetTransient();
+    const bool is_growing = growing && !growing->IsComplete && m_Controls.IsRunning();
+    ImGui::BeginDisabled(is_growing);
     m_MathChannels.Draw(operands);
+    ImGui::EndDisabled();
+    if (is_growing) {
+        ImGui::PushTextWrapPos(0.0f);
+        ImGui::TextDisabled("Math waits for the end of the run");
+        ImGui::PopTextWrapPos();
+    }
     ImGui::EndChild();
 }
 
@@ -1350,8 +1404,7 @@ void OutputWindow::DrawTabs(const FrameResults &frame) {
 }
 
 void OutputWindow::DrawTransientTab(const FrameResults &frame) {
-    const auto &transient = m_Schematic.GetTransient();
-    if (!transient) {
+    if (!frame.TransientWindow) {
         ImGui::TextDisabled("No transient for the current circuit; pick it beside Run in the editor");
         return;
     }
@@ -1366,9 +1419,9 @@ void OutputWindow::DrawTransientTab(const FrameResults &frame) {
                 ImGui::TextDisabled("%s", NOTHING_MEASURED);
             }
             DrawMathErrors(frame.TransientErrors);
-            DrawTransient(*transient, frame.TransientMath);
+            DrawTransient(*frame.TransientWindow, frame.TransientMath, frame.StepWindows);
         },
-        [&] { DrawTransientStatistics(*transient, frame.TransientMath); });
+        [&] { DrawTransientStatistics(*frame.TransientWindow, frame.TransientMath); });
 }
 
 void OutputWindow::DrawSpectrumTab(const FrameResults &frame) {
@@ -1377,13 +1430,17 @@ void OutputWindow::DrawSpectrumTab(const FrameResults &frame) {
         ImGui::TextDisabled("No transient for the current circuit; the spectrum transforms its measured traces");
         return;
     }
-    UpdateSpectra(*transient, frame.TransientMath);
+    // The spectrum goes over the whole run, so a run that is still growing has no math channels in it yet
+    static const std::vector<MathTrace> no_math;
+    static const std::vector<std::string> no_errors;
+    const std::vector<MathTrace> &math = m_FullMath ? m_FullMath->Traces : no_math;
+    UpdateSpectra(*transient, math);
     DrawWithStatistics(
         [&] {
-            if (!frame.AnythingMeasured && frame.TransientMath.empty()) {
+            if (!frame.AnythingMeasured && math.empty()) {
                 ImGui::TextDisabled("%s", NOTHING_MEASURED);
             }
-            DrawMathErrors(frame.TransientErrors);
+            DrawMathErrors(m_FullMath ? m_FullMath->Errors : no_errors);
             DrawSpectrum();
         },
         [&] { DrawSpectrumStatistics(); });
@@ -1475,9 +1532,82 @@ void OutputWindow::DrawTruthTableTab() {
     DrawTruthTable(*truth_table, m_Schematic);
 }
 
+// A transient that has not reached its stop time is either still running, and can be stopped from here since the
+// Output window takes the front as its first chunk arrives, or was stopped and keeps the points it made
+void OutputWindow::DrawIncompleteNote(const Core::Transient &transient) {
+    const std::string reached = std::format("simulated up to {}s of {}s", Core::FormatValue(transient.Times.back()),
+                                            Core::FormatValue(m_Schematic.GetSimulationSettings().Transient.StopTime));
+    if (m_Controls.IsRunning()) {
+        ImGui::BeginDisabled(m_Controls.IsStopping());
+        if (ImGui::Button("Stop")) {
+            m_Controls.StopRun();
+        }
+        ImGui::EndDisabled();
+        ImGui::SameLine();
+        ImGui::TextDisabled("%s",
+                            std::format("{}, {}", m_Controls.IsStopping() ? "Stopping" : "Running", reached).c_str());
+    } else {
+        ImGui::TextDisabled("%s", std::format("Stopped, {}", reached).c_str());
+    }
+}
+
+// A run longer than the plot shows is seen through a window of a size the user picks, which a scroll bar the width of
+// the plot moves along the run, with a handle as large as the share of the run in view. While the run goes on, the
+// window can follow its newest points. The schematic plays the same window
+void OutputWindow::DrawWindowControls(const Core::Transient &shown) {
+    TransientWindow &window = m_Playback.Window;
+    const std::size_t total_points = window.GetTotalPoints();
+    if (total_points <= static_cast<std::size_t>(MIN_WINDOW_POINTS) || shown.Times.empty()) {
+        return;
+    }
+    const float width = ImGui::GetContentRegionAvail().x;
+    const std::string span =
+        std::format("{}s to {}s", Core::FormatValue(shown.Times.front()), Core::FormatValue(shown.Times.back()));
+    const ImVec2 row_start = ImGui::GetCursorPos();
+    if (m_Controls.IsRunning()) {
+        bool follows = window.DoesFollow();
+        if (ImGui::Checkbox("Follow", &follows)) {
+            window.SetFollow(follows);
+        }
+        ImGui::SetItemTooltip("Keep the window on the newest points of the run");
+    }
+    ImGui::SetCursorPos({row_start.x + (width - ImGui::CalcTextSize(span.c_str()).x) / 2.0f, row_start.y});
+    ImGui::TextDisabled("%s", span.c_str());
+    const float size_width = ImGui::GetFontSize() * WINDOW_SIZE_WIDTH;
+    ImGui::SetCursorPos({row_start.x + width - size_width, row_start.y});
+    ImGui::SetNextItemWidth(size_width);
+    int points = window.GetPoints();
+    if (ImGui::DragInt("##window_points", &points, WINDOW_SIZE_DRAG_SPEED, MIN_WINDOW_POINTS, MAX_WINDOW_POINTS,
+                       "%d points", ImGuiSliderFlags_AlwaysClamp)) {
+        window.SetPoints(points);
+    }
+    ImGui::SetItemTooltip("%s", std::format("How many points the plot and the schematic show at a time, from {} to "
+                                            "{}; drag, or double-click to type. The run has {} points",
+                                            MIN_WINDOW_POINTS, MAX_WINDOW_POINTS, total_points)
+                                    .c_str());
+    if (total_points <= static_cast<std::size_t>(window.GetPoints())) {
+        return;
+    }
+
+    const ImRect bar(ImGui::GetCursorScreenPos(),
+                     ImGui::GetCursorScreenPos() + ImVec2(width, ImGui::GetStyle().ScrollbarSize));
+    ImGui::ItemSize(bar);
+    ImS64 first = static_cast<ImS64>(window.GetWindow().First);
+    if (ImGui::ScrollbarEx(bar, ImGui::GetID("##window"), ImGuiAxis_X, &first,
+                           static_cast<ImS64>(window.GetWindow().Count), static_cast<ImS64>(total_points))) {
+        window.SetFirst(static_cast<std::size_t>(first));
+    }
+    ImGui::SetItemTooltip("Drag to move the window along the run");
+}
+
 // The signals of logic parts are drawn as lanes in a plot under the analog traces, which share its time axis. The
 // analog plot is left out when it would be empty, so a circuit measured only at logic nodes shows the lanes alone
-void OutputWindow::DrawTransient(const Core::Transient &transient, const std::vector<MathTrace> &math) {
+void OutputWindow::DrawTransient(const Core::Transient &transient, const std::vector<MathTrace> &math,
+                                 const std::optional<StepFamily<Core::Transient>> &steps) {
+    if (!transient.IsComplete) {
+        DrawIncompleteNote(transient);
+    }
+    DrawWindowControls(transient);
     const std::vector<LogicNode> lanes = FindMeasuredLanes(transient.NodeVoltages.size());
     const std::vector<int> lane_nodes = ListNodes(lanes);
     std::vector<int> analog_nodes = ListMeasuredNodes(transient.NodeVoltages.size(), m_Schematic, lane_nodes);
@@ -1487,7 +1617,16 @@ void OutputWindow::DrawTransient(const Core::Transient &transient, const std::ve
     const bool has_analog_plot = has_voltages || show_currents || !math.empty() || lanes.empty();
     const bool currents_changed = m_TransientFit.TakeCurrentsChanged(std::move(measured_currents));
     const bool voltages_changed = m_TransientFit.TakeNodesChanged(std::move(analog_nodes));
-    const bool new_result = m_TransientFit.TakeNewResult(m_Schematic.GetTransientVersion());
+    // A transient that is still being made fits its axes as the chunks arrive, so the plot follows the run; once the
+    // run ends, whether whole or stopped, the axes are the user's again
+    const bool has_grown = std::exchange(m_DrawnTransientDataVersion, m_Schematic.GetTransientDataVersion()) !=
+                               m_Schematic.GetTransientDataVersion() &&
+                           !transient.IsComplete;
+    // The window that moved is the one this frame's points come from, so the fit sees the points it moved to
+    const PointWindow window = m_Playback.Window.GetWindow();
+    const PointWindow previous = std::exchange(m_DrawnWindow, window);
+    const bool has_moved = previous.First != window.First || previous.Count != window.Count;
+    const bool new_result = m_TransientFit.TakeNewResult(m_Schematic.GetTransientVersion()) || has_grown || has_moved;
     SetNextFits(new_result, voltages_changed, currents_changed);
     if (m_TransientFit.TakeMathChanged(ListMathLabels(math))) {
         FitMathAxes(math);
@@ -1503,7 +1642,7 @@ void OutputWindow::DrawTransient(const Core::Transient &transient, const std::ve
             std::max(font_size * MIN_PLOT_HEIGHT, available - lane_height - ImGui::GetStyle().ItemSpacing.y * 2.0f);
     }
     if (has_analog_plot) {
-        DrawTransientAnalog(transient, math, lane_nodes, show_currents, has_voltages, analog_height);
+        DrawTransientAnalog(transient, math, steps, lane_nodes, show_currents, has_voltages, analog_height);
     }
     if (!lanes.empty()) {
         if (new_result) {
@@ -1514,6 +1653,7 @@ void OutputWindow::DrawTransient(const Core::Transient &transient, const std::ve
 }
 
 void OutputWindow::DrawTransientAnalog(const Core::Transient &transient, const std::vector<MathTrace> &math,
+                                       const std::optional<StepFamily<Core::Transient>> &steps,
                                        const std::vector<int> &lane_nodes, const bool show_currents,
                                        const bool has_voltages, const float height) {
     if (!BeginTracePlot("##transient", ImVec2(-1.0f, height))) {
@@ -1532,7 +1672,6 @@ void OutputWindow::DrawTransientAnalog(const Core::Transient &transient, const s
     }
     const std::string third_unit = ThirdAxisUnit(math);
     SetupMathAxes(math, show_currents, third_unit);
-    const auto &steps = m_Schematic.GetTransientSteps();
     std::vector<StepTraces> step_traces;
     if (steps) {
         for (const Core::Transient &step : steps->Results) {
@@ -1550,7 +1689,7 @@ void OutputWindow::DrawTransientAnalog(const Core::Transient &transient, const s
         LabelSteps(step_traces, steps->Selected, ListStepLabels(*steps), m_Schematic, show_currents, lane_nodes);
     }
     DrawCursors(m_TransientCursors, false);
-    DrawPlayhead(m_Playback, transient.Times.back());
+    DrawPlayhead(m_Playback, transient.Times.front(), transient.Times.back());
     DrawCursorReadout(transient.Times, "s", false, plotted);
     const ImPlotRange view = ImPlot::GetPlotLimits().X;
     m_TransientView = {.From = view.Min, .To = view.Max};
@@ -1647,7 +1786,7 @@ void OutputWindow::DrawLogicLanes(const Core::Transient &transient, const std::v
         }
     }
     DrawCursors(m_TransientCursors, false);
-    DrawPlayhead(m_Playback, transient.Times.back());
+    DrawPlayhead(m_Playback, transient.Times.front(), transient.Times.back());
     DrawCursorReadout(transient.Times, "s", false, plotted);
     const ImPlotRange view = ImPlot::GetPlotLimits().X;
     m_TransientView = {.From = view.Min, .To = view.Max};
@@ -1901,7 +2040,7 @@ void OutputWindow::UpdateSpectra(const Core::Transient &transient, const std::ve
         labels.push_back(trace.Label + trace.Unit);
     }
     const PlotSpan span = GetSpectrumSpan(transient);
-    const std::size_t version = m_Schematic.GetTransientVersion();
+    const std::size_t version = m_Schematic.GetTransientDataVersion();
     if (m_Spectra && m_Spectra->TransientVersion == version && m_Spectra->Span.From == span.From &&
         m_Spectra->Span.To == span.To && m_Spectra->Window == m_SpectrumWindow && m_Spectra->Labels == labels) {
         return;
@@ -2318,8 +2457,12 @@ void OutputWindow::DrawExportButton(const ImVec2 tab_row, const float tab_row_wi
     ImGui::SetItemTooltip("Save the plot of this tab as an SVG image or a CSV table");
     ImGui::SetNextWindowPos({ImGui::GetItemRectMax().x, ImGui::GetItemRectMax().y}, ImGuiCond_Appearing,
                             ImVec2(1.0f, 0.0f));
-    if (const std::optional<ExportFormat> format = m_Exporter.DrawPopup(GetTabTitle(m_ShownTab), CanExport(frame))) {
-        m_Exporter.Start(BuildShownFigure(frame), *format, m_Schematic.GetFilePath(), GetTabFileSuffix(m_ShownTab));
+    if (const std::optional<ExportChoice> choice =
+            m_Exporter.DrawPopup(GetTabTitle(m_ShownTab), CanExport(frame), HasLongerRun())) {
+        const std::string suffix =
+            std::format("{}{}", GetTabFileSuffix(m_ShownTab), choice->IsWholeRun ? "-whole-run" : "");
+        m_Exporter.Start(BuildShownFigure(frame, choice->IsWholeRun), choice->Format, m_Schematic.GetFilePath(),
+                         suffix);
     }
 }
 
@@ -2329,7 +2472,7 @@ bool OutputWindow::CanExport(const FrameResults &frame) const {
     case PlotTab::OPERATING_POINT:
         return false;
     case PlotTab::TRANSIENT:
-        return m_Schematic.GetTransient() && (frame.AnythingMeasured || !frame.TransientMath.empty());
+        return frame.TransientWindow && (frame.AnythingMeasured || !frame.TransientMath.empty());
     case PlotTab::SPECTRUM:
         return m_Schematic.GetTransient() && m_Spectra &&
                std::ranges::any_of(m_Spectra->Traces,
@@ -2348,16 +2491,35 @@ bool OutputWindow::CanExport(const FrameResults &frame) const {
     return false;
 }
 
+// Whether the transient plot shows only a window of a longer run that is over, whose every point a CSV table can hold
+bool OutputWindow::HasLongerRun() const {
+    const auto &transient = m_Schematic.GetTransient();
+    return m_ShownTab == PlotTab::TRANSIENT && transient &&
+           transient->Times.size() > static_cast<std::size_t>(m_Playback.Window.GetPoints()) && !m_Controls.IsRunning();
+}
+
+// The figure of the transient: the window as plotted, or, for a CSV table of the whole run, every point of the
+// transient and its math channels, whatever the window shows
+ExportFigure OutputWindow::BuildShownTransientFigure(const FrameResults &frame, const bool is_whole_run) const {
+    if (const auto &transient = m_Schematic.GetTransient(); is_whole_run && transient) {
+        static const std::vector<MathTrace> no_math;
+        return BuildTransientFigure(*transient, m_FullMath ? m_FullMath->Traces : no_math,
+                                    FindMeasuredLanes(transient->NodeVoltages.size()), m_Schematic, m_ShowBitValues,
+                                    {.From = transient->Times.front(), .To = transient->Times.back()});
+    }
+    if (frame.TransientWindow) {
+        return BuildTransientFigure(*frame.TransientWindow, frame.TransientMath,
+                                    FindMeasuredLanes(frame.TransientWindow->NodeVoltages.size()), m_Schematic,
+                                    m_ShowBitValues, m_TransientView);
+    }
+    return {};
+}
+
 // The figure of the shown tab, which CanExport() has found something to export in
-ExportFigure OutputWindow::BuildShownFigure(const FrameResults &frame) const {
+ExportFigure OutputWindow::BuildShownFigure(const FrameResults &frame, const bool is_whole_run) const {
     switch (m_ShownTab) {
     case PlotTab::TRANSIENT:
-        if (const std::optional<Core::Transient> &transient = m_Schematic.GetTransient()) {
-            return BuildTransientFigure(*transient, frame.TransientMath,
-                                        FindMeasuredLanes(transient->NodeVoltages.size()), m_Schematic, m_ShowBitValues,
-                                        m_TransientView);
-        }
-        break;
+        return BuildShownTransientFigure(frame, is_whole_run);
     case PlotTab::SPECTRUM:
         if (m_Spectra) {
             return BuildSpectrumFigure(*m_Spectra, m_SpectrumLogarithmic, m_SpectrumView);

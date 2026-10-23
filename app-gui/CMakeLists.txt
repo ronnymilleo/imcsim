@@ -32,6 +32,7 @@ add_library(imcsim-gui-lib
             plot_exporter.cpp
             plot_figures.cpp
             plot_helpers.cpp
+            point_window.cpp
             probing.cpp
             schematic.cpp
             schematic_canvas.cpp
@@ -46,6 +47,7 @@ add_library(imcsim-gui-lib
             trace_fit_state.cpp
             trace_math.cpp
             trace_statistics.cpp
+            transient_window.cpp
             truth_table.cpp
             ui_elements/ui_bjt.cpp
             ui_elements/ui_capacitor.cpp

@@ -107,6 +107,9 @@ constexpr auto SUPPLY_PARTS = std::to_array({Core::ComponentType::GROUND, Core::
 // Toolbar buttons are square, this many frame heights wide; icons fill this share of them
 constexpr float TOOL_BUTTON_SCALE = 1.4f;
 constexpr float ICON_SCALE = 0.7f;
+// How often the heat scale of a transient that is still being made is worked out again, in seconds
+constexpr double SCALE_REFRESH_SECONDS = 0.5;
+
 // The dropdown arrow beside a group button, in frame heights
 constexpr float DROPDOWN_BUTTON_SCALE = 0.6f;
 
@@ -244,6 +247,45 @@ std::string FormatRunProgress(const char *analysis_name, const bool is_stopping,
         return std::format("{} running, {:.0f}%", analysis_name, progress * 100.0);
     }
     return std::format("{} running", analysis_name);
+}
+
+/**
+ * @struct  RunStatusLine
+ * @brief   The text of the run status in the status bar, its color, and whether it is a run in progress.
+ */
+struct RunStatusLine {
+    std::string Text;
+    ImVec4 Color;
+    bool IsRunning = false;
+};
+
+// What the last run reported, in the color its outcome asks for; a run in progress takes the place of that report
+RunStatusLine DescribeRunStatus(const AnalysisControls &controls) {
+    const ImVec4 plain = ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled);
+    if (const std::optional<Analysis> running = controls.GetRunningAnalysis()) {
+        return {.Text = FormatRunProgress(GetAnalysisName(*running), controls.IsStopping(), controls.GetRunProgress()),
+                .Color = plain,
+                .IsRunning = true};
+    }
+    const std::optional<Analysis> last_run = controls.GetLastRun();
+    if (!last_run) {
+        return {.Text = "", .Color = plain, .IsRunning = false};
+    }
+    const std::string_view name = GetAnalysisName(*last_run);
+    switch (controls.GetOutcome(*last_run)) {
+    case RunOutcome::SUCCEEDED:
+        return {.Text = std::format("{} done", name), .Color = plain, .IsRunning = false};
+    case RunOutcome::SUCCEEDED_WITH_WARNINGS:
+        return {
+            .Text = std::format("{} done, with warnings", name), .Color = GetWarningTextColor(), .IsRunning = false};
+    case RunOutcome::STOPPED:
+        return {.Text = std::format("{} stopped", name), .Color = plain, .IsRunning = false};
+    case RunOutcome::FAILED:
+        return {.Text = std::format("{} failed", name), .Color = GetErrorTextColor(), .IsRunning = false};
+    case RunOutcome::NONE:
+    default:
+        return {.Text = "", .Color = plain, .IsRunning = false};
+    }
 }
 
 // The button that names the selected analysis, with room for its dropdown arrow
@@ -442,9 +484,15 @@ EditorWindow::EditorWindow(Schematic &schematic, AnalysisControls &controls, Ana
  *          Draw(), and the popups opened here are drawn here too, so they show whichever window is in front.
  */
 void EditorWindow::Update() {
-    // The playhead of the Output window moves with the time too, so playing goes on while this window is hidden
-    if (const auto &transient = m_Schematic.GetTransient(); transient && !transient->Times.empty()) {
-        m_Playback.Advance(ImGui::GetIO().DeltaTime, transient->Times.back());
+    // The playhead of the Output window moves with the time too, so playing goes on while this window is hidden. It
+    // plays the window of points that the plot shows; while the window follows a run, the schematic shows its newest
+    // point
+    if (const std::optional<TimeSpan> window = GetWindowSpan()) {
+        if (m_Playback.Window.IsLive()) {
+            m_Playback.Time = window->To;
+            m_Playback.Playing = false;
+        }
+        m_Playback.Advance(ImGui::GetIO().DeltaTime, window->From, window->To);
     }
     m_Files.Update();
     HandleCommandRequest();
@@ -869,9 +917,18 @@ void EditorWindow::UpdateDisplayedState() {
     const Connectivity &connectivity = m_Schematic.GetConnectivity();
     DisplayedState state;
     if (show_transient) {
-        if (m_ScaledTransientVersion != m_Schematic.GetTransientVersion()) {
-            m_TransientScale = ScaleOf(*transient, elements, connectivity);
-            m_ScaledTransientVersion = m_Schematic.GetTransientVersion();
+        // The scale goes over the window that plays, so a window of any size costs the same; while chunks keep arriving
+        // it is refreshed a few times a second only
+        const PointWindow window = m_Playback.Window.GetWindow();
+        const bool is_stale = m_ScaledTransientVersion != m_Schematic.GetTransientDataVersion() ||
+                              m_ScaledWindow.First != window.First || m_ScaledWindow.Count != window.Count;
+        const bool may_refresh = transient->IsComplete || !m_ScaledTransientVersion.has_value() ||
+                                 ImGui::GetTime() - m_LastScaleTime >= SCALE_REFRESH_SECONDS;
+        if (is_stale && may_refresh) {
+            m_TransientScale = ScaleOf(SliceTransient(*transient, window), elements, connectivity);
+            m_ScaledTransientVersion = m_Schematic.GetTransientDataVersion();
+            m_ScaledWindow = window;
+            m_LastScaleTime = ImGui::GetTime();
         }
         state.Point = SampleTransient(*transient, m_Playback.Time);
         state.Scale = m_TransientScale;
@@ -884,8 +941,18 @@ void EditorWindow::UpdateDisplayedState() {
     m_Displayed = std::move(state);
 }
 
-// A row above the canvas with the playback of the transient on display: play, loop, a slider over the whole run and
-// the instant. Moving the slider stops the playback, so it holds where the user put it
+// The span of time of the window of the transient that plays, or none without a transient
+std::optional<EditorWindow::TimeSpan> EditorWindow::GetWindowSpan() const {
+    const auto &transient = m_Schematic.GetTransient();
+    const PointWindow window = m_Playback.Window.GetWindow();
+    if (!transient || window.Count == 0 || window.First + window.Count > transient->Times.size()) {
+        return std::nullopt;
+    }
+    return TimeSpan{.From = transient->Times[window.First], .To = transient->Times[window.First + window.Count - 1]};
+}
+
+// A row above the canvas with the playback of the transient on display: play, loop, a slider over the window and the
+// instant. Moving the slider stops the playback, so it holds where the user put it
 void EditorWindow::DrawTimeBar() {
     if (!m_Displayed || !m_Displayed->Time) {
         return;
@@ -894,10 +961,14 @@ void EditorWindow::DrawTimeBar() {
     if (!transient) {
         return;
     }
-    const double stop_time = transient->Times.back();
+    const std::optional<TimeSpan> window = GetWindowSpan();
+    if (!window) {
+        return;
+    }
+    const double stop_time = window->To;
     if (ImGui::Button(m_Playback.Playing ? "Pause" : "Play")) {
         if (!m_Playback.Playing && m_Playback.Time >= stop_time) {
-            m_Playback.Time = 0.0;
+            m_Playback.Time = window->From;
         }
         m_Playback.Playing = !m_Playback.Playing;
     }
@@ -908,8 +979,7 @@ void EditorWindow::DrawTimeBar() {
         std::format("t = {}s / {}s", Core::FormatValue(m_Playback.Time), Core::FormatValue(stop_time));
     const float readout_width = ImGui::CalcTextSize(readout.c_str()).x + ImGui::GetStyle().ItemSpacing.x;
     ImGui::SetNextItemWidth(std::max(ImGui::GetContentRegionAvail().x - readout_width, MIN_TIME_SLIDER_WIDTH));
-    constexpr double START = 0.0;
-    ImGui::SliderScalar("##time", ImGuiDataType_Double, &m_Playback.Time, &START, &stop_time, "");
+    ImGui::SliderScalar("##time", ImGuiDataType_Double, &m_Playback.Time, &window->From, &stop_time, "");
     if (ImGui::IsItemActive()) {
         m_Playback.Playing = false;
     }
@@ -1118,41 +1188,17 @@ void EditorWindow::DrawStatusBar(const ViewTransform &view, const bool hovered) 
 // opens the report of the run, with the ngspice output. Returns where the space left for the hint ends
 float EditorWindow::DrawRunStatus(float right_edge) {
     const std::optional<Analysis> last_run = m_Controls.GetLastRun();
-    const RunOutcome outcome = last_run ? m_Controls.GetOutcome(*last_run) : RunOutcome::NONE;
-    const std::string_view analysis_name = last_run ? GetAnalysisName(*last_run) : std::string_view();
-    std::string status;
-    ImVec4 color = ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled);
-    switch (outcome) {
-    case RunOutcome::NONE:
-        break;
-    case RunOutcome::SUCCEEDED:
-        status = std::format("{} done", analysis_name);
-        break;
-    case RunOutcome::SUCCEEDED_WITH_WARNINGS:
-        status = std::format("{} done, with warnings", analysis_name);
-        color = GetWarningTextColor();
-        break;
-    case RunOutcome::FAILED:
-        status = std::format("{} failed", analysis_name);
-        color = GetErrorTextColor();
-        break;
-    }
-    // A run in progress takes the place of the report of the last one
-    const std::optional<Analysis> running = m_Controls.GetRunningAnalysis();
-    if (running) {
-        status = FormatRunProgress(GetAnalysisName(*running), m_Controls.IsStopping(), m_Controls.GetRunProgress());
-        color = ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled);
-    }
+    const RunStatusLine line = DescribeRunStatus(m_Controls);
     const ImVec2 line_start = ImGui::GetCursorScreenPos();
-    if (!status.empty()) {
-        const ImVec2 status_size = ImGui::CalcTextSize(status.c_str());
+    if (!line.Text.empty()) {
+        const ImVec2 status_size = ImGui::CalcTextSize(line.Text.c_str());
         right_edge -= status_size.x;
         ImGui::SetCursorScreenPos({right_edge, line_start.y});
-        if (running) {
-            ImGui::TextDisabled("%s", status.c_str());
+        if (line.IsRunning) {
+            ImGui::TextDisabled("%s", line.Text.c_str());
         } else {
-            ImGui::PushStyleColor(ImGuiCol_Text, color);
-            if (ImGui::Selectable(status.c_str(), false, ImGuiSelectableFlags_None, status_size)) {
+            ImGui::PushStyleColor(ImGuiCol_Text, line.Color);
+            if (ImGui::Selectable(line.Text.c_str(), false, ImGuiSelectableFlags_None, status_size)) {
                 ImGui::OpenPopup("run_report");
             }
             ImGui::PopStyleColor();

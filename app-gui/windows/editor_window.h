@@ -75,6 +75,15 @@ public:
 
 private:
     /**
+     * @struct  TimeSpan
+     * @brief   A stretch of time of the transient, in seconds.
+     */
+    struct TimeSpan {
+        double From = 0.0;
+        double To = 0.0;
+    };
+
+    /**
      * @struct  GroupDrag
      * @brief   Schematic state captured when a drag of the selection starts; every frame of the drag is computed from
      * it.
@@ -160,6 +169,10 @@ private:
     // result and kept
     std::optional<DisplayedState> m_Displayed;
     std::optional<std::size_t> m_ScaledTransientVersion;
+    // The window of points the scale was worked out over
+    PointWindow m_ScaledWindow;
+    // When the heat scale of a transient that is still being made was last worked out
+    double m_LastScaleTime = 0.0;
     HeatScale m_TransientScale;
 
     // Placement
@@ -207,6 +220,7 @@ private:
     void DrawPartGroup(std::size_t index);
     void DrawRunControls();
     void UpdateDisplayedState();
+    std::optional<TimeSpan> GetWindowSpan() const;
     void DrawTimeBar();
     void DrawWires(SchematicCanvas &canvas, const ViewTransform &view);
     void DrawWireSelectionHalos(SchematicCanvas &canvas, const ViewTransform &view);

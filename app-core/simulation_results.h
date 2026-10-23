@@ -68,6 +68,8 @@ struct Transient {
     std::vector<ComponentTrace> Currents;
     // Problems in the results that ngspice does not report, such as a diode in reverse breakdown
     std::vector<std::string> Warnings;
+    // False while the run still goes on and after a stop, when the points end before the stop time
+    bool IsComplete = true;
 };
 
 /**

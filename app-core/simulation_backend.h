@@ -11,7 +11,9 @@
 
 #include "analysis_settings.h"
 #include "circuit.h"
+#include "run_control.h"
 #include "simulation_results.h"
+#include <functional>
 #include <map>
 #include <memory>
 #include <optional>
@@ -47,6 +49,20 @@ struct BackendCapabilities {
 };
 
 /**
+ * @struct  RunMonitor
+ * @brief   What the caller of a transient watches while it goes on, and how it can stop it.
+ * @details A backend that runs the transient in stretches of simulated time reads the stop request and reports the
+ *          progress between stretches, and hands over the points of each stretch as it goes. With neither set, the run
+ *          goes from start to end in one piece. A backend that cannot split the run ignores the monitor.
+ */
+struct RunMonitor {
+    // Where to look for a stop request and to report the share of the stop time reached, or null
+    RunControl *Control = nullptr;
+    // Receives the points made since the last call, from the worker thread, or empty
+    std::function<void(Transient)> OnChunk;
+};
+
+/**
  * @class   SimulationBackend
  * @brief   A program that solves circuits, such as ngspice.
  * @details Every Run method takes a circuit and settings the simulator has checked, and a circuit whose parts the
@@ -61,7 +77,7 @@ public:
 
     virtual OperatingPointRun RunOperatingPoint(const Circuit &circuit) = 0;
     virtual TransientRun RunTransient(const Circuit &circuit, const TransientSettings &settings,
-                                      const std::optional<double> &temperature_celsius) = 0;
+                                      const std::optional<double> &temperature_celsius, const RunMonitor &monitor) = 0;
     virtual ACSweepRun RunACSweep(const Circuit &circuit, const ACSweepSettings &settings,
                                   const std::optional<double> &temperature_celsius) = 0;
     virtual DCSweepRun RunDCSweep(const Circuit &circuit, const DCSweepSettings &settings,

@@ -49,7 +49,8 @@ public:
     }
 
     Core::TransientRun RunTransient(const Core::Circuit &circuit, const Core::TransientSettings &settings,
-                                    const std::optional<double> &temperature_celsius) override {
+                                    const std::optional<double> &temperature_celsius,
+                                    const Core::RunMonitor &) override {
         LastTransientSettings = settings;
         LastTemperatureCelsius = temperature_celsius;
         // The circuit of a stepped run is gone after the call, so only what the tests compare is kept

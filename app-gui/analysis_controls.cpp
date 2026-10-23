@@ -70,13 +70,14 @@ SteppedRuns<Result> RunSteps(const ParameterStepSettings &step, const std::strin
 }
 
 // A job that simulates its own copy of the circuit, so the user can go on editing, and hands the run it makes to the
-// thread that polls, where store puts it away. A job that was stopped delivers nothing
-template <typename Run, typename Work, typename Store>
+// thread that polls, where store puts it away. A job that was stopped delivers nothing, unless what it has made is
+// worth keeping, as the points of a transient
+template <typename Run, bool KeepsPartial = false, typename Work, typename Store>
 Core::Job MakeJob(const Core::Circuit &circuit, Work work, Store store) {
     const auto copy = std::make_shared<const Core::CircuitCopy>(circuit);
     return [copy, work = std::move(work), store = std::move(store)](Core::RunControl &control) -> Core::Delivery {
         auto run = std::make_shared<Run>(work(copy->GetCircuit(), control));
-        if (control.IsCancelled()) {
+        if (control.IsCancelled() && !KeepsPartial) {
             return {};
         }
         return [run, store] { store(std::move(*run)); };
@@ -162,12 +163,13 @@ void AnalysisControls::RunSelected() {
 }
 
 /**
- * @brief   Asks the run in progress to stop; its result is dropped.
- * @note    The run stops between its steps (the values of a stepped analysis, the combinations of a truth table), so a
- *          single long simulation ends before the stop shows; IsStopping() is true until then.
+ * @brief   Asks the run in progress to stop.
+ * @note    A transient keeps the points made until the end of its current chunk. The other runs stop between their
+ *          steps (the values of a stepped analysis, the combinations of a truth table) and drop their result, so a
+ *          single simulation ends before the stop shows; IsStopping() is true until then.
  */
 void AnalysisControls::StopRun() {
-    m_Service.Cancel();
+    m_Service.Stop();
 }
 
 /**
@@ -231,8 +233,8 @@ std::optional<Analysis> AnalysisControls::GetLastRun() const {
 /**
  * @brief   Tells how the last run of an analysis went.
  * @param[in] analysis  Analysis to check.
- * @return  Failed while its last run has an error; with warnings when the result or ngspice reported some; None
- *          when it has no result, such as after the circuit changed.
+ * @return  Failed while its last run has an error; Stopped for a transient that ended early; with warnings when the
+ *          result or ngspice reported some; None when it has no result, such as after the circuit changed.
  */
 RunOutcome AnalysisControls::GetOutcome(const Analysis analysis) const {
     const RunStatus &status = m_Statuses[ToIndex(analysis)];
@@ -241,6 +243,9 @@ RunOutcome AnalysisControls::GetOutcome(const Analysis analysis) const {
     }
     if (!HasResult(analysis)) {
         return RunOutcome::NONE;
+    }
+    if (analysis == Analysis::TRANSIENT && m_Schematic.GetTransient() && !m_Schematic.GetTransient()->IsComplete) {
+        return RunOutcome::STOPPED;
     }
     const bool ngspice_warned = std::ranges::any_of(
         status.Messages, [](const Core::SimulatorMessage &message) { return message.FromErrorStream; });
@@ -319,11 +324,23 @@ void AnalysisControls::RunTransientAnalysis(const Core::Circuit &circuit, const 
                      }));
         return;
     }
+    // The points arrive in chunks while the run goes on, so the old result gives way to the first one
+    m_Schematic.SetTransient(std::nullopt);
+    const std::size_t circuit_version = m_Schematic.GetCircuitVersion();
     StartRun(
         Analysis::TRANSIENT,
-        MakeJob<Core::TransientRun>(
+        MakeJob<Core::TransientRun, true>(
             circuit,
-            [settings](const Core::Circuit &copy, Core::RunControl &) { return Core::RunTransient(copy, settings); },
+            [this, settings, circuit_version](const Core::Circuit &copy, Core::RunControl &control) {
+                const auto post_chunk = [this, &control, circuit_version](Core::Transient chunk) {
+                    control.Post([this, circuit_version, points = std::make_shared<Core::Transient>(std::move(chunk))] {
+                        if (m_Schematic.GetCircuitVersion() == circuit_version) {
+                            m_Schematic.AppendTransient(std::move(*points));
+                        }
+                    });
+                };
+                return Core::RunTransient(copy, settings, std::nullopt, {.Control = &control, .OnChunk = post_chunk});
+            },
             [this](Core::TransientRun run) {
                 Finish(Analysis::TRANSIENT,
                        StoreResult(std::move(run.Result),

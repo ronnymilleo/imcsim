@@ -104,9 +104,20 @@ How to read what imcsim measures, plots and exports. The [README](../README.md) 
   bandwidths). Nothing runs by itself: edit the circuit, then run again. View > Analysis Settings keeps the same
   settings open in a window.
 - **Stopping**: a run goes on in the background, so the editor stays usable. The ▶ button becomes a ■ Stop button, and the
-  status bar shows the run and, for a stepped analysis or a truth table, how much of it is done. Stop ends a run
-  between its steps (the values of a stepped analysis, the combinations of a truth table) and drops its result; a
-  single simulation finishes first. Editing the circuit also stops the run, since its answer would no longer fit.
+  status bar shows the run and, for a stepped analysis or a truth table, how much of it is done. A transient runs in
+  chunks: its plot opens in the Output window with the first one and grows as the others arrive, with a Stop button
+  and "Running, simulated up to 230ms of 1s" above it. Stop keeps the points made so far ("Stopped, simulated up to
+  530ms of 1s", and "Transient stopped" in the status bar). The transient plot shows a window of 2000 points at a time (a field
+  at its top right sets 1000 to 10000), so a long run stays quick to draw and to measure: a scroll bar the width of the
+  plot, with its time span written above it, moves the window along the run (the plot fits itself to every window), and
+  while the run goes on a Follow box keeps the window on the newest points. The schematic plays the same window: its
+  time bar, its heat colors and the playhead of the plot all go over the window, and while the window follows a run the
+  schematic shows the newest point. The statistics and the cursors work on the
+  points in the window. The SVG image is the window; a CSV table can be of the window or of the whole run, as Export
+  asks. The math channels are worked out over the whole run, so an integral starts at the start of the simulation, and
+  they wait, grayed out, for the end of a run that is still going on. The spectrum uses the whole run too. The other analyses stop between their steps (the values
+  of a stepped analysis, the combinations of a truth table) and drop their result, and a single simulation finishes
+  first. Editing the circuit also stops the run and drops what it made, since the answer would no longer fit.
 - **Status bar**: below the schematic, the keys of the current mode on the left; on the right, the grid position of
   the cursor and how the last run went ("Transient done", with warnings, or failed). Click the result for the
   errors, the warnings and the ngspice output.

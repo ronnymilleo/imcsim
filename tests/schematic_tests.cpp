@@ -607,3 +607,44 @@ TEST_CASE("A measured node that is joined to ground and then freed is measured a
     CHECK(nodes.GetNode({10, 10}).value() > 0);
     CHECK(schematic.IsVoltageMeasured(nodes.GetNode({10, 10}).value()));
 }
+
+TEST_CASE("Chunks of a transient make the result grow, and only the first counts as a new result", "[schematic]") {
+    GUI::Schematic schematic;
+    const auto make_chunk = [](const std::vector<double> &times) {
+        Core::Transient chunk;
+        chunk.Times = times;
+        chunk.NodeVoltages = {std::vector<double>(times.size(), 0.0), times};
+        chunk.Currents = {{"R1", times}};
+        return chunk;
+    };
+
+    schematic.AppendTransient(make_chunk({0.0, 1.0}));
+    REQUIRE(schematic.GetTransient().has_value());
+    // A transient that is still being made is not complete
+    CHECK_FALSE(schematic.GetTransient()->IsComplete);
+    const std::size_t result_version = schematic.GetTransientVersion();
+    const std::size_t data_version = schematic.GetTransientDataVersion();
+
+    schematic.AppendTransient(make_chunk({2.0, 3.0}));
+    CHECK(schematic.GetTransient()->Times == std::vector<double>{0.0, 1.0, 2.0, 3.0});
+    CHECK(schematic.GetTransient()->NodeVoltages[1] == std::vector<double>{0.0, 1.0, 2.0, 3.0});
+    CHECK(schematic.GetTransient()->Currents[0].Values == std::vector<double>{0.0, 1.0, 2.0, 3.0});
+    CHECK(schematic.GetTransientVersion() == result_version);
+    CHECK(schematic.GetTransientDataVersion() == data_version + 1);
+
+    // A chunk made for another circuit, with other nodes or other currents, is dropped
+    Core::Transient other = make_chunk({4.0});
+    other.NodeVoltages.push_back({4.0});
+    schematic.AppendTransient(other);
+    other = make_chunk({4.0});
+    other.Currents[0].Name = "R2";
+    schematic.AppendTransient(other);
+    CHECK(schematic.GetTransient()->Times.size() == 4);
+    CHECK(schematic.GetTransientDataVersion() == data_version + 1);
+
+    // The whole run replaces what the chunks made, as a new result
+    schematic.SetTransient(make_chunk({0.0, 5.0}));
+    CHECK(schematic.GetTransient()->IsComplete);
+    CHECK(schematic.GetTransientVersion() == result_version + 1);
+    CHECK(schematic.GetTransientDataVersion() == data_version + 2);
+}

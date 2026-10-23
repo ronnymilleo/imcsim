@@ -120,3 +120,32 @@ TEST_CASE("Levels place voltage linearly and power logarithmically", "[circuit_s
     CHECK(GUI::PowerLevel(1e-6, scale) < 0.0f);
     CHECK(GUI::PowerLevel(0.0, scale) == 0.0f);
 }
+
+TEST_CASE("The scale of a long transient keeps its exact voltage and current extremes and samples its power",
+          "[circuit_snapshot]") {
+    const SeriesLoop loop;
+    const GUI::Connectivity connectivity(loop.Elements, loop.Wires);
+
+    // A ramp of many more samples than the scale reads the power of: the source goes from 0 V to 4 V and the current
+    // from 0 to 2 mA, so the largest power is at the last sample, which is always read
+    const std::size_t count = GUI::MAX_POWER_SAMPLES * 5 + 3;
+    Core::Transient transient;
+    transient.NodeVoltages = {std::vector<double>(count, 0.0), {}};
+    transient.Currents = {{"V1", {}}, {"R1", {}}};
+    for (std::size_t index = 0; index < count; ++index) {
+        const double fraction = static_cast<double>(index) / static_cast<double>(count - 1);
+        transient.Times.push_back(fraction);
+        transient.NodeVoltages[1].push_back(4.0 * fraction);
+        transient.Currents[0].Values.push_back(-2e-3 * fraction);
+        transient.Currents[1].Values.push_back(2e-3 * fraction);
+    }
+    // A spike at a sample the power is not read at still sets the voltage and current extremes
+    transient.NodeVoltages[1][1] = 9.0;
+    transient.Currents[1].Values[1] = 5e-3;
+
+    const GUI::HeatScale scale = GUI::ScaleOf(transient, loop.Elements, connectivity);
+    CHECK(scale.LowestVoltage == 0.0);
+    CHECK(scale.HighestVoltage == 9.0);
+    CHECK_THAT(scale.LargestCurrent, WithinAbs(5e-3, 1e-12));
+    CHECK_THAT(scale.LargestPower, WithinAbs(8e-3, 1e-12));
+}
