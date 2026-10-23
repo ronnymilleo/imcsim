@@ -11,6 +11,7 @@
 #include "ngspice_library.h"
 #include "ratings.h"
 #include <algorithm>
+#include <array>
 #include <cctype>
 #include <cmath>
 #include <complex>
@@ -133,70 +134,51 @@ void AddACCurrent(std::string name, const std::vector<std::complex<double>> &cur
     result.CurrentPhasesDegrees.push_back(std::move(phases));
 }
 
+// Voltage across the part times its admittance: 1/R for a resistor, j*2*pi*f*C for a capacitor
+std::vector<std::complex<double>>
+PassiveACCurrent(const CircuitEntry &entry, const std::vector<double> &frequencies,
+                 const std::vector<std::vector<std::complex<double>>> &node_voltages) {
+    const Component &component = *entry.Part;
+    std::vector<std::complex<double>> currents(frequencies.size());
+    for (std::size_t index = 0; index < frequencies.size(); ++index) {
+        const std::complex<double> voltage = node_voltages[static_cast<std::size_t>(entry.Nodes[0])][index] -
+                                             node_voltages[static_cast<std::size_t>(entry.Nodes[1])][index];
+        const std::complex<double> admittance =
+            component.GetType() == ComponentType::RESISTOR
+                ? std::complex<double>(1.0 / component.GetValue(), 0.0)
+                : std::complex<double>(0.0, 2.0 * std::numbers::pi * frequencies[index] * component.GetValue());
+        currents[index] = voltage * admittance;
+    }
+    return currents;
+}
+
+// The source drives its AC magnitude at zero phase, and nothing when it is not AC
+std::vector<std::complex<double>> CurrentSourceACCurrent(const Component &component, const std::size_t point_count) {
+    const auto &source = static_cast<const Source &>(component);
+    const double magnitude = source.GetSourceType() == Source::SourceType::AC ? source.GetAC().Magnitude : 0.0;
+    return std::vector<std::complex<double>>(point_count, std::complex<double>(magnitude, 0.0));
+}
+
+bool HasACBranchCurrent(const ComponentType type) {
+    static constexpr std::array BRANCH_CURRENT_TYPES = {ComponentType::INDUCTOR, ComponentType::VCC,
+                                                        ComponentType::VOLTAGE_SOURCE, ComponentType::CLOCK,
+                                                        ComponentType::LOGIC_INPUT};
+    return std::ranges::contains(BRANCH_CURRENT_TYPES, type);
+}
+
 std::expected<std::vector<std::complex<double>>, std::string>
 ACCurrent(const CircuitEntry &entry, const std::vector<double> &frequencies,
           const std::vector<std::vector<std::complex<double>>> &node_voltages) {
     const Component &component = *entry.Part;
-    std::vector<std::complex<double>> currents(frequencies.size());
-    switch (component.GetType()) {
-    case ComponentType::RESISTOR:
-    case ComponentType::CAPACITOR:
-        for (std::size_t index = 0; index < frequencies.size(); ++index) {
-            const std::complex<double> voltage = node_voltages[static_cast<std::size_t>(entry.Nodes[0])][index] -
-                                                 node_voltages[static_cast<std::size_t>(entry.Nodes[1])][index];
-            const std::complex<double> admittance =
-                component.GetType() == ComponentType::RESISTOR
-                    ? std::complex<double>(1.0 / component.GetValue(), 0.0)
-                    : std::complex<double>(0.0, 2.0 * std::numbers::pi * frequencies[index] * component.GetValue());
-            currents[index] = voltage * admittance;
-        }
-        return currents;
-    case ComponentType::CURRENT_SOURCE: {
-        // The source drives its AC magnitude at zero phase, and nothing when it is not AC
-        const auto &source = static_cast<const Source &>(component);
-        const double magnitude = source.GetSourceType() == Source::SourceType::AC ? source.GetAC().Magnitude : 0.0;
-        std::ranges::fill(currents, std::complex<double>(magnitude, 0.0));
-        return currents;
+    const ComponentType type = component.GetType();
+    if (type == ComponentType::RESISTOR || type == ComponentType::CAPACITOR) {
+        return PassiveACCurrent(entry, frequencies, node_voltages);
     }
-    case ComponentType::INDUCTOR:
-    case ComponentType::VCC:
-    case ComponentType::VOLTAGE_SOURCE:
-    case ComponentType::CLOCK:
-    case ComponentType::LOGIC_INPUT:
+    if (type == ComponentType::CURRENT_SOURCE) {
+        return CurrentSourceACCurrent(component, frequencies.size());
+    }
+    if (HasACBranchCurrent(type)) {
         return ReadACCurrent(BranchVectorName(component.GetName()), component.GetName(), frequencies.size());
-    case ComponentType::GROUND:
-    case ComponentType::NET_LABEL:
-    case ComponentType::DIODE:
-    case ComponentType::ZENER_DIODE:
-    case ComponentType::LED:
-    case ComponentType::NPN:
-    case ComponentType::PNP:
-    case ComponentType::NMOS:
-    case ComponentType::PMOS:
-    case ComponentType::VCVS:
-    case ComponentType::VCCS:
-    case ComponentType::CCCS:
-    case ComponentType::CCVS:
-    case ComponentType::OP_AMP:
-    case ComponentType::POTENTIOMETER:
-    case ComponentType::SWITCH:
-    case ComponentType::PUSH_BUTTON:
-    case ComponentType::V_SWITCH:
-    case ComponentType::RELAY:
-    case ComponentType::TRANSFORMER:
-    case ComponentType::AND:
-    case ComponentType::OR:
-    case ComponentType::NOT:
-    case ComponentType::NAND:
-    case ComponentType::NOR:
-    case ComponentType::XOR:
-    case ComponentType::XNOR:
-    case ComponentType::BUFFER:
-    case ComponentType::D_FLIP_FLOP:
-    case ComponentType::JK_FLIP_FLOP:
-    case ComponentType::T_FLIP_FLOP:
-    case ComponentType::SR_FLIP_FLOP:
-        break;
     }
     return std::unexpected(std::format("{} carries no current", component.GetName()));
 }

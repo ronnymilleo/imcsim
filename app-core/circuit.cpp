@@ -21,6 +21,7 @@
 #include "components/voltage_controlled_switch.h"
 #include "spice_value.h"
 #include <algorithm>
+#include <array>
 #include <format>
 #include <iterator>
 #include <utility>
@@ -600,51 +601,12 @@ std::string GetCurrentName(const Component &component, const std::string_view la
  *          report their currents through probes or not at all, such as the logic parts.
  */
 bool HasSingleCurrent(const ComponentType type) {
-    switch (type) {
-    case ComponentType::RESISTOR:
-    case ComponentType::CAPACITOR:
-    case ComponentType::INDUCTOR:
-    case ComponentType::VCC:
-    case ComponentType::VOLTAGE_SOURCE:
-    case ComponentType::CLOCK:
-    case ComponentType::LOGIC_INPUT:
-    case ComponentType::CURRENT_SOURCE:
-        return true;
-    case ComponentType::GROUND:
-    case ComponentType::NET_LABEL:
-    case ComponentType::DIODE:
-    case ComponentType::ZENER_DIODE:
-    case ComponentType::LED:
-    case ComponentType::NPN:
-    case ComponentType::PNP:
-    case ComponentType::NMOS:
-    case ComponentType::PMOS:
-    case ComponentType::VCVS:
-    case ComponentType::VCCS:
-    case ComponentType::CCCS:
-    case ComponentType::CCVS:
-    case ComponentType::OP_AMP:
-    case ComponentType::POTENTIOMETER:
-    case ComponentType::SWITCH:
-    case ComponentType::PUSH_BUTTON:
-    case ComponentType::V_SWITCH:
-    case ComponentType::RELAY:
-    case ComponentType::TRANSFORMER:
-    case ComponentType::AND:
-    case ComponentType::OR:
-    case ComponentType::NOT:
-    case ComponentType::NAND:
-    case ComponentType::NOR:
-    case ComponentType::XOR:
-    case ComponentType::XNOR:
-    case ComponentType::BUFFER:
-    case ComponentType::D_FLIP_FLOP:
-    case ComponentType::JK_FLIP_FLOP:
-    case ComponentType::T_FLIP_FLOP:
-    case ComponentType::SR_FLIP_FLOP:
-    default:
-        return false;
-    }
+    static constexpr std::array SINGLE_CURRENT_TYPES = {
+        ComponentType::RESISTOR,    ComponentType::CAPACITOR,      ComponentType::INDUCTOR,
+        ComponentType::VCC,         ComponentType::VOLTAGE_SOURCE, ComponentType::CLOCK,
+        ComponentType::LOGIC_INPUT, ComponentType::CURRENT_SOURCE,
+    };
+    return std::ranges::contains(SINGLE_CURRENT_TYPES, type);
 }
 
 /**
