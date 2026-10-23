@@ -30,6 +30,89 @@ std::optional<std::string> FindProblem(const Circuit &circuit, const std::option
     return FindUnsupported(GetBackend(), circuit, kind);
 }
 
+// The chosen logic inputs as copies that each row of a truth table sets, and the circuit that uses them in place of
+// the originals
+struct InputCopies {
+    std::vector<LogicInput> Inputs;
+    Circuit Simulated;
+};
+
+InputCopies CopyInputs(const Circuit &circuit, const std::vector<std::string> &names) {
+    InputCopies copies;
+    // The simulated circuit points at the copies, so they must not move while it is built
+    copies.Inputs.reserve(names.size());
+    for (const std::string &name : names) {
+        copies.Inputs.push_back(static_cast<const LogicInput &>(*FindLogicInput(circuit, name)));
+    }
+    for (const CircuitEntry &entry : circuit.GetEntries()) {
+        const auto chosen = std::ranges::find(names, entry.Part->GetName());
+        const bool is_chosen = chosen != names.end() && entry.Part->GetType() == ComponentType::LOGIC_INPUT;
+        copies.Simulated.Add(is_chosen ? copies.Inputs[static_cast<std::size_t>(chosen - names.begin())] : *entry.Part,
+                             entry.Nodes);
+    }
+    return copies;
+}
+
+// Sets the inputs to one combination, the first as the most significant bit, and starts the row of that combination
+TruthTableRow SetCombination(std::vector<LogicInput> &inputs, const std::size_t combination) {
+    TruthTableRow row;
+    for (std::size_t input = 0; input < inputs.size(); ++input) {
+        const bool is_high = ((combination >> (inputs.size() - 1 - input)) & 1u) != 0;
+        inputs[input].SetHigh(is_high);
+        row.InputsHigh.push_back(is_high);
+    }
+    return row;
+}
+
+// Tells whether a stop was asked, and otherwise reports the share of combinations done
+bool IsStopped(RunControl *control, const std::size_t done, const std::size_t total) {
+    if (control == nullptr) {
+        return false;
+    }
+    if (control->IsCancelled()) {
+        return true;
+    }
+    control->SetProgress(static_cast<double>(done) / static_cast<double>(total));
+    return false;
+}
+
+// Why the first combination without an operating point failed, and what ngspice printed for it
+struct FirstFailure {
+    std::optional<std::string> Reason;
+    std::vector<SimulatorMessage> Messages;
+};
+
+// Reads the output voltages of a combination, or remembers the first failure
+void ReadRow(TruthTableRow &row, const OperatingPointRun &point, const std::vector<int> &output_nodes,
+             FirstFailure &failure) {
+    if (point.Result) {
+        for (const int node : output_nodes) {
+            row.OutputVoltages.push_back(point.Result->NodeVoltages[static_cast<std::size_t>(node)]);
+        }
+    } else if (!failure.Reason) {
+        failure = {.Reason = point.Result.error(), .Messages = point.Messages};
+    }
+}
+
+// The table with a warning for the combinations that have no operating point; a run fails only when none has one
+TruthTableRun ConcludeTable(TruthTable table, TruthTableRun run, FirstFailure failure) {
+    const std::size_t row_count = table.Rows.size();
+    const std::size_t missing = static_cast<std::size_t>(
+        std::ranges::count_if(table.Rows, [](const TruthTableRow &row) { return !row.HasOperatingPoint(); }));
+    if (failure.Reason && missing == row_count) {
+        return {std::unexpected(*failure.Reason), std::move(failure.Messages)};
+    }
+    if (missing > 0) {
+        table.Warnings.push_back(std::format(
+            "{} of {} combinations have no operating point, so their outputs read X; a circuit whose outputs depend on "
+            "its history, such as a latch, has none for the combinations that hold its state",
+            missing, row_count));
+        run.Messages = std::move(failure.Messages);
+    }
+    run.Result = std::move(table);
+    return run;
+}
+
 } // namespace
 
 /**
@@ -184,68 +267,28 @@ TruthTableRun RunTruthTable(const Circuit &circuit, const TruthTableSettings &se
         return {std::unexpected(*error), {}};
     }
 
+    InputCopies copies = CopyInputs(circuit, settings.Inputs);
     TruthTable table{.InputNames = settings.Inputs, .InputLevels = {}, .OutputNodes = settings.OutputNodes};
-    // The chosen inputs are copies that each row sets, and the simulated circuit points at them
-    std::vector<LogicInput> inputs;
-    inputs.reserve(settings.Inputs.size());
-    for (const std::string &name : settings.Inputs) {
-        inputs.push_back(static_cast<const LogicInput &>(*FindLogicInput(circuit, name)));
-        table.InputLevels.push_back(inputs.back().GetParameters().LogicLevel);
-    }
-    Circuit simulated;
-    for (const CircuitEntry &entry : circuit.GetEntries()) {
-        const auto chosen = std::ranges::find(settings.Inputs, entry.Part->GetName());
-        const bool is_chosen = chosen != settings.Inputs.end() && entry.Part->GetType() == ComponentType::LOGIC_INPUT;
-        simulated.Add(is_chosen ? inputs[static_cast<std::size_t>(chosen - settings.Inputs.begin())] : *entry.Part,
-                      entry.Nodes);
+    for (const LogicInput &input : copies.Inputs) {
+        table.InputLevels.push_back(input.GetParameters().LogicLevel);
     }
 
     TruthTableRun run;
-    std::optional<std::string> first_failure;
-    std::vector<SimulatorMessage> failure_messages;
-    const std::size_t row_count = std::size_t{1} << inputs.size();
-    for (std::size_t row_index = 0; row_index < row_count; ++row_index) {
-        if (control != nullptr) {
-            if (control->IsCancelled()) {
-                return {std::unexpected("Stopped"), {}};
-            }
-            control->SetProgress(static_cast<double>(row_index) / static_cast<double>(row_count));
+    FirstFailure failure;
+    const std::size_t row_count = std::size_t{1} << copies.Inputs.size();
+    for (std::size_t combination = 0; combination < row_count; ++combination) {
+        if (IsStopped(control, combination, row_count)) {
+            return {std::unexpected("Stopped"), {}};
         }
-        TruthTableRow row;
-        for (std::size_t input = 0; input < inputs.size(); ++input) {
-            const bool is_high = ((row_index >> (inputs.size() - 1 - input)) & 1u) != 0;
-            inputs[input].SetHigh(is_high);
-            row.InputsHigh.push_back(is_high);
-        }
-        OperatingPointRun point = RunOperatingPoint(simulated);
-        if (point.Result) {
-            for (const int node : settings.OutputNodes) {
-                row.OutputVoltages.push_back(point.Result->NodeVoltages[static_cast<std::size_t>(node)]);
-            }
-        } else if (!first_failure) {
-            first_failure = point.Result.error();
-            failure_messages = point.Messages;
-        }
-        if (row_index == 0) {
+        TruthTableRow row = SetCombination(copies.Inputs, combination);
+        OperatingPointRun point = RunOperatingPoint(copies.Simulated);
+        ReadRow(row, point, settings.OutputNodes, failure);
+        if (combination == 0) {
             run.Messages = std::move(point.Messages);
         }
         table.Rows.push_back(std::move(row));
     }
-
-    const std::size_t missing = static_cast<std::size_t>(
-        std::ranges::count_if(table.Rows, [](const TruthTableRow &row) { return !row.HasOperatingPoint(); }));
-    if (first_failure && missing == row_count) {
-        return {std::unexpected(*first_failure), std::move(failure_messages)};
-    }
-    if (missing > 0) {
-        table.Warnings.push_back(std::format(
-            "{} of {} combinations have no operating point, so their outputs read X; a circuit whose outputs depend on "
-            "its history, such as a latch, has none for the combinations that hold its state",
-            missing, row_count));
-        run.Messages = std::move(failure_messages);
-    }
-    run.Result = std::move(table);
-    return run;
+    return ConcludeTable(std::move(table), std::move(run), std::move(failure));
 }
 
 } // namespace Core
