@@ -107,6 +107,9 @@ constexpr auto SUPPLY_PARTS = std::to_array({Core::ComponentType::GROUND, Core::
 // Toolbar buttons are square, this many frame heights wide; icons fill this share of them
 constexpr float TOOL_BUTTON_SCALE = 1.4f;
 constexpr float ICON_SCALE = 0.7f;
+// How often the heat scale of a transient that is still being made is worked out again, in seconds
+constexpr double SCALE_REFRESH_SECONDS = 0.5;
+
 // The dropdown arrow beside a group button, in frame heights
 constexpr float DROPDOWN_BUTTON_SCALE = 0.6f;
 
@@ -869,9 +872,13 @@ void EditorWindow::UpdateDisplayedState() {
     const Connectivity &connectivity = m_Schematic.GetConnectivity();
     DisplayedState state;
     if (show_transient) {
-        if (m_ScaledTransientVersion != m_Schematic.GetTransientVersion()) {
+        // The scale goes over the whole run, so while chunks keep arriving it is refreshed a few times a second only
+        const bool may_refresh = transient->IsComplete || !m_ScaledTransientVersion.has_value() ||
+                                 ImGui::GetTime() - m_LastScaleTime >= SCALE_REFRESH_SECONDS;
+        if (m_ScaledTransientVersion != m_Schematic.GetTransientDataVersion() && may_refresh) {
             m_TransientScale = ScaleOf(*transient, elements, connectivity);
-            m_ScaledTransientVersion = m_Schematic.GetTransientVersion();
+            m_ScaledTransientVersion = m_Schematic.GetTransientDataVersion();
+            m_LastScaleTime = ImGui::GetTime();
         }
         state.Point = SampleTransient(*transient, m_Playback.Time);
         state.Scale = m_TransientScale;
@@ -1131,6 +1138,9 @@ float EditorWindow::DrawRunStatus(float right_edge) {
     case RunOutcome::SUCCEEDED_WITH_WARNINGS:
         status = std::format("{} done, with warnings", analysis_name);
         color = GetWarningTextColor();
+        break;
+    case RunOutcome::STOPPED:
+        status = std::format("{} stopped", analysis_name);
         break;
     case RunOutcome::FAILED:
         status = std::format("{} failed", analysis_name);

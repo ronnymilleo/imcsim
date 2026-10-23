@@ -111,6 +111,7 @@ public:
     void SetOperatingPoint(std::optional<Core::OperatingPoint> operating_point);
     const std::optional<Core::OperatingPoint> &GetOperatingPoint() const;
     void SetTransient(std::optional<Core::Transient> transient);
+    void AppendTransient(Core::Transient chunk);
     const std::optional<Core::Transient> &GetTransient() const;
     void SetTransientSteps(StepFamily<Core::Transient> steps);
     const std::optional<StepFamily<Core::Transient>> &GetTransientSteps() const;
@@ -130,6 +131,7 @@ public:
     const std::optional<Core::TruthTable> &GetTruthTable() const;
     std::size_t GetOperatingPointVersion() const;
     std::size_t GetTransientVersion() const;
+    std::size_t GetTransientDataVersion() const;
     std::size_t GetACSweepVersion() const;
     std::size_t GetDCSweepVersion() const;
     std::size_t GetNoiseVersion() const;
@@ -196,6 +198,8 @@ private:
     // Change with every new result, so windows can tell a rerun from the result they already showed
     std::size_t m_OperatingPointVersion = 0;
     std::size_t m_TransientVersion = 0;
+    // Also counts the chunks added to a transient that is still being made
+    std::size_t m_TransientDataVersion = 0;
     std::size_t m_ACSweepVersion = 0;
     std::size_t m_DCSweepVersion = 0;
     std::size_t m_NoiseVersion = 0;

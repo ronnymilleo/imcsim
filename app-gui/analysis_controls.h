@@ -24,12 +24,13 @@ namespace GUI {
  * @enum    RunOutcome
  * @brief   How the last run of an analysis went, as the editor status bar reports it.
  * @details Succeeded turns back into None when the result is dropped, as when the circuit changes; Failed stays
- *          until the next run.
+ *          until the next run. Stopped is a transient that ended early and kept the points made until then.
  */
 enum class RunOutcome {
     NONE,
     SUCCEEDED,
     SUCCEEDED_WITH_WARNINGS,
+    STOPPED,
     FAILED
 };
 

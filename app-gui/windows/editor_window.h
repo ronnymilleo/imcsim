@@ -160,6 +160,8 @@ private:
     // result and kept
     std::optional<DisplayedState> m_Displayed;
     std::optional<std::size_t> m_ScaledTransientVersion;
+    // When the heat scale of a transient that is still being made was last worked out
+    double m_LastScaleTime = 0.0;
     HeatScale m_TransientScale;
 
     // Placement

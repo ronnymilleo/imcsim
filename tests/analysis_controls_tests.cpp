@@ -36,6 +36,14 @@ void Select(GUI::Schematic &schematic, const GUI::Analysis analysis) {
     schematic.SetSimulationSettings(settings);
 }
 
+// A transient of half a second at 1 us, which takes long enough to stop in the middle
+void SelectLongTransient(GUI::Schematic &schematic) {
+    GUI::SimulationSettings settings = schematic.GetSimulationSettings();
+    settings.Selected = GUI::Analysis::TRANSIENT;
+    settings.Transient = {.StopTime = 0.5, .TimeStep = 1e-6};
+    schematic.SetSimulationSettings(settings);
+}
+
 // A transient stepped through 50 resistances, each long enough that the run lasts far beyond a few frames
 void SelectLongSteppedTransient(GUI::Schematic &schematic) {
     GUI::SimulationSettings settings = schematic.GetSimulationSettings();
@@ -236,4 +244,84 @@ TEST_CASE("Analyses have names, and all of them are counted", "[analysis_control
     CHECK(std::string(GUI::GetAnalysisName(GUI::Analysis::AC_SWEEP)) == "AC sweep");
     CHECK(std::string(GUI::GetAnalysisName(GUI::Analysis::TRUTH_TABLE)) == "Truth table");
     CHECK(static_cast<std::size_t>(GUI::Analysis::TRUTH_TABLE) + 1 == GUI::ANALYSIS_COUNT);
+}
+
+TEST_CASE("A transient grows in the schematic while it runs, and the whole run replaces its chunks",
+          "[analysis_controls]") {
+    GUI::Schematic schematic;
+    OpenRCFilter(schematic);
+    SelectLongTransient(schematic);
+    GUI::AnalysisControls controls(schematic);
+
+    controls.RunSelected();
+    // The first chunk starts the result, which is incomplete until the run ends
+    const auto deadline = std::chrono::steady_clock::now() + WAIT_LIMIT;
+    while (!schematic.GetTransient() && std::chrono::steady_clock::now() < deadline) {
+        controls.Update();
+        std::this_thread::sleep_for(1ms);
+    }
+    REQUIRE(schematic.GetTransient().has_value());
+    CHECK_FALSE(schematic.GetTransient()->IsComplete);
+    CHECK(controls.IsRunning());
+    const std::size_t first_version = schematic.GetTransientVersion();
+
+    std::size_t points = schematic.GetTransient()->Times.size();
+    while (controls.IsRunning() && std::chrono::steady_clock::now() < deadline) {
+        controls.Update();
+        if (!controls.IsRunning()) {
+            break;
+        }
+        // The chunks add points without counting as a new result, so the view is not reset under the user
+        CHECK(schematic.GetTransientVersion() == first_version);
+        CHECK(schematic.GetTransient()->Times.size() >= points);
+        points = schematic.GetTransient()->Times.size();
+        std::this_thread::sleep_for(1ms);
+    }
+    REQUIRE_FALSE(controls.IsRunning());
+    REQUIRE(schematic.GetTransient().has_value());
+    CHECK(schematic.GetTransient()->IsComplete);
+    CHECK(schematic.GetTransientVersion() == first_version + 1);
+    CHECK(controls.GetOutcome(GUI::Analysis::TRANSIENT) == GUI::RunOutcome::SUCCEEDED);
+}
+
+TEST_CASE("Stopping a transient keeps the points made so far and reports it as stopped", "[analysis_controls]") {
+    GUI::Schematic schematic;
+    OpenRCFilter(schematic);
+    SelectLongTransient(schematic);
+    GUI::AnalysisControls controls(schematic);
+
+    controls.RunSelected();
+    const auto deadline = std::chrono::steady_clock::now() + WAIT_LIMIT;
+    while (!schematic.GetTransient() && std::chrono::steady_clock::now() < deadline) {
+        controls.Update();
+        std::this_thread::sleep_for(1ms);
+    }
+    REQUIRE(schematic.GetTransient().has_value());
+    controls.StopRun();
+    CHECK(controls.IsStopping());
+    REQUIRE(UpdateUntilIdle(controls));
+
+    REQUIRE(schematic.GetTransient().has_value());
+    CHECK_FALSE(schematic.GetTransient()->IsComplete);
+    CHECK_FALSE(schematic.GetTransient()->Times.empty());
+    CHECK(schematic.GetTransient()->Times.back() < schematic.GetSimulationSettings().Transient.StopTime);
+    CHECK(controls.GetOutcome(GUI::Analysis::TRANSIENT) == GUI::RunOutcome::STOPPED);
+}
+
+TEST_CASE("Editing the circuit during a transient drops what it made", "[analysis_controls]") {
+    GUI::Schematic schematic;
+    OpenRCFilter(schematic);
+    SelectLongTransient(schematic);
+    GUI::AnalysisControls controls(schematic);
+
+    controls.RunSelected();
+    const auto deadline = std::chrono::steady_clock::now() + WAIT_LIMIT;
+    while (!schematic.GetTransient() && std::chrono::steady_clock::now() < deadline) {
+        controls.Update();
+        std::this_thread::sleep_for(1ms);
+    }
+    schematic.MarkModified();
+    REQUIRE(UpdateUntilIdle(controls));
+    CHECK_FALSE(schematic.GetTransient().has_value());
+    CHECK(controls.GetOutcome(GUI::Analysis::TRANSIENT) == GUI::RunOutcome::NONE);
 }
