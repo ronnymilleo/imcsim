@@ -23,9 +23,6 @@ namespace GUI {
 
 namespace {
 
-constexpr auto ANALYSIS_NAMES = std::to_array<const char *>(
-    {"Operating point", "Transient", "AC sweep", "DC sweep", "Noise", "Transfer function", "Truth table"});
-
 bool IsPositive(const double value) {
     return value > 0.0;
 }
@@ -154,11 +151,12 @@ AnalysisSettingsPanel::AnalysisSettingsPanel(Schematic &schematic) : m_Schematic
 void AnalysisSettingsPanel::DrawAnalysisPicker() {
     SimulationSettings settings = m_Schematic.GetSimulationSettings();
     const std::set<Core::ComponentType> parts = ListPartTypes(m_Schematic);
-    for (std::size_t index = 0; index < ANALYSIS_NAMES.size(); ++index) {
+    for (std::size_t index = 0; index < ANALYSIS_COUNT; ++index) {
         const std::optional<std::string> unsupported =
             Core::FindUnsupported(Core::GetBackend(), parts, ToKind(static_cast<Analysis>(index)));
         ImGui::BeginDisabled(unsupported.has_value());
-        if (ImGui::RadioButton(ANALYSIS_NAMES[index], static_cast<std::size_t>(settings.Selected) == index)) {
+        if (ImGui::RadioButton(GetAnalysisName(static_cast<Analysis>(index)),
+                               static_cast<std::size_t>(settings.Selected) == index)) {
             settings.Selected = static_cast<Analysis>(index);
         }
         ImGui::EndDisabled();
@@ -516,15 +514,6 @@ void AnalysisSettingsPanel::LoadParameterStepFields(const ParameterStepSettings 
     m_ParameterFields[0].Load(step.Start);
     m_ParameterFields[1].Load(step.Stop);
     m_ParameterFields[2].Load(step.Step);
-}
-
-/**
- * @brief   Returns the name of an analysis, as menus and messages show it.
- * @param[in] analysis  Analysis to name.
- * @return  Such as "Operating point" or "AC sweep".
- */
-const char *GetAnalysisName(const Analysis analysis) {
-    return ANALYSIS_NAMES[static_cast<std::size_t>(analysis)];
 }
 
 } // namespace GUI

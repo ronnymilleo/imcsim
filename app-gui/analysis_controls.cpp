@@ -7,7 +7,6 @@
 #include "analysis_controls.h"
 
 #include "analysis_inputs.h"
-#include "analysis_settings_panel.h"
 #include "circuit_copy.h"
 #include "imgui.h"
 #include "theme.h"

@@ -90,7 +90,7 @@ private:
     std::size_t m_RunCircuitVersion = 0;
 
     // Last run of each analysis, in the order of the Analysis enum
-    std::array<RunStatus, 7> m_Statuses;
+    std::array<RunStatus, ANALYSIS_COUNT> m_Statuses;
     std::optional<Analysis> m_LastRun;
 
     // Runs of one analysis

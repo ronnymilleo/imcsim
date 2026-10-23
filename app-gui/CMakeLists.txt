@@ -39,6 +39,7 @@ add_library(imcsim-gui-lib
             schematic_file.cpp
             schematic_file_actions.cpp
             selection.cpp
+            simulation_settings.cpp
             spectrum.cpp
             svg_writer.cpp
             theme.cpp

@@ -9,6 +9,7 @@
 #include "helpers.h"
 #include "parameter_step.h"
 #include "simulator.h"
+#include <cstddef>
 #include <optional>
 #include <string>
 #include <vector>
@@ -28,6 +29,8 @@ enum class Analysis {
     TRANSFER_FUNCTION,
     TRUTH_TABLE
 };
+
+constexpr std::size_t ANALYSIS_COUNT = 7;
 
 /**
  * @struct  SimulationSettings
@@ -60,6 +63,9 @@ struct SimulationSettings {
 
     bool operator==(const SimulationSettings &) const = default;
 };
+
+// Names
+const char *GetAnalysisName(Analysis analysis);
 
 } // namespace GUI
 

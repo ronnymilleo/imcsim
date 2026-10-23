@@ -63,8 +63,6 @@ private:
     void LoadParameterStepFields(const ParameterStepSettings &step);
 };
 
-const char *GetAnalysisName(Analysis analysis);
-
 } // namespace GUI
 
 #endif // IMCSIM_ANALYSIS_SETTINGS_PANEL_H
