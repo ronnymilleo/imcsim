@@ -116,6 +116,7 @@ constexpr float DROPDOWN_BUTTON_SCALE = 0.6f;
  */
 enum class ToolIcon {
     RUN,
+    STOP,
     SELECT,
     WIRE,
     PROBE,
@@ -134,6 +135,9 @@ void DrawToolIcon(ImDrawList *draw_list, const ToolIcon icon, const ImVec2 cente
         draw_list->AddTriangleFilled(point(-0.25f, -0.35f), point(0.35f, 0.0f), point(-0.25f, 0.35f), color);
         break;
     }
+    case ToolIcon::STOP:
+        draw_list->AddRectFilled(point(-0.28f, -0.28f), point(0.28f, 0.28f), color);
+        break;
     case ToolIcon::SELECT: {
         const std::array<ImVec2, 7> arrow = {point(-0.3f, -0.45f), point(-0.3f, 0.3f),  point(-0.12f, 0.13f),
                                              point(0.02f, 0.43f),  point(0.14f, 0.37f), point(0.0f, 0.08f),
@@ -192,6 +196,17 @@ void DrawToolIcon(ImDrawList *draw_list, const ToolIcon icon, const ImVec2 cente
 bool ToolButton(const char *id, const bool active) {
     const float side = ImGui::GetFrameHeight() * TOOL_BUTTON_SCALE;
     return active ? PrimaryButton(id, {side, side}) : ImGui::Button(id, {side, side});
+}
+
+// "Transient running", with the share done when the run reports one
+std::string FormatRunProgress(const char *analysis_name, const bool is_stopping, const double progress) {
+    if (is_stopping) {
+        return std::format("Stopping {}", analysis_name);
+    }
+    if (progress > 0.0) {
+        return std::format("{} running, {:.0f}%", analysis_name, progress * 100.0);
+    }
+    return std::format("{} running", analysis_name);
 }
 
 // The button that names the selected analysis, with room for its dropdown arrow
@@ -699,12 +714,22 @@ void EditorWindow::DrawPartButton(const Core::ComponentType type) {
 void EditorWindow::DrawRunControls() {
     const float side = ImGui::GetFrameHeight() * TOOL_BUTTON_SCALE;
     const Analysis selected = m_Schematic.GetSimulationSettings().Selected;
+    const bool is_running = m_Controls.IsRunning();
     if (PrimaryButton("##run", {side, side})) {
-        m_Controls.RunSelected();
+        if (is_running) {
+            m_Controls.StopRun();
+        } else {
+            m_Controls.RunSelected();
+        }
     }
     const float run_left = ImGui::GetItemRectMin().x;
-    DrawToolIcon(ImGui::GetWindowDrawList(), ToolIcon::RUN, ItemCenter(), IconSize(), IconColor(true));
-    ImGui::SetItemTooltip("Run %s (F5)", GetAnalysisName(selected));
+    DrawToolIcon(ImGui::GetWindowDrawList(), is_running ? ToolIcon::STOP : ToolIcon::RUN, ItemCenter(), IconSize(),
+                 IconColor(true));
+    if (const std::optional<Analysis> running = m_Controls.GetRunningAnalysis()) {
+        ImGui::SetItemTooltip("Stop the %s run", GetAnalysisName(*running));
+    } else {
+        ImGui::SetItemTooltip("Run %s (F5)", GetAnalysisName(selected));
+    }
 
     ImGui::SameLine(0.0f, ToolbarRow::ButtonSpacing());
     ImGui::PushStyleVar(ImGuiStyleVar_ButtonTextAlign, {0.0f, 0.5f});
@@ -730,8 +755,12 @@ void EditorWindow::DrawRunControls() {
         m_Controls.DrawSettings();
         ImGui::Separator();
         // The popup has the focus, so F5 is checked here too
-        if (PrimaryButton("Run (F5)") || ImGui::IsKeyPressed(ImGuiKey_F5, false)) {
-            m_Controls.RunSelected();
+        if (PrimaryButton(is_running ? "Stop" : "Run (F5)") || ImGui::IsKeyPressed(ImGuiKey_F5, false)) {
+            if (is_running) {
+                m_Controls.StopRun();
+            } else {
+                m_Controls.RunSelected();
+            }
             ImGui::CloseCurrentPopup();
         }
         ImGui::EndPopup();
@@ -1070,17 +1099,27 @@ float EditorWindow::DrawRunStatus(float right_edge) {
         color = GetErrorTextColor();
         break;
     }
+    // A run in progress takes the place of the report of the last one
+    const std::optional<Analysis> running = m_Controls.GetRunningAnalysis();
+    if (running) {
+        status = FormatRunProgress(GetAnalysisName(*running), m_Controls.IsStopping(), m_Controls.GetRunProgress());
+        color = ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled);
+    }
     const ImVec2 line_start = ImGui::GetCursorScreenPos();
     if (!status.empty()) {
         const ImVec2 status_size = ImGui::CalcTextSize(status.c_str());
         right_edge -= status_size.x;
         ImGui::SetCursorScreenPos({right_edge, line_start.y});
-        ImGui::PushStyleColor(ImGuiCol_Text, color);
-        if (ImGui::Selectable(status.c_str(), false, ImGuiSelectableFlags_None, status_size)) {
-            ImGui::OpenPopup("run_report");
+        if (running) {
+            ImGui::TextDisabled("%s", status.c_str());
+        } else {
+            ImGui::PushStyleColor(ImGuiCol_Text, color);
+            if (ImGui::Selectable(status.c_str(), false, ImGuiSelectableFlags_None, status_size)) {
+                ImGui::OpenPopup("run_report");
+            }
+            ImGui::PopStyleColor();
+            ImGui::SetItemTooltip("Show what the run reported, with the ngspice output");
         }
-        ImGui::PopStyleColor();
-        ImGui::SetItemTooltip("Show what the run reported, with the ngspice output");
         right_edge -= ImGui::GetFontSize() * 1.5f;
     }
     if (ImGui::BeginPopup("run_report")) {
@@ -2051,8 +2090,13 @@ void EditorWindow::DrawContextMenu() {
         if (ImGui::MenuItem("Find a Part...", "Space")) {
             m_PartPickerRequested = true;
         }
-        if (ImGui::MenuItem(
-                std::format("Run {}", GetAnalysisName(m_Schematic.GetSimulationSettings().Selected)).c_str(), "F5")) {
+        if (m_Controls.IsRunning()) {
+            if (ImGui::MenuItem("Stop the Run")) {
+                m_Controls.StopRun();
+            }
+        } else if (ImGui::MenuItem(
+                       std::format("Run {}", GetAnalysisName(m_Schematic.GetSimulationSettings().Selected)).c_str(),
+                       "F5")) {
             m_Controls.RunSelected();
         }
         if (ImGui::MenuItem("Fit Schematic", "Home")) {

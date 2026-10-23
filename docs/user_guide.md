@@ -103,6 +103,10 @@ How to read what imcsim measures, plots and exports. The [README](../README.md) 
   points in a period of the fastest) or the AC range (two decades past the RC, RL and LC corners and the op-amp
   bandwidths). Nothing runs by itself: edit the circuit, then run again. View > Analysis Settings keeps the same
   settings open in a window.
+- **Stopping**: a run goes on in the background, so the editor stays usable. The ▶ button becomes a ■ Stop button, and the
+  status bar shows the run and, for a stepped analysis or a truth table, how much of it is done. Stop ends a run
+  between its steps (the values of a stepped analysis, the combinations of a truth table) and drops its result; a
+  single simulation finishes first. Editing the circuit also stops the run, since its answer would no longer fit.
 - **Status bar**: below the schematic, the keys of the current mode on the left; on the right, the grid position of
   the cursor and how the last run went ("Transient done", with warnings, or failed). Click the result for the
   errors, the warnings and the ngspice output.

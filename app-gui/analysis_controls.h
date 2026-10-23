@@ -7,6 +7,7 @@
 #define IMCSIM_ANALYSIS_CONTROLS_H
 
 #include "schematic.h"
+#include "simulation_service.h"
 #include "simulation_settings.h"
 #include "simulator.h"
 #include "value_field.h"
@@ -33,11 +34,13 @@ enum class RunOutcome {
 
 /**
  * @class   AnalysisControls
- * @brief   Picks the analysis Run starts, edits the settings of each analysis and runs them through ngspice.
+ * @brief   Picks the analysis Run starts, edits the settings of each analysis and runs them on a worker thread.
  * @details The settings and the results live in the Schematic: the settings are saved with it, and the results
  *          disappear as soon as the circuit changes. The error and the ngspice output belong to the last run of
  *          each analysis and stay until its next run. The Application owns one instance, which the editor toolbar
- *          and the Analysis Settings window both draw, so the fields being typed are the same in both.
+ *          and the Analysis Settings window both draw, so the fields being typed are the same in both. A run works on a
+ *          copy of the circuit, so the user keeps editing while it goes on; an edit of the circuit stops it, as it
+ *          drops the results of the last one. Call Update() every frame, since the results arrive there.
  */
 class AnalysisControls {
 public:
@@ -49,6 +52,12 @@ public:
 
     // Runs
     void RunSelected();
+    void StopRun();
+    void Update();
+    bool IsRunning() const;
+    bool IsStopping() const;
+    std::optional<Analysis> GetRunningAnalysis() const;
+    double GetRunProgress() const;
 
     // Last run
     std::optional<Analysis> GetLastRun() const;
@@ -78,6 +87,11 @@ private:
 
     Schematic &m_Schematic;
 
+    // The run in progress: the analysis, and the version of the circuit it started from
+    Core::SimulationService m_Service;
+    std::optional<Analysis> m_RunningAnalysis;
+    std::size_t m_RunCircuitVersion = 0;
+
     // Settings fields, reloaded whenever the schematic replaces its settings
     std::size_t m_LoadedSettingsVersion = 0;
     ValueField m_StopTime;
@@ -97,6 +111,7 @@ private:
     std::optional<Analysis> m_LastRun;
 
     // Runs of one analysis
+    void StartRun(Analysis analysis, Core::Job job);
     void RunTransientAnalysis(const Core::Circuit &circuit, const std::optional<StepPlan> &steps);
     void RunACSweepAnalysis(const Core::Circuit &circuit, const std::optional<StepPlan> &steps);
     void RunDCSweepAnalysis(const Core::Circuit &circuit, const std::optional<StepPlan> &steps);

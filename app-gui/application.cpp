@@ -257,6 +257,8 @@ void Application::Render() {
     // The menu bar goes first so the dockspace fills the space left below it
     DrawMainMenuBar();
     UpdateWindowTitle();
+    // Takes in the result of a run that ended, so ShowNewResults() sees it in the same frame
+    m_AnalysisControls.Update();
     ShowNewResults();
 
     // A fixed ID lets the layout be rebuilt before the dockspace is submitted this frame

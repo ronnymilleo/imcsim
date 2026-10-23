@@ -6,6 +6,7 @@
 #include "analysis_controls.h"
 
 #include "analysis_suggestions.h"
+#include "circuit_copy.h"
 #include "imgui.h"
 #include "misc/cpp/imgui_stdlib.h"
 #include "probing.h"
@@ -249,16 +250,20 @@ template <typename Result> struct SteppedRuns {
     std::vector<Core::SimulatorMessage> Messages;
 };
 
-// Runs once per value and stops at the first step that fails; the output of each step is headed by its value, so
-// a warning can be traced to the step that printed it
+// Runs once per value and stops at the first step that fails or when asked to; the output of each step is headed by
+// its value, so a warning can be traced to the step that printed it
 template <typename Result, typename RunStep>
 SteppedRuns<Result> RunSteps(const ParameterStepSettings &step, const std::string &unit,
-                             const std::vector<double> &values, const RunStep &run_step) {
+                             const std::vector<double> &values, Core::RunControl &control, const RunStep &run_step) {
     StepFamily<Result> family{.Parameter = GetParameterLabel(step), .Unit = unit, .Values = values, .Results = {}};
     std::vector<Core::SimulatorMessage> messages;
-    for (const double value : values) {
-        const std::string label = FormatStepValue(family.Parameter, value, unit);
-        auto run = run_step(Core::ParameterValue{step.Part, value});
+    for (std::size_t index = 0; index < values.size(); ++index) {
+        if (control.IsCancelled()) {
+            return {std::unexpected("Stopped"), std::move(messages)};
+        }
+        control.SetProgress(static_cast<double>(index) / static_cast<double>(values.size()));
+        const std::string label = FormatStepValue(family.Parameter, values[index], unit);
+        auto run = run_step(Core::ParameterValue{step.Part, values[index]});
         messages.push_back({std::format("Step {}", label), false});
         std::ranges::move(run.Messages, std::back_inserter(messages));
         if (!run.Result) {
@@ -267,6 +272,20 @@ SteppedRuns<Result> RunSteps(const ParameterStepSettings &step, const std::strin
         family.Results.push_back(std::move(*run.Result));
     }
     return {std::move(family), std::move(messages)};
+}
+
+// A job that simulates its own copy of the circuit, so the user can go on editing, and hands the run it makes to the
+// thread that polls, where store puts it away. A job that was stopped delivers nothing
+template <typename Run, typename Work, typename Store>
+Core::Job MakeJob(const Core::Circuit &circuit, Work work, Store store) {
+    const auto copy = std::make_shared<const Core::CircuitCopy>(circuit);
+    return [copy, work = std::move(work), store = std::move(store)](Core::RunControl &control) -> Core::Delivery {
+        auto run = std::make_shared<Run>(work(copy->GetCircuit(), control));
+        if (control.IsCancelled()) {
+            return {};
+        }
+        return [run, store] { store(std::move(*run)); };
+    };
 }
 
 // Hands the steps to the schematic, or reports the step that failed; the old result is cleared before the steps run
@@ -391,10 +410,14 @@ void AnalysisControls::DrawSettings() {
 }
 
 /**
- * @brief   Runs the selected analysis with its settings and stores the result, or the error, in the schematic.
- * @note    ngspice runs synchronously, so the frame waits for it.
+ * @brief   Starts the selected analysis with its settings on the worker thread.
+ * @note    The result, or the error, goes to the schematic when the run ends, which Update() notices. Nothing happens
+ *          while another run is in progress.
  */
 void AnalysisControls::RunSelected() {
+    if (IsRunning()) {
+        return;
+    }
     const SimulationSettings &settings = m_Schematic.GetSimulationSettings();
     const Analysis analysis = settings.Selected;
     const Core::Circuit circuit = m_Schematic.BuildCircuit();
@@ -412,14 +435,18 @@ void AnalysisControls::RunSelected() {
         steps = StepPlan{.Settings = settings.ParameterStep, .Unit = unit, .Values = std::move(*values)};
     }
     switch (analysis) {
-    case Analysis::OPERATING_POINT: {
-        Core::OperatingPointRun run = Core::RunOperatingPoint(circuit);
-        Finish(analysis,
-               StoreResult(std::move(run.Result),
-                           [this](auto result) { m_Schematic.SetOperatingPoint(std::move(result)); }),
-               std::move(run.Messages));
+    case Analysis::OPERATING_POINT:
+        StartRun(analysis,
+                 MakeJob<Core::OperatingPointRun>(
+                     circuit,
+                     [](const Core::Circuit &copy, Core::RunControl &) { return Core::RunOperatingPoint(copy); },
+                     [this](Core::OperatingPointRun run) {
+                         Finish(Analysis::OPERATING_POINT,
+                                StoreResult(std::move(run.Result),
+                                            [this](auto result) { m_Schematic.SetOperatingPoint(std::move(result)); }),
+                                std::move(run.Messages));
+                     }));
         break;
-    }
     case Analysis::TRANSIENT:
         RunTransientAnalysis(circuit, steps);
         break;
@@ -439,6 +466,65 @@ void AnalysisControls::RunSelected() {
         RunTruthTableAnalysis(circuit);
         break;
     }
+}
+
+/**
+ * @brief   Asks the run in progress to stop; its result is dropped.
+ * @note    The run stops between its steps (the values of a stepped analysis, the combinations of a truth table), so a
+ *          single long simulation ends before the stop shows; IsStopping() is true until then.
+ */
+void AnalysisControls::StopRun() {
+    m_Service.Cancel();
+}
+
+/**
+ * @brief   Takes in the result of the run that ended, and stops a run whose circuit was edited. Call it every frame.
+ */
+void AnalysisControls::Update() {
+    if (!m_RunningAnalysis) {
+        return;
+    }
+    // An edit drops the results of the last run, so the answer of one that started before it would not fit
+    if (m_Schematic.GetCircuitVersion() != m_RunCircuitVersion) {
+        m_Service.Cancel();
+    }
+    m_Service.Poll();
+    if (!m_Service.IsBusy()) {
+        m_RunningAnalysis.reset();
+    }
+}
+
+/**
+ * @brief   Tells whether a run is in progress.
+ * @return  True from RunSelected() until its result arrives or the stop takes effect.
+ */
+bool AnalysisControls::IsRunning() const {
+    return m_RunningAnalysis.has_value();
+}
+
+/**
+ * @brief   Tells whether the run in progress was asked to stop and has not yet.
+ * @return  True between StopRun() and the end of the run.
+ */
+bool AnalysisControls::IsStopping() const {
+    return m_Service.IsCancelling();
+}
+
+/**
+ * @brief   Returns the analysis in progress.
+ * @return  The analysis, or no value when none runs.
+ */
+std::optional<Analysis> AnalysisControls::GetRunningAnalysis() const {
+    return m_RunningAnalysis;
+}
+
+/**
+ * @brief   Returns how far the run in progress has got.
+ * @return  A fraction from 0 to 1; only the runs made of steps, such as a stepped analysis or a truth table, report
+ *          it, and the others stay at 0 until they end.
+ */
+double AnalysisControls::GetRunProgress() const {
+    return m_Service.GetProgress();
 }
 
 /**
@@ -513,40 +599,76 @@ void AnalysisControls::DrawRunReport(const Analysis analysis) const {
     }
 }
 
+// Hands the job to the worker and remembers the circuit it started from
+void AnalysisControls::StartRun(const Analysis analysis, Core::Job job) {
+    m_RunCircuitVersion = m_Schematic.GetCircuitVersion();
+    m_RunningAnalysis = analysis;
+    m_Service.Submit(std::move(job));
+}
+
 void AnalysisControls::RunTransientAnalysis(const Core::Circuit &circuit, const std::optional<StepPlan> &steps) {
-    const Core::TransientSettings &settings = m_Schematic.GetSimulationSettings().Transient;
+    const Core::TransientSettings settings = m_Schematic.GetSimulationSettings().Transient;
     if (steps) {
-        auto runs = RunSteps<Core::Transient>(
-            steps->Settings, steps->Unit, steps->Values,
-            [&](const Core::ParameterValue &value) { return Core::RunTransient(circuit, settings, value); });
-        Finish(Analysis::TRANSIENT,
-               StoreSteps(std::move(runs.Family),
-                          [this](auto family) { m_Schematic.SetTransientSteps(std::move(family)); }),
-               std::move(runs.Messages));
+        StartRun(Analysis::TRANSIENT,
+                 MakeJob<SteppedRuns<Core::Transient>>(
+                     circuit,
+                     [settings, plan = *steps](const Core::Circuit &copy, Core::RunControl &control) {
+                         return RunSteps<Core::Transient>(plan.Settings, plan.Unit, plan.Values, control,
+                                                          [&](const Core::ParameterValue &value) {
+                                                              return Core::RunTransient(copy, settings, value);
+                                                          });
+                     },
+                     [this](SteppedRuns<Core::Transient> runs) {
+                         Finish(Analysis::TRANSIENT,
+                                StoreSteps(std::move(runs.Family),
+                                           [this](auto family) { m_Schematic.SetTransientSteps(std::move(family)); }),
+                                std::move(runs.Messages));
+                     }));
         return;
     }
-    Core::TransientRun run = Core::RunTransient(circuit, settings);
-    Finish(Analysis::TRANSIENT,
-           StoreResult(std::move(run.Result), [this](auto result) { m_Schematic.SetTransient(std::move(result)); }),
-           std::move(run.Messages));
+    StartRun(
+        Analysis::TRANSIENT,
+        MakeJob<Core::TransientRun>(
+            circuit,
+            [settings](const Core::Circuit &copy, Core::RunControl &) { return Core::RunTransient(copy, settings); },
+            [this](Core::TransientRun run) {
+                Finish(Analysis::TRANSIENT,
+                       StoreResult(std::move(run.Result),
+                                   [this](auto result) { m_Schematic.SetTransient(std::move(result)); }),
+                       std::move(run.Messages));
+            }));
 }
 
 void AnalysisControls::RunACSweepAnalysis(const Core::Circuit &circuit, const std::optional<StepPlan> &steps) {
-    const Core::ACSweepSettings &settings = m_Schematic.GetSimulationSettings().ACSweep;
+    const Core::ACSweepSettings settings = m_Schematic.GetSimulationSettings().ACSweep;
     if (steps) {
-        auto runs = RunSteps<Core::ACSweep>(
-            steps->Settings, steps->Unit, steps->Values,
-            [&](const Core::ParameterValue &value) { return Core::RunACSweep(circuit, settings, value); });
-        Finish(
-            Analysis::AC_SWEEP,
-            StoreSteps(std::move(runs.Family), [this](auto family) { m_Schematic.SetACSweepSteps(std::move(family)); }),
-            std::move(runs.Messages));
+        StartRun(Analysis::AC_SWEEP,
+                 MakeJob<SteppedRuns<Core::ACSweep>>(
+                     circuit,
+                     [settings, plan = *steps](const Core::Circuit &copy, Core::RunControl &control) {
+                         return RunSteps<Core::ACSweep>(plan.Settings, plan.Unit, plan.Values, control,
+                                                        [&](const Core::ParameterValue &value) {
+                                                            return Core::RunACSweep(copy, settings, value);
+                                                        });
+                     },
+                     [this](SteppedRuns<Core::ACSweep> runs) {
+                         Finish(Analysis::AC_SWEEP,
+                                StoreSteps(std::move(runs.Family),
+                                           [this](auto family) { m_Schematic.SetACSweepSteps(std::move(family)); }),
+                                std::move(runs.Messages));
+                     }));
         return;
     }
-    Core::ACSweepRun run = Core::RunACSweep(circuit, settings);
-    Finish(Analysis::AC_SWEEP,
-           StoreResult(std::move(run.Result), [this](auto result) { m_Schematic.SetACSweep(std::move(result)); }),
-           std::move(run.Messages));
+    StartRun(Analysis::AC_SWEEP,
+             MakeJob<Core::ACSweepRun>(
+                 circuit,
+                 [settings](const Core::Circuit &copy, Core::RunControl &) { return Core::RunACSweep(copy, settings); },
+                 [this](Core::ACSweepRun run) {
+                     Finish(Analysis::AC_SWEEP,
+                            StoreResult(std::move(run.Result),
+                                        [this](auto result) { m_Schematic.SetACSweep(std::move(result)); }),
+                            std::move(run.Messages));
+                 }));
 }
 
 // A source that is unset, or that left the circuit, uses a default; a stepped parameter and a second stepped source
@@ -569,19 +691,37 @@ void AnalysisControls::RunDCSweepAnalysis(const Core::Circuit &circuit, const st
         run_settings.Stepped->Source = ResolveSweepSource(settings.SteppedRange, sources, STEPPED_SOURCE_INDEX);
     }
     if (steps) {
-        auto runs = RunSteps<Core::DCSweep>(
-            steps->Settings, steps->Unit, steps->Values,
-            [&](const Core::ParameterValue &value) { return Core::RunDCSweep(circuit, run_settings, value); });
-        Finish(Analysis::DC_SWEEP,
-               StoreSteps(std::move(runs.Family),
-                          [this](auto family) { m_Schematic.SetDCSweep(JoinDCSweepSteps(std::move(family))); }),
-               std::move(runs.Messages));
+        StartRun(Analysis::DC_SWEEP,
+                 MakeJob<SteppedRuns<Core::DCSweep>>(
+                     circuit,
+                     [run_settings, plan = *steps](const Core::Circuit &copy, Core::RunControl &control) {
+                         return RunSteps<Core::DCSweep>(plan.Settings, plan.Unit, plan.Values, control,
+                                                        [&](const Core::ParameterValue &value) {
+                                                            return Core::RunDCSweep(copy, run_settings, value);
+                                                        });
+                     },
+                     [this](SteppedRuns<Core::DCSweep> runs) {
+                         Finish(Analysis::DC_SWEEP,
+                                StoreSteps(std::move(runs.Family),
+                                           [this](auto family) {
+                                               m_Schematic.SetDCSweep(JoinDCSweepSteps(std::move(family)));
+                                           }),
+                                std::move(runs.Messages));
+                     }));
         return;
     }
-    Core::DCSweepRun run = Core::RunDCSweep(circuit, run_settings);
-    Finish(Analysis::DC_SWEEP,
-           StoreResult(std::move(run.Result), [this](auto result) { m_Schematic.SetDCSweep(std::move(result)); }),
-           std::move(run.Messages));
+    StartRun(Analysis::DC_SWEEP,
+             MakeJob<Core::DCSweepRun>(
+                 circuit,
+                 [run_settings](const Core::Circuit &copy, Core::RunControl &) {
+                     return Core::RunDCSweep(copy, run_settings);
+                 },
+                 [this](Core::DCSweepRun run) {
+                     Finish(Analysis::DC_SWEEP,
+                            StoreResult(std::move(run.Result),
+                                        [this](auto result) { m_Schematic.SetDCSweep(std::move(result)); }),
+                            std::move(run.Messages));
+                 }));
 }
 
 void AnalysisControls::RunNoiseAnalysis(const Core::Circuit &circuit) {
@@ -602,10 +742,18 @@ void AnalysisControls::RunNoiseAnalysis(const Core::Circuit &circuit) {
                                            .StartFrequency = settings.NoiseRange.StartFrequency,
                                            .StopFrequency = settings.NoiseRange.StopFrequency,
                                            .PointsPerDecade = settings.NoiseRange.PointsPerDecade};
-    Core::NoiseRun run = Core::RunNoise(circuit, run_settings);
-    Finish(Analysis::NOISE,
-           StoreResult(std::move(run.Result), [this](auto result) { m_Schematic.SetNoise(std::move(result)); }),
-           std::move(run.Messages));
+    StartRun(Analysis::NOISE,
+             MakeJob<Core::NoiseRun>(
+                 circuit,
+                 [run_settings](const Core::Circuit &copy, Core::RunControl &) {
+                     return Core::RunNoise(copy, run_settings);
+                 },
+                 [this](Core::NoiseRun run) {
+                     Finish(Analysis::NOISE,
+                            StoreResult(std::move(run.Result),
+                                        [this](auto result) { m_Schematic.SetNoise(std::move(result)); }),
+                            std::move(run.Messages));
+                 }));
 }
 
 void AnalysisControls::RunTransferFunctionAnalysis(const Core::Circuit &circuit) {
@@ -623,11 +771,18 @@ void AnalysisControls::RunTransferFunctionAnalysis(const Core::Circuit &circuit)
     }
     const Core::TransferFunctionSettings run_settings{
         .OutputNode = *output, .InputSource = ResolveOptionalInput(settings.TransferFunctionSource, sources)};
-    Core::TransferFunctionRun run = Core::RunTransferFunction(circuit, run_settings);
-    Finish(
-        Analysis::TRANSFER_FUNCTION,
-        StoreResult(std::move(run.Result), [this](auto result) { m_Schematic.SetTransferFunction(std::move(result)); }),
-        std::move(run.Messages));
+    StartRun(Analysis::TRANSFER_FUNCTION,
+             MakeJob<Core::TransferFunctionRun>(
+                 circuit,
+                 [run_settings](const Core::Circuit &copy, Core::RunControl &) {
+                     return Core::RunTransferFunction(copy, run_settings);
+                 },
+                 [this](Core::TransferFunctionRun run) {
+                     Finish(Analysis::TRANSFER_FUNCTION,
+                            StoreResult(std::move(run.Result),
+                                        [this](auto result) { m_Schematic.SetTransferFunction(std::move(result)); }),
+                            std::move(run.Messages));
+                 }));
 }
 
 void AnalysisControls::RunTruthTableAnalysis(const Core::Circuit &circuit) {
@@ -644,10 +799,18 @@ void AnalysisControls::RunTruthTableAnalysis(const Core::Circuit &circuit) {
     const Core::TruthTableSettings run_settings{
         .Inputs = ResolveTruthTableInputs(m_Schematic.GetSimulationSettings().TruthTableInputs, available),
         .OutputNodes = outputs};
-    Core::TruthTableRun run = Core::RunTruthTable(circuit, run_settings);
-    Finish(Analysis::TRUTH_TABLE,
-           StoreResult(std::move(run.Result), [this](auto result) { m_Schematic.SetTruthTable(std::move(result)); }),
-           std::move(run.Messages));
+    StartRun(Analysis::TRUTH_TABLE,
+             MakeJob<Core::TruthTableRun>(
+                 circuit,
+                 [run_settings](const Core::Circuit &copy, Core::RunControl &control) {
+                     return Core::RunTruthTable(copy, run_settings, &control);
+                 },
+                 [this](Core::TruthTableRun run) {
+                     Finish(Analysis::TRUTH_TABLE,
+                            StoreResult(std::move(run.Result),
+                                        [this](auto result) { m_Schematic.SetTruthTable(std::move(result)); }),
+                            std::move(run.Messages));
+                 }));
 }
 
 void AnalysisControls::LoadSettingsFields() {

@@ -23,7 +23,11 @@ void SimulationWindow::Draw() {
     m_Controls.DrawAnalysisPicker();
     ImGui::Separator();
     m_Controls.DrawSettings();
-    if (PrimaryButton("Run (F5)")) {
+    if (m_Controls.IsRunning()) {
+        if (PrimaryButton("Stop")) {
+            m_Controls.StopRun();
+        }
+    } else if (PrimaryButton("Run (F5)")) {
         m_Controls.RunSelected();
     }
     ImGui::Separator();
