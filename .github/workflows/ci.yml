@@ -120,6 +120,42 @@ jobs:
       - name: Run tests
         run: ctest --test-dir build --output-on-failure
 
+  # The simulations run on a worker thread, so a data race between it and the interface shows up here. ThreadSanitizer
+  # cannot be combined with AddressSanitizer, which is why this is a job of its own
+  linux-thread-sanitizer:
+    runs-on: ubuntu-latest
+    container: archlinux:latest
+    steps:
+      - name: Install build dependencies
+        run: pacman -Syu --noconfirm --needed $PACKAGES
+
+      - name: Check out the repository
+        uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - name: Locate the compiler cache
+        run: echo "CCACHE_DIR=$GITHUB_WORKSPACE/.ccache" >> "$GITHUB_ENV"
+
+      - name: Restore the compiler cache
+        uses: actions/cache@v6
+        with:
+          path: .ccache
+          key: ccache-thread-sanitizer-${{ github.sha }}
+          restore-keys: ccache-thread-sanitizer-
+
+      - name: Configure with ThreadSanitizer
+        run: >-
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug -DBUILD_TESTS=ON $COMPILER_LAUNCHER
+          -DCMAKE_CXX_FLAGS="-fsanitize=thread -fno-omit-frame-pointer"
+          -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=thread"
+
+      - name: Build
+        run: cmake --build build
+
+      - name: Run tests
+        run: ctest --test-dir build --output-on-failure
+
   windows:
     # windows-latest is the Windows Server 2025 image with Visual Studio 2026, and comes with CMake 4.4 and
     # Ninja; SDL3 comes from its vendor submodule and ngspice from vendor/ngspice-windows, and the build copies the
