@@ -7,14 +7,16 @@
 
 #include "ngspice_backend.h"
 #include <format>
+#include <mutex>
 #include <utility>
 
 namespace Core {
 
 namespace {
 
-// The backend in use; created as ngspice on first use
+// The backend in use; created as ngspice on first use, by whichever thread asks first
 std::unique_ptr<SimulationBackend> g_backend;
+std::mutex g_backend_mutex;
 
 // The truth table asks the backend only for operating points
 AnalysisKind GetRequiredAnalysis(const AnalysisKind kind) {
@@ -28,6 +30,7 @@ AnalysisKind GetRequiredAnalysis(const AnalysisKind kind) {
  * @return  The backend set with SetBackend(), or ngspice when none was set.
  */
 SimulationBackend &GetBackend() {
+    const std::lock_guard lock(g_backend_mutex);
     if (!g_backend) {
         g_backend = std::make_unique<NgspiceBackend>();
     }
@@ -37,8 +40,10 @@ SimulationBackend &GetBackend() {
 /**
  * @brief   Replaces the backend that runs the simulations, such as a fake one in a test.
  * @param[in] backend  The new backend, which the simulator owns from now on; null goes back to ngspice.
+ * @note    Call it while no simulation runs, since the one in progress uses the old backend.
  */
 void SetBackend(std::unique_ptr<SimulationBackend> backend) {
+    const std::lock_guard lock(g_backend_mutex);
     g_backend = std::move(backend);
 }
 

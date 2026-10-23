@@ -9,6 +9,7 @@
 #include "analysis_settings.h"
 #include "circuit.h"
 #include "circuit_checks.h"
+#include "run_control.h"
 #include "simulation_results.h"
 #include "stepped_circuit.h"
 #include <optional>
@@ -24,7 +25,7 @@ DCSweepRun RunDCSweep(const Circuit &circuit, const DCSweepSettings &settings,
                       const std::optional<ParameterValue> &parameter = std::nullopt);
 NoiseRun RunNoise(const Circuit &circuit, const NoiseSettings &settings);
 TransferFunctionRun RunTransferFunction(const Circuit &circuit, const TransferFunctionSettings &settings);
-TruthTableRun RunTruthTable(const Circuit &circuit, const TruthTableSettings &settings);
+TruthTableRun RunTruthTable(const Circuit &circuit, const TruthTableSettings &settings, RunControl *control = nullptr);
 
 } // namespace Core
 

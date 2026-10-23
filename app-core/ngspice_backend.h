@@ -7,6 +7,7 @@
 #define IMCSIM_NGSPICE_BACKEND_H
 
 #include "simulation_backend.h"
+#include <mutex>
 #include <optional>
 
 namespace Core {
@@ -32,8 +33,9 @@ public:
     TransferFunctionRun RunTransferFunction(const Circuit &circuit, const TransferFunctionSettings &settings) override;
 
 private:
-    // Known after ngspice starts, so it is worked out on first use
-    mutable std::optional<BackendCapabilities> m_Capabilities;
+    // Known after ngspice starts, so it is worked out on first use, by whichever thread asks first
+    mutable std::once_flag m_CapabilitiesReady;
+    mutable BackendCapabilities m_Capabilities;
 };
 
 } // namespace Core

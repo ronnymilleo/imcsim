@@ -33,6 +33,7 @@ add_executable(imcsim-tests
             schematic_tests.cpp
             selection_tests.cpp
             simulation_backend_tests.cpp
+            simulation_service_tests.cpp
             simulator_tests.cpp
             spectrum_tests.cpp
             spice_value_tests.cpp

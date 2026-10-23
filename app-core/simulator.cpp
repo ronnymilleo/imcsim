@@ -167,16 +167,18 @@ TransferFunctionRun RunTransferFunction(const Circuit &circuit, const TransferFu
  * @param[in] circuit   Circuit to simulate; it needs a ground component, unless it holds only clocks, logic inputs,
  *                      logic parts and supply rails.
  * @param[in] settings  The logic inputs to vary, the first as the most significant bit, and the nodes to read.
+ * @param[in,out] control  Where to report the share of combinations done and to look for a request to stop between
+ *                      them, or null to run them all without reporting.
  * @return  One row per combination in binary counting order, with the voltage of each output node, or an error, plus
  *          the lines ngspice printed for the first combination that failed, or else for the first one. Invalid
- *          settings are rejected before reaching the backend.
+ *          settings are rejected before reaching the backend; a run that was stopped fails with "Stopped".
  * @note    Each row is an operating point of a copy of the circuit with the inputs set, so a row is independent of the
  *          others. A combination without an operating point, as a latch left to its history has, stays in the table
  *          without voltages and a warning says how many; the call fails only when no combination has one. The other
  *          logic inputs keep the state they have in the circuit. Not thread-safe: ngspice is a single global library
  *          instance.
  */
-TruthTableRun RunTruthTable(const Circuit &circuit, const TruthTableSettings &settings) {
+TruthTableRun RunTruthTable(const Circuit &circuit, const TruthTableSettings &settings, RunControl *control) {
     if (const std::optional<std::string> error =
             FindProblem(circuit, CheckTruthTableSettings(circuit, settings), AnalysisKind::TRUTH_TABLE)) {
         return {std::unexpected(*error), {}};
@@ -203,6 +205,12 @@ TruthTableRun RunTruthTable(const Circuit &circuit, const TruthTableSettings &se
     std::vector<SimulatorMessage> failure_messages;
     const std::size_t row_count = std::size_t{1} << inputs.size();
     for (std::size_t row_index = 0; row_index < row_count; ++row_index) {
+        if (control != nullptr) {
+            if (control->IsCancelled()) {
+                return {std::unexpected("Stopped"), {}};
+            }
+            control->SetProgress(static_cast<double>(row_index) / static_cast<double>(row_count));
+        }
         TruthTableRow row;
         for (std::size_t input = 0; input < inputs.size(); ++input) {
             const bool is_high = ((row_index >> (inputs.size() - 1 - input)) & 1u) != 0;

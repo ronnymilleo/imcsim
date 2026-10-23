@@ -35,8 +35,10 @@ add_library(imcsim-core-lib
             ngspice_library.cpp
             ngspice_readers.cpp
             ratings.cpp
+            run_control.cpp
             simulation_backend.cpp
             simulation_results.cpp
+            simulation_service.cpp
             simulator.cpp
             spice_value.cpp
             standard_values.cpp
@@ -79,7 +81,12 @@ else()
     endif()
 endif()
 
+# The simulation service runs jobs on a worker thread
+find_package(Threads REQUIRED)
+
 target_link_libraries(imcsim-core-lib
+        PUBLIC
+            Threads::Threads
         PRIVATE
             ${NGSPICE_LINK_TARGET}
 )
