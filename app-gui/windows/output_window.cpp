@@ -2498,23 +2498,28 @@ bool OutputWindow::HasLongerRun() const {
            transient->Times.size() > static_cast<std::size_t>(m_Playback.Window.GetPoints()) && !m_Controls.IsRunning();
 }
 
-// The figure of the shown tab, which CanExport() has found something to export in. A CSV table of the whole run holds
-// every point of the transient and its math channels, whatever the window shows
+// The figure of the transient: the window as plotted, or, for a CSV table of the whole run, every point of the
+// transient and its math channels, whatever the window shows
+ExportFigure OutputWindow::BuildShownTransientFigure(const FrameResults &frame, const bool is_whole_run) const {
+    if (const auto &transient = m_Schematic.GetTransient(); is_whole_run && transient) {
+        static const std::vector<MathTrace> no_math;
+        return BuildTransientFigure(*transient, m_FullMath ? m_FullMath->Traces : no_math,
+                                    FindMeasuredLanes(transient->NodeVoltages.size()), m_Schematic, m_ShowBitValues,
+                                    {.From = transient->Times.front(), .To = transient->Times.back()});
+    }
+    if (frame.TransientWindow) {
+        return BuildTransientFigure(*frame.TransientWindow, frame.TransientMath,
+                                    FindMeasuredLanes(frame.TransientWindow->NodeVoltages.size()), m_Schematic,
+                                    m_ShowBitValues, m_TransientView);
+    }
+    return {};
+}
+
+// The figure of the shown tab, which CanExport() has found something to export in
 ExportFigure OutputWindow::BuildShownFigure(const FrameResults &frame, const bool is_whole_run) const {
     switch (m_ShownTab) {
     case PlotTab::TRANSIENT:
-        if (const auto &transient = m_Schematic.GetTransient(); is_whole_run && transient) {
-            static const std::vector<MathTrace> no_math;
-            return BuildTransientFigure(*transient, m_FullMath ? m_FullMath->Traces : no_math,
-                                        FindMeasuredLanes(transient->NodeVoltages.size()), m_Schematic, m_ShowBitValues,
-                                        {.From = transient->Times.front(), .To = transient->Times.back()});
-        }
-        if (frame.TransientWindow) {
-            return BuildTransientFigure(*frame.TransientWindow, frame.TransientMath,
-                                        FindMeasuredLanes(frame.TransientWindow->NodeVoltages.size()), m_Schematic,
-                                        m_ShowBitValues, m_TransientView);
-        }
-        break;
+        return BuildShownTransientFigure(frame, is_whole_run);
     case PlotTab::SPECTRUM:
         if (m_Spectra) {
             return BuildSpectrumFigure(*m_Spectra, m_SpectrumLogarithmic, m_SpectrumView);

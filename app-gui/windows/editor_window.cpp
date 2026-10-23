@@ -249,6 +249,45 @@ std::string FormatRunProgress(const char *analysis_name, const bool is_stopping,
     return std::format("{} running", analysis_name);
 }
 
+/**
+ * @struct  RunStatusLine
+ * @brief   The text of the run status in the status bar, its color, and whether it is a run in progress.
+ */
+struct RunStatusLine {
+    std::string Text;
+    ImVec4 Color;
+    bool IsRunning = false;
+};
+
+// What the last run reported, in the color its outcome asks for; a run in progress takes the place of that report
+RunStatusLine DescribeRunStatus(const AnalysisControls &controls) {
+    const ImVec4 plain = ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled);
+    if (const std::optional<Analysis> running = controls.GetRunningAnalysis()) {
+        return {.Text = FormatRunProgress(GetAnalysisName(*running), controls.IsStopping(), controls.GetRunProgress()),
+                .Color = plain,
+                .IsRunning = true};
+    }
+    const std::optional<Analysis> last_run = controls.GetLastRun();
+    if (!last_run) {
+        return {.Text = "", .Color = plain, .IsRunning = false};
+    }
+    const std::string_view name = GetAnalysisName(*last_run);
+    switch (controls.GetOutcome(*last_run)) {
+    case RunOutcome::SUCCEEDED:
+        return {.Text = std::format("{} done", name), .Color = plain, .IsRunning = false};
+    case RunOutcome::SUCCEEDED_WITH_WARNINGS:
+        return {
+            .Text = std::format("{} done, with warnings", name), .Color = GetWarningTextColor(), .IsRunning = false};
+    case RunOutcome::STOPPED:
+        return {.Text = std::format("{} stopped", name), .Color = plain, .IsRunning = false};
+    case RunOutcome::FAILED:
+        return {.Text = std::format("{} failed", name), .Color = GetErrorTextColor(), .IsRunning = false};
+    case RunOutcome::NONE:
+    default:
+        return {.Text = "", .Color = plain, .IsRunning = false};
+    }
+}
+
 // The button that names the selected analysis, with room for its dropdown arrow
 float AnalysisButtonWidth() {
     float widest = 0.0f;
@@ -1149,44 +1188,17 @@ void EditorWindow::DrawStatusBar(const ViewTransform &view, const bool hovered) 
 // opens the report of the run, with the ngspice output. Returns where the space left for the hint ends
 float EditorWindow::DrawRunStatus(float right_edge) {
     const std::optional<Analysis> last_run = m_Controls.GetLastRun();
-    const RunOutcome outcome = last_run ? m_Controls.GetOutcome(*last_run) : RunOutcome::NONE;
-    const std::string_view analysis_name = last_run ? GetAnalysisName(*last_run) : std::string_view();
-    std::string status;
-    ImVec4 color = ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled);
-    switch (outcome) {
-    case RunOutcome::NONE:
-        break;
-    case RunOutcome::SUCCEEDED:
-        status = std::format("{} done", analysis_name);
-        break;
-    case RunOutcome::SUCCEEDED_WITH_WARNINGS:
-        status = std::format("{} done, with warnings", analysis_name);
-        color = GetWarningTextColor();
-        break;
-    case RunOutcome::STOPPED:
-        status = std::format("{} stopped", analysis_name);
-        break;
-    case RunOutcome::FAILED:
-        status = std::format("{} failed", analysis_name);
-        color = GetErrorTextColor();
-        break;
-    }
-    // A run in progress takes the place of the report of the last one
-    const std::optional<Analysis> running = m_Controls.GetRunningAnalysis();
-    if (running) {
-        status = FormatRunProgress(GetAnalysisName(*running), m_Controls.IsStopping(), m_Controls.GetRunProgress());
-        color = ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled);
-    }
+    const RunStatusLine line = DescribeRunStatus(m_Controls);
     const ImVec2 line_start = ImGui::GetCursorScreenPos();
-    if (!status.empty()) {
-        const ImVec2 status_size = ImGui::CalcTextSize(status.c_str());
+    if (!line.Text.empty()) {
+        const ImVec2 status_size = ImGui::CalcTextSize(line.Text.c_str());
         right_edge -= status_size.x;
         ImGui::SetCursorScreenPos({right_edge, line_start.y});
-        if (running) {
-            ImGui::TextDisabled("%s", status.c_str());
+        if (line.IsRunning) {
+            ImGui::TextDisabled("%s", line.Text.c_str());
         } else {
-            ImGui::PushStyleColor(ImGuiCol_Text, color);
-            if (ImGui::Selectable(status.c_str(), false, ImGuiSelectableFlags_None, status_size)) {
+            ImGui::PushStyleColor(ImGuiCol_Text, line.Color);
+            if (ImGui::Selectable(line.Text.c_str(), false, ImGuiSelectableFlags_None, status_size)) {
                 ImGui::OpenPopup("run_report");
             }
             ImGui::PopStyleColor();

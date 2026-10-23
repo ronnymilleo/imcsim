@@ -200,6 +200,7 @@ private:
     void DrawExportButton(ImVec2 tab_row, float tab_row_width, float export_width, const FrameResults &frame);
     bool CanExport(const FrameResults &frame) const;
     bool HasLongerRun() const;
+    ExportFigure BuildShownTransientFigure(const FrameResults &frame, bool is_whole_run) const;
     ExportFigure BuildShownFigure(const FrameResults &frame, bool is_whole_run) const;
 };
 
