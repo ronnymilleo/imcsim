@@ -57,6 +57,7 @@ public:
 
     // Evaluation
     bool IsEmpty() const;
+    std::string GetSignature() const;
     std::vector<MathTrace> Evaluate(std::span<const double> xs, Dimension x_unit,
                                     const std::vector<std::vector<double>> &node_voltages,
                                     const std::vector<Core::ComponentTrace> &currents,

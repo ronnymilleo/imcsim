@@ -44,15 +44,19 @@ void PlotExporter::OpenPopup() {
  * @brief   Draws the export popup while it is open: like the export dialog of a scope, the image follows the plot as
  *          shown, at the size and theme chosen here.
  * @param[in] plot_name   Name of the plot, such as "AC sweep", for the title of the popup.
- * @param[in] can_export  Whether the plot has something to export; the save buttons are disabled otherwise.
- * @return  The format to save once the user picks one.
+ * @param[in] can_export      Whether the plot has something to export; the save buttons are disabled otherwise.
+ * @param[in] has_longer_run  Whether the plot shows only a window of a longer run, whose every point a CSV table can
+ *                            hold; the image always shows the window.
+ * @return  What to save once the user picks it.
  */
-std::optional<ExportFormat> PlotExporter::DrawPopup(const std::string &plot_name, const bool can_export) {
+std::optional<ExportChoice> PlotExporter::DrawPopup(const std::string &plot_name, const bool can_export,
+                                                    const bool has_longer_run) {
     if (!ImGui::BeginPopup(EXPORT_POPUP)) {
         return std::nullopt;
     }
     ImGui::TextUnformatted(std::format("Export the {} plot", plot_name).c_str());
-    ImGui::TextDisabled("The measured traces: the image shows the visible range, the table every sample");
+    ImGui::TextDisabled("The measured traces: the image shows the visible range, the table every sample%s",
+                        has_longer_run ? " of the window, or of the whole run" : "");
     ImGui::Separator();
     if (ImGui::RadioButton("Light, for print", !m_Style.Dark)) {
         m_Style.Dark = false;
@@ -72,24 +76,30 @@ std::optional<ExportFormat> PlotExporter::DrawPopup(const std::string &plot_name
     m_Style.Height = std::clamp(m_Style.Height, MIN_EXPORT_SIZE, MAX_EXPORT_SIZE);
     ImGui::Separator();
 
-    std::optional<ExportFormat> format;
+    std::optional<ExportChoice> choice;
     if (!can_export) {
         ImGui::TextDisabled("Run the analysis and measure a trace to export it");
     }
     ImGui::BeginDisabled(!can_export || m_Dialog.IsPending());
     if (PrimaryButton("Save SVG...")) {
-        format = ExportFormat::SVG;
+        choice = ExportChoice{.Format = ExportFormat::SVG, .IsWholeRun = false};
     }
     ImGui::SameLine();
-    if (ImGui::Button("Save CSV...")) {
-        format = ExportFormat::CSV;
+    if (ImGui::Button(has_longer_run ? "Save CSV of the window..." : "Save CSV...")) {
+        choice = ExportChoice{.Format = ExportFormat::CSV, .IsWholeRun = false};
+    }
+    if (has_longer_run) {
+        ImGui::SameLine();
+        if (ImGui::Button("Save CSV of the whole run...")) {
+            choice = ExportChoice{.Format = ExportFormat::CSV, .IsWholeRun = true};
+        }
     }
     ImGui::EndDisabled();
-    if (format) {
+    if (choice) {
         ImGui::CloseCurrentPopup();
     }
     ImGui::EndPopup();
-    return format;
+    return choice;
 }
 
 /**

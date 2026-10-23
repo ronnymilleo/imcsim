@@ -77,7 +77,7 @@ private:
     PropertiesWindow m_PropertiesWindow{m_PartEditor};
     NetlistWindow m_NetlistWindow{m_Schematic};
     SimulationWindow m_SimulationWindow{m_Schematic, m_AnalysisControls, m_AnalysisSettings};
-    OutputWindow m_OutputWindow{m_Schematic, m_Playback};
+    OutputWindow m_OutputWindow{m_Schematic, m_AnalysisControls, m_Playback};
 
     // Errors
     void AddError(const std::string &message);
