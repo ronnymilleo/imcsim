@@ -416,15 +416,16 @@ std::optional<ComponentPower> FindPower(const std::vector<ComponentPower> &power
 /**
  * @brief   Creates the editor for a schematic.
  * @param[in] schematic    Schematic to edit; it must outlive the window.
- * @param[in] controls     Analysis settings and runs, for the Run button; they must outlive the window.
+ * @param[in] controls     Runs of the analyses, for the Run button; they must outlive the window.
+ * @param[in] settings_panel  Analysis picker and settings, for the popover beside Run; it must outlive the window.
  * @param[in] part_editor  Fields of the selected part, for the properties popover; it must outlive the window.
  * @param[in] glow_renderer  Draws the glow of lit LEDs; it must outlive the window.
  * @param[in] playback     Instant of the transient to show, which the time bar moves; it must outlive the window.
  */
-EditorWindow::EditorWindow(Schematic &schematic, AnalysisControls &controls, PartEditor &part_editor,
-                           GlowRenderer &glow_renderer, TransientPlayback &playback)
-    : AppWindow("Schematic", false), m_Schematic(schematic), m_Controls(controls), m_PartEditor(part_editor),
-      m_GlowRenderer(glow_renderer), m_Playback(playback), m_Preferences(part_editor),
+EditorWindow::EditorWindow(Schematic &schematic, AnalysisControls &controls, AnalysisSettingsPanel &settings_panel,
+                           PartEditor &part_editor, GlowRenderer &glow_renderer, TransientPlayback &playback)
+    : AppWindow("Schematic", false), m_Schematic(schematic), m_Controls(controls), m_SettingsPanel(settings_panel),
+      m_PartEditor(part_editor), m_GlowRenderer(glow_renderer), m_Playback(playback), m_Preferences(part_editor),
       m_Files(schematic, m_Preferences,
               {.StopEditing = [this] { StopEditing(); },
                .FrameSchematic = [this] { m_View.RequestDefaultFrame(); },
@@ -787,9 +788,9 @@ void EditorWindow::DrawRunControls() {
         ImGui::OpenPopup("analysis");
     }
     if (ImGui::BeginPopup("analysis")) {
-        m_Controls.DrawAnalysisPicker();
+        m_SettingsPanel.DrawAnalysisPicker();
         ImGui::Separator();
-        m_Controls.DrawSettings();
+        m_SettingsPanel.DrawSettings();
         ImGui::Separator();
         // The popup has the focus, so F5 is checked here too
         if (PrimaryButton(is_running ? "Stop" : "Run (F5)") || ImGui::IsKeyPressed(ImGuiKey_F5, false)) {

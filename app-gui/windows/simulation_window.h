@@ -7,6 +7,7 @@
 #define IMCSIM_SIMULATION_WINDOW_H
 
 #include "analysis_controls.h"
+#include "analysis_settings_panel.h"
 #include "schematic.h"
 #include "windows/app_window.h"
 
@@ -21,12 +22,13 @@ namespace GUI {
  */
 class SimulationWindow : public AppWindow {
 public:
-    SimulationWindow(Schematic &schematic, AnalysisControls &controls);
+    SimulationWindow(Schematic &schematic, AnalysisControls &controls, AnalysisSettingsPanel &settings_panel);
     ~SimulationWindow() override = default;
 
 private:
     Schematic &m_Schematic;
     AnalysisControls &m_Controls;
+    AnalysisSettingsPanel &m_SettingsPanel;
 
     void Draw() override;
 };

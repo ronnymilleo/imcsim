@@ -7,6 +7,7 @@
 #define IMCSIM_EDITOR_WINDOW_H
 
 #include "analysis_controls.h"
+#include "analysis_settings_panel.h"
 #include "canvas_view.h"
 #include "circuit_snapshot.h"
 #include "clipboard.h"
@@ -48,8 +49,8 @@ namespace GUI {
  */
 class EditorWindow : public AppWindow {
 public:
-    EditorWindow(Schematic &schematic, AnalysisControls &controls, PartEditor &part_editor, GlowRenderer &glow_renderer,
-                 TransientPlayback &playback);
+    EditorWindow(Schematic &schematic, AnalysisControls &controls, AnalysisSettingsPanel &settings_panel,
+                 PartEditor &part_editor, GlowRenderer &glow_renderer, TransientPlayback &playback);
     ~EditorWindow() override = default;
 
     // Requests, global shortcuts and file popups, whichever window is in front
@@ -145,6 +146,7 @@ private:
 
     Schematic &m_Schematic;
     AnalysisControls &m_Controls;
+    AnalysisSettingsPanel &m_SettingsPanel;
     PartEditor &m_PartEditor;
     GlowRenderer &m_GlowRenderer;
     TransientPlayback &m_Playback;

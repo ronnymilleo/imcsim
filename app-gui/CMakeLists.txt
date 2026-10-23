@@ -5,6 +5,8 @@
 add_library(imcsim-gui-lib
         STATIC
             analysis_controls.cpp
+            analysis_inputs.cpp
+            analysis_settings_panel.cpp
             application.cpp
             canvas_view.cpp
             circuit_snapshot.cpp

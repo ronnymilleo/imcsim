@@ -12,17 +12,20 @@ namespace GUI {
 /**
  * @brief   Creates the window, closed until the View menu opens it.
  * @param[in] schematic  Schematic whose analyses are set; it must outlive the window.
- * @param[in] controls   Analysis settings and runs shared with the editor toolbar; they must outlive the window.
+ * @param[in] controls   Runs of the analyses, shared with the editor toolbar; they must outlive the window.
+ * @param[in] settings_panel  Analysis picker and settings, shared with the editor toolbar; it must outlive the window.
  */
-SimulationWindow::SimulationWindow(Schematic &schematic, AnalysisControls &controls)
-    : AppWindow("Analysis Settings", true), m_Schematic(schematic), m_Controls(controls) {
+SimulationWindow::SimulationWindow(Schematic &schematic, AnalysisControls &controls,
+                                   AnalysisSettingsPanel &settings_panel)
+    : AppWindow("Analysis Settings", true), m_Schematic(schematic), m_Controls(controls),
+      m_SettingsPanel(settings_panel) {
     SetOpen(false);
 }
 
 void SimulationWindow::Draw() {
-    m_Controls.DrawAnalysisPicker();
+    m_SettingsPanel.DrawAnalysisPicker();
     ImGui::Separator();
-    m_Controls.DrawSettings();
+    m_SettingsPanel.DrawSettings();
     if (m_Controls.IsRunning()) {
         if (PrimaryButton("Stop")) {
             m_Controls.StopRun();

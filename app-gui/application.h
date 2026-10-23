@@ -7,6 +7,7 @@
 #define IMCSIM_APPLICATION_H
 
 #include "analysis_controls.h"
+#include "analysis_settings_panel.h"
 #include "glow_renderer.h"
 #include "part_editor.h"
 #include "playback.h"
@@ -68,12 +69,14 @@ private:
     // The schematic is declared first, so it exists when the windows that refer to it are built
     Schematic m_Schematic;
     AnalysisControls m_AnalysisControls{m_Schematic};
+    AnalysisSettingsPanel m_AnalysisSettings{m_Schematic};
     PartEditor m_PartEditor{m_Schematic};
     TransientPlayback m_Playback;
-    EditorWindow m_EditorWindow{m_Schematic, m_AnalysisControls, m_PartEditor, m_GlowRenderer, m_Playback};
+    EditorWindow m_EditorWindow{m_Schematic,  m_AnalysisControls, m_AnalysisSettings,
+                                m_PartEditor, m_GlowRenderer,     m_Playback};
     PropertiesWindow m_PropertiesWindow{m_PartEditor};
     NetlistWindow m_NetlistWindow{m_Schematic};
-    SimulationWindow m_SimulationWindow{m_Schematic, m_AnalysisControls};
+    SimulationWindow m_SimulationWindow{m_Schematic, m_AnalysisControls, m_AnalysisSettings};
     OutputWindow m_OutputWindow{m_Schematic, m_Playback};
 
     // Errors

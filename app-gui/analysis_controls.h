@@ -1,16 +1,17 @@
 /**
  * @file    analysis_controls.h
- * @brief   Settings and runs of the analyses, shared by the editor toolbar and the Analysis Settings window.
+ * @brief   Runs of the analyses on the worker thread and what they leave in the schematic, shared by the editor
+ *          toolbar and the Analysis Settings window.
  */
 
 #ifndef IMCSIM_ANALYSIS_CONTROLS_H
 #define IMCSIM_ANALYSIS_CONTROLS_H
 
+#include "parameter_step.h"
 #include "schematic.h"
 #include "simulation_service.h"
 #include "simulation_settings.h"
 #include "simulator.h"
-#include "value_field.h"
 #include <array>
 #include <cstddef>
 #include <optional>
@@ -34,21 +35,17 @@ enum class RunOutcome {
 
 /**
  * @class   AnalysisControls
- * @brief   Picks the analysis Run starts, edits the settings of each analysis and runs them on a worker thread.
+ * @brief   Runs the selected analysis on a worker thread and keeps what the last run of each analysis reported.
  * @details The settings and the results live in the Schematic: the settings are saved with it, and the results
  *          disappear as soon as the circuit changes. The error and the ngspice output belong to the last run of
  *          each analysis and stay until its next run. The Application owns one instance, which the editor toolbar
- *          and the Analysis Settings window both draw, so the fields being typed are the same in both. A run works on a
- *          copy of the circuit, so the user keeps editing while it goes on; an edit of the circuit stops it, as it
- *          drops the results of the last one. Call Update() every frame, since the results arrive there.
+ *          and the Analysis Settings window both use. A run works on a copy of the circuit, so the user keeps editing
+ * while it goes on; an edit of the circuit stops it, as it drops the results of the last one. Call Update() every
+ * frame, since the results arrive there.
  */
 class AnalysisControls {
 public:
     explicit AnalysisControls(Schematic &schematic);
-
-    // Settings
-    void DrawAnalysisPicker();
-    void DrawSettings();
 
     // Runs
     void RunSelected();
@@ -92,20 +89,6 @@ private:
     std::optional<Analysis> m_RunningAnalysis;
     std::size_t m_RunCircuitVersion = 0;
 
-    // Settings fields, reloaded whenever the schematic replaces its settings
-    std::size_t m_LoadedSettingsVersion = 0;
-    ValueField m_StopTime;
-    ValueField m_TimeStep;
-    ValueField m_StartFrequency;
-    ValueField m_StopFrequency;
-    // Start, stop and step of each DC sweep range
-    std::array<ValueField, 3> m_SweptFields;
-    std::array<ValueField, 3> m_SteppedFields;
-    ValueField m_NoiseStartFrequency;
-    ValueField m_NoiseStopFrequency;
-    // Start, stop and step of the stepped parameter
-    std::array<ValueField, 3> m_ParameterFields;
-
     // Last run of each analysis, in the order of the Analysis enum
     std::array<RunStatus, 7> m_Statuses;
     std::optional<Analysis> m_LastRun;
@@ -119,27 +102,12 @@ private:
     void RunTransferFunctionAnalysis(const Core::Circuit &circuit);
     void RunTruthTableAnalysis(const Core::Circuit &circuit);
 
-    // Settings fields
-    void LoadSettingsFields();
-    void DrawTransientSettings(SimulationSettings &settings);
-    void DrawACSweepSettings(SimulationSettings &settings);
-    void DrawDCSweepSettings(SimulationSettings &settings);
-    void DrawNoiseSettings(SimulationSettings &settings);
-    void DrawTransferFunctionSettings(SimulationSettings &settings);
-    void DrawTruthTableSettings(SimulationSettings &settings);
-    void DrawParameterStepSettings(SimulationSettings &settings);
-    void DrawParameterPicker(ParameterStepSettings &step, const Core::Circuit &circuit);
-    void DrawStepValues(ParameterStepSettings &step, const std::string &unit);
-    void LoadParameterStepFields(const ParameterStepSettings &step);
-
     // Results
     void ClearResult(Analysis analysis);
     void Finish(Analysis analysis, std::optional<std::string> error, std::vector<Core::SimulatorMessage> messages);
     std::vector<std::string> GetResultWarnings(Analysis analysis) const;
     bool HasResult(Analysis analysis) const;
 };
-
-const char *GetAnalysisName(Analysis analysis);
 
 } // namespace GUI
 
