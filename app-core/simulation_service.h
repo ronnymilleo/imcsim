@@ -15,13 +15,9 @@
 namespace Core {
 
 /**
- * @brief   What a job hands back for the calling thread to run once the job is done, such as storing its results.
- */
-using Delivery = std::function<void()>;
-
-/**
  * @brief   Work for the worker thread. It checks the RunControl between its steps and returns the delivery of its
- *          results, or an empty one when it was stopped.
+ *          results, or an empty one when it has nothing to hand over. It may post deliveries on the way, such as the
+ *          points of a transient made so far.
  */
 using Job = std::function<Delivery(RunControl &)>;
 
@@ -30,8 +26,9 @@ using Job = std::function<Delivery(RunControl &)>;
  * @brief   One worker thread that runs one job at a time and hands the result back to the thread that polls.
  * @details ngspice is a single global instance, so the worker is the only thread that runs a simulation, and a job
  *          works on copies of what it needs (see CircuitCopy), never on what the interface edits. The interface
- *          submits a job, calls Poll() every frame and runs the delivery that comes back on its own thread, so
- *          nothing it owns is touched from the worker.
+ *          submits a job, calls Poll() every frame and runs the deliveries that come back on its own thread, so
+ *          nothing it owns is touched from the worker. Stop() ends a job early and keeps what it has made, which a job
+ *          that can hand over a partial result does; Cancel() ends it and drops everything.
  */
 class SimulationService {
 public:
@@ -42,6 +39,7 @@ public:
 
     // Jobs
     bool Submit(Job job);
+    void Stop();
     void Cancel();
     bool Poll();
 

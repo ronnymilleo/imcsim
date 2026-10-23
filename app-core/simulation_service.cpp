@@ -6,6 +6,7 @@
 #include "simulation_service.h"
 
 #include <utility>
+#include <vector>
 
 namespace Core {
 
@@ -48,9 +49,20 @@ bool SimulationService::Submit(Job job) {
 }
 
 /**
- * @brief   Asks the job to stop, and drops its result.
+ * @brief   Asks the job to stop at the end of its current step and to hand over what it has made.
  * @note    A job checks between its steps, so a long single step ends first; IsBusy() tells when the worker is free
- *          again. A result that is done but not yet polled is dropped at once.
+ *          again. A job that cannot hand over a partial result delivers nothing.
+ */
+void SimulationService::Stop() {
+    const std::lock_guard lock(m_Mutex);
+    if (m_State == State::QUEUED || m_State == State::RUNNING) {
+        m_Control.Cancel();
+    }
+}
+
+/**
+ * @brief   Asks the job to stop and drops everything it made or will make.
+ * @note    The same wait as Stop(). A result that is done but not yet polled is dropped at once.
  */
 void SimulationService::Cancel() {
     const std::lock_guard lock(m_Mutex);
@@ -58,28 +70,38 @@ void SimulationService::Cancel() {
         m_Delivery = nullptr;
         m_State = State::IDLE;
     } else if (m_State != State::IDLE) {
-        m_Control.Cancel();
+        m_Control.Discard();
     }
 }
 
 /**
- * @brief   Runs the delivery of a finished job on the calling thread.
- * @return  True when a delivery ran; false while the job still runs, when none was submitted, and when it was stopped.
- * @note    Call it every frame from the thread that owns what the delivery changes.
+ * @brief   Runs what the job has posted, and the delivery of a finished job, on the calling thread.
+ * @return  True when a delivery ran; false while the job runs and has posted nothing, when none was submitted, and
+ *          when the job delivered nothing.
+ * @note    Call it every frame from the thread that owns what the deliveries change. What a discarded job posted is
+ *          dropped.
  */
 bool SimulationService::Poll() {
+    bool has_delivered = false;
+    std::vector<Delivery> posted = m_Control.TakePosted();
+    if (!m_Control.IsDiscarded()) {
+        for (const Delivery &delivery : posted) {
+            delivery();
+            has_delivered = true;
+        }
+    }
     Delivery delivery;
     {
         const std::lock_guard lock(m_Mutex);
         if (m_State != State::DONE) {
-            return false;
+            return has_delivered;
         }
         delivery = std::move(m_Delivery);
         m_Delivery = nullptr;
         m_State = State::IDLE;
     }
     if (!delivery) {
-        return false;
+        return has_delivered;
     }
     delivery();
     return true;
@@ -112,7 +134,7 @@ double SimulationService::GetProgress() const {
 }
 
 // The worker waits for a job, runs it without holding the lock, and leaves its delivery for Poll(). A job that was
-// stopped delivers nothing
+// discarded delivers nothing
 void SimulationService::Work() {
     std::unique_lock lock(m_Mutex);
     while (true) {
@@ -125,7 +147,7 @@ void SimulationService::Work() {
         lock.unlock();
         Delivery delivery = job(m_Control);
         lock.lock();
-        if (m_Control.IsCancelled()) {
+        if (m_Control.IsDiscarded()) {
             m_State = State::IDLE;
         } else {
             m_Delivery = std::move(delivery);

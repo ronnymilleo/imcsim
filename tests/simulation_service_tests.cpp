@@ -11,12 +11,14 @@
 #include "components/resistor.h"
 #include "components/voltage_source.h"
 #include "simulator.h"
+#include <algorithm>
 #include <atomic>
 #include <catch2/catch_test_macros.hpp>
 #include <chrono>
 #include <memory>
 #include <optional>
 #include <thread>
+#include <vector>
 
 namespace {
 
@@ -203,4 +205,97 @@ TEST_CASE("A copy of the circuit simulates on the worker to the result of the sa
     REQUIRE(delivered->Result.has_value());
     CHECK(delivered->Result->Times == expected.Result->Times);
     CHECK(delivered->Result->NodeVoltages == expected.Result->NodeVoltages);
+}
+
+TEST_CASE("A stop keeps what the job hands over, where a cancel drops it", "[simulation_service]") {
+    Core::SimulationService service;
+    std::atomic<bool> has_started = false;
+    bool has_delivered = false;
+    const auto make_job = [&] {
+        return [&](Core::RunControl &control) -> Core::Delivery {
+            has_started = true;
+            while (!control.IsCancelled()) {
+                std::this_thread::sleep_for(1ms);
+            }
+            return [&has_delivered] { has_delivered = true; };
+        };
+    };
+
+    REQUIRE(service.Submit(make_job()));
+    while (!has_started) {
+        std::this_thread::sleep_for(1ms);
+    }
+    service.Stop();
+    CHECK(service.IsCancelling());
+    REQUIRE(PollUntilDelivered(service));
+    CHECK(has_delivered);
+
+    has_started = false;
+    has_delivered = false;
+    REQUIRE(service.Submit(make_job()));
+    while (!has_started) {
+        std::this_thread::sleep_for(1ms);
+    }
+    service.Cancel();
+    REQUIRE(WaitUntilIdle(service));
+    CHECK_FALSE(service.Poll());
+    CHECK_FALSE(has_delivered);
+}
+
+TEST_CASE("What a job posts while it runs reaches the polling thread, in order", "[simulation_service]") {
+    Core::SimulationService service;
+    std::atomic<bool> may_finish = false;
+    std::vector<int> received;
+    std::vector<std::thread::id> threads;
+    REQUIRE(service.Submit([&](Core::RunControl &control) -> Core::Delivery {
+        for (int chunk = 1; chunk <= 3; ++chunk) {
+            control.Post([&received, &threads, chunk] {
+                received.push_back(chunk);
+                threads.push_back(std::this_thread::get_id());
+            });
+        }
+        while (!may_finish) {
+            std::this_thread::sleep_for(1ms);
+        }
+        return {};
+    }));
+    const auto deadline = std::chrono::steady_clock::now() + WAIT_LIMIT;
+    while (received.size() < 3 && std::chrono::steady_clock::now() < deadline) {
+        service.Poll();
+        std::this_thread::sleep_for(1ms);
+    }
+    // The job still runs, and its chunks are already here
+    CHECK(service.IsBusy());
+    CHECK(received == std::vector<int>{1, 2, 3});
+    CHECK(std::ranges::all_of(threads, [](const std::thread::id id) { return id == std::this_thread::get_id(); }));
+
+    may_finish = true;
+    while (service.IsBusy()) {
+        service.Poll();
+        std::this_thread::sleep_for(1ms);
+    }
+    CHECK_FALSE(service.IsBusy());
+}
+
+TEST_CASE("What a discarded job posted is dropped", "[simulation_service]") {
+    Core::SimulationService service;
+    std::atomic<bool> has_posted = false;
+    std::atomic<bool> may_finish = false;
+    bool has_delivered = false;
+    REQUIRE(service.Submit([&](Core::RunControl &control) -> Core::Delivery {
+        control.Post([&has_delivered] { has_delivered = true; });
+        has_posted = true;
+        while (!may_finish) {
+            std::this_thread::sleep_for(1ms);
+        }
+        return {};
+    }));
+    while (!has_posted) {
+        std::this_thread::sleep_for(1ms);
+    }
+    service.Cancel();
+    CHECK_FALSE(service.Poll());
+    may_finish = true;
+    REQUIRE(WaitUntilIdle(service));
+    CHECK_FALSE(has_delivered);
 }
