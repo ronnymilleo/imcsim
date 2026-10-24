@@ -6,6 +6,7 @@
 #include "part_editor.h"
 
 #include "element_factory.h"
+#include "live_input.h"
 #include "misc/cpp/imgui_stdlib.h"
 #include "simulator.h"
 #include "spice_value.h"
@@ -326,6 +327,10 @@ void PartEditor::Draw() {
 
     if (m_LoadedSelection != m_Schematic.GetSelectionVersion()) {
         LoadFields(component);
+    }
+    // Most edits end a live run and drop what it made, which should never come as a surprise
+    if (const char *live_note = m_Schematic.IsLiveRun() ? GetLiveEditNote(type) : nullptr) {
+        ImGui::TextColored(GetWarningTextColor(), "%s", live_note);
     }
     DrawFields(component);
     if (!ShowsValueFields(component)) {

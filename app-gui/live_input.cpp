@@ -54,6 +54,25 @@ std::optional<std::size_t> PickLivePart(const std::vector<std::unique_ptr<UIElem
 }
 
 /**
+ * @brief   Tells what editing the properties of a part does to a live run, so a change does not end it by surprise.
+ * @param[in] type  Kind of component.
+ * @return  The note shown above the fields, or null for a switch or a push button, whose only field changes in the run.
+ */
+const char *GetLiveEditNote(const Core::ComponentType type) {
+    switch (type) {
+    case Core::ComponentType::SWITCH:
+    case Core::ComponentType::PUSH_BUTTON:
+        return nullptr;
+    case Core::ComponentType::LOGIC_INPUT:
+        return "High changes in the live run; changing the logic level ends it";
+    case Core::ComponentType::POTENTIOMETER:
+        return "The wiper changes in the live run; changing the resistance ends it";
+    default:
+        return "Changing this part ends the live run";
+    }
+}
+
+/**
  * @brief   Opens a closed switch and closes an open one, or sets a logic input to the other level.
  * @param[in,out] component  A switch or a logic input; any other part is left as it is.
  */

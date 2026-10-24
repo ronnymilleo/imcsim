@@ -36,6 +36,7 @@ enum class LiveAction {
 // Parts
 LiveAction GetLiveAction(Core::ComponentType type);
 std::optional<std::size_t> PickLivePart(const std::vector<std::unique_ptr<UIElement>> &elements, ImVec2 world_pos);
+const char *GetLiveEditNote(Core::ComponentType type);
 
 // Changes
 void Flip(Core::Component &component);

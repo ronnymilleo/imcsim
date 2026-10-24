@@ -500,6 +500,10 @@ ImVec4 GetLEDLight(const Core::LEDColor color) {
 constexpr float SELECTION_HALO_EXTRA = 6.0f;
 constexpr ImU32 SELECTION_HALO_ALPHA = 150;
 constexpr ImU32 SELECTION_BOX_FILL_ALPHA = 40;
+// During a live run the parts the user can set are outlined faintly, and the one under the cursor or held fully, so
+// they stand out from the parts whose edits end the run without hiding the heat colors
+constexpr ImU32 LIVE_PART_OUTLINE_ALPHA = 110;
+constexpr ImU32 LIVE_PART_HOVERED_ALPHA = 255;
 
 ImU32 WithAlpha(const ImU32 color, const ImU32 alpha) {
     return (color & ~IM_COL32_A_MASK) | (alpha << IM_COL32_A_SHIFT);
@@ -753,10 +757,17 @@ void EditorWindow::Draw() {
     DrawListCanvas canvas(draw_list);
     DrawWires(canvas, view);
     const auto &elements = m_Schematic.GetElements();
+    const bool marks_live_parts = m_Controls.IsLive() && IsSelecting();
+    const std::optional<std::size_t> lit_live_part = m_HeldButton ? m_HeldButton : live_part;
     for (std::size_t index = 0; index < elements.size(); ++index) {
         elements[index]->Draw(canvas, view, GetElementColor(index), m_Preferences.GetSymbolStyle());
-        if (m_Schematic.IsElementSelected(index) && ArePartsHeatColored()) {
-            elements[index]->DrawOutline(canvas, view, GetPalette().Selected);
+        if (m_Schematic.IsElementSelected(index)) {
+            if (ArePartsHeatColored()) {
+                elements[index]->DrawOutline(canvas, view, GetPalette().Selected);
+            }
+        } else if (marks_live_parts && GetLiveAction(elements[index]->GetComponent().GetType()) != LiveAction::NONE) {
+            const ImU32 alpha = index == lit_live_part ? LIVE_PART_HOVERED_ALPHA : LIVE_PART_OUTLINE_ALPHA;
+            elements[index]->DrawOutline(canvas, view, WithAlpha(GetHighlightColor(), alpha));
         }
     }
     // Over the symbols, so a lit LED looks lit through its own lines

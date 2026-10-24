@@ -13,6 +13,7 @@
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 #include <memory>
+#include <string>
 #include <vector>
 
 TEST_CASE("A click flips switches and logic inputs, holds push buttons and the wheel turns potentiometers",
@@ -36,6 +37,16 @@ TEST_CASE("The part picked is the topmost one under the cursor, only when the us
     // A resistor drawn over the switch takes the click, as it would to select
     elements.push_back(GUI::CreateElement(Core::ComponentType::RESISTOR, {20, 0}, GUI::Rotation::R0));
     CHECK_FALSE(GUI::PickLivePart(elements, {20.0f, 0.0f}).has_value());
+}
+
+TEST_CASE("Editing a part during a live run warns when the edit ends the run", "[live_input]") {
+    // A switch has nothing to edit but the state the run takes
+    CHECK(GUI::GetLiveEditNote(Core::ComponentType::SWITCH) == nullptr);
+    CHECK(GUI::GetLiveEditNote(Core::ComponentType::PUSH_BUTTON) == nullptr);
+    // These have a field the run takes and others that end it
+    CHECK(std::string(GUI::GetLiveEditNote(Core::ComponentType::LOGIC_INPUT)).contains("logic level ends"));
+    CHECK(std::string(GUI::GetLiveEditNote(Core::ComponentType::POTENTIOMETER)).contains("resistance ends"));
+    CHECK(std::string(GUI::GetLiveEditNote(Core::ComponentType::RESISTOR)) == "Changing this part ends the live run");
 }
 
 TEST_CASE("Flipping toggles a switch and a logic input, and leaves a push button to be held", "[live_input]") {
