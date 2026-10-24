@@ -172,7 +172,11 @@ The **Live** button beside the analysis turns the next transient into a live run
 is simulated and goes on until you stop it. It covers the stop time every **Live run** seconds of the transient
 settings (10 s at first, from 2 to 60), whatever the circuit: a circuit of a millisecond is slowed down so you can follow
 it, and one of a minute is sped up. The stop time is also how much of the run the plot and the schematic show at a time,
-the newest stretch, which scrolls as the run goes on. While it runs:
+the newest stretch, which scrolls as the run goes on.
+
+Only switches, push buttons, logic inputs and potentiometers change during a live run: they are outlined on the
+schematic while it lasts. Changing any other part, or the wiring, ends the run, and the properties of a part say so
+before you edit it. While it runs:
 
 - A click on a switch or a logic input flips it, a push button is pressed while the mouse button holds it down, and
   the mouse wheel over a potentiometer moves its wiper by 5% a notch. The Closed, Pressed, High and Wiper fields of the
