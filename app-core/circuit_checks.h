@@ -16,6 +16,9 @@
 
 namespace Core {
 
+// Most time steps a transient may span, which keeps a mistyped setting from running for minutes or exhausting memory
+constexpr int MAX_TRANSIENT_POINTS = 1000000;
+
 // What is wrong with a circuit or with settings, in words for the user, or no value when nothing is
 std::optional<std::string> CheckCircuit(const Circuit &circuit);
 std::optional<std::string> CheckTransientSettings(const TransientSettings &settings);

@@ -17,7 +17,6 @@ namespace Core {
 namespace {
 
 // Limits that keep a mistyped setting from running for minutes or exhausting memory
-constexpr int MAX_TRANSIENT_POINTS = 1000000;
 constexpr int MAX_POINTS_PER_DECADE = 1000;
 constexpr int MAX_DC_SWEEP_POINTS = 100000;
 
