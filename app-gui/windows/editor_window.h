@@ -233,6 +233,7 @@ private:
     ImU32 GetWireColor(int node) const;
     void DrawWireCurrents(SchematicCanvas &canvas, const ViewTransform &view);
     void DrawGlows(ImDrawList *draw_list, const ViewTransform &view);
+    void DrawElements(SchematicCanvas &canvas, const ViewTransform &view, std::optional<std::size_t> lit_live_part);
     ImU32 GetElementColor(std::size_t index) const;
     bool AreWiresHeatColored() const;
     bool ArePartsHeatColored() const;

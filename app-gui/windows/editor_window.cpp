@@ -756,20 +756,7 @@ void EditorWindow::Draw() {
 
     DrawListCanvas canvas(draw_list);
     DrawWires(canvas, view);
-    const auto &elements = m_Schematic.GetElements();
-    const bool marks_live_parts = m_Controls.IsLive() && IsSelecting();
-    const std::optional<std::size_t> lit_live_part = m_HeldButton ? m_HeldButton : live_part;
-    for (std::size_t index = 0; index < elements.size(); ++index) {
-        elements[index]->Draw(canvas, view, GetElementColor(index), m_Preferences.GetSymbolStyle());
-        if (m_Schematic.IsElementSelected(index)) {
-            if (ArePartsHeatColored()) {
-                elements[index]->DrawOutline(canvas, view, GetPalette().Selected);
-            }
-        } else if (marks_live_parts && GetLiveAction(elements[index]->GetComponent().GetType()) != LiveAction::NONE) {
-            const ImU32 alpha = index == lit_live_part ? LIVE_PART_HOVERED_ALPHA : LIVE_PART_OUTLINE_ALPHA;
-            elements[index]->DrawOutline(canvas, view, WithAlpha(GetHighlightColor(), alpha));
-        }
-    }
+    DrawElements(canvas, view, m_HeldButton ? m_HeldButton : live_part);
     // Over the symbols, so a lit LED looks lit through its own lines
     DrawGlows(draw_list, view);
     if (m_Preferences.ShowsTerminalNumbers()) {
@@ -1214,6 +1201,25 @@ void EditorWindow::DrawGlows(ImDrawList *draw_list, const ViewTransform &view) {
         }
     }
     m_GlowRenderer.AddGlows(draw_list, glows, additive);
+}
+
+// Over heat colors a selected part is outlined, as its color stands for its power. During a live run the parts the
+// user sets are outlined too, the one under the cursor or held more strongly
+void EditorWindow::DrawElements(SchematicCanvas &canvas, const ViewTransform &view,
+                                const std::optional<std::size_t> lit_live_part) {
+    const auto &elements = m_Schematic.GetElements();
+    const bool marks_live_parts = m_Controls.IsLive() && IsSelecting();
+    for (std::size_t index = 0; index < elements.size(); ++index) {
+        elements[index]->Draw(canvas, view, GetElementColor(index), m_Preferences.GetSymbolStyle());
+        if (m_Schematic.IsElementSelected(index)) {
+            if (ArePartsHeatColored()) {
+                elements[index]->DrawOutline(canvas, view, GetPalette().Selected);
+            }
+        } else if (marks_live_parts && GetLiveAction(elements[index]->GetComponent().GetType()) != LiveAction::NONE) {
+            const ImU32 alpha = index == lit_live_part ? LIVE_PART_HOVERED_ALPHA : LIVE_PART_OUTLINE_ALPHA;
+            elements[index]->DrawOutline(canvas, view, WithAlpha(GetHighlightColor(), alpha));
+        }
+    }
 }
 
 // Selection wins, unless the parts are heat colored, where an outline marks it instead; coloring by current heats each
