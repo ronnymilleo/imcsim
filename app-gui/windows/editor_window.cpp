@@ -49,6 +49,9 @@ constexpr float MIN_JUNCTION_RADIUS = 2.5f;
 constexpr ImVec2 VOLTAGE_LABEL_OFFSET = {4.0f, -16.0f};
 // The time slider of a transient does not shrink below this, in pixels, so it stays usable in a narrow window
 constexpr float MIN_TIME_SLIDER_WIDTH = 80.0f;
+// The instant readout keeps the width of its widest text, so the slider does not resize as the digits change: four
+// significant digits with a suffix are at most this wide
+constexpr const char *WIDEST_TIME_READOUT = "t = 888.8ms / 888.8ms";
 // Heat legend, in font sizes, at the bottom left of the canvas
 constexpr float LEGEND_WIDTH = 10.0f;
 constexpr float LEGEND_HEIGHT = 0.6f;
@@ -966,7 +969,11 @@ void EditorWindow::DrawTimeBar() {
         return;
     }
     const double stop_time = window->To;
-    if (ImGui::Button(m_Playback.Playing ? "Pause" : "Play")) {
+    const ImGuiStyle &style = ImGui::GetStyle();
+    // Play and Pause share the width of the wider label, so the row does not shift when they swap
+    const float play_width =
+        std::max(ImGui::CalcTextSize("Play").x, ImGui::CalcTextSize("Pause").x) + style.FramePadding.x * 2.0f;
+    if (ImGui::Button(m_Playback.Playing ? "Pause" : "Play", ImVec2(play_width, 0.0f))) {
         if (!m_Playback.Playing && m_Playback.Time >= stop_time) {
             m_Playback.Time = window->From;
         }
@@ -977,7 +984,9 @@ void EditorWindow::DrawTimeBar() {
     ImGui::SameLine();
     const std::string readout =
         std::format("t = {}s / {}s", Core::FormatValue(m_Playback.Time), Core::FormatValue(stop_time));
-    const float readout_width = ImGui::CalcTextSize(readout.c_str()).x + ImGui::GetStyle().ItemSpacing.x;
+    const float readout_width =
+        std::max(ImGui::CalcTextSize(readout.c_str()).x, ImGui::CalcTextSize(WIDEST_TIME_READOUT).x) +
+        style.ItemSpacing.x;
     ImGui::SetNextItemWidth(std::max(ImGui::GetContentRegionAvail().x - readout_width, MIN_TIME_SLIDER_WIDTH));
     ImGui::SliderScalar("##time", ImGuiDataType_Double, &m_Playback.Time, &window->From, &stop_time, "");
     if (ImGui::IsItemActive()) {
