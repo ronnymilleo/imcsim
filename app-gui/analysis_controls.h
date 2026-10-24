@@ -130,6 +130,8 @@ private:
 
     // Runs of one analysis
     void StartRun(Analysis analysis, Core::Job job);
+    void StartAnalysis(Analysis analysis, const Core::Circuit &circuit, const std::optional<StepPlan> &steps);
+    void RunOperatingPointAnalysis(const Core::Circuit &circuit);
     void RunTransientAnalysis(const Core::Circuit &circuit, const std::optional<StepPlan> &steps);
     void RunACSweepAnalysis(const Core::Circuit &circuit, const std::optional<StepPlan> &steps);
     void RunDCSweepAnalysis(const Core::Circuit &circuit, const std::optional<StepPlan> &steps);

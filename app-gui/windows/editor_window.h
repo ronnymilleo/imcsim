@@ -221,6 +221,7 @@ private:
     void DrawToolbar();
     void DrawPartButton(Core::ComponentType type);
     void DrawRunControls();
+    void DrawAnalysisButton(float run_left);
     void DrawLiveToggle();
     void DrawPartGroup(std::size_t index);
     void UpdateDisplayedState();

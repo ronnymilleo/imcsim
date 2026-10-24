@@ -326,6 +326,38 @@ float LiveButtonWidth() {
            ImGui::GetStyle().FramePadding.x * 2.0f + ImGui::GetFontSize();
 }
 
+// What the Run button does now, for its tooltip
+std::string DescribeRunAction(const AnalysisControls &controls, const Analysis selected) {
+    const RunAction action = controls.GetRunAction();
+    const std::optional<Analysis> running = controls.GetRunningAnalysis();
+    if (action == RunAction::STOP && controls.IsLive()) {
+        return "Stop the live run, keeping what it made; Continue then takes it on from there";
+    }
+    if (action == RunAction::STOP && running) {
+        return std::format("Stop the {} run", GetAnalysisName(*running));
+    }
+    if (action == RunAction::CONTINUE) {
+        return "Continue the live run from where it stopped (F5)";
+    }
+    if (controls.IsLiveModeOn() && !controls.FindLiveObstacle()) {
+        return std::format("Run {} live (F5)", GetAnalysisName(selected));
+    }
+    return std::format("Run {} (F5)", GetAnalysisName(selected));
+}
+
+// The label of the Run button at the foot of the analysis settings
+const char *GetRunButtonLabel(const RunAction action) {
+    switch (action) {
+    case RunAction::STOP:
+        return "Stop";
+    case RunAction::CONTINUE:
+        return "Continue (F5)";
+    case RunAction::RUN:
+    default:
+        return "Run (F5)";
+    }
+}
+
 // The character of a key that starts a value, from the main row or the keypad: a digit, a point or a minus
 std::optional<char> FindTypedValueStart() {
     for (int digit = 0; digit <= 9; ++digit) {
@@ -843,20 +875,15 @@ void EditorWindow::DrawRunControls() {
     const float run_left = ImGui::GetItemRectMin().x;
     DrawToolIcon(ImGui::GetWindowDrawList(), action == RunAction::STOP ? ToolIcon::STOP : ToolIcon::RUN, ItemCenter(),
                  IconSize(), IconColor(true));
-    const std::optional<Analysis> running = m_Controls.GetRunningAnalysis();
-    if (action == RunAction::STOP && m_Controls.IsLive()) {
-        ImGui::SetItemTooltip("Stop the live run, keeping what it made; Continue then takes it on from there");
-    } else if (action == RunAction::STOP && running) {
-        ImGui::SetItemTooltip("Stop the %s run", GetAnalysisName(*running));
-    } else if (action == RunAction::CONTINUE) {
-        ImGui::SetItemTooltip("Continue the live run from where it stopped (F5)");
-    } else if (m_Controls.IsLiveModeOn() && !m_Controls.FindLiveObstacle()) {
-        ImGui::SetItemTooltip("Run %s live (F5)", GetAnalysisName(selected));
-    } else {
-        ImGui::SetItemTooltip("Run %s (F5)", GetAnalysisName(selected));
-    }
-
+    ImGui::SetItemTooltip("%s", DescribeRunAction(m_Controls, selected).c_str());
     ImGui::SameLine(0.0f, ToolbarRow::ButtonSpacing());
+    DrawAnalysisButton(run_left);
+}
+
+// The analysis picker beside Run, whose popover holds the settings of the analysis and its own Run button
+void EditorWindow::DrawAnalysisButton(const float run_left) {
+    const float side = ImGui::GetFrameHeight() * TOOL_BUTTON_SCALE;
+    const Analysis selected = m_Schematic.GetSimulationSettings().Selected;
     ImGui::PushStyleVar(ImGuiStyleVar_ButtonTextAlign, {0.0f, 0.5f});
     const std::string label = std::format("{}##analysis", GetAnalysisName(selected));
     const bool open = ImGui::Button(label.c_str(), {AnalysisButtonWidth(), side});
@@ -880,13 +907,9 @@ void EditorWindow::DrawRunControls() {
         m_SettingsPanel.DrawSettings();
         ImGui::Separator();
         // The popup has the focus, so F5 is checked here too; like the shortcut, it never stops a run
-        const char *label = "Run (F5)";
-        if (action == RunAction::STOP) {
-            label = "Stop";
-        } else if (action == RunAction::CONTINUE) {
-            label = "Continue (F5)";
-        }
-        if (PrimaryButton(label) || (action != RunAction::STOP && ImGui::IsKeyPressed(ImGuiKey_F5, false))) {
+        const RunAction action = m_Controls.GetRunAction();
+        if (PrimaryButton(GetRunButtonLabel(action)) ||
+            (action != RunAction::STOP && ImGui::IsKeyPressed(ImGuiKey_F5, false))) {
             m_Controls.PressRun();
             ImGui::CloseCurrentPopup();
         }

@@ -135,38 +135,7 @@ void AnalysisControls::RunSelected() {
         }
         steps = StepPlan{.Settings = settings.ParameterStep, .Unit = unit, .Values = std::move(*values)};
     }
-    switch (analysis) {
-    case Analysis::OPERATING_POINT:
-        StartRun(analysis,
-                 MakeJob<Core::OperatingPointRun>(
-                     circuit,
-                     [](const Core::Circuit &copy, Core::RunControl &) { return Core::RunOperatingPoint(copy); },
-                     [this](Core::OperatingPointRun run) {
-                         Finish(Analysis::OPERATING_POINT,
-                                StoreResult(std::move(run.Result),
-                                            [this](auto result) { m_Schematic.SetOperatingPoint(std::move(result)); }),
-                                std::move(run.Messages));
-                     }));
-        break;
-    case Analysis::TRANSIENT:
-        RunTransientAnalysis(circuit, steps);
-        break;
-    case Analysis::AC_SWEEP:
-        RunACSweepAnalysis(circuit, steps);
-        break;
-    case Analysis::DC_SWEEP:
-        RunDCSweepAnalysis(circuit, steps);
-        break;
-    case Analysis::NOISE:
-        RunNoiseAnalysis(circuit);
-        break;
-    case Analysis::TRANSFER_FUNCTION:
-        RunTransferFunctionAnalysis(circuit);
-        break;
-    case Analysis::TRUTH_TABLE:
-        RunTruthTableAnalysis(circuit);
-        break;
-    }
+    StartAnalysis(analysis, circuit, steps);
 }
 
 /**
@@ -440,6 +409,48 @@ void AnalysisControls::StartRun(const Analysis analysis, Core::Job job) {
     m_RunCircuitVersion = m_Schematic.GetCircuitVersion();
     m_RunningAnalysis = analysis;
     m_Service.Submit(std::move(job));
+}
+
+// The analysis picked, on the circuit built from the schematic, run once or once per step
+void AnalysisControls::StartAnalysis(const Analysis analysis, const Core::Circuit &circuit,
+                                     const std::optional<StepPlan> &steps) {
+    switch (analysis) {
+    case Analysis::OPERATING_POINT:
+        RunOperatingPointAnalysis(circuit);
+        break;
+    case Analysis::TRANSIENT:
+        RunTransientAnalysis(circuit, steps);
+        break;
+    case Analysis::AC_SWEEP:
+        RunACSweepAnalysis(circuit, steps);
+        break;
+    case Analysis::DC_SWEEP:
+        RunDCSweepAnalysis(circuit, steps);
+        break;
+    case Analysis::NOISE:
+        RunNoiseAnalysis(circuit);
+        break;
+    case Analysis::TRANSFER_FUNCTION:
+        RunTransferFunctionAnalysis(circuit);
+        break;
+    case Analysis::TRUTH_TABLE:
+        RunTruthTableAnalysis(circuit);
+        break;
+    default:
+        break;
+    }
+}
+
+void AnalysisControls::RunOperatingPointAnalysis(const Core::Circuit &circuit) {
+    StartRun(Analysis::OPERATING_POINT,
+             MakeJob<Core::OperatingPointRun>(
+                 circuit, [](const Core::Circuit &copy, Core::RunControl &) { return Core::RunOperatingPoint(copy); },
+                 [this](Core::OperatingPointRun run) {
+                     Finish(Analysis::OPERATING_POINT,
+                            StoreResult(std::move(run.Result),
+                                        [this](auto result) { m_Schematic.SetOperatingPoint(std::move(result)); }),
+                            std::move(run.Messages));
+                 }));
 }
 
 // A live run is a transient that goes on to its limit at the pace the settings give, unless the user stops it first
