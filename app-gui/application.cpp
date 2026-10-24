@@ -259,8 +259,12 @@ void Application::Render() {
     UpdateWindowTitle();
     // Takes in the result of a run that ended, so ShowNewResults() sees it in the same frame
     m_AnalysisControls.Update();
-    // The window of points that the plot shows and the schematic plays follows a run whichever window is in front
+    // The window of points that the plot shows and the schematic plays follows a run whichever window is in front. A
+    // live run is seen a stop time at a time, however many points that is
     const std::optional<Core::Transient> &transient = m_Schematic.GetTransient();
+    m_Playback.Window.SetSpan(m_AnalysisControls.IsLiveResult()
+                                  ? std::optional(m_Schematic.GetSimulationSettings().Transient.StopTime)
+                                  : std::nullopt);
     m_Playback.Window.Update(transient ? &*transient : nullptr, m_Schematic.GetTransientVersion(),
                              m_AnalysisControls.IsRunning());
     ShowNewResults();
@@ -405,10 +409,11 @@ void Application::ShowNewResults() {
     if (m_Schematic.GetTransientVersion() != m_ShownTransientVersion) {
         m_Playback.Reset();
     }
+    // A live run is played on the schematic, so its results never take the front from it
     const auto show_if_new = [this](std::size_t &shown, const std::size_t version, const bool has_result,
                                     const PlotTab tab) {
         if (std::exchange(shown, version) != version && has_result) {
-            m_OutputWindow.ShowTab(tab);
+            m_OutputWindow.ShowTab(tab, !m_AnalysisControls.IsLive());
         }
     };
     show_if_new(m_ShownOperatingPointVersion, m_Schematic.GetOperatingPointVersion(),

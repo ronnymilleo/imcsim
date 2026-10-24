@@ -13,6 +13,7 @@
 #include "heat_glow.h"
 #include "imgui_internal.h"
 #include "led_glow.h"
+#include "live_input.h"
 #include "misc/cpp/imgui_stdlib.h"
 #include "node_colors.h"
 #include "probing.h"
@@ -252,6 +253,15 @@ std::string FormatRunProgress(const char *analysis_name, const bool is_stopping,
     return std::format("{} running", analysis_name);
 }
 
+// "Transient live at 12.5ms", or paused: a live run has no end to count toward, so it tells how far it has got
+std::string FormatLiveProgress(const AnalysisControls &controls, const std::optional<Core::Transient> &transient) {
+    const char *state = controls.IsLivePaused() ? "paused" : "live";
+    if (!transient || transient->Times.empty()) {
+        return std::format("Transient {}", state);
+    }
+    return std::format("Transient {} at {}s", state, Core::FormatValue(transient->Times.back()));
+}
+
 /**
  * @struct  RunStatusLine
  * @brief   The text of the run status in the status bar, its color, and whether it is a run in progress.
@@ -260,11 +270,19 @@ struct RunStatusLine {
     std::string Text;
     ImVec4 Color;
     bool IsRunning = false;
+    // Text as wide as the line can get, whose width it keeps so it does not shift as its figures change, or empty
+    std::string_view WidestText;
 };
 
 // What the last run reported, in the color its outcome asks for; a run in progress takes the place of that report
-RunStatusLine DescribeRunStatus(const AnalysisControls &controls) {
+RunStatusLine DescribeRunStatus(const AnalysisControls &controls, const std::optional<Core::Transient> &transient) {
     const ImVec4 plain = ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled);
+    if (controls.IsLive() && !controls.IsStopping()) {
+        return {.Text = FormatLiveProgress(controls, transient),
+                .Color = plain,
+                .IsRunning = true,
+                .WidestText = "Transient paused at 888.8ms"};
+    }
     if (const std::optional<Analysis> running = controls.GetRunningAnalysis()) {
         return {.Text = FormatRunProgress(GetAnalysisName(*running), controls.IsStopping(), controls.GetRunProgress()),
                 .Color = plain,
@@ -300,6 +318,12 @@ float AnalysisButtonWidth() {
         widest = std::max(widest, ImGui::CalcTextSize(GetAnalysisName(analysis)).x);
     }
     return widest + ImGui::GetStyle().FramePadding.x * 2.0f + ImGui::GetFontSize();
+}
+
+// The Live toggle beside the analysis button, which becomes Discard while a live run goes on
+float LiveButtonWidth() {
+    return std::max(ImGui::CalcTextSize("Live").x, ImGui::CalcTextSize("Discard").x) +
+           ImGui::GetStyle().FramePadding.x * 2.0f + ImGui::GetFontSize();
 }
 
 // The character of a key that starts a value, from the main row or the keypad: a digit, a point or a minus
@@ -675,11 +699,18 @@ void EditorWindow::Draw() {
                                ImGuiButtonFlags_MouseButtonMiddle);
     const bool hovered = ImGui::IsItemHovered();
     const bool active = ImGui::IsItemActive();
-    m_View.HandlePanAndZoom(origin, hovered, active);
+    // During a live run the wheel over a potentiometer turns it instead of zooming, and a click on a part the user sets
+    // by hand changes it instead of selecting it
+    const std::optional<std::size_t> live_part =
+        hovered ? FindLivePart(m_View.GetTransform(origin)) : std::optional<std::size_t>();
+    const bool turns_part =
+        live_part && GetLiveAction(m_Schematic.GetElements()[*live_part]->GetComponent().GetType()) == LiveAction::TURN;
+    m_View.HandlePanAndZoom(origin, hovered && !turns_part, active);
 
     const ViewTransform view = m_View.GetTransform(origin);
+    const bool took_mouse = HandleLiveInput(live_part);
     // Selection runs before drawing so a dragged element is drawn where the cursor is this frame
-    HandleSelection(view, hovered);
+    HandleSelection(view, hovered && !took_mouse);
     HandleContextMenu(view, hovered);
     HandleValueTyping(view);
     ImDrawList *draw_list = ImGui::GetWindowDrawList();
@@ -784,8 +815,10 @@ void EditorWindow::DrawToolbar() {
     DrawPartButton(Core::ComponentType::OP_AMP);
 
     // Simulation
-    row.Place(side + ToolbarRow::ButtonSpacing() + AnalysisButtonWidth(), gap);
+    row.Place(side + ToolbarRow::ButtonSpacing() * 2.0f + AnalysisButtonWidth() + LiveButtonWidth(), gap);
     DrawRunControls();
+    ImGui::SameLine(0.0f, ToolbarRow::ButtonSpacing());
+    DrawLiveToggle();
 }
 
 void EditorWindow::DrawPartButton(const Core::ComponentType type) {
@@ -803,19 +836,22 @@ void EditorWindow::DrawPartButton(const Core::ComponentType type) {
 void EditorWindow::DrawRunControls() {
     const float side = ImGui::GetFrameHeight() * TOOL_BUTTON_SCALE;
     const Analysis selected = m_Schematic.GetSimulationSettings().Selected;
-    const bool is_running = m_Controls.IsRunning();
+    const RunAction action = m_Controls.GetRunAction();
     if (PrimaryButton("##run", {side, side})) {
-        if (is_running) {
-            m_Controls.StopRun();
-        } else {
-            m_Controls.RunSelected();
-        }
+        m_Controls.PressRun();
     }
     const float run_left = ImGui::GetItemRectMin().x;
-    DrawToolIcon(ImGui::GetWindowDrawList(), is_running ? ToolIcon::STOP : ToolIcon::RUN, ItemCenter(), IconSize(),
-                 IconColor(true));
-    if (const std::optional<Analysis> running = m_Controls.GetRunningAnalysis()) {
+    DrawToolIcon(ImGui::GetWindowDrawList(), action == RunAction::STOP ? ToolIcon::STOP : ToolIcon::RUN, ItemCenter(),
+                 IconSize(), IconColor(true));
+    const std::optional<Analysis> running = m_Controls.GetRunningAnalysis();
+    if (action == RunAction::STOP && m_Controls.IsLive()) {
+        ImGui::SetItemTooltip("Stop the live run, keeping what it made; Continue then takes it on from there");
+    } else if (action == RunAction::STOP && running) {
         ImGui::SetItemTooltip("Stop the %s run", GetAnalysisName(*running));
+    } else if (action == RunAction::CONTINUE) {
+        ImGui::SetItemTooltip("Continue the live run from where it stopped (F5)");
+    } else if (m_Controls.IsLiveModeOn() && !m_Controls.FindLiveObstacle()) {
+        ImGui::SetItemTooltip("Run %s live (F5)", GetAnalysisName(selected));
     } else {
         ImGui::SetItemTooltip("Run %s (F5)", GetAnalysisName(selected));
     }
@@ -843,16 +879,48 @@ void EditorWindow::DrawRunControls() {
         ImGui::Separator();
         m_SettingsPanel.DrawSettings();
         ImGui::Separator();
-        // The popup has the focus, so F5 is checked here too
-        if (PrimaryButton(is_running ? "Stop" : "Run (F5)") || ImGui::IsKeyPressed(ImGuiKey_F5, false)) {
-            if (is_running) {
-                m_Controls.StopRun();
-            } else {
-                m_Controls.RunSelected();
-            }
+        // The popup has the focus, so F5 is checked here too; like the shortcut, it never stops a run
+        const char *label = "Run (F5)";
+        if (action == RunAction::STOP) {
+            label = "Stop";
+        } else if (action == RunAction::CONTINUE) {
+            label = "Continue (F5)";
+        }
+        if (PrimaryButton(label) || (action != RunAction::STOP && ImGui::IsKeyPressed(ImGuiKey_F5, false))) {
+            m_Controls.PressRun();
             ImGui::CloseCurrentPopup();
         }
         ImGui::EndPopup();
+    }
+}
+
+// Live makes Run start the transient paced against the clock, so the user sets switches, push buttons, logic inputs
+// and potentiometers on the schematic while it runs; it is disabled, with the reason, for any other analysis. While a
+// live run goes on, paused or not, the mode cannot change it, so the button drops the run instead
+void EditorWindow::DrawLiveToggle() {
+    const float side = ImGui::GetFrameHeight() * TOOL_BUTTON_SCALE;
+    const ImVec2 size = {LiveButtonWidth(), side};
+    if (m_Controls.IsLive()) {
+        if (ImGui::Button("Discard", size)) {
+            m_Controls.DiscardLive();
+        }
+        ImGui::SetItemTooltip("End the live run and drop what it made; Run then starts a new one from zero");
+        return;
+    }
+    const std::optional<std::string> obstacle = m_Controls.FindLiveObstacle();
+    const bool is_on = m_Controls.IsLiveModeOn();
+    ImGui::BeginDisabled(obstacle.has_value());
+    if (is_on && !obstacle ? PrimaryButton("Live", size) : ImGui::Button("Live", size)) {
+        m_Controls.SetLiveMode(!is_on);
+    }
+    ImGui::EndDisabled();
+    if (obstacle) {
+        ImGui::SetItemTooltip("%s", obstacle->c_str());
+    } else {
+        ImGui::SetItemTooltip(
+            "Live: Run plays the transient on the schematic, a stop time every %s s, until you stop it, and a click "
+            "flips a switch or a logic input, holds a push button or, with the wheel, turns a potentiometer on the way",
+            Core::FormatValue(m_Schematic.GetSimulationSettings().LiveSeconds).c_str());
     }
 }
 
@@ -1157,6 +1225,9 @@ void EditorWindow::DrawStatusBar(const ViewTransform &view, const bool hovered) 
                            : "Wire: click to start, Esc or right click to stop";
     } else if (m_Probing) {
         hint = "Probe: click a wire for its voltage or a part for its current, Esc or right click to stop";
+    } else if (m_Controls.IsLive()) {
+        hint = "Live: click a switch or logic input to flip it, hold a push button down, turn a potentiometer with the "
+               "wheel; any other edit ends the run";
     } else if (const UIElement *element = m_Schematic.GetSelectedElement()) {
         const Core::Component &component = element->GetComponent();
         const std::string name =
@@ -1197,11 +1268,16 @@ void EditorWindow::DrawStatusBar(const ViewTransform &view, const bool hovered) 
 // opens the report of the run, with the ngspice output. Returns where the space left for the hint ends
 float EditorWindow::DrawRunStatus(float right_edge) {
     const std::optional<Analysis> last_run = m_Controls.GetLastRun();
-    const RunStatusLine line = DescribeRunStatus(m_Controls);
+    const RunStatusLine line = DescribeRunStatus(m_Controls, m_Schematic.GetTransient());
     const ImVec2 line_start = ImGui::GetCursorScreenPos();
     if (!line.Text.empty()) {
         const ImVec2 status_size = ImGui::CalcTextSize(line.Text.c_str());
-        right_edge -= status_size.x;
+        right_edge -=
+            line.WidestText.empty()
+                ? status_size.x
+                : std::max(
+                      status_size.x,
+                      ImGui::CalcTextSize(line.WidestText.data(), line.WidestText.data() + line.WidestText.size()).x);
         ImGui::SetCursorScreenPos({right_edge, line_start.y});
         if (line.IsRunning) {
             ImGui::TextDisabled("%s", line.Text.c_str());
@@ -2031,6 +2107,67 @@ void EditorWindow::TransformSelection(const PointTransform::Kind kind, const boo
 }
 
 // Beside the part, on its right, or on its left when the right side lacks room
+// The part under the cursor that the user sets by hand during a live run, or none outside one or outside selecting
+std::optional<std::size_t> EditorWindow::FindLivePart(const ViewTransform &view) const {
+    if (!m_Controls.IsLive() || !IsSelecting()) {
+        return std::nullopt;
+    }
+    return PickLivePart(m_Schematic.GetElements(), view.ToWorld(ImGui::GetIO().MousePos));
+}
+
+// A click flips a switch or a logic input, a push button stays pressed while the mouse button holds it, and the wheel
+// turns a potentiometer; each change goes to the run through the schematic. Returns whether the mouse went to a part,
+// so the click does not also select
+bool EditorWindow::HandleLiveInput(const std::optional<std::size_t> live_part) {
+    if (m_HeldButton) {
+        if (!ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
+            ReleaseHeldButton();
+        }
+        return true;
+    }
+    if (!live_part) {
+        return false;
+    }
+    ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
+    Core::Component &component = m_Schematic.GetElement(*live_part).GetComponent();
+    switch (GetLiveAction(component.GetType())) {
+    case LiveAction::TURN:
+        if (Turn(component, ImGui::GetIO().MouseWheel)) {
+            m_Schematic.MarkLiveChanged(component);
+        }
+        return false;
+    case LiveAction::FLIP:
+        if (!ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+            return false;
+        }
+        Flip(component);
+        m_Schematic.MarkLiveChanged(component);
+        return true;
+    case LiveAction::HOLD:
+        if (!ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+            return false;
+        }
+        SetPressed(component, true);
+        m_Schematic.MarkLiveChanged(component);
+        m_HeldButton = live_part;
+        return true;
+    case LiveAction::NONE:
+    default:
+        return false;
+    }
+}
+
+// The push button lets go when the mouse button does, wherever the cursor is then
+void EditorWindow::ReleaseHeldButton() {
+    const std::optional<std::size_t> index = std::exchange(m_HeldButton, std::nullopt);
+    if (!index || *index >= m_Schematic.GetElements().size()) {
+        return;
+    }
+    Core::Component &component = m_Schematic.GetElement(*index).GetComponent();
+    SetPressed(component, false);
+    m_Schematic.MarkLiveChanged(component);
+}
+
 void EditorWindow::PlacePartPopover(const ViewTransform &view) {
     const UIElement *element = m_Schematic.GetSelectedElement();
     if (element == nullptr) {
@@ -2183,7 +2320,14 @@ void EditorWindow::DrawContextMenu() {
         if (ImGui::MenuItem("Find a Part...", "Space")) {
             m_PartPickerRequested = true;
         }
-        if (m_Controls.IsRunning()) {
+        if (m_Controls.IsLive() && ImGui::MenuItem("Discard the Live Run")) {
+            m_Controls.DiscardLive();
+        }
+        if (m_Controls.GetRunAction() == RunAction::CONTINUE) {
+            if (ImGui::MenuItem("Continue the Live Run", "F5")) {
+                m_Controls.ContinueLive();
+            }
+        } else if (m_Controls.IsRunning()) {
             if (ImGui::MenuItem("Stop the Run")) {
                 m_Controls.StopRun();
             }
@@ -2213,8 +2357,8 @@ void EditorWindow::HandleGlobalShortcuts() {
     if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiMod_Shift | ImGuiKey_S, ImGuiInputFlags_RouteGlobal)) {
         m_Files.SaveAs();
     }
-    if (ImGui::Shortcut(ImGuiKey_F5, ImGuiInputFlags_RouteGlobal)) {
-        m_Controls.RunSelected();
+    if (ImGui::Shortcut(ImGuiKey_F5, ImGuiInputFlags_RouteGlobal) && m_Controls.GetRunAction() != RunAction::STOP) {
+        m_Controls.PressRun();
     }
     if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_Q, ImGuiInputFlags_RouteGlobal)) {
         RequestQuit();

@@ -200,6 +200,9 @@ private:
     std::optional<GroupDrag> m_Drag;
     std::optional<SelectionBox> m_Box;
 
+    // Live runs: the push button the mouse holds down
+    std::optional<std::size_t> m_HeldButton;
+
     // Properties popover: the corner it hangs from, which side of the part it opens on, and a request from a menu
     ImVec2 m_PartPopoverAnchor = {0.0f, 0.0f};
     float m_PartPopoverPivotX = 0.0f;
@@ -217,8 +220,9 @@ private:
     void Draw() override;
     void DrawToolbar();
     void DrawPartButton(Core::ComponentType type);
-    void DrawPartGroup(std::size_t index);
     void DrawRunControls();
+    void DrawLiveToggle();
+    void DrawPartGroup(std::size_t index);
     void UpdateDisplayedState();
     std::optional<TimeSpan> GetWindowSpan() const;
     void DrawTimeBar();
@@ -275,6 +279,11 @@ private:
     void EndDrag();
     void DrawSelectionBox(ImDrawList *draw_list, const ViewTransform &view) const;
     void TransformSelection(PointTransform::Kind kind, bool keep_wires);
+
+    // Live runs
+    std::optional<std::size_t> FindLivePart(const ViewTransform &view) const;
+    bool HandleLiveInput(std::optional<std::size_t> live_part);
+    void ReleaseHeldButton();
 
     // Properties popover and context menu
     void PlacePartPopover(const ViewTransform &view);

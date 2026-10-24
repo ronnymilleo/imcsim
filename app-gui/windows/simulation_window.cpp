@@ -26,12 +26,14 @@ void SimulationWindow::Draw() {
     m_SettingsPanel.DrawAnalysisPicker();
     ImGui::Separator();
     m_SettingsPanel.DrawSettings();
-    if (m_Controls.IsRunning()) {
-        if (PrimaryButton("Stop")) {
-            m_Controls.StopRun();
-        }
-    } else if (PrimaryButton("Run (F5)")) {
-        m_Controls.RunSelected();
+    const char *label = "Run (F5)";
+    if (m_Controls.GetRunAction() == RunAction::STOP) {
+        label = "Stop";
+    } else if (m_Controls.GetRunAction() == RunAction::CONTINUE) {
+        label = "Continue (F5)";
+    }
+    if (PrimaryButton(label)) {
+        m_Controls.PressRun();
     }
     ImGui::Separator();
     m_Controls.DrawRunReport(m_Schematic.GetSimulationSettings().Selected);

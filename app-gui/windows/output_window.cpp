@@ -1120,13 +1120,15 @@ OutputWindow::OutputWindow(Schematic &schematic, AnalysisControls &controls, Tra
 
 /**
  * @brief   Opens the window, if closed, on one of its tabs, and brings it to the front on the next frame.
- * @param[in] tab  Tab of the analysis whose result just arrived.
- * @note    When the user turned off bringing it to the front, the window marks its title or tab with a dot
- *          instead, until it is shown.
+ * @param[in] tab                Tab of the analysis whose result just arrived.
+ * @param[in] may_come_to_front  False to leave the window behind whatever the preference, as for a live run, which
+ *                               the user follows on the schematic.
+ * @note    When the user turned off bringing it to the front, or the caller did, the window marks its title or tab
+ *          with a dot instead, until it is shown.
  */
-void OutputWindow::ShowTab(const PlotTab tab) {
+void OutputWindow::ShowTab(const PlotTab tab, const bool may_come_to_front) {
     m_TabToShow = tab;
-    if (m_FrontOnNewResult) {
+    if (m_FrontOnNewResult && may_come_to_front) {
         SetOpen(true);
         Focus();
     } else {
@@ -1532,9 +1534,14 @@ void OutputWindow::DrawTruthTableTab() {
     DrawTruthTable(*truth_table, m_Schematic);
 }
 
-// A transient that has not reached its stop time is either still running, and can be stopped from here since the
-// Output window takes the front as its first chunk arrives, or was stopped and keeps the points it made
+// A transient that has not reached its stop time is either still running and can be stopped from here, since the
+// Output window takes the front as its first chunk arrives, or was stopped and keeps the points it made. A live run
+// has no stop time to reach: stopped, it is paused, and goes on or is dropped from here
 void OutputWindow::DrawIncompleteNote(const Core::Transient &transient) {
+    if (m_Controls.IsLive()) {
+        DrawLiveNote(transient);
+        return;
+    }
     const std::string reached = std::format("simulated up to {}s of {}s", Core::FormatValue(transient.Times.back()),
                                             Core::FormatValue(m_Schematic.GetSimulationSettings().Transient.StopTime));
     if (m_Controls.IsRunning()) {
@@ -1551,13 +1558,37 @@ void OutputWindow::DrawIncompleteNote(const Core::Transient &transient) {
     }
 }
 
+// Stop pauses a live run, which then goes on with Continue or ends with Discard
+void OutputWindow::DrawLiveNote(const Core::Transient &transient) {
+    const bool is_paused = m_Controls.IsLivePaused();
+    ImGui::BeginDisabled(m_Controls.IsStopping());
+    if (is_paused ? ImGui::Button("Continue") : ImGui::Button("Stop")) {
+        if (is_paused) {
+            m_Controls.ContinueLive();
+        } else {
+            m_Controls.StopRun();
+        }
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Discard")) {
+        m_Controls.DiscardLive();
+    }
+    ImGui::EndDisabled();
+    ImGui::SameLine();
+    ImGui::TextDisabled("%s", std::format("{}, simulated up to {}s", is_paused ? "Live, paused" : "Live",
+                                          Core::FormatValue(transient.Times.back()))
+                                  .c_str());
+}
+
 // A run longer than the plot shows is seen through a window of a size the user picks, which a scroll bar the width of
 // the plot moves along the run, with a handle as large as the share of the run in view. While the run goes on, the
 // window can follow its newest points. The schematic plays the same window
 void OutputWindow::DrawWindowControls(const Core::Transient &shown) {
     TransientWindow &window = m_Playback.Window;
     const std::size_t total_points = window.GetTotalPoints();
-    if (total_points <= static_cast<std::size_t>(MIN_WINDOW_POINTS) || shown.Times.empty()) {
+    const bool has_span = window.GetSpan().has_value();
+    if ((!has_span && total_points <= static_cast<std::size_t>(MIN_WINDOW_POINTS)) ||
+        (has_span && window.GetWindow().Count >= total_points) || shown.Times.empty()) {
         return;
     }
     const float width = ImGui::GetContentRegionAvail().x;
@@ -1573,6 +1604,27 @@ void OutputWindow::DrawWindowControls(const Core::Transient &shown) {
     }
     ImGui::SetCursorPos({row_start.x + (width - ImGui::CalcTextSize(span.c_str()).x) / 2.0f, row_start.y});
     ImGui::TextDisabled("%s", span.c_str());
+    // A live run is seen a stop time at a time, so its window has no size to pick
+    if (!has_span) {
+        DrawWindowSize(row_start, width);
+    }
+    if (window.GetWindow().Count >= total_points) {
+        return;
+    }
+    const ImRect bar(ImGui::GetCursorScreenPos(),
+                     ImGui::GetCursorScreenPos() + ImVec2(width, ImGui::GetStyle().ScrollbarSize));
+    ImGui::ItemSize(bar);
+    ImS64 first = static_cast<ImS64>(window.GetWindow().First);
+    if (ImGui::ScrollbarEx(bar, ImGui::GetID("##window"), ImGuiAxis_X, &first,
+                           static_cast<ImS64>(window.GetWindow().Count), static_cast<ImS64>(total_points))) {
+        window.SetFirst(static_cast<std::size_t>(first));
+    }
+    ImGui::SetItemTooltip("Drag to move the window along the run");
+}
+
+// The size of the window, at the right end of the row above its scroll bar
+void OutputWindow::DrawWindowSize(const ImVec2 row_start, const float width) {
+    TransientWindow &window = m_Playback.Window;
     const float size_width = ImGui::GetFontSize() * WINDOW_SIZE_WIDTH;
     ImGui::SetCursorPos({row_start.x + width - size_width, row_start.y});
     ImGui::SetNextItemWidth(size_width);
@@ -1583,21 +1635,8 @@ void OutputWindow::DrawWindowControls(const Core::Transient &shown) {
     }
     ImGui::SetItemTooltip("%s", std::format("How many points the plot and the schematic show at a time, from {} to "
                                             "{}; drag, or double-click to type. The run has {} points",
-                                            MIN_WINDOW_POINTS, MAX_WINDOW_POINTS, total_points)
+                                            MIN_WINDOW_POINTS, MAX_WINDOW_POINTS, window.GetTotalPoints())
                                     .c_str());
-    if (total_points <= static_cast<std::size_t>(window.GetPoints())) {
-        return;
-    }
-
-    const ImRect bar(ImGui::GetCursorScreenPos(),
-                     ImGui::GetCursorScreenPos() + ImVec2(width, ImGui::GetStyle().ScrollbarSize));
-    ImGui::ItemSize(bar);
-    ImS64 first = static_cast<ImS64>(window.GetWindow().First);
-    if (ImGui::ScrollbarEx(bar, ImGui::GetID("##window"), ImGuiAxis_X, &first,
-                           static_cast<ImS64>(window.GetWindow().Count), static_cast<ImS64>(total_points))) {
-        window.SetFirst(static_cast<std::size_t>(first));
-    }
-    ImGui::SetItemTooltip("Drag to move the window along the run");
 }
 
 // The signals of logic parts are drawn as lanes in a plot under the analog traces, which share its time axis. The
@@ -2495,7 +2534,7 @@ bool OutputWindow::CanExport(const FrameResults &frame) const {
 bool OutputWindow::HasLongerRun() const {
     const auto &transient = m_Schematic.GetTransient();
     return m_ShownTab == PlotTab::TRANSIENT && transient &&
-           transient->Times.size() > static_cast<std::size_t>(m_Playback.Window.GetPoints()) && !m_Controls.IsRunning();
+           transient->Times.size() > m_Playback.Window.GetWindow().Count && !m_Controls.IsRunning();
 }
 
 // The figure of the transient: the window as plotted, or, for a CSV table of the whole run, every point of the
