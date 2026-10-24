@@ -6,9 +6,15 @@
 
 #include "components/capacitor.h"
 #include "components/ground.h"
+#include "components/logic_input.h"
+#include "components/logic_part.h"
+#include "components/potentiometer.h"
 #include "components/resistor.h"
+#include "components/switch.h"
 #include "components/voltage_source.h"
+#include "digital_models.h"
 #include "examples.h"
+#include "live_change.h"
 #include "ngspice_library.h"
 #include "schematic.h"
 #include "simulator.h"
@@ -17,10 +23,12 @@
 #include <array>
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
+#include <chrono>
 #include <cmath>
 #include <cstddef>
 #include <optional>
 #include <string_view>
+#include <thread>
 #include <utility>
 #include <vector>
 
@@ -95,6 +103,55 @@ std::pair<double, double> RangeAround(const std::vector<double> &times, const st
         highest = std::max(highest, values[index]);
     }
     return {lowest, highest};
+}
+
+// A 5 V source feeding a divider of two 1k resistors through an open switch, for 10 ms
+struct SwitchedDivider {
+    Core::VoltageSource Source;
+    Core::Switch Contact{Core::ComponentType::SWITCH};
+    Core::Resistor Upper;
+    Core::Resistor Lower;
+    Core::Ground Reference;
+    Core::Circuit Circuit;
+    Core::TransientSettings Settings{.StopTime = 10e-3, .TimeStep = 10e-6};
+
+    SwitchedDivider() {
+        Source.SetName("V1");
+        Source.SetValue(5.0);
+        Contact.SetName("SW1");
+        Upper.SetName("R1");
+        Upper.SetValue(1e3);
+        Lower.SetName("R2");
+        Lower.SetValue(1e3);
+        Circuit.Add(Source, {1, 0});
+        Circuit.Add(Contact, {1, 2});
+        Circuit.Add(Upper, {2, 3});
+        Circuit.Add(Lower, {3, 0});
+        Circuit.Add(Reference, {0});
+    }
+};
+
+// A live run of a circuit that sends the changes once the run has passed an instant, as a user would, and the time of
+// the last point made before they were sent
+struct LiveRun {
+    Core::RunControl Control;
+    Core::RunMonitor Monitor;
+    double SentAt = 0.0;
+
+    LiveRun(const double pace, const double send_after, std::vector<Core::LiveChange> changes) {
+        Monitor.Control = &Control;
+        Monitor.LivePace = pace;
+        Monitor.OnChunk = [this, send_after, changes = std::move(changes)](const Core::Transient &chunk) {
+            if (SentAt == 0.0 && chunk.Times.back() > send_after) {
+                SentAt = chunk.Times.back();
+                Control.SendChanges(changes);
+            }
+        };
+    }
+};
+
+double SecondsSince(const std::chrono::steady_clock::time_point start) {
+    return std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
 }
 
 double Span(const std::vector<double> &values) {
@@ -270,4 +327,158 @@ TEST_CASE("The lines ngspice prints at each chunk are left out of the messages, 
     const auto analysis_lines = std::ranges::count_if(
         run.Messages, [](const Core::SimulatorMessage &message) { return message.Text.starts_with("Doing analysis"); });
     CHECK(analysis_lines == 1);
+}
+
+TEST_CASE("A live transient keeps the pace it was given", "[transient_chunks][live]") {
+    ChargingCapacitor setup;
+    // The stop time in 0.4 s of the clock
+    LiveRun live(setup.Settings.StopTime / 0.4, setup.Settings.StopTime, {});
+    const auto start = std::chrono::steady_clock::now();
+    const Core::TransientRun run = Core::RunTransient(setup.Circuit, setup.Settings, std::nullopt, live.Monitor);
+    const double wall_seconds = SecondsSince(start);
+    REQUIRE(run.Result.has_value());
+    CHECK(run.Result->IsComplete);
+    // A few milliseconds early at most, as the last chunk ends at the stop time without waiting; the upper bound leaves
+    // room for a slow machine, as a run that ignored the pace would end in milliseconds and one stuck waiting never
+    CHECK(wall_seconds > 0.35);
+    CHECK(wall_seconds < 5.0);
+}
+
+TEST_CASE("A stop ends a live transient while it waits for the clock", "[transient_chunks][live]") {
+    ChargingCapacitor setup;
+    LiveRun live(setup.Settings.StopTime / 30.0, 0.0, {});
+    live.Monitor.OnChunk = [&live](const Core::Transient &) { live.Control.Cancel(); };
+    const auto start = std::chrono::steady_clock::now();
+    const Core::TransientRun run = Core::RunTransient(setup.Circuit, setup.Settings, std::nullopt, live.Monitor);
+    REQUIRE(run.Result.has_value());
+    CHECK_FALSE(run.Result->IsComplete);
+    // Far below the 30 s the run was given, with room for a slow machine
+    CHECK(SecondsSince(start) < 5.0);
+}
+
+TEST_CASE("A paused live transient holds until resumed, then keeps its pace instead of catching up",
+          "[transient_chunks][live]") {
+    ChargingCapacitor setup;
+    LiveRun live(setup.Settings.StopTime / 0.4, 0.0, {});
+    double paused_at = 0.0;
+    std::jthread resumer;
+    live.Monitor.OnChunk = [&](const Core::Transient &chunk) {
+        if (paused_at == 0.0) {
+            paused_at = chunk.Times.back();
+            live.Control.Pause();
+            resumer = std::jthread([&live] {
+                std::this_thread::sleep_for(std::chrono::milliseconds(300));
+                live.Control.Resume();
+            });
+        }
+    };
+    const auto start = std::chrono::steady_clock::now();
+    const Core::TransientRun run = Core::RunTransient(setup.Circuit, setup.Settings, std::nullopt, live.Monitor);
+    const double wall_seconds = SecondsSince(start);
+    REQUIRE(run.Result.has_value());
+    CHECK(run.Result->IsComplete);
+    CHECK(paused_at < setup.Settings.StopTime);
+    // The 0.4 s of the run and the 0.3 s it held: a run that rushed to make up for the pause would end near 0.4 s
+    CHECK(wall_seconds > 0.65);
+    CHECK(wall_seconds < 5.0);
+}
+
+TEST_CASE("A stop ends a paused live transient with the points it made", "[transient_chunks][live]") {
+    ChargingCapacitor setup;
+    LiveRun live(setup.Settings.StopTime / 0.4, 0.0, {});
+    std::jthread stopper;
+    live.Monitor.OnChunk = [&](const Core::Transient &) {
+        if (!live.Control.IsPaused() && !stopper.joinable()) {
+            live.Control.Pause();
+            stopper = std::jthread([&live] {
+                std::this_thread::sleep_for(std::chrono::milliseconds(100));
+                live.Control.Cancel();
+            });
+        }
+    };
+    const auto start = std::chrono::steady_clock::now();
+    const Core::TransientRun run = Core::RunTransient(setup.Circuit, setup.Settings, std::nullopt, live.Monitor);
+    REQUIRE(run.Result.has_value());
+    CHECK_FALSE(run.Result->IsComplete);
+    CHECK_FALSE(run.Result->Times.empty());
+    CHECK(SecondsSince(start) < 5.0);
+}
+
+TEST_CASE("A switch closed during a live transient conducts from the next chunk on", "[transient_chunks][live]") {
+    SwitchedDivider setup;
+    setup.Contact.SetClosed(true);
+    const std::vector<Core::LiveChange> close = Core::DescribeLiveChange(setup.Contact);
+    setup.Contact.SetClosed(false);
+    LiveRun live(setup.Settings.StopTime / 0.5, 4e-3, close);
+    const auto start = std::chrono::steady_clock::now();
+    const Core::TransientRun run = Core::RunTransient(setup.Circuit, setup.Settings, std::nullopt, live.Monitor);
+    REQUIRE(run.Result.has_value());
+    REQUIRE(live.SentAt > 0.0);
+    CHECK(run.Result->IsComplete);
+    // The change does not hurry the run along: it keeps its pace to the end
+    CHECK(SecondsSince(start) > 0.45);
+    const std::vector<double> &times = run.Result->Times;
+    const std::vector<double> &middle = run.Result->NodeVoltages[3];
+    // Open, the divider carries nothing; closed, it halves the source
+    CHECK(std::abs(ValueAt(times, middle, live.SentAt / 2.0)) < 1e-3);
+    CHECK(ValueAt(times, middle, setup.Settings.StopTime) == Catch::Approx(2.5).margin(1e-3));
+    CHECK(std::ranges::none_of(run.Messages,
+                               [](const Core::SimulatorMessage &message) { return message.FromErrorStream; }));
+}
+
+TEST_CASE("A potentiometer turned during a live transient moves its wiper voltage", "[transient_chunks][live]") {
+    Core::VoltageSource source;
+    source.SetName("V1");
+    source.SetValue(10.0);
+    Core::Potentiometer pot;
+    pot.SetName("RV1");
+    pot.SetValue(10e3);
+    Core::Ground reference;
+    Core::Circuit circuit;
+    circuit.Add(source, {1, 0});
+    circuit.Add(pot, {1, 0, 2});
+    circuit.Add(reference, {0});
+    const Core::TransientSettings settings{.StopTime = 10e-3, .TimeStep = 10e-6};
+
+    // The wiper starts in the middle and moves to 20% of the track from terminal 1, which sits at 10 V
+    pot.SetWiper(0.2);
+    LiveRun live(settings.StopTime / 0.5, 4e-3, Core::DescribeLiveChange(pot));
+    pot.SetWiper(0.5);
+    const Core::TransientRun run = Core::RunTransient(circuit, settings, std::nullopt, live.Monitor);
+    REQUIRE(run.Result.has_value());
+    REQUIRE(live.SentAt > 0.0);
+    const std::vector<double> &times = run.Result->Times;
+    const std::vector<double> &wiper = run.Result->NodeVoltages[2];
+    CHECK(ValueAt(times, wiper, live.SentAt / 2.0) == Catch::Approx(5.0).margin(1e-3));
+    CHECK(ValueAt(times, wiper, settings.StopTime) == Catch::Approx(8.0).margin(1e-3));
+}
+
+TEST_CASE("A logic input set high during a live transient drives the gate it feeds", "[transient_chunks][live]") {
+    SKIP_WITHOUT_DIGITAL_MODELS();
+    Core::LogicInput input;
+    input.SetName("V1");
+    Core::LogicPart inverter(Core::ComponentType::NOT);
+    inverter.SetName("U1");
+    Core::Resistor load;
+    load.SetName("R1");
+    load.SetValue(10e3);
+    Core::Ground reference;
+    Core::Circuit circuit;
+    circuit.Add(input, {1});
+    circuit.Add(inverter, {1, 2});
+    circuit.Add(load, {2, 0});
+    circuit.Add(reference, {0});
+    const Core::TransientSettings settings{.StopTime = 10e-3, .TimeStep = 10e-6};
+
+    input.SetHigh(true);
+    LiveRun live(settings.StopTime / 0.5, 4e-3, Core::DescribeLiveChange(input));
+    input.SetHigh(false);
+    const Core::TransientRun run = Core::RunTransient(circuit, settings, std::nullopt, live.Monitor);
+    REQUIRE(run.Result.has_value());
+    REQUIRE(live.SentAt > 0.0);
+    const std::vector<double> &times = run.Result->Times;
+    const std::vector<double> &output = run.Result->NodeVoltages[2];
+    // The 50 Ohm output resistance of the gate and the 10k load take a little off the level
+    CHECK(ValueAt(times, output, live.SentAt / 2.0) > 4.9);
+    CHECK(ValueAt(times, output, settings.StopTime) < 0.1);
 }

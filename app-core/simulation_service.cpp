@@ -108,6 +108,37 @@ bool SimulationService::Poll() {
 }
 
 /**
+ * @brief   Passes changes of the circuit to the job in progress, which a live transient applies before its next chunk.
+ * @param[in] changes  New values of netlist elements, in the order they happened.
+ * @note    Without a job queued or running the changes are dropped, since the next job starts from a new copy of the
+ *          circuit, which has them.
+ */
+void SimulationService::SendChanges(const std::vector<LiveChange> &changes) {
+    const std::lock_guard lock(m_Mutex);
+    if (m_State == State::QUEUED || m_State == State::RUNNING) {
+        m_Control.SendChanges(changes);
+    }
+}
+
+/**
+ * @brief   Holds a live transient in progress after its current chunk, with ngspice and its points kept for Resume().
+ * @note    Without a job queued or running nothing happens; Stop() and Cancel() still end a paused job.
+ */
+void SimulationService::Pause() {
+    const std::lock_guard lock(m_Mutex);
+    if (m_State == State::QUEUED || m_State == State::RUNNING) {
+        m_Control.Pause();
+    }
+}
+
+/**
+ * @brief   Lets a paused live transient go on from where it held.
+ */
+void SimulationService::Resume() {
+    m_Control.Resume();
+}
+
+/**
  * @brief   Tells whether a job is queued, running, or done and not yet polled.
  * @return  True until Poll() takes the result or Cancel() drops it.
  */
@@ -123,6 +154,15 @@ bool SimulationService::IsBusy() const {
 bool SimulationService::IsCancelling() const {
     const std::lock_guard lock(m_Mutex);
     return (m_State == State::QUEUED || m_State == State::RUNNING) && m_Control.IsCancelled();
+}
+
+/**
+ * @brief   Tells whether the job in progress is held by Pause().
+ * @return  True from Pause() until Resume() or the end of the job.
+ */
+bool SimulationService::IsPaused() const {
+    const std::lock_guard lock(m_Mutex);
+    return (m_State == State::QUEUED || m_State == State::RUNNING) && m_Control.IsPaused();
 }
 
 /**

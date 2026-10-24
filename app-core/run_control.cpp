@@ -1,7 +1,7 @@
 /**
  * @file    run_control.cpp
- * @brief   How the caller of a long run asks it to stop and learns how far it got, and how the run hands over what it
- *          has so far.
+ * @brief   How the caller of a long run asks it to stop and learns how far it got, how the run hands over what it
+ *          has so far, and how the caller pauses and changes a live run.
  */
 
 #include "run_control.h"
@@ -42,6 +42,29 @@ bool RunControl::IsDiscarded() const {
 }
 
 /**
+ * @brief   Asks a live run to hold where it is after its current chunk, keeping its state for Resume().
+ * @note    A run that is not live never pauses; a stop request still ends a paused run.
+ */
+void RunControl::Pause() {
+    m_IsPaused = true;
+}
+
+/**
+ * @brief   Lets a paused live run go on from where it held.
+ */
+void RunControl::Resume() {
+    m_IsPaused = false;
+}
+
+/**
+ * @brief   Tells whether the run is asked to hold.
+ * @return  True from Pause() until Resume() or Reset().
+ */
+bool RunControl::IsPaused() const {
+    return m_IsPaused;
+}
+
+/**
  * @brief   Reports how much of the run is done.
  * @param[in] fraction  From 0 for nothing done to 1 for finished.
  */
@@ -76,14 +99,36 @@ std::vector<Delivery> RunControl::TakePosted() {
 }
 
 /**
- * @brief   Clears the stop request, the discard, the progress and the mailbox, for the next run.
+ * @brief   Hands changes of the circuit to a live run, which applies them before its next chunk.
+ * @param[in] changes  New values of netlist elements, in the order they happened.
+ * @note    A run that is not live never takes them; Reset() drops what is left.
+ */
+void RunControl::SendChanges(const std::vector<LiveChange> &changes) {
+    const std::lock_guard lock(m_MailboxMutex);
+    m_Changes.insert(m_Changes.end(), changes.begin(), changes.end());
+}
+
+/**
+ * @brief   Takes the changes sent since the last call.
+ * @return  The changes in the order they were sent.
+ */
+std::vector<LiveChange> RunControl::TakeChanges() {
+    const std::lock_guard lock(m_MailboxMutex);
+    return std::exchange(m_Changes, {});
+}
+
+/**
+ * @brief   Clears the stop request, the discard, the pause, the progress, the mailbox and the changes, for the next
+ * run.
  */
 void RunControl::Reset() {
     m_IsCancelled = false;
     m_IsDiscarded = false;
+    m_IsPaused = false;
     m_Progress = 0.0;
     const std::lock_guard lock(m_MailboxMutex);
     m_Posted.clear();
+    m_Changes.clear();
 }
 
 } // namespace Core

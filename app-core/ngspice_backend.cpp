@@ -7,6 +7,7 @@
 #include "ngspice_backend.h"
 
 #include "components/logic_part.h"
+#include "live_change.h"
 #include "ngspice_library.h"
 #include "ngspice_readers.h"
 #include "spice_value.h"
@@ -15,6 +16,7 @@
 #include <format>
 #include <ngspice/sharedspice.h>
 #include <string_view>
+#include <thread>
 #include <utility>
 
 namespace Core {
@@ -80,6 +82,8 @@ constexpr double TARGET_CHUNK_SECONDS = 0.03;
 constexpr double FIRST_CHUNK_SHARE = 0.01;
 // A run has ended when its last point is this close to the stop time, which ngspice lands on exactly
 constexpr double COMPLETE_SHARE = 1.0 - 1e-9;
+// A live run that is ahead of the clock waits in slices this long, so a stop waits little
+constexpr std::chrono::duration<double> PACE_WAIT_SLICE{0.01};
 
 // How much simulated time the next chunk covers: twice the last one when it was quick, half when it was slow, so the
 // chunks settle around the target wall time as the circuit gets easier or harder
@@ -113,6 +117,47 @@ std::optional<std::string> RunToTheEnd(const std::vector<SimulatorMessage> & /*m
     return std::nullopt;
 }
 
+// The name ngspice gives the figure a live change sets, for alter
+std::string_view GetAlterParameter(const LiveQuantity quantity) {
+    switch (quantity) {
+    case LiveQuantity::RESISTANCE:
+        return "resistance";
+    case LiveQuantity::DC_VOLTAGE:
+        return "dc";
+    default:
+        return "";
+    }
+}
+
+// Applies the changes the caller sent since the last chunk, which take effect from the next resume
+void ApplyLiveChanges(RunControl &control) {
+    for (const LiveChange &change : control.TakeChanges()) {
+        SendCommand(std::format("alter {} {} = {}", change.Element, GetAlterParameter(change.Quantity),
+                                FormatSpiceValue(change.Value)));
+    }
+}
+
+// Waits until the clock catches up with the simulated time a live run has reached, unless the run is asked to stop
+void WaitForClock(const std::chrono::steady_clock::time_point due, const RunControl *control) {
+    while (control == nullptr || !control->IsCancelled()) {
+        const std::chrono::duration<double> left = due - std::chrono::steady_clock::now();
+        if (left <= std::chrono::duration<double>::zero()) {
+            return;
+        }
+        std::this_thread::sleep_for(std::min(left, PACE_WAIT_SLICE));
+    }
+}
+
+// Holds a paused live run until it is resumed or asked to stop, and returns how long it held, by which the clock the
+// run keeps pace with moves on
+std::chrono::steady_clock::duration WaitWhilePaused(const RunControl *control) {
+    const auto start = std::chrono::steady_clock::now();
+    while (control != nullptr && control->IsPaused() && !control->IsCancelled()) {
+        std::this_thread::sleep_for(PACE_WAIT_SLICE);
+    }
+    return std::chrono::steady_clock::now() - start;
+}
+
 // Hands over the points made since the last chunk, if the monitor wants them, and reports how far the run is
 bool PublishChunk(const Circuit &circuit, const RunMonitor &monitor, const double progress, std::size_t &sent) {
     if (monitor.Control != nullptr) {
@@ -133,14 +178,22 @@ bool PublishChunk(const Circuit &circuit, const RunMonitor &monitor, const doubl
 // Runs the loaded transient in stretches of simulated time: ngspice stops when the time passes a limit, the chunk is
 // read, and the next limit is set to resume. Stop conditions pile up, so they are deleted before each new one, or
 // every resume would advance one step. A stop request ends the loop between chunks, and what ngspice has made stays
-// in its plot
+// in its plot. A live run covers a fixed stretch of the clock per chunk at its pace and waits when it gets ahead,
+// holds between chunks while paused, and alters the circuit with the changes sent before each chunk
 std::optional<std::string> RunInChunks(const Circuit &circuit, const TransientSettings &settings,
                                        const RunMonitor &monitor, const std::vector<SimulatorMessage> &messages) {
-    double duration = settings.StopTime * FIRST_CHUNK_SHARE;
+    const bool is_live = monitor.LivePace > 0.0;
+    const double pace = monitor.LivePace;
+    double duration = is_live ? pace * TARGET_CHUNK_SECONDS : settings.StopTime * FIRST_CHUNK_SHARE;
     double reached = 0.0;
     std::size_t sent = 0;
     bool is_started = false;
+    // When the clock the live run keeps pace with started, moved later by the time spent paused
+    auto start = std::chrono::steady_clock::now();
     while (true) {
+        if (is_live && monitor.Control != nullptr) {
+            ApplyLiveChanges(*monitor.Control);
+        }
         const double stop_at = reached + duration;
         if (is_started) {
             SendCommand("delete all");
@@ -169,7 +222,17 @@ std::optional<std::string> RunInChunks(const Circuit &circuit, const TransientSe
         if (is_complete || (monitor.Control != nullptr && monitor.Control->IsCancelled())) {
             return std::nullopt;
         }
-        duration = GetNextChunkDuration(duration, wall.count(), settings.TimeStep);
+        if (is_live) {
+            WaitForClock(start + std::chrono::duration_cast<std::chrono::steady_clock::duration>(
+                                     std::chrono::duration<double>(reached / pace)),
+                         monitor.Control);
+            start += WaitWhilePaused(monitor.Control);
+            if (monitor.Control != nullptr && monitor.Control->IsCancelled()) {
+                return std::nullopt;
+            }
+        } else {
+            duration = GetNextChunkDuration(duration, wall.count(), settings.TimeStep);
+        }
     }
 }
 
