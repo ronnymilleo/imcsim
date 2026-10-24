@@ -656,7 +656,7 @@ void PartEditor::DrawLogicInput(Core::LogicInput &input) {
     bool high = input.IsHigh();
     if (ImGui::Checkbox("High", &high)) {
         input.SetHigh(high);
-        m_Schematic.MarkModified();
+        m_Schematic.MarkLiveChanged(input);
     }
     Core::LogicInputParameters parameters = input.GetParameters();
     const auto is_valid = [](const Core::LogicInputParameters &candidate) {
@@ -675,7 +675,7 @@ void PartEditor::DrawSwitch(Core::Switch &contact) {
     const bool is_button = contact.GetType() == Core::ComponentType::PUSH_BUTTON;
     if (ImGui::Checkbox(is_button ? "Pressed" : "Closed", &closed)) {
         contact.SetClosed(closed);
-        m_Schematic.MarkModified();
+        m_Schematic.MarkLiveChanged(contact);
     }
     ImGui::TextDisabled("It is a %s while the circuit is simulated", closed ? "wire" : "gap");
 }
@@ -686,7 +686,7 @@ void PartEditor::DrawWiper(Core::Potentiometer &pot) {
     auto percent = static_cast<float>(pot.GetWiper() * 100.0);
     if (ImGui::SliderFloat("##wiper", &percent, 0.0f, 100.0f, "%.0f%%")) {
         pot.SetWiper(static_cast<double>(percent) / 100.0);
-        m_Schematic.MarkModified();
+        m_Schematic.MarkLiveChanged(pot);
     }
     ImGui::TextDisabled("0%% is terminal 1 and 100%% is terminal 2");
 }

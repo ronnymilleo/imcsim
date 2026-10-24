@@ -426,6 +426,7 @@ TEST_CASE("Simulation settings load back unchanged", "[schematic_file]") {
     GUI::SimulationSettings settings;
     settings.Selected = GUI::Analysis::DC_SWEEP;
     settings.Transient = {.StopTime = 50e-3, .TimeStep = 20e-6};
+    settings.LiveSeconds = 25.0;
     settings.ACSweep = {.StartFrequency = 10.0, .StopFrequency = 100e3, .PointsPerDecade = 50};
     settings.SweptRange = {.Source = "V1", .Start = 5.0, .Stop = 0.0, .Step = -0.05};
     settings.SteppedRange = {.Source = "I1", .Start = 10e-6, .Stop = 50e-6, .Step = 10e-6};
@@ -516,6 +517,15 @@ TEST_CASE("Invalid settings of one analysis fall back to its defaults with a war
     CHECK(loaded.Settings.ACSweep ==
           Core::ACSweepSettings{.StartFrequency = 10.0, .StopFrequency = 1e3, .PointsPerDecade = 5});
     CHECK(loaded.Settings.SweptRange == Core::SweepRange{});
+}
+
+TEST_CASE("A live duration out of its range resets the transient settings with a warning", "[schematic_file]") {
+    const std::string text = R"({"format": "imcsim-schematic", "version": 1, "simulation": {)"
+                             R"("transient": {"stop": 1e-3, "step": 1e-6, "live_seconds": 600.0}}})";
+    const GUI::LoadedSchematic loaded = LoadOrFail(text);
+    CHECK(loaded.Warnings.size() == 1);
+    CHECK(loaded.Settings.LiveSeconds == GUI::DEFAULT_LIVE_SECONDS);
+    CHECK(loaded.Settings.Transient == Core::TransientSettings{});
 }
 
 TEST_CASE("An unknown selected analysis falls back to the transient with a warning", "[schematic_file]") {

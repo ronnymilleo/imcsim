@@ -444,6 +444,59 @@ void Schematic::MarkSaved(std::filesystem::path path) {
 }
 
 /**
+ * @brief   Records whether a live transient runs, so the parts the user sets by hand change in it.
+ * @param[in] is_live  True from the start of a live run to its end.
+ * @note    The changes the run has not taken are dropped when it ends.
+ */
+void Schematic::SetLiveRun(const bool is_live) {
+    m_IsLiveRun = is_live;
+    if (!is_live) {
+        m_LiveChanges.clear();
+    }
+}
+
+/**
+ * @brief   Tells whether a live transient runs.
+ * @return  True between SetLiveRun(true) and SetLiveRun(false).
+ */
+bool Schematic::IsLiveRun() const {
+    return m_IsLiveRun;
+}
+
+/**
+ * @brief   Records that the user flipped a switch, pressed or released a button, set a logic input or turned a
+ *          potentiometer.
+ * @param[in] component  The part, already in its new state.
+ * @note    It is a change like any other, saved and undone, but while a live run goes on it keeps the transient and
+ *          the circuit version, and queues the change for the run (TakeLiveChanges()); the other results no longer
+ *          match the circuit and are dropped. Without a live run, or for any other part, it is MarkModified().
+ */
+void Schematic::MarkLiveChanged(const Core::Component &component) {
+    if (!m_IsLiveRun || !Core::IsLiveChangeable(component.GetType())) {
+        MarkModified();
+        return;
+    }
+    m_Modified = true;
+    m_ChangedSinceCommit = true;
+    std::ranges::move(Core::DescribeLiveChange(component), std::back_inserter(m_LiveChanges));
+    m_OperatingPoint.reset();
+    m_ACSweep.reset();
+    m_ACSweepSteps.reset();
+    m_DCSweep.reset();
+    m_Noise.reset();
+    m_TransferFunction.reset();
+    m_TruthTable.reset();
+}
+
+/**
+ * @brief   Takes the changes the live run should apply.
+ * @return  The changes recorded by MarkLiveChanged() since the last call, in order.
+ */
+std::vector<Core::LiveChange> Schematic::TakeLiveChanges() {
+    return std::exchange(m_LiveChanges, {});
+}
+
+/**
  * @brief   Turns the changes made since the last call into one undo step.
  * @note    Call it once the user finishes an interaction, such as at the end of a frame with no item active, so
  *          a whole drag counts as one step. Changes that leave the schematic as it was add no step. A new step

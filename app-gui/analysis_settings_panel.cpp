@@ -213,6 +213,7 @@ void AnalysisSettingsPanel::LoadSettingsFields() {
     const SimulationSettings &settings = m_Schematic.GetSimulationSettings();
     m_StopTime.Load(settings.Transient.StopTime);
     m_TimeStep.Load(settings.Transient.TimeStep);
+    m_LiveSeconds.Load(settings.LiveSeconds);
     m_StartFrequency.Load(settings.ACSweep.StartFrequency);
     m_StopFrequency.Load(settings.ACSweep.StopFrequency);
     LoadSweepFields(settings.SweptRange, m_SweptFields);
@@ -240,6 +241,12 @@ void AnalysisSettingsPanel::DrawTransientSettings(SimulationSettings &settings) 
         m_StopTime.Load(suggested->StopTime);
         m_TimeStep.Load(suggested->TimeStep);
     }
+    if (const std::optional<double> live_seconds = m_LiveSeconds.Draw("Live run", "s", IsValidLiveSeconds)) {
+        settings.LiveSeconds = *live_seconds;
+    }
+    ImGui::SetItemTooltip("With Live on, the transient runs until it is stopped and covers the stop time in this long "
+                          "on the clock, from %.0f to %.0f s; the plot and the schematic show the last stop time",
+                          MIN_LIVE_SECONDS, MAX_LIVE_SECONDS);
 }
 
 void AnalysisSettingsPanel::DrawACSweepSettings(SimulationSettings &settings) {
