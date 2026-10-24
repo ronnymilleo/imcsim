@@ -6,8 +6,28 @@
 #include "transient_window.h"
 
 #include <algorithm>
+#include <vector>
 
 namespace GUI {
+
+namespace {
+
+// How many points from first fit in a span of time, at least one and at most the largest window
+std::size_t CountSpanPoints(const std::vector<double> &times, const std::size_t first, const double span) {
+    const auto end =
+        std::upper_bound(times.begin() + static_cast<std::ptrdiff_t>(first), times.end(), times[first] + span);
+    const auto count = static_cast<std::size_t>(end - times.begin()) - first;
+    return std::clamp<std::size_t>(count, 1, MAX_WINDOW_POINTS);
+}
+
+// The first of the points that end a run within a span of time, keeping at most the largest window
+std::size_t FindSpanStart(const std::vector<double> &times, const double span) {
+    const auto start = std::lower_bound(times.begin(), times.end(), times.back() - span);
+    const auto first = static_cast<std::size_t>(start - times.begin());
+    return std::max(first, times.size() - std::min(times.size(), static_cast<std::size_t>(MAX_WINDOW_POINTS)));
+}
+
+} // namespace
 
 /**
  * @brief   Chooses the window to show this frame.
@@ -16,7 +36,7 @@ namespace GUI {
  * @param[in] is_running     Whether a run is in progress.
  * @return  The window of points. A new result starts at its beginning, unless it is the whole run that replaces the
  *          chunks the window was following, which stays where it was. A window that follows a run in progress is on its
- *          newest points.
+ *          newest points. With a span, the window holds the points of that stretch of time, up to MAX_WINDOW_POINTS.
  */
 PointWindow TransientWindow::Update(const Core::Transient *transient, const std::size_t result_version,
                                     const bool is_running) {
@@ -28,7 +48,7 @@ PointWindow TransientWindow::Update(const Core::Transient *transient, const std:
     }
     m_TotalPoints = transient->Times.size();
     m_Points = std::clamp(m_Points, MIN_WINDOW_POINTS, MAX_WINDOW_POINTS);
-    const std::size_t points = static_cast<std::size_t>(m_Points);
+    auto points = static_cast<std::size_t>(m_Points);
     if (result_version != m_ResultVersion) {
         m_ResultVersion = result_version;
         if (!m_WasIncomplete) {
@@ -38,7 +58,13 @@ PointWindow TransientWindow::Update(const Core::Transient *transient, const std:
     }
     m_WasIncomplete = !transient->IsComplete;
     m_IsLive = m_Follows && is_running && !transient->IsComplete;
-    if (m_IsLive) {
+    if (m_Span && m_TotalPoints > 0) {
+        if (m_IsLive) {
+            m_First = FindSpanStart(transient->Times, *m_Span);
+        }
+        m_First = std::min(m_First, m_TotalPoints - 1);
+        points = CountSpanPoints(transient->Times, m_First, *m_Span);
+    } else if (m_IsLive) {
         m_First = GetEndWindow(m_TotalPoints, points).First;
     }
     m_Shown = ClampWindow(m_TotalPoints, m_First, points);
@@ -110,6 +136,22 @@ bool TransientWindow::DoesFollow() const {
  */
 void TransientWindow::SetFollow(const bool follows) {
     m_Follows = follows;
+}
+
+/**
+ * @brief   Returns the stretch of time the window holds in place of a number of points.
+ * @return  The span in seconds, or no value when the window holds the number of points the user picked.
+ */
+std::optional<double> TransientWindow::GetSpan() const {
+    return m_Span;
+}
+
+/**
+ * @brief   Makes the window hold a stretch of time instead of a number of points, as a live run is seen.
+ * @param[in] span  The span in seconds, or no value to go back to the number of points.
+ */
+void TransientWindow::SetSpan(const std::optional<double> span) {
+    m_Span = span;
 }
 
 } // namespace GUI

@@ -9,6 +9,7 @@
 #include "point_window.h"
 #include "simulation_results.h"
 #include <cstddef>
+#include <optional>
 
 namespace GUI {
 
@@ -16,8 +17,9 @@ namespace GUI {
  * @class   TransientWindow
  * @brief   The window of points that the Output window plots and the schematic plays, which the user moves and sizes.
  * @details The Application updates it every frame, so it follows a run in progress whichever window is shown; the plot
- *          and the schematic read the window the last update chose. It is view state: it is not saved with the
- * schematic.
+ *          and the schematic read the window the last update chose. The window holds a number of points the user
+ *          picks, or, with a span set, the points of that stretch of time, as a live run is seen. It is view state: it
+ * is not saved with the schematic.
  */
 class TransientWindow {
 public:
@@ -34,11 +36,16 @@ public:
     bool DoesFollow() const;
     void SetFollow(bool follows);
 
+    // A stretch of time in place of a number of points
+    std::optional<double> GetSpan() const;
+    void SetSpan(std::optional<double> span);
+
 private:
     // What the user asked for, which the next update applies
     std::size_t m_First = 0;
     int m_Points = DEFAULT_WINDOW_POINTS;
     bool m_Follows = true;
+    std::optional<double> m_Span;
 
     // What the last update chose, and what it saw
     PointWindow m_Shown;
