@@ -8,6 +8,14 @@
 
 namespace Core {
 
+namespace {
+
+// A switch is a resistor, which closed is nearly a wire and open nearly nothing at all
+constexpr double CLOSED_RESISTANCE = 1e-3;
+constexpr double OPEN_RESISTANCE = 1e12;
+
+} // namespace
+
 /**
  * @brief   Creates an open switch or push button.
  * @param[in] type  ComponentType::Switch or ComponentType::PushButton.
@@ -37,6 +45,14 @@ bool Switch::IsClosed() const {
  */
 void Switch::SetClosed(const bool closed) {
     m_Closed = closed;
+}
+
+/**
+ * @brief   Returns the resistance the contact is simulated with.
+ * @return  1 mOhm when closed and 1 TOhm when open.
+ */
+double Switch::GetResistance() const {
+    return m_Closed ? CLOSED_RESISTANCE : OPEN_RESISTANCE;
 }
 
 /**
