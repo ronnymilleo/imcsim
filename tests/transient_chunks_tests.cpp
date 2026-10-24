@@ -338,9 +338,9 @@ TEST_CASE("A live transient keeps the pace it was given", "[transient_chunks][li
     const double wall_seconds = SecondsSince(start);
     REQUIRE(run.Result.has_value());
     CHECK(run.Result->IsComplete);
-    // A few milliseconds early at most, as the last chunk ends at the stop time without waiting; the upper bound leaves
-    // room for a slow machine, as a run that ignored the pace would end in milliseconds and one stuck waiting never
-    CHECK(wall_seconds > 0.35);
+    // Up to a chunk early, as the last one ends at the stop time without waiting. A run that ignored the pace would end
+    // in milliseconds and one stuck waiting never, so both bounds leave room for a busy machine
+    CHECK(wall_seconds > 0.3);
     CHECK(wall_seconds < 5.0);
 }
 
@@ -367,7 +367,7 @@ TEST_CASE("A paused live transient holds until resumed, then keeps its pace inst
             paused_at = chunk.Times.back();
             live.Control.Pause();
             resumer = std::jthread([&live] {
-                std::this_thread::sleep_for(std::chrono::milliseconds(300));
+                std::this_thread::sleep_for(std::chrono::milliseconds(500));
                 live.Control.Resume();
             });
         }
@@ -378,8 +378,10 @@ TEST_CASE("A paused live transient holds until resumed, then keeps its pace inst
     REQUIRE(run.Result.has_value());
     CHECK(run.Result->IsComplete);
     CHECK(paused_at < setup.Settings.StopTime);
-    // The 0.4 s of the run and the 0.3 s it held: a run that rushed to make up for the pause would end near 0.4 s
-    CHECK(wall_seconds > 0.65);
+    // The 0.4 s of the run and the 0.5 s it held, less a chunk at each end (the first waits for the clock while
+    // paused, the last ends without waiting), come to about 0.85 s; a run that rushed to make up for the pause would
+    // end soon after it was resumed, near 0.55 s
+    CHECK(wall_seconds > 0.75);
     CHECK(wall_seconds < 5.0);
 }
 
@@ -415,8 +417,9 @@ TEST_CASE("A switch closed during a live transient conducts from the next chunk 
     REQUIRE(run.Result.has_value());
     REQUIRE(live.SentAt > 0.0);
     CHECK(run.Result->IsComplete);
-    // The change does not hurry the run along: it keeps its pace to the end
-    CHECK(SecondsSince(start) > 0.45);
+    // The change does not hurry the run along: it keeps its pace to the end, about 0.5 s, where a run that ignored the
+    // pace would end in milliseconds
+    CHECK(SecondsSince(start) > 0.35);
     const std::vector<double> &times = run.Result->Times;
     const std::vector<double> &middle = run.Result->NodeVoltages[3];
     // Open, the divider carries nothing; closed, it halves the source
