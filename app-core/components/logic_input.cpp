@@ -63,4 +63,12 @@ void LogicInput::SetHigh(const bool high) {
     m_IsHigh = high;
 }
 
+/**
+ * @brief   Returns the voltage the input drives.
+ * @return  The logic level when high, 0 V when low.
+ */
+double LogicInput::GetVoltage() const {
+    return m_IsHigh ? m_Parameters.LogicLevel : 0.0;
+}
+
 } // namespace Core

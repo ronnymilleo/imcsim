@@ -8,6 +8,7 @@
 
 #include "connectivity.h"
 #include "helpers.h"
+#include "live_change.h"
 #include "parameter_step.h"
 #include "schematic_file.h"
 #include "simulation_settings.h"
@@ -40,7 +41,9 @@ namespace GUI {
  *          since small edits rarely renumber nodes, and are saved with the file so it opens ready to plot, but
  *          they stay out of the history and changing them does not count as an unsaved change. The simulation
  *          settings belong to the document: they are saved, undone and count as changes, but changing them keeps
- *          the results, which still match the circuit.
+ *          the results, which still match the circuit. While a live transient runs, flipping a switch, pressing a
+ *          button, setting a logic input or turning a potentiometer (MarkLiveChanged()) is a change that keeps the
+ *          transient and the circuit version: the part changes in the run instead of stopping it.
  */
 class Schematic {
 public:
@@ -95,6 +98,12 @@ public:
     void MarkModified();
     const std::optional<std::filesystem::path> &GetFilePath() const;
     void MarkSaved(std::filesystem::path path);
+
+    // Live runs
+    void SetLiveRun(bool is_live);
+    bool IsLiveRun() const;
+    void MarkLiveChanged(const Core::Component &component);
+    std::vector<Core::LiveChange> TakeLiveChanges();
 
     // History
     void CommitUndoStep();
@@ -174,6 +183,10 @@ private:
     // Document state
     bool m_Modified = false;
     std::optional<std::filesystem::path> m_FilePath;
+
+    // Live runs: whether one is going on, and the changes of its parts that it has not taken yet
+    bool m_IsLiveRun = false;
+    std::vector<Core::LiveChange> m_LiveChanges;
 
     // History, as whole schematics saved to text: simple and always consistent, at the cost of some memory
     std::string m_CurrentSnapshot;

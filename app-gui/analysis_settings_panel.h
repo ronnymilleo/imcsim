@@ -39,6 +39,7 @@ private:
     std::size_t m_LoadedSettingsVersion = 0;
     ValueField m_StopTime;
     ValueField m_TimeStep;
+    ValueField m_LiveSeconds;
     ValueField m_StartFrequency;
     ValueField m_StopFrequency;
     // Start, stop and step of each DC sweep range

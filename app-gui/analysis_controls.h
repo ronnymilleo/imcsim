@@ -35,6 +35,17 @@ enum class RunOutcome {
 };
 
 /**
+ * @enum    RunAction
+ * @brief   What the Run button does now: start the selected analysis, stop the run in progress, or take a paused live
+ *          run on.
+ */
+enum class RunAction {
+    RUN,
+    STOP,
+    CONTINUE
+};
+
+/**
  * @class   AnalysisControls
  * @brief   Runs the selected analysis on a worker thread and keeps what the last run of each analysis reported.
  * @details The settings and the results live in the Schematic: the settings are saved with it, and the results
@@ -42,7 +53,10 @@ enum class RunOutcome {
  *          each analysis and stay until its next run. The Application owns one instance, which the editor toolbar
  *          and the Analysis Settings window both use. A run works on a copy of the circuit, so the user keeps editing
  * while it goes on; an edit of the circuit stops it, as it drops the results of the last one. Call Update() every
- * frame, since the results arrive there.
+ * frame, since the results arrive there. With Live mode on, a transient runs paced against the clock, covering its stop
+ * time in the live seconds of the settings, and goes on until it is stopped, up to LIVE_RUN_LIMIT_SECONDS or
+ * MAX_TRANSIENT_POINTS; the parts the user sets by hand change in it (see Schematic::MarkLiveChanged()). Stopping a
+ * live run pauses it with every point kept, ContinueLive() goes on from there and DiscardLive() drops it.
  */
 class AnalysisControls {
 public:
@@ -51,11 +65,23 @@ public:
     // Runs
     void RunSelected();
     void StopRun();
+    RunAction GetRunAction() const;
+    void PressRun();
     void Update();
     bool IsRunning() const;
     bool IsStopping() const;
     std::optional<Analysis> GetRunningAnalysis() const;
     double GetRunProgress() const;
+
+    // Live mode
+    bool IsLiveModeOn() const;
+    void SetLiveMode(bool is_on);
+    std::optional<std::string> FindLiveObstacle() const;
+    bool IsLive() const;
+    bool IsLivePaused() const;
+    void ContinueLive();
+    void DiscardLive();
+    bool IsLiveResult() const;
 
     // Last run
     std::optional<Analysis> GetLastRun() const;
@@ -89,6 +115,14 @@ private:
     Core::SimulationService m_Service;
     std::optional<Analysis> m_RunningAnalysis;
     std::size_t m_RunCircuitVersion = 0;
+    // Run asked for while a paused live run held the worker, which starts once that run has ended
+    bool m_IsRunPending = false;
+
+    // Whether the next transient runs live, whether the run in progress does, and whether the transient on display
+    // came from a live run
+    bool m_IsLiveModeOn = false;
+    bool m_IsLiveRun = false;
+    bool m_IsLiveResult = false;
 
     // Last run of each analysis, in the order of the Analysis enum
     std::array<RunStatus, ANALYSIS_COUNT> m_Statuses;
@@ -96,6 +130,8 @@ private:
 
     // Runs of one analysis
     void StartRun(Analysis analysis, Core::Job job);
+    void StartAnalysis(Analysis analysis, const Core::Circuit &circuit, const std::optional<StepPlan> &steps);
+    void RunOperatingPointAnalysis(const Core::Circuit &circuit);
     void RunTransientAnalysis(const Core::Circuit &circuit, const std::optional<StepPlan> &steps);
     void RunACSweepAnalysis(const Core::Circuit &circuit, const std::optional<StepPlan> &steps);
     void RunDCSweepAnalysis(const Core::Circuit &circuit, const std::optional<StepPlan> &steps);

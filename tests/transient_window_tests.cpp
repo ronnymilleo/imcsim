@@ -5,8 +5,10 @@
 
 #include "transient_window.h"
 
+#include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 #include <cstddef>
+#include <optional>
 
 namespace {
 
@@ -14,6 +16,16 @@ namespace {
 Core::Transient TransientOf(const std::size_t point_count, const bool is_complete = true) {
     Core::Transient transient;
     transient.Times.assign(point_count, 0.0);
+    transient.IsComplete = is_complete;
+    return transient;
+}
+
+// A transient with points every step from 0, complete or still being made
+Core::Transient EvenTransient(const std::size_t point_count, const double step, const bool is_complete = true) {
+    Core::Transient transient;
+    for (std::size_t index = 0; index < point_count; ++index) {
+        transient.Times.push_back(static_cast<double>(index) * step);
+    }
     transient.IsComplete = is_complete;
     return transient;
 }
@@ -99,4 +111,34 @@ TEST_CASE("The whole run that replaces the chunks keeps the place of the window,
     const Core::Transient next_chunks = TransientOf(2 * SIZE, false);
     CHECK(window.Update(&next_chunks, 3, true).First == SIZE);
     CHECK(window.DoesFollow());
+}
+
+TEST_CASE("A window with a span holds the points of that stretch of time, wherever it is", "[transient_window]") {
+    GUI::TransientWindow window;
+    window.SetSpan(1e-3);
+    CHECK(window.GetSpan() == 1e-3);
+    // A point every 1 us, so 1 ms holds a thousand intervals
+    const Core::Transient growing = EvenTransient(5000, 1e-6, false);
+    const GUI::PointWindow followed = window.Update(&growing, 1, true);
+    CHECK(followed.First + followed.Count == 5000);
+    CHECK(growing.Times[followed.First] == Catch::Approx(growing.Times.back() - 1e-3).margin(1e-9));
+
+    // Moved back, it holds the same stretch from where it starts
+    window.SetFirst(100);
+    const GUI::PointWindow moved = window.Update(&growing, 1, true);
+    CHECK(moved.First == 100);
+    CHECK(growing.Times[moved.First + moved.Count - 1] == Catch::Approx(growing.Times[100] + 1e-3).margin(1e-9));
+
+    // Without the span it goes back to the number of points
+    window.SetSpan(std::nullopt);
+    CHECK(window.Update(&growing, 1, true).Count == static_cast<std::size_t>(GUI::DEFAULT_WINDOW_POINTS));
+}
+
+TEST_CASE("A span with more points than the largest window shows its newest ones", "[transient_window]") {
+    GUI::TransientWindow window;
+    window.SetSpan(1.0);
+    const Core::Transient dense = EvenTransient(50'000, 1e-6, false);
+    const GUI::PointWindow shown = window.Update(&dense, 1, true);
+    CHECK(shown.Count == static_cast<std::size_t>(GUI::MAX_WINDOW_POINTS));
+    CHECK(shown.First + shown.Count == 50'000);
 }

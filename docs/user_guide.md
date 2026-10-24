@@ -166,6 +166,39 @@ The colors keep one scale for the whole run, from its lowest to its highest volt
 so a value keeps its color from one instant to the next. A new result starts again at the beginning of the run, paused.
 The schematic shows the last of the operating point and the transient that ran; the bar is only there for a transient.
 
+## Live runs
+
+The **Live** button beside the analysis turns the next transient into a live run, which plays on the schematic while it
+is simulated and goes on until you stop it. It covers the stop time every **Live run** seconds of the transient
+settings (10 s at first, from 2 to 60), whatever the circuit: a circuit of a millisecond is slowed down so you can follow
+it, and one of a minute is sped up. The stop time is also how much of the run the plot and the schematic show at a time,
+the newest stretch, which scrolls as the run goes on.
+
+Only switches, push buttons, logic inputs and potentiometers change during a live run: they are outlined on the
+schematic while it lasts. Changing any other part, or the wiring, ends the run, and the properties of a part say so
+before you edit it. While it runs:
+
+- A click on a switch or a logic input flips it, a push button is pressed while the mouse button holds it down, and
+  the mouse wheel over a potentiometer moves its wiper by 5% a notch. The Closed, Pressed, High and Wiper fields of the
+  part's properties do the same. The circuit takes the change a few hundredths of a second later, and the plot shows it
+  at the instant it happened.
+- The schematic shows the newest point, the status bar reads "Transient live at 12.5ms", and the Output window marks
+  its tab with a dot instead of coming to the front, so the schematic stays in view.
+- **Stop** pauses the run and keeps every point it made: scroll back through it, play it on the time bar, export it, or
+  set switches for when it goes on. **Continue** (the Run button, or F5) takes the run on from where it stopped, at the
+  same pace. **Discard**, which takes the place of Live while a live run lasts, ends it and drops what it made; Run then
+  starts a new one from zero. The Output window offers the same buttons above the plot.
+- Running another analysis ends a paused live run and keeps its points, as a stopped transient. Any other edit ends
+  the run and drops it, as it does any run.
+
+A live run stops by itself after an hour on the clock, or sooner when it reaches a million time steps (a small time
+step for its stop time), with a warning: ngspice keeps every point of the run and cannot let go of the old ones, so its
+memory grows the longer the run goes on.
+
+Live works only for a transient, and not for a stepped one; when it cannot run, the button is grayed out and its
+tooltip says why. The result of a live run stays like any other, with the changes made during it, until the circuit is
+edited.
+
 ## Live effects
 
 **View > Live Effects** turns on effects drawn over any wire coloring, each on its own. Both read what the schematic

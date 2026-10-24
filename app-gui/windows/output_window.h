@@ -72,7 +72,7 @@ public:
     OutputWindow(Schematic &schematic, AnalysisControls &controls, TransientPlayback &playback);
     ~OutputWindow() override = default;
 
-    void ShowTab(PlotTab tab);
+    void ShowTab(PlotTab tab, bool may_come_to_front = true);
     void DrawViewMenuItems();
     void RegisterSettingsHandler();
 
@@ -169,7 +169,9 @@ private:
 
     // Plots
     void DrawIncompleteNote(const Core::Transient &transient);
+    void DrawLiveNote(const Core::Transient &transient);
     void DrawWindowControls(const Core::Transient &shown);
+    void DrawWindowSize(ImVec2 row_start, float width);
     void DrawTransient(const Core::Transient &transient, const std::vector<MathTrace> &math,
                        const std::optional<StepFamily<Core::Transient>> &steps);
     void DrawTransientAnalog(const Core::Transient &transient, const std::vector<MathTrace> &math,

@@ -26,6 +26,7 @@ public:
 
     bool IsClosed() const;
     void SetClosed(bool closed);
+    double GetResistance() const;
 
 private:
     bool m_Closed = false;
