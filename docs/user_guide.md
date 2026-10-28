@@ -104,8 +104,9 @@ How to read what imcsim measures, plots and exports. The [README](../README.md) 
   points in a period of the fastest) or the AC range (two decades past the RC, RL and LC corners and the op-amp
   bandwidths). By default nothing runs by itself: edit the circuit, then run again, or turn on Run again after edits
   in Edit > Preferences. With it on, once you have run the selected analysis, each change to the circuit (a value, a
-  part added, moved or deleted, an undo) runs it again half a second after the edit is over: while a value is being
-  typed or something dragged it waits, a burst of edits runs it once, and a run still going on is stopped first.
+  part added, moved or deleted, an undo) runs it again once the circuit has stayed unchanged for Wait after an edit
+  (half a second unless you change it, from 0.1 to 5 seconds): while a value is being typed or something dragged it
+  waits, a burst of edits runs it once, and a run still going on is stopped first.
   Opening another schematic does not run anything, and a live run already follows the parts set by hand. View >
   Analysis Settings keeps the same settings open in a window.
 - **Stopping**: a run goes on in the background, so the editor stays usable. The ▶ button becomes a ■ Stop button, and the
