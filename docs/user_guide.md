@@ -85,8 +85,9 @@ How to read what imcsim measures, plots and exports. The [README](../README.md) 
   name of the last one, so another point of the same net is a click away. A label with no name shows a `?` and joins
   nothing. A node with a label shows its name instead of its number where the plots and probes name it: `V(OUT)`
   rather than `V(3)`, in the legends, the trace lists, the operating point table (as `OUT (3)`), the probe markers
-  and the hover. Math channel expressions still use node numbers. Labels are ordinary parts: they select, move,
-  turn, copy and paste like the others, and the netlist has no line for them.
+  and the hover. Math channels take the name too, as `V(OUT)`, and find the node again after edits that renumber
+  the nodes. Labels are ordinary parts: they select, move, turn, copy and paste like the others, and the netlist has
+  no line for them.
 - **Rotating and mirroring**: R, M (left to right) and Shift+M (top to bottom) turn the selection about its center;
   with one part selected, that part turns in place. The wires that meet the selection follow it. Hold Alt (Alt+R,
   Alt+M, Alt+Shift+M, or Edit > Keep Wires in Place) to turn the parts and leave every wire where it is, so nothing
@@ -344,7 +345,11 @@ their statistics and the exports always agree.
   axis again. The plot is left out when only logic signals are measured. The SVG export has the same panels and bit
   labels; the CSV lists the voltages.
 - Math channels are heavier lines; volts and amperes share the axes above, any other unit or none goes on a third
-  axis.
+  axis. Their trace pickers offer a labeled node by its name, and a typed expression may name it as `V(OUT)` or
+  `V(OUT, IN)`; a name of digits alone, such as `V(3)`, is a node number. The channels are saved with the schematic,
+  like the measured traces, but adding or editing one is not an unsaved change. A channel that names a net no label
+  has any longer keeps its expression and reads in red, with the reason in its tooltip and above the plot, instead
+  of disappearing.
 - The AC sweep is a Bode plot: magnitude in dB and phase in degrees, relative to the AC magnitude of the sources.
   That magnitude is set in Properties apart from the amplitude of the sine, as in SPICE, and is 1 by default, so
   the plot reads as gain while a transient uses the small amplitude a real circuit would see.
