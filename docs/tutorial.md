@@ -112,8 +112,9 @@ put its decimals after the suffix, as resistor codes do: `4k7` is 4.7 kΩ.
 
 ![Typing a value straight onto the selected resistor](images/tutorial_value.gif)
 
-Nothing runs by itself: after any edit, run again with F5. With a 220 Ω load the capacitor drains almost five times
-faster: V(2) still peaks at about 4.27 V but drops below 0.5 V before each pulse, so the ripple is now most of the
+By default nothing runs by itself: after any edit, run again with F5. To have it follow your edits, turn on Run again
+after edits in Edit > Preferences (Ctrl+,): once you have run an analysis, each change runs it again half a second
+after the edit is over. With a 220 Ω load the capacitor drains almost five times faster: V(2) still peaks at about 4.27 V but drops below 0.5 V before each pulse, so the ripple is now most of the
 output. The next plots use this transient.
 
 ## 7. Read the plots
@@ -187,6 +188,8 @@ analysis, and the measured nodes and currents, so reopening it is one F5 away fr
 - Open the other examples in File > Examples, sorted into Basics, Diodes, Transistors, Op-amps, Switching,
   Transformers and Digital; each has its analyses and measurements set up.
 - Try the transistors, diodes and op-amps: each takes a ready model or custom SPICE parameters in its properties.
-- View > Theme switches between nine color themes, shown side by side in [Themes](themes.md).
+- View > Theme switches between nine color themes, shown side by side in [Themes](themes.md). Edit > Preferences
+  gathers the theme with your other choices: IEC or ANSI symbols, terminal numbers, wire colors, live effects and
+  standard values.
 - Read the [user guide](user_guide.md) for terminal order, current signs and the details of each plot, and
   [Simulation models](models.md) for what each part leaves out.
