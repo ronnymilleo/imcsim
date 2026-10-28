@@ -33,9 +33,6 @@ namespace GUI {
 
 namespace {
 
-// Section of imgui.ini that keeps the View preference of the window
-constexpr const char *SETTINGS_TYPE_NAME = "Output";
-
 // In font sizes, so the layout follows the DPI scale
 constexpr float MIN_PLOT_HEIGHT = 12.0f;
 // Width of the field for the size of the window, in font sizes, and how many points a pixel of dragging adds
@@ -1110,10 +1107,12 @@ PlotSpan GetSpectrumFitRange(const TransientSpectra &spectra, const bool logarit
  * @param[in] controls   Runs of the analyses, to stop one from here while its plot grows; they must outlive the window.
  * @param[in] playback   Instant of the transient shown on the schematic, drawn as a line in the transient plot that
  *                       can be dragged; it must outlive the window.
+ * @param[in] preferences  Whether a new result brings the window to the front; they must outlive the window.
  */
-OutputWindow::OutputWindow(Schematic &schematic, AnalysisControls &controls, TransientPlayback &playback)
+OutputWindow::OutputWindow(Schematic &schematic, AnalysisControls &controls, TransientPlayback &playback,
+                           const Preferences &preferences)
     : AppWindow("Output", true), m_Schematic(schematic), m_Controls(controls), m_Playback(playback),
-      m_MathChannels(schematic) {
+      m_Preferences(preferences), m_MathChannels(schematic) {
     SetInitialSize(INITIAL_SIZE);
     // Nothing to plot yet; the first result opens it
     SetOpen(false);
@@ -1129,50 +1128,13 @@ OutputWindow::OutputWindow(Schematic &schematic, AnalysisControls &controls, Tra
  */
 void OutputWindow::ShowTab(const PlotTab tab, const bool may_come_to_front) {
     m_TabToShow = tab;
-    if (m_FrontOnNewResult && may_come_to_front) {
+    if (m_Preferences.BringOutputToFront && may_come_to_front) {
         SetOpen(true);
         Focus();
     } else {
         OpenBehind();
         SetNewContentMarker(true);
     }
-}
-
-/**
- * @brief   Draws the View menu items of the window, inside the main menu bar.
- */
-void OutputWindow::DrawViewMenuItems() {
-    if (ImGui::MenuItem("Bring Output to Front on Results", nullptr, &m_FrontOnNewResult)) {
-        ImGui::MarkIniSettingsDirty();
-    }
-    ImGui::SetItemTooltip("Otherwise a new result leaves the current tab in front and marks Output with a dot");
-}
-
-/**
- * @brief   Keeps the View preference of the window in imgui.ini, next to the window layout, so it survives a
- *          restart.
- */
-void OutputWindow::RegisterSettingsHandler() {
-    ImGuiSettingsHandler handler;
-    handler.TypeName = SETTINGS_TYPE_NAME;
-    handler.TypeHash = ImHashStr(SETTINGS_TYPE_NAME);
-    handler.UserData = this;
-    handler.ReadOpenFn = [](ImGuiContext *, ImGuiSettingsHandler *settings, const char *) -> void * {
-        return settings->UserData;
-    };
-    handler.ReadLineFn = [](ImGuiContext *, ImGuiSettingsHandler *, void *entry, const char *line) {
-        constexpr std::string_view FRONT_KEY = "FrontOnNewResult=";
-        const std::string_view text(line);
-        if (text.starts_with(FRONT_KEY)) {
-            static_cast<OutputWindow *>(entry)->m_FrontOnNewResult = text.substr(FRONT_KEY.size()) == "1";
-        }
-    };
-    handler.WriteAllFn = [](ImGuiContext *, ImGuiSettingsHandler *settings, ImGuiTextBuffer *buffer) {
-        const auto *output = static_cast<const OutputWindow *>(settings->UserData);
-        buffer->appendf("[%s][Preferences]\n", SETTINGS_TYPE_NAME);
-        buffer->appendf("FrontOnNewResult=%d\n\n", output->m_FrontOnNewResult ? 1 : 0);
-    };
-    ImGui::AddSettingsHandler(&handler);
 }
 
 void OutputWindow::Draw() {

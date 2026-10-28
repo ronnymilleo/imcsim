@@ -12,6 +12,7 @@
 #include "imgui_internal.h"
 #include "implot.h"
 #include "ngspice_library.h"
+#include "schematic_file.h"
 #include "shortcuts.h"
 #include "simulator.h"
 #include "theme.h"
@@ -19,8 +20,11 @@
 #include <array>
 #include <cstdio>
 #include <cstdlib>
+#include <expected>
 #include <filesystem>
 #include <format>
+#include <optional>
+#include <string>
 #include <string_view>
 #include <utility>
 
@@ -194,6 +198,7 @@ int Application::InitImGui() {
     // XDG_DATA_HOME), so they do not depend on where the program starts or need a writable install folder
     if (char *pref_path = SDL_GetPrefPath(nullptr, "imcsim")) {
         m_SettingsPath = std::string(pref_path) + "imgui.ini";
+        m_PreferencesPath = std::string(pref_path) + std::string(PREFERENCES_FILE_NAME);
         SDL_free(pref_path);
         io.IniFilename = m_SettingsPath.c_str();
     }
@@ -205,9 +210,7 @@ int Application::InitImGui() {
 
     ApplyTheme();
     LoadThemeFonts();
-    m_EditorWindow.RegisterSettingsHandler();
-    m_OutputWindow.RegisterSettingsHandler();
-    RegisterThemeSettingsHandler();
+    LoadPreferencesFile();
 
     ImGuiStyle &style = ImGui::GetStyle();
     style.ScaleAllSizes(m_SDLWindowScale);
@@ -224,6 +227,43 @@ int Application::InitImGui() {
         AddError(std::string("Glow renderer: ") + SDL_GetError());
     }
     return EXIT_SUCCESS;
+}
+
+// A missing file is a first start and keeps the defaults; a file that cannot be read keeps them too, with a line on
+// the log, since the program works the same without it
+void Application::LoadPreferencesFile() {
+    if (!m_PreferencesPath.empty() && std::filesystem::exists(m_PreferencesPath)) {
+        const std::expected<std::string, std::string> text = ReadTextFile(m_PreferencesPath);
+        if (text) {
+            LoadedPreferences loaded = LoadPreferences(*text);
+            for (const std::string &warning : loaded.Warnings) {
+                SDL_Log("%s", warning.c_str());
+            }
+            m_Preferences = std::move(loaded.Choices);
+        } else {
+            SDL_Log("%s", text.error().c_str());
+        }
+    }
+    m_SavedPreferences = m_Preferences;
+    ApplyPreferences();
+}
+
+// The theme is global to ImGui, so it follows the preferences here; the windows read the other choices themselves.
+// Writing only when something changed keeps the file untouched frame after frame, and a failed write is logged once
+void Application::ApplyPreferences() {
+    if (const std::optional<std::size_t> theme = FindTheme(m_Preferences.Theme); theme && *theme != GetThemeIndex()) {
+        SetTheme(*theme);
+    }
+    if (m_Preferences == m_SavedPreferences) {
+        return;
+    }
+    m_SavedPreferences = m_Preferences;
+    if (m_PreferencesPath.empty()) {
+        return;
+    }
+    if (const auto written = WriteTextFile(m_PreferencesPath, SavePreferences(m_Preferences)); !written) {
+        SDL_Log("%s", written.error().c_str());
+    }
 }
 
 void Application::PollEvents() {
@@ -289,6 +329,8 @@ void Application::Render() {
     m_NetlistWindow.Render();
     m_SimulationWindow.Render();
     m_OutputWindow.Render();
+    m_PreferencesWindow.Render();
+    ApplyPreferences();
     // A held mouse button or a focused text field is an interaction in progress, which becomes one undo step
     // once it ends
     if (!ImGui::IsAnyItemActive()) {
@@ -301,6 +343,11 @@ void Application::Render() {
 }
 
 void Application::DrawMainMenuBar() {
+    // Ctrl+comma opens the preferences in most desktop programs
+    if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_Comma, ImGuiInputFlags_RouteGlobal)) {
+        m_PreferencesWindow.SetOpen(true);
+        m_PreferencesWindow.Focus();
+    }
     if (!ImGui::BeginMainMenuBar()) {
         return;
     }
@@ -351,20 +398,17 @@ void Application::DrawMainMenuBar() {
     }
     if (ImGui::BeginMenu("Edit")) {
         m_EditorWindow.DrawEditMenuItems();
+        ImGui::Separator();
+        if (ImGui::MenuItem("Preferences...", IMCSIM_SHORTCUT ",")) {
+            m_PreferencesWindow.SetOpen(true);
+            m_PreferencesWindow.Focus();
+        }
         ImGui::EndMenu();
     }
     if (ImGui::BeginMenu("View")) {
         m_EditorWindow.DrawViewMenuItems();
-        if (ImGui::BeginMenu("Theme")) {
-            const auto themes = GetThemes();
-            for (std::size_t index = 0; index < themes.size(); ++index) {
-                if (ImGui::MenuItem(themes[index].Name, nullptr, index == GetThemeIndex())) {
-                    SetTheme(index);
-                    ImGui::MarkIniSettingsDirty();
-                }
-            }
-            ImGui::EndMenu();
-        }
+        ImGui::Separator();
+        m_PreferencesWindow.DrawViewMenuItems();
         ImGui::Separator();
         // The editor cannot be closed, so only the side windows are listed
         const std::array<AppWindow *, 4> closable_windows = {&m_PropertiesWindow, &m_NetlistWindow, &m_SimulationWindow,
@@ -375,7 +419,6 @@ void Application::DrawMainMenuBar() {
                 window->SetOpen(open);
             }
         }
-        m_OutputWindow.DrawViewMenuItems();
         ImGui::Separator();
         // Render() applies it right after the menu; the windows keep their open state and dock back in place
         if (ImGui::MenuItem("Reset Layout")) {

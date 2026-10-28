@@ -32,8 +32,7 @@ constexpr std::array<SDL_DialogFileFilter, 1> SVG_FILTERS = {{{"SVG image", "svg
  *                         actions.
  * @param[in] hooks        What the editor does around an action; every hook must be set.
  */
-SchematicFileActions::SchematicFileActions(Schematic &schematic, const EditorPreferences &preferences,
-                                           FileActionHooks hooks)
+SchematicFileActions::SchematicFileActions(Schematic &schematic, const Preferences &preferences, FileActionHooks hooks)
     : m_Schematic(schematic), m_Preferences(preferences), m_Hooks(std::move(hooks)) {
 }
 
@@ -403,8 +402,8 @@ void SchematicFileActions::ExportSchematic(std::filesystem::path path) {
     if (path.extension() != ".svg") {
         path += ".svg";
     }
-    const auto svg = RenderSchematicSvg(m_Schematic, m_Preferences.GetSymbolStyle(),
-                                        m_Preferences.ShowsTerminalNumbers(), m_ExportDark);
+    const auto svg =
+        RenderSchematicSvg(m_Schematic, m_Preferences.Symbols, m_Preferences.ShowTerminalNumbers, m_ExportDark);
     const auto written =
         svg ? WriteTextFile(path, *svg) : std::expected<void, std::string>(std::unexpected(svg.error()));
     if (!written) {

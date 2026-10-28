@@ -15,6 +15,7 @@
 #include "plot_exporter.h"
 #include "plot_types.h"
 #include "point_window.h"
+#include "preferences.h"
 #include "schematic.h"
 #include "simulator.h"
 #include "trace_fit_state.h"
@@ -69,12 +70,11 @@ enum class PlotTab {
  */
 class OutputWindow : public AppWindow {
 public:
-    OutputWindow(Schematic &schematic, AnalysisControls &controls, TransientPlayback &playback);
+    OutputWindow(Schematic &schematic, AnalysisControls &controls, TransientPlayback &playback,
+                 const Preferences &preferences);
     ~OutputWindow() override = default;
 
     void ShowTab(PlotTab tab, bool may_come_to_front = true);
-    void DrawViewMenuItems();
-    void RegisterSettingsHandler();
 
 private:
     /**
@@ -109,6 +109,8 @@ private:
     Schematic &m_Schematic;
     AnalysisControls &m_Controls;
     TransientPlayback &m_Playback;
+    // Whether a new result brings the window to the front
+    const Preferences &m_Preferences;
     // What each plot showed last frame, so its axes fit for a new result and when its traces change
     TraceFitState m_TransientFit;
     TraceFitState m_ACSweepFit;
@@ -140,8 +142,6 @@ private:
     PlotTab m_ShownTab = PlotTab::TRANSIENT;
     // Tab to bring to the front on the next frame, after a new result
     std::optional<PlotTab> m_TabToShow;
-    // View preference, kept in imgui.ini: whether a new result brings the window to the front
-    bool m_FrontOnNewResult = true;
     PlotSpan m_DCSweepView;
     // Noise: the result its axes were fitted to, its visible range and the parts whose share it plots
     TraceFitState m_NoiseFit;

@@ -297,9 +297,11 @@ bool ShowsValueFields(const Core::Component &component) {
 
 /**
  * @brief   Creates the editor for a schematic.
- * @param[in] schematic  Schematic whose selection is edited; it must outlive the editor.
+ * @param[in] schematic    Schematic whose selection is edited; it must outlive the editor.
+ * @param[in] preferences  Gives the series of standard values; it must outlive the editor.
  */
-PartEditor::PartEditor(Schematic &schematic) : m_Schematic(schematic) {
+PartEditor::PartEditor(Schematic &schematic, const Preferences &preferences)
+    : m_Schematic(schematic), m_Preferences(preferences) {
 }
 
 /**
@@ -445,23 +447,6 @@ void PartEditor::FocusNetName() {
     m_FocusNet = true;
 }
 
-/**
- * @brief   Returns the standard series the values of resistors, capacitors and inductors are taken from.
- * @return  The series, or Core::ValueSeries::Free when any value is allowed.
- */
-Core::ValueSeries PartEditor::GetValueSeries() const {
-    return m_ValueSeries;
-}
-
-/**
- * @brief   Chooses the standard series for resistors, capacitors and inductors.
- * @param[in] series  The series, or Core::ValueSeries::Free to allow any value.
- * @note    Parts that already have a value outside the series keep it until the user edits it.
- */
-void PartEditor::SetValueSeries(const Core::ValueSeries series) {
-    m_ValueSeries = series;
-}
-
 void PartEditor::LoadFields(const Core::Component &component) {
     m_Value.Load(component.GetValue());
     m_InitialCondition.LoadOptional(component.GetInitialCondition());
@@ -547,7 +532,7 @@ void PartEditor::DrawValue(Core::Component &component) {
     const Core::ComponentType type = component.GetType();
     const bool passive = type == Core::ComponentType::RESISTOR || type == Core::ComponentType::CAPACITOR ||
                          type == Core::ComponentType::INDUCTOR;
-    const Core::ValueSeries series = passive ? m_ValueSeries : Core::ValueSeries::FREE;
+    const Core::ValueSeries series = passive ? m_Preferences.ValueSeries : Core::ValueSeries::FREE;
     if (const std::optional<double> value = m_Value.Draw("Value", component.GetUnit(), is_valid, series)) {
         component.SetValue(*value);
         m_Schematic.MarkModified();

@@ -11,10 +11,12 @@
 #include "glow_renderer.h"
 #include "part_editor.h"
 #include "playback.h"
+#include "preferences.h"
 #include "schematic.h"
 #include "windows/editor_window.h"
 #include "windows/netlist_window.h"
 #include "windows/output_window.h"
+#include "windows/preferences_window.h"
 #include "windows/properties_window.h"
 #include "windows/simulation_window.h"
 
@@ -55,6 +57,10 @@ private:
     bool m_ResetLayout{false};
     // imgui.ini in the user's data folder; ImGui keeps only the pointer, so the path lives here
     std::string m_SettingsPath;
+    // The user's choices, in a file of their own beside imgui.ini; empty when the data folder is not known
+    std::string m_PreferencesPath;
+    // What the file holds, so the preferences are written only when they change
+    Preferences m_SavedPreferences;
     // Last title given to the window, so it is only set again when the file or its state changes
     std::string m_WindowTitle;
     // Result versions already shown, so each new result opens the Output window once
@@ -66,18 +72,21 @@ private:
     std::size_t m_ShownTransferFunctionVersion = 0;
     std::size_t m_ShownTruthTableVersion = 0;
 
-    // The schematic is declared first, so it exists when the windows that refer to it are built
+    // The schematic and the preferences are declared first, so they exist when the windows that refer to them are
+    // built
     Schematic m_Schematic;
+    Preferences m_Preferences;
     AnalysisControls m_AnalysisControls{m_Schematic};
     AnalysisSettingsPanel m_AnalysisSettings{m_Schematic};
-    PartEditor m_PartEditor{m_Schematic};
+    PartEditor m_PartEditor{m_Schematic, m_Preferences};
     TransientPlayback m_Playback;
-    EditorWindow m_EditorWindow{m_Schematic,  m_AnalysisControls, m_AnalysisSettings,
-                                m_PartEditor, m_GlowRenderer,     m_Playback};
+    EditorWindow m_EditorWindow{m_Schematic,    m_AnalysisControls, m_AnalysisSettings, m_PartEditor,
+                                m_GlowRenderer, m_Playback,         m_Preferences};
     PropertiesWindow m_PropertiesWindow{m_PartEditor};
     NetlistWindow m_NetlistWindow{m_Schematic};
     SimulationWindow m_SimulationWindow{m_Schematic, m_AnalysisControls, m_AnalysisSettings};
-    OutputWindow m_OutputWindow{m_Schematic, m_AnalysisControls, m_Playback};
+    OutputWindow m_OutputWindow{m_Schematic, m_AnalysisControls, m_Playback, m_Preferences};
+    PreferencesWindow m_PreferencesWindow{m_Preferences};
 
     // Errors
     void AddError(const std::string &message);
@@ -87,6 +96,10 @@ private:
     int InitSDL();
     int InitGPU();
     int InitImGui();
+
+    // Preferences
+    void LoadPreferencesFile();
+    void ApplyPreferences();
 
     // Frame
     void PollEvents();

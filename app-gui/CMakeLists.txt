@@ -13,7 +13,6 @@ add_library(imcsim-gui-lib
             clipboard.cpp
             connectivity.cpp
             current_flow.cpp
-            editor_preferences.cpp
             element_factory.cpp
             examples.cpp
             file_dialog.cpp
@@ -35,6 +34,7 @@ add_library(imcsim-gui-lib
             plot_figures.cpp
             plot_helpers.cpp
             point_window.cpp
+            preferences.cpp
             probing.cpp
             schematic.cpp
             schematic_canvas.cpp
@@ -80,6 +80,7 @@ add_library(imcsim-gui-lib
             windows/editor_window.cpp
             windows/netlist_window.cpp
             windows/output_window.cpp
+            windows/preferences_window.cpp
             windows/properties_window.cpp
             windows/simulation_window.cpp
             wire_editing.cpp
