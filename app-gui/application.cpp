@@ -331,6 +331,7 @@ void Application::Render() {
     m_OutputWindow.Render();
     m_PreferencesWindow.Render();
     ApplyPreferences();
+    RerunAfterEdits();
     // A held mouse button or a focused text field is an interaction in progress, which becomes one undo step
     // once it ends
     if (!ImGui::IsAnyItemActive()) {
@@ -472,6 +473,26 @@ void Application::ShowNewResults() {
                 m_Schematic.GetTransferFunction().has_value(), PlotTab::TRANSFER_FUNCTION);
     show_if_new(m_ShownTruthTableVersion, m_Schematic.GetTruthTableVersion(), m_Schematic.GetTruthTable().has_value(),
                 PlotTab::TRUTH_TABLE);
+}
+
+// Seen after the windows drew, so a field still being typed in or a drag still going on holds the run. A live run
+// takes part changes by itself, so a run that would be live is never started from here
+void Application::RerunAfterEdits() {
+    const Analysis selected = m_Schematic.GetSimulationSettings().Selected;
+    const std::optional<Analysis> running = m_AnalysisControls.GetRunningAnalysis();
+    const bool would_run_live = m_AnalysisControls.IsLiveModeOn() && !m_AnalysisControls.FindLiveObstacle();
+    const AutoRerunFrame frame{
+        .IsEnabled = m_Preferences.RerunOnEdit,
+        .Time = ImGui::GetTime(),
+        .CircuitVersion = m_Schematic.GetCircuitVersion(),
+        .DocumentVersion = m_Schematic.GetDocumentVersion(),
+        .HasRunToFollow = m_AnalysisControls.GetOutcome(selected) != RunOutcome::NONE || running == selected,
+        .IsEditing = ImGui::IsAnyItemActive(),
+        .IsRunBlocked = running.has_value() || would_run_live,
+    };
+    if (m_AutoRerun.Update(frame)) {
+        m_AnalysisControls.RunSelected();
+    }
 }
 
 // The editor, Output, Analysis Settings and Netlist share the main node as tabs, and Properties sits on the right.

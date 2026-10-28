@@ -8,6 +8,7 @@
 
 #include "analysis_controls.h"
 #include "analysis_settings_panel.h"
+#include "auto_rerun.h"
 #include "glow_renderer.h"
 #include "part_editor.h"
 #include "playback.h"
@@ -71,6 +72,8 @@ private:
     std::size_t m_ShownNoiseVersion = 0;
     std::size_t m_ShownTransferFunctionVersion = 0;
     std::size_t m_ShownTruthTableVersion = 0;
+    // Runs the selected analysis again after edits, when the preference asks for it
+    AutoRerun m_AutoRerun;
 
     // The schematic and the preferences are declared first, so they exist when the windows that refer to them are
     // built
@@ -108,6 +111,7 @@ private:
     void DrawMainMenuBar();
     void UpdateWindowTitle();
     void ShowNewResults();
+    void RerunAfterEdits();
     void SetupDefaultLayout(ImGuiID dockspace_id);
     void EndFrame();
 };

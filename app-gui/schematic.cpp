@@ -185,6 +185,7 @@ void Schematic::Replace(std::vector<std::unique_ptr<UIElement>> elements, std::v
     m_Wires = std::move(wires);
     m_SimulationSettings = std::move(settings);
     ++m_SimulationSettingsVersion;
+    ++m_DocumentVersion;
     InvalidateDerivedData();
     // The probes belong to the old content; whoever replaces it sets them again
     m_VoltageProbes.clear();
@@ -610,6 +611,15 @@ Core::Circuit Schematic::BuildCircuit() {
  */
 std::size_t Schematic::GetCircuitVersion() const {
     return m_CircuitVersion;
+}
+
+/**
+ * @brief   Returns a number that changes whenever the whole content is replaced, as by opening a file, an example or a
+ *          new schematic.
+ * @return  A count of the replacements; edits, undo and redo leave it alone.
+ */
+std::size_t Schematic::GetDocumentVersion() const {
+    return m_DocumentVersion;
 }
 
 /**

@@ -118,6 +118,7 @@ std::string SavePreferences(const Preferences &preferences) {
         {"live_effects", live_effects},
         {"value_series", Core::GetSeriesName(preferences.ValueSeries)},
         {"bring_output_to_front", preferences.BringOutputToFront},
+        {"rerun_on_edit", preferences.RerunOnEdit},
     };
     return document.dump(2) + "\n";
 }
@@ -187,6 +188,10 @@ LoadedPreferences LoadPreferences(const std::string_view text) {
     });
     reader.Read<bool>("bring_output_to_front", Type::boolean, [&choices](const bool on) {
         choices.BringOutputToFront = on;
+        return true;
+    });
+    reader.Read<bool>("rerun_on_edit", Type::boolean, [&choices](const bool on) {
+        choices.RerunOnEdit = on;
         return true;
     });
     return loaded;

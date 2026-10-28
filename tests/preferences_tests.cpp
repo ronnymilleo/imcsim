@@ -19,6 +19,7 @@ TEST_CASE("Preferences load back unchanged from the file they save", "[preferenc
     preferences.SetEffectOn(GUI::LiveEffect::HEAT_GLOW, true);
     preferences.ValueSeries = Core::ValueSeries::E24;
     preferences.BringOutputToFront = false;
+    preferences.RerunOnEdit = true;
 
     const GUI::LoadedPreferences loaded = GUI::LoadPreferences(GUI::SavePreferences(preferences));
     CHECK(loaded.Warnings.empty());
@@ -33,6 +34,7 @@ TEST_CASE("A new user gets the first theme, plain wires, no effects and any valu
     CHECK_FALSE(preferences.IsEffectOn(GUI::LiveEffect::CURRENT_FLOW));
     CHECK(preferences.ValueSeries == Core::ValueSeries::FREE);
     CHECK(preferences.BringOutputToFront);
+    CHECK_FALSE(preferences.RerunOnEdit);
     // A file with none of the keys, as one from a later version that renamed them all, keeps every default
     const GUI::LoadedPreferences loaded = GUI::LoadPreferences(R"({"version": 9, "unknown": true})");
     CHECK(loaded.Warnings.empty());

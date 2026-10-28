@@ -9,6 +9,7 @@ add_executable(imcsim-tests
             analysis_controls_tests.cpp
             analysis_inputs_tests.cpp
             analysis_suggestions_tests.cpp
+            auto_rerun_tests.cpp
             circuit_checks_tests.cpp
             circuit_copy_tests.cpp
             circuit_snapshot_tests.cpp

@@ -192,6 +192,10 @@ void PreferencesWindow::DrawResults() {
     BeginChoice("Bring Output to front");
     ImGui::Checkbox("##output_to_front", &m_Preferences.BringOutputToFront);
     ImGui::SetItemTooltip("Bring the Output window to the front on a new result; otherwise it is marked with a dot");
+    BeginChoice("Run again after edits");
+    ImGui::Checkbox("##rerun_on_edit", &m_Preferences.RerunOnEdit);
+    ImGui::SetItemTooltip("Once you have run the selected analysis, run it again by itself half a second after each "
+                          "change to the circuit, so the results follow your edits; a live run follows them already");
     ImGui::EndTable();
 }
 
