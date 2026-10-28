@@ -436,8 +436,8 @@ source sees and the output impedance looking back into the output, without a fre
 then set:
 
 - **Output**: the node the gain is measured at, picked as in the noise analysis and kept by a point of its node.
-- **Input**: a voltage source, current source or VCC. It needs no AC setting and no particular value: ngspice only
-  uses it to define the gain from it to the output, so a plain DC source works.
+- **Input**: a voltage or current source, VCC, clock or logic input. It needs no AC setting and no particular value:
+  ngspice only uses it to define the gain from it to the output, so a plain DC source works.
 
 The Transfer function tab of the Output window is a table of three values:
 
