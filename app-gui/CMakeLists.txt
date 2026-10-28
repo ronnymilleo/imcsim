@@ -7,6 +7,7 @@ add_library(imcsim-gui-lib
             analysis_controls.cpp
             analysis_inputs.cpp
             analysis_settings_panel.cpp
+            auto_rerun.cpp
             application.cpp
             canvas_view.cpp
             circuit_snapshot.cpp

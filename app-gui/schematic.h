@@ -119,6 +119,7 @@ public:
     const Connectivity &GetConnectivity();
     Core::Circuit BuildCircuit();
     std::size_t GetCircuitVersion() const;
+    std::size_t GetDocumentVersion() const;
     std::string BuildSpiceNetlist();
     void SetOperatingPoint(std::optional<Core::OperatingPoint> operating_point);
     const std::optional<Core::OperatingPoint> &GetOperatingPoint() const;
@@ -183,6 +184,8 @@ private:
     std::size_t m_SimulationSettingsVersion = 0;
     // Counts the edits that drop the results, so a run that started before one knows its answer is stale
     std::size_t m_CircuitVersion = 0;
+    // Counts the schematics opened or created in place of the content, which edits and undo do not change
+    std::size_t m_DocumentVersion = 0;
 
     // Document state
     bool m_Modified = false;

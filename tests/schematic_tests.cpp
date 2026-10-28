@@ -453,6 +453,17 @@ TEST_CASE("Measurements are saved by node point and restored by node", "[schemat
     CHECK(schematic.IsCurrentMeasured("R1"));
 }
 
+TEST_CASE("The document version changes when the content is replaced, not when it is edited or undone", "[schematic]") {
+    GUI::Schematic schematic;
+    const std::size_t opened = schematic.GetDocumentVersion();
+    schematic.AddElement(MakeResistor({0, 0}));
+    schematic.CommitUndoStep();
+    schematic.Undo();
+    CHECK(schematic.GetDocumentVersion() == opened);
+    schematic.Clear();
+    CHECK(schematic.GetDocumentVersion() != opened);
+}
+
 TEST_CASE("Measuring is not an unsaved change and adds no undo step", "[schematic]") {
     GUI::Schematic schematic;
     schematic.AddElement(MakeResistor({0, 0}));

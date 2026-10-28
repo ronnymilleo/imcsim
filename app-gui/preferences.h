@@ -45,6 +45,12 @@ enum class LiveEffect {
 
 constexpr std::size_t NUMBER_OF_LIVE_EFFECTS = static_cast<std::size_t>(LiveEffect::COUNT);
 
+// How long an edit must settle before the analysis runs again by itself: long enough for a burst of edits to run once,
+// short enough to feel like it follows them
+constexpr double DEFAULT_RERUN_DELAY_SECONDS = 0.5;
+constexpr double MIN_RERUN_DELAY_SECONDS = 0.1;
+constexpr double MAX_RERUN_DELAY_SECONDS = 5.0;
+
 /**
  * @struct  Preferences
  * @brief   How the program looks and behaves for this user, whatever schematic is open.
@@ -69,6 +75,10 @@ struct Preferences {
 
     // Results: a new result brings the Output window to the front, or only marks it
     bool BringOutputToFront = true;
+    // The selected analysis runs again by itself once an edit of the circuit settles, if it was already run
+    bool RerunOnEdit = false;
+    // Quiet time after the last edit before it runs, from MIN_RERUN_DELAY_SECONDS to MAX_RERUN_DELAY_SECONDS
+    double RerunDelaySeconds = DEFAULT_RERUN_DELAY_SECONDS;
 
     bool IsEffectOn(LiveEffect effect) const;
     void SetEffectOn(LiveEffect effect, bool on);
