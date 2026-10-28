@@ -8,6 +8,7 @@
 
 #include "analysis_inputs.h"
 #include "analysis_suggestions.h"
+#include "circuit_checks.h"
 #include "imgui.h"
 #include "misc/cpp/imgui_stdlib.h"
 #include "probing.h"
@@ -275,7 +276,7 @@ void AnalysisSettingsPanel::DrawACSweepSettings(SimulationSettings &settings) {
 void AnalysisSettingsPanel::DrawDCSweepSettings(SimulationSettings &settings) {
     const std::vector<SweepSource> sources = ListSweepSources(m_Schematic.BuildCircuit());
     if (sources.empty()) {
-        ImGui::TextDisabled("Add a voltage source, current source or VCC to sweep");
+        ImGui::TextDisabled("%s", std::format("Add {} to sweep", Core::SWEEPABLE_SOURCES).c_str());
         return;
     }
     DrawSweepRange("swept", "Sweep", sources, SWEPT_SOURCE_INDEX, settings.SweptRange, m_SweptFields);
@@ -347,7 +348,7 @@ void AnalysisSettingsPanel::DrawNoiseSettings(SimulationSettings &settings) {
 }
 
 // The output picker lists every node by the label the plots give it, as the noise one does; the input picker lists
-// every voltage source, current source and VCC rail, whatever its waveform
+// every source a DC sweep could drive, whatever its waveform
 void AnalysisSettingsPanel::DrawTransferFunctionSettings(SimulationSettings &settings) {
     const Core::Circuit circuit = m_Schematic.BuildCircuit();
     const std::vector<std::string> sources = Core::GetTransferFunctionInputSources(circuit);
@@ -369,7 +370,7 @@ void AnalysisSettingsPanel::DrawTransferFunctionSettings(SimulationSettings &set
     }
     DrawFieldLabel("Input");
     if (sources.empty()) {
-        ImGui::TextDisabled("Add a voltage source, current source or VCC");
+        ImGui::TextDisabled("%s", std::format("Add {}", Core::SWEEPABLE_SOURCES).c_str());
     } else if (ImGui::BeginCombo("##tf_input", input.c_str())) {
         for (const std::string &source : sources) {
             if (ImGui::Selectable(source.c_str(), source == input)) {

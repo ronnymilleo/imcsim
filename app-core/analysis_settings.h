@@ -93,8 +93,8 @@ struct NoiseSettings {
 /**
  * @struct  TransferFunctionSettings
  * @brief   Where a transfer function analysis measures its output, and which source drives the circuit.
- * @details The input must be an independent source, a voltage source, current source or supply rail; ngspice uses
- *          it only to find the gain from it to the output, whatever its value or waveform.
+ * @details The input must be an independent source: a voltage or current source, supply rail, clock or logic input;
+ *          ngspice uses it only to find the gain from it to the output, whatever its value or waveform.
  */
 struct TransferFunctionSettings {
     int OutputNode = 0;

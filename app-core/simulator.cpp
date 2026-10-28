@@ -233,7 +233,8 @@ NoiseRun RunNoise(const Circuit &circuit, const NoiseSettings &settings) {
  * @brief   Finds the small-signal DC transfer function from an input source to an output, with both impedances.
  * @param[in] circuit   Circuit to simulate; it needs a ground component, unless it holds only logic parts, logic inputs
  * and supply rails.
- * @param[in] settings  Output node and input source (an independent voltage source, current source or VCC rail).
+ * @param[in] settings  Output node and input source (an independent voltage source, current source, VCC rail,
+ *                      clock or logic input).
  * @return  The DC gain, the input impedance and the output impedance, or an error, plus every line ngspice printed.
  *          Invalid settings are rejected before reaching the backend.
  * @note    The gain is dimensionless for a voltage source input and a transimpedance for a current source; ngspice

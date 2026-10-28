@@ -96,10 +96,12 @@ TEST_CASE("A second job is refused until the first one has been polled", "[simul
 TEST_CASE("Cancelling a job stops it and drops its result", "[simulation_service]") {
     Core::SimulationService service;
     std::atomic<bool> has_started = false;
+    // The job holds after it sees the cancel until the test has looked, since a finished job is no longer cancelling
+    std::atomic<bool> may_finish = false;
     bool has_delivered = false;
     REQUIRE(service.Submit([&](Core::RunControl &control) -> Core::Delivery {
         has_started = true;
-        while (!control.IsCancelled()) {
+        while (!control.IsCancelled() || !may_finish) {
             std::this_thread::sleep_for(1ms);
         }
         return [&has_delivered] { has_delivered = true; };
@@ -110,6 +112,7 @@ TEST_CASE("Cancelling a job stops it and drops its result", "[simulation_service
     CHECK_FALSE(service.IsCancelling());
     service.Cancel();
     CHECK(service.IsCancelling());
+    may_finish = true;
 
     REQUIRE(WaitUntilIdle(service));
     CHECK_FALSE(service.IsCancelling());
@@ -212,11 +215,13 @@ TEST_CASE("A copy of the circuit simulates on the worker to the result of the sa
 TEST_CASE("A stop keeps what the job hands over, where a cancel drops it", "[simulation_service]") {
     Core::SimulationService service;
     std::atomic<bool> has_started = false;
+    // The job holds after it sees the stop until the test has looked, since a finished job is no longer cancelling
+    std::atomic<bool> may_finish = false;
     bool has_delivered = false;
     const auto make_job = [&] {
         return [&](Core::RunControl &control) -> Core::Delivery {
             has_started = true;
-            while (!control.IsCancelled()) {
+            while (!control.IsCancelled() || !may_finish) {
                 std::this_thread::sleep_for(1ms);
             }
             return [&has_delivered] { has_delivered = true; };
@@ -229,6 +234,7 @@ TEST_CASE("A stop keeps what the job hands over, where a cancel drops it", "[sim
     }
     service.Stop();
     CHECK(service.IsCancelling());
+    may_finish = true;
     REQUIRE(PollUntilDelivered(service));
     CHECK(has_delivered);
 

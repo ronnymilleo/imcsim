@@ -1112,7 +1112,8 @@ PlotSpan GetSpectrumFitRange(const TransientSpectra &spectra, const bool logarit
  *                       can be dragged; it must outlive the window.
  */
 OutputWindow::OutputWindow(Schematic &schematic, AnalysisControls &controls, TransientPlayback &playback)
-    : AppWindow("Output", true), m_Schematic(schematic), m_Controls(controls), m_Playback(playback) {
+    : AppWindow("Output", true), m_Schematic(schematic), m_Controls(controls), m_Playback(playback),
+      m_MathChannels(schematic) {
     SetInitialSize(INITIAL_SIZE);
     // Nothing to plot yet; the first result opens it
     SetOpen(false);
@@ -1335,9 +1336,11 @@ void OutputWindow::DrawTraceList(const std::size_t node_count, const std::vector
         }
     }
 
+    // A node a label names is offered by its name, so a channel saved with the file still finds it after edits that
+    // number the nodes again
     std::vector<std::string> operands;
     for (std::size_t node = 1; node < node_count; ++node) {
-        operands.push_back(std::format("V({})", node));
+        operands.push_back(GetVoltageLabel(m_Schematic.GetConnectivity(), static_cast<int>(node)));
     }
     for (const Core::ComponentTrace &current : currents) {
         operands.push_back(std::format("I({})", current.Name));

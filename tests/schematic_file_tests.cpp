@@ -546,6 +546,37 @@ TEST_CASE("Measurements load back unchanged, and files without them leave the ke
     CHECK(GUI::SaveSchematic({}, {}, {}, {}).find("\"measurements\"") == std::string::npos);
 }
 
+TEST_CASE("Math channels load back unchanged, operation and expression alike", "[schematic_file]") {
+    const GUI::SavedMeasurements measurements{
+        .Voltages = {},
+        .Currents = {},
+        .MathChannels = {{.Name = "M1", .First = "V(OUT)", .Operator = GUI::MathOperator::MULTIPLY, .Second = "I(R1)"},
+                         {.Name = "M3",
+                          .Shown = false,
+                          .UsesExpression = true,
+                          .First = "V(1)",
+                          .Second = "V(2)",
+                          .Expression = "ddt(V(OUT))"}}};
+    const GUI::LoadedSchematic loaded = LoadOrFail(GUI::SaveSchematic({}, {}, {}, measurements));
+    CHECK(loaded.Warnings.empty());
+    CHECK(loaded.Measurements == measurements);
+}
+
+TEST_CASE("Math channels that cannot be read are skipped with a warning", "[schematic_file]") {
+    // No name, an operator that is none of the four, and an entry that is no object
+    // The JSON holds )" inside V(1)", so the raw strings take a delimiter
+    const std::string text = R"json({"format": "imcsim-schematic", "version": 1, "measurements": {"math": [)json"
+                             R"json({"name": "M1", "expression": "V(1)", "uses_expression": true},)json"
+                             R"json({"first": "V(1)"}, {"name": "M2", "operator": "%"}, 4]}})json";
+    const GUI::LoadedSchematic loaded = LoadOrFail(text);
+    CHECK(loaded.Warnings.size() == 1);
+    REQUIRE(loaded.Measurements.MathChannels.size() == 1);
+    CHECK(loaded.Measurements.MathChannels[0].Expression == "V(1)");
+    // Fields left out keep those of a new channel
+    CHECK(loaded.Measurements.MathChannels[0].Shown);
+    CHECK(loaded.Measurements.MathChannels[0].Operator == GUI::MathOperator::SUBTRACT);
+}
+
 TEST_CASE("Measurements that cannot be read are skipped with a warning", "[schematic_file]") {
     const std::string text = R"({"format": "imcsim-schematic", "version": 1, "measurements": )"
                              R"({"voltages": [[1, 2], [1.5, 2], "x"], "currents": ["R1", 3]}})";

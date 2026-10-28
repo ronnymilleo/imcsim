@@ -465,6 +465,22 @@ TEST_CASE("Measuring is not an unsaved change and adds no undo step", "[schemati
     CHECK(schematic.IsCurrentMeasured("R1"));
 }
 
+TEST_CASE("Math channels are saved and restored with the measurements, and are no unsaved change", "[schematic]") {
+    GUI::Schematic schematic;
+    schematic.AddElement(MakeResistor({0, 0}));
+    schematic.MarkSaved("circuit.imcsim");
+    const std::vector<GUI::MathChannel> channels = {{.Name = "M1", .UsesExpression = true, .Expression = "V(OUT)"}};
+    schematic.SetMathChannels(channels);
+    schematic.CommitUndoStep();
+    CHECK_FALSE(schematic.IsModified());
+    CHECK(schematic.SaveMeasurements().MathChannels == channels);
+
+    schematic.ClearMeasurements();
+    CHECK(schematic.GetMathChannels().empty());
+    schematic.RestoreMeasurements({.Voltages = {}, .Currents = {}, .MathChannels = channels});
+    CHECK(schematic.GetMathChannels() == channels);
+}
+
 TEST_CASE("A measured node stays the same node when an edit renumbers the nodes", "[schematic]") {
     GUI::Schematic schematic;
     // Nodes are numbered by position, so the wire at x = 10 is node 1 until something appears to its left

@@ -174,6 +174,7 @@ Connectivity::Connectivity(const std::vector<std::unique_ptr<UIElement>> &elemen
     m_NodeOfPoint = NumberNodes(nodes, index_of_point, classes.GroundPoints);
     for (const auto &[point, text] : classes.LabelText) {
         m_NetOfNode.emplace(m_NodeOfPoint.at(point), text);
+        m_NodeOfNet.emplace(Core::NetLabel::NormalizeNet(text), m_NodeOfPoint.at(point));
     }
 }
 
@@ -228,6 +229,24 @@ std::optional<GridPoint> Connectivity::FindPointOfNode(const int node) const {
 std::optional<std::string> Connectivity::GetNetName(const int node) const {
     const auto entry = m_NetOfNode.find(node);
     if (node == 0 || entry == m_NetOfNode.end()) {
+        return std::nullopt;
+    }
+    return entry->second;
+}
+
+/**
+ * @brief   Finds the node a net label names, such as to read V(OUT) after the nodes are numbered again.
+ * @param[in] net  Name of the net, in any case.
+ * @return  The node of the labels with that name, 0 for the names of ground (0 and GND), or no value when no label
+ *          has that name.
+ */
+std::optional<int> Connectivity::FindNodeOfNet(const std::string_view net) const {
+    const std::string compared = Core::NetLabel::NormalizeNet(net);
+    if (std::ranges::contains(GROUND_NETS, compared)) {
+        return 0;
+    }
+    const auto entry = m_NodeOfNet.find(compared);
+    if (entry == m_NodeOfNet.end()) {
         return std::nullopt;
     }
     return entry->second;

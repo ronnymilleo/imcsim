@@ -7,6 +7,7 @@
 #define IMCSIM_SCHEMATIC_FILE_H
 
 #include "helpers.h"
+#include "math_channel.h"
 #include "simulation_settings.h"
 #include "ui_elements/ui_element.h"
 #include "ui_elements/ui_wire.h"
@@ -24,11 +25,12 @@ namespace GUI {
  * @struct  SavedMeasurements
  * @brief   The traces the plots show, as saved in a file.
  * @details Voltages are kept as a point of their node instead of its number, so they survive changes in how
- *          nodes are numbered; currents by name, such as "R1" or "Q1.C".
+ *          nodes are numbered; currents by name, such as "R1" or "Q1.C"; math channels by what they compute.
  */
 struct SavedMeasurements {
     std::vector<GridPoint> Voltages;
     std::vector<std::string> Currents;
+    std::vector<MathChannel> MathChannels;
 
     bool operator==(const SavedMeasurements &) const = default;
 };

@@ -10,10 +10,12 @@
 #include "helpers.h"
 #include "ui_elements/ui_element.h"
 #include "ui_elements/ui_wire.h"
+#include <functional>
 #include <map>
 #include <memory>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace GUI {
@@ -35,6 +37,7 @@ public:
     std::optional<int> GetNode(GridPoint point) const;
     std::optional<GridPoint> FindPointOfNode(int node) const;
     std::optional<std::string> GetNetName(int node) const;
+    std::optional<int> FindNodeOfNet(std::string_view net) const;
     std::vector<GridPoint> GetPointsOfNode(int node) const;
     const std::vector<GridPoint> &GetJunctions() const;
 
@@ -42,6 +45,8 @@ private:
     std::map<GridPoint, int> m_NodeOfPoint;
     // Name of the first label, in grid order, on each labeled node
     std::map<int, std::string> m_NetOfNode;
+    // Node of every label name, compared without regard to case
+    std::map<std::string, int, std::less<>> m_NodeOfNet;
     std::vector<GridPoint> m_Junctions;
 };
 
