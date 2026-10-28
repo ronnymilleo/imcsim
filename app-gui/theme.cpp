@@ -6,11 +6,11 @@
 #include "theme.h"
 
 #include "font_files.h"
-#include "imgui_internal.h"
 #include "implot.h"
 #include "svg_writer.h"
 #include <algorithm>
 #include <array>
+#include <optional>
 #include <span>
 #include <string_view>
 
@@ -248,9 +248,6 @@ constexpr auto THEMES = std::to_array<ThemePalette>({
      .VoltageLabel = Col(175, 80, 20)},
 });
 
-// Section of imgui.ini that keeps the chosen theme
-constexpr const char *SETTINGS_TYPE_NAME = "Theme";
-
 std::size_t g_current_theme = 0;
 
 constexpr float FONT_SIZE = 17.0f;
@@ -388,37 +385,6 @@ void ApplyTheme() {
 }
 
 /**
- * @brief   Keeps the chosen theme in imgui.ini, by name, and applies it when the file is read.
- * @note    Call once after the ImGui context exists and before the first frame.
- */
-void RegisterThemeSettingsHandler() {
-    ImGuiSettingsHandler handler;
-    handler.TypeName = SETTINGS_TYPE_NAME;
-    handler.TypeHash = ImHashStr(SETTINGS_TYPE_NAME);
-    handler.ReadOpenFn = [](ImGuiContext *, ImGuiSettingsHandler *, const char *) -> void * {
-        // Any non-null pointer tells ImGui to pass the lines of the section to ReadLineFn
-        return &g_current_theme;
-    };
-    handler.ReadLineFn = [](ImGuiContext *, ImGuiSettingsHandler *, void *, const char *line) {
-        const std::string_view text = line;
-        constexpr std::string_view NAME_KEY = "Name=";
-        if (!text.starts_with(NAME_KEY)) {
-            return;
-        }
-        const auto themes = GetThemes();
-        const auto theme = std::ranges::find(themes, text.substr(NAME_KEY.size()), &ThemePalette::Name);
-        if (theme != themes.end()) {
-            SetTheme(static_cast<std::size_t>(theme - themes.begin()));
-        }
-    };
-    handler.WriteAllFn = [](ImGuiContext *, ImGuiSettingsHandler *, ImGuiTextBuffer *buffer) {
-        buffer->appendf("[%s][Current]\n", SETTINGS_TYPE_NAME);
-        buffer->appendf("Name=%s\n\n", GetPalette().Name);
-    };
-    ImGui::AddSettingsHandler(&handler);
-}
-
-/**
  * @brief   Lists the themes the View menu offers.
  * @return  Every theme, the default first.
  */
@@ -432,6 +398,19 @@ std::span<const ThemePalette> GetThemes() {
  */
 std::size_t GetThemeIndex() {
     return g_current_theme;
+}
+
+/**
+ * @brief   Finds a theme by the name it is listed with.
+ * @param[in] name  Name such as "Graphite".
+ * @return  Its position in GetThemes(), or no value when no theme has that name.
+ */
+std::optional<std::size_t> FindTheme(const std::string_view name) {
+    const auto theme = std::ranges::find(THEMES, name, &ThemePalette::Name);
+    if (theme == THEMES.end()) {
+        return std::nullopt;
+    }
+    return static_cast<std::size_t>(theme - THEMES.begin());
 }
 
 /**

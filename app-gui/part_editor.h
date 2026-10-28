@@ -22,6 +22,7 @@
 #include "components/switch.h"
 #include "components/transformer.h"
 #include "components/voltage_controlled_switch.h"
+#include "preferences.h"
 #include "schematic.h"
 #include "standard_values.h"
 #include "value_field.h"
@@ -41,7 +42,7 @@ namespace GUI {
  */
 class PartEditor {
 public:
-    explicit PartEditor(Schematic &schematic);
+    PartEditor(Schematic &schematic, const Preferences &preferences);
 
     void Draw();
 
@@ -52,13 +53,10 @@ public:
     // The name of a selected net label gets the focus on the next Draw(), as for a label just placed
     void FocusNetName();
 
-    // Standard values for resistors, capacitors and inductors, or any value
-    Core::ValueSeries GetValueSeries() const;
-    void SetValueSeries(Core::ValueSeries series);
-
 private:
     Schematic &m_Schematic;
-    Core::ValueSeries m_ValueSeries = Core::ValueSeries::FREE;
+    // The standard series that resistors, capacitors and inductors take their values from
+    const Preferences &m_Preferences;
     // Texts being edited, and the selection they were loaded from
     std::optional<std::size_t> m_LoadedSelection;
     ValueField m_Value;

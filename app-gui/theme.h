@@ -8,7 +8,9 @@
 
 #include "imgui.h"
 #include <cstddef>
+#include <optional>
 #include <span>
+#include <string_view>
 
 namespace GUI {
 
@@ -55,11 +57,11 @@ struct ThemePalette {
 // Setup
 void ApplyTheme();
 void LoadThemeFonts();
-void RegisterThemeSettingsHandler();
 
 // Themes
 std::span<const ThemePalette> GetThemes();
 std::size_t GetThemeIndex();
+std::optional<std::size_t> FindTheme(std::string_view name);
 void SetTheme(std::size_t index);
 const ThemePalette &GetPalette();
 ImU32 AdaptToBackground(ImU32 color);

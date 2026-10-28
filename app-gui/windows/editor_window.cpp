@@ -526,12 +526,14 @@ std::optional<ComponentPower> FindPower(const std::vector<ComponentPower> &power
  * @param[in] part_editor  Fields of the selected part, for the properties popover; it must outlive the window.
  * @param[in] glow_renderer  Draws the glow of lit LEDs; it must outlive the window.
  * @param[in] playback     Instant of the transient to show, which the time bar moves; it must outlive the window.
+ * @param[in] preferences  How the schematic is drawn and exported; they must outlive the window.
  */
 EditorWindow::EditorWindow(Schematic &schematic, AnalysisControls &controls, AnalysisSettingsPanel &settings_panel,
-                           PartEditor &part_editor, GlowRenderer &glow_renderer, TransientPlayback &playback)
+                           PartEditor &part_editor, GlowRenderer &glow_renderer, TransientPlayback &playback,
+                           const Preferences &preferences)
     : AppWindow("Schematic", false), m_Schematic(schematic), m_Controls(controls), m_SettingsPanel(settings_panel),
-      m_PartEditor(part_editor), m_GlowRenderer(glow_renderer), m_Playback(playback), m_Preferences(part_editor),
-      m_Files(schematic, m_Preferences,
+      m_PartEditor(part_editor), m_GlowRenderer(glow_renderer), m_Playback(playback), m_Preferences(preferences),
+      m_Files(schematic, preferences,
               {.StopEditing = [this] { StopEditing(); },
                .FrameSchematic = [this] { m_View.RequestDefaultFrame(); },
                .PlaceGroup = [this](PastedGroup group) { StartPastingGroup(std::move(group)); }}) {
@@ -692,23 +694,13 @@ void EditorWindow::DrawEditMenuItems() {
 }
 
 /**
- * @brief   Draws the View menu items that set how the schematic looks; they apply right away and are remembered.
+ * @brief   Draws the View menu items of the editor.
  * @note    Call between BeginMenu() and EndMenu().
  */
 void EditorWindow::DrawViewMenuItems() {
     if (ImGui::MenuItem("Fit Schematic", "Home")) {
         m_View.RequestFit();
     }
-    ImGui::Separator();
-    m_Preferences.DrawMenuItems();
-}
-
-/**
- * @brief   Keeps the View preferences (wire colors, symbol style, terminal numbers, standard values) in imgui.ini,
- *          next to the window layout, so they survive a restart.
- */
-void EditorWindow::RegisterSettingsHandler() {
-    m_Preferences.RegisterSettingsHandler();
 }
 
 // Window content only: AppWindow::Render() wraps it in Begin/End
@@ -728,7 +720,7 @@ void EditorWindow::Draw() {
     size.y -= ImGui::GetTextLineHeightWithSpacing();
     size.x = std::max(size.x, MIN_CANVAS_SIZE);
     size.y = std::max(size.y, MIN_CANVAS_SIZE);
-    m_View.FrameIfRequested(m_Schematic, size, m_Preferences.GetSymbolStyle(), m_Preferences.ShowsTerminalNumbers());
+    m_View.FrameIfRequested(m_Schematic, size, m_Preferences.Symbols, m_Preferences.ShowTerminalNumbers);
 
     ImGui::InvisibleButton("canvas", size,
                            ImGuiButtonFlags_MouseButtonLeft | ImGuiButtonFlags_MouseButtonRight |
@@ -759,7 +751,7 @@ void EditorWindow::Draw() {
     DrawElements(canvas, view, m_HeldButton ? m_HeldButton : live_part);
     // Over the symbols, so a lit LED looks lit through its own lines
     DrawGlows(draw_list, view);
-    if (m_Preferences.ShowsTerminalNumbers()) {
+    if (m_Preferences.ShowTerminalNumbers) {
         DrawTerminalNumbers(canvas, view, m_Schematic, SCREEN_TERMINAL_RING_SCALE);
     }
     DrawNodeVoltages(draw_list, view);
@@ -857,7 +849,7 @@ void EditorWindow::DrawPartButton(const Core::ComponentType type) {
         StartPlacing(type);
     }
     ImGui::PopID();
-    DrawPartIcon(ImGui::GetWindowDrawList(), type, ItemCenter(), IconSize(), m_Preferences.GetSymbolStyle());
+    DrawPartIcon(ImGui::GetWindowDrawList(), type, ItemCenter(), IconSize(), m_Preferences.Symbols);
     ImGui::SetItemTooltip("%s", GetPartName(type));
 }
 
@@ -984,7 +976,7 @@ void EditorWindow::DrawPartGroup(const std::size_t index) {
             ImGui::PopID();
             ImDrawList *draw_list = ImGui::GetWindowDrawList();
             DrawPartIcon(draw_list, type, start + ImVec2(row_height, row_height) / 2.0f, row_height * ICON_SCALE,
-                         m_Preferences.GetSymbolStyle());
+                         m_Preferences.Symbols);
             const float text_y = (row_height - ImGui::GetTextLineHeight()) / 2.0f;
             draw_list->AddText(start + ImVec2(row_height + ImGui::GetStyle().ItemSpacing.x, text_y), IconColor(true),
                                GetPartName(type));
@@ -1092,7 +1084,7 @@ void EditorWindow::DrawTimeBar() {
 void EditorWindow::DrawWires(SchematicCanvas &canvas, const ViewTransform &view) {
     const Connectivity &connectivity = m_Schematic.GetConnectivity();
     const auto &wires = m_Schematic.GetWires();
-    const bool drawn_by_current = m_Preferences.GetWireColoring() == WireColoring::CURRENT && m_Displayed;
+    const bool drawn_by_current = m_Preferences.WireColors == WireColoring::CURRENT && m_Displayed;
     DrawWireSelectionHalos(canvas, view);
     if (drawn_by_current) {
         DrawWireCurrents(canvas, view);
@@ -1119,7 +1111,7 @@ void EditorWindow::DrawWires(SchematicCanvas &canvas, const ViewTransform &view)
         DrawLiveCurrent(canvas, view, m_Schematic, m_Displayed->Point, m_Displayed->Scale, ImGui::GetTime());
     }
 
-    if (m_Preferences.GetWireColoring() == WireColoring::NODES) {
+    if (m_Preferences.WireColors == WireColoring::NODES) {
         DrawNodeNumbers(canvas, view);
     }
 }
@@ -1148,10 +1140,10 @@ void EditorWindow::DrawNodeNumbers(SchematicCanvas &canvas, const ViewTransform 
 
 // The color of the wires of a node: its own by node, its heat color by voltage, otherwise the color of the theme
 ImU32 EditorWindow::GetWireColor(const int node) const {
-    if (m_Preferences.GetWireColoring() == WireColoring::NODES) {
+    if (m_Preferences.WireColors == WireColoring::NODES) {
         return GetNodeColor(node);
     }
-    const bool by_voltage = m_Preferences.GetWireColoring() == WireColoring::VOLTAGE && m_Displayed;
+    const bool by_voltage = m_Preferences.WireColors == WireColoring::VOLTAGE && m_Displayed;
     if (by_voltage && static_cast<std::size_t>(node) < m_Displayed->Point.NodeVoltages.size()) {
         const double voltage = m_Displayed->Point.NodeVoltages[static_cast<std::size_t>(node)];
         return GetHeatColor(VoltageLevel(voltage, m_Displayed->Scale));
@@ -1210,7 +1202,7 @@ void EditorWindow::DrawElements(SchematicCanvas &canvas, const ViewTransform &vi
     const auto &elements = m_Schematic.GetElements();
     const bool marks_live_parts = m_Controls.IsLive() && IsSelecting();
     for (std::size_t index = 0; index < elements.size(); ++index) {
-        elements[index]->Draw(canvas, view, GetElementColor(index), m_Preferences.GetSymbolStyle());
+        elements[index]->Draw(canvas, view, GetElementColor(index), m_Preferences.Symbols);
         if (m_Schematic.IsElementSelected(index)) {
             if (ArePartsHeatColored()) {
                 elements[index]->DrawOutline(canvas, view, GetPalette().Selected);
@@ -1228,8 +1220,8 @@ ImU32 EditorWindow::GetElementColor(const std::size_t index) const {
     if (m_Schematic.IsElementSelected(index) && !ArePartsHeatColored()) {
         return GetPalette().Selected;
     }
-    const bool by_current = m_Preferences.GetWireColoring() == WireColoring::CURRENT;
-    if ((!by_current && m_Preferences.GetWireColoring() != WireColoring::POWER) || !m_Displayed) {
+    const bool by_current = m_Preferences.WireColors == WireColoring::CURRENT;
+    if ((!by_current && m_Preferences.WireColors != WireColoring::POWER) || !m_Displayed) {
         return GetPalette().Element;
     }
     const UIElement &element = *m_Schematic.GetElements()[index];
@@ -1342,21 +1334,20 @@ float EditorWindow::DrawRunStatus(float right_edge) {
 
 // Voltage and Current color the wires with the heat scale, once there is a result to color them by
 bool EditorWindow::AreWiresHeatColored() const {
-    return m_Displayed && (m_Preferences.GetWireColoring() == WireColoring::VOLTAGE ||
-                           m_Preferences.GetWireColoring() == WireColoring::CURRENT);
+    return m_Displayed &&
+           (m_Preferences.WireColors == WireColoring::VOLTAGE || m_Preferences.WireColors == WireColoring::CURRENT);
 }
 
 // Current and Power color the parts with the heat scale, once there is a result to color them by
 bool EditorWindow::ArePartsHeatColored() const {
-    return m_Displayed && (m_Preferences.GetWireColoring() == WireColoring::CURRENT ||
-                           m_Preferences.GetWireColoring() == WireColoring::POWER);
+    return m_Displayed &&
+           (m_Preferences.WireColors == WireColoring::CURRENT || m_Preferences.WireColors == WireColoring::POWER);
 }
 
 // A gradient with the values at its ends, or a reminder to run an operating point or a transient
 void EditorWindow::DrawColorLegend(ImDrawList *draw_list, const ImVec2 origin, const ImVec2 size) const {
-    if (m_Preferences.GetWireColoring() != WireColoring::VOLTAGE &&
-        m_Preferences.GetWireColoring() != WireColoring::CURRENT &&
-        m_Preferences.GetWireColoring() != WireColoring::POWER) {
+    if (m_Preferences.WireColors != WireColoring::VOLTAGE && m_Preferences.WireColors != WireColoring::CURRENT &&
+        m_Preferences.WireColors != WireColoring::POWER) {
         return;
     }
     const float font_size = ImGui::GetFontSize();
@@ -1370,10 +1361,10 @@ void EditorWindow::DrawColorLegend(ImDrawList *draw_list, const ImVec2 origin, c
     const HeatScale &scale = m_Displayed->Scale;
     std::string low_label;
     std::string high_label;
-    if (m_Preferences.GetWireColoring() == WireColoring::VOLTAGE) {
+    if (m_Preferences.WireColors == WireColoring::VOLTAGE) {
         low_label = std::format("{}V", Core::FormatValue(scale.LowestVoltage));
         high_label = std::format("{}V", Core::FormatValue(scale.HighestVoltage));
-    } else if (m_Preferences.GetWireColoring() == WireColoring::CURRENT) {
+    } else if (m_Preferences.WireColors == WireColoring::CURRENT) {
         low_label = std::format("<{}A", Core::FormatValue(scale.LargestCurrent * std::pow(10.0, -CURRENT_DECADES)));
         high_label = std::format("{}A", Core::FormatValue(scale.LargestCurrent));
     } else {
@@ -1566,7 +1557,7 @@ void EditorWindow::DrawPartPicker() {
         }
         ImDrawList *draw_list = ImGui::GetWindowDrawList();
         DrawPartIcon(draw_list, type, start + ImVec2(row_height, row_height) / 2.0f, row_height * ICON_SCALE,
-                     m_Preferences.GetSymbolStyle());
+                     m_Preferences.Symbols);
         const float text_y = (row_height - ImGui::GetTextLineHeight()) / 2.0f;
         draw_list->AddText(start + ImVec2(row_height + ImGui::GetStyle().ItemSpacing.x, text_y), IconColor(true),
                            GetPartName(type));
@@ -1627,7 +1618,7 @@ void EditorWindow::HandlePlacement(SchematicCanvas &canvas, const ViewTransform 
         // A new label starts with the name of the last one, so the same net is a click away
         static_cast<Core::NetLabel &>(preview->GetComponent()).SetNet(FindLastNet());
     }
-    preview->Draw(canvas, view, GetPreviewColor(), m_Preferences.GetSymbolStyle());
+    preview->Draw(canvas, view, GetPreviewColor(), m_Preferences.Symbols);
     if (!ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
         return;
     }
@@ -1756,7 +1747,7 @@ void EditorWindow::HandlePasting(SchematicCanvas &canvas, const ViewTransform &v
         wire.Draw(canvas, view, GetPreviewColor());
     }
     for (const auto &element : m_Pasting->Elements) {
-        element->Draw(canvas, view, GetPreviewColor(), m_Preferences.GetSymbolStyle());
+        element->Draw(canvas, view, GetPreviewColor(), m_Preferences.Symbols);
     }
     if (!ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
         return;

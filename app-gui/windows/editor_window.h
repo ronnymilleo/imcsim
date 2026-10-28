@@ -12,13 +12,13 @@
 #include "circuit_snapshot.h"
 #include "clipboard.h"
 #include "components/component.h"
-#include "editor_preferences.h"
 #include "examples.h"
 #include "glow_renderer.h"
 #include "helpers.h"
 #include "imgui.h"
 #include "part_editor.h"
 #include "playback.h"
+#include "preferences.h"
 #include "probing.h"
 #include "schematic.h"
 #include "schematic_file_actions.h"
@@ -50,7 +50,8 @@ namespace GUI {
 class EditorWindow : public AppWindow {
 public:
     EditorWindow(Schematic &schematic, AnalysisControls &controls, AnalysisSettingsPanel &settings_panel,
-                 PartEditor &part_editor, GlowRenderer &glow_renderer, TransientPlayback &playback);
+                 PartEditor &part_editor, GlowRenderer &glow_renderer, TransientPlayback &playback,
+                 const Preferences &preferences);
     ~EditorWindow() override = default;
 
     // Requests, global shortcuts and file popups, whichever window is in front
@@ -69,9 +70,6 @@ public:
     void DrawFileMenuItems();
     void DrawEditMenuItems();
     void DrawViewMenuItems();
-
-    // Preferences, kept in imgui.ini; call once after the ImGui context exists and before the first frame
-    void RegisterSettingsHandler();
 
 private:
     /**
@@ -159,9 +157,10 @@ private:
     PartEditor &m_PartEditor;
     GlowRenderer &m_GlowRenderer;
     TransientPlayback &m_Playback;
+    // How the schematic is drawn and exported
+    const Preferences &m_Preferences;
 
-    // Parts of the editor, in the order they are built: the files export what the preferences pick
-    EditorPreferences m_Preferences;
+    // Parts of the editor, in the order they are built
     CanvasView m_View;
     SchematicFileActions m_Files;
 
