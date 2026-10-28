@@ -558,7 +558,7 @@ void AnalysisControls::RunDCSweepAnalysis(const Core::Circuit &circuit, const st
     if (sources.empty() || (steps && settings.StepSource)) {
         m_Schematic.SetDCSweep(std::nullopt);
         Finish(Analysis::DC_SWEEP,
-               sources.empty() ? "Add a voltage source, current source or VCC to sweep"
+               sources.empty() ? std::format("Add {} to sweep", Core::SWEEPABLE_SOURCES)
                                : "Step either a second source or a parameter, not both",
                {});
         return;
@@ -643,7 +643,7 @@ void AnalysisControls::RunTransferFunctionAnalysis(const Core::Circuit &circuit)
         m_Schematic.SetTransferFunction(std::nullopt);
         Finish(Analysis::TRANSFER_FUNCTION,
                sources.empty()
-                   ? "A transfer function analysis needs an input source; add a voltage source, current source or VCC"
+                   ? std::format("A transfer function analysis needs an input source; add {}", Core::SWEEPABLE_SOURCES)
                    : "Connect some parts: the transfer function needs a node to measure",
                {});
         return;

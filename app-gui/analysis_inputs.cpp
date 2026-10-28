@@ -5,6 +5,7 @@
 
 #include "analysis_inputs.h"
 
+#include "circuit_checks.h"
 #include <algorithm>
 
 namespace GUI {
@@ -39,7 +40,8 @@ std::vector<int> ListHeldNodes(const Core::Circuit &circuit) {
 /**
  * @brief   Lists the sources a DC sweep can drive.
  * @param[in] circuit  Circuit to look in.
- * @return  The voltage sources, current sources and VCC rails, in circuit order, with the unit of each.
+ * @return  The voltage sources, current sources, VCC rails, clocks and logic inputs, in circuit order, with the unit
+ *          of each.
  */
 std::vector<SweepSource> ListSweepSources(const Core::Circuit &circuit) {
     std::vector<SweepSource> sources;
@@ -47,7 +49,7 @@ std::vector<SweepSource> ListSweepSources(const Core::Circuit &circuit) {
         const auto entry = std::ranges::find_if(circuit.GetEntries(), [&name](const Core::CircuitEntry &candidate) {
             return candidate.Part->GetName() == name;
         });
-        sources.push_back({name, entry->Part->GetType() == Core::ComponentType::CURRENT_SOURCE ? "A" : "V"});
+        sources.push_back({name, Core::SourceUnit(*entry->Part)});
     }
     return sources;
 }

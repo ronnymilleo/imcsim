@@ -7,6 +7,7 @@
 
 #include "components/current_source.h"
 #include "components/ground.h"
+#include "components/logic_input.h"
 #include "components/resistor.h"
 #include "components/voltage_source.h"
 #include "examples.h"
@@ -37,19 +38,24 @@ TEST_CASE("The sources a DC sweep can drive come with the unit of their values",
     voltage.SetName("V1");
     Core::CurrentSource current;
     current.SetName("I1");
+    Core::LogicInput input;
+    input.SetName("Vlogic1");
     Core::Resistor resistor;
     resistor.SetName("R1");
     Core::Circuit circuit;
     circuit.Add(voltage, {1, 0});
     circuit.Add(resistor, {1, 2});
     circuit.Add(current, {2, 0});
+    circuit.Add(input, {3});
 
     const std::vector<GUI::SweepSource> sources = GUI::ListSweepSources(circuit);
-    REQUIRE(sources.size() == 2);
+    REQUIRE(sources.size() == 3);
     CHECK(sources[0].Name == "V1");
     CHECK(std::string(sources[0].Unit) == "V");
     CHECK(sources[1].Name == "I1");
     CHECK(std::string(sources[1].Unit) == "A");
+    CHECK(sources[2].Name == "Vlogic1");
+    CHECK(std::string(sources[2].Unit) == "V");
 }
 
 TEST_CASE("A sweep keeps its stored source while the circuit offers it, and falls back to the preferred one",

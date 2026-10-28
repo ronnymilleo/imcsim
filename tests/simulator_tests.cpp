@@ -1443,8 +1443,8 @@ TEST_CASE("Invalid DC sweep settings are rejected before reaching ngspice", "[si
         return run.Result.error();
     };
     CHECK(error_of({.Swept = {.Source = ""}}).starts_with("Pick the swept source"));
-    CHECK(error_of({.Swept = {.Source = "R1"}}).contains("not a voltage source"));
-    CHECK(error_of({.Swept = {.Source = "V9"}}).contains("not a voltage source"));
+    CHECK(error_of({.Swept = {.Source = "R1"}}).contains("not a voltage or current source"));
+    CHECK(error_of({.Swept = {.Source = "V9"}}).contains("not a voltage or current source"));
     CHECK(error_of({.Swept = {.Source = "V1", .Start = 1.0, .Stop = 1.0}}).contains("must differ"));
     CHECK(error_of({.Swept = {.Source = "V1", .Step = 0.0}}).contains("toward its stop value"));
     CHECK(error_of({.Swept = {.Source = "V1", .Step = -0.1}}).contains("toward its stop value"));
@@ -2245,6 +2245,27 @@ TEST_CASE("A DC sweep of an inverter input flips its output through an undefined
     CHECK_THAT(output[40], Catch::Matchers::WithinAbs(0.0, 0.05));
 }
 
+TEST_CASE("A DC sweep of a logic input flips an inverter as a voltage source would", "[simulator][digital]") {
+    SKIP_WITHOUT_DIGITAL_MODELS();
+    Core::LogicInput input;
+    input.SetName("Vlogic1");
+    Core::LogicPart inverter(Core::ComponentType::NOT);
+    inverter.SetName("U1");
+    Core::Circuit circuit;
+    circuit.Add(input, {1});
+    circuit.Add(inverter, {1, 2});
+
+    // The input is low, so its own level plays no part: the sweep replaces it
+    const Core::DCSweepRun run =
+        Core::RunDCSweep(circuit, {.Swept = {.Source = "Vlogic1", .Start = 0.0, .Stop = 5.0, .Step = 0.5}});
+    REQUIRE(run.Result.has_value());
+    CHECK(run.Result->SweptUnit == "V");
+    const std::vector<double> &output = run.Result->Curves.front().NodeVoltages[2];
+    REQUIRE(output.size() == 11);
+    CHECK_THAT(output.front(), Catch::Matchers::WithinAbs(5.0, 0.05));
+    CHECK_THAT(output.back(), Catch::Matchers::WithinAbs(0.0, 0.05));
+}
+
 TEST_CASE("An AC sweep runs with a gate in the circuit", "[simulator][digital]") {
     SKIP_WITHOUT_DIGITAL_MODELS();
     Core::VoltageSource input;
@@ -2523,6 +2544,31 @@ TEST_CASE("A VCC supply rail is a transfer function input", "[simulator]") {
     CHECK_THAT(transfer.Gain, Catch::Matchers::WithinRel(3e3 / (1e3 + 3e3), 1e-6));
     CHECK_THAT(transfer.InputImpedance, Catch::Matchers::WithinRel(4e3, 1e-6));
     CHECK_THAT(transfer.OutputImpedance, Catch::Matchers::WithinRel(1e3 * 3e3 / (1e3 + 3e3), 1e-6));
+}
+
+TEST_CASE("A clock is a transfer function input, whatever its pulse", "[simulator]") {
+    Core::Clock clock;
+    clock.SetName("Vclk1");
+    Core::Resistor top;
+    top.SetName("R1");
+    Core::Resistor bottom;
+    bottom.SetName("R2");
+    bottom.SetValue(3e3);
+    const Core::Ground reference;
+    Core::Circuit circuit;
+    circuit.Add(clock, {1});
+    circuit.Add(top, {1, 2});
+    circuit.Add(bottom, {2, 0});
+    circuit.Add(reference, {0});
+
+    const Core::TransferFunctionRun run = Core::RunTransferFunction(circuit, {.OutputNode = 2, .InputSource = "Vclk1"});
+    if (!run.Result) {
+        FAIL(run.Result.error());
+    }
+    // The 1k/3k divider, as from any voltage source
+    CHECK(run.Result->InputUnit == "V");
+    CHECK_THAT(run.Result->Gain, Catch::Matchers::WithinRel(3e3 / (1e3 + 3e3), 1e-6));
+    CHECK_THAT(run.Result->InputImpedance, Catch::Matchers::WithinRel(4e3, 1e-6));
 }
 
 TEST_CASE("The transfer function from a current source is a transimpedance in V/A", "[simulator]") {

@@ -5,6 +5,7 @@
 
 #include "circuit_checks.h"
 
+#include "components/clock.h"
 #include "components/ground.h"
 #include "components/logic_input.h"
 #include "components/logic_part.h"
@@ -107,4 +108,27 @@ TEST_CASE("The lists of sources hold the parts an analysis can use", "[circuit_c
     CHECK(Core::FindSweepableSource(setup.Circuit, "R1") == nullptr);
     CHECK(Core::FindLogicInput(setup.Circuit, "Vin1") == nullptr);
     CHECK(std::string(Core::SourceUnit(setup.Source)) == "V");
+}
+
+TEST_CASE("A clock or a logic input can be swept or be the input of a transfer function", "[circuit_checks]") {
+    // Both are voltage sources in the netlist, whose DC value the analysis replaces
+    SourceAndResistor setup;
+    Core::Clock clock;
+    clock.SetName("Vclk1");
+    Core::LogicInput input;
+    input.SetName("Vlogic1");
+    setup.Circuit.Add(clock, {2});
+    setup.Circuit.Add(input, {3});
+    const std::vector<std::string> sources = {"Vin1", "Vclk1", "Vlogic1"};
+    CHECK(Core::GetSweepableSources(setup.Circuit) == sources);
+    CHECK(Core::GetTransferFunctionInputSources(setup.Circuit) == sources);
+    CHECK(Core::FindTransferFunctionInput(setup.Circuit, "Vclk1") == &clock);
+    CHECK(std::string(Core::SourceUnit(input)) == "V");
+    CHECK_FALSE(Core::CheckDCSweepSettings(setup.Circuit,
+                                           {.Swept = {.Source = "Vlogic1", .Start = 0.0, .Stop = 5.0, .Step = 0.5}})
+                    .has_value());
+    // A part that is no source is refused with the list of what can be
+    CHECK(Core::CheckTransferFunctionSettings(setup.Circuit, {.OutputNode = 1, .InputSource = "R1"})
+              .value_or("")
+              .contains(Core::SWEEPABLE_SOURCES));
 }
