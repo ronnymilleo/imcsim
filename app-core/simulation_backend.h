@@ -53,13 +53,17 @@ struct BackendCapabilities {
  * @brief   What the caller of a transient watches while it goes on, and how it can stop it.
  * @details A backend that runs the transient in stretches of simulated time reads the stop request and reports the
  *          progress between stretches, and hands over the points of each stretch as it goes. With neither set, the run
- *          goes from start to end in one piece. A backend that cannot split the run ignores the monitor.
+ *          goes from start to end in one piece. A live run is paced against the clock, LivePace simulated seconds to
+ * the second, holds while the RunControl pauses it, and applies the changes the caller sends through the RunControl
+ * between stretches. A backend that cannot split the run ignores the monitor.
  */
 struct RunMonitor {
     // Where to look for a stop request and to report the share of the stop time reached, or null
     RunControl *Control = nullptr;
     // Receives the points made since the last call, from the worker thread, or empty
     std::function<void(Transient)> OnChunk;
+    // Simulated seconds a live run covers per second of the clock, or 0 to run as fast as the backend goes
+    double LivePace = 0.0;
 };
 
 /**

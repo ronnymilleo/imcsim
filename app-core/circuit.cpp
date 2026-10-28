@@ -35,13 +35,6 @@ bool IsACSource(const Component &component) {
            static_cast<const Source &>(component).GetSourceType() == Source::SourceType::AC;
 }
 
-// The two halves of a potentiometer track never get to 0 Ohm, which SPICE rejects, however close to an end the wiper is
-constexpr double MIN_TRACK_RESISTANCE = 1e-3;
-
-// A switch is a resistor, which closed is nearly a wire and open nearly nothing at all
-constexpr double CLOSED_SWITCH_RESISTANCE = 1e-3;
-constexpr double OPEN_SWITCH_RESISTANCE = 1e12;
-
 // One line serves every analysis: .op reads the DC value, .ac the AC magnitude and .tran the waveform. Every
 // waveform writes the value it starts from, so the operating point matches the beginning of the transient. The name
 // tells SPICE whether it is a voltage or current source
@@ -382,8 +375,8 @@ std::string Circuit::ToSpiceNetlist(const std::string_view analysis, const bool 
         case ComponentType::LOGIC_INPUT: {
             // A constant source from its terminal to ground: the logic level when high, 0 V when low
             const auto &input = static_cast<const LogicInput &>(component);
-            const double level = input.IsHigh() ? input.GetParameters().LogicLevel : 0.0;
-            netlist += std::format("{} {} 0 DC {}\n", component.GetName(), nodes[0], FormatSpiceValue(level));
+            netlist +=
+                std::format("{} {} 0 DC {}\n", component.GetName(), nodes[0], FormatSpiceValue(input.GetVoltage()));
             break;
         }
         case ComponentType::VCVS:
@@ -445,18 +438,17 @@ std::string Circuit::ToSpiceNetlist(const std::string_view analysis, const bool 
         case ComponentType::POTENTIOMETER: {
             // The wiper, terminal 3, splits the track into two resistors
             const auto &pot = static_cast<const Potentiometer &>(component);
-            const std::string first = FormatSpiceValue(std::max(pot.GetValue() * pot.GetWiper(), MIN_TRACK_RESISTANCE));
-            const std::string second =
-                FormatSpiceValue(std::max(pot.GetValue() * (1.0 - pot.GetWiper()), MIN_TRACK_RESISTANCE));
-            netlist += std::format("R-{}a {} {} {}\n", pot.GetName(), nodes[0], nodes[2], first);
-            netlist += std::format("R-{}b {} {} {}\n", pot.GetName(), nodes[2], nodes[1], second);
+            netlist += std::format("R-{}a {} {} {}\n", pot.GetName(), nodes[0], nodes[2],
+                                   FormatSpiceValue(pot.GetFirstTrackResistance()));
+            netlist += std::format("R-{}b {} {} {}\n", pot.GetName(), nodes[2], nodes[1],
+                                   FormatSpiceValue(pot.GetSecondTrackResistance()));
             break;
         }
         case ComponentType::SWITCH:
         case ComponentType::PUSH_BUTTON: {
-            const bool closed = static_cast<const Switch &>(component).IsClosed();
+            const auto &contact = static_cast<const Switch &>(component);
             netlist += std::format("R-{} {} {} {}\n", component.GetName(), nodes[0], nodes[1],
-                                   FormatSpiceValue(closed ? CLOSED_SWITCH_RESISTANCE : OPEN_SWITCH_RESISTANCE));
+                                   FormatSpiceValue(contact.GetResistance()));
             break;
         }
         case ComponentType::V_SWITCH: {

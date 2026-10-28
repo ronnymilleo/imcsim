@@ -875,6 +875,7 @@ constexpr auto ANALYSIS_KEYS = std::to_array<std::string_view>(
 nlohmann::json WriteSettings(const SimulationSettings &settings) {
     nlohmann::json transient = nlohmann::json::object();
     WriteParameters(TRANSIENT_KEYS, settings.Transient, transient);
+    transient["live_seconds"] = settings.LiveSeconds;
     nlohmann::json ac_sweep = nlohmann::json::object();
     WriteParameters(AC_SWEEP_KEYS, settings.ACSweep, ac_sweep);
     ac_sweep["points_per_decade"] = settings.ACSweep.PointsPerDecade;
@@ -917,6 +918,13 @@ std::expected<void, std::string> ReadTransientSettings(const nlohmann::json &obj
     }
     if (settings.Transient.StopTime <= 0.0 || settings.Transient.TimeStep <= 0.0) {
         return std::unexpected("have a time that is not positive");
+    }
+    if (object.contains("live_seconds")) {
+        const std::optional<double> live_seconds = ReadNumber(object, "live_seconds");
+        if (!live_seconds || !IsValidLiveSeconds(*live_seconds)) {
+            return std::unexpected("have no valid live_seconds");
+        }
+        settings.LiveSeconds = *live_seconds;
     }
     return {};
 }

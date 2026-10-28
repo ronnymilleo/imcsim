@@ -124,7 +124,11 @@ jobs:
   # cannot be combined with AddressSanitizer, which is why this is a job of its own
   linux-thread-sanitizer:
     runs-on: ubuntu-latest
-    container: archlinux:latest
+    # ThreadSanitizer cannot map its shadow memory under the ASLR entropy of current runner kernels, so it restarts the
+    # program with ASLR off, which Docker's default seccomp profile forbids (the personality call)
+    container:
+      image: archlinux:latest
+      options: --security-opt seccomp=unconfined
     steps:
       - name: Install build dependencies
         run: pacman -Syu --noconfirm --needed $PACKAGES

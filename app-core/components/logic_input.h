@@ -38,6 +38,7 @@ public:
 
     bool IsHigh() const;
     void SetHigh(bool high);
+    double GetVoltage() const;
 
 private:
     LogicInputParameters m_Parameters;

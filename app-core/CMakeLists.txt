@@ -31,6 +31,7 @@ add_library(imcsim-core-lib
             components/vcc.cpp
             components/voltage_controlled_switch.cpp
             components/voltage_source.cpp
+            live_change.cpp
             ngspice_backend.cpp
             ngspice_library.cpp
             ngspice_readers.cpp

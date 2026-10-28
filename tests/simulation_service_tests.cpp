@@ -11,10 +11,12 @@
 #include "components/resistor.h"
 #include "components/voltage_source.h"
 #include "simulator.h"
+#include "test_printers.h"
 #include <algorithm>
 #include <atomic>
 #include <catch2/catch_test_macros.hpp>
 #include <chrono>
+#include <iterator>
 #include <memory>
 #include <optional>
 #include <thread>
@@ -298,4 +300,71 @@ TEST_CASE("What a discarded job posted is dropped", "[simulation_service]") {
     may_finish = true;
     REQUIRE(WaitUntilIdle(service));
     CHECK_FALSE(has_delivered);
+}
+
+TEST_CASE("Changes sent while a job runs reach it in order, and changes sent with no job are dropped",
+          "[simulation_service]") {
+    Core::SimulationService service;
+    const Core::LiveChange close{.Element = "R-SW1", .Quantity = Core::LiveQuantity::RESISTANCE, .Value = 1e-3};
+    const Core::LiveChange high{.Element = "V1", .Quantity = Core::LiveQuantity::DC_VOLTAGE, .Value = 5.0};
+    // Nobody runs, so the next job starts without them
+    service.SendChanges({high});
+
+    std::atomic<bool> has_started = false;
+    std::vector<Core::LiveChange> received;
+    REQUIRE(service.Submit([&](Core::RunControl &control) -> Core::Delivery {
+        has_started = true;
+        while (!control.IsCancelled()) {
+            std::ranges::move(control.TakeChanges(), std::back_inserter(received));
+            std::this_thread::sleep_for(1ms);
+        }
+        std::ranges::move(control.TakeChanges(), std::back_inserter(received));
+        return [] {};
+    }));
+    while (!has_started) {
+        std::this_thread::sleep_for(1ms);
+    }
+    service.SendChanges({close});
+    service.SendChanges({high, close});
+    service.Stop();
+    REQUIRE(PollUntilDelivered(service));
+    CHECK(received == std::vector<Core::LiveChange>{close, high, close});
+}
+
+TEST_CASE("A pause reaches the job in progress until it is resumed, and a stop still ends a paused job",
+          "[simulation_service]") {
+    Core::SimulationService service;
+    // Nobody runs, so there is nothing to pause
+    service.Pause();
+    CHECK_FALSE(service.IsPaused());
+
+    std::atomic<bool> has_started = false;
+    std::atomic<bool> was_paused = false;
+    REQUIRE(service.Submit([&](Core::RunControl &control) -> Core::Delivery {
+        has_started = true;
+        while (!control.IsCancelled()) {
+            if (control.IsPaused()) {
+                was_paused = true;
+            }
+            std::this_thread::sleep_for(1ms);
+        }
+        return [] {};
+    }));
+    while (!has_started) {
+        std::this_thread::sleep_for(1ms);
+    }
+    service.Pause();
+    CHECK(service.IsPaused());
+    const auto deadline = std::chrono::steady_clock::now() + WAIT_LIMIT;
+    while (!was_paused && std::chrono::steady_clock::now() < deadline) {
+        std::this_thread::sleep_for(1ms);
+    }
+    CHECK(was_paused);
+    service.Resume();
+    CHECK_FALSE(service.IsPaused());
+
+    service.Pause();
+    service.Stop();
+    REQUIRE(PollUntilDelivered(service));
+    CHECK_FALSE(service.IsPaused());
 }

@@ -27,6 +27,8 @@ public:
     double GetWiper() const;
     void SetWiper(double position);
     static bool IsValidWiper(double position);
+    double GetFirstTrackResistance() const;
+    double GetSecondTrackResistance() const;
 
 private:
     double m_Wiper;

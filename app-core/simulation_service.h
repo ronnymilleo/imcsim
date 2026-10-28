@@ -11,6 +11,7 @@
 #include <functional>
 #include <mutex>
 #include <thread>
+#include <vector>
 
 namespace Core {
 
@@ -28,7 +29,8 @@ using Job = std::function<Delivery(RunControl &)>;
  *          works on copies of what it needs (see CircuitCopy), never on what the interface edits. The interface
  *          submits a job, calls Poll() every frame and runs the deliveries that come back on its own thread, so
  *          nothing it owns is touched from the worker. Stop() ends a job early and keeps what it has made, which a job
- *          that can hand over a partial result does; Cancel() ends it and drops everything.
+ *          that can hand over a partial result does; Cancel() ends it and drops everything. SendChanges() passes
+ * changes of the circuit to a live transient in progress, and Pause() holds it where it is until Resume().
  */
 class SimulationService {
 public:
@@ -42,10 +44,14 @@ public:
     void Stop();
     void Cancel();
     bool Poll();
+    void SendChanges(const std::vector<LiveChange> &changes);
+    void Pause();
+    void Resume();
 
     // State
     bool IsBusy() const;
     bool IsCancelling() const;
+    bool IsPaused() const;
     double GetProgress() const;
 
 private:

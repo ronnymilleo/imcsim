@@ -7,6 +7,7 @@
 #include "analysis_controls.h"
 
 #include "analysis_inputs.h"
+#include "circuit_checks.h"
 #include "circuit_copy.h"
 #include "imgui.h"
 #include "theme.h"
@@ -106,10 +107,16 @@ AnalysisControls::AnalysisControls(Schematic &schematic) : m_Schematic(schematic
 /**
  * @brief   Starts the selected analysis with its settings on the worker thread.
  * @note    The result, or the error, goes to the schematic when the run ends, which Update() notices. Nothing happens
- *          while another run is in progress.
+ *          while another run is in progress. A paused live run holds the worker, so it ends first, keeping its points,
+ *          and the analysis starts in the Update() that sees it end.
  */
 void AnalysisControls::RunSelected() {
     if (IsRunning()) {
+        return;
+    }
+    if (m_RunningAnalysis) {
+        m_Service.Stop();
+        m_IsRunPending = true;
         return;
     }
     const SimulationSettings &settings = m_Schematic.GetSimulationSettings();
@@ -128,52 +135,60 @@ void AnalysisControls::RunSelected() {
         }
         steps = StepPlan{.Settings = settings.ParameterStep, .Unit = unit, .Values = std::move(*values)};
     }
-    switch (analysis) {
-    case Analysis::OPERATING_POINT:
-        StartRun(analysis,
-                 MakeJob<Core::OperatingPointRun>(
-                     circuit,
-                     [](const Core::Circuit &copy, Core::RunControl &) { return Core::RunOperatingPoint(copy); },
-                     [this](Core::OperatingPointRun run) {
-                         Finish(Analysis::OPERATING_POINT,
-                                StoreResult(std::move(run.Result),
-                                            [this](auto result) { m_Schematic.SetOperatingPoint(std::move(result)); }),
-                                std::move(run.Messages));
-                     }));
+    StartAnalysis(analysis, circuit, steps);
+}
+
+/**
+ * @brief   Asks the run in progress to stop.
+ * @note    A transient keeps the points made until the end of its current chunk. A live one only pauses, so
+ *          ContinueLive() can take it on; stopping it once paused ends it. The other runs stop between their steps (the
+ *          values of a stepped analysis, the combinations of a truth table) and drop their result, so a single
+ *          simulation ends before the stop shows; IsStopping() is true until then.
+ */
+void AnalysisControls::StopRun() {
+    if (m_IsLiveRun && !m_Service.IsPaused()) {
+        m_Service.Pause();
+        return;
+    }
+    m_Service.Stop();
+}
+
+/**
+ * @brief   Tells what the Run button does now.
+ * @return  Stop while a run goes on, Continue while a live run is paused and the transient is selected, and Run
+ *          otherwise, which ends a paused live run before the selected analysis starts.
+ */
+RunAction AnalysisControls::GetRunAction() const {
+    if (IsRunning()) {
+        return RunAction::STOP;
+    }
+    if (IsLivePaused() && m_Schematic.GetSimulationSettings().Selected == Analysis::TRANSIENT) {
+        return RunAction::CONTINUE;
+    }
+    return RunAction::RUN;
+}
+
+/**
+ * @brief   Does what the Run button does now (see GetRunAction()).
+ */
+void AnalysisControls::PressRun() {
+    switch (GetRunAction()) {
+    case RunAction::STOP:
+        StopRun();
         break;
-    case Analysis::TRANSIENT:
-        RunTransientAnalysis(circuit, steps);
+    case RunAction::CONTINUE:
+        ContinueLive();
         break;
-    case Analysis::AC_SWEEP:
-        RunACSweepAnalysis(circuit, steps);
-        break;
-    case Analysis::DC_SWEEP:
-        RunDCSweepAnalysis(circuit, steps);
-        break;
-    case Analysis::NOISE:
-        RunNoiseAnalysis(circuit);
-        break;
-    case Analysis::TRANSFER_FUNCTION:
-        RunTransferFunctionAnalysis(circuit);
-        break;
-    case Analysis::TRUTH_TABLE:
-        RunTruthTableAnalysis(circuit);
+    case RunAction::RUN:
+    default:
+        RunSelected();
         break;
     }
 }
 
 /**
- * @brief   Asks the run in progress to stop.
- * @note    A transient keeps the points made until the end of its current chunk. The other runs stop between their
- *          steps (the values of a stepped analysis, the combinations of a truth table) and drop their result, so a
- *          single simulation ends before the stop shows; IsStopping() is true until then.
- */
-void AnalysisControls::StopRun() {
-    m_Service.Stop();
-}
-
-/**
- * @brief   Takes in the result of the run that ended, and stops a run whose circuit was edited. Call it every frame.
+ * @brief   Takes in the result of the run that ended, stops a run whose circuit was edited, hands a live run the parts
+ *          the user changed and starts the run asked for while a paused live run held the worker. Call it every frame.
  */
 void AnalysisControls::Update() {
     if (!m_RunningAnalysis) {
@@ -183,18 +198,29 @@ void AnalysisControls::Update() {
     if (m_Schematic.GetCircuitVersion() != m_RunCircuitVersion) {
         m_Service.Cancel();
     }
+    if (m_IsLiveRun) {
+        m_Service.SendChanges(m_Schematic.TakeLiveChanges());
+    }
     m_Service.Poll();
-    if (!m_Service.IsBusy()) {
-        m_RunningAnalysis.reset();
+    if (m_Service.IsBusy()) {
+        return;
+    }
+    m_RunningAnalysis.reset();
+    if (std::exchange(m_IsLiveRun, false)) {
+        m_Schematic.SetLiveRun(false);
+    }
+    if (std::exchange(m_IsRunPending, false)) {
+        RunSelected();
     }
 }
 
 /**
  * @brief   Tells whether a run is in progress.
- * @return  True from RunSelected() until its result arrives or the stop takes effect.
+ * @return  True from RunSelected() until its result arrives or the stop takes effect; false while a live run is
+ *          paused, which holds as a stopped one does.
  */
 bool AnalysisControls::IsRunning() const {
-    return m_RunningAnalysis.has_value();
+    return m_RunningAnalysis.has_value() && !IsLivePaused();
 }
 
 /**
@@ -220,6 +246,87 @@ std::optional<Analysis> AnalysisControls::GetRunningAnalysis() const {
  */
 double AnalysisControls::GetRunProgress() const {
     return m_Service.GetProgress();
+}
+
+/**
+ * @brief   Tells whether Live mode is on.
+ * @return  True when the next transient runs live, if FindLiveObstacle() finds nothing in the way.
+ */
+bool AnalysisControls::IsLiveModeOn() const {
+    return m_IsLiveModeOn;
+}
+
+/**
+ * @brief   Turns Live mode on or off.
+ * @param[in] is_on  True to run the next transients live.
+ * @note    The run in progress goes on as it started.
+ */
+void AnalysisControls::SetLiveMode(const bool is_on) {
+    m_IsLiveModeOn = is_on;
+}
+
+/**
+ * @brief   Tells why Run would not start a live run now.
+ * @return  The reason to show the user, or no value when the selected analysis is a transient that can run live.
+ */
+std::optional<std::string> AnalysisControls::FindLiveObstacle() const {
+    const SimulationSettings &settings = m_Schematic.GetSimulationSettings();
+    if (settings.Selected != Analysis::TRANSIENT) {
+        return "Only a transient runs live; pick the transient to use Live";
+    }
+    if (settings.ParameterStep.Enabled) {
+        return "A stepped transient runs once per value, so it cannot run live; turn the stepping off to use Live";
+    }
+    return std::nullopt;
+}
+
+/**
+ * @brief   Tells whether the run in progress is live.
+ * @return  True from the start of a live transient until it ends or is discarded, paused or not.
+ */
+bool AnalysisControls::IsLive() const {
+    return m_IsLiveRun;
+}
+
+/**
+ * @brief   Tells whether a live run is paused.
+ * @return  True from the StopRun() that paused it until ContinueLive(), DiscardLive() or its end.
+ */
+bool AnalysisControls::IsLivePaused() const {
+    return m_IsLiveRun && m_Service.IsPaused();
+}
+
+/**
+ * @brief   Takes a paused live run on from where it stopped, with the parts as the user left them.
+ */
+void AnalysisControls::ContinueLive() {
+    if (IsLivePaused()) {
+        m_Service.Resume();
+    }
+}
+
+/**
+ * @brief   Ends a live run, paused or not, and drops its points.
+ */
+void AnalysisControls::DiscardLive() {
+    if (!m_IsLiveRun) {
+        return;
+    }
+    m_Service.Cancel();
+    m_IsLiveRun = false;
+    m_IsLiveResult = false;
+    m_Schematic.SetLiveRun(false);
+    ClearResult(Analysis::TRANSIENT);
+    m_Statuses[ToIndex(Analysis::TRANSIENT)] = {};
+}
+
+/**
+ * @brief   Tells whether the transient on display came from a live run.
+ * @return  True from the start of a live run until another transient starts or the live one is discarded, so its
+ *          points are seen a stop time at a time.
+ */
+bool AnalysisControls::IsLiveResult() const {
+    return m_IsLiveResult;
 }
 
 /**
@@ -304,8 +411,52 @@ void AnalysisControls::StartRun(const Analysis analysis, Core::Job job) {
     m_Service.Submit(std::move(job));
 }
 
+// The analysis picked, on the circuit built from the schematic, run once or once per step
+void AnalysisControls::StartAnalysis(const Analysis analysis, const Core::Circuit &circuit,
+                                     const std::optional<StepPlan> &steps) {
+    switch (analysis) {
+    case Analysis::OPERATING_POINT:
+        RunOperatingPointAnalysis(circuit);
+        break;
+    case Analysis::TRANSIENT:
+        RunTransientAnalysis(circuit, steps);
+        break;
+    case Analysis::AC_SWEEP:
+        RunACSweepAnalysis(circuit, steps);
+        break;
+    case Analysis::DC_SWEEP:
+        RunDCSweepAnalysis(circuit, steps);
+        break;
+    case Analysis::NOISE:
+        RunNoiseAnalysis(circuit);
+        break;
+    case Analysis::TRANSFER_FUNCTION:
+        RunTransferFunctionAnalysis(circuit);
+        break;
+    case Analysis::TRUTH_TABLE:
+        RunTruthTableAnalysis(circuit);
+        break;
+    default:
+        break;
+    }
+}
+
+void AnalysisControls::RunOperatingPointAnalysis(const Core::Circuit &circuit) {
+    StartRun(Analysis::OPERATING_POINT,
+             MakeJob<Core::OperatingPointRun>(
+                 circuit, [](const Core::Circuit &copy, Core::RunControl &) { return Core::RunOperatingPoint(copy); },
+                 [this](Core::OperatingPointRun run) {
+                     Finish(Analysis::OPERATING_POINT,
+                            StoreResult(std::move(run.Result),
+                                        [this](auto result) { m_Schematic.SetOperatingPoint(std::move(result)); }),
+                            std::move(run.Messages));
+                 }));
+}
+
+// A live run is a transient that goes on to its limit at the pace the settings give, unless the user stops it first
 void AnalysisControls::RunTransientAnalysis(const Core::Circuit &circuit, const std::optional<StepPlan> &steps) {
     const Core::TransientSettings settings = m_Schematic.GetSimulationSettings().Transient;
+    m_IsLiveResult = false;
     if (steps) {
         StartRun(Analysis::TRANSIENT,
                  MakeJob<SteppedRuns<Core::Transient>>(
@@ -327,26 +478,44 @@ void AnalysisControls::RunTransientAnalysis(const Core::Circuit &circuit, const 
     // The points arrive in chunks while the run goes on, so the old result gives way to the first one
     m_Schematic.SetTransient(std::nullopt);
     const std::size_t circuit_version = m_Schematic.GetCircuitVersion();
-    StartRun(
-        Analysis::TRANSIENT,
-        MakeJob<Core::TransientRun, true>(
-            circuit,
-            [this, settings, circuit_version](const Core::Circuit &copy, Core::RunControl &control) {
-                const auto post_chunk = [this, &control, circuit_version](Core::Transient chunk) {
-                    control.Post([this, circuit_version, points = std::make_shared<Core::Transient>(std::move(chunk))] {
-                        if (m_Schematic.GetCircuitVersion() == circuit_version) {
-                            m_Schematic.AppendTransient(std::move(*points));
-                        }
-                    });
-                };
-                return Core::RunTransient(copy, settings, std::nullopt, {.Control = &control, .OnChunk = post_chunk});
-            },
-            [this](Core::TransientRun run) {
-                Finish(Analysis::TRANSIENT,
-                       StoreResult(std::move(run.Result),
-                                   [this](auto result) { m_Schematic.SetTransient(std::move(result)); }),
-                       std::move(run.Messages));
-            }));
+    m_IsLiveRun = m_IsLiveModeOn && !FindLiveObstacle();
+    m_IsLiveResult = m_IsLiveRun;
+    m_Schematic.SetLiveRun(m_IsLiveRun);
+    Core::TransientSettings run_settings = settings;
+    double pace = 0.0;
+    if (m_IsLiveRun) {
+        pace = settings.StopTime / m_Schematic.GetSimulationSettings().LiveSeconds;
+        // One step short of the most a transient may span, which the check would refuse after rounding
+        run_settings.StopTime = std::min(pace * LIVE_RUN_LIMIT_SECONDS,
+                                         settings.TimeStep * static_cast<double>(Core::MAX_TRANSIENT_POINTS - 1));
+    }
+    const bool is_live = m_IsLiveRun;
+    StartRun(Analysis::TRANSIENT,
+             MakeJob<Core::TransientRun, true>(
+                 circuit,
+                 [this, run_settings, circuit_version, pace](const Core::Circuit &copy, Core::RunControl &control) {
+                     const auto post_chunk = [this, &control, circuit_version](Core::Transient chunk) {
+                         control.Post(
+                             [this, circuit_version, points = std::make_shared<Core::Transient>(std::move(chunk))] {
+                                 if (m_Schematic.GetCircuitVersion() == circuit_version) {
+                                     m_Schematic.AppendTransient(std::move(*points));
+                                 }
+                             });
+                     };
+                     return Core::RunTransient(copy, run_settings, std::nullopt,
+                                               {.Control = &control, .OnChunk = post_chunk, .LivePace = pace});
+                 },
+                 [this, is_live](Core::TransientRun run) {
+                     if (is_live && run.Result && run.Result->IsComplete) {
+                         run.Result->Warnings.emplace_back(
+                             "The live run reached its limit, an hour on the clock or a million time steps, whichever "
+                             "comes first; Run starts a new one");
+                     }
+                     Finish(Analysis::TRANSIENT,
+                            StoreResult(std::move(run.Result),
+                                        [this](auto result) { m_Schematic.SetTransient(std::move(result)); }),
+                            std::move(run.Messages));
+                 }));
 }
 
 void AnalysisControls::RunACSweepAnalysis(const Core::Circuit &circuit, const std::optional<StepPlan> &steps) {

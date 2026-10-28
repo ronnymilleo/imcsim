@@ -4,6 +4,7 @@
  */
 
 #include "components/net_label.h"
+#include "components/switch.h"
 #include "element_factory.h"
 #include "examples.h"
 #include "schematic.h"
@@ -647,4 +648,53 @@ TEST_CASE("Chunks of a transient make the result grow, and only the first counts
     CHECK(schematic.GetTransient()->IsComplete);
     CHECK(schematic.GetTransientVersion() == result_version + 1);
     CHECK(schematic.GetTransientDataVersion() == data_version + 2);
+}
+
+TEST_CASE("A part set by hand during a live run keeps the transient and goes to the run as a change", "[schematic]") {
+    GUI::Schematic schematic;
+    schematic.AddElement(GUI::CreateElement(Core::ComponentType::SWITCH, {0, 0}, GUI::Rotation::R0));
+    auto &contact = static_cast<Core::Switch &>(schematic.GetElement(0).GetComponent());
+    schematic.SetTransient(Core::Transient{.Times = {0.0}, .NodeVoltages = {}, .Currents = {}, .Warnings = {}});
+    schematic.SetOperatingPoint(Core::OperatingPoint{});
+    schematic.CommitUndoStep();
+    const std::size_t circuit_version = schematic.GetCircuitVersion();
+
+    schematic.SetLiveRun(true);
+    CHECK(schematic.IsLiveRun());
+    contact.SetClosed(true);
+    schematic.MarkLiveChanged(contact);
+    // The transient that the run is making stays, the operating point no longer matches the circuit
+    CHECK(schematic.GetTransient().has_value());
+    CHECK_FALSE(schematic.GetOperatingPoint().has_value());
+    CHECK(schematic.GetCircuitVersion() == circuit_version);
+    CHECK(schematic.IsModified());
+    CHECK(schematic.TakeLiveChanges() == Core::DescribeLiveChange(contact));
+    CHECK(schematic.TakeLiveChanges().empty());
+
+    // It is an undo step like any other, and undoing it is an edit that stops the run
+    schematic.CommitUndoStep();
+    schematic.Undo();
+    CHECK_FALSE(static_cast<Core::Switch &>(schematic.GetElement(0).GetComponent()).IsClosed());
+    CHECK(schematic.GetCircuitVersion() != circuit_version);
+}
+
+TEST_CASE("Outside a live run a part set by hand is an edit that drops the results", "[schematic]") {
+    GUI::Schematic schematic;
+    schematic.AddElement(GUI::CreateElement(Core::ComponentType::SWITCH, {0, 0}, GUI::Rotation::R0));
+    auto &contact = static_cast<Core::Switch &>(schematic.GetElement(0).GetComponent());
+    schematic.SetTransient(Core::Transient{});
+    const std::size_t circuit_version = schematic.GetCircuitVersion();
+
+    contact.SetClosed(true);
+    schematic.MarkLiveChanged(contact);
+    CHECK_FALSE(schematic.GetTransient().has_value());
+    CHECK(schematic.GetCircuitVersion() != circuit_version);
+    CHECK(schematic.TakeLiveChanges().empty());
+
+    // The changes a run did not take are dropped when it ends
+    schematic.SetLiveRun(true);
+    schematic.MarkLiveChanged(contact);
+    schematic.SetLiveRun(false);
+    CHECK_FALSE(schematic.IsLiveRun());
+    CHECK(schematic.TakeLiveChanges().empty());
 }
