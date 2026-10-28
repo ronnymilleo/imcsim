@@ -20,6 +20,7 @@ TEST_CASE("Preferences load back unchanged from the file they save", "[preferenc
     preferences.ValueSeries = Core::ValueSeries::E24;
     preferences.BringOutputToFront = false;
     preferences.RerunOnEdit = true;
+    preferences.RerunDelaySeconds = 1.5;
 
     const GUI::LoadedPreferences loaded = GUI::LoadPreferences(GUI::SavePreferences(preferences));
     CHECK(loaded.Warnings.empty());
@@ -35,6 +36,7 @@ TEST_CASE("A new user gets the first theme, plain wires, no effects and any valu
     CHECK(preferences.ValueSeries == Core::ValueSeries::FREE);
     CHECK(preferences.BringOutputToFront);
     CHECK_FALSE(preferences.RerunOnEdit);
+    CHECK(preferences.RerunDelaySeconds == GUI::DEFAULT_RERUN_DELAY_SECONDS);
     // A file with none of the keys, as one from a later version that renamed them all, keeps every default
     const GUI::LoadedPreferences loaded = GUI::LoadPreferences(R"({"version": 9, "unknown": true})");
     CHECK(loaded.Warnings.empty());
@@ -45,9 +47,9 @@ TEST_CASE("A preference that is not understood keeps its default with a warning,
           "[preferences]") {
     const std::string text = R"({"theme": "No such theme", "symbols": "DIN", "terminal_numbers": "yes",)"
                              R"("wire_colors": "Voltage", "live_effects": ["LED Glow", "Sparks"],)"
-                             R"("value_series": "E7", "bring_output_to_front": false})";
+                             R"("value_series": "E7", "bring_output_to_front": false, "rerun_delay_seconds": 60})";
     const GUI::LoadedPreferences loaded = GUI::LoadPreferences(text);
-    CHECK(loaded.Warnings.size() == 5);
+    CHECK(loaded.Warnings.size() == 6);
     const GUI::Preferences defaults;
     CHECK(loaded.Choices.Theme == defaults.Theme);
     CHECK(loaded.Choices.Symbols == defaults.Symbols);
@@ -55,8 +57,16 @@ TEST_CASE("A preference that is not understood keeps its default with a warning,
     // A list of effects with one unknown name is not taken in part
     CHECK(loaded.Choices.LiveEffects == defaults.LiveEffects);
     CHECK(loaded.Choices.ValueSeries == defaults.ValueSeries);
+    // A delay outside the range the window offers
+    CHECK(loaded.Choices.RerunDelaySeconds == defaults.RerunDelaySeconds);
     CHECK(loaded.Choices.WireColors == GUI::WireColoring::VOLTAGE);
     CHECK_FALSE(loaded.Choices.BringOutputToFront);
+}
+
+TEST_CASE("The delay before running again reads whole numbers too", "[preferences]") {
+    const GUI::LoadedPreferences loaded = GUI::LoadPreferences(R"({"rerun_delay_seconds": 2})");
+    CHECK(loaded.Warnings.empty());
+    CHECK(loaded.Choices.RerunDelaySeconds == 2.0);
 }
 
 TEST_CASE("A preferences file that is not a JSON object gives the defaults with one warning", "[preferences]") {

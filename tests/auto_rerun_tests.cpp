@@ -11,6 +11,7 @@
 namespace {
 
 constexpr double FRAME_SECONDS = 1.0 / 60.0;
+constexpr double SETTLE_SECONDS = 0.5;
 
 /**
  * @struct  Session
@@ -18,7 +19,7 @@ constexpr double FRAME_SECONDS = 1.0 / 60.0;
  */
 struct Session {
     GUI::AutoRerun Rerun;
-    GUI::AutoRerunFrame Frame{.IsEnabled = true, .HasRunToFollow = true};
+    GUI::AutoRerunFrame Frame{.IsEnabled = true, .SettleSeconds = SETTLE_SECONDS, .HasRunToFollow = true};
     std::size_t Runs = 0;
 
     // Advances the clock by one frame, counting the runs it asks for
@@ -53,13 +54,24 @@ TEST_CASE("An edit of an analysis that was run runs it again once the edit settl
     session.Step();
     session.Edit();
     CHECK(session.Rerun.IsDue());
-    session.Wait(GUI::AutoRerun::SETTLE_SECONDS / 2.0);
+    session.Wait(SETTLE_SECONDS / 2.0);
     CHECK(session.Runs == 0);
-    session.Wait(GUI::AutoRerun::SETTLE_SECONDS);
+    session.Wait(SETTLE_SECONDS);
     CHECK(session.Runs == 1);
     CHECK_FALSE(session.Rerun.IsDue());
     // Nothing more without another edit
     session.Wait(2.0);
+    CHECK(session.Runs == 1);
+}
+
+TEST_CASE("A longer settle time waits longer after the edit", "[auto_rerun]") {
+    Session session;
+    session.Frame.SettleSeconds = 3.0;
+    session.Step();
+    session.Edit();
+    session.Wait(2.0);
+    CHECK(session.Runs == 0);
+    session.Wait(1.5);
     CHECK(session.Runs == 1);
 }
 
@@ -77,10 +89,10 @@ TEST_CASE("A burst of edits runs once, after the last of them", "[auto_rerun]") 
     session.Step();
     for (int edit = 0; edit < 5; ++edit) {
         session.Edit();
-        session.Wait(GUI::AutoRerun::SETTLE_SECONDS / 2.0);
+        session.Wait(SETTLE_SECONDS / 2.0);
     }
     CHECK(session.Runs == 0);
-    session.Wait(GUI::AutoRerun::SETTLE_SECONDS);
+    session.Wait(SETTLE_SECONDS);
     CHECK(session.Runs == 1);
 }
 

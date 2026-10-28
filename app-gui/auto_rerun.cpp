@@ -34,7 +34,7 @@ bool AutoRerun::Update(const AutoRerunFrame &frame) {
         m_DueSince.reset();
         return false;
     }
-    if (!m_DueSince || frame.IsEditing || frame.IsRunBlocked || frame.Time - *m_DueSince < SETTLE_SECONDS) {
+    if (!m_DueSince || frame.IsEditing || frame.IsRunBlocked || frame.Time - *m_DueSince < frame.SettleSeconds) {
         return false;
     }
     m_DueSince.reset();

@@ -50,13 +50,28 @@ public:
             return;
         }
         if (entry->type() != type || !apply(entry->template get<Value>())) {
-            m_Warnings.push_back(std::format("The preference {} was not understood and keeps its default", key));
+            Warn(key);
+        }
+    }
+
+    // A number may be written whole or not, which JSON tells apart as different types
+    template <typename Apply> void ReadNumber(const char *key, const Apply &apply) {
+        const auto entry = m_Document.find(key);
+        if (entry == m_Document.end()) {
+            return;
+        }
+        if (!entry->is_number() || !apply(entry->get<double>())) {
+            Warn(key);
         }
     }
 
 private:
     const nlohmann::json &m_Document;
     std::vector<std::string> &m_Warnings;
+
+    void Warn(const char *key) {
+        m_Warnings.push_back(std::format("The preference {} was not understood and keeps its default", key));
+    }
 };
 
 } // namespace
@@ -119,6 +134,7 @@ std::string SavePreferences(const Preferences &preferences) {
         {"value_series", Core::GetSeriesName(preferences.ValueSeries)},
         {"bring_output_to_front", preferences.BringOutputToFront},
         {"rerun_on_edit", preferences.RerunOnEdit},
+        {"rerun_delay_seconds", preferences.RerunDelaySeconds},
     };
     return document.dump(2) + "\n";
 }
@@ -192,6 +208,14 @@ LoadedPreferences LoadPreferences(const std::string_view text) {
     });
     reader.Read<bool>("rerun_on_edit", Type::boolean, [&choices](const bool on) {
         choices.RerunOnEdit = on;
+        return true;
+    });
+    // Only a delay within the range the window offers, so a hand-edited file cannot make it run on every frame
+    reader.ReadNumber("rerun_delay_seconds", [&choices](const double seconds) {
+        if (seconds < MIN_RERUN_DELAY_SECONDS || seconds > MAX_RERUN_DELAY_SECONDS) {
+            return false;
+        }
+        choices.RerunDelaySeconds = seconds;
         return true;
     });
     return loaded;

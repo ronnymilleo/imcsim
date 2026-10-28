@@ -16,8 +16,9 @@ namespace GUI {
  * @brief   What the program is doing this frame, as far as running again by itself is concerned.
  */
 struct AutoRerunFrame {
-    // The user's preference
+    // The user's preferences: whether to run again, and how long an edit must settle first
     bool IsEnabled = false;
+    double SettleSeconds = 0.0;
     // Seconds on any clock that only goes forward
     double Time = 0.0;
     // Change with each edit that drops the results, and with each schematic opened or created
@@ -36,14 +37,11 @@ struct AutoRerunFrame {
  * @brief   Runs the selected analysis again once an edit of the circuit settles, so results follow edits.
  * @details Only an analysis the user already ran is followed: an edit while it had a result, an error or a run in
  *          progress makes it due. It runs once the edit is over (no field active, nothing dragged) and nothing changed
- *          for SETTLE_SECONDS, so typing or a burst of edits runs it once; a run in progress, which the edit cancels,
- *          ends first. Opening or creating a schematic forgets what was followed.
+ *          for the settle time of the frame, so typing or a burst of edits runs it once; a run in progress, which the
+ * edit cancels, ends first. Opening or creating a schematic forgets what was followed.
  */
 class AutoRerun {
 public:
-    // Quiet time after the last edit before running again
-    static constexpr double SETTLE_SECONDS = 0.5;
-
     bool Update(const AutoRerunFrame &frame);
     bool IsDue() const;
 

@@ -483,6 +483,7 @@ void Application::RerunAfterEdits() {
     const bool would_run_live = m_AnalysisControls.IsLiveModeOn() && !m_AnalysisControls.FindLiveObstacle();
     const AutoRerunFrame frame{
         .IsEnabled = m_Preferences.RerunOnEdit,
+        .SettleSeconds = m_Preferences.RerunDelaySeconds,
         .Time = ImGui::GetTime(),
         .CircuitVersion = m_Schematic.GetCircuitVersion(),
         .DocumentVersion = m_Schematic.GetDocumentVersion(),

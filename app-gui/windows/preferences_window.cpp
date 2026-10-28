@@ -17,7 +17,7 @@ namespace GUI {
 namespace {
 
 // In font sizes, before imgui.ini remembers the size the user gave it
-constexpr ImVec2 INITIAL_SIZE = {30.0f, 36.0f};
+constexpr ImVec2 INITIAL_SIZE = {30.0f, 40.0f};
 // Width of the column that names each choice, in font sizes
 constexpr float LABEL_COLUMN_WIDTH = 12.0f;
 constexpr auto VALUE_SERIES =
@@ -194,8 +194,15 @@ void PreferencesWindow::DrawResults() {
     ImGui::SetItemTooltip("Bring the Output window to the front on a new result; otherwise it is marked with a dot");
     BeginChoice("Run again after edits");
     ImGui::Checkbox("##rerun_on_edit", &m_Preferences.RerunOnEdit);
-    ImGui::SetItemTooltip("Once you have run the selected analysis, run it again by itself half a second after each "
-                          "change to the circuit, so the results follow your edits; a live run follows them already");
+    ImGui::SetItemTooltip("Once you have run the selected analysis, run it again by itself after each change to the "
+                          "circuit, so the results follow your edits; a live run follows them already");
+    BeginChoice("Wait after an edit");
+    ImGui::BeginDisabled(!m_Preferences.RerunOnEdit);
+    ImGui::SliderScalar("##rerun_delay", ImGuiDataType_Double, &m_Preferences.RerunDelaySeconds,
+                        &MIN_RERUN_DELAY_SECONDS, &MAX_RERUN_DELAY_SECONDS, "%.1f s", ImGuiSliderFlags_AlwaysClamp);
+    ImGui::EndDisabled();
+    ImGui::SetItemTooltip("How long the circuit must stay unchanged before the analysis runs again: shorter follows "
+                          "edits sooner, longer waits for a series of edits to end");
     ImGui::EndTable();
 }
 
