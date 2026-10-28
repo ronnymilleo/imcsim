@@ -7,6 +7,8 @@
 #define IMCSIM_MATH_CHANNELS_H
 
 #include "implot.h"
+#include "math_channel.h"
+#include "schematic.h"
 #include "simulator.h"
 #include "trace_math.h"
 #include <expected>
@@ -15,24 +17,6 @@
 #include <vector>
 
 namespace GUI {
-
-/**
- * @struct  MathChannel
- * @brief   A trace computed from others, like the math channel of an oscilloscope.
- * @details Either an operation between two traces, picked with buttons, or a typed expression; both compile to
- *          the same program. Channels belong to the Output window for now and are not saved with the schematic.
- */
-struct MathChannel {
-    std::string Name;
-    bool Shown = true;
-    bool UsesExpression = false;
-    std::string First;
-    MathOperator Operator = MathOperator::SUBTRACT;
-    std::string Second;
-    std::string Expression;
-    // Compiled from the operation or the expression, whichever is in use
-    std::expected<MathProgram, std::string> Program = std::unexpected("Not compiled yet");
-};
 
 /**
  * @struct  MathTrace
@@ -48,10 +32,15 @@ struct MathTrace {
 
 /**
  * @class   MathChannels
- * @brief   The math channels of the Output window, numbered M1, M2... as they are added, each with its own color.
+ * @brief   The panel and evaluation of the math channels, numbered M1, M2... as they are added, each with its own
+ * color.
+ * @details The channels belong to the schematic, which saves them with the file; their net names are read on the
+ *          circuit as it is now.
  */
 class MathChannels {
 public:
+    explicit MathChannels(Schematic &schematic);
+
     // Panel beside the plots
     void Draw(const std::vector<std::string> &operands);
 
@@ -64,10 +53,10 @@ public:
                                     std::vector<std::string> &errors) const;
 
 private:
-    std::vector<MathChannel> m_Channels;
-    int m_NextNumber = 1;
+    Schematic &m_Schematic;
 
-    bool DrawEditor(MathChannel &channel, const std::vector<std::string> &operands);
+    NetResolver GetNetResolver() const;
+    bool DrawEditor(MathChannel &channel, const std::vector<std::string> &operands) const;
 };
 
 bool UsesAxis(const std::vector<MathTrace> &math, ImAxis axis);

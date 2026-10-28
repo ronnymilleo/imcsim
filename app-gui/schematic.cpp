@@ -333,16 +333,33 @@ void Schematic::SetCurrentMeasured(const std::string &name, const bool measured)
 }
 
 /**
+ * @brief   Returns the math channels the plots add to the measured traces.
+ * @return  The channels, in the order they were added.
+ */
+const std::vector<MathChannel> &Schematic::GetMathChannels() const {
+    return m_MathChannels;
+}
+
+/**
+ * @brief   Replaces the math channels, as the Output window does when the user adds, edits or removes one.
+ * @param[in] channels  New channels.
+ */
+void Schematic::SetMathChannels(std::vector<MathChannel> channels) {
+    m_MathChannels = std::move(channels);
+}
+
+/**
  * @brief   Removes every measurement, so the plots start empty; for a new or opened schematic.
  */
 void Schematic::ClearMeasurements() {
     m_VoltageProbes.clear();
     m_MeasuredCurrents.clear();
+    m_MathChannels.clear();
 }
 
 /**
  * @brief   Describes the measurements for a file, with each voltage as a point of its node.
- * @return  The measured voltages and currents; nodes that no longer exist are left out.
+ * @return  The measured voltages and currents, and the math channels; nodes that no longer exist are left out.
  */
 SavedMeasurements Schematic::SaveMeasurements() {
     SavedMeasurements measurements;
@@ -355,12 +372,14 @@ SavedMeasurements Schematic::SaveMeasurements() {
         }
     }
     measurements.Currents.assign(m_MeasuredCurrents.begin(), m_MeasuredCurrents.end());
+    measurements.MathChannels = m_MathChannels;
     return measurements;
 }
 
 /**
  * @brief   Replaces the measurements with those read from a file.
- * @param[in] measurements  Measured voltages and currents; call it after the content they refer to is in place.
+ * @param[in] measurements  Measured voltages and currents, and math channels; call it after the content they refer to
+ *                          is in place.
  * @note    Points that connect to nothing, or to ground, are skipped. Currents of parts that do not exist are kept
  *          but plot nothing, like after deleting a measured part.
  */
@@ -372,6 +391,7 @@ void Schematic::RestoreMeasurements(const SavedMeasurements &measurements) {
         }
     }
     m_MeasuredCurrents.insert(measurements.Currents.begin(), measurements.Currents.end());
+    m_MathChannels = measurements.MathChannels;
 }
 
 /**

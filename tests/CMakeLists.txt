@@ -27,6 +27,7 @@ add_executable(imcsim-tests
             live_change_tests.cpp
             live_input_tests.cpp
             logic_trace_tests.cpp
+            math_channel_tests.cpp
             parameter_step_tests.cpp
             playback_tests.cpp
             plot_export_tests.cpp

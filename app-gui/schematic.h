@@ -9,6 +9,7 @@
 #include "connectivity.h"
 #include "helpers.h"
 #include "live_change.h"
+#include "math_channel.h"
 #include "parameter_step.h"
 #include "schematic_file.h"
 #include "simulation_settings.h"
@@ -84,6 +85,8 @@ public:
     void SetVoltageMeasured(int node, bool measured);
     bool IsCurrentMeasured(const std::string &name) const;
     void SetCurrentMeasured(const std::string &name, bool measured);
+    const std::vector<MathChannel> &GetMathChannels() const;
+    void SetMathChannels(std::vector<MathChannel> channels);
     void ClearMeasurements();
     SavedMeasurements SaveMeasurements();
     void RestoreMeasurements(const SavedMeasurements &measurements);
@@ -172,6 +175,7 @@ private:
     // Measurements: probes on nodes, and current names such as "R1" or "Q1.C"
     std::vector<VoltageProbe> m_VoltageProbes;
     std::set<std::string> m_MeasuredCurrents;
+    std::vector<MathChannel> m_MathChannels;
 
     // Simulation settings; the version changes only when they are replaced from outside the analysis settings,
     // such as by opening a file or undoing, so the window knows to reload its fields

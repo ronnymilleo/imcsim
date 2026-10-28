@@ -6,7 +6,9 @@
 #include "trace_math.h"
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
+#include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace {
@@ -93,7 +95,10 @@ TEST_CASE("Mistakes are reported instead of evaluated", "[trace_math]") {
     CHECK_FALSE(GUI::CompileExpression(""));
     CHECK_FALSE(GUI::CompileExpression("V(1)-"));
     CHECK_FALSE(GUI::CompileExpression("V(1"));
-    CHECK_FALSE(GUI::CompileExpression("V(x)"));
+    CHECK_FALSE(GUI::CompileExpression("V(x y)"));
+    CHECK_FALSE(GUI::CompileExpression("V(o%t)"));
+    // A node number too large for any circuit is refused rather than wrapped around
+    CHECK_FALSE(GUI::CompileExpression("V(99999999999)"));
     CHECK_FALSE(GUI::CompileExpression("log(V(1))"));
     CHECK_FALSE(GUI::CompileExpression("V(1) V(2)"));
     CHECK_FALSE(GUI::CompileExpression("I()"));
@@ -105,6 +110,35 @@ TEST_CASE("Mistakes are reported instead of evaluated", "[trace_math]") {
     const auto missing_current = GUI::CompileExpression("I(R9)");
     REQUIRE(missing_current);
     CHECK_FALSE(GUI::EvaluateExpression(*missing_current, result.Times, SECONDS, result.NodeVoltages, result.Currents));
+}
+
+TEST_CASE("A net name stands for the node a label gives it, found when the expression is evaluated", "[trace_math]") {
+    const TestResult result;
+    const auto program = GUI::CompileExpression("V(OUT) - V(in, 2)");
+    REQUIRE(program);
+    // Before its nets are resolved, the program refuses to run rather than read ground
+    CHECK_FALSE(GUI::EvaluateExpression(*program, result.Times, SECONDS, result.NodeVoltages, result.Currents));
+
+    const GUI::NetResolver find_node = [](const std::string_view net) -> std::optional<int> {
+        if (net == "OUT") {
+            return 1;
+        }
+        if (net == "in") {
+            return 2;
+        }
+        return std::nullopt;
+    };
+    const auto resolved = GUI::ResolveNetNames(*program, find_node);
+    REQUIRE(resolved);
+    const auto evaluated =
+        GUI::EvaluateExpression(*resolved, result.Times, SECONDS, result.NodeVoltages, result.Currents);
+    REQUIRE(evaluated);
+    // V(1) minus V(2, 2), which is zero
+    CheckValues(evaluated->Values, {5.0, 6.0, 7.0});
+
+    const auto missing = GUI::ResolveNetNames(*GUI::CompileExpression("V(GONE)"), find_node);
+    REQUIRE_FALSE(missing);
+    CHECK(missing.error().contains("GONE"));
 }
 
 TEST_CASE("Operator channels write expressions that compile", "[trace_math]") {

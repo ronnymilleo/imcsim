@@ -171,6 +171,21 @@ TEST_CASE("A node is named after the first label on it, as typed", "[connectivit
     CHECK_FALSE(connectivity.GetNetName(99));
 }
 
+TEST_CASE("A net name finds its node in any case, whichever label on the node gave it", "[connectivity]") {
+    Schematic schematic;
+    schematic.Label({10, 0}, "Second");
+    schematic.Label({0, 0}, "First");
+    schematic.Wires.emplace_back(GUI::GridPoint{0, 0}, GUI::GridPoint{10, 0});
+
+    const GUI::Connectivity connectivity = schematic.Connect();
+    const int node = connectivity.GetNode({0, 0}).value();
+    CHECK(connectivity.FindNodeOfNet("first") == node);
+    CHECK(connectivity.FindNodeOfNet("SECOND") == node);
+    CHECK(connectivity.FindNodeOfNet("gnd") == 0);
+    CHECK(connectivity.FindNodeOfNet("0") == 0);
+    CHECK_FALSE(connectivity.FindNodeOfNet("Third"));
+}
+
 TEST_CASE("A label named 0 or GND, in any case, is ground", "[connectivity]") {
     Schematic schematic;
     schematic.Elements.push_back(std::make_unique<GUI::UIGround>(GUI::GridPoint{0, 0}, GUI::Rotation::R0));

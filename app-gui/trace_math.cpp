@@ -1,14 +1,16 @@
 /**
  * @file    trace_math.cpp
- * @brief   Math channels: expressions of voltages and currents, such as V(1)-V(2), evaluated over a result.
+ * @brief   Math channels: expressions of voltages and currents, such as V(1)-V(OUT), evaluated over a result.
  */
 
 #include "trace_math.h"
 
+#include "components/net_label.h"
 #include "spice_value.h"
 #include <algorithm>
 #include <array>
 #include <cctype>
+#include <charconv>
 #include <cmath>
 #include <format>
 #include <functional>
@@ -45,6 +47,7 @@ constexpr auto FUNCTIONS = std::to_array<FunctionName>({
  *          product := unary (('*' | '/') unary)*
  *          unary := '-' unary | primary
  *          primary := number | V(node) | V(node, node) | I(name) | function(sum) | (sum)
+ *          node := number | net name
  */
 class Parser {
 public:
@@ -206,20 +209,45 @@ private:
         if (const Step step = Expect('('); !step) {
             return step;
         }
-        const std::optional<int> node = ReadNode();
-        if (!node) {
-            return std::unexpected("V() takes a node number, such as V(2)");
+        if (const Step step = ParseNode(); !step) {
+            return step;
         }
-        m_Program.Instructions.push_back({.Type = Kind::VOLTAGE, .Node = *node});
         if (Accept(',')) {
-            const std::optional<int> second = ReadNode();
-            if (!second) {
-                return std::unexpected("V(a, b) takes two node numbers");
+            if (const Step step = ParseNode(); !step) {
+                return step;
             }
-            m_Program.Instructions.push_back({.Type = Kind::VOLTAGE, .Node = *second});
             Emit(Kind::SUBTRACT);
         }
         return Expect(')');
+    }
+
+    // A node is a number, or a name a net label gave it, which stays valid when the nodes are numbered again. A name
+    // of digits alone reads as a number
+    Step ParseNode() {
+        SkipSpaces();
+        const std::size_t start = m_Position;
+        while (m_Position < m_Text.size() && m_Text[m_Position] != ',' && m_Text[m_Position] != ')' &&
+               std::isspace(static_cast<unsigned char>(m_Text[m_Position])) == 0) {
+            ++m_Position;
+        }
+        const std::string_view text = m_Text.substr(start, m_Position - start);
+        if (text.empty()) {
+            return std::unexpected("V() takes a node number or a net name, such as V(2) or V(OUT)");
+        }
+        if (std::ranges::all_of(
+                text, [](const char character) { return std::isdigit(static_cast<unsigned char>(character)) != 0; })) {
+            int node = 0;
+            if (std::from_chars(text.data(), text.data() + text.size(), node).ec != std::errc()) {
+                return std::unexpected(std::format("The circuit has no node {}", text));
+            }
+            m_Program.Instructions.push_back({.Type = Kind::VOLTAGE, .Node = node});
+            return {};
+        }
+        if (!Core::NetLabel::IsValidNet(text)) {
+            return std::unexpected(std::format("\"{}\" is not a node number or a net name", text));
+        }
+        m_Program.Instructions.push_back({.Type = Kind::VOLTAGE, .Net = std::string(text)});
+        return {};
     }
 
     Step ParseCurrent() {
@@ -238,18 +266,6 @@ private:
         m_Program.Instructions.push_back(
             {.Type = Kind::CURRENT, .Current = std::string(m_Text.substr(start, m_Position - start))});
         return Expect(')');
-    }
-
-    std::optional<int> ReadNode() {
-        SkipSpaces();
-        const std::size_t start = m_Position;
-        while (m_Position < m_Text.size() && std::isdigit(static_cast<unsigned char>(m_Text[m_Position])) != 0) {
-            ++m_Position;
-        }
-        if (m_Position == start) {
-            return std::nullopt;
-        }
-        return std::stoi(std::string(m_Text.substr(start, m_Position - start)));
     }
 
     std::string ReadWord() {
@@ -334,17 +350,39 @@ StackEntry ApplyBinary(StackEntry first, const StackEntry &second, const Operati
 
 /**
  * @brief   Compiles an expression typed by the user.
- * @param[in] text  Expression such as V(1)-V(2), V(3)*I(R1), V(1,2), abs(I(D1)), ddt(V(2)) or integ(I(C1)); numbers
- *                  take SPICE suffixes, and names of functions, V and I ignore case.
+ * @param[in] text  Expression such as V(1)-V(2), V(OUT)*I(R1), V(1,2), abs(I(D1)), ddt(V(2)) or integ(I(C1));
+ *                  numbers take SPICE suffixes, and names of functions, V and I ignore case.
  * @return  The compiled program, or a message saying what is wrong and where.
+ * @note    Net names are kept as written; ResolveNetNames() finds their nodes before the program is evaluated.
  */
 std::expected<MathProgram, std::string> CompileExpression(const std::string_view text) {
     return Parser(text).Parse();
 }
 
 /**
+ * @brief   Turns the net names of a compiled expression into the nodes they have in the circuit now.
+ * @param[in] program    Compiled expression.
+ * @param[in] find_node  Finds the node of a net name.
+ * @return  The program with every voltage on a node number, or an error naming a net the circuit no longer has.
+ */
+std::expected<MathProgram, std::string> ResolveNetNames(MathProgram program, const NetResolver &find_node) {
+    for (MathInstruction &instruction : program.Instructions) {
+        if (instruction.Type != Kind::VOLTAGE || instruction.Net.empty()) {
+            continue;
+        }
+        const std::optional<int> node = find_node(instruction.Net);
+        if (!node) {
+            return std::unexpected(std::format("The circuit has no net named {}", instruction.Net));
+        }
+        instruction.Node = *node;
+        instruction.Net.clear();
+    }
+    return program;
+}
+
+/**
  * @brief   Evaluates a compiled expression over every sample of a result.
- * @param[in] program        Compiled expression.
+ * @param[in] program        Compiled expression, with its net names resolved.
  * @param[in] xs             X value of each sample: times, or the values of a swept source.
  * @param[in] x_unit         Unit of the X values, which derivatives divide by and integrals multiply by.
  * @param[in] node_voltages  Voltage of each node at each sample, indexed by node number.
@@ -364,6 +402,9 @@ std::expected<MathResult, std::string> EvaluateExpression(const MathProgram &pro
             stack.push_back({std::vector<double>(count, instruction.Number), {}, true});
             continue;
         case Kind::VOLTAGE:
+            if (!instruction.Net.empty()) {
+                return std::unexpected(std::format("The net {} was not resolved to a node", instruction.Net));
+            }
             if (instruction.Node < 0 || static_cast<std::size_t>(instruction.Node) >= node_voltages.size()) {
                 return std::unexpected(std::format("The circuit has no node {}", instruction.Node));
             }

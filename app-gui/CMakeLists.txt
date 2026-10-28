@@ -24,6 +24,7 @@ add_library(imcsim-gui-lib
             led_glow.cpp
             live_input.cpp
             logic_trace.cpp
+            math_channel.cpp
             math_channels.cpp
             node_colors.cpp
             parameter_step.cpp

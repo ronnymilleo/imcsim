@@ -28,12 +28,6 @@ constexpr auto MATH_COLORS = std::to_array<ImU32>({
 // Widths in the math editor, in font sizes
 constexpr float OPERAND_WIDTH = 10.0f;
 constexpr float EXPRESSION_WIDTH = 20.0f;
-constexpr auto MATH_OPERATORS = std::to_array<MathOperator>({
-    MathOperator::ADD,
-    MathOperator::SUBTRACT,
-    MathOperator::MULTIPLY,
-    MathOperator::DIVIDE,
-});
 
 // Voltages and currents share the axes of the probed traces; any other unit, or none, goes on the third axis
 ImAxis AxisForUnit(const Dimension unit) {
@@ -46,68 +40,66 @@ ImAxis AxisForUnit(const Dimension unit) {
     return ImAxis_Y3;
 }
 
-std::string GetChannelExpression(const MathChannel &channel) {
-    if (channel.UsesExpression) {
-        return channel.Expression;
-    }
-    return BuildOperatorExpression(channel.First, channel.Operator, channel.Second);
-}
-
-void CompileChannel(MathChannel &channel) {
-    channel.Program = CompileExpression(GetChannelExpression(channel));
-}
-
-// Returns whether the user picked another trace
-bool DrawOperandCombo(const char *id, std::string &operand, const std::vector<std::string> &operands) {
-    bool changed = false;
+void DrawOperandCombo(const char *id, std::string &operand, const std::vector<std::string> &operands) {
     ImGui::SetNextItemWidth(ImGui::GetFontSize() * OPERAND_WIDTH);
     if (ImGui::BeginCombo(id, operand.empty() ? "(none)" : operand.c_str())) {
         for (const std::string &candidate : operands) {
             if (ImGui::Selectable(candidate.c_str(), candidate == operand)) {
                 operand = candidate;
-                changed = true;
             }
         }
         ImGui::EndCombo();
     }
-    return changed;
 }
 
 } // namespace
 
 /**
- * @brief   Draws the list of channels: each shows its check box, an Edit button and, when its expression does not
- *          compile, a warning mark. Add creates a channel and opens its editor right away.
- * @param[in] operands  Traces a channel may combine, such as "V(2)" or "I(R1)".
+ * @brief   Creates the panel of the math channels of a schematic.
+ * @param[in,out] schematic  Schematic that keeps the channels; it must outlive the panel.
+ */
+MathChannels::MathChannels(Schematic &schematic) : m_Schematic(schematic) {
+}
+
+/**
+ * @brief   Draws the list of channels: each shows its check box and an Edit button. A channel whose expression does
+ *          not compile, or names a net the circuit no longer has, reads in the error color, with the reason in its
+ *          tooltip. Add creates a channel and opens its editor right away.
+ * @param[in] operands  Traces a channel may combine, such as "V(2)", "V(OUT)" or "I(R1)".
  */
 void MathChannels::Draw(const std::vector<std::string> &operands) {
     ImGui::TextDisabled("Math");
+    std::vector<MathChannel> channels = m_Schematic.GetMathChannels();
+    const NetResolver find_node = GetNetResolver();
     bool open_new_editor = false;
     if (ImGui::SmallButton("Add")) {
-        MathChannel channel;
-        channel.Name = std::format("M{}", m_NextNumber++);
+        MathChannel channel{.Name = GetNextChannelName(channels)};
         channel.First = operands.empty() ? "" : operands.front();
         channel.Second = operands.size() > 1 ? operands[1] : channel.First;
-        CompileChannel(channel);
-        m_Channels.push_back(std::move(channel));
+        channels.push_back(std::move(channel));
         open_new_editor = true;
     }
     std::optional<std::size_t> removed;
-    for (std::size_t index = 0; index < m_Channels.size(); ++index) {
-        MathChannel &channel = m_Channels[index];
+    for (std::size_t index = 0; index < channels.size(); ++index) {
+        MathChannel &channel = channels[index];
         ImGui::PushID(static_cast<int>(index));
+        // The list is as narrow as the trace names, so a mark after the Edit button would be cut off; the name of a
+        // channel in error takes the error color instead
+        const auto program = CompileChannel(channel, find_node);
         ImGui::PushStyleColor(ImGuiCol_CheckMark, AdaptToBackground(MATH_COLORS[index % MATH_COLORS.size()]));
-        ImGui::Checkbox(channel.Name.c_str(), &channel.Shown);
-        ImGui::PopStyleColor();
-        ImGui::SetItemTooltip("%s", GetChannelExpression(channel).c_str());
-        ImGui::SameLine();
-        if (ImGui::SmallButton("Edit") || (open_new_editor && index + 1 == m_Channels.size())) {
-            ImGui::OpenPopup("math_editor");
+        if (!program) {
+            ImGui::PushStyleColor(ImGuiCol_Text, GetErrorTextColor());
         }
-        if (!channel.Program) {
-            ImGui::SameLine();
-            ImGui::TextColored(GetErrorTextColor(), "!");
-            ImGui::SetItemTooltip("%s", channel.Program.error().c_str());
+        ImGui::Checkbox(channel.Name.c_str(), &channel.Shown);
+        ImGui::PopStyleColor(program ? 1 : 2);
+        if (program) {
+            ImGui::SetItemTooltip("%s", GetChannelExpression(channel).c_str());
+        } else {
+            ImGui::SetItemTooltip("%s\n%s", GetChannelExpression(channel).c_str(), program.error().c_str());
+        }
+        ImGui::SameLine();
+        if (ImGui::SmallButton("Edit") || (open_new_editor && index + 1 == channels.size())) {
+            ImGui::OpenPopup("math_editor");
         }
         if (ImGui::BeginPopup("math_editor")) {
             if (!DrawEditor(channel, operands)) {
@@ -118,7 +110,10 @@ void MathChannels::Draw(const std::vector<std::string> &operands) {
         ImGui::PopID();
     }
     if (removed) {
-        m_Channels.erase(m_Channels.begin() + static_cast<std::ptrdiff_t>(*removed));
+        channels.erase(channels.begin() + static_cast<std::ptrdiff_t>(*removed));
+    }
+    if (channels != m_Schematic.GetMathChannels()) {
+        m_Schematic.SetMathChannels(std::move(channels));
     }
 }
 
@@ -127,18 +122,19 @@ void MathChannels::Draw(const std::vector<std::string> &operands) {
  * @return  True when the user has added none, or removed them all.
  */
 bool MathChannels::IsEmpty() const {
-    return m_Channels.empty();
+    return m_Schematic.GetMathChannels().empty();
 }
 
 /**
  * @brief   Describes the channels, so a result evaluated with them can tell whether they changed since.
  * @return  A text that differs whenever a channel is added, removed, shown or hidden, renamed or edited.
+ * @note    The nodes its net names stand for are not part of it: an edit that numbers the nodes again also drops the
+ *          results the channels were evaluated over.
  */
 std::string MathChannels::GetSignature() const {
     std::string signature;
-    for (const MathChannel &channel : m_Channels) {
-        signature += std::format("{}|{}|{}|{};", channel.Name, channel.Shown, GetChannelExpression(channel),
-                                 channel.Program.has_value());
+    for (const MathChannel &channel : m_Schematic.GetMathChannels()) {
+        signature += std::format("{}|{}|{};", channel.Name, channel.Shown, GetChannelExpression(channel));
     }
     return signature;
 }
@@ -149,7 +145,7 @@ std::string MathChannels::GetSignature() const {
  * @param[in]  x_unit         Unit of the X values, which ddt() and integ() take into the unit of their result.
  * @param[in]  node_voltages  Voltage of every node at every X value, ground first.
  * @param[in]  currents       Currents of the result, which I(name) reads.
- * @param[out] errors         Gets a line for each channel that names a node or part the result lacks.
+ * @param[out] errors         Gets a line for each channel that names a net, node or part the result lacks.
  * @return  The traces of the shown channels that compile and evaluate; the others are left out.
  */
 std::vector<MathTrace> MathChannels::Evaluate(const std::span<const double> xs, const Dimension x_unit,
@@ -157,12 +153,21 @@ std::vector<MathTrace> MathChannels::Evaluate(const std::span<const double> xs, 
                                               const std::vector<Core::ComponentTrace> &currents,
                                               std::vector<std::string> &errors) const {
     std::vector<MathTrace> traces;
-    for (std::size_t index = 0; index < m_Channels.size(); ++index) {
-        const MathChannel &channel = m_Channels[index];
-        if (!channel.Shown || !channel.Program) {
+    const std::vector<MathChannel> &channels = m_Schematic.GetMathChannels();
+    const NetResolver find_node = GetNetResolver();
+    for (std::size_t index = 0; index < channels.size(); ++index) {
+        const MathChannel &channel = channels[index];
+        // A channel that does not compile has its mark in the panel and nothing to add here
+        const std::expected<MathProgram, std::string> compiled = CompileExpression(GetChannelExpression(channel));
+        if (!channel.Shown || !compiled) {
             continue;
         }
-        auto result = EvaluateExpression(*channel.Program, xs, x_unit, node_voltages, currents);
+        const std::expected<MathProgram, std::string> program = ResolveNetNames(*compiled, find_node);
+        if (!program) {
+            errors.push_back(std::format("{}: {}", channel.Name, program.error()));
+            continue;
+        }
+        auto result = EvaluateExpression(*program, xs, x_unit, node_voltages, currents);
         if (!result) {
             errors.push_back(std::format("{}: {}", channel.Name, result.error()));
             continue;
@@ -176,29 +181,33 @@ std::vector<MathTrace> MathChannels::Evaluate(const std::span<const double> xs, 
     return traces;
 }
 
+// Net names are looked up in the connectivity of the moment, which the schematic keeps up to date
+NetResolver MathChannels::GetNetResolver() const {
+    return [&schematic = m_Schematic](const std::string_view net) {
+        return schematic.GetConnectivity().FindNodeOfNet(net);
+    };
+}
+
 // Like the math menu of an oscilloscope: two traces and an operator button, or a typed expression. Switching to
 // an expression starts from the operation, so it can be extended. Returns false when the channel is removed
-bool MathChannels::DrawEditor(MathChannel &channel, const std::vector<std::string> &operands) {
+bool MathChannels::DrawEditor(MathChannel &channel, const std::vector<std::string> &operands) const {
     ImGui::TextUnformatted(channel.Name.c_str());
-    bool changed = false;
     if (ImGui::RadioButton("Operation", !channel.UsesExpression)) {
         channel.UsesExpression = false;
-        changed = true;
     }
     ImGui::SameLine();
     if (ImGui::RadioButton("Expression", channel.UsesExpression) && !channel.UsesExpression) {
         channel.Expression = GetChannelExpression(channel);
         channel.UsesExpression = true;
-        changed = true;
     }
 
     if (channel.UsesExpression) {
         ImGui::SetNextItemWidth(ImGui::GetFontSize() * EXPRESSION_WIDTH);
-        changed |= ImGui::InputText("##expression", &channel.Expression);
-        ImGui::TextDisabled("V(2), V(1,2), I(R1), I(Q1.C), numbers such as 1k");
+        ImGui::InputText("##expression", &channel.Expression);
+        ImGui::TextDisabled("V(2), V(OUT), V(1,2), I(R1), I(Q1.C), numbers such as 1k");
         ImGui::TextDisabled("+ - * / ( ), abs(), sqrt(), ddt() and integ()");
     } else {
-        changed |= DrawOperandCombo("##first", channel.First, operands);
+        DrawOperandCombo("##first", channel.First, operands);
         for (std::size_t index = 0; index < MATH_OPERATORS.size(); ++index) {
             const MathOperator math_operator = MATH_OPERATORS[index];
             if (index > 0) {
@@ -207,16 +216,12 @@ bool MathChannels::DrawEditor(MathChannel &channel, const std::vector<std::strin
             const char *symbol = GetOperatorSymbol(math_operator);
             if (channel.Operator == math_operator ? PrimaryButton(symbol) : ImGui::Button(symbol)) {
                 channel.Operator = math_operator;
-                changed = true;
             }
         }
-        changed |= DrawOperandCombo("##second", channel.Second, operands);
+        DrawOperandCombo("##second", channel.Second, operands);
     }
-    if (changed) {
-        CompileChannel(channel);
-    }
-    if (!channel.Program) {
-        ImGui::TextColored(GetErrorTextColor(), "%s", channel.Program.error().c_str());
+    if (const auto program = CompileChannel(channel, GetNetResolver()); !program) {
+        ImGui::TextColored(GetErrorTextColor(), "%s", program.error().c_str());
     }
     ImGui::Separator();
     if (ImGui::Button("Remove")) {
