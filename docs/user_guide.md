@@ -102,8 +102,12 @@ How to read what imcsim measures, plots and exports. The [README](../README.md) 
   the list of analyses (operating point, transient, AC sweep, DC sweep, noise, transfer function and truth table) and the settings
   of the one picked, saved with the schematic. Suggest fills the transient times (five periods of the slowest source with a waveform, 200
   points in a period of the fastest) or the AC range (two decades past the RC, RL and LC corners and the op-amp
-  bandwidths). Nothing runs by itself: edit the circuit, then run again. View > Analysis Settings keeps the same
-  settings open in a window.
+  bandwidths). By default nothing runs by itself: edit the circuit, then run again, or turn on Run again after edits
+  in Edit > Preferences. With it on, once you have run the selected analysis, each change to the circuit (a value, a
+  part added, moved or deleted, an undo) runs it again half a second after the edit is over: while a value is being
+  typed or something dragged it waits, a burst of edits runs it once, and a run still going on is stopped first.
+  Opening another schematic does not run anything, and a live run already follows the parts set by hand. View >
+  Analysis Settings keeps the same settings open in a window.
 - **Stopping**: a run goes on in the background, so the editor stays usable. The ▶ button becomes a ■ Stop button, and the
   status bar shows the run and, for a stepped analysis or a truth table, how much of it is done. A transient runs in
   chunks: its plot opens in the Output window with the first one and grows as the others arrive, with a Stop button
@@ -126,8 +130,8 @@ How to read what imcsim measures, plots and exports. The [README](../README.md) 
   Preferences) and View (fit, wire colors, live effects, theme, and the windows). On macOS the shortcuts use Cmd where
   this guide says Ctrl: Cmd+S saves, Cmd+Z undoes.
 - **Preferences**: Edit > Preferences (Ctrl+,) gathers your own choices, whatever schematic is open: the theme, IEC
-  or ANSI symbols, terminal numbers, wire colors, live effects, the series of standard values and whether a new result
-  brings the Output window to the front. A change applies at once and is kept between sessions; Restore Defaults
+  or ANSI symbols, terminal numbers, wire colors, live effects, the series of standard values, whether a new result
+  brings the Output window to the front and whether the analysis runs again after edits. A change applies at once and is kept between sessions; Restore Defaults
   sets them all back. Wire colors, live effects and the theme also have shortcuts in the View menu. The choices are
   kept in `preferences.json` in your data folder (`~/.local/share/imcsim` on Linux, `~/Library/Application
   Support/imcsim` on macOS, `%APPDATA%\imcsim` on Windows), which can be copied to another computer or deleted to
