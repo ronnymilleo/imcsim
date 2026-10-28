@@ -49,9 +49,9 @@ How to read what imcsim measures, plots and exports. The [README](../README.md) 
   while high and a 0 while low, and both start low. It is a source from its terminal to ground, so it gives a gate
   input or a latch's SET or RESET a defined level to start from. A circuit of only logic parts, clocks, logic inputs and VCC
   runs without a Ground symbol or a load on the outputs; add a Ground as soon as it has any other part.
-- **Standard values**: View > Component Values restricts resistors, capacitors and inductors to one of the E series
-  (E6, E12, E24, E48, E96 or E192, with their tolerances of 20% down to 0.5%), or leaves any value allowed, which is
-  the default. With a series chosen, a typed value becomes the nearest one of the series on a log scale (`5000` is
+- **Standard values**: Standard values in Edit > Preferences restricts resistors, capacitors and inductors to one of
+  the E series (E6, E12, E24, E48, E96 or E192, with their tolerances of 20% down to 0.5%), or leaves any value
+  allowed, which is the default. With a series chosen, a typed value becomes the nearest one of the series on a log scale (`5000` is
   4.7k in E12), and the arrow buttons beside the value, the up and down keys and the mouse wheel over the field step
   to the next or previous standard value, into the next decade at the ends. A part keeps a value outside the series
   until you edit it, and the sources, gains and parameters of the other parts are never restricted. The choice is a
@@ -122,15 +122,22 @@ How to read what imcsim measures, plots and exports. The [README](../README.md) 
 - **Status bar**: below the schematic, the keys of the current mode on the left; on the right, the grid position of
   the cursor and how the last run went ("Transient done", with warnings, or failed). Click the result for the
   errors, the warnings and the ngspice output.
-- **Menus**: File (files, import, examples and the schematic export), Edit (undo, redo and changes to the selection) and
-  View (fit, wire colors, symbol style, terminal numbers, theme, and the windows). The View choices are kept between
-  sessions. On macOS the shortcuts use Cmd where this guide says Ctrl: Cmd+S saves, Cmd+Z undoes.
+- **Menus**: File (files, import, examples and the schematic export), Edit (undo, redo, changes to the selection and
+  Preferences) and View (fit, wire colors, live effects, theme, and the windows). On macOS the shortcuts use Cmd where
+  this guide says Ctrl: Cmd+S saves, Cmd+Z undoes.
+- **Preferences**: Edit > Preferences (Ctrl+,) gathers your own choices, whatever schematic is open: the theme, IEC
+  or ANSI symbols, terminal numbers, wire colors, live effects, the series of standard values and whether a new result
+  brings the Output window to the front. A change applies at once and is kept between sessions; Restore Defaults
+  sets them all back. Wire colors, live effects and the theme also have shortcuts in the View menu. The choices are
+  kept in `preferences.json` in your data folder (`~/.local/share/imcsim` on Linux, `~/Library/Application
+  Support/imcsim` on macOS, `%APPDATA%\imcsim` on Windows), which can be copied to another computer or deleted to
+  start over; what belongs to a circuit, such as the simulation settings, stays in its file.
 - **Themes**: View > Theme switches between nine themes, seven dark (Graphite, the default, Ember, Phosphor,
   Oscilloscope, Cyber Slate, Blueprint and Amber) and two light (Paper and Vintage); [Themes](themes.md) shows each
   one. Node and trace colors keep their hues in every theme: the light themes darken them to read on their
   background, and Phosphor, Oscilloscope, Cyber Slate, Blueprint and Amber brighten them.
 - **Output window**: hidden until an analysis runs; it then comes to the front on the tab of the new result. Turn
-  off View > Bring Output to Front on Results to keep the schematic in front: a dot on the Output tab then tells a
+  off Bring Output to front in Edit > Preferences to keep the schematic in front: a dot on the Output tab then tells a
   new result is waiting. The operating point tab lists the node voltages and part currents, which also show on the schematic. Reopen it from View.
 - **Window layout**: every window floats or docks. Drag a window by its title (or a docked one by its tab) onto
   the arrows that appear over another window to dock it on that side or as a tab; drop it anywhere else to let it
@@ -219,7 +226,7 @@ shows, an operating point or an instant of a transient, so they show nothing unt
 ## Terminals
 
 Every part with more than one terminal numbers them in the order the SPICE netlist lists them. Turn on
-**View > Terminal Numbers** to show the numbers, each beside a small ring at its terminal.
+**Terminal numbers** in Edit > Preferences to show the numbers, each beside a small ring at its terminal.
 
 | Part | Terminal 1 | Terminal 2 | Terminal 3 |
 |---|---|---|---|

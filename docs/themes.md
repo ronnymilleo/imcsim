@@ -1,10 +1,10 @@
 # Themes
 
-imcsim has nine color themes, seven dark and two light. View > Theme switches between them, and the choice is kept
-between sessions in `imgui.ini`. A theme colors the interface, the schematic canvas and the plots; the node and trace
-colors keep their hues in every theme, so a trace is easy to find again after switching. The light themes darken them
-to read on their background, and Phosphor, Oscilloscope, Cyber Slate, Blueprint and Amber brighten them to stand out
-on their darker ones.
+imcsim has nine color themes, seven dark and two light. View > Theme or Edit > Preferences switches between them,
+and the choice is kept between sessions in `preferences.json`. A theme colors the interface, the schematic canvas and
+the plots; the node and trace colors keep their hues in every theme, so a trace is easy to find again after switching.
+The light themes darken them to read on their background, and Phosphor, Oscilloscope, Cyber Slate, Blueprint and
+Amber brighten them to stand out on their darker ones.
 
 Every theme below shows the same circuit, the "Small-signal model of a BJT" example from File > Examples: the
 schematic, then the Output window with its AC sweep.
