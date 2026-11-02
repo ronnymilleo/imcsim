@@ -6,6 +6,8 @@ add_library(imcsim-core-lib
         STATIC
             analysis_suggestions.cpp
             circuit.cpp
+            circuit_checks.cpp
+            circuit_copy.cpp
             components/bjt.cpp
             components/capacitor.cpp
             components/clock.cpp
@@ -29,9 +31,19 @@ add_library(imcsim-core-lib
             components/vcc.cpp
             components/voltage_controlled_switch.cpp
             components/voltage_source.cpp
+            live_change.cpp
+            ngspice_backend.cpp
+            ngspice_library.cpp
+            ngspice_readers.cpp
+            ratings.cpp
+            run_control.cpp
+            simulation_backend.cpp
+            simulation_results.cpp
+            simulation_service.cpp
             simulator.cpp
             spice_value.cpp
             standard_values.cpp
+            stepped_circuit.cpp
 )
 
 target_include_directories(imcsim-core-lib
@@ -70,7 +82,12 @@ else()
     endif()
 endif()
 
+# The simulation service runs jobs on a worker thread
+find_package(Threads REQUIRED)
+
 target_link_libraries(imcsim-core-lib
+        PUBLIC
+            Threads::Threads
         PRIVATE
             ${NGSPICE_LINK_TARGET}
 )

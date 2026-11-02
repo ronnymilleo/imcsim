@@ -21,7 +21,7 @@ float HeatBrightness(const double power, const double largest_power) {
     if (power <= 0.0) {
         return 0.0f;
     }
-    return std::clamp(LogarithmicLevel(power, largest_power, HeatGlowDecades), 0.0f, 1.0f);
+    return std::clamp(LogarithmicLevel(power, largest_power, HEAT_GLOW_DECADES), 0.0f, 1.0f);
 }
 
 /**
@@ -37,7 +37,7 @@ std::vector<HeatGlow> ComputeHeatGlows(const std::vector<std::unique_ptr<UIEleme
     std::vector<HeatGlow> glows;
     for (const auto &element : elements) {
         const Core::Component &component = element->GetComponent();
-        if (component.GetType() != Core::ComponentType::Resistor) {
+        if (component.GetType() != Core::ComponentType::RESISTOR) {
             continue;
         }
         const auto power = std::ranges::find(powers, component.GetName(), &ComponentPower::Name);

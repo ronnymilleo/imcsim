@@ -16,11 +16,11 @@ namespace {
 
 // The lead ends at the foot of a small circle, which no other symbol uses on a lead, so a label is not taken for a
 // supply rail
-constexpr float LeadLength = 0.7f;
-constexpr float CircleRadius = 0.4f;
-constexpr float CircleTop = LeadLength + 2.0f * CircleRadius;
+constexpr float LEAD_LENGTH = 0.7f;
+constexpr float CIRCLE_RADIUS = 0.4f;
+constexpr float CIRCLE_TOP = LEAD_LENGTH + 2.0f * CIRCLE_RADIUS;
 // The name starts a little past the top of the circle
-constexpr float LabelOffset = CircleTop + 0.2f;
+constexpr float LABEL_OFFSET = CIRCLE_TOP + 0.2f;
 
 } // namespace
 
@@ -34,20 +34,20 @@ UINetLabel::UINetLabel(const GridPoint position, const Rotation rotation)
 }
 
 void UINetLabel::DrawTerminals(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color) const {
-    canvas.AddLine(LocalToScreen(view, 0, 0), LocalToScreen(view, 0, -LeadLength), color, LineThickness);
+    canvas.AddLine(LocalToScreen(view, 0, 0), LocalToScreen(view, 0, -LEAD_LENGTH), color, LINE_THICKNESS);
 }
 
 void UINetLabel::DrawSymbol(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color,
                             SymbolStyle /*style*/) const {
-    const ImVec2 center = LocalToScreen(view, 0, -(LeadLength + CircleRadius));
-    const ImVec2 radius_offset = LocalToScreen(view, CircleRadius, -(LeadLength + CircleRadius)) - center;
-    canvas.AddCircle(center, std::hypot(radius_offset.x, radius_offset.y), color, 0, LineThickness);
+    const ImVec2 center = LocalToScreen(view, 0, -(LEAD_LENGTH + CIRCLE_RADIUS));
+    const ImVec2 radius_offset = LocalToScreen(view, CIRCLE_RADIUS, -(LEAD_LENGTH + CIRCLE_RADIUS)) - center;
+    canvas.AddCircle(center, std::hypot(radius_offset.x, radius_offset.y), color, 0, LINE_THICKNESS);
 }
 
 // The name of the net stands where parts show their name; a label with none shows a question mark
 void UINetLabel::DrawLabels(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color) const {
     const std::string &net = static_cast<const Core::NetLabel &>(GetComponent()).GetNet();
-    DrawLabel(canvas, view, {0.0f, -LabelOffset}, {0.0f, -1.0f}, net.empty() ? "?" : net, color);
+    DrawLabel(canvas, view, {0.0f, -LABEL_OFFSET}, {0.0f, -1.0f}, net.empty() ? "?" : net, color);
 }
 
 std::vector<GridPoint> UINetLabel::GetLocalTerminals() const {
@@ -60,7 +60,7 @@ GridPoint UINetLabel::GetLocalTerminalInward(std::size_t /*terminal*/) const {
 }
 
 LocalBounds UINetLabel::GetLocalBounds() const {
-    return {{-CircleRadius, -CircleTop}, {CircleRadius, 0.0f}};
+    return {{-CIRCLE_RADIUS, -CIRCLE_TOP}, {CIRCLE_RADIUS, 0.0f}};
 }
 
 } // namespace GUI

@@ -7,6 +7,7 @@
 #define IMCSIM_BJT_H
 
 #include "component.h"
+#include <memory>
 #include <span>
 #include <string>
 #include <string_view>
@@ -55,7 +56,7 @@ struct BJTModel {
     ComponentType Type;
 };
 
-inline constexpr const char *CustomBJTModelName = "Custom";
+inline constexpr const char *CUSTOM_BJT_MODEL_NAME = "Custom";
 
 /**
  * @class   BJT
@@ -67,6 +68,9 @@ class BJT : public Component {
 public:
     explicit BJT(ComponentType type);
     ~BJT() override = default;
+
+    // Copying
+    std::unique_ptr<Component> Clone() const override;
 
     // Ready model
     const BJTModel *GetModel() const;

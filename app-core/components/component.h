@@ -6,6 +6,7 @@
 #ifndef IMCSIM_COMPONENT_H
 #define IMCSIM_COMPONENT_H
 
+#include <memory>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -18,15 +19,15 @@ namespace Core {
  * @brief   Kinds of circuit components the simulator supports.
  */
 enum class ComponentType {
-    Resistor,
-    Capacitor,
-    Inductor,
-    Ground,
+    RESISTOR,
+    CAPACITOR,
+    INDUCTOR,
+    GROUND,
     VCC,
-    VoltageSource,
-    CurrentSource,
-    Diode,
-    ZenerDiode,
+    VOLTAGE_SOURCE,
+    CURRENT_SOURCE,
+    DIODE,
+    ZENER_DIODE,
     LED,
     NPN,
     PNP,
@@ -36,28 +37,28 @@ enum class ComponentType {
     VCCS,
     CCCS,
     CCVS,
-    OpAmp,
-    NetLabel,
-    Potentiometer,
-    Switch,
-    PushButton,
-    VSwitch,
-    Relay,
-    Transformer,
-    And,
-    Or,
-    Not,
-    Nand,
-    Nor,
-    Xor,
-    Xnor,
-    Buffer,
-    DFlipFlop,
-    JKFlipFlop,
-    TFlipFlop,
-    SRFlipFlop,
-    Clock,
-    LogicInput,
+    OP_AMP,
+    NET_LABEL,
+    POTENTIOMETER,
+    SWITCH,
+    PUSH_BUTTON,
+    V_SWITCH,
+    RELAY,
+    TRANSFORMER,
+    AND,
+    OR,
+    NOT,
+    NAND,
+    NOR,
+    XOR,
+    XNOR,
+    BUFFER,
+    D_FLIP_FLOP,
+    JK_FLIP_FLOP,
+    T_FLIP_FLOP,
+    SR_FLIP_FLOP,
+    CLOCK,
+    LOGIC_INPUT,
 };
 
 /**
@@ -77,6 +78,9 @@ class Component {
 public:
     Component(ComponentType type, double value);
     virtual ~Component() = default;
+
+    // Copying
+    virtual std::unique_ptr<Component> Clone() const = 0;
 
     // Kind of component
     ComponentType GetType() const;

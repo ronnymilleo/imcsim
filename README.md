@@ -168,7 +168,8 @@ Windows 10 version 1903 or newer, x64: download `imcsim-<version>-windows-x64.zi
 
 ### Settings
 
-The layout, theme and view preferences are kept in `imgui.ini`, in `~/.local/share/imcsim` on Linux,
+Edit > Preferences keeps your choices (theme, symbols, wire colors, live effects, standard values) in
+`preferences.json`, and the window layout is kept in `imgui.ini`, both in `~/.local/share/imcsim` on Linux,
 `~/Library/Application Support/imcsim` on macOS and `%APPDATA%\imcsim` on Windows.
 
 ## Build

@@ -7,6 +7,7 @@
 #define IMCSIM_NET_LABEL_H
 
 #include "component.h"
+#include <memory>
 #include <string>
 #include <string_view>
 
@@ -23,6 +24,8 @@ class NetLabel : public Component {
 public:
     NetLabel();
     ~NetLabel() override = default;
+
+    std::unique_ptr<Component> Clone() const override;
 
     const std::string &GetNet() const;
     void SetNet(std::string net);

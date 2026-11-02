@@ -18,9 +18,9 @@ namespace GUI {
 namespace {
 
 // Labels sit just outside the tallest two-terminal symbol, which spans y = -0.8 to 0.8
-constexpr float LabelOffset = 1.0f;
+constexpr float LABEL_OFFSET = 1.0f;
 // Room, in grid units, between the symbol bounds and the outline that marks it
-constexpr float OutlinePadding = 0.15f;
+constexpr float OUTLINE_PADDING = 0.15f;
 
 } // namespace
 
@@ -77,13 +77,13 @@ void UIElement::DrawIcon(SchematicCanvas &canvas, const ImVec2 center, const flo
  */
 void UIElement::DrawOutline(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color) const {
     const LocalBounds bounds = GetLocalBounds();
-    const float left = bounds.Min.x - OutlinePadding;
-    const float top = bounds.Min.y - OutlinePadding;
-    const float right = bounds.Max.x + OutlinePadding;
-    const float bottom = bounds.Max.y + OutlinePadding;
+    const float left = bounds.Min.x - OUTLINE_PADDING;
+    const float top = bounds.Min.y - OUTLINE_PADDING;
+    const float right = bounds.Max.x + OUTLINE_PADDING;
+    const float bottom = bounds.Max.y + OUTLINE_PADDING;
     const std::array<ImVec2, 4> corners = {LocalToScreen(view, left, top), LocalToScreen(view, right, top),
                                            LocalToScreen(view, right, bottom), LocalToScreen(view, left, bottom)};
-    canvas.AddPolyline(corners.data(), static_cast<int>(corners.size()), color, ImDrawFlags_Closed, LineThickness);
+    canvas.AddPolyline(corners.data(), static_cast<int>(corners.size()), color, ImDrawFlags_Closed, LINE_THICKNESS);
 }
 
 /**
@@ -221,8 +221,8 @@ bool UIElement::Intersects(const ImVec2 min, const ImVec2 max) const {
  * @param[in] color      Line color.
  */
 void UIElement::DrawTerminals(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color) const {
-    canvas.AddLine(LocalToScreen(view, -2, 0), LocalToScreen(view, -1, 0), color, LineThickness);
-    canvas.AddLine(LocalToScreen(view, 1, 0), LocalToScreen(view, 2, 0), color, LineThickness);
+    canvas.AddLine(LocalToScreen(view, -2, 0), LocalToScreen(view, -1, 0), color, LINE_THICKNESS);
+    canvas.AddLine(LocalToScreen(view, 1, 0), LocalToScreen(view, 2, 0), color, LINE_THICKNESS);
 }
 
 /**
@@ -232,9 +232,9 @@ void UIElement::DrawTerminals(SchematicCanvas &canvas, const ViewTransform &view
  * @param[in] color      Text color.
  */
 void UIElement::DrawLabels(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color) const {
-    DrawLabel(canvas, view, {0.0f, -LabelOffset}, {0.0f, -1.0f}, m_Component->GetName(), color);
+    DrawLabel(canvas, view, {0.0f, -LABEL_OFFSET}, {0.0f, -1.0f}, m_Component->GetName(), color);
     if (m_Component->HasValue()) {
-        DrawLabel(canvas, view, {0.0f, LabelOffset}, {0.0f, 1.0f}, Core::FormatValue(m_Component->GetValue()), color);
+        DrawLabel(canvas, view, {0.0f, LABEL_OFFSET}, {0.0f, 1.0f}, Core::FormatValue(m_Component->GetValue()), color);
     }
 }
 
@@ -281,8 +281,8 @@ void UIElement::DrawLabel(SchematicCanvas &canvas, const ViewTransform &view, co
     // The local direction is one grid unit long, so its length on screen is the current zoom
     const ImVec2 offset = step - anchor;
     const float zoom = std::hypot(offset.x, offset.y);
-    const float font_size = zoom * LabelScale;
-    if (font_size < MinLabelSize) {
+    const float font_size = zoom * LABEL_SCALE;
+    if (font_size < MIN_LABEL_SIZE) {
         return;
     }
 

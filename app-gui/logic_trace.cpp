@@ -21,13 +21,13 @@ namespace GUI {
  * @return  High at or above 70% of the level, low at or below 30% of it, and unknown in between.
  */
 LogicState ReadLogicState(const double voltage, const double logic_level) {
-    if (voltage >= logic_level * Core::LogicHighFraction) {
-        return LogicState::High;
+    if (voltage >= logic_level * Core::LOGIC_HIGH_FRACTION) {
+        return LogicState::HIGH;
     }
-    if (voltage <= logic_level * Core::LogicLowFraction) {
-        return LogicState::Low;
+    if (voltage <= logic_level * Core::LOGIC_LOW_FRACTION) {
+        return LogicState::LOW;
     }
-    return LogicState::Unknown;
+    return LogicState::UNKNOWN;
 }
 
 /**
@@ -37,11 +37,11 @@ LogicState ReadLogicState(const double voltage, const double logic_level) {
  */
 const char *GetLogicStateName(const LogicState state) {
     switch (state) {
-    case LogicState::Low:
+    case LogicState::LOW:
         return "0";
-    case LogicState::High:
+    case LogicState::HIGH:
         return "1";
-    case LogicState::Unknown:
+    case LogicState::UNKNOWN:
         break;
     }
     return "X";
@@ -56,19 +56,19 @@ const char *GetLogicStateName(const LogicState state) {
  *          between while unknown.
  */
 std::vector<double> BuildLane(const std::vector<double> &voltages, const double logic_level, const std::size_t lane) {
-    const double bottom = static_cast<double>(lane) * LaneStride;
+    const double bottom = static_cast<double>(lane) * LANE_STRIDE;
     std::vector<double> heights;
     heights.reserve(voltages.size());
     for (const double voltage : voltages) {
         switch (ReadLogicState(voltage, logic_level)) {
-        case LogicState::Low:
-            heights.push_back(bottom + LaneLowOffset);
+        case LogicState::LOW:
+            heights.push_back(bottom + LANE_LOW_OFFSET);
             break;
-        case LogicState::High:
-            heights.push_back(bottom + LaneHighOffset);
+        case LogicState::HIGH:
+            heights.push_back(bottom + LANE_HIGH_OFFSET);
             break;
-        case LogicState::Unknown:
-            heights.push_back(bottom + LaneUnknownOffset);
+        case LogicState::UNKNOWN:
+            heights.push_back(bottom + LANE_UNKNOWN_OFFSET);
             break;
         }
     }
@@ -130,11 +130,11 @@ std::vector<LogicSegment> FindLogicSegments(const std::span<const double> times,
 namespace {
 
 // A stretch shorter than this share of the typical one is a glitch, which does not set the width of a cell
-constexpr double GlitchShare = 0.2;
+constexpr double GLITCH_SHARE = 0.2;
 // Gaps this close to the shortest are the same width
-constexpr double SameWidth = 1.05;
+constexpr double SAME_WIDTH = 1.05;
 // Beyond this many cells in view they would be too narrow to label, so none are listed
-constexpr double MaxCells = 5000.0;
+constexpr double MAX_CELLS = 5000.0;
 
 // What the signal reads at the sample nearest a time
 LogicState ReadStateAt(const std::span<const double> times, const std::span<const double> voltages,
@@ -160,7 +160,7 @@ struct CellGrid {
 std::vector<LogicSegment> JoinDefiniteSegments(const std::vector<LogicSegment> &segments) {
     std::vector<LogicSegment> joined;
     for (const LogicSegment &segment : segments) {
-        if (segment.State == LogicState::Unknown) {
+        if (segment.State == LogicState::UNKNOWN) {
             continue;
         }
         if (!joined.empty() && joined.back().State == segment.State) {
@@ -198,7 +198,7 @@ CellGrid FindCellGrid(const std::span<const double> times, const std::span<const
     const double typical = durations.empty() ? whole.Width : durations[durations.size() / 2];
     std::vector<double> merged = {changes.front()};
     for (const double change : changes) {
-        if (change - merged.back() > typical * GlitchShare) {
+        if (change - merged.back() > typical * GLITCH_SHARE) {
             merged.push_back(change);
         }
     }
@@ -213,7 +213,7 @@ CellGrid FindCellGrid(const std::span<const double> times, const std::span<const
     double total = 0.0;
     int count = 0;
     for (const double gap : gaps) {
-        if (gap <= shortest * SameWidth) {
+        if (gap <= shortest * SAME_WIDTH) {
             total += gap;
             ++count;
         }
@@ -251,16 +251,16 @@ std::vector<std::vector<LogicSegment>> FindBitCells(const std::span<const double
     const double width = grid.Width;
     const double visible_from = std::max(from, first_time);
     const double visible_to = std::min(to, last_time);
-    if (!(width > 0.0) || !(visible_to > visible_from) || (visible_to - visible_from) / width > MaxCells) {
+    if (!(width > 0.0) || !(visible_to > visible_from) || (visible_to - visible_from) / width > MAX_CELLS) {
         return cells;
     }
     const double first_cell = std::floor((visible_from - start) / width);
     bool joins_next = false;
     for (double cell = first_cell;; cell += 1.0) {
         double cell_from = std::max(start + cell * width, first_time);
-        double cell_to = std::min(start + (cell + 1.0) * width, last_time);
+        const double cell_to = std::min(start + (cell + 1.0) * width, last_time);
         // What is left of a cell at either end of the samples is too narrow to read, so it joins its neighbor
-        if (cell_to - cell_from < width * GlitchShare) {
+        if (cell_to - cell_from < width * GLITCH_SHARE) {
             if (cell_to >= last_time) {
                 for (std::vector<LogicSegment> &lane : cells) {
                     if (!lane.empty()) {

@@ -15,7 +15,7 @@ namespace GUI {
 namespace {
 
 // Ground (node 0) uses the first one, the others cycle through the rest
-constexpr auto NodeColors = std::to_array<ImU32>({
+constexpr auto NODE_COLORS = std::to_array<ImU32>({
     IM_COL32(160, 160, 160, 255),
     IM_COL32(230, 120, 100, 255),
     IM_COL32(110, 170, 240, 255),
@@ -28,7 +28,7 @@ constexpr auto NodeColors = std::to_array<ImU32>({
 // Heat scale, the same in every theme, from the lowest value to the highest: blue, cyan, yellow, red. Each
 // neighbor pair blends without passing through gray or a dark purple, and every stop stays clear on dark and light
 // canvases alike
-constexpr auto HeatStops = std::to_array<ImVec4>({
+constexpr auto HEAT_STOPS = std::to_array<ImVec4>({
     {60.0f / 255.0f, 120.0f / 255.0f, 255.0f / 255.0f, 1.0f},
     {0.0f / 255.0f, 190.0f / 255.0f, 210.0f / 255.0f, 1.0f},
     {240.0f / 255.0f, 200.0f / 255.0f, 40.0f / 255.0f, 1.0f},
@@ -45,10 +45,10 @@ constexpr auto HeatStops = std::to_array<ImVec4>({
  */
 ImU32 GetNodeColor(const int node) {
     if (node == 0) {
-        return AdaptToBackground(NodeColors[0]);
+        return AdaptToBackground(NODE_COLORS[0]);
     }
-    const auto cycle_length = static_cast<int>(NodeColors.size()) - 1;
-    return AdaptToBackground(NodeColors[1 + (node - 1) % cycle_length]);
+    const auto cycle_length = static_cast<int>(NODE_COLORS.size()) - 1;
+    return AdaptToBackground(NODE_COLORS[1 + (node - 1) % cycle_length]);
 }
 
 /**
@@ -68,11 +68,11 @@ ImU32 GetCurrentColor(const std::size_t index) {
  * @return  A color from the blue of low values through cyan and yellow to the red of high ones.
  */
 ImU32 GetHeatColor(const float level) {
-    const float position = std::clamp(level, 0.0f, 1.0f) * static_cast<float>(HeatStops.size() - 1);
-    const auto stop = std::min(static_cast<std::size_t>(position), HeatStops.size() - 2);
+    const float position = std::clamp(level, 0.0f, 1.0f) * static_cast<float>(HEAT_STOPS.size() - 1);
+    const auto stop = std::min(static_cast<std::size_t>(position), HEAT_STOPS.size() - 2);
     const float fraction = position - static_cast<float>(stop);
-    const ImVec4 &low = HeatStops[stop];
-    const ImVec4 &high = HeatStops[stop + 1];
+    const ImVec4 &low = HEAT_STOPS[stop];
+    const ImVec4 &high = HEAT_STOPS[stop + 1];
     return ImGui::ColorConvertFloat4ToU32({low.x + (high.x - low.x) * fraction, low.y + (high.y - low.y) * fraction,
                                            low.z + (high.z - low.z) * fraction, 1.0f});
 }

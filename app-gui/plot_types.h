@@ -62,7 +62,7 @@ struct SpectrumTrace {
 struct TransientSpectra {
     std::size_t TransientVersion = 0;
     PlotSpan Span;
-    SpectrumWindow Window = SpectrumWindow::Hann;
+    SpectrumWindow Window = SpectrumWindow::HANN;
     std::vector<std::string> Labels;
     // From the first frequency above 0 Hz to half the sampling rate, shared by every trace
     std::vector<double> Frequencies;

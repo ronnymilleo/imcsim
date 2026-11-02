@@ -20,8 +20,8 @@ namespace GUI {
  *          only when the span holds a whole number of periods; otherwise the tone leaks across the spectrum.
  */
 enum class SpectrumWindow {
-    Hann,
-    Rectangular
+    HANN,
+    RECTANGULAR
 };
 
 /**
@@ -33,7 +33,7 @@ enum class SpectrumWindow {
 struct Spectrum {
     std::vector<double> Frequencies;
     std::vector<double> Amplitudes;
-    SpectrumWindow Window = SpectrumWindow::Hann;
+    SpectrumWindow Window = SpectrumWindow::HANN;
 };
 
 /**

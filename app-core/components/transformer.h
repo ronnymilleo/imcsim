@@ -7,6 +7,7 @@
 #define IMCSIM_TRANSFORMER_H
 
 #include "component.h"
+#include <memory>
 
 namespace Core {
 
@@ -34,6 +35,8 @@ class Transformer : public Component {
 public:
     Transformer();
     ~Transformer() override = default;
+
+    std::unique_ptr<Component> Clone() const override;
 
     const TransformerParameters &GetParameters() const;
     void SetParameters(const TransformerParameters &parameters);

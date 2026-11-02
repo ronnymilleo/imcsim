@@ -4,6 +4,7 @@
  */
 
 #include "components/net_label.h"
+#include "components/switch.h"
 #include "element_factory.h"
 #include "examples.h"
 #include "schematic.h"
@@ -18,7 +19,7 @@
 namespace {
 
 std::unique_ptr<GUI::UIElement> MakeResistor(const GUI::GridPoint position) {
-    return GUI::CreateElement(Core::ComponentType::Resistor, position, GUI::Rotation::R0);
+    return GUI::CreateElement(Core::ComponentType::RESISTOR, position, GUI::Rotation::R0);
 }
 
 } // namespace
@@ -35,7 +36,7 @@ TEST_CASE("Added elements get the next free name and mark the schematic as modif
     GUI::Schematic schematic;
     schematic.AddElement(MakeResistor({0, 0}));
     schematic.AddElement(MakeResistor({4, 0}));
-    schematic.AddElement(GUI::CreateElement(Core::ComponentType::Ground, {0, 2}, GUI::Rotation::R0));
+    schematic.AddElement(GUI::CreateElement(Core::ComponentType::GROUND, {0, 2}, GUI::Rotation::R0));
 
     REQUIRE(schematic.GetElements().size() == 3);
     CHECK(schematic.GetElements()[0]->GetComponent().GetName() == "R1");
@@ -210,7 +211,7 @@ TEST_CASE("Replace swaps the content but keeps the file", "[schematic]") {
 TEST_CASE("BuildSpiceNetlist reflects value changes made through MarkModified", "[schematic]") {
     GUI::Schematic schematic;
     schematic.AddElement(MakeResistor({0, 0}));
-    schematic.AddElement(GUI::CreateElement(Core::ComponentType::Ground, {2, 0}, GUI::Rotation::R0));
+    schematic.AddElement(GUI::CreateElement(Core::ComponentType::GROUND, {2, 0}, GUI::Rotation::R0));
     CHECK(schematic.BuildSpiceNetlist().find("R1 1 0 1k") != std::string::npos);
 
     schematic.GetElement(0).GetComponent().SetValue(4.7e3);
@@ -433,7 +434,7 @@ TEST_CASE("Replace and Clear swap the simulation settings and change their versi
 TEST_CASE("Measurements are saved by node point and restored by node", "[schematic]") {
     GUI::Schematic schematic;
     schematic.AddElement(MakeResistor({0, 0}));
-    schematic.AddElement(GUI::CreateElement(Core::ComponentType::Ground, {2, 0}, GUI::Rotation::R0));
+    schematic.AddElement(GUI::CreateElement(Core::ComponentType::GROUND, {2, 0}, GUI::Rotation::R0));
     schematic.AddWire({-2, 0}, {-2, 4});
     const int node = *schematic.GetConnectivity().GetNode({-2, 4});
     schematic.SetVoltageMeasured(node, true);
@@ -452,6 +453,17 @@ TEST_CASE("Measurements are saved by node point and restored by node", "[schemat
     CHECK(schematic.IsCurrentMeasured("R1"));
 }
 
+TEST_CASE("The document version changes when the content is replaced, not when it is edited or undone", "[schematic]") {
+    GUI::Schematic schematic;
+    const std::size_t opened = schematic.GetDocumentVersion();
+    schematic.AddElement(MakeResistor({0, 0}));
+    schematic.CommitUndoStep();
+    schematic.Undo();
+    CHECK(schematic.GetDocumentVersion() == opened);
+    schematic.Clear();
+    CHECK(schematic.GetDocumentVersion() != opened);
+}
+
 TEST_CASE("Measuring is not an unsaved change and adds no undo step", "[schematic]") {
     GUI::Schematic schematic;
     schematic.AddElement(MakeResistor({0, 0}));
@@ -462,6 +474,22 @@ TEST_CASE("Measuring is not an unsaved change and adds no undo step", "[schemati
     schematic.Undo();
     CHECK(schematic.GetElements().empty());
     CHECK(schematic.IsCurrentMeasured("R1"));
+}
+
+TEST_CASE("Math channels are saved and restored with the measurements, and are no unsaved change", "[schematic]") {
+    GUI::Schematic schematic;
+    schematic.AddElement(MakeResistor({0, 0}));
+    schematic.MarkSaved("circuit.imcsim");
+    const std::vector<GUI::MathChannel> channels = {{.Name = "M1", .UsesExpression = true, .Expression = "V(OUT)"}};
+    schematic.SetMathChannels(channels);
+    schematic.CommitUndoStep();
+    CHECK_FALSE(schematic.IsModified());
+    CHECK(schematic.SaveMeasurements().MathChannels == channels);
+
+    schematic.ClearMeasurements();
+    CHECK(schematic.GetMathChannels().empty());
+    schematic.RestoreMeasurements({.Voltages = {}, .Currents = {}, .MathChannels = channels});
+    CHECK(schematic.GetMathChannels() == channels);
 }
 
 TEST_CASE("A measured node stays the same node when an edit renumbers the nodes", "[schematic]") {
@@ -524,7 +552,7 @@ TEST_CASE("A measured node stays measured when a net label takes the place of a 
     schematic.AddWire({14, 0}, {14, 6});
     schematic.AddWire({14, 6}, {20, 6});
     for (const GUI::GridPoint point : {GUI::GridPoint{10, 0}, GUI::GridPoint{20, 6}}) {
-        schematic.AddElement(GUI::CreateElement(Core::ComponentType::NetLabel, point, GUI::Rotation::R0));
+        schematic.AddElement(GUI::CreateElement(Core::ComponentType::NET_LABEL, point, GUI::Rotation::R0));
         static_cast<Core::NetLabel &>(schematic.GetElements().back()->GetComponent()).SetNet("OUT");
     }
     schematic.SetVoltageMeasured(schematic.GetConnectivity().GetNode({10, 0}).value(), true);
@@ -559,7 +587,7 @@ TEST_CASE("A measured node survives net labels being placed, named and moved", "
     schematic.GetConnectivity();
 
     const GUI::GridPoint rail = schematic.GetWires().front().GetStart();
-    schematic.AddElement(GUI::CreateElement(Core::ComponentType::NetLabel, rail, GUI::Rotation::R0));
+    schematic.AddElement(GUI::CreateElement(Core::ComponentType::NET_LABEL, rail, GUI::Rotation::R0));
     const std::size_t first = schematic.GetElements().size() - 1;
     schematic.GetConnectivity();
     CHECK(measured_count() == 1);
@@ -569,7 +597,7 @@ TEST_CASE("A measured node survives net labels being placed, named and moved", "
     schematic.GetConnectivity();
     CHECK(measured_count() == 1);
 
-    schematic.AddElement(GUI::CreateElement(Core::ComponentType::NetLabel, {60, 60}, GUI::Rotation::R0));
+    schematic.AddElement(GUI::CreateElement(Core::ComponentType::NET_LABEL, {60, 60}, GUI::Rotation::R0));
     const std::size_t second = schematic.GetElements().size() - 1;
     static_cast<Core::NetLabel &>(schematic.GetElement(second).GetComponent()).SetNet("OUT");
     schematic.MarkModified();
@@ -586,11 +614,11 @@ TEST_CASE("A measured node survives net labels being placed, named and moved", "
 
 TEST_CASE("A measured node that is joined to ground and then freed is measured again", "[schematic]") {
     GUI::Schematic schematic;
-    schematic.AddElement(GUI::CreateElement(Core::ComponentType::Ground, {0, 0}, GUI::Rotation::R0));
+    schematic.AddElement(GUI::CreateElement(Core::ComponentType::GROUND, {0, 0}, GUI::Rotation::R0));
     schematic.AddWire({10, 10}, {14, 10});
-    schematic.AddElement(GUI::CreateElement(Core::ComponentType::NetLabel, {14, 10}, GUI::Rotation::R0));
+    schematic.AddElement(GUI::CreateElement(Core::ComponentType::NET_LABEL, {14, 10}, GUI::Rotation::R0));
     static_cast<Core::NetLabel &>(schematic.GetElements().back()->GetComponent()).SetNet("OUT");
-    schematic.AddElement(GUI::CreateElement(Core::ComponentType::NetLabel, {30, 30}, GUI::Rotation::R0));
+    schematic.AddElement(GUI::CreateElement(Core::ComponentType::NET_LABEL, {30, 30}, GUI::Rotation::R0));
     const std::size_t second = schematic.GetElements().size() - 1;
     static_cast<Core::NetLabel &>(schematic.GetElement(second).GetComponent()).SetNet("OUT");
     schematic.SetVoltageMeasured(schematic.GetConnectivity().GetNode({10, 10}).value(), true);
@@ -606,4 +634,94 @@ TEST_CASE("A measured node that is joined to ground and then freed is measured a
     const GUI::Connectivity &nodes = schematic.GetConnectivity();
     CHECK(nodes.GetNode({10, 10}).value() > 0);
     CHECK(schematic.IsVoltageMeasured(nodes.GetNode({10, 10}).value()));
+}
+
+TEST_CASE("Chunks of a transient make the result grow, and only the first counts as a new result", "[schematic]") {
+    GUI::Schematic schematic;
+    const auto make_chunk = [](const std::vector<double> &times) {
+        Core::Transient chunk;
+        chunk.Times = times;
+        chunk.NodeVoltages = {std::vector<double>(times.size(), 0.0), times};
+        chunk.Currents = {{"R1", times}};
+        return chunk;
+    };
+
+    schematic.AppendTransient(make_chunk({0.0, 1.0}));
+    REQUIRE(schematic.GetTransient().has_value());
+    // A transient that is still being made is not complete
+    CHECK_FALSE(schematic.GetTransient()->IsComplete);
+    const std::size_t result_version = schematic.GetTransientVersion();
+    const std::size_t data_version = schematic.GetTransientDataVersion();
+
+    schematic.AppendTransient(make_chunk({2.0, 3.0}));
+    CHECK(schematic.GetTransient()->Times == std::vector<double>{0.0, 1.0, 2.0, 3.0});
+    CHECK(schematic.GetTransient()->NodeVoltages[1] == std::vector<double>{0.0, 1.0, 2.0, 3.0});
+    CHECK(schematic.GetTransient()->Currents[0].Values == std::vector<double>{0.0, 1.0, 2.0, 3.0});
+    CHECK(schematic.GetTransientVersion() == result_version);
+    CHECK(schematic.GetTransientDataVersion() == data_version + 1);
+
+    // A chunk made for another circuit, with other nodes or other currents, is dropped
+    Core::Transient other = make_chunk({4.0});
+    other.NodeVoltages.push_back({4.0});
+    schematic.AppendTransient(other);
+    other = make_chunk({4.0});
+    other.Currents[0].Name = "R2";
+    schematic.AppendTransient(other);
+    CHECK(schematic.GetTransient()->Times.size() == 4);
+    CHECK(schematic.GetTransientDataVersion() == data_version + 1);
+
+    // The whole run replaces what the chunks made, as a new result
+    schematic.SetTransient(make_chunk({0.0, 5.0}));
+    CHECK(schematic.GetTransient()->IsComplete);
+    CHECK(schematic.GetTransientVersion() == result_version + 1);
+    CHECK(schematic.GetTransientDataVersion() == data_version + 2);
+}
+
+TEST_CASE("A part set by hand during a live run keeps the transient and goes to the run as a change", "[schematic]") {
+    GUI::Schematic schematic;
+    schematic.AddElement(GUI::CreateElement(Core::ComponentType::SWITCH, {0, 0}, GUI::Rotation::R0));
+    auto &contact = static_cast<Core::Switch &>(schematic.GetElement(0).GetComponent());
+    schematic.SetTransient(Core::Transient{.Times = {0.0}, .NodeVoltages = {}, .Currents = {}, .Warnings = {}});
+    schematic.SetOperatingPoint(Core::OperatingPoint{});
+    schematic.CommitUndoStep();
+    const std::size_t circuit_version = schematic.GetCircuitVersion();
+
+    schematic.SetLiveRun(true);
+    CHECK(schematic.IsLiveRun());
+    contact.SetClosed(true);
+    schematic.MarkLiveChanged(contact);
+    // The transient that the run is making stays, the operating point no longer matches the circuit
+    CHECK(schematic.GetTransient().has_value());
+    CHECK_FALSE(schematic.GetOperatingPoint().has_value());
+    CHECK(schematic.GetCircuitVersion() == circuit_version);
+    CHECK(schematic.IsModified());
+    CHECK(schematic.TakeLiveChanges() == Core::DescribeLiveChange(contact));
+    CHECK(schematic.TakeLiveChanges().empty());
+
+    // It is an undo step like any other, and undoing it is an edit that stops the run
+    schematic.CommitUndoStep();
+    schematic.Undo();
+    CHECK_FALSE(static_cast<Core::Switch &>(schematic.GetElement(0).GetComponent()).IsClosed());
+    CHECK(schematic.GetCircuitVersion() != circuit_version);
+}
+
+TEST_CASE("Outside a live run a part set by hand is an edit that drops the results", "[schematic]") {
+    GUI::Schematic schematic;
+    schematic.AddElement(GUI::CreateElement(Core::ComponentType::SWITCH, {0, 0}, GUI::Rotation::R0));
+    auto &contact = static_cast<Core::Switch &>(schematic.GetElement(0).GetComponent());
+    schematic.SetTransient(Core::Transient{});
+    const std::size_t circuit_version = schematic.GetCircuitVersion();
+
+    contact.SetClosed(true);
+    schematic.MarkLiveChanged(contact);
+    CHECK_FALSE(schematic.GetTransient().has_value());
+    CHECK(schematic.GetCircuitVersion() != circuit_version);
+    CHECK(schematic.TakeLiveChanges().empty());
+
+    // The changes a run did not take are dropped when it ends
+    schematic.SetLiveRun(true);
+    schematic.MarkLiveChanged(contact);
+    schematic.SetLiveRun(false);
+    CHECK_FALSE(schematic.IsLiveRun());
+    CHECK(schematic.TakeLiveChanges().empty());
 }

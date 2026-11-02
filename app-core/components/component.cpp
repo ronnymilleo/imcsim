@@ -16,17 +16,47 @@ namespace Core {
 
 namespace {
 
-constexpr auto AllTypes = std::to_array<ComponentType>({
-    ComponentType::Resistor,      ComponentType::Capacitor,     ComponentType::Inductor,      ComponentType::Ground,
-    ComponentType::VCC,           ComponentType::VoltageSource, ComponentType::CurrentSource, ComponentType::Diode,
-    ComponentType::ZenerDiode,    ComponentType::LED,           ComponentType::NPN,           ComponentType::PNP,
-    ComponentType::NMOS,          ComponentType::PMOS,          ComponentType::VCVS,          ComponentType::VCCS,
-    ComponentType::CCCS,          ComponentType::CCVS,          ComponentType::OpAmp,         ComponentType::NetLabel,
-    ComponentType::Potentiometer, ComponentType::Switch,        ComponentType::PushButton,    ComponentType::VSwitch,
-    ComponentType::Relay,         ComponentType::Transformer,   ComponentType::And,           ComponentType::Or,
-    ComponentType::Not,           ComponentType::Nand,          ComponentType::Nor,           ComponentType::Xor,
-    ComponentType::Xnor,          ComponentType::Buffer,        ComponentType::DFlipFlop,     ComponentType::JKFlipFlop,
-    ComponentType::TFlipFlop,     ComponentType::SRFlipFlop,    ComponentType::Clock,         ComponentType::LogicInput,
+constexpr auto ALL_TYPES = std::to_array<ComponentType>({
+    ComponentType::RESISTOR,
+    ComponentType::CAPACITOR,
+    ComponentType::INDUCTOR,
+    ComponentType::GROUND,
+    ComponentType::VCC,
+    ComponentType::VOLTAGE_SOURCE,
+    ComponentType::CURRENT_SOURCE,
+    ComponentType::DIODE,
+    ComponentType::ZENER_DIODE,
+    ComponentType::LED,
+    ComponentType::NPN,
+    ComponentType::PNP,
+    ComponentType::NMOS,
+    ComponentType::PMOS,
+    ComponentType::VCVS,
+    ComponentType::VCCS,
+    ComponentType::CCCS,
+    ComponentType::CCVS,
+    ComponentType::OP_AMP,
+    ComponentType::NET_LABEL,
+    ComponentType::POTENTIOMETER,
+    ComponentType::SWITCH,
+    ComponentType::PUSH_BUTTON,
+    ComponentType::V_SWITCH,
+    ComponentType::RELAY,
+    ComponentType::TRANSFORMER,
+    ComponentType::AND,
+    ComponentType::OR,
+    ComponentType::NOT,
+    ComponentType::NAND,
+    ComponentType::NOR,
+    ComponentType::XOR,
+    ComponentType::XNOR,
+    ComponentType::BUFFER,
+    ComponentType::D_FLIP_FLOP,
+    ComponentType::JK_FLIP_FLOP,
+    ComponentType::T_FLIP_FLOP,
+    ComponentType::SR_FLIP_FLOP,
+    ComponentType::CLOCK,
+    ComponentType::LOGIC_INPUT,
 });
 
 } // namespace
@@ -62,25 +92,23 @@ const char *Component::GetTypeName() const {
  */
 const char *Component::GetNamePrefix() const {
     switch (m_Type) {
-    case ComponentType::Resistor:
+    case ComponentType::RESISTOR:
         return "R";
-    case ComponentType::Capacitor:
+    case ComponentType::CAPACITOR:
         return "C";
-    case ComponentType::Inductor:
+    case ComponentType::INDUCTOR:
         return "L";
     case ComponentType::VCC:
-        // A supply rail is simulated as a voltage source to ground
+    case ComponentType::CLOCK:
+    case ComponentType::LOGIC_INPUT:
+        // A supply rail, a clock and a logic input are simulated as voltage sources to ground
         return "V";
-    case ComponentType::Clock:
-    case ComponentType::LogicInput:
-        // A clock and a logic input are voltage sources to ground too
-        return "V";
-    case ComponentType::VoltageSource:
+    case ComponentType::VOLTAGE_SOURCE:
         return "Vin";
-    case ComponentType::CurrentSource:
+    case ComponentType::CURRENT_SOURCE:
         return "I";
-    case ComponentType::Diode:
-    case ComponentType::ZenerDiode:
+    case ComponentType::DIODE:
+    case ComponentType::ZENER_DIODE:
     case ComponentType::LED:
         return "D";
     case ComponentType::NPN:
@@ -97,34 +125,34 @@ const char *Component::GetNamePrefix() const {
         return "F";
     case ComponentType::CCVS:
         return "H";
-    case ComponentType::OpAmp:
-    case ComponentType::And:
-    case ComponentType::Or:
-    case ComponentType::Not:
-    case ComponentType::Nand:
-    case ComponentType::Nor:
-    case ComponentType::Xor:
-    case ComponentType::Xnor:
-    case ComponentType::Buffer:
-    case ComponentType::DFlipFlop:
-    case ComponentType::JKFlipFlop:
-    case ComponentType::TFlipFlop:
-    case ComponentType::SRFlipFlop:
+    case ComponentType::OP_AMP:
+    case ComponentType::AND:
+    case ComponentType::OR:
+    case ComponentType::NOT:
+    case ComponentType::NAND:
+    case ComponentType::NOR:
+    case ComponentType::XOR:
+    case ComponentType::XNOR:
+    case ComponentType::BUFFER:
+    case ComponentType::D_FLIP_FLOP:
+    case ComponentType::JK_FLIP_FLOP:
+    case ComponentType::T_FLIP_FLOP:
+    case ComponentType::SR_FLIP_FLOP:
         return "U";
-    case ComponentType::Potentiometer:
+    case ComponentType::POTENTIOMETER:
         return "RV";
-    case ComponentType::Switch:
+    case ComponentType::SWITCH:
         return "SW";
-    case ComponentType::PushButton:
+    case ComponentType::PUSH_BUTTON:
         return "PB";
-    case ComponentType::VSwitch:
+    case ComponentType::V_SWITCH:
         return "S";
-    case ComponentType::Relay:
+    case ComponentType::RELAY:
         return "K";
-    case ComponentType::Transformer:
+    case ComponentType::TRANSFORMER:
         return "T";
-    case ComponentType::Ground:
-    case ComponentType::NetLabel:
+    case ComponentType::GROUND:
+    case ComponentType::NET_LABEL:
         return "";
     }
     return "";
@@ -137,21 +165,20 @@ const char *Component::GetNamePrefix() const {
  */
 const char *Component::GetUnit() const {
     switch (m_Type) {
-    case ComponentType::Resistor:
-    case ComponentType::Potentiometer:
+    case ComponentType::RESISTOR:
+    case ComponentType::POTENTIOMETER:
         return "Ohm";
-    case ComponentType::Capacitor:
+    case ComponentType::CAPACITOR:
         return "F";
-    case ComponentType::Inductor:
-    case ComponentType::Transformer:
+    case ComponentType::INDUCTOR:
+    case ComponentType::TRANSFORMER:
         return "H";
     case ComponentType::VCC:
-    case ComponentType::VoltageSource:
+    case ComponentType::VOLTAGE_SOURCE:
+    case ComponentType::CLOCK:
+    case ComponentType::LOGIC_INPUT:
         return "V";
-    case ComponentType::Clock:
-    case ComponentType::LogicInput:
-        return "V";
-    case ComponentType::CurrentSource:
+    case ComponentType::CURRENT_SOURCE:
         return "A";
     case ComponentType::VCVS:
         return "V/V";
@@ -161,27 +188,27 @@ const char *Component::GetUnit() const {
         return "A/A";
     case ComponentType::CCVS:
         return "V/A";
-    case ComponentType::OpAmp:
-    case ComponentType::And:
-    case ComponentType::Or:
-    case ComponentType::Not:
-    case ComponentType::Nand:
-    case ComponentType::Nor:
-    case ComponentType::Xor:
-    case ComponentType::Xnor:
-    case ComponentType::Buffer:
-    case ComponentType::DFlipFlop:
-    case ComponentType::JKFlipFlop:
-    case ComponentType::TFlipFlop:
-    case ComponentType::SRFlipFlop:
-    case ComponentType::Ground:
-    case ComponentType::NetLabel:
-    case ComponentType::Switch:
-    case ComponentType::PushButton:
-    case ComponentType::VSwitch:
-    case ComponentType::Relay:
-    case ComponentType::Diode:
-    case ComponentType::ZenerDiode:
+    case ComponentType::OP_AMP:
+    case ComponentType::AND:
+    case ComponentType::OR:
+    case ComponentType::NOT:
+    case ComponentType::NAND:
+    case ComponentType::NOR:
+    case ComponentType::XOR:
+    case ComponentType::XNOR:
+    case ComponentType::BUFFER:
+    case ComponentType::D_FLIP_FLOP:
+    case ComponentType::JK_FLIP_FLOP:
+    case ComponentType::T_FLIP_FLOP:
+    case ComponentType::SR_FLIP_FLOP:
+    case ComponentType::GROUND:
+    case ComponentType::NET_LABEL:
+    case ComponentType::SWITCH:
+    case ComponentType::PUSH_BUTTON:
+    case ComponentType::V_SWITCH:
+    case ComponentType::RELAY:
+    case ComponentType::DIODE:
+    case ComponentType::ZENER_DIODE:
     case ComponentType::LED:
     case ComponentType::NPN:
     case ComponentType::PNP:
@@ -199,43 +226,43 @@ const char *Component::GetUnit() const {
  */
 bool Component::HasValue() const {
     switch (m_Type) {
-    case ComponentType::Ground:
-    case ComponentType::NetLabel:
-    case ComponentType::Switch:
-    case ComponentType::PushButton:
-    case ComponentType::VSwitch:
-    case ComponentType::Relay:
-    case ComponentType::Diode:
-    case ComponentType::ZenerDiode:
+    case ComponentType::GROUND:
+    case ComponentType::NET_LABEL:
+    case ComponentType::SWITCH:
+    case ComponentType::PUSH_BUTTON:
+    case ComponentType::V_SWITCH:
+    case ComponentType::RELAY:
+    case ComponentType::DIODE:
+    case ComponentType::ZENER_DIODE:
     case ComponentType::LED:
     case ComponentType::NPN:
     case ComponentType::PNP:
     case ComponentType::NMOS:
     case ComponentType::PMOS:
-    case ComponentType::OpAmp:
-    case ComponentType::And:
-    case ComponentType::Or:
-    case ComponentType::Not:
-    case ComponentType::Nand:
-    case ComponentType::Nor:
-    case ComponentType::Xor:
-    case ComponentType::Xnor:
-    case ComponentType::Buffer:
-    case ComponentType::DFlipFlop:
-    case ComponentType::JKFlipFlop:
-    case ComponentType::TFlipFlop:
-    case ComponentType::SRFlipFlop:
-    case ComponentType::Clock:
-    case ComponentType::LogicInput:
+    case ComponentType::OP_AMP:
+    case ComponentType::AND:
+    case ComponentType::OR:
+    case ComponentType::NOT:
+    case ComponentType::NAND:
+    case ComponentType::NOR:
+    case ComponentType::XOR:
+    case ComponentType::XNOR:
+    case ComponentType::BUFFER:
+    case ComponentType::D_FLIP_FLOP:
+    case ComponentType::JK_FLIP_FLOP:
+    case ComponentType::T_FLIP_FLOP:
+    case ComponentType::SR_FLIP_FLOP:
+    case ComponentType::CLOCK:
+    case ComponentType::LOGIC_INPUT:
         return false;
-    case ComponentType::Resistor:
-    case ComponentType::Capacitor:
-    case ComponentType::Inductor:
-    case ComponentType::Potentiometer:
-    case ComponentType::Transformer:
+    case ComponentType::RESISTOR:
+    case ComponentType::CAPACITOR:
+    case ComponentType::INDUCTOR:
+    case ComponentType::POTENTIOMETER:
+    case ComponentType::TRANSFORMER:
     case ComponentType::VCC:
-    case ComponentType::VoltageSource:
-    case ComponentType::CurrentSource:
+    case ComponentType::VOLTAGE_SOURCE:
+    case ComponentType::CURRENT_SOURCE:
     case ComponentType::VCVS:
     case ComponentType::VCCS:
     case ComponentType::CCCS:
@@ -253,48 +280,48 @@ bool Component::HasValue() const {
  */
 bool Component::IsValidValue(const double value) const {
     switch (m_Type) {
-    case ComponentType::Resistor:
-    case ComponentType::Capacitor:
-    case ComponentType::Inductor:
-    case ComponentType::Potentiometer:
-    case ComponentType::Transformer:
+    case ComponentType::RESISTOR:
+    case ComponentType::CAPACITOR:
+    case ComponentType::INDUCTOR:
+    case ComponentType::POTENTIOMETER:
+    case ComponentType::TRANSFORMER:
         return value > 0.0;
     case ComponentType::VCC:
-    case ComponentType::VoltageSource:
-    case ComponentType::CurrentSource:
+    case ComponentType::VOLTAGE_SOURCE:
+    case ComponentType::CURRENT_SOURCE:
     case ComponentType::VCVS:
     case ComponentType::VCCS:
     case ComponentType::CCCS:
     case ComponentType::CCVS:
         return true;
-    case ComponentType::Ground:
-    case ComponentType::NetLabel:
-    case ComponentType::Switch:
-    case ComponentType::PushButton:
-    case ComponentType::VSwitch:
-    case ComponentType::Relay:
-    case ComponentType::Diode:
-    case ComponentType::ZenerDiode:
+    case ComponentType::GROUND:
+    case ComponentType::NET_LABEL:
+    case ComponentType::SWITCH:
+    case ComponentType::PUSH_BUTTON:
+    case ComponentType::V_SWITCH:
+    case ComponentType::RELAY:
+    case ComponentType::DIODE:
+    case ComponentType::ZENER_DIODE:
     case ComponentType::LED:
     case ComponentType::NPN:
     case ComponentType::PNP:
     case ComponentType::NMOS:
     case ComponentType::PMOS:
-    case ComponentType::OpAmp:
-    case ComponentType::And:
-    case ComponentType::Or:
-    case ComponentType::Not:
-    case ComponentType::Nand:
-    case ComponentType::Nor:
-    case ComponentType::Xor:
-    case ComponentType::Xnor:
-    case ComponentType::Buffer:
-    case ComponentType::DFlipFlop:
-    case ComponentType::JKFlipFlop:
-    case ComponentType::TFlipFlop:
-    case ComponentType::SRFlipFlop:
-    case ComponentType::Clock:
-    case ComponentType::LogicInput:
+    case ComponentType::OP_AMP:
+    case ComponentType::AND:
+    case ComponentType::OR:
+    case ComponentType::NOT:
+    case ComponentType::NAND:
+    case ComponentType::NOR:
+    case ComponentType::XOR:
+    case ComponentType::XNOR:
+    case ComponentType::BUFFER:
+    case ComponentType::D_FLIP_FLOP:
+    case ComponentType::JK_FLIP_FLOP:
+    case ComponentType::T_FLIP_FLOP:
+    case ComponentType::SR_FLIP_FLOP:
+    case ComponentType::CLOCK:
+    case ComponentType::LOGIC_INPUT:
         return false;
     }
     return false;
@@ -338,7 +365,7 @@ void Component::SetValue(const double value) {
  *          for every other kind.
  */
 bool Component::SupportsInitialCondition() const {
-    return m_Type == ComponentType::Capacitor || m_Type == ComponentType::Inductor;
+    return m_Type == ComponentType::CAPACITOR || m_Type == ComponentType::INDUCTOR;
 }
 
 /**
@@ -384,23 +411,23 @@ void Component::ClearInitialCondition() {
  */
 const char *GetTypeName(const ComponentType type) {
     switch (type) {
-    case ComponentType::Resistor:
+    case ComponentType::RESISTOR:
         return "Resistor";
-    case ComponentType::Capacitor:
+    case ComponentType::CAPACITOR:
         return "Capacitor";
-    case ComponentType::Inductor:
+    case ComponentType::INDUCTOR:
         return "Inductor";
-    case ComponentType::Ground:
+    case ComponentType::GROUND:
         return "Ground";
     case ComponentType::VCC:
         return "VCC";
-    case ComponentType::VoltageSource:
+    case ComponentType::VOLTAGE_SOURCE:
         return "VoltageSource";
-    case ComponentType::CurrentSource:
+    case ComponentType::CURRENT_SOURCE:
         return "CurrentSource";
-    case ComponentType::Diode:
+    case ComponentType::DIODE:
         return "Diode";
-    case ComponentType::ZenerDiode:
+    case ComponentType::ZENER_DIODE:
         return "ZenerDiode";
     case ComponentType::LED:
         return "LED";
@@ -420,49 +447,49 @@ const char *GetTypeName(const ComponentType type) {
         return "CCCS";
     case ComponentType::CCVS:
         return "CCVS";
-    case ComponentType::OpAmp:
+    case ComponentType::OP_AMP:
         return "OpAmp";
-    case ComponentType::NetLabel:
+    case ComponentType::NET_LABEL:
         return "NetLabel";
-    case ComponentType::Potentiometer:
+    case ComponentType::POTENTIOMETER:
         return "Potentiometer";
-    case ComponentType::Switch:
+    case ComponentType::SWITCH:
         return "Switch";
-    case ComponentType::PushButton:
+    case ComponentType::PUSH_BUTTON:
         return "PushButton";
-    case ComponentType::VSwitch:
+    case ComponentType::V_SWITCH:
         return "VSwitch";
-    case ComponentType::Relay:
+    case ComponentType::RELAY:
         return "Relay";
-    case ComponentType::Transformer:
+    case ComponentType::TRANSFORMER:
         return "Transformer";
-    case ComponentType::And:
+    case ComponentType::AND:
         return "And";
-    case ComponentType::Or:
+    case ComponentType::OR:
         return "Or";
-    case ComponentType::Not:
+    case ComponentType::NOT:
         return "Not";
-    case ComponentType::Nand:
+    case ComponentType::NAND:
         return "Nand";
-    case ComponentType::Nor:
+    case ComponentType::NOR:
         return "Nor";
-    case ComponentType::Xor:
+    case ComponentType::XOR:
         return "Xor";
-    case ComponentType::Xnor:
+    case ComponentType::XNOR:
         return "Xnor";
-    case ComponentType::Buffer:
+    case ComponentType::BUFFER:
         return "Buffer";
-    case ComponentType::DFlipFlop:
+    case ComponentType::D_FLIP_FLOP:
         return "DFlipFlop";
-    case ComponentType::JKFlipFlop:
+    case ComponentType::JK_FLIP_FLOP:
         return "JKFlipFlop";
-    case ComponentType::TFlipFlop:
+    case ComponentType::T_FLIP_FLOP:
         return "TFlipFlop";
-    case ComponentType::SRFlipFlop:
+    case ComponentType::SR_FLIP_FLOP:
         return "SRFlipFlop";
-    case ComponentType::Clock:
+    case ComponentType::CLOCK:
         return "Clock";
-    case ComponentType::LogicInput:
+    case ComponentType::LOGIC_INPUT:
         return "LogicInput";
     }
     return "Unknown";
@@ -474,7 +501,7 @@ const char *GetTypeName(const ComponentType type) {
  * @return  The matching type, or no value for an unknown name.
  */
 std::optional<ComponentType> ParseComponentType(const std::string_view text) {
-    for (const ComponentType type : AllTypes) {
+    for (const ComponentType type : ALL_TYPES) {
         if (text == GetTypeName(type)) {
             return type;
         }

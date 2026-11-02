@@ -13,7 +13,7 @@
 namespace GUI {
 
 // File name and contents of each example
-inline constexpr auto ExampleFiles = std::to_array<std::pair<std::string_view, std::string_view>>({
+inline constexpr auto EXAMPLE_FILES = std::to_array<std::pair<std::string_view, std::string_view>>({
 @EXAMPLE_FILE_ENTRIES@});
 
 } // namespace GUI

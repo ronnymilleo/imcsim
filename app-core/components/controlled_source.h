@@ -7,6 +7,7 @@
 #define IMCSIM_CONTROLLED_SOURCE_H
 
 #include "component.h"
+#include <memory>
 #include <string>
 
 namespace Core {
@@ -23,6 +24,8 @@ class ControlledSource : public Component {
 public:
     explicit ControlledSource(ComponentType type);
     ~ControlledSource() override = default;
+
+    std::unique_ptr<Component> Clone() const override;
 
     const std::string &GetControllingCurrent() const;
     void SetControllingCurrent(std::string current);

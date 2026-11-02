@@ -7,6 +7,7 @@
 #define IMCSIM_VOLTAGE_CONTROLLED_SWITCH_H
 
 #include "component.h"
+#include <memory>
 #include <string>
 #include <string_view>
 
@@ -34,6 +35,8 @@ class VoltageControlledSwitch : public Component {
 public:
     VoltageControlledSwitch();
     ~VoltageControlledSwitch() override = default;
+
+    std::unique_ptr<Component> Clone() const override;
 
     const SwitchParameters &GetParameters() const;
     void SetParameters(const SwitchParameters &parameters);

@@ -26,10 +26,10 @@ UIWire::UIWire(const GridPoint start, const GridPoint end) : m_Start(start), m_E
 void UIWire::Draw(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color) const {
     const ImVec2 start = view.ToScreen(ToVec2(m_Start));
     const ImVec2 end = view.ToScreen(ToVec2(m_End));
-    canvas.AddLine(start, end, color, LineThickness);
+    canvas.AddLine(start, end, color, LINE_THICKNESS);
 
     // Lines have flat ends, so two segments meeting at a corner leave a notch; a square on each end fills it
-    const ImVec2 half_square = {LineThickness / 2.0f, LineThickness / 2.0f};
+    const ImVec2 half_square = {LINE_THICKNESS / 2.0f, LINE_THICKNESS / 2.0f};
     canvas.AddRectFilled(start - half_square, start + half_square, color);
     canvas.AddRectFilled(end - half_square, end + half_square, color);
 }

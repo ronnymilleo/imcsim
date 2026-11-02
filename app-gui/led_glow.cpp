@@ -15,8 +15,8 @@ namespace {
 
 // The eye sees LED light on a logarithmic scale: an LED starts to glow faintly around this current and reaches full
 // brightness at the rated current of the ready models
-constexpr double DimmestCurrent = 50e-6;
-constexpr double RatedCurrent = 20e-3;
+constexpr double DIMMEST_CURRENT = 50e-6;
+constexpr double RATED_CURRENT = 20e-3;
 
 } // namespace
 
@@ -27,11 +27,11 @@ constexpr double RatedCurrent = 20e-3;
  *          between.
  */
 float LEDBrightness(const double current) {
-    if (current <= DimmestCurrent) {
+    if (current <= DIMMEST_CURRENT) {
         return 0.0f;
     }
     const double level =
-        (std::log10(current) - std::log10(DimmestCurrent)) / (std::log10(RatedCurrent) - std::log10(DimmestCurrent));
+        (std::log10(current) - std::log10(DIMMEST_CURRENT)) / (std::log10(RATED_CURRENT) - std::log10(DIMMEST_CURRENT));
     return static_cast<float>(std::min(level, 1.0));
 }
 
@@ -56,7 +56,7 @@ std::vector<LEDGlow> ComputeLEDGlows(const std::vector<std::unique_ptr<UIElement
             continue;
         }
         const Core::DiodeModel *model = static_cast<const Core::Diode &>(component).GetModel();
-        glows.push_back({element->GetPosition(), model != nullptr ? model->Color : Core::LEDColor::None, brightness});
+        glows.push_back({element->GetPosition(), model != nullptr ? model->Color : Core::LEDColor::NONE, brightness});
     }
     return glows;
 }

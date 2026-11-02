@@ -16,7 +16,11 @@
 namespace GUI {
 
 // Powers span decades like currents, so the heat scale is logarithmic and shows this many below the largest power
-inline constexpr double PowerDecades = 4.0;
+inline constexpr double POWER_DECADES = 4.0;
+
+// The scale of a long transient reads the power of this many samples at most, evenly spread, since working out the
+// power of a part at a sample costs far more than reading a voltage
+inline constexpr std::size_t MAX_POWER_SAMPLES = 4000;
 
 /**
  * @struct  HeatScale

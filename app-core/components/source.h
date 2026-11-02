@@ -128,7 +128,7 @@ public:
     enum class SourceType {
         DC,
         AC,
-        Pulse,
+        PULSE,
         EXP,
         SFFM,
         AM,

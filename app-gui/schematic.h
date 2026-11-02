@@ -8,6 +8,8 @@
 
 #include "connectivity.h"
 #include "helpers.h"
+#include "live_change.h"
+#include "math_channel.h"
 #include "parameter_step.h"
 #include "schematic_file.h"
 #include "simulation_settings.h"
@@ -40,7 +42,9 @@ namespace GUI {
  *          since small edits rarely renumber nodes, and are saved with the file so it opens ready to plot, but
  *          they stay out of the history and changing them does not count as an unsaved change. The simulation
  *          settings belong to the document: they are saved, undone and count as changes, but changing them keeps
- *          the results, which still match the circuit.
+ *          the results, which still match the circuit. While a live transient runs, flipping a switch, pressing a
+ *          button, setting a logic input or turning a potentiometer (MarkLiveChanged()) is a change that keeps the
+ *          transient and the circuit version: the part changes in the run instead of stopping it.
  */
 class Schematic {
 public:
@@ -81,6 +85,8 @@ public:
     void SetVoltageMeasured(int node, bool measured);
     bool IsCurrentMeasured(const std::string &name) const;
     void SetCurrentMeasured(const std::string &name, bool measured);
+    const std::vector<MathChannel> &GetMathChannels() const;
+    void SetMathChannels(std::vector<MathChannel> channels);
     void ClearMeasurements();
     SavedMeasurements SaveMeasurements();
     void RestoreMeasurements(const SavedMeasurements &measurements);
@@ -96,6 +102,12 @@ public:
     const std::optional<std::filesystem::path> &GetFilePath() const;
     void MarkSaved(std::filesystem::path path);
 
+    // Live runs
+    void SetLiveRun(bool is_live);
+    bool IsLiveRun() const;
+    void MarkLiveChanged(const Core::Component &component);
+    std::vector<Core::LiveChange> TakeLiveChanges();
+
     // History
     void CommitUndoStep();
     bool CanUndo() const;
@@ -106,10 +118,13 @@ public:
     // Derived data
     const Connectivity &GetConnectivity();
     Core::Circuit BuildCircuit();
+    std::size_t GetCircuitVersion() const;
+    std::size_t GetDocumentVersion() const;
     std::string BuildSpiceNetlist();
     void SetOperatingPoint(std::optional<Core::OperatingPoint> operating_point);
     const std::optional<Core::OperatingPoint> &GetOperatingPoint() const;
     void SetTransient(std::optional<Core::Transient> transient);
+    void AppendTransient(Core::Transient chunk);
     const std::optional<Core::Transient> &GetTransient() const;
     void SetTransientSteps(StepFamily<Core::Transient> steps);
     const std::optional<StepFamily<Core::Transient>> &GetTransientSteps() const;
@@ -129,6 +144,7 @@ public:
     const std::optional<Core::TruthTable> &GetTruthTable() const;
     std::size_t GetOperatingPointVersion() const;
     std::size_t GetTransientVersion() const;
+    std::size_t GetTransientDataVersion() const;
     std::size_t GetACSweepVersion() const;
     std::size_t GetDCSweepVersion() const;
     std::size_t GetNoiseVersion() const;
@@ -160,15 +176,24 @@ private:
     // Measurements: probes on nodes, and current names such as "R1" or "Q1.C"
     std::vector<VoltageProbe> m_VoltageProbes;
     std::set<std::string> m_MeasuredCurrents;
+    std::vector<MathChannel> m_MathChannels;
 
     // Simulation settings; the version changes only when they are replaced from outside the analysis settings,
     // such as by opening a file or undoing, so the window knows to reload its fields
     SimulationSettings m_SimulationSettings;
     std::size_t m_SimulationSettingsVersion = 0;
+    // Counts the edits that drop the results, so a run that started before one knows its answer is stale
+    std::size_t m_CircuitVersion = 0;
+    // Counts the schematics opened or created in place of the content, which edits and undo do not change
+    std::size_t m_DocumentVersion = 0;
 
     // Document state
     bool m_Modified = false;
     std::optional<std::filesystem::path> m_FilePath;
+
+    // Live runs: whether one is going on, and the changes of its parts that it has not taken yet
+    bool m_IsLiveRun = false;
+    std::vector<Core::LiveChange> m_LiveChanges;
 
     // History, as whole schematics saved to text: simple and always consistent, at the cost of some memory
     std::string m_CurrentSnapshot;
@@ -193,6 +218,8 @@ private:
     // Change with every new result, so windows can tell a rerun from the result they already showed
     std::size_t m_OperatingPointVersion = 0;
     std::size_t m_TransientVersion = 0;
+    // Also counts the chunks added to a transient that is still being made
+    std::size_t m_TransientDataVersion = 0;
     std::size_t m_ACSweepVersion = 0;
     std::size_t m_DCSweepVersion = 0;
     std::size_t m_NoiseVersion = 0;

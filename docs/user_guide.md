@@ -49,9 +49,9 @@ How to read what imcsim measures, plots and exports. The [README](../README.md) 
   while high and a 0 while low, and both start low. It is a source from its terminal to ground, so it gives a gate
   input or a latch's SET or RESET a defined level to start from. A circuit of only logic parts, clocks, logic inputs and VCC
   runs without a Ground symbol or a load on the outputs; add a Ground as soon as it has any other part.
-- **Standard values**: View > Component Values restricts resistors, capacitors and inductors to one of the E series
-  (E6, E12, E24, E48, E96 or E192, with their tolerances of 20% down to 0.5%), or leaves any value allowed, which is
-  the default. With a series chosen, a typed value becomes the nearest one of the series on a log scale (`5000` is
+- **Standard values**: Standard values in Edit > Preferences restricts resistors, capacitors and inductors to one of
+  the E series (E6, E12, E24, E48, E96 or E192, with their tolerances of 20% down to 0.5%), or leaves any value
+  allowed, which is the default. With a series chosen, a typed value becomes the nearest one of the series on a log scale (`5000` is
   4.7k in E12), and the arrow buttons beside the value, the up and down keys and the mouse wheel over the field step
   to the next or previous standard value, into the next decade at the ends. A part keeps a value outside the series
   until you edit it, and the sources, gains and parameters of the other parts are never restricted. The choice is a
@@ -85,8 +85,9 @@ How to read what imcsim measures, plots and exports. The [README](../README.md) 
   name of the last one, so another point of the same net is a click away. A label with no name shows a `?` and joins
   nothing. A node with a label shows its name instead of its number where the plots and probes name it: `V(OUT)`
   rather than `V(3)`, in the legends, the trace lists, the operating point table (as `OUT (3)`), the probe markers
-  and the hover. Math channel expressions still use node numbers. Labels are ordinary parts: they select, move,
-  turn, copy and paste like the others, and the netlist has no line for them.
+  and the hover. Math channels take the name too, as `V(OUT)`, and find the node again after edits that renumber
+  the nodes. Labels are ordinary parts: they select, move, turn, copy and paste like the others, and the netlist has
+  no line for them.
 - **Rotating and mirroring**: R, M (left to right) and Shift+M (top to bottom) turn the selection about its center;
   with one part selected, that part turns in place. The wires that meet the selection follow it. Hold Alt (Alt+R,
   Alt+M, Alt+Shift+M, or Edit > Keep Wires in Place) to turn the parts and leave every wire where it is, so nothing
@@ -101,20 +102,47 @@ How to read what imcsim measures, plots and exports. The [README](../README.md) 
   the list of analyses (operating point, transient, AC sweep, DC sweep, noise, transfer function and truth table) and the settings
   of the one picked, saved with the schematic. Suggest fills the transient times (five periods of the slowest source with a waveform, 200
   points in a period of the fastest) or the AC range (two decades past the RC, RL and LC corners and the op-amp
-  bandwidths). Nothing runs by itself: edit the circuit, then run again. View > Analysis Settings keeps the same
-  settings open in a window.
+  bandwidths). By default nothing runs by itself: edit the circuit, then run again, or turn on Run again after edits
+  in Edit > Preferences. With it on, once you have run the selected analysis, each change to the circuit (a value, a
+  part added, moved or deleted, an undo) runs it again once the circuit has stayed unchanged for Wait after an edit
+  (half a second unless you change it, from 0.1 to 5 seconds): while a value is being typed or something dragged it
+  waits, a burst of edits runs it once, and a run still going on is stopped first.
+  Opening another schematic does not run anything, and a live run already follows the parts set by hand. View >
+  Analysis Settings keeps the same settings open in a window.
+- **Stopping**: a run goes on in the background, so the editor stays usable. The ▶ button becomes a ■ Stop button, and the
+  status bar shows the run and, for a stepped analysis or a truth table, how much of it is done. A transient runs in
+  chunks: its plot opens in the Output window with the first one and grows as the others arrive, with a Stop button
+  and "Running, simulated up to 230ms of 1s" above it. Stop keeps the points made so far ("Stopped, simulated up to
+  530ms of 1s", and "Transient stopped" in the status bar). The transient plot shows a window of 2000 points at a time (a field
+  at its top right sets 1000 to 10000), so a long run stays quick to draw and to measure: a scroll bar the width of the
+  plot, with its time span written above it, moves the window along the run (the plot fits itself to every window), and
+  while the run goes on a Follow box keeps the window on the newest points. The schematic plays the same window: its
+  time bar, its heat colors and the playhead of the plot all go over the window, and while the window follows a run the
+  schematic shows the newest point. The statistics and the cursors work on the
+  points in the window. The SVG image is the window; a CSV table can be of the window or of the whole run, as Export
+  asks. The math channels are worked out over the whole run, so an integral starts at the start of the simulation, and
+  they wait, grayed out, for the end of a run that is still going on. The spectrum uses the whole run too. The other analyses stop between their steps (the values
+  of a stepped analysis, the combinations of a truth table) and drop their result, and a single simulation finishes
+  first. Editing the circuit also stops the run and drops what it made, since the answer would no longer fit.
 - **Status bar**: below the schematic, the keys of the current mode on the left; on the right, the grid position of
   the cursor and how the last run went ("Transient done", with warnings, or failed). Click the result for the
   errors, the warnings and the ngspice output.
-- **Menus**: File (files, import, examples and the schematic export), Edit (undo, redo and changes to the selection) and
-  View (fit, wire colors, symbol style, terminal numbers, theme, and the windows). The View choices are kept between
-  sessions. On macOS the shortcuts use Cmd where this guide says Ctrl: Cmd+S saves, Cmd+Z undoes.
+- **Menus**: File (files, import, examples and the schematic export), Edit (undo, redo, changes to the selection and
+  Preferences) and View (fit, wire colors, live effects, theme, and the windows). On macOS the shortcuts use Cmd where
+  this guide says Ctrl: Cmd+S saves, Cmd+Z undoes.
+- **Preferences**: Edit > Preferences (Ctrl+,) gathers your own choices, whatever schematic is open: the theme, IEC
+  or ANSI symbols, terminal numbers, wire colors, live effects, the series of standard values, whether a new result
+  brings the Output window to the front and whether the analysis runs again after edits. A change applies at once and is kept between sessions; Restore Defaults
+  sets them all back. Wire colors, live effects and the theme also have shortcuts in the View menu. The choices are
+  kept in `preferences.json` in your data folder (`~/.local/share/imcsim` on Linux, `~/Library/Application
+  Support/imcsim` on macOS, `%APPDATA%\imcsim` on Windows), which can be copied to another computer or deleted to
+  start over; what belongs to a circuit, such as the simulation settings, stays in its file.
 - **Themes**: View > Theme switches between nine themes, seven dark (Graphite, the default, Ember, Phosphor,
   Oscilloscope, Cyber Slate, Blueprint and Amber) and two light (Paper and Vintage); [Themes](themes.md) shows each
   one. Node and trace colors keep their hues in every theme: the light themes darken them to read on their
   background, and Phosphor, Oscilloscope, Cyber Slate, Blueprint and Amber brighten them.
 - **Output window**: hidden until an analysis runs; it then comes to the front on the tab of the new result. Turn
-  off View > Bring Output to Front on Results to keep the schematic in front: a dot on the Output tab then tells a
+  off Bring Output to front in Edit > Preferences to keep the schematic in front: a dot on the Output tab then tells a
   new result is waiting. The operating point tab lists the node voltages and part currents, which also show on the schematic. Reopen it from View.
 - **Window layout**: every window floats or docks. Drag a window by its title (or a docked one by its tab) onto
   the arrows that appear over another window to dock it on that side or as a tab; drop it anywhere else to let it
@@ -151,6 +179,39 @@ The colors keep one scale for the whole run, from its lowest to its highest volt
 so a value keeps its color from one instant to the next. A new result starts again at the beginning of the run, paused.
 The schematic shows the last of the operating point and the transient that ran; the bar is only there for a transient.
 
+## Live runs
+
+The **Live** button beside the analysis turns the next transient into a live run, which plays on the schematic while it
+is simulated and goes on until you stop it. It covers the stop time every **Live run** seconds of the transient
+settings (10 s at first, from 2 to 60), whatever the circuit: a circuit of a millisecond is slowed down so you can follow
+it, and one of a minute is sped up. The stop time is also how much of the run the plot and the schematic show at a time,
+the newest stretch, which scrolls as the run goes on.
+
+Only switches, push buttons, logic inputs and potentiometers change during a live run: they are outlined on the
+schematic while it lasts. Changing any other part, or the wiring, ends the run, and the properties of a part say so
+before you edit it. While it runs:
+
+- A click on a switch or a logic input flips it, a push button is pressed while the mouse button holds it down, and
+  the mouse wheel over a potentiometer moves its wiper by 5% a notch. The Closed, Pressed, High and Wiper fields of the
+  part's properties do the same. The circuit takes the change a few hundredths of a second later, and the plot shows it
+  at the instant it happened.
+- The schematic shows the newest point, the status bar reads "Transient live at 12.5ms", and the Output window marks
+  its tab with a dot instead of coming to the front, so the schematic stays in view.
+- **Stop** pauses the run and keeps every point it made: scroll back through it, play it on the time bar, export it, or
+  set switches for when it goes on. **Continue** (the Run button, or F5) takes the run on from where it stopped, at the
+  same pace. **Discard**, which takes the place of Live while a live run lasts, ends it and drops what it made; Run then
+  starts a new one from zero. The Output window offers the same buttons above the plot.
+- Running another analysis ends a paused live run and keeps its points, as a stopped transient. Any other edit ends
+  the run and drops it, as it does any run.
+
+A live run stops by itself after an hour on the clock, or sooner when it reaches a million time steps (a small time
+step for its stop time), with a warning: ngspice keeps every point of the run and cannot let go of the old ones, so its
+memory grows the longer the run goes on.
+
+Live works only for a transient, and not for a stepped one; when it cannot run, the button is grayed out and its
+tooltip says why. The result of a live run stays like any other, with the changes made during it, until the circuit is
+edited.
+
 ## Live effects
 
 **View > Live Effects** turns on effects drawn over any wire coloring, each on its own. Both read what the schematic
@@ -170,7 +231,7 @@ shows, an operating point or an instant of a transient, so they show nothing unt
 ## Terminals
 
 Every part with more than one terminal numbers them in the order the SPICE netlist lists them. Turn on
-**View > Terminal Numbers** to show the numbers, each beside a small ring at its terminal.
+**Terminal numbers** in Edit > Preferences to show the numbers, each beside a small ring at its terminal.
 
 | Part | Terminal 1 | Terminal 2 | Terminal 3 |
 |---|---|---|---|
@@ -296,7 +357,11 @@ their statistics and the exports always agree.
   axis again. The plot is left out when only logic signals are measured. The SVG export has the same panels and bit
   labels; the CSV lists the voltages.
 - Math channels are heavier lines; volts and amperes share the axes above, any other unit or none goes on a third
-  axis.
+  axis. Their trace pickers offer a labeled node by its name, and a typed expression may name it as `V(OUT)` or
+  `V(OUT, IN)`; a name of digits alone, such as `V(3)`, is a node number. The channels are saved with the schematic,
+  like the measured traces, but adding or editing one is not an unsaved change. A channel that names a net no label
+  has any longer keeps its expression and reads in red, with the reason in its tooltip and above the plot, instead
+  of disappearing.
 - The AC sweep is a Bode plot: magnitude in dB and phase in degrees, relative to the AC magnitude of the sources.
   That magnitude is set in Properties apart from the amplitude of the sine, as in SPICE, and is 1 by default, so
   the plot reads as gain while a transient uses the small amplitude a real circuit would see.
@@ -388,8 +453,8 @@ source sees and the output impedance looking back into the output, without a fre
 then set:
 
 - **Output**: the node the gain is measured at, picked as in the noise analysis and kept by a point of its node.
-- **Input**: a voltage source, current source or VCC. It needs no AC setting and no particular value: ngspice only
-  uses it to define the gain from it to the output, so a plain DC source works.
+- **Input**: a voltage or current source, VCC, clock or logic input. It needs no AC setting and no particular value:
+  ngspice only uses it to define the gain from it to the output, so a plain DC source works.
 
 The Transfer function tab of the Output window is a table of three values:
 

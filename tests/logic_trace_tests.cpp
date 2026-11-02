@@ -13,45 +13,45 @@
 #include <string_view>
 
 TEST_CASE("A voltage reads 1 above 70% of the logic level, 0 below 30% of it, and unknown between", "[logic_trace]") {
-    CHECK(GUI::ReadLogicState(5.0, 5.0) == GUI::LogicState::High);
-    CHECK(GUI::ReadLogicState(3.5, 5.0) == GUI::LogicState::High);
-    CHECK(GUI::ReadLogicState(3.4, 5.0) == GUI::LogicState::Unknown);
-    CHECK(GUI::ReadLogicState(2.5, 5.0) == GUI::LogicState::Unknown);
-    CHECK(GUI::ReadLogicState(1.6, 5.0) == GUI::LogicState::Unknown);
-    CHECK(GUI::ReadLogicState(1.5, 5.0) == GUI::LogicState::Low);
-    CHECK(GUI::ReadLogicState(0.0, 5.0) == GUI::LogicState::Low);
+    CHECK(GUI::ReadLogicState(5.0, 5.0) == GUI::LogicState::HIGH);
+    CHECK(GUI::ReadLogicState(3.5, 5.0) == GUI::LogicState::HIGH);
+    CHECK(GUI::ReadLogicState(3.4, 5.0) == GUI::LogicState::UNKNOWN);
+    CHECK(GUI::ReadLogicState(2.5, 5.0) == GUI::LogicState::UNKNOWN);
+    CHECK(GUI::ReadLogicState(1.6, 5.0) == GUI::LogicState::UNKNOWN);
+    CHECK(GUI::ReadLogicState(1.5, 5.0) == GUI::LogicState::LOW);
+    CHECK(GUI::ReadLogicState(0.0, 5.0) == GUI::LogicState::LOW);
     // The thresholds follow the level
-    CHECK(GUI::ReadLogicState(2.4, 3.3) == GUI::LogicState::High);
-    CHECK(GUI::ReadLogicState(2.4, 5.0) == GUI::LogicState::Unknown);
+    CHECK(GUI::ReadLogicState(2.4, 3.3) == GUI::LogicState::HIGH);
+    CHECK(GUI::ReadLogicState(2.4, 5.0) == GUI::LogicState::UNKNOWN);
 }
 
 TEST_CASE("A logic state is named as a logic analyzer writes it", "[logic_trace]") {
-    CHECK(std::string_view(GUI::GetLogicStateName(GUI::LogicState::Low)) == "0");
-    CHECK(std::string_view(GUI::GetLogicStateName(GUI::LogicState::High)) == "1");
-    CHECK(std::string_view(GUI::GetLogicStateName(GUI::LogicState::Unknown)) == "X");
+    CHECK(std::string_view(GUI::GetLogicStateName(GUI::LogicState::LOW)) == "0");
+    CHECK(std::string_view(GUI::GetLogicStateName(GUI::LogicState::HIGH)) == "1");
+    CHECK(std::string_view(GUI::GetLogicStateName(GUI::LogicState::UNKNOWN)) == "X");
 }
 
 TEST_CASE("A lane lays the three states at three heights above the bottom of its lane", "[logic_trace]") {
     const std::vector<double> voltages = {0.0, 5.0, 2.5, 4.6};
     const std::vector<double> bottom = GUI::BuildLane(voltages, 5.0, 0);
     REQUIRE(bottom.size() == voltages.size());
-    CHECK(bottom[0] == GUI::LaneLowOffset);
-    CHECK(bottom[1] == GUI::LaneHighOffset);
-    CHECK(bottom[2] == GUI::LaneUnknownOffset);
+    CHECK(bottom[0] == GUI::LANE_LOW_OFFSET);
+    CHECK(bottom[1] == GUI::LANE_HIGH_OFFSET);
+    CHECK(bottom[2] == GUI::LANE_UNKNOWN_OFFSET);
     // A high that a load pulls below the level is still high
-    CHECK(bottom[3] == GUI::LaneHighOffset);
+    CHECK(bottom[3] == GUI::LANE_HIGH_OFFSET);
 
     // Each lane stands one stride above the one below it, and a low lane's high stays below the next lane's low
     const std::vector<double> second = GUI::BuildLane(voltages, 5.0, 1);
-    CHECK(second[0] == GUI::LaneStride + GUI::LaneLowOffset);
-    CHECK(second[1] == GUI::LaneStride + GUI::LaneHighOffset);
-    CHECK(GUI::LaneHighOffset < GUI::LaneStride);
+    CHECK(second[0] == GUI::LANE_STRIDE + GUI::LANE_LOW_OFFSET);
+    CHECK(second[1] == GUI::LANE_STRIDE + GUI::LANE_HIGH_OFFSET);
+    CHECK(GUI::LANE_HIGH_OFFSET < GUI::LANE_STRIDE);
 }
 
 TEST_CASE("The logic nodes are those a gate or flip-flop is connected to, with their largest level", "[logic_trace]") {
-    Core::LogicPart gate(Core::ComponentType::And);
+    Core::LogicPart gate(Core::ComponentType::AND);
     gate.SetName("U1");
-    Core::LogicPart inverter(Core::ComponentType::Not);
+    Core::LogicPart inverter(Core::ComponentType::NOT);
     inverter.SetName("U2");
     inverter.SetParameters({.LogicLevel = 3.3, .PropagationDelay = 10e-9});
     Core::Resistor resistor;
@@ -92,16 +92,16 @@ TEST_CASE("A signal splits into the stretches that keep one logic state", "[logi
     // Each stretch runs to where the next starts, so together they cover the whole time
     CHECK(segments[0].From == 0.0);
     CHECK(segments[0].To == 2.0);
-    CHECK(segments[0].State == GUI::LogicState::Low);
+    CHECK(segments[0].State == GUI::LogicState::LOW);
     CHECK(segments[1].From == 2.0);
     CHECK(segments[1].To == 4.0);
-    CHECK(segments[1].State == GUI::LogicState::High);
+    CHECK(segments[1].State == GUI::LogicState::HIGH);
     CHECK(segments[2].From == 4.0);
     CHECK(segments[2].To == 5.0);
-    CHECK(segments[2].State == GUI::LogicState::Unknown);
+    CHECK(segments[2].State == GUI::LogicState::UNKNOWN);
     CHECK(segments[3].From == 5.0);
     CHECK(segments[3].To == 5.0);
-    CHECK(segments[3].State == GUI::LogicState::Low);
+    CHECK(segments[3].State == GUI::LogicState::LOW);
 }
 
 TEST_CASE("A signal that never changes is one segment, and no samples give none", "[logic_trace]") {
@@ -111,7 +111,7 @@ TEST_CASE("A signal that never changes is one segment, and no samples give none"
     REQUIRE(segments.size() == 1);
     CHECK(segments[0].From == 0.0);
     CHECK(segments[0].To == 2e-3);
-    CHECK(segments[0].State == GUI::LogicState::High);
+    CHECK(segments[0].State == GUI::LogicState::HIGH);
     CHECK(GUI::FindLogicSegments({}, {}, 5.0).empty());
 }
 
@@ -183,7 +183,7 @@ TEST_CASE("A signal that never changes is one cell, and too few samples give non
     const std::vector<GUI::LogicSignal> list = {{flat, 5.0}};
     const auto cells = GUI::FindBitCells(times, list, 0.0, 2e-3);
     REQUIRE(cells[0].size() == 1);
-    CHECK(cells[0][0].State == GUI::LogicState::High);
+    CHECK(cells[0][0].State == GUI::LogicState::HIGH);
     CHECK(GUI::FindBitCells(std::vector<double>{0.0}, list, 0.0, 1.0)[0].empty());
 }
 

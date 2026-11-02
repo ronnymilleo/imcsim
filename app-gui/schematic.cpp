@@ -20,7 +20,7 @@ namespace GUI {
 namespace {
 
 // Older steps are dropped beyond this, so a long session does not keep growing
-constexpr std::size_t MaxUndoSteps = 100;
+constexpr std::size_t MAX_UNDO_STEPS = 100;
 
 } // namespace
 
@@ -185,6 +185,7 @@ void Schematic::Replace(std::vector<std::unique_ptr<UIElement>> elements, std::v
     m_Wires = std::move(wires);
     m_SimulationSettings = std::move(settings);
     ++m_SimulationSettingsVersion;
+    ++m_DocumentVersion;
     InvalidateDerivedData();
     // The probes belong to the old content; whoever replaces it sets them again
     m_VoltageProbes.clear();
@@ -333,34 +334,53 @@ void Schematic::SetCurrentMeasured(const std::string &name, const bool measured)
 }
 
 /**
+ * @brief   Returns the math channels the plots add to the measured traces.
+ * @return  The channels, in the order they were added.
+ */
+const std::vector<MathChannel> &Schematic::GetMathChannels() const {
+    return m_MathChannels;
+}
+
+/**
+ * @brief   Replaces the math channels, as the Output window does when the user adds, edits or removes one.
+ * @param[in] channels  New channels.
+ */
+void Schematic::SetMathChannels(std::vector<MathChannel> channels) {
+    m_MathChannels = std::move(channels);
+}
+
+/**
  * @brief   Removes every measurement, so the plots start empty; for a new or opened schematic.
  */
 void Schematic::ClearMeasurements() {
     m_VoltageProbes.clear();
     m_MeasuredCurrents.clear();
+    m_MathChannels.clear();
 }
 
 /**
  * @brief   Describes the measurements for a file, with each voltage as a point of its node.
- * @return  The measured voltages and currents; nodes that no longer exist are left out.
+ * @return  The measured voltages and currents, and the math channels; nodes that no longer exist are left out.
  */
 SavedMeasurements Schematic::SaveMeasurements() {
     SavedMeasurements measurements;
-    GetConnectivity();
+    const Connectivity &connectivity = GetConnectivity();
     for (const VoltageProbe &probe : m_VoltageProbes) {
         if (probe.Node) {
-            if (const std::optional<GridPoint> point = m_Connectivity->FindPointOfNode(*probe.Node)) {
+            if (const std::optional<GridPoint> point = connectivity.FindPointOfNode(*probe.Node)) {
                 measurements.Voltages.push_back(*point);
             }
         }
     }
     measurements.Currents.assign(m_MeasuredCurrents.begin(), m_MeasuredCurrents.end());
+    measurements.MathChannels = m_MathChannels;
     return measurements;
 }
 
 /**
  * @brief   Replaces the measurements with those read from a file.
- * @param[in] measurements  Measured voltages and currents; call it after the content they refer to is in place.
+ * @param[in] measurements  Measured voltages and currents, and math channels; call it after the content they refer to
+ *                          is in place.
  * @note    Points that connect to nothing, or to ground, are skipped. Currents of parts that do not exist are kept
  *          but plot nothing, like after deleting a measured part.
  */
@@ -372,6 +392,7 @@ void Schematic::RestoreMeasurements(const SavedMeasurements &measurements) {
         }
     }
     m_MeasuredCurrents.insert(measurements.Currents.begin(), measurements.Currents.end());
+    m_MathChannels = measurements.MathChannels;
 }
 
 /**
@@ -444,6 +465,59 @@ void Schematic::MarkSaved(std::filesystem::path path) {
 }
 
 /**
+ * @brief   Records whether a live transient runs, so the parts the user sets by hand change in it.
+ * @param[in] is_live  True from the start of a live run to its end.
+ * @note    The changes the run has not taken are dropped when it ends.
+ */
+void Schematic::SetLiveRun(const bool is_live) {
+    m_IsLiveRun = is_live;
+    if (!is_live) {
+        m_LiveChanges.clear();
+    }
+}
+
+/**
+ * @brief   Tells whether a live transient runs.
+ * @return  True between SetLiveRun(true) and SetLiveRun(false).
+ */
+bool Schematic::IsLiveRun() const {
+    return m_IsLiveRun;
+}
+
+/**
+ * @brief   Records that the user flipped a switch, pressed or released a button, set a logic input or turned a
+ *          potentiometer.
+ * @param[in] component  The part, already in its new state.
+ * @note    It is a change like any other, saved and undone, but while a live run goes on it keeps the transient and
+ *          the circuit version, and queues the change for the run (TakeLiveChanges()); the other results no longer
+ *          match the circuit and are dropped. Without a live run, or for any other part, it is MarkModified().
+ */
+void Schematic::MarkLiveChanged(const Core::Component &component) {
+    if (!m_IsLiveRun || !Core::IsLiveChangeable(component.GetType())) {
+        MarkModified();
+        return;
+    }
+    m_Modified = true;
+    m_ChangedSinceCommit = true;
+    std::ranges::move(Core::DescribeLiveChange(component), std::back_inserter(m_LiveChanges));
+    m_OperatingPoint.reset();
+    m_ACSweep.reset();
+    m_ACSweepSteps.reset();
+    m_DCSweep.reset();
+    m_Noise.reset();
+    m_TransferFunction.reset();
+    m_TruthTable.reset();
+}
+
+/**
+ * @brief   Takes the changes the live run should apply.
+ * @return  The changes recorded by MarkLiveChanged() since the last call, in order.
+ */
+std::vector<Core::LiveChange> Schematic::TakeLiveChanges() {
+    return std::exchange(m_LiveChanges, {});
+}
+
+/**
  * @brief   Turns the changes made since the last call into one undo step.
  * @note    Call it once the user finishes an interaction, such as at the end of a frame with no item active, so
  *          a whole drag counts as one step. Changes that leave the schematic as it was add no step. A new step
@@ -458,7 +532,7 @@ void Schematic::CommitUndoStep() {
         return;
     }
     m_UndoSnapshots.push_back(std::move(m_CurrentSnapshot));
-    if (m_UndoSnapshots.size() > MaxUndoSteps) {
+    if (m_UndoSnapshots.size() > MAX_UNDO_STEPS) {
         m_UndoSnapshots.erase(m_UndoSnapshots.begin());
     }
     m_CurrentSnapshot = std::move(snapshot);
@@ -516,8 +590,9 @@ void Schematic::Redo() {
  */
 const Connectivity &Schematic::GetConnectivity() {
     if (!m_Connectivity) {
-        m_Connectivity.emplace(m_Elements, m_Wires);
+        const Connectivity &connectivity = m_Connectivity.emplace(m_Elements, m_Wires);
         FollowVoltageProbes();
+        return connectivity;
     }
     return *m_Connectivity;
 }
@@ -528,6 +603,23 @@ const Connectivity &Schematic::GetConnectivity() {
  */
 Core::Circuit Schematic::BuildCircuit() {
     return GUI::BuildCircuit(m_Elements, GetConnectivity());
+}
+
+/**
+ * @brief   Returns a number that changes whenever the circuit does.
+ * @return  A count of the edits that drop the results; it differs from an earlier value once the circuit was edited.
+ */
+std::size_t Schematic::GetCircuitVersion() const {
+    return m_CircuitVersion;
+}
+
+/**
+ * @brief   Returns a number that changes whenever the whole content is replaced, as by opening a file, an example or a
+ *          new schematic.
+ * @return  A count of the replacements; edits, undo and redo leave it alone.
+ */
+std::size_t Schematic::GetDocumentVersion() const {
+    return m_DocumentVersion;
 }
 
 /**
@@ -565,6 +657,39 @@ void Schematic::SetTransient(std::optional<Core::Transient> transient) {
     m_TransientSteps.reset();
     m_Transient = std::move(transient);
     ++m_TransientVersion;
+    ++m_TransientDataVersion;
+}
+
+/**
+ * @brief   Adds the points a transient has made since the last call to the one being made.
+ * @param[in] chunk  The new points, numbered like GetConnectivity(); the first chunk starts the result.
+ * @note    The result stays incomplete until SetTransient() stores the whole run. A chunk that does not fit the
+ *          result, because the circuit changed under it, is dropped.
+ */
+void Schematic::AppendTransient(Core::Transient chunk) {
+    if (!m_Transient) {
+        chunk.IsComplete = false;
+        SetTransient(std::move(chunk));
+        return;
+    }
+    Core::Transient &whole = *m_Transient;
+    const bool fits = whole.NodeVoltages.size() == chunk.NodeVoltages.size() &&
+                      std::ranges::equal(whole.Currents, chunk.Currents, {}, &Core::ComponentTrace::Name,
+                                         &Core::ComponentTrace::Name);
+    if (!fits) {
+        return;
+    }
+    whole.Times.insert(whole.Times.end(), chunk.Times.begin(), chunk.Times.end());
+    for (std::size_t node = 0; node < chunk.NodeVoltages.size(); ++node) {
+        whole.NodeVoltages[node].insert(whole.NodeVoltages[node].end(), chunk.NodeVoltages[node].begin(),
+                                        chunk.NodeVoltages[node].end());
+    }
+    for (std::size_t current = 0; current < chunk.Currents.size(); ++current) {
+        whole.Currents[current].Values.insert(whole.Currents[current].Values.end(),
+                                              chunk.Currents[current].Values.begin(),
+                                              chunk.Currents[current].Values.end());
+    }
+    ++m_TransientDataVersion;
 }
 
 /**
@@ -604,6 +729,7 @@ void Schematic::SetTransientSteps(StepFamily<Core::Transient> steps) {
     m_Transient = steps.Results[steps.Selected];
     m_TransientSteps = std::move(steps);
     ++m_TransientVersion;
+    ++m_TransientDataVersion;
 }
 
 /**
@@ -626,6 +752,7 @@ void Schematic::SelectTransientStep(const std::size_t step) {
     m_TransientSteps->Selected = step;
     m_Transient = m_TransientSteps->Results[step];
     ++m_TransientVersion;
+    ++m_TransientDataVersion;
 }
 
 /**
@@ -751,6 +878,14 @@ std::size_t Schematic::GetTransientVersion() const {
 }
 
 /**
+ * @brief   Returns a number that changes whenever the transient result changes, as a chunk is added too.
+ * @return  The data version; compare it with a stored one to know whether the points to draw changed.
+ */
+std::size_t Schematic::GetTransientDataVersion() const {
+    return m_TransientDataVersion;
+}
+
+/**
  * @brief   Returns a number that changes whenever an AC sweep result is stored.
  * @return  The AC sweep version; compare it with a stored one to know whether the result was replaced.
  */
@@ -791,6 +926,7 @@ std::size_t Schematic::GetTruthTableVersion() const {
 }
 
 void Schematic::InvalidateDerivedData() {
+    ++m_CircuitVersion;
     m_Connectivity.reset();
     m_OperatingPoint.reset();
     m_Transient.reset();
@@ -807,12 +943,13 @@ void Schematic::InvalidateDerivedData() {
 // node, because its net is ground or its wires are gone, it waits with the points it had and comes back when they
 // belong to a node again. Two probes that end up on one node are one
 void Schematic::FollowVoltageProbes() {
+    const Connectivity &connectivity = GetConnectivity();
     std::set<int> taken;
     std::vector<VoltageProbe> followed;
     for (VoltageProbe &probe : m_VoltageProbes) {
         std::map<int, int> votes;
         for (const GridPoint point : probe.Points) {
-            if (const std::optional<int> node = m_Connectivity->GetNode(point); node && *node != 0) {
+            if (const std::optional<int> node = connectivity.GetNode(point); node && *node != 0) {
                 ++votes[*node];
             }
         }
@@ -821,7 +958,7 @@ void Schematic::FollowVoltageProbes() {
             probe.Node.reset();
         } else if (taken.insert(best->first).second) {
             probe.Node = best->first;
-            probe.Points = m_Connectivity->GetPointsOfNode(best->first);
+            probe.Points = connectivity.GetPointsOfNode(best->first);
         } else {
             continue;
         }

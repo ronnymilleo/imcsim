@@ -24,6 +24,16 @@ enum class ExportFormat {
 };
 
 /**
+ * @struct  ExportChoice
+ * @brief   What the user asked the export popup to save: a format and, for a CSV table, whether it holds the whole run
+ * or only the points in view.
+ */
+struct ExportChoice {
+    ExportFormat Format = ExportFormat::SVG;
+    bool IsWholeRun = false;
+};
+
+/**
  * @class   PlotExporter
  * @brief   Asks how to export a plot, captures its figure, and writes it once the user picks a file.
  * @details The figure is captured when the user asks, so the file holds what the plot showed then, whatever happens
@@ -33,7 +43,7 @@ class PlotExporter {
 public:
     // Popup
     void OpenPopup();
-    std::optional<ExportFormat> DrawPopup(const std::string &plot_name, bool can_export);
+    std::optional<ExportChoice> DrawPopup(const std::string &plot_name, bool can_export, bool has_longer_run);
 
     // Saving
     void Start(ExportFigure figure, ExportFormat format, const std::optional<std::filesystem::path> &schematic_path,

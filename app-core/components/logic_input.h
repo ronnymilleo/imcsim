@@ -7,6 +7,7 @@
 #define IMCSIM_LOGIC_INPUT_H
 
 #include "component.h"
+#include <memory>
 
 namespace Core {
 
@@ -29,12 +30,15 @@ public:
     LogicInput();
     ~LogicInput() override = default;
 
+    std::unique_ptr<Component> Clone() const override;
+
     const LogicInputParameters &GetParameters() const;
     void SetParameters(const LogicInputParameters &parameters);
     static bool IsValidParameters(const LogicInputParameters &parameters);
 
     bool IsHigh() const;
     void SetHigh(bool high);
+    double GetVoltage() const;
 
 private:
     LogicInputParameters m_Parameters;

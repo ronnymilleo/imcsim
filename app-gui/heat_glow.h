@@ -15,7 +15,7 @@
 namespace GUI {
 
 // A resistor reaches full brightness at the largest power of the circuit and fades out this many decades below it
-inline constexpr double HeatGlowDecades = 2.0;
+inline constexpr double HEAT_GLOW_DECADES = 2.0;
 
 /**
  * @struct  HeatGlow

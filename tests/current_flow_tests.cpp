@@ -34,7 +34,7 @@ const GUI::WireCurrent &FindPiece(const std::vector<GUI::WireCurrent> &pieces, c
 
 TEST_CASE("Terminal currents follow the part: into the first terminal, out of the second", "[current_flow]") {
     const std::vector<Core::ComponentCurrent> currents = {{"R1", 2e-3}, {"Q1.C", 5e-3}, {"Q1.B", 1e-5}};
-    const auto resistor = Part(Core::ComponentType::Resistor, {0, 0}, "R1");
+    const auto resistor = Part(Core::ComponentType::RESISTOR, {0, 0}, "R1");
     CHECK(GUI::GetTerminalCurrent(resistor->GetComponent(), 0, currents) == 2e-3);
     CHECK(GUI::GetTerminalCurrent(resistor->GetComponent(), 1, currents) == -2e-3);
     const auto transistor = Part(Core::ComponentType::NPN, {0, 0}, "Q1");
@@ -42,7 +42,7 @@ TEST_CASE("Terminal currents follow the part: into the first terminal, out of th
     CHECK(GUI::GetTerminalCurrent(transistor->GetComponent(), 1, currents) == 1e-5);
     // The emitter current is missing from these results, and ground never has one
     CHECK_FALSE(GUI::GetTerminalCurrent(transistor->GetComponent(), 2, currents));
-    const auto ground = Part(Core::ComponentType::Ground, {0, 0}, "");
+    const auto ground = Part(Core::ComponentType::GROUND, {0, 0}, "");
     CHECK_FALSE(GUI::GetTerminalCurrent(ground->GetComponent(), 0, currents));
 }
 
@@ -50,8 +50,8 @@ TEST_CASE("Wires carry the current of the parts in a series loop", "[current_flo
     // A 1 mA supply at (0, 0) wired to R1 from (4, 0) to (8, 0), and R1 wired down to ground at (8, 4)
     std::vector<std::unique_ptr<GUI::UIElement>> elements;
     elements.push_back(Part(Core::ComponentType::VCC, {0, 0}, "V1"));
-    elements.push_back(Part(Core::ComponentType::Resistor, {6, 0}, "R1"));
-    elements.push_back(Part(Core::ComponentType::Ground, {8, 4}, ""));
+    elements.push_back(Part(Core::ComponentType::RESISTOR, {6, 0}, "R1"));
+    elements.push_back(Part(Core::ComponentType::GROUND, {8, 4}, ""));
     const std::vector<GUI::UIWire> wires = {{{0, 0}, {4, 0}}, {{8, 0}, {8, 4}}};
     const std::vector<Core::ComponentCurrent> currents = {{"V1", -1e-3}, {"R1", 1e-3}};
 
@@ -64,9 +64,9 @@ TEST_CASE("Wires carry the current of the parts in a series loop", "[current_flo
 TEST_CASE("A ground in the middle of a wire splits it where the return currents meet", "[current_flow]") {
     // R2 returns 2 mA at (0, 10) and R3 returns 3 mA at (10, 10), both into a ground wire grounded at (5, 10)
     std::vector<std::unique_ptr<GUI::UIElement>> elements;
-    elements.push_back(Part(Core::ComponentType::Resistor, {-2, 10}, "R2"));
-    elements.push_back(Part(Core::ComponentType::Resistor, {12, 10}, "R3"));
-    elements.push_back(Part(Core::ComponentType::Ground, {5, 10}, ""));
+    elements.push_back(Part(Core::ComponentType::RESISTOR, {-2, 10}, "R2"));
+    elements.push_back(Part(Core::ComponentType::RESISTOR, {12, 10}, "R3"));
+    elements.push_back(Part(Core::ComponentType::GROUND, {5, 10}, ""));
     const std::vector<GUI::UIWire> wires = {{{0, 10}, {10, 10}}};
     const std::vector<Core::ComponentCurrent> currents = {{"R2", 2e-3}, {"R3", -3e-3}};
 
@@ -80,7 +80,7 @@ TEST_CASE("A ground in the middle of a wire splits it where the return currents 
 TEST_CASE("Wires that close a loop inside a node carry the current on one path only", "[current_flow]") {
     std::vector<std::unique_ptr<GUI::UIElement>> elements;
     elements.push_back(Part(Core::ComponentType::VCC, {0, 0}, "V1"));
-    elements.push_back(Part(Core::ComponentType::Resistor, {6, 0}, "R1"));
+    elements.push_back(Part(Core::ComponentType::RESISTOR, {6, 0}, "R1"));
     // Two wires between the same points
     const std::vector<GUI::UIWire> wires = {{{0, 0}, {4, 0}}, {{0, 0}, {4, 0}}};
     const std::vector<Core::ComponentCurrent> currents = {{"V1", -1e-3}, {"R1", 1e-3}};
@@ -112,7 +112,7 @@ TEST_CASE("Control pins and the op-amp pins other than the output carry no curre
     CHECK(GUI::GetTerminalCurrent(source->GetComponent(), 2, currents) == 0.0);
     CHECK(GUI::GetTerminalCurrent(source->GetComponent(), 3, currents) == 0.0);
     // The output current of an op-amp returns through ground, not through its other pins
-    const auto op_amp = Part(Core::ComponentType::OpAmp, {0, 0}, "U1");
+    const auto op_amp = Part(Core::ComponentType::OP_AMP, {0, 0}, "U1");
     CHECK(GUI::GetTerminalCurrent(op_amp->GetComponent(), 0, currents) == 2e-3);
     for (std::size_t terminal = 1; terminal < 5; ++terminal) {
         CHECK(GUI::GetTerminalCurrent(op_amp->GetComponent(), terminal, currents) == 0.0);
@@ -123,13 +123,13 @@ TEST_CASE("A relay and a transformer have a current per pair of terminals, oppos
           "[current_flow]") {
     const std::vector<Core::ComponentCurrent> currents = {
         {"K1.S", 2e-3}, {"K1.C", 7e-2}, {"T1.P", 0.5}, {"T1.S", -0.25}};
-    const auto relay = Part(Core::ComponentType::Relay, {0, 0}, "K1");
+    const auto relay = Part(Core::ComponentType::RELAY, {0, 0}, "K1");
     // Contact terminals 0 and 1, coil terminals 2 and 3
     CHECK(GUI::GetTerminalCurrent(relay->GetComponent(), 0, currents) == 2e-3);
     CHECK(GUI::GetTerminalCurrent(relay->GetComponent(), 1, currents) == -2e-3);
     CHECK(GUI::GetTerminalCurrent(relay->GetComponent(), 2, currents) == 7e-2);
     CHECK(GUI::GetTerminalCurrent(relay->GetComponent(), 3, currents) == -7e-2);
-    const auto transformer = Part(Core::ComponentType::Transformer, {0, 0}, "T1");
+    const auto transformer = Part(Core::ComponentType::TRANSFORMER, {0, 0}, "T1");
     CHECK(GUI::GetTerminalCurrent(transformer->GetComponent(), 0, currents) == 0.5);
     CHECK(GUI::GetTerminalCurrent(transformer->GetComponent(), 1, currents) == -0.5);
     CHECK(GUI::GetTerminalCurrent(transformer->GetComponent(), 2, currents) == -0.25);

@@ -33,11 +33,11 @@ struct CurveFamily {
 };
 
 // Spread between the curves of a family, against their size, below which they count as one and get no labels
-inline constexpr double NegligibleSpread = 1e-6;
+inline constexpr double NEGLIGIBLE_SPREAD = 1e-6;
 // Below a femtovolt or a femtoampere a value is the rounding residue of the solver, such as 1e-170 V for a node at 0 V
-inline constexpr double ResidueLevel = 1e-15;
+inline constexpr double RESIDUE_LEVEL = 1e-15;
 // The input-referred noise takes a color of its own, apart from the node colors the output uses
-inline constexpr ImU32 InputNoiseColor = IM_COL32(150, 230, 90, 255);
+inline constexpr ImU32 INPUT_NOISE_COLOR = IM_COL32(150, 230, 90, 255);
 
 // Traces shown
 bool HasMeasuredCurrent(const std::vector<Core::ComponentTrace> &currents, const Schematic &schematic);

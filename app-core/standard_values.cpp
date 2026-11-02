@@ -19,13 +19,13 @@ namespace Core {
 namespace {
 
 // The IEC tables of the three oldest series were rounded by hand, so they are written out
-constexpr auto E6Mantissas = std::to_array<double>({1.0, 1.5, 2.2, 3.3, 4.7, 6.8});
-constexpr auto E12Mantissas = std::to_array<double>({1.0, 1.2, 1.5, 1.8, 2.2, 2.7, 3.3, 3.9, 4.7, 5.6, 6.8, 8.2});
-constexpr auto E24Mantissas = std::to_array<double>({1.0, 1.1, 1.2, 1.3, 1.5, 1.6, 1.8, 2.0, 2.2, 2.4, 2.7, 3.0,
-                                                     3.3, 3.6, 3.9, 4.3, 4.7, 5.1, 5.6, 6.2, 6.8, 7.5, 8.2, 9.1});
+constexpr auto E6_MANTISSAS = std::to_array<double>({1.0, 1.5, 2.2, 3.3, 4.7, 6.8});
+constexpr auto E12_MANTISSAS = std::to_array<double>({1.0, 1.2, 1.5, 1.8, 2.2, 2.7, 3.3, 3.9, 4.7, 5.6, 6.8, 8.2});
+constexpr auto E24_MANTISSAS = std::to_array<double>({1.0, 1.1, 1.2, 1.3, 1.5, 1.6, 1.8, 2.0, 2.2, 2.4, 2.7, 3.0,
+                                                      3.3, 3.6, 3.9, 4.3, 4.7, 5.1, 5.6, 6.2, 6.8, 7.5, 8.2, 9.1});
 
-constexpr auto SeriesNames = std::to_array<std::pair<ValueSeries, std::string_view>>({
-    {ValueSeries::Free, "Free"},
+constexpr auto SERIES_NAMES = std::to_array<std::pair<ValueSeries, std::string_view>>({
+    {ValueSeries::FREE, "Free"},
     {ValueSeries::E6, "E6"},
     {ValueSeries::E12, "E12"},
     {ValueSeries::E24, "E24"},
@@ -46,9 +46,9 @@ std::vector<double> ComputeMantissas(const int values_per_decade) {
 
 // The mantissas of a series, from 1 up to below 10; empty for the free series
 const std::vector<double> &GetMantissas(const ValueSeries series) {
-    static const std::vector<double> e6(E6Mantissas.begin(), E6Mantissas.end());
-    static const std::vector<double> e12(E12Mantissas.begin(), E12Mantissas.end());
-    static const std::vector<double> e24(E24Mantissas.begin(), E24Mantissas.end());
+    static const std::vector<double> e6(E6_MANTISSAS.begin(), E6_MANTISSAS.end());
+    static const std::vector<double> e12(E12_MANTISSAS.begin(), E12_MANTISSAS.end());
+    static const std::vector<double> e24(E24_MANTISSAS.begin(), E24_MANTISSAS.end());
     static const std::vector<double> e48 = ComputeMantissas(48);
     static const std::vector<double> e96 = ComputeMantissas(96);
     static const std::vector<double> e192 = ComputeMantissas(192);
@@ -66,7 +66,7 @@ const std::vector<double> &GetMantissas(const ValueSeries series) {
         return e96;
     case ValueSeries::E192:
         return e192;
-    case ValueSeries::Free:
+    case ValueSeries::FREE:
         break;
     }
     return free;
@@ -133,7 +133,7 @@ bool IsUsable(const double value) {
  * @return  "Free", "E6", "E12", "E24", "E48", "E96" or "E192".
  */
 const char *GetSeriesName(const ValueSeries series) {
-    const auto found = std::ranges::find(SeriesNames, series, &std::pair<ValueSeries, std::string_view>::first);
+    const auto found = std::ranges::find(SERIES_NAMES, series, &std::pair<ValueSeries, std::string_view>::first);
     return found->second.data();
 }
 
@@ -143,8 +143,8 @@ const char *GetSeriesName(const ValueSeries series) {
  * @return  The series, or no value for text that is not a name.
  */
 std::optional<ValueSeries> ParseSeriesName(const std::string_view text) {
-    const auto found = std::ranges::find(SeriesNames, text, &std::pair<ValueSeries, std::string_view>::second);
-    if (found == SeriesNames.end()) {
+    const auto found = std::ranges::find(SERIES_NAMES, text, &std::pair<ValueSeries, std::string_view>::second);
+    if (found == SERIES_NAMES.end()) {
         return std::nullopt;
     }
     return found->first;
@@ -169,7 +169,7 @@ double GetSeriesTolerancePercent(const ValueSeries series) {
         return 1.0;
     case ValueSeries::E192:
         return 0.5;
-    case ValueSeries::Free:
+    case ValueSeries::FREE:
         break;
     }
     return 0.0;
@@ -206,8 +206,8 @@ double StepStandardValue(const ValueSeries series, const double value, const int
     Position position = FindNearest(mantissas, value);
     const double nearest = ValueAt(mantissas, position);
     // The nearest value may already be on the right side of a value that is off the series
-    constexpr double SameValueTolerance = 1e-9;
-    const bool on_series = std::abs(nearest - value) <= SameValueTolerance * value;
+    constexpr double SAME_VALUE_TOLERANCE = 1e-9;
+    const bool on_series = std::abs(nearest - value) <= SAME_VALUE_TOLERANCE * value;
     const bool past = direction > 0 ? nearest > value : nearest < value;
     if (on_series || !past) {
         position = Shift(mantissas, position, direction);

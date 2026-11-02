@@ -16,7 +16,7 @@ namespace {
 // frame it docks, leaves nothing new for that update, so the selected tab stays in front
 void KeepTabBehind() {
     ImGuiWindow *window = ImGui::GetCurrentWindow();
-    ImGuiDockNode *node = window->DockNode;
+    const ImGuiDockNode *node = window->DockNode;
     if (node == nullptr || node->TabBar == nullptr ||
         ImGui::TabBarFindTabByID(node->TabBar, window->TabId) != nullptr) {
         return;

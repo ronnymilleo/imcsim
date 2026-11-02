@@ -12,9 +12,9 @@ namespace GUI {
 
 namespace {
 
-constexpr float LeadLength = 1.0f;
-constexpr float BarSpacing = 0.3f;
-constexpr float BarHalfWidths[] = {0.8f, 0.5f, 0.2f};
+constexpr float LEAD_LENGTH = 1.0f;
+constexpr float BAR_SPACING = 0.3f;
+constexpr float BAR_HALF_WIDTHS[] = {0.8f, 0.5f, 0.2f};
 
 } // namespace
 
@@ -28,15 +28,15 @@ UIGround::UIGround(const GridPoint position, const Rotation rotation)
 }
 
 void UIGround::DrawTerminals(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color) const {
-    canvas.AddLine(LocalToScreen(view, 0, 0), LocalToScreen(view, 0, LeadLength), color, LineThickness);
+    canvas.AddLine(LocalToScreen(view, 0, 0), LocalToScreen(view, 0, LEAD_LENGTH), color, LINE_THICKNESS);
 }
 
 void UIGround::DrawSymbol(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color,
                           SymbolStyle /*style*/) const {
-    float y = LeadLength;
-    for (const float half_width : BarHalfWidths) {
-        canvas.AddLine(LocalToScreen(view, -half_width, y), LocalToScreen(view, half_width, y), color, LineThickness);
-        y += BarSpacing;
+    float y = LEAD_LENGTH;
+    for (const float half_width : BAR_HALF_WIDTHS) {
+        canvas.AddLine(LocalToScreen(view, -half_width, y), LocalToScreen(view, half_width, y), color, LINE_THICKNESS);
+        y += BAR_SPACING;
     }
 }
 

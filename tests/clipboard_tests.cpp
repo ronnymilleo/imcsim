@@ -19,9 +19,9 @@ namespace {
 
 std::vector<std::unique_ptr<GUI::UIElement>> Parts() {
     std::vector<std::unique_ptr<GUI::UIElement>> elements;
-    elements.push_back(GUI::CreateElement(Core::ComponentType::Resistor, {10, 10}, GUI::Rotation::R0));
-    elements.push_back(GUI::CreateElement(Core::ComponentType::Capacitor, {20, 10}, GUI::Rotation::R90));
-    elements.push_back(GUI::CreateElement(Core::ComponentType::Resistor, {40, 30}, GUI::Rotation::R0));
+    elements.push_back(GUI::CreateElement(Core::ComponentType::RESISTOR, {10, 10}, GUI::Rotation::R0));
+    elements.push_back(GUI::CreateElement(Core::ComponentType::CAPACITOR, {20, 10}, GUI::Rotation::R90));
+    elements.push_back(GUI::CreateElement(Core::ComponentType::RESISTOR, {40, 30}, GUI::Rotation::R0));
     elements[0]->GetComponent().SetName("R1");
     elements[1]->GetComponent().SetName("C1");
     elements[2]->GetComponent().SetName("R2");
@@ -29,19 +29,19 @@ std::vector<std::unique_ptr<GUI::UIElement>> Parts() {
     return elements;
 }
 
-const std::vector<GUI::UIWire> Wires = {{{12, 10}, {18, 10}}, {{22, 10}, {30, 10}}, {{40, 28}, {40, 20}}};
+const std::vector<GUI::UIWire> WIRES = {{{12, 10}, {18, 10}}, {{22, 10}, {30, 10}}, {{40, 28}, {40, 20}}};
 
 } // namespace
 
 TEST_CASE("Copying keeps only the selected parts and wires and pastes back as they were", "[clipboard]") {
     const auto elements = Parts();
-    const std::string text = GUI::CopySelection(elements, Wires, {.Elements = {0, 1}, .Wires = {0}});
+    const std::string text = GUI::CopySelection(elements, WIRES, {.Elements = {0, 1}, .Wires = {0}});
 
     REQUIRE(GUI::LooksLikeCopiedSchematic(text));
     auto group = GUI::ParseCopiedSchematic(text);
     REQUIRE(group);
     REQUIRE(group->Elements.size() == 2);
-    CHECK(group->Elements[0]->GetComponent().GetType() == Core::ComponentType::Resistor);
+    CHECK(group->Elements[0]->GetComponent().GetType() == Core::ComponentType::RESISTOR);
     CHECK(group->Elements[0]->GetComponent().GetValue() == 4700.0);
     CHECK(group->Elements[0]->GetPosition() == GUI::GridPoint{10, 10});
     CHECK(group->Elements[1]->GetRotation() == GUI::Rotation::R90);
@@ -51,7 +51,7 @@ TEST_CASE("Copying keeps only the selected parts and wires and pastes back as th
 
 TEST_CASE("A group is held by the middle of the box around its parts and wire ends", "[clipboard]") {
     const auto elements = Parts();
-    auto group = GUI::ParseCopiedSchematic(GUI::CopySelection(elements, Wires, {.Elements = {0, 1}, .Wires = {0, 1}}));
+    auto group = GUI::ParseCopiedSchematic(GUI::CopySelection(elements, WIRES, {.Elements = {0, 1}, .Wires = {0, 1}}));
     REQUIRE(group);
     // From x = 10, the first part, to x = 30, the end of the last wire
     CHECK(group->Pivot == GUI::GridPoint{20, 10});
@@ -59,7 +59,7 @@ TEST_CASE("A group is held by the middle of the box around its parts and wire en
 
 TEST_CASE("Moving a group by its pivot moves its parts and wires together", "[clipboard]") {
     const auto elements = Parts();
-    auto group = GUI::ParseCopiedSchematic(GUI::CopySelection(elements, Wires, {.Elements = {0, 1}, .Wires = {0}}));
+    auto group = GUI::ParseCopiedSchematic(GUI::CopySelection(elements, WIRES, {.Elements = {0, 1}, .Wires = {0}}));
     REQUIRE(group);
 
     // The group is held at (15, 10), halfway between its parts, so it moves by (11, 4)
@@ -73,14 +73,14 @@ TEST_CASE("Moving a group by its pivot moves its parts and wires together", "[cl
 
 TEST_CASE("Turning a group about its pivot turns its parts and wires", "[clipboard]") {
     std::vector<std::unique_ptr<GUI::UIElement>> elements;
-    elements.push_back(GUI::CreateElement(Core::ComponentType::Resistor, {10, 10}, GUI::Rotation::R0));
+    elements.push_back(GUI::CreateElement(Core::ComponentType::RESISTOR, {10, 10}, GUI::Rotation::R0));
     const std::vector<GUI::UIWire> wires = {{{12, 10}, {18, 10}}};
     auto group = GUI::ParseCopiedSchematic(GUI::CopySelection(elements, wires, {.Elements = {0}, .Wires = {0}}));
     REQUIRE(group);
     // The box runs from x = 10, the part, to 18, the end of the wire, so the pivot is (14, 10)
     REQUIRE(group->Pivot == GUI::GridPoint{14, 10});
 
-    GUI::TransformGroup(*group, {.Type = GUI::PointTransform::Kind::QuarterTurn, .Delta = {}, .Pivot = {}});
+    GUI::TransformGroup(*group, {.Type = GUI::PointTransform::Kind::QUARTER_TURN, .Delta = {}, .Pivot = {}});
     CHECK(group->Pivot == GUI::GridPoint{14, 10});
     CHECK(group->Elements[0]->GetPosition() == GUI::GridPoint{14, 6});
     CHECK(group->Elements[0]->GetRotation() == GUI::Rotation::R90);
@@ -93,7 +93,7 @@ TEST_CASE("Text that is not a schematic, or has nothing in it, cannot be pasted"
     CHECK_FALSE(GUI::ParseCopiedSchematic("R1 1 0 1k"));
     CHECK_FALSE(GUI::ParseCopiedSchematic("{\"hello\": 1}"));
     const auto elements = Parts();
-    CHECK_FALSE(GUI::ParseCopiedSchematic(GUI::CopySelection(elements, Wires, {})));
+    CHECK_FALSE(GUI::ParseCopiedSchematic(GUI::CopySelection(elements, WIRES, {})));
 }
 
 TEST_CASE("What cannot be read is left out and reported", "[clipboard]") {
@@ -114,7 +114,7 @@ TEST_CASE("Pasted parts get the next free names of the schematic", "[clipboard]"
     for (auto &element : Parts()) {
         schematic.AddElement(std::move(element));
     }
-    auto group = GUI::ParseCopiedSchematic(GUI::CopySelection(schematic.GetElements(), Wires, {.Elements = {0, 1}}));
+    auto group = GUI::ParseCopiedSchematic(GUI::CopySelection(schematic.GetElements(), WIRES, {.Elements = {0, 1}}));
     REQUIRE(group);
 
     for (auto &element : group->Elements) {
@@ -143,11 +143,11 @@ TEST_CASE("A schematic with nothing in it cannot be placed", "[clipboard]") {
 
 TEST_CASE("A copied clock and logic input keep their figures", "[clipboard]") {
     std::vector<std::unique_ptr<GUI::UIElement>> elements;
-    elements.push_back(GUI::CreateElement(Core::ComponentType::Clock, {0, 0}, GUI::Rotation::R0));
+    elements.push_back(GUI::CreateElement(Core::ComponentType::CLOCK, {0, 0}, GUI::Rotation::R0));
     auto &clock = static_cast<Core::Clock &>(elements.back()->GetComponent());
     clock.SetName("V1");
     clock.SetParameters({.Frequency = 4e3, .DutyCycle = 0.75, .LogicLevel = 3.3, .StartDelay = 2e-3});
-    elements.push_back(GUI::CreateElement(Core::ComponentType::LogicInput, {8, 0}, GUI::Rotation::R0));
+    elements.push_back(GUI::CreateElement(Core::ComponentType::LOGIC_INPUT, {8, 0}, GUI::Rotation::R0));
     auto &input = static_cast<Core::LogicInput &>(elements.back()->GetComponent());
     input.SetName("V2");
     input.SetParameters({.LogicLevel = 3.3});
@@ -166,7 +166,7 @@ TEST_CASE("A copied clock and logic input keep their figures", "[clipboard]") {
 
 TEST_CASE("A copied net label keeps its name and joins the net it is pasted into", "[clipboard]") {
     GUI::Schematic schematic;
-    schematic.AddElement(GUI::CreateElement(Core::ComponentType::NetLabel, {0, 0}, GUI::Rotation::R0));
+    schematic.AddElement(GUI::CreateElement(Core::ComponentType::NET_LABEL, {0, 0}, GUI::Rotation::R0));
     static_cast<Core::NetLabel &>(schematic.GetElement(0).GetComponent()).SetNet("OUT");
 
     auto group = GUI::ParseCopiedSchematic(GUI::CopySelection(schematic.GetElements(), {}, {.Elements = {0}}));

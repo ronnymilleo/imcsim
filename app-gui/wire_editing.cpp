@@ -181,13 +181,13 @@ void AddConnectors(std::vector<UIWire> &result, const UIWire &carried, const UIW
  */
 GridPoint PointTransform::Apply(const GridPoint point) const {
     switch (Type) {
-    case Kind::Translate:
+    case Kind::TRANSLATE:
         return point + Delta;
-    case Kind::QuarterTurn:
+    case Kind::QUARTER_TURN:
         return Pivot + Rotate(point - Pivot, Rotation::R90);
-    case Kind::MirrorLeftRight:
+    case Kind::MIRROR_LEFT_RIGHT:
         return {2 * Pivot.X - point.X, point.Y};
-    case Kind::MirrorTopBottom:
+    case Kind::MIRROR_TOP_BOTTOM:
         return {point.X, 2 * Pivot.Y - point.Y};
     }
     return point;

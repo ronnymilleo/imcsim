@@ -65,7 +65,7 @@ TEST_CASE("ChooseSpectrumSampleCount follows the samples in the span", "[spectru
 TEST_CASE("ComputeSpectrum reads the peak amplitude and the mean of a sine", "[spectrum]") {
     // Ten periods of 1 kHz with 1 V of offset
     const Trace trace = Sample([](const double time) { return 1.0 + Sine(2.0, 1e3, time); }, 10e-3, 4000);
-    for (const GUI::SpectrumWindow window : {GUI::SpectrumWindow::Rectangular, GUI::SpectrumWindow::Hann}) {
+    for (const GUI::SpectrumWindow window : {GUI::SpectrumWindow::RECTANGULAR, GUI::SpectrumWindow::HANN}) {
         const auto spectrum = GUI::ComputeSpectrum(trace.Xs, trace.Ys, 0.0, 10e-3, 4096, window);
         REQUIRE(spectrum);
         REQUIRE(spectrum->Frequencies.size() == 2049);
@@ -78,11 +78,11 @@ TEST_CASE("ComputeSpectrum reads the peak amplitude and the mean of a sine", "[s
 
 TEST_CASE("ComputeSpectrum rejects spans without a trace and odd sample counts", "[spectrum]") {
     const Trace trace = Sample([](const double time) { return Sine(1.0, 1e3, time); }, 1e-3, 100);
-    CHECK_FALSE(GUI::ComputeSpectrum(trace.Xs, trace.Ys, 2e-3, 3e-3, 1024, GUI::SpectrumWindow::Hann));
-    CHECK_FALSE(GUI::ComputeSpectrum(trace.Xs, trace.Ys, 0.0, 1e-3, 1000, GUI::SpectrumWindow::Hann));
-    CHECK_FALSE(GUI::ComputeSpectrum({}, {}, 0.0, 1e-3, 1024, GUI::SpectrumWindow::Hann));
+    CHECK_FALSE(GUI::ComputeSpectrum(trace.Xs, trace.Ys, 2e-3, 3e-3, 1024, GUI::SpectrumWindow::HANN));
+    CHECK_FALSE(GUI::ComputeSpectrum(trace.Xs, trace.Ys, 0.0, 1e-3, 1000, GUI::SpectrumWindow::HANN));
+    CHECK_FALSE(GUI::ComputeSpectrum({}, {}, 0.0, 1e-3, 1024, GUI::SpectrumWindow::HANN));
     // Reversed ends measure the same span
-    CHECK(GUI::ComputeSpectrum(trace.Xs, trace.Ys, 1e-3, 0.0, 1024, GUI::SpectrumWindow::Hann));
+    CHECK(GUI::ComputeSpectrum(trace.Xs, trace.Ys, 1e-3, 0.0, 1024, GUI::SpectrumWindow::HANN));
 }
 
 TEST_CASE("AnalyzeHarmonics measures the distortion of a clipped-like signal", "[spectrum]") {
@@ -95,7 +95,7 @@ TEST_CASE("AnalyzeHarmonics measures the distortion of a clipped-like signal", "
 
     SECTION("with a whole number of periods and a rectangular window") {
         const auto spectrum =
-            GUI::ComputeSpectrum(trace.Xs, trace.Ys, 0.0, 20e-3, 32768, GUI::SpectrumWindow::Rectangular);
+            GUI::ComputeSpectrum(trace.Xs, trace.Ys, 0.0, 20e-3, 32768, GUI::SpectrumWindow::RECTANGULAR);
         REQUIRE(spectrum);
         const GUI::HarmonicAnalysis analysis = GUI::AnalyzeHarmonics(*spectrum, 10);
         REQUIRE(analysis.Harmonics.size() == 10);
@@ -110,7 +110,7 @@ TEST_CASE("AnalyzeHarmonics measures the distortion of a clipped-like signal", "
     }
     SECTION("with a span that cuts a period and a Hann window") {
         const auto spectrum =
-            GUI::ComputeSpectrum(trace.Xs, trace.Ys, 0.3e-3, 17.55e-3, 32768, GUI::SpectrumWindow::Hann);
+            GUI::ComputeSpectrum(trace.Xs, trace.Ys, 0.3e-3, 17.55e-3, 32768, GUI::SpectrumWindow::HANN);
         REQUIRE(spectrum);
         const GUI::HarmonicAnalysis analysis = GUI::AnalyzeHarmonics(*spectrum, 10);
         REQUIRE(analysis.Harmonics.size() >= 3);
@@ -124,7 +124,7 @@ TEST_CASE("AnalyzeHarmonics measures the distortion of a clipped-like signal", "
 
 TEST_CASE("AnalyzeHarmonics finds no fundamental in a constant trace", "[spectrum]") {
     const Trace trace = Sample([](double) { return 5.0; }, 1e-3, 1000);
-    const auto spectrum = GUI::ComputeSpectrum(trace.Xs, trace.Ys, 0.0, 1e-3, 1024, GUI::SpectrumWindow::Hann);
+    const auto spectrum = GUI::ComputeSpectrum(trace.Xs, trace.Ys, 0.0, 1e-3, 1024, GUI::SpectrumWindow::HANN);
     REQUIRE(spectrum);
     const GUI::HarmonicAnalysis analysis = GUI::AnalyzeHarmonics(*spectrum, 10);
     CHECK_THAT(analysis.Mean, WithinRel(5.0, 1e-9));
@@ -135,7 +135,7 @@ TEST_CASE("AnalyzeHarmonics finds no fundamental in a constant trace", "[spectru
 TEST_CASE("AnalyzeHarmonics stops at half the sampling rate", "[spectrum]") {
     // 1024 samples over 1 ms put half the sampling rate at 512 kHz, past the third harmonic of 150 kHz only
     const Trace trace = Sample([](const double time) { return Sine(1.0, 150e3, time); }, 1e-3, 20000);
-    const auto spectrum = GUI::ComputeSpectrum(trace.Xs, trace.Ys, 0.0, 1e-3, 1024, GUI::SpectrumWindow::Hann);
+    const auto spectrum = GUI::ComputeSpectrum(trace.Xs, trace.Ys, 0.0, 1e-3, 1024, GUI::SpectrumWindow::HANN);
     REQUIRE(spectrum);
     const GUI::HarmonicAnalysis analysis = GUI::AnalyzeHarmonics(*spectrum, 10);
     CHECK(analysis.Harmonics.size() == 3);
@@ -155,7 +155,7 @@ TEST_CASE("ToDecibels floors the residue 200 dB below the strongest bin", "[spec
 TEST_CASE("AnalyzeHarmonics asks for more periods when the peaks would overlap", "[spectrum]") {
     // Three periods: enough for the rectangular window, too few for the wider peaks of Hann
     const Trace trace = Sample([](const double time) { return 0.5 + Sine(1.0, 1e3, time); }, 3e-3, 3000);
-    const auto hann = GUI::ComputeSpectrum(trace.Xs, trace.Ys, 0.0, 3e-3, 4096, GUI::SpectrumWindow::Hann);
+    const auto hann = GUI::ComputeSpectrum(trace.Xs, trace.Ys, 0.0, 3e-3, 4096, GUI::SpectrumWindow::HANN);
     REQUIRE(hann);
     const GUI::HarmonicAnalysis hann_analysis = GUI::AnalyzeHarmonics(*hann, 10);
     CHECK(hann_analysis.Harmonics.empty());
@@ -163,7 +163,7 @@ TEST_CASE("AnalyzeHarmonics asks for more periods when the peaks would overlap",
     CHECK_THAT(hann_analysis.Mean, WithinRel(0.5, 1e-3));
 
     const auto rectangular =
-        GUI::ComputeSpectrum(trace.Xs, trace.Ys, 0.0, 3e-3, 4096, GUI::SpectrumWindow::Rectangular);
+        GUI::ComputeSpectrum(trace.Xs, trace.Ys, 0.0, 3e-3, 4096, GUI::SpectrumWindow::RECTANGULAR);
     REQUIRE(rectangular);
     const GUI::HarmonicAnalysis rectangular_analysis = GUI::AnalyzeHarmonics(*rectangular, 10);
     CHECK_FALSE(rectangular_analysis.PeriodsNeeded);

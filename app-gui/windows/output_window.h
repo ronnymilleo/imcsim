@@ -6,6 +6,7 @@
 #ifndef IMCSIM_OUTPUT_WINDOW_H
 #define IMCSIM_OUTPUT_WINDOW_H
 
+#include "analysis_controls.h"
 #include "implot.h"
 #include "logic_trace.h"
 #include "math_channels.h"
@@ -13,6 +14,8 @@
 #include "plot_export.h"
 #include "plot_exporter.h"
 #include "plot_types.h"
+#include "point_window.h"
+#include "preferences.h"
 #include "schematic.h"
 #include "simulator.h"
 #include "trace_fit_state.h"
@@ -30,14 +33,14 @@ namespace GUI {
  * @brief   The tabs of the Output window, one per analysis, and the spectrum of the transient.
  */
 enum class PlotTab {
-    OperatingPoint,
-    Transient,
-    Spectrum,
-    ACSweep,
-    DCSweep,
-    Noise,
-    TransferFunction,
-    TruthTable
+    OPERATING_POINT,
+    TRANSIENT,
+    SPECTRUM,
+    AC_SWEEP,
+    DC_SWEEP,
+    NOISE,
+    TRANSFER_FUNCTION,
+    TRUTH_TABLE
 };
 
 /**
@@ -67,12 +70,11 @@ enum class PlotTab {
  */
 class OutputWindow : public AppWindow {
 public:
-    OutputWindow(Schematic &schematic, TransientPlayback &playback);
+    OutputWindow(Schematic &schematic, AnalysisControls &controls, TransientPlayback &playback,
+                 const Preferences &preferences);
     ~OutputWindow() override = default;
 
-    void ShowTab(PlotTab tab);
-    void DrawViewMenuItems();
-    void RegisterSettingsHandler();
+    void ShowTab(PlotTab tab, bool may_come_to_front = true);
 
 private:
     /**
@@ -81,6 +83,10 @@ private:
      *          and whether any trace is measured.
      */
     struct FrameResults {
+        // The points of the transient in the window, and the steps of the same analysis cut to the same stretch of
+        // time: the plot and its statistics only ever see these
+        std::optional<Core::Transient> TransientWindow;
+        std::optional<StepFamily<Core::Transient>> StepWindows;
         std::vector<MathTrace> TransientMath;
         std::vector<std::string> TransientErrors;
         // One list of channels per curve of the DC sweep
@@ -89,8 +95,22 @@ private:
         bool AnythingMeasured = false;
     };
 
+    /**
+     * @struct  FullMath
+     * @brief   The math channels worked out over the whole run, and what they were worked out for.
+     */
+    struct FullMath {
+        std::size_t DataVersion = 0;
+        std::string Signature;
+        std::vector<MathTrace> Traces;
+        std::vector<std::string> Errors;
+    };
+
     Schematic &m_Schematic;
+    AnalysisControls &m_Controls;
     TransientPlayback &m_Playback;
+    // Whether a new result brings the window to the front
+    const Preferences &m_Preferences;
     // What each plot showed last frame, so its axes fit for a new result and when its traces change
     TraceFitState m_TransientFit;
     TraceFitState m_ACSweepFit;
@@ -100,24 +120,28 @@ private:
     PlotCursors m_ACSweepCursors;
     PlotCursors m_DCSweepCursors;
     PlotSpan m_TransientView;
+    // The data version of the transient drawn last frame, to fit the axes as a run that is still going on grows
+    std::size_t m_DrawnTransientDataVersion = 0;
+    // The window the plot drew last frame, so a window that moved or changed size fits the axes
+    PointWindow m_DrawnWindow;
+    // Over the whole run, or none while it grows; the plot of a run in progress evaluates the window instead
+    std::optional<FullMath> m_FullMath;
     // Whether the signals of logic parts get a lane each, in a plot of their own under the analog one
     bool m_ShowLogicLanes = true;
     // Whether each steady stretch of a lane is labeled 0, 1 or X
     bool m_ShowBitValues = false;
     PlotSpan m_ACSweepView{.From = 1.0, .To = 1e6};
     // Spectrum of the transient: its window and frequency scale, its visible range and the last spectra computed
-    SpectrumWindow m_SpectrumWindow = SpectrumWindow::Hann;
+    SpectrumWindow m_SpectrumWindow = SpectrumWindow::HANN;
     bool m_SpectrumLogarithmic = false;
     PlotSpan m_SpectrumView;
     std::optional<TransientSpectra> m_Spectra;
     bool m_SpectraChanged = false;
     MathChannels m_MathChannels;
     // The tab shown this frame, which Export saves
-    PlotTab m_ShownTab = PlotTab::Transient;
+    PlotTab m_ShownTab = PlotTab::TRANSIENT;
     // Tab to bring to the front on the next frame, after a new result
     std::optional<PlotTab> m_TabToShow;
-    // View preference, kept in imgui.ini: whether a new result brings the window to the front
-    bool m_FrontOnNewResult = true;
     PlotSpan m_DCSweepView;
     // Noise: the result its axes were fitted to, its visible range and the parts whose share it plots
     TraceFitState m_NoiseFit;
@@ -129,6 +153,7 @@ private:
     void Draw() override;
     const std::vector<Core::ComponentTrace> &GetListedCurrents() const;
     std::size_t GetListedNodeCount() const;
+    void UpdateFullMath();
     FrameResults EvaluateFrame(std::size_t node_count, const std::vector<Core::ComponentTrace> &currents) const;
     void DrawTraceList(std::size_t node_count, const std::vector<Core::ComponentTrace> &currents);
 
@@ -143,8 +168,14 @@ private:
     void DrawTruthTableTab();
 
     // Plots
-    void DrawTransient(const Core::Transient &transient, const std::vector<MathTrace> &math);
+    void DrawIncompleteNote(const Core::Transient &transient);
+    void DrawLiveNote(const Core::Transient &transient);
+    void DrawWindowControls(const Core::Transient &shown);
+    void DrawWindowSize(ImVec2 row_start, float width);
+    void DrawTransient(const Core::Transient &transient, const std::vector<MathTrace> &math,
+                       const std::optional<StepFamily<Core::Transient>> &steps);
     void DrawTransientAnalog(const Core::Transient &transient, const std::vector<MathTrace> &math,
+                             const std::optional<StepFamily<Core::Transient>> &steps,
                              const std::vector<int> &lane_nodes, bool show_currents, bool has_voltages, float height);
     void DrawLogicLanes(const Core::Transient &transient, const std::vector<LogicNode> &lanes, float height);
     std::vector<LogicNode> FindMeasuredLanes(std::size_t node_count) const;
@@ -170,7 +201,9 @@ private:
     // Export
     void DrawExportButton(ImVec2 tab_row, float tab_row_width, float export_width, const FrameResults &frame);
     bool CanExport(const FrameResults &frame) const;
-    ExportFigure BuildShownFigure(const FrameResults &frame) const;
+    bool HasLongerRun() const;
+    ExportFigure BuildShownTransientFigure(const FrameResults &frame, bool is_whole_run) const;
+    ExportFigure BuildShownFigure(const FrameResults &frame, bool is_whole_run) const;
 };
 
 } // namespace GUI

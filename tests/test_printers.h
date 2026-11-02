@@ -1,12 +1,13 @@
 /**
  * @file    test_printers.h
- * @brief   Teaches Catch2 how to print editor types, so failed checks show the values instead of "{?}".
+ * @brief   Teaches Catch2 how to print editor and simulation types, so failed checks show the values instead of "{?}".
  */
 
 #ifndef IMCSIM_TEST_PRINTERS_H
 #define IMCSIM_TEST_PRINTERS_H
 
 #include "helpers.h"
+#include "live_change.h"
 #include "ui_elements/ui_wire.h"
 #include <catch2/catch_tostring.hpp>
 #include <format>
@@ -20,6 +21,13 @@ template <> struct Catch::StringMaker<GUI::GridPoint> {
 template <> struct Catch::StringMaker<GUI::UIWire> {
     static std::string convert(const GUI::UIWire &wire) {
         return std::format("({}, {})-({}, {})", wire.GetStart().X, wire.GetStart().Y, wire.GetEnd().X, wire.GetEnd().Y);
+    }
+};
+
+template <> struct Catch::StringMaker<Core::LiveChange> {
+    static std::string convert(const Core::LiveChange &change) {
+        return std::format("{} {} = {}", change.Element,
+                           change.Quantity == Core::LiveQuantity::RESISTANCE ? "resistance" : "dc", change.Value);
     }
 };
 

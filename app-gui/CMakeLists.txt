@@ -5,13 +5,15 @@
 add_library(imcsim-gui-lib
         STATIC
             analysis_controls.cpp
+            analysis_inputs.cpp
+            analysis_settings_panel.cpp
+            auto_rerun.cpp
             application.cpp
             canvas_view.cpp
             circuit_snapshot.cpp
             clipboard.cpp
             connectivity.cpp
             current_flow.cpp
-            editor_preferences.cpp
             element_factory.cpp
             examples.cpp
             file_dialog.cpp
@@ -20,7 +22,9 @@ add_library(imcsim-gui-lib
             heat_glow.cpp
             helpers.cpp
             led_glow.cpp
+            live_input.cpp
             logic_trace.cpp
+            math_channel.cpp
             math_channels.cpp
             node_colors.cpp
             parameter_step.cpp
@@ -30,6 +34,8 @@ add_library(imcsim-gui-lib
             plot_exporter.cpp
             plot_figures.cpp
             plot_helpers.cpp
+            point_window.cpp
+            preferences.cpp
             probing.cpp
             schematic.cpp
             schematic_canvas.cpp
@@ -37,12 +43,14 @@ add_library(imcsim-gui-lib
             schematic_file.cpp
             schematic_file_actions.cpp
             selection.cpp
+            simulation_settings.cpp
             spectrum.cpp
             svg_writer.cpp
             theme.cpp
             trace_fit_state.cpp
             trace_math.cpp
             trace_statistics.cpp
+            transient_window.cpp
             truth_table.cpp
             ui_elements/ui_bjt.cpp
             ui_elements/ui_capacitor.cpp
@@ -73,6 +81,7 @@ add_library(imcsim-gui-lib
             windows/editor_window.cpp
             windows/netlist_window.cpp
             windows/output_window.cpp
+            windows/preferences_window.cpp
             windows/properties_window.cpp
             windows/simulation_window.cpp
             wire_editing.cpp

@@ -16,7 +16,7 @@ namespace {
 // ImGui sizes a font by its full height, from ascent to descent; SVG and CSS by its em square, which is smaller.
 // Common sans fonts span about 1.33 em (Noto Sans 1.36, Inter 1.21, DejaVu Sans 1.16), so this keeps exported text
 // close to the size it has on screen
-constexpr float ImGuiToSvgFontSize = 0.75f;
+constexpr float IM_GUI_TO_SVG_FONT_SIZE = 0.75f;
 
 SvgPoint ToSvg(const ImVec2 point) {
     return {point.x, point.y};
@@ -136,8 +136,8 @@ void SvgCanvas::AddText(ImFont *font, const float font_size, const ImVec2 positi
                         const char *text) {
     const ImVec2 size = font->CalcTextSizeA(font_size, FLT_MAX, 0.0f, text);
     const float ascent = font->GetFontBaked(font_size)->Ascent;
-    m_Svg.Text({position.x + size.x / 2.0f, position.y + ascent}, text, font_size * ImGuiToSvgFontSize, Convert(color),
-               TextAnchor::Middle);
+    m_Svg.Text({position.x + size.x / 2.0f, position.y + ascent}, text, font_size * IM_GUI_TO_SVG_FONT_SIZE,
+               Convert(color), TextAnchor::MIDDLE);
     Cover(position, 0.0f);
     Cover(position + size, 0.0f);
 }

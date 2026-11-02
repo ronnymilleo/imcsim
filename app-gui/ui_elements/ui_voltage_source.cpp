@@ -12,10 +12,10 @@ namespace GUI {
 
 namespace {
 
-constexpr float SignHalfSize = 0.15f;
-constexpr float SignOffset = 0.4f;
-constexpr float IECPlusPosition = 1.4f;
-constexpr float IECPlusHeight = 0.4f;
+constexpr float SIGN_HALF_SIZE = 0.15f;
+constexpr float SIGN_OFFSET = 0.4f;
+constexpr float IEC_PLUS_POSITION = 1.4f;
+constexpr float IEC_PLUS_HEIGHT = 0.4f;
 
 } // namespace
 
@@ -38,22 +38,24 @@ void UIVoltageSource::DrawSymbol(SchematicCanvas &canvas, const ViewTransform &v
 
     if (style == SymbolStyle::IEC) {
         // IEC draws the conductor through the circle and marks the positive side outside it
-        canvas.AddLine(LocalToScreen(view, -CircleRadius, 0), LocalToScreen(view, CircleRadius, 0), color,
-                       LineThickness);
-        canvas.AddLine(LocalToScreen(view, -IECPlusPosition - SignHalfSize, -IECPlusHeight),
-                       LocalToScreen(view, -IECPlusPosition + SignHalfSize, -IECPlusHeight), color, LineThickness);
-        canvas.AddLine(LocalToScreen(view, -IECPlusPosition, -IECPlusHeight - SignHalfSize),
-                       LocalToScreen(view, -IECPlusPosition, -IECPlusHeight + SignHalfSize), color, LineThickness);
+        canvas.AddLine(LocalToScreen(view, -CIRCLE_RADIUS, 0), LocalToScreen(view, CIRCLE_RADIUS, 0), color,
+                       LINE_THICKNESS);
+        canvas.AddLine(LocalToScreen(view, -IEC_PLUS_POSITION - SIGN_HALF_SIZE, -IEC_PLUS_HEIGHT),
+                       LocalToScreen(view, -IEC_PLUS_POSITION + SIGN_HALF_SIZE, -IEC_PLUS_HEIGHT), color,
+                       LINE_THICKNESS);
+        canvas.AddLine(LocalToScreen(view, -IEC_PLUS_POSITION, -IEC_PLUS_HEIGHT - SIGN_HALF_SIZE),
+                       LocalToScreen(view, -IEC_PLUS_POSITION, -IEC_PLUS_HEIGHT + SIGN_HALF_SIZE), color,
+                       LINE_THICKNESS);
         return;
     }
 
     // The minus bar is drawn across the axis, so it reads as a minus when the source stands vertically
-    canvas.AddLine(LocalToScreen(view, -SignOffset - SignHalfSize, 0),
-                   LocalToScreen(view, -SignOffset + SignHalfSize, 0), color, LineThickness);
-    canvas.AddLine(LocalToScreen(view, -SignOffset, -SignHalfSize), LocalToScreen(view, -SignOffset, SignHalfSize),
-                   color, LineThickness);
-    canvas.AddLine(LocalToScreen(view, SignOffset, -SignHalfSize), LocalToScreen(view, SignOffset, SignHalfSize), color,
-                   LineThickness);
+    canvas.AddLine(LocalToScreen(view, -SIGN_OFFSET - SIGN_HALF_SIZE, 0),
+                   LocalToScreen(view, -SIGN_OFFSET + SIGN_HALF_SIZE, 0), color, LINE_THICKNESS);
+    canvas.AddLine(LocalToScreen(view, -SIGN_OFFSET, -SIGN_HALF_SIZE),
+                   LocalToScreen(view, -SIGN_OFFSET, SIGN_HALF_SIZE), color, LINE_THICKNESS);
+    canvas.AddLine(LocalToScreen(view, SIGN_OFFSET, -SIGN_HALF_SIZE), LocalToScreen(view, SIGN_OFFSET, SIGN_HALF_SIZE),
+                   color, LINE_THICKNESS);
 }
 
 } // namespace GUI

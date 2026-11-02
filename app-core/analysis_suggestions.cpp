@@ -21,29 +21,29 @@ namespace Core {
 namespace {
 
 // A transient shows this many periods of the slowest source, with this many points in a period of the fastest
-constexpr double SuggestedPeriods = 5.0;
-constexpr double PointsPerPeriod = 200.0;
+constexpr double SUGGESTED_PERIODS = 5.0;
+constexpr double POINTS_PER_PERIOD = 200.0;
 // A waveform that happens once, such as an exponential or piecewise linear one, shows its whole span with this much
 // room after it
-constexpr double OneShotMargin = 1.2;
+constexpr double ONE_SHOT_MARGIN = 1.2;
 // The AC sweep reaches two decades past the lowest and the highest frequency the parts set
-constexpr double ACMarginDecades = 2.0;
-constexpr double MinACFrequency = 1e-3;
-constexpr double MaxACFrequency = 1e10;
+constexpr double AC_MARGIN_DECADES = 2.0;
+constexpr double MIN_AC_FREQUENCY = 1e-3;
+constexpr double MAX_AC_FREQUENCY = 1e10;
 
 // Rounds to the closest 1, 2 or 5 times a power of ten, below or above the value, so suggestions read well
 double RoundToNiceStep(const double value, const bool up) {
     const double decade = std::pow(10.0, std::floor(std::log10(value)));
-    constexpr auto Steps = std::to_array({1.0, 2.0, 5.0, 10.0});
+    constexpr auto STEPS = std::to_array({1.0, 2.0, 5.0, 10.0});
     if (up) {
-        for (const double step : Steps) {
+        for (const double step : STEPS) {
             if (step * decade >= value * (1.0 - 1e-9)) {
                 return step * decade;
             }
         }
         return 10.0 * decade;
     }
-    for (const double step : Steps | std::views::reverse) {
+    for (const double step : STEPS | std::views::reverse) {
         if (step * decade <= value * (1.0 + 1e-9)) {
             return step * decade;
         }
@@ -64,26 +64,26 @@ std::vector<double> ListPartValues(const Circuit &circuit, const ComponentType t
 // Corners of every resistor with every capacitor or inductor, resonances of every inductor with every capacitor,
 // and the gain-bandwidth product of every op-amp
 std::vector<double> ListCharacteristicFrequencies(const Circuit &circuit) {
-    const std::vector<double> resistances = ListPartValues(circuit, ComponentType::Resistor);
-    const std::vector<double> capacitances = ListPartValues(circuit, ComponentType::Capacitor);
-    const std::vector<double> inductances = ListPartValues(circuit, ComponentType::Inductor);
-    constexpr double TwoPi = 2.0 * std::numbers::pi;
+    const std::vector<double> resistances = ListPartValues(circuit, ComponentType::RESISTOR);
+    const std::vector<double> capacitances = ListPartValues(circuit, ComponentType::CAPACITOR);
+    const std::vector<double> inductances = ListPartValues(circuit, ComponentType::INDUCTOR);
+    constexpr double TWO_PI = 2.0 * std::numbers::pi;
     std::vector<double> frequencies;
     for (const double capacitance : capacitances) {
         for (const double resistance : resistances) {
-            frequencies.push_back(1.0 / (TwoPi * resistance * capacitance));
+            frequencies.push_back(1.0 / (TWO_PI * resistance * capacitance));
         }
         for (const double inductance : inductances) {
-            frequencies.push_back(1.0 / (TwoPi * std::sqrt(inductance * capacitance)));
+            frequencies.push_back(1.0 / (TWO_PI * std::sqrt(inductance * capacitance)));
         }
     }
     for (const double inductance : inductances) {
         for (const double resistance : resistances) {
-            frequencies.push_back(resistance / (TwoPi * inductance));
+            frequencies.push_back(resistance / (TWO_PI * inductance));
         }
     }
     for (const CircuitEntry &entry : circuit.GetEntries()) {
-        if (entry.Part->GetType() == ComponentType::OpAmp) {
+        if (entry.Part->GetType() == ComponentType::OP_AMP) {
             const auto &op_amp = static_cast<const OpAmp &>(*entry.Part);
             frequencies.push_back(op_amp.IsIdeal() ? op_amp.GetIdealBandwidth() : op_amp.GetParameters().GainBandwidth);
         }
@@ -106,7 +106,7 @@ void AddSourceWaveform(const Source &source, Waveforms &waveforms) {
     case Source::SourceType::AC:
         waveforms.Periods.push_back(1.0 / source.GetAC().Frequency);
         break;
-    case Source::SourceType::Pulse:
+    case Source::SourceType::PULSE:
         waveforms.Periods.push_back(source.GetPulse().Period);
         waveforms.LongestDelay = std::max(waveforms.LongestDelay, source.GetPulse().Delay);
         break;
@@ -136,7 +136,7 @@ void AddSourceWaveform(const Source &source, Waveforms &waveforms) {
 
 // A clock is a periodic source like a pulse one, with its period and its start delay
 void AddWaveform(const Component &part, Waveforms &waveforms) {
-    if (part.GetType() == ComponentType::Clock) {
+    if (part.GetType() == ComponentType::CLOCK) {
         const ClockParameters &clock = static_cast<const Clock &>(part).GetParameters();
         waveforms.Periods.push_back(1.0 / clock.Frequency);
         waveforms.LongestDelay = std::max(waveforms.LongestDelay, clock.StartDelay);
@@ -170,16 +170,16 @@ std::optional<TransientSettings> SuggestTransientSettings(const Circuit &circuit
     double shortest = std::numeric_limits<double>::max();
     if (!waveforms.Periods.empty()) {
         const auto [shortest_period, longest_period] = std::ranges::minmax(waveforms.Periods);
-        stop_time = waveforms.LongestDelay + SuggestedPeriods * longest_period;
+        stop_time = waveforms.LongestDelay + SUGGESTED_PERIODS * longest_period;
         shortest = shortest_period;
     }
     if (!waveforms.Spans.empty()) {
         const auto [shortest_span, longest_span] = std::ranges::minmax(waveforms.Spans);
-        stop_time = std::max(stop_time, OneShotMargin * longest_span);
+        stop_time = std::max(stop_time, ONE_SHOT_MARGIN * longest_span);
         shortest = std::min(shortest, shortest_span);
     }
     return TransientSettings{.StopTime = RoundToNiceStep(stop_time, true),
-                             .TimeStep = RoundToNiceStep(shortest / PointsPerPeriod, false)};
+                             .TimeStep = RoundToNiceStep(shortest / POINTS_PER_PERIOD, false)};
 }
 
 /**
@@ -195,10 +195,10 @@ std::optional<ACSweepSettings> SuggestACSweepSettings(const Circuit &circuit) {
         return std::nullopt;
     }
     const auto [lowest, highest] = std::ranges::minmax(frequencies);
-    const double start = std::pow(10.0, std::floor(std::log10(lowest) - ACMarginDecades));
-    const double stop = std::pow(10.0, std::ceil(std::log10(highest) + ACMarginDecades));
-    return ACSweepSettings{.StartFrequency = std::clamp(start, MinACFrequency, MaxACFrequency),
-                           .StopFrequency = std::clamp(stop, MinACFrequency, MaxACFrequency)};
+    const double start = std::pow(10.0, std::floor(std::log10(lowest) - AC_MARGIN_DECADES));
+    const double stop = std::pow(10.0, std::ceil(std::log10(highest) + AC_MARGIN_DECADES));
+    return ACSweepSettings{.StartFrequency = std::clamp(start, MIN_AC_FREQUENCY, MAX_AC_FREQUENCY),
+                           .StopFrequency = std::clamp(stop, MIN_AC_FREQUENCY, MAX_AC_FREQUENCY)};
 }
 
 } // namespace Core

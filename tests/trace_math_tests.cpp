@@ -6,15 +6,17 @@
 #include "trace_math.h"
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
+#include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace {
 
 using Catch::Matchers::WithinAbs;
 
-const GUI::Dimension Seconds{.Seconds = 1};
-const GUI::Dimension Volts{.Volts = 1};
+const GUI::Dimension SECONDS{.Seconds = 1};
+const GUI::Dimension VOLTS{.Volts = 1};
 
 /**
  * @struct  TestResult
@@ -26,7 +28,7 @@ struct TestResult {
     std::vector<Core::ComponentTrace> Currents = {{"R1", {1.0, 2.0, 3.0}}, {"Q1.C", {0.5, 0.5, 0.5}}};
 };
 
-GUI::MathResult EvaluateOrFail(const std::string &text, const GUI::Dimension x_unit = Seconds) {
+GUI::MathResult EvaluateOrFail(const std::string &text, const GUI::Dimension x_unit = SECONDS) {
     const TestResult result;
     const auto program = GUI::CompileExpression(text);
     if (!program) {
@@ -84,7 +86,7 @@ TEST_CASE("Derivatives and integrals follow the X axis", "[trace_math]") {
     CheckValues(EvaluateOrFail("ddt(V(1))").Values, {1.0, 1.0, 1.0});
     CheckValues(EvaluateOrFail("integ(I(R1))").Values, {0.0, 1.5, 4.0});
     // Against a swept voltage, the slope of a current is a conductance
-    CHECK(GUI::FormatUnit(EvaluateOrFail("ddt(I(R1))", Volts).Unit) == "S");
+    CHECK(GUI::FormatUnit(EvaluateOrFail("ddt(I(R1))", VOLTS).Unit) == "S");
     CheckValues(EvaluateOrFail("abs(-I(Q1.C))").Values, {0.5, 0.5, 0.5});
     CheckValues(EvaluateOrFail("sqrt(4)").Values, {2.0, 2.0, 2.0});
 }
@@ -93,7 +95,10 @@ TEST_CASE("Mistakes are reported instead of evaluated", "[trace_math]") {
     CHECK_FALSE(GUI::CompileExpression(""));
     CHECK_FALSE(GUI::CompileExpression("V(1)-"));
     CHECK_FALSE(GUI::CompileExpression("V(1"));
-    CHECK_FALSE(GUI::CompileExpression("V(x)"));
+    CHECK_FALSE(GUI::CompileExpression("V(x y)"));
+    CHECK_FALSE(GUI::CompileExpression("V(o%t)"));
+    // A node number too large for any circuit is refused rather than wrapped around
+    CHECK_FALSE(GUI::CompileExpression("V(99999999999)"));
     CHECK_FALSE(GUI::CompileExpression("log(V(1))"));
     CHECK_FALSE(GUI::CompileExpression("V(1) V(2)"));
     CHECK_FALSE(GUI::CompileExpression("I()"));
@@ -101,14 +106,43 @@ TEST_CASE("Mistakes are reported instead of evaluated", "[trace_math]") {
     const TestResult result;
     const auto missing_node = GUI::CompileExpression("V(9)");
     REQUIRE(missing_node);
-    CHECK_FALSE(GUI::EvaluateExpression(*missing_node, result.Times, Seconds, result.NodeVoltages, result.Currents));
+    CHECK_FALSE(GUI::EvaluateExpression(*missing_node, result.Times, SECONDS, result.NodeVoltages, result.Currents));
     const auto missing_current = GUI::CompileExpression("I(R9)");
     REQUIRE(missing_current);
-    CHECK_FALSE(GUI::EvaluateExpression(*missing_current, result.Times, Seconds, result.NodeVoltages, result.Currents));
+    CHECK_FALSE(GUI::EvaluateExpression(*missing_current, result.Times, SECONDS, result.NodeVoltages, result.Currents));
+}
+
+TEST_CASE("A net name stands for the node a label gives it, found when the expression is evaluated", "[trace_math]") {
+    const TestResult result;
+    const auto program = GUI::CompileExpression("V(OUT) - V(in, 2)");
+    REQUIRE(program);
+    // Before its nets are resolved, the program refuses to run rather than read ground
+    CHECK_FALSE(GUI::EvaluateExpression(*program, result.Times, SECONDS, result.NodeVoltages, result.Currents));
+
+    const GUI::NetResolver find_node = [](const std::string_view net) -> std::optional<int> {
+        if (net == "OUT") {
+            return 1;
+        }
+        if (net == "in") {
+            return 2;
+        }
+        return std::nullopt;
+    };
+    const auto resolved = GUI::ResolveNetNames(*program, find_node);
+    REQUIRE(resolved);
+    const auto evaluated =
+        GUI::EvaluateExpression(*resolved, result.Times, SECONDS, result.NodeVoltages, result.Currents);
+    REQUIRE(evaluated);
+    // V(1) minus V(2, 2), which is zero
+    CheckValues(evaluated->Values, {5.0, 6.0, 7.0});
+
+    const auto missing = GUI::ResolveNetNames(*GUI::CompileExpression("V(GONE)"), find_node);
+    REQUIRE_FALSE(missing);
+    CHECK(missing.error().contains("GONE"));
 }
 
 TEST_CASE("Operator channels write expressions that compile", "[trace_math]") {
-    CHECK(GUI::BuildOperatorExpression("V(1)", GUI::MathOperator::Subtract, "V(2)") == "V(1)-V(2)");
-    const std::string power = GUI::BuildOperatorExpression("V(1)", GUI::MathOperator::Multiply, "I(Q1.C)");
+    CHECK(GUI::BuildOperatorExpression("V(1)", GUI::MathOperator::SUBTRACT, "V(2)") == "V(1)-V(2)");
+    const std::string power = GUI::BuildOperatorExpression("V(1)", GUI::MathOperator::MULTIPLY, "I(Q1.C)");
     CHECK(GUI::FormatUnit(EvaluateOrFail(power).Unit) == "W");
 }

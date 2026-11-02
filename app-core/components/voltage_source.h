@@ -7,6 +7,7 @@
 #define IMCSIM_VOLTAGE_SOURCE_H
 
 #include "source.h"
+#include <memory>
 
 namespace Core {
 
@@ -18,6 +19,8 @@ class VoltageSource : public Source {
 public:
     VoltageSource();
     ~VoltageSource() override = default;
+
+    std::unique_ptr<Component> Clone() const override;
 };
 
 } // namespace Core

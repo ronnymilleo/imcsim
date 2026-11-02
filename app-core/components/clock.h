@@ -7,6 +7,7 @@
 #define IMCSIM_CLOCK_H
 
 #include "component.h"
+#include <memory>
 
 namespace Core {
 
@@ -36,6 +37,8 @@ public:
     Clock();
     ~Clock() override = default;
 
+    std::unique_ptr<Component> Clone() const override;
+
     const ClockParameters &GetParameters() const;
     void SetParameters(const ClockParameters &parameters);
     static bool IsValidParameters(const ClockParameters &parameters);
@@ -46,7 +49,7 @@ private:
 
 // Rise and fall time of a clock, each as a share of the period; the part picks these so the shape is the same at
 // every frequency and the user never has to set them
-inline constexpr double ClockEdgeFraction = 1e-3;
+inline constexpr double CLOCK_EDGE_FRACTION = 1e-3;
 
 } // namespace Core
 

@@ -18,31 +18,31 @@ namespace GUI {
 namespace {
 
 // The default leads end at x = -1 and x = 1, so a short segment reaches the circle
-constexpr float LeadEnd = 1.0f;
-constexpr int SineSegmentCount = 16;
-constexpr float WaveHalfWidth = 0.5f;
-constexpr float WaveAmplitude = 0.3f;
+constexpr float LEAD_END = 1.0f;
+constexpr int SINE_SEGMENT_COUNT = 16;
+constexpr float WAVE_HALF_WIDTH = 0.5f;
+constexpr float WAVE_AMPLITUDE = 0.3f;
 // The pulse stays high for the middle half of the box the waves are drawn in
-constexpr float PulseHalfWidth = 0.25f;
+constexpr float PULSE_HALF_WIDTH = 0.25f;
 // The circle reaches 0.8 from the center, so the labels start a little further out than those of other
 // two-terminal symbols, which would touch it
-constexpr float LabelOffset = 1.25f;
+constexpr float LABEL_OFFSET = 1.25f;
 
 // A generic exponential rise and decay over the box the waves are drawn in, the shape of an EXP source: nothing,
 // then a rise with a short time constant, then a decay with a longer one
 float ExponentialShape(const float fraction) {
-    constexpr float RiseStart = 0.3f;
-    constexpr float FallStart = 0.5f;
-    constexpr float RiseTau = 0.1f;
-    constexpr float FallTau = 0.15f;
-    if (fraction <= RiseStart) {
+    constexpr float RISE_START = 0.3f;
+    constexpr float FALL_START = 0.5f;
+    constexpr float RISE_TAU = 0.1f;
+    constexpr float FALL_TAU = 0.15f;
+    if (fraction <= RISE_START) {
         return 0.0f;
     }
-    const float risen = 1.0f - std::exp(-(fraction - RiseStart) / RiseTau);
-    if (fraction <= FallStart) {
+    const float risen = 1.0f - std::exp(-(fraction - RISE_START) / RISE_TAU);
+    if (fraction <= FALL_START) {
         return risen;
     }
-    return risen - (1.0f - std::exp(-(fraction - FallStart) / FallTau));
+    return risen - (1.0f - std::exp(-(fraction - FALL_START) / FALL_TAU));
 }
 
 } // namespace
@@ -70,7 +70,7 @@ void UISource::DrawLabels(SchematicCanvas &canvas, const ViewTransform &view, co
         waveform = std::format("{}{} {}Hz", Core::FormatValue(source.GetAC().Amplitude), unit,
                                Core::FormatValue(source.GetAC().Frequency));
         break;
-    case Core::Source::SourceType::Pulse: {
+    case Core::Source::SourceType::PULSE: {
         const Core::PulseParameters &pulse = source.GetPulse();
         waveform = std::format("{}{}/{}{} {}Hz", Core::FormatValue(pulse.Low), unit, Core::FormatValue(pulse.High),
                                unit, Core::FormatValue(1.0 / pulse.Period));
@@ -91,8 +91,8 @@ void UISource::DrawLabels(SchematicCanvas &canvas, const ViewTransform &view, co
         waveform = std::format("{}pt", source.GetPWL().Points.size());
         break;
     }
-    DrawLabel(canvas, view, {0.0f, -LabelOffset}, {0.0f, -1.0f}, source.GetName(), color);
-    DrawLabel(canvas, view, {0.0f, LabelOffset}, {0.0f, 1.0f}, waveform, color);
+    DrawLabel(canvas, view, {0.0f, -LABEL_OFFSET}, {0.0f, -1.0f}, source.GetName(), color);
+    DrawLabel(canvas, view, {0.0f, LABEL_OFFSET}, {0.0f, 1.0f}, waveform, color);
 }
 
 /**
@@ -111,11 +111,11 @@ const Core::Source &UISource::GetSource() const {
  */
 void UISource::DrawCircle(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color) const {
     const ImVec2 center = LocalToScreen(view, 0, 0);
-    const ImVec2 radius_offset = LocalToScreen(view, CircleRadius, 0) - center;
+    const ImVec2 radius_offset = LocalToScreen(view, CIRCLE_RADIUS, 0) - center;
     const float radius = std::hypot(radius_offset.x, radius_offset.y);
-    canvas.AddCircle(center, radius, color, 0, LineThickness);
-    canvas.AddLine(LocalToScreen(view, -LeadEnd, 0), LocalToScreen(view, -CircleRadius, 0), color, LineThickness);
-    canvas.AddLine(LocalToScreen(view, CircleRadius, 0), LocalToScreen(view, LeadEnd, 0), color, LineThickness);
+    canvas.AddCircle(center, radius, color, 0, LINE_THICKNESS);
+    canvas.AddLine(LocalToScreen(view, -LEAD_END, 0), LocalToScreen(view, -CIRCLE_RADIUS, 0), color, LINE_THICKNESS);
+    canvas.AddLine(LocalToScreen(view, CIRCLE_RADIUS, 0), LocalToScreen(view, LEAD_END, 0), color, LINE_THICKNESS);
 }
 
 /**
@@ -131,54 +131,56 @@ bool UISource::DrawWaveform(SchematicCanvas &canvas, const ViewTransform &view, 
         return false;
     case Core::Source::SourceType::AC:
     case Core::Source::SourceType::SFFM: {
-        std::array<ImVec2, SineSegmentCount + 1> sine;
-        for (int point = 0; point <= SineSegmentCount; ++point) {
-            const float fraction = static_cast<float>(point) / SineSegmentCount;
-            const float x = -WaveHalfWidth + 2.0f * WaveHalfWidth * fraction;
-            const float y = -WaveAmplitude * std::sin(2.0f * std::numbers::pi_v<float> * fraction);
+        std::array<ImVec2, SINE_SEGMENT_COUNT + 1> sine;
+        for (int point = 0; point <= SINE_SEGMENT_COUNT; ++point) {
+            const float fraction = static_cast<float>(point) / SINE_SEGMENT_COUNT;
+            const float x = -WAVE_HALF_WIDTH + 2.0f * WAVE_HALF_WIDTH * fraction;
+            const float y = -WAVE_AMPLITUDE * std::sin(2.0f * std::numbers::pi_v<float> * fraction);
             sine[point] = LocalToScreen(view, x, y);
         }
-        canvas.AddPolyline(sine.data(), static_cast<int>(sine.size()), color, ImDrawFlags_None, LineThickness);
+        canvas.AddPolyline(sine.data(), static_cast<int>(sine.size()), color, ImDrawFlags_None, LINE_THICKNESS);
         return true;
     }
-    case Core::Source::SourceType::Pulse: {
+    case Core::Source::SourceType::PULSE: {
         // Screen Y grows downwards, so the high level has the negative Y
-        const std::array<ImVec2, 6> pulse = {
-            LocalToScreen(view, -WaveHalfWidth, WaveAmplitude),   LocalToScreen(view, -PulseHalfWidth, WaveAmplitude),
-            LocalToScreen(view, -PulseHalfWidth, -WaveAmplitude), LocalToScreen(view, PulseHalfWidth, -WaveAmplitude),
-            LocalToScreen(view, PulseHalfWidth, WaveAmplitude),   LocalToScreen(view, WaveHalfWidth, WaveAmplitude)};
-        canvas.AddPolyline(pulse.data(), static_cast<int>(pulse.size()), color, ImDrawFlags_None, LineThickness);
+        const std::array<ImVec2, 6> pulse = {LocalToScreen(view, -WAVE_HALF_WIDTH, WAVE_AMPLITUDE),
+                                             LocalToScreen(view, -PULSE_HALF_WIDTH, WAVE_AMPLITUDE),
+                                             LocalToScreen(view, -PULSE_HALF_WIDTH, -WAVE_AMPLITUDE),
+                                             LocalToScreen(view, PULSE_HALF_WIDTH, -WAVE_AMPLITUDE),
+                                             LocalToScreen(view, PULSE_HALF_WIDTH, WAVE_AMPLITUDE),
+                                             LocalToScreen(view, WAVE_HALF_WIDTH, WAVE_AMPLITUDE)};
+        canvas.AddPolyline(pulse.data(), static_cast<int>(pulse.size()), color, ImDrawFlags_None, LINE_THICKNESS);
         return true;
     }
     case Core::Source::SourceType::EXP: {
-        std::array<ImVec2, SineSegmentCount + 1> curve;
-        for (int point = 0; point <= SineSegmentCount; ++point) {
-            const float fraction = static_cast<float>(point) / SineSegmentCount;
-            const float x = -WaveHalfWidth + 2.0f * WaveHalfWidth * fraction;
-            curve[point] = LocalToScreen(view, x, -WaveAmplitude * ExponentialShape(fraction));
+        std::array<ImVec2, SINE_SEGMENT_COUNT + 1> curve;
+        for (int point = 0; point <= SINE_SEGMENT_COUNT; ++point) {
+            const float fraction = static_cast<float>(point) / SINE_SEGMENT_COUNT;
+            const float x = -WAVE_HALF_WIDTH + 2.0f * WAVE_HALF_WIDTH * fraction;
+            curve[point] = LocalToScreen(view, x, -WAVE_AMPLITUDE * ExponentialShape(fraction));
         }
-        canvas.AddPolyline(curve.data(), static_cast<int>(curve.size()), color, ImDrawFlags_None, LineThickness);
+        canvas.AddPolyline(curve.data(), static_cast<int>(curve.size()), color, ImDrawFlags_None, LINE_THICKNESS);
         return true;
     }
     case Core::Source::SourceType::AM: {
         // A carrier inside an envelope: two carrier cycles under one modulation cycle
-        std::array<ImVec2, SineSegmentCount + 1> modulated;
-        for (int point = 0; point <= SineSegmentCount; ++point) {
-            const float fraction = static_cast<float>(point) / SineSegmentCount;
-            const float x = -WaveHalfWidth + 2.0f * WaveHalfWidth * fraction;
+        std::array<ImVec2, SINE_SEGMENT_COUNT + 1> modulated;
+        for (int point = 0; point <= SINE_SEGMENT_COUNT; ++point) {
+            const float fraction = static_cast<float>(point) / SINE_SEGMENT_COUNT;
+            const float x = -WAVE_HALF_WIDTH + 2.0f * WAVE_HALF_WIDTH * fraction;
             const float envelope = 0.5f + 0.5f * std::sin(2.0f * std::numbers::pi_v<float> * fraction);
-            const float y = -WaveAmplitude * envelope * std::sin(4.0f * std::numbers::pi_v<float> * fraction);
+            const float y = -WAVE_AMPLITUDE * envelope * std::sin(4.0f * std::numbers::pi_v<float> * fraction);
             modulated[point] = LocalToScreen(view, x, y);
         }
         canvas.AddPolyline(modulated.data(), static_cast<int>(modulated.size()), color, ImDrawFlags_None,
-                           LineThickness);
+                           LINE_THICKNESS);
         return true;
     }
     case Core::Source::SourceType::PWL: {
-        const std::array<ImVec2, 3> points = {LocalToScreen(view, -WaveHalfWidth, WaveAmplitude),
-                                              LocalToScreen(view, 0.0f, -WaveAmplitude),
-                                              LocalToScreen(view, WaveHalfWidth, WaveAmplitude)};
-        canvas.AddPolyline(points.data(), static_cast<int>(points.size()), color, ImDrawFlags_None, LineThickness);
+        const std::array<ImVec2, 3> points = {LocalToScreen(view, -WAVE_HALF_WIDTH, WAVE_AMPLITUDE),
+                                              LocalToScreen(view, 0.0f, -WAVE_AMPLITUDE),
+                                              LocalToScreen(view, WAVE_HALF_WIDTH, WAVE_AMPLITUDE)};
+        canvas.AddPolyline(points.data(), static_cast<int>(points.size()), color, ImDrawFlags_None, LINE_THICKNESS);
         return true;
     }
     }

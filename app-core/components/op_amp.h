@@ -7,6 +7,7 @@
 #define IMCSIM_OP_AMP_H
 
 #include "component.h"
+#include <memory>
 #include <span>
 #include <string>
 #include <string_view>
@@ -50,7 +51,7 @@ struct OpAmpModel {
     OpAmpParameters Parameters;
 };
 
-inline constexpr const char *CustomOpAmpModelName = "Custom";
+inline constexpr const char *CUSTOM_OP_AMP_MODEL_NAME = "Custom";
 
 /**
  * @class   OpAmp
@@ -66,6 +67,9 @@ class OpAmp : public Component {
 public:
     OpAmp();
     ~OpAmp() override = default;
+
+    // Copying
+    std::unique_ptr<Component> Clone() const override;
 
     // Ready model
     const OpAmpModel *GetModel() const;

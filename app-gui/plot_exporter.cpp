@@ -18,13 +18,13 @@ namespace GUI {
 
 namespace {
 
-constexpr const char *ExportPopup = "export";
-constexpr const char *ExportErrorPopup = "Could not export the plot";
+constexpr const char *EXPORT_POPUP = "export";
+constexpr const char *EXPORT_ERROR_POPUP = "Could not export the plot";
 // Width of the size fields of the export popup, in font sizes
-constexpr float ExportSizeWidth = 7.0f;
+constexpr float EXPORT_SIZE_WIDTH = 7.0f;
 // Must stay valid until the dialog callback runs, so they live for the whole program
-constexpr std::array<SDL_DialogFileFilter, 1> SVGFilters = {{{"SVG image", "svg"}}};
-constexpr std::array<SDL_DialogFileFilter, 1> CSVFilters = {{{"CSV table", "csv"}}};
+constexpr std::array<SDL_DialogFileFilter, 1> SVG_FILTERS = {{{"SVG image", "svg"}}};
+constexpr std::array<SDL_DialogFileFilter, 1> CSV_FILTERS = {{{"CSV table", "csv"}}};
 
 std::string GetExtension(const ExportFormat format) {
     return format == ExportFormat::SVG ? ".svg" : ".csv";
@@ -37,22 +37,26 @@ std::string GetExtension(const ExportFormat format) {
  * @note    Call it where DrawPopup() is called, so ImGui finds the popup in the same ID stack.
  */
 void PlotExporter::OpenPopup() {
-    ImGui::OpenPopup(ExportPopup);
+    ImGui::OpenPopup(EXPORT_POPUP);
 }
 
 /**
  * @brief   Draws the export popup while it is open: like the export dialog of a scope, the image follows the plot as
  *          shown, at the size and theme chosen here.
  * @param[in] plot_name   Name of the plot, such as "AC sweep", for the title of the popup.
- * @param[in] can_export  Whether the plot has something to export; the save buttons are disabled otherwise.
- * @return  The format to save once the user picks one.
+ * @param[in] can_export      Whether the plot has something to export; the save buttons are disabled otherwise.
+ * @param[in] has_longer_run  Whether the plot shows only a window of a longer run, whose every point a CSV table can
+ *                            hold; the image always shows the window.
+ * @return  What to save once the user picks it.
  */
-std::optional<ExportFormat> PlotExporter::DrawPopup(const std::string &plot_name, const bool can_export) {
-    if (!ImGui::BeginPopup(ExportPopup)) {
+std::optional<ExportChoice> PlotExporter::DrawPopup(const std::string &plot_name, const bool can_export,
+                                                    const bool has_longer_run) {
+    if (!ImGui::BeginPopup(EXPORT_POPUP)) {
         return std::nullopt;
     }
     ImGui::TextUnformatted(std::format("Export the {} plot", plot_name).c_str());
-    ImGui::TextDisabled("The measured traces: the image shows the visible range, the table every sample");
+    ImGui::TextDisabled("The measured traces: the image shows the visible range, the table every sample%s",
+                        has_longer_run ? " of the window, or of the whole run" : "");
     ImGui::Separator();
     if (ImGui::RadioButton("Light, for print", !m_Style.Dark)) {
         m_Style.Dark = false;
@@ -61,35 +65,41 @@ std::optional<ExportFormat> PlotExporter::DrawPopup(const std::string &plot_name
     if (ImGui::RadioButton("Dark", m_Style.Dark)) {
         m_Style.Dark = true;
     }
-    ImGui::SetNextItemWidth(ImGui::GetFontSize() * ExportSizeWidth);
+    ImGui::SetNextItemWidth(ImGui::GetFontSize() * EXPORT_SIZE_WIDTH);
     ImGui::InputInt("##width", &m_Style.Width, 100, 500);
     ImGui::SameLine();
     ImGui::TextUnformatted("x");
     ImGui::SameLine();
-    ImGui::SetNextItemWidth(ImGui::GetFontSize() * ExportSizeWidth);
+    ImGui::SetNextItemWidth(ImGui::GetFontSize() * EXPORT_SIZE_WIDTH);
     ImGui::InputInt("pixels##height", &m_Style.Height, 100, 500);
-    m_Style.Width = std::clamp(m_Style.Width, MinExportSize, MaxExportSize);
-    m_Style.Height = std::clamp(m_Style.Height, MinExportSize, MaxExportSize);
+    m_Style.Width = std::clamp(m_Style.Width, MIN_EXPORT_SIZE, MAX_EXPORT_SIZE);
+    m_Style.Height = std::clamp(m_Style.Height, MIN_EXPORT_SIZE, MAX_EXPORT_SIZE);
     ImGui::Separator();
 
-    std::optional<ExportFormat> format;
+    std::optional<ExportChoice> choice;
     if (!can_export) {
         ImGui::TextDisabled("Run the analysis and measure a trace to export it");
     }
     ImGui::BeginDisabled(!can_export || m_Dialog.IsPending());
     if (PrimaryButton("Save SVG...")) {
-        format = ExportFormat::SVG;
+        choice = ExportChoice{.Format = ExportFormat::SVG, .IsWholeRun = false};
     }
     ImGui::SameLine();
-    if (ImGui::Button("Save CSV...")) {
-        format = ExportFormat::CSV;
+    if (ImGui::Button(has_longer_run ? "Save CSV of the window..." : "Save CSV...")) {
+        choice = ExportChoice{.Format = ExportFormat::CSV, .IsWholeRun = false};
+    }
+    if (has_longer_run) {
+        ImGui::SameLine();
+        if (ImGui::Button("Save CSV of the whole run...")) {
+            choice = ExportChoice{.Format = ExportFormat::CSV, .IsWholeRun = true};
+        }
     }
     ImGui::EndDisabled();
-    if (format) {
+    if (choice) {
         ImGui::CloseCurrentPopup();
     }
     ImGui::EndPopup();
-    return format;
+    return choice;
 }
 
 /**
@@ -112,9 +122,9 @@ void PlotExporter::Start(ExportFigure figure, const ExportFormat format,
     const std::filesystem::path location =
         schematic_path ? schematic_path->parent_path() / file_name : std::filesystem::path(file_name);
     if (format == ExportFormat::SVG) {
-        m_Dialog.ShowSave(SVGFilters, location.string());
+        m_Dialog.ShowSave(SVG_FILTERS, location.string());
     } else {
-        m_Dialog.ShowSave(CSVFilters, location.string());
+        m_Dialog.ShowSave(CSV_FILTERS, location.string());
     }
 }
 
@@ -143,7 +153,7 @@ void PlotExporter::Update() {
         text ? WriteTextFile(path, *text) : std::expected<void, std::string>(std::unexpected(text.error()));
     if (!written) {
         m_Error = written.error();
-        ImGui::OpenPopup(ExportErrorPopup);
+        ImGui::OpenPopup(EXPORT_ERROR_POPUP);
     }
 }
 
@@ -151,7 +161,7 @@ void PlotExporter::Update() {
  * @brief   Draws the popup that tells why the last export failed, while it is open.
  */
 void PlotExporter::DrawError() {
-    if (!ImGui::BeginPopupModal(ExportErrorPopup, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+    if (!ImGui::BeginPopupModal(EXPORT_ERROR_POPUP, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
         return;
     }
     ImGui::TextColored(GetErrorTextColor(), "%s", m_Error.c_str());

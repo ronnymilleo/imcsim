@@ -4,13 +4,22 @@
  */
 
 #include "clock.h"
+#include <memory>
 
 namespace Core {
 
 /**
  * @brief   Creates a 1 kHz, 50% clock at 5 V with no start delay.
  */
-Clock::Clock() : Component(ComponentType::Clock, 0.0) {
+Clock::Clock() : Component(ComponentType::CLOCK, 0.0) {
+}
+
+/**
+ * @brief   Copies the component with its name, value and settings.
+ * @return  An independent component of the same kind.
+ */
+std::unique_ptr<Component> Clock::Clone() const {
+    return std::make_unique<Clock>(*this);
 }
 
 /**

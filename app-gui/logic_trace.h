@@ -18,9 +18,9 @@ namespace GUI {
  * @brief   What a gate reads at a voltage: 0, 1, or unknown in between.
  */
 enum class LogicState {
-    Low,
-    High,
-    Unknown
+    LOW,
+    HIGH,
+    UNKNOWN
 };
 
 /**
@@ -39,7 +39,7 @@ struct LogicNode {
 struct LogicSegment {
     double From = 0.0;
     double To = 0.0;
-    LogicState State = LogicState::Low;
+    LogicState State = LogicState::LOW;
 };
 
 /**
@@ -52,12 +52,12 @@ struct LogicSignal {
 };
 
 // Height of one lane, and the offsets of the three states inside it; lanes are stacked from the bottom
-inline constexpr double LaneStride = 1.5;
-inline constexpr double LaneLowOffset = 0.0;
-inline constexpr double LaneUnknownOffset = 0.5;
-inline constexpr double LaneHighOffset = 1.0;
+inline constexpr double LANE_STRIDE = 1.5;
+inline constexpr double LANE_LOW_OFFSET = 0.0;
+inline constexpr double LANE_UNKNOWN_OFFSET = 0.5;
+inline constexpr double LANE_HIGH_OFFSET = 1.0;
 // Room above and below the stack of lanes, in lane units
-inline constexpr double LaneMargin = 0.3;
+inline constexpr double LANE_MARGIN = 0.3;
 
 LogicState ReadLogicState(double voltage, double logic_level);
 const char *GetLogicStateName(LogicState state);

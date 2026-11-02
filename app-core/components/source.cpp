@@ -242,7 +242,7 @@ bool Source::IsValidPWL(const PWLParameters &pwl) const {
  * @return  True for voltage and current sources. The VCC rail is a fixed DC supply, not a Source.
  */
 bool IsSource(const ComponentType type) {
-    return type == ComponentType::VoltageSource || type == ComponentType::CurrentSource;
+    return type == ComponentType::VOLTAGE_SOURCE || type == ComponentType::CURRENT_SOURCE;
 }
 
 /**
@@ -256,7 +256,7 @@ const char *GetSourceTypeName(const Source::SourceType type) {
         return "DC";
     case Source::SourceType::AC:
         return "AC";
-    case Source::SourceType::Pulse:
+    case Source::SourceType::PULSE:
         return "Pulse";
     case Source::SourceType::EXP:
         return "EXP";
@@ -277,7 +277,7 @@ const char *GetSourceTypeName(const Source::SourceType type) {
  */
 std::optional<Source::SourceType> ParseSourceType(const std::string_view text) {
     for (const Source::SourceType type :
-         {Source::SourceType::DC, Source::SourceType::AC, Source::SourceType::Pulse, Source::SourceType::EXP,
+         {Source::SourceType::DC, Source::SourceType::AC, Source::SourceType::PULSE, Source::SourceType::EXP,
           Source::SourceType::SFFM, Source::SourceType::AM, Source::SourceType::PWL}) {
         if (text == GetSourceTypeName(type)) {
             return type;

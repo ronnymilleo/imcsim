@@ -39,7 +39,7 @@ public:
     void LoadOptional(const std::optional<double> &value);
     void StartTyping(char first);
     std::optional<double> Draw(const char *label, const std::string &unit, const std::function<bool(double)> &is_valid,
-                               Core::ValueSeries series = Core::ValueSeries::Free);
+                               Core::ValueSeries series = Core::ValueSeries::FREE);
     OptionalValueEdit DrawOptional(const char *label, const std::string &unit,
                                    const std::function<bool(double)> &is_valid);
 

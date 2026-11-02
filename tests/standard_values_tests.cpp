@@ -13,7 +13,7 @@
 
 namespace {
 
-constexpr auto AllSeries = std::to_array<std::pair<Core::ValueSeries, int>>({
+constexpr auto ALL_SERIES = std::to_array<std::pair<Core::ValueSeries, int>>({
     {Core::ValueSeries::E6, 6},
     {Core::ValueSeries::E12, 12},
     {Core::ValueSeries::E24, 24},
@@ -25,7 +25,7 @@ constexpr auto AllSeries = std::to_array<std::pair<Core::ValueSeries, int>>({
 } // namespace
 
 TEST_CASE("A series has its number of values in each decade", "[standard_values]") {
-    for (const auto &[series, count] : AllSeries) {
+    for (const auto &[series, count] : ALL_SERIES) {
         INFO(Core::GetSeriesName(series));
         double value = 1.0;
         for (int step = 0; step < count; ++step) {
@@ -65,11 +65,11 @@ TEST_CASE("The nearest value is judged on a log scale and may be in the next dec
 
 TEST_CASE("E96 and E192 follow their IEC tables", "[standard_values]") {
     using Core::ValueSeries;
-    constexpr auto E96Start = std::to_array<double>({1000, 1020, 1050, 1070, 1100, 1130, 1150, 1180, 1210, 1240});
+    constexpr auto E96_START = std::to_array<double>({1000, 1020, 1050, 1070, 1100, 1130, 1150, 1180, 1210, 1240});
     double value = 1000.0;
-    for (std::size_t index = 1; index < E96Start.size(); ++index) {
+    for (std::size_t index = 1; index < E96_START.size(); ++index) {
         value = Core::StepStandardValue(ValueSeries::E96, value, 1);
-        CHECK(value == E96Start[index]);
+        CHECK(value == E96_START[index]);
     }
     CHECK(Core::NearestStandardValue(ValueSeries::E96, 4990.0) == 4990.0);
     CHECK(Core::NearestStandardValue(ValueSeries::E96, 2740.0) == 2740.0);
@@ -101,8 +101,8 @@ TEST_CASE("Stepping goes to the next value, also from one that is not on the ser
 
 TEST_CASE("The free series and values that are not positive numbers stay as they are", "[standard_values]") {
     using Core::ValueSeries;
-    CHECK(Core::NearestStandardValue(ValueSeries::Free, 1234.5) == 1234.5);
-    CHECK(Core::StepStandardValue(ValueSeries::Free, 1234.5, 1) == 1234.5);
+    CHECK(Core::NearestStandardValue(ValueSeries::FREE, 1234.5) == 1234.5);
+    CHECK(Core::StepStandardValue(ValueSeries::FREE, 1234.5, 1) == 1234.5);
     for (const double value :
          {0.0, -4700.0, std::numeric_limits<double>::infinity(), std::numeric_limits<double>::quiet_NaN()}) {
         const double nearest = Core::NearestStandardValue(ValueSeries::E24, value);
@@ -119,10 +119,10 @@ TEST_CASE("The free series and values that are not positive numbers stay as they
 
 TEST_CASE("Series have names that read back and the tolerance of their standard", "[standard_values]") {
     using Core::ValueSeries;
-    for (const auto &[series, count] : AllSeries) {
+    for (const auto &[series, count] : ALL_SERIES) {
         CHECK(Core::ParseSeriesName(Core::GetSeriesName(series)) == series);
     }
-    CHECK(Core::ParseSeriesName("Free") == ValueSeries::Free);
+    CHECK(Core::ParseSeriesName("Free") == ValueSeries::FREE);
     CHECK_FALSE(Core::ParseSeriesName("E3"));
     CHECK_FALSE(Core::ParseSeriesName("e12"));
     CHECK(Core::GetSeriesTolerancePercent(ValueSeries::E6) == 20.0);
@@ -131,5 +131,5 @@ TEST_CASE("Series have names that read back and the tolerance of their standard"
     CHECK(Core::GetSeriesTolerancePercent(ValueSeries::E48) == 2.0);
     CHECK(Core::GetSeriesTolerancePercent(ValueSeries::E96) == 1.0);
     CHECK(Core::GetSeriesTolerancePercent(ValueSeries::E192) == 0.5);
-    CHECK(Core::GetSeriesTolerancePercent(ValueSeries::Free) == 0.0);
+    CHECK(Core::GetSeriesTolerancePercent(ValueSeries::FREE) == 0.0);
 }

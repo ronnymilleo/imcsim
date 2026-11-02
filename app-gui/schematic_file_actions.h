@@ -7,9 +7,9 @@
 #define IMCSIM_SCHEMATIC_FILE_ACTIONS_H
 
 #include "clipboard.h"
-#include "editor_preferences.h"
 #include "examples.h"
 #include "file_dialog.h"
+#include "preferences.h"
 #include "schematic.h"
 #include <filesystem>
 #include <functional>
@@ -42,7 +42,7 @@ struct FileActionHooks {
  */
 class SchematicFileActions {
 public:
-    SchematicFileActions(Schematic &schematic, const EditorPreferences &preferences, FileActionHooks hooks);
+    SchematicFileActions(Schematic &schematic, const Preferences &preferences, FileActionHooks hooks);
 
     // Frame
     void Update();
@@ -71,17 +71,17 @@ private:
      * @brief   File operation waiting for a file dialog or for the user to confirm discarding changes.
      */
     enum class FileAction {
-        New,
-        Open,
-        Save,
-        Quit,
-        Example,
-        ExportSchematic,
-        Import
+        NEW,
+        OPEN,
+        SAVE,
+        QUIT,
+        EXAMPLE,
+        EXPORT_SCHEMATIC,
+        IMPORT
     };
 
     Schematic &m_Schematic;
-    const EditorPreferences &m_Preferences;
+    const Preferences &m_Preferences;
     FileActionHooks m_Hooks;
 
     // Quitting: requested by the application between frames, handled by the next Update()

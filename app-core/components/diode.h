@@ -7,6 +7,7 @@
 #define IMCSIM_DIODE_H
 
 #include "component.h"
+#include <memory>
 #include <span>
 #include <string>
 #include <string_view>
@@ -37,10 +38,10 @@ struct DiodeParameters {
  * @brief   Color an LED model emits, so the editor can light it up; None for the models of other diodes.
  */
 enum class LEDColor {
-    None,
-    Red,
-    Green,
-    Blue,
+    NONE,
+    RED,
+    GREEN,
+    BLUE,
 };
 
 /**
@@ -57,7 +58,7 @@ struct DiodeModel {
     LEDColor Color;
 };
 
-inline constexpr const char *CustomDiodeModelName = "Custom";
+inline constexpr const char *CUSTOM_DIODE_MODEL_NAME = "Custom";
 
 /**
  * @class   Diode
@@ -69,6 +70,9 @@ class Diode : public Component {
 public:
     explicit Diode(ComponentType type);
     ~Diode() override = default;
+
+    // Copying
+    std::unique_ptr<Component> Clone() const override;
 
     // Ready model
     const DiodeModel *GetModel() const;

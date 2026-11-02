@@ -17,10 +17,10 @@ namespace {
 
 // Fraction of the peak-to-peak value the trace must swing back below its mean before another rising crossing
 // counts, as the trigger hysteresis of an oscilloscope, so noise around the mean adds no cycles
-constexpr double FrequencyHysteresis = 0.1;
-constexpr double CutoffDrop = 3.0;
+constexpr double FREQUENCY_HYSTERESIS = 0.1;
+constexpr double CUTOFF_DROP = 3.0;
 // Values this small next to the size of their trace are floating point residue, such as 1e-46 W for a zero
-constexpr double NegligibleFraction = 1e-9;
+constexpr double NEGLIGIBLE_FRACTION = 1e-9;
 
 /**
  * @struct  Sample
@@ -97,7 +97,7 @@ std::optional<double> MeasureFrequency(const std::vector<Sample> &samples, const
         return std::nullopt;
     }
     const double level = statistics.Mean;
-    const double rearm_level = level - FrequencyHysteresis * statistics.PeakToPeak;
+    const double rearm_level = level - FREQUENCY_HYSTERESIS * statistics.PeakToPeak;
     bool armed = false;
     std::optional<double> first_crossing;
     double last_crossing = 0.0;
@@ -119,7 +119,7 @@ std::optional<double> MeasureFrequency(const std::vector<Sample> &samples, const
             armed = false;
         }
     }
-    if (cycles == 0 || last_crossing <= *first_crossing) {
+    if (!first_crossing || cycles == 0 || last_crossing <= *first_crossing) {
         return std::nullopt;
     }
     return static_cast<double>(cycles) / (last_crossing - *first_crossing);
@@ -151,7 +151,7 @@ std::optional<double> FindFallingFrequency(const std::vector<Sample> &samples, c
  * @return  True when the value is nonzero but negligible next to the scale, so it reads as about zero.
  */
 bool IsNegligible(const double value, const double scale) {
-    return value != 0.0 && std::abs(value) < NegligibleFraction * std::abs(scale);
+    return value != 0.0 && std::abs(value) < NEGLIGIBLE_FRACTION * std::abs(scale);
 }
 
 /**
@@ -330,8 +330,8 @@ std::optional<BodeStatistics> ComputeBodeStatistics(const std::span<const double
     const auto peak_index = static_cast<std::size_t>(peak - samples.begin());
     statistics.PeakGain = peak->Y;
     statistics.PeakFrequency = std::pow(10.0, peak->X);
-    statistics.UpperCutoff = FindFallingFrequency(samples, peak_index, 1, peak->Y - CutoffDrop);
-    statistics.LowerCutoff = FindFallingFrequency(samples, peak_index, -1, peak->Y - CutoffDrop);
+    statistics.UpperCutoff = FindFallingFrequency(samples, peak_index, 1, peak->Y - CUTOFF_DROP);
+    statistics.LowerCutoff = FindFallingFrequency(samples, peak_index, -1, peak->Y - CUTOFF_DROP);
     statistics.UnityGainFrequency = FindFallingFrequency(samples, 0, 1, 0.0);
     if (statistics.UnityGainFrequency) {
         statistics.PhaseMargin = 180.0 + InterpolateAt(frequencies, phases, *statistics.UnityGainFrequency, true);

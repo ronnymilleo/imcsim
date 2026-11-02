@@ -1,14 +1,16 @@
 /**
  * @file    trace_math.cpp
- * @brief   Math channels: expressions of voltages and currents, such as V(1)-V(2), evaluated over a result.
+ * @brief   Math channels: expressions of voltages and currents, such as V(1)-V(OUT), evaluated over a result.
  */
 
 #include "trace_math.h"
 
+#include "components/net_label.h"
 #include "spice_value.h"
 #include <algorithm>
 #include <array>
 #include <cctype>
+#include <charconv>
 #include <cmath>
 #include <format>
 #include <functional>
@@ -30,11 +32,11 @@ struct FunctionName {
     Kind Type;
 };
 
-constexpr auto Functions = std::to_array<FunctionName>({
-    {"abs", Kind::Absolute},
-    {"sqrt", Kind::SquareRoot},
-    {"ddt", Kind::Derivative},
-    {"integ", Kind::Integral},
+constexpr auto FUNCTIONS = std::to_array<FunctionName>({
+    {"abs", Kind::ABS},
+    {"sqrt", Kind::SQUARE_ROOT},
+    {"ddt", Kind::DERIVATIVE},
+    {"integ", Kind::INTEGRAL},
 });
 
 /**
@@ -45,6 +47,7 @@ constexpr auto Functions = std::to_array<FunctionName>({
  *          product := unary (('*' | '/') unary)*
  *          unary := '-' unary | primary
  *          primary := number | V(node) | V(node, node) | I(name) | function(sum) | (sum)
+ *          node := number | net name
  */
 class Parser {
 public:
@@ -105,7 +108,7 @@ private:
             if (const Step step = ParseProduct(); !step) {
                 return step;
             }
-            Emit(add ? Kind::Add : Kind::Subtract);
+            Emit(add ? Kind::ADD : Kind::SUBTRACT);
         }
     }
 
@@ -121,7 +124,7 @@ private:
             if (const Step step = ParseUnary(); !step) {
                 return step;
             }
-            Emit(multiply ? Kind::Multiply : Kind::Divide);
+            Emit(multiply ? Kind::MULTIPLY : Kind::DIVIDE);
         }
     }
 
@@ -130,7 +133,7 @@ private:
             if (const Step step = ParseUnary(); !step) {
                 return step;
             }
-            Emit(Kind::Negate);
+            Emit(Kind::NEGATE);
             return {};
         }
         return ParsePrimary();
@@ -162,8 +165,8 @@ private:
         if (lower == "i") {
             return ParseCurrent();
         }
-        const auto function = std::ranges::find(Functions, std::string_view(lower), &FunctionName::Name);
-        if (function == Functions.end()) {
+        const auto function = std::ranges::find(FUNCTIONS, std::string_view(lower), &FunctionName::Name);
+        if (function == FUNCTIONS.end()) {
             return std::unexpected(std::format("Unknown name \"{}\"; use V(node), I(part) or a function", name));
         }
         if (const Step step = Expect('('); !step) {
@@ -197,7 +200,7 @@ private:
         if (!value) {
             return std::unexpected(std::format("\"{}\" is not a number", text));
         }
-        m_Program.Instructions.push_back({.Type = Kind::Number, .Number = *value});
+        m_Program.Instructions.push_back({.Type = Kind::NUMBER, .Number = *value});
         return {};
     }
 
@@ -206,20 +209,45 @@ private:
         if (const Step step = Expect('('); !step) {
             return step;
         }
-        const std::optional<int> node = ReadNode();
-        if (!node) {
-            return std::unexpected("V() takes a node number, such as V(2)");
+        if (const Step step = ParseNode(); !step) {
+            return step;
         }
-        m_Program.Instructions.push_back({.Type = Kind::Voltage, .Node = *node});
         if (Accept(',')) {
-            const std::optional<int> second = ReadNode();
-            if (!second) {
-                return std::unexpected("V(a, b) takes two node numbers");
+            if (const Step step = ParseNode(); !step) {
+                return step;
             }
-            m_Program.Instructions.push_back({.Type = Kind::Voltage, .Node = *second});
-            Emit(Kind::Subtract);
+            Emit(Kind::SUBTRACT);
         }
         return Expect(')');
+    }
+
+    // A node is a number, or a name a net label gave it, which stays valid when the nodes are numbered again. A name
+    // of digits alone reads as a number
+    Step ParseNode() {
+        SkipSpaces();
+        const std::size_t start = m_Position;
+        while (m_Position < m_Text.size() && m_Text[m_Position] != ',' && m_Text[m_Position] != ')' &&
+               std::isspace(static_cast<unsigned char>(m_Text[m_Position])) == 0) {
+            ++m_Position;
+        }
+        const std::string_view text = m_Text.substr(start, m_Position - start);
+        if (text.empty()) {
+            return std::unexpected("V() takes a node number or a net name, such as V(2) or V(OUT)");
+        }
+        if (std::ranges::all_of(
+                text, [](const char character) { return std::isdigit(static_cast<unsigned char>(character)) != 0; })) {
+            int node = 0;
+            if (std::from_chars(text.data(), text.data() + text.size(), node).ec != std::errc()) {
+                return std::unexpected(std::format("The circuit has no node {}", text));
+            }
+            m_Program.Instructions.push_back({.Type = Kind::VOLTAGE, .Node = node});
+            return {};
+        }
+        if (!Core::NetLabel::IsValidNet(text)) {
+            return std::unexpected(std::format("\"{}\" is not a node number or a net name", text));
+        }
+        m_Program.Instructions.push_back({.Type = Kind::VOLTAGE, .Net = std::string(text)});
+        return {};
     }
 
     Step ParseCurrent() {
@@ -236,20 +264,8 @@ private:
             return std::unexpected("I() takes the name of a part, such as I(R1) or I(Q1.C)");
         }
         m_Program.Instructions.push_back(
-            {.Type = Kind::Current, .Current = std::string(m_Text.substr(start, m_Position - start))});
+            {.Type = Kind::CURRENT, .Current = std::string(m_Text.substr(start, m_Position - start))});
         return Expect(')');
-    }
-
-    std::optional<int> ReadNode() {
-        SkipSpaces();
-        const std::size_t start = m_Position;
-        while (m_Position < m_Text.size() && std::isdigit(static_cast<unsigned char>(m_Text[m_Position])) != 0) {
-            ++m_Position;
-        }
-        if (m_Position == start) {
-            return std::nullopt;
-        }
-        return std::stoi(std::string(m_Text.substr(start, m_Position - start)));
     }
 
     std::string ReadWord() {
@@ -334,17 +350,39 @@ StackEntry ApplyBinary(StackEntry first, const StackEntry &second, const Operati
 
 /**
  * @brief   Compiles an expression typed by the user.
- * @param[in] text  Expression such as V(1)-V(2), V(3)*I(R1), V(1,2), abs(I(D1)), ddt(V(2)) or integ(I(C1)); numbers
- *                  take SPICE suffixes, and names of functions, V and I ignore case.
+ * @param[in] text  Expression such as V(1)-V(2), V(OUT)*I(R1), V(1,2), abs(I(D1)), ddt(V(2)) or integ(I(C1));
+ *                  numbers take SPICE suffixes, and names of functions, V and I ignore case.
  * @return  The compiled program, or a message saying what is wrong and where.
+ * @note    Net names are kept as written; ResolveNetNames() finds their nodes before the program is evaluated.
  */
 std::expected<MathProgram, std::string> CompileExpression(const std::string_view text) {
     return Parser(text).Parse();
 }
 
 /**
+ * @brief   Turns the net names of a compiled expression into the nodes they have in the circuit now.
+ * @param[in] program    Compiled expression.
+ * @param[in] find_node  Finds the node of a net name.
+ * @return  The program with every voltage on a node number, or an error naming a net the circuit no longer has.
+ */
+std::expected<MathProgram, std::string> ResolveNetNames(MathProgram program, const NetResolver &find_node) {
+    for (MathInstruction &instruction : program.Instructions) {
+        if (instruction.Type != Kind::VOLTAGE || instruction.Net.empty()) {
+            continue;
+        }
+        const std::optional<int> node = find_node(instruction.Net);
+        if (!node) {
+            return std::unexpected(std::format("The circuit has no net named {}", instruction.Net));
+        }
+        instruction.Node = *node;
+        instruction.Net.clear();
+    }
+    return program;
+}
+
+/**
  * @brief   Evaluates a compiled expression over every sample of a result.
- * @param[in] program        Compiled expression.
+ * @param[in] program        Compiled expression, with its net names resolved.
  * @param[in] xs             X value of each sample: times, or the values of a swept source.
  * @param[in] x_unit         Unit of the X values, which derivatives divide by and integrals multiply by.
  * @param[in] node_voltages  Voltage of each node at each sample, indexed by node number.
@@ -360,16 +398,19 @@ std::expected<MathResult, std::string> EvaluateExpression(const MathProgram &pro
     std::vector<StackEntry> stack;
     for (const MathInstruction &instruction : program.Instructions) {
         switch (instruction.Type) {
-        case Kind::Number:
+        case Kind::NUMBER:
             stack.push_back({std::vector<double>(count, instruction.Number), {}, true});
             continue;
-        case Kind::Voltage:
+        case Kind::VOLTAGE:
+            if (!instruction.Net.empty()) {
+                return std::unexpected(std::format("The net {} was not resolved to a node", instruction.Net));
+            }
             if (instruction.Node < 0 || static_cast<std::size_t>(instruction.Node) >= node_voltages.size()) {
                 return std::unexpected(std::format("The circuit has no node {}", instruction.Node));
             }
             stack.push_back({node_voltages[static_cast<std::size_t>(instruction.Node)], {.Volts = 1}, false});
             continue;
-        case Kind::Current: {
+        case Kind::CURRENT: {
             const auto current = std::ranges::find_if(currents, [&instruction](const Core::ComponentTrace &trace) {
                 return trace.Name == instruction.Current;
             });
@@ -387,24 +428,24 @@ std::expected<MathResult, std::string> EvaluateExpression(const MathProgram &pro
         StackEntry operand = std::move(stack.back());
         stack.pop_back();
         switch (instruction.Type) {
-        case Kind::Negate:
+        case Kind::NEGATE:
             std::ranges::transform(operand.Values, operand.Values.begin(), [](const double value) { return -value; });
             break;
-        case Kind::Absolute:
+        case Kind::ABS:
             std::ranges::transform(operand.Values, operand.Values.begin(),
                                    [](const double value) { return std::abs(value); });
             break;
-        case Kind::SquareRoot:
+        case Kind::SQUARE_ROOT:
             std::ranges::transform(operand.Values, operand.Values.begin(),
                                    [](const double value) { return std::sqrt(value); });
             operand.Unit = {.Known = operand.Unit == Dimension{}};
             break;
-        case Kind::Derivative:
+        case Kind::DERIVATIVE:
             operand.Values = Differentiate(xs, operand.Values);
             operand.Unit = Combine(operand.Unit, x_unit, -1);
             operand.IsNumber = false;
             break;
-        case Kind::Integral:
+        case Kind::INTEGRAL:
             operand.Values = Integrate(xs, operand.Values);
             operand.Unit = Combine(operand.Unit, x_unit, 1);
             operand.IsNumber = false;
@@ -415,15 +456,15 @@ std::expected<MathResult, std::string> EvaluateExpression(const MathProgram &pro
             const Dimension first_unit = first.Unit;
             const bool first_is_number = first.IsNumber;
             switch (instruction.Type) {
-            case Kind::Add:
+            case Kind::ADD:
                 operand = ApplyBinary(std::move(first), operand, std::plus<>(),
                                       AddUnits(first_unit, first_is_number, operand.Unit, operand.IsNumber));
                 break;
-            case Kind::Subtract:
+            case Kind::SUBTRACT:
                 operand = ApplyBinary(std::move(first), operand, std::minus<>(),
                                       AddUnits(first_unit, first_is_number, operand.Unit, operand.IsNumber));
                 break;
-            case Kind::Multiply:
+            case Kind::MULTIPLY:
                 operand =
                     ApplyBinary(std::move(first), operand, std::multiplies<>(), Combine(first_unit, operand.Unit, 1));
                 break;
@@ -505,13 +546,13 @@ std::string FormatUnit(const Dimension unit) {
  */
 const char *GetOperatorSymbol(const MathOperator math_operator) {
     switch (math_operator) {
-    case MathOperator::Add:
+    case MathOperator::ADD:
         return "+";
-    case MathOperator::Subtract:
+    case MathOperator::SUBTRACT:
         return "-";
-    case MathOperator::Multiply:
+    case MathOperator::MULTIPLY:
         return "*";
-    case MathOperator::Divide:
+    case MathOperator::DIVIDE:
         return "/";
     }
     return "+";

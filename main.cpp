@@ -4,12 +4,13 @@
  */
 
 #include "application.h"
-#include "error_codes.h"
+
+#include <cstdlib>
 
 int main(int, char **) {
     GUI::Application app;
     int result = app.Init();
-    if (result == Core::ExitSuccess) {
+    if (result == EXIT_SUCCESS) {
         result = app.Run();
     }
     app.Shutdown();

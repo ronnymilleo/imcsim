@@ -13,12 +13,12 @@ namespace GUI {
 namespace {
 
 // The fonts the application itself prefers, then common fallbacks; the viewer picks the first it has
-constexpr std::string_view FontFamily =
+constexpr std::string_view FONT_FAMILY =
     "Inter, 'Noto Sans', 'DejaVu Sans', 'Liberation Sans', Helvetica, Arial, sans-serif";
 
 // Trace colors are picked for a dark screen; on white, the lighter ones (yellow, pale gray) are darkened to this
 // relative luminance so they stay readable in print
-constexpr double MaxPrintLuminance = 0.5;
+constexpr double MAX_PRINT_LUMINANCE = 0.5;
 
 std::string FormatColor(const ExportColor color) {
     return std::format("#{:02x}{:02x}{:02x}", color.Red, color.Green, color.Blue);
@@ -76,7 +76,7 @@ std::string SvgWriter::Finish(const SvgPoint corner, const double width, const d
                     "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"{}\" height=\"{}\" viewBox=\"{} {} {} {}\" "
                     "font-family=\"{}\">\n",
                     FormatCoordinate(width), FormatCoordinate(height), FormatCoordinate(corner.X),
-                    FormatCoordinate(corner.Y), FormatCoordinate(width), FormatCoordinate(height), FontFamily);
+                    FormatCoordinate(corner.Y), FormatCoordinate(width), FormatCoordinate(height), FONT_FAMILY);
     if (background) {
         document += std::format("<rect x=\"{}\" y=\"{}\" width=\"{}\" height=\"{}\" fill=\"{}\"/>\n",
                                 FormatCoordinate(corner.X), FormatCoordinate(corner.Y), FormatCoordinate(width),
@@ -179,7 +179,7 @@ void SvgWriter::FilledCircle(const SvgPoint center, const double radius, const E
  */
 void SvgWriter::Text(const SvgPoint baseline, const std::string_view text, const double font_size,
                      const ExportColor color, const TextAnchor anchor, const bool vertical) {
-    const char *anchor_name = anchor == TextAnchor::Start ? "start" : anchor == TextAnchor::Middle ? "middle" : "end";
+    const char *anchor_name = anchor == TextAnchor::START ? "start" : anchor == TextAnchor::MIDDLE ? "middle" : "end";
     m_Body += std::format("<text x=\"{}\" y=\"{}\" font-size=\"{}\" fill=\"{}\" text-anchor=\"{}\"",
                           FormatCoordinate(baseline.X), FormatCoordinate(baseline.Y), FormatCoordinate(font_size),
                           FormatColor(color), anchor_name);
@@ -234,10 +234,10 @@ std::string FormatCoordinate(const double value) {
  */
 ExportColor AdjustColorForPrint(const ExportColor color) {
     const double luminance = (0.2126 * color.Red + 0.7152 * color.Green + 0.0722 * color.Blue) / 255.0;
-    if (luminance <= MaxPrintLuminance) {
+    if (luminance <= MAX_PRINT_LUMINANCE) {
         return color;
     }
-    const double factor = MaxPrintLuminance / luminance;
+    const double factor = MAX_PRINT_LUMINANCE / luminance;
     const auto darken = [factor](const std::uint8_t channel) {
         return static_cast<std::uint8_t>(std::lround(channel * factor));
     };

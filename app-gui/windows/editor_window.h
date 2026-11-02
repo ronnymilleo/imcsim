@@ -7,17 +7,18 @@
 #define IMCSIM_EDITOR_WINDOW_H
 
 #include "analysis_controls.h"
+#include "analysis_settings_panel.h"
 #include "canvas_view.h"
 #include "circuit_snapshot.h"
 #include "clipboard.h"
 #include "components/component.h"
-#include "editor_preferences.h"
 #include "examples.h"
 #include "glow_renderer.h"
 #include "helpers.h"
 #include "imgui.h"
 #include "part_editor.h"
 #include "playback.h"
+#include "preferences.h"
 #include "probing.h"
 #include "schematic.h"
 #include "schematic_file_actions.h"
@@ -48,8 +49,9 @@ namespace GUI {
  */
 class EditorWindow : public AppWindow {
 public:
-    EditorWindow(Schematic &schematic, AnalysisControls &controls, PartEditor &part_editor, GlowRenderer &glow_renderer,
-                 TransientPlayback &playback);
+    EditorWindow(Schematic &schematic, AnalysisControls &controls, AnalysisSettingsPanel &settings_panel,
+                 PartEditor &part_editor, GlowRenderer &glow_renderer, TransientPlayback &playback,
+                 const Preferences &preferences);
     ~EditorWindow() override = default;
 
     // Requests, global shortcuts and file popups, whichever window is in front
@@ -69,10 +71,16 @@ public:
     void DrawEditMenuItems();
     void DrawViewMenuItems();
 
-    // Preferences, kept in imgui.ini; call once after the ImGui context exists and before the first frame
-    void RegisterSettingsHandler();
-
 private:
+    /**
+     * @struct  TimeSpan
+     * @brief   A stretch of time of the transient, in seconds.
+     */
+    struct TimeSpan {
+        double From = 0.0;
+        double To = 0.0;
+    };
+
     /**
      * @struct  GroupDrag
      * @brief   Schematic state captured when a drag of the selection starts; every frame of the drag is computed from
@@ -122,35 +130,37 @@ private:
      * @brief   A command picked in a menu, run by the next Draw() so its popups belong to the editor window.
      */
     enum class EditorCommand {
-        New,
-        Open,
-        Save,
-        SaveAs,
-        Import,
-        ExportSchematic,
-        Undo,
-        Redo,
-        Rotate,
-        Mirror,
-        Flip,
-        RotateKeepWires,
-        MirrorKeepWires,
-        FlipKeepWires,
-        Cut,
-        Copy,
-        Paste,
-        SelectAll,
-        Delete
+        NEW,
+        OPEN,
+        SAVE,
+        SAVE_AS,
+        IMPORT,
+        EXPORT_SCHEMATIC,
+        UNDO,
+        REDO,
+        ROTATE,
+        MIRROR,
+        FLIP,
+        ROTATE_KEEP_WIRES,
+        MIRROR_KEEP_WIRES,
+        FLIP_KEEP_WIRES,
+        CUT,
+        COPY,
+        PASTE,
+        SELECT_ALL,
+        DELETE_SELECTION
     };
 
     Schematic &m_Schematic;
     AnalysisControls &m_Controls;
+    AnalysisSettingsPanel &m_SettingsPanel;
     PartEditor &m_PartEditor;
     GlowRenderer &m_GlowRenderer;
     TransientPlayback &m_Playback;
+    // How the schematic is drawn and exported
+    const Preferences &m_Preferences;
 
-    // Parts of the editor, in the order they are built: the files export what the preferences pick
-    EditorPreferences m_Preferences;
+    // Parts of the editor, in the order they are built
     CanvasView m_View;
     SchematicFileActions m_Files;
 
@@ -158,6 +168,10 @@ private:
     // result and kept
     std::optional<DisplayedState> m_Displayed;
     std::optional<std::size_t> m_ScaledTransientVersion;
+    // The window of points the scale was worked out over
+    PointWindow m_ScaledWindow;
+    // When the heat scale of a transient that is still being made was last worked out
+    double m_LastScaleTime = 0.0;
     HeatScale m_TransientScale;
 
     // Placement
@@ -185,6 +199,9 @@ private:
     std::optional<GroupDrag> m_Drag;
     std::optional<SelectionBox> m_Box;
 
+    // Live runs: the push button the mouse holds down
+    std::optional<std::size_t> m_HeldButton;
+
     // Properties popover: the corner it hangs from, which side of the part it opens on, and a request from a menu
     ImVec2 m_PartPopoverAnchor = {0.0f, 0.0f};
     float m_PartPopoverPivotX = 0.0f;
@@ -202,9 +219,12 @@ private:
     void Draw() override;
     void DrawToolbar();
     void DrawPartButton(Core::ComponentType type);
-    void DrawPartGroup(std::size_t index);
     void DrawRunControls();
+    void DrawAnalysisButton(float run_left);
+    void DrawLiveToggle();
+    void DrawPartGroup(std::size_t index);
     void UpdateDisplayedState();
+    std::optional<TimeSpan> GetWindowSpan() const;
     void DrawTimeBar();
     void DrawWires(SchematicCanvas &canvas, const ViewTransform &view);
     void DrawWireSelectionHalos(SchematicCanvas &canvas, const ViewTransform &view);
@@ -212,6 +232,7 @@ private:
     ImU32 GetWireColor(int node) const;
     void DrawWireCurrents(SchematicCanvas &canvas, const ViewTransform &view);
     void DrawGlows(ImDrawList *draw_list, const ViewTransform &view);
+    void DrawElements(SchematicCanvas &canvas, const ViewTransform &view, std::optional<std::size_t> lit_live_part);
     ImU32 GetElementColor(std::size_t index) const;
     bool AreWiresHeatColored() const;
     bool ArePartsHeatColored() const;
@@ -259,6 +280,11 @@ private:
     void EndDrag();
     void DrawSelectionBox(ImDrawList *draw_list, const ViewTransform &view) const;
     void TransformSelection(PointTransform::Kind kind, bool keep_wires);
+
+    // Live runs
+    std::optional<std::size_t> FindLivePart(const ViewTransform &view) const;
+    bool HandleLiveInput(std::optional<std::size_t> live_part);
+    void ReleaseHeldButton();
 
     // Properties popover and context menu
     void PlacePartPopover(const ViewTransform &view);

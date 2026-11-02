@@ -23,9 +23,9 @@ namespace GUI {
 namespace {
 
 // The share of the time an export shows that a cell needs for its bit label
-constexpr double MinBitLabelShare = 0.03;
+constexpr double MIN_BIT_LABEL_SHARE = 0.03;
 // Gain from the input source to the output below which the input-referred noise is left out: -120 dB
-constexpr double MinInputGain = 1e-6;
+constexpr double MIN_INPUT_GAIN = 1e-6;
 
 ExportColor ToExportColor(const ImU32 color) {
     return {static_cast<std::uint8_t>((color >> IM_COL32_R_SHIFT) & 0xFF),
@@ -134,11 +134,11 @@ void AddBitNotes(ExportPanel &panel, const Core::Transient &transient, const std
     }
     const auto cells = FindBitCells(transient.Times, signals, view.From, view.To);
     for (std::size_t lane = 0; lane < lanes.size(); ++lane) {
-        const double middle = static_cast<double>(lanes.size() - 1 - lane) * LaneStride + LaneHighOffset / 2.0;
+        const double middle = static_cast<double>(lanes.size() - 1 - lane) * LANE_STRIDE + LANE_HIGH_OFFSET / 2.0;
         for (const LogicSegment &cell : cells[lane]) {
             const double from = std::max(cell.From, view.From);
             const double to = std::min(cell.To, view.To);
-            if (to - from >= (view.To - view.From) * MinBitLabelShare) {
+            if (to - from >= (view.To - view.From) * MIN_BIT_LABEL_SHARE) {
                 panel.Notes.push_back(
                     {.X = (from + to) / 2.0, .Y = middle, .Text = GetLogicStateName(cell.State), .Centered = true});
             }
@@ -157,7 +157,7 @@ ExportPanel BuildLanePanel(const Core::Transient &transient, const std::vector<L
         const std::string label = GetVoltageLabel(schematic.GetConnectivity(), lanes[lane].Node);
         const std::vector<double> &voltages = transient.NodeVoltages[static_cast<std::size_t>(lanes[lane].Node)];
         axis.Ticks.push_back(
-            {.Value = static_cast<double>(position) * LaneStride + LaneHighOffset / 2.0, .Label = label});
+            {.Value = static_cast<double>(position) * LANE_STRIDE + LANE_HIGH_OFFSET / 2.0, .Label = label});
         panel.Series.push_back({.Name = label,
                                 .Values = BuildLane(voltages, lanes[lane].LogicLevel, position),
                                 .Samples = voltages,
@@ -166,8 +166,9 @@ ExportPanel BuildLanePanel(const Core::Transient &transient, const std::vector<L
     if (bit_values) {
         AddBitNotes(panel, transient, lanes, view);
     }
-    axis.Range = ExportRange{.From = LaneLowOffset - LaneMargin,
-                             .To = static_cast<double>(lanes.size() - 1) * LaneStride + LaneHighOffset + LaneMargin};
+    axis.Range =
+        ExportRange{.From = LANE_LOW_OFFSET - LANE_MARGIN,
+                    .To = static_cast<double>(lanes.size() - 1) * LANE_STRIDE + LANE_HIGH_OFFSET + LANE_MARGIN};
     panel.YAxes.push_back(std::move(axis));
     return panel;
 }
@@ -234,7 +235,7 @@ bool CurvesDiffer(const std::vector<const std::vector<double> *> &curves, const 
             highest = std::max(highest, (*curve)[sample]);
         }
     }
-    return highest > lowest && highest - lowest > std::max(largest * NegligibleSpread, ResidueLevel);
+    return highest > lowest && highest - lowest > std::max(largest * NEGLIGIBLE_SPREAD, RESIDUE_LEVEL);
 }
 
 /**
@@ -314,7 +315,7 @@ std::string FormatStepLabel(const Core::DCSweep &sweep, const Core::DCSweepCurve
  * @return  True when the input-referred noise means something.
  */
 bool HasInputGain(const Core::Noise &noise) {
-    return noise.InputTotal > 0.0 && noise.OutputTotal >= noise.InputTotal * MinInputGain;
+    return noise.InputTotal > 0.0 && noise.OutputTotal >= noise.InputTotal * MIN_INPUT_GAIN;
 }
 
 /**
@@ -516,7 +517,7 @@ ExportFigure BuildNoiseFigure(const Core::Noise &noise, Schematic &schematic, co
                                 .LegendLabel = input_label,
                                 .Values = noise.InputDensities,
                                 .Axis = input_in_volts ? 0U : 1U,
-                                .Color = ToExportColor(AdaptToBackground(InputNoiseColor)),
+                                .Color = ToExportColor(AdaptToBackground(INPUT_NOISE_COLOR)),
                                 .Dashed = true});
     }
     figure.Panels.push_back(std::move(panel));

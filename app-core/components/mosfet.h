@@ -7,6 +7,7 @@
 #define IMCSIM_MOSFET_H
 
 #include "component.h"
+#include <memory>
 #include <span>
 #include <string>
 #include <string_view>
@@ -53,7 +54,7 @@ struct MOSFETModel {
     ComponentType Type;
 };
 
-inline constexpr const char *CustomMOSFETModelName = "Custom";
+inline constexpr const char *CUSTOM_MOSFET_MODEL_NAME = "Custom";
 
 /**
  * @class   MOSFET
@@ -66,6 +67,9 @@ class MOSFET : public Component {
 public:
     explicit MOSFET(ComponentType type);
     ~MOSFET() override = default;
+
+    // Copying
+    std::unique_ptr<Component> Clone() const override;
 
     // Ready model
     const MOSFETModel *GetModel() const;
