@@ -27,7 +27,7 @@ The toolbar groups its buttons:
 
 Hover any button for its name and shortcut.
 
-![Placing a source, a resistor, a capacitor and a ground, then wiring them](images/tutorial_build.gif)
+![The completed source, resistor, capacitor and ground circuit](images/tutorial_build.png)
 
 1. Click the first button of the sources group, the voltage source. It follows the cursor; click to place it. R
    rotates a part before the click, M mirrors it. Placing stays active, so you can drop several parts in a row;
@@ -51,7 +51,7 @@ Start over with File > New and draw the rectifier: a voltage source, a diode fou
 capacitor below the diode's cathode and a resistor beside the capacitor, then a ground. Wire the source to the anode,
 the cathode to the top of the capacitor and the resistor, and their bottoms to the source and the ground.
 
-![The part search: Space, then type part of a name, while drawing the rectifier](images/tutorial_search.gif)
+![The part search: Space, then type part of a name, while drawing the rectifier](images/tutorial_search.png)
 
 ## 3. Edit a part
 
@@ -59,7 +59,7 @@ A double click on a part opens its properties in a popover beside it, as does En
 apply as you type; Enter, Esc or a click outside closes it. A right click opens everything else the part can do:
 its properties, rotate, mirror, flip, measure its current and delete.
 
-![The source switched to a pulse, then the diode's model, from 1N4148 to custom parameters, and its right-click menu](images/tutorial_properties.gif)
+![The voltage source set to Pulse, with its default 0 to 5 V, 1 kHz settings](images/tutorial_properties.png)
 
 - **The source**: switch Vin1 from DC to Pulse. Its default is the square wave this tutorial needs: 0 V low, 5 V high,
   1 µs edges, 500 µs wide every 1 ms, so it repeats at 1 kHz.
@@ -75,7 +75,7 @@ what a click would measure. Clicking a wire measures the voltage of its node, cl
 and clicking a measured item again stops measuring it. Click D1 for its current and the wire on top of R1 for the
 output voltage, V(2). Each gets a colored mark on the schematic, in the color its trace will have.
 
-![Probing: the current of the diode, the output voltage, and the tooltip of a measured item](images/tutorial_probe.gif)
+![The diode current and output voltage marked with colored probes](images/tutorial_probe.png)
 
 Press Esc to leave probe mode. You can also pick traces later in the Output window.
 
@@ -88,7 +88,7 @@ of the source (5 ms) with a 5 µs step.
 Click Run, or press F5. ngspice runs the circuit, the status bar reports the result, and the Output window opens by
 itself, as a tab beside the schematic, on the tab of the new analysis.
 
-![Running a transient, the Output window, then playing the run on the schematic](images/tutorial_run.gif)
+![The transient result for the rectifier: output voltage and diode current](images/tutorial_run.png)
 
 V(2) climbs to about 4.35 V, the 5 V pulse less the drop of the diode, and sags to about 2.64 V before the next pulse,
 for a mean of about 3.88 V. I(D1) is a train of spikes: the source has no resistance and 1 µs edges, so each rising
@@ -110,7 +110,7 @@ If a run fails, the status bar says so in red; click it for the error and the ng
 Parts with a single value take it straight from the keyboard: select R1 and type `220`, then Enter. A whole number may
 put its decimals after the suffix, as resistor codes do: `4k7` is 4.7 kΩ.
 
-![Typing a value straight onto the selected resistor](images/tutorial_value.gif)
+![Typing a value straight onto the selected resistor](images/tutorial_value.png)
 
 By default nothing runs by itself: after any edit, run again with F5. To have it follow your edits, turn on Run again
 after edits in Edit > Preferences (Ctrl+,): once you have run an analysis, each change runs it again half a second
@@ -125,7 +125,7 @@ output. The next plots use this transient.
   statistics over that span only, with the value of each trace at each cursor. Put A on a peak of V(2) and B at the
   bottom of the sag to read the ripple and how long it takes.
 
-![Cursors A and B over the transient, with Output docked below the schematic](images/tutorial_cursors.gif)
+![Cursors A and B over the transient, with statistics for the selected interval](images/tutorial_cursors.png)
 
 - **Math channels**: click Add under Math. A new channel starts as an operation between two traces, V(1) − V(2);
   change the operator to ×, then the traces to V(2) and I(R1): V(2) × I(R1) is the power the load takes. Its unit is
@@ -133,7 +133,7 @@ output. The next plots use this transient.
   axis of its own. It peaks at about 83 mW at the top of each pulse. A channel can also be an expression such as
   `V(1)-V(2)` or `ddt(V(2))`.
 
-![A math channel: the power V(2) × I(R1), with its statistics in the panel](images/tutorial_math.gif)
+![A math channel: the power V(2) × I(R1), with its statistics in the panel](images/tutorial_math.png)
 
 ## 8. Other analyses
 
