@@ -43,14 +43,16 @@ New to imcsim? The [tutorial](docs/tutorial.md) builds, simulates and exports a 
 - A truth table of a digital circuit: every combination of the chosen logic inputs and the 0, 1 or X it gives at the
   measured outputs
 - Math channels on transient and DC sweep plots, as on an oscilloscope: an operation between two traces picked
-  with buttons, or a typed expression such as `V(1,2)`, `V(3)*I(R1)` or `ddt(V(2))`, with units followed (W, Ohm,
-  V/s) and a third axis for any unit other than volts and amperes
+  with buttons, or a typed expression such as `V(OUT, IN)`, `V(3)*I(R1)` or `ddt(V(2))`, with units followed (W, Ohm,
+  V/s) and a third axis for any unit other than volts and amperes; channels are saved with the schematic and can use
+  named nets
 - Operating point and transient results on the schematic: values on hover, wires colored by node, by voltage or by a
   current heat map that shows the path of the current, parts colored by power, and a time bar to play a transient
 - Logic signals plot as stacked lanes under the analog traces, like a logic analyzer
 - Exports for reports: plots as SVG images (light for print or dark, at any size) or CSV tables, and the schematic
   as an SVG image with its probes, so the two figures can be shown side by side
-- Nine color themes, seven dark and two light, switched from the View menu (see [Themes](docs/themes.md))
+- Nine color themes, seven dark and two light, switched in Edit > Preferences or from View > Theme (see
+  [Themes](docs/themes.md))
 - Multi-selection (Shift+click, selection box, whole node by double click), moving and turning groups, sliding wire
   segments, copy, cut and paste (also between windows), importing a file or an example into the schematic (also by dropping
   the file on the window), net labels that join distant points by name, and an option to turn parts and leave their
@@ -74,7 +76,11 @@ New to imcsim? The [tutorial](docs/tutorial.md) builds, simulates and exports a 
 - Part properties in a popover beside the part (double click or Enter), values typed straight onto a selected
   part (`4k7`), a right-click menu, and Fit (Home)
 - Run (F5) from the toolbar, with the analysis and its settings beside it, settings suggested from the sources and
-  parts, and the result of the last run in the status bar
+  parts, and the result of the last run in the status bar; an optional preference runs the analysis again after edits
+- Analyses run in the background with progress and Stop; transient plots and the schematic grow as chunks arrive, and
+  a configurable window of points keeps long runs responsive
+- Live transients paced by the clock: flip switches, hold push buttons, change logic inputs and turn potentiometers on
+  the schematic while the run continues, then pause, continue or discard the session
 - 29 example circuits sorted by topic, each with its analyses and measurements set up: dividers, RC and RLC
   filters, diode curves, a Zener regulator and a rectifier, BJT and MOSFET switches and characteristics, a current
   mirror, common-emitter and class AB amplifiers, op-amp amplifiers, an integrator, a Schmitt trigger and a Sallen-Key
@@ -105,10 +111,8 @@ This is a possible roadmap, not a promise: what comes next depends on what users
 it can change at any time. The ideas below are tracked as tasks in the project's backlog and grouped here by theme,
 roughly in the order they are likely to come.
 
-- **Next**: an interactive mode, where flipping a switch or turning a potentiometer updates the transient at once,
-  built on background simulation with progress, a stop button and traces drawn while a run goes on; and subcircuits,
-  which group part of a schematic into a reusable block with pins, followed by importing vendor `.model`, `.subckt` and
-  `.lib` files
+- **Next**: subcircuits, which group part of a schematic into a reusable block with pins, followed by importing vendor
+  `.model`, `.subckt` and `.lib` files
 - **Digital**: counters, shift registers, multiplexers, decoders and the 555 timer; bus and bit-value options for the
   logic lanes; Verilog modules placed as parts and simulated together with the analog circuit
 - **Analyses**: poles and zeros with an s-plane view, sensitivity shown on the schematic, S-parameters with a Smith chart
@@ -116,13 +120,13 @@ roughly in the order they are likely to come.
 - **Sources, parts and models**: behavioral sources, XSPICE analog blocks, transmission lines, a circuit driven from a
   WAV or CSV file, more ready op-amp macromodels, and a MOSFET body diode and higher-level MOSFET models
 - **Live effects and plots**: overload sparks, a capacitor charge bar, inductor field lines, an animated lamp, motor and
-  buzzer, a fuse that blows, safe operating area warnings, and math channels in AC sweeps and saved with the schematic
+  buzzer, a fuse that blows, safe operating area warnings, and math channels in AC sweeps
 - **Platform**: a Flatpak release, and a web version with sharing by link
 - **Longer term, a native simulation backend**: a solver written from published circuit theory that sits beside ngspice,
-  which stays available, tested against closed-form results and built to use modern CPUs well. It would come in steps:
-  a backend interface with a capability matrix, a linear core (operating point, DC and AC), small-signal and RF
-  analyses (noise, S-parameters, Touchstone blocks), harmonic balance, bipolar transistors with the transient analysis,
-  digital co-simulation, and extras. Nothing else on the roadmap depends on it
+  which stays available, tested against closed-form results and built to use modern CPUs well. With the backend
+  interface and capability matrix in place, it would come in steps: a linear core (operating point, DC and AC),
+  small-signal and RF analyses (noise, S-parameters, Touchstone blocks), harmonic balance, bipolar transistors with the
+  transient analysis, digital co-simulation, and extras. Nothing else on the roadmap depends on it
 
 ## Install
 
