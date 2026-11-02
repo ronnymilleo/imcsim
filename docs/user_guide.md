@@ -14,7 +14,8 @@ How to read what imcsim measures, plots and exports. The [README](../README.md) 
   number may put its decimals after the suffix, as resistor codes do (`4k7`, `2M2`, `3u3`). View > Properties keeps
   the same fields in a docked window.
 - **Potentiometer**: its properties hold the resistance between its ends and the wiper, a slider from 0% at terminal 1
-  to 100% at terminal 2. Move the wiper and run again to see the output change; the wiper does not move during a run.
+  to 100% at terminal 2. Move the wiper and run again to see the output change. During a live run, use the mouse wheel
+  over the part or its Wiper field to change it while the simulation continues (see Live runs).
 - **Initial conditions**: a capacitor and an inductor have an Initial field beside the value, for the voltage the
   capacitor starts charged to or the current the inductor starts carrying; the sign is free. When any part has one,
   the transient runs with `uic`, so the circuit starts from those values without an operating point first, and says so
@@ -22,8 +23,8 @@ How to read what imcsim measures, plots and exports. The [README](../README.md) 
   every part that should start charged. The operating point, the AC sweep and the DC sweep ignore the initial
   conditions.
 - **Switches**: a switch and a push button have a Closed (or Pressed) box in their properties, and the symbol and a
-  label under it show the state. Both start open. The state holds for the whole run, so a switch cannot open in the
-  middle of a transient.
+  label under it show the state. Both start open. Outside a live run, the state holds for the whole simulation. During
+  a live run, click a switch to flip it or hold a push button to press it (see Live runs).
 - **Switches that follow a voltage**: a voltage-controlled switch has its threshold, hysteresis and resistances in its
   properties, and a relay its coil and contact figures. Both are drawn open, since they open and close during a run.
   The Switching examples use them: a buck converter and a relay driver with a flyback diode.
