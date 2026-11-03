@@ -642,7 +642,7 @@ bool PartEditor::DrawParameterChoice(Core::Component &component) {
     if (!component.GetValueExpression()) {
         return false;
     }
-    ImGui::TextDisabled("Each instance of the block sets this value, or takes the parameter's default");
+    ImGui::TextDisabled("Set by each instance, or the parameter's default");
     return true;
 }
 

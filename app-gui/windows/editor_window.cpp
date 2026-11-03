@@ -907,7 +907,7 @@ void EditorWindow::DrawPartButton(const Core::ComponentType type) {
 // one can be picked
 void EditorWindow::DrawRunControls() {
     const float side = ImGui::GetFrameHeight() * TOOL_BUTTON_SCALE;
-    const Analysis selected = m_Schematic->GetSimulationSettings().Selected;
+    const Analysis selected = m_RootSchematic.GetSimulationSettings().Selected;
     const RunAction action = m_Controls.GetRunAction();
     if (PrimaryButton("##run", {side, side})) {
         m_Controls.PressRun();
@@ -923,7 +923,7 @@ void EditorWindow::DrawRunControls() {
 // The analysis picker beside Run, whose popover holds the settings of the analysis and its own Run button
 void EditorWindow::DrawAnalysisButton(const float run_left) {
     const float side = ImGui::GetFrameHeight() * TOOL_BUTTON_SCALE;
-    const Analysis selected = m_Schematic->GetSimulationSettings().Selected;
+    const Analysis selected = m_RootSchematic.GetSimulationSettings().Selected;
     ImGui::PushStyleVar(ImGuiStyleVar_ButtonTextAlign, {0.0f, 0.5f});
     const std::string label = std::format("{}##analysis", GetAnalysisName(selected));
     const bool open = ImGui::Button(label.c_str(), {AnalysisButtonWidth(), side});
@@ -983,7 +983,7 @@ void EditorWindow::DrawLiveToggle() {
         ImGui::SetItemTooltip(
             "Live: Run plays the transient on the schematic, a stop time every %s s, until you stop it, and a click "
             "flips a switch or a logic input, holds a push button or, with the wheel, turns a potentiometer on the way",
-            Core::FormatValue(m_Schematic->GetSimulationSettings().LiveSeconds).c_str());
+            Core::FormatValue(m_RootSchematic.GetSimulationSettings().LiveSeconds).c_str());
     }
 }
 
@@ -2734,7 +2734,7 @@ void EditorWindow::DrawContextMenu() {
                     m_Controls.StopRun();
                 }
             } else if (ImGui::MenuItem(
-                           std::format("Run {}", GetAnalysisName(m_Schematic->GetSimulationSettings().Selected))
+                           std::format("Run {}", GetAnalysisName(m_RootSchematic.GetSimulationSettings().Selected))
                                .c_str(),
                            "F5")) {
                 m_Controls.RunSelected();

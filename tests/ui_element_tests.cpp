@@ -315,3 +315,12 @@ TEST_CASE("Every gate and flip-flop has one terminal for each input and each out
               Core::GetLogicInputLabels(type).size() + Core::GetLogicOutputLabels(type).size());
     }
 }
+
+TEST_CASE("A part inside a block that follows a parameter shows the parameter as its value", "[ui_element]") {
+    GUI::UIResistor resistor({0, 0}, GUI::Rotation::R0);
+    Core::Component &component = resistor.GetComponent();
+    component.SetValue(4700.0);
+    CHECK(GUI::GetValueLabel(component) == "4.7k");
+    component.SetValueExpression("{RTOP}");
+    CHECK(GUI::GetValueLabel(component) == "{RTOP}");
+}
