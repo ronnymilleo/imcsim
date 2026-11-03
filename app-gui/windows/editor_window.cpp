@@ -759,6 +759,10 @@ void EditorWindow::Draw() {
     size.y = std::max(size.y, MIN_CANVAS_SIZE);
     m_View.FrameIfRequested(*m_Schematic, size, m_Preferences.Symbols, m_Preferences.ShowTerminalNumbers);
 
+    // The way back from a block sits over the canvas, and takes the clicks that land on it
+    if (IsEditingSubcircuit()) {
+        ImGui::SetNextItemAllowOverlap();
+    }
     ImGui::InvisibleButton("canvas", size,
                            ImGuiButtonFlags_MouseButtonLeft | ImGuiButtonFlags_MouseButtonRight |
                                ImGuiButtonFlags_MouseButtonMiddle);
@@ -814,6 +818,7 @@ void EditorWindow::Draw() {
     DrawColorLegend(draw_list, origin, size);
 
     draw_list->PopClipRect();
+    DrawBlockBar(origin);
     DrawStatusBar(view, hovered);
     DrawContextMenu();
     DrawPartPopover();
@@ -836,16 +841,6 @@ void EditorWindow::DrawToolbar() {
         ImGui::SetItemTooltip("%s", tooltip);
         return clicked;
     };
-
-    if (IsEditingSubcircuit()) {
-        constexpr const char *BACK_LABEL = "Back to schematic";
-        const float back_width = ImGui::CalcTextSize(BACK_LABEL).x + 2.0f * ImGui::GetStyle().FramePadding.x;
-        row.Place(back_width, 0.0f);
-        if (ImGui::Button(BACK_LABEL)) {
-            FinishSubcircuitEditing(true);
-        }
-        ImGui::SetItemTooltip("Apply the block changes and return to the schematic");
-    }
 
     // Tools, history and view
     const bool selecting = IsSelecting();
@@ -1291,6 +1286,28 @@ ImU32 EditorWindow::GetElementColor(const std::size_t index) const {
             current, std::abs(GetTerminalCurrent(component, terminal, m_Displayed->Point.Currents).value_or(0.0)));
     }
     return GetHeatColor(CurrentLevel(current, m_Displayed->Scale.LargestCurrent));
+}
+
+// While a block is open, its name and the way back to the schematic, in the top left corner of the canvas so they stay
+// in sight wherever the toolbar wraps
+void EditorWindow::DrawBlockBar(const ImVec2 origin) {
+    if (!IsEditingSubcircuit()) {
+        return;
+    }
+    const ImVec2 after_canvas = ImGui::GetCursorScreenPos();
+    const ImVec2 spacing = ImGui::GetStyle().ItemSpacing;
+    ImGui::SetCursorScreenPos(origin + spacing);
+    if (ImGui::Button("Back to schematic")) {
+        FinishSubcircuitEditing(true);
+    }
+    ImGui::SetItemTooltip("Apply the block changes and return to the schematic");
+    if (IsEditingSubcircuit()) {
+        ImGui::SameLine();
+        ImGui::AlignTextToFramePadding();
+        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(GetPalette().CanvasText), "Editing block: %s",
+                           m_EditingSubcircuit.c_str());
+    }
+    ImGui::SetCursorScreenPos(after_canvas);
 }
 
 // What the current mode does and which keys it takes, so the shortcuts can be learned while working, and the grid

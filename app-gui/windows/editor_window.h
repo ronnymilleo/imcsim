@@ -247,6 +247,7 @@ private:
     ImU32 GetElementColor(std::size_t index) const;
     bool AreWiresHeatColored() const;
     bool ArePartsHeatColored() const;
+    void DrawBlockBar(ImVec2 origin);
     void DrawStatusBar(const ViewTransform &view, bool hovered);
     float DrawRunStatus(float right_edge);
     void DrawColorLegend(ImDrawList *draw_list, ImVec2 origin, ImVec2 size) const;
