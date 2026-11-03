@@ -610,6 +610,8 @@ std::string Circuit::ToSpiceNetlist(const std::string_view analysis, const bool 
         }
         case ComponentType::GROUND:
         case ComponentType::NET_LABEL:
+        case ComponentType::PIN:
+        case ComponentType::POUT:
             break;
         }
         netlist += probes;
@@ -775,12 +777,12 @@ std::optional<std::string> FindControllingSource(const Circuit &circuit, const s
  * @return  The component name for a part that is one element, such as "R1" or "Q1"; the elements of a part written
  *          as several, such as "R-RV1a" and "R-RV1b" for a potentiometer or "X-U1" for an op-amp macromodel, whose
  *          own elements ngspice names after it ("q.x-u1.q1"), and the model, bridges and resistors of a logic part;
- *          nothing for ground and net labels.
+ *          nothing for ground, net labels and subcircuit pin markers.
  */
 std::vector<std::string> GetElementNames(const Component &component) {
     const std::string &name = component.GetName();
     const ComponentType type = component.GetType();
-    if (type == ComponentType::GROUND || type == ComponentType::NET_LABEL) {
+    if (type == ComponentType::GROUND || type == ComponentType::NET_LABEL || IsSubcircuitPin(type)) {
         return {};
     }
     if (IsLogicGate(type) || IsFlipFlop(type)) {

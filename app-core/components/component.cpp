@@ -38,6 +38,8 @@ constexpr auto ALL_TYPES = std::to_array<ComponentType>({
     ComponentType::OP_AMP,
     ComponentType::SUBCIRCUIT,
     ComponentType::NET_LABEL,
+    ComponentType::PIN,
+    ComponentType::POUT,
     ComponentType::POTENTIOMETER,
     ComponentType::SWITCH,
     ComponentType::PUSH_BUTTON,
@@ -89,7 +91,7 @@ const char *Component::GetTypeName() const {
 /**
  * @brief   Returns the SPICE letter that starts the name of this kind of component.
  * @return  "R", "C", "L", "V", "Vin", "I", "D", "Q", "M", "E", "G", "F", "H", "U" or "X", or an empty string
- *          for ground and net labels, which are not named.
+ *          for ground, net labels and subcircuit pin markers, which are not named.
  */
 const char *Component::GetNamePrefix() const {
     switch (m_Type) {
@@ -156,6 +158,8 @@ const char *Component::GetNamePrefix() const {
         return "T";
     case ComponentType::GROUND:
     case ComponentType::NET_LABEL:
+    case ComponentType::PIN:
+    case ComponentType::POUT:
         return "";
     }
     return "";
@@ -207,6 +211,8 @@ const char *Component::GetUnit() const {
     case ComponentType::SR_FLIP_FLOP:
     case ComponentType::GROUND:
     case ComponentType::NET_LABEL:
+    case ComponentType::PIN:
+    case ComponentType::POUT:
     case ComponentType::SWITCH:
     case ComponentType::PUSH_BUTTON:
     case ComponentType::V_SWITCH:
@@ -232,6 +238,8 @@ bool Component::HasValue() const {
     switch (m_Type) {
     case ComponentType::GROUND:
     case ComponentType::NET_LABEL:
+    case ComponentType::PIN:
+    case ComponentType::POUT:
     case ComponentType::SWITCH:
     case ComponentType::PUSH_BUTTON:
     case ComponentType::V_SWITCH:
@@ -301,6 +309,8 @@ bool Component::IsValidValue(const double value) const {
         return true;
     case ComponentType::GROUND:
     case ComponentType::NET_LABEL:
+    case ComponentType::PIN:
+    case ComponentType::POUT:
     case ComponentType::SWITCH:
     case ComponentType::PUSH_BUTTON:
     case ComponentType::V_SWITCH:
@@ -425,6 +435,10 @@ void Component::ClearInitialCondition() {
     m_InitialCondition.reset();
 }
 
+bool IsSubcircuitPin(const ComponentType type) {
+    return type == ComponentType::PIN || type == ComponentType::POUT;
+}
+
 /**
  * @brief   Returns a readable name for a kind of component.
  * @param[in] type  Kind of component.
@@ -474,6 +488,10 @@ const char *GetTypeName(const ComponentType type) {
         return "Subcircuit";
     case ComponentType::NET_LABEL:
         return "NetLabel";
+    case ComponentType::PIN:
+        return "Pin";
+    case ComponentType::POUT:
+        return "Pout";
     case ComponentType::POTENTIOMETER:
         return "Potentiometer";
     case ComponentType::SWITCH:

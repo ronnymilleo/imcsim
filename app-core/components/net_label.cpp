@@ -26,7 +26,10 @@ bool IsNetCharacter(const char character) {
 /**
  * @brief   Creates a label with no name, which joins nothing until it is named.
  */
-NetLabel::NetLabel() : Component(ComponentType::NET_LABEL, 0.0) {
+NetLabel::NetLabel() : NetLabel(ComponentType::NET_LABEL) {
+}
+
+NetLabel::NetLabel(const ComponentType type) : Component(type, 0.0) {
 }
 
 /**

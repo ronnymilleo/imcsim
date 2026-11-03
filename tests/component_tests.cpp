@@ -19,6 +19,7 @@
 #include "components/potentiometer.h"
 #include "components/relay.h"
 #include "components/resistor.h"
+#include "components/subcircuit_pin.h"
 #include "components/switch.h"
 #include "components/transformer.h"
 #include "components/vcc.h"
@@ -252,6 +253,24 @@ TEST_CASE("A cloned net label keeps its net name", "[component]") {
     REQUIRE(clone);
     CHECK(clone->GetType() == Core::ComponentType::NET_LABEL);
     CHECK(static_cast<const Core::NetLabel &>(*clone).GetNet() == "Vout");
+}
+
+TEST_CASE("Subcircuit pin markers retain their kind and name when cloned", "[component]") {
+    for (const Core::ComponentType type : {Core::ComponentType::PIN, Core::ComponentType::POUT}) {
+        Core::SubcircuitPinMarker marker(type);
+        marker.SetNet("OUTPUT");
+        CHECK(Core::IsSubcircuitPin(type));
+        CHECK_FALSE(marker.HasValue());
+        CHECK_FALSE(marker.IsValidValue(1.0));
+        CHECK(std::string_view(marker.GetNamePrefix()).empty());
+        CHECK(std::string_view(marker.GetUnit()).empty());
+        const auto clone = marker.Clone();
+        REQUIRE(clone);
+        CHECK(clone->GetType() == type);
+        CHECK(static_cast<const Core::SubcircuitPinMarker &>(*clone).GetNet() == "OUTPUT");
+        CHECK(Core::ParseComponentType(clone->GetTypeName()) == type);
+    }
+    CHECK_FALSE(Core::IsSubcircuitPin(Core::ComponentType::NET_LABEL));
 }
 
 TEST_CASE("Net names are 1 to 32 letters, digits, underscores, hyphens and dots", "[component]") {
