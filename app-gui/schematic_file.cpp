@@ -380,8 +380,8 @@ void WriteKindFields(const Core::Component &component, nlohmann::json &object) {
         if (!instance.GetParameters().empty()) {
             object["parameters"] = instance.GetParameters();
         }
-    } else if (type == Core::ComponentType::NET_LABEL) {
-        // A label with no name yet is saved without the key
+    } else if (type == Core::ComponentType::NET_LABEL || Core::IsSubcircuitPin(type)) {
+        // A label or pin marker with no name yet is saved without the key
         if (const std::string &net = static_cast<const Core::NetLabel &>(component).GetNet(); !net.empty()) {
             object["net"] = net;
         }
@@ -635,12 +635,17 @@ std::expected<void, std::string> ReadControllingCurrent(const nlohmann::json &ob
 }
 
 std::expected<void, std::string> ReadNetName(const nlohmann::json &object, Core::Component &component) {
-    if (component.GetType() != Core::ComponentType::NET_LABEL || !object.contains("net")) {
+    const Core::ComponentType type = component.GetType();
+    if ((type != Core::ComponentType::NET_LABEL && !Core::IsSubcircuitPin(type)) || !object.contains("net")) {
         return {};
     }
     const std::optional<std::string> net = ReadString(object, "net");
-    if (!net || !Core::NetLabel::IsValidNet(*net)) {
-        return std::unexpected("has a net name that is not 1 to 32 letters, digits, _, - or .");
+    const bool is_pin = Core::IsSubcircuitPin(type);
+    const bool valid =
+        net && (is_pin ? Core::SubcircuitInstance::IsValidIdentifier(*net) : Core::NetLabel::IsValidNet(*net));
+    if (!valid) {
+        return std::unexpected(is_pin ? "has a subcircuit pin name that is not an identifier"
+                                      : "has a net name that is not 1 to 32 letters, digits, _, - or .");
     }
     static_cast<Core::NetLabel &>(component).SetNet(*net);
     return {};
@@ -1495,12 +1500,14 @@ std::string SaveSchematic(const std::vector<std::unique_ptr<UIElement>> &element
 /**
  * @brief   Writes some parts and wires as a schematic of their own, for the clipboard.
  * @param[in] elements  Parts to write, which stay where they are.
- * @param[in] wires     Wire segments to write.
+ * @param[in] wires        Wire segments to write.
+ * @param[in] subcircuits  Definitions referenced by the copied instances.
  * @return  The same JSON a file holds, with the default settings and no measurements, so it loads back with
  *          LoadSchematic().
  */
-std::string SaveParts(const std::span<const UIElement *const> elements, const std::vector<UIWire> &wires) {
-    return WriteDocument(elements, wires, {}, {});
+std::string SaveParts(const std::span<const UIElement *const> elements, const std::vector<UIWire> &wires,
+                      const std::span<const SavedSubcircuit> subcircuits) {
+    return WriteDocument(elements, wires, {}, {}, subcircuits);
 }
 
 /**

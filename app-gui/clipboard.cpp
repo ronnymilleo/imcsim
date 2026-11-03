@@ -5,8 +5,10 @@
 
 #include "clipboard.h"
 
+#include "components/subcircuit.h"
 #include "group_editing.h"
 #include "schematic_file.h"
+#include <set>
 
 namespace GUI {
 
@@ -35,16 +37,32 @@ GridPoint FindGroupPivot(const PastedGroup &group) {
  *          as well as this one.
  */
 std::string CopySelection(const std::vector<std::unique_ptr<UIElement>> &elements, const std::vector<UIWire> &wires,
-                          const Selection &selection) {
+                          const Selection &selection, const std::span<const SavedSubcircuit> subcircuits) {
     std::vector<const UIElement *> copied_elements;
+    std::set<std::string> needed_definitions;
     for (const std::size_t index : selection.Elements) {
-        copied_elements.push_back(elements[index].get());
+        const UIElement *element = elements[index].get();
+        copied_elements.push_back(element);
+        if (element->GetComponent().GetType() == Core::ComponentType::SUBCIRCUIT) {
+            needed_definitions.insert(
+                static_cast<const Core::SubcircuitInstance &>(element->GetComponent()).GetDefinitionName());
+        }
     }
     std::vector<UIWire> copied_wires;
     for (const std::size_t index : selection.Wires) {
         copied_wires.push_back(wires[index]);
     }
-    return SaveParts(copied_elements, copied_wires);
+    std::vector<SavedSubcircuit> copied_definitions;
+    for (const SavedSubcircuit &definition : subcircuits) {
+        if (!needed_definitions.contains(definition.Name)) {
+            continue;
+        }
+        auto loaded = LoadSchematic(SaveSchematic({}, {}, {}, {}, std::span<const SavedSubcircuit>(&definition, 1)));
+        if (loaded && loaded->Subcircuits.size() == 1) {
+            copied_definitions.push_back(std::move(loaded->Subcircuits.front()));
+        }
+    }
+    return SaveParts(copied_elements, copied_wires, copied_definitions);
 }
 
 /**
@@ -84,6 +102,7 @@ std::expected<PastedGroup, std::string> MakePastedGroup(LoadedSchematic loaded) 
     PastedGroup group;
     group.Elements = std::move(loaded.Elements);
     group.Wires = std::move(loaded.Wires);
+    group.Subcircuits = std::move(loaded.Subcircuits);
     group.Warnings = std::move(loaded.Warnings);
     group.Pivot = FindGroupPivot(group);
     return group;

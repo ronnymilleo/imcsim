@@ -6,9 +6,14 @@
 #include "schematic.h"
 
 #include "components/component.h"
+#include "components/net_label.h"
+#include "components/subcircuit.h"
+#include "element_factory.h"
+#include "group_editing.h"
 #include "schematic_file.h"
 #include "wire_editing.h"
 #include <algorithm>
+#include <format>
 #include <iterator>
 #include <map>
 #include <set>
@@ -21,6 +26,23 @@ namespace {
 
 // Older steps are dropped beyond this, so a long session does not keep growing
 constexpr std::size_t MAX_UNDO_STEPS = 100;
+
+std::expected<void, std::string> ValidateMetadata(const std::vector<SavedSubcircuitPin> &pins,
+                                                  const std::vector<Core::SubcircuitParameter> &parameters) {
+    std::set<std::string> names;
+    for (const SavedSubcircuitPin &pin : pins) {
+        if (!Core::SubcircuitInstance::IsValidIdentifier(pin.Name) || !names.insert(pin.Name).second) {
+            return std::unexpected("Subcircuit pin names must be unique identifiers");
+        }
+    }
+    names.clear();
+    for (const Core::SubcircuitParameter &parameter : parameters) {
+        if (!Core::SubcircuitInstance::IsValidIdentifier(parameter.Name) || !names.insert(parameter.Name).second) {
+            return std::unexpected("Subcircuit parameter names must be unique identifiers");
+        }
+    }
+    return {};
+}
 
 } // namespace
 
@@ -196,6 +218,252 @@ void Schematic::Replace(std::vector<std::unique_ptr<UIElement>> elements, std::v
     m_VoltageProbes.clear();
     m_Modified = false;
     ResetHistory();
+}
+
+namespace {
+
+std::expected<std::vector<Schematic::SubcircuitPinCandidate>, std::string>
+CollectSubcircuitPinMarkers(const std::vector<std::unique_ptr<UIElement>> &elements, const std::vector<UIWire> &wires,
+                            const std::set<std::size_t> *selected) {
+    const Connectivity connectivity(elements, wires);
+    std::vector<Schematic::SubcircuitPinCandidate> candidates;
+    std::set<std::string> names;
+    std::set<int> nodes;
+    int inputs = 0;
+    int outputs = 0;
+    for (std::size_t index = 0; index < elements.size(); ++index) {
+        if (selected != nullptr && !selected->contains(index)) {
+            continue;
+        }
+        const Core::Component &component = elements[index]->GetComponent();
+        const Core::ComponentType type = component.GetType();
+        if (!Core::IsSubcircuitPin(type)) {
+            continue;
+        }
+        const GridPoint point = elements[index]->GetTerminals().front();
+        const std::string &marker_name = static_cast<const Core::NetLabel &>(component).GetNet();
+        std::string suggested = marker_name;
+        if (suggested.empty()) {
+            suggested = std::format("{}{}", type == Core::ComponentType::PIN ? "IN" : "OUT",
+                                    type == Core::ComponentType::PIN ? ++inputs : ++outputs);
+        }
+        if (!Core::SubcircuitInstance::IsValidIdentifier(suggested) || !names.insert(suggested).second) {
+            return std::unexpected("Subcircuit pin names must be unique identifiers");
+        }
+        const std::optional<int> node = connectivity.GetNode(point);
+        if (node && !nodes.insert(*node).second) {
+            return std::unexpected("Place only one PIN or POUT marker on each subcircuit pin node");
+        }
+        candidates.push_back({point, std::move(suggested)});
+    }
+    return candidates;
+}
+
+} // namespace
+
+std::expected<std::vector<Schematic::SubcircuitPinCandidate>, std::string>
+Schematic::GetSubcircuitPinCandidates() const {
+    if (m_SelectedElements.empty()) {
+        return std::unexpected("Select the circuit to turn into a subcircuit");
+    }
+    for (const std::size_t index : m_SelectedElements) {
+        if (m_Elements[index]->GetComponent().GetType() == Core::ComponentType::SUBCIRCUIT) {
+            return std::unexpected("Nested subcircuit instances are not supported");
+        }
+    }
+    auto candidates = CollectSubcircuitPinMarkers(m_Elements, m_Wires, &m_SelectedElements);
+    if (candidates && candidates->empty()) {
+        return std::unexpected("Select PIN and POUT markers with the circuit to choose the block connections");
+    }
+    return candidates;
+}
+
+std::expected<std::vector<Schematic::SubcircuitPinCandidate>, std::string> Schematic::GetSubcircuitPinMarkers() const {
+    return CollectSubcircuitPinMarkers(m_Elements, m_Wires, nullptr);
+}
+
+std::expected<void, std::string>
+Schematic::CreateSubcircuitFromSelection(std::string name, const std::vector<std::string> &pins,
+                                         std::vector<Core::SubcircuitParameter> parameters) {
+    if (!Core::SubcircuitInstance::IsValidIdentifier(name)) {
+        return std::unexpected("The subcircuit name must be an identifier");
+    }
+    if (std::ranges::find(m_Subcircuits, name, &SavedSubcircuit::Name) != m_Subcircuits.end()) {
+        return std::unexpected("A subcircuit with this name already exists");
+    }
+    auto candidates = GetSubcircuitPinCandidates();
+    if (!candidates) {
+        return std::unexpected(candidates.error());
+    }
+    if (pins.size() != candidates->size()) {
+        return std::unexpected("Choose one name for every PIN and POUT marker");
+    }
+    SavedSubcircuit definition;
+    definition.Name = std::move(name);
+    definition.Parameters = std::move(parameters);
+    for (std::size_t index = 0; index < pins.size(); ++index) {
+        definition.Pins.push_back({pins[index], (*candidates)[index].Point});
+    }
+    if (auto valid = ValidateMetadata(definition.Pins, definition.Parameters); !valid) {
+        return std::unexpected(valid.error());
+    }
+
+    std::vector<const UIElement *> copied_elements;
+    for (const std::size_t index : m_SelectedElements) {
+        copied_elements.push_back(m_Elements[index].get());
+    }
+    std::vector<UIWire> copied_wires;
+    for (const std::size_t index : m_SelectedWires) {
+        copied_wires.push_back(m_Wires[index]);
+    }
+    auto copied = LoadSchematic(SaveParts(copied_elements, copied_wires));
+    if (!copied) {
+        return std::unexpected(copied.error());
+    }
+    definition.Elements = std::move(copied->Elements);
+    definition.Wires = std::move(copied->Wires);
+    for (auto &element : definition.Elements) {
+        if (!Core::IsSubcircuitPin(element->GetComponent().GetType())) {
+            continue;
+        }
+        const GridPoint point = element->GetTerminals().front();
+        const auto candidate = std::ranges::find(*candidates, point, &SubcircuitPinCandidate::Point);
+        const std::size_t index = static_cast<std::size_t>(candidate - candidates->begin());
+        static_cast<Core::NetLabel &>(element->GetComponent()).SetNet(pins[index]);
+    }
+
+    const GridPoint pivot = FindPivot(m_Elements, m_SelectedElements, m_Wires, m_SelectedWires);
+    auto instance_element = CreateElement(Core::ComponentType::SUBCIRCUIT, pivot, Rotation::R0);
+    auto &instance = static_cast<Core::SubcircuitInstance &>(instance_element->GetComponent());
+    instance.SetDefinitionName(definition.Name);
+    instance.SetPins(pins);
+    const std::vector<GridPoint> new_points = instance_element->GetTerminals();
+
+    DeleteSelection();
+    m_Subcircuits.push_back(std::move(definition));
+    AddElement(std::move(instance_element));
+    for (std::size_t index = 0; index < new_points.size(); ++index) {
+        const GridPoint old_point = (*candidates)[index].Point;
+        const GridPoint bend = {new_points[index].X, old_point.Y};
+        AddWire(old_point, bend);
+        AddWire(bend, new_points[index]);
+    }
+    SelectElement(m_Elements.size() - 1);
+    return {};
+}
+
+std::expected<std::unique_ptr<Schematic>, std::string> Schematic::OpenSubcircuit(const std::string &name) const {
+    const auto found = std::ranges::find(m_Subcircuits, name, &SavedSubcircuit::Name);
+    if (found == m_Subcircuits.end()) {
+        return std::unexpected("Unknown subcircuit " + name);
+    }
+    auto loaded = LoadSchematic(SaveSchematic({}, {}, {}, {}, std::span<const SavedSubcircuit>(&*found, 1)));
+    if (!loaded || loaded->Subcircuits.size() != 1) {
+        return std::unexpected("The subcircuit definition could not be opened");
+    }
+    SavedSubcircuit &definition = loaded->Subcircuits.front();
+    auto content = std::make_unique<Schematic>();
+    content->Replace(std::move(definition.Elements), std::move(definition.Wires), {});
+    for (const SavedSubcircuitPin &pin : definition.Pins) {
+        const bool has_marker = std::ranges::any_of(content->GetElements(), [&](const auto &element) {
+            return Core::IsSubcircuitPin(element->GetComponent().GetType()) &&
+                   element->GetTerminals().front() == pin.Point;
+        });
+        if (!has_marker) {
+            auto marker = CreateElement(Core::ComponentType::PIN, pin.Point, Rotation::R0);
+            static_cast<Core::NetLabel &>(marker->GetComponent()).SetNet(pin.Name);
+            content->AddElement(std::move(marker));
+        }
+    }
+    return content;
+}
+
+std::expected<void, std::string> Schematic::UpdateSubcircuit(const std::string &name, const Schematic &content,
+                                                             const std::vector<SavedSubcircuitPin> &pins,
+                                                             const std::vector<Core::SubcircuitParameter> &parameters) {
+    const auto found = std::ranges::find(m_Subcircuits, name, &SavedSubcircuit::Name);
+    if (found == m_Subcircuits.end()) {
+        return std::unexpected("Unknown subcircuit " + name);
+    }
+    for (const auto &element : content.GetElements()) {
+        if (element->GetComponent().GetType() == Core::ComponentType::SUBCIRCUIT) {
+            return std::unexpected("Nested subcircuit instances are not supported");
+        }
+    }
+    if (auto valid = ValidateMetadata(pins, parameters); !valid) {
+        return std::unexpected(valid.error());
+    }
+    auto copied = LoadSchematic(SaveSchematic(content.GetElements(), content.GetWires(), {}, {}));
+    if (!copied) {
+        return std::unexpected(copied.error());
+    }
+
+    SavedSubcircuit &definition = *found;
+    definition.Pins = pins;
+    definition.Parameters = parameters;
+    definition.Elements = std::move(copied->Elements);
+    definition.Wires = std::move(copied->Wires);
+    std::set<std::string> parameter_names;
+    for (const Core::SubcircuitParameter &parameter : parameters) {
+        parameter_names.insert(parameter.Name);
+    }
+
+    std::vector<GridPoint> old_points;
+    std::vector<GridPoint> new_points;
+    std::vector<GridPoint> removed_points;
+    for (auto &element : m_Elements) {
+        if (element->GetComponent().GetType() != Core::ComponentType::SUBCIRCUIT) {
+            continue;
+        }
+        auto &instance = static_cast<Core::SubcircuitInstance &>(element->GetComponent());
+        if (instance.GetDefinitionName() != name) {
+            continue;
+        }
+        const std::vector<std::string> old_pins = instance.GetPins();
+        const std::vector<GridPoint> old_terminals = element->GetTerminals();
+        const auto overrides = instance.GetParameters();
+        instance.ClearParameters();
+        for (const auto &[parameter, value] : overrides) {
+            if (parameter_names.contains(parameter)) {
+                instance.SetParameter(parameter, value);
+            }
+        }
+        std::vector<std::string> surviving_pins;
+        for (const SavedSubcircuitPin &pin : pins) {
+            surviving_pins.push_back(pin.Name);
+        }
+        for (std::size_t old_index = 0; old_index < old_pins.size(); ++old_index) {
+            if (!std::ranges::contains(surviving_pins, old_pins[old_index])) {
+                removed_points.push_back(old_terminals[old_index]);
+            }
+        }
+        instance.SetPins(surviving_pins);
+        const std::vector<GridPoint> new_terminals = element->GetTerminals();
+        for (std::size_t new_index = 0; new_index < pins.size(); ++new_index) {
+            const auto old_index = std::ranges::find(old_pins, pins[new_index].Name);
+            if (old_index != old_pins.end()) {
+                const std::size_t index = static_cast<std::size_t>(old_index - old_pins.begin());
+                old_points.push_back(old_terminals[index]);
+                new_points.push_back(new_terminals[new_index]);
+            }
+        }
+    }
+    std::erase_if(m_Wires, [&](const UIWire &wire) {
+        return std::ranges::contains(removed_points, wire.GetStart()) ||
+               std::ranges::contains(removed_points, wire.GetEnd());
+    });
+    m_Wires = FollowTerminals(m_Wires, old_points, new_points);
+    MarkModified();
+    return {};
+}
+
+void Schematic::MergeSubcircuits(std::vector<SavedSubcircuit> definitions) {
+    for (SavedSubcircuit &definition : definitions) {
+        if (std::ranges::find(m_Subcircuits, definition.Name, &SavedSubcircuit::Name) == m_Subcircuits.end()) {
+            m_Subcircuits.push_back(std::move(definition));
+            MarkModified();
+        }
+    }
 }
 
 /**

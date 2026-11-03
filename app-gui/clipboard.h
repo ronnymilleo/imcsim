@@ -14,6 +14,7 @@
 #include "wire_editing.h"
 #include <expected>
 #include <memory>
+#include <span>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -23,18 +24,20 @@ namespace GUI {
 /**
  * @struct  PastedGroup
  * @brief   Parts and wires read from the clipboard or from a file, waiting to be placed.
- * @details Pivot is the point the group is held by: the middle of its box, which follows the cursor. Warnings lists
+ * @details Pivot is the point the group is held by: the middle of its box, which follows the cursor. Subcircuits holds
+ *          the definitions referenced by its instances, without transforming their internal geometry. Warnings lists
  *          what could not be read as it was, as the file loader reports it.
  */
 struct PastedGroup {
     std::vector<std::unique_ptr<UIElement>> Elements;
     std::vector<UIWire> Wires;
+    std::vector<SavedSubcircuit> Subcircuits;
     GridPoint Pivot;
     std::vector<std::string> Warnings;
 };
 
 std::string CopySelection(const std::vector<std::unique_ptr<UIElement>> &elements, const std::vector<UIWire> &wires,
-                          const Selection &selection);
+                          const Selection &selection, std::span<const SavedSubcircuit> subcircuits = {});
 bool LooksLikeCopiedSchematic(std::string_view text);
 std::expected<PastedGroup, std::string> ParseCopiedSchematic(std::string_view text);
 std::expected<PastedGroup, std::string> MakePastedGroup(LoadedSchematic loaded);

@@ -17,6 +17,7 @@
 #include "ui_elements/ui_element.h"
 #include "ui_elements/ui_wire.h"
 #include <cstddef>
+#include <expected>
 #include <filesystem>
 #include <memory>
 #include <optional>
@@ -48,6 +49,11 @@ namespace GUI {
  */
 class Schematic {
 public:
+    struct SubcircuitPinCandidate {
+        GridPoint Point;
+        std::string SuggestedName;
+    };
+
     Schematic();
 
     // Content
@@ -67,6 +73,16 @@ public:
     void Clear();
     void Replace(std::vector<std::unique_ptr<UIElement>> elements, std::vector<UIWire> wires,
                  SimulationSettings settings, std::vector<SavedSubcircuit> subcircuits = {});
+    std::expected<std::vector<SubcircuitPinCandidate>, std::string> GetSubcircuitPinCandidates() const;
+    std::expected<std::vector<SubcircuitPinCandidate>, std::string> GetSubcircuitPinMarkers() const;
+    std::expected<void, std::string>
+    CreateSubcircuitFromSelection(std::string name, const std::vector<std::string> &pins,
+                                  std::vector<Core::SubcircuitParameter> parameters = {});
+    std::expected<std::unique_ptr<Schematic>, std::string> OpenSubcircuit(const std::string &name) const;
+    std::expected<void, std::string> UpdateSubcircuit(const std::string &name, const Schematic &content,
+                                                      const std::vector<SavedSubcircuitPin> &pins,
+                                                      const std::vector<Core::SubcircuitParameter> &parameters);
+    void MergeSubcircuits(std::vector<SavedSubcircuit> definitions);
 
     // Selection
     void SelectElement(std::size_t index);

@@ -7,6 +7,7 @@
 #include "components/clock.h"
 #include "components/logic_input.h"
 #include "components/net_label.h"
+#include "components/subcircuit.h"
 #include "element_factory.h"
 #include "examples.h"
 #include "schematic.h"
@@ -181,4 +182,41 @@ TEST_CASE("A copied net label keeps its name and joins the net it is pasted into
     const GUI::Connectivity &nodes = schematic.GetConnectivity();
     CHECK(nodes.GetNode(schematic.GetElements()[0]->GetTerminals()[0]) ==
           nodes.GetNode(schematic.GetElements()[1]->GetTerminals()[0]));
+}
+
+TEST_CASE("Copied blocks carry their definitions without transforming their contents", "[clipboard][subcircuit]") {
+    GUI::SavedSubcircuit definition;
+    definition.Name = "block";
+    definition.Pins = {{"IN", {-2, 0}}, {"OUT", {2, 0}}};
+    definition.Parameters = {{"R", 1e3}};
+    definition.Elements.push_back(GUI::CreateElement(Core::ComponentType::RESISTOR, {0, 0}, GUI::Rotation::R0));
+    definition.Elements[0]->GetComponent().SetValueExpression("{R}");
+    std::vector<GUI::SavedSubcircuit> definitions;
+    definitions.push_back(std::move(definition));
+    std::vector<std::unique_ptr<GUI::UIElement>> elements;
+    elements.push_back(GUI::CreateElement(Core::ComponentType::SUBCIRCUIT, {10, 10}, GUI::Rotation::R0));
+    auto &instance = static_cast<Core::SubcircuitInstance &>(elements[0]->GetComponent());
+    instance.SetDefinitionName("block");
+    instance.SetPins({"IN", "OUT"});
+    GUI::Schematic source;
+    source.Replace(std::move(elements), {}, {}, std::move(definitions));
+
+    const std::string text = GUI::CopySelection(source.GetElements(), {}, {.Elements = {0}}, source.GetSubcircuits());
+    auto group = GUI::ParseCopiedSchematic(text);
+    REQUIRE(group);
+    REQUIRE(group->Subcircuits.size() == 1);
+    CHECK(group->Subcircuits[0].Elements[0]->GetComponent().GetValueExpression() == "{R}");
+    GUI::TransformGroup(*group, {.Type = GUI::PointTransform::Kind::QUARTER_TURN});
+    CHECK(group->Subcircuits[0].Elements[0]->GetPosition() == GUI::GridPoint{0, 0});
+
+    GUI::Schematic target;
+    target.MergeSubcircuits(std::move(group->Subcircuits));
+    auto duplicate = GUI::ParseCopiedSchematic(text);
+    REQUIRE(duplicate);
+    target.MergeSubcircuits(std::move(duplicate->Subcircuits));
+    CHECK(target.GetSubcircuits().size() == 1);
+    for (auto &element : group->Elements) {
+        target.AddElement(std::move(element));
+    }
+    CHECK(target.BuildSpiceNetlist().contains(".subckt block"));
 }

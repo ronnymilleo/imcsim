@@ -69,7 +69,8 @@ inline constexpr std::string_view SCHEMATIC_EXTENSION = ".imcsim";
 std::string SaveSchematic(const std::vector<std::unique_ptr<UIElement>> &elements, const std::vector<UIWire> &wires,
                           const SimulationSettings &settings, const SavedMeasurements &measurements,
                           std::span<const SavedSubcircuit> subcircuits = {});
-std::string SaveParts(std::span<const UIElement *const> elements, const std::vector<UIWire> &wires);
+std::string SaveParts(std::span<const UIElement *const> elements, const std::vector<UIWire> &wires,
+                      std::span<const SavedSubcircuit> subcircuits = {});
 std::expected<LoadedSchematic, std::string> LoadSchematic(std::string_view text);
 std::expected<std::string, std::string> ReadTextFile(const std::filesystem::path &path);
 std::expected<void, std::string> WriteTextFile(const std::filesystem::path &path, std::string_view text);

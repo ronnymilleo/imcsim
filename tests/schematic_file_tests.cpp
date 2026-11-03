@@ -27,6 +27,7 @@
 #include <memory>
 #include <string>
 #include <string_view>
+#include <tuple>
 #include <vector>
 
 namespace {
@@ -696,6 +697,27 @@ TEST_CASE("Two labels with one name both load, and an invalid net name skips the
     CHECK(static_cast<const Core::NetLabel &>(loaded.Elements[1]->GetComponent()).GetNet() == "OUT");
     REQUIRE(loaded.Warnings.size() == 1);
     CHECK(loaded.Warnings[0].find("net name") != std::string::npos);
+}
+
+TEST_CASE("Subcircuit pin markers round-trip and reject invalid identifiers", "[schematic_file]") {
+    std::vector<std::unique_ptr<GUI::UIElement>> elements;
+    for (const auto &[type, point, name] : {std::tuple{Core::ComponentType::PIN, GUI::GridPoint{0, 0}, "IN"},
+                                            std::tuple{Core::ComponentType::POUT, GUI::GridPoint{8, 0}, "OUT"}}) {
+        elements.push_back(GUI::CreateElement(type, point, GUI::Rotation::R0));
+        static_cast<Core::NetLabel &>(elements.back()->GetComponent()).SetNet(name);
+    }
+    const GUI::LoadedSchematic loaded = LoadOrFail(GUI::SaveSchematic(elements, {}, {}, {}));
+    REQUIRE(loaded.Elements.size() == 2);
+    CHECK(loaded.Warnings.empty());
+    CHECK(loaded.Elements[0]->GetComponent().GetType() == Core::ComponentType::PIN);
+    CHECK(loaded.Elements[1]->GetComponent().GetType() == Core::ComponentType::POUT);
+    CHECK(static_cast<const Core::NetLabel &>(loaded.Elements[1]->GetComponent()).GetNet() == "OUT");
+
+    const GUI::LoadedSchematic invalid =
+        LoadOrFail(Document(R"({"type":"Pin","x":0,"y":0,"rotation":0,"net":"not-valid"})", ""));
+    CHECK(invalid.Elements.empty());
+    REQUIRE(invalid.Warnings.size() == 1);
+    CHECK(invalid.Warnings[0].contains("pin name"));
 }
 
 TEST_CASE("A potentiometer keeps its value and wiper", "[schematic_file]") {
