@@ -5,8 +5,10 @@
 
 #include "spice_import.h"
 
+#include "clipboard.h"
 #include "components/subcircuit.h"
 #include "element_factory.h"
+#include "library_model.h"
 #include "schematic.h"
 #include "schematic_file.h"
 #include "spice_library.h"
@@ -184,4 +186,75 @@ TEST_CASE("New pin names and edges of a SPICE block reach its instances, which k
     // The text has five ports, so it needs five pins
     pins.pop_back();
     CHECK_FALSE(schematic.UpdateSpiceSubcircuit("OPA_1", pins, {}));
+}
+
+TEST_CASE("Library models and the parts that use them come back from a file", "[spice_import]") {
+    std::vector<std::unique_ptr<GUI::UIElement>> elements;
+    elements.push_back(GUI::CreateElement(Core::ComponentType::DIODE, {0, 0}, GUI::Rotation::R0));
+    elements.back()->GetComponent().SetName("D1");
+    elements.back()->GetComponent().SetLibraryModel("1N4148");
+    const std::vector<Core::LibraryModel> models = {*Core::ReadLibraryModel(".model 1N4148 D(IS=2.52n)")};
+
+    const auto loaded = GUI::LoadSchematic(GUI::SaveSchematic(elements, {}, {}, {}, {}, models));
+    REQUIRE(loaded);
+    CHECK(loaded->Warnings.empty());
+    CHECK(loaded->Models == models);
+    REQUIRE(loaded->Elements.size() == 1);
+    CHECK(loaded->Elements[0]->GetComponent().GetLibraryModel() == "1N4148");
+
+    const auto broken = GUI::LoadSchematic(R"json({"format":"imcsim-schematic","version":1,"elements":[],
+        "models":[{"text":".model SW1 SW(VT=1)"},{"text":".model D1 D"},{"text":".model D1 D(IS=1n)"}]})json");
+    REQUIRE(broken);
+    CHECK(broken->Models.size() == 1);
+    REQUIRE(broken->Warnings.size() == 2);
+    CHECK(broken->Warnings[0].contains("not a diode or transistor"));
+    CHECK(broken->Warnings[1].contains("repeated"));
+}
+
+TEST_CASE("A library model that differs from one of the same name joins under a name of its own", "[spice_import]") {
+    GUI::Schematic schematic;
+    std::vector<std::unique_ptr<GUI::UIElement>> no_parts;
+    std::vector<GUI::SavedSubcircuit> no_blocks;
+    CHECK(schematic.MergeLibraryModels({*Core::ReadLibraryModel(".model 1N4148 D(IS=2.52n)")}, no_parts, no_blocks) ==
+          std::vector<std::string>{"1N4148"});
+    // The same model again adds nothing
+    CHECK(schematic.MergeLibraryModels({*Core::ReadLibraryModel(".model 1N4148 D(IS=2.52n)")}, no_parts, no_blocks) ==
+          std::vector<std::string>{"1N4148"});
+    REQUIRE(schematic.GetLibraryModels().size() == 1);
+
+    // A different one is renamed, and so are the parts that came with it, in blocks too
+    std::vector<std::unique_ptr<GUI::UIElement>> parts;
+    parts.push_back(GUI::CreateElement(Core::ComponentType::DIODE, {0, 0}, GUI::Rotation::R0));
+    parts.back()->GetComponent().SetLibraryModel("1N4148");
+    std::vector<GUI::SavedSubcircuit> blocks(1);
+    blocks[0].Elements.push_back(GUI::CreateElement(Core::ComponentType::LED, {0, 0}, GUI::Rotation::R0));
+    blocks[0].Elements.back()->GetComponent().SetLibraryModel("1N4148");
+    CHECK(schematic.MergeLibraryModels({*Core::ReadLibraryModel(".model 1N4148 D(IS=1n)")}, parts, blocks) ==
+          std::vector<std::string>{"1N4148_2"});
+    REQUIRE(schematic.GetLibraryModels().size() == 2);
+    CHECK(schematic.GetLibraryModels()[1].Text == ".model 1N4148_2 D(IS=1n)\n");
+    CHECK(parts[0]->GetComponent().GetLibraryModel() == "1N4148_2");
+    CHECK(blocks[0].Elements[0]->GetComponent().GetLibraryModel() == "1N4148_2");
+
+    // The circuit carries the models, and undo takes them back
+    schematic.CommitUndoStep();
+    CHECK(schematic.BuildSpiceNetlist().contains(".model LIB_1N4148_2 D(IS=1n)"));
+}
+
+TEST_CASE("A copied part takes the library model it uses along", "[spice_import]") {
+    std::vector<std::unique_ptr<GUI::UIElement>> elements;
+    elements.push_back(GUI::CreateElement(Core::ComponentType::DIODE, {0, 0}, GUI::Rotation::R0));
+    elements.back()->GetComponent().SetLibraryModel("1N4148");
+    elements.push_back(GUI::CreateElement(Core::ComponentType::RESISTOR, {6, 0}, GUI::Rotation::R0));
+    const std::vector<Core::LibraryModel> models = {*Core::ReadLibraryModel(".model 1N4148 D(IS=2.52n)"),
+                                                    *Core::ReadLibraryModel(".model 2N3904 NPN(BF=416)")};
+
+    const std::string text = GUI::CopySelection(elements, {}, {.Elements = {0}}, {}, models);
+    const auto group = GUI::ParseCopiedSchematic(text);
+    REQUIRE(group);
+    // Only the model the copied diode uses goes along
+    REQUIRE(group->Models.size() == 1);
+    CHECK(group->Models[0].Name == "1N4148");
+    REQUIRE(group->Elements.size() == 1);
+    CHECK(group->Elements[0]->GetComponent().GetLibraryModel() == "1N4148");
 }

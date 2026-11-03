@@ -66,6 +66,7 @@ public:
     UIElement &GetElement(std::size_t index);
     const std::vector<UIWire> &GetWires() const;
     const std::vector<SavedSubcircuit> &GetSubcircuits() const;
+    const std::vector<Core::LibraryModel> &GetLibraryModels() const;
     bool IsTerminal(GridPoint point) const;
     std::vector<GridPoint> CollectTerminals() const;
 
@@ -77,7 +78,8 @@ public:
     void DeleteSelection();
     void Clear();
     void Replace(std::vector<std::unique_ptr<UIElement>> elements, std::vector<UIWire> wires,
-                 SimulationSettings settings, std::vector<SavedSubcircuit> subcircuits = {});
+                 SimulationSettings settings, std::vector<SavedSubcircuit> subcircuits = {},
+                 std::vector<Core::LibraryModel> models = {});
 
     // Blocks
     std::expected<std::vector<SubcircuitPinCandidate>, std::string> GetSubcircuitPinCandidates() const;
@@ -95,6 +97,11 @@ public:
                                                            const std::vector<Core::SubcircuitParameter> &parameters);
     std::vector<std::string> MergeSubcircuits(std::vector<SavedSubcircuit> definitions,
                                               std::vector<std::unique_ptr<UIElement>> &instances);
+
+    // Library models
+    std::vector<std::string> MergeLibraryModels(std::vector<Core::LibraryModel> models,
+                                                std::vector<std::unique_ptr<UIElement>> &elements,
+                                                std::vector<SavedSubcircuit> &definitions);
 
     // Selection
     void SelectElement(std::size_t index);
@@ -185,6 +192,8 @@ private:
     std::vector<std::unique_ptr<UIElement>> m_Elements;
     std::vector<UIWire> m_Wires;
     std::vector<SavedSubcircuit> m_Subcircuits;
+    // Device models imported from libraries, which diodes and transistors anywhere in the document can use
+    std::vector<Core::LibraryModel> m_LibraryModels;
     // The blocks as the simulator takes them, built once from m_Subcircuits and dropped when it changes
     std::optional<std::vector<std::shared_ptr<Core::SubcircuitDefinition>>> m_BuiltSubcircuits;
 

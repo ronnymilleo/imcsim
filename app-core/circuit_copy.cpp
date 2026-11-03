@@ -32,6 +32,9 @@ CircuitCopy::CircuitCopy(const Circuit &circuit) {
         m_SubcircuitCopies.push_back(std::move(body));
         m_Circuit.AddSubcircuit(std::move(copy));
     }
+    for (const LibraryModel &model : circuit.GetLibraryModels()) {
+        m_Circuit.AddLibraryModel(model);
+    }
 }
 
 /**

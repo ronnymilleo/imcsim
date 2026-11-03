@@ -274,7 +274,7 @@ void SchematicFileActions::OpenFile(const std::filesystem::path &path) {
 
     NewSchematic();
     m_Schematic.Replace(std::move(loaded->Elements), std::move(loaded->Wires), std::move(loaded->Settings),
-                        std::move(loaded->Subcircuits));
+                        std::move(loaded->Subcircuits), std::move(loaded->Models));
     m_Schematic.RestoreMeasurements(loaded->Measurements);
     m_Schematic.MarkSaved(path);
     m_Hooks.FrameSchematic();
@@ -294,7 +294,7 @@ void SchematicFileActions::OpenExample(const Example &example) {
 
     NewSchematic();
     m_Schematic.Replace(std::move(loaded->Elements), std::move(loaded->Wires), std::move(loaded->Settings),
-                        std::move(loaded->Subcircuits));
+                        std::move(loaded->Subcircuits), std::move(loaded->Models));
     m_Schematic.RestoreMeasurements(loaded->Measurements);
     m_Hooks.FrameSchematic();
 }
@@ -327,7 +327,7 @@ void SchematicFileActions::ImportSpiceFile(const std::filesystem::path &path) {
         return;
     }
     Core::SpiceLibrary library = Core::ReadSpiceLibrary(*text);
-    if (library.Subcircuits.empty()) {
+    if (library.Subcircuits.empty() && library.Models.empty()) {
         ShowMessages(std::format("Nothing to import from {}", path.filename().string()), std::move(library.Warnings));
         return;
     }
@@ -354,9 +354,10 @@ void SchematicFileActions::SaveFile(std::filesystem::path path) {
     if (path.extension() != SCHEMATIC_EXTENSION) {
         path += SCHEMATIC_EXTENSION;
     }
-    const auto written = WriteTextFile(
-        path, SaveSchematic(m_Schematic.GetElements(), m_Schematic.GetWires(), m_Schematic.GetSimulationSettings(),
-                            m_Schematic.SaveMeasurements(), m_Schematic.GetSubcircuits()));
+    const auto written =
+        WriteTextFile(path, SaveSchematic(m_Schematic.GetElements(), m_Schematic.GetWires(),
+                                          m_Schematic.GetSimulationSettings(), m_Schematic.SaveMeasurements(),
+                                          m_Schematic.GetSubcircuits(), m_Schematic.GetLibraryModels()));
     if (!written) {
         ShowMessages("Could not save the schematic", {written.error()});
         return;

@@ -386,6 +386,27 @@ void Circuit::AddSubcircuit(std::shared_ptr<SubcircuitDefinition> definition) {
 }
 
 /**
+ * @brief   Adds a model from a library, which the diodes and transistors of the circuit can use by name.
+ * @param[in] model  Model to write in the netlist, under GetLibraryModelSpiceName().
+ */
+void Circuit::AddLibraryModel(LibraryModel model) {
+    m_LibraryModels.push_back(std::move(model));
+}
+
+/**
+ * @brief   Adds the subcircuit definitions and library models of another circuit, as a circuit derived from it needs.
+ * @param[in] other  Circuit whose definitions are shared and whose models are copied.
+ */
+void Circuit::AddDefinitionsOf(const Circuit &other) {
+    for (const auto &definition : other.m_Subcircuits) {
+        m_Subcircuits.push_back(definition);
+    }
+    for (const LibraryModel &model : other.m_LibraryModels) {
+        m_LibraryModels.push_back(model);
+    }
+}
+
+/**
  * @brief   Returns the components of the circuit, in the order they were added.
  * @return  Every component with the nodes of its terminals.
  */
@@ -409,6 +430,24 @@ const std::vector<std::shared_ptr<SubcircuitDefinition>> &Circuit::GetSubcircuit
 std::shared_ptr<const SubcircuitDefinition> Circuit::FindSubcircuit(const std::string_view name) const {
     const auto found = std::ranges::find(m_Subcircuits, name, &SubcircuitDefinition::Name);
     return found != m_Subcircuits.end() ? *found : nullptr;
+}
+
+/**
+ * @brief   Returns the library models of the circuit.
+ * @return  Every model, used by a part or not.
+ */
+const std::vector<LibraryModel> &Circuit::GetLibraryModels() const {
+    return m_LibraryModels;
+}
+
+/**
+ * @brief   Finds a library model by the name its library gives it.
+ * @param[in] name  Name of the model.
+ * @return  The model, or null when the circuit has none of that name.
+ */
+const LibraryModel *Circuit::FindLibraryModel(const std::string_view name) const {
+    const auto found = std::ranges::find(m_LibraryModels, name, &LibraryModel::Name);
+    return found != m_LibraryModels.end() ? &*found : nullptr;
 }
 
 /**
@@ -569,7 +608,10 @@ std::string Circuit::ToSpiceNetlist(const std::string_view analysis, const bool 
             const auto &diode = static_cast<const Diode &>(component);
             std::string model_name = diode.GetSpiceModelName();
             netlist += std::format("{} {} {} {}\n", diode.GetName(), nodes[0], nodes[1], model_name);
-            AddModelLine(model_name, FormatDiodeModel(model_name, diode.GetParameters()), model_names, models);
+            // A library model is written once, with the other library models, after the parts
+            if (!diode.HasLibraryModel()) {
+                AddModelLine(model_name, FormatDiodeModel(model_name, diode.GetParameters()), model_names, models);
+            }
             break;
         }
         case ComponentType::NPN:
@@ -577,8 +619,10 @@ std::string Circuit::ToSpiceNetlist(const std::string_view analysis, const bool 
             const auto &bjt = static_cast<const BJT &>(component);
             std::string model_name = bjt.GetSpiceModelName();
             netlist += std::format("{} {} {} {} {}\n", bjt.GetName(), nodes[0], nodes[1], nodes[2], model_name);
-            AddModelLine(model_name, FormatBJTModel(bjt.GetType(), model_name, bjt.GetParameters()), model_names,
-                         models);
+            if (!bjt.HasLibraryModel()) {
+                AddModelLine(model_name, FormatBJTModel(bjt.GetType(), model_name, bjt.GetParameters()), model_names,
+                             models);
+            }
             break;
         }
         case ComponentType::NMOS:
@@ -587,6 +631,12 @@ std::string Circuit::ToSpiceNetlist(const std::string_view analysis, const bool 
             const auto &mosfet = static_cast<const MOSFET &>(component);
             const MOSFETParameters &parameters = mosfet.GetParameters();
             std::string model_name = mosfet.GetSpiceModelName();
+            // A library model brings its own channel size, or the defaults of ngspice
+            if (mosfet.HasLibraryModel()) {
+                netlist += std::format("{} {} {} {} {} {}\n", mosfet.GetName(), nodes[0], nodes[1], nodes[2], nodes[2],
+                                       model_name);
+                break;
+            }
             netlist += std::format("{} {} {} {} {} {} W={:.6g} L={:.6g}\n", mosfet.GetName(), nodes[0], nodes[1],
                                    nodes[2], nodes[2], model_name, parameters.Width, parameters.Length);
             AddModelLine(model_name, FormatMOSFETModel(mosfet.GetType(), model_name, parameters), model_names, models);
@@ -671,6 +721,9 @@ std::string Circuit::ToSpiceNetlist(const std::string_view analysis, const bool 
         netlist += probes;
     }
     netlist += models;
+    for (const LibraryModel &model : m_LibraryModels) {
+        netlist += FormatLibraryModel(model);
+    }
     for (const auto &definition : m_Subcircuits) {
         netlist += FormatSubcircuit(*definition);
     }

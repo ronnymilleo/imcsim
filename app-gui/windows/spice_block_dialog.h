@@ -17,10 +17,12 @@ namespace GUI {
 /**
  * @struct  SpiceBlockResult
  * @brief   What the user confirmed in a SpiceBlockDialog, for the editor to apply to the schematic.
- * @details An import fills Imported; the settings of a block fill UpdatedName, Pins and Parameters.
+ * @details An import fills Imported with blocks and Models with device models; the settings of a block fill
+ *          UpdatedName, Pins and Parameters.
  */
 struct SpiceBlockResult {
     std::vector<SavedSubcircuit> Imported;
+    std::vector<Core::LibraryModel> Models;
     std::optional<std::string> UpdatedName;
     std::vector<SavedSubcircuitPin> Pins;
     std::vector<Core::SubcircuitParameter> Parameters;
@@ -28,7 +30,8 @@ struct SpiceBlockResult {
 
 /**
  * @class   SpiceBlockDialog
- * @brief   A modal dialog that imports the subcircuits of a SPICE library, or changes the pins of one imported before.
+ * @brief   A modal dialog that imports the subcircuits and device models of a SPICE library, or changes the pins of a
+ *          subcircuit imported before.
  * @details Each pin of a library subcircuit is one of its ports: the dialog asks for its name and the edge of the block
  *          it goes on, starting from what the port's name suggests. Draw() runs every frame from the same place, so the
  *          popup opens where it is drawn; it returns the result once the user confirms.
@@ -63,6 +66,9 @@ private:
     std::string m_FileName;
     std::vector<std::string> m_Warnings;
     std::vector<Choice> m_Choices;
+    std::vector<Core::LibraryModel> m_Models;
+    // One per model, whether it is picked; not a vector<bool>, which ImGui cannot point at
+    std::vector<char> m_AreModelsChosen;
 
     // Settings
     std::string m_BlockName;

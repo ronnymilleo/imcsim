@@ -408,6 +408,51 @@ void Component::ClearValueExpression() {
 }
 
 /**
+ * @brief   Tells whether the part can use a model from a library.
+ * @return  True for diodes, LEDs, Zeners and transistors.
+ */
+bool Component::TakesLibraryModel() const {
+    static constexpr auto MODELED_TYPES =
+        std::to_array({ComponentType::DIODE, ComponentType::ZENER_DIODE, ComponentType::LED, ComponentType::NPN,
+                       ComponentType::PNP, ComponentType::NMOS, ComponentType::PMOS});
+    return std::ranges::contains(MODELED_TYPES, m_Type);
+}
+
+/**
+ * @brief   Tells whether the part uses a model from a library.
+ * @return  True when it names one, in place of a ready model or custom parameters.
+ */
+bool Component::HasLibraryModel() const {
+    return !m_LibraryModel.empty();
+}
+
+/**
+ * @brief   Returns the name of the library model the part uses.
+ * @return  The name, as its library writes it, or an empty string when the part uses a ready or custom model.
+ */
+const std::string &Component::GetLibraryModel() const {
+    return m_LibraryModel;
+}
+
+/**
+ * @brief   Makes the part use a model from a library, which the schematic keeps.
+ * @param[in] name  Name of the model; a part that cannot use one (TakesLibraryModel()) ignores it.
+ * @note    Choosing a ready model or custom parameters later goes back to them.
+ */
+void Component::SetLibraryModel(std::string name) {
+    if (TakesLibraryModel()) {
+        m_LibraryModel = std::move(name);
+    }
+}
+
+/**
+ * @brief   Stops using a library model, so the part uses its ready model or its custom parameters again.
+ */
+void Component::ClearLibraryModel() {
+    m_LibraryModel.clear();
+}
+
+/**
  * @brief   Tells whether this kind of component can start from a value of its own.
  * @return  True for a capacitor, whose initial condition is a voltage, and an inductor, whose is a current; false
  *          for every other kind.

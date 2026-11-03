@@ -24,6 +24,10 @@ std::optional<std::string> BreakdownWarning(const CircuitEntry &entry, const dou
         return std::nullopt;
     }
     const auto &diode = static_cast<const Diode &>(*entry.Part);
+    // The breakdown of a library model is in its text, which is not read
+    if (diode.HasLibraryModel()) {
+        return std::nullopt;
+    }
     const double breakdown_voltage = diode.GetParameters().BreakdownVoltage;
     if (highest_reverse_voltage < breakdown_voltage) {
         return std::nullopt;
@@ -93,6 +97,10 @@ void AddRatingWarning(const Component &part, const char *model_name, const std::
 std::vector<std::string> RatingWarnings(const Component &part, const std::vector<double> &times,
                                         const TerminalWaveforms &terminals) {
     std::vector<std::string> warnings;
+    // A library model carries no datasheet ratings, only the parameters ngspice reads
+    if (part.HasLibraryModel()) {
+        return warnings;
+    }
     const std::vector<std::vector<double>> &voltages = terminals.Voltages;
     if (IsBJT(part.GetType())) {
         const auto &bjt = static_cast<const BJT &>(part);

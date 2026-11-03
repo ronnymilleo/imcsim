@@ -6,7 +6,11 @@
 #include "spice_library.h"
 
 #include "circuit.h"
+#include "circuit_checks.h"
+#include "components/diode.h"
 #include "components/ground.h"
+#include "components/mosfet.h"
+#include "components/resistor.h"
 #include "components/subcircuit.h"
 #include "components/vcc.h"
 #include "simulator.h"
@@ -16,6 +20,7 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace {
@@ -176,4 +181,121 @@ TEST_CASE("A subcircuit kept as text simulates with its parameters, models and t
     // A silicon diode drops a little under a volt into the 2k load
     CHECK(run.Result->NodeVoltages[2] > 4.0);
     CHECK(run.Result->NodeVoltages[2] < 4.6);
+}
+
+TEST_CASE("A device model is read with its name, kind and text, and written under a name of its own",
+          "[spice_library]") {
+    const std::optional<Core::LibraryModel> diode =
+        Core::ReadLibraryModel(".MODEL 1N4148 D(IS=2.52n RS=0.568\n+ N=1.752)");
+    REQUIRE(diode);
+    CHECK(diode->Name == "1N4148");
+    CHECK(diode->Kind == Core::ComponentType::DIODE);
+    CHECK(diode->Text == ".MODEL 1N4148 D(IS=2.52n RS=0.568\n+ N=1.752)\n");
+    CHECK(Core::FormatLibraryModel(*diode).starts_with(".MODEL LIB_1N4148 D(IS=2.52n"));
+    CHECK(Core::RenameLibraryModel(*diode, "1N4148_2").starts_with(".MODEL 1N4148_2 D("));
+
+    const std::optional<Core::LibraryModel> npn = Core::ReadLibraryModel(".model 2N3904 NPN (IS=6.734f BF=416.4)");
+    REQUIRE(npn);
+    CHECK(npn->Kind == Core::ComponentType::NPN);
+    CHECK(Core::ReadLibraryModel(".model IRF540 NMOS(LEVEL=3 VTO=3.5)")->Kind == Core::ComponentType::NMOS);
+    // No part of imcsim takes these
+    CHECK_FALSE(Core::ReadLibraryModel(".model IRFP VDMOS(VTO=4)"));
+    CHECK_FALSE(Core::ReadLibraryModel(".model SW1 SW(VT=1)"));
+    CHECK_FALSE(Core::ReadLibraryModel("R1 1 2 1k"));
+
+    CHECK(Core::CanUseLibraryModel(Core::ComponentType::LED, Core::ComponentType::DIODE));
+    CHECK(Core::CanUseLibraryModel(Core::ComponentType::ZENER_DIODE, Core::ComponentType::DIODE));
+    CHECK(Core::CanUseLibraryModel(Core::ComponentType::NPN, Core::ComponentType::NPN));
+    CHECK_FALSE(Core::CanUseLibraryModel(Core::ComponentType::PNP, Core::ComponentType::NPN));
+    CHECK_FALSE(Core::CanUseLibraryModel(Core::ComponentType::NPN, Core::ComponentType::DIODE));
+}
+
+TEST_CASE("A library offers the diode and transistor models outside its subcircuits", "[spice_library]") {
+    const Core::SpiceLibrary library = Core::ReadSpiceLibrary(R"(.model 1N4148 D(IS=2.52n)
+.model Q2N3904 NPN(IS=6.734f BF=416.4)
+.model RELAY SW(VT=1)
+.subckt WITH A B
+.model INSIDE D(IS=1n)
+D1 A B INSIDE
+.ends
+)");
+    REQUIRE(library.Models.size() == 2);
+    CHECK(library.Models[0].Name == "1N4148");
+    CHECK(library.Models[1].Name == "Q2N3904");
+    CHECK(library.Warnings.empty());
+
+    const Core::SpiceLibrary models_only = Core::ReadSpiceLibrary(".model 1N4148 D(IS=2.52n)\n");
+    CHECK(models_only.Subcircuits.empty());
+    CHECK(models_only.Models.size() == 1);
+    CHECK(models_only.Warnings.empty());
+}
+
+TEST_CASE("A diode that uses a library model is written with it and simulates", "[spice_library]") {
+    Core::Diode diode(Core::ComponentType::DIODE);
+    diode.SetName("D1");
+    diode.SetLibraryModel("1N4148");
+    CHECK(diode.HasLibraryModel());
+    CHECK_FALSE(diode.IsCustom());
+    CHECK(diode.GetModel() == nullptr);
+    CHECK(std::string_view(diode.GetModelName()) == "1N4148");
+    CHECK(diode.GetSpiceModelName() == "LIB_1N4148");
+    Core::Resistor resistor;
+    resistor.SetName("R1");
+    resistor.SetValue(1e3);
+    Core::VCC supply;
+    supply.SetName("V1");
+    supply.SetValue(5.0);
+    const Core::Ground ground;
+    Core::Circuit circuit;
+    circuit.Add(supply, {1});
+    circuit.Add(resistor, {1, 2});
+    circuit.Add(diode, {2, 0});
+    circuit.Add(ground, {0});
+
+    // Without the model in the circuit, the run says which part misses it
+    const std::optional<std::string> missing = Core::CheckCircuit(circuit);
+    REQUIRE(missing);
+    CHECK(missing->contains("D1 uses the model 1N4148"));
+    circuit.AddLibraryModel(*Core::ReadLibraryModel(".model 2N3904 NPN(IS=6.734f BF=416.4)"));
+    diode.SetLibraryModel("2N3904");
+    const std::optional<std::string> wrong_kind = Core::CheckCircuit(circuit);
+    REQUIRE(wrong_kind);
+    CHECK(wrong_kind->contains("NPN model"));
+
+    circuit.AddLibraryModel(*Core::ReadLibraryModel(".model 1N4148 D(IS=2.52n RS=0.568 N=1.752)"));
+    diode.SetLibraryModel("1N4148");
+    const std::string netlist = circuit.ToSpiceNetlist();
+    INFO(netlist);
+    CHECK(netlist.contains("D1 2 0 LIB_1N4148\n"));
+    CHECK(netlist.contains(".model LIB_1N4148 D(IS=2.52n RS=0.568 N=1.752)\n"));
+    CHECK_FALSE(netlist.contains("DCUSTOM"));
+    const Core::OperatingPointRun run = Core::RunOperatingPoint(circuit);
+    if (!run.Result) {
+        FAIL(run.Result.error());
+    }
+    // A small-signal silicon diode at a few milliamps
+    CHECK(run.Result->NodeVoltages[2] > 0.55);
+    CHECK(run.Result->NodeVoltages[2] < 0.85);
+
+    // A ready model or custom parameters take the place of the library model again
+    diode.SetCustom();
+    CHECK_FALSE(diode.HasLibraryModel());
+    CHECK(diode.IsCustom());
+}
+
+TEST_CASE("A MOSFET with a library model takes its channel size from the model", "[spice_library]") {
+    Core::MOSFET mosfet(Core::ComponentType::NMOS);
+    mosfet.SetName("M1");
+    mosfet.SetLibraryModel("IRF540");
+    Core::Circuit circuit;
+    circuit.Add(mosfet, {1, 2, 0});
+    circuit.AddLibraryModel(*Core::ReadLibraryModel(".model IRF540 NMOS(LEVEL=3 VTO=3.5 KP=20u)"));
+    const std::string netlist = circuit.ToSpiceNetlist();
+    INFO(netlist);
+    CHECK(netlist.contains("M1 1 2 0 0 LIB_IRF540\n"));
+    CHECK(netlist.contains(".model LIB_IRF540 NMOS(LEVEL=3 VTO=3.5 KP=20u)\n"));
+    // A resistor cannot use one
+    Core::Resistor resistor;
+    resistor.SetLibraryModel("IRF540");
+    CHECK_FALSE(resistor.HasLibraryModel());
 }

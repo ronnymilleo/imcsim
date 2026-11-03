@@ -230,6 +230,14 @@ const std::vector<SavedSubcircuit> &Schematic::GetSubcircuits() const {
 }
 
 /**
+ * @brief   Returns the device models imported from libraries.
+ * @return  Every model, used by a part or not, in the order they were imported.
+ */
+const std::vector<Core::LibraryModel> &Schematic::GetLibraryModels() const {
+    return m_LibraryModels;
+}
+
+/**
  * @brief   Checks whether a grid point is the terminal of some element.
  * @param[in] point  Grid point to test.
  * @return  True when an element has a terminal there.
@@ -348,15 +356,19 @@ void Schematic::Clear() {
  * @brief   Replaces the whole content, for example with a schematic read from a file.
  * @param[in] elements  New elements, with names already set.
  * @param[in] wires     New wires.
- * @param[in] settings  New simulation settings.
+ * @param[in] settings     New simulation settings.
+ * @param[in] subcircuits  New block definitions.
+ * @param[in] models       New library models.
  * @note    The schematic becomes unmodified and the undo history starts over; the file path is kept.
  */
 void Schematic::Replace(std::vector<std::unique_ptr<UIElement>> elements, std::vector<UIWire> wires,
-                        SimulationSettings settings, std::vector<SavedSubcircuit> subcircuits) {
+                        SimulationSettings settings, std::vector<SavedSubcircuit> subcircuits,
+                        std::vector<Core::LibraryModel> models) {
     ClearSelection();
     m_Elements = std::move(elements);
     m_Wires = std::move(wires);
     m_Subcircuits = std::move(subcircuits);
+    m_LibraryModels = std::move(models);
     m_BuiltSubcircuits.reset();
     m_SimulationSettings = std::move(settings);
     ++m_SimulationSettingsVersion;
@@ -506,7 +518,8 @@ std::expected<std::unique_ptr<Schematic>, std::string> Schematic::OpenSubcircuit
     }
     SavedSubcircuit &definition = loaded->Subcircuits.front();
     auto content = std::make_unique<Schematic>();
-    content->Replace(std::move(definition.Elements), std::move(definition.Wires), {});
+    // The parts inside can use the library models of the document, as its own parts can
+    content->Replace(std::move(definition.Elements), std::move(definition.Wires), {}, {}, m_LibraryModels);
     for (const SavedSubcircuitPin &pin : definition.Pins) {
         const bool has_marker = std::ranges::any_of(content->GetElements(), [&](const auto &element) {
             return Core::IsSubcircuitPin(element->GetComponent().GetType()) &&
@@ -651,6 +664,55 @@ std::vector<std::string> Schematic::MergeSubcircuits(std::vector<SavedSubcircuit
         names.push_back(definition.Name);
         m_Subcircuits.push_back(std::move(definition));
         m_BuiltSubcircuits.reset();
+        MarkModified();
+    }
+    return names;
+}
+
+/**
+ * @brief   Adds device models from a library or a paste, so the parts that name them have them.
+ * @param[in]     models       Models to add.
+ * @param[in,out] elements     Parts that came with them, pointed at the new name of a renamed model.
+ * @param[in,out] definitions  Blocks that came with them, whose parts are pointed at it too.
+ * @return  The name each model has here, in order: its own, or the free name it was given.
+ * @note    A model equal to one of the same name already here is dropped, since the parts can use that one; one that
+ *          differs is added under a free name, such as "1N4148_2", so neither replaces the other.
+ */
+std::vector<std::string> Schematic::MergeLibraryModels(std::vector<Core::LibraryModel> models,
+                                                       std::vector<std::unique_ptr<UIElement>> &elements,
+                                                       std::vector<SavedSubcircuit> &definitions) {
+    const auto rename_users = [](std::vector<std::unique_ptr<UIElement>> &users, const std::string &old_name,
+                                 const std::string &new_name) {
+        for (auto &user : users) {
+            Core::Component &component = user->GetComponent();
+            if (component.GetLibraryModel() == old_name) {
+                component.SetLibraryModel(new_name);
+            }
+        }
+    };
+    std::vector<std::string> names;
+    for (Core::LibraryModel &model : models) {
+        const auto existing = std::ranges::find(m_LibraryModels, model.Name, &Core::LibraryModel::Name);
+        if (existing != m_LibraryModels.end() && existing->Text == model.Text) {
+            names.push_back(model.Name);
+            continue;
+        }
+        if (existing != m_LibraryModels.end()) {
+            std::string free_name;
+            for (int suffix = 2;
+                 free_name.empty() || std::ranges::contains(m_LibraryModels, free_name, &Core::LibraryModel::Name);
+                 ++suffix) {
+                free_name = std::format("{}_{}", model.Name, suffix);
+            }
+            rename_users(elements, model.Name, free_name);
+            for (SavedSubcircuit &definition : definitions) {
+                rename_users(definition.Elements, model.Name, free_name);
+            }
+            model.Text = Core::RenameLibraryModel(model, free_name);
+            model.Name = free_name;
+        }
+        names.push_back(model.Name);
+        m_LibraryModels.push_back(std::move(model));
         MarkModified();
     }
     return names;
@@ -1085,6 +1147,9 @@ Core::Circuit Schematic::BuildCircuit() {
     for (const auto &definition : *m_BuiltSubcircuits) {
         circuit.AddSubcircuit(definition);
     }
+    for (const Core::LibraryModel &model : m_LibraryModels) {
+        circuit.AddLibraryModel(model);
+    }
     return circuit;
 }
 
@@ -1514,7 +1579,7 @@ void Schematic::RefreshInstances(const SavedSubcircuit &definition, const std::v
 
 // Measurements stay out of snapshots, so probing adds no undo step and does not count as a change
 std::string Schematic::TakeSnapshot() const {
-    return SaveSchematic(m_Elements, m_Wires, m_SimulationSettings, {}, m_Subcircuits);
+    return SaveSchematic(m_Elements, m_Wires, m_SimulationSettings, {}, m_Subcircuits, m_LibraryModels);
 }
 
 // Snapshots come from TakeSnapshot(), so they always load back without warnings
@@ -1527,6 +1592,7 @@ void Schematic::RestoreSnapshot(const std::string &snapshot) {
     m_Elements = std::move(loaded->Elements);
     m_Wires = std::move(loaded->Wires);
     m_Subcircuits = std::move(loaded->Subcircuits);
+    m_LibraryModels = std::move(loaded->Models);
     m_BuiltSubcircuits.reset();
     if (loaded->Settings != m_SimulationSettings) {
         m_SimulationSettings = std::move(loaded->Settings);

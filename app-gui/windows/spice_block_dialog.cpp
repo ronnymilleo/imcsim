@@ -67,7 +67,8 @@ std::string DescribeParameters(const std::vector<Core::SubcircuitParameter> &par
 } // namespace
 
 /**
- * @brief   Opens the dialog on the subcircuits of a library, to pick which to import and set up their pins.
+ * @brief   Opens the dialog on the subcircuits and device models of a library, to pick which to import and set up the
+ *          pins of the subcircuits.
  * @param[in] file_name  Name of the library file, shown in the dialog.
  * @param[in] library    What ReadSpiceLibrary() read from it.
  * @note    A library of one subcircuit has it picked already.
@@ -77,6 +78,9 @@ void SpiceBlockDialog::OpenImport(std::string file_name, Core::SpiceLibrary libr
     m_FileName = std::move(file_name);
     m_Warnings = std::move(library.Warnings);
     m_Choices.clear();
+    m_Models = std::move(library.Models);
+    // A file of models only has them picked, as a single subcircuit is
+    m_AreModelsChosen.assign(m_Models.size(), static_cast<char>(library.Subcircuits.empty()));
     const bool is_single = library.Subcircuits.size() == 1;
     for (Core::LibrarySubcircuit &subcircuit : library.Subcircuits) {
         std::vector<SavedSubcircuitPin> pins = SuggestSpicePins(subcircuit);
@@ -127,8 +131,10 @@ std::optional<SpiceBlockResult> SpiceBlockDialog::DrawImport() {
     for (const std::string &warning : m_Warnings) {
         ImGui::TextColored(GetWarningTextColor(), "%s", warning.c_str());
     }
-    ImGui::TextDisabled(
-        "Pick the subcircuits to import, then name each pin and choose the edge of the block it goes on");
+    if (!m_Choices.empty()) {
+        ImGui::TextDisabled(
+            "Pick the subcircuits to import, then name each pin and choose the edge of the block it goes on");
+    }
     // As tall as what it lists, up to a limit past which it scrolls
     ImGui::SetNextWindowSizeConstraints({0.0f, 0.0f}, {FLT_MAX, font_size * LIST_HEIGHT});
     ImGui::BeginChild("##subcircuits", {0.0f, 0.0f}, ImGuiChildFlags_AutoResizeX | ImGuiChildFlags_AutoResizeY);
@@ -156,28 +162,49 @@ std::optional<SpiceBlockResult> SpiceBlockDialog::DrawImport() {
         }
         ImGui::PopID();
     }
+    if (!m_Models.empty()) {
+        ImGui::SeparatorText("Device models");
+        ImGui::TextDisabled("Diodes and transistors list the picked ones in their Model choice");
+        for (std::size_t index = 0; index < m_Models.size(); ++index) {
+            ImGui::PushID(static_cast<int>(m_Choices.size() + index));
+            bool is_chosen = m_AreModelsChosen[index] != 0;
+            if (ImGui::Checkbox(
+                    std::format("{} ({})", m_Models[index].Name, Core::GetModelKindName(m_Models[index].Kind)).c_str(),
+                    &is_chosen)) {
+                m_AreModelsChosen[index] = static_cast<char>(is_chosen);
+            }
+            ImGui::PopID();
+        }
+    }
     ImGui::EndChild();
     if (!m_Error.empty()) {
         ImGui::TextColored(GetErrorTextColor(), "%s", m_Error.c_str());
     }
 
     std::optional<SpiceBlockResult> result;
-    const bool is_any_chosen = std::ranges::any_of(m_Choices, &Choice::IsChosen);
+    const bool is_any_chosen = std::ranges::any_of(m_Choices, &Choice::IsChosen) ||
+                               std::ranges::any_of(m_AreModelsChosen, [](const char chosen) { return chosen != 0; });
     ImGui::BeginDisabled(!is_any_chosen);
     if (ImGui::Button("Import")) {
         SpiceBlockResult imported;
+        bool is_valid = true;
         for (const Choice &choice : m_Choices) {
             if (!choice.IsChosen) {
                 continue;
             }
             if (const std::optional<std::string> problem = CheckSpicePins(choice.Pins)) {
                 m_Error = std::format("{}: {}", choice.Subcircuit.Name, *problem);
-                imported.Imported.clear();
+                is_valid = false;
                 break;
             }
             imported.Imported.push_back(MakeSpiceBlock(choice.Subcircuit, choice.Pins));
         }
-        if (!imported.Imported.empty()) {
+        for (std::size_t index = 0; index < m_Models.size(); ++index) {
+            if (m_AreModelsChosen[index] != 0) {
+                imported.Models.push_back(m_Models[index]);
+            }
+        }
+        if (is_valid) {
             result = std::move(imported);
             ImGui::CloseCurrentPopup();
         }

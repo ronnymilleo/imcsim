@@ -1823,12 +1823,20 @@ void EditorWindow::DrawSubcircuitDialogButtons(const bool editing) {
 // Imported blocks join the schematic as one undo step and the first one starts placing, so it lands where the user
 // clicks; new settings of a block reach every instance of it
 void EditorWindow::ApplySpiceBlockResult(SpiceBlockResult result) {
-    if (!result.Imported.empty()) {
-        std::vector<std::unique_ptr<UIElement>> no_instances;
-        const std::vector<std::string> names =
-            m_RootSchematic.MergeSubcircuits(std::move(result.Imported), no_instances);
+    if (!result.Imported.empty() || !result.Models.empty()) {
+        std::vector<std::unique_ptr<UIElement>> no_parts;
+        std::vector<SavedSubcircuit> no_blocks;
+        const std::vector<std::string> models =
+            m_RootSchematic.MergeLibraryModels(std::move(result.Models), no_parts, no_blocks);
+        const std::vector<std::string> names = m_RootSchematic.MergeSubcircuits(std::move(result.Imported), no_parts);
         m_RootSchematic.CommitUndoStep();
-        StartPlacingSubcircuit(names.front());
+        if (!names.empty()) {
+            StartPlacingSubcircuit(names.front());
+        } else {
+            m_Files.QueueMessages(
+                std::format("{} device model{} imported", models.size(), models.size() == 1 ? "" : "s"),
+                {"Select a diode or a transistor and pick the model in its Model choice"});
+        }
         return;
     }
     if (!result.UpdatedName) {
@@ -2071,9 +2079,9 @@ void EditorWindow::CopySelected() {
         return;
     }
     const Selection selection = {m_Schematic->GetSelectedElements(), m_Schematic->GetSelectedWires()};
-    ImGui::SetClipboardText(
-        CopySelection(m_Schematic->GetElements(), m_Schematic->GetWires(), selection, m_Schematic->GetSubcircuits())
-            .c_str());
+    ImGui::SetClipboardText(CopySelection(m_Schematic->GetElements(), m_Schematic->GetWires(), selection,
+                                          m_Schematic->GetSubcircuits(), m_Schematic->GetLibraryModels())
+                                .c_str());
 }
 
 // Deleting in the middle of a drag would leave the drag pointing at removed items
@@ -2162,6 +2170,8 @@ void EditorWindow::HandlePasting(SchematicCanvas &canvas, const ViewTransform &v
 
     const std::size_t first_element = m_Schematic->GetElements().size();
     const std::size_t first_wire = m_Schematic->GetWires().size();
+    // Models first, so a renamed one is renamed in the blocks too before they join
+    m_Schematic->MergeLibraryModels(std::move(m_Pasting->Models), m_Pasting->Elements, m_Pasting->Subcircuits);
     m_Schematic->MergeSubcircuits(std::move(m_Pasting->Subcircuits), m_Pasting->Elements);
     for (auto &element : m_Pasting->Elements) {
         m_Schematic->AddElement(std::move(element));

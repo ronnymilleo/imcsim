@@ -6,6 +6,7 @@
 #ifndef IMCSIM_SPICE_LIBRARY_H
 #define IMCSIM_SPICE_LIBRARY_H
 
+#include "library_model.h"
 #include "subcircuit.h"
 #include <optional>
 #include <string>
@@ -34,10 +35,12 @@ struct LibrarySubcircuit {
 
 /**
  * @struct  SpiceLibrary
- * @brief   The subcircuits of a library file, in file order, and what could not be read at all.
+ * @brief   The subcircuits of a library file and the device models its diodes and transistors can use, in file order,
+ *          and what could not be read at all.
  */
 struct SpiceLibrary {
     std::vector<LibrarySubcircuit> Subcircuits;
+    std::vector<LibraryModel> Models;
     std::vector<std::string> Warnings;
 };
 

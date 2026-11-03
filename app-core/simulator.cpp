@@ -51,9 +51,7 @@ InputCopies CopyInputs(const Circuit &circuit, const std::vector<std::string> &n
         copies.Simulated.Add(is_chosen ? copies.Inputs[static_cast<std::size_t>(chosen - names.begin())] : *entry.Part,
                              entry.Nodes);
     }
-    for (const auto &definition : circuit.GetSubcircuits()) {
-        copies.Simulated.AddSubcircuit(definition);
-    }
+    copies.Simulated.AddDefinitionsOf(circuit);
     return copies;
 }
 

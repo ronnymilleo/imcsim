@@ -7,6 +7,7 @@
 #define IMCSIM_CIRCUIT_H
 
 #include "components/component.h"
+#include "library_model.h"
 #include <memory>
 #include <optional>
 #include <string>
@@ -48,10 +49,14 @@ class Circuit {
 public:
     void Add(const Component &component, std::vector<int> nodes);
     void AddSubcircuit(std::shared_ptr<SubcircuitDefinition> definition);
+    void AddLibraryModel(LibraryModel model);
+    void AddDefinitionsOf(const Circuit &other);
 
     const std::vector<CircuitEntry> &GetEntries() const;
     const std::vector<std::shared_ptr<SubcircuitDefinition>> &GetSubcircuits() const;
     std::shared_ptr<const SubcircuitDefinition> FindSubcircuit(std::string_view name) const;
+    const std::vector<LibraryModel> &GetLibraryModels() const;
+    const LibraryModel *FindLibraryModel(std::string_view name) const;
     int GetNodeCount() const;
     bool HasGround() const;
     bool HasACSource() const;
@@ -61,6 +66,7 @@ public:
 private:
     std::vector<CircuitEntry> m_Entries;
     std::vector<std::shared_ptr<SubcircuitDefinition>> m_Subcircuits;
+    std::vector<LibraryModel> m_LibraryModels;
     int m_NodeCount = 0;
 };
 

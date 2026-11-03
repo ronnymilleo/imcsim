@@ -277,7 +277,8 @@ bool IsInclusion(const std::string_view directive) {
  * @brief   Reads the subcircuits of a SPICE library file.
  * @param[in] text  Contents of a .lib, .mod, .sub or .cir file.
  * @return  Every .subckt of the file outside any other, each with the .model, .subckt and .param definitions of the
- *          file that it uses, so it simulates on its own; and the warnings that concern the whole file, such as an
+ *          file that it uses, so it simulates on its own; every diode and transistor .model outside a subcircuit, which
+ *          the parts can use by name; and the warnings that concern the whole file, such as an
  *          .include it does not follow or a subcircuit left unclosed. An encrypted subcircuit is left out with a
  *          warning, since only its vendor's simulator can read it.
  */
@@ -323,9 +324,13 @@ SpiceLibrary ReadSpiceLibrary(const std::string_view text) {
                 }
             }
         } else if (depth == 0 && directive == ".model" && tokens.size() >= 2) {
-            definitions.try_emplace(
-                ToLower(tokens[1]),
-                Definition{.Order = order++, .Text = JoinLines(lines, statement.FirstLine, statement.LastLine)});
+            const std::string model_text = JoinLines(lines, statement.FirstLine, statement.LastLine);
+            const bool is_new =
+                definitions.try_emplace(ToLower(tokens[1]), Definition{.Order = order++, .Text = model_text}).second;
+            // A model a part of imcsim can use is offered on its own too; the others only serve the subcircuits
+            if (std::optional<LibraryModel> model = ReadLibraryModel(model_text); model && is_new) {
+                library.Models.push_back(std::move(*model));
+            }
         } else if (depth == 0 && directive == ".param") {
             const std::string line_text = JoinLines(lines, statement.FirstLine, statement.LastLine);
             const std::size_t line_order = order++;
@@ -386,8 +391,8 @@ SpiceLibrary ReadSpiceLibrary(const std::string_view text) {
         subcircuit.Text = AddDependencies(own, ToLower(subcircuit.Name), definitions) + own;
         library.Subcircuits.push_back(std::move(subcircuit));
     }
-    if (library.Subcircuits.empty() && library.Warnings.empty()) {
-        library.Warnings.emplace_back("The file has no .subckt to import");
+    if (library.Subcircuits.empty() && library.Models.empty() && library.Warnings.empty()) {
+        library.Warnings.emplace_back("The file has no .subckt, nor a diode or transistor .model, to import");
     }
     return library;
 }

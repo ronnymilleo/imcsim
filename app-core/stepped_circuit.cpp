@@ -79,9 +79,7 @@ std::expected<ParameterCircuit, std::string> ApplyParameter(const Circuit &circu
     for (const CircuitEntry &original : circuit.GetEntries()) {
         applied.Simulated.Add(original.Part == entry->Part ? *applied.Part : *original.Part, original.Nodes);
     }
-    for (const auto &definition : circuit.GetSubcircuits()) {
-        applied.Simulated.AddSubcircuit(definition);
-    }
+    applied.Simulated.AddDefinitionsOf(circuit);
     return applied;
 }
 

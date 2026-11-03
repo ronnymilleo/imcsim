@@ -344,6 +344,11 @@ std::expected<void, std::string> ReadPartParameters(const nlohmann::json &object
 template <typename Part, typename Parameters, std::size_t Count>
 void WriteModelChoice(const Part &part, const std::array<ParameterKey<Parameters>, Count> &keys,
                       nlohmann::json &object) {
+    // A library model lives in the document, which the part names
+    if (part.HasLibraryModel()) {
+        object["library_model"] = part.GetLibraryModel();
+        return;
+    }
     object["model"] = part.GetModelName();
     if (part.IsCustom()) {
         nlohmann::json parameters = nlohmann::json::object();
@@ -556,6 +561,15 @@ std::expected<void, std::string> ReadModelChoice(const nlohmann::json &object, P
                                                  const Model *(*find_model)(Core::ComponentType, std::string_view),
                                                  const char *custom_name,
                                                  const std::array<ParameterKey<Parameters>, Count> &keys) {
+    // The model it names may be missing from the document; the checks of a run say so
+    if (object.contains("library_model")) {
+        const std::optional<std::string> library_model = ReadString(object, "library_model");
+        if (!library_model || library_model->empty() || !part.TakesLibraryModel()) {
+            return std::unexpected("has no valid library model");
+        }
+        part.SetLibraryModel(*library_model);
+        return {};
+    }
     const std::optional<std::string> model_name = ReadString(object, "model");
     if (!model_name) {
         return std::unexpected("has no valid model");
@@ -1361,7 +1375,8 @@ nlohmann::json WriteSubcircuit(const SavedSubcircuit &definition) {
 
 std::string WriteDocument(const std::span<const UIElement *const> elements, const std::vector<UIWire> &wires,
                           const SimulationSettings &settings, const SavedMeasurements &measurements,
-                          const std::span<const SavedSubcircuit> subcircuits = {}) {
+                          const std::span<const SavedSubcircuit> subcircuits = {},
+                          const std::span<const Core::LibraryModel> models = {}) {
     nlohmann::json document = {
         {"format", FORMAT_NAME},
         {"version", FORMAT_VERSION},
@@ -1373,6 +1388,13 @@ std::string WriteDocument(const std::span<const UIElement *const> elements, cons
         document["subcircuits"] = nlohmann::json::array();
         for (const SavedSubcircuit &definition : subcircuits) {
             document["subcircuits"].push_back(WriteSubcircuit(definition));
+        }
+    }
+    // A model is its text, from which its name and kind are read back
+    if (!models.empty()) {
+        document["models"] = nlohmann::json::array();
+        for (const Core::LibraryModel &model : models) {
+            document["models"].push_back({{"text", model.Text}});
         }
     }
     if (!measurements.Voltages.empty() || !measurements.Currents.empty() || !measurements.MathChannels.empty()) {
@@ -1502,6 +1524,32 @@ std::expected<SavedSubcircuit, std::string> ReadSubcircuit(const nlohmann::json 
     return definition;
 }
 
+std::vector<Core::LibraryModel> ReadLibraryModels(const nlohmann::json &document, std::vector<std::string> &warnings) {
+    std::vector<Core::LibraryModel> models;
+    const auto list = document.find("models");
+    if (list == document.end()) {
+        return models;
+    }
+    if (!list->is_array()) {
+        warnings.emplace_back("The library models are not a list and were skipped");
+        return models;
+    }
+    for (std::size_t index = 0; index < list->size(); ++index) {
+        const nlohmann::json &entry = (*list)[index];
+        const std::optional<std::string> text = entry.is_object() ? ReadString(entry, "text") : std::nullopt;
+        std::optional<Core::LibraryModel> model = text ? Core::ReadLibraryModel(*text) : std::nullopt;
+        if (!model) {
+            warnings.push_back(
+                std::format("Library model {} is not a diode or transistor .model and was skipped", index + 1));
+        } else if (std::ranges::contains(models, model->Name, &Core::LibraryModel::Name)) {
+            warnings.push_back(std::format("Library model {} is repeated and was skipped", model->Name));
+        } else {
+            models.push_back(std::move(*model));
+        }
+    }
+    return models;
+}
+
 std::vector<SavedSubcircuit> ReadSubcircuits(const nlohmann::json &document, std::vector<std::string> &warnings) {
     std::vector<SavedSubcircuit> definitions;
     const auto list = document.find("subcircuits");
@@ -1534,17 +1582,19 @@ std::vector<SavedSubcircuit> ReadSubcircuits(const nlohmann::json &document, std
  * @param[in] settings      Settings of the analyses.
  * @param[in] measurements  Traces the plots show; the key is left out when there are none.
  * @param[in] subcircuits   Project-local definitions, including their internal elements and wires.
+ * @param[in] models        Device models imported from libraries, as their text.
  * @return  The file contents, indented for reading and diffing. Values are plain numbers, never suffixed text, except
  *          for subcircuit parameter references saved as strings such as "{RESISTANCE}".
  */
 std::string SaveSchematic(const std::vector<std::unique_ptr<UIElement>> &elements, const std::vector<UIWire> &wires,
                           const SimulationSettings &settings, const SavedMeasurements &measurements,
-                          const std::span<const SavedSubcircuit> subcircuits) {
+                          const std::span<const SavedSubcircuit> subcircuits,
+                          const std::span<const Core::LibraryModel> models) {
     std::vector<const UIElement *> pointers;
     for (const auto &element : elements) {
         pointers.push_back(element.get());
     }
-    return WriteDocument(pointers, wires, settings, measurements, subcircuits);
+    return WriteDocument(pointers, wires, settings, measurements, subcircuits, models);
 }
 
 /**
@@ -1552,12 +1602,14 @@ std::string SaveSchematic(const std::vector<std::unique_ptr<UIElement>> &element
  * @param[in] elements  Parts to write, which stay where they are.
  * @param[in] wires        Wire segments to write.
  * @param[in] subcircuits  Definitions referenced by the copied instances.
+ * @param[in] models       Library models the copied parts use.
  * @return  The same JSON a file holds, with the default settings and no measurements, so it loads back with
  *          LoadSchematic().
  */
 std::string SaveParts(const std::span<const UIElement *const> elements, const std::vector<UIWire> &wires,
-                      const std::span<const SavedSubcircuit> subcircuits) {
-    return WriteDocument(elements, wires, {}, {}, subcircuits);
+                      const std::span<const SavedSubcircuit> subcircuits,
+                      const std::span<const Core::LibraryModel> models) {
+    return WriteDocument(elements, wires, {}, {}, subcircuits, models);
 }
 
 /**
@@ -1586,6 +1638,7 @@ std::expected<LoadedSchematic, std::string> LoadSchematic(const std::string_view
     }
 
     LoadedSchematic schematic;
+    schematic.Models = ReadLibraryModels(document, schematic.Warnings);
     schematic.Subcircuits = ReadSubcircuits(document, schematic.Warnings);
     const auto elements = document.find("elements");
     if (elements != document.end() && elements->is_array()) {
