@@ -82,6 +82,7 @@ public:
     // Blocks
     std::expected<std::vector<SubcircuitPinCandidate>, std::string> GetSubcircuitPinCandidates() const;
     std::expected<std::vector<SubcircuitPinCandidate>, std::string> GetSubcircuitPinMarkers() const;
+    bool SetPinMarkerSide(GridPoint point, Core::PinSide side);
     std::expected<void, std::string>
     CreateSubcircuitFromSelection(std::string name, std::vector<SavedSubcircuitPin> pins,
                                   std::vector<Core::SubcircuitParameter> parameters = {});

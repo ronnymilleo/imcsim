@@ -401,6 +401,30 @@ std::expected<std::vector<Schematic::SubcircuitPinCandidate>, std::string> Schem
 }
 
 /**
+ * @brief   Turns the pin marker on a point so its pin goes on an edge of the block.
+ * @param[in] point  Point of the marker's terminal.
+ * @param[in] side   Edge of the block the pin should go on.
+ * @return  True when a marker turned; false when no marker is on the point or it already gives that edge.
+ * @note    The marker turns about its terminal, so the wires on it stay where they are; only its arrow and square face
+ *          the other way. It counts as an edit, which CommitUndoStep() makes one undo step.
+ */
+bool Schematic::SetPinMarkerSide(const GridPoint point, const Core::PinSide side) {
+    for (auto &element : m_Elements) {
+        if (!Core::IsSubcircuitPin(element->GetComponent().GetType()) || element->GetTerminals().front() != point) {
+            continue;
+        }
+        if (GetMarkerSide(*element) == side) {
+            return false;
+        }
+        element->SetRotation(GetSideRotation(side));
+        element->SetMirrored(false);
+        MarkModified();
+        return true;
+    }
+    return false;
+}
+
+/**
  * @brief   Turns the selection into a block definition and puts one instance of it in its place.
  * @param[in] name        Name of the new definition, an identifier no other definition has.
  * @param[in] pins        One pin per selected marker, at the marker's point, in the order of the instance's terminals.

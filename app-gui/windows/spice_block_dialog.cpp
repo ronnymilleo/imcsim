@@ -23,8 +23,6 @@ namespace {
 
 constexpr const char *IMPORT_POPUP = "Import SPICE library";
 constexpr const char *SETTINGS_POPUP = "SPICE block";
-constexpr auto SIDES =
-    std::to_array({Core::PinSide::LEFT, Core::PinSide::RIGHT, Core::PinSide::TOP, Core::PinSide::BOTTOM});
 // Widths in font sizes, so the dialogs follow the font
 constexpr float PORT_COLUMN_WIDTH = 6.0f;
 constexpr float NAME_FIELD_WIDTH = 8.0f;
@@ -46,7 +44,7 @@ void DrawPinTable(std::vector<SavedSubcircuitPin> &pins, const std::vector<std::
         ImGui::SameLine();
         ImGui::SetNextItemWidth(font_size * SIDE_FIELD_WIDTH);
         if (ImGui::BeginCombo("##side", GetPinSideName(pins[index].Side))) {
-            for (const Core::PinSide side : SIDES) {
+            for (const Core::PinSide side : PIN_SIDES) {
                 if (ImGui::Selectable(GetPinSideName(side), side == pins[index].Side)) {
                     pins[index].Side = side;
                 }

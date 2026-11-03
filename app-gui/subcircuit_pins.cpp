@@ -80,6 +80,26 @@ std::optional<Core::PinSide> FindMarkerSide(const std::vector<std::unique_ptr<UI
 }
 
 /**
+ * @brief   Returns the rotation that makes a pin marker put its pin on an edge, unmirrored.
+ * @param[in] side  Edge of the block.
+ * @return  The rotation whose arrow comes from that edge: none for the left, a half turn for the right, a quarter turn
+ *          for the top and three for the bottom; GetMarkerSide() gives the side back.
+ */
+Rotation GetSideRotation(const Core::PinSide side) {
+    switch (side) {
+    case Core::PinSide::RIGHT:
+        return Rotation::R180;
+    case Core::PinSide::TOP:
+        return Rotation::R90;
+    case Core::PinSide::BOTTOM:
+        return Rotation::R270;
+    case Core::PinSide::LEFT:
+    default:
+        return Rotation::R0;
+    }
+}
+
+/**
  * @brief   Returns a readable name for an edge of a block.
  * @param[in] side  Edge of the box.
  * @return  "left", "right", "top" or "bottom".
@@ -104,8 +124,7 @@ const char *GetPinSideName(const Core::PinSide side) {
  * @return  The edge, or no value for any other text.
  */
 std::optional<Core::PinSide> ParsePinSide(const std::string_view name) {
-    for (const Core::PinSide side :
-         {Core::PinSide::LEFT, Core::PinSide::RIGHT, Core::PinSide::TOP, Core::PinSide::BOTTOM}) {
+    for (const Core::PinSide side : PIN_SIDES) {
         if (name == GetPinSideName(side)) {
             return side;
         }

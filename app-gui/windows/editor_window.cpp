@@ -111,6 +111,8 @@ constexpr auto SUPPLY_PARTS =
     std::to_array({Core::ComponentType::GROUND, Core::ComponentType::VCC, Core::ComponentType::NET_LABEL,
                    Core::ComponentType::PIN, Core::ComponentType::LOGIC_INPUT});
 
+// The edge choice of a block pin, this many font sizes wide
+constexpr float PIN_SIDE_FIELD_WIDTH = 6.0f;
 // Toolbar buttons are square, this many frame heights wide; icons fill this share of them
 constexpr float TOOL_BUTTON_SCALE = 1.4f;
 constexpr float ICON_SCALE = 0.7f;
@@ -1731,10 +1733,22 @@ void EditorWindow::DrawSubcircuitPinRows(const bool editing) {
         ImGui::SetNextItemWidth(ImGui::GetFontSize() * 8.0f);
         ImGui::InputText("##pin", &m_SubcircuitPins[index].Name);
         ImGui::SameLine();
-        // The edge the pin goes on, from the way its marker points, so turning a marker shows where it lands
-        const auto &elements = editing ? m_SubcircuitContent->GetElements() : m_RootSchematic.GetElements();
-        const std::optional<Core::PinSide> side = FindMarkerSide(elements, m_SubcircuitPins[index].Point);
-        ImGui::TextDisabled("%-6s", side ? GetPinSideName(*side) : "?");
+        // The edge the pin goes on comes from the way its marker points; picking another turns the marker about its
+        // terminal, so its wires stay put
+        Schematic &markers = editing ? *m_SubcircuitContent : m_RootSchematic;
+        const GridPoint point = m_SubcircuitPins[index].Point;
+        const std::optional<Core::PinSide> side = FindMarkerSide(markers.GetElements(), point);
+        ImGui::SetNextItemWidth(ImGui::GetFontSize() * PIN_SIDE_FIELD_WIDTH);
+        ImGui::BeginDisabled(!side);
+        if (ImGui::BeginCombo("##side", side ? GetPinSideName(*side) : "?")) {
+            for (const Core::PinSide choice : PIN_SIDES) {
+                if (ImGui::Selectable(GetPinSideName(choice), side == choice)) {
+                    markers.SetPinMarkerSide(point, choice);
+                }
+            }
+            ImGui::EndCombo();
+        }
+        ImGui::EndDisabled();
         ImGui::SameLine();
         ImGui::BeginDisabled(index == 0);
         if (ImGui::Button("Up")) {
