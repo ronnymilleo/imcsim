@@ -109,7 +109,7 @@ constexpr auto PASSIVE_PARTS =
     std::to_array({Core::ComponentType::RESISTOR, Core::ComponentType::CAPACITOR, Core::ComponentType::INDUCTOR});
 constexpr auto SUPPLY_PARTS =
     std::to_array({Core::ComponentType::GROUND, Core::ComponentType::VCC, Core::ComponentType::NET_LABEL,
-                   Core::ComponentType::PIN, Core::ComponentType::POUT, Core::ComponentType::LOGIC_INPUT});
+                   Core::ComponentType::PIN, Core::ComponentType::LOGIC_INPUT});
 
 // Toolbar buttons are square, this many frame heights wide; icons fill this share of them
 constexpr float TOOL_BUTTON_SCALE = 1.4f;
@@ -1671,7 +1671,7 @@ bool EditorWindow::ApplySubcircuitPinNames() {
         const GridPoint point = element->GetTerminals().front();
         const auto pin = std::ranges::find(m_SubcircuitPins, point, &SavedSubcircuitPin::Point);
         if (pin == m_SubcircuitPins.end()) {
-            m_SubcircuitError = "Every PIN and POUT marker needs a block pin name";
+            m_SubcircuitError = "Every pin marker needs a block pin name";
             return false;
         }
         auto &marker = static_cast<Core::NetLabel &>(element->GetComponent());
@@ -1733,13 +1733,16 @@ void EditorWindow::DrawSubcircuitDialog() {
     ImGui::BeginDisabled(editing);
     ImGui::InputText("Name", &m_SubcircuitName);
     ImGui::EndDisabled();
-    ImGui::SeparatorText("Pins (outer to inner order)");
+    ImGui::SeparatorText("Pins, in terminal order, and their edge");
     for (std::size_t index = 0; index < m_SubcircuitPins.size(); ++index) {
         ImGui::PushID(static_cast<int>(index));
         ImGui::SetNextItemWidth(ImGui::GetFontSize() * 8.0f);
         ImGui::InputText("##pin", &m_SubcircuitPins[index].Name);
         ImGui::SameLine();
-        ImGui::TextDisabled("(%d, %d)", m_SubcircuitPins[index].Point.X, m_SubcircuitPins[index].Point.Y);
+        // The edge the pin goes on, from the way its marker points, so turning a marker shows where it lands
+        const auto &elements = editing ? m_SubcircuitContent->GetElements() : m_RootSchematic.GetElements();
+        const std::optional<Core::PinSide> side = FindMarkerSide(elements, m_SubcircuitPins[index].Point);
+        ImGui::TextDisabled("%-6s", side ? GetPinSideName(*side) : "?");
         ImGui::SameLine();
         ImGui::BeginDisabled(index == 0);
         if (ImGui::Button("Up")) {
@@ -1755,7 +1758,7 @@ void EditorWindow::DrawSubcircuitDialog() {
         ImGui::PopID();
     }
     if (m_SubcircuitPins.empty()) {
-        ImGui::TextDisabled("Place PIN and POUT markers to choose the block connections");
+        ImGui::TextDisabled("Place pin markers to choose the block connections");
     }
     ImGui::SeparatorText("Parameters");
     for (std::size_t index = 0; index < m_SubcircuitParameters.size(); ++index) {

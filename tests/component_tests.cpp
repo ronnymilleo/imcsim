@@ -256,20 +256,18 @@ TEST_CASE("A cloned net label keeps its net name", "[component]") {
 }
 
 TEST_CASE("Subcircuit pin markers retain their kind and name when cloned", "[component]") {
-    for (const Core::ComponentType type : {Core::ComponentType::PIN, Core::ComponentType::POUT}) {
-        Core::SubcircuitPinMarker marker(type);
-        marker.SetNet("OUTPUT");
-        CHECK(Core::IsSubcircuitPin(type));
-        CHECK_FALSE(marker.HasValue());
-        CHECK_FALSE(marker.IsValidValue(1.0));
-        CHECK(std::string_view(marker.GetNamePrefix()).empty());
-        CHECK(std::string_view(marker.GetUnit()).empty());
-        const auto clone = marker.Clone();
-        REQUIRE(clone);
-        CHECK(clone->GetType() == type);
-        CHECK(static_cast<const Core::SubcircuitPinMarker &>(*clone).GetNet() == "OUTPUT");
-        CHECK(Core::ParseComponentType(clone->GetTypeName()) == type);
-    }
+    Core::SubcircuitPinMarker marker;
+    marker.SetNet("OUTPUT");
+    CHECK(Core::IsSubcircuitPin(marker.GetType()));
+    CHECK_FALSE(marker.HasValue());
+    CHECK_FALSE(marker.IsValidValue(1.0));
+    CHECK(std::string_view(marker.GetNamePrefix()).empty());
+    CHECK(std::string_view(marker.GetUnit()).empty());
+    const auto clone = marker.Clone();
+    REQUIRE(clone);
+    CHECK(clone->GetType() == Core::ComponentType::PIN);
+    CHECK(static_cast<const Core::SubcircuitPinMarker &>(*clone).GetNet() == "OUTPUT");
+    CHECK(Core::ParseComponentType(clone->GetTypeName()) == Core::ComponentType::PIN);
     CHECK_FALSE(Core::IsSubcircuitPin(Core::ComponentType::NET_LABEL));
 }
 

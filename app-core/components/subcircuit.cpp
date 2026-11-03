@@ -67,20 +67,21 @@ void SubcircuitInstance::SetPins(std::vector<std::string> pins) {
 }
 
 /**
- * @brief   Tells whether a pin is an output of the block, drawn on its right.
+ * @brief   Returns the edge of the box a pin is drawn on.
  * @param[in] pin  Name of the pin.
- * @return  True for a pin marked as an output in the definition; false for inputs and unknown names.
+ * @return  The side its marker gave it in the definition; PinSide::LEFT for a pin with none and for unknown names.
  */
-bool SubcircuitInstance::IsOutputPin(const std::string_view pin) const {
-    return m_OutputPins.contains(pin);
+PinSide SubcircuitInstance::GetPinSide(const std::string_view pin) const {
+    const auto found = m_PinSides.find(pin);
+    return found != m_PinSides.end() ? found->second : PinSide::LEFT;
 }
 
 /**
- * @brief   Sets which pins are outputs of the block.
- * @param[in] pins  Names of the output pins; the other pins are inputs.
+ * @brief   Sets the edge of the box each pin is drawn on.
+ * @param[in] sides  Side by pin name; pins left out go on the left.
  */
-void SubcircuitInstance::SetOutputPins(std::set<std::string, std::less<>> pins) {
-    m_OutputPins = std::move(pins);
+void SubcircuitInstance::SetPinSides(std::map<std::string, PinSide, std::less<>> sides) {
+    m_PinSides = std::move(sides);
 }
 
 /**

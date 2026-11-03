@@ -52,30 +52,27 @@ CollectSubcircuitPinMarkers(const std::vector<std::unique_ptr<UIElement>> &eleme
     std::vector<Schematic::SubcircuitPinCandidate> candidates;
     std::set<std::string> names;
     std::set<int> nodes;
-    int inputs = 0;
-    int outputs = 0;
+    int unnamed = 0;
     for (std::size_t index = 0; index < elements.size(); ++index) {
         if (selected != nullptr && !selected->contains(index)) {
             continue;
         }
         const Core::Component &component = elements[index]->GetComponent();
-        const Core::ComponentType type = component.GetType();
-        if (!Core::IsSubcircuitPin(type)) {
+        if (!Core::IsSubcircuitPin(component.GetType())) {
             continue;
         }
         const GridPoint point = elements[index]->GetTerminals().front();
         const std::string &marker_name = static_cast<const Core::NetLabel &>(component).GetNet();
         std::string suggested = marker_name;
         if (suggested.empty()) {
-            suggested = std::format("{}{}", type == Core::ComponentType::PIN ? "IN" : "OUT",
-                                    type == Core::ComponentType::PIN ? ++inputs : ++outputs);
+            suggested = std::format("P{}", ++unnamed);
         }
         if (!Core::SubcircuitInstance::IsValidIdentifier(suggested) || !names.insert(suggested).second) {
             return std::unexpected("Subcircuit pin names must be unique identifiers");
         }
         const std::optional<int> node = connectivity.GetNode(point);
         if (node && !nodes.insert(*node).second) {
-            return std::unexpected("Place only one PIN or POUT marker on each subcircuit pin node");
+            return std::unexpected("Place only one pin marker on each subcircuit pin node");
         }
         candidates.push_back({point, std::move(suggested)});
     }
@@ -321,7 +318,7 @@ void Schematic::Replace(std::vector<std::unique_ptr<UIElement>> elements, std::v
 
 /**
  * @brief   Lists the markers of the selection that would become the pins of a block made from it.
- * @return  The selected PIN and POUT markers, in the order of the elements; the reason a block cannot be made
+ * @return  The selected pin markers, in the order of the elements; the reason a block cannot be made
  * otherwise: nothing selected, a block in the selection (blocks do not nest), no marker, or markers that repeat a name
  * or share a node.
  */
@@ -337,13 +334,13 @@ Schematic::GetSubcircuitPinCandidates() const {
     }
     auto candidates = CollectSubcircuitPinMarkers(m_Elements, m_Wires, &m_SelectedElements);
     if (candidates && candidates->empty()) {
-        return std::unexpected("Select PIN and POUT markers with the circuit to choose the block connections");
+        return std::unexpected("Select pin markers with the circuit to choose the block connections");
     }
     return candidates;
 }
 
 /**
- * @brief   Lists every PIN and POUT marker, as the contents of a block being edited have them.
+ * @brief   Lists every pin marker, as the contents of a block being edited have them.
  * @return  The markers, in the order of the elements; the reason they cannot be pins when names repeat or markers share
  *          a node.
  */
@@ -379,11 +376,11 @@ Schematic::CreateSubcircuitFromSelection(std::string name, std::vector<SavedSubc
     for (const SavedSubcircuitPin &pin : pins) {
         if (!std::ranges::contains(*candidates, pin.Point, &SubcircuitPinCandidate::Point) ||
             !pin_points.insert(pin.Point).second) {
-            return std::unexpected("Choose one name for every PIN and POUT marker");
+            return std::unexpected("Choose one name for every pin marker");
         }
     }
     if (pins.size() != candidates->size()) {
-        return std::unexpected("Choose one name for every PIN and POUT marker");
+        return std::unexpected("Choose one name for every pin marker");
     }
     if (auto valid = ValidateMetadata(pins, parameters); !valid) {
         return std::unexpected(valid.error());

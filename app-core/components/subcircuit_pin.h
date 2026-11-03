@@ -12,13 +12,13 @@ namespace Core {
 
 /**
  * @class   SubcircuitPinMarker
- * @brief   A PIN or POUT marker that makes the node it sits on a connection of the block it belongs to.
- * @details It is named like a net label, but only joins the block to the outside: the netlist never sees it. A PIN is
- *          drawn on the left of the block and a POUT on the right.
+ * @brief   A pin marker that makes the node it sits on a connection of the block it belongs to.
+ * @details It is named like a net label, but only joins the block to the outside: the netlist never sees it. Which edge
+ *          of the block the pin goes on is the drawing's business, decided by the way the marker points.
  */
 class SubcircuitPinMarker : public NetLabel {
 public:
-    explicit SubcircuitPinMarker(ComponentType type);
+    SubcircuitPinMarker();
     ~SubcircuitPinMarker() override = default;
 
     std::unique_ptr<Component> Clone() const override;

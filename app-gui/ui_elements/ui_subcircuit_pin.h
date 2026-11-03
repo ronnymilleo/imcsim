@@ -1,6 +1,6 @@
 /**
  * @file    ui_subcircuit_pin.h
- * @brief   Schematic symbols of explicit subcircuit input and output markers.
+ * @brief   Schematic symbol of the pin markers that give a block its connections.
  */
 
 #ifndef IMCSIM_UI_SUBCIRCUIT_PIN_H
@@ -12,12 +12,14 @@ namespace GUI {
 
 /**
  * @class   UISubcircuitPin
- * @brief   A small square on a short lead, with the pin name above it: an arrow pointing into the square marks a PIN
- *          and an arrow leaving it marks a POUT.
+ * @brief   A square with an arrow inside, on a short lead, with the pin name beyond the square.
+ * @details The square stands for the edge of the block and the arrow points from it into the circuit, toward the lead
+ *          and the terminal. The pin goes on the edge the arrow comes from: an arrow pointing right puts it on the left
+ *          of the block's box, one pointing down on its top.
  */
 class UISubcircuitPin : public UIElement {
 public:
-    UISubcircuitPin(Core::ComponentType type, GridPoint position, Rotation rotation);
+    UISubcircuitPin(GridPoint position, Rotation rotation);
     ~UISubcircuitPin() override = default;
 
 protected:

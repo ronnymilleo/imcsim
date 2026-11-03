@@ -9,9 +9,8 @@ namespace Core {
 
 /**
  * @brief   Creates an unnamed marker.
- * @param[in] type  ComponentType::PIN for an input or ComponentType::POUT for an output.
  */
-SubcircuitPinMarker::SubcircuitPinMarker(const ComponentType type) : NetLabel(type) {
+SubcircuitPinMarker::SubcircuitPinMarker() : NetLabel(ComponentType::PIN) {
 }
 
 /**

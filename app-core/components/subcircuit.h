@@ -8,7 +8,6 @@
 
 #include "component.h"
 #include <map>
-#include <set>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -16,10 +15,21 @@
 namespace Core {
 
 /**
+ * @enum    PinSide
+ * @brief   The edge of a block's box a pin is drawn on.
+ */
+enum class PinSide {
+    LEFT,
+    RIGHT,
+    TOP,
+    BOTTOM
+};
+
+/**
  * @class   SubcircuitInstance
  * @brief   One use of a subcircuit definition, written as an X line that names the definition.
  * @details The pins are the names of the definition's pins, in its order, which is the order of the terminals and of
- *          the nodes on the X line. The output pins only decide the side a pin is drawn on. Parameters hold the values
+ *          the nodes on the X line. The side of each pin only decides where it is drawn. Parameters hold the values
  *          this instance overrides; the others keep the definition's defaults.
  */
 class SubcircuitInstance : public Component {
@@ -35,8 +45,8 @@ public:
     void SetDefinitionName(std::string name);
     const std::vector<std::string> &GetPins() const;
     void SetPins(std::vector<std::string> pins);
-    bool IsOutputPin(std::string_view pin) const;
-    void SetOutputPins(std::set<std::string, std::less<>> pins);
+    PinSide GetPinSide(std::string_view pin) const;
+    void SetPinSides(std::map<std::string, PinSide, std::less<>> sides);
 
     // Parameter overrides
     const std::map<std::string, double, std::less<>> &GetParameters() const;
@@ -51,7 +61,7 @@ public:
 private:
     std::string m_DefinitionName;
     std::vector<std::string> m_Pins;
-    std::set<std::string, std::less<>> m_OutputPins;
+    std::map<std::string, PinSide, std::less<>> m_PinSides;
     std::map<std::string, double, std::less<>> m_Parameters;
 };
 

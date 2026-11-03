@@ -1,10 +1,11 @@
 /**
  * @file    subcircuit_pins.cpp
- * @brief   Checks the pins of a block definition and hands them to its instances.
+ * @brief   Checks the pins of a block definition, tells the edge each one goes on and hands them to its instances.
  */
 
 #include "subcircuit_pins.h"
 
+#include <map>
 #include <set>
 #include <utility>
 
@@ -14,16 +15,6 @@ namespace {
 
 // Ground is node 0 when the block has a ground, through a Ground part or a label named 0 or GND
 constexpr int GROUND_NODE = 0;
-
-bool IsOutputMarkerAt(const SavedSubcircuit &definition, const GridPoint point) {
-    for (const auto &element : definition.Elements) {
-        if (element->GetComponent().GetType() == Core::ComponentType::POUT &&
-            element->GetTerminals().front() == point) {
-            return true;
-        }
-    }
-    return false;
-}
 
 } // namespace
 
@@ -48,29 +39,80 @@ std::optional<std::string> CheckPinNodes(const Connectivity &connectivity,
                    " is on the ground of the block, which every part shares already; remove the pin or the ground";
         }
         if (!nodes.insert(*node).second) {
-            return "Pin " + pin.Name + " shares a node with another pin; place only one PIN or POUT on each node";
+            return "Pin " + pin.Name + " shares a node with another pin; place only one pin marker on each node";
         }
     }
     return std::nullopt;
 }
 
 /**
- * @brief   Gives an instance the pins of its definition: their names in order and which of them are outputs.
+ * @brief   Tells the edge of the block a pin marker puts its pin on.
+ * @param[in] marker  A pin marker, as placed in the block.
+ * @return  The edge its arrow comes from, since the arrow points from the block's edge into the circuit: the left for
+ * an arrow pointing right, the top for one pointing down.
+ */
+Core::PinSide GetMarkerSide(const UIElement &marker) {
+    // The terminal is at the tip of the arrow, so inward from it runs back toward the edge
+    const GridPoint inward = marker.GetTerminalInward(0);
+    if (inward.X < 0) {
+        return Core::PinSide::LEFT;
+    }
+    if (inward.X > 0) {
+        return Core::PinSide::RIGHT;
+    }
+    return inward.Y < 0 ? Core::PinSide::TOP : Core::PinSide::BOTTOM;
+}
+
+/**
+ * @brief   Finds the edge the pin marker on a point puts its pin on.
+ * @param[in] elements  Contents of a block.
+ * @param[in] point     Point of a pin.
+ * @return  The side of the marker whose terminal is on the point, or no value when none is.
+ */
+std::optional<Core::PinSide> FindMarkerSide(const std::vector<std::unique_ptr<UIElement>> &elements,
+                                            const GridPoint point) {
+    for (const auto &element : elements) {
+        if (Core::IsSubcircuitPin(element->GetComponent().GetType()) && element->GetTerminals().front() == point) {
+            return GetMarkerSide(*element);
+        }
+    }
+    return std::nullopt;
+}
+
+/**
+ * @brief   Returns a readable name for an edge of a block.
+ * @param[in] side  Edge of the box.
+ * @return  "left", "right", "top" or "bottom".
+ */
+const char *GetPinSideName(const Core::PinSide side) {
+    switch (side) {
+    case Core::PinSide::RIGHT:
+        return "right";
+    case Core::PinSide::TOP:
+        return "top";
+    case Core::PinSide::BOTTOM:
+        return "bottom";
+    case Core::PinSide::LEFT:
+    default:
+        return "left";
+    }
+}
+
+/**
+ * @brief   Gives an instance the pins of its definition: their names in order and the edge each one goes on.
  * @param[in,out] instance    Instance to set, which takes the name of the definition too.
- * @param[in]     definition  Definition it uses; a pin is an output when a POUT marker sits on its point.
+ * @param[in]     definition  Definition it uses; each pin takes the side of the marker on its point, or the left.
  */
 void ApplyDefinitionPins(Core::SubcircuitInstance &instance, const SavedSubcircuit &definition) {
     std::vector<std::string> names;
-    std::set<std::string, std::less<>> outputs;
+    std::map<std::string, Core::PinSide, std::less<>> sides;
     for (const SavedSubcircuitPin &pin : definition.Pins) {
         names.push_back(pin.Name);
-        if (IsOutputMarkerAt(definition, pin.Point)) {
-            outputs.insert(pin.Name);
-        }
+        sides[pin.Name] = FindMarkerSide(definition.Elements, pin.Point).value_or(Core::PinSide::LEFT);
     }
     instance.SetDefinitionName(definition.Name);
     instance.SetPins(std::move(names));
-    instance.SetOutputPins(std::move(outputs));
+    instance.SetPinSides(std::move(sides));
 }
 
 } // namespace GUI

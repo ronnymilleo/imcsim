@@ -12,8 +12,9 @@ namespace GUI {
 
 /**
  * @class   UISubcircuit
- * @brief   A box with the name of the block below it, its inputs on the left and its outputs on the right.
- * @details The box grows with the side that has more pins. Each pin is labelled inside the box.
+ * @brief   A box with the instance name above it, the name of the block below it and a lead per pin.
+ * @details Each pin goes on the edge its marker in the block gave it, and is labelled inside the box. The box grows to
+ *          fit the fuller of the left and right edges in height, and of the top and bottom ones in width.
  */
 class UISubcircuit : public UIElement {
 public:

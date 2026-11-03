@@ -57,18 +57,18 @@ TEST_CASE("A net label has a single terminal at its position and leads upward be
     CHECK(turned.Contains({5.8f, 5.0f}));
 }
 
-TEST_CASE("Subcircuit pin markers have one terminal and a pickable directional body", "[ui_element]") {
-    for (const Core::ComponentType type : {Core::ComponentType::PIN, Core::ComponentType::POUT}) {
-        const GUI::UISubcircuitPin marker(type, {5, 5}, GUI::Rotation::R0);
-        CHECK(marker.GetComponent().GetType() == type);
-        CHECK(marker.GetTerminals() == std::vector<GUI::GridPoint>{{5, 5}});
-        CHECK(marker.GetTerminalInward(0) == GUI::GridPoint{0, -1});
-        CHECK(marker.Contains({5.0f, 4.2f}));
-        CHECK_FALSE(marker.Contains({5.0f, 6.0f}));
-    }
+TEST_CASE("A pin marker has one terminal at the tip of its arrow and the square behind it", "[ui_element]") {
+    const GUI::UISubcircuitPin marker({5, 5}, GUI::Rotation::R0);
+    CHECK(marker.GetComponent().GetType() == Core::ComponentType::PIN);
+    CHECK(marker.GetTerminals() == std::vector<GUI::GridPoint>{{5, 5}});
+    // Unturned, the arrow points right, so the square lies to the left of the terminal
+    CHECK(marker.GetTerminalInward(0) == GUI::GridPoint{-1, 0});
+    CHECK(marker.Contains({4.0f, 5.0f}));
+    CHECK_FALSE(marker.Contains({6.0f, 5.0f}));
 
-    const GUI::UISubcircuitPin turned(Core::ComponentType::PIN, {5, 5}, GUI::Rotation::R90);
-    CHECK(turned.Contains({5.8f, 5.0f}));
+    const GUI::UISubcircuitPin turned({5, 5}, GUI::Rotation::R90);
+    CHECK(turned.GetTerminalInward(0) == GUI::GridPoint{0, -1});
+    CHECK(turned.Contains({5.0f, 4.0f}));
 }
 
 TEST_CASE("Elements own a component of their type", "[ui_element]") {

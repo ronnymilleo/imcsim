@@ -39,7 +39,6 @@ constexpr auto ALL_TYPES = std::to_array<ComponentType>({
     ComponentType::SUBCIRCUIT,
     ComponentType::NET_LABEL,
     ComponentType::PIN,
-    ComponentType::POUT,
     ComponentType::POTENTIOMETER,
     ComponentType::SWITCH,
     ComponentType::PUSH_BUTTON,
@@ -159,7 +158,6 @@ const char *Component::GetNamePrefix() const {
     case ComponentType::GROUND:
     case ComponentType::NET_LABEL:
     case ComponentType::PIN:
-    case ComponentType::POUT:
         return "";
     }
     return "";
@@ -212,7 +210,6 @@ const char *Component::GetUnit() const {
     case ComponentType::GROUND:
     case ComponentType::NET_LABEL:
     case ComponentType::PIN:
-    case ComponentType::POUT:
     case ComponentType::SWITCH:
     case ComponentType::PUSH_BUTTON:
     case ComponentType::V_SWITCH:
@@ -239,7 +236,6 @@ bool Component::HasValue() const {
     case ComponentType::GROUND:
     case ComponentType::NET_LABEL:
     case ComponentType::PIN:
-    case ComponentType::POUT:
     case ComponentType::SWITCH:
     case ComponentType::PUSH_BUTTON:
     case ComponentType::V_SWITCH:
@@ -310,7 +306,6 @@ bool Component::IsValidValue(const double value) const {
     case ComponentType::GROUND:
     case ComponentType::NET_LABEL:
     case ComponentType::PIN:
-    case ComponentType::POUT:
     case ComponentType::SWITCH:
     case ComponentType::PUSH_BUTTON:
     case ComponentType::V_SWITCH:
@@ -458,12 +453,12 @@ void Component::ClearInitialCondition() {
 }
 
 /**
- * @brief   Tells whether a kind of part is a PIN or POUT marker of a subcircuit.
+ * @brief   Tells whether a kind of part is the pin marker of a subcircuit.
  * @param[in] type  Kind of part.
- * @return  True for ComponentType::PIN and ComponentType::POUT.
+ * @return  True for ComponentType::PIN.
  */
 bool IsSubcircuitPin(const ComponentType type) {
-    return type == ComponentType::PIN || type == ComponentType::POUT;
+    return type == ComponentType::PIN;
 }
 
 /**
@@ -517,8 +512,6 @@ const char *GetTypeName(const ComponentType type) {
         return "NetLabel";
     case ComponentType::PIN:
         return "Pin";
-    case ComponentType::POUT:
-        return "Pout";
     case ComponentType::POTENTIOMETER:
         return "Potentiometer";
     case ComponentType::SWITCH:

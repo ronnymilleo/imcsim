@@ -38,7 +38,7 @@ struct SavedMeasurements {
 
 /**
  * @struct  SavedSubcircuitPin
- * @brief   A connection of a block: its name and the point of its PIN or POUT marker inside the block.
+ * @brief   A connection of a block: its name and the point of its pin marker inside the block.
  */
 struct SavedSubcircuitPin {
     std::string Name;

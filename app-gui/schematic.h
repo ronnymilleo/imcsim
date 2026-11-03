@@ -51,8 +51,8 @@ class Schematic {
 public:
     /**
      * @struct  SubcircuitPinCandidate
-     * @brief   A PIN or POUT marker that can become a pin of a block: where it sits and the name it suggests.
-     * @details The name is the marker's own, or IN1, OUT1... for an unnamed marker.
+     * @brief   A pin marker that can become a pin of a block: where it sits and the name it suggests.
+     * @details The name is the marker's own, or P1, P2... for an unnamed marker.
      */
     struct SubcircuitPinCandidate {
         GridPoint Point;

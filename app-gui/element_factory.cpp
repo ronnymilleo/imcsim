@@ -66,8 +66,7 @@ constexpr auto PARTS = std::to_array<PartInfo>({
     {Core::ComponentType::CCVS, "CCVS (H)"},
     {Core::ComponentType::OP_AMP, "Op-amp"},
     {Core::ComponentType::NET_LABEL, "Net label"},
-    {Core::ComponentType::PIN, "Subcircuit input (PIN)"},
-    {Core::ComponentType::POUT, "Subcircuit output (POUT)"},
+    {Core::ComponentType::PIN, "Block pin"},
     {Core::ComponentType::POTENTIOMETER, "Potentiometer"},
     {Core::ComponentType::SWITCH, "Switch"},
     {Core::ComponentType::PUSH_BUTTON, "Push button"},
@@ -149,8 +148,7 @@ std::unique_ptr<UIElement> CreateElement(const Core::ComponentType type, const G
     case Core::ComponentType::NET_LABEL:
         return std::make_unique<UINetLabel>(position, rotation);
     case Core::ComponentType::PIN:
-    case Core::ComponentType::POUT:
-        return std::make_unique<UISubcircuitPin>(type, position, rotation);
+        return std::make_unique<UISubcircuitPin>(position, rotation);
     case Core::ComponentType::POTENTIOMETER:
         return std::make_unique<UIPotentiometer>(position, rotation);
     case Core::ComponentType::SWITCH:

@@ -232,9 +232,10 @@ TEST_CASE("The simulator never sees a net label", "[connectivity]") {
 
 TEST_CASE("Subcircuit pin markers neither join nets nor reach the simulator", "[connectivity]") {
     Schematic schematic;
-    for (const auto &[type, point, name] : {std::tuple{Core::ComponentType::PIN, GUI::GridPoint{0, 0}, "IN"},
-                                            std::tuple{Core::ComponentType::POUT, GUI::GridPoint{10, 0}, "IN"}}) {
-        schematic.Elements.push_back(std::make_unique<GUI::UISubcircuitPin>(type, point, GUI::Rotation::R0));
+    for (const GUI::GridPoint point : {GUI::GridPoint{0, 0}, GUI::GridPoint{10, 0}}) {
+        // Two markers of one name stay two nets, unlike two net labels
+        const std::string name = "IN";
+        schematic.Elements.push_back(std::make_unique<GUI::UISubcircuitPin>(point, GUI::Rotation::R0));
         static_cast<Core::NetLabel &>(schematic.Elements.back()->GetComponent()).SetNet(name);
     }
 

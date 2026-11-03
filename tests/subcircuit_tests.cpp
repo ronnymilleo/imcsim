@@ -16,12 +16,14 @@
 #include "schematic_file.h"
 #include "simulator.h"
 #include "subcircuit.h"
+#include "subcircuit_pins.h"
 #include <algorithm>
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 #include <memory>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace {
@@ -48,9 +50,10 @@ Core::SubcircuitInstance MakeInstance(const std::string &name, const std::string
     return instance;
 }
 
-void AddMarker(GUI::Schematic &schematic, const Core::ComponentType type, const GUI::GridPoint point,
-               const std::string &name) {
-    schematic.AddElement(GUI::CreateElement(type, point, GUI::Rotation::R0));
+// A pin marker; unturned, its arrow points right, which puts the pin on the left of the block
+void AddMarker(GUI::Schematic &schematic, const GUI::GridPoint point, const std::string &name,
+               const GUI::Rotation rotation = GUI::Rotation::R0) {
+    schematic.AddElement(GUI::CreateElement(Core::ComponentType::PIN, point, rotation));
     static_cast<Core::NetLabel &>(schematic.GetElements().back()->GetComponent()).SetNet(name);
 }
 
@@ -270,8 +273,8 @@ TEST_CASE("A selection becomes a reusable block and its creation is undoable", "
     schematic.AddElement(GUI::CreateElement(Core::ComponentType::RESISTOR, {0, 0}, GUI::Rotation::R0));
     schematic.AddElement(GUI::CreateElement(Core::ComponentType::RESISTOR, {8, 0}, GUI::Rotation::R0));
     schematic.AddElement(GUI::CreateElement(Core::ComponentType::RESISTOR, {-8, 0}, GUI::Rotation::R0));
-    AddMarker(schematic, Core::ComponentType::PIN, {-2, 0}, "IN");
-    AddMarker(schematic, Core::ComponentType::POUT, {2, 0}, "OUT");
+    AddMarker(schematic, {-2, 0}, "IN");
+    AddMarker(schematic, {2, 0}, "OUT", GUI::Rotation::R180);
     schematic.AddWire({2, 0}, {6, 0});
     schematic.AddWire({-6, 0}, {-2, 0});
     schematic.SetSelection({0, 3, 4}, {0, 1});
@@ -308,14 +311,14 @@ TEST_CASE("A selection becomes a reusable block and its creation is undoable", "
     CHECK(schematic.GetElement(2).GetComponent().GetType() == Core::ComponentType::SUBCIRCUIT);
 }
 
-TEST_CASE("Only selected PIN and POUT markers become block connections", "[subcircuit]") {
+TEST_CASE("Only selected pin markers become block connections", "[subcircuit]") {
     GUI::Schematic schematic;
     schematic.AddElement(GUI::CreateElement(Core::ComponentType::RESISTOR, {0, 0}, GUI::Rotation::R0));
     schematic.AddElement(GUI::CreateElement(Core::ComponentType::RESISTOR, {8, 0}, GUI::Rotation::R0));
     schematic.AddElement(GUI::CreateElement(Core::ComponentType::RESISTOR, {-8, 0}, GUI::Rotation::R0));
     schematic.AddElement(GUI::CreateElement(Core::ComponentType::RESISTOR, {0, 8}, GUI::Rotation::R90));
-    AddMarker(schematic, Core::ComponentType::PIN, {-2, 0}, "");
-    AddMarker(schematic, Core::ComponentType::POUT, {2, 0}, "");
+    AddMarker(schematic, {-2, 0}, "");
+    AddMarker(schematic, {2, 0}, "", GUI::Rotation::R180);
     schematic.AddWire({2, 0}, {6, 0});
     schematic.AddWire({-6, 0}, {-2, 0});
     schematic.AddWire({0, 2}, {0, 6});
@@ -324,8 +327,8 @@ TEST_CASE("Only selected PIN and POUT markers become block connections", "[subci
     auto candidates = schematic.GetSubcircuitPinCandidates();
     REQUIRE(candidates);
     REQUIRE(candidates->size() == 2);
-    CHECK((*candidates)[0].SuggestedName == "IN1");
-    CHECK((*candidates)[1].SuggestedName == "OUT1");
+    CHECK((*candidates)[0].SuggestedName == "P1");
+    CHECK((*candidates)[1].SuggestedName == "P2");
     REQUIRE(schematic.CreateSubcircuitFromSelection("amplifier", {{"IN", {-2, 0}}, {"OUT", {2, 0}}}));
     CHECK(schematic.GetSubcircuits()[0].Pins.size() == 2);
     CHECK(static_cast<const Core::SubcircuitInstance &>(schematic.GetElements().back()->GetComponent()).GetPins() ==
@@ -338,11 +341,11 @@ TEST_CASE("Block creation requires unique markers on separate nodes", "[subcircu
     schematic.SetSelection({0}, {});
     auto unmarked = schematic.GetSubcircuitPinCandidates();
     REQUIRE_FALSE(unmarked);
-    CHECK(unmarked.error().contains("PIN and POUT"));
+    CHECK(unmarked.error().contains("pin markers"));
     CHECK_FALSE(schematic.CreateSubcircuitFromSelection("block", {}));
 
-    AddMarker(schematic, Core::ComponentType::PIN, {-2, 0}, "IN");
-    AddMarker(schematic, Core::ComponentType::POUT, {2, 0}, "IN");
+    AddMarker(schematic, {-2, 0}, "IN");
+    AddMarker(schematic, {2, 0}, "IN", GUI::Rotation::R180);
     schematic.SetSelection({0, 1, 2}, {});
     auto repeated = schematic.GetSubcircuitPinCandidates();
     REQUIRE_FALSE(repeated);
@@ -352,7 +355,7 @@ TEST_CASE("Block creation requires unique markers on separate nodes", "[subcircu
     schematic.AddWire({-2, 0}, {2, 0});
     auto same_node = schematic.GetSubcircuitPinCandidates();
     REQUIRE_FALSE(same_node);
-    CHECK((same_node.error().contains("same") || same_node.error().contains("one PIN")));
+    CHECK(same_node.error().contains("one pin marker"));
 }
 
 TEST_CASE("Editing a definition propagates pins, parameters and contents to every instance", "[subcircuit]") {
@@ -360,8 +363,8 @@ TEST_CASE("Editing a definition propagates pins, parameters and contents to ever
     schematic.AddElement(GUI::CreateElement(Core::ComponentType::RESISTOR, {0, 0}, GUI::Rotation::R0));
     schematic.AddElement(GUI::CreateElement(Core::ComponentType::RESISTOR, {8, 0}, GUI::Rotation::R0));
     schematic.AddElement(GUI::CreateElement(Core::ComponentType::RESISTOR, {-8, 0}, GUI::Rotation::R0));
-    AddMarker(schematic, Core::ComponentType::PIN, {-2, 0}, "IN");
-    AddMarker(schematic, Core::ComponentType::POUT, {2, 0}, "OUT");
+    AddMarker(schematic, {-2, 0}, "IN");
+    AddMarker(schematic, {2, 0}, "OUT", GUI::Rotation::R180);
     schematic.AddWire({2, 0}, {6, 0});
     schematic.AddWire({-6, 0}, {-2, 0});
     schematic.SetSelection({0, 3, 4}, {});
@@ -453,8 +456,8 @@ TEST_CASE("A pin on the ground inside a block is refused, since it would connect
     GUI::Schematic schematic;
     schematic.AddElement(GUI::CreateElement(Core::ComponentType::RESISTOR, {0, 0}, GUI::Rotation::R0));
     schematic.AddElement(GUI::CreateElement(Core::ComponentType::GROUND, {2, 0}, GUI::Rotation::R0));
-    AddMarker(schematic, Core::ComponentType::PIN, {-2, 0}, "IN");
-    AddMarker(schematic, Core::ComponentType::POUT, {2, 0}, "GND");
+    AddMarker(schematic, {-2, 0}, "IN");
+    AddMarker(schematic, {2, 0}, "GND", GUI::Rotation::R180);
     schematic.SetSelection({0, 1, 2, 3}, {});
     const auto created = schematic.CreateSubcircuitFromSelection("grounded", {{"IN", {-2, 0}}, {"GND", {2, 0}}});
     REQUIRE_FALSE(created);
@@ -479,8 +482,8 @@ TEST_CASE("A pin on the ground inside a block is refused, since it would connect
 TEST_CASE("Reordering the pins of a new block keeps each name on its own marker", "[subcircuit]") {
     GUI::Schematic schematic;
     schematic.AddElement(GUI::CreateElement(Core::ComponentType::RESISTOR, {0, 0}, GUI::Rotation::R0));
-    AddMarker(schematic, Core::ComponentType::PIN, {-2, 0}, "IN");
-    AddMarker(schematic, Core::ComponentType::POUT, {2, 0}, "OUT");
+    AddMarker(schematic, {-2, 0}, "IN");
+    AddMarker(schematic, {2, 0}, "OUT", GUI::Rotation::R180);
     schematic.SetSelection({0, 1, 2}, {});
     // The output first, as the dialog's Up button leaves them
     REQUIRE(schematic.CreateSubcircuitFromSelection("block", {{"OUT", {2, 0}}, {"IN", {-2, 0}}}));
@@ -494,31 +497,67 @@ TEST_CASE("Reordering the pins of a new block keeps each name on its own marker"
             continue;
         }
         const std::string &net = static_cast<const Core::NetLabel &>(element->GetComponent()).GetNet();
-        CHECK(net == (element->GetComponent().GetType() == Core::ComponentType::POUT ? "OUT" : "IN"));
+        CHECK(net == (element->GetTerminals().front() == GUI::GridPoint{2, 0} ? "OUT" : "IN"));
     }
     // The output is the first terminal, and still on the right of the box
     const GUI::UIElement &block = *schematic.GetElements().back();
     const auto &instance = static_cast<const Core::SubcircuitInstance &>(block.GetComponent());
     CHECK(instance.GetPins() == std::vector<std::string>{"OUT", "IN"});
-    CHECK(instance.IsOutputPin("OUT"));
-    CHECK_FALSE(instance.IsOutputPin("IN"));
+    CHECK(instance.GetPinSide("OUT") == Core::PinSide::RIGHT);
+    CHECK(instance.GetPinSide("IN") == Core::PinSide::LEFT);
     const std::vector<GUI::GridPoint> terminals = block.GetTerminals();
     REQUIRE(terminals.size() == 2);
     CHECK(terminals[0].X > block.GetPosition().X);
     CHECK(terminals[1].X < block.GetPosition().X);
 }
 
-TEST_CASE("A block draws its inputs on the left and its outputs on the right, whatever their order", "[subcircuit]") {
+TEST_CASE("A block puts each pin on the edge its marker gave it, centered along that edge", "[subcircuit]") {
     auto element = GUI::CreateElement(Core::ComponentType::SUBCIRCUIT, {0, 0}, GUI::Rotation::R0);
     auto &instance = static_cast<Core::SubcircuitInstance &>(element->GetComponent());
-    instance.SetPins({"Q", "A", "B"});
-    instance.SetOutputPins({"Q"});
+    instance.SetPins({"Q", "A", "VP", "B", "VN"});
+    instance.SetPinSides({{"Q", Core::PinSide::RIGHT},
+                          {"A", Core::PinSide::LEFT},
+                          {"VP", Core::PinSide::TOP},
+                          {"B", Core::PinSide::LEFT},
+                          {"VN", Core::PinSide::BOTTOM}});
     const std::vector<GUI::GridPoint> terminals = element->GetTerminals();
-    REQUIRE(terminals.size() == 3);
-    // One output, centered on the right; two inputs, two units apart, on the left
-    CHECK(terminals[0] == GUI::GridPoint{3, 0});
-    CHECK(terminals[1] == GUI::GridPoint{-3, -1});
-    CHECK(terminals[2] == GUI::GridPoint{-3, 1});
+    // Two pins on the left make the box two units tall each way, plus one for the names of the pins on top and below,
+    // which keep it two wide
+    CHECK(terminals == std::vector<GUI::GridPoint>{{3, 0}, {-3, -1}, {0, -4}, {-3, 1}, {0, 4}});
+
+    // Four pins on top widen the box, and stay two units apart
+    instance.SetPins({"A", "B", "C", "D"});
+    instance.SetPinSides(
+        {{"A", Core::PinSide::TOP}, {"B", Core::PinSide::TOP}, {"C", Core::PinSide::TOP}, {"D", Core::PinSide::TOP}});
+    CHECK(element->GetTerminals() == std::vector<GUI::GridPoint>{{-3, -2}, {-1, -2}, {1, -2}, {3, -2}});
+}
+
+TEST_CASE("A pin goes on the edge its marker's arrow comes from", "[subcircuit]") {
+    // The arrow points from the block's edge into the circuit
+    const auto side_of = [](const GUI::Rotation rotation, const bool is_mirrored) {
+        auto marker = GUI::CreateElement(Core::ComponentType::PIN, {0, 0}, rotation);
+        marker->SetMirrored(is_mirrored);
+        return GUI::GetMarkerSide(*marker);
+    };
+    CHECK(side_of(GUI::Rotation::R0, false) == Core::PinSide::LEFT);
+    CHECK(side_of(GUI::Rotation::R180, false) == Core::PinSide::RIGHT);
+    CHECK(side_of(GUI::Rotation::R90, false) == Core::PinSide::TOP);
+    CHECK(side_of(GUI::Rotation::R270, false) == Core::PinSide::BOTTOM);
+    CHECK(side_of(GUI::Rotation::R0, true) == Core::PinSide::RIGHT);
+
+    GUI::SavedSubcircuit definition;
+    definition.Name = "amplifier";
+    definition.Pins = {{"VP", {0, -4}}, {"IN", {-4, 0}}};
+    definition.Elements.push_back(GUI::CreateElement(Core::ComponentType::PIN, {0, -4}, GUI::Rotation::R90));
+    definition.Elements.push_back(GUI::CreateElement(Core::ComponentType::PIN, {-4, 0}, GUI::Rotation::R0));
+    Core::SubcircuitInstance instance;
+    GUI::ApplyDefinitionPins(instance, definition);
+    CHECK(instance.GetDefinitionName() == "amplifier");
+    CHECK(instance.GetPins() == std::vector<std::string>{"VP", "IN"});
+    CHECK(instance.GetPinSide("VP") == Core::PinSide::TOP);
+    CHECK(instance.GetPinSide("IN") == Core::PinSide::LEFT);
+    CHECK(GUI::FindMarkerSide(definition.Elements, {1, 1}) == std::nullopt);
+    CHECK(std::string_view(GUI::GetPinSideName(Core::PinSide::BOTTOM)) == "bottom");
 }
 
 TEST_CASE("Renaming a pin keeps the wires of every instance on it", "[subcircuit]") {
@@ -526,8 +565,8 @@ TEST_CASE("Renaming a pin keeps the wires of every instance on it", "[subcircuit
     schematic.AddElement(GUI::CreateElement(Core::ComponentType::RESISTOR, {0, 0}, GUI::Rotation::R0));
     schematic.AddElement(GUI::CreateElement(Core::ComponentType::RESISTOR, {8, 0}, GUI::Rotation::R0));
     schematic.AddElement(GUI::CreateElement(Core::ComponentType::RESISTOR, {-8, 0}, GUI::Rotation::R0));
-    AddMarker(schematic, Core::ComponentType::PIN, {-2, 0}, "IN");
-    AddMarker(schematic, Core::ComponentType::POUT, {2, 0}, "OUT");
+    AddMarker(schematic, {-2, 0}, "IN");
+    AddMarker(schematic, {2, 0}, "OUT", GUI::Rotation::R180);
     schematic.AddWire({2, 0}, {6, 0});
     schematic.AddWire({-6, 0}, {-2, 0});
     schematic.SetSelection({0, 3, 4}, {});
@@ -580,8 +619,8 @@ TEST_CASE("A part follows only a parameter of the block it is in", "[subcircuit]
     // The block editor cannot drop a parameter that a part still follows
     GUI::Schematic schematic;
     schematic.AddElement(GUI::CreateElement(Core::ComponentType::RESISTOR, {0, 0}, GUI::Rotation::R0));
-    AddMarker(schematic, Core::ComponentType::PIN, {-2, 0}, "IN");
-    AddMarker(schematic, Core::ComponentType::POUT, {2, 0}, "OUT");
+    AddMarker(schematic, {-2, 0}, "IN");
+    AddMarker(schematic, {2, 0}, "OUT", GUI::Rotation::R180);
     schematic.SetSelection({0, 1, 2}, {});
     REQUIRE(schematic.CreateSubcircuitFromSelection("block", {{"IN", {-2, 0}}, {"OUT", {2, 0}}}, {{"R", 1e3}}));
     auto content = schematic.OpenSubcircuit("block");

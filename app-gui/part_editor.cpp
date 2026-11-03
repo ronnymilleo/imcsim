@@ -588,7 +588,7 @@ void PartEditor::DrawNetLabel(Core::NetLabel &label) {
                            is_pin ? "Use a letter or _, then letters, digits or _"
                                   : "1 to 32 letters, digits, _, - or .");
     } else if (is_pin) {
-        ImGui::TextDisabled("Only marked nodes become block pins; input and output are visual roles");
+        ImGui::TextDisabled("The arrow points from the block's edge into the circuit; turn it to pick the edge");
     } else {
         ImGui::TextDisabled("Labels with the same name are one net; 0 and GND are ground, VCC is the supplies");
     }

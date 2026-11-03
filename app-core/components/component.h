@@ -41,7 +41,6 @@ enum class ComponentType {
     SUBCIRCUIT,
     NET_LABEL,
     PIN,
-    POUT,
     POTENTIOMETER,
     SWITCH,
     PUSH_BUTTON,

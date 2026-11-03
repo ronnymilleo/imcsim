@@ -621,7 +621,6 @@ std::string Circuit::ToSpiceNetlist(const std::string_view analysis, const bool 
         case ComponentType::GROUND:
         case ComponentType::NET_LABEL:
         case ComponentType::PIN:
-        case ComponentType::POUT:
             break;
         }
         netlist += probes;
