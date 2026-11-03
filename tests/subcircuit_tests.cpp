@@ -676,3 +676,46 @@ TEST_CASE("Only the blocks in use count toward ground and the parts a run needs"
     CHECK(parts.size() == 4);
     CHECK(std::ranges::contains(parts, &inner));
 }
+
+TEST_CASE("Picking another edge for a pin turns its marker in place, and the instances keep their wires",
+          "[subcircuit]") {
+    // Each edge has the rotation whose arrow comes from it
+    for (const Core::PinSide side : GUI::PIN_SIDES) {
+        const auto marker = GUI::CreateElement(Core::ComponentType::PIN, {0, 0}, GUI::GetSideRotation(side));
+        CHECK(GUI::GetMarkerSide(*marker) == side);
+    }
+
+    GUI::Schematic schematic;
+    schematic.AddElement(GUI::CreateElement(Core::ComponentType::RESISTOR, {0, 0}, GUI::Rotation::R0));
+    schematic.AddElement(GUI::CreateElement(Core::ComponentType::RESISTOR, {8, 0}, GUI::Rotation::R0));
+    schematic.AddElement(GUI::CreateElement(Core::ComponentType::RESISTOR, {-8, 0}, GUI::Rotation::R0));
+    AddMarker(schematic, {-2, 0}, "IN");
+    AddMarker(schematic, {2, 0}, "OUT", GUI::Rotation::R180);
+    schematic.AddWire({2, 0}, {6, 0});
+    schematic.AddWire({-6, 0}, {-2, 0});
+    schematic.SetSelection({0, 3, 4}, {});
+    REQUIRE(schematic.CreateSubcircuitFromSelection("block", {{"IN", {-2, 0}}, {"OUT", {2, 0}}}));
+    schematic.CommitUndoStep();
+
+    auto content = schematic.OpenSubcircuit("block");
+    REQUIRE(content);
+    const std::vector<GUI::UIWire> inner_wires = (*content)->GetWires();
+    // The input moves to the top of the block
+    CHECK((*content)->SetPinMarkerSide({-2, 0}, Core::PinSide::TOP));
+    CHECK_FALSE((*content)->SetPinMarkerSide({-2, 0}, Core::PinSide::TOP));
+    CHECK_FALSE((*content)->SetPinMarkerSide({5, 5}, Core::PinSide::TOP));
+    CHECK((*content)->IsModified());
+    CHECK(GUI::FindMarkerSide((*content)->GetElements(), {-2, 0}) == Core::PinSide::TOP);
+    // It turned about its terminal, so the wires inside are as they were
+    CHECK((*content)->GetWires() == inner_wires);
+
+    REQUIRE(schematic.UpdateSubcircuit("block", **content, {{"IN", {-2, 0}}, {"OUT", {2, 0}}}, {}));
+    const GUI::UIElement &block = schematic.GetElement(2);
+    CHECK(static_cast<const Core::SubcircuitInstance &>(block.GetComponent()).GetPinSide("IN") == Core::PinSide::TOP);
+    const std::vector<GUI::GridPoint> terminals = block.GetTerminals();
+    // The input terminal is above the box now, and the wire from the outside followed it
+    CHECK(terminals[0].Y < block.GetPosition().Y);
+    const GUI::Connectivity &nodes = schematic.GetConnectivity();
+    CHECK(nodes.GetNode({-6, 0}) == nodes.GetNode(terminals[0]));
+    CHECK(nodes.GetNode({6, 0}) == nodes.GetNode(terminals[1]));
+}

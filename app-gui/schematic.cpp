@@ -230,6 +230,14 @@ const std::vector<SavedSubcircuit> &Schematic::GetSubcircuits() const {
 }
 
 /**
+ * @brief   Returns the device models imported from libraries.
+ * @return  Every model, used by a part or not, in the order they were imported.
+ */
+const std::vector<Core::LibraryModel> &Schematic::GetLibraryModels() const {
+    return m_LibraryModels;
+}
+
+/**
  * @brief   Checks whether a grid point is the terminal of some element.
  * @param[in] point  Grid point to test.
  * @return  True when an element has a terminal there.
@@ -348,15 +356,19 @@ void Schematic::Clear() {
  * @brief   Replaces the whole content, for example with a schematic read from a file.
  * @param[in] elements  New elements, with names already set.
  * @param[in] wires     New wires.
- * @param[in] settings  New simulation settings.
+ * @param[in] settings     New simulation settings.
+ * @param[in] subcircuits  New block definitions.
+ * @param[in] models       New library models.
  * @note    The schematic becomes unmodified and the undo history starts over; the file path is kept.
  */
 void Schematic::Replace(std::vector<std::unique_ptr<UIElement>> elements, std::vector<UIWire> wires,
-                        SimulationSettings settings, std::vector<SavedSubcircuit> subcircuits) {
+                        SimulationSettings settings, std::vector<SavedSubcircuit> subcircuits,
+                        std::vector<Core::LibraryModel> models) {
     ClearSelection();
     m_Elements = std::move(elements);
     m_Wires = std::move(wires);
     m_Subcircuits = std::move(subcircuits);
+    m_LibraryModels = std::move(models);
     m_BuiltSubcircuits.reset();
     m_SimulationSettings = std::move(settings);
     ++m_SimulationSettingsVersion;
@@ -398,6 +410,30 @@ Schematic::GetSubcircuitPinCandidates() const {
  */
 std::expected<std::vector<Schematic::SubcircuitPinCandidate>, std::string> Schematic::GetSubcircuitPinMarkers() const {
     return CollectSubcircuitPinMarkers(m_Elements, m_Wires, nullptr);
+}
+
+/**
+ * @brief   Turns the pin marker on a point so its pin goes on an edge of the block.
+ * @param[in] point  Point of the marker's terminal.
+ * @param[in] side   Edge of the block the pin should go on.
+ * @return  True when a marker turned; false when no marker is on the point or it already gives that edge.
+ * @note    The marker turns about its terminal, so the wires on it stay where they are; only its arrow and square face
+ *          the other way. It counts as an edit, which CommitUndoStep() makes one undo step.
+ */
+bool Schematic::SetPinMarkerSide(const GridPoint point, const Core::PinSide side) {
+    for (auto &element : m_Elements) {
+        if (!Core::IsSubcircuitPin(element->GetComponent().GetType()) || element->GetTerminals().front() != point) {
+            continue;
+        }
+        if (GetMarkerSide(*element) == side) {
+            return false;
+        }
+        element->SetRotation(GetSideRotation(side));
+        element->SetMirrored(false);
+        MarkModified();
+        return true;
+    }
+    return false;
 }
 
 /**
@@ -473,13 +509,17 @@ std::expected<std::unique_ptr<Schematic>, std::string> Schematic::OpenSubcircuit
     if (found == m_Subcircuits.end()) {
         return std::unexpected("Unknown subcircuit " + name);
     }
+    if (found->Spice) {
+        return std::unexpected(name + " is SPICE text, which has no drawing to open");
+    }
     auto loaded = LoadSchematic(SaveSchematic({}, {}, {}, {}, std::span<const SavedSubcircuit>(&*found, 1)));
     if (!loaded || loaded->Subcircuits.size() != 1) {
         return std::unexpected("The subcircuit definition could not be opened");
     }
     SavedSubcircuit &definition = loaded->Subcircuits.front();
     auto content = std::make_unique<Schematic>();
-    content->Replace(std::move(definition.Elements), std::move(definition.Wires), {});
+    // The parts inside can use the library models of the document, as its own parts can
+    content->Replace(std::move(definition.Elements), std::move(definition.Wires), {}, {}, m_LibraryModels);
     for (const SavedSubcircuitPin &pin : definition.Pins) {
         const bool has_marker = std::ranges::any_of(content->GetElements(), [&](const auto &element) {
             return Core::IsSubcircuitPin(element->GetComponent().GetType()) &&
@@ -550,17 +590,62 @@ std::expected<void, std::string> Schematic::UpdateSubcircuit(const std::string &
 }
 
 /**
+ * @brief   Changes the pins and parameters of a block kept as SPICE text, and brings every instance up to date.
+ * @param[in] name        Name of the definition.
+ * @param[in] pins        Its pins, one per port of its .subckt line and in that order, with their names and edges.
+ * @param[in] parameters  Its parameters, with their defaults.
+ * @return  Nothing on success; the reason otherwise, with the schematic unchanged.
+ * @note    The text stays as it came. Each pin keeps the wires of its instances wherever its edge moves it. Call
+ *          CommitUndoStep() after it, so it undoes in one step.
+ */
+std::expected<void, std::string>
+Schematic::UpdateSpiceSubcircuit(const std::string &name, const std::vector<SavedSubcircuitPin> &pins,
+                                 const std::vector<Core::SubcircuitParameter> &parameters) {
+    const auto found = std::ranges::find(m_Subcircuits, name, &SavedSubcircuit::Name);
+    if (found == m_Subcircuits.end()) {
+        return std::unexpected("Unknown SPICE block " + name);
+    }
+    const std::optional<Core::SubcircuitText> &spice = found->Spice;
+    if (!spice) {
+        return std::unexpected(name + " is a drawn block, not SPICE text");
+    }
+    if (pins.size() != spice->Ports.size()) {
+        return std::unexpected("Give every port of the SPICE text a pin");
+    }
+    if (auto valid = ValidateMetadata(pins, parameters); !valid) {
+        return std::unexpected(valid.error());
+    }
+    SavedSubcircuit &definition = *found;
+    std::vector<std::string> old_names;
+    std::vector<std::optional<std::size_t>> matches;
+    for (std::size_t index = 0; index < definition.Pins.size(); ++index) {
+        old_names.push_back(definition.Pins[index].Name);
+        // A port is the same pin whatever it is called now
+        matches.emplace_back(index);
+    }
+    definition.Pins = pins;
+    definition.Parameters = parameters;
+    m_BuiltSubcircuits.reset();
+    RefreshInstances(definition, old_names, matches);
+    MarkModified();
+    return {};
+}
+
+/**
  * @brief   Adds the definitions a pasted group brought, so its instances have them.
  * @param[in]     definitions  Definitions the group's instances use.
  * @param[in,out] instances    Elements of the group; the instances of a renamed definition are pointed at its new name.
+ * @return  The name each definition has here, in order: its own, or the free name it was given.
  * @note    A definition equal to one of the same name already here is dropped, since the instances can use that one.
  *          One that differs is added under a free name, such as "block_2", so neither replaces the other.
  */
-void Schematic::MergeSubcircuits(std::vector<SavedSubcircuit> definitions,
-                                 std::vector<std::unique_ptr<UIElement>> &instances) {
+std::vector<std::string> Schematic::MergeSubcircuits(std::vector<SavedSubcircuit> definitions,
+                                                     std::vector<std::unique_ptr<UIElement>> &instances) {
+    std::vector<std::string> names;
     for (SavedSubcircuit &definition : definitions) {
         const auto existing = std::ranges::find(m_Subcircuits, definition.Name, &SavedSubcircuit::Name);
         if (existing != m_Subcircuits.end() && DescribeDefinition(*existing) == DescribeDefinition(definition)) {
+            names.push_back(definition.Name);
             continue;
         }
         if (existing != m_Subcircuits.end()) {
@@ -576,10 +661,61 @@ void Schematic::MergeSubcircuits(std::vector<SavedSubcircuit> definitions,
                 }
             }
         }
+        names.push_back(definition.Name);
         m_Subcircuits.push_back(std::move(definition));
         m_BuiltSubcircuits.reset();
         MarkModified();
     }
+    return names;
+}
+
+/**
+ * @brief   Adds device models from a library or a paste, so the parts that name them have them.
+ * @param[in]     models       Models to add.
+ * @param[in,out] elements     Parts that came with them, pointed at the new name of a renamed model.
+ * @param[in,out] definitions  Blocks that came with them, whose parts are pointed at it too.
+ * @return  The name each model has here, in order: its own, or the free name it was given.
+ * @note    A model equal to one of the same name already here is dropped, since the parts can use that one; one that
+ *          differs is added under a free name, such as "1N4148_2", so neither replaces the other.
+ */
+std::vector<std::string> Schematic::MergeLibraryModels(std::vector<Core::LibraryModel> models,
+                                                       std::vector<std::unique_ptr<UIElement>> &elements,
+                                                       std::vector<SavedSubcircuit> &definitions) {
+    const auto rename_users = [](std::vector<std::unique_ptr<UIElement>> &users, const std::string &old_name,
+                                 const std::string &new_name) {
+        for (auto &user : users) {
+            Core::Component &component = user->GetComponent();
+            if (component.GetLibraryModel() == old_name) {
+                component.SetLibraryModel(new_name);
+            }
+        }
+    };
+    std::vector<std::string> names;
+    for (Core::LibraryModel &model : models) {
+        const auto existing = std::ranges::find(m_LibraryModels, model.Name, &Core::LibraryModel::Name);
+        if (existing != m_LibraryModels.end() && existing->Text == model.Text) {
+            names.push_back(model.Name);
+            continue;
+        }
+        if (existing != m_LibraryModels.end()) {
+            std::string free_name;
+            for (int suffix = 2;
+                 free_name.empty() || std::ranges::contains(m_LibraryModels, free_name, &Core::LibraryModel::Name);
+                 ++suffix) {
+                free_name = std::format("{}_{}", model.Name, suffix);
+            }
+            rename_users(elements, model.Name, free_name);
+            for (SavedSubcircuit &definition : definitions) {
+                rename_users(definition.Elements, model.Name, free_name);
+            }
+            model.Text = Core::RenameLibraryModel(model, free_name);
+            model.Name = free_name;
+        }
+        names.push_back(model.Name);
+        m_LibraryModels.push_back(std::move(model));
+        MarkModified();
+    }
+    return names;
 }
 
 /**
@@ -999,6 +1135,7 @@ Core::Circuit Schematic::BuildCircuit() {
             auto definition = std::make_shared<Core::SubcircuitDefinition>();
             definition->Name = saved.Name;
             definition->Parameters = saved.Parameters;
+            definition->Spice = saved.Spice;
             // A pin on no node would be refused by the checks, which read node 0 as ground
             for (const SavedSubcircuitPin &pin : saved.Pins) {
                 definition->Pins.push_back({pin.Name, connectivity.GetNode(pin.Point).value_or(0)});
@@ -1009,6 +1146,9 @@ Core::Circuit Schematic::BuildCircuit() {
     }
     for (const auto &definition : *m_BuiltSubcircuits) {
         circuit.AddSubcircuit(definition);
+    }
+    for (const Core::LibraryModel &model : m_LibraryModels) {
+        circuit.AddLibraryModel(model);
     }
     return circuit;
 }
@@ -1439,7 +1579,7 @@ void Schematic::RefreshInstances(const SavedSubcircuit &definition, const std::v
 
 // Measurements stay out of snapshots, so probing adds no undo step and does not count as a change
 std::string Schematic::TakeSnapshot() const {
-    return SaveSchematic(m_Elements, m_Wires, m_SimulationSettings, {}, m_Subcircuits);
+    return SaveSchematic(m_Elements, m_Wires, m_SimulationSettings, {}, m_Subcircuits, m_LibraryModels);
 }
 
 // Snapshots come from TakeSnapshot(), so they always load back without warnings
@@ -1452,6 +1592,7 @@ void Schematic::RestoreSnapshot(const std::string &snapshot) {
     m_Elements = std::move(loaded->Elements);
     m_Wires = std::move(loaded->Wires);
     m_Subcircuits = std::move(loaded->Subcircuits);
+    m_LibraryModels = std::move(loaded->Models);
     m_BuiltSubcircuits.reset();
     if (loaded->Settings != m_SimulationSettings) {
         m_SimulationSettings = std::move(loaded->Settings);

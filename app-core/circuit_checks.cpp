@@ -86,6 +86,14 @@ bool IsNoiseInput(const Component &component) {
 // A pin on ground would connect nothing, since ngspice keeps node 0 global instead of joining it to the outside, and
 // two pins on one node would short the nets of the instance
 std::optional<std::string> CheckPins(const SubcircuitDefinition &definition) {
+    // The ports of a block kept as SPICE text are the vendor's own names, written as they came
+    if (definition.Spice) {
+        if (definition.Spice->Ports.size() != definition.Pins.size()) {
+            return std::format("{} has {} pins but its SPICE text has {} ports", definition.Name,
+                               definition.Pins.size(), definition.Spice->Ports.size());
+        }
+        return std::nullopt;
+    }
     std::set<int> nodes;
     for (const SubcircuitPin &pin : definition.Pins) {
         if (pin.Node == 0) {
@@ -155,6 +163,27 @@ std::optional<std::string> CheckSubcircuits(const Circuit &circuit) {
     return std::nullopt;
 }
 
+// A part that names a library model needs the circuit to have it, and of its own kind
+std::optional<std::string> CheckLibraryModels(const Circuit &circuit) {
+    for (const Component *part : CollectParts(circuit)) {
+        if (!part->HasLibraryModel()) {
+            continue;
+        }
+        const LibraryModel *model = circuit.FindLibraryModel(part->GetLibraryModel());
+        if (model == nullptr) {
+            return std::format(
+                "{} uses the model {}, which the schematic does not have; import it again or pick another "
+                "model",
+                part->GetName(), part->GetLibraryModel());
+        }
+        if (!CanUseLibraryModel(part->GetType(), model->Kind)) {
+            return std::format("{} uses the model {}, which is a {} model", part->GetName(), model->Name,
+                               GetModelKindName(model->Kind));
+        }
+    }
+    return std::nullopt;
+}
+
 } // namespace
 
 /**
@@ -162,8 +191,8 @@ std::optional<std::string> CheckSubcircuits(const Circuit &circuit) {
  * @param[in] circuit  Circuit to check.
  * @return  The reason it cannot, in words for the user: it is empty, it has no ground (a circuit of only clocks, logic
  *          inputs, supply rails and logic parts needs none), a subcircuit instance or definition cannot be written (an
- *          unknown definition, a pin on ground, a parameter it lacks), or a current-controlled source follows no valid
- *          current; no value when it can.
+ *          unknown definition, a pin on ground, a parameter it lacks), a part uses a library model the circuit lacks or
+ *          of another kind, or a current-controlled source follows no valid current; no value when it can.
  */
 std::optional<std::string> CheckCircuit(const Circuit &circuit) {
     if (circuit.GetEntries().empty()) {
@@ -173,6 +202,9 @@ std::optional<std::string> CheckCircuit(const Circuit &circuit) {
         return "The circuit has no ground; add a Ground so node voltages have a reference";
     }
     if (std::optional<std::string> problem = CheckSubcircuits(circuit)) {
+        return problem;
+    }
+    if (std::optional<std::string> problem = CheckLibraryModels(circuit)) {
         return problem;
     }
     // A current-controlled source needs a current that some other part reports

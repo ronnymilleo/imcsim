@@ -219,16 +219,20 @@ bool DrawParameterFields(const std::array<ParameterField<Parameters>, Count> &fi
     return changed;
 }
 
-// Draws the model combo of a part that offers ready models or custom parameters, its description or its custom
-// fields, and applies a change; returns whether the part changed. Custom starts from the parameters of the model it
-// replaces, so a ready part can be tweaked
+// Draws the model combo of a part that offers ready models, models imported from libraries or custom parameters, its
+// description or its custom fields, and applies a change; returns whether the part changed. Custom starts from the
+// parameters of the model it replaces, so a ready part can be tweaked
 template <typename Part, typename Model, typename Parameters, std::size_t Count>
 bool DrawModelChoice(Part &part, const std::span<const Model> models, const char *custom_name,
                      const std::array<ParameterField<Parameters>, Count> &fields,
-                     std::array<ValueField, Count> &value_fields) {
+                     std::array<ValueField, Count> &value_fields,
+                     const std::span<const Core::LibraryModel> library_models = {}) {
     bool changed = false;
     DrawFieldLabel("Model");
-    if (ImGui::BeginCombo("##Model", part.GetModelName())) {
+    // A library model may share its name with a ready one, so it says where it comes from
+    const std::string preview =
+        part.HasLibraryModel() ? std::format("{} (library)", part.GetModelName()) : std::string(part.GetModelName());
+    if (ImGui::BeginCombo("##Model", preview.c_str())) {
         for (const Model &model : models) {
             const bool selected = &model == part.GetModel();
             if (ImGui::Selectable(model.Name, selected) && !selected) {
@@ -239,6 +243,17 @@ bool DrawModelChoice(Part &part, const std::span<const Model> models, const char
                 ImGui::SetItemDefaultFocus();
             }
         }
+        // The models imported from libraries that fit the part, after the ready ones
+        for (const Core::LibraryModel &model : library_models) {
+            if (!Core::CanUseLibraryModel(part.GetType(), model.Kind)) {
+                continue;
+            }
+            const bool selected = part.GetLibraryModel() == model.Name;
+            if (ImGui::Selectable(std::format("{} (library)", model.Name).c_str(), selected) && !selected) {
+                part.SetLibraryModel(model.Name);
+                changed = true;
+            }
+        }
         if (ImGui::Selectable(custom_name, part.IsCustom()) && !part.IsCustom()) {
             part.SetCustom();
             LoadParameterFields(fields, value_fields, part.GetParameters());
@@ -247,6 +262,10 @@ bool DrawModelChoice(Part &part, const std::span<const Model> models, const char
         ImGui::EndCombo();
     }
 
+    if (part.HasLibraryModel()) {
+        ImGui::TextDisabled("From a SPICE library: its parameters are those of its .model text");
+        return changed;
+    }
     if (!part.IsCustom()) {
         ImGui::TextDisabled("%s", part.GetModel()->Description);
         return changed;
@@ -497,6 +516,9 @@ void PartEditor::DrawSubcircuit(Core::SubcircuitInstance &instance) {
         return;
     }
     ImGui::TextUnformatted(std::format("Definition: {}", definition->Name).c_str());
+    if (definition->Spice) {
+        ImGui::TextDisabled("SPICE text from a library; double click the block for its pins");
+    }
     for (std::size_t index = 0; index < definition->Parameters.size() && index < m_SubcircuitFields.size(); ++index) {
         const Core::SubcircuitParameter &parameter = definition->Parameters[index];
         if (const auto value = m_SubcircuitFields[index].Draw(parameter.Name.c_str(), "", AnyValue)) {
@@ -811,7 +833,7 @@ void PartEditor::DrawWiper(Core::Potentiometer &pot) {
 
 void PartEditor::DrawDiode(Core::Diode &diode) {
     if (DrawModelChoice(diode, Core::GetDiodeModels(diode.GetType()), Core::CUSTOM_DIODE_MODEL_NAME, DIODE_FIELDS,
-                        m_DiodeFields)) {
+                        m_DiodeFields, std::span(m_Schematic->GetLibraryModels()))) {
         m_Schematic->MarkModified();
     }
     if (diode.IsCustom()) {
@@ -822,7 +844,8 @@ void PartEditor::DrawDiode(Core::Diode &diode) {
 }
 
 void PartEditor::DrawBJT(Core::BJT &bjt) {
-    if (DrawModelChoice(bjt, Core::GetBJTModels(bjt.GetType()), Core::CUSTOM_BJT_MODEL_NAME, BJT_FIELDS, m_BJTFields)) {
+    if (DrawModelChoice(bjt, Core::GetBJTModels(bjt.GetType()), Core::CUSTOM_BJT_MODEL_NAME, BJT_FIELDS, m_BJTFields,
+                        std::span(m_Schematic->GetLibraryModels()))) {
         m_Schematic->MarkModified();
     }
     if (bjt.IsCustom()) {
@@ -833,7 +856,7 @@ void PartEditor::DrawBJT(Core::BJT &bjt) {
 
 void PartEditor::DrawMOSFET(Core::MOSFET &mosfet) {
     if (DrawModelChoice(mosfet, Core::GetMOSFETModels(mosfet.GetType()), Core::CUSTOM_MOSFET_MODEL_NAME, MOSFET_FIELDS,
-                        m_MOSFETFields)) {
+                        m_MOSFETFields, std::span(m_Schematic->GetLibraryModels()))) {
         m_Schematic->MarkModified();
     }
     if (mosfet.IsCustom()) {

@@ -33,6 +33,7 @@ add_library(imcsim-core-lib
             components/vcc.cpp
             components/voltage_controlled_switch.cpp
             components/voltage_source.cpp
+            library_model.cpp
             live_change.cpp
             ngspice_backend.cpp
             ngspice_library.cpp
@@ -43,6 +44,7 @@ add_library(imcsim-core-lib
             simulation_results.cpp
             simulation_service.cpp
             simulator.cpp
+            spice_library.cpp
             spice_value.cpp
             standard_values.cpp
             stepped_circuit.cpp

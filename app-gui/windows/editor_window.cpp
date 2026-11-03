@@ -111,6 +111,8 @@ constexpr auto SUPPLY_PARTS =
     std::to_array({Core::ComponentType::GROUND, Core::ComponentType::VCC, Core::ComponentType::NET_LABEL,
                    Core::ComponentType::PIN, Core::ComponentType::LOGIC_INPUT});
 
+// The edge choice of a block pin, this many font sizes wide
+constexpr float PIN_SIDE_FIELD_WIDTH = 6.0f;
 // Toolbar buttons are square, this many frame heights wide; icons fill this share of them
 constexpr float TOOL_BUTTON_SCALE = 1.4f;
 constexpr float ICON_SCALE = 0.7f;
@@ -540,7 +542,11 @@ EditorWindow::EditorWindow(Schematic &schematic, AnalysisControls &controls, Ana
       m_Files(schematic, preferences,
               {.StopEditing = [this] { StopEditing(); },
                .FrameSchematic = [this] { m_View.RequestDefaultFrame(); },
-               .PlaceGroup = [this](PastedGroup group) { StartPastingGroup(std::move(group)); }}) {
+               .PlaceGroup = [this](PastedGroup group) { StartPastingGroup(std::move(group)); },
+               .OpenSpiceLibrary =
+                   [this](std::string file_name, Core::SpiceLibrary library) {
+                       m_SpiceDialog.OpenImport(std::move(file_name), std::move(library));
+                   }}) {
     for (const PartGroup &group : PART_GROUPS) {
         m_PartGroupChoices.push_back(group.Types.front());
     }
@@ -568,6 +574,9 @@ void EditorWindow::Update() {
     HandleGlobalShortcuts();
     m_Files.DrawPopups();
     DrawSubcircuitDialog();
+    if (std::optional<SpiceBlockResult> result = m_SpiceDialog.Draw()) {
+        ApplySpiceBlockResult(std::move(*result));
+    }
 }
 
 /**
@@ -645,6 +654,10 @@ void EditorWindow::DrawFileMenuItems() {
         m_RequestedCommand = EditorCommand::IMPORT;
     }
     ImGui::SetItemTooltip("Add the circuit of a file to this schematic: it follows the cursor until a click places it");
+    if (ImGui::MenuItem("Import SPICE Library...")) {
+        m_RequestedCommand = EditorCommand::IMPORT_SPICE;
+    }
+    ImGui::SetItemTooltip("Bring in a vendor's subcircuits, such as op-amp models, as blocks kept in this schematic");
     if (ImGui::MenuItem("Export Schematic...")) {
         m_RequestedCommand = EditorCommand::EXPORT_SCHEMATIC;
     }
@@ -1575,6 +1588,13 @@ void EditorWindow::RequestEditSelectedSubcircuit() {
         return;
     }
     const auto &instance = static_cast<const Core::SubcircuitInstance &>(element->GetComponent());
+    // A block kept as SPICE text has no drawing to open, only its pins and parameters to set
+    if (const auto spice =
+            std::ranges::find(m_RootSchematic.GetSubcircuits(), instance.GetDefinitionName(), &SavedSubcircuit::Name);
+        spice != m_RootSchematic.GetSubcircuits().end() && spice->Spice) {
+        m_SpiceDialog.OpenSettings(*spice);
+        return;
+    }
     auto content = m_RootSchematic.OpenSubcircuit(instance.GetDefinitionName());
     if (!content) {
         m_SubcircuitError = content.error();
@@ -1713,10 +1733,22 @@ void EditorWindow::DrawSubcircuitPinRows(const bool editing) {
         ImGui::SetNextItemWidth(ImGui::GetFontSize() * 8.0f);
         ImGui::InputText("##pin", &m_SubcircuitPins[index].Name);
         ImGui::SameLine();
-        // The edge the pin goes on, from the way its marker points, so turning a marker shows where it lands
-        const auto &elements = editing ? m_SubcircuitContent->GetElements() : m_RootSchematic.GetElements();
-        const std::optional<Core::PinSide> side = FindMarkerSide(elements, m_SubcircuitPins[index].Point);
-        ImGui::TextDisabled("%-6s", side ? GetPinSideName(*side) : "?");
+        // The edge the pin goes on comes from the way its marker points; picking another turns the marker about its
+        // terminal, so its wires stay put
+        Schematic &markers = editing ? *m_SubcircuitContent : m_RootSchematic;
+        const GridPoint point = m_SubcircuitPins[index].Point;
+        const std::optional<Core::PinSide> side = FindMarkerSide(markers.GetElements(), point);
+        ImGui::SetNextItemWidth(ImGui::GetFontSize() * PIN_SIDE_FIELD_WIDTH);
+        ImGui::BeginDisabled(!side);
+        if (ImGui::BeginCombo("##side", side ? GetPinSideName(*side) : "?")) {
+            for (const Core::PinSide choice : PIN_SIDES) {
+                if (ImGui::Selectable(GetPinSideName(choice), side == choice)) {
+                    markers.SetPinMarkerSide(point, choice);
+                }
+            }
+            ImGui::EndCombo();
+        }
+        ImGui::EndDisabled();
         ImGui::SameLine();
         ImGui::BeginDisabled(index == 0);
         if (ImGui::Button("Up")) {
@@ -1754,9 +1786,9 @@ void EditorWindow::DrawSubcircuitParameterRows() {
     }
 }
 
-// Creating the block, or keeping the settings of the one open, and the way out without them
+// Creating the block, or applying the settings of the one open, and the way out without them
 void EditorWindow::DrawSubcircuitDialogButtons(const bool editing) {
-    if (ImGui::Button(editing ? "Keep settings" : "Create block")) {
+    if (ImGui::Button(editing ? "Apply" : "Create block")) {
         if (editing) {
             if (ApplySubcircuitPinNames()) {
                 OfferBlockParameters();
@@ -1776,7 +1808,7 @@ void EditorWindow::DrawSubcircuitDialogButtons(const bool editing) {
         }
     }
     ImGui::SameLine();
-    if (ImGui::Button(editing ? "Discard settings" : "Cancel")) {
+    if (ImGui::Button("Cancel")) {
         if (editing) {
             const auto definition =
                 std::ranges::find(m_RootSchematic.GetSubcircuits(), m_EditingSubcircuit, &SavedSubcircuit::Name);
@@ -1786,6 +1818,36 @@ void EditorWindow::DrawSubcircuitDialogButtons(const bool editing) {
         }
         ImGui::CloseCurrentPopup();
     }
+}
+
+// Imported blocks join the schematic as one undo step and the first one starts placing, so it lands where the user
+// clicks; new settings of a block reach every instance of it
+void EditorWindow::ApplySpiceBlockResult(SpiceBlockResult result) {
+    if (!result.Imported.empty() || !result.Models.empty()) {
+        std::vector<std::unique_ptr<UIElement>> no_parts;
+        std::vector<SavedSubcircuit> no_blocks;
+        const std::vector<std::string> models =
+            m_RootSchematic.MergeLibraryModels(std::move(result.Models), no_parts, no_blocks);
+        const std::vector<std::string> names = m_RootSchematic.MergeSubcircuits(std::move(result.Imported), no_parts);
+        m_RootSchematic.CommitUndoStep();
+        if (!names.empty()) {
+            StartPlacingSubcircuit(names.front());
+        } else {
+            m_Files.QueueMessages(
+                std::format("{} device model{} imported", models.size(), models.size() == 1 ? "" : "s"),
+                {"Select a diode or a transistor and pick the model in its Model choice"});
+        }
+        return;
+    }
+    if (!result.UpdatedName) {
+        return;
+    }
+    const auto updated = m_RootSchematic.UpdateSpiceSubcircuit(*result.UpdatedName, result.Pins, result.Parameters);
+    if (!updated) {
+        m_Files.QueueMessages("Could not change the SPICE block", {updated.error()});
+        return;
+    }
+    m_RootSchematic.CommitUndoStep();
 }
 
 /**
@@ -2017,9 +2079,9 @@ void EditorWindow::CopySelected() {
         return;
     }
     const Selection selection = {m_Schematic->GetSelectedElements(), m_Schematic->GetSelectedWires()};
-    ImGui::SetClipboardText(
-        CopySelection(m_Schematic->GetElements(), m_Schematic->GetWires(), selection, m_Schematic->GetSubcircuits())
-            .c_str());
+    ImGui::SetClipboardText(CopySelection(m_Schematic->GetElements(), m_Schematic->GetWires(), selection,
+                                          m_Schematic->GetSubcircuits(), m_Schematic->GetLibraryModels())
+                                .c_str());
 }
 
 // Deleting in the middle of a drag would leave the drag pointing at removed items
@@ -2108,6 +2170,8 @@ void EditorWindow::HandlePasting(SchematicCanvas &canvas, const ViewTransform &v
 
     const std::size_t first_element = m_Schematic->GetElements().size();
     const std::size_t first_wire = m_Schematic->GetWires().size();
+    // Models first, so a renamed one is renamed in the blocks too before they join
+    m_Schematic->MergeLibraryModels(std::move(m_Pasting->Models), m_Pasting->Elements, m_Pasting->Subcircuits);
     m_Schematic->MergeSubcircuits(std::move(m_Pasting->Subcircuits), m_Pasting->Elements);
     for (auto &element : m_Pasting->Elements) {
         m_Schematic->AddElement(std::move(element));
@@ -2819,6 +2883,9 @@ bool EditorWindow::RunFileCommand(const EditorCommand command) {
         return true;
     case EditorCommand::IMPORT:
         m_Files.Import();
+        return true;
+    case EditorCommand::IMPORT_SPICE:
+        m_Files.ImportSpiceLibrary();
         return true;
     case EditorCommand::EXPORT_SCHEMATIC:
         m_Files.OpenExportPopup();

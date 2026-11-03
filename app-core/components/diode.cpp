@@ -5,6 +5,7 @@
 
 #include "diode.h"
 
+#include "library_model.h"
 #include <algorithm>
 #include <array>
 #include <format>
@@ -144,10 +145,11 @@ std::unique_ptr<Component> Diode::Clone() const {
 
 /**
  * @brief   Returns the ready model the diode uses.
- * @return  An entry of the model list of its kind, or nullptr when the diode uses custom parameters.
+ * @return  An entry of the model list of its kind, or nullptr when the diode uses custom parameters or a
+ *          library model.
  */
 const DiodeModel *Diode::GetModel() const {
-    return m_Model;
+    return HasLibraryModel() ? nullptr : m_Model;
 }
 
 /**
@@ -156,14 +158,15 @@ const DiodeModel *Diode::GetModel() const {
  */
 void Diode::SetModel(const DiodeModel &model) {
     m_Model = &model;
+    ClearLibraryModel();
 }
 
 /**
  * @brief   Tells whether the diode uses its own parameters instead of a ready model.
- * @return  True for a custom diode.
+ * @return  True for a custom diode; false for one with a ready or a library model.
  */
 bool Diode::IsCustom() const {
-    return m_Model == nullptr;
+    return m_Model == nullptr && !HasLibraryModel();
 }
 
 /**
@@ -171,6 +174,7 @@ bool Diode::IsCustom() const {
  * @note    Does nothing when the diode is already custom, so its parameters are kept.
  */
 void Diode::SetCustom() {
+    ClearLibraryModel();
     if (m_Model == nullptr) {
         return;
     }
@@ -183,6 +187,7 @@ void Diode::SetCustom() {
  * @param[in] parameters  New parameters; check them with IsValidParameters() first.
  */
 void Diode::SetCustomParameters(const DiodeParameters &parameters) {
+    ClearLibraryModel();
     m_CustomParameters = parameters;
     m_Model = nullptr;
 }
@@ -211,18 +216,25 @@ const DiodeParameters &Diode::GetParameters() const {
 
 /**
  * @brief   Returns the name of the model, as shown in the editor and saved in files.
- * @return  The ready model name, such as "1N4148", or CustomDiodeModelName.
+ * @return  The ready model name, such as "1N4148", or CustomDiodeModelName, or the name of
+ *          the library model it uses.
  */
 const char *Diode::GetModelName() const {
+    if (HasLibraryModel()) {
+        return GetLibraryModel().c_str();
+    }
     return m_Model != nullptr ? m_Model->Name : CUSTOM_DIODE_MODEL_NAME;
 }
 
 /**
  * @brief   Returns the name of the ".model" line the diode uses in a netlist.
- * @return  The ready model SPICE name, or "DCUSTOM_" followed by the diode name, since custom parameters belong
- *          to one diode.
+ * @return  The ready model SPICE name, the library model one from GetLibraryModelSpiceName(), or "DCUSTOM_" followed by
+ * the diode name, since custom parameters belong to one diode.
  */
 std::string Diode::GetSpiceModelName() const {
+    if (HasLibraryModel()) {
+        return GetLibraryModelSpiceName(GetLibraryModel());
+    }
     return m_Model != nullptr ? std::string(m_Model->SpiceName) : std::format("DCUSTOM_{}", GetName());
 }
 

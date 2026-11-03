@@ -103,6 +103,13 @@ public:
     void SetValueExpression(std::string expression);
     void ClearValueExpression();
 
+    // Library model, for diodes and transistors
+    bool TakesLibraryModel() const;
+    bool HasLibraryModel() const;
+    const std::string &GetLibraryModel() const;
+    void SetLibraryModel(std::string name);
+    void ClearLibraryModel();
+
     // Initial condition
     bool SupportsInitialCondition() const;
     bool HasInitialCondition() const;
@@ -116,6 +123,8 @@ protected:
     double m_Value = 0.0;
     // A parameter reference such as {RESISTANCE}; only meaningful inside a subcircuit definition
     std::optional<std::string> m_ValueExpression;
+    // Name of the library model a diode or a transistor uses instead of a ready or custom one; empty for none
+    std::string m_LibraryModel;
     // Voltage a capacitor starts charged to or current an inductor starts carrying; only these kinds carry one
     std::optional<double> m_InitialCondition;
 };

@@ -45,6 +45,7 @@ add_library(imcsim-gui-lib
             selection.cpp
             simulation_settings.cpp
             spectrum.cpp
+            spice_import.cpp
             subcircuit_pins.cpp
             svg_writer.cpp
             theme.cpp
@@ -87,6 +88,7 @@ add_library(imcsim-gui-lib
             windows/preferences_window.cpp
             windows/properties_window.cpp
             windows/simulation_window.cpp
+            windows/spice_block_dialog.cpp
             wire_editing.cpp
 )
 

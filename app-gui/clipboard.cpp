@@ -34,11 +34,13 @@ GridPoint FindGroupPivot(const PastedGroup &group) {
  * @param[in] wires        Wires of the schematic.
  * @param[in] selection    What to copy.
  * @param[in] subcircuits  Block definitions of the schematic; those the copied instances use go with them.
+ * @param[in] models       Library models of the schematic; those the copied parts use go with them.
  * @return  A schematic of just those items, in the format of the files, so it pastes into another copy of the program
  *          as well as this one.
  */
 std::string CopySelection(const std::vector<std::unique_ptr<UIElement>> &elements, const std::vector<UIWire> &wires,
-                          const Selection &selection, const std::span<const SavedSubcircuit> subcircuits) {
+                          const Selection &selection, const std::span<const SavedSubcircuit> subcircuits,
+                          const std::span<const Core::LibraryModel> models) {
     std::vector<const UIElement *> copied_elements;
     std::set<std::string> needed_definitions;
     for (const std::size_t index : selection.Elements) {
@@ -63,7 +65,23 @@ std::string CopySelection(const std::vector<std::unique_ptr<UIElement>> &element
             copied_definitions.push_back(std::move(loaded->Subcircuits.front()));
         }
     }
-    return SaveParts(copied_elements, copied_wires, copied_definitions);
+    // The library models the copied parts use, those inside the copied blocks included
+    std::set<std::string> needed_models;
+    for (const UIElement *element : copied_elements) {
+        needed_models.insert(element->GetComponent().GetLibraryModel());
+    }
+    for (const SavedSubcircuit &definition : copied_definitions) {
+        for (const auto &element : definition.Elements) {
+            needed_models.insert(element->GetComponent().GetLibraryModel());
+        }
+    }
+    std::vector<Core::LibraryModel> copied_models;
+    for (const Core::LibraryModel &model : models) {
+        if (needed_models.contains(model.Name)) {
+            copied_models.push_back(model);
+        }
+    }
+    return SaveParts(copied_elements, copied_wires, copied_definitions, copied_models);
 }
 
 /**
@@ -104,6 +122,7 @@ std::expected<PastedGroup, std::string> MakePastedGroup(LoadedSchematic loaded) 
     group.Elements = std::move(loaded.Elements);
     group.Wires = std::move(loaded.Wires);
     group.Subcircuits = std::move(loaded.Subcircuits);
+    group.Models = std::move(loaded.Models);
     group.Warnings = std::move(loaded.Warnings);
     group.Pivot = FindGroupPivot(group);
     return group;

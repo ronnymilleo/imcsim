@@ -80,6 +80,26 @@ std::optional<Core::PinSide> FindMarkerSide(const std::vector<std::unique_ptr<UI
 }
 
 /**
+ * @brief   Returns the rotation that makes a pin marker put its pin on an edge, unmirrored.
+ * @param[in] side  Edge of the block.
+ * @return  The rotation whose arrow comes from that edge: none for the left, a half turn for the right, a quarter turn
+ *          for the top and three for the bottom; GetMarkerSide() gives the side back.
+ */
+Rotation GetSideRotation(const Core::PinSide side) {
+    switch (side) {
+    case Core::PinSide::RIGHT:
+        return Rotation::R180;
+    case Core::PinSide::TOP:
+        return Rotation::R90;
+    case Core::PinSide::BOTTOM:
+        return Rotation::R270;
+    case Core::PinSide::LEFT:
+    default:
+        return Rotation::R0;
+    }
+}
+
+/**
  * @brief   Returns a readable name for an edge of a block.
  * @param[in] side  Edge of the box.
  * @return  "left", "right", "top" or "bottom".
@@ -99,16 +119,33 @@ const char *GetPinSideName(const Core::PinSide side) {
 }
 
 /**
+ * @brief   Reads the name of an edge of a block, as GetPinSideName() writes it.
+ * @param[in] name  "left", "right", "top" or "bottom".
+ * @return  The edge, or no value for any other text.
+ */
+std::optional<Core::PinSide> ParsePinSide(const std::string_view name) {
+    for (const Core::PinSide side : PIN_SIDES) {
+        if (name == GetPinSideName(side)) {
+            return side;
+        }
+    }
+    return std::nullopt;
+}
+
+/**
  * @brief   Gives an instance the pins of its definition: their names in order and the edge each one goes on.
  * @param[in,out] instance    Instance to set, which takes the name of the definition too.
- * @param[in]     definition  Definition it uses; each pin takes the side of the marker on its point, or the left.
+ * @param[in]     definition  Definition it uses; each pin takes the side of the marker on its point, or the left, or
+ *                            for a block kept as SPICE text the side kept with the pin.
  */
 void ApplyDefinitionPins(Core::SubcircuitInstance &instance, const SavedSubcircuit &definition) {
     std::vector<std::string> names;
     std::map<std::string, Core::PinSide, std::less<>> sides;
     for (const SavedSubcircuitPin &pin : definition.Pins) {
         names.push_back(pin.Name);
-        sides[pin.Name] = FindMarkerSide(definition.Elements, pin.Point).value_or(Core::PinSide::LEFT);
+        // A block kept as SPICE text has no markers, so it keeps the edge its pins were given
+        sides[pin.Name] =
+            definition.Spice ? pin.Side : FindMarkerSide(definition.Elements, pin.Point).value_or(Core::PinSide::LEFT);
     }
     instance.SetDefinitionName(definition.Name);
     instance.SetPins(std::move(names));
