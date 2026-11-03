@@ -1,0 +1,246 @@
+{
+  "elements": [
+    {
+      "ac_magnitude": 1.0,
+      "amplitude": 1.0,
+      "frequency": 1000.0,
+      "name": "Vin1",
+      "offset": 0.0,
+      "pulse": {
+        "delay": 0.0,
+        "fall": 1e-06,
+        "high": 5.0,
+        "low": 0.0,
+        "period": 0.001,
+        "rise": 1e-06,
+        "width": 0.0005
+      },
+      "rotation": 90,
+      "source": "AC",
+      "type": "VoltageSource",
+      "value": 0.0,
+      "x": 2,
+      "y": 1
+    },
+    {
+      "rotation": 0,
+      "type": "Ground",
+      "x": 2,
+      "y": 3
+    },
+    {
+      "definition": "GENERIC_OPAMP",
+      "name": "X1",
+      "rotation": 0,
+      "type": "Subcircuit",
+      "x": 10,
+      "y": 0
+    },
+    {
+      "name": "V2",
+      "rotation": 0,
+      "type": "VCC",
+      "value": 12.0,
+      "x": 10,
+      "y": -4
+    },
+    {
+      "rotation": 0,
+      "type": "Ground",
+      "x": 10,
+      "y": 4
+    },
+    {
+      "library_model": "BAT54",
+      "name": "D1",
+      "rotation": 0,
+      "type": "Diode",
+      "x": 15,
+      "y": 0
+    },
+    {
+      "name": "R1",
+      "rotation": 90,
+      "type": "Resistor",
+      "value": 10000.0,
+      "x": 20,
+      "y": 2
+    },
+    {
+      "rotation": 0,
+      "type": "Ground",
+      "x": 20,
+      "y": 4
+    },
+    {
+      "net": "VIN",
+      "rotation": 0,
+      "type": "NetLabel",
+      "x": 2,
+      "y": -1
+    },
+    {
+      "net": "VOUT",
+      "rotation": 0,
+      "type": "NetLabel",
+      "x": 20,
+      "y": 0
+    }
+  ],
+  "format": "imcsim-schematic",
+  "measurements": {
+    "currents": [],
+    "voltages": [
+      [
+        2,
+        -1
+      ],
+      [
+        5,
+        1
+      ]
+    ]
+  },
+  "models": [
+    {
+      "text": ".model BAT54 D(IS=2n RS=0.9 N=1.0 BV=30 IBV=10u CJO=10p TT=5n)\n"
+    }
+  ],
+  "simulation": {
+    "ac_sweep": {
+      "points_per_decade": 20,
+      "start": 10.0,
+      "stop": 1000000.0
+    },
+    "analysis": "transient",
+    "dc_sweep": {
+      "step_source": false,
+      "stepped": {
+        "source": "",
+        "start": 0.0,
+        "step": 1.0,
+        "stop": 5.0
+      },
+      "swept": {
+        "source": "",
+        "start": 0.0,
+        "step": 0.1,
+        "stop": 5.0
+      }
+    },
+    "transient": {
+      "step": 5e-06,
+      "stop": 0.005
+    }
+  },
+  "subcircuits": [
+    {
+      "name": "GENERIC_OPAMP",
+      "parameters": [
+        {
+          "default": 100000.0,
+          "name": "GAIN"
+        },
+        {
+          "default": 75.0,
+          "name": "RO"
+        }
+      ],
+      "pins": [
+        {
+          "name": "INP",
+          "side": "left"
+        },
+        {
+          "name": "INN",
+          "side": "left"
+        },
+        {
+          "name": "VP",
+          "side": "top"
+        },
+        {
+          "name": "VN",
+          "side": "bottom"
+        },
+        {
+          "name": "OUT",
+          "side": "right"
+        }
+      ],
+      "spice": {
+        "ports": [
+          "INP",
+          "INN",
+          "VP",
+          "VN",
+          "OUT"
+        ],
+        "text": "* A generic op-amp, written for this example: a transconductance stage into 1Meg and 15.9p gives 100k of gain\n* falling from 10 Hz, so 1 MHz of gain-bandwidth; diodes hold the inner node within the supplies, and a buffer with\n* 75 Ohm drives the output\nRIN INP INN 1Meg\nG1 0 INT INP INN {GAIN/1Meg}\nRP INT 0 1Meg\nCP INT 0 15.9p\nDHIGH INT VP DCLAMP\nDLOW VN INT DCLAMP\nE2 DRIVE 0 INT 0 1\nROUT DRIVE OUT {RO}\n.model DCLAMP D(IS=1e-15)\n"
+      }
+    }
+  ],
+  "version": 1,
+  "wires": [
+    {
+      "end": [
+        7,
+        -1
+      ],
+      "start": [
+        2,
+        -1
+      ]
+    },
+    {
+      "end": [
+        20,
+        0
+      ],
+      "start": [
+        17,
+        0
+      ]
+    },
+    {
+      "end": [
+        17,
+        6
+      ],
+      "start": [
+        17,
+        0
+      ]
+    },
+    {
+      "end": [
+        5,
+        6
+      ],
+      "start": [
+        17,
+        6
+      ]
+    },
+    {
+      "end": [
+        5,
+        1
+      ],
+      "start": [
+        5,
+        6
+      ]
+    },
+    {
+      "end": [
+        7,
+        1
+      ],
+      "start": [
+        5,
+        1
+      ]
+    }
+  ]
+}
