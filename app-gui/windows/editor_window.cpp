@@ -7,6 +7,7 @@
 
 #include "circuit_snapshot.h"
 #include "components/net_label.h"
+#include "components/subcircuit.h"
 #include "current_flow.h"
 #include "element_factory.h"
 #include "group_editing.h"
@@ -105,8 +106,9 @@ constexpr auto PART_GROUPS = std::to_array<PartGroup>({
 // Parts with a button of their own, in toolbar groups
 constexpr auto PASSIVE_PARTS =
     std::to_array({Core::ComponentType::RESISTOR, Core::ComponentType::CAPACITOR, Core::ComponentType::INDUCTOR});
-constexpr auto SUPPLY_PARTS = std::to_array({Core::ComponentType::GROUND, Core::ComponentType::VCC,
-                                             Core::ComponentType::NET_LABEL, Core::ComponentType::LOGIC_INPUT});
+constexpr auto SUPPLY_PARTS =
+    std::to_array({Core::ComponentType::GROUND, Core::ComponentType::VCC, Core::ComponentType::NET_LABEL,
+                   Core::ComponentType::PIN, Core::ComponentType::POUT, Core::ComponentType::LOGIC_INPUT});
 
 // Toolbar buttons are square, this many frame heights wide; icons fill this share of them
 constexpr float TOOL_BUTTON_SCALE = 1.4f;
@@ -531,8 +533,9 @@ std::optional<ComponentPower> FindPower(const std::vector<ComponentPower> &power
 EditorWindow::EditorWindow(Schematic &schematic, AnalysisControls &controls, AnalysisSettingsPanel &settings_panel,
                            PartEditor &part_editor, GlowRenderer &glow_renderer, TransientPlayback &playback,
                            const Preferences &preferences)
-    : AppWindow("Schematic", false), m_Schematic(schematic), m_Controls(controls), m_SettingsPanel(settings_panel),
-      m_PartEditor(part_editor), m_GlowRenderer(glow_renderer), m_Playback(playback), m_Preferences(preferences),
+    : AppWindow("Schematic", false), m_RootSchematic(schematic), m_Schematic(&schematic), m_Controls(controls),
+      m_SettingsPanel(settings_panel), m_PartEditor(part_editor), m_GlowRenderer(glow_renderer), m_Playback(playback),
+      m_Preferences(preferences),
       m_Files(schematic, preferences,
               {.StopEditing = [this] { StopEditing(); },
                .FrameSchematic = [this] { m_View.RequestDefaultFrame(); },
@@ -563,6 +566,7 @@ void EditorWindow::Update() {
     HandleCommandRequest();
     HandleGlobalShortcuts();
     m_Files.DrawPopups();
+    DrawSubcircuitDialog();
 }
 
 /**
@@ -615,6 +619,7 @@ void EditorWindow::RequestImport(std::filesystem::path path) {
  * @note    Call between BeginMenu() and EndMenu(); the command runs on the next frame of the editor.
  */
 void EditorWindow::DrawFileMenuItems() {
+    ImGui::BeginDisabled(IsEditingSubcircuit());
     if (ImGui::MenuItem("New", IMCSIM_SHORTCUT "N")) {
         m_RequestedCommand = EditorCommand::NEW;
     }
@@ -636,6 +641,7 @@ void EditorWindow::DrawFileMenuItems() {
         m_RequestedCommand = EditorCommand::EXPORT_SCHEMATIC;
     }
     ImGui::SetItemTooltip("Save the schematic as an SVG image, to show next to its plots");
+    ImGui::EndDisabled();
 }
 
 /**
@@ -643,14 +649,14 @@ void EditorWindow::DrawFileMenuItems() {
  * @note    Call between BeginMenu() and EndMenu(); the command runs on the next frame of the editor.
  */
 void EditorWindow::DrawEditMenuItems() {
-    if (ImGui::MenuItem("Undo", IMCSIM_SHORTCUT "Z", false, m_Schematic.CanUndo())) {
+    if (ImGui::MenuItem("Undo", IMCSIM_SHORTCUT "Z", false, m_Schematic->CanUndo())) {
         m_RequestedCommand = EditorCommand::UNDO;
     }
-    if (ImGui::MenuItem("Redo", IMCSIM_SHORTCUT "Y", false, m_Schematic.CanRedo())) {
+    if (ImGui::MenuItem("Redo", IMCSIM_SHORTCUT "Y", false, m_Schematic->CanRedo())) {
         m_RequestedCommand = EditorCommand::REDO;
     }
     ImGui::Separator();
-    const bool part_selected = !m_Schematic.GetSelectedElements().empty();
+    const bool part_selected = !m_Schematic->GetSelectedElements().empty();
     if (ImGui::MenuItem("Rotate", "R", false, part_selected)) {
         m_RequestedCommand = EditorCommand::ROTATE;
     }
@@ -673,10 +679,10 @@ void EditorWindow::DrawEditMenuItems() {
         ImGui::EndMenu();
     }
     ImGui::Separator();
-    if (ImGui::MenuItem("Cut", IMCSIM_SHORTCUT "X", false, m_Schematic.HasSelection())) {
+    if (ImGui::MenuItem("Cut", IMCSIM_SHORTCUT "X", false, m_Schematic->HasSelection())) {
         m_RequestedCommand = EditorCommand::CUT;
     }
-    if (ImGui::MenuItem("Copy", IMCSIM_SHORTCUT "C", false, m_Schematic.HasSelection())) {
+    if (ImGui::MenuItem("Copy", IMCSIM_SHORTCUT "C", false, m_Schematic->HasSelection())) {
         m_RequestedCommand = EditorCommand::COPY;
     }
     const char *clipboard_text = ImGui::GetClipboardText();
@@ -688,8 +694,31 @@ void EditorWindow::DrawEditMenuItems() {
     if (ImGui::MenuItem("Select All", IMCSIM_SHORTCUT "A")) {
         m_RequestedCommand = EditorCommand::SELECT_ALL;
     }
-    if (ImGui::MenuItem("Delete", "Del", false, m_Schematic.HasSelection())) {
+    if (ImGui::MenuItem("Delete", "Del", false, m_Schematic->HasSelection())) {
         m_RequestedCommand = EditorCommand::DELETE_SELECTION;
+    }
+    ImGui::Separator();
+    if (IsEditingSubcircuit()) {
+        if (ImGui::MenuItem("Block Pin and Parameter Settings...")) {
+            SyncSubcircuitPins();
+            m_SubcircuitDialogRequested = true;
+        }
+        if (ImGui::MenuItem("Apply Block and Return")) {
+            FinishSubcircuitEditing(true);
+        }
+        if (ImGui::MenuItem("Discard Block Changes")) {
+            FinishSubcircuitEditing(false);
+        }
+    } else {
+        if (ImGui::MenuItem("Create Block from Selection...", nullptr, false, m_Schematic->HasSelection())) {
+            RequestCreateSubcircuit();
+        }
+        const UIElement *selected = m_Schematic->GetSelectedElement();
+        const bool block_selected =
+            selected != nullptr && selected->GetComponent().GetType() == Core::ComponentType::SUBCIRCUIT;
+        if (ImGui::MenuItem("Edit Block Contents", nullptr, false, block_selected)) {
+            RequestEditSelectedSubcircuit();
+        }
     }
 }
 
@@ -720,7 +749,7 @@ void EditorWindow::Draw() {
     size.y -= ImGui::GetTextLineHeightWithSpacing();
     size.x = std::max(size.x, MIN_CANVAS_SIZE);
     size.y = std::max(size.y, MIN_CANVAS_SIZE);
-    m_View.FrameIfRequested(m_Schematic, size, m_Preferences.Symbols, m_Preferences.ShowTerminalNumbers);
+    m_View.FrameIfRequested(*m_Schematic, size, m_Preferences.Symbols, m_Preferences.ShowTerminalNumbers);
 
     ImGui::InvisibleButton("canvas", size,
                            ImGuiButtonFlags_MouseButtonLeft | ImGuiButtonFlags_MouseButtonRight |
@@ -732,7 +761,8 @@ void EditorWindow::Draw() {
     const std::optional<std::size_t> live_part =
         hovered ? FindLivePart(m_View.GetTransform(origin)) : std::optional<std::size_t>();
     const bool turns_part =
-        live_part && GetLiveAction(m_Schematic.GetElements()[*live_part]->GetComponent().GetType()) == LiveAction::TURN;
+        live_part &&
+        GetLiveAction(m_Schematic->GetElements()[*live_part]->GetComponent().GetType()) == LiveAction::TURN;
     m_View.HandlePanAndZoom(origin, hovered && !turns_part, active);
 
     const ViewTransform view = m_View.GetTransform(origin);
@@ -752,10 +782,10 @@ void EditorWindow::Draw() {
     // Over the symbols, so a lit LED looks lit through its own lines
     DrawGlows(draw_list, view);
     if (m_Preferences.ShowTerminalNumbers) {
-        DrawTerminalNumbers(canvas, view, m_Schematic, SCREEN_TERMINAL_RING_SCALE);
+        DrawTerminalNumbers(canvas, view, *m_Schematic, SCREEN_TERMINAL_RING_SCALE);
     }
     DrawNodeVoltages(draw_list, view);
-    DrawMeasurementMarkers(canvas, view, m_Schematic);
+    DrawMeasurementMarkers(canvas, view, *m_Schematic);
     DrawSelectionBox(draw_list, view);
 
     if (ImGui::IsWindowFocused() && ImGui::IsKeyPressed(ImGuiKey_W)) {
@@ -799,6 +829,16 @@ void EditorWindow::DrawToolbar() {
         return clicked;
     };
 
+    if (IsEditingSubcircuit()) {
+        constexpr const char *back_label = "Back to schematic";
+        const float back_width = ImGui::CalcTextSize(back_label).x + 2.0f * ImGui::GetStyle().FramePadding.x;
+        row.Place(back_width, 0.0f);
+        if (ImGui::Button(back_label)) {
+            FinishSubcircuitEditing(true);
+        }
+        ImGui::SetItemTooltip("Apply the block changes and return to the schematic");
+    }
+
     // Tools, history and view
     const bool selecting = IsSelecting();
     if (tool_button("##select", ToolIcon::SELECT, selecting, true, "Select (Esc)", 0.0f)) {
@@ -810,10 +850,10 @@ void EditorWindow::DrawToolbar() {
     if (tool_button("##probe", ToolIcon::PROBE, m_Probing, true, "Probe (P): pick what the plots measure", 0.0f)) {
         StartProbing();
     }
-    if (tool_button("##undo", ToolIcon::UNDO, false, m_Schematic.CanUndo(), "Undo (" IMCSIM_SHORTCUT "Z)", 0.0f)) {
+    if (tool_button("##undo", ToolIcon::UNDO, false, m_Schematic->CanUndo(), "Undo (" IMCSIM_SHORTCUT "Z)", 0.0f)) {
         Undo();
     }
-    if (tool_button("##redo", ToolIcon::REDO, false, m_Schematic.CanRedo(), "Redo (" IMCSIM_SHORTCUT "Y)", 0.0f)) {
+    if (tool_button("##redo", ToolIcon::REDO, false, m_Schematic->CanRedo(), "Redo (" IMCSIM_SHORTCUT "Y)", 0.0f)) {
         Redo();
     }
     if (tool_button("##fit", ToolIcon::FIT, false, true, "Fit the schematic in view (Home)", 0.0f)) {
@@ -838,9 +878,11 @@ void EditorWindow::DrawToolbar() {
 
     // Simulation
     row.Place(side + ToolbarRow::ButtonSpacing() * 2.0f + AnalysisButtonWidth() + LiveButtonWidth(), gap);
+    ImGui::BeginDisabled(IsEditingSubcircuit());
     DrawRunControls();
     ImGui::SameLine(0.0f, ToolbarRow::ButtonSpacing());
     DrawLiveToggle();
+    ImGui::EndDisabled();
 }
 
 void EditorWindow::DrawPartButton(const Core::ComponentType type) {
@@ -857,7 +899,7 @@ void EditorWindow::DrawPartButton(const Core::ComponentType type) {
 // one can be picked
 void EditorWindow::DrawRunControls() {
     const float side = ImGui::GetFrameHeight() * TOOL_BUTTON_SCALE;
-    const Analysis selected = m_Schematic.GetSimulationSettings().Selected;
+    const Analysis selected = m_Schematic->GetSimulationSettings().Selected;
     const RunAction action = m_Controls.GetRunAction();
     if (PrimaryButton("##run", {side, side})) {
         m_Controls.PressRun();
@@ -873,7 +915,7 @@ void EditorWindow::DrawRunControls() {
 // The analysis picker beside Run, whose popover holds the settings of the analysis and its own Run button
 void EditorWindow::DrawAnalysisButton(const float run_left) {
     const float side = ImGui::GetFrameHeight() * TOOL_BUTTON_SCALE;
-    const Analysis selected = m_Schematic.GetSimulationSettings().Selected;
+    const Analysis selected = m_Schematic->GetSimulationSettings().Selected;
     ImGui::PushStyleVar(ImGuiStyleVar_ButtonTextAlign, {0.0f, 0.5f});
     const std::string label = std::format("{}##analysis", GetAnalysisName(selected));
     const bool open = ImGui::Button(label.c_str(), {AnalysisButtonWidth(), side});
@@ -933,7 +975,7 @@ void EditorWindow::DrawLiveToggle() {
         ImGui::SetItemTooltip(
             "Live: Run plays the transient on the schematic, a stop time every %s s, until you stop it, and a click "
             "flips a switch or a logic input, holds a push button or, with the wheel, turns a potentiometer on the way",
-            Core::FormatValue(m_Schematic.GetSimulationSettings().LiveSeconds).c_str());
+            Core::FormatValue(m_Schematic->GetSimulationSettings().LiveSeconds).c_str());
     }
 }
 
@@ -990,27 +1032,27 @@ void EditorWindow::DrawPartGroup(const std::size_t index) {
 // on a scale that covers the whole run, so a value keeps its color while the time moves
 void EditorWindow::UpdateDisplayedState() {
     m_Displayed.reset();
-    const auto &operating_point = m_Schematic.GetOperatingPoint();
-    const auto &transient = m_Schematic.GetTransient();
+    const auto &operating_point = m_Schematic->GetOperatingPoint();
+    const auto &transient = m_Schematic->GetTransient();
     const bool show_transient = transient && !transient->Times.empty() &&
                                 (!operating_point || m_Controls.GetLastRun() != Analysis::OPERATING_POINT);
     if (!show_transient && !operating_point) {
         return;
     }
-    const auto &elements = m_Schematic.GetElements();
-    const Connectivity &connectivity = m_Schematic.GetConnectivity();
+    const auto &elements = m_Schematic->GetElements();
+    const Connectivity &connectivity = m_Schematic->GetConnectivity();
     DisplayedState state;
     if (show_transient) {
         // The scale goes over the window that plays, so a window of any size costs the same; while chunks keep arriving
         // it is refreshed a few times a second only
         const PointWindow window = m_Playback.Window.GetWindow();
-        const bool is_stale = m_ScaledTransientVersion != m_Schematic.GetTransientDataVersion() ||
+        const bool is_stale = m_ScaledTransientVersion != m_Schematic->GetTransientDataVersion() ||
                               m_ScaledWindow.First != window.First || m_ScaledWindow.Count != window.Count;
         const bool may_refresh = transient->IsComplete || !m_ScaledTransientVersion.has_value() ||
                                  ImGui::GetTime() - m_LastScaleTime >= SCALE_REFRESH_SECONDS;
         if (is_stale && may_refresh) {
             m_TransientScale = ScaleOf(SliceTransient(*transient, window), elements, connectivity);
-            m_ScaledTransientVersion = m_Schematic.GetTransientDataVersion();
+            m_ScaledTransientVersion = m_Schematic->GetTransientDataVersion();
             m_ScaledWindow = window;
             m_LastScaleTime = ImGui::GetTime();
         }
@@ -1027,7 +1069,7 @@ void EditorWindow::UpdateDisplayedState() {
 
 // The span of time of the window of the transient that plays, or none without a transient
 std::optional<EditorWindow::TimeSpan> EditorWindow::GetWindowSpan() const {
-    const auto &transient = m_Schematic.GetTransient();
+    const auto &transient = m_Schematic->GetTransient();
     const PointWindow window = m_Playback.Window.GetWindow();
     if (!transient || window.Count == 0 || window.First + window.Count > transient->Times.size()) {
         return std::nullopt;
@@ -1041,7 +1083,7 @@ void EditorWindow::DrawTimeBar() {
     if (!m_Displayed || !m_Displayed->Time) {
         return;
     }
-    const std::optional<Core::Transient> &transient = m_Schematic.GetTransient();
+    const std::optional<Core::Transient> &transient = m_Schematic->GetTransient();
     if (!transient) {
         return;
     }
@@ -1082,8 +1124,8 @@ void EditorWindow::DrawTimeBar() {
 // Wires carry no power, so they stay plain by power. Over heat colors a selected wire is marked by a halo instead of
 // a color of its own, which could pass for a value on the scale
 void EditorWindow::DrawWires(SchematicCanvas &canvas, const ViewTransform &view) {
-    const Connectivity &connectivity = m_Schematic.GetConnectivity();
-    const auto &wires = m_Schematic.GetWires();
+    const Connectivity &connectivity = m_Schematic->GetConnectivity();
+    const auto &wires = m_Schematic->GetWires();
     const bool drawn_by_current = m_Preferences.WireColors == WireColoring::CURRENT && m_Displayed;
     DrawWireSelectionHalos(canvas, view);
     if (drawn_by_current) {
@@ -1092,7 +1134,7 @@ void EditorWindow::DrawWires(SchematicCanvas &canvas, const ViewTransform &view)
 
     for (std::size_t index = 0; index < wires.size(); ++index) {
         const UIWire &wire = wires[index];
-        const bool selected = m_Schematic.IsWireSelected(index) && !AreWiresHeatColored();
+        const bool selected = m_Schematic->IsWireSelected(index) && !AreWiresHeatColored();
         if (drawn_by_current && !selected) {
             continue;
         }
@@ -1108,7 +1150,7 @@ void EditorWindow::DrawWires(SchematicCanvas &canvas, const ViewTransform &view)
     }
 
     if (m_Preferences.IsEffectOn(LiveEffect::CURRENT_FLOW) && m_Displayed) {
-        DrawLiveCurrent(canvas, view, m_Schematic, m_Displayed->Point, m_Displayed->Scale, ImGui::GetTime());
+        DrawLiveCurrent(canvas, view, *m_Schematic, m_Displayed->Point, m_Displayed->Scale, ImGui::GetTime());
     }
 
     if (m_Preferences.WireColors == WireColoring::NODES) {
@@ -1121,8 +1163,8 @@ void EditorWindow::DrawWireSelectionHalos(SchematicCanvas &canvas, const ViewTra
     if (!AreWiresHeatColored()) {
         return;
     }
-    for (const std::size_t selected : m_Schematic.GetSelectedWires()) {
-        const UIWire &wire = m_Schematic.GetWires()[selected];
+    for (const std::size_t selected : m_Schematic->GetSelectedWires()) {
+        const UIWire &wire = m_Schematic->GetWires()[selected];
         canvas.AddLine(view.ToScreen(ToVec2(wire.GetStart())), view.ToScreen(ToVec2(wire.GetEnd())),
                        WithAlpha(GetPalette().Selected, SELECTION_HALO_ALPHA), LINE_THICKNESS + SELECTION_HALO_EXTRA);
     }
@@ -1130,8 +1172,8 @@ void EditorWindow::DrawWireSelectionHalos(SchematicCanvas &canvas, const ViewTra
 
 // The number of the node on the middle of each wire
 void EditorWindow::DrawNodeNumbers(SchematicCanvas &canvas, const ViewTransform &view) {
-    const Connectivity &connectivity = m_Schematic.GetConnectivity();
-    for (const UIWire &wire : m_Schematic.GetWires()) {
+    const Connectivity &connectivity = m_Schematic->GetConnectivity();
+    for (const UIWire &wire : m_Schematic->GetWires()) {
         const int node = connectivity.GetNode(wire.GetStart()).value_or(0);
         const ImVec2 middle = view.ToScreen((ToVec2(wire.GetStart()) + ToVec2(wire.GetEnd())) / 2.0f);
         canvas.AddText(middle, GetPalette().CanvasText, std::format("{}", node).c_str());
@@ -1157,7 +1199,7 @@ void EditorWindow::DrawWireCurrents(SchematicCanvas &canvas, const ViewTransform
         return;
     }
     for (const WireCurrent &piece :
-         ComputeWireCurrents(m_Schematic.GetElements(), m_Schematic.GetWires(), m_Displayed->Point.Currents)) {
+         ComputeWireCurrents(m_Schematic->GetElements(), m_Schematic->GetWires(), m_Displayed->Point.Currents)) {
         UIWire(piece.Start, piece.End)
             .Draw(canvas, view, GetHeatColor(CurrentLevel(piece.Current, m_Displayed->Scale.LargestCurrent)));
     }
@@ -1182,13 +1224,13 @@ void EditorWindow::DrawGlows(ImDrawList *draw_list, const ViewTransform &view) {
             {view.ToScreen(ToVec2(center)), radius * m_View.GetZoom(), ImGui::ColorConvertFloat4ToU32(light)});
     };
     if (leds) {
-        for (const LEDGlow &led : ComputeLEDGlows(m_Schematic.GetElements(), m_Displayed->Point.Currents)) {
+        for (const LEDGlow &led : ComputeLEDGlows(m_Schematic->GetElements(), m_Displayed->Point.Currents)) {
             add_glow(led.Center, GetLEDLight(led.Color), led.Brightness, GLOW_MIN_RADIUS, GLOW_MAX_RADIUS);
         }
     }
     if (resistors) {
         for (const HeatGlow &resistor :
-             ComputeHeatGlows(m_Schematic.GetElements(), m_Displayed->Powers, m_Displayed->Scale)) {
+             ComputeHeatGlows(m_Schematic->GetElements(), m_Displayed->Powers, m_Displayed->Scale)) {
             add_glow(resistor.Center, HEAT_LIGHT, resistor.Brightness, HEAT_GLOW_MIN_RADIUS, HEAT_GLOW_MAX_RADIUS);
         }
     }
@@ -1199,11 +1241,11 @@ void EditorWindow::DrawGlows(ImDrawList *draw_list, const ViewTransform &view) {
 // user sets are outlined too, the one under the cursor or held more strongly
 void EditorWindow::DrawElements(SchematicCanvas &canvas, const ViewTransform &view,
                                 const std::optional<std::size_t> lit_live_part) {
-    const auto &elements = m_Schematic.GetElements();
+    const auto &elements = m_Schematic->GetElements();
     const bool marks_live_parts = m_Controls.IsLive() && IsSelecting();
     for (std::size_t index = 0; index < elements.size(); ++index) {
         elements[index]->Draw(canvas, view, GetElementColor(index), m_Preferences.Symbols);
-        if (m_Schematic.IsElementSelected(index)) {
+        if (m_Schematic->IsElementSelected(index)) {
             if (ArePartsHeatColored()) {
                 elements[index]->DrawOutline(canvas, view, GetPalette().Selected);
             }
@@ -1217,17 +1259,18 @@ void EditorWindow::DrawElements(SchematicCanvas &canvas, const ViewTransform &vi
 // Selection wins, unless the parts are heat colored, where an outline marks it instead; coloring by current heats each
 // part by the largest current through its terminals, and coloring by power by the power it absorbs
 ImU32 EditorWindow::GetElementColor(const std::size_t index) const {
-    if (m_Schematic.IsElementSelected(index) && !ArePartsHeatColored()) {
+    if (m_Schematic->IsElementSelected(index) && !ArePartsHeatColored()) {
         return GetPalette().Selected;
     }
     const bool by_current = m_Preferences.WireColors == WireColoring::CURRENT;
     if ((!by_current && m_Preferences.WireColors != WireColoring::POWER) || !m_Displayed) {
         return GetPalette().Element;
     }
-    const UIElement &element = *m_Schematic.GetElements()[index];
+    const UIElement &element = *m_Schematic->GetElements()[index];
     const Core::Component &component = element.GetComponent();
-    // Ground and net labels carry no current or power of their own
-    if (component.GetType() == Core::ComponentType::GROUND || component.GetType() == Core::ComponentType::NET_LABEL) {
+    // Ground, net labels and subcircuit pin markers carry no current or power of their own
+    if (component.GetType() == Core::ComponentType::GROUND || component.GetType() == Core::ComponentType::NET_LABEL ||
+        Core::IsSubcircuitPin(component.GetType())) {
         return GetPalette().Element;
     }
     if (!by_current) {
@@ -1260,7 +1303,7 @@ void EditorWindow::DrawStatusBar(const ViewTransform &view, const bool hovered) 
     } else if (m_Controls.IsLive()) {
         hint = "Live: click a switch or logic input to flip it, hold a push button down, turn a potentiometer with the "
                "wheel; any other edit ends the run";
-    } else if (const UIElement *element = m_Schematic.GetSelectedElement()) {
+    } else if (const UIElement *element = m_Schematic->GetSelectedElement()) {
         const Core::Component &component = element->GetComponent();
         const std::string name =
             component.GetName().empty() ? std::string(GetPartName(component.GetType())) : component.GetName();
@@ -1268,8 +1311,8 @@ void EditorWindow::DrawStatusBar(const ViewTransform &view, const bool hovered) 
             std::format("{} selected: Enter or double click to edit, type a value, drag to move, R rotate, M mirror, "
                         "Alt keeps the wires, Del delete, right click for more",
                         name);
-    } else if (m_Schematic.HasSelection()) {
-        const std::size_t count = m_Schematic.GetSelectedElements().size() + m_Schematic.GetSelectedWires().size();
+    } else if (m_Schematic->HasSelection()) {
+        const std::size_t count = m_Schematic->GetSelectedElements().size() + m_Schematic->GetSelectedWires().size();
         hint = count == 1 ? "Wire selected: drag to slide it, double click for its whole node, Del delete, Esc deselect"
                           : std::format("{} items selected: drag to move, R rotate, M mirror, Alt keeps the wires, "
                                         "Shift+click to add or remove, Del delete, Esc deselect",
@@ -1300,7 +1343,7 @@ void EditorWindow::DrawStatusBar(const ViewTransform &view, const bool hovered) 
 // opens the report of the run, with the ngspice output. Returns where the space left for the hint ends
 float EditorWindow::DrawRunStatus(float right_edge) {
     const std::optional<Analysis> last_run = m_Controls.GetLastRun();
-    const RunStatusLine line = DescribeRunStatus(m_Controls, m_Schematic.GetTransient());
+    const RunStatusLine line = DescribeRunStatus(m_Controls, m_Schematic->GetTransient());
     const ImVec2 line_start = ImGui::GetCursorScreenPos();
     if (!line.Text.empty()) {
         const ImVec2 status_size = ImGui::CalcTextSize(line.Text.c_str());
@@ -1391,7 +1434,7 @@ void EditorWindow::DrawNodeVoltages(ImDrawList *draw_list, const ViewTransform &
     if (!m_Displayed) {
         return;
     }
-    const Connectivity &connectivity = m_Schematic.GetConnectivity();
+    const Connectivity &connectivity = m_Schematic->GetConnectivity();
     const std::vector<double> &voltages = m_Displayed->Point.NodeVoltages;
     // The theme color of the labels is yellow, which gets lost over the yellow of the heat scale
     const ImU32 label_color = AreWiresHeatColored() ? GetPalette().CanvasText : GetPalette().VoltageLabel;
@@ -1410,10 +1453,10 @@ void EditorWindow::DrawNodeVoltages(ImDrawList *draw_list, const ViewTransform &
         draw_list->AddText(view.ToScreen(world_pos) + VOLTAGE_LABEL_OFFSET, label_color, text.c_str());
     };
 
-    for (const UIWire &wire : m_Schematic.GetWires()) {
+    for (const UIWire &wire : m_Schematic->GetWires()) {
         draw_label(wire.GetStart(), (ToVec2(wire.GetStart()) + ToVec2(wire.GetEnd())) / 2.0f);
     }
-    for (const auto &element : m_Schematic.GetElements()) {
+    for (const auto &element : m_Schematic->GetElements()) {
         for (const GridPoint terminal : element->GetTerminals()) {
             draw_label(terminal, ToVec2(terminal));
         }
@@ -1426,12 +1469,12 @@ void EditorWindow::DrawHoveredValue(const ViewTransform &view, const bool hovere
         return;
     }
     const std::optional<MeasurementTarget> target =
-        FindMeasurementTarget(m_Schematic.GetElements(), m_Schematic.GetWires(), m_Schematic.GetConnectivity(),
+        FindMeasurementTarget(m_Schematic->GetElements(), m_Schematic->GetWires(), m_Schematic->GetConnectivity(),
                               view.ToWorld(ImGui::GetIO().MousePos), WIRE_PICK_DISTANCE / m_View.GetZoom());
     if (!target || !FindOperatingPointValue(*target, m_Displayed->Point)) {
         return;
     }
-    std::string text = DescribeMeasurement(*target, m_Schematic.GetConnectivity(), &m_Displayed->Point);
+    std::string text = DescribeMeasurement(*target, m_Schematic->GetConnectivity(), &m_Displayed->Point);
     if (!target->Node) {
         if (const std::optional<ComponentPower> power = FindPower(m_Displayed->Powers, target->Current)) {
             text += std::format("\nP({}) = {}W", power->Name, Core::FormatValue(power->Power));
@@ -1456,8 +1499,17 @@ void EditorWindow::StartPlacing(const Core::ComponentType type) {
     m_DrawingWires = false;
     m_WireStart.reset();
     m_PlacingType = type;
+    m_PlacingSubcircuit.clear();
     m_PlacingRotation = Rotation::R0;
     m_PlacingMirrored = false;
+}
+
+void EditorWindow::StartPlacingSubcircuit(const std::string &name) {
+    if (IsEditingSubcircuit()) {
+        return;
+    }
+    StartPlacing(Core::ComponentType::SUBCIRCUIT);
+    m_PlacingSubcircuit = name;
 }
 
 void EditorWindow::StartDrawingWires() {
@@ -1484,6 +1536,229 @@ void EditorWindow::StopEditing() {
     m_PlacingType.reset();
     m_DrawingWires = false;
     m_WireStart.reset();
+}
+
+bool EditorWindow::IsEditingSubcircuit() const {
+    return m_SubcircuitContent != nullptr;
+}
+
+void EditorWindow::RequestCreateSubcircuit() {
+    if (IsEditingSubcircuit()) {
+        return;
+    }
+    auto candidates = m_RootSchematic.GetSubcircuitPinCandidates();
+    m_SubcircuitName = "block";
+    while (std::ranges::find(m_RootSchematic.GetSubcircuits(), m_SubcircuitName, &SavedSubcircuit::Name) !=
+           m_RootSchematic.GetSubcircuits().end()) {
+        m_SubcircuitName += "_2";
+    }
+    m_SubcircuitPins.clear();
+    m_SubcircuitParameters.clear();
+    m_SubcircuitError.clear();
+    if (candidates) {
+        for (const auto &candidate : *candidates) {
+            m_SubcircuitPins.push_back({candidate.SuggestedName, candidate.Point});
+        }
+    } else {
+        m_SubcircuitError = candidates.error();
+    }
+    m_SubcircuitDialogRequested = true;
+}
+
+void EditorWindow::RequestEditSelectedSubcircuit() {
+    if (IsEditingSubcircuit()) {
+        return;
+    }
+    const UIElement *element = m_RootSchematic.GetSelectedElement();
+    if (element == nullptr || element->GetComponent().GetType() != Core::ComponentType::SUBCIRCUIT) {
+        return;
+    }
+    const auto &instance = static_cast<const Core::SubcircuitInstance &>(element->GetComponent());
+    auto content = m_RootSchematic.OpenSubcircuit(instance.GetDefinitionName());
+    if (!content) {
+        m_SubcircuitError = content.error();
+        m_SubcircuitDialogRequested = true;
+        return;
+    }
+    const auto definition =
+        std::ranges::find(m_RootSchematic.GetSubcircuits(), instance.GetDefinitionName(), &SavedSubcircuit::Name);
+    m_EditingSubcircuit = instance.GetDefinitionName();
+    m_SubcircuitName = m_EditingSubcircuit;
+    m_SubcircuitPins = definition->Pins;
+    m_SubcircuitParameters = definition->Parameters;
+    m_SubcircuitContent = std::move(*content);
+    m_Schematic = m_SubcircuitContent.get();
+    m_PartEditor.SetSchematic(*m_Schematic);
+    m_Schematic->ClearSelection();
+    m_Displayed.reset();
+    m_PlacingType.reset();
+    m_Pasting.reset();
+    m_View.RequestDefaultFrame();
+}
+
+bool EditorWindow::SyncSubcircuitPins() {
+    auto markers = m_SubcircuitContent->GetSubcircuitPinMarkers();
+    if (!markers) {
+        m_SubcircuitError = markers.error();
+        return false;
+    }
+    std::vector<SavedSubcircuitPin> synchronized;
+    std::set<std::string> added;
+    for (const SavedSubcircuitPin &pin : m_SubcircuitPins) {
+        const auto marker = std::ranges::find(*markers, pin.Name, &Schematic::SubcircuitPinCandidate::SuggestedName);
+        if (marker != markers->end()) {
+            synchronized.push_back({pin.Name, marker->Point});
+            added.insert(pin.Name);
+        }
+    }
+    for (const auto &marker : *markers) {
+        if (added.insert(marker.SuggestedName).second) {
+            synchronized.push_back({marker.SuggestedName, marker.Point});
+        }
+    }
+    m_SubcircuitPins = std::move(synchronized);
+    return true;
+}
+
+bool EditorWindow::ApplySubcircuitPinNames() {
+    for (auto &element : m_SubcircuitContent->GetElements()) {
+        if (!Core::IsSubcircuitPin(element->GetComponent().GetType())) {
+            continue;
+        }
+        const GridPoint point = element->GetTerminals().front();
+        const auto pin = std::ranges::find(m_SubcircuitPins, point, &SavedSubcircuitPin::Point);
+        if (pin == m_SubcircuitPins.end()) {
+            m_SubcircuitError = "Every PIN and POUT marker needs a block pin name";
+            return false;
+        }
+        auto &marker = static_cast<Core::NetLabel &>(element->GetComponent());
+        if (marker.GetNet() != pin->Name) {
+            marker.SetNet(pin->Name);
+            m_SubcircuitContent->MarkModified();
+        }
+    }
+    return true;
+}
+
+void EditorWindow::FinishSubcircuitEditing(const bool apply) {
+    if (!IsEditingSubcircuit()) {
+        return;
+    }
+    if (apply) {
+        if (!SyncSubcircuitPins()) {
+            m_SubcircuitDialogRequested = true;
+            return;
+        }
+        auto updated = m_RootSchematic.UpdateSubcircuit(m_EditingSubcircuit, *m_SubcircuitContent, m_SubcircuitPins,
+                                                        m_SubcircuitParameters);
+        if (!updated) {
+            m_SubcircuitError = updated.error();
+            m_SubcircuitDialogRequested = true;
+            return;
+        }
+        m_RootSchematic.CommitUndoStep();
+    }
+    m_SubcircuitContent.reset();
+    m_EditingSubcircuit.clear();
+    m_SubcircuitPins.clear();
+    m_SubcircuitParameters.clear();
+    m_Schematic = &m_RootSchematic;
+    m_PartEditor.SetSchematic(m_RootSchematic);
+    m_Schematic->ClearSelection();
+    m_Displayed.reset();
+    m_View.RequestDefaultFrame();
+}
+
+void EditorWindow::DrawSubcircuitDialog() {
+    constexpr const char *popup = "Subcircuit block";
+    if (std::exchange(m_SubcircuitDialogRequested, false)) {
+        ImGui::OpenPopup(popup);
+    }
+    if (!ImGui::BeginPopupModal(popup, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+        return;
+    }
+    const bool editing = IsEditingSubcircuit();
+    ImGui::BeginDisabled(editing);
+    ImGui::InputText("Name", &m_SubcircuitName);
+    ImGui::EndDisabled();
+    ImGui::SeparatorText("Pins (outer to inner order)");
+    for (std::size_t index = 0; index < m_SubcircuitPins.size(); ++index) {
+        ImGui::PushID(static_cast<int>(index));
+        ImGui::SetNextItemWidth(ImGui::GetFontSize() * 8.0f);
+        ImGui::InputText("##pin", &m_SubcircuitPins[index].Name);
+        ImGui::SameLine();
+        ImGui::TextDisabled("(%d, %d)", m_SubcircuitPins[index].Point.X, m_SubcircuitPins[index].Point.Y);
+        ImGui::SameLine();
+        ImGui::BeginDisabled(index == 0);
+        if (ImGui::Button("Up")) {
+            std::swap(m_SubcircuitPins[index], m_SubcircuitPins[index - 1]);
+        }
+        ImGui::EndDisabled();
+        ImGui::SameLine();
+        ImGui::BeginDisabled(index + 1 == m_SubcircuitPins.size());
+        if (ImGui::Button("Down")) {
+            std::swap(m_SubcircuitPins[index], m_SubcircuitPins[index + 1]);
+        }
+        ImGui::EndDisabled();
+        ImGui::PopID();
+    }
+    if (m_SubcircuitPins.empty()) {
+        ImGui::TextDisabled("Place PIN and POUT markers to choose the block connections");
+    }
+    ImGui::SeparatorText("Parameters");
+    for (std::size_t index = 0; index < m_SubcircuitParameters.size(); ++index) {
+        ImGui::PushID(static_cast<int>(index));
+        ImGui::SetNextItemWidth(ImGui::GetFontSize() * 8.0f);
+        ImGui::InputText("##parameter", &m_SubcircuitParameters[index].Name);
+        ImGui::SameLine();
+        ImGui::InputDouble("##default", &m_SubcircuitParameters[index].DefaultValue, 0.0, 0.0, "%g");
+        ImGui::SameLine();
+        if (ImGui::Button("Remove")) {
+            m_SubcircuitParameters.erase(m_SubcircuitParameters.begin() + static_cast<std::ptrdiff_t>(index));
+            ImGui::PopID();
+            break;
+        }
+        ImGui::PopID();
+    }
+    if (ImGui::Button("Add parameter")) {
+        m_SubcircuitParameters.push_back({std::format("P{}", m_SubcircuitParameters.size() + 1), 1.0});
+    }
+    if (!m_SubcircuitError.empty()) {
+        ImGui::TextColored(GetErrorTextColor(), "%s", m_SubcircuitError.c_str());
+    }
+    if (ImGui::Button(editing ? "Keep settings" : "Create block")) {
+        if (editing) {
+            if (ApplySubcircuitPinNames()) {
+                m_SubcircuitError.clear();
+                ImGui::CloseCurrentPopup();
+            }
+        } else {
+            std::vector<std::string> pins;
+            for (const auto &pin : m_SubcircuitPins) {
+                pins.push_back(pin.Name);
+            }
+            auto created =
+                m_RootSchematic.CreateSubcircuitFromSelection(m_SubcircuitName, pins, m_SubcircuitParameters);
+            if (created) {
+                m_RootSchematic.CommitUndoStep();
+                m_SubcircuitError.clear();
+                ImGui::CloseCurrentPopup();
+            } else {
+                m_SubcircuitError = created.error();
+            }
+        }
+    }
+    ImGui::SameLine();
+    if (ImGui::Button(editing ? "Discard settings" : "Cancel")) {
+        if (editing) {
+            const auto definition =
+                std::ranges::find(m_RootSchematic.GetSubcircuits(), m_EditingSubcircuit, &SavedSubcircuit::Name);
+            m_SubcircuitPins = definition->Pins;
+            m_SubcircuitParameters = definition->Parameters;
+        }
+        ImGui::CloseCurrentPopup();
+    }
+    ImGui::EndPopup();
 }
 
 /**
@@ -1517,9 +1792,18 @@ void EditorWindow::DrawPartPicker() {
         m_PartPickerIndex = 0;
     }
     const std::vector<Core::ComponentType> found = FindParts(m_PartQuery);
+    std::vector<const SavedSubcircuit *> definitions;
+    if (!IsEditingSubcircuit()) {
+        for (const SavedSubcircuit &definition : m_RootSchematic.GetSubcircuits()) {
+            if (definition.Name.contains(m_PartQuery)) {
+                definitions.push_back(&definition);
+            }
+        }
+    }
+    const std::size_t match_count = found.size() + definitions.size();
     // The list follows the highlight only when the keys move it, so the wheel still scrolls it
     bool moved = false;
-    if (ImGui::IsKeyPressed(ImGuiKey_DownArrow) && m_PartPickerIndex + 1 < found.size()) {
+    if (ImGui::IsKeyPressed(ImGuiKey_DownArrow) && m_PartPickerIndex + 1 < match_count) {
         ++m_PartPickerIndex;
         moved = true;
     }
@@ -1527,18 +1811,24 @@ void EditorWindow::DrawPartPicker() {
         --m_PartPickerIndex;
         moved = true;
     }
-    m_PartPickerIndex = std::min(m_PartPickerIndex, found.empty() ? 0 : found.size() - 1);
+    m_PartPickerIndex = std::min(m_PartPickerIndex, match_count == 0 ? 0 : match_count - 1);
 
     std::optional<Core::ComponentType> picked;
-    if (!found.empty() && (ImGui::IsKeyPressed(ImGuiKey_Enter) || ImGui::IsKeyPressed(ImGuiKey_KeypadEnter))) {
-        picked = found[m_PartPickerIndex];
+    std::string picked_definition;
+    const bool enter = ImGui::IsKeyPressed(ImGuiKey_Enter) || ImGui::IsKeyPressed(ImGuiKey_KeypadEnter);
+    if (match_count > 0 && enter) {
+        if (m_PartPickerIndex < found.size()) {
+            picked = found[m_PartPickerIndex];
+        } else {
+            picked_definition = definitions[m_PartPickerIndex - found.size()]->Name;
+        }
     }
-    if (found.empty()) {
+    if (match_count == 0) {
         ImGui::TextDisabled("No part matches");
     }
     // A short list that scrolls, so the picker stays small
     const float row_spacing = ImGui::GetStyle().ItemSpacing.y;
-    const std::size_t visible_rows = std::min(found.size(), PART_PICKER_ROWS);
+    const std::size_t visible_rows = std::min(match_count, PART_PICKER_ROWS);
     const float list_height = static_cast<float>(visible_rows) * (row_height + row_spacing) - row_spacing;
     if (visible_rows > 0) {
         ImGui::BeginChild("##matches", {width + ImGui::GetStyle().ScrollbarSize, list_height}, ImGuiChildFlags_None,
@@ -1562,12 +1852,28 @@ void EditorWindow::DrawPartPicker() {
         draw_list->AddText(start + ImVec2(row_height + ImGui::GetStyle().ItemSpacing.x, text_y), IconColor(true),
                            GetPartName(type));
     }
+    for (std::size_t index = 0; index < definitions.size(); ++index) {
+        const std::size_t match = found.size() + index;
+        ImGui::PushID(static_cast<int>(match));
+        if (ImGui::Selectable(std::format("Block: {}", definitions[index]->Name).c_str(), match == m_PartPickerIndex,
+                              ImGuiSelectableFlags_None, {width, row_height})) {
+            picked_definition = definitions[index]->Name;
+        }
+        ImGui::PopID();
+        if (moved && match == m_PartPickerIndex) {
+            ImGui::SetScrollHereY();
+        }
+    }
     if (visible_rows > 0) {
         ImGui::EndChild();
     }
 
-    if (picked) {
-        StartPlacing(*picked);
+    if (picked || !picked_definition.empty()) {
+        if (picked) {
+            StartPlacing(*picked);
+        } else {
+            StartPlacingSubcircuit(picked_definition);
+        }
         ImGui::CloseCurrentPopup();
     } else if (ImGui::IsKeyPressed(ImGuiKey_Escape)) {
         // Esc only closes the list; the lock keeps the editor below from also leaving its mode this frame
@@ -1614,19 +1920,35 @@ void EditorWindow::HandlePlacement(SchematicCanvas &canvas, const ViewTransform 
     auto preview = CreateElement(*m_PlacingType, position, m_PlacingRotation);
     preview->SetMirrored(m_PlacingMirrored);
     const bool is_label = *m_PlacingType == Core::ComponentType::NET_LABEL;
+    const bool is_pin = Core::IsSubcircuitPin(*m_PlacingType);
     if (is_label) {
         // A new label starts with the name of the last one, so the same net is a click away
         static_cast<Core::NetLabel &>(preview->GetComponent()).SetNet(FindLastNet());
+    }
+    if (!m_PlacingSubcircuit.empty()) {
+        const auto definition =
+            std::ranges::find(m_RootSchematic.GetSubcircuits(), m_PlacingSubcircuit, &SavedSubcircuit::Name);
+        if (definition == m_RootSchematic.GetSubcircuits().end()) {
+            m_PlacingType.reset();
+            return;
+        }
+        auto &instance = static_cast<Core::SubcircuitInstance &>(preview->GetComponent());
+        instance.SetDefinitionName(definition->Name);
+        std::vector<std::string> pins;
+        for (const SavedSubcircuitPin &pin : definition->Pins) {
+            pins.push_back(pin.Name);
+        }
+        instance.SetPins(std::move(pins));
     }
     preview->Draw(canvas, view, GetPreviewColor(), m_Preferences.Symbols);
     if (!ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
         return;
     }
-    m_Schematic.AddElement(std::move(preview));
-    if (is_label) {
-        // The name is what a label needs next: placing ends and its popover opens on the name
+    m_Schematic->AddElement(std::move(preview));
+    if (is_label || is_pin) {
+        // The name is what a label or pin marker needs next: placing ends and its popover opens on the name
         m_PlacingType.reset();
-        m_Schematic.SelectElement(m_Schematic.GetElements().size() - 1);
+        m_Schematic->SelectElement(m_Schematic->GetElements().size() - 1);
         m_PartEditor.FocusNetName();
         PlacePartPopover(view);
         m_PartPopoverRequested = true;
@@ -1635,7 +1957,7 @@ void EditorWindow::HandlePlacement(SchematicCanvas &canvas, const ViewTransform 
 
 // The name of the newest label that has one, or none
 std::string EditorWindow::FindLastNet() const {
-    for (const auto &element : std::views::reverse(m_Schematic.GetElements())) {
+    for (const auto &element : std::views::reverse(m_Schematic->GetElements())) {
         if (element->GetComponent().GetType() != Core::ComponentType::NET_LABEL) {
             continue;
         }
@@ -1670,20 +1992,22 @@ void EditorWindow::HandleClipboardShortcuts() {
 
 // The selection goes to the clipboard as text in the format of the files, so another copy of the program can paste it
 void EditorWindow::CopySelected() {
-    if (!IsSelecting() || !m_Schematic.HasSelection()) {
+    if (!IsSelecting() || !m_Schematic->HasSelection()) {
         return;
     }
-    const Selection selection = {m_Schematic.GetSelectedElements(), m_Schematic.GetSelectedWires()};
-    ImGui::SetClipboardText(CopySelection(m_Schematic.GetElements(), m_Schematic.GetWires(), selection).c_str());
+    const Selection selection = {m_Schematic->GetSelectedElements(), m_Schematic->GetSelectedWires()};
+    ImGui::SetClipboardText(
+        CopySelection(m_Schematic->GetElements(), m_Schematic->GetWires(), selection, m_Schematic->GetSubcircuits())
+            .c_str());
 }
 
 // Deleting in the middle of a drag would leave the drag pointing at removed items
 void EditorWindow::CutSelected() {
-    if (m_Drag || !IsSelecting() || !m_Schematic.HasSelection()) {
+    if (m_Drag || !IsSelecting() || !m_Schematic->HasSelection()) {
         return;
     }
     CopySelected();
-    m_Schematic.DeleteSelection();
+    m_Schematic->DeleteSelection();
 }
 
 // Reads the clipboard and, when it holds a schematic, places it. Text that is not a schematic is left alone
@@ -1701,6 +2025,12 @@ void EditorWindow::StartPasting() {
 
 // Leaves every other mode, so the group is the only thing to place
 void EditorWindow::StartPastingGroup(PastedGroup group) {
+    const bool has_block = std::ranges::any_of(group.Elements, [](const auto &element) {
+        return element->GetComponent().GetType() == Core::ComponentType::SUBCIRCUIT;
+    });
+    if (IsEditingSubcircuit() && has_block) {
+        return;
+    }
     ClearSelection();
     m_PlacingType.reset();
     m_DrawingWires = false;
@@ -1753,24 +2083,25 @@ void EditorWindow::HandlePasting(SchematicCanvas &canvas, const ViewTransform &v
         return;
     }
 
-    const std::size_t first_element = m_Schematic.GetElements().size();
-    const std::size_t first_wire = m_Schematic.GetWires().size();
+    const std::size_t first_element = m_Schematic->GetElements().size();
+    const std::size_t first_wire = m_Schematic->GetWires().size();
+    m_Schematic->MergeSubcircuits(std::move(m_Pasting->Subcircuits));
     for (auto &element : m_Pasting->Elements) {
-        m_Schematic.AddElement(std::move(element));
+        m_Schematic->AddElement(std::move(element));
     }
     for (const UIWire &wire : m_Pasting->Wires) {
-        m_Schematic.AddWire(wire.GetStart(), wire.GetEnd());
+        m_Schematic->AddWire(wire.GetStart(), wire.GetEnd());
     }
     std::set<std::size_t> elements;
-    for (std::size_t index = first_element; index < m_Schematic.GetElements().size(); ++index) {
+    for (std::size_t index = first_element; index < m_Schematic->GetElements().size(); ++index) {
         elements.insert(index);
     }
     std::set<std::size_t> wires;
-    for (std::size_t index = first_wire; index < m_Schematic.GetWires().size(); ++index) {
+    for (std::size_t index = first_wire; index < m_Schematic->GetWires().size(); ++index) {
         wires.insert(index);
     }
     m_Pasting.reset();
-    m_Schematic.SetSelection(std::move(elements), std::move(wires));
+    m_Schematic->SetSelection(std::move(elements), std::move(wires));
 }
 
 /**
@@ -1825,9 +2156,9 @@ void EditorWindow::HandleWireDrawing(ImDrawList *draw_list, const ViewTransform 
         m_WireStart.reset();
         return;
     }
-    m_Schematic.AddWire(start, corner);
-    m_Schematic.AddWire(corner, cursor);
-    if (m_Schematic.IsTerminal(cursor)) {
+    m_Schematic->AddWire(start, corner);
+    m_Schematic->AddWire(corner, cursor);
+    if (m_Schematic->IsTerminal(cursor)) {
         m_WireStart.reset();
     } else {
         m_WireStart = cursor;
@@ -1866,17 +2197,17 @@ void EditorWindow::HandleProbing(ImDrawList *draw_list, const ViewTransform &vie
 
     const ImVec2 cursor = ImGui::GetIO().MousePos;
     const std::optional<MeasurementTarget> target =
-        FindMeasurementTarget(m_Schematic.GetElements(), m_Schematic.GetWires(), m_Schematic.GetConnectivity(),
+        FindMeasurementTarget(m_Schematic->GetElements(), m_Schematic->GetWires(), m_Schematic->GetConnectivity(),
                               view.ToWorld(cursor), WIRE_PICK_DISTANCE / m_View.GetZoom());
     if (!target) {
         ImGui::SetTooltip("Click a wire for its voltage, or a part for its current");
         return;
     }
     const bool measured =
-        target->Node ? m_Schematic.IsVoltageMeasured(*target->Node) : m_Schematic.IsCurrentMeasured(target->Current);
+        target->Node ? m_Schematic->IsVoltageMeasured(*target->Node) : m_Schematic->IsCurrentMeasured(target->Current);
     draw_list->AddCircle(cursor, MEASUREMENT_MARKER_RADIUS * 2.0f, GetHighlightColor(), 0, LINE_THICKNESS);
     ImGui::SetTooltip("%s", std::format("{}\nClick to {} the plots",
-                                        DescribeMeasurement(*target, m_Schematic.GetConnectivity(),
+                                        DescribeMeasurement(*target, m_Schematic->GetConnectivity(),
                                                             m_Displayed ? &m_Displayed->Point : nullptr),
                                         measured ? "remove it from" : "add it to")
                                 .c_str());
@@ -1884,9 +2215,9 @@ void EditorWindow::HandleProbing(ImDrawList *draw_list, const ViewTransform &vie
         return;
     }
     if (target->Node) {
-        m_Schematic.SetVoltageMeasured(*target->Node, !measured);
+        m_Schematic->SetVoltageMeasured(*target->Node, !measured);
     } else {
-        m_Schematic.SetCurrentMeasured(target->Current, !measured);
+        m_Schematic->SetCurrentMeasured(target->Current, !measured);
     }
 }
 
@@ -1907,9 +2238,9 @@ void EditorWindow::HandleSelection(const ViewTransform &view, const bool hovered
     const ImVec2 cursor_world = view.ToWorld(ImGui::GetIO().MousePos);
     const bool shift = ImGui::GetIO().KeyShift;
     if (hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
-        const Selection picked = PickAt(m_Schematic.GetElements(), m_Schematic.GetWires(), cursor_world,
+        const Selection picked = PickAt(m_Schematic->GetElements(), m_Schematic->GetWires(), cursor_world,
                                         WIRE_PICK_DISTANCE / m_View.GetZoom());
-        const Selection current = {m_Schematic.GetSelectedElements(), m_Schematic.GetSelectedWires()};
+        const Selection current = {m_Schematic->GetSelectedElements(), m_Schematic->GetSelectedWires()};
         if (picked.Empty()) {
             // Empty canvas starts a box; with Shift it adds to what is selected, otherwise it starts over
             if (!shift) {
@@ -1928,13 +2259,18 @@ void EditorWindow::HandleSelection(const ViewTransform &view, const bool hovered
     }
 
     if (hovered && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
-        if (m_Schematic.GetSelectedElement() != nullptr) {
+        if (m_Schematic->GetSelectedElement() != nullptr) {
             EndDrag();
-            PlacePartPopover(view);
-            m_PartPopoverRequested = true;
-        } else if (m_Schematic.GetSelectedElements().empty() && m_Schematic.GetSelectedWires().size() == 1) {
-            const Selection node = PickNode(m_Schematic.GetWires(), m_Schematic.GetConnectivity(),
-                                            *m_Schematic.GetSelectedWires().begin());
+            if (!IsEditingSubcircuit() &&
+                m_Schematic->GetSelectedElement()->GetComponent().GetType() == Core::ComponentType::SUBCIRCUIT) {
+                RequestEditSelectedSubcircuit();
+            } else {
+                PlacePartPopover(view);
+                m_PartPopoverRequested = true;
+            }
+        } else if (m_Schematic->GetSelectedElements().empty() && m_Schematic->GetSelectedWires().size() == 1) {
+            const Selection node = PickNode(m_Schematic->GetWires(), m_Schematic->GetConnectivity(),
+                                            *m_Schematic->GetSelectedWires().begin());
             EndDrag();
             ApplySelection(node);
         }
@@ -1943,7 +2279,7 @@ void EditorWindow::HandleSelection(const ViewTransform &view, const bool hovered
     if (m_Box) {
         if (ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
             const Selection inside =
-                PickInRectangle(m_Schematic.GetElements(), m_Schematic.GetWires(), m_Box->Start, cursor_world);
+                PickInRectangle(m_Schematic->GetElements(), m_Schematic->GetWires(), m_Box->Start, cursor_world);
             ApplySelection(Joined(m_Box->Base, inside));
         } else {
             m_Box.reset();
@@ -1965,7 +2301,7 @@ void EditorWindow::HandleSelection(const ViewTransform &view, const bool hovered
         }
         const bool enter =
             ImGui::IsKeyPressed(ImGuiKey_Enter, false) || ImGui::IsKeyPressed(ImGuiKey_KeypadEnter, false);
-        if (enter && m_Schematic.GetSelectedElement() != nullptr && !ImGui::IsAnyItemActive()) {
+        if (enter && m_Schematic->GetSelectedElement() != nullptr && !ImGui::IsAnyItemActive()) {
             PlacePartPopover(view);
             m_PartPopoverRequested = true;
         }
@@ -1975,7 +2311,7 @@ void EditorWindow::HandleSelection(const ViewTransform &view, const bool hovered
         }
         // Deleting mid-drag would leave the drag pointing at removed items
         if (ImGui::IsKeyPressed(ImGuiKey_Delete) && !m_Drag) {
-            m_Schematic.DeleteSelection();
+            m_Schematic->DeleteSelection();
         }
         if (ImGui::IsKeyPressed(ImGuiKey_Escape) && !m_PopupOpenLastFrame) {
             ClearSelection();
@@ -1986,21 +2322,21 @@ void EditorWindow::HandleSelection(const ViewTransform &view, const bool hovered
 // Replaces the selection; a drag belongs to the items it was started with, so it ends
 void EditorWindow::ApplySelection(const Selection &selection) {
     EndDrag();
-    m_Schematic.SetSelection(selection.Elements, selection.Wires);
+    m_Schematic->SetSelection(selection.Elements, selection.Wires);
 }
 
 // A drag belongs to the selection, so it ends with it, and so does a selection box
 void EditorWindow::ClearSelection() {
     EndDrag();
     m_Box.reset();
-    m_Schematic.ClearSelection();
+    m_Schematic->ClearSelection();
 }
 
 void EditorWindow::SelectAll() {
     if (!IsSelecting()) {
         return;
     }
-    ApplySelection(PickAll(m_Schematic.GetElements(), m_Schematic.GetWires()));
+    ApplySelection(PickAll(m_Schematic->GetElements(), m_Schematic->GetWires()));
 }
 
 // Captures what a drag of the current selection needs, so every frame can be computed from the start. A click on one
@@ -2008,11 +2344,11 @@ void EditorWindow::SelectAll() {
 EditorWindow::GroupDrag EditorWindow::MakeDrag(const GridPoint cursor, std::optional<Selection> collapse_to) const {
     GroupDrag drag;
     drag.StartCursor = cursor;
-    drag.Elements = m_Schematic.GetSelectedElements();
-    drag.Wires = m_Schematic.GetSelectedWires();
-    drag.StartWires = m_Schematic.GetWires();
+    drag.Elements = m_Schematic->GetSelectedElements();
+    drag.Wires = m_Schematic->GetSelectedWires();
+    drag.StartWires = m_Schematic->GetWires();
     drag.CollapseTo = std::move(collapse_to);
-    const auto &elements = m_Schematic.GetElements();
+    const auto &elements = m_Schematic->GetElements();
     for (std::size_t index = 0; index < elements.size(); ++index) {
         const std::vector<GridPoint> terminals = elements[index]->GetTerminals();
         if (drag.Elements.contains(index)) {
@@ -2054,7 +2390,7 @@ void EditorWindow::UpdateDrag(const GridPoint cursor) {
     std::vector<GridPoint> new_terminals;
     std::size_t position_index = 0;
     for (const std::size_t index : drag.Elements) {
-        UIElement &element = m_Schematic.GetElement(index);
+        UIElement &element = m_Schematic->GetElement(index);
         element.SetPosition(drag.StartPositions[position_index++] + delta);
         const std::vector<GridPoint> terminals = element.GetTerminals();
         new_terminals.insert(new_terminals.end(), terminals.begin(), terminals.end());
@@ -2062,9 +2398,9 @@ void EditorWindow::UpdateDrag(const GridPoint cursor) {
     const PointTransform translation = {.Type = PointTransform::Kind::TRANSLATE, .Delta = delta, .Pivot = {}};
     MovedWires moved =
         MoveGroup(drag.StartWires, drag.Wires, drag.StartTerminals, new_terminals, drag.FixedTerminals, translation);
-    m_Schematic.SetWires(std::move(moved.Wires));
-    m_Schematic.SetSelection(drag.Elements, std::move(moved.Selected));
-    m_Schematic.MarkModified();
+    m_Schematic->SetWires(std::move(moved.Wires));
+    m_Schematic->SetSelection(drag.Elements, std::move(moved.Selected));
+    m_Schematic->MarkModified();
 }
 
 // What the drag left selected: just the clicked item when the mouse never moved over a group. The cleanup of the
@@ -2076,9 +2412,9 @@ void EditorWindow::EndDrag() {
     const std::optional<Selection> collapse_to = std::move(m_Drag->CollapseTo);
     m_Drag.reset();
     if (collapse_to) {
-        m_Schematic.SetSelection(collapse_to->Elements, collapse_to->Wires);
+        m_Schematic->SetSelection(collapse_to->Elements, collapse_to->Wires);
     }
-    m_Schematic.SimplifyAllWires();
+    m_Schematic->SimplifyAllWires();
 }
 
 // The box and the items it takes in, drawn over the schematic
@@ -2097,19 +2433,19 @@ void EditorWindow::DrawSelectionBox(ImDrawList *draw_list, const ViewTransform &
 // that meet them follow, unless Alt is held: then the parts turn alone and every wire stays where it was. A turn
 // during a drag ends that move and goes on dragging from the new position
 void EditorWindow::TransformSelection(const PointTransform::Kind kind, const bool keep_wires) {
-    if (m_Schematic.GetSelectedElements().empty()) {
+    if (m_Schematic->GetSelectedElements().empty()) {
         return;
     }
     const std::optional<GridPoint> drag_cursor = m_Drag ? std::optional(m_Drag->LastCursor) : std::nullopt;
     EndDrag();
 
-    const auto &elements = m_Schematic.GetElements();
-    const std::set<std::size_t> selected_elements = m_Schematic.GetSelectedElements();
-    const std::set<std::size_t> selected_wires = m_Schematic.GetSelectedWires();
+    const auto &elements = m_Schematic->GetElements();
+    const std::set<std::size_t> selected_elements = m_Schematic->GetSelectedElements();
+    const std::set<std::size_t> selected_wires = m_Schematic->GetSelectedWires();
     const PointTransform transform = {
         .Type = kind,
         .Delta = {},
-        .Pivot = FindPivot(elements, selected_elements, m_Schematic.GetWires(), selected_wires)};
+        .Pivot = FindPivot(elements, selected_elements, m_Schematic->GetWires(), selected_wires)};
 
     std::vector<GridPoint> old_terminals;
     std::vector<GridPoint> new_terminals;
@@ -2121,17 +2457,17 @@ void EditorWindow::TransformSelection(const PointTransform::Kind kind, const boo
             continue;
         }
         old_terminals.insert(old_terminals.end(), before.begin(), before.end());
-        TransformElement(m_Schematic.GetElement(index), transform);
+        TransformElement(m_Schematic->GetElement(index), transform);
         const std::vector<GridPoint> after = elements[index]->GetTerminals();
         new_terminals.insert(new_terminals.end(), after.begin(), after.end());
     }
     if (!keep_wires) {
-        MovedWires moved =
-            MoveGroup(m_Schematic.GetWires(), selected_wires, old_terminals, new_terminals, fixed_terminals, transform);
-        m_Schematic.SetWires(std::move(moved.Wires));
-        m_Schematic.SetSelection(selected_elements, std::move(moved.Selected));
+        MovedWires moved = MoveGroup(m_Schematic->GetWires(), selected_wires, old_terminals, new_terminals,
+                                     fixed_terminals, transform);
+        m_Schematic->SetWires(std::move(moved.Wires));
+        m_Schematic->SetSelection(selected_elements, std::move(moved.Selected));
     }
-    m_Schematic.MarkModified();
+    m_Schematic->MarkModified();
     if (drag_cursor) {
         m_Drag = MakeDrag(*drag_cursor, std::nullopt);
     }
@@ -2140,10 +2476,10 @@ void EditorWindow::TransformSelection(const PointTransform::Kind kind, const boo
 // Beside the part, on its right, or on its left when the right side lacks room
 // The part under the cursor that the user sets by hand during a live run, or none outside one or outside selecting
 std::optional<std::size_t> EditorWindow::FindLivePart(const ViewTransform &view) const {
-    if (!m_Controls.IsLive() || !IsSelecting()) {
+    if (IsEditingSubcircuit() || !m_Controls.IsLive() || !IsSelecting()) {
         return std::nullopt;
     }
-    return PickLivePart(m_Schematic.GetElements(), view.ToWorld(ImGui::GetIO().MousePos));
+    return PickLivePart(m_Schematic->GetElements(), view.ToWorld(ImGui::GetIO().MousePos));
 }
 
 // A click flips a switch or a logic input, a push button stays pressed while the mouse button holds it, and the wheel
@@ -2160,11 +2496,11 @@ bool EditorWindow::HandleLiveInput(const std::optional<std::size_t> live_part) {
         return false;
     }
     ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
-    Core::Component &component = m_Schematic.GetElement(*live_part).GetComponent();
+    Core::Component &component = m_Schematic->GetElement(*live_part).GetComponent();
     switch (GetLiveAction(component.GetType())) {
     case LiveAction::TURN:
         if (Turn(component, ImGui::GetIO().MouseWheel)) {
-            m_Schematic.MarkLiveChanged(component);
+            m_Schematic->MarkLiveChanged(component);
         }
         return false;
     case LiveAction::FLIP:
@@ -2172,14 +2508,14 @@ bool EditorWindow::HandleLiveInput(const std::optional<std::size_t> live_part) {
             return false;
         }
         Flip(component);
-        m_Schematic.MarkLiveChanged(component);
+        m_Schematic->MarkLiveChanged(component);
         return true;
     case LiveAction::HOLD:
         if (!ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
             return false;
         }
         SetPressed(component, true);
-        m_Schematic.MarkLiveChanged(component);
+        m_Schematic->MarkLiveChanged(component);
         m_HeldButton = live_part;
         return true;
     case LiveAction::NONE:
@@ -2191,16 +2527,16 @@ bool EditorWindow::HandleLiveInput(const std::optional<std::size_t> live_part) {
 // The push button lets go when the mouse button does, wherever the cursor is then
 void EditorWindow::ReleaseHeldButton() {
     const std::optional<std::size_t> index = std::exchange(m_HeldButton, std::nullopt);
-    if (!index || *index >= m_Schematic.GetElements().size()) {
+    if (!index || *index >= m_Schematic->GetElements().size()) {
         return;
     }
-    Core::Component &component = m_Schematic.GetElement(*index).GetComponent();
+    Core::Component &component = m_Schematic->GetElement(*index).GetComponent();
     SetPressed(component, false);
-    m_Schematic.MarkLiveChanged(component);
+    m_Schematic->MarkLiveChanged(component);
 }
 
 void EditorWindow::PlacePartPopover(const ViewTransform &view) {
-    const UIElement *element = m_Schematic.GetSelectedElement();
+    const UIElement *element = m_Schematic->GetSelectedElement();
     if (element == nullptr) {
         return;
     }
@@ -2248,7 +2584,7 @@ void EditorWindow::DrawPartPopover() {
         return;
     }
     // Undo or a deletion may take the part away while the popover is open
-    if (m_Schematic.GetSelectedElement() == nullptr) {
+    if (m_Schematic->GetSelectedElement() == nullptr) {
         ImGui::CloseCurrentPopup();
         ImGui::EndPopup();
         return;
@@ -2272,14 +2608,14 @@ void EditorWindow::HandleContextMenu(const ViewTransform &view, const bool hover
     }
     const ImVec2 cursor_world = view.ToWorld(ImGui::GetIO().MousePos);
     // Right click keeps a group when it lands on one of its items; anywhere else it selects what is under the cursor
-    const Selection picked =
-        PickAt(m_Schematic.GetElements(), m_Schematic.GetWires(), cursor_world, WIRE_PICK_DISTANCE / m_View.GetZoom());
-    const Selection current = {m_Schematic.GetSelectedElements(), m_Schematic.GetSelectedWires()};
+    const Selection picked = PickAt(m_Schematic->GetElements(), m_Schematic->GetWires(), cursor_world,
+                                    WIRE_PICK_DISTANCE / m_View.GetZoom());
+    const Selection current = {m_Schematic->GetSelectedElements(), m_Schematic->GetSelectedWires()};
     if (picked.Empty() || Joined(current, picked) != current) {
         ApplySelection(picked);
     }
     m_ContextTarget =
-        FindMeasurementTarget(m_Schematic.GetElements(), m_Schematic.GetWires(), m_Schematic.GetConnectivity(),
+        FindMeasurementTarget(m_Schematic->GetElements(), m_Schematic->GetWires(), m_Schematic->GetConnectivity(),
                               cursor_world, WIRE_PICK_DISTANCE / m_View.GetZoom());
     PlacePartPopover(view);
     ImGui::OpenPopup(CONTEXT_MENU);
@@ -2293,12 +2629,17 @@ void EditorWindow::DrawContextMenu() {
     if (!ImGui::BeginPopup(CONTEXT_MENU)) {
         return;
     }
-    const bool on_element = !m_Schematic.GetSelectedElements().empty();
-    const bool on_wire = !m_Schematic.GetSelectedWires().empty();
-    const bool single = m_Schematic.GetSelectedElements().size() + m_Schematic.GetSelectedWires().size() == 1;
-    if (m_Schematic.GetSelectedElement() != nullptr) {
+    const bool on_element = !m_Schematic->GetSelectedElements().empty();
+    const bool on_wire = !m_Schematic->GetSelectedWires().empty();
+    const bool single = m_Schematic->GetSelectedElements().size() + m_Schematic->GetSelectedWires().size() == 1;
+    if (m_Schematic->GetSelectedElement() != nullptr) {
         if (ImGui::MenuItem("Properties...", "Enter")) {
             m_PartPopoverRequested = true;
+        }
+        if (!IsEditingSubcircuit() &&
+            m_Schematic->GetSelectedElement()->GetComponent().GetType() == Core::ComponentType::SUBCIRCUIT &&
+            ImGui::MenuItem("Edit Block Contents")) {
+            RequestEditSelectedSubcircuit();
         }
         ImGui::Separator();
     }
@@ -2331,41 +2672,44 @@ void EditorWindow::DrawContextMenu() {
         }
         const MeasurementTarget &target = *m_ContextTarget;
         const bool measured =
-            target.Node ? m_Schematic.IsVoltageMeasured(*target.Node) : m_Schematic.IsCurrentMeasured(target.Current);
+            target.Node ? m_Schematic->IsVoltageMeasured(*target.Node) : m_Schematic->IsCurrentMeasured(target.Current);
         const std::string label = std::format("{} {}", measured ? "Stop measuring" : "Measure",
-                                              GetMeasurementLabel(target, m_Schematic.GetConnectivity()));
+                                              GetMeasurementLabel(target, m_Schematic->GetConnectivity()));
         if (ImGui::MenuItem(label.c_str())) {
             if (target.Node) {
-                m_Schematic.SetVoltageMeasured(*target.Node, !measured);
+                m_Schematic->SetVoltageMeasured(*target.Node, !measured);
             } else {
-                m_Schematic.SetCurrentMeasured(target.Current, !measured);
+                m_Schematic->SetCurrentMeasured(target.Current, !measured);
             }
         }
     }
     if (on_element || on_wire) {
         ImGui::Separator();
         if (ImGui::MenuItem("Delete", "Del")) {
-            m_Schematic.DeleteSelection();
+            m_Schematic->DeleteSelection();
         }
     } else {
         if (ImGui::MenuItem("Find a Part...", "Space")) {
             m_PartPickerRequested = true;
         }
-        if (m_Controls.IsLive() && ImGui::MenuItem("Discard the Live Run")) {
-            m_Controls.DiscardLive();
-        }
-        if (m_Controls.GetRunAction() == RunAction::CONTINUE) {
-            if (ImGui::MenuItem("Continue the Live Run", "F5")) {
-                m_Controls.ContinueLive();
+        if (!IsEditingSubcircuit()) {
+            if (m_Controls.IsLive() && ImGui::MenuItem("Discard the Live Run")) {
+                m_Controls.DiscardLive();
             }
-        } else if (m_Controls.IsRunning()) {
-            if (ImGui::MenuItem("Stop the Run")) {
-                m_Controls.StopRun();
+            if (m_Controls.GetRunAction() == RunAction::CONTINUE) {
+                if (ImGui::MenuItem("Continue the Live Run", "F5")) {
+                    m_Controls.ContinueLive();
+                }
+            } else if (m_Controls.IsRunning()) {
+                if (ImGui::MenuItem("Stop the Run")) {
+                    m_Controls.StopRun();
+                }
+            } else if (ImGui::MenuItem(
+                           std::format("Run {}", GetAnalysisName(m_Schematic->GetSimulationSettings().Selected))
+                               .c_str(),
+                           "F5")) {
+                m_Controls.RunSelected();
             }
-        } else if (ImGui::MenuItem(
-                       std::format("Run {}", GetAnalysisName(m_Schematic.GetSimulationSettings().Selected)).c_str(),
-                       "F5")) {
-            m_Controls.RunSelected();
         }
         if (ImGui::MenuItem("Fit Schematic", "Home")) {
             m_View.RequestFit();
@@ -2376,23 +2720,25 @@ void EditorWindow::DrawContextMenu() {
 
 // Global routing makes the shortcuts work while another editor window, such as Properties, has focus
 void EditorWindow::HandleGlobalShortcuts() {
-    if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_N, ImGuiInputFlags_RouteGlobal)) {
-        m_Files.RequestNew();
-    }
-    if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_O, ImGuiInputFlags_RouteGlobal)) {
-        m_Files.RequestOpen();
-    }
-    if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_S, ImGuiInputFlags_RouteGlobal)) {
-        m_Files.Save();
-    }
-    if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiMod_Shift | ImGuiKey_S, ImGuiInputFlags_RouteGlobal)) {
-        m_Files.SaveAs();
-    }
-    if (ImGui::Shortcut(ImGuiKey_F5, ImGuiInputFlags_RouteGlobal) && m_Controls.GetRunAction() != RunAction::STOP) {
-        m_Controls.PressRun();
-    }
-    if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_Q, ImGuiInputFlags_RouteGlobal)) {
-        RequestQuit();
+    if (!IsEditingSubcircuit()) {
+        if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_N, ImGuiInputFlags_RouteGlobal)) {
+            m_Files.RequestNew();
+        }
+        if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_O, ImGuiInputFlags_RouteGlobal)) {
+            m_Files.RequestOpen();
+        }
+        if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_S, ImGuiInputFlags_RouteGlobal)) {
+            m_Files.Save();
+        }
+        if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiMod_Shift | ImGuiKey_S, ImGuiInputFlags_RouteGlobal)) {
+            m_Files.SaveAs();
+        }
+        if (ImGui::Shortcut(ImGuiKey_F5, ImGuiInputFlags_RouteGlobal) && m_Controls.GetRunAction() != RunAction::STOP) {
+            m_Controls.PressRun();
+        }
+        if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_Q, ImGuiInputFlags_RouteGlobal)) {
+            RequestQuit();
+        }
     }
     // A focused text field keeps Ctrl+Z for undoing its own typing
     if (ImGui::GetIO().WantTextInput) {
@@ -2415,14 +2761,14 @@ void EditorWindow::Undo() {
     if (m_Drag) {
         return;
     }
-    m_Schematic.Undo();
+    m_Schematic->Undo();
 }
 
 void EditorWindow::Redo() {
     if (m_Drag) {
         return;
     }
-    m_Schematic.Redo();
+    m_Schematic->Redo();
 }
 
 // Menu commands run here, from Update(), where their popups are opened and drawn whichever window is in front
@@ -2491,7 +2837,7 @@ void EditorWindow::RunEditCommand(const EditorCommand command) {
     case EditorCommand::DELETE_SELECTION:
         // Deleting mid-drag would leave the drag pointing at a removed element
         if (!m_Drag) {
-            m_Schematic.DeleteSelection();
+            m_Schematic->DeleteSelection();
         }
         break;
     default:

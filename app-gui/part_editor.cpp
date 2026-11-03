@@ -11,6 +11,7 @@
 #include "simulator.h"
 #include "spice_value.h"
 #include "theme.h"
+#include <algorithm>
 #include <array>
 #include <cfloat>
 #include <cstddef>
@@ -301,7 +302,12 @@ bool ShowsValueFields(const Core::Component &component) {
  * @param[in] preferences  Gives the series of standard values; it must outlive the editor.
  */
 PartEditor::PartEditor(Schematic &schematic, const Preferences &preferences)
-    : m_Schematic(schematic), m_Preferences(preferences) {
+    : m_Schematic(&schematic), m_Preferences(preferences) {
+}
+
+void PartEditor::SetSchematic(Schematic &schematic) {
+    m_Schematic = &schematic;
+    m_LoadedSelection.reset();
 }
 
 /**
@@ -309,7 +315,7 @@ PartEditor::PartEditor(Schematic &schematic, const Preferences &preferences)
  * @note    Edits apply as soon as a field holds a valid value, and mark the schematic modified.
  */
 void PartEditor::Draw() {
-    UIElement *element = m_Schematic.GetSelectedElement();
+    UIElement *element = m_Schematic->GetSelectedElement();
     if (element == nullptr) {
         DrawSelectionSummary();
         return;
@@ -321,17 +327,18 @@ void PartEditor::Draw() {
         ImGui::TextUnformatted(std::format("Name: {}", component.GetName()).c_str());
     }
     const Core::ComponentType type = component.GetType();
-    if (!component.HasValue() && !HasModel(type) && type != Core::ComponentType::NET_LABEL && !Core::IsSwitch(type) &&
+    if (!component.HasValue() && !HasModel(type) && type != Core::ComponentType::NET_LABEL &&
+        !Core::IsSubcircuitPin(type) && type != Core::ComponentType::SUBCIRCUIT && !Core::IsSwitch(type) &&
         type != Core::ComponentType::V_SWITCH && type != Core::ComponentType::RELAY && !Core::IsLogicPart(type) &&
         type != Core::ComponentType::CLOCK && type != Core::ComponentType::LOGIC_INPUT) {
         return;
     }
 
-    if (m_LoadedSelection != m_Schematic.GetSelectionVersion()) {
+    if (m_LoadedSelection != m_Schematic->GetSelectionVersion()) {
         LoadFields(component);
     }
     // Most edits end a live run and drop what it made, which should never come as a surprise
-    if (const char *live_note = m_Schematic.IsLiveRun() ? GetLiveEditNote(type) : nullptr) {
+    if (const char *live_note = m_Schematic->IsLiveRun() ? GetLiveEditNote(type) : nullptr) {
         ImGui::TextColored(GetWarningTextColor(), "%s", live_note);
     }
     DrawFields(component);
@@ -343,7 +350,7 @@ void PartEditor::Draw() {
 
 // What there is to edit when no single part is selected: how many items are, or a hint
 void PartEditor::DrawSelectionSummary() {
-    const std::size_t count = m_Schematic.GetSelectedElements().size() + m_Schematic.GetSelectedWires().size();
+    const std::size_t count = m_Schematic->GetSelectedElements().size() + m_Schematic->GetSelectedWires().size();
     if (count > 1) {
         ImGui::TextUnformatted(std::format("{} items selected", count).c_str());
     } else if (count == 1) {
@@ -356,8 +363,12 @@ void PartEditor::DrawSelectionSummary() {
 // The fields of the kind of part: its net name, model, waveform, gain or value
 void PartEditor::DrawFields(Core::Component &component) {
     const Core::ComponentType type = component.GetType();
-    if (type == Core::ComponentType::NET_LABEL) {
+    if (type == Core::ComponentType::NET_LABEL || Core::IsSubcircuitPin(type)) {
         DrawNetLabel(static_cast<Core::NetLabel &>(component));
+        return;
+    }
+    if (type == Core::ComponentType::SUBCIRCUIT) {
+        DrawSubcircuit(static_cast<Core::SubcircuitInstance &>(component));
         return;
     }
     if (DrawModeledPart(component)) {
@@ -415,7 +426,7 @@ bool PartEditor::DrawModeledPart(Core::Component &component) {
  *          ideal op-amps; false without a selected part, and for parts set by a model or a waveform.
  */
 bool PartEditor::CanTypeValue() const {
-    const UIElement *element = m_Schematic.GetSelectedElement();
+    const UIElement *element = m_Schematic->GetSelectedElement();
     if (element == nullptr) {
         return false;
     }
@@ -447,13 +458,51 @@ void PartEditor::FocusNetName() {
     m_FocusNet = true;
 }
 
+void PartEditor::DrawSubcircuit(Core::SubcircuitInstance &instance) {
+    const auto definition =
+        std::ranges::find(m_Schematic->GetSubcircuits(), instance.GetDefinitionName(), &SavedSubcircuit::Name);
+    if (definition == m_Schematic->GetSubcircuits().end()) {
+        ImGui::TextColored(GetErrorTextColor(), "Unknown definition: %s", instance.GetDefinitionName().c_str());
+        return;
+    }
+    ImGui::TextUnformatted(std::format("Definition: {}", definition->Name).c_str());
+    for (std::size_t index = 0; index < definition->Parameters.size() && index < m_SubcircuitFields.size(); ++index) {
+        const Core::SubcircuitParameter &parameter = definition->Parameters[index];
+        if (const auto value = m_SubcircuitFields[index].Draw(parameter.Name.c_str(), "", AnyValue)) {
+            instance.SetParameter(parameter.Name, *value);
+            m_Schematic->MarkModified();
+        }
+    }
+    if (ImGui::Button("Reset parameters")) {
+        instance.ClearParameters();
+        m_Schematic->MarkModified();
+        LoadFields(instance);
+    }
+    ImGui::TextDisabled("Values shown are overrides or the definition defaults");
+}
+
 void PartEditor::LoadFields(const Core::Component &component) {
     m_Value.Load(component.GetValue());
     m_InitialCondition.LoadOptional(component.GetInitialCondition());
-    if (component.GetType() == Core::ComponentType::NET_LABEL) {
+    if (component.GetType() == Core::ComponentType::NET_LABEL || Core::IsSubcircuitPin(component.GetType())) {
         const std::string &net = static_cast<const Core::NetLabel &>(component).GetNet();
         m_Net.fill('\0');
         net.copy(m_Net.data(), m_Net.size() - 1);
+    }
+    if (component.GetType() == Core::ComponentType::SUBCIRCUIT) {
+        const auto &instance = static_cast<const Core::SubcircuitInstance &>(component);
+        const auto definition =
+            std::ranges::find(m_Schematic->GetSubcircuits(), instance.GetDefinitionName(), &SavedSubcircuit::Name);
+        m_SubcircuitFields.clear();
+        if (definition != m_Schematic->GetSubcircuits().end()) {
+            m_SubcircuitFields.resize(definition->Parameters.size());
+            for (std::size_t index = 0; index < definition->Parameters.size(); ++index) {
+                const Core::SubcircuitParameter &parameter = definition->Parameters[index];
+                const auto override_value = instance.GetParameters().find(parameter.Name);
+                m_SubcircuitFields[index].Load(
+                    override_value != instance.GetParameters().end() ? override_value->second : parameter.DefaultValue);
+            }
+        }
     }
     if (Core::IsSource(component.GetType())) {
         const auto &source = static_cast<const Core::Source &>(component);
@@ -503,24 +552,30 @@ void PartEditor::LoadFields(const Core::Component &component) {
         LoadParameterFields(TRANSFORMER_FIELDS, m_TransformerFields,
                             static_cast<const Core::Transformer &>(component).GetParameters());
     }
-    m_LoadedSelection = m_Schematic.GetSelectionVersion();
+    m_LoadedSelection = m_Schematic->GetSelectionVersion();
 }
 
-// The name applies as soon as it is valid, or empty, which leaves the label unnamed
+// The name applies as soon as it is valid, or empty, which leaves the label or marker unnamed
 void PartEditor::DrawNetLabel(Core::NetLabel &label) {
-    DrawFieldLabel("Net");
+    const bool is_pin = Core::IsSubcircuitPin(label.GetType());
+    DrawFieldLabel(is_pin ? "Pin" : "Net");
     if (std::exchange(m_FocusNet, false)) {
         ImGui::SetKeyboardFocusHere();
     }
     const bool changed = ImGui::InputText("##net", m_Net.data(), m_Net.size());
     const std::string typed = m_Net.data();
-    const bool valid = typed.empty() || Core::NetLabel::IsValidNet(typed);
+    const bool valid = typed.empty() || (is_pin ? Core::SubcircuitInstance::IsValidIdentifier(typed)
+                                                : Core::NetLabel::IsValidNet(typed));
     if (changed && valid && typed != label.GetNet()) {
         label.SetNet(typed);
-        m_Schematic.MarkModified();
+        m_Schematic->MarkModified();
     }
     if (!valid) {
-        ImGui::TextColored(GetErrorTextColor(), "1 to 32 letters, digits, _, - or .");
+        ImGui::TextColored(GetErrorTextColor(), "%s",
+                           is_pin ? "Use a letter or _, then letters, digits or _"
+                                  : "1 to 32 letters, digits, _, - or .");
+    } else if (is_pin) {
+        ImGui::TextDisabled("Only marked nodes become block pins; input and output are visual roles");
     } else {
         ImGui::TextDisabled("Labels with the same name are one net; 0 and GND are ground, VCC is the supplies");
     }
@@ -535,7 +590,7 @@ void PartEditor::DrawValue(Core::Component &component) {
     const Core::ValueSeries series = passive ? m_Preferences.ValueSeries : Core::ValueSeries::FREE;
     if (const std::optional<double> value = m_Value.Draw("Value", component.GetUnit(), is_valid, series)) {
         component.SetValue(*value);
-        m_Schematic.MarkModified();
+        m_Schematic->MarkModified();
     }
     if (series != Core::ValueSeries::FREE) {
         ImGui::TextDisabled("Standard values: %s, %g%%", Core::GetSeriesName(series),
@@ -554,7 +609,7 @@ void PartEditor::DrawInitialCondition(Core::Component &component) {
         } else {
             component.ClearInitialCondition();
         }
-        m_Schematic.MarkModified();
+        m_Schematic->MarkModified();
     }
     ImGui::TextDisabled("Skips the operating point (uic); parts left empty start at zero");
 }
@@ -567,7 +622,7 @@ void PartEditor::DrawControlledSwitch(Core::VoltageControlledSwitch &controlled)
     };
     if (DrawParameterFields(SWITCH_FIELDS, m_SwitchFields, "", is_valid, parameters)) {
         controlled.SetParameters(parameters);
-        m_Schematic.MarkModified();
+        m_Schematic->MarkModified();
     }
     ImGui::TextDisabled("Closes above threshold + hysteresis, opens below threshold - hysteresis");
 }
@@ -580,7 +635,7 @@ void PartEditor::DrawRelay(Core::Relay &relay) {
     };
     if (DrawParameterFields(RELAY_FIELDS, m_RelayFields, "", is_valid, parameters)) {
         relay.SetParameters(parameters);
-        m_Schematic.MarkModified();
+        m_Schematic->MarkModified();
     }
     ImGui::TextDisabled("The contact follows the coil current, so it lags by L over R");
 }
@@ -593,7 +648,7 @@ void PartEditor::DrawTransformer(Core::Transformer &transformer) {
     };
     if (DrawParameterFields(TRANSFORMER_FIELDS, m_TransformerFields, "", is_valid, parameters)) {
         transformer.SetParameters(parameters);
-        m_Schematic.MarkModified();
+        m_Schematic->MarkModified();
     }
     ImGui::TextDisabled("Value is the primary inductance; the secondary is %s",
                         Core::FormatValue(transformer.GetSecondaryInductance()).c_str());
@@ -607,7 +662,7 @@ void PartEditor::DrawLogicPart(Core::LogicPart &part) {
     };
     if (DrawParameterFields(LOGIC_FIELDS, m_LogicFields, "", is_valid, parameters)) {
         part.SetParameters(parameters);
-        m_Schematic.MarkModified();
+        m_Schematic->MarkModified();
     }
     if (Core::HasVariableInputs(part.GetType())) {
         // The pins that go away when the count falls are left with the wires they had, which stay loose
@@ -618,7 +673,7 @@ void PartEditor::DrawLogicPart(Core::LogicPart &part) {
                 if (ImGui::Selectable(std::to_string(candidate).c_str(), candidate == input_count) &&
                     candidate != input_count) {
                     part.SetInputCount(candidate);
-                    m_Schematic.MarkModified();
+                    m_Schematic->MarkModified();
                 }
             }
             ImGui::EndCombo();
@@ -635,7 +690,7 @@ void PartEditor::DrawClock(Core::Clock &clock) {
     };
     if (DrawParameterFields(CLOCK_FIELDS, m_ClockFields, "", is_valid, parameters)) {
         clock.SetParameters(parameters);
-        m_Schematic.MarkModified();
+        m_Schematic->MarkModified();
     }
     ImGui::TextDisabled("Duty is the share of the period above half the level, from 0 to 100%%");
     ImGui::TextDisabled("The start delay holds the clock low; at 0 the first rising edge is at t = 0");
@@ -646,7 +701,7 @@ void PartEditor::DrawLogicInput(Core::LogicInput &input) {
     bool high = input.IsHigh();
     if (ImGui::Checkbox("High", &high)) {
         input.SetHigh(high);
-        m_Schematic.MarkLiveChanged(input);
+        m_Schematic->MarkLiveChanged(input);
     }
     Core::LogicInputParameters parameters = input.GetParameters();
     const auto is_valid = [](const Core::LogicInputParameters &candidate) {
@@ -654,7 +709,7 @@ void PartEditor::DrawLogicInput(Core::LogicInput &input) {
     };
     if (DrawParameterFields(LOGIC_INPUT_FIELDS, m_LogicInputFields, "", is_valid, parameters)) {
         input.SetParameters(parameters);
-        m_Schematic.MarkModified();
+        m_Schematic->MarkModified();
     }
     ImGui::TextDisabled("A source from its terminal to ground, so it gives a gate a defined level");
 }
@@ -665,7 +720,7 @@ void PartEditor::DrawSwitch(Core::Switch &contact) {
     const bool is_button = contact.GetType() == Core::ComponentType::PUSH_BUTTON;
     if (ImGui::Checkbox(is_button ? "Pressed" : "Closed", &closed)) {
         contact.SetClosed(closed);
-        m_Schematic.MarkLiveChanged(contact);
+        m_Schematic->MarkLiveChanged(contact);
     }
     ImGui::TextDisabled("It is a %s while the circuit is simulated", closed ? "wire" : "gap");
 }
@@ -676,7 +731,7 @@ void PartEditor::DrawWiper(Core::Potentiometer &pot) {
     auto percent = static_cast<float>(pot.GetWiper() * 100.0);
     if (ImGui::SliderFloat("##wiper", &percent, 0.0f, 100.0f, "%.0f%%")) {
         pot.SetWiper(static_cast<double>(percent) / 100.0);
-        m_Schematic.MarkLiveChanged(pot);
+        m_Schematic->MarkLiveChanged(pot);
     }
     ImGui::TextDisabled("0%% is terminal 1 and 100%% is terminal 2");
 }
@@ -684,7 +739,7 @@ void PartEditor::DrawWiper(Core::Potentiometer &pot) {
 void PartEditor::DrawDiode(Core::Diode &diode) {
     if (DrawModelChoice(diode, Core::GetDiodeModels(diode.GetType()), Core::CUSTOM_DIODE_MODEL_NAME, DIODE_FIELDS,
                         m_DiodeFields)) {
-        m_Schematic.MarkModified();
+        m_Schematic->MarkModified();
     }
     if (diode.IsCustom()) {
         ImGui::TextDisabled("%s", diode.GetType() == Core::ComponentType::ZENER_DIODE
@@ -695,7 +750,7 @@ void PartEditor::DrawDiode(Core::Diode &diode) {
 
 void PartEditor::DrawBJT(Core::BJT &bjt) {
     if (DrawModelChoice(bjt, Core::GetBJTModels(bjt.GetType()), Core::CUSTOM_BJT_MODEL_NAME, BJT_FIELDS, m_BJTFields)) {
-        m_Schematic.MarkModified();
+        m_Schematic->MarkModified();
     }
     if (bjt.IsCustom()) {
         ImGui::TextDisabled("A VAF or IKF of 0 turns that effect off");
@@ -706,7 +761,7 @@ void PartEditor::DrawBJT(Core::BJT &bjt) {
 void PartEditor::DrawMOSFET(Core::MOSFET &mosfet) {
     if (DrawModelChoice(mosfet, Core::GetMOSFETModels(mosfet.GetType()), Core::CUSTOM_MOSFET_MODEL_NAME, MOSFET_FIELDS,
                         m_MOSFETFields)) {
-        m_Schematic.MarkModified();
+        m_Schematic->MarkModified();
     }
     if (mosfet.IsCustom()) {
         ImGui::TextDisabled("Level 1: ID = KP/2 W/L (VGS - VTO)^2; VTO is negative for PMOS");
@@ -718,12 +773,12 @@ void PartEditor::DrawMOSFET(Core::MOSFET &mosfet) {
 void PartEditor::DrawOpAmp(Core::OpAmp &op_amp) {
     if (DrawModelChoice(op_amp, Core::GetOpAmpModels(op_amp.GetType()), Core::CUSTOM_OP_AMP_MODEL_NAME, OP_AMP_FIELDS,
                         m_OpAmpFields)) {
-        m_Schematic.MarkModified();
+        m_Schematic->MarkModified();
     }
     if (op_amp.IsIdeal()) {
         if (const std::optional<double> bandwidth = m_Value.Draw("GBW", "Hz", Core::IsValidIdealBandwidth)) {
             op_amp.SetIdealBandwidth(*bandwidth);
-            m_Schematic.MarkModified();
+            m_Schematic->MarkModified();
         }
         ImGui::TextDisabled("The open-loop gain falls to 1 at the GBW");
     } else if (op_amp.IsCustom()) {
@@ -742,7 +797,7 @@ void PartEditor::DrawSource(Core::Source &source) {
         if (ImGui::RadioButton(Core::GetSourceTypeName(type), source.GetSourceType() == type) &&
             source.GetSourceType() != type) {
             source.SetSourceType(type);
-            m_Schematic.MarkModified();
+            m_Schematic->MarkModified();
         }
     }
 
@@ -751,7 +806,7 @@ void PartEditor::DrawSource(Core::Source &source) {
         const char *label = source.GetType() == Core::ComponentType::CURRENT_SOURCE ? "Current" : "Voltage";
         if (const std::optional<double> value = m_Value.Draw(label, source.GetUnit(), AnyValue)) {
             source.SetValue(*value);
-            m_Schematic.MarkModified();
+            m_Schematic->MarkModified();
         }
         break;
     }
@@ -781,7 +836,7 @@ void PartEditor::DrawSine(Core::Source &source) {
     const auto is_valid = [&source](const Core::ACParameters &candidate) { return source.IsValidAC(candidate); };
     if (DrawParameterFields(AC_FIELDS, m_ACFields, source.GetUnit(), is_valid, ac)) {
         source.SetAC(ac);
-        m_Schematic.MarkModified();
+        m_Schematic->MarkModified();
     }
     ImGui::TextDisabled("The amplitude is the peak of the sine in a transient");
     ImGui::TextDisabled("The AC magnitude drives the AC sweep; 1 reads as gain");
@@ -792,7 +847,7 @@ void PartEditor::DrawPulse(Core::Source &source) {
     const auto is_valid = [&source](const Core::PulseParameters &candidate) { return source.IsValidPulse(candidate); };
     if (DrawParameterFields(PULSE_FIELDS, m_PulseFields, source.GetUnit(), is_valid, pulse)) {
         source.SetPulse(pulse);
-        m_Schematic.MarkModified();
+        m_Schematic->MarkModified();
     }
 
     ImGui::TextDisabled("%s", std::format("Repeats at {}Hz", Core::FormatValue(1.0 / pulse.Period)).c_str());
@@ -806,7 +861,7 @@ void PartEditor::DrawEXP(Core::Source &source) {
     const auto is_valid = [&source](const Core::EXPParameters &candidate) { return source.IsValidEXP(candidate); };
     if (DrawParameterFields(EXP_FIELDS, m_EXPFields, source.GetUnit(), is_valid, exp)) {
         source.SetEXP(exp);
-        m_Schematic.MarkModified();
+        m_Schematic->MarkModified();
     }
     ImGui::TextDisabled("Rises towards the peak, then decays back towards the start");
 }
@@ -816,7 +871,7 @@ void PartEditor::DrawSFFM(Core::Source &source) {
     const auto is_valid = [&source](const Core::SFFMParameters &candidate) { return source.IsValidSFFM(candidate); };
     if (DrawParameterFields(SFFM_FIELDS, m_SFFMFields, source.GetUnit(), is_valid, sffm)) {
         source.SetSFFM(sffm);
-        m_Schematic.MarkModified();
+        m_Schematic->MarkModified();
     }
     ImGui::TextDisabled("A carrier whose phase swings with the signal");
 }
@@ -826,7 +881,7 @@ void PartEditor::DrawAM(Core::Source &source) {
     const auto is_valid = [&source](const Core::AMParameters &candidate) { return source.IsValidAM(candidate); };
     if (DrawParameterFields(AM_FIELDS, m_AMFields, source.GetUnit(), is_valid, am)) {
         source.SetAM(am);
-        m_Schematic.MarkModified();
+        m_Schematic->MarkModified();
     }
     ImGui::TextDisabled("The modulating and carrier sines multiply; the offset shifts the whole waveform");
 }
@@ -838,7 +893,7 @@ void PartEditor::DrawPWL(Core::Source &source) {
     const std::optional<std::vector<Core::PWLPoint>> points = Core::ParsePWLPoints(m_PWLText);
     if (changed && points) {
         source.SetPWL({.Points = *points});
-        m_Schematic.MarkModified();
+        m_Schematic->MarkModified();
     }
     if (!points) {
         ImGui::TextColored(GetErrorTextColor(), "At least two \"time value\" pairs, times increasing from zero");
@@ -851,7 +906,7 @@ void PartEditor::DrawPWL(Core::Source &source) {
 void PartEditor::DrawControlledSource(Core::ControlledSource &source) {
     if (const std::optional<double> value = m_Value.Draw("Gain", source.GetUnit(), AnyValue)) {
         source.SetValue(*value);
-        m_Schematic.MarkModified();
+        m_Schematic->MarkModified();
     }
     const Core::ComponentType type = source.GetType();
     if (Core::IsCurrentControlled(type)) {
@@ -875,7 +930,7 @@ void PartEditor::DrawControllingCurrent(Core::ControlledSource &source) {
     const std::string preview = current.empty() ? "(none)" : std::format("I({})", current);
     DrawFieldLabel("Follows");
     if (ImGui::BeginCombo("##Follows", preview.c_str())) {
-        for (const auto &element : m_Schematic.GetElements()) {
+        for (const auto &element : m_Schematic->GetElements()) {
             if (&element->GetComponent() == &source) {
                 continue;
             }
@@ -883,7 +938,7 @@ void PartEditor::DrawControllingCurrent(Core::ControlledSource &source) {
                 const bool selected = name == current;
                 if (ImGui::Selectable(std::format("I({})", name).c_str(), selected) && !selected) {
                     source.SetControllingCurrent(name);
-                    m_Schematic.MarkModified();
+                    m_Schematic->MarkModified();
                 }
             }
         }

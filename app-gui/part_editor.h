@@ -19,6 +19,7 @@
 #include "components/potentiometer.h"
 #include "components/relay.h"
 #include "components/source.h"
+#include "components/subcircuit.h"
 #include "components/switch.h"
 #include "components/transformer.h"
 #include "components/voltage_controlled_switch.h"
@@ -38,13 +39,15 @@ namespace GUI {
  * @details Voltage and current sources also switch between their waveforms and show the parameters of the chosen
  *          one, edited as fields except the piecewise linear points, which are one text of "time value" pairs. The
  *          Application owns one instance, which the Properties window and the editor popover both draw, so the
- *          texts being typed are the same in both.
+ *          texts being typed are the same in both. Subcircuit instances expose one field per definition parameter,
+ *          showing an override or its default. SetSchematic follows the editor into and out of a block definition.
  */
 class PartEditor {
 public:
     PartEditor(Schematic &schematic, const Preferences &preferences);
 
     void Draw();
+    void SetSchematic(Schematic &schematic);
 
     // Typing a value straight onto the selected part
     bool CanTypeValue() const;
@@ -54,7 +57,7 @@ public:
     void FocusNetName();
 
 private:
-    Schematic &m_Schematic;
+    Schematic *m_Schematic;
     // The standard series that resistors, capacitors and inductors take their values from
     const Preferences &m_Preferences;
     // Texts being edited, and the selection they were loaded from
@@ -89,11 +92,13 @@ private:
     // One per member of Core::ClockParameters and Core::LogicInputParameters
     std::array<ValueField, 4> m_ClockFields;
     std::array<ValueField, 1> m_LogicInputFields;
+    std::vector<ValueField> m_SubcircuitFields;
 
     void LoadFields(const Core::Component &component);
     void DrawSelectionSummary();
     void DrawFields(Core::Component &component);
     bool DrawModeledPart(Core::Component &component);
+    void DrawSubcircuit(Core::SubcircuitInstance &instance);
     void DrawValue(Core::Component &component);
     void DrawInitialCondition(Core::Component &component);
     void DrawWiper(Core::Potentiometer &pot);
