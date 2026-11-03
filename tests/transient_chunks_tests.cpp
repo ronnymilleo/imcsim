@@ -215,7 +215,8 @@ TEST_CASE("A chunked transient matches the one-piece run on every example", "[tr
         auto loaded = GUI::LoadExample(example);
         REQUIRE(loaded.has_value());
         GUI::Schematic schematic;
-        schematic.Replace(std::move(loaded->Elements), std::move(loaded->Wires), std::move(loaded->Settings));
+        schematic.Replace(std::move(loaded->Elements), std::move(loaded->Wires), std::move(loaded->Settings),
+                          std::move(loaded->Subcircuits), std::move(loaded->Models));
         const Core::Circuit circuit = schematic.BuildCircuit();
         const Core::TransientSettings settings = schematic.GetSimulationSettings().Transient;
 

@@ -34,7 +34,8 @@ void OpenOrFail(const GUI::Example &example, GUI::Schematic &schematic) {
         FAIL(loaded.error());
     }
     CHECK(loaded->Warnings.empty());
-    schematic.Replace(std::move(loaded->Elements), std::move(loaded->Wires), std::move(loaded->Settings));
+    schematic.Replace(std::move(loaded->Elements), std::move(loaded->Wires), std::move(loaded->Settings),
+                      std::move(loaded->Subcircuits), std::move(loaded->Models));
     schematic.RestoreMeasurements(loaded->Measurements);
     // Every saved voltage lands on a node, so none is dropped on the way in
     CHECK(schematic.SaveMeasurements() == loaded->Measurements);
@@ -871,4 +872,45 @@ TEST_CASE("The full adder example adds three bits in its truth table", "[example
         CHECK(((table.Rows[row].OutputVoltages[0] > 4.0) == ((total & 1) != 0)));
         CHECK(((table.Rows[row].OutputVoltages[1] > 4.0) == (total >= 2)));
     }
+}
+
+TEST_CASE("The two RC blocks have their corners a decade apart, as their parameters set", "[examples]") {
+    GUI::Schematic schematic;
+    OpenExample("rc_blocks.imcsim", schematic);
+    const Core::ACSweepRun run = Core::RunACSweep(schematic.BuildCircuit(), schematic.GetSimulationSettings().ACSweep);
+    REQUIRE(run.Result.has_value());
+    const Core::ACSweep &sweep = *run.Result;
+    const auto corner_at = [&](const GUI::GridPoint point) {
+        const std::size_t node = NodeAt(schematic, point);
+        const auto statistics = GUI::ComputeBodeStatistics(sweep.Frequencies, sweep.NodeMagnitudesDecibels[node],
+                                                           sweep.NodePhasesDegrees[node], sweep.Frequencies.front(),
+                                                           sweep.Frequencies.back());
+        REQUIRE(statistics);
+        REQUIRE(statistics->UpperCutoff);
+        return *statistics->UpperCutoff;
+    };
+    // X1 keeps the defaults, 1k and 100n; X2 sets R to 10k
+    const double fast = 1.0 / (2.0 * std::numbers::pi * 1e3 * 100e-9);
+    CHECK_THAT(corner_at({11, 0}), Catch::Matchers::WithinRel(fast, 2e-2));
+    CHECK_THAT(corner_at({11, 6}), Catch::Matchers::WithinRel(fast / 10.0, 2e-2));
+}
+
+TEST_CASE("The precision rectifier passes the positive half of the sine without the diode drop", "[examples]") {
+    GUI::Schematic schematic;
+    OpenExample("precision_rectifier.imcsim", schematic);
+    const Core::TransientRun run =
+        Core::RunTransient(schematic.BuildCircuit(), schematic.GetSimulationSettings().Transient);
+    REQUIRE(run.Result.has_value());
+    const Core::Transient &transient = *run.Result;
+    const std::vector<double> &input = transient.NodeVoltages[NodeAt(schematic, {2, -1})];
+    const std::vector<double> &output = transient.NodeVoltages[NodeAt(schematic, {20, 0})];
+    const double highest = std::ranges::max(output);
+    const double lowest = std::ranges::min(output);
+    INFO(std::format("Output from {} V to {} V, input peaks at {} V", lowest, highest, std::ranges::max(input)));
+    // A diode alone would lose a few hundred millivolts of the 1 V peak; inside the loop it loses almost none
+    CHECK(highest > 0.98);
+    CHECK(highest < 1.01);
+    // The capacitance of the diode lets a few tens of millivolts of the edge through when the op-amp output drops to
+    // its negative limit; without the loop the output would not reach the peak by about the diode drop instead
+    CHECK(lowest > -0.05);
 }

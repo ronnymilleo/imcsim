@@ -312,6 +312,26 @@ constexpr auto EXAMPLES = std::to_array<Example>({
             "reads down the edges.",
         .FileName = "ripple_counter.imcsim",
     },
+    {
+        .Title = "Two RC filters from one block",
+        .Group = "Blocks",
+        .Description =
+            "RC_LOWPASS is a block drawn once, a resistor and a capacitor whose values follow its parameters R and "
+            "C. X1 uses the defaults, 1k and 100n, for a corner at 1.6 kHz; X2 sets R to 10k, which moves its corner "
+            "a decade down, to 160 Hz. Run the AC sweep to compare FAST and SLOW, double click a block to see inside "
+            "it, or select one and set its parameters in Properties.",
+        .FileName = "rc_blocks.imcsim",
+    },
+    {
+        .Title = "Precision rectifier with vendor models",
+        .Group = "Blocks",
+        .Description =
+            "An op-amp kept as SPICE text, as a vendor's library gives one, drives a BAT54 Schottky diode whose "
+            ".model came from a library too; File > Import SPICE Library brings both in. With the diode inside the "
+            "feedback loop, the op-amp makes up for its drop: VOUT follows the positive half of the 1 V sine to the "
+            "millivolt and stays at 0 V for the negative half. Double click the op-amp for its pins and text.",
+        .FileName = "precision_rectifier.imcsim",
+    },
 });
 
 } // namespace
