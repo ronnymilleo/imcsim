@@ -32,6 +32,8 @@ TEST_CASE("FindParts ignores case, spaces and punctuation", "[element_factory]")
     CHECK(GUI::FindParts("inverter") == std::vector{ComponentType::NOT});
     CHECK(GUI::FindParts("clock") == std::vector{ComponentType::CLOCK});
     CHECK(GUI::FindParts("logic input") == std::vector{ComponentType::LOGIC_INPUT});
+    CHECK(GUI::FindParts("subcircuit input") == std::vector{ComponentType::PIN});
+    CHECK(GUI::FindParts("POUT") == std::vector{ComponentType::POUT});
     CHECK(GUI::FindParts("flip flop") == std::vector{ComponentType::D_FLIP_FLOP, ComponentType::JK_FLIP_FLOP,
                                                      ComponentType::T_FLIP_FLOP, ComponentType::SR_FLIP_FLOP});
     CHECK(GUI::FindParts("xyz").empty());
@@ -41,7 +43,7 @@ TEST_CASE("FindParts ignores case, spaces and punctuation", "[element_factory]")
     }
     SECTION("an empty query lists every part") {
         const std::vector<ComponentType> all = GUI::FindParts("");
-        CHECK(all.size() == 40);
+        CHECK(all.size() == 42);
         CHECK(std::ranges::contains(all, ComponentType::RESISTOR));
         CHECK(std::ranges::contains(all, ComponentType::CLOCK));
         CHECK(std::ranges::contains(all, ComponentType::LOGIC_INPUT));

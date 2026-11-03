@@ -10,10 +10,12 @@
 #include "ui_elements/ui_logic_input.h"
 #include "ui_elements/ui_net_label.h"
 #include "ui_elements/ui_resistor.h"
+#include "ui_elements/ui_subcircuit_pin.h"
 #include "ui_elements/ui_vcc.h"
 #include <catch2/catch_test_macros.hpp>
 #include <memory>
 #include <string>
+#include <tuple>
 #include <vector>
 
 namespace {
@@ -226,6 +228,21 @@ TEST_CASE("The simulator never sees a net label", "[connectivity]") {
     const Core::Circuit circuit = GUI::BuildCircuit(schematic.Elements, connectivity);
     CHECK(circuit.GetEntries().size() == 2);
     CHECK(circuit.ToSpiceNetlist().find("NetLabel") == std::string::npos);
+}
+
+TEST_CASE("Subcircuit pin markers neither join nets nor reach the simulator", "[connectivity]") {
+    Schematic schematic;
+    for (const auto &[type, point, name] : {std::tuple{Core::ComponentType::PIN, GUI::GridPoint{0, 0}, "IN"},
+                                            std::tuple{Core::ComponentType::POUT, GUI::GridPoint{10, 0}, "IN"}}) {
+        schematic.Elements.push_back(std::make_unique<GUI::UISubcircuitPin>(type, point, GUI::Rotation::R0));
+        static_cast<Core::NetLabel &>(schematic.Elements.back()->GetComponent()).SetNet(name);
+    }
+
+    const GUI::Connectivity connectivity = schematic.Connect();
+    CHECK(connectivity.GetNode({0, 0}) != connectivity.GetNode({10, 0}));
+    const Core::Circuit circuit = GUI::BuildCircuit(schematic.Elements, connectivity);
+    CHECK(circuit.GetEntries().empty());
+    CHECK(circuit.ToSpiceNetlist().find("Pin") == std::string::npos);
 }
 
 TEST_CASE("A label named VCC joins every VCC supply, and only when there is one", "[connectivity]") {

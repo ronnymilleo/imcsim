@@ -16,6 +16,7 @@
 #include "ui_elements/ui_op_amp.h"
 #include "ui_elements/ui_potentiometer.h"
 #include "ui_elements/ui_resistor.h"
+#include "ui_elements/ui_subcircuit_pin.h"
 #include "ui_elements/ui_switch.h"
 #include "ui_elements/ui_transformer.h"
 #include "ui_elements/ui_vcc.h"
@@ -53,6 +54,20 @@ TEST_CASE("A net label has a single terminal at its position and leads upward be
 
     const GUI::UINetLabel turned({5, 5}, GUI::Rotation::R90);
     CHECK(turned.GetTerminals() == std::vector<GUI::GridPoint>{{5, 5}});
+    CHECK(turned.Contains({5.8f, 5.0f}));
+}
+
+TEST_CASE("Subcircuit pin markers have one terminal and a pickable directional body", "[ui_element]") {
+    for (const Core::ComponentType type : {Core::ComponentType::PIN, Core::ComponentType::POUT}) {
+        const GUI::UISubcircuitPin marker(type, {5, 5}, GUI::Rotation::R0);
+        CHECK(marker.GetComponent().GetType() == type);
+        CHECK(marker.GetTerminals() == std::vector<GUI::GridPoint>{{5, 5}});
+        CHECK(marker.GetTerminalInward(0) == GUI::GridPoint{0, -1});
+        CHECK(marker.Contains({5.0f, 4.2f}));
+        CHECK_FALSE(marker.Contains({5.0f, 6.0f}));
+    }
+
+    const GUI::UISubcircuitPin turned(Core::ComponentType::PIN, {5, 5}, GUI::Rotation::R90);
     CHECK(turned.Contains({5.8f, 5.0f}));
 }
 
