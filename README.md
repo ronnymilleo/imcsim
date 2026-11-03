@@ -18,8 +18,11 @@ New to imcsim? The [tutorial](docs/tutorial.md) builds, simulates and exports a 
 ## Features
 
 - Resistors, capacitors, inductors, ground, a VCC rail, and voltage and current sources (DC, sine or pulse)
-- Diodes, Zener diodes, LEDs, NPN and PNP bipolar transistors, and N- and P-channel MOSFETs, each with ready models
-  or custom SPICE parameters
+- Diodes, Zener diodes, LEDs, NPN and PNP bipolar transistors, and N- and P-channel MOSFETs, each with ready models,
+  custom SPICE parameters or a vendor's `.model` imported from a library
+- Blocks: part of a schematic grouped into a reusable part with named pins on any edge and parameters each instance
+  can set, edited in place; and a vendor's subcircuits, such as op-amp models, imported from a SPICE library as blocks
+  kept as text. The schematic file keeps them all, so it opens anywhere
 - Controlled sources (VCVS, VCCS, CCCS, CCVS), and op-amps: ideal with a gain-bandwidth product and an output
   limited by its supply pins, or a uA741 or custom part built as a Boyle macromodel from datasheet values (slew rate,
   bias current, output swing, current limit)
@@ -81,11 +84,12 @@ New to imcsim? The [tutorial](docs/tutorial.md) builds, simulates and exports a 
   a configurable window of points keeps long runs responsive
 - Live transients paced by the clock: flip switches, hold push buttons, change logic inputs and turn potentiometers on
   the schematic while the run continues, then pause, continue or discard the session
-- 29 example circuits sorted by topic, each with its analyses and measurements set up: dividers, RC and RLC
+- 33 example circuits sorted by topic, each with its analyses and measurements set up: dividers, RC and RLC
   filters, diode curves, a Zener regulator and a rectifier, BJT and MOSFET switches and characteristics, a current
   mirror, common-emitter and class AB amplifiers, op-amp amplifiers, an integrator, a Schmitt trigger and a Sallen-Key
-  filter, an ideal transformer made of controlled sources, switching circuits, and digital ones: gates, a truth
-  table of the basic gates, half and full adders, an SR latch and a ripple counter
+  filter, an ideal transformer made of controlled sources, switching circuits, digital ones (gates, a truth
+  table of the basic gates, half and full adders, an SR latch and a ripple counter), and blocks: one RC filter used
+  twice, and a precision rectifier from a vendor's op-amp and diode models
 
 ## Screenshots
 
@@ -111,8 +115,8 @@ This is a possible roadmap, not a promise: what comes next depends on what users
 it can change at any time. The ideas below are tracked as tasks in the project's backlog and grouped here by theme,
 roughly in the order they are likely to come.
 
-- **Next**: subcircuits, which group part of a schematic into a reusable block with pins, followed by importing vendor
-  `.model`, `.subckt` and `.lib` files
+- **Blocks**: blocks inside blocks, wires routed around a new block, and following the `.include` and `.lib` lines of
+  an imported library
 - **Digital**: counters, shift registers, multiplexers, decoders and the 555 timer; bus and bit-value options for the
   logic lanes; Verilog modules placed as parts and simulated together with the analog circuit
 - **Analyses**: poles and zeros with an s-plane view, sensitivity shown on the schematic, S-parameters with a Smith chart

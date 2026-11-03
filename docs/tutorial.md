@@ -186,7 +186,10 @@ analysis, and the measured nodes and currents, so reopening it is one F5 away fr
 ## Where to go next
 
 - Open the other examples in File > Examples, sorted into Basics, Diodes, Transistors, Op-amps, Switching,
-  Transformers and Digital; each has its analyses and measurements set up.
+  Transformers, Digital and Blocks; each has its analyses and measurements set up.
+- Group part of a circuit into a block you can place again, with pins and parameters, or bring in a vendor's op-amp
+  or diode with File > Import SPICE Library: the [user guide](user_guide.md#blocks) explains both, and the Blocks
+  examples show them.
 - Try the transistors, diodes and op-amps: each takes a ready model or custom SPICE parameters in its properties.
 - View > Theme switches between nine color themes, shown side by side in [Themes](themes.md). Edit > Preferences
   gathers the theme with your other choices: IEC or ANSI symbols, terminal numbers, wire colors, live effects and
