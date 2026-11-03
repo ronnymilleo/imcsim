@@ -1403,6 +1403,50 @@ std::string WriteDocument(const std::span<const UIElement *const> elements, cons
     return document.dump(2) + "\n";
 }
 
+// One pin of a block: a drawn one sits at the point of its marker, one of SPICE text keeps the edge it goes on
+std::expected<SavedSubcircuitPin, std::string> ReadSubcircuitPin(const nlohmann::json &pin, const bool is_text) {
+    const std::optional<std::string> name = pin.is_object() ? ReadString(pin, "name") : std::nullopt;
+    if (!name || !Core::SubcircuitInstance::IsValidIdentifier(*name)) {
+        return std::unexpected("has an invalid or repeated pin");
+    }
+    if (is_text) {
+        const std::optional<std::string> side_name = ReadString(pin, "side");
+        const std::optional<Core::PinSide> side = side_name ? ParsePinSide(*side_name) : std::nullopt;
+        if (!side) {
+            return std::unexpected(std::format("has no valid edge for pin {}", *name));
+        }
+        return SavedSubcircuitPin{.Name = *name, .Point = {}, .Side = *side};
+    }
+    const std::optional<GridPoint> point = ReadPoint(pin, "point");
+    if (!point) {
+        return std::unexpected("has an invalid or repeated pin");
+    }
+    return SavedSubcircuitPin{.Name = *name, .Point = *point};
+}
+
+// The pins of a block, in order, each with a name of its own
+std::expected<void, std::string> ReadSubcircuitPins(const nlohmann::json &object, const bool is_text,
+                                                    std::vector<SavedSubcircuitPin> &pins) {
+    const auto list = object.find("pins");
+    if (list == object.end()) {
+        return {};
+    }
+    if (!list->is_array()) {
+        return std::unexpected("has pins that are not a list");
+    }
+    for (const nlohmann::json &entry : *list) {
+        std::expected<SavedSubcircuitPin, std::string> pin = ReadSubcircuitPin(entry, is_text);
+        if (!pin) {
+            return std::unexpected(pin.error());
+        }
+        if (std::ranges::contains(pins, pin->Name, &SavedSubcircuitPin::Name)) {
+            return std::unexpected("has an invalid or repeated pin");
+        }
+        pins.push_back(std::move(*pin));
+    }
+    return {};
+}
+
 // The ports and text of a block kept as SPICE text; each pin is the port of the same place
 std::expected<SavedSubcircuit, std::string> ReadSubcircuitText(const nlohmann::json &object,
                                                                SavedSubcircuit definition) {
@@ -1440,33 +1484,9 @@ std::expected<SavedSubcircuit, std::string> ReadSubcircuit(const nlohmann::json 
         return std::unexpected("has no valid name");
     }
     definition.Name = *name;
-    const auto pins = object.find("pins");
-    if (pins != object.end() && !pins->is_array()) {
-        return std::unexpected("has pins that are not a list");
-    }
     const bool is_text = object.contains("spice");
-    if (pins != object.end()) {
-        for (const nlohmann::json &pin : *pins) {
-            const std::optional<std::string> pin_name = pin.is_object() ? ReadString(pin, "name") : std::nullopt;
-            if (!pin_name || !Core::SubcircuitInstance::IsValidIdentifier(*pin_name) ||
-                std::ranges::contains(definition.Pins, *pin_name, &SavedSubcircuitPin::Name)) {
-                return std::unexpected("has an invalid or repeated pin");
-            }
-            if (is_text) {
-                const std::optional<std::string> side_name = ReadString(pin, "side");
-                const std::optional<Core::PinSide> side = side_name ? ParsePinSide(*side_name) : std::nullopt;
-                if (!side) {
-                    return std::unexpected(std::format("has no valid edge for pin {}", *pin_name));
-                }
-                definition.Pins.push_back({.Name = *pin_name, .Point = {}, .Side = *side});
-                continue;
-            }
-            const std::optional<GridPoint> point = ReadPoint(pin, "point");
-            if (!point) {
-                return std::unexpected("has an invalid or repeated pin");
-            }
-            definition.Pins.push_back({.Name = *pin_name, .Point = *point});
-        }
+    if (auto read = ReadSubcircuitPins(object, is_text, definition.Pins); !read) {
+        return std::unexpected(read.error());
     }
     const auto parameters = object.find("parameters");
     if (parameters != object.end() && !parameters->is_array()) {

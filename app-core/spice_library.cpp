@@ -271,6 +271,134 @@ bool IsInclusion(const std::string_view directive) {
     return directive == ".include" || directive == ".inc" || directive == ".lib";
 }
 
+// What the first pass over a library finds: where each subcircuit outside any other starts and ends, as indices of its
+// statements, and the definitions outside the subcircuits that one may use
+struct LibraryScan {
+    std::vector<std::string> Lines;
+    std::vector<Statement> Statements;
+    std::vector<std::pair<std::size_t, std::size_t>> Found;
+    std::map<std::string, Definition> Definitions;
+    std::size_t Order = 0;
+};
+
+// A .model, .param or inclusion outside the subcircuits
+void ReadTopLevelStatement(LibraryScan &scan, const Statement &statement, const std::vector<std::string> &tokens,
+                           SpiceLibrary &library) {
+    const std::string directive = ToLower(tokens.front());
+    const std::string text = JoinLines(scan.Lines, statement.FirstLine, statement.LastLine);
+    if (directive == ".model" && tokens.size() >= 2) {
+        const bool is_new =
+            scan.Definitions.try_emplace(ToLower(tokens[1]), Definition{.Order = scan.Order++, .Text = text}).second;
+        // A model a part of imcsim can use is offered on its own too; the others only serve the subcircuits
+        if (std::optional<LibraryModel> model = ReadLibraryModel(text); model && is_new) {
+            library.Models.push_back(std::move(*model));
+        }
+    } else if (directive == ".param") {
+        const std::size_t order = scan.Order++;
+        for (std::size_t token = 1; token < tokens.size(); ++token) {
+            if (const std::size_t equals = tokens[token].find('='); equals != std::string::npos && equals > 0) {
+                scan.Definitions.try_emplace(ToLower(tokens[token].substr(0, equals)),
+                                             Definition{.Order = order, .Text = text});
+            }
+        }
+    } else if (IsInclusion(directive)) {
+        library.Warnings.push_back(std::format("Line {}: {} is not followed; import the file it names as well",
+                                               statement.FirstLine + 1, tokens.front()));
+    }
+}
+
+// Records a subcircuit that ends, which another one may use by its name
+void AddFoundSubcircuit(LibraryScan &scan, const std::size_t header, const std::size_t end) {
+    scan.Found.emplace_back(header, end);
+    if (const std::vector<std::string> tokens = Tokenize(scan.Statements[header].Logical); tokens.size() >= 2) {
+        scan.Definitions.try_emplace(ToLower(tokens[1]),
+                                     Definition{.Order = scan.Order++,
+                                                .Text = JoinLines(scan.Lines, scan.Statements[header].FirstLine,
+                                                                  scan.Statements[end].LastLine)});
+    }
+}
+
+// The first pass finds the subcircuits and the definitions outside them
+LibraryScan ScanLibrary(const std::string_view text, SpiceLibrary &library) {
+    LibraryScan scan;
+    scan.Lines = SplitLines(text);
+    scan.Statements = ReadStatements(scan.Lines);
+    int depth = 0;
+    std::size_t header = 0;
+    for (std::size_t index = 0; index < scan.Statements.size(); ++index) {
+        const Statement &statement = scan.Statements[index];
+        const std::vector<std::string> tokens = Tokenize(statement.Logical);
+        if (tokens.empty()) {
+            continue;
+        }
+        const std::string directive = ToLower(tokens.front());
+        if (directive == ".subckt") {
+            header = depth++ == 0 ? index : header;
+        } else if (directive == ".ends" && depth == 0) {
+            library.Warnings.push_back(
+                std::format("Line {} closes a subcircuit that was never opened", statement.FirstLine + 1));
+        } else if (directive == ".ends") {
+            if (--depth == 0) {
+                AddFoundSubcircuit(scan, header, index);
+            }
+        } else if (depth == 0) {
+            ReadTopLevelStatement(scan, statement, tokens, library);
+        }
+    }
+    if (depth > 0) {
+        library.Warnings.emplace_back("The file ends inside a subcircuit, which was left out");
+    }
+    return scan;
+}
+
+// An .include or .lib inside a subcircuit brings in what the file does not have
+void WarnInclusions(const LibraryScan &scan, const std::size_t header, const std::size_t end,
+                    LibrarySubcircuit &subcircuit) {
+    for (std::size_t index = header + 1; index < end; ++index) {
+        const std::vector<std::string> inner = Tokenize(scan.Statements[index].Logical);
+        if (!inner.empty() && IsInclusion(ToLower(inner.front()))) {
+            subcircuit.Warnings.push_back(std::format("Line {}: {} is not followed, so what it brings in is missing",
+                                                      scan.Statements[index].FirstLine + 1, inner.front()));
+        }
+    }
+}
+
+// The second pass turns a subcircuit into a text that needs nothing else from the file; no value for one without a
+// name, defined twice or encrypted, with the warning that says so
+std::optional<LibrarySubcircuit> BuildSubcircuit(const LibraryScan &scan, const std::size_t header,
+                                                 const std::size_t end, std::set<std::string> &names,
+                                                 std::vector<std::string> &warnings) {
+    const Statement &first = scan.Statements[header];
+    const Statement &last = scan.Statements[end];
+    const std::vector<std::string> tokens = Tokenize(first.Logical);
+    if (tokens.size() < 2) {
+        warnings.push_back(std::format("The subcircuit on line {} has no name and was left out", first.FirstLine + 1));
+        return std::nullopt;
+    }
+    LibrarySubcircuit subcircuit;
+    subcircuit.Name = tokens[1];
+    subcircuit.Description = ReadDescription(scan.Lines, first.FirstLine);
+    if (!names.insert(ToLower(subcircuit.Name)).second) {
+        warnings.push_back(std::format("{} is defined twice; only the first one was read", subcircuit.Name));
+        return std::nullopt;
+    }
+    std::string expressions;
+    ReadHeader(tokens, subcircuit, expressions);
+    const std::string body = last.FirstLine > first.LastLine + 1
+                                 ? JoinLines(scan.Lines, first.LastLine + 1, last.FirstLine - 1)
+                                 : std::string();
+    if (IsEncrypted(body)) {
+        warnings.push_back(std::format("{} is encrypted, so only its vendor's simulator can read it; it was left out",
+                                       subcircuit.Name));
+        return std::nullopt;
+    }
+    WarnInclusions(scan, header, end, subcircuit);
+    // What it uses from the file comes first, since a .param must be set before an expression reads it
+    const std::string own = expressions + body;
+    subcircuit.Text = AddDependencies(own, ToLower(subcircuit.Name), scan.Definitions) + own;
+    return subcircuit;
+}
+
 } // namespace
 
 /**
@@ -284,112 +412,12 @@ bool IsInclusion(const std::string_view directive) {
  */
 SpiceLibrary ReadSpiceLibrary(const std::string_view text) {
     SpiceLibrary library;
-    const std::vector<std::string> lines = SplitLines(text);
-    const std::vector<Statement> statements = ReadStatements(lines);
-
-    // The first pass finds the subcircuits and the definitions outside them
-    std::map<std::string, Definition> definitions;
-    struct Found {
-        std::size_t Header;
-        std::size_t End;
-    };
-    std::vector<Found> found;
-    std::size_t order = 0;
-    int depth = 0;
-    std::size_t header = 0;
-    for (std::size_t index = 0; index < statements.size(); ++index) {
-        const Statement &statement = statements[index];
-        const std::vector<std::string> tokens = Tokenize(statement.Logical);
-        if (tokens.empty()) {
-            continue;
-        }
-        const std::string directive = ToLower(tokens.front());
-        if (directive == ".subckt") {
-            if (depth++ == 0) {
-                header = index;
-            }
-        } else if (directive == ".ends") {
-            if (depth == 0) {
-                library.Warnings.push_back(
-                    std::format("Line {} closes a subcircuit that was never opened", statement.FirstLine + 1));
-            } else if (--depth == 0) {
-                found.push_back({.Header = header, .End = index});
-                // Another subcircuit may use this one by its name, so it is a definition too
-                if (const std::vector<std::string> header_tokens = Tokenize(statements[header].Logical);
-                    header_tokens.size() >= 2) {
-                    definitions.try_emplace(
-                        ToLower(header_tokens[1]),
-                        Definition{.Order = order++,
-                                   .Text = JoinLines(lines, statements[header].FirstLine, statement.LastLine)});
-                }
-            }
-        } else if (depth == 0 && directive == ".model" && tokens.size() >= 2) {
-            const std::string model_text = JoinLines(lines, statement.FirstLine, statement.LastLine);
-            const bool is_new =
-                definitions.try_emplace(ToLower(tokens[1]), Definition{.Order = order++, .Text = model_text}).second;
-            // A model a part of imcsim can use is offered on its own too; the others only serve the subcircuits
-            if (std::optional<LibraryModel> model = ReadLibraryModel(model_text); model && is_new) {
-                library.Models.push_back(std::move(*model));
-            }
-        } else if (depth == 0 && directive == ".param") {
-            const std::string line_text = JoinLines(lines, statement.FirstLine, statement.LastLine);
-            const std::size_t line_order = order++;
-            for (std::size_t token = 1; token < tokens.size(); ++token) {
-                if (const std::size_t equals = tokens[token].find('='); equals != std::string::npos && equals > 0) {
-                    definitions.try_emplace(ToLower(tokens[token].substr(0, equals)),
-                                            Definition{.Order = line_order, .Text = line_text});
-                }
-            }
-        } else if (depth == 0 && IsInclusion(directive)) {
-            library.Warnings.push_back(std::format("Line {}: {} is not followed; import the file it names as well",
-                                                   statement.FirstLine + 1, tokens.front()));
-        }
-    }
-    if (depth > 0) {
-        library.Warnings.push_back("The file ends inside a subcircuit, which was left out");
-    }
-
-    // The second pass turns each subcircuit into a text that needs nothing else from the file
+    const LibraryScan scan = ScanLibrary(text, library);
     std::set<std::string> names;
-    for (const Found &subcircuit_lines : found) {
-        const Statement &first = statements[subcircuit_lines.Header];
-        const Statement &last = statements[subcircuit_lines.End];
-        const std::vector<std::string> tokens = Tokenize(first.Logical);
-        if (tokens.size() < 2) {
-            library.Warnings.push_back(
-                std::format("The subcircuit on line {} has no name and was left out", first.FirstLine + 1));
-            continue;
+    for (const auto &[header, end] : scan.Found) {
+        if (std::optional<LibrarySubcircuit> subcircuit = BuildSubcircuit(scan, header, end, names, library.Warnings)) {
+            library.Subcircuits.push_back(std::move(*subcircuit));
         }
-        LibrarySubcircuit subcircuit;
-        subcircuit.Name = tokens[1];
-        subcircuit.Description = ReadDescription(lines, first.FirstLine);
-        if (!names.insert(ToLower(subcircuit.Name)).second) {
-            library.Warnings.push_back(
-                std::format("{} is defined twice; only the first one was read", subcircuit.Name));
-            continue;
-        }
-        std::string expressions;
-        ReadHeader(tokens, subcircuit, expressions);
-        const std::string body = last.FirstLine > first.LastLine + 1
-                                     ? JoinLines(lines, first.LastLine + 1, last.FirstLine - 1)
-                                     : std::string();
-        if (IsEncrypted(body)) {
-            library.Warnings.push_back(std::format(
-                "{} is encrypted, so only its vendor's simulator can read it; it was left out", subcircuit.Name));
-            continue;
-        }
-        for (std::size_t index = subcircuit_lines.Header + 1; index < subcircuit_lines.End; ++index) {
-            const std::vector<std::string> inner = Tokenize(statements[index].Logical);
-            if (!inner.empty() && IsInclusion(ToLower(inner.front()))) {
-                subcircuit.Warnings.push_back(
-                    std::format("Line {}: {} is not followed, so what it brings in is missing",
-                                statements[index].FirstLine + 1, inner.front()));
-            }
-        }
-        // What it uses from the file comes first, since a .param must be set before an expression reads it
-        const std::string own = expressions + body;
-        subcircuit.Text = AddDependencies(own, ToLower(subcircuit.Name), definitions) + own;
-        library.Subcircuits.push_back(std::move(subcircuit));
     }
     if (library.Subcircuits.empty() && library.Models.empty() && library.Warnings.empty()) {
         library.Warnings.emplace_back("The file has no .subckt, nor a diode or transistor .model, to import");

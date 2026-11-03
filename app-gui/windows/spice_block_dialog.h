@@ -78,6 +78,9 @@ private:
     std::string m_Text;
 
     std::optional<SpiceBlockResult> DrawImport();
+    void DrawSubcircuitChoice(Choice &choice);
+    void DrawModelChoices();
+    std::optional<SpiceBlockResult> TakeChosen();
     std::optional<SpiceBlockResult> DrawSettings();
 };
 

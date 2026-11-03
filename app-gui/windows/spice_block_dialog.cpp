@@ -139,43 +139,11 @@ std::optional<SpiceBlockResult> SpiceBlockDialog::DrawImport() {
     ImGui::SetNextWindowSizeConstraints({0.0f, 0.0f}, {FLT_MAX, font_size * LIST_HEIGHT});
     ImGui::BeginChild("##subcircuits", {0.0f, 0.0f}, ImGuiChildFlags_AutoResizeX | ImGuiChildFlags_AutoResizeY);
     for (std::size_t index = 0; index < m_Choices.size(); ++index) {
-        Choice &choice = m_Choices[index];
         ImGui::PushID(static_cast<int>(index));
-        ImGui::Checkbox(choice.Subcircuit.Name.c_str(), &choice.IsChosen);
-        if (choice.IsChosen) {
-            ImGui::Indent();
-            // What the vendor says each port is, which numbered ports need to be named
-            // In a fixed-width font, since vendors line their ports up with "|" columns
-            if (!choice.Subcircuit.Description.empty()) {
-                ImGui::PushFont(GetMonospaceFont(), 0.0f);
-                ImGui::TextDisabled("%s", choice.Subcircuit.Description.c_str());
-                ImGui::PopFont();
-            }
-            if (!choice.Subcircuit.Parameters.empty()) {
-                ImGui::TextDisabled("Parameters: %s", DescribeParameters(choice.Subcircuit.Parameters).c_str());
-            }
-            for (const std::string &warning : choice.Subcircuit.Warnings) {
-                ImGui::TextColored(GetWarningTextColor(), "%s", warning.c_str());
-            }
-            DrawPinTable(choice.Pins, choice.Subcircuit.Ports);
-            ImGui::Unindent();
-        }
+        DrawSubcircuitChoice(m_Choices[index]);
         ImGui::PopID();
     }
-    if (!m_Models.empty()) {
-        ImGui::SeparatorText("Device models");
-        ImGui::TextDisabled("Diodes and transistors list the picked ones in their Model choice");
-        for (std::size_t index = 0; index < m_Models.size(); ++index) {
-            ImGui::PushID(static_cast<int>(m_Choices.size() + index));
-            bool is_chosen = m_AreModelsChosen[index] != 0;
-            if (ImGui::Checkbox(
-                    std::format("{} ({})", m_Models[index].Name, Core::GetModelKindName(m_Models[index].Kind)).c_str(),
-                    &is_chosen)) {
-                m_AreModelsChosen[index] = static_cast<char>(is_chosen);
-            }
-            ImGui::PopID();
-        }
-    }
+    DrawModelChoices();
     ImGui::EndChild();
     if (!m_Error.empty()) {
         ImGui::TextColored(GetErrorTextColor(), "%s", m_Error.c_str());
@@ -186,26 +154,8 @@ std::optional<SpiceBlockResult> SpiceBlockDialog::DrawImport() {
                                std::ranges::any_of(m_AreModelsChosen, [](const char chosen) { return chosen != 0; });
     ImGui::BeginDisabled(!is_any_chosen);
     if (ImGui::Button("Import")) {
-        SpiceBlockResult imported;
-        bool is_valid = true;
-        for (const Choice &choice : m_Choices) {
-            if (!choice.IsChosen) {
-                continue;
-            }
-            if (const std::optional<std::string> problem = CheckSpicePins(choice.Pins)) {
-                m_Error = std::format("{}: {}", choice.Subcircuit.Name, *problem);
-                is_valid = false;
-                break;
-            }
-            imported.Imported.push_back(MakeSpiceBlock(choice.Subcircuit, choice.Pins));
-        }
-        for (std::size_t index = 0; index < m_Models.size(); ++index) {
-            if (m_AreModelsChosen[index] != 0) {
-                imported.Models.push_back(m_Models[index]);
-            }
-        }
-        if (is_valid) {
-            result = std::move(imported);
+        result = TakeChosen();
+        if (result) {
             ImGui::CloseCurrentPopup();
         }
     }
@@ -216,6 +166,70 @@ std::optional<SpiceBlockResult> SpiceBlockDialog::DrawImport() {
     }
     ImGui::EndPopup();
     return result;
+}
+
+// A subcircuit of the library with a box to pick it; once picked, what the vendor says of its ports, its parameters,
+// its warnings and its pins to name and place
+void SpiceBlockDialog::DrawSubcircuitChoice(Choice &choice) {
+    ImGui::Checkbox(choice.Subcircuit.Name.c_str(), &choice.IsChosen);
+    if (!choice.IsChosen) {
+        return;
+    }
+    ImGui::Indent();
+    // In a fixed-width font, since vendors line their ports up with "|" columns
+    if (!choice.Subcircuit.Description.empty()) {
+        ImGui::PushFont(GetMonospaceFont(), 0.0f);
+        ImGui::TextDisabled("%s", choice.Subcircuit.Description.c_str());
+        ImGui::PopFont();
+    }
+    if (!choice.Subcircuit.Parameters.empty()) {
+        ImGui::TextDisabled("Parameters: %s", DescribeParameters(choice.Subcircuit.Parameters).c_str());
+    }
+    for (const std::string &warning : choice.Subcircuit.Warnings) {
+        ImGui::TextColored(GetWarningTextColor(), "%s", warning.c_str());
+    }
+    DrawPinTable(choice.Pins, choice.Subcircuit.Ports);
+    ImGui::Unindent();
+}
+
+// The device models of the library, each with a box to pick it
+void SpiceBlockDialog::DrawModelChoices() {
+    if (m_Models.empty()) {
+        return;
+    }
+    ImGui::SeparatorText("Device models");
+    ImGui::TextDisabled("Diodes and transistors list the picked ones in their Model choice");
+    for (std::size_t index = 0; index < m_Models.size(); ++index) {
+        ImGui::PushID(static_cast<int>(m_Choices.size() + index));
+        bool is_chosen = m_AreModelsChosen[index] != 0;
+        const Core::LibraryModel &model = m_Models[index];
+        if (ImGui::Checkbox(std::format("{} ({})", model.Name, Core::GetModelKindName(model.Kind)).c_str(),
+                            &is_chosen)) {
+            m_AreModelsChosen[index] = static_cast<char>(is_chosen);
+        }
+        ImGui::PopID();
+    }
+}
+
+// The picked subcircuits as blocks and the picked models; no value when a pin name cannot be kept, which m_Error tells
+std::optional<SpiceBlockResult> SpiceBlockDialog::TakeChosen() {
+    SpiceBlockResult imported;
+    for (const Choice &choice : m_Choices) {
+        if (!choice.IsChosen) {
+            continue;
+        }
+        if (const std::optional<std::string> problem = CheckSpicePins(choice.Pins)) {
+            m_Error = std::format("{}: {}", choice.Subcircuit.Name, *problem);
+            return std::nullopt;
+        }
+        imported.Imported.push_back(MakeSpiceBlock(choice.Subcircuit, choice.Pins));
+    }
+    for (std::size_t index = 0; index < m_Models.size(); ++index) {
+        if (m_AreModelsChosen[index] != 0) {
+            imported.Models.push_back(m_Models[index]);
+        }
+    }
+    return imported;
 }
 
 // The pins and parameter defaults of the block, and its text, which stays as it came

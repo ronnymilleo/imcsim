@@ -271,11 +271,50 @@ std::string ToLowerCase(const std::string_view text) {
     return lower;
 }
 
-// Model names are global in ngspice, even when their declarations sit inside a subcircuit. Prefix every declaration
-// and reference of a definition so equal custom parts in two definitions cannot replace each other's models. Names are
-// matched without regard to case, as SPICE reads them, and the first word of an element line is left alone: it is the
-// element's own name, whose first letter says what the element is
-std::string ScopeModels(const std::string &body, const std::string_view definition_name) {
+// The line of a diode or a transistor, with the line of its model added to models the first time it comes up. A
+// library model is written once, with the other library models, after the parts. The body of a MOSFET is tied to its
+// source, past its probe, so the source current includes it; a library model brings its own channel size
+std::string FormatModeledPart(const Component &component, const std::vector<int> &nodes,
+                              std::vector<std::string> &model_names, std::string &models) {
+    const ComponentType type = component.GetType();
+    if (IsDiode(type)) {
+        const auto &diode = static_cast<const Diode &>(component);
+        const std::string model_name = diode.GetSpiceModelName();
+        if (!diode.HasLibraryModel()) {
+            AddModelLine(model_name, FormatDiodeModel(model_name, diode.GetParameters()), model_names, models);
+        }
+        return std::format("{} {} {} {}\n", diode.GetName(), nodes[0], nodes[1], model_name);
+    }
+    if (IsBJT(type)) {
+        const auto &bjt = static_cast<const BJT &>(component);
+        const std::string model_name = bjt.GetSpiceModelName();
+        if (!bjt.HasLibraryModel()) {
+            AddModelLine(model_name, FormatBJTModel(type, model_name, bjt.GetParameters()), model_names, models);
+        }
+        return std::format("{} {} {} {} {}\n", bjt.GetName(), nodes[0], nodes[1], nodes[2], model_name);
+    }
+    const auto &mosfet = static_cast<const MOSFET &>(component);
+    const std::string model_name = mosfet.GetSpiceModelName();
+    if (mosfet.HasLibraryModel()) {
+        return std::format("{} {} {} {} {} {}\n", mosfet.GetName(), nodes[0], nodes[1], nodes[2], nodes[2], model_name);
+    }
+    const MOSFETParameters &parameters = mosfet.GetParameters();
+    AddModelLine(model_name, FormatMOSFETModel(type, model_name, parameters), model_names, models);
+    return std::format("{} {} {} {} {} {} W={:.6g} L={:.6g}\n", mosfet.GetName(), nodes[0], nodes[1], nodes[2],
+                       nodes[2], model_name, parameters.Width, parameters.Length);
+}
+
+// Every library model of a circuit, under the names the parts use, after the models of the parts
+std::string FormatLibraryModels(const std::vector<LibraryModel> &library_models) {
+    std::string text;
+    for (const LibraryModel &model : library_models) {
+        text += FormatLibraryModel(model);
+    }
+    return text;
+}
+
+// The names a body declares with .model or .subckt, lowercase, since SPICE reads names without regard to case
+std::set<std::string> CollectDeclaredNames(const std::string &body) {
     std::set<std::string> declared;
     std::istringstream lines(body);
     std::string line;
@@ -283,44 +322,59 @@ std::string ScopeModels(const std::string &body, const std::string_view definiti
         std::istringstream fields(line);
         std::string directive;
         std::string name;
-        if (fields >> directive >> name) {
-            directive = ToLowerCase(directive);
-            if (directive == ".model" || directive == ".subckt") {
-                declared.insert(ToLowerCase(name));
-            }
-        }
-    }
-    const std::string prefix = std::format("imcsim_{}_", definition_name);
-    std::string scoped;
-    scoped.reserve(body.size() + declared.size() * prefix.size());
-    bool is_line_start = true;
-    bool is_element_line = false;
-    bool is_comment = false;
-    bool is_first_word = false;
-    for (std::size_t position = 0; position < body.size();) {
-        const char character = body[position];
-        if (character == '\n') {
-            is_line_start = true;
-            scoped += body[position++];
+        if (!(fields >> directive >> name)) {
             continue;
         }
-        if (is_line_start && character != ' ' && character != '\t') {
-            is_line_start = false;
-            is_comment = character == '*';
-            is_element_line = character != '.' && character != '+' && !is_comment;
-            is_first_word = is_element_line;
+        directive = ToLowerCase(directive);
+        if (directive == ".model" || directive == ".subckt") {
+            declared.insert(ToLowerCase(name));
         }
-        if (is_comment || !IsModelNameCharacter(character)) {
-            scoped += body[position++];
+    }
+    return declared;
+}
+
+// One line with the declared names prefixed. A comment stays as it is, and the first word of an element line is left
+// alone: it is the element's own name, whose first letter says what the element is
+std::string ScopeLine(const std::string_view line, const std::set<std::string> &declared, const std::string &prefix) {
+    const std::size_t first = line.find_first_not_of(" \t");
+    if (first == std::string_view::npos || line[first] == '*') {
+        return std::string(line);
+    }
+    bool is_first_word = line[first] != '.' && line[first] != '+';
+    std::string scoped;
+    for (std::size_t position = 0; position < line.size();) {
+        if (!IsModelNameCharacter(line[position])) {
+            scoped += line[position++];
             continue;
         }
         const std::size_t start = position;
-        while (position < body.size() && IsModelNameCharacter(body[position])) {
+        while (position < line.size() && IsModelNameCharacter(line[position])) {
             ++position;
         }
-        const std::string token = body.substr(start, position - start);
+        const std::string token(line.substr(start, position - start));
         const bool is_element_name = std::exchange(is_first_word, false);
         scoped += !is_element_name && declared.contains(ToLowerCase(token)) ? prefix + token : token;
+    }
+    return scoped;
+}
+
+// Model names are global in ngspice, even when their declarations sit inside a subcircuit. Prefix every declaration
+// and reference of a definition so equal custom parts in two definitions cannot replace each other's models
+std::string ScopeModels(const std::string &body, const std::string_view definition_name) {
+    const std::set<std::string> declared = CollectDeclaredNames(body);
+    const std::string prefix = std::format("imcsim_{}_", definition_name);
+    std::string scoped;
+    scoped.reserve(body.size() + declared.size() * prefix.size());
+    std::size_t start = 0;
+    while (start < body.size()) {
+        const std::size_t end = body.find('\n', start);
+        const std::size_t length = end == std::string::npos ? std::string::npos : end - start;
+        scoped += ScopeLine(std::string_view(body).substr(start, length), declared, prefix);
+        if (end == std::string::npos) {
+            break;
+        }
+        scoped += '\n';
+        start = end + 1;
     }
     return scoped;
 }
@@ -604,44 +658,13 @@ std::string Circuit::ToSpiceNetlist(const std::string_view analysis, const bool 
         }
         case ComponentType::DIODE:
         case ComponentType::ZENER_DIODE:
-        case ComponentType::LED: {
-            const auto &diode = static_cast<const Diode &>(component);
-            std::string model_name = diode.GetSpiceModelName();
-            netlist += std::format("{} {} {} {}\n", diode.GetName(), nodes[0], nodes[1], model_name);
-            // A library model is written once, with the other library models, after the parts
-            if (!diode.HasLibraryModel()) {
-                AddModelLine(model_name, FormatDiodeModel(model_name, diode.GetParameters()), model_names, models);
-            }
-            break;
-        }
+        case ComponentType::LED:
         case ComponentType::NPN:
-        case ComponentType::PNP: {
-            const auto &bjt = static_cast<const BJT &>(component);
-            std::string model_name = bjt.GetSpiceModelName();
-            netlist += std::format("{} {} {} {} {}\n", bjt.GetName(), nodes[0], nodes[1], nodes[2], model_name);
-            if (!bjt.HasLibraryModel()) {
-                AddModelLine(model_name, FormatBJTModel(bjt.GetType(), model_name, bjt.GetParameters()), model_names,
-                             models);
-            }
-            break;
-        }
+        case ComponentType::PNP:
         case ComponentType::NMOS:
-        case ComponentType::PMOS: {
-            // The body is tied to the source, past its probe, so the source current includes it
-            const auto &mosfet = static_cast<const MOSFET &>(component);
-            const MOSFETParameters &parameters = mosfet.GetParameters();
-            std::string model_name = mosfet.GetSpiceModelName();
-            // A library model brings its own channel size, or the defaults of ngspice
-            if (mosfet.HasLibraryModel()) {
-                netlist += std::format("{} {} {} {} {} {}\n", mosfet.GetName(), nodes[0], nodes[1], nodes[2], nodes[2],
-                                       model_name);
-                break;
-            }
-            netlist += std::format("{} {} {} {} {} {} W={:.6g} L={:.6g}\n", mosfet.GetName(), nodes[0], nodes[1],
-                                   nodes[2], nodes[2], model_name, parameters.Width, parameters.Length);
-            AddModelLine(model_name, FormatMOSFETModel(mosfet.GetType(), model_name, parameters), model_names, models);
+        case ComponentType::PMOS:
+            netlist += FormatModeledPart(component, nodes, model_names, models);
             break;
-        }
         case ComponentType::POTENTIOMETER: {
             // The wiper, terminal 3, splits the track into two resistors
             const auto &pot = static_cast<const Potentiometer &>(component);
@@ -721,9 +744,7 @@ std::string Circuit::ToSpiceNetlist(const std::string_view analysis, const bool 
         netlist += probes;
     }
     netlist += models;
-    for (const LibraryModel &model : m_LibraryModels) {
-        netlist += FormatLibraryModel(model);
-    }
+    netlist += FormatLibraryModels(m_LibraryModels);
     for (const auto &definition : m_Subcircuits) {
         netlist += FormatSubcircuit(*definition);
     }
