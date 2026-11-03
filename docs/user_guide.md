@@ -193,6 +193,24 @@ schematic file keeps the definition of each block, so it opens anywhere without 
   - `.include` and `.lib` lines are reported and not followed, so import the files they name as well. Encrypted
     models, which only their vendor's simulator reads, are left out with a warning.
 
+The RC_LOWPASS block of the Two RC filters example, open in the editor: a pin marker on each side, and a resistor and
+a capacitor that follow the parameters R and C:
+
+![The inside of a block: IN and OUT pin markers, a resistor whose value reads {R} and a capacitor whose value reads {C},
+with Back to schematic and the name of the block over the corner of the canvas](images/blocks_contents.png)
+
+Its settings, with the edge of each pin and the defaults of the parameters:
+
+![The block dialog: the name RC_LOWPASS, the pins IN on the left and OUT on the right, and the parameters R = 1000 and
+C = 1e-07](images/blocks_dialog.png)
+
+Importing an op-amp from a library: the comment above its `.subckt` line says what each numbered port is, and each
+port gets a name and an edge:
+
+![The Import SPICE library dialog with GENERIC_OPAMP picked, the vendor's comment naming its five ports, its
+parameters, and the pins INP and INN on the left, VP on top, VN at the bottom and OUT on the
+right](images/spice_import.png)
+
 ## Wire colors
 
 **View > Wire Colors** picks what the wires show. **Plain** keeps them in the theme color and **Nodes** colors each
