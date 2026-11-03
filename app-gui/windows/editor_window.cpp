@@ -665,27 +665,7 @@ void EditorWindow::DrawEditMenuItems() {
     }
     ImGui::Separator();
     const bool part_selected = !m_Schematic->GetSelectedElements().empty();
-    if (ImGui::MenuItem("Rotate", "R", false, part_selected)) {
-        m_RequestedCommand = EditorCommand::ROTATE;
-    }
-    if (ImGui::MenuItem("Mirror", "M", false, part_selected)) {
-        m_RequestedCommand = EditorCommand::MIRROR;
-    }
-    if (ImGui::MenuItem("Flip", "Shift+M", false, part_selected)) {
-        m_RequestedCommand = EditorCommand::FLIP;
-    }
-    if (ImGui::BeginMenu("Keep Wires in Place", part_selected)) {
-        if (ImGui::MenuItem("Rotate", "Alt+R")) {
-            m_RequestedCommand = EditorCommand::ROTATE_KEEP_WIRES;
-        }
-        if (ImGui::MenuItem("Mirror", "Alt+M")) {
-            m_RequestedCommand = EditorCommand::MIRROR_KEEP_WIRES;
-        }
-        if (ImGui::MenuItem("Flip", "Alt+Shift+M")) {
-            m_RequestedCommand = EditorCommand::FLIP_KEEP_WIRES;
-        }
-        ImGui::EndMenu();
-    }
+    DrawTurnMenuItems(part_selected);
     ImGui::Separator();
     if (ImGui::MenuItem("Cut", IMCSIM_SHORTCUT "X", false, m_Schematic->HasSelection())) {
         m_RequestedCommand = EditorCommand::CUT;
@@ -706,28 +686,7 @@ void EditorWindow::DrawEditMenuItems() {
         m_RequestedCommand = EditorCommand::DELETE_SELECTION;
     }
     ImGui::Separator();
-    if (IsEditingSubcircuit()) {
-        if (ImGui::MenuItem("Block Pin and Parameter Settings...")) {
-            SyncSubcircuitPins();
-            m_SubcircuitDialogRequested = true;
-        }
-        if (ImGui::MenuItem("Apply Block and Return")) {
-            FinishSubcircuitEditing(true);
-        }
-        if (ImGui::MenuItem("Discard Block Changes")) {
-            FinishSubcircuitEditing(false);
-        }
-    } else {
-        if (ImGui::MenuItem("Create Block from Selection...", nullptr, false, m_Schematic->HasSelection())) {
-            RequestCreateSubcircuit();
-        }
-        const UIElement *selected = m_Schematic->GetSelectedElement();
-        const bool block_selected =
-            selected != nullptr && selected->GetComponent().GetType() == Core::ComponentType::SUBCIRCUIT;
-        if (ImGui::MenuItem("Edit Block Contents", nullptr, false, block_selected)) {
-            RequestEditSelectedSubcircuit();
-        }
-    }
+    DrawBlockMenuItems();
 }
 
 /**
@@ -1734,6 +1693,21 @@ void EditorWindow::DrawSubcircuitDialog() {
     ImGui::InputText("Name", &m_SubcircuitName);
     ImGui::EndDisabled();
     ImGui::SeparatorText("Pins, in terminal order, and their edge");
+    DrawSubcircuitPinRows(editing);
+    if (m_SubcircuitPins.empty()) {
+        ImGui::TextDisabled("Place pin markers to choose the block connections");
+    }
+    ImGui::SeparatorText("Parameters");
+    DrawSubcircuitParameterRows();
+    if (!m_SubcircuitError.empty()) {
+        ImGui::TextColored(GetErrorTextColor(), "%s", m_SubcircuitError.c_str());
+    }
+    DrawSubcircuitDialogButtons(editing);
+    ImGui::EndPopup();
+}
+
+// One row per pin: its name, the edge it goes on and the buttons that move it in the terminal order
+void EditorWindow::DrawSubcircuitPinRows(const bool editing) {
     for (std::size_t index = 0; index < m_SubcircuitPins.size(); ++index) {
         ImGui::PushID(static_cast<int>(index));
         ImGui::SetNextItemWidth(ImGui::GetFontSize() * 8.0f);
@@ -1757,10 +1731,10 @@ void EditorWindow::DrawSubcircuitDialog() {
         ImGui::EndDisabled();
         ImGui::PopID();
     }
-    if (m_SubcircuitPins.empty()) {
-        ImGui::TextDisabled("Place pin markers to choose the block connections");
-    }
-    ImGui::SeparatorText("Parameters");
+}
+
+// One row per parameter: its name, its default and a button that removes it
+void EditorWindow::DrawSubcircuitParameterRows() {
     for (std::size_t index = 0; index < m_SubcircuitParameters.size(); ++index) {
         ImGui::PushID(static_cast<int>(index));
         ImGui::SetNextItemWidth(ImGui::GetFontSize() * 8.0f);
@@ -1778,9 +1752,10 @@ void EditorWindow::DrawSubcircuitDialog() {
     if (ImGui::Button("Add parameter")) {
         m_SubcircuitParameters.push_back({std::format("P{}", m_SubcircuitParameters.size() + 1), 1.0});
     }
-    if (!m_SubcircuitError.empty()) {
-        ImGui::TextColored(GetErrorTextColor(), "%s", m_SubcircuitError.c_str());
-    }
+}
+
+// Creating the block, or keeping the settings of the one open, and the way out without them
+void EditorWindow::DrawSubcircuitDialogButtons(const bool editing) {
     if (ImGui::Button(editing ? "Keep settings" : "Create block")) {
         if (editing) {
             if (ApplySubcircuitPinNames()) {
@@ -1811,7 +1786,6 @@ void EditorWindow::DrawSubcircuitDialog() {
         }
         ImGui::CloseCurrentPopup();
     }
-    ImGui::EndPopup();
 }
 
 /**
@@ -2918,6 +2892,57 @@ void EditorWindow::RunTurnCommand(const EditorCommand command) {
         break;
     default:
         break;
+    }
+}
+
+// Rotate, mirror and flip the selected parts, with or without their wires
+void EditorWindow::DrawTurnMenuItems(const bool part_selected) {
+    if (ImGui::MenuItem("Rotate", "R", false, part_selected)) {
+        m_RequestedCommand = EditorCommand::ROTATE;
+    }
+    if (ImGui::MenuItem("Mirror", "M", false, part_selected)) {
+        m_RequestedCommand = EditorCommand::MIRROR;
+    }
+    if (ImGui::MenuItem("Flip", "Shift+M", false, part_selected)) {
+        m_RequestedCommand = EditorCommand::FLIP;
+    }
+    if (ImGui::BeginMenu("Keep Wires in Place", part_selected)) {
+        if (ImGui::MenuItem("Rotate", "Alt+R")) {
+            m_RequestedCommand = EditorCommand::ROTATE_KEEP_WIRES;
+        }
+        if (ImGui::MenuItem("Mirror", "Alt+M")) {
+            m_RequestedCommand = EditorCommand::MIRROR_KEEP_WIRES;
+        }
+        if (ImGui::MenuItem("Flip", "Alt+Shift+M")) {
+            m_RequestedCommand = EditorCommand::FLIP_KEEP_WIRES;
+        }
+        ImGui::EndMenu();
+    }
+}
+
+// Making a block from the selection and opening one, or, inside a block, its settings and the ways out
+void EditorWindow::DrawBlockMenuItems() {
+    if (IsEditingSubcircuit()) {
+        if (ImGui::MenuItem("Block Pin and Parameter Settings...")) {
+            SyncSubcircuitPins();
+            m_SubcircuitDialogRequested = true;
+        }
+        if (ImGui::MenuItem("Apply Block and Return")) {
+            FinishSubcircuitEditing(true);
+        }
+        if (ImGui::MenuItem("Discard Block Changes")) {
+            FinishSubcircuitEditing(false);
+        }
+    } else {
+        if (ImGui::MenuItem("Create Block from Selection...", nullptr, false, m_Schematic->HasSelection())) {
+            RequestCreateSubcircuit();
+        }
+        const UIElement *selected = m_Schematic->GetSelectedElement();
+        const bool block_selected =
+            selected != nullptr && selected->GetComponent().GetType() == Core::ComponentType::SUBCIRCUIT;
+        if (ImGui::MenuItem("Edit Block Contents", nullptr, false, block_selected)) {
+            RequestEditSelectedSubcircuit();
+        }
     }
 }
 

@@ -101,9 +101,13 @@ private:
     std::vector<std::string> m_BlockParameters;
 
     void LoadFields(const Core::Component &component);
+    void LoadSubcircuitFields(const Core::SubcircuitInstance &instance);
+    void LoadModelFields(const Core::Component &component);
+    void LoadSettingFields(const Core::Component &component);
     void DrawSelectionSummary();
     void DrawFields(Core::Component &component);
     bool DrawModeledPart(Core::Component &component);
+    bool DrawSettingPart(Core::Component &component);
     void DrawSubcircuit(Core::SubcircuitInstance &instance);
     void DrawValue(Core::Component &component);
     bool DrawParameterChoice(Core::Component &component);

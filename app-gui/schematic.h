@@ -255,6 +255,8 @@ private:
 
     void InvalidateDerivedData();
     void FollowVoltageProbes();
+    void RefreshInstances(const SavedSubcircuit &definition, const std::vector<std::string> &old_names,
+                          const std::vector<std::optional<std::size_t>> &matches);
     std::string TakeSnapshot() const;
     void RestoreSnapshot(const std::string &snapshot);
     void ResetHistory();

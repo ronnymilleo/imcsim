@@ -266,6 +266,9 @@ private:
     void RequestCreateSubcircuit();
     void RequestEditSelectedSubcircuit();
     void DrawSubcircuitDialog();
+    void DrawSubcircuitPinRows(bool editing);
+    void DrawSubcircuitParameterRows();
+    void DrawSubcircuitDialogButtons(bool editing);
     bool SyncSubcircuitPins();
     bool ApplySubcircuitPinNames();
     void FinishSubcircuitEditing(bool apply);
@@ -324,6 +327,8 @@ private:
     bool RunClipboardCommand(EditorCommand command);
     void RunEditCommand(EditorCommand command);
     void RunTurnCommand(EditorCommand command);
+    void DrawTurnMenuItems(bool part_selected);
+    void DrawBlockMenuItems();
 };
 
 } // namespace GUI

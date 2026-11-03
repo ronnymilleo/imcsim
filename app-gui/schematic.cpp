@@ -120,6 +120,58 @@ std::vector<std::optional<std::size_t>> MatchPins(const std::vector<SavedSubcirc
     return matches;
 }
 
+// Each selected marker is one pin, whatever order the pins were put in
+std::expected<void, std::string> CheckPinChoice(const std::vector<Schematic::SubcircuitPinCandidate> &candidates,
+                                                const std::vector<SavedSubcircuitPin> &pins) {
+    std::set<GridPoint> pin_points;
+    for (const SavedSubcircuitPin &pin : pins) {
+        if (!std::ranges::contains(candidates, pin.Point, &Schematic::SubcircuitPinCandidate::Point) ||
+            !pin_points.insert(pin.Point).second) {
+            return std::unexpected("Choose one name for every pin marker");
+        }
+    }
+    if (pins.size() != candidates.size()) {
+        return std::unexpected("Choose one name for every pin marker");
+    }
+    return {};
+}
+
+// The contents of a new block: a copy of the selection, with each marker named after its pin, and pins that reach
+// nodes the outside can connect to
+std::expected<SavedSubcircuit, std::string> DrawDefinition(const std::vector<std::unique_ptr<UIElement>> &elements,
+                                                           const std::vector<UIWire> &wires,
+                                                           const std::set<std::size_t> &selected_elements,
+                                                           const std::set<std::size_t> &selected_wires,
+                                                           SavedSubcircuit definition) {
+    std::vector<const UIElement *> copied_elements;
+    for (const std::size_t index : selected_elements) {
+        copied_elements.push_back(elements[index].get());
+    }
+    std::vector<UIWire> copied_wires;
+    for (const std::size_t index : selected_wires) {
+        copied_wires.push_back(wires[index]);
+    }
+    auto copied = LoadSchematic(SaveParts(copied_elements, copied_wires));
+    if (!copied) {
+        return std::unexpected(copied.error());
+    }
+    definition.Elements = std::move(copied->Elements);
+    definition.Wires = std::move(copied->Wires);
+    for (auto &element : definition.Elements) {
+        if (!Core::IsSubcircuitPin(element->GetComponent().GetType())) {
+            continue;
+        }
+        const GridPoint point = element->GetTerminals().front();
+        const auto pin = std::ranges::find(definition.Pins, point, &SavedSubcircuitPin::Point);
+        static_cast<Core::NetLabel &>(element->GetComponent()).SetNet(pin->Name);
+    }
+    if (const std::optional<std::string> problem =
+            CheckPinNodes(Connectivity(definition.Elements, definition.Wires), definition.Pins)) {
+        return std::unexpected(*problem);
+    }
+    return definition;
+}
+
 // The definition as text, so two definitions of one name can be told equal or not
 std::string DescribeDefinition(const SavedSubcircuit &definition) {
     return SaveSchematic({}, {}, {}, {}, std::span<const SavedSubcircuit>(&definition, 1));
@@ -371,51 +423,22 @@ Schematic::CreateSubcircuitFromSelection(std::string name, std::vector<SavedSubc
     if (!candidates) {
         return std::unexpected(candidates.error());
     }
-    // Each marker is one pin, whatever order the pins were put in
-    std::set<GridPoint> pin_points;
-    for (const SavedSubcircuitPin &pin : pins) {
-        if (!std::ranges::contains(*candidates, pin.Point, &SubcircuitPinCandidate::Point) ||
-            !pin_points.insert(pin.Point).second) {
-            return std::unexpected("Choose one name for every pin marker");
-        }
-    }
-    if (pins.size() != candidates->size()) {
-        return std::unexpected("Choose one name for every pin marker");
+    if (auto valid = CheckPinChoice(*candidates, pins); !valid) {
+        return std::unexpected(valid.error());
     }
     if (auto valid = ValidateMetadata(pins, parameters); !valid) {
         return std::unexpected(valid.error());
     }
 
-    SavedSubcircuit definition;
-    definition.Name = std::move(name);
-    definition.Pins = std::move(pins);
-    definition.Parameters = std::move(parameters);
-    std::vector<const UIElement *> copied_elements;
-    for (const std::size_t index : m_SelectedElements) {
-        copied_elements.push_back(m_Elements[index].get());
+    SavedSubcircuit made;
+    made.Name = std::move(name);
+    made.Pins = std::move(pins);
+    made.Parameters = std::move(parameters);
+    auto drawn = DrawDefinition(m_Elements, m_Wires, m_SelectedElements, m_SelectedWires, std::move(made));
+    if (!drawn) {
+        return std::unexpected(drawn.error());
     }
-    std::vector<UIWire> copied_wires;
-    for (const std::size_t index : m_SelectedWires) {
-        copied_wires.push_back(m_Wires[index]);
-    }
-    auto copied = LoadSchematic(SaveParts(copied_elements, copied_wires));
-    if (!copied) {
-        return std::unexpected(copied.error());
-    }
-    definition.Elements = std::move(copied->Elements);
-    definition.Wires = std::move(copied->Wires);
-    for (auto &element : definition.Elements) {
-        if (!Core::IsSubcircuitPin(element->GetComponent().GetType())) {
-            continue;
-        }
-        const GridPoint point = element->GetTerminals().front();
-        const auto pin = std::ranges::find(definition.Pins, point, &SavedSubcircuitPin::Point);
-        static_cast<Core::NetLabel &>(element->GetComponent()).SetNet(pin->Name);
-    }
-    if (const std::optional<std::string> problem =
-            CheckPinNodes(Connectivity(definition.Elements, definition.Wires), definition.Pins)) {
-        return std::unexpected(*problem);
-    }
+    SavedSubcircuit &definition = *drawn;
 
     const GridPoint pivot = FindPivot(m_Elements, m_SelectedElements, m_Wires, m_SelectedWires);
     auto instance_element = CreateElement(Core::ComponentType::SUBCIRCUIT, pivot, Rotation::R0);
@@ -521,59 +544,7 @@ std::expected<void, std::string> Schematic::UpdateSubcircuit(const std::string &
     definition.Wires = std::move(copied->Wires);
     m_BuiltSubcircuits.reset();
 
-    std::vector<GridPoint> old_points;
-    std::vector<GridPoint> new_points;
-    std::vector<GridPoint> removed_points;
-    for (auto &element : m_Elements) {
-        if (element->GetComponent().GetType() != Core::ComponentType::SUBCIRCUIT) {
-            continue;
-        }
-        auto &instance = static_cast<Core::SubcircuitInstance &>(element->GetComponent());
-        if (instance.GetDefinitionName() != name) {
-            continue;
-        }
-        const std::vector<std::string> instance_pins = instance.GetPins();
-        const std::vector<GridPoint> old_terminals = element->GetTerminals();
-        // The terminal an old pin had on this instance, found by its name in case the instance is behind
-        const auto old_terminal = [&](const std::size_t old_pin) -> std::optional<std::size_t> {
-            const auto terminal = std::ranges::find(instance_pins, old_names[old_pin]);
-            if (terminal == instance_pins.end()) {
-                return std::nullopt;
-            }
-            return static_cast<std::size_t>(terminal - instance_pins.begin());
-        };
-        const auto overrides = instance.GetParameters();
-        instance.ClearParameters();
-        for (const auto &[parameter, value] : overrides) {
-            if (std::ranges::contains(parameters, parameter, &Core::SubcircuitParameter::Name)) {
-                instance.SetParameter(parameter, value);
-            }
-        }
-        ApplyDefinitionPins(instance, definition);
-        const std::vector<GridPoint> new_terminals = element->GetTerminals();
-        std::set<std::size_t> kept_terminals;
-        for (std::size_t new_index = 0; new_index < matches.size(); ++new_index) {
-            const std::optional<std::size_t> old_pin = matches[new_index];
-            if (!old_pin) {
-                continue;
-            }
-            if (const std::optional<std::size_t> terminal = old_terminal(*old_pin)) {
-                kept_terminals.insert(*terminal);
-                old_points.push_back(old_terminals[*terminal]);
-                new_points.push_back(new_terminals[new_index]);
-            }
-        }
-        for (std::size_t terminal = 0; terminal < old_terminals.size(); ++terminal) {
-            if (!kept_terminals.contains(terminal)) {
-                removed_points.push_back(old_terminals[terminal]);
-            }
-        }
-    }
-    std::erase_if(m_Wires, [&](const UIWire &wire) {
-        return std::ranges::contains(removed_points, wire.GetStart()) ||
-               std::ranges::contains(removed_points, wire.GetEnd());
-    });
-    m_Wires = FollowTerminals(m_Wires, old_points, new_points);
+    RefreshInstances(definition, old_names, matches);
     MarkModified();
     return {};
 }
@@ -1402,6 +1373,68 @@ void Schematic::FollowVoltageProbes() {
         followed.push_back(std::move(probe));
     }
     m_VoltageProbes = std::move(followed);
+}
+
+// Brings every instance of a definition that changed up to date: its pins and their edges, the overrides of the
+// parameters it still has, and the wires on its terminals, which follow the pins that go on (matches gives the old pin
+// each new one continues) and are removed from the pins that went away
+void Schematic::RefreshInstances(const SavedSubcircuit &definition, const std::vector<std::string> &old_names,
+                                 const std::vector<std::optional<std::size_t>> &matches) {
+    const std::string &name = definition.Name;
+    const std::vector<Core::SubcircuitParameter> &parameters = definition.Parameters;
+    std::vector<GridPoint> old_points;
+    std::vector<GridPoint> new_points;
+    std::vector<GridPoint> removed_points;
+    for (auto &element : m_Elements) {
+        if (element->GetComponent().GetType() != Core::ComponentType::SUBCIRCUIT) {
+            continue;
+        }
+        auto &instance = static_cast<Core::SubcircuitInstance &>(element->GetComponent());
+        if (instance.GetDefinitionName() != name) {
+            continue;
+        }
+        const std::vector<std::string> instance_pins = instance.GetPins();
+        const std::vector<GridPoint> old_terminals = element->GetTerminals();
+        // The terminal an old pin had on this instance, found by its name in case the instance is behind
+        const auto old_terminal = [&](const std::size_t old_pin) -> std::optional<std::size_t> {
+            const auto terminal = std::ranges::find(instance_pins, old_names[old_pin]);
+            if (terminal == instance_pins.end()) {
+                return std::nullopt;
+            }
+            return static_cast<std::size_t>(terminal - instance_pins.begin());
+        };
+        const auto overrides = instance.GetParameters();
+        instance.ClearParameters();
+        for (const auto &[parameter, value] : overrides) {
+            if (std::ranges::contains(parameters, parameter, &Core::SubcircuitParameter::Name)) {
+                instance.SetParameter(parameter, value);
+            }
+        }
+        ApplyDefinitionPins(instance, definition);
+        const std::vector<GridPoint> new_terminals = element->GetTerminals();
+        std::set<std::size_t> kept_terminals;
+        for (std::size_t new_index = 0; new_index < matches.size(); ++new_index) {
+            const std::optional<std::size_t> old_pin = matches[new_index];
+            if (!old_pin) {
+                continue;
+            }
+            if (const std::optional<std::size_t> terminal = old_terminal(*old_pin)) {
+                kept_terminals.insert(*terminal);
+                old_points.push_back(old_terminals[*terminal]);
+                new_points.push_back(new_terminals[new_index]);
+            }
+        }
+        for (std::size_t terminal = 0; terminal < old_terminals.size(); ++terminal) {
+            if (!kept_terminals.contains(terminal)) {
+                removed_points.push_back(old_terminals[terminal]);
+            }
+        }
+    }
+    std::erase_if(m_Wires, [&](const UIWire &wire) {
+        return std::ranges::contains(removed_points, wire.GetStart()) ||
+               std::ranges::contains(removed_points, wire.GetEnd());
+    });
+    m_Wires = FollowTerminals(m_Wires, old_points, new_points);
 }
 
 // Measurements stay out of snapshots, so probing adds no undo step and does not count as a change

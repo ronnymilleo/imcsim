@@ -265,6 +265,18 @@ bool DrawModelChoice(Part &part, const std::span<const Model> models, const char
     return changed;
 }
 
+// Parts with something to edit: a value, a model, a name, a state or parameters; ground has nothing
+bool HasFields(const Core::Component &component) {
+    const Core::ComponentType type = component.GetType();
+    if (component.HasValue() || Core::IsSwitch(type) || Core::IsLogicPart(type) || Core::IsSubcircuitPin(type)) {
+        return true;
+    }
+    static constexpr auto OTHER_TYPES =
+        std::to_array({Core::ComponentType::NET_LABEL, Core::ComponentType::SUBCIRCUIT, Core::ComponentType::V_SWITCH,
+                       Core::ComponentType::RELAY, Core::ComponentType::CLOCK, Core::ComponentType::LOGIC_INPUT});
+    return std::ranges::contains(OTHER_TYPES, type);
+}
+
 bool HasModel(const Core::ComponentType type) {
     return Core::IsDiode(type) || Core::IsBJT(type) || Core::IsMOSFET(type) || type == Core::ComponentType::OP_AMP;
 }
@@ -340,10 +352,7 @@ void PartEditor::Draw() {
         ImGui::TextUnformatted(std::format("Name: {}", component.GetName()).c_str());
     }
     const Core::ComponentType type = component.GetType();
-    if (!component.HasValue() && !HasModel(type) && type != Core::ComponentType::NET_LABEL &&
-        !Core::IsSubcircuitPin(type) && type != Core::ComponentType::SUBCIRCUIT && !Core::IsSwitch(type) &&
-        type != Core::ComponentType::V_SWITCH && type != Core::ComponentType::RELAY && !Core::IsLogicPart(type) &&
-        type != Core::ComponentType::CLOCK && type != Core::ComponentType::LOGIC_INPUT) {
+    if (!HasFields(component) && !HasModel(type)) {
         return;
     }
 
@@ -384,25 +393,13 @@ void PartEditor::DrawFields(Core::Component &component) {
         DrawSubcircuit(static_cast<Core::SubcircuitInstance &>(component));
         return;
     }
-    if (DrawModeledPart(component)) {
+    if (DrawModeledPart(component) || DrawSettingPart(component)) {
         return;
     }
     if (Core::IsSource(type)) {
         DrawSource(static_cast<Core::Source &>(component));
     } else if (Core::IsControlledSource(type)) {
         DrawControlledSource(static_cast<Core::ControlledSource &>(component));
-    } else if (Core::IsSwitch(type)) {
-        DrawSwitch(static_cast<Core::Switch &>(component));
-    } else if (type == Core::ComponentType::V_SWITCH) {
-        DrawControlledSwitch(static_cast<Core::VoltageControlledSwitch &>(component));
-    } else if (type == Core::ComponentType::RELAY) {
-        DrawRelay(static_cast<Core::Relay &>(component));
-    } else if (Core::IsLogicPart(type)) {
-        DrawLogicPart(static_cast<Core::LogicPart &>(component));
-    } else if (type == Core::ComponentType::CLOCK) {
-        DrawClock(static_cast<Core::Clock &>(component));
-    } else if (type == Core::ComponentType::LOGIC_INPUT) {
-        DrawLogicInput(static_cast<Core::LogicInput &>(component));
     } else if (type == Core::ComponentType::TRANSFORMER) {
         DrawValue(component);
         DrawTransformer(static_cast<Core::Transformer &>(component));
@@ -427,6 +424,27 @@ bool PartEditor::DrawModeledPart(Core::Component &component) {
         DrawMOSFET(static_cast<Core::MOSFET &>(component));
     } else if (type == Core::ComponentType::OP_AMP) {
         DrawOpAmp(static_cast<Core::OpAmp &>(component));
+    } else {
+        return false;
+    }
+    return true;
+}
+
+// Switches, relays and the digital parts, which have a state or parameters instead of a value; false for the others
+bool PartEditor::DrawSettingPart(Core::Component &component) {
+    const Core::ComponentType type = component.GetType();
+    if (Core::IsSwitch(type)) {
+        DrawSwitch(static_cast<Core::Switch &>(component));
+    } else if (type == Core::ComponentType::V_SWITCH) {
+        DrawControlledSwitch(static_cast<Core::VoltageControlledSwitch &>(component));
+    } else if (type == Core::ComponentType::RELAY) {
+        DrawRelay(static_cast<Core::Relay &>(component));
+    } else if (Core::IsLogicPart(type)) {
+        DrawLogicPart(static_cast<Core::LogicPart &>(component));
+    } else if (type == Core::ComponentType::CLOCK) {
+        DrawClock(static_cast<Core::Clock &>(component));
+    } else if (type == Core::ComponentType::LOGIC_INPUT) {
+        DrawLogicInput(static_cast<Core::LogicInput &>(component));
     } else {
         return false;
     }
@@ -503,19 +521,7 @@ void PartEditor::LoadFields(const Core::Component &component) {
         net.copy(m_Net.data(), m_Net.size() - 1);
     }
     if (component.GetType() == Core::ComponentType::SUBCIRCUIT) {
-        const auto &instance = static_cast<const Core::SubcircuitInstance &>(component);
-        const auto definition =
-            std::ranges::find(m_Schematic->GetSubcircuits(), instance.GetDefinitionName(), &SavedSubcircuit::Name);
-        m_SubcircuitFields.clear();
-        if (definition != m_Schematic->GetSubcircuits().end()) {
-            m_SubcircuitFields.resize(definition->Parameters.size());
-            for (std::size_t index = 0; index < definition->Parameters.size(); ++index) {
-                const Core::SubcircuitParameter &parameter = definition->Parameters[index];
-                const auto override_value = instance.GetParameters().find(parameter.Name);
-                m_SubcircuitFields[index].Load(
-                    override_value != instance.GetParameters().end() ? override_value->second : parameter.DefaultValue);
-            }
-        }
+        LoadSubcircuitFields(static_cast<const Core::SubcircuitInstance &>(component));
     }
     if (Core::IsSource(component.GetType())) {
         const auto &source = static_cast<const Core::Source &>(component);
@@ -526,46 +532,65 @@ void PartEditor::LoadFields(const Core::Component &component) {
         LoadParameterFields(AM_FIELDS, m_AMFields, source.GetAM());
         m_PWLText = Core::FormatPWLPoints(source.GetPWL().Points);
     }
-    if (Core::IsDiode(component.GetType())) {
-        const auto &diode = static_cast<const Core::Diode &>(component);
-        LoadParameterFields(DIODE_FIELDS, m_DiodeFields, diode.GetParameters());
+    LoadModelFields(component);
+    LoadSettingFields(component);
+    m_LoadedSelection = m_Schematic->GetSelectionVersion();
+}
+
+// One field per parameter of the block, showing the override of this instance or the default
+void PartEditor::LoadSubcircuitFields(const Core::SubcircuitInstance &instance) {
+    const auto definition =
+        std::ranges::find(m_Schematic->GetSubcircuits(), instance.GetDefinitionName(), &SavedSubcircuit::Name);
+    m_SubcircuitFields.clear();
+    if (definition == m_Schematic->GetSubcircuits().end()) {
+        return;
     }
-    if (Core::IsBJT(component.GetType())) {
-        const auto &bjt = static_cast<const Core::BJT &>(component);
-        LoadParameterFields(BJT_FIELDS, m_BJTFields, bjt.GetParameters());
+    m_SubcircuitFields.resize(definition->Parameters.size());
+    for (std::size_t index = 0; index < definition->Parameters.size(); ++index) {
+        const Core::SubcircuitParameter &parameter = definition->Parameters[index];
+        const auto override_value = instance.GetParameters().find(parameter.Name);
+        m_SubcircuitFields[index].Load(override_value != instance.GetParameters().end() ? override_value->second
+                                                                                        : parameter.DefaultValue);
     }
-    if (Core::IsMOSFET(component.GetType())) {
-        const auto &mosfet = static_cast<const Core::MOSFET &>(component);
-        LoadParameterFields(MOSFET_FIELDS, m_MOSFETFields, mosfet.GetParameters());
-    }
-    if (component.GetType() == Core::ComponentType::OP_AMP) {
+}
+
+// The custom parameters of diodes, transistors and op-amps, and the bandwidth of the ideal op-amp
+void PartEditor::LoadModelFields(const Core::Component &component) {
+    const Core::ComponentType type = component.GetType();
+    if (Core::IsDiode(type)) {
+        LoadParameterFields(DIODE_FIELDS, m_DiodeFields, static_cast<const Core::Diode &>(component).GetParameters());
+    } else if (Core::IsBJT(type)) {
+        LoadParameterFields(BJT_FIELDS, m_BJTFields, static_cast<const Core::BJT &>(component).GetParameters());
+    } else if (Core::IsMOSFET(type)) {
+        LoadParameterFields(MOSFET_FIELDS, m_MOSFETFields,
+                            static_cast<const Core::MOSFET &>(component).GetParameters());
+    } else if (type == Core::ComponentType::OP_AMP) {
         const auto &op_amp = static_cast<const Core::OpAmp &>(component);
         LoadParameterFields(OP_AMP_FIELDS, m_OpAmpFields, op_amp.GetParameters());
         m_Value.Load(op_amp.GetIdealBandwidth());
     }
-    if (component.GetType() == Core::ComponentType::V_SWITCH) {
+}
+
+// The parameters of the switches, relays, digital parts and transformers
+void PartEditor::LoadSettingFields(const Core::Component &component) {
+    const Core::ComponentType type = component.GetType();
+    if (type == Core::ComponentType::V_SWITCH) {
         LoadParameterFields(SWITCH_FIELDS, m_SwitchFields,
                             static_cast<const Core::VoltageControlledSwitch &>(component).GetParameters());
-    }
-    if (component.GetType() == Core::ComponentType::RELAY) {
+    } else if (type == Core::ComponentType::RELAY) {
         LoadParameterFields(RELAY_FIELDS, m_RelayFields, static_cast<const Core::Relay &>(component).GetParameters());
-    }
-    if (Core::IsLogicPart(component.GetType())) {
+    } else if (Core::IsLogicPart(type)) {
         LoadParameterFields(LOGIC_FIELDS, m_LogicFields,
                             static_cast<const Core::LogicPart &>(component).GetParameters());
-    }
-    if (component.GetType() == Core::ComponentType::CLOCK) {
+    } else if (type == Core::ComponentType::CLOCK) {
         LoadParameterFields(CLOCK_FIELDS, m_ClockFields, static_cast<const Core::Clock &>(component).GetParameters());
-    }
-    if (component.GetType() == Core::ComponentType::LOGIC_INPUT) {
+    } else if (type == Core::ComponentType::LOGIC_INPUT) {
         LoadParameterFields(LOGIC_INPUT_FIELDS, m_LogicInputFields,
                             static_cast<const Core::LogicInput &>(component).GetParameters());
-    }
-    if (component.GetType() == Core::ComponentType::TRANSFORMER) {
+    } else if (type == Core::ComponentType::TRANSFORMER) {
         LoadParameterFields(TRANSFORMER_FIELDS, m_TransformerFields,
                             static_cast<const Core::Transformer &>(component).GetParameters());
     }
-    m_LoadedSelection = m_Schematic->GetSelectionVersion();
 }
 
 // The name applies as soon as it is valid, or empty, which leaves the label or marker unnamed
