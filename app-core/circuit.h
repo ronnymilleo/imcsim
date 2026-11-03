@@ -7,12 +7,15 @@
 #define IMCSIM_CIRCUIT_H
 
 #include "components/component.h"
+#include <memory>
 #include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
 
 namespace Core {
+
+struct SubcircuitDefinition;
 
 /**
  * @struct  CircuitEntry
@@ -44,8 +47,11 @@ struct CurrentProbe {
 class Circuit {
 public:
     void Add(const Component &component, std::vector<int> nodes);
+    void AddSubcircuit(std::shared_ptr<SubcircuitDefinition> definition);
 
     const std::vector<CircuitEntry> &GetEntries() const;
+    const std::vector<std::shared_ptr<SubcircuitDefinition>> &GetSubcircuits() const;
+    std::shared_ptr<const SubcircuitDefinition> FindSubcircuit(std::string_view name) const;
     int GetNodeCount() const;
     bool HasGround() const;
     bool HasACSource() const;
@@ -54,6 +60,7 @@ public:
 
 private:
     std::vector<CircuitEntry> m_Entries;
+    std::vector<std::shared_ptr<SubcircuitDefinition>> m_Subcircuits;
     int m_NodeCount = 0;
 };
 

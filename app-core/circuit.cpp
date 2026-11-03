@@ -16,14 +16,19 @@
 #include "components/potentiometer.h"
 #include "components/relay.h"
 #include "components/source.h"
+#include "components/subcircuit.h"
 #include "components/switch.h"
 #include "components/transformer.h"
 #include "components/voltage_controlled_switch.h"
 #include "spice_value.h"
+#include "subcircuit.h"
 #include <algorithm>
 #include <array>
+#include <cctype>
 #include <format>
 #include <iterator>
+#include <set>
+#include <sstream>
 #include <utility>
 
 namespace Core {
@@ -248,6 +253,71 @@ void AddModelLine(std::string spice_name, const std::string &line, std::vector<s
     written_names.push_back(std::move(spice_name));
 }
 
+std::string FormatComponentValue(const Component &component) {
+    if (const auto &expression = component.GetValueExpression()) {
+        return *expression;
+    }
+    return FormatSpiceValue(component.GetValue());
+}
+
+bool IsModelNameCharacter(const char character) {
+    return std::isalnum(static_cast<unsigned char>(character)) != 0 || character == '_' || character == '-';
+}
+
+// Model names are global in ngspice, even when their declarations sit inside a subcircuit. Prefix every declaration
+// and reference of a definition so equal custom parts in two definitions cannot replace each other's models.
+std::string ScopeModels(std::string body, const std::string_view definition_name) {
+    std::set<std::string> declared;
+    std::istringstream lines(body);
+    std::string line;
+    while (std::getline(lines, line)) {
+        std::istringstream fields(line);
+        std::string directive;
+        std::string name;
+        if (fields >> directive >> name && (directive == ".model" || directive == ".subckt")) {
+            declared.insert(std::move(name));
+        }
+    }
+    const std::string prefix = std::format("imcsim_{}_", definition_name);
+    std::string scoped;
+    scoped.reserve(body.size() + declared.size() * prefix.size());
+    for (std::size_t position = 0; position < body.size();) {
+        if (!IsModelNameCharacter(body[position])) {
+            scoped += body[position++];
+            continue;
+        }
+        const std::size_t start = position;
+        while (position < body.size() && IsModelNameCharacter(body[position])) {
+            ++position;
+        }
+        const std::string token = body.substr(start, position - start);
+        scoped += declared.contains(token) ? prefix + token : token;
+    }
+    return scoped;
+}
+
+std::string FormatSubcircuit(const SubcircuitDefinition &definition) {
+    std::string text = std::format(".subckt {}", definition.Name);
+    for (const SubcircuitPin &pin : definition.Pins) {
+        text += std::format(" {}", pin.Node);
+    }
+    if (!definition.Parameters.empty()) {
+        text += " params:";
+        for (const SubcircuitParameter &parameter : definition.Parameters) {
+            text += std::format(" {}={}", parameter.Name, FormatSpiceValue(parameter.DefaultValue));
+        }
+    }
+    text += "\n";
+    std::string body = definition.Body.ToSpiceNetlist();
+    body.erase(0, body.find('\n') + 1);
+    if (body.ends_with(".end\n")) {
+        body.erase(body.size() - 5);
+    }
+    text += ScopeModels(std::move(body), definition.Name);
+    text += std::format(".ends {}\n", definition.Name);
+    return text;
+}
+
 } // namespace
 
 /**
@@ -262,12 +332,25 @@ void Circuit::Add(const Component &component, std::vector<int> nodes) {
     m_Entries.push_back({&component, std::move(nodes)});
 }
 
+void Circuit::AddSubcircuit(std::shared_ptr<SubcircuitDefinition> definition) {
+    m_Subcircuits.push_back(std::move(definition));
+}
+
 /**
  * @brief   Returns the components of the circuit, in the order they were added.
  * @return  Every component with the nodes of its terminals.
  */
 const std::vector<CircuitEntry> &Circuit::GetEntries() const {
     return m_Entries;
+}
+
+const std::vector<std::shared_ptr<SubcircuitDefinition>> &Circuit::GetSubcircuits() const {
+    return m_Subcircuits;
+}
+
+std::shared_ptr<const SubcircuitDefinition> Circuit::FindSubcircuit(const std::string_view name) const {
+    const auto found = std::ranges::find(m_Subcircuits, name, &SubcircuitDefinition::Name);
+    return found != m_Subcircuits.end() ? *found : nullptr;
 }
 
 /**
@@ -284,7 +367,8 @@ int Circuit::GetNodeCount() const {
  */
 bool Circuit::HasGround() const {
     return std::ranges::any_of(
-        m_Entries, [](const CircuitEntry &entry) { return entry.Part->GetType() == ComponentType::GROUND; });
+               m_Entries, [](const CircuitEntry &entry) { return entry.Part->GetType() == ComponentType::GROUND; }) ||
+           std::ranges::any_of(m_Subcircuits, [](const auto &definition) { return definition->Body.HasGround(); });
 }
 
 /**
@@ -292,7 +376,8 @@ bool Circuit::HasGround() const {
  * @return  True when it contains at least one voltage or current source set to AC.
  */
 bool Circuit::HasACSource() const {
-    return std::ranges::any_of(m_Entries, [](const CircuitEntry &entry) { return IsACSource(*entry.Part); });
+    return std::ranges::any_of(m_Entries, [](const CircuitEntry &entry) { return IsACSource(*entry.Part); }) ||
+           std::ranges::any_of(m_Subcircuits, [](const auto &definition) { return definition->Body.HasACSource(); });
 }
 
 /**
@@ -300,7 +385,10 @@ bool Circuit::HasACSource() const {
  * @return  True when at least one capacitor or inductor has one set; a transient then runs with uic.
  */
 bool Circuit::HasInitialConditions() const {
-    return std::ranges::any_of(m_Entries, [](const CircuitEntry &entry) { return entry.Part->HasInitialCondition(); });
+    return std::ranges::any_of(m_Entries,
+                               [](const CircuitEntry &entry) { return entry.Part->HasInitialCondition(); }) ||
+           std::ranges::any_of(m_Subcircuits,
+                               [](const auto &definition) { return definition->Body.HasInitialConditions(); });
 }
 
 /**
@@ -310,7 +398,8 @@ bool Circuit::HasInitialConditions() const {
  *                                by GetCurrentProbeName(), whose branch current is the terminal current; for
  *                                simulation only.
  * @return  One line per component, plus its probes, with node numbers as SPICE node names (0 is ground), then one
- *          ".model" line per model in use, ending in ".end".
+ *          ".model" line per model in use and one ".subckt" block per project-local definition, ending in ".end".
+ *          Subcircuit instances use X lines, with their pins in definition order and their parameter overrides.
  * @note    Ground components produce no line; they only make their node 0. A supply rail becomes a DC voltage
  *          source from its node to ground. A part whose current controls a CCCS or CCVS gets a probe even without
  *          add_current_probes, unless it is a voltage source itself, since ngspice follows currents through
@@ -330,7 +419,7 @@ std::string Circuit::ToSpiceNetlist(const std::string_view analysis, const bool 
     int next_extra_node = m_NodeCount;
     for (const CircuitEntry &entry : m_Entries) {
         const Component &component = *entry.Part;
-        const std::string value = FormatSpiceValue(component.GetValue());
+        const std::string value = FormatComponentValue(component);
         // Probed parts connect through the probe nodes; the probe lines follow the part
         std::vector<int> nodes = entry.Nodes;
         const std::string probes = ProbeTerminals(
@@ -390,6 +479,19 @@ std::string Circuit::ToSpiceNetlist(const std::string_view analysis, const bool 
             const std::string &current = static_cast<const ControlledSource &>(component).GetControllingCurrent();
             const std::string control = FindControllingSource(*this, current).value_or(current);
             netlist += std::format("{} {} {} {} {}\n", component.GetName(), nodes[0], nodes[1], control, value);
+            break;
+        }
+        case ComponentType::SUBCIRCUIT: {
+            const auto &instance = static_cast<const SubcircuitInstance &>(component);
+            netlist += component.GetName();
+            for (const int node : nodes) {
+                netlist += std::format(" {}", node);
+            }
+            netlist += std::format(" {}", instance.GetDefinitionName());
+            for (const auto &[name, parameter] : instance.GetParameters()) {
+                netlist += std::format(" {}={}", name, FormatSpiceValue(parameter));
+            }
+            netlist += "\n";
             break;
         }
         case ComponentType::OP_AMP: {
@@ -513,6 +615,9 @@ std::string Circuit::ToSpiceNetlist(const std::string_view analysis, const bool 
         netlist += probes;
     }
     netlist += models;
+    for (const auto &definition : m_Subcircuits) {
+        netlist += FormatSubcircuit(*definition);
+    }
     if (!analysis.empty()) {
         netlist += std::format("{}\n", analysis);
     }
