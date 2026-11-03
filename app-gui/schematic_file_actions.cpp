@@ -22,6 +22,9 @@ constexpr const char *EXPORT_POPUP = "Export schematic";
 // Must stay valid until the dialog callback runs, so it lives for the whole program
 constexpr std::array<SDL_DialogFileFilter, 1> SCHEMATIC_FILTERS = {{{"imcsim schematic", "imcsim"}}};
 constexpr std::array<SDL_DialogFileFilter, 1> SVG_FILTERS = {{{"SVG image", "svg"}}};
+// Vendors ship their models under many extensions, so any file can be picked too
+constexpr std::array<SDL_DialogFileFilter, 2> SPICE_FILTERS = {
+    {{"SPICE library", "lib;mod;sub;cir;spi;txt;inc"}, {"All files", "*"}}};
 
 } // namespace
 
@@ -192,6 +195,13 @@ void SchematicFileActions::Import() {
 }
 
 /**
+ * @brief   Shows the dialog to pick a SPICE library, whose subcircuits can then be imported as blocks.
+ */
+void SchematicFileActions::ImportSpiceLibrary() {
+    ShowFileDialog(FileAction::IMPORT_SPICE);
+}
+
+/**
  * @brief   Opens the popup that exports the schematic as an SVG image.
  * @note    Call it from where DrawPopups() runs, so ImGui finds the popup in the same ID stack.
  */
@@ -309,6 +319,21 @@ void SchematicFileActions::ImportFile(const std::filesystem::path &path) {
     m_Hooks.PlaceGroup(std::move(*group));
 }
 
+// The subcircuits of the library go to the editor, which asks which to import; a file with none only says why
+void SchematicFileActions::ImportSpiceFile(const std::filesystem::path &path) {
+    const auto text = ReadTextFile(path);
+    if (!text) {
+        ShowMessages("Could not read the SPICE library", {text.error()});
+        return;
+    }
+    Core::SpiceLibrary library = Core::ReadSpiceLibrary(*text);
+    if (library.Subcircuits.empty()) {
+        ShowMessages(std::format("Nothing to import from {}", path.filename().string()), std::move(library.Warnings));
+        return;
+    }
+    m_Hooks.OpenSpiceLibrary(path.filename().string(), std::move(library));
+}
+
 // Like an import, the example follows the cursor until a click places it; its analysis settings stay behind
 void SchematicFileActions::InsertExample(const Example &example) {
     auto loaded = LoadExample(example);
@@ -354,6 +379,10 @@ void SchematicFileActions::ShowFileDialog(const FileAction action) {
         return;
     }
     std::string location = file_path ? file_path->string() : "";
+    if (action == FileAction::IMPORT_SPICE) {
+        m_FileDialog.ShowOpen(SPICE_FILTERS, file_path ? file_path->parent_path().string() : "");
+        return;
+    }
     if (action == FileAction::OPEN || action == FileAction::IMPORT) {
         m_FileDialog.ShowOpen(SCHEMATIC_FILTERS, std::move(location));
     } else {
@@ -378,6 +407,8 @@ void SchematicFileActions::ProcessDialogResult() {
         ExportSchematic(**result);
     } else if (action == FileAction::IMPORT) {
         ImportFile(**result);
+    } else if (action == FileAction::IMPORT_SPICE) {
+        ImportSpiceFile(**result);
     }
 }
 

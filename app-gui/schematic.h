@@ -89,7 +89,11 @@ public:
     std::expected<void, std::string> UpdateSubcircuit(const std::string &name, const Schematic &content,
                                                       const std::vector<SavedSubcircuitPin> &pins,
                                                       const std::vector<Core::SubcircuitParameter> &parameters);
-    void MergeSubcircuits(std::vector<SavedSubcircuit> definitions, std::vector<std::unique_ptr<UIElement>> &instances);
+    std::expected<void, std::string> UpdateSpiceSubcircuit(const std::string &name,
+                                                           const std::vector<SavedSubcircuitPin> &pins,
+                                                           const std::vector<Core::SubcircuitParameter> &parameters);
+    std::vector<std::string> MergeSubcircuits(std::vector<SavedSubcircuit> definitions,
+                                              std::vector<std::unique_ptr<UIElement>> &instances);
 
     // Selection
     void SelectElement(std::size_t index);

@@ -12,6 +12,7 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace GUI {
@@ -23,6 +24,7 @@ std::optional<std::string> CheckPinNodes(const Connectivity &connectivity, const
 Core::PinSide GetMarkerSide(const UIElement &marker);
 std::optional<Core::PinSide> FindMarkerSide(const std::vector<std::unique_ptr<UIElement>> &elements, GridPoint point);
 const char *GetPinSideName(Core::PinSide side);
+std::optional<Core::PinSide> ParsePinSide(std::string_view name);
 
 // Instances
 void ApplyDefinitionPins(Core::SubcircuitInstance &instance, const SavedSubcircuit &definition);

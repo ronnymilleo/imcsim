@@ -264,9 +264,18 @@ bool IsModelNameCharacter(const char character) {
     return std::isalnum(static_cast<unsigned char>(character)) != 0 || character == '_' || character == '-';
 }
 
+std::string ToLowerCase(const std::string_view text) {
+    std::string lower(text);
+    std::ranges::transform(lower, lower.begin(),
+                           [](const unsigned char character) { return static_cast<char>(std::tolower(character)); });
+    return lower;
+}
+
 // Model names are global in ngspice, even when their declarations sit inside a subcircuit. Prefix every declaration
-// and reference of a definition so equal custom parts in two definitions cannot replace each other's models.
-std::string ScopeModels(std::string body, const std::string_view definition_name) {
+// and reference of a definition so equal custom parts in two definitions cannot replace each other's models. Names are
+// matched without regard to case, as SPICE reads them, and the first word of an element line is left alone: it is the
+// element's own name, whose first letter says what the element is
+std::string ScopeModels(const std::string &body, const std::string_view definition_name) {
     std::set<std::string> declared;
     std::istringstream lines(body);
     std::string line;
@@ -274,15 +283,34 @@ std::string ScopeModels(std::string body, const std::string_view definition_name
         std::istringstream fields(line);
         std::string directive;
         std::string name;
-        if (fields >> directive >> name && (directive == ".model" || directive == ".subckt")) {
-            declared.insert(std::move(name));
+        if (fields >> directive >> name) {
+            directive = ToLowerCase(directive);
+            if (directive == ".model" || directive == ".subckt") {
+                declared.insert(ToLowerCase(name));
+            }
         }
     }
     const std::string prefix = std::format("imcsim_{}_", definition_name);
     std::string scoped;
     scoped.reserve(body.size() + declared.size() * prefix.size());
+    bool is_line_start = true;
+    bool is_element_line = false;
+    bool is_comment = false;
+    bool is_first_word = false;
     for (std::size_t position = 0; position < body.size();) {
-        if (!IsModelNameCharacter(body[position])) {
+        const char character = body[position];
+        if (character == '\n') {
+            is_line_start = true;
+            scoped += body[position++];
+            continue;
+        }
+        if (is_line_start && character != ' ' && character != '\t') {
+            is_line_start = false;
+            is_comment = character == '*';
+            is_element_line = character != '.' && character != '+' && !is_comment;
+            is_first_word = is_element_line;
+        }
+        if (is_comment || !IsModelNameCharacter(character)) {
             scoped += body[position++];
             continue;
         }
@@ -291,15 +319,24 @@ std::string ScopeModels(std::string body, const std::string_view definition_name
             ++position;
         }
         const std::string token = body.substr(start, position - start);
-        scoped += declared.contains(token) ? prefix + token : token;
+        const bool is_element_name = std::exchange(is_first_word, false);
+        scoped += !is_element_name && declared.contains(ToLowerCase(token)) ? prefix + token : token;
     }
     return scoped;
 }
 
+// A drawn block lists the nodes of its pins and writes its body as a netlist; a block kept as SPICE text lists the
+// ports of its .subckt line and writes its text as it came
 std::string FormatSubcircuit(const SubcircuitDefinition &definition) {
     std::string text = std::format(".subckt {}", definition.Name);
-    for (const SubcircuitPin &pin : definition.Pins) {
-        text += std::format(" {}", pin.Node);
+    if (definition.Spice) {
+        for (const std::string &port : definition.Spice->Ports) {
+            text += std::format(" {}", port);
+        }
+    } else {
+        for (const SubcircuitPin &pin : definition.Pins) {
+            text += std::format(" {}", pin.Node);
+        }
     }
     if (!definition.Parameters.empty()) {
         text += " params:";
@@ -308,12 +345,20 @@ std::string FormatSubcircuit(const SubcircuitDefinition &definition) {
         }
     }
     text += "\n";
-    std::string body = definition.Body.ToSpiceNetlist();
-    body.erase(0, body.find('\n') + 1);
-    if (body.ends_with(".end\n")) {
-        body.erase(body.size() - 5);
+    std::string body;
+    if (definition.Spice) {
+        body = definition.Spice->Text;
+        if (!body.empty() && !body.ends_with('\n')) {
+            body += '\n';
+        }
+    } else {
+        body = definition.Body.ToSpiceNetlist();
+        body.erase(0, body.find('\n') + 1);
+        if (body.ends_with(".end\n")) {
+            body.erase(body.size() - 5);
+        }
     }
-    text += ScopeModels(std::move(body), definition.Name);
+    text += ScopeModels(body, definition.Name);
     text += std::format(".ends {}\n", definition.Name);
     return text;
 }

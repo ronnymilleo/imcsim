@@ -26,6 +26,7 @@
 #include "ui_elements/ui_element.h"
 #include "ui_elements/ui_wire.h"
 #include "windows/app_window.h"
+#include "windows/spice_block_dialog.h"
 #include "wire_editing.h"
 #include <cstddef>
 #include <filesystem>
@@ -137,6 +138,7 @@ private:
         SAVE,
         SAVE_AS,
         IMPORT,
+        IMPORT_SPICE,
         EXPORT_SCHEMATIC,
         UNDO,
         REDO,
@@ -163,6 +165,8 @@ private:
     std::string m_SubcircuitError;
     bool m_SubcircuitDialogRequested = false;
     std::string m_PlacingSubcircuit;
+    // Imports SPICE libraries and sets up the pins of the blocks they become
+    SpiceBlockDialog m_SpiceDialog;
     AnalysisControls &m_Controls;
     AnalysisSettingsPanel &m_SettingsPanel;
     PartEditor &m_PartEditor;
@@ -269,6 +273,7 @@ private:
     void DrawSubcircuitPinRows(bool editing);
     void DrawSubcircuitParameterRows();
     void DrawSubcircuitDialogButtons(bool editing);
+    void ApplySpiceBlockResult(SpiceBlockResult result);
     bool SyncSubcircuitPins();
     bool ApplySubcircuitPinNames();
     void FinishSubcircuitEditing(bool apply);

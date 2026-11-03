@@ -86,6 +86,14 @@ bool IsNoiseInput(const Component &component) {
 // A pin on ground would connect nothing, since ngspice keeps node 0 global instead of joining it to the outside, and
 // two pins on one node would short the nets of the instance
 std::optional<std::string> CheckPins(const SubcircuitDefinition &definition) {
+    // The ports of a block kept as SPICE text are the vendor's own names, written as they came
+    if (definition.Spice) {
+        if (definition.Spice->Ports.size() != definition.Pins.size()) {
+            return std::format("{} has {} pins but its SPICE text has {} ports", definition.Name,
+                               definition.Pins.size(), definition.Spice->Ports.size());
+        }
+        return std::nullopt;
+    }
     std::set<int> nodes;
     for (const SubcircuitPin &pin : definition.Pins) {
         if (pin.Node == 0) {

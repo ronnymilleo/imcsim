@@ -11,6 +11,7 @@
 #include "file_dialog.h"
 #include "preferences.h"
 #include "schematic.h"
+#include "spice_library.h"
 #include <filesystem>
 #include <functional>
 #include <optional>
@@ -30,6 +31,8 @@ struct FileActionHooks {
     std::function<void()> FrameSchematic;
     // Lets an imported file or an inserted example follow the cursor until a click places it
     std::function<void(PastedGroup)> PlaceGroup;
+    // Lets the user pick the subcircuits of a SPICE library to import, with the name of its file
+    std::function<void(std::string, Core::SpiceLibrary)> OpenSpiceLibrary;
 };
 
 /**
@@ -63,6 +66,7 @@ public:
     void Save();
     void SaveAs();
     void Import();
+    void ImportSpiceLibrary();
     void OpenExportPopup();
 
     // Messages
@@ -80,7 +84,8 @@ private:
         QUIT,
         EXAMPLE,
         EXPORT_SCHEMATIC,
-        IMPORT
+        IMPORT,
+        IMPORT_SPICE
     };
 
     Schematic &m_Schematic;
@@ -115,6 +120,7 @@ private:
     void OpenFile(const std::filesystem::path &path);
     void OpenExample(const Example &example);
     void ImportFile(const std::filesystem::path &path);
+    void ImportSpiceFile(const std::filesystem::path &path);
     void InsertExample(const Example &example);
     void SaveFile(std::filesystem::path path);
     void ShowFileDialog(FileAction action);

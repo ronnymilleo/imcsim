@@ -1331,11 +1331,22 @@ nlohmann::json WriteWires(const std::vector<UIWire> &wires) {
 nlohmann::json WriteSubcircuit(const SavedSubcircuit &definition) {
     nlohmann::json pins = nlohmann::json::array();
     for (const SavedSubcircuitPin &pin : definition.Pins) {
-        pins.push_back({{"name", pin.Name}, {"point", {pin.Point.X, pin.Point.Y}}});
+        if (definition.Spice) {
+            pins.push_back({{"name", pin.Name}, {"side", GetPinSideName(pin.Side)}});
+        } else {
+            pins.push_back({{"name", pin.Name}, {"point", {pin.Point.X, pin.Point.Y}}});
+        }
     }
     nlohmann::json parameters = nlohmann::json::array();
     for (const Core::SubcircuitParameter &parameter : definition.Parameters) {
         parameters.push_back({{"name", parameter.Name}, {"default", parameter.DefaultValue}});
+    }
+    // A block kept as SPICE text is its ports and its text, which the file keeps as they came
+    if (definition.Spice) {
+        return {{"name", definition.Name},
+                {"pins", pins},
+                {"parameters", parameters},
+                {"spice", {{"ports", definition.Spice->Ports}, {"text", definition.Spice->Text}}}};
     }
     std::vector<const UIElement *> elements;
     for (const auto &element : definition.Elements) {
@@ -1370,6 +1381,32 @@ std::string WriteDocument(const std::span<const UIElement *const> elements, cons
     return document.dump(2) + "\n";
 }
 
+// The ports and text of a block kept as SPICE text; each pin is the port of the same place
+std::expected<SavedSubcircuit, std::string> ReadSubcircuitText(const nlohmann::json &object,
+                                                               SavedSubcircuit definition) {
+    if (!object.is_object()) {
+        return std::unexpected("has SPICE text that is not an object");
+    }
+    const auto ports = object.find("ports");
+    const std::optional<std::string> text = ReadString(object, "text");
+    if (ports == object.end() || !ports->is_array() || !text) {
+        return std::unexpected("has no SPICE ports or text");
+    }
+    Core::SubcircuitText spice{.Ports = {}, .Text = *text};
+    for (const nlohmann::json &port : *ports) {
+        if (!port.is_string() || port.get<std::string>().empty() ||
+            port.get<std::string>().find_first_of(" \t\n") != std::string::npos) {
+            return std::unexpected("has a SPICE port that is not one word");
+        }
+        spice.Ports.push_back(port.get<std::string>());
+    }
+    if (spice.Ports.size() != definition.Pins.size()) {
+        return std::unexpected("has a different number of pins and SPICE ports");
+    }
+    definition.Spice = std::move(spice);
+    return definition;
+}
+
 std::expected<SavedSubcircuit, std::string> ReadSubcircuit(const nlohmann::json &object,
                                                            std::vector<std::string> &warnings) {
     if (!object.is_object()) {
@@ -1385,15 +1422,28 @@ std::expected<SavedSubcircuit, std::string> ReadSubcircuit(const nlohmann::json 
     if (pins != object.end() && !pins->is_array()) {
         return std::unexpected("has pins that are not a list");
     }
+    const bool is_text = object.contains("spice");
     if (pins != object.end()) {
         for (const nlohmann::json &pin : *pins) {
             const std::optional<std::string> pin_name = pin.is_object() ? ReadString(pin, "name") : std::nullopt;
-            const std::optional<GridPoint> point = pin.is_object() ? ReadPoint(pin, "point") : std::nullopt;
-            if (!pin_name || !Core::SubcircuitInstance::IsValidIdentifier(*pin_name) || !point ||
+            if (!pin_name || !Core::SubcircuitInstance::IsValidIdentifier(*pin_name) ||
                 std::ranges::contains(definition.Pins, *pin_name, &SavedSubcircuitPin::Name)) {
                 return std::unexpected("has an invalid or repeated pin");
             }
-            definition.Pins.push_back({*pin_name, *point});
+            if (is_text) {
+                const std::optional<std::string> side_name = ReadString(pin, "side");
+                const std::optional<Core::PinSide> side = side_name ? ParsePinSide(*side_name) : std::nullopt;
+                if (!side) {
+                    return std::unexpected(std::format("has no valid edge for pin {}", *pin_name));
+                }
+                definition.Pins.push_back({.Name = *pin_name, .Point = {}, .Side = *side});
+                continue;
+            }
+            const std::optional<GridPoint> point = ReadPoint(pin, "point");
+            if (!point) {
+                return std::unexpected("has an invalid or repeated pin");
+            }
+            definition.Pins.push_back({.Name = *pin_name, .Point = *point});
         }
     }
     const auto parameters = object.find("parameters");
@@ -1411,6 +1461,9 @@ std::expected<SavedSubcircuit, std::string> ReadSubcircuit(const nlohmann::json 
             }
             definition.Parameters.push_back({*parameter_name, *value});
         }
+    }
+    if (is_text) {
+        return ReadSubcircuitText(object.at("spice"), std::move(definition));
     }
 
     std::vector<std::string> local_warnings;

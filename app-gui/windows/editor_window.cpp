@@ -540,7 +540,11 @@ EditorWindow::EditorWindow(Schematic &schematic, AnalysisControls &controls, Ana
       m_Files(schematic, preferences,
               {.StopEditing = [this] { StopEditing(); },
                .FrameSchematic = [this] { m_View.RequestDefaultFrame(); },
-               .PlaceGroup = [this](PastedGroup group) { StartPastingGroup(std::move(group)); }}) {
+               .PlaceGroup = [this](PastedGroup group) { StartPastingGroup(std::move(group)); },
+               .OpenSpiceLibrary =
+                   [this](std::string file_name, Core::SpiceLibrary library) {
+                       m_SpiceDialog.OpenImport(std::move(file_name), std::move(library));
+                   }}) {
     for (const PartGroup &group : PART_GROUPS) {
         m_PartGroupChoices.push_back(group.Types.front());
     }
@@ -568,6 +572,9 @@ void EditorWindow::Update() {
     HandleGlobalShortcuts();
     m_Files.DrawPopups();
     DrawSubcircuitDialog();
+    if (std::optional<SpiceBlockResult> result = m_SpiceDialog.Draw()) {
+        ApplySpiceBlockResult(std::move(*result));
+    }
 }
 
 /**
@@ -645,6 +652,10 @@ void EditorWindow::DrawFileMenuItems() {
         m_RequestedCommand = EditorCommand::IMPORT;
     }
     ImGui::SetItemTooltip("Add the circuit of a file to this schematic: it follows the cursor until a click places it");
+    if (ImGui::MenuItem("Import SPICE Library...")) {
+        m_RequestedCommand = EditorCommand::IMPORT_SPICE;
+    }
+    ImGui::SetItemTooltip("Bring in a vendor's subcircuits, such as op-amp models, as blocks kept in this schematic");
     if (ImGui::MenuItem("Export Schematic...")) {
         m_RequestedCommand = EditorCommand::EXPORT_SCHEMATIC;
     }
@@ -1575,6 +1586,13 @@ void EditorWindow::RequestEditSelectedSubcircuit() {
         return;
     }
     const auto &instance = static_cast<const Core::SubcircuitInstance &>(element->GetComponent());
+    // A block kept as SPICE text has no drawing to open, only its pins and parameters to set
+    if (const auto spice =
+            std::ranges::find(m_RootSchematic.GetSubcircuits(), instance.GetDefinitionName(), &SavedSubcircuit::Name);
+        spice != m_RootSchematic.GetSubcircuits().end() && spice->Spice) {
+        m_SpiceDialog.OpenSettings(*spice);
+        return;
+    }
     auto content = m_RootSchematic.OpenSubcircuit(instance.GetDefinitionName());
     if (!content) {
         m_SubcircuitError = content.error();
@@ -1786,6 +1804,28 @@ void EditorWindow::DrawSubcircuitDialogButtons(const bool editing) {
         }
         ImGui::CloseCurrentPopup();
     }
+}
+
+// Imported blocks join the schematic as one undo step and the first one starts placing, so it lands where the user
+// clicks; new settings of a block reach every instance of it
+void EditorWindow::ApplySpiceBlockResult(SpiceBlockResult result) {
+    if (!result.Imported.empty()) {
+        std::vector<std::unique_ptr<UIElement>> no_instances;
+        const std::vector<std::string> names =
+            m_RootSchematic.MergeSubcircuits(std::move(result.Imported), no_instances);
+        m_RootSchematic.CommitUndoStep();
+        StartPlacingSubcircuit(names.front());
+        return;
+    }
+    if (!result.UpdatedName) {
+        return;
+    }
+    const auto updated = m_RootSchematic.UpdateSpiceSubcircuit(*result.UpdatedName, result.Pins, result.Parameters);
+    if (!updated) {
+        m_Files.QueueMessages("Could not change the SPICE block", {updated.error()});
+        return;
+    }
+    m_RootSchematic.CommitUndoStep();
 }
 
 /**
@@ -2819,6 +2859,9 @@ bool EditorWindow::RunFileCommand(const EditorCommand command) {
         return true;
     case EditorCommand::IMPORT:
         m_Files.Import();
+        return true;
+    case EditorCommand::IMPORT_SPICE:
+        m_Files.ImportSpiceLibrary();
         return true;
     case EditorCommand::EXPORT_SCHEMATIC:
         m_Files.OpenExportPopup();

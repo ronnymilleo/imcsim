@@ -6,6 +6,7 @@
 #ifndef IMCSIM_SCHEMATIC_FILE_H
 #define IMCSIM_SCHEMATIC_FILE_H
 
+#include "components/subcircuit.h"
 #include "helpers.h"
 #include "math_channel.h"
 #include "simulation_settings.h"
@@ -39,10 +40,13 @@ struct SavedMeasurements {
 /**
  * @struct  SavedSubcircuitPin
  * @brief   A connection of a block: its name and the point of its pin marker inside the block.
+ * @details A block kept as SPICE text has no markers: its pins have no point, and the edge of the box each goes on is
+ *          kept in Side instead of following a marker's arrow.
  */
 struct SavedSubcircuitPin {
     std::string Name;
     GridPoint Point;
+    Core::PinSide Side = Core::PinSide::LEFT;
 
     bool operator==(const SavedSubcircuitPin &) const = default;
 };
@@ -51,7 +55,8 @@ struct SavedSubcircuitPin {
  * @struct  SavedSubcircuit
  * @brief   A block definition as the schematic keeps it: its pins in order, its parameters and its contents.
  * @details The contents are drawn parts and wires, like a schematic of their own; Schematic::BuildCircuit() turns them
- *          into a Core::SubcircuitDefinition for each run.
+ *          into a Core::SubcircuitDefinition for each run. A block imported from a SPICE library keeps its text in
+ * Spice instead, and has no parts or wires.
  */
 struct SavedSubcircuit {
     std::string Name;
@@ -59,6 +64,7 @@ struct SavedSubcircuit {
     std::vector<Core::SubcircuitParameter> Parameters;
     std::vector<std::unique_ptr<UIElement>> Elements;
     std::vector<UIWire> Wires;
+    std::optional<Core::SubcircuitText> Spice;
 };
 
 /**

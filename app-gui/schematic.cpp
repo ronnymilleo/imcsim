@@ -473,6 +473,9 @@ std::expected<std::unique_ptr<Schematic>, std::string> Schematic::OpenSubcircuit
     if (found == m_Subcircuits.end()) {
         return std::unexpected("Unknown subcircuit " + name);
     }
+    if (found->Spice) {
+        return std::unexpected(name + " is SPICE text, which has no drawing to open");
+    }
     auto loaded = LoadSchematic(SaveSchematic({}, {}, {}, {}, std::span<const SavedSubcircuit>(&*found, 1)));
     if (!loaded || loaded->Subcircuits.size() != 1) {
         return std::unexpected("The subcircuit definition could not be opened");
@@ -550,17 +553,62 @@ std::expected<void, std::string> Schematic::UpdateSubcircuit(const std::string &
 }
 
 /**
+ * @brief   Changes the pins and parameters of a block kept as SPICE text, and brings every instance up to date.
+ * @param[in] name        Name of the definition.
+ * @param[in] pins        Its pins, one per port of its .subckt line and in that order, with their names and edges.
+ * @param[in] parameters  Its parameters, with their defaults.
+ * @return  Nothing on success; the reason otherwise, with the schematic unchanged.
+ * @note    The text stays as it came. Each pin keeps the wires of its instances wherever its edge moves it. Call
+ *          CommitUndoStep() after it, so it undoes in one step.
+ */
+std::expected<void, std::string>
+Schematic::UpdateSpiceSubcircuit(const std::string &name, const std::vector<SavedSubcircuitPin> &pins,
+                                 const std::vector<Core::SubcircuitParameter> &parameters) {
+    const auto found = std::ranges::find(m_Subcircuits, name, &SavedSubcircuit::Name);
+    if (found == m_Subcircuits.end()) {
+        return std::unexpected("Unknown SPICE block " + name);
+    }
+    const std::optional<Core::SubcircuitText> &spice = found->Spice;
+    if (!spice) {
+        return std::unexpected(name + " is a drawn block, not SPICE text");
+    }
+    if (pins.size() != spice->Ports.size()) {
+        return std::unexpected("Give every port of the SPICE text a pin");
+    }
+    if (auto valid = ValidateMetadata(pins, parameters); !valid) {
+        return std::unexpected(valid.error());
+    }
+    SavedSubcircuit &definition = *found;
+    std::vector<std::string> old_names;
+    std::vector<std::optional<std::size_t>> matches;
+    for (std::size_t index = 0; index < definition.Pins.size(); ++index) {
+        old_names.push_back(definition.Pins[index].Name);
+        // A port is the same pin whatever it is called now
+        matches.emplace_back(index);
+    }
+    definition.Pins = pins;
+    definition.Parameters = parameters;
+    m_BuiltSubcircuits.reset();
+    RefreshInstances(definition, old_names, matches);
+    MarkModified();
+    return {};
+}
+
+/**
  * @brief   Adds the definitions a pasted group brought, so its instances have them.
  * @param[in]     definitions  Definitions the group's instances use.
  * @param[in,out] instances    Elements of the group; the instances of a renamed definition are pointed at its new name.
+ * @return  The name each definition has here, in order: its own, or the free name it was given.
  * @note    A definition equal to one of the same name already here is dropped, since the instances can use that one.
  *          One that differs is added under a free name, such as "block_2", so neither replaces the other.
  */
-void Schematic::MergeSubcircuits(std::vector<SavedSubcircuit> definitions,
-                                 std::vector<std::unique_ptr<UIElement>> &instances) {
+std::vector<std::string> Schematic::MergeSubcircuits(std::vector<SavedSubcircuit> definitions,
+                                                     std::vector<std::unique_ptr<UIElement>> &instances) {
+    std::vector<std::string> names;
     for (SavedSubcircuit &definition : definitions) {
         const auto existing = std::ranges::find(m_Subcircuits, definition.Name, &SavedSubcircuit::Name);
         if (existing != m_Subcircuits.end() && DescribeDefinition(*existing) == DescribeDefinition(definition)) {
+            names.push_back(definition.Name);
             continue;
         }
         if (existing != m_Subcircuits.end()) {
@@ -576,10 +624,12 @@ void Schematic::MergeSubcircuits(std::vector<SavedSubcircuit> definitions,
                 }
             }
         }
+        names.push_back(definition.Name);
         m_Subcircuits.push_back(std::move(definition));
         m_BuiltSubcircuits.reset();
         MarkModified();
     }
+    return names;
 }
 
 /**
@@ -999,6 +1049,7 @@ Core::Circuit Schematic::BuildCircuit() {
             auto definition = std::make_shared<Core::SubcircuitDefinition>();
             definition->Name = saved.Name;
             definition->Parameters = saved.Parameters;
+            definition->Spice = saved.Spice;
             // A pin on no node would be refused by the checks, which read node 0 as ground
             for (const SavedSubcircuitPin &pin : saved.Pins) {
                 definition->Pins.push_back({pin.Name, connectivity.GetNode(pin.Point).value_or(0)});

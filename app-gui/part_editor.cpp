@@ -497,6 +497,9 @@ void PartEditor::DrawSubcircuit(Core::SubcircuitInstance &instance) {
         return;
     }
     ImGui::TextUnformatted(std::format("Definition: {}", definition->Name).c_str());
+    if (definition->Spice) {
+        ImGui::TextDisabled("SPICE text from a library; double click the block for its pins");
+    }
     for (std::size_t index = 0; index < definition->Parameters.size() && index < m_SubcircuitFields.size(); ++index) {
         const Core::SubcircuitParameter &parameter = definition->Parameters[index];
         if (const auto value = m_SubcircuitFields[index].Draw(parameter.Name.c_str(), "", AnyValue)) {
