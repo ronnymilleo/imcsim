@@ -231,3 +231,17 @@ TEST_CASE("An instance with an unknown definition is rejected clearly", "[subcir
     REQUIRE(loaded->Warnings.size() == 1);
     CHECK(loaded->Warnings[0].contains("unknown subcircuit"));
 }
+
+TEST_CASE("Subcircuit instances clear parameter overrides and validate identifiers", "[subcircuit]") {
+    auto instance = MakeInstance("X1", "divider");
+    instance.SetParameter("RTOP", 3e3);
+    REQUIRE_FALSE(instance.GetParameters().empty());
+    instance.ClearParameters();
+    CHECK(instance.GetParameters().empty());
+
+    CHECK(Core::SubcircuitInstance::IsValidIdentifier("divider_2"));
+    CHECK(Core::SubcircuitInstance::IsValidIdentifier("_divider"));
+    CHECK_FALSE(Core::SubcircuitInstance::IsValidIdentifier(""));
+    CHECK_FALSE(Core::SubcircuitInstance::IsValidIdentifier("2divider"));
+    CHECK_FALSE(Core::SubcircuitInstance::IsValidIdentifier("two-words"));
+}
