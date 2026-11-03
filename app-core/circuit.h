@@ -64,6 +64,9 @@ private:
     int m_NodeCount = 0;
 };
 
+// Parts
+std::vector<const Component *> CollectParts(const Circuit &circuit);
+
 // Current probes
 std::vector<CurrentProbe> GetCurrentProbes(const Component &component);
 std::string GetCurrentProbeName(const Component &component, std::string_view label);

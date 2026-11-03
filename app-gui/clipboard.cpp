@@ -30,9 +30,10 @@ GridPoint FindGroupPivot(const PastedGroup &group) {
 
 /**
  * @brief   Writes the selected parts and wires as text for the clipboard.
- * @param[in] elements   Parts of the schematic.
- * @param[in] wires      Wires of the schematic.
- * @param[in] selection  What to copy.
+ * @param[in] elements     Parts of the schematic.
+ * @param[in] wires        Wires of the schematic.
+ * @param[in] selection    What to copy.
+ * @param[in] subcircuits  Block definitions of the schematic; those the copied instances use go with them.
  * @return  A schematic of just those items, in the format of the files, so it pastes into another copy of the program
  *          as well as this one.
  */

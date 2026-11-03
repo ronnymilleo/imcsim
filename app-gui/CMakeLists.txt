@@ -45,6 +45,7 @@ add_library(imcsim-gui-lib
             selection.cpp
             simulation_settings.cpp
             spectrum.cpp
+            subcircuit_pins.cpp
             svg_writer.cpp
             theme.cpp
             trace_fit_state.cpp

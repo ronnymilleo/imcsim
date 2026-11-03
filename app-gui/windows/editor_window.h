@@ -260,6 +260,8 @@ private:
     void StartProbing();
     void StopEditing();
     bool IsEditingSubcircuit() const;
+    bool LeaveSubcircuitForDocument();
+    void OfferBlockParameters();
     void RequestCreateSubcircuit();
     void RequestEditSelectedSubcircuit();
     void DrawSubcircuitDialog();

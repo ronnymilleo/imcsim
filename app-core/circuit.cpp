@@ -332,6 +332,10 @@ void Circuit::Add(const Component &component, std::vector<int> nodes) {
     m_Entries.push_back({&component, std::move(nodes)});
 }
 
+/**
+ * @brief   Adds a subcircuit definition, which the instances of the circuit refer to by name.
+ * @param[in] definition  Definition to write as a .subckt block; it is shared, not copied.
+ */
 void Circuit::AddSubcircuit(std::shared_ptr<SubcircuitDefinition> definition) {
     m_Subcircuits.push_back(std::move(definition));
 }
@@ -344,10 +348,19 @@ const std::vector<CircuitEntry> &Circuit::GetEntries() const {
     return m_Entries;
 }
 
+/**
+ * @brief   Returns the subcircuit definitions, in the order they were added.
+ * @return  Every definition, used by an instance or not.
+ */
 const std::vector<std::shared_ptr<SubcircuitDefinition>> &Circuit::GetSubcircuits() const {
     return m_Subcircuits;
 }
 
+/**
+ * @brief   Finds a subcircuit definition by name.
+ * @param[in] name  Name of the definition.
+ * @return  The definition, or null when the circuit has none of that name.
+ */
 std::shared_ptr<const SubcircuitDefinition> Circuit::FindSubcircuit(const std::string_view name) const {
     const auto found = std::ranges::find(m_Subcircuits, name, &SubcircuitDefinition::Name);
     return found != m_Subcircuits.end() ? *found : nullptr;
@@ -363,32 +376,29 @@ int Circuit::GetNodeCount() const {
 
 /**
  * @brief   Tells whether the circuit has a ground reference.
- * @return  True when it contains at least one ground component; without one, node voltages are undefined.
+ * @return  True when it, or a subcircuit one of its instances uses, contains a ground component; without one, node
+ *          voltages are undefined.
  */
 bool Circuit::HasGround() const {
-    return std::ranges::any_of(
-               m_Entries, [](const CircuitEntry &entry) { return entry.Part->GetType() == ComponentType::GROUND; }) ||
-           std::ranges::any_of(m_Subcircuits, [](const auto &definition) { return definition->Body.HasGround(); });
+    return std::ranges::any_of(CollectParts(*this),
+                               [](const Component *part) { return part->GetType() == ComponentType::GROUND; });
 }
 
 /**
  * @brief   Tells whether the circuit has a source that an AC sweep can excite.
- * @return  True when it contains at least one voltage or current source set to AC.
+ * @return  True when it, or a subcircuit one of its instances uses, contains a voltage or current source set to AC.
  */
 bool Circuit::HasACSource() const {
-    return std::ranges::any_of(m_Entries, [](const CircuitEntry &entry) { return IsACSource(*entry.Part); }) ||
-           std::ranges::any_of(m_Subcircuits, [](const auto &definition) { return definition->Body.HasACSource(); });
+    return std::ranges::any_of(CollectParts(*this), [](const Component *part) { return IsACSource(*part); });
 }
 
 /**
  * @brief   Tells whether any part starts from an initial condition.
- * @return  True when at least one capacitor or inductor has one set; a transient then runs with uic.
+ * @return  True when at least one capacitor or inductor, here or in a subcircuit one of its instances uses, has one
+ *          set; a transient then runs with uic.
  */
 bool Circuit::HasInitialConditions() const {
-    return std::ranges::any_of(m_Entries,
-                               [](const CircuitEntry &entry) { return entry.Part->HasInitialCondition(); }) ||
-           std::ranges::any_of(m_Subcircuits,
-                               [](const auto &definition) { return definition->Body.HasInitialConditions(); });
+    return std::ranges::any_of(CollectParts(*this), [](const Component *part) { return part->HasInitialCondition(); });
 }
 
 /**
@@ -625,6 +635,33 @@ std::string Circuit::ToSpiceNetlist(const std::string_view analysis, const bool 
     }
     netlist += ".end\n";
     return netlist;
+}
+
+/**
+ * @brief   Lists every part the netlist of a circuit simulates.
+ * @param[in] circuit  Circuit to look into.
+ * @return  The parts of the circuit, then the parts of each subcircuit definition one of its instances uses, once
+ *          per definition. Definitions no instance uses are left out, and so are the subcircuits of a definition's
+ *          body, since blocks do not nest.
+ */
+std::vector<const Component *> CollectParts(const Circuit &circuit) {
+    std::vector<const Component *> parts;
+    std::set<std::string, std::less<>> used;
+    for (const CircuitEntry &entry : circuit.GetEntries()) {
+        parts.push_back(entry.Part);
+        if (entry.Part->GetType() == ComponentType::SUBCIRCUIT) {
+            used.insert(static_cast<const SubcircuitInstance &>(*entry.Part).GetDefinitionName());
+        }
+    }
+    for (const auto &definition : circuit.GetSubcircuits()) {
+        if (!used.contains(definition->Name)) {
+            continue;
+        }
+        for (const CircuitEntry &entry : definition->Body.GetEntries()) {
+            parts.push_back(entry.Part);
+        }
+    }
+    return parts;
 }
 
 /**

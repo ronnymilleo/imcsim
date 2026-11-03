@@ -10,6 +10,11 @@
 
 namespace GUI {
 
+/**
+ * @class   UISubcircuit
+ * @brief   A box with the name of the block below it, its inputs on the left and its outputs on the right.
+ * @details The box grows with the side that has more pins. Each pin is labelled inside the box.
+ */
 class UISubcircuit : public UIElement {
 public:
     UISubcircuit(GridPoint position, Rotation rotation);

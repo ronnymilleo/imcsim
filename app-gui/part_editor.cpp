@@ -305,9 +305,22 @@ PartEditor::PartEditor(Schematic &schematic, const Preferences &preferences)
     : m_Schematic(&schematic), m_Preferences(preferences) {
 }
 
+/**
+ * @brief   Makes the editor edit the parts of another schematic, such as the contents of a block being edited.
+ * @param[in] schematic  Schematic whose selected part the editor shows; it must outlive its use here.
+ * @note    Back on the document, call SetBlockParameters() with no names too.
+ */
 void PartEditor::SetSchematic(Schematic &schematic) {
     m_Schematic = &schematic;
     m_LoadedSelection.reset();
+}
+
+/**
+ * @brief   Sets the parameters that the values of the parts being edited can follow.
+ * @param[in] names  Parameters of the block being edited; none on the document, whose parts cannot follow any.
+ */
+void PartEditor::SetBlockParameters(std::vector<std::string> names) {
+    m_BlockParameters = std::move(names);
 }
 
 /**
@@ -582,6 +595,9 @@ void PartEditor::DrawNetLabel(Core::NetLabel &label) {
 }
 
 void PartEditor::DrawValue(Core::Component &component) {
+    if (DrawParameterChoice(component)) {
+        return;
+    }
     const auto is_valid = [&component](const double value) { return component.IsValidValue(value); };
     // Standard values are for the passive parts; the value of a source or a gain is whatever the circuit needs
     const Core::ComponentType type = component.GetType();
@@ -596,6 +612,38 @@ void PartEditor::DrawValue(Core::Component &component) {
         ImGui::TextDisabled("Standard values: %s, %g%%", Core::GetSeriesName(series),
                             Core::GetSeriesTolerancePercent(series));
     }
+}
+
+// Inside a block, a resistor, capacitor or inductor can take its value from a parameter of the block, which each
+// instance sets. Returns whether it does, in which case it has no value of its own to edit
+bool PartEditor::DrawParameterChoice(Core::Component &component) {
+    const std::optional<std::string> &expression = component.GetValueExpression();
+    if (!component.CanFollowParameter() || (m_BlockParameters.empty() && !expression)) {
+        return false;
+    }
+    constexpr const char *OWN_VALUE = "(its own value)";
+    const std::string preview = expression ? std::string(Core::SubcircuitInstance::GetExpressionParameter(*expression))
+                                           : std::string(OWN_VALUE);
+    DrawFieldLabel("Follows");
+    if (ImGui::BeginCombo("##follows", preview.c_str())) {
+        if (ImGui::Selectable(OWN_VALUE, !expression) && expression) {
+            component.ClearValueExpression();
+            m_Value.Load(component.GetValue());
+            m_Schematic->MarkModified();
+        }
+        for (const std::string &name : m_BlockParameters) {
+            if (ImGui::Selectable(name.c_str(), name == preview) && name != preview) {
+                component.SetValueExpression(std::format("{{{}}}", name));
+                m_Schematic->MarkModified();
+            }
+        }
+        ImGui::EndCombo();
+    }
+    if (!component.GetValueExpression()) {
+        return false;
+    }
+    ImGui::TextDisabled("Each instance of the block sets this value, or takes the parameter's default");
+    return true;
 }
 
 // A capacitor's initial condition is a voltage and an inductor's a current; leaving the field empty means no initial

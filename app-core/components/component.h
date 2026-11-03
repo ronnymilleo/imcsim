@@ -93,6 +93,7 @@ public:
     const char *GetUnit() const;
     bool HasValue() const;
     bool IsValidValue(double value) const;
+    bool CanFollowParameter() const;
 
     // Instance data
     const std::string &GetName() const;

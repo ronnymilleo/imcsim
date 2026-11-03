@@ -21,6 +21,7 @@
 #include "schematic_drawing.h"
 #include "shortcuts.h"
 #include "spice_value.h"
+#include "subcircuit_pins.h"
 #include "theme.h"
 #include "wire_editing.h"
 #include <algorithm>
@@ -572,10 +573,14 @@ void EditorWindow::Update() {
 /**
  * @brief   Asks to quit, as when the user closes the main window. Call it between frames.
  * @note    Quitting is confirmed right away when there is nothing to lose; otherwise the next frame asks the user
- *          to discard the changes. Check IsQuitConfirmed() after drawing the frame.
+ *          to discard the changes. Check IsQuitConfirmed() after drawing the frame. A block being edited is applied
+ *          to the schematic first, so its edits count as changes; when it cannot be, the block stays open with the
+ *          reason and nothing quits.
  */
 void EditorWindow::RequestQuit() {
-    m_Files.RequestQuit();
+    if (LeaveSubcircuitForDocument()) {
+        m_Files.RequestQuit();
+    }
 }
 
 /**
@@ -590,10 +595,13 @@ bool EditorWindow::IsQuitConfirmed() const {
  * @brief   Asks to open an example, as when the user picks one from the menu.
  * @param[in] example  One of GetExamples().
  * @note    Like quitting, the next frame opens it, after asking the user to discard unsaved changes if there are
- *          any. The example opens untitled, so saving it asks for a file.
+ *          any. The example opens untitled, so saving it asks for a file. A block being edited is applied first, as
+ *          for quitting.
  */
 void EditorWindow::RequestExample(const Example &example) {
-    m_Files.RequestExample(example);
+    if (LeaveSubcircuitForDocument()) {
+        m_Files.RequestExample(example);
+    }
 }
 
 /**
@@ -830,10 +838,10 @@ void EditorWindow::DrawToolbar() {
     };
 
     if (IsEditingSubcircuit()) {
-        constexpr const char *back_label = "Back to schematic";
-        const float back_width = ImGui::CalcTextSize(back_label).x + 2.0f * ImGui::GetStyle().FramePadding.x;
+        constexpr const char *BACK_LABEL = "Back to schematic";
+        const float back_width = ImGui::CalcTextSize(BACK_LABEL).x + 2.0f * ImGui::GetStyle().FramePadding.x;
         row.Place(back_width, 0.0f);
-        if (ImGui::Button(back_label)) {
+        if (ImGui::Button(BACK_LABEL)) {
             FinishSubcircuitEditing(true);
         }
         ImGui::SetItemTooltip("Apply the block changes and return to the schematic");
@@ -1542,6 +1550,23 @@ bool EditorWindow::IsEditingSubcircuit() const {
     return m_SubcircuitContent != nullptr;
 }
 
+// Quitting or opening another document while a block is open applies the block first, so its edits count as unsaved
+// changes of the document instead of vanishing with it. Returns false when the block cannot be applied, which leaves
+// it open with the reason shown
+bool EditorWindow::LeaveSubcircuitForDocument() {
+    FinishSubcircuitEditing(true);
+    return !IsEditingSubcircuit();
+}
+
+// The parts of the block can follow the parameters in the settings, as they stand
+void EditorWindow::OfferBlockParameters() {
+    std::vector<std::string> names;
+    for (const Core::SubcircuitParameter &parameter : m_SubcircuitParameters) {
+        names.push_back(parameter.Name);
+    }
+    m_PartEditor.SetBlockParameters(std::move(names));
+}
+
 void EditorWindow::RequestCreateSubcircuit() {
     if (IsEditingSubcircuit()) {
         return;
@@ -1589,6 +1614,7 @@ void EditorWindow::RequestEditSelectedSubcircuit() {
     m_SubcircuitContent = std::move(*content);
     m_Schematic = m_SubcircuitContent.get();
     m_PartEditor.SetSchematic(*m_Schematic);
+    OfferBlockParameters();
     m_Schematic->ClearSelection();
     m_Displayed.reset();
     m_PlacingType.reset();
@@ -1649,14 +1675,22 @@ void EditorWindow::FinishSubcircuitEditing(const bool apply) {
             m_SubcircuitDialogRequested = true;
             return;
         }
-        auto updated = m_RootSchematic.UpdateSubcircuit(m_EditingSubcircuit, *m_SubcircuitContent, m_SubcircuitPins,
-                                                        m_SubcircuitParameters);
-        if (!updated) {
-            m_SubcircuitError = updated.error();
-            m_SubcircuitDialogRequested = true;
-            return;
+        // A block opened and closed without a change leaves the document unmodified
+        const auto definition =
+            std::ranges::find(m_RootSchematic.GetSubcircuits(), m_EditingSubcircuit, &SavedSubcircuit::Name);
+        const bool is_changed =
+            m_SubcircuitContent->IsModified() || definition == m_RootSchematic.GetSubcircuits().end() ||
+            definition->Pins != m_SubcircuitPins || definition->Parameters != m_SubcircuitParameters;
+        if (is_changed) {
+            auto updated = m_RootSchematic.UpdateSubcircuit(m_EditingSubcircuit, *m_SubcircuitContent, m_SubcircuitPins,
+                                                            m_SubcircuitParameters);
+            if (!updated) {
+                m_SubcircuitError = updated.error();
+                m_SubcircuitDialogRequested = true;
+                return;
+            }
+            m_RootSchematic.CommitUndoStep();
         }
-        m_RootSchematic.CommitUndoStep();
     }
     m_SubcircuitContent.reset();
     m_EditingSubcircuit.clear();
@@ -1664,17 +1698,18 @@ void EditorWindow::FinishSubcircuitEditing(const bool apply) {
     m_SubcircuitParameters.clear();
     m_Schematic = &m_RootSchematic;
     m_PartEditor.SetSchematic(m_RootSchematic);
+    m_PartEditor.SetBlockParameters({});
     m_Schematic->ClearSelection();
     m_Displayed.reset();
     m_View.RequestDefaultFrame();
 }
 
 void EditorWindow::DrawSubcircuitDialog() {
-    constexpr const char *popup = "Subcircuit block";
+    constexpr const char *POPUP = "Subcircuit block";
     if (std::exchange(m_SubcircuitDialogRequested, false)) {
-        ImGui::OpenPopup(popup);
+        ImGui::OpenPopup(POPUP);
     }
-    if (!ImGui::BeginPopupModal(popup, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+    if (!ImGui::BeginPopupModal(POPUP, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
         return;
     }
     const bool editing = IsEditingSubcircuit();
@@ -1729,16 +1764,13 @@ void EditorWindow::DrawSubcircuitDialog() {
     if (ImGui::Button(editing ? "Keep settings" : "Create block")) {
         if (editing) {
             if (ApplySubcircuitPinNames()) {
+                OfferBlockParameters();
                 m_SubcircuitError.clear();
                 ImGui::CloseCurrentPopup();
             }
         } else {
-            std::vector<std::string> pins;
-            for (const auto &pin : m_SubcircuitPins) {
-                pins.push_back(pin.Name);
-            }
-            auto created =
-                m_RootSchematic.CreateSubcircuitFromSelection(m_SubcircuitName, pins, m_SubcircuitParameters);
+            auto created = m_RootSchematic.CreateSubcircuitFromSelection(m_SubcircuitName, m_SubcircuitPins,
+                                                                         m_SubcircuitParameters);
             if (created) {
                 m_RootSchematic.CommitUndoStep();
                 m_SubcircuitError.clear();
@@ -1755,6 +1787,7 @@ void EditorWindow::DrawSubcircuitDialog() {
                 std::ranges::find(m_RootSchematic.GetSubcircuits(), m_EditingSubcircuit, &SavedSubcircuit::Name);
             m_SubcircuitPins = definition->Pins;
             m_SubcircuitParameters = definition->Parameters;
+            OfferBlockParameters();
         }
         ImGui::CloseCurrentPopup();
     }
@@ -1932,13 +1965,7 @@ void EditorWindow::HandlePlacement(SchematicCanvas &canvas, const ViewTransform 
             m_PlacingType.reset();
             return;
         }
-        auto &instance = static_cast<Core::SubcircuitInstance &>(preview->GetComponent());
-        instance.SetDefinitionName(definition->Name);
-        std::vector<std::string> pins;
-        for (const SavedSubcircuitPin &pin : definition->Pins) {
-            pins.push_back(pin.Name);
-        }
-        instance.SetPins(std::move(pins));
+        ApplyDefinitionPins(static_cast<Core::SubcircuitInstance &>(preview->GetComponent()), *definition);
     }
     preview->Draw(canvas, view, GetPreviewColor(), m_Preferences.Symbols);
     if (!ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
@@ -2029,6 +2056,8 @@ void EditorWindow::StartPastingGroup(PastedGroup group) {
         return element->GetComponent().GetType() == Core::ComponentType::SUBCIRCUIT;
     });
     if (IsEditingSubcircuit() && has_block) {
+        m_Files.QueueMessages("Could not paste inside the block",
+                              {"Blocks do not nest; paste the block on the schematic instead"});
         return;
     }
     ClearSelection();
@@ -2085,7 +2114,7 @@ void EditorWindow::HandlePasting(SchematicCanvas &canvas, const ViewTransform &v
 
     const std::size_t first_element = m_Schematic->GetElements().size();
     const std::size_t first_wire = m_Schematic->GetWires().size();
-    m_Schematic->MergeSubcircuits(std::move(m_Pasting->Subcircuits));
+    m_Schematic->MergeSubcircuits(std::move(m_Pasting->Subcircuits), m_Pasting->Elements);
     for (auto &element : m_Pasting->Elements) {
         m_Schematic->AddElement(std::move(element));
     }

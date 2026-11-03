@@ -24,6 +24,7 @@
 #include "connectivity.h"
 #include "element_factory.h"
 #include "nlohmann/json.hpp"
+#include "subcircuit_pins.h"
 #include <array>
 #include <format>
 #include <fstream>
@@ -790,12 +791,7 @@ std::expected<void, std::string> ReadSubcircuitInstance(const nlohmann::json &ob
     if (definition == definitions.end()) {
         return std::unexpected(std::format("refers to unknown subcircuit \"{}\"", *name));
     }
-    instance.SetDefinitionName(*name);
-    std::vector<std::string> pins;
-    for (const SavedSubcircuitPin &pin : definition->Pins) {
-        pins.push_back(pin.Name);
-    }
-    instance.SetPins(std::move(pins));
+    ApplyDefinitionPins(instance, *definition);
     if (const auto parameters = object.find("parameters"); parameters != object.end()) {
         if (!parameters->is_object()) {
             return std::unexpected("has subcircuit parameters that are not an object");
@@ -861,6 +857,9 @@ ReadElement(const nlohmann::json &object, const std::span<const SavedSubcircuit>
         } else if (const std::optional<std::string> expression = ReadString(object, "value")) {
             if (!Core::SubcircuitInstance::IsValidValueExpression(*expression)) {
                 return std::unexpected("has no valid parameter expression");
+            }
+            if (!component.CanFollowParameter()) {
+                return std::unexpected("follows a parameter, which only resistors, capacitors and inductors can");
             }
             component.SetValueExpression(*expression);
         } else {
@@ -1440,11 +1439,9 @@ std::expected<SavedSubcircuit, std::string> ReadSubcircuit(const nlohmann::json 
             }
         }
     }
-    const Connectivity connectivity(definition.Elements, definition.Wires);
-    for (const SavedSubcircuitPin &pin : definition.Pins) {
-        if (!connectivity.GetNode(pin.Point)) {
-            return std::unexpected(std::format("has pin {} on an unconnected point", pin.Name));
-        }
+    if (const std::optional<std::string> problem =
+            CheckPinNodes(Connectivity(definition.Elements, definition.Wires), definition.Pins)) {
+        return std::unexpected(std::format("has pins it cannot connect: {}", *problem));
     }
     for (std::string &warning : local_warnings) {
         warnings.push_back(std::format("Subcircuit {}: {}", definition.Name, warning));

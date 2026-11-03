@@ -344,6 +344,15 @@ bool Component::IsValidValue(const double value) const {
 }
 
 /**
+ * @brief   Tells whether the value can follow a parameter of the subcircuit the part belongs to.
+ * @return  True for resistors, capacitors and inductors, whose netlist line holds the value as it is; false for the
+ *          parts that work their lines out from the value, such as a potentiometer or a transformer.
+ */
+bool Component::CanFollowParameter() const {
+    return m_Type == ComponentType::RESISTOR || m_Type == ComponentType::CAPACITOR || m_Type == ComponentType::INDUCTOR;
+}
+
+/**
  * @brief   Returns the instance name, such as "R1".
  * @return  The name, empty when not assigned yet or for ground.
  */
@@ -376,16 +385,29 @@ void Component::SetValue(const double value) {
     m_ValueExpression.reset();
 }
 
+/**
+ * @brief   Returns the parameter the value refers to, for a part inside a subcircuit.
+ * @return  An expression such as "{R}", written in the netlist instead of the value; no value for a fixed value.
+ */
 const std::optional<std::string> &Component::GetValueExpression() const {
     return m_ValueExpression;
 }
 
+/**
+ * @brief   Makes the value follow a parameter of the subcircuit the part belongs to.
+ * @param[in] expression  A parameter name in braces, such as "{R}".
+ * @note    Parts that cannot follow a parameter (CanFollowParameter()) ignore it. SetValue() goes back to a fixed
+ * value.
+ */
 void Component::SetValueExpression(std::string expression) {
-    if (HasValue()) {
+    if (CanFollowParameter()) {
         m_ValueExpression = std::move(expression);
     }
 }
 
+/**
+ * @brief   Goes back to the fixed value, which GetValue() returns.
+ */
 void Component::ClearValueExpression() {
     m_ValueExpression.reset();
 }
@@ -435,6 +457,11 @@ void Component::ClearInitialCondition() {
     m_InitialCondition.reset();
 }
 
+/**
+ * @brief   Tells whether a kind of part is a PIN or POUT marker of a subcircuit.
+ * @param[in] type  Kind of part.
+ * @return  True for ComponentType::PIN and ComponentType::POUT.
+ */
 bool IsSubcircuitPin(const ComponentType type) {
     return type == ComponentType::PIN || type == ComponentType::POUT;
 }

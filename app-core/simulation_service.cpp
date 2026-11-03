@@ -62,12 +62,14 @@ void SimulationService::Stop() {
 
 /**
  * @brief   Asks the job to stop and drops everything it made or will make.
- * @note    The same wait as Stop(). A result that is done but not yet polled is dropped at once.
+ * @note    The same wait as Stop(). A result that is done but not yet polled is dropped at once, with what the job
+ *          posted before it ended.
  */
 void SimulationService::Cancel() {
     const std::lock_guard lock(m_Mutex);
     if (m_State == State::DONE) {
         m_Delivery = nullptr;
+        m_Control.TakePosted();
         m_State = State::IDLE;
     } else if (m_State != State::IDLE) {
         m_Control.Discard();
@@ -82,23 +84,24 @@ void SimulationService::Cancel() {
  *          dropped.
  */
 bool SimulationService::Poll() {
-    bool has_delivered = false;
-    std::vector<Delivery> posted = m_Control.TakePosted();
-    if (!m_Control.IsDiscarded()) {
-        for (const Delivery &delivery : posted) {
-            delivery();
-            has_delivered = true;
-        }
-    }
+    // The state is read before the mailbox: a job posts before it ends, so once it is seen done, everything it posted
+    // is in the mailbox and runs before its delivery, never after it
     Delivery delivery;
     {
         const std::lock_guard lock(m_Mutex);
-        if (m_State != State::DONE) {
-            return has_delivered;
+        if (m_State == State::DONE) {
+            delivery = std::move(m_Delivery);
+            m_Delivery = nullptr;
+            m_State = State::IDLE;
         }
-        delivery = std::move(m_Delivery);
-        m_Delivery = nullptr;
-        m_State = State::IDLE;
+    }
+    bool has_delivered = false;
+    std::vector<Delivery> posted = m_Control.TakePosted();
+    if (!m_Control.IsDiscarded()) {
+        for (const Delivery &post : posted) {
+            post();
+            has_delivered = true;
+        }
     }
     if (!delivery) {
         return has_delivered;

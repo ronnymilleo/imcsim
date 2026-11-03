@@ -20,6 +20,12 @@ constexpr float LABEL_OFFSET = 2.1f;
 
 } // namespace
 
+/**
+ * @brief   Creates an unnamed marker.
+ * @param[in] type      ComponentType::PIN or ComponentType::POUT.
+ * @param[in] position  Grid point of its terminal.
+ * @param[in] rotation  Orientation of the symbol.
+ */
 UISubcircuitPin::UISubcircuitPin(const Core::ComponentType type, const GridPoint position, const Rotation rotation)
     : UIElement(std::make_unique<Core::SubcircuitPinMarker>(type), position, rotation) {
 }

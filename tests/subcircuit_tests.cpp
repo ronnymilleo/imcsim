@@ -16,9 +16,11 @@
 #include "schematic_file.h"
 #include "simulator.h"
 #include "subcircuit.h"
+#include <algorithm>
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -32,7 +34,8 @@ std::shared_ptr<Core::SubcircuitDefinition> MakeDivider(std::string name, Core::
     lower.SetValueExpression("{RBOTTOM}");
     auto definition = std::make_shared<Core::SubcircuitDefinition>();
     definition->Name = std::move(name);
-    definition->Pins = {{"IN", 1}, {"OUT", 2}, {"GND", 0}};
+    // The lower resistor reaches ground inside the block, which every part of the netlist shares
+    definition->Pins = {{"IN", 1}, {"OUT", 2}};
     definition->Parameters = {{"RTOP", 1e3}, {"RBOTTOM", 1e3}};
     definition->Body.Add(upper, {1, 2});
     definition->Body.Add(lower, {2, 0});
@@ -40,7 +43,7 @@ std::shared_ptr<Core::SubcircuitDefinition> MakeDivider(std::string name, Core::
 }
 
 Core::SubcircuitInstance MakeInstance(const std::string &name, const std::string &definition) {
-    Core::SubcircuitInstance instance(definition, {"IN", "OUT", "GND"});
+    Core::SubcircuitInstance instance(definition, {"IN", "OUT"});
     instance.SetName(name);
     return instance;
 }
@@ -65,13 +68,13 @@ TEST_CASE("A subcircuit instance writes X and substitutes its parameters", "[sub
     const Core::Ground ground;
     Core::Circuit circuit;
     circuit.Add(supply, {1});
-    circuit.Add(instance, {1, 2, 0});
+    circuit.Add(instance, {1, 2});
     circuit.Add(ground, {0});
     circuit.AddSubcircuit(definition);
 
     const std::string netlist = circuit.ToSpiceNetlist();
-    CHECK(netlist.contains("X1 1 2 0 divider RBOTTOM=2k\n"));
-    CHECK(netlist.contains(".subckt divider 1 2 0 params: RTOP=1k RBOTTOM=1k\n"));
+    CHECK(netlist.contains("X1 1 2 divider RBOTTOM=2k\n"));
+    CHECK(netlist.contains(".subckt divider 1 2 params: RTOP=1k RBOTTOM=1k\n"));
     CHECK(netlist.contains("R1 1 2 {RTOP}\n"));
     CHECK(netlist.contains("R2 2 0 {RBOTTOM}\n"));
     CHECK(netlist.contains(".ends divider\n"));
@@ -104,15 +107,15 @@ TEST_CASE("Equal internal node numbers stay local to each subcircuit", "[subcirc
     const Core::Ground ground;
     Core::Circuit circuit;
     circuit.Add(supply, {1});
-    circuit.Add(first_instance, {1, 2, 0});
-    circuit.Add(second_instance, {1, 3, 0});
+    circuit.Add(first_instance, {1, 2});
+    circuit.Add(second_instance, {1, 3});
     circuit.Add(ground, {0});
     circuit.AddSubcircuit(first);
     circuit.AddSubcircuit(second);
 
     const std::string netlist = circuit.ToSpiceNetlist();
-    CHECK(netlist.contains(".subckt first 1 2 0"));
-    CHECK(netlist.contains(".subckt second 1 2 0"));
+    CHECK(netlist.contains(".subckt first 1 2 params:"));
+    CHECK(netlist.contains(".subckt second 1 2 params:"));
     const Core::OperatingPointRun run = Core::RunOperatingPoint(circuit);
     REQUIRE(run.Result);
     CHECK(run.Result->NodeVoltages[2] == Catch::Approx(4.0).margin(1e-6));
@@ -133,7 +136,7 @@ TEST_CASE("Custom models with equal names are scoped by definition", "[subcircui
 
     auto first = std::make_shared<Core::SubcircuitDefinition>();
     first->Name = "first";
-    first->Pins = {{"IN", 1}, {"GND", 0}};
+    first->Pins = {{"IN", 1}};
     first->Body.Add(first_resistor, {1, 2});
     first->Body.Add(first_diode, {2, 0});
     auto second = std::make_shared<Core::SubcircuitDefinition>(*first);
@@ -142,9 +145,9 @@ TEST_CASE("Custom models with equal names are scoped by definition", "[subcircui
     second->Body.Add(second_resistor, {1, 2});
     second->Body.Add(second_diode, {2, 0});
 
-    Core::SubcircuitInstance first_instance("first", {"IN", "GND"});
+    Core::SubcircuitInstance first_instance("first", {"IN"});
     first_instance.SetName("X1");
-    Core::SubcircuitInstance second_instance("second", {"IN", "GND"});
+    Core::SubcircuitInstance second_instance("second", {"IN"});
     second_instance.SetName("X2");
     Core::VCC supply;
     supply.SetName("V1");
@@ -152,8 +155,8 @@ TEST_CASE("Custom models with equal names are scoped by definition", "[subcircui
     const Core::Ground ground;
     Core::Circuit circuit;
     circuit.Add(supply, {1});
-    circuit.Add(first_instance, {1, 0});
-    circuit.Add(second_instance, {1, 0});
+    circuit.Add(first_instance, {1});
+    circuit.Add(second_instance, {1});
     circuit.Add(ground, {0});
     circuit.AddSubcircuit(first);
     circuit.AddSubcircuit(second);
@@ -279,7 +282,8 @@ TEST_CASE("A selection becomes a reusable block and its creation is undoable", "
     REQUIRE(candidates->size() == 2);
     CHECK((*candidates)[0].Point == GUI::GridPoint{-2, 0});
     CHECK((*candidates)[0].SuggestedName == "IN");
-    auto created = schematic.CreateSubcircuitFromSelection("block", {"INPUT", "OUTPUT"}, {{"R", 2e3}});
+    auto created =
+        schematic.CreateSubcircuitFromSelection("block", {{"INPUT", {-2, 0}}, {"OUTPUT", {2, 0}}}, {{"R", 2e3}});
     REQUIRE(created);
     REQUIRE(schematic.GetSubcircuits().size() == 1);
     CHECK(schematic.GetSubcircuits()[0].Elements.size() == 3);
@@ -322,7 +326,7 @@ TEST_CASE("Only selected PIN and POUT markers become block connections", "[subci
     REQUIRE(candidates->size() == 2);
     CHECK((*candidates)[0].SuggestedName == "IN1");
     CHECK((*candidates)[1].SuggestedName == "OUT1");
-    REQUIRE(schematic.CreateSubcircuitFromSelection("amplifier", {"IN", "OUT"}));
+    REQUIRE(schematic.CreateSubcircuitFromSelection("amplifier", {{"IN", {-2, 0}}, {"OUT", {2, 0}}}));
     CHECK(schematic.GetSubcircuits()[0].Pins.size() == 2);
     CHECK(static_cast<const Core::SubcircuitInstance &>(schematic.GetElements().back()->GetComponent()).GetPins() ==
           std::vector<std::string>{"IN", "OUT"});
@@ -361,7 +365,8 @@ TEST_CASE("Editing a definition propagates pins, parameters and contents to ever
     schematic.AddWire({2, 0}, {6, 0});
     schematic.AddWire({-6, 0}, {-2, 0});
     schematic.SetSelection({0, 3, 4}, {});
-    auto created = schematic.CreateSubcircuitFromSelection("block", {"IN", "OUT"}, {{"R", 1e3}, {"DROP", 2.0}});
+    auto created = schematic.CreateSubcircuitFromSelection("block", {{"IN", {-2, 0}}, {"OUT", {2, 0}}},
+                                                           {{"R", 1e3}, {"DROP", 2.0}});
     REQUIRE(created);
     auto &first_instance = static_cast<Core::SubcircuitInstance &>(schematic.GetElement(2).GetComponent());
     first_instance.SetParameter("R", 3e3);
@@ -389,7 +394,8 @@ TEST_CASE("Editing a definition propagates pins, parameters and contents to ever
     CHECK(schematic.GetSubcircuits()[0].Pins.size() == 1);
     CHECK(schematic.GetSubcircuits()[0].Elements[0]->GetComponent().GetValueExpression() == "{R}");
     CAPTURE(schematic.GetWires());
-    CHECK(schematic.GetWires() == std::vector<GUI::UIWire>{{{2, 0}, {6, 0}}, {{-6, 0}, {-2, 0}}, {{2, 0}, {-3, 0}}});
+    // OUT is an output, so its terminal sits on the right of the block
+    CHECK(schematic.GetWires() == std::vector<GUI::UIWire>{{{2, 0}, {6, 0}}, {{-6, 0}, {-2, 0}}, {{2, 0}, {3, 0}}});
     const GUI::Connectivity &nodes = schematic.GetConnectivity();
     const std::vector<GUI::GridPoint> moved_terminals = schematic.GetElement(2).GetTerminals();
     REQUIRE(moved_terminals.size() == 1);
@@ -420,4 +426,214 @@ TEST_CASE("Block creation rejects nested blocks and invalid metadata", "[subcirc
     CHECK_FALSE(schematic.GetSubcircuitPinCandidates());
     CHECK_FALSE(schematic.CreateSubcircuitFromSelection("not valid", {}));
     CHECK_FALSE(schematic.OpenSubcircuit("missing"));
+}
+
+TEST_CASE("A pin on the ground inside a block is refused, since it would connect nothing", "[subcircuit]") {
+    // ngspice keeps node 0 global, so a port on it leaves the outer net unconnected
+    Core::Resistor resistor;
+    resistor.SetName("R1");
+    auto definition = std::make_shared<Core::SubcircuitDefinition>();
+    definition->Name = "grounded";
+    definition->Pins = {{"IN", 1}, {"GND", 0}};
+    definition->Body.Add(resistor, {1, 0});
+    Core::SubcircuitInstance instance("grounded", {"IN", "GND"});
+    instance.SetName("X1");
+    Core::VCC supply;
+    supply.SetName("V1");
+    const Core::Ground ground;
+    Core::Circuit circuit;
+    circuit.Add(supply, {1});
+    circuit.Add(instance, {1, 0});
+    circuit.Add(ground, {0});
+    circuit.AddSubcircuit(definition);
+    const std::optional<std::string> problem = Core::CheckCircuit(circuit);
+    REQUIRE(problem);
+    CHECK(problem->contains("ground"));
+
+    GUI::Schematic schematic;
+    schematic.AddElement(GUI::CreateElement(Core::ComponentType::RESISTOR, {0, 0}, GUI::Rotation::R0));
+    schematic.AddElement(GUI::CreateElement(Core::ComponentType::GROUND, {2, 0}, GUI::Rotation::R0));
+    AddMarker(schematic, Core::ComponentType::PIN, {-2, 0}, "IN");
+    AddMarker(schematic, Core::ComponentType::POUT, {2, 0}, "GND");
+    schematic.SetSelection({0, 1, 2, 3}, {});
+    const auto created = schematic.CreateSubcircuitFromSelection("grounded", {{"IN", {-2, 0}}, {"GND", {2, 0}}});
+    REQUIRE_FALSE(created);
+    CHECK(created.error().contains("ground"));
+    CHECK(schematic.GetSubcircuits().empty());
+    CHECK(schematic.GetElements().size() == 4);
+
+    GUI::SavedSubcircuit saved;
+    saved.Name = "grounded";
+    saved.Pins = {{"IN", {-2, 0}}, {"GND", {2, 0}}};
+    saved.Elements.push_back(GUI::CreateElement(Core::ComponentType::RESISTOR, {0, 0}, GUI::Rotation::R0));
+    saved.Elements.push_back(GUI::CreateElement(Core::ComponentType::GROUND, {2, 0}, GUI::Rotation::R0));
+    std::vector<GUI::SavedSubcircuit> definitions;
+    definitions.push_back(std::move(saved));
+    const auto loaded = GUI::LoadSchematic(GUI::SaveSchematic({}, {}, {}, {}, definitions));
+    REQUIRE(loaded);
+    CHECK(loaded->Subcircuits.empty());
+    REQUIRE(loaded->Warnings.size() == 1);
+    CHECK(loaded->Warnings[0].contains("ground"));
+}
+
+TEST_CASE("Reordering the pins of a new block keeps each name on its own marker", "[subcircuit]") {
+    GUI::Schematic schematic;
+    schematic.AddElement(GUI::CreateElement(Core::ComponentType::RESISTOR, {0, 0}, GUI::Rotation::R0));
+    AddMarker(schematic, Core::ComponentType::PIN, {-2, 0}, "IN");
+    AddMarker(schematic, Core::ComponentType::POUT, {2, 0}, "OUT");
+    schematic.SetSelection({0, 1, 2}, {});
+    // The output first, as the dialog's Up button leaves them
+    REQUIRE(schematic.CreateSubcircuitFromSelection("block", {{"OUT", {2, 0}}, {"IN", {-2, 0}}}));
+
+    const GUI::SavedSubcircuit &definition = schematic.GetSubcircuits()[0];
+    REQUIRE(definition.Pins.size() == 2);
+    CHECK(definition.Pins[0] == GUI::SavedSubcircuitPin{"OUT", {2, 0}});
+    CHECK(definition.Pins[1] == GUI::SavedSubcircuitPin{"IN", {-2, 0}});
+    for (const auto &element : definition.Elements) {
+        if (!Core::IsSubcircuitPin(element->GetComponent().GetType())) {
+            continue;
+        }
+        const std::string &net = static_cast<const Core::NetLabel &>(element->GetComponent()).GetNet();
+        CHECK(net == (element->GetComponent().GetType() == Core::ComponentType::POUT ? "OUT" : "IN"));
+    }
+    // The output is the first terminal, and still on the right of the box
+    const GUI::UIElement &block = *schematic.GetElements().back();
+    const auto &instance = static_cast<const Core::SubcircuitInstance &>(block.GetComponent());
+    CHECK(instance.GetPins() == std::vector<std::string>{"OUT", "IN"});
+    CHECK(instance.IsOutputPin("OUT"));
+    CHECK_FALSE(instance.IsOutputPin("IN"));
+    const std::vector<GUI::GridPoint> terminals = block.GetTerminals();
+    REQUIRE(terminals.size() == 2);
+    CHECK(terminals[0].X > block.GetPosition().X);
+    CHECK(terminals[1].X < block.GetPosition().X);
+}
+
+TEST_CASE("A block draws its inputs on the left and its outputs on the right, whatever their order", "[subcircuit]") {
+    auto element = GUI::CreateElement(Core::ComponentType::SUBCIRCUIT, {0, 0}, GUI::Rotation::R0);
+    auto &instance = static_cast<Core::SubcircuitInstance &>(element->GetComponent());
+    instance.SetPins({"Q", "A", "B"});
+    instance.SetOutputPins({"Q"});
+    const std::vector<GUI::GridPoint> terminals = element->GetTerminals();
+    REQUIRE(terminals.size() == 3);
+    // One output, centered on the right; two inputs, two units apart, on the left
+    CHECK(terminals[0] == GUI::GridPoint{3, 0});
+    CHECK(terminals[1] == GUI::GridPoint{-3, -1});
+    CHECK(terminals[2] == GUI::GridPoint{-3, 1});
+}
+
+TEST_CASE("Renaming a pin keeps the wires of every instance on it", "[subcircuit]") {
+    GUI::Schematic schematic;
+    schematic.AddElement(GUI::CreateElement(Core::ComponentType::RESISTOR, {0, 0}, GUI::Rotation::R0));
+    schematic.AddElement(GUI::CreateElement(Core::ComponentType::RESISTOR, {8, 0}, GUI::Rotation::R0));
+    schematic.AddElement(GUI::CreateElement(Core::ComponentType::RESISTOR, {-8, 0}, GUI::Rotation::R0));
+    AddMarker(schematic, Core::ComponentType::PIN, {-2, 0}, "IN");
+    AddMarker(schematic, Core::ComponentType::POUT, {2, 0}, "OUT");
+    schematic.AddWire({2, 0}, {6, 0});
+    schematic.AddWire({-6, 0}, {-2, 0});
+    schematic.SetSelection({0, 3, 4}, {});
+    REQUIRE(schematic.CreateSubcircuitFromSelection("block", {{"IN", {-2, 0}}, {"OUT", {2, 0}}}));
+    schematic.CommitUndoStep();
+    const std::size_t wire_count = schematic.GetWires().size();
+
+    auto content = schematic.OpenSubcircuit("block");
+    REQUIRE(content);
+    // The marker stays where it was, so the pin is the same one under a new name
+    REQUIRE(schematic.UpdateSubcircuit("block", **content, {{"SIGNAL", {-2, 0}}, {"OUT", {2, 0}}}, {}));
+    CHECK(schematic.GetWires().size() == wire_count);
+    const GUI::UIElement &block = schematic.GetElement(2);
+    CHECK(static_cast<const Core::SubcircuitInstance &>(block.GetComponent()).GetPins() ==
+          std::vector<std::string>{"SIGNAL", "OUT"});
+    const GUI::Connectivity &nodes = schematic.GetConnectivity();
+    const std::vector<GUI::GridPoint> terminals = block.GetTerminals();
+    CHECK(nodes.GetNode({-6, 0}) == nodes.GetNode(terminals[0]));
+    CHECK(nodes.GetNode({6, 0}) == nodes.GetNode(terminals[1]));
+}
+
+TEST_CASE("A part follows only a parameter of the block it is in", "[subcircuit]") {
+    Core::Resistor outside;
+    outside.SetName("R9");
+    outside.SetValueExpression("{R}");
+    const Core::Ground ground;
+    Core::Circuit top;
+    top.Add(outside, {1, 0});
+    top.Add(ground, {0});
+    const std::optional<std::string> outside_problem = Core::CheckCircuit(top);
+    REQUIRE(outside_problem);
+    CHECK(outside_problem->contains("only a part inside a subcircuit"));
+
+    Core::Resistor upper;
+    Core::Resistor lower;
+    const auto definition = MakeDivider("divider", upper, lower);
+    definition->Parameters = {{"RTOP", 1e3}};
+    auto instance = MakeInstance("X1", "divider");
+    Core::VCC supply;
+    supply.SetName("V1");
+    Core::Circuit circuit;
+    circuit.Add(supply, {1});
+    circuit.Add(instance, {1, 2});
+    circuit.Add(ground, {0});
+    circuit.AddSubcircuit(definition);
+    const std::optional<std::string> missing = Core::CheckCircuit(circuit);
+    REQUIRE(missing);
+    CHECK(missing->contains("{RBOTTOM}"));
+
+    // The block editor cannot drop a parameter that a part still follows
+    GUI::Schematic schematic;
+    schematic.AddElement(GUI::CreateElement(Core::ComponentType::RESISTOR, {0, 0}, GUI::Rotation::R0));
+    AddMarker(schematic, Core::ComponentType::PIN, {-2, 0}, "IN");
+    AddMarker(schematic, Core::ComponentType::POUT, {2, 0}, "OUT");
+    schematic.SetSelection({0, 1, 2}, {});
+    REQUIRE(schematic.CreateSubcircuitFromSelection("block", {{"IN", {-2, 0}}, {"OUT", {2, 0}}}, {{"R", 1e3}}));
+    auto content = schematic.OpenSubcircuit("block");
+    REQUIRE(content);
+    (*content)->GetElement(0).GetComponent().SetValueExpression("{R}");
+    const auto updated = schematic.UpdateSubcircuit("block", **content, {{"IN", {-2, 0}}, {"OUT", {2, 0}}}, {});
+    REQUIRE_FALSE(updated);
+    CHECK(updated.error().contains("{R}"));
+}
+
+TEST_CASE("Only resistors, capacitors and inductors follow a parameter", "[subcircuit]") {
+    Core::Resistor resistor;
+    CHECK(resistor.CanFollowParameter());
+    Core::VCC supply;
+    CHECK_FALSE(supply.CanFollowParameter());
+    supply.SetValueExpression("{V}");
+    CHECK_FALSE(supply.GetValueExpression());
+
+    const auto loaded = GUI::LoadSchematic(R"({"format":"imcsim-schematic","version":1,
+        "elements":[{"type":"VCC","name":"V1","value":"{V}","x":0,"y":0,"rotation":0}]})");
+    REQUIRE(loaded);
+    CHECK(loaded->Elements.empty());
+    REQUIRE(loaded->Warnings.size() == 1);
+    CHECK(loaded->Warnings[0].contains("follows a parameter"));
+}
+
+TEST_CASE("Only the blocks in use count toward ground and the parts a run needs", "[subcircuit]") {
+    Core::Resistor inner;
+    inner.SetName("R1");
+    const Core::Ground inner_ground;
+    auto definition = std::make_shared<Core::SubcircuitDefinition>();
+    definition->Name = "load";
+    definition->Pins = {{"IN", 1}};
+    definition->Body.Add(inner, {1, 0});
+    definition->Body.Add(inner_ground, {0});
+    Core::VCC supply;
+    supply.SetName("V1");
+    Core::Circuit unused;
+    unused.Add(supply, {1});
+    unused.AddSubcircuit(definition);
+    // A ground in a block nobody uses grounds nothing
+    CHECK_FALSE(unused.HasGround());
+    CHECK(Core::CollectParts(unused).size() == 1);
+
+    Core::SubcircuitInstance instance("load", {"IN"});
+    instance.SetName("X1");
+    Core::Circuit used;
+    used.Add(supply, {1});
+    used.Add(instance, {1});
+    used.AddSubcircuit(definition);
+    CHECK(used.HasGround());
+    const std::vector<const Core::Component *> parts = Core::CollectParts(used);
+    CHECK(parts.size() == 4);
+    CHECK(std::ranges::contains(parts, &inner));
 }

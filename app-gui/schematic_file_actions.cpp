@@ -53,6 +53,9 @@ void SchematicFileActions::Update() {
  * @note    Call it every frame, outside any window, so the popups show whichever window is in front.
  */
 void SchematicFileActions::DrawPopups() {
+    if (std::exchange(m_HasQueuedMessages, false)) {
+        ImGui::OpenPopup(MESSAGES_POPUP);
+    }
     DrawExportPopup();
     // Centered each time they appear, like the export popup, instead of where imgui.ini remembers them
     const ImVec2 center = ImGui::GetMainViewport()->GetCenter();
@@ -194,6 +197,18 @@ void SchematicFileActions::Import() {
  */
 void SchematicFileActions::OpenExportPopup() {
     ImGui::OpenPopup(EXPORT_POPUP);
+}
+
+/**
+ * @brief   Shows messages to the user in the popup the file actions use, from anywhere in the frame.
+ * @param[in] title     First line, which says what happened.
+ * @param[in] messages  One line per detail.
+ * @note    The popup opens in the next DrawPopups(), so a window can call it while it draws.
+ */
+void SchematicFileActions::QueueMessages(std::string title, std::vector<std::string> messages) {
+    m_MessagesTitle = std::move(title);
+    m_Messages = std::move(messages);
+    m_HasQueuedMessages = true;
 }
 
 void SchematicFileActions::HandleQuitRequest() {

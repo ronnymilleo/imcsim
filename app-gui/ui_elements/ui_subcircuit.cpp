@@ -6,8 +6,10 @@
 #include "ui_subcircuit.h"
 
 #include "components/subcircuit.h"
+#include <algorithm>
 #include <array>
 #include <memory>
+#include <string>
 
 namespace GUI {
 
@@ -15,14 +17,17 @@ namespace {
 
 constexpr float BODY_EDGE = 2.0f;
 constexpr int PIN_SPACING = 2;
+// How far from the middle the terminals are, past the body edge
+constexpr int PIN_REACH = 3;
 
 const Core::SubcircuitInstance &Instance(const Core::Component &component) {
     return static_cast<const Core::SubcircuitInstance &>(component);
 }
 
+// Inputs go on the left and outputs on the right, each side in the order of the pins
 int SidePinCount(const Core::SubcircuitInstance &instance, const bool right) {
-    const int count = static_cast<int>(instance.GetPins().size());
-    return right ? count / 2 : (count + 1) / 2;
+    return static_cast<int>(std::ranges::count_if(
+        instance.GetPins(), [&](const std::string &pin) { return instance.IsOutputPin(pin) == right; }));
 }
 
 int PinY(const int index, const int side_count) {
@@ -31,6 +36,11 @@ int PinY(const int index, const int side_count) {
 
 } // namespace
 
+/**
+ * @brief   Creates the symbol of an instance of no definition yet, with no pins.
+ * @param[in] position  Grid point of the middle of the body.
+ * @param[in] rotation  Orientation of the symbol.
+ */
 UISubcircuit::UISubcircuit(const GridPoint position, const Rotation rotation)
     : UIElement(std::make_unique<Core::SubcircuitInstance>(), position, rotation) {
 }
@@ -65,15 +75,20 @@ void UISubcircuit::DrawLabels(SchematicCanvas &canvas, const ViewTransform &view
     }
 }
 
+// One terminal per pin, in pin order: inputs down the left side and outputs down the right, each side centered
 std::vector<GridPoint> UISubcircuit::GetLocalTerminals() const {
     const auto &instance = Instance(GetComponent());
     std::vector<GridPoint> terminals;
     const int left_count = SidePinCount(instance, false);
     const int right_count = SidePinCount(instance, true);
-    for (std::size_t pin = 0; pin < instance.GetPins().size(); ++pin) {
-        const bool right = pin >= static_cast<std::size_t>(left_count);
-        const int index = static_cast<int>(right ? pin - static_cast<std::size_t>(left_count) : pin);
-        terminals.push_back({right ? 3 : -3, PinY(index, right ? right_count : left_count)});
+    int left_index = 0;
+    int right_index = 0;
+    for (const std::string &pin : instance.GetPins()) {
+        if (instance.IsOutputPin(pin)) {
+            terminals.push_back({PIN_REACH, PinY(right_index++, right_count)});
+        } else {
+            terminals.push_back({-PIN_REACH, PinY(left_index++, left_count)});
+        }
     }
     return terminals;
 }
@@ -82,7 +97,7 @@ LocalBounds UISubcircuit::GetLocalBounds() const {
     const auto &instance = Instance(GetComponent());
     const int rows = std::max(SidePinCount(instance, false), SidePinCount(instance, true));
     const float half_height = std::max(1.0f, static_cast<float>(PIN_SPACING * rows) / 2.0f);
-    return {{-3.0f, -half_height}, {3.0f, half_height}};
+    return {{-static_cast<float>(PIN_REACH), -half_height}, {static_cast<float>(PIN_REACH), half_height}};
 }
 
 } // namespace GUI

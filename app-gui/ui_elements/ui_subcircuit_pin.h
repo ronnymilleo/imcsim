@@ -10,6 +10,10 @@
 
 namespace GUI {
 
+/**
+ * @class   UISubcircuitPin
+ * @brief   A flag on a short lead, pointing right for a PIN and left for a POUT, with the pin name above it.
+ */
 class UISubcircuitPin : public UIElement {
 public:
     UISubcircuitPin(Core::ComponentType type, GridPoint position, Rotation rotation);

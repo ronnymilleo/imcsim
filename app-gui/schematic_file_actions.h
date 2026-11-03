@@ -65,6 +65,9 @@ public:
     void Import();
     void OpenExportPopup();
 
+    // Messages
+    void QueueMessages(std::string title, std::vector<std::string> messages);
+
 private:
     /**
      * @enum    FileAction
@@ -101,6 +104,8 @@ private:
     FileDialog m_FileDialog;
     std::string m_MessagesTitle;
     std::vector<std::string> m_Messages;
+    // Messages from outside the popups' ID stack, opened by the next DrawPopups()
+    bool m_HasQueuedMessages = false;
     // Export: dark keeps the colors of the editor, light suits print
     bool m_ExportDark = false;
 

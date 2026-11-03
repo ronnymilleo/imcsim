@@ -210,13 +210,49 @@ TEST_CASE("Copied blocks carry their definitions without transforming their cont
     CHECK(group->Subcircuits[0].Elements[0]->GetPosition() == GUI::GridPoint{0, 0});
 
     GUI::Schematic target;
-    target.MergeSubcircuits(std::move(group->Subcircuits));
+    target.MergeSubcircuits(std::move(group->Subcircuits), group->Elements);
     auto duplicate = GUI::ParseCopiedSchematic(text);
     REQUIRE(duplicate);
-    target.MergeSubcircuits(std::move(duplicate->Subcircuits));
+    target.MergeSubcircuits(std::move(duplicate->Subcircuits), duplicate->Elements);
     CHECK(target.GetSubcircuits().size() == 1);
     for (auto &element : group->Elements) {
         target.AddElement(std::move(element));
     }
     CHECK(target.BuildSpiceNetlist().contains(".subckt block"));
+}
+
+TEST_CASE("A pasted block that differs from one of the same name joins under a name of its own",
+          "[clipboard][subcircuit]") {
+    const auto make_source = [](const double default_resistance) {
+        GUI::SavedSubcircuit definition;
+        definition.Name = "block";
+        definition.Pins = {{"IN", {-2, 0}}, {"OUT", {2, 0}}};
+        definition.Parameters = {{"R", default_resistance}};
+        definition.Elements.push_back(GUI::CreateElement(Core::ComponentType::RESISTOR, {0, 0}, GUI::Rotation::R0));
+        std::vector<GUI::SavedSubcircuit> definitions;
+        definitions.push_back(std::move(definition));
+        std::vector<std::unique_ptr<GUI::UIElement>> elements;
+        elements.push_back(GUI::CreateElement(Core::ComponentType::SUBCIRCUIT, {10, 10}, GUI::Rotation::R0));
+        auto &instance = static_cast<Core::SubcircuitInstance &>(elements[0]->GetComponent());
+        instance.SetDefinitionName("block");
+        instance.SetPins({"IN", "OUT"});
+        auto source = std::make_unique<GUI::Schematic>();
+        source->Replace(std::move(elements), {}, {}, std::move(definitions));
+        return source;
+    };
+    const auto target = make_source(1e3);
+    const auto other = make_source(2e3);
+    auto group = GUI::ParseCopiedSchematic(
+        GUI::CopySelection(other->GetElements(), {}, {.Elements = {0}}, other->GetSubcircuits()));
+    REQUIRE(group);
+
+    target->MergeSubcircuits(std::move(group->Subcircuits), group->Elements);
+    // The block already there keeps its contents, and the pasted instance uses the copy it came with
+    REQUIRE(target->GetSubcircuits().size() == 2);
+    CHECK(target->GetSubcircuits()[0].Name == "block");
+    CHECK(target->GetSubcircuits()[0].Parameters[0].DefaultValue == 1e3);
+    CHECK(target->GetSubcircuits()[1].Name == "block_2");
+    CHECK(target->GetSubcircuits()[1].Parameters[0].DefaultValue == 2e3);
+    CHECK(static_cast<const Core::SubcircuitInstance &>(group->Elements[0]->GetComponent()).GetDefinitionName() ==
+          "block_2");
 }

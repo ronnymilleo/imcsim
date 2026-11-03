@@ -10,6 +10,12 @@
 
 namespace Core {
 
+/**
+ * @class   SubcircuitPinMarker
+ * @brief   A PIN or POUT marker that makes the node it sits on a connection of the block it belongs to.
+ * @details It is named like a net label, but only joins the block to the outside: the netlist never sees it. A PIN is
+ *          drawn on the left of the block and a POUT on the right.
+ */
 class SubcircuitPinMarker : public NetLabel {
 public:
     explicit SubcircuitPinMarker(ComponentType type);

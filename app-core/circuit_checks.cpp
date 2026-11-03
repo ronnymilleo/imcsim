@@ -13,6 +13,7 @@
 #include <algorithm>
 #include <cmath>
 #include <format>
+#include <set>
 
 namespace Core {
 
@@ -82,21 +83,48 @@ bool IsNoiseInput(const Component &component) {
            static_cast<const Source &>(component).GetSourceType() == Source::SourceType::AC;
 }
 
-} // namespace
-
-/**
- * @brief   Checks that a circuit can be simulated at all.
- * @param[in] circuit  Circuit to check.
- * @return  The reason it cannot, in words for the user: it is empty, it has no ground (a circuit of only clocks, logic
- *          inputs, supply rails and logic parts needs none), or a current-controlled source follows no valid current;
- *          no value when it can.
- */
-std::optional<std::string> CheckCircuit(const Circuit &circuit) {
-    if (circuit.GetEntries().empty()) {
-        return "The schematic is empty";
+// A pin on ground would connect nothing, since ngspice keeps node 0 global instead of joining it to the outside, and
+// two pins on one node would short the nets of the instance
+std::optional<std::string> CheckPins(const SubcircuitDefinition &definition) {
+    std::set<int> nodes;
+    for (const SubcircuitPin &pin : definition.Pins) {
+        if (pin.Node == 0) {
+            return std::format("Pin {} of {} sits on ground inside it, so it would connect nothing; ground is shared "
+                               "by the whole circuit, so remove the pin",
+                               pin.Name, definition.Name);
+        }
+        if (!nodes.insert(pin.Node).second) {
+            return std::format("Pins of {} share a node inside it; give each pin a node of its own", definition.Name);
+        }
     }
-    if (!circuit.HasGround() && !IsDigitalOnly(circuit)) {
-        return "The circuit has no ground; add a Ground so node voltages have a reference";
+    return std::nullopt;
+}
+
+// Only parts inside a subcircuit can follow its parameters
+std::optional<std::string> CheckExpressions(const Circuit &body, const SubcircuitDefinition *definition) {
+    for (const CircuitEntry &entry : body.GetEntries()) {
+        const std::optional<std::string> &expression = entry.Part->GetValueExpression();
+        if (!expression) {
+            continue;
+        }
+        const std::string_view parameter = SubcircuitInstance::GetExpressionParameter(*expression);
+        if (definition == nullptr) {
+            return std::format("{} follows a parameter, which only a part inside a subcircuit can do",
+                               entry.Part->GetName());
+        }
+        if (!std::ranges::contains(definition->Parameters, parameter, &SubcircuitParameter::Name)) {
+            return std::format("{} in {} follows {}, which is not a parameter of it", entry.Part->GetName(),
+                               definition->Name, *expression);
+        }
+    }
+    return std::nullopt;
+}
+
+// Every instance needs a known definition with a node for each pin and parameters it has, and every definition in use
+// needs pins it can connect and parameters for its parts
+std::optional<std::string> CheckSubcircuits(const Circuit &circuit) {
+    if (std::optional<std::string> problem = CheckExpressions(circuit, nullptr)) {
+        return problem;
     }
     for (const CircuitEntry &entry : circuit.GetEntries()) {
         if (entry.Part->GetType() != ComponentType::SUBCIRCUIT) {
@@ -117,6 +145,35 @@ std::optional<std::string> CheckCircuit(const Circuit &circuit) {
                                    definition->Name);
             }
         }
+        if (std::optional<std::string> problem = CheckPins(*definition)) {
+            return problem;
+        }
+        if (std::optional<std::string> problem = CheckExpressions(definition->Body, definition.get())) {
+            return problem;
+        }
+    }
+    return std::nullopt;
+}
+
+} // namespace
+
+/**
+ * @brief   Checks that a circuit can be simulated at all.
+ * @param[in] circuit  Circuit to check.
+ * @return  The reason it cannot, in words for the user: it is empty, it has no ground (a circuit of only clocks, logic
+ *          inputs, supply rails and logic parts needs none), a subcircuit instance or definition cannot be written (an
+ *          unknown definition, a pin on ground, a parameter it lacks), or a current-controlled source follows no valid
+ *          current; no value when it can.
+ */
+std::optional<std::string> CheckCircuit(const Circuit &circuit) {
+    if (circuit.GetEntries().empty()) {
+        return "The schematic is empty";
+    }
+    if (!circuit.HasGround() && !IsDigitalOnly(circuit)) {
+        return "The circuit has no ground; add a Ground so node voltages have a reference";
+    }
+    if (std::optional<std::string> problem = CheckSubcircuits(circuit)) {
+        return problem;
     }
     // A current-controlled source needs a current that some other part reports
     for (const CircuitEntry &entry : circuit.GetEntries()) {

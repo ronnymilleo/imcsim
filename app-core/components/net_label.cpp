@@ -29,6 +29,10 @@ bool IsNetCharacter(const char character) {
 NetLabel::NetLabel() : NetLabel(ComponentType::NET_LABEL) {
 }
 
+/**
+ * @brief   Creates an unnamed label of another kind, for the markers that are named like labels.
+ * @param[in] type  Kind of the derived part.
+ */
 NetLabel::NetLabel(const ComponentType type) : Component(type, 0.0) {
 }
 
