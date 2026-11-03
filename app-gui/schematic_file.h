@@ -9,6 +9,7 @@
 #include "helpers.h"
 #include "math_channel.h"
 #include "simulation_settings.h"
+#include "subcircuit.h"
 #include "ui_elements/ui_element.h"
 #include "ui_elements/ui_wire.h"
 #include <expected>
@@ -35,6 +36,21 @@ struct SavedMeasurements {
     bool operator==(const SavedMeasurements &) const = default;
 };
 
+struct SavedSubcircuitPin {
+    std::string Name;
+    GridPoint Point;
+
+    bool operator==(const SavedSubcircuitPin &) const = default;
+};
+
+struct SavedSubcircuit {
+    std::string Name;
+    std::vector<SavedSubcircuitPin> Pins;
+    std::vector<Core::SubcircuitParameter> Parameters;
+    std::vector<std::unique_ptr<UIElement>> Elements;
+    std::vector<UIWire> Wires;
+};
+
 /**
  * @struct  LoadedSchematic
  * @brief   Everything read from a schematic file, plus a message for each part that was skipped or changed.
@@ -42,6 +58,7 @@ struct SavedMeasurements {
 struct LoadedSchematic {
     std::vector<std::unique_ptr<UIElement>> Elements;
     std::vector<UIWire> Wires;
+    std::vector<SavedSubcircuit> Subcircuits;
     SimulationSettings Settings;
     SavedMeasurements Measurements;
     std::vector<std::string> Warnings;
@@ -50,7 +67,8 @@ struct LoadedSchematic {
 inline constexpr std::string_view SCHEMATIC_EXTENSION = ".imcsim";
 
 std::string SaveSchematic(const std::vector<std::unique_ptr<UIElement>> &elements, const std::vector<UIWire> &wires,
-                          const SimulationSettings &settings, const SavedMeasurements &measurements);
+                          const SimulationSettings &settings, const SavedMeasurements &measurements,
+                          std::span<const SavedSubcircuit> subcircuits = {});
 std::string SaveParts(std::span<const UIElement *const> elements, const std::vector<UIWire> &wires);
 std::expected<LoadedSchematic, std::string> LoadSchematic(std::string_view text);
 std::expected<std::string, std::string> ReadTextFile(const std::filesystem::path &path);

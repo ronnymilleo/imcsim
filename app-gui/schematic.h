@@ -54,6 +54,7 @@ public:
     const std::vector<std::unique_ptr<UIElement>> &GetElements() const;
     UIElement &GetElement(std::size_t index);
     const std::vector<UIWire> &GetWires() const;
+    const std::vector<SavedSubcircuit> &GetSubcircuits() const;
     bool IsTerminal(GridPoint point) const;
     std::vector<GridPoint> CollectTerminals() const;
 
@@ -65,7 +66,7 @@ public:
     void DeleteSelection();
     void Clear();
     void Replace(std::vector<std::unique_ptr<UIElement>> elements, std::vector<UIWire> wires,
-                 SimulationSettings settings);
+                 SimulationSettings settings, std::vector<SavedSubcircuit> subcircuits = {});
 
     // Selection
     void SelectElement(std::size_t index);
@@ -155,6 +156,7 @@ private:
     // Content
     std::vector<std::unique_ptr<UIElement>> m_Elements;
     std::vector<UIWire> m_Wires;
+    std::vector<SavedSubcircuit> m_Subcircuits;
 
     // Selection; the version changes with every change, so windows can tell even when an index is reused
     std::set<std::size_t> m_SelectedElements;
