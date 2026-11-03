@@ -8,6 +8,7 @@
 #include "components/capacitor.h"
 #include "components/inductor.h"
 #include "components/resistor.h"
+#include "subcircuit.h"
 #include <algorithm>
 #include <format>
 
@@ -77,6 +78,9 @@ std::expected<ParameterCircuit, std::string> ApplyParameter(const Circuit &circu
     applied.Simulated = Circuit();
     for (const CircuitEntry &original : circuit.GetEntries()) {
         applied.Simulated.Add(original.Part == entry->Part ? *applied.Part : *original.Part, original.Nodes);
+    }
+    for (const auto &definition : circuit.GetSubcircuits()) {
+        applied.Simulated.AddSubcircuit(definition);
     }
     return applied;
 }

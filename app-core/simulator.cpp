@@ -9,6 +9,7 @@
 #include "components/logic_input.h"
 #include "simulation_backend.h"
 #include "stepped_circuit.h"
+#include "subcircuit.h"
 #include <algorithm>
 #include <format>
 #include <utility>
@@ -49,6 +50,9 @@ InputCopies CopyInputs(const Circuit &circuit, const std::vector<std::string> &n
         const bool is_chosen = chosen != names.end() && entry.Part->GetType() == ComponentType::LOGIC_INPUT;
         copies.Simulated.Add(is_chosen ? copies.Inputs[static_cast<std::size_t>(chosen - names.begin())] : *entry.Part,
                              entry.Nodes);
+    }
+    for (const auto &definition : circuit.GetSubcircuits()) {
+        copies.Simulated.AddSubcircuit(definition);
     }
     return copies;
 }
