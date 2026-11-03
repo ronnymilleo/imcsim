@@ -40,6 +40,7 @@ enum class ComponentType {
     OP_AMP,
     SUBCIRCUIT,
     NET_LABEL,
+    PIN,
     POTENTIOMETER,
     SWITCH,
     PUSH_BUTTON,
@@ -91,6 +92,7 @@ public:
     const char *GetUnit() const;
     bool HasValue() const;
     bool IsValidValue(double value) const;
+    bool CanFollowParameter() const;
 
     // Instance data
     const std::string &GetName() const;
@@ -119,6 +121,7 @@ protected:
 };
 
 // Type names
+bool IsSubcircuitPin(ComponentType type);
 const char *GetTypeName(ComponentType type);
 std::optional<ComponentType> ParseComponentType(std::string_view text);
 

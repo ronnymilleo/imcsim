@@ -36,6 +36,10 @@ struct SavedMeasurements {
     bool operator==(const SavedMeasurements &) const = default;
 };
 
+/**
+ * @struct  SavedSubcircuitPin
+ * @brief   A connection of a block: its name and the point of its pin marker inside the block.
+ */
 struct SavedSubcircuitPin {
     std::string Name;
     GridPoint Point;
@@ -43,6 +47,12 @@ struct SavedSubcircuitPin {
     bool operator==(const SavedSubcircuitPin &) const = default;
 };
 
+/**
+ * @struct  SavedSubcircuit
+ * @brief   A block definition as the schematic keeps it: its pins in order, its parameters and its contents.
+ * @details The contents are drawn parts and wires, like a schematic of their own; Schematic::BuildCircuit() turns them
+ *          into a Core::SubcircuitDefinition for each run.
+ */
 struct SavedSubcircuit {
     std::string Name;
     std::vector<SavedSubcircuitPin> Pins;
@@ -69,7 +79,8 @@ inline constexpr std::string_view SCHEMATIC_EXTENSION = ".imcsim";
 std::string SaveSchematic(const std::vector<std::unique_ptr<UIElement>> &elements, const std::vector<UIWire> &wires,
                           const SimulationSettings &settings, const SavedMeasurements &measurements,
                           std::span<const SavedSubcircuit> subcircuits = {});
-std::string SaveParts(std::span<const UIElement *const> elements, const std::vector<UIWire> &wires);
+std::string SaveParts(std::span<const UIElement *const> elements, const std::vector<UIWire> &wires,
+                      std::span<const SavedSubcircuit> subcircuits = {});
 std::expected<LoadedSchematic, std::string> LoadSchematic(std::string_view text);
 std::expected<std::string, std::string> ReadTextFile(const std::filesystem::path &path);
 std::expected<void, std::string> WriteTextFile(const std::filesystem::path &path, std::string_view text);

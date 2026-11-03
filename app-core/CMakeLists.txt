@@ -27,6 +27,7 @@ add_library(imcsim-core-lib
             components/resistor.cpp
             components/source.cpp
             components/subcircuit.cpp
+            components/subcircuit_pin.cpp
             components/switch.cpp
             components/transformer.cpp
             components/vcc.cpp

@@ -27,6 +27,7 @@ double DefaultGain(const ComponentType type) {
     case ComponentType::INDUCTOR:
     case ComponentType::GROUND:
     case ComponentType::NET_LABEL:
+    case ComponentType::PIN:
     case ComponentType::VCC:
     case ComponentType::VOLTAGE_SOURCE:
     case ComponentType::CURRENT_SOURCE:

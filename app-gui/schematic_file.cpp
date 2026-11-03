@@ -24,6 +24,7 @@
 #include "connectivity.h"
 #include "element_factory.h"
 #include "nlohmann/json.hpp"
+#include "subcircuit_pins.h"
 #include <array>
 #include <format>
 #include <fstream>
@@ -380,8 +381,8 @@ void WriteKindFields(const Core::Component &component, nlohmann::json &object) {
         if (!instance.GetParameters().empty()) {
             object["parameters"] = instance.GetParameters();
         }
-    } else if (type == Core::ComponentType::NET_LABEL) {
-        // A label with no name yet is saved without the key
+    } else if (type == Core::ComponentType::NET_LABEL || Core::IsSubcircuitPin(type)) {
+        // A label or pin marker with no name yet is saved without the key
         if (const std::string &net = static_cast<const Core::NetLabel &>(component).GetNet(); !net.empty()) {
             object["net"] = net;
         }
@@ -635,12 +636,17 @@ std::expected<void, std::string> ReadControllingCurrent(const nlohmann::json &ob
 }
 
 std::expected<void, std::string> ReadNetName(const nlohmann::json &object, Core::Component &component) {
-    if (component.GetType() != Core::ComponentType::NET_LABEL || !object.contains("net")) {
+    const Core::ComponentType type = component.GetType();
+    if ((type != Core::ComponentType::NET_LABEL && !Core::IsSubcircuitPin(type)) || !object.contains("net")) {
         return {};
     }
     const std::optional<std::string> net = ReadString(object, "net");
-    if (!net || !Core::NetLabel::IsValidNet(*net)) {
-        return std::unexpected("has a net name that is not 1 to 32 letters, digits, _, - or .");
+    const bool is_pin = Core::IsSubcircuitPin(type);
+    const bool valid =
+        net && (is_pin ? Core::SubcircuitInstance::IsValidIdentifier(*net) : Core::NetLabel::IsValidNet(*net));
+    if (!valid) {
+        return std::unexpected(is_pin ? "has a subcircuit pin name that is not an identifier"
+                                      : "has a net name that is not 1 to 32 letters, digits, _, - or .");
     }
     static_cast<Core::NetLabel &>(component).SetNet(*net);
     return {};
@@ -785,12 +791,7 @@ std::expected<void, std::string> ReadSubcircuitInstance(const nlohmann::json &ob
     if (definition == definitions.end()) {
         return std::unexpected(std::format("refers to unknown subcircuit \"{}\"", *name));
     }
-    instance.SetDefinitionName(*name);
-    std::vector<std::string> pins;
-    for (const SavedSubcircuitPin &pin : definition->Pins) {
-        pins.push_back(pin.Name);
-    }
-    instance.SetPins(std::move(pins));
+    ApplyDefinitionPins(instance, *definition);
     if (const auto parameters = object.find("parameters"); parameters != object.end()) {
         if (!parameters->is_object()) {
             return std::unexpected("has subcircuit parameters that are not an object");
@@ -856,6 +857,9 @@ ReadElement(const nlohmann::json &object, const std::span<const SavedSubcircuit>
         } else if (const std::optional<std::string> expression = ReadString(object, "value")) {
             if (!Core::SubcircuitInstance::IsValidValueExpression(*expression)) {
                 return std::unexpected("has no valid parameter expression");
+            }
+            if (!component.CanFollowParameter()) {
+                return std::unexpected("follows a parameter, which only resistors, capacitors and inductors can");
             }
             component.SetValueExpression(*expression);
         } else {
@@ -1435,11 +1439,9 @@ std::expected<SavedSubcircuit, std::string> ReadSubcircuit(const nlohmann::json 
             }
         }
     }
-    const Connectivity connectivity(definition.Elements, definition.Wires);
-    for (const SavedSubcircuitPin &pin : definition.Pins) {
-        if (!connectivity.GetNode(pin.Point)) {
-            return std::unexpected(std::format("has pin {} on an unconnected point", pin.Name));
-        }
+    if (const std::optional<std::string> problem =
+            CheckPinNodes(Connectivity(definition.Elements, definition.Wires), definition.Pins)) {
+        return std::unexpected(std::format("has pins it cannot connect: {}", *problem));
     }
     for (std::string &warning : local_warnings) {
         warnings.push_back(std::format("Subcircuit {}: {}", definition.Name, warning));
@@ -1495,12 +1497,14 @@ std::string SaveSchematic(const std::vector<std::unique_ptr<UIElement>> &element
 /**
  * @brief   Writes some parts and wires as a schematic of their own, for the clipboard.
  * @param[in] elements  Parts to write, which stay where they are.
- * @param[in] wires     Wire segments to write.
+ * @param[in] wires        Wire segments to write.
+ * @param[in] subcircuits  Definitions referenced by the copied instances.
  * @return  The same JSON a file holds, with the default settings and no measurements, so it loads back with
  *          LoadSchematic().
  */
-std::string SaveParts(const std::span<const UIElement *const> elements, const std::vector<UIWire> &wires) {
-    return WriteDocument(elements, wires, {}, {});
+std::string SaveParts(const std::span<const UIElement *const> elements, const std::vector<UIWire> &wires,
+                      const std::span<const SavedSubcircuit> subcircuits) {
+    return WriteDocument(elements, wires, {}, {}, subcircuits);
 }
 
 /**

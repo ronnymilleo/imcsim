@@ -33,6 +33,9 @@ public:
     static bool IsValidNet(std::string_view net);
     static std::string NormalizeNet(std::string_view net);
 
+protected:
+    explicit NetLabel(ComponentType type);
+
 private:
     std::string m_Net;
 };

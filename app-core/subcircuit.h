@@ -12,6 +12,11 @@
 
 namespace Core {
 
+/**
+ * @struct  SubcircuitPin
+ * @brief   A connection of a subcircuit definition: its name and the node of the body it reaches.
+ * @details The node is never 0, since ground is shared by the whole netlist and a port on it would connect nothing.
+ */
 struct SubcircuitPin {
     std::string Name;
     int Node = 0;
@@ -19,6 +24,10 @@ struct SubcircuitPin {
     bool operator==(const SubcircuitPin &) const = default;
 };
 
+/**
+ * @struct  SubcircuitParameter
+ * @brief   A parameter of a subcircuit definition, which the values of its parts can refer to as "{Name}".
+ */
 struct SubcircuitParameter {
     std::string Name;
     double DefaultValue = 0.0;
@@ -26,6 +35,12 @@ struct SubcircuitParameter {
     bool operator==(const SubcircuitParameter &) const = default;
 };
 
+/**
+ * @struct  SubcircuitDefinition
+ * @brief   A circuit written once as a .subckt block and used by the X lines of its instances.
+ * @details Body points at parts it does not own, like any Circuit. Its node numbers are local to the definition,
+ *          except 0, which is the ground of the whole netlist.
+ */
 struct SubcircuitDefinition {
     std::string Name;
     std::vector<SubcircuitPin> Pins;

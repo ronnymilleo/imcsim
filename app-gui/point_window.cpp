@@ -38,12 +38,15 @@ PointWindow GetEndWindow(const std::size_t total_points, const std::size_t windo
  * @param[in] transient  Transient to cut.
  * @param[in] window     Points to keep, which ClampWindow() fitted inside it.
  * @return  A transient with only those points of every time, node voltage and current, and the warnings and
- *          completeness of the original.
+ *          completeness of the original; a window that reaches past the end keeps the points up to it.
  */
 Core::Transient SliceTransient(const Core::Transient &transient, const PointWindow window) {
+    // A window from an older, longer transient keeps only the points this one has
     const auto cut = [&window](const std::vector<double> &values) {
-        const auto first = values.begin() + static_cast<std::ptrdiff_t>(window.First);
-        return std::vector<double>(first, first + static_cast<std::ptrdiff_t>(window.Count));
+        const std::size_t first = std::min(window.First, values.size());
+        const std::size_t last = std::min(window.First + window.Count, values.size());
+        return std::vector<double>(values.begin() + static_cast<std::ptrdiff_t>(first),
+                                   values.begin() + static_cast<std::ptrdiff_t>(last));
     };
     Core::Transient slice{.Times = cut(transient.Times),
                           .NodeVoltages = {},

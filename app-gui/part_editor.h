@@ -19,6 +19,7 @@
 #include "components/potentiometer.h"
 #include "components/relay.h"
 #include "components/source.h"
+#include "components/subcircuit.h"
 #include "components/switch.h"
 #include "components/transformer.h"
 #include "components/voltage_controlled_switch.h"
@@ -38,13 +39,19 @@ namespace GUI {
  * @details Voltage and current sources also switch between their waveforms and show the parameters of the chosen
  *          one, edited as fields except the piecewise linear points, which are one text of "time value" pairs. The
  *          Application owns one instance, which the Properties window and the editor popover both draw, so the
- *          texts being typed are the same in both.
+ *          texts being typed are the same in both. Subcircuit instances expose one field per definition parameter,
+ *          showing an override or its default. SetSchematic follows the editor into and out of a block definition,
+ * where SetBlockParameters offers the block's parameters to the values of its resistors, capacitors and inductors.
  */
 class PartEditor {
 public:
     PartEditor(Schematic &schematic, const Preferences &preferences);
 
     void Draw();
+
+    // The schematic edited: the document, or the contents of a block and the parameters its parts can follow
+    void SetSchematic(Schematic &schematic);
+    void SetBlockParameters(std::vector<std::string> names);
 
     // Typing a value straight onto the selected part
     bool CanTypeValue() const;
@@ -54,7 +61,7 @@ public:
     void FocusNetName();
 
 private:
-    Schematic &m_Schematic;
+    Schematic *m_Schematic;
     // The standard series that resistors, capacitors and inductors take their values from
     const Preferences &m_Preferences;
     // Texts being edited, and the selection they were loaded from
@@ -89,12 +96,21 @@ private:
     // One per member of Core::ClockParameters and Core::LogicInputParameters
     std::array<ValueField, 4> m_ClockFields;
     std::array<ValueField, 1> m_LogicInputFields;
+    std::vector<ValueField> m_SubcircuitFields;
+    // Parameters of the block being edited, which a resistor, capacitor or inductor can take its value from
+    std::vector<std::string> m_BlockParameters;
 
     void LoadFields(const Core::Component &component);
+    void LoadSubcircuitFields(const Core::SubcircuitInstance &instance);
+    void LoadModelFields(const Core::Component &component);
+    void LoadSettingFields(const Core::Component &component);
     void DrawSelectionSummary();
     void DrawFields(Core::Component &component);
     bool DrawModeledPart(Core::Component &component);
+    bool DrawSettingPart(Core::Component &component);
+    void DrawSubcircuit(Core::SubcircuitInstance &instance);
     void DrawValue(Core::Component &component);
+    bool DrawParameterChoice(Core::Component &component);
     void DrawInitialCondition(Core::Component &component);
     void DrawWiper(Core::Potentiometer &pot);
     void DrawSwitch(Core::Switch &contact);

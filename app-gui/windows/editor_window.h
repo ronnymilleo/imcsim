@@ -29,6 +29,7 @@
 #include "wire_editing.h"
 #include <cstddef>
 #include <filesystem>
+#include <memory>
 #include <optional>
 #include <set>
 #include <string>
@@ -44,8 +45,9 @@ namespace GUI {
  *          a component, drawing wires or probing; starting one mode leaves the others. Modes start from the icon
  *          toolbar, their keys, or the part search that Space opens; a status bar lists the keys of each mode.
  * Schematics are saved to and opened from JSON files by its SchematicFileActions, how it looks is kept by its
- * EditorPreferences, and where it looks by its CanvasView. The schematic itself belongs to the application; this window
- * only keeps interaction state such as the current mode and drag.
+ * EditorPreferences, and where it looks by its CanvasView. The root schematic belongs to the application. While a
+ * subcircuit is open, this window edits a temporary document and applies it back to the root as one undo step; it
+ * otherwise keeps interaction state such as the current mode and drag.
  */
 class EditorWindow : public AppWindow {
 public:
@@ -151,7 +153,16 @@ private:
         DELETE_SELECTION
     };
 
-    Schematic &m_Schematic;
+    Schematic &m_RootSchematic;
+    Schematic *m_Schematic;
+    std::unique_ptr<Schematic> m_SubcircuitContent;
+    std::string m_EditingSubcircuit;
+    std::vector<SavedSubcircuitPin> m_SubcircuitPins;
+    std::vector<Core::SubcircuitParameter> m_SubcircuitParameters;
+    std::string m_SubcircuitName;
+    std::string m_SubcircuitError;
+    bool m_SubcircuitDialogRequested = false;
+    std::string m_PlacingSubcircuit;
     AnalysisControls &m_Controls;
     AnalysisSettingsPanel &m_SettingsPanel;
     PartEditor &m_PartEditor;
@@ -236,6 +247,7 @@ private:
     ImU32 GetElementColor(std::size_t index) const;
     bool AreWiresHeatColored() const;
     bool ArePartsHeatColored() const;
+    void DrawBlockBar(ImVec2 origin);
     void DrawStatusBar(const ViewTransform &view, bool hovered);
     float DrawRunStatus(float right_edge);
     void DrawColorLegend(ImDrawList *draw_list, ImVec2 origin, ImVec2 size) const;
@@ -248,9 +260,22 @@ private:
     void StartDrawingWires();
     void StartProbing();
     void StopEditing();
+    bool IsEditingSubcircuit() const;
+    bool LeaveSubcircuitForDocument();
+    void OfferBlockParameters();
+    void RequestCreateSubcircuit();
+    void RequestEditSelectedSubcircuit();
+    void DrawSubcircuitDialog();
+    void DrawSubcircuitPinRows(bool editing);
+    void DrawSubcircuitParameterRows();
+    void DrawSubcircuitDialogButtons(bool editing);
+    bool SyncSubcircuitPins();
+    bool ApplySubcircuitPinNames();
+    void FinishSubcircuitEditing(bool apply);
 
     // Placement
     void DrawPartPicker();
+    void StartPlacingSubcircuit(const std::string &name);
     void HandlePlacement(SchematicCanvas &canvas, const ViewTransform &view, bool hovered);
 
     // Wiring
@@ -302,6 +327,8 @@ private:
     bool RunClipboardCommand(EditorCommand command);
     void RunEditCommand(EditorCommand command);
     void RunTurnCommand(EditorCommand command);
+    void DrawTurnMenuItems(bool part_selected);
+    void DrawBlockMenuItems();
 };
 
 } // namespace GUI
