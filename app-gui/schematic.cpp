@@ -56,6 +56,10 @@ const std::vector<UIWire> &Schematic::GetWires() const {
     return m_Wires;
 }
 
+const std::vector<SavedSubcircuit> &Schematic::GetSubcircuits() const {
+    return m_Subcircuits;
+}
+
 /**
  * @brief   Checks whether a grid point is the terminal of some element.
  * @param[in] point  Grid point to test.
@@ -179,10 +183,11 @@ void Schematic::Clear() {
  * @note    The schematic becomes unmodified and the undo history starts over; the file path is kept.
  */
 void Schematic::Replace(std::vector<std::unique_ptr<UIElement>> elements, std::vector<UIWire> wires,
-                        SimulationSettings settings) {
+                        SimulationSettings settings, std::vector<SavedSubcircuit> subcircuits) {
     ClearSelection();
     m_Elements = std::move(elements);
     m_Wires = std::move(wires);
+    m_Subcircuits = std::move(subcircuits);
     m_SimulationSettings = std::move(settings);
     ++m_SimulationSettingsVersion;
     ++m_DocumentVersion;
@@ -602,7 +607,19 @@ const Connectivity &Schematic::GetConnectivity() {
  * @return  The circuit; it points at the components of this schematic, so use it before the next change.
  */
 Core::Circuit Schematic::BuildCircuit() {
-    return GUI::BuildCircuit(m_Elements, GetConnectivity());
+    Core::Circuit circuit = GUI::BuildCircuit(m_Elements, GetConnectivity());
+    for (const SavedSubcircuit &saved : m_Subcircuits) {
+        const Connectivity connectivity(saved.Elements, saved.Wires);
+        auto definition = std::make_shared<Core::SubcircuitDefinition>();
+        definition->Name = saved.Name;
+        definition->Parameters = saved.Parameters;
+        for (const SavedSubcircuitPin &pin : saved.Pins) {
+            definition->Pins.push_back({pin.Name, connectivity.GetNode(pin.Point).value_or(0)});
+        }
+        definition->Body = GUI::BuildCircuit(saved.Elements, connectivity);
+        circuit.AddSubcircuit(std::move(definition));
+    }
+    return circuit;
 }
 
 /**
@@ -969,7 +986,7 @@ void Schematic::FollowVoltageProbes() {
 
 // Measurements stay out of snapshots, so probing adds no undo step and does not count as a change
 std::string Schematic::TakeSnapshot() const {
-    return SaveSchematic(m_Elements, m_Wires, m_SimulationSettings, {});
+    return SaveSchematic(m_Elements, m_Wires, m_SimulationSettings, {}, m_Subcircuits);
 }
 
 // Snapshots come from TakeSnapshot(), so they always load back without warnings
@@ -981,6 +998,7 @@ void Schematic::RestoreSnapshot(const std::string &snapshot) {
     ClearSelection();
     m_Elements = std::move(loaded->Elements);
     m_Wires = std::move(loaded->Wires);
+    m_Subcircuits = std::move(loaded->Subcircuits);
     if (loaded->Settings != m_SimulationSettings) {
         m_SimulationSettings = std::move(loaded->Settings);
         ++m_SimulationSettingsVersion;

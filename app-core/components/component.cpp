@@ -36,6 +36,7 @@ constexpr auto ALL_TYPES = std::to_array<ComponentType>({
     ComponentType::CCCS,
     ComponentType::CCVS,
     ComponentType::OP_AMP,
+    ComponentType::SUBCIRCUIT,
     ComponentType::NET_LABEL,
     ComponentType::POTENTIOMETER,
     ComponentType::SWITCH,
@@ -87,8 +88,8 @@ const char *Component::GetTypeName() const {
 
 /**
  * @brief   Returns the SPICE letter that starts the name of this kind of component.
- * @return  "R", "C", "L", "V", "Vin", "I", "D", "Q", "M", "E", "G", "F", "H" or "U", or an empty string for
- *          ground, which is not named.
+ * @return  "R", "C", "L", "V", "Vin", "I", "D", "Q", "M", "E", "G", "F", "H", "U" or "X", or an empty string
+ *          for ground and net labels, which are not named.
  */
 const char *Component::GetNamePrefix() const {
     switch (m_Type) {
@@ -125,6 +126,8 @@ const char *Component::GetNamePrefix() const {
         return "F";
     case ComponentType::CCVS:
         return "H";
+    case ComponentType::SUBCIRCUIT:
+        return "X";
     case ComponentType::OP_AMP:
     case ComponentType::AND:
     case ComponentType::OR:
@@ -189,6 +192,7 @@ const char *Component::GetUnit() const {
     case ComponentType::CCVS:
         return "V/A";
     case ComponentType::OP_AMP:
+    case ComponentType::SUBCIRCUIT:
     case ComponentType::AND:
     case ComponentType::OR:
     case ComponentType::NOT:
@@ -240,6 +244,7 @@ bool Component::HasValue() const {
     case ComponentType::NMOS:
     case ComponentType::PMOS:
     case ComponentType::OP_AMP:
+    case ComponentType::SUBCIRCUIT:
     case ComponentType::AND:
     case ComponentType::OR:
     case ComponentType::NOT:
@@ -308,6 +313,7 @@ bool Component::IsValidValue(const double value) const {
     case ComponentType::NMOS:
     case ComponentType::PMOS:
     case ComponentType::OP_AMP:
+    case ComponentType::SUBCIRCUIT:
     case ComponentType::AND:
     case ComponentType::OR:
     case ComponentType::NOT:
@@ -357,6 +363,21 @@ double Component::GetValue() const {
  */
 void Component::SetValue(const double value) {
     m_Value = value;
+    m_ValueExpression.reset();
+}
+
+const std::optional<std::string> &Component::GetValueExpression() const {
+    return m_ValueExpression;
+}
+
+void Component::SetValueExpression(std::string expression) {
+    if (HasValue()) {
+        m_ValueExpression = std::move(expression);
+    }
+}
+
+void Component::ClearValueExpression() {
+    m_ValueExpression.reset();
 }
 
 /**
@@ -449,6 +470,8 @@ const char *GetTypeName(const ComponentType type) {
         return "CCVS";
     case ComponentType::OP_AMP:
         return "OpAmp";
+    case ComponentType::SUBCIRCUIT:
+        return "Subcircuit";
     case ComponentType::NET_LABEL:
         return "NetLabel";
     case ComponentType::POTENTIOMETER:

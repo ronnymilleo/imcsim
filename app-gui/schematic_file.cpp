@@ -17,9 +17,11 @@
 #include "components/potentiometer.h"
 #include "components/relay.h"
 #include "components/source.h"
+#include "components/subcircuit.h"
 #include "components/switch.h"
 #include "components/transformer.h"
 #include "components/voltage_controlled_switch.h"
+#include "connectivity.h"
 #include "element_factory.h"
 #include "nlohmann/json.hpp"
 #include <array>
@@ -372,6 +374,12 @@ void WriteKindFields(const Core::Component &component, nlohmann::json &object) {
     const Core::ComponentType type = component.GetType();
     if (Core::IsCurrentControlled(type)) {
         object["control"] = static_cast<const Core::ControlledSource &>(component).GetControllingCurrent();
+    } else if (type == Core::ComponentType::SUBCIRCUIT) {
+        const auto &instance = static_cast<const Core::SubcircuitInstance &>(component);
+        object["definition"] = instance.GetDefinitionName();
+        if (!instance.GetParameters().empty()) {
+            object["parameters"] = instance.GetParameters();
+        }
     } else if (type == Core::ComponentType::NET_LABEL) {
         // A label with no name yet is saved without the key
         if (const std::string &net = static_cast<const Core::NetLabel &>(component).GetNet(); !net.empty()) {
@@ -425,7 +433,11 @@ nlohmann::json WriteElement(const UIElement &element) {
         object["name"] = component.GetName();
     }
     if (component.HasValue()) {
-        object["value"] = component.GetValue();
+        if (const auto &expression = component.GetValueExpression()) {
+            object["value"] = *expression;
+        } else {
+            object["value"] = component.GetValue();
+        }
     }
     // Only a capacitor or an inductor carries one, and only when it is set
     if (const std::optional<double> initial = component.GetInitialCondition()) {
@@ -762,8 +774,41 @@ std::expected<void, std::string> ReadFigureFields(const nlohmann::json &object, 
     return {};
 }
 
+std::expected<void, std::string> ReadSubcircuitInstance(const nlohmann::json &object,
+                                                        Core::SubcircuitInstance &instance,
+                                                        const std::span<const SavedSubcircuit> definitions) {
+    const std::optional<std::string> name = ReadString(object, "definition");
+    if (!name || !Core::SubcircuitInstance::IsValidIdentifier(*name)) {
+        return std::unexpected("has no valid subcircuit definition");
+    }
+    const auto definition = std::ranges::find(definitions, *name, &SavedSubcircuit::Name);
+    if (definition == definitions.end()) {
+        return std::unexpected(std::format("refers to unknown subcircuit \"{}\"", *name));
+    }
+    instance.SetDefinitionName(*name);
+    std::vector<std::string> pins;
+    for (const SavedSubcircuitPin &pin : definition->Pins) {
+        pins.push_back(pin.Name);
+    }
+    instance.SetPins(std::move(pins));
+    if (const auto parameters = object.find("parameters"); parameters != object.end()) {
+        if (!parameters->is_object()) {
+            return std::unexpected("has subcircuit parameters that are not an object");
+        }
+        for (const auto &[parameter, value] : parameters->items()) {
+            if (!value.is_number() ||
+                !std::ranges::contains(definition->Parameters, parameter, &Core::SubcircuitParameter::Name)) {
+                return std::unexpected(std::format("has no valid value for subcircuit parameter {}", parameter));
+            }
+            instance.SetParameter(parameter, value.get<double>());
+        }
+    }
+    return {};
+}
+
 // Names are checked separately, once every element is read, so duplicates can be found
-std::expected<std::unique_ptr<UIElement>, std::string> ReadElement(const nlohmann::json &object) {
+std::expected<std::unique_ptr<UIElement>, std::string>
+ReadElement(const nlohmann::json &object, const std::span<const SavedSubcircuit> definitions = {}) {
     if (!object.is_object()) {
         return std::unexpected("is not an object");
     }
@@ -795,12 +840,27 @@ std::expected<std::unique_ptr<UIElement>, std::string> ReadElement(const nlohman
         element->SetMirrored(*mirrored);
     }
     Core::Component &component = element->GetComponent();
+    if (component.GetType() == Core::ComponentType::SUBCIRCUIT) {
+        if (const auto read =
+                ReadSubcircuitInstance(object, static_cast<Core::SubcircuitInstance &>(component), definitions);
+            !read) {
+            return std::unexpected(read.error());
+        }
+    }
     if (component.HasValue()) {
-        const std::optional<double> value = ReadNumber(object, "value");
-        if (!value || !component.IsValidValue(*value)) {
+        if (const std::optional<double> value = ReadNumber(object, "value")) {
+            if (!component.IsValidValue(*value)) {
+                return std::unexpected("has no valid value");
+            }
+            component.SetValue(*value);
+        } else if (const std::optional<std::string> expression = ReadString(object, "value")) {
+            if (!Core::SubcircuitInstance::IsValidValueExpression(*expression)) {
+                return std::unexpected("has no valid parameter expression");
+            }
+            component.SetValueExpression(*expression);
+        } else {
             return std::unexpected("has no valid value");
         }
-        component.SetValue(*value);
     }
     // A file saved before initial conditions had no key, so the part has none
     if (component.SupportsInitialCondition() && object.contains("ic")) {
@@ -1245,30 +1305,169 @@ SavedMeasurements ReadMeasurements(const nlohmann::json &document, std::vector<s
     return measurements;
 }
 
-std::string WriteDocument(const std::span<const UIElement *const> elements, const std::vector<UIWire> &wires,
-                          const SimulationSettings &settings, const SavedMeasurements &measurements) {
-    nlohmann::json element_list = nlohmann::json::array();
+nlohmann::json WriteElements(const std::span<const UIElement *const> elements) {
+    nlohmann::json list = nlohmann::json::array();
     for (const UIElement *element : elements) {
-        element_list.push_back(WriteElement(*element));
+        list.push_back(WriteElement(*element));
     }
-    nlohmann::json wire_list = nlohmann::json::array();
+    return list;
+}
+
+nlohmann::json WriteWires(const std::vector<UIWire> &wires) {
+    nlohmann::json list = nlohmann::json::array();
     for (const UIWire &wire : wires) {
-        wire_list.push_back({
+        list.push_back({
             {"start", {wire.GetStart().X, wire.GetStart().Y}},
             {"end", {wire.GetEnd().X, wire.GetEnd().Y}},
         });
     }
+    return list;
+}
+
+nlohmann::json WriteSubcircuit(const SavedSubcircuit &definition) {
+    nlohmann::json pins = nlohmann::json::array();
+    for (const SavedSubcircuitPin &pin : definition.Pins) {
+        pins.push_back({{"name", pin.Name}, {"point", {pin.Point.X, pin.Point.Y}}});
+    }
+    nlohmann::json parameters = nlohmann::json::array();
+    for (const Core::SubcircuitParameter &parameter : definition.Parameters) {
+        parameters.push_back({{"name", parameter.Name}, {"default", parameter.DefaultValue}});
+    }
+    std::vector<const UIElement *> elements;
+    for (const auto &element : definition.Elements) {
+        elements.push_back(element.get());
+    }
+    return {{"name", definition.Name},
+            {"pins", pins},
+            {"parameters", parameters},
+            {"elements", WriteElements(elements)},
+            {"wires", WriteWires(definition.Wires)}};
+}
+
+std::string WriteDocument(const std::span<const UIElement *const> elements, const std::vector<UIWire> &wires,
+                          const SimulationSettings &settings, const SavedMeasurements &measurements,
+                          const std::span<const SavedSubcircuit> subcircuits = {}) {
     nlohmann::json document = {
         {"format", FORMAT_NAME},
         {"version", FORMAT_VERSION},
-        {"elements", element_list},
-        {"wires", wire_list},
+        {"elements", WriteElements(elements)},
+        {"wires", WriteWires(wires)},
         {"simulation", WriteSettings(settings)},
     };
+    if (!subcircuits.empty()) {
+        document["subcircuits"] = nlohmann::json::array();
+        for (const SavedSubcircuit &definition : subcircuits) {
+            document["subcircuits"].push_back(WriteSubcircuit(definition));
+        }
+    }
     if (!measurements.Voltages.empty() || !measurements.Currents.empty() || !measurements.MathChannels.empty()) {
         document["measurements"] = WriteMeasurements(measurements);
     }
     return document.dump(2) + "\n";
+}
+
+std::expected<SavedSubcircuit, std::string> ReadSubcircuit(const nlohmann::json &object,
+                                                           std::vector<std::string> &warnings) {
+    if (!object.is_object()) {
+        return std::unexpected("is not an object");
+    }
+    SavedSubcircuit definition;
+    const std::optional<std::string> name = ReadString(object, "name");
+    if (!name || !Core::SubcircuitInstance::IsValidIdentifier(*name)) {
+        return std::unexpected("has no valid name");
+    }
+    definition.Name = *name;
+    const auto pins = object.find("pins");
+    if (pins != object.end() && !pins->is_array()) {
+        return std::unexpected("has pins that are not a list");
+    }
+    if (pins != object.end()) {
+        for (const nlohmann::json &pin : *pins) {
+            const std::optional<std::string> pin_name = pin.is_object() ? ReadString(pin, "name") : std::nullopt;
+            const std::optional<GridPoint> point = pin.is_object() ? ReadPoint(pin, "point") : std::nullopt;
+            if (!pin_name || !Core::SubcircuitInstance::IsValidIdentifier(*pin_name) || !point ||
+                std::ranges::contains(definition.Pins, *pin_name, &SavedSubcircuitPin::Name)) {
+                return std::unexpected("has an invalid or repeated pin");
+            }
+            definition.Pins.push_back({*pin_name, *point});
+        }
+    }
+    const auto parameters = object.find("parameters");
+    if (parameters != object.end() && !parameters->is_array()) {
+        return std::unexpected("has parameters that are not a list");
+    }
+    if (parameters != object.end()) {
+        for (const nlohmann::json &parameter : *parameters) {
+            const std::optional<std::string> parameter_name =
+                parameter.is_object() ? ReadString(parameter, "name") : std::nullopt;
+            const std::optional<double> value = parameter.is_object() ? ReadNumber(parameter, "default") : std::nullopt;
+            if (!parameter_name || !Core::SubcircuitInstance::IsValidIdentifier(*parameter_name) || !value ||
+                std::ranges::contains(definition.Parameters, *parameter_name, &Core::SubcircuitParameter::Name)) {
+                return std::unexpected("has an invalid or repeated parameter");
+            }
+            definition.Parameters.push_back({*parameter_name, *value});
+        }
+    }
+
+    std::vector<std::string> local_warnings;
+    const auto elements = object.find("elements");
+    if (elements != object.end() && elements->is_array()) {
+        for (std::size_t index = 0; index < elements->size(); ++index) {
+            auto element = ReadElement((*elements)[index]);
+            if (element) {
+                definition.Elements.push_back(std::move(*element));
+            } else {
+                local_warnings.push_back(std::format("Element {} {} and was skipped", index + 1, element.error()));
+            }
+        }
+    }
+    FixNames(definition.Elements, local_warnings);
+    const auto wires = object.find("wires");
+    if (wires != object.end() && wires->is_array()) {
+        for (std::size_t index = 0; index < wires->size(); ++index) {
+            const nlohmann::json &wire = (*wires)[index];
+            const std::optional<GridPoint> start = wire.is_object() ? ReadPoint(wire, "start") : std::nullopt;
+            const std::optional<GridPoint> end = wire.is_object() ? ReadPoint(wire, "end") : std::nullopt;
+            if (!start || !end || *start == *end || (start->X != end->X && start->Y != end->Y)) {
+                local_warnings.push_back(std::format("Wire {} is invalid and was skipped", index + 1));
+            } else {
+                definition.Wires.emplace_back(*start, *end);
+            }
+        }
+    }
+    const Connectivity connectivity(definition.Elements, definition.Wires);
+    for (const SavedSubcircuitPin &pin : definition.Pins) {
+        if (!connectivity.GetNode(pin.Point)) {
+            return std::unexpected(std::format("has pin {} on an unconnected point", pin.Name));
+        }
+    }
+    for (std::string &warning : local_warnings) {
+        warnings.push_back(std::format("Subcircuit {}: {}", definition.Name, warning));
+    }
+    return definition;
+}
+
+std::vector<SavedSubcircuit> ReadSubcircuits(const nlohmann::json &document, std::vector<std::string> &warnings) {
+    std::vector<SavedSubcircuit> definitions;
+    const auto list = document.find("subcircuits");
+    if (list == document.end()) {
+        return definitions;
+    }
+    if (!list->is_array()) {
+        warnings.push_back("The subcircuit definitions are not a list and were skipped");
+        return definitions;
+    }
+    for (std::size_t index = 0; index < list->size(); ++index) {
+        auto definition = ReadSubcircuit((*list)[index], warnings);
+        if (!definition) {
+            warnings.push_back(std::format("Subcircuit {} {} and was skipped", index + 1, definition.error()));
+        } else if (std::ranges::contains(definitions, definition->Name, &SavedSubcircuit::Name)) {
+            warnings.push_back(std::format("Subcircuit {} is repeated and was skipped", definition->Name));
+        } else {
+            definitions.push_back(std::move(*definition));
+        }
+    }
+    return definitions;
 }
 
 } // namespace
@@ -1279,15 +1478,18 @@ std::string WriteDocument(const std::span<const UIElement *const> elements, cons
  * @param[in] wires         Wire segments.
  * @param[in] settings      Settings of the analyses.
  * @param[in] measurements  Traces the plots show; the key is left out when there are none.
- * @return  The file contents, indented for reading and diffing. Values are plain numbers, never suffixed text.
+ * @param[in] subcircuits   Project-local definitions, including their internal elements and wires.
+ * @return  The file contents, indented for reading and diffing. Values are plain numbers, never suffixed text, except
+ *          for subcircuit parameter references saved as strings such as "{RESISTANCE}".
  */
 std::string SaveSchematic(const std::vector<std::unique_ptr<UIElement>> &elements, const std::vector<UIWire> &wires,
-                          const SimulationSettings &settings, const SavedMeasurements &measurements) {
+                          const SimulationSettings &settings, const SavedMeasurements &measurements,
+                          const std::span<const SavedSubcircuit> subcircuits) {
     std::vector<const UIElement *> pointers;
     for (const auto &element : elements) {
         pointers.push_back(element.get());
     }
-    return WriteDocument(pointers, wires, settings, measurements);
+    return WriteDocument(pointers, wires, settings, measurements, subcircuits);
 }
 
 /**
@@ -1327,10 +1529,11 @@ std::expected<LoadedSchematic, std::string> LoadSchematic(const std::string_view
     }
 
     LoadedSchematic schematic;
+    schematic.Subcircuits = ReadSubcircuits(document, schematic.Warnings);
     const auto elements = document.find("elements");
     if (elements != document.end() && elements->is_array()) {
         for (std::size_t index = 0; index < elements->size(); ++index) {
-            auto element = ReadElement((*elements)[index]);
+            auto element = ReadElement((*elements)[index], schematic.Subcircuits);
             if (element) {
                 schematic.Elements.push_back(std::move(*element));
             } else {

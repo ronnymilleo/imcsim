@@ -8,6 +8,8 @@
 #include "components/controlled_source.h"
 #include "components/logic_part.h"
 #include "components/source.h"
+#include "components/subcircuit.h"
+#include "subcircuit.h"
 #include <algorithm>
 #include <cmath>
 #include <format>
@@ -95,6 +97,26 @@ std::optional<std::string> CheckCircuit(const Circuit &circuit) {
     }
     if (!circuit.HasGround() && !IsDigitalOnly(circuit)) {
         return "The circuit has no ground; add a Ground so node voltages have a reference";
+    }
+    for (const CircuitEntry &entry : circuit.GetEntries()) {
+        if (entry.Part->GetType() != ComponentType::SUBCIRCUIT) {
+            continue;
+        }
+        const auto &instance = static_cast<const SubcircuitInstance &>(*entry.Part);
+        const auto definition = circuit.FindSubcircuit(instance.GetDefinitionName());
+        if (!definition) {
+            return std::format("{} refers to the unknown subcircuit {}", entry.Part->GetName(),
+                               instance.GetDefinitionName());
+        }
+        if (entry.Nodes.size() != definition->Pins.size()) {
+            return std::format("{} does not connect every pin of {}", entry.Part->GetName(), definition->Name);
+        }
+        for (const auto &[name, value] : instance.GetParameters()) {
+            if (!std::ranges::contains(definition->Parameters, name, &SubcircuitParameter::Name)) {
+                return std::format("{} sets {}, which is not a parameter of {}", entry.Part->GetName(), name,
+                                   definition->Name);
+            }
+        }
     }
     // A current-controlled source needs a current that some other part reports
     for (const CircuitEntry &entry : circuit.GetEntries()) {

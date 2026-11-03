@@ -245,6 +245,15 @@ TEST_CASE("A net label has no prefix, value or unit and its name is kept as type
     CHECK(label.GetNet() == "Vout");
 }
 
+TEST_CASE("A cloned net label keeps its net name", "[component]") {
+    Core::NetLabel label;
+    label.SetNet("Vout");
+    const auto clone = label.Clone();
+    REQUIRE(clone);
+    CHECK(clone->GetType() == Core::ComponentType::NET_LABEL);
+    CHECK(static_cast<const Core::NetLabel &>(*clone).GetNet() == "Vout");
+}
+
 TEST_CASE("Net names are 1 to 32 letters, digits, underscores, hyphens and dots", "[component]") {
     CHECK(Core::NetLabel::IsValidNet("VOUT"));
     CHECK(Core::NetLabel::IsValidNet("out_1-a.b"));

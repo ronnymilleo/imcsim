@@ -21,6 +21,7 @@
 #include "ui_elements/ui_op_amp.h"
 #include "ui_elements/ui_potentiometer.h"
 #include "ui_elements/ui_resistor.h"
+#include "ui_elements/ui_subcircuit.h"
 #include "ui_elements/ui_switch.h"
 #include "ui_elements/ui_transformer.h"
 #include "ui_elements/ui_vcc.h"
@@ -140,6 +141,8 @@ std::unique_ptr<UIElement> CreateElement(const Core::ComponentType type, const G
         return std::make_unique<UIControlledSource>(type, position, rotation);
     case Core::ComponentType::OP_AMP:
         return std::make_unique<UIOpAmp>(position, rotation);
+    case Core::ComponentType::SUBCIRCUIT:
+        return std::make_unique<UISubcircuit>(position, rotation);
     case Core::ComponentType::NET_LABEL:
         return std::make_unique<UINetLabel>(position, rotation);
     case Core::ComponentType::POTENTIOMETER:

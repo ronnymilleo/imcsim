@@ -248,7 +248,8 @@ void SchematicFileActions::OpenFile(const std::filesystem::path &path) {
     }
 
     NewSchematic();
-    m_Schematic.Replace(std::move(loaded->Elements), std::move(loaded->Wires), std::move(loaded->Settings));
+    m_Schematic.Replace(std::move(loaded->Elements), std::move(loaded->Wires), std::move(loaded->Settings),
+                        std::move(loaded->Subcircuits));
     m_Schematic.RestoreMeasurements(loaded->Measurements);
     m_Schematic.MarkSaved(path);
     m_Hooks.FrameSchematic();
@@ -267,7 +268,8 @@ void SchematicFileActions::OpenExample(const Example &example) {
     }
 
     NewSchematic();
-    m_Schematic.Replace(std::move(loaded->Elements), std::move(loaded->Wires), std::move(loaded->Settings));
+    m_Schematic.Replace(std::move(loaded->Elements), std::move(loaded->Wires), std::move(loaded->Settings),
+                        std::move(loaded->Subcircuits));
     m_Schematic.RestoreMeasurements(loaded->Measurements);
     m_Hooks.FrameSchematic();
 }
@@ -312,9 +314,9 @@ void SchematicFileActions::SaveFile(std::filesystem::path path) {
     if (path.extension() != SCHEMATIC_EXTENSION) {
         path += SCHEMATIC_EXTENSION;
     }
-    const auto written =
-        WriteTextFile(path, SaveSchematic(m_Schematic.GetElements(), m_Schematic.GetWires(),
-                                          m_Schematic.GetSimulationSettings(), m_Schematic.SaveMeasurements()));
+    const auto written = WriteTextFile(
+        path, SaveSchematic(m_Schematic.GetElements(), m_Schematic.GetWires(), m_Schematic.GetSimulationSettings(),
+                            m_Schematic.SaveMeasurements(), m_Schematic.GetSubcircuits()));
     if (!written) {
         ShowMessages("Could not save the schematic", {written.error()});
         return;
