@@ -12,7 +12,8 @@ namespace GUI {
 
 /**
  * @class   UISubcircuitPin
- * @brief   A flag on a short lead, pointing right for a PIN and left for a POUT, with the pin name above it.
+ * @brief   A small square on a short lead, with the pin name above it: an arrow pointing into the square marks a PIN
+ *          and an arrow leaving it marks a POUT.
  */
 class UISubcircuitPin : public UIElement {
 public:

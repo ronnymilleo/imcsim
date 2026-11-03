@@ -6,6 +6,7 @@
 #include "ui_subcircuit_pin.h"
 
 #include "components/subcircuit_pin.h"
+#include <array>
 #include <memory>
 #include <string>
 
@@ -13,10 +14,15 @@ namespace GUI {
 
 namespace {
 
+// The lead rises to a small square, the block side of the pin, with an arrow beside it
 constexpr float LEAD_LENGTH = 0.7f;
-constexpr float BODY_HEIGHT = 0.8f;
-constexpr float BODY_WIDTH = 1.0f;
+constexpr float SQUARE_SIDE = 0.6f;
+constexpr float ARROW_GAP = 0.05f;
+constexpr float ARROW_LENGTH = 0.95f;
+constexpr float HEAD_LENGTH = 0.3f;
+constexpr float HEAD_HALF_WIDTH = 0.18f;
 constexpr float LABEL_OFFSET = 2.1f;
+constexpr float BODY_HALF_WIDTH = SQUARE_SIDE / 2.0f + ARROW_GAP + ARROW_LENGTH;
 
 } // namespace
 
@@ -34,17 +40,24 @@ void UISubcircuitPin::DrawTerminals(SchematicCanvas &canvas, const ViewTransform
     canvas.AddLine(LocalToScreen(view, 0, 0), LocalToScreen(view, 0, -LEAD_LENGTH), color, LINE_THICKNESS);
 }
 
+// An input is an arrow pointing into the square and an output an arrow leaving it, both the way the signal flows
 void UISubcircuitPin::DrawSymbol(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color,
                                  SymbolStyle /*style*/) const {
-    const float direction = GetComponent().GetType() == Core::ComponentType::PIN ? 1.0f : -1.0f;
-    const float left = direction > 0.0f ? -BODY_WIDTH / 2.0f : -BODY_WIDTH / 2.0f - 0.35f;
-    const float right = direction > 0.0f ? BODY_WIDTH / 2.0f + 0.35f : BODY_WIDTH / 2.0f;
-    canvas.AddLine(LocalToScreen(view, left, -LEAD_LENGTH - BODY_HEIGHT / 2.0f),
-                   LocalToScreen(view, right, -LEAD_LENGTH), color, LINE_THICKNESS);
-    canvas.AddLine(LocalToScreen(view, right, -LEAD_LENGTH),
-                   LocalToScreen(view, left, -LEAD_LENGTH + BODY_HEIGHT / 2.0f), color, LINE_THICKNESS);
-    canvas.AddLine(LocalToScreen(view, left, -LEAD_LENGTH + BODY_HEIGHT / 2.0f),
-                   LocalToScreen(view, left, -LEAD_LENGTH - BODY_HEIGHT / 2.0f), color, LINE_THICKNESS);
+    const float half_side = SQUARE_SIDE / 2.0f;
+    const float middle = -LEAD_LENGTH - half_side;
+    const std::array square = {LocalToScreen(view, -half_side, -LEAD_LENGTH),
+                               LocalToScreen(view, half_side, -LEAD_LENGTH),
+                               LocalToScreen(view, half_side, -LEAD_LENGTH - SQUARE_SIDE),
+                               LocalToScreen(view, -half_side, -LEAD_LENGTH - SQUARE_SIDE)};
+    canvas.AddPolyline(square.data(), static_cast<int>(square.size()), color, ImDrawFlags_Closed, LINE_THICKNESS);
+
+    const bool is_input = GetComponent().GetType() == Core::ComponentType::PIN;
+    const float tail = is_input ? -BODY_HALF_WIDTH : half_side + ARROW_GAP;
+    const float tip = is_input ? -half_side - ARROW_GAP : BODY_HALF_WIDTH;
+    const float head_base = tip - HEAD_LENGTH;
+    canvas.AddLine(LocalToScreen(view, tail, middle), LocalToScreen(view, head_base, middle), color, LINE_THICKNESS);
+    canvas.AddTriangleFilled(LocalToScreen(view, tip, middle), LocalToScreen(view, head_base, middle - HEAD_HALF_WIDTH),
+                             LocalToScreen(view, head_base, middle + HEAD_HALF_WIDTH), color);
 }
 
 void UISubcircuitPin::DrawLabels(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color) const {
@@ -61,7 +74,7 @@ GridPoint UISubcircuitPin::GetLocalTerminalInward(std::size_t /*terminal*/) cons
 }
 
 LocalBounds UISubcircuitPin::GetLocalBounds() const {
-    return {{-0.85f, -1.5f}, {0.85f, 0.0f}};
+    return {{-BODY_HALF_WIDTH, -LEAD_LENGTH - SQUARE_SIDE - HEAD_HALF_WIDTH}, {BODY_HALF_WIDTH, 0.0f}};
 }
 
 } // namespace GUI
