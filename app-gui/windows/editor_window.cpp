@@ -1786,9 +1786,9 @@ void EditorWindow::DrawSubcircuitParameterRows() {
     }
 }
 
-// Creating the block, or keeping the settings of the one open, and the way out without them
+// Creating the block, or applying the settings of the one open, and the way out without them
 void EditorWindow::DrawSubcircuitDialogButtons(const bool editing) {
-    if (ImGui::Button(editing ? "Keep settings" : "Create block")) {
+    if (ImGui::Button(editing ? "Apply" : "Create block")) {
         if (editing) {
             if (ApplySubcircuitPinNames()) {
                 OfferBlockParameters();
@@ -1808,7 +1808,7 @@ void EditorWindow::DrawSubcircuitDialogButtons(const bool editing) {
         }
     }
     ImGui::SameLine();
-    if (ImGui::Button(editing ? "Discard settings" : "Cancel")) {
+    if (ImGui::Button("Cancel")) {
         if (editing) {
             const auto definition =
                 std::ranges::find(m_RootSchematic.GetSubcircuits(), m_EditingSubcircuit, &SavedSubcircuit::Name);
