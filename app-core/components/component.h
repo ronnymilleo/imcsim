@@ -83,6 +83,11 @@ public:
     virtual ~Component() = default;
 
     // Copying
+    /**
+     * @brief   Copies the component with its name, value and settings.
+     * @return  An independent component of the same kind, which shares nothing with this one, so a simulation copy
+     *          can run on another thread while the editor changes the original.
+     */
     virtual std::unique_ptr<Component> Clone() const = 0;
 
     // Kind of component

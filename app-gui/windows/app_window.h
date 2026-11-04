@@ -35,6 +35,11 @@ protected:
     void SetNewContentMarker(bool shown);
 
 private:
+    /**
+     * @brief   Draws the content of the window.
+     * @note    Render() calls it between ImGui::Begin() and ImGui::End(), only while the window is open, not
+     *          collapsed and not hidden behind another dock tab, so it draws no Begin/End pair of its own.
+     */
     virtual void Draw() = 0;
 
     std::string m_WindowTitle;
