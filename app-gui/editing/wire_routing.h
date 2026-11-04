@@ -8,6 +8,7 @@
 
 #include "helpers.h"
 #include "ui_elements/ui_wire.h"
+#include <cstddef>
 #include <cstdint>
 #include <map>
 #include <optional>
@@ -58,6 +59,7 @@ private:
     std::map<GridPoint, Use> m_Uses;
     std::vector<Area> m_Areas;
 
+    bool CanEnter(GridPoint point, std::size_t direction) const;
     void Mark(GridPoint point, Use use);
 };
 

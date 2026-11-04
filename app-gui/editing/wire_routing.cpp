@@ -89,6 +89,43 @@ std::vector<GridPoint> KeepCorners(const std::vector<GridPoint> &path) {
     return corners;
 }
 
+/**
+ * @brief   The rectangle a search covers: around its two ends and the given corners, with a margin to go around them.
+ */
+Region SpanRegion(const GridPoint from, const GridPoint to, const std::vector<GridPoint> &corners) {
+    Region region{.Min = from, .Max = from};
+    Include(region, to);
+    for (const GridPoint corner : corners) {
+        Include(region, corner);
+    }
+    region.Min = {region.Min.X - ROUTE_MARGIN, region.Min.Y - ROUTE_MARGIN};
+    region.Max = {region.Max.X + ROUTE_MARGIN, region.Max.Y + ROUTE_MARGIN};
+    return region;
+}
+
+/**
+ * @brief   Whether a route going one way may go on another: never back, and only straight on over a crossing.
+ */
+bool CanTurn(const std::size_t direction, const std::size_t next_direction, const bool is_crossing) {
+    if (direction == NO_DIRECTION) {
+        return true;
+    }
+    return !AreOpposite(direction, next_direction) && (!is_crossing || next_direction == direction);
+}
+
+/**
+ * @brief   The corners of the path that ends in a search state, followed back through the state before each.
+ */
+std::vector<GridPoint> TracePath(const Region &region, const std::vector<std::size_t> &previous,
+                                 const std::size_t end) {
+    std::vector<GridPoint> path;
+    for (std::size_t step = end; step != previous.size(); step = previous[step]) {
+        path.push_back(region.GetPoint(step / STATES_PER_POINT));
+    }
+    std::ranges::reverse(path);
+    return KeepCorners(path);
+}
+
 } // namespace
 
 /**
@@ -147,14 +184,12 @@ void RoutingGrid::AddWire(const UIWire &wire) {
  *          obstacles near the two points and the blocked areas.
  */
 std::optional<std::vector<GridPoint>> RoutingGrid::Route(const GridPoint from, const GridPoint to) const {
-    Region region{.Min = from, .Max = from};
-    Include(region, to);
+    std::vector<GridPoint> corners;
     for (const Area &area : m_Areas) {
-        Include(region, area.Min);
-        Include(region, area.Max);
+        corners.push_back(area.Min);
+        corners.push_back(area.Max);
     }
-    region.Min = {region.Min.X - ROUTE_MARGIN, region.Min.Y - ROUTE_MARGIN};
-    region.Max = {region.Max.X + ROUTE_MARGIN, region.Max.Y + ROUTE_MARGIN};
+    const Region region = SpanRegion(from, to, corners);
     if (region.GetSize() > MAX_ROUTING_POINTS) {
         return std::nullopt;
     }
@@ -175,37 +210,19 @@ std::optional<std::vector<GridPoint>> RoutingGrid::Route(const GridPoint from, c
             continue;
         }
         const GridPoint point = region.GetPoint(state / STATES_PER_POINT);
-        const std::size_t direction = state % STATES_PER_POINT;
         if (point == to) {
-            std::vector<GridPoint> path;
-            for (std::size_t step = state; step != state_count; step = previous[step]) {
-                path.push_back(region.GetPoint(step / STATES_PER_POINT));
-            }
-            std::ranges::reverse(path);
-            return KeepCorners(path);
+            return TracePath(region, previous, state);
         }
+        const std::size_t direction = state % STATES_PER_POINT;
         // A route that crosses a wire goes straight on over it, since a bend there would join the two
-        const auto here = m_Uses.find(point);
-        const bool is_crossing = point != from && here != m_Uses.end();
+        const bool is_crossing = point != from && m_Uses.contains(point);
         for (std::size_t next_direction = 0; next_direction < DIRECTIONS.size(); ++next_direction) {
-            if (direction != NO_DIRECTION &&
-                (AreOpposite(direction, next_direction) || (is_crossing && next_direction != direction))) {
-                continue;
-            }
             const GridPoint next = {point.X + DIRECTIONS[next_direction].X, point.Y + DIRECTIONS[next_direction].Y};
-            if (!region.Contains(next)) {
+            if (!CanTurn(direction, next_direction, is_crossing) || !region.Contains(next) ||
+                (next != to && !CanEnter(next, next_direction))) {
                 continue;
             }
-            if (next != to) {
-                const auto there = m_Uses.find(next);
-                if (there != m_Uses.end() &&
-                    (there->second == Use::BLOCKED ||
-                     (there->second == Use::HORIZONTAL) == IsHorizontalDirection(next_direction))) {
-                    continue;
-                }
-            }
-            const bool is_bend = direction != NO_DIRECTION && next_direction != direction;
-            const int next_cost = cost + 1 + (is_bend ? BEND_COST : 0);
+            const int next_cost = cost + 1 + (direction != NO_DIRECTION && next_direction != direction ? BEND_COST : 0);
             const std::size_t next_state = region.GetIndex(next) * STATES_PER_POINT + next_direction;
             if (next_cost < costs[next_state]) {
                 costs[next_state] = next_cost;
@@ -215,6 +232,17 @@ std::optional<std::vector<GridPoint>> RoutingGrid::Route(const GridPoint from, c
         }
     }
     return std::nullopt;
+}
+
+/**
+ * @brief   Whether a route may step onto a point going one way: a free point, or the middle of a wire it crosses.
+ */
+bool RoutingGrid::CanEnter(const GridPoint point, const std::size_t direction) const {
+    const auto found = m_Uses.find(point);
+    if (found == m_Uses.end()) {
+        return true;
+    }
+    return found->second != Use::BLOCKED && (found->second == Use::HORIZONTAL) != IsHorizontalDirection(direction);
 }
 
 /**

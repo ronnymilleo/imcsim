@@ -100,6 +100,55 @@ bool IsFreeSpot(const UIElement &block, const std::vector<GridPoint> &pin_points
     });
 }
 
+/**
+ * @brief   Where a wire from a point inside a box leaves it, or the point itself when it lies off the box; none when
+ *          no wire on the point leaves the box.
+ */
+std::optional<GridPoint> FindWayOut(const std::vector<UIWire> &wires, const GridPoint point, const WorldBounds &box) {
+    if (!IsInside(box, point)) {
+        return point;
+    }
+    for (const UIWire &wire : wires) {
+        const bool is_start_inside = IsInside(box, wire.GetStart());
+        if (is_start_inside == IsInside(box, wire.GetEnd()) || !IsOnWire(wire, point)) {
+            continue;
+        }
+        // Walk from the point toward the end outside until the box is left behind
+        const GridPoint outside = is_start_inside ? wire.GetEnd() : wire.GetStart();
+        const GridPoint step = {(outside.X > point.X) - (outside.X < point.X),
+                                (outside.Y > point.Y) - (outside.Y < point.Y)};
+        GridPoint way_out = point;
+        while (IsInside(box, way_out)) {
+            way_out = {way_out.X + step.X, way_out.Y + step.Y};
+        }
+        return way_out;
+    }
+    return std::nullopt;
+}
+
+/**
+ * @brief   The wires with the one that runs from a point into a box cut back to the point, and the pieces inside the
+ *          box that reach none of its terminals left out.
+ */
+std::vector<UIWire> CutAtBox(const std::vector<UIWire> &wires, const GridPoint point, const WorldBounds &box,
+                             const std::vector<GridPoint> &terminals) {
+    std::vector<UIWire> kept;
+    for (const UIWire &wire : wires) {
+        const bool is_start_inside = IsInside(box, wire.GetStart());
+        const bool is_end_inside = IsInside(box, wire.GetEnd());
+        if (is_start_inside && is_end_inside) {
+            if (std::ranges::any_of(terminals, [&](const GridPoint terminal) { return IsOnWire(wire, terminal); })) {
+                kept.push_back(wire);
+            }
+        } else if (is_start_inside == is_end_inside || !IsOnWire(wire, point)) {
+            kept.push_back(wire);
+        } else if (const GridPoint outside = is_start_inside ? wire.GetEnd() : wire.GetStart(); outside != point) {
+            kept.emplace_back(outside, point);
+        }
+    }
+    return kept;
+}
+
 } // namespace
 
 /**
@@ -143,52 +192,10 @@ void MoveToFreeSpot(UIElement &block, const std::vector<GridPoint> &pin_points,
  */
 std::optional<GridPoint> DetachFromBox(std::vector<UIWire> &wires, const GridPoint old_point, const UIElement &block) {
     const WorldBounds box = block.GetWorldBounds();
-    std::optional<GridPoint> start;
-    if (!IsInside(box, old_point)) {
-        start = old_point;
-    } else {
-        for (const UIWire &wire : wires) {
-            const bool is_start_inside = IsInside(box, wire.GetStart());
-            if (is_start_inside == IsInside(box, wire.GetEnd()) || !IsOnWire(wire, old_point)) {
-                continue;
-            }
-            // Walk from the old point toward the end outside until the box is left behind
-            const GridPoint outside = is_start_inside ? wire.GetEnd() : wire.GetStart();
-            const GridPoint step = {(outside.X > old_point.X) - (outside.X < old_point.X),
-                                    (outside.Y > old_point.Y) - (outside.Y < old_point.Y)};
-            GridPoint point = old_point;
-            while (IsInside(box, point)) {
-                point = {point.X + step.X, point.Y + step.Y};
-            }
-            start = point;
-            break;
-        }
+    const std::optional<GridPoint> start = FindWayOut(wires, old_point, box);
+    if (start) {
+        wires = CutAtBox(wires, *start, box, block.GetTerminals());
     }
-    if (!start) {
-        return std::nullopt;
-    }
-
-    const std::vector<GridPoint> terminals = block.GetTerminals();
-    std::vector<UIWire> kept;
-    for (const UIWire &wire : wires) {
-        const bool is_start_inside = IsInside(box, wire.GetStart());
-        const bool is_end_inside = IsInside(box, wire.GetEnd());
-        if (is_start_inside && is_end_inside) {
-            if (std::ranges::any_of(terminals, [&](const GridPoint terminal) { return IsOnWire(wire, terminal); })) {
-                kept.push_back(wire);
-            }
-            continue;
-        }
-        if (is_start_inside == is_end_inside || !IsOnWire(wire, *start)) {
-            kept.push_back(wire);
-            continue;
-        }
-        const GridPoint outside = is_start_inside ? wire.GetEnd() : wire.GetStart();
-        if (outside != *start) {
-            kept.emplace_back(outside, *start);
-        }
-    }
-    wires = std::move(kept);
     return start;
 }
 
