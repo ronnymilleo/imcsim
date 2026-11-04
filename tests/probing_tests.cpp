@@ -119,3 +119,33 @@ TEST_CASE("Probing a relay or a transformer picks the current of the winding nea
     REQUIRE(secondary);
     CHECK(secondary->Current == "T1.S");
 }
+
+TEST_CASE("A measurement reads its value in the operating point, and names it with the value", "[probing]") {
+    const ProbedSchematic schematic;
+    const GUI::Connectivity connectivity(schematic.Elements, schematic.Wires);
+    const int node = *schematic.At({4.0f, 0.0f})->Node;
+    Core::OperatingPoint operating_point;
+    operating_point.NodeVoltages.assign(static_cast<std::size_t>(node) + 1, 0.0);
+    operating_point.NodeVoltages[static_cast<std::size_t>(node)] = 4.5;
+    operating_point.Currents.push_back({.Name = "R1", .Current = 2e-3});
+
+    const GUI::MeasurementTarget voltage = {.Node = node, .Current = {}};
+    const GUI::MeasurementTarget current = {.Node = std::nullopt, .Current = "R1"};
+    CHECK(GUI::FindMeasuredValue(voltage, operating_point) == 4.5);
+    CHECK(GUI::FindMeasuredValue(current, operating_point) == 2e-3);
+    CHECK(GUI::DescribeMeasurement(voltage, connectivity, &operating_point) == std::format("V({}) = 4.5V", node));
+    CHECK(GUI::DescribeMeasurement(current, connectivity, &operating_point) == "I(R1) = 2mA");
+}
+
+TEST_CASE("A measurement the operating point lacks, or one before any run, is named without a value", "[probing]") {
+    const ProbedSchematic schematic;
+    const GUI::Connectivity connectivity(schematic.Elements, schematic.Wires);
+    const Core::OperatingPoint operating_point;
+    const GUI::MeasurementTarget voltage = {.Node = 3, .Current = {}};
+    const GUI::MeasurementTarget current = {.Node = std::nullopt, .Current = "Q1.C"};
+
+    CHECK_FALSE(GUI::FindMeasuredValue(voltage, operating_point));
+    CHECK_FALSE(GUI::FindMeasuredValue(current, operating_point));
+    CHECK(GUI::DescribeMeasurement(voltage, connectivity, &operating_point) == "V(3)");
+    CHECK(GUI::DescribeMeasurement(current, connectivity, nullptr) == "I(Q1.C)");
+}

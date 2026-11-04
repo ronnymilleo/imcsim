@@ -31,10 +31,13 @@ add_library(imcsim-gui-lib
             drawing/node_colors.cpp
             drawing/schematic_canvas.cpp
             drawing/schematic_drawing.cpp
+            drawing/schematic_overlays.cpp
             drawing/svg_writer.cpp
             drawing/theme.cpp
+            drawing/tool_icons.cpp
             editing/canvas_view.cpp
             editing/connectivity.cpp
+            editing/editor_mode.cpp
             editing/element_factory.cpp
             editing/group_editing.cpp
             editing/live_input.cpp
@@ -83,9 +86,18 @@ add_library(imcsim-gui-lib
             ui_elements/ui_wire.cpp
             value_field.cpp
             windows/app_window.cpp
+            windows/editor_toolbar.cpp
             windows/editor_window.cpp
             windows/netlist_window.cpp
+            windows/output_tabs/ac_sweep_tab.cpp
+            windows/output_tabs/dc_sweep_tab.cpp
+            windows/output_tabs/noise_tab.cpp
+            windows/output_tabs/plot_widgets.cpp
+            windows/output_tabs/result_tables.cpp
+            windows/output_tabs/spectrum_tab.cpp
+            windows/output_tabs/transient_tab.cpp
             windows/output_window.cpp
+            windows/part_picker.cpp
             windows/preferences_window.cpp
             windows/properties_window.cpp
             windows/simulation_window.cpp

@@ -7,6 +7,7 @@
 #define IMCSIM_PROBING_H
 
 #include "editing/connectivity.h"
+#include "simulation/simulation_results.h"
 #include "ui_elements/ui_element.h"
 #include "ui_elements/ui_wire.h"
 #include <memory>
@@ -26,12 +27,18 @@ struct MeasurementTarget {
     std::string Current;
 };
 
+// Targets
 std::optional<MeasurementTarget> FindMeasurementTarget(const std::vector<std::unique_ptr<UIElement>> &elements,
                                                        const std::vector<UIWire> &wires,
                                                        const Connectivity &connectivity, ImVec2 world_pos,
                                                        float wire_tolerance);
 std::string GetVoltageLabel(const Connectivity &connectivity, int node);
 std::string GetMeasurementLabel(const MeasurementTarget &target, const Connectivity &connectivity);
+
+// Values
+std::optional<double> FindMeasuredValue(const MeasurementTarget &target, const Core::OperatingPoint &operating_point);
+std::string DescribeMeasurement(const MeasurementTarget &target, const Connectivity &connectivity,
+                                const Core::OperatingPoint *operating_point);
 
 } // namespace GUI
 
