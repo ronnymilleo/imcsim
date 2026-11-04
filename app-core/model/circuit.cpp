@@ -439,7 +439,12 @@ std::string FormatSubcircuit(const SubcircuitDefinition &definition) {
             body += '\n';
         }
     } else {
-        body = definition.Body.ToSpiceNetlist();
+        // A pin that no part inside uses still owns its node, which the extra nodes of the body must not take
+        Circuit numbered_body = definition.Body;
+        for (const SubcircuitPin &pin : definition.Pins) {
+            numbered_body.ReserveNode(pin.Node);
+        }
+        body = numbered_body.ToSpiceNetlist();
         body.erase(0, body.find('\n') + 1);
         if (body.ends_with(".end\n")) {
             body.erase(body.size() - 5);
@@ -491,6 +496,15 @@ void Circuit::Add(const Component &component, std::vector<int> nodes) {
         m_NodeCount = std::max(m_NodeCount, node + 1);
     }
     m_Entries.push_back({&component, std::move(nodes)});
+}
+
+/**
+ * @brief   Counts a node that no part may reach, such as the pin of a block that nothing inside uses, so the extra
+ *          nodes of the netlist are numbered after it.
+ * @param[in] node  Node number; GetNodeCount() grows to cover it.
+ */
+void Circuit::ReserveNode(const int node) {
+    m_NodeCount = std::max(m_NodeCount, node + 1);
 }
 
 /**

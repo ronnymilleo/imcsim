@@ -5,6 +5,7 @@
 
 #include "components/diode.h"
 #include "components/ground.h"
+#include "components/logic_part.h"
 #include "components/net_label.h"
 #include "components/resistor.h"
 #include "components/subcircuit.h"
@@ -804,4 +805,22 @@ TEST_CASE("Picking another edge for a pin turns its marker in place, and the ins
     // The wire to the new edge goes around the box, and the one that came to the old edge stops short of it
     CAPTURE(schematic.GetWires());
     CHECK(AreWiresClearOf(schematic, block));
+}
+
+TEST_CASE("A pin that nothing inside a block uses keeps its node from the extra nodes of the body", "[subcircuit]") {
+    Core::LogicPart inverter(Core::ComponentType::NOT);
+    inverter.SetName("U1");
+    auto definition = std::make_shared<Core::SubcircuitDefinition>();
+    definition->Name = "inverter";
+    // EXTRA is node 3, which no part inside reaches, so the digital nodes of the gate start at 4
+    definition->Pins = {{"A", 1}, {"Y", 2}, {"EXTRA", 3}};
+    definition->Body.Add(inverter, {1, 2});
+    Core::SubcircuitInstance instance("inverter", {"A", "Y", "EXTRA"});
+    instance.SetName("X1");
+    Core::Circuit circuit;
+    circuit.Add(instance, {1, 2, 3});
+    circuit.AddSubcircuit(definition);
+    const std::string netlist = circuit.ToSpiceNetlist();
+    CHECK(netlist.contains("A-U1-A [1] [4]"));
+    CHECK_FALSE(netlist.contains("[3]"));
 }
