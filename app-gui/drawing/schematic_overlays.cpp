@@ -5,6 +5,7 @@
 
 #include "drawing/schematic_overlays.h"
 
+#include "analysis/logic_outputs.h"
 #include "components/subcircuit.h"
 #include "drawing/current_flow.h"
 #include "drawing/heat_glow.h"
@@ -14,6 +15,7 @@
 #include "drawing/theme.h"
 #include "editing/live_input.h"
 #include "spice/spice_value.h"
+#include "ui_elements/ui_logic_output.h"
 #include <algorithm>
 #include <cmath>
 #include <format>
@@ -147,6 +149,12 @@ void SchematicOverlays::Update(Schematic &schematic, const AnalysisControls &con
         state.Scale = ScaleOf(state.Point, elements, connectivity);
     }
     state.Powers = ComputePowers(elements, connectivity, state.Point);
+    state.LogicReadings.resize(elements.size());
+    for (std::size_t index = 0; index < elements.size(); ++index) {
+        if (elements[index]->GetComponent().GetType() == Core::ComponentType::LOGIC_OUTPUT) {
+            state.LogicReadings[index] = ReadLogicOutput(*elements[index], connectivity, state.Point);
+        }
+    }
     m_Displayed = std::move(state);
 }
 
@@ -226,6 +234,7 @@ void SchematicOverlays::DrawElements(SchematicCanvas &canvas, const ViewTransfor
     const auto &elements = schematic.GetElements();
     for (std::size_t index = 0; index < elements.size(); ++index) {
         elements[index]->Draw(canvas, view, GetElementColor(schematic, index), m_Preferences.Symbols);
+        DrawLogicReading(canvas, view, *elements[index], index);
         if (schematic.IsElementSelected(index)) {
             if (ArePartsHeatColored()) {
                 elements[index]->DrawOutline(canvas, view, GetPalette().Selected);
@@ -456,9 +465,10 @@ ImU32 SchematicOverlays::GetElementColor(const Schematic &schematic, const std::
     }
     const UIElement &element = *schematic.GetElements()[index];
     const Core::Component &component = element.GetComponent();
-    // Ground, net labels and subcircuit pin markers carry no current or power of their own
-    if (component.GetType() == Core::ComponentType::GROUND || component.GetType() == Core::ComponentType::NET_LABEL ||
-        Core::IsSubcircuitPin(component.GetType())) {
+    // Ground, net labels, logic outputs and subcircuit pin markers carry no current or power of their own
+    const Core::ComponentType type = component.GetType();
+    if (type == Core::ComponentType::GROUND || type == Core::ComponentType::NET_LABEL ||
+        type == Core::ComponentType::LOGIC_OUTPUT || Core::IsSubcircuitPin(type)) {
         return GetPalette().Element;
     }
     if (!by_current) {
@@ -471,6 +481,24 @@ ImU32 SchematicOverlays::GetElementColor(const Schematic &schematic, const std::
             current, std::abs(GetTerminalCurrent(component, terminal, m_Displayed->Point.Currents).value_or(0.0)));
     }
     return GetHeatColor(CurrentLevel(current, m_Displayed->Scale.LargestCurrent));
+}
+
+/**
+ * @brief   Shows what a logic output reads, lit when it reads 1 and its live effect is on; nothing for the other parts
+ *          and before there is a result.
+ */
+void SchematicOverlays::DrawLogicReading(SchematicCanvas &canvas, const ViewTransform &view, const UIElement &element,
+                                         const std::size_t index) const {
+    if (!m_Displayed || index >= m_Displayed->LogicReadings.size()) {
+        return;
+    }
+    const std::optional<LogicState> reading = m_Displayed->LogicReadings[index];
+    if (!reading) {
+        return;
+    }
+    const LogicState state = *reading;
+    const bool is_lit = state == LogicState::HIGH && m_Preferences.IsEffectOn(LiveEffect::LOGIC_LIGHTS);
+    static_cast<const UILogicOutput &>(element).DrawReading(canvas, view, state, GetPalette().CanvasText, is_lit);
 }
 
 /**

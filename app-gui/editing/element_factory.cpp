@@ -15,6 +15,7 @@
 #include "ui_elements/ui_ground.h"
 #include "ui_elements/ui_inductor.h"
 #include "ui_elements/ui_logic_input.h"
+#include "ui_elements/ui_logic_output.h"
 #include "ui_elements/ui_logic_part.h"
 #include "ui_elements/ui_mosfet.h"
 #include "ui_elements/ui_net_label.h"
@@ -87,6 +88,7 @@ constexpr auto PARTS = std::to_array<PartInfo>({
     {Core::ComponentType::SR_FLIP_FLOP, "SR flip-flop"},
     {Core::ComponentType::CLOCK, "Clock"},
     {Core::ComponentType::LOGIC_INPUT, "Logic input"},
+    {Core::ComponentType::LOGIC_OUTPUT, "Logic output"},
 });
 
 } // namespace
@@ -165,6 +167,8 @@ std::unique_ptr<UIElement> CreateElement(const Core::ComponentType type, const G
         return std::make_unique<UIClock>(position, rotation);
     case Core::ComponentType::LOGIC_INPUT:
         return std::make_unique<UILogicInput>(position, rotation);
+    case Core::ComponentType::LOGIC_OUTPUT:
+        return std::make_unique<UILogicOutput>(position, rotation);
     }
     return nullptr;
 }

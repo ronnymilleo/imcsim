@@ -65,7 +65,7 @@ constexpr auto PASSIVE_PARTS =
     std::to_array({Core::ComponentType::RESISTOR, Core::ComponentType::CAPACITOR, Core::ComponentType::INDUCTOR});
 constexpr auto SUPPLY_PARTS =
     std::to_array({Core::ComponentType::GROUND, Core::ComponentType::VCC, Core::ComponentType::NET_LABEL,
-                   Core::ComponentType::PIN, Core::ComponentType::LOGIC_INPUT});
+                   Core::ComponentType::PIN, Core::ComponentType::LOGIC_INPUT, Core::ComponentType::LOGIC_OUTPUT});
 
 /// The dropdown arrow beside a group button, in frame heights.
 constexpr float DROPDOWN_BUTTON_SCALE = 0.6f;

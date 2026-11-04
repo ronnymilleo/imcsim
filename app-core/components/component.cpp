@@ -59,6 +59,7 @@ constexpr auto ALL_TYPES = std::to_array<ComponentType>({
     ComponentType::SR_FLIP_FLOP,
     ComponentType::CLOCK,
     ComponentType::LOGIC_INPUT,
+    ComponentType::LOGIC_OUTPUT,
 });
 
 } // namespace
@@ -158,6 +159,7 @@ const char *Component::GetNamePrefix() const {
     case ComponentType::GROUND:
     case ComponentType::NET_LABEL:
     case ComponentType::PIN:
+    case ComponentType::LOGIC_OUTPUT:
         return "";
     }
     return "";
@@ -210,6 +212,7 @@ const char *Component::GetUnit() const {
     case ComponentType::GROUND:
     case ComponentType::NET_LABEL:
     case ComponentType::PIN:
+    case ComponentType::LOGIC_OUTPUT:
     case ComponentType::SWITCH:
     case ComponentType::PUSH_BUTTON:
     case ComponentType::V_SWITCH:
@@ -236,6 +239,7 @@ bool Component::HasValue() const {
     case ComponentType::GROUND:
     case ComponentType::NET_LABEL:
     case ComponentType::PIN:
+    case ComponentType::LOGIC_OUTPUT:
     case ComponentType::SWITCH:
     case ComponentType::PUSH_BUTTON:
     case ComponentType::V_SWITCH:
@@ -306,6 +310,7 @@ bool Component::IsValidValue(const double value) const {
     case ComponentType::GROUND:
     case ComponentType::NET_LABEL:
     case ComponentType::PIN:
+    case ComponentType::LOGIC_OUTPUT:
     case ComponentType::SWITCH:
     case ComponentType::PUSH_BUTTON:
     case ComponentType::V_SWITCH:
@@ -597,6 +602,8 @@ const char *GetTypeName(const ComponentType type) {
         return "Clock";
     case ComponentType::LOGIC_INPUT:
         return "LogicInput";
+    case ComponentType::LOGIC_OUTPUT:
+        return "LogicOutput";
     }
     return "Unknown";
 }

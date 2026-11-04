@@ -10,6 +10,7 @@
 #include "components/controlled_source.h"
 #include "components/diode.h"
 #include "components/logic_input.h"
+#include "components/logic_output.h"
 #include "components/logic_part.h"
 #include "components/mosfet.h"
 #include "components/net_label.h"
@@ -95,6 +96,10 @@ constexpr auto CLOCK_KEYS = std::to_array<ParameterKey<Core::ClockParameters>>({
 
 constexpr auto LOGIC_INPUT_KEYS = std::to_array<ParameterKey<Core::LogicInputParameters>>({
     {"logic_level", &Core::LogicInputParameters::LogicLevel},
+});
+
+constexpr auto LOGIC_OUTPUT_KEYS = std::to_array<ParameterKey<Core::LogicOutputParameters>>({
+    {"logic_level", &Core::LogicOutputParameters::LogicLevel},
 });
 
 constexpr auto PULSE_KEYS = std::to_array<ParameterKey<Core::PulseParameters>>({
@@ -446,6 +451,8 @@ void WriteFigureFields(const Core::Component &component, nlohmann::json &object)
         WritePartParameters(static_cast<const Core::Clock &>(component), CLOCK_KEYS, object);
     } else if (type == Core::ComponentType::LOGIC_INPUT) {
         WritePartParameters(static_cast<const Core::LogicInput &>(component), LOGIC_INPUT_KEYS, object);
+    } else if (type == Core::ComponentType::LOGIC_OUTPUT) {
+        WritePartParameters(static_cast<const Core::LogicOutput &>(component), LOGIC_OUTPUT_KEYS, object);
     }
 }
 
@@ -823,9 +830,16 @@ std::expected<void, std::string> ReadLogicInputFigures(const nlohmann::json &obj
     return ReadPartParameters(object, static_cast<Core::LogicInput &>(component), LOGIC_INPUT_KEYS);
 }
 
+std::expected<void, std::string> ReadLogicOutputFigures(const nlohmann::json &object, Core::Component &component) {
+    if (component.GetType() != Core::ComponentType::LOGIC_OUTPUT) {
+        return {};
+    }
+    return ReadPartParameters(object, static_cast<Core::LogicOutput &>(component), LOGIC_OUTPUT_KEYS);
+}
+
 constexpr auto FIGURE_READERS =
     std::to_array<StateReader>({&ReadSwitchFigures, &ReadRelayFigures, &ReadTransformerFigures, &ReadLogicFigures,
-                                &ReadClockFigures, &ReadLogicInputFigures});
+                                &ReadClockFigures, &ReadLogicInputFigures, &ReadLogicOutputFigures});
 
 /**
  * @brief   Parts whose figures are all there is to them: the switch that follows a voltage, the relay, the transformer,
