@@ -320,7 +320,8 @@ shows, an operating point or an instant of a transient, so they show nothing unt
 - **Heat Glow** makes every resistor that dissipates power glow orange, bigger and stronger with its power. The
   largest power of the circuit (of the whole run, for a transient) is full brightness, and the glow fades out two
   decades below it, so it shows where the power is lost and, while a transient plays, when.
-- **Logic Lights** fills the box of every logic output that reads 1 in green, as a lit indicator.
+- **Logic Lights** fills the box of every logic input that is high and every logic output that reads 1 with the
+  accent color of the theme, as a lit indicator.
 
 ## Terminals
 
