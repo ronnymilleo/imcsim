@@ -18,6 +18,7 @@ add_executable(imcsim-tests
             circuit_tests.cpp
             component_tests.cpp
             connectivity_tests.cpp
+            editor_mode_tests.cpp
             element_factory_tests.cpp
             current_flow_tests.cpp
             examples_tests.cpp
