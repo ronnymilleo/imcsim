@@ -3,27 +3,27 @@
  * @brief   Schematic editor window with a pannable and zoomable grid canvas.
  */
 
-#include "editor_window.h"
+#include "windows/editor_window.h"
 
-#include "circuit_snapshot.h"
+#include "analysis/circuit_snapshot.h"
 #include "components/net_label.h"
 #include "components/subcircuit.h"
-#include "current_flow.h"
-#include "element_factory.h"
-#include "group_editing.h"
-#include "heat_glow.h"
+#include "document/subcircuit_pins.h"
+#include "drawing/current_flow.h"
+#include "drawing/heat_glow.h"
+#include "drawing/led_glow.h"
+#include "drawing/node_colors.h"
+#include "drawing/schematic_drawing.h"
+#include "drawing/theme.h"
+#include "editing/element_factory.h"
+#include "editing/group_editing.h"
+#include "editing/live_input.h"
+#include "editing/probing.h"
+#include "editing/shortcuts.h"
+#include "editing/wire_editing.h"
 #include "imgui_internal.h"
-#include "led_glow.h"
-#include "live_input.h"
 #include "misc/cpp/imgui_stdlib.h"
-#include "node_colors.h"
-#include "probing.h"
-#include "schematic_drawing.h"
-#include "shortcuts.h"
-#include "spice_value.h"
-#include "subcircuit_pins.h"
-#include "theme.h"
-#include "wire_editing.h"
+#include "spice/spice_value.h"
 #include <algorithm>
 #include <array>
 #include <cfloat>

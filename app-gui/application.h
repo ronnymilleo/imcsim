@@ -6,14 +6,14 @@
 #ifndef IMCSIM_APPLICATION_H
 #define IMCSIM_APPLICATION_H
 
-#include "analysis_controls.h"
-#include "analysis_settings_panel.h"
-#include "auto_rerun.h"
-#include "glow_renderer.h"
+#include "analysis/analysis_controls.h"
+#include "analysis/analysis_settings_panel.h"
+#include "analysis/auto_rerun.h"
+#include "analysis/playback.h"
+#include "document/schematic.h"
+#include "drawing/glow_renderer.h"
 #include "part_editor.h"
-#include "playback.h"
 #include "preferences.h"
-#include "schematic.h"
 #include "windows/editor_window.h"
 #include "windows/netlist_window.h"
 #include "windows/output_window.h"

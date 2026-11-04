@@ -3,9 +3,9 @@
  * @brief   Diodes, Zener diodes and LEDs, simulated with a model from a fixed list or with custom parameters.
  */
 
-#include "diode.h"
+#include "components/diode.h"
 
-#include "library_model.h"
+#include "model/library_model.h"
 #include <algorithm>
 #include <array>
 #include <format>

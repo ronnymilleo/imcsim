@@ -3,7 +3,7 @@
  * @brief   Tests for the SVG and CSV export of plots.
  */
 
-#include "plot_export.h"
+#include "plots/plot_export.h"
 #include <algorithm>
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>

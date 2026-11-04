@@ -1,0 +1,66 @@
+/**
+ * @file    plot_figures.h
+ * @brief   The export figures of the Output window plots, and the lists of traces the plots and the figures share.
+ */
+
+#ifndef IMCSIM_PLOT_FIGURES_H
+#define IMCSIM_PLOT_FIGURES_H
+
+#include "document/schematic.h"
+#include "implot.h"
+#include "plots/logic_trace.h"
+#include "plots/math_channels.h"
+#include "plots/plot_export.h"
+#include "plots/plot_types.h"
+#include "simulation/simulator.h"
+#include <cstddef>
+#include <set>
+#include <string>
+#include <vector>
+
+namespace GUI {
+
+/**
+ * @struct  CurveFamily
+ * @brief   One trace of a DC sweep across the steps of its family: its name, unit, color, axis and its curve per step.
+ */
+struct CurveFamily {
+    std::string Label;
+    const char *Unit = "";
+    ImU32 Color = 0;
+    ImAxis Axis = ImAxis_Y1;
+    std::vector<const std::vector<double> *> Curves;
+};
+
+/// Spread between the curves of a family, against their size, below which they count as one and get no labels.
+inline constexpr double NEGLIGIBLE_SPREAD = 1e-6;
+/// Below a femtovolt or a femtoampere a value is the rounding residue of the solver, such as 1e-170 V for a node
+/// at 0 V.
+inline constexpr double RESIDUE_LEVEL = 1e-15;
+/// The input-referred noise takes a color of its own, apart from the node colors the output uses.
+inline constexpr ImU32 INPUT_NOISE_COLOR = IM_COL32(150, 230, 90, 255);
+
+// Traces shown
+bool HasMeasuredCurrent(const std::vector<Core::ComponentTrace> &currents, const Schematic &schematic);
+std::vector<int> ListNodes(const std::vector<LogicNode> &lanes);
+bool CurvesDiffer(const std::vector<const std::vector<double> *> &curves, std::size_t sample);
+std::vector<CurveFamily> ListCurveFamilies(const Core::DCSweep &sweep, Schematic &schematic, bool show_currents,
+                                           const std::vector<std::vector<MathTrace>> &math);
+std::string FormatStepLabel(const Core::DCSweep &sweep, const Core::DCSweepCurve &curve);
+bool HasInputGain(const Core::Noise &noise);
+std::string GetDensityUnit(const std::string &unit);
+
+// Figures
+ExportFigure BuildTransientFigure(const Core::Transient &transient, const std::vector<MathTrace> &math,
+                                  const std::vector<LogicNode> &lanes, Schematic &schematic, bool bit_values,
+                                  const PlotSpan &view);
+ExportFigure BuildSpectrumFigure(const TransientSpectra &spectra, bool logarithmic, const PlotSpan &view);
+ExportFigure BuildACSweepFigure(const Core::ACSweep &sweep, Schematic &schematic, const PlotSpan &view);
+ExportFigure BuildDCSweepFigure(const Core::DCSweep &sweep, const std::vector<std::vector<MathTrace>> &math,
+                                Schematic &schematic, const PlotSpan &view);
+ExportFigure BuildNoiseFigure(const Core::Noise &noise, Schematic &schematic, const std::set<std::string> &shown,
+                              const PlotSpan &view);
+
+} // namespace GUI
+
+#endif // IMCSIM_PLOT_FIGURES_H

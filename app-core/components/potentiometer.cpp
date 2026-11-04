@@ -3,7 +3,7 @@
  * @brief   A potentiometer in the simulation model.
  */
 
-#include "potentiometer.h"
+#include "components/potentiometer.h"
 
 #include <algorithm>
 #include <memory>

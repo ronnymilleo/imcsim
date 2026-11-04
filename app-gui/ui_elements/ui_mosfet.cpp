@@ -3,7 +3,7 @@
  * @brief   Schematic symbol of an N- or P-channel enhancement MOSFET.
  */
 
-#include "ui_mosfet.h"
+#include "ui_elements/ui_mosfet.h"
 
 #include "components/mosfet.h"
 #include <array>

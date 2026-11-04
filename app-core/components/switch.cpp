@@ -3,7 +3,7 @@
  * @brief   A manual switch and a push button in the simulation model.
  */
 
-#include "switch.h"
+#include "components/switch.h"
 #include <memory>
 
 namespace Core {

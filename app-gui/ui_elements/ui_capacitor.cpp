@@ -3,7 +3,7 @@
  * @brief   Schematic symbol of a capacitor.
  */
 
-#include "ui_capacitor.h"
+#include "ui_elements/ui_capacitor.h"
 
 #include "components/capacitor.h"
 #include <memory>

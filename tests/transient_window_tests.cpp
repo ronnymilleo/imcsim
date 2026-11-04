@@ -3,7 +3,7 @@
  * @brief   Tests for the window of points that the plot shows and the schematic plays.
  */
 
-#include "transient_window.h"
+#include "analysis/transient_window.h"
 
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>

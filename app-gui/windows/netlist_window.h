@@ -6,7 +6,7 @@
 #ifndef IMCSIM_NETLIST_WINDOW_H
 #define IMCSIM_NETLIST_WINDOW_H
 
-#include "schematic.h"
+#include "document/schematic.h"
 #include "windows/app_window.h"
 
 namespace GUI {

@@ -3,10 +3,10 @@
  * @brief   Schematic symbol of a VCC supply rail.
  */
 
-#include "ui_vcc.h"
+#include "ui_elements/ui_vcc.h"
 
 #include "components/vcc.h"
-#include "spice_value.h"
+#include "spice/spice_value.h"
 #include <format>
 #include <memory>
 #include <string>

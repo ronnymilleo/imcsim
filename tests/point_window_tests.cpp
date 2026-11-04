@@ -3,7 +3,7 @@
  * @brief   Tests for the stretch of a long transient that the plot shows.
  */
 
-#include "point_window.h"
+#include "analysis/point_window.h"
 
 #include <catch2/catch_test_macros.hpp>
 #include <cstddef>

@@ -3,7 +3,7 @@
  * @brief   Schematic symbol of a resistor.
  */
 
-#include "ui_resistor.h"
+#include "ui_elements/ui_resistor.h"
 
 #include "components/resistor.h"
 #include <array>

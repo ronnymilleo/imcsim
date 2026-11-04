@@ -3,7 +3,7 @@
  * @brief   A positive supply rail in the simulation model.
  */
 
-#include "vcc.h"
+#include "components/vcc.h"
 #include <memory>
 
 namespace Core {

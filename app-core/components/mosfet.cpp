@@ -3,9 +3,9 @@
  * @brief   N- and P-channel MOSFETs, simulated with a model from a fixed list or with custom parameters.
  */
 
-#include "mosfet.h"
+#include "components/mosfet.h"
 
-#include "library_model.h"
+#include "model/library_model.h"
 #include <algorithm>
 #include <array>
 #include <format>

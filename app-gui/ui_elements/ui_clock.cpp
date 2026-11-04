@@ -3,10 +3,10 @@
  * @brief   Schematic symbol of a digital clock.
  */
 
-#include "ui_clock.h"
+#include "ui_elements/ui_clock.h"
 
 #include "components/clock.h"
-#include "spice_value.h"
+#include "spice/spice_value.h"
 #include <array>
 #include <format>
 #include <memory>

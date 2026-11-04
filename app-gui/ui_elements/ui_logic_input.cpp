@@ -3,7 +3,7 @@
  * @brief   Schematic symbol of a logic input that drives a circuit high or low.
  */
 
-#include "ui_logic_input.h"
+#include "ui_elements/ui_logic_input.h"
 
 #include "components/logic_input.h"
 #include <array>

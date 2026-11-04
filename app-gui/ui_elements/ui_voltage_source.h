@@ -6,7 +6,7 @@
 #ifndef IMCSIM_UI_VOLTAGE_SOURCE_H
 #define IMCSIM_UI_VOLTAGE_SOURCE_H
 
-#include "ui_source.h"
+#include "ui_elements/ui_source.h"
 
 namespace GUI {
 

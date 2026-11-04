@@ -6,7 +6,7 @@
 #ifndef IMCSIM_CLOCK_H
 #define IMCSIM_CLOCK_H
 
-#include "component.h"
+#include "components/component.h"
 #include <memory>
 
 namespace Core {

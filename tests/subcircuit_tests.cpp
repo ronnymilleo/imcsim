@@ -3,20 +3,20 @@
  * @brief   Tests for project-local subcircuit definitions, instances, files and ngspice runs.
  */
 
-#include "circuit_checks.h"
-#include "circuit_copy.h"
 #include "components/diode.h"
 #include "components/ground.h"
 #include "components/net_label.h"
 #include "components/resistor.h"
 #include "components/subcircuit.h"
 #include "components/vcc.h"
-#include "element_factory.h"
-#include "schematic.h"
-#include "schematic_file.h"
-#include "simulator.h"
-#include "subcircuit.h"
-#include "subcircuit_pins.h"
+#include "document/schematic.h"
+#include "document/schematic_file.h"
+#include "document/subcircuit_pins.h"
+#include "editing/element_factory.h"
+#include "model/subcircuit.h"
+#include "simulation/circuit_checks.h"
+#include "simulation/circuit_copy.h"
+#include "simulation/simulator.h"
 #include <algorithm>
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>

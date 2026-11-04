@@ -3,7 +3,7 @@
  * @brief   A net label in the simulation model: a name that joins every point labeled with it into one node.
  */
 
-#include "net_label.h"
+#include "components/net_label.h"
 
 #include <algorithm>
 #include <cctype>

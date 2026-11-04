@@ -3,7 +3,7 @@
  * @brief   Schematic symbol of an independent current source.
  */
 
-#include "ui_current_source.h"
+#include "ui_elements/ui_current_source.h"
 
 #include "components/current_source.h"
 #include <memory>

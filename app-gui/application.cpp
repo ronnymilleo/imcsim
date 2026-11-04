@@ -5,17 +5,17 @@
 
 #include "application.h"
 
-#include "examples.h"
+#include "document/examples.h"
+#include "document/schematic_file.h"
+#include "drawing/theme.h"
+#include "editing/shortcuts.h"
 #include "imgui.h"
 #include "imgui_impl_sdl3.h"
 #include "imgui_impl_sdlgpu3.h"
 #include "imgui_internal.h"
 #include "implot.h"
-#include "ngspice_library.h"
-#include "schematic_file.h"
-#include "shortcuts.h"
-#include "simulator.h"
-#include "theme.h"
+#include "ngspice/ngspice_library.h"
+#include "simulation/simulator.h"
 #include <SDL3/SDL.h>
 #include <array>
 #include <cstdio>

@@ -6,8 +6,8 @@
 #ifndef IMCSIM_PREFERENCES_H
 #define IMCSIM_PREFERENCES_H
 
-#include "standard_values.h"
-#include "theme.h"
+#include "drawing/theme.h"
+#include "spice/standard_values.h"
 #include "ui_elements/ui_element.h"
 #include <array>
 #include <cstddef>

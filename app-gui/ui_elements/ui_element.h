@@ -7,9 +7,9 @@
 #define IMCSIM_UI_ELEMENT_H
 
 #include "components/component.h"
+#include "drawing/schematic_canvas.h"
 #include "helpers.h"
 #include "imgui.h"
-#include "schematic_canvas.h"
 #include <memory>
 #include <string>
 #include <vector>

@@ -6,7 +6,7 @@
 #ifndef IMCSIM_VALUE_FIELD_H
 #define IMCSIM_VALUE_FIELD_H
 
-#include "standard_values.h"
+#include "spice/standard_values.h"
 #include <array>
 #include <functional>
 #include <optional>

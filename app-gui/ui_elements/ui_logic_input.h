@@ -6,7 +6,7 @@
 #ifndef IMCSIM_UI_LOGIC_INPUT_H
 #define IMCSIM_UI_LOGIC_INPUT_H
 
-#include "ui_element.h"
+#include "ui_elements/ui_element.h"
 
 namespace GUI {
 

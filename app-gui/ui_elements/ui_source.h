@@ -7,7 +7,7 @@
 #define IMCSIM_UI_SOURCE_H
 
 #include "components/source.h"
-#include "ui_element.h"
+#include "ui_elements/ui_element.h"
 #include <memory>
 
 namespace GUI {

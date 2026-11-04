@@ -3,7 +3,7 @@
  * @brief   An electromechanical relay: a coil and the contact it closes.
  */
 
-#include "relay.h"
+#include "components/relay.h"
 #include <memory>
 
 namespace Core {

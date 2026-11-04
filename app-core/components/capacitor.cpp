@@ -3,7 +3,7 @@
  * @brief   A capacitor in the simulation model.
  */
 
-#include "capacitor.h"
+#include "components/capacitor.h"
 #include <memory>
 
 namespace Core {

@@ -3,7 +3,7 @@
  * @brief   Tests for the values and labels of a stepped parameter.
  */
 
-#include "parameter_step.h"
+#include "analysis/parameter_step.h"
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 #include <string>

@@ -3,7 +3,7 @@
  * @brief   Tests for what a math channel computes, as the schematic keeps and saves it, and its compiled program.
  */
 
-#include "math_channel.h"
+#include "plots/math_channel.h"
 
 #include <catch2/catch_test_macros.hpp>
 #include <optional>

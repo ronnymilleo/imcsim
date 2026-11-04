@@ -3,7 +3,7 @@
  * @brief   A ground reference (0 V node) in the simulation model.
  */
 
-#include "ground.h"
+#include "components/ground.h"
 #include <memory>
 
 namespace Core {

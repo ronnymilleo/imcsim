@@ -3,15 +3,15 @@
  * @brief   Tests for what an analysis takes from the circuit and the stored settings.
  */
 
-#include "analysis_inputs.h"
+#include "analysis/analysis_inputs.h"
 
 #include "components/current_source.h"
 #include "components/ground.h"
 #include "components/logic_input.h"
 #include "components/resistor.h"
 #include "components/voltage_source.h"
-#include "examples.h"
-#include "schematic.h"
+#include "document/examples.h"
+#include "document/schematic.h"
 #include "test_printers.h"
 #include <algorithm>
 #include <catch2/catch_test_macros.hpp>

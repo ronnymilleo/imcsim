@@ -7,7 +7,7 @@
 #ifndef IMCSIM_SOURCE_H
 #define IMCSIM_SOURCE_H
 
-#include "component.h"
+#include "components/component.h"
 
 namespace Core {
 

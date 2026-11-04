@@ -3,7 +3,7 @@
  * @brief   Schematic symbol of the pin markers that give a block its connections.
  */
 
-#include "ui_subcircuit_pin.h"
+#include "ui_elements/ui_subcircuit_pin.h"
 
 #include "components/subcircuit_pin.h"
 #include <array>

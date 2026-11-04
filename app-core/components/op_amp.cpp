@@ -7,7 +7,7 @@
  *          macromodels, which limits the output without the large internal currents of the original.
  */
 
-#include "op_amp.h"
+#include "components/op_amp.h"
 
 #include <algorithm>
 #include <array>

@@ -3,7 +3,7 @@
  * @brief   Straight wire segment between two grid points of the schematic.
  */
 
-#include "ui_wire.h"
+#include "ui_elements/ui_wire.h"
 
 #include <algorithm>
 

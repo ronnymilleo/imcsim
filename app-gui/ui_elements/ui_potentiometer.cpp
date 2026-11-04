@@ -3,10 +3,10 @@
  * @brief   Schematic symbol of a potentiometer.
  */
 
-#include "ui_potentiometer.h"
+#include "ui_elements/ui_potentiometer.h"
 
 #include "components/potentiometer.h"
-#include "spice_value.h"
+#include "spice/spice_value.h"
 #include <format>
 #include <memory>
 

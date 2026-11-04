@@ -3,9 +3,9 @@
  * @brief   Drawing shared by the schematic symbols of independent sources.
  */
 
-#include "ui_source.h"
+#include "ui_elements/ui_source.h"
 
-#include "spice_value.h"
+#include "spice/spice_value.h"
 #include <array>
 #include <cmath>
 #include <format>

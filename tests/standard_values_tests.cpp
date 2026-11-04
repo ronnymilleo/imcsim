@@ -3,7 +3,7 @@
  * @brief   Tests of the E series of standard component values.
  */
 
-#include "standard_values.h"
+#include "spice/standard_values.h"
 
 #include <array>
 #include <catch2/catch_test_macros.hpp>
