@@ -19,6 +19,7 @@ add_library(imcsim-gui-lib
             document/clipboard.cpp
             document/examples.cpp
             document/file_dialog.cpp
+            document/ready_blocks.cpp
             document/schematic.cpp
             document/schematic_file.cpp
             document/schematic_file_actions.cpp
@@ -129,6 +130,21 @@ foreach(example_file IN LISTS EXAMPLE_FILES)
     set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${example_file})
 endforeach()
 configure_file(example_files.h.in ${CMAKE_CURRENT_BINARY_DIR}/generated/example_files.h @ONLY)
+
+# =============================================================================
+# Ready blocks
+# =============================================================================
+
+# The ready logic blocks are compiled in the same way, each a file with one instance and its definition
+file(GLOB READY_BLOCK_FILES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/ready_blocks/*.imcsim)
+set(READY_BLOCK_FILE_ENTRIES "")
+foreach(block_file IN LISTS READY_BLOCK_FILES)
+    get_filename_component(block_name ${block_file} NAME)
+    file(READ ${block_file} block_text)
+    string(APPEND READY_BLOCK_FILE_ENTRIES "    {\"${block_name}\", R\"imcsim(${block_text})imcsim\"},\n")
+    set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${block_file})
+endforeach()
+configure_file(ready_block_files.h.in ${CMAKE_CURRENT_BINARY_DIR}/generated/ready_block_files.h @ONLY)
 
 # =============================================================================
 # Bundled fonts

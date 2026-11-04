@@ -371,7 +371,7 @@ void EditorWindow::Draw() {
     if (ImGui::Shortcut(ImGuiKey_Home)) {
         m_View.RequestFit();
     }
-    if (std::optional<PlacingMode> picked = m_PartPicker.Draw(ListPlaceableBlocks())) {
+    if (std::optional<EditorMode> picked = m_PartPicker.Draw(ListPlaceableBlocks())) {
         SetMode(std::move(*picked));
     }
     ApplyToolbarRequest(m_Toolbar.Draw(m_Mode, *m_Schematic, IsEditingSubcircuit()));

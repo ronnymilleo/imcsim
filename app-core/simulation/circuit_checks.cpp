@@ -26,13 +26,13 @@ constexpr int MAX_DC_SWEEP_POINTS = 100000;
 
 /**
  * @brief   Clocks, logic inputs, supply rails and logic parts tie themselves to node 0 in the netlist, so a circuit
- *          made only of them has its reference without a Ground part.
+ *          made only of them has its reference without a Ground part, and so does one whose blocks hold only them.
  */
 bool IsDigitalOnly(const Circuit &circuit) {
-    return std::ranges::all_of(circuit.GetEntries(), [](const CircuitEntry &entry) {
-        const ComponentType type = entry.Part->GetType();
+    return std::ranges::all_of(CollectParts(circuit), [](const Component *part) {
+        const ComponentType type = part->GetType();
         return type == ComponentType::CLOCK || type == ComponentType::LOGIC_INPUT || type == ComponentType::VCC ||
-               IsLogicPart(type);
+               type == ComponentType::SUBCIRCUIT || IsLogicPart(type);
     });
 }
 
@@ -234,9 +234,9 @@ std::optional<std::string> CheckLibraryModels(const Circuit &circuit) {
  * @brief   Checks that a circuit can be simulated at all.
  * @param[in] circuit  Circuit to check.
  * @return  The reason it cannot, in words for the user: it is empty, it has no ground (a circuit of only clocks, logic
- *          inputs, supply rails and logic parts needs none), a subcircuit instance or definition cannot be written (an
- *          unknown definition, a pin on ground, a parameter it lacks), a part uses a library model the circuit lacks or
- *          of another kind, or a current-controlled source follows no valid current; no value when it can.
+ *          inputs, supply rails and logic parts, in blocks or not, needs none), a subcircuit instance or definition
+ * cannot be written (an unknown definition, a pin on ground, a parameter it lacks), a part uses a library model the
+ * circuit lacks or of another kind, or a current-controlled source follows no valid current; no value when it can.
  */
 std::optional<std::string> CheckCircuit(const Circuit &circuit) {
     if (circuit.GetEntries().empty()) {

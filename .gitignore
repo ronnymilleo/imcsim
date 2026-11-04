@@ -6,5 +6,6 @@ compile_commands.json
 imgui.ini
 *.imcsim
 !app-gui/examples/*.imcsim
+!app-gui/ready_blocks/*.imcsim
 /graphify-out/
 .vs

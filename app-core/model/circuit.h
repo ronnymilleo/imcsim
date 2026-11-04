@@ -48,6 +48,7 @@ struct CurrentProbe {
 class Circuit {
 public:
     void Add(const Component &component, std::vector<int> nodes);
+    void ReserveNode(int node);
     void AddSubcircuit(std::shared_ptr<SubcircuitDefinition> definition);
     void AddLibraryModel(LibraryModel model);
     void AddDefinitionsOf(const Circuit &other);
