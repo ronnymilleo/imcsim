@@ -8,6 +8,7 @@
 #include "components/component.h"
 #include "components/net_label.h"
 #include "components/subcircuit.h"
+#include "document/block_nesting.h"
 #include "document/schematic_file.h"
 #include "document/subcircuit_pins.h"
 #include "editing/element_factory.h"
@@ -147,11 +148,10 @@ std::expected<void, std::string> CheckPinChoice(const std::vector<Schematic::Sub
  * @brief   The contents of a new block: a copy of the selection, with each marker named after its pin, and pins that
  *          reach nodes the outside can connect to.
  */
-std::expected<SavedSubcircuit, std::string> DrawDefinition(const std::vector<std::unique_ptr<UIElement>> &elements,
-                                                           const std::vector<UIWire> &wires,
-                                                           const std::set<std::size_t> &selected_elements,
-                                                           const std::set<std::size_t> &selected_wires,
-                                                           SavedSubcircuit definition) {
+std::expected<SavedSubcircuit, std::string>
+DrawDefinition(const std::vector<std::unique_ptr<UIElement>> &elements, const std::vector<UIWire> &wires,
+               const std::set<std::size_t> &selected_elements, const std::set<std::size_t> &selected_wires,
+               const std::vector<SavedSubcircuit> &definitions, SavedSubcircuit definition) {
     std::vector<const UIElement *> copied_elements;
     for (const std::size_t index : selected_elements) {
         copied_elements.push_back(elements[index].get());
@@ -160,7 +160,8 @@ std::expected<SavedSubcircuit, std::string> DrawDefinition(const std::vector<std
     for (const std::size_t index : selected_wires) {
         copied_wires.push_back(wires[index]);
     }
-    auto copied = LoadSchematic(SaveParts(copied_elements, copied_wires));
+    // The blocks the selection places go along, so their instances read back
+    auto copied = LoadSchematic(SaveParts(copied_elements, copied_wires, definitions));
     if (!copied) {
         return std::unexpected(copied.error());
     }
@@ -186,6 +187,79 @@ std::expected<SavedSubcircuit, std::string> DrawDefinition(const std::vector<std
  */
 std::string DescribeDefinition(const SavedSubcircuit &definition) {
     return SaveSchematic({}, {}, {}, {}, std::span<const SavedSubcircuit>(&definition, 1));
+}
+
+/**
+ * @brief   A copy of every definition that shares nothing with them, through the text of a file.
+ */
+std::vector<SavedSubcircuit> CopyDefinitions(const std::vector<SavedSubcircuit> &definitions) {
+    auto loaded = LoadSchematic(SaveSchematic({}, {}, {}, {}, definitions));
+    return loaded ? std::move(loaded->Subcircuits) : std::vector<SavedSubcircuit>{};
+}
+
+/**
+ * @brief   Brings the instances of a definition that changed up to date among some parts: their pins and edges, the
+ *          overrides of the parameters it still has, and the wires on their terminals, which follow the pins that go
+ *          on (matches gives the old pin each new one continues) and are removed from the pins that went away.
+ */
+void RefreshInstancesIn(std::vector<std::unique_ptr<UIElement>> &elements, std::vector<UIWire> &wires,
+                        const SavedSubcircuit &definition, const std::vector<std::string> &old_names,
+                        const std::vector<std::optional<std::size_t>> &matches) {
+    const std::string &name = definition.Name;
+    const std::vector<Core::SubcircuitParameter> &parameters = definition.Parameters;
+    std::vector<GridPoint> old_points;
+    std::vector<GridPoint> new_points;
+    std::vector<GridPoint> removed_points;
+    for (auto &element : elements) {
+        if (element->GetComponent().GetType() != Core::ComponentType::SUBCIRCUIT) {
+            continue;
+        }
+        auto &instance = static_cast<Core::SubcircuitInstance &>(element->GetComponent());
+        if (instance.GetDefinitionName() != name) {
+            continue;
+        }
+        const std::vector<std::string> instance_pins = instance.GetPins();
+        const std::vector<GridPoint> old_terminals = element->GetTerminals();
+        // The terminal an old pin had on this instance, found by its name in case the instance is behind
+        const auto old_terminal = [&](const std::size_t old_pin) -> std::optional<std::size_t> {
+            const auto terminal = std::ranges::find(instance_pins, old_names[old_pin]);
+            if (terminal == instance_pins.end()) {
+                return std::nullopt;
+            }
+            return static_cast<std::size_t>(terminal - instance_pins.begin());
+        };
+        const auto overrides = instance.GetParameters();
+        instance.ClearParameters();
+        for (const auto &[parameter, value] : overrides) {
+            if (std::ranges::contains(parameters, parameter, &Core::SubcircuitParameter::Name)) {
+                instance.SetParameter(parameter, value);
+            }
+        }
+        ApplyDefinitionPins(instance, definition);
+        const std::vector<GridPoint> new_terminals = element->GetTerminals();
+        std::set<std::size_t> kept_terminals;
+        for (std::size_t new_index = 0; new_index < matches.size(); ++new_index) {
+            const std::optional<std::size_t> old_pin = matches[new_index];
+            if (!old_pin) {
+                continue;
+            }
+            if (const std::optional<std::size_t> terminal = old_terminal(*old_pin)) {
+                kept_terminals.insert(*terminal);
+                old_points.push_back(old_terminals[*terminal]);
+                new_points.push_back(new_terminals[new_index]);
+            }
+        }
+        for (std::size_t terminal = 0; terminal < old_terminals.size(); ++terminal) {
+            if (!kept_terminals.contains(terminal)) {
+                removed_points.push_back(old_terminals[terminal]);
+            }
+        }
+    }
+    std::erase_if(wires, [&](const UIWire &wire) {
+        return std::ranges::contains(removed_points, wire.GetStart()) ||
+               std::ranges::contains(removed_points, wire.GetEnd());
+    });
+    wires = FollowTerminals(wires, old_points, new_points);
 }
 
 /**
@@ -396,18 +470,13 @@ void Schematic::Replace(std::vector<std::unique_ptr<UIElement>> elements, std::v
 /**
  * @brief   Lists the markers of the selection that would become the pins of a block made from it.
  * @return  The selected pin markers, in the order of the elements; the reason a block cannot be made
- * otherwise: nothing selected, a block in the selection (blocks do not nest), no marker, or markers that repeat a name
- * or share a node.
+ *          otherwise: nothing selected, no marker, or markers that repeat a name or share a node. Blocks in the
+ *          selection go into the new block.
  */
 std::expected<std::vector<Schematic::SubcircuitPinCandidate>, std::string>
 Schematic::GetSubcircuitPinCandidates() const {
     if (m_SelectedElements.empty()) {
         return std::unexpected("Select the circuit to turn into a subcircuit");
-    }
-    for (const std::size_t index : m_SelectedElements) {
-        if (m_Elements[index]->GetComponent().GetType() == Core::ComponentType::SUBCIRCUIT) {
-            return std::unexpected("Nested subcircuit instances are not supported");
-        }
     }
     auto candidates = CollectSubcircuitPinMarkers(m_Elements, m_Wires, &m_SelectedElements);
     if (candidates && candidates->empty()) {
@@ -483,7 +552,8 @@ Schematic::CreateSubcircuitFromSelection(std::string name, std::vector<SavedSubc
     made.Name = std::move(name);
     made.Pins = std::move(pins);
     made.Parameters = std::move(parameters);
-    auto drawn = DrawDefinition(m_Elements, m_Wires, m_SelectedElements, m_SelectedWires, std::move(made));
+    auto drawn =
+        DrawDefinition(m_Elements, m_Wires, m_SelectedElements, m_SelectedWires, m_Subcircuits, std::move(made));
     if (!drawn) {
         return std::unexpected(drawn.error());
     }
@@ -514,7 +584,8 @@ Schematic::CreateSubcircuitFromSelection(std::string name, std::vector<SavedSubc
 /**
  * @brief   Copies the contents of a block definition into a schematic of their own, to edit them.
  * @param[in] name  Name of the definition.
- * @return  The contents, with a PIN marker added at any pin that lost its marker; the reason otherwise.
+ * @return  The contents, with a PIN marker added at any pin that lost its marker, and a copy of the other blocks and
+ * the library models, which its parts may use; the reason otherwise.
  * @note    The copy shares nothing with this schematic; UpdateSubcircuit() puts the edited contents back.
  */
 std::expected<std::unique_ptr<Schematic>, std::string> Schematic::OpenSubcircuit(const std::string &name) const {
@@ -525,14 +596,18 @@ std::expected<std::unique_ptr<Schematic>, std::string> Schematic::OpenSubcircuit
     if (found->Spice) {
         return std::unexpected(name + " is SPICE text, which has no drawing to open");
     }
-    auto loaded = LoadSchematic(SaveSchematic({}, {}, {}, {}, std::span<const SavedSubcircuit>(&*found, 1)));
-    if (!loaded || loaded->Subcircuits.size() != 1) {
+    std::vector<SavedSubcircuit> definitions = CopyDefinitions(m_Subcircuits);
+    const auto copied = std::ranges::find(definitions, name, &SavedSubcircuit::Name);
+    if (copied == definitions.end()) {
         return std::unexpected("The subcircuit definition could not be opened");
     }
-    SavedSubcircuit &definition = loaded->Subcircuits.front();
+    SavedSubcircuit definition = std::move(*copied);
+    definitions.erase(copied);
     auto content = std::make_unique<Schematic>();
-    // The parts inside can use the library models of the document, as its own parts can
-    content->Replace(std::move(definition.Elements), std::move(definition.Wires), {}, {}, m_LibraryModels);
+    // The parts inside can use the blocks and library models of the document, as its own parts can; the block itself
+    // is left out, so it cannot be placed inside itself
+    content->Replace(std::move(definition.Elements), std::move(definition.Wires), {}, std::move(definitions),
+                     m_LibraryModels);
     for (const SavedSubcircuitPin &pin : definition.Pins) {
         const bool has_marker = std::ranges::any_of(content->GetElements(), [&](const auto &element) {
             return Core::IsSubcircuitPin(element->GetComponent().GetType()) &&
@@ -556,7 +631,8 @@ std::expected<std::unique_ptr<Schematic>, std::string> Schematic::OpenSubcircuit
  * @return  Nothing on success; the reason otherwise, with the schematic unchanged.
  * @note    A pin keeps the wires of its instances when its marker stays where it was, even renamed, or keeps its name;
  *          the wires on the terminals of the other old pins are removed, and the overrides of removed parameters
- *          are dropped. Call CommitUndoStep() after it, so it undoes in one step.
+ *          are dropped, in the schematic and inside the other blocks alike. A block that would contain itself,
+ *          directly or through another block, is refused. Call CommitUndoStep() after it, so it undoes in one step.
  */
 std::expected<void, std::string> Schematic::UpdateSubcircuit(const std::string &name, const Schematic &content,
                                                              const std::vector<SavedSubcircuitPin> &pins,
@@ -565,10 +641,8 @@ std::expected<void, std::string> Schematic::UpdateSubcircuit(const std::string &
     if (found == m_Subcircuits.end()) {
         return std::unexpected("Unknown subcircuit " + name);
     }
-    for (const auto &element : content.GetElements()) {
-        if (element->GetComponent().GetType() == Core::ComponentType::SUBCIRCUIT) {
-            return std::unexpected("Nested subcircuit instances are not supported");
-        }
+    if (UsesBlock(content.GetElements(), m_Subcircuits, name)) {
+        return std::unexpected(std::format("{} cannot contain itself, directly or through another block", name));
     }
     if (auto valid = ValidateMetadata(pins, parameters); !valid) {
         return std::unexpected(valid.error());
@@ -580,7 +654,7 @@ std::expected<void, std::string> Schematic::UpdateSubcircuit(const std::string &
     if (auto valid = ValidateExpressions(content.GetElements(), parameters); !valid) {
         return std::unexpected(valid.error());
     }
-    auto copied = LoadSchematic(SaveSchematic(content.GetElements(), content.GetWires(), {}, {}));
+    auto copied = LoadSchematic(SaveSchematic(content.GetElements(), content.GetWires(), {}, {}, m_Subcircuits));
     if (!copied) {
         return std::unexpected(copied.error());
     }
@@ -646,42 +720,39 @@ Schematic::UpdateSpiceSubcircuit(const std::string &name, const std::vector<Save
 
 /**
  * @brief   Adds the definitions a pasted group brought, so its instances have them.
- * @param[in]     definitions  Definitions the group's instances use.
+ * @param[in]     definitions  Definitions the group's instances use, with the blocks those place.
  * @param[in,out] instances    Elements of the group; the instances of a renamed definition are pointed at its new name.
- * @return  The name each definition has here, in order: its own, or the free name it was given.
+ * @return  The name each definition has here, in the order they came: its own, or the free name it was given.
  * @note    A definition equal to one of the same name already here is dropped, since the instances can use that one.
- *          One that differs is added under a free name, such as "block_2", so neither replaces the other.
+ *          One that differs is added under a free name, such as "block_2", so neither replaces the other; the blocks
+ *          that place it are pointed at that name too. Each block is merged after the blocks it places, so it is
+ *          compared with their names as they end up here.
  */
 std::vector<std::string> Schematic::MergeSubcircuits(std::vector<SavedSubcircuit> definitions,
                                                      std::vector<std::unique_ptr<UIElement>> &instances) {
-    std::vector<std::string> names;
-    for (SavedSubcircuit &definition : definitions) {
+    std::vector<std::string> names(definitions.size());
+    for (const std::size_t index : OrderByUse(definitions)) {
+        SavedSubcircuit &definition = definitions[index];
         const auto existing = std::ranges::find(m_Subcircuits, definition.Name, &SavedSubcircuit::Name);
         if (existing != m_Subcircuits.end() && DescribeDefinition(*existing) == DescribeDefinition(definition)) {
-            names.push_back(definition.Name);
+            names[index] = definition.Name;
             continue;
         }
         if (existing != m_Subcircuits.end()) {
             const std::string old_name = definition.Name;
             definition.Name = FindFreeName(old_name, m_Subcircuits);
-            for (auto &element : instances) {
-                if (element->GetComponent().GetType() != Core::ComponentType::SUBCIRCUIT) {
-                    continue;
-                }
-                auto &instance = static_cast<Core::SubcircuitInstance &>(element->GetComponent());
-                if (instance.GetDefinitionName() == old_name) {
-                    instance.SetDefinitionName(definition.Name);
-                }
+            RenameBlockInstances(instances, old_name, definition.Name);
+            for (SavedSubcircuit &other : definitions) {
+                RenameBlockInstances(other.Elements, old_name, definition.Name);
             }
         }
-        names.push_back(definition.Name);
+        names[index] = definition.Name;
         m_Subcircuits.push_back(std::move(definition));
         m_BuiltSubcircuits.reset();
         MarkModified();
     }
     return names;
 }
-
 /**
  * @brief   Adds device models from a library or a paste, so the parts that name them have them.
  * @param[in]     models       Models to add.
@@ -729,6 +800,20 @@ std::vector<std::string> Schematic::MergeLibraryModels(std::vector<Core::Library
         MarkModified();
     }
     return names;
+}
+
+/**
+ * @brief   Takes a copy of the blocks and library models of another schematic, as the contents of an open block need
+ *          those of the document after it gained some.
+ * @param[in] library  The schematic whose blocks and models are copied.
+ * @param[in] left_out  A block to leave out, such as the one these are the contents of, or empty.
+ * @note    The parts here are left as they are, so call it only with a library that still has every block they place.
+ */
+void Schematic::CopyDefinitionsFrom(const Schematic &library, const std::string_view left_out) {
+    m_Subcircuits = CopyDefinitions(library.m_Subcircuits);
+    std::erase_if(m_Subcircuits, [&](const SavedSubcircuit &definition) { return definition.Name == left_out; });
+    m_LibraryModels = library.m_LibraryModels;
+    m_BuiltSubcircuits.reset();
 }
 
 /**
@@ -1531,69 +1616,17 @@ void Schematic::FollowVoltageProbes() {
 }
 
 /**
- * @brief   Brings every instance of a definition that changed up to date: its pins and their edges, the overrides of
- *          the parameters it still has, and the wires on its terminals, which follow the pins that go on (matches gives
- *          the old pin each new one continues) and are removed from the pins that went away.
+ * @brief   Brings every instance of a definition that changed up to date, in the schematic and inside every block.
  */
 void Schematic::RefreshInstances(const SavedSubcircuit &definition, const std::vector<std::string> &old_names,
                                  const std::vector<std::optional<std::size_t>> &matches) {
-    const std::string &name = definition.Name;
-    const std::vector<Core::SubcircuitParameter> &parameters = definition.Parameters;
-    std::vector<GridPoint> old_points;
-    std::vector<GridPoint> new_points;
-    std::vector<GridPoint> removed_points;
-    for (auto &element : m_Elements) {
-        if (element->GetComponent().GetType() != Core::ComponentType::SUBCIRCUIT) {
-            continue;
-        }
-        auto &instance = static_cast<Core::SubcircuitInstance &>(element->GetComponent());
-        if (instance.GetDefinitionName() != name) {
-            continue;
-        }
-        const std::vector<std::string> instance_pins = instance.GetPins();
-        const std::vector<GridPoint> old_terminals = element->GetTerminals();
-        // The terminal an old pin had on this instance, found by its name in case the instance is behind
-        const auto old_terminal = [&](const std::size_t old_pin) -> std::optional<std::size_t> {
-            const auto terminal = std::ranges::find(instance_pins, old_names[old_pin]);
-            if (terminal == instance_pins.end()) {
-                return std::nullopt;
-            }
-            return static_cast<std::size_t>(terminal - instance_pins.begin());
-        };
-        const auto overrides = instance.GetParameters();
-        instance.ClearParameters();
-        for (const auto &[parameter, value] : overrides) {
-            if (std::ranges::contains(parameters, parameter, &Core::SubcircuitParameter::Name)) {
-                instance.SetParameter(parameter, value);
-            }
-        }
-        ApplyDefinitionPins(instance, definition);
-        const std::vector<GridPoint> new_terminals = element->GetTerminals();
-        std::set<std::size_t> kept_terminals;
-        for (std::size_t new_index = 0; new_index < matches.size(); ++new_index) {
-            const std::optional<std::size_t> old_pin = matches[new_index];
-            if (!old_pin) {
-                continue;
-            }
-            if (const std::optional<std::size_t> terminal = old_terminal(*old_pin)) {
-                kept_terminals.insert(*terminal);
-                old_points.push_back(old_terminals[*terminal]);
-                new_points.push_back(new_terminals[new_index]);
-            }
-        }
-        for (std::size_t terminal = 0; terminal < old_terminals.size(); ++terminal) {
-            if (!kept_terminals.contains(terminal)) {
-                removed_points.push_back(old_terminals[terminal]);
-            }
+    RefreshInstancesIn(m_Elements, m_Wires, definition, old_names, matches);
+    for (SavedSubcircuit &other : m_Subcircuits) {
+        if (&other != &definition) {
+            RefreshInstancesIn(other.Elements, other.Wires, definition, old_names, matches);
         }
     }
-    std::erase_if(m_Wires, [&](const UIWire &wire) {
-        return std::ranges::contains(removed_points, wire.GetStart()) ||
-               std::ranges::contains(removed_points, wire.GetEnd());
-    });
-    m_Wires = FollowTerminals(m_Wires, old_points, new_points);
 }
-
 /**
  * @brief   Measurements stay out of snapshots, so probing adds no undo step and does not count as a change.
  */

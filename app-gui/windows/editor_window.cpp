@@ -7,6 +7,7 @@
 
 #include "components/net_label.h"
 #include "components/subcircuit.h"
+#include "document/block_nesting.h"
 #include "document/subcircuit_pins.h"
 #include "drawing/schematic_drawing.h"
 #include "drawing/theme.h"
@@ -24,7 +25,6 @@
 #include <cmath>
 #include <format>
 #include <ranges>
-#include <span>
 #include <string>
 #include <utility>
 
@@ -371,10 +371,7 @@ void EditorWindow::Draw() {
     if (ImGui::Shortcut(ImGuiKey_Home)) {
         m_View.RequestFit();
     }
-    // Blocks do not nest, so inside one the picker offers parts only
-    const std::span<const SavedSubcircuit> blocks =
-        IsEditingSubcircuit() ? std::span<const SavedSubcircuit>() : std::span(m_RootSchematic.GetSubcircuits());
-    if (std::optional<PlacingMode> picked = m_PartPicker.Draw(blocks)) {
+    if (std::optional<PlacingMode> picked = m_PartPicker.Draw(ListPlaceableBlocks())) {
         SetMode(std::move(*picked));
     }
     ApplyToolbarRequest(m_Toolbar.Draw(m_Mode, *m_Schematic, IsEditingSubcircuit()));
@@ -557,8 +554,8 @@ void EditorWindow::DrawTimeBar() {
 }
 
 /**
- * @brief   While a block is open, its name and the way back to the schematic, in the top left corner of the canvas so
- *          they stay in sight wherever the toolbar wraps.
+ * @brief   While a block is open, the path from the schematic down to it, in the top left corner of the canvas so it
+ * stays in sight wherever the toolbar wraps; a click on a level above applies the blocks below it and goes back there.
  */
 void EditorWindow::DrawBlockBar(const ImVec2 origin) {
     if (!IsEditingSubcircuit()) {
@@ -566,18 +563,35 @@ void EditorWindow::DrawBlockBar(const ImVec2 origin) {
     }
     const ImVec2 after_canvas = ImGui::GetCursorScreenPos();
     const ImVec2 spacing = ImGui::GetStyle().ItemSpacing;
+    const ImVec4 text_color = ImGui::ColorConvertU32ToFloat4(GetPalette().CanvasText);
     ImGui::SetCursorScreenPos(origin + spacing);
-    if (ImGui::Button("Back to schematic")) {
-        FinishSubcircuitEditing(true);
+    std::optional<std::size_t> picked;
+    if (ImGui::Button("Schematic")) {
+        picked = 0;
     }
-    ImGui::SetItemTooltip("Apply the block changes and return to the schematic");
-    if (IsEditingSubcircuit()) {
+    ImGui::SetItemTooltip("Apply the open blocks and return to the schematic");
+    for (std::size_t level = 0; level < m_OpenBlocks.size(); ++level) {
         ImGui::SameLine();
         ImGui::AlignTextToFramePadding();
-        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(GetPalette().CanvasText), "Editing block: %s",
-                           m_EditingSubcircuit.c_str());
+        ImGui::TextColored(text_color, ">");
+        ImGui::SameLine();
+        const std::string &name = m_OpenBlocks[level].Name;
+        if (level + 1 == m_OpenBlocks.size()) {
+            ImGui::AlignTextToFramePadding();
+            ImGui::TextColored(text_color, "%s", name.c_str());
+            continue;
+        }
+        ImGui::PushID(static_cast<int>(level));
+        if (ImGui::Button(name.c_str())) {
+            picked = level + 1;
+        }
+        ImGui::PopID();
+        ImGui::SetItemTooltip("Apply the blocks inside %s and return to it", name.c_str());
     }
     ImGui::SetCursorScreenPos(after_canvas);
+    if (picked) {
+        ReturnToLevel(*picked);
+    }
 }
 
 /**
@@ -668,7 +682,7 @@ std::optional<MeasurementTarget> EditorWindow::FindTargetAt(const ViewTransform 
  *          asks.
  * @details Selecting keeps the selection, which a paste or a placed label has just made; every other mode starts with
  *          an empty selection, ending a drag in progress first. Wire mode asked again keeps the wire in progress, and
- *          placing starts over with the new part. A block cannot be placed inside a block.
+ *          placing starts over with the new part. A block cannot be placed where it would contain itself.
  */
 void EditorWindow::SetMode(EditorMode mode) {
     if (std::holds_alternative<SelectingMode>(mode)) {
@@ -678,7 +692,7 @@ void EditorWindow::SetMode(EditorMode mode) {
         return;
     }
     if (const auto *placing = std::get_if<PlacingMode>(&mode);
-        placing != nullptr && !placing->Block.empty() && IsEditingSubcircuit()) {
+        placing != nullptr && !placing->Block.empty() && !CanPlaceBlock(placing->Block)) {
         return;
     }
     ClearSelection();
@@ -716,17 +730,86 @@ void EditorWindow::StopEditing() {
 }
 
 bool EditorWindow::IsEditingSubcircuit() const {
-    return m_SubcircuitContent != nullptr;
+    return !m_OpenBlocks.empty();
 }
 
 /**
- * @brief   Quitting or opening another document while a block is open applies the block first, so its edits count as
- *          unsaved changes of the document instead of vanishing with it.
- * @details Returns false when the block cannot be applied, which leaves it open with the reason shown.
+ * @brief   Quitting or opening another document while blocks are open applies them first, innermost first, so their
+ *          edits count as unsaved changes of the document instead of vanishing with it.
+ * @details Returns false when a block cannot be applied, which leaves it open with the reason shown.
  */
 bool EditorWindow::LeaveSubcircuitForDocument() {
-    FinishSubcircuitEditing(true);
-    return !IsEditingSubcircuit();
+    return ReturnToLevel(0);
+}
+
+/**
+ * @brief   Applies the open blocks, innermost first, until as many are left open as asked: 0 goes back to the
+ * schematic.
+ * @details Returns false when a block cannot be applied, which stops there with the reason shown.
+ */
+bool EditorWindow::ReturnToLevel(const std::size_t depth) {
+    while (m_OpenBlocks.size() > depth) {
+        const std::size_t open = m_OpenBlocks.size();
+        FinishSubcircuitEditing(true);
+        if (m_OpenBlocks.size() == open) {
+            return false;
+        }
+    }
+    return true;
+}
+
+/**
+ * @brief   Shows a schematic, the document or the contents of a block, starting it unselected and framed.
+ * @details A drag belongs to the schematic it started on, and a part or a group on its way would land in the other one,
+ *          so both end first.
+ */
+void EditorWindow::ShowSchematic(Schematic &schematic) {
+    EndDrag();
+    if (std::holds_alternative<PlacingMode>(m_Mode) || std::holds_alternative<PastingMode>(m_Mode)) {
+        m_Mode = SelectingMode{};
+    }
+    m_Schematic = &schematic;
+    m_PartEditor.SetSchematic(schematic);
+    if (IsEditingSubcircuit()) {
+        OfferBlockParameters();
+    } else {
+        m_PartEditor.SetBlockParameters({});
+    }
+    m_Schematic->ClearSelection();
+    m_Overlays.Reset();
+    m_View.RequestDefaultFrame();
+}
+
+/**
+ * @brief   Whether a block can be placed where the editor is: never inside itself, nor inside a block it contains, at
+ *          any depth.
+ */
+bool EditorWindow::CanPlaceBlock(const std::string_view name) const {
+    return std::ranges::none_of(m_OpenBlocks, [&](const OpenBlock &block) {
+        return ContainsBlock(m_RootSchematic.GetSubcircuits(), name, block.Name);
+    });
+}
+
+/**
+ * @brief   The blocks of the document the part picker offers where the editor is, which CanPlaceBlock() allows.
+ */
+std::vector<const SavedSubcircuit *> EditorWindow::ListPlaceableBlocks() const {
+    std::vector<const SavedSubcircuit *> blocks;
+    for (const SavedSubcircuit &definition : m_RootSchematic.GetSubcircuits()) {
+        if (CanPlaceBlock(definition.Name)) {
+            blocks.push_back(&definition);
+        }
+    }
+    return blocks;
+}
+
+/**
+ * @brief   The contents of every open block take the blocks and models of the document again, after it gained some.
+ */
+void EditorWindow::SyncOpenBlockDefinitions() {
+    for (OpenBlock &block : m_OpenBlocks) {
+        block.Content->CopyDefinitionsFrom(m_RootSchematic, block.Name);
+    }
 }
 
 /**
@@ -763,49 +846,41 @@ void EditorWindow::RequestCreateSubcircuit() {
     m_SubcircuitDialogRequested = true;
 }
 
+/**
+ * @brief   Opens the block selected where the editor is, which may be inside another block: the way back up keeps the
+ *          path, and the block it leaves keeps its pins and parameters until the editor comes back to it.
+ * @details A block kept as SPICE text has no drawing to open, only its pins and parameters to set.
+ */
 void EditorWindow::RequestEditSelectedSubcircuit() {
-    if (IsEditingSubcircuit()) {
-        return;
-    }
-    const UIElement *element = m_RootSchematic.GetSelectedElement();
+    const UIElement *element = m_Schematic->GetSelectedElement();
     if (element == nullptr || element->GetComponent().GetType() != Core::ComponentType::SUBCIRCUIT) {
         return;
     }
-    const auto &instance = static_cast<const Core::SubcircuitInstance &>(element->GetComponent());
-    // A block kept as SPICE text has no drawing to open, only its pins and parameters to set
-    if (const auto spice =
-            std::ranges::find(m_RootSchematic.GetSubcircuits(), instance.GetDefinitionName(), &SavedSubcircuit::Name);
-        spice != m_RootSchematic.GetSubcircuits().end() && spice->Spice) {
-        m_SpiceDialog.OpenSettings(*spice);
+    const std::string name = static_cast<const Core::SubcircuitInstance &>(element->GetComponent()).GetDefinitionName();
+    const std::vector<SavedSubcircuit> &definitions = m_RootSchematic.GetSubcircuits();
+    const auto definition = std::ranges::find(definitions, name, &SavedSubcircuit::Name);
+    if (definition != definitions.end() && definition->Spice) {
+        m_SpiceDialog.OpenSettings(*definition);
         return;
     }
-    auto content = m_RootSchematic.OpenSubcircuit(instance.GetDefinitionName());
+    auto content = m_RootSchematic.OpenSubcircuit(name);
     if (!content) {
         m_SubcircuitError = content.error();
         m_SubcircuitDialogRequested = true;
         return;
     }
-    const auto definition =
-        std::ranges::find(m_RootSchematic.GetSubcircuits(), instance.GetDefinitionName(), &SavedSubcircuit::Name);
-    m_EditingSubcircuit = instance.GetDefinitionName();
-    m_SubcircuitName = m_EditingSubcircuit;
+    if (IsEditingSubcircuit()) {
+        m_OpenBlocks.back().Pins = std::move(m_SubcircuitPins);
+        m_OpenBlocks.back().Parameters = std::move(m_SubcircuitParameters);
+    }
+    m_OpenBlocks.push_back({.Name = name, .Content = std::move(*content), .Pins = {}, .Parameters = {}});
+    m_SubcircuitName = name;
     m_SubcircuitPins = definition->Pins;
     m_SubcircuitParameters = definition->Parameters;
-    m_SubcircuitContent = std::move(*content);
-    m_Schematic = m_SubcircuitContent.get();
-    m_PartEditor.SetSchematic(*m_Schematic);
-    OfferBlockParameters();
-    m_Schematic->ClearSelection();
-    m_Overlays.Reset();
-    // A part or a group on its way to the schematic would land in the block instead
-    if (std::holds_alternative<PlacingMode>(m_Mode) || std::holds_alternative<PastingMode>(m_Mode)) {
-        m_Mode = SelectingMode{};
-    }
-    m_View.RequestDefaultFrame();
+    ShowSchematic(*m_OpenBlocks.back().Content);
 }
-
 bool EditorWindow::SyncSubcircuitPins() {
-    auto markers = m_SubcircuitContent->GetSubcircuitPinMarkers();
+    auto markers = m_OpenBlocks.back().Content->GetSubcircuitPinMarkers();
     if (!markers) {
         m_SubcircuitError = markers.error();
         return false;
@@ -829,7 +904,8 @@ bool EditorWindow::SyncSubcircuitPins() {
 }
 
 bool EditorWindow::ApplySubcircuitPinNames() {
-    for (auto &element : m_SubcircuitContent->GetElements()) {
+    Schematic &content = *m_OpenBlocks.back().Content;
+    for (auto &element : content.GetElements()) {
         if (!Core::IsSubcircuitPin(element->GetComponent().GetType())) {
             continue;
         }
@@ -842,50 +918,62 @@ bool EditorWindow::ApplySubcircuitPinNames() {
         auto &marker = static_cast<Core::NetLabel &>(element->GetComponent());
         if (marker.GetNet() != pin->Name) {
             marker.SetNet(pin->Name);
-            m_SubcircuitContent->MarkModified();
+            content.MarkModified();
         }
     }
     return true;
 }
 
+/**
+ * @brief   Closes the innermost open block, applying it to the document or dropping its changes, and goes back to the
+ *          level above it.
+ * @details Applied, it is one undo step of the document, and the blocks still open take it too, since they may hold
+ *          instances of it. When it cannot be applied it stays open with the reason.
+ */
 void EditorWindow::FinishSubcircuitEditing(const bool apply) {
     if (!IsEditingSubcircuit()) {
         return;
     }
+    const OpenBlock &block = m_OpenBlocks.back();
     if (apply) {
         if (!SyncSubcircuitPins()) {
             m_SubcircuitDialogRequested = true;
             return;
         }
         // A block opened and closed without a change leaves the document unmodified
-        const auto definition =
-            std::ranges::find(m_RootSchematic.GetSubcircuits(), m_EditingSubcircuit, &SavedSubcircuit::Name);
-        const bool is_changed =
-            m_SubcircuitContent->IsModified() || definition == m_RootSchematic.GetSubcircuits().end() ||
-            definition->Pins != m_SubcircuitPins || definition->Parameters != m_SubcircuitParameters;
+        const auto definition = std::ranges::find(m_RootSchematic.GetSubcircuits(), block.Name, &SavedSubcircuit::Name);
+        const bool is_changed = block.Content->IsModified() || definition == m_RootSchematic.GetSubcircuits().end() ||
+                                definition->Pins != m_SubcircuitPins ||
+                                definition->Parameters != m_SubcircuitParameters;
         if (is_changed) {
-            auto updated = m_RootSchematic.UpdateSubcircuit(m_EditingSubcircuit, *m_SubcircuitContent, m_SubcircuitPins,
-                                                            m_SubcircuitParameters);
+            auto updated =
+                m_RootSchematic.UpdateSubcircuit(block.Name, *block.Content, m_SubcircuitPins, m_SubcircuitParameters);
             if (!updated) {
                 m_SubcircuitError = updated.error();
                 m_SubcircuitDialogRequested = true;
                 return;
             }
             m_RootSchematic.CommitUndoStep();
+            // Every copy holds the same blocks as the document, so they take it as the document did
+            for (std::size_t level = 0; level + 1 < m_OpenBlocks.size(); ++level) {
+                static_cast<void>(m_OpenBlocks[level].Content->UpdateSubcircuit(
+                    block.Name, *block.Content, m_SubcircuitPins, m_SubcircuitParameters));
+            }
         }
     }
-    m_SubcircuitContent.reset();
-    m_EditingSubcircuit.clear();
-    m_SubcircuitPins.clear();
-    m_SubcircuitParameters.clear();
-    m_Schematic = &m_RootSchematic;
-    m_PartEditor.SetSchematic(m_RootSchematic);
-    m_PartEditor.SetBlockParameters({});
-    m_Schematic->ClearSelection();
-    m_Overlays.Reset();
-    m_View.RequestDefaultFrame();
+    m_OpenBlocks.pop_back();
+    if (IsEditingSubcircuit()) {
+        OpenBlock &outer = m_OpenBlocks.back();
+        m_SubcircuitName = outer.Name;
+        m_SubcircuitPins = std::move(outer.Pins);
+        m_SubcircuitParameters = std::move(outer.Parameters);
+        ShowSchematic(*outer.Content);
+    } else {
+        m_SubcircuitPins.clear();
+        m_SubcircuitParameters.clear();
+        ShowSchematic(m_RootSchematic);
+    }
 }
-
 void EditorWindow::DrawSubcircuitDialog() {
     constexpr const char *POPUP = "Subcircuit block";
     if (std::exchange(m_SubcircuitDialogRequested, false)) {
@@ -923,7 +1011,7 @@ void EditorWindow::DrawSubcircuitPinRows(const bool editing) {
         ImGui::SameLine();
         // The edge the pin goes on comes from the way its marker points; picking another turns the marker about its
         // terminal, so its wires stay put
-        Schematic &markers = editing ? *m_SubcircuitContent : m_RootSchematic;
+        Schematic &markers = editing ? *m_OpenBlocks.back().Content : m_RootSchematic;
         const GridPoint point = m_SubcircuitPins[index].Point;
         const std::optional<Core::PinSide> side = FindMarkerSide(markers.GetElements(), point);
         ImGui::SetNextItemWidth(ImGui::GetFontSize() * PIN_SIDE_FIELD_WIDTH);
@@ -1003,7 +1091,7 @@ void EditorWindow::DrawSubcircuitDialogButtons(const bool editing) {
     if (ImGui::Button("Cancel")) {
         if (editing) {
             const auto definition =
-                std::ranges::find(m_RootSchematic.GetSubcircuits(), m_EditingSubcircuit, &SavedSubcircuit::Name);
+                std::ranges::find(m_RootSchematic.GetSubcircuits(), m_OpenBlocks.back().Name, &SavedSubcircuit::Name);
             m_SubcircuitPins = definition->Pins;
             m_SubcircuitParameters = definition->Parameters;
             OfferBlockParameters();
@@ -1042,6 +1130,10 @@ void EditorWindow::ApplySpiceBlockResult(SpiceBlockResult result) {
         return;
     }
     m_RootSchematic.CommitUndoStep();
+    // The open blocks hold copies of it, whose instances follow it as the document's do
+    for (OpenBlock &block : m_OpenBlocks) {
+        static_cast<void>(block.Content->UpdateSpiceSubcircuit(*result.UpdatedName, result.Pins, result.Parameters));
+    }
 }
 
 /**
@@ -1208,20 +1300,8 @@ std::optional<EditorMode> EditorWindow::HandleMode(ProbingMode & /*mode*/, Schem
 std::optional<EditorMode> EditorWindow::HandleMode(PastingMode &mode, SchematicCanvas &canvas,
                                                    const ViewTransform &view, const bool hovered) {
     PastedGroup &group = mode.Group;
-    if (ImGui::IsWindowFocused()) {
-        if (ImGui::IsKeyPressed(ImGuiKey_R)) {
-            TransformGroup(group, {.Type = PointTransform::Kind::QUARTER_TURN, .Delta = {}, .Pivot = {}});
-        }
-        if (ImGui::IsKeyPressed(ImGuiKey_M)) {
-            const bool top_to_bottom = ImGui::GetIO().KeyShift;
-            TransformGroup(group, {.Type = top_to_bottom ? PointTransform::Kind::MIRROR_TOP_BOTTOM
-                                                         : PointTransform::Kind::MIRROR_LEFT_RIGHT,
-                                   .Delta = {},
-                                   .Pivot = {}});
-        }
-        if (ImGui::IsKeyPressed(ImGuiKey_Escape)) {
-            return SelectingMode{};
-        }
+    if (ImGui::IsWindowFocused() && HandlePastingKeys(group)) {
+        return SelectingMode{};
     }
     if (!hovered) {
         return std::nullopt;
@@ -1240,12 +1320,51 @@ std::optional<EditorMode> EditorWindow::HandleMode(PastingMode &mode, SchematicC
     if (!ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
         return std::nullopt;
     }
+    PlacePastedGroup(group);
+    return SelectingMode{};
+}
 
+/**
+ * @brief   Turns or mirrors the pasted group by the keys pressed this frame.
+ * @return  True when Esc cancels the paste.
+ */
+bool EditorWindow::HandlePastingKeys(PastedGroup &group) {
+    if (ImGui::IsKeyPressed(ImGuiKey_R)) {
+        TransformGroup(group, {.Type = PointTransform::Kind::QUARTER_TURN, .Delta = {}, .Pivot = {}});
+    }
+    if (ImGui::IsKeyPressed(ImGuiKey_M)) {
+        const bool top_to_bottom = ImGui::GetIO().KeyShift;
+        TransformGroup(group, {.Type = top_to_bottom ? PointTransform::Kind::MIRROR_TOP_BOTTOM
+                                                     : PointTransform::Kind::MIRROR_LEFT_RIGHT,
+                               .Delta = {},
+                               .Pivot = {}});
+    }
+    return ImGui::IsKeyPressed(ImGuiKey_Escape);
+}
+
+/**
+ * @brief   Adds the pasted group to the schematic shown and selects it, after its blocks and models join the document.
+ * @details Inside an open block, a group that places a block containing the one being edited is refused with a
+ *          message, as it would make a block that contains itself.
+ */
+void EditorWindow::PlacePastedGroup(PastedGroup &group) {
+    // The blocks and models a group brings belong to the document, wherever it is pasted. Models go first, so a
+    // renamed one is renamed in the blocks too before they join
+    m_RootSchematic.MergeLibraryModels(std::move(group.Models), group.Elements, group.Subcircuits);
+    m_RootSchematic.MergeSubcircuits(std::move(group.Subcircuits), group.Elements);
+    if (IsEditingSubcircuit()) {
+        SyncOpenBlockDefinitions();
+        for (const std::string &used : ListUsedBlocks(group.Elements)) {
+            if (!CanPlaceBlock(used)) {
+                m_Files.QueueMessages(
+                    "Could not paste inside the block",
+                    {std::format("{} would contain itself, directly or through another block", used)});
+                return;
+            }
+        }
+    }
     const std::size_t first_element = m_Schematic->GetElements().size();
     const std::size_t first_wire = m_Schematic->GetWires().size();
-    // Models first, so a renamed one is renamed in the blocks too before they join
-    m_Schematic->MergeLibraryModels(std::move(group.Models), group.Elements, group.Subcircuits);
-    m_Schematic->MergeSubcircuits(std::move(group.Subcircuits), group.Elements);
     for (auto &element : group.Elements) {
         m_Schematic->AddElement(std::move(element));
     }
@@ -1261,7 +1380,6 @@ std::optional<EditorMode> EditorWindow::HandleMode(PastingMode &mode, SchematicC
         wires.insert(index);
     }
     m_Schematic->SetSelection(std::move(elements), std::move(wires));
-    return SelectingMode{};
 }
 
 /**
@@ -1340,20 +1458,11 @@ void EditorWindow::StartPasting() {
 }
 
 /**
- * @brief   Leaves every other mode, so the group is the only thing to place; a block cannot be pasted inside a block.
+ * @brief   Leaves every other mode, so the group is the only thing to place.
  */
 void EditorWindow::StartPastingGroup(PastedGroup group) {
-    const bool has_block = std::ranges::any_of(group.Elements, [](const auto &element) {
-        return element->GetComponent().GetType() == Core::ComponentType::SUBCIRCUIT;
-    });
-    if (IsEditingSubcircuit() && has_block) {
-        m_Files.QueueMessages("Could not paste inside the block",
-                              {"Blocks do not nest; paste the block on the schematic instead"});
-        return;
-    }
     SetMode(PastingMode{.Group = std::move(group)});
 }
-
 /**
  * @brief   Handles selection mode, active while not placing, wiring or probing: a click selects an element or a wire,
  *          Shift+click adds or removes one, a drag on empty canvas selects what the box touches, and a double click on
@@ -1394,8 +1503,7 @@ void EditorWindow::HandleSelection(const ViewTransform &view, const bool hovered
     if (hovered && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
         if (m_Schematic->GetSelectedElement() != nullptr) {
             EndDrag();
-            if (!IsEditingSubcircuit() &&
-                m_Schematic->GetSelectedElement()->GetComponent().GetType() == Core::ComponentType::SUBCIRCUIT) {
+            if (m_Schematic->GetSelectedElement()->GetComponent().GetType() == Core::ComponentType::SUBCIRCUIT) {
                 RequestEditSelectedSubcircuit();
             } else {
                 PlacePartPopover(view);
@@ -1803,8 +1911,7 @@ void EditorWindow::DrawContextMenu() {
         if (ImGui::MenuItem("Properties...", "Enter")) {
             m_PartPopoverRequested = true;
         }
-        if (!IsEditingSubcircuit() &&
-            m_Schematic->GetSelectedElement()->GetComponent().GetType() == Core::ComponentType::SUBCIRCUIT &&
+        if (m_Schematic->GetSelectedElement()->GetComponent().GetType() == Core::ComponentType::SUBCIRCUIT &&
             ImGui::MenuItem("Edit Block Contents")) {
             RequestEditSelectedSubcircuit();
         }
@@ -2084,31 +2191,32 @@ void EditorWindow::DrawTurnMenuItems(const bool part_selected) {
 }
 
 /**
- * @brief   Making a block from the selection and opening one, or, inside a block, its settings and the ways out.
+ * @brief   Making a block from the selection, opening the selected block, and, inside a block, its settings and the
+ *          ways out.
  */
 void EditorWindow::DrawBlockMenuItems() {
-    if (IsEditingSubcircuit()) {
-        if (ImGui::MenuItem("Block Pin and Parameter Settings...")) {
-            SyncSubcircuitPins();
-            m_SubcircuitDialogRequested = true;
-        }
-        if (ImGui::MenuItem("Apply Block and Return")) {
-            FinishSubcircuitEditing(true);
-        }
-        if (ImGui::MenuItem("Discard Block Changes")) {
-            FinishSubcircuitEditing(false);
-        }
-    } else {
-        if (ImGui::MenuItem("Create Block from Selection...", nullptr, false, m_Schematic->HasSelection())) {
-            RequestCreateSubcircuit();
-        }
-        const UIElement *selected = m_Schematic->GetSelectedElement();
-        const bool block_selected =
-            selected != nullptr && selected->GetComponent().GetType() == Core::ComponentType::SUBCIRCUIT;
-        if (ImGui::MenuItem("Edit Block Contents", nullptr, false, block_selected)) {
-            RequestEditSelectedSubcircuit();
-        }
+    if (!IsEditingSubcircuit() &&
+        ImGui::MenuItem("Create Block from Selection...", nullptr, false, m_Schematic->HasSelection())) {
+        RequestCreateSubcircuit();
+    }
+    const UIElement *selected = m_Schematic->GetSelectedElement();
+    const bool block_selected =
+        selected != nullptr && selected->GetComponent().GetType() == Core::ComponentType::SUBCIRCUIT;
+    if (ImGui::MenuItem("Edit Block Contents", nullptr, false, block_selected)) {
+        RequestEditSelectedSubcircuit();
+    }
+    if (!IsEditingSubcircuit()) {
+        return;
+    }
+    if (ImGui::MenuItem("Block Pin and Parameter Settings...")) {
+        SyncSubcircuitPins();
+        m_SubcircuitDialogRequested = true;
+    }
+    if (ImGui::MenuItem("Apply Block and Return")) {
+        FinishSubcircuitEditing(true);
+    }
+    if (ImGui::MenuItem("Discard Block Changes")) {
+        FinishSubcircuitEditing(false);
     }
 }
-
 } // namespace GUI

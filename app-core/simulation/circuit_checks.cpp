@@ -142,14 +142,16 @@ std::optional<std::string> CheckExpressions(const Circuit &body, const Subcircui
 }
 
 /**
- * @brief   Every instance needs a known definition with a node for each pin and parameters it has, and every definition
- *          in use needs pins it can connect and parameters for its parts.
+ * @brief   The instances of one circuit or block body: each needs a known definition with a node for each pin and
+ *          parameters it has, and each definition pins it can connect and parameters for its parts; the blocks inside
+ *          a definition are checked the same way, once each.
+ * @details open holds the blocks being looked into on the way down, so one that places itself, directly or through
+ *          another, is caught instead of looped through.
  */
-std::optional<std::string> CheckSubcircuits(const Circuit &circuit) {
-    if (std::optional<std::string> problem = CheckExpressions(circuit, nullptr)) {
-        return problem;
-    }
-    for (const CircuitEntry &entry : circuit.GetEntries()) {
+std::optional<std::string> CheckInstances(const Circuit &circuit, const Circuit &body,
+                                          std::set<std::string, std::less<>> &checked,
+                                          std::set<std::string, std::less<>> &open) {
+    for (const CircuitEntry &entry : body.GetEntries()) {
         if (entry.Part->GetType() != ComponentType::SUBCIRCUIT) {
             continue;
         }
@@ -168,14 +170,39 @@ std::optional<std::string> CheckSubcircuits(const Circuit &circuit) {
                                    definition->Name);
             }
         }
+        if (open.contains(definition->Name)) {
+            return std::format("{} contains itself, directly or through another block", definition->Name);
+        }
+        if (!checked.insert(definition->Name).second) {
+            continue;
+        }
         if (std::optional<std::string> problem = CheckPins(*definition)) {
             return problem;
         }
         if (std::optional<std::string> problem = CheckExpressions(definition->Body, definition.get())) {
             return problem;
         }
+        open.insert(definition->Name);
+        if (std::optional<std::string> problem = CheckInstances(circuit, definition->Body, checked, open)) {
+            return problem;
+        }
+        open.erase(definition->Name);
     }
     return std::nullopt;
+}
+
+/**
+ * @brief   Every instance needs a known definition with a node for each pin and parameters it has, and every definition
+ *          in use needs pins it can connect and parameters for its parts, down to the blocks inside blocks; no block
+ *          may contain itself.
+ */
+std::optional<std::string> CheckSubcircuits(const Circuit &circuit) {
+    if (std::optional<std::string> problem = CheckExpressions(circuit, nullptr)) {
+        return problem;
+    }
+    std::set<std::string, std::less<>> checked;
+    std::set<std::string, std::less<>> open;
+    return CheckInstances(circuit, circuit, checked, open);
 }
 
 /**

@@ -44,12 +44,11 @@ void PartPicker::RequestOpen() {
 
 /**
  * @brief   Opens the picker on Space or when asked, and draws it while it is open.
- * @param[in] blocks  The blocks of the document, listed after the parts, or none inside a block, since blocks do not
- *                    nest.
+ * @param[in] blocks  The blocks that can be placed where the editor is, listed after the parts.
  * @return  The part or the block to place, on the frame it is picked, or no value.
  * @note    Call it inside the editor window, before anything that reads Esc: Esc only closes the list.
  */
-std::optional<PlacingMode> PartPicker::Draw(const std::span<const SavedSubcircuit> blocks) {
+std::optional<PlacingMode> PartPicker::Draw(const std::vector<const SavedSubcircuit *> &blocks) {
     OpenIfAsked();
     // Hangs from its top edge, a third of the way down the editor, so it stays put as the list filters
     const ImVec2 anchor = {ImGui::GetWindowPos().x + ImGui::GetWindowWidth() / 2.0f,
@@ -113,11 +112,11 @@ PlacingMode PartPicker::PartMatches::Get(const std::size_t index) const {
  * @brief   The parts whose names hold the query, and the blocks whose names hold it as typed.
  */
 PartPicker::PartMatches PartPicker::FindMatches(const std::string &query,
-                                                const std::span<const SavedSubcircuit> blocks) {
+                                                const std::vector<const SavedSubcircuit *> &blocks) {
     PartMatches matches{.Parts = FindParts(query), .Blocks = {}};
-    for (const SavedSubcircuit &definition : blocks) {
-        if (definition.Name.contains(query)) {
-            matches.Blocks.push_back(&definition);
+    for (const SavedSubcircuit *definition : blocks) {
+        if (definition->Name.contains(query)) {
+            matches.Blocks.push_back(definition);
         }
     }
     return matches;

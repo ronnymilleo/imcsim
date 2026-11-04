@@ -11,7 +11,6 @@
 #include "preferences.h"
 #include <cstddef>
 #include <optional>
-#include <span>
 #include <string>
 #include <vector>
 
@@ -27,7 +26,7 @@ public:
     explicit PartPicker(const Preferences &preferences);
 
     void RequestOpen();
-    std::optional<PlacingMode> Draw(std::span<const SavedSubcircuit> blocks);
+    std::optional<PlacingMode> Draw(const std::vector<const SavedSubcircuit *> &blocks);
 
 private:
     /**
@@ -51,7 +50,7 @@ private:
     /// Whether a menu asked to open the picker on the next frame.
     bool m_IsOpenRequested = false;
 
-    static PartMatches FindMatches(const std::string &query, std::span<const SavedSubcircuit> blocks);
+    static PartMatches FindMatches(const std::string &query, const std::vector<const SavedSubcircuit *> &blocks);
     void OpenIfAsked();
     bool MoveHighlight(std::size_t match_count);
     std::optional<PlacingMode> DrawMatches(const PartMatches &matches, bool moved);
