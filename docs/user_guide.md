@@ -173,12 +173,18 @@ schematic file keeps the definition of each block, so it opens anywhere without 
   the definitions of the blocks they copy, to this schematic or another one; a pasted block that differs from one of
   the same name already there joins under a name of its own, such as `RC_LOWPASS_2`.
 - **Editing a block**: double click an instance, or pick Edit > Edit Block Contents, to open its contents in the
-  editor, with Back to schematic and the name of the block over the corner of the canvas. Edit > Block Pin and
-  Parameter Settings opens the dialog again, where Apply keeps the pin names, edges and parameters. Back to schematic
-  applies the changes to every instance at once, as one undo step, and Edit > Discard Block Changes leaves the block as
-  it was. A pin that keeps its marker, even renamed or on another edge, keeps the wires of its instances; the wires of a
-  pin that went away are removed. Quitting, or opening an example, applies an open block first, so its changes count
-  as unsaved changes of the schematic. Blocks do not nest: a block cannot hold another.
+  editor, with the path from the schematic down to the block over the corner of the canvas, such as
+  `Schematic > AMPLIFIER > STAGE`. Edit > Block Pin and Parameter Settings opens the dialog again, where Apply keeps
+  the pin names, edges and parameters. A click on a level of the path, or Edit > Apply Block and Return, applies the
+  changes to every instance at once, as one undo step, and Edit > Discard Block Changes leaves the block as it was. A
+  pin that keeps its marker, even renamed or on another edge, keeps the wires of its instances; the wires of a pin that
+  went away are removed. Quitting, or opening an example, applies the open blocks first, so their changes count as
+  unsaved changes of the schematic.
+- **Blocks inside blocks**: a block can hold other blocks. Select them with the rest of the circuit to make a bigger
+  block, or place one while a block is open, from the part search or by pasting. Double click a block inside an open
+  block to go one level down; the path leads back up a level at a time, each one applied on the way. A block can never
+  hold itself, directly or through another block: the part search leaves those out, and a paste or an apply that would
+  make one is refused.
 - **SPICE libraries**: File > Import SPICE Library reads a vendor's `.lib`, `.mod`, `.sub` or `.cir` file and lists its
   subcircuits and its diode and transistor models.
   - A picked subcircuit becomes a block kept as SPICE text: imcsim simulates its text as it came, with the `.model`,
