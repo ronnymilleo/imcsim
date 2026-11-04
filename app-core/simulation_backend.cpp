@@ -105,8 +105,8 @@ std::optional<std::string> FindUnsupported(const SimulationBackend &backend, con
 std::optional<std::string> FindUnsupported(const SimulationBackend &backend, const Circuit &circuit,
                                            const AnalysisKind kind) {
     std::set<ComponentType> parts;
-    for (const CircuitEntry &entry : circuit.GetEntries()) {
-        parts.insert(entry.Part->GetType());
+    for (const Component *part : CollectParts(circuit)) {
+        parts.insert(part->GetType());
     }
     return FindUnsupported(backend, parts, kind);
 }

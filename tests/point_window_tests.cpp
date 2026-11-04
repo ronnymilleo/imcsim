@@ -71,6 +71,18 @@ TEST_CASE("A slice keeps the same points of every time, node and current, and th
     CHECK_FALSE(slice.IsComplete);
 }
 
+TEST_CASE("A window left over from a longer result slices only the points there are", "[point_window]") {
+    // Picking a shorter step of a stepped run swaps the result under a window made for the old one
+    const Core::Transient past_the_end = GUI::SliceTransient(CountingTransient(5), {.First = 3, .Count = 10});
+    CHECK(past_the_end.Times == std::vector<double>{3.0, 4.0});
+    CHECK(past_the_end.NodeVoltages[1] == std::vector<double>{6.0, 8.0});
+    CHECK(past_the_end.Currents[0].Values == std::vector<double>{3.0, 4.0});
+
+    const Core::Transient beyond = GUI::SliceTransient(CountingTransient(5), {.First = 8, .Count = 2});
+    CHECK(beyond.Times.empty());
+    CHECK(beyond.NodeVoltages[1].empty());
+}
+
 TEST_CASE("A slice by time reaches one point past each edge, so the lines cross the edges of the plot",
           "[point_window]") {
     const Core::Transient transient = CountingTransient(100);

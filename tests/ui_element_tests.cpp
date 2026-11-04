@@ -16,6 +16,7 @@
 #include "ui_elements/ui_op_amp.h"
 #include "ui_elements/ui_potentiometer.h"
 #include "ui_elements/ui_resistor.h"
+#include "ui_elements/ui_subcircuit_pin.h"
 #include "ui_elements/ui_switch.h"
 #include "ui_elements/ui_transformer.h"
 #include "ui_elements/ui_vcc.h"
@@ -54,6 +55,20 @@ TEST_CASE("A net label has a single terminal at its position and leads upward be
     const GUI::UINetLabel turned({5, 5}, GUI::Rotation::R90);
     CHECK(turned.GetTerminals() == std::vector<GUI::GridPoint>{{5, 5}});
     CHECK(turned.Contains({5.8f, 5.0f}));
+}
+
+TEST_CASE("A pin marker has one terminal at the tip of its arrow and the square behind it", "[ui_element]") {
+    const GUI::UISubcircuitPin marker({5, 5}, GUI::Rotation::R0);
+    CHECK(marker.GetComponent().GetType() == Core::ComponentType::PIN);
+    CHECK(marker.GetTerminals() == std::vector<GUI::GridPoint>{{5, 5}});
+    // Unturned, the arrow points right, so the square lies to the left of the terminal
+    CHECK(marker.GetTerminalInward(0) == GUI::GridPoint{-1, 0});
+    CHECK(marker.Contains({4.0f, 5.0f}));
+    CHECK_FALSE(marker.Contains({6.0f, 5.0f}));
+
+    const GUI::UISubcircuitPin turned({5, 5}, GUI::Rotation::R90);
+    CHECK(turned.GetTerminalInward(0) == GUI::GridPoint{0, -1});
+    CHECK(turned.Contains({5.0f, 4.0f}));
 }
 
 TEST_CASE("Elements own a component of their type", "[ui_element]") {
@@ -299,4 +314,13 @@ TEST_CASE("Every gate and flip-flop has one terminal for each input and each out
         CHECK(part.GetTerminals().size() ==
               Core::GetLogicInputLabels(type).size() + Core::GetLogicOutputLabels(type).size());
     }
+}
+
+TEST_CASE("A part inside a block that follows a parameter shows the parameter as its value", "[ui_element]") {
+    GUI::UIResistor resistor({0, 0}, GUI::Rotation::R0);
+    Core::Component &component = resistor.GetComponent();
+    component.SetValue(4700.0);
+    CHECK(GUI::GetValueLabel(component) == "4.7k");
+    component.SetValueExpression("{RTOP}");
+    CHECK(GUI::GetValueLabel(component) == "{RTOP}");
 }

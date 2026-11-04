@@ -16,14 +16,19 @@
 #include "components/potentiometer.h"
 #include "components/relay.h"
 #include "components/source.h"
+#include "components/subcircuit.h"
 #include "components/switch.h"
 #include "components/transformer.h"
 #include "components/voltage_controlled_switch.h"
 #include "spice_value.h"
+#include "subcircuit.h"
 #include <algorithm>
 #include <array>
+#include <cctype>
 #include <format>
 #include <iterator>
+#include <set>
+#include <sstream>
 #include <utility>
 
 namespace Core {
@@ -248,6 +253,170 @@ void AddModelLine(std::string spice_name, const std::string &line, std::vector<s
     written_names.push_back(std::move(spice_name));
 }
 
+std::string FormatComponentValue(const Component &component) {
+    if (const auto &expression = component.GetValueExpression()) {
+        return *expression;
+    }
+    return FormatSpiceValue(component.GetValue());
+}
+
+bool IsModelNameCharacter(const char character) {
+    return std::isalnum(static_cast<unsigned char>(character)) != 0 || character == '_' || character == '-';
+}
+
+std::string ToLowerCase(const std::string_view text) {
+    std::string lower(text);
+    std::ranges::transform(lower, lower.begin(),
+                           [](const unsigned char character) { return static_cast<char>(std::tolower(character)); });
+    return lower;
+}
+
+// The line of a diode or a transistor, with the line of its model added to models the first time it comes up. A
+// library model is written once, with the other library models, after the parts. The body of a MOSFET is tied to its
+// source, past its probe, so the source current includes it; a library model brings its own channel size
+std::string FormatModeledPart(const Component &component, const std::vector<int> &nodes,
+                              std::vector<std::string> &model_names, std::string &models) {
+    const ComponentType type = component.GetType();
+    if (IsDiode(type)) {
+        const auto &diode = static_cast<const Diode &>(component);
+        const std::string model_name = diode.GetSpiceModelName();
+        if (!diode.HasLibraryModel()) {
+            AddModelLine(model_name, FormatDiodeModel(model_name, diode.GetParameters()), model_names, models);
+        }
+        return std::format("{} {} {} {}\n", diode.GetName(), nodes[0], nodes[1], model_name);
+    }
+    if (IsBJT(type)) {
+        const auto &bjt = static_cast<const BJT &>(component);
+        const std::string model_name = bjt.GetSpiceModelName();
+        if (!bjt.HasLibraryModel()) {
+            AddModelLine(model_name, FormatBJTModel(type, model_name, bjt.GetParameters()), model_names, models);
+        }
+        return std::format("{} {} {} {} {}\n", bjt.GetName(), nodes[0], nodes[1], nodes[2], model_name);
+    }
+    const auto &mosfet = static_cast<const MOSFET &>(component);
+    const std::string model_name = mosfet.GetSpiceModelName();
+    if (mosfet.HasLibraryModel()) {
+        return std::format("{} {} {} {} {} {}\n", mosfet.GetName(), nodes[0], nodes[1], nodes[2], nodes[2], model_name);
+    }
+    const MOSFETParameters &parameters = mosfet.GetParameters();
+    AddModelLine(model_name, FormatMOSFETModel(type, model_name, parameters), model_names, models);
+    return std::format("{} {} {} {} {} {} W={:.6g} L={:.6g}\n", mosfet.GetName(), nodes[0], nodes[1], nodes[2],
+                       nodes[2], model_name, parameters.Width, parameters.Length);
+}
+
+// Every library model of a circuit, under the names the parts use, after the models of the parts
+std::string FormatLibraryModels(const std::vector<LibraryModel> &library_models) {
+    std::string text;
+    for (const LibraryModel &model : library_models) {
+        text += FormatLibraryModel(model);
+    }
+    return text;
+}
+
+// The names a body declares with .model or .subckt, lowercase, since SPICE reads names without regard to case
+std::set<std::string> CollectDeclaredNames(const std::string &body) {
+    std::set<std::string> declared;
+    std::istringstream lines(body);
+    std::string line;
+    while (std::getline(lines, line)) {
+        std::istringstream fields(line);
+        std::string directive;
+        std::string name;
+        if (!(fields >> directive >> name)) {
+            continue;
+        }
+        directive = ToLowerCase(directive);
+        if (directive == ".model" || directive == ".subckt") {
+            declared.insert(ToLowerCase(name));
+        }
+    }
+    return declared;
+}
+
+// One line with the declared names prefixed. A comment stays as it is, and the first word of an element line is left
+// alone: it is the element's own name, whose first letter says what the element is
+std::string ScopeLine(const std::string_view line, const std::set<std::string> &declared, const std::string &prefix) {
+    const std::size_t first = line.find_first_not_of(" \t");
+    if (first == std::string_view::npos || line[first] == '*') {
+        return std::string(line);
+    }
+    bool is_first_word = line[first] != '.' && line[first] != '+';
+    std::string scoped;
+    for (std::size_t position = 0; position < line.size();) {
+        if (!IsModelNameCharacter(line[position])) {
+            scoped += line[position++];
+            continue;
+        }
+        const std::size_t start = position;
+        while (position < line.size() && IsModelNameCharacter(line[position])) {
+            ++position;
+        }
+        const std::string token(line.substr(start, position - start));
+        const bool is_element_name = std::exchange(is_first_word, false);
+        scoped += !is_element_name && declared.contains(ToLowerCase(token)) ? prefix + token : token;
+    }
+    return scoped;
+}
+
+// Model names are global in ngspice, even when their declarations sit inside a subcircuit. Prefix every declaration
+// and reference of a definition so equal custom parts in two definitions cannot replace each other's models
+std::string ScopeModels(const std::string &body, const std::string_view definition_name) {
+    const std::set<std::string> declared = CollectDeclaredNames(body);
+    const std::string prefix = std::format("imcsim_{}_", definition_name);
+    std::string scoped;
+    scoped.reserve(body.size() + declared.size() * prefix.size());
+    std::size_t start = 0;
+    while (start < body.size()) {
+        const std::size_t end = body.find('\n', start);
+        const std::size_t length = end == std::string::npos ? std::string::npos : end - start;
+        scoped += ScopeLine(std::string_view(body).substr(start, length), declared, prefix);
+        if (end == std::string::npos) {
+            break;
+        }
+        scoped += '\n';
+        start = end + 1;
+    }
+    return scoped;
+}
+
+// A drawn block lists the nodes of its pins and writes its body as a netlist; a block kept as SPICE text lists the
+// ports of its .subckt line and writes its text as it came
+std::string FormatSubcircuit(const SubcircuitDefinition &definition) {
+    std::string text = std::format(".subckt {}", definition.Name);
+    if (definition.Spice) {
+        for (const std::string &port : definition.Spice->Ports) {
+            text += std::format(" {}", port);
+        }
+    } else {
+        for (const SubcircuitPin &pin : definition.Pins) {
+            text += std::format(" {}", pin.Node);
+        }
+    }
+    if (!definition.Parameters.empty()) {
+        text += " params:";
+        for (const SubcircuitParameter &parameter : definition.Parameters) {
+            text += std::format(" {}={}", parameter.Name, FormatSpiceValue(parameter.DefaultValue));
+        }
+    }
+    text += "\n";
+    std::string body;
+    if (definition.Spice) {
+        body = definition.Spice->Text;
+        if (!body.empty() && !body.ends_with('\n')) {
+            body += '\n';
+        }
+    } else {
+        body = definition.Body.ToSpiceNetlist();
+        body.erase(0, body.find('\n') + 1);
+        if (body.ends_with(".end\n")) {
+            body.erase(body.size() - 5);
+        }
+    }
+    text += ScopeModels(body, definition.Name);
+    text += std::format(".ends {}\n", definition.Name);
+    return text;
+}
+
 } // namespace
 
 /**
@@ -263,11 +432,76 @@ void Circuit::Add(const Component &component, std::vector<int> nodes) {
 }
 
 /**
+ * @brief   Adds a subcircuit definition, which the instances of the circuit refer to by name.
+ * @param[in] definition  Definition to write as a .subckt block; it is shared, not copied.
+ */
+void Circuit::AddSubcircuit(std::shared_ptr<SubcircuitDefinition> definition) {
+    m_Subcircuits.push_back(std::move(definition));
+}
+
+/**
+ * @brief   Adds a model from a library, which the diodes and transistors of the circuit can use by name.
+ * @param[in] model  Model to write in the netlist, under GetLibraryModelSpiceName().
+ */
+void Circuit::AddLibraryModel(LibraryModel model) {
+    m_LibraryModels.push_back(std::move(model));
+}
+
+/**
+ * @brief   Adds the subcircuit definitions and library models of another circuit, as a circuit derived from it needs.
+ * @param[in] other  Circuit whose definitions are shared and whose models are copied.
+ */
+void Circuit::AddDefinitionsOf(const Circuit &other) {
+    for (const auto &definition : other.m_Subcircuits) {
+        m_Subcircuits.push_back(definition);
+    }
+    for (const LibraryModel &model : other.m_LibraryModels) {
+        m_LibraryModels.push_back(model);
+    }
+}
+
+/**
  * @brief   Returns the components of the circuit, in the order they were added.
  * @return  Every component with the nodes of its terminals.
  */
 const std::vector<CircuitEntry> &Circuit::GetEntries() const {
     return m_Entries;
+}
+
+/**
+ * @brief   Returns the subcircuit definitions, in the order they were added.
+ * @return  Every definition, used by an instance or not.
+ */
+const std::vector<std::shared_ptr<SubcircuitDefinition>> &Circuit::GetSubcircuits() const {
+    return m_Subcircuits;
+}
+
+/**
+ * @brief   Finds a subcircuit definition by name.
+ * @param[in] name  Name of the definition.
+ * @return  The definition, or null when the circuit has none of that name.
+ */
+std::shared_ptr<const SubcircuitDefinition> Circuit::FindSubcircuit(const std::string_view name) const {
+    const auto found = std::ranges::find(m_Subcircuits, name, &SubcircuitDefinition::Name);
+    return found != m_Subcircuits.end() ? *found : nullptr;
+}
+
+/**
+ * @brief   Returns the library models of the circuit.
+ * @return  Every model, used by a part or not.
+ */
+const std::vector<LibraryModel> &Circuit::GetLibraryModels() const {
+    return m_LibraryModels;
+}
+
+/**
+ * @brief   Finds a library model by the name its library gives it.
+ * @param[in] name  Name of the model.
+ * @return  The model, or null when the circuit has none of that name.
+ */
+const LibraryModel *Circuit::FindLibraryModel(const std::string_view name) const {
+    const auto found = std::ranges::find(m_LibraryModels, name, &LibraryModel::Name);
+    return found != m_LibraryModels.end() ? &*found : nullptr;
 }
 
 /**
@@ -280,27 +514,29 @@ int Circuit::GetNodeCount() const {
 
 /**
  * @brief   Tells whether the circuit has a ground reference.
- * @return  True when it contains at least one ground component; without one, node voltages are undefined.
+ * @return  True when it, or a subcircuit one of its instances uses, contains a ground component; without one, node
+ *          voltages are undefined.
  */
 bool Circuit::HasGround() const {
-    return std::ranges::any_of(
-        m_Entries, [](const CircuitEntry &entry) { return entry.Part->GetType() == ComponentType::GROUND; });
+    return std::ranges::any_of(CollectParts(*this),
+                               [](const Component *part) { return part->GetType() == ComponentType::GROUND; });
 }
 
 /**
  * @brief   Tells whether the circuit has a source that an AC sweep can excite.
- * @return  True when it contains at least one voltage or current source set to AC.
+ * @return  True when it, or a subcircuit one of its instances uses, contains a voltage or current source set to AC.
  */
 bool Circuit::HasACSource() const {
-    return std::ranges::any_of(m_Entries, [](const CircuitEntry &entry) { return IsACSource(*entry.Part); });
+    return std::ranges::any_of(CollectParts(*this), [](const Component *part) { return IsACSource(*part); });
 }
 
 /**
  * @brief   Tells whether any part starts from an initial condition.
- * @return  True when at least one capacitor or inductor has one set; a transient then runs with uic.
+ * @return  True when at least one capacitor or inductor, here or in a subcircuit one of its instances uses, has one
+ *          set; a transient then runs with uic.
  */
 bool Circuit::HasInitialConditions() const {
-    return std::ranges::any_of(m_Entries, [](const CircuitEntry &entry) { return entry.Part->HasInitialCondition(); });
+    return std::ranges::any_of(CollectParts(*this), [](const Component *part) { return part->HasInitialCondition(); });
 }
 
 /**
@@ -310,7 +546,8 @@ bool Circuit::HasInitialConditions() const {
  *                                by GetCurrentProbeName(), whose branch current is the terminal current; for
  *                                simulation only.
  * @return  One line per component, plus its probes, with node numbers as SPICE node names (0 is ground), then one
- *          ".model" line per model in use, ending in ".end".
+ *          ".model" line per model in use and one ".subckt" block per project-local definition, ending in ".end".
+ *          Subcircuit instances use X lines, with their pins in definition order and their parameter overrides.
  * @note    Ground components produce no line; they only make their node 0. A supply rail becomes a DC voltage
  *          source from its node to ground. A part whose current controls a CCCS or CCVS gets a probe even without
  *          add_current_probes, unless it is a voltage source itself, since ngspice follows currents through
@@ -330,7 +567,7 @@ std::string Circuit::ToSpiceNetlist(const std::string_view analysis, const bool 
     int next_extra_node = m_NodeCount;
     for (const CircuitEntry &entry : m_Entries) {
         const Component &component = *entry.Part;
-        const std::string value = FormatSpiceValue(component.GetValue());
+        const std::string value = FormatComponentValue(component);
         // Probed parts connect through the probe nodes; the probe lines follow the part
         std::vector<int> nodes = entry.Nodes;
         const std::string probes = ProbeTerminals(
@@ -392,6 +629,19 @@ std::string Circuit::ToSpiceNetlist(const std::string_view analysis, const bool 
             netlist += std::format("{} {} {} {} {}\n", component.GetName(), nodes[0], nodes[1], control, value);
             break;
         }
+        case ComponentType::SUBCIRCUIT: {
+            const auto &instance = static_cast<const SubcircuitInstance &>(component);
+            netlist += component.GetName();
+            for (const int node : nodes) {
+                netlist += std::format(" {}", node);
+            }
+            netlist += std::format(" {}", instance.GetDefinitionName());
+            for (const auto &[name, parameter] : instance.GetParameters()) {
+                netlist += std::format(" {}={}", name, FormatSpiceValue(parameter));
+            }
+            netlist += "\n";
+            break;
+        }
         case ComponentType::OP_AMP: {
             // A macromodel is a subcircuit, written once for every op-amp of its model
             const auto &op_amp = static_cast<const OpAmp &>(component);
@@ -408,33 +658,13 @@ std::string Circuit::ToSpiceNetlist(const std::string_view analysis, const bool 
         }
         case ComponentType::DIODE:
         case ComponentType::ZENER_DIODE:
-        case ComponentType::LED: {
-            const auto &diode = static_cast<const Diode &>(component);
-            std::string model_name = diode.GetSpiceModelName();
-            netlist += std::format("{} {} {} {}\n", diode.GetName(), nodes[0], nodes[1], model_name);
-            AddModelLine(model_name, FormatDiodeModel(model_name, diode.GetParameters()), model_names, models);
-            break;
-        }
+        case ComponentType::LED:
         case ComponentType::NPN:
-        case ComponentType::PNP: {
-            const auto &bjt = static_cast<const BJT &>(component);
-            std::string model_name = bjt.GetSpiceModelName();
-            netlist += std::format("{} {} {} {} {}\n", bjt.GetName(), nodes[0], nodes[1], nodes[2], model_name);
-            AddModelLine(model_name, FormatBJTModel(bjt.GetType(), model_name, bjt.GetParameters()), model_names,
-                         models);
-            break;
-        }
+        case ComponentType::PNP:
         case ComponentType::NMOS:
-        case ComponentType::PMOS: {
-            // The body is tied to the source, past its probe, so the source current includes it
-            const auto &mosfet = static_cast<const MOSFET &>(component);
-            const MOSFETParameters &parameters = mosfet.GetParameters();
-            std::string model_name = mosfet.GetSpiceModelName();
-            netlist += std::format("{} {} {} {} {} {} W={:.6g} L={:.6g}\n", mosfet.GetName(), nodes[0], nodes[1],
-                                   nodes[2], nodes[2], model_name, parameters.Width, parameters.Length);
-            AddModelLine(model_name, FormatMOSFETModel(mosfet.GetType(), model_name, parameters), model_names, models);
+        case ComponentType::PMOS:
+            netlist += FormatModeledPart(component, nodes, model_names, models);
             break;
-        }
         case ComponentType::POTENTIOMETER: {
             // The wiper, terminal 3, splits the track into two resistors
             const auto &pot = static_cast<const Potentiometer &>(component);
@@ -508,16 +738,48 @@ std::string Circuit::ToSpiceNetlist(const std::string_view analysis, const bool 
         }
         case ComponentType::GROUND:
         case ComponentType::NET_LABEL:
+        case ComponentType::PIN:
             break;
         }
         netlist += probes;
     }
     netlist += models;
+    netlist += FormatLibraryModels(m_LibraryModels);
+    for (const auto &definition : m_Subcircuits) {
+        netlist += FormatSubcircuit(*definition);
+    }
     if (!analysis.empty()) {
         netlist += std::format("{}\n", analysis);
     }
     netlist += ".end\n";
     return netlist;
+}
+
+/**
+ * @brief   Lists every part the netlist of a circuit simulates.
+ * @param[in] circuit  Circuit to look into.
+ * @return  The parts of the circuit, then the parts of each subcircuit definition one of its instances uses, once
+ *          per definition. Definitions no instance uses are left out, and so are the subcircuits of a definition's
+ *          body, since blocks do not nest.
+ */
+std::vector<const Component *> CollectParts(const Circuit &circuit) {
+    std::vector<const Component *> parts;
+    std::set<std::string, std::less<>> used;
+    for (const CircuitEntry &entry : circuit.GetEntries()) {
+        parts.push_back(entry.Part);
+        if (entry.Part->GetType() == ComponentType::SUBCIRCUIT) {
+            used.insert(static_cast<const SubcircuitInstance &>(*entry.Part).GetDefinitionName());
+        }
+    }
+    for (const auto &definition : circuit.GetSubcircuits()) {
+        if (!used.contains(definition->Name)) {
+            continue;
+        }
+        for (const CircuitEntry &entry : definition->Body.GetEntries()) {
+            parts.push_back(entry.Part);
+        }
+    }
+    return parts;
 }
 
 /**
@@ -670,12 +932,12 @@ std::optional<std::string> FindControllingSource(const Circuit &circuit, const s
  * @return  The component name for a part that is one element, such as "R1" or "Q1"; the elements of a part written
  *          as several, such as "R-RV1a" and "R-RV1b" for a potentiometer or "X-U1" for an op-amp macromodel, whose
  *          own elements ngspice names after it ("q.x-u1.q1"), and the model, bridges and resistors of a logic part;
- *          nothing for ground and net labels.
+ *          nothing for ground, net labels and subcircuit pin markers.
  */
 std::vector<std::string> GetElementNames(const Component &component) {
     const std::string &name = component.GetName();
     const ComponentType type = component.GetType();
-    if (type == ComponentType::GROUND || type == ComponentType::NET_LABEL) {
+    if (type == ComponentType::GROUND || type == ComponentType::NET_LABEL || IsSubcircuitPin(type)) {
         return {};
     }
     if (IsLogicGate(type) || IsFlipFlop(type)) {

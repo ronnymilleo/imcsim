@@ -1,0 +1,219 @@
+{
+  "elements": [
+    {
+      "ac_magnitude": 1.0,
+      "amplitude": 1.0,
+      "frequency": 1000.0,
+      "name": "Vin1",
+      "offset": 0.0,
+      "pulse": {
+        "delay": 0.0,
+        "fall": 1e-06,
+        "high": 5.0,
+        "low": 0.0,
+        "period": 0.001,
+        "rise": 1e-06,
+        "width": 0.0005
+      },
+      "rotation": 90,
+      "source": "AC",
+      "type": "VoltageSource",
+      "value": 0.0,
+      "x": 0,
+      "y": 2
+    },
+    {
+      "rotation": 0,
+      "type": "Ground",
+      "x": 0,
+      "y": 4
+    },
+    {
+      "definition": "RC_LOWPASS",
+      "name": "X1",
+      "rotation": 0,
+      "type": "Subcircuit",
+      "x": 8,
+      "y": 0
+    },
+    {
+      "definition": "RC_LOWPASS",
+      "name": "X2",
+      "parameters": {
+        "R": 10000.0
+      },
+      "rotation": 0,
+      "type": "Subcircuit",
+      "x": 8,
+      "y": 6
+    },
+    {
+      "net": "FAST",
+      "rotation": 0,
+      "type": "NetLabel",
+      "x": 11,
+      "y": 0
+    },
+    {
+      "net": "SLOW",
+      "rotation": 0,
+      "type": "NetLabel",
+      "x": 11,
+      "y": 6
+    }
+  ],
+  "format": "imcsim-schematic",
+  "measurements": {
+    "currents": [],
+    "voltages": [
+      [
+        11,
+        0
+      ],
+      [
+        11,
+        6
+      ]
+    ]
+  },
+  "simulation": {
+    "ac_sweep": {
+      "points_per_decade": 20,
+      "start": 10.0,
+      "stop": 1000000.0
+    },
+    "analysis": "ac_sweep",
+    "dc_sweep": {
+      "step_source": false,
+      "stepped": {
+        "source": "",
+        "start": 0.0,
+        "step": 1.0,
+        "stop": 5.0
+      },
+      "swept": {
+        "source": "",
+        "start": 0.0,
+        "step": 0.1,
+        "stop": 5.0
+      }
+    },
+    "transient": {
+      "step": 5e-06,
+      "stop": 0.005
+    }
+  },
+  "subcircuits": [
+    {
+      "elements": [
+        {
+          "net": "IN",
+          "rotation": 0,
+          "type": "Pin",
+          "x": 0,
+          "y": 0
+        },
+        {
+          "name": "R1",
+          "rotation": 0,
+          "type": "Resistor",
+          "value": "{R}",
+          "x": 2,
+          "y": 0
+        },
+        {
+          "name": "C1",
+          "rotation": 90,
+          "type": "Capacitor",
+          "value": "{C}",
+          "x": 4,
+          "y": 2
+        },
+        {
+          "rotation": 0,
+          "type": "Ground",
+          "x": 4,
+          "y": 4
+        },
+        {
+          "net": "OUT",
+          "rotation": 180,
+          "type": "Pin",
+          "x": 4,
+          "y": 0
+        }
+      ],
+      "name": "RC_LOWPASS",
+      "parameters": [
+        {
+          "default": 1000.0,
+          "name": "R"
+        },
+        {
+          "default": 1e-07,
+          "name": "C"
+        }
+      ],
+      "pins": [
+        {
+          "name": "IN",
+          "point": [
+            0,
+            0
+          ]
+        },
+        {
+          "name": "OUT",
+          "point": [
+            4,
+            0
+          ]
+        }
+      ],
+      "wires": []
+    }
+  ],
+  "version": 1,
+  "wires": [
+    {
+      "end": [
+        2,
+        0
+      ],
+      "start": [
+        0,
+        0
+      ]
+    },
+    {
+      "end": [
+        5,
+        0
+      ],
+      "start": [
+        2,
+        0
+      ]
+    },
+    {
+      "end": [
+        2,
+        6
+      ],
+      "start": [
+        2,
+        0
+      ]
+    },
+    {
+      "end": [
+        5,
+        6
+      ],
+      "start": [
+        2,
+        6
+      ]
+    }
+  ]
+}

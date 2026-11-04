@@ -19,6 +19,7 @@
 #include <iterator>
 #include <memory>
 #include <optional>
+#include <string>
 #include <thread>
 #include <vector>
 
@@ -283,6 +284,44 @@ TEST_CASE("What a job posts while it runs reaches the polling thread, in order",
         std::this_thread::sleep_for(1ms);
     }
     CHECK_FALSE(service.IsBusy());
+}
+
+TEST_CASE("What a job posts right before it ends runs before its result, never after it", "[simulation_service]") {
+    Core::SimulationService service;
+    std::vector<std::string> events;
+    REQUIRE(service.Submit([&events](Core::RunControl &control) -> Core::Delivery {
+        control.Post([&events] { events.emplace_back("chunk"); });
+        return [&events] { events.emplace_back("result"); };
+    }));
+    const auto deadline = std::chrono::steady_clock::now() + WAIT_LIMIT;
+    while (service.IsBusy() && std::chrono::steady_clock::now() < deadline) {
+        service.Poll();
+        std::this_thread::sleep_for(1ms);
+    }
+    // A chunk that ran after the result would be appended to the whole run that replaced the chunks
+    CHECK(events == std::vector<std::string>{"chunk", "result"});
+    CHECK_FALSE(service.Poll());
+    CHECK(events.size() == 2);
+}
+
+TEST_CASE("Cancelling after the job has returned drops what it posted too", "[simulation_service]") {
+    Core::SimulationService service;
+    std::atomic<bool> has_returned = false;
+    bool has_run = false;
+    REQUIRE(service.Submit([&](Core::RunControl &control) -> Core::Delivery {
+        control.Post([&has_run] { has_run = true; });
+        has_returned = true;
+        return [&has_run] { has_run = true; };
+    }));
+    while (!has_returned) {
+        std::this_thread::sleep_for(1ms);
+    }
+    // Leaves the worker time to mark the job done, the case where the posts used to outlive the cancel
+    std::this_thread::sleep_for(20ms);
+    service.Cancel();
+    REQUIRE(WaitUntilIdle(service));
+    CHECK_FALSE(service.Poll());
+    CHECK_FALSE(has_run);
 }
 
 TEST_CASE("What a discarded job posted is dropped", "[simulation_service]") {

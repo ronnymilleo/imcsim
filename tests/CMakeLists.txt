@@ -44,9 +44,12 @@ add_executable(imcsim-tests
             simulation_service_tests.cpp
             simulator_tests.cpp
             spectrum_tests.cpp
+            spice_import_tests.cpp
+            spice_library_tests.cpp
             spice_value_tests.cpp
             standard_values_tests.cpp
             stepped_circuit_tests.cpp
+            subcircuit_tests.cpp
             svg_writer_tests.cpp
             trace_fit_state_tests.cpp
             transient_chunks_tests.cpp

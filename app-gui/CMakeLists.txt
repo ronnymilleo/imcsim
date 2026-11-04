@@ -45,6 +45,8 @@ add_library(imcsim-gui-lib
             selection.cpp
             simulation_settings.cpp
             spectrum.cpp
+            spice_import.cpp
+            subcircuit_pins.cpp
             svg_writer.cpp
             theme.cpp
             trace_fit_state.cpp
@@ -71,6 +73,8 @@ add_library(imcsim-gui-lib
             ui_elements/ui_resistor.cpp
             ui_elements/ui_source.cpp
             ui_elements/ui_switch.cpp
+            ui_elements/ui_subcircuit.cpp
+            ui_elements/ui_subcircuit_pin.cpp
             ui_elements/ui_transformer.cpp
             ui_elements/ui_transistor.cpp
             ui_elements/ui_vcc.cpp
@@ -84,6 +88,7 @@ add_library(imcsim-gui-lib
             windows/preferences_window.cpp
             windows/properties_window.cpp
             windows/simulation_window.cpp
+            windows/spice_block_dialog.cpp
             wire_editing.cpp
 )
 

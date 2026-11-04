@@ -33,8 +33,8 @@ bool HasErrorLine(const std::vector<SimulatorMessage> &messages) {
 }
 
 bool HasLogicPart(const Circuit &circuit) {
-    return std::ranges::any_of(circuit.GetEntries(),
-                               [](const CircuitEntry &entry) { return IsLogicPart(entry.Part->GetType()); });
+    return std::ranges::any_of(CollectParts(circuit),
+                               [](const Component *part) { return IsLogicPart(part->GetType()); });
 }
 
 // ngspice only warns when the analog and digital solutions keep alternating, and then leaves the results empty
@@ -84,6 +84,9 @@ constexpr double FIRST_CHUNK_SHARE = 0.01;
 constexpr double COMPLETE_SHARE = 1.0 - 1e-9;
 // A live run that is ahead of the clock waits in slices this long, so a stop waits little
 constexpr std::chrono::duration<double> PACE_WAIT_SLICE{0.01};
+// A live run further behind the clock than one chunk drops the delay instead of making it up; smaller delays, such as
+// the oversleep of a wait, are made up, so they do not add up over a long run
+constexpr std::chrono::duration<double> LIVE_CATCH_UP_LIMIT{TARGET_CHUNK_SECONDS};
 
 // How much simulated time the next chunk covers: twice the last one when it was quick, half when it was slow, so the
 // chunks settle around the target wall time as the circuit gets easier or harder
@@ -163,12 +166,17 @@ std::chrono::steady_clock::duration WaitWhilePaused(const RunControl *control) {
 }
 
 // Keeps a live run at its pace once it reached a simulated time: waits for the clock, then holds while it is paused,
-// moving the start of its clock by the time paused so it never catches up. Returns whether the run goes on
+// moving the start of its clock by the time paused so it never catches up. A run that fell more than a chunk behind,
+// because the circuit was slow for a while, moves the start by its delay too, so it goes on at its pace instead of
+// hurrying to make the delay up once the circuit gets easy. Returns whether the run goes on
 bool KeepLivePace(std::chrono::steady_clock::time_point &start, const double reached, const double pace,
                   const RunControl *control) {
-    WaitForClock(start + std::chrono::duration_cast<std::chrono::steady_clock::duration>(
-                             std::chrono::duration<double>(reached / pace)),
-                 control);
+    const auto due = start + std::chrono::duration_cast<std::chrono::steady_clock::duration>(
+                                 std::chrono::duration<double>(reached / pace));
+    WaitForClock(due, control);
+    if (const auto late = std::chrono::steady_clock::now() - due; late > LIVE_CATCH_UP_LIMIT) {
+        start += late;
+    }
     start += WaitWhilePaused(control);
     return !IsCancelled(control);
 }

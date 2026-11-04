@@ -5,6 +5,7 @@
 
 #include "circuit_copy.h"
 
+#include "subcircuit.h"
 #include <map>
 
 namespace Core {
@@ -23,6 +24,16 @@ CircuitCopy::CircuitCopy(const Circuit &circuit) {
             clone->second = m_Parts.back().get();
         }
         m_Circuit.Add(*clone->second, entry.Nodes);
+    }
+    for (const auto &definition : circuit.GetSubcircuits()) {
+        auto body = std::make_unique<CircuitCopy>(definition->Body);
+        auto copy = std::make_shared<SubcircuitDefinition>(*definition);
+        copy->Body = body->GetCircuit();
+        m_SubcircuitCopies.push_back(std::move(body));
+        m_Circuit.AddSubcircuit(std::move(copy));
+    }
+    for (const LibraryModel &model : circuit.GetLibraryModels()) {
+        m_Circuit.AddLibraryModel(model);
     }
 }
 

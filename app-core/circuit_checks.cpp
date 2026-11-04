@@ -8,9 +8,12 @@
 #include "components/controlled_source.h"
 #include "components/logic_part.h"
 #include "components/source.h"
+#include "components/subcircuit.h"
+#include "subcircuit.h"
 #include <algorithm>
 #include <cmath>
 #include <format>
+#include <set>
 
 namespace Core {
 
@@ -80,14 +83,116 @@ bool IsNoiseInput(const Component &component) {
            static_cast<const Source &>(component).GetSourceType() == Source::SourceType::AC;
 }
 
+// A pin on ground would connect nothing, since ngspice keeps node 0 global instead of joining it to the outside, and
+// two pins on one node would short the nets of the instance
+std::optional<std::string> CheckPins(const SubcircuitDefinition &definition) {
+    // The ports of a block kept as SPICE text are the vendor's own names, written as they came
+    if (definition.Spice) {
+        if (definition.Spice->Ports.size() != definition.Pins.size()) {
+            return std::format("{} has {} pins but its SPICE text has {} ports", definition.Name,
+                               definition.Pins.size(), definition.Spice->Ports.size());
+        }
+        return std::nullopt;
+    }
+    std::set<int> nodes;
+    for (const SubcircuitPin &pin : definition.Pins) {
+        if (pin.Node == 0) {
+            return std::format("Pin {} of {} sits on ground inside it, so it would connect nothing; ground is shared "
+                               "by the whole circuit, so remove the pin",
+                               pin.Name, definition.Name);
+        }
+        if (!nodes.insert(pin.Node).second) {
+            return std::format("Pins of {} share a node inside it; give each pin a node of its own", definition.Name);
+        }
+    }
+    return std::nullopt;
+}
+
+// Only parts inside a subcircuit can follow its parameters
+std::optional<std::string> CheckExpressions(const Circuit &body, const SubcircuitDefinition *definition) {
+    for (const CircuitEntry &entry : body.GetEntries()) {
+        const std::optional<std::string> &expression = entry.Part->GetValueExpression();
+        if (!expression) {
+            continue;
+        }
+        const std::string_view parameter = SubcircuitInstance::GetExpressionParameter(*expression);
+        if (definition == nullptr) {
+            return std::format("{} follows a parameter, which only a part inside a subcircuit can do",
+                               entry.Part->GetName());
+        }
+        if (!std::ranges::contains(definition->Parameters, parameter, &SubcircuitParameter::Name)) {
+            return std::format("{} in {} follows {}, which is not a parameter of it", entry.Part->GetName(),
+                               definition->Name, *expression);
+        }
+    }
+    return std::nullopt;
+}
+
+// Every instance needs a known definition with a node for each pin and parameters it has, and every definition in use
+// needs pins it can connect and parameters for its parts
+std::optional<std::string> CheckSubcircuits(const Circuit &circuit) {
+    if (std::optional<std::string> problem = CheckExpressions(circuit, nullptr)) {
+        return problem;
+    }
+    for (const CircuitEntry &entry : circuit.GetEntries()) {
+        if (entry.Part->GetType() != ComponentType::SUBCIRCUIT) {
+            continue;
+        }
+        const auto &instance = static_cast<const SubcircuitInstance &>(*entry.Part);
+        const auto definition = circuit.FindSubcircuit(instance.GetDefinitionName());
+        if (!definition) {
+            return std::format("{} refers to the unknown subcircuit {}", entry.Part->GetName(),
+                               instance.GetDefinitionName());
+        }
+        if (entry.Nodes.size() != definition->Pins.size()) {
+            return std::format("{} does not connect every pin of {}", entry.Part->GetName(), definition->Name);
+        }
+        for (const auto &[name, value] : instance.GetParameters()) {
+            if (!std::ranges::contains(definition->Parameters, name, &SubcircuitParameter::Name)) {
+                return std::format("{} sets {}, which is not a parameter of {}", entry.Part->GetName(), name,
+                                   definition->Name);
+            }
+        }
+        if (std::optional<std::string> problem = CheckPins(*definition)) {
+            return problem;
+        }
+        if (std::optional<std::string> problem = CheckExpressions(definition->Body, definition.get())) {
+            return problem;
+        }
+    }
+    return std::nullopt;
+}
+
+// A part that names a library model needs the circuit to have it, and of its own kind
+std::optional<std::string> CheckLibraryModels(const Circuit &circuit) {
+    for (const Component *part : CollectParts(circuit)) {
+        if (!part->HasLibraryModel()) {
+            continue;
+        }
+        const LibraryModel *model = circuit.FindLibraryModel(part->GetLibraryModel());
+        if (model == nullptr) {
+            return std::format(
+                "{} uses the model {}, which the schematic does not have; import it again or pick another "
+                "model",
+                part->GetName(), part->GetLibraryModel());
+        }
+        if (!CanUseLibraryModel(part->GetType(), model->Kind)) {
+            return std::format("{} uses the model {}, which is a {} model", part->GetName(), model->Name,
+                               GetModelKindName(model->Kind));
+        }
+    }
+    return std::nullopt;
+}
+
 } // namespace
 
 /**
  * @brief   Checks that a circuit can be simulated at all.
  * @param[in] circuit  Circuit to check.
  * @return  The reason it cannot, in words for the user: it is empty, it has no ground (a circuit of only clocks, logic
- *          inputs, supply rails and logic parts needs none), or a current-controlled source follows no valid current;
- *          no value when it can.
+ *          inputs, supply rails and logic parts needs none), a subcircuit instance or definition cannot be written (an
+ *          unknown definition, a pin on ground, a parameter it lacks), a part uses a library model the circuit lacks or
+ *          of another kind, or a current-controlled source follows no valid current; no value when it can.
  */
 std::optional<std::string> CheckCircuit(const Circuit &circuit) {
     if (circuit.GetEntries().empty()) {
@@ -95,6 +200,12 @@ std::optional<std::string> CheckCircuit(const Circuit &circuit) {
     }
     if (!circuit.HasGround() && !IsDigitalOnly(circuit)) {
         return "The circuit has no ground; add a Ground so node voltages have a reference";
+    }
+    if (std::optional<std::string> problem = CheckSubcircuits(circuit)) {
+        return problem;
+    }
+    if (std::optional<std::string> problem = CheckLibraryModels(circuit)) {
+        return problem;
     }
     // A current-controlled source needs a current that some other part reports
     for (const CircuitEntry &entry : circuit.GetEntries()) {

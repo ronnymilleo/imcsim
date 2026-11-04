@@ -21,6 +21,8 @@
 #include "ui_elements/ui_op_amp.h"
 #include "ui_elements/ui_potentiometer.h"
 #include "ui_elements/ui_resistor.h"
+#include "ui_elements/ui_subcircuit.h"
+#include "ui_elements/ui_subcircuit_pin.h"
 #include "ui_elements/ui_switch.h"
 #include "ui_elements/ui_transformer.h"
 #include "ui_elements/ui_vcc.h"
@@ -64,6 +66,7 @@ constexpr auto PARTS = std::to_array<PartInfo>({
     {Core::ComponentType::CCVS, "CCVS (H)"},
     {Core::ComponentType::OP_AMP, "Op-amp"},
     {Core::ComponentType::NET_LABEL, "Net label"},
+    {Core::ComponentType::PIN, "Block pin"},
     {Core::ComponentType::POTENTIOMETER, "Potentiometer"},
     {Core::ComponentType::SWITCH, "Switch"},
     {Core::ComponentType::PUSH_BUTTON, "Push button"},
@@ -140,8 +143,12 @@ std::unique_ptr<UIElement> CreateElement(const Core::ComponentType type, const G
         return std::make_unique<UIControlledSource>(type, position, rotation);
     case Core::ComponentType::OP_AMP:
         return std::make_unique<UIOpAmp>(position, rotation);
+    case Core::ComponentType::SUBCIRCUIT:
+        return std::make_unique<UISubcircuit>(position, rotation);
     case Core::ComponentType::NET_LABEL:
         return std::make_unique<UINetLabel>(position, rotation);
+    case Core::ComponentType::PIN:
+        return std::make_unique<UISubcircuitPin>(position, rotation);
     case Core::ComponentType::POTENTIOMETER:
         return std::make_unique<UIPotentiometer>(position, rotation);
     case Core::ComponentType::SWITCH:

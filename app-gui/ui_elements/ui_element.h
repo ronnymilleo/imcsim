@@ -94,6 +94,9 @@ private:
     bool m_Mirrored = false;
 };
 
+// Labels
+std::string GetValueLabel(const Core::Component &component);
+
 } // namespace GUI
 
 #endif // IMCSIM_UI_ELEMENT_H

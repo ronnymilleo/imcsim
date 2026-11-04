@@ -11,6 +11,8 @@
 #include <cfloat>
 #include <cmath>
 #include <cstdlib>
+#include <optional>
+#include <string>
 #include <utility>
 
 namespace GUI {
@@ -226,7 +228,8 @@ void UIElement::DrawTerminals(SchematicCanvas &canvas, const ViewTransform &view
 }
 
 /**
- * @brief   Draws the component name above the symbol and its value below, in local orientation.
+ * @brief   Draws the component name above the symbol and its value below, in local orientation; the value is the
+ *          parameter it follows, such as "{R}", for a part inside a block.
  * @param[in,out] canvas Where it is drawn: the editor window or an exported image.
  * @param[in] view       Transform of the current frame.
  * @param[in] color      Text color.
@@ -234,7 +237,7 @@ void UIElement::DrawTerminals(SchematicCanvas &canvas, const ViewTransform &view
 void UIElement::DrawLabels(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color) const {
     DrawLabel(canvas, view, {0.0f, -LABEL_OFFSET}, {0.0f, -1.0f}, m_Component->GetName(), color);
     if (m_Component->HasValue()) {
-        DrawLabel(canvas, view, {0.0f, LABEL_OFFSET}, {0.0f, 1.0f}, Core::FormatValue(m_Component->GetValue()), color);
+        DrawLabel(canvas, view, {0.0f, LABEL_OFFSET}, {0.0f, 1.0f}, GetValueLabel(*m_Component), color);
     }
 }
 
@@ -303,6 +306,19 @@ void UIElement::DrawLabel(SchematicCanvas &canvas, const ViewTransform &view, co
  */
 ImVec2 UIElement::LocalToScreen(const ViewTransform &view, const float x, const float y) const {
     return view.ToScreen(ToVec2(m_Position) + Rotate(ImVec2{m_Mirrored ? -x : x, y}, m_Rotation));
+}
+
+/**
+ * @brief   Returns the text a symbol shows for the value of its part.
+ * @param[in] component  Part with a value.
+ * @return  The value with its scale suffix, such as "4.7k"; the parameter it follows, such as "{R}", for a part inside
+ *          a block, since its own value is not used then.
+ */
+std::string GetValueLabel(const Core::Component &component) {
+    if (const std::optional<std::string> &expression = component.GetValueExpression()) {
+        return *expression;
+    }
+    return Core::FormatValue(component.GetValue());
 }
 
 } // namespace GUI

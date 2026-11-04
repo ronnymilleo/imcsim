@@ -16,8 +16,9 @@ namespace Core {
  * @class   CircuitCopy
  * @brief   Owns clones of the parts of a circuit and the circuit that wires them like the original.
  * @details A Circuit only points at its parts, which the schematic owns and the user can change at any moment. A
- *          simulation on the worker thread takes a CircuitCopy instead, so there is nothing shared to race on. It can
- *          be moved, since the circuit points at the parts on the heap, but not copied.
+ *          simulation on the worker thread takes a CircuitCopy instead, so there is nothing shared to race on. The
+ *          bodies of subcircuit definitions are copied too, including their own parts. It can be moved, since the
+ *          circuit points at the parts on the heap, but not copied.
  */
 class CircuitCopy {
 public:
@@ -33,6 +34,7 @@ public:
 
 private:
     std::vector<std::unique_ptr<Component>> m_Parts;
+    std::vector<std::unique_ptr<CircuitCopy>> m_SubcircuitCopies;
     Circuit m_Circuit;
 };
 

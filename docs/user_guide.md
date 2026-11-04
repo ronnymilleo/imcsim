@@ -14,7 +14,8 @@ How to read what imcsim measures, plots and exports. The [README](../README.md) 
   number may put its decimals after the suffix, as resistor codes do (`4k7`, `2M2`, `3u3`). View > Properties keeps
   the same fields in a docked window.
 - **Potentiometer**: its properties hold the resistance between its ends and the wiper, a slider from 0% at terminal 1
-  to 100% at terminal 2. Move the wiper and run again to see the output change; the wiper does not move during a run.
+  to 100% at terminal 2. Move the wiper and run again to see the output change. During a live run, use the mouse wheel
+  over the part or its Wiper field to change it while the simulation continues (see Live runs).
 - **Initial conditions**: a capacitor and an inductor have an Initial field beside the value, for the voltage the
   capacitor starts charged to or the current the inductor starts carrying; the sign is free. When any part has one,
   the transient runs with `uic`, so the circuit starts from those values without an operating point first, and says so
@@ -22,8 +23,8 @@ How to read what imcsim measures, plots and exports. The [README](../README.md) 
   every part that should start charged. The operating point, the AC sweep and the DC sweep ignore the initial
   conditions.
 - **Switches**: a switch and a push button have a Closed (or Pressed) box in their properties, and the symbol and a
-  label under it show the state. Both start open. The state holds for the whole run, so a switch cannot open in the
-  middle of a transient.
+  label under it show the state. Both start open. Outside a live run, the state holds for the whole simulation. During
+  a live run, click a switch to flip it or hold a push button to press it (see Live runs).
 - **Switches that follow a voltage**: a voltage-controlled switch has its threshold, hysteresis and resistances in its
   properties, and a relay its coil and contact figures. Both are drawn open, since they open and close during a run.
   The Switching examples use them: a buck converter and a relay driver with a flyback diode.
@@ -127,8 +128,8 @@ How to read what imcsim measures, plots and exports. The [README](../README.md) 
 - **Status bar**: below the schematic, the keys of the current mode on the left; on the right, the grid position of
   the cursor and how the last run went ("Transient done", with warnings, or failed). Click the result for the
   errors, the warnings and the ngspice output.
-- **Menus**: File (files, import, examples and the schematic export), Edit (undo, redo, changes to the selection and
-  Preferences) and View (fit, wire colors, live effects, theme, and the windows). On macOS the shortcuts use Cmd where
+- **Menus**: File (files, import of schematics and of SPICE libraries, examples and the schematic export), Edit (undo,
+  redo, changes to the selection, blocks and Preferences) and View (fit, wire colors, live effects, theme, and the windows). On macOS the shortcuts use Cmd where
   this guide says Ctrl: Cmd+S saves, Cmd+Z undoes.
 - **Preferences**: Edit > Preferences (Ctrl+,) gathers your own choices, whatever schematic is open: the theme, IEC
   or ANSI symbols, terminal numbers, wire colors, live effects, the series of standard values, whether a new result
@@ -148,6 +149,67 @@ How to read what imcsim measures, plots and exports. The [README](../README.md) 
   the arrows that appear over another window to dock it on that side or as a tab; drop it anywhere else to let it
   float. By default the editor, Output, Analysis Settings and Netlist are tabs of the main area and Properties sits
   on its right. The layout is kept between sessions, and View > Reset Layout restores the default.
+
+## Blocks
+
+A block groups part of a schematic into a part of its own, with pins, which can be placed as many times as needed. The
+schematic file keeps the definition of each block, so it opens anywhere without other files.
+
+- **Pins**: a Block pin marker (in the supplies group of the toolbar, or Space and `pin`) marks a node of the circuit
+  as a pin of the block. Its square stands for the edge of the block and its arrow points from that edge into the
+  circuit: a marker whose arrow points right puts its pin on the left of the block, one pointing left on the right, one
+  pointing down on the top and one pointing up on the bottom. Name it in its properties (a letter or `_`, then letters,
+  digits or `_`); two markers with one name do not join, unlike net labels. Each pin needs a node of its own, and not
+  ground: the ground of a block is the ground of the whole circuit already, so a pin on it would connect nothing, and
+  imcsim refuses it.
+- **Making a block**: select the circuit together with its pin markers and pick Edit > Create Block from Selection.
+  The dialog names the block, lists the pins in the order of its terminals (Up and Down reorder them) with the edge
+  of each, which a choice there turns the marker to, and holds its parameters with their defaults. Create block puts
+  one instance where the selection was, wired to the points where the markers were. Undo takes it back in one step.
+- **Parameters**: inside a block, a resistor, capacitor or inductor can take its value from a parameter of the block:
+  pick the parameter in Follows, in its properties, and its symbol shows `{R}` instead of a value. Each instance sets
+  its own values in its properties, or keeps the defaults, and Reset parameters goes back to them.
+- **Placing more**: the part search (Space) lists every block of the schematic as `Block: name`. Copy and paste carry
+  the definitions of the blocks they copy, to this schematic or another one; a pasted block that differs from one of
+  the same name already there joins under a name of its own, such as `RC_LOWPASS_2`.
+- **Editing a block**: double click an instance, or pick Edit > Edit Block Contents, to open its contents in the
+  editor, with Back to schematic and the name of the block over the corner of the canvas. Edit > Block Pin and
+  Parameter Settings opens the dialog again, where Apply keeps the pin names, edges and parameters. Back to schematic
+  applies the changes to every instance at once, as one undo step, and Edit > Discard Block Changes leaves the block as
+  it was. A pin that keeps its marker, even renamed or on another edge, keeps the wires of its instances; the wires of a
+  pin that went away are removed. Quitting, or opening an example, applies an open block first, so its changes count
+  as unsaved changes of the schematic. Blocks do not nest: a block cannot hold another.
+- **SPICE libraries**: File > Import SPICE Library reads a vendor's `.lib`, `.mod`, `.sub` or `.cir` file and lists its
+  subcircuits and its diode and transistor models.
+  - A picked subcircuit becomes a block kept as SPICE text: imcsim simulates its text as it came, with the `.model`,
+    `.subckt` and `.param` lines of the file it uses, so the schematic does not need the file afterwards. The dialog
+    shows the comment the vendor wrote above it, which usually says what each numbered port is, and asks for the name
+    of each pin and the edge it goes on, starting from what the port names suggest (`VCC` on top, `OUT` on the
+    right). The block then follows the cursor until a click places it. Double click it for its pins, the defaults of
+    its parameters and its text, which can be read but not edited.
+  - A picked model joins the schematic and shows in the Model choice of the parts it fits, as `1N4148 (library)`
+    after the ready models; a diode model fits diodes, LEDs and Zeners, and a transistor model the transistors of its
+    type.
+  - `.include` and `.lib` lines are reported and not followed, so import the files they name as well. Encrypted
+    models, which only their vendor's simulator reads, are left out with a warning.
+
+The RC_LOWPASS block of the Two RC filters example, open in the editor: a pin marker on each side, and a resistor and
+a capacitor that follow the parameters R and C:
+
+![The inside of a block: IN and OUT pin markers, a resistor whose value reads {R} and a capacitor whose value reads {C},
+with Back to schematic and the name of the block over the corner of the canvas](images/blocks_contents.png)
+
+Its settings, with the edge of each pin and the defaults of the parameters:
+
+![The block dialog: the name RC_LOWPASS, the pins IN on the left and OUT on the right, and the parameters R = 1000 and
+C = 1e-07](images/blocks_dialog.png)
+
+Importing an op-amp from a library: the comment above its `.subckt` line says what each numbered port is, and each
+port gets a name and an edge:
+
+![The Import SPICE library dialog with GENERIC_OPAMP picked, the vendor's comment naming its five ports, its
+parameters, and the pins INP and INN on the left, VP on top, VN at the bottom and OUT on the
+right](images/spice_import.png)
 
 ## Wire colors
 

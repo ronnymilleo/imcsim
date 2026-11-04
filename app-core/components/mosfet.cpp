@@ -5,6 +5,7 @@
 
 #include "mosfet.h"
 
+#include "library_model.h"
 #include <algorithm>
 #include <array>
 #include <format>
@@ -106,10 +107,11 @@ std::unique_ptr<Component> MOSFET::Clone() const {
 
 /**
  * @brief   Returns the ready model the MOSFET uses.
- * @return  An entry of the model list of its kind, or nullptr when it uses custom parameters.
+ * @return  An entry of the model list of its kind, or nullptr when it uses custom parameters or a library
+ *          model.
  */
 const MOSFETModel *MOSFET::GetModel() const {
-    return m_Model;
+    return HasLibraryModel() ? nullptr : m_Model;
 }
 
 /**
@@ -118,14 +120,15 @@ const MOSFETModel *MOSFET::GetModel() const {
  */
 void MOSFET::SetModel(const MOSFETModel &model) {
     m_Model = &model;
+    ClearLibraryModel();
 }
 
 /**
  * @brief   Tells whether the MOSFET uses its own parameters instead of a ready model.
- * @return  True for a custom MOSFET.
+ * @return  True for a custom MOSFET; false for one with a ready or a library model.
  */
 bool MOSFET::IsCustom() const {
-    return m_Model == nullptr;
+    return m_Model == nullptr && !HasLibraryModel();
 }
 
 /**
@@ -133,6 +136,7 @@ bool MOSFET::IsCustom() const {
  * @note    Does nothing when it is already custom, so its parameters are kept.
  */
 void MOSFET::SetCustom() {
+    ClearLibraryModel();
     if (m_Model == nullptr) {
         return;
     }
@@ -145,6 +149,7 @@ void MOSFET::SetCustom() {
  * @param[in] parameters  New parameters; check them with IsValidParameters() first.
  */
 void MOSFET::SetCustomParameters(const MOSFETParameters &parameters) {
+    ClearLibraryModel();
     m_CustomParameters = parameters;
     m_Model = nullptr;
 }
@@ -173,18 +178,25 @@ const MOSFETParameters &MOSFET::GetParameters() const {
 
 /**
  * @brief   Returns the name of the model, as shown in the editor and saved in files.
- * @return  The ready model name, such as "2N7000", or CustomMOSFETModelName.
+ * @return  The ready model name, such as "2N7000", or CustomMOSFETModelName, or the name of
+ *          the library model it uses.
  */
 const char *MOSFET::GetModelName() const {
+    if (HasLibraryModel()) {
+        return GetLibraryModel().c_str();
+    }
     return m_Model != nullptr ? m_Model->Name : CUSTOM_MOSFET_MODEL_NAME;
 }
 
 /**
  * @brief   Returns the name of the ".model" line the MOSFET uses in a netlist.
- * @return  The ready model SPICE name, or "MCUSTOM_" followed by the MOSFET name, since custom parameters belong
- *          to one MOSFET.
+ * @return  The ready model SPICE name, the library model one from GetLibraryModelSpiceName(), or "MCUSTOM_" followed by
+ * the MOSFET name, since custom parameters belong to one MOSFET.
  */
 std::string MOSFET::GetSpiceModelName() const {
+    if (HasLibraryModel()) {
+        return GetLibraryModelSpiceName(GetLibraryModel());
+    }
     return m_Model != nullptr ? std::string(m_Model->SpiceName) : std::format("MCUSTOM_{}", GetName());
 }
 

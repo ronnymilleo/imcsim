@@ -17,6 +17,7 @@
 #include "ui_elements/ui_element.h"
 #include "ui_elements/ui_wire.h"
 #include <cstddef>
+#include <expected>
 #include <filesystem>
 #include <memory>
 #include <optional>
@@ -48,12 +49,24 @@ namespace GUI {
  */
 class Schematic {
 public:
+    /**
+     * @struct  SubcircuitPinCandidate
+     * @brief   A pin marker that can become a pin of a block: where it sits and the name it suggests.
+     * @details The name is the marker's own, or P1, P2... for an unnamed marker.
+     */
+    struct SubcircuitPinCandidate {
+        GridPoint Point;
+        std::string SuggestedName;
+    };
+
     Schematic();
 
     // Content
     const std::vector<std::unique_ptr<UIElement>> &GetElements() const;
     UIElement &GetElement(std::size_t index);
     const std::vector<UIWire> &GetWires() const;
+    const std::vector<SavedSubcircuit> &GetSubcircuits() const;
+    const std::vector<Core::LibraryModel> &GetLibraryModels() const;
     bool IsTerminal(GridPoint point) const;
     std::vector<GridPoint> CollectTerminals() const;
 
@@ -65,7 +78,30 @@ public:
     void DeleteSelection();
     void Clear();
     void Replace(std::vector<std::unique_ptr<UIElement>> elements, std::vector<UIWire> wires,
-                 SimulationSettings settings);
+                 SimulationSettings settings, std::vector<SavedSubcircuit> subcircuits = {},
+                 std::vector<Core::LibraryModel> models = {});
+
+    // Blocks
+    std::expected<std::vector<SubcircuitPinCandidate>, std::string> GetSubcircuitPinCandidates() const;
+    std::expected<std::vector<SubcircuitPinCandidate>, std::string> GetSubcircuitPinMarkers() const;
+    bool SetPinMarkerSide(GridPoint point, Core::PinSide side);
+    std::expected<void, std::string>
+    CreateSubcircuitFromSelection(std::string name, std::vector<SavedSubcircuitPin> pins,
+                                  std::vector<Core::SubcircuitParameter> parameters = {});
+    std::expected<std::unique_ptr<Schematic>, std::string> OpenSubcircuit(const std::string &name) const;
+    std::expected<void, std::string> UpdateSubcircuit(const std::string &name, const Schematic &content,
+                                                      const std::vector<SavedSubcircuitPin> &pins,
+                                                      const std::vector<Core::SubcircuitParameter> &parameters);
+    std::expected<void, std::string> UpdateSpiceSubcircuit(const std::string &name,
+                                                           const std::vector<SavedSubcircuitPin> &pins,
+                                                           const std::vector<Core::SubcircuitParameter> &parameters);
+    std::vector<std::string> MergeSubcircuits(std::vector<SavedSubcircuit> definitions,
+                                              std::vector<std::unique_ptr<UIElement>> &instances);
+
+    // Library models
+    std::vector<std::string> MergeLibraryModels(std::vector<Core::LibraryModel> models,
+                                                std::vector<std::unique_ptr<UIElement>> &elements,
+                                                std::vector<SavedSubcircuit> &definitions);
 
     // Selection
     void SelectElement(std::size_t index);
@@ -155,6 +191,11 @@ private:
     // Content
     std::vector<std::unique_ptr<UIElement>> m_Elements;
     std::vector<UIWire> m_Wires;
+    std::vector<SavedSubcircuit> m_Subcircuits;
+    // Device models imported from libraries, which diodes and transistors anywhere in the document can use
+    std::vector<Core::LibraryModel> m_LibraryModels;
+    // The blocks as the simulator takes them, built once from m_Subcircuits and dropped when it changes
+    std::optional<std::vector<std::shared_ptr<Core::SubcircuitDefinition>>> m_BuiltSubcircuits;
 
     // Selection; the version changes with every change, so windows can tell even when an index is reused
     std::set<std::size_t> m_SelectedElements;
@@ -228,6 +269,8 @@ private:
 
     void InvalidateDerivedData();
     void FollowVoltageProbes();
+    void RefreshInstances(const SavedSubcircuit &definition, const std::vector<std::string> &old_names,
+                          const std::vector<std::optional<std::size_t>> &matches);
     std::string TakeSnapshot() const;
     void RestoreSnapshot(const std::string &snapshot);
     void ResetHistory();

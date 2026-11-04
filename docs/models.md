@@ -307,7 +307,8 @@ Ready models: 2N7000, BS170 and IRF540N (N-channel), BS250 and IRF9540N (P-chann
 - The body is tied to the source, as in a discrete MOSFET, so there is no body effect.
 - The body diode is the level 1 drain-body junction with ngspice defaults: it conducts in reverse, but drops about
   0.9 V at 30 A where an IRF540N drops about 1.3 V at 16 A, and has no reverse recovery.
-- Like transistors, the ratings (VDS, VGS, ID, P max) are checked after each simulation.
+- Like transistors, the ratings (VDS, VGS, ID, P max) are checked after each simulation, except for a model imported
+  from a library (see [Blocks and library models](#blocks-and-library-models)).
 - Not modeled: subthreshold conduction, velocity saturation and other short-channel effects, the nonlinear gate
   capacitances of power MOSFETs, and temperature. Level 1 is fine for switching and biasing studies, rough for
   precise analog work.
@@ -374,6 +375,20 @@ Limitations:
   rejection, more than two poles, and an output current drawn from the supply pins (it returns through ground).
 - Noise comes from its input transistors and internal resistors, so it has the right shape (shot and thermal noise
   of the input pair) but not the voltage and current noise densities of a datasheet.
+
+## Blocks and library models
+
+- A block is written as a `.subckt` with one X line per instance. Its node numbers are its own, so two blocks or two
+  instances never share an inner node, but node 0 inside a block is the ground of the whole circuit. Its parameters
+  go on its `.subckt` line as `params:`, with their defaults, and an instance writes only the values it overrides.
+- The `.model` lines inside a block are renamed after it (`imcsim_RC_LOWPASS_...`), since ngspice keeps model names
+  global and two blocks with a custom part of the same name would otherwise share one model.
+- A block kept as SPICE text is written as it came from its library, between a `.subckt` line with its own ports and
+  `.ends`; imcsim reads none of it, so it simulates whatever the vendor modeled, and only what ngspice understands.
+- A library model is written once as `LIB_` and its name, which no ready model uses. imcsim does not read its
+  parameters: a part with one gets no rating warnings, since a `.model` holds no datasheet ratings, and a MOSFET with
+  one takes its channel width and length from the model, or the ngspice defaults, instead of the W and L of the
+  custom fields. An LED with a library model glows a warm white, since the model says nothing of its color.
 
 ## References
 

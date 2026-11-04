@@ -65,7 +65,8 @@ void OpenExample(GUI::Schematic &schematic, const std::string_view file_name) {
     REQUIRE(example != GUI::GetExamples().end());
     auto loaded = GUI::LoadExample(*example);
     REQUIRE(loaded.has_value());
-    schematic.Replace(std::move(loaded->Elements), std::move(loaded->Wires), std::move(loaded->Settings));
+    schematic.Replace(std::move(loaded->Elements), std::move(loaded->Wires), std::move(loaded->Settings),
+                      std::move(loaded->Subcircuits), std::move(loaded->Models));
 }
 
 // A transient of 10 ms that a live run spreads over the shortest time the user may set

@@ -36,7 +36,9 @@ constexpr auto ALL_TYPES = std::to_array<ComponentType>({
     ComponentType::CCCS,
     ComponentType::CCVS,
     ComponentType::OP_AMP,
+    ComponentType::SUBCIRCUIT,
     ComponentType::NET_LABEL,
+    ComponentType::PIN,
     ComponentType::POTENTIOMETER,
     ComponentType::SWITCH,
     ComponentType::PUSH_BUTTON,
@@ -87,8 +89,8 @@ const char *Component::GetTypeName() const {
 
 /**
  * @brief   Returns the SPICE letter that starts the name of this kind of component.
- * @return  "R", "C", "L", "V", "Vin", "I", "D", "Q", "M", "E", "G", "F", "H" or "U", or an empty string for
- *          ground, which is not named.
+ * @return  "R", "C", "L", "V", "Vin", "I", "D", "Q", "M", "E", "G", "F", "H", "U" or "X", or an empty string
+ *          for ground, net labels and subcircuit pin markers, which are not named.
  */
 const char *Component::GetNamePrefix() const {
     switch (m_Type) {
@@ -125,6 +127,8 @@ const char *Component::GetNamePrefix() const {
         return "F";
     case ComponentType::CCVS:
         return "H";
+    case ComponentType::SUBCIRCUIT:
+        return "X";
     case ComponentType::OP_AMP:
     case ComponentType::AND:
     case ComponentType::OR:
@@ -153,6 +157,7 @@ const char *Component::GetNamePrefix() const {
         return "T";
     case ComponentType::GROUND:
     case ComponentType::NET_LABEL:
+    case ComponentType::PIN:
         return "";
     }
     return "";
@@ -189,6 +194,7 @@ const char *Component::GetUnit() const {
     case ComponentType::CCVS:
         return "V/A";
     case ComponentType::OP_AMP:
+    case ComponentType::SUBCIRCUIT:
     case ComponentType::AND:
     case ComponentType::OR:
     case ComponentType::NOT:
@@ -203,6 +209,7 @@ const char *Component::GetUnit() const {
     case ComponentType::SR_FLIP_FLOP:
     case ComponentType::GROUND:
     case ComponentType::NET_LABEL:
+    case ComponentType::PIN:
     case ComponentType::SWITCH:
     case ComponentType::PUSH_BUTTON:
     case ComponentType::V_SWITCH:
@@ -228,6 +235,7 @@ bool Component::HasValue() const {
     switch (m_Type) {
     case ComponentType::GROUND:
     case ComponentType::NET_LABEL:
+    case ComponentType::PIN:
     case ComponentType::SWITCH:
     case ComponentType::PUSH_BUTTON:
     case ComponentType::V_SWITCH:
@@ -240,6 +248,7 @@ bool Component::HasValue() const {
     case ComponentType::NMOS:
     case ComponentType::PMOS:
     case ComponentType::OP_AMP:
+    case ComponentType::SUBCIRCUIT:
     case ComponentType::AND:
     case ComponentType::OR:
     case ComponentType::NOT:
@@ -296,6 +305,7 @@ bool Component::IsValidValue(const double value) const {
         return true;
     case ComponentType::GROUND:
     case ComponentType::NET_LABEL:
+    case ComponentType::PIN:
     case ComponentType::SWITCH:
     case ComponentType::PUSH_BUTTON:
     case ComponentType::V_SWITCH:
@@ -308,6 +318,7 @@ bool Component::IsValidValue(const double value) const {
     case ComponentType::NMOS:
     case ComponentType::PMOS:
     case ComponentType::OP_AMP:
+    case ComponentType::SUBCIRCUIT:
     case ComponentType::AND:
     case ComponentType::OR:
     case ComponentType::NOT:
@@ -325,6 +336,15 @@ bool Component::IsValidValue(const double value) const {
         return false;
     }
     return false;
+}
+
+/**
+ * @brief   Tells whether the value can follow a parameter of the subcircuit the part belongs to.
+ * @return  True for resistors, capacitors and inductors, whose netlist line holds the value as it is; false for the
+ *          parts that work their lines out from the value, such as a potentiometer or a transformer.
+ */
+bool Component::CanFollowParameter() const {
+    return m_Type == ComponentType::RESISTOR || m_Type == ComponentType::CAPACITOR || m_Type == ComponentType::INDUCTOR;
 }
 
 /**
@@ -357,6 +377,79 @@ double Component::GetValue() const {
  */
 void Component::SetValue(const double value) {
     m_Value = value;
+    m_ValueExpression.reset();
+}
+
+/**
+ * @brief   Returns the parameter the value refers to, for a part inside a subcircuit.
+ * @return  An expression such as "{R}", written in the netlist instead of the value; no value for a fixed value.
+ */
+const std::optional<std::string> &Component::GetValueExpression() const {
+    return m_ValueExpression;
+}
+
+/**
+ * @brief   Makes the value follow a parameter of the subcircuit the part belongs to.
+ * @param[in] expression  A parameter name in braces, such as "{R}".
+ * @note    Parts that cannot follow a parameter (CanFollowParameter()) ignore it. SetValue() goes back to a fixed
+ * value.
+ */
+void Component::SetValueExpression(std::string expression) {
+    if (CanFollowParameter()) {
+        m_ValueExpression = std::move(expression);
+    }
+}
+
+/**
+ * @brief   Goes back to the fixed value, which GetValue() returns.
+ */
+void Component::ClearValueExpression() {
+    m_ValueExpression.reset();
+}
+
+/**
+ * @brief   Tells whether the part can use a model from a library.
+ * @return  True for diodes, LEDs, Zeners and transistors.
+ */
+bool Component::TakesLibraryModel() const {
+    static constexpr auto MODELED_TYPES =
+        std::to_array({ComponentType::DIODE, ComponentType::ZENER_DIODE, ComponentType::LED, ComponentType::NPN,
+                       ComponentType::PNP, ComponentType::NMOS, ComponentType::PMOS});
+    return std::ranges::contains(MODELED_TYPES, m_Type);
+}
+
+/**
+ * @brief   Tells whether the part uses a model from a library.
+ * @return  True when it names one, in place of a ready model or custom parameters.
+ */
+bool Component::HasLibraryModel() const {
+    return !m_LibraryModel.empty();
+}
+
+/**
+ * @brief   Returns the name of the library model the part uses.
+ * @return  The name, as its library writes it, or an empty string when the part uses a ready or custom model.
+ */
+const std::string &Component::GetLibraryModel() const {
+    return m_LibraryModel;
+}
+
+/**
+ * @brief   Makes the part use a model from a library, which the schematic keeps.
+ * @param[in] name  Name of the model; a part that cannot use one (TakesLibraryModel()) ignores it.
+ * @note    Choosing a ready model or custom parameters later goes back to them.
+ */
+void Component::SetLibraryModel(std::string name) {
+    if (TakesLibraryModel()) {
+        m_LibraryModel = std::move(name);
+    }
+}
+
+/**
+ * @brief   Stops using a library model, so the part uses its ready model or its custom parameters again.
+ */
+void Component::ClearLibraryModel() {
+    m_LibraryModel.clear();
 }
 
 /**
@@ -405,6 +498,15 @@ void Component::ClearInitialCondition() {
 }
 
 /**
+ * @brief   Tells whether a kind of part is the pin marker of a subcircuit.
+ * @param[in] type  Kind of part.
+ * @return  True for ComponentType::PIN.
+ */
+bool IsSubcircuitPin(const ComponentType type) {
+    return type == ComponentType::PIN;
+}
+
+/**
  * @brief   Returns a readable name for a kind of component.
  * @param[in] type  Kind of component.
  * @return  The type as text, such as "Resistor"; ParseComponentType() reads it back.
@@ -449,8 +551,12 @@ const char *GetTypeName(const ComponentType type) {
         return "CCVS";
     case ComponentType::OP_AMP:
         return "OpAmp";
+    case ComponentType::SUBCIRCUIT:
+        return "Subcircuit";
     case ComponentType::NET_LABEL:
         return "NetLabel";
+    case ComponentType::PIN:
+        return "Pin";
     case ComponentType::POTENTIOMETER:
         return "Potentiometer";
     case ComponentType::SWITCH:
