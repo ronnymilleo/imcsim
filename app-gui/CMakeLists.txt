@@ -36,6 +36,7 @@ add_library(imcsim-gui-lib
             drawing/svg_writer.cpp
             drawing/theme.cpp
             drawing/tool_icons.cpp
+            editing/block_wiring.cpp
             editing/canvas_view.cpp
             editing/connectivity.cpp
             editing/editor_mode.cpp
@@ -45,6 +46,7 @@ add_library(imcsim-gui-lib
             editing/probing.cpp
             editing/selection.cpp
             editing/wire_editing.cpp
+            editing/wire_routing.cpp
             helpers.cpp
             part_editor.cpp
             plots/logic_trace.cpp

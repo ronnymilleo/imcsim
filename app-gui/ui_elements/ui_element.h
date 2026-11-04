@@ -37,6 +37,15 @@ struct LocalBounds {
 };
 
 /**
+ * @struct  WorldBounds
+ * @brief   Axis-aligned box around a placed symbol, terminals included, in world grid units.
+ */
+struct WorldBounds {
+    ImVec2 Min;
+    ImVec2 Max;
+};
+
+/**
  * @class   UIElement
  * @brief   A component placed on the schematic grid, with its position, rotation and mirroring.
  * @details Owns its Core::Component. By default an element has two terminals at local x = -2 and x = +2 and
@@ -68,6 +77,7 @@ public:
     std::vector<GridPoint> GetTerminals() const;
     GridPoint GetTerminalInward(std::size_t terminal) const;
     bool Contains(ImVec2 world_pos) const;
+    WorldBounds GetWorldBounds() const;
     bool Intersects(ImVec2 min, ImVec2 max) const;
 
 protected:
