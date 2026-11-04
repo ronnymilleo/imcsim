@@ -17,19 +17,21 @@ namespace GUI {
 
 namespace {
 
-// The default leads end at x = -1 and x = 1, so a short segment reaches the circle
+/// The default leads end at x = -1 and x = 1, so a short segment reaches the circle.
 constexpr float LEAD_END = 1.0f;
 constexpr int SINE_SEGMENT_COUNT = 16;
 constexpr float WAVE_HALF_WIDTH = 0.5f;
 constexpr float WAVE_AMPLITUDE = 0.3f;
-// The pulse stays high for the middle half of the box the waves are drawn in
+/// The pulse stays high for the middle half of the box the waves are drawn in.
 constexpr float PULSE_HALF_WIDTH = 0.25f;
-// The circle reaches 0.8 from the center, so the labels start a little further out than those of other
-// two-terminal symbols, which would touch it
+/// The circle reaches 0.8 from the center, so the labels start a little further out than those of other
+/// two-terminal symbols, which would touch it.
 constexpr float LABEL_OFFSET = 1.25f;
 
-// A generic exponential rise and decay over the box the waves are drawn in, the shape of an EXP source: nothing,
-// then a rise with a short time constant, then a decay with a longer one
+/**
+ * @brief   A generic exponential rise and decay over the box the waves are drawn in, the shape of an EXP source:
+ *          nothing, then a rise with a short time constant, then a decay with a longer one.
+ */
 float ExponentialShape(const float fraction) {
     constexpr float RISE_START = 0.3f;
     constexpr float FALL_START = 0.5f;
@@ -57,7 +59,9 @@ UISource::UISource(std::unique_ptr<Core::Source> source, const GridPoint positio
     : UIElement(std::move(source), position, rotation) {
 }
 
-// Every waveform but DC ignores the value of the source, so it is labeled by its main figures instead
+/**
+ * @brief   Every waveform but DC ignores the value of the source, so it is labeled by its main figures instead.
+ */
 void UISource::DrawLabels(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color) const {
     const Core::Source &source = GetSource();
     const std::string unit = source.GetUnit();

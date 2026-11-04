@@ -27,7 +27,7 @@ struct ScaleSuffix {
     double Factor;
 };
 
-// Ordered from largest to smallest so formatting can pick the first one that fits
+/// Ordered from largest to smallest so formatting can pick the first one that fits.
 constexpr auto SUFFIXES = std::to_array<ScaleSuffix>({
     {"T", "T", 1e12},
     {"G", "G", 1e9},
@@ -41,7 +41,7 @@ constexpr auto SUFFIXES = std::to_array<ScaleSuffix>({
     {"f", "f", 1e-15},
 });
 
-// The micro sign, as typed on many keyboards, encoded in UTF-8
+/// The micro sign, as typed on many keyboards, encoded in UTF-8.
 constexpr std::string_view MICRO_SIGN = "\xC2\xB5";
 
 std::string_view Trim(std::string_view text) {
@@ -54,7 +54,10 @@ std::string_view Trim(std::string_view text) {
     return text;
 }
 
-// Such a value would read like "9.9e-05f" with the smallest suffix, so it is written in exponent notation instead
+/**
+ * @brief   Such a value would read like "9.9e-05f" with the smallest suffix, so it is written in exponent notation
+ *          instead.
+ */
 bool IsBelowSuffixes(const double value) {
     return std::abs(value) < SUFFIXES.back().Factor;
 }

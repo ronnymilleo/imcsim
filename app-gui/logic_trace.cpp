@@ -129,14 +129,16 @@ std::vector<LogicSegment> FindLogicSegments(const std::span<const double> times,
 
 namespace {
 
-// A stretch shorter than this share of the typical one is a glitch, which does not set the width of a cell
+/// A stretch shorter than this share of the typical one is a glitch, which does not set the width of a cell.
 constexpr double GLITCH_SHARE = 0.2;
-// Gaps this close to the shortest are the same width
+/// Gaps this close to the shortest are the same width.
 constexpr double SAME_WIDTH = 1.05;
-// Beyond this many cells in view they would be too narrow to label, so none are listed
+/// Beyond this many cells in view they would be too narrow to label, so none are listed.
 constexpr double MAX_CELLS = 5000.0;
 
-// What the signal reads at the sample nearest a time
+/**
+ * @brief   What the signal reads at the sample nearest a time.
+ */
 LogicState ReadStateAt(const std::span<const double> times, const std::span<const double> voltages,
                        const double logic_level, const double time) {
     const auto after = std::ranges::lower_bound(times, time);
@@ -149,14 +151,16 @@ LogicState ReadStateAt(const std::span<const double> times, const std::span<cons
     return ReadLogicState(voltages[std::min(index, voltages.size() - 1)], logic_level);
 }
 
-// Where the cells start and how wide they are
+/// Where the cells start and how wide they are.
 struct CellGrid {
     double Start = 0.0;
     double Width = 1.0;
 };
 
-// The stretches that keep a defined state, joined when the signal leaves a state and comes back to it through the
-// unknown band, which is a glitch or a slow edge and not a change of the data
+/**
+ * @brief   The stretches that keep a defined state, joined when the signal leaves a state and comes back to it through
+ *          the unknown band, which is a glitch or a slow edge and not a change of the data.
+ */
 std::vector<LogicSegment> JoinDefiniteSegments(const std::vector<LogicSegment> &segments) {
     std::vector<LogicSegment> joined;
     for (const LogicSegment &segment : segments) {
@@ -172,10 +176,13 @@ std::vector<LogicSegment> JoinDefiniteSegments(const std::vector<LogicSegment> &
     return joined;
 }
 
-// The changes of every signal, with those that follow another closely merged into the first, since a glitch is
-// not a change of the data. The cells are as wide as the shortest gap between changes, taken as the mean of those
-// within a few percent of it so the quantizing of the sample times does not add up over many cells, and start at the
-// first change, so the edges of a clock are the edges of the cells
+/**
+ * @brief   The changes of every signal, with those that follow another closely merged into the first, since a glitch is
+ *          not a change of the data.
+ * @details The cells are as wide as the shortest gap between changes, taken as the mean of those within a few percent
+ *          of it so the quantizing of the sample times does not add up over many cells, and start at the first change,
+ *          so the edges of a clock are the edges of the cells.
+ */
 CellGrid FindCellGrid(const std::span<const double> times, const std::span<const LogicSignal> signals) {
     std::vector<double> changes;
     std::vector<double> durations;

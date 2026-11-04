@@ -11,7 +11,7 @@
 
 namespace {
 
-// Only the Windows build copies digital.cm beside the tests; elsewhere ngspice loads its own through its spinit file
+/// Only the Windows build copies digital.cm beside the tests; elsewhere ngspice loads its own through its spinit file.
 class CodeModelListener : public Catch::EventListenerBase {
 public:
     using Catch::EventListenerBase::EventListenerBase;

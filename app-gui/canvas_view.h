@@ -38,8 +38,8 @@ private:
 
     ImVec2 m_Pan = {0, 0};
     float m_Zoom = DEFAULT_ZOOM;
-    // Largest zoom of a framing the next frame does, once the canvas size is known: the default when a schematic is
-    // opened, more for Fit
+    /// Largest zoom of a framing the next frame does, once the canvas size is known: the default when a schematic is
+    /// opened, more for Fit.
     std::optional<float> m_FrameMaxZoom;
 };
 

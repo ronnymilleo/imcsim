@@ -27,10 +27,12 @@ namespace {
 
 using namespace std::chrono_literals;
 
-// The longest a test waits for the worker before it calls the job lost
+/// The longest a test waits for the worker before it calls the job lost.
 constexpr auto WAIT_LIMIT = 10s;
 
-// Polls until the service delivers, or the limit passes
+/**
+ * @brief   Polls until the service delivers, or the limit passes.
+ */
 bool PollUntilDelivered(Core::SimulationService &service) {
     const auto deadline = std::chrono::steady_clock::now() + WAIT_LIMIT;
     while (std::chrono::steady_clock::now() < deadline) {
@@ -53,7 +55,9 @@ bool WaitUntilIdle(const Core::SimulationService &service) {
     return false;
 }
 
-// Runs until the control says stop, reporting a little progress on the way
+/**
+ * @brief   Runs until the control says stop, reporting a little progress on the way.
+ */
 Core::Job EndlessJob(std::atomic<bool> &has_started) {
     return [&has_started](Core::RunControl &control) -> Core::Delivery {
         has_started = true;

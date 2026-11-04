@@ -23,14 +23,79 @@ class SchematicCanvas {
 public:
     virtual ~SchematicCanvas() = default;
 
+    /**
+     * @brief   Draws a straight line.
+     * @param[in] start      First end, in screen pixels.
+     * @param[in] end        Second end, in screen pixels.
+     * @param[in] color      Line color.
+     * @param[in] thickness  Line width in pixels.
+     */
     virtual void AddLine(ImVec2 start, ImVec2 end, ImU32 color, float thickness) = 0;
+    /**
+     * @brief   Draws a line through a series of points, open or closed.
+     * @param[in] points     First of the points, in screen pixels.
+     * @param[in] count      Number of points.
+     * @param[in] color      Line color.
+     * @param[in] flags      ImDrawFlags_Closed joins the last point back to the first.
+     * @param[in] thickness  Line width in pixels.
+     */
     virtual void AddPolyline(const ImVec2 *points, int count, ImU32 color, ImDrawFlags flags, float thickness) = 0;
+    /**
+     * @brief   Draws the outline of a triangle.
+     * @param[in] first      First corner, in screen pixels.
+     * @param[in] second     Second corner, in screen pixels.
+     * @param[in] third      Third corner, in screen pixels.
+     * @param[in] color      Line color.
+     * @param[in] thickness  Line width in pixels.
+     */
     virtual void AddTriangle(ImVec2 first, ImVec2 second, ImVec2 third, ImU32 color, float thickness) = 0;
+    /**
+     * @brief   Draws a filled triangle.
+     * @param[in] first   First corner, in screen pixels.
+     * @param[in] second  Second corner, in screen pixels.
+     * @param[in] third   Third corner, in screen pixels.
+     * @param[in] color   Fill color.
+     */
     virtual void AddTriangleFilled(ImVec2 first, ImVec2 second, ImVec2 third, ImU32 color) = 0;
+    /**
+     * @brief   Draws a filled rectangle aligned with the axes.
+     * @param[in] min    Top left corner, in screen pixels.
+     * @param[in] max    Bottom right corner, in screen pixels.
+     * @param[in] color  Fill color.
+     */
     virtual void AddRectFilled(ImVec2 min, ImVec2 max, ImU32 color) = 0;
+    /**
+     * @brief   Draws the outline of a circle.
+     * @param[in] center     Center, in screen pixels.
+     * @param[in] radius     Radius in pixels.
+     * @param[in] color      Line color.
+     * @param[in] segments   Number of straight segments on screen, or 0 to let ImGui choose; an image draws a true
+     *                       circle.
+     * @param[in] thickness  Line width in pixels.
+     */
     virtual void AddCircle(ImVec2 center, float radius, ImU32 color, int segments, float thickness) = 0;
+    /**
+     * @brief   Draws a filled circle.
+     * @param[in] center  Center, in screen pixels.
+     * @param[in] radius  Radius in pixels.
+     * @param[in] color   Fill color.
+     */
     virtual void AddCircleFilled(ImVec2 center, float radius, ImU32 color) = 0;
+    /**
+     * @brief   Writes text in a given font and size.
+     * @param[in] font       Font that measures the text.
+     * @param[in] font_size  Font size in pixels.
+     * @param[in] position   Top left corner of the text, in screen pixels.
+     * @param[in] color      Text color.
+     * @param[in] text       Text to write, in UTF-8.
+     */
     virtual void AddText(ImFont *font, float font_size, ImVec2 position, ImU32 color, const char *text) = 0;
+    /**
+     * @brief   Writes text in the current ImGui font and size.
+     * @param[in] position  Top left corner of the text, in screen pixels.
+     * @param[in] color     Text color.
+     * @param[in] text      Text to write, in UTF-8.
+     */
     virtual void AddText(ImVec2 position, ImU32 color, const char *text) = 0;
 };
 

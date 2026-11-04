@@ -18,15 +18,18 @@ namespace GUI {
 
 namespace {
 
-// Side of the falloff texture, in texels; the glow is smooth, so a small texture scales up without steps
+/// Side of the falloff texture, in texels; the glow is smooth, so a small texture scales up without steps.
 constexpr std::uint32_t TEXTURE_SIZE = 64;
-// The falloff is a broad halo plus a narrow core, so a glow looks hot in the middle. The core width is a fraction of
-// the radius and the weights add up to 1, the alpha at the center
+/// Share of the broad halo in the falloff of a glow; with the narrow core it adds up to 1, the alpha at the center.
 constexpr float HALO_WEIGHT = 0.65f;
+/// Share of the narrow core in the falloff, so a glow looks hot in the middle.
 constexpr float CORE_WEIGHT = 0.35f;
+/// Width of the core, as a fraction of the radius.
 constexpr float CORE_WIDTH = 0.2f;
 
-// Alpha of the glow at a distance from its center, as a fraction of its radius
+/**
+ * @brief   Alpha of the glow at a distance from its center, as a fraction of its radius.
+ */
 float Falloff(const float distance) {
     if (distance >= 1.0f) {
         return 0.0f;
@@ -110,8 +113,10 @@ void GlowRenderer::AddGlows(ImDrawList *draw_list, const std::span<const Glow> g
     }
 }
 
-// Same vertex layout, shaders and state as the pipeline of the ImGui backend, except for the blending, so the
-// glows can be drawn from the vertex and index buffers the backend has already bound
+/**
+ * @brief   Same vertex layout, shaders and state as the pipeline of the ImGui backend, except for the blending, so the
+ *          glows can be drawn from the vertex and index buffers the backend has already bound.
+ */
 int GlowRenderer::CreatePipeline(const SDL_GPUTextureFormat target_format) {
     SDL_GPUShaderCreateInfo vertex_info{};
     vertex_info.entrypoint = "main";
@@ -218,7 +223,9 @@ int GlowRenderer::CreatePipeline(const SDL_GPUTextureFormat target_format) {
     return m_Pipeline != nullptr ? EXIT_SUCCESS : EXIT_FAILURE;
 }
 
-// White texels whose alpha falls off from the center, so the vertex color of each glow tints it
+/**
+ * @brief   White texels whose alpha falls off from the center, so the vertex color of each glow tints it.
+ */
 int GlowRenderer::CreateTexture() {
     std::array<std::uint8_t, std::size_t{TEXTURE_SIZE} * TEXTURE_SIZE * 4> texels{};
     for (std::uint32_t row = 0; row < TEXTURE_SIZE; ++row) {
@@ -283,8 +290,11 @@ int GlowRenderer::CreateTexture() {
     return submitted ? EXIT_SUCCESS : EXIT_FAILURE;
 }
 
-// Draw callback that switches to the additive pipeline. The backend keeps its buffers, viewport and uniforms bound
-// across the switch, and binds the texture and scissor of each following draw command as usual
+/**
+ * @brief   Draw callback that switches to the additive pipeline.
+ * @details The backend keeps its buffers, viewport and uniforms bound across the switch, and binds the texture and
+ *          scissor of each following draw command as usual.
+ */
 void GlowRenderer::BindPipeline(const ImDrawList * /*draw_list*/, const ImDrawCmd *command) {
     const auto *renderer = static_cast<const GlowRenderer *>(command->UserCallbackData);
     if (renderer->m_RenderPass != nullptr) {

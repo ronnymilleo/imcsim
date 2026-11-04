@@ -17,8 +17,10 @@ namespace Core {
 
 namespace {
 
-// Zeners work in breakdown, but other diodes only reach it when the circuit exceeds their rating, which ngspice
-// simulates without complaint
+/**
+ * @brief   Zeners work in breakdown, but other diodes only reach it when the circuit exceeds their rating, which
+ *          ngspice simulates without complaint.
+ */
 std::optional<std::string> BreakdownWarning(const CircuitEntry &entry, const double highest_reverse_voltage) {
     if (entry.Part->GetType() == ComponentType::ZENER_DIODE) {
         return std::nullopt;
@@ -63,8 +65,11 @@ double PeakMagnitude(const std::vector<double> &values) {
     return peak;
 }
 
-// Power taken by a part, the sum of voltage times current over its terminals. Datasheet dissipation is continuous,
-// so a transient is averaged over its whole run; a single point, as in .op, is its own average
+/**
+ * @brief   Power taken by a part, the sum of voltage times current over its terminals.
+ * @details Datasheet dissipation is continuous, so a transient is averaged over its whole run; a single point, as in
+ *          .op, is its own average.
+ */
 double AveragePower(const std::vector<double> &times, const TerminalWaveforms &terminals) {
     std::vector<double> power(times.size(), 0.0);
     for (std::size_t terminal = 0; terminal < terminals.Voltages.size(); ++terminal) {
@@ -92,8 +97,10 @@ void AddRatingWarning(const Component &part, const char *model_name, const std::
                                    quantity, FormatValue(value), unit, FormatValue(rating), unit));
 }
 
-// Checks a transistor against its datasheet ratings, which ngspice knows nothing about. Voltages and currents are
-// checked at their peak, and power on average
+/**
+ * @brief   Checks a transistor against its datasheet ratings, which ngspice knows nothing about.
+ * @details Voltages and currents are checked at their peak, and power on average.
+ */
 std::vector<std::string> RatingWarnings(const Component &part, const std::vector<double> &times,
                                         const TerminalWaveforms &terminals) {
     std::vector<std::string> warnings;
@@ -126,8 +133,10 @@ std::vector<std::string> RatingWarnings(const Component &part, const std::vector
     return warnings;
 }
 
-// Terminal voltages and probed currents of a part, read back from results that list currents by name. Every probed
-// current is in the results, since they were read from the same circuit
+/**
+ * @brief   Terminal voltages and probed currents of a part, read back from results that list currents by name.
+ * @details Every probed current is in the results, since they were read from the same circuit.
+ */
 TerminalWaveforms OperatingPointTerminals(const CircuitEntry &entry, const OperatingPoint &result) {
     TerminalWaveforms terminals;
     for (const int node : entry.Nodes) {

@@ -23,14 +23,14 @@ struct KindName {
     ComponentType Kind;
 };
 
-// The SPICE model types a part of imcsim can use; the others, such as VDMOS or switches, have no part to go on
+/// The SPICE model types a part of imcsim can use; the others, such as VDMOS or switches, have no part to go on.
 constexpr auto KINDS = std::to_array<KindName>({{"d", ComponentType::DIODE},
                                                 {"npn", ComponentType::NPN},
                                                 {"pnp", ComponentType::PNP},
                                                 {"nmos", ComponentType::NMOS},
                                                 {"pmos", ComponentType::PMOS}});
 
-// Prefix of the netlist name of a library model, which no ready model starts with
+/// Prefix of the netlist name of a library model, which no ready model starts with.
 constexpr std::string_view SPICE_NAME_PREFIX = "LIB_";
 
 bool IsSpace(const char character) {
@@ -44,7 +44,9 @@ std::string ToLower(std::string_view text) {
     return lower;
 }
 
-// Where the name of a .model statement starts and how long it is, or no value when the text is not one
+/**
+ * @brief   Where the name of a .model statement starts and how long it is, or no value when the text is not one.
+ */
 std::optional<std::pair<std::size_t, std::size_t>> FindName(const std::string_view text) {
     std::size_t position = 0;
     while (position < text.size() && IsSpace(text[position])) {

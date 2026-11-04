@@ -25,13 +25,13 @@ namespace GUI {
  * @brief   What the editor does around a file action, which the file actions cannot do themselves.
  */
 struct FileActionHooks {
-    // Leaves any drag, paste, placement or wire in progress, before the schematic is cleared or replaced
+    /// Leaves any drag, paste, placement or wire in progress, before the schematic is cleared or replaced.
     std::function<void()> StopEditing;
-    // Shows the whole schematic that was just opened
+    /// Shows the whole schematic that was just opened.
     std::function<void()> FrameSchematic;
-    // Lets an imported file or an inserted example follow the cursor until a click places it
+    /// Lets an imported file or an inserted example follow the cursor until a click places it.
     std::function<void(PastedGroup)> PlaceGroup;
-    // Lets the user pick the subcircuits of a SPICE library to import, with the name of its file
+    /// Lets the user pick the subcircuits of a SPICE library to import, with the name of its file.
     std::function<void(std::string, Core::SpiceLibrary)> OpenSpiceLibrary;
 };
 
@@ -96,22 +96,24 @@ private:
     bool m_QuitRequested = false;
     bool m_QuitConfirmed = false;
 
-    // Examples: requested from the menu and handled by the next Update(), then kept while discarding is confirmed
+    /// Examples: requested from the menu and handled by the next Update(), then kept while discarding is confirmed.
     std::optional<Example> m_RequestedExample;
     // Insertions, which add to the schematic instead of replacing it, so they need no confirmation
     std::optional<Example> m_RequestedInsertExample;
     std::optional<std::filesystem::path> m_RequestedImport;
     std::optional<Example> m_ExampleToOpen;
 
-    // The dialog in progress and the confirmation are touched only by the main thread
+    // Dialogs
+    /// Touched only by the main thread.
     std::optional<FileAction> m_ActionToConfirm;
+    /// The action of the dialog in progress, touched only by the main thread.
     std::optional<FileAction> m_DialogAction;
     FileDialog m_FileDialog;
     std::string m_MessagesTitle;
     std::vector<std::string> m_Messages;
-    // Messages from outside the popups' ID stack, opened by the next DrawPopups()
+    /// Messages from outside the popups' ID stack, opened by the next DrawPopups().
     bool m_HasQueuedMessages = false;
-    // Export: dark keeps the colors of the editor, light suits print
+    /// Export: dark keeps the colors of the editor, light suits print.
     bool m_ExportDark = false;
 
     void HandleQuitRequest();

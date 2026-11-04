@@ -22,9 +22,9 @@ namespace GUI {
 
 namespace {
 
-// The share of the time an export shows that a cell needs for its bit label
+/// The share of the time an export shows that a cell needs for its bit label.
 constexpr double MIN_BIT_LABEL_SHARE = 0.03;
-// Gain from the input source to the output below which the input-referred noise is left out: -120 dB
+/// Gain from the input source to the output below which the input-referred noise is left out: -120 dB.
 constexpr double MIN_INPUT_GAIN = 1e-6;
 
 ExportColor ToExportColor(const ImU32 color) {
@@ -93,8 +93,11 @@ private:
     std::vector<ImAxis> m_UsedAxes;
 };
 
-// Adds the measured voltages and currents of a result, as the plots draw them. The suffix tells the curves of a
-// DC sweep family apart in the CSV headers; only the first curve of a family has a legend entry
+/**
+ * @brief   Adds the measured voltages and currents of a result, as the plots draw them.
+ * @details The suffix tells the curves of a DC sweep family apart in the CSV headers; only the first curve of a family
+ *          has a legend entry.
+ */
 void AddExportTraces(PanelBuilder &builder, const std::vector<std::vector<double>> &node_values,
                      const std::vector<Core::ComponentTrace> &currents, Schematic &schematic, const std::string &suffix,
                      const bool in_legend, const std::vector<int> &excluded = {}) {
@@ -124,8 +127,10 @@ void AddExportTraces(PanelBuilder &builder, const std::vector<std::vector<double
     }
 }
 
-// A note for each cell that is wide enough for its label in what the image shows, which has no pixels to measure it
-// with, so a share of the span stands for the width of the box
+/**
+ * @brief   A note for each cell that is wide enough for its label in what the image shows, which has no pixels to
+ *          measure it with, so a share of the span stands for the width of the box.
+ */
 void AddBitNotes(ExportPanel &panel, const Core::Transient &transient, const std::vector<LogicNode> &lanes,
                  const PlotSpan &view) {
     std::vector<LogicSignal> signals;
@@ -146,8 +151,11 @@ void AddBitNotes(ExportPanel &panel, const Core::Transient &transient, const std
     }
 }
 
-// The lanes as a panel of their own: each trace is drawn at the height of its lane, and its axis names the lanes,
-// while the CSV lists the voltages. The first lane is on top, as in the plot
+/**
+ * @brief   The lanes as a panel of their own: each trace is drawn at the height of its lane, and its axis names the
+ *          lanes, while the CSV lists the voltages.
+ * @details The first lane is on top, as in the plot.
+ */
 ExportPanel BuildLanePanel(const Core::Transient &transient, const std::vector<LogicNode> &lanes, Schematic &schematic,
                            const bool bit_values, const PlotSpan &view) {
     ExportPanel panel;

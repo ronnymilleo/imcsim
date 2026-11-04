@@ -12,7 +12,9 @@ namespace GUI {
 
 namespace {
 
-// How many points from first fit in a span of time, at least one and at most the largest window
+/**
+ * @brief   How many points from first fit in a span of time, at least one and at most the largest window.
+ */
 std::size_t CountSpanPoints(const std::vector<double> &times, const std::size_t first, const double span) {
     const auto end =
         std::upper_bound(times.begin() + static_cast<std::ptrdiff_t>(first), times.end(), times[first] + span);
@@ -20,7 +22,9 @@ std::size_t CountSpanPoints(const std::vector<double> &times, const std::size_t 
     return std::clamp<std::size_t>(count, 1, MAX_WINDOW_POINTS);
 }
 
-// The first of the points that end a run within a span of time, keeping at most the largest window
+/**
+ * @brief   The first of the points that end a run within a span of time, keeping at most the largest window.
+ */
 std::size_t FindSpanStart(const std::vector<double> &times, const double span) {
     const auto start = std::lower_bound(times.begin(), times.end(), times.back() - span);
     const auto first = static_cast<std::size_t>(start - times.begin());

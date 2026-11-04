@@ -11,7 +11,9 @@
 
 namespace {
 
-// An AND of V1 and V2 on node 3, whose last row has no operating point to show the unknown state
+/**
+ * @brief   An AND of V1 and V2 on node 3, whose last row has no operating point to show the unknown state.
+ */
 Core::TruthTable MakeTable() {
     Core::TruthTable table;
     table.InputNames = {"V1", "V2"};

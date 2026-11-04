@@ -11,7 +11,9 @@ namespace GUI {
 
 namespace {
 
-// Wires are horizontal or vertical, so a wire is its own bounding box
+/**
+ * @brief   Wires are horizontal or vertical, so a wire is its own bounding box.
+ */
 bool WireIntersects(const UIWire &wire, const ImVec2 min, const ImVec2 max) {
     const GridPoint start = wire.GetStart();
     const GridPoint end = wire.GetEnd();

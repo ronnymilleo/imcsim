@@ -18,11 +18,11 @@ namespace GUI {
 
 namespace {
 
-// A dot is drawn where three or more connections meet, like in most schematic editors
+/// A dot is drawn where three or more connections meet, like in most schematic editors.
 constexpr int MIN_JUNCTION_CONNECTIONS = 3;
-// The nets a label can name to mean ground, in the form nets are compared in
+/// The nets a label can name to mean ground, in the form nets are compared in.
 constexpr std::array<std::string_view, 2> GROUND_NETS = {"0", "gnd"};
-// The net that joins every VCC supply, in the form nets are compared in
+/// The net that joins every VCC supply, in the form nets are compared in.
 constexpr std::string_view SUPPLY_NET = "vcc";
 
 /**
@@ -50,14 +50,15 @@ private:
     std::vector<std::size_t> m_Parents;
 };
 
-// What the terminals and wires of a schematic put on each grid point
+/// What the terminals and wires of a schematic put on each grid point.
 struct PointClasses {
-    // How many connections reach each point; a wire passing through a point counts twice
+    /// How many connections reach each point; a wire passing through a point counts twice.
     std::map<GridPoint, int> ConnectionCount;
     std::vector<GridPoint> GroundPoints;
     std::vector<GridPoint> SupplyPoints;
-    // Points of the named labels by the name they are compared with, and the name as typed on each point
+    /// Points of the named labels, by the name they are compared with.
     std::map<std::string, std::vector<GridPoint>> LabeledPoints;
+    /// The name of a label as typed, on each of its points.
     std::map<GridPoint, std::string> LabelText;
 };
 
@@ -101,8 +102,10 @@ PointClasses ClassifyPoints(const std::vector<std::unique_ptr<UIElement>> &eleme
     return classes;
 }
 
-// Joins the two ends of every wire, and the points a wire passes through; a point reached that way counts for the
-// junction dot, which returns the points where three or more connections meet
+/**
+ * @brief   Joins the two ends of every wire, and the points a wire passes through; a point reached that way counts for
+ *          the junction dot, which returns the points where three or more connections meet.
+ */
 std::vector<GridPoint> UniteWires(DisjointSet &nodes, const std::map<GridPoint, std::size_t> &index_of_point,
                                   std::map<GridPoint, int> &connection_count, const std::vector<UIWire> &wires) {
     std::vector<GridPoint> junctions;
@@ -123,7 +126,9 @@ std::vector<GridPoint> UniteWires(DisjointSet &nodes, const std::map<GridPoint, 
     return junctions;
 }
 
-// Labels with one name are one node, with or without a wire between them
+/**
+ * @brief   Labels with one name are one node, with or without a wire between them.
+ */
 void UniteLabels(DisjointSet &nodes, const std::map<GridPoint, std::size_t> &index_of_point,
                  const std::map<std::string, std::vector<GridPoint>> &labeled_points) {
     for (const auto &[name, points] : labeled_points) {
@@ -133,7 +138,9 @@ void UniteLabels(DisjointSet &nodes, const std::map<GridPoint, std::size_t> &ind
     }
 }
 
-// Ground first as node 0, the rest in grid order from 1
+/**
+ * @brief   Ground first as node 0, the rest in grid order from 1.
+ */
 std::map<GridPoint, int> NumberNodes(DisjointSet &nodes, const std::map<GridPoint, std::size_t> &index_of_point,
                                      const std::vector<GridPoint> &ground_points) {
     std::map<std::size_t, int> node_of_root;

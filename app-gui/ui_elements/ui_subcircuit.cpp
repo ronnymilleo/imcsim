@@ -16,14 +16,16 @@ namespace GUI {
 
 namespace {
 
-// Pins sit two units apart, so their labels have room, and their terminals one unit outside the box
+/// Pins sit two units apart, so their labels have room.
 constexpr int PIN_SPACING = 2;
+/// Terminals sit one unit outside the box.
 constexpr int LEAD_LENGTH = 1;
-// The smallest box is four units wide and two high
+/// The smallest box is four units wide.
 constexpr int MIN_HALF_WIDTH = 2;
+/// The smallest box is two units high.
 constexpr int MIN_HALF_HEIGHT = 1;
 constexpr int VERTICAL_NAME_ROOM = 1;
-// Pin names sit just inside the box
+/// Pin names sit just inside the box.
 constexpr float PIN_LABEL_INSET = 0.2f;
 constexpr float NAME_LABEL_GAP = 0.5f;
 
@@ -36,8 +38,8 @@ int CountPins(const Core::SubcircuitInstance &instance, const Core::PinSide side
         instance.GetPins(), [&](const std::string &pin) { return instance.GetPinSide(pin) == side; }));
 }
 
-// The half sizes of the box, in whole units so the terminals land on the grid: tall enough for the pins of the fuller
-// of the left and right edges, wide enough for those of the top and bottom
+/// The half sizes of the box, in whole units so the terminals land on the grid: tall enough for the pins of the fuller
+/// of the left and right edges, wide enough for those of the top and bottom.
 struct BoxSize {
     int HalfWidth = MIN_HALF_WIDTH;
     int HalfHeight = MIN_HALF_HEIGHT;
@@ -54,12 +56,16 @@ BoxSize MeasureBox(const Core::SubcircuitInstance &instance) {
             .HasVerticalPins = columns > 0};
 }
 
-// Where along its edge the pin of an index goes, the pins of the edge centered on it
+/**
+ * @brief   Where along its edge the pin of an index goes, the pins of the edge centered on it.
+ */
 int PinOffset(const int index, const int edge_count) {
     return PIN_SPACING * index - PIN_SPACING * (edge_count - 1) / 2;
 }
 
-// The point on the box where the lead of a terminal meets it, one unit in from the terminal
+/**
+ * @brief   The point on the box where the lead of a terminal meets it, one unit in from the terminal.
+ */
 ImVec2 GetEdgePoint(const GridPoint terminal, const BoxSize box) {
     if (terminal.X < -box.HalfWidth) {
         return {static_cast<float>(-box.HalfWidth), static_cast<float>(terminal.Y)};
@@ -101,7 +107,9 @@ void UISubcircuit::DrawSymbol(SchematicCanvas &canvas, const ViewTransform &view
     canvas.AddPolyline(corners.data(), static_cast<int>(corners.size()), color, ImDrawFlags_Closed, LINE_THICKNESS);
 }
 
-// The instance name above, the definition below, and each pin name inside the box next to its lead
+/**
+ * @brief   The instance name above, the definition below, and each pin name inside the box next to its lead.
+ */
 void UISubcircuit::DrawLabels(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color) const {
     const auto &instance = Instance(GetComponent());
     const LocalBounds bounds = GetLocalBounds();
@@ -119,8 +127,10 @@ void UISubcircuit::DrawLabels(SchematicCanvas &canvas, const ViewTransform &view
     }
 }
 
-// One terminal per pin, in pin order, on the edge its marker gave it; the pins of each edge are centered on it in the
-// order they come
+/**
+ * @brief   One terminal per pin, in pin order, on the edge its marker gave it; the pins of each edge are centered on it
+ *          in the order they come.
+ */
 std::vector<GridPoint> UISubcircuit::GetLocalTerminals() const {
     const auto &instance = Instance(GetComponent());
     const BoxSize box = MeasureBox(instance);

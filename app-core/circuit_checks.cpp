@@ -19,12 +19,15 @@ namespace Core {
 
 namespace {
 
-// Limits that keep a mistyped setting from running for minutes or exhausting memory
+/// Most points per decade a sweep may ask for, so a mistyped setting cannot run for minutes or exhaust memory.
 constexpr int MAX_POINTS_PER_DECADE = 1000;
+/// Most points a DC sweep may take, for the same reason.
 constexpr int MAX_DC_SWEEP_POINTS = 100000;
 
-// Clocks, logic inputs, supply rails and logic parts tie themselves to node 0 in the netlist, so a circuit made only of
-// them has its reference without a Ground part
+/**
+ * @brief   Clocks, logic inputs, supply rails and logic parts tie themselves to node 0 in the netlist, so a circuit
+ *          made only of them has its reference without a Ground part.
+ */
 bool IsDigitalOnly(const Circuit &circuit) {
     return std::ranges::all_of(circuit.GetEntries(), [](const CircuitEntry &entry) {
         const ComponentType type = entry.Part->GetType();
@@ -47,15 +50,19 @@ std::optional<std::string> CheckFrequencyRange(const double start_frequency, con
     return std::nullopt;
 }
 
-// The independent sources a DC sweep or a transfer function can drive, whatever their waveform: voltage and current
-// sources, supply rails, and clocks and logic inputs, which are voltage sources in the netlist whose DC value the
-// analysis replaces
+/**
+ * @brief   The independent sources a DC sweep or a transfer function can drive, whatever their waveform: voltage and
+ *          current sources, supply rails, and clocks and logic inputs, which are voltage sources in the netlist whose
+ *          DC value the analysis replaces.
+ */
 bool IsSweepable(const ComponentType type) {
     return type == ComponentType::VCC || type == ComponentType::VOLTAGE_SOURCE ||
            type == ComponentType::CURRENT_SOURCE || type == ComponentType::CLOCK || type == ComponentType::LOGIC_INPUT;
 }
 
-// Values from start to stop, both included, as ngspice counts them
+/**
+ * @brief   Values from start to stop, both included, as ngspice counts them.
+ */
 double SweepPointCount(const SweepRange &range) {
     return std::floor((range.Stop - range.Start) / range.Step + 1e-9) + 1.0;
 }
@@ -76,15 +83,19 @@ std::optional<std::string> CheckSweepRange(const Circuit &circuit, const SweepRa
     return std::nullopt;
 }
 
-// Independent sources set to AC, which ngspice accepts as the input of a noise analysis
+/**
+ * @brief   Independent sources set to AC, which ngspice accepts as the input of a noise analysis.
+ */
 bool IsNoiseInput(const Component &component) {
     const ComponentType type = component.GetType();
     return (type == ComponentType::VOLTAGE_SOURCE || type == ComponentType::CURRENT_SOURCE) &&
            static_cast<const Source &>(component).GetSourceType() == Source::SourceType::AC;
 }
 
-// A pin on ground would connect nothing, since ngspice keeps node 0 global instead of joining it to the outside, and
-// two pins on one node would short the nets of the instance
+/**
+ * @brief   A pin on ground would connect nothing, since ngspice keeps node 0 global instead of joining it to the
+ *          outside, and two pins on one node would short the nets of the instance.
+ */
 std::optional<std::string> CheckPins(const SubcircuitDefinition &definition) {
     // The ports of a block kept as SPICE text are the vendor's own names, written as they came
     if (definition.Spice) {
@@ -108,7 +119,9 @@ std::optional<std::string> CheckPins(const SubcircuitDefinition &definition) {
     return std::nullopt;
 }
 
-// Only parts inside a subcircuit can follow its parameters
+/**
+ * @brief   Only parts inside a subcircuit can follow its parameters.
+ */
 std::optional<std::string> CheckExpressions(const Circuit &body, const SubcircuitDefinition *definition) {
     for (const CircuitEntry &entry : body.GetEntries()) {
         const std::optional<std::string> &expression = entry.Part->GetValueExpression();
@@ -128,8 +141,10 @@ std::optional<std::string> CheckExpressions(const Circuit &body, const Subcircui
     return std::nullopt;
 }
 
-// Every instance needs a known definition with a node for each pin and parameters it has, and every definition in use
-// needs pins it can connect and parameters for its parts
+/**
+ * @brief   Every instance needs a known definition with a node for each pin and parameters it has, and every definition
+ *          in use needs pins it can connect and parameters for its parts.
+ */
 std::optional<std::string> CheckSubcircuits(const Circuit &circuit) {
     if (std::optional<std::string> problem = CheckExpressions(circuit, nullptr)) {
         return problem;
@@ -163,7 +178,9 @@ std::optional<std::string> CheckSubcircuits(const Circuit &circuit) {
     return std::nullopt;
 }
 
-// A part that names a library model needs the circuit to have it, and of its own kind
+/**
+ * @brief   A part that names a library model needs the circuit to have it, and of its own kind.
+ */
 std::optional<std::string> CheckLibraryModels(const Circuit &circuit) {
     for (const Component *part : CollectParts(circuit)) {
         if (!part->HasLibraryModel()) {

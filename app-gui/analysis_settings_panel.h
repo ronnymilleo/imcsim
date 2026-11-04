@@ -35,19 +35,22 @@ public:
 private:
     Schematic &m_Schematic;
 
-    // Settings fields, reloaded whenever the schematic replaces its settings
+    // Settings fields
+    /// Version of the settings the fields were loaded from, so they reload whenever the schematic replaces its
+    /// settings.
     std::size_t m_LoadedSettingsVersion = 0;
     ValueField m_StopTime;
     ValueField m_TimeStep;
     ValueField m_LiveSeconds;
     ValueField m_StartFrequency;
     ValueField m_StopFrequency;
-    // Start, stop and step of each DC sweep range
+    /// Start, stop and step of the swept DC sweep range.
     std::array<ValueField, 3> m_SweptFields;
+    /// Start, stop and step of the stepped DC sweep range.
     std::array<ValueField, 3> m_SteppedFields;
     ValueField m_NoiseStartFrequency;
     ValueField m_NoiseStopFrequency;
-    // Start, stop and step of the stepped parameter
+    /// Start, stop and step of the stepped parameter.
     std::array<ValueField, 3> m_ParameterFields;
 
     // Settings fields

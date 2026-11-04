@@ -14,7 +14,7 @@ namespace {
 
 constexpr double DEFAULT_RESISTANCE = 10e3;
 constexpr double DEFAULT_WIPER = 0.5;
-// The two halves of the track never get to 0 Ohm, which SPICE rejects, however close to an end the wiper is
+/// The two halves of the track never get to 0 Ohm, which SPICE rejects, however close to an end the wiper is.
 constexpr double MIN_TRACK_RESISTANCE = 1e-3;
 
 } // namespace

@@ -69,7 +69,7 @@ private:
     Job m_Job;
     Delivery m_Delivery;
     RunControl m_Control;
-    // Started with the first job, so a program that never simulates has no thread
+    /// Started with the first job, so a program that never simulates has no thread.
     std::thread m_Worker;
 
     void Work();

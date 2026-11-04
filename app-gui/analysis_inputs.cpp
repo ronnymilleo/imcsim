@@ -12,14 +12,18 @@ namespace GUI {
 
 namespace {
 
-// A source that is empty, or that left the circuit or its AC setting, falls back to the first source that can be
-// the input; sources must not be empty
+/**
+ * @brief   A source that is empty, or that left the circuit or its AC setting, falls back to the first source that can
+ *          be the input; sources must not be empty.
+ */
 std::string ResolveInputSource(const std::string &stored, const std::vector<std::string> &sources) {
     return std::ranges::contains(sources, stored) ? stored : sources.front();
 }
 
-// Nodes an ideal voltage source holds against ground, such as a supply rail or the output of a source, where no
-// noise can show
+/**
+ * @brief   Nodes an ideal voltage source holds against ground, such as a supply rail or the output of a source, where
+ *          no noise can show.
+ */
 std::vector<int> ListHeldNodes(const Core::Circuit &circuit) {
     std::vector<int> nodes;
     for (const Core::CircuitEntry &entry : circuit.GetEntries()) {

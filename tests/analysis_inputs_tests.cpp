@@ -21,7 +21,10 @@
 
 namespace {
 
-// Opens the RC low-pass example, whose source drives node 1, its resistor joins nodes 1 and 2, and which measures both
+/**
+ * @brief   Opens the RC low-pass example, whose source drives node 1, its resistor joins nodes 1 and 2, and which
+ *          measures both.
+ */
 void OpenRCFilter(GUI::Schematic &schematic) {
     const auto example = std::ranges::find(GUI::GetExamples(), "rc_low_pass_filter.imcsim", &GUI::Example::FileName);
     REQUIRE(example != GUI::GetExamples().end());

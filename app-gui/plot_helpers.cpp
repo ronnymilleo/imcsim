@@ -30,9 +30,11 @@ ImVec2 ToVec2(const PixelPoint point) {
     return {static_cast<float>(point.X), static_cast<float>(point.Y)};
 }
 
-// Narrows [first, last], the part of a segment still inside, by one edge of the rectangle (Liang-Barsky). The
-// segment is start + fraction * delta, and offset is how far start is inside the edge; returns false once nothing
-// is left
+/**
+ * @brief   Narrows [first, last], the part of a segment still inside, by one edge of the rectangle (Liang-Barsky).
+ * @details The segment is start + fraction * delta, and offset is how far start is inside the edge; returns false once
+ *          nothing is left.
+ */
 bool ClipEdge(const double delta, const double offset, double &first, double &last) {
     if (delta == 0.0) {
         return offset >= 0.0;

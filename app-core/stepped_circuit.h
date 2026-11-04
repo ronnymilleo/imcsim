@@ -26,7 +26,7 @@ namespace Core {
 struct ParameterCircuit {
     std::unique_ptr<Component> Part;
     Circuit Simulated;
-    // Temperature of the run in degrees Celsius when the stepped parameter is the temperature
+    /// Temperature of the run in degrees Celsius when the stepped parameter is the temperature.
     std::optional<double> Temperature;
 };
 

@@ -49,8 +49,8 @@ struct ThemePalette {
     ImU32 Selected;
     ImU32 CanvasText;
     ImU32 VoltageLabel;
-    // Raises node and trace colors to full brightness, for a theme whose canvas is so dark that their usual tones
-    // look dim on it
+    /// Raises node and trace colors to full brightness, for a theme whose canvas is so dark that their usual tones
+    /// look dim on it.
     bool BrightTraces = false;
 };
 

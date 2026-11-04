@@ -15,9 +15,9 @@ namespace Core {
 
 namespace {
 
-// Grouped by part, default model first. Common vendor cards reduced to the parameters of BJTParameters; the gain
-// stays within the datasheet range at the test currents of each part. Ratings are the absolute maximum VCEO and
-// IC and the free-air dissipation
+/// Grouped by part, default model first. Common vendor cards reduced to the parameters of BJTParameters; the gain
+/// stays within the datasheet range at the test currents of each part. Ratings are the absolute maximum VCEO and
+/// IC and the free-air dissipation.
 constexpr auto BJT_MODELS = std::to_array<BJTModel>({
     {"2N3904",
      "General-purpose NPN, 40 V 200 mA",

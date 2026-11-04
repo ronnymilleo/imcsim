@@ -18,18 +18,21 @@ namespace GUI {
 
 namespace {
 
-// Math channels take their own colors, apart from those of nodes and currents
+/// Math channels take their own colors, apart from those of nodes and currents.
 constexpr auto MATH_COLORS = std::to_array<ImU32>({
     IM_COL32(230, 110, 230, 255),
     IM_COL32(150, 230, 90, 255),
     IM_COL32(235, 235, 235, 255),
     IM_COL32(90, 220, 190, 255),
 });
-// Widths in the math editor, in font sizes
+/// Width of an operand field in the math editor, in font sizes.
 constexpr float OPERAND_WIDTH = 10.0f;
+/// Width of an expression field in the math editor, in font sizes.
 constexpr float EXPRESSION_WIDTH = 20.0f;
 
-// Voltages and currents share the axes of the probed traces; any other unit, or none, goes on the third axis
+/**
+ * @brief   Voltages and currents share the axes of the probed traces; any other unit, or none, goes on the third axis.
+ */
 ImAxis AxisForUnit(const Dimension unit) {
     if (unit == Dimension{.Volts = 1}) {
         return ImAxis_Y1;
@@ -181,15 +184,20 @@ std::vector<MathTrace> MathChannels::Evaluate(const std::span<const double> xs, 
     return traces;
 }
 
-// Net names are looked up in the connectivity of the moment, which the schematic keeps up to date
+/**
+ * @brief   Net names are looked up in the connectivity of the moment, which the schematic keeps up to date.
+ */
 NetResolver MathChannels::GetNetResolver() const {
     return [&schematic = m_Schematic](const std::string_view net) {
         return schematic.GetConnectivity().FindNodeOfNet(net);
     };
 }
 
-// Like the math menu of an oscilloscope: two traces and an operator button, or a typed expression. Switching to
-// an expression starts from the operation, so it can be extended. Returns false when the channel is removed
+/**
+ * @brief   Like the math menu of an oscilloscope: two traces and an operator button, or a typed expression.
+ * @details Switching to an expression starts from the operation, so it can be extended. Returns false when the channel
+ *          is removed.
+ */
 bool MathChannels::DrawEditor(MathChannel &channel, const std::vector<std::string> &operands) const {
     ImGui::TextUnformatted(channel.Name.c_str());
     if (ImGui::RadioButton("Operation", !channel.UsesExpression)) {

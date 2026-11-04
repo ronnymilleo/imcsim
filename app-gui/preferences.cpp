@@ -22,7 +22,9 @@ static_assert(LIVE_EFFECT_NAMES.size() == NUMBER_OF_LIVE_EFFECTS);
 
 constexpr int FORMAT_VERSION = 1;
 
-// The position of a name in a list of names, or no value when it is not there
+/**
+ * @brief   The position of a name in a list of names, or no value when it is not there.
+ */
 template <std::size_t Count>
 std::optional<std::size_t> FindName(const std::array<const char *, Count> &names, const std::string_view name) {
     const auto found = std::ranges::find(names, name);
@@ -42,7 +44,9 @@ public:
     ChoiceReader(const nlohmann::json &document, std::vector<std::string> &warnings)
         : m_Document(document), m_Warnings(warnings) {}
 
-    // Reads a key of the given JSON type and hands its value to apply, which tells whether it understood it
+    /**
+     * @brief   Reads a key of the given JSON type and hands its value to apply, which tells whether it understood it.
+     */
     template <typename Value, typename Apply>
     void Read(const char *key, const nlohmann::json::value_t type, const Apply &apply) {
         const auto entry = m_Document.find(key);
@@ -54,7 +58,9 @@ public:
         }
     }
 
-    // A number may be written whole or not, which JSON tells apart as different types
+    /**
+     * @brief   A number may be written whole or not, which JSON tells apart as different types.
+     */
     template <typename Apply> void ReadNumber(const char *key, const Apply &apply) {
         const auto entry = m_Document.find(key);
         if (entry == m_Document.end()) {

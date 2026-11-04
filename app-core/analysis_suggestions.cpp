@@ -20,18 +20,21 @@ namespace Core {
 
 namespace {
 
-// A transient shows this many periods of the slowest source, with this many points in a period of the fastest
+/// Periods of the slowest source a suggested transient shows.
 constexpr double SUGGESTED_PERIODS = 5.0;
+/// Points a suggested transient takes in a period of the fastest source.
 constexpr double POINTS_PER_PERIOD = 200.0;
-// A waveform that happens once, such as an exponential or piecewise linear one, shows its whole span with this much
-// room after it
+/// A waveform that happens once, such as an exponential or piecewise linear one, shows its whole span with this much
+/// room after it.
 constexpr double ONE_SHOT_MARGIN = 1.2;
-// The AC sweep reaches two decades past the lowest and the highest frequency the parts set
+/// Decades a suggested AC sweep reaches past the lowest and the highest frequency the parts set.
 constexpr double AC_MARGIN_DECADES = 2.0;
 constexpr double MIN_AC_FREQUENCY = 1e-3;
 constexpr double MAX_AC_FREQUENCY = 1e10;
 
-// Rounds to the closest 1, 2 or 5 times a power of ten, below or above the value, so suggestions read well
+/**
+ * @brief   Rounds to the closest 1, 2 or 5 times a power of ten, below or above the value, so suggestions read well.
+ */
 double RoundToNiceStep(const double value, const bool up) {
     const double decade = std::pow(10.0, std::floor(std::log10(value)));
     constexpr auto STEPS = std::to_array({1.0, 2.0, 5.0, 10.0});
@@ -61,8 +64,10 @@ std::vector<double> ListPartValues(const Circuit &circuit, const ComponentType t
     return values;
 }
 
-// Corners of every resistor with every capacitor or inductor, resonances of every inductor with every capacitor,
-// and the gain-bandwidth product of every op-amp
+/**
+ * @brief   Corners of every resistor with every capacitor or inductor, resonances of every inductor with every
+ *          capacitor, and the gain-bandwidth product of every op-amp.
+ */
 std::vector<double> ListCharacteristicFrequencies(const Circuit &circuit) {
     const std::vector<double> resistances = ListPartValues(circuit, ComponentType::RESISTOR);
     const std::vector<double> capacitances = ListPartValues(circuit, ComponentType::CAPACITOR);
@@ -91,8 +96,8 @@ std::vector<double> ListCharacteristicFrequencies(const Circuit &circuit) {
     return frequencies;
 }
 
-// What the sources of a circuit say about time: the periods of the repeating waveforms, the spans of those that
-// happen once, and the longest delay before a waveform starts
+/// What the sources of a circuit say about time: the periods of the repeating waveforms, the spans of those that
+/// happen once, and the longest delay before a waveform starts.
 struct Waveforms {
     std::vector<double> Periods;
     std::vector<double> Spans;
@@ -134,7 +139,9 @@ void AddSourceWaveform(const Source &source, Waveforms &waveforms) {
     }
 }
 
-// A clock is a periodic source like a pulse one, with its period and its start delay
+/**
+ * @brief   A clock is a periodic source like a pulse one, with its period and its start delay.
+ */
 void AddWaveform(const Component &part, Waveforms &waveforms) {
     if (part.GetType() == ComponentType::CLOCK) {
         const ClockParameters &clock = static_cast<const Clock &>(part).GetParameters();

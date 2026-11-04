@@ -15,10 +15,10 @@ namespace Core {
 
 namespace {
 
-// Grouped by part, default model first. Level 1 approximations: VTO is the typical threshold, KP sets the
-// datasheet RDS(on) at |VGS| = 10 V, and the overlaps, in F per meter of width, give the typical input and reverse
-// transfer capacitances with the default 100 um width (20 pF is 2e-7 F/m). Ratings are the absolute maximum VDS, VGS
-// and continuous ID, and the dissipation in free air, or with an ideal heatsink for the power parts
+/// Grouped by part, default model first. Level 1 approximations: VTO is the typical threshold, KP sets the
+/// datasheet RDS(on) at |VGS| = 10 V, and the overlaps, in F per meter of width, give the typical input and reverse
+/// transfer capacitances with the default 100 um width (20 pF is 2e-7 F/m). Ratings are the absolute maximum VDS, VGS
+/// and continuous ID, and the dissipation in free air, or with an ideal heatsink for the power parts.
 constexpr auto MOSFET_MODELS = std::to_array<MOSFETModel>({
     {"2N7000",
      "Small-signal N-channel, 60 V 200 mA, 1.8 Ohm",

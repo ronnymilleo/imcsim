@@ -52,12 +52,12 @@ struct Harmonic {
  */
 struct HarmonicAnalysis {
     double Mean = 0.0;
-    // The fundamental first; empty when the trace holds no tone
+    /// The fundamental first; empty when the trace holds no tone.
     std::vector<Harmonic> Harmonics;
-    // Root sum of squares of the harmonics over the fundamental; no value without a fundamental and a second harmonic
+    /// Root sum of squares of the harmonics over the fundamental; no value without a fundamental and a second harmonic.
     std::optional<double> TotalDistortion;
-    // Periods of the fundamental the span must hold, when it holds fewer: the peaks of the mean, the fundamental and
-    // its harmonics would overlap, so no harmonic is measured
+    /// Periods of the fundamental the span must hold, when it holds fewer: the peaks of the mean, the fundamental and
+    /// its harmonics would overlap, so no harmonic is measured.
     std::optional<int> PeriodsNeeded;
 };
 

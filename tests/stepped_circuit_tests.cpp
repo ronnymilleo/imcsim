@@ -14,7 +14,7 @@
 
 namespace {
 
-// A 1k resistor and a 100n capacitor in series, to ground
+/// A 1k resistor and a 100n capacitor in series, to ground.
 struct Ladder {
     Core::Resistor Series;
     Core::Capacitor Shunt;

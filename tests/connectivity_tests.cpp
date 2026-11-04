@@ -30,7 +30,9 @@ struct Schematic {
 
     GUI::Connectivity Connect() const { return {Elements, Wires}; }
 
-    // A label at a point; its terminal is at that point
+    /**
+     * @brief   A label at a point; its terminal is at that point.
+     */
     void Label(const GUI::GridPoint point, const std::string &net) {
         Elements.push_back(std::make_unique<GUI::UINetLabel>(point, GUI::Rotation::R0));
         static_cast<Core::NetLabel &>(Elements.back()->GetComponent()).SetNet(net);

@@ -50,7 +50,9 @@ Core::SubcircuitInstance MakeInstance(const std::string &name, const std::string
     return instance;
 }
 
-// A pin marker; unturned, its arrow points right, which puts the pin on the left of the block
+/**
+ * @brief   A pin marker; unturned, its arrow points right, which puts the pin on the left of the block.
+ */
 void AddMarker(GUI::Schematic &schematic, const GUI::GridPoint point, const std::string &name,
                const GUI::Rotation rotation = GUI::Rotation::R0) {
     schematic.AddElement(GUI::CreateElement(Core::ComponentType::PIN, point, rotation));

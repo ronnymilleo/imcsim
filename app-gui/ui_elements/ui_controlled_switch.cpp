@@ -16,21 +16,24 @@ namespace GUI {
 
 namespace {
 
-// The contact: two points on the vertical axis, and a lever from the lower one that rests above the upper one
+/// The two contact points sit on the vertical axis, this far above and below the middle.
 constexpr float CONTACT_Y = 0.7f;
 constexpr float CONTACT_RADIUS = 0.12f;
+/// The lever runs from the lower contact and rests above the upper one.
 constexpr ImVec2 LEVER_TIP = {0.7f, -0.5f};
-// The control leads end at a bar, or at the coil, which is a box this wide and tall around (-1.2, 0)
+/// The control leads end at a bar, or at the coil around this point.
 constexpr float CONTROL_END_X = -1.2f;
 constexpr float BAR_HALF_LENGTH = 1.0f;
+/// Half the width of the coil, a box around the end of the control leads.
 constexpr float COIL_HALF_WIDTH = 0.4f;
+/// Half the height of the coil.
 constexpr float COIL_HALF_HEIGHT = 0.8f;
 constexpr float SIGN_HALF_SIZE = 0.15f;
 constexpr ImVec2 CONTROL_PLUS_SIGN = {-1.7f, -1.4f};
 constexpr ImVec2 CONTROL_MINUS_SIGN = {-1.7f, 1.4f};
 constexpr float DASH_LENGTH = 0.2f;
 constexpr float DASH_GAP = 0.15f;
-// Where the dashed line reaches the lever
+/// Where the dashed line reaches the lever.
 constexpr float LINK_END_X = 0.25f;
 constexpr float LABEL_OFFSET_X = 1.1f;
 constexpr float LABEL_OFFSET_Y = 0.5f;
@@ -51,7 +54,10 @@ UIControlledSwitch::UIControlledSwitch(const Core::ComponentType type, const Gri
                 position, rotation) {
 }
 
-// The contact leads stop at the contacts; the control leads run to the bar or the coil, with their polarity beside
+/**
+ * @brief   The contact leads stop at the contacts; the control leads run to the bar or the coil, with their polarity
+ *          beside.
+ */
 void UIControlledSwitch::DrawTerminals(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color) const {
     canvas.AddLine(LocalToScreen(view, 0, -2), LocalToScreen(view, 0, -CONTACT_Y - CONTACT_RADIUS), color,
                    LINE_THICKNESS);
@@ -95,7 +101,9 @@ void UIControlledSwitch::DrawSymbol(SchematicCanvas &canvas, const ViewTransform
     DrawDashedLine(canvas, view, CONTROL_END_X, LINK_END_X, 0.0f, color);
 }
 
-// The threshold of a switch, or the pull-in voltage of a relay, under the name
+/**
+ * @brief   The threshold of a switch, or the pull-in voltage of a relay, under the name.
+ */
 void UIControlledSwitch::DrawLabels(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color) const {
     const double voltage =
         IsRelay() ? static_cast<const Core::Relay &>(GetComponent()).GetParameters().PullInVoltage

@@ -18,7 +18,9 @@ namespace {
 
 constexpr double ABSOLUTE_ZERO = -273.15;
 
-// Parts a stepped analysis can change: those written as one element whose value is all there is to them
+/**
+ * @brief   Parts a stepped analysis can change: those written as one element whose value is all there is to them.
+ */
 bool IsSteppable(const ComponentType type) {
     return type == ComponentType::RESISTOR || type == ComponentType::CAPACITOR || type == ComponentType::INDUCTOR;
 }

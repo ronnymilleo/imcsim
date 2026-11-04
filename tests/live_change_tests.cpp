@@ -19,7 +19,9 @@
 
 namespace {
 
-// Whether the netlist writes the element of a change with the value the change gives it
+/**
+ * @brief   Whether the netlist writes the element of a change with the value the change gives it.
+ */
 bool NetlistAgrees(const Core::Circuit &circuit, const Core::LiveChange &change) {
     const std::string netlist = circuit.ToSpiceNetlist();
     const std::string value = Core::FormatSpiceValue(change.Value);

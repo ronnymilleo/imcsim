@@ -34,7 +34,7 @@
 
 namespace {
 
-// A 5 V source charging 1 uF through 1k, for 5 ms, from an empty capacitor
+/// A 5 V source charging 1 uF through 1k, for 5 ms, from an empty capacitor.
 struct ChargingCapacitor {
     Core::VoltageSource Source;
     Core::Resistor Series;
@@ -58,7 +58,7 @@ struct ChargingCapacitor {
     }
 };
 
-// What a monitored run handed over: each chunk, so the tests see where the run was cut
+/// What a monitored run handed over: each chunk, so the tests see where the run was cut.
 struct Received {
     std::vector<Core::Transient> Chunks;
     Core::RunMonitor Monitor;
@@ -69,7 +69,9 @@ struct Received {
     }
 };
 
-// Value of a trace at a time, between the two points that surround it
+/**
+ * @brief   Value of a trace at a time, between the two points that surround it.
+ */
 double ValueAt(const std::vector<double> &times, const std::vector<double> &values, const double time) {
     const auto after = std::ranges::lower_bound(times, time);
     if (after == times.begin()) {
@@ -83,11 +85,13 @@ double ValueAt(const std::vector<double> &times, const std::vector<double> &valu
     return values[index - 1] + fraction * (values[index] - values[index - 1]);
 }
 
-// Circuits that switch when a slow input barely passes a threshold, so the instant of the switching depends on the
-// step sequence by a hundred microseconds or so; they are compared by what they reach, not point by point
+/// Circuits that switch when a slow input barely passes a threshold, so the instant of the switching depends on the
+/// step sequence by a hundred microseconds or so; they are compared by what they reach, not point by point.
 constexpr auto THRESHOLD_SENSITIVE_EXAMPLES = std::to_array<std::string_view>({"Schmitt trigger"});
 
-// Lowest and highest value of a trace within a window of time around an instant
+/**
+ * @brief   Lowest and highest value of a trace within a window of time around an instant.
+ */
 std::pair<double, double> RangeAround(const std::vector<double> &times, const std::vector<double> &values,
                                       const double time, const double half_window) {
     double lowest = ValueAt(times, values, time - half_window);
@@ -105,7 +109,7 @@ std::pair<double, double> RangeAround(const std::vector<double> &times, const st
     return {lowest, highest};
 }
 
-// A 5 V source feeding a divider of two 1k resistors through an open switch, for 10 ms
+/// A 5 V source feeding a divider of two 1k resistors through an open switch, for 10 ms.
 struct SwitchedDivider {
     Core::VoltageSource Source;
     Core::Switch Contact{Core::ComponentType::SWITCH};
@@ -131,8 +135,8 @@ struct SwitchedDivider {
     }
 };
 
-// A live run of a circuit that sends the changes once the run has passed an instant, as a user would, and the time of
-// the last point made before they were sent
+/// A live run of a circuit that sends the changes once the run has passed an instant, as a user would, and the time of
+/// the last point made before they were sent.
 struct LiveRun {
     Core::RunControl Control;
     Core::RunMonitor Monitor;

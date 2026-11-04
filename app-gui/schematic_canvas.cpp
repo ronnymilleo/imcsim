@@ -13,9 +13,9 @@ namespace GUI {
 
 namespace {
 
-// ImGui sizes a font by its full height, from ascent to descent; SVG and CSS by its em square, which is smaller.
-// Common sans fonts span about 1.33 em (Noto Sans 1.36, Inter 1.21, DejaVu Sans 1.16), so this keeps exported text
-// close to the size it has on screen
+/// ImGui sizes a font by its full height, from ascent to descent; SVG and CSS by its em square, which is smaller.
+/// Common sans fonts span about 1.33 em (Noto Sans 1.36, Inter 1.21, DejaVu Sans 1.16), so this keeps exported text
+/// close to the size it has on screen.
 constexpr float IM_GUI_TO_SVG_FONT_SIZE = 0.75f;
 
 SvgPoint ToSvg(const ImVec2 point) {
@@ -130,8 +130,10 @@ void SvgCanvas::AddCircleFilled(const ImVec2 center, const float radius, const I
     Cover(center, radius);
 }
 
-// ImGui places text by its top left corner; SVG by a point on the baseline. The ascent of the ImGui font puts the
-// baseline where the screen has it
+/**
+ * @brief   ImGui places text by its top left corner; SVG by a point on the baseline.
+ * @details The ascent of the ImGui font puts the baseline where the screen has it.
+ */
 void SvgCanvas::AddText(ImFont *font, const float font_size, const ImVec2 position, const ImU32 color,
                         const char *text) {
     const ImVec2 size = font->CalcTextSizeA(font_size, FLT_MAX, 0.0f, text);
@@ -162,7 +164,9 @@ ImVec2 SvgCanvas::GetMax() const {
     return m_Max;
 }
 
-// Transparency is dropped: exported schematics have no overlapping translucent shapes
+/**
+ * @brief   Transparency is dropped: exported schematics have no overlapping translucent shapes.
+ */
 ExportColor SvgCanvas::Convert(const ImU32 color) const {
     const ExportColor converted = {static_cast<std::uint8_t>((color >> IM_COL32_R_SHIFT) & 0xFF),
                                    static_cast<std::uint8_t>((color >> IM_COL32_G_SHIFT) & 0xFF),

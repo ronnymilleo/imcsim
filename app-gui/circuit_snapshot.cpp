@@ -14,14 +14,16 @@ namespace GUI {
 
 namespace {
 
-// The two samples around an instant and how far the instant is from the first to the second
+/// The two samples around an instant and how far the instant is from the first to the second.
 struct Bracket {
     std::size_t Before = 0;
     std::size_t After = 0;
     double Fraction = 0.0;
 };
 
-// Instants outside the run take its first or last sample
+/**
+ * @brief   Instants outside the run take its first or last sample.
+ */
 Bracket FindBracket(const std::vector<double> &times, const double time) {
     if (time <= times.front()) {
         return {};
@@ -34,7 +36,9 @@ Bracket FindBracket(const std::vector<double> &times, const double time) {
     return {.Before = before, .After = after, .Fraction = (time - times[before]) / (times[after] - times[before])};
 }
 
-// A trace shorter than the time axis reads as zero where it has no sample
+/**
+ * @brief   A trace shorter than the time axis reads as zero where it has no sample.
+ */
 double Interpolate(const std::vector<double> &values, const Bracket &bracket) {
     if (bracket.After >= values.size()) {
         return 0.0;

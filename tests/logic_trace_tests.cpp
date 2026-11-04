@@ -117,8 +117,8 @@ TEST_CASE("A signal that never changes is one segment, and no samples give none"
 
 namespace {
 
-// A clock of 1 ms halves, high from 1 to 2 ms and 3 to 4 ms, and a signal that is high from 1 to 3 ms, over 0 to 4 ms
-// sampled every 0.01 ms
+/// A clock of 1 ms halves, high from 1 to 2 ms and 3 to 4 ms, and a signal that is high from 1 to 3 ms, over 0 to 4 ms
+/// sampled every 0.01 ms.
 struct Cells {
     std::vector<double> Times;
     std::vector<double> Clock;

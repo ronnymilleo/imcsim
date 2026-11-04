@@ -19,7 +19,7 @@
 namespace GUI {
 
 inline constexpr float MEASUREMENT_MARKER_RADIUS = 4.0f;
-// Terminal rings on screen, relative to the zoom like junction dots: 4 pixels at the default zoom
+/// Terminal rings on screen, relative to the zoom like junction dots: 4 pixels at the default zoom.
 inline constexpr float SCREEN_TERMINAL_RING_SCALE = 0.2f;
 
 // Static annotations

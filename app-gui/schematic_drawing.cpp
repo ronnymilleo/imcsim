@@ -22,42 +22,45 @@ namespace GUI {
 
 namespace {
 
-// Space between a measurement marker and the near edge of its label, in pixels
+/// Space between a measurement marker and the near edge of its label, in pixels.
 constexpr float MARKER_LABEL_GAP = 4.0f;
-// Voltage dots follow the zoom like the rest of the drawing: 4 pixels at the default zoom
+/// Voltage dots follow the zoom like the rest of the drawing: 4 pixels at the default zoom.
 constexpr float VOLTAGE_DOT_SCALE = 0.2f;
+/// Smallest radius of a voltage dot, in pixels.
 constexpr float MIN_VOLTAGE_DOT_RADIUS = 2.5f;
-// Current arrows lie on the lead, in grid units from the terminal: from the base of the head to its tip
+/// Where a current arrow starts on its lead, at the base of its head, in grid units from the terminal.
 constexpr float ARROW_START = 0.2f;
+/// Where the tip of a current arrow sits, in grid units from the terminal.
 constexpr float ARROW_TIP = 0.75f;
 constexpr float ARROW_HALF_WIDTH = 0.25f;
-// Flowing-current arrows: equal heads spaced this far apart along the wires, in grid units, so they follow the zoom.
-// The arrows only show direction, so they all have the same size and scroll at one speed; the magnitude stays on the
-// heat color. The speed is in grid units per second
+/// Distance between flowing-current arrows along the wires, in grid units, so they follow the zoom. The arrows only
+/// show direction, so they all have the same size and scroll at one speed; the magnitude stays on the heat color.
 constexpr float FLOW_ARROW_SPACING = 0.60f;
 constexpr float FLOW_ARROW_LENGTH = 0.20f;
 constexpr float FLOW_ARROW_HALF_WIDTH = 0.10f;
+/// Speed of the flowing-current arrows, in grid units per second.
 constexpr float FLOW_SPEED = 1.5f;
-// Terminal numbers are smaller than part labels and muted, so they do not compete with names and values. They sit
-// just outside the terminal, in grid units along the line of its lead, where neither the symbol nor probes draw
+/// Terminal numbers are smaller than part labels and muted, so they do not compete with names and values.
 constexpr float TERMINAL_NUMBER_SCALE = 0.8f;
+/// Distance of a terminal number past its terminal, in grid units along the line of its lead, where neither the symbol
+/// nor probes draw.
 constexpr float TERMINAL_NUMBER_OUTSIDE = 0.3f;
 constexpr float TERMINAL_NUMBER_GAP = 3.0f;
-// Each numbered terminal also gets a small open ring, the usual mark of a connection point; open so it does not read
-// as a junction or a voltage probe, which are filled dots. Exported images are usually viewed enlarged, so their ring
-// is smaller than the one on screen, relative to the zoom
+/// Each numbered terminal also gets a small open ring, the usual mark of a connection point; open so it does not read
+/// as a junction or a voltage probe, which are filled dots. Exported images are usually viewed enlarged, so their ring
+/// is smaller than the one on screen, relative to the zoom.
 constexpr float EXPORT_TERMINAL_RING_SCALE = 0.125f;
 constexpr float MIN_TERMINAL_RING_RADIUS = 2.5f;
 constexpr float TERMINAL_RING_THICKNESS = 1.5f;
 
-// The export draws at the default zoom of the editor, so it looks like the circuit on screen; the image is vector,
-// so it scales from there
+/// The export draws at the default zoom of the editor, so it looks like the circuit on screen; the image is vector,
+/// so it scales from there.
 constexpr float EXPORT_ZOOM = 20.0f;
-// Room around the circuit, in pixels
+/// Room around the circuit, in pixels.
 constexpr float EXPORT_MARGIN = 16.0f;
-// Junction dots as the editor draws them at the default zoom
+/// Junction dots as the editor draws them at the default zoom.
 constexpr float JUNCTION_RADIUS = 3.0f;
-// Symbols and wires are black on white for print; probes keep the colors of their traces
+/// Symbols and wires are black on white for print; probes keep the colors of their traces.
 constexpr ImU32 PRINT_LINE_COLOR = IM_COL32(30, 30, 30, 255);
 constexpr ExportColor PRINT_BACKGROUND = {255, 255, 255};
 
@@ -67,7 +70,9 @@ ExportColor ToExportColor(const ImU32 color) {
             static_cast<std::uint8_t>((color >> IM_COL32_B_SHIFT) & 0xFF)};
 }
 
-// Wires, junctions, parts with their labels, terminal numbers and probes, at the export zoom from the origin
+/**
+ * @brief   Wires, junctions, parts with their labels, terminal numbers and probes, at the export zoom from the origin.
+ */
 void DrawWholeSchematic(SvgCanvas &canvas, Schematic &schematic, const SymbolStyle style, const bool terminal_numbers,
                         const ImU32 element_color, const ImU32 wire_color) {
     const ViewTransform view({0.0f, 0.0f}, {0.0f, 0.0f}, EXPORT_ZOOM);
@@ -86,18 +91,24 @@ void DrawWholeSchematic(SvgCanvas &canvas, Schematic &schematic, const SymbolSty
     DrawMeasurementMarkers(canvas, view, schematic);
 }
 
-// Pixels per grid unit
+/**
+ * @brief   Pixels per grid unit.
+ */
 float GetZoom(const ViewTransform &view) {
     return view.ToScreen({1.0f, 0.0f}).x - view.ToScreen({0.0f, 0.0f}).x;
 }
 
-// Labels take the size of the part labels, so they follow the zoom
+/**
+ * @brief   Labels take the size of the part labels, so they follow the zoom.
+ */
 float GetLabelFontSize(const ViewTransform &view) {
     return std::max(GetZoom(view) * LABEL_SCALE, MIN_LABEL_SIZE);
 }
 
-// Top left corner of a text of the given size beside a line, centered on a point of it: above or left of the line
-// before it, below or right after it
+/**
+ * @brief   Top left corner of a text of the given size beside a line, centered on a point of it: above or left of the
+ *          line before it, below or right after it.
+ */
 ImVec2 PlaceBesideLine(const ImVec2 point, const ImVec2 size, const bool horizontal_line, const bool before_line,
                        const float gap) {
     if (horizontal_line) {
@@ -106,9 +117,12 @@ ImVec2 PlaceBesideLine(const ImVec2 point, const ImVec2 size, const bool horizon
     return {before_line ? point.x - gap - size.x : point.x + gap, point.y - size.y / 2.0f};
 }
 
-// Marker labels sit beside the line their marker is on, centered on the marker, so they never run along it into a
-// corner. Voltages go above or left of their line and currents below or right, so a voltage marked next to a
-// measured terminal does not cover the current label. The marker extent is how far the marker reaches from the line
+/**
+ * @brief   Marker labels sit beside the line their marker is on, centered on the marker, so they never run along it
+ *          into a corner.
+ * @details Voltages go above or left of their line and currents below or right, so a voltage marked next to a measured
+ *          terminal does not cover the current label. The marker extent is how far the marker reaches from the line.
+ */
 void DrawMarkerLabel(SchematicCanvas &canvas, const ViewTransform &view, const ImVec2 point, const bool horizontal_line,
                      const bool before_line, const float marker_extent, const std::string &text, const ImU32 color) {
     const float font_size = GetLabelFontSize(view);

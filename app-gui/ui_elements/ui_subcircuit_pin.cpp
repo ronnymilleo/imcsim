@@ -14,8 +14,8 @@ namespace GUI {
 
 namespace {
 
-// Unrotated, the terminal is at the origin, the lead runs left from it to the square, and the arrow inside the square
-// points right, toward the terminal
+/// Unrotated, the terminal is at the origin, the lead runs left from it to the square, and the arrow inside the square
+/// points right, toward the terminal.
 constexpr float LEAD_LENGTH = 0.5f;
 constexpr float SQUARE_SIDE = 1.0f;
 constexpr float ARROW_INSET = 0.15f;
@@ -56,7 +56,9 @@ void UISubcircuitPin::DrawSymbol(SchematicCanvas &canvas, const ViewTransform &v
                              LocalToScreen(view, head_base, HEAD_HALF_WIDTH), color);
 }
 
-// The name sits beyond the square, outside the circuit, where the block's edge is
+/**
+ * @brief   The name sits beyond the square, outside the circuit, where the block's edge is.
+ */
 void UISubcircuitPin::DrawLabels(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color) const {
     const std::string &name = static_cast<const Core::SubcircuitPinMarker &>(GetComponent()).GetNet();
     DrawLabel(canvas, view, {SQUARE_FAR - LABEL_GAP, 0.0f}, {-1.0f, 0.0f}, name.empty() ? "?" : name, color);

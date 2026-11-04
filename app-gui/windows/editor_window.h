@@ -99,10 +99,11 @@ private:
         std::vector<GridPoint> FixedTerminals;
         std::vector<UIWire> StartWires;
         std::optional<bool> SlidesVertically;
-        // Moved the mouse far enough to change something, and what a click without a move leaves selected
+        /// Moved the mouse far enough to change something.
         bool Moved = false;
         GridPoint LastCursor;
         GridPoint LastDelta;
+        /// What a click without a move leaves selected.
         std::optional<Selection> CollapseTo;
     };
 
@@ -165,27 +166,28 @@ private:
     std::string m_SubcircuitError;
     bool m_SubcircuitDialogRequested = false;
     std::string m_PlacingSubcircuit;
-    // Imports SPICE libraries and sets up the pins of the blocks they become
+    /// Imports SPICE libraries and sets up the pins of the blocks they become.
     SpiceBlockDialog m_SpiceDialog;
     AnalysisControls &m_Controls;
     AnalysisSettingsPanel &m_SettingsPanel;
     PartEditor &m_PartEditor;
     GlowRenderer &m_GlowRenderer;
     TransientPlayback &m_Playback;
-    // How the schematic is drawn and exported
+    /// How the schematic is drawn and exported.
     const Preferences &m_Preferences;
 
     // Parts of the editor, in the order they are built
     CanvasView m_View;
     SchematicFileActions m_Files;
 
-    // What the schematic shows, resolved at the start of each frame; the scale of a transient is worked out once per
-    // result and kept
+    // What the schematic shows
+    /// What the schematic shows, resolved at the start of each frame.
     std::optional<DisplayedState> m_Displayed;
+    /// Version of the transient the heat scale was worked out for, so it is worked out once per result and kept.
     std::optional<std::size_t> m_ScaledTransientVersion;
-    // The window of points the scale was worked out over
+    /// The window of points the scale was worked out over.
     PointWindow m_ScaledWindow;
-    // When the heat scale of a transient that is still being made was last worked out
+    /// When the heat scale of a transient that is still being made was last worked out.
     double m_LastScaleTime = 0.0;
     HeatScale m_TransientScale;
 
@@ -193,10 +195,12 @@ private:
     std::optional<Core::ComponentType> m_PlacingType;
     Rotation m_PlacingRotation = Rotation::R0;
     bool m_PlacingMirrored = false;
-    // Part each toolbar group places, the last one picked from its list
+    /// Part each toolbar group places, the last one picked from its list.
     std::vector<Core::ComponentType> m_PartGroupChoices;
-    // Part picker: the typed query and the highlighted match
+    // Part picker
+    /// The query typed in the part picker.
     std::string m_PartQuery;
+    /// The highlighted match of the part picker.
     std::size_t m_PartPickerIndex = 0;
 
     // Wiring
@@ -204,30 +208,36 @@ private:
     std::optional<GridPoint> m_WireStart;
     bool m_WireVerticalFirst = false;
 
-    // Probing: picks what the plots measure
+    /// Probing: picks what the plots measure.
     bool m_Probing = false;
 
-    // Pasting: what was read from the clipboard, following the cursor until a click places it
+    /// Pasting: what was read from the clipboard, following the cursor until a click places it.
     std::optional<PastedGroup> m_Pasting;
 
     // Selection and dragging
     std::optional<GroupDrag> m_Drag;
     std::optional<SelectionBox> m_Box;
 
-    // Live runs: the push button the mouse holds down
+    /// Live runs: the push button the mouse holds down.
     std::optional<std::size_t> m_HeldButton;
 
-    // Properties popover: the corner it hangs from, which side of the part it opens on, and a request from a menu
+    // Properties popover
+    /// The corner the popover hangs from.
     ImVec2 m_PartPopoverAnchor = {0.0f, 0.0f};
+    /// Which side of the part the popover opens on.
     float m_PartPopoverPivotX = 0.0f;
+    /// Whether a menu asked to open the popover.
     bool m_PartPopoverRequested = false;
-    // Context menu: what the right click was on, for its measure item; the part picker it can open
+    // Context menu
+    /// What the right click was on, for the measure item of the context menu.
     std::optional<MeasurementTarget> m_ContextTarget;
+    /// Whether the context menu asked to open the part picker.
     bool m_PartPickerRequested = false;
-    // ImGui closes a popup on Esc before the frame starts, so the editor checks the last frame to leave that Esc alone
+    /// ImGui closes a popup on Esc before the frame starts, so the editor checks the last frame to leave that
+    /// Esc alone.
     bool m_PopupOpenLastFrame = false;
 
-    // Menu command waiting for the next Update()
+    /// Menu command waiting for the next Update().
     std::optional<EditorCommand> m_RequestedCommand;
 
     // Frame

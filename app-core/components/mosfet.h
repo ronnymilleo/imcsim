@@ -87,7 +87,7 @@ public:
     std::string GetSpiceModelName() const;
 
 private:
-    // Null when the transistor uses its custom parameters
+    /// Null when the transistor uses its custom parameters.
     const MOSFETModel *m_Model;
     MOSFETParameters m_CustomParameters;
 };

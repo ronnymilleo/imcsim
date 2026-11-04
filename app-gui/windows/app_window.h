@@ -35,19 +35,24 @@ protected:
     void SetNewContentMarker(bool shown);
 
 private:
+    /**
+     * @brief   Draws the content of the window.
+     * @note    Render() calls it between ImGui::Begin() and ImGui::End(), only while the window is open, not
+     *          collapsed and not hidden behind another dock tab, so it draws no Begin/End pair of its own.
+     */
     virtual void Draw() = 0;
 
     std::string m_WindowTitle;
     bool m_Closable;
     ImGuiWindowFlags m_WindowFlags;
     bool m_IsOpen = true;
-    // Brings the window to the front on its next Render(), as the selected tab when docked
+    /// Brings the window to the front on its next Render(), as the selected tab when docked.
     bool m_FocusRequested = false;
-    // Opened by OpenBehind(): appears without taking the focus, and behind the selected tab when docked
+    /// Opened by OpenBehind(): appears without taking the focus, and behind the selected tab when docked.
     bool m_AppearBehind = false;
-    // A dot beside the title or tab, for something new the user has not seen yet
+    /// A dot beside the title or tab, for something new the user has not seen yet.
     bool m_NewContentMarker = false;
-    // In font sizes; only used the first time the window appears, before imgui.ini remembers it
+    /// In font sizes; only used the first time the window appears, before imgui.ini remembers it.
     std::optional<ImVec2> m_InitialSize;
 };
 

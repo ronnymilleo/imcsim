@@ -27,13 +27,13 @@ constexpr std::string_view ERROR_PREFIX = "stderr ";
  */
 struct NgspiceState {
     bool Initialized = false;
-    // Set when ngspice asks to quit; the library cannot be used again in this process
+    /// Set when ngspice asks to quit; the library cannot be used again in this process.
     bool Exited = false;
-    // Where the callbacks store printed lines; only set while a run is in progress
+    /// Where the callbacks store printed lines; only set while a run is in progress.
     std::vector<SimulatorMessage> *Messages = nullptr;
-    // Where a build that ships the digital code models keeps digital.cm, when the system ngspice does not load them
+    /// Where a build that ships the digital code models keeps digital.cm, when the system ngspice does not load them.
     std::filesystem::path CodeModelDirectory;
-    // Whether the digital code models are loaded, which the logic parts need; known once ngspice is initialized
+    /// Whether the digital code models are loaded, which the logic parts need; known once ngspice is initialized.
     bool HasDigitalModels = false;
 };
 
@@ -42,7 +42,9 @@ NgspiceState &GetState() {
     return state;
 }
 
-// ngspice prefixes every line with the stream it was printed to
+/**
+ * @brief   ngspice prefixes every line with the stream it was printed to.
+ */
 int HandleOutput(char *text, int /*id*/, void * /*user_data*/) {
     std::vector<SimulatorMessage> *messages = GetState().Messages;
     if (messages == nullptr || text == nullptr) {
@@ -70,7 +72,9 @@ int HandleExit(int /*status*/, NG_BOOL /*immediate*/, NG_BOOL /*quit*/, int /*id
     return 0;
 }
 
-// The help of a code model is printed only when the model is loaded
+/**
+ * @brief   The help of a code model is printed only when the model is loaded.
+ */
 bool AskForDigitalModels() {
     std::vector<SimulatorMessage> messages;
     std::vector<SimulatorMessage> *const printing = std::exchange(GetState().Messages, &messages);
@@ -80,9 +84,11 @@ bool AskForDigitalModels() {
                                [](const SimulatorMessage &message) { return message.Text.starts_with("d_and"); });
 }
 
-// The codemodel command keeps quotes as part of the file name and splits it at spaces, so the library is named
-// relative to its folder, made the working directory for the call; on Windows ngspice resolves a relative name
-// against the program's folder instead, which is where the Windows build keeps it
+/**
+ * @brief   The codemodel command keeps quotes as part of the file name and splits it at spaces, so the library is named
+ *          relative to its folder, made the working directory for the call; on Windows ngspice resolves a relative name
+ *          against the program's folder instead, which is where the Windows build keeps it.
+ */
 void LoadLibraryFrom(const std::filesystem::path &directory) {
     std::error_code error;
     const std::filesystem::path previous = std::filesystem::current_path(error);
@@ -94,8 +100,10 @@ void LoadLibraryFrom(const std::filesystem::path &directory) {
     std::filesystem::current_path(previous, error);
 }
 
-// A system ngspice loads digital.cm through its spinit file, and loading it a second time crashes ngspice, so the
-// copy shipped with the program is loaded only when the digital models are missing
+/**
+ * @brief   A system ngspice loads digital.cm through its spinit file, and loading it a second time crashes ngspice, so
+ *          the copy shipped with the program is loaded only when the digital models are missing.
+ */
 void LoadDigitalModels() {
     const std::filesystem::path &directory = GetState().CodeModelDirectory;
     std::error_code error;

@@ -13,8 +13,10 @@ namespace GUI {
 
 namespace {
 
-// A part that reports one current per probed terminal, such as a transistor, gives the one whose terminal is nearest
-// the point; the result is the position among its currents
+/**
+ * @brief   A part that reports one current per probed terminal, such as a transistor, gives the one whose terminal is
+ *          nearest the point; the result is the position among its currents.
+ */
 std::size_t NearestCurrent(const UIElement &element, const std::vector<std::size_t> &current_terminals,
                            const ImVec2 world_pos) {
     const std::vector<GridPoint> terminals = element.GetTerminals();

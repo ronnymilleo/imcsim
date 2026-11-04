@@ -32,9 +32,12 @@ UIInductor::UIInductor(const GridPoint position, const Rotation rotation)
     : UIElement(std::make_unique<Core::Inductor>(), position, rotation) {
 }
 
-// Each turn is sampled in local coordinates instead of using PathArcTo, so the arcs follow the element rotation.
-// Turns are separate polylines: joining them would put a near 180 degree corner where two turns meet, and ImGui
-// extends such miter joins into visible spikes
+/**
+ * @brief   Each turn is sampled in local coordinates instead of using PathArcTo, so the arcs follow the element
+ *          rotation.
+ * @details Turns are separate polylines: joining them would put a near 180 degree corner where two turns meet, and
+ *          ImGui extends such miter joins into visible spikes.
+ */
 void UIInductor::DrawSymbol(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color,
                             SymbolStyle /*style*/) const {
     std::array<ImVec2, SEGMENTS_PER_TURN + 1> points;

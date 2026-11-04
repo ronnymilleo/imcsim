@@ -26,9 +26,9 @@ struct SweepSource {
     const char *Unit;
 };
 
-// The swept source defaults to the first one and the stepped source to the second, so a transistor curve family needs
-// no picking
+/// The swept source defaults to the first one, so a transistor curve family needs no picking.
 constexpr std::size_t SWEPT_SOURCE_INDEX = 0;
+/// The stepped source defaults to the second one.
 constexpr std::size_t STEPPED_SOURCE_INDEX = 1;
 
 // Sources

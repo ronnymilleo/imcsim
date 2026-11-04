@@ -18,7 +18,7 @@ namespace Core {
 
 namespace {
 
-// The IEC tables of the three oldest series were rounded by hand, so they are written out
+/// The IEC tables of the three oldest series were rounded by hand, so they are written out.
 constexpr auto E6_MANTISSAS = std::to_array<double>({1.0, 1.5, 2.2, 3.3, 4.7, 6.8});
 constexpr auto E12_MANTISSAS = std::to_array<double>({1.0, 1.2, 1.5, 1.8, 2.2, 2.7, 3.3, 3.9, 4.7, 5.6, 6.8, 8.2});
 constexpr auto E24_MANTISSAS = std::to_array<double>({1.0, 1.1, 1.2, 1.3, 1.5, 1.6, 1.8, 2.0, 2.2, 2.4, 2.7, 3.0,
@@ -34,7 +34,9 @@ constexpr auto SERIES_NAMES = std::to_array<std::pair<ValueSeries, std::string_v
     {ValueSeries::E192, "E192"},
 });
 
-// The newer series are 10^(i/N) rounded to three digits
+/**
+ * @brief   The newer series are 10^(i/N) rounded to three digits.
+ */
 std::vector<double> ComputeMantissas(const int values_per_decade) {
     std::vector<double> mantissas;
     for (int index = 0; index < values_per_decade; ++index) {
@@ -44,7 +46,9 @@ std::vector<double> ComputeMantissas(const int values_per_decade) {
     return mantissas;
 }
 
-// The mantissas of a series, from 1 up to below 10; empty for the free series
+/**
+ * @brief   The mantissas of a series, from 1 up to below 10; empty for the free series.
+ */
 const std::vector<double> &GetMantissas(const ValueSeries series) {
     static const std::vector<double> e6(E6_MANTISSAS.begin(), E6_MANTISSAS.end());
     static const std::vector<double> e12(E12_MANTISSAS.begin(), E12_MANTISSAS.end());
@@ -72,13 +76,16 @@ const std::vector<double> &GetMantissas(const ValueSeries series) {
     return free;
 }
 
-// A value of a series: the decade it is in (the power of ten) and which mantissa of the decade
+/// A value of a series: the decade it is in (the power of ten) and which mantissa of the decade.
 struct Position {
     int Decade = 0;
     std::size_t Index = 0;
 };
 
-// Goes through the decimal text so that 4.7 in the decade 3 is exactly the double 4700, which 4.7 * 1000.0 is not
+/**
+ * @brief   Goes through the decimal text so that 4.7 in the decade 3 is exactly the double 4700, which 4.7 * 1000.0 is
+ *          not.
+ */
 double ValueAt(const std::vector<double> &mantissas, const Position position) {
     const std::string text = std::format("{}e{}", mantissas[position.Index], position.Decade);
     double value = 0.0;
@@ -86,7 +93,9 @@ double ValueAt(const std::vector<double> &mantissas, const Position position) {
     return value;
 }
 
-// The value of the series closest to the given one on a log scale, which is how the series is spaced
+/**
+ * @brief   The value of the series closest to the given one on a log scale, which is how the series is spaced.
+ */
 Position FindNearest(const std::vector<double> &mantissas, const double value) {
     const int decade = static_cast<int>(std::floor(std::log10(value)));
     Position best;
@@ -105,7 +114,9 @@ Position FindNearest(const std::vector<double> &mantissas, const double value) {
     return best;
 }
 
-// One value up or down the series, into the next decade when it runs past the end of one
+/**
+ * @brief   One value up or down the series, into the next decade when it runs past the end of one.
+ */
 Position Shift(const std::vector<double> &mantissas, Position position, const int direction) {
     if (direction > 0) {
         if (++position.Index == mantissas.size()) {

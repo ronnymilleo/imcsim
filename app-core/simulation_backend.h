@@ -44,7 +44,7 @@ enum class AnalysisKind {
  */
 struct BackendCapabilities {
     std::set<AnalysisKind> Analyses;
-    // Parts the backend cannot simulate, each with the reason shown to the user
+    /// Parts the backend cannot simulate, each with the reason shown to the user.
     std::map<ComponentType, std::string> UnsupportedParts;
 };
 
@@ -58,11 +58,11 @@ struct BackendCapabilities {
  * between stretches. A backend that cannot split the run ignores the monitor.
  */
 struct RunMonitor {
-    // Where to look for a stop request and to report the share of the stop time reached, or null
+    /// Where to look for a stop request and to report the share of the stop time reached, or null.
     RunControl *Control = nullptr;
-    // Receives the points made since the last call, from the worker thread, or empty
+    /// Receives the points made since the last call, from the worker thread, or empty.
     std::function<void(Transient)> OnChunk;
-    // Simulated seconds a live run covers per second of the clock, or 0 to run as fast as the backend goes
+    /// Simulated seconds a live run covers per second of the clock, or 0 to run as fast as the backend goes.
     double LivePace = 0.0;
 };
 
@@ -76,17 +76,72 @@ class SimulationBackend {
 public:
     virtual ~SimulationBackend() = default;
 
+    /**
+     * @brief   Names the backend in the messages that say what it cannot run.
+     * @return  A short name, such as "ngspice".
+     */
     virtual std::string_view GetName() const = 0;
+    /**
+     * @brief   Tells which analyses the backend runs and which parts it cannot simulate.
+     * @return  The capabilities, each unsupported part with the reason shown to the user.
+     * @note    The editor asks every frame while a run goes on in the worker, so it must be safe to call from any
+     *          thread.
+     */
     virtual const BackendCapabilities &GetCapabilities() const = 0;
 
+    /**
+     * @brief   Computes the DC operating point of a circuit.
+     * @param[in] circuit  Circuit to simulate, already checked.
+     * @return  The node voltages and currents or an error, plus the messages of the backend.
+     */
     virtual OperatingPointRun RunOperatingPoint(const Circuit &circuit) = 0;
+    /**
+     * @brief   Simulates how the node voltages and currents of a circuit change over time.
+     * @param[in] circuit              Circuit to simulate, already checked.
+     * @param[in] settings             Stop time and time step, already checked.
+     * @param[in] temperature_celsius  Temperature of the run in degrees Celsius, or none for the default one.
+     * @param[in] monitor              Where to look for a stop request and report progress, and who receives the points
+     *                                 as they are made; a backend that cannot split the run ignores it.
+     * @return  The values at every time point or an error, plus the messages of the backend. A run that was stopped
+     *          returns the points made until then, with IsComplete false.
+     */
     virtual TransientRun RunTransient(const Circuit &circuit, const TransientSettings &settings,
                                       const std::optional<double> &temperature_celsius, const RunMonitor &monitor) = 0;
+    /**
+     * @brief   Sweeps the small-signal response of a circuit across frequency.
+     * @param[in] circuit              Circuit to simulate, already checked.
+     * @param[in] settings             Frequency range and points per decade, already checked.
+     * @param[in] temperature_celsius  Temperature of the run in degrees Celsius, or none for the default one.
+     * @return  The magnitude and phase of every node and current at every frequency or an error, plus the messages of
+     *          the backend.
+     */
     virtual ACSweepRun RunACSweep(const Circuit &circuit, const ACSweepSettings &settings,
                                   const std::optional<double> &temperature_celsius) = 0;
+    /**
+     * @brief   Sweeps a source through a range of DC values and finds the operating point at each one.
+     * @param[in] circuit              Circuit to simulate, already checked.
+     * @param[in] settings             Swept source and range, and optionally a second source stepped once per curve.
+     * @param[in] temperature_celsius  Temperature of the run in degrees Celsius, or none for the default one.
+     * @return  The node voltages and currents along the sweep, one curve per stepped value, or an error, plus the
+     *          messages of the backend.
+     */
     virtual DCSweepRun RunDCSweep(const Circuit &circuit, const DCSweepSettings &settings,
                                   const std::optional<double> &temperature_celsius) = 0;
+    /**
+     * @brief   Computes the noise of a circuit at a node across frequency, and refers it to an input source.
+     * @param[in] circuit   Circuit to simulate, already checked.
+     * @param[in] settings  Output node, input source and frequency range, already checked.
+     * @return  The output and input-referred noise densities, their totals and the share of every part, or an error,
+     *          plus the messages of the backend.
+     */
     virtual NoiseRun RunNoise(const Circuit &circuit, const NoiseSettings &settings) = 0;
+    /**
+     * @brief   Finds the small-signal DC transfer function from an input source to an output, with both impedances.
+     * @param[in] circuit   Circuit to simulate, already checked.
+     * @param[in] settings  Output node and input source, already checked.
+     * @return  The DC gain, the input impedance and the output impedance, or an error, plus the messages of the
+     *          backend.
+     */
     virtual TransferFunctionRun RunTransferFunction(const Circuit &circuit,
                                                     const TransferFunctionSettings &settings) = 0;
 };

@@ -48,11 +48,11 @@ struct ComponentTrace {
  *          second. A voltage source that delivers power therefore shows a negative current.
  */
 struct OperatingPoint {
-    // Indexed by node number; node 0 is ground and always 0 V
+    /// Indexed by node number; node 0 is ground and always 0 V.
     std::vector<double> NodeVoltages;
-    // One per named component, in circuit order; ground carries none
+    /// One per named component, in circuit order; ground carries none.
     std::vector<ComponentCurrent> Currents;
-    // Problems in the results that ngspice does not report, such as a diode in reverse breakdown
+    /// Problems in the results that ngspice does not report, such as a diode in reverse breakdown.
     std::vector<std::string> Warnings;
 };
 
@@ -62,13 +62,13 @@ struct OperatingPoint {
  */
 struct Transient {
     std::vector<double> Times;
-    // Indexed by node number, then by time point; node 0 is ground and always 0 V
+    /// Indexed by node number, then by time point; node 0 is ground and always 0 V.
     std::vector<std::vector<double>> NodeVoltages;
-    // One per named component, in circuit order, with a value per time point
+    /// One per named component, in circuit order, with a value per time point.
     std::vector<ComponentTrace> Currents;
-    // Problems in the results that ngspice does not report, such as a diode in reverse breakdown
+    /// Problems in the results that ngspice does not report, such as a diode in reverse breakdown.
     std::vector<std::string> Warnings;
-    // False while the run still goes on and after a stop, when the points end before the stop time
+    /// False while the run still goes on and after a stop, when the points end before the stop time.
     bool IsComplete = true;
 };
 
@@ -80,11 +80,13 @@ struct Transient {
  */
 struct ACSweep {
     std::vector<double> Frequencies;
-    // Indexed by node number, then by frequency point; node 0 is ground and stays empty
+    /// Indexed by node number, then by frequency point; node 0 is ground and stays empty.
     std::vector<std::vector<double>> NodeMagnitudesDecibels;
+    /// Indexed as NodeMagnitudesDecibels.
     std::vector<std::vector<double>> NodePhasesDegrees;
-    // One per named component, in circuit order, with a value per frequency point
+    /// One per named component, in circuit order, with a value per frequency point.
     std::vector<ComponentTrace> CurrentMagnitudesDecibels;
+    /// Indexed as CurrentMagnitudesDecibels.
     std::vector<ComponentTrace> CurrentPhasesDegrees;
 };
 
@@ -93,11 +95,11 @@ struct ACSweep {
  * @brief   Node voltages and component currents along a DC sweep, for one value of the stepped source.
  */
 struct DCSweepCurve {
-    // Value of the stepped source for this curve; 0 when there is no stepped source
+    /// Value of the stepped source for this curve; 0 when there is no stepped source.
     double StepValue = 0.0;
-    // Indexed by node number, then by swept value; node 0 is ground and always 0 V
+    /// Indexed by node number, then by swept value; node 0 is ground and always 0 V.
     std::vector<std::vector<double>> NodeVoltages;
-    // One per current, as in Transient, with a value per swept value
+    /// One per current, as in Transient, with a value per swept value.
     std::vector<ComponentTrace> Currents;
 };
 
@@ -109,12 +111,13 @@ struct DCSweepCurve {
 struct DCSweep {
     std::string SweptSource;
     std::string SweptUnit;
-    // The X axis of every curve
+    /// The X axis of every curve.
     std::vector<double> SweptValues;
-    // Empty when no source is stepped
+    /// Empty when no source is stepped.
     std::string SteppedSource;
+    /// Empty when no source is stepped.
     std::string SteppedUnit;
-    // One per value of the stepped source, or a single curve
+    /// One per value of the stepped source, or a single curve.
     std::vector<DCSweepCurve> Curves;
 };
 
@@ -144,7 +147,7 @@ struct Noise {
     std::vector<double> InputDensities;
     double OutputTotal = 0.0;
     double InputTotal = 0.0;
-    // Every part that adds noise, the largest total first
+    /// Every part that adds noise, the largest total first.
     std::vector<NoiseContribution> Contributions;
 };
 
@@ -158,7 +161,7 @@ struct Noise {
 struct TransferFunction {
     int OutputNode = 0;
     std::string InputSource;
-    // Unit of the input source, "V" or "A", which sets the unit of the gain
+    /// Unit of the input source, "V" or "A", which sets the unit of the gain.
     std::string InputUnit;
     double Gain = 0.0;
     double InputImpedance = 0.0;
@@ -172,9 +175,9 @@ struct TransferFunction {
  *          outputs depend on its history has none.
  */
 struct TruthTableRow {
-    // Whether each input is high, in the order of TruthTable::InputNames
+    /// Whether each input is high, in the order of TruthTable::InputNames.
     std::vector<bool> InputsHigh;
-    // One voltage per output node, in the order of TruthTable::OutputNodes
+    /// One voltage per output node, in the order of TruthTable::OutputNodes.
     std::vector<double> OutputVoltages;
 
     bool HasOperatingPoint() const;
@@ -186,7 +189,7 @@ struct TruthTableRow {
  */
 struct TruthTable {
     std::vector<std::string> InputNames;
-    // High voltage of each input, so a view can tell what level the signals swing to
+    /// High voltage of each input, so a view can tell what level the signals swing to.
     std::vector<double> InputLevels;
     std::vector<int> OutputNodes;
     std::vector<TruthTableRow> Rows;

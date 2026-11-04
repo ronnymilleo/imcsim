@@ -26,7 +26,9 @@ struct Trace {
     std::vector<double> Ys;
 };
 
-// A sine with an offset, sampled unevenly, as ngspice would: dense in the first half of each period
+/**
+ * @brief   A sine with an offset, sampled unevenly, as ngspice would: dense in the first half of each period.
+ */
 Trace Sine(const double amplitude, const double offset, const double frequency, const int periods) {
     Trace trace;
     const int samples_per_period = 200;
@@ -44,7 +46,9 @@ Trace Sine(const double amplitude, const double offset, const double frequency, 
     return trace;
 }
 
-// Bode response of a first order low-pass with its corner at corner_frequency
+/**
+ * @brief   Bode response of a first order low-pass with its corner at corner_frequency.
+ */
 void LowPass(const double corner_frequency, std::vector<double> &frequencies, std::vector<double> &magnitudes,
              std::vector<double> &phases) {
     for (int step = 0; step <= 600; ++step) {

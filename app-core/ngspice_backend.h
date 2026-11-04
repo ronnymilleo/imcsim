@@ -33,7 +33,8 @@ public:
     TransferFunctionRun RunTransferFunction(const Circuit &circuit, const TransferFunctionSettings &settings) override;
 
 private:
-    // Known after ngspice starts, so it is worked out on first use, by whichever thread asks first
+    /// Works the capabilities out once, on first use, by whichever thread asks first, since they are known only after
+    /// ngspice starts.
     mutable std::once_flag m_CapabilitiesReady;
     mutable BackendCapabilities m_Capabilities;
 };

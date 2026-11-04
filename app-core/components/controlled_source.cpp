@@ -12,7 +12,9 @@ namespace Core {
 
 namespace {
 
-// Gains that give round outputs from typical controlling values: 1 V or 1 mA in, 10 V, 1 mA, 10 mA or 1 V out
+/**
+ * @brief   Gains that give round outputs from typical controlling values: 1 V or 1 mA in, 10 V, 1 mA, 10 mA or 1 V out.
+ */
 double DefaultGain(const ComponentType type) {
     switch (type) {
     case ComponentType::VCVS:

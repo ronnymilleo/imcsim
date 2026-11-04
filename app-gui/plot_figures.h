@@ -32,11 +32,12 @@ struct CurveFamily {
     std::vector<const std::vector<double> *> Curves;
 };
 
-// Spread between the curves of a family, against their size, below which they count as one and get no labels
+/// Spread between the curves of a family, against their size, below which they count as one and get no labels.
 inline constexpr double NEGLIGIBLE_SPREAD = 1e-6;
-// Below a femtovolt or a femtoampere a value is the rounding residue of the solver, such as 1e-170 V for a node at 0 V
+/// Below a femtovolt or a femtoampere a value is the rounding residue of the solver, such as 1e-170 V for a node
+/// at 0 V.
 inline constexpr double RESIDUE_LEVEL = 1e-15;
-// The input-referred noise takes a color of its own, apart from the node colors the output uses
+/// The input-referred noise takes a color of its own, apart from the node colors the output uses.
 inline constexpr ImU32 INPUT_NOISE_COLOR = IM_COL32(150, 230, 90, 255);
 
 // Traces shown

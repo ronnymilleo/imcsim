@@ -27,7 +27,9 @@
 
 namespace {
 
-// Loads an example into a schematic, as the editor does
+/**
+ * @brief   Loads an example into a schematic, as the editor does.
+ */
 void OpenOrFail(const GUI::Example &example, GUI::Schematic &schematic) {
     auto loaded = GUI::LoadExample(example);
     if (!loaded) {
@@ -41,7 +43,9 @@ void OpenOrFail(const GUI::Example &example, GUI::Schematic &schematic) {
     CHECK(schematic.SaveMeasurements() == loaded->Measurements);
 }
 
-// Opens the example saved in a file of the given name
+/**
+ * @brief   Opens the example saved in a file of the given name.
+ */
 void OpenExample(const std::string_view file_name, GUI::Schematic &schematic) {
     const auto example = std::ranges::find(GUI::GetExamples(), file_name, &GUI::Example::FileName);
     REQUIRE(example != GUI::GetExamples().end());
@@ -54,7 +58,9 @@ std::size_t NodeAt(GUI::Schematic &schematic, const GUI::GridPoint point) {
     return static_cast<std::size_t>(*node);
 }
 
-// Largest magnitude of a waveform, either sign
+/**
+ * @brief   Largest magnitude of a waveform, either sign.
+ */
 double PeakOf(const std::vector<double> &values) {
     return std::abs(std::ranges::max(values, {}, [](const double value) { return std::abs(value); }));
 }
@@ -330,14 +336,18 @@ TEST_CASE("The class B stage has a dead zone around zero that the class AB stage
 
 namespace {
 
-// Gain in dB of a node at the sweep point nearest to a frequency
+/**
+ * @brief   Gain in dB of a node at the sweep point nearest to a frequency.
+ */
 double GainAt(const Core::ACSweep &sweep, const std::size_t node, const double frequency) {
     const auto index = static_cast<std::size_t>(std::ranges::lower_bound(sweep.Frequencies, frequency * 0.999) -
                                                 sweep.Frequencies.begin());
     return sweep.NodeMagnitudesDecibels[node][index];
 }
 
-// Runs the AC sweep of an example with its own settings
+/**
+ * @brief   Runs the AC sweep of an example with its own settings.
+ */
 Core::ACSweep SweepOf(GUI::Schematic &schematic) {
     const Core::ACSweepRun run = Core::RunACSweep(schematic.BuildCircuit(), schematic.GetSimulationSettings().ACSweep);
     if (!run.Result) {
@@ -697,14 +707,19 @@ TEST_CASE("The SR latch is set at the start, and with both inputs idle has no op
 
 namespace {
 
-// The voltage of a node at one instant of a transient
+/**
+ * @brief   The voltage of a node at one instant of a transient.
+ */
 double VoltageAt(const Core::Transient &transient, const std::size_t node, const double time) {
     const auto index =
         static_cast<std::size_t>(std::ranges::lower_bound(transient.Times, time) - transient.Times.begin());
     return transient.NodeVoltages[node][index];
 }
 
-// A logic output reads high above 4 V and low below 0.1 V, which a LED load pulls from the full 5 V to about 4.6 V
+/**
+ * @brief   A logic output reads high above 4 V and low below 0.1 V, which a LED load pulls from the full 5 V to about
+ *          4.6 V.
+ */
 void CheckLevel(const Core::Transient &transient, const std::size_t node, const double time, const bool high) {
     INFO(std::format("at {} s", time));
     const double voltage = VoltageAt(transient, node, time);

@@ -29,7 +29,7 @@ bool AnyValue(double /*value*/) {
     return true;
 }
 
-// Custom model parameters beyond this many scroll
+/// Custom model parameters beyond this many scroll.
 constexpr float MAX_VISIBLE_PARAMETERS = 10.0f;
 
 /**
@@ -87,7 +87,7 @@ constexpr auto AM_FIELDS = std::to_array<ParameterField<Core::AMParameters>>({
     {"Delay", &Core::AMParameters::Delay, "s"},
 });
 
-// Labeled with the SPICE parameter names, as datasheet models list them
+/// Labeled with the SPICE parameter names, as datasheet models list them.
 constexpr auto DIODE_FIELDS = std::to_array<ParameterField<Core::DiodeParameters>>({
     {"IS", &Core::DiodeParameters::SaturationCurrent, "A"},
     {"N", &Core::DiodeParameters::EmissionCoefficient, ""},
@@ -135,7 +135,7 @@ constexpr auto MOSFET_FIELDS = std::to_array<ParameterField<Core::MOSFETParamete
     {"P max", &Core::MOSFETParameters::MaxPower, "W"},
 });
 
-// Datasheet specifications, from which the macromodel is built
+/// Datasheet specifications, from which the macromodel is built.
 constexpr auto OP_AMP_FIELDS = std::to_array<ParameterField<Core::OpAmpParameters>>({
     {"Avol", &Core::OpAmpParameters::OpenLoopGainDecibels, "dB"},
     {"GBW", &Core::OpAmpParameters::GainBandwidth, "Hz"},
@@ -176,7 +176,7 @@ constexpr auto LOGIC_FIELDS = std::to_array<ParameterField<Core::LogicParameters
     {"Delay", &Core::LogicParameters::PropagationDelay, "s"},
 });
 
-// A clock picks its own rise and fall times, so the user sets only these figures
+/// A clock picks its own rise and fall times, so the user sets only these figures.
 constexpr auto CLOCK_FIELDS = std::to_array<ParameterField<Core::ClockParameters>>({
     {"Frequency", &Core::ClockParameters::Frequency, "Hz"},
     {"Duty", &Core::ClockParameters::DutyCycle, "%", 100.0},
@@ -196,8 +196,11 @@ void LoadParameterFields(const std::array<ParameterField<Parameters>, Count> &fi
     }
 }
 
-// Draws one field per member and applies a valid edit to the parameters; each value is checked by trying it in a
-// copy of the whole set, since some limits depend on several members. Returns whether a value changed
+/**
+ * @brief   Draws one field per member and applies a valid edit to the parameters; each value is checked by trying it in
+ *          a copy of the whole set, since some limits depend on several members.
+ * @details Returns whether a value changed.
+ */
 template <typename Parameters, std::size_t Count>
 bool DrawParameterFields(const std::array<ParameterField<Parameters>, Count> &fields,
                          std::array<ValueField, Count> &value_fields, const char *source_unit, const auto &is_valid,
@@ -219,9 +222,11 @@ bool DrawParameterFields(const std::array<ParameterField<Parameters>, Count> &fi
     return changed;
 }
 
-// Draws the model combo of a part that offers ready models, models imported from libraries or custom parameters, its
-// description or its custom fields, and applies a change; returns whether the part changed. Custom starts from the
-// parameters of the model it replaces, so a ready part can be tweaked
+/**
+ * @brief   Draws the model combo of a part that offers ready models, models imported from libraries or custom
+ *          parameters, its description or its custom fields, and applies a change; returns whether the part changed.
+ * @details Custom starts from the parameters of the model it replaces, so a ready part can be tweaked.
+ */
 template <typename Part, typename Model, typename Parameters, std::size_t Count>
 bool DrawModelChoice(Part &part, const std::span<const Model> models, const char *custom_name,
                      const std::array<ParameterField<Parameters>, Count> &fields,
@@ -284,7 +289,9 @@ bool DrawModelChoice(Part &part, const std::span<const Model> models, const char
     return changed;
 }
 
-// Parts with something to edit: a value, a model, a name, a state or parameters; ground has nothing
+/**
+ * @brief   Parts with something to edit: a value, a model, a name, a state or parameters; ground has nothing.
+ */
 bool HasFields(const Core::Component &component) {
     const Core::ComponentType type = component.GetType();
     if (component.HasValue() || Core::IsSwitch(type) || Core::IsLogicPart(type) || Core::IsSubcircuitPin(type)) {
@@ -300,7 +307,9 @@ bool HasModel(const Core::ComponentType type) {
     return Core::IsDiode(type) || Core::IsBJT(type) || Core::IsMOSFET(type) || type == Core::ComponentType::OP_AMP;
 }
 
-// Value fields show for parts with a value, and for parts with a model only while they are custom
+/**
+ * @brief   Value fields show for parts with a value, and for parts with a model only while they are custom.
+ */
 bool ShowsValueFields(const Core::Component &component) {
     const Core::ComponentType type = component.GetType();
     if (Core::IsDiode(type)) {
@@ -389,7 +398,9 @@ void PartEditor::Draw() {
     ImGui::TextDisabled("Suffixes: T G M k m u n p f (case sensitive)");
 }
 
-// What there is to edit when no single part is selected: how many items are, or a hint
+/**
+ * @brief   What there is to edit when no single part is selected: how many items are, or a hint.
+ */
 void PartEditor::DrawSelectionSummary() {
     const std::size_t count = m_Schematic->GetSelectedElements().size() + m_Schematic->GetSelectedWires().size();
     if (count > 1) {
@@ -401,7 +412,9 @@ void PartEditor::DrawSelectionSummary() {
     }
 }
 
-// The fields of the kind of part: its net name, model, waveform, gain or value
+/**
+ * @brief   The fields of the kind of part: its net name, model, waveform, gain or value.
+ */
 void PartEditor::DrawFields(Core::Component &component) {
     const Core::ComponentType type = component.GetType();
     if (type == Core::ComponentType::NET_LABEL || Core::IsSubcircuitPin(type)) {
@@ -432,7 +445,9 @@ void PartEditor::DrawFields(Core::Component &component) {
     }
 }
 
-// Diodes, transistors and op-amps, which a model sets; false for the other parts
+/**
+ * @brief   Diodes, transistors and op-amps, which a model sets; false for the other parts.
+ */
 bool PartEditor::DrawModeledPart(Core::Component &component) {
     const Core::ComponentType type = component.GetType();
     if (Core::IsDiode(type)) {
@@ -449,7 +464,10 @@ bool PartEditor::DrawModeledPart(Core::Component &component) {
     return true;
 }
 
-// Switches, relays and the digital parts, which have a state or parameters instead of a value; false for the others
+/**
+ * @brief   Switches, relays and the digital parts, which have a state or parameters instead of a value; false for the
+ *          others.
+ */
 bool PartEditor::DrawSettingPart(Core::Component &component) {
     const Core::ComponentType type = component.GetType();
     if (Core::IsSwitch(type)) {
@@ -559,7 +577,9 @@ void PartEditor::LoadFields(const Core::Component &component) {
     m_LoadedSelection = m_Schematic->GetSelectionVersion();
 }
 
-// One field per parameter of the block, showing the override of this instance or the default
+/**
+ * @brief   One field per parameter of the block, showing the override of this instance or the default.
+ */
 void PartEditor::LoadSubcircuitFields(const Core::SubcircuitInstance &instance) {
     const auto definition =
         std::ranges::find(m_Schematic->GetSubcircuits(), instance.GetDefinitionName(), &SavedSubcircuit::Name);
@@ -576,7 +596,9 @@ void PartEditor::LoadSubcircuitFields(const Core::SubcircuitInstance &instance) 
     }
 }
 
-// The custom parameters of diodes, transistors and op-amps, and the bandwidth of the ideal op-amp
+/**
+ * @brief   The custom parameters of diodes, transistors and op-amps, and the bandwidth of the ideal op-amp.
+ */
 void PartEditor::LoadModelFields(const Core::Component &component) {
     const Core::ComponentType type = component.GetType();
     if (Core::IsDiode(type)) {
@@ -593,7 +615,9 @@ void PartEditor::LoadModelFields(const Core::Component &component) {
     }
 }
 
-// The parameters of the switches, relays, digital parts and transformers
+/**
+ * @brief   The parameters of the switches, relays, digital parts and transformers.
+ */
 void PartEditor::LoadSettingFields(const Core::Component &component) {
     const Core::ComponentType type = component.GetType();
     if (type == Core::ComponentType::V_SWITCH) {
@@ -615,7 +639,9 @@ void PartEditor::LoadSettingFields(const Core::Component &component) {
     }
 }
 
-// The name applies as soon as it is valid, or empty, which leaves the label or marker unnamed
+/**
+ * @brief   The name applies as soon as it is valid, or empty, which leaves the label or marker unnamed.
+ */
 void PartEditor::DrawNetLabel(Core::NetLabel &label) {
     const bool is_pin = Core::IsSubcircuitPin(label.GetType());
     DrawFieldLabel(is_pin ? "Pin" : "Net");
@@ -661,8 +687,11 @@ void PartEditor::DrawValue(Core::Component &component) {
     }
 }
 
-// Inside a block, a resistor, capacitor or inductor can take its value from a parameter of the block, which each
-// instance sets. Returns whether it does, in which case it has no value of its own to edit
+/**
+ * @brief   Inside a block, a resistor, capacitor or inductor can take its value from a parameter of the block, which
+ *          each instance sets.
+ * @details Returns whether it does, in which case it has no value of its own to edit.
+ */
 bool PartEditor::DrawParameterChoice(Core::Component &component) {
     const std::optional<std::string> &expression = component.GetValueExpression();
     if (!component.CanFollowParameter() || (m_BlockParameters.empty() && !expression)) {
@@ -693,8 +722,11 @@ bool PartEditor::DrawParameterChoice(Core::Component &component) {
     return true;
 }
 
-// A capacitor's initial condition is a voltage and an inductor's a current; leaving the field empty means no initial
-// condition, but once any part has one the whole transient runs with uic and an empty part starts at zero
+/**
+ * @brief   A capacitor's initial condition is a voltage and an inductor's a current; leaving the field empty means no
+ *          initial condition, but once any part has one the whole transient runs with uic and an empty part starts at
+ *          zero.
+ */
 void PartEditor::DrawInitialCondition(Core::Component &component) {
     const bool is_capacitor = component.GetType() == Core::ComponentType::CAPACITOR;
     const GUI::OptionalValueEdit edit = m_InitialCondition.DrawOptional("Initial", is_capacitor ? "V" : "A", AnyValue);
@@ -709,7 +741,9 @@ void PartEditor::DrawInitialCondition(Core::Component &component) {
     ImGui::TextDisabled("Skips the operating point (uic); parts left empty start at zero");
 }
 
-// The switch closes above the threshold plus the hysteresis, and opens below the threshold minus it
+/**
+ * @brief   The switch closes above the threshold plus the hysteresis, and opens below the threshold minus it.
+ */
 void PartEditor::DrawControlledSwitch(Core::VoltageControlledSwitch &controlled) {
     Core::SwitchParameters parameters = controlled.GetParameters();
     const auto is_valid = [](const Core::SwitchParameters &candidate) {
@@ -722,7 +756,10 @@ void PartEditor::DrawControlledSwitch(Core::VoltageControlledSwitch &controlled)
     ImGui::TextDisabled("Closes above threshold + hysteresis, opens below threshold - hysteresis");
 }
 
-// The contact closes when the coil voltage reaches the pull-in value and opens when it falls to the drop-out one
+/**
+ * @brief   The contact closes when the coil voltage reaches the pull-in value and opens when it falls to the drop-out
+ *          one.
+ */
 void PartEditor::DrawRelay(Core::Relay &relay) {
     Core::RelayParameters parameters = relay.GetParameters();
     const auto is_valid = [](const Core::RelayParameters &candidate) {
@@ -735,7 +772,9 @@ void PartEditor::DrawRelay(Core::Relay &relay) {
     ImGui::TextDisabled("The contact follows the coil current, so it lags by L over R");
 }
 
-// The value is the primary inductance; the secondary's follows from the turns ratio
+/**
+ * @brief   The value is the primary inductance; the secondary's follows from the turns ratio.
+ */
 void PartEditor::DrawTransformer(Core::Transformer &transformer) {
     Core::TransformerParameters parameters = transformer.GetParameters();
     const auto is_valid = [](const Core::TransformerParameters &candidate) {
@@ -749,7 +788,9 @@ void PartEditor::DrawTransformer(Core::Transformer &transformer) {
                         Core::FormatValue(transformer.GetSecondaryInductance()).c_str());
 }
 
-// The levels the part swaps at follow from the logic level: it reads 1 above 70% of it and 0 below 30%
+/**
+ * @brief   The levels the part swaps at follow from the logic level: it reads 1 above 70% of it and 0 below 30%.
+ */
 void PartEditor::DrawLogicPart(Core::LogicPart &part) {
     Core::LogicParameters parameters = part.GetParameters();
     const auto is_valid = [](const Core::LogicParameters &candidate) {
@@ -777,7 +818,10 @@ void PartEditor::DrawLogicPart(Core::LogicPart &part) {
     ImGui::TextDisabled("Inputs read 1 above 70%% of the level and 0 below 30%%; an open input reads 0");
 }
 
-// The clock picks its own rise and fall times; the frequency sets the period and the duty the share that is high
+/**
+ * @brief   The clock picks its own rise and fall times; the frequency sets the period and the duty the share that is
+ *          high.
+ */
 void PartEditor::DrawClock(Core::Clock &clock) {
     Core::ClockParameters parameters = clock.GetParameters();
     const auto is_valid = [](const Core::ClockParameters &candidate) {
@@ -791,7 +835,10 @@ void PartEditor::DrawClock(Core::Clock &clock) {
     ImGui::TextDisabled("The start delay holds the clock low; at 0 the first rising edge is at t = 0");
 }
 
-// A constant source from the part to ground: high drives the logic level and low 0 V, so a latch has a defined start
+/**
+ * @brief   A constant source from the part to ground: high drives the logic level and low 0 V, so a latch has a defined
+ *          start.
+ */
 void PartEditor::DrawLogicInput(Core::LogicInput &input) {
     bool high = input.IsHigh();
     if (ImGui::Checkbox("High", &high)) {
@@ -809,7 +856,9 @@ void PartEditor::DrawLogicInput(Core::LogicInput &input) {
     ImGui::TextDisabled("A source from its terminal to ground, so it gives a gate a defined level");
 }
 
-// A closed switch conducts; a push button is pressed when closed
+/**
+ * @brief   A closed switch conducts; a push button is pressed when closed.
+ */
 void PartEditor::DrawSwitch(Core::Switch &contact) {
     bool closed = contact.IsClosed();
     const bool is_button = contact.GetType() == Core::ComponentType::PUSH_BUTTON;
@@ -820,7 +869,9 @@ void PartEditor::DrawSwitch(Core::Switch &contact) {
     ImGui::TextDisabled("It is a %s while the circuit is simulated", closed ? "wire" : "gap");
 }
 
-// The wiper as a share of the track, counted from terminal 1
+/**
+ * @brief   The wiper as a share of the track, counted from terminal 1.
+ */
 void PartEditor::DrawWiper(Core::Potentiometer &pot) {
     DrawFieldLabel("Wiper");
     auto percent = static_cast<float>(pot.GetWiper() * 100.0);
@@ -865,7 +916,10 @@ void PartEditor::DrawMOSFET(Core::MOSFET &mosfet) {
     }
 }
 
-// The ideal op-amp has only its gain-bandwidth product to set; a macromodel shows its specifications when custom
+/**
+ * @brief   The ideal op-amp has only its gain-bandwidth product to set; a macromodel shows its specifications when
+ *          custom.
+ */
 void PartEditor::DrawOpAmp(Core::OpAmp &op_amp) {
     if (DrawModelChoice(op_amp, Core::GetOpAmpModels(op_amp.GetType()), Core::CUSTOM_OP_AMP_MODEL_NAME, OP_AMP_FIELDS,
                         m_OpAmpFields)) {
@@ -982,7 +1036,9 @@ void PartEditor::DrawAM(Core::Source &source) {
     ImGui::TextDisabled("The modulating and carrier sines multiply; the offset shifts the whole waveform");
 }
 
-// The points apply as soon as the text reads, so a half-typed field keeps the last valid shape
+/**
+ * @brief   The points apply as soon as the text reads, so a half-typed field keeps the last valid shape.
+ */
 void PartEditor::DrawPWL(Core::Source &source) {
     DrawFieldLabel("Points");
     const bool changed = ImGui::InputText("##pwl", &m_PWLText);
@@ -998,7 +1054,9 @@ void PartEditor::DrawPWL(Core::Source &source) {
     }
 }
 
-// The gain is the ratio of output to control, so the line below spells out what it multiplies
+/**
+ * @brief   The gain is the ratio of output to control, so the line below spells out what it multiplies.
+ */
 void PartEditor::DrawControlledSource(Core::ControlledSource &source) {
     if (const std::optional<double> value = m_Value.Draw("Gain", source.GetUnit(), AnyValue)) {
         source.SetValue(*value);
@@ -1020,7 +1078,9 @@ void PartEditor::DrawControlledSource(Core::ControlledSource &source) {
     ImGui::TextDisabled("A negative gain inverts the output");
 }
 
-// Any current the results report can control the source, except its own; they read as the plots name them
+/**
+ * @brief   Any current the results report can control the source, except its own; they read as the plots name them.
+ */
 void PartEditor::DrawControllingCurrent(Core::ControlledSource &source) {
     const std::string &current = source.GetControllingCurrent();
     const std::string preview = current.empty() ? "(none)" : std::format("I({})", current);

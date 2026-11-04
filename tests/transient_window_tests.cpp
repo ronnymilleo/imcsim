@@ -12,7 +12,9 @@
 
 namespace {
 
-// A transient with the given number of points, complete or still being made
+/**
+ * @brief   A transient with the given number of points, complete or still being made.
+ */
 Core::Transient TransientOf(const std::size_t point_count, const bool is_complete = true) {
     Core::Transient transient;
     transient.Times.assign(point_count, 0.0);
@@ -20,7 +22,9 @@ Core::Transient TransientOf(const std::size_t point_count, const bool is_complet
     return transient;
 }
 
-// A transient with points every step from 0, complete or still being made
+/**
+ * @brief   A transient with points every step from 0, complete or still being made.
+ */
 Core::Transient EvenTransient(const std::size_t point_count, const double step, const bool is_complete = true) {
     Core::Transient transient;
     for (std::size_t index = 0; index < point_count; ++index) {

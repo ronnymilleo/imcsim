@@ -18,16 +18,18 @@ namespace GUI {
 
 namespace {
 
-// The body of a gate reaches half a unit past its first and last input, so a gate of two inputs is 3 units high
+/// A gate of two inputs is 3 units high.
 constexpr float TWO_INPUT_GATE_HALF_HEIGHT = 1.5f;
+/// The body of a gate reaches half a unit past its first and last input.
 constexpr float BODY_MARGIN = 0.5f;
 constexpr float GATE_LEFT = -2.0f;
 constexpr float GATE_RIGHT = 2.0f;
 constexpr float BUBBLE_RADIUS = 0.3f;
-// How far the back of an OR gate curves in, and how far the second curve of an XOR gate is from the first
+/// How far the back of an OR gate curves in.
 constexpr float OR_BACK_DEPTH = 0.5f;
+/// How far the second curve of an XOR gate is from the first.
 constexpr float XOR_GAP = 0.35f;
-// Exponent of the curve from the back corner of an OR gate to its tip
+/// Exponent of the curve from the back corner of an OR gate to its tip.
 constexpr float OR_SIDE_EXPONENT = 2.2f;
 constexpr int CURVE_SEGMENTS = 12;
 constexpr float TRIANGLE_HALF_HEIGHT = 1.3f;
@@ -56,12 +58,17 @@ bool HasTwoDataInputs(const Core::ComponentType type) {
     return type == Core::ComponentType::JK_FLIP_FLOP || type == Core::ComponentType::SR_FLIP_FLOP;
 }
 
-// Half of the height of the box of a flip-flop: the inputs of a JK or SR one are two apart, a D or T one's one
+/**
+ * @brief   Half of the height of the box of a flip-flop: the inputs of a JK or SR one are two apart, a D or T one's
+ *          one.
+ */
 float FlipFlopHalfHeight(const Core::ComponentType type) {
     return HasTwoDataInputs(type) ? 3.0f : 2.0f;
 }
 
-// What the IEC symbol of a gate writes in its box
+/**
+ * @brief   What the IEC symbol of a gate writes in its box.
+ */
 const char *IECQualifier(const Core::ComponentType type) {
     switch (type) {
     case Core::ComponentType::AND:
@@ -79,7 +86,9 @@ const char *IECQualifier(const Core::ComponentType type) {
     }
 }
 
-// The x where the body of an ANSI gate ends and the output lead starts: before the bubble of an inverting one
+/**
+ * @brief   The x where the body of an ANSI gate ends and the output lead starts: before the bubble of an inverting one.
+ */
 float OutputStart(const Core::ComponentType type) {
     if (type == Core::ComponentType::NOT) {
         return TRIANGLE_HALF_HEIGHT + 0.1f + 2.0f * BUBBLE_RADIUS;
@@ -90,14 +99,18 @@ float OutputStart(const Core::ComponentType type) {
     return type == Core::ComponentType::BUFFER ? 1.5f : GATE_RIGHT;
 }
 
-// Where the back of an OR gate is at a height, the curve its inputs touch
+/**
+ * @brief   Where the back of an OR gate is at a height, the curve its inputs touch.
+ */
 float OrBackX(const float y, const float half_height) {
     const float ratio = y / half_height;
     return GATE_LEFT + OR_BACK_DEPTH * (1.0f - ratio * ratio);
 }
 
-// The inputs go down the left side two units apart, A at y = -1, B at 1, C at 3 and so on, so adding an input leaves
-// the ones already wired where they are and the body only grows downward
+/**
+ * @brief   The inputs go down the left side two units apart, A at y = -1, B at 1, C at 3 and so on, so adding an input
+ *          leaves the ones already wired where they are and the body only grows downward.
+ */
 int GateInputY(const int input) {
     return 2 * input - 1;
 }
@@ -133,7 +146,9 @@ void UILogicPart::DrawSymbol(SchematicCanvas &canvas, const ViewTransform &view,
     }
 }
 
-// The name above the body, and for a flip-flop the names of its pins inside it
+/**
+ * @brief   The name above the body, and for a flip-flop the names of its pins inside it.
+ */
 void UILogicPart::DrawLabels(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color) const {
     const Core::ComponentType type = GetComponent().GetType();
     // A flip-flop's name stands above the end of its SET lead, which is a unit over the box
@@ -192,7 +207,10 @@ std::vector<GridPoint> UILogicPart::GetLocalTerminals() const {
     return {{-3, -1}, {-3, 1}, {0, -3}, {0, 3}, {3, -1}, {3, 1}};
 }
 
-// The leads of a gate run along x, whichever input they are, and the default direction would follow the longer axis
+/**
+ * @brief   The leads of a gate run along x, whichever input they are, and the default direction would follow the longer
+ *          axis.
+ */
 GridPoint UILogicPart::GetLocalTerminalInward(const std::size_t terminal) const {
     if (IsFlipFlop()) {
         return UIElement::GetLocalTerminalInward(terminal);
@@ -218,9 +236,11 @@ bool UILogicPart::IsFlipFlop() const {
     return Core::IsFlipFlop(GetComponent().GetType());
 }
 
-// The body of a gate goes from half a unit above its first input to half a unit below its last, so it grows downward
-// with the inputs and its middle, where the output is, moves down a unit with each one. A gate of one input is
-// as high as one of two
+/**
+ * @brief   The body of a gate goes from half a unit above its first input to half a unit below its last, so it grows
+ *          downward with the inputs and its middle, where the output is, moves down a unit with each one.
+ * @details A gate of one input is as high as one of two.
+ */
 float UILogicPart::GetGateHalfHeight() const {
     if (HasOneInput(GetComponent().GetType())) {
         return TWO_INPUT_GATE_HALF_HEIGHT;
@@ -275,8 +295,10 @@ void UILogicPart::DrawFlipFlopTerminals(SchematicCanvas &canvas, const ViewTrans
     }
 }
 
-// The distinctive shapes: a flat back and a round front for AND, a curved back and a pointed front for OR, a
-// second curve for XOR, a triangle for NOT and the buffer, and a bubble on every inverting one
+/**
+ * @brief   The distinctive shapes: a flat back and a round front for AND, a curved back and a pointed front for OR, a
+ *          second curve for XOR, a triangle for NOT and the buffer, and a bubble on every inverting one.
+ */
 void UILogicPart::DrawAnsiGate(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color) const {
     const Core::ComponentType type = GetComponent().GetType();
     const float tip = OutputStart(type);

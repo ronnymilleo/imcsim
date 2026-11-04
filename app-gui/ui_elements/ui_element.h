@@ -73,6 +73,13 @@ public:
 protected:
     // Parts of the symbol, in the order Draw() draws them
     virtual void DrawTerminals(SchematicCanvas &canvas, const ViewTransform &view, ImU32 color) const;
+    /**
+     * @brief   Draws the body of the symbol between the leads, in local grid units.
+     * @param[in,out] canvas Where it is drawn: the editor window or an exported image.
+     * @param[in] view       Transform of the current frame.
+     * @param[in] color      Line color, so the same element can be drawn as a placement preview.
+     * @param[in] style      Drawing standard for the symbol; parts drawn alike in both ignore it.
+     */
     virtual void DrawSymbol(SchematicCanvas &canvas, const ViewTransform &view, ImU32 color,
                             SymbolStyle style) const = 0;
     virtual void DrawLabels(SchematicCanvas &canvas, const ViewTransform &view, ImU32 color) const;

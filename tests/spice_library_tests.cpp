@@ -25,8 +25,8 @@
 
 namespace {
 
-// A library as vendors write them: upper and lower case, continuations, comments, definitions outside the subcircuits
-// that use them, a subcircuit one uses, a model no one uses, an include and an encrypted model
+/// A library as vendors write them: upper and lower case, continuations, comments, definitions outside the subcircuits
+/// that use them, a subcircuit one uses, a model no one uses, an include and an encrypted model.
 constexpr std::string_view LIBRARY = R"(* Test library
 .param RLOAD=10k
 .SUBCKT DIVIDER IN OUT
@@ -62,7 +62,9 @@ const Core::LibrarySubcircuit &Find(const Core::SpiceLibrary &library, const std
     return library.Subcircuits.front();
 }
 
-// A definition of the text of a library subcircuit, with one pin per port
+/**
+ * @brief   A definition of the text of a library subcircuit, with one pin per port.
+ */
 std::shared_ptr<Core::SubcircuitDefinition> MakeDefinition(const Core::LibrarySubcircuit &subcircuit) {
     auto definition = std::make_shared<Core::SubcircuitDefinition>();
     definition->Name = subcircuit.Name;

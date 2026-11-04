@@ -176,8 +176,10 @@ double SimulationService::GetProgress() const {
     return m_Control.GetProgress();
 }
 
-// The worker waits for a job, runs it without holding the lock, and leaves its delivery for Poll(). A job that was
-// discarded delivers nothing
+/**
+ * @brief   The worker waits for a job, runs it without holding the lock, and leaves its delivery for Poll().
+ * @details A job that was discarded delivers nothing.
+ */
 void SimulationService::Work() {
     std::unique_lock lock(m_Mutex);
     while (true) {

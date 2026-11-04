@@ -65,8 +65,11 @@ std::optional<std::optional<std::filesystem::path>> FileDialog::TakeResult() {
     return result;
 }
 
-// SDL may call this from another thread, and after the owner is gone, so it only stores the answer in the channel
-// for the main thread to take. SDL calls it exactly once per dialog
+/**
+ * @brief   SDL may call this from another thread, and after the owner is gone, so it only stores the answer in the
+ *          channel for the main thread to take.
+ * @details SDL calls it exactly once per dialog.
+ */
 void SDLCALL FileDialog::HandleResult(void *userdata, const char *const *file_list, int /*filter*/) {
     const std::unique_ptr<std::shared_ptr<Channel>> channel(static_cast<std::shared_ptr<Channel> *>(userdata));
     std::optional<std::filesystem::path> path;

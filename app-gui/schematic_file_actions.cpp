@@ -19,10 +19,10 @@ namespace {
 constexpr const char *DISCARD_POPUP = "Discard changes?";
 constexpr const char *MESSAGES_POPUP = "File messages";
 constexpr const char *EXPORT_POPUP = "Export schematic";
-// Must stay valid until the dialog callback runs, so it lives for the whole program
+// Must stay valid until the dialog callback runs, so they live for the whole program
 constexpr std::array<SDL_DialogFileFilter, 1> SCHEMATIC_FILTERS = {{{"imcsim schematic", "imcsim"}}};
 constexpr std::array<SDL_DialogFileFilter, 1> SVG_FILTERS = {{{"SVG image", "svg"}}};
-// Vendors ship their models under many extensions, so any file can be picked too
+/// Vendors ship their models under many extensions, so any file can be picked too.
 constexpr std::array<SDL_DialogFileFilter, 2> SPICE_FILTERS = {
     {{"SPICE library", "lib;mod;sub;cir;spi;txt;inc"}, {"All files", "*"}}};
 
@@ -259,7 +259,9 @@ void SchematicFileActions::NewSchematic() {
     m_Schematic.ClearMeasurements();
 }
 
-// Skipped parts are reported, and the schematic counts as modified because saving it would drop them
+/**
+ * @brief   Skipped parts are reported, and the schematic counts as modified because saving it would drop them.
+ */
 void SchematicFileActions::OpenFile(const std::filesystem::path &path) {
     const auto text = ReadTextFile(path);
     if (!text) {
@@ -299,8 +301,11 @@ void SchematicFileActions::OpenExample(const Example &example) {
     m_Hooks.FrameSchematic();
 }
 
-// The circuit of the file joins the schematic as a pasted group: it follows the cursor until a click places it, and
-// the settings and probes of the file are left behind. Skipped parts are reported, but the rest still comes in
+/**
+ * @brief   The circuit of the file joins the schematic as a pasted group: it follows the cursor until a click places
+ *          it, and the settings and probes of the file are left behind.
+ * @details Skipped parts are reported, but the rest still comes in.
+ */
 void SchematicFileActions::ImportFile(const std::filesystem::path &path) {
     const auto text = ReadTextFile(path);
     if (!text) {
@@ -319,7 +324,9 @@ void SchematicFileActions::ImportFile(const std::filesystem::path &path) {
     m_Hooks.PlaceGroup(std::move(*group));
 }
 
-// The subcircuits of the library go to the editor, which asks which to import; a file with none only says why
+/**
+ * @brief   The subcircuits of the library go to the editor, which asks which to import; a file with none only says why.
+ */
 void SchematicFileActions::ImportSpiceFile(const std::filesystem::path &path) {
     const auto text = ReadTextFile(path);
     if (!text) {
@@ -334,7 +341,9 @@ void SchematicFileActions::ImportSpiceFile(const std::filesystem::path &path) {
     m_Hooks.OpenSpiceLibrary(path.filename().string(), std::move(library));
 }
 
-// Like an import, the example follows the cursor until a click places it; its analysis settings stay behind
+/**
+ * @brief   Like an import, the example follows the cursor until a click places it; its analysis settings stay behind.
+ */
 void SchematicFileActions::InsertExample(const Example &example) {
     auto loaded = LoadExample(example);
     if (!loaded) {
@@ -349,7 +358,9 @@ void SchematicFileActions::InsertExample(const Example &example) {
     m_Hooks.PlaceGroup(std::move(*group));
 }
 
-// Dialogs do not always add the extension, so it is added here when missing
+/**
+ * @brief   Dialogs do not always add the extension, so it is added here when missing.
+ */
 void SchematicFileActions::SaveFile(std::filesystem::path path) {
     if (path.extension() != SCHEMATIC_EXTENSION) {
         path += SCHEMATIC_EXTENSION;
@@ -365,7 +376,9 @@ void SchematicFileActions::SaveFile(std::filesystem::path path) {
     m_Schematic.MarkSaved(std::move(path));
 }
 
-// The dialog runs asynchronously: its result is picked up by ProcessDialogResult() on a later frame
+/**
+ * @brief   The dialog runs asynchronously: its result is picked up by ProcessDialogResult() on a later frame.
+ */
 void SchematicFileActions::ShowFileDialog(const FileAction action) {
     if (m_FileDialog.IsPending()) {
         return;
@@ -413,7 +426,9 @@ void SchematicFileActions::ProcessDialogResult() {
     }
 }
 
-// The image follows the editor: the symbol style chosen in the View menu, names, values and probes
+/**
+ * @brief   The image follows the editor: the symbol style chosen in the View menu, names, values and probes.
+ */
 void SchematicFileActions::DrawExportPopup() {
     ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
     if (!ImGui::BeginPopupModal(EXPORT_POPUP, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
@@ -446,7 +461,9 @@ void SchematicFileActions::DrawExportPopup() {
     ImGui::EndPopup();
 }
 
-// Dialogs do not always add the extension, so it is added here when missing
+/**
+ * @brief   Dialogs do not always add the extension, so it is added here when missing.
+ */
 void SchematicFileActions::ExportSchematic(std::filesystem::path path) {
     if (path.extension() != ".svg") {
         path += ".svg";

@@ -16,9 +16,9 @@ namespace {
 constexpr float GATE_X = -0.6f;
 constexpr float CHANNEL_X = -0.3f;
 constexpr float PLATE_HALF_HEIGHT = 0.7f;
-// Drain and source connect to the ends of the channel
+/// Drain and source connect to the ends of the channel.
 constexpr float CONTACT_Y = 0.55f;
-// The channel is broken in three, the sign of an enhancement part
+/// The channel is broken in three, the sign of an enhancement part.
 constexpr std::array<std::array<float, 2>, 3> CHANNEL_SEGMENTS = {{{-0.7f, -0.4f}, {-0.15f, 0.15f}, {0.4f, 0.7f}}};
 constexpr float NMOS_ARROW_TIP_X = CHANNEL_X + 0.05f;
 constexpr float PMOS_ARROW_TIP_X = 0.55f;

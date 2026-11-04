@@ -25,7 +25,7 @@ struct SubcircuitDefinition;
  */
 struct CircuitEntry {
     const Component *Part = nullptr;
-    // One node per terminal, in terminal order; node 0 is ground
+    /// One node per terminal, in terminal order; node 0 is ground.
     std::vector<int> Nodes;
 };
 

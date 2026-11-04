@@ -16,7 +16,7 @@ namespace {
 constexpr float MIN_ZOOM = 4.0f;
 constexpr float MAX_ZOOM = 200.0f;
 constexpr float ZOOM_STEP = 1.1f;
-// Fit may zoom in this far on a small circuit; opening a file stops at the default zoom
+/// Fit may zoom in this far on a small circuit; opening a file stops at the default zoom.
 constexpr float FIT_MAX_ZOOM = 50.0f;
 
 } // namespace

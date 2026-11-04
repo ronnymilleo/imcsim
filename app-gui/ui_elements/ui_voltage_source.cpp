@@ -28,7 +28,10 @@ UIVoltageSource::UIVoltageSource(const GridPoint position, const Rotation rotati
     : UISource(std::make_unique<Core::VoltageSource>(), position, rotation) {
 }
 
-// The positive terminal is the first one, at x = -2. AC and pulse sources show their waveform instead of signs
+/**
+ * @brief   The positive terminal is the first one, at x = -2.
+ * @details AC and pulse sources show their waveform instead of signs.
+ */
 void UIVoltageSource::DrawSymbol(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color,
                                  const SymbolStyle style) const {
     DrawCircle(canvas, view, color);

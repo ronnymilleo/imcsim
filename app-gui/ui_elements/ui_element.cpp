@@ -19,9 +19,9 @@ namespace GUI {
 
 namespace {
 
-// Labels sit just outside the tallest two-terminal symbol, which spans y = -0.8 to 0.8
+/// Labels sit just outside the tallest two-terminal symbol, which spans y = -0.8 to 0.8.
 constexpr float LABEL_OFFSET = 1.0f;
-// Room, in grid units, between the symbol bounds and the outline that marks it
+/// Room, in grid units, between the symbol bounds and the outline that marks it.
 constexpr float OUTLINE_PADDING = 0.15f;
 
 } // namespace
@@ -272,8 +272,10 @@ LocalBounds UIElement::GetLocalBounds() const {
     return {{-2.0f, -0.8f}, {2.0f, 0.8f}};
 }
 
-// ImGui text cannot rotate, so the text stays upright and is pushed from the anchor along the rotated direction
-// until it no longer overlaps the anchor, whatever the element rotation
+/**
+ * @brief   ImGui text cannot rotate, so the text stays upright and is pushed from the anchor along the rotated
+ *          direction until it no longer overlaps the anchor, whatever the element rotation.
+ */
 void UIElement::DrawLabel(SchematicCanvas &canvas, const ViewTransform &view, const ImVec2 local_anchor,
                           const ImVec2 local_direction, const std::string &text, const ImU32 color) const {
     if (text.empty()) {

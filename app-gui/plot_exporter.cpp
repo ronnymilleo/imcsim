@@ -20,7 +20,7 @@ namespace {
 
 constexpr const char *EXPORT_POPUP = "export";
 constexpr const char *EXPORT_ERROR_POPUP = "Could not export the plot";
-// Width of the size fields of the export popup, in font sizes
+/// Width of the size fields of the export popup, in font sizes.
 constexpr float EXPORT_SIZE_WIDTH = 7.0f;
 // Must stay valid until the dialog callback runs, so they live for the whole program
 constexpr std::array<SDL_DialogFileFilter, 1> SVG_FILTERS = {{{"SVG image", "svg"}}};

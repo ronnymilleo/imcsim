@@ -14,12 +14,12 @@ namespace GUI {
 
 namespace {
 
-// The lead ends at the foot of a small circle, which no other symbol uses on a lead, so a label is not taken for a
-// supply rail
+/// The lead ends at the foot of a small circle, which no other symbol uses on a lead, so a label is not taken for a
+/// supply rail.
 constexpr float LEAD_LENGTH = 0.7f;
 constexpr float CIRCLE_RADIUS = 0.4f;
 constexpr float CIRCLE_TOP = LEAD_LENGTH + 2.0f * CIRCLE_RADIUS;
-// The name starts a little past the top of the circle
+/// The name starts a little past the top of the circle.
 constexpr float LABEL_OFFSET = CIRCLE_TOP + 0.2f;
 
 } // namespace
@@ -44,7 +44,9 @@ void UINetLabel::DrawSymbol(SchematicCanvas &canvas, const ViewTransform &view, 
     canvas.AddCircle(center, std::hypot(radius_offset.x, radius_offset.y), color, 0, LINE_THICKNESS);
 }
 
-// The name of the net stands where parts show their name; a label with none shows a question mark
+/**
+ * @brief   The name of the net stands where parts show their name; a label with none shows a question mark.
+ */
 void UINetLabel::DrawLabels(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color) const {
     const std::string &net = static_cast<const Core::NetLabel &>(GetComponent()).GetNet();
     DrawLabel(canvas, view, {0.0f, -LABEL_OFFSET}, {0.0f, -1.0f}, net.empty() ? "?" : net, color);
@@ -54,7 +56,9 @@ std::vector<GridPoint> UINetLabel::GetLocalTerminals() const {
     return {{0, 0}};
 }
 
-// The terminal is at the foot of the symbol, and its lead goes up to the circle
+/**
+ * @brief   The terminal is at the foot of the symbol, and its lead goes up to the circle.
+ */
 GridPoint UINetLabel::GetLocalTerminalInward(std::size_t /*terminal*/) const {
     return {0, -1};
 }

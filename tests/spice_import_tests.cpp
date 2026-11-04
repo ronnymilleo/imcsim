@@ -20,7 +20,7 @@
 
 namespace {
 
-// An op-amp as a vendor writes it: numbered ports, documented in a comment
+/// An op-amp as a vendor writes it: numbered ports, documented in a comment.
 constexpr std::string_view OP_AMP_LIBRARY = R"(* connections: non-inverting input
 *              | inverting input
 *              | | positive supply
@@ -32,7 +32,9 @@ R1 6 5 10
 .ENDS
 )";
 
-// A library subcircuit whose ports say what they are
+/**
+ * @brief   A library subcircuit whose ports say what they are.
+ */
 Core::LibrarySubcircuit NamedPorts() {
     return {.Name = "AMP",
             .Ports = {"IN+", "IN-", "VCC", "VEE", "OUT", "OUT"},
