@@ -12,7 +12,9 @@
 #include "document/schematic.h"
 #include "editing/editor_mode.h"
 #include "preferences.h"
+#include "ui_elements/ui_element.h"
 #include <cstddef>
+#include <memory>
 #include <optional>
 #include <vector>
 
@@ -42,7 +44,7 @@ struct ToolbarRequest {
  * @brief   One row of icon buttons whose groups wrap onto new lines when the window is narrow.
  * @details The tool and part buttons only ask for a mode, which the editor starts; the run controls drive the analyses
  *          directly, since they belong to the whole document. Related parts share a button that places the last one
- *          picked from its list.
+ *          picked from its list, and so do the ready logic blocks.
  */
 class EditorToolbar {
 public:
@@ -59,10 +61,16 @@ private:
     const Preferences &m_Preferences;
     /// Part each toolbar group places, the last one picked from its list.
     std::vector<Core::ComponentType> m_PartGroupChoices;
+    /// An instance of each ready block, read once, which its button and its row draw as their icon.
+    std::vector<std::unique_ptr<UIElement>> m_ReadyBlockIcons;
+    /// The ready block the button places, the last one picked from its list.
+    std::size_t m_ReadyBlockChoice = 0;
 
     // Parts
     bool DrawPartButton(Core::ComponentType type, const EditorMode &mode);
     std::optional<Core::ComponentType> DrawPartGroup(std::size_t index, const EditorMode &mode);
+    std::optional<EditorMode> DrawReadyBlockGroup();
+    void DrawReadyBlockIcon(std::size_t index, ImVec2 center) const;
 
     // Simulation
     void DrawRunControls();

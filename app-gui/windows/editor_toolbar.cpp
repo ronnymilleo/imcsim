@@ -5,6 +5,8 @@
 
 #include "windows/editor_toolbar.h"
 
+#include "document/ready_blocks.h"
+#include "drawing/schematic_canvas.h"
 #include "drawing/theme.h"
 #include "drawing/tool_icons.h"
 #include "editing/element_factory.h"
@@ -191,6 +193,10 @@ EditorToolbar::EditorToolbar(AnalysisControls &controls, AnalysisSettingsPanel &
     for (const PartGroup &group : PART_GROUPS) {
         m_PartGroupChoices.push_back(group.Types.front());
     }
+    for (const ReadyBlock &block : GetReadyBlocks()) {
+        auto group = MakeReadyBlock(block);
+        m_ReadyBlockIcons.push_back(group && !group->Elements.empty() ? std::move(group->Elements.front()) : nullptr);
+    }
 }
 
 /**
@@ -255,6 +261,10 @@ ToolbarRequest EditorToolbar::Draw(const EditorMode &mode, const Schematic &sche
         if (const std::optional<Core::ComponentType> type = DrawPartGroup(index, mode)) {
             picked = type;
         }
+    }
+    row.Place(side + ImGui::GetFrameHeight() * DROPDOWN_BUTTON_SCALE);
+    if (std::optional<EditorMode> block = DrawReadyBlockGroup()) {
+        request.Mode = std::move(block);
     }
     row.Place(side);
     if (DrawPartButton(Core::ComponentType::OP_AMP, mode)) {
@@ -328,6 +338,78 @@ std::optional<Core::ComponentType> EditorToolbar::DrawPartGroup(const std::size_
     }
     ImGui::PopID();
     return picked;
+}
+
+/**
+ * @brief   The button places the ready logic block last picked; the arrow beside it, or a right click, lists them all,
+ *          each telling what it does when hovered.
+ * @details Returns the paste of the block to place, which brings its definition along, or none.
+ */
+std::optional<EditorMode> EditorToolbar::DrawReadyBlockGroup() {
+    const std::span<const ReadyBlock> blocks = GetReadyBlocks();
+    std::optional<std::size_t> picked;
+    ImGui::PushID("ready blocks");
+    const float side = GetToolButtonSide();
+    if (ToolButton("##block", false)) {
+        picked = m_ReadyBlockChoice;
+    }
+    DrawReadyBlockIcon(m_ReadyBlockChoice, GetItemCenter());
+    ImGui::SetItemTooltip("%.*s", static_cast<int>(blocks[m_ReadyBlockChoice].Title.size()),
+                          blocks[m_ReadyBlockChoice].Title.data());
+    const bool open_list = ImGui::IsItemClicked(ImGuiMouseButton_Right);
+
+    ImGui::SameLine(0.0f, 0.0f);
+    const bool open_arrow = ImGui::Button("##more", {ImGui::GetFrameHeight() * DROPDOWN_BUTTON_SCALE, side});
+    ImGui::SetItemTooltip("More logic blocks");
+    DrawDropdownArrow(GetItemCenter());
+    if (open_list || open_arrow) {
+        ImGui::SetNextWindowPos({ImGui::GetItemRectMin().x - side, ImGui::GetItemRectMax().y});
+        ImGui::OpenPopup("blocks");
+    }
+    if (ImGui::BeginPopup("blocks")) {
+        float width = 0.0f;
+        for (const ReadyBlock &block : blocks) {
+            width = std::max(width, ImGui::CalcTextSize(block.Title.data(), block.Title.data() + block.Title.size()).x);
+        }
+        width += side + ImGui::GetStyle().ItemSpacing.x;
+        for (std::size_t index = 0; index < blocks.size(); ++index) {
+            const ImVec2 start = ImGui::GetCursorScreenPos();
+            ImGui::PushID(static_cast<int>(index));
+            if (ImGui::Selectable("##block", index == m_ReadyBlockChoice, ImGuiSelectableFlags_None, {width, side})) {
+                picked = index;
+            }
+            ImGui::PopID();
+            ImGui::SetItemTooltip("%.*s", static_cast<int>(blocks[index].Description.size()),
+                                  blocks[index].Description.data());
+            DrawReadyBlockIcon(index, start + ImVec2(side, side) / 2.0f);
+            ImGui::GetWindowDrawList()->AddText(
+                start + ImVec2(side + ImGui::GetStyle().ItemSpacing.x, (side - ImGui::GetTextLineHeight()) / 2.0f),
+                GetIconColor(true), blocks[index].Title.data(),
+                blocks[index].Title.data() + blocks[index].Title.size());
+        }
+        ImGui::EndPopup();
+    }
+    ImGui::PopID();
+    if (!picked) {
+        return std::nullopt;
+    }
+    m_ReadyBlockChoice = *picked;
+    auto group = MakeReadyBlock(blocks[*picked]);
+    if (!group) {
+        return std::nullopt;
+    }
+    return PastingMode{.Group = std::move(*group)};
+}
+
+/**
+ * @brief   Draws a ready block as its icon: its box with the leads of its pins, scaled to a button.
+ */
+void EditorToolbar::DrawReadyBlockIcon(const std::size_t index, const ImVec2 center) const {
+    if (index >= m_ReadyBlockIcons.size() || !m_ReadyBlockIcons[index]) {
+        return;
+    }
+    DrawListCanvas canvas(ImGui::GetWindowDrawList());
+    m_ReadyBlockIcons[index]->DrawIcon(canvas, center, GetIconSize(), GetIconColor(true), m_Preferences.Symbols);
 }
 
 /**
