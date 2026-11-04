@@ -77,6 +77,7 @@ public:
     void SetWires(std::vector<UIWire> wires);
     void SimplifyAllWires();
     void DeleteSelection();
+    std::expected<void, std::string> RenameElement(std::size_t index, const std::string &name);
     void Clear();
     void Replace(std::vector<std::unique_ptr<UIElement>> elements, std::vector<UIWire> wires,
                  SimulationSettings settings, std::vector<SavedSubcircuit> subcircuits = {},
