@@ -13,9 +13,9 @@ namespace GUI {
 
 namespace {
 
-// The eye sees LED light on a logarithmic scale: an LED starts to glow faintly around this current and reaches full
-// brightness at the rated current of the ready models
+/// Current around which an LED starts to glow faintly; the eye sees LED light on a logarithmic scale.
 constexpr double DIMMEST_CURRENT = 50e-6;
+/// Current at which an LED reaches full brightness, the rated current of the ready models.
 constexpr double RATED_CURRENT = 20e-3;
 
 } // namespace

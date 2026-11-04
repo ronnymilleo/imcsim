@@ -18,9 +18,11 @@ constexpr float DIAMOND_RADIUS = 0.8f;
 /// Control leads stop short of the diamond, which they do not touch.
 constexpr float CONTROL_LEAD_END = -1.2f;
 constexpr float SIGN_HALF_SIZE = 0.15f;
-// Signs inside the diamond, above and below its middle, and beside the control leads
+/// Distance of the signs inside the diamond above and below its middle.
 constexpr float INNER_SIGN_OFFSET = 0.4f;
+/// Plus sign beside the control leads.
 constexpr ImVec2 CONTROL_PLUS_SIGN = {-1.6f, -1.4f};
+/// Minus sign beside the control leads.
 constexpr ImVec2 CONTROL_MINUS_SIGN = {-1.6f, 1.4f};
 constexpr float ARROW_HALF_LENGTH = 0.45f;
 constexpr float ARROW_HEAD_LENGTH = 0.2f;

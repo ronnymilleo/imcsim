@@ -99,10 +99,11 @@ private:
         std::vector<GridPoint> FixedTerminals;
         std::vector<UIWire> StartWires;
         std::optional<bool> SlidesVertically;
-        // Moved the mouse far enough to change something, and what a click without a move leaves selected
+        /// Moved the mouse far enough to change something.
         bool Moved = false;
         GridPoint LastCursor;
         GridPoint LastDelta;
+        /// What a click without a move leaves selected.
         std::optional<Selection> CollapseTo;
     };
 
@@ -179,9 +180,10 @@ private:
     CanvasView m_View;
     SchematicFileActions m_Files;
 
-    // What the schematic shows, resolved at the start of each frame; the scale of a transient is worked out once per
-    // result and kept
+    // What the schematic shows
+    /// What the schematic shows, resolved at the start of each frame.
     std::optional<DisplayedState> m_Displayed;
+    /// Version of the transient the heat scale was worked out for, so it is worked out once per result and kept.
     std::optional<std::size_t> m_ScaledTransientVersion;
     /// The window of points the scale was worked out over.
     PointWindow m_ScaledWindow;
@@ -195,8 +197,10 @@ private:
     bool m_PlacingMirrored = false;
     /// Part each toolbar group places, the last one picked from its list.
     std::vector<Core::ComponentType> m_PartGroupChoices;
-    // Part picker: the typed query and the highlighted match
+    // Part picker
+    /// The query typed in the part picker.
     std::string m_PartQuery;
+    /// The highlighted match of the part picker.
     std::size_t m_PartPickerIndex = 0;
 
     // Wiring
@@ -217,12 +221,17 @@ private:
     /// Live runs: the push button the mouse holds down.
     std::optional<std::size_t> m_HeldButton;
 
-    // Properties popover: the corner it hangs from, which side of the part it opens on, and a request from a menu
+    // Properties popover
+    /// The corner the popover hangs from.
     ImVec2 m_PartPopoverAnchor = {0.0f, 0.0f};
+    /// Which side of the part the popover opens on.
     float m_PartPopoverPivotX = 0.0f;
+    /// Whether a menu asked to open the popover.
     bool m_PartPopoverRequested = false;
-    // Context menu: what the right click was on, for its measure item; the part picker it can open
+    // Context menu
+    /// What the right click was on, for the measure item of the context menu.
     std::optional<MeasurementTarget> m_ContextTarget;
+    /// Whether the context menu asked to open the part picker.
     bool m_PartPickerRequested = false;
     /// ImGui closes a popup on Esc before the frame starts, so the editor checks the last frame to leave that
     /// Esc alone.

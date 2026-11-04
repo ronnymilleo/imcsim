@@ -16,8 +16,9 @@ constexpr float BAR_X = -0.4f;
 constexpr float BAR_HALF_HEIGHT = 0.6f;
 /// Where the collector and emitter leave the bar.
 constexpr float JUNCTION_Y = 0.3f;
-// How far along the emitter, from the bar, the arrow tip sits
+/// How far along the emitter, from the bar, the arrow tip of an NPN sits.
 constexpr float NPN_ARROW_POSITION = 0.8f;
+/// How far along the emitter, from the bar, the arrow tip of a PNP sits.
 constexpr float PNP_ARROW_POSITION = 0.3f;
 
 } // namespace

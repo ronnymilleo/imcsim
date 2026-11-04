@@ -14,8 +14,8 @@ namespace GUI {
 
 namespace {
 
-// Unrotated, the terminal is at the origin, the lead runs left from it to the square, and the arrow inside the square
-// points right, toward the terminal
+/// Unrotated, the terminal is at the origin, the lead runs left from it to the square, and the arrow inside the square
+/// points right, toward the terminal.
 constexpr float LEAD_LENGTH = 0.5f;
 constexpr float SQUARE_SIDE = 1.0f;
 constexpr float ARROW_INSET = 0.15f;

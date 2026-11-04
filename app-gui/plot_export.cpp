@@ -36,7 +36,7 @@ struct ExportTheme {
     double MinorGridOpacity;
 };
 
-// Dark follows Graphite, the default theme of the application; light is plain black on white for print
+/// Follows Graphite, the default theme of the application.
 constexpr ExportTheme DARK_THEME = {
     .Background = {30, 34, 41},
     .PlotBackground = {22, 25, 30},
@@ -47,6 +47,7 @@ constexpr ExportTheme DARK_THEME = {
     .GridOpacity = 0.08,
     .MinorGridOpacity = 0.035,
 };
+/// Plain black on white, for print.
 constexpr ExportTheme LIGHT_THEME = {
     .Background = {255, 255, 255},
     .PlotBackground = {255, 255, 255},

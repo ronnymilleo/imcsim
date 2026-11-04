@@ -80,11 +80,13 @@ struct Transient {
  */
 struct ACSweep {
     std::vector<double> Frequencies;
-    // Indexed by node number, then by frequency point; node 0 is ground and stays empty
+    /// Indexed by node number, then by frequency point; node 0 is ground and stays empty.
     std::vector<std::vector<double>> NodeMagnitudesDecibels;
+    /// Indexed as NodeMagnitudesDecibels.
     std::vector<std::vector<double>> NodePhasesDegrees;
-    // One per named component, in circuit order, with a value per frequency point
+    /// One per named component, in circuit order, with a value per frequency point.
     std::vector<ComponentTrace> CurrentMagnitudesDecibels;
+    /// Indexed as CurrentMagnitudesDecibels.
     std::vector<ComponentTrace> CurrentPhasesDegrees;
 };
 
@@ -111,8 +113,9 @@ struct DCSweep {
     std::string SweptUnit;
     /// The X axis of every curve.
     std::vector<double> SweptValues;
-    // Empty when no source is stepped
+    /// Empty when no source is stepped.
     std::string SteppedSource;
+    /// Empty when no source is stepped.
     std::string SteppedUnit;
     /// One per value of the stepped source, or a single curve.
     std::vector<DCSweepCurve> Curves;

@@ -16,14 +16,17 @@ namespace GUI {
 
 namespace {
 
-// The contact: two points on the vertical axis, and a lever from the lower one that rests above the upper one
+/// The two contact points sit on the vertical axis, this far above and below the middle.
 constexpr float CONTACT_Y = 0.7f;
 constexpr float CONTACT_RADIUS = 0.12f;
+/// The lever runs from the lower contact and rests above the upper one.
 constexpr ImVec2 LEVER_TIP = {0.7f, -0.5f};
-// The control leads end at a bar, or at the coil, which is a box this wide and tall around (-1.2, 0)
+/// The control leads end at a bar, or at the coil around this point.
 constexpr float CONTROL_END_X = -1.2f;
 constexpr float BAR_HALF_LENGTH = 1.0f;
+/// Half the width of the coil, a box around the end of the control leads.
 constexpr float COIL_HALF_WIDTH = 0.4f;
+/// Half the height of the coil.
 constexpr float COIL_HALF_HEIGHT = 0.8f;
 constexpr float SIGN_HALF_SIZE = 0.15f;
 constexpr ImVec2 CONTROL_PLUS_SIGN = {-1.7f, -1.4f};

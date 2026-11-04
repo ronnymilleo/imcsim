@@ -45,11 +45,13 @@ struct SweepStatistics {
 struct BodeStatistics {
     double PeakGain = 0.0;
     double PeakFrequency = 0.0;
-    // Where the gain falls 3 dB below the peak, below and above it; no value when it does not within the span
+    /// Where the gain falls 3 dB below the peak, below it; no value when it does not within the span.
     std::optional<double> LowerCutoff;
+    /// Where the gain falls 3 dB below the peak, above it; no value when it does not within the span.
     std::optional<double> UpperCutoff;
-    // Where the gain first falls through 0 dB, and 180 degrees plus the phase there, as for a loop gain
+    /// Where the gain first falls through 0 dB.
     std::optional<double> UnityGainFrequency;
+    /// 180 degrees plus the phase at the unity-gain frequency, as for a loop gain.
     std::optional<double> PhaseMargin;
 };
 

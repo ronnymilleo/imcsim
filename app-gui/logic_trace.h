@@ -51,10 +51,13 @@ struct LogicSignal {
     double LogicLevel = 5.0;
 };
 
-// Height of one lane, and the offsets of the three states inside it; lanes are stacked from the bottom
+/// Height of one lane; lanes are stacked from the bottom.
 inline constexpr double LANE_STRIDE = 1.5;
+/// Height of the low state inside a lane.
 inline constexpr double LANE_LOW_OFFSET = 0.0;
+/// Height of the unknown state inside a lane.
 inline constexpr double LANE_UNKNOWN_OFFSET = 0.5;
+/// Height of the high state inside a lane.
 inline constexpr double LANE_HIGH_OFFSET = 1.0;
 /// Room above and below the stack of lanes, in lane units.
 inline constexpr double LANE_MARGIN = 0.3;

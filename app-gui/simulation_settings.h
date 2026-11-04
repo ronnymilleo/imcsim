@@ -32,9 +32,11 @@ enum class Analysis {
 
 constexpr std::size_t ANALYSIS_COUNT = 7;
 
-// Wall seconds a live transient takes to cover its stop time, at first and at the least and most the user may set
+/// Wall seconds a live transient takes to cover its stop time, at first.
 constexpr double DEFAULT_LIVE_SECONDS = 10.0;
+/// Fewest wall seconds the user may set.
 constexpr double MIN_LIVE_SECONDS = 2.0;
+/// Most wall seconds the user may set.
 constexpr double MAX_LIVE_SECONDS = 60.0;
 /// A live transient goes on until it is stopped, up to an hour on the clock or the most time steps a transient may
 /// span, whichever comes first: ngspice keeps every point it makes and cannot drop the old ones, so its memory grows

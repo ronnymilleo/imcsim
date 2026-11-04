@@ -111,17 +111,21 @@ private:
 
     Schematic &m_Schematic;
 
-    // The run in progress: the analysis, and the version of the circuit it started from
+    // Run in progress
     Core::SimulationService m_Service;
+    /// Analysis of the run in progress, if any.
     std::optional<Analysis> m_RunningAnalysis;
+    /// Version of the circuit the run in progress started from.
     std::size_t m_RunCircuitVersion = 0;
     /// Run asked for while a paused live run held the worker, which starts once that run has ended.
     bool m_IsRunPending = false;
 
-    // Whether the next transient runs live, whether the run in progress does, and whether the transient on display
-    // came from a live run
+    // Live runs
+    /// Whether the next transient runs live.
     bool m_IsLiveModeOn = false;
+    /// Whether the run in progress is a live one.
     bool m_IsLiveRun = false;
+    /// Whether the transient on display came from a live run.
     bool m_IsLiveResult = false;
 
     /// Last run of each analysis, in the order of the Analysis enum.

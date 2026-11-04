@@ -20,13 +20,14 @@ namespace Core {
 
 namespace {
 
-// A transient shows this many periods of the slowest source, with this many points in a period of the fastest
+/// Periods of the slowest source a suggested transient shows.
 constexpr double SUGGESTED_PERIODS = 5.0;
+/// Points a suggested transient takes in a period of the fastest source.
 constexpr double POINTS_PER_PERIOD = 200.0;
 /// A waveform that happens once, such as an exponential or piecewise linear one, shows its whole span with this much
 /// room after it.
 constexpr double ONE_SHOT_MARGIN = 1.2;
-// The AC sweep reaches two decades past the lowest and the highest frequency the parts set
+/// Decades a suggested AC sweep reaches past the lowest and the highest frequency the parts set.
 constexpr double AC_MARGIN_DECADES = 2.0;
 constexpr double MIN_AC_FREQUENCY = 1e-3;
 constexpr double MAX_AC_FREQUENCY = 1e10;

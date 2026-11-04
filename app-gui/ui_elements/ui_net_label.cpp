@@ -14,8 +14,8 @@ namespace GUI {
 
 namespace {
 
-// The lead ends at the foot of a small circle, which no other symbol uses on a lead, so a label is not taken for a
-// supply rail
+/// The lead ends at the foot of a small circle, which no other symbol uses on a lead, so a label is not taken for a
+/// supply rail.
 constexpr float LEAD_LENGTH = 0.7f;
 constexpr float CIRCLE_RADIUS = 0.4f;
 constexpr float CIRCLE_TOP = LEAD_LENGTH + 2.0f * CIRCLE_RADIUS;

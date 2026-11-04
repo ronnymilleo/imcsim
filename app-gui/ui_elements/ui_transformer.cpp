@@ -17,7 +17,7 @@ namespace GUI {
 
 namespace {
 
-// Each coil runs from y = -1 to y = 1 in turns that bulge toward the core
+/// Each coil runs from y = -1 to y = 1 in turns that bulge toward the core.
 constexpr float COIL_X = 0.9f;
 constexpr int TURN_COUNT = 3;
 constexpr int SEGMENTS_PER_TURN = 8;

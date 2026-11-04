@@ -45,10 +45,12 @@ enum class LiveEffect {
 
 constexpr std::size_t NUMBER_OF_LIVE_EFFECTS = static_cast<std::size_t>(LiveEffect::COUNT);
 
-// How long an edit must settle before the analysis runs again by itself: long enough for a burst of edits to run once,
-// short enough to feel like it follows them
+/// How long an edit must settle before the analysis runs again by itself: long enough for a burst of edits to run once,
+/// short enough to feel like it follows them.
 constexpr double DEFAULT_RERUN_DELAY_SECONDS = 0.5;
+/// Shortest delay the user may set.
 constexpr double MIN_RERUN_DELAY_SECONDS = 0.1;
+/// Longest delay the user may set.
 constexpr double MAX_RERUN_DELAY_SECONDS = 5.0;
 
 /**

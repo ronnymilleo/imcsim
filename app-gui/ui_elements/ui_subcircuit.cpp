@@ -16,14 +16,16 @@ namespace GUI {
 
 namespace {
 
-// Pins sit two units apart, so their labels have room, and their terminals one unit outside the box
+/// Pins sit two units apart, so their labels have room.
 constexpr int PIN_SPACING = 2;
+/// Terminals sit one unit outside the box.
 constexpr int LEAD_LENGTH = 1;
-// The smallest box is four units wide and two high
+/// The smallest box is four units wide.
 constexpr int MIN_HALF_WIDTH = 2;
+/// The smallest box is two units high.
 constexpr int MIN_HALF_HEIGHT = 1;
 constexpr int VERTICAL_NAME_ROOM = 1;
-// Pin names sit just inside the box
+/// Pin names sit just inside the box.
 constexpr float PIN_LABEL_INSET = 0.2f;
 constexpr float NAME_LABEL_GAP = 0.5f;
 

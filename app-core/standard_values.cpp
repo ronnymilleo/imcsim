@@ -18,7 +18,7 @@ namespace Core {
 
 namespace {
 
-// The IEC tables of the three oldest series were rounded by hand, so they are written out
+/// The IEC tables of the three oldest series were rounded by hand, so they are written out.
 constexpr auto E6_MANTISSAS = std::to_array<double>({1.0, 1.5, 2.2, 3.3, 4.7, 6.8});
 constexpr auto E12_MANTISSAS = std::to_array<double>({1.0, 1.2, 1.5, 1.8, 2.2, 2.7, 3.3, 3.9, 4.7, 5.6, 6.8, 8.2});
 constexpr auto E24_MANTISSAS = std::to_array<double>({1.0, 1.1, 1.2, 1.3, 1.5, 1.6, 1.8, 2.0, 2.2, 2.4, 2.7, 3.0,

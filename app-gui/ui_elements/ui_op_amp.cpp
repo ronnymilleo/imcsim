@@ -15,9 +15,10 @@ namespace GUI {
 
 namespace {
 
-// The triangle spans x = -2 to 2, so its slanted sides cross x = 0 at y = -1 and 1, where the supply leads end
+/// The triangle spans x = -2 to 2.
 constexpr float BODY_HALF_LENGTH = 2.0f;
 constexpr float BODY_HALF_HEIGHT = 2.0f;
+/// The slanted sides cross x = 0 at y = -1 and 1, where the supply leads end.
 constexpr float SUPPLY_LEAD_END = 1.0f;
 constexpr float SIGN_X = -1.4f;
 constexpr float SIGN_HALF_SIZE = 0.2f;

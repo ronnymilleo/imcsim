@@ -83,9 +83,9 @@ private:
      *          and whether any trace is measured.
      */
     struct FrameResults {
-        // The points of the transient in the window, and the steps of the same analysis cut to the same stretch of
-        // time: the plot and its statistics only ever see these
+        /// The points of the transient in the window; the plot and its statistics only ever see these.
         std::optional<Core::Transient> TransientWindow;
+        /// The steps of the same analysis, cut to the same stretch of time.
         std::optional<StepFamily<Core::Transient>> StepWindows;
         std::vector<MathTrace> TransientMath;
         std::vector<std::string> TransientErrors;
@@ -131,10 +131,14 @@ private:
     /// Whether each steady stretch of a lane is labeled 0, 1 or X.
     bool m_ShowBitValues = false;
     PlotSpan m_ACSweepView{.From = 1.0, .To = 1e6};
-    // Spectrum of the transient: its window and frequency scale, its visible range and the last spectra computed
+    // Spectrum of the transient
+    /// Window the transform of the spectrum applies.
     SpectrumWindow m_SpectrumWindow = SpectrumWindow::HANN;
+    /// Whether the frequency scale of the spectrum is logarithmic.
     bool m_SpectrumLogarithmic = false;
+    /// Visible range of the spectrum plot.
     PlotSpan m_SpectrumView;
+    /// The last spectra computed.
     std::optional<TransientSpectra> m_Spectra;
     bool m_SpectraChanged = false;
     MathChannels m_MathChannels;
@@ -143,9 +147,12 @@ private:
     /// Tab to bring to the front on the next frame, after a new result.
     std::optional<PlotTab> m_TabToShow;
     PlotSpan m_DCSweepView;
-    // Noise: the result its axes were fitted to, its visible range and the parts whose share it plots
+    // Noise
+    /// The noise result the axes of its plot were fitted to.
     TraceFitState m_NoiseFit;
+    /// Visible range of the noise plot.
     PlotSpan m_NoiseView;
+    /// The parts whose share the noise plot shows.
     std::set<std::string> m_ShownNoiseContributions;
     std::vector<std::string> m_PlottedNoiseContributions;
     PlotExporter m_Exporter;

@@ -19,7 +19,7 @@ namespace {
 constexpr const char *DISCARD_POPUP = "Discard changes?";
 constexpr const char *MESSAGES_POPUP = "File messages";
 constexpr const char *EXPORT_POPUP = "Export schematic";
-// Must stay valid until the dialog callback runs, so it lives for the whole program
+// Must stay valid until the dialog callback runs, so they live for the whole program
 constexpr std::array<SDL_DialogFileFilter, 1> SCHEMATIC_FILTERS = {{{"imcsim schematic", "imcsim"}}};
 constexpr std::array<SDL_DialogFileFilter, 1> SVG_FILTERS = {{{"SVG image", "svg"}}};
 /// Vendors ship their models under many extensions, so any file can be picked too.

@@ -45,8 +45,9 @@ constexpr float MIN_DOT_SPACING = 8.0f;
 constexpr float WIRE_CURSOR_HALF_SIZE = 4.0f;
 /// How close, in pixels, the cursor must be to a wire to select it.
 constexpr float WIRE_PICK_DISTANCE = 5.0f;
-// Junction dot radius relative to the zoom, with a minimum so it stays visible when zoomed out
+/// Junction dot radius relative to the zoom.
 constexpr float JUNCTION_RADIUS_SCALE = 0.15f;
+/// Smallest junction dot radius, so it stays visible when zoomed out.
 constexpr float MIN_JUNCTION_RADIUS = 2.5f;
 /// Voltage labels sit just above and right of their point, clear of the line.
 constexpr ImVec2 VOLTAGE_LABEL_OFFSET = {4.0f, -16.0f};
@@ -58,13 +59,15 @@ constexpr const char *WIDEST_TIME_READOUT = "t = 888.8ms / 888.8ms";
 // Heat legend, in font sizes, at the bottom left of the canvas
 constexpr float LEGEND_WIDTH = 10.0f;
 constexpr float LEGEND_HEIGHT = 0.6f;
-// LED glows, in grid units: a dim LED glows over its symbol (4 units long) and a fully lit one beyond it. Additive
-// light can be stronger than a glow blended over a light background, which would hide the symbol
+/// Radius of the glow of a dim LED, in grid units, over its symbol (4 units long).
 constexpr float GLOW_MIN_RADIUS = 2.0f;
+/// Radius of the glow of a fully lit LED, beyond its symbol. Additive light can be stronger than a glow blended over a
+/// light background, which would hide the symbol.
 constexpr float GLOW_MAX_RADIUS = 3.5f;
-// Hot resistors glow smaller than LEDs, around their symbol, in a warm orange
+/// Hot resistors glow smaller than LEDs, around their symbol.
 constexpr float HEAT_GLOW_MIN_RADIUS = 1.5f;
 constexpr float HEAT_GLOW_MAX_RADIUS = 2.5f;
+/// The warm orange of a hot resistor.
 constexpr ImVec4 HEAT_LIGHT = {1.0f, 0.45f, 0.1f, 1.0f};
 constexpr float ADDITIVE_GLOW_INTENSITY = 0.9f;
 constexpr float BLENDED_GLOW_INTENSITY = 0.5f;
@@ -113,8 +116,9 @@ constexpr auto SUPPLY_PARTS =
 
 /// The edge choice of a block pin, this many font sizes wide.
 constexpr float PIN_SIDE_FIELD_WIDTH = 6.0f;
-// Toolbar buttons are square, this many frame heights wide; icons fill this share of them
+/// Toolbar buttons are square, this many frame heights wide.
 constexpr float TOOL_BUTTON_SCALE = 1.4f;
+/// Share of a toolbar button its icon fills.
 constexpr float ICON_SCALE = 0.7f;
 /// How often the heat scale of a transient that is still being made is worked out again, in seconds.
 constexpr double SCALE_REFRESH_SECONDS = 0.5;
@@ -430,11 +434,13 @@ void DrawPartIcon(ImDrawList *draw_list, const Core::ComponentType type, const I
 constexpr const char *PART_PICKER_POPUP = "Find a part";
 constexpr const char *PART_POPOVER = "Part properties";
 constexpr const char *CONTEXT_MENU = "Schematic actions";
-// The properties popover opens this many grid units beside the part, and is about this many font sizes wide
+/// The properties popover opens this many grid units beside the part.
 constexpr float POPOVER_MARGIN = 1.0f;
+/// Width of the properties popover, in font sizes.
 constexpr float POPOVER_WIDTH = 18.0f;
-// The part picker shows this many matches at once, and its top sits this far down the editor, as a share of it
+/// How many matches the part picker shows at once.
 constexpr std::size_t PART_PICKER_ROWS = 5;
+/// How far down the editor the top of the part picker sits, as a share of it.
 constexpr float PART_PICKER_TOP = 0.3f;
 
 void DrawGrid(ImDrawList *draw_list, const ViewTransform &view, const ImVec2 origin, const ImVec2 size,
@@ -539,13 +545,15 @@ ImVec4 GetLEDLight(const Core::LEDColor color) {
     return {1.0f, 0.9f, 0.7f, 1.0f};
 }
 
-// A selected wire keeps its heat color and gets this much wider halo behind it, in pixels, partly see-through
+/// A selected wire keeps its heat color and gets a halo behind it this much wider, in pixels.
 constexpr float SELECTION_HALO_EXTRA = 6.0f;
+/// The halo is partly see-through.
 constexpr ImU32 SELECTION_HALO_ALPHA = 150;
 constexpr ImU32 SELECTION_BOX_FILL_ALPHA = 40;
-// During a live run the parts the user can set are outlined faintly, and the one under the cursor or held fully, so
-// they stand out from the parts whose edits end the run without hiding the heat colors
+/// During a live run the parts the user can set are outlined faintly, so they stand out from the parts whose edits end
+/// the run without hiding the heat colors.
 constexpr ImU32 LIVE_PART_OUTLINE_ALPHA = 110;
+/// The part under the cursor or held is outlined fully.
 constexpr ImU32 LIVE_PART_HOVERED_ALPHA = 255;
 
 ImU32 WithAlpha(const ImU32 color, const ImU32 alpha) {

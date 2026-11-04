@@ -15,21 +15,24 @@ namespace GUI {
 
 namespace {
 
-// The lead runs from the terminal up to the box, and the square wave sits in the middle of the box
+/// The lead runs from the terminal up to the box.
 constexpr float LEAD_LENGTH = 0.6f;
 constexpr float BOX_HALF_WIDTH = 1.0f;
 constexpr float BOX_HEIGHT = 1.6f;
 constexpr float BOX_TOP = -(LEAD_LENGTH + BOX_HEIGHT);
 constexpr float BOX_BOTTOM = -LEAD_LENGTH;
+/// The square wave sits in the middle of the box.
 constexpr float BOX_MIDDLE = (BOX_TOP + BOX_BOTTOM) / 2.0f;
 constexpr float WAVE_HALF_HEIGHT = 0.35f;
 constexpr float WAVE_LOW = BOX_MIDDLE + WAVE_HALF_HEIGHT;
 constexpr float WAVE_HIGH = BOX_MIDDLE - WAVE_HALF_HEIGHT;
-// The high and low halves of one cycle of the wave inside the box
+/// Where the high half of the cycle of the wave inside the box starts.
 constexpr float FIRST_RISE = -0.2f;
+/// Where the high half ends and the low half starts.
 constexpr float FIRST_FALL = 0.3f;
-// The wave starts and ends on the low level, a little inside the box
+/// The wave starts on the low level, a little inside the box.
 constexpr float WAVE_LEFT = -0.7f;
+/// The wave ends on the low level, a little inside the box.
 constexpr float WAVE_RIGHT = 0.7f;
 constexpr float LABEL_OFFSET = 0.3f;
 

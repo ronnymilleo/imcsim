@@ -19,8 +19,9 @@ namespace Core {
 
 namespace {
 
-// Limits that keep a mistyped setting from running for minutes or exhausting memory
+/// Most points per decade a sweep may ask for, so a mistyped setting cannot run for minutes or exhaust memory.
 constexpr int MAX_POINTS_PER_DECADE = 1000;
+/// Most points a DC sweep may take, for the same reason.
 constexpr int MAX_DC_SWEEP_POINTS = 100000;
 
 /**

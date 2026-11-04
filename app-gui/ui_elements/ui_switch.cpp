@@ -17,7 +17,7 @@ constexpr float CONTACT_X = 1.0f;
 constexpr float CONTACT_RADIUS = 0.12f;
 /// A lever that is open ends here, above the second contact.
 constexpr ImVec2 OPEN_LEVER_TIP = {0.9f, -0.9f};
-// A push button's bar rests this high above the contacts, and is pushed down onto them
+/// A push button's bar rests this high above the contacts, and is pushed down onto them.
 constexpr float RAISED_BAR_Y = -0.7f;
 constexpr float BAR_HALF_LENGTH = 0.7f;
 constexpr float STEM_LENGTH = 0.6f;

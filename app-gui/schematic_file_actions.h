@@ -103,8 +103,10 @@ private:
     std::optional<std::filesystem::path> m_RequestedImport;
     std::optional<Example> m_ExampleToOpen;
 
-    // The dialog in progress and the confirmation are touched only by the main thread
+    // Dialogs
+    /// Touched only by the main thread.
     std::optional<FileAction> m_ActionToConfirm;
+    /// The action of the dialog in progress, touched only by the main thread.
     std::optional<FileAction> m_DialogAction;
     FileDialog m_FileDialog;
     std::string m_MessagesTitle;

@@ -13,7 +13,7 @@ namespace GUI {
 namespace {
 
 constexpr float INNER_ARROW_HALF_LENGTH = 0.5f;
-// The outside arrow sits above the lead on the side the current leaves, like the plus of a voltage source
+/// The outside arrow sits above the lead on the side the current leaves, like the plus of a voltage source.
 constexpr float OUTER_ARROW_START = 1.1f;
 constexpr float OUTER_ARROW_END = 1.7f;
 constexpr float OUTER_ARROW_HEIGHT = 0.4f;

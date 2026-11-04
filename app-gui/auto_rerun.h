@@ -16,13 +16,15 @@ namespace GUI {
  * @brief   What the program is doing this frame, as far as running again by itself is concerned.
  */
 struct AutoRerunFrame {
-    // The user's preferences: whether to run again, and how long an edit must settle first
+    /// The user's preference to run again after edits.
     bool IsEnabled = false;
+    /// How long an edit must settle before the analysis runs again.
     double SettleSeconds = 0.0;
     /// Seconds on any clock that only goes forward.
     double Time = 0.0;
-    // Change with each edit that drops the results, and with each schematic opened or created
+    /// Changes with each edit that drops the results.
     std::size_t CircuitVersion = 0;
+    /// Changes with each schematic opened or created.
     std::size_t DocumentVersion = 0;
     /// The selected analysis has a result or an error to follow, or is running.
     bool HasRunToFollow = false;

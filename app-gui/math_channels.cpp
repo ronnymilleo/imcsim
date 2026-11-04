@@ -25,8 +25,9 @@ constexpr auto MATH_COLORS = std::to_array<ImU32>({
     IM_COL32(235, 235, 235, 255),
     IM_COL32(90, 220, 190, 255),
 });
-// Widths in the math editor, in font sizes
+/// Width of an operand field in the math editor, in font sizes.
 constexpr float OPERAND_WIDTH = 10.0f;
+/// Width of an expression field in the math editor, in font sizes.
 constexpr float EXPRESSION_WIDTH = 20.0f;
 
 /**

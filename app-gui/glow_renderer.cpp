@@ -20,10 +20,11 @@ namespace {
 
 /// Side of the falloff texture, in texels; the glow is smooth, so a small texture scales up without steps.
 constexpr std::uint32_t TEXTURE_SIZE = 64;
-// The falloff is a broad halo plus a narrow core, so a glow looks hot in the middle. The core width is a fraction of
-// the radius and the weights add up to 1, the alpha at the center
+/// Share of the broad halo in the falloff of a glow; with the narrow core it adds up to 1, the alpha at the center.
 constexpr float HALO_WEIGHT = 0.65f;
+/// Share of the narrow core in the falloff, so a glow looks hot in the middle.
 constexpr float CORE_WEIGHT = 0.35f;
+/// Width of the core, as a fraction of the radius.
 constexpr float CORE_WIDTH = 0.2f;
 
 /**

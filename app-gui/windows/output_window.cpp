@@ -35,8 +35,9 @@ namespace {
 
 /// In font sizes, so the layout follows the DPI scale.
 constexpr float MIN_PLOT_HEIGHT = 12.0f;
-// Width of the field for the size of the window, in font sizes, and how many points a pixel of dragging adds
+/// Width of the field for the size of the window, in font sizes.
 constexpr float WINDOW_SIZE_WIDTH = 8.0f;
+/// How many points a pixel of dragging adds to the size of the window.
 constexpr float WINDOW_SIZE_DRAG_SPEED = 20.0f;
 constexpr float TRACE_LIST_WIDTH = 8.0f;
 constexpr ImVec2 INITIAL_SIZE = {65.0f, 35.0f};
@@ -48,8 +49,9 @@ constexpr float DASH_GAP = 0.3f;
 constexpr float DASH_WEIGHT = 1.5f;
 /// Width of the statistics panel, in font sizes.
 constexpr float STATISTICS_WIDTH = 15.0f;
-// Cursors A and B are placed at these fractions of the visible range when turned on
+/// Fraction of the visible range where cursor A is placed when turned on.
 constexpr double CURSOR_A_PLACEMENT = 1.0 / 3.0;
+/// Fraction of the visible range where cursor B is placed when turned on.
 constexpr double CURSOR_B_PLACEMENT = 2.0 / 3.0;
 constexpr ImU32 CURSOR_A_COLOR = IM_COL32(255, 199, 77, 255);
 constexpr ImU32 CURSOR_B_COLOR = IM_COL32(115, 204, 255, 255);
@@ -57,20 +59,22 @@ constexpr ImU32 CURSOR_B_COLOR = IM_COL32(115, 204, 255, 255);
 constexpr ImU32 PLAYHEAD_COLOR = IM_COL32(255, 96, 96, 255);
 /// Math channels are drawn with a heavier line than the traces they come from.
 constexpr float MATH_LINE_WEIGHT = 2.0f;
-// The plot of logic lanes: its height is a margin for the axis and a row per lane, in font sizes, and at most this
-// share of the room
+/// Height of the plot of logic lanes for its axis, in font sizes.
 constexpr float LANE_PLOT_MARGIN = 3.5f;
+/// Height of each lane of the plot, in font sizes.
 constexpr float LANE_ROW_HEIGHT = 2.2f;
+/// Most of the room the plot of logic lanes may take.
 constexpr float MAX_LANE_SHARE = 0.6f;
-// Bit labels: the room around the digit, in font sizes, and the corner rounding of its box
+/// Room around the digit of a bit label, in font sizes.
 constexpr float BIT_BOX_PADDING = 0.25f;
+/// Corner rounding of the box of a bit label.
 constexpr float BIT_BOX_ROUNDING = 3.0f;
 constexpr const char *EXPORT_LABEL = "Export...";
 /// A new result starts with empty plots until the user picks what to measure.
 constexpr const char *NOTHING_MEASURED =
     "Nothing is measured yet: pick nodes and parts with Probe in the editor, or check traces in the list";
-// The harmonics the spectrum measures, and how many the plot shows when it fits: a linear axis spans them, plus one
-// harmonic of room, from 0 Hz
+/// The harmonics the spectrum measures, and how many the plot shows when it fits: a linear axis spans them, plus one
+/// harmonic of room, from 0 Hz.
 constexpr int HIGHEST_HARMONIC = 10;
 constexpr float HARMONIC_MARKER_SIZE = 3.0f;
 constexpr double MIN_SHOWN_DISTORTION_PERCENT = 0.001;

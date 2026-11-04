@@ -64,7 +64,7 @@ private:
     Preferences m_SavedPreferences;
     /// Last title given to the window, so it is only set again when the file or its state changes.
     std::string m_WindowTitle;
-    // Result versions already shown, so each new result opens the Output window once
+    /// Result versions already shown, one per analysis, so each new result opens the Output window once.
     std::size_t m_ShownOperatingPointVersion = 0;
     std::size_t m_ShownTransientVersion = 0;
     std::size_t m_ShownACSweepVersion = 0;
@@ -75,9 +75,9 @@ private:
     /// Runs the selected analysis again after edits, when the preference asks for it.
     AutoRerun m_AutoRerun;
 
-    // The schematic and the preferences are declared first, so they exist when the windows that refer to them are
-    // built
+    /// Declared before the windows that refer to it, so it exists when they are built.
     Schematic m_Schematic;
+    /// Declared before the windows that refer to them, so they exist when they are built.
     Preferences m_Preferences;
     AnalysisControls m_AnalysisControls{m_Schematic};
     AnalysisSettingsPanel m_AnalysisSettings{m_Schematic};

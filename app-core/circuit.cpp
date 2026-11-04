@@ -168,10 +168,10 @@ std::string ProbeTerminals(const Component &component, const std::vector<Current
     return lines;
 }
 
-// A gate or flip-flop is a digital code model, which only meets digital nodes: each input reaches it through an
-// analog-to-digital bridge, and each output leaves through a digital-to-analog bridge and a resistor, the output
-// resistance of the family. Every input also gets a resistor to ground, so one left unconnected reads 0
+/// Output resistance of the logic family, in series with the digital-to-analog bridge of every output of a gate or
+/// flip-flop, whose digital code model only meets digital nodes.
 constexpr double LOGIC_OUTPUT_RESISTANCE = 50.0;
+/// Resistance from every logic input to ground, so an input left unconnected reads 0.
 constexpr double LOGIC_INPUT_PULL_DOWN = 1e9;
 
 std::string FormatLogicModels(const LogicPart &part) {

@@ -24,28 +24,31 @@ namespace {
 
 /// Space between a measurement marker and the near edge of its label, in pixels.
 constexpr float MARKER_LABEL_GAP = 4.0f;
-// Voltage dots follow the zoom like the rest of the drawing: 4 pixels at the default zoom
+/// Voltage dots follow the zoom like the rest of the drawing: 4 pixels at the default zoom.
 constexpr float VOLTAGE_DOT_SCALE = 0.2f;
+/// Smallest radius of a voltage dot, in pixels.
 constexpr float MIN_VOLTAGE_DOT_RADIUS = 2.5f;
-// Current arrows lie on the lead, in grid units from the terminal: from the base of the head to its tip
+/// Where a current arrow starts on its lead, at the base of its head, in grid units from the terminal.
 constexpr float ARROW_START = 0.2f;
+/// Where the tip of a current arrow sits, in grid units from the terminal.
 constexpr float ARROW_TIP = 0.75f;
 constexpr float ARROW_HALF_WIDTH = 0.25f;
-// Flowing-current arrows: equal heads spaced this far apart along the wires, in grid units, so they follow the zoom.
-// The arrows only show direction, so they all have the same size and scroll at one speed; the magnitude stays on the
-// heat color. The speed is in grid units per second
+/// Distance between flowing-current arrows along the wires, in grid units, so they follow the zoom. The arrows only
+/// show direction, so they all have the same size and scroll at one speed; the magnitude stays on the heat color.
 constexpr float FLOW_ARROW_SPACING = 0.60f;
 constexpr float FLOW_ARROW_LENGTH = 0.20f;
 constexpr float FLOW_ARROW_HALF_WIDTH = 0.10f;
+/// Speed of the flowing-current arrows, in grid units per second.
 constexpr float FLOW_SPEED = 1.5f;
-// Terminal numbers are smaller than part labels and muted, so they do not compete with names and values. They sit
-// just outside the terminal, in grid units along the line of its lead, where neither the symbol nor probes draw
+/// Terminal numbers are smaller than part labels and muted, so they do not compete with names and values.
 constexpr float TERMINAL_NUMBER_SCALE = 0.8f;
+/// Distance of a terminal number past its terminal, in grid units along the line of its lead, where neither the symbol
+/// nor probes draw.
 constexpr float TERMINAL_NUMBER_OUTSIDE = 0.3f;
 constexpr float TERMINAL_NUMBER_GAP = 3.0f;
-// Each numbered terminal also gets a small open ring, the usual mark of a connection point; open so it does not read
-// as a junction or a voltage probe, which are filled dots. Exported images are usually viewed enlarged, so their ring
-// is smaller than the one on screen, relative to the zoom
+/// Each numbered terminal also gets a small open ring, the usual mark of a connection point; open so it does not read
+/// as a junction or a voltage probe, which are filled dots. Exported images are usually viewed enlarged, so their ring
+/// is smaller than the one on screen, relative to the zoom.
 constexpr float EXPORT_TERMINAL_RING_SCALE = 0.125f;
 constexpr float MIN_TERMINAL_RING_RADIUS = 2.5f;
 constexpr float TERMINAL_RING_THICKNESS = 1.5f;
@@ -57,7 +60,7 @@ constexpr float EXPORT_ZOOM = 20.0f;
 constexpr float EXPORT_MARGIN = 16.0f;
 /// Junction dots as the editor draws them at the default zoom.
 constexpr float JUNCTION_RADIUS = 3.0f;
-// Symbols and wires are black on white for print; probes keep the colors of their traces
+/// Symbols and wires are black on white for print; probes keep the colors of their traces.
 constexpr ImU32 PRINT_LINE_COLOR = IM_COL32(30, 30, 30, 255);
 constexpr ExportColor PRINT_BACKGROUND = {255, 255, 255};
 

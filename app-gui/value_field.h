@@ -51,9 +51,9 @@ private:
 
     std::array<char, 32> m_Text{};
     bool m_Invalid = false;
-    // A character typed elsewhere that the next Draw() focuses the input with, and whether the cursor still has to
-    // move after it once the input is active
+    /// A character typed elsewhere that the next Draw() focuses the input with.
     std::optional<char> m_TypingStart;
+    /// Whether the cursor still has to move after the typed character once the input is active.
     bool m_CursorToEnd = false;
     /// Whether the next Draw() focuses the input again, after a step rewrote its text.
     bool m_RefocusInput = false;

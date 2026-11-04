@@ -10,8 +10,9 @@ namespace Core {
 
 namespace {
 
-// A switch is a resistor, which closed is nearly a wire and open nearly nothing at all
+/// Resistance of a closed switch, nearly a wire.
 constexpr double CLOSED_RESISTANCE = 1e-3;
+/// Resistance of an open switch, nearly nothing at all.
 constexpr double OPEN_RESISTANCE = 1e12;
 
 } // namespace

@@ -14,8 +14,9 @@ namespace Core {
 
 namespace {
 
-// The backend in use; created as ngspice on first use, by whichever thread asks first
+/// The backend in use; created as ngspice on first use, by whichever thread asks first.
 std::unique_ptr<SimulationBackend> g_backend;
+/// Guards g_backend, which any thread may ask for.
 std::mutex g_backend_mutex;
 
 /**

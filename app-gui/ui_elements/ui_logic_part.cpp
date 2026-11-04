@@ -18,14 +18,16 @@ namespace GUI {
 
 namespace {
 
-// The body of a gate reaches half a unit past its first and last input, so a gate of two inputs is 3 units high
+/// A gate of two inputs is 3 units high.
 constexpr float TWO_INPUT_GATE_HALF_HEIGHT = 1.5f;
+/// The body of a gate reaches half a unit past its first and last input.
 constexpr float BODY_MARGIN = 0.5f;
 constexpr float GATE_LEFT = -2.0f;
 constexpr float GATE_RIGHT = 2.0f;
 constexpr float BUBBLE_RADIUS = 0.3f;
-// How far the back of an OR gate curves in, and how far the second curve of an XOR gate is from the first
+/// How far the back of an OR gate curves in.
 constexpr float OR_BACK_DEPTH = 0.5f;
+/// How far the second curve of an XOR gate is from the first.
 constexpr float XOR_GAP = 0.35f;
 /// Exponent of the curve from the back corner of an OR gate to its tip.
 constexpr float OR_SIDE_EXPONENT = 2.2f;
