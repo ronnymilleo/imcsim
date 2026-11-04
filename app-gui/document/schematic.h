@@ -23,6 +23,7 @@
 #include <optional>
 #include <set>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace GUI {
@@ -102,6 +103,7 @@ public:
     std::vector<std::string> MergeLibraryModels(std::vector<Core::LibraryModel> models,
                                                 std::vector<std::unique_ptr<UIElement>> &elements,
                                                 std::vector<SavedSubcircuit> &definitions);
+    void CopyDefinitionsFrom(const Schematic &library, std::string_view left_out = {});
 
     // Selection
     void SelectElement(std::size_t index);

@@ -13,6 +13,7 @@ add_executable(imcsim-tests
             circuit_checks_tests.cpp
             circuit_copy_tests.cpp
             circuit_snapshot_tests.cpp
+            block_nesting_tests.cpp
             clipboard_tests.cpp
             code_models.cpp
             circuit_tests.cpp

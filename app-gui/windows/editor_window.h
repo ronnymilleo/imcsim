@@ -35,6 +35,7 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace GUI {
@@ -87,6 +88,19 @@ private:
     };
 
     /**
+     * @struct  OpenBlock
+     * @brief   A block whose contents the editor opened, on the way down from the schematic.
+     * @details Pins and Parameters hold its settings while a block inside it is open; the innermost block keeps them in
+     *          the dialog fields instead.
+     */
+    struct OpenBlock {
+        std::string Name;
+        std::unique_ptr<Schematic> Content;
+        std::vector<SavedSubcircuitPin> Pins;
+        std::vector<Core::SubcircuitParameter> Parameters;
+    };
+
+    /**
      * @enum    EditorCommand
      * @brief   A command picked in a menu, run by the next Draw() so its popups belong to the editor window.
      */
@@ -115,8 +129,8 @@ private:
 
     Schematic &m_RootSchematic;
     Schematic *m_Schematic;
-    std::unique_ptr<Schematic> m_SubcircuitContent;
-    std::string m_EditingSubcircuit;
+    /// The blocks open, from the outermost to the one shown; empty while the schematic is shown.
+    std::vector<OpenBlock> m_OpenBlocks;
     std::vector<SavedSubcircuitPin> m_SubcircuitPins;
     std::vector<Core::SubcircuitParameter> m_SubcircuitParameters;
     std::string m_SubcircuitName;
@@ -183,6 +197,11 @@ private:
     // Blocks
     bool IsEditingSubcircuit() const;
     bool LeaveSubcircuitForDocument();
+    bool ReturnToLevel(std::size_t depth);
+    void ShowSchematic(Schematic &schematic);
+    bool CanPlaceBlock(std::string_view name) const;
+    std::vector<const SavedSubcircuit *> ListPlaceableBlocks() const;
+    void SyncOpenBlockDefinitions();
     void OfferBlockParameters();
     void RequestCreateSubcircuit();
     void RequestEditSelectedSubcircuit();

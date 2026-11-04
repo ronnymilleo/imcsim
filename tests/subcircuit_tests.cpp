@@ -423,7 +423,7 @@ TEST_CASE("Editing a definition propagates pins, parameters and contents to ever
     CHECK(schematic.GetSubcircuits()[0].Pins.size() == 1);
 }
 
-TEST_CASE("Block creation rejects nested blocks and invalid metadata", "[subcircuit]") {
+TEST_CASE("Block creation needs pin markers in the selection and valid metadata", "[subcircuit]") {
     GUI::Schematic schematic;
     CHECK_FALSE(schematic.GetSubcircuitPinCandidates());
     schematic.AddElement(GUI::CreateElement(Core::ComponentType::SUBCIRCUIT, {0, 0}, GUI::Rotation::R0));

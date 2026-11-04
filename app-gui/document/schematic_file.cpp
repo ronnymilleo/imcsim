@@ -25,10 +25,14 @@
 #include "editing/connectivity.h"
 #include "editing/element_factory.h"
 #include "nlohmann/json.hpp"
+#include <algorithm>
 #include <array>
 #include <format>
 #include <fstream>
+#include <functional>
+#include <map>
 #include <optional>
+#include <set>
 #include <sstream>
 #include <utility>
 
@@ -1540,8 +1544,13 @@ std::expected<SavedSubcircuit, std::string> ReadSubcircuitText(const nlohmann::j
     return definition;
 }
 
+/**
+ * @brief   Reads one block definition; the blocks its parts place must be read already, since their instances take
+ *          their pins from them.
+ */
 std::expected<SavedSubcircuit, std::string> ReadSubcircuit(const nlohmann::json &object,
-                                                           std::vector<std::string> &warnings) {
+                                                           std::vector<std::string> &warnings,
+                                                           const std::span<const SavedSubcircuit> definitions) {
     if (!object.is_object()) {
         return std::unexpected("is not an object");
     }
@@ -1579,7 +1588,7 @@ std::expected<SavedSubcircuit, std::string> ReadSubcircuit(const nlohmann::json 
     const auto elements = object.find("elements");
     if (elements != object.end() && elements->is_array()) {
         for (std::size_t index = 0; index < elements->size(); ++index) {
-            auto element = ReadElement((*elements)[index]);
+            auto element = ReadElement((*elements)[index], definitions);
             if (element) {
                 definition.Elements.push_back(std::move(*element));
             } else {
@@ -1637,6 +1646,62 @@ std::vector<Core::LibraryModel> ReadLibraryModels(const nlohmann::json &document
     return models;
 }
 
+/**
+ * @brief   The names of the blocks the parts of a block definition place, as the file lists them.
+ */
+std::set<std::string> ListPlacedDefinitions(const nlohmann::json &object) {
+    std::set<std::string> names;
+    const auto elements = object.is_object() ? object.find("elements") : object.end();
+    if (elements == object.end() || !elements->is_array()) {
+        return names;
+    }
+    for (const nlohmann::json &element : *elements) {
+        if (const std::optional<std::string> name =
+                element.is_object() ? ReadString(element, "definition") : std::nullopt) {
+            names.insert(*name);
+        }
+    }
+    return names;
+}
+
+/**
+ * @brief   The order to read the definitions in, so each block is read after the blocks it places, whatever order the
+ *          file lists them in; a block in a cycle, which only a damaged file can hold, comes after the others it can.
+ */
+std::vector<std::size_t> OrderDefinitionsForReading(const nlohmann::json &list) {
+    std::map<std::string, std::size_t, std::less<>> first_of_name;
+    for (std::size_t index = 0; index < list.size(); ++index) {
+        if (const std::optional<std::string> name =
+                list[index].is_object() ? ReadString(list[index], "name") : std::nullopt) {
+            first_of_name.try_emplace(*name, index);
+        }
+    }
+    std::vector<std::size_t> order;
+    std::vector<bool> is_placed(list.size(), false);
+    std::vector<bool> is_open(list.size(), false);
+    const std::function<void(std::size_t)> place = [&](const std::size_t index) {
+        if (is_placed[index] || is_open[index]) {
+            return;
+        }
+        is_open[index] = true;
+        for (const std::string &used : ListPlacedDefinitions(list[index])) {
+            if (const auto inner = first_of_name.find(used); inner != first_of_name.end()) {
+                place(inner->second);
+            }
+        }
+        is_open[index] = false;
+        is_placed[index] = true;
+        order.push_back(index);
+    };
+    for (std::size_t index = 0; index < list.size(); ++index) {
+        place(index);
+    }
+    return order;
+}
+
+/**
+ * @brief   Reads every block definition, each after the blocks it places, and keeps them in the order of the file.
+ */
 std::vector<SavedSubcircuit> ReadSubcircuits(const nlohmann::json &document, std::vector<std::string> &warnings) {
     std::vector<SavedSubcircuit> definitions;
     const auto list = document.find("subcircuits");
@@ -1647,17 +1712,36 @@ std::vector<SavedSubcircuit> ReadSubcircuits(const nlohmann::json &document, std
         warnings.push_back("The subcircuit definitions are not a list and were skipped");
         return definitions;
     }
-    for (std::size_t index = 0; index < list->size(); ++index) {
-        auto definition = ReadSubcircuit((*list)[index], warnings);
+    std::vector<std::size_t> file_positions;
+    for (const std::size_t index : OrderDefinitionsForReading(*list)) {
+        auto definition = ReadSubcircuit((*list)[index], warnings, definitions);
         if (!definition) {
             warnings.push_back(std::format("Subcircuit {} {} and was skipped", index + 1, definition.error()));
-        } else if (std::ranges::contains(definitions, definition->Name, &SavedSubcircuit::Name)) {
+        } else if (const auto existing = std::ranges::find(definitions, definition->Name, &SavedSubcircuit::Name);
+                   existing != definitions.end()) {
+            // The first in the file wins, whichever was read first
             warnings.push_back(std::format("Subcircuit {} is repeated and was skipped", definition->Name));
+            const auto position = static_cast<std::size_t>(existing - definitions.begin());
+            if (index < file_positions[position]) {
+                *existing = std::move(*definition);
+                file_positions[position] = index;
+            }
         } else {
             definitions.push_back(std::move(*definition));
+            file_positions.push_back(index);
         }
     }
-    return definitions;
+    // Back to the order of the file, so saving writes them where they were
+    std::vector<std::size_t> by_file(definitions.size());
+    for (std::size_t position = 0; position < by_file.size(); ++position) {
+        by_file[position] = position;
+    }
+    std::ranges::sort(by_file, {}, [&](const std::size_t position) { return file_positions[position]; });
+    std::vector<SavedSubcircuit> ordered;
+    for (const std::size_t position : by_file) {
+        ordered.push_back(std::move(definitions[position]));
+    }
+    return ordered;
 }
 
 } // namespace

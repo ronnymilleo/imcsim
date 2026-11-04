@@ -15,6 +15,7 @@ add_library(imcsim-gui-lib
             analysis/transient_window.cpp
             analysis/truth_table.cpp
             application.cpp
+            document/block_nesting.cpp
             document/clipboard.cpp
             document/examples.cpp
             document/file_dialog.cpp

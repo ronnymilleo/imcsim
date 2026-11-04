@@ -450,6 +450,35 @@ std::string FormatSubcircuit(const SubcircuitDefinition &definition) {
     return text;
 }
 
+/**
+ * @brief   The definitions in an order that writes each one after the blocks its body places, as a reader of the
+ *          netlist meets them; the order of the list stays among the others, and a cycle, which the checks refuse, ends
+ *          the walk.
+ */
+std::vector<const SubcircuitDefinition *> OrderByUse(const std::vector<std::shared_ptr<SubcircuitDefinition>> &list) {
+    std::vector<const SubcircuitDefinition *> order;
+    std::set<std::string, std::less<>> visited;
+    const auto place = [&](const auto &self, const SubcircuitDefinition &definition) -> void {
+        if (!visited.insert(definition.Name).second) {
+            return;
+        }
+        for (const CircuitEntry &entry : definition.Body.GetEntries()) {
+            if (entry.Part->GetType() != ComponentType::SUBCIRCUIT) {
+                continue;
+            }
+            const std::string &name = static_cast<const SubcircuitInstance &>(*entry.Part).GetDefinitionName();
+            if (const auto inner = std::ranges::find(list, name, &SubcircuitDefinition::Name); inner != list.end()) {
+                self(self, **inner);
+            }
+        }
+        order.push_back(&definition);
+    };
+    for (const auto &definition : list) {
+        place(place, *definition);
+    }
+    return order;
+}
+
 } // namespace
 
 /**
@@ -778,7 +807,7 @@ std::string Circuit::ToSpiceNetlist(const std::string_view analysis, const bool 
     }
     netlist += models;
     netlist += FormatLibraryModels(m_LibraryModels);
-    for (const auto &definition : m_Subcircuits) {
+    for (const SubcircuitDefinition *definition : OrderByUse(m_Subcircuits)) {
         netlist += FormatSubcircuit(*definition);
     }
     if (!analysis.empty()) {
@@ -791,27 +820,28 @@ std::string Circuit::ToSpiceNetlist(const std::string_view analysis, const bool 
 /**
  * @brief   Lists every part the netlist of a circuit simulates.
  * @param[in] circuit  Circuit to look into.
- * @return  The parts of the circuit, then the parts of each subcircuit definition one of its instances uses, once
- *          per definition. Definitions no instance uses are left out, and so are the subcircuits of a definition's
- *          body, since blocks do not nest.
+ * @return  The parts of the circuit, then the parts of each subcircuit definition one of its instances uses, at any
+ *          depth, once per definition. Definitions no instance uses are left out.
  */
 std::vector<const Component *> CollectParts(const Circuit &circuit) {
     std::vector<const Component *> parts;
-    std::set<std::string, std::less<>> used;
-    for (const CircuitEntry &entry : circuit.GetEntries()) {
-        parts.push_back(entry.Part);
-        if (entry.Part->GetType() == ComponentType::SUBCIRCUIT) {
-            used.insert(static_cast<const SubcircuitInstance &>(*entry.Part).GetDefinitionName());
-        }
-    }
-    for (const auto &definition : circuit.GetSubcircuits()) {
-        if (!used.contains(definition->Name)) {
-            continue;
-        }
-        for (const CircuitEntry &entry : definition->Body.GetEntries()) {
+    std::set<std::string, std::less<>> visited;
+    const auto collect = [&](const auto &self, const Circuit &body) -> void {
+        for (const CircuitEntry &entry : body.GetEntries()) {
             parts.push_back(entry.Part);
+            if (entry.Part->GetType() != ComponentType::SUBCIRCUIT) {
+                continue;
+            }
+            const std::string &name = static_cast<const SubcircuitInstance &>(*entry.Part).GetDefinitionName();
+            if (!visited.insert(name).second) {
+                continue;
+            }
+            if (const auto definition = circuit.FindSubcircuit(name)) {
+                self(self, definition->Body);
+            }
         }
-    }
+    };
+    collect(collect, circuit);
     return parts;
 }
 
