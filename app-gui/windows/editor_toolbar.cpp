@@ -15,6 +15,7 @@
 #include <algorithm>
 #include <array>
 #include <format>
+#include <functional>
 #include <span>
 #include <string>
 #include <utility>
@@ -245,33 +246,9 @@ ToolbarRequest EditorToolbar::Draw(const EditorMode &mode, const Schematic &sche
     }
 
     // Parts
-    std::optional<Core::ComponentType> picked;
-    for (const auto parts :
-         {std::span<const Core::ComponentType>(PASSIVE_PARTS), std::span<const Core::ComponentType>(SUPPLY_PARTS)}) {
-        float part_gap = gap;
-        for (const Core::ComponentType type : parts) {
-            row.Place(side, std::exchange(part_gap, 0.0f));
-            if (DrawPartButton(type, mode)) {
-                picked = type;
-            }
-        }
-    }
-    for (std::size_t index = 0; index < PART_GROUPS.size(); ++index) {
-        row.Place(side + ImGui::GetFrameHeight() * DROPDOWN_BUTTON_SCALE, index == 0 ? gap : 0.0f);
-        if (const std::optional<Core::ComponentType> type = DrawPartGroup(index, mode)) {
-            picked = type;
-        }
-    }
-    row.Place(side + ImGui::GetFrameHeight() * DROPDOWN_BUTTON_SCALE);
-    if (std::optional<EditorMode> block = DrawReadyBlockGroup()) {
-        request.Mode = std::move(block);
-    }
-    row.Place(side);
-    if (DrawPartButton(Core::ComponentType::OP_AMP, mode)) {
-        picked = Core::ComponentType::OP_AMP;
-    }
-    if (picked) {
-        request.Mode = PlacingMode{.Type = *picked};
+    if (std::optional<EditorMode> placing =
+            DrawParts(mode, [&row](const float width, const float part_gap) { row.Place(width, part_gap); })) {
+        request.Mode = std::move(placing);
     }
 
     // Simulation
@@ -282,6 +259,45 @@ ToolbarRequest EditorToolbar::Draw(const EditorMode &mode, const Schematic &sche
     DrawLiveToggle();
     ImGui::EndDisabled();
     return request;
+}
+
+/**
+ * @brief   The part buttons: the passive parts and supplies with a button each, the groups with a list, the ready logic
+ *          blocks and the op-amp.
+ * @details place lays out the next button, with its width and the gap before it. Returns the mode that places the part
+ *          or block clicked this frame, or none.
+ */
+std::optional<EditorMode> EditorToolbar::DrawParts(const EditorMode &mode,
+                                                   const std::function<void(float, float)> &place) {
+    const float gap = ToolbarRow::GroupGap();
+    const float side = GetToolButtonSide();
+    std::optional<Core::ComponentType> picked;
+    for (const auto parts :
+         {std::span<const Core::ComponentType>(PASSIVE_PARTS), std::span<const Core::ComponentType>(SUPPLY_PARTS)}) {
+        float part_gap = gap;
+        for (const Core::ComponentType type : parts) {
+            place(side, std::exchange(part_gap, 0.0f));
+            if (DrawPartButton(type, mode)) {
+                picked = type;
+            }
+        }
+    }
+    for (std::size_t index = 0; index < PART_GROUPS.size(); ++index) {
+        place(side + ImGui::GetFrameHeight() * DROPDOWN_BUTTON_SCALE, index == 0 ? gap : 0.0f);
+        if (const std::optional<Core::ComponentType> type = DrawPartGroup(index, mode)) {
+            picked = type;
+        }
+    }
+    place(side + ImGui::GetFrameHeight() * DROPDOWN_BUTTON_SCALE, 0.0f);
+    std::optional<EditorMode> block = DrawReadyBlockGroup();
+    place(side, 0.0f);
+    if (DrawPartButton(Core::ComponentType::OP_AMP, mode)) {
+        picked = Core::ComponentType::OP_AMP;
+    }
+    if (picked) {
+        return PlacingMode{.Type = *picked};
+    }
+    return block;
 }
 
 /**

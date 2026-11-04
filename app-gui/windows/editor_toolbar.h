@@ -14,6 +14,7 @@
 #include "preferences.h"
 #include "ui_elements/ui_element.h"
 #include <cstddef>
+#include <functional>
 #include <memory>
 #include <optional>
 #include <vector>
@@ -67,6 +68,7 @@ private:
     std::size_t m_ReadyBlockChoice = 0;
 
     // Parts
+    std::optional<EditorMode> DrawParts(const EditorMode &mode, const std::function<void(float, float)> &place);
     bool DrawPartButton(Core::ComponentType type, const EditorMode &mode);
     std::optional<Core::ComponentType> DrawPartGroup(std::size_t index, const EditorMode &mode);
     std::optional<EditorMode> DrawReadyBlockGroup();
