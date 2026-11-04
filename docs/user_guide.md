@@ -199,8 +199,13 @@ schematic file keeps the definition of each block, so it opens anywhere without 
   - A picked model joins the schematic and shows in the Model choice of the parts it fits, as `1N4148 (library)`
     after the ready models; a diode model fits diodes, LEDs and Zeners, and a transistor model the transistors of its
     type.
-  - `.include` and `.lib` lines are reported and not followed, so import the files they name as well. Encrypted
-    models, which only their vendor's simulator reads, are left out with a warning.
+  - `.include` and `.lib` lines are followed, with paths taken from the folder of the file that writes them:
+    `.include file` reads the whole file in its place, `.lib file section` reads that section of it, and `.lib file`
+    with no section reads the whole file, as LTspice writes it. What a block uses from those files is copied into its
+    text, so it needs none of them afterwards. When the file picked has sections of its own, all of them are read and
+    the first definition of each name wins. A file that cannot be read, a missing section or a file that includes
+    itself is reported with the line that names it. Encrypted models, which only their vendor's simulator reads, are
+    left out with a warning.
 
 The RC_LOWPASS block of the Two RC filters example, open in the editor: a pin marker on each side, and a resistor and
 a capacitor that follow the parameters R and C:
