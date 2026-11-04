@@ -47,6 +47,7 @@ add_executable(imcsim-tests
             simulator_tests.cpp
             spectrum_tests.cpp
             spice_import_tests.cpp
+            spice_inclusions_tests.cpp
             spice_library_tests.cpp
             spice_value_tests.cpp
             standard_values_tests.cpp

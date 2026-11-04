@@ -325,15 +325,11 @@ void SchematicFileActions::ImportFile(const std::filesystem::path &path) {
 }
 
 /**
- * @brief   The subcircuits of the library go to the editor, which asks which to import; a file with none only says why.
+ * @brief   The subcircuits of the library, with the files it includes, go to the editor, which asks which to import; a
+ *          file with none only says why.
  */
 void SchematicFileActions::ImportSpiceFile(const std::filesystem::path &path) {
-    const auto text = ReadTextFile(path);
-    if (!text) {
-        ShowMessages("Could not read the SPICE library", {text.error()});
-        return;
-    }
-    Core::SpiceLibrary library = Core::ReadSpiceLibrary(*text);
+    Core::SpiceLibrary library = Core::ReadSpiceLibraryFile(path, ReadTextFile);
     if (library.Subcircuits.empty() && library.Models.empty()) {
         ShowMessages(std::format("Nothing to import from {}", path.filename().string()), std::move(library.Warnings));
         return;

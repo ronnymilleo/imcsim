@@ -45,7 +45,9 @@ add_library(imcsim-core-lib
             simulation/simulation_service.cpp
             simulation/simulator.cpp
             simulation/stepped_circuit.cpp
+            spice/spice_inclusions.cpp
             spice/spice_library.cpp
+            spice/spice_text.cpp
             spice/spice_value.cpp
             spice/standard_values.cpp
 )

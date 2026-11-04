@@ -6,6 +6,8 @@
 #include "spice/spice_library.h"
 
 #include "components/subcircuit.h"
+#include "spice/spice_inclusions.h"
+#include "spice/spice_text.h"
 #include <algorithm>
 #include <array>
 #include <cctype>
@@ -52,42 +54,6 @@ constexpr auto SCALES = std::to_array<Scale>({{"meg", 1e6},
 
 /// What vendors write around encrypted models, which no other simulator can read.
 constexpr auto ENCRYPTION_MARKERS = std::to_array<std::string_view>({"$cdnencstart", "pspice_encrypted"});
-
-std::string ToLower(const std::string_view text) {
-    std::string lower(text);
-    std::ranges::transform(lower, lower.begin(),
-                           [](const unsigned char character) { return static_cast<char>(std::tolower(character)); });
-    return lower;
-}
-
-std::string_view Trim(std::string_view text) {
-    while (!text.empty() && std::isspace(static_cast<unsigned char>(text.front())) != 0) {
-        text.remove_prefix(1);
-    }
-    while (!text.empty() && std::isspace(static_cast<unsigned char>(text.back())) != 0) {
-        text.remove_suffix(1);
-    }
-    return text;
-}
-
-std::vector<std::string> SplitLines(const std::string_view text) {
-    std::vector<std::string> lines;
-    std::size_t start = 0;
-    while (start <= text.size()) {
-        const std::size_t end = text.find('\n', start);
-        std::string_view line =
-            text.substr(start, end == std::string_view::npos ? std::string_view::npos : end - start);
-        if (line.ends_with('\r')) {
-            line.remove_suffix(1);
-        }
-        lines.emplace_back(line);
-        if (end == std::string_view::npos) {
-            break;
-        }
-        start = end + 1;
-    }
-    return lines;
-}
 
 /**
  * @brief   ngspice ends a line at ";", and at "$" when it follows a space or a tab.
@@ -290,6 +256,8 @@ bool IsInclusion(const std::string_view directive) {
 /// statements, and the definitions outside the subcircuits that one may use.
 struct LibraryScan {
     std::vector<std::string> Lines;
+    /// Where each line is, for the warnings.
+    std::vector<std::string> Origins;
     std::vector<Statement> Statements;
     std::vector<std::pair<std::size_t, std::size_t>> Found;
     std::map<std::string, Definition> Definitions;
@@ -319,8 +287,8 @@ void ReadTopLevelStatement(LibraryScan &scan, const Statement &statement, const 
             }
         }
     } else if (IsInclusion(directive)) {
-        library.Warnings.push_back(std::format("Line {}: {} is not followed; import the file it names as well",
-                                               statement.FirstLine + 1, tokens.front()));
+        library.Warnings.push_back(std::format("{}: {} is not followed; import the file it names as well",
+                                               scan.Origins[statement.FirstLine], tokens.front()));
     }
 }
 
@@ -340,9 +308,10 @@ void AddFoundSubcircuit(LibraryScan &scan, const std::size_t header, const std::
 /**
  * @brief   The first pass finds the subcircuits and the definitions outside them.
  */
-LibraryScan ScanLibrary(const std::string_view text, SpiceLibrary &library) {
+LibraryScan ScanLibrary(LibraryLines lines, SpiceLibrary &library) {
     LibraryScan scan;
-    scan.Lines = SplitLines(text);
+    scan.Lines = std::move(lines.Lines);
+    scan.Origins = std::move(lines.Origins);
     scan.Statements = ReadStatements(scan.Lines);
     int depth = 0;
     std::size_t header = 0;
@@ -357,7 +326,7 @@ LibraryScan ScanLibrary(const std::string_view text, SpiceLibrary &library) {
             header = depth++ == 0 ? index : header;
         } else if (directive == ".ends" && depth == 0) {
             library.Warnings.push_back(
-                std::format("Line {} closes a subcircuit that was never opened", statement.FirstLine + 1));
+                std::format("{} closes a subcircuit that was never opened", scan.Origins[statement.FirstLine]));
         } else if (directive == ".ends") {
             if (--depth == 0) {
                 AddFoundSubcircuit(scan, header, index);
@@ -380,8 +349,8 @@ void WarnInclusions(const LibraryScan &scan, const std::size_t header, const std
     for (std::size_t index = header + 1; index < end; ++index) {
         const std::vector<std::string> inner = Tokenize(scan.Statements[index].Logical);
         if (!inner.empty() && IsInclusion(ToLower(inner.front()))) {
-            subcircuit.Warnings.push_back(std::format("Line {}: {} is not followed, so what it brings in is missing",
-                                                      scan.Statements[index].FirstLine + 1, inner.front()));
+            subcircuit.Warnings.push_back(std::format("{}: {} is not followed, so what it brings in is missing",
+                                                      scan.Origins[scan.Statements[index].FirstLine], inner.front()));
         }
     }
 }
@@ -397,7 +366,7 @@ std::optional<LibrarySubcircuit> BuildSubcircuit(const LibraryScan &scan, const 
     const Statement &last = scan.Statements[end];
     const std::vector<std::string> tokens = Tokenize(first.Logical);
     if (tokens.size() < 2) {
-        warnings.push_back(std::format("The subcircuit on line {} has no name and was left out", first.FirstLine + 1));
+        warnings.push_back(std::format("{}: a subcircuit has no name and was left out", scan.Origins[first.FirstLine]));
         return std::nullopt;
     }
     LibrarySubcircuit subcircuit;
@@ -424,20 +393,13 @@ std::optional<LibrarySubcircuit> BuildSubcircuit(const LibraryScan &scan, const 
     return subcircuit;
 }
 
-} // namespace
-
 /**
- * @brief   Reads the subcircuits of a SPICE library file.
- * @param[in] text  Contents of a .lib, .mod, .sub or .cir file.
- * @return  Every .subckt of the file outside any other, each with the .model, .subckt and .param definitions of the
- *          file that it uses, so it simulates on its own; every diode and transistor .model outside a subcircuit, which
- *          the parts can use by name; and the warnings that concern the whole file, such as an
- *          .include it does not follow or a subcircuit left unclosed. An encrypted subcircuit is left out with a
- *          warning, since only its vendor's simulator can read it.
+ * @brief   Reads the subcircuits and models of a library from its lines, after the warnings of putting them together.
  */
-SpiceLibrary ReadSpiceLibrary(const std::string_view text) {
+SpiceLibrary ReadLibrary(LibraryLines lines) {
     SpiceLibrary library;
-    const LibraryScan scan = ScanLibrary(text, library);
+    library.Warnings = std::move(lines.Warnings);
+    const LibraryScan scan = ScanLibrary(std::move(lines), library);
     std::set<std::string> names;
     for (const auto &[header, end] : scan.Found) {
         if (std::optional<LibrarySubcircuit> subcircuit = BuildSubcircuit(scan, header, end, names, library.Warnings)) {
@@ -448,6 +410,33 @@ SpiceLibrary ReadSpiceLibrary(const std::string_view text) {
         library.Warnings.emplace_back("The file has no .subckt, nor a diode or transistor .model, to import");
     }
     return library;
+}
+
+} // namespace
+
+/**
+ * @brief   Reads the subcircuits of a SPICE library given as text, with no file to follow its inclusions from.
+ * @param[in] text  Contents of a .lib, .mod, .sub or .cir file.
+ * @return  Every .subckt of the file outside any other, each with the .model, .subckt and .param definitions of the
+ *          file that it uses, so it simulates on its own; every diode and transistor .model outside a subcircuit, which
+ *          the parts can use by name; and the warnings that concern the whole file, such as an
+ *          .include it does not follow or a subcircuit left unclosed. An encrypted subcircuit is left out with a
+ *          warning, since only its vendor's simulator can read it.
+ */
+SpiceLibrary ReadSpiceLibrary(const std::string_view text) {
+    return ReadLibrary(ListLibraryLines(text));
+}
+
+/**
+ * @brief   Reads the subcircuits of a SPICE library file, with the files it includes.
+ * @param[in] path       The library file.
+ * @param[in] read_file  Reads it and the files its .include and .lib lines name.
+ * @return  What ReadSpiceLibrary() returns for the file with each inclusion in place (ExpandInclusions()), so what a
+ *          subcircuit uses from an included file goes into its text too, and it still simulates on its own. Warnings
+ *          tell which inclusions could not be read.
+ */
+SpiceLibrary ReadSpiceLibraryFile(const std::filesystem::path &path, const LibraryFileReader &read_file) {
+    return ReadLibrary(ExpandInclusions(path, read_file));
 }
 
 /**
