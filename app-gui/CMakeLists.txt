@@ -89,6 +89,13 @@ add_library(imcsim-gui-lib
             windows/editor_toolbar.cpp
             windows/editor_window.cpp
             windows/netlist_window.cpp
+            windows/output_tabs/ac_sweep_tab.cpp
+            windows/output_tabs/dc_sweep_tab.cpp
+            windows/output_tabs/noise_tab.cpp
+            windows/output_tabs/plot_widgets.cpp
+            windows/output_tabs/result_tables.cpp
+            windows/output_tabs/spectrum_tab.cpp
+            windows/output_tabs/transient_tab.cpp
             windows/output_window.cpp
             windows/part_picker.cpp
             windows/preferences_window.cpp
