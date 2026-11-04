@@ -55,6 +55,11 @@ How to read what imcsim measures, plots and exports. The [README](../README.md) 
   while high and a 0 while low, and both start low. It is a source from its terminal to ground, so it gives a gate
   input or a latch's SET or RESET a defined level to start from. A circuit of only logic parts, clocks, logic inputs and VCC
   runs without a Ground symbol or a load on the outputs; add a Ground as soon as it has any other part.
+- **Logic output**: the box beside the logic input, with an arrow on its lead, shows the level of the net it is wired
+  to, read as a gate reads it: 1 at 70% of its logic level or above, 0 at 30% or below and X between (5 V by default,
+  editable in its properties). It shows the operating point, or the transient at the instant of the time bar, and
+  follows a live run; it is empty before there is a result. It takes no part in the simulation, so a digital circuit
+  can be tried with logic inputs and outputs alone, with no LED, resistor or Ground.
 - **Standard values**: Standard values in Edit > Preferences restricts resistors, capacitors and inductors to one of
   the E series (E6, E12, E24, E48, E96 or E192, with their tolerances of 20% down to 0.5%), or leaves any value
   allowed, which is the default. With a series chosen, a typed value becomes the nearest one of the series on a log scale (`5000` is
@@ -315,6 +320,7 @@ shows, an operating point or an instant of a transient, so they show nothing unt
 - **Heat Glow** makes every resistor that dissipates power glow orange, bigger and stronger with its power. The
   largest power of the circuit (of the whole run, for a transient) is full brightness, and the glow fades out two
   decades below it, so it shows where the power is lost and, while a transient plays, when.
+- **Logic Lights** fills the box of every logic output that reads 1 in green, as a lit indicator.
 
 ## Terminals
 
