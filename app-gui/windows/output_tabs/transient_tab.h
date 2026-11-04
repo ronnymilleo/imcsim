@@ -34,7 +34,7 @@ public:
     TransientTab(Schematic &schematic, AnalysisControls &controls, TransientPlayback &playback);
 
     void Draw(const FrameResults &frame);
-    PlotSpan GetMeasuredSpan(const Core::Transient &transient) const;
+    PlotSpan GetMeasuredSpan() const;
 
     // Export
     bool CanExport(const FrameResults &frame) const;

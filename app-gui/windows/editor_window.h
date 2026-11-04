@@ -164,6 +164,8 @@ private:
 
     // Frame
     void Draw() override;
+    static ImVec2 GetCanvasSize();
+    void HandleModeKeys();
     void ApplyToolbarRequest(ToolbarRequest request);
     std::optional<TimeSpan> GetWindowSpan() const;
     void DrawTimeBar();

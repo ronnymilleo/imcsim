@@ -141,14 +141,17 @@ void TransientTab::Draw(const FrameResults &frame) {
 
 /**
  * @brief   The span the statistics measure, which the spectrum transforms too.
- * @param[in] transient  The transient shown.
  * @return  The span between the cursors, or what the plot shows, or the whole run before the plot was first drawn,
- *          clipped to the run from the earlier end.
+ *          clipped to the run from the earlier end; an empty span without a transient.
  */
-PlotSpan TransientTab::GetMeasuredSpan(const Core::Transient &transient) const {
+PlotSpan TransientTab::GetMeasuredSpan() const {
+    const auto &transient = m_Schematic.GetTransient();
+    if (!transient || transient->Times.empty()) {
+        return {};
+    }
     const PlotSpan measured = MeasuredSpan(m_Cursors, m_View);
-    const double run_start = transient.Times.front();
-    const double run_stop = transient.Times.back();
+    const double run_start = transient->Times.front();
+    const double run_stop = transient->Times.back();
     const double from = std::max(std::min(measured.From, measured.To), run_start);
     const double to = std::min(std::max(measured.From, measured.To), run_stop);
     if (!(from < to)) {

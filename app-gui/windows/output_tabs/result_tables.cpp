@@ -41,8 +41,6 @@ std::vector<bool> ReadCurrentInputs(const Core::TruthTable &table, const Core::C
     return inputs_high;
 }
 
-} // namespace
-
 /**
  * @brief   Draws the operating point as tables of DC values, one row per node and per current, under its warnings.
  * @param[in] operating_point  The result.
@@ -210,6 +208,44 @@ void DrawTruthTable(const Core::TruthTable &table, Schematic &schematic) {
         }
     }
     ImGui::EndTable();
+}
+
+} // namespace
+
+/**
+ * @brief   Draws the Operating point tab: the table of the last operating point, or how to get one.
+ * @param[in] schematic  The schematic, whose result is shown.
+ */
+void DrawOperatingPointTab(Schematic &schematic) {
+    if (const auto &operating_point = schematic.GetOperatingPoint()) {
+        DrawOperatingPoint(*operating_point, schematic);
+    } else {
+        ImGui::TextDisabled("No operating point for the current circuit; pick it beside Run in the editor");
+    }
+}
+
+/**
+ * @brief   Draws the Transfer function tab: the table of the last transfer function, or how to get one.
+ * @param[in] schematic  The schematic, whose result is shown.
+ */
+void DrawTransferFunctionTab(Schematic &schematic) {
+    if (const auto &transfer = schematic.GetTransferFunction()) {
+        DrawTransferFunction(*transfer, schematic);
+    } else {
+        ImGui::TextDisabled("No transfer function for the current circuit; pick it beside Run in the editor");
+    }
+}
+
+/**
+ * @brief   Draws the Truth table tab: the last truth table, or how to get one.
+ * @param[in] schematic  The schematic, whose result is shown.
+ */
+void DrawTruthTableTab(Schematic &schematic) {
+    if (const auto &truth_table = schematic.GetTruthTable()) {
+        DrawTruthTable(*truth_table, schematic);
+    } else {
+        ImGui::TextDisabled("No truth table for the current circuit; pick it beside Run in the editor");
+    }
 }
 
 } // namespace GUI

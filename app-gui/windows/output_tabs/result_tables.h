@@ -8,14 +8,13 @@
 #define IMCSIM_RESULT_TABLES_H
 
 #include "document/schematic.h"
-#include "simulation/simulation_results.h"
 
 namespace GUI {
 
 // Tables
-void DrawOperatingPoint(const Core::OperatingPoint &operating_point, Schematic &schematic);
-void DrawTransferFunction(const Core::TransferFunction &transfer, Schematic &schematic);
-void DrawTruthTable(const Core::TruthTable &table, Schematic &schematic);
+void DrawOperatingPointTab(Schematic &schematic);
+void DrawTransferFunctionTab(Schematic &schematic);
+void DrawTruthTableTab(Schematic &schematic);
 
 } // namespace GUI
 

@@ -382,11 +382,7 @@ void EditorWindow::Draw() {
     DrawTimeBar();
 
     const ImVec2 origin = ImGui::GetCursorScreenPos();
-    // The status bar takes one line below the canvas
-    ImVec2 size = ImGui::GetContentRegionAvail();
-    size.y -= ImGui::GetTextLineHeightWithSpacing();
-    size.x = std::max(size.x, MIN_CANVAS_SIZE);
-    size.y = std::max(size.y, MIN_CANVAS_SIZE);
+    const ImVec2 size = GetCanvasSize();
     m_View.FrameIfRequested(*m_Schematic, size, m_Preferences.Symbols, m_Preferences.ShowTerminalNumbers);
 
     // The way back from a block sits over the canvas, and takes the clicks that land on it
@@ -431,15 +427,7 @@ void EditorWindow::Draw() {
     DrawMeasurementMarkers(canvas, view, *m_Schematic);
     DrawSelectionBox(draw_list, view);
 
-    if (ImGui::IsWindowFocused() && ImGui::IsKeyPressed(ImGuiKey_W)) {
-        SetMode(WiringMode{});
-    }
-    if (ImGui::IsWindowFocused() && ImGui::IsKeyPressed(ImGuiKey_P)) {
-        SetMode(ProbingMode{});
-    }
-    if (ImGui::IsWindowFocused() && ImGui::IsKeyPressed(ImGuiKey_L) && !ImGui::GetIO().KeyCtrl) {
-        SetMode(PlacingMode{.Type = Core::ComponentType::NET_LABEL});
-    }
+    HandleModeKeys();
     // Previews go over the schematic, so the mode handles its clicks after it is drawn
     std::optional<EditorMode> next =
         std::visit([&](auto &mode) { return HandleMode(mode, canvas, view, hovered); }, m_Mode);
@@ -455,6 +443,33 @@ void EditorWindow::Draw() {
     DrawContextMenu();
     DrawPartPopover();
     m_PopupOpenLastFrame = ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId | ImGuiPopupFlags_AnyPopupLevel);
+}
+
+/**
+ * @brief   The room left for the canvas, less the line of the status bar below it, never smaller than a usable size.
+ */
+ImVec2 EditorWindow::GetCanvasSize() {
+    ImVec2 size = ImGui::GetContentRegionAvail();
+    size.y -= ImGui::GetTextLineHeightWithSpacing();
+    return {std::max(size.x, MIN_CANVAS_SIZE), std::max(size.y, MIN_CANVAS_SIZE)};
+}
+
+/**
+ * @brief   W starts drawing wires, P probing and L placing a net label, while the editor has the focus.
+ */
+void EditorWindow::HandleModeKeys() {
+    if (!ImGui::IsWindowFocused()) {
+        return;
+    }
+    if (ImGui::IsKeyPressed(ImGuiKey_W)) {
+        SetMode(WiringMode{});
+    }
+    if (ImGui::IsKeyPressed(ImGuiKey_P)) {
+        SetMode(ProbingMode{});
+    }
+    if (ImGui::IsKeyPressed(ImGuiKey_L) && !ImGui::GetIO().KeyCtrl) {
+        SetMode(PlacingMode{.Type = Core::ComponentType::NET_LABEL});
+    }
 }
 
 /**

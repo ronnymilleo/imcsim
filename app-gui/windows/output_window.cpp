@@ -345,11 +345,7 @@ void OutputWindow::DrawTabs(const FrameResults &frame) {
         return true;
     };
     if (begin_tab("Operating point", PlotTab::OPERATING_POINT)) {
-        if (const auto &operating_point = m_Schematic.GetOperatingPoint()) {
-            DrawOperatingPoint(*operating_point, m_Schematic);
-        } else {
-            ImGui::TextDisabled("No operating point for the current circuit; pick it beside Run in the editor");
-        }
+        DrawOperatingPointTab(m_Schematic);
         ImGui::EndTabItem();
     }
     if (begin_tab("Transient", PlotTab::TRANSIENT)) {
@@ -358,9 +354,7 @@ void OutputWindow::DrawTabs(const FrameResults &frame) {
     }
     if (begin_tab("Spectrum", PlotTab::SPECTRUM)) {
         // The spectrum goes over the stretch the transient statistics measure
-        const auto &transient = m_Schematic.GetTransient();
-        m_SpectrumTab.Draw(frame, transient && !transient->Times.empty() ? m_TransientTab.GetMeasuredSpan(*transient)
-                                                                         : PlotSpan{});
+        m_SpectrumTab.Draw(frame, m_TransientTab.GetMeasuredSpan());
         ImGui::EndTabItem();
     }
     if (begin_tab("AC sweep", PlotTab::AC_SWEEP)) {
@@ -376,19 +370,11 @@ void OutputWindow::DrawTabs(const FrameResults &frame) {
         ImGui::EndTabItem();
     }
     if (begin_tab("Transfer function", PlotTab::TRANSFER_FUNCTION)) {
-        if (const auto &transfer = m_Schematic.GetTransferFunction()) {
-            DrawTransferFunction(*transfer, m_Schematic);
-        } else {
-            ImGui::TextDisabled("No transfer function for the current circuit; pick it beside Run in the editor");
-        }
+        DrawTransferFunctionTab(m_Schematic);
         ImGui::EndTabItem();
     }
     if (begin_tab("Truth table", PlotTab::TRUTH_TABLE)) {
-        if (const auto &truth_table = m_Schematic.GetTruthTable()) {
-            DrawTruthTable(*truth_table, m_Schematic);
-        } else {
-            ImGui::TextDisabled("No truth table for the current circuit; pick it beside Run in the editor");
-        }
+        DrawTruthTableTab(m_Schematic);
         ImGui::EndTabItem();
     }
 }
