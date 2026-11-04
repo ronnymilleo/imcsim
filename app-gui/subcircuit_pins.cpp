@@ -13,7 +13,7 @@ namespace GUI {
 
 namespace {
 
-// Ground is node 0 when the block has a ground, through a Ground part or a label named 0 or GND
+/// Ground is node 0 when the block has a ground, through a Ground part or a label named 0 or GND.
 constexpr int GROUND_NODE = 0;
 
 } // namespace

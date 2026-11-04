@@ -13,9 +13,9 @@ namespace GUI {
 
 namespace {
 
-// The diamond reaches this far from the middle along both axes
+/// The diamond reaches this far from the middle along both axes.
 constexpr float DIAMOND_RADIUS = 0.8f;
-// Control leads stop short of the diamond, which they do not touch
+/// Control leads stop short of the diamond, which they do not touch.
 constexpr float CONTROL_LEAD_END = -1.2f;
 constexpr float SIGN_HALF_SIZE = 0.15f;
 // Signs inside the diamond, above and below its middle, and beside the control leads

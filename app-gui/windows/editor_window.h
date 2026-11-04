@@ -165,14 +165,14 @@ private:
     std::string m_SubcircuitError;
     bool m_SubcircuitDialogRequested = false;
     std::string m_PlacingSubcircuit;
-    // Imports SPICE libraries and sets up the pins of the blocks they become
+    /// Imports SPICE libraries and sets up the pins of the blocks they become.
     SpiceBlockDialog m_SpiceDialog;
     AnalysisControls &m_Controls;
     AnalysisSettingsPanel &m_SettingsPanel;
     PartEditor &m_PartEditor;
     GlowRenderer &m_GlowRenderer;
     TransientPlayback &m_Playback;
-    // How the schematic is drawn and exported
+    /// How the schematic is drawn and exported.
     const Preferences &m_Preferences;
 
     // Parts of the editor, in the order they are built
@@ -183,9 +183,9 @@ private:
     // result and kept
     std::optional<DisplayedState> m_Displayed;
     std::optional<std::size_t> m_ScaledTransientVersion;
-    // The window of points the scale was worked out over
+    /// The window of points the scale was worked out over.
     PointWindow m_ScaledWindow;
-    // When the heat scale of a transient that is still being made was last worked out
+    /// When the heat scale of a transient that is still being made was last worked out.
     double m_LastScaleTime = 0.0;
     HeatScale m_TransientScale;
 
@@ -193,7 +193,7 @@ private:
     std::optional<Core::ComponentType> m_PlacingType;
     Rotation m_PlacingRotation = Rotation::R0;
     bool m_PlacingMirrored = false;
-    // Part each toolbar group places, the last one picked from its list
+    /// Part each toolbar group places, the last one picked from its list.
     std::vector<Core::ComponentType> m_PartGroupChoices;
     // Part picker: the typed query and the highlighted match
     std::string m_PartQuery;
@@ -204,17 +204,17 @@ private:
     std::optional<GridPoint> m_WireStart;
     bool m_WireVerticalFirst = false;
 
-    // Probing: picks what the plots measure
+    /// Probing: picks what the plots measure.
     bool m_Probing = false;
 
-    // Pasting: what was read from the clipboard, following the cursor until a click places it
+    /// Pasting: what was read from the clipboard, following the cursor until a click places it.
     std::optional<PastedGroup> m_Pasting;
 
     // Selection and dragging
     std::optional<GroupDrag> m_Drag;
     std::optional<SelectionBox> m_Box;
 
-    // Live runs: the push button the mouse holds down
+    /// Live runs: the push button the mouse holds down.
     std::optional<std::size_t> m_HeldButton;
 
     // Properties popover: the corner it hangs from, which side of the part it opens on, and a request from a menu
@@ -224,10 +224,11 @@ private:
     // Context menu: what the right click was on, for its measure item; the part picker it can open
     std::optional<MeasurementTarget> m_ContextTarget;
     bool m_PartPickerRequested = false;
-    // ImGui closes a popup on Esc before the frame starts, so the editor checks the last frame to leave that Esc alone
+    /// ImGui closes a popup on Esc before the frame starts, so the editor checks the last frame to leave that
+    /// Esc alone.
     bool m_PopupOpenLastFrame = false;
 
-    // Menu command waiting for the next Update()
+    /// Menu command waiting for the next Update().
     std::optional<EditorCommand> m_RequestedCommand;
 
     // Frame

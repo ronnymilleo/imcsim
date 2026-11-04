@@ -36,8 +36,8 @@ int CountPins(const Core::SubcircuitInstance &instance, const Core::PinSide side
         instance.GetPins(), [&](const std::string &pin) { return instance.GetPinSide(pin) == side; }));
 }
 
-// The half sizes of the box, in whole units so the terminals land on the grid: tall enough for the pins of the fuller
-// of the left and right edges, wide enough for those of the top and bottom
+/// The half sizes of the box, in whole units so the terminals land on the grid: tall enough for the pins of the fuller
+/// of the left and right edges, wide enough for those of the top and bottom.
 struct BoxSize {
     int HalfWidth = MIN_HALF_WIDTH;
     int HalfHeight = MIN_HALF_HEIGHT;

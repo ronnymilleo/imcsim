@@ -15,9 +15,9 @@
 namespace GUI {
 
 inline constexpr float LINE_THICKNESS = 2.0f;
-// Label font size relative to the zoom (pixels per grid unit)
+/// Label font size relative to the zoom (pixels per grid unit).
 inline constexpr float LABEL_SCALE = 0.7f;
-// Below this font size labels are unreadable
+/// Below this font size labels are unreadable.
 inline constexpr float MIN_LABEL_SIZE = 6.0f;
 
 /**
@@ -29,7 +29,7 @@ struct GridPoint {
     int X = 0;
     int Y = 0;
 
-    // Ordering lets grid points be keys of std::map
+    /// Ordering lets grid points be keys of std::map.
     auto operator<=>(const GridPoint &) const = default;
 };
 

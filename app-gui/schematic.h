@@ -192,9 +192,9 @@ private:
     std::vector<std::unique_ptr<UIElement>> m_Elements;
     std::vector<UIWire> m_Wires;
     std::vector<SavedSubcircuit> m_Subcircuits;
-    // Device models imported from libraries, which diodes and transistors anywhere in the document can use
+    /// Device models imported from libraries, which diodes and transistors anywhere in the document can use.
     std::vector<Core::LibraryModel> m_LibraryModels;
-    // The blocks as the simulator takes them, built once from m_Subcircuits and dropped when it changes
+    /// The blocks as the simulator takes them, built once from m_Subcircuits and dropped when it changes.
     std::optional<std::vector<std::shared_ptr<Core::SubcircuitDefinition>>> m_BuiltSubcircuits;
 
     // Selection; the version changes with every change, so windows can tell even when an index is reused
@@ -223,9 +223,9 @@ private:
     // such as by opening a file or undoing, so the window knows to reload its fields
     SimulationSettings m_SimulationSettings;
     std::size_t m_SimulationSettingsVersion = 0;
-    // Counts the edits that drop the results, so a run that started before one knows its answer is stale
+    /// Counts the edits that drop the results, so a run that started before one knows its answer is stale.
     std::size_t m_CircuitVersion = 0;
-    // Counts the schematics opened or created in place of the content, which edits and undo do not change
+    /// Counts the schematics opened or created in place of the content, which edits and undo do not change.
     std::size_t m_DocumentVersion = 0;
 
     // Document state
@@ -241,7 +241,7 @@ private:
     std::string m_SavedSnapshot;
     std::vector<std::string> m_UndoSnapshots;
     std::vector<std::string> m_RedoSnapshots;
-    // Set by every change and cleared by CommitUndoStep(), so unchanged frames skip taking a snapshot
+    /// Set by every change and cleared by CommitUndoStep(), so unchanged frames skip taking a snapshot.
     bool m_ChangedSinceCommit = false;
 
     // Derived data, dropped on every change: nodes are rebuilt on first use, results by the next simulation
@@ -259,7 +259,7 @@ private:
     // Change with every new result, so windows can tell a rerun from the result they already showed
     std::size_t m_OperatingPointVersion = 0;
     std::size_t m_TransientVersion = 0;
-    // Also counts the chunks added to a transient that is still being made
+    /// Also counts the chunks added to a transient that is still being made.
     std::size_t m_TransientDataVersion = 0;
     std::size_t m_ACSweepVersion = 0;
     std::size_t m_DCSweepVersion = 0;

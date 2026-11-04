@@ -2906,7 +2906,7 @@ TEST_CASE("Gates with three inputs follow their truth tables, an XOR giving odd 
     SKIP_WITHOUT_DIGITAL_MODELS();
     struct GateCase {
         Core::ComponentType Type;
-        // Whether the output is high for 0, 1, 2 and 3 high inputs
+        /// Whether the output is high for 0, 1, 2 and 3 high inputs.
         std::array<bool, 4> HighForCount;
     };
     constexpr std::array<GateCase, 6> CASES = {{{Core::ComponentType::AND, {false, false, false, true}},

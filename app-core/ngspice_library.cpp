@@ -27,13 +27,13 @@ constexpr std::string_view ERROR_PREFIX = "stderr ";
  */
 struct NgspiceState {
     bool Initialized = false;
-    // Set when ngspice asks to quit; the library cannot be used again in this process
+    /// Set when ngspice asks to quit; the library cannot be used again in this process.
     bool Exited = false;
-    // Where the callbacks store printed lines; only set while a run is in progress
+    /// Where the callbacks store printed lines; only set while a run is in progress.
     std::vector<SimulatorMessage> *Messages = nullptr;
-    // Where a build that ships the digital code models keeps digital.cm, when the system ngspice does not load them
+    /// Where a build that ships the digital code models keeps digital.cm, when the system ngspice does not load them.
     std::filesystem::path CodeModelDirectory;
-    // Whether the digital code models are loaded, which the logic parts need; known once ngspice is initialized
+    /// Whether the digital code models are loaded, which the logic parts need; known once ngspice is initialized.
     bool HasDigitalModels = false;
 };
 

@@ -19,9 +19,9 @@ namespace GUI {
 
 namespace {
 
-// Labels sit just outside the tallest two-terminal symbol, which spans y = -0.8 to 0.8
+/// Labels sit just outside the tallest two-terminal symbol, which spans y = -0.8 to 0.8.
 constexpr float LABEL_OFFSET = 1.0f;
-// Room, in grid units, between the symbol bounds and the outline that marks it
+/// Room, in grid units, between the symbol bounds and the outline that marks it.
 constexpr float OUTLINE_PADDING = 0.15f;
 
 } // namespace

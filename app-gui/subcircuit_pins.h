@@ -18,7 +18,7 @@
 
 namespace GUI {
 
-// Every edge of a block's box, in the order the dialogs offer them
+/// Every edge of a block's box, in the order the dialogs offer them.
 inline constexpr auto PIN_SIDES =
     std::to_array({Core::PinSide::LEFT, Core::PinSide::RIGHT, Core::PinSide::TOP, Core::PinSide::BOTTOM});
 

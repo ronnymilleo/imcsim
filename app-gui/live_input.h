@@ -17,7 +17,7 @@
 
 namespace GUI {
 
-// Share of the track one notch of the mouse wheel moves the wiper of a potentiometer
+/// Share of the track one notch of the mouse wheel moves the wiper of a potentiometer.
 inline constexpr double WIPER_STEP = 0.05;
 
 /**

@@ -15,8 +15,8 @@ namespace Core {
 
 namespace {
 
-// Grouped by part, default model first. LEDs are tuned for their forward voltage at 20 mA, Zeners break down at
-// their voltage at 5 mA
+/// Grouped by part, default model first. LEDs are tuned for their forward voltage at 20 mA, Zeners break down at
+/// their voltage at 5 mA.
 constexpr auto DIODE_MODELS = std::to_array<DiodeModel>({
     {"1N4148",
      "Small-signal switching diode, 100 V",

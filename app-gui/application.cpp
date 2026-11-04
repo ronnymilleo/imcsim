@@ -32,7 +32,7 @@ namespace GUI {
 
 namespace {
 
-// Wrap width of the example descriptions, in characters of the current font size
+/// Wrap width of the example descriptions, in characters of the current font size.
 constexpr float EXAMPLE_TOOLTIP_WIDTH = 30.0f;
 
 // Debug builds ask for the validation layers of the GPU API; SDL runs without them when they are not installed

@@ -129,11 +129,11 @@ std::vector<LogicSegment> FindLogicSegments(const std::span<const double> times,
 
 namespace {
 
-// A stretch shorter than this share of the typical one is a glitch, which does not set the width of a cell
+/// A stretch shorter than this share of the typical one is a glitch, which does not set the width of a cell.
 constexpr double GLITCH_SHARE = 0.2;
-// Gaps this close to the shortest are the same width
+/// Gaps this close to the shortest are the same width.
 constexpr double SAME_WIDTH = 1.05;
-// Beyond this many cells in view they would be too narrow to label, so none are listed
+/// Beyond this many cells in view they would be too narrow to label, so none are listed.
 constexpr double MAX_CELLS = 5000.0;
 
 /**
@@ -151,7 +151,7 @@ LogicState ReadStateAt(const std::span<const double> times, const std::span<cons
     return ReadLogicState(voltages[std::min(index, voltages.size() - 1)], logic_level);
 }
 
-// Where the cells start and how wide they are
+/// Where the cells start and how wide they are.
 struct CellGrid {
     double Start = 0.0;
     double Width = 1.0;

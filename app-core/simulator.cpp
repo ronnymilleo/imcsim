@@ -33,8 +33,8 @@ std::optional<std::string> FindProblem(const Circuit &circuit, const std::option
     return FindUnsupported(GetBackend(), circuit, kind);
 }
 
-// The chosen logic inputs as copies that each row of a truth table sets, and the circuit that uses them in place of
-// the originals
+/// The chosen logic inputs as copies that each row of a truth table sets, and the circuit that uses them in place of
+/// the originals.
 struct InputCopies {
     std::vector<LogicInput> Inputs;
     Circuit Simulated;
@@ -85,7 +85,7 @@ bool IsStopped(RunControl *control, const std::size_t done, const std::size_t to
     return false;
 }
 
-// Why the first combination without an operating point failed, and what ngspice printed for it
+/// Why the first combination without an operating point failed, and what ngspice printed for it.
 struct FirstFailure {
     std::optional<std::string> Reason;
     std::vector<SimulatorMessage> Messages;

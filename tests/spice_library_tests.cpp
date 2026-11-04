@@ -25,8 +25,8 @@
 
 namespace {
 
-// A library as vendors write them: upper and lower case, continuations, comments, definitions outside the subcircuits
-// that use them, a subcircuit one uses, a model no one uses, an include and an encrypted model
+/// A library as vendors write them: upper and lower case, continuations, comments, definitions outside the subcircuits
+/// that use them, a subcircuit one uses, a model no one uses, an include and an encrypted model.
 constexpr std::string_view LIBRARY = R"(* Test library
 .param RLOAD=10k
 .SUBCKT DIVIDER IN OUT

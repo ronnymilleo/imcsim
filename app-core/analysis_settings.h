@@ -19,7 +19,7 @@ namespace Core {
  */
 struct TransientSettings {
     double StopTime = 10e-3;
-    // Largest step between output points; ngspice may take smaller ones where the signals change fast
+    /// Largest step between output points; ngspice may take smaller ones where the signals change fast.
     double TimeStep = 10e-6;
 
     bool operator==(const TransientSettings &) const = default;
@@ -115,7 +115,7 @@ struct TruthTableSettings {
     bool operator==(const TruthTableSettings &) const = default;
 };
 
-// Most inputs a truth table varies; each one doubles the number of runs
+/// Most inputs a truth table varies; each one doubles the number of runs.
 inline constexpr std::size_t MAX_TRUTH_TABLE_INPUTS = 10;
 
 } // namespace Core

@@ -18,7 +18,7 @@ namespace {
 constexpr float ARROW_TIP_Y = -0.45f;
 constexpr float ARROW_HEAD_LENGTH = 0.3f;
 constexpr float ARROW_HEAD_HALF_WIDTH = 0.15f;
-// The label hangs below the body
+/// The label hangs below the body.
 constexpr float LABEL_OFFSET_Y = 0.7f;
 
 } // namespace

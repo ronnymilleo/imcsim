@@ -47,7 +47,7 @@ private:
     std::array<ValueField, 3> m_SteppedFields;
     ValueField m_NoiseStartFrequency;
     ValueField m_NoiseStopFrequency;
-    // Start, stop and step of the stepped parameter
+    /// Start, stop and step of the stepped parameter.
     std::array<ValueField, 3> m_ParameterFields;
 
     // Settings fields

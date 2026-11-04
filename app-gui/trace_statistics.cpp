@@ -15,11 +15,11 @@ namespace GUI {
 
 namespace {
 
-// Fraction of the peak-to-peak value the trace must swing back below its mean before another rising crossing
-// counts, as the trigger hysteresis of an oscilloscope, so noise around the mean adds no cycles
+/// Fraction of the peak-to-peak value the trace must swing back below its mean before another rising crossing
+/// counts, as the trigger hysteresis of an oscilloscope, so noise around the mean adds no cycles.
 constexpr double FREQUENCY_HYSTERESIS = 0.1;
 constexpr double CUTOFF_DROP = 3.0;
-// Values this small next to the size of their trace are floating point residue, such as 1e-46 W for a zero
+/// Values this small next to the size of their trace are floating point residue, such as 1e-46 W for a zero.
 constexpr double NEGLIGIBLE_FRACTION = 1e-9;
 
 /**

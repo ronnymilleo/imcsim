@@ -18,11 +18,11 @@ namespace GUI {
 
 namespace {
 
-// A dot is drawn where three or more connections meet, like in most schematic editors
+/// A dot is drawn where three or more connections meet, like in most schematic editors.
 constexpr int MIN_JUNCTION_CONNECTIONS = 3;
-// The nets a label can name to mean ground, in the form nets are compared in
+/// The nets a label can name to mean ground, in the form nets are compared in.
 constexpr std::array<std::string_view, 2> GROUND_NETS = {"0", "gnd"};
-// The net that joins every VCC supply, in the form nets are compared in
+/// The net that joins every VCC supply, in the form nets are compared in.
 constexpr std::string_view SUPPLY_NET = "vcc";
 
 /**
@@ -50,9 +50,9 @@ private:
     std::vector<std::size_t> m_Parents;
 };
 
-// What the terminals and wires of a schematic put on each grid point
+/// What the terminals and wires of a schematic put on each grid point.
 struct PointClasses {
-    // How many connections reach each point; a wire passing through a point counts twice
+    /// How many connections reach each point; a wire passing through a point counts twice.
     std::map<GridPoint, int> ConnectionCount;
     std::vector<GridPoint> GroundPoints;
     std::vector<GridPoint> SupplyPoints;

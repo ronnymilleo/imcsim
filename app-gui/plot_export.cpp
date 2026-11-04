@@ -78,11 +78,11 @@ constexpr double DASH_GAP = 5.0;
 constexpr double LEGEND_SAMPLE = 26.0;
 constexpr double LEGEND_SPACING = 20.0;
 constexpr double MIN_PLOT_SIZE = 40.0;
-// Average advance of a sans-serif character, in font sizes
+/// Average advance of a sans-serif character, in font sizes.
 constexpr double CHARACTER_WIDTH = 0.56;
-// Data range added above and below the traces, as a fraction of it
+/// Data range added above and below the traces, as a fraction of it.
 constexpr double Y_PADDING = 0.08;
-// Samples closer than this to the last one drawn, in pixels, add nothing to the line
+/// Samples closer than this to the last one drawn, in pixels, add nothing to the line.
 constexpr double MIN_POINT_DISTANCE = 0.5;
 
 /**
@@ -287,9 +287,9 @@ struct PanelLayout {
  * @brief   Horizontal room of the Y axes, shared by every panel so their axes line up.
  */
 struct AxisColumns {
-    // Baseline of the name of the left axis, which reads bottom to top
+    /// Baseline of the name of the left axis, which reads bottom to top.
     double LeftNameX = 0.0;
-    // Width of each right axis, from the plot outwards
+    /// Width of each right axis, from the plot outwards.
     std::vector<double> RightWidths;
 };
 

@@ -16,7 +16,7 @@
 
 namespace GUI {
 
-// The operations an operator channel offers, in the order of their buttons
+/// The operations an operator channel offers, in the order of their buttons.
 constexpr auto MATH_OPERATORS = std::to_array<MathOperator>({
     MathOperator::ADD,
     MathOperator::SUBTRACT,

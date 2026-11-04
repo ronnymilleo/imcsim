@@ -22,7 +22,7 @@ struct TraceStatistics {
     double PeakToPeak = 0.0;
     double Mean = 0.0;
     double RMS = 0.0;
-    // No value when the trace does not repeat at least once within the span
+    /// No value when the trace does not repeat at least once within the span.
     std::optional<double> Frequency;
 };
 

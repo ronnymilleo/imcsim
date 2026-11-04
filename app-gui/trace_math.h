@@ -65,7 +65,7 @@ struct MathInstruction {
     Kind Type = Kind::NUMBER;
     double Number = 0.0;
     int Node = 0;
-    // A voltage named by a net label, such as OUT, until ResolveNetNames() turns it into a node
+    /// A voltage named by a net label, such as OUT, until ResolveNetNames() turns it into a node.
     std::string Net;
     std::string Current;
 };
@@ -87,7 +87,7 @@ struct MathResult {
     Dimension Unit;
 };
 
-// Finds the node of a net name, or no value when no label gives that name
+/// Finds the node of a net name, or no value when no label gives that name.
 using NetResolver = std::function<std::optional<int>(std::string_view)>;
 
 std::expected<MathProgram, std::string> CompileExpression(std::string_view text);

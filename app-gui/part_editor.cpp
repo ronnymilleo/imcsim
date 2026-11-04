@@ -29,7 +29,7 @@ bool AnyValue(double /*value*/) {
     return true;
 }
 
-// Custom model parameters beyond this many scroll
+/// Custom model parameters beyond this many scroll.
 constexpr float MAX_VISIBLE_PARAMETERS = 10.0f;
 
 /**
@@ -87,7 +87,7 @@ constexpr auto AM_FIELDS = std::to_array<ParameterField<Core::AMParameters>>({
     {"Delay", &Core::AMParameters::Delay, "s"},
 });
 
-// Labeled with the SPICE parameter names, as datasheet models list them
+/// Labeled with the SPICE parameter names, as datasheet models list them.
 constexpr auto DIODE_FIELDS = std::to_array<ParameterField<Core::DiodeParameters>>({
     {"IS", &Core::DiodeParameters::SaturationCurrent, "A"},
     {"N", &Core::DiodeParameters::EmissionCoefficient, ""},
@@ -135,7 +135,7 @@ constexpr auto MOSFET_FIELDS = std::to_array<ParameterField<Core::MOSFETParamete
     {"P max", &Core::MOSFETParameters::MaxPower, "W"},
 });
 
-// Datasheet specifications, from which the macromodel is built
+/// Datasheet specifications, from which the macromodel is built.
 constexpr auto OP_AMP_FIELDS = std::to_array<ParameterField<Core::OpAmpParameters>>({
     {"Avol", &Core::OpAmpParameters::OpenLoopGainDecibels, "dB"},
     {"GBW", &Core::OpAmpParameters::GainBandwidth, "Hz"},
@@ -176,7 +176,7 @@ constexpr auto LOGIC_FIELDS = std::to_array<ParameterField<Core::LogicParameters
     {"Delay", &Core::LogicParameters::PropagationDelay, "s"},
 });
 
-// A clock picks its own rise and fall times, so the user sets only these figures
+/// A clock picks its own rise and fall times, so the user sets only these figures.
 constexpr auto CLOCK_FIELDS = std::to_array<ParameterField<Core::ClockParameters>>({
     {"Frequency", &Core::ClockParameters::Frequency, "Hz"},
     {"Duty", &Core::ClockParameters::DutyCycle, "%", 100.0},

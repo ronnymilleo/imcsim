@@ -20,7 +20,7 @@
 
 namespace {
 
-// An op-amp as a vendor writes it: numbered ports, documented in a comment
+/// An op-amp as a vendor writes it: numbered ports, documented in a comment.
 constexpr std::string_view OP_AMP_LIBRARY = R"(* connections: non-inverting input
 *              | inverting input
 *              | | positive supply

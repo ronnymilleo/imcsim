@@ -19,7 +19,7 @@ constexpr float BOX_HALF_WIDTH = 0.8f;
 constexpr float BOX_TOP = -2.0f;
 constexpr float BOX_BOTTOM = -LEAD_LENGTH;
 constexpr float LABEL_OFFSET = 0.3f;
-// The digit is the state of the part, so it is larger than the labels, as tall as most of the box
+/// The digit is the state of the part, so it is larger than the labels, as tall as most of the box.
 constexpr float DIGIT_SCALE = 1.0f;
 
 } // namespace

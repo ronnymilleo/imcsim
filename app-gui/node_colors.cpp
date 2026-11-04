@@ -14,7 +14,7 @@ namespace GUI {
 
 namespace {
 
-// Ground (node 0) uses the first one, the others cycle through the rest
+/// Ground (node 0) uses the first one, the others cycle through the rest.
 constexpr auto NODE_COLORS = std::to_array<ImU32>({
     IM_COL32(160, 160, 160, 255),
     IM_COL32(230, 120, 100, 255),
@@ -25,9 +25,9 @@ constexpr auto NODE_COLORS = std::to_array<ImU32>({
     IM_COL32(240, 150, 200, 255),
 });
 
-// Heat scale, the same in every theme, from the lowest value to the highest: blue, cyan, yellow, red. Each
-// neighbor pair blends without passing through gray or a dark purple, and every stop stays clear on dark and light
-// canvases alike
+/// Heat scale, the same in every theme, from the lowest value to the highest: blue, cyan, yellow, red. Each
+/// neighbor pair blends without passing through gray or a dark purple, and every stop stays clear on dark and light
+/// canvases alike.
 constexpr auto HEAT_STOPS = std::to_array<ImVec4>({
     {60.0f / 255.0f, 120.0f / 255.0f, 255.0f / 255.0f, 1.0f},
     {0.0f / 255.0f, 190.0f / 255.0f, 210.0f / 255.0f, 1.0f},

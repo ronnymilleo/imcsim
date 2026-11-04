@@ -13,9 +13,9 @@ namespace GUI {
 
 namespace {
 
-// ImGui sizes a font by its full height, from ascent to descent; SVG and CSS by its em square, which is smaller.
-// Common sans fonts span about 1.33 em (Noto Sans 1.36, Inter 1.21, DejaVu Sans 1.16), so this keeps exported text
-// close to the size it has on screen
+/// ImGui sizes a font by its full height, from ascent to descent; SVG and CSS by its em square, which is smaller.
+/// Common sans fonts span about 1.33 em (Noto Sans 1.36, Inter 1.21, DejaVu Sans 1.16), so this keeps exported text
+/// close to the size it has on screen.
 constexpr float IM_GUI_TO_SVG_FONT_SIZE = 0.75f;
 
 SvgPoint ToSvg(const ImVec2 point) {

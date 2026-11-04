@@ -25,7 +25,7 @@ namespace GUI {
 
 namespace {
 
-// Older steps are dropped beyond this, so a long session does not keep growing
+/// Older steps are dropped beyond this, so a long session does not keep growing.
 constexpr std::size_t MAX_UNDO_STEPS = 100;
 
 std::expected<void, std::string> ValidateMetadata(const std::vector<SavedSubcircuitPin> &pins,

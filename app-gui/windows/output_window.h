@@ -89,7 +89,7 @@ private:
         std::optional<StepFamily<Core::Transient>> StepWindows;
         std::vector<MathTrace> TransientMath;
         std::vector<std::string> TransientErrors;
-        // One list of channels per curve of the DC sweep
+        /// One list of channels per curve of the DC sweep.
         std::vector<std::vector<MathTrace>> DCSweepMath;
         std::vector<std::string> DCSweepErrors;
         bool AnythingMeasured = false;
@@ -109,7 +109,7 @@ private:
     Schematic &m_Schematic;
     AnalysisControls &m_Controls;
     TransientPlayback &m_Playback;
-    // Whether a new result brings the window to the front
+    /// Whether a new result brings the window to the front.
     const Preferences &m_Preferences;
     // What each plot showed last frame, so its axes fit for a new result and when its traces change
     TraceFitState m_TransientFit;
@@ -120,15 +120,15 @@ private:
     PlotCursors m_ACSweepCursors;
     PlotCursors m_DCSweepCursors;
     PlotSpan m_TransientView;
-    // The data version of the transient drawn last frame, to fit the axes as a run that is still going on grows
+    /// The data version of the transient drawn last frame, to fit the axes as a run that is still going on grows.
     std::size_t m_DrawnTransientDataVersion = 0;
-    // The window the plot drew last frame, so a window that moved or changed size fits the axes
+    /// The window the plot drew last frame, so a window that moved or changed size fits the axes.
     PointWindow m_DrawnWindow;
-    // Over the whole run, or none while it grows; the plot of a run in progress evaluates the window instead
+    /// Over the whole run, or none while it grows; the plot of a run in progress evaluates the window instead.
     std::optional<FullMath> m_FullMath;
-    // Whether the signals of logic parts get a lane each, in a plot of their own under the analog one
+    /// Whether the signals of logic parts get a lane each, in a plot of their own under the analog one.
     bool m_ShowLogicLanes = true;
-    // Whether each steady stretch of a lane is labeled 0, 1 or X
+    /// Whether each steady stretch of a lane is labeled 0, 1 or X.
     bool m_ShowBitValues = false;
     PlotSpan m_ACSweepView{.From = 1.0, .To = 1e6};
     // Spectrum of the transient: its window and frequency scale, its visible range and the last spectra computed
@@ -138,9 +138,9 @@ private:
     std::optional<TransientSpectra> m_Spectra;
     bool m_SpectraChanged = false;
     MathChannels m_MathChannels;
-    // The tab shown this frame, which Export saves
+    /// The tab shown this frame, which Export saves.
     PlotTab m_ShownTab = PlotTab::TRANSIENT;
-    // Tab to bring to the front on the next frame, after a new result
+    /// Tab to bring to the front on the next frame, after a new result.
     std::optional<PlotTab> m_TabToShow;
     PlotSpan m_DCSweepView;
     // Noise: the result its axes were fitted to, its visible range and the parts whose share it plots

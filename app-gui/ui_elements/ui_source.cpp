@@ -17,15 +17,15 @@ namespace GUI {
 
 namespace {
 
-// The default leads end at x = -1 and x = 1, so a short segment reaches the circle
+/// The default leads end at x = -1 and x = 1, so a short segment reaches the circle.
 constexpr float LEAD_END = 1.0f;
 constexpr int SINE_SEGMENT_COUNT = 16;
 constexpr float WAVE_HALF_WIDTH = 0.5f;
 constexpr float WAVE_AMPLITUDE = 0.3f;
-// The pulse stays high for the middle half of the box the waves are drawn in
+/// The pulse stays high for the middle half of the box the waves are drawn in.
 constexpr float PULSE_HALF_WIDTH = 0.25f;
-// The circle reaches 0.8 from the center, so the labels start a little further out than those of other
-// two-terminal symbols, which would touch it
+/// The circle reaches 0.8 from the center, so the labels start a little further out than those of other
+/// two-terminal symbols, which would touch it.
 constexpr float LABEL_OFFSET = 1.25f;
 
 /**

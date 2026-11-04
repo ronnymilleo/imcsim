@@ -115,7 +115,7 @@ private:
     Core::SimulationService m_Service;
     std::optional<Analysis> m_RunningAnalysis;
     std::size_t m_RunCircuitVersion = 0;
-    // Run asked for while a paused live run held the worker, which starts once that run has ended
+    /// Run asked for while a paused live run held the worker, which starts once that run has ended.
     bool m_IsRunPending = false;
 
     // Whether the next transient runs live, whether the run in progress does, and whether the transient on display
@@ -124,7 +124,7 @@ private:
     bool m_IsLiveRun = false;
     bool m_IsLiveResult = false;
 
-    // Last run of each analysis, in the order of the Analysis enum
+    /// Last run of each analysis, in the order of the Analysis enum.
     std::array<RunStatus, ANALYSIS_COUNT> m_Statuses;
     std::optional<Analysis> m_LastRun;
 

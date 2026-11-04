@@ -14,7 +14,7 @@
 
 namespace GUI {
 
-// A resistor reaches full brightness at the largest power of the circuit and fades out this many decades below it
+/// A resistor reaches full brightness at the largest power of the circuit and fades out this many decades below it.
 inline constexpr double HEAT_GLOW_DECADES = 2.0;
 
 /**

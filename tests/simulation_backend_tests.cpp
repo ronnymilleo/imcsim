@@ -26,7 +26,7 @@ namespace {
 constexpr double HIGH_LEVEL = 5.0;
 const std::string NO_LOGIC_REASON = "The fake backend has no logic parts";
 
-// Records what it is asked and answers with fixed results, so the tests see what the simulator hands to a backend
+/// Records what it is asked and answers with fixed results, so the tests see what the simulator hands to a backend.
 class FakeBackend : public Core::SimulationBackend {
 public:
     explicit FakeBackend(Core::BackendCapabilities capabilities) : m_Capabilities(std::move(capabilities)) {}
@@ -92,7 +92,7 @@ private:
     Core::BackendCapabilities m_Capabilities;
 };
 
-// Puts a fake backend in use for one test and goes back to ngspice at the end
+/// Puts a fake backend in use for one test and goes back to ngspice at the end.
 class BackendInUse {
 public:
     explicit BackendInUse(Core::BackendCapabilities capabilities) {
@@ -119,7 +119,7 @@ Core::BackendCapabilities AllAnalysesWithoutLogicParts() {
     return capabilities;
 }
 
-// A 5 V source across a 1k resistor to ground
+/// A 5 V source across a 1k resistor to ground.
 struct SourceAndResistor {
     Core::VoltageSource Source;
     Core::Resistor Load;

@@ -30,7 +30,7 @@ constexpr ImVec2 CONTROL_PLUS_SIGN = {-1.7f, -1.4f};
 constexpr ImVec2 CONTROL_MINUS_SIGN = {-1.7f, 1.4f};
 constexpr float DASH_LENGTH = 0.2f;
 constexpr float DASH_GAP = 0.15f;
-// Where the dashed line reaches the lever
+/// Where the dashed line reaches the lever.
 constexpr float LINK_END_X = 0.25f;
 constexpr float LABEL_OFFSET_X = 1.1f;
 constexpr float LABEL_OFFSET_Y = 0.5f;

@@ -46,13 +46,13 @@ private:
     bool m_Closable;
     ImGuiWindowFlags m_WindowFlags;
     bool m_IsOpen = true;
-    // Brings the window to the front on its next Render(), as the selected tab when docked
+    /// Brings the window to the front on its next Render(), as the selected tab when docked.
     bool m_FocusRequested = false;
-    // Opened by OpenBehind(): appears without taking the focus, and behind the selected tab when docked
+    /// Opened by OpenBehind(): appears without taking the focus, and behind the selected tab when docked.
     bool m_AppearBehind = false;
-    // A dot beside the title or tab, for something new the user has not seen yet
+    /// A dot beside the title or tab, for something new the user has not seen yet.
     bool m_NewContentMarker = false;
-    // In font sizes; only used the first time the window appears, before imgui.ini remembers it
+    /// In font sizes; only used the first time the window appears, before imgui.ini remembers it.
     std::optional<ImVec2> m_InitialSize;
 };
 

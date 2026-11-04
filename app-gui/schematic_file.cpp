@@ -48,7 +48,7 @@ template <typename Parameters> struct ParameterKey {
     double Parameters::*Value;
 };
 
-// The sine keys sit in the element object itself, where the first files with AC sources put them
+/// The sine keys sit in the element object itself, where the first files with AC sources put them.
 constexpr auto AC_KEYS = std::to_array<ParameterKey<Core::ACParameters>>({
     {"amplitude", &Core::ACParameters::Amplitude},
     {"frequency", &Core::ACParameters::Frequency},
@@ -103,7 +103,7 @@ constexpr auto PULSE_KEYS = std::to_array<ParameterKey<Core::PulseParameters>>({
     {"period", &Core::PulseParameters::Period},
 });
 
-// Named after the SPICE EXP parameters
+/// Named after the SPICE EXP parameters.
 constexpr auto EXP_KEYS = std::to_array<ParameterKey<Core::EXPParameters>>({
     {"v1", &Core::EXPParameters::InitialValue},
     {"v2", &Core::EXPParameters::PeakValue},
@@ -129,7 +129,7 @@ constexpr auto AM_KEYS = std::to_array<ParameterKey<Core::AMParameters>>({
     {"delay", &Core::AMParameters::Delay},
 });
 
-// Named after the SPICE diode parameters
+/// Named after the SPICE diode parameters.
 constexpr auto DIODE_KEYS = std::to_array<ParameterKey<Core::DiodeParameters>>({
     {"is", &Core::DiodeParameters::SaturationCurrent},
     {"n", &Core::DiodeParameters::EmissionCoefficient},
@@ -196,7 +196,7 @@ constexpr auto TRANSIENT_KEYS = std::to_array<ParameterKey<Core::TransientSettin
     {"step", &Core::TransientSettings::TimeStep},
 });
 
-// The points per decade are an integer, so they are written and read apart
+/// The points per decade are an integer, so they are written and read apart.
 constexpr auto AC_SWEEP_KEYS = std::to_array<ParameterKey<Core::ACSweepSettings>>({
     {"start", &Core::ACSweepSettings::StartFrequency},
     {"stop", &Core::ACSweepSettings::StopFrequency},
@@ -990,7 +990,7 @@ nlohmann::json WriteSweepRange(const Core::SweepRange &range) {
     return object;
 }
 
-// File names of the analyses, in the order of the Analysis enum
+/// File names of the analyses, in the order of the Analysis enum.
 constexpr auto ANALYSIS_KEYS = std::to_array<std::string_view>(
     {"operating_point", "transient", "ac_sweep", "dc_sweep", "noise", "transfer_function", "truth_table"});
 

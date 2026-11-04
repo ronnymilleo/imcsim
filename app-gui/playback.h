@@ -10,7 +10,7 @@
 
 namespace GUI {
 
-// Seconds a whole window takes to play, whatever its length
+/// Seconds a whole window takes to play, whatever its length.
 inline constexpr double PLAYBACK_SECONDS = 5.0;
 
 /**

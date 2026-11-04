@@ -88,7 +88,7 @@ public:
     std::string GetSpiceModelName() const;
 
 private:
-    // Null when the transistor uses its custom parameters
+    /// Null when the transistor uses its custom parameters.
     const BJTModel *m_Model;
     BJTParameters m_CustomParameters;
 };

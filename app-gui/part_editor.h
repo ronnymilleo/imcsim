@@ -62,12 +62,12 @@ public:
 
 private:
     Schematic *m_Schematic;
-    // The standard series that resistors, capacitors and inductors take their values from
+    /// The standard series that resistors, capacitors and inductors take their values from.
     const Preferences &m_Preferences;
     // Texts being edited, and the selection they were loaded from
     std::optional<std::size_t> m_LoadedSelection;
     ValueField m_Value;
-    // Voltage a capacitor or current an inductor starts a transient from; empty when none is set
+    /// Voltage a capacitor or current an inductor starts a transient from; empty when none is set.
     ValueField m_InitialCondition;
     // The net name being typed for a net label, and whether the next Draw() focuses it
     std::array<char, 40> m_Net{};
@@ -79,7 +79,7 @@ private:
     std::array<ValueField, 6> m_EXPFields;
     std::array<ValueField, 5> m_SFFMFields;
     std::array<ValueField, 5> m_AMFields;
-    // The "time value" points of a PWL source being typed, as long as the user wants them
+    /// The "time value" points of a PWL source being typed, as long as the user wants them.
     std::string m_PWLText;
     // One per member of the parameters of custom diodes and transistors
     std::array<ValueField, 9> m_DiodeFields;
@@ -89,15 +89,15 @@ private:
     // One per member of Core::SwitchParameters and Core::RelayParameters
     std::array<ValueField, 4> m_SwitchFields;
     std::array<ValueField, 5> m_RelayFields;
-    // One per member of Core::TransformerParameters
+    /// One per member of Core::TransformerParameters.
     std::array<ValueField, 3> m_TransformerFields;
-    // One per member of Core::LogicParameters
+    /// One per member of Core::LogicParameters.
     std::array<ValueField, 2> m_LogicFields;
     // One per member of Core::ClockParameters and Core::LogicInputParameters
     std::array<ValueField, 4> m_ClockFields;
     std::array<ValueField, 1> m_LogicInputFields;
     std::vector<ValueField> m_SubcircuitFields;
-    // Parameters of the block being edited, which a resistor, capacitor or inductor can take its value from
+    /// Parameters of the block being edited, which a resistor, capacitor or inductor can take its value from.
     std::vector<std::string> m_BlockParameters;
 
     void LoadFields(const Core::Component &component);

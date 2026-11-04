@@ -12,12 +12,12 @@ namespace GUI {
 
 namespace {
 
-// The fonts the application itself prefers, then common fallbacks; the viewer picks the first it has
+/// The fonts the application itself prefers, then common fallbacks; the viewer picks the first it has.
 constexpr std::string_view FONT_FAMILY =
     "Inter, 'Noto Sans', 'DejaVu Sans', 'Liberation Sans', Helvetica, Arial, sans-serif";
 
-// Trace colors are picked for a dark screen; on white, the lighter ones (yellow, pale gray) are darkened to this
-// relative luminance so they stay readable in print
+/// Trace colors are picked for a dark screen; on white, the lighter ones (yellow, pale gray) are darkened to this
+/// relative luminance so they stay readable in print.
 constexpr double MAX_PRINT_LUMINANCE = 0.5;
 
 std::string FormatColor(const ExportColor color) {

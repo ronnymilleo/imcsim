@@ -76,7 +76,7 @@ const std::vector<double> &GetMantissas(const ValueSeries series) {
     return free;
 }
 
-// A value of a series: the decade it is in (the power of ten) and which mantissa of the decade
+/// A value of a series: the decade it is in (the power of ten) and which mantissa of the decade.
 struct Position {
     int Decade = 0;
     std::size_t Index = 0;

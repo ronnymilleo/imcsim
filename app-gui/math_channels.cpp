@@ -18,7 +18,7 @@ namespace GUI {
 
 namespace {
 
-// Math channels take their own colors, apart from those of nodes and currents
+/// Math channels take their own colors, apart from those of nodes and currents.
 constexpr auto MATH_COLORS = std::to_array<ImU32>({
     IM_COL32(230, 110, 230, 255),
     IM_COL32(150, 230, 90, 255),

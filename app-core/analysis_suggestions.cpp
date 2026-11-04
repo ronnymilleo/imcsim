@@ -23,8 +23,8 @@ namespace {
 // A transient shows this many periods of the slowest source, with this many points in a period of the fastest
 constexpr double SUGGESTED_PERIODS = 5.0;
 constexpr double POINTS_PER_PERIOD = 200.0;
-// A waveform that happens once, such as an exponential or piecewise linear one, shows its whole span with this much
-// room after it
+/// A waveform that happens once, such as an exponential or piecewise linear one, shows its whole span with this much
+/// room after it.
 constexpr double ONE_SHOT_MARGIN = 1.2;
 // The AC sweep reaches two decades past the lowest and the highest frequency the parts set
 constexpr double AC_MARGIN_DECADES = 2.0;
@@ -95,8 +95,8 @@ std::vector<double> ListCharacteristicFrequencies(const Circuit &circuit) {
     return frequencies;
 }
 
-// What the sources of a circuit say about time: the periods of the repeating waveforms, the spans of those that
-// happen once, and the longest delay before a waveform starts
+/// What the sources of a circuit say about time: the periods of the repeating waveforms, the spans of those that
+/// happen once, and the longest delay before a waveform starts.
 struct Waveforms {
     std::vector<double> Periods;
     std::vector<double> Spans;

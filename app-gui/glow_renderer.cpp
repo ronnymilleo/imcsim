@@ -18,7 +18,7 @@ namespace GUI {
 
 namespace {
 
-// Side of the falloff texture, in texels; the glow is smooth, so a small texture scales up without steps
+/// Side of the falloff texture, in texels; the glow is smooth, so a small texture scales up without steps.
 constexpr std::uint32_t TEXTURE_SIZE = 64;
 // The falloff is a broad halo plus a narrow core, so a glow looks hot in the middle. The core width is a fraction of
 // the radius and the weights add up to 1, the alpha at the center

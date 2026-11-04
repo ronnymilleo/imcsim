@@ -27,7 +27,7 @@ constexpr float BUBBLE_RADIUS = 0.3f;
 // How far the back of an OR gate curves in, and how far the second curve of an XOR gate is from the first
 constexpr float OR_BACK_DEPTH = 0.5f;
 constexpr float XOR_GAP = 0.35f;
-// Exponent of the curve from the back corner of an OR gate to its tip
+/// Exponent of the curve from the back corner of an OR gate to its tip.
 constexpr float OR_SIDE_EXPONENT = 2.2f;
 constexpr int CURVE_SEGMENTS = 12;
 constexpr float TRIANGLE_HALF_HEIGHT = 1.3f;

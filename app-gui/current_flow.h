@@ -29,7 +29,7 @@ struct WireCurrent {
     double Current = 0.0;
 };
 
-// Currents span decades, so the heat scale is logarithmic and shows this many below the largest current
+/// Currents span decades, so the heat scale is logarithmic and shows this many below the largest current.
 inline constexpr double CURRENT_DECADES = 4.0;
 
 std::optional<double> GetTerminalCurrent(const Core::Component &component, std::size_t terminal,

@@ -14,7 +14,7 @@ namespace GUI {
 
 namespace {
 
-// The two samples around an instant and how far the instant is from the first to the second
+/// The two samples around an instant and how far the instant is from the first to the second.
 struct Bracket {
     std::size_t Before = 0;
     std::size_t After = 0;

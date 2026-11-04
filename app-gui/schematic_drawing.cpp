@@ -22,7 +22,7 @@ namespace GUI {
 
 namespace {
 
-// Space between a measurement marker and the near edge of its label, in pixels
+/// Space between a measurement marker and the near edge of its label, in pixels.
 constexpr float MARKER_LABEL_GAP = 4.0f;
 // Voltage dots follow the zoom like the rest of the drawing: 4 pixels at the default zoom
 constexpr float VOLTAGE_DOT_SCALE = 0.2f;
@@ -50,12 +50,12 @@ constexpr float EXPORT_TERMINAL_RING_SCALE = 0.125f;
 constexpr float MIN_TERMINAL_RING_RADIUS = 2.5f;
 constexpr float TERMINAL_RING_THICKNESS = 1.5f;
 
-// The export draws at the default zoom of the editor, so it looks like the circuit on screen; the image is vector,
-// so it scales from there
+/// The export draws at the default zoom of the editor, so it looks like the circuit on screen; the image is vector,
+/// so it scales from there.
 constexpr float EXPORT_ZOOM = 20.0f;
-// Room around the circuit, in pixels
+/// Room around the circuit, in pixels.
 constexpr float EXPORT_MARGIN = 16.0f;
-// Junction dots as the editor draws them at the default zoom
+/// Junction dots as the editor draws them at the default zoom.
 constexpr float JUNCTION_RADIUS = 3.0f;
 // Symbols and wires are black on white for print; probes keep the colors of their traces
 constexpr ImU32 PRINT_LINE_COLOR = IM_COL32(30, 30, 30, 255);

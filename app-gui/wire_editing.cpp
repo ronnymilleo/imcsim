@@ -121,7 +121,7 @@ bool TryMergeOnce(std::vector<UIWire> &wires, const std::vector<GridPoint> &term
     return false;
 }
 
-// The wires that stay and the wires that move
+/// The wires that stay and the wires that move.
 struct SplitWires {
     std::vector<UIWire> Staying;
     std::vector<UIWire> Carried;

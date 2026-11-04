@@ -26,7 +26,7 @@ struct ClipArea {
     ImVec2 Max;
 };
 
-// Large enough that the tests of the dash pattern clip nothing
+/// Large enough that the tests of the dash pattern clip nothing.
 constexpr ClipArea WIDE_AREA = {{-1000.0f, -1000.0f}, {1000.0f, 1000.0f}};
 
 } // namespace

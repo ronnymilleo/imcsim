@@ -23,7 +23,7 @@ namespace {
 
 using namespace std::chrono_literals;
 
-// The longest a test waits for a run before it calls it lost
+/// The longest a test waits for a run before it calls it lost.
 constexpr auto WAIT_LIMIT = 20s;
 
 /**

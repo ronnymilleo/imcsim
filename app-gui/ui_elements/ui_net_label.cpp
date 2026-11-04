@@ -19,7 +19,7 @@ namespace {
 constexpr float LEAD_LENGTH = 0.7f;
 constexpr float CIRCLE_RADIUS = 0.4f;
 constexpr float CIRCLE_TOP = LEAD_LENGTH + 2.0f * CIRCLE_RADIUS;
-// The name starts a little past the top of the circle
+/// The name starts a little past the top of the circle.
 constexpr float LABEL_OFFSET = CIRCLE_TOP + 0.2f;
 
 } // namespace

@@ -47,8 +47,8 @@ private:
     ClockParameters m_Parameters;
 };
 
-// Rise and fall time of a clock, each as a share of the period; the part picks these so the shape is the same at
-// every frequency and the user never has to set them
+/// Rise and fall time of a clock, each as a share of the period; the part picks these so the shape is the same at
+/// every frequency and the user never has to set them.
 inline constexpr double CLOCK_EDGE_FRACTION = 1e-3;
 
 } // namespace Core

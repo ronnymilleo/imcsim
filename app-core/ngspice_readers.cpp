@@ -26,7 +26,7 @@ namespace Core {
 
 namespace {
 
-// 1e-15 V is -300 dB
+/// 1e-15 V is -300 dB.
 constexpr double MIN_MAGNITUDE = 1e-15;
 
 /**

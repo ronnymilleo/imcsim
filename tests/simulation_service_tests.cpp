@@ -27,7 +27,7 @@ namespace {
 
 using namespace std::chrono_literals;
 
-// The longest a test waits for the worker before it calls the job lost
+/// The longest a test waits for the worker before it calls the job lost.
 constexpr auto WAIT_LIMIT = 10s;
 
 /**

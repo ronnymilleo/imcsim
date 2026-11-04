@@ -34,9 +34,9 @@ struct PointTransform {
     };
 
     Kind Type = Kind::TRANSLATE;
-    // How far a translation moves points
+    /// How far a translation moves points.
     GridPoint Delta;
-    // The point the other kinds turn or mirror about
+    /// The point the other kinds turn or mirror about.
     GridPoint Pivot;
 
     GridPoint Apply(GridPoint point) const;

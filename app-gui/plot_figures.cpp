@@ -22,9 +22,9 @@ namespace GUI {
 
 namespace {
 
-// The share of the time an export shows that a cell needs for its bit label
+/// The share of the time an export shows that a cell needs for its bit label.
 constexpr double MIN_BIT_LABEL_SHARE = 0.03;
-// Gain from the input source to the output below which the input-referred noise is left out: -120 dB
+/// Gain from the input source to the output below which the input-referred noise is left out: -120 dB.
 constexpr double MIN_INPUT_GAIN = 1e-6;
 
 ExportColor ToExportColor(const ImU32 color) {

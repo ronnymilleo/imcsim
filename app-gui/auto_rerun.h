@@ -19,16 +19,16 @@ struct AutoRerunFrame {
     // The user's preferences: whether to run again, and how long an edit must settle first
     bool IsEnabled = false;
     double SettleSeconds = 0.0;
-    // Seconds on any clock that only goes forward
+    /// Seconds on any clock that only goes forward.
     double Time = 0.0;
     // Change with each edit that drops the results, and with each schematic opened or created
     std::size_t CircuitVersion = 0;
     std::size_t DocumentVersion = 0;
-    // The selected analysis has a result or an error to follow, or is running
+    /// The selected analysis has a result or an error to follow, or is running.
     bool HasRunToFollow = false;
-    // A field is being typed in or something is being dragged, so the edit is not over yet
+    /// A field is being typed in or something is being dragged, so the edit is not over yet.
     bool IsEditing = false;
-    // A run is in progress or ending, or the next run would be a live one, which follows edits by itself
+    /// A run is in progress or ending, or the next run would be a live one, which follows edits by itself.
     bool IsRunBlocked = false;
 };
 
@@ -49,7 +49,7 @@ private:
     std::optional<std::size_t> m_SeenCircuitVersion;
     std::optional<std::size_t> m_SeenDocumentVersion;
     bool m_IsFollowing = false;
-    // Time of the last edit while a run is due
+    /// Time of the last edit while a run is due.
     std::optional<double> m_DueSince;
 };
 

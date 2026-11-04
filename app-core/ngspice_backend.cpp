@@ -84,17 +84,17 @@ void RaiseEventBreakpoint() {
     SendCommand("remcirc");
 }
 
-// A chunk of a transient aims at this much wall time: long enough that the commands between chunks are a small part of
-// it, short enough that a stop or a screen update waits little
+/// A chunk of a transient aims at this much wall time: long enough that the commands between chunks are a small part of
+/// it, short enough that a stop or a screen update waits little.
 constexpr double TARGET_CHUNK_SECONDS = 0.03;
-// The first chunk is this share of the stop time, to learn how fast the circuit goes
+/// The first chunk is this share of the stop time, to learn how fast the circuit goes.
 constexpr double FIRST_CHUNK_SHARE = 0.01;
-// A run has ended when its last point is this close to the stop time, which ngspice lands on exactly
+/// A run has ended when its last point is this close to the stop time, which ngspice lands on exactly.
 constexpr double COMPLETE_SHARE = 1.0 - 1e-9;
-// A live run that is ahead of the clock waits in slices this long, so a stop waits little
+/// A live run that is ahead of the clock waits in slices this long, so a stop waits little.
 constexpr std::chrono::duration<double> PACE_WAIT_SLICE{0.01};
-// A live run further behind the clock than one chunk drops the delay instead of making it up; smaller delays, such as
-// the oversleep of a wait, are made up, so they do not add up over a long run
+/// A live run further behind the clock than one chunk drops the delay instead of making it up; smaller delays, such as
+/// the oversleep of a wait, are made up, so they do not add up over a long run.
 constexpr std::chrono::duration<double> LIVE_CATCH_UP_LIMIT{TARGET_CHUNK_SECONDS};
 
 /**

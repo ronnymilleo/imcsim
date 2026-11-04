@@ -43,9 +43,9 @@ public:
 
 private:
     std::map<GridPoint, int> m_NodeOfPoint;
-    // Name of the first label, in grid order, on each labeled node
+    /// Name of the first label, in grid order, on each labeled node.
     std::map<int, std::string> m_NetOfNode;
-    // Node of every label name, compared without regard to case
+    /// Node of every label name, compared without regard to case.
     std::map<std::string, int, std::less<>> m_NodeOfNet;
     std::vector<GridPoint> m_Junctions;
 };

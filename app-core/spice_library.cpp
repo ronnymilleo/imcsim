@@ -20,14 +20,14 @@ namespace Core {
 
 namespace {
 
-// A statement of the file: its physical lines, continuations included, and the same text as one line without comments
+/// A statement of the file: its physical lines, continuations included, and the same text as one line without comments.
 struct Statement {
     std::size_t FirstLine = 0;
     std::size_t LastLine = 0;
     std::string Logical;
 };
 
-// A definition the file makes outside any subcircuit, which a subcircuit may use by name
+/// A definition the file makes outside any subcircuit, which a subcircuit may use by name.
 struct Definition {
     std::size_t Order = 0;
     std::string Text;
@@ -38,7 +38,7 @@ struct Scale {
     double Factor;
 };
 
-// SPICE scale suffixes, matched without regard to case; "meg" and "mil" come before "m", which is milli
+/// SPICE scale suffixes, matched without regard to case; "meg" and "mil" come before "m", which is milli.
 constexpr auto SCALES = std::to_array<Scale>({{"meg", 1e6},
                                               {"mil", 25.4e-6},
                                               {"t", 1e12},
@@ -50,7 +50,7 @@ constexpr auto SCALES = std::to_array<Scale>({{"meg", 1e6},
                                               {"p", 1e-12},
                                               {"f", 1e-15}});
 
-// What vendors write around encrypted models, which no other simulator can read
+/// What vendors write around encrypted models, which no other simulator can read.
 constexpr auto ENCRYPTION_MARKERS = std::to_array<std::string_view>({"$cdnencstart", "pspice_encrypted"});
 
 std::string ToLower(const std::string_view text) {
@@ -286,8 +286,8 @@ bool IsInclusion(const std::string_view directive) {
     return directive == ".include" || directive == ".inc" || directive == ".lib";
 }
 
-// What the first pass over a library finds: where each subcircuit outside any other starts and ends, as indices of its
-// statements, and the definitions outside the subcircuits that one may use
+/// What the first pass over a library finds: where each subcircuit outside any other starts and ends, as indices of its
+/// statements, and the definitions outside the subcircuits that one may use.
 struct LibraryScan {
     std::vector<std::string> Lines;
     std::vector<Statement> Statements;

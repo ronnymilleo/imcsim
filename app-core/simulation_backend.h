@@ -44,7 +44,7 @@ enum class AnalysisKind {
  */
 struct BackendCapabilities {
     std::set<AnalysisKind> Analyses;
-    // Parts the backend cannot simulate, each with the reason shown to the user
+    /// Parts the backend cannot simulate, each with the reason shown to the user.
     std::map<ComponentType, std::string> UnsupportedParts;
 };
 
@@ -58,11 +58,11 @@ struct BackendCapabilities {
  * between stretches. A backend that cannot split the run ignores the monitor.
  */
 struct RunMonitor {
-    // Where to look for a stop request and to report the share of the stop time reached, or null
+    /// Where to look for a stop request and to report the share of the stop time reached, or null.
     RunControl *Control = nullptr;
-    // Receives the points made since the last call, from the worker thread, or empty
+    /// Receives the points made since the last call, from the worker thread, or empty.
     std::function<void(Transient)> OnChunk;
-    // Simulated seconds a live run covers per second of the clock, or 0 to run as fast as the backend goes
+    /// Simulated seconds a live run covers per second of the clock, or 0 to run as fast as the backend goes.
     double LivePace = 0.0;
 };
 

@@ -16,9 +16,9 @@ namespace GUI {
 
 namespace {
 
-// In font sizes, before imgui.ini remembers the size the user gave it
+/// In font sizes, before imgui.ini remembers the size the user gave it.
 constexpr ImVec2 INITIAL_SIZE = {30.0f, 40.0f};
-// Width of the column that names each choice, in font sizes
+/// Width of the column that names each choice, in font sizes.
 constexpr float LABEL_COLUMN_WIDTH = 12.0f;
 constexpr auto VALUE_SERIES =
     std::to_array({Core::ValueSeries::FREE, Core::ValueSeries::E6, Core::ValueSeries::E12, Core::ValueSeries::E24,

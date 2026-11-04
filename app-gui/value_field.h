@@ -20,9 +20,9 @@ namespace GUI {
  * @details An empty field means the value is not set; editing the field to empty clears it.
  */
 struct OptionalValueEdit {
-    // New value; empty when the field was cleared
+    /// New value; empty when the field was cleared.
     std::optional<double> Value;
-    // Whether the user edited the field this frame
+    /// Whether the user edited the field this frame.
     bool Changed = false;
 };
 
@@ -55,7 +55,7 @@ private:
     // move after it once the input is active
     std::optional<char> m_TypingStart;
     bool m_CursorToEnd = false;
-    // Whether the next Draw() focuses the input again, after a step rewrote its text
+    /// Whether the next Draw() focuses the input again, after a step rewrote its text.
     bool m_RefocusInput = false;
 };
 

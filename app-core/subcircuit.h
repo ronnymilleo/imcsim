@@ -60,7 +60,7 @@ struct SubcircuitDefinition {
     std::vector<SubcircuitPin> Pins;
     std::vector<SubcircuitParameter> Parameters;
     Circuit Body;
-    // Set for a block kept as SPICE text, whose pins then have no node in Body, which stays empty
+    /// Set for a block kept as SPICE text, whose pins then have no node in Body, which stays empty.
     std::optional<SubcircuitText> Spice;
 };
 

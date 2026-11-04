@@ -33,16 +33,16 @@ constexpr const char *IDEAL_CLAMP_MODEL_PARAMETERS = "IS=1e-15 N=0.01";
 // Boyle macromodel: fixed elements, as in the original paper and the LTC models
 constexpr double COMPENSATION_CAPACITANCE = 30e-12;
 constexpr double GAIN_STAGE_RESISTANCE = 100e3;
-// The tail resistance sets the common-mode output impedance of the input pair, from a 200 V Early voltage
+/// The tail resistance sets the common-mode output impedance of the input pair, from a 200 V Early voltage.
 constexpr double TAIL_EARLY_VOLTAGE = 200.0;
-// kT/q at 27 degrees Celsius, the temperature ngspice simulates at
+/// kT/q at 27 degrees Celsius, the temperature ngspice simulates at.
 constexpr double THERMAL_VOLTAGE = 0.025852;
 constexpr double INPUT_SATURATION_CURRENT = 8e-16;
 // The output current flows through this sense resistance; past the short-circuit current, the voltage across it
 // amplified to this threshold turns on the current-limit diodes
 constexpr double OUTPUT_SENSE_RESISTANCE = 1.0;
 constexpr double CURRENT_LIMIT_THRESHOLD = 0.853;
-// Two limiter diodes in series drop this much at the limit, so the swing limit sources add it to the headroom
+/// Two limiter diodes in series drop this much at the limit, so the swing limit sources add it to the headroom.
 constexpr double LIMITER_DIODE_DROPS = 1.3831;
 
 constexpr auto MODELS = std::to_array<OpAmpModel>({

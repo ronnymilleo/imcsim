@@ -56,7 +56,7 @@ inline constexpr double LANE_STRIDE = 1.5;
 inline constexpr double LANE_LOW_OFFSET = 0.0;
 inline constexpr double LANE_UNKNOWN_OFFSET = 0.5;
 inline constexpr double LANE_HIGH_OFFSET = 1.0;
-// Room above and below the stack of lanes, in lane units
+/// Room above and below the stack of lanes, in lane units.
 inline constexpr double LANE_MARGIN = 0.3;
 
 LogicState ReadLogicState(double voltage, double logic_level);

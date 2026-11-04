@@ -40,20 +40,20 @@ namespace GUI {
 namespace {
 
 constexpr float MIN_CANVAS_SIZE = 50.0f;
-// Below this spacing the dots are thinned out, otherwise far zoom-out draws hundreds of thousands of them
+/// Below this spacing the dots are thinned out, otherwise far zoom-out draws hundreds of thousands of them.
 constexpr float MIN_DOT_SPACING = 8.0f;
 constexpr float WIRE_CURSOR_HALF_SIZE = 4.0f;
-// How close, in pixels, the cursor must be to a wire to select it
+/// How close, in pixels, the cursor must be to a wire to select it.
 constexpr float WIRE_PICK_DISTANCE = 5.0f;
 // Junction dot radius relative to the zoom, with a minimum so it stays visible when zoomed out
 constexpr float JUNCTION_RADIUS_SCALE = 0.15f;
 constexpr float MIN_JUNCTION_RADIUS = 2.5f;
-// Voltage labels sit just above and right of their point, clear of the line
+/// Voltage labels sit just above and right of their point, clear of the line.
 constexpr ImVec2 VOLTAGE_LABEL_OFFSET = {4.0f, -16.0f};
-// The time slider of a transient does not shrink below this, in pixels, so it stays usable in a narrow window
+/// The time slider of a transient does not shrink below this, in pixels, so it stays usable in a narrow window.
 constexpr float MIN_TIME_SLIDER_WIDTH = 80.0f;
-// The instant readout keeps the width of its widest text, so the slider does not resize as the digits change: four
-// significant digits with a suffix are at most this wide
+/// The instant readout keeps the width of its widest text, so the slider does not resize as the digits change: four
+/// significant digits with a suffix are at most this wide.
 constexpr const char *WIDEST_TIME_READOUT = "t = 888.8ms / 888.8ms";
 // Heat legend, in font sizes, at the bottom left of the canvas
 constexpr float LEGEND_WIDTH = 10.0f;
@@ -111,15 +111,15 @@ constexpr auto SUPPLY_PARTS =
     std::to_array({Core::ComponentType::GROUND, Core::ComponentType::VCC, Core::ComponentType::NET_LABEL,
                    Core::ComponentType::PIN, Core::ComponentType::LOGIC_INPUT});
 
-// The edge choice of a block pin, this many font sizes wide
+/// The edge choice of a block pin, this many font sizes wide.
 constexpr float PIN_SIDE_FIELD_WIDTH = 6.0f;
 // Toolbar buttons are square, this many frame heights wide; icons fill this share of them
 constexpr float TOOL_BUTTON_SCALE = 1.4f;
 constexpr float ICON_SCALE = 0.7f;
-// How often the heat scale of a transient that is still being made is worked out again, in seconds
+/// How often the heat scale of a transient that is still being made is worked out again, in seconds.
 constexpr double SCALE_REFRESH_SECONDS = 0.5;
 
-// The dropdown arrow beside a group button, in frame heights
+/// The dropdown arrow beside a group button, in frame heights.
 constexpr float DROPDOWN_BUTTON_SCALE = 0.6f;
 
 /**
@@ -146,7 +146,7 @@ struct IconPlacement {
     ImVec2 Center;
     float Size;
     ImU32 Color;
-    // -1 mirrors the icon horizontally, for Redo
+    /// -1 mirrors the icon horizontally, for Redo.
     float Flip;
 
     ImVec2 Point(const float x, const float y) const { return Center + ImVec2(x * Flip, y) * Size; }
@@ -288,7 +288,7 @@ struct RunStatusLine {
     std::string Text;
     ImVec4 Color;
     bool IsRunning = false;
-    // Text as wide as the line can get, whose width it keeps so it does not shift as its figures change, or empty
+    /// Text as wide as the line can get, whose width it keeps so it does not shift as its figures change, or empty.
     std::string_view WidestText;
 };
 

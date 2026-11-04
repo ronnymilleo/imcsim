@@ -49,9 +49,9 @@ struct ExportAxis {
     std::string Unit;
     bool UsesPrefixes = true;
     bool Logarithmic = false;
-    // Empty: round ticks across the range of the samples, or decades on a logarithmic axis
+    /// Empty: round ticks across the range of the samples, or decades on a logarithmic axis.
     std::vector<ExportTick> Ticks;
-    // Empty: the range of the samples, with some room
+    /// Empty: the range of the samples, with some room.
     std::optional<ExportRange> Range;
 };
 
@@ -60,15 +60,15 @@ struct ExportAxis {
  * @brief   One trace of a panel, sampled at the X values of its figure.
  */
 struct ExportSeries {
-    // Heads its CSV column, with the unit of its axis
+    /// Heads its CSV column, with the unit of its axis.
     std::string Name;
-    // Empty: no legend entry, as for the second and later curves of a DC sweep family
+    /// Empty: no legend entry, as for the second and later curves of a DC sweep family.
     std::string LegendLabel;
     std::vector<double> Values;
-    // Empty: the CSV lists the values. Otherwise it lists these, for values that only stand for something, such as
-    // the heights of a logic signal in its lane standing for its voltages
+    /// Empty: the CSV lists the values. Otherwise it lists these, for values that only stand for something, such as
+    /// the heights of a logic signal in its lane standing for its voltages.
     std::vector<double> Samples;
-    // Index in the Y axes of the panel
+    /// Index in the Y axes of the panel.
     std::size_t Axis = 0;
     ExportColor Color;
     bool Dashed = false;
@@ -84,7 +84,7 @@ struct ExportNote {
     double Y = 0.0;
     std::size_t Axis = 0;
     std::string Text;
-    // Centered on its point instead of beside it, as the bit labels of a logic lane are
+    /// Centered on its point instead of beside it, as the bit labels of a logic lane are.
     bool Centered = false;
 };
 
@@ -107,7 +107,7 @@ struct ExportFigure {
     ExportAxis XAxis;
     bool XLogarithmic = false;
     std::vector<double> Xs;
-    // Empty: the whole X data
+    /// Empty: the whole X data.
     std::optional<ExportRange> XRange;
     std::vector<ExportPanel> Panels;
 };

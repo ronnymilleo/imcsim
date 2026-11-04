@@ -17,7 +17,7 @@ namespace {
 
 constexpr float LEAD_LENGTH = 1.0f;
 constexpr float BAR_HALF_WIDTH = 0.6f;
-// The label starts a little past the bar
+/// The label starts a little past the bar.
 constexpr float LABEL_OFFSET = 1.2f;
 
 } // namespace

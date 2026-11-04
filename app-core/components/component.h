@@ -126,11 +126,11 @@ protected:
     ComponentType m_Type{};
     std::string m_Name;
     double m_Value = 0.0;
-    // A parameter reference such as {RESISTANCE}; only meaningful inside a subcircuit definition
+    /// A parameter reference such as {RESISTANCE}; only meaningful inside a subcircuit definition.
     std::optional<std::string> m_ValueExpression;
-    // Name of the library model a diode or a transistor uses instead of a ready or custom one; empty for none
+    /// Name of the library model a diode or a transistor uses instead of a ready or custom one; empty for none.
     std::string m_LibraryModel;
-    // Voltage a capacitor starts charged to or current an inductor starts carrying; only these kinds carry one
+    /// Voltage a capacitor starts charged to or current an inductor starts carrying; only these kinds carry one.
     std::optional<double> m_InitialCondition;
 };
 

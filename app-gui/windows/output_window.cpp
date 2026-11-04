@@ -33,29 +33,29 @@ namespace GUI {
 
 namespace {
 
-// In font sizes, so the layout follows the DPI scale
+/// In font sizes, so the layout follows the DPI scale.
 constexpr float MIN_PLOT_HEIGHT = 12.0f;
 // Width of the field for the size of the window, in font sizes, and how many points a pixel of dragging adds
 constexpr float WINDOW_SIZE_WIDTH = 8.0f;
 constexpr float WINDOW_SIZE_DRAG_SPEED = 20.0f;
 constexpr float TRACE_LIST_WIDTH = 8.0f;
 constexpr ImVec2 INITIAL_SIZE = {65.0f, 35.0f};
-// ImPlot adds half of it on each side, so 0.4 leaves 20% of the data range above and below the curves
+/// ImPlot adds half of it on each side, so 0.4 leaves 20% of the data range above and below the curves.
 constexpr ImVec2 FIT_PADDING = {0.0f, 0.4f};
 // Current dashes, in font sizes
 constexpr float DASH_LENGTH = 0.5f;
 constexpr float DASH_GAP = 0.3f;
 constexpr float DASH_WEIGHT = 1.5f;
-// Width of the statistics panel, in font sizes
+/// Width of the statistics panel, in font sizes.
 constexpr float STATISTICS_WIDTH = 15.0f;
 // Cursors A and B are placed at these fractions of the visible range when turned on
 constexpr double CURSOR_A_PLACEMENT = 1.0 / 3.0;
 constexpr double CURSOR_B_PLACEMENT = 2.0 / 3.0;
 constexpr ImU32 CURSOR_A_COLOR = IM_COL32(255, 199, 77, 255);
 constexpr ImU32 CURSOR_B_COLOR = IM_COL32(115, 204, 255, 255);
-// The instant of the transient shown on the schematic
+/// The instant of the transient shown on the schematic.
 constexpr ImU32 PLAYHEAD_COLOR = IM_COL32(255, 96, 96, 255);
-// Math channels are drawn with a heavier line than the traces they come from
+/// Math channels are drawn with a heavier line than the traces they come from.
 constexpr float MATH_LINE_WEIGHT = 2.0f;
 // The plot of logic lanes: its height is a margin for the axis and a row per lane, in font sizes, and at most this
 // share of the room
@@ -66,7 +66,7 @@ constexpr float MAX_LANE_SHARE = 0.6f;
 constexpr float BIT_BOX_PADDING = 0.25f;
 constexpr float BIT_BOX_ROUNDING = 3.0f;
 constexpr const char *EXPORT_LABEL = "Export...";
-// A new result starts with empty plots until the user picks what to measure
+/// A new result starts with empty plots until the user picks what to measure.
 constexpr const char *NOTHING_MEASURED =
     "Nothing is measured yet: pick nodes and parts with Probe in the editor, or check traces in the list";
 // The harmonics the spectrum measures, and how many the plot shows when it fits: a linear axis spans them, plus one
@@ -74,16 +74,16 @@ constexpr const char *NOTHING_MEASURED =
 constexpr int HIGHEST_HARMONIC = 10;
 constexpr float HARMONIC_MARKER_SIZE = 3.0f;
 constexpr double MIN_SHOWN_DISTORTION_PERCENT = 0.001;
-// The other steps of a stepped run are drawn this opaque, behind the shown step
+/// The other steps of a stepped run are drawn this opaque, behind the shown step.
 constexpr float OTHER_STEP_ALPHA = 0.35f;
-// Samples on each side of a step label over which the curves must stay apart
+/// Samples on each side of a step label over which the curves must stay apart.
 constexpr std::size_t STEADY_SAMPLES = 2;
-// Six decades below the largest density, about where the share of a part stops mattering
+/// Six decades below the largest density, about where the share of a part stops mattering.
 constexpr double DECADE_FIT_FLOOR = 1e-6;
-// The first bins above 0 Hz, where the Hann window spreads the mean
+/// The first bins above 0 Hz, where the Hann window spreads the mean.
 constexpr std::ptrdiff_t SPECTRUM_SKIRT_BINS = 2;
-// ngspice reports an open path with a resistance around 1e20 ohm, which no readable suffix shows; it is drawn as an
-// open circuit instead
+/// ngspice reports an open path with a resistance around 1e20 ohm, which no readable suffix shows; it is drawn as an
+/// open circuit instead.
 constexpr double OPEN_RESISTANCE = 1e15;
 
 /**
@@ -95,7 +95,7 @@ struct PlottedTrace {
     const std::vector<double> *Values;
     const char *Unit;
     ImU32 Color;
-    // Set for the lane of a logic signal, whose readout gives its logic state too
+    /// Set for the lane of a logic signal, whose readout gives its logic state too.
     std::optional<double> LogicLevel = std::nullopt;
 };
 

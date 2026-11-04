@@ -48,7 +48,7 @@ private:
     SDL_GPUDevice *m_Device = nullptr;
     SDL_GPUGraphicsPipeline *m_Pipeline = nullptr;
     SDL_GPUTexture *m_Texture = nullptr;
-    // Only set while the application renders the draw data, the only time the callbacks run
+    /// Only set while the application renders the draw data, the only time the callbacks run.
     SDL_GPURenderPass *m_RenderPass = nullptr;
 
     int CreatePipeline(SDL_GPUTextureFormat target_format);

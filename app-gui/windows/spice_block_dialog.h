@@ -51,7 +51,7 @@ private:
         SETTINGS
     };
 
-    // A subcircuit of the library and what the user chose for it
+    /// A subcircuit of the library and what the user chose for it.
     struct Choice {
         Core::LibrarySubcircuit Subcircuit;
         bool IsChosen = false;
@@ -67,7 +67,7 @@ private:
     std::vector<std::string> m_Warnings;
     std::vector<Choice> m_Choices;
     std::vector<Core::LibraryModel> m_Models;
-    // One per model, whether it is picked; not a vector<bool>, which ImGui cannot point at
+    /// One per model, whether it is picked; not a vector<bool>, which ImGui cannot point at.
     std::vector<char> m_AreModelsChosen;
 
     // Settings
