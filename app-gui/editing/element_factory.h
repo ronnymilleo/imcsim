@@ -10,6 +10,7 @@
 #include "helpers.h"
 #include "ui_elements/ui_element.h"
 #include <memory>
+#include <string>
 #include <string_view>
 #include <vector>
 
@@ -20,6 +21,7 @@ std::unique_ptr<UIElement> CreateElement(Core::ComponentType type, GridPoint pos
 // Part names, as menus, tooltips and the part search show them
 const char *GetPartName(Core::ComponentType type);
 std::vector<Core::ComponentType> FindParts(std::string_view query);
+std::string NormalizeSearchText(std::string_view text);
 
 } // namespace GUI
 

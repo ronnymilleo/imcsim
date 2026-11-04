@@ -89,19 +89,6 @@ constexpr auto PARTS = std::to_array<PartInfo>({
     {Core::ComponentType::LOGIC_INPUT, "Logic input"},
 });
 
-/**
- * @brief   Lowercase letters and digits only, so "opamp" finds "Op-amp" and "vcc" finds "VCC supply".
- */
-std::string NormalizeSearchText(const std::string_view text) {
-    std::string normalized;
-    for (const char character : text) {
-        if (std::isalnum(static_cast<unsigned char>(character)) != 0) {
-            normalized += static_cast<char>(std::tolower(static_cast<unsigned char>(character)));
-        }
-    }
-    return normalized;
-}
-
 } // namespace
 
 /**
@@ -208,6 +195,21 @@ std::vector<Core::ComponentType> FindParts(const std::string_view query) {
         }
     }
     return found;
+}
+
+/**
+ * @brief   Reduces a name or a query to what a search compares.
+ * @param[in] text  A name or what the user typed.
+ * @return  Its letters and digits only, in lowercase, so "opamp" finds "Op-amp" and "vcc" finds "VCC supply".
+ */
+std::string NormalizeSearchText(const std::string_view text) {
+    std::string normalized;
+    for (const char character : text) {
+        if (std::isalnum(static_cast<unsigned char>(character)) != 0) {
+            normalized += static_cast<char>(std::tolower(static_cast<unsigned char>(character)));
+        }
+    }
+    return normalized;
 }
 
 } // namespace GUI

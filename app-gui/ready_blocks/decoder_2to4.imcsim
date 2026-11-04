@@ -1,0 +1,654 @@
+{
+ "format": "imcsim-schematic",
+ "version": 1,
+ "elements": [
+  {
+   "type": "Subcircuit",
+   "definition": "DECODER_2TO4",
+   "name": "X1",
+   "rotation": 0,
+   "x": 0,
+   "y": 0
+  }
+ ],
+ "wires": [],
+ "subcircuits": [
+  {
+   "name": "DECODER_2TO4",
+   "parameters": [],
+   "pins": [
+    {
+     "name": "A0",
+     "point": [
+      0,
+      0
+     ]
+    },
+    {
+     "name": "A1",
+     "point": [
+      0,
+      2
+     ]
+    },
+    {
+     "name": "EN",
+     "point": [
+      0,
+      4
+     ]
+    },
+    {
+     "name": "Y0",
+     "point": [
+      44,
+      0
+     ]
+    },
+    {
+     "name": "Y1",
+     "point": [
+      44,
+      2
+     ]
+    },
+    {
+     "name": "Y2",
+     "point": [
+      44,
+      4
+     ]
+    },
+    {
+     "name": "Y3",
+     "point": [
+      44,
+      6
+     ]
+    }
+   ],
+   "wires": [
+    {
+     "start": [
+      0,
+      0
+     ],
+     "end": [
+      1,
+      0
+     ]
+    },
+    {
+     "start": [
+      0,
+      2
+     ],
+     "end": [
+      1,
+      2
+     ]
+    },
+    {
+     "start": [
+      0,
+      4
+     ],
+     "end": [
+      1,
+      4
+     ]
+    },
+    {
+     "start": [
+      11,
+      8
+     ],
+     "end": [
+      10,
+      8
+     ]
+    },
+    {
+     "start": [
+      17,
+      8
+     ],
+     "end": [
+      18,
+      8
+     ]
+    },
+    {
+     "start": [
+      11,
+      14
+     ],
+     "end": [
+      10,
+      14
+     ]
+    },
+    {
+     "start": [
+      17,
+      14
+     ],
+     "end": [
+      18,
+      14
+     ]
+    },
+    {
+     "start": [
+      27,
+      -1
+     ],
+     "end": [
+      26,
+      -1
+     ]
+    },
+    {
+     "start": [
+      27,
+      1
+     ],
+     "end": [
+      26,
+      1
+     ]
+    },
+    {
+     "start": [
+      27,
+      3
+     ],
+     "end": [
+      26,
+      3
+     ]
+    },
+    {
+     "start": [
+      33,
+      1
+     ],
+     "end": [
+      34,
+      1
+     ]
+    },
+    {
+     "start": [
+      27,
+      9
+     ],
+     "end": [
+      26,
+      9
+     ]
+    },
+    {
+     "start": [
+      27,
+      11
+     ],
+     "end": [
+      26,
+      11
+     ]
+    },
+    {
+     "start": [
+      27,
+      13
+     ],
+     "end": [
+      26,
+      13
+     ]
+    },
+    {
+     "start": [
+      33,
+      11
+     ],
+     "end": [
+      34,
+      11
+     ]
+    },
+    {
+     "start": [
+      27,
+      19
+     ],
+     "end": [
+      26,
+      19
+     ]
+    },
+    {
+     "start": [
+      27,
+      21
+     ],
+     "end": [
+      26,
+      21
+     ]
+    },
+    {
+     "start": [
+      27,
+      23
+     ],
+     "end": [
+      26,
+      23
+     ]
+    },
+    {
+     "start": [
+      33,
+      21
+     ],
+     "end": [
+      34,
+      21
+     ]
+    },
+    {
+     "start": [
+      27,
+      29
+     ],
+     "end": [
+      26,
+      29
+     ]
+    },
+    {
+     "start": [
+      27,
+      31
+     ],
+     "end": [
+      26,
+      31
+     ]
+    },
+    {
+     "start": [
+      27,
+      33
+     ],
+     "end": [
+      26,
+      33
+     ]
+    },
+    {
+     "start": [
+      33,
+      31
+     ],
+     "end": [
+      34,
+      31
+     ]
+    },
+    {
+     "start": [
+      44,
+      0
+     ],
+     "end": [
+      43,
+      0
+     ]
+    },
+    {
+     "start": [
+      44,
+      2
+     ],
+     "end": [
+      43,
+      2
+     ]
+    },
+    {
+     "start": [
+      44,
+      4
+     ],
+     "end": [
+      43,
+      4
+     ]
+    },
+    {
+     "start": [
+      44,
+      6
+     ],
+     "end": [
+      43,
+      6
+     ]
+    }
+   ],
+   "elements": [
+    {
+     "type": "Pin",
+     "net": "A0",
+     "rotation": 0,
+     "x": 0,
+     "y": 0
+    },
+    {
+     "type": "NetLabel",
+     "net": "A0",
+     "rotation": 90,
+     "x": 1,
+     "y": 0
+    },
+    {
+     "type": "Pin",
+     "net": "A1",
+     "rotation": 0,
+     "x": 0,
+     "y": 2
+    },
+    {
+     "type": "NetLabel",
+     "net": "A1",
+     "rotation": 90,
+     "x": 1,
+     "y": 2
+    },
+    {
+     "type": "Pin",
+     "net": "EN",
+     "rotation": 0,
+     "x": 0,
+     "y": 4
+    },
+    {
+     "type": "NetLabel",
+     "net": "EN",
+     "rotation": 90,
+     "x": 1,
+     "y": 4
+    },
+    {
+     "type": "Not",
+     "name": "U1",
+     "rotation": 0,
+     "x": 14,
+     "y": 8,
+     "parameters": {
+      "logic_level": 5.0,
+      "propagation_delay": 1e-08
+     }
+    },
+    {
+     "type": "NetLabel",
+     "net": "A0",
+     "rotation": 270,
+     "x": 10,
+     "y": 8
+    },
+    {
+     "type": "NetLabel",
+     "net": "A0N",
+     "rotation": 90,
+     "x": 18,
+     "y": 8
+    },
+    {
+     "type": "Not",
+     "name": "U2",
+     "rotation": 0,
+     "x": 14,
+     "y": 14,
+     "parameters": {
+      "logic_level": 5.0,
+      "propagation_delay": 1e-08
+     }
+    },
+    {
+     "type": "NetLabel",
+     "net": "A1",
+     "rotation": 270,
+     "x": 10,
+     "y": 14
+    },
+    {
+     "type": "NetLabel",
+     "net": "A1N",
+     "rotation": 90,
+     "x": 18,
+     "y": 14
+    },
+    {
+     "type": "And",
+     "name": "U3",
+     "rotation": 0,
+     "x": 30,
+     "y": 0,
+     "parameters": {
+      "logic_level": 5.0,
+      "propagation_delay": 1e-08
+     },
+     "inputs": 3
+    },
+    {
+     "type": "NetLabel",
+     "net": "A1N",
+     "rotation": 270,
+     "x": 26,
+     "y": -1
+    },
+    {
+     "type": "NetLabel",
+     "net": "A0N",
+     "rotation": 270,
+     "x": 26,
+     "y": 1
+    },
+    {
+     "type": "NetLabel",
+     "net": "EN",
+     "rotation": 270,
+     "x": 26,
+     "y": 3
+    },
+    {
+     "type": "NetLabel",
+     "net": "Y0",
+     "rotation": 90,
+     "x": 34,
+     "y": 1
+    },
+    {
+     "type": "And",
+     "name": "U4",
+     "rotation": 0,
+     "x": 30,
+     "y": 10,
+     "parameters": {
+      "logic_level": 5.0,
+      "propagation_delay": 1e-08
+     },
+     "inputs": 3
+    },
+    {
+     "type": "NetLabel",
+     "net": "A1N",
+     "rotation": 270,
+     "x": 26,
+     "y": 9
+    },
+    {
+     "type": "NetLabel",
+     "net": "A0",
+     "rotation": 270,
+     "x": 26,
+     "y": 11
+    },
+    {
+     "type": "NetLabel",
+     "net": "EN",
+     "rotation": 270,
+     "x": 26,
+     "y": 13
+    },
+    {
+     "type": "NetLabel",
+     "net": "Y1",
+     "rotation": 90,
+     "x": 34,
+     "y": 11
+    },
+    {
+     "type": "And",
+     "name": "U5",
+     "rotation": 0,
+     "x": 30,
+     "y": 20,
+     "parameters": {
+      "logic_level": 5.0,
+      "propagation_delay": 1e-08
+     },
+     "inputs": 3
+    },
+    {
+     "type": "NetLabel",
+     "net": "A1",
+     "rotation": 270,
+     "x": 26,
+     "y": 19
+    },
+    {
+     "type": "NetLabel",
+     "net": "A0N",
+     "rotation": 270,
+     "x": 26,
+     "y": 21
+    },
+    {
+     "type": "NetLabel",
+     "net": "EN",
+     "rotation": 270,
+     "x": 26,
+     "y": 23
+    },
+    {
+     "type": "NetLabel",
+     "net": "Y2",
+     "rotation": 90,
+     "x": 34,
+     "y": 21
+    },
+    {
+     "type": "And",
+     "name": "U6",
+     "rotation": 0,
+     "x": 30,
+     "y": 30,
+     "parameters": {
+      "logic_level": 5.0,
+      "propagation_delay": 1e-08
+     },
+     "inputs": 3
+    },
+    {
+     "type": "NetLabel",
+     "net": "A1",
+     "rotation": 270,
+     "x": 26,
+     "y": 29
+    },
+    {
+     "type": "NetLabel",
+     "net": "A0",
+     "rotation": 270,
+     "x": 26,
+     "y": 31
+    },
+    {
+     "type": "NetLabel",
+     "net": "EN",
+     "rotation": 270,
+     "x": 26,
+     "y": 33
+    },
+    {
+     "type": "NetLabel",
+     "net": "Y3",
+     "rotation": 90,
+     "x": 34,
+     "y": 31
+    },
+    {
+     "type": "Pin",
+     "net": "Y0",
+     "rotation": 180,
+     "x": 44,
+     "y": 0
+    },
+    {
+     "type": "NetLabel",
+     "net": "Y0",
+     "rotation": 270,
+     "x": 43,
+     "y": 0
+    },
+    {
+     "type": "Pin",
+     "net": "Y1",
+     "rotation": 180,
+     "x": 44,
+     "y": 2
+    },
+    {
+     "type": "NetLabel",
+     "net": "Y1",
+     "rotation": 270,
+     "x": 43,
+     "y": 2
+    },
+    {
+     "type": "Pin",
+     "net": "Y2",
+     "rotation": 180,
+     "x": 44,
+     "y": 4
+    },
+    {
+     "type": "NetLabel",
+     "net": "Y2",
+     "rotation": 270,
+     "x": 43,
+     "y": 4
+    },
+    {
+     "type": "Pin",
+     "net": "Y3",
+     "rotation": 180,
+     "x": 44,
+     "y": 6
+    },
+    {
+     "type": "NetLabel",
+     "net": "Y3",
+     "rotation": 270,
+     "x": 43,
+     "y": 6
+    }
+   ]
+  }
+ ]
+}

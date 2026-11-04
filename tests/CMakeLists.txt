@@ -39,6 +39,7 @@ add_executable(imcsim-tests
             preferences_tests.cpp
             probing_tests.cpp
             schematic_canvas_tests.cpp
+            ready_blocks_tests.cpp
             schematic_file_tests.cpp
             schematic_tests.cpp
             selection_tests.cpp

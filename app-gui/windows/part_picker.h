@@ -6,6 +6,7 @@
 #ifndef IMCSIM_PART_PICKER_H
 #define IMCSIM_PART_PICKER_H
 
+#include "document/ready_blocks.h"
 #include "document/schematic_file.h"
 #include "editing/editor_mode.h"
 #include "preferences.h"
@@ -26,19 +27,20 @@ public:
     explicit PartPicker(const Preferences &preferences);
 
     void RequestOpen();
-    std::optional<PlacingMode> Draw(const std::vector<const SavedSubcircuit *> &blocks);
+    std::optional<EditorMode> Draw(const std::vector<const SavedSubcircuit *> &blocks);
 
 private:
     /**
      * @struct  PartMatches
-     * @brief   What the query finds: the parts first, then the blocks of the document.
+     * @brief   What the query finds: the parts first, then the ready blocks, then the blocks of the document.
      */
     struct PartMatches {
         std::vector<Core::ComponentType> Parts;
+        std::vector<const ReadyBlock *> ReadyBlocks;
         std::vector<const SavedSubcircuit *> Blocks;
 
         std::size_t GetCount() const;
-        PlacingMode Get(std::size_t index) const;
+        std::optional<EditorMode> Get(std::size_t index) const;
     };
 
     /// The symbol standard of the part icons.
@@ -53,7 +55,8 @@ private:
     static PartMatches FindMatches(const std::string &query, const std::vector<const SavedSubcircuit *> &blocks);
     void OpenIfAsked();
     bool MoveHighlight(std::size_t match_count);
-    std::optional<PlacingMode> DrawMatches(const PartMatches &matches, bool moved);
+    std::optional<EditorMode> DrawMatches(const PartMatches &matches, bool moved);
+    bool DrawMatchRow(const PartMatches &matches, std::size_t index, bool is_highlighted, float width);
 };
 
 } // namespace GUI
