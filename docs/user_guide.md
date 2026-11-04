@@ -188,6 +188,13 @@ schematic file keeps the definition of each block, so it opens anywhere without 
   block to go one level down; the path leads back up a level at a time, each one applied on the way. A block can never
   hold itself, directly or through another block: the part search leaves those out, and a paste or an apply that would
   make one is refused.
+- **Ready logic blocks**: the part search also offers four blocks built from the gates and flip-flops, listed as
+  `Logic block: ...`: a 4-bit counter (a ripple counter whose Q3 Q2 Q1 Q0 count the rising edges of CLK), a 4-bit
+  shift register (each rising edge of CLK moves IN into Q0 and each Q on), a 4-to-1 multiplexer (Y follows the input
+  that S1 S0 select) and a 2-to-4 decoder (with EN high, the output that A1 A0 select is high). RESET clears the
+  counter and the shift register. Hovering one in the list tells what it does. Placed, it joins the schematic as any
+  block does, so it can be opened to see its gates and changed there. Their logic level is 5 V, and a circuit of them,
+  clocks and logic inputs needs no Ground part, as loose gates do not.
 - **SPICE libraries**: File > Import SPICE Library reads a vendor's `.lib`, `.mod`, `.sub` or `.cir` file and lists its
   subcircuits and its diode and transistor models.
   - A picked subcircuit becomes a block kept as SPICE text: imcsim simulates its text as it came, with the `.model`,
