@@ -6,6 +6,7 @@
 #include "document/schematic.h"
 
 #include "components/component.h"
+#include "components/controlled_source.h"
 #include "components/net_label.h"
 #include "components/subcircuit.h"
 #include "document/block_nesting.h"
@@ -14,6 +15,7 @@
 #include "editing/block_wiring.h"
 #include "editing/element_factory.h"
 #include "editing/group_editing.h"
+#include "editing/part_names.h"
 #include "editing/wire_editing.h"
 #include <algorithm>
 #include <format>
@@ -491,6 +493,44 @@ void Schematic::DeleteSelection() {
     }
     ClearSelection();
     MarkModified();
+}
+
+/**
+ * @brief   Gives a part another name, and keeps what refers to it by name on it.
+ * @param[in] index  Index into GetElements() of a part that has a name.
+ * @param[in] name   The new name, which CheckPartName() must allow.
+ * @return  Nothing on success, the name unchanged too; the reason otherwise, with the schematic unchanged.
+ * @note    The controlled sources that follow the part's current, the measured currents of the part and the math
+ *          channels that read them follow the new name. The results go, since they name the part as it was.
+ */
+std::expected<void, std::string> Schematic::RenameElement(const std::size_t index, const std::string &name) {
+    Core::Component &component = m_Elements[index]->GetComponent();
+    const std::string old_name = component.GetName();
+    if (name == old_name) {
+        return {};
+    }
+    if (const std::optional<std::string> problem = CheckPartName(m_Elements, index, name)) {
+        return std::unexpected(*problem);
+    }
+    component.SetName(name);
+    for (const auto &element : m_Elements) {
+        if (Core::IsControlledSource(element->GetComponent().GetType())) {
+            auto &source = static_cast<Core::ControlledSource &>(element->GetComponent());
+            source.SetControllingCurrent(RenameCurrent(source.GetControllingCurrent(), old_name, name));
+        }
+    }
+    std::set<std::string> measured;
+    for (const std::string &current : m_MeasuredCurrents) {
+        measured.insert(RenameCurrent(current, old_name, name));
+    }
+    m_MeasuredCurrents = std::move(measured);
+    for (MathChannel &channel : m_MathChannels) {
+        channel.First = RenameCurrentsIn(channel.First, old_name, name);
+        channel.Second = RenameCurrentsIn(channel.Second, old_name, name);
+        channel.Expression = RenameCurrentsIn(channel.Expression, old_name, name);
+    }
+    MarkModified();
+    return {};
 }
 
 /**

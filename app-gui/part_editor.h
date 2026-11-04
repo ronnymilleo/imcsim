@@ -30,6 +30,7 @@
 #include <array>
 #include <cstddef>
 #include <optional>
+#include <string>
 
 namespace GUI {
 
@@ -72,6 +73,10 @@ private:
     ValueField m_InitialCondition;
     /// The net name being typed for a net label.
     std::array<char, 40> m_Net{};
+    /// The name being typed for the part, applied when the field is left.
+    std::array<char, 40> m_Name{};
+    /// Why the name typed last cannot be used, or empty.
+    std::string m_NameError;
     /// Whether the next Draw() focuses the net name.
     bool m_FocusNet = false;
     // One per member of the parameters of each source waveform, in the order the window lists them
@@ -108,6 +113,7 @@ private:
     void LoadModelFields(const Core::Component &component);
     void LoadSettingFields(const Core::Component &component);
     void DrawSelectionSummary();
+    void DrawName(Core::Component &component);
     void DrawFields(Core::Component &component);
     bool DrawModeledPart(Core::Component &component);
     bool DrawSettingPart(Core::Component &component);

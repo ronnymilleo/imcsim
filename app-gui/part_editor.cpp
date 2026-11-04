@@ -376,16 +376,13 @@ void PartEditor::Draw() {
 
     Core::Component &component = element->GetComponent();
     ImGui::TextUnformatted(GetPartName(component.GetType()));
-    if (!component.GetName().empty()) {
-        ImGui::TextUnformatted(std::format("Name: {}", component.GetName()).c_str());
+    if (m_LoadedSelection != m_Schematic->GetSelectionVersion()) {
+        LoadFields(component);
     }
+    DrawName(component);
     const Core::ComponentType type = component.GetType();
     if (!HasFields(component) && !HasModel(type)) {
         return;
-    }
-
-    if (m_LoadedSelection != m_Schematic->GetSelectionVersion()) {
-        LoadFields(component);
     }
     // Most edits end a live run and drop what it made, which should never come as a surprise
     if (const char *live_note = m_Schematic->IsLiveRun() ? GetLiveEditNote(type) : nullptr) {
@@ -409,6 +406,28 @@ void PartEditor::DrawSelectionSummary() {
         ImGui::TextUnformatted("Wire");
     } else {
         ImGui::TextDisabled("Select a component to edit it");
+    }
+}
+
+/**
+ * @brief   The name of a part that has one, which a new name replaces when the field is left with Enter or a click
+ *          elsewhere; a name that cannot be used says why and goes back to the one the part has.
+ */
+void PartEditor::DrawName(Core::Component &component) {
+    if (std::string_view(component.GetNamePrefix()).empty()) {
+        return;
+    }
+    DrawFieldLabel("Name");
+    ImGui::InputText("##name", m_Name.data(), m_Name.size(), ImGuiInputTextFlags_CharsNoBlank);
+    if (ImGui::IsItemDeactivatedAfterEdit()) {
+        const std::size_t index = *m_Schematic->GetSelectedElements().begin();
+        const auto renamed = m_Schematic->RenameElement(index, m_Name.data());
+        m_NameError = renamed ? std::string() : renamed.error();
+        m_Name.fill('\0');
+        component.GetName().copy(m_Name.data(), m_Name.size() - 1);
+    }
+    if (!m_NameError.empty()) {
+        ImGui::TextColored(GetErrorTextColor(), "%s", m_NameError.c_str());
     }
 }
 
@@ -553,6 +572,9 @@ void PartEditor::DrawSubcircuit(Core::SubcircuitInstance &instance) {
 }
 
 void PartEditor::LoadFields(const Core::Component &component) {
+    m_Name.fill('\0');
+    component.GetName().copy(m_Name.data(), m_Name.size() - 1);
+    m_NameError.clear();
     m_Value.Load(component.GetValue());
     m_InitialCondition.LoadOptional(component.GetInitialCondition());
     if (component.GetType() == Core::ComponentType::NET_LABEL || Core::IsSubcircuitPin(component.GetType())) {
