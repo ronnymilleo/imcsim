@@ -13,6 +13,11 @@ How to read what imcsim measures, plots and exports. The [README](../README.md) 
   editing its main value right away: `4k7` and Enter make a resistor 4.7k. Values take SPICE suffixes, and a whole
   number may put its decimals after the suffix, as resistor codes do (`4k7`, `2M2`, `3u3`). View > Properties keeps
   the same fields in a docked window.
+- **Renaming a part**: the Name field of its properties takes a new name when you press Enter or click away. The name
+  keeps the letter the part starts with, which tells ngspice what the part is (`R` for a resistor, `X` for a block,
+  `U` for a gate), then letters, digits or `_`, such as `RLOAD` or `XCOUNT`; no two parts may share a name, whatever
+  its case. A name that cannot be used says why and the part keeps its own. The measured current of the part, a
+  controlled source that follows it and the math channels that read `I(name)` follow the new name.
 - **Potentiometer**: its properties hold the resistance between its ends and the wiper, a slider from 0% at terminal 1
   to 100% at terminal 2. Move the wiper and run again to see the output change. During a live run, use the mouse wheel
   over the part or its Wiper field to change it while the simulation continues (see Live runs).
