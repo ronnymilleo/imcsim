@@ -69,7 +69,9 @@ struct Received {
     }
 };
 
-// Value of a trace at a time, between the two points that surround it
+/**
+ * @brief   Value of a trace at a time, between the two points that surround it.
+ */
 double ValueAt(const std::vector<double> &times, const std::vector<double> &values, const double time) {
     const auto after = std::ranges::lower_bound(times, time);
     if (after == times.begin()) {
@@ -87,7 +89,9 @@ double ValueAt(const std::vector<double> &times, const std::vector<double> &valu
 // step sequence by a hundred microseconds or so; they are compared by what they reach, not point by point
 constexpr auto THRESHOLD_SENSITIVE_EXAMPLES = std::to_array<std::string_view>({"Schmitt trigger"});
 
-// Lowest and highest value of a trace within a window of time around an instant
+/**
+ * @brief   Lowest and highest value of a trace within a window of time around an instant.
+ */
 std::pair<double, double> RangeAround(const std::vector<double> &times, const std::vector<double> &values,
                                       const double time, const double half_window) {
     double lowest = ValueAt(times, values, time - half_window);

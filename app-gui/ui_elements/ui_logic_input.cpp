@@ -37,7 +37,9 @@ void UILogicInput::DrawTerminals(SchematicCanvas &canvas, const ViewTransform &v
     canvas.AddLine(LocalToScreen(view, 0, 0), LocalToScreen(view, 0, BOX_BOTTOM), color, LINE_THICKNESS);
 }
 
-// The box shows the level the part drives, 1 when high and 0 when low
+/**
+ * @brief   The box shows the level the part drives, 1 when high and 0 when low.
+ */
 void UILogicInput::DrawSymbol(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color,
                               const SymbolStyle /*style*/) const {
     const std::array<ImVec2, 4> box = {
@@ -58,7 +60,9 @@ void UILogicInput::DrawSymbol(SchematicCanvas &canvas, const ViewTransform &view
     canvas.AddText(font, font_size, center - text_size / 2.0f, color, digit);
 }
 
-// The name sits above the box
+/**
+ * @brief   The name sits above the box.
+ */
 void UILogicInput::DrawLabels(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color) const {
     DrawLabel(canvas, view, {0.0f, BOX_TOP - LABEL_OFFSET}, {0.0f, -1.0f}, GetComponent().GetName(), color);
 }
@@ -67,7 +71,9 @@ std::vector<GridPoint> UILogicInput::GetLocalTerminals() const {
     return {{0, 0}};
 }
 
-// The terminal is at the origin and its lead goes up to the box
+/**
+ * @brief   The terminal is at the origin and its lead goes up to the box.
+ */
 GridPoint UILogicInput::GetLocalTerminalInward(std::size_t /*terminal*/) const {
     return {0, -1};
 }

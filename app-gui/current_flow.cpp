@@ -21,7 +21,9 @@ std::optional<double> FindCurrent(const std::vector<Core::ComponentCurrent> &cur
     return current != currents.end() ? std::optional(current->Current) : std::nullopt;
 }
 
-// Splits every wire at the connection points on it, so each piece joins two points with nothing in between
+/**
+ * @brief   Splits every wire at the connection points on it, so each piece joins two points with nothing in between.
+ */
 std::vector<WireCurrent> SplitWires(const std::vector<UIWire> &wires, const std::vector<GridPoint> &points) {
     std::vector<WireCurrent> pieces;
     for (const UIWire &wire : wires) {
@@ -44,8 +46,10 @@ std::vector<WireCurrent> SplitWires(const std::vector<UIWire> &wires, const std:
     return pieces;
 }
 
-// A part with several currents, each at the terminal it was probed on; the other end of a winding or of a contact
-// takes what the probed end gives out
+/**
+ * @brief   A part with several currents, each at the terminal it was probed on; the other end of a winding or of a
+ *          contact takes what the probed end gives out.
+ */
 std::optional<double> GetProbedTerminalCurrent(const Core::Component &component, const std::vector<std::string> &names,
                                                const std::size_t terminal,
                                                const std::vector<Core::ComponentCurrent> &currents) {
@@ -68,9 +72,12 @@ std::optional<double> GetProbedTerminalCurrent(const Core::Component &component,
     return std::nullopt;
 }
 
-// The output current of an op-amp or a gate returns through ground or the supply, and their other pins carry none.
-// Any other single current enters terminal 1 and leaves terminal 2, and the control pins of a controlled source
-// carry none
+/**
+ * @brief   The output current of an op-amp or a gate returns through ground or the supply, and their other pins carry
+ *          none.
+ * @details Any other single current enters terminal 1 and leaves terminal 2, and the control pins of a controlled
+ *          source carry none.
+ */
 double GetSingleCurrentAt(const Core::Component &component, const double current, const std::size_t terminal) {
     if (component.GetType() == Core::ComponentType::OP_AMP || Core::IsLogicGate(component.GetType())) {
         return terminal == Core::GetCurrentTerminals(component).front() ? current : 0.0;

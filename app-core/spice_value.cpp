@@ -54,7 +54,10 @@ std::string_view Trim(std::string_view text) {
     return text;
 }
 
-// Such a value would read like "9.9e-05f" with the smallest suffix, so it is written in exponent notation instead
+/**
+ * @brief   Such a value would read like "9.9e-05f" with the smallest suffix, so it is written in exponent notation
+ *          instead.
+ */
 bool IsBelowSuffixes(const double value) {
     return std::abs(value) < SUFFIXES.back().Factor;
 }

@@ -254,7 +254,9 @@ constexpr float FONT_SIZE = 17.0f;
 
 ImFont *g_monospace_font = nullptr;
 
-// The atlas only reads the bytes, which live for the whole program
+/**
+ * @brief   The atlas only reads the bytes, which live for the whole program.
+ */
 ImFont *AddBundledFont(const std::span<const unsigned char> bytes) {
     ImFontConfig config;
     config.FontDataOwnedByAtlas = false;
@@ -285,7 +287,9 @@ void ApplyImGuiSizes() {
     style.SeparatorTextPadding = ImVec2(18.0f, 6.0f);
 }
 
-// Colors only, so a theme can change while running without undoing the display scaling of the sizes
+/**
+ * @brief   Colors only, so a theme can change while running without undoing the display scaling of the sizes.
+ */
 void ApplyImGuiColors(const ThemePalette &palette) {
     ImGuiStyle &style = ImGui::GetStyle();
     if (palette.Light) {

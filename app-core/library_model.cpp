@@ -44,7 +44,9 @@ std::string ToLower(std::string_view text) {
     return lower;
 }
 
-// Where the name of a .model statement starts and how long it is, or no value when the text is not one
+/**
+ * @brief   Where the name of a .model statement starts and how long it is, or no value when the text is not one.
+ */
 std::optional<std::pair<std::size_t, std::size_t>> FindName(const std::string_view text) {
     std::size_t position = 0;
     while (position < text.size() && IsSpace(text[position])) {

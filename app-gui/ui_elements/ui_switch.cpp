@@ -59,7 +59,9 @@ void UISwitch::DrawSymbol(SchematicCanvas &canvas, const ViewTransform &view, co
                    LocalToScreen(view, CAP_HALF_LENGTH, bar_y - STEM_LENGTH), color, LINE_THICKNESS);
 }
 
-// The name sits above whatever is drawn highest, and the state under the contacts
+/**
+ * @brief   The name sits above whatever is drawn highest, and the state under the contacts.
+ */
 void UISwitch::DrawLabels(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color) const {
     const float top = IsPushButton() ? RAISED_BAR_Y - STEM_LENGTH : OPEN_LEVER_TIP.y;
     DrawLabel(canvas, view, {0.0f, top - 0.3f}, {0.0f, -1.0f}, GetComponent().GetName(), color);

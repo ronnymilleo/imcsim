@@ -79,7 +79,9 @@ CollectSubcircuitPinMarkers(const std::vector<std::unique_ptr<UIElement>> &eleme
     return candidates;
 }
 
-// A parameter that a part of the block follows cannot go away with the part still following it
+/**
+ * @brief   A parameter that a part of the block follows cannot go away with the part still following it.
+ */
 std::expected<void, std::string> ValidateExpressions(const std::vector<std::unique_ptr<UIElement>> &elements,
                                                      const std::vector<Core::SubcircuitParameter> &parameters) {
     for (const auto &element : elements) {
@@ -95,8 +97,11 @@ std::expected<void, std::string> ValidateExpressions(const std::vector<std::uniq
     return {};
 }
 
-// The old pin each new pin continues, by the point of its marker, so a renamed pin keeps its wires, or else by name, so
-// a marker moved inside the block keeps them too. No value for a pin that is new
+/**
+ * @brief   The old pin each new pin continues, by the point of its marker, so a renamed pin keeps its wires, or else by
+ *          name, so a marker moved inside the block keeps them too.
+ * @details No value for a pin that is new.
+ */
 std::vector<std::optional<std::size_t>> MatchPins(const std::vector<SavedSubcircuitPin> &old_pins,
                                                   const std::vector<SavedSubcircuitPin> &new_pins) {
     std::vector<std::optional<std::size_t>> matches(new_pins.size());
@@ -120,7 +125,9 @@ std::vector<std::optional<std::size_t>> MatchPins(const std::vector<SavedSubcirc
     return matches;
 }
 
-// Each selected marker is one pin, whatever order the pins were put in
+/**
+ * @brief   Each selected marker is one pin, whatever order the pins were put in.
+ */
 std::expected<void, std::string> CheckPinChoice(const std::vector<Schematic::SubcircuitPinCandidate> &candidates,
                                                 const std::vector<SavedSubcircuitPin> &pins) {
     std::set<GridPoint> pin_points;
@@ -136,8 +143,10 @@ std::expected<void, std::string> CheckPinChoice(const std::vector<Schematic::Sub
     return {};
 }
 
-// The contents of a new block: a copy of the selection, with each marker named after its pin, and pins that reach
-// nodes the outside can connect to
+/**
+ * @brief   The contents of a new block: a copy of the selection, with each marker named after its pin, and pins that
+ *          reach nodes the outside can connect to.
+ */
 std::expected<SavedSubcircuit, std::string> DrawDefinition(const std::vector<std::unique_ptr<UIElement>> &elements,
                                                            const std::vector<UIWire> &wires,
                                                            const std::set<std::size_t> &selected_elements,
@@ -172,12 +181,16 @@ std::expected<SavedSubcircuit, std::string> DrawDefinition(const std::vector<std
     return definition;
 }
 
-// The definition as text, so two definitions of one name can be told equal or not
+/**
+ * @brief   The definition as text, so two definitions of one name can be told equal or not.
+ */
 std::string DescribeDefinition(const SavedSubcircuit &definition) {
     return SaveSchematic({}, {}, {}, {}, std::span<const SavedSubcircuit>(&definition, 1));
 }
 
-// A name no definition has yet, from the one a pasted definition came with
+/**
+ * @brief   A name no definition has yet, from the one a pasted definition came with.
+ */
 std::string FindFreeName(const std::string &name, const std::vector<SavedSubcircuit> &definitions) {
     for (int suffix = 2;; ++suffix) {
         std::string candidate = std::format("{}_{}", name, suffix);
@@ -1487,9 +1500,11 @@ void Schematic::InvalidateDerivedData() {
     m_TruthTable.reset();
 }
 
-// A probe is on the node most of its points belong to now, and takes the points of that node as its own. With no such
-// node, because its net is ground or its wires are gone, it waits with the points it had and comes back when they
-// belong to a node again. Two probes that end up on one node are one
+/**
+ * @brief   A probe is on the node most of its points belong to now, and takes the points of that node as its own.
+ * @details With no such node, because its net is ground or its wires are gone, it waits with the points it had and
+ *          comes back when they belong to a node again. Two probes that end up on one node are one.
+ */
 void Schematic::FollowVoltageProbes() {
     const Connectivity &connectivity = GetConnectivity();
     std::set<int> taken;
@@ -1515,9 +1530,11 @@ void Schematic::FollowVoltageProbes() {
     m_VoltageProbes = std::move(followed);
 }
 
-// Brings every instance of a definition that changed up to date: its pins and their edges, the overrides of the
-// parameters it still has, and the wires on its terminals, which follow the pins that go on (matches gives the old pin
-// each new one continues) and are removed from the pins that went away
+/**
+ * @brief   Brings every instance of a definition that changed up to date: its pins and their edges, the overrides of
+ *          the parameters it still has, and the wires on its terminals, which follow the pins that go on (matches gives
+ *          the old pin each new one continues) and are removed from the pins that went away.
+ */
 void Schematic::RefreshInstances(const SavedSubcircuit &definition, const std::vector<std::string> &old_names,
                                  const std::vector<std::optional<std::size_t>> &matches) {
     const std::string &name = definition.Name;
@@ -1577,12 +1594,16 @@ void Schematic::RefreshInstances(const SavedSubcircuit &definition, const std::v
     m_Wires = FollowTerminals(m_Wires, old_points, new_points);
 }
 
-// Measurements stay out of snapshots, so probing adds no undo step and does not count as a change
+/**
+ * @brief   Measurements stay out of snapshots, so probing adds no undo step and does not count as a change.
+ */
 std::string Schematic::TakeSnapshot() const {
     return SaveSchematic(m_Elements, m_Wires, m_SimulationSettings, {}, m_Subcircuits, m_LibraryModels);
 }
 
-// Snapshots come from TakeSnapshot(), so they always load back without warnings
+/**
+ * @brief   Snapshots come from TakeSnapshot(), so they always load back without warnings.
+ */
 void Schematic::RestoreSnapshot(const std::string &snapshot) {
     auto loaded = LoadSchematic(snapshot);
     if (!loaded) {
@@ -1603,7 +1624,9 @@ void Schematic::RestoreSnapshot(const std::string &snapshot) {
     InvalidateDerivedData();
 }
 
-// The current content becomes the only state, and also the saved one
+/**
+ * @brief   The current content becomes the only state, and also the saved one.
+ */
 void Schematic::ResetHistory() {
     m_CurrentSnapshot = TakeSnapshot();
     m_SavedSnapshot = m_CurrentSnapshot;

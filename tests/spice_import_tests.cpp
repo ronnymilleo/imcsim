@@ -32,7 +32,9 @@ R1 6 5 10
 .ENDS
 )";
 
-// A library subcircuit whose ports say what they are
+/**
+ * @brief   A library subcircuit whose ports say what they are.
+ */
 Core::LibrarySubcircuit NamedPorts() {
     return {.Name = "AMP",
             .Ports = {"IN+", "IN-", "VCC", "VEE", "OUT", "OUT"},

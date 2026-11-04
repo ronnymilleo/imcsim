@@ -26,7 +26,9 @@ std::size_t ToIndex(const Analysis analysis) {
     return static_cast<std::size_t>(analysis);
 }
 
-// Hands a result to the schematic, or clears the old one so stale values never sit next to an error
+/**
+ * @brief   Hands a result to the schematic, or clears the old one so stale values never sit next to an error.
+ */
 template <typename Result, typename Store>
 std::optional<std::string> StoreResult(std::expected<Result, std::string> result, Store store) {
     if (result) {
@@ -46,8 +48,10 @@ template <typename Result> struct SteppedRuns {
     std::vector<Core::SimulatorMessage> Messages;
 };
 
-// Runs once per value and stops at the first step that fails or when asked to; the output of each step is headed by
-// its value, so a warning can be traced to the step that printed it
+/**
+ * @brief   Runs once per value and stops at the first step that fails or when asked to; the output of each step is
+ *          headed by its value, so a warning can be traced to the step that printed it.
+ */
 template <typename Result, typename RunStep>
 SteppedRuns<Result> RunSteps(const ParameterStepSettings &step, const std::string &unit,
                              const std::vector<double> &values, Core::RunControl &control, const RunStep &run_step) {
@@ -70,9 +74,12 @@ SteppedRuns<Result> RunSteps(const ParameterStepSettings &step, const std::strin
     return {std::move(family), std::move(messages)};
 }
 
-// A job that simulates its own copy of the circuit, so the user can go on editing, and hands the run it makes to the
-// thread that polls, where store puts it away. A job that was stopped delivers nothing, unless what it has made is
-// worth keeping, as the points of a transient
+/**
+ * @brief   A job that simulates its own copy of the circuit, so the user can go on editing, and hands the run it makes
+ *          to the thread that polls, where store puts it away.
+ * @details A job that was stopped delivers nothing, unless what it has made is worth keeping, as the points of a
+ *          transient.
+ */
 template <typename Run, bool KeepsPartial = false, typename Work, typename Store>
 Core::Job MakeJob(const Core::Circuit &circuit, Work work, Store store) {
     const auto copy = std::make_shared<const Core::CircuitCopy>(circuit);
@@ -85,7 +92,10 @@ Core::Job MakeJob(const Core::Circuit &circuit, Work work, Store store) {
     };
 }
 
-// Hands the steps to the schematic, or reports the step that failed; the old result is cleared before the steps run
+/**
+ * @brief   Hands the steps to the schematic, or reports the step that failed; the old result is cleared before the
+ *          steps run.
+ */
 template <typename Result, typename Store>
 std::optional<std::string> StoreSteps(std::expected<StepFamily<Result>, std::string> family, Store store) {
     if (!family) {
@@ -404,14 +414,18 @@ void AnalysisControls::DrawRunReport(const Analysis analysis) const {
     }
 }
 
-// Hands the job to the worker and remembers the circuit it started from
+/**
+ * @brief   Hands the job to the worker and remembers the circuit it started from.
+ */
 void AnalysisControls::StartRun(const Analysis analysis, Core::Job job) {
     m_RunCircuitVersion = m_Schematic.GetCircuitVersion();
     m_RunningAnalysis = analysis;
     m_Service.Submit(std::move(job));
 }
 
-// The analysis picked, on the circuit built from the schematic, run once or once per step
+/**
+ * @brief   The analysis picked, on the circuit built from the schematic, run once or once per step.
+ */
 void AnalysisControls::StartAnalysis(const Analysis analysis, const Core::Circuit &circuit,
                                      const std::optional<StepPlan> &steps) {
     switch (analysis) {
@@ -453,7 +467,10 @@ void AnalysisControls::RunOperatingPointAnalysis(const Core::Circuit &circuit) {
                  }));
 }
 
-// A live run is a transient that goes on to its limit at the pace the settings give, unless the user stops it first
+/**
+ * @brief   A live run is a transient that goes on to its limit at the pace the settings give, unless the user stops it
+ *          first.
+ */
 void AnalysisControls::RunTransientAnalysis(const Core::Circuit &circuit, const std::optional<StepPlan> &steps) {
     const Core::TransientSettings settings = m_Schematic.GetSimulationSettings().Transient;
     m_IsLiveResult = false;
@@ -550,8 +567,10 @@ void AnalysisControls::RunACSweepAnalysis(const Core::Circuit &circuit, const st
                  }));
 }
 
-// A source that is unset, or that left the circuit, uses a default; a stepped parameter and a second stepped source
-// would both make the family of curves, so only one may be on
+/**
+ * @brief   A source that is unset, or that left the circuit, uses a default; a stepped parameter and a second stepped
+ *          source would both make the family of curves, so only one may be on.
+ */
 void AnalysisControls::RunDCSweepAnalysis(const Core::Circuit &circuit, const std::optional<StepPlan> &steps) {
     const SimulationSettings &settings = m_Schematic.GetSimulationSettings();
     const std::vector<SweepSource> sources = ListSweepSources(circuit);
@@ -724,8 +743,10 @@ void AnalysisControls::Finish(const Analysis analysis, std::optional<std::string
     m_LastRun = analysis;
 }
 
-// Rating warnings, such as a transistor past its maximum voltage, which the operating point and the transient check,
-// and the combinations of a truth table that have no operating point
+/**
+ * @brief   Rating warnings, such as a transistor past its maximum voltage, which the operating point and the transient
+ *          check, and the combinations of a truth table that have no operating point.
+ */
 std::vector<std::string> AnalysisControls::GetResultWarnings(const Analysis analysis) const {
     if (analysis == Analysis::OPERATING_POINT && m_Schematic.GetOperatingPoint()) {
         return m_Schematic.GetOperatingPoint()->Warnings;

@@ -89,7 +89,9 @@ std::vector<std::string> SplitLines(const std::string_view text) {
     return lines;
 }
 
-// ngspice ends a line at ";", and at "$" when it follows a space or a tab
+/**
+ * @brief   ngspice ends a line at ";", and at "$" when it follows a space or a tab.
+ */
 std::string_view StripComment(std::string_view line) {
     if (const std::size_t semicolon = line.find(';'); semicolon != std::string_view::npos) {
         line = line.substr(0, semicolon);
@@ -102,7 +104,9 @@ std::string_view StripComment(std::string_view line) {
     return line;
 }
 
-// Joins each line with the "+" lines that continue it; comment lines and blank lines belong to no statement
+/**
+ * @brief   Joins each line with the "+" lines that continue it; comment lines and blank lines belong to no statement.
+ */
 std::vector<Statement> ReadStatements(const std::vector<std::string> &lines) {
     std::vector<Statement> statements;
     for (std::size_t index = 0; index < lines.size(); ++index) {
@@ -122,7 +126,9 @@ std::vector<Statement> ReadStatements(const std::vector<std::string> &lines) {
     return statements;
 }
 
-// Splits on spaces, with "name = value" read as one "name=value" token
+/**
+ * @brief   Splits on spaces, with "name = value" read as one "name=value" token.
+ */
 std::vector<std::string> Tokenize(const std::string_view logical) {
     std::string text;
     for (const char character : logical) {
@@ -164,7 +170,9 @@ bool IsNameCharacter(const char character) {
     return std::isalnum(static_cast<unsigned char>(character)) != 0 || character == '_' || character == '-';
 }
 
-// The names a text could refer to, lowercase, since SPICE ignores case
+/**
+ * @brief   The names a text could refer to, lowercase, since SPICE ignores case.
+ */
 std::set<std::string> CollectNames(const std::string_view text) {
     std::set<std::string> names;
     for (std::size_t position = 0; position < text.size();) {
@@ -181,7 +189,9 @@ std::set<std::string> CollectNames(const std::string_view text) {
     return names;
 }
 
-// The header of a .subckt: its ports, then its parameters after "params:" or from the first "name=value"
+/**
+ * @brief   The header of a .subckt: its ports, then its parameters after "params:" or from the first "name=value".
+ */
 void ReadHeader(const std::vector<std::string> &tokens, LibrarySubcircuit &subcircuit, std::string &expressions) {
     bool are_parameters = false;
     for (std::size_t index = 2; index < tokens.size(); ++index) {
@@ -212,7 +222,9 @@ void ReadHeader(const std::vector<std::string> &tokens, LibrarySubcircuit &subci
     }
 }
 
-// Appends the definitions of the file that the text uses, and those they use in turn, in file order
+/**
+ * @brief   Appends the definitions of the file that the text uses, and those they use in turn, in file order.
+ */
 std::string AddDependencies(const std::string &text, const std::string &own_name,
                             const std::map<std::string, Definition> &definitions) {
     std::set<std::string> used;
@@ -251,7 +263,10 @@ bool IsEncrypted(const std::string_view text) {
                                [&lower](const std::string_view marker) { return lower.contains(marker); });
 }
 
-// The comment lines right above a line, without their "*", which vendors use to say what each port of a .subckt is
+/**
+ * @brief   The comment lines right above a line, without their "*", which vendors use to say what each port of a
+ *          .subckt is.
+ */
 std::string ReadDescription(const std::vector<std::string> &lines, const std::size_t line) {
     std::size_t first = line;
     while (first > 0 && Trim(lines[first - 1]).starts_with('*')) {
@@ -281,7 +296,9 @@ struct LibraryScan {
     std::size_t Order = 0;
 };
 
-// A .model, .param or inclusion outside the subcircuits
+/**
+ * @brief   A .model, .param or inclusion outside the subcircuits.
+ */
 void ReadTopLevelStatement(LibraryScan &scan, const Statement &statement, const std::vector<std::string> &tokens,
                            SpiceLibrary &library) {
     const std::string directive = ToLower(tokens.front());
@@ -307,7 +324,9 @@ void ReadTopLevelStatement(LibraryScan &scan, const Statement &statement, const 
     }
 }
 
-// Records a subcircuit that ends, which another one may use by its name
+/**
+ * @brief   Records a subcircuit that ends, which another one may use by its name.
+ */
 void AddFoundSubcircuit(LibraryScan &scan, const std::size_t header, const std::size_t end) {
     scan.Found.emplace_back(header, end);
     if (const std::vector<std::string> tokens = Tokenize(scan.Statements[header].Logical); tokens.size() >= 2) {
@@ -318,7 +337,9 @@ void AddFoundSubcircuit(LibraryScan &scan, const std::size_t header, const std::
     }
 }
 
-// The first pass finds the subcircuits and the definitions outside them
+/**
+ * @brief   The first pass finds the subcircuits and the definitions outside them.
+ */
 LibraryScan ScanLibrary(const std::string_view text, SpiceLibrary &library) {
     LibraryScan scan;
     scan.Lines = SplitLines(text);
@@ -351,7 +372,9 @@ LibraryScan ScanLibrary(const std::string_view text, SpiceLibrary &library) {
     return scan;
 }
 
-// An .include or .lib inside a subcircuit brings in what the file does not have
+/**
+ * @brief   An .include or .lib inside a subcircuit brings in what the file does not have.
+ */
 void WarnInclusions(const LibraryScan &scan, const std::size_t header, const std::size_t end,
                     LibrarySubcircuit &subcircuit) {
     for (std::size_t index = header + 1; index < end; ++index) {
@@ -363,8 +386,10 @@ void WarnInclusions(const LibraryScan &scan, const std::size_t header, const std
     }
 }
 
-// The second pass turns a subcircuit into a text that needs nothing else from the file; no value for one without a
-// name, defined twice or encrypted, with the warning that says so
+/**
+ * @brief   The second pass turns a subcircuit into a text that needs nothing else from the file; no value for one
+ *          without a name, defined twice or encrypted, with the warning that says so.
+ */
 std::optional<LibrarySubcircuit> BuildSubcircuit(const LibraryScan &scan, const std::size_t header,
                                                  const std::size_t end, std::set<std::string> &names,
                                                  std::vector<std::string> &warnings) {

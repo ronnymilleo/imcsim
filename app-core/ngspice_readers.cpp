@@ -29,7 +29,9 @@ namespace {
 // 1e-15 V is -300 dB
 constexpr double MIN_MAGNITUDE = 1e-15;
 
-// ngspice keeps no reference to the name after the call
+/**
+ * @brief   ngspice keeps no reference to the name after the call.
+ */
 pvector_info FindVector(std::string name) {
     const pvector_info vector = ngGet_Vec_Info(name.data());
     if (vector == nullptr || vector->v_length < 1 || (vector->v_realdata == nullptr && vector->v_compdata == nullptr)) {
@@ -38,7 +40,9 @@ pvector_info FindVector(std::string name) {
     return vector;
 }
 
-// Analyses with complex results, such as .ac, also store their scale (the frequency) as complex numbers
+/**
+ * @brief   Analyses with complex results, such as .ac, also store their scale (the frequency) as complex numbers.
+ */
 std::vector<double> RealPart(const vector_info &vector, const std::size_t first_point = 0) {
     const std::size_t length = static_cast<std::size_t>(vector.v_length);
     std::vector<double> values(length > first_point ? length - first_point : 0);
@@ -59,13 +63,17 @@ std::vector<std::complex<double>> ComplexValues(const vector_info &vector) {
     return values;
 }
 
-// ngspice stores vector names in lower case
+/**
+ * @brief   ngspice stores vector names in lower case.
+ */
 std::string ToLower(std::string text) {
     std::ranges::transform(text, text.begin(), [](const unsigned char character) { return std::tolower(character); });
     return text;
 }
 
-// The branch current of a voltage source, an inductor or a current probe
+/**
+ * @brief   The branch current of a voltage source, an inductor or a current probe.
+ */
 std::string BranchVectorName(const std::string &element_name) {
     return std::format("{}#branch", ToLower(element_name));
 }
@@ -79,9 +87,11 @@ struct CurrentVector {
     std::string VectorName;
 };
 
-// Where ngspice saves the currents of a component, with .options savecurrents and the current probes. Two-terminal
-// parts report one current, positive from their first terminal to their second; probed parts one per probed
-// terminal, positive into it
+/**
+ * @brief   Where ngspice saves the currents of a component, with .options savecurrents and the current probes.
+ * @details Two-terminal parts report one current, positive from their first terminal to their second; probed parts one
+ *          per probed terminal, positive into it.
+ */
 std::vector<CurrentVector> CurrentVectors(const Component &component) {
     const std::vector<CurrentProbe> probes = GetCurrentProbes(component);
     if (!probes.empty()) {
@@ -106,7 +116,9 @@ std::vector<CurrentVector> CurrentVectors(const Component &component) {
     return {{component.GetName(), BranchVectorName(name)}};
 }
 
-// 20 log10 of the magnitude, with a floor that keeps a value the AC sources do not reach finite for plotting
+/**
+ * @brief   20 log10 of the magnitude, with a floor that keeps a value the AC sources do not reach finite for plotting.
+ */
 double ToDecibels(const std::complex<double> value) {
     return 20.0 * std::log10(std::max(std::abs(value), MIN_MAGNITUDE));
 }
@@ -154,7 +166,9 @@ PassiveACCurrent(const CircuitEntry &entry, const std::vector<double> &frequenci
     return currents;
 }
 
-// The source drives its AC magnitude at zero phase, and nothing when it is not AC
+/**
+ * @brief   The source drives its AC magnitude at zero phase, and nothing when it is not AC.
+ */
 std::vector<std::complex<double>> CurrentSourceACCurrent(const Component &component, const std::size_t point_count) {
     const auto &source = static_cast<const Source &>(component);
     const double magnitude = source.GetSourceType() == Source::SourceType::AC ? source.GetAC().Magnitude : 0.0;
@@ -185,7 +199,9 @@ ACCurrent(const CircuitEntry &entry, const std::vector<double> &frequencies,
     return std::unexpected(std::format("{} carries no current", component.GetName()));
 }
 
-// ngspice saves the vector names of a plot in lower case; the plot name itself is kept as listed
+/**
+ * @brief   ngspice saves the vector names of a plot in lower case; the plot name itself is kept as listed.
+ */
 std::vector<std::string> ListVectors(std::string plot) {
     std::vector<std::string> names;
     char *const *vectors = ngSpice_AllVecs(plot.data());
@@ -204,7 +220,9 @@ struct NoisePlots {
     std::string Totals;
 };
 
-// The densities are the plot with a frequency scale; the totals have a single point and no scale
+/**
+ * @brief   The densities are the plot with a frequency scale; the totals have a single point and no scale.
+ */
 std::optional<NoisePlots> FindNoisePlots() {
     NoisePlots plots;
     char *const *names = ngSpice_AllPlots();
@@ -222,9 +240,11 @@ std::optional<NoisePlots> FindNoisePlots() {
     return plots;
 }
 
-// The devices with noise in a plot, from the names of their vectors after prefix. ngspice also saves each noise
-// source of a device under the device name and a suffix, such as "onoise_q1_ib" next to "onoise_q1", so a name
-// that extends another one by "_" is a source, not a device
+/**
+ * @brief   The devices with noise in a plot, from the names of their vectors after prefix. ngspice also saves each
+ *          noise source of a device under the device name and a suffix, such as "onoise_q1_ib" next to "onoise_q1", so
+ *          a name that extends another one by "_" is a source, not a device.
+ */
 std::vector<std::string> ListNoiseDevices(const std::vector<std::string> &vectors, const std::string_view prefix) {
     std::vector<std::string> names;
     for (const std::string &vector : vectors) {
@@ -244,15 +264,19 @@ std::vector<std::string> ListNoiseDevices(const std::vector<std::string> &vector
     return devices;
 }
 
-// A device is an element of the part, or one inside the subcircuit of one, which ngspice names after the instance
-// between dots, such as "q.x-u1.q1"
+/**
+ * @brief   A device is an element of the part, or one inside the subcircuit of one, which ngspice names after the
+ *          instance between dots, such as "q.x-u1.q1".
+ */
 bool IsDeviceOf(const std::string_view device, const std::vector<std::string> &elements) {
     return std::ranges::any_of(elements, [device](const std::string &element) {
         return device == element || device.contains(std::format(".{}.", element));
     });
 }
 
-// ngspice describes every vector in the same static record, so the values are copied before the next lookup
+/**
+ * @brief   ngspice describes every vector in the same static record, so the values are copied before the next lookup.
+ */
 std::optional<std::vector<double>> ReadRealVector(const std::string &name) {
     const pvector_info vector = FindVector(name);
     if (vector == nullptr) {
@@ -318,7 +342,9 @@ ReadNoiseContributions(const Circuit &circuit, const NoisePlots &plots, const st
     return contributions;
 }
 
-// The plot a transfer function analysis leaves; its name starts with "tf" and it holds one row
+/**
+ * @brief   The plot a transfer function analysis leaves; its name starts with "tf" and it holds one row.
+ */
 std::optional<std::string> FindTransferFunctionPlot() {
     char *const *names = ngSpice_AllPlots();
     for (; names != nullptr && *names != nullptr; ++names) {
@@ -330,7 +356,10 @@ std::optional<std::string> FindTransferFunctionPlot() {
     return std::nullopt;
 }
 
-// One of the three single-value vectors of a transfer function; ngspice names them after the source and the output
+/**
+ * @brief   One of the three single-value vectors of a transfer function; ngspice names them after the source and the
+ *          output.
+ */
 std::expected<double, std::string> ReadTransferFunctionValue(const std::string &name) {
     const pvector_info vector = FindVector(name);
     if (vector == nullptr || vector->v_realdata == nullptr) {
@@ -491,11 +520,12 @@ std::expected<ACSweep, std::string> ReadACSweep(const Circuit &circuit) {
 
 /**
  * @brief   Reads the curves of a DC sweep, one per value of the stepped source.
+ * @details The swept values repeat once per value of the stepped source, so the curves are the stretches between
+ *          repeats.
  * @param[in] circuit    Circuit that was simulated.
  * @param[in] settings   Swept and stepped sources the run used.
  * @return  The sweep or the error when a vector is missing.
  */
-// The swept values repeat once per value of the stepped source, so the curves are the stretches between repeats
 std::expected<DCSweep, std::string> ReadDCSweep(const Circuit &circuit, const DCSweepSettings &settings) {
     const Component &swept = *FindSweepableSource(circuit, settings.Swept.Source);
     const pvector_info scale = FindVector(swept.GetType() == ComponentType::CURRENT_SOURCE ? "i-sweep" : "v-sweep");

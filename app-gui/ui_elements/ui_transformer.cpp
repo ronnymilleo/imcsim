@@ -40,7 +40,9 @@ UITransformer::UITransformer(const GridPoint position, const Rotation rotation)
     : UIElement(std::make_unique<Core::Transformer>(), position, rotation) {
 }
 
-// The leads run to the ends of the coils, one unit apart from the core on each side
+/**
+ * @brief   The leads run to the ends of the coils, one unit apart from the core on each side.
+ */
 void UITransformer::DrawTerminals(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color) const {
     for (const float y : {-1.0f, 1.0f}) {
         canvas.AddLine(LocalToScreen(view, -2, y), LocalToScreen(view, -COIL_X, y), color, LINE_THICKNESS);
@@ -62,7 +64,9 @@ void UITransformer::DrawSymbol(SchematicCanvas &canvas, const ViewTransform &vie
     canvas.AddCircleFilled(LocalToScreen(view, SECONDARY_DOT.x, SECONDARY_DOT.y), radius, color);
 }
 
-// The primary inductance and the turns ratio, such as "100m 2:1"
+/**
+ * @brief   The primary inductance and the turns ratio, such as "100m 2:1".
+ */
 void UITransformer::DrawLabels(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color) const {
     const auto &transformer = static_cast<const Core::Transformer &>(GetComponent());
     DrawLabel(canvas, view, {0.0f, -NAME_OFFSET_Y}, {0.0f, -1.0f}, transformer.GetName(), color);
@@ -88,8 +92,10 @@ LocalBounds UITransformer::GetLocalBounds() const {
     return {{-2.0f, -1.5f}, {2.0f, 1.5f}};
 }
 
-// Each turn is its own polyline, sampled in local coordinates so the arcs follow the rotation, like an inductor's;
-// bulge is +1 toward +X and -1 toward -X
+/**
+ * @brief   Each turn is its own polyline, sampled in local coordinates so the arcs follow the rotation, like an
+ *          inductor's; bulge is +1 toward +X and -1 toward -X.
+ */
 void UITransformer::DrawCoil(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color, const float x,
                              const float bulge) const {
     std::array<ImVec2, SEGMENTS_PER_TURN + 1> points;

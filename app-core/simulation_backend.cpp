@@ -18,7 +18,9 @@ namespace {
 std::unique_ptr<SimulationBackend> g_backend;
 std::mutex g_backend_mutex;
 
-// The truth table asks the backend only for operating points
+/**
+ * @brief   The truth table asks the backend only for operating points.
+ */
 AnalysisKind GetRequiredAnalysis(const AnalysisKind kind) {
     return kind == AnalysisKind::TRUTH_TABLE ? AnalysisKind::OPERATING_POINT : kind;
 }

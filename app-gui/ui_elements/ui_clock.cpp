@@ -61,7 +61,9 @@ void UIClock::DrawSymbol(SchematicCanvas &canvas, const ViewTransform &view, con
     canvas.AddPolyline(wave.data(), static_cast<int>(wave.size()), color, ImDrawFlags_None, LINE_THICKNESS);
 }
 
-// The name above the box and the frequency with the duty cycle beside it
+/**
+ * @brief   The name above the box and the frequency with the duty cycle beside it.
+ */
 void UIClock::DrawLabels(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color) const {
     const Core::ClockParameters &figures = static_cast<const Core::Clock &>(GetComponent()).GetParameters();
     DrawLabel(canvas, view, {0.0f, BOX_TOP - LABEL_OFFSET}, {0.0f, -1.0f}, GetComponent().GetName(), color);
@@ -74,7 +76,9 @@ std::vector<GridPoint> UIClock::GetLocalTerminals() const {
     return {{0, 0}};
 }
 
-// The terminal is at the origin and its lead goes up to the box
+/**
+ * @brief   The terminal is at the origin and its lead goes up to the box.
+ */
 GridPoint UIClock::GetLocalTerminalInward(std::size_t /*terminal*/) const {
     return {0, -1};
 }

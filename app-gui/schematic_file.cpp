@@ -214,7 +214,9 @@ constexpr auto SWEEP_RANGE_KEYS = std::to_array<ParameterKey<Core::SweepRange>>(
     {"step", &Core::SweepRange::Step},
 });
 
-// Readers return no value when the key is missing or holds another type, so a damaged file never throws
+/**
+ * @brief   Readers return no value when the key is missing or holds another type, so a damaged file never throws.
+ */
 std::optional<int> ReadInt(const nlohmann::json &object, const char *key) {
     const auto entry = object.find(key);
     if (entry == object.end() || !entry->is_number_integer()) {
@@ -270,7 +272,10 @@ void WriteParameters(const std::array<ParameterKey<Parameters>, Count> &keys, co
     }
 }
 
-// One waveform of a source, such as its pulse, under its own key so the sine keys in the element object stay apart
+/**
+ * @brief   One waveform of a source, such as its pulse, under its own key so the sine keys in the element object stay
+ *          apart.
+ */
 template <typename Parameters, std::size_t Count>
 void WriteSourceParameters(const std::array<ParameterKey<Parameters>, Count> &keys, const Parameters &parameters,
                            const char *name, nlohmann::json &object) {
@@ -279,7 +284,10 @@ void WriteSourceParameters(const std::array<ParameterKey<Parameters>, Count> &ke
     object[name] = values;
 }
 
-// Missing keys keep the value the parameters already have; a key with something other than a number is an error
+/**
+ * @brief   Missing keys keep the value the parameters already have; a key with something other than a number is an
+ *          error.
+ */
 template <typename Parameters, std::size_t Count>
 std::expected<void, std::string> ReadParameters(const std::array<ParameterKey<Parameters>, Count> &keys,
                                                 const nlohmann::json &object, Parameters &parameters) {
@@ -296,7 +304,9 @@ std::expected<void, std::string> ReadParameters(const std::array<ParameterKey<Pa
     return {};
 }
 
-// One waveform of a source; nothing to read when the file has no key for it
+/**
+ * @brief   One waveform of a source; nothing to read when the file has no key for it.
+ */
 template <typename Parameters, std::size_t Count>
 std::expected<void, std::string> ReadSourceParameters(const nlohmann::json &object, const char *name,
                                                       const std::array<ParameterKey<Parameters>, Count> &keys,
@@ -311,7 +321,9 @@ std::expected<void, std::string> ReadSourceParameters(const nlohmann::json &obje
     return ReadParameters(keys, *entry, parameters);
 }
 
-// Parts whose parameters are all there is to them save them as one object
+/**
+ * @brief   Parts whose parameters are all there is to them save them as one object.
+ */
 template <typename Part, typename Parameters, std::size_t Count>
 void WritePartParameters(const Part &part, const std::array<ParameterKey<Parameters>, Count> &keys,
                          nlohmann::json &object) {
@@ -320,7 +332,9 @@ void WritePartParameters(const Part &part, const std::array<ParameterKey<Paramet
     object["parameters"] = parameters;
 }
 
-// Missing parameters keep those the part starts with
+/**
+ * @brief   Missing parameters keep those the part starts with.
+ */
 template <typename Part, typename Parameters, std::size_t Count>
 std::expected<void, std::string> ReadPartParameters(const nlohmann::json &object, Part &part,
                                                     const std::array<ParameterKey<Parameters>, Count> &keys) {
@@ -340,7 +354,9 @@ std::expected<void, std::string> ReadPartParameters(const nlohmann::json &object
     return {};
 }
 
-// Parts with a model save its name, plus their parameters when custom
+/**
+ * @brief   Parts with a model save its name, plus their parameters when custom.
+ */
 template <typename Part, typename Parameters, std::size_t Count>
 void WriteModelChoice(const Part &part, const std::array<ParameterKey<Parameters>, Count> &keys,
                       nlohmann::json &object) {
@@ -357,7 +373,9 @@ void WriteModelChoice(const Part &part, const std::array<ParameterKey<Parameters
     }
 }
 
-// Parts with a ready model or custom parameters; the ideal op-amp also keeps its bandwidth
+/**
+ * @brief   Parts with a ready model or custom parameters; the ideal op-amp also keeps its bandwidth.
+ */
 void WriteModelFields(const Core::Component &component, nlohmann::json &object) {
     const Core::ComponentType type = component.GetType();
     if (Core::IsDiode(type)) {
@@ -375,7 +393,9 @@ void WriteModelFields(const Core::Component &component, nlohmann::json &object) 
     }
 }
 
-// The state or figures of the other parts that have any
+/**
+ * @brief   The state or figures of the other parts that have any.
+ */
 void WriteKindFields(const Core::Component &component, nlohmann::json &object) {
     const Core::ComponentType type = component.GetType();
     if (Core::IsCurrentControlled(type)) {
@@ -400,8 +420,10 @@ void WriteKindFields(const Core::Component &component, nlohmann::json &object) {
     }
 }
 
-// Parts whose figures are all there is to them: the switch that follows a voltage, the relay, the transformer, the
-// gates and flip-flops with their logic family, a clock and a logic input
+/**
+ * @brief   Parts whose figures are all there is to them: the switch that follows a voltage, the relay, the transformer,
+ *          the gates and flip-flops with their logic family, a clock and a logic input.
+ */
 void WriteFigureFields(const Core::Component &component, nlohmann::json &object) {
     const Core::ComponentType type = component.GetType();
     if (type == Core::ComponentType::V_SWITCH) {
@@ -470,7 +492,9 @@ nlohmann::json WriteElement(const UIElement &element) {
     return object;
 }
 
-// Every waveform key is optional, so files saved before a waveform existed keep the default one of the source
+/**
+ * @brief   Every waveform key is optional, so files saved before a waveform existed keep the default one of the source.
+ */
 std::expected<void, std::string> ReadSource(const nlohmann::json &object, Core::Source &source) {
     if (object.contains("source")) {
         const std::optional<std::string> type_name = ReadString(object, "source");
@@ -555,7 +579,9 @@ std::expected<void, std::string> ReadSource(const nlohmann::json &object, Core::
     return {};
 }
 
-// Missing custom parameters keep those of the default model of the part
+/**
+ * @brief   Missing custom parameters keep those of the default model of the part.
+ */
 template <typename Part, typename Model, typename Parameters, std::size_t Count>
 std::expected<void, std::string> ReadModelChoice(const nlohmann::json &object, Part &part,
                                                  const Model *(*find_model)(Core::ComponentType, std::string_view),
@@ -636,7 +662,9 @@ std::expected<void, std::string> ReadModel(const nlohmann::json &object, Core::C
 
 // Each reader fills what one kind of part carries, and does nothing for the others; a missing key keeps the default
 
-// The current a controlled source follows; a missing one loads as none, and the simulation then asks for one
+/**
+ * @brief   The current a controlled source follows; a missing one loads as none, and the simulation then asks for one.
+ */
 std::expected<void, std::string> ReadControllingCurrent(const nlohmann::json &object, Core::Component &component) {
     if (!Core::IsCurrentControlled(component.GetType()) || !object.contains("control")) {
         return {};
@@ -666,7 +694,9 @@ std::expected<void, std::string> ReadNetName(const nlohmann::json &object, Core:
     return {};
 }
 
-// A switch saved without a state stays open
+/**
+ * @brief   A switch saved without a state stays open.
+ */
 std::expected<void, std::string> ReadSwitchState(const nlohmann::json &object, Core::Component &component) {
     if (!Core::IsSwitch(component.GetType()) || !object.contains("closed")) {
         return {};
@@ -679,7 +709,9 @@ std::expected<void, std::string> ReadSwitchState(const nlohmann::json &object, C
     return {};
 }
 
-// A potentiometer saved without a wiper keeps it in the middle
+/**
+ * @brief   A potentiometer saved without a wiper keeps it in the middle.
+ */
 std::expected<void, std::string> ReadWiper(const nlohmann::json &object, Core::Component &component) {
     if (component.GetType() != Core::ComponentType::POTENTIOMETER || !object.contains("wiper")) {
         return {};
@@ -692,7 +724,9 @@ std::expected<void, std::string> ReadWiper(const nlohmann::json &object, Core::C
     return {};
 }
 
-// A logic input saved without a state stays low
+/**
+ * @brief   A logic input saved without a state stays low.
+ */
 std::expected<void, std::string> ReadLogicInputState(const nlohmann::json &object, Core::Component &component) {
     if (component.GetType() != Core::ComponentType::LOGIC_INPUT || !object.contains("high")) {
         return {};
@@ -710,8 +744,10 @@ using StateReader = std::expected<void, std::string> (*)(const nlohmann::json &,
 constexpr auto STATE_READERS = std::to_array<StateReader>(
     {&ReadControllingCurrent, &ReadNetName, &ReadSwitchState, &ReadWiper, &ReadLogicInputState});
 
-// What only some kinds of part carry: the current a controlled source follows, a net name, a switch state, a wiper
-// and the state of a logic input
+/**
+ * @brief   What only some kinds of part carry: the current a controlled source follows, a net name, a switch state, a
+ *          wiper and the state of a logic input.
+ */
 std::expected<void, std::string> ReadStateFields(const nlohmann::json &object, Core::Component &component) {
     for (const StateReader reader : STATE_READERS) {
         if (const auto read = reader(object, component); !read) {
@@ -721,8 +757,10 @@ std::expected<void, std::string> ReadStateFields(const nlohmann::json &object, C
     return {};
 }
 
-// Each reader fills the figures of one kind of part and does nothing for the others; missing keys leave the part as it
-// starts
+/**
+ * @brief   Each reader fills the figures of one kind of part and does nothing for the others; missing keys leave the
+ *          part as it starts.
+ */
 std::expected<void, std::string> ReadSwitchFigures(const nlohmann::json &object, Core::Component &component) {
     if (component.GetType() != Core::ComponentType::V_SWITCH) {
         return {};
@@ -744,7 +782,9 @@ std::expected<void, std::string> ReadTransformerFigures(const nlohmann::json &ob
     return ReadPartParameters(object, static_cast<Core::Transformer &>(component), TRANSFORMER_KEYS);
 }
 
-// A gate saved without a count has two inputs
+/**
+ * @brief   A gate saved without a count has two inputs.
+ */
 std::expected<void, std::string> ReadLogicFigures(const nlohmann::json &object, Core::Component &component) {
     if (!Core::IsLogicPart(component.GetType())) {
         return {};
@@ -783,8 +823,10 @@ constexpr auto FIGURE_READERS =
     std::to_array<StateReader>({&ReadSwitchFigures, &ReadRelayFigures, &ReadTransformerFigures, &ReadLogicFigures,
                                 &ReadClockFigures, &ReadLogicInputFigures});
 
-// Parts whose figures are all there is to them: the switch that follows a voltage, the relay, the transformer, the
-// gates and flip-flops with their logic family, a clock and a logic input
+/**
+ * @brief   Parts whose figures are all there is to them: the switch that follows a voltage, the relay, the transformer,
+ *          the gates and flip-flops with their logic family, a clock and a logic input.
+ */
 std::expected<void, std::string> ReadFigureFields(const nlohmann::json &object, Core::Component &component) {
     for (const StateReader reader : FIGURE_READERS) {
         if (const auto read = reader(object, component); !read) {
@@ -909,7 +951,9 @@ ReadElement(const nlohmann::json &object, const std::span<const SavedSubcircuit>
     return element;
 }
 
-// Keeps valid, unique names and renames the rest, so the netlist never gets two components with one name
+/**
+ * @brief   Keeps valid, unique names and renames the rest, so the netlist never gets two components with one name.
+ */
 void FixNames(const std::vector<std::unique_ptr<UIElement>> &elements, std::vector<std::string> &warnings) {
     std::vector<std::string> used_names;
     std::vector<Core::Component *> to_rename;
@@ -989,7 +1033,9 @@ nlohmann::json WriteSettings(const SimulationSettings &settings) {
     };
 }
 
-// The analysis readers below change only their own part of the settings; missing keys keep its value
+/**
+ * @brief   The analysis readers below change only their own part of the settings; missing keys keep its value.
+ */
 std::expected<void, std::string> ReadTransientSettings(const nlohmann::json &object, SimulationSettings &settings) {
     if (const auto read = ReadParameters(TRANSIENT_KEYS, object, settings.Transient); !read) {
         return read;
@@ -1007,7 +1053,9 @@ std::expected<void, std::string> ReadTransientSettings(const nlohmann::json &obj
     return {};
 }
 
-// The AC sweep and the noise analysis share the form of their frequency range
+/**
+ * @brief   The AC sweep and the noise analysis share the form of their frequency range.
+ */
 std::expected<void, std::string> ReadFrequencyRange(const nlohmann::json &object, Core::ACSweepSettings &range) {
     if (const auto read = ReadParameters(AC_SWEEP_KEYS, object, range); !read) {
         return read;
@@ -1175,8 +1223,10 @@ constexpr auto ANALYSIS_READERS = std::to_array<AnalysisReader>({
     {"parameter_step", "parameter step", &ReadParameterStepSettings},
 });
 
-// Files saved before settings were stored have none and get the defaults; an analysis with invalid settings
-// falls back to its defaults without affecting the others
+/**
+ * @brief   Files saved before settings were stored have none and get the defaults; an analysis with invalid settings
+ *          falls back to its defaults without affecting the others.
+ */
 SimulationSettings ReadSettings(const nlohmann::json &document, std::vector<std::string> &warnings) {
     SimulationSettings settings;
     const auto simulation = document.find("simulation");
@@ -1216,7 +1266,10 @@ SimulationSettings ReadSettings(const nlohmann::json &document, std::vector<std:
     return settings;
 }
 
-// A channel keeps both its operation and its expression, so switching between them after opening loses nothing
+/**
+ * @brief   A channel keeps both its operation and its expression, so switching between them after opening loses
+ *          nothing.
+ */
 nlohmann::json WriteMathChannel(const MathChannel &channel) {
     return {
         {"name", channel.Name},
@@ -1245,8 +1298,10 @@ nlohmann::json WriteMeasurements(const SavedMeasurements &measurements) {
     return measurements_object;
 }
 
-// Reads every entry of a list that read_entry accepts. Returns false when the key holds no list or some entry was
-// skipped; a missing key is an empty list
+/**
+ * @brief   Reads every entry of a list that read_entry accepts.
+ * @details Returns false when the key holds no list or some entry was skipped; a missing key is an empty list.
+ */
 template <typename Value, typename ReadEntry>
 bool ReadList(const nlohmann::json &object, const char *key, const ReadEntry &read_entry, std::vector<Value> &values) {
     const auto list = object.find(key);
@@ -1274,8 +1329,10 @@ std::optional<std::string> ReadStringValue(const nlohmann::json &value) {
     return value.get<std::string>();
 }
 
-// A channel needs its name; the other fields fall back to those of a new channel, but an operator that is not one
-// of the four rejects the channel, since it would compute something else
+/**
+ * @brief   A channel needs its name; the other fields fall back to those of a new channel, but an operator that is not
+ *          one of the four rejects the channel, since it would compute something else.
+ */
 std::optional<MathChannel> ReadMathChannelValue(const nlohmann::json &value) {
     if (!value.is_object()) {
         return std::nullopt;
@@ -1300,7 +1357,10 @@ std::optional<MathChannel> ReadMathChannelValue(const nlohmann::json &value) {
     return channel;
 }
 
-// Entries that cannot be read are skipped with one warning per list, since a lost trace is easy to probe again
+/**
+ * @brief   Entries that cannot be read are skipped with one warning per list, since a lost trace is easy to probe
+ *          again.
+ */
 SavedMeasurements ReadMeasurements(const nlohmann::json &document, std::vector<std::string> &warnings) {
     SavedMeasurements measurements;
     const auto object = document.find("measurements");
@@ -1403,7 +1463,10 @@ std::string WriteDocument(const std::span<const UIElement *const> elements, cons
     return document.dump(2) + "\n";
 }
 
-// One pin of a block: a drawn one sits at the point of its marker, one of SPICE text keeps the edge it goes on
+/**
+ * @brief   One pin of a block: a drawn one sits at the point of its marker, one of SPICE text keeps the edge it goes
+ *          on.
+ */
 std::expected<SavedSubcircuitPin, std::string> ReadSubcircuitPin(const nlohmann::json &pin, const bool is_text) {
     const std::optional<std::string> name = pin.is_object() ? ReadString(pin, "name") : std::nullopt;
     if (!name || !Core::SubcircuitInstance::IsValidIdentifier(*name)) {
@@ -1424,7 +1487,9 @@ std::expected<SavedSubcircuitPin, std::string> ReadSubcircuitPin(const nlohmann:
     return SavedSubcircuitPin{.Name = *name, .Point = *point};
 }
 
-// The pins of a block, in order, each with a name of its own
+/**
+ * @brief   The pins of a block, in order, each with a name of its own.
+ */
 std::expected<void, std::string> ReadSubcircuitPins(const nlohmann::json &object, const bool is_text,
                                                     std::vector<SavedSubcircuitPin> &pins) {
     const auto list = object.find("pins");
@@ -1447,7 +1512,9 @@ std::expected<void, std::string> ReadSubcircuitPins(const nlohmann::json &object
     return {};
 }
 
-// The ports and text of a block kept as SPICE text; each pin is the port of the same place
+/**
+ * @brief   The ports and text of a block kept as SPICE text; each pin is the port of the same place.
+ */
 std::expected<SavedSubcircuit, std::string> ReadSubcircuitText(const nlohmann::json &object,
                                                                SavedSubcircuit definition) {
     if (!object.is_object()) {

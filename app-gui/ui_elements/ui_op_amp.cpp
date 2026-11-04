@@ -43,7 +43,9 @@ void UIOpAmp::DrawTerminals(SchematicCanvas &canvas, const ViewTransform &view, 
     canvas.AddLine(LocalToScreen(view, 0, SUPPLY_LEAD_END), LocalToScreen(view, 0, 2), color, LINE_THICKNESS);
 }
 
-// The input signs sit inside the triangle, next to their inputs
+/**
+ * @brief   The input signs sit inside the triangle, next to their inputs.
+ */
 void UIOpAmp::DrawSymbol(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color,
                          SymbolStyle /*style*/) const {
     const ImVec2 triangle[3] = {LocalToScreen(view, -BODY_HALF_LENGTH, -BODY_HALF_HEIGHT),
@@ -58,7 +60,9 @@ void UIOpAmp::DrawSymbol(SchematicCanvas &canvas, const ViewTransform &view, con
                    LocalToScreen(view, SIGN_X, 1.0f + SIGN_HALF_SIZE), color, LINE_THICKNESS);
 }
 
-// The name above the triangle and the model below it, with its gain-bandwidth product while ideal
+/**
+ * @brief   The name above the triangle and the model below it, with its gain-bandwidth product while ideal.
+ */
 void UIOpAmp::DrawLabels(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color) const {
     const auto &op_amp = static_cast<const Core::OpAmp &>(GetComponent());
     std::string model = op_amp.GetModelName();

@@ -42,8 +42,10 @@ constexpr bool GPU_DEBUG_MODE = false;
 constexpr bool GPU_DEBUG_MODE = true;
 #endif
 
-// Where a build that ships digital.cm keeps it: beside the program on Windows, in the PlugIns folder of the macOS
-// bundle (SDL gives its Resources folder), and in lib/imcsim of the Linux layout, as the AppImage does
+/**
+ * @brief   Where a build that ships digital.cm keeps it: beside the program on Windows, in the PlugIns folder of the
+ *          macOS bundle (SDL gives its Resources folder), and in lib/imcsim of the Linux layout, as the AppImage does.
+ */
 std::filesystem::path GetCodeModelDirectory(const std::filesystem::path &base_path) {
 #if defined(_WIN32)
     return base_path;
@@ -166,8 +168,10 @@ int Application::InitSDL() {
     return EXIT_SUCCESS;
 }
 
-// SDL picks the native API of the system (Direct3D 12 on Windows, Vulkan on Linux) among the shader formats the
-// Dear ImGui backend ships
+/**
+ * @brief   SDL picks the native API of the system (Direct3D 12 on Windows, Vulkan on Linux) among the shader formats
+ *          the Dear ImGui backend ships.
+ */
 int Application::InitGPU() {
     m_GPUDevice = SDL_CreateGPUDevice(SDL_GPU_SHADERFORMAT_SPIRV | SDL_GPU_SHADERFORMAT_DXIL |
                                           SDL_GPU_SHADERFORMAT_MSL | SDL_GPU_SHADERFORMAT_METALLIB,
@@ -229,8 +233,10 @@ int Application::InitImGui() {
     return EXIT_SUCCESS;
 }
 
-// A missing file is a first start and keeps the defaults; a file that cannot be read keeps them too, with a line on
-// the log, since the program works the same without it
+/**
+ * @brief   A missing file is a first start and keeps the defaults; a file that cannot be read keeps them too, with a
+ *          line on the log, since the program works the same without it.
+ */
 void Application::LoadPreferencesFile() {
     if (!m_PreferencesPath.empty() && std::filesystem::exists(m_PreferencesPath)) {
         const std::expected<std::string, std::string> text = ReadTextFile(m_PreferencesPath);
@@ -248,8 +254,12 @@ void Application::LoadPreferencesFile() {
     ApplyPreferences();
 }
 
-// The theme is global to ImGui, so it follows the preferences here; the windows read the other choices themselves.
-// Writing only when something changed keeps the file untouched frame after frame, and a failed write is logged once
+/**
+ * @brief   The theme is global to ImGui, so it follows the preferences here; the windows read the other choices
+ *          themselves.
+ * @details Writing only when something changed keeps the file untouched frame after frame, and a failed write is logged
+ *          once.
+ */
 void Application::ApplyPreferences() {
     if (const std::optional<std::size_t> theme = FindTheme(m_Preferences.Theme); theme && *theme != GetThemeIndex()) {
         SetTheme(*theme);
@@ -435,7 +445,9 @@ void Application::DrawMainMenuBar() {
     ImGui::EndMainMenuBar();
 }
 
-// The window title names the schematic, with an asterisk while it has unsaved changes, as editors do
+/**
+ * @brief   The window title names the schematic, with an asterisk while it has unsaved changes, as editors do.
+ */
 void Application::UpdateWindowTitle() {
     const auto &file_path = m_Schematic.GetFilePath();
     const std::string title = std::format("{}{} - imcsim", file_path ? file_path->filename().string() : "Untitled",
@@ -446,9 +458,12 @@ void Application::UpdateWindowTitle() {
     }
 }
 
-// A new result of any analysis opens the Output window on its tab, in front unless the user turned that off; the
-// operating point and the transient also show on the schematic, so running one is enough to see it, and a new transient
-// plays from its start. Versions also change when results are dropped, which opens nothing
+/**
+ * @brief   A new result of any analysis opens the Output window on its tab, in front unless the user turned that off;
+ *          the operating point and the transient also show on the schematic, so running one is enough to see it, and a
+ *          new transient plays from its start.
+ * @details Versions also change when results are dropped, which opens nothing.
+ */
 void Application::ShowNewResults() {
     if (m_Schematic.GetTransientVersion() != m_ShownTransientVersion) {
         m_Playback.Reset();
@@ -475,8 +490,10 @@ void Application::ShowNewResults() {
                 PlotTab::TRUTH_TABLE);
 }
 
-// Seen after the windows drew, so a field still being typed in or a drag still going on holds the run. A live run
-// takes part changes by itself, so a run that would be live is never started from here
+/**
+ * @brief   Seen after the windows drew, so a field still being typed in or a drag still going on holds the run.
+ * @details A live run takes part changes by itself, so a run that would be live is never started from here.
+ */
 void Application::RerunAfterEdits() {
     const Analysis selected = m_Schematic.GetSimulationSettings().Selected;
     const std::optional<Analysis> running = m_AnalysisControls.GetRunningAnalysis();
@@ -496,11 +513,13 @@ void Application::RerunAfterEdits() {
     }
 }
 
-// The editor, Output, Analysis Settings and Netlist share the main node as tabs, and Properties sits on the right.
-// Only the editor starts open: the View menu opens the others in their place, and each result brings Output to the
-// front.
-// Must run before the windows are drawn. A split returns the new node in the given direction and leaves the rest
-// in its last argument
+/**
+ * @brief   The editor, Output, Analysis Settings and Netlist share the main node as tabs, and Properties sits on the
+ *          right.
+ * @details Only the editor starts open: the View menu opens the others in their place, and each result brings Output to
+ *          the front. Must run before the windows are drawn. A split returns the new node in the given direction and
+ *          leaves the rest in its last argument.
+ */
 void Application::SetupDefaultLayout(ImGuiID dockspace_id) {
     ImGui::DockBuilderSetNodeSize(dockspace_id, ImGui::GetMainViewport()->WorkSize);
     ImGuiID main_id = dockspace_id;

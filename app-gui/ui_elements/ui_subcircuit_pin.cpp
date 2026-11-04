@@ -56,7 +56,9 @@ void UISubcircuitPin::DrawSymbol(SchematicCanvas &canvas, const ViewTransform &v
                              LocalToScreen(view, head_base, HEAD_HALF_WIDTH), color);
 }
 
-// The name sits beyond the square, outside the circuit, where the block's edge is
+/**
+ * @brief   The name sits beyond the square, outside the circuit, where the block's edge is.
+ */
 void UISubcircuitPin::DrawLabels(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color) const {
     const std::string &name = static_cast<const Core::SubcircuitPinMarker &>(GetComponent()).GetNet();
     DrawLabel(canvas, view, {SQUARE_FAR - LABEL_GAP, 0.0f}, {-1.0f, 0.0f}, name.empty() ? "?" : name, color);

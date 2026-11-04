@@ -25,7 +25,9 @@ struct Trace {
     std::vector<double> Ys;
 };
 
-// A signal sampled unevenly, as ngspice would, alternating short and long steps
+/**
+ * @brief   A signal sampled unevenly, as ngspice would, alternating short and long steps.
+ */
 Trace Sample(const std::function<double(double)> &signal, const double stop_time, const int point_count) {
     Trace trace;
     const double average_step = stop_time / point_count;

@@ -32,7 +32,9 @@ UIPotentiometer::UIPotentiometer(const GridPoint position, const Rotation rotati
     : UIResistor(std::make_unique<Core::Potentiometer>(), position, rotation) {
 }
 
-// The body of a resistor, and the wiper lead from the third terminal down to an arrow head on it
+/**
+ * @brief   The body of a resistor, and the wiper lead from the third terminal down to an arrow head on it.
+ */
 void UIPotentiometer::DrawSymbol(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color,
                                  const SymbolStyle style) const {
     UIResistor::DrawSymbol(canvas, view, color, style);
@@ -44,8 +46,10 @@ void UIPotentiometer::DrawSymbol(SchematicCanvas &canvas, const ViewTransform &v
                    LINE_THICKNESS);
 }
 
-// One line with the name, the value and the position of the wiper, such as "RV1 10k 25%", so that the parts of the
-// label never overlap whichever way the part is turned
+/**
+ * @brief   One line with the name, the value and the position of the wiper, such as "RV1 10k 25%", so that the parts of
+ *          the label never overlap whichever way the part is turned.
+ */
 void UIPotentiometer::DrawLabels(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color) const {
     const auto &pot = static_cast<const Core::Potentiometer &>(GetComponent());
     DrawLabel(canvas, view, {0.0f, LABEL_OFFSET_Y}, {0.0f, 1.0f},

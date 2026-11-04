@@ -31,7 +31,9 @@ std::string GetValueSeriesLabel(const Core::ValueSeries series) {
     return std::format("{} ({:g}%)", Core::GetSeriesName(series), Core::GetSeriesTolerancePercent(series));
 }
 
-// A section is a heading over a table of two columns, the name of each choice and its widget
+/**
+ * @brief   A section is a heading over a table of two columns, the name of each choice and its widget.
+ */
 bool BeginSection(const char *title) {
     ImGui::SeparatorText(title);
     if (!ImGui::BeginTable(title, 2)) {
@@ -42,7 +44,9 @@ bool BeginSection(const char *title) {
     return true;
 }
 
-// Starts a row: the name of the choice on the left, then the widget fills the rest of the row
+/**
+ * @brief   Starts a row: the name of the choice on the left, then the widget fills the rest of the row.
+ */
 void BeginChoice(const char *label) {
     ImGui::TableNextRow();
     ImGui::TableNextColumn();

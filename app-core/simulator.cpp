@@ -18,8 +18,10 @@ namespace Core {
 
 namespace {
 
-// What stops a run before it reaches the backend: the circuit, the settings the analysis takes, and a part or an
-// analysis the backend does not run
+/**
+ * @brief   What stops a run before it reaches the backend: the circuit, the settings the analysis takes, and a part or
+ *          an analysis the backend does not run.
+ */
 std::optional<std::string> FindProblem(const Circuit &circuit, const std::optional<std::string> &settings_error,
                                        const AnalysisKind kind) {
     if (const std::optional<std::string> error = CheckCircuit(circuit)) {
@@ -55,7 +57,10 @@ InputCopies CopyInputs(const Circuit &circuit, const std::vector<std::string> &n
     return copies;
 }
 
-// Sets the inputs to one combination, the first as the most significant bit, and starts the row of that combination
+/**
+ * @brief   Sets the inputs to one combination, the first as the most significant bit, and starts the row of that
+ *          combination.
+ */
 TruthTableRow SetCombination(std::vector<LogicInput> &inputs, const std::size_t combination) {
     TruthTableRow row;
     for (std::size_t input = 0; input < inputs.size(); ++input) {
@@ -66,7 +71,9 @@ TruthTableRow SetCombination(std::vector<LogicInput> &inputs, const std::size_t 
     return row;
 }
 
-// Tells whether a stop was asked, and otherwise reports the share of combinations done
+/**
+ * @brief   Tells whether a stop was asked, and otherwise reports the share of combinations done.
+ */
 bool IsStopped(RunControl *control, const std::size_t done, const std::size_t total) {
     if (control == nullptr) {
         return false;
@@ -84,7 +91,9 @@ struct FirstFailure {
     std::vector<SimulatorMessage> Messages;
 };
 
-// Reads the output voltages of a combination, or remembers the first failure
+/**
+ * @brief   Reads the output voltages of a combination, or remembers the first failure.
+ */
 void ReadRow(TruthTableRow &row, const OperatingPointRun &point, const std::vector<int> &output_nodes,
              FirstFailure &failure) {
     if (point.Result) {
@@ -96,7 +105,10 @@ void ReadRow(TruthTableRow &row, const OperatingPointRun &point, const std::vect
     }
 }
 
-// The table with a warning for the combinations that have no operating point; a run fails only when none has one
+/**
+ * @brief   The table with a warning for the combinations that have no operating point; a run fails only when none has
+ *          one.
+ */
 TruthTableRun ConcludeTable(TruthTable table, TruthTableRun run, FirstFailure failure) {
     const std::size_t row_count = table.Rows.size();
     const std::size_t missing = static_cast<std::size_t>(

@@ -41,7 +41,9 @@ void UIVCC::DrawSymbol(SchematicCanvas &canvas, const ViewTransform &view, const
                    LocalToScreen(view, BAR_HALF_WIDTH, -LEAD_LENGTH), color, LINE_THICKNESS);
 }
 
-// The rail is labeled by its role and voltage past the bar; the SPICE name (V1) only matters in the netlist
+/**
+ * @brief   The rail is labeled by its role and voltage past the bar; the SPICE name (V1) only matters in the netlist.
+ */
 void UIVCC::DrawLabels(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color) const {
     const std::string label = std::format("VCC {}V", Core::FormatValue(GetComponent().GetValue()));
     DrawLabel(canvas, view, {0.0f, -LABEL_OFFSET}, {0.0f, -1.0f}, label, color);
@@ -51,7 +53,9 @@ std::vector<GridPoint> UIVCC::GetLocalTerminals() const {
     return {{0, 0}};
 }
 
-// The terminal is at the middle of the symbol, and its lead goes up to the bar
+/**
+ * @brief   The terminal is at the middle of the symbol, and its lead goes up to the bar.
+ */
 GridPoint UIVCC::GetLocalTerminalInward(std::size_t /*terminal*/) const {
     return {0, -1};
 }

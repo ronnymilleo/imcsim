@@ -89,7 +89,9 @@ constexpr auto PARTS = std::to_array<PartInfo>({
     {Core::ComponentType::LOGIC_INPUT, "Logic input"},
 });
 
-// Lowercase letters and digits only, so "opamp" finds "Op-amp" and "vcc" finds "VCC supply"
+/**
+ * @brief   Lowercase letters and digits only, so "opamp" finds "Op-amp" and "vcc" finds "VCC supply".
+ */
 std::string NormalizeSearchText(const std::string_view text) {
     std::string normalized;
     for (const char character : text) {

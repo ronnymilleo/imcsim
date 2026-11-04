@@ -40,9 +40,11 @@ bool IsACSource(const Component &component) {
            static_cast<const Source &>(component).GetSourceType() == Source::SourceType::AC;
 }
 
-// One line serves every analysis: .op reads the DC value, .ac the AC magnitude and .tran the waveform. Every
-// waveform writes the value it starts from, so the operating point matches the beginning of the transient. The name
-// tells SPICE whether it is a voltage or current source
+/**
+ * @brief   One line serves every analysis: .op reads the DC value, .ac the AC magnitude and .tran the waveform.
+ * @details Every waveform writes the value it starts from, so the operating point matches the beginning of the
+ *          transient. The name tells SPICE whether it is a voltage or current source.
+ */
 std::string FormatSource(const Source &source, const std::vector<int> &nodes) {
     const std::string start = std::format("{} {} {}", source.GetName(), nodes[0], nodes[1]);
     switch (source.GetSourceType()) {
@@ -102,13 +104,17 @@ std::string FormatSource(const Source &source, const std::vector<int> &nodes) {
     return "";
 }
 
-// Supplies and voltage sources carry their own branch current, which a CCCS or CCVS can follow directly
+/**
+ * @brief   Supplies and voltage sources carry their own branch current, which a CCCS or CCVS can follow directly.
+ */
 bool HasBranchCurrent(const ComponentType type) {
     return type == ComponentType::VCC || type == ComponentType::VOLTAGE_SOURCE || type == ComponentType::CLOCK ||
            type == ComponentType::LOGIC_INPUT;
 }
 
-// The currents that CCCS and CCVS sources of the circuit follow
+/**
+ * @brief   The currents that CCCS and CCVS sources of the circuit follow.
+ */
 std::vector<std::string> ListControllingCurrents(const std::vector<CircuitEntry> &entries) {
     std::vector<std::string> currents;
     for (const CircuitEntry &entry : entries) {
@@ -119,7 +125,9 @@ std::vector<std::string> ListControllingCurrents(const std::vector<CircuitEntry>
     return currents;
 }
 
-// A current names its part, alone or followed by "." and a terminal label
+/**
+ * @brief   A current names its part, alone or followed by "." and a terminal label.
+ */
 bool CarriesCurrent(const Component &component, const std::vector<std::string> &currents) {
     const std::string &name = component.GetName();
     return !name.empty() && std::ranges::any_of(currents, [&name](const std::string &current) {
@@ -128,9 +136,11 @@ bool CarriesCurrent(const Component &component, const std::vector<std::string> &
     });
 }
 
-// The probes of a part: those it always reports, when probes are asked for or when one of its currents controls a
-// source; a part without probes of its own gets one on its first terminal when it controls a source, unless it has
-// a branch current already
+/**
+ * @brief   The probes of a part: those it always reports, when probes are asked for or when one of its currents
+ *          controls a source; a part without probes of its own gets one on its first terminal when it controls a
+ *          source, unless it has a branch current already.
+ */
 std::vector<CurrentProbe> ProbesFor(const Component &component, const bool add_current_probes, const bool controlling) {
     if (!add_current_probes && !controlling) {
         return {};
@@ -142,8 +152,10 @@ std::vector<CurrentProbe> ProbesFor(const Component &component, const bool add_c
     return probes;
 }
 
-// Moves every probed terminal onto a node of its own, joined to its circuit node by a 0 V source whose current
-// flows into the terminal, and returns the lines of those sources
+/**
+ * @brief   Moves every probed terminal onto a node of its own, joined to its circuit node by a 0 V source whose current
+ *          flows into the terminal, and returns the lines of those sources.
+ */
 std::string ProbeTerminals(const Component &component, const std::vector<CurrentProbe> &probes, std::vector<int> &nodes,
                            int &next_probe_node) {
     std::string lines;
@@ -182,8 +194,10 @@ std::string FormatLogicModels(const LogicPart &part) {
     return models;
 }
 
-// The terminal nodes are in the order of GetInputLabels() and GetLogicOutputLabels(); the digital nodes and the
-// analog nodes behind the output resistors are numbered from next_extra_node
+/**
+ * @brief   The terminal nodes are in the order of GetInputLabels() and GetLogicOutputLabels(); the digital nodes and
+ *          the analog nodes behind the output resistors are numbered from next_extra_node.
+ */
 std::string FormatLogicPart(const LogicPart &part, const std::vector<int> &nodes, int &next_extra_node) {
     const std::string &name = part.GetName();
     const std::vector<std::string> inputs = part.GetInputLabels();
@@ -230,7 +244,9 @@ std::string FormatLogicPart(const LogicPart &part, const std::vector<int> &nodes
     return lines;
 }
 
-// The model of a logic part, and a bridge and a resistor on every pin, as FormatLogicPart() writes them
+/**
+ * @brief   The model of a logic part, and a bridge and a resistor on every pin, as FormatLogicPart() writes them.
+ */
 std::vector<std::string> GetLogicElementNames(const Component &part) {
     const std::string &name = part.GetName();
     std::vector<std::string> names{std::format("A-{}", name)};
@@ -243,7 +259,9 @@ std::vector<std::string> GetLogicElementNames(const Component &part) {
     return names;
 }
 
-// Parts that share a ready model share its line, written the first time the model comes up
+/**
+ * @brief   Parts that share a ready model share its line, written the first time the model comes up.
+ */
 void AddModelLine(std::string spice_name, const std::string &line, std::vector<std::string> &written_names,
                   std::string &models) {
     if (std::ranges::contains(written_names, spice_name)) {
@@ -271,9 +289,12 @@ std::string ToLowerCase(const std::string_view text) {
     return lower;
 }
 
-// The line of a diode or a transistor, with the line of its model added to models the first time it comes up. A
-// library model is written once, with the other library models, after the parts. The body of a MOSFET is tied to its
-// source, past its probe, so the source current includes it; a library model brings its own channel size
+/**
+ * @brief   The line of a diode or a transistor, with the line of its model added to models the first time it comes up.
+ * @details A library model is written once, with the other library models, after the parts. The body of a MOSFET is
+ *          tied to its source, past its probe, so the source current includes it; a library model brings its own
+ *          channel size.
+ */
 std::string FormatModeledPart(const Component &component, const std::vector<int> &nodes,
                               std::vector<std::string> &model_names, std::string &models) {
     const ComponentType type = component.GetType();
@@ -304,7 +325,9 @@ std::string FormatModeledPart(const Component &component, const std::vector<int>
                        nodes[2], model_name, parameters.Width, parameters.Length);
 }
 
-// Every library model of a circuit, under the names the parts use, after the models of the parts
+/**
+ * @brief   Every library model of a circuit, under the names the parts use, after the models of the parts.
+ */
 std::string FormatLibraryModels(const std::vector<LibraryModel> &library_models) {
     std::string text;
     for (const LibraryModel &model : library_models) {
@@ -313,7 +336,9 @@ std::string FormatLibraryModels(const std::vector<LibraryModel> &library_models)
     return text;
 }
 
-// The names a body declares with .model or .subckt, lowercase, since SPICE reads names without regard to case
+/**
+ * @brief   The names a body declares with .model or .subckt, lowercase, since SPICE reads names without regard to case.
+ */
 std::set<std::string> CollectDeclaredNames(const std::string &body) {
     std::set<std::string> declared;
     std::istringstream lines(body);
@@ -333,8 +358,11 @@ std::set<std::string> CollectDeclaredNames(const std::string &body) {
     return declared;
 }
 
-// One line with the declared names prefixed. A comment stays as it is, and the first word of an element line is left
-// alone: it is the element's own name, whose first letter says what the element is
+/**
+ * @brief   One line with the declared names prefixed.
+ * @details A comment stays as it is, and the first word of an element line is left alone: it is the element's own name,
+ *          whose first letter says what the element is.
+ */
 std::string ScopeLine(const std::string_view line, const std::set<std::string> &declared, const std::string &prefix) {
     const std::size_t first = line.find_first_not_of(" \t");
     if (first == std::string_view::npos || line[first] == '*') {
@@ -358,8 +386,11 @@ std::string ScopeLine(const std::string_view line, const std::set<std::string> &
     return scoped;
 }
 
-// Model names are global in ngspice, even when their declarations sit inside a subcircuit. Prefix every declaration
-// and reference of a definition so equal custom parts in two definitions cannot replace each other's models
+/**
+ * @brief   Model names are global in ngspice, even when their declarations sit inside a subcircuit.
+ * @details Prefix every declaration and reference of a definition so equal custom parts in two definitions cannot
+ *          replace each other's models.
+ */
 std::string ScopeModels(const std::string &body, const std::string_view definition_name) {
     const std::set<std::string> declared = CollectDeclaredNames(body);
     const std::string prefix = std::format("imcsim_{}_", definition_name);
@@ -379,8 +410,10 @@ std::string ScopeModels(const std::string &body, const std::string_view definiti
     return scoped;
 }
 
-// A drawn block lists the nodes of its pins and writes its body as a netlist; a block kept as SPICE text lists the
-// ports of its .subckt line and writes its text as it came
+/**
+ * @brief   A drawn block lists the nodes of its pins and writes its body as a netlist; a block kept as SPICE text lists
+ *          the ports of its .subckt line and writes its text as it came.
+ */
 std::string FormatSubcircuit(const SubcircuitDefinition &definition) {
     std::string text = std::format(".subckt {}", definition.Name);
     if (definition.Spice) {

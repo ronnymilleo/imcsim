@@ -37,7 +37,9 @@ struct SeriesLoop {
     }
 };
 
-// Two samples, 0 s and 2 s: the source goes from 0 V to 4 V and delivers 0 to 2 mA
+/**
+ * @brief   Two samples, 0 s and 2 s: the source goes from 0 V to 4 V and delivers 0 to 2 mA.
+ */
 Core::Transient RampingLoop() {
     Core::Transient transient;
     transient.Times = {0.0, 2.0};

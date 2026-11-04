@@ -51,7 +51,10 @@ UIControlledSwitch::UIControlledSwitch(const Core::ComponentType type, const Gri
                 position, rotation) {
 }
 
-// The contact leads stop at the contacts; the control leads run to the bar or the coil, with their polarity beside
+/**
+ * @brief   The contact leads stop at the contacts; the control leads run to the bar or the coil, with their polarity
+ *          beside.
+ */
 void UIControlledSwitch::DrawTerminals(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color) const {
     canvas.AddLine(LocalToScreen(view, 0, -2), LocalToScreen(view, 0, -CONTACT_Y - CONTACT_RADIUS), color,
                    LINE_THICKNESS);
@@ -95,7 +98,9 @@ void UIControlledSwitch::DrawSymbol(SchematicCanvas &canvas, const ViewTransform
     DrawDashedLine(canvas, view, CONTROL_END_X, LINK_END_X, 0.0f, color);
 }
 
-// The threshold of a switch, or the pull-in voltage of a relay, under the name
+/**
+ * @brief   The threshold of a switch, or the pull-in voltage of a relay, under the name.
+ */
 void UIControlledSwitch::DrawLabels(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color) const {
     const double voltage =
         IsRelay() ? static_cast<const Core::Relay &>(GetComponent()).GetParameters().PullInVoltage

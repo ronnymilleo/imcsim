@@ -15,7 +15,9 @@ namespace GUI {
 
 namespace {
 
-// Separators between the values of a list: commas, semicolons and blanks, in any mix
+/**
+ * @brief   Separators between the values of a list: commas, semicolons and blanks, in any mix.
+ */
 bool IsListSeparator(const char character) {
     return character == ',' || character == ';' || character == ' ' || character == '\t';
 }

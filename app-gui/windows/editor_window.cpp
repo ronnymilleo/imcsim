@@ -175,7 +175,9 @@ void DrawProbeIcon(const IconPlacement &icon) {
     icon.DrawList->AddLine(icon.Point(0.3f, -0.3f), icon.Point(0.45f, -0.45f), icon.Color, LINE_THICKNESS);
 }
 
-// Four corners of a frame
+/**
+ * @brief   Four corners of a frame.
+ */
 void DrawFitIcon(const IconPlacement &icon) {
     constexpr float CORNER = 0.4f;
     constexpr float ARM = 0.18f;
@@ -191,7 +193,9 @@ void DrawFitIcon(const IconPlacement &icon) {
     }
 }
 
-// An arc over the top that turns back, with the arrowhead at its left end, mirrored for Redo
+/**
+ * @brief   An arc over the top that turns back, with the arrowhead at its left end, mirrored for Redo.
+ */
 void DrawUndoIcon(const IconPlacement &icon) {
     const float radius = 0.28f;
     const ImVec2 middle = {0.05f, 0.05f};
@@ -206,7 +210,9 @@ void DrawUndoIcon(const IconPlacement &icon) {
                                      icon.Point(middle.x - radius + 0.14f, middle.y - 0.02f), icon.Color);
 }
 
-// Line drawings on a unit square centered on the icon, y pointing down
+/**
+ * @brief   Line drawings on a unit square centered on the icon, y pointing down.
+ */
 void DrawToolIcon(ImDrawList *draw_list, const ToolIcon icon, const ImVec2 center, const float size,
                   const ImU32 color) {
     const IconPlacement placement{.DrawList = draw_list,
@@ -241,13 +247,17 @@ void DrawToolIcon(ImDrawList *draw_list, const ToolIcon icon, const ImVec2 cente
     }
 }
 
-// Square toolbar button; the active one uses the primary colors, as the tool in use
+/**
+ * @brief   Square toolbar button; the active one uses the primary colors, as the tool in use.
+ */
 bool ToolButton(const char *id, const bool active) {
     const float side = ImGui::GetFrameHeight() * TOOL_BUTTON_SCALE;
     return active ? PrimaryButton(id, {side, side}) : ImGui::Button(id, {side, side});
 }
 
-// "Transient running", with the share done when the run reports one
+/**
+ * @brief   "Transient running", with the share done when the run reports one.
+ */
 std::string FormatRunProgress(const char *analysis_name, const bool is_stopping, const double progress) {
     if (is_stopping) {
         return std::format("Stopping {}", analysis_name);
@@ -258,7 +268,10 @@ std::string FormatRunProgress(const char *analysis_name, const bool is_stopping,
     return std::format("{} running", analysis_name);
 }
 
-// "Transient live at 12.5ms", or paused: a live run has no end to count toward, so it tells how far it has got
+/**
+ * @brief   "Transient live at 12.5ms", or paused: a live run has no end to count toward, so it tells how far it has
+ *          got.
+ */
 std::string FormatLiveProgress(const AnalysisControls &controls, const std::optional<Core::Transient> &transient) {
     const char *state = controls.IsLivePaused() ? "paused" : "live";
     if (!transient || transient->Times.empty()) {
@@ -279,7 +292,10 @@ struct RunStatusLine {
     std::string_view WidestText;
 };
 
-// What the last run reported, in the color its outcome asks for; a run in progress takes the place of that report
+/**
+ * @brief   What the last run reported, in the color its outcome asks for; a run in progress takes the place of that
+ *          report.
+ */
 RunStatusLine DescribeRunStatus(const AnalysisControls &controls, const std::optional<Core::Transient> &transient) {
     const ImVec4 plain = ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled);
     if (controls.IsLive() && !controls.IsStopping()) {
@@ -314,7 +330,9 @@ RunStatusLine DescribeRunStatus(const AnalysisControls &controls, const std::opt
     }
 }
 
-// The button that names the selected analysis, with room for its dropdown arrow
+/**
+ * @brief   The button that names the selected analysis, with room for its dropdown arrow.
+ */
 float AnalysisButtonWidth() {
     float widest = 0.0f;
     for (const Analysis analysis :
@@ -325,13 +343,17 @@ float AnalysisButtonWidth() {
     return widest + ImGui::GetStyle().FramePadding.x * 2.0f + ImGui::GetFontSize();
 }
 
-// The Live toggle beside the analysis button, which becomes Discard while a live run goes on
+/**
+ * @brief   The Live toggle beside the analysis button, which becomes Discard while a live run goes on.
+ */
 float LiveButtonWidth() {
     return std::max(ImGui::CalcTextSize("Live").x, ImGui::CalcTextSize("Discard").x) +
            ImGui::GetStyle().FramePadding.x * 2.0f + ImGui::GetFontSize();
 }
 
-// What the Run button does now, for its tooltip
+/**
+ * @brief   What the Run button does now, for its tooltip.
+ */
 std::string DescribeRunAction(const AnalysisControls &controls, const Analysis selected) {
     const RunAction action = controls.GetRunAction();
     const std::optional<Analysis> running = controls.GetRunningAnalysis();
@@ -350,7 +372,9 @@ std::string DescribeRunAction(const AnalysisControls &controls, const Analysis s
     return std::format("Run {} (F5)", GetAnalysisName(selected));
 }
 
-// The label of the Run button at the foot of the analysis settings
+/**
+ * @brief   The label of the Run button at the foot of the analysis settings.
+ */
 const char *GetRunButtonLabel(const RunAction action) {
     switch (action) {
     case RunAction::STOP:
@@ -363,7 +387,9 @@ const char *GetRunButtonLabel(const RunAction action) {
     }
 }
 
-// The character of a key that starts a value, from the main row or the keypad: a digit, a point or a minus
+/**
+ * @brief   The character of a key that starts a value, from the main row or the keypad: a digit, a point or a minus.
+ */
 std::optional<char> FindTypedValueStart() {
     for (int digit = 0; digit <= 9; ++digit) {
         if (ImGui::IsKeyPressed(static_cast<ImGuiKey>(ImGuiKey_0 + digit), false) ||
@@ -380,7 +406,9 @@ std::optional<char> FindTypedValueStart() {
     return std::nullopt;
 }
 
-// Middle and icon size of the last item, and the color its icon takes
+/**
+ * @brief   Middle and icon size of the last item, and the color its icon takes.
+ */
 ImVec2 ItemCenter() {
     return (ImGui::GetItemRectMin() + ImGui::GetItemRectMax()) / 2.0f;
 }
@@ -453,7 +481,9 @@ public:
         }
     }
 
-    // Space between buttons, and the extra space between groups, in font sizes
+    /**
+     * @brief   Space between buttons, and the extra space between groups, in font sizes.
+     */
     static float ButtonSpacing() { return ImGui::GetFontSize() * 0.25f; }
     static float GroupGap() { return ImGui::GetFontSize() * 0.6f; }
 
@@ -462,7 +492,9 @@ private:
     bool m_First = true;
 };
 
-// Operating point value of a measurement, or no value before a simulation or for a current it lacks
+/**
+ * @brief   Operating point value of a measurement, or no value before a simulation or for a current it lacks.
+ */
 std::optional<double> FindOperatingPointValue(const MeasurementTarget &target,
                                               const Core::OperatingPoint &operating_point) {
     if (target.Node) {
@@ -474,7 +506,10 @@ std::optional<double> FindOperatingPointValue(const MeasurementTarget &target,
     return current != operating_point.Currents.end() ? std::optional(current->Current) : std::nullopt;
 }
 
-// "V(3) = 4.5V" once there is an operating point, or just "V(3)"; a node a net label named shows the name, V(VOUT)
+/**
+ * @brief   "V(3) = 4.5V" once there is an operating point, or just "V(3)"; a node a net label named shows the name,
+ *          V(VOUT).
+ */
 std::string DescribeMeasurement(const MeasurementTarget &target, const Connectivity &connectivity,
                                 const Core::OperatingPoint *operating_point) {
     const std::optional<double> value =
@@ -486,7 +521,10 @@ std::string DescribeMeasurement(const MeasurementTarget &target, const Connectiv
     return std::format("{} = {}{}", label, Core::FormatValue(*value), target.Node ? "V" : "A");
 }
 
-// Light of an LED color, kept bright so it reads on any background; an LED with custom parameters glows warm white
+/**
+ * @brief   Light of an LED color, kept bright so it reads on any background; an LED with custom parameters glows warm
+ *          white.
+ */
 ImVec4 GetLEDLight(const Core::LEDColor color) {
     switch (color) {
     case Core::LEDColor::RED:
@@ -514,7 +552,9 @@ ImU32 WithAlpha(const ImU32 color, const ImU32 alpha) {
     return (color & ~IM_COL32_A_MASK) | (alpha << IM_COL32_A_SHIFT);
 }
 
-// Power a part absorbs, looked up by the name of the part; a current name such as "Q1.C" belongs to part "Q1"
+/**
+ * @brief   Power a part absorbs, looked up by the name of the part; a current name such as "Q1.C" belongs to part "Q1".
+ */
 std::optional<ComponentPower> FindPower(const std::vector<ComponentPower> &powers, const std::string &name) {
     const std::string part = name.substr(0, name.find('.'));
     const auto found = std::ranges::find(powers, part, &ComponentPower::Name);
@@ -712,7 +752,6 @@ void EditorWindow::DrawViewMenuItems() {
     }
 }
 
-// Window content only: AppWindow::Render() wraps it in Begin/End
 void EditorWindow::Draw() {
     // Only while the editor has the focus, since text fields use Home
     if (ImGui::Shortcut(ImGuiKey_Home)) {
@@ -797,7 +836,10 @@ void EditorWindow::Draw() {
     m_PopupOpenLastFrame = ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId | ImGuiPopupFlags_AnyPopupLevel);
 }
 
-// One row of icon buttons, whose groups wrap onto new lines when the window is narrow instead of being cut off
+/**
+ * @brief   One row of icon buttons, whose groups wrap onto new lines when the window is narrow instead of being cut
+ *          off.
+ */
 void EditorWindow::DrawToolbar() {
     ToolbarRow row;
     const float gap = ToolbarRow::GroupGap();
@@ -870,8 +912,10 @@ void EditorWindow::DrawPartButton(const Core::ComponentType type) {
     ImGui::SetItemTooltip("%s", GetPartName(type));
 }
 
-// Run starts the selected analysis; the button beside it names that analysis and opens its settings, where another
-// one can be picked
+/**
+ * @brief   Run starts the selected analysis; the button beside it names that analysis and opens its settings, where
+ *          another one can be picked.
+ */
 void EditorWindow::DrawRunControls() {
     const float side = ImGui::GetFrameHeight() * TOOL_BUTTON_SCALE;
     const Analysis selected = m_RootSchematic.GetSimulationSettings().Selected;
@@ -887,7 +931,9 @@ void EditorWindow::DrawRunControls() {
     DrawAnalysisButton(run_left);
 }
 
-// The analysis picker beside Run, whose popover holds the settings of the analysis and its own Run button
+/**
+ * @brief   The analysis picker beside Run, whose popover holds the settings of the analysis and its own Run button.
+ */
 void EditorWindow::DrawAnalysisButton(const float run_left) {
     const float side = ImGui::GetFrameHeight() * TOOL_BUTTON_SCALE;
     const Analysis selected = m_RootSchematic.GetSimulationSettings().Selected;
@@ -924,9 +970,12 @@ void EditorWindow::DrawAnalysisButton(const float run_left) {
     }
 }
 
-// Live makes Run start the transient paced against the clock, so the user sets switches, push buttons, logic inputs
-// and potentiometers on the schematic while it runs; it is disabled, with the reason, for any other analysis. While a
-// live run goes on, paused or not, the mode cannot change it, so the button drops the run instead
+/**
+ * @brief   Live makes Run start the transient paced against the clock, so the user sets switches, push buttons, logic
+ *          inputs and potentiometers on the schematic while it runs; it is disabled, with the reason, for any other
+ *          analysis.
+ * @details While a live run goes on, paused or not, the mode cannot change it, so the button drops the run instead.
+ */
 void EditorWindow::DrawLiveToggle() {
     const float side = ImGui::GetFrameHeight() * TOOL_BUTTON_SCALE;
     const ImVec2 size = {LiveButtonWidth(), side};
@@ -954,7 +1003,10 @@ void EditorWindow::DrawLiveToggle() {
     }
 }
 
-// The button places the part last picked in the group; the arrow beside it, or a right click, lists the others
+/**
+ * @brief   The button places the part last picked in the group; the arrow beside it, or a right click, lists the
+ *          others.
+ */
 void EditorWindow::DrawPartGroup(const std::size_t index) {
     const PartGroup &group = PART_GROUPS[index];
     Core::ComponentType &choice = m_PartGroupChoices[index];
@@ -1003,8 +1055,10 @@ void EditorWindow::DrawPartGroup(const std::size_t index) {
     ImGui::PopID();
 }
 
-// The last operating point, unless a transient was run after it: then the transient at the instant of the playback,
-// on a scale that covers the whole run, so a value keeps its color while the time moves
+/**
+ * @brief   The last operating point, unless a transient was run after it: then the transient at the instant of the
+ *          playback, on a scale that covers the whole run, so a value keeps its color while the time moves.
+ */
 void EditorWindow::UpdateDisplayedState() {
     m_Displayed.reset();
     const auto &operating_point = m_Schematic->GetOperatingPoint();
@@ -1042,7 +1096,9 @@ void EditorWindow::UpdateDisplayedState() {
     m_Displayed = std::move(state);
 }
 
-// The span of time of the window of the transient that plays, or none without a transient
+/**
+ * @brief   The span of time of the window of the transient that plays, or none without a transient.
+ */
 std::optional<EditorWindow::TimeSpan> EditorWindow::GetWindowSpan() const {
     const auto &transient = m_Schematic->GetTransient();
     const PointWindow window = m_Playback.Window.GetWindow();
@@ -1052,8 +1108,11 @@ std::optional<EditorWindow::TimeSpan> EditorWindow::GetWindowSpan() const {
     return TimeSpan{.From = transient->Times[window.First], .To = transient->Times[window.First + window.Count - 1]};
 }
 
-// A row above the canvas with the playback of the transient on display: play, loop, a slider over the window and the
-// instant. Moving the slider stops the playback, so it holds where the user put it
+/**
+ * @brief   A row above the canvas with the playback of the transient on display: play, loop, a slider over the window
+ *          and the instant.
+ * @details Moving the slider stops the playback, so it holds where the user put it.
+ */
 void EditorWindow::DrawTimeBar() {
     if (!m_Displayed || !m_Displayed->Time) {
         return;
@@ -1095,9 +1154,12 @@ void EditorWindow::DrawTimeBar() {
     ImGui::TextUnformatted(readout.c_str());
 }
 
-// Voltage, Current and Power need a result on display; without one, wires stay plain and the legend asks for it.
-// Wires carry no power, so they stay plain by power. Over heat colors a selected wire is marked by a halo instead of
-// a color of its own, which could pass for a value on the scale
+/**
+ * @brief   Voltage, Current and Power need a result on display; without one, wires stay plain and the legend asks for
+ *          it.
+ * @details Wires carry no power, so they stay plain by power. Over heat colors a selected wire is marked by a halo
+ *          instead of a color of its own, which could pass for a value on the scale.
+ */
 void EditorWindow::DrawWires(SchematicCanvas &canvas, const ViewTransform &view) {
     const Connectivity &connectivity = m_Schematic->GetConnectivity();
     const auto &wires = m_Schematic->GetWires();
@@ -1133,7 +1195,9 @@ void EditorWindow::DrawWires(SchematicCanvas &canvas, const ViewTransform &view)
     }
 }
 
-// Over heat colors a selected wire has a halo behind it
+/**
+ * @brief   Over heat colors a selected wire has a halo behind it.
+ */
 void EditorWindow::DrawWireSelectionHalos(SchematicCanvas &canvas, const ViewTransform &view) {
     if (!AreWiresHeatColored()) {
         return;
@@ -1145,7 +1209,9 @@ void EditorWindow::DrawWireSelectionHalos(SchematicCanvas &canvas, const ViewTra
     }
 }
 
-// The number of the node on the middle of each wire
+/**
+ * @brief   The number of the node on the middle of each wire.
+ */
 void EditorWindow::DrawNodeNumbers(SchematicCanvas &canvas, const ViewTransform &view) {
     const Connectivity &connectivity = m_Schematic->GetConnectivity();
     for (const UIWire &wire : m_Schematic->GetWires()) {
@@ -1155,7 +1221,10 @@ void EditorWindow::DrawNodeNumbers(SchematicCanvas &canvas, const ViewTransform 
     }
 }
 
-// The color of the wires of a node: its own by node, its heat color by voltage, otherwise the color of the theme
+/**
+ * @brief   The color of the wires of a node: its own by node, its heat color by voltage, otherwise the color of the
+ *          theme.
+ */
 ImU32 EditorWindow::GetWireColor(const int node) const {
     if (m_Preferences.WireColors == WireColoring::NODES) {
         return GetNodeColor(node);
@@ -1168,7 +1237,10 @@ ImU32 EditorWindow::GetWireColor(const int node) const {
     return GetPalette().Wire;
 }
 
-// Each piece of wire takes the heat color of its own current, so the path of the current shows along the wires
+/**
+ * @brief   Each piece of wire takes the heat color of its own current, so the path of the current shows along the
+ *          wires.
+ */
 void EditorWindow::DrawWireCurrents(SchematicCanvas &canvas, const ViewTransform &view) {
     if (!m_Displayed) {
         return;
@@ -1180,8 +1252,11 @@ void EditorWindow::DrawWireCurrents(SchematicCanvas &canvas, const ViewTransform
     }
 }
 
-// Every lit LED glows in its color, bigger and stronger with its current, and every resistor that dissipates power
-// glows orange with it. Additive light needs a dark background, so light themes blend the glows instead
+/**
+ * @brief   Every lit LED glows in its color, bigger and stronger with its current, and every resistor that dissipates
+ *          power glows orange with it.
+ * @details Additive light needs a dark background, so light themes blend the glows instead.
+ */
 void EditorWindow::DrawGlows(ImDrawList *draw_list, const ViewTransform &view) {
     const bool leds = m_Preferences.IsEffectOn(LiveEffect::LED_GLOW);
     const bool resistors = m_Preferences.IsEffectOn(LiveEffect::HEAT_GLOW);
@@ -1212,8 +1287,10 @@ void EditorWindow::DrawGlows(ImDrawList *draw_list, const ViewTransform &view) {
     m_GlowRenderer.AddGlows(draw_list, glows, additive);
 }
 
-// Over heat colors a selected part is outlined, as its color stands for its power. During a live run the parts the
-// user sets are outlined too, the one under the cursor or held more strongly
+/**
+ * @brief   Over heat colors a selected part is outlined, as its color stands for its power.
+ * @details During a live run the parts the user sets are outlined too, the one under the cursor or held more strongly.
+ */
 void EditorWindow::DrawElements(SchematicCanvas &canvas, const ViewTransform &view,
                                 const std::optional<std::size_t> lit_live_part) {
     const auto &elements = m_Schematic->GetElements();
@@ -1231,8 +1308,10 @@ void EditorWindow::DrawElements(SchematicCanvas &canvas, const ViewTransform &vi
     }
 }
 
-// Selection wins, unless the parts are heat colored, where an outline marks it instead; coloring by current heats each
-// part by the largest current through its terminals, and coloring by power by the power it absorbs
+/**
+ * @brief   Selection wins, unless the parts are heat colored, where an outline marks it instead; coloring by current
+ *          heats each part by the largest current through its terminals, and coloring by power by the power it absorbs.
+ */
 ImU32 EditorWindow::GetElementColor(const std::size_t index) const {
     if (m_Schematic->IsElementSelected(index) && !ArePartsHeatColored()) {
         return GetPalette().Selected;
@@ -1260,8 +1339,10 @@ ImU32 EditorWindow::GetElementColor(const std::size_t index) const {
     return GetHeatColor(CurrentLevel(current, m_Displayed->Scale.LargestCurrent));
 }
 
-// While a block is open, its name and the way back to the schematic, in the top left corner of the canvas so they stay
-// in sight wherever the toolbar wraps
+/**
+ * @brief   While a block is open, its name and the way back to the schematic, in the top left corner of the canvas so
+ *          they stay in sight wherever the toolbar wraps.
+ */
 void EditorWindow::DrawBlockBar(const ImVec2 origin) {
     if (!IsEditingSubcircuit()) {
         return;
@@ -1282,8 +1363,10 @@ void EditorWindow::DrawBlockBar(const ImVec2 origin) {
     ImGui::SetCursorScreenPos(after_canvas);
 }
 
-// What the current mode does and which keys it takes, so the shortcuts can be learned while working, and the grid
-// point under the cursor on the right
+/**
+ * @brief   What the current mode does and which keys it takes, so the shortcuts can be learned while working, and the
+ *          grid point under the cursor on the right.
+ */
 void EditorWindow::DrawStatusBar(const ViewTransform &view, const bool hovered) {
     std::string hint;
     if (m_Pasting) {
@@ -1336,8 +1419,11 @@ void EditorWindow::DrawStatusBar(const ViewTransform &view, const bool hovered) 
     ImGui::PopClipRect();
 }
 
-// "Transient done", in the warning color when something needs a look and in the error color after a failure; a click
-// opens the report of the run, with the ngspice output. Returns where the space left for the hint ends
+/**
+ * @brief   "Transient done", in the warning color when something needs a look and in the error color after a failure; a
+ *          click opens the report of the run, with the ngspice output.
+ * @details Returns where the space left for the hint ends.
+ */
 float EditorWindow::DrawRunStatus(float right_edge) {
     const std::optional<Analysis> last_run = m_Controls.GetLastRun();
     const RunStatusLine line = DescribeRunStatus(m_Controls, m_Schematic->GetTransient());
@@ -1372,19 +1458,25 @@ float EditorWindow::DrawRunStatus(float right_edge) {
     return right_edge;
 }
 
-// Voltage and Current color the wires with the heat scale, once there is a result to color them by
+/**
+ * @brief   Voltage and Current color the wires with the heat scale, once there is a result to color them by.
+ */
 bool EditorWindow::AreWiresHeatColored() const {
     return m_Displayed &&
            (m_Preferences.WireColors == WireColoring::VOLTAGE || m_Preferences.WireColors == WireColoring::CURRENT);
 }
 
-// Current and Power color the parts with the heat scale, once there is a result to color them by
+/**
+ * @brief   Current and Power color the parts with the heat scale, once there is a result to color them by.
+ */
 bool EditorWindow::ArePartsHeatColored() const {
     return m_Displayed &&
            (m_Preferences.WireColors == WireColoring::CURRENT || m_Preferences.WireColors == WireColoring::POWER);
 }
 
-// A gradient with the values at its ends, or a reminder to run an operating point or a transient
+/**
+ * @brief   A gradient with the values at its ends, or a reminder to run an operating point or a transient.
+ */
 void EditorWindow::DrawColorLegend(ImDrawList *draw_list, const ImVec2 origin, const ImVec2 size) const {
     if (m_Preferences.WireColors != WireColoring::VOLTAGE && m_Preferences.WireColors != WireColoring::CURRENT &&
         m_Preferences.WireColors != WireColoring::POWER) {
@@ -1425,8 +1517,10 @@ void EditorWindow::DrawColorLegend(ImDrawList *draw_list, const ImVec2 origin, c
     draw_list->AddText({corner.x + bar_size.x - high_width, text_y}, GetPalette().CanvasText, high_label.c_str());
 }
 
-// One label per node, on its first wire or, for terminals joined without wires, on a terminal. Ground is
-// always 0 V, so it is left out
+/**
+ * @brief   One label per node, on its first wire or, for terminals joined without wires, on a terminal.
+ * @details Ground is always 0 V, so it is left out.
+ */
 void EditorWindow::DrawNodeVoltages(ImDrawList *draw_list, const ViewTransform &view) {
     if (!m_Displayed) {
         return;
@@ -1460,7 +1554,10 @@ void EditorWindow::DrawNodeVoltages(ImDrawList *draw_list, const ViewTransform &
     }
 }
 
-// In selection mode, hovering a wire or a part shows its value on display, once there is one, and the power of a part
+/**
+ * @brief   In selection mode, hovering a wire or a part shows its value on display, once there is one, and the power of
+ *          a part.
+ */
 void EditorWindow::DrawHoveredValue(const ViewTransform &view, const bool hovered) {
     if (!hovered || !m_Displayed || !IsSelecting() || m_Drag) {
         return;
@@ -1480,7 +1577,9 @@ void EditorWindow::DrawHoveredValue(const ViewTransform &view, const bool hovere
     ImGui::SetTooltip("%s", text.c_str());
 }
 
-// Leaves every other mode, so clicks select and drag
+/**
+ * @brief   Leaves every other mode, so clicks select and drag.
+ */
 void EditorWindow::StartSelecting() {
     m_Pasting.reset();
     m_PlacingType.reset();
@@ -1526,7 +1625,9 @@ void EditorWindow::StartProbing() {
     m_Probing = true;
 }
 
-// Before the schematic is cleared or replaced: a drag or paste in progress would point at parts that are gone
+/**
+ * @brief   Before the schematic is cleared or replaced: a drag or paste in progress would point at parts that are gone.
+ */
 void EditorWindow::StopEditing() {
     EndDrag();
     m_Pasting.reset();
@@ -1539,15 +1640,19 @@ bool EditorWindow::IsEditingSubcircuit() const {
     return m_SubcircuitContent != nullptr;
 }
 
-// Quitting or opening another document while a block is open applies the block first, so its edits count as unsaved
-// changes of the document instead of vanishing with it. Returns false when the block cannot be applied, which leaves
-// it open with the reason shown
+/**
+ * @brief   Quitting or opening another document while a block is open applies the block first, so its edits count as
+ *          unsaved changes of the document instead of vanishing with it.
+ * @details Returns false when the block cannot be applied, which leaves it open with the reason shown.
+ */
 bool EditorWindow::LeaveSubcircuitForDocument() {
     FinishSubcircuitEditing(true);
     return !IsEditingSubcircuit();
 }
 
-// The parts of the block can follow the parameters in the settings, as they stand
+/**
+ * @brief   The parts of the block can follow the parameters in the settings, as they stand.
+ */
 void EditorWindow::OfferBlockParameters() {
     std::vector<std::string> names;
     for (const Core::SubcircuitParameter &parameter : m_SubcircuitParameters) {
@@ -1726,7 +1831,9 @@ void EditorWindow::DrawSubcircuitDialog() {
     ImGui::EndPopup();
 }
 
-// One row per pin: its name, the edge it goes on and the buttons that move it in the terminal order
+/**
+ * @brief   One row per pin: its name, the edge it goes on and the buttons that move it in the terminal order.
+ */
 void EditorWindow::DrawSubcircuitPinRows(const bool editing) {
     for (std::size_t index = 0; index < m_SubcircuitPins.size(); ++index) {
         ImGui::PushID(static_cast<int>(index));
@@ -1765,7 +1872,9 @@ void EditorWindow::DrawSubcircuitPinRows(const bool editing) {
     }
 }
 
-// One row per parameter: its name, its default and a button that removes it
+/**
+ * @brief   One row per parameter: its name, its default and a button that removes it.
+ */
 void EditorWindow::DrawSubcircuitParameterRows() {
     for (std::size_t index = 0; index < m_SubcircuitParameters.size(); ++index) {
         ImGui::PushID(static_cast<int>(index));
@@ -1786,7 +1895,9 @@ void EditorWindow::DrawSubcircuitParameterRows() {
     }
 }
 
-// Creating the block, or applying the settings of the one open, and the way out without them
+/**
+ * @brief   Creating the block, or applying the settings of the one open, and the way out without them.
+ */
 void EditorWindow::DrawSubcircuitDialogButtons(const bool editing) {
     if (ImGui::Button(editing ? "Apply" : "Create block")) {
         if (editing) {
@@ -1820,8 +1931,10 @@ void EditorWindow::DrawSubcircuitDialogButtons(const bool editing) {
     }
 }
 
-// Imported blocks join the schematic as one undo step and the first one starts placing, so it lands where the user
-// clicks; new settings of a block reach every instance of it
+/**
+ * @brief   Imported blocks join the schematic as one undo step and the first one starts placing, so it lands where the
+ *          user clicks; new settings of a block reach every instance of it.
+ */
 void EditorWindow::ApplySpiceBlockResult(SpiceBlockResult result) {
     if (!result.Imported.empty() || !result.Models.empty()) {
         std::vector<std::unique_ptr<UIElement>> no_parts;
@@ -2038,7 +2151,9 @@ void EditorWindow::HandlePlacement(SchematicCanvas &canvas, const ViewTransform 
     }
 }
 
-// The name of the newest label that has one, or none
+/**
+ * @brief   The name of the newest label that has one, or none.
+ */
 std::string EditorWindow::FindLastNet() const {
     for (const auto &element : std::views::reverse(m_Schematic->GetElements())) {
         if (element->GetComponent().GetType() != Core::ComponentType::NET_LABEL) {
@@ -2052,12 +2167,17 @@ std::string EditorWindow::FindLastNet() const {
     return {};
 }
 
-// Selecting is the mode where clicks pick, drag and select: none of placing, pasting, wiring and probing is active
+/**
+ * @brief   Selecting is the mode where clicks pick, drag and select: none of placing, pasting, wiring and probing is
+ *          active.
+ */
 bool EditorWindow::IsSelecting() const {
     return !m_PlacingType && !m_Pasting && !m_DrawingWires && !m_Probing;
 }
 
-// Ctrl+C, Ctrl+X and Ctrl+V while the editor has the focus and no text field wants the keys
+/**
+ * @brief   Ctrl+C, Ctrl+X and Ctrl+V while the editor has the focus and no text field wants the keys.
+ */
 void EditorWindow::HandleClipboardShortcuts() {
     if (!ImGui::IsWindowFocused() || ImGui::GetIO().WantTextInput) {
         return;
@@ -2073,7 +2193,10 @@ void EditorWindow::HandleClipboardShortcuts() {
     }
 }
 
-// The selection goes to the clipboard as text in the format of the files, so another copy of the program can paste it
+/**
+ * @brief   The selection goes to the clipboard as text in the format of the files, so another copy of the program can
+ *          paste it.
+ */
 void EditorWindow::CopySelected() {
     if (!IsSelecting() || !m_Schematic->HasSelection()) {
         return;
@@ -2084,7 +2207,9 @@ void EditorWindow::CopySelected() {
                                 .c_str());
 }
 
-// Deleting in the middle of a drag would leave the drag pointing at removed items
+/**
+ * @brief   Deleting in the middle of a drag would leave the drag pointing at removed items.
+ */
 void EditorWindow::CutSelected() {
     if (m_Drag || !IsSelecting() || !m_Schematic->HasSelection()) {
         return;
@@ -2093,7 +2218,10 @@ void EditorWindow::CutSelected() {
     m_Schematic->DeleteSelection();
 }
 
-// Reads the clipboard and, when it holds a schematic, places it. Text that is not a schematic is left alone
+/**
+ * @brief   Reads the clipboard and, when it holds a schematic, places it.
+ * @details Text that is not a schematic is left alone.
+ */
 void EditorWindow::StartPasting() {
     const char *text = ImGui::GetClipboardText();
     if (text == nullptr) {
@@ -2106,7 +2234,9 @@ void EditorWindow::StartPasting() {
     StartPastingGroup(std::move(*group));
 }
 
-// Leaves every other mode, so the group is the only thing to place
+/**
+ * @brief   Leaves every other mode, so the group is the only thing to place.
+ */
 void EditorWindow::StartPastingGroup(PastedGroup group) {
     const bool has_block = std::ranges::any_of(group.Elements, [](const auto &element) {
         return element->GetComponent().GetType() == Core::ComponentType::SUBCIRCUIT;
@@ -2252,7 +2382,9 @@ void EditorWindow::HandleWireDrawing(ImDrawList *draw_list, const ViewTransform 
     }
 }
 
-// Esc and right click first drop the wire in progress, and only leave wire mode when there is none
+/**
+ * @brief   Esc and right click first drop the wire in progress, and only leave wire mode when there is none.
+ */
 void EditorWindow::StopWire() {
     if (m_WireStart) {
         m_WireStart.reset();
@@ -2406,13 +2538,17 @@ void EditorWindow::HandleSelection(const ViewTransform &view, const bool hovered
     }
 }
 
-// Replaces the selection; a drag belongs to the items it was started with, so it ends
+/**
+ * @brief   Replaces the selection; a drag belongs to the items it was started with, so it ends.
+ */
 void EditorWindow::ApplySelection(const Selection &selection) {
     EndDrag();
     m_Schematic->SetSelection(selection.Elements, selection.Wires);
 }
 
-// A drag belongs to the selection, so it ends with it, and so does a selection box
+/**
+ * @brief   A drag belongs to the selection, so it ends with it, and so does a selection box.
+ */
 void EditorWindow::ClearSelection() {
     EndDrag();
     m_Box.reset();
@@ -2426,8 +2562,11 @@ void EditorWindow::SelectAll() {
     ApplySelection(PickAll(m_Schematic->GetElements(), m_Schematic->GetWires()));
 }
 
-// Captures what a drag of the current selection needs, so every frame can be computed from the start. A click on one
-// item of a group only keeps the group while the mouse moves: without a move it leaves just that item selected
+/**
+ * @brief   Captures what a drag of the current selection needs, so every frame can be computed from the start.
+ * @details A click on one item of a group only keeps the group while the mouse moves: without a move it leaves just
+ *          that item selected.
+ */
 EditorWindow::GroupDrag EditorWindow::MakeDrag(const GridPoint cursor, std::optional<Selection> collapse_to) const {
     GroupDrag drag;
     drag.StartCursor = cursor;
@@ -2452,8 +2591,10 @@ EditorWindow::GroupDrag EditorWindow::MakeDrag(const GridPoint cursor, std::opti
     return drag;
 }
 
-// Moves the selection by how far the cursor went from where the drag started, rebuilding the wires from the wires the
-// drag started with so moving back and forth does not pile up bends
+/**
+ * @brief   Moves the selection by how far the cursor went from where the drag started, rebuilding the wires from the
+ *          wires the drag started with so moving back and forth does not pile up bends.
+ */
 void EditorWindow::UpdateDrag(const GridPoint cursor) {
     if (!m_Drag) {
         return;
@@ -2490,8 +2631,11 @@ void EditorWindow::UpdateDrag(const GridPoint cursor) {
     m_Schematic->MarkModified();
 }
 
-// What the drag left selected: just the clicked item when the mouse never moved over a group. The cleanup of the
-// wires is done by every frame of the drag already, so it only matters when the drag changed nothing
+/**
+ * @brief   What the drag left selected: just the clicked item when the mouse never moved over a group.
+ * @details The cleanup of the wires is done by every frame of the drag already, so it only matters when the drag
+ *          changed nothing.
+ */
 void EditorWindow::EndDrag() {
     if (!m_Drag) {
         return;
@@ -2504,7 +2648,9 @@ void EditorWindow::EndDrag() {
     m_Schematic->SimplifyAllWires();
 }
 
-// The box and the items it takes in, drawn over the schematic
+/**
+ * @brief   The box and the items it takes in, drawn over the schematic.
+ */
 void EditorWindow::DrawSelectionBox(ImDrawList *draw_list, const ViewTransform &view) const {
     if (!m_Box) {
         return;
@@ -2516,9 +2662,11 @@ void EditorWindow::DrawSelectionBox(ImDrawList *draw_list, const ViewTransform &
     draw_list->AddRect(start, end, color, 0.0f, 0, 1.0f);
 }
 
-// Turns or mirrors every selected part about the center of the selection, and the selected wires with them. The wires
-// that meet them follow, unless Alt is held: then the parts turn alone and every wire stays where it was. A turn
-// during a drag ends that move and goes on dragging from the new position
+/**
+ * @brief   Turns or mirrors every selected part about the center of the selection, and the selected wires with them.
+ * @details The wires that meet them follow, unless Alt is held: then the parts turn alone and every wire stays where it
+ *          was. A turn during a drag ends that move and goes on dragging from the new position.
+ */
 void EditorWindow::TransformSelection(const PointTransform::Kind kind, const bool keep_wires) {
     if (m_Schematic->GetSelectedElements().empty()) {
         return;
@@ -2560,8 +2708,10 @@ void EditorWindow::TransformSelection(const PointTransform::Kind kind, const boo
     }
 }
 
-// Beside the part, on its right, or on its left when the right side lacks room
-// The part under the cursor that the user sets by hand during a live run, or none outside one or outside selecting
+/**
+ * @brief   Beside the part, on its right, or on its left when the right side lacks room The part under the cursor that
+ *          the user sets by hand during a live run, or none outside one or outside selecting.
+ */
 std::optional<std::size_t> EditorWindow::FindLivePart(const ViewTransform &view) const {
     if (IsEditingSubcircuit() || !m_Controls.IsLive() || !IsSelecting()) {
         return std::nullopt;
@@ -2569,9 +2719,11 @@ std::optional<std::size_t> EditorWindow::FindLivePart(const ViewTransform &view)
     return PickLivePart(m_Schematic->GetElements(), view.ToWorld(ImGui::GetIO().MousePos));
 }
 
-// A click flips a switch or a logic input, a push button stays pressed while the mouse button holds it, and the wheel
-// turns a potentiometer; each change goes to the run through the schematic. Returns whether the mouse went to a part,
-// so the click does not also select
+/**
+ * @brief   A click flips a switch or a logic input, a push button stays pressed while the mouse button holds it, and
+ *          the wheel turns a potentiometer; each change goes to the run through the schematic.
+ * @details Returns whether the mouse went to a part, so the click does not also select.
+ */
 bool EditorWindow::HandleLiveInput(const std::optional<std::size_t> live_part) {
     if (m_HeldButton) {
         if (!ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
@@ -2611,7 +2763,9 @@ bool EditorWindow::HandleLiveInput(const std::optional<std::size_t> live_part) {
     }
 }
 
-// The push button lets go when the mouse button does, wherever the cursor is then
+/**
+ * @brief   The push button lets go when the mouse button does, wherever the cursor is then.
+ */
 void EditorWindow::ReleaseHeldButton() {
     const std::optional<std::size_t> index = std::exchange(m_HeldButton, std::nullopt);
     if (!index || *index >= m_Schematic->GetElements().size()) {
@@ -2641,8 +2795,11 @@ void EditorWindow::PlacePartPopover(const ViewTransform &view) {
     m_PartPopoverPivotX = fits_right ? 0.0f : 1.0f;
 }
 
-// A digit, a point or a minus typed on a selected part starts editing its value, as in LTspice: "4k7" and Enter.
-// Keys are read rather than characters, since SDL sends characters only while a text field is active
+/**
+ * @brief   A digit, a point or a minus typed on a selected part starts editing its value, as in LTspice: "4k7" and
+ *          Enter.
+ * @details Keys are read rather than characters, since SDL sends characters only while a text field is active.
+ */
 void EditorWindow::HandleValueTyping(const ViewTransform &view) {
     const ImGuiIO &io = ImGui::GetIO();
     if (!ImGui::IsWindowFocused() || ImGui::IsAnyItemActive() || io.KeyCtrl || io.KeyAlt || io.KeyShift ||
@@ -2688,7 +2845,9 @@ void EditorWindow::DrawPartPopover() {
     ImGui::EndPopup();
 }
 
-// A right click while selecting selects what is under the cursor and opens the menu of what it can do
+/**
+ * @brief   A right click while selecting selects what is under the cursor and opens the menu of what it can do.
+ */
 void EditorWindow::HandleContextMenu(const ViewTransform &view, const bool hovered) {
     if (!IsSelecting() || !hovered || !ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
         return;
@@ -2805,7 +2964,9 @@ void EditorWindow::DrawContextMenu() {
     ImGui::EndPopup();
 }
 
-// Global routing makes the shortcuts work while another editor window, such as Properties, has focus
+/**
+ * @brief   Global routing makes the shortcuts work while another editor window, such as Properties, has focus.
+ */
 void EditorWindow::HandleGlobalShortcuts() {
     if (!IsEditingSubcircuit()) {
         if (ImGui::Shortcut(ImGuiMod_Ctrl | ImGuiKey_N, ImGuiInputFlags_RouteGlobal)) {
@@ -2843,7 +3004,9 @@ void EditorWindow::HandleGlobalShortcuts() {
     }
 }
 
-// A drag keeps pointers into the elements, so undoing in the middle of one waits until it ends
+/**
+ * @brief   A drag keeps pointers into the elements, so undoing in the middle of one waits until it ends.
+ */
 void EditorWindow::Undo() {
     if (m_Drag) {
         return;
@@ -2858,7 +3021,9 @@ void EditorWindow::Redo() {
     m_Schematic->Redo();
 }
 
-// Menu commands run here, from Update(), where their popups are opened and drawn whichever window is in front
+/**
+ * @brief   Menu commands run here, from Update(), where their popups are opened and drawn whichever window is in front.
+ */
 void EditorWindow::HandleCommandRequest() {
     const std::optional<EditorCommand> command = std::exchange(m_RequestedCommand, std::nullopt);
     if (command && !RunFileCommand(*command) && !RunClipboardCommand(*command)) {
@@ -2866,7 +3031,9 @@ void EditorWindow::HandleCommandRequest() {
     }
 }
 
-// The commands of the File menu; false for any other
+/**
+ * @brief   The commands of the File menu; false for any other.
+ */
 bool EditorWindow::RunFileCommand(const EditorCommand command) {
     switch (command) {
     case EditorCommand::NEW:
@@ -2895,7 +3062,9 @@ bool EditorWindow::RunFileCommand(const EditorCommand command) {
     }
 }
 
-// Cut, Copy and Paste; false for any other
+/**
+ * @brief   Cut, Copy and Paste; false for any other.
+ */
 bool EditorWindow::RunClipboardCommand(const EditorCommand command) {
     switch (command) {
     case EditorCommand::CUT:
@@ -2912,7 +3081,9 @@ bool EditorWindow::RunClipboardCommand(const EditorCommand command) {
     }
 }
 
-// The commands of the Edit menu: history, selecting all, deleting and turning the selection
+/**
+ * @brief   The commands of the Edit menu: history, selecting all, deleting and turning the selection.
+ */
 void EditorWindow::RunEditCommand(const EditorCommand command) {
     switch (command) {
     case EditorCommand::UNDO:
@@ -2936,7 +3107,9 @@ void EditorWindow::RunEditCommand(const EditorCommand command) {
     }
 }
 
-// Rotate, Mirror and Flip, and their variants that keep the wires where they are
+/**
+ * @brief   Rotate, Mirror and Flip, and their variants that keep the wires where they are.
+ */
 void EditorWindow::RunTurnCommand(const EditorCommand command) {
     switch (command) {
     case EditorCommand::ROTATE:
@@ -2962,7 +3135,9 @@ void EditorWindow::RunTurnCommand(const EditorCommand command) {
     }
 }
 
-// Rotate, mirror and flip the selected parts, with or without their wires
+/**
+ * @brief   Rotate, mirror and flip the selected parts, with or without their wires.
+ */
 void EditorWindow::DrawTurnMenuItems(const bool part_selected) {
     if (ImGui::MenuItem("Rotate", "R", false, part_selected)) {
         m_RequestedCommand = EditorCommand::ROTATE;
@@ -2987,7 +3162,9 @@ void EditorWindow::DrawTurnMenuItems(const bool part_selected) {
     }
 }
 
-// Making a block from the selection and opening one, or, inside a block, its settings and the ways out
+/**
+ * @brief   Making a block from the selection and opening one, or, inside a block, its settings and the ways out.
+ */
 void EditorWindow::DrawBlockMenuItems() {
     if (IsEditingSubcircuit()) {
         if (ImGui::MenuItem("Block Pin and Parameter Settings...")) {

@@ -71,7 +71,9 @@ void LoadSweepFields(const Core::SweepRange &range, std::array<ValueField, 3> &f
     fields[2].Load(range.Step);
 }
 
-// Draws the source picker and the start, stop and step of one range; sources must not be empty
+/**
+ * @brief   Draws the source picker and the start, stop and step of one range; sources must not be empty.
+ */
 void DrawSweepRange(const char *id, const char *source_label, const std::vector<SweepSource> &sources,
                     const std::size_t preferred_index, Core::SweepRange &range, std::array<ValueField, 3> &fields) {
     ImGui::PushID(id);
@@ -98,7 +100,10 @@ void DrawSweepRange(const char *id, const char *source_label, const std::vector<
     ImGui::PopID();
 }
 
-// The values of the range of a step as a list to edit, such as "500, 1k, 1.5k"; empty when the range is invalid
+/**
+ * @brief   The values of the range of a step as a list to edit, such as "500, 1k, 1.5k"; empty when the range is
+ *          invalid.
+ */
 std::string FormatRangeAsList(ParameterStepSettings step, const std::string &unit) {
     step.UsesList = false;
     std::string list;
@@ -110,7 +115,9 @@ std::string FormatRangeAsList(ParameterStepSettings step, const std::string &uni
     return list;
 }
 
-// How many runs the step makes, from which value to which, or why it cannot run
+/**
+ * @brief   How many runs the step makes, from which value to which, or why it cannot run.
+ */
 void DrawStepSummary(const ParameterStepSettings &step, const std::string &unit) {
     const auto values = ListStepValues(step, unit);
     ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + ImGui::GetFontSize() * 20.0f);
@@ -126,7 +133,9 @@ void DrawStepSummary(const ParameterStepSettings &step, const std::string &unit)
     ImGui::PopTextWrapPos();
 }
 
-// A Suggest button, disabled with the reason when the circuit gives nothing to base a suggestion on
+/**
+ * @brief   A Suggest button, disabled with the reason when the circuit gives nothing to base a suggestion on.
+ */
 bool DrawSuggestButton(const bool available, const char *tooltip, const char *unavailable_reason) {
     ImGui::BeginDisabled(!available);
     const bool clicked = ImGui::Button("Suggest");
@@ -225,7 +234,9 @@ void AnalysisSettingsPanel::LoadSettingsFields() {
     m_LoadedSettingsVersion = m_Schematic.GetSimulationSettingsVersion();
 }
 
-// Settings change as soon as a field is valid; ngspice checks how they relate only when the analysis runs
+/**
+ * @brief   Settings change as soon as a field is valid; ngspice checks how they relate only when the analysis runs.
+ */
 void AnalysisSettingsPanel::DrawTransientSettings(SimulationSettings &settings) {
     if (const std::optional<double> stop_time = m_StopTime.Draw("Stop time", "s", IsPositive)) {
         settings.Transient.StopTime = *stop_time;
@@ -293,8 +304,10 @@ void AnalysisSettingsPanel::DrawDCSweepSettings(SimulationSettings &settings) {
     ImGui::TextDisabled("AC and pulse sources are swept through their DC value");
 }
 
-// The output picker lists every node by the label the plots give it; picking one keeps a point of it, so the choice
-// follows the node through edits
+/**
+ * @brief   The output picker lists every node by the label the plots give it; picking one keeps a point of it, so the
+ *          choice follows the node through edits.
+ */
 void AnalysisSettingsPanel::DrawNoiseSettings(SimulationSettings &settings) {
     const Core::Circuit circuit = m_Schematic.BuildCircuit();
     const std::vector<std::string> sources = Core::GetNoiseInputSources(circuit);
@@ -347,8 +360,10 @@ void AnalysisSettingsPanel::DrawNoiseSettings(SimulationSettings &settings) {
     }
 }
 
-// The output picker lists every node by the label the plots give it, as the noise one does; the input picker lists
-// every source a DC sweep could drive, whatever its waveform
+/**
+ * @brief   The output picker lists every node by the label the plots give it, as the noise one does; the input picker
+ *          lists every source a DC sweep could drive, whatever its waveform.
+ */
 void AnalysisSettingsPanel::DrawTransferFunctionSettings(SimulationSettings &settings) {
     const Core::Circuit circuit = m_Schematic.BuildCircuit();
     const std::vector<std::string> sources = Core::GetTransferFunctionInputSources(circuit);
@@ -382,8 +397,10 @@ void AnalysisSettingsPanel::DrawTransferFunctionSettings(SimulationSettings &set
     ImGui::SetItemTooltip("The DC gain, the input impedance and the output impedance from this source to the output");
 }
 
-// One checkbox per logic input, and the nodes the table reads, which are the voltages already measured. Nothing stored
-// means every input, and a change stores the whole list
+/**
+ * @brief   One checkbox per logic input, and the nodes the table reads, which are the voltages already measured.
+ * @details Nothing stored means every input, and a change stores the whole list.
+ */
 void AnalysisSettingsPanel::DrawTruthTableSettings(SimulationSettings &settings) {
     const Core::Circuit circuit = m_Schematic.BuildCircuit();
     const std::vector<std::string> available = Core::GetTruthTableInputs(circuit);
@@ -431,9 +448,11 @@ void AnalysisSettingsPanel::DrawTruthTableSettings(SimulationSettings &settings)
                           "each of these is read as 0, 1 or X");
 }
 
-// Below the settings of the transient, the AC sweep and the DC sweep: the part or the temperature, and its values
-// as a range or a typed list. The range fields share their labels with those of the analysis above, so they get an
-// ID of their own
+/**
+ * @brief   Below the settings of the transient, the AC sweep and the DC sweep: the part or the temperature, and its
+ *          values as a range or a typed list.
+ * @details The range fields share their labels with those of the analysis above, so they get an ID of their own.
+ */
 void AnalysisSettingsPanel::DrawParameterStepSettings(SimulationSettings &settings) {
     ParameterStepSettings &step = settings.ParameterStep;
     ImGui::Separator();
@@ -454,8 +473,10 @@ void AnalysisSettingsPanel::DrawParameterStepSettings(SimulationSettings &settin
     ImGui::PopID();
 }
 
-// The temperature or a resistor, capacitor or inductor; picking a part starts its range around its value, from
-// half to twice it
+/**
+ * @brief   The temperature or a resistor, capacitor or inductor; picking a part starts its range around its value, from
+ *          half to twice it.
+ */
 void AnalysisSettingsPanel::DrawParameterPicker(ParameterStepSettings &step, const Core::Circuit &circuit) {
     DrawFieldLabel("Parameter");
     const std::string shown = step.Part.empty() ? std::string("Temperature") : step.Part;
@@ -488,8 +509,10 @@ void AnalysisSettingsPanel::DrawParameterPicker(ParameterStepSettings &step, con
     ImGui::EndCombo();
 }
 
-// A range or a typed list, and below it how many runs it makes or why it cannot run. A list starts from the values
-// of the range, so it can be edited from there
+/**
+ * @brief   A range or a typed list, and below it how many runs it makes or why it cannot run.
+ * @details A list starts from the values of the range, so it can be edited from there.
+ */
 void AnalysisSettingsPanel::DrawStepValues(ParameterStepSettings &step, const std::string &unit) {
     if (ImGui::RadioButton("Range", !step.UsesList)) {
         step.UsesList = false;

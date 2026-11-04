@@ -40,7 +40,9 @@ void UIGround::DrawSymbol(SchematicCanvas &canvas, const ViewTransform &view, co
     }
 }
 
-// Ground has no name or value to show
+/**
+ * @brief   Ground has no name or value to show.
+ */
 void UIGround::DrawLabels(SchematicCanvas & /*canvas*/, const ViewTransform & /*view*/, ImU32 /*color*/) const {
 }
 

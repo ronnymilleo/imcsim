@@ -12,7 +12,9 @@
 
 namespace {
 
-// A transient of the given number of points, with time n at index n, node 1 at twice the time and one current
+/**
+ * @brief   A transient of the given number of points, with time n at index n, node 1 at twice the time and one current.
+ */
 Core::Transient CountingTransient(const std::size_t point_count) {
     Core::Transient transient;
     for (std::size_t index = 0; index < point_count; ++index) {

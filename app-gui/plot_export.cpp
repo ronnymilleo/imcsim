@@ -128,7 +128,9 @@ struct ValueRange {
     double High = 1.0;
 };
 
-// A logarithmic axis maps decades to equal lengths
+/**
+ * @brief   A logarithmic axis maps decades to equal lengths.
+ */
 double ToAxis(const double value, const bool logarithmic) {
     return logarithmic ? std::log10(value) : value;
 }
@@ -137,7 +139,9 @@ bool IsShownOnAxis(const double value, const bool logarithmic) {
     return std::isfinite(value) && (!logarithmic || value > 0.0);
 }
 
-// A range with no width opens around its value, so a flat trace is drawn across the middle of the plot
+/**
+ * @brief   A range with no width opens around its value, so a flat trace is drawn across the middle of the plot.
+ */
 ValueRange Widen(const ValueRange range) {
     if (range.High > range.Low) {
         return range;
@@ -170,8 +174,10 @@ ValueRange FindXRange(const ExportFigure &figure) {
     return Widen(range);
 }
 
-// Range of the samples of an axis whose X is shown, with some room above and below; a logarithmic axis pads by
-// a share of its decades
+/**
+ * @brief   Range of the samples of an axis whose X is shown, with some room above and below; a logarithmic axis pads by
+ *          a share of its decades.
+ */
 ValueRange FindYRange(const ExportFigure &figure, const ExportPanel &panel, const std::size_t axis,
                       const ValueRange x_range) {
     const bool logarithmic = panel.YAxes[axis].Logarithmic;
@@ -204,7 +210,9 @@ ValueRange FindYRange(const ExportFigure &figure, const ExportPanel &panel, cons
     return {range.Low - padding, range.High + padding};
 }
 
-// The largest prefix that keeps the biggest tick at 1 or more, so all ticks of an axis share it
+/**
+ * @brief   The largest prefix that keeps the biggest tick at 1 or more, so all ticks of an axis share it.
+ */
 const Prefix &ChoosePrefix(const std::vector<double> &ticks) {
     double largest = 0.0;
     for (const double tick : ticks) {
@@ -310,7 +318,9 @@ struct Frame {
     }
 };
 
-// Places the legend entries in rows no wider than the space given, right-aligned later when drawn
+/**
+ * @brief   Places the legend entries in rows no wider than the space given, right-aligned later when drawn.
+ */
 std::size_t PlaceLegend(const ExportPanel &panel, const double max_width, const double scale,
                         std::vector<LegendEntry> &entries) {
     std::size_t row = 0;
@@ -336,7 +346,9 @@ std::vector<double> FindXTicks(const ValueRange range, const bool logarithmic, c
     return logarithmic ? FindDecadeTicks(range.Low, range.High, count) : FindNiceTicks(range.Low, range.High, count);
 }
 
-// Decades read with their prefix, as the values the user types ("1k", "10m"), followed by the unit
+/**
+ * @brief   Decades read with their prefix, as the values the user types ("1k", "10m"), followed by the unit.
+ */
 std::vector<std::string> FormatDecadeTicks(const std::vector<double> &ticks, const ExportAxis &axis) {
     std::vector<std::string> labels;
     for (const double tick : ticks) {
@@ -353,8 +365,10 @@ std::vector<std::string> FormatXTicks(const std::vector<double> &ticks, const Ex
 
 // region Drawing
 
-// The visible part of a series in pixels, split where samples are missing; samples just outside the X range are
-// kept so the line reaches the edge of the plot
+/**
+ * @brief   The visible part of a series in pixels, split where samples are missing; samples just outside the X range
+ *          are kept so the line reaches the edge of the plot.
+ */
 std::vector<std::vector<SvgPoint>> BuildRuns(const ExportFigure &figure, const ExportSeries &series, const Frame &frame,
                                              const YAxisLayout &y_axis) {
     std::vector<std::vector<SvgPoint>> runs(1);
@@ -399,7 +413,9 @@ void DrawSeries(SvgWriter &svg, const ExportFigure &figure, const ExportSeries &
     }
 }
 
-// Notes sit right of their point, or left of it when they would leave the plot; a centered one is over it
+/**
+ * @brief   Notes sit right of their point, or left of it when they would leave the plot; a centered one is over it.
+ */
 void DrawNote(SvgWriter &svg, const ExportNote &note, const Frame &frame, const YAxisLayout &y_axis,
               const ExportTheme &theme, const double scale) {
     const double x = frame.ToPixelX(note.X);
@@ -459,8 +475,10 @@ void DrawXAxis(SvgWriter &svg, const ExportFigure &figure, const Frame &frame, c
     }
 }
 
-// The first axis is on the left; the others stack outwards on the right, each as wide as its widest labels in
-// any panel, with their names in the same columns across panels
+/**
+ * @brief   The first axis is on the left; the others stack outwards on the right, each as wide as its widest labels in
+ *          any panel, with their names in the same columns across panels.
+ */
 void DrawYAxes(SvgWriter &svg, const ExportPanel &panel, const PanelLayout &layout, const Frame &frame,
                const AxisColumns &columns, const ExportTheme &theme, const double scale) {
     double right_edge = frame.Left + frame.Width;
@@ -559,7 +577,9 @@ void DrawPanel(SvgWriter &svg, const ExportFigure &figure, const ExportPanel &pa
 
 // region CSV
 
-// Quotes a field that holds a separator, a quote or a line break, doubling its quotes
+/**
+ * @brief   Quotes a field that holds a separator, a quote or a line break, doubling its quotes.
+ */
 std::string QuoteCsvField(const std::string &text) {
     if (text.find_first_of(",\"\n") == std::string::npos) {
         return text;
@@ -578,7 +598,9 @@ std::string CsvHeader(const std::string &name, const std::string &unit) {
     return QuoteCsvField(unit.empty() ? name : std::format("{} ({})", name, unit));
 }
 
-// Shortest text that reads back as the same number; missing samples stay empty
+/**
+ * @brief   Shortest text that reads back as the same number; missing samples stay empty.
+ */
 std::string FormatCsvValue(const double value) {
     return std::isfinite(value) ? std::format("{}", value) : "";
 }

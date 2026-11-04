@@ -26,7 +26,10 @@ using namespace std::chrono_literals;
 // The longest a test waits for a run before it calls it lost
 constexpr auto WAIT_LIMIT = 20s;
 
-// Opens the RC low-pass example, as the editor does, with a transient heavy enough to take a while when stepped
+/**
+ * @brief   Opens the RC low-pass example, as the editor does, with a transient heavy enough to take a while when
+ *          stepped.
+ */
 void OpenRCFilter(GUI::Schematic &schematic) {
     const auto example = std::ranges::find(GUI::GetExamples(), "rc_low_pass_filter.imcsim", &GUI::Example::FileName);
     REQUIRE(example != GUI::GetExamples().end());
@@ -41,7 +44,9 @@ void Select(GUI::Schematic &schematic, const GUI::Analysis analysis) {
     schematic.SetSimulationSettings(settings);
 }
 
-// A transient of half a second at 1 us, which takes long enough to stop in the middle
+/**
+ * @brief   A transient of half a second at 1 us, which takes long enough to stop in the middle.
+ */
 void SelectLongTransient(GUI::Schematic &schematic) {
     GUI::SimulationSettings settings = schematic.GetSimulationSettings();
     settings.Selected = GUI::Analysis::TRANSIENT;
@@ -49,7 +54,9 @@ void SelectLongTransient(GUI::Schematic &schematic) {
     schematic.SetSimulationSettings(settings);
 }
 
-// A transient stepped through 50 resistances, each long enough that the run lasts far beyond a few frames
+/**
+ * @brief   A transient stepped through 50 resistances, each long enough that the run lasts far beyond a few frames.
+ */
 void SelectLongSteppedTransient(GUI::Schematic &schematic) {
     GUI::SimulationSettings settings = schematic.GetSimulationSettings();
     settings.Selected = GUI::Analysis::TRANSIENT;
@@ -59,7 +66,9 @@ void SelectLongSteppedTransient(GUI::Schematic &schematic) {
     schematic.SetSimulationSettings(settings);
 }
 
-// Opens an example by its file name, as the editor does
+/**
+ * @brief   Opens an example by its file name, as the editor does.
+ */
 void OpenExample(GUI::Schematic &schematic, const std::string_view file_name) {
     const auto example = std::ranges::find(GUI::GetExamples(), file_name, &GUI::Example::FileName);
     REQUIRE(example != GUI::GetExamples().end());
@@ -69,7 +78,9 @@ void OpenExample(GUI::Schematic &schematic, const std::string_view file_name) {
                       std::move(loaded->Subcircuits), std::move(loaded->Models));
 }
 
-// A transient of 10 ms that a live run spreads over the shortest time the user may set
+/**
+ * @brief   A transient of 10 ms that a live run spreads over the shortest time the user may set.
+ */
 void SelectLiveTransient(GUI::Schematic &schematic) {
     GUI::SimulationSettings settings = schematic.GetSimulationSettings();
     settings.Selected = GUI::Analysis::TRANSIENT;
@@ -90,7 +101,9 @@ std::size_t FindElement(const GUI::Schematic &schematic, const std::string_view 
     return 0;
 }
 
-// The current of a part at the first point at or after an instant
+/**
+ * @brief   The current of a part at the first point at or after an instant.
+ */
 double CurrentAt(const Core::Transient &transient, const std::string_view name, const double time) {
     const auto trace = std::ranges::find(transient.Currents, name, &Core::ComponentTrace::Name);
     REQUIRE(trace != transient.Currents.end());
@@ -99,7 +112,9 @@ double CurrentAt(const Core::Transient &transient, const std::string_view name, 
     return trace->Values[static_cast<std::size_t>(point - transient.Times.begin())];
 }
 
-// Calls Update() as the frame loop does until the run ends
+/**
+ * @brief   Calls Update() as the frame loop does until the run ends.
+ */
 bool UpdateUntilIdle(GUI::AnalysisControls &controls) {
     const auto deadline = std::chrono::steady_clock::now() + WAIT_LIMIT;
     while (std::chrono::steady_clock::now() < deadline) {
@@ -125,7 +140,9 @@ template <typename Condition> bool UpdateUntil(GUI::AnalysisControls &controls, 
     return false;
 }
 
-// Calls Update() as the frame loop does for a while
+/**
+ * @brief   Calls Update() as the frame loop does for a while.
+ */
 void UpdateFor(GUI::AnalysisControls &controls, const std::chrono::milliseconds duration) {
     const auto end = std::chrono::steady_clock::now() + duration;
     while (std::chrono::steady_clock::now() < end) {
@@ -134,13 +151,17 @@ void UpdateFor(GUI::AnalysisControls &controls, const std::chrono::milliseconds 
     }
 }
 
-// The time the transient on display has reached, or 0 without one
+/**
+ * @brief   The time the transient on display has reached, or 0 without one.
+ */
 double ReachedTime(const GUI::Schematic &schematic) {
     const std::optional<Core::Transient> &transient = schematic.GetTransient();
     return transient && !transient->Times.empty() ? transient->Times.back() : 0.0;
 }
 
-// Runs the selected analysis and takes its result in, as the frame loop does
+/**
+ * @brief   Runs the selected analysis and takes its result in, as the frame loop does.
+ */
 void RunAndWait(GUI::AnalysisControls &controls) {
     controls.RunSelected();
     REQUIRE(UpdateUntilIdle(controls));

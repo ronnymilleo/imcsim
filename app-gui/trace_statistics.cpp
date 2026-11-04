@@ -38,7 +38,9 @@ double Lerp(const Sample first, const Sample second, const double x) {
     return first.Y + (second.Y - first.Y) * (x - first.X) / (second.X - first.X);
 }
 
-// X where the segment from first to second reaches level, which must lie between their Y values
+/**
+ * @brief   X where the segment from first to second reaches level, which must lie between their Y values.
+ */
 double CrossingX(const Sample first, const Sample second, const double level) {
     if (second.Y == first.Y) {
         return first.X;
@@ -46,9 +48,11 @@ double CrossingX(const Sample first, const Sample second, const double level) {
     return first.X + (second.X - first.X) * (level - first.Y) / (second.Y - first.Y);
 }
 
-// The trace between from and to, with points interpolated at both ends, so measurements cover exactly the span.
-// xs must be monotonic; a sweep that runs downward, as a negative .dc step, is reversed so it rises. On a
-// logarithmic axis the X of every sample is its decade, so interpolation follows the plot
+/**
+ * @brief   The trace between from and to, with points interpolated at both ends, so measurements cover exactly the
+ *          span. xs must be monotonic; a sweep that runs downward, as a negative .dc step, is reversed so it rises.
+ * @details On a logarithmic axis the X of every sample is its decade, so interpolation follows the plot.
+ */
 std::vector<Sample> ClipSamples(const std::span<const double> xs, const std::span<const double> ys, double from,
                                 double to, const bool logarithmic) {
     std::vector<Sample> all;
@@ -91,7 +95,9 @@ std::vector<Sample> ClipSamples(const std::span<const double> xs, const std::spa
     return clipped;
 }
 
-// Rising crossings of the mean, one per cycle, averaged over every whole cycle in the span
+/**
+ * @brief   Rising crossings of the mean, one per cycle, averaged over every whole cycle in the span.
+ */
 std::optional<double> MeasureFrequency(const std::vector<Sample> &samples, const TraceStatistics &statistics) {
     if (statistics.PeakToPeak <= 0.0) {
         return std::nullopt;
@@ -125,8 +131,10 @@ std::optional<double> MeasureFrequency(const std::vector<Sample> &samples, const
     return static_cast<double>(cycles) / (last_crossing - *first_crossing);
 }
 
-// First X, walking from start in steps of direction, where the trace falls through level; samples are in
-// decades, so the result is converted back to a frequency
+/**
+ * @brief   First X, walking from start in steps of direction, where the trace falls through level; samples are in
+ *          decades, so the result is converted back to a frequency.
+ */
 std::optional<double> FindFallingFrequency(const std::vector<Sample> &samples, const std::size_t start,
                                            const int direction, const double level) {
     for (std::size_t index = start; index < samples.size();) {

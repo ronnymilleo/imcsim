@@ -62,7 +62,9 @@ const Core::LibrarySubcircuit &Find(const Core::SpiceLibrary &library, const std
     return library.Subcircuits.front();
 }
 
-// A definition of the text of a library subcircuit, with one pin per port
+/**
+ * @brief   A definition of the text of a library subcircuit, with one pin per port.
+ */
 std::shared_ptr<Core::SubcircuitDefinition> MakeDefinition(const Core::LibrarySubcircuit &subcircuit) {
     auto definition = std::make_shared<Core::SubcircuitDefinition>();
     definition->Name = subcircuit.Name;

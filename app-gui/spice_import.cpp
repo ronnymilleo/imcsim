@@ -29,7 +29,10 @@ std::string ToUpper(const std::string_view text) {
     return upper;
 }
 
-// The edge a port name suggests; most libraries number their ports, which suggests nothing and stays on the left
+/**
+ * @brief   The edge a port name suggests; most libraries number their ports, which suggests nothing and stays on the
+ *          left.
+ */
 Core::PinSide SuggestSide(const std::string_view port) {
     const std::string upper = ToUpper(port);
     if (std::ranges::contains(TOP_PORTS, upper)) {

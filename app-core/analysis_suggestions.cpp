@@ -31,7 +31,9 @@ constexpr double AC_MARGIN_DECADES = 2.0;
 constexpr double MIN_AC_FREQUENCY = 1e-3;
 constexpr double MAX_AC_FREQUENCY = 1e10;
 
-// Rounds to the closest 1, 2 or 5 times a power of ten, below or above the value, so suggestions read well
+/**
+ * @brief   Rounds to the closest 1, 2 or 5 times a power of ten, below or above the value, so suggestions read well.
+ */
 double RoundToNiceStep(const double value, const bool up) {
     const double decade = std::pow(10.0, std::floor(std::log10(value)));
     constexpr auto STEPS = std::to_array({1.0, 2.0, 5.0, 10.0});
@@ -61,8 +63,10 @@ std::vector<double> ListPartValues(const Circuit &circuit, const ComponentType t
     return values;
 }
 
-// Corners of every resistor with every capacitor or inductor, resonances of every inductor with every capacitor,
-// and the gain-bandwidth product of every op-amp
+/**
+ * @brief   Corners of every resistor with every capacitor or inductor, resonances of every inductor with every
+ *          capacitor, and the gain-bandwidth product of every op-amp.
+ */
 std::vector<double> ListCharacteristicFrequencies(const Circuit &circuit) {
     const std::vector<double> resistances = ListPartValues(circuit, ComponentType::RESISTOR);
     const std::vector<double> capacitances = ListPartValues(circuit, ComponentType::CAPACITOR);
@@ -134,7 +138,9 @@ void AddSourceWaveform(const Source &source, Waveforms &waveforms) {
     }
 }
 
-// A clock is a periodic source like a pulse one, with its period and its start delay
+/**
+ * @brief   A clock is a periodic source like a pulse one, with its period and its start delay.
+ */
 void AddWaveform(const Component &part, Waveforms &waveforms) {
     if (part.GetType() == ComponentType::CLOCK) {
         const ClockParameters &clock = static_cast<const Clock &>(part).GetParameters();

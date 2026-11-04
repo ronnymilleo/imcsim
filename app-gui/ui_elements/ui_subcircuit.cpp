@@ -54,12 +54,16 @@ BoxSize MeasureBox(const Core::SubcircuitInstance &instance) {
             .HasVerticalPins = columns > 0};
 }
 
-// Where along its edge the pin of an index goes, the pins of the edge centered on it
+/**
+ * @brief   Where along its edge the pin of an index goes, the pins of the edge centered on it.
+ */
 int PinOffset(const int index, const int edge_count) {
     return PIN_SPACING * index - PIN_SPACING * (edge_count - 1) / 2;
 }
 
-// The point on the box where the lead of a terminal meets it, one unit in from the terminal
+/**
+ * @brief   The point on the box where the lead of a terminal meets it, one unit in from the terminal.
+ */
 ImVec2 GetEdgePoint(const GridPoint terminal, const BoxSize box) {
     if (terminal.X < -box.HalfWidth) {
         return {static_cast<float>(-box.HalfWidth), static_cast<float>(terminal.Y)};
@@ -101,7 +105,9 @@ void UISubcircuit::DrawSymbol(SchematicCanvas &canvas, const ViewTransform &view
     canvas.AddPolyline(corners.data(), static_cast<int>(corners.size()), color, ImDrawFlags_Closed, LINE_THICKNESS);
 }
 
-// The instance name above, the definition below, and each pin name inside the box next to its lead
+/**
+ * @brief   The instance name above, the definition below, and each pin name inside the box next to its lead.
+ */
 void UISubcircuit::DrawLabels(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color) const {
     const auto &instance = Instance(GetComponent());
     const LocalBounds bounds = GetLocalBounds();
@@ -119,8 +125,10 @@ void UISubcircuit::DrawLabels(SchematicCanvas &canvas, const ViewTransform &view
     }
 }
 
-// One terminal per pin, in pin order, on the edge its marker gave it; the pins of each edge are centered on it in the
-// order they come
+/**
+ * @brief   One terminal per pin, in pin order, on the edge its marker gave it; the pins of each edge are centered on it
+ *          in the order they come.
+ */
 std::vector<GridPoint> UISubcircuit::GetLocalTerminals() const {
     const auto &instance = Instance(GetComponent());
     const BoxSize box = MeasureBox(instance);

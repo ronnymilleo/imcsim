@@ -37,15 +37,20 @@ bool HasLogicPart(const Circuit &circuit) {
                                [](const Component *part) { return IsLogicPart(part->GetType()); });
 }
 
-// ngspice only warns when the analog and digital solutions keep alternating, and then leaves the results empty
+/**
+ * @brief   ngspice only warns when the analog and digital solutions keep alternating, and then leaves the results
+ *          empty.
+ */
 bool NeverSettled(const std::vector<SimulatorMessage> &messages) {
     return std::ranges::any_of(messages, [](const SimulatorMessage &message) {
         return message.Text.contains("event-driven solution alternations");
     });
 }
 
-// What to tell the user when ngspice rejected a circuit: a latch with both inputs idle has no state to start from, so
-// the digital loop never settles
+/**
+ * @brief   What to tell the user when ngspice rejected a circuit: a latch with both inputs idle has no state to start
+ *          from, so the digital loop never settles.
+ */
 std::string DescribeFailure(const Circuit &circuit, const std::vector<SimulatorMessage> &messages) {
     if (HasLogicPart(circuit) && NeverSettled(messages)) {
         return "The logic parts never settle; a loop such as a latch needs one input at a defined level to have "
@@ -54,7 +59,9 @@ std::string DescribeFailure(const Circuit &circuit, const std::vector<SimulatorM
     return "ngspice could not simulate the circuit; see its output for details";
 }
 
-// The card that sets the temperature of a stepped run, or nothing when the run keeps the default one
+/**
+ * @brief   The card that sets the temperature of a stepped run, or nothing when the run keeps the default one.
+ */
 std::string TemperatureCard(const std::optional<double> temperature) {
     return temperature ? std::format(".temp {}\n", FormatSpiceValue(*temperature)) : std::string();
 }
@@ -64,10 +71,12 @@ std::string FormatSweepRange(const SweepRange &range) {
                        FormatSpiceValue(range.Step));
 }
 
-// A DC sweep keeps the swept value in the simulation time, and the event-driven code of ngspice stops calling the
-// logic inputs, after the first one, at any time past a breakpoint that only a transient raises (to 1e30) and that
-// starts at 0 in a new process: only one gate would follow the sweep. A transient of a circuit with no code model
-// raises it and leaves it there
+/**
+ * @brief   A DC sweep keeps the swept value in the simulation time, and the event-driven code of ngspice stops calling
+ *          the logic inputs, after the first one, at any time past a breakpoint that only a transient raises (to 1e30)
+ *          and that starts at 0 in a new process: only one gate would follow the sweep.
+ * @details A transient of a circuit with no code model raises it and leaves it there.
+ */
 void RaiseEventBreakpoint() {
     LoadCircuit("* event breakpoint\nV1 1 0 0\nR1 1 0 1\n.tran 1n 1n\n.end");
     SendCommand("run");
@@ -88,8 +97,10 @@ constexpr std::chrono::duration<double> PACE_WAIT_SLICE{0.01};
 // the oversleep of a wait, are made up, so they do not add up over a long run
 constexpr std::chrono::duration<double> LIVE_CATCH_UP_LIMIT{TARGET_CHUNK_SECONDS};
 
-// How much simulated time the next chunk covers: twice the last one when it was quick, half when it was slow, so the
-// chunks settle around the target wall time as the circuit gets easier or harder
+/**
+ * @brief   How much simulated time the next chunk covers: twice the last one when it was quick, half when it was slow,
+ *          so the chunks settle around the target wall time as the circuit gets easier or harder.
+ */
 double GetNextChunkDuration(const double duration, const double wall_seconds, const double smallest) {
     if (wall_seconds < TARGET_CHUNK_SECONDS / 2.0) {
         return duration * 2.0;
@@ -100,8 +111,11 @@ double GetNextChunkDuration(const double duration, const double wall_seconds, co
     return duration;
 }
 
-// The lines ngspice prints each time a chunk ends or resumes say nothing about the circuit, and the ones on the error
-// stream would pass for warnings, so a chunked run keeps only the first line that announces the analysis
+/**
+ * @brief   The lines ngspice prints each time a chunk ends or resumes say nothing about the circuit, and the ones on
+ *          the error stream would pass for warnings, so a chunked run keeps only the first line that announces the
+ *          analysis.
+ */
 void RemoveChunkMessages(std::vector<SimulatorMessage> &messages) {
     bool has_analysis_line = false;
     std::erase_if(messages, [&has_analysis_line](const SimulatorMessage &message) {
@@ -114,13 +128,17 @@ void RemoveChunkMessages(std::vector<SimulatorMessage> &messages) {
     });
 }
 
-// Runs the loaded one-piece analysis, which is all most of them need
+/**
+ * @brief   Runs the loaded one-piece analysis, which is all most of them need.
+ */
 std::optional<std::string> RunToTheEnd(const std::vector<SimulatorMessage> & /*messages*/) {
     SendCommand("run");
     return std::nullopt;
 }
 
-// The name ngspice gives the figure a live change sets, for alter
+/**
+ * @brief   The name ngspice gives the figure a live change sets, for alter.
+ */
 std::string_view GetAlterParameter(const LiveQuantity quantity) {
     switch (quantity) {
     case LiveQuantity::RESISTANCE:
@@ -136,7 +154,9 @@ bool IsCancelled(const RunControl *control) {
     return control != nullptr && control->IsCancelled();
 }
 
-// Applies the changes the caller sent since the last chunk, which take effect from the next resume
+/**
+ * @brief   Applies the changes the caller sent since the last chunk, which take effect from the next resume.
+ */
 void ApplyLiveChanges(RunControl &control) {
     for (const LiveChange &change : control.TakeChanges()) {
         SendCommand(std::format("alter {} {} = {}", change.Element, GetAlterParameter(change.Quantity),
@@ -144,7 +164,10 @@ void ApplyLiveChanges(RunControl &control) {
     }
 }
 
-// Waits until the clock catches up with the simulated time a live run has reached, unless the run is asked to stop
+/**
+ * @brief   Waits until the clock catches up with the simulated time a live run has reached, unless the run is asked to
+ *          stop.
+ */
 void WaitForClock(const std::chrono::steady_clock::time_point due, const RunControl *control) {
     while (!IsCancelled(control)) {
         const std::chrono::duration<double> left = due - std::chrono::steady_clock::now();
@@ -155,8 +178,10 @@ void WaitForClock(const std::chrono::steady_clock::time_point due, const RunCont
     }
 }
 
-// Holds a paused live run until it is resumed or asked to stop, and returns how long it held, by which the clock the
-// run keeps pace with moves on
+/**
+ * @brief   Holds a paused live run until it is resumed or asked to stop, and returns how long it held, by which the
+ *          clock the run keeps pace with moves on.
+ */
 std::chrono::steady_clock::duration WaitWhilePaused(const RunControl *control) {
     const auto start = std::chrono::steady_clock::now();
     while (control != nullptr && control->IsPaused() && !IsCancelled(control)) {
@@ -165,10 +190,13 @@ std::chrono::steady_clock::duration WaitWhilePaused(const RunControl *control) {
     return std::chrono::steady_clock::now() - start;
 }
 
-// Keeps a live run at its pace once it reached a simulated time: waits for the clock, then holds while it is paused,
-// moving the start of its clock by the time paused so it never catches up. A run that fell more than a chunk behind,
-// because the circuit was slow for a while, moves the start by its delay too, so it goes on at its pace instead of
-// hurrying to make the delay up once the circuit gets easy. Returns whether the run goes on
+/**
+ * @brief   Keeps a live run at its pace once it reached a simulated time: waits for the clock, then holds while it is
+ *          paused, moving the start of its clock by the time paused so it never catches up.
+ * @details A run that fell more than a chunk behind, because the circuit was slow for a while, moves the start by its
+ *          delay too, so it goes on at its pace instead of hurrying to make the delay up once the circuit gets easy.
+ *          Returns whether the run goes on.
+ */
 bool KeepLivePace(std::chrono::steady_clock::time_point &start, const double reached, const double pace,
                   const RunControl *control) {
     const auto due = start + std::chrono::duration_cast<std::chrono::steady_clock::duration>(
@@ -181,8 +209,10 @@ bool KeepLivePace(std::chrono::steady_clock::time_point &start, const double rea
     return !IsCancelled(control);
 }
 
-// Sets where the next chunk stops, short of the stop time, and runs ngspice up to it. Stop conditions pile up, so the
-// old one is deleted first, or every resume would advance one step
+/**
+ * @brief   Sets where the next chunk stops, short of the stop time, and runs ngspice up to it.
+ * @details Stop conditions pile up, so the old one is deleted first, or every resume would advance one step.
+ */
 void RunChunk(const double stop_at, const double stop_time, const bool is_started) {
     if (is_started) {
         SendCommand("delete all");
@@ -193,7 +223,9 @@ void RunChunk(const double stop_at, const double stop_time, const bool is_starte
     SendCommand(is_started ? "resume" : "run");
 }
 
-// Hands over the points made since the last chunk, if the monitor wants them, and reports how far the run is
+/**
+ * @brief   Hands over the points made since the last chunk, if the monitor wants them, and reports how far the run is.
+ */
 bool PublishChunk(const Circuit &circuit, const RunMonitor &monitor, const double progress, std::size_t &sent) {
     if (monitor.Control != nullptr) {
         monitor.Control->SetProgress(progress);
@@ -210,10 +242,13 @@ bool PublishChunk(const Circuit &circuit, const RunMonitor &monitor, const doubl
     return true;
 }
 
-// Runs the loaded transient in stretches of simulated time: ngspice stops when the time passes a limit, the chunk is
-// read, and the next limit is set to resume. A stop request ends the loop between chunks, and what ngspice has made
-// stays in its plot. A live run covers a fixed stretch of the clock per chunk at its pace and waits when it gets ahead,
-// holds between chunks while paused, and alters the circuit with the changes sent before each chunk
+/**
+ * @brief   Runs the loaded transient in stretches of simulated time: ngspice stops when the time passes a limit, the
+ *          chunk is read, and the next limit is set to resume.
+ * @details A stop request ends the loop between chunks, and what ngspice has made stays in its plot. A live run covers
+ *          a fixed stretch of the clock per chunk at its pace and waits when it gets ahead, holds between chunks while
+ *          paused, and alters the circuit with the changes sent before each chunk.
+ */
 std::optional<std::string> RunInChunks(const Circuit &circuit, const TransientSettings &settings,
                                        const RunMonitor &monitor, const std::vector<SimulatorMessage> &messages) {
     const bool is_live = monitor.LivePace > 0.0;
@@ -257,9 +292,12 @@ std::optional<std::string> RunInChunks(const Circuit &circuit, const TransientSe
     }
 }
 
-// Runs one analysis on a clean library. Return codes stay 0 even when the netlist is rejected, so success is
-// told by the plot the run created, whose name starts with the analysis (op1, tran1, ac1). execute runs the loaded
-// analysis and returns why it failed, if it did on its own account
+/**
+ * @brief   Runs one analysis on a clean library.
+ * @details Return codes stay 0 even when the netlist is rejected, so success is told by the plot the run created, whose
+ *          name starts with the analysis (op1, tran1, ac1). execute runs the loaded analysis and returns why it failed,
+ *          if it did on its own account.
+ */
 template <typename Data, typename Reader, typename Execute = decltype(&RunToTheEnd)>
 SimulationRun<Data> Simulate(const Circuit &circuit, const std::string_view analysis,
                              const std::string_view plot_prefix, Reader read_result, Execute execute = &RunToTheEnd) {

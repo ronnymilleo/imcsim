@@ -24,20 +24,26 @@ constexpr std::size_t MAX_SAMPLE_COUNT = 65536;
 constexpr double DECIBEL_FLOOR = 1e-10;
 constexpr double MIN_AMPLITUDE = 1e-15;
 
-// Bins on each side of a peak that still belong to its tone: the main lobe of the Hann window spans two bins each
-// way, while a rectangular window keeps a coherent tone in one bin and spreads an incoherent one too widely for a
-// lobe to hold it
+/**
+ * @brief   Bins on each side of a peak that still belong to its tone: the main lobe of the Hann window spans two bins
+ *          each way, while a rectangular window keeps a coherent tone in one bin and spreads an incoherent one too
+ *          widely for a lobe to hold it.
+ */
 std::size_t LobeHalfWidth(const SpectrumWindow window) {
     return window == SpectrumWindow::HANN ? 2 : 1;
 }
 
-// Equivalent noise bandwidth of the window, in bins: the power of a tone summed over its lobe, against the square of
-// its amplitude
+/**
+ * @brief   Equivalent noise bandwidth of the window, in bins: the power of a tone summed over its lobe, against the
+ *          square of its amplitude.
+ */
 double NoiseBandwidth(const SpectrumWindow window) {
     return window == SpectrumWindow::HANN ? 1.5 : 1.0;
 }
 
-// The periodic form, which leaves the sample after the span out, as the transform repeats the span
+/**
+ * @brief   The periodic form, which leaves the sample after the span out, as the transform repeats the span.
+ */
 double WindowWeight(const SpectrumWindow window, const std::size_t index, const std::size_t count) {
     if (window == SpectrumWindow::RECTANGULAR) {
         return 1.0;
@@ -45,7 +51,9 @@ double WindowWeight(const SpectrumWindow window, const std::size_t index, const 
     return 0.5 * (1.0 - std::cos(2.0 * std::numbers::pi * static_cast<double>(index) / static_cast<double>(count)));
 }
 
-// Iterative radix-2 Cooley-Tukey transform, in place; the size must be a power of two
+/**
+ * @brief   Iterative radix-2 Cooley-Tukey transform, in place; the size must be a power of two.
+ */
 void Transform(std::vector<std::complex<double>> &values) {
     const std::size_t count = values.size();
     for (std::size_t index = 1, reversed = 0; index < count; ++index) {
@@ -74,7 +82,9 @@ void Transform(std::vector<std::complex<double>> &values) {
     }
 }
 
-// Power of the bins around center that belong to its tone, clipped to the spectrum
+/**
+ * @brief   Power of the bins around center that belong to its tone, clipped to the spectrum.
+ */
 double LobePower(const std::vector<double> &amplitudes, const std::size_t center, const std::size_t half_width) {
     const std::size_t first = center > half_width ? center - half_width : 0;
     const std::size_t last = std::min(center + half_width, amplitudes.size() - 1);

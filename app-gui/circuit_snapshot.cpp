@@ -21,7 +21,9 @@ struct Bracket {
     double Fraction = 0.0;
 };
 
-// Instants outside the run take its first or last sample
+/**
+ * @brief   Instants outside the run take its first or last sample.
+ */
 Bracket FindBracket(const std::vector<double> &times, const double time) {
     if (time <= times.front()) {
         return {};
@@ -34,7 +36,9 @@ Bracket FindBracket(const std::vector<double> &times, const double time) {
     return {.Before = before, .After = after, .Fraction = (time - times[before]) / (times[after] - times[before])};
 }
 
-// A trace shorter than the time axis reads as zero where it has no sample
+/**
+ * @brief   A trace shorter than the time axis reads as zero where it has no sample.
+ */
 double Interpolate(const std::vector<double> &values, const Bracket &bracket) {
     if (bracket.After >= values.size()) {
         return 0.0;

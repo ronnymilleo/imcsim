@@ -36,8 +36,10 @@ void AddSegment(std::vector<UIWire> &wires, const GridPoint start, const GridPoi
     }
 }
 
-// The leg that reaches the terminal keeps the direction of the original wire, so it still enters the terminal
-// the same way; the bend goes next to the fixed end
+/**
+ * @brief   The leg that reaches the terminal keeps the direction of the original wire, so it still enters the terminal
+ *          the same way; the bend goes next to the fixed end.
+ */
 void AddBentWire(std::vector<UIWire> &wires, const GridPoint fixed, const GridPoint moved, const bool was_horizontal) {
     const GridPoint corner = was_horizontal ? GridPoint{fixed.X, moved.Y} : GridPoint{moved.X, fixed.Y};
     AddSegment(wires, fixed, corner);
@@ -53,9 +55,11 @@ GridPoint OtherEnd(const UIWire &wire, const GridPoint end) {
     return wire.GetStart() == end ? wire.GetEnd() : wire.GetStart();
 }
 
-// Two segments can become one when they meet end to end in a straight line at a point nothing else uses.
-// Terminals are excluded so wires keep ending on them, and so do points another wire passes through, which
-// would otherwise lose their connection
+/**
+ * @brief   Two segments can become one when they meet end to end in a straight line at a point nothing else uses.
+ * @details Terminals are excluded so wires keep ending on them, and so do points another wire passes through, which
+ *          would otherwise lose their connection.
+ */
 bool CanMergeAt(const std::vector<UIWire> &wires, const std::vector<GridPoint> &terminals, const GridPoint point,
                 const UIWire &first, const UIWire &second) {
     if (std::ranges::contains(terminals, point) || CountWireEnds(wires, point) != 2) {
@@ -81,7 +85,9 @@ bool IsSameWire(const UIWire &first, const UIWire &second) {
            (first.GetStart() == second.GetEnd() && first.GetEnd() == second.GetStart());
 }
 
-// Two wires on the same line that share some length, not just a point
+/**
+ * @brief   Two wires on the same line that share some length, not just a point.
+ */
 bool Overlaps(const UIWire &first, const UIWire &second) {
     const bool horizontal = IsHorizontal(first);
     if (horizontal != IsHorizontal(second)) {
@@ -129,8 +135,11 @@ SplitWires SplitBySelection(const std::vector<UIWire> &wires, const std::set<std
     return split;
 }
 
-// Wires that stay follow every point that moves: the terminals of moved parts, the ends of the moved wires, and the
-// ends of wires that touch the moved wires in the middle. A part that stays keeps its terminals where they are
+/**
+ * @brief   Wires that stay follow every point that moves: the terminals of moved parts, the ends of the moved wires,
+ *          and the ends of wires that touch the moved wires in the middle.
+ * @details A part that stays keeps its terminals where they are.
+ */
 void CollectFollowedPoints(const SplitWires &split, const std::vector<GridPoint> &fixed_terminals,
                            const PointTransform &transform, std::vector<GridPoint> &from, std::vector<GridPoint> &to) {
     const auto follow = [&](const GridPoint point) {
@@ -152,8 +161,10 @@ void CollectFollowedPoints(const SplitWires &split, const std::vector<GridPoint>
     }
 }
 
-// A moved wire that ended on a part that stays or on the middle of a wire that stays leaves a wire behind, and so
-// does a part that stays and touches the moved wire in its middle, such as a ground on a rail
+/**
+ * @brief   A moved wire that ended on a part that stays or on the middle of a wire that stays leaves a wire behind, and
+ *          so does a part that stays and touches the moved wire in its middle, such as a ground on a rail.
+ */
 void AddConnectors(std::vector<UIWire> &result, const UIWire &carried, const UIWire &shifted,
                    const std::vector<UIWire> &staying, const std::vector<GridPoint> &fixed_terminals,
                    const PointTransform &transform) {

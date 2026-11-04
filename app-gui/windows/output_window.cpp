@@ -99,15 +99,20 @@ struct PlottedTrace {
     std::optional<double> LogicLevel = std::nullopt;
 };
 
-// Axis ticks use the same suffixes as the values the user types, such as "10m" or "1k", followed by the unit.
-// ImPlot hands the unit back as untyped user data, which is why callers cast away the const of the literal
+/**
+ * @brief   Axis ticks use the same suffixes as the values the user types, such as "10m" or "1k", followed by the unit.
+ * @details ImPlot hands the unit back as untyped user data, which is why callers cast away the const of the literal.
+ */
 int FormatAxisValue(const double value, char *buffer, const int size, void *unit) {
     const std::string text = std::format("{}{}", Core::FormatValue(value), static_cast<const char *>(unit));
     return std::snprintf(buffer, static_cast<std::size_t>(size), "%s", text.c_str());
 }
 
-// The legend only names the traces: clicking an entry would hide a curve from the plot alone, while the statistics
-// and the export still showed it. The trace list is the one place that picks what is shown
+/**
+ * @brief   The legend only names the traces: clicking an entry would hide a curve from the plot alone, while the
+ *          statistics and the export still showed it.
+ * @details The trace list is the one place that picks what is shown.
+ */
 bool BeginTracePlot(const char *id, const ImVec2 size) {
     if (!ImPlot::BeginPlot(id, size)) {
         return false;
@@ -116,15 +121,20 @@ bool BeginTracePlot(const char *id, const ImVec2 size) {
     return true;
 }
 
-// Splits the room left in the window between the plots
+/**
+ * @brief   Splits the room left in the window between the plots.
+ */
 float PlotHeight(const int plot_count) {
     return std::max(ImGui::GetFontSize() * MIN_PLOT_HEIGHT,
                     ImGui::GetContentRegionAvail().y / static_cast<float>(plot_count) -
                         ImGui::GetStyle().ItemSpacing.y);
 }
 
-// Ground is always 0 V, so plots start at node 1. Each node keeps its color whichever nodes are measured. The
-// suffix tells the curves of a DC sweep family apart in the cursor readout
+/**
+ * @brief   Ground is always 0 V, so plots start at node 1.
+ * @details Each node keeps its color whichever nodes are measured. The suffix tells the curves of a DC sweep family
+ *          apart in the cursor readout.
+ */
 void PlotNodes(const std::vector<double> &xs, const std::vector<std::vector<double>> &node_values, Schematic &schematic,
                const char *unit, const std::string &suffix, std::vector<PlottedTrace> &plotted,
                const std::vector<int> &excluded = {}) {
@@ -142,8 +152,10 @@ void PlotNodes(const std::vector<double> &xs, const std::vector<std::vector<doub
     }
 }
 
-// ImPlot draws no dashes, so the line is drawn by hand: a dummy item gives the legend entry, and an invisible line
-// keeps the automatic fit of the axes
+/**
+ * @brief   ImPlot draws no dashes, so the line is drawn by hand: a dummy item gives the legend entry, and an invisible
+ *          line keeps the automatic fit of the axes.
+ */
 void PlotDashedLine(const std::string &label, const std::vector<double> &xs, const std::vector<double> &ys,
                     const ImU32 color) {
     ImPlotSpec legend_spec;
@@ -174,8 +186,10 @@ void PlotDashedLine(const std::string &label, const std::vector<double> &xs, con
     ImPlot::PopPlotClipRect();
 }
 
-// Currents go on the secondary Y axis, which the caller sets up before plotting anything. Each keeps the color of
-// its position in the circuit, as in the editor
+/**
+ * @brief   Currents go on the secondary Y axis, which the caller sets up before plotting anything.
+ * @details Each keeps the color of its position in the circuit, as in the editor.
+ */
 void PlotCurrents(const std::vector<double> &xs, const std::vector<Core::ComponentTrace> &currents,
                   const Schematic &schematic, const char *unit, const std::string &suffix,
                   std::vector<PlottedTrace> &plotted) {
@@ -200,7 +214,9 @@ bool HasMeasuredVoltage(const std::size_t node_count, const Schematic &schematic
     return false;
 }
 
-// While the plot is hovered, marks the sample nearest the cursor and lists every plotted trace at it
+/**
+ * @brief   While the plot is hovered, marks the sample nearest the cursor and lists every plotted trace at it.
+ */
 void DrawCursorReadout(const std::vector<double> &xs, const char *x_unit, const bool logarithmic,
                        const std::vector<PlottedTrace> &plotted) {
     if (!ImPlot::IsPlotHovered() || xs.empty() || plotted.empty()) {
@@ -239,10 +255,12 @@ struct StepTraces {
     const std::vector<Core::ComponentTrace> *Currents;
 };
 
-// The other steps of a stepped run, faint behind the shown one and without legend entries, so the family shows its
-// spread while the shown step stays readable; currents are thin solid lines on their axis, since dashes would
-// clutter a family. Nodes drawn as logic lanes are skipped, as PlotNodes() skips them. Call it before plotting the
-// shown step
+/**
+ * @brief   The other steps of a stepped run, faint behind the shown one and without legend entries, so the family shows
+ *          its spread while the shown step stays readable; currents are thin solid lines on their axis, since dashes
+ *          would clutter a family.
+ * @details Nodes drawn as logic lanes are skipped, as PlotNodes() skips them. Call it before plotting the shown step.
+ */
 void PlotOtherSteps(const std::vector<StepTraces> &steps, const std::size_t selected, const Schematic &schematic,
                     const bool show_currents, const std::vector<int> &lane_nodes) {
     for (std::size_t step = 0; step < steps.size(); ++step) {
@@ -281,8 +299,10 @@ void PlotOtherSteps(const std::vector<StepTraces> &steps, const std::size_t sele
     }
 }
 
-// A curve read at other X values, by straight lines between its samples and held at its ends; both X lists rise, so
-// one walk along each does it
+/**
+ * @brief   A curve read at other X values, by straight lines between its samples and held at its ends; both X lists
+ *          rise, so one walk along each does it.
+ */
 std::vector<double> ResampleOnto(const std::vector<double> &xs, const std::vector<double> &ys,
                                  const std::vector<double> &targets) {
     std::vector<double> values;
@@ -305,8 +325,10 @@ std::vector<double> ResampleOnto(const std::vector<double> &xs, const std::vecto
     return values;
 }
 
-// The sample where curves of equal length part most and stay apart for a few samples around it, so an edge that
-// one step crosses before the others, as in a pulse, does not take the labels
+/**
+ * @brief   The sample where curves of equal length part most and stay apart for a few samples around it, so an edge
+ *          that one step crosses before the others, as in a pulse, does not take the labels.
+ */
 std::size_t FindSteadySpread(const std::vector<std::vector<double>> &curves) {
     const std::size_t count = curves.empty() ? 0 : curves.front().size();
     std::vector<double> spreads(count, 0.0);
@@ -336,9 +358,11 @@ std::size_t FindSteadySpread(const std::vector<std::vector<double>> &curves) {
     return widest;
 }
 
-// Labels each step of every measured trace with its value, where its curves part most. Every step is read at the X
-// values of the shown one, since each transient has its own time points. A trace the steps leave unchanged, such
-// as the input, gets no labels, which would only pile up on one line
+/**
+ * @brief   Labels each step of every measured trace with its value, where its curves part most.
+ * @details Every step is read at the X values of the shown one, since each transient has its own time points. A trace
+ *          the steps leave unchanged, such as the input, gets no labels, which would only pile up on one line.
+ */
 void LabelSteps(const std::vector<StepTraces> &steps, const std::size_t selected,
                 const std::vector<std::string> &labels, const Schematic &schematic, const bool show_currents,
                 const std::vector<int> &lane_nodes) {
@@ -431,9 +455,12 @@ template <typename Result> std::vector<std::string> ListStepLabels(const StepFam
     return labels;
 }
 
-// Labels every curve of each shown trace with the value of the stepped source, so the curves of a family tell
-// apart. The labels of a trace go where its curves are furthest apart, which is the end for most traces but the
-// peak for a derivative, whose curves all end near zero. Each label sits on the axis of its curve
+/**
+ * @brief   Labels every curve of each shown trace with the value of the stepped source, so the curves of a family tell
+ *          apart.
+ * @details The labels of a trace go where its curves are furthest apart, which is the end for most traces but the peak
+ *          for a derivative, whose curves all end near zero. Each label sits on the axis of its curve.
+ */
 void LabelCurves(const Core::DCSweep &sweep, Schematic &schematic, const bool show_currents,
                  const std::vector<std::vector<MathTrace>> &math) {
     const ImVec4 color = ImGui::GetStyleColorVec4(ImGuiCol_PopupBg);
@@ -463,8 +490,10 @@ void LabelCurves(const Core::DCSweep &sweep, Schematic &schematic, const bool sh
     ImPlot::SetAxes(ImAxis_X1, ImAxis_Y1);
 }
 
-// While other traces are shown and no voltage is, the voltage axis keeps its grid but drops its label and
-// ticks, so an empty scale is not read as data
+/**
+ * @brief   While other traces are shown and no voltage is, the voltage axis keeps its grid but drops its label and
+ *          ticks, so an empty scale is not read as data.
+ */
 ImPlotAxisFlags VoltageAxisFlags(const bool has_voltages, const bool has_other_traces) {
     if (has_voltages || !has_other_traces) {
         return ImPlotAxisFlags_None;
@@ -472,7 +501,9 @@ ImPlotAxisFlags VoltageAxisFlags(const bool has_voltages, const bool has_other_t
     return ImPlotAxisFlags_NoLabel | ImPlotAxisFlags_NoTickMarks | ImPlotAxisFlags_NoTickLabels;
 }
 
-// Measured nodes of a result, ground excluded; empty when the plot shows no voltage
+/**
+ * @brief   Measured nodes of a result, ground excluded; empty when the plot shows no voltage.
+ */
 std::vector<int> ListMeasuredNodes(const std::size_t node_count, const Schematic &schematic,
                                    const std::vector<int> &excluded = {}) {
     std::vector<int> nodes;
@@ -485,7 +516,9 @@ std::vector<int> ListMeasuredNodes(const std::size_t node_count, const Schematic
     return nodes;
 }
 
-// The measured nodes of a result that logic parts are connected to, which the transient plots as lanes
+/**
+ * @brief   The measured nodes of a result that logic parts are connected to, which the transient plots as lanes.
+ */
 std::vector<LogicNode> ListMeasuredLogicNodes(const std::vector<LogicNode> &logic_nodes, const std::size_t node_count,
                                               const Schematic &schematic) {
     std::vector<LogicNode> measured;
@@ -497,7 +530,9 @@ std::vector<LogicNode> ListMeasuredLogicNodes(const std::vector<LogicNode> &logi
     return measured;
 }
 
-// Measured currents of a result, in result order; empty when the plot shows no current axis
+/**
+ * @brief   Measured currents of a result, in result order; empty when the plot shows no current axis.
+ */
 std::vector<std::string> ListMeasuredCurrents(const std::vector<Core::ComponentTrace> &currents,
                                               const Schematic &schematic) {
     std::vector<std::string> names;
@@ -509,8 +544,11 @@ std::vector<std::string> ListMeasuredCurrents(const std::vector<Core::ComponentT
     return names;
 }
 
-// Fits every axis for a new result; otherwise only the axes whose traces changed, so the zoom of the others stays.
-// Call it before each BeginPlot()
+/**
+ * @brief   Fits every axis for a new result; otherwise only the axes whose traces changed, so the zoom of the others
+ *          stays.
+ * @details Call it before each BeginPlot().
+ */
 void SetNextFits(const bool new_result, const bool voltages_changed, const bool currents_changed) {
     if (new_result) {
         ImPlot::SetNextAxesToFit();
@@ -524,8 +562,10 @@ void SetNextFits(const bool new_result, const bool voltages_changed, const bool 
     }
 }
 
-// Toggles every trace of a section at once; the ID keeps the buttons of each section apart. Returns the new state
-// for all of them, or no value when neither button was pressed
+/**
+ * @brief   Toggles every trace of a section at once; the ID keeps the buttons of each section apart.
+ * @details Returns the new state for all of them, or no value when neither button was pressed.
+ */
 std::optional<bool> DrawAllNoneButtons(const char *id) {
     ImGui::PushID(id);
     std::optional<bool> measure_all;
@@ -540,7 +580,9 @@ std::optional<bool> DrawAllNoneButtons(const char *id) {
     return measure_all;
 }
 
-// Every measured trace of a result, voltages first, with the labels and colors of the plots
+/**
+ * @brief   Every measured trace of a result, voltages first, with the labels and colors of the plots.
+ */
 std::vector<PlottedTrace> ListTraces(const std::vector<std::vector<double>> &node_values,
                                      const std::vector<Core::ComponentTrace> &currents, Schematic &schematic,
                                      const char *voltage_unit, const char *current_unit) {
@@ -560,8 +602,10 @@ std::vector<PlottedTrace> ListTraces(const std::vector<std::vector<double>> &nod
     return traces;
 }
 
-// Draws the cursors in the current plot, placing them in the visible range the first frame they are shown. On a
-// logarithmic axis they are placed by decades, as the axis shows them
+/**
+ * @brief   Draws the cursors in the current plot, placing them in the visible range the first frame they are shown.
+ * @details On a logarithmic axis they are placed by decades, as the axis shows them.
+ */
 void DrawCursors(PlotCursors &cursors, const bool logarithmic) {
     if (!cursors.Shown) {
         return;
@@ -585,8 +629,10 @@ void DrawCursors(PlotCursors &cursors, const bool logarithmic) {
     ImPlot::TagX(cursors.B, color_b, "B");
 }
 
-// The instant of the transient shown on the schematic, as a line along the plot. Dragging it moves the instant and
-// stops the playback, so the line stays where it was dropped
+/**
+ * @brief   The instant of the transient shown on the schematic, as a line along the plot.
+ * @details Dragging it moves the instant and stops the playback, so the line stays where it was dropped.
+ */
 void DrawPlayhead(TransientPlayback &playback, const double from, const double to) {
     const ImVec4 color = ImGui::ColorConvertU32ToFloat4(AdaptToBackground(PLAYHEAD_COLOR));
     double time = playback.Time;
@@ -596,14 +642,18 @@ void DrawPlayhead(TransientPlayback &playback, const double from, const double t
     }
 }
 
-// Turning the cursors on places them again in the current view, so they are never lost off screen
+/**
+ * @brief   Turning the cursors on places them again in the current view, so they are never lost off screen.
+ */
 void DrawCursorToggle(PlotCursors &cursors) {
     if (ImGui::Checkbox("Cursors A and B", &cursors.Shown) && cursors.Shown) {
         cursors.Placed = false;
     }
 }
 
-// The statistics cover the span between the cursors while they are shown, otherwise what the plot shows
+/**
+ * @brief   The statistics cover the span between the cursors while they are shown, otherwise what the plot shows.
+ */
 PlotSpan MeasuredSpan(const PlotCursors &cursors, const PlotSpan &view) {
     return cursors.Shown ? PlotSpan{.From = cursors.A, .To = cursors.B} : view;
 }
@@ -612,7 +662,9 @@ std::string FormatQuantity(const double value, const char *unit) {
     return std::format("{}{}", Core::FormatValue(value), unit);
 }
 
-// Decibels and degrees read better with fixed decimals than with SPICE suffixes, which would show 500m dB
+/**
+ * @brief   Decibels and degrees read better with fixed decimals than with SPICE suffixes, which would show 500m dB.
+ */
 std::string FormatFixed(const double value, const char *unit) {
     return Core::FormatFixed(value, 2) + unit;
 }
@@ -621,7 +673,9 @@ std::string FormatOptionalQuantity(const std::optional<double> value, const char
     return value ? FormatQuantity(*value, unit) : "-";
 }
 
-// Two-column rows of a statistics table: what is measured and its value
+/**
+ * @brief   Two-column rows of a statistics table: what is measured and its value.
+ */
 void DrawStatistic(const char *name, const std::string &value) {
     ImGui::TableNextRow();
     ImGui::TableNextColumn();
@@ -630,7 +684,9 @@ void DrawStatistic(const char *name, const std::string &value) {
     ImGui::TextUnformatted(value.c_str());
 }
 
-// A negligible value reads as ~0, so it is not mistaken for an exact zero; hovering it shows the exact value
+/**
+ * @brief   A negligible value reads as ~0, so it is not mistaken for an exact zero; hovering it shows the exact value.
+ */
 void DrawMeasuredValue(const char *name, const double value, const double scale, const char *unit) {
     if (!IsNegligible(value, scale)) {
         DrawStatistic(name, FormatQuantity(value, unit));
@@ -645,7 +701,9 @@ bool BeginStatisticsTable(const std::string &id) {
     return ImGui::BeginTable(id.c_str(), 2, ImGuiTableFlags_SizingStretchProp);
 }
 
-// Splits a tab into the plots and the statistics panel on their right
+/**
+ * @brief   Splits a tab into the plots and the statistics panel on their right.
+ */
 template <typename DrawPlots, typename DrawStatistics>
 void DrawWithStatistics(const DrawPlots &draw_plots, const DrawStatistics &draw_statistics) {
     const float statistics_width = ImGui::GetFontSize() * STATISTICS_WIDTH;
@@ -660,8 +718,10 @@ void DrawWithStatistics(const DrawPlots &draw_plots, const DrawStatistics &draw_
     ImGui::EndChild();
 }
 
-// The current axis may already be set up for probed currents; the third axis is labeled with its unit, which
-// must outlive the plot because ImPlot formats the ticks when it ends
+/**
+ * @brief   The current axis may already be set up for probed currents; the third axis is labeled with its unit, which
+ *          must outlive the plot because ImPlot formats the ticks when it ends.
+ */
 void SetupMathAxes(const std::vector<MathTrace> &math, const bool current_axis_ready, const std::string &third_unit) {
     if (!current_axis_ready && UsesAxis(math, ImAxis_Y2)) {
         ImPlot::SetupAxis(ImAxis_Y2, "Current", ImPlotAxisFlags_AuxDefault);
@@ -673,7 +733,9 @@ void SetupMathAxes(const std::vector<MathTrace> &math, const bool current_axis_r
     }
 }
 
-// Fits the axes of the math traces when the channels change, like the probed traces
+/**
+ * @brief   Fits the axes of the math traces when the channels change, like the probed traces.
+ */
 void FitMathAxes(const std::vector<MathTrace> &math) {
     for (const ImAxis axis : {ImAxis_Y1, ImAxis_Y2, ImAxis_Y3}) {
         if (UsesAxis(math, axis)) {
@@ -682,7 +744,9 @@ void FitMathAxes(const std::vector<MathTrace> &math) {
     }
 }
 
-// Division by zero leaves NaN samples, which are skipped instead of breaking the line
+/**
+ * @brief   Division by zero leaves NaN samples, which are skipped instead of breaking the line.
+ */
 void PlotMath(const std::vector<double> &xs, const std::vector<MathTrace> &math, const std::string &suffix,
               std::vector<PlottedTrace> &plotted) {
     for (const MathTrace &trace : math) {
@@ -703,8 +767,11 @@ void DrawMathErrors(const std::vector<std::string> &errors) {
     }
 }
 
-// Like ImGui::BeginTabBar(), but the bar and the line under it stop short of the right edge by the given width,
-// leaving room for a button there. Mirrors BeginTabBar() in imgui_widgets.cpp, which takes no width
+/**
+ * @brief   Like ImGui::BeginTabBar(), but the bar and the line under it stop short of the right edge by the given
+ *          width, leaving room for a button there.
+ * @details Mirrors BeginTabBar() in imgui_widgets.cpp, which takes no width.
+ */
 bool BeginTabBarBefore(const char *id, const float reserved_width) {
     ImGuiContext &context = *ImGui::GetCurrentContext();
     ImGuiWindow *window = context.CurrentWindow;
@@ -766,7 +833,9 @@ const char *GetTabTitle(const PlotTab tab) {
     return "";
 }
 
-// The operating point is a table of DC values, one row per node and per current
+/**
+ * @brief   The operating point is a table of DC values, one row per node and per current.
+ */
 void DrawOperatingPoint(const Core::OperatingPoint &operating_point, Schematic &schematic) {
     ImGui::PushTextWrapPos(0.0f);
     for (const std::string &warning : operating_point.Warnings) {
@@ -821,8 +890,10 @@ void DrawOperatingPoint(const Core::OperatingPoint &operating_point, Schematic &
     ImGui::PopTextWrapPos();
 }
 
-// The transfer function is a table of three small-signal DC values; an impedance that ngspice reports as practically
-// infinite, such as an input path held open, reads as an open circuit instead of a giant number
+/**
+ * @brief   The transfer function is a table of three small-signal DC values; an impedance that ngspice reports as
+ *          practically infinite, such as an input path held open, reads as an open circuit instead of a giant number.
+ */
 void DrawTransferFunction(const Core::TransferFunction &transfer, Schematic &schematic) {
     constexpr ImGuiTableFlags TABLE_FLAGS =
         ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingStretchProp;
@@ -861,8 +932,10 @@ void DrawTransferFunction(const Core::TransferFunction &transfer, Schematic &sch
     ImGui::PopTextWrapPos();
 }
 
-// Whether each input of the table is high in the schematic as it is now, in the order of the table's inputs; an input
-// that left the circuit reads low
+/**
+ * @brief   Whether each input of the table is high in the schematic as it is now, in the order of the table's inputs;
+ *          an input that left the circuit reads low.
+ */
 std::vector<bool> ReadCurrentInputs(const Core::TruthTable &table, const Core::Circuit &circuit) {
     std::vector<bool> inputs_high;
     for (const std::string &name : table.InputNames) {
@@ -875,8 +948,11 @@ std::vector<bool> ReadCurrentInputs(const Core::TruthTable &table, const Core::C
     return inputs_high;
 }
 
-// One row per combination of the inputs, in counting order: 0 dimmed, 1 bright and X, which no operating point or a
-// voltage between the logic levels gives, in the warning color; the row the inputs are in now is highlighted
+/**
+ * @brief   One row per combination of the inputs, in counting order: 0 dimmed, 1 bright and X, which no operating point
+ *          or a voltage between the logic levels gives, in the warning color; the row the inputs are in now is
+ *          highlighted.
+ */
 void DrawTruthTable(const Core::TruthTable &table, Schematic &schematic) {
     const Core::Circuit circuit = schematic.BuildCircuit();
     const std::vector<LogicNode> logic_nodes = FindLogicNodes(circuit);
@@ -936,9 +1012,12 @@ void DrawTruthTable(const Core::TruthTable &table, Schematic &schematic) {
     ImGui::EndTable();
 }
 
-// The range a logarithmic axis fits to: the positive values of the traces, with a tenth of their decades, and at
-// least half a decade, of room above and below. The first trace is always in full; values of the others far below
-// its peak, such as the share of the ideal op-amp, are left below the axis, so they do not squash the plot
+/**
+ * @brief   The range a logarithmic axis fits to: the positive values of the traces, with a tenth of their decades, and
+ *          at least half a decade, of room above and below.
+ * @details The first trace is always in full; values of the others far below its peak, such as the share of the ideal
+ *          op-amp, are left below the axis, so they do not squash the plot.
+ */
 PlotSpan GetDecadeFitRange(const std::vector<std::span<const double>> &traces) {
     double highest = 0.0;
     double reference = 0.0;
@@ -971,7 +1050,9 @@ std::string FormatFrequencyRange(const Core::Noise &noise) {
                        Core::FormatValue(noise.Frequencies.back()));
 }
 
-// The output in the color of its node, the shares checked in the panel, and the input-referred noise dashed
+/**
+ * @brief   The output in the color of its node, the shares checked in the panel, and the input-referred noise dashed.
+ */
 void PlotNoiseTraces(const Core::Noise &noise, const Connectivity &connectivity, const std::set<std::string> &shown,
                      const bool input_shown, const std::string &output_unit, const std::string &input_unit,
                      std::vector<PlottedTrace> &plotted) {
@@ -1006,21 +1087,27 @@ void PlotNoiseTraces(const Core::Noise &noise, const Connectivity &connectivity,
     plotted.push_back({input_label, &noise.InputDensities, input_unit.c_str(), input_color});
 }
 
-// Decibels relative to 1 of the unit of the trace, as spectrum analyzers write dBV
+/**
+ * @brief   Decibels relative to 1 of the unit of the trace, as spectrum analyzers write dBV.
+ */
 std::string GetDecibelUnit(const SpectrumTrace &trace) {
     return trace.Unit.empty() ? " dB" : std::format(" dB{}", trace.Unit);
 }
 
-// Distortion reads as a percentage with three significant digits, down to the floor the interpolation of the
-// transient leaves; the decibels give the exact figure below it
+/**
+ * @brief   Distortion reads as a percentage with three significant digits, down to the floor the interpolation of the
+ *          transient leaves; the decibels give the exact figure below it.
+ */
 std::string FormatDistortionPercent(const double ratio) {
     const double percent = ratio * 100.0;
     return percent < MIN_SHOWN_DISTORTION_PERCENT ? std::format("<{}%", MIN_SHOWN_DISTORTION_PERCENT)
                                                   : std::format("{:.3g}%", percent);
 }
 
-// Every trace of a spectrum shares the span and the window, so one warning covers them all when the span holds too
-// few periods to tell the harmonics apart
+/**
+ * @brief   Every trace of a spectrum shares the span and the window, so one warning covers them all when the span holds
+ *          too few periods to tell the harmonics apart.
+ */
 void DrawPeriodsWarning(const TransientSpectra &spectra) {
     std::optional<int> periods_needed;
     for (const SpectrumTrace &trace : spectra.Traces) {
@@ -1042,7 +1129,9 @@ void DrawPeriodsWarning(const TransientSpectra &spectra) {
     ImGui::PopTextWrapPos();
 }
 
-// The rows of one trace in its statistics table: its mean, its fundamental and THD, then each harmonic in dBc
+/**
+ * @brief   The rows of one trace in its statistics table: its mean, its fundamental and THD, then each harmonic in dBc.
+ */
 void DrawHarmonics(const SpectrumTrace &trace) {
     const HarmonicAnalysis &analysis = trace.Harmonics;
     const char *unit = trace.Unit.c_str();
@@ -1073,8 +1162,10 @@ void DrawHarmonics(const SpectrumTrace &trace) {
     }
 }
 
-// The frequency range a new spectrum opens on: the fundamental and its harmonics on a linear axis, so they spread
-// across the plot, and every frequency on a logarithmic one
+/**
+ * @brief   The frequency range a new spectrum opens on: the fundamental and its harmonics on a linear axis, so they
+ *          spread across the plot, and every frequency on a logarithmic one.
+ */
 PlotSpan GetSpectrumFitRange(const TransientSpectra &spectra, const bool logarithmic) {
     const PlotSpan whole{.From = spectra.Frequencies.front(), .To = spectra.Frequencies.back()};
     if (logarithmic) {
@@ -1175,7 +1266,10 @@ void OutputWindow::Draw() {
     ImGui::EndChild();
 }
 
-// Every result comes from the same circuit, so they have the same components; the first result there is lists them
+/**
+ * @brief   Every result comes from the same circuit, so they have the same components; the first result there is lists
+ *          them.
+ */
 const std::vector<Core::ComponentTrace> &OutputWindow::GetListedCurrents() const {
     static const std::vector<Core::ComponentTrace> no_currents;
     if (const auto &transient = m_Schematic.GetTransient()) {
@@ -1190,7 +1284,9 @@ const std::vector<Core::ComponentTrace> &OutputWindow::GetListedCurrents() const
     return no_currents;
 }
 
-// The nodes of the results, which share them as they share the components
+/**
+ * @brief   The nodes of the results, which share them as they share the components.
+ */
 std::size_t OutputWindow::GetListedNodeCount() const {
     const auto &transient = m_Schematic.GetTransient();
     const auto &sweep = m_Schematic.GetACSweep();
@@ -1199,9 +1295,12 @@ std::size_t OutputWindow::GetListedNodeCount() const {
                      dc_sweep ? dc_sweep->Curves.front().NodeVoltages.size() : 0});
 }
 
-// The math channels go over the whole run, so a derivative or an integral starts at the start of the simulation and not
-// at the edge of the window. It is done again only when the run or the channels change, and not at all while a run
-// grows, which waits for the end of the run
+/**
+ * @brief   The math channels go over the whole run, so a derivative or an integral starts at the start of the
+ *          simulation and not at the edge of the window.
+ * @details It is done again only when the run or the channels change, and not at all while a run grows, which waits for
+ *          the end of the run.
+ */
 void OutputWindow::UpdateFullMath() {
     const auto &transient = m_Schematic.GetTransient();
     if (!transient || (m_Controls.IsRunning() && !transient->IsComplete)) {
@@ -1220,9 +1319,11 @@ void OutputWindow::UpdateFullMath() {
     m_FullMath = std::move(math);
 }
 
-// The math channels of the plot are cut from those over the whole run, so a run of any length costs the same, and there
-// are none while a run grows. Every curve of a DC sweep has the same nodes and currents, so the first one reports the
-// errors of all
+/**
+ * @brief   The math channels of the plot are cut from those over the whole run, so a run of any length costs the same,
+ *          and there are none while a run grows.
+ * @details Every curve of a DC sweep has the same nodes and currents, so the first one reports the errors of all.
+ */
 OutputWindow::FrameResults OutputWindow::EvaluateFrame(const std::size_t node_count,
                                                        const std::vector<Core::ComponentTrace> &currents) const {
     FrameResults frame;
@@ -1262,7 +1363,9 @@ OutputWindow::FrameResults OutputWindow::EvaluateFrame(const std::size_t node_co
     return frame;
 }
 
-// The check marks take the colors of the curves, which match the probes in the editor
+/**
+ * @brief   The check marks take the colors of the curves, which match the probes in the editor.
+ */
 void OutputWindow::DrawTraceList(const std::size_t node_count, const std::vector<Core::ComponentTrace> &currents) {
     ImGui::BeginChild("traces", ImVec2(ImGui::GetFontSize() * TRACE_LIST_WIDTH, 0.0f), ImGuiChildFlags_Borders);
     if (node_count > 1) {
@@ -1321,7 +1424,9 @@ void OutputWindow::DrawTraceList(const std::size_t node_count, const std::vector
     ImGui::EndChild();
 }
 
-// One tab per analysis, and the spectrum of the transient; a new result brings its tab to the front once
+/**
+ * @brief   One tab per analysis, and the spectrum of the transient; a new result brings its tab to the front once.
+ */
 void OutputWindow::DrawTabs(const FrameResults &frame) {
     const std::optional<PlotTab> tab_to_show = std::exchange(m_TabToShow, std::nullopt);
     const auto begin_tab = [this, &tab_to_show](const char *label, const PlotTab tab) {
@@ -1455,7 +1560,10 @@ void OutputWindow::DrawDCSweepTab(const FrameResults &frame) {
         [&] { DrawDCSweepStatistics(*dc_sweep, frame.DCSweepMath); });
 }
 
-// An output held by an ideal source, or cut off from every noisy part, has nothing to plot, so the tab says why
+/**
+ * @brief   An output held by an ideal source, or cut off from every noisy part, has nothing to plot, so the tab says
+ *          why.
+ */
 void OutputWindow::DrawNoiseTab() {
     const auto &noise = m_Schematic.GetNoise();
     if (!noise) {
@@ -1479,7 +1587,9 @@ void OutputWindow::DrawNoiseTab() {
         [&] { DrawNoiseStatistics(*noise); });
 }
 
-// The transfer function is a table, not a plot, so the tab draws it alone
+/**
+ * @brief   The transfer function is a table, not a plot, so the tab draws it alone.
+ */
 void OutputWindow::DrawTransferFunctionTab() {
     const auto &transfer = m_Schematic.GetTransferFunction();
     if (!transfer) {
@@ -1489,7 +1599,9 @@ void OutputWindow::DrawTransferFunctionTab() {
     DrawTransferFunction(*transfer, m_Schematic);
 }
 
-// The truth table is a table too, so the tab draws it alone
+/**
+ * @brief   The truth table is a table too, so the tab draws it alone.
+ */
 void OutputWindow::DrawTruthTableTab() {
     const auto &truth_table = m_Schematic.GetTruthTable();
     if (!truth_table) {
@@ -1499,9 +1611,11 @@ void OutputWindow::DrawTruthTableTab() {
     DrawTruthTable(*truth_table, m_Schematic);
 }
 
-// A transient that has not reached its stop time is either still running and can be stopped from here, since the
-// Output window takes the front as its first chunk arrives, or was stopped and keeps the points it made. A live run
-// has no stop time to reach: stopped, it is paused, and goes on or is dropped from here
+/**
+ * @brief   A transient that has not reached its stop time is either still running and can be stopped from here, since
+ *          the Output window takes the front as its first chunk arrives, or was stopped and keeps the points it made.
+ * @details A live run has no stop time to reach: stopped, it is paused, and goes on or is dropped from here.
+ */
 void OutputWindow::DrawIncompleteNote(const Core::Transient &transient) {
     if (m_Controls.IsLive()) {
         DrawLiveNote(transient);
@@ -1523,7 +1637,9 @@ void OutputWindow::DrawIncompleteNote(const Core::Transient &transient) {
     }
 }
 
-// Stop pauses a live run, which then goes on with Continue or ends with Discard
+/**
+ * @brief   Stop pauses a live run, which then goes on with Continue or ends with Discard.
+ */
 void OutputWindow::DrawLiveNote(const Core::Transient &transient) {
     const bool is_paused = m_Controls.IsLivePaused();
     ImGui::BeginDisabled(m_Controls.IsStopping());
@@ -1545,9 +1661,11 @@ void OutputWindow::DrawLiveNote(const Core::Transient &transient) {
                                   .c_str());
 }
 
-// A run longer than the plot shows is seen through a window of a size the user picks, which a scroll bar the width of
-// the plot moves along the run, with a handle as large as the share of the run in view. While the run goes on, the
-// window can follow its newest points. The schematic plays the same window
+/**
+ * @brief   A run longer than the plot shows is seen through a window of a size the user picks, which a scroll bar the
+ *          width of the plot moves along the run, with a handle as large as the share of the run in view.
+ * @details While the run goes on, the window can follow its newest points. The schematic plays the same window.
+ */
 void OutputWindow::DrawWindowControls(const Core::Transient &shown) {
     TransientWindow &window = m_Playback.Window;
     const std::size_t total_points = window.GetTotalPoints();
@@ -1587,7 +1705,9 @@ void OutputWindow::DrawWindowControls(const Core::Transient &shown) {
     ImGui::SetItemTooltip("Drag to move the window along the run");
 }
 
-// The size of the window, at the right end of the row above its scroll bar
+/**
+ * @brief   The size of the window, at the right end of the row above its scroll bar.
+ */
 void OutputWindow::DrawWindowSize(const ImVec2 row_start, const float width) {
     TransientWindow &window = m_Playback.Window;
     const float size_width = ImGui::GetFontSize() * WINDOW_SIZE_WIDTH;
@@ -1604,8 +1724,11 @@ void OutputWindow::DrawWindowSize(const ImVec2 row_start, const float width) {
                                     .c_str());
 }
 
-// The signals of logic parts are drawn as lanes in a plot under the analog traces, which share its time axis. The
-// analog plot is left out when it would be empty, so a circuit measured only at logic nodes shows the lanes alone
+/**
+ * @brief   The signals of logic parts are drawn as lanes in a plot under the analog traces, which share its time axis.
+ * @details The analog plot is left out when it would be empty, so a circuit measured only at logic nodes shows the
+ *          lanes alone.
+ */
 void OutputWindow::DrawTransient(const Core::Transient &transient, const std::vector<MathTrace> &math,
                                  const std::optional<StepFamily<Core::Transient>> &steps) {
     if (!transient.IsComplete) {
@@ -1700,7 +1823,9 @@ void OutputWindow::DrawTransientAnalog(const Core::Transient &transient, const s
     ImPlot::EndPlot();
 }
 
-// The logic signals the plot shows as lanes: the measured nodes of logic parts, unless lanes are turned off
+/**
+ * @brief   The logic signals the plot shows as lanes: the measured nodes of logic parts, unless lanes are turned off.
+ */
 std::vector<LogicNode> OutputWindow::FindMeasuredLanes(const std::size_t node_count) const {
     if (!m_ShowLogicLanes) {
         return {};
@@ -1708,8 +1833,10 @@ std::vector<LogicNode> OutputWindow::FindMeasuredLanes(const std::size_t node_co
     return ListMeasuredLogicNodes(FindLogicNodes(m_Schematic.BuildCircuit()), node_count, m_Schematic);
 }
 
-// Writes 0, 1 or X in a box at the middle of every cell of a lane that has room for it, within what the plot shows,
-// so zooming out drops the labels that no longer fit
+/**
+ * @brief   Writes 0, 1 or X in a box at the middle of every cell of a lane that has room for it, within what the plot
+ *          shows, so zooming out drops the labels that no longer fit.
+ */
 void DrawBitValues(const std::vector<LogicSegment> &cells, const std::size_t lane_position, const ImU32 color) {
     const ImPlotRange view = ImPlot::GetPlotLimits().X;
     const double middle = static_cast<double>(lane_position) * LANE_STRIDE + LANE_HIGH_OFFSET / 2.0;
@@ -1739,8 +1866,10 @@ void DrawBitValues(const std::vector<LogicSegment> &cells, const std::size_t lan
     ImPlot::PopPlotClipRect();
 }
 
-// Each lane is a trace between its low and high levels, named on the axis, with a state read at the cursor. A lane
-// the circuit drives to a voltage between the thresholds is drawn halfway between low and high
+/**
+ * @brief   Each lane is a trace between its low and high levels, named on the axis, with a state read at the cursor.
+ * @details A lane the circuit drives to a voltage between the thresholds is drawn halfway between low and high.
+ */
 void OutputWindow::DrawLogicLanes(const Core::Transient &transient, const std::vector<LogicNode> &lanes,
                                   const float height) {
     if (!ImPlot::BeginPlot("##transient_logic", ImVec2(-1.0f, height),
@@ -1797,9 +1926,11 @@ void OutputWindow::DrawLogicLanes(const Core::Transient &transient, const std::v
     ImPlot::EndPlot();
 }
 
-// Currents go on the secondary axis of both plots: their magnitudes are relative to 1 A instead of 1 V, and
-// their phases follow so each current stays on the same side in both plots. Both plots share their frequency
-// range and cursors, so zooming one zooms the other
+/**
+ * @brief   Currents go on the secondary axis of both plots: their magnitudes are relative to 1 A instead of 1 V, and
+ *          their phases follow so each current stays on the same side in both plots.
+ * @details Both plots share their frequency range and cursors, so zooming one zooms the other.
+ */
 void OutputWindow::DrawACSweep(const Core::ACSweep &sweep) {
     const bool fit = m_ACSweepFit.TakeNewResult(m_Schematic.GetACSweepVersion());
     const auto &steps = m_Schematic.GetACSweepSteps();
@@ -1867,7 +1998,9 @@ void OutputWindow::DrawACSweep(const Core::ACSweep &sweep) {
     }
 }
 
-// Every curve of a family plots under the same label, so a trace keeps one color and one legend entry
+/**
+ * @brief   Every curve of a family plots under the same label, so a trace keeps one color and one legend entry.
+ */
 void OutputWindow::DrawDCSweep(const Core::DCSweep &sweep, const std::vector<std::vector<MathTrace>> &math) {
     static const std::vector<MathTrace> no_math;
     const std::vector<MathTrace> &first_math = math.empty() ? no_math : math.front();
@@ -1924,9 +2057,12 @@ void OutputWindow::DrawDCSweep(const Core::DCSweep &sweep, const std::vector<std
     ImPlot::EndPlot();
 }
 
-// Densities on log-log axes, as noise is read: the output in the color of its node, and the input-referred noise
-// dashed, on the same axis when the input is a voltage source and on the right one in amperes for a current source.
-// The parts checked in the panel add their share at the output
+/**
+ * @brief   Densities on log-log axes, as noise is read: the output in the color of its node, and the input-referred
+ *          noise dashed, on the same axis when the input is a voltage source and on the right one in amperes for a
+ *          current source.
+ * @details The parts checked in the panel add their share at the output.
+ */
 void OutputWindow::DrawNoise(const Core::Noise &noise) {
     const bool input_shown = HasInputGain(noise);
     if (!input_shown) {
@@ -1954,10 +2090,13 @@ void OutputWindow::DrawNoise(const Core::Noise &noise) {
     ImPlot::EndPlot();
 }
 
-// Logarithmic axes, fitted in decades, since the padding of the other plots is linear and would reach below zero:
-// every axis for a new result, and the output axis when the plotted shares change. Referred to a voltage source,
-// the input noise is in volts too and shares the axis of the output; referred to a current source, it has its own.
-// The limits are set during the setup, since ImPlot fits an axis on its own the first frame it is shown
+/**
+ * @brief   Logarithmic axes, fitted in decades, since the padding of the other plots is linear and would reach below
+ *          zero: every axis for a new result, and the output axis when the plotted shares change.
+ * @details Referred to a voltage source, the input noise is in volts too and shares the axis of the output; referred to
+ *          a current source, it has its own. The limits are set during the setup, since ImPlot fits an axis on its own
+ *          the first frame it is shown.
+ */
 void OutputWindow::SetupNoiseAxes(const Core::Noise &noise, const bool input_shown, const std::string &output_unit,
                                   const std::string &input_unit) {
     const bool new_result = m_NoiseFit.TakeNewResult(m_Schematic.GetNoiseVersion());
@@ -1998,8 +2137,11 @@ void OutputWindow::SetupNoiseAxes(const Core::Noise &noise, const bool input_sho
     ImPlot::SetupAxisLimits(ImAxis_Y1, voltage_range.From, voltage_range.To, ImPlotCond_Always);
 }
 
-// The span the transient statistics measure: between its cursors, or what its plot shows, or the whole run before
-// the plot was first drawn. Clipped to the run, from the earlier end
+/**
+ * @brief   The span the transient statistics measure: between its cursors, or what its plot shows, or the whole run
+ *          before the plot was first drawn.
+ * @details Clipped to the run, from the earlier end.
+ */
 PlotSpan OutputWindow::GetSpectrumSpan(const Core::Transient &transient) const {
     const PlotSpan measured = MeasuredSpan(m_TransientCursors, m_TransientView);
     const double run_start = transient.Times.front();
@@ -2012,8 +2154,10 @@ PlotSpan OutputWindow::GetSpectrumSpan(const Core::Transient &transient) const {
     return {.From = from, .To = to};
 }
 
-// Transforms the measured traces again only when the result, the span, the window or the traces changed. Every trace
-// shares one even grid, so the spectra share their frequencies
+/**
+ * @brief   Transforms the measured traces again only when the result, the span, the window or the traces changed.
+ * @details Every trace shares one even grid, so the spectra share their frequencies.
+ */
 void OutputWindow::UpdateSpectra(const Core::Transient &transient, const std::vector<MathTrace> &math) {
     std::vector<PlottedTrace> sources = ListTraces(transient.NodeVoltages, transient.Currents, m_Schematic, "V", "A");
     std::vector<SpectrumTrace> traces;
@@ -2080,8 +2224,11 @@ void OutputWindow::UpdateSpectra(const Core::Transient &transient, const std::ve
     m_SpectraChanged = true;
 }
 
-// Voltages, currents and math channels keep the axes they have in the transient, in decibels; each trace marks its
-// harmonics. A new spectrum fits its axes, and a linear one opens on the harmonics of the first trace that has some
+/**
+ * @brief   Voltages, currents and math channels keep the axes they have in the transient, in decibels; each trace marks
+ *          its harmonics.
+ * @details A new spectrum fits its axes, and a linear one opens on the harmonics of the first trace that has some.
+ */
 void OutputWindow::DrawSpectrum() {
     if (!m_Spectra) {
         return;
@@ -2162,8 +2309,10 @@ void OutputWindow::DrawSpectrum() {
     ImPlot::EndPlot();
 }
 
-// Like the measurements of an oscilloscope, for every shown trace; with the cursors, also the value of each
-// trace at both and their difference, and the time between them with its frequency
+/**
+ * @brief   Like the measurements of an oscilloscope, for every shown trace; with the cursors, also the value of each
+ *          trace at both and their difference, and the time between them with its frequency.
+ */
 void OutputWindow::DrawTransientStatistics(const Core::Transient &transient, const std::vector<MathTrace> &math) {
     DrawCursorToggle(m_TransientCursors);
     if (!FindLogicNodes(m_Schematic.BuildCircuit()).empty()) {
@@ -2223,8 +2372,10 @@ void OutputWindow::DrawTransientStatistics(const Core::Transient &transient, con
     }
 }
 
-// Like the harmonic readout of a spectrum analyzer: the mean, the fundamental and the THD of every shown trace,
-// then each harmonic relative to the fundamental, in dBc
+/**
+ * @brief   Like the harmonic readout of a spectrum analyzer: the mean, the fundamental and the THD of every shown
+ *          trace, then each harmonic relative to the fundamental, in dBc.
+ */
 void OutputWindow::DrawSpectrumStatistics() {
     DrawSpectrumControls();
     if (!m_Spectra) {
@@ -2252,7 +2403,9 @@ void OutputWindow::DrawSpectrumStatistics() {
     }
 }
 
-// The window of the transform and the scale of the frequency axis, which refits the plot when it changes
+/**
+ * @brief   The window of the transform and the scale of the frequency axis, which refits the plot when it changes.
+ */
 void OutputWindow::DrawSpectrumControls() {
     DrawFieldLabel("Window");
     const char *window_name = m_SpectrumWindow == SpectrumWindow::HANN ? "Hann" : "Rectangular";
@@ -2273,9 +2426,11 @@ void OutputWindow::DrawSpectrumControls() {
     }
 }
 
-// Like the measurements of a network analyzer: peak, -3 dB band, unity gain and phase margin for every shown
-// trace, always over the whole sweep, since they describe the response and a narrower span would move the peak
-// that the -3 dB points refer to; the cursors only read the gain and phase at two frequencies
+/**
+ * @brief   Like the measurements of a network analyzer: peak, -3 dB band, unity gain and phase margin for every shown
+ *          trace, always over the whole sweep, since they describe the response and a narrower span would move the peak
+ *          that the -3 dB points refer to; the cursors only read the gain and phase at two frequencies.
+ */
 void OutputWindow::DrawACSweepStatistics(const Core::ACSweep &sweep) {
     DrawCursorToggle(m_ACSweepCursors);
     const PlotCursors &cursors = m_ACSweepCursors;
@@ -2328,8 +2483,11 @@ void OutputWindow::DrawACSweepStatistics(const Core::ACSweep &sweep) {
     }
 }
 
-// Like the measurements of a curve tracer: for every shown trace, its value at each cursor with the change and slope
-// between them, and its extremes and mean over the span. A stepped sweep lists every curve, named by its step value
+/**
+ * @brief   Like the measurements of a curve tracer: for every shown trace, its value at each cursor with the change and
+ *          slope between them, and its extremes and mean over the span.
+ * @details A stepped sweep lists every curve, named by its step value.
+ */
 void OutputWindow::DrawDCSweepStatistics(const Core::DCSweep &sweep, const std::vector<std::vector<MathTrace>> &math) {
     DrawCursorToggle(m_DCSweepCursors);
     const PlotCursors &cursors = m_DCSweepCursors;
@@ -2391,8 +2549,10 @@ void OutputWindow::DrawDCSweepStatistics(const Core::DCSweep &sweep, const std::
     }
 }
 
-// The RMS noise over the whole range, at the output and at the input, then the share of every part in the output
-// noise, largest first; checking a part plots its share
+/**
+ * @brief   The RMS noise over the whole range, at the output and at the input, then the share of every part in the
+ *          output noise, largest first; checking a part plots its share.
+ */
 void OutputWindow::DrawNoiseStatistics(const Core::Noise &noise) {
     ImGui::PushTextWrapPos(0.0f);
     ImGui::TextDisabled("%s", std::format("RMS from {}", FormatFrequencyRange(noise)).c_str());
@@ -2450,8 +2610,10 @@ void OutputWindow::DrawNoiseStatistics(const Core::Noise &noise) {
     ImGui::EndTable();
 }
 
-// A plain button apart from the tabs, so it does not read as another page; its popup hangs below it, aligned to its
-// right edge, so it stays inside the window
+/**
+ * @brief   A plain button apart from the tabs, so it does not read as another page; its popup hangs below it, aligned
+ *          to its right edge, so it stays inside the window.
+ */
 void OutputWindow::DrawExportButton(const ImVec2 tab_row, const float tab_row_width, const float export_width,
                                     const FrameResults &frame) {
     ImGui::SetCursorScreenPos({tab_row.x + tab_row_width - export_width, tab_row.y});
@@ -2470,7 +2632,9 @@ void OutputWindow::DrawExportButton(const ImVec2 tab_row, const float tab_row_wi
     }
 }
 
-// Whether the shown tab has something to export: a result with a measured trace or a math channel
+/**
+ * @brief   Whether the shown tab has something to export: a result with a measured trace or a math channel.
+ */
 bool OutputWindow::CanExport(const FrameResults &frame) const {
     switch (m_ShownTab) {
     case PlotTab::OPERATING_POINT:
@@ -2495,15 +2659,20 @@ bool OutputWindow::CanExport(const FrameResults &frame) const {
     return false;
 }
 
-// Whether the transient plot shows only a window of a longer run that is over, whose every point a CSV table can hold
+/**
+ * @brief   Whether the transient plot shows only a window of a longer run that is over, whose every point a CSV table
+ *          can hold.
+ */
 bool OutputWindow::HasLongerRun() const {
     const auto &transient = m_Schematic.GetTransient();
     return m_ShownTab == PlotTab::TRANSIENT && transient &&
            transient->Times.size() > m_Playback.Window.GetWindow().Count && !m_Controls.IsRunning();
 }
 
-// The figure of the transient: the window as plotted, or, for a CSV table of the whole run, every point of the
-// transient and its math channels, whatever the window shows
+/**
+ * @brief   The figure of the transient: the window as plotted, or, for a CSV table of the whole run, every point of the
+ *          transient and its math channels, whatever the window shows.
+ */
 ExportFigure OutputWindow::BuildShownTransientFigure(const FrameResults &frame, const bool is_whole_run) const {
     if (const auto &transient = m_Schematic.GetTransient(); is_whole_run && transient) {
         static const std::vector<MathTrace> no_math;
@@ -2519,7 +2688,9 @@ ExportFigure OutputWindow::BuildShownTransientFigure(const FrameResults &frame, 
     return {};
 }
 
-// The figure of the shown tab, which CanExport() has found something to export in
+/**
+ * @brief   The figure of the shown tab, which CanExport() has found something to export in.
+ */
 ExportFigure OutputWindow::BuildShownFigure(const FrameResults &frame, const bool is_whole_run) const {
     switch (m_ShownTab) {
     case PlotTab::TRANSIENT:

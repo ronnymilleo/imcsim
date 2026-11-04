@@ -77,7 +77,9 @@ private:
         }
     }
 
-    // Consumes the character when it comes next, after any spaces
+    /**
+     * @brief   Consumes the character when it comes next, after any spaces.
+     */
     bool Accept(const char character) {
         SkipSpaces();
         if (m_Position < m_Text.size() && m_Text[m_Position] == character) {
@@ -182,7 +184,9 @@ private:
         return {};
     }
 
-    // Numbers take SPICE suffixes, such as 1k or 10m, like every value the user types
+    /**
+     * @brief   Numbers take SPICE suffixes, such as 1k or 10m, like every value the user types.
+     */
     Step ParseNumber() {
         const std::size_t start = m_Position;
         while (m_Position < m_Text.size()) {
@@ -204,7 +208,9 @@ private:
         return {};
     }
 
-    // V(a) is the voltage of a node and V(a, b) the voltage between two, as in SPICE
+    /**
+     * @brief   V(a) is the voltage of a node and V(a, b) the voltage between two, as in SPICE.
+     */
     Step ParseVoltage() {
         if (const Step step = Expect('('); !step) {
             return step;
@@ -221,8 +227,10 @@ private:
         return Expect(')');
     }
 
-    // A node is a number, or a name a net label gave it, which stays valid when the nodes are numbered again. A name
-    // of digits alone reads as a number
+    /**
+     * @brief   A node is a number, or a name a net label gave it, which stays valid when the nodes are numbered again.
+     * @details A name of digits alone reads as a number.
+     */
     Step ParseNode() {
         SkipSpaces();
         const std::size_t start = m_Position;
@@ -291,7 +299,9 @@ Dimension Combine(const Dimension first, const Dimension second, const int sign)
             .Known = first.Known && second.Known};
 }
 
-// Adding a number to a trace, such as V(1)+1, keeps the unit of the trace
+/**
+ * @brief   Adding a number to a trace, such as V(1)+1, keeps the unit of the trace.
+ */
 Dimension AddUnits(const Dimension first, const bool first_is_number, const Dimension second,
                    const bool second_is_number) {
     if (first_is_number) {
@@ -303,7 +313,9 @@ Dimension AddUnits(const Dimension first, const bool first_is_number, const Dime
     return {.Known = false};
 }
 
-// Central differences inside, one-sided at the ends; repeated X values give a slope of zero
+/**
+ * @brief   Central differences inside, one-sided at the ends; repeated X values give a slope of zero.
+ */
 std::vector<double> Differentiate(const std::span<const double> xs, const std::vector<double> &values) {
     std::vector<double> slopes(values.size(), 0.0);
     for (std::size_t index = 0; index < values.size(); ++index) {
@@ -317,7 +329,9 @@ std::vector<double> Differentiate(const std::span<const double> xs, const std::v
     return slopes;
 }
 
-// Running trapezoidal integral from the first sample, which starts at zero
+/**
+ * @brief   Running trapezoidal integral from the first sample, which starts at zero.
+ */
 std::vector<double> Integrate(const std::span<const double> xs, const std::vector<double> &values) {
     std::vector<double> integral(values.size(), 0.0);
     for (std::size_t index = 1; index < values.size(); ++index) {

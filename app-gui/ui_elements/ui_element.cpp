@@ -272,8 +272,10 @@ LocalBounds UIElement::GetLocalBounds() const {
     return {{-2.0f, -0.8f}, {2.0f, 0.8f}};
 }
 
-// ImGui text cannot rotate, so the text stays upright and is pushed from the anchor along the rotated direction
-// until it no longer overlaps the anchor, whatever the element rotation
+/**
+ * @brief   ImGui text cannot rotate, so the text stays upright and is pushed from the anchor along the rotated
+ *          direction until it no longer overlaps the anchor, whatever the element rotation.
+ */
 void UIElement::DrawLabel(SchematicCanvas &canvas, const ViewTransform &view, const ImVec2 local_anchor,
                           const ImVec2 local_direction, const std::string &text, const ImU32 color) const {
     if (text.empty()) {

@@ -67,7 +67,9 @@ ExportColor ToExportColor(const ImU32 color) {
             static_cast<std::uint8_t>((color >> IM_COL32_B_SHIFT) & 0xFF)};
 }
 
-// Wires, junctions, parts with their labels, terminal numbers and probes, at the export zoom from the origin
+/**
+ * @brief   Wires, junctions, parts with their labels, terminal numbers and probes, at the export zoom from the origin.
+ */
 void DrawWholeSchematic(SvgCanvas &canvas, Schematic &schematic, const SymbolStyle style, const bool terminal_numbers,
                         const ImU32 element_color, const ImU32 wire_color) {
     const ViewTransform view({0.0f, 0.0f}, {0.0f, 0.0f}, EXPORT_ZOOM);
@@ -86,18 +88,24 @@ void DrawWholeSchematic(SvgCanvas &canvas, Schematic &schematic, const SymbolSty
     DrawMeasurementMarkers(canvas, view, schematic);
 }
 
-// Pixels per grid unit
+/**
+ * @brief   Pixels per grid unit.
+ */
 float GetZoom(const ViewTransform &view) {
     return view.ToScreen({1.0f, 0.0f}).x - view.ToScreen({0.0f, 0.0f}).x;
 }
 
-// Labels take the size of the part labels, so they follow the zoom
+/**
+ * @brief   Labels take the size of the part labels, so they follow the zoom.
+ */
 float GetLabelFontSize(const ViewTransform &view) {
     return std::max(GetZoom(view) * LABEL_SCALE, MIN_LABEL_SIZE);
 }
 
-// Top left corner of a text of the given size beside a line, centered on a point of it: above or left of the line
-// before it, below or right after it
+/**
+ * @brief   Top left corner of a text of the given size beside a line, centered on a point of it: above or left of the
+ *          line before it, below or right after it.
+ */
 ImVec2 PlaceBesideLine(const ImVec2 point, const ImVec2 size, const bool horizontal_line, const bool before_line,
                        const float gap) {
     if (horizontal_line) {
@@ -106,9 +114,12 @@ ImVec2 PlaceBesideLine(const ImVec2 point, const ImVec2 size, const bool horizon
     return {before_line ? point.x - gap - size.x : point.x + gap, point.y - size.y / 2.0f};
 }
 
-// Marker labels sit beside the line their marker is on, centered on the marker, so they never run along it into a
-// corner. Voltages go above or left of their line and currents below or right, so a voltage marked next to a
-// measured terminal does not cover the current label. The marker extent is how far the marker reaches from the line
+/**
+ * @brief   Marker labels sit beside the line their marker is on, centered on the marker, so they never run along it
+ *          into a corner.
+ * @details Voltages go above or left of their line and currents below or right, so a voltage marked next to a measured
+ *          terminal does not cover the current label. The marker extent is how far the marker reaches from the line.
+ */
 void DrawMarkerLabel(SchematicCanvas &canvas, const ViewTransform &view, const ImVec2 point, const bool horizontal_line,
                      const bool before_line, const float marker_extent, const std::string &text, const ImU32 color) {
     const float font_size = GetLabelFontSize(view);

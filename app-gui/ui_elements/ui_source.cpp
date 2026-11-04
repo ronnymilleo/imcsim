@@ -28,8 +28,10 @@ constexpr float PULSE_HALF_WIDTH = 0.25f;
 // two-terminal symbols, which would touch it
 constexpr float LABEL_OFFSET = 1.25f;
 
-// A generic exponential rise and decay over the box the waves are drawn in, the shape of an EXP source: nothing,
-// then a rise with a short time constant, then a decay with a longer one
+/**
+ * @brief   A generic exponential rise and decay over the box the waves are drawn in, the shape of an EXP source:
+ *          nothing, then a rise with a short time constant, then a decay with a longer one.
+ */
 float ExponentialShape(const float fraction) {
     constexpr float RISE_START = 0.3f;
     constexpr float FALL_START = 0.5f;
@@ -57,7 +59,9 @@ UISource::UISource(std::unique_ptr<Core::Source> source, const GridPoint positio
     : UIElement(std::move(source), position, rotation) {
 }
 
-// Every waveform but DC ignores the value of the source, so it is labeled by its main figures instead
+/**
+ * @brief   Every waveform but DC ignores the value of the source, so it is labeled by its main figures instead.
+ */
 void UISource::DrawLabels(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color) const {
     const Core::Source &source = GetSource();
     const std::string unit = source.GetUnit();
