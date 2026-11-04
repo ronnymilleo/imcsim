@@ -1300,20 +1300,8 @@ std::optional<EditorMode> EditorWindow::HandleMode(ProbingMode & /*mode*/, Schem
 std::optional<EditorMode> EditorWindow::HandleMode(PastingMode &mode, SchematicCanvas &canvas,
                                                    const ViewTransform &view, const bool hovered) {
     PastedGroup &group = mode.Group;
-    if (ImGui::IsWindowFocused()) {
-        if (ImGui::IsKeyPressed(ImGuiKey_R)) {
-            TransformGroup(group, {.Type = PointTransform::Kind::QUARTER_TURN, .Delta = {}, .Pivot = {}});
-        }
-        if (ImGui::IsKeyPressed(ImGuiKey_M)) {
-            const bool top_to_bottom = ImGui::GetIO().KeyShift;
-            TransformGroup(group, {.Type = top_to_bottom ? PointTransform::Kind::MIRROR_TOP_BOTTOM
-                                                         : PointTransform::Kind::MIRROR_LEFT_RIGHT,
-                                   .Delta = {},
-                                   .Pivot = {}});
-        }
-        if (ImGui::IsKeyPressed(ImGuiKey_Escape)) {
-            return SelectingMode{};
-        }
+    if (ImGui::IsWindowFocused() && HandlePastingKeys(group)) {
+        return SelectingMode{};
     }
     if (!hovered) {
         return std::nullopt;
@@ -1332,7 +1320,34 @@ std::optional<EditorMode> EditorWindow::HandleMode(PastingMode &mode, SchematicC
     if (!ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
         return std::nullopt;
     }
+    PlacePastedGroup(group);
+    return SelectingMode{};
+}
 
+/**
+ * @brief   Turns or mirrors the pasted group by the keys pressed this frame.
+ * @return  True when Esc cancels the paste.
+ */
+bool EditorWindow::HandlePastingKeys(PastedGroup &group) {
+    if (ImGui::IsKeyPressed(ImGuiKey_R)) {
+        TransformGroup(group, {.Type = PointTransform::Kind::QUARTER_TURN, .Delta = {}, .Pivot = {}});
+    }
+    if (ImGui::IsKeyPressed(ImGuiKey_M)) {
+        const bool top_to_bottom = ImGui::GetIO().KeyShift;
+        TransformGroup(group, {.Type = top_to_bottom ? PointTransform::Kind::MIRROR_TOP_BOTTOM
+                                                     : PointTransform::Kind::MIRROR_LEFT_RIGHT,
+                               .Delta = {},
+                               .Pivot = {}});
+    }
+    return ImGui::IsKeyPressed(ImGuiKey_Escape);
+}
+
+/**
+ * @brief   Adds the pasted group to the schematic shown and selects it, after its blocks and models join the document.
+ * @details Inside an open block, a group that places a block containing the one being edited is refused with a
+ *          message, as it would make a block that contains itself.
+ */
+void EditorWindow::PlacePastedGroup(PastedGroup &group) {
     // The blocks and models a group brings belong to the document, wherever it is pasted. Models go first, so a
     // renamed one is renamed in the blocks too before they join
     m_RootSchematic.MergeLibraryModels(std::move(group.Models), group.Elements, group.Subcircuits);
@@ -1344,7 +1359,7 @@ std::optional<EditorMode> EditorWindow::HandleMode(PastingMode &mode, SchematicC
                 m_Files.QueueMessages(
                     "Could not paste inside the block",
                     {std::format("{} would contain itself, directly or through another block", used)});
-                return SelectingMode{};
+                return;
             }
         }
     }
@@ -1365,7 +1380,6 @@ std::optional<EditorMode> EditorWindow::HandleMode(PastingMode &mode, SchematicC
         wires.insert(index);
     }
     m_Schematic->SetSelection(std::move(elements), std::move(wires));
-    return SelectingMode{};
 }
 
 /**

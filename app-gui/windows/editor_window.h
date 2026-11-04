@@ -225,6 +225,8 @@ private:
                                          bool hovered);
     std::optional<EditorMode> HandleMode(PastingMode &mode, SchematicCanvas &canvas, const ViewTransform &view,
                                          bool hovered);
+    bool HandlePastingKeys(PastedGroup &group);
+    void PlacePastedGroup(PastedGroup &group);
     std::string FindLastNet() const;
 
     // Clipboard
