@@ -3,11 +3,11 @@
  * @brief   Schematic symbol of a voltage-controlled switch and of a relay.
  */
 
-#include "ui_controlled_switch.h"
+#include "ui_elements/ui_controlled_switch.h"
 
 #include "components/relay.h"
 #include "components/voltage_controlled_switch.h"
-#include "spice_value.h"
+#include "spice/spice_value.h"
 #include <cmath>
 #include <format>
 #include <memory>

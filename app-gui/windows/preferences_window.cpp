@@ -3,10 +3,10 @@
  * @brief   Window where the user sets their own choices, and the View menu shortcuts to the most used of them.
  */
 
-#include "preferences_window.h"
+#include "windows/preferences_window.h"
 
-#include "standard_values.h"
-#include "theme.h"
+#include "drawing/theme.h"
+#include "spice/standard_values.h"
 #include <array>
 #include <cstddef>
 #include <format>

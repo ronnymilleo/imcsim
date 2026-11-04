@@ -13,11 +13,11 @@
 #include "components/switch.h"
 #include "components/voltage_source.h"
 #include "digital_models.h"
-#include "examples.h"
-#include "live_change.h"
-#include "ngspice_library.h"
-#include "schematic.h"
-#include "simulator.h"
+#include "document/examples.h"
+#include "document/schematic.h"
+#include "ngspice/ngspice_library.h"
+#include "simulation/live_change.h"
+#include "simulation/simulator.h"
 #include "test_printers.h"
 #include <algorithm>
 #include <array>

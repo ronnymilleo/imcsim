@@ -6,7 +6,7 @@
 #ifndef IMCSIM_LOGIC_INPUT_H
 #define IMCSIM_LOGIC_INPUT_H
 
-#include "component.h"
+#include "components/component.h"
 #include <memory>
 
 namespace Core {

@@ -6,7 +6,7 @@
 #ifndef IMCSIM_UI_NET_LABEL_H
 #define IMCSIM_UI_NET_LABEL_H
 
-#include "ui_element.h"
+#include "ui_elements/ui_element.h"
 
 namespace GUI {
 

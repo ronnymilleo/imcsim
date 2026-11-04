@@ -6,8 +6,8 @@
 #ifndef IMCSIM_RELAY_H
 #define IMCSIM_RELAY_H
 
-#include "component.h"
-#include "voltage_controlled_switch.h"
+#include "components/component.h"
+#include "components/voltage_controlled_switch.h"
 #include <memory>
 
 namespace Core {

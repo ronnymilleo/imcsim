@@ -6,7 +6,7 @@
 #ifndef IMCSIM_SUBCIRCUIT_PIN_H
 #define IMCSIM_SUBCIRCUIT_PIN_H
 
-#include "net_label.h"
+#include "components/net_label.h"
 
 namespace Core {
 

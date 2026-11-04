@@ -3,11 +3,11 @@
  * @brief   Tests for the runs that AnalysisControls starts on the worker thread and takes in when they end.
  */
 
-#include "analysis_controls.h"
+#include "analysis/analysis_controls.h"
 
-#include "examples.h"
-#include "live_input.h"
-#include "schematic.h"
+#include "document/examples.h"
+#include "document/schematic.h"
+#include "editing/live_input.h"
 #include "test_printers.h"
 #include <algorithm>
 #include <catch2/catch_test_macros.hpp>

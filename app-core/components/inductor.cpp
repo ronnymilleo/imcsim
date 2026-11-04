@@ -3,7 +3,7 @@
  * @brief   An inductor in the simulation model.
  */
 
-#include "inductor.h"
+#include "components/inductor.h"
 #include <memory>
 
 namespace Core {

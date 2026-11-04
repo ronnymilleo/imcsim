@@ -3,7 +3,7 @@
  * @brief   Tests for the plot geometry: nearest samples and dashed lines.
  */
 
-#include "plot_helpers.h"
+#include "plots/plot_helpers.h"
 #include <array>
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>

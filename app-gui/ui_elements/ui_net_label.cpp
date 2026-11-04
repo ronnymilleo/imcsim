@@ -3,7 +3,7 @@
  * @brief   Schematic symbol of a net label.
  */
 
-#include "ui_net_label.h"
+#include "ui_elements/ui_net_label.h"
 
 #include "components/net_label.h"
 #include <cmath>

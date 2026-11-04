@@ -3,7 +3,7 @@
  * @brief   Tests for the part names and the part search.
  */
 
-#include "element_factory.h"
+#include "editing/element_factory.h"
 #include <algorithm>
 #include <catch2/catch_test_macros.hpp>
 #include <string>

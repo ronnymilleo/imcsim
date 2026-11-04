@@ -3,10 +3,10 @@
  * @brief   Schematic symbol of a transformer.
  */
 
-#include "ui_transformer.h"
+#include "ui_elements/ui_transformer.h"
 
 #include "components/transformer.h"
-#include "spice_value.h"
+#include "spice/spice_value.h"
 #include <array>
 #include <cmath>
 #include <format>

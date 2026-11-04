@@ -3,8 +3,8 @@
  * @brief   Tests for when the axes of a plot fit, and for the math traces they fit to.
  */
 
-#include "math_channels.h"
-#include "trace_fit_state.h"
+#include "plots/math_channels.h"
+#include "plots/trace_fit_state.h"
 #include <catch2/catch_test_macros.hpp>
 
 TEST_CASE("Every axis fits once for each new result", "[trace_fit]") {

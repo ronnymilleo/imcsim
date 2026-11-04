@@ -3,7 +3,7 @@
  * @brief   Schematic symbol of an inductor.
  */
 
-#include "ui_inductor.h"
+#include "ui_elements/ui_inductor.h"
 
 #include "components/inductor.h"
 #include <array>

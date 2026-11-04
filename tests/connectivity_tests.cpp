@@ -4,7 +4,7 @@
  */
 
 #include "components/net_label.h"
-#include "connectivity.h"
+#include "editing/connectivity.h"
 #include "test_printers.h"
 #include "ui_elements/ui_ground.h"
 #include "ui_elements/ui_logic_input.h"

@@ -6,7 +6,7 @@
 #ifndef IMCSIM_CAPACITOR_H
 #define IMCSIM_CAPACITOR_H
 
-#include "component.h"
+#include "components/component.h"
 #include <memory>
 
 namespace Core {

@@ -6,7 +6,7 @@
 #ifndef IMCSIM_BJT_H
 #define IMCSIM_BJT_H
 
-#include "component.h"
+#include "components/component.h"
 #include <memory>
 #include <span>
 #include <string>

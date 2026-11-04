@@ -3,13 +3,13 @@
  * @brief   Tests for the transient and AC sweep settings suggested from a circuit.
  */
 
-#include "analysis_suggestions.h"
 #include "components/capacitor.h"
 #include "components/clock.h"
 #include "components/current_source.h"
 #include "components/op_amp.h"
 #include "components/resistor.h"
 #include "components/voltage_source.h"
+#include "simulation/analysis_suggestions.h"
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 

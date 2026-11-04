@@ -3,7 +3,6 @@
  * @brief   Tests for the operating point simulation, run through the real ngspice library.
  */
 
-#include "circuit.h"
 #include "components/bjt.h"
 #include "components/capacitor.h"
 #include "components/clock.h"
@@ -24,7 +23,8 @@
 #include "components/voltage_controlled_switch.h"
 #include "components/voltage_source.h"
 #include "digital_models.h"
-#include "simulator.h"
+#include "model/circuit.h"
+#include "simulation/simulator.h"
 #include <algorithm>
 #include <array>
 #include <catch2/catch_test_macros.hpp>

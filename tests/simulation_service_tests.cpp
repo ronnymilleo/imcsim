@@ -3,14 +3,14 @@
  * @brief   Tests for the worker thread that runs simulations while the interface keeps drawing.
  */
 
-#include "simulation_service.h"
+#include "simulation/simulation_service.h"
 
-#include "circuit_copy.h"
 #include "components/capacitor.h"
 #include "components/ground.h"
 #include "components/resistor.h"
 #include "components/voltage_source.h"
-#include "simulator.h"
+#include "simulation/circuit_copy.h"
+#include "simulation/simulator.h"
 #include "test_printers.h"
 #include <algorithm>
 #include <atomic>

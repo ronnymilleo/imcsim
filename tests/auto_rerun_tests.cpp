@@ -3,7 +3,7 @@
  * @brief   Tests for running the selected analysis again by itself after an edit of the circuit.
  */
 
-#include "auto_rerun.h"
+#include "analysis/auto_rerun.h"
 
 #include <catch2/catch_test_macros.hpp>
 #include <cstddef>

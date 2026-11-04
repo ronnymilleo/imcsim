@@ -6,7 +6,7 @@
 #ifndef IMCSIM_GROUND_H
 #define IMCSIM_GROUND_H
 
-#include "component.h"
+#include "components/component.h"
 #include <memory>
 
 namespace Core {

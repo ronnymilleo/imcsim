@@ -6,7 +6,7 @@
 #ifndef IMCSIM_SWITCH_H
 #define IMCSIM_SWITCH_H
 
-#include "component.h"
+#include "components/component.h"
 #include <memory>
 
 namespace Core {

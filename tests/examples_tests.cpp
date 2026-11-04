@@ -7,12 +7,12 @@
 #include "components/source.h"
 #include "components/switch.h"
 #include "digital_models.h"
-#include "examples.h"
-#include "ngspice_library.h"
-#include "schematic.h"
-#include "simulator.h"
+#include "document/examples.h"
+#include "document/schematic.h"
+#include "ngspice/ngspice_library.h"
+#include "plots/trace_statistics.h"
+#include "simulation/simulator.h"
 #include "test_printers.h"
-#include "trace_statistics.h"
 #include <algorithm>
 #include <array>
 #include <catch2/catch_test_macros.hpp>

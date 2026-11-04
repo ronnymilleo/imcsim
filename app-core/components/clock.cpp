@@ -3,7 +3,7 @@
  * @brief   A digital clock source in the simulation model.
  */
 
-#include "clock.h"
+#include "components/clock.h"
 #include <memory>
 
 namespace Core {

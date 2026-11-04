@@ -6,7 +6,7 @@
 #ifndef IMCSIM_VOLTAGE_SOURCE_H
 #define IMCSIM_VOLTAGE_SOURCE_H
 
-#include "source.h"
+#include "components/source.h"
 #include <memory>
 
 namespace Core {

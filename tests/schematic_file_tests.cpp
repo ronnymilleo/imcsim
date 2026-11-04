@@ -19,8 +19,8 @@
 #include "components/transformer.h"
 #include "components/voltage_controlled_switch.h"
 #include "components/voltage_source.h"
-#include "element_factory.h"
-#include "schematic_file.h"
+#include "document/schematic_file.h"
+#include "editing/element_factory.h"
 #include "test_printers.h"
 #include <catch2/catch_test_macros.hpp>
 #include <format>

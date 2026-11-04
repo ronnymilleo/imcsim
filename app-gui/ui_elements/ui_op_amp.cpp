@@ -3,10 +3,10 @@
  * @brief   Schematic symbol of an op-amp with its supply pins.
  */
 
-#include "ui_op_amp.h"
+#include "ui_elements/ui_op_amp.h"
 
 #include "components/op_amp.h"
-#include "spice_value.h"
+#include "spice/spice_value.h"
 #include <format>
 #include <memory>
 #include <string>

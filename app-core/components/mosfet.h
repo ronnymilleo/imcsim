@@ -6,7 +6,7 @@
 #ifndef IMCSIM_MOSFET_H
 #define IMCSIM_MOSFET_H
 
-#include "component.h"
+#include "components/component.h"
 #include <memory>
 #include <span>
 #include <string>

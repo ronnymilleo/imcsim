@@ -3,7 +3,7 @@
  * @brief   Rectangular symbol of a project-local subcircuit instance.
  */
 
-#include "ui_subcircuit.h"
+#include "ui_elements/ui_subcircuit.h"
 
 #include "components/subcircuit.h"
 #include <algorithm>

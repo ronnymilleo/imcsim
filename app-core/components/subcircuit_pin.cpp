@@ -3,7 +3,7 @@
  * @brief   Explicit input and output markers for a project-local subcircuit definition.
  */
 
-#include "subcircuit_pin.h"
+#include "components/subcircuit_pin.h"
 
 namespace Core {
 

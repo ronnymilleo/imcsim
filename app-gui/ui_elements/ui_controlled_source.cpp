@@ -3,9 +3,9 @@
  * @brief   Schematic symbol of a controlled source: VCVS, VCCS, CCCS or CCVS.
  */
 
-#include "ui_controlled_source.h"
+#include "ui_elements/ui_controlled_source.h"
 
-#include "spice_value.h"
+#include "spice/spice_value.h"
 #include <format>
 #include <memory>
 

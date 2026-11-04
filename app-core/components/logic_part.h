@@ -6,7 +6,7 @@
 #ifndef IMCSIM_LOGIC_PART_H
 #define IMCSIM_LOGIC_PART_H
 
-#include "component.h"
+#include "components/component.h"
 #include <memory>
 #include <string>
 #include <vector>

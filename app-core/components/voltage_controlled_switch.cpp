@@ -3,7 +3,7 @@
  * @brief   A switch that opens and closes with a voltage elsewhere in the circuit (SPICE S).
  */
 
-#include "voltage_controlled_switch.h"
+#include "components/voltage_controlled_switch.h"
 
 #include <format>
 #include <memory>

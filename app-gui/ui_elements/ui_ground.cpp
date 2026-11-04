@@ -3,7 +3,7 @@
  * @brief   Schematic symbol of a ground reference.
  */
 
-#include "ui_ground.h"
+#include "ui_elements/ui_ground.h"
 
 #include "components/ground.h"
 #include <memory>

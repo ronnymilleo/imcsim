@@ -3,14 +3,14 @@
  * @brief   The dialogs of blocks kept as SPICE text: picking what to import from a library, and their pin settings.
  */
 
-#include "spice_block_dialog.h"
+#include "windows/spice_block_dialog.h"
 
+#include "document/spice_import.h"
+#include "document/subcircuit_pins.h"
+#include "drawing/theme.h"
 #include "imgui.h"
 #include "misc/cpp/imgui_stdlib.h"
-#include "spice_import.h"
-#include "spice_value.h"
-#include "subcircuit_pins.h"
-#include "theme.h"
+#include "spice/spice_value.h"
 #include <algorithm>
 #include <array>
 #include <cfloat>

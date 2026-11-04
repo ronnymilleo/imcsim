@@ -6,9 +6,9 @@
 #ifndef IMCSIM_SIMULATION_WINDOW_H
 #define IMCSIM_SIMULATION_WINDOW_H
 
-#include "analysis_controls.h"
-#include "analysis_settings_panel.h"
-#include "schematic.h"
+#include "analysis/analysis_controls.h"
+#include "analysis/analysis_settings_panel.h"
+#include "document/schematic.h"
 #include "windows/app_window.h"
 
 namespace GUI {

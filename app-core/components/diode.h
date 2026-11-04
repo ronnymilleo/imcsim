@@ -6,7 +6,7 @@
 #ifndef IMCSIM_DIODE_H
 #define IMCSIM_DIODE_H
 
-#include "component.h"
+#include "components/component.h"
 #include <memory>
 #include <span>
 #include <string>

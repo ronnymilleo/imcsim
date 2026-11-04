@@ -3,9 +3,9 @@
  * @brief   Window that shows the SPICE netlist of the schematic.
  */
 
-#include "netlist_window.h"
+#include "windows/netlist_window.h"
 
-#include "theme.h"
+#include "drawing/theme.h"
 #include <string>
 
 namespace GUI {

@@ -3,7 +3,7 @@
  * @brief   Schematic symbol of a logic gate and of a flip-flop.
  */
 
-#include "ui_logic_part.h"
+#include "ui_elements/ui_logic_part.h"
 
 #include "components/logic_part.h"
 #include <algorithm>

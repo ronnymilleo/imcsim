@@ -3,7 +3,7 @@
  * @brief   Tests for the spectrum and harmonic distortion of traces.
  */
 
-#include "spectrum.h"
+#include "plots/spectrum.h"
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 #include <cmath>

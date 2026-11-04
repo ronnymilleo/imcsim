@@ -3,21 +3,21 @@
  * @brief   Window that plots the transient, AC sweep and DC sweep results of the schematic.
  */
 
-#include "output_window.h"
+#include "windows/output_window.h"
 
+#include "analysis/truth_table.h"
 #include "components/logic_input.h"
+#include "drawing/node_colors.h"
+#include "drawing/theme.h"
+#include "editing/probing.h"
 #include "imgui_internal.h"
 #include "implot.h"
 #include "implot_internal.h"
-#include "logic_trace.h"
-#include "node_colors.h"
-#include "plot_figures.h"
-#include "plot_helpers.h"
-#include "probing.h"
-#include "spice_value.h"
-#include "theme.h"
-#include "trace_statistics.h"
-#include "truth_table.h"
+#include "plots/logic_trace.h"
+#include "plots/plot_figures.h"
+#include "plots/plot_helpers.h"
+#include "plots/trace_statistics.h"
+#include "spice/spice_value.h"
 #include "value_field.h"
 #include <algorithm>
 #include <cmath>

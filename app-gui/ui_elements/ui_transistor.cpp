@@ -3,7 +3,7 @@
  * @brief   Geometry and drawing shared by the schematic symbols of three-terminal transistors.
  */
 
-#include "ui_transistor.h"
+#include "ui_elements/ui_transistor.h"
 
 #include <cmath>
 #include <utility>

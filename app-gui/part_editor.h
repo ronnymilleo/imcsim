@@ -23,9 +23,9 @@
 #include "components/switch.h"
 #include "components/transformer.h"
 #include "components/voltage_controlled_switch.h"
+#include "document/schematic.h"
 #include "preferences.h"
-#include "schematic.h"
-#include "standard_values.h"
+#include "spice/standard_values.h"
 #include "value_field.h"
 #include <array>
 #include <cstddef>

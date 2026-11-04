@@ -3,9 +3,9 @@
  * @brief   Visual representation of a circuit component inside the schematic editor.
  */
 
-#include "ui_element.h"
+#include "ui_elements/ui_element.h"
 
-#include "spice_value.h"
+#include "spice/spice_value.h"
 #include <algorithm>
 #include <array>
 #include <cfloat>

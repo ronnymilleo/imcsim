@@ -5,12 +5,12 @@
 
 #include "part_editor.h"
 
-#include "element_factory.h"
-#include "live_input.h"
+#include "drawing/theme.h"
+#include "editing/element_factory.h"
+#include "editing/live_input.h"
 #include "misc/cpp/imgui_stdlib.h"
-#include "simulator.h"
-#include "spice_value.h"
-#include "theme.h"
+#include "simulation/simulator.h"
+#include "spice/spice_value.h"
 #include <algorithm>
 #include <array>
 #include <cfloat>

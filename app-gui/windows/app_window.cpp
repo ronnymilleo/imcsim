@@ -3,7 +3,7 @@
  * @brief   Base class for the dockable ImGui windows of the application.
  */
 
-#include "app_window.h"
+#include "windows/app_window.h"
 
 #include "imgui_internal.h"
 #include <utility>

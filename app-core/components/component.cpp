@@ -3,7 +3,7 @@
  * @brief   Circuit component model implementation.
  */
 
-#include "component.h"
+#include "components/component.h"
 
 #include <algorithm>
 #include <array>

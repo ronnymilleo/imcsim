@@ -3,7 +3,7 @@
  * @brief   Logic gates and flip-flops in the simulation model.
  */
 
-#include "logic_part.h"
+#include "components/logic_part.h"
 #include <memory>
 
 namespace Core {

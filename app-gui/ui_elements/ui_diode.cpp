@@ -3,7 +3,7 @@
  * @brief   Schematic symbol of a diode, a Zener diode or an LED.
  */
 
-#include "ui_diode.h"
+#include "ui_elements/ui_diode.h"
 
 #include "components/diode.h"
 #include <memory>

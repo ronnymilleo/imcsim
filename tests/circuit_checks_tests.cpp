@@ -3,7 +3,7 @@
  * @brief   Tests for the checks of a circuit and of the settings of an analysis, which no backend takes part in.
  */
 
-#include "circuit_checks.h"
+#include "simulation/circuit_checks.h"
 
 #include "components/clock.h"
 #include "components/ground.h"

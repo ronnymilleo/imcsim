@@ -4,9 +4,9 @@
  *          piecewise linear waveform, shared by voltage and current sources.
  */
 
-#include "source.h"
+#include "components/source.h"
 
-#include "spice_value.h"
+#include "spice/spice_value.h"
 #include <cstddef>
 #include <format>
 

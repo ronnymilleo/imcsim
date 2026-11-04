@@ -3,7 +3,7 @@
  * @brief   Schematic symbol of a switch and of a push button.
  */
 
-#include "ui_switch.h"
+#include "ui_elements/ui_switch.h"
 
 #include "components/switch.h"
 #include <cmath>

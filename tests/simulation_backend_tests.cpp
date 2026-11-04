@@ -3,17 +3,17 @@
  * @brief   Tests for the seam between the simulator and its backend, run against a fake backend.
  */
 
-#include "simulation_backend.h"
+#include "simulation/simulation_backend.h"
 
 #include "components/ground.h"
 #include "components/logic_input.h"
 #include "components/logic_part.h"
 #include "components/resistor.h"
 #include "components/voltage_source.h"
-#include "ngspice_backend.h"
-#include "ngspice_library.h"
-#include "run_control.h"
-#include "simulator.h"
+#include "ngspice/ngspice_backend.h"
+#include "ngspice/ngspice_library.h"
+#include "simulation/run_control.h"
+#include "simulation/simulator.h"
 #include <catch2/catch_test_macros.hpp>
 #include <memory>
 #include <optional>

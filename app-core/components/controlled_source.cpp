@@ -3,7 +3,7 @@
  * @brief   Sources whose output follows a voltage or a current elsewhere in the circuit (SPICE E, F, G and H).
  */
 
-#include "controlled_source.h"
+#include "components/controlled_source.h"
 
 #include <memory>
 #include <utility>

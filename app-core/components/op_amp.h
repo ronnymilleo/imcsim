@@ -6,7 +6,7 @@
 #ifndef IMCSIM_OP_AMP_H
 #define IMCSIM_OP_AMP_H
 
-#include "component.h"
+#include "components/component.h"
 #include <memory>
 #include <span>
 #include <string>

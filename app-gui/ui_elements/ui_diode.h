@@ -6,7 +6,7 @@
 #ifndef IMCSIM_UI_DIODE_H
 #define IMCSIM_UI_DIODE_H
 
-#include "ui_element.h"
+#include "ui_elements/ui_element.h"
 
 namespace GUI {
 

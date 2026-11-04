@@ -6,7 +6,7 @@
 #ifndef IMCSIM_COMPONENT_SUBCIRCUIT_H
 #define IMCSIM_COMPONENT_SUBCIRCUIT_H
 
-#include "component.h"
+#include "components/component.h"
 #include <map>
 #include <string>
 #include <string_view>

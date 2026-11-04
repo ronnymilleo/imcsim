@@ -6,7 +6,7 @@
 #ifndef IMCSIM_NET_LABEL_H
 #define IMCSIM_NET_LABEL_H
 
-#include "component.h"
+#include "components/component.h"
 #include <memory>
 #include <string>
 #include <string_view>

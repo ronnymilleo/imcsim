@@ -3,7 +3,7 @@
  * @brief   Tests for copying a circuit and its parts, which a simulation on another thread works on.
  */
 
-#include "circuit_copy.h"
+#include "simulation/circuit_copy.h"
 
 #include "components/capacitor.h"
 #include "components/diode.h"
@@ -11,8 +11,8 @@
 #include "components/op_amp.h"
 #include "components/resistor.h"
 #include "components/voltage_source.h"
-#include "examples.h"
-#include "schematic.h"
+#include "document/examples.h"
+#include "document/schematic.h"
 #include <catch2/catch_test_macros.hpp>
 #include <memory>
 #include <string>

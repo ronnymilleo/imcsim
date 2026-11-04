@@ -7,7 +7,7 @@
 #define IMCSIM_UI_CONTROLLED_SOURCE_H
 
 #include "components/controlled_source.h"
-#include "ui_element.h"
+#include "ui_elements/ui_element.h"
 
 namespace GUI {
 

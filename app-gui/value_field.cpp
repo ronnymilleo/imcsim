@@ -5,10 +5,10 @@
 
 #include "value_field.h"
 
+#include "drawing/theme.h"
 #include "imgui.h"
 #include "imgui_internal.h"
-#include "spice_value.h"
-#include "theme.h"
+#include "spice/spice_value.h"
 #include <utility>
 
 namespace GUI {

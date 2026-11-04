@@ -4,56 +4,57 @@
 
 add_library(imcsim-gui-lib
         STATIC
-            analysis_controls.cpp
-            analysis_inputs.cpp
-            analysis_settings_panel.cpp
-            auto_rerun.cpp
+            analysis/analysis_controls.cpp
+            analysis/analysis_inputs.cpp
+            analysis/analysis_settings_panel.cpp
+            analysis/auto_rerun.cpp
+            analysis/circuit_snapshot.cpp
+            analysis/parameter_step.cpp
+            analysis/playback.cpp
+            analysis/point_window.cpp
+            analysis/transient_window.cpp
+            analysis/truth_table.cpp
             application.cpp
-            canvas_view.cpp
-            circuit_snapshot.cpp
-            clipboard.cpp
-            connectivity.cpp
-            current_flow.cpp
-            element_factory.cpp
-            examples.cpp
-            file_dialog.cpp
-            glow_renderer.cpp
-            group_editing.cpp
-            heat_glow.cpp
+            document/clipboard.cpp
+            document/examples.cpp
+            document/file_dialog.cpp
+            document/schematic.cpp
+            document/schematic_file.cpp
+            document/schematic_file_actions.cpp
+            document/simulation_settings.cpp
+            document/spice_import.cpp
+            document/subcircuit_pins.cpp
+            drawing/current_flow.cpp
+            drawing/glow_renderer.cpp
+            drawing/heat_glow.cpp
+            drawing/led_glow.cpp
+            drawing/node_colors.cpp
+            drawing/schematic_canvas.cpp
+            drawing/schematic_drawing.cpp
+            drawing/svg_writer.cpp
+            drawing/theme.cpp
+            editing/canvas_view.cpp
+            editing/connectivity.cpp
+            editing/element_factory.cpp
+            editing/group_editing.cpp
+            editing/live_input.cpp
+            editing/probing.cpp
+            editing/selection.cpp
+            editing/wire_editing.cpp
             helpers.cpp
-            led_glow.cpp
-            live_input.cpp
-            logic_trace.cpp
-            math_channel.cpp
-            math_channels.cpp
-            node_colors.cpp
-            parameter_step.cpp
             part_editor.cpp
-            playback.cpp
-            plot_export.cpp
-            plot_exporter.cpp
-            plot_figures.cpp
-            plot_helpers.cpp
-            point_window.cpp
+            plots/logic_trace.cpp
+            plots/math_channel.cpp
+            plots/math_channels.cpp
+            plots/plot_export.cpp
+            plots/plot_exporter.cpp
+            plots/plot_figures.cpp
+            plots/plot_helpers.cpp
+            plots/spectrum.cpp
+            plots/trace_fit_state.cpp
+            plots/trace_math.cpp
+            plots/trace_statistics.cpp
             preferences.cpp
-            probing.cpp
-            schematic.cpp
-            schematic_canvas.cpp
-            schematic_drawing.cpp
-            schematic_file.cpp
-            schematic_file_actions.cpp
-            selection.cpp
-            simulation_settings.cpp
-            spectrum.cpp
-            spice_import.cpp
-            subcircuit_pins.cpp
-            svg_writer.cpp
-            theme.cpp
-            trace_fit_state.cpp
-            trace_math.cpp
-            trace_statistics.cpp
-            transient_window.cpp
-            truth_table.cpp
             ui_elements/ui_bjt.cpp
             ui_elements/ui_capacitor.cpp
             ui_elements/ui_clock.cpp
@@ -72,9 +73,9 @@ add_library(imcsim-gui-lib
             ui_elements/ui_potentiometer.cpp
             ui_elements/ui_resistor.cpp
             ui_elements/ui_source.cpp
-            ui_elements/ui_switch.cpp
             ui_elements/ui_subcircuit.cpp
             ui_elements/ui_subcircuit_pin.cpp
+            ui_elements/ui_switch.cpp
             ui_elements/ui_transformer.cpp
             ui_elements/ui_transistor.cpp
             ui_elements/ui_vcc.cpp
@@ -89,13 +90,11 @@ add_library(imcsim-gui-lib
             windows/properties_window.cpp
             windows/simulation_window.cpp
             windows/spice_block_dialog.cpp
-            wire_editing.cpp
 )
 
 target_include_directories(imcsim-gui-lib
         PUBLIC
             ${CMAKE_CURRENT_SOURCE_DIR}
-            ${CMAKE_CURRENT_SOURCE_DIR}/ui_elements
         PRIVATE
             ${CMAKE_CURRENT_BINARY_DIR}/generated
 )

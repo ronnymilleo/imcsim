@@ -3,7 +3,7 @@
  * @brief   Schematic symbol of an NPN or PNP bipolar transistor.
  */
 
-#include "ui_bjt.h"
+#include "ui_elements/ui_bjt.h"
 
 #include "components/bjt.h"
 #include <memory>
