@@ -165,7 +165,9 @@ schematic file keeps the definition of each block, so it opens anywhere without 
 - **Making a block**: select the circuit together with its pin markers and pick Edit > Create Block from Selection.
   The dialog names the block, lists the pins in the order of its terminals (Up and Down reorder them) with the edge
   of each, which a choice there turns the marker to, and holds its parameters with their defaults. Create block puts
-  one instance where the selection was, wired to the points where the markers were. Undo takes it back in one step.
+  one instance where the selection was, moved aside when its box would cover the points where the markers were, and
+  wires it to those points. Each wire leaves the box from the edge of its pin and goes around the box, clear of the
+  other wires and terminals. Undo takes it back in one step.
 - **Parameters**: inside a block, a resistor, capacitor or inductor can take its value from a parameter of the block:
   pick the parameter in Follows, in its properties, and its symbol shows `{R}` instead of a value. Each instance sets
   its own values in its properties, or keeps the defaults, and Reset parameters goes back to them.
@@ -177,8 +179,9 @@ schematic file keeps the definition of each block, so it opens anywhere without 
   `Schematic > AMPLIFIER > STAGE`. Edit > Block Pin and Parameter Settings opens the dialog again, where Apply keeps
   the pin names, edges and parameters. A click on a level of the path, or Edit > Apply Block and Return, applies the
   changes to every instance at once, as one undo step, and Edit > Discard Block Changes leaves the block as it was. A
-  pin that keeps its marker, even renamed or on another edge, keeps the wires of its instances; the wires of a pin that
-  went away are removed. Quitting, or opening an example, applies the open blocks first, so their changes count as
+  pin that keeps its marker, even renamed or on another edge, keeps the wires of its instances, and a pin that moved
+  to another edge gets a wire around the box from where its old wire leaves it; the wires of a pin that went away are
+  removed. Quitting, or opening an example, applies the open blocks first, so their changes count as
   unsaved changes of the schematic.
 - **Blocks inside blocks**: a block can hold other blocks. Select them with the rest of the circuit to make a bigger
   block, or place one while a block is open, from the part search or by pasting. Double click a block inside an open
@@ -196,8 +199,13 @@ schematic file keeps the definition of each block, so it opens anywhere without 
   - A picked model joins the schematic and shows in the Model choice of the parts it fits, as `1N4148 (library)`
     after the ready models; a diode model fits diodes, LEDs and Zeners, and a transistor model the transistors of its
     type.
-  - `.include` and `.lib` lines are reported and not followed, so import the files they name as well. Encrypted
-    models, which only their vendor's simulator reads, are left out with a warning.
+  - `.include` and `.lib` lines are followed, with paths taken from the folder of the file that writes them:
+    `.include file` reads the whole file in its place, `.lib file section` reads that section of it, and `.lib file`
+    with no section reads the whole file, as LTspice writes it. What a block uses from those files is copied into its
+    text, so it needs none of them afterwards. When the file picked has sections of its own, all of them are read and
+    the first definition of each name wins. A file that cannot be read, a missing section or a file that includes
+    itself is reported with the line that names it. Encrypted models, which only their vendor's simulator reads, are
+    left out with a warning.
 
 The RC_LOWPASS block of the Two RC filters example, open in the editor: a pin marker on each side, and a resistor and
 a capacitor that follow the parameters R and C:

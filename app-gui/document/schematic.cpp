@@ -11,6 +11,7 @@
 #include "document/block_nesting.h"
 #include "document/schematic_file.h"
 #include "document/subcircuit_pins.h"
+#include "editing/block_wiring.h"
 #include "editing/element_factory.h"
 #include "editing/group_editing.h"
 #include "editing/wire_editing.h"
@@ -198,68 +199,129 @@ std::vector<SavedSubcircuit> CopyDefinitions(const std::vector<SavedSubcircuit> 
 }
 
 /**
+ * @struct  ReroutedPin
+ * @brief   A pin that moved to another edge of a block.
+ */
+struct ReroutedPin {
+    const UIElement *Block = nullptr;
+    GridPoint OldPoint;
+    GridPoint NewPoint;
+};
+
+/**
+ * @struct  TerminalMoves
+ * @brief   What happens to the wires on the terminals of the instances of a block that changed.
+ */
+struct TerminalMoves {
+    /// Terminals whose wires follow them, before the change.
+    std::vector<GridPoint> OldPoints;
+    /// The same terminals after it, in the same order.
+    std::vector<GridPoint> NewPoints;
+    /// Terminals of pins that went away, whose wires go too.
+    std::vector<GridPoint> Removed;
+    /// Pins that moved to another edge, which get a new wire around the box from where they were.
+    std::vector<ReroutedPin> Rerouted;
+    /// The boxes of the instances, which the new wires go around.
+    std::vector<WorldBounds> Boxes;
+};
+
+/**
+ * @brief   Brings one instance of a definition that changed up to date, and notes where its wires go.
+ */
+void RefreshInstance(UIElement &element, const SavedSubcircuit &definition, const std::vector<std::string> &old_names,
+                     const std::vector<std::optional<std::size_t>> &matches, TerminalMoves &moves) {
+    auto &instance = static_cast<Core::SubcircuitInstance &>(element.GetComponent());
+    const std::vector<std::string> instance_pins = instance.GetPins();
+    const std::vector<GridPoint> old_terminals = element.GetTerminals();
+    std::vector<GridPoint> old_inwards;
+    for (std::size_t terminal = 0; terminal < old_terminals.size(); ++terminal) {
+        old_inwards.push_back(element.GetTerminalInward(terminal));
+    }
+    const auto overrides = instance.GetParameters();
+    instance.ClearParameters();
+    for (const auto &[parameter, value] : overrides) {
+        if (std::ranges::contains(definition.Parameters, parameter, &Core::SubcircuitParameter::Name)) {
+            instance.SetParameter(parameter, value);
+        }
+    }
+    ApplyDefinitionPins(instance, definition);
+    const std::vector<GridPoint> new_terminals = element.GetTerminals();
+    moves.Boxes.push_back(element.GetWorldBounds());
+
+    std::set<std::size_t> kept_terminals;
+    for (std::size_t new_index = 0; new_index < matches.size(); ++new_index) {
+        const std::optional<std::size_t> old_pin = matches[new_index];
+        if (!old_pin) {
+            continue;
+        }
+        // The terminal the old pin had on this instance, found by its name in case the instance is behind
+        const auto found = std::ranges::find(instance_pins, old_names[*old_pin]);
+        if (found == instance_pins.end()) {
+            continue;
+        }
+        const auto terminal = static_cast<std::size_t>(found - instance_pins.begin());
+        kept_terminals.insert(terminal);
+        const GridPoint old_point = old_terminals[terminal];
+        const GridPoint new_point = new_terminals[new_index];
+        if (old_point != new_point && element.GetTerminalInward(new_index) != old_inwards[terminal]) {
+            moves.Rerouted.push_back({.Block = &element, .OldPoint = old_point, .NewPoint = new_point});
+        } else {
+            moves.OldPoints.push_back(old_point);
+            moves.NewPoints.push_back(new_point);
+        }
+    }
+    for (std::size_t terminal = 0; terminal < old_terminals.size(); ++terminal) {
+        if (!kept_terminals.contains(terminal)) {
+            moves.Removed.push_back(old_terminals[terminal]);
+        }
+    }
+}
+
+/**
  * @brief   Brings the instances of a definition that changed up to date among some parts: their pins and edges, the
  *          overrides of the parameters it still has, and the wires on their terminals, which follow the pins that go
  *          on (matches gives the old pin each new one continues) and are removed from the pins that went away.
+ * @details A pin that moves to another edge gets a new wire around the box from where its wires leave the box, since
+ *          stretching them could run them along it. They are stretched as before when none leaves the box, and the new
+ *          wire bends once when no route is found.
  */
 void RefreshInstancesIn(std::vector<std::unique_ptr<UIElement>> &elements, std::vector<UIWire> &wires,
                         const SavedSubcircuit &definition, const std::vector<std::string> &old_names,
                         const std::vector<std::optional<std::size_t>> &matches) {
-    const std::string &name = definition.Name;
-    const std::vector<Core::SubcircuitParameter> &parameters = definition.Parameters;
-    std::vector<GridPoint> old_points;
-    std::vector<GridPoint> new_points;
-    std::vector<GridPoint> removed_points;
+    TerminalMoves moves;
     for (auto &element : elements) {
-        if (element->GetComponent().GetType() != Core::ComponentType::SUBCIRCUIT) {
-            continue;
-        }
-        auto &instance = static_cast<Core::SubcircuitInstance &>(element->GetComponent());
-        if (instance.GetDefinitionName() != name) {
-            continue;
-        }
-        const std::vector<std::string> instance_pins = instance.GetPins();
-        const std::vector<GridPoint> old_terminals = element->GetTerminals();
-        // The terminal an old pin had on this instance, found by its name in case the instance is behind
-        const auto old_terminal = [&](const std::size_t old_pin) -> std::optional<std::size_t> {
-            const auto terminal = std::ranges::find(instance_pins, old_names[old_pin]);
-            if (terminal == instance_pins.end()) {
-                return std::nullopt;
-            }
-            return static_cast<std::size_t>(terminal - instance_pins.begin());
-        };
-        const auto overrides = instance.GetParameters();
-        instance.ClearParameters();
-        for (const auto &[parameter, value] : overrides) {
-            if (std::ranges::contains(parameters, parameter, &Core::SubcircuitParameter::Name)) {
-                instance.SetParameter(parameter, value);
-            }
-        }
-        ApplyDefinitionPins(instance, definition);
-        const std::vector<GridPoint> new_terminals = element->GetTerminals();
-        std::set<std::size_t> kept_terminals;
-        for (std::size_t new_index = 0; new_index < matches.size(); ++new_index) {
-            const std::optional<std::size_t> old_pin = matches[new_index];
-            if (!old_pin) {
-                continue;
-            }
-            if (const std::optional<std::size_t> terminal = old_terminal(*old_pin)) {
-                kept_terminals.insert(*terminal);
-                old_points.push_back(old_terminals[*terminal]);
-                new_points.push_back(new_terminals[new_index]);
-            }
-        }
-        for (std::size_t terminal = 0; terminal < old_terminals.size(); ++terminal) {
-            if (!kept_terminals.contains(terminal)) {
-                removed_points.push_back(old_terminals[terminal]);
-            }
+        if (element->GetComponent().GetType() == Core::ComponentType::SUBCIRCUIT &&
+            static_cast<const Core::SubcircuitInstance &>(element->GetComponent()).GetDefinitionName() ==
+                definition.Name) {
+            RefreshInstance(*element, definition, old_names, matches, moves);
         }
     }
     std::erase_if(wires, [&](const UIWire &wire) {
-        return std::ranges::contains(removed_points, wire.GetStart()) ||
-               std::ranges::contains(removed_points, wire.GetEnd());
+        return std::ranges::contains(moves.Removed, wire.GetStart()) ||
+               std::ranges::contains(moves.Removed, wire.GetEnd());
     });
-    wires = FollowTerminals(wires, old_points, new_points);
+    wires = FollowTerminals(wires, moves.OldPoints, moves.NewPoints);
+    if (moves.Rerouted.empty()) {
+        return;
+    }
+    std::vector<WireLink> links;
+    for (const ReroutedPin &pin : moves.Rerouted) {
+        if (const std::optional<GridPoint> start = DetachFromBox(wires, pin.OldPoint, *pin.Block)) {
+            links.push_back({.From = *start, .To = pin.NewPoint});
+        } else {
+            wires = FollowTerminals(wires, {pin.OldPoint}, {pin.NewPoint});
+        }
+    }
+    const auto routed = RouteLinks(elements, wires, moves.Boxes, links);
+    for (std::size_t index = 0; index < links.size(); ++index) {
+        if (const std::optional<std::vector<UIWire>> &path = routed[index]) {
+            std::ranges::copy(*path, std::back_inserter(wires));
+        } else {
+            const GridPoint bend = {links[index].To.X, links[index].From.Y};
+            wires.emplace_back(links[index].From, bend);
+            wires.emplace_back(bend, links[index].To);
+        }
+    }
 }
 
 /**
@@ -562,7 +624,6 @@ Schematic::CreateSubcircuitFromSelection(std::string name, std::vector<SavedSubc
     const GridPoint pivot = FindPivot(m_Elements, m_SelectedElements, m_Wires, m_SelectedWires);
     auto instance_element = CreateElement(Core::ComponentType::SUBCIRCUIT, pivot, Rotation::R0);
     ApplyDefinitionPins(static_cast<Core::SubcircuitInstance &>(instance_element->GetComponent()), definition);
-    const std::vector<GridPoint> new_points = instance_element->GetTerminals();
     std::vector<GridPoint> old_points;
     for (const SavedSubcircuitPin &pin : definition.Pins) {
         old_points.push_back(pin.Point);
@@ -571,12 +632,9 @@ Schematic::CreateSubcircuitFromSelection(std::string name, std::vector<SavedSubc
     DeleteSelection();
     m_Subcircuits.push_back(std::move(definition));
     m_BuiltSubcircuits.reset();
+    MoveToFreeSpot(*instance_element, old_points, m_Elements, m_Wires);
     AddElement(std::move(instance_element));
-    for (std::size_t index = 0; index < new_points.size(); ++index) {
-        const GridPoint bend = {new_points[index].X, old_points[index].Y};
-        AddWire(old_points[index], bend);
-        AddWire(bend, new_points[index]);
-    }
+    WireNewBlock(old_points);
     SelectElement(m_Elements.size() - 1);
     return {};
 }
@@ -1627,6 +1685,32 @@ void Schematic::RefreshInstances(const SavedSubcircuit &definition, const std::v
         }
     }
 }
+/**
+ * @brief   Wires the terminals of a block just made, the last element, to the points where its pin markers were.
+ * @details Each wire goes around the box from the edge its pin is on, clear of the other wires and terminals; one
+ *          that finds no route bends once instead, as it can always do.
+ */
+void Schematic::WireNewBlock(const std::vector<GridPoint> &old_points) {
+    const UIElement &instance = *m_Elements.back();
+    const std::vector<GridPoint> new_points = instance.GetTerminals();
+    std::vector<WireLink> links;
+    for (std::size_t index = 0; index < new_points.size(); ++index) {
+        links.push_back({.From = old_points[index], .To = new_points[index]});
+    }
+    const auto routed = RouteLinks(m_Elements, m_Wires, {instance.GetWorldBounds()}, links);
+    for (std::size_t index = 0; index < links.size(); ++index) {
+        if (const std::optional<std::vector<UIWire>> &path = routed[index]) {
+            for (const UIWire &wire : *path) {
+                AddWire(wire.GetStart(), wire.GetEnd());
+            }
+            continue;
+        }
+        const GridPoint bend = {links[index].To.X, links[index].From.Y};
+        AddWire(links[index].From, bend);
+        AddWire(bend, links[index].To);
+    }
+}
+
 /**
  * @brief   Measurements stay out of snapshots, so probing adds no undo step and does not count as a change.
  */

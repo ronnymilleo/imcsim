@@ -195,25 +195,33 @@ bool UIElement::Contains(const ImVec2 world_pos) const {
 }
 
 /**
- * @brief   Checks whether the element touches a rectangle in world space, for picking it with a selection box.
- * @param[in] min  Corner of the rectangle with the lowest X and Y.
- * @param[in] max  Corner with the highest X and Y.
- * @return  True when the symbol bounds, terminals included, overlap the rectangle.
+ * @brief   Finds the box the element takes on the grid, after its rotation and mirroring.
+ * @return  The symbol bounds, terminals included, in world units.
  */
-bool UIElement::Intersects(const ImVec2 min, const ImVec2 max) const {
+WorldBounds UIElement::GetWorldBounds() const {
     const LocalBounds bounds = GetLocalBounds();
-    ImVec2 low = {FLT_MAX, FLT_MAX};
-    ImVec2 high = {-FLT_MAX, -FLT_MAX};
+    WorldBounds world_bounds = {.Min = {FLT_MAX, FLT_MAX}, .Max = {-FLT_MAX, -FLT_MAX}};
     for (ImVec2 corner :
          {bounds.Min, ImVec2{bounds.Max.x, bounds.Min.y}, bounds.Max, ImVec2{bounds.Min.x, bounds.Max.y}}) {
         if (m_Mirrored) {
             corner.x = -corner.x;
         }
         const ImVec2 world = ToVec2(m_Position) + Rotate(corner, m_Rotation);
-        low = {std::min(low.x, world.x), std::min(low.y, world.y)};
-        high = {std::max(high.x, world.x), std::max(high.y, world.y)};
+        world_bounds.Min = {std::min(world_bounds.Min.x, world.x), std::min(world_bounds.Min.y, world.y)};
+        world_bounds.Max = {std::max(world_bounds.Max.x, world.x), std::max(world_bounds.Max.y, world.y)};
     }
-    return low.x <= max.x && high.x >= min.x && low.y <= max.y && high.y >= min.y;
+    return world_bounds;
+}
+
+/**
+ * @brief   Checks whether the element touches a rectangle in world space, for picking it with a selection box.
+ * @param[in] min  Corner of the rectangle with the lowest X and Y.
+ * @param[in] max  Corner with the highest X and Y.
+ * @return  True when the symbol bounds, terminals included, overlap the rectangle.
+ */
+bool UIElement::Intersects(const ImVec2 min, const ImVec2 max) const {
+    const WorldBounds bounds = GetWorldBounds();
+    return bounds.Min.x <= max.x && bounds.Max.x >= min.x && bounds.Min.y <= max.y && bounds.Max.y >= min.y;
 }
 
 /**

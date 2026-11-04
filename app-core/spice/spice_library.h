@@ -8,6 +8,8 @@
 
 #include "model/library_model.h"
 #include "model/subcircuit.h"
+#include "spice/spice_inclusions.h"
+#include <filesystem>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -46,6 +48,7 @@ struct SpiceLibrary {
 
 // Reading
 SpiceLibrary ReadSpiceLibrary(std::string_view text);
+SpiceLibrary ReadSpiceLibraryFile(const std::filesystem::path &path, const LibraryFileReader &read_file);
 std::optional<double> ParseSpiceNumber(std::string_view text);
 
 } // namespace Core

@@ -282,6 +282,7 @@ private:
     void FollowVoltageProbes();
     void RefreshInstances(const SavedSubcircuit &definition, const std::vector<std::string> &old_names,
                           const std::vector<std::optional<std::size_t>> &matches);
+    void WireNewBlock(const std::vector<GridPoint> &old_points);
     std::string TakeSnapshot() const;
     void RestoreSnapshot(const std::string &snapshot);
     void ResetHistory();
