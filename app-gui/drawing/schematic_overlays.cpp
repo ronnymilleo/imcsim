@@ -6,6 +6,7 @@
 #include "drawing/schematic_overlays.h"
 
 #include "analysis/logic_outputs.h"
+#include "components/logic_input.h"
 #include "components/subcircuit.h"
 #include "drawing/current_flow.h"
 #include "drawing/heat_glow.h"
@@ -15,6 +16,7 @@
 #include "drawing/theme.h"
 #include "editing/live_input.h"
 #include "spice/spice_value.h"
+#include "ui_elements/ui_logic_input.h"
 #include "ui_elements/ui_logic_output.h"
 #include <algorithm>
 #include <cmath>
@@ -484,11 +486,19 @@ ImU32 SchematicOverlays::GetElementColor(const Schematic &schematic, const std::
 }
 
 /**
- * @brief   Shows what a logic output reads, lit when it reads 1 and its live effect is on; nothing for the other parts
- *          and before there is a result.
+ * @brief   Shows what a logic output reads, lit when it reads 1 and the Logic Lights effect is on, and lights a logic
+ *          input that is high with that effect; nothing for the other parts, nor for an output before there is a
+ *          result.
  */
 void SchematicOverlays::DrawLogicReading(SchematicCanvas &canvas, const ViewTransform &view, const UIElement &element,
                                          const std::size_t index) const {
+    const bool are_lights_on = m_Preferences.IsEffectOn(LiveEffect::LOGIC_LIGHTS);
+    if (element.GetComponent().GetType() == Core::ComponentType::LOGIC_INPUT) {
+        if (are_lights_on && static_cast<const Core::LogicInput &>(element.GetComponent()).IsHigh()) {
+            static_cast<const UILogicInput &>(element).DrawLit(canvas, view, "1");
+        }
+        return;
+    }
     if (!m_Displayed || index >= m_Displayed->LogicReadings.size()) {
         return;
     }
@@ -497,7 +507,7 @@ void SchematicOverlays::DrawLogicReading(SchematicCanvas &canvas, const ViewTran
         return;
     }
     const LogicState state = *reading;
-    const bool is_lit = state == LogicState::HIGH && m_Preferences.IsEffectOn(LiveEffect::LOGIC_LIGHTS);
+    const bool is_lit = state == LogicState::HIGH && are_lights_on;
     static_cast<const UILogicOutput &>(element).DrawReading(canvas, view, state, GetPalette().CanvasText, is_lit);
 }
 

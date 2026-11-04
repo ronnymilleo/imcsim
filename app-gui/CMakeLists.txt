@@ -74,6 +74,7 @@ add_library(imcsim-gui-lib
             ui_elements/ui_element.cpp
             ui_elements/ui_ground.cpp
             ui_elements/ui_inductor.cpp
+            ui_elements/ui_logic_box.cpp
             ui_elements/ui_logic_input.cpp
             ui_elements/ui_logic_output.cpp
             ui_elements/ui_logic_part.cpp

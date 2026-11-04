@@ -7,7 +7,7 @@
 #define IMCSIM_UI_LOGIC_OUTPUT_H
 
 #include "plots/logic_trace.h"
-#include "ui_elements/ui_element.h"
+#include "ui_elements/ui_logic_box.h"
 
 namespace GUI {
 
@@ -18,7 +18,7 @@ namespace GUI {
  *          signal comes in. The symbol alone is the empty box: the reading comes from the result shown, through
  *          DrawReading().
  */
-class UILogicOutput : public UIElement {
+class UILogicOutput : public UILogicBox {
 public:
     UILogicOutput(GridPoint position, Rotation rotation);
     ~UILogicOutput() override = default;
@@ -29,10 +29,6 @@ public:
 protected:
     void DrawTerminals(SchematicCanvas &canvas, const ViewTransform &view, ImU32 color) const override;
     void DrawSymbol(SchematicCanvas &canvas, const ViewTransform &view, ImU32 color, SymbolStyle style) const override;
-
-    std::vector<GridPoint> GetLocalTerminals() const override;
-    GridPoint GetLocalTerminalInward(std::size_t terminal) const override;
-    LocalBounds GetLocalBounds() const override;
 };
 
 } // namespace GUI
