@@ -7,6 +7,7 @@
 #include "components/logic_input.h"
 #include "components/net_label.h"
 #include "components/subcircuit.h"
+#include "digital_models.h"
 #include "document/ready_blocks.h"
 #include "document/schematic.h"
 #include "editing/element_factory.h"
@@ -169,7 +170,8 @@ TEST_CASE("The part search finds the ready blocks by their titles", "[ready_bloc
     CHECK(GUI::FindReadyBlocks("resistor").empty());
 }
 
-TEST_CASE("The decoder raises the output its address selects, and none when disabled", "[ready_blocks]") {
+TEST_CASE("The decoder raises the output its address selects, and none when disabled", "[ready_blocks][digital]") {
+    SKIP_WITHOUT_DIGITAL_MODELS();
     for (int address = 0; address < 4; ++address) {
         for (const bool is_enabled : {true, false}) {
             CAPTURE(address, is_enabled);
@@ -186,7 +188,8 @@ TEST_CASE("The decoder raises the output its address selects, and none when disa
     }
 }
 
-TEST_CASE("The multiplexer passes the input its select lines name", "[ready_blocks]") {
+TEST_CASE("The multiplexer passes the input its select lines name", "[ready_blocks][digital]") {
+    SKIP_WITHOUT_DIGITAL_MODELS();
     // Data inputs 1, 0, 1, 1, so every select gives a different answer from its neighbor
     const std::vector<bool> data = {true, false, true, true};
     for (int select = 0; select < 4; ++select) {
@@ -202,7 +205,8 @@ TEST_CASE("The multiplexer passes the input its select lines name", "[ready_bloc
     }
 }
 
-TEST_CASE("The counter counts the rising edges of its clock in binary", "[ready_blocks]") {
+TEST_CASE("The counter counts the rising edges of its clock in binary", "[ready_blocks][digital]") {
+    SKIP_WITHOUT_DIGITAL_MODELS();
     Bench bench;
     Place(bench, "4-bit counter");
     DriveClock(bench, "CLK");
@@ -210,7 +214,8 @@ TEST_CASE("The counter counts the rising edges of its clock in binary", "[ready_
     CHECK(ReadFinalLevels(bench, {"Q0", "Q1", "Q2", "Q3"}, 8.9e-3) == std::vector<bool>{true, false, false, true});
 }
 
-TEST_CASE("The shift register moves its input one stage on at each rising edge", "[ready_blocks]") {
+TEST_CASE("The shift register moves its input one stage on at each rising edge", "[ready_blocks][digital]") {
+    SKIP_WITHOUT_DIGITAL_MODELS();
     Bench bench;
     Place(bench, "4-bit shift register");
     DriveLogic(bench, "IN", true);
@@ -219,7 +224,8 @@ TEST_CASE("The shift register moves its input one stage on at each rising edge",
     CHECK(ReadFinalLevels(bench, {"Q0", "Q1", "Q2", "Q3"}, 2e-3) == std::vector<bool>{true, true, false, false});
 }
 
-TEST_CASE("RESET clears the counter and the shift register", "[ready_blocks]") {
+TEST_CASE("RESET clears the counter and the shift register", "[ready_blocks][digital]") {
+    SKIP_WITHOUT_DIGITAL_MODELS();
     for (const std::string_view title : {"4-bit counter", "4-bit shift register"}) {
         CAPTURE(title);
         Bench bench;
