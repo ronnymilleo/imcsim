@@ -61,6 +61,9 @@ private:
     void DrawNoiseSettings(SimulationSettings &settings);
     void DrawTransferFunctionSettings(SimulationSettings &settings);
     void DrawSensitivitySettings(SimulationSettings &settings);
+    void DrawPoleZeroSettings(SimulationSettings &settings);
+    void DrawSourceAndOutputPickers(std::string &source, std::optional<GridPoint> &output, const std::string &id,
+                                    const char *empty_text, const char *tooltip);
     void DrawTruthTableSettings(SimulationSettings &settings);
     void DrawParameterStepSettings(SimulationSettings &settings);
     void DrawParameterPicker(ParameterStepSettings &step, const Core::Circuit &circuit);

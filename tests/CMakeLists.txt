@@ -40,6 +40,8 @@ add_executable(imcsim-tests
             plot_export_tests.cpp
             plot_helpers_tests.cpp
             point_window_tests.cpp
+            pole_zero_tests.cpp
+            pole_zero_view_tests.cpp
             preferences_tests.cpp
             probing_tests.cpp
             schematic_canvas_tests.cpp

@@ -280,6 +280,12 @@ TEST_CASE("Every analysis runs on the worker and stores its result in the schema
     REQUIRE(schematic.GetSensitivity().has_value());
     CHECK_FALSE(schematic.GetSensitivity()->Parts.empty());
     CHECK(controls.GetLastRun() == GUI::Analysis::SENSITIVITY);
+
+    Select(schematic, GUI::Analysis::POLE_ZERO);
+    RunAndWait(controls);
+    REQUIRE(schematic.GetPoleZero().has_value());
+    CHECK_FALSE(schematic.GetPoleZero()->Roots.empty());
+    CHECK(controls.GetLastRun() == GUI::Analysis::POLE_ZERO);
 }
 
 TEST_CASE("A stepped AC sweep and a stepped DC sweep deliver one result per value", "[analysis_controls]") {
@@ -343,6 +349,7 @@ TEST_CASE("A run that cannot start says why, and a circuit that cannot run fails
 TEST_CASE("Analyses have names, and all of them are counted", "[analysis_controls]") {
     CHECK(std::string(GUI::GetAnalysisName(GUI::Analysis::AC_SWEEP)) == "AC sweep");
     CHECK(std::string(GUI::GetAnalysisName(GUI::Analysis::SENSITIVITY)) == "Sensitivity");
+    CHECK(std::string(GUI::GetAnalysisName(GUI::Analysis::POLE_ZERO)) == "Poles and zeros");
     CHECK(std::string(GUI::GetAnalysisName(GUI::Analysis::TRUTH_TABLE)) == "Truth table");
     CHECK(static_cast<std::size_t>(GUI::Analysis::TRUTH_TABLE) + 1 == GUI::ANALYSIS_COUNT);
 }

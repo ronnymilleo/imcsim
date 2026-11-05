@@ -32,6 +32,21 @@ elements, so the results are those of ngspice with the models below. Some things
   read the same meaningless number or nan, so they are left out. Logic parts are refused, since ngspice cannot recover
   from a sensitivity analysis that holds them. The AC form of `.sens` is not used: ngspice leaves the small-signal
   conductance of forward-biased diodes and transistors out of it, so it is wrong for nonlinear circuits.
+- A pole-zero analysis is ngspice's `.pz`: it finds the poles and zeros of the small-signal transfer function from an
+  independent source to the voltage of a node, with the circuit linearized at its DC operating point, so a diode or
+  transistor contributes its bias-point conductance and capacitances. The input port is the source's terminals, and
+  the kind of source sets the transfer: a voltage source gives a voltage gain (ngspice's `vol`) and a current source a
+  transimpedance (`cur`), since poles and zeros depend on whether the port is held to a voltage or a current. ngspice
+  accepts a voltage source as the input only when it has an AC magnitude, so imcsim sets it to 1 for the run, which
+  changes nothing else. The run leaves out the 0 V current probes, whose extra branch equations make the solver lose
+  the poles of fast parts. Roots are in rad/s; a pole and a zero that coincide within a thousandth of the larger are
+  dropped as cancelling, since ngspice reports them for parts the signal never reaches. Pole-zero relies on ngspice's
+  root-finding, which has known failures: it can find nothing without saying why (the ideal op-amp Sallen-Key at
+  gain-bandwidth products around 10 kHz to 30 kHz and 500 kHz to 1 MHz, for one; a uA741 or another product works), it
+  can stop early with "iteration limit reached", which the tab shows as a warning that some roots may be missing, and
+  it can return a wrong list with no warning, such as a ladder of right-half-plane poles for a rectifier at its
+  unbiased operating point. `.options` do not help, and imcsim does not retry or work around it. Circuits with logic
+  parts are refused, since the digital models leave the solver nothing to follow.
 - A truth table runs one operating point per combination of the chosen logic inputs, each on a copy of the circuit
   with the inputs set, so a row never depends on the one before it. That describes combinational logic; a latch or
   flip-flop that holds its state has no operating point for those combinations, and the row reads X.

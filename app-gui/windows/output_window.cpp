@@ -68,6 +68,8 @@ const char *GetTabFileSuffix(const PlotTab tab) {
         return "transfer-function";
     case PlotTab::SENSITIVITY:
         return "sensitivity";
+    case PlotTab::POLE_ZERO:
+        return "poles-and-zeros";
     case PlotTab::TRUTH_TABLE:
         return "truth-table";
     }
@@ -92,6 +94,8 @@ const char *GetTabTitle(const PlotTab tab) {
         return "transfer function";
     case PlotTab::SENSITIVITY:
         return "sensitivity";
+    case PlotTab::POLE_ZERO:
+        return "poles and zeros";
     case PlotTab::TRUTH_TABLE:
         return "truth table";
     }
@@ -114,7 +118,7 @@ OutputWindow::OutputWindow(Schematic &schematic, AnalysisControls &controls, Tra
     : AppWindow("Output", true), m_Schematic(schematic), m_Controls(controls), m_Playback(playback),
       m_Preferences(preferences), m_MathChannels(schematic), m_Buses(schematic),
       m_TransientTab(schematic, controls, playback), m_SpectrumTab(schematic), m_ACSweepTab(schematic),
-      m_DCSweepTab(schematic), m_NoiseTab(schematic) {
+      m_DCSweepTab(schematic), m_NoiseTab(schematic), m_PoleZeroTab(schematic) {
     SetInitialSize(INITIAL_SIZE);
     // Nothing to plot yet; the first result opens it
     SetOpen(false);
@@ -407,6 +411,10 @@ void OutputWindow::DrawTabs(const FrameResults &frame) {
         DrawSensitivityTab(m_Schematic, m_Preferences);
         ImGui::EndTabItem();
     }
+    if (begin_tab("Poles and zeros", PlotTab::POLE_ZERO)) {
+        m_PoleZeroTab.Draw();
+        ImGui::EndTabItem();
+    }
     if (begin_tab("Truth table", PlotTab::TRUTH_TABLE)) {
         DrawTruthTableTab(m_Schematic);
         ImGui::EndTabItem();
@@ -453,6 +461,7 @@ bool OutputWindow::CanExport(const FrameResults &frame) const {
     case PlotTab::OPERATING_POINT:
     case PlotTab::TRANSFER_FUNCTION:
     case PlotTab::SENSITIVITY:
+    case PlotTab::POLE_ZERO:
     case PlotTab::TRUTH_TABLE:
     default:
         return false;
@@ -487,6 +496,7 @@ ExportFigure OutputWindow::BuildShownFigure(const FrameResults &frame, const boo
     case PlotTab::OPERATING_POINT:
     case PlotTab::TRANSFER_FUNCTION:
     case PlotTab::SENSITIVITY:
+    case PlotTab::POLE_ZERO:
     case PlotTab::TRUTH_TABLE:
     default:
         return {};

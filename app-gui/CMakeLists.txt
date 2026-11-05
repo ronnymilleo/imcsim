@@ -14,6 +14,7 @@ add_library(imcsim-gui-lib
             analysis/parameter_step.cpp
             analysis/playback.cpp
             analysis/point_window.cpp
+            analysis/pole_zero_view.cpp
             analysis/sensitivity_view.cpp
             analysis/transient_window.cpp
             analysis/truth_table.cpp
@@ -108,6 +109,7 @@ add_library(imcsim-gui-lib
             windows/output_tabs/dc_sweep_tab.cpp
             windows/output_tabs/noise_tab.cpp
             windows/output_tabs/plot_widgets.cpp
+            windows/output_tabs/pole_zero_tab.cpp
             windows/output_tabs/result_tables.cpp
             windows/output_tabs/spectrum_tab.cpp
             windows/output_tabs/transient_tab.cpp

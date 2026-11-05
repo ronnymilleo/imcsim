@@ -503,6 +503,43 @@ TEST_CASE("The Sallen-Key filter has its corner near 1.1 kHz and falls 40 dB per
     CHECK_THAT(GainAt(sweep, output, 1e4) - GainAt(sweep, output, 1e5), Catch::Matchers::WithinAbs(40.0, 1.0));
 }
 
+TEST_CASE(
+    "The pole-zero example finds one clean pair at the natural frequency and Q of the RLC, and the AC sweep agrees",
+    "[examples]") {
+    GUI::Schematic schematic;
+    OpenExample("rlc_low_pass_poles_and_zeros.imcsim", schematic);
+    const GUI::SimulationSettings &settings = schematic.GetSimulationSettings();
+    CHECK(settings.Selected == GUI::Analysis::POLE_ZERO);
+    REQUIRE(settings.PoleZeroOutput.has_value());
+    const int output = static_cast<int>(NodeAt(schematic, *settings.PoleZeroOutput));
+
+    const Core::PoleZeroRun run =
+        Core::RunPoleZero(schematic.BuildCircuit(), {.OutputNode = output, .InputSource = settings.PoleZeroSource});
+    if (!run.Result) {
+        FAIL(run.Result.error());
+    }
+    // A teaching example must be clean: no warning from the solver, and a single pole pair in the left half-plane
+    CHECK(run.Result->Warnings.empty());
+    CHECK(run.Result->CancelledPairs == 0);
+    REQUIRE(run.Result->Roots.size() == 1);
+    const Core::PoleZeroRoot &pair = run.Result->Roots.front();
+    CHECK(pair.IsPole);
+    CHECK_FALSE(pair.IsRightHalfPlane);
+    // f0 = 1 / (2 pi sqrt(LC)) = 5.03 kHz and Q = sqrt(L / C) / R = 3.16
+    CHECK_THAT(pair.NaturalFrequencyHertz, Catch::Matchers::WithinRel(5.033e3, 0.01));
+    REQUIRE(pair.QualityFactor.has_value());
+    CHECK_THAT(*pair.QualityFactor, Catch::Matchers::WithinRel(3.162, 0.01));
+
+    // The response peaks a little below f0, at f0 sqrt(1 - 1 / (2 Q^2)), by Q / sqrt(1 - 1 / (4 Q^2)) in gain
+    const Core::ACSweep sweep = SweepOf(schematic);
+    const GUI::BodeStatistics bode = BodeOf(sweep, static_cast<std::size_t>(output));
+    const double q = *pair.QualityFactor;
+    CHECK_THAT(bode.PeakFrequency,
+               Catch::Matchers::WithinRel(pair.NaturalFrequencyHertz * std::sqrt(1.0 - 1.0 / (2.0 * q * q)), 0.03));
+    CHECK_THAT(bode.PeakGain,
+               Catch::Matchers::WithinAbs(20.0 * std::log10(q / std::sqrt(1.0 - 1.0 / (4.0 * q * q))), 0.3));
+}
+
 TEST_CASE("The common-emitter amplifier has a mid-band gain of about 43 dB between its two corners", "[examples]") {
     GUI::Schematic schematic;
     OpenExample("common_emitter_amplifier.imcsim", schematic);

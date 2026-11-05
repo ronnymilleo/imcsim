@@ -142,6 +142,7 @@ private:
     void RunNoiseAnalysis(const Core::Circuit &circuit);
     void RunTransferFunctionAnalysis(const Core::Circuit &circuit);
     void RunSensitivityAnalysis(const Core::Circuit &circuit);
+    void RunPoleZeroAnalysis(const Core::Circuit &circuit);
     void RunTruthTableAnalysis(const Core::Circuit &circuit);
 
     // Results

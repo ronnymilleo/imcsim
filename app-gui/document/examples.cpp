@@ -72,6 +72,17 @@ constexpr auto EXAMPLES = std::to_array<Example>({
         .FileName = "series_rlc.imcsim",
     },
     {
+        .Title = "Poles of a series RLC low-pass",
+        .Group = "Basics",
+        .Description =
+            "A 100 Ohm resistor, a 10 mH inductor and a 100n capacitor in series, with the output across the capacitor "
+            "and the Poles and zeros analysis selected. Run it and read the Poles and zeros tab of the Output window: "
+            "one pair of complex poles at -5000 +/- j31225 rad/s, a natural frequency of 5.03 kHz and a quality "
+            "factor of 3.16, and no zeros. Run the AC sweep too and tick Show poles and zeros in its tab: the dashed "
+            "line at 5.03 kHz sits at the peak of the response, which rises about 10 dB there, as Q = 3.16 predicts.",
+        .FileName = "rlc_low_pass_poles_and_zeros.imcsim",
+    },
+    {
         .Title = "Diode curves",
         .Group = "Diodes",
         .Description = "A 1N4148, a 1N4007 and a 1N5819 Schottky, each with its own 100 Ohm resistor, across one "

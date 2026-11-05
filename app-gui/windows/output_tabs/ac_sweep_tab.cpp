@@ -43,6 +43,12 @@ void ACSweepTab::Draw(const FrameResults &frame) {
             if (frame.HasMathChannels) {
                 ImGui::TextDisabled("Math channels are not calculated for AC sweeps yet");
             }
+            if (const auto &pole_zero = m_Schematic.GetPoleZero()) {
+                ImGui::Checkbox("Show poles and zeros", &m_ShowPoleZero);
+                ImGui::SetItemTooltip(
+                    "Mark the natural frequency of each pole (p) and zero (z) of the last Poles and zeros "
+                    "analysis with a dashed line; the colors are those of its s-plane");
+            }
             if (const auto &steps = m_Schematic.GetACSweepSteps()) {
                 if (const std::optional<std::size_t> picked =
                         DrawStepSelector(steps->Parameter, steps->Unit, steps->Values, steps->Selected)) {
@@ -116,6 +122,7 @@ void ACSweepTab::DrawPlots(const Core::ACSweep &sweep) {
             LabelSteps(step_traces, steps->Selected, ListStepLabels(steps->Parameter, steps->Unit, steps->Values),
                        m_Schematic, show_currents, {});
         }
+        DrawRoots(true);
         DrawCursors(m_Cursors, true);
         DrawCursorReadout(sweep.Frequencies, "Hz", true, plotted);
         ImPlot::EndPlot();
@@ -141,9 +148,21 @@ void ACSweepTab::DrawPlots(const Core::ACSweep &sweep) {
         if (show_currents) {
             PlotCurrents(sweep.Frequencies, sweep.CurrentPhasesDegrees, m_Schematic, " deg", "", plotted);
         }
+        DrawRoots(false);
         DrawCursors(m_Cursors, true);
         DrawCursorReadout(sweep.Frequencies, "Hz", true, plotted);
         ImPlot::EndPlot();
+    }
+}
+
+/**
+ * @brief   Marks the poles and zeros with a dashed vertical line each, when the user asked and there is a result.
+ * @param[in] has_labels  Whether the lines are labelled with their frequency, as on the magnitude plot.
+ * @note    Call it inside a plot.
+ */
+void ACSweepTab::DrawRoots(const bool has_labels) {
+    if (m_ShowPoleZero && m_Schematic.GetPoleZero()) {
+        DrawRootMarkers(*m_Schematic.GetPoleZero(), has_labels);
     }
 }
 

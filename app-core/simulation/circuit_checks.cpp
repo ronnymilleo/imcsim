@@ -447,6 +447,25 @@ std::optional<std::string> CheckTransferFunctionSettings(const Circuit &circuit,
 }
 
 /**
+ * @brief   Checks the output node and the input source of a pole-zero analysis.
+ * @param[in] circuit   Circuit to analyze.
+ * @param[in] settings  Output node and input source.
+ * @return  The reason the analysis cannot run; no value when it can.
+ */
+std::optional<std::string> CheckPoleZeroSettings(const Circuit &circuit, const PoleZeroSettings &settings) {
+    if (settings.OutputNode < 1 || settings.OutputNode >= circuit.GetNodeCount()) {
+        return "Pick the output node; ground has no poles or zeros";
+    }
+    if (settings.InputSource.empty()) {
+        return std::format("A pole-zero analysis needs an input source; select {}", SWEEPABLE_SOURCES);
+    }
+    if (FindTransferFunctionInput(circuit, settings.InputSource) == nullptr) {
+        return std::format("The input source {} is not {} of the circuit", settings.InputSource, SWEEPABLE_SOURCES);
+    }
+    return std::nullopt;
+}
+
+/**
  * @brief   Checks the output node of a sensitivity analysis.
  * @param[in] circuit   Circuit to analyze.
  * @param[in] settings  Output node.

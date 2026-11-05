@@ -1095,7 +1095,7 @@ nlohmann::json WriteSweepRange(const Core::SweepRange &range) {
 /// File names of the analyses, in the order of the Analysis enum.
 constexpr auto ANALYSIS_KEYS =
     std::to_array<std::string_view>({"operating_point", "transient", "ac_sweep", "dc_sweep", "noise",
-                                     "transfer_function", "sensitivity", "truth_table"});
+                                     "transfer_function", "sensitivity", "pole_zero", "truth_table"});
 
 nlohmann::json WriteSettings(const SimulationSettings &settings) {
     nlohmann::json transient = nlohmann::json::object();
@@ -1119,6 +1119,10 @@ nlohmann::json WriteSettings(const SimulationSettings &settings) {
     if (settings.SensitivityOutput) {
         sensitivity["output"] = {settings.SensitivityOutput->X, settings.SensitivityOutput->Y};
     }
+    nlohmann::json pole_zero = {{"source", settings.PoleZeroSource}};
+    if (settings.PoleZeroOutput) {
+        pole_zero["output"] = {settings.PoleZeroOutput->X, settings.PoleZeroOutput->Y};
+    }
     const nlohmann::json truth_table = {{"inputs", settings.TruthTableInputs}};
     const ParameterStepSettings &step = settings.ParameterStep;
     nlohmann::json parameter_step = {
@@ -1137,6 +1141,7 @@ nlohmann::json WriteSettings(const SimulationSettings &settings) {
         {"noise", noise},
         {"transfer_function", transfer_function},
         {"sensitivity", sensitivity},
+        {"pole_zero", pole_zero},
         {"truth_table", truth_table},
         {"parameter_step", parameter_step},
     };
@@ -1274,6 +1279,24 @@ std::expected<void, std::string> ReadTransferFunctionSettings(const nlohmann::js
     return {};
 }
 
+std::expected<void, std::string> ReadPoleZeroSettings(const nlohmann::json &object, SimulationSettings &settings) {
+    if (object.contains("source")) {
+        const std::optional<std::string> source = ReadString(object, "source");
+        if (!source) {
+            return std::unexpected("have no valid source");
+        }
+        settings.PoleZeroSource = *source;
+    }
+    if (object.contains("output")) {
+        const std::optional<GridPoint> output = ReadPoint(object, "output");
+        if (!output) {
+            return std::unexpected("have no valid output point");
+        }
+        settings.PoleZeroOutput = *output;
+    }
+    return {};
+}
+
 std::expected<void, std::string> ReadSensitivitySettings(const nlohmann::json &object, SimulationSettings &settings) {
     if (object.contains("output")) {
         const std::optional<GridPoint> output = ReadPoint(object, "output");
@@ -1347,6 +1370,7 @@ constexpr auto ANALYSIS_READERS = std::to_array<AnalysisReader>({
     {"noise", "noise", &ReadNoiseSettings},
     {"transfer_function", "transfer function", &ReadTransferFunctionSettings},
     {"sensitivity", "sensitivity", &ReadSensitivitySettings},
+    {"pole_zero", "pole-zero", &ReadPoleZeroSettings},
     {"truth_table", "truth table", &ReadTruthTableSettings},
     {"parameter_step", "parameter step", &ReadParameterStepSettings},
 });

@@ -25,6 +25,7 @@ std::expected<DCSweep, std::string> ReadDCSweep(const Circuit &circuit, const DC
 std::expected<Noise, std::string> ReadNoise(const Circuit &circuit, const NoiseSettings &settings);
 std::expected<TransferFunction, std::string> ReadTransferFunction(const Circuit &circuit,
                                                                   const TransferFunctionSettings &settings);
+std::expected<PoleZero, std::string> ReadPoleZero(const Circuit &circuit, const PoleZeroSettings &settings);
 std::expected<Sensitivity, std::string> ReadSensitivity(const Circuit &circuit, const SensitivitySettings &settings);
 
 } // namespace Core

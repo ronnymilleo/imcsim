@@ -28,7 +28,7 @@ New to imcsim? The [tutorial](docs/tutorial.md) builds, simulates and exports a 
   limited by its supply pins, or a uA741 or custom part built as a Boyle macromodel from datasheet values (slew rate,
   bias current, output swing, current limit)
 - Warnings when a diode goes into reverse breakdown or a transistor exceeds its voltage, current or power ratings
-- Operating point, transient, AC sweep, DC sweep, noise, transfer function, sensitivity and truth table analyses, with node
+- Operating point, transient, AC sweep, DC sweep, noise, transfer function, sensitivity, pole-zero and truth table analyses, with node
   voltages and component currents
 - Stepping a resistor, capacitor, inductor or the temperature over a range or a list, as SPICE's `.step`: the
   transient, AC sweep and DC sweep plot every step as a family of curves
@@ -46,6 +46,8 @@ New to imcsim? The [tutorial](docs/tutorial.md) builds, simulates and exports a 
 - A transfer function from an input source to an output: the DC gain, the input impedance and the output impedance
 - A sensitivity analysis: how much the DC voltage of a node changes with the value of each part, as a table and as
   colors on the schematic
+- Poles and zeros from an input source to a node, on an s-plane with their frequency, quality factor and damping, and
+  marked on the Bode plot of an AC sweep
 - A truth table of a digital circuit: every combination of the chosen logic inputs and the 0, 1 or X it gives at the
   measured outputs
 - Math channels on transient and DC sweep plots, as on an oscilloscope: an operation between two traces picked
@@ -124,7 +126,7 @@ it can change at any time. The ideas below are tracked as tasks in the project's
 roughly in the order they are likely to come.
 
 - **Digital**: Verilog modules placed as parts and simulated together with the analog circuit
-- **Analyses**: poles and zeros with an s-plane view, sensitivity shown on the schematic, S-parameters with a Smith chart
+- **Analyses**: S-parameters with a Smith chart
   and Touchstone export, transient noise sources, and Monte Carlo runs on top of the parameter step
 - **Sources, parts and models**: behavioral sources, XSPICE analog blocks, transmission lines, a circuit driven from a
   WAV or CSV file, more ready op-amp macromodels, and a MOSFET body diode and higher-level MOSFET models

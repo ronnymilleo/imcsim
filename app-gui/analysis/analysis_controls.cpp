@@ -451,6 +451,9 @@ void AnalysisControls::StartAnalysis(const Analysis analysis, const Core::Circui
     case Analysis::SENSITIVITY:
         RunSensitivityAnalysis(circuit);
         break;
+    case Analysis::POLE_ZERO:
+        RunPoleZeroAnalysis(circuit);
+        break;
     case Analysis::TRUTH_TABLE:
         RunTruthTableAnalysis(circuit);
         break;
@@ -713,6 +716,35 @@ void AnalysisControls::RunSensitivityAnalysis(const Core::Circuit &circuit) {
                  }));
 }
 
+void AnalysisControls::RunPoleZeroAnalysis(const Core::Circuit &circuit) {
+    const SimulationSettings &settings = m_Schematic.GetSimulationSettings();
+    const std::vector<std::string> sources = Core::GetTransferFunctionInputSources(circuit);
+    const std::optional<int> output = ResolveOutputNode(settings.PoleZeroOutput, circuit, m_Schematic);
+    if (sources.empty() || !output) {
+        m_Schematic.SetPoleZero(std::nullopt);
+        Finish(Analysis::POLE_ZERO,
+               sources.empty()
+                   ? std::format("A pole-zero analysis needs an input source; add {}", Core::SWEEPABLE_SOURCES)
+                   : "Connect some parts: the pole-zero analysis needs a node to measure",
+               {});
+        return;
+    }
+    const Core::PoleZeroSettings run_settings{.OutputNode = *output,
+                                              .InputSource = ResolveOptionalInput(settings.PoleZeroSource, sources)};
+    StartRun(Analysis::POLE_ZERO,
+             MakeJob<Core::PoleZeroRun>(
+                 circuit,
+                 [run_settings](const Core::Circuit &copy, Core::RunControl &) {
+                     return Core::RunPoleZero(copy, run_settings);
+                 },
+                 [this](Core::PoleZeroRun run) {
+                     Finish(Analysis::POLE_ZERO,
+                            StoreResult(std::move(run.Result),
+                                        [this](auto result) { m_Schematic.SetPoleZero(std::move(result)); }),
+                            std::move(run.Messages));
+                 }));
+}
+
 void AnalysisControls::RunTruthTableAnalysis(const Core::Circuit &circuit) {
     const std::vector<std::string> available = Core::GetTruthTableInputs(circuit);
     const std::vector<int> outputs = ListMeasuredNodes(circuit, m_Schematic);
@@ -764,6 +796,9 @@ void AnalysisControls::ClearResult(const Analysis analysis) {
     case Analysis::SENSITIVITY:
         m_Schematic.SetSensitivity(std::nullopt);
         break;
+    case Analysis::POLE_ZERO:
+        m_Schematic.SetPoleZero(std::nullopt);
+        break;
     case Analysis::TRUTH_TABLE:
         m_Schematic.SetTruthTable(std::nullopt);
         break;
@@ -787,6 +822,9 @@ std::vector<std::string> AnalysisControls::GetResultWarnings(const Analysis anal
     if (analysis == Analysis::TRANSIENT && m_Schematic.GetTransient()) {
         return m_Schematic.GetTransient()->Warnings;
     }
+    if (analysis == Analysis::POLE_ZERO && m_Schematic.GetPoleZero()) {
+        return m_Schematic.GetPoleZero()->Warnings;
+    }
     if (analysis == Analysis::TRUTH_TABLE && m_Schematic.GetTruthTable()) {
         return m_Schematic.GetTruthTable()->Warnings;
     }
@@ -809,6 +847,8 @@ bool AnalysisControls::HasResult(const Analysis analysis) const {
         return m_Schematic.GetTransferFunction().has_value();
     case Analysis::SENSITIVITY:
         return m_Schematic.GetSensitivity().has_value();
+    case Analysis::POLE_ZERO:
+        return m_Schematic.GetPoleZero().has_value();
     case Analysis::TRUTH_TABLE:
         return m_Schematic.GetTruthTable().has_value();
     }
