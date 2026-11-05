@@ -17,8 +17,10 @@
 #include <cstddef>
 #include <format>
 #include <map>
+#include <set>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 namespace {
@@ -93,6 +95,26 @@ void DriveClock(Bench &bench, const std::string &pin) {
 }
 
 /**
+ * @brief   Drives the pins PREFIX0, PREFIX1... with the bits of a number, the least significant on PREFIX0.
+ */
+void DriveNumber(Bench &bench, const std::string_view prefix, const int value, const int bit_count) {
+    for (int bit = 0; bit < bit_count; ++bit) {
+        DriveLogic(bench, std::format("{}{}", prefix, bit), ((value >> bit) & 1) != 0);
+    }
+}
+
+/**
+ * @brief   Reads pins as the bits of a number, the first one the least significant.
+ */
+int ReadNumber(const std::vector<bool> &levels) {
+    int value = 0;
+    for (std::size_t bit = 0; bit < levels.size(); ++bit) {
+        value |= levels[bit] ? 1 << bit : 0;
+    }
+    return value;
+}
+
+/**
  * @brief   The logic levels of some pins at the operating point.
  */
 std::vector<bool> ReadLevels(Bench &bench, const std::vector<std::string> &pins) {
@@ -138,7 +160,18 @@ std::vector<bool> ReadFinalLevels(Bench &bench, const std::vector<std::string> &
 
 TEST_CASE("Every ready block reads as one instance of its definition, with inputs left and outputs right",
           "[ready_blocks]") {
-    REQUIRE(GUI::GetReadyBlocks().size() == 4);
+    // The outputs of each block; every other pin is an input
+    const std::map<std::string, std::set<std::string>, std::less<>> outputs = {
+        {"4-bit counter", {"Q0", "Q1", "Q2", "Q3"}},
+        {"4-bit shift register", {"Q0", "Q1", "Q2", "Q3"}},
+        {"4-to-1 multiplexer", {"Y"}},
+        {"2-to-4 decoder", {"Y0", "Y1", "Y2", "Y3"}},
+        {"4-bit adder", {"S0", "S1", "S2", "S3", "COUT"}},
+        {"4-bit comparator", {"GT", "EQ", "LT"}},
+        {"1-to-4 demultiplexer", {"Y0", "Y1", "Y2", "Y3"}},
+        {"BCD to 7-segment decoder", {"a", "b", "c", "d", "e", "f", "g"}},
+    };
+    REQUIRE(GUI::GetReadyBlocks().size() == outputs.size());
     for (const GUI::ReadyBlock &block : GUI::GetReadyBlocks()) {
         CAPTURE(block.Title);
         const auto group = GUI::MakeReadyBlock(block);
@@ -149,9 +182,11 @@ TEST_CASE("Every ready block reads as one instance of its definition, with input
         CHECK(instance.GetDefinitionName() == group->Subcircuits[0].Name);
         CHECK(group->Subcircuits[0].Name == block.Name);
         CHECK(instance.GetPins().size() == group->Subcircuits[0].Pins.size());
+        const auto block_outputs = outputs.find(block.Title);
+        REQUIRE(block_outputs != outputs.end());
         for (const std::string &pin : instance.GetPins()) {
-            // Outputs are the Q, Y and nothing else
-            const bool is_output = pin.starts_with('Q') || pin.starts_with('Y');
+            CAPTURE(pin);
+            const bool is_output = block_outputs->second.contains(pin);
             CHECK(instance.GetPinSide(pin) == (is_output ? Core::PinSide::RIGHT : Core::PinSide::LEFT));
         }
     }
@@ -163,10 +198,12 @@ TEST_CASE("The part search finds the ready blocks by their titles", "[ready_bloc
     REQUIRE(counters.size() == 1);
     CHECK(counters[0]->Title == "4-bit counter");
     CHECK(GUI::FindReadyBlocks("4to1").size() == 1);
-    // The definition name counts too
+    // The definition name counts too, and DEMUX_1TO4 holds "mux" as well
     const std::vector<const GUI::ReadyBlock *> muxes = GUI::FindReadyBlocks("mux");
-    REQUIRE(muxes.size() == 1);
+    REQUIRE(muxes.size() == 2);
     CHECK(muxes[0]->Title == "4-to-1 multiplexer");
+    CHECK(muxes[1]->Title == "1-to-4 demultiplexer");
+    CHECK(GUI::FindReadyBlocks("7seg").size() == 1);
     CHECK(GUI::FindReadyBlocks("resistor").empty());
 }
 
@@ -236,5 +273,78 @@ TEST_CASE("RESET clears the counter and the shift register", "[ready_blocks][dig
         DriveLogic(bench, "RESET", true);
         DriveClock(bench, "CLK");
         CHECK(ReadFinalLevels(bench, {"Q0", "Q1", "Q2", "Q3"}, 3e-3) == std::vector<bool>{false, false, false, false});
+    }
+}
+
+TEST_CASE("The adder adds two numbers and a carry, carrying out past 15", "[ready_blocks][digital]") {
+    SKIP_WITHOUT_DIGITAL_MODELS();
+    struct Sum {
+        int A;
+        int B;
+        bool HasCarryIn;
+    };
+    // The last two carry out, and the carry in of 7 + 8 + 1 runs through every stage
+    for (const Sum sum : {Sum{5, 9, false}, Sum{3, 4, true}, Sum{15, 1, false}, Sum{7, 8, true}}) {
+        CAPTURE(sum.A, sum.B, sum.HasCarryIn);
+        Bench bench;
+        Place(bench, "4-bit adder");
+        DriveNumber(bench, "A", sum.A, 4);
+        DriveNumber(bench, "B", sum.B, 4);
+        DriveLogic(bench, "CIN", sum.HasCarryIn);
+        const int expected = sum.A + sum.B + (sum.HasCarryIn ? 1 : 0);
+        CHECK(ReadNumber(ReadLevels(bench, {"S0", "S1", "S2", "S3", "COUT"})) == expected);
+    }
+}
+
+TEST_CASE("The comparator tells whether A is greater than, equal to or less than B", "[ready_blocks][digital]") {
+    SKIP_WITHOUT_DIGITAL_MODELS();
+    // 8 against 7 is decided by the top bit alone, 2 against 3 by the bottom one
+    for (const auto [a, b] : {std::pair{9, 5}, std::pair{5, 9}, std::pair{6, 6}, std::pair{8, 7}, std::pair{2, 3}}) {
+        CAPTURE(a, b);
+        Bench bench;
+        Place(bench, "4-bit comparator");
+        DriveNumber(bench, "A", a, 4);
+        DriveNumber(bench, "B", b, 4);
+        CHECK(ReadLevels(bench, {"GT", "EQ", "LT"}) == std::vector<bool>{a > b, a == b, a < b});
+    }
+}
+
+TEST_CASE("The demultiplexer sends its input to the output its select lines name", "[ready_blocks][digital]") {
+    SKIP_WITHOUT_DIGITAL_MODELS();
+    for (int select = 0; select < 4; ++select) {
+        for (const bool is_high : {true, false}) {
+            CAPTURE(select, is_high);
+            Bench bench;
+            Place(bench, "1-to-4 demultiplexer");
+            DriveLogic(bench, "D", is_high);
+            DriveNumber(bench, "S", select, 2);
+            const std::vector<bool> outputs = ReadLevels(bench, {"Y0", "Y1", "Y2", "Y3"});
+            for (int output = 0; output < 4; ++output) {
+                CHECK(outputs[static_cast<std::size_t>(output)] == (is_high && output == select));
+            }
+        }
+    }
+}
+
+TEST_CASE("The BCD decoder lights the segments of each digit and none past 9", "[ready_blocks][digital]") {
+    SKIP_WITHOUT_DIGITAL_MODELS();
+    // Segments a to g of 0 to 9, with the tails on 6 and 9
+    const std::map<int, std::string> lit = {
+        {0, "abcdef"}, {1, "bc"},  {2, "abdeg"},   {3, "abcdg"},  {4, "bcfg"}, {5, "acdfg"},
+        {6, "acdefg"}, {7, "abc"}, {8, "abcdefg"}, {9, "abcdfg"}, {10, ""},    {15, ""},
+    };
+    for (const auto &[digit, segments] : lit) {
+        CAPTURE(digit);
+        Bench bench;
+        Place(bench, "BCD to 7-segment decoder");
+        DriveNumber(bench, "D", digit, 4);
+        const std::vector<bool> levels = ReadLevels(bench, {"a", "b", "c", "d", "e", "f", "g"});
+        std::string read;
+        for (std::size_t segment = 0; segment < levels.size(); ++segment) {
+            if (levels[segment]) {
+                read += static_cast<char>('a' + segment);
+            }
+        }
+        CHECK(read == segments);
     }
 }

@@ -198,12 +198,19 @@ schematic file keeps the definition of each block, so it opens anywhere without 
   block to go one level down; the path leads back up a level at a time, each one applied on the way. A block can never
   hold itself, directly or through another block: the part search leaves those out, and a paste or an apply that would
   make one is refused.
-- **Ready logic blocks**: the toolbar button after the flip-flops places one of four blocks built from the gates and
-  flip-flops, the last one picked from its list, and the part search lists them as `Logic block: ...`: a 4-bit counter (a ripple counter whose Q3 Q2 Q1 Q0 count the rising edges of CLK), a 4-bit
-  shift register (each rising edge of CLK moves IN into Q0 and each Q on), a 4-to-1 multiplexer (Y follows the input
-  that S1 S0 select) and a 2-to-4 decoder (with EN high, the output that A1 A0 select is high). RESET clears the
-  counter and the shift register. Hovering one in either list tells what it does. Placed, it joins the schematic as any
-  block does, so it can be opened to see its gates and changed there. Their logic level is 5 V, and a circuit of them,
+- **Ready logic blocks**: the toolbar button after the flip-flops places one of eight blocks built from the gates and
+  flip-flops, the last one picked from its list, and the part search lists them as `Logic block: ...`:
+  - a 4-bit counter (a ripple counter whose Q3 Q2 Q1 Q0 count the rising edges of CLK);
+  - a 4-bit shift register (each rising edge of CLK moves IN into Q0 and each Q on);
+  - a 4-to-1 multiplexer (Y follows the input that S1 S0 select);
+  - a 2-to-4 decoder (with EN high, the output that A1 A0 select is high);
+  - a 4-bit adder (S3..S0 and COUT are A3..A0 plus B3..B0 plus CIN);
+  - a 4-bit comparator (GT, EQ or LT is high as A3..A0 is greater than, equal to or less than B3..B0);
+  - a 1-to-4 demultiplexer (D goes to the output that S1 S0 select);
+  - a BCD to 7-segment decoder (a to g light the digit D3..D0 reads, 0 to 9; codes past 9 light nothing).
+
+  RESET clears the counter and the shift register. Hovering one in either list tells what it does. Placed, it joins the
+  schematic as any block does, so it can be opened to see its gates and changed there. Their logic level is 5 V, and a circuit of them,
   clocks and logic inputs needs no Ground part, as loose gates do not.
 - **SPICE libraries**: File > Import SPICE Library reads a vendor's `.lib`, `.mod`, `.sub` or `.cir` file and lists its
   subcircuits and its diode and transistor models.
