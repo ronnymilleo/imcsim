@@ -548,6 +548,35 @@ measures their harmonic distortion.
   straight lines, which leaves a floor around -130 dB for a sine at 200 points per period; a smaller time step
   lowers it.
 
+### Noise and random sources
+
+A voltage or current source set to **Noise** adds noise to a transient on top of its Offset, and one set to
+**Random** makes random values. Both show up in the Spectrum tab as a floor.
+
+- **White rms** is the rms of the Gaussian white noise and **Sample step** the time between its samples; the output is
+  a straight line between them. The line under the fields gives the density, the white rms times the square root of
+  twice the step (`rms * sqrt(2 * step)` in V/√Hz or A/√Hz), and says it is flat up to `1 / (2 * step)`. For 100 mV
+  and 10 us that is 447 uV/√Hz up to 50 kHz.
+- The Spectrum tab shows the floor as the peak of a sine per bin, not as a density, so it depends on the stretch: with
+  the Hann window a bin of width `df` reads `sqrt(2 * density^2 * 1.5 * df)`, and a longer stretch lowers the floor.
+  Divide by that to read the density back.
+- **1/f amplitude** with an **exponent** between 0 and 2 (both excluded) adds flicker noise, which falls 10 dB per
+  decade of frequency at an exponent of 1. **Telegraph** adds a signal that jumps between 0 and its amplitude, staying
+  up **Capture time** and down **Emission time** on average. An amplitude of 0 turns the part off.
+- The step also steps the simulation: ngspice computes a point at each sample, so a step much shorter than the time
+  step gives many points. A run that would span more than a million points is refused, noise steps included.
+- The noise changes on each run. The **Seed** of the transient settings (0 draws new ones) makes the Random sources and
+  the telegraph part repeat, but never the white and 1/f noise, which ngspice does not seed. A seeded Gaussian
+  Random source repeats only every other run in one session, since ngspice keeps half of its last pair of Gaussian
+  values for the next run; the other distributions repeat every run.
+- **Random** holds a new value every **Sample step**, after the **Delay**, from a distribution whose two parameters
+  are called after it: uniform (range around the offset), Gaussian (standard deviation, mean), exponential (mean,
+  offset) or Poisson (lambda, offset).
+- A source has one waveform, so noise on top of a sine or a pulse takes a second Noise source in series with the
+  first.
+- The AC sweep, operating point and DC sweep see only the offset. The noise analysis is separate: it computes the
+  noise of the parts and ignores these sources.
+
 ## Noise
 
 The Noise analysis computes the random noise of the circuit at one node across frequency, as ngspice's `.noise`

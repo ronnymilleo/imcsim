@@ -446,7 +446,7 @@ TEST_CASE("A mirrored flag that is not a boolean skips the element", "[schematic
 TEST_CASE("Simulation settings load back unchanged", "[schematic_file]") {
     GUI::SimulationSettings settings;
     settings.Selected = GUI::Analysis::DC_SWEEP;
-    settings.Transient = {.StopTime = 50e-3, .TimeStep = 20e-6};
+    settings.Transient = {.StopTime = 50e-3, .TimeStep = 20e-6, .Seed = 42};
     settings.LiveSeconds = 25.0;
     settings.ACSweep = {.StartFrequency = 10.0, .StopFrequency = 100e3, .PointsPerDecade = 50};
     settings.SweptRange = {.Source = "V1", .Start = 5.0, .Stop = 0.0, .Step = -0.05};
@@ -1028,4 +1028,93 @@ TEST_CASE("A clock and a logic input load with their defaults when the file leav
         LoadOrFail(Document(R"({"type": "Resistor", "name": "R1", "value": 10, "x": 0, "y": 0, "rotation": 0})", ""));
     CHECK(old.Warnings.empty());
     CHECK(old.Elements.size() == 1);
+}
+
+TEST_CASE("A noise and a random source load back with every parameter", "[schematic_file]") {
+    std::vector<std::unique_ptr<GUI::UIElement>> elements;
+    elements.push_back(GUI::CreateElement(Core::ComponentType::VOLTAGE_SOURCE, {0, 0}, GUI::Rotation::R0));
+    auto &noisy = static_cast<Core::VoltageSource &>(elements.back()->GetComponent());
+    noisy.SetName("Vin1");
+    noisy.SetNoise({.Offset = 1.5,
+                    .WhiteAmplitude = 2e-3,
+                    .TimeStep = 5e-6,
+                    .FlickerExponent = 1.2,
+                    .FlickerAmplitude = 3e-3,
+                    .TelegraphAmplitude = 4e-3,
+                    .CaptureTime = 2e-3,
+                    .EmissionTime = 6e-3});
+    noisy.SetSourceType(Core::VoltageSource::SourceType::NOISE);
+    elements.push_back(GUI::CreateElement(Core::ComponentType::CURRENT_SOURCE, {6, 0}, GUI::Rotation::R0));
+    auto &random = static_cast<Core::CurrentSource &>(elements.back()->GetComponent());
+    random.SetName("Iin1");
+    random.SetRandom({.Distribution = Core::RandomDistribution::POISSON,
+                      .TimeStep = 20e-6,
+                      .Delay = 1e-3,
+                      .First = 4.0,
+                      .Second = 0.5});
+    random.SetSourceType(Core::CurrentSource::SourceType::RANDOM);
+
+    const GUI::LoadedSchematic loaded = LoadOrFail(GUI::SaveSchematic(elements, {}, {}, {}));
+    CAPTURE(loaded.Warnings);
+    CHECK(loaded.Warnings.empty());
+    REQUIRE(loaded.Elements.size() == 2);
+    const auto &noisy_copy = static_cast<const Core::VoltageSource &>(loaded.Elements[0]->GetComponent());
+    CHECK(noisy_copy.GetSourceType() == Core::Source::SourceType::NOISE);
+    CHECK(noisy_copy.GetNoise().Offset == 1.5);
+    CHECK(noisy_copy.GetNoise().WhiteAmplitude == 2e-3);
+    CHECK(noisy_copy.GetNoise().TimeStep == 5e-6);
+    CHECK(noisy_copy.GetNoise().FlickerExponent == 1.2);
+    CHECK(noisy_copy.GetNoise().FlickerAmplitude == 3e-3);
+    CHECK(noisy_copy.GetNoise().TelegraphAmplitude == 4e-3);
+    CHECK(noisy_copy.GetNoise().CaptureTime == 2e-3);
+    CHECK(noisy_copy.GetNoise().EmissionTime == 6e-3);
+    const auto &random_copy = static_cast<const Core::CurrentSource &>(loaded.Elements[1]->GetComponent());
+    CHECK(random_copy.GetSourceType() == Core::Source::SourceType::RANDOM);
+    CHECK(random_copy.GetRandom().Distribution == Core::RandomDistribution::POISSON);
+    CHECK(random_copy.GetRandom().TimeStep == 20e-6);
+    CHECK(random_copy.GetRandom().Delay == 1e-3);
+    CHECK(random_copy.GetRandom().First == 4.0);
+    CHECK(random_copy.GetRandom().Second == 0.5);
+}
+
+TEST_CASE("A source from an older file keeps the default noise and random values", "[schematic_file]") {
+    const GUI::LoadedSchematic loaded = LoadOrFail(Document(
+        R"({"type": "VoltageSource", "name": "Vin1", "x": 0, "y": 0, "rotation": 0, "value": 3, "source": "AC"})", ""));
+    REQUIRE(loaded.Elements.size() == 1);
+    CAPTURE(loaded.Warnings);
+    CHECK(loaded.Warnings.empty());
+    const auto &source = static_cast<const Core::VoltageSource &>(loaded.Elements[0]->GetComponent());
+    CHECK(source.GetNoise().WhiteAmplitude == Core::VoltageSource().GetNoise().WhiteAmplitude);
+    CHECK(source.GetRandom().Distribution == Core::RandomDistribution::GAUSSIAN);
+}
+
+TEST_CASE("A noise with a negative step or a random source with an unknown distribution is skipped",
+          "[schematic_file]") {
+    const GUI::LoadedSchematic loaded = LoadOrFail(Document(
+        R"({"type": "VoltageSource", "name": "Vin1", "x": 0, "y": 0, "rotation": 0, "value": 1, "source": "Noise",
+            "noise": {"white": 1e-3, "step": -1e-5}},
+           {"type": "VoltageSource", "name": "Vin2", "x": 0, "y": 0, "rotation": 0, "value": 1, "source": "Random",
+            "random": {"distribution": "Laplace"}},
+           {"type": "VoltageSource", "name": "Vin3", "x": 0, "y": 0, "rotation": 0, "value": 1, "source": "Random",
+            "random": {"distribution": "Exponential", "step": 1e-5, "first": 2}})",
+        ""));
+    REQUIRE(loaded.Elements.size() == 1);
+    CHECK(loaded.Elements[0]->GetComponent().GetName() == "Vin3");
+    CAPTURE(loaded.Warnings);
+    CHECK(loaded.Warnings.size() == 2);
+}
+
+TEST_CASE("The seed is optional in a file and never negative", "[schematic_file]") {
+    // Files saved before the seed existed have none, which means random each run
+    const GUI::LoadedSchematic without_seed =
+        LoadOrFail(R"({"format": "imcsim-schematic", "version": 1, "elements": [], "wires": [],
+                       "simulation": {"transient": {"stop": 0.01, "step": 1e-5}}})");
+    CHECK(without_seed.Warnings.empty());
+    CHECK(without_seed.Settings.Transient.Seed == 0);
+
+    const GUI::LoadedSchematic negative =
+        LoadOrFail(R"({"format": "imcsim-schematic", "version": 1, "elements": [], "wires": [],
+                       "simulation": {"transient": {"stop": 0.01, "step": 1e-5, "seed": -3}}})");
+    CHECK(negative.Warnings.size() == 1);
+    CHECK(negative.Settings.Transient.Seed == 0);
 }

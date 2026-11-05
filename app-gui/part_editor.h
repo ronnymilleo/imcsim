@@ -88,6 +88,8 @@ private:
     std::array<ValueField, 6> m_EXPFields;
     std::array<ValueField, 5> m_SFFMFields;
     std::array<ValueField, 5> m_AMFields;
+    std::array<ValueField, 8> m_NoiseFields;
+    std::array<ValueField, 4> m_RandomFields;
     /// The "time value" points of a PWL source being typed, as long as the user wants them.
     std::string m_PWLText;
     // One per member of the parameters of custom diodes, transistors and op-amps
@@ -147,12 +149,15 @@ private:
     void DrawMOSFET(Core::MOSFET &mosfet);
     void DrawOpAmp(Core::OpAmp &op_amp);
     void DrawSource(Core::Source &source);
+    void DrawSourceTypes(Core::Source &source);
     void DrawSine(Core::Source &source);
     void DrawPulse(Core::Source &source);
     void DrawEXP(Core::Source &source);
     void DrawSFFM(Core::Source &source);
     void DrawAM(Core::Source &source);
     void DrawPWL(Core::Source &source);
+    void DrawNoise(Core::Source &source);
+    void DrawRandom(Core::Source &source);
     void DrawControlledSource(Core::ControlledSource &source);
     void DrawControllingCurrent(Core::ControlledSource &source);
 };

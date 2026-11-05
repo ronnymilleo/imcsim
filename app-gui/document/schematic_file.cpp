@@ -215,6 +215,25 @@ constexpr auto OP_AMP_KEYS = std::to_array<ParameterKey<Core::OpAmpParameters>>(
     {"iq", &Core::OpAmpParameters::SupplyCurrent},
 });
 
+constexpr auto NOISE_KEYS = std::to_array<ParameterKey<Core::NoiseParameters>>({
+    {"offset", &Core::NoiseParameters::Offset},
+    {"white", &Core::NoiseParameters::WhiteAmplitude},
+    {"step", &Core::NoiseParameters::TimeStep},
+    {"flicker_exponent", &Core::NoiseParameters::FlickerExponent},
+    {"flicker", &Core::NoiseParameters::FlickerAmplitude},
+    {"telegraph", &Core::NoiseParameters::TelegraphAmplitude},
+    {"capture", &Core::NoiseParameters::CaptureTime},
+    {"emission", &Core::NoiseParameters::EmissionTime},
+});
+
+/// The distribution is a name, so it is written and read apart.
+constexpr auto RANDOM_KEYS = std::to_array<ParameterKey<Core::RandomParameters>>({
+    {"step", &Core::RandomParameters::TimeStep},
+    {"delay", &Core::RandomParameters::Delay},
+    {"first", &Core::RandomParameters::First},
+    {"second", &Core::RandomParameters::Second},
+});
+
 constexpr auto TRANSIENT_KEYS = std::to_array<ParameterKey<Core::TransientSettings>>({
     {"stop", &Core::TransientSettings::StopTime},
     {"step", &Core::TransientSettings::TimeStep},
@@ -515,6 +534,9 @@ nlohmann::json WriteElement(const UIElement &element) {
             pwl.push_back({{"time", point.Time}, {"value", point.Value}});
         }
         object["pwl"] = pwl;
+        WriteSourceParameters(NOISE_KEYS, source.GetNoise(), "noise", object);
+        WriteSourceParameters(RANDOM_KEYS, source.GetRandom(), "random", object);
+        object["random"]["distribution"] = Core::GetRandomDistributionName(source.GetRandom().Distribution);
     }
     WriteModelFields(component, object);
     WriteKindFields(component, object);
@@ -531,7 +553,7 @@ std::expected<void, std::string> ReadSource(const nlohmann::json &object, Core::
         const std::optional<Core::Source::SourceType> type =
             type_name ? Core::ParseSourceType(*type_name) : std::nullopt;
         if (!type) {
-            return std::unexpected("has a source type other than DC, AC, Pulse, EXP, SFFM, AM or PWL");
+            return std::unexpected("has a source type other than DC, AC, Pulse, EXP, SFFM, AM, PWL, Noise or Random");
         }
         source.SetSourceType(*type);
     }
@@ -606,6 +628,35 @@ std::expected<void, std::string> ReadSource(const nlohmann::json &object, Core::
         }
         source.SetPWL(pwl);
     }
+
+    Core::NoiseParameters noise = source.GetNoise();
+    if (const auto read = ReadSourceParameters(object, "noise", NOISE_KEYS, noise); !read) {
+        return read;
+    }
+    if (!source.IsValidNoise(noise)) {
+        return std::unexpected("has a noise with a time step that is negative or missing, a 1/f exponent outside 0 to "
+                               "2 or a telegraph time that is not positive");
+    }
+    source.SetNoise(noise);
+
+    Core::RandomParameters random = source.GetRandom();
+    if (const auto read = ReadSourceParameters(object, "random", RANDOM_KEYS, random); !read) {
+        return read;
+    }
+    if (const auto entry = object.find("random"); entry != object.end() && entry->contains("distribution")) {
+        const std::optional<std::string> name = ReadString(*entry, "distribution");
+        const std::optional<Core::RandomDistribution> distribution =
+            name ? Core::ParseRandomDistribution(*name) : std::nullopt;
+        if (!distribution) {
+            return std::unexpected("has a random distribution other than Uniform, Gaussian, Exponential or Poisson");
+        }
+        random.Distribution = *distribution;
+    }
+    if (!source.IsValidRandom(random)) {
+        return std::unexpected("has random values with a time step that is not positive, a negative delay or a first "
+                               "parameter that is not valid for the distribution");
+    }
+    source.SetRandom(random);
     return {};
 }
 
@@ -1049,6 +1100,7 @@ nlohmann::json WriteSettings(const SimulationSettings &settings) {
     nlohmann::json transient = nlohmann::json::object();
     WriteParameters(TRANSIENT_KEYS, settings.Transient, transient);
     transient["live_seconds"] = settings.LiveSeconds;
+    transient["seed"] = settings.Transient.Seed;
     nlohmann::json ac_sweep = nlohmann::json::object();
     WriteParameters(AC_SWEEP_KEYS, settings.ACSweep, ac_sweep);
     ac_sweep["points_per_decade"] = settings.ACSweep.PointsPerDecade;
@@ -1100,6 +1152,13 @@ std::expected<void, std::string> ReadTransientSettings(const nlohmann::json &obj
             return std::unexpected("have no valid live_seconds");
         }
         settings.LiveSeconds = *live_seconds;
+    }
+    if (object.contains("seed")) {
+        const std::optional<int> seed = ReadInt(object, "seed");
+        if (!seed || *seed < 0) {
+            return std::unexpected("have no valid seed");
+        }
+        settings.Transient.Seed = static_cast<unsigned int>(*seed);
     }
     return {};
 }

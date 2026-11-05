@@ -25,6 +25,12 @@ constexpr std::string_view SWEEPABLE_SOURCES = "a voltage or current source, VCC
 // What is wrong with a circuit or with settings, in words for the user, or no value when nothing is
 std::optional<std::string> CheckCircuit(const Circuit &circuit);
 std::optional<std::string> CheckTransientSettings(const TransientSettings &settings);
+
+// Noise and random sources step the transient on their own, so they count in its points
+std::optional<double> FindFinestSignalStep(const Circuit &circuit);
+std::optional<std::string> CheckSourceSteps(const Circuit &circuit, const TransientSettings &settings);
+
+// What is wrong with the settings of the other analyses, or no value when nothing is
 std::optional<std::string> CheckACSweepSettings(const Circuit &circuit, const ACSweepSettings &settings);
 std::optional<std::string> CheckDCSweepSettings(const Circuit &circuit, const DCSweepSettings &settings);
 std::optional<std::string> CheckNoiseSettings(const Circuit &circuit, const NoiseSettings &settings);

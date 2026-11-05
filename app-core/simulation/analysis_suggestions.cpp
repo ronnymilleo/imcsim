@@ -136,6 +136,11 @@ void AddSourceWaveform(const Source &source, Waveforms &waveforms) {
         }
         break;
     }
+    case Source::SourceType::NOISE:
+    case Source::SourceType::RANDOM:
+    default:
+        // Noise has no period or span to show; the other sources of the circuit set the stop time
+        break;
     }
 }
 

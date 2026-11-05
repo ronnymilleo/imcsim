@@ -16,6 +16,7 @@
 #include "document/schematic.h"
 #include "ngspice/ngspice_library.h"
 #include "plots/logic_trace.h"
+#include "plots/spectrum.h"
 #include "plots/trace_statistics.h"
 #include "simulation/circuit_checks.h"
 #include "simulation/simulation_backend.h"
@@ -127,6 +128,52 @@ TEST_CASE("The BJT example draws one collector curve per base current", "[exampl
         Core::RunDCSweep(schematic.BuildCircuit(), {.Swept = settings.SweptRange, .Stepped = settings.SteppedRange});
     REQUIRE(run.Result.has_value());
     CHECK(run.Result->Curves.size() == 5);
+}
+
+TEST_CASE("The noise example shows a flat floor at the input that the low-pass cuts after its corner", "[examples]") {
+    GUI::Schematic schematic;
+    OpenExample("noise_through_rc_low_pass.imcsim", schematic);
+    const GUI::SimulationSettings &settings = schematic.GetSimulationSettings();
+    REQUIRE(settings.Selected == GUI::Analysis::TRANSIENT);
+
+    const Core::TransientRun run = Core::RunTransient(schematic.BuildCircuit(), settings.Transient);
+    REQUIRE(run.Result.has_value());
+    const Core::Transient &transient = *run.Result;
+    // The whole run fits the default window of 2000 points, so the Spectrum tab covers all of it
+    INFO(transient.Times.size());
+    CHECK(transient.Times.size() <= 2000);
+    const std::size_t input = NodeAt(schematic, {4, 4});
+    const std::size_t output = NodeAt(schematic, {11, 4});
+
+    const auto band_rms = [&transient](const std::size_t node, const double from_hertz, const double to_hertz) {
+        const auto spectrum = GUI::ComputeSpectrum(
+            transient.Times, transient.NodeVoltages[node], 0.0, transient.Times.back(),
+            GUI::ChooseSpectrumSampleCount(transient.Times, 0.0, transient.Times.back()), GUI::SpectrumWindow::HANN);
+        REQUIRE(spectrum.has_value());
+        double sum = 0.0;
+        int count = 0;
+        for (std::size_t index = 0; index < spectrum->Frequencies.size(); ++index) {
+            if (spectrum->Frequencies[index] >= from_hertz && spectrum->Frequencies[index] <= to_hertz) {
+                sum += spectrum->Amplitudes[index] * spectrum->Amplitudes[index];
+                ++count;
+            }
+        }
+        REQUIRE(count > 0);
+        return std::sqrt(sum / count);
+    };
+
+    // White noise of 100 mV rms sampled every 50 us is 2 * 0.1^2 * 50u = 1e-6 V^2/Hz one-sided; the Hann window reads
+    // 1.5 bins of 1 / 19 ms of it as a sine of peak sqrt(2 * 1e-6 * 1.5 * df), a little less where the straight lines
+    // between samples attenuate
+    const double resolution = 1.0 / transient.Times.back();
+    const double expected_floor = std::sqrt(2.0 * 1e-6 * 1.5 * resolution);
+    CHECK_THAT(band_rms(input, 200.0, 2000.0), Catch::Matchers::WithinRel(expected_floor, 0.3));
+    // A few dozen bins per band scatter by 10% or more, so the limits are wide enough never to fail by chance
+    // The floor stays flat up to the 10 kHz Nyquist band, losing a little to the straight lines between samples
+    CHECK_THAT(band_rms(input, 3e3, 4.5e3) / band_rms(input, 200.0, 2000.0), Catch::Matchers::WithinRel(0.93, 0.5));
+    // The output follows the floor below the 1.6 kHz corner and is far below it near 10 kHz
+    CHECK_THAT(band_rms(output, 100.0, 500.0) / band_rms(input, 100.0, 500.0), Catch::Matchers::WithinRel(1.0, 0.1));
+    CHECK(band_rms(output, 8e3, 9.5e3) < 0.25 * band_rms(input, 8e3, 9.5e3));
 }
 
 TEST_CASE("The RC example measures its corner frequency over the whole sweep", "[examples]") {

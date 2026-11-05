@@ -21,6 +21,10 @@ struct TransientSettings {
     double StopTime = 10e-3;
     /// Largest step between output points; ngspice may take smaller ones where the signals change fast.
     double TimeStep = 10e-6;
+    /// Seed of the random numbers of the Random sources and the telegraph part of the Noise sources, so a run repeats;
+    /// 0 draws new ones each run. The white and 1/f noise of a Noise source change each run whatever the seed, since
+    /// ngspice does not seed them.
+    unsigned int Seed = 0;
 
     bool operator==(const TransientSettings &) const = default;
 };

@@ -363,9 +363,15 @@ TEST_CASE("Source type names convert both ways", "[component]") {
     for (const auto type : {Core::VoltageSource::SourceType::DC, Core::VoltageSource::SourceType::AC,
                             Core::VoltageSource::SourceType::PULSE, Core::VoltageSource::SourceType::EXP,
                             Core::VoltageSource::SourceType::SFFM, Core::VoltageSource::SourceType::AM,
-                            Core::VoltageSource::SourceType::PWL}) {
+                            Core::VoltageSource::SourceType::PWL, Core::VoltageSource::SourceType::NOISE,
+                            Core::VoltageSource::SourceType::RANDOM}) {
         CHECK(Core::ParseSourceType(Core::GetSourceTypeName(type)) == type);
     }
+    for (const auto distribution : {Core::RandomDistribution::UNIFORM, Core::RandomDistribution::GAUSSIAN,
+                                    Core::RandomDistribution::EXPONENTIAL, Core::RandomDistribution::POISSON}) {
+        CHECK(Core::ParseRandomDistribution(Core::GetRandomDistributionName(distribution)) == distribution);
+    }
+    CHECK_FALSE(Core::ParseRandomDistribution("gaussian"));
     CHECK_FALSE(Core::ParseSourceType("ac"));
     CHECK_FALSE(Core::ParseSourceType("pwl "));
 }
@@ -801,4 +807,95 @@ TEST_CASE("A logic input is a V part that drives 0 V or the logic level", "[comp
     CHECK(input.GetParameters().LogicLevel == 5.0);
     CHECK(input.IsValidParameters(input.GetParameters()));
     CHECK_FALSE(Core::LogicInput::IsValidParameters({.LogicLevel = 0.0}));
+}
+
+TEST_CASE("A noise needs a positive step while white or 1/f noise is on, and never a negative one", "[component]") {
+    const Core::VoltageSource source;
+    CHECK(source.IsValidNoise(Core::NoiseParameters{}));
+    // A tenth of the sine amplitude, in volts here and in amperes for a current source
+    CHECK(source.GetNoise().WhiteAmplitude == 0.1);
+    CHECK(Core::CurrentSource().GetNoise().WhiteAmplitude == 1e-4);
+
+    Core::NoiseParameters noise;
+    noise.TimeStep = -10e-6;
+    CHECK_FALSE(source.IsValidNoise(noise));
+    noise.TimeStep = 0.0;
+    CHECK_FALSE(source.IsValidNoise(noise));
+    // Nothing needs the step once only the telegraph signal is on, but a negative one never passes
+    noise.WhiteAmplitude = 0.0;
+    noise.TelegraphAmplitude = 1.0;
+    CHECK(source.IsValidNoise(noise));
+    noise.TimeStep = -1e-6;
+    CHECK_FALSE(source.IsValidNoise(noise));
+
+    noise = {};
+    noise.WhiteAmplitude = -1.0;
+    CHECK_FALSE(source.IsValidNoise(noise));
+}
+
+TEST_CASE("A noise limits the 1/f exponent and the telegraph times", "[component]") {
+    const Core::VoltageSource source;
+    Core::NoiseParameters noise;
+    // The exponent only matters while the 1/f noise is on
+    noise.FlickerExponent = 2.5;
+    CHECK(source.IsValidNoise(noise));
+    noise.FlickerAmplitude = 1e-3;
+    CHECK_FALSE(source.IsValidNoise(noise));
+    noise.FlickerExponent = 2.0;
+    CHECK_FALSE(source.IsValidNoise(noise));
+    noise.FlickerExponent = 0.0;
+    CHECK_FALSE(source.IsValidNoise(noise));
+    noise.FlickerExponent = 1.0;
+    CHECK(source.IsValidNoise(noise));
+
+    noise.TelegraphAmplitude = 1e-3;
+    noise.CaptureTime = 0.0;
+    CHECK_FALSE(source.IsValidNoise(noise));
+    noise.CaptureTime = 1e-3;
+    noise.EmissionTime = -1e-3;
+    CHECK_FALSE(source.IsValidNoise(noise));
+}
+
+TEST_CASE("Random values need a positive step and a first parameter that suits the distribution", "[component]") {
+    const Core::VoltageSource source;
+    Core::RandomParameters random;
+    CHECK(source.IsValidRandom(random));
+    random.TimeStep = 0.0;
+    CHECK_FALSE(source.IsValidRandom(random));
+    random = {};
+    random.Delay = -1e-3;
+    CHECK_FALSE(source.IsValidRandom(random));
+
+    random = {};
+    random.First = -1.0;
+    CHECK_FALSE(source.IsValidRandom(random));
+    random.Distribution = Core::RandomDistribution::UNIFORM;
+    CHECK_FALSE(source.IsValidRandom(random));
+    // A mean or a lambda of zero would make every value the offset
+    random.First = 0.0;
+    random.Distribution = Core::RandomDistribution::GAUSSIAN;
+    CHECK(source.IsValidRandom(random));
+    random.Distribution = Core::RandomDistribution::EXPONENTIAL;
+    CHECK_FALSE(source.IsValidRandom(random));
+    random.Distribution = Core::RandomDistribution::POISSON;
+    CHECK_FALSE(source.IsValidRandom(random));
+}
+
+TEST_CASE("A source tells the step its noise or random values force on a transient", "[component]") {
+    Core::VoltageSource source;
+    CHECK_FALSE(source.GetSignalStep());
+    source.SetNoise({.WhiteAmplitude = 1e-3, .TimeStep = 5e-6});
+    CHECK_FALSE(source.GetSignalStep());
+
+    source.SetSourceType(Core::VoltageSource::SourceType::NOISE);
+    CHECK(source.GetSignalStep() == 5e-6);
+    // Only the telegraph signal is on: it jumps at random times, with no step of its own
+    source.SetNoise({.WhiteAmplitude = 0.0, .TimeStep = 5e-6, .TelegraphAmplitude = 1e-3});
+    CHECK_FALSE(source.GetSignalStep());
+    source.SetNoise({.WhiteAmplitude = 0.0, .TimeStep = 2e-6, .FlickerAmplitude = 1e-3});
+    CHECK(source.GetSignalStep() == 2e-6);
+
+    source.SetRandom({.TimeStep = 7e-6});
+    source.SetSourceType(Core::VoltageSource::SourceType::RANDOM);
+    CHECK(source.GetSignalStep() == 7e-6);
 }

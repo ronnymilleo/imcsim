@@ -34,6 +34,7 @@
 #include <complex>
 #include <format>
 #include <numbers>
+#include <numeric>
 #include <vector>
 
 namespace {
@@ -351,6 +352,185 @@ TEST_CASE("A transient run follows the sine of an AC source", "[simulator]") {
         const double expected = 1.0 + 2.0 * std::sin(2.0 * std::numbers::pi * 1e3 * transient.Times[index]);
         CHECK_THAT(transient.NodeVoltages[1][index], Catch::Matchers::WithinAbs(expected, 1e-3));
     }
+}
+
+namespace {
+
+/// A source across a 1k resistor to ground, so node 1 carries the source voltage itself.
+struct SourceOnLoad {
+    Core::VoltageSource Source;
+    Core::Resistor Load;
+    Core::Ground Reference;
+    Core::Circuit Circuit;
+
+    SourceOnLoad() {
+        Source.SetName("Vn1");
+        Load.SetName("R1");
+        Circuit.Add(Source, {1, 0});
+        Circuit.Add(Load, {1, 0});
+        Circuit.Add(Reference, {0});
+    }
+};
+
+/**
+ * @brief   Root mean square of a trace around its mean over time, integrating the straight lines between the points.
+ */
+double RmsAroundMean(const Core::Transient &transient, const std::size_t node) {
+    const std::vector<double> &times = transient.Times;
+    const std::vector<double> &values = transient.NodeVoltages[node];
+    const double span = times.back() - times.front();
+    double integral = 0.0;
+    double square_integral = 0.0;
+    for (std::size_t index = 1; index < times.size(); ++index) {
+        const double width = times[index] - times[index - 1];
+        const double first = values[index - 1];
+        const double second = values[index];
+        integral += 0.5 * (first + second) * width;
+        square_integral += (first * first + first * second + second * second) / 3.0 * width;
+    }
+    const double mean = integral / span;
+    return std::sqrt(square_integral / span - mean * mean);
+}
+
+} // namespace
+
+TEST_CASE("The white noise of a noise source has the rms asked for, as a line between its samples", "[simulator]") {
+    SourceOnLoad setup;
+    setup.Source.SetSourceType(Core::VoltageSource::SourceType::NOISE);
+    setup.Source.SetNoise({.Offset = 2.0, .WhiteAmplitude = 1e-3, .TimeStep = 10e-6});
+
+    const Core::TransientRun run = Core::RunTransient(setup.Circuit, {.StopTime = 100e-3, .TimeStep = 10e-6});
+    if (!run.Result) {
+        FAIL(run.Result.error());
+    }
+    // The rms of a Gaussian of 1 mV joined by straight lines is sqrt(2/3) of it, since the line passes between two
+    // independent samples; 10000 samples keep the estimate within a few percent
+    const double expected = 1e-3 * std::sqrt(2.0 / 3.0);
+    CHECK_THAT(RmsAroundMean(*run.Result, 1), Catch::Matchers::WithinRel(expected, 0.05));
+    const std::vector<double> &voltages = run.Result->NodeVoltages[1];
+    const double mean = std::accumulate(voltages.begin(), voltages.end(), 0.0) / static_cast<double>(voltages.size());
+    CHECK_THAT(mean, Catch::Matchers::WithinAbs(2.0, 5e-4));
+}
+
+TEST_CASE("A noise source is its offset in the operating point", "[simulator]") {
+    SourceOnLoad setup;
+    setup.Source.SetSourceType(Core::VoltageSource::SourceType::NOISE);
+    setup.Source.SetNoise({.Offset = 1.5, .WhiteAmplitude = 10e-3, .TimeStep = 10e-6});
+
+    const Core::OperatingPointRun run = Core::RunOperatingPoint(setup.Circuit);
+    if (!run.Result) {
+        FAIL(run.Result.error());
+    }
+    CHECK_THAT(run.Result->NodeVoltages[1], Catch::Matchers::WithinAbs(1.5, 1e-9));
+}
+
+TEST_CASE("A noise with a negative step never reaches ngspice, which would loop forever", "[simulator]") {
+    SourceOnLoad setup;
+    setup.Source.SetSourceType(Core::VoltageSource::SourceType::NOISE);
+    setup.Source.SetNoise({.WhiteAmplitude = 1e-3, .TimeStep = -10e-6});
+
+    const Core::TransientRun run = Core::RunTransient(setup.Circuit, {.StopTime = 1e-3, .TimeStep = 10e-6});
+    REQUIRE_FALSE(run.Result.has_value());
+    CHECK(run.Result.error().contains("noise"));
+}
+
+TEST_CASE("A transient refuses a noise step that would produce too many points", "[simulator]") {
+    SourceOnLoad setup;
+    setup.Source.SetSourceType(Core::VoltageSource::SourceType::NOISE);
+    setup.Source.SetNoise({.WhiteAmplitude = 1e-3, .TimeStep = 5e-9});
+
+    // The time step alone is fine: 1000 points
+    const Core::TransientRun run = Core::RunTransient(setup.Circuit, {.StopTime = 10e-3, .TimeStep = 10e-6});
+    REQUIRE_FALSE(run.Result.has_value());
+    CHECK(run.Result.error().contains("too small"));
+}
+
+namespace {
+
+/**
+ * @brief   The voltage of a source on its load over a transient of a given seed, as ngspice made it.
+ */
+std::vector<double> RunSeeded(const SourceOnLoad &setup, const unsigned int seed) {
+    const Core::TransientRun transient =
+        Core::RunTransient(setup.Circuit, {.StopTime = 5e-3, .TimeStep = 10e-6, .Seed = seed});
+    if (!transient.Result) {
+        FAIL(transient.Result.error());
+    }
+    return transient.Result->NodeVoltages[1];
+}
+
+} // namespace
+
+TEST_CASE("A seeded random source repeats its values and a new seed changes them", "[simulator]") {
+    for (const auto distribution : {Core::RandomDistribution::UNIFORM, Core::RandomDistribution::EXPONENTIAL,
+                                    Core::RandomDistribution::POISSON}) {
+        CAPTURE(Core::GetRandomDistributionName(distribution));
+        SourceOnLoad setup;
+        setup.Source.SetSourceType(Core::VoltageSource::SourceType::RANDOM);
+        setup.Source.SetRandom({.Distribution = distribution, .TimeStep = 50e-6, .First = 2.0});
+
+        const std::vector<double> first = RunSeeded(setup, 7);
+        CHECK(RunSeeded(setup, 7) == first);
+        CHECK(RunSeeded(setup, 8) != first);
+    }
+}
+
+TEST_CASE("Without a seed each run draws new random values, even after a seeded one", "[simulator]") {
+    SourceOnLoad setup;
+    setup.Source.SetSourceType(Core::VoltageSource::SourceType::RANDOM);
+    setup.Source.SetRandom({.Distribution = Core::RandomDistribution::UNIFORM, .TimeStep = 50e-6, .First = 1.0});
+
+    RunSeeded(setup, 7);
+    CHECK(RunSeeded(setup, 0) != RunSeeded(setup, 0));
+}
+
+TEST_CASE("A random source holds each value for its step and follows its distribution", "[simulator]") {
+    SourceOnLoad setup;
+    setup.Source.SetSourceType(Core::VoltageSource::SourceType::RANDOM);
+    setup.Source.SetRandom({.Distribution = Core::RandomDistribution::UNIFORM,
+                            .TimeStep = 100e-6,
+                            .Delay = 1e-3,
+                            .First = 1.0,
+                            .Second = 3.0});
+
+    const Core::TransientRun run = Core::RunTransient(setup.Circuit, {.StopTime = 20e-3, .TimeStep = 10e-6, .Seed = 3});
+    if (!run.Result) {
+        FAIL(run.Result.error());
+    }
+    const Core::Transient &transient = *run.Result;
+    for (std::size_t index = 0; index < transient.Times.size(); ++index) {
+        const double voltage = transient.NodeVoltages[1][index];
+        // A uniform of +/-1 around 3 V, and the offset itself until the delay
+        CHECK(voltage >= 2.0 - 1e-9);
+        CHECK(voltage <= 4.0 + 1e-9);
+        if (transient.Times[index] < 1e-3) {
+            CHECK_THAT(voltage, Catch::Matchers::WithinAbs(3.0, 1e-9));
+        }
+    }
+}
+
+TEST_CASE("A telegraph signal jumps between 0 and its amplitude on top of the offset, and repeats with its seed",
+          "[simulator]") {
+    SourceOnLoad setup;
+    setup.Source.SetSourceType(Core::VoltageSource::SourceType::NOISE);
+    setup.Source.SetNoise({.Offset = 1.0,
+                           .WhiteAmplitude = 0.0,
+                           .TimeStep = 10e-6,
+                           .TelegraphAmplitude = 0.5,
+                           .CaptureTime = 0.5e-3,
+                           .EmissionTime = 0.5e-3});
+
+    const std::vector<double> voltages = RunSeeded(setup, 5);
+    bool is_seen_low = false;
+    bool is_seen_high = false;
+    for (const double voltage : voltages) {
+        is_seen_low = is_seen_low || std::abs(voltage - 1.0) < 1e-9;
+        is_seen_high = is_seen_high || std::abs(voltage - 1.5) < 1e-9;
+        CHECK(((std::abs(voltage - 1.0) < 1e-6) || (std::abs(voltage - 1.5) < 1e-6)));
+    }
+    CHECK(is_seen_low);
+    CHECK(is_seen_high);
+    CHECK(RunSeeded(setup, 5) == voltages);
 }
 
 TEST_CASE("An AC sweep of an RC low-pass matches its transfer function", "[simulator]") {

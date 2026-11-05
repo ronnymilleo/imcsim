@@ -1,7 +1,7 @@
 /**
  * @file    source.h
- * @brief   Independent sources with a DC, sine, pulse, exponential, single-frequency FM, amplitude-modulated or
- *          piecewise linear waveform, shared by voltage and current sources.
+ * @brief   Independent sources with a DC, sine, pulse, exponential, single-frequency FM, amplitude-modulated,
+ *          piecewise linear, noise or random waveform, shared by voltage and current sources.
  */
 
 #ifndef IMCSIM_SOURCE_H
@@ -111,19 +111,68 @@ struct PWLParameters {
 };
 
 /**
+ * @struct  NoiseParameters
+ * @brief   A source of transient noise, as in the SPICE TRNOISE source: levels in the unit of the source, times in
+ *          seconds.
+ * @details The source is Offset plus up to three kinds of noise: Gaussian white noise of WhiteAmplitude rms with a new
+ *          sample every TimeStep (the output is a straight line between samples), 1/f noise of FlickerAmplitude with
+ *          the power falling as FlickerExponent, and a random telegraph signal that jumps between 0 and
+ *          TelegraphAmplitude, staying CaptureTime up and EmissionTime down on average. A kind whose amplitude is 0 is
+ *          off. The white noise has a flat density of WhiteAmplitude times the square root of 2 TimeStep per root hertz
+ *          up to half the sampling rate, 1 / (2 TimeStep).
+ */
+struct NoiseParameters {
+    double Offset = 0.0;
+    double WhiteAmplitude = 0.1;
+    double TimeStep = 10e-6;
+    double FlickerExponent = 1.0;
+    double FlickerAmplitude = 0.0;
+    double TelegraphAmplitude = 0.0;
+    double CaptureTime = 1e-3;
+    double EmissionTime = 1e-3;
+};
+
+/**
+ * @enum    RandomDistribution
+ * @brief   Distribution of the values of a random source, numbered as the type of the SPICE TRRANDOM source.
+ */
+enum class RandomDistribution {
+    UNIFORM = 1,
+    GAUSSIAN = 2,
+    EXPONENTIAL = 3,
+    POISSON = 4
+};
+
+/**
+ * @struct  RandomParameters
+ * @brief   A source of random values held for TimeStep each, as in the SPICE TRRANDOM source: levels in the unit of
+ *          the source, times in seconds.
+ * @details First and Second mean different things for each distribution: the range around the offset and the offset
+ *          for a uniform one, the standard deviation and the mean for a Gaussian, the mean and the offset for an
+ *          exponential, lambda and the offset for a Poisson one. Before Delay the source holds Second.
+ */
+struct RandomParameters {
+    RandomDistribution Distribution = RandomDistribution::GAUSSIAN;
+    double TimeStep = 10e-6;
+    double Delay = 0.0;
+    double First = 0.1;
+    double Second = 0.0;
+};
+
+/**
  * @class   Source
- * @brief   An independent source between two nodes, whose value follows one of seven waveforms.
+ * @brief   An independent source between two nodes, whose value follows one of nine waveforms.
  * @details A DC source holds its level in the component value. The other types keep it but do not use it, holding
  *          their own parameters instead: a sine (AC), a repeating pulse, an exponential, a single-frequency FM, an
- *          amplitude modulation or piecewise linear points. Every type keeps its parameters while another one is
- *          selected. Levels are in the unit of the derived source, volts or amperes.
+ *          amplitude modulation, piecewise linear points, noise or random values. Every type keeps its parameters
+ *          while another one is selected. Levels are in the unit of the derived source, volts or amperes.
  */
 class Source : public Component {
 public:
     /**
      * @enum    SourceType
      * @brief   Waveform of the source: direct current, a sine, a repeating pulse, an exponential, a
-     *          single-frequency FM, an amplitude modulation or piecewise linear points.
+     *          single-frequency FM, an amplitude modulation, piecewise linear points, noise or random values.
      */
     enum class SourceType {
         DC,
@@ -132,7 +181,9 @@ public:
         EXP,
         SFFM,
         AM,
-        PWL
+        PWL,
+        NOISE,
+        RANDOM
     };
 
     ~Source() override = default;
@@ -171,6 +222,19 @@ public:
     void SetPWL(const PWLParameters &pwl);
     bool IsValidPWL(const PWLParameters &pwl) const;
 
+    // Noise parameters, used when the source is a noise
+    const NoiseParameters &GetNoise() const;
+    void SetNoise(const NoiseParameters &noise);
+    bool IsValidNoise(const NoiseParameters &noise) const;
+
+    // Random parameters, used when the source is a random one
+    const RandomParameters &GetRandom() const;
+    void SetRandom(const RandomParameters &random);
+    bool IsValidRandom(const RandomParameters &random) const;
+
+    // Time resolution
+    std::optional<double> GetSignalStep() const;
+
 protected:
     Source(ComponentType type, double value, double amplitude, double pulse_high);
 
@@ -182,12 +246,16 @@ private:
     SFFMParameters m_SFFM;
     AMParameters m_AM;
     PWLParameters m_PWL;
+    NoiseParameters m_Noise;
+    RandomParameters m_Random;
 };
 
 // Sources
 bool IsSource(ComponentType type);
 const char *GetSourceTypeName(Source::SourceType type);
 std::optional<Source::SourceType> ParseSourceType(std::string_view text);
+const char *GetRandomDistributionName(RandomDistribution distribution);
+std::optional<RandomDistribution> ParseRandomDistribution(std::string_view text);
 
 // Piecewise linear points, edited as one text of "time value" pairs such as "0 0, 1m 5, 2m 0"
 std::optional<std::vector<PWLPoint>> ParsePWLPoints(std::string_view text);

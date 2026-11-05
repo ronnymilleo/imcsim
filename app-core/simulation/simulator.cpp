@@ -164,8 +164,11 @@ OperatingPointRun RunOperatingPoint(const Circuit &circuit) {
  */
 TransientRun RunTransient(const Circuit &circuit, const TransientSettings &settings,
                           const std::optional<ParameterValue> &parameter, const RunMonitor &monitor) {
-    if (const std::optional<std::string> error =
-            FindProblem(circuit, CheckTransientSettings(settings), AnalysisKind::TRANSIENT)) {
+    std::optional<std::string> settings_error = CheckTransientSettings(settings);
+    if (!settings_error) {
+        settings_error = CheckSourceSteps(circuit, settings);
+    }
+    if (const std::optional<std::string> error = FindProblem(circuit, settings_error, AnalysisKind::TRANSIENT)) {
         return {std::unexpected(*error), {}};
     }
     const auto applied = ApplyParameter(circuit, parameter);

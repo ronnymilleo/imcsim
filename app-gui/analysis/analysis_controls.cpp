@@ -503,8 +503,11 @@ void AnalysisControls::RunTransientAnalysis(const Core::Circuit &circuit, const 
     if (m_IsLiveRun) {
         pace = settings.StopTime / m_Schematic.GetSimulationSettings().LiveSeconds;
         // One step short of the most a transient may span, which the check would refuse after rounding
-        run_settings.StopTime = std::min(pace * LIVE_RUN_LIMIT_SECONDS,
-                                         settings.TimeStep * static_cast<double>(Core::MAX_TRANSIENT_POINTS - 1));
+        // A noise or random source steps the transient on its own, so the finest step counts for the points
+        const double finest_step =
+            std::min(settings.TimeStep, Core::FindFinestSignalStep(circuit).value_or(settings.TimeStep));
+        run_settings.StopTime =
+            std::min(pace * LIVE_RUN_LIMIT_SECONDS, finest_step * static_cast<double>(Core::MAX_TRANSIENT_POINTS - 1));
     }
     const bool is_live = m_IsLiveRun;
     StartRun(Analysis::TRANSIENT,
