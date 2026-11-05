@@ -274,6 +274,12 @@ TEST_CASE("Every analysis runs on the worker and stores its result in the schema
     RunAndWait(controls);
     CHECK(schematic.GetTransferFunction().has_value());
     CHECK(controls.GetLastRun() == GUI::Analysis::TRANSFER_FUNCTION);
+
+    Select(schematic, GUI::Analysis::SENSITIVITY);
+    RunAndWait(controls);
+    REQUIRE(schematic.GetSensitivity().has_value());
+    CHECK_FALSE(schematic.GetSensitivity()->Parts.empty());
+    CHECK(controls.GetLastRun() == GUI::Analysis::SENSITIVITY);
 }
 
 TEST_CASE("A stepped AC sweep and a stepped DC sweep deliver one result per value", "[analysis_controls]") {
@@ -322,8 +328,8 @@ TEST_CASE("A run that cannot start says why, and a circuit that cannot run fails
     // A circuit without a source, or without even a ground
     GUI::Schematic empty;
     GUI::AnalysisControls empty_controls(empty);
-    for (const GUI::Analysis analysis :
-         {GUI::Analysis::DC_SWEEP, GUI::Analysis::NOISE, GUI::Analysis::TRANSFER_FUNCTION}) {
+    for (const GUI::Analysis analysis : {GUI::Analysis::DC_SWEEP, GUI::Analysis::NOISE,
+                                         GUI::Analysis::TRANSFER_FUNCTION, GUI::Analysis::SENSITIVITY}) {
         Select(empty, analysis);
         empty_controls.RunSelected();
         CHECK(empty_controls.GetOutcome(analysis) == GUI::RunOutcome::FAILED);
@@ -336,6 +342,7 @@ TEST_CASE("A run that cannot start says why, and a circuit that cannot run fails
 
 TEST_CASE("Analyses have names, and all of them are counted", "[analysis_controls]") {
     CHECK(std::string(GUI::GetAnalysisName(GUI::Analysis::AC_SWEEP)) == "AC sweep");
+    CHECK(std::string(GUI::GetAnalysisName(GUI::Analysis::SENSITIVITY)) == "Sensitivity");
     CHECK(std::string(GUI::GetAnalysisName(GUI::Analysis::TRUTH_TABLE)) == "Truth table");
     CHECK(static_cast<std::size_t>(GUI::Analysis::TRUTH_TABLE) + 1 == GUI::ANALYSIS_COUNT);
 }

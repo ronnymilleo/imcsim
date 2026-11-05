@@ -132,7 +132,8 @@ void AnalysisControls::RunSelected() {
     const SimulationSettings &settings = m_Schematic.GetSimulationSettings();
     const Analysis analysis = settings.Selected;
     const Core::Circuit circuit = m_Schematic.BuildCircuit();
-    // The operating point, the noise and the transfer function analyses run once, whatever the step settings
+    // The operating point, the noise, the transfer function and the sensitivity analyses run once, whatever the step
+    // settings
     std::optional<StepPlan> steps;
     if (settings.ParameterStep.Enabled &&
         (analysis == Analysis::TRANSIENT || analysis == Analysis::AC_SWEEP || analysis == Analysis::DC_SWEEP)) {
@@ -447,6 +448,9 @@ void AnalysisControls::StartAnalysis(const Analysis analysis, const Core::Circui
     case Analysis::TRANSFER_FUNCTION:
         RunTransferFunctionAnalysis(circuit);
         break;
+    case Analysis::SENSITIVITY:
+        RunSensitivityAnalysis(circuit);
+        break;
     case Analysis::TRUTH_TABLE:
         RunTruthTableAnalysis(circuit);
         break;
@@ -686,6 +690,29 @@ void AnalysisControls::RunTransferFunctionAnalysis(const Core::Circuit &circuit)
                  }));
 }
 
+void AnalysisControls::RunSensitivityAnalysis(const Core::Circuit &circuit) {
+    const SimulationSettings &settings = m_Schematic.GetSimulationSettings();
+    const std::optional<int> output = ResolveOutputNode(settings.SensitivityOutput, circuit, m_Schematic);
+    if (!output) {
+        m_Schematic.SetSensitivity(std::nullopt);
+        Finish(Analysis::SENSITIVITY, "Connect some parts: the sensitivity needs a node to measure", {});
+        return;
+    }
+    const Core::SensitivitySettings run_settings{.OutputNode = *output};
+    StartRun(Analysis::SENSITIVITY,
+             MakeJob<Core::SensitivityRun>(
+                 circuit,
+                 [run_settings](const Core::Circuit &copy, Core::RunControl &) {
+                     return Core::RunSensitivity(copy, run_settings);
+                 },
+                 [this](Core::SensitivityRun run) {
+                     Finish(Analysis::SENSITIVITY,
+                            StoreResult(std::move(run.Result),
+                                        [this](auto result) { m_Schematic.SetSensitivity(std::move(result)); }),
+                            std::move(run.Messages));
+                 }));
+}
+
 void AnalysisControls::RunTruthTableAnalysis(const Core::Circuit &circuit) {
     const std::vector<std::string> available = Core::GetTruthTableInputs(circuit);
     const std::vector<int> outputs = ListMeasuredNodes(circuit, m_Schematic);
@@ -734,6 +761,9 @@ void AnalysisControls::ClearResult(const Analysis analysis) {
     case Analysis::TRANSFER_FUNCTION:
         m_Schematic.SetTransferFunction(std::nullopt);
         break;
+    case Analysis::SENSITIVITY:
+        m_Schematic.SetSensitivity(std::nullopt);
+        break;
     case Analysis::TRUTH_TABLE:
         m_Schematic.SetTruthTable(std::nullopt);
         break;
@@ -777,6 +807,8 @@ bool AnalysisControls::HasResult(const Analysis analysis) const {
         return m_Schematic.GetNoise().has_value();
     case Analysis::TRANSFER_FUNCTION:
         return m_Schematic.GetTransferFunction().has_value();
+    case Analysis::SENSITIVITY:
+        return m_Schematic.GetSensitivity().has_value();
     case Analysis::TRUTH_TABLE:
         return m_Schematic.GetTruthTable().has_value();
     }

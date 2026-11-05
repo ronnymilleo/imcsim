@@ -147,6 +147,23 @@ constexpr auto EXAMPLES = std::to_array<Example>({
         .FileName = "common_emitter_amplifier.imcsim",
     },
     {
+        .Title = "Bias sensitivity of a common-emitter stage",
+        .Group = "Transistors",
+        .Description =
+            "The common-emitter amplifier above with the Sensitivity analysis selected and its output at the "
+            "base, where the divider sets the bias. Run it, then tick "
+            "Color the schematic at the top of the Sensitivity tab of the Output window (or choose View > Wire "
+            "Colors > Sensitivity): the parts are colored by how much a change of their value moves "
+            "the DC voltage of the base, hot for the most influential. After the supply, the 51k and 10k "
+            "divider resistors R1 and R2 dominate, by about 1.5 V for 100 % more of either (15 mV per 1 %), with "
+            "opposite "
+            "signs, since a larger R1 lowers the base and a larger R2 raises it; the table of the Sensitivity "
+            "tab in the Output window lists every part with its sign, and the capacitors and the collector "
+            "and load parts barely matter. The transistor itself is not listed: only the values of "
+            "resistors, capacitors, inductors and sources are.",
+        .FileName = "bias_sensitivity.imcsim",
+    },
+    {
         .Title = "Small-signal model of a BJT",
         .Group = "Transistors",
         .Description = "A 2N3904 common-emitter stage on top and its hybrid-pi model below: rpi = 3.17k and a VCCS "

@@ -1247,6 +1247,7 @@ void Schematic::MarkLiveChanged(const Core::Component &component) {
     m_DCSweep.reset();
     m_Noise.reset();
     m_TransferFunction.reset();
+    m_Sensitivity.reset();
     m_TruthTable.reset();
 }
 
@@ -1600,6 +1601,24 @@ void Schematic::SetTransferFunction(std::optional<Core::TransferFunction> transf
 }
 
 /**
+ * @brief   Stores the result of a sensitivity analysis of the current schematic.
+ * @param[in] sensitivity  Sensitivity of the output node to each part, or no value to clear it.
+ * @note    The result is dropped on the next change, since it no longer matches the circuit.
+ */
+void Schematic::SetSensitivity(std::optional<Core::Sensitivity> sensitivity) {
+    m_Sensitivity = std::move(sensitivity);
+    ++m_SensitivityVersion;
+}
+
+/**
+ * @brief   Returns the last sensitivity simulated for the current schematic.
+ * @return  The sensitivity result, or no value when there was no simulation since the last change.
+ */
+const std::optional<Core::Sensitivity> &Schematic::GetSensitivity() const {
+    return m_Sensitivity;
+}
+
+/**
  * @brief   Returns the last transfer function simulated for the current schematic.
  * @return  The transfer function result, or no value when there was no simulation since the last change.
  */
@@ -1682,6 +1701,14 @@ std::size_t Schematic::GetTransferFunctionVersion() const {
 }
 
 /**
+ * @brief   Returns a number that changes whenever a sensitivity result is stored.
+ * @return  The sensitivity version; compare it with a stored one to know whether the result was replaced.
+ */
+std::size_t Schematic::GetSensitivityVersion() const {
+    return m_SensitivityVersion;
+}
+
+/**
  * @brief   Returns a number that changes whenever a truth table result is stored.
  * @return  The truth table version; compare it with a stored one to know whether the result was replaced.
  */
@@ -1700,6 +1727,7 @@ void Schematic::InvalidateDerivedData() {
     m_DCSweep.reset();
     m_Noise.reset();
     m_TransferFunction.reset();
+    m_Sensitivity.reset();
     m_TruthTable.reset();
 }
 

@@ -36,6 +36,7 @@ std::optional<std::string> CheckDCSweepSettings(const Circuit &circuit, const DC
 std::optional<std::string> CheckNoiseSettings(const Circuit &circuit, const NoiseSettings &settings);
 std::optional<std::string> CheckTransferFunctionSettings(const Circuit &circuit,
                                                          const TransferFunctionSettings &settings);
+std::optional<std::string> CheckSensitivitySettings(const Circuit &circuit, const SensitivitySettings &settings);
 std::optional<std::string> CheckTruthTableSettings(const Circuit &circuit, const TruthTableSettings &settings);
 
 // Parts by name

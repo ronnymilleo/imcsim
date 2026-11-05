@@ -15,7 +15,8 @@ namespace GUI {
 namespace {
 
 // Null-terminated literals, so they can go to ImGui as they are
-constexpr auto WIRE_COLORING_NAMES = std::to_array<const char *>({"Plain", "Nodes", "Voltage", "Current", "Power"});
+constexpr auto WIRE_COLORING_NAMES =
+    std::to_array<const char *>({"Plain", "Nodes", "Voltage", "Current", "Power", "Sensitivity"});
 constexpr auto LIVE_EFFECT_NAMES =
     std::to_array<const char *>({"Current Flow", "LED Glow", "Heat Glow", "Logic Lights", "Fuse"});
 static_assert(WIRE_COLORING_NAMES.size() == static_cast<std::size_t>(WireColoring::COUNT));

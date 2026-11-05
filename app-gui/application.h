@@ -71,6 +71,7 @@ private:
     std::size_t m_ShownDCSweepVersion = 0;
     std::size_t m_ShownNoiseVersion = 0;
     std::size_t m_ShownTransferFunctionVersion = 0;
+    std::size_t m_ShownSensitivityVersion = 0;
     std::size_t m_ShownTruthTableVersion = 0;
     /// Runs the selected analysis again after edits, when the preference asks for it.
     AutoRerun m_AutoRerun;

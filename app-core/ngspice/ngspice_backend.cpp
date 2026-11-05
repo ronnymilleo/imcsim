@@ -354,8 +354,19 @@ std::string_view NgspiceBackend::GetName() const {
 const BackendCapabilities &NgspiceBackend::GetCapabilities() const {
     std::call_once(m_CapabilitiesReady, [this] {
         m_Capabilities = {.Analyses = {AnalysisKind::OPERATING_POINT, AnalysisKind::TRANSIENT, AnalysisKind::AC_SWEEP,
-                                       AnalysisKind::DC_SWEEP, AnalysisKind::NOISE, AnalysisKind::TRANSFER_FUNCTION},
-                          .UnsupportedParts = {}};
+                                       AnalysisKind::DC_SWEEP, AnalysisKind::NOISE, AnalysisKind::TRANSFER_FUNCTION,
+                                       AnalysisKind::SENSITIVITY},
+                          .UnsupportedParts = {},
+                          .UnsupportedPartsByAnalysis = {}};
+        // The digital models allocate nodes while ngspice sets up the sensitivity analysis, which it cannot recover
+        // from; the parts are told apart by type, from the first to the last of the enumeration
+        for (int index = 0; index <= static_cast<int>(ComponentType::SEVEN_SEGMENT); ++index) {
+            const auto type = static_cast<ComponentType>(index);
+            if (IsLogicPart(type)) {
+                m_Capabilities.UnsupportedPartsByAnalysis[AnalysisKind::SENSITIVITY][type] =
+                    "ngspice cannot run a sensitivity analysis on logic gates and flip-flops";
+            }
+        }
         if (!AreDigitalModelsAvailable()) {
             // The parts are told apart by type, from the first to the last of the enumeration
             for (int index = 0; index <= static_cast<int>(ComponentType::SEVEN_SEGMENT); ++index) {
@@ -508,6 +519,26 @@ TransferFunctionRun NgspiceBackend::RunTransferFunction(const Circuit &circuit,
     const std::string analysis = std::format(".tf v({}) {}", settings.OutputNode, settings.InputSource);
     return Simulate<TransferFunction>(circuit, analysis, "tf",
                                       [&circuit, &settings] { return ReadTransferFunction(circuit, settings); });
+}
+
+/**
+ * @brief   Finds how much the DC voltage of a node changes with the value of each part of the circuit.
+ * @param[in] circuit   Circuit to simulate, already checked.
+ * @param[in] settings  Output node, already checked.
+ * @return  The sensitivity of every part with a value, or an error, plus every line ngspice printed.
+ */
+SensitivityRun NgspiceBackend::RunSensitivity(const Circuit &circuit, const SensitivitySettings &settings) {
+    const std::string analysis = std::format(".sens v({})", settings.OutputNode);
+    SensitivityRun run = Simulate<Sensitivity>(circuit, analysis, "sens",
+                                               [&circuit, &settings] { return ReadSensitivity(circuit, settings); });
+    // ngspice always notes, on its error stream, that a source with a waveform is taken at its DC value; that is what
+    // this analysis does, so the note is no warning, but it stays in the output
+    for (SimulatorMessage &message : run.Messages) {
+        if (message.Text.starts_with("Note:") && message.Text.contains("dc value used for op")) {
+            message.FromErrorStream = false;
+        }
+    }
+    return run;
 }
 
 } // namespace Core

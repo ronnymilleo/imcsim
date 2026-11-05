@@ -447,6 +447,20 @@ std::optional<std::string> CheckTransferFunctionSettings(const Circuit &circuit,
 }
 
 /**
+ * @brief   Checks the output node of a sensitivity analysis.
+ * @param[in] circuit   Circuit to analyze.
+ * @param[in] settings  Output node.
+ * @return  The reason the analysis cannot run; no value when it can.
+ * @note    ngspice answers a node that does not exist with zeros and no error, so the node is checked here.
+ */
+std::optional<std::string> CheckSensitivitySettings(const Circuit &circuit, const SensitivitySettings &settings) {
+    if (settings.OutputNode < 1 || settings.OutputNode >= circuit.GetNodeCount()) {
+        return "Pick the output node; ground has no sensitivity";
+    }
+    return std::nullopt;
+}
+
+/**
  * @brief   Checks the inputs and outputs of a truth table.
  * @param[in] circuit   Circuit to run.
  * @param[in] settings  The logic inputs to vary and the nodes to read.

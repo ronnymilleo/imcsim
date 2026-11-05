@@ -48,6 +48,8 @@ add_executable(imcsim-tests
             schematic_tests.cpp
             selection_tests.cpp
             seven_segment_tests.cpp
+            sensitivity_tests.cpp
+            sensitivity_view_tests.cpp
             simulation_backend_tests.cpp
             simulation_service_tests.cpp
             simulator_tests.cpp

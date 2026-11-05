@@ -66,6 +66,8 @@ const char *GetTabFileSuffix(const PlotTab tab) {
         return "noise";
     case PlotTab::TRANSFER_FUNCTION:
         return "transfer-function";
+    case PlotTab::SENSITIVITY:
+        return "sensitivity";
     case PlotTab::TRUTH_TABLE:
         return "truth-table";
     }
@@ -88,6 +90,8 @@ const char *GetTabTitle(const PlotTab tab) {
         return "noise";
     case PlotTab::TRANSFER_FUNCTION:
         return "transfer function";
+    case PlotTab::SENSITIVITY:
+        return "sensitivity";
     case PlotTab::TRUTH_TABLE:
         return "truth table";
     }
@@ -102,10 +106,11 @@ const char *GetTabTitle(const PlotTab tab) {
  * @param[in] controls   Runs of the analyses, to stop one from here while its plot grows; they must outlive the window.
  * @param[in] playback   Instant of the transient shown on the schematic, drawn as a line in the transient plot that
  *                       can be dragged; it must outlive the window.
- * @param[in] preferences  Whether a new result brings the window to the front; they must outlive the window.
+ * @param[in] preferences  Whether a new result brings the window to the front, and the wire coloring the Sensitivity
+ * tab sets; they must outlive the window.
  */
 OutputWindow::OutputWindow(Schematic &schematic, AnalysisControls &controls, TransientPlayback &playback,
-                           const Preferences &preferences)
+                           Preferences &preferences)
     : AppWindow("Output", true), m_Schematic(schematic), m_Controls(controls), m_Playback(playback),
       m_Preferences(preferences), m_MathChannels(schematic), m_Buses(schematic),
       m_TransientTab(schematic, controls, playback), m_SpectrumTab(schematic), m_ACSweepTab(schematic),
@@ -398,6 +403,10 @@ void OutputWindow::DrawTabs(const FrameResults &frame) {
         DrawTransferFunctionTab(m_Schematic);
         ImGui::EndTabItem();
     }
+    if (begin_tab("Sensitivity", PlotTab::SENSITIVITY)) {
+        DrawSensitivityTab(m_Schematic, m_Preferences);
+        ImGui::EndTabItem();
+    }
     if (begin_tab("Truth table", PlotTab::TRUTH_TABLE)) {
         DrawTruthTableTab(m_Schematic);
         ImGui::EndTabItem();
@@ -443,6 +452,7 @@ bool OutputWindow::CanExport(const FrameResults &frame) const {
         return m_NoiseTab.CanExport();
     case PlotTab::OPERATING_POINT:
     case PlotTab::TRANSFER_FUNCTION:
+    case PlotTab::SENSITIVITY:
     case PlotTab::TRUTH_TABLE:
     default:
         return false;
@@ -476,6 +486,7 @@ ExportFigure OutputWindow::BuildShownFigure(const FrameResults &frame, const boo
         return m_NoiseTab.BuildFigure();
     case PlotTab::OPERATING_POINT:
     case PlotTab::TRANSFER_FUNCTION:
+    case PlotTab::SENSITIVITY:
     case PlotTab::TRUTH_TABLE:
     default:
         return {};

@@ -69,6 +69,8 @@ std::string_view GetAnalysisKindName(const AnalysisKind kind) {
         return "noise";
     case AnalysisKind::TRANSFER_FUNCTION:
         return "transfer function";
+    case AnalysisKind::SENSITIVITY:
+        return "sensitivity";
     case AnalysisKind::TRUTH_TABLE:
         return "truth table";
     default:
@@ -92,6 +94,16 @@ std::optional<std::string> FindUnsupported(const SimulationBackend &backend, con
     for (const ComponentType part : parts) {
         const auto unsupported = capabilities.UnsupportedParts.find(part);
         if (unsupported != capabilities.UnsupportedParts.end()) {
+            return unsupported->second;
+        }
+    }
+    const auto in_analysis = capabilities.UnsupportedPartsByAnalysis.find(kind);
+    if (in_analysis == capabilities.UnsupportedPartsByAnalysis.end()) {
+        return std::nullopt;
+    }
+    for (const ComponentType part : parts) {
+        const auto unsupported = in_analysis->second.find(part);
+        if (unsupported != in_analysis->second.end()) {
             return unsupported->second;
         }
     }

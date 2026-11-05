@@ -523,6 +523,41 @@ TEST_CASE("The common-emitter amplifier has a mid-band gain of about 43 dB betwe
     CHECK(*bode.UpperCutoff > 5e6);
 }
 
+TEST_CASE("The bias example finds the divider resistors the most influential on the base voltage", "[examples]") {
+    GUI::Schematic schematic;
+    OpenExample("bias_sensitivity.imcsim", schematic);
+    const GUI::SimulationSettings &settings = schematic.GetSimulationSettings();
+    CHECK(settings.Selected == GUI::Analysis::SENSITIVITY);
+    REQUIRE(settings.SensitivityOutput.has_value());
+    const int base = static_cast<int>(NodeAt(schematic, *settings.SensitivityOutput));
+
+    const Core::SensitivityRun run = Core::RunSensitivity(schematic.BuildCircuit(), {.OutputNode = base});
+    if (!run.Result) {
+        FAIL(run.Result.error());
+    }
+    // ngspice notes that the sine source is taken at its DC value, which is no warning: a clean run reports none
+    for (const Core::SimulatorMessage &message : run.Messages) {
+        INFO(message.Text);
+        CHECK_FALSE(message.FromErrorStream);
+    }
+    const std::vector<Core::PartSensitivity> &parts = run.Result->Parts;
+    const auto find = [&parts](const std::string_view name) {
+        const auto found = std::ranges::find(parts, name, &Core::PartSensitivity::Name);
+        REQUIRE(found != parts.end());
+        return *found;
+    };
+    // The supply sets the base through the divider, so it leads, and R1 and R2 follow with opposite signs, a larger R1
+    // lowering the base and a larger R2 raising it, by about 1.5 V for 100 %
+    CHECK(parts.front().Name == "V1");
+    CHECK(find("R1").Normalized < 0.0);
+    CHECK(find("R2").Normalized > 0.0);
+    CHECK_THAT(std::abs(find("R1").Normalized), Catch::Matchers::WithinAbs(1.5, 0.2));
+    CHECK_THAT(std::abs(find("R2").Normalized), Catch::Matchers::WithinAbs(1.5, 0.2));
+    // The load and the collector side hardly matter for the bias
+    CHECK(std::abs(find("R5").Normalized) < 0.01 * std::abs(find("R1").Normalized));
+    CHECK(std::abs(find("R3").Normalized) < 0.2 * std::abs(find("R1").Normalized));
+}
+
 TEST_CASE("The current mirror copies the reference current while Q2 is out of saturation", "[examples]") {
     GUI::Schematic schematic;
     OpenExample("current_mirror.imcsim", schematic);

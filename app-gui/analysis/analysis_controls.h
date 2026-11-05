@@ -141,6 +141,7 @@ private:
     void RunDCSweepAnalysis(const Core::Circuit &circuit, const std::optional<StepPlan> &steps);
     void RunNoiseAnalysis(const Core::Circuit &circuit);
     void RunTransferFunctionAnalysis(const Core::Circuit &circuit);
+    void RunSensitivityAnalysis(const Core::Circuit &circuit);
     void RunTruthTableAnalysis(const Core::Circuit &circuit);
 
     // Results
