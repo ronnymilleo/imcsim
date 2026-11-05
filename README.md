@@ -121,14 +121,12 @@ This is a possible roadmap, not a promise: what comes next depends on what users
 it can change at any time. The ideas below are tracked as tasks in the project's backlog and grouped here by theme,
 roughly in the order they are likely to come.
 
-- **Digital**: the 555 timer, and Verilog modules placed as parts and simulated together with the analog circuit
+- **Digital**: Verilog modules placed as parts and simulated together with the analog circuit
 - **Analyses**: poles and zeros with an s-plane view, sensitivity shown on the schematic, S-parameters with a Smith chart
   and Touchstone export, transient noise sources, and Monte Carlo runs on top of the parameter step
 - **Sources, parts and models**: behavioral sources, XSPICE analog blocks, transmission lines, a circuit driven from a
   WAV or CSV file, more ready op-amp macromodels, and a MOSFET body diode and higher-level MOSFET models
-- **Live effects and plots**: overload sparks, a capacitor charge bar, inductor field lines, an animated lamp, motor and
-  buzzer, a fuse that blows, safe operating area warnings, and math channels in AC sweeps
-- **Platform**: a Flatpak release, and a web version with sharing by link
+- **Live effects and plots**: a fuse that blows, safe operating area warnings, and math channels in AC sweeps
 - **Longer term, a native simulation backend**: a solver written from published circuit theory that sits beside ngspice,
   which stays available, tested against closed-form results and built to use modern CPUs well. With the backend
   interface and capability matrix in place, it would come in steps: a linear core (operating point, DC and AC),
