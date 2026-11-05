@@ -1093,8 +1093,9 @@ nlohmann::json WriteSweepRange(const Core::SweepRange &range) {
 }
 
 /// File names of the analyses, in the order of the Analysis enum.
-constexpr auto ANALYSIS_KEYS = std::to_array<std::string_view>(
-    {"operating_point", "transient", "ac_sweep", "dc_sweep", "noise", "transfer_function", "truth_table"});
+constexpr auto ANALYSIS_KEYS =
+    std::to_array<std::string_view>({"operating_point", "transient", "ac_sweep", "dc_sweep", "noise",
+                                     "transfer_function", "sensitivity", "truth_table"});
 
 nlohmann::json WriteSettings(const SimulationSettings &settings) {
     nlohmann::json transient = nlohmann::json::object();
@@ -1114,6 +1115,10 @@ nlohmann::json WriteSettings(const SimulationSettings &settings) {
     if (settings.TransferFunctionOutput) {
         transfer_function["output"] = {settings.TransferFunctionOutput->X, settings.TransferFunctionOutput->Y};
     }
+    nlohmann::json sensitivity = nlohmann::json::object();
+    if (settings.SensitivityOutput) {
+        sensitivity["output"] = {settings.SensitivityOutput->X, settings.SensitivityOutput->Y};
+    }
     const nlohmann::json truth_table = {{"inputs", settings.TruthTableInputs}};
     const ParameterStepSettings &step = settings.ParameterStep;
     nlohmann::json parameter_step = {
@@ -1131,6 +1136,7 @@ nlohmann::json WriteSettings(const SimulationSettings &settings) {
          }},
         {"noise", noise},
         {"transfer_function", transfer_function},
+        {"sensitivity", sensitivity},
         {"truth_table", truth_table},
         {"parameter_step", parameter_step},
     };
@@ -1268,6 +1274,17 @@ std::expected<void, std::string> ReadTransferFunctionSettings(const nlohmann::js
     return {};
 }
 
+std::expected<void, std::string> ReadSensitivitySettings(const nlohmann::json &object, SimulationSettings &settings) {
+    if (object.contains("output")) {
+        const std::optional<GridPoint> output = ReadPoint(object, "output");
+        if (!output) {
+            return std::unexpected("have no valid output point");
+        }
+        settings.SensitivityOutput = *output;
+    }
+    return {};
+}
+
 std::expected<void, std::string> ReadTruthTableSettings(const nlohmann::json &object, SimulationSettings &settings) {
     const auto inputs = object.find("inputs");
     if (inputs == object.end()) {
@@ -1329,6 +1346,7 @@ constexpr auto ANALYSIS_READERS = std::to_array<AnalysisReader>({
     {"dc_sweep", "DC sweep", &ReadDCSweepSettings},
     {"noise", "noise", &ReadNoiseSettings},
     {"transfer_function", "transfer function", &ReadTransferFunctionSettings},
+    {"sensitivity", "sensitivity", &ReadSensitivitySettings},
     {"truth_table", "truth table", &ReadTruthTableSettings},
     {"parameter_step", "parameter step", &ReadParameterStepSettings},
 });

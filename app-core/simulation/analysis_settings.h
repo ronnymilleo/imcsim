@@ -108,6 +108,17 @@ struct TransferFunctionSettings {
 };
 
 /**
+ * @struct  SensitivitySettings
+ * @brief   The node whose DC voltage a sensitivity analysis measures.
+ * @details Every part with a value is varied one at a time around the DC operating point; there is nothing else to set.
+ */
+struct SensitivitySettings {
+    int OutputNode = 0;
+
+    bool operator==(const SensitivitySettings &) const = default;
+};
+
+/**
  * @struct  TruthTableSettings
  * @brief   Which logic inputs a truth table varies and which nodes it reads.
  * @details Inputs are named logic inputs, the first being the most significant bit of the row number.

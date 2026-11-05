@@ -267,6 +267,24 @@ TransferFunctionRun RunTransferFunction(const Circuit &circuit, const TransferFu
 }
 
 /**
+ * @brief   Finds how much the DC voltage of a node changes with the value of each part of the circuit.
+ * @param[in] circuit   Circuit to simulate; it needs a ground component.
+ * @param[in] settings  Output node.
+ * @return  The sensitivity of every resistor, capacitor, inductor, source and potentiometer, and of every block by its
+ *          most influential element, or an error, plus every line ngspice printed. Invalid settings are rejected
+ *          before reaching the backend.
+ * @note    ngspice linearizes the circuit at its DC operating point, so a circuit driven only by AC sources reads zero.
+ *          Not thread-safe: the backend in use may be a single global instance, as ngspice is.
+ */
+SensitivityRun RunSensitivity(const Circuit &circuit, const SensitivitySettings &settings) {
+    if (const std::optional<std::string> error =
+            FindProblem(circuit, CheckSensitivitySettings(circuit, settings), AnalysisKind::SENSITIVITY)) {
+        return {std::unexpected(*error), {}};
+    }
+    return GetBackend().RunSensitivity(circuit, settings);
+}
+
+/**
  * @brief   Runs every combination of some logic inputs and reads what the output nodes give.
  * @param[in] circuit   Circuit to simulate; it needs a ground component, unless it holds only clocks, logic inputs,
  *                      logic parts and supply rails.

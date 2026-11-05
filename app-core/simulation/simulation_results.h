@@ -6,7 +6,9 @@
 #ifndef IMCSIM_SIMULATION_RESULTS_H
 #define IMCSIM_SIMULATION_RESULTS_H
 
+#include "components/component.h"
 #include <expected>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -169,6 +171,39 @@ struct TransferFunction {
 };
 
 /**
+ * @struct  PartSensitivity
+ * @brief   How much the output node voltage changes with the value of one part.
+ * @details Absolute is in volts per unit of the part (V/Ohm, V/F, V/V...). Normalized is the change in volts for a
+ *          100 % change of the value, which compares parts of different kinds; its sign is the sign of the change of
+ *          the output when the value grows. A block reports its most influential element inside, named by Element,
+ *          and a potentiometer the two halves together, as its total resistance.
+ */
+struct PartSensitivity {
+    std::string Name;
+    /// Kind of the part, which tells how the schematic labels it.
+    ComponentType Type = ComponentType::RESISTOR;
+    /// The element inside the block that has the largest normalized sensitivity, such as "R1"; empty for other parts.
+    std::string Element;
+    /// Unit of the value of the part, as Component::GetUnit() gives it; empty for a gain.
+    std::string Unit;
+    /// None for an element inside a block, whose value the results do not carry.
+    std::optional<double> Value;
+    double Absolute = 0.0;
+    double Normalized = 0.0;
+};
+
+/**
+ * @struct  Sensitivity
+ * @brief   The DC sensitivity of the voltage of a node to every part with a value, around the operating point.
+ * @details Parts are listed from the largest absolute normalized sensitivity to the smallest. Diodes, transistors,
+ *          op-amps, switches and other parts without a value of their own are not listed.
+ */
+struct Sensitivity {
+    int OutputNode = 0;
+    std::vector<PartSensitivity> Parts;
+};
+
+/**
  * @struct  TruthTableRow
  * @brief   One combination of the inputs and the voltages it gives at the output nodes.
  * @details The voltages are empty when ngspice found no operating point for the combination, as a latch whose
@@ -210,6 +245,7 @@ using TransientRun = SimulationRun<Transient>;
 using ACSweepRun = SimulationRun<ACSweep>;
 using DCSweepRun = SimulationRun<DCSweep>;
 using NoiseRun = SimulationRun<Noise>;
+using SensitivityRun = SimulationRun<Sensitivity>;
 using TransferFunctionRun = SimulationRun<TransferFunction>;
 using TruthTableRun = SimulationRun<TruthTable>;
 

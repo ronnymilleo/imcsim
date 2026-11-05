@@ -41,6 +41,7 @@ enum class PlotTab {
     DC_SWEEP,
     NOISE,
     TRANSFER_FUNCTION,
+    SENSITIVITY,
     TRUTH_TABLE
 };
 
@@ -74,7 +75,7 @@ enum class PlotTab {
 class OutputWindow : public AppWindow {
 public:
     OutputWindow(Schematic &schematic, AnalysisControls &controls, TransientPlayback &playback,
-                 const Preferences &preferences);
+                 Preferences &preferences);
     ~OutputWindow() override = default;
 
     void ShowTab(PlotTab tab, bool may_come_to_front = true);
@@ -83,8 +84,8 @@ private:
     Schematic &m_Schematic;
     AnalysisControls &m_Controls;
     TransientPlayback &m_Playback;
-    /// Whether a new result brings the window to the front.
-    const Preferences &m_Preferences;
+    /// Whether a new result brings the window to the front, and the coloring the Sensitivity tab switches on.
+    Preferences &m_Preferences;
 
     // Math channels
     MathChannels m_MathChannels;

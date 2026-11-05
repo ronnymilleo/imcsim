@@ -23,6 +23,15 @@ elements, so the results are those of ngspice with the models below. Some things
   independent source to an output node, with the resistance seen by the source and the resistance looking back into
   the output. It is the same small-signal model an AC sweep uses, so the gain agrees with what the sweep would show
   at 0 Hz.
+- A sensitivity analysis is ngspice's DC `.sens`: it differentiates the voltage of one node with respect to the value
+  of each element at the DC operating point. imcsim lists the value of resistors, capacitors, inductors, sources and
+  supply rails, the gain of controlled sources, the two halves of a potentiometer together (the sum of their normalized
+  sensitivities, which is the sensitivity to its total resistance), and for a block its most influential element.
+  Parts that are several elements in the netlist, such as op-amps, fuses, relays and transformers, and parts with no
+  value, such as switches, are not listed. ngspice also reports model parameters of diodes and transistors, but most
+  read the same meaningless number or nan, so they are left out. Logic parts are refused, since ngspice cannot recover
+  from a sensitivity analysis that holds them. The AC form of `.sens` is not used: ngspice leaves the small-signal
+  conductance of forward-biased diodes and transistors out of it, so it is wrong for nonlinear circuits.
 - A truth table runs one operating point per combination of the chosen logic inputs, each on a copy of the circuit
   with the inputs set, so a row never depends on the one before it. That describes combinational logic; a latch or
   flip-flop that holds its state has no operating point for those combinations, and the row reads X.

@@ -19,8 +19,9 @@ namespace GUI {
 
 /**
  * @enum    WireColoring
- * @brief   What the colors of wires (and, by current and power, of parts) show.
- * @details Voltage, Current and Power color by the state on display, on a heat scale with a legend.
+ * @brief   What the colors of wires (and, by current, power and sensitivity, of parts) show.
+ * @details Voltage, Current and Power color by the state on display, on a heat scale with a legend. Sensitivity colors
+ *          the parts by their influence on the output of the last sensitivity analysis, and leaves the wires plain.
  */
 enum class WireColoring {
     PLAIN,
@@ -28,6 +29,7 @@ enum class WireColoring {
     VOLTAGE,
     CURRENT,
     POWER,
+    SENSITIVITY,
     COUNT
 };
 

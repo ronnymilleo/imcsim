@@ -60,6 +60,7 @@ private:
     void DrawDCSweepSettings(SimulationSettings &settings);
     void DrawNoiseSettings(SimulationSettings &settings);
     void DrawTransferFunctionSettings(SimulationSettings &settings);
+    void DrawSensitivitySettings(SimulationSettings &settings);
     void DrawTruthTableSettings(SimulationSettings &settings);
     void DrawParameterStepSettings(SimulationSettings &settings);
     void DrawParameterPicker(ParameterStepSettings &step, const Core::Circuit &circuit);

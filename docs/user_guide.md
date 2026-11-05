@@ -120,7 +120,7 @@ How to read what imcsim measures, plots and exports. The [README](../README.md) 
 - **Find a part**: press Space over the editor, type part of a name (`mos`, `zener`, `opamp`, `nmos`, `vcvs`), move
   with Up and Down, and press Enter to start placing it.
 - **Running**: the ▶ button at the end of the toolbar, or F5, runs the analysis named beside it. That button opens
-  the list of analyses (operating point, transient, AC sweep, DC sweep, noise, transfer function and truth table) and the settings
+  the list of analyses (operating point, transient, AC sweep, DC sweep, noise, transfer function, sensitivity and truth table) and the settings
   of the one picked, saved with the schematic. Suggest fills the transient times (five periods of the slowest source with a waveform, 200
   points in a period of the fastest) or the AC range (two decades past the RC, RL and LC corners and the op-amp
   bandwidths). By default nothing runs by itself: edit the circuit, then run again, or turn on Run again after edits
@@ -267,7 +267,9 @@ right](images/spice_import.png)
 **View > Wire Colors** picks what the wires show. **Plain** keeps them in the theme color and **Nodes** colors each
 wire by its node, numbered on the canvas. **Voltage**, **Current** and **Power** color the wires (Power only the
 parts, since wires carry none) on a heat scale, with a legend at the bottom left. They need a result on the schematic:
-run an operating point or a transient first, or they have nothing to show.
+run an operating point or a transient first, or they have nothing to show. **Sensitivity** colors the parts by their
+influence on the output of a sensitivity analysis (see below) and leaves the wires plain, so it needs that analysis
+run first.
 
 Over these colors a selected wire gets a halo and a selected part an outline in the selection color, instead of turning that color,
 and the voltage labels switch to the text color of the canvas, so neither passes for a value on the scale.
@@ -279,6 +281,9 @@ and the voltage labels switch to the text color of the canvas, so neither passes
   voltage of each terminal times the current into it, so a resistor shows its dissipation and a source that delivers
   power shows it too: colors follow the size of the power, and the hover tooltip gives its sign (negative when the part
   delivers power).
+- **Sensitivity** colors each part the sensitivity analysis lists by the size of its normalized sensitivity, on a
+  logarithmic scale of four decades below the largest one; the legend gives the volts for a 1 % change of the value (titled with
+  the output it refers to), and marks the floor with `<`. Parts the analysis does not list, such as diodes, transistors and ground, keep the theme color.
 
 ## Transient on the schematic
 
@@ -623,6 +628,38 @@ The Transfer function tab of the Output window is a table of three values:
 
 An output an ideal voltage source holds has an output impedance of 0 Ohm, and an input path held open reads as
 `open` rather than a giant number. The table is a readout like the operating point, so it is not exported.
+
+## Sensitivity
+
+The Sensitivity analysis tells which parts matter most for one node voltage: ngspice's `.sens` changes the value of
+every part a little, one at a time, around the DC operating point, and reports how much the voltage of the output moves.
+Pick it beside Run, then set **Output**, the node whose voltage is measured, picked as in the noise analysis and kept by
+a point of its node. A circuit with logic gates or flip-flops cannot run it (ngspice cannot recover from it), and the
+analysis is disabled with that reason as its tooltip.
+
+The parts listed are resistors, capacitors, inductors, voltage and current sources and supply rails (their DC value),
+and the gain of controlled sources. A potentiometer counts as its total resistance, the sum of its two halves. A block
+is listed by the element inside it that matters most, named as `X2.R1`. Diodes, transistors, op-amps, switches, relays,
+fuses, transformers and logic parts are not listed, and the model parameters of diodes and transistors are not shown:
+ngspice reports them, but unreliably.
+
+The Sensitivity tab of the Output window is a table sorted by influence, with a click on a row selecting the part:
+
+- **Value**: the value of the part, when the result carries it (not for an element inside a block).
+- **Absolute**: the change of the output voltage per unit of the value, in V/Ohm, V/F, V/H or V/V.
+- **Per 1 %**: the change of the output voltage, in volts, for a value 1 % higher. This normalized sensitivity compares
+  parts of different kinds, which the absolute one does not, and it is what the colors follow.
+- **Share of largest**: the size of the part's normalized sensitivity as a share of the largest one.
+
+The sign says the direction: negative means a higher value lowers the output voltage, positive that it raises it. A
+voltage source's row is the share of the output it gives, and a capacitor, which is open at DC, reads zero.
+
+It is a small-signal DC analysis at the operating point, so a circuit driven only by AC sources has no DC output to
+move and reads zero everywhere; give it a DC level, or use the AC sweep instead. The table is a readout like the
+operating point, so it is not exported. To see the same values on the schematic, tick **Color the schematic** at the top of the tab, which is the same as
+**View > Wire Colors > Sensitivity**; untick it to go back to plain wires. The legend then reads "Change of V(out) per
+1 %", with the volts for a 1 % change at its two ends. A supply rail is named in the table as on the schematic, such
+as `VCC 12V`; clicking its row still selects it.
 
 ## Truth table
 

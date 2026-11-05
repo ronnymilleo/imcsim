@@ -44,6 +44,7 @@ add_library(imcsim-core-lib
             simulation/live_change.cpp
             simulation/ratings.cpp
             simulation/run_control.cpp
+            simulation/sensitivity.cpp
             simulation/simulation_backend.cpp
             simulation/simulation_results.cpp
             simulation/simulation_service.cpp

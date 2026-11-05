@@ -21,6 +21,7 @@
 #include "simulation/simulation_results.h"
 #include <cstddef>
 #include <optional>
+#include <string>
 #include <vector>
 
 namespace GUI {
@@ -69,9 +70,17 @@ public:
     void DrawGlows(ImDrawList *draw_list, const ViewTransform &view, const Schematic &schematic, float zoom) const;
     void DrawNodeVoltages(ImDrawList *draw_list, const ViewTransform &view, Schematic &schematic) const;
     void DrawHoveredValue(const MeasurementTarget &target, Schematic &schematic) const;
-    void DrawColorLegend(ImDrawList *draw_list, ImVec2 origin, ImVec2 size) const;
+    void DrawColorLegend(ImDrawList *draw_list, ImVec2 origin, ImVec2 size, Schematic &schematic) const;
 
 private:
+    /// The values at the two ends of the legend.
+    struct LegendLabels {
+        std::string Low;
+        std::string High;
+        /// What the colors measure, drawn above the bar, or empty.
+        std::string Title;
+    };
+
     GlowRenderer &m_GlowRenderer;
     /// The instant of the transient shown, and the window of points the scale goes over.
     const TransientPlayback &m_Playback;
@@ -97,6 +106,7 @@ private:
 
     // Parts
     ImU32 GetElementColor(const Schematic &schematic, std::size_t index) const;
+    ImU32 GetSensitivityColor(const Schematic &schematic, std::size_t index) const;
     void DrawLogicReading(SchematicCanvas &canvas, const ViewTransform &view, const UIElement &element,
                           std::size_t index) const;
 
@@ -112,8 +122,9 @@ private:
     void UpdateFuses(Schematic &schematic, const Core::Transient *shown, std::optional<double> instant);
 
     // Heat colors
+    std::optional<LegendLabels> GetLegendLabels(Schematic &schematic) const;
     bool AreWiresHeatColored() const;
-    bool ArePartsHeatColored() const;
+    bool ArePartsHeatColored(const Schematic &schematic) const;
 };
 
 } // namespace GUI

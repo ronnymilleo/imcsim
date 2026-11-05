@@ -486,6 +486,8 @@ void Application::ShowNewResults() {
     show_if_new(m_ShownNoiseVersion, m_Schematic.GetNoiseVersion(), m_Schematic.GetNoise().has_value(), PlotTab::NOISE);
     show_if_new(m_ShownTransferFunctionVersion, m_Schematic.GetTransferFunctionVersion(),
                 m_Schematic.GetTransferFunction().has_value(), PlotTab::TRANSFER_FUNCTION);
+    show_if_new(m_ShownSensitivityVersion, m_Schematic.GetSensitivityVersion(),
+                m_Schematic.GetSensitivity().has_value(), PlotTab::SENSITIVITY);
     show_if_new(m_ShownTruthTableVersion, m_Schematic.GetTruthTableVersion(), m_Schematic.GetTruthTable().has_value(),
                 PlotTab::TRUTH_TABLE);
 }

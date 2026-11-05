@@ -50,6 +50,8 @@ Core::AnalysisKind ToKind(const Analysis analysis) {
         return Core::AnalysisKind::NOISE;
     case Analysis::TRANSFER_FUNCTION:
         return Core::AnalysisKind::TRANSFER_FUNCTION;
+    case Analysis::SENSITIVITY:
+        return Core::AnalysisKind::SENSITIVITY;
     case Analysis::TRUTH_TABLE:
         return Core::AnalysisKind::TRUTH_TABLE;
     default:
@@ -207,6 +209,9 @@ void AnalysisSettingsPanel::DrawSettings() {
         break;
     case Analysis::TRANSFER_FUNCTION:
         DrawTransferFunctionSettings(settings);
+        break;
+    case Analysis::SENSITIVITY:
+        DrawSensitivitySettings(settings);
         break;
     case Analysis::TRUTH_TABLE:
         DrawTruthTableSettings(settings);
@@ -406,6 +411,29 @@ void AnalysisSettingsPanel::DrawTransferFunctionSettings(SimulationSettings &set
         ImGui::EndCombo();
     }
     ImGui::SetItemTooltip("The DC gain, the input impedance and the output impedance from this source to the output");
+}
+
+/**
+ * @brief   The output picker lists every node by the label the plots give it, as the transfer function one does.
+ */
+void AnalysisSettingsPanel::DrawSensitivitySettings(SimulationSettings &settings) {
+    const Core::Circuit circuit = m_Schematic.BuildCircuit();
+    const std::optional<int> output = ResolveOutputNode(settings.SensitivityOutput, circuit, m_Schematic);
+    if (!output) {
+        ImGui::TextDisabled("Connect some parts to measure their sensitivity");
+        return;
+    }
+    const Connectivity &connectivity = m_Schematic.GetConnectivity();
+    DrawFieldLabel("Output");
+    if (ImGui::BeginCombo("##sensitivity_output", GetVoltageLabel(connectivity, *output).c_str())) {
+        for (int node = 1; node < circuit.GetNodeCount(); ++node) {
+            if (ImGui::Selectable(GetVoltageLabel(connectivity, node).c_str(), node == *output)) {
+                settings.SensitivityOutput = connectivity.FindPointOfNode(node);
+            }
+        }
+        ImGui::EndCombo();
+    }
+    ImGui::SetItemTooltip("How much the DC voltage of this node changes with the value of each part");
 }
 
 /**

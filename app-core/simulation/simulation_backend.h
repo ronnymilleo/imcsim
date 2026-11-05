@@ -34,6 +34,7 @@ enum class AnalysisKind {
     DC_SWEEP,
     NOISE,
     TRANSFER_FUNCTION,
+    SENSITIVITY,
     TRUTH_TABLE
 };
 
@@ -46,6 +47,8 @@ struct BackendCapabilities {
     std::set<AnalysisKind> Analyses;
     /// Parts the backend cannot simulate, each with the reason shown to the user.
     std::map<ComponentType, std::string> UnsupportedParts;
+    /// Parts the backend cannot simulate in one analysis only, each with the reason shown to the user.
+    std::map<AnalysisKind, std::map<ComponentType, std::string>> UnsupportedPartsByAnalysis;
 };
 
 /**
@@ -144,6 +147,13 @@ public:
      */
     virtual TransferFunctionRun RunTransferFunction(const Circuit &circuit,
                                                     const TransferFunctionSettings &settings) = 0;
+    /**
+     * @brief   Finds how much the DC voltage of a node changes with the value of each part of the circuit.
+     * @param[in] circuit   Circuit to simulate, already checked.
+     * @param[in] settings  Output node, already checked.
+     * @return  The sensitivity of every part with a value, or an error, plus the messages of the backend.
+     */
+    virtual SensitivityRun RunSensitivity(const Circuit &circuit, const SensitivitySettings &settings) = 0;
 };
 
 // Backend in use

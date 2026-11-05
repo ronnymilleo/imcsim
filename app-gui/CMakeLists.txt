@@ -14,6 +14,7 @@ add_library(imcsim-gui-lib
             analysis/parameter_step.cpp
             analysis/playback.cpp
             analysis/point_window.cpp
+            analysis/sensitivity_view.cpp
             analysis/transient_window.cpp
             analysis/truth_table.cpp
             application.cpp
