@@ -9,6 +9,7 @@
 #include "components/clock.h"
 #include "components/controlled_source.h"
 #include "components/diode.h"
+#include "components/fuse.h"
 #include "components/logic_input.h"
 #include "components/logic_output.h"
 #include "components/logic_part.h"
@@ -67,6 +68,13 @@ constexpr auto SWITCH_KEYS = std::to_array<ParameterKey<Core::SwitchParameters>>
     {"hysteresis", &Core::SwitchParameters::Hysteresis},
     {"on_resistance", &Core::SwitchParameters::OnResistance},
     {"off_resistance", &Core::SwitchParameters::OffResistance},
+});
+
+constexpr auto FUSE_KEYS = std::to_array<ParameterKey<Core::FuseParameters>>({
+    {"rated_current", &Core::FuseParameters::RatedCurrent},
+    {"melting_i2t", &Core::FuseParameters::MeltingI2t},
+    {"cold_resistance", &Core::FuseParameters::ColdResistance},
+    {"blown_resistance", &Core::FuseParameters::BlownResistance},
 });
 
 constexpr auto RELAY_KEYS = std::to_array<ParameterKey<Core::RelayParameters>>({
@@ -437,8 +445,8 @@ void WriteKindFields(const Core::Component &component, nlohmann::json &object) {
 }
 
 /**
- * @brief   Parts whose figures are all there is to them: the switch that follows a voltage, the relay, the transformer,
- *          the gates and flip-flops with their logic family, a clock and a logic input.
+ * @brief   Parts whose figures are all there is to them: the switch that follows a voltage, the relay, the fuse, the
+ * transformer, the gates and flip-flops with their logic family, a clock and a logic input.
  */
 void WriteFigureFields(const Core::Component &component, nlohmann::json &object) {
     const Core::ComponentType type = component.GetType();
@@ -446,6 +454,8 @@ void WriteFigureFields(const Core::Component &component, nlohmann::json &object)
         WritePartParameters(static_cast<const Core::VoltageControlledSwitch &>(component), SWITCH_KEYS, object);
     } else if (type == Core::ComponentType::RELAY) {
         WritePartParameters(static_cast<const Core::Relay &>(component), RELAY_KEYS, object);
+    } else if (type == Core::ComponentType::FUSE) {
+        WritePartParameters(static_cast<const Core::Fuse &>(component), FUSE_KEYS, object);
     } else if (type == Core::ComponentType::TRANSFORMER) {
         WritePartParameters(static_cast<const Core::Transformer &>(component), TRANSFORMER_KEYS, object);
     } else if (Core::IsLogicPart(type)) {
@@ -795,6 +805,13 @@ std::expected<void, std::string> ReadRelayFigures(const nlohmann::json &object, 
     return ReadPartParameters(object, static_cast<Core::Relay &>(component), RELAY_KEYS);
 }
 
+std::expected<void, std::string> ReadFuseFigures(const nlohmann::json &object, Core::Component &component) {
+    if (component.GetType() != Core::ComponentType::FUSE) {
+        return {};
+    }
+    return ReadPartParameters(object, static_cast<Core::Fuse &>(component), FUSE_KEYS);
+}
+
 std::expected<void, std::string> ReadTransformerFigures(const nlohmann::json &object, Core::Component &component) {
     if (component.GetType() != Core::ComponentType::TRANSFORMER) {
         return {};
@@ -854,12 +871,12 @@ std::expected<void, std::string> ReadSevenSegmentFigures(const nlohmann::json &o
 }
 
 constexpr auto FIGURE_READERS = std::to_array<StateReader>(
-    {&ReadSwitchFigures, &ReadRelayFigures, &ReadTransformerFigures, &ReadLogicFigures, &ReadClockFigures,
-     &ReadLogicInputFigures, &ReadLogicOutputFigures, &ReadSevenSegmentFigures});
+    {&ReadSwitchFigures, &ReadRelayFigures, &ReadFuseFigures, &ReadTransformerFigures, &ReadLogicFigures,
+     &ReadClockFigures, &ReadLogicInputFigures, &ReadLogicOutputFigures, &ReadSevenSegmentFigures});
 
 /**
- * @brief   Parts whose figures are all there is to them: the switch that follows a voltage, the relay, the transformer,
- *          the gates and flip-flops with their logic family, a clock and a logic input.
+ * @brief   Parts whose figures are all there is to them: the switch that follows a voltage, the relay, the fuse, the
+ * transformer, the gates and flip-flops with their logic family, a clock and a logic input.
  */
 std::expected<void, std::string> ReadFigureFields(const nlohmann::json &object, Core::Component &component) {
     for (const StateReader reader : FIGURE_READERS) {

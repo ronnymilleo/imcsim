@@ -8,6 +8,7 @@
 #include "components/bjt.h"
 #include "components/diode.h"
 #include "components/mosfet.h"
+#include "simulation/fuse_state.h"
 #include "spice/spice_value.h"
 #include <algorithm>
 #include <format>
@@ -235,7 +236,7 @@ void AddRatingWarnings(const Circuit &circuit, OperatingPoint &result) {
 
 /**
  * @brief   Adds the warnings a transient earns, with voltages and transistor currents checked at their peak, and power
- * and diode forward current on average.
+ * and diode forward current on average, and the time each fuse blew.
  * @param[in] circuit  Circuit the result is of.
  * @param[in,out] result  Transient to add the warnings to; its currents must include every probed current of the
  *                        circuit.
@@ -261,6 +262,11 @@ void AddRatingWarnings(const Circuit &circuit, Transient &result) {
         if (IsBJT(entry.Part->GetType()) || IsMOSFET(entry.Part->GetType())) {
             std::ranges::move(RatingWarnings(*entry.Part, result.Times, TransientTerminals(entry, result)),
                               std::back_inserter(result.Warnings));
+        }
+    }
+    for (const CircuitEntry &entry : circuit.GetEntries()) {
+        if (const std::optional<double> blow_time = FindFuseBlowTime(*entry.Part, entry.Nodes, result)) {
+            result.Warnings.push_back(std::format("{} blew at {}s", entry.Part->GetName(), FormatValue(*blow_time)));
         }
     }
 }

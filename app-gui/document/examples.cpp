@@ -227,6 +227,17 @@ constexpr auto EXAMPLES = std::to_array<Example>({
         .FileName = "relay_driver.imcsim",
     },
     {
+        .Title = "Fast and slow-blow fuses",
+        .Group = "Protection",
+        .Description =
+            "A 5 V supply feeds two 4 Ohm loads, 1.2 A each, through a 1 A fast fuse (FU1) and a 1 A slow-blow "
+            "fuse (FU2). Run the transient: FU1 blows after about 0.18 s and FU2 after about 1.2 s, for the same "
+            "overload, and each branch loses its current in the same run; the Output window warns when each blew, "
+            "and a flash marks it on the schematic. A fuse never blows below its rating, and every run starts with "
+            "both whole, so the operating point, a DC sweep and an AC sweep always see them closed.",
+        .FileName = "fuse_fast_and_slow_blow.imcsim",
+    },
+    {
         .Title = "Transformer power supply",
         .Group = "Transformers",
         .Description = "A 2:1 transformer (100 mH primary, 0.999 coupling, 0.1 Ohm windings) steps a 34 V peak, 60 Hz "

@@ -167,6 +167,13 @@ constexpr auto RELAY_FIELDS = std::to_array<ParameterField<Core::RelayParameters
     {"Contact R", &Core::RelayParameters::ContactResistance, "Ohm"},
 });
 
+constexpr auto FUSE_FIELDS = std::to_array<ParameterField<Core::FuseParameters>>({
+    {"Rated current", &Core::FuseParameters::RatedCurrent, "A"},
+    {"Melting I2t", &Core::FuseParameters::MeltingI2t, "A2s"},
+    {"Cold R", &Core::FuseParameters::ColdResistance, "Ohm"},
+    {"Blown R", &Core::FuseParameters::BlownResistance, "Ohm"},
+});
+
 constexpr auto TRANSFORMER_FIELDS = std::to_array<ParameterField<Core::TransformerParameters>>({
     {"Turns ratio", &Core::TransformerParameters::TurnsRatio, ":1"},
     {"Coupling", &Core::TransformerParameters::Coupling, ""},
@@ -307,10 +314,10 @@ bool HasFields(const Core::Component &component) {
     if (component.HasValue() || Core::IsSwitch(type) || Core::IsLogicPart(type) || Core::IsSubcircuitPin(type)) {
         return true;
     }
-    static constexpr auto OTHER_TYPES =
-        std::to_array({Core::ComponentType::NET_LABEL, Core::ComponentType::SUBCIRCUIT, Core::ComponentType::V_SWITCH,
-                       Core::ComponentType::RELAY, Core::ComponentType::CLOCK, Core::ComponentType::LOGIC_INPUT,
-                       Core::ComponentType::LOGIC_OUTPUT, Core::ComponentType::SEVEN_SEGMENT});
+    static constexpr auto OTHER_TYPES = std::to_array(
+        {Core::ComponentType::NET_LABEL, Core::ComponentType::SUBCIRCUIT, Core::ComponentType::V_SWITCH,
+         Core::ComponentType::RELAY, Core::ComponentType::FUSE, Core::ComponentType::CLOCK,
+         Core::ComponentType::LOGIC_INPUT, Core::ComponentType::LOGIC_OUTPUT, Core::ComponentType::SEVEN_SEGMENT});
     return std::ranges::contains(OTHER_TYPES, type);
 }
 
@@ -339,8 +346,9 @@ bool ShowsValueFields(const Core::Component &component) {
     }
     // The switches that follow a voltage, the logic parts, a clock and the logic inputs and outputs have only their
     // parameters
-    if (type == Core::ComponentType::V_SWITCH || type == Core::ComponentType::RELAY || Core::IsLogicPart(type) ||
-        type == Core::ComponentType::CLOCK || type == Core::ComponentType::LOGIC_INPUT || Core::IsLogicDisplay(type)) {
+    if (type == Core::ComponentType::V_SWITCH || type == Core::ComponentType::RELAY ||
+        type == Core::ComponentType::FUSE || Core::IsLogicPart(type) || type == Core::ComponentType::CLOCK ||
+        type == Core::ComponentType::LOGIC_INPUT || Core::IsLogicDisplay(type)) {
         return true;
     }
     return component.HasValue();
@@ -507,6 +515,8 @@ bool PartEditor::DrawSettingPart(Core::Component &component) {
         DrawControlledSwitch(static_cast<Core::VoltageControlledSwitch &>(component));
     } else if (type == Core::ComponentType::RELAY) {
         DrawRelay(static_cast<Core::Relay &>(component));
+    } else if (type == Core::ComponentType::FUSE) {
+        DrawFuse(static_cast<Core::Fuse &>(component));
     } else if (Core::IsLogicPart(type)) {
         DrawLogicPart(static_cast<Core::LogicPart &>(component));
     } else if (type == Core::ComponentType::CLOCK) {
@@ -663,6 +673,8 @@ void PartEditor::LoadSettingFields(const Core::Component &component) {
                             static_cast<const Core::VoltageControlledSwitch &>(component).GetParameters());
     } else if (type == Core::ComponentType::RELAY) {
         LoadParameterFields(RELAY_FIELDS, m_RelayFields, static_cast<const Core::Relay &>(component).GetParameters());
+    } else if (type == Core::ComponentType::FUSE) {
+        LoadParameterFields(FUSE_FIELDS, m_FuseFields, static_cast<const Core::Fuse &>(component).GetParameters());
     } else if (Core::IsLogicPart(type)) {
         LoadParameterFields(LOGIC_FIELDS, m_LogicFields,
                             static_cast<const Core::LogicPart &>(component).GetParameters());
@@ -814,6 +826,40 @@ void PartEditor::DrawRelay(Core::Relay &relay) {
         m_Schematic->MarkModified();
     }
     ImGui::TextDisabled("The contact follows the coil current, so it lags by L over R");
+}
+
+/**
+ * @brief   A combo of ready fuses fills the figures, which stay editable, and the cooling time constant that they
+ *          imply is shown read-only.
+ */
+void PartEditor::DrawFuse(Core::Fuse &fuse) {
+    Core::FuseParameters parameters = fuse.GetParameters();
+    const std::span<const Core::ReadyFuse> ready_fuses = Core::GetReadyFuses();
+    const auto matching = std::ranges::find(ready_fuses, parameters, &Core::ReadyFuse::Parameters);
+    const Core::ReadyFuse *selected = matching != ready_fuses.end() ? &*matching : nullptr;
+    DrawFieldLabel("Ready fuse");
+    if (ImGui::BeginCombo("##ReadyFuse", selected != nullptr ? selected->Name : "Custom")) {
+        for (const Core::ReadyFuse &ready : ready_fuses) {
+            const bool is_selected = &ready == selected;
+            if (ImGui::Selectable(ready.Name, is_selected) && !is_selected) {
+                fuse.SetParameters(ready.Parameters);
+                LoadParameterFields(FUSE_FIELDS, m_FuseFields, ready.Parameters);
+                m_Schematic->MarkModified();
+            }
+        }
+        ImGui::EndCombo();
+    }
+    parameters = fuse.GetParameters();
+    const auto is_valid = [](const Core::FuseParameters &candidate) {
+        return Core::Fuse::IsValidParameters(candidate);
+    };
+    if (DrawParameterFields(FUSE_FIELDS, m_FuseFields, "", is_valid, parameters)) {
+        fuse.SetParameters(parameters);
+        m_Schematic->MarkModified();
+    }
+    ImGui::TextDisabled("Cooling time constant: %ss",
+                        Core::FormatValue(Core::GetCoolingTimeConstant(parameters)).c_str());
+    ImGui::TextDisabled("Never blows below the rated current; blows open for the rest of the run, and starts whole");
 }
 
 /**

@@ -5,6 +5,7 @@
 
 #include "analysis/analysis_inputs.h"
 #include "analysis/circuit_snapshot.h"
+#include "analysis/fuse_readings.h"
 #include "analysis/logic_outputs.h"
 #include "components/potentiometer.h"
 #include "components/seven_segment.h"
@@ -1048,4 +1049,38 @@ TEST_CASE("The 8-bit counter of two nested 4-bit blocks carries into its high ni
     for (const std::size_t bit : bits) {
         CHECK(std::ranges::contains(logic_nodes, static_cast<int>(bit), &GUI::LogicNode::Node));
     }
+}
+
+TEST_CASE("The fuse example blows the fast fuse first and the slow-blow one later, each cutting its branch",
+          "[examples][fuse]") {
+    GUI::Schematic schematic;
+    OpenExample("fuse_fast_and_slow_blow.imcsim", schematic);
+
+    const Core::TransientRun run =
+        Core::RunTransient(schematic.BuildCircuit(), schematic.GetSimulationSettings().Transient);
+    REQUIRE(run.Result.has_value());
+    const Core::Transient &transient = *run.Result;
+    const std::vector<std::optional<double>> blow_times =
+        GUI::FindFuseBlowTimes(schematic.GetElements(), schematic.GetConnectivity(), transient);
+    const auto blow_time_of = [&](const std::string_view name) -> std::optional<double> {
+        for (std::size_t index = 0; index < schematic.GetElements().size(); ++index) {
+            if (schematic.GetElements()[index]->GetComponent().GetName() == name) {
+                return blow_times[index];
+            }
+        }
+        return std::nullopt;
+    };
+    const std::optional<double> fast = blow_time_of("FU1");
+    const std::optional<double> slow = blow_time_of("FU2");
+    REQUIRE(fast.has_value());
+    REQUIRE(slow.has_value());
+    CHECK_THAT(*fast, Catch::Matchers::WithinRel(0.18, 0.1));
+    CHECK_THAT(*slow, Catch::Matchers::WithinRel(1.2, 0.1));
+    // Each branch loses its current in the same run, and it was carrying 1.2 A before
+    const auto current = [&transient](const std::string &name) -> const std::vector<double> & {
+        return std::ranges::find(transient.Currents, name, &Core::ComponentTrace::Name)->Values;
+    };
+    CHECK_THAT(current("FU1").front(), Catch::Matchers::WithinAbs(1.2, 0.01));
+    CHECK_THAT(current("FU1").back(), Catch::Matchers::WithinAbs(0.0, 1e-6));
+    CHECK_THAT(current("FU2").back(), Catch::Matchers::WithinAbs(0.0, 1e-6));
 }

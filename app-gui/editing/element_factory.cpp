@@ -12,6 +12,7 @@
 #include "ui_elements/ui_controlled_switch.h"
 #include "ui_elements/ui_current_source.h"
 #include "ui_elements/ui_diode.h"
+#include "ui_elements/ui_fuse.h"
 #include "ui_elements/ui_ground.h"
 #include "ui_elements/ui_inductor.h"
 #include "ui_elements/ui_logic_input.h"
@@ -74,6 +75,7 @@ constexpr auto PARTS = std::to_array<PartInfo>({
     {Core::ComponentType::PUSH_BUTTON, "Push button"},
     {Core::ComponentType::V_SWITCH, "Voltage-controlled switch"},
     {Core::ComponentType::RELAY, "Relay"},
+    {Core::ComponentType::FUSE, "Fuse"},
     {Core::ComponentType::TRANSFORMER, "Transformer"},
     {Core::ComponentType::AND, "AND gate"},
     {Core::ComponentType::OR, "OR gate"},
@@ -150,6 +152,8 @@ std::unique_ptr<UIElement> CreateElement(const Core::ComponentType type, const G
     case Core::ComponentType::V_SWITCH:
     case Core::ComponentType::RELAY:
         return std::make_unique<UIControlledSwitch>(type, position, rotation);
+    case Core::ComponentType::FUSE:
+        return std::make_unique<UIFuse>(position, rotation);
     case Core::ComponentType::TRANSFORMER:
         return std::make_unique<UITransformer>(position, rotation);
     case Core::ComponentType::AND:

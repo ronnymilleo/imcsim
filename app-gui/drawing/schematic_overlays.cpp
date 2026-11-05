@@ -5,10 +5,12 @@
 
 #include "drawing/schematic_overlays.h"
 
+#include "analysis/fuse_readings.h"
 #include "analysis/logic_outputs.h"
 #include "components/logic_input.h"
 #include "components/subcircuit.h"
 #include "drawing/current_flow.h"
+#include "drawing/fuse_flash.h"
 #include "drawing/heat_glow.h"
 #include "drawing/led_glow.h"
 #include "drawing/node_colors.h"
@@ -16,6 +18,7 @@
 #include "drawing/theme.h"
 #include "editing/live_input.h"
 #include "spice/spice_value.h"
+#include "ui_elements/ui_fuse.h"
 #include "ui_elements/ui_logic_input.h"
 #include "ui_elements/ui_logic_output.h"
 #include "ui_elements/ui_seven_segment.h"
@@ -124,6 +127,8 @@ void SchematicOverlays::Update(Schematic &schematic, const AnalysisControls &con
     const auto &transient = schematic.GetTransient();
     const bool show_transient = transient && !transient->Times.empty() &&
                                 (!operating_point || controls.GetLastRun() != Analysis::OPERATING_POINT);
+    UpdateFuses(schematic, show_transient ? &*transient : nullptr,
+                show_transient ? std::optional(m_Playback.Time) : std::nullopt);
     if (!show_transient && !operating_point) {
         return;
     }
@@ -152,11 +157,53 @@ void SchematicOverlays::Update(Schematic &schematic, const AnalysisControls &con
         state.Scale = ScaleOf(state.Point, elements, connectivity);
     }
     state.Powers = ComputePowers(elements, connectivity, state.Point);
+    state.FuseBlowTimes = m_FuseBlowTimes;
     state.LogicReadings.resize(elements.size());
     for (std::size_t index = 0; index < elements.size(); ++index) {
         state.LogicReadings[index] = ReadLogicDisplay(*elements[index], connectivity, state.Point);
     }
     m_Displayed = std::move(state);
+}
+
+/**
+ * @brief   Tells each fuse whether the result on display shows it open, and how strong the flash of its blow still is.
+ * @param[in,out] schematic  The schematic being edited, whose fuses are told.
+ * @param[in]     shown      The transient on display, or none when the schematic shows an operating point or nothing,
+ *                           which see every fuse whole.
+ * @param[in]     instant    Instant of the transient on display.
+ * @details The flash starts when a fuse is seen going from whole to open between two frames, so a result that arrives
+ *          with a fuse already blown does not flash, and it lasts FUSE_FLASH_SECONDS of the screen clock, whatever the
+ *          speed of the playback.
+ */
+void SchematicOverlays::UpdateFuses(Schematic &schematic, const Core::Transient *shown,
+                                    const std::optional<double> instant) {
+    const auto &elements = schematic.GetElements();
+    if (shown == nullptr) {
+        m_FuseBlowTimes.clear();
+        m_FuseBlowTimesVersion.reset();
+    } else if (m_FuseBlowTimesVersion != schematic.GetTransientDataVersion() ||
+               m_FuseBlowTimes.size() != elements.size()) {
+        m_FuseBlowTimes = FindFuseBlowTimes(elements, schematic.GetConnectivity(), *shown);
+        m_FuseBlowTimesVersion = schematic.GetTransientDataVersion();
+    }
+    const bool has_previous_frame = shown != nullptr && m_WasFuseBlown.size() == elements.size();
+    std::vector<bool> is_blown(elements.size(), false);
+    m_FuseBlownSince.resize(elements.size(), 0.0);
+    const bool is_flash_on = m_Preferences.IsEffectOn(LiveEffect::FUSE);
+    const double now = ImGui::GetTime();
+    for (std::size_t index = 0; index < elements.size(); ++index) {
+        if (elements[index]->GetComponent().GetType() != Core::ComponentType::FUSE) {
+            continue;
+        }
+        is_blown[index] = shown != nullptr && IsFuseBlownAt(m_FuseBlowTimes[index], instant);
+        if (is_blown[index] && has_previous_frame && !m_WasFuseBlown[index]) {
+            m_FuseBlownSince[index] = now;
+        }
+        const float flash_level =
+            is_flash_on && is_blown[index] ? GetFuseFlashLevel(now - m_FuseBlownSince[index]) : 0.0f;
+        static_cast<UIFuse &>(*elements[index]).SetDisplayState(is_blown[index], flash_level);
+    }
+    m_WasFuseBlown = shown != nullptr ? std::move(is_blown) : std::vector<bool>();
 }
 
 /**
@@ -340,6 +387,16 @@ void SchematicOverlays::DrawHoveredValue(const MeasurementTarget &target, Schema
     if (!target.Node) {
         if (const std::optional<ComponentPower> power = FindPower(m_Displayed->Powers, target.Current)) {
             text += std::format("\nP({}) = {}W", power->Name, Core::FormatValue(power->Power));
+        }
+    }
+    if (!target.Node) {
+        const auto &elements = schematic.GetElements();
+        for (std::size_t index = 0; index < elements.size() && index < m_Displayed->FuseBlowTimes.size(); ++index) {
+            const std::optional<double> blow_time = m_Displayed->FuseBlowTimes[index];
+            if (blow_time && elements[index]->GetComponent().GetName() == target.Current &&
+                IsFuseBlownAt(blow_time, m_Displayed->Time)) {
+                text += std::format("\n{} blew at t = {}s", target.Current, Core::FormatValue(*blow_time));
+            }
         }
     }
     ImGui::SetTooltip("%s", text.c_str());

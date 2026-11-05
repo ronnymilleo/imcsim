@@ -44,6 +44,7 @@ constexpr auto ALL_TYPES = std::to_array<ComponentType>({
     ComponentType::PUSH_BUTTON,
     ComponentType::V_SWITCH,
     ComponentType::RELAY,
+    ComponentType::FUSE,
     ComponentType::TRANSFORMER,
     ComponentType::AND,
     ComponentType::OR,
@@ -155,6 +156,8 @@ const char *Component::GetNamePrefix() const {
         return "S";
     case ComponentType::RELAY:
         return "K";
+    case ComponentType::FUSE:
+        return "FU";
     case ComponentType::TRANSFORMER:
         return "T";
     case ComponentType::GROUND:
@@ -220,6 +223,7 @@ const char *Component::GetUnit() const {
     case ComponentType::PUSH_BUTTON:
     case ComponentType::V_SWITCH:
     case ComponentType::RELAY:
+    case ComponentType::FUSE:
     case ComponentType::DIODE:
     case ComponentType::ZENER_DIODE:
     case ComponentType::LED:
@@ -248,6 +252,7 @@ bool Component::HasValue() const {
     case ComponentType::PUSH_BUTTON:
     case ComponentType::V_SWITCH:
     case ComponentType::RELAY:
+    case ComponentType::FUSE:
     case ComponentType::DIODE:
     case ComponentType::ZENER_DIODE:
     case ComponentType::LED:
@@ -320,6 +325,7 @@ bool Component::IsValidValue(const double value) const {
     case ComponentType::PUSH_BUTTON:
     case ComponentType::V_SWITCH:
     case ComponentType::RELAY:
+    case ComponentType::FUSE:
     case ComponentType::DIODE:
     case ComponentType::ZENER_DIODE:
     case ComponentType::LED:
@@ -586,6 +592,8 @@ const char *GetTypeName(const ComponentType type) {
         return "VSwitch";
     case ComponentType::RELAY:
         return "Relay";
+    case ComponentType::FUSE:
+        return "Fuse";
     case ComponentType::TRANSFORMER:
         return "Transformer";
     case ComponentType::AND:
