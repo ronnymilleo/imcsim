@@ -1566,7 +1566,6 @@ void Schematic::SelectACSweepStep(const std::size_t step) {
  * @note    The result is dropped on the next change, since it no longer matches the circuit.
  */
 void Schematic::SetDCSweep(std::optional<Core::DCSweep> sweep) {
-
     ClearMonteCarlo();
     m_DCSweep = std::move(sweep);
     ++m_DCSweepVersion;
