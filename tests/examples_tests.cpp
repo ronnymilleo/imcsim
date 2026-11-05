@@ -17,6 +17,7 @@
 #include "plots/logic_trace.h"
 #include "plots/trace_statistics.h"
 #include "simulation/circuit_checks.h"
+#include "simulation/simulation_backend.h"
 #include "simulation/simulator.h"
 #include "test_printers.h"
 #include <algorithm>
@@ -80,8 +81,9 @@ TEST_CASE("Every example opens without warnings, measures existing traces and ru
         GUI::Schematic schematic;
         OpenOrFail(example, schematic);
         CHECK_FALSE(schematic.GetElements().empty());
-        // The digital examples open everywhere, but run only where ngspice has the digital models
-        if (std::string_view(example.Group) == "Digital" && !Core::AreDigitalModelsAvailable()) {
+        // The examples with logic parts, loose or inside blocks, open everywhere, but run only where ngspice has the
+        // digital models
+        if (Core::FindUnsupported(Core::GetBackend(), schematic.BuildCircuit(), Core::AnalysisKind::TRANSIENT)) {
             continue;
         }
 
