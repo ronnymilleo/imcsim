@@ -126,7 +126,8 @@ void DrawBusValue(ImDrawList *draw_list, const float left, const float right, co
     }
     draw_list->AddPolyline(band.data(), static_cast<int>(band.size()), color, ImDrawFlags_Closed, 1.5f);
     const ImVec2 text_size = ImGui::CalcTextSize(text.c_str());
-    if (right - left >= text_size.x + slant * 2.0f) {
+    // The text sits across the middle, where the band is widest, so it may reach into the slanted ends
+    if (right - left >= text_size.x + slant) {
         draw_list->AddText({(left + right - text_size.x) / 2.0f, middle - text_size.y / 2.0f},
                            ImGui::GetColorU32(ImGuiCol_Text), text.c_str());
     }
