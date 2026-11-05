@@ -6,9 +6,12 @@
 #include "components/ground.h"
 #include "components/logic_part.h"
 #include "components/resistor.h"
+#include "components/subcircuit.h"
+#include "model/subcircuit.h"
 #include "plots/logic_trace.h"
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
+#include <memory>
 #include <string>
 #include <string_view>
 
@@ -74,6 +77,50 @@ TEST_CASE("The logic nodes are those a gate or flip-flop is connected to, with t
     CHECK(nodes[2].LogicLevel == 5.0);
     CHECK(nodes[3].Node == 4);
     CHECK(nodes[3].LogicLevel == 3.3);
+}
+
+TEST_CASE("A pin of a block is a logic node when a logic part reaches it inside, at any depth", "[logic_trace]") {
+    Core::LogicPart gate(Core::ComponentType::AND);
+    gate.SetName("U1");
+    gate.SetParameters({.LogicLevel = 3.3, .PropagationDelay = 10e-9});
+    Core::Resistor resistor;
+    resistor.SetName("R1");
+    // The gate reaches pin A of the leaf block, and only the resistor reaches pin B
+    auto leaf = std::make_shared<Core::SubcircuitDefinition>();
+    leaf->Name = "leaf";
+    leaf->Pins = {{"A", 1}, {"B", 4}};
+    leaf->Body.Add(gate, {1, 2, 3});
+    leaf->Body.Add(resistor, {4, 0});
+    Core::SubcircuitInstance inner("leaf", {"A", "B"});
+    inner.SetName("X1");
+    auto middle = std::make_shared<Core::SubcircuitDefinition>();
+    middle->Name = "middle";
+    middle->Pins = {{"X", 1}, {"Y", 2}};
+    middle->Body.Add(inner, {1, 2});
+    Core::SubcircuitInstance outer("middle", {"X", "Y"});
+    outer.SetName("X1");
+    Core::Circuit circuit;
+    circuit.Add(outer, {5, 6});
+    circuit.AddSubcircuit(middle);
+    circuit.AddSubcircuit(leaf);
+
+    const std::vector<GUI::LogicNode> nodes = GUI::FindLogicNodes(circuit);
+    REQUIRE(nodes.size() == 1);
+    CHECK(nodes[0].Node == 5);
+    CHECK(nodes[0].LogicLevel == 3.3);
+}
+
+TEST_CASE("A block that holds itself is looked into once", "[logic_trace]") {
+    auto looped = std::make_shared<Core::SubcircuitDefinition>();
+    looped->Name = "looped";
+    looped->Pins = {{"A", 1}};
+    Core::SubcircuitInstance itself("looped", {"A"});
+    itself.SetName("X1");
+    looped->Body.Add(itself, {1});
+    Core::Circuit circuit;
+    circuit.Add(itself, {1});
+    circuit.AddSubcircuit(looped);
+    CHECK(GUI::FindLogicNodes(circuit).empty());
 }
 
 TEST_CASE("A circuit with no logic part has no logic nodes", "[logic_trace]") {
