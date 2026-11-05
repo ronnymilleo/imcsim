@@ -66,6 +66,10 @@ enum class ComponentType {
     SEVEN_SEGMENT,
 };
 
+/// Largest tolerance a part may have, in percent: far beyond any real part, and well short of the 100 % that could take
+/// a value to zero.
+constexpr double MAX_TOLERANCE_PERCENT = 50.0;
+
 /**
  * @class   Component
  * @brief   A circuit component in the simulation model.
@@ -125,6 +129,13 @@ public:
     void SetInitialCondition(double value);
     void ClearInitialCondition();
 
+    // Tolerance
+    bool SupportsTolerance() const;
+    bool HasTolerance() const;
+    std::optional<double> GetTolerance() const;
+    void SetTolerance(double percent);
+    void ClearTolerance();
+
 protected:
     ComponentType m_Type{};
     std::string m_Name;
@@ -135,6 +146,8 @@ protected:
     std::string m_LibraryModel;
     /// Voltage a capacitor starts charged to or current an inductor starts carrying; only these kinds carry one.
     std::optional<double> m_InitialCondition;
+    /// Percent the value may be off, for a Monte Carlo run; empty when the part keeps its value in every run.
+    std::optional<double> m_Tolerance;
 };
 
 // Type names

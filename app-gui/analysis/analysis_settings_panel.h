@@ -10,6 +10,7 @@
 #include "analysis/parameter_step.h"
 #include "document/schematic.h"
 #include "document/simulation_settings.h"
+#include "simulation/monte_carlo.h"
 #include "value_field.h"
 #include <array>
 #include <cstddef>
@@ -52,6 +53,9 @@ private:
     ValueField m_NoiseStopFrequency;
     /// Start, stop and step of the stepped parameter.
     std::array<ValueField, 3> m_ParameterFields;
+    /// The tolerance in percent that the buttons of Monte Carlo give every part of a kind.
+    ValueField m_ToleranceAllField;
+    double m_ToleranceAllPercent = 5.0;
 
     // Settings fields
     void LoadSettingsFields();
@@ -65,7 +69,11 @@ private:
     void DrawSourceAndOutputPickers(std::string &source, std::optional<GridPoint> &output, const std::string &id,
                                     const char *empty_text, const char *tooltip);
     void DrawTruthTableSettings(SimulationSettings &settings);
-    void DrawParameterStepSettings(SimulationSettings &settings);
+    void DrawRunModeSettings(SimulationSettings &settings);
+    void DrawParameterStepSettings(ParameterStepSettings &step);
+    void DrawMonteCarloSettings(Core::MonteCarloSettings &monte_carlo);
+    void DrawToleranceButtons();
+    void DrawMonteCarloSummary(const Core::MonteCarloSettings &monte_carlo);
     void DrawParameterPicker(ParameterStepSettings &step, const Core::Circuit &circuit);
     void DrawStepValues(ParameterStepSettings &step, const std::string &unit);
     void LoadParameterStepFields(const ParameterStepSettings &step);

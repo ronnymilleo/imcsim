@@ -515,6 +515,9 @@ void PartEditor::DrawFields(Core::Component &component) {
             DrawInitialCondition(component);
         }
     }
+    if (component.SupportsTolerance()) {
+        DrawTolerance(component);
+    }
 }
 
 /**
@@ -636,6 +639,7 @@ void PartEditor::LoadFields(const Core::Component &component) {
     m_NameError.clear();
     m_Value.Load(component.GetValue());
     m_InitialCondition.LoadOptional(component.GetInitialCondition());
+    m_Tolerance.LoadOptional(component.GetTolerance());
     if (component.GetType() == Core::ComponentType::NET_LABEL || Core::IsSubcircuitPin(component.GetType())) {
         const std::string &net = static_cast<const Core::NetLabel &>(component).GetNet();
         m_Net.fill('\0');
@@ -833,6 +837,37 @@ void PartEditor::DrawInitialCondition(Core::Component &component) {
         m_Schematic->MarkModified();
     }
     ImGui::TextDisabled("Skips the operating point (uic); parts left empty start at zero");
+}
+
+/**
+ * @brief   The percent the value may be off in a Monte Carlo run; an empty field means the part keeps its value. A
+ *          voltage source only varies while it is a DC one, and the series of standard values of the preferences
+ *          offers its own tolerance for a resistor, capacitor or inductor.
+ */
+void PartEditor::DrawTolerance(Core::Component &component) {
+    const bool is_source = Core::IsSource(component.GetType());
+    if (is_source && static_cast<const Core::Source &>(component).GetSourceType() != Core::Source::SourceType::DC) {
+        return;
+    }
+    const GUI::OptionalValueEdit edit = m_Tolerance.DrawOptional(
+        "Tolerance", "%", [](const double percent) { return percent > 0.0 && percent <= Core::MAX_TOLERANCE_PERCENT; });
+    if (edit.Changed) {
+        if (edit.Value) {
+            component.SetTolerance(*edit.Value);
+        } else {
+            component.ClearTolerance();
+        }
+        m_Schematic->MarkModified();
+    }
+    const double series_percent = Core::GetSeriesTolerancePercent(m_Preferences.ValueSeries);
+    if (!is_source && !component.HasTolerance() && series_percent > 0.0 &&
+        ImGui::SmallButton(
+            std::format("Use {} ({:g}%)", Core::GetSeriesName(m_Preferences.ValueSeries), series_percent).c_str())) {
+        component.SetTolerance(series_percent);
+        m_Tolerance.LoadOptional(component.GetTolerance());
+        m_Schematic->MarkModified();
+    }
+    ImGui::TextDisabled("Monte Carlo draws the value within it; empty keeps the value");
 }
 
 /**

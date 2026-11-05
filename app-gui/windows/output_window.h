@@ -20,6 +20,7 @@
 #include "windows/output_tabs/ac_sweep_tab.h"
 #include "windows/output_tabs/dc_sweep_tab.h"
 #include "windows/output_tabs/frame_results.h"
+#include "windows/output_tabs/monte_carlo_tab.h"
 #include "windows/output_tabs/noise_tab.h"
 #include "windows/output_tabs/pole_zero_tab.h"
 #include "windows/output_tabs/spectrum_tab.h"
@@ -44,7 +45,8 @@ enum class PlotTab {
     TRANSFER_FUNCTION,
     SENSITIVITY,
     POLE_ZERO,
-    TRUTH_TABLE
+    TRUTH_TABLE,
+    MONTE_CARLO
 };
 
 /**
@@ -103,6 +105,7 @@ private:
     DCSweepTab m_DCSweepTab;
     NoiseTab m_NoiseTab;
     PoleZeroTab m_PoleZeroTab;
+    MonteCarloTab m_MonteCarloTab;
     /// The tab shown this frame, which Export saves.
     PlotTab m_ShownTab = PlotTab::TRANSIENT;
     /// Tab to bring to the front on the next frame, after a new result.

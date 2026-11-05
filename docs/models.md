@@ -85,6 +85,24 @@ All three are ideal:
   no log taper, no wiper resistance and no power rating, and the wiper moves only by editing the part, not during a
   run.
 
+### Tolerance and Monte Carlo
+
+A resistor, capacitor, inductor or DC voltage source may carry a tolerance in percent, which does nothing in an
+ordinary run: the part is as ideal as before, at exactly its value. In a Monte Carlo analysis each run simulates a copy
+of the circuit in which every toleranced part takes its value times a factor drawn within the tolerance, so the
+spread of a result comes from the values alone:
+
+- The Gaussian factor is `1 + t * z / 3`, with `t` the tolerance and `z` a normal number drawn again whenever it
+  passes 3 in size; the uniform factor is `1 + t * (2u - 1)` with `u` from 0 up to 1.
+- The numbers come from a Mersenne Twister (64 bits) started from the seed and the run number, a Box-Muller
+  transform and the top 53 bits for `u`, written here instead of taken from the C++ distributions, whose results
+  differ between standard libraries. The generator is exact everywhere; the logarithm and cosine of the transform may
+  differ from platform to platform in the last digits.
+- Only the main value varies: not the initial conditions, the model parameters of diodes and transistors, nor
+  the parts inside blocks, which refuse the run. Parts are independent; there is no matching or correlation between
+  two resistors of the same lot, and no temperature coefficient.
+- ngspice runs one simulation at a time, so the runs are made one after the other.
+
 ## Switches and push buttons
 
 A switch and a push button are the same part for the simulation: a resistor, `R-SW1` in the netlist, of 1 mOhm when

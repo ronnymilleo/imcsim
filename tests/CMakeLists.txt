@@ -34,6 +34,8 @@ add_executable(imcsim-tests
             logic_outputs_tests.cpp
             logic_trace_tests.cpp
             math_channel_tests.cpp
+            monte_carlo_results_tests.cpp
+            monte_carlo_tests.cpp
             parameter_step_tests.cpp
             part_names_tests.cpp
             playback_tests.cpp

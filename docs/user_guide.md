@@ -144,7 +144,7 @@ How to read what imcsim measures, plots and exports. The [README](../README.md) 
   asks. The math channels are worked out over the whole run, so an integral starts at the start of the simulation, and
   they wait, grayed out, for the end of a run that is still going on. The spectrum uses the whole run too. The other analyses stop between their steps (the values
   of a stepped analysis, the combinations of a truth table) and drop their result, and a single simulation finishes
-  first. Editing the circuit also stops the run and drops what it made, since the answer would no longer fit.
+  first; a Monte Carlo analysis keeps the runs made ("Stopped after 40 of 100 runs"). Editing the circuit also stops the run and drops what it made, since the answer would no longer fit.
 - **Status bar**: below the schematic, the keys of the current mode on the left; on the right, the grid position of
   the cursor and how the last run went ("Transient done", with warnings, or failed). Click the result for the
   errors, the warnings and the ngspice output. Among the warnings are the safe operating area ones: a diode, LED,
@@ -532,6 +532,54 @@ Results:
 - The DC sweep draws one curve per step, as when stepping a second source, so only one of the two can be on.
 - ngspice's output lists each step under a `Step R1=10kOhm` line. A step that fails stops the run and names the
   step.
+
+## Monte Carlo
+
+Real parts are not exact: a 1k resistor with a 5 % tolerance may be anything from 950 to 1050 ohm. A Monte Carlo
+analysis runs the transient, the AC sweep or the DC sweep once with every value as it is (the **nominal** run) and then
+once per **run**, each with the values of the parts drawn within their tolerances, and shows how a result spreads.
+
+**Setting it up**
+
+1. Give the parts a tolerance: select a resistor, capacitor, inductor or DC voltage source and fill **Tolerance** (in
+   percent, above 0 and up to 50) in its properties. With a series picked in Preferences (E12, E24...), the properties
+   offer **Use E24 (5%)**, the tolerance of that series. An empty field means the part keeps its value in every run.
+   In the analysis settings, **Tolerance of all** gives every resistor, capacitor or inductor one percent at once, and
+   **Clear all** takes the tolerances away. A source only varies while it is a DC one.
+2. Pick the transient, AC sweep or DC sweep and set **Run mode** to **Monte Carlo** (the other modes are **Single
+   run** and **Step a parameter**; only one is on). Live mode and a second stepped source of the DC sweep do not go
+   with it.
+3. Set **Runs** (2 to 1000, 100 at first), the **Distribution** and the **Seed**, and run.
+
+**Distribution.** *Gaussian* takes the tolerance as three standard deviations and never draws a value beyond it, so
+most parts land near their value; *uniform* draws any value within the tolerance with the same chance. Every part is
+drawn on its own.
+
+**Seed.** The same seed draws the same values, on any computer, and run 17 of a seed is the same whether or not the
+runs before it were made. **New seed** picks another one. The seed is saved with the schematic, so a saved analysis can
+be repeated.
+
+**Blocks.** The parts inside a block are not varied yet: a block with a toleranced part refuses the run and names the
+block and the parts; clear their tolerance, or take the parts out of the block.
+
+**Results.** The transient and the AC sweep plot the runs as the stepped ones are plotted: the **shown step** is
+**Nominal** or **Run n**, in full colors, and the others are faint; the DC sweep draws one curve per run. Only the
+first 100 runs keep their curves, since a thousand transients would not fit in memory; every run keeps its
+measurements. Runs that fail to converge are skipped, and a warning counts them and lists the first ones; the nominal
+run has to work. Stop keeps the runs made.
+
+The **Monte Carlo** tab of the Output window shows:
+
+- a **histogram** of one quantity measured on one node in every run, with a line at the nominal value. The quantities
+  are the ones the statistics of the other tabs read: for a transient the mean, RMS, peak to peak and frequency; for
+  an AC sweep the upper and lower -3 dB frequency, peak gain, unity-gain frequency and phase margin; for a DC sweep the
+  minimum, maximum and mean;
+- on the right, the nominal reading and, over the drawn runs, their count, mean, standard deviation (with n - 1),
+  minimum, maximum and the 1 % and 99 % percentiles;
+- a **table of runs** with the value each part took and the quantity shown; click a header to sort, which puts the
+  worst case first, and click a row to show that run in the transient or AC sweep tab (a row beyond the first 100
+  runs has no curve to show);
+- **Export runs...** saves every run, the values of the parts and all the measurements as a CSV table.
 
 ## Spectrum
 

@@ -30,13 +30,16 @@
 #include "nlohmann/json.hpp"
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <format>
 #include <fstream>
 #include <functional>
+#include <limits>
 #include <map>
 #include <optional>
 #include <set>
 #include <sstream>
+#include <string_view>
 #include <utility>
 
 namespace GUI {
@@ -519,6 +522,9 @@ nlohmann::json WriteElement(const UIElement &element) {
     // Only a capacitor or an inductor carries one, and only when it is set
     if (const std::optional<double> initial = component.GetInitialCondition()) {
         object["ic"] = *initial;
+    }
+    if (const std::optional<double> tolerance = component.GetTolerance()) {
+        object["tolerance"] = *tolerance;
     }
     // Every waveform is saved, so switching type after loading keeps the parameters of the others
     if (Core::IsSource(component.GetType())) {
@@ -1032,6 +1038,15 @@ ReadElement(const nlohmann::json &object, const std::span<const SavedSubcircuit>
         }
         component.SetInitialCondition(*initial);
     }
+    // A file saved before tolerances had no key, so the part has none
+    if (component.SupportsTolerance() && object.contains("tolerance")) {
+        const std::optional<double> tolerance = ReadNumber(object, "tolerance");
+        if (!tolerance || !(*tolerance > 0.0 && *tolerance <= Core::MAX_TOLERANCE_PERCENT)) {
+            return std::unexpected(
+                std::format("has a tolerance that is not a percent above 0 and up to {}", Core::MAX_TOLERANCE_PERCENT));
+        }
+        component.SetTolerance(*tolerance);
+    }
     if (Core::IsSource(component.GetType())) {
         const std::expected<void, std::string> source = ReadSource(object, static_cast<Core::Source &>(component));
         if (!source) {
@@ -1097,6 +1112,20 @@ constexpr auto ANALYSIS_KEYS =
     std::to_array<std::string_view>({"operating_point", "transient", "ac_sweep", "dc_sweep", "noise",
                                      "transfer_function", "sensitivity", "pole_zero", "truth_table"});
 
+const char *ToFileName(const Core::ToleranceDistribution distribution) {
+    return distribution == Core::ToleranceDistribution::UNIFORM ? "uniform" : "gaussian";
+}
+
+std::optional<Core::ToleranceDistribution> ParseDistributionName(const std::string_view name) {
+    if (name == "gaussian") {
+        return Core::ToleranceDistribution::GAUSSIAN;
+    }
+    if (name == "uniform") {
+        return Core::ToleranceDistribution::UNIFORM;
+    }
+    return std::nullopt;
+}
+
 nlohmann::json WriteSettings(const SimulationSettings &settings) {
     nlohmann::json transient = nlohmann::json::object();
     WriteParameters(TRANSIENT_KEYS, settings.Transient, transient);
@@ -1128,6 +1157,13 @@ nlohmann::json WriteSettings(const SimulationSettings &settings) {
     nlohmann::json parameter_step = {
         {"enabled", step.Enabled}, {"part", step.Part}, {"uses_list", step.UsesList}, {"list", step.List}};
     WriteParameters(PARAMETER_STEP_KEYS, step, parameter_step);
+    const Core::MonteCarloSettings &monte_carlo = settings.MonteCarlo;
+    const nlohmann::json monte_carlo_object = {
+        {"enabled", monte_carlo.Enabled},
+        {"runs", monte_carlo.Runs},
+        {"distribution", ToFileName(monte_carlo.Distribution)},
+        {"seed", monte_carlo.Seed},
+    };
     return {
         {"analysis", ANALYSIS_KEYS[static_cast<std::size_t>(settings.Selected)]},
         {"transient", transient},
@@ -1144,6 +1180,7 @@ nlohmann::json WriteSettings(const SimulationSettings &settings) {
         {"pole_zero", pole_zero},
         {"truth_table", truth_table},
         {"parameter_step", parameter_step},
+        {"monte_carlo", monte_carlo_object},
     };
 }
 
@@ -1353,6 +1390,43 @@ std::expected<void, std::string> ReadParameterStepSettings(const nlohmann::json 
     return {};
 }
 
+std::expected<void, std::string> ReadMonteCarloSettings(const nlohmann::json &object, SimulationSettings &settings) {
+    Core::MonteCarloSettings &monte_carlo = settings.MonteCarlo;
+    if (object.contains("enabled")) {
+        const std::optional<bool> enabled = ReadBool(object, "enabled");
+        if (!enabled) {
+            return std::unexpected("have an enabled flag that is not true or false");
+        }
+        monte_carlo.Enabled = *enabled;
+    }
+    if (object.contains("runs")) {
+        const std::optional<int> runs = ReadInt(object, "runs");
+        if (!runs || *runs < Core::MIN_MONTE_CARLO_RUNS || *runs > Core::MAX_MONTE_CARLO_RUNS) {
+            return std::unexpected(
+                std::format("have no valid runs, {} to {}", Core::MIN_MONTE_CARLO_RUNS, Core::MAX_MONTE_CARLO_RUNS));
+        }
+        monte_carlo.Runs = *runs;
+    }
+    if (object.contains("distribution")) {
+        const std::optional<std::string> name = ReadString(object, "distribution");
+        const std::optional<Core::ToleranceDistribution> distribution =
+            name ? ParseDistributionName(*name) : std::nullopt;
+        if (!distribution) {
+            return std::unexpected("have an unknown distribution");
+        }
+        monte_carlo.Distribution = *distribution;
+    }
+    if (object.contains("seed")) {
+        const std::optional<double> seed = ReadNumber(object, "seed");
+        if (!seed || *seed < 0.0 || *seed > static_cast<double>(std::numeric_limits<unsigned int>::max()) ||
+            *seed != std::floor(*seed)) {
+            return std::unexpected("have no valid seed");
+        }
+        monte_carlo.Seed = static_cast<unsigned int>(*seed);
+    }
+    return {};
+}
+
 /**
  * @struct  AnalysisReader
  * @brief   JSON key of the settings of one analysis, its name in warnings and the function that reads them.
@@ -1373,6 +1447,7 @@ constexpr auto ANALYSIS_READERS = std::to_array<AnalysisReader>({
     {"pole_zero", "pole-zero", &ReadPoleZeroSettings},
     {"truth_table", "truth table", &ReadTruthTableSettings},
     {"parameter_step", "parameter step", &ReadParameterStepSettings},
+    {"monte_carlo", "Monte Carlo", &ReadMonteCarloSettings},
 });
 
 /**

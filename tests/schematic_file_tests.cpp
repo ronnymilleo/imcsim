@@ -463,6 +463,8 @@ TEST_CASE("Simulation settings load back unchanged", "[schematic_file]") {
     settings.TruthTableInputs = {"V1", "V3"};
     settings.ParameterStep = {
         .Enabled = true, .Part = "R2", .UsesList = true, .Start = 1e3, .Stop = 4e3, .Step = 1e3, .List = "1k, 2.2k"};
+    settings.MonteCarlo = {
+        .Enabled = true, .Runs = 250, .Distribution = Core::ToleranceDistribution::UNIFORM, .Seed = 4000000000U};
 
     const GUI::LoadedSchematic loaded = LoadOrFail(GUI::SaveSchematic({}, {}, settings, {}));
     CHECK(loaded.Warnings.empty());
@@ -868,6 +870,54 @@ TEST_CASE("A capacitor and an inductor keep their initial condition, and load wi
     const GUI::LoadedSchematic skipped = LoadOrFail(Document(bad_ic, ""));
     CHECK(skipped.Elements.empty());
     CHECK(skipped.Warnings.size() == 1);
+}
+
+TEST_CASE("A part keeps its tolerance, and loads without one", "[schematic_file]") {
+    std::vector<std::unique_ptr<GUI::UIElement>> elements;
+    elements.push_back(GUI::CreateElement(Core::ComponentType::RESISTOR, {2, 4}, GUI::Rotation::R0));
+    elements.back()->GetComponent().SetName("R1");
+    elements.back()->GetComponent().SetTolerance(5.0);
+    elements.push_back(GUI::CreateElement(Core::ComponentType::VOLTAGE_SOURCE, {6, 4}, GUI::Rotation::R0));
+    elements.back()->GetComponent().SetName("Vin1");
+    elements.back()->GetComponent().SetTolerance(2.5);
+    elements.push_back(GUI::CreateElement(Core::ComponentType::CAPACITOR, {9, 4}, GUI::Rotation::R0));
+    elements.back()->GetComponent().SetName("C1");
+
+    const std::string saved = GUI::SaveSchematic(elements, {}, {}, {});
+    const GUI::LoadedSchematic loaded = LoadOrFail(saved);
+    const std::string first_warning = loaded.Warnings.empty() ? std::string() : loaded.Warnings.front();
+    INFO(first_warning);
+    CHECK(loaded.Warnings.empty());
+    REQUIRE(loaded.Elements.size() == 3);
+    CHECK(loaded.Elements[0]->GetComponent().GetTolerance() == 5.0);
+    CHECK(loaded.Elements[1]->GetComponent().GetTolerance() == 2.5);
+    CHECK_FALSE(loaded.Elements[2]->GetComponent().HasTolerance());
+    // A part without one writes no key, so files of circuits without tolerances stay as they were
+    CHECK(saved.find("\"tolerance\"") != std::string::npos);
+    CHECK(GUI::SaveSchematic({}, {}, {}, {}).find("tolerance") == std::string::npos);
+
+    const std::string bad_tolerance =
+        R"({"type": "Resistor", "x": 1, "y": 1, "rotation": 0, "name": "R1", "value": 1e3, "tolerance": 0})";
+    CHECK(LoadOrFail(Document(bad_tolerance, "")).Elements.empty());
+    const std::string too_large =
+        R"({"type": "Resistor", "x": 1, "y": 1, "rotation": 0, "name": "R1", "value": 1e3, "tolerance": 100})";
+    CHECK(LoadOrFail(Document(too_large, "")).Warnings.size() == 1);
+}
+
+TEST_CASE("Invalid Monte Carlo settings fall back to their defaults with a warning", "[schematic_file]") {
+    const std::string text = R"({"format": "imcsim-schematic", "version": 1, "simulation": {)"
+                             R"("monte_carlo": {"enabled": true, "runs": 5000, "seed": 7}}})";
+    const GUI::LoadedSchematic loaded = LoadOrFail(text);
+    CHECK(loaded.Warnings.size() == 1);
+    CHECK(loaded.Settings.MonteCarlo == Core::MonteCarloSettings{});
+
+    const std::string unknown = R"({"format": "imcsim-schematic", "version": 1, "simulation": {)"
+                                R"("monte_carlo": {"distribution": "triangular"}}})";
+    CHECK(LoadOrFail(unknown).Warnings.size() == 1);
+
+    // A file saved before Monte Carlo has no key and keeps it off
+    const std::string old_file = R"({"format": "imcsim-schematic", "version": 1, "simulation": {}})";
+    CHECK_FALSE(LoadOrFail(old_file).Settings.MonteCarlo.Enabled);
 }
 
 TEST_CASE("A voltage-controlled switch keeps its parameters, and loads with the defaults when it has none",

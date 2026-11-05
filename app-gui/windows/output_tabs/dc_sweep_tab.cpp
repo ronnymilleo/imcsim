@@ -5,6 +5,7 @@
 
 #include "windows/output_tabs/dc_sweep_tab.h"
 
+#include "analysis/parameter_step.h"
 #include "implot.h"
 #include "plots/plot_figures.h"
 #include "plots/plot_helpers.h"
@@ -127,9 +128,12 @@ void DCSweepTab::DrawPlot(const Core::DCSweep &sweep, const std::vector<std::vec
     }
     const bool stepped = !sweep.SteppedSource.empty();
     if (stepped) {
-        ImGui::TextDisabled(
-            "%s",
-            std::format("One curve per value of {}, labeled where the curves part most", sweep.SteppedSource).c_str());
+        const std::string note =
+            sweep.SteppedSource == MONTE_CARLO_PARAMETER
+                ? std::string("One curve per Monte Carlo run, the nominal one first, labeled where "
+                              "the curves part most")
+                : std::format("One curve per value of {}, labeled where the curves part most", sweep.SteppedSource);
+        ImGui::TextDisabled("%s", note.c_str());
     }
     if (!BeginTracePlot("##dc", ImVec2(-1.0f, PlotHeight(1)))) {
         return;

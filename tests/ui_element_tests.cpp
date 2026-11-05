@@ -324,3 +324,17 @@ TEST_CASE("A part inside a block that follows a parameter shows the parameter as
     component.SetValueExpression("{RTOP}");
     CHECK(GUI::GetValueLabel(component) == "{RTOP}");
 }
+
+TEST_CASE("A part that Monte Carlo varies shows its tolerance beside its value", "[ui_element]") {
+    GUI::UIResistor resistor({0, 0}, GUI::Rotation::R0);
+    Core::Component &component = resistor.GetComponent();
+    component.SetValue(1000.0);
+    CHECK(GUI::GetValueLabel(component) == "1k");
+    component.SetTolerance(5.0);
+    CHECK(GUI::GetValueLabel(component) == "1k ±5%");
+    component.SetTolerance(2.5);
+    CHECK(GUI::GetValueLabel(component) == "1k ±2.5%");
+    // Inside a block the part follows a parameter and is not varied
+    component.SetValueExpression("{RTOP}");
+    CHECK(GUI::GetValueLabel(component) == "{RTOP}");
+}

@@ -5,6 +5,7 @@
 
 #include "analysis/auto_rerun.h"
 
+#include "document/simulation_settings.h"
 #include <catch2/catch_test_macros.hpp>
 #include <cstddef>
 
@@ -154,4 +155,35 @@ TEST_CASE("Opening another schematic forgets the analysis that was followed", "[
     session.Edit();
     session.Wait(2.0);
     CHECK(session.Runs == 0);
+}
+
+TEST_CASE("An edit never starts a Monte Carlo analysis by itself", "[auto_rerun]") {
+    Session session;
+    session.Step();
+    session.Frame.IsMonteCarlo = true;
+    session.Edit();
+    CHECK_FALSE(session.Rerun.IsDue());
+    session.Wait(2.0);
+    CHECK(session.Runs == 0);
+
+    // Going back to a single run does not bring the old edit back
+    session.Frame.IsMonteCarlo = false;
+    session.Frame.HasRunToFollow = true;
+    session.Wait(2.0);
+    CHECK(session.Runs == 0);
+    session.Edit();
+    session.Wait(1.0);
+    CHECK(session.Runs == 1);
+}
+
+TEST_CASE("Monte Carlo is the run mode only for the analyses it repeats", "[auto_rerun]") {
+    GUI::SimulationSettings settings;
+    CHECK_FALSE(GUI::IsMonteCarloRun(settings));
+    settings.MonteCarlo.Enabled = true;
+    for (const GUI::Analysis analysis : {GUI::Analysis::TRANSIENT, GUI::Analysis::AC_SWEEP, GUI::Analysis::DC_SWEEP}) {
+        settings.Selected = analysis;
+        CHECK(GUI::IsMonteCarloRun(settings));
+    }
+    settings.Selected = GUI::Analysis::OPERATING_POINT;
+    CHECK_FALSE(GUI::IsMonteCarloRun(settings));
 }

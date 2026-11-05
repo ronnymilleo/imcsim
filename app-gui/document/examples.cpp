@@ -43,6 +43,16 @@ constexpr auto EXAMPLES = std::to_array<Example>({
         .FileName = "noise_through_rc_low_pass.imcsim",
     },
     {
+        .Title = "Monte Carlo of an RC low-pass filter",
+        .Group = "Basics",
+        .Description = "The 1k and 100n low-pass again, with the resistor within 5% and the capacitor within 10%. The "
+                       "analysis is an AC sweep run as Monte Carlo: 100 runs with the values drawn within those "
+                       "tolerances, from the seed of the settings, plus the nominal run. Run it and open the Monte "
+                       "Carlo tab of the Output window: the corner frequency spreads over about 11% around the "
+                       "nominal 1.6 kHz, and a click on a row of the table shows that run in the AC sweep tab.",
+        .FileName = "monte_carlo_rc_low_pass.imcsim",
+    },
+    {
         .Title = "LED dimmer with a potentiometer",
         .Group = "Basics",
         .Description =
