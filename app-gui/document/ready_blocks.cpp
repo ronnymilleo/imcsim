@@ -44,6 +44,34 @@ constexpr auto READY_BLOCKS = std::to_array<ReadyBlock>({
                        "low; with EN low, all of them are low. Its logic level is 5 V.",
         .FileName = "decoder_2to4.imcsim",
     },
+    {
+        .Title = "4-bit adder",
+        .Name = "ADDER_4BIT",
+        .Description = "Adds A3..A0, B3..B0 and the carry CIN into S3..S0 and the carry COUT, through four full adders "
+                       "in a ripple. Its logic level is 5 V.",
+        .FileName = "adder_4bit.imcsim",
+    },
+    {
+        .Title = "4-bit comparator",
+        .Name = "COMPARATOR_4BIT",
+        .Description = "Compares A3..A0 with B3..B0 as binary numbers: GT is high when A is greater, EQ when they are "
+                       "equal and LT when A is less. Its logic level is 5 V.",
+        .FileName = "comparator_4bit.imcsim",
+    },
+    {
+        .Title = "1-to-4 demultiplexer",
+        .Name = "DEMUX_1TO4",
+        .Description = "D goes to the output among Y0 to Y3 that S1 S0 select in binary; the others are low. Its logic "
+                       "level is 5 V.",
+        .FileName = "demux_1to4.imcsim",
+    },
+    {
+        .Title = "BCD to 7-segment decoder",
+        .Name = "BCD_TO_7SEG",
+        .Description = "Lights the segments a to g of a display for the digit D3..D0 reads in binary, 0 to 9; codes "
+                       "past 9 leave every segment off. Its logic level is 5 V.",
+        .FileName = "bcd_to_7seg.imcsim",
+    },
 });
 
 } // namespace
