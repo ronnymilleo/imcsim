@@ -249,7 +249,8 @@ void AnalysisSettingsPanel::DrawTransientSettings(SimulationSettings &settings) 
                           "Five periods of the slowest source, or the whole span of a one-shot one",
                           "Needs a source with a waveform") &&
         suggested) {
-        settings.Transient = *suggested;
+        settings.Transient.StopTime = suggested->StopTime;
+        settings.Transient.TimeStep = suggested->TimeStep;
         m_StopTime.Load(suggested->StopTime);
         m_TimeStep.Load(suggested->TimeStep);
     }
@@ -259,6 +260,16 @@ void AnalysisSettingsPanel::DrawTransientSettings(SimulationSettings &settings) 
     ImGui::SetItemTooltip("With Live on, the transient runs until it is stopped and covers the stop time in this long "
                           "on the clock, from %.0f to %.0f s; the plot and the schematic show the last stop time",
                           MIN_LIVE_SECONDS, MAX_LIVE_SECONDS);
+    DrawFieldLabel("Seed");
+    // Files reject a negative seed, so the field never produces a value that would not load back
+    int seed = static_cast<int>(settings.Transient.Seed);
+    if (ImGui::InputInt("##seed", &seed, 0)) {
+        settings.Transient.Seed = static_cast<unsigned int>(std::max(seed, 0));
+    }
+    ImGui::SetItemTooltip(
+        "0 draws new random numbers each run. Another number repeats the values of the Random sources "
+        "and the telegraph noise of the Noise sources. The white and 1/f noise of a Noise source "
+        "change on each run whatever the seed");
 }
 
 void AnalysisSettingsPanel::DrawACSweepSettings(SimulationSettings &settings) {

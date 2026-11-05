@@ -66,6 +66,13 @@ std::string TemperatureCard(const std::optional<double> temperature) {
     return temperature ? std::format(".temp {}\n", FormatSpiceValue(*temperature)) : std::string();
 }
 
+/**
+ * @brief   The card that makes the random sources of a run repeat, or nothing when each run draws new numbers.
+ */
+std::string SeedCard(const unsigned int seed) {
+    return seed != 0 ? std::format(".options seed={}\n", seed) : std::string();
+}
+
 std::string FormatSweepRange(const SweepRange &range) {
     return std::format("{} {} {} {}", range.Source, FormatSpiceValue(range.Start), FormatSpiceValue(range.Stop),
                        FormatSpiceValue(range.Step));
@@ -391,7 +398,7 @@ TransientRun NgspiceBackend::RunTransient(const Circuit &circuit, const Transien
     // An initial condition needs uic, which skips the operating point and starts the capacitors and inductors from
     // the IC= values written in the netlist
     const bool has_initial_conditions = circuit.HasInitialConditions();
-    std::string analysis = std::format("{}.tran {} {}", TemperatureCard(temperature_celsius),
+    std::string analysis = std::format("{}{}.tran {} {}", TemperatureCard(temperature_celsius), SeedCard(settings.Seed),
                                        FormatSpiceValue(settings.TimeStep), FormatSpiceValue(settings.StopTime));
     if (has_initial_conditions) {
         analysis += " uic";

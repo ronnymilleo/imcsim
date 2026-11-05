@@ -228,6 +228,31 @@ std::optional<std::string> CheckLibraryModels(const Circuit &circuit) {
     return std::nullopt;
 }
 
+/**
+ * @brief   A noise or random source with a value ngspice cannot take is stopped here: a negative noise time step makes
+ *          ngspice loop forever, and it runs inside this process.
+ */
+std::optional<std::string> CheckSourceWaveforms(const Circuit &circuit) {
+    for (const Component *part : CollectParts(circuit)) {
+        if (!IsSource(part->GetType())) {
+            continue;
+        }
+        const auto &source = static_cast<const Source &>(*part);
+        if (source.GetSourceType() == Source::SourceType::NOISE && !source.IsValidNoise(source.GetNoise())) {
+            return std::format("The noise of {} has a value ngspice cannot use: check that the time step is positive "
+                               "with white or 1/f noise, the 1/f exponent is between 0 and 2 and the telegraph times "
+                               "are positive",
+                               part->GetName());
+        }
+        if (source.GetSourceType() == Source::SourceType::RANDOM && !source.IsValidRandom(source.GetRandom())) {
+            return std::format("The random values of {} have a value ngspice cannot use: check that the time step is "
+                               "positive and the first parameter is not negative",
+                               part->GetName());
+        }
+    }
+    return std::nullopt;
+}
+
 } // namespace
 
 /**
@@ -249,6 +274,9 @@ std::optional<std::string> CheckCircuit(const Circuit &circuit) {
         return problem;
     }
     if (std::optional<std::string> problem = CheckLibraryModels(circuit)) {
+        return problem;
+    }
+    if (std::optional<std::string> problem = CheckSourceWaveforms(circuit)) {
         return problem;
     }
     // A current-controlled source needs a current that some other part reports
@@ -289,6 +317,42 @@ std::optional<std::string> CheckTransientSettings(const TransientSettings &setti
     }
     if (settings.StopTime / settings.TimeStep > MAX_TRANSIENT_POINTS) {
         return std::format("The time step is too small for the stop time: it would produce more than {} points",
+                           MAX_TRANSIENT_POINTS);
+    }
+    return std::nullopt;
+}
+
+/**
+ * @brief   Finds the shortest interval at which a noise or random source of the circuit changes.
+ * @param[in] circuit  Circuit to look through, blocks included.
+ * @return  The shortest time step of its noise and random sources; no value when none has one.
+ */
+std::optional<double> FindFinestSignalStep(const Circuit &circuit) {
+    std::optional<double> finest;
+    for (const Component *part : CollectParts(circuit)) {
+        if (!IsSource(part->GetType())) {
+            continue;
+        }
+        const std::optional<double> step = static_cast<const Source &>(*part).GetSignalStep();
+        if (step && (!finest || *step < *finest)) {
+            finest = step;
+        }
+    }
+    return finest;
+}
+
+/**
+ * @brief   Checks that the noise and random sources of a circuit keep a transient within the points it may span.
+ * @param[in] circuit   Circuit to simulate.
+ * @param[in] settings  Stop time and time step.
+ * @return  The reason it would span too many points, since ngspice stops at every sample of a noise or random source
+ *          and not only at the time step; no value when it does not.
+ */
+std::optional<std::string> CheckSourceSteps(const Circuit &circuit, const TransientSettings &settings) {
+    const std::optional<double> finest = FindFinestSignalStep(circuit);
+    if (finest && *finest > 0.0 && settings.StopTime / *finest > MAX_TRANSIENT_POINTS) {
+        return std::format("The time step of a noise or random source is too small for the stop time: it would "
+                           "produce more than {} points",
                            MAX_TRANSIENT_POINTS);
     }
     return std::nullopt;

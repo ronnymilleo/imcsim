@@ -32,6 +32,17 @@ constexpr auto EXAMPLES = std::to_array<Example>({
         .FileName = "rc_low_pass_filter.imcsim",
     },
     {
+        .Title = "Noise through an RC low-pass filter",
+        .Group = "Basics",
+        .Description = "The 1k and 100n low-pass of the example above, driven by 100 mV rms of white noise, a new "
+                       "sample every 50 us, which is a flat 1 mV per root hertz up to 10 kHz. Run the transient "
+                       "(19 ms, within one window of the plot), then open the Spectrum tab of the Output window: the "
+                       "input floor is flat and the output follows it up to the 1.6 kHz corner and falls beyond it. "
+                       "The noise changes on each run; "
+                       "the seed of the Simulation settings only fixes the Random sources.",
+        .FileName = "noise_through_rc_low_pass.imcsim",
+    },
+    {
         .Title = "LED dimmer with a potentiometer",
         .Group = "Basics",
         .Description =

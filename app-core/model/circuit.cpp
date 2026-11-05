@@ -42,6 +42,22 @@ bool IsACSource(const Component &component) {
 }
 
 /**
+ * @brief   The arguments of TRNOISE, with the parts that are off written as 0: ngspice ignores a source with no time
+ *          step and no telegraph amplitude, and takes the step only for the white and 1/f noise.
+ */
+std::string FormatNoiseArguments(const NoiseParameters &noise) {
+    const bool is_flicker_on = noise.FlickerAmplitude != 0.0;
+    const bool is_telegraph_on = noise.TelegraphAmplitude != 0.0;
+    const bool needs_step = noise.WhiteAmplitude != 0.0 || is_flicker_on;
+    return std::format("{} {} {} {} {} {} {}", FormatSpiceValue(noise.WhiteAmplitude),
+                       FormatSpiceValue(needs_step ? noise.TimeStep : 0.0),
+                       FormatSpiceValue(is_flicker_on ? noise.FlickerExponent : 0.0),
+                       FormatSpiceValue(noise.FlickerAmplitude), FormatSpiceValue(noise.TelegraphAmplitude),
+                       FormatSpiceValue(is_telegraph_on ? noise.CaptureTime : 0.0),
+                       FormatSpiceValue(is_telegraph_on ? noise.EmissionTime : 0.0));
+}
+
+/**
  * @brief   One line serves every analysis: .op reads the DC value, .ac the AC magnitude and .tran the waveform.
  * @details Every waveform writes the value it starts from, so the operating point matches the beginning of the
  *          transient. The name tells SPICE whether it is a voltage or current source.
@@ -101,8 +117,20 @@ std::string FormatSource(const Source &source, const std::vector<int> &nodes) {
         const std::string first = FormatSpiceValue(pwl.Points.front().Value);
         return std::format("{} DC {} PWL({})\n", start, first, points);
     }
+    case Source::SourceType::NOISE:
+        return std::format("{} DC {} TRNOISE({})\n", start, FormatSpiceValue(source.GetNoise().Offset),
+                           FormatNoiseArguments(source.GetNoise()));
+    case Source::SourceType::RANDOM: {
+        const RandomParameters &random = source.GetRandom();
+        // ngspice adds the DC value to what TRRANDOM gives, so the offset or mean is written once, as the DC value,
+        // which also makes it the operating point; the offset of TRRANDOM itself stays 0
+        return std::format("{} DC {} TRRANDOM({} {} {} {} 0)\n", start, FormatSpiceValue(random.Second),
+                           static_cast<int>(random.Distribution), FormatSpiceValue(random.TimeStep),
+                           FormatSpiceValue(random.Delay), FormatSpiceValue(random.First));
     }
-    return "";
+    default:
+        return "";
+    }
 }
 
 /**

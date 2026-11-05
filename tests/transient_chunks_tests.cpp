@@ -16,6 +16,7 @@
 #include "document/examples.h"
 #include "document/schematic.h"
 #include "ngspice/ngspice_library.h"
+#include "simulation/circuit_checks.h"
 #include "simulation/live_change.h"
 #include "simulation/simulation_backend.h"
 #include "simulation/simulator.h"
@@ -221,6 +222,10 @@ TEST_CASE("A chunked transient matches the one-piece run on every example", "[tr
         const Core::Circuit circuit = schematic.BuildCircuit();
         // The examples with logic parts, loose or inside blocks, run only where ngspice has the digital models
         if (Core::FindUnsupported(Core::GetBackend(), circuit, Core::AnalysisKind::TRANSIENT)) {
+            continue;
+        }
+        // The noise of a source changes on each run, so two runs of it never match
+        if (Core::FindFinestSignalStep(circuit)) {
             continue;
         }
         const Core::TransientSettings settings = schematic.GetSimulationSettings().Transient;

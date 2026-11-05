@@ -14,6 +14,7 @@
 #include <algorithm>
 #include <array>
 #include <cfloat>
+#include <cmath>
 #include <cstddef>
 #include <format>
 #include <optional>
@@ -70,6 +71,38 @@ constexpr auto EXP_FIELDS = std::to_array<ParameterField<Core::EXPParameters>>({
     {"Fall delay", &Core::EXPParameters::FallDelay, "s"},
     {"Fall tau", &Core::EXPParameters::FallTimeConstant, "s"},
 });
+
+constexpr auto NOISE_FIELDS = std::to_array<ParameterField<Core::NoiseParameters>>({
+    {"Offset", &Core::NoiseParameters::Offset, nullptr},
+    {"White rms", &Core::NoiseParameters::WhiteAmplitude, nullptr},
+    {"Sample step", &Core::NoiseParameters::TimeStep, "s"},
+    {"1/f exponent", &Core::NoiseParameters::FlickerExponent, ""},
+    {"1/f amplitude", &Core::NoiseParameters::FlickerAmplitude, nullptr},
+    {"Telegraph", &Core::NoiseParameters::TelegraphAmplitude, nullptr},
+    {"Capture time", &Core::NoiseParameters::CaptureTime, "s"},
+    {"Emission time", &Core::NoiseParameters::EmissionTime, "s"},
+});
+
+/// What the first and second parameters of each distribution are called; Poisson lambda is a count, with no unit.
+struct RandomLabels {
+    const char *First;
+    const char *Second;
+    const char *FirstUnit;
+};
+
+constexpr RandomLabels GetRandomLabels(const Core::RandomDistribution distribution) {
+    switch (distribution) {
+    case Core::RandomDistribution::UNIFORM:
+        return {"Range +/-", "Offset", nullptr};
+    case Core::RandomDistribution::EXPONENTIAL:
+        return {"Mean", "Offset", nullptr};
+    case Core::RandomDistribution::POISSON:
+        return {"Lambda", "Offset", ""};
+    case Core::RandomDistribution::GAUSSIAN:
+    default:
+        return {"Std deviation", "Mean", nullptr};
+    }
+}
 
 constexpr auto SFFM_FIELDS = std::to_array<ParameterField<Core::SFFMParameters>>({
     {"Offset", &Core::SFFMParameters::Offset, nullptr},
@@ -618,6 +651,11 @@ void PartEditor::LoadFields(const Core::Component &component) {
         LoadParameterFields(EXP_FIELDS, m_EXPFields, source.GetEXP());
         LoadParameterFields(SFFM_FIELDS, m_SFFMFields, source.GetSFFM());
         LoadParameterFields(AM_FIELDS, m_AMFields, source.GetAM());
+        LoadParameterFields(NOISE_FIELDS, m_NoiseFields, source.GetNoise());
+        m_RandomFields[0].Load(source.GetRandom().TimeStep);
+        m_RandomFields[1].Load(source.GetRandom().Delay);
+        m_RandomFields[2].Load(source.GetRandom().First);
+        m_RandomFields[3].Load(source.GetRandom().Second);
         m_PWLText = Core::FormatPWLPoints(source.GetPWL().Points);
     }
     LoadModelFields(component);
@@ -1061,8 +1099,9 @@ void PartEditor::DrawOpAmp(Core::OpAmp &op_amp) {
 void PartEditor::DrawSource(Core::Source &source) {
     using SourceType = Core::Source::SourceType;
     for (const SourceType type : {SourceType::DC, SourceType::AC, SourceType::PULSE, SourceType::EXP, SourceType::SFFM,
-                                  SourceType::AM, SourceType::PWL}) {
-        if (type != SourceType::DC) {
+                                  SourceType::AM, SourceType::PWL, SourceType::NOISE, SourceType::RANDOM}) {
+        // Nine buttons do not fit one row
+        if (type != SourceType::DC && type != SourceType::NOISE) {
             ImGui::SameLine();
         }
         if (ImGui::RadioButton(Core::GetSourceTypeName(type), source.GetSourceType() == type) &&
@@ -1098,6 +1137,14 @@ void PartEditor::DrawSource(Core::Source &source) {
         break;
     case SourceType::PWL:
         DrawPWL(source);
+        break;
+    case SourceType::NOISE:
+        DrawNoise(source);
+        break;
+    case SourceType::RANDOM:
+        DrawRandom(source);
+        break;
+    default:
         break;
     }
 }
@@ -1173,6 +1220,77 @@ void PartEditor::DrawPWL(Core::Source &source) {
     } else {
         ImGui::TextDisabled("For example: 0 0, 1m 5, 2m 0");
     }
+}
+
+/**
+ * @brief   The density below the fields is what the Spectrum tab of a run shows as a floor: the white noise is flat up
+ * to half the sampling rate.
+ */
+void PartEditor::DrawNoise(Core::Source &source) {
+    Core::NoiseParameters noise = source.GetNoise();
+    const auto is_valid = [&source](const Core::NoiseParameters &candidate) { return source.IsValidNoise(candidate); };
+    if (DrawParameterFields(NOISE_FIELDS, m_NoiseFields, source.GetUnit(), is_valid, noise)) {
+        source.SetNoise(noise);
+        m_Schematic->MarkModified();
+    }
+    if (noise.WhiteAmplitude > 0.0 && noise.TimeStep > 0.0) {
+        const double density = noise.WhiteAmplitude * std::sqrt(2.0 * noise.TimeStep);
+        ImGui::TextDisabled("%s", std::format("White noise: {}{}/rtHz, flat up to {}Hz", Core::FormatValue(density),
+                                              source.GetUnit(), Core::FormatValue(0.5 / noise.TimeStep))
+                                      .c_str());
+    }
+    ImGui::TextDisabled("1/f amplitude, telegraph amplitude and white rms at 0 turn that part off");
+    ImGui::TextDisabled("Noise changes on each run; for noise over a signal, put a second source in series");
+}
+
+/**
+ * @brief   The labels of the two parameters follow the distribution, as the ngspice TRRANDOM source defines them.
+ */
+void PartEditor::DrawRandom(Core::Source &source) {
+    Core::RandomParameters random = source.GetRandom();
+    DrawFieldLabel("Distribution");
+    if (ImGui::BeginCombo("##distribution", Core::GetRandomDistributionName(random.Distribution))) {
+        for (const Core::RandomDistribution distribution :
+             {Core::RandomDistribution::UNIFORM, Core::RandomDistribution::GAUSSIAN,
+              Core::RandomDistribution::EXPONENTIAL, Core::RandomDistribution::POISSON}) {
+            const bool is_selected = distribution == random.Distribution;
+            if (ImGui::Selectable(Core::GetRandomDistributionName(distribution), is_selected) && !is_selected) {
+                random.Distribution = distribution;
+                if (source.IsValidRandom(random)) {
+                    source.SetRandom(random);
+                    m_Schematic->MarkModified();
+                }
+            }
+        }
+        ImGui::EndCombo();
+    }
+    random = source.GetRandom();
+    const RandomLabels labels = GetRandomLabels(random.Distribution);
+    const char *unit = source.GetUnit();
+    const auto is_valid = [&source, &random](double Core::RandomParameters::*member, const double value) {
+        Core::RandomParameters candidate = random;
+        candidate.*member = value;
+        return source.IsValidRandom(candidate);
+    };
+    bool changed = false;
+    const auto draw = [&](ValueField &field, const char *label, const char *field_unit,
+                          double Core::RandomParameters::*member) {
+        if (const std::optional<double> value =
+                field.Draw(label, field_unit, [&](const double candidate) { return is_valid(member, candidate); })) {
+            random.*member = *value;
+            changed = true;
+        }
+    };
+    draw(m_RandomFields[0], "Sample step", "s", &Core::RandomParameters::TimeStep);
+    draw(m_RandomFields[1], "Delay", "s", &Core::RandomParameters::Delay);
+    draw(m_RandomFields[2], labels.First, labels.FirstUnit != nullptr ? labels.FirstUnit : unit,
+         &Core::RandomParameters::First);
+    draw(m_RandomFields[3], labels.Second, unit, &Core::RandomParameters::Second);
+    if (changed) {
+        source.SetRandom(random);
+        m_Schematic->MarkModified();
+    }
+    ImGui::TextDisabled("Each value is held for the sample step; the seed is in the Simulation settings");
 }
 
 /**

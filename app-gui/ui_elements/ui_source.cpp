@@ -94,6 +94,14 @@ void UISource::DrawLabels(SchematicCanvas &canvas, const ViewTransform &view, co
     case Core::Source::SourceType::PWL:
         waveform = std::format("{}pt", source.GetPWL().Points.size());
         break;
+    case Core::Source::SourceType::NOISE:
+        waveform = std::format("{}{} rms", Core::FormatValue(source.GetNoise().WhiteAmplitude), unit);
+        break;
+    case Core::Source::SourceType::RANDOM:
+        waveform = Core::GetRandomDistributionName(source.GetRandom().Distribution);
+        break;
+    default:
+        break;
     }
     DrawLabel(canvas, view, {0.0f, -LABEL_OFFSET}, {0.0f, -1.0f}, source.GetName(), color);
     DrawLabel(canvas, view, {0.0f, LABEL_OFFSET}, {0.0f, 1.0f}, waveform, color);
@@ -187,8 +195,35 @@ bool UISource::DrawWaveform(SchematicCanvas &canvas, const ViewTransform &view, 
         canvas.AddPolyline(points.data(), static_cast<int>(points.size()), color, ImDrawFlags_None, LINE_THICKNESS);
         return true;
     }
+    case Core::Source::SourceType::NOISE: {
+        // A fixed jagged line, since the symbol has to look the same every frame
+        constexpr std::array<float, 9> HEIGHTS = {0.0f, 0.8f, -0.5f, 0.3f, -0.9f, 0.6f, -0.3f, 0.9f, 0.0f};
+        std::array<ImVec2, HEIGHTS.size()> noise;
+        for (std::size_t point = 0; point < HEIGHTS.size(); ++point) {
+            const float fraction = static_cast<float>(point) / static_cast<float>(HEIGHTS.size() - 1);
+            noise[point] = LocalToScreen(view, -WAVE_HALF_WIDTH + 2.0f * WAVE_HALF_WIDTH * fraction,
+                                         -WAVE_AMPLITUDE * HEIGHTS[point]);
+        }
+        canvas.AddPolyline(noise.data(), static_cast<int>(noise.size()), color, ImDrawFlags_None, LINE_THICKNESS);
+        return true;
     }
-    return false;
+    case Core::Source::SourceType::RANDOM: {
+        // Held values: a staircase with a step up and a step down
+        constexpr std::array<float, 4> HEIGHTS = {0.4f, -0.7f, 0.7f, -0.3f};
+        std::array<ImVec2, 2 * HEIGHTS.size()> stairs;
+        for (std::size_t step = 0; step < HEIGHTS.size(); ++step) {
+            const float left = -WAVE_HALF_WIDTH + 2.0f * WAVE_HALF_WIDTH * static_cast<float>(step) / HEIGHTS.size();
+            const float right =
+                -WAVE_HALF_WIDTH + 2.0f * WAVE_HALF_WIDTH * static_cast<float>(step + 1) / HEIGHTS.size();
+            stairs[2 * step] = LocalToScreen(view, left, -WAVE_AMPLITUDE * HEIGHTS[step]);
+            stairs[2 * step + 1] = LocalToScreen(view, right, -WAVE_AMPLITUDE * HEIGHTS[step]);
+        }
+        canvas.AddPolyline(stairs.data(), static_cast<int>(stairs.size()), color, ImDrawFlags_None, LINE_THICKNESS);
+        return true;
+    }
+    default:
+        return false;
+    }
 }
 
 } // namespace GUI
