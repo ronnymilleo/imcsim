@@ -18,6 +18,7 @@
 #include "components/voltage_source.h"
 #include "model/circuit.h"
 #include "model/subcircuit.h"
+#include "ngspice/ngspice_library.h"
 #include "simulation/circuit_checks.h"
 #include "simulation/simulation_backend.h"
 #include "simulation/simulator.h"
@@ -180,8 +181,9 @@ TEST_CASE("The sensitivity analysis refuses ground as its output and a circuit w
         Core::FindUnsupported(Core::GetBackend(), parts, Core::AnalysisKind::SENSITIVITY);
     REQUIRE(reason.has_value());
     CHECK(reason->contains("logic"));
-    // Any other analysis of those parts is the backend's business as before
-    CHECK_FALSE(Core::FindUnsupported(Core::GetBackend(), parts, Core::AnalysisKind::OPERATING_POINT).has_value());
+    // Any other analysis of those parts is the backend's business as before: refused only without the digital models
+    CHECK(Core::FindUnsupported(Core::GetBackend(), parts, Core::AnalysisKind::OPERATING_POINT).has_value() ==
+          !Core::AreDigitalModelsAvailable());
     CHECK_FALSE(
         Core::FindUnsupported(Core::GetBackend(), {Core::ComponentType::RESISTOR}, Core::AnalysisKind::SENSITIVITY)
             .has_value());
