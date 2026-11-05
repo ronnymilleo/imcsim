@@ -10,6 +10,7 @@
 #include "analysis/playback.h"
 #include "analysis/point_window.h"
 #include "document/schematic.h"
+#include "plots/logic_bus.h"
 #include "plots/logic_trace.h"
 #include "plots/plot_export.h"
 #include "plots/plot_types.h"
@@ -17,6 +18,7 @@
 #include "windows/output_tabs/frame_results.h"
 #include <cstddef>
 #include <optional>
+#include <string>
 #include <vector>
 
 namespace GUI {
@@ -73,9 +75,11 @@ private:
                    const std::optional<StepFamily<Core::Transient>> &steps);
     void DrawAnalog(const Core::Transient &transient, const std::vector<MathTrace> &math,
                     const std::optional<StepFamily<Core::Transient>> &steps, const std::vector<int> &lane_nodes,
-                    bool show_currents, bool has_voltages, float height);
-    void DrawLogicLanes(const Core::Transient &transient, const std::vector<LogicNode> &lanes, float height);
+                    bool show_currents, bool has_voltages, bool has_lanes, float height);
+    void DrawLogicLanes(const Core::Transient &transient, const std::vector<BusLane> &buses,
+                        const std::vector<LogicNode> &lanes, float height);
     std::vector<LogicNode> FindMeasuredLanes(std::size_t node_count) const;
+    std::vector<BusLane> FindShownBuses(std::size_t node_count) const;
 
     // Statistics
     void DrawStatistics(const Core::Transient &transient, const std::vector<MathTrace> &math);

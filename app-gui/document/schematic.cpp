@@ -1071,12 +1071,30 @@ void Schematic::SetMathChannels(std::vector<MathChannel> channels) {
 }
 
 /**
+ * @brief   Returns the logic buses the transient plot shows as lanes of numbers.
+ * @return  The buses, in the order they were added.
+ */
+const std::vector<LogicBus> &Schematic::GetBuses() const {
+    return m_Buses;
+}
+
+/**
+ * @brief   Replaces the logic buses, as the Output window does when the user adds, edits or removes one.
+ * @param[in] buses  New buses.
+ * @note    Like the math channels, they are saved with the file but stay out of undo and do not mark it modified.
+ */
+void Schematic::SetBuses(std::vector<LogicBus> buses) {
+    m_Buses = std::move(buses);
+}
+
+/**
  * @brief   Removes every measurement, so the plots start empty; for a new or opened schematic.
  */
 void Schematic::ClearMeasurements() {
     m_VoltageProbes.clear();
     m_MeasuredCurrents.clear();
     m_MathChannels.clear();
+    m_Buses.clear();
 }
 
 /**
@@ -1095,6 +1113,7 @@ SavedMeasurements Schematic::SaveMeasurements() {
     }
     measurements.Currents.assign(m_MeasuredCurrents.begin(), m_MeasuredCurrents.end());
     measurements.MathChannels = m_MathChannels;
+    measurements.Buses = m_Buses;
     return measurements;
 }
 
@@ -1114,6 +1133,7 @@ void Schematic::RestoreMeasurements(const SavedMeasurements &measurements) {
     }
     m_MeasuredCurrents.insert(measurements.Currents.begin(), measurements.Currents.end());
     m_MathChannels = measurements.MathChannels;
+    m_Buses = measurements.Buses;
 }
 
 /**

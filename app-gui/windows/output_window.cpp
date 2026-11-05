@@ -107,8 +107,9 @@ const char *GetTabTitle(const PlotTab tab) {
 OutputWindow::OutputWindow(Schematic &schematic, AnalysisControls &controls, TransientPlayback &playback,
                            const Preferences &preferences)
     : AppWindow("Output", true), m_Schematic(schematic), m_Controls(controls), m_Playback(playback),
-      m_Preferences(preferences), m_MathChannels(schematic), m_TransientTab(schematic, controls, playback),
-      m_SpectrumTab(schematic), m_ACSweepTab(schematic), m_DCSweepTab(schematic), m_NoiseTab(schematic) {
+      m_Preferences(preferences), m_MathChannels(schematic), m_Buses(schematic),
+      m_TransientTab(schematic, controls, playback), m_SpectrumTab(schematic), m_ACSweepTab(schematic),
+      m_DCSweepTab(schematic), m_NoiseTab(schematic) {
     SetInitialSize(INITIAL_SIZE);
     // Nothing to plot yet; the first result opens it
     SetOpen(false);
@@ -327,6 +328,16 @@ void OutputWindow::DrawTraceList(const std::size_t node_count, const std::vector
         ImGui::PushTextWrapPos(0.0f);
         ImGui::TextDisabled("Math waits for the end of the run");
         ImGui::PopTextWrapPos();
+    }
+    // Buses read the signals of logic parts, so a circuit without any has none to offer
+    std::vector<std::string> signals;
+    for (const LogicNode &logic_node : FindLogicNodes(m_Schematic.BuildCircuit())) {
+        if (static_cast<std::size_t>(logic_node.Node) < node_count) {
+            signals.push_back(GetVoltageLabel(m_Schematic.GetConnectivity(), logic_node.Node));
+        }
+    }
+    if (!signals.empty() || !m_Schematic.GetBuses().empty()) {
+        m_Buses.Draw(signals);
     }
     ImGui::EndChild();
 }

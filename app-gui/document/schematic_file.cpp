@@ -1300,6 +1300,15 @@ nlohmann::json WriteMathChannel(const MathChannel &channel) {
     };
 }
 
+nlohmann::json WriteBus(const LogicBus &bus) {
+    return {
+        {"name", bus.Name},
+        {"shown", bus.Shown},
+        {"bits", bus.Bits},
+        {"format", GetBusFormatName(bus.Format)},
+    };
+}
+
 nlohmann::json WriteMeasurements(const SavedMeasurements &measurements) {
     nlohmann::json voltages = nlohmann::json::array();
     for (const GridPoint point : measurements.Voltages) {
@@ -1312,6 +1321,13 @@ nlohmann::json WriteMeasurements(const SavedMeasurements &measurements) {
             channels.push_back(WriteMathChannel(channel));
         }
         measurements_object["math"] = channels;
+    }
+    if (!measurements.Buses.empty()) {
+        nlohmann::json buses = nlohmann::json::array();
+        for (const LogicBus &bus : measurements.Buses) {
+            buses.push_back(WriteBus(bus));
+        }
+        measurements_object["buses"] = buses;
     }
     return measurements_object;
 }
@@ -1376,6 +1392,37 @@ std::optional<MathChannel> ReadMathChannelValue(const nlohmann::json &value) {
 }
 
 /**
+ * @brief   A bus needs its name and a list of bit names; a format it does not know rejects it, since it would show
+ *          other values.
+ */
+std::optional<LogicBus> ReadBusValue(const nlohmann::json &value) {
+    if (!value.is_object()) {
+        return std::nullopt;
+    }
+    const std::optional<std::string> name = ReadString(value, "name");
+    const auto bits = value.find("bits");
+    if (!name || name->empty() || bits == value.end() || !bits->is_array()) {
+        return std::nullopt;
+    }
+    LogicBus bus{.Name = *name};
+    bus.Shown = ReadBool(value, "shown").value_or(bus.Shown);
+    for (const nlohmann::json &bit : *bits) {
+        if (!bit.is_string()) {
+            return std::nullopt;
+        }
+        bus.Bits.push_back(bit.get<std::string>());
+    }
+    if (const std::optional<std::string> format_name = ReadString(value, "format")) {
+        const std::optional<BusFormat> format = ParseBusFormat(*format_name);
+        if (!format) {
+            return std::nullopt;
+        }
+        bus.Format = *format;
+    }
+    return bus;
+}
+
+/**
  * @brief   Entries that cannot be read are skipped with one warning per list, since a lost trace is easy to probe
  *          again.
  */
@@ -1397,6 +1444,9 @@ SavedMeasurements ReadMeasurements(const nlohmann::json &document, std::vector<s
     }
     if (!ReadList(*object, "math", ReadMathChannelValue, measurements.MathChannels)) {
         warnings.push_back("Some math channels could not be read and were skipped");
+    }
+    if (!ReadList(*object, "buses", ReadBusValue, measurements.Buses)) {
+        warnings.push_back("Some logic buses could not be read and were skipped");
     }
     return measurements;
 }
@@ -1475,7 +1525,8 @@ std::string WriteDocument(const std::span<const UIElement *const> elements, cons
             document["models"].push_back({{"text", model.Text}});
         }
     }
-    if (!measurements.Voltages.empty() || !measurements.Currents.empty() || !measurements.MathChannels.empty()) {
+    if (!measurements.Voltages.empty() || !measurements.Currents.empty() || !measurements.MathChannels.empty() ||
+        !measurements.Buses.empty()) {
         document["measurements"] = WriteMeasurements(measurements);
     }
     return document.dump(2) + "\n";

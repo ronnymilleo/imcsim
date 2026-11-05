@@ -11,6 +11,7 @@
 #include "helpers.h"
 #include "model/library_model.h"
 #include "model/subcircuit.h"
+#include "plots/logic_bus.h"
 #include "plots/math_channel.h"
 #include "ui_elements/ui_element.h"
 #include "ui_elements/ui_wire.h"
@@ -28,12 +29,14 @@ namespace GUI {
  * @struct  SavedMeasurements
  * @brief   The traces the plots show, as saved in a file.
  * @details Voltages are kept as a point of their node instead of its number, so they survive changes in how
- *          nodes are numbered; currents by name, such as "R1" or "Q1.C"; math channels by what they compute.
+ *          nodes are numbered; currents by name, such as "R1" or "Q1.C"; math channels by what they compute; logic
+ * buses by the voltages of their bits.
  */
 struct SavedMeasurements {
     std::vector<GridPoint> Voltages;
     std::vector<std::string> Currents;
     std::vector<MathChannel> MathChannels;
+    std::vector<LogicBus> Buses;
 
     bool operator==(const SavedMeasurements &) const = default;
 };

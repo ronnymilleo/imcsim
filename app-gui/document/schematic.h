@@ -11,6 +11,7 @@
 #include "document/simulation_settings.h"
 #include "editing/connectivity.h"
 #include "helpers.h"
+#include "plots/logic_bus.h"
 #include "plots/math_channel.h"
 #include "simulation/live_change.h"
 #include "simulation/simulator.h"
@@ -126,6 +127,8 @@ public:
     void SetCurrentMeasured(const std::string &name, bool measured);
     const std::vector<MathChannel> &GetMathChannels() const;
     void SetMathChannels(std::vector<MathChannel> channels);
+    const std::vector<LogicBus> &GetBuses() const;
+    void SetBuses(std::vector<LogicBus> buses);
     void ClearMeasurements();
     SavedMeasurements SaveMeasurements();
     void RestoreMeasurements(const SavedMeasurements &measurements);
@@ -224,6 +227,8 @@ private:
     /// Current names such as "R1" or "Q1.C".
     std::set<std::string> m_MeasuredCurrents;
     std::vector<MathChannel> m_MathChannels;
+    /// Logic signals the transient plot reads together as numbers.
+    std::vector<LogicBus> m_Buses;
 
     // Simulation settings
     SimulationSettings m_SimulationSettings;

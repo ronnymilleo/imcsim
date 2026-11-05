@@ -15,8 +15,11 @@
 #include "spice/spice_value.h"
 #include "windows/output_tabs/plot_widgets.h"
 #include <algorithm>
+#include <array>
+#include <expected>
 #include <format>
 #include <string>
+#include <string_view>
 #include <utility>
 
 namespace GUI {
@@ -39,6 +42,10 @@ constexpr float MAX_LANE_SHARE = 0.6f;
 constexpr float BIT_BOX_PADDING = 0.25f;
 /// Corner rounding of the box of a bit label.
 constexpr float BIT_BOX_ROUNDING = 3.0f;
+/// How far the ends of a value of a bus slant in, in font sizes, as a logic analyzer draws a change of a bus.
+constexpr float BUS_SLANT = 0.3f;
+/// How much of the lane color fills a value of a bus that is unknown.
+constexpr float UNKNOWN_BUS_FILL_ALPHA = 0.25f;
 
 /**
  * @brief   The measured nodes of a result that logic parts are connected to, which the transient plots as lanes.
@@ -96,6 +103,56 @@ void DrawBitValues(const std::vector<LogicSegment> &cells, const std::size_t lan
         draw_list->AddRectFilled(box_min, box_min + box_size, ImGui::GetColorU32(ImGuiCol_FrameBg), BIT_BOX_ROUNDING);
         draw_list->AddRect(box_min, box_min + box_size, color, BIT_BOX_ROUNDING);
         draw_list->AddText(box_min + ImVec2(padding, padding), ImGui::GetColorU32(ImGuiCol_Text), text);
+    }
+    ImPlot::PopPlotClipRect();
+}
+
+/**
+ * @brief   Draws one value of a bus between two pixel columns of its lane: a band whose ends slant in to its middle,
+ *          shaded while the value is unknown, with the value written in it when it fits.
+ */
+void DrawBusValue(ImDrawList *draw_list, const float left, const float right, const float top, const float bottom,
+                  const std::string &text, const bool is_unknown, const ImU32 color) {
+    const float middle = (top + bottom) / 2.0f;
+    const float slant = std::min(ImGui::GetFontSize() * BUS_SLANT, (right - left) / 2.0f);
+    const std::array<ImVec2, 6> band = {ImVec2(left, middle),          ImVec2(left + slant, top),
+                                        ImVec2(right - slant, top),    ImVec2(right, middle),
+                                        ImVec2(right - slant, bottom), ImVec2(left + slant, bottom)};
+    if (is_unknown) {
+        ImVec4 fill = ImGui::ColorConvertU32ToFloat4(color);
+        fill.w *= UNKNOWN_BUS_FILL_ALPHA;
+        draw_list->AddConvexPolyFilled(band.data(), static_cast<int>(band.size()),
+                                       ImGui::ColorConvertFloat4ToU32(fill));
+    }
+    draw_list->AddPolyline(band.data(), static_cast<int>(band.size()), color, ImDrawFlags_Closed, 1.5f);
+    const ImVec2 text_size = ImGui::CalcTextSize(text.c_str());
+    if (right - left >= text_size.x + slant * 2.0f) {
+        draw_list->AddText({(left + right - text_size.x) / 2.0f, middle - text_size.y / 2.0f},
+                           ImGui::GetColorU32(ImGuiCol_Text), text.c_str());
+    }
+}
+
+/**
+ * @brief   Draws the lane of a bus: one band per value within what the plot shows, so a value too short to see at the
+ *          zoom is a sliver and its text is left out.
+ */
+void DrawBusLane(const Core::Transient &transient, const BusLane &lane, const std::size_t lane_position,
+                 const ImU32 color) {
+    const std::vector<LogicSignal> bits = GetBusSignals(lane, transient.NodeVoltages);
+    const ImPlotRange view = ImPlot::GetPlotLimits().X;
+    const double base = static_cast<double>(lane_position) * LANE_STRIDE;
+    const float top = ImPlot::PlotToPixels(view.Min, base + LANE_HIGH_OFFSET).y;
+    const float bottom = ImPlot::PlotToPixels(view.Min, base + LANE_LOW_OFFSET).y;
+    ImDrawList *draw_list = ImPlot::GetPlotDrawList();
+    ImPlot::PushPlotClipRect();
+    for (const BusSegment &segment : FindBusSegments(transient.Times, bits)) {
+        const double from = std::max(segment.From, view.Min);
+        const double to = std::min(segment.To, view.Max);
+        if (to <= from) {
+            continue;
+        }
+        DrawBusValue(draw_list, ImPlot::PlotToPixels(from, base).x, ImPlot::PlotToPixels(to, base).x, top, bottom,
+                     FormatBusValue(segment.Value, lane.Bits.size(), lane.Format), !segment.Value, color);
     }
     ImPlot::PopPlotClipRect();
 }
@@ -180,13 +237,14 @@ ExportFigure TransientTab::BuildFigure(const FrameResults &frame, const bool is_
     if (const auto &transient = m_Schematic.GetTransient(); is_whole_run && transient) {
         static const std::vector<MathTrace> no_math;
         return BuildTransientFigure(*transient, frame.WholeRunMath != nullptr ? frame.WholeRunMath->Traces : no_math,
-                                    FindMeasuredLanes(transient->NodeVoltages.size()), m_Schematic, m_ShowBitValues,
+                                    FindMeasuredLanes(transient->NodeVoltages.size()),
+                                    FindShownBuses(transient->NodeVoltages.size()), m_Schematic, m_ShowBitValues,
                                     {.From = transient->Times.front(), .To = transient->Times.back()});
     }
     if (frame.TransientWindow) {
-        return BuildTransientFigure(*frame.TransientWindow, frame.TransientMath,
-                                    FindMeasuredLanes(frame.TransientWindow->NodeVoltages.size()), m_Schematic,
-                                    m_ShowBitValues, m_View);
+        return BuildTransientFigure(
+            *frame.TransientWindow, frame.TransientMath, FindMeasuredLanes(frame.TransientWindow->NodeVoltages.size()),
+            FindShownBuses(frame.TransientWindow->NodeVoltages.size()), m_Schematic, m_ShowBitValues, m_View);
     }
     return {};
 }
@@ -316,12 +374,14 @@ void TransientTab::DrawPlots(const Core::Transient &transient, const std::vector
     }
     DrawWindowControls(transient);
     const std::vector<LogicNode> lanes = FindMeasuredLanes(transient.NodeVoltages.size());
+    const std::vector<BusLane> buses = FindShownBuses(transient.NodeVoltages.size());
+    const std::size_t lane_count = lanes.size() + buses.size();
     const std::vector<int> lane_nodes = ListNodes(lanes);
     std::vector<int> analog_nodes = ListMeasuredNodes(transient.NodeVoltages.size(), m_Schematic, lane_nodes);
     const bool has_voltages = !analog_nodes.empty() || UsesAxis(math, ImAxis_Y1);
     std::vector<std::string> measured_currents = ListMeasuredCurrents(transient.Currents, m_Schematic);
     const bool show_currents = !measured_currents.empty();
-    const bool has_analog_plot = has_voltages || show_currents || !math.empty() || lanes.empty();
+    const bool has_analog_plot = has_voltages || show_currents || !math.empty() || lane_count == 0;
     const bool currents_changed = m_Fit.TakeCurrentsChanged(std::move(measured_currents));
     const bool voltages_changed = m_Fit.TakeNodesChanged(std::move(analog_nodes));
     // A transient that is still being made fits its axes as the chunks arrive, so the plot follows the run; once the
@@ -340,35 +400,36 @@ void TransientTab::DrawPlots(const Core::Transient &transient, const std::vector
     }
     float analog_height = PlotHeight(1);
     float lane_height = analog_height;
-    if (!lanes.empty() && has_analog_plot) {
+    if (lane_count > 0 && has_analog_plot) {
         const float font_size = ImGui::GetFontSize();
         const float available = ImGui::GetContentRegionAvail().y;
-        lane_height = std::clamp(font_size * (LANE_PLOT_MARGIN + static_cast<float>(lanes.size()) * LANE_ROW_HEIGHT),
+        lane_height = std::clamp(font_size * (LANE_PLOT_MARGIN + static_cast<float>(lane_count) * LANE_ROW_HEIGHT),
                                  font_size * MIN_PLOT_HEIGHT, available * MAX_LANE_SHARE);
         analog_height =
             std::max(font_size * MIN_PLOT_HEIGHT, available - lane_height - ImGui::GetStyle().ItemSpacing.y * 2.0f);
     }
     if (has_analog_plot) {
-        DrawAnalog(transient, math, steps, lane_nodes, show_currents, has_voltages, analog_height);
+        DrawAnalog(transient, math, steps, lane_nodes, show_currents, has_voltages, lane_count > 0, analog_height);
     }
-    if (!lanes.empty()) {
+    if (lane_count > 0) {
         if (new_result) {
             ImPlot::SetNextAxisToFit(ImAxis_X1);
         }
-        DrawLogicLanes(transient, lanes, lane_height);
+        DrawLogicLanes(transient, buses, lanes, lane_height);
     }
 }
 
 void TransientTab::DrawAnalog(const Core::Transient &transient, const std::vector<MathTrace> &math,
                               const std::optional<StepFamily<Core::Transient>> &steps,
                               const std::vector<int> &lane_nodes, const bool show_currents, const bool has_voltages,
-                              const float height) {
+                              const bool has_lanes, const float height) {
     if (!BeginTracePlot("##transient", ImVec2(-1.0f, height))) {
         return;
     }
     ImPlot::SetupAxes("Time", "Voltage", ImPlotAxisFlags_None,
                       VoltageAxisFlags(has_voltages, show_currents || !math.empty()));
-    if (!lane_nodes.empty()) {
+    // The plot of the lanes below shares the time axis
+    if (has_lanes) {
         ImPlot::SetupAxisLinks(ImAxis_X1, &m_View.From, &m_View.To);
     }
     ImPlot::SetupAxisFormat(ImAxis_X1, FormatAxisValue, const_cast<char *>("s"));
@@ -408,13 +469,16 @@ void TransientTab::DrawAnalog(const Core::Transient &transient, const std::vecto
  * @brief   Each lane is a trace between its low and high levels, named on the axis, with a state read at the cursor.
  * @details A lane the circuit drives to a voltage between the thresholds is drawn halfway between low and high.
  */
-void TransientTab::DrawLogicLanes(const Core::Transient &transient, const std::vector<LogicNode> &lanes,
-                                  const float height) {
+void TransientTab::DrawLogicLanes(const Core::Transient &transient, const std::vector<BusLane> &buses,
+                                  const std::vector<LogicNode> &lanes, const float height) {
     if (!ImPlot::BeginPlot("##transient_logic", ImVec2(-1.0f, height),
                            ImPlotFlags_NoLegend | ImPlotFlags_NoMouseText)) {
         return;
     }
-    const auto top = static_cast<double>(lanes.size() - 1) * LANE_STRIDE + LANE_HIGH_OFFSET + LANE_MARGIN;
+    // The buses take the top lanes and the signals the ones below, each lane at a height counted from the bottom
+    const std::size_t lane_count = buses.size() + lanes.size();
+    const auto position_of = [&](const std::size_t lane) { return lane_count - 1 - lane; };
+    const auto top = static_cast<double>(lane_count - 1) * LANE_STRIDE + LANE_HIGH_OFFSET + LANE_MARGIN;
     ImPlot::SetupAxes("Time", "", ImPlotAxisFlags_None,
                       ImPlotAxisFlags_Lock | ImPlotAxisFlags_NoGridLines | ImPlotAxisFlags_NoTickMarks);
     ImPlot::SetupAxisLimits(ImAxis_Y1, LANE_LOW_OFFSET - LANE_MARGIN, top, ImPlotCond_Always);
@@ -423,27 +487,31 @@ void TransientTab::DrawLogicLanes(const Core::Transient &transient, const std::v
     // The first lane is on top, and each is named at its middle
     std::vector<double> positions;
     std::vector<std::string> names;
-    for (std::size_t lane = 0; lane < lanes.size(); ++lane) {
-        const std::size_t height_index = lanes.size() - 1 - lane;
-        positions.push_back(static_cast<double>(height_index) * LANE_STRIDE + LANE_HIGH_OFFSET / 2.0);
-        names.push_back(GetVoltageLabel(m_Schematic.GetConnectivity(), lanes[lane].Node));
+    for (std::size_t lane = 0; lane < lane_count; ++lane) {
+        positions.push_back(static_cast<double>(position_of(lane)) * LANE_STRIDE + LANE_HIGH_OFFSET / 2.0);
+        names.push_back(lane < buses.size()
+                            ? buses[lane].Name
+                            : GetVoltageLabel(m_Schematic.GetConnectivity(), lanes[lane - buses.size()].Node));
     }
     std::vector<const char *> labels;
     for (const std::string &name : names) {
         labels.push_back(name.c_str());
     }
     ImPlot::SetupAxisTicks(ImAxis_Y1, positions.data(), static_cast<int>(positions.size()), labels.data());
+    for (std::size_t bus = 0; bus < buses.size(); ++bus) {
+        DrawBusLane(transient, buses[bus], position_of(bus), GetNodeColor(buses[bus].Bits.front().Node));
+    }
     std::vector<PlottedTrace> plotted;
     for (std::size_t lane = 0; lane < lanes.size(); ++lane) {
         const LogicNode &node = lanes[lane];
         const std::vector<double> &voltages = transient.NodeVoltages[static_cast<std::size_t>(node.Node)];
-        const std::vector<double> heights = BuildLane(voltages, node.LogicLevel, lanes.size() - 1 - lane);
+        const std::vector<double> heights = BuildLane(voltages, node.LogicLevel, position_of(buses.size() + lane));
         const ImU32 color = GetNodeColor(node.Node);
         ImPlotSpec spec;
         spec.LineColor = ImGui::ColorConvertU32ToFloat4(color);
-        ImPlot::PlotLine(names[lane].c_str(), transient.Times.data(), heights.data(), static_cast<int>(heights.size()),
-                         spec);
-        plotted.push_back({names[lane], &voltages, "V", color, node.LogicLevel});
+        const std::string &name = names[buses.size() + lane];
+        ImPlot::PlotLine(name.c_str(), transient.Times.data(), heights.data(), static_cast<int>(heights.size()), spec);
+        plotted.push_back({name, &voltages, "V", color, node.LogicLevel});
     }
     if (m_ShowBitValues) {
         std::vector<LogicSignal> signals;
@@ -453,7 +521,7 @@ void TransientTab::DrawLogicLanes(const Core::Transient &transient, const std::v
         const ImPlotRange view = ImPlot::GetPlotLimits().X;
         const auto cells = FindBitCells(transient.Times, signals, view.Min, view.Max);
         for (std::size_t lane = 0; lane < lanes.size(); ++lane) {
-            DrawBitValues(cells[lane], lanes.size() - 1 - lane, GetNodeColor(lanes[lane].Node));
+            DrawBitValues(cells[lane], position_of(buses.size() + lane), GetNodeColor(lanes[lane].Node));
         }
     }
     DrawCursors(m_Cursors, false);
@@ -472,6 +540,20 @@ std::vector<LogicNode> TransientTab::FindMeasuredLanes(const std::size_t node_co
         return {};
     }
     return ListMeasuredLogicNodes(FindLogicNodes(m_Schematic.BuildCircuit()), node_count, m_Schematic);
+}
+
+/**
+ * @brief   The buses the plot shows as lanes over the signals: those shown whose bits all name a node of the result,
+ *          unless lanes are turned off.
+ */
+std::vector<BusLane> TransientTab::FindShownBuses(const std::size_t node_count) const {
+    if (!m_ShowLogicLanes) {
+        return {};
+    }
+    const NetResolver find_node = [this](const std::string_view net) {
+        return m_Schematic.GetConnectivity().FindNodeOfNet(net);
+    };
+    return ResolveBusLanes(m_Schematic.GetBuses(), FindLogicNodes(m_Schematic.BuildCircuit()), find_node, node_count);
 }
 
 /**
