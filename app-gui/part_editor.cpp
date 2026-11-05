@@ -1098,19 +1098,7 @@ void PartEditor::DrawOpAmp(Core::OpAmp &op_amp) {
 
 void PartEditor::DrawSource(Core::Source &source) {
     using SourceType = Core::Source::SourceType;
-    for (const SourceType type : {SourceType::DC, SourceType::AC, SourceType::PULSE, SourceType::EXP, SourceType::SFFM,
-                                  SourceType::AM, SourceType::PWL, SourceType::NOISE, SourceType::RANDOM}) {
-        // Nine buttons do not fit one row
-        if (type != SourceType::DC && type != SourceType::NOISE) {
-            ImGui::SameLine();
-        }
-        if (ImGui::RadioButton(Core::GetSourceTypeName(type), source.GetSourceType() == type) &&
-            source.GetSourceType() != type) {
-            source.SetSourceType(type);
-            m_Schematic->MarkModified();
-        }
-    }
-
+    DrawSourceTypes(source);
     switch (source.GetSourceType()) {
     case SourceType::DC: {
         const char *label = source.GetType() == Core::ComponentType::CURRENT_SOURCE ? "Current" : "Voltage";
@@ -1146,6 +1134,26 @@ void PartEditor::DrawSource(Core::Source &source) {
         break;
     default:
         break;
+    }
+}
+
+/**
+ * @brief   Draws the choice of waveform of a source, one radio button per kind, on two rows.
+ * @param[in,out] source  Source whose waveform is chosen.
+ */
+void PartEditor::DrawSourceTypes(Core::Source &source) {
+    using SourceType = Core::Source::SourceType;
+    for (const SourceType type : {SourceType::DC, SourceType::AC, SourceType::PULSE, SourceType::EXP, SourceType::SFFM,
+                                  SourceType::AM, SourceType::PWL, SourceType::NOISE, SourceType::RANDOM}) {
+        // Nine buttons do not fit one row
+        if (type != SourceType::DC && type != SourceType::NOISE) {
+            ImGui::SameLine();
+        }
+        if (ImGui::RadioButton(Core::GetSourceTypeName(type), source.GetSourceType() == type) &&
+            source.GetSourceType() != type) {
+            source.SetSourceType(type);
+            m_Schematic->MarkModified();
+        }
     }
 }
 

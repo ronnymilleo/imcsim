@@ -149,6 +149,7 @@ private:
     void DrawMOSFET(Core::MOSFET &mosfet);
     void DrawOpAmp(Core::OpAmp &op_amp);
     void DrawSource(Core::Source &source);
+    void DrawSourceTypes(Core::Source &source);
     void DrawSine(Core::Source &source);
     void DrawPulse(Core::Source &source);
     void DrawEXP(Core::Source &source);

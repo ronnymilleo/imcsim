@@ -9,9 +9,11 @@
 #include <array>
 #include <cmath>
 #include <format>
+#include <functional>
 #include <numbers>
 #include <string>
 #include <utility>
+#include <vector>
 
 namespace GUI {
 
@@ -45,6 +47,86 @@ float ExponentialShape(const float fraction) {
         return risen;
     }
     return risen - (1.0f - std::exp(-(fraction - FALL_START) / FALL_TAU));
+}
+
+/**
+ * @brief   Samples a curve over the box the waves are drawn in, from its left edge to its right one.
+ * @param[in] height  Height at each fraction of the width, from 0 to 1, positive upwards.
+ */
+std::vector<ImVec2> SampleCurve(const std::function<float(float)> &height) {
+    std::vector<ImVec2> curve;
+    for (int point = 0; point <= SINE_SEGMENT_COUNT; ++point) {
+        const float fraction = static_cast<float>(point) / SINE_SEGMENT_COUNT;
+        // Screen Y grows downwards, so a positive height has the negative Y
+        curve.emplace_back(-WAVE_HALF_WIDTH + 2.0f * WAVE_HALF_WIDTH * fraction, -WAVE_AMPLITUDE * height(fraction));
+    }
+    return curve;
+}
+
+std::vector<ImVec2> PulseShape() {
+    return {{-WAVE_HALF_WIDTH, WAVE_AMPLITUDE},   {-PULSE_HALF_WIDTH, WAVE_AMPLITUDE},
+            {-PULSE_HALF_WIDTH, -WAVE_AMPLITUDE}, {PULSE_HALF_WIDTH, -WAVE_AMPLITUDE},
+            {PULSE_HALF_WIDTH, WAVE_AMPLITUDE},   {WAVE_HALF_WIDTH, WAVE_AMPLITUDE}};
+}
+
+/**
+ * @brief   A fixed jagged line for a noise source, since the symbol has to look the same every frame.
+ */
+std::vector<ImVec2> NoiseShape() {
+    constexpr auto HEIGHTS = std::to_array<float>({0.0f, 0.8f, -0.5f, 0.3f, -0.9f, 0.6f, -0.3f, 0.9f, 0.0f});
+    std::vector<ImVec2> noise;
+    for (std::size_t point = 0; point < HEIGHTS.size(); ++point) {
+        const float fraction = static_cast<float>(point) / static_cast<float>(HEIGHTS.size() - 1);
+        noise.emplace_back(-WAVE_HALF_WIDTH + 2.0f * WAVE_HALF_WIDTH * fraction, -WAVE_AMPLITUDE * HEIGHTS[point]);
+    }
+    return noise;
+}
+
+/**
+ * @brief   Held values for a random source: a staircase with a step up and a step down.
+ */
+std::vector<ImVec2> RandomShape() {
+    constexpr auto HEIGHTS = std::to_array<float>({0.4f, -0.7f, 0.7f, -0.3f});
+    const auto edge = [&HEIGHTS](const std::size_t step) {
+        return -WAVE_HALF_WIDTH + 2.0f * WAVE_HALF_WIDTH * static_cast<float>(step) / HEIGHTS.size();
+    };
+    std::vector<ImVec2> stairs;
+    for (std::size_t step = 0; step < HEIGHTS.size(); ++step) {
+        stairs.emplace_back(edge(step), -WAVE_AMPLITUDE * HEIGHTS[step]);
+        stairs.emplace_back(edge(step + 1), -WAVE_AMPLITUDE * HEIGHTS[step]);
+    }
+    return stairs;
+}
+
+/**
+ * @brief   The wave drawn inside the circle of a source, in local coordinates.
+ * @return  The points of one polyline; none for a DC source, which shows no wave.
+ */
+std::vector<ImVec2> WaveShape(const Core::Source::SourceType type) {
+    constexpr float TWO_PI = 2.0f * std::numbers::pi_v<float>;
+    switch (type) {
+    case Core::Source::SourceType::AC:
+    case Core::Source::SourceType::SFFM:
+        return SampleCurve([](const float fraction) { return std::sin(TWO_PI * fraction); });
+    case Core::Source::SourceType::PULSE:
+        return PulseShape();
+    case Core::Source::SourceType::EXP:
+        return SampleCurve(ExponentialShape);
+    case Core::Source::SourceType::AM:
+        // A carrier inside an envelope: two carrier cycles under one modulation cycle
+        return SampleCurve([](const float fraction) {
+            return (0.5f + 0.5f * std::sin(TWO_PI * fraction)) * std::sin(2.0f * TWO_PI * fraction);
+        });
+    case Core::Source::SourceType::PWL:
+        return {{-WAVE_HALF_WIDTH, WAVE_AMPLITUDE}, {0.0f, -WAVE_AMPLITUDE}, {WAVE_HALF_WIDTH, WAVE_AMPLITUDE}};
+    case Core::Source::SourceType::NOISE:
+        return NoiseShape();
+    case Core::Source::SourceType::RANDOM:
+        return RandomShape();
+    case Core::Source::SourceType::DC:
+    default:
+        return {};
+    }
 }
 
 } // namespace
@@ -138,92 +220,17 @@ void UISource::DrawCircle(SchematicCanvas &canvas, const ViewTransform &view, co
  * @return  True for every waveform but DC, which leaves the inside to the derived symbol.
  */
 bool UISource::DrawWaveform(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color) const {
-    switch (GetSource().GetSourceType()) {
-    case Core::Source::SourceType::DC:
-        return false;
-    case Core::Source::SourceType::AC:
-    case Core::Source::SourceType::SFFM: {
-        std::array<ImVec2, SINE_SEGMENT_COUNT + 1> sine;
-        for (int point = 0; point <= SINE_SEGMENT_COUNT; ++point) {
-            const float fraction = static_cast<float>(point) / SINE_SEGMENT_COUNT;
-            const float x = -WAVE_HALF_WIDTH + 2.0f * WAVE_HALF_WIDTH * fraction;
-            const float y = -WAVE_AMPLITUDE * std::sin(2.0f * std::numbers::pi_v<float> * fraction);
-            sine[point] = LocalToScreen(view, x, y);
-        }
-        canvas.AddPolyline(sine.data(), static_cast<int>(sine.size()), color, ImDrawFlags_None, LINE_THICKNESS);
-        return true;
-    }
-    case Core::Source::SourceType::PULSE: {
-        // Screen Y grows downwards, so the high level has the negative Y
-        const std::array<ImVec2, 6> pulse = {LocalToScreen(view, -WAVE_HALF_WIDTH, WAVE_AMPLITUDE),
-                                             LocalToScreen(view, -PULSE_HALF_WIDTH, WAVE_AMPLITUDE),
-                                             LocalToScreen(view, -PULSE_HALF_WIDTH, -WAVE_AMPLITUDE),
-                                             LocalToScreen(view, PULSE_HALF_WIDTH, -WAVE_AMPLITUDE),
-                                             LocalToScreen(view, PULSE_HALF_WIDTH, WAVE_AMPLITUDE),
-                                             LocalToScreen(view, WAVE_HALF_WIDTH, WAVE_AMPLITUDE)};
-        canvas.AddPolyline(pulse.data(), static_cast<int>(pulse.size()), color, ImDrawFlags_None, LINE_THICKNESS);
-        return true;
-    }
-    case Core::Source::SourceType::EXP: {
-        std::array<ImVec2, SINE_SEGMENT_COUNT + 1> curve;
-        for (int point = 0; point <= SINE_SEGMENT_COUNT; ++point) {
-            const float fraction = static_cast<float>(point) / SINE_SEGMENT_COUNT;
-            const float x = -WAVE_HALF_WIDTH + 2.0f * WAVE_HALF_WIDTH * fraction;
-            curve[point] = LocalToScreen(view, x, -WAVE_AMPLITUDE * ExponentialShape(fraction));
-        }
-        canvas.AddPolyline(curve.data(), static_cast<int>(curve.size()), color, ImDrawFlags_None, LINE_THICKNESS);
-        return true;
-    }
-    case Core::Source::SourceType::AM: {
-        // A carrier inside an envelope: two carrier cycles under one modulation cycle
-        std::array<ImVec2, SINE_SEGMENT_COUNT + 1> modulated;
-        for (int point = 0; point <= SINE_SEGMENT_COUNT; ++point) {
-            const float fraction = static_cast<float>(point) / SINE_SEGMENT_COUNT;
-            const float x = -WAVE_HALF_WIDTH + 2.0f * WAVE_HALF_WIDTH * fraction;
-            const float envelope = 0.5f + 0.5f * std::sin(2.0f * std::numbers::pi_v<float> * fraction);
-            const float y = -WAVE_AMPLITUDE * envelope * std::sin(4.0f * std::numbers::pi_v<float> * fraction);
-            modulated[point] = LocalToScreen(view, x, y);
-        }
-        canvas.AddPolyline(modulated.data(), static_cast<int>(modulated.size()), color, ImDrawFlags_None,
-                           LINE_THICKNESS);
-        return true;
-    }
-    case Core::Source::SourceType::PWL: {
-        const std::array<ImVec2, 3> points = {LocalToScreen(view, -WAVE_HALF_WIDTH, WAVE_AMPLITUDE),
-                                              LocalToScreen(view, 0.0f, -WAVE_AMPLITUDE),
-                                              LocalToScreen(view, WAVE_HALF_WIDTH, WAVE_AMPLITUDE)};
-        canvas.AddPolyline(points.data(), static_cast<int>(points.size()), color, ImDrawFlags_None, LINE_THICKNESS);
-        return true;
-    }
-    case Core::Source::SourceType::NOISE: {
-        // A fixed jagged line, since the symbol has to look the same every frame
-        constexpr std::array<float, 9> HEIGHTS = {0.0f, 0.8f, -0.5f, 0.3f, -0.9f, 0.6f, -0.3f, 0.9f, 0.0f};
-        std::array<ImVec2, HEIGHTS.size()> noise;
-        for (std::size_t point = 0; point < HEIGHTS.size(); ++point) {
-            const float fraction = static_cast<float>(point) / static_cast<float>(HEIGHTS.size() - 1);
-            noise[point] = LocalToScreen(view, -WAVE_HALF_WIDTH + 2.0f * WAVE_HALF_WIDTH * fraction,
-                                         -WAVE_AMPLITUDE * HEIGHTS[point]);
-        }
-        canvas.AddPolyline(noise.data(), static_cast<int>(noise.size()), color, ImDrawFlags_None, LINE_THICKNESS);
-        return true;
-    }
-    case Core::Source::SourceType::RANDOM: {
-        // Held values: a staircase with a step up and a step down
-        constexpr std::array<float, 4> HEIGHTS = {0.4f, -0.7f, 0.7f, -0.3f};
-        std::array<ImVec2, 2 * HEIGHTS.size()> stairs;
-        for (std::size_t step = 0; step < HEIGHTS.size(); ++step) {
-            const float left = -WAVE_HALF_WIDTH + 2.0f * WAVE_HALF_WIDTH * static_cast<float>(step) / HEIGHTS.size();
-            const float right =
-                -WAVE_HALF_WIDTH + 2.0f * WAVE_HALF_WIDTH * static_cast<float>(step + 1) / HEIGHTS.size();
-            stairs[2 * step] = LocalToScreen(view, left, -WAVE_AMPLITUDE * HEIGHTS[step]);
-            stairs[2 * step + 1] = LocalToScreen(view, right, -WAVE_AMPLITUDE * HEIGHTS[step]);
-        }
-        canvas.AddPolyline(stairs.data(), static_cast<int>(stairs.size()), color, ImDrawFlags_None, LINE_THICKNESS);
-        return true;
-    }
-    default:
+    const std::vector<ImVec2> shape = WaveShape(GetSource().GetSourceType());
+    if (shape.empty()) {
         return false;
     }
+    std::vector<ImVec2> points;
+    points.reserve(shape.size());
+    for (const ImVec2 &point : shape) {
+        points.push_back(LocalToScreen(view, point.x, point.y));
+    }
+    canvas.AddPolyline(points.data(), static_cast<int>(points.size()), color, ImDrawFlags_None, LINE_THICKNESS);
+    return true;
 }
 
 } // namespace GUI
