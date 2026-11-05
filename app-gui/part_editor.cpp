@@ -192,6 +192,10 @@ constexpr auto LOGIC_OUTPUT_FIELDS = std::to_array<ParameterField<Core::LogicOut
     {"Logic level", &Core::LogicOutputParameters::LogicLevel, "V"},
 });
 
+constexpr auto SEVEN_SEGMENT_FIELDS = std::to_array<ParameterField<Core::SevenSegmentParameters>>({
+    {"Logic level", &Core::SevenSegmentParameters::LogicLevel, "V"},
+});
+
 template <typename Parameters, std::size_t Count>
 void LoadParameterFields(const std::array<ParameterField<Parameters>, Count> &fields,
                          std::array<ValueField, Count> &value_fields, const Parameters &parameters) {
@@ -304,7 +308,7 @@ bool HasFields(const Core::Component &component) {
     static constexpr auto OTHER_TYPES =
         std::to_array({Core::ComponentType::NET_LABEL, Core::ComponentType::SUBCIRCUIT, Core::ComponentType::V_SWITCH,
                        Core::ComponentType::RELAY, Core::ComponentType::CLOCK, Core::ComponentType::LOGIC_INPUT,
-                       Core::ComponentType::LOGIC_OUTPUT});
+                       Core::ComponentType::LOGIC_OUTPUT, Core::ComponentType::SEVEN_SEGMENT});
     return std::ranges::contains(OTHER_TYPES, type);
 }
 
@@ -334,8 +338,7 @@ bool ShowsValueFields(const Core::Component &component) {
     // The switches that follow a voltage, the logic parts, a clock and the logic inputs and outputs have only their
     // parameters
     if (type == Core::ComponentType::V_SWITCH || type == Core::ComponentType::RELAY || Core::IsLogicPart(type) ||
-        type == Core::ComponentType::CLOCK || type == Core::ComponentType::LOGIC_INPUT ||
-        type == Core::ComponentType::LOGIC_OUTPUT) {
+        type == Core::ComponentType::CLOCK || type == Core::ComponentType::LOGIC_INPUT || Core::IsLogicDisplay(type)) {
         return true;
     }
     return component.HasValue();
@@ -510,6 +513,8 @@ bool PartEditor::DrawSettingPart(Core::Component &component) {
         DrawLogicInput(static_cast<Core::LogicInput &>(component));
     } else if (type == Core::ComponentType::LOGIC_OUTPUT) {
         DrawLogicOutput(static_cast<Core::LogicOutput &>(component));
+    } else if (type == Core::ComponentType::SEVEN_SEGMENT) {
+        DrawSevenSegment(static_cast<Core::SevenSegmentDisplay &>(component));
     } else {
         return false;
     }
@@ -667,6 +672,9 @@ void PartEditor::LoadSettingFields(const Core::Component &component) {
     } else if (type == Core::ComponentType::LOGIC_OUTPUT) {
         LoadParameterFields(LOGIC_OUTPUT_FIELDS, m_LogicOutputFields,
                             static_cast<const Core::LogicOutput &>(component).GetParameters());
+    } else if (type == Core::ComponentType::SEVEN_SEGMENT) {
+        LoadParameterFields(SEVEN_SEGMENT_FIELDS, m_SevenSegmentFields,
+                            static_cast<const Core::SevenSegmentDisplay &>(component).GetParameters());
     } else if (type == Core::ComponentType::TRANSFORMER) {
         LoadParameterFields(TRANSFORMER_FIELDS, m_TransformerFields,
                             static_cast<const Core::Transformer &>(component).GetParameters());
@@ -904,6 +912,21 @@ void PartEditor::DrawLogicOutput(Core::LogicOutput &output) {
     }
     ImGui::TextDisabled("Shows 1 at 70%% of the level or above, 0 at 30%% or below, X between; it adds nothing to the "
                         "circuit");
+}
+
+/**
+ * @brief   The logic level the display reads its inputs against; it changes no result, only which segments light.
+ */
+void PartEditor::DrawSevenSegment(Core::SevenSegmentDisplay &display) {
+    Core::SevenSegmentParameters parameters = display.GetParameters();
+    const auto is_valid = [](const Core::SevenSegmentParameters &candidate) {
+        return Core::SevenSegmentDisplay::IsValidParameters(candidate);
+    };
+    if (DrawParameterFields(SEVEN_SEGMENT_FIELDS, m_SevenSegmentFields, "", is_valid, parameters)) {
+        display.SetParameters(parameters);
+        m_Schematic->MarkModified();
+    }
+    ImGui::TextDisabled("Lights a segment at 70%% of the level or above; it adds nothing to the circuit");
 }
 
 /**

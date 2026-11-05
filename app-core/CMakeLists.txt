@@ -22,6 +22,7 @@ add_library(imcsim-core-lib
             components/potentiometer.cpp
             components/relay.cpp
             components/resistor.cpp
+            components/seven_segment.cpp
             components/source.cpp
             components/subcircuit.cpp
             components/subcircuit_pin.cpp

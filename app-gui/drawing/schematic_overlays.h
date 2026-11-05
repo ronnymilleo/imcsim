@@ -36,9 +36,9 @@ struct DisplayedState {
     HeatScale Scale;
     std::vector<ComponentPower> Powers;
     std::optional<double> Time;
-    /// What each logic output reads, by the index of its element; none for the other parts and for an output whose
-    /// node the result has no voltage for.
-    std::vector<std::optional<LogicState>> LogicReadings;
+    /// What the terminals of each logic display read, by the index of its element, in terminal order; empty for the
+    /// other parts, and none for a terminal whose node the result has no voltage for.
+    std::vector<std::vector<std::optional<LogicState>>> LogicReadings;
 };
 
 /**

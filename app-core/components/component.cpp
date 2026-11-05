@@ -60,6 +60,7 @@ constexpr auto ALL_TYPES = std::to_array<ComponentType>({
     ComponentType::CLOCK,
     ComponentType::LOGIC_INPUT,
     ComponentType::LOGIC_OUTPUT,
+    ComponentType::SEVEN_SEGMENT,
 });
 
 } // namespace
@@ -160,6 +161,7 @@ const char *Component::GetNamePrefix() const {
     case ComponentType::NET_LABEL:
     case ComponentType::PIN:
     case ComponentType::LOGIC_OUTPUT:
+    case ComponentType::SEVEN_SEGMENT:
         return "";
     }
     return "";
@@ -213,6 +215,7 @@ const char *Component::GetUnit() const {
     case ComponentType::NET_LABEL:
     case ComponentType::PIN:
     case ComponentType::LOGIC_OUTPUT:
+    case ComponentType::SEVEN_SEGMENT:
     case ComponentType::SWITCH:
     case ComponentType::PUSH_BUTTON:
     case ComponentType::V_SWITCH:
@@ -240,6 +243,7 @@ bool Component::HasValue() const {
     case ComponentType::NET_LABEL:
     case ComponentType::PIN:
     case ComponentType::LOGIC_OUTPUT:
+    case ComponentType::SEVEN_SEGMENT:
     case ComponentType::SWITCH:
     case ComponentType::PUSH_BUTTON:
     case ComponentType::V_SWITCH:
@@ -311,6 +315,7 @@ bool Component::IsValidValue(const double value) const {
     case ComponentType::NET_LABEL:
     case ComponentType::PIN:
     case ComponentType::LOGIC_OUTPUT:
+    case ComponentType::SEVEN_SEGMENT:
     case ComponentType::SWITCH:
     case ComponentType::PUSH_BUTTON:
     case ComponentType::V_SWITCH:
@@ -512,6 +517,15 @@ bool IsSubcircuitPin(const ComponentType type) {
 }
 
 /**
+ * @brief   Tells whether a kind of part only shows the logic levels of its nodes, with no netlist line of its own.
+ * @param[in] type  Kind of part.
+ * @return  True for the logic output and the 7-segment display.
+ */
+bool IsLogicDisplay(const ComponentType type) {
+    return type == ComponentType::LOGIC_OUTPUT || type == ComponentType::SEVEN_SEGMENT;
+}
+
+/**
  * @brief   Returns a readable name for a kind of component.
  * @param[in] type  Kind of component.
  * @return  The type as text, such as "Resistor"; ParseComponentType() reads it back.
@@ -604,6 +618,8 @@ const char *GetTypeName(const ComponentType type) {
         return "LogicInput";
     case ComponentType::LOGIC_OUTPUT:
         return "LogicOutput";
+    case ComponentType::SEVEN_SEGMENT:
+        return "SevenSegment";
     }
     return "Unknown";
 }

@@ -62,6 +62,7 @@ enum class ComponentType {
     CLOCK,
     LOGIC_INPUT,
     LOGIC_OUTPUT,
+    SEVEN_SEGMENT,
 };
 
 /**
@@ -137,6 +138,7 @@ protected:
 
 // Type names
 bool IsSubcircuitPin(ComponentType type);
+bool IsLogicDisplay(ComponentType type);
 const char *GetTypeName(ComponentType type);
 std::optional<ComponentType> ParseComponentType(std::string_view text);
 
