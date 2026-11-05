@@ -233,7 +233,7 @@ between). It loads nothing and needs no Ground. A **7-segment display** is the s
 
 ## Independent sources
 
-**Voltage source** (`V`, named Vin) and **current source** (`I`) take one of seven waveforms:
+**Voltage source** (`V`, named Vin) and **current source** (`I`) take one of nine waveforms:
 
 | Waveform | Transient | Operating point and DC sweep | AC sweep |
 |---|---|---|---|
@@ -244,6 +244,8 @@ between). It loads nothing and needs no Ground. A **7-segment display** is the s
 | SFFM | `SFFM(vo va fc mdi fs)` | vo, the offset | not excited |
 | AM | `AM(vo 0 va mf fc td)` | vo, the offset | not excited |
 | PWL | `PWL(t1 v1 t2 v2 ...)` | v1, the first point | not excited |
+| Noise | `TRNOISE(na nt alpha namp rtsam capt emt)` | the offset | not excited |
+| Random | `TRRANDOM(type ts td p1 0)` | the offset or mean | not excited |
 
 - The AC magnitude is set apart from the sine amplitude, as in SPICE, and is 1 by default so a Bode plot reads as
   gain. The sine has no phase, delay or damping.
@@ -264,6 +266,24 @@ between). It loads nothing and needs no Ground. A **7-segment display** is the s
   last value after the last point. It defaults to `0 0, 1m 5, 2m 0` (1 mA instead of 5 for a current source). The
   points are edited as one text of "time value" pairs in the part editor; at least two are needed, times are not
   negative and strictly increase.
+- The noise source `TRNOISE(na nt alpha namp rtsam capt emt)` is `DC offset` plus transient noise: Gaussian white
+  noise of rms na with a new sample every nt (the output is a straight line between samples, so its rms over time is
+  sqrt(2/3) of na and its density is na times sqrt(2 nt) per root hertz, flat up to 1 / (2 nt)), 1/f noise of
+  amplitude namp with the exponent alpha, and a telegraph signal between 0 and rtsam with mean capture and emission
+  times capt and emt. A part whose amplitude is 0 is written as 0, and nt is 0 when the white and 1/f parts are both
+  off, which ngspice then ignores. nt must be positive otherwise: a negative one makes ngspice loop forever, so it never
+  reaches it, and alpha must be between 0 and 2. It defaults to 100 mV rms (100 uA for a current source) at 10 us, with
+  the 1/f and telegraph parts off. ngspice 47 does not seed the white and 1/f noise, so they change on each run; the
+  telegraph part follows the seed.
+- The random source `TRRANDOM(type ts td p1 0)` holds a value for ts, from td on: type 1 is uniform (p1 the range
+  either side of the offset), 2 Gaussian (p1 the standard deviation), 3 exponential (p1 the mean) and 4 Poisson (p1
+  lambda). The offset or mean is the DC value of the source, since ngspice adds that to what TRRANDOM gives, and it is
+  what the source holds before td. It defaults to a Gaussian with 100 mV at 10 us. The seed option makes it repeat.
+- Both stop the transient at every sample, so a transient may not span more than a million points counting the
+  finest step of a noise or random source, and a live run's stop time is cut to keep within it. The Seed of the
+  transient settings is written as `.options seed=N` only when it is not 0. ngspice draws the Gaussian values in
+  pairs and keeps the second across runs, so a seeded Gaussian random source repeats only every other run in one
+  session; the uniform, exponential and Poisson ones, and the telegraph signal, repeat every run.
 - Both sources are ideal: a voltage source has no internal resistance and a current source no output resistance,
   so they deliver any current or voltage the circuit asks for.
 - A current source pushes its current from terminal 1 to terminal 2 through itself, into the node at terminal 2.
