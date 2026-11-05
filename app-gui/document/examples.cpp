@@ -313,6 +313,27 @@ constexpr auto EXAMPLES = std::to_array<Example>({
         .FileName = "ripple_counter.imcsim",
     },
     {
+        .Title = "2-to-4 decoder with logic outputs",
+        .Group = "Digital",
+        .Description =
+            "The 2-to-4 decoder block, from the logic blocks of the toolbar, with logic inputs on A0, A1 and EN and "
+            "a logic output on each of Y0 to Y3, so the schematic shows the level of every output with no LED, "
+            "resistor or Ground. The Truth table analysis is picked and varies A0 and A1 only: EN keeps the High it "
+            "has in the schematic, so the table shows one output high per row. Set EN Low and run it again to see "
+            "every output stay low.",
+        .FileName = "decoder_logic_outputs.imcsim",
+    },
+    {
+        .Title = "Decade counter on a 7-segment display",
+        .Group = "Digital",
+        .Description =
+            "A 4-bit counter block counts the rising edges of a 1 kHz clock, and an AND gate clears it the moment it "
+            "reaches ten (Q3 and Q1 high), so it counts 0 to 9 and over again. The BCD to 7-segment decoder block "
+            "turns the count into the segments of the display. Run the transient and move the time bar, or turn "
+            "Live on, to watch the digit count; the Output window reads the count as the DIGIT bus, in decimal.",
+        .FileName = "decade_counter.imcsim",
+    },
+    {
         .Title = "Two RC filters from one block",
         .Group = "Blocks",
         .Description =
@@ -321,6 +342,16 @@ constexpr auto EXAMPLES = std::to_array<Example>({
             "a decade down, to 160 Hz. Run the AC sweep to compare FAST and SLOW, double click a block to see inside "
             "it, or select one and set its parameters in Properties.",
         .FileName = "rc_blocks.imcsim",
+    },
+    {
+        .Title = "8-bit counter from two 4-bit blocks",
+        .Group = "Blocks",
+        .Description =
+            "COUNTER_8BIT is a block that holds two 4-bit counter blocks: the high one steps when Q3 of the low one "
+            "falls, through a NOT gate, as each stage of a ripple counter steps when the one before it falls. Double "
+            "click it to go inside, and double click one of its counters to go a level further. The Output window "
+            "reads Q7 to Q0 together as the COUNT bus, in hexadecimal, over the lanes of each bit.",
+        .FileName = "counter_8bit_blocks.imcsim",
     },
     {
         .Title = "Precision rectifier with vendor models",
