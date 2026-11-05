@@ -10,6 +10,7 @@
 #include "misc/cpp/imgui_stdlib.h"
 #include <algorithm>
 #include <array>
+#include <cfloat>
 #include <cstddef>
 #include <format>
 #include <optional>
@@ -22,6 +23,23 @@ namespace {
 constexpr auto BUS_FORMATS = std::to_array({BusFormat::BINARY, BusFormat::HEXADECIMAL, BusFormat::DECIMAL});
 /// Width of the name field and of the bit picker, in font sizes.
 constexpr float EDITOR_FIELD_WIDTH = 10.0f;
+/// Bit rows the editor shows before the list scrolls.
+constexpr float MAX_VISIBLE_BITS = 8.0f;
+
+/**
+ * @brief   Moves the current popup up when its bottom falls off its viewport.
+ * @details The editor opens from the foot of the trace list and grows as bits are added, so without this the rows
+ *          added last, and the button that removes the bus, would end up below the window.
+ */
+void KeepPopupInsideViewport() {
+    const ImGuiViewport *viewport = ImGui::GetWindowViewport();
+    const float bottom = viewport->WorkPos.y + viewport->WorkSize.y;
+    const ImVec2 position = ImGui::GetWindowPos();
+    const float overflow = position.y + ImGui::GetWindowSize().y - bottom;
+    if (overflow > 0.0f) {
+        ImGui::SetWindowPos({position.x, std::max(viewport->WorkPos.y, position.y - overflow)});
+    }
+}
 
 } // namespace
 
@@ -49,16 +67,20 @@ void LogicBuses::Draw(const std::vector<std::string> &signals) {
     for (std::size_t index = 0; index < buses.size(); ++index) {
         LogicBus &bus = buses[index];
         ImGui::PushID(static_cast<int>(index));
+        // Edit comes first, so a long name is what the narrow list clips, not the button
+        ImGui::AlignTextToFramePadding();
+        const bool is_edit_pressed = ImGui::SmallButton("Edit");
+        ImGui::SameLine();
         ImGui::Checkbox(bus.Name.c_str(), &bus.Shown);
         ImGui::SetItemTooltip("%s", DescribeBus(bus).c_str());
-        ImGui::SameLine();
-        if (ImGui::SmallButton("Edit") || (open_new_editor && index + 1 == buses.size())) {
+        if (is_edit_pressed || (open_new_editor && index + 1 == buses.size())) {
             ImGui::OpenPopup("bus_editor");
         }
         if (ImGui::BeginPopup("bus_editor")) {
             if (!DrawEditor(bus, signals)) {
                 removed = index;
             }
+            KeepPopupInsideViewport();
             ImGui::EndPopup();
         }
         ImGui::PopID();
@@ -113,6 +135,9 @@ void LogicBuses::DrawBitRows(LogicBus &bus) {
     }
     std::optional<std::pair<std::size_t, std::size_t>> swapped;
     std::optional<std::size_t> removed;
+    // A long bus scrolls, so the editor stays small enough for a popup
+    ImGui::SetNextWindowSizeConstraints({0.0f, 0.0f}, {FLT_MAX, ImGui::GetFrameHeightWithSpacing() * MAX_VISIBLE_BITS});
+    ImGui::BeginChild("bits", {0.0f, 0.0f}, ImGuiChildFlags_AutoResizeX | ImGuiChildFlags_AutoResizeY);
     for (std::size_t index = 0; index < bus.Bits.size(); ++index) {
         ImGui::PushID(static_cast<int>(index));
         ImGui::Text("%zu  %s", bus.Bits.size() - 1 - index, bus.Bits[index].c_str());
@@ -134,6 +159,7 @@ void LogicBuses::DrawBitRows(LogicBus &bus) {
         }
         ImGui::PopID();
     }
+    ImGui::EndChild();
     if (swapped) {
         std::swap(bus.Bits[swapped->first], bus.Bits[swapped->second]);
     }

@@ -89,6 +89,10 @@ void MathChannels::Draw(const std::vector<std::string> &operands) {
         // The list is as narrow as the trace names, so a mark after the Edit button would be cut off; the name of a
         // channel in error takes the error color instead
         const auto program = CompileChannel(channel, find_node);
+        // Edit comes first, so a long name is what the narrow list clips, not the button
+        ImGui::AlignTextToFramePadding();
+        const bool is_edit_pressed = ImGui::SmallButton("Edit");
+        ImGui::SameLine();
         ImGui::PushStyleColor(ImGuiCol_CheckMark, AdaptToBackground(MATH_COLORS[index % MATH_COLORS.size()]));
         if (!program) {
             ImGui::PushStyleColor(ImGuiCol_Text, GetErrorTextColor());
@@ -100,8 +104,7 @@ void MathChannels::Draw(const std::vector<std::string> &operands) {
         } else {
             ImGui::SetItemTooltip("%s\n%s", GetChannelExpression(channel).c_str(), program.error().c_str());
         }
-        ImGui::SameLine();
-        if (ImGui::SmallButton("Edit") || (open_new_editor && index + 1 == channels.size())) {
+        if (is_edit_pressed || (open_new_editor && index + 1 == channels.size())) {
             ImGui::OpenPopup("math_editor");
         }
         if (ImGui::BeginPopup("math_editor")) {
