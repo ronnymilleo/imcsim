@@ -61,6 +61,11 @@ TEST_CASE("Step labels name the part, or T for the temperature", "[parameter_ste
     CHECK(GUI::FormatStepValue("T", 85.0, "°C") == "T=85°C");
 }
 
+TEST_CASE("The runs of a Monte Carlo analysis are labeled Nominal and Run n", "[parameter_step]") {
+    CHECK(GUI::FormatStepValue(GUI::MONTE_CARLO_PARAMETER, 0.0, "") == "Nominal");
+    CHECK(GUI::FormatStepValue(GUI::MONTE_CARLO_PARAMETER, 17.0, "") == "Run 17");
+}
+
 TEST_CASE("Stepped DC sweeps join into one family of curves", "[parameter_step]") {
     GUI::StepFamily<Core::DCSweep> family{.Parameter = "R1", .Unit = "Ohm", .Values = {1e3, 2e3}, .Results = {}};
     for (const double level : {1.0, 2.0}) {

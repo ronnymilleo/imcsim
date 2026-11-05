@@ -8,6 +8,7 @@
 
 #include "analysis/parameter_step.h"
 #include "helpers.h"
+#include "simulation/monte_carlo.h"
 #include "simulation/simulator.h"
 #include <cstddef>
 #include <optional>
@@ -80,6 +81,9 @@ struct SimulationSettings {
     std::vector<std::string> TruthTableInputs;
     /// Runs the transient, AC sweep or DC sweep once per value of a part or of the temperature.
     ParameterStepSettings ParameterStep;
+    /// Runs the transient, AC sweep or DC sweep once with the nominal values and then with values drawn within the
+    /// tolerances of the parts; the step and Monte Carlo are never both on.
+    Core::MonteCarloSettings MonteCarlo;
 
     bool operator==(const SimulationSettings &) const = default;
 };
@@ -89,6 +93,9 @@ const char *GetAnalysisName(Analysis analysis);
 
 // Live runs
 bool IsValidLiveSeconds(double seconds);
+
+// Run modes
+bool IsMonteCarloRun(const SimulationSettings &settings);
 
 } // namespace GUI
 

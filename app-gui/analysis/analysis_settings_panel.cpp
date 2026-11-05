@@ -17,6 +17,7 @@
 #include "spice/spice_value.h"
 #include <algorithm>
 #include <format>
+#include <random>
 #include <set>
 #include <utility>
 
@@ -34,6 +35,39 @@ bool AnyValue(double /*value*/) {
 
 bool IsNonZero(const double value) {
     return value != 0.0;
+}
+
+/**
+ * @enum    RunMode
+ * @brief   How the transient, AC sweep and DC sweep repeat: not at all, once per value of a parameter, or once per draw
+ *          of the values of the parts within their tolerances.
+ */
+enum class RunMode {
+    SINGLE,
+    STEP,
+    MONTE_CARLO,
+};
+
+constexpr std::array<const char *, 3> RUN_MODE_NAMES = {"Single run", "Step a parameter", "Monte Carlo"};
+
+RunMode GetRunMode(const SimulationSettings &settings) {
+    if (settings.MonteCarlo.Enabled) {
+        return RunMode::MONTE_CARLO;
+    }
+    return settings.ParameterStep.Enabled ? RunMode::STEP : RunMode::SINGLE;
+}
+
+/**
+ * @brief   Turns one mode on and the others off, so the step and Monte Carlo are never both on; the first time Monte
+ *          Carlo is on it gets a random seed.
+ */
+void SetRunMode(SimulationSettings &settings, const RunMode mode) {
+    settings.ParameterStep.Enabled = mode == RunMode::STEP;
+    settings.MonteCarlo.Enabled = mode == RunMode::MONTE_CARLO;
+    if (mode == RunMode::MONTE_CARLO && settings.MonteCarlo.Seed == 0) {
+        std::random_device device;
+        settings.MonteCarlo.Seed = device() | 1U;
+    }
 }
 
 Core::AnalysisKind ToKind(const Analysis analysis) {
@@ -156,6 +190,7 @@ bool DrawSuggestButton(const bool available, const char *tooltip, const char *un
  */
 AnalysisSettingsPanel::AnalysisSettingsPanel(Schematic &schematic) : m_Schematic(schematic) {
     LoadSettingsFields();
+    m_ToleranceAllField.Load(m_ToleranceAllPercent);
 }
 
 /**
@@ -224,7 +259,7 @@ void AnalysisSettingsPanel::DrawSettings() {
     }
     if (settings.Selected == Analysis::TRANSIENT || settings.Selected == Analysis::AC_SWEEP ||
         settings.Selected == Analysis::DC_SWEEP) {
-        DrawParameterStepSettings(settings);
+        DrawRunModeSettings(settings);
     }
     m_Schematic.SetSimulationSettings(settings);
 }
@@ -521,28 +556,141 @@ void AnalysisSettingsPanel::DrawTruthTableSettings(SimulationSettings &settings)
 }
 
 /**
- * @brief   Below the settings of the transient, the AC sweep and the DC sweep: the part or the temperature, and its
- *          values as a range or a typed list.
- * @details The range fields share their labels with those of the analysis above, so they get an ID of their own.
+ * @brief   Below the settings of the transient, the AC sweep and the DC sweep: how they repeat, which is not at all,
+ * once per value of a parameter or once per draw of the parts within their tolerances.
+ * @details The fields share their labels with those of the analysis above, so they get an ID of their own.
  */
-void AnalysisSettingsPanel::DrawParameterStepSettings(SimulationSettings &settings) {
-    ParameterStepSettings &step = settings.ParameterStep;
+void AnalysisSettingsPanel::DrawRunModeSettings(SimulationSettings &settings) {
     ImGui::Separator();
-    ImGui::PushID("parameter_step");
-    // A second stepped source of the DC sweep would also make the family of curves, so only one is on at a time
-    const bool blocked = settings.Selected == Analysis::DC_SWEEP && settings.StepSource && !step.Enabled;
-    ImGui::BeginDisabled(blocked);
-    ImGui::Checkbox("Step a parameter, one run per value", &step.Enabled);
-    ImGui::EndDisabled();
-    if (blocked) {
-        ImGui::SetItemTooltip("Turn off the second stepped source above to step a parameter");
+    ImGui::PushID("run_mode");
+    // A second stepped source of the DC sweep would also make the family of curves, so a repeated run waits for it
+    const bool is_blocked = settings.Selected == Analysis::DC_SWEEP && settings.StepSource;
+    const RunMode mode = GetRunMode(settings);
+    DrawFieldLabel("Run mode");
+    if (ImGui::BeginCombo("##run_mode", RUN_MODE_NAMES[static_cast<std::size_t>(mode)])) {
+        for (std::size_t index = 0; index < RUN_MODE_NAMES.size(); ++index) {
+            const auto candidate = static_cast<RunMode>(index);
+            ImGui::BeginDisabled(is_blocked && candidate != RunMode::SINGLE);
+            if (ImGui::Selectable(RUN_MODE_NAMES[index], candidate == mode) && candidate != mode) {
+                SetRunMode(settings, candidate);
+            }
+            ImGui::EndDisabled();
+        }
+        ImGui::EndCombo();
     }
-    if (step.Enabled) {
-        const Core::Circuit circuit = m_Schematic.BuildCircuit();
-        DrawParameterPicker(step, circuit);
-        DrawStepValues(step, GetParameterUnit(circuit, step.Part));
+    ImGui::SetItemTooltip("Single run: the analysis once. Step a parameter: once per value of a part or of the "
+                          "temperature. Monte Carlo: once with every value as it is, then with the values of the parts "
+                          "drawn within their tolerances");
+    if (is_blocked) {
+        ImGui::TextDisabled("Turn off the second stepped source above to repeat the run");
+    }
+    if (settings.ParameterStep.Enabled) {
+        DrawParameterStepSettings(settings.ParameterStep);
+    } else if (settings.MonteCarlo.Enabled) {
+        DrawMonteCarloSettings(settings.MonteCarlo);
     }
     ImGui::PopID();
+}
+
+/**
+ * @brief   The part or the temperature, and its values as a range or a typed list.
+ */
+void AnalysisSettingsPanel::DrawParameterStepSettings(ParameterStepSettings &step) {
+    const Core::Circuit circuit = m_Schematic.BuildCircuit();
+    DrawParameterPicker(step, circuit);
+    DrawStepValues(step, GetParameterUnit(circuit, step.Part));
+}
+
+/**
+ * @brief   The number of runs, how the values spread, the seed, and the tolerances of the parts.
+ */
+void AnalysisSettingsPanel::DrawMonteCarloSettings(Core::MonteCarloSettings &monte_carlo) {
+    DrawFieldLabel("Runs");
+    if (ImGui::InputInt("##runs", &monte_carlo.Runs, 1, 10)) {
+        monte_carlo.Runs = std::clamp(monte_carlo.Runs, Core::MIN_MONTE_CARLO_RUNS, Core::MAX_MONTE_CARLO_RUNS);
+    }
+    ImGui::SetItemTooltip("%s", std::format("Draws, besides the nominal run that keeps every value; {} to {}",
+                                            Core::MIN_MONTE_CARLO_RUNS, Core::MAX_MONTE_CARLO_RUNS)
+                                    .c_str());
+    DrawFieldLabel("Distribution");
+    if (ImGui::BeginCombo("##distribution", Core::GetDistributionName(monte_carlo.Distribution))) {
+        for (const Core::ToleranceDistribution candidate :
+             {Core::ToleranceDistribution::GAUSSIAN, Core::ToleranceDistribution::UNIFORM}) {
+            if (ImGui::Selectable(Core::GetDistributionName(candidate), candidate == monte_carlo.Distribution)) {
+                monte_carlo.Distribution = candidate;
+            }
+        }
+        ImGui::EndCombo();
+    }
+    ImGui::SetItemTooltip("Gaussian: the tolerance is three standard deviations, and no value falls beyond it. "
+                          "Uniform: every value within the tolerance is as likely");
+    DrawFieldLabel("Seed");
+    ImGui::InputScalar("##seed", ImGuiDataType_U32, &monte_carlo.Seed);
+    ImGui::SetItemTooltip("The same seed draws the same values, whichever the computer, so a run can be repeated");
+    if (ImGui::Button("New seed")) {
+        std::random_device device;
+        monte_carlo.Seed = device() | 1U;
+    }
+    DrawToleranceButtons();
+    DrawMonteCarloSummary(monte_carlo);
+}
+
+/**
+ * @brief   Gives every resistor, capacitor or inductor one tolerance, or takes it from them, as a shortcut over setting
+ *          it part by part in the properties.
+ */
+void AnalysisSettingsPanel::DrawToleranceButtons() {
+    ImGui::TextDisabled("Tolerance of all");
+    if (const std::optional<double> percent = m_ToleranceAllField.Draw(
+            "Percent", "%", [](const double value) { return value > 0.0 && value <= Core::MAX_TOLERANCE_PERCENT; })) {
+        m_ToleranceAllPercent = *percent;
+    }
+    struct Button {
+        const char *Label;
+        Core::ComponentType Type;
+    };
+    const std::array<Button, 3> buttons = {{{"Resistors", Core::ComponentType::RESISTOR},
+                                            {"Capacitors", Core::ComponentType::CAPACITOR},
+                                            {"Inductors", Core::ComponentType::INDUCTOR}}};
+    std::vector<Core::Component *> parts;
+    for (const std::unique_ptr<UIElement> &element : m_Schematic.GetElements()) {
+        parts.push_back(&element->GetComponent());
+    }
+    bool is_changed = false;
+    for (const Button &button : buttons) {
+        if (ImGui::Button(button.Label)) {
+            is_changed = Core::SetTolerances(parts, button.Type, m_ToleranceAllPercent) > 0 || is_changed;
+        }
+        ImGui::SetItemTooltip("Sets the tolerance of every %s to the percent above", button.Label);
+        ImGui::SameLine();
+    }
+    if (ImGui::Button("Clear all")) {
+        for (const Button &button : buttons) {
+            is_changed = Core::SetTolerances(parts, button.Type, std::nullopt) > 0 || is_changed;
+        }
+    }
+    ImGui::SetItemTooltip("Takes the tolerance from every resistor, capacitor and inductor");
+    if (is_changed) {
+        m_Schematic.MarkModified();
+    }
+}
+
+/**
+ * @brief   Which parts vary, or why the run cannot start.
+ */
+void AnalysisSettingsPanel::DrawMonteCarloSummary(const Core::MonteCarloSettings &monte_carlo) {
+    const Core::Circuit circuit = m_Schematic.BuildCircuit();
+    ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + ImGui::GetFontSize() * 20.0f);
+    if (const std::optional<std::string> problem = Core::CheckMonteCarlo(circuit, monte_carlo)) {
+        ImGui::TextColored(GetErrorTextColor(), "%s", problem->c_str());
+    } else {
+        std::string names;
+        for (const Core::Component *part : Core::FindVariedParts(circuit)) {
+            names += (names.empty() ? "" : ", ") + part->GetName();
+        }
+        ImGui::TextDisabled("%s", std::format("{} runs; these parts vary: {}", monte_carlo.Runs, names).c_str());
+    }
+    ImGui::PopTextWrapPos();
 }
 
 /**

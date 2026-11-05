@@ -74,6 +74,8 @@ private:
     ValueField m_Value;
     /// Voltage a capacitor or current an inductor starts a transient from; empty when none is set.
     ValueField m_InitialCondition;
+    /// Percent the value may be off in a Monte Carlo run; empty when the part keeps its value.
+    ValueField m_Tolerance;
     /// The net name being typed for a net label.
     std::array<char, 40> m_Net{};
     /// The name being typed for the part, applied when the field is left.
@@ -132,6 +134,7 @@ private:
     void DrawValue(Core::Component &component);
     bool DrawParameterChoice(Core::Component &component);
     void DrawInitialCondition(Core::Component &component);
+    void DrawTolerance(Core::Component &component);
     void DrawWiper(Core::Potentiometer &pot);
     void DrawSwitch(Core::Switch &contact);
     void DrawControlledSwitch(Core::VoltageControlledSwitch &controlled);

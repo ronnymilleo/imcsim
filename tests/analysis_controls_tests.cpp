@@ -8,12 +8,14 @@
 #include "document/examples.h"
 #include "document/schematic.h"
 #include "editing/live_input.h"
+#include "simulation/simulation_backend.h"
 #include "test_printers.h"
 #include <algorithm>
 #include <catch2/catch_test_macros.hpp>
 #include <chrono>
 #include <cmath>
 #include <cstddef>
+#include <memory>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -166,6 +168,74 @@ void RunAndWait(GUI::AnalysisControls &controls) {
     controls.RunSelected();
     REQUIRE(UpdateUntilIdle(controls));
 }
+
+/**
+ * @brief   Opens the Monte Carlo example, an RC low-pass with a toleranced resistor and capacitor, and picks the
+ *          analysis and the number of runs.
+ */
+void OpenMonteCarloFilter(GUI::Schematic &schematic, const GUI::Analysis analysis, const int runs) {
+    OpenExample(schematic, "monte_carlo_rc_low_pass.imcsim");
+    GUI::SimulationSettings settings = schematic.GetSimulationSettings();
+    settings.Selected = analysis;
+    settings.MonteCarlo.Runs = runs;
+    schematic.SetSimulationSettings(settings);
+}
+
+/// Answers a transient with a made-up result, and fails the runs whose R1 is above 1k, as a circuit that does not
+/// converge would.
+class FailingAboveBackend : public Core::SimulationBackend {
+public:
+    FailingAboveBackend()
+        : m_Capabilities{.Analyses = {Core::AnalysisKind::OPERATING_POINT, Core::AnalysisKind::TRANSIENT,
+                                      Core::AnalysisKind::AC_SWEEP, Core::AnalysisKind::DC_SWEEP},
+                         .UnsupportedParts = {},
+                         .UnsupportedPartsByAnalysis = {}} {}
+
+    std::string_view GetName() const override { return "failing"; }
+    const Core::BackendCapabilities &GetCapabilities() const override { return m_Capabilities; }
+    Core::OperatingPointRun RunOperatingPoint(const Core::Circuit &) override { return {std::unexpected("no"), {}}; }
+    Core::TransientRun RunTransient(const Core::Circuit &circuit, const Core::TransientSettings &,
+                                    const std::optional<double> &, const Core::RunMonitor &) override {
+        for (const Core::CircuitEntry &entry : circuit.GetEntries()) {
+            if (entry.Part->GetName() == "R1" && entry.Part->GetValue() > 1e3) {
+                return {std::unexpected("no convergence"), {}};
+            }
+        }
+        return {Core::Transient{.Times = {0.0, 1.0}, .NodeVoltages = {{0.0, 0.0}, {1.0, 1.0}, {2.0, 2.0}}}, {}};
+    }
+    Core::ACSweepRun RunACSweep(const Core::Circuit &, const Core::ACSweepSettings &,
+                                const std::optional<double> &) override {
+        return {std::unexpected("no"), {}};
+    }
+    Core::DCSweepRun RunDCSweep(const Core::Circuit &, const Core::DCSweepSettings &,
+                                const std::optional<double> &) override {
+        return {std::unexpected("no"), {}};
+    }
+    Core::NoiseRun RunNoise(const Core::Circuit &, const Core::NoiseSettings &) override {
+        return {std::unexpected("no"), {}};
+    }
+    Core::TransferFunctionRun RunTransferFunction(const Core::Circuit &,
+                                                  const Core::TransferFunctionSettings &) override {
+        return {std::unexpected("no"), {}};
+    }
+    Core::SensitivityRun RunSensitivity(const Core::Circuit &, const Core::SensitivitySettings &) override {
+        return {std::unexpected("no"), {}};
+    }
+    Core::PoleZeroRun RunPoleZero(const Core::Circuit &, const Core::PoleZeroSettings &) override {
+        return {std::unexpected("no"), {}};
+    }
+
+private:
+    Core::BackendCapabilities m_Capabilities;
+};
+
+/// Puts the failing backend in use for one test and goes back to ngspice at the end, even when a check throws.
+struct FailingBackendInUse {
+    FailingBackendInUse() { Core::SetBackend(std::make_unique<FailingAboveBackend>()); }
+    ~FailingBackendInUse() { Core::SetBackend(nullptr); }
+    FailingBackendInUse(const FailingBackendInUse &) = delete;
+    FailingBackendInUse &operator=(const FailingBackendInUse &) = delete;
+};
 
 } // namespace
 
@@ -563,4 +633,215 @@ TEST_CASE("Running another analysis while a live run is paused ends the live run
     REQUIRE(schematic.GetTransient().has_value());
     CHECK_FALSE(schematic.GetTransient()->IsComplete);
     CHECK(controls.GetOutcome(GUI::Analysis::TRANSIENT) == GUI::RunOutcome::STOPPED);
+}
+
+TEST_CASE("A Monte Carlo AC sweep delivers the nominal run first and a table of every run",
+          "[analysis_controls][monte_carlo]") {
+    GUI::Schematic schematic;
+    OpenMonteCarloFilter(schematic, GUI::Analysis::AC_SWEEP, 20);
+    GUI::AnalysisControls controls(schematic);
+
+    RunAndWait(controls);
+    REQUIRE_FALSE(controls.GetError(GUI::Analysis::AC_SWEEP));
+    REQUIRE(schematic.GetACSweepSteps().has_value());
+    const GUI::StepFamily<Core::ACSweep> &family = *schematic.GetACSweepSteps();
+    CHECK(family.Parameter == GUI::MONTE_CARLO_PARAMETER);
+    CHECK(family.Results.size() == 21);
+    CHECK(family.Values.front() == 0.0);
+    CHECK(family.Values.back() == 20.0);
+    REQUIRE(schematic.GetMonteCarlo().has_value());
+    const GUI::MonteCarloTable &table = *schematic.GetMonteCarlo();
+    CHECK(table.Runs.size() == 21);
+    CHECK(table.Parts == std::vector<std::string>{"R1", "C1"});
+    CHECK(table.Runs.front().Values == std::vector<double>{1e3, 100e-9});
+    CHECK(table.Runs[1].Values != table.Runs.front().Values);
+    CHECK_FALSE(table.Columns.empty());
+    CHECK(controls.GetOutcome(GUI::Analysis::AC_SWEEP) == GUI::RunOutcome::SUCCEEDED);
+}
+
+TEST_CASE("The same seed draws the same values and another seed draws others", "[analysis_controls][monte_carlo]") {
+    GUI::Schematic schematic;
+    OpenMonteCarloFilter(schematic, GUI::Analysis::AC_SWEEP, 5);
+    GUI::AnalysisControls controls(schematic);
+    RunAndWait(controls);
+    const std::vector<double> first = schematic.GetMonteCarlo()->Runs[3].Values;
+    RunAndWait(controls);
+    CHECK(schematic.GetMonteCarlo()->Runs[3].Values == first);
+
+    GUI::SimulationSettings settings = schematic.GetSimulationSettings();
+    settings.MonteCarlo.Seed += 1;
+    schematic.SetSimulationSettings(settings);
+    RunAndWait(controls);
+    CHECK(schematic.GetMonteCarlo()->Runs[3].Values != first);
+}
+
+TEST_CASE("The cutoff of the filter spreads around its nominal value over the runs",
+          "[analysis_controls][monte_carlo]") {
+    GUI::Schematic schematic;
+    OpenMonteCarloFilter(schematic, GUI::Analysis::AC_SWEEP, 100);
+    GUI::AnalysisControls controls(schematic);
+    RunAndWait(controls);
+    REQUIRE(schematic.GetMonteCarlo().has_value());
+    const GUI::MonteCarloTable &table = *schematic.GetMonteCarlo();
+    const auto column =
+        std::ranges::find(table.Columns, GUI::MeasureColumn{.Node = 2, .Kind = GUI::MeasureKind::UPPER_CUTOFF});
+    REQUIRE(column != table.Columns.end());
+    const auto index = static_cast<std::size_t>(column - table.Columns.begin());
+    const std::vector<double> samples = GUI::CollectMeasure(table, index);
+    CHECK(samples.size() == 100);
+    const std::optional<GUI::SampleStatistics> statistics = GUI::ComputeSampleStatistics(samples);
+    REQUIRE(statistics);
+    const double nominal = 1.0 / (2.0 * 3.14159265358979 * 1e3 * 100e-9);
+    CHECK(std::abs(statistics->Mean - nominal) < 0.02 * nominal);
+    // R within 5 % and C within 10 %, each at three deviations, give about 3.7 % in all
+    CHECK(statistics->StandardDeviation > 0.02 * nominal);
+    CHECK(statistics->StandardDeviation < 0.06 * nominal);
+    CHECK(statistics->Maximum < 1.13 * nominal);
+    CHECK(statistics->Minimum > 0.88 * nominal);
+
+    // The tab opens on this quantity, whichever node is measured first, since nothing else in the filter spreads
+    const std::vector<int> measured = {1, 2};
+    const GUI::MeasureColumn chosen = table.Columns[GUI::FindDefaultColumn(table, measured)];
+    INFO(chosen.Node << " " << GUI::GetMeasureName(chosen.Kind));
+    CHECK(chosen == *column);
+}
+
+TEST_CASE("Only the first runs keep their traces, and every run keeps its measurements",
+          "[analysis_controls][monte_carlo]") {
+    GUI::Schematic schematic;
+    OpenMonteCarloFilter(schematic, GUI::Analysis::AC_SWEEP, 150);
+    GUI::AnalysisControls controls(schematic);
+    RunAndWait(controls);
+    REQUIRE(schematic.GetACSweepSteps().has_value());
+    CHECK(schematic.GetACSweepSteps()->Results.size() == 101);
+    CHECK(schematic.GetMonteCarlo()->Runs.size() == 151);
+    CHECK(schematic.GetMonteCarlo()->Runs.back().Measures.size() == schematic.GetMonteCarlo()->Columns.size());
+}
+
+TEST_CASE("A Monte Carlo transient and DC sweep deliver their runs as steps and curves",
+          "[analysis_controls][monte_carlo]") {
+    GUI::Schematic schematic;
+    OpenMonteCarloFilter(schematic, GUI::Analysis::TRANSIENT, 4);
+    GUI::AnalysisControls controls(schematic);
+    RunAndWait(controls);
+    REQUIRE(schematic.GetTransientSteps().has_value());
+    CHECK(schematic.GetTransientSteps()->Results.size() == 5);
+    CHECK(schematic.GetMonteCarlo()->Runs.size() == 5);
+    // The run on show is the nominal one
+    CHECK(schematic.GetTransientSteps()->Selected == 0);
+
+    Select(schematic, GUI::Analysis::DC_SWEEP);
+    RunAndWait(controls);
+    REQUIRE(schematic.GetDCSweep().has_value());
+    CHECK(schematic.GetDCSweep()->Curves.size() == 5);
+    CHECK(schematic.GetDCSweep()->SteppedSource == GUI::MONTE_CARLO_PARAMETER);
+    CHECK(schematic.GetDCSweep()->Curves[3].StepValue == 3.0);
+    CHECK(schematic.GetMonteCarlo().has_value());
+}
+
+TEST_CASE("A new single run drops the Monte Carlo table", "[analysis_controls][monte_carlo]") {
+    GUI::Schematic schematic;
+    OpenMonteCarloFilter(schematic, GUI::Analysis::AC_SWEEP, 3);
+    GUI::AnalysisControls controls(schematic);
+    RunAndWait(controls);
+    REQUIRE(schematic.GetMonteCarlo().has_value());
+    GUI::SimulationSettings settings = schematic.GetSimulationSettings();
+    settings.MonteCarlo.Enabled = false;
+    schematic.SetSimulationSettings(settings);
+    RunAndWait(controls);
+    CHECK_FALSE(schematic.GetMonteCarlo().has_value());
+    CHECK_FALSE(schematic.GetACSweepSteps().has_value());
+    CHECK(schematic.GetACSweep().has_value());
+}
+
+TEST_CASE("A Monte Carlo run without a tolerance, or with a second stepped source, says why it cannot start",
+          "[analysis_controls][monte_carlo]") {
+    GUI::Schematic schematic;
+    OpenMonteCarloFilter(schematic, GUI::Analysis::AC_SWEEP, 5);
+    GUI::AnalysisControls controls(schematic);
+    for (const std::unique_ptr<GUI::UIElement> &element : schematic.GetElements()) {
+        element->GetComponent().ClearTolerance();
+    }
+    schematic.MarkModified();
+    controls.RunSelected();
+    REQUIRE(controls.GetError(GUI::Analysis::AC_SWEEP));
+    CHECK(controls.GetError(GUI::Analysis::AC_SWEEP)->contains("No part has a tolerance"));
+    CHECK(controls.GetOutcome(GUI::Analysis::AC_SWEEP) == GUI::RunOutcome::FAILED);
+    CHECK_FALSE(controls.IsRunning());
+
+    OpenMonteCarloFilter(schematic, GUI::Analysis::DC_SWEEP, 5);
+    GUI::SimulationSettings settings = schematic.GetSimulationSettings();
+    settings.StepSource = true;
+    schematic.SetSimulationSettings(settings);
+    controls.RunSelected();
+    REQUIRE(controls.GetError(GUI::Analysis::DC_SWEEP));
+    CHECK(controls.GetError(GUI::Analysis::DC_SWEEP)->contains("second stepped source"));
+}
+
+TEST_CASE("Live is refused while Monte Carlo is on", "[analysis_controls][monte_carlo]") {
+    GUI::Schematic schematic;
+    OpenMonteCarloFilter(schematic, GUI::Analysis::TRANSIENT, 5);
+    GUI::AnalysisControls controls(schematic);
+    const std::optional<std::string> obstacle = controls.FindLiveObstacle();
+    REQUIRE(obstacle);
+    CHECK(obstacle->contains("Monte Carlo"));
+}
+
+TEST_CASE("Stopping a Monte Carlo run keeps the runs made and says it stopped early",
+          "[analysis_controls][monte_carlo]") {
+    GUI::Schematic schematic;
+    OpenMonteCarloFilter(schematic, GUI::Analysis::TRANSIENT, 1000);
+    GUI::SimulationSettings settings = schematic.GetSimulationSettings();
+    settings.Transient = {.StopTime = 0.5, .TimeStep = 1e-6};
+    schematic.SetSimulationSettings(settings);
+    GUI::AnalysisControls controls(schematic);
+
+    controls.RunSelected();
+    REQUIRE(UpdateUntil(controls, [&] { return controls.GetRunProgress() > 0.0; }));
+    controls.StopRun();
+    REQUIRE(UpdateUntilIdle(controls));
+
+    REQUIRE(schematic.GetTransientSteps().has_value());
+    REQUIRE(schematic.GetMonteCarlo().has_value());
+    CHECK(schematic.GetMonteCarlo()->Runs.size() < 1001);
+    CHECK(schematic.GetTransientSteps()->Results.size() == schematic.GetMonteCarlo()->Runs.size());
+    CHECK(controls.GetOutcome(GUI::Analysis::TRANSIENT) == GUI::RunOutcome::SUCCEEDED_WITH_WARNINGS);
+}
+
+TEST_CASE("A run that fails is skipped with a warning, but the nominal run has to work",
+          "[analysis_controls][monte_carlo]") {
+    const FailingBackendInUse backend;
+    GUI::Schematic schematic;
+    OpenMonteCarloFilter(schematic, GUI::Analysis::TRANSIENT, 30);
+    GUI::AnalysisControls controls(schematic);
+    RunAndWait(controls);
+
+    REQUIRE(schematic.GetMonteCarlo().has_value());
+    const GUI::MonteCarloTable &table = *schematic.GetMonteCarlo();
+    CHECK(table.Runs.size() == 31);
+    const auto failed = std::ranges::count_if(table.Runs, &GUI::MonteCarloRun::IsFailed);
+    CHECK(failed > 0);
+    CHECK(failed < 30);
+    CHECK(schematic.GetTransientSteps()->Results.size() == 31 - static_cast<std::size_t>(failed));
+    CHECK(table.Runs.front().IsFailed == false);
+    for (const GUI::MonteCarloRun &run : table.Runs) {
+        CHECK(run.IsFailed == (run.Values[0] > 1e3));
+    }
+    CHECK(controls.GetOutcome(GUI::Analysis::TRANSIENT) == GUI::RunOutcome::SUCCEEDED_WITH_WARNINGS);
+
+    // With the nominal circuit failing too, nothing is kept
+    GUI::SimulationSettings settings = schematic.GetSimulationSettings();
+    for (const std::unique_ptr<GUI::UIElement> &element : schematic.GetElements()) {
+        if (element->GetComponent().GetName() == "R1") {
+            element->GetComponent().SetValue(2e3);
+            element->GetComponent().ClearTolerance();
+        }
+    }
+    schematic.MarkModified();
+    schematic.SetSimulationSettings(settings);
+    controls.RunSelected();
+    REQUIRE(UpdateUntilIdle(controls));
+    REQUIRE(controls.GetError(GUI::Analysis::TRANSIENT));
+    CHECK(controls.GetError(GUI::Analysis::TRANSIENT)->contains("The nominal run failed"));
+    CHECK_FALSE(schematic.GetMonteCarlo().has_value());
 }

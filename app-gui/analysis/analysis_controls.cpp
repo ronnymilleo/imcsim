@@ -11,6 +11,7 @@
 #include "imgui.h"
 #include "simulation/circuit_checks.h"
 #include "simulation/circuit_copy.h"
+#include "simulation/monte_carlo.h"
 #include <algorithm>
 #include <expected>
 #include <format>
@@ -74,6 +75,89 @@ SteppedRuns<Result> RunSteps(const ParameterStepSettings &step, const std::strin
     return {std::move(family), std::move(messages)};
 }
 
+/// Runs whose traces are kept besides the nominal one; the rest only leave their measurements, since the traces of a
+/// thousand transients would not fit in memory.
+constexpr std::size_t MAX_KEPT_TRACES = 100;
+
+/**
+ * @struct  MonteCarloRuns
+ * @brief   The traces kept from the runs of a Monte Carlo analysis, or why it could not run, what every run measured
+ *          and what ngspice printed in all.
+ */
+template <typename Result> struct MonteCarloRuns {
+    std::expected<StepFamily<Result>, std::string> Family;
+    MonteCarloTable Table;
+    std::vector<Core::SimulatorMessage> Messages;
+};
+
+MonteCarloTable MakeMonteCarloTable(const Core::Circuit &circuit, const Core::MonteCarloSettings &settings) {
+    MonteCarloTable table{.RequestedRuns = static_cast<std::size_t>(settings.Runs)};
+    for (const Core::Component *part : Core::FindVariedParts(circuit)) {
+        table.Parts.push_back(part->GetName());
+        table.Units.emplace_back(part->GetUnit());
+    }
+    return table;
+}
+
+/**
+ * @brief   Runs the nominal circuit and then each draw, and goes on past a run that fails to converge, since a random
+ *          draw may land on values the solver cannot handle; the nominal run has to work.
+ * @details A stop keeps the runs made. Only the first runs keep their traces; every run keeps its measurements.
+ */
+template <typename Result, typename RunCircuit, typename Measure>
+MonteCarloRuns<Result> RunMonteCarlo(const Core::MonteCarloSettings &settings, const Core::Circuit &circuit,
+                                     Core::RunControl &control, const RunCircuit &run_circuit, const Measure &measure) {
+    StepFamily<Result> family{.Parameter = MONTE_CARLO_PARAMETER, .Unit = "", .Values = {}, .Results = {}};
+    MonteCarloTable table = MakeMonteCarloTable(circuit, settings);
+    std::vector<Core::SimulatorMessage> messages;
+    for (int run = 0; run <= settings.Runs && !control.IsCancelled(); ++run) {
+        control.SetProgress(static_cast<double>(run) / static_cast<double>(settings.Runs + 1));
+        const Core::MonteCarloCircuit built = Core::BuildMonteCarloCircuit(circuit, settings, run);
+        auto outcome = run_circuit(built.Simulated);
+        messages.push_back({run == 0 ? std::string("Nominal run") : std::format("Run {}", run), false});
+        std::ranges::move(outcome.Messages, std::back_inserter(messages));
+        MonteCarloRun entry{.Values = built.Values};
+        if (!outcome.Result) {
+            if (run == 0) {
+                return {std::unexpected(std::format("The nominal run failed: {}", outcome.Result.error())),
+                        {},
+                        std::move(messages)};
+            }
+            entry.IsFailed = true;
+            entry.Error = std::move(outcome.Result.error());
+        } else {
+            Measurement measured = measure(*outcome.Result);
+            if (run == 0) {
+                table.Columns = std::move(measured.Columns);
+            }
+            entry.Measures = std::move(measured.Values);
+            if (family.Results.size() <= MAX_KEPT_TRACES) {
+                family.Values.push_back(static_cast<double>(run));
+                family.Results.push_back(std::move(*outcome.Result));
+            }
+        }
+        table.Runs.push_back(std::move(entry));
+    }
+    if (table.Runs.empty()) {
+        return {std::unexpected("Stopped"), {}, std::move(messages)};
+    }
+    return {std::move(family), std::move(table), std::move(messages)};
+}
+
+/**
+ * @brief   Hands the traces and the table of the runs to the schematic, or reports why they did not run.
+ */
+template <typename Result, typename Store>
+std::optional<std::string> StoreMonteCarlo(std::expected<StepFamily<Result>, std::string> family, MonteCarloTable table,
+                                           Schematic &schematic, Store store) {
+    if (!family) {
+        return std::move(family.error());
+    }
+    store(std::move(*family));
+    schematic.SetMonteCarlo(std::move(table));
+    return std::nullopt;
+}
+
 /**
  * @brief   A job that simulates its own copy of the circuit, so the user can go on editing, and hands the run it makes
  *          to the thread that polls, where store puts it away.
@@ -133,10 +217,19 @@ void AnalysisControls::RunSelected() {
     const Analysis analysis = settings.Selected;
     const Core::Circuit circuit = m_Schematic.BuildCircuit();
     // The operating point, the noise, the transfer function and the sensitivity analyses run once, whatever the step
-    // settings
+    // and Monte Carlo settings
     std::optional<StepPlan> steps;
-    if (settings.ParameterStep.Enabled &&
-        (analysis == Analysis::TRANSIENT || analysis == Analysis::AC_SWEEP || analysis == Analysis::DC_SWEEP)) {
+    std::optional<Core::MonteCarloSettings> monte_carlo;
+    const bool is_repeated =
+        analysis == Analysis::TRANSIENT || analysis == Analysis::AC_SWEEP || analysis == Analysis::DC_SWEEP;
+    if (is_repeated && settings.MonteCarlo.Enabled) {
+        ClearResult(analysis);
+        if (const std::optional<std::string> problem = Core::CheckMonteCarlo(circuit, settings.MonteCarlo)) {
+            Finish(analysis, problem, {});
+            return;
+        }
+        monte_carlo = settings.MonteCarlo;
+    } else if (is_repeated && settings.ParameterStep.Enabled) {
         ClearResult(analysis);
         const std::string unit = GetParameterUnit(circuit, settings.ParameterStep.Part);
         auto values = ListStepValues(settings.ParameterStep, unit);
@@ -146,7 +239,7 @@ void AnalysisControls::RunSelected() {
         }
         steps = StepPlan{.Settings = settings.ParameterStep, .Unit = unit, .Values = std::move(*values)};
     }
-    StartAnalysis(analysis, circuit, steps);
+    StartAnalysis(analysis, circuit, steps, monte_carlo);
 }
 
 /**
@@ -154,7 +247,8 @@ void AnalysisControls::RunSelected() {
  * @note    A transient keeps the points made until the end of its current chunk. A live one only pauses, so
  *          ContinueLive() can take it on; stopping it once paused ends it. The other runs stop between their steps (the
  *          values of a stepped analysis, the combinations of a truth table) and drop their result, so a single
- *          simulation ends before the stop shows; IsStopping() is true until then.
+ *          simulation ends before the stop shows; IsStopping() is true until then. A Monte Carlo analysis keeps the
+ * runs made.
  */
 void AnalysisControls::StopRun() {
     if (m_IsLiveRun && !m_Service.IsPaused()) {
@@ -284,6 +378,9 @@ std::optional<std::string> AnalysisControls::FindLiveObstacle() const {
     const SimulationSettings &settings = m_Schematic.GetSimulationSettings();
     if (settings.Selected != Analysis::TRANSIENT) {
         return "Only a transient runs live; pick the transient to use Live";
+    }
+    if (settings.MonteCarlo.Enabled) {
+        return "A Monte Carlo analysis runs once per draw, so it cannot run live; use a single run to use Live";
     }
     if (settings.ParameterStep.Enabled) {
         return "A stepped transient runs once per value, so it cannot run live; turn the stepping off to use Live";
@@ -428,19 +525,20 @@ void AnalysisControls::StartRun(const Analysis analysis, Core::Job job) {
  * @brief   The analysis picked, on the circuit built from the schematic, run once or once per step.
  */
 void AnalysisControls::StartAnalysis(const Analysis analysis, const Core::Circuit &circuit,
-                                     const std::optional<StepPlan> &steps) {
+                                     const std::optional<StepPlan> &steps,
+                                     const std::optional<Core::MonteCarloSettings> &monte_carlo) {
     switch (analysis) {
     case Analysis::OPERATING_POINT:
         RunOperatingPointAnalysis(circuit);
         break;
     case Analysis::TRANSIENT:
-        RunTransientAnalysis(circuit, steps);
+        RunTransientAnalysis(circuit, steps, monte_carlo);
         break;
     case Analysis::AC_SWEEP:
-        RunACSweepAnalysis(circuit, steps);
+        RunACSweepAnalysis(circuit, steps, monte_carlo);
         break;
     case Analysis::DC_SWEEP:
-        RunDCSweepAnalysis(circuit, steps);
+        RunDCSweepAnalysis(circuit, steps, monte_carlo);
         break;
     case Analysis::NOISE:
         RunNoiseAnalysis(circuit);
@@ -478,9 +576,29 @@ void AnalysisControls::RunOperatingPointAnalysis(const Core::Circuit &circuit) {
  * @brief   A live run is a transient that goes on to its limit at the pace the settings give, unless the user stops it
  *          first.
  */
-void AnalysisControls::RunTransientAnalysis(const Core::Circuit &circuit, const std::optional<StepPlan> &steps) {
+void AnalysisControls::RunTransientAnalysis(const Core::Circuit &circuit, const std::optional<StepPlan> &steps,
+                                            const std::optional<Core::MonteCarloSettings> &monte_carlo) {
     const Core::TransientSettings settings = m_Schematic.GetSimulationSettings().Transient;
     m_IsLiveResult = false;
+    if (monte_carlo) {
+        StartRun(Analysis::TRANSIENT,
+                 MakeJob<MonteCarloRuns<Core::Transient>, true>(
+                     circuit,
+                     [settings, monte_carlo = *monte_carlo](const Core::Circuit &copy, Core::RunControl &control) {
+                         return RunMonteCarlo<Core::Transient>(
+                             monte_carlo, copy, control,
+                             [&](const Core::Circuit &varied) { return Core::RunTransient(varied, settings); },
+                             MeasureTransient);
+                     },
+                     [this](MonteCarloRuns<Core::Transient> runs) {
+                         Finish(
+                             Analysis::TRANSIENT,
+                             StoreMonteCarlo(std::move(runs.Family), std::move(runs.Table), m_Schematic,
+                                             [this](auto family) { m_Schematic.SetTransientSteps(std::move(family)); }),
+                             std::move(runs.Messages));
+                     }));
+        return;
+    }
     if (steps) {
         StartRun(Analysis::TRANSIENT,
                  MakeJob<SteppedRuns<Core::Transient>>(
@@ -545,8 +663,28 @@ void AnalysisControls::RunTransientAnalysis(const Core::Circuit &circuit, const 
                  }));
 }
 
-void AnalysisControls::RunACSweepAnalysis(const Core::Circuit &circuit, const std::optional<StepPlan> &steps) {
+void AnalysisControls::RunACSweepAnalysis(const Core::Circuit &circuit, const std::optional<StepPlan> &steps,
+                                          const std::optional<Core::MonteCarloSettings> &monte_carlo) {
     const Core::ACSweepSettings settings = m_Schematic.GetSimulationSettings().ACSweep;
+    if (monte_carlo) {
+        StartRun(Analysis::AC_SWEEP,
+                 MakeJob<MonteCarloRuns<Core::ACSweep>, true>(
+                     circuit,
+                     [settings, monte_carlo = *monte_carlo](const Core::Circuit &copy, Core::RunControl &control) {
+                         return RunMonteCarlo<Core::ACSweep>(
+                             monte_carlo, copy, control,
+                             [&](const Core::Circuit &varied) { return Core::RunACSweep(varied, settings); },
+                             MeasureACSweep);
+                     },
+                     [this](MonteCarloRuns<Core::ACSweep> runs) {
+                         Finish(
+                             Analysis::AC_SWEEP,
+                             StoreMonteCarlo(std::move(runs.Family), std::move(runs.Table), m_Schematic,
+                                             [this](auto family) { m_Schematic.SetACSweepSteps(std::move(family)); }),
+                             std::move(runs.Messages));
+                     }));
+        return;
+    }
     if (steps) {
         StartRun(Analysis::AC_SWEEP,
                  MakeJob<SteppedRuns<Core::ACSweep>>(
@@ -581,13 +719,15 @@ void AnalysisControls::RunACSweepAnalysis(const Core::Circuit &circuit, const st
  * @brief   A source that is unset, or that left the circuit, uses a default; a stepped parameter and a second stepped
  *          source would both make the family of curves, so only one may be on.
  */
-void AnalysisControls::RunDCSweepAnalysis(const Core::Circuit &circuit, const std::optional<StepPlan> &steps) {
+void AnalysisControls::RunDCSweepAnalysis(const Core::Circuit &circuit, const std::optional<StepPlan> &steps,
+                                          const std::optional<Core::MonteCarloSettings> &monte_carlo) {
     const SimulationSettings &settings = m_Schematic.GetSimulationSettings();
     const std::vector<SweepSource> sources = ListSweepSources(circuit);
-    if (sources.empty() || (steps && settings.StepSource)) {
+    if (sources.empty() || ((steps || monte_carlo) && settings.StepSource)) {
         m_Schematic.SetDCSweep(std::nullopt);
         Finish(Analysis::DC_SWEEP,
                sources.empty() ? std::format("Add {} to sweep", Core::SWEEPABLE_SOURCES)
+               : monte_carlo   ? "Monte Carlo makes one curve per run, so turn off the second stepped source"
                                : "Step either a second source or a parameter, not both",
                {});
         return;
@@ -597,6 +737,26 @@ void AnalysisControls::RunDCSweepAnalysis(const Core::Circuit &circuit, const st
     if (settings.StepSource) {
         run_settings.Stepped = settings.SteppedRange;
         run_settings.Stepped->Source = ResolveSweepSource(settings.SteppedRange, sources, STEPPED_SOURCE_INDEX);
+    }
+    if (monte_carlo) {
+        StartRun(Analysis::DC_SWEEP,
+                 MakeJob<MonteCarloRuns<Core::DCSweep>, true>(
+                     circuit,
+                     [run_settings, monte_carlo = *monte_carlo](const Core::Circuit &copy, Core::RunControl &control) {
+                         return RunMonteCarlo<Core::DCSweep>(
+                             monte_carlo, copy, control,
+                             [&](const Core::Circuit &varied) { return Core::RunDCSweep(varied, run_settings); },
+                             MeasureDCSweep);
+                     },
+                     [this](MonteCarloRuns<Core::DCSweep> runs) {
+                         Finish(Analysis::DC_SWEEP,
+                                StoreMonteCarlo(std::move(runs.Family), std::move(runs.Table), m_Schematic,
+                                                [this](auto family) {
+                                                    m_Schematic.SetDCSweep(JoinDCSweepSteps(std::move(family)));
+                                                }),
+                                std::move(runs.Messages));
+                     }));
+        return;
     }
     if (steps) {
         StartRun(Analysis::DC_SWEEP,
@@ -813,9 +973,19 @@ void AnalysisControls::Finish(const Analysis analysis, std::optional<std::string
 
 /**
  * @brief   Rating warnings, such as a transistor past its maximum voltage, which the operating point and the transient
- *          check, and the combinations of a truth table that have no operating point.
+ *          check, the combinations of a truth table that have no operating point, and the runs of a Monte Carlo
+ *          analysis that failed or did not run.
  */
 std::vector<std::string> AnalysisControls::GetResultWarnings(const Analysis analysis) const {
+    if (const auto &monte_carlo = m_Schematic.GetMonteCarlo();
+        monte_carlo &&
+        (analysis == Analysis::TRANSIENT || analysis == Analysis::AC_SWEEP || analysis == Analysis::DC_SWEEP)) {
+        std::vector<std::string> warnings = ListMonteCarloWarnings(*monte_carlo);
+        if (analysis == Analysis::TRANSIENT && m_Schematic.GetTransient()) {
+            std::ranges::copy(m_Schematic.GetTransient()->Warnings, std::back_inserter(warnings));
+        }
+        return warnings;
+    }
     if (analysis == Analysis::OPERATING_POINT && m_Schematic.GetOperatingPoint()) {
         return m_Schematic.GetOperatingPoint()->Warnings;
     }

@@ -49,6 +49,9 @@ template <typename Result> struct StepFamily {
 
 constexpr std::size_t MAX_PARAMETER_STEPS = 50;
 
+/// Name of the parameter of a Monte Carlo family, whose values are run numbers: 0 is the nominal run.
+constexpr const char *MONTE_CARLO_PARAMETER = "Run";
+
 std::expected<std::vector<double>, std::string> ListStepValues(const ParameterStepSettings &settings,
                                                                const std::string &unit);
 std::string GetParameterLabel(const ParameterStepSettings &settings);

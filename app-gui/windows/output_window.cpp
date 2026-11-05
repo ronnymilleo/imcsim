@@ -72,6 +72,8 @@ const char *GetTabFileSuffix(const PlotTab tab) {
         return "poles-and-zeros";
     case PlotTab::TRUTH_TABLE:
         return "truth-table";
+    case PlotTab::MONTE_CARLO:
+        return "monte-carlo";
     }
     return "plot";
 }
@@ -98,6 +100,8 @@ const char *GetTabTitle(const PlotTab tab) {
         return "poles and zeros";
     case PlotTab::TRUTH_TABLE:
         return "truth table";
+    case PlotTab::MONTE_CARLO:
+        return "Monte Carlo";
     }
     return "";
 }
@@ -118,7 +122,7 @@ OutputWindow::OutputWindow(Schematic &schematic, AnalysisControls &controls, Tra
     : AppWindow("Output", true), m_Schematic(schematic), m_Controls(controls), m_Playback(playback),
       m_Preferences(preferences), m_MathChannels(schematic), m_Buses(schematic),
       m_TransientTab(schematic, controls, playback), m_SpectrumTab(schematic), m_ACSweepTab(schematic),
-      m_DCSweepTab(schematic), m_NoiseTab(schematic), m_PoleZeroTab(schematic) {
+      m_DCSweepTab(schematic), m_NoiseTab(schematic), m_PoleZeroTab(schematic), m_MonteCarloTab(schematic) {
     SetInitialSize(INITIAL_SIZE);
     // Nothing to plot yet; the first result opens it
     SetOpen(false);
@@ -419,6 +423,13 @@ void OutputWindow::DrawTabs(const FrameResults &frame) {
         DrawTruthTableTab(m_Schematic);
         ImGui::EndTabItem();
     }
+    if (begin_tab("Monte Carlo", PlotTab::MONTE_CARLO)) {
+        if (m_MonteCarloTab.Draw()) {
+            m_Exporter.StartText(m_MonteCarloTab.BuildCsv(), m_Schematic.GetFilePath(),
+                                 GetTabFileSuffix(PlotTab::MONTE_CARLO));
+        }
+        ImGui::EndTabItem();
+    }
 }
 
 /**
@@ -463,6 +474,7 @@ bool OutputWindow::CanExport(const FrameResults &frame) const {
     case PlotTab::SENSITIVITY:
     case PlotTab::POLE_ZERO:
     case PlotTab::TRUTH_TABLE:
+    case PlotTab::MONTE_CARLO:
     default:
         return false;
     }
@@ -498,6 +510,7 @@ ExportFigure OutputWindow::BuildShownFigure(const FrameResults &frame, const boo
     case PlotTab::SENSITIVITY:
     case PlotTab::POLE_ZERO:
     case PlotTab::TRUTH_TABLE:
+    case PlotTab::MONTE_CARLO:
     default:
         return {};
     }

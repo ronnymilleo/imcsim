@@ -346,9 +346,12 @@ std::vector<CurveFamily> ListCurveFamilies(const Core::DCSweep &sweep, Schematic
  * @brief   Names a curve of a stepped DC sweep by the value of its stepped source.
  * @param[in] sweep  A stepped DC sweep.
  * @param[in] curve  One of its curves.
- * @return  Such as "V2=5V".
+ * @return  Such as "V2=5V", or "Run 17" for a Monte Carlo run.
  */
 std::string FormatStepLabel(const Core::DCSweep &sweep, const Core::DCSweepCurve &curve) {
+    if (sweep.SteppedSource == MONTE_CARLO_PARAMETER) {
+        return FormatStepValue(sweep.SteppedSource, curve.StepValue, sweep.SteppedUnit);
+    }
     return std::format("{}={}{}", sweep.SteppedSource, Core::FormatValue(curve.StepValue), sweep.SteppedUnit);
 }
 

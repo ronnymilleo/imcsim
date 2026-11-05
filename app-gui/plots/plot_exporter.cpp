@@ -116,6 +116,7 @@ void PlotExporter::Start(ExportFigure figure, const ExportFormat format,
         return;
     }
     m_PendingFigure = std::move(figure);
+    m_PendingText.reset();
     m_PendingFormat = format;
     const std::string stem = schematic_path ? schematic_path->stem().string() : "circuit";
     const std::string file_name = std::format("{}-{}{}", stem, file_suffix, GetExtension(format));
@@ -129,6 +130,27 @@ void PlotExporter::Start(ExportFigure figure, const ExportFormat format,
 }
 
 /**
+ * @brief   Asks where to save a CSV table that is not a plot, such as the runs of a Monte Carlo analysis.
+ * @param[in] csv             The table, already written.
+ * @param[in] schematic_path  File the schematic was saved to, which names the table and sets the folder; none for an
+ *                            untitled one.
+ * @param[in] file_suffix     Added to the schematic's name.
+ */
+void PlotExporter::StartText(std::string csv, const std::optional<std::filesystem::path> &schematic_path,
+                             const std::string &file_suffix) {
+    if (m_Dialog.IsPending()) {
+        return;
+    }
+    m_PendingText = std::move(csv);
+    m_PendingFormat = ExportFormat::CSV;
+    const std::string stem = schematic_path ? schematic_path->stem().string() : "circuit";
+    const std::string file_name = std::format("{}-{}.csv", stem, file_suffix);
+    const std::filesystem::path location =
+        schematic_path ? schematic_path->parent_path() / file_name : std::filesystem::path(file_name);
+    m_Dialog.ShowSave(CSV_FILTERS, location.string());
+}
+
+/**
  * @brief   Writes the figure once the dialog answers, adding the extension when the dialog left it out, and opens the
  *          error popup when it cannot.
  * @note    Call it every frame, where DrawError() is called.
@@ -139,7 +161,8 @@ void PlotExporter::Update() {
         return;
     }
     const std::optional<ExportFigure> figure = std::exchange(m_PendingFigure, std::nullopt);
-    if (!*result || !figure) {
+    std::optional<std::string> pending_text = std::exchange(m_PendingText, std::nullopt);
+    if (!*result || (!figure && !pending_text)) {
         return;
     }
     std::filesystem::path path = **result;
@@ -147,8 +170,12 @@ void PlotExporter::Update() {
     if (path.extension() != extension) {
         path += extension;
     }
-    std::expected<std::string, std::string> text =
-        m_PendingFormat == ExportFormat::SVG ? RenderSvg(*figure, m_Style) : RenderCsv(*figure);
+    std::expected<std::string, std::string> text = std::string();
+    if (pending_text) {
+        text = std::move(*pending_text);
+    } else {
+        text = m_PendingFormat == ExportFormat::SVG ? RenderSvg(*figure, m_Style) : RenderCsv(*figure);
+    }
     std::expected<void, std::string> written =
         text ? WriteTextFile(path, *text) : std::expected<void, std::string>(std::unexpected(text.error()));
     if (!written) {

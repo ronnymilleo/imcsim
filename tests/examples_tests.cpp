@@ -7,6 +7,7 @@
 #include "analysis/circuit_snapshot.h"
 #include "analysis/fuse_readings.h"
 #include "analysis/logic_outputs.h"
+#include "analysis/monte_carlo_results.h"
 #include "components/potentiometer.h"
 #include "components/seven_segment.h"
 #include "components/source.h"
@@ -19,6 +20,7 @@
 #include "plots/spectrum.h"
 #include "plots/trace_statistics.h"
 #include "simulation/circuit_checks.h"
+#include "simulation/monte_carlo.h"
 #include "simulation/simulation_backend.h"
 #include "simulation/simulator.h"
 #include "test_printers.h"
@@ -196,6 +198,40 @@ TEST_CASE("The RC example measures its corner frequency over the whole sweep", "
     const double corner = 1.0 / (2.0 * std::numbers::pi * 1e3 * 100e-9);
     CHECK_THAT(*statistics->UpperCutoff, Catch::Matchers::WithinRel(corner, 2e-2));
     CHECK_FALSE(statistics->LowerCutoff);
+}
+
+TEST_CASE("The Monte Carlo example opens with its tolerances and runs as Monte Carlo", "[examples]") {
+    const auto example = std::ranges::find(GUI::GetExamples(), std::string_view("monte_carlo_rc_low_pass.imcsim"),
+                                           &GUI::Example::FileName);
+    REQUIRE(example != GUI::GetExamples().end());
+    GUI::Schematic schematic;
+    OpenOrFail(*example, schematic);
+
+    const GUI::SimulationSettings &settings = schematic.GetSimulationSettings();
+    CHECK(settings.Selected == GUI::Analysis::AC_SWEEP);
+    CHECK(settings.MonteCarlo.Enabled);
+    CHECK(settings.MonteCarlo.Runs == 100);
+    CHECK_FALSE(settings.ParameterStep.Enabled);
+    const Core::Circuit circuit = schematic.BuildCircuit();
+    const std::vector<const Core::Component *> varied = Core::FindVariedParts(circuit);
+    REQUIRE(varied.size() == 2);
+    CHECK(varied[0]->GetName() == "R1");
+    CHECK(varied[0]->GetTolerance() == 5.0);
+    CHECK(varied[1]->GetName() == "C1");
+    CHECK(varied[1]->GetTolerance() == 10.0);
+    CHECK_FALSE(Core::CheckMonteCarlo(circuit, settings.MonteCarlo));
+
+    // Every run of the sweep reads a corner, and the nominal one is the RC corner
+    const Core::MonteCarloCircuit nominal = Core::BuildMonteCarloCircuit(circuit, settings.MonteCarlo, 0);
+    const Core::ACSweepRun run = Core::RunACSweep(nominal.Simulated, settings.ACSweep);
+    REQUIRE(run.Result.has_value());
+    const GUI::Measurement measured = GUI::MeasureACSweep(*run.Result);
+    const auto column =
+        std::ranges::find(measured.Columns, GUI::MeasureColumn{.Node = 2, .Kind = GUI::MeasureKind::UPPER_CUTOFF});
+    REQUIRE(column != measured.Columns.end());
+    const std::optional<double> corner = measured.Values[static_cast<std::size_t>(column - measured.Columns.begin())];
+    REQUIRE(corner);
+    CHECK_THAT(*corner, Catch::Matchers::WithinRel(1.0 / (2.0 * std::numbers::pi * 1e3 * 100e-9), 2e-2));
 }
 
 TEST_CASE("The hybrid-pi model has the gain of its transistor in the middle band only", "[examples]") {

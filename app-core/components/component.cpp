@@ -514,6 +514,49 @@ void Component::ClearInitialCondition() {
 }
 
 /**
+ * @brief   Tells whether this kind of component can have a tolerance.
+ * @return  True for a resistor, capacitor, inductor and voltage source; a source only varies while it is a DC one.
+ */
+bool Component::SupportsTolerance() const {
+    return m_Type == ComponentType::RESISTOR || m_Type == ComponentType::CAPACITOR ||
+           m_Type == ComponentType::INDUCTOR || m_Type == ComponentType::VOLTAGE_SOURCE;
+}
+
+/**
+ * @brief   Tells whether a tolerance is set.
+ * @return  True when SetTolerance() has been called and the tolerance has not been cleared.
+ */
+bool Component::HasTolerance() const {
+    return m_Tolerance.has_value();
+}
+
+/**
+ * @brief   Returns the tolerance.
+ * @return  The percent the value may be off in a Monte Carlo run, or no value when the part does not vary.
+ */
+std::optional<double> Component::GetTolerance() const {
+    return m_Tolerance;
+}
+
+/**
+ * @brief   Sets the tolerance.
+ * @param[in] percent  Percent the value may be off, above 0 and up to MAX_TOLERANCE_PERCENT.
+ * @note    Only a part that SupportsTolerance() takes one, and only a valid one; the call does nothing otherwise.
+ */
+void Component::SetTolerance(const double percent) {
+    if (SupportsTolerance() && percent > 0.0 && percent <= MAX_TOLERANCE_PERCENT) {
+        m_Tolerance = percent;
+    }
+}
+
+/**
+ * @brief   Clears the tolerance, so the part keeps its value in every Monte Carlo run.
+ */
+void Component::ClearTolerance() {
+    m_Tolerance.reset();
+}
+
+/**
  * @brief   Tells whether a kind of part is the pin marker of a subcircuit.
  * @param[in] type  Kind of part.
  * @return  True for ComponentType::PIN.

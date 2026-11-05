@@ -11,6 +11,7 @@ add_library(imcsim-gui-lib
             analysis/circuit_snapshot.cpp
             analysis/fuse_readings.cpp
             analysis/logic_outputs.cpp
+            analysis/monte_carlo_results.cpp
             analysis/parameter_step.cpp
             analysis/playback.cpp
             analysis/point_window.cpp
@@ -107,6 +108,7 @@ add_library(imcsim-gui-lib
             windows/netlist_window.cpp
             windows/output_tabs/ac_sweep_tab.cpp
             windows/output_tabs/dc_sweep_tab.cpp
+            windows/output_tabs/monte_carlo_tab.cpp
             windows/output_tabs/noise_tab.cpp
             windows/output_tabs/plot_widgets.cpp
             windows/output_tabs/pole_zero_tab.cpp

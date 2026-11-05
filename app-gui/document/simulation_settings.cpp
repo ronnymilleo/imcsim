@@ -35,4 +35,16 @@ bool IsValidLiveSeconds(const double seconds) {
     return seconds >= MIN_LIVE_SECONDS && seconds <= MAX_LIVE_SECONDS;
 }
 
+/**
+ * @brief   Tells whether Run would start a Monte Carlo analysis.
+ * @param[in] settings  Settings of the schematic.
+ * @return  True when Monte Carlo is the run mode and the selected analysis is one that it repeats: the transient, the
+ * AC sweep or the DC sweep.
+ */
+bool IsMonteCarloRun(const SimulationSettings &settings) {
+    return settings.MonteCarlo.Enabled &&
+           (settings.Selected == Analysis::TRANSIENT || settings.Selected == Analysis::AC_SWEEP ||
+            settings.Selected == Analysis::DC_SWEEP);
+}
+
 } // namespace GUI

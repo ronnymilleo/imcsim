@@ -492,6 +492,9 @@ void Application::ShowNewResults() {
                 PlotTab::POLE_ZERO);
     show_if_new(m_ShownTruthTableVersion, m_Schematic.GetTruthTableVersion(), m_Schematic.GetTruthTable().has_value(),
                 PlotTab::TRUTH_TABLE);
+    // After the analyses, so the table of a Monte Carlo run is what shows in front of the traces it came with
+    show_if_new(m_ShownMonteCarloVersion, m_Schematic.GetMonteCarloVersion(), m_Schematic.GetMonteCarlo().has_value(),
+                PlotTab::MONTE_CARLO);
 }
 
 /**
@@ -510,6 +513,7 @@ void Application::RerunAfterEdits() {
         .DocumentVersion = m_Schematic.GetDocumentVersion(),
         .HasRunToFollow = m_AnalysisControls.GetOutcome(selected) != RunOutcome::NONE || running == selected,
         .IsEditing = ImGui::IsAnyItemActive(),
+        .IsMonteCarlo = IsMonteCarloRun(m_Schematic.GetSimulationSettings()),
         .IsRunBlocked = running.has_value() || would_run_live,
     };
     if (m_AutoRerun.Update(frame)) {

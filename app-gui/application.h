@@ -74,6 +74,7 @@ private:
     std::size_t m_ShownSensitivityVersion = 0;
     std::size_t m_ShownPoleZeroVersion = 0;
     std::size_t m_ShownTruthTableVersion = 0;
+    std::size_t m_ShownMonteCarloVersion = 0;
     /// Runs the selected analysis again after edits, when the preference asks for it.
     AutoRerun m_AutoRerun;
 
