@@ -276,11 +276,10 @@ const std::vector<GridPoint> &Connectivity::GetJunctions() const {
 Core::Circuit BuildCircuit(const std::vector<std::unique_ptr<UIElement>> &elements, const Connectivity &connectivity) {
     Core::Circuit circuit;
     for (const auto &element : elements) {
-        // Labels join points, subcircuit pins mark ports and logic outputs only read their node; the simulator sees
+        // Labels join points, subcircuit pins mark ports and logic displays only read their nodes; the simulator sees
         // none
         const Core::ComponentType type = element->GetComponent().GetType();
-        if (type == Core::ComponentType::NET_LABEL || type == Core::ComponentType::LOGIC_OUTPUT ||
-            Core::IsSubcircuitPin(type)) {
+        if (type == Core::ComponentType::NET_LABEL || Core::IsLogicDisplay(type) || Core::IsSubcircuitPin(type)) {
             continue;
         }
         std::vector<int> nodes;

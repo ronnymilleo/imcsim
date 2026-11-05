@@ -17,6 +17,7 @@
 #include "components/op_amp.h"
 #include "components/potentiometer.h"
 #include "components/relay.h"
+#include "components/seven_segment.h"
 #include "components/source.h"
 #include "components/subcircuit.h"
 #include "components/switch.h"
@@ -100,6 +101,10 @@ constexpr auto LOGIC_INPUT_KEYS = std::to_array<ParameterKey<Core::LogicInputPar
 
 constexpr auto LOGIC_OUTPUT_KEYS = std::to_array<ParameterKey<Core::LogicOutputParameters>>({
     {"logic_level", &Core::LogicOutputParameters::LogicLevel},
+});
+
+constexpr auto SEVEN_SEGMENT_KEYS = std::to_array<ParameterKey<Core::SevenSegmentParameters>>({
+    {"logic_level", &Core::SevenSegmentParameters::LogicLevel},
 });
 
 constexpr auto PULSE_KEYS = std::to_array<ParameterKey<Core::PulseParameters>>({
@@ -453,6 +458,8 @@ void WriteFigureFields(const Core::Component &component, nlohmann::json &object)
         WritePartParameters(static_cast<const Core::LogicInput &>(component), LOGIC_INPUT_KEYS, object);
     } else if (type == Core::ComponentType::LOGIC_OUTPUT) {
         WritePartParameters(static_cast<const Core::LogicOutput &>(component), LOGIC_OUTPUT_KEYS, object);
+    } else if (type == Core::ComponentType::SEVEN_SEGMENT) {
+        WritePartParameters(static_cast<const Core::SevenSegmentDisplay &>(component), SEVEN_SEGMENT_KEYS, object);
     }
 }
 
@@ -837,9 +844,16 @@ std::expected<void, std::string> ReadLogicOutputFigures(const nlohmann::json &ob
     return ReadPartParameters(object, static_cast<Core::LogicOutput &>(component), LOGIC_OUTPUT_KEYS);
 }
 
-constexpr auto FIGURE_READERS =
-    std::to_array<StateReader>({&ReadSwitchFigures, &ReadRelayFigures, &ReadTransformerFigures, &ReadLogicFigures,
-                                &ReadClockFigures, &ReadLogicInputFigures, &ReadLogicOutputFigures});
+std::expected<void, std::string> ReadSevenSegmentFigures(const nlohmann::json &object, Core::Component &component) {
+    if (component.GetType() != Core::ComponentType::SEVEN_SEGMENT) {
+        return {};
+    }
+    return ReadPartParameters(object, static_cast<Core::SevenSegmentDisplay &>(component), SEVEN_SEGMENT_KEYS);
+}
+
+constexpr auto FIGURE_READERS = std::to_array<StateReader>(
+    {&ReadSwitchFigures, &ReadRelayFigures, &ReadTransformerFigures, &ReadLogicFigures, &ReadClockFigures,
+     &ReadLogicInputFigures, &ReadLogicOutputFigures, &ReadSevenSegmentFigures});
 
 /**
  * @brief   Parts whose figures are all there is to them: the switch that follows a voltage, the relay, the transformer,

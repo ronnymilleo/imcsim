@@ -18,6 +18,7 @@
 #include "spice/spice_value.h"
 #include "ui_elements/ui_logic_input.h"
 #include "ui_elements/ui_logic_output.h"
+#include "ui_elements/ui_seven_segment.h"
 #include <algorithm>
 #include <cmath>
 #include <format>
@@ -153,9 +154,7 @@ void SchematicOverlays::Update(Schematic &schematic, const AnalysisControls &con
     state.Powers = ComputePowers(elements, connectivity, state.Point);
     state.LogicReadings.resize(elements.size());
     for (std::size_t index = 0; index < elements.size(); ++index) {
-        if (elements[index]->GetComponent().GetType() == Core::ComponentType::LOGIC_OUTPUT) {
-            state.LogicReadings[index] = ReadLogicOutput(*elements[index], connectivity, state.Point);
-        }
+        state.LogicReadings[index] = ReadLogicDisplay(*elements[index], connectivity, state.Point);
     }
     m_Displayed = std::move(state);
 }
@@ -467,10 +466,10 @@ ImU32 SchematicOverlays::GetElementColor(const Schematic &schematic, const std::
     }
     const UIElement &element = *schematic.GetElements()[index];
     const Core::Component &component = element.GetComponent();
-    // Ground, net labels, logic outputs and subcircuit pin markers carry no current or power of their own
+    // Ground, net labels, logic displays and subcircuit pin markers carry no current or power of their own
     const Core::ComponentType type = component.GetType();
-    if (type == Core::ComponentType::GROUND || type == Core::ComponentType::NET_LABEL ||
-        type == Core::ComponentType::LOGIC_OUTPUT || Core::IsSubcircuitPin(type)) {
+    if (type == Core::ComponentType::GROUND || type == Core::ComponentType::NET_LABEL || Core::IsLogicDisplay(type) ||
+        Core::IsSubcircuitPin(type)) {
         return GetPalette().Element;
     }
     if (!by_current) {
@@ -486,9 +485,9 @@ ImU32 SchematicOverlays::GetElementColor(const Schematic &schematic, const std::
 }
 
 /**
- * @brief   Shows what a logic output reads, lit when it reads 1 and the Logic Lights effect is on, and lights a logic
- *          input that is high with that effect; nothing for the other parts, nor for an output before there is a
- *          result.
+ * @brief   Shows what a logic output reads, lit when it reads 1 and the Logic Lights effect is on, and the segments of
+ *          a 7-segment display that read 1, and lights a logic input that is high with that effect; nothing for the
+ *          other parts, nor for a display before there is a result.
  */
 void SchematicOverlays::DrawLogicReading(SchematicCanvas &canvas, const ViewTransform &view, const UIElement &element,
                                          const std::size_t index) const {
@@ -499,16 +498,21 @@ void SchematicOverlays::DrawLogicReading(SchematicCanvas &canvas, const ViewTran
         }
         return;
     }
-    if (!m_Displayed || index >= m_Displayed->LogicReadings.size()) {
+    if (!m_Displayed || index >= m_Displayed->LogicReadings.size() || m_Displayed->LogicReadings[index].empty()) {
         return;
     }
-    const std::optional<LogicState> reading = m_Displayed->LogicReadings[index];
-    if (!reading) {
+    const std::vector<std::optional<LogicState>> &readings = m_Displayed->LogicReadings[index];
+    const ImU32 color = GetPalette().CanvasText;
+    if (element.GetComponent().GetType() == Core::ComponentType::SEVEN_SEGMENT) {
+        static_cast<const UISevenSegment &>(element).DrawReading(canvas, view, readings, color, are_lights_on);
         return;
     }
-    const LogicState state = *reading;
+    if (!readings.front()) {
+        return;
+    }
+    const LogicState state = *readings.front();
     const bool is_lit = state == LogicState::HIGH && are_lights_on;
-    static_cast<const UILogicOutput &>(element).DrawReading(canvas, view, state, GetPalette().CanvasText, is_lit);
+    static_cast<const UILogicOutput &>(element).DrawReading(canvas, view, state, color, is_lit);
 }
 
 /**

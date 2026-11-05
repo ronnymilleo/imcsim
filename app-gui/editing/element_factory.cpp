@@ -22,6 +22,7 @@
 #include "ui_elements/ui_op_amp.h"
 #include "ui_elements/ui_potentiometer.h"
 #include "ui_elements/ui_resistor.h"
+#include "ui_elements/ui_seven_segment.h"
 #include "ui_elements/ui_subcircuit.h"
 #include "ui_elements/ui_subcircuit_pin.h"
 #include "ui_elements/ui_switch.h"
@@ -89,6 +90,7 @@ constexpr auto PARTS = std::to_array<PartInfo>({
     {Core::ComponentType::CLOCK, "Clock"},
     {Core::ComponentType::LOGIC_INPUT, "Logic input"},
     {Core::ComponentType::LOGIC_OUTPUT, "Logic output"},
+    {Core::ComponentType::SEVEN_SEGMENT, "7-segment display"},
 });
 
 } // namespace
@@ -169,6 +171,8 @@ std::unique_ptr<UIElement> CreateElement(const Core::ComponentType type, const G
         return std::make_unique<UILogicInput>(position, rotation);
     case Core::ComponentType::LOGIC_OUTPUT:
         return std::make_unique<UILogicOutput>(position, rotation);
+    case Core::ComponentType::SEVEN_SEGMENT:
+        return std::make_unique<UISevenSegment>(position, rotation);
     }
     return nullptr;
 }

@@ -19,6 +19,7 @@
 #include "components/op_amp.h"
 #include "components/potentiometer.h"
 #include "components/relay.h"
+#include "components/seven_segment.h"
 #include "components/source.h"
 #include "components/subcircuit.h"
 #include "components/switch.h"
@@ -107,6 +108,8 @@ private:
     std::array<ValueField, 1> m_LogicInputFields;
     /// One per member of Core::LogicOutputParameters.
     std::array<ValueField, 1> m_LogicOutputFields;
+    /// One per member of Core::SevenSegmentParameters.
+    std::array<ValueField, 1> m_SevenSegmentFields;
     std::vector<ValueField> m_SubcircuitFields;
     /// Parameters of the block being edited, which a resistor, capacitor or inductor can take its value from.
     std::vector<std::string> m_BlockParameters;
@@ -133,6 +136,7 @@ private:
     void DrawClock(Core::Clock &clock);
     void DrawLogicInput(Core::LogicInput &input);
     void DrawLogicOutput(Core::LogicOutput &output);
+    void DrawSevenSegment(Core::SevenSegmentDisplay &display);
     void DrawNetLabel(Core::NetLabel &label);
     void DrawDiode(Core::Diode &diode);
     void DrawBJT(Core::BJT &bjt);

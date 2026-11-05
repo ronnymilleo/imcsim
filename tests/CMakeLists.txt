@@ -46,6 +46,7 @@ add_executable(imcsim-tests
             schematic_file_tests.cpp
             schematic_tests.cpp
             selection_tests.cpp
+            seven_segment_tests.cpp
             simulation_backend_tests.cpp
             simulation_service_tests.cpp
             simulator_tests.cpp

@@ -351,7 +351,7 @@ const BackendCapabilities &NgspiceBackend::GetCapabilities() const {
                           .UnsupportedParts = {}};
         if (!AreDigitalModelsAvailable()) {
             // The parts are told apart by type, from the first to the last of the enumeration
-            for (int index = 0; index <= static_cast<int>(ComponentType::LOGIC_OUTPUT); ++index) {
+            for (int index = 0; index <= static_cast<int>(ComponentType::SEVEN_SEGMENT); ++index) {
                 const auto type = static_cast<ComponentType>(index);
                 if (IsLogicPart(type)) {
                     m_Capabilities.UnsupportedParts[type] =
