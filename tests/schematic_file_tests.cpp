@@ -323,6 +323,8 @@ TEST_CASE("A custom diode keeps its parameters", "[schematic_file]") {
     Core::DiodeParameters parameters = led.GetParameters();
     parameters.SaturationCurrent = 1.5e-21;
     parameters.TransitTime = 5e-9;
+    parameters.MaxForwardCurrent = 12e-3;
+    parameters.MaxPower = 45e-3;
     led.SetCustomParameters(parameters);
 
     const GUI::LoadedSchematic loaded = LoadOrFail(GUI::SaveSchematic(elements, {}, {}, {}));
@@ -332,6 +334,8 @@ TEST_CASE("A custom diode keeps its parameters", "[schematic_file]") {
     CHECK(copy.IsCustom());
     CHECK(copy.GetParameters().SaturationCurrent == 1.5e-21);
     CHECK(copy.GetParameters().TransitTime == 5e-9);
+    CHECK(copy.GetParameters().MaxForwardCurrent == 12e-3);
+    CHECK(copy.GetParameters().MaxPower == 45e-3);
     CHECK(copy.GetParameters().EmissionCoefficient == parameters.EmissionCoefficient);
 }
 
@@ -352,6 +356,22 @@ TEST_CASE("Custom diode parameters fill in from the default model and are checke
     CHECK(zener.GetParameters().BreakdownCurrent == 5e-3);
     CAPTURE(loaded.Warnings);
     CHECK(loaded.Warnings.size() == 2);
+}
+
+TEST_CASE("A custom diode from an older file takes its ratings from the default model", "[schematic_file]") {
+    // Files written before the ratings existed list the SPICE parameters only
+    const GUI::LoadedSchematic loaded = LoadOrFail(Document(
+        R"({"type": "Diode", "name": "D1", "model": "Custom", "parameters": {"is": 1e-12}, "x": 0, "y": 0,
+            "rotation": 0})",
+        ""));
+
+    REQUIRE(loaded.Elements.size() == 1);
+    CAPTURE(loaded.Warnings);
+    CHECK(loaded.Warnings.empty());
+    const auto &diode = static_cast<const Core::Diode &>(loaded.Elements[0]->GetComponent());
+    const Core::DiodeParameters &defaults = Core::GetDiodeModels(Core::ComponentType::DIODE).front().Parameters;
+    CHECK(diode.GetParameters().MaxForwardCurrent == defaults.MaxForwardCurrent);
+    CHECK(diode.GetParameters().MaxPower == defaults.MaxPower);
 }
 
 TEST_CASE("Transistors keep their model or custom parameters", "[schematic_file]") {

@@ -98,6 +98,8 @@ constexpr auto DIODE_FIELDS = std::to_array<ParameterField<Core::DiodeParameters
     {"VJ", &Core::DiodeParameters::JunctionPotential, "V"},
     {"M", &Core::DiodeParameters::GradingCoefficient, ""},
     {"TT", &Core::DiodeParameters::TransitTime, "s"},
+    {"IF max", &Core::DiodeParameters::MaxForwardCurrent, "A"},
+    {"P max", &Core::DiodeParameters::MaxPower, "W"},
 });
 
 constexpr auto BJT_FIELDS = std::to_array<ParameterField<Core::BJTParameters>>({

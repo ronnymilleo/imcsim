@@ -250,6 +250,7 @@ All three use the SPICE diode model (`D`), with these parameters:
 | BV, IBV | reverse breakdown voltage, and the current at which it is reached |
 | CJO, VJ, M | zero-bias junction capacitance, junction potential and grading coefficient |
 | TT | transit time, which sets the reverse recovery charge |
+| IF max, P max | datasheet average forward current and power dissipation, which are not part of the SPICE model |
 
 Ready models:
 
@@ -263,6 +264,14 @@ Any of them can switch to **Custom** and edit the parameters, starting from the 
 
 - A Zener regulates at BV in reverse. For the other diodes and LEDs, BV is their rating: the simulation still
   conducts in breakdown, as ngspice does, and imcsim warns when the reverse voltage reaches it.
+- The ratings (forward current, power) are checked after each simulation, as for transistors: the forward current
+  and the power on their average over the run (the forward current is the datasheet IF(AV), so a rectifier that peaks
+  above it into a capacitor is fine; only the forward part of the current counts), the voltages and currents of
+  transistors at their peak, with the same warnings. A Zener regulating in reverse is judged
+  on power alone, since its rating is the dissipation. A diode imported from a library has no ratings. The ready
+  models carry the datasheet values (for example 200 mA and 500 mW for the 1N4148, 1 A and 3 W for the 1N4007, 30 mA
+  and 100 mW for the red LED), and a custom diode starts from those of the model it replaces; files saved before the
+  ratings existed take them from the default model.
 - An LED is a diode whose parameters give its forward voltage; light output is not modeled.
 - Not modeled: temperature, forward recovery and package parasitics. The gradual knee of a real Zener at low
   current is only approximated, through BV and IBV.

@@ -90,7 +90,7 @@ private:
     /// The "time value" points of a PWL source being typed, as long as the user wants them.
     std::string m_PWLText;
     // One per member of the parameters of custom diodes, transistors and op-amps
-    std::array<ValueField, 9> m_DiodeFields;
+    std::array<ValueField, 11> m_DiodeFields;
     std::array<ValueField, 16> m_BJTFields;
     std::array<ValueField, 13> m_MOSFETFields;
     std::array<ValueField, 11> m_OpAmpFields;
