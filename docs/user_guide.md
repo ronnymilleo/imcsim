@@ -239,7 +239,7 @@ The RC_LOWPASS block of the Two RC filters example, open in the editor: a pin ma
 a capacitor that follow the parameters R and C:
 
 ![The inside of a block: IN and OUT pin markers, a resistor whose value reads {R} and a capacitor whose value reads {C},
-with Back to schematic and the name of the block over the corner of the canvas](images/blocks_contents.png)
+with the path Schematic > RC_LOWPASS over the corner of the canvas](images/blocks_contents.png)
 
 Its settings, with the edge of each pin and the defaults of the parameters:
 
