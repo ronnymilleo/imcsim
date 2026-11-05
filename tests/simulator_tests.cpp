@@ -85,6 +85,10 @@ struct LowPass {
     }
 };
 
+bool HasWarning(const std::vector<std::string> &warnings, const std::string &start) {
+    return std::ranges::any_of(warnings, [&start](const std::string &warning) { return warning.starts_with(start); });
+}
+
 /**
  * @struct  DiodeLoop
  * @brief   A supply on node 1 feeding a resistor to node 2, where a diode part connects to ground.
@@ -908,6 +912,83 @@ TEST_CASE("A reversed LED past its rating is reported in reverse breakdown", "[s
     CHECK(run.Result->Warnings[0].ends_with("rated for 5V"));
 }
 
+TEST_CASE("A diode above its forward current and power ratings is reported", "[simulator]") {
+    // 10 V through 10 Ohm leaves about 0.9 A and 0.8 W in a 1N4148 rated for 200 mA and 500 mW
+    DiodeLoop loop(Core::ComponentType::DIODE, 10.0, 10.0);
+    const Core::OperatingPointRun run = Core::RunOperatingPoint(loop.Circuit);
+    if (!run.Result) {
+        FAIL(run.Result.error());
+    }
+    CAPTURE(run.Result->Warnings);
+    CHECK(HasWarning(run.Result->Warnings, "D1 (1N4148) exceeds its average forward current rating: "));
+    CHECK(HasWarning(run.Result->Warnings, "D1 (1N4148) exceeds its power rating: "));
+}
+
+TEST_CASE("A diode within its ratings earns no warning", "[simulator]") {
+    // About 4.3 mA through a 1N4148
+    DiodeLoop loop(Core::ComponentType::DIODE, 5.0, 1e3);
+    const Core::OperatingPointRun run = Core::RunOperatingPoint(loop.Circuit);
+    if (!run.Result) {
+        FAIL(run.Result.error());
+    }
+    CHECK(run.Result->Warnings.empty());
+}
+
+TEST_CASE("A Zener regulating in reverse is judged on power, not on forward current", "[simulator]") {
+    // 12 V through 100 Ohm into a 5V1 Zener leaves about 69 mA at 5.1 V, which is 350 mW of the 500 mW it may dissipate
+    DiodeLoop loop(Core::ComponentType::ZENER_DIODE, 12.0, 100.0);
+    const Core::OperatingPointRun run = Core::RunOperatingPoint(loop.Circuit);
+    if (!run.Result) {
+        FAIL(run.Result.error());
+    }
+    CHECK(run.Result->Warnings.empty());
+
+    // 12 V through 10 Ohm is over 600 mW
+    DiodeLoop hot(Core::ComponentType::ZENER_DIODE, 12.0, 10.0);
+    const Core::OperatingPointRun hot_run = Core::RunOperatingPoint(hot.Circuit);
+    if (!hot_run.Result) {
+        FAIL(hot_run.Result.error());
+    }
+    CAPTURE(hot_run.Result->Warnings);
+    CHECK(HasWarning(hot_run.Result->Warnings, "D1 (5V1) exceeds its power rating: "));
+    CHECK_FALSE(HasWarning(hot_run.Result->Warnings, "D1 (5V1) exceeds its average forward current rating"));
+}
+
+TEST_CASE("A transient judges the forward current of a diode on its average, not its peak", "[simulator]") {
+    Core::VoltageSource source;
+    source.SetName("Vin1");
+    source.SetSourceType(Core::VoltageSource::SourceType::AC);
+    Core::Diode rectifier(Core::ComponentType::DIODE);
+    rectifier.SetName("D1");
+    Core::Resistor load;
+    load.SetName("R1");
+    load.SetValue(10.0);
+    const Core::Ground reference;
+    Core::Circuit circuit;
+    circuit.Add(source, {1, 0});
+    circuit.Add(rectifier, {1, 2});
+    circuit.Add(load, {2, 0});
+    circuit.Add(reference, {0});
+
+    // 5 V peaks near 0.4 A in a 1N4148 rated for 200 mA average, but half a sine every cycle averages near 0.13 A
+    source.SetAC({.Amplitude = 5.0, .Frequency = 1e3, .Offset = 0.0});
+    const Core::TransientRun gentle = Core::RunTransient(circuit, {.StopTime = 2e-3, .TimeStep = 1e-6});
+    if (!gentle.Result) {
+        FAIL(gentle.Result.error());
+    }
+    CAPTURE(gentle.Result->Warnings);
+    CHECK_FALSE(HasWarning(gentle.Result->Warnings, "D1 (1N4148) exceeds its average forward current rating"));
+
+    // 12 V averages about 0.35 A, over the rating
+    source.SetAC({.Amplitude = 12.0, .Frequency = 1e3, .Offset = 0.0});
+    const Core::TransientRun heavy = Core::RunTransient(circuit, {.StopTime = 2e-3, .TimeStep = 1e-6});
+    if (!heavy.Result) {
+        FAIL(heavy.Result.error());
+    }
+    CAPTURE(heavy.Result->Warnings);
+    CHECK(HasWarning(heavy.Result->Warnings, "D1 (1N4148) exceeds its average forward current rating: "));
+}
+
 TEST_CASE("A transient reports a diode that breaks down at any time point", "[simulator]") {
     Core::VoltageSource source;
     source.SetName("Vin1");
@@ -929,9 +1010,9 @@ TEST_CASE("A transient reports a diode that breaks down at any time point", "[si
     if (!run.Result) {
         FAIL(run.Result.error());
     }
-    REQUIRE(run.Result->Warnings.size() == 1);
-    CAPTURE(run.Result->Warnings[0]);
-    CHECK(run.Result->Warnings[0].starts_with("D1 (1N4148) goes into reverse breakdown"));
+    // The positive half of the sine also pushes the forward current past the rating, which is another warning
+    CAPTURE(run.Result->Warnings);
+    CHECK(HasWarning(run.Result->Warnings, "D1 (1N4148) goes into reverse breakdown"));
 }
 
 TEST_CASE("A custom Zener regulates at its own breakdown voltage", "[simulator]") {
@@ -1202,10 +1283,6 @@ TEST_CASE("An AC sweep gives the small-signal gain and currents of a common-emit
 /**
  * @brief   True when some warning starts with the text, so tests can check one rating at a time.
  */
-bool HasWarning(const std::vector<std::string> &warnings, const std::string &start) {
-    return std::ranges::any_of(warnings, [&start](const std::string &warning) { return warning.starts_with(start); });
-}
-
 TEST_CASE("A BJT above its VCEO rating is reported", "[simulator]") {
     // A small base current keeps the 2N3904 barely on, so nearly the whole 60 V supply sits across it
     CommonEmitter stage(Core::ComponentType::NPN);

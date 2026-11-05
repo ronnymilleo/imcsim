@@ -545,6 +545,8 @@ TEST_CASE("Custom diode parameters must be in the range ngspice simulates", "[co
     CHECK_FALSE(diode.IsValidParameters({.SeriesResistance = -1.0}));
     CHECK_FALSE(diode.IsValidParameters({.BreakdownVoltage = 0.0}));
     CHECK_FALSE(diode.IsValidParameters({.BreakdownCurrent = 0.0}));
+    CHECK_FALSE(diode.IsValidParameters({.MaxForwardCurrent = 0.0}));
+    CHECK_FALSE(diode.IsValidParameters({.MaxPower = -1.0}));
     CHECK_FALSE(diode.IsValidParameters({.JunctionCapacitance = -1e-12}));
     CHECK_FALSE(diode.IsValidParameters({.JunctionPotential = 0.0}));
     CHECK_FALSE(diode.IsValidParameters({.GradingCoefficient = 0.0}));

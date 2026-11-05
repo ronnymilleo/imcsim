@@ -98,6 +98,18 @@ TEST_CASE("Every example opens without warnings, measures existing traces and ru
         const Core::TransientRun transient =
             Core::RunTransient(schematic.BuildCircuit(), schematic.GetSimulationSettings().Transient);
         CHECK(transient.Result.has_value());
+
+        // No example is shown overloading a part
+        for (const std::string &warning : operating_point.Result->Warnings) {
+            INFO(warning);
+            CHECK_FALSE(warning.contains("exceeds its"));
+        }
+        if (transient.Result) {
+            for (const std::string &warning : transient.Result->Warnings) {
+                INFO(warning);
+                CHECK_FALSE(warning.contains("exceeds its"));
+            }
+        }
     }
 }
 

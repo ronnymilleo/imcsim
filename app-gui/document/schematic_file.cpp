@@ -154,6 +154,8 @@ constexpr auto DIODE_KEYS = std::to_array<ParameterKey<Core::DiodeParameters>>({
     {"vj", &Core::DiodeParameters::JunctionPotential},
     {"m", &Core::DiodeParameters::GradingCoefficient},
     {"tt", &Core::DiodeParameters::TransitTime},
+    {"ifmax", &Core::DiodeParameters::MaxForwardCurrent},
+    {"pmax", &Core::DiodeParameters::MaxPower},
 });
 
 constexpr auto BJT_KEYS = std::to_array<ParameterKey<Core::BJTParameters>>({

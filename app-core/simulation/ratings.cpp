@@ -57,6 +57,36 @@ double PeakVoltageBetween(const std::vector<double> &first, const std::vector<do
     return peak;
 }
 
+/**
+ * @brief   Reduces the terminals of a diode to the voltage across it and the current into its anode, which is all the
+ *          power takes, since the current out of the cathode is the same one.
+ */
+TerminalWaveforms AcrossAnodeAndCathode(const TerminalWaveforms &terminals) {
+    std::vector<double> voltage_drop = terminals.Voltages[0];
+    for (std::size_t index = 0; index < voltage_drop.size(); ++index) {
+        voltage_drop[index] -= terminals.Voltages[1][index];
+    }
+    return {.Voltages = {std::move(voltage_drop)}, .Currents = {terminals.Currents[0]}};
+}
+
+/**
+ * @brief   Time-weighted average of the forward part of a diode current, negative values counting as zero.
+ * @details Datasheet forward currents are averages (IF(AV)), and a rectifier into a capacitor legitimately peaks far
+ *          above them. Counting only the forward part keeps reverse recovery, or a Zener in breakdown, from cancelling
+ *          it. A single point, as in .op, is its own average.
+ */
+double AverageForwardCurrent(const std::vector<double> &times, const std::vector<double> &currents) {
+    if (times.size() < 2) {
+        return currents.empty() ? 0.0 : std::max(currents.front(), 0.0);
+    }
+    double charge = 0.0;
+    for (std::size_t index = 1; index < times.size(); ++index) {
+        charge += (std::max(currents[index], 0.0) + std::max(currents[index - 1], 0.0)) / 2.0 *
+                  (times[index] - times[index - 1]);
+    }
+    return charge / (times.back() - times.front());
+}
+
 double PeakMagnitude(const std::vector<double> &values) {
     double peak = 0.0;
     for (const double value : values) {
@@ -98,8 +128,9 @@ void AddRatingWarning(const Component &part, const char *model_name, const std::
 }
 
 /**
- * @brief   Checks a transistor against its datasheet ratings, which ngspice knows nothing about.
- * @details Voltages and currents are checked at their peak, and power on average.
+ * @brief   Checks a diode or a transistor against its datasheet ratings, which ngspice knows nothing about.
+ * @details Voltages and the currents of transistors are checked at their peak, and power and the forward current of
+ *          a diode on average.
  */
 std::vector<std::string> RatingWarnings(const Component &part, const std::vector<double> &times,
                                         const TerminalWaveforms &terminals) {
@@ -109,7 +140,16 @@ std::vector<std::string> RatingWarnings(const Component &part, const std::vector
         return warnings;
     }
     const std::vector<std::vector<double>> &voltages = terminals.Voltages;
-    if (IsBJT(part.GetType())) {
+    if (IsDiode(part.GetType())) {
+        const auto &diode = static_cast<const Diode &>(part);
+        const DiodeParameters &ratings = diode.GetParameters();
+        const char *model = diode.GetModelName();
+        // The forward current is the one into the anode, so a Zener in reverse breakdown is judged on power alone
+        AddRatingWarning(part, model, "average forward current", AverageForwardCurrent(times, terminals.Currents[0]),
+                         ratings.MaxForwardCurrent, "A", warnings);
+        AddRatingWarning(part, model, "power", AveragePower(times, AcrossAnodeAndCathode(terminals)), ratings.MaxPower,
+                         "W", warnings);
+    } else if (IsBJT(part.GetType())) {
         const auto &bjt = static_cast<const BJT &>(part);
         const BJTParameters &ratings = bjt.GetParameters();
         const char *model = bjt.GetModelName();
@@ -166,8 +206,8 @@ TerminalWaveforms TransientTerminals(const CircuitEntry &entry, const Transient 
 } // namespace
 
 /**
- * @brief   Adds the warnings an operating point earns: diodes in reverse breakdown, and transistors past their
- *          voltage, current or power ratings.
+ * @brief   Adds the warnings an operating point earns: diodes in reverse breakdown or past their forward current or
+ *          power ratings, and transistors past their voltage, current or power ratings.
  * @param[in] circuit  Circuit the result is of.
  * @param[in,out] result  Operating point to add the warnings to; its currents must include every probed current of
  *                        the circuit.
@@ -177,6 +217,8 @@ void AddRatingWarnings(const Circuit &circuit, OperatingPoint &result) {
         if (!IsDiode(entry.Part->GetType())) {
             continue;
         }
+        std::ranges::move(RatingWarnings(*entry.Part, {0.0}, OperatingPointTerminals(entry, result)),
+                          std::back_inserter(result.Warnings));
         const double reverse_voltage = result.NodeVoltages[static_cast<std::size_t>(entry.Nodes[1])] -
                                        result.NodeVoltages[static_cast<std::size_t>(entry.Nodes[0])];
         if (std::optional<std::string> warning = BreakdownWarning(entry, reverse_voltage)) {
@@ -192,7 +234,8 @@ void AddRatingWarnings(const Circuit &circuit, OperatingPoint &result) {
 }
 
 /**
- * @brief   Adds the warnings a transient earns, with voltages and currents checked at their peak and power on average.
+ * @brief   Adds the warnings a transient earns, with voltages and transistor currents checked at their peak, and power
+ * and diode forward current on average.
  * @param[in] circuit  Circuit the result is of.
  * @param[in,out] result  Transient to add the warnings to; its currents must include every probed current of the
  *                        circuit.
@@ -202,6 +245,8 @@ void AddRatingWarnings(const Circuit &circuit, Transient &result) {
         if (!IsDiode(entry.Part->GetType())) {
             continue;
         }
+        std::ranges::move(RatingWarnings(*entry.Part, result.Times, TransientTerminals(entry, result)),
+                          std::back_inserter(result.Warnings));
         const std::vector<double> &anode = result.NodeVoltages[static_cast<std::size_t>(entry.Nodes[0])];
         const std::vector<double> &cathode = result.NodeVoltages[static_cast<std::size_t>(entry.Nodes[1])];
         double highest_reverse_voltage = cathode[0] - anode[0];
