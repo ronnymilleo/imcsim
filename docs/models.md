@@ -27,7 +27,7 @@ elements, so the results are those of ngspice with the models below. Some things
   with the inputs set, so a row never depends on the one before it. That describes combinational logic; a latch or
   flip-flop that holds its state has no operating point for those combinations, and the row reads X.
 - To report terminal currents in every analysis, the netlist adds a 0 V source in series with diodes, transistors,
-  potentiometers, switches, relays, transformers, controlled sources, op-amp outputs and the outputs of logic parts. It does not change the circuit; the Netlist window leaves it out unless a
+  potentiometers, switches, relays, fuses, transformers, controlled sources, op-amp outputs and the outputs of logic parts. It does not change the circuit; the Netlist window leaves it out unless a
   current-controlled source needs it.
 
 - The power shown on the schematic is what a part absorbs: the sum over its terminals of the node voltage times the
@@ -90,6 +90,56 @@ contact is 1 GOhm.
   coil heating, and the pull-in and drop-out voltages are steady-state ones.
 - A switch or a relay that is open or closed at the operating point stays so in an AC sweep, since the sweep is
   linear around it. Fast switching can fail to converge in a transient; a smaller time step helps.
+
+## Fuses
+
+A fuse is a low resistance that opens for good once the current has run through it long enough. It is written as an
+instance of the subcircuit `imcsim_fuse`, defined once in the netlist, and has two parts: a resistance between its
+terminals, and a thermal state that decides it. You set the figures a datasheet gives, and the model derives the rest.
+
+- **Rated current** (`Ih`, 1 A): the largest current the fuse carries for ever. It never blows below it.
+- **Melting I2t** (`I2t`, 0.15 A2s): the current squared times the time that melts the element in a short overload.
+- **Cold resistance** (150 mOhm) and **blown resistance** (1 GOhm).
+- The **cooling time constant** `tau = I2t / Ih^2` follows from the two ratings, and the part editor shows it as a
+  read-only line (0.15 s for the 1 A fast fuse).
+
+The element heats with the square of the current and loses its heat with the time constant `tau`:
+`dT/dt = (i^2 / Ih^2 - T) / tau`, with `T` in units of the melting point, so the fuse melts when `T` reaches 1. In
+steady state `T = i^2 / Ih^2`, so a current below the rated one never melts it, and a short overload (much shorter than
+`tau`) melts it when the integral of `i^2` over time reaches `Ih^2 tau`, the melting I2t. In between, the time to blow
+is `-tau ln(1 - Ih^2 / i^2)`: 0.045 s at 1.96 A for the default fuse. Each overload leaves heat that the fuse loses
+again with `tau`, so overloads spaced several time constants apart do not add up, and overloads close together do. In
+the netlist `T` is the voltage of a capacitor of 1 F with a resistor of `tau` across it, charged by a behavioral
+current source.
+
+When `T` passes 1.015 a second node, the latch, starts to charge. It has no discharge path, so the fuse cannot close
+again, and once it is under way it keeps charging by itself, since the open fuse stops carrying current and `T`
+falls. The latch sets the resistance, from the cold to the blown value, through an exponential, so the resistance
+changes by parts per million where the latch is far from its steps and the transition converges in ngspice. The part
+blows when the heat reaches 1.015, a margin above the 1 that the rated current settles at, so a 1 A fuse carries
+1 A for ever, and the time to blow and the melting I2t come out about 1.5% longer than the figures above.
+
+- **The branch really opens**: the blown resistance goes into the same run, so the current in the branch and the
+  voltages around it change from that instant, and the Output window warns "FU1 blew at 176ms". The instant is read
+  from the results as the first point where the voltage across the fuse over its current is above the geometric mean of
+  the cold and blown resistances.
+- **Every run starts with a whole fuse**: the thermal state is not saved with the file nor kept from one run to the
+  next, and there is no replace action. A gate source inside the model is 0 in an operating point, a DC sweep and an
+  AC sweep, so they always see a whole fuse, even at a current far above its rating, and rises a nanosecond into a
+  transient. A stepped transient or AC sweep starts each step whole. In a live run the fuse blows when the circuit
+  makes it, and stays open until the run ends.
+- **Inductive loads**: the open fuse cuts an inductor current at once, which the trapezoidal integration of ngspice
+  turns into an oscillation that never dies. A circuit with a fuse, in a block or not, therefore writes
+  `.options method=gear` once, and the Gear integration settles the node. Gear damps fast ringing a little, so a lightly
+  damped resonance in the same circuit loses some of its ring.
+- **The ready fuses** (the 100 mA, 500 mA, 1 A and 5 A fast fuses and the 1 A slow-blow) carry typical figures: about
+  0.15 s of I2t per A2 of rating for a fast fuse and 1 s for a slow-blow, and cold resistances of 4 Ohm (100 mA) down to
+  20 mOhm (5 A). They are not taken from one vendor's datasheet.
+- A fuse is a model of the thermal state, not of the arc: there is no breaking capacity, arc voltage or voltage rating,
+  no temperature dependence of the cold resistance, and the part carries a current through its probe like a switch.
+  In a noise analysis the model adds none.
+- The blown state is read from the voltage across the fuse and its current, so a fuse inside a block is simulated, but
+  its blow is not shown on the schematic or warned about; the fuses of the main schematic are.
 
 ## Transformers
 

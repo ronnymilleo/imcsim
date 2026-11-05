@@ -11,6 +11,7 @@
 #include "components/component.h"
 #include "components/controlled_source.h"
 #include "components/diode.h"
+#include "components/fuse.h"
 #include "components/logic_input.h"
 #include "components/logic_output.h"
 #include "components/logic_part.h"
@@ -98,6 +99,8 @@ private:
     std::array<ValueField, 4> m_SwitchFields;
     /// One per member of Core::RelayParameters.
     std::array<ValueField, 5> m_RelayFields;
+    /// One per member of Core::FuseParameters.
+    std::array<ValueField, 4> m_FuseFields;
     /// One per member of Core::TransformerParameters.
     std::array<ValueField, 3> m_TransformerFields;
     /// One per member of Core::LogicParameters.
@@ -131,6 +134,7 @@ private:
     void DrawSwitch(Core::Switch &contact);
     void DrawControlledSwitch(Core::VoltageControlledSwitch &controlled);
     void DrawRelay(Core::Relay &relay);
+    void DrawFuse(Core::Fuse &fuse);
     void DrawTransformer(Core::Transformer &transformer);
     void DrawLogicPart(Core::LogicPart &part);
     void DrawClock(Core::Clock &clock);

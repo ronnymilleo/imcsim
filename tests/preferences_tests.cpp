@@ -29,7 +29,8 @@ TEST_CASE("Preferences load back unchanged from the file they save", "[preferenc
     CHECK_FALSE(loaded.Choices.IsEffectOn(GUI::LiveEffect::CURRENT_FLOW));
 }
 
-TEST_CASE("A new user gets the first theme, plain wires, no effects and any value", "[preferences]") {
+TEST_CASE("A new user gets the first theme, plain wires, no effects but the fuse flash and any value",
+          "[preferences]") {
     const GUI::Preferences preferences;
     CHECK(preferences.Theme == GUI::GetThemes().front().Name);
     CHECK(preferences.WireColors == GUI::WireColoring::PLAIN);

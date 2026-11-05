@@ -23,6 +23,7 @@ add_executable(imcsim-tests
             element_factory_tests.cpp
             current_flow_tests.cpp
             examples_tests.cpp
+            fuse_tests.cpp
             group_editing_tests.cpp
             heat_glow_tests.cpp
             helpers_tests.cpp
