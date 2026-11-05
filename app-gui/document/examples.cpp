@@ -93,6 +93,17 @@ constexpr auto EXAMPLES = std::to_array<Example>({
         .FileName = "rlc_low_pass_poles_and_zeros.imcsim",
     },
     {
+        .Title = "S-parameters of an LC low-pass",
+        .Group = "Basics",
+        .Description =
+            "Two 8 uH inductors and a 3.18 nF capacitor make a T low-pass between two ports, the Block pin markers "
+            "IN and OUT, set as S-parameter ports of 50 Ohm in their properties. Run the S-parameters analysis and "
+            "open its tab: on the Smith chart S11 starts at the center, matched, and sweeps out to the rim as the "
+            "inductors stop the signal, while S21 stays near 0 dB up to about 1 MHz and falls beyond it. Hover a "
+            "point for the impedance, the VSWR and the return loss, or save the matrix as a Touchstone .s2p file.",
+        .FileName = "s_parameters_lc_low_pass.imcsim",
+    },
+    {
         .Title = "Diode curves",
         .Group = "Diodes",
         .Description = "A 1N4148, a 1N4007 and a 1N5819 Schottky, each with its own 100 Ohm resistor, across one "

@@ -6,6 +6,7 @@
 #ifndef IMCSIM_SUBCIRCUIT_PINS_H
 #define IMCSIM_SUBCIRCUIT_PINS_H
 
+#include "components/component.h"
 #include "components/subcircuit.h"
 #include "document/schematic_file.h"
 #include "editing/connectivity.h"
@@ -31,6 +32,11 @@ std::optional<Core::PinSide> FindMarkerSide(const std::vector<std::unique_ptr<UI
 Rotation GetSideRotation(Core::PinSide side);
 const char *GetPinSideName(Core::PinSide side);
 std::optional<Core::PinSide> ParsePinSide(std::string_view name);
+
+// S-parameter ports
+bool IsPortNumberTaken(const std::vector<std::unique_ptr<UIElement>> &elements, int number,
+                       const Core::Component *except);
+int FindFreePortNumber(const std::vector<std::unique_ptr<UIElement>> &elements, const Core::Component *except);
 
 // Instances
 void ApplyDefinitionPins(Core::SubcircuitInstance &instance, const SavedSubcircuit &definition);

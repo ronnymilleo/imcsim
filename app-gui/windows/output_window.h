@@ -23,6 +23,7 @@
 #include "windows/output_tabs/monte_carlo_tab.h"
 #include "windows/output_tabs/noise_tab.h"
 #include "windows/output_tabs/pole_zero_tab.h"
+#include "windows/output_tabs/s_parameter_tab.h"
 #include "windows/output_tabs/spectrum_tab.h"
 #include "windows/output_tabs/transient_tab.h"
 #include <cstddef>
@@ -45,6 +46,7 @@ enum class PlotTab {
     TRANSFER_FUNCTION,
     SENSITIVITY,
     POLE_ZERO,
+    S_PARAMETERS,
     TRUTH_TABLE,
     MONTE_CARLO
 };
@@ -105,6 +107,7 @@ private:
     DCSweepTab m_DCSweepTab;
     NoiseTab m_NoiseTab;
     PoleZeroTab m_PoleZeroTab;
+    SParameterTab m_SParameterTab;
     MonteCarloTab m_MonteCarloTab;
     /// The tab shown this frame, which Export saves.
     PlotTab m_ShownTab = PlotTab::TRANSIENT;
@@ -130,7 +133,7 @@ private:
     void DrawExportButton(ImVec2 tab_row, float tab_row_width, float export_width, const FrameResults &frame);
     bool CanExport(const FrameResults &frame) const;
     bool HasLongerRun() const;
-    ExportFigure BuildShownFigure(const FrameResults &frame, bool is_whole_run) const;
+    ExportFigure BuildShownFigure(const FrameResults &frame, bool is_whole_run, bool is_table) const;
 };
 
 } // namespace GUI

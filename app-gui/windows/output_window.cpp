@@ -70,6 +70,8 @@ const char *GetTabFileSuffix(const PlotTab tab) {
         return "sensitivity";
     case PlotTab::POLE_ZERO:
         return "poles-and-zeros";
+    case PlotTab::S_PARAMETERS:
+        return "s-parameters";
     case PlotTab::TRUTH_TABLE:
         return "truth-table";
     case PlotTab::MONTE_CARLO:
@@ -98,6 +100,8 @@ const char *GetTabTitle(const PlotTab tab) {
         return "sensitivity";
     case PlotTab::POLE_ZERO:
         return "poles and zeros";
+    case PlotTab::S_PARAMETERS:
+        return "S-parameters";
     case PlotTab::TRUTH_TABLE:
         return "truth table";
     case PlotTab::MONTE_CARLO:
@@ -122,7 +126,8 @@ OutputWindow::OutputWindow(Schematic &schematic, AnalysisControls &controls, Tra
     : AppWindow("Output", true), m_Schematic(schematic), m_Controls(controls), m_Playback(playback),
       m_Preferences(preferences), m_MathChannels(schematic), m_Buses(schematic),
       m_TransientTab(schematic, controls, playback), m_SpectrumTab(schematic), m_ACSweepTab(schematic),
-      m_DCSweepTab(schematic), m_NoiseTab(schematic), m_PoleZeroTab(schematic), m_MonteCarloTab(schematic) {
+      m_DCSweepTab(schematic), m_NoiseTab(schematic), m_PoleZeroTab(schematic), m_SParameterTab(schematic),
+      m_MonteCarloTab(schematic) {
     SetInitialSize(INITIAL_SIZE);
     // Nothing to plot yet; the first result opens it
     SetOpen(false);
@@ -419,6 +424,10 @@ void OutputWindow::DrawTabs(const FrameResults &frame) {
         m_PoleZeroTab.Draw();
         ImGui::EndTabItem();
     }
+    if (begin_tab("S-parameters", PlotTab::S_PARAMETERS)) {
+        m_SParameterTab.Draw(m_Exporter);
+        ImGui::EndTabItem();
+    }
     if (begin_tab("Truth table", PlotTab::TRUTH_TABLE)) {
         DrawTruthTableTab(m_Schematic);
         ImGui::EndTabItem();
@@ -449,8 +458,8 @@ void OutputWindow::DrawExportButton(const ImVec2 tab_row, const float tab_row_wi
             m_Exporter.DrawPopup(GetTabTitle(m_ShownTab), CanExport(frame), HasLongerRun())) {
         const std::string suffix =
             std::format("{}{}", GetTabFileSuffix(m_ShownTab), choice->IsWholeRun ? "-whole-run" : "");
-        m_Exporter.Start(BuildShownFigure(frame, choice->IsWholeRun), choice->Format, m_Schematic.GetFilePath(),
-                         suffix);
+        m_Exporter.Start(BuildShownFigure(frame, choice->IsWholeRun, choice->Format == ExportFormat::CSV),
+                         choice->Format, m_Schematic.GetFilePath(), suffix);
     }
 }
 
@@ -469,6 +478,8 @@ bool OutputWindow::CanExport(const FrameResults &frame) const {
         return m_DCSweepTab.CanExport(frame);
     case PlotTab::NOISE:
         return m_NoiseTab.CanExport();
+    case PlotTab::S_PARAMETERS:
+        return m_SParameterTab.CanExport();
     case PlotTab::OPERATING_POINT:
     case PlotTab::TRANSFER_FUNCTION:
     case PlotTab::SENSITIVITY:
@@ -493,7 +504,8 @@ bool OutputWindow::HasLongerRun() const {
 /**
  * @brief   The figure of the shown tab, which CanExport() has found something to export in.
  */
-ExportFigure OutputWindow::BuildShownFigure(const FrameResults &frame, const bool is_whole_run) const {
+ExportFigure OutputWindow::BuildShownFigure(const FrameResults &frame, const bool is_whole_run,
+                                            const bool is_table) const {
     switch (m_ShownTab) {
     case PlotTab::TRANSIENT:
         return m_TransientTab.BuildFigure(frame, is_whole_run);
@@ -505,6 +517,8 @@ ExportFigure OutputWindow::BuildShownFigure(const FrameResults &frame, const boo
         return m_DCSweepTab.BuildFigure(frame);
     case PlotTab::NOISE:
         return m_NoiseTab.BuildFigure();
+    case PlotTab::S_PARAMETERS:
+        return m_SParameterTab.BuildFigure(is_table);
     case PlotTab::OPERATING_POINT:
     case PlotTab::TRANSFER_FUNCTION:
     case PlotTab::SENSITIVITY:

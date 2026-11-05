@@ -189,6 +189,8 @@ public:
     const std::optional<Core::Sensitivity> &GetSensitivity() const;
     void SetPoleZero(std::optional<Core::PoleZero> pole_zero);
     const std::optional<Core::PoleZero> &GetPoleZero() const;
+    void SetSParameters(std::optional<Core::SParameters> s_parameters);
+    const std::optional<Core::SParameters> &GetSParameters() const;
     void SetTruthTable(std::optional<Core::TruthTable> truth_table);
     const std::optional<Core::TruthTable> &GetTruthTable() const;
     std::size_t GetOperatingPointVersion() const;
@@ -201,6 +203,7 @@ public:
     std::size_t GetTransferFunctionVersion() const;
     std::size_t GetSensitivityVersion() const;
     std::size_t GetPoleZeroVersion() const;
+    std::size_t GetSParametersVersion() const;
     std::size_t GetTruthTableVersion() const;
 
 private:
@@ -286,6 +289,7 @@ private:
     std::optional<Core::TransferFunction> m_TransferFunction;
     std::optional<Core::Sensitivity> m_Sensitivity;
     std::optional<Core::PoleZero> m_PoleZero;
+    std::optional<Core::SParameters> m_SParameters;
     std::optional<Core::TruthTable> m_TruthTable;
     // Result versions, which change with every new result, so windows can tell a rerun from one they showed
     std::size_t m_OperatingPointVersion = 0;
@@ -299,6 +303,7 @@ private:
     std::size_t m_TransferFunctionVersion = 0;
     std::size_t m_SensitivityVersion = 0;
     std::size_t m_PoleZeroVersion = 0;
+    std::size_t m_SParametersVersion = 0;
     std::size_t m_TruthTableVersion = 0;
 
     void InvalidateDerivedData();

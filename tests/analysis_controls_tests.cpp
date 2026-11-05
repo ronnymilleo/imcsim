@@ -5,6 +5,7 @@
 
 #include "analysis/analysis_controls.h"
 
+#include "components/subcircuit_pin.h"
 #include "document/examples.h"
 #include "document/schematic.h"
 #include "editing/live_input.h"
@@ -224,6 +225,9 @@ public:
     Core::PoleZeroRun RunPoleZero(const Core::Circuit &, const Core::PoleZeroSettings &) override {
         return {std::unexpected("no"), {}};
     }
+    Core::SParametersRun RunSParameters(const Core::Circuit &, const Core::SParameterSettings &) override {
+        return {std::unexpected("no"), {}};
+    }
 
 private:
     Core::BackendCapabilities m_Capabilities;
@@ -420,6 +424,7 @@ TEST_CASE("Analyses have names, and all of them are counted", "[analysis_control
     CHECK(std::string(GUI::GetAnalysisName(GUI::Analysis::AC_SWEEP)) == "AC sweep");
     CHECK(std::string(GUI::GetAnalysisName(GUI::Analysis::SENSITIVITY)) == "Sensitivity");
     CHECK(std::string(GUI::GetAnalysisName(GUI::Analysis::POLE_ZERO)) == "Poles and zeros");
+    CHECK(std::string(GUI::GetAnalysisName(GUI::Analysis::S_PARAMETERS)) == "S-parameters");
     CHECK(std::string(GUI::GetAnalysisName(GUI::Analysis::TRUTH_TABLE)) == "Truth table");
     CHECK(static_cast<std::size_t>(GUI::Analysis::TRUTH_TABLE) + 1 == GUI::ANALYSIS_COUNT);
 }
@@ -844,4 +849,38 @@ TEST_CASE("A run that fails is skipped with a warning, but the nominal run has t
     REQUIRE(controls.GetError(GUI::Analysis::TRANSIENT));
     CHECK(controls.GetError(GUI::Analysis::TRANSIENT)->contains("The nominal run failed"));
     CHECK_FALSE(schematic.GetMonteCarlo().has_value());
+}
+
+TEST_CASE("The S-parameter analysis runs the example on the worker, and refuses a circuit with one port",
+          "[analysis_controls]") {
+    GUI::Schematic schematic;
+    OpenExample(schematic, "s_parameters_lc_low_pass.imcsim");
+    GUI::AnalysisControls controls(schematic);
+    CHECK(schematic.GetSimulationSettings().Selected == GUI::Analysis::S_PARAMETERS);
+    RunAndWait(controls);
+    REQUIRE(schematic.GetSParameters().has_value());
+    CHECK(schematic.GetSParameters()->GetPortCount() == 2);
+    CHECK(controls.GetLastRun() == GUI::Analysis::S_PARAMETERS);
+    CHECK(controls.GetOutcome(GUI::Analysis::S_PARAMETERS) == GUI::RunOutcome::SUCCEEDED);
+
+    // Turning a port off leaves one; the run is refused before ngspice, which a single port would stop for good
+    for (const auto &element : schematic.GetElements()) {
+        if (element->GetComponent().GetType() == Core::ComponentType::PIN) {
+            auto &marker = static_cast<Core::SubcircuitPinMarker &>(element->GetComponent());
+            Core::PortSettings port = marker.GetPort();
+            port.IsPort = port.Number == 1;
+            marker.SetPort(port);
+        }
+    }
+    schematic.MarkModified();
+    RunAndWait(controls);
+    CHECK(controls.GetOutcome(GUI::Analysis::S_PARAMETERS) == GUI::RunOutcome::FAILED);
+    REQUIRE(controls.GetError(GUI::Analysis::S_PARAMETERS).has_value());
+    CHECK(controls.GetError(GUI::Analysis::S_PARAMETERS)->contains("at least two S-parameter ports"));
+    CHECK_FALSE(schematic.GetSParameters().has_value());
+    // The library was not stopped: the operating point still runs
+    Select(schematic, GUI::Analysis::OPERATING_POINT);
+    RunAndWait(controls);
+    CHECK(controls.GetOutcome(GUI::Analysis::OPERATING_POINT) != GUI::RunOutcome::FAILED);
+    CHECK(schematic.GetOperatingPoint().has_value());
 }

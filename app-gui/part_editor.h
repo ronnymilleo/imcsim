@@ -23,6 +23,7 @@
 #include "components/seven_segment.h"
 #include "components/source.h"
 #include "components/subcircuit.h"
+#include "components/subcircuit_pin.h"
 #include "components/switch.h"
 #include "components/transformer.h"
 #include "components/voltage_controlled_switch.h"
@@ -76,6 +77,8 @@ private:
     ValueField m_InitialCondition;
     /// Percent the value may be off in a Monte Carlo run; empty when the part keeps its value.
     ValueField m_Tolerance;
+    /// Reference impedance of the pin marker that is an S-parameter port.
+    ValueField m_PortReference;
     /// The net name being typed for a net label.
     std::array<char, 40> m_Net{};
     /// The name being typed for the part, applied when the field is left.
@@ -131,6 +134,7 @@ private:
     bool DrawModeledPart(Core::Component &component);
     bool DrawSettingPart(Core::Component &component);
     void DrawSubcircuit(Core::SubcircuitInstance &instance);
+    void DrawPortSettings(Core::SubcircuitPinMarker &marker);
     void DrawValue(Core::Component &component);
     bool DrawParameterChoice(Core::Component &component);
     void DrawInitialCondition(Core::Component &component);

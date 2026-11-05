@@ -11,6 +11,7 @@
 #include "ngspice/ngspice_readers.h"
 #include "simulation/live_change.h"
 #include "simulation/pole_zero.h"
+#include "simulation/s_parameters.h"
 #include "spice/spice_value.h"
 #include <algorithm>
 #include <chrono>
@@ -358,7 +359,7 @@ const BackendCapabilities &NgspiceBackend::GetCapabilities() const {
     std::call_once(m_CapabilitiesReady, [this] {
         m_Capabilities = {.Analyses = {AnalysisKind::OPERATING_POINT, AnalysisKind::TRANSIENT, AnalysisKind::AC_SWEEP,
                                        AnalysisKind::DC_SWEEP, AnalysisKind::NOISE, AnalysisKind::TRANSFER_FUNCTION,
-                                       AnalysisKind::SENSITIVITY, AnalysisKind::POLE_ZERO},
+                                       AnalysisKind::SENSITIVITY, AnalysisKind::POLE_ZERO, AnalysisKind::S_PARAMETERS},
                           .UnsupportedParts = {},
                           .UnsupportedPartsByAnalysis = {}};
         // The digital models allocate nodes while ngspice sets up the sensitivity analysis, which it cannot recover
@@ -371,6 +372,9 @@ const BackendCapabilities &NgspiceBackend::GetCapabilities() const {
                     "ngspice cannot run a sensitivity analysis on logic gates and flip-flops";
                 m_Capabilities.UnsupportedPartsByAnalysis[AnalysisKind::POLE_ZERO][type] =
                     "ngspice finds no poles or zeros through digital parts";
+                m_Capabilities.UnsupportedPartsByAnalysis[AnalysisKind::S_PARAMETERS][type] =
+                    "S-parameters are small-signal, and the digital parts of ngspice have no small-signal model: "
+                    "they would hold their nodes at fixed levels";
             }
         }
         if (!AreDigitalModelsAvailable()) {
@@ -560,6 +564,29 @@ PoleZeroRun NgspiceBackend::RunPoleZero(const Circuit &circuit, const PoleZeroSe
         }
     } else if (const std::optional<std::string> warning = FindPoleZeroWarning(run.Messages)) {
         run.Result->Warnings.push_back(*warning);
+    }
+    return run;
+}
+
+/**
+ * @brief   Measures the scattering matrix of the ports of a circuit across frequency.
+ * @param[in] circuit   Circuit to simulate, already checked: at least two ports, numbered 1 to N.
+ * @param[in] settings  Frequency range and points, already checked.
+ * @return  The matrix at every frequency or an error, plus every line ngspice printed.
+ * @details Each port becomes a 0 V source from its node to ground that carries the port number and reference
+ *          impedance. They are written for this run only, since their reference impedance in series would load the
+ *          circuit in every other analysis. The run leaves out the current probes, which an S-parameter run does not
+ *          read.
+ */
+SParametersRun NgspiceBackend::RunSParameters(const Circuit &circuit, const SParameterSettings &settings) {
+    const std::string analysis =
+        std::format("{}{}", FormatPortSources(circuit.GetPorts()), FormatSParameterAnalysis(settings));
+    SParametersRun run = Simulate<SParameters>(
+        circuit, analysis, "sp", [&circuit] { return ReadSParameters(circuit); }, &RunToTheEnd, false);
+    if (!run.Result) {
+        if (const std::optional<std::string> explanation = DescribeSParameterFailure(run.Messages)) {
+            run.Result = std::unexpected(*explanation);
+        }
     }
     return run;
 }

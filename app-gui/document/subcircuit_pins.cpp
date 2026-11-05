@@ -5,6 +5,8 @@
 
 #include "document/subcircuit_pins.h"
 
+#include "components/subcircuit_pin.h"
+#include <algorithm>
 #include <map>
 #include <set>
 #include <utility>
@@ -130,6 +132,39 @@ std::optional<Core::PinSide> ParsePinSide(const std::string_view name) {
         }
     }
     return std::nullopt;
+}
+
+/**
+ * @brief   Tells whether another pin marker of the schematic is an S-parameter port with this number.
+ * @param[in] elements  Elements of the schematic.
+ * @param[in] number    Port number to look for.
+ * @param[in] except    Marker to leave out, the one being edited, or null.
+ * @return  True when a marker other than except is a port with that number.
+ */
+bool IsPortNumberTaken(const std::vector<std::unique_ptr<UIElement>> &elements, const int number,
+                       const Core::Component *except) {
+    return std::ranges::any_of(elements, [number, except](const std::unique_ptr<UIElement> &element) {
+        const Core::Component &component = element->GetComponent();
+        if (&component == except || !Core::IsSubcircuitPin(component.GetType())) {
+            return false;
+        }
+        const Core::PortSettings &port = static_cast<const Core::SubcircuitPinMarker &>(component).GetPort();
+        return port.IsPort && port.Number == number;
+    });
+}
+
+/**
+ * @brief   Finds the number a new port should take: the lowest one no other port has, so the numbers stay 1 to N.
+ * @param[in] elements  Elements of the schematic.
+ * @param[in] except    Marker to leave out, the one being edited, or null.
+ * @return  The lowest number from 1 that no other marker uses.
+ */
+int FindFreePortNumber(const std::vector<std::unique_ptr<UIElement>> &elements, const Core::Component *except) {
+    int number = 1;
+    while (IsPortNumberTaken(elements, number, except)) {
+        ++number;
+    }
+    return number;
 }
 
 /**

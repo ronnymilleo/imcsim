@@ -36,6 +36,7 @@ enum class AnalysisKind {
     TRANSFER_FUNCTION,
     SENSITIVITY,
     POLE_ZERO,
+    S_PARAMETERS,
     TRUTH_TABLE
 };
 
@@ -162,6 +163,13 @@ public:
      * @return  The poles and zeros, or an error, plus the messages of the backend.
      */
     virtual PoleZeroRun RunPoleZero(const Circuit &circuit, const PoleZeroSettings &settings) = 0;
+    /**
+     * @brief   Measures the scattering matrix of the ports of a circuit across frequency.
+     * @param[in] circuit   Circuit to simulate, already checked: it holds at least two ports, numbered 1 to N.
+     * @param[in] settings  Frequency range and points, already checked.
+     * @return  The matrix at every frequency or an error, plus the messages of the backend.
+     */
+    virtual SParametersRun RunSParameters(const Circuit &circuit, const SParameterSettings &settings) = 0;
 };
 
 // Backend in use

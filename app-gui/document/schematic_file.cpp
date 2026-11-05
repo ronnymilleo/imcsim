@@ -21,6 +21,7 @@
 #include "components/seven_segment.h"
 #include "components/source.h"
 #include "components/subcircuit.h"
+#include "components/subcircuit_pin.h"
 #include "components/switch.h"
 #include "components/transformer.h"
 #include "components/voltage_controlled_switch.h"
@@ -248,6 +249,12 @@ constexpr auto AC_SWEEP_KEYS = std::to_array<ParameterKey<Core::ACSweepSettings>
     {"stop", &Core::ACSweepSettings::StopFrequency},
 });
 
+/// The sweep type and the points are written and read apart.
+constexpr auto S_PARAMETER_KEYS = std::to_array<ParameterKey<Core::SParameterSettings>>({
+    {"start", &Core::SParameterSettings::StartFrequency},
+    {"stop", &Core::SParameterSettings::StopFrequency},
+});
+
 constexpr auto PARAMETER_STEP_KEYS = std::to_array<ParameterKey<ParameterStepSettings>>({
     {"start", &ParameterStepSettings::Start},
     {"stop", &ParameterStepSettings::Stop},
@@ -440,6 +447,15 @@ void WriteModelFields(const Core::Component &component, nlohmann::json &object) 
 }
 
 /**
+ * @brief   A marker that is a port saves its number and reference impedance; one that is not saves nothing.
+ */
+void WritePortSettings(const Core::PortSettings &port, nlohmann::json &object) {
+    if (port.IsPort) {
+        object["port"] = {{"number", port.Number}, {"z0", port.ReferenceOhms}};
+    }
+}
+
+/**
  * @brief   The state or figures of the other parts that have any.
  */
 void WriteKindFields(const Core::Component &component, nlohmann::json &object) {
@@ -456,6 +472,9 @@ void WriteKindFields(const Core::Component &component, nlohmann::json &object) {
         // A label or pin marker with no name yet is saved without the key
         if (const std::string &net = static_cast<const Core::NetLabel &>(component).GetNet(); !net.empty()) {
             object["net"] = net;
+        }
+        if (Core::IsSubcircuitPin(type)) {
+            WritePortSettings(static_cast<const Core::SubcircuitPinMarker &>(component).GetPort(), object);
         }
     } else if (Core::IsSwitch(type)) {
         object["closed"] = static_cast<const Core::Switch &>(component).IsClosed();
@@ -782,6 +801,24 @@ std::expected<void, std::string> ReadNetName(const nlohmann::json &object, Core:
 }
 
 /**
+ * @brief   A pin marker saved without a port is no port.
+ */
+std::expected<void, std::string> ReadPortSettings(const nlohmann::json &object, Core::Component &component) {
+    if (!Core::IsSubcircuitPin(component.GetType()) || !object.contains("port")) {
+        return {};
+    }
+    const nlohmann::json &port = object["port"];
+    const std::optional<int> number = port.is_object() ? ReadInt(port, "number") : std::nullopt;
+    const std::optional<double> reference = port.is_object() ? ReadNumber(port, "z0") : std::nullopt;
+    if (!number || !reference || *number < 1 || *reference <= 0.0) {
+        return std::unexpected("has an S-parameter port without a valid number and reference impedance");
+    }
+    static_cast<Core::SubcircuitPinMarker &>(component).SetPort(
+        {.IsPort = true, .Number = *number, .ReferenceOhms = *reference});
+    return {};
+}
+
+/**
  * @brief   A switch saved without a state stays open.
  */
 std::expected<void, std::string> ReadSwitchState(const nlohmann::json &object, Core::Component &component) {
@@ -829,7 +866,7 @@ std::expected<void, std::string> ReadLogicInputState(const nlohmann::json &objec
 using StateReader = std::expected<void, std::string> (*)(const nlohmann::json &, Core::Component &);
 
 constexpr auto STATE_READERS = std::to_array<StateReader>(
-    {&ReadControllingCurrent, &ReadNetName, &ReadSwitchState, &ReadWiper, &ReadLogicInputState});
+    {&ReadControllingCurrent, &ReadNetName, &ReadPortSettings, &ReadSwitchState, &ReadWiper, &ReadLogicInputState});
 
 /**
  * @brief   What only some kinds of part carry: the current a controlled source follows, a net name, a switch state, a
@@ -1110,7 +1147,7 @@ nlohmann::json WriteSweepRange(const Core::SweepRange &range) {
 /// File names of the analyses, in the order of the Analysis enum.
 constexpr auto ANALYSIS_KEYS =
     std::to_array<std::string_view>({"operating_point", "transient", "ac_sweep", "dc_sweep", "noise",
-                                     "transfer_function", "sensitivity", "pole_zero", "truth_table"});
+                                     "transfer_function", "sensitivity", "pole_zero", "s_parameters", "truth_table"});
 
 const char *ToFileName(const Core::ToleranceDistribution distribution) {
     return distribution == Core::ToleranceDistribution::UNIFORM ? "uniform" : "gaussian";
@@ -1124,6 +1161,14 @@ std::optional<Core::ToleranceDistribution> ParseDistributionName(const std::stri
         return Core::ToleranceDistribution::UNIFORM;
     }
     return std::nullopt;
+}
+
+nlohmann::json WriteSParameterSettings(const Core::SParameterSettings &settings) {
+    nlohmann::json object = {{"logarithmic", settings.IsLogarithmic},
+                             {"points_per_decade", settings.PointsPerDecade},
+                             {"linear_points", settings.LinearPoints}};
+    WriteParameters(S_PARAMETER_KEYS, settings, object);
+    return object;
 }
 
 nlohmann::json WriteSettings(const SimulationSettings &settings) {
@@ -1178,6 +1223,7 @@ nlohmann::json WriteSettings(const SimulationSettings &settings) {
         {"transfer_function", transfer_function},
         {"sensitivity", sensitivity},
         {"pole_zero", pole_zero},
+        {"s_parameters", WriteSParameterSettings(settings.SParameters)},
         {"truth_table", truth_table},
         {"parameter_step", parameter_step},
         {"monte_carlo", monte_carlo_object},
@@ -1334,6 +1380,38 @@ std::expected<void, std::string> ReadPoleZeroSettings(const nlohmann::json &obje
     return {};
 }
 
+std::expected<void, std::string> ReadSParameterSettings(const nlohmann::json &object, SimulationSettings &settings) {
+    Core::SParameterSettings &range = settings.SParameters;
+    if (const auto read = ReadParameters(S_PARAMETER_KEYS, object, range); !read) {
+        return read;
+    }
+    if (range.StartFrequency <= 0.0 || range.StopFrequency <= 0.0) {
+        return std::unexpected("have a frequency that is not positive");
+    }
+    if (object.contains("logarithmic")) {
+        const std::optional<bool> is_logarithmic = ReadBool(object, "logarithmic");
+        if (!is_logarithmic) {
+            return std::unexpected("have a logarithmic flag that is not true or false");
+        }
+        range.IsLogarithmic = *is_logarithmic;
+    }
+    if (object.contains("points_per_decade")) {
+        const std::optional<int> points = ReadInt(object, "points_per_decade");
+        if (!points || *points < 1) {
+            return std::unexpected("have no valid points_per_decade");
+        }
+        range.PointsPerDecade = *points;
+    }
+    if (object.contains("linear_points")) {
+        const std::optional<int> points = ReadInt(object, "linear_points");
+        if (!points || *points < 3) {
+            return std::unexpected("have no valid linear_points");
+        }
+        range.LinearPoints = *points;
+    }
+    return {};
+}
+
 std::expected<void, std::string> ReadSensitivitySettings(const nlohmann::json &object, SimulationSettings &settings) {
     if (object.contains("output")) {
         const std::optional<GridPoint> output = ReadPoint(object, "output");
@@ -1445,6 +1523,7 @@ constexpr auto ANALYSIS_READERS = std::to_array<AnalysisReader>({
     {"transfer_function", "transfer function", &ReadTransferFunctionSettings},
     {"sensitivity", "sensitivity", &ReadSensitivitySettings},
     {"pole_zero", "pole-zero", &ReadPoleZeroSettings},
+    {"s_parameters", "S-parameter", &ReadSParameterSettings},
     {"truth_table", "truth table", &ReadTruthTableSettings},
     {"parameter_step", "parameter step", &ReadParameterStepSettings},
     {"monte_carlo", "Monte Carlo", &ReadMonteCarloSettings},

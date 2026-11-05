@@ -121,6 +121,27 @@ struct PoleZeroSettings {
     bool operator==(const PoleZeroSettings &) const = default;
 };
 
+/// Default range of the S-parameter analysis, where the parts of a radio-frequency circuit work.
+constexpr double DEFAULT_S_START_FREQUENCY = 1e6;
+constexpr double DEFAULT_S_STOP_FREQUENCY = 1e9;
+
+/**
+ * @struct  SParameterSettings
+ * @brief   Frequency range and resolution of an S-parameter analysis.
+ * @details The ports are the pin markers of the schematic that are set as ports, so there is nothing else to pick. A
+ *          logarithmic sweep takes PointsPerDecade points per decade; a linear one takes LinearPoints points in all,
+ *          both ends included, and at least 3, since ngspice gives one point for two.
+ */
+struct SParameterSettings {
+    double StartFrequency = DEFAULT_S_START_FREQUENCY;
+    double StopFrequency = DEFAULT_S_STOP_FREQUENCY;
+    bool IsLogarithmic = true;
+    int PointsPerDecade = 100;
+    int LinearPoints = 101;
+
+    bool operator==(const SParameterSettings &) const = default;
+};
+
 /**
  * @struct  SensitivitySettings
  * @brief   The node whose DC voltage a sensitivity analysis measures.

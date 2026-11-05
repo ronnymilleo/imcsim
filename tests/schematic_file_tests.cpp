@@ -15,6 +15,7 @@
 #include "components/op_amp.h"
 #include "components/potentiometer.h"
 #include "components/relay.h"
+#include "components/subcircuit_pin.h"
 #include "components/switch.h"
 #include "components/transformer.h"
 #include "components/voltage_controlled_switch.h"
@@ -1208,4 +1209,68 @@ TEST_CASE("The seed is optional in a file and never negative", "[schematic_file]
                        "simulation": {"transient": {"stop": 0.01, "step": 1e-5, "seed": -3}}})");
     CHECK(negative.Warnings.size() == 1);
     CHECK(negative.Settings.Transient.Seed == 0);
+}
+
+TEST_CASE("A pin marker that is an S-parameter port saves its number and reference, and one that is not saves nothing",
+          "[schematic_file]") {
+    std::vector<std::unique_ptr<GUI::UIElement>> elements;
+    elements.push_back(GUI::CreateElement(Core::ComponentType::PIN, {0, 0}, GUI::Rotation::R0));
+    elements.push_back(GUI::CreateElement(Core::ComponentType::PIN, {8, 0}, GUI::Rotation::R180));
+    static_cast<Core::SubcircuitPinMarker &>(elements[0]->GetComponent())
+        .SetPort({.IsPort = true, .Number = 2, .ReferenceOhms = 75.0});
+
+    const std::string text = GUI::SaveSchematic(elements, {}, {}, {});
+    const GUI::LoadedSchematic loaded = LoadOrFail(text);
+    CHECK(loaded.Warnings.empty());
+    REQUIRE(loaded.Elements.size() == 2);
+    const Core::PortSettings &port =
+        static_cast<const Core::SubcircuitPinMarker &>(loaded.Elements[0]->GetComponent()).GetPort();
+    CHECK(port == Core::PortSettings{.IsPort = true, .Number = 2, .ReferenceOhms = 75.0});
+    CHECK_FALSE(static_cast<const Core::SubcircuitPinMarker &>(loaded.Elements[1]->GetComponent()).GetPort().IsPort);
+    // Only the port has the key, so the files of markers that are not ports stay as they were
+    CHECK(text.find("\"port\"") == text.rfind("\"port\""));
+}
+
+TEST_CASE("A port without a positive number and a positive impedance leaves the marker out, with a warning",
+          "[schematic_file]") {
+    for (const char *port : {R"("port": {"number": 0, "z0": 50})", R"("port": {"number": 1, "z0": 0})",
+                             R"("port": {"number": 1})", R"("port": 3)"}) {
+        const GUI::LoadedSchematic loaded =
+            LoadOrFail(Document(std::string(R"({"type":"Pin","x":0,"y":0,"rotation":0,"net":"IN",)") + port + "}", ""));
+        CHECK(loaded.Elements.empty());
+        REQUIRE(loaded.Warnings.size() == 1);
+        CHECK(loaded.Warnings[0].contains("S-parameter port"));
+    }
+}
+
+TEST_CASE("The S-parameter settings load back unchanged", "[schematic_file]") {
+    GUI::SimulationSettings settings;
+    settings.SParameters = {
+        .StartFrequency = 2e6, .StopFrequency = 3e9, .IsLogarithmic = false, .PointsPerDecade = 7, .LinearPoints = 55};
+    settings.Selected = GUI::Analysis::S_PARAMETERS;
+    const GUI::LoadedSchematic loaded = LoadOrFail(GUI::SaveSchematic({}, {}, settings, {}));
+    CHECK(loaded.Warnings.empty());
+    CHECK(loaded.Settings == settings);
+    CHECK(loaded.Settings.Selected == GUI::Analysis::S_PARAMETERS);
+}
+
+TEST_CASE("Invalid S-parameter settings fall back to their defaults with a warning", "[schematic_file]") {
+    for (const char *settings : {R"({"start": -1, "stop": 1e9})", R"({"points_per_decade": 0})",
+                                 R"({"linear_points": 2})", R"({"logarithmic": "yes"})"}) {
+        const std::string text = std::string(R"({"format": "imcsim-schematic", "version": 1, "simulation": {)"
+                                             R"("s_parameters": )") +
+                                 settings + "}}";
+        const GUI::LoadedSchematic loaded = LoadOrFail(text);
+        CHECK(loaded.Warnings.size() == 1);
+        CHECK(loaded.Settings.SParameters == Core::SParameterSettings{});
+    }
+}
+
+TEST_CASE("A file saved before the S-parameter analysis loads it as its defaults", "[schematic_file]") {
+    const std::string text = R"({"format": "imcsim-schematic", "version": 1, "simulation": {)"
+                             R"("analysis": "pole_zero", "pole_zero": {}}})";
+    const GUI::LoadedSchematic loaded = LoadOrFail(text);
+    CHECK(loaded.Warnings.empty());
+    CHECK(loaded.Settings.Selected == GUI::Analysis::POLE_ZERO);
+    CHECK(loaded.Settings.SParameters == Core::SParameterSettings{});
 }
