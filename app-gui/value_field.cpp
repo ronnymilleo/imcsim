@@ -5,10 +5,10 @@
 
 #include "value_field.h"
 
+#include "drawing/theme.h"
 #include "imgui.h"
 #include "imgui_internal.h"
-#include "spice_value.h"
-#include "theme.h"
+#include "spice/spice_value.h"
 #include <utility>
 
 namespace GUI {
@@ -19,8 +19,11 @@ namespace {
 constexpr float LABEL_WIDTH = 8.0f;
 constexpr float INPUT_WIDTH = 8.0f;
 
-// +1 for one standard value up and -1 for one down, from the arrow keys while the input is active and from the mouse
-// wheel over it; 0 when the user did neither this frame. Call right after the input
+/**
+ * @brief   +1 for one standard value up and -1 for one down, from the arrow keys while the input is active and from the
+ *          mouse wheel over it; 0 when the user did neither this frame.
+ * @details Call right after the input.
+ */
 int ReadStepFromInput() {
     if (ImGui::IsItemActive()) {
         if (ImGui::IsKeyPressed(ImGuiKey_UpArrow)) {
@@ -37,7 +40,10 @@ int ReadStepFromInput() {
     return 0;
 }
 
-// The two buttons that step through the series: +1 for the up one and -1 for the down one, 0 when none was clicked
+/**
+ * @brief   The two buttons that step through the series: +1 for the up one and -1 for the down one, 0 when none was
+ *          clicked.
+ */
 int DrawStepButtons() {
     int step = 0;
     ImGui::SameLine();

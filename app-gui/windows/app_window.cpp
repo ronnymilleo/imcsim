@@ -3,7 +3,7 @@
  * @brief   Base class for the dockable ImGui windows of the application.
  */
 
-#include "app_window.h"
+#include "windows/app_window.h"
 
 #include "imgui_internal.h"
 #include <utility>
@@ -12,8 +12,11 @@ namespace GUI {
 
 namespace {
 
-// A dock node selects every tab added to it on its next update. Adding the tab of the current window now, in the
-// frame it docks, leaves nothing new for that update, so the selected tab stays in front
+/**
+ * @brief   A dock node selects every tab added to it on its next update.
+ * @details Adding the tab of the current window now, in the frame it docks, leaves nothing new for that update, so the
+ *          selected tab stays in front.
+ */
 void KeepTabBehind() {
     ImGuiWindow *window = ImGui::GetCurrentWindow();
     const ImGuiDockNode *node = window->DockNode;

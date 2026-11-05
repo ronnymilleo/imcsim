@@ -7,7 +7,7 @@
 #define IMCSIM_TEST_PRINTERS_H
 
 #include "helpers.h"
-#include "live_change.h"
+#include "simulation/live_change.h"
 #include "ui_elements/ui_wire.h"
 #include <catch2/catch_tostring.hpp>
 #include <format>

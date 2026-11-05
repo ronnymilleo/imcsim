@@ -3,7 +3,7 @@
  * @brief   An independent voltage source in the simulation model.
  */
 
-#include "voltage_source.h"
+#include "components/voltage_source.h"
 #include <memory>
 
 namespace Core {

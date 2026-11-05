@@ -3,7 +3,7 @@
  * @brief   Schematic symbol of a diode, a Zener diode or an LED.
  */
 
-#include "ui_diode.h"
+#include "ui_elements/ui_diode.h"
 
 #include "components/diode.h"
 #include <memory>
@@ -12,17 +12,18 @@ namespace GUI {
 
 namespace {
 
-// The triangle spans x = -0.5 to 0.5 and the bar sits at its tip
+/// The triangle spans x = -0.5 to 0.5 and the bar sits at its tip.
 constexpr float BODY_HALF_LENGTH = 0.5f;
 constexpr float BODY_HALF_HEIGHT = 0.6f;
 constexpr float ZENER_WING_SIZE = 0.15f;
-// LED arrows leave the upper side of the triangle at 45 degrees
+/// LED arrows leave the upper side of the triangle at 45 degrees.
 constexpr float ARROW_LENGTH = 0.4f;
 constexpr float ARROW_HEAD_SIZE = 0.15f;
 constexpr ImVec2 FIRST_ARROW_START = {-0.2f, -0.7f};
 constexpr ImVec2 SECOND_ARROW_START = {0.15f, -0.7f};
-// Labels clear the tallest part of the symbol, the arrows for an LED
+/// Labels clear the tallest part of the symbol.
 constexpr float LABEL_OFFSET = 1.0f;
+/// The name of an LED clears its arrows.
 constexpr float LED_NAME_OFFSET = 1.3f;
 
 } // namespace

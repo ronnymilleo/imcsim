@@ -3,7 +3,7 @@
  * @brief   A logic input that drives a digital circuit high or low, in the simulation model.
  */
 
-#include "logic_input.h"
+#include "components/logic_input.h"
 #include <memory>
 
 namespace Core {

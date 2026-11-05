@@ -3,7 +3,7 @@
  * @brief   Tests for reading and writing component values with scale suffixes.
  */
 
-#include "spice_value.h"
+#include "spice/spice_value.h"
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>

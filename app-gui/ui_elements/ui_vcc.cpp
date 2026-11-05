@@ -3,10 +3,10 @@
  * @brief   Schematic symbol of a VCC supply rail.
  */
 
-#include "ui_vcc.h"
+#include "ui_elements/ui_vcc.h"
 
 #include "components/vcc.h"
-#include "spice_value.h"
+#include "spice/spice_value.h"
 #include <format>
 #include <memory>
 #include <string>
@@ -17,7 +17,7 @@ namespace {
 
 constexpr float LEAD_LENGTH = 1.0f;
 constexpr float BAR_HALF_WIDTH = 0.6f;
-// The label starts a little past the bar
+/// The label starts a little past the bar.
 constexpr float LABEL_OFFSET = 1.2f;
 
 } // namespace
@@ -41,7 +41,9 @@ void UIVCC::DrawSymbol(SchematicCanvas &canvas, const ViewTransform &view, const
                    LocalToScreen(view, BAR_HALF_WIDTH, -LEAD_LENGTH), color, LINE_THICKNESS);
 }
 
-// The rail is labeled by its role and voltage past the bar; the SPICE name (V1) only matters in the netlist
+/**
+ * @brief   The rail is labeled by its role and voltage past the bar; the SPICE name (V1) only matters in the netlist.
+ */
 void UIVCC::DrawLabels(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color) const {
     const std::string label = std::format("VCC {}V", Core::FormatValue(GetComponent().GetValue()));
     DrawLabel(canvas, view, {0.0f, -LABEL_OFFSET}, {0.0f, -1.0f}, label, color);
@@ -51,7 +53,9 @@ std::vector<GridPoint> UIVCC::GetLocalTerminals() const {
     return {{0, 0}};
 }
 
-// The terminal is at the middle of the symbol, and its lead goes up to the bar
+/**
+ * @brief   The terminal is at the middle of the symbol, and its lead goes up to the bar.
+ */
 GridPoint UIVCC::GetLocalTerminalInward(std::size_t /*terminal*/) const {
     return {0, -1};
 }

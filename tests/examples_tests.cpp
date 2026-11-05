@@ -3,16 +3,23 @@
  * @brief   Tests that every example circuit opens cleanly and simulates with its own settings.
  */
 
+#include "analysis/analysis_inputs.h"
+#include "analysis/circuit_snapshot.h"
+#include "analysis/logic_outputs.h"
 #include "components/potentiometer.h"
+#include "components/seven_segment.h"
 #include "components/source.h"
 #include "components/switch.h"
 #include "digital_models.h"
-#include "examples.h"
-#include "ngspice_library.h"
-#include "schematic.h"
-#include "simulator.h"
+#include "document/examples.h"
+#include "document/schematic.h"
+#include "ngspice/ngspice_library.h"
+#include "plots/logic_trace.h"
+#include "plots/trace_statistics.h"
+#include "simulation/circuit_checks.h"
+#include "simulation/simulation_backend.h"
+#include "simulation/simulator.h"
 #include "test_printers.h"
-#include "trace_statistics.h"
 #include <algorithm>
 #include <array>
 #include <catch2/catch_test_macros.hpp>
@@ -27,7 +34,9 @@
 
 namespace {
 
-// Loads an example into a schematic, as the editor does
+/**
+ * @brief   Loads an example into a schematic, as the editor does.
+ */
 void OpenOrFail(const GUI::Example &example, GUI::Schematic &schematic) {
     auto loaded = GUI::LoadExample(example);
     if (!loaded) {
@@ -41,7 +50,9 @@ void OpenOrFail(const GUI::Example &example, GUI::Schematic &schematic) {
     CHECK(schematic.SaveMeasurements() == loaded->Measurements);
 }
 
-// Opens the example saved in a file of the given name
+/**
+ * @brief   Opens the example saved in a file of the given name.
+ */
 void OpenExample(const std::string_view file_name, GUI::Schematic &schematic) {
     const auto example = std::ranges::find(GUI::GetExamples(), file_name, &GUI::Example::FileName);
     REQUIRE(example != GUI::GetExamples().end());
@@ -54,7 +65,9 @@ std::size_t NodeAt(GUI::Schematic &schematic, const GUI::GridPoint point) {
     return static_cast<std::size_t>(*node);
 }
 
-// Largest magnitude of a waveform, either sign
+/**
+ * @brief   Largest magnitude of a waveform, either sign.
+ */
 double PeakOf(const std::vector<double> &values) {
     return std::abs(std::ranges::max(values, {}, [](const double value) { return std::abs(value); }));
 }
@@ -68,8 +81,9 @@ TEST_CASE("Every example opens without warnings, measures existing traces and ru
         GUI::Schematic schematic;
         OpenOrFail(example, schematic);
         CHECK_FALSE(schematic.GetElements().empty());
-        // The digital examples open everywhere, but run only where ngspice has the digital models
-        if (std::string_view(example.Group) == "Digital" && !Core::AreDigitalModelsAvailable()) {
+        // The examples with logic parts, loose or inside blocks, open everywhere, but run only where ngspice has the
+        // digital models
+        if (Core::FindUnsupported(Core::GetBackend(), schematic.BuildCircuit(), Core::AnalysisKind::TRANSIENT)) {
             continue;
         }
 
@@ -330,14 +344,18 @@ TEST_CASE("The class B stage has a dead zone around zero that the class AB stage
 
 namespace {
 
-// Gain in dB of a node at the sweep point nearest to a frequency
+/**
+ * @brief   Gain in dB of a node at the sweep point nearest to a frequency.
+ */
 double GainAt(const Core::ACSweep &sweep, const std::size_t node, const double frequency) {
     const auto index = static_cast<std::size_t>(std::ranges::lower_bound(sweep.Frequencies, frequency * 0.999) -
                                                 sweep.Frequencies.begin());
     return sweep.NodeMagnitudesDecibels[node][index];
 }
 
-// Runs the AC sweep of an example with its own settings
+/**
+ * @brief   Runs the AC sweep of an example with its own settings.
+ */
 Core::ACSweep SweepOf(GUI::Schematic &schematic) {
     const Core::ACSweepRun run = Core::RunACSweep(schematic.BuildCircuit(), schematic.GetSimulationSettings().ACSweep);
     if (!run.Result) {
@@ -697,14 +715,19 @@ TEST_CASE("The SR latch is set at the start, and with both inputs idle has no op
 
 namespace {
 
-// The voltage of a node at one instant of a transient
+/**
+ * @brief   The voltage of a node at one instant of a transient.
+ */
 double VoltageAt(const Core::Transient &transient, const std::size_t node, const double time) {
     const auto index =
         static_cast<std::size_t>(std::ranges::lower_bound(transient.Times, time) - transient.Times.begin());
     return transient.NodeVoltages[node][index];
 }
 
-// A logic output reads high above 4 V and low below 0.1 V, which a LED load pulls from the full 5 V to about 4.6 V
+/**
+ * @brief   A logic output reads high above 4 V and low below 0.1 V, which a LED load pulls from the full 5 V to about
+ *          4.6 V.
+ */
 void CheckLevel(const Core::Transient &transient, const std::size_t node, const double time, const bool high) {
     INFO(std::format("at {} s", time));
     const double voltage = VoltageAt(transient, node, time);
@@ -913,4 +936,104 @@ TEST_CASE("The precision rectifier passes the positive half of the sine without 
     // The capacitance of the diode lets a few tens of millivolts of the edge through when the op-amp output drops to
     // its negative limit; without the loop the output would not reach the peak by about the diode drop instead
     CHECK(lowest > -0.05);
+}
+
+TEST_CASE("The decoder example varies A0 and A1 only, and each row raises the output they select",
+          "[examples][digital]") {
+    SKIP_WITHOUT_DIGITAL_MODELS();
+    GUI::Schematic schematic;
+    OpenExample("decoder_logic_outputs.imcsim", schematic);
+    const GUI::SimulationSettings &settings = schematic.GetSimulationSettings();
+    CHECK(settings.Selected == GUI::Analysis::TRUTH_TABLE);
+    const Core::Circuit circuit = schematic.BuildCircuit();
+    REQUIRE_FALSE(circuit.HasGround());
+    // V1 drives A0 and V2 drives A1; V3 holds EN high
+    const std::vector<std::string> inputs =
+        GUI::ResolveTruthTableInputs(settings.TruthTableInputs, Core::GetTruthTableInputs(circuit));
+    REQUIRE(inputs == std::vector<std::string>{"V1", "V2"});
+    // The logic outputs read Y0 to Y3 from these points
+    std::vector<int> outputs;
+    for (int output = 0; output < 4; ++output) {
+        outputs.push_back(static_cast<int>(NodeAt(schematic, {17, 4 + 2 * output})));
+    }
+    const Core::TruthTableRun run = Core::RunTruthTable(circuit, {.Inputs = inputs, .OutputNodes = outputs});
+    if (!run.Result) {
+        FAIL(run.Result.error());
+    }
+    REQUIRE(run.Result->Rows.size() == 4);
+    for (std::size_t row = 0; row < run.Result->Rows.size(); ++row) {
+        const Core::TruthTableRow &values = run.Result->Rows[row];
+        REQUIRE(values.HasOperatingPoint());
+        const std::size_t address = (values.InputsHigh[0] ? 1U : 0U) + (values.InputsHigh[1] ? 2U : 0U);
+        for (std::size_t output = 0; output < outputs.size(); ++output) {
+            INFO(std::format("row {} output {}", row, output));
+            CHECK((values.OutputVoltages[output] > 4.0) == (output == address));
+        }
+    }
+}
+
+TEST_CASE("The decade counter counts 0 to 9 and over again, and its display shows the digit", "[examples][digital]") {
+    SKIP_WITHOUT_DIGITAL_MODELS();
+    GUI::Schematic schematic;
+    OpenExample("decade_counter.imcsim", schematic);
+    const Core::TransientRun run = RunExampleTransient(schematic);
+    const Core::Transient &transient = *run.Result;
+    // Q0 to Q3, at the points the example measures
+    const std::array<std::size_t, 4> bits = {NodeAt(schematic, {15, -3}), NodeAt(schematic, {8, 13}),
+                                             NodeAt(schematic, {15, 1}), NodeAt(schematic, {8, 11})};
+    const auto display = std::ranges::find_if(schematic.GetElements(), [](const auto &element) {
+        return element->GetComponent().GetType() == Core::ComponentType::SEVEN_SEGMENT;
+    });
+    REQUIRE(display != schematic.GetElements().end());
+    // Segments a to g of each digit, as the decoder lights them
+    constexpr std::array<std::string_view, 10> DIGITS = {"abcdef", "bc",     "abdeg", "abcdg",   "bcfg",
+                                                         "acdfg",  "acdefg", "abc",   "abcdefg", "abcdfg"};
+    // The clock rises at 0.5 ms and every millisecond after; eleven edges go past nine and back to 0
+    for (int edges = 1; edges <= 11; ++edges) {
+        const double time = 0.5e-3 + static_cast<double>(edges - 1) * 1e-3 + 0.3e-3;
+        const int count = edges % 10;
+        INFO(std::format("{} edges", edges));
+        for (std::size_t bit = 0; bit < bits.size(); ++bit) {
+            const bool expected = ((count >> bit) & 1) != 0;
+            CHECK(
+                (expected ? VoltageAt(transient, bits[bit], time) > 4.0 : VoltageAt(transient, bits[bit], time) < 0.5));
+        }
+        const auto segments =
+            GUI::ReadLogicDisplay(**display, schematic.GetConnectivity(), GUI::SampleTransient(transient, time));
+        std::string lit;
+        for (std::size_t segment = 0; segment < segments.size(); ++segment) {
+            if (segments[segment] == GUI::LogicState::HIGH) {
+                lit += Core::SEGMENT_NAMES[segment];
+            }
+        }
+        CHECK(lit == DIGITS[static_cast<std::size_t>(count)]);
+    }
+}
+
+TEST_CASE("The 8-bit counter of two nested 4-bit blocks carries into its high nibble", "[examples][digital]") {
+    SKIP_WITHOUT_DIGITAL_MODELS();
+    GUI::Schematic schematic;
+    OpenExample("counter_8bit_blocks.imcsim", schematic);
+    const Core::TransientRun run = RunExampleTransient(schematic);
+    const Core::Transient &transient = *run.Result;
+    // Q0 to Q7 on the right of the block, two units apart
+    std::vector<std::size_t> bits;
+    for (int bit = 0; bit < 8; ++bit) {
+        bits.push_back(NodeAt(schematic, {15, 2 * bit - 7}));
+    }
+    // 15, 16 and 17 edges cross the carry from the low nibble to the high one, 39 is the last edge in 40 ms
+    for (const int edges : {1, 2, 15, 16, 17, 39}) {
+        const double time = 0.5e-3 + static_cast<double>(edges - 1) * 1e-3 + 0.3e-3;
+        int count = 0;
+        for (std::size_t bit = 0; bit < bits.size(); ++bit) {
+            count |= VoltageAt(transient, bits[bit], time) > 4.0 ? 1 << bit : 0;
+        }
+        CHECK(count == edges);
+    }
+    CHECK(schematic.GetBuses().size() == 1);
+    // The pins of the block reach flip-flops two levels down, so the plot draws them as logic lanes
+    const std::vector<GUI::LogicNode> logic_nodes = GUI::FindLogicNodes(schematic.BuildCircuit());
+    for (const std::size_t bit : bits) {
+        CHECK(std::ranges::contains(logic_nodes, static_cast<int>(bit), &GUI::LogicNode::Node));
+    }
 }

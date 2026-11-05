@@ -3,7 +3,7 @@
  * @brief   Tests for the part names and the part search.
  */
 
-#include "element_factory.h"
+#include "editing/element_factory.h"
 #include <algorithm>
 #include <catch2/catch_test_macros.hpp>
 #include <string>
@@ -42,7 +42,7 @@ TEST_CASE("FindParts ignores case, spaces and punctuation", "[element_factory]")
     }
     SECTION("an empty query lists every part") {
         const std::vector<ComponentType> all = GUI::FindParts("");
-        CHECK(all.size() == 41);
+        CHECK(all.size() == 43);
         CHECK(std::ranges::contains(all, ComponentType::RESISTOR));
         CHECK(std::ranges::contains(all, ComponentType::CLOCK));
         CHECK(std::ranges::contains(all, ComponentType::LOGIC_INPUT));

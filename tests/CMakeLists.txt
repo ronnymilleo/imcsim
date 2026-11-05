@@ -13,11 +13,13 @@ add_executable(imcsim-tests
             circuit_checks_tests.cpp
             circuit_copy_tests.cpp
             circuit_snapshot_tests.cpp
+            block_nesting_tests.cpp
             clipboard_tests.cpp
             code_models.cpp
             circuit_tests.cpp
             component_tests.cpp
             connectivity_tests.cpp
+            editor_mode_tests.cpp
             element_factory_tests.cpp
             current_flow_tests.cpp
             examples_tests.cpp
@@ -27,9 +29,12 @@ add_executable(imcsim-tests
             led_glow_tests.cpp
             live_change_tests.cpp
             live_input_tests.cpp
+            logic_bus_tests.cpp
+            logic_outputs_tests.cpp
             logic_trace_tests.cpp
             math_channel_tests.cpp
             parameter_step_tests.cpp
+            part_names_tests.cpp
             playback_tests.cpp
             plot_export_tests.cpp
             plot_helpers_tests.cpp
@@ -37,14 +42,17 @@ add_executable(imcsim-tests
             preferences_tests.cpp
             probing_tests.cpp
             schematic_canvas_tests.cpp
+            ready_blocks_tests.cpp
             schematic_file_tests.cpp
             schematic_tests.cpp
             selection_tests.cpp
+            seven_segment_tests.cpp
             simulation_backend_tests.cpp
             simulation_service_tests.cpp
             simulator_tests.cpp
             spectrum_tests.cpp
             spice_import_tests.cpp
+            spice_inclusions_tests.cpp
             spice_library_tests.cpp
             spice_value_tests.cpp
             standard_values_tests.cpp
@@ -60,6 +68,7 @@ add_executable(imcsim-tests
             ui_element_tests.cpp
             ui_wire_tests.cpp
             wire_editing_tests.cpp
+            wire_routing_tests.cpp
 )
 
 target_include_directories(imcsim-tests

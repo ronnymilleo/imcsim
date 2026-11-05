@@ -3,7 +3,7 @@
  * @brief   Geometry and drawing shared by the schematic symbols of three-terminal transistors.
  */
 
-#include "ui_transistor.h"
+#include "ui_elements/ui_transistor.h"
 
 #include <cmath>
 #include <utility>
@@ -14,7 +14,7 @@ namespace {
 
 constexpr float LABEL_OFFSET_X = 1.3f;
 constexpr float LABEL_OFFSET_Y = 0.5f;
-// Bounds reach a little past the right-hand leads, where the terminals sit
+/// Bounds reach a little past the right-hand leads, where the terminals sit.
 constexpr float BOUNDS_RIGHT = 1.2f;
 constexpr float ARROW_HEAD_LENGTH = 0.3f;
 constexpr float ARROW_HEAD_HALF_WIDTH = 0.15f;

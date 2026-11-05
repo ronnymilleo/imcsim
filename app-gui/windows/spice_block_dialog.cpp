@@ -3,14 +3,14 @@
  * @brief   The dialogs of blocks kept as SPICE text: picking what to import from a library, and their pin settings.
  */
 
-#include "spice_block_dialog.h"
+#include "windows/spice_block_dialog.h"
 
+#include "document/spice_import.h"
+#include "document/subcircuit_pins.h"
+#include "drawing/theme.h"
 #include "imgui.h"
 #include "misc/cpp/imgui_stdlib.h"
-#include "spice_import.h"
-#include "spice_value.h"
-#include "subcircuit_pins.h"
-#include "theme.h"
+#include "spice/spice_value.h"
 #include <algorithm>
 #include <array>
 #include <cfloat>
@@ -31,7 +31,9 @@ constexpr float LIST_HEIGHT = 24.0f;
 constexpr float TEXT_WIDTH = 36.0f;
 constexpr float TEXT_HEIGHT = 12.0f;
 
-// One row per port: the port as the text names it, the pin name and the edge of the box it goes on
+/**
+ * @brief   One row per port: the port as the text names it, the pin name and the edge of the box it goes on.
+ */
 void DrawPinTable(std::vector<SavedSubcircuitPin> &pins, const std::vector<std::string> &ports) {
     const float font_size = ImGui::GetFontSize();
     for (std::size_t index = 0; index < pins.size() && index < ports.size(); ++index) {
@@ -120,7 +122,9 @@ std::optional<SpiceBlockResult> SpiceBlockDialog::Draw() {
     return m_Mode == Mode::IMPORT ? DrawImport() : DrawSettings();
 }
 
-// Every subcircuit of the library with a box to pick it; a picked one shows its pins to name and place
+/**
+ * @brief   Every subcircuit of the library with a box to pick it; a picked one shows its pins to name and place.
+ */
 std::optional<SpiceBlockResult> SpiceBlockDialog::DrawImport() {
     ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
     if (!ImGui::BeginPopupModal(IMPORT_POPUP, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
@@ -168,8 +172,10 @@ std::optional<SpiceBlockResult> SpiceBlockDialog::DrawImport() {
     return result;
 }
 
-// A subcircuit of the library with a box to pick it; once picked, what the vendor says of its ports, its parameters,
-// its warnings and its pins to name and place
+/**
+ * @brief   A subcircuit of the library with a box to pick it; once picked, what the vendor says of its ports, its
+ *          parameters, its warnings and its pins to name and place.
+ */
 void SpiceBlockDialog::DrawSubcircuitChoice(Choice &choice) {
     ImGui::Checkbox(choice.Subcircuit.Name.c_str(), &choice.IsChosen);
     if (!choice.IsChosen) {
@@ -192,7 +198,9 @@ void SpiceBlockDialog::DrawSubcircuitChoice(Choice &choice) {
     ImGui::Unindent();
 }
 
-// The device models of the library, each with a box to pick it
+/**
+ * @brief   The device models of the library, each with a box to pick it.
+ */
 void SpiceBlockDialog::DrawModelChoices() {
     if (m_Models.empty()) {
         return;
@@ -211,7 +219,10 @@ void SpiceBlockDialog::DrawModelChoices() {
     }
 }
 
-// The picked subcircuits as blocks and the picked models; no value when a pin name cannot be kept, which m_Error tells
+/**
+ * @brief   The picked subcircuits as blocks and the picked models; no value when a pin name cannot be kept, which
+ *          m_Error tells.
+ */
 std::optional<SpiceBlockResult> SpiceBlockDialog::TakeChosen() {
     SpiceBlockResult imported;
     for (const Choice &choice : m_Choices) {
@@ -232,7 +243,9 @@ std::optional<SpiceBlockResult> SpiceBlockDialog::TakeChosen() {
     return imported;
 }
 
-// The pins and parameter defaults of the block, and its text, which stays as it came
+/**
+ * @brief   The pins and parameter defaults of the block, and its text, which stays as it came.
+ */
 std::optional<SpiceBlockResult> SpiceBlockDialog::DrawSettings() {
     ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
     if (!ImGui::BeginPopupModal(SETTINGS_POPUP, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {

@@ -3,15 +3,15 @@
  * @brief   Tests for what an analysis takes from the circuit and the stored settings.
  */
 
-#include "analysis_inputs.h"
+#include "analysis/analysis_inputs.h"
 
 #include "components/current_source.h"
 #include "components/ground.h"
 #include "components/logic_input.h"
 #include "components/resistor.h"
 #include "components/voltage_source.h"
-#include "examples.h"
-#include "schematic.h"
+#include "document/examples.h"
+#include "document/schematic.h"
 #include "test_printers.h"
 #include <algorithm>
 #include <catch2/catch_test_macros.hpp>
@@ -21,7 +21,10 @@
 
 namespace {
 
-// Opens the RC low-pass example, whose source drives node 1, its resistor joins nodes 1 and 2, and which measures both
+/**
+ * @brief   Opens the RC low-pass example, whose source drives node 1, its resistor joins nodes 1 and 2, and which
+ *          measures both.
+ */
 void OpenRCFilter(GUI::Schematic &schematic) {
     const auto example = std::ranges::find(GUI::GetExamples(), "rc_low_pass_filter.imcsim", &GUI::Example::FileName);
     REQUIRE(example != GUI::GetExamples().end());

@@ -3,7 +3,7 @@
  * @brief   Window that shows and edits the component selected in the schematic.
  */
 
-#include "properties_window.h"
+#include "windows/properties_window.h"
 
 namespace GUI {
 

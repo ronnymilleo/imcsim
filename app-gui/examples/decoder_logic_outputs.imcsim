@@ -1,0 +1,867 @@
+{
+ "elements": [
+  {
+   "definition": "DECODER_2TO4",
+   "name": "X1",
+   "rotation": 0,
+   "type": "Subcircuit",
+   "x": 9,
+   "y": 7
+  },
+  {
+   "high": false,
+   "name": "V1",
+   "parameters": {
+    "logic_level": 5.0
+   },
+   "rotation": 270,
+   "type": "LogicInput",
+   "x": 2,
+   "y": 5
+  },
+  {
+   "high": false,
+   "name": "V2",
+   "parameters": {
+    "logic_level": 5.0
+   },
+   "rotation": 270,
+   "type": "LogicInput",
+   "x": 2,
+   "y": 7
+  },
+  {
+   "parameters": {
+    "logic_level": 5.0
+   },
+   "rotation": 90,
+   "type": "LogicOutput",
+   "x": 17,
+   "y": 4
+  },
+  {
+   "parameters": {
+    "logic_level": 5.0
+   },
+   "rotation": 90,
+   "type": "LogicOutput",
+   "x": 17,
+   "y": 6
+  },
+  {
+   "parameters": {
+    "logic_level": 5.0
+   },
+   "rotation": 90,
+   "type": "LogicOutput",
+   "x": 17,
+   "y": 8
+  },
+  {
+   "parameters": {
+    "logic_level": 5.0
+   },
+   "rotation": 90,
+   "type": "LogicOutput",
+   "x": 17,
+   "y": 10
+  },
+  {
+   "high": true,
+   "name": "V3",
+   "parameters": {
+    "logic_level": 5.0
+   },
+   "rotation": 270,
+   "type": "LogicInput",
+   "x": 2,
+   "y": 9
+  }
+ ],
+ "format": "imcsim-schematic",
+ "measurements": {
+  "currents": [],
+  "voltages": [
+   [
+    12,
+    4
+   ],
+   [
+    12,
+    6
+   ],
+   [
+    12,
+    8
+   ],
+   [
+    12,
+    10
+   ]
+  ]
+ },
+ "simulation": {
+  "ac_sweep": {
+   "points_per_decade": 20,
+   "start": 1.0,
+   "stop": 1000000.0
+  },
+  "analysis": "truth_table",
+  "dc_sweep": {
+   "step_source": false,
+   "stepped": {
+    "source": "",
+    "start": 0.0,
+    "step": 1.0,
+    "stop": 5.0
+   },
+   "swept": {
+    "source": "",
+    "start": 0.0,
+    "step": 0.1,
+    "stop": 5.0
+   }
+  },
+  "noise": {
+   "points_per_decade": 20,
+   "source": "",
+   "start": 10.0,
+   "stop": 100000.0
+  },
+  "parameter_step": {
+   "enabled": false,
+   "list": "",
+   "part": "",
+   "start": 0.0,
+   "step": 25.0,
+   "stop": 100.0,
+   "uses_list": false
+  },
+  "transfer_function": {
+   "source": ""
+  },
+  "transient": {
+   "live_seconds": 10.0,
+   "step": 1e-05,
+   "stop": 0.01
+  },
+  "truth_table": {
+   "inputs": [
+    "V1",
+    "V2"
+   ]
+  }
+ },
+ "subcircuits": [
+  {
+   "elements": [
+    {
+     "net": "A0",
+     "rotation": 0,
+     "type": "Pin",
+     "x": 0,
+     "y": 0
+    },
+    {
+     "net": "A0",
+     "rotation": 90,
+     "type": "NetLabel",
+     "x": 1,
+     "y": 0
+    },
+    {
+     "net": "A1",
+     "rotation": 0,
+     "type": "Pin",
+     "x": 0,
+     "y": 2
+    },
+    {
+     "net": "A1",
+     "rotation": 90,
+     "type": "NetLabel",
+     "x": 1,
+     "y": 2
+    },
+    {
+     "net": "EN",
+     "rotation": 0,
+     "type": "Pin",
+     "x": 0,
+     "y": 4
+    },
+    {
+     "net": "EN",
+     "rotation": 90,
+     "type": "NetLabel",
+     "x": 1,
+     "y": 4
+    },
+    {
+     "name": "U1",
+     "parameters": {
+      "logic_level": 5.0,
+      "propagation_delay": 1e-08
+     },
+     "rotation": 0,
+     "type": "Not",
+     "x": 14,
+     "y": 8
+    },
+    {
+     "net": "A0",
+     "rotation": 270,
+     "type": "NetLabel",
+     "x": 10,
+     "y": 8
+    },
+    {
+     "net": "A0N",
+     "rotation": 90,
+     "type": "NetLabel",
+     "x": 18,
+     "y": 8
+    },
+    {
+     "name": "U2",
+     "parameters": {
+      "logic_level": 5.0,
+      "propagation_delay": 1e-08
+     },
+     "rotation": 0,
+     "type": "Not",
+     "x": 14,
+     "y": 14
+    },
+    {
+     "net": "A1",
+     "rotation": 270,
+     "type": "NetLabel",
+     "x": 10,
+     "y": 14
+    },
+    {
+     "net": "A1N",
+     "rotation": 90,
+     "type": "NetLabel",
+     "x": 18,
+     "y": 14
+    },
+    {
+     "inputs": 3,
+     "name": "U3",
+     "parameters": {
+      "logic_level": 5.0,
+      "propagation_delay": 1e-08
+     },
+     "rotation": 0,
+     "type": "And",
+     "x": 30,
+     "y": 0
+    },
+    {
+     "net": "A1N",
+     "rotation": 270,
+     "type": "NetLabel",
+     "x": 26,
+     "y": -1
+    },
+    {
+     "net": "A0N",
+     "rotation": 270,
+     "type": "NetLabel",
+     "x": 26,
+     "y": 1
+    },
+    {
+     "net": "EN",
+     "rotation": 270,
+     "type": "NetLabel",
+     "x": 26,
+     "y": 3
+    },
+    {
+     "net": "Y0",
+     "rotation": 90,
+     "type": "NetLabel",
+     "x": 34,
+     "y": 1
+    },
+    {
+     "inputs": 3,
+     "name": "U4",
+     "parameters": {
+      "logic_level": 5.0,
+      "propagation_delay": 1e-08
+     },
+     "rotation": 0,
+     "type": "And",
+     "x": 30,
+     "y": 10
+    },
+    {
+     "net": "A1N",
+     "rotation": 270,
+     "type": "NetLabel",
+     "x": 26,
+     "y": 9
+    },
+    {
+     "net": "A0",
+     "rotation": 270,
+     "type": "NetLabel",
+     "x": 26,
+     "y": 11
+    },
+    {
+     "net": "EN",
+     "rotation": 270,
+     "type": "NetLabel",
+     "x": 26,
+     "y": 13
+    },
+    {
+     "net": "Y1",
+     "rotation": 90,
+     "type": "NetLabel",
+     "x": 34,
+     "y": 11
+    },
+    {
+     "inputs": 3,
+     "name": "U5",
+     "parameters": {
+      "logic_level": 5.0,
+      "propagation_delay": 1e-08
+     },
+     "rotation": 0,
+     "type": "And",
+     "x": 30,
+     "y": 20
+    },
+    {
+     "net": "A1",
+     "rotation": 270,
+     "type": "NetLabel",
+     "x": 26,
+     "y": 19
+    },
+    {
+     "net": "A0N",
+     "rotation": 270,
+     "type": "NetLabel",
+     "x": 26,
+     "y": 21
+    },
+    {
+     "net": "EN",
+     "rotation": 270,
+     "type": "NetLabel",
+     "x": 26,
+     "y": 23
+    },
+    {
+     "net": "Y2",
+     "rotation": 90,
+     "type": "NetLabel",
+     "x": 34,
+     "y": 21
+    },
+    {
+     "inputs": 3,
+     "name": "U6",
+     "parameters": {
+      "logic_level": 5.0,
+      "propagation_delay": 1e-08
+     },
+     "rotation": 0,
+     "type": "And",
+     "x": 30,
+     "y": 30
+    },
+    {
+     "net": "A1",
+     "rotation": 270,
+     "type": "NetLabel",
+     "x": 26,
+     "y": 29
+    },
+    {
+     "net": "A0",
+     "rotation": 270,
+     "type": "NetLabel",
+     "x": 26,
+     "y": 31
+    },
+    {
+     "net": "EN",
+     "rotation": 270,
+     "type": "NetLabel",
+     "x": 26,
+     "y": 33
+    },
+    {
+     "net": "Y3",
+     "rotation": 90,
+     "type": "NetLabel",
+     "x": 34,
+     "y": 31
+    },
+    {
+     "net": "Y0",
+     "rotation": 180,
+     "type": "Pin",
+     "x": 44,
+     "y": 0
+    },
+    {
+     "net": "Y0",
+     "rotation": 270,
+     "type": "NetLabel",
+     "x": 43,
+     "y": 0
+    },
+    {
+     "net": "Y1",
+     "rotation": 180,
+     "type": "Pin",
+     "x": 44,
+     "y": 2
+    },
+    {
+     "net": "Y1",
+     "rotation": 270,
+     "type": "NetLabel",
+     "x": 43,
+     "y": 2
+    },
+    {
+     "net": "Y2",
+     "rotation": 180,
+     "type": "Pin",
+     "x": 44,
+     "y": 4
+    },
+    {
+     "net": "Y2",
+     "rotation": 270,
+     "type": "NetLabel",
+     "x": 43,
+     "y": 4
+    },
+    {
+     "net": "Y3",
+     "rotation": 180,
+     "type": "Pin",
+     "x": 44,
+     "y": 6
+    },
+    {
+     "net": "Y3",
+     "rotation": 270,
+     "type": "NetLabel",
+     "x": 43,
+     "y": 6
+    }
+   ],
+   "name": "DECODER_2TO4",
+   "parameters": [],
+   "pins": [
+    {
+     "name": "A0",
+     "point": [
+      0,
+      0
+     ]
+    },
+    {
+     "name": "A1",
+     "point": [
+      0,
+      2
+     ]
+    },
+    {
+     "name": "EN",
+     "point": [
+      0,
+      4
+     ]
+    },
+    {
+     "name": "Y0",
+     "point": [
+      44,
+      0
+     ]
+    },
+    {
+     "name": "Y1",
+     "point": [
+      44,
+      2
+     ]
+    },
+    {
+     "name": "Y2",
+     "point": [
+      44,
+      4
+     ]
+    },
+    {
+     "name": "Y3",
+     "point": [
+      44,
+      6
+     ]
+    }
+   ],
+   "wires": [
+    {
+     "end": [
+      1,
+      0
+     ],
+     "start": [
+      0,
+      0
+     ]
+    },
+    {
+     "end": [
+      1,
+      2
+     ],
+     "start": [
+      0,
+      2
+     ]
+    },
+    {
+     "end": [
+      1,
+      4
+     ],
+     "start": [
+      0,
+      4
+     ]
+    },
+    {
+     "end": [
+      10,
+      8
+     ],
+     "start": [
+      11,
+      8
+     ]
+    },
+    {
+     "end": [
+      18,
+      8
+     ],
+     "start": [
+      17,
+      8
+     ]
+    },
+    {
+     "end": [
+      10,
+      14
+     ],
+     "start": [
+      11,
+      14
+     ]
+    },
+    {
+     "end": [
+      18,
+      14
+     ],
+     "start": [
+      17,
+      14
+     ]
+    },
+    {
+     "end": [
+      26,
+      -1
+     ],
+     "start": [
+      27,
+      -1
+     ]
+    },
+    {
+     "end": [
+      26,
+      1
+     ],
+     "start": [
+      27,
+      1
+     ]
+    },
+    {
+     "end": [
+      26,
+      3
+     ],
+     "start": [
+      27,
+      3
+     ]
+    },
+    {
+     "end": [
+      34,
+      1
+     ],
+     "start": [
+      33,
+      1
+     ]
+    },
+    {
+     "end": [
+      26,
+      9
+     ],
+     "start": [
+      27,
+      9
+     ]
+    },
+    {
+     "end": [
+      26,
+      11
+     ],
+     "start": [
+      27,
+      11
+     ]
+    },
+    {
+     "end": [
+      26,
+      13
+     ],
+     "start": [
+      27,
+      13
+     ]
+    },
+    {
+     "end": [
+      34,
+      11
+     ],
+     "start": [
+      33,
+      11
+     ]
+    },
+    {
+     "end": [
+      26,
+      19
+     ],
+     "start": [
+      27,
+      19
+     ]
+    },
+    {
+     "end": [
+      26,
+      21
+     ],
+     "start": [
+      27,
+      21
+     ]
+    },
+    {
+     "end": [
+      26,
+      23
+     ],
+     "start": [
+      27,
+      23
+     ]
+    },
+    {
+     "end": [
+      34,
+      21
+     ],
+     "start": [
+      33,
+      21
+     ]
+    },
+    {
+     "end": [
+      26,
+      29
+     ],
+     "start": [
+      27,
+      29
+     ]
+    },
+    {
+     "end": [
+      26,
+      31
+     ],
+     "start": [
+      27,
+      31
+     ]
+    },
+    {
+     "end": [
+      26,
+      33
+     ],
+     "start": [
+      27,
+      33
+     ]
+    },
+    {
+     "end": [
+      34,
+      31
+     ],
+     "start": [
+      33,
+      31
+     ]
+    },
+    {
+     "end": [
+      43,
+      0
+     ],
+     "start": [
+      44,
+      0
+     ]
+    },
+    {
+     "end": [
+      43,
+      2
+     ],
+     "start": [
+      44,
+      2
+     ]
+    },
+    {
+     "end": [
+      43,
+      4
+     ],
+     "start": [
+      44,
+      4
+     ]
+    },
+    {
+     "end": [
+      43,
+      6
+     ],
+     "start": [
+      44,
+      6
+     ]
+    }
+   ]
+  }
+ ],
+ "version": 1,
+ "wires": [
+  {
+   "end": [
+    17,
+    4
+   ],
+   "start": [
+    12,
+    4
+   ]
+  },
+  {
+   "end": [
+    17,
+    10
+   ],
+   "start": [
+    12,
+    10
+   ]
+  },
+  {
+   "end": [
+    17,
+    8
+   ],
+   "start": [
+    12,
+    8
+   ]
+  },
+  {
+   "end": [
+    17,
+    6
+   ],
+   "start": [
+    12,
+    6
+   ]
+  },
+  {
+   "end": [
+    2,
+    9
+   ],
+   "start": [
+    6,
+    9
+   ]
+  },
+  {
+   "end": [
+    2,
+    7
+   ],
+   "start": [
+    6,
+    7
+   ]
+  },
+  {
+   "end": [
+    6,
+    5
+   ],
+   "start": [
+    2,
+    5
+   ]
+  }
+ ]
+}

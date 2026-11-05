@@ -3,7 +3,7 @@
  * @brief   A transformer in the simulation model: two coupled inductors.
  */
 
-#include "transformer.h"
+#include "components/transformer.h"
 #include <memory>
 
 namespace Core {

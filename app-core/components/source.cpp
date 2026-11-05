@@ -4,9 +4,9 @@
  *          piecewise linear waveform, shared by voltage and current sources.
  */
 
-#include "source.h"
+#include "components/source.h"
 
-#include "spice_value.h"
+#include "spice/spice_value.h"
 #include <cstddef>
 #include <format>
 
@@ -14,7 +14,9 @@ namespace Core {
 
 namespace {
 
-// Splits a text of "time value" pairs on commas and whitespace
+/**
+ * @brief   Splits a text of "time value" pairs on commas and whitespace.
+ */
 std::vector<std::string_view> SplitPWLTokens(const std::string_view text) {
     std::vector<std::string_view> tokens;
     std::string_view rest = text;

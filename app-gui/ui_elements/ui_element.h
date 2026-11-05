@@ -7,9 +7,9 @@
 #define IMCSIM_UI_ELEMENT_H
 
 #include "components/component.h"
+#include "drawing/schematic_canvas.h"
 #include "helpers.h"
 #include "imgui.h"
-#include "schematic_canvas.h"
 #include <memory>
 #include <string>
 #include <vector>
@@ -32,6 +32,15 @@ enum class SymbolStyle {
  * @brief   Axis-aligned box around a symbol, in local grid units before rotation.
  */
 struct LocalBounds {
+    ImVec2 Min;
+    ImVec2 Max;
+};
+
+/**
+ * @struct  WorldBounds
+ * @brief   Axis-aligned box around a placed symbol, terminals included, in world grid units.
+ */
+struct WorldBounds {
     ImVec2 Min;
     ImVec2 Max;
 };
@@ -68,11 +77,19 @@ public:
     std::vector<GridPoint> GetTerminals() const;
     GridPoint GetTerminalInward(std::size_t terminal) const;
     bool Contains(ImVec2 world_pos) const;
+    WorldBounds GetWorldBounds() const;
     bool Intersects(ImVec2 min, ImVec2 max) const;
 
 protected:
     // Parts of the symbol, in the order Draw() draws them
     virtual void DrawTerminals(SchematicCanvas &canvas, const ViewTransform &view, ImU32 color) const;
+    /**
+     * @brief   Draws the body of the symbol between the leads, in local grid units.
+     * @param[in,out] canvas Where it is drawn: the editor window or an exported image.
+     * @param[in] view       Transform of the current frame.
+     * @param[in] color      Line color, so the same element can be drawn as a placement preview.
+     * @param[in] style      Drawing standard for the symbol; parts drawn alike in both ignore it.
+     */
     virtual void DrawSymbol(SchematicCanvas &canvas, const ViewTransform &view, ImU32 color,
                             SymbolStyle style) const = 0;
     virtual void DrawLabels(SchematicCanvas &canvas, const ViewTransform &view, ImU32 color) const;

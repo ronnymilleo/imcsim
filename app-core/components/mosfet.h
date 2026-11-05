@@ -6,7 +6,7 @@
 #ifndef IMCSIM_MOSFET_H
 #define IMCSIM_MOSFET_H
 
-#include "component.h"
+#include "components/component.h"
 #include <memory>
 #include <span>
 #include <string>
@@ -87,7 +87,7 @@ public:
     std::string GetSpiceModelName() const;
 
 private:
-    // Null when the transistor uses its custom parameters
+    /// Null when the transistor uses its custom parameters.
     const MOSFETModel *m_Model;
     MOSFETParameters m_CustomParameters;
 };

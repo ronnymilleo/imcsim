@@ -6,7 +6,7 @@
 #ifndef IMCSIM_CONTROLLED_SOURCE_H
 #define IMCSIM_CONTROLLED_SOURCE_H
 
-#include "component.h"
+#include "components/component.h"
 #include <memory>
 #include <string>
 

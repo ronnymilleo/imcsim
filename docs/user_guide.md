@@ -13,6 +13,11 @@ How to read what imcsim measures, plots and exports. The [README](../README.md) 
   editing its main value right away: `4k7` and Enter make a resistor 4.7k. Values take SPICE suffixes, and a whole
   number may put its decimals after the suffix, as resistor codes do (`4k7`, `2M2`, `3u3`). View > Properties keeps
   the same fields in a docked window.
+- **Renaming a part**: the Name field of its properties takes a new name when you press Enter or click away. The name
+  keeps the letter the part starts with, which tells ngspice what the part is (`R` for a resistor, `X` for a block,
+  `U` for a gate), then letters, digits or `_`, such as `RLOAD` or `XCOUNT`; no two parts may share a name, whatever
+  its case. A name that cannot be used says why and the part keeps its own. The measured current of the part, a
+  controlled source that follows it and the math channels that read `I(name)` follow the new name.
 - **Potentiometer**: its properties hold the resistance between its ends and the wiper, a slider from 0% at terminal 1
   to 100% at terminal 2. Move the wiper and run again to see the output change. During a live run, use the mouse wheel
   over the part or its Wiper field to change it while the simulation continues (see Live runs).
@@ -50,6 +55,15 @@ How to read what imcsim measures, plots and exports. The [README](../README.md) 
   while high and a 0 while low, and both start low. It is a source from its terminal to ground, so it gives a gate
   input or a latch's SET or RESET a defined level to start from. A circuit of only logic parts, clocks, logic inputs and VCC
   runs without a Ground symbol or a load on the outputs; add a Ground as soon as it has any other part.
+- **Logic output**: the box beside the logic input, with an arrow on its lead, shows the level of the net it is wired
+  to, read as a gate reads it: 1 at 70% of its logic level or above, 0 at 30% or below and X between (5 V by default,
+  editable in its properties). It shows the operating point, or the transient at the instant of the time bar, and
+  follows a live run; it is empty before there is a result. It takes no part in the simulation, so a digital circuit
+  can be tried with logic inputs and outputs alone, with no LED, resistor or Ground.
+- **7-segment display**: the box after the logic output has the inputs a to g down its left side (a the top segment,
+  b to f around it clockwise, g across the middle) and lights each segment whose input reads 1, read as the logic output
+  reads its node. A segment whose input is between the levels is filled faintly. Like the logic output, it takes no part
+  in the simulation; wired to the BCD to 7-segment decoder block, it shows the digit the decoder gets.
 - **Standard values**: Standard values in Edit > Preferences restricts resistors, capacitors and inductors to one of
   the E series (E6, E12, E24, E48, E96 or E192, with their tolerances of 20% down to 0.5%), or leaves any value
   allowed, which is the default. With a series chosen, a typed value becomes the nearest one of the series on a log scale (`5000` is
@@ -165,7 +179,9 @@ schematic file keeps the definition of each block, so it opens anywhere without 
 - **Making a block**: select the circuit together with its pin markers and pick Edit > Create Block from Selection.
   The dialog names the block, lists the pins in the order of its terminals (Up and Down reorder them) with the edge
   of each, which a choice there turns the marker to, and holds its parameters with their defaults. Create block puts
-  one instance where the selection was, wired to the points where the markers were. Undo takes it back in one step.
+  one instance where the selection was, moved aside when its box would cover the points where the markers were, and
+  wires it to those points. Each wire leaves the box from the edge of its pin and goes around the box, clear of the
+  other wires and terminals. Undo takes it back in one step.
 - **Parameters**: inside a block, a resistor, capacitor or inductor can take its value from a parameter of the block:
   pick the parameter in Follows, in its properties, and its symbol shows `{R}` instead of a value. Each instance sets
   its own values in its properties, or keeps the defaults, and Reset parameters goes back to them.
@@ -173,12 +189,33 @@ schematic file keeps the definition of each block, so it opens anywhere without 
   the definitions of the blocks they copy, to this schematic or another one; a pasted block that differs from one of
   the same name already there joins under a name of its own, such as `RC_LOWPASS_2`.
 - **Editing a block**: double click an instance, or pick Edit > Edit Block Contents, to open its contents in the
-  editor, with Back to schematic and the name of the block over the corner of the canvas. Edit > Block Pin and
-  Parameter Settings opens the dialog again, where Apply keeps the pin names, edges and parameters. Back to schematic
-  applies the changes to every instance at once, as one undo step, and Edit > Discard Block Changes leaves the block as
-  it was. A pin that keeps its marker, even renamed or on another edge, keeps the wires of its instances; the wires of a
-  pin that went away are removed. Quitting, or opening an example, applies an open block first, so its changes count
-  as unsaved changes of the schematic. Blocks do not nest: a block cannot hold another.
+  editor, with the path from the schematic down to the block over the corner of the canvas, such as
+  `Schematic > AMPLIFIER > STAGE`. Edit > Block Pin and Parameter Settings opens the dialog again, where Apply keeps
+  the pin names, edges and parameters. A click on a level of the path, or Edit > Apply Block and Return, applies the
+  changes to every instance at once, as one undo step, and Edit > Discard Block Changes leaves the block as it was. A
+  pin that keeps its marker, even renamed or on another edge, keeps the wires of its instances, and a pin that moved
+  to another edge gets a wire around the box from where its old wire leaves it; the wires of a pin that went away are
+  removed. Quitting, or opening an example, applies the open blocks first, so their changes count as
+  unsaved changes of the schematic.
+- **Blocks inside blocks**: a block can hold other blocks. Select them with the rest of the circuit to make a bigger
+  block, or place one while a block is open, from the part search or by pasting. Double click a block inside an open
+  block to go one level down; the path leads back up a level at a time, each one applied on the way. A block can never
+  hold itself, directly or through another block: the part search leaves those out, and a paste or an apply that would
+  make one is refused.
+- **Ready logic blocks**: the toolbar button after the flip-flops places one of eight blocks built from the gates and
+  flip-flops, the last one picked from its list, and the part search lists them as `Logic block: ...`:
+  - a 4-bit counter (a ripple counter whose Q3 Q2 Q1 Q0 count the rising edges of CLK);
+  - a 4-bit shift register (each rising edge of CLK moves IN into Q0 and each Q on);
+  - a 4-to-1 multiplexer (Y follows the input that S1 S0 select);
+  - a 2-to-4 decoder (with EN high, the output that A1 A0 select is high);
+  - a 4-bit adder (S3..S0 and COUT are A3..A0 plus B3..B0 plus CIN);
+  - a 4-bit comparator (GT, EQ or LT is high as A3..A0 is greater than, equal to or less than B3..B0);
+  - a 1-to-4 demultiplexer (D goes to the output that S1 S0 select);
+  - a BCD to 7-segment decoder (a to g light the digit D3..D0 reads, 0 to 9; codes past 9 light nothing).
+
+  RESET clears the counter and the shift register. Hovering one in either list tells what it does. Placed, it joins the
+  schematic as any block does, so it can be opened to see its gates and changed there. Their logic level is 5 V, and a circuit of them,
+  clocks and logic inputs needs no Ground part, as loose gates do not.
 - **SPICE libraries**: File > Import SPICE Library reads a vendor's `.lib`, `.mod`, `.sub` or `.cir` file and lists its
   subcircuits and its diode and transistor models.
   - A picked subcircuit becomes a block kept as SPICE text: imcsim simulates its text as it came, with the `.model`,
@@ -190,14 +227,19 @@ schematic file keeps the definition of each block, so it opens anywhere without 
   - A picked model joins the schematic and shows in the Model choice of the parts it fits, as `1N4148 (library)`
     after the ready models; a diode model fits diodes, LEDs and Zeners, and a transistor model the transistors of its
     type.
-  - `.include` and `.lib` lines are reported and not followed, so import the files they name as well. Encrypted
-    models, which only their vendor's simulator reads, are left out with a warning.
+  - `.include` and `.lib` lines are followed, with paths taken from the folder of the file that writes them:
+    `.include file` reads the whole file in its place, `.lib file section` reads that section of it, and `.lib file`
+    with no section reads the whole file, as LTspice writes it. What a block uses from those files is copied into its
+    text, so it needs none of them afterwards. When the file picked has sections of its own, all of them are read and
+    the first definition of each name wins. A file that cannot be read, a missing section or a file that includes
+    itself is reported with the line that names it. Encrypted models, which only their vendor's simulator reads, are
+    left out with a warning.
 
 The RC_LOWPASS block of the Two RC filters example, open in the editor: a pin marker on each side, and a resistor and
 a capacitor that follow the parameters R and C:
 
 ![The inside of a block: IN and OUT pin markers, a resistor whose value reads {R} and a capacitor whose value reads {C},
-with Back to schematic and the name of the block over the corner of the canvas](images/blocks_contents.png)
+with the path Schematic > RC_LOWPASS over the corner of the canvas](images/blocks_contents.png)
 
 Its settings, with the edge of each pin and the defaults of the parameters:
 
@@ -289,6 +331,9 @@ shows, an operating point or an instant of a transient, so they show nothing unt
 - **Heat Glow** makes every resistor that dissipates power glow orange, bigger and stronger with its power. The
   largest power of the circuit (of the whole run, for a transient) is full brightness, and the glow fades out two
   decades below it, so it shows where the power is lost and, while a transient plays, when.
+- **Logic Lights** fills the box of every logic input that is high and every logic output that reads 1 with the
+  accent color of the theme, as a lit indicator, and lights the segments of the 7-segment displays in that color too;
+  with it off, the lit segments take the color of the symbol.
 
 ## Terminals
 
@@ -408,16 +453,24 @@ their statistics and the exports always agree.
 
 - Voltages are solid lines on the left axis, in the color of their node, the same color as in the editor.
 - Currents are dashed lines on the right axis.
-- The transient plots the measured nodes that gates and flip-flops are connected to as lanes of their own, in a plot
-  under the analog traces with the same time axis, cursors and playhead. Each lane is named at its left, high is the
-  upper level and low the lower, and a voltage between 30% and 70% of the logic level, which a gate reads as unknown,
-  is drawn halfway. Hovering a lane reads its state and voltage, such as `1 (4.72V)`. The Bit values box, off by
-  default, divides the lanes into cells as wide as the shortest steady stretch of any of them, which is half a period
+- The transient plots the measured nodes that gates and flip-flops are connected to, directly or through the pins of a
+  block that holds them, as lanes of their own, in a plot under the analog traces with the same time axis, cursors and
+  playhead. Each lane is named at its left, high is the upper level and low the lower, and a voltage between 30% and
+  70% of the logic level, which a gate reads as unknown, is drawn halfway. Hovering a lane reads its state and voltage,
+  such as `1 (4.72V)`. The Bit values box, off by default, divides the lanes into cells as wide as the shortest steady
+  stretch of any of them, which is half a period
   when there is a clock, starting at the first change, and writes 0, 1 or X in a box at the middle of each cell that has
   room for it at the current zoom. A stretch that lasts several cells reads `1 1 1`, and a glitch inside a cell does not
   show. The Logic lanes box beside the statistics turns the lanes off, which draws every voltage on the analog
   axis again. The plot is left out when only logic signals are measured. The SVG export has the same panels and bit
   labels; the CSV lists the voltages.
+- A logic bus reads several logic signals as one number, as a logic analyzer does, so a counter reads 0, 1, 2...
+  instead of a lane per bit. Buses, under Math in the trace list when the circuit has logic parts, adds one and opens
+  its editor: its name, its format (bin, hex or dec) and its bits, the most significant first, picked from the signals
+  of the logic parts and moved with Up and Down. Each shown bus takes a lane over the others, drawn as a band that
+  pinches at every change of its value, with the value written in it where it fits; a value is X while any of its
+  bits is unknown. A bit names its net, such as `V(Q0)`, so the bus survives edits of the circuit, and buses are saved
+  with the file. The SVG export draws them the same way, and the CSV lists their values as numbers.
 - Math channels are heavier lines; volts and amperes share the axes above, any other unit or none goes on a third
   axis. Their trace pickers offer a labeled node by its name, and a typed expression may name it as `V(OUT)` or
   `V(OUT, IN)`; a name of digits alone, such as `V(3)`, is a node number. The channels are saved with the schematic,

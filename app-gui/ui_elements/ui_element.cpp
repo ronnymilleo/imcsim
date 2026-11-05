@@ -3,9 +3,9 @@
  * @brief   Visual representation of a circuit component inside the schematic editor.
  */
 
-#include "ui_element.h"
+#include "ui_elements/ui_element.h"
 
-#include "spice_value.h"
+#include "spice/spice_value.h"
 #include <algorithm>
 #include <array>
 #include <cfloat>
@@ -19,9 +19,9 @@ namespace GUI {
 
 namespace {
 
-// Labels sit just outside the tallest two-terminal symbol, which spans y = -0.8 to 0.8
+/// Labels sit just outside the tallest two-terminal symbol, which spans y = -0.8 to 0.8.
 constexpr float LABEL_OFFSET = 1.0f;
-// Room, in grid units, between the symbol bounds and the outline that marks it
+/// Room, in grid units, between the symbol bounds and the outline that marks it.
 constexpr float OUTLINE_PADDING = 0.15f;
 
 } // namespace
@@ -195,25 +195,33 @@ bool UIElement::Contains(const ImVec2 world_pos) const {
 }
 
 /**
- * @brief   Checks whether the element touches a rectangle in world space, for picking it with a selection box.
- * @param[in] min  Corner of the rectangle with the lowest X and Y.
- * @param[in] max  Corner with the highest X and Y.
- * @return  True when the symbol bounds, terminals included, overlap the rectangle.
+ * @brief   Finds the box the element takes on the grid, after its rotation and mirroring.
+ * @return  The symbol bounds, terminals included, in world units.
  */
-bool UIElement::Intersects(const ImVec2 min, const ImVec2 max) const {
+WorldBounds UIElement::GetWorldBounds() const {
     const LocalBounds bounds = GetLocalBounds();
-    ImVec2 low = {FLT_MAX, FLT_MAX};
-    ImVec2 high = {-FLT_MAX, -FLT_MAX};
+    WorldBounds world_bounds = {.Min = {FLT_MAX, FLT_MAX}, .Max = {-FLT_MAX, -FLT_MAX}};
     for (ImVec2 corner :
          {bounds.Min, ImVec2{bounds.Max.x, bounds.Min.y}, bounds.Max, ImVec2{bounds.Min.x, bounds.Max.y}}) {
         if (m_Mirrored) {
             corner.x = -corner.x;
         }
         const ImVec2 world = ToVec2(m_Position) + Rotate(corner, m_Rotation);
-        low = {std::min(low.x, world.x), std::min(low.y, world.y)};
-        high = {std::max(high.x, world.x), std::max(high.y, world.y)};
+        world_bounds.Min = {std::min(world_bounds.Min.x, world.x), std::min(world_bounds.Min.y, world.y)};
+        world_bounds.Max = {std::max(world_bounds.Max.x, world.x), std::max(world_bounds.Max.y, world.y)};
     }
-    return low.x <= max.x && high.x >= min.x && low.y <= max.y && high.y >= min.y;
+    return world_bounds;
+}
+
+/**
+ * @brief   Checks whether the element touches a rectangle in world space, for picking it with a selection box.
+ * @param[in] min  Corner of the rectangle with the lowest X and Y.
+ * @param[in] max  Corner with the highest X and Y.
+ * @return  True when the symbol bounds, terminals included, overlap the rectangle.
+ */
+bool UIElement::Intersects(const ImVec2 min, const ImVec2 max) const {
+    const WorldBounds bounds = GetWorldBounds();
+    return bounds.Min.x <= max.x && bounds.Max.x >= min.x && bounds.Min.y <= max.y && bounds.Max.y >= min.y;
 }
 
 /**
@@ -272,8 +280,10 @@ LocalBounds UIElement::GetLocalBounds() const {
     return {{-2.0f, -0.8f}, {2.0f, 0.8f}};
 }
 
-// ImGui text cannot rotate, so the text stays upright and is pushed from the anchor along the rotated direction
-// until it no longer overlaps the anchor, whatever the element rotation
+/**
+ * @brief   ImGui text cannot rotate, so the text stays upright and is pushed from the anchor along the rotated
+ *          direction until it no longer overlaps the anchor, whatever the element rotation.
+ */
 void UIElement::DrawLabel(SchematicCanvas &canvas, const ViewTransform &view, const ImVec2 local_anchor,
                           const ImVec2 local_direction, const std::string &text, const ImU32 color) const {
     if (text.empty()) {

@@ -6,7 +6,7 @@
 #ifndef IMCSIM_OP_AMP_H
 #define IMCSIM_OP_AMP_H
 
-#include "component.h"
+#include "components/component.h"
 #include <memory>
 #include <span>
 #include <string>
@@ -24,7 +24,7 @@ namespace Core {
 struct OpAmpParameters {
     double OpenLoopGainDecibels = 106.0;
     double GainBandwidth = 1e6;
-    // Volts per microsecond, as datasheets give it
+    /// Volts per microsecond, as datasheets give it.
     double SlewRate = 0.5;
     double PhaseMarginDegrees = 60.0;
     double InputBiasCurrent = 80e-9;
@@ -90,7 +90,7 @@ public:
     std::string GetSpiceModelName() const;
 
 private:
-    // Null when the op-amp uses its custom parameters
+    /// Null when the op-amp uses its custom parameters.
     const OpAmpModel *m_Model;
     OpAmpParameters m_CustomParameters;
     double m_IdealBandwidth;

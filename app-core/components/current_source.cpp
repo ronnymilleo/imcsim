@@ -3,7 +3,7 @@
  * @brief   An independent current source in the simulation model.
  */
 
-#include "current_source.h"
+#include "components/current_source.h"
 #include <memory>
 
 namespace Core {

@@ -6,7 +6,7 @@
 #ifndef IMCSIM_UI_POTENTIOMETER_H
 #define IMCSIM_UI_POTENTIOMETER_H
 
-#include "ui_resistor.h"
+#include "ui_elements/ui_resistor.h"
 
 namespace GUI {
 

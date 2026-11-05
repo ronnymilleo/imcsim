@@ -4,10 +4,6 @@
 
 add_library(imcsim-core-lib
         STATIC
-            analysis_suggestions.cpp
-            circuit.cpp
-            circuit_checks.cpp
-            circuit_copy.cpp
             components/bjt.cpp
             components/capacitor.cpp
             components/clock.cpp
@@ -18,6 +14,7 @@ add_library(imcsim-core-lib
             components/ground.cpp
             components/inductor.cpp
             components/logic_input.cpp
+            components/logic_output.cpp
             components/logic_part.cpp
             components/mosfet.cpp
             components/net_label.cpp
@@ -25,6 +22,7 @@ add_library(imcsim-core-lib
             components/potentiometer.cpp
             components/relay.cpp
             components/resistor.cpp
+            components/seven_segment.cpp
             components/source.cpp
             components/subcircuit.cpp
             components/subcircuit_pin.cpp
@@ -33,27 +31,32 @@ add_library(imcsim-core-lib
             components/vcc.cpp
             components/voltage_controlled_switch.cpp
             components/voltage_source.cpp
-            library_model.cpp
-            live_change.cpp
-            ngspice_backend.cpp
-            ngspice_library.cpp
-            ngspice_readers.cpp
-            ratings.cpp
-            run_control.cpp
-            simulation_backend.cpp
-            simulation_results.cpp
-            simulation_service.cpp
-            simulator.cpp
-            spice_library.cpp
-            spice_value.cpp
-            standard_values.cpp
-            stepped_circuit.cpp
+            model/circuit.cpp
+            model/library_model.cpp
+            ngspice/ngspice_backend.cpp
+            ngspice/ngspice_library.cpp
+            ngspice/ngspice_readers.cpp
+            simulation/analysis_suggestions.cpp
+            simulation/circuit_checks.cpp
+            simulation/circuit_copy.cpp
+            simulation/live_change.cpp
+            simulation/ratings.cpp
+            simulation/run_control.cpp
+            simulation/simulation_backend.cpp
+            simulation/simulation_results.cpp
+            simulation/simulation_service.cpp
+            simulation/simulator.cpp
+            simulation/stepped_circuit.cpp
+            spice/spice_inclusions.cpp
+            spice/spice_library.cpp
+            spice/spice_text.cpp
+            spice/spice_value.cpp
+            spice/standard_values.cpp
 )
 
 target_include_directories(imcsim-core-lib
         PUBLIC
             ${CMAKE_CURRENT_SOURCE_DIR}
-            ${CMAKE_CURRENT_SOURCE_DIR}/components
 )
 
 # ngspice runs as a shared library: pkg-config finds it on Linux and macOS, and on Windows the build of

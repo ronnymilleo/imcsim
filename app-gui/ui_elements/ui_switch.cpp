@@ -3,7 +3,7 @@
  * @brief   Schematic symbol of a switch and of a push button.
  */
 
-#include "ui_switch.h"
+#include "ui_elements/ui_switch.h"
 
 #include "components/switch.h"
 #include <cmath>
@@ -15,9 +15,9 @@ namespace {
 
 constexpr float CONTACT_X = 1.0f;
 constexpr float CONTACT_RADIUS = 0.12f;
-// A lever that is open ends here, above the second contact
+/// A lever that is open ends here, above the second contact.
 constexpr ImVec2 OPEN_LEVER_TIP = {0.9f, -0.9f};
-// A push button's bar rests this high above the contacts, and is pushed down onto them
+/// A push button's bar rests this high above the contacts, and is pushed down onto them.
 constexpr float RAISED_BAR_Y = -0.7f;
 constexpr float BAR_HALF_LENGTH = 0.7f;
 constexpr float STEM_LENGTH = 0.6f;
@@ -59,7 +59,9 @@ void UISwitch::DrawSymbol(SchematicCanvas &canvas, const ViewTransform &view, co
                    LocalToScreen(view, CAP_HALF_LENGTH, bar_y - STEM_LENGTH), color, LINE_THICKNESS);
 }
 
-// The name sits above whatever is drawn highest, and the state under the contacts
+/**
+ * @brief   The name sits above whatever is drawn highest, and the state under the contacts.
+ */
 void UISwitch::DrawLabels(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color) const {
     const float top = IsPushButton() ? RAISED_BAR_Y - STEM_LENGTH : OPEN_LEVER_TIP.y;
     DrawLabel(canvas, view, {0.0f, top - 0.3f}, {0.0f, -1.0f}, GetComponent().GetName(), color);

@@ -6,7 +6,7 @@
 #ifndef IMCSIM_BJT_H
 #define IMCSIM_BJT_H
 
-#include "component.h"
+#include "components/component.h"
 #include <memory>
 #include <span>
 #include <string>
@@ -28,8 +28,9 @@ struct BJTParameters {
     double ReverseBeta = 1.0;
     double EarlyVoltage = 0.0;
     double ForwardKneeCurrent = 0.0;
-    // Base-emitter leakage, which lowers the gain at low currents
+    /// Saturation current of the base-emitter leakage, which lowers the gain at low currents.
     double LeakageSaturationCurrent = 0.0;
+    /// Emission coefficient of the base-emitter leakage.
     double LeakageEmissionCoefficient = 1.5;
     double BaseResistance = 0.0;
     double CollectorResistance = 0.0;
@@ -88,7 +89,7 @@ public:
     std::string GetSpiceModelName() const;
 
 private:
-    // Null when the transistor uses its custom parameters
+    /// Null when the transistor uses its custom parameters.
     const BJTModel *m_Model;
     BJTParameters m_CustomParameters;
 };

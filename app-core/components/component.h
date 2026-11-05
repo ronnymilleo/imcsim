@@ -61,6 +61,8 @@ enum class ComponentType {
     SR_FLIP_FLOP,
     CLOCK,
     LOGIC_INPUT,
+    LOGIC_OUTPUT,
+    SEVEN_SEGMENT,
 };
 
 /**
@@ -83,6 +85,11 @@ public:
     virtual ~Component() = default;
 
     // Copying
+    /**
+     * @brief   Copies the component with its name, value and settings.
+     * @return  An independent component of the same kind, which shares nothing with this one, so a simulation copy
+     *          can run on another thread while the editor changes the original.
+     */
     virtual std::unique_ptr<Component> Clone() const = 0;
 
     // Kind of component
@@ -121,16 +128,17 @@ protected:
     ComponentType m_Type{};
     std::string m_Name;
     double m_Value = 0.0;
-    // A parameter reference such as {RESISTANCE}; only meaningful inside a subcircuit definition
+    /// A parameter reference such as {RESISTANCE}; only meaningful inside a subcircuit definition.
     std::optional<std::string> m_ValueExpression;
-    // Name of the library model a diode or a transistor uses instead of a ready or custom one; empty for none
+    /// Name of the library model a diode or a transistor uses instead of a ready or custom one; empty for none.
     std::string m_LibraryModel;
-    // Voltage a capacitor starts charged to or current an inductor starts carrying; only these kinds carry one
+    /// Voltage a capacitor starts charged to or current an inductor starts carrying; only these kinds carry one.
     std::optional<double> m_InitialCondition;
 };
 
 // Type names
 bool IsSubcircuitPin(ComponentType type);
+bool IsLogicDisplay(ComponentType type);
 const char *GetTypeName(ComponentType type);
 std::optional<ComponentType> ParseComponentType(std::string_view text);
 

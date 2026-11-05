@@ -3,7 +3,7 @@
  * @brief   Schematic symbol of an independent current source.
  */
 
-#include "ui_current_source.h"
+#include "ui_elements/ui_current_source.h"
 
 #include "components/current_source.h"
 #include <memory>
@@ -13,7 +13,7 @@ namespace GUI {
 namespace {
 
 constexpr float INNER_ARROW_HALF_LENGTH = 0.5f;
-// The outside arrow sits above the lead on the side the current leaves, like the plus of a voltage source
+/// The outside arrow sits above the lead on the side the current leaves, like the plus of a voltage source.
 constexpr float OUTER_ARROW_START = 1.1f;
 constexpr float OUTER_ARROW_END = 1.7f;
 constexpr float OUTER_ARROW_HEIGHT = 0.4f;
@@ -31,8 +31,10 @@ UICurrentSource::UICurrentSource(const GridPoint position, const Rotation rotati
     : UISource(std::make_unique<Core::CurrentSource>(), position, rotation) {
 }
 
-// The arrow points from the first terminal to the second, the way a positive current flows through the source.
-// ANSI draws it inside the circle; IEC, and any source showing its waveform, draw it outside
+/**
+ * @brief   The arrow points from the first terminal to the second, the way a positive current flows through the source.
+ * @details ANSI draws it inside the circle; IEC, and any source showing its waveform, draw it outside.
+ */
 void UICurrentSource::DrawSymbol(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color,
                                  const SymbolStyle style) const {
     const auto draw_arrow = [&](const float start, const float end, const float height) {

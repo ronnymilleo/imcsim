@@ -6,14 +6,14 @@
 #ifndef IMCSIM_APPLICATION_H
 #define IMCSIM_APPLICATION_H
 
-#include "analysis_controls.h"
-#include "analysis_settings_panel.h"
-#include "auto_rerun.h"
-#include "glow_renderer.h"
+#include "analysis/analysis_controls.h"
+#include "analysis/analysis_settings_panel.h"
+#include "analysis/auto_rerun.h"
+#include "analysis/playback.h"
+#include "document/schematic.h"
+#include "drawing/glow_renderer.h"
 #include "part_editor.h"
-#include "playback.h"
 #include "preferences.h"
-#include "schematic.h"
 #include "windows/editor_window.h"
 #include "windows/netlist_window.h"
 #include "windows/output_window.h"
@@ -49,22 +49,22 @@ private:
     SDL_WindowFlags m_SDLWindowFlags{};
     SDL_Window *m_SDLWindow = nullptr;
     SDL_GPUDevice *m_GPUDevice = nullptr;
-    // Declared before the editor, which draws with it
+    /// Declared before the editor, which draws with it.
     GlowRenderer m_GlowRenderer;
 
     // Application state
     std::vector<std::string> m_Errors;
     bool m_IsOpen{true};
     bool m_ResetLayout{false};
-    // imgui.ini in the user's data folder; ImGui keeps only the pointer, so the path lives here
+    /// imgui.ini in the user's data folder; ImGui keeps only the pointer, so the path lives here.
     std::string m_SettingsPath;
-    // The user's choices, in a file of their own beside imgui.ini; empty when the data folder is not known
+    /// The user's choices, in a file of their own beside imgui.ini; empty when the data folder is not known.
     std::string m_PreferencesPath;
-    // What the file holds, so the preferences are written only when they change
+    /// What the file holds, so the preferences are written only when they change.
     Preferences m_SavedPreferences;
-    // Last title given to the window, so it is only set again when the file or its state changes
+    /// Last title given to the window, so it is only set again when the file or its state changes.
     std::string m_WindowTitle;
-    // Result versions already shown, so each new result opens the Output window once
+    /// Result versions already shown, one per analysis, so each new result opens the Output window once.
     std::size_t m_ShownOperatingPointVersion = 0;
     std::size_t m_ShownTransientVersion = 0;
     std::size_t m_ShownACSweepVersion = 0;
@@ -72,12 +72,12 @@ private:
     std::size_t m_ShownNoiseVersion = 0;
     std::size_t m_ShownTransferFunctionVersion = 0;
     std::size_t m_ShownTruthTableVersion = 0;
-    // Runs the selected analysis again after edits, when the preference asks for it
+    /// Runs the selected analysis again after edits, when the preference asks for it.
     AutoRerun m_AutoRerun;
 
-    // The schematic and the preferences are declared first, so they exist when the windows that refer to them are
-    // built
+    /// Declared before the windows that refer to it, so it exists when they are built.
     Schematic m_Schematic;
+    /// Declared before the windows that refer to them, so they exist when they are built.
     Preferences m_Preferences;
     AnalysisControls m_AnalysisControls{m_Schematic};
     AnalysisSettingsPanel m_AnalysisSettings{m_Schematic};

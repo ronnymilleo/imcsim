@@ -6,8 +6,8 @@
 #ifndef IMCSIM_PREFERENCES_H
 #define IMCSIM_PREFERENCES_H
 
-#include "standard_values.h"
-#include "theme.h"
+#include "drawing/theme.h"
+#include "spice/standard_values.h"
 #include "ui_elements/ui_element.h"
 #include <array>
 #include <cstddef>
@@ -40,15 +40,19 @@ enum class LiveEffect {
     CURRENT_FLOW,
     LED_GLOW,
     HEAT_GLOW,
+    /// Lights the box of a logic input that is high and of a logic output that reads 1.
+    LOGIC_LIGHTS,
     COUNT
 };
 
 constexpr std::size_t NUMBER_OF_LIVE_EFFECTS = static_cast<std::size_t>(LiveEffect::COUNT);
 
-// How long an edit must settle before the analysis runs again by itself: long enough for a burst of edits to run once,
-// short enough to feel like it follows them
+/// How long an edit must settle before the analysis runs again by itself: long enough for a burst of edits to run once,
+/// short enough to feel like it follows them.
 constexpr double DEFAULT_RERUN_DELAY_SECONDS = 0.5;
+/// Shortest delay the user may set.
 constexpr double MIN_RERUN_DELAY_SECONDS = 0.1;
+/// Longest delay the user may set.
 constexpr double MAX_RERUN_DELAY_SECONDS = 5.0;
 
 /**
@@ -59,25 +63,25 @@ constexpr double MAX_RERUN_DELAY_SECONDS = 5.0;
  */
 struct Preferences {
     // Appearance
-    // By name, so the choice survives themes being added or reordered
+    /// By name, so the choice survives themes being added or reordered.
     std::string Theme = GetThemes().front().Name;
     SymbolStyle Symbols = SymbolStyle::IEC;
-    // Numbers each terminal; terminal 1 is where a positive current enters
+    /// Numbers each terminal; terminal 1 is where a positive current enters.
     bool ShowTerminalNumbers = false;
 
-    // Schematic while showing results
+    /// Schematic while showing results.
     WireColoring WireColors = WireColoring::PLAIN;
-    // By enum value, each on its own; all off until asked for
+    /// By enum value, each on its own; all off until asked for.
     std::array<bool, NUMBER_OF_LIVE_EFFECTS> LiveEffects = {};
 
-    // Parts: resistors, capacitors and inductors take the nearest value of the series
+    /// Parts: resistors, capacitors and inductors take the nearest value of the series.
     Core::ValueSeries ValueSeries = Core::ValueSeries::FREE;
 
-    // Results: a new result brings the Output window to the front, or only marks it
+    /// Results: a new result brings the Output window to the front, or only marks it.
     bool BringOutputToFront = true;
-    // The selected analysis runs again by itself once an edit of the circuit settles, if it was already run
+    /// The selected analysis runs again by itself once an edit of the circuit settles, if it was already run.
     bool RerunOnEdit = false;
-    // Quiet time after the last edit before it runs, from MIN_RERUN_DELAY_SECONDS to MAX_RERUN_DELAY_SECONDS
+    /// Quiet time after the last edit before it runs, from MIN_RERUN_DELAY_SECONDS to MAX_RERUN_DELAY_SECONDS.
     double RerunDelaySeconds = DEFAULT_RERUN_DELAY_SECONDS;
 
     bool IsEffectOn(LiveEffect effect) const;

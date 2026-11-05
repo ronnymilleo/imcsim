@@ -3,7 +3,7 @@
  * @brief   An instance of a project-local subcircuit definition.
  */
 
-#include "subcircuit.h"
+#include "components/subcircuit.h"
 
 #include <algorithm>
 #include <cctype>

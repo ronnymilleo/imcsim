@@ -3,14 +3,14 @@
  * @brief   Tests for copying parts and wires to text and reading them back for a paste.
  */
 
-#include "clipboard.h"
 #include "components/clock.h"
 #include "components/logic_input.h"
 #include "components/net_label.h"
 #include "components/subcircuit.h"
-#include "element_factory.h"
-#include "examples.h"
-#include "schematic.h"
+#include "document/clipboard.h"
+#include "document/examples.h"
+#include "document/schematic.h"
+#include "editing/element_factory.h"
 #include "test_printers.h"
 #include <catch2/catch_test_macros.hpp>
 #include <memory>

@@ -7,7 +7,7 @@
 #define IMCSIM_UI_SOURCE_H
 
 #include "components/source.h"
-#include "ui_element.h"
+#include "ui_elements/ui_element.h"
 #include <memory>
 
 namespace GUI {
@@ -24,7 +24,7 @@ public:
     ~UISource() override = default;
 
 protected:
-    // Same height as the capacitor plates, so the default labels and pick area still fit
+    /// Same height as the capacitor plates, so the default labels and pick area still fit.
     static constexpr float CIRCLE_RADIUS = 0.8f;
 
     void DrawLabels(SchematicCanvas &canvas, const ViewTransform &view, ImU32 color) const override;

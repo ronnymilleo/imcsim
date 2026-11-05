@@ -3,7 +3,7 @@
  * @brief   Schematic symbol of a resistor.
  */
 
-#include "ui_resistor.h"
+#include "ui_elements/ui_resistor.h"
 
 #include "components/resistor.h"
 #include <array>
@@ -29,6 +29,12 @@ UIResistor::UIResistor(const GridPoint position, const Rotation rotation)
     : UIElement(std::make_unique<Core::Resistor>(), position, rotation) {
 }
 
+/**
+ * @brief   Creates a resistor symbol for another resistive component, such as a potentiometer.
+ * @param[in] component  Simulation component owned by this element.
+ * @param[in] position   Grid position in world units.
+ * @param[in] rotation   Orientation on the grid.
+ */
 UIResistor::UIResistor(std::unique_ptr<Core::Component> component, const GridPoint position, const Rotation rotation)
     : UIElement(std::move(component), position, rotation) {
 }

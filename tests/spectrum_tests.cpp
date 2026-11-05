@@ -3,7 +3,7 @@
  * @brief   Tests for the spectrum and harmonic distortion of traces.
  */
 
-#include "spectrum.h"
+#include "plots/spectrum.h"
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 #include <cmath>
@@ -25,7 +25,9 @@ struct Trace {
     std::vector<double> Ys;
 };
 
-// A signal sampled unevenly, as ngspice would, alternating short and long steps
+/**
+ * @brief   A signal sampled unevenly, as ngspice would, alternating short and long steps.
+ */
 Trace Sample(const std::function<double(double)> &signal, const double stop_time, const int point_count) {
     Trace trace;
     const double average_step = stop_time / point_count;

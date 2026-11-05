@@ -12,7 +12,7 @@ namespace GUI {
 
 namespace {
 
-// Grid units left around the framed points, since symbols reach a little past their terminals
+/// Grid units left around the framed points, since symbols reach a little past their terminals.
 constexpr float FRAME_MARGIN = 2.0f;
 
 } // namespace

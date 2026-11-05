@@ -4,56 +4,68 @@
 
 add_library(imcsim-gui-lib
         STATIC
-            analysis_controls.cpp
-            analysis_inputs.cpp
-            analysis_settings_panel.cpp
-            auto_rerun.cpp
+            analysis/analysis_controls.cpp
+            analysis/analysis_inputs.cpp
+            analysis/analysis_settings_panel.cpp
+            analysis/auto_rerun.cpp
+            analysis/circuit_snapshot.cpp
+            analysis/logic_outputs.cpp
+            analysis/parameter_step.cpp
+            analysis/playback.cpp
+            analysis/point_window.cpp
+            analysis/transient_window.cpp
+            analysis/truth_table.cpp
             application.cpp
-            canvas_view.cpp
-            circuit_snapshot.cpp
-            clipboard.cpp
-            connectivity.cpp
-            current_flow.cpp
-            element_factory.cpp
-            examples.cpp
-            file_dialog.cpp
-            glow_renderer.cpp
-            group_editing.cpp
-            heat_glow.cpp
+            document/block_nesting.cpp
+            document/clipboard.cpp
+            document/examples.cpp
+            document/file_dialog.cpp
+            document/ready_blocks.cpp
+            document/schematic.cpp
+            document/schematic_file.cpp
+            document/schematic_file_actions.cpp
+            document/simulation_settings.cpp
+            document/spice_import.cpp
+            document/subcircuit_pins.cpp
+            drawing/current_flow.cpp
+            drawing/glow_renderer.cpp
+            drawing/heat_glow.cpp
+            drawing/led_glow.cpp
+            drawing/node_colors.cpp
+            drawing/schematic_canvas.cpp
+            drawing/schematic_drawing.cpp
+            drawing/schematic_overlays.cpp
+            drawing/svg_writer.cpp
+            drawing/theme.cpp
+            drawing/tool_icons.cpp
+            editing/block_wiring.cpp
+            editing/canvas_view.cpp
+            editing/connectivity.cpp
+            editing/editor_mode.cpp
+            editing/element_factory.cpp
+            editing/group_editing.cpp
+            editing/live_input.cpp
+            editing/part_names.cpp
+            editing/probing.cpp
+            editing/selection.cpp
+            editing/wire_editing.cpp
+            editing/wire_routing.cpp
             helpers.cpp
-            led_glow.cpp
-            live_input.cpp
-            logic_trace.cpp
-            math_channel.cpp
-            math_channels.cpp
-            node_colors.cpp
-            parameter_step.cpp
             part_editor.cpp
-            playback.cpp
-            plot_export.cpp
-            plot_exporter.cpp
-            plot_figures.cpp
-            plot_helpers.cpp
-            point_window.cpp
+            plots/logic_bus.cpp
+            plots/logic_buses.cpp
+            plots/logic_trace.cpp
+            plots/math_channel.cpp
+            plots/math_channels.cpp
+            plots/plot_export.cpp
+            plots/plot_exporter.cpp
+            plots/plot_figures.cpp
+            plots/plot_helpers.cpp
+            plots/spectrum.cpp
+            plots/trace_fit_state.cpp
+            plots/trace_math.cpp
+            plots/trace_statistics.cpp
             preferences.cpp
-            probing.cpp
-            schematic.cpp
-            schematic_canvas.cpp
-            schematic_drawing.cpp
-            schematic_file.cpp
-            schematic_file_actions.cpp
-            selection.cpp
-            simulation_settings.cpp
-            spectrum.cpp
-            spice_import.cpp
-            subcircuit_pins.cpp
-            svg_writer.cpp
-            theme.cpp
-            trace_fit_state.cpp
-            trace_math.cpp
-            trace_statistics.cpp
-            transient_window.cpp
-            truth_table.cpp
             ui_elements/ui_bjt.cpp
             ui_elements/ui_capacitor.cpp
             ui_elements/ui_clock.cpp
@@ -64,17 +76,20 @@ add_library(imcsim-gui-lib
             ui_elements/ui_element.cpp
             ui_elements/ui_ground.cpp
             ui_elements/ui_inductor.cpp
+            ui_elements/ui_logic_box.cpp
             ui_elements/ui_logic_input.cpp
+            ui_elements/ui_logic_output.cpp
             ui_elements/ui_logic_part.cpp
             ui_elements/ui_mosfet.cpp
             ui_elements/ui_net_label.cpp
             ui_elements/ui_op_amp.cpp
             ui_elements/ui_potentiometer.cpp
             ui_elements/ui_resistor.cpp
+            ui_elements/ui_seven_segment.cpp
             ui_elements/ui_source.cpp
-            ui_elements/ui_switch.cpp
             ui_elements/ui_subcircuit.cpp
             ui_elements/ui_subcircuit_pin.cpp
+            ui_elements/ui_switch.cpp
             ui_elements/ui_transformer.cpp
             ui_elements/ui_transistor.cpp
             ui_elements/ui_vcc.cpp
@@ -82,20 +97,27 @@ add_library(imcsim-gui-lib
             ui_elements/ui_wire.cpp
             value_field.cpp
             windows/app_window.cpp
+            windows/editor_toolbar.cpp
             windows/editor_window.cpp
             windows/netlist_window.cpp
+            windows/output_tabs/ac_sweep_tab.cpp
+            windows/output_tabs/dc_sweep_tab.cpp
+            windows/output_tabs/noise_tab.cpp
+            windows/output_tabs/plot_widgets.cpp
+            windows/output_tabs/result_tables.cpp
+            windows/output_tabs/spectrum_tab.cpp
+            windows/output_tabs/transient_tab.cpp
             windows/output_window.cpp
+            windows/part_picker.cpp
             windows/preferences_window.cpp
             windows/properties_window.cpp
             windows/simulation_window.cpp
             windows/spice_block_dialog.cpp
-            wire_editing.cpp
 )
 
 target_include_directories(imcsim-gui-lib
         PUBLIC
             ${CMAKE_CURRENT_SOURCE_DIR}
-            ${CMAKE_CURRENT_SOURCE_DIR}/ui_elements
         PRIVATE
             ${CMAKE_CURRENT_BINARY_DIR}/generated
 )
@@ -115,6 +137,21 @@ foreach(example_file IN LISTS EXAMPLE_FILES)
     set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${example_file})
 endforeach()
 configure_file(example_files.h.in ${CMAKE_CURRENT_BINARY_DIR}/generated/example_files.h @ONLY)
+
+# =============================================================================
+# Ready blocks
+# =============================================================================
+
+# The ready logic blocks are compiled in the same way, each a file with one instance and its definition
+file(GLOB READY_BLOCK_FILES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/ready_blocks/*.imcsim)
+set(READY_BLOCK_FILE_ENTRIES "")
+foreach(block_file IN LISTS READY_BLOCK_FILES)
+    get_filename_component(block_name ${block_file} NAME)
+    file(READ ${block_file} block_text)
+    string(APPEND READY_BLOCK_FILE_ENTRIES "    {\"${block_name}\", R\"imcsim(${block_text})imcsim\"},\n")
+    set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${block_file})
+endforeach()
+configure_file(ready_block_files.h.in ${CMAKE_CURRENT_BINARY_DIR}/generated/ready_block_files.h @ONLY)
 
 # =============================================================================
 # Bundled fonts

@@ -6,7 +6,7 @@
 #ifndef IMCSIM_VOLTAGE_CONTROLLED_SWITCH_H
 #define IMCSIM_VOLTAGE_CONTROLLED_SWITCH_H
 
-#include "component.h"
+#include "components/component.h"
 #include <memory>
 #include <string>
 #include <string_view>

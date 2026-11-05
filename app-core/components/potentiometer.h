@@ -6,7 +6,7 @@
 #ifndef IMCSIM_POTENTIOMETER_H
 #define IMCSIM_POTENTIOMETER_H
 
-#include "component.h"
+#include "components/component.h"
 #include <memory>
 
 namespace Core {

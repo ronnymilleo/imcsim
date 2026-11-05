@@ -3,7 +3,7 @@
  * @brief   Points the simulator at the digital code models the build copies next to the tests, before any test runs.
  */
 
-#include "ngspice_library.h"
+#include "ngspice/ngspice_library.h"
 #include <SDL3/SDL.h>
 #include <catch2/catch_test_run_info.hpp>
 #include <catch2/reporters/catch_reporter_event_listener.hpp>
@@ -11,7 +11,7 @@
 
 namespace {
 
-// Only the Windows build copies digital.cm beside the tests; elsewhere ngspice loads its own through its spinit file
+/// Only the Windows build copies digital.cm beside the tests; elsewhere ngspice loads its own through its spinit file.
 class CodeModelListener : public Catch::EventListenerBase {
 public:
     using Catch::EventListenerBase::EventListenerBase;

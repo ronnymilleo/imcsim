@@ -12,24 +12,27 @@
 #include "components/controlled_source.h"
 #include "components/diode.h"
 #include "components/logic_input.h"
+#include "components/logic_output.h"
 #include "components/logic_part.h"
 #include "components/mosfet.h"
 #include "components/net_label.h"
 #include "components/op_amp.h"
 #include "components/potentiometer.h"
 #include "components/relay.h"
+#include "components/seven_segment.h"
 #include "components/source.h"
 #include "components/subcircuit.h"
 #include "components/switch.h"
 #include "components/transformer.h"
 #include "components/voltage_controlled_switch.h"
+#include "document/schematic.h"
 #include "preferences.h"
-#include "schematic.h"
-#include "standard_values.h"
+#include "spice/standard_values.h"
 #include "value_field.h"
 #include <array>
 #include <cstddef>
 #include <optional>
+#include <string>
 
 namespace GUI {
 
@@ -62,42 +65,53 @@ public:
 
 private:
     Schematic *m_Schematic;
-    // The standard series that resistors, capacitors and inductors take their values from
+    /// The standard series that resistors, capacitors and inductors take their values from.
     const Preferences &m_Preferences;
-    // Texts being edited, and the selection they were loaded from
+    // Texts being edited
+    /// Selection the texts were loaded from.
     std::optional<std::size_t> m_LoadedSelection;
     ValueField m_Value;
-    // Voltage a capacitor or current an inductor starts a transient from; empty when none is set
+    /// Voltage a capacitor or current an inductor starts a transient from; empty when none is set.
     ValueField m_InitialCondition;
-    // The net name being typed for a net label, and whether the next Draw() focuses it
+    /// The net name being typed for a net label.
     std::array<char, 40> m_Net{};
+    /// The name being typed for the part, applied when the field is left.
+    std::array<char, 40> m_Name{};
+    /// Why the name typed last cannot be used, or empty.
+    std::string m_NameError;
+    /// Whether the next Draw() focuses the net name.
     bool m_FocusNet = false;
-    // One per member of Core::ACParameters, Core::PulseParameters, Core::EXPParameters, Core::SFFMParameters and
-    // Core::AMParameters, in the order the window lists them
+    // One per member of the parameters of each source waveform, in the order the window lists them
     std::array<ValueField, 4> m_ACFields;
     std::array<ValueField, 7> m_PulseFields;
     std::array<ValueField, 6> m_EXPFields;
     std::array<ValueField, 5> m_SFFMFields;
     std::array<ValueField, 5> m_AMFields;
-    // The "time value" points of a PWL source being typed, as long as the user wants them
+    /// The "time value" points of a PWL source being typed, as long as the user wants them.
     std::string m_PWLText;
-    // One per member of the parameters of custom diodes and transistors
+    // One per member of the parameters of custom diodes, transistors and op-amps
     std::array<ValueField, 9> m_DiodeFields;
     std::array<ValueField, 16> m_BJTFields;
     std::array<ValueField, 13> m_MOSFETFields;
     std::array<ValueField, 11> m_OpAmpFields;
-    // One per member of Core::SwitchParameters and Core::RelayParameters
+    /// One per member of Core::SwitchParameters.
     std::array<ValueField, 4> m_SwitchFields;
+    /// One per member of Core::RelayParameters.
     std::array<ValueField, 5> m_RelayFields;
-    // One per member of Core::TransformerParameters
+    /// One per member of Core::TransformerParameters.
     std::array<ValueField, 3> m_TransformerFields;
-    // One per member of Core::LogicParameters
+    /// One per member of Core::LogicParameters.
     std::array<ValueField, 2> m_LogicFields;
-    // One per member of Core::ClockParameters and Core::LogicInputParameters
+    /// One per member of Core::ClockParameters.
     std::array<ValueField, 4> m_ClockFields;
+    /// One per member of Core::LogicInputParameters.
     std::array<ValueField, 1> m_LogicInputFields;
+    /// One per member of Core::LogicOutputParameters.
+    std::array<ValueField, 1> m_LogicOutputFields;
+    /// One per member of Core::SevenSegmentParameters.
+    std::array<ValueField, 1> m_SevenSegmentFields;
     std::vector<ValueField> m_SubcircuitFields;
-    // Parameters of the block being edited, which a resistor, capacitor or inductor can take its value from
+    /// Parameters of the block being edited, which a resistor, capacitor or inductor can take its value from.
     std::vector<std::string> m_BlockParameters;
 
     void LoadFields(const Core::Component &component);
@@ -105,6 +119,7 @@ private:
     void LoadModelFields(const Core::Component &component);
     void LoadSettingFields(const Core::Component &component);
     void DrawSelectionSummary();
+    void DrawName(Core::Component &component);
     void DrawFields(Core::Component &component);
     bool DrawModeledPart(Core::Component &component);
     bool DrawSettingPart(Core::Component &component);
@@ -120,6 +135,8 @@ private:
     void DrawLogicPart(Core::LogicPart &part);
     void DrawClock(Core::Clock &clock);
     void DrawLogicInput(Core::LogicInput &input);
+    void DrawLogicOutput(Core::LogicOutput &output);
+    void DrawSevenSegment(Core::SevenSegmentDisplay &display);
     void DrawNetLabel(Core::NetLabel &label);
     void DrawDiode(Core::Diode &diode);
     void DrawBJT(Core::BJT &bjt);

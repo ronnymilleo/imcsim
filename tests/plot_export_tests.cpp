@@ -3,7 +3,7 @@
  * @brief   Tests for the SVG and CSV export of plots.
  */
 
-#include "plot_export.h"
+#include "plots/plot_export.h"
 #include <algorithm>
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
@@ -19,7 +19,9 @@ namespace {
 using Catch::Matchers::ContainsSubstring;
 using Catch::Matchers::WithinAbs;
 
-// A transient-like figure: one voltage and one dashed current over 0 to 1 ms
+/**
+ * @brief   A transient-like figure: one voltage and one dashed current over 0 to 1 ms.
+ */
 GUI::ExportFigure MakeFigure(const std::size_t sample_count = 101) {
     GUI::ExportFigure figure;
     figure.XAxis = {.Name = "Time", .Unit = "s"};
@@ -48,7 +50,9 @@ std::size_t CountOccurrences(const std::string &text, const std::string &pattern
     return count;
 }
 
-// Points of the first polyline drawn in the given color
+/**
+ * @brief   Points of the first polyline drawn in the given color.
+ */
 std::size_t CountPolylinePoints(const std::string &svg, const std::string &color) {
     const std::size_t line = svg.find(std::string("<polyline fill=\"none\" stroke=\"") + color);
     if (line == std::string::npos) {
@@ -230,7 +234,9 @@ TEST_CASE("CSV headers name the panel when there are several and quote separator
 
 namespace {
 
-// Two lanes of logic signals standing for a clock and its inverse, over four samples
+/**
+ * @brief   Two lanes of logic signals standing for a clock and its inverse, over four samples.
+ */
 GUI::ExportFigure MakeLaneFigure() {
     GUI::ExportFigure figure;
     figure.XAxis = {.Name = "Time", .Unit = "s"};

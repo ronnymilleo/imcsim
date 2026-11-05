@@ -3,23 +3,25 @@
  * @brief   Tests for project-local subcircuit definitions, instances, files and ngspice runs.
  */
 
-#include "circuit_checks.h"
-#include "circuit_copy.h"
 #include "components/diode.h"
 #include "components/ground.h"
+#include "components/logic_part.h"
 #include "components/net_label.h"
 #include "components/resistor.h"
 #include "components/subcircuit.h"
 #include "components/vcc.h"
-#include "element_factory.h"
-#include "schematic.h"
-#include "schematic_file.h"
-#include "simulator.h"
-#include "subcircuit.h"
-#include "subcircuit_pins.h"
+#include "document/schematic.h"
+#include "document/schematic_file.h"
+#include "document/subcircuit_pins.h"
+#include "editing/element_factory.h"
+#include "model/subcircuit.h"
+#include "simulation/circuit_checks.h"
+#include "simulation/circuit_copy.h"
+#include "simulation/simulator.h"
 #include <algorithm>
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
+#include <cstddef>
 #include <memory>
 #include <optional>
 #include <string>
@@ -50,11 +52,42 @@ Core::SubcircuitInstance MakeInstance(const std::string &name, const std::string
     return instance;
 }
 
-// A pin marker; unturned, its arrow points right, which puts the pin on the left of the block
+/**
+ * @brief   A pin marker; unturned, its arrow points right, which puts the pin on the left of the block.
+ */
 void AddMarker(GUI::Schematic &schematic, const GUI::GridPoint point, const std::string &name,
                const GUI::Rotation rotation = GUI::Rotation::R0) {
     schematic.AddElement(GUI::CreateElement(Core::ComponentType::PIN, point, rotation));
     static_cast<Core::NetLabel &>(schematic.GetElements().back()->GetComponent()).SetNet(name);
+}
+
+/**
+ * @brief   Whether no wire goes over the box of a block, but for its leads, where a wire may end or lie.
+ */
+bool AreWiresClearOf(const GUI::Schematic &schematic, const GUI::UIElement &block) {
+    const GUI::WorldBounds bounds = block.GetWorldBounds();
+    std::vector<GUI::GridPoint> leads = block.GetTerminals();
+    for (std::size_t terminal = 0; terminal < block.GetTerminals().size(); ++terminal) {
+        const GUI::GridPoint inward = block.GetTerminalInward(terminal);
+        leads.push_back({leads[terminal].X + inward.X, leads[terminal].Y + inward.Y});
+    }
+    for (const GUI::UIWire &wire : schematic.GetWires()) {
+        GUI::GridPoint point = wire.GetStart();
+        const GUI::GridPoint end = wire.GetEnd();
+        const GUI::GridPoint step = {(end.X > point.X) - (end.X < point.X), (end.Y > point.Y) - (end.Y < point.Y)};
+        for (;; point = {point.X + step.X, point.Y + step.Y}) {
+            const bool is_inside =
+                static_cast<float>(point.X) >= bounds.Min.x && static_cast<float>(point.X) <= bounds.Max.x &&
+                static_cast<float>(point.Y) >= bounds.Min.y && static_cast<float>(point.Y) <= bounds.Max.y;
+            if (is_inside && !std::ranges::contains(leads, point)) {
+                return false;
+            }
+            if (point == end) {
+                break;
+            }
+        }
+    }
+    return true;
 }
 
 } // namespace
@@ -421,7 +454,7 @@ TEST_CASE("Editing a definition propagates pins, parameters and contents to ever
     CHECK(schematic.GetSubcircuits()[0].Pins.size() == 1);
 }
 
-TEST_CASE("Block creation rejects nested blocks and invalid metadata", "[subcircuit]") {
+TEST_CASE("Block creation needs pin markers in the selection and valid metadata", "[subcircuit]") {
     GUI::Schematic schematic;
     CHECK_FALSE(schematic.GetSubcircuitPinCandidates());
     schematic.AddElement(GUI::CreateElement(Core::ComponentType::SUBCIRCUIT, {0, 0}, GUI::Rotation::R0));
@@ -588,6 +621,56 @@ TEST_CASE("Renaming a pin keeps the wires of every instance on it", "[subcircuit
     CHECK(nodes.GetNode({6, 0}) == nodes.GetNode(terminals[1]));
 }
 
+TEST_CASE("The wires of a new block go around its box, from the edge each pin is on", "[subcircuit]") {
+    GUI::Schematic schematic;
+    schematic.AddElement(GUI::CreateElement(Core::ComponentType::RESISTOR, {0, 0}, GUI::Rotation::R0));
+    schematic.AddElement(GUI::CreateElement(Core::ComponentType::RESISTOR, {-8, 6}, GUI::Rotation::R0));
+    schematic.AddElement(GUI::CreateElement(Core::ComponentType::RESISTOR, {8, 6}, GUI::Rotation::R0));
+    // The input pin goes on top and the output one at the bottom, while the circuit around comes from below on both
+    // sides, so a wire with one bend would run through the box
+    AddMarker(schematic, {-2, 0}, "IN", GUI::Rotation::R90);
+    AddMarker(schematic, {2, 0}, "OUT", GUI::Rotation::R270);
+    schematic.AddWire({-2, 0}, {-2, 6});
+    schematic.AddWire({-2, 6}, {-6, 6});
+    schematic.AddWire({2, 0}, {2, 6});
+    schematic.AddWire({2, 6}, {6, 6});
+    schematic.SetSelection({0, 3, 4}, {});
+    REQUIRE(schematic.CreateSubcircuitFromSelection("block", {{"IN", {-2, 0}}, {"OUT", {2, 0}}}));
+
+    const GUI::UIElement &block = *schematic.GetElements().back();
+    const auto &instance = static_cast<const Core::SubcircuitInstance &>(block.GetComponent());
+    REQUIRE(instance.GetPinSide("IN") == Core::PinSide::TOP);
+    REQUIRE(instance.GetPinSide("OUT") == Core::PinSide::BOTTOM);
+    CHECK(AreWiresClearOf(schematic, block));
+    const GUI::Connectivity &nodes = schematic.GetConnectivity();
+    const std::vector<GUI::GridPoint> terminals = block.GetTerminals();
+    CHECK(nodes.GetNode({-6, 6}) == nodes.GetNode(terminals[0]));
+    CHECK(nodes.GetNode({6, 6}) == nodes.GetNode(terminals[1]));
+    CHECK(nodes.GetNode(terminals[0]) != nodes.GetNode(terminals[1]));
+}
+
+TEST_CASE("A new block moves aside when its box would cover a point its wires go to", "[subcircuit]") {
+    GUI::Schematic schematic;
+    schematic.AddElement(GUI::CreateElement(Core::ComponentType::RESISTOR, {0, 0}, GUI::Rotation::R0));
+    schematic.AddElement(GUI::CreateElement(Core::ComponentType::RESISTOR, {-8, 0}, GUI::Rotation::R0));
+    schematic.AddElement(GUI::CreateElement(Core::ComponentType::RESISTOR, {8, 0}, GUI::Rotation::R0));
+    // Markers this close to the middle sit where the box of the block goes
+    AddMarker(schematic, {-1, 0}, "IN");
+    AddMarker(schematic, {1, 0}, "OUT", GUI::Rotation::R180);
+    schematic.AddWire({-6, 0}, {-1, 0});
+    schematic.AddWire({1, 0}, {6, 0});
+    schematic.SetSelection({0, 3, 4}, {});
+    REQUIRE(schematic.CreateSubcircuitFromSelection("block", {{"IN", {-1, 0}}, {"OUT", {1, 0}}}));
+
+    const GUI::UIElement &block = *schematic.GetElements().back();
+    CHECK(AreWiresClearOf(schematic, block));
+    const GUI::Connectivity &nodes = schematic.GetConnectivity();
+    const std::vector<GUI::GridPoint> terminals = block.GetTerminals();
+    CHECK(nodes.GetNode({-6, 0}) == nodes.GetNode(terminals[0]));
+    CHECK(nodes.GetNode({6, 0}) == nodes.GetNode(terminals[1]));
+    CHECK(nodes.GetNode(terminals[0]) != nodes.GetNode(terminals[1]));
+}
+
 TEST_CASE("A part follows only a parameter of the block it is in", "[subcircuit]") {
     Core::Resistor outside;
     outside.SetName("R9");
@@ -718,4 +801,26 @@ TEST_CASE("Picking another edge for a pin turns its marker in place, and the ins
     const GUI::Connectivity &nodes = schematic.GetConnectivity();
     CHECK(nodes.GetNode({-6, 0}) == nodes.GetNode(terminals[0]));
     CHECK(nodes.GetNode({6, 0}) == nodes.GetNode(terminals[1]));
+    CHECK(nodes.GetNode(terminals[0]) != nodes.GetNode(terminals[1]));
+    // The wire to the new edge goes around the box, and the one that came to the old edge stops short of it
+    CAPTURE(schematic.GetWires());
+    CHECK(AreWiresClearOf(schematic, block));
+}
+
+TEST_CASE("A pin that nothing inside a block uses keeps its node from the extra nodes of the body", "[subcircuit]") {
+    Core::LogicPart inverter(Core::ComponentType::NOT);
+    inverter.SetName("U1");
+    auto definition = std::make_shared<Core::SubcircuitDefinition>();
+    definition->Name = "inverter";
+    // EXTRA is node 3, which no part inside reaches, so the digital nodes of the gate start at 4
+    definition->Pins = {{"A", 1}, {"Y", 2}, {"EXTRA", 3}};
+    definition->Body.Add(inverter, {1, 2});
+    Core::SubcircuitInstance instance("inverter", {"A", "Y", "EXTRA"});
+    instance.SetName("X1");
+    Core::Circuit circuit;
+    circuit.Add(instance, {1, 2, 3});
+    circuit.AddSubcircuit(definition);
+    const std::string netlist = circuit.ToSpiceNetlist();
+    CHECK(netlist.contains("A-U1-A [1] [4]"));
+    CHECK_FALSE(netlist.contains("[3]"));
 }

@@ -7,7 +7,7 @@
  *          macromodels, which limits the output without the large internal currents of the original.
  */
 
-#include "op_amp.h"
+#include "components/op_amp.h"
 
 #include <algorithm>
 #include <array>
@@ -20,29 +20,32 @@ namespace Core {
 
 namespace {
 
-// Ideal op-amp: the gain stage drives this transconductance into this resistance, for an open-loop gain of 100 dB.
-// The small transconductance keeps the clamp current in the milliamperes
+/// Open-loop gain of the ideal op-amp, 100 dB.
 constexpr double IDEAL_GAIN = 1e5;
+/// Transconductance of the gain stage of the ideal op-amp, small so the clamp current stays in the milliamperes.
 constexpr double IDEAL_TRANSCONDUCTANCE = 1e-3;
+/// Resistance the gain stage of the ideal op-amp drives, which sets its open-loop gain.
 constexpr double IDEAL_RESISTANCE = IDEAL_GAIN / IDEAL_TRANSCONDUCTANCE;
 constexpr double DEFAULT_IDEAL_BANDWIDTH = 1e6;
-// Clamp diodes so sharp that the ideal output stops within about 10 mV of a supply pin
+/// Model of the clamp diodes that stop the output of the ideal op-amp at its supply pins.
 constexpr const char *IDEAL_CLAMP_MODEL_NAME = "imcsim_opamp_clamp";
+/// Clamp diodes so sharp that the ideal output stops within about 10 mV of a supply pin.
 constexpr const char *IDEAL_CLAMP_MODEL_PARAMETERS = "IS=1e-15 N=0.01";
 
 // Boyle macromodel: fixed elements, as in the original paper and the LTC models
 constexpr double COMPENSATION_CAPACITANCE = 30e-12;
 constexpr double GAIN_STAGE_RESISTANCE = 100e3;
-// The tail resistance sets the common-mode output impedance of the input pair, from a 200 V Early voltage
+/// The tail resistance sets the common-mode output impedance of the input pair, from a 200 V Early voltage.
 constexpr double TAIL_EARLY_VOLTAGE = 200.0;
-// kT/q at 27 degrees Celsius, the temperature ngspice simulates at
+/// kT/q at 27 degrees Celsius, the temperature ngspice simulates at.
 constexpr double THERMAL_VOLTAGE = 0.025852;
 constexpr double INPUT_SATURATION_CURRENT = 8e-16;
-// The output current flows through this sense resistance; past the short-circuit current, the voltage across it
-// amplified to this threshold turns on the current-limit diodes
+/// Resistance the output current flows through, so its voltage tells the current.
 constexpr double OUTPUT_SENSE_RESISTANCE = 1.0;
+/// Voltage the amplified sense voltage reaches at the short-circuit current, where it turns on the current-limit
+/// diodes.
 constexpr double CURRENT_LIMIT_THRESHOLD = 0.853;
-// Two limiter diodes in series drop this much at the limit, so the swing limit sources add it to the headroom
+/// Two limiter diodes in series drop this much at the limit, so the swing limit sources add it to the headroom.
 constexpr double LIMITER_DIODE_DROPS = 1.3831;
 
 constexpr auto MODELS = std::to_array<OpAmpModel>({

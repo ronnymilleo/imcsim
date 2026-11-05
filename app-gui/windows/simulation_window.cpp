@@ -3,9 +3,9 @@
  * @brief   Window with the settings of the analyses and the report of their last run.
  */
 
-#include "simulation_window.h"
+#include "windows/simulation_window.h"
 
-#include "theme.h"
+#include "drawing/theme.h"
 
 namespace GUI {
 

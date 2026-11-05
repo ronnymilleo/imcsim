@@ -5,7 +5,7 @@
 
 #include "preferences.h"
 
-#include "theme.h"
+#include "drawing/theme.h"
 #include <catch2/catch_test_macros.hpp>
 #include <string>
 
@@ -17,6 +17,7 @@ TEST_CASE("Preferences load back unchanged from the file they save", "[preferenc
     preferences.WireColors = GUI::WireColoring::POWER;
     preferences.SetEffectOn(GUI::LiveEffect::LED_GLOW, true);
     preferences.SetEffectOn(GUI::LiveEffect::HEAT_GLOW, true);
+    preferences.SetEffectOn(GUI::LiveEffect::LOGIC_LIGHTS, true);
     preferences.ValueSeries = Core::ValueSeries::E24;
     preferences.BringOutputToFront = false;
     preferences.RerunOnEdit = true;

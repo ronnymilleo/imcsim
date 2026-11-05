@@ -3,7 +3,7 @@
  * @brief   Tests for running the selected analysis again by itself after an edit of the circuit.
  */
 
-#include "auto_rerun.h"
+#include "analysis/auto_rerun.h"
 
 #include <catch2/catch_test_macros.hpp>
 #include <cstddef>
@@ -22,7 +22,9 @@ struct Session {
     GUI::AutoRerunFrame Frame{.IsEnabled = true, .SettleSeconds = SETTLE_SECONDS, .HasRunToFollow = true};
     std::size_t Runs = 0;
 
-    // Advances the clock by one frame, counting the runs it asks for
+    /**
+     * @brief   Advances the clock by one frame, counting the runs it asks for.
+     */
     bool Step() {
         Frame.Time += FRAME_SECONDS;
         const bool should_run = Rerun.Update(Frame);
@@ -39,7 +41,9 @@ struct Session {
         }
     }
 
-    // An edit drops the result, so the analysis has nothing left to follow until it runs again
+    /**
+     * @brief   An edit drops the result, so the analysis has nothing left to follow until it runs again.
+     */
     void Edit() {
         ++Frame.CircuitVersion;
         Frame.HasRunToFollow = false;

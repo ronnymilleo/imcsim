@@ -3,9 +3,9 @@
  * @brief   Tests for reading a transient at an instant, the heat scales and the power of each part.
  */
 
-#include "circuit_snapshot.h"
-#include "current_flow.h"
-#include "element_factory.h"
+#include "analysis/circuit_snapshot.h"
+#include "drawing/current_flow.h"
+#include "editing/element_factory.h"
 #include "test_printers.h"
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
@@ -24,8 +24,8 @@ std::unique_ptr<GUI::UIElement> Part(const Core::ComponentType type, const GUI::
     return element;
 }
 
-// A source V1 at (0, 0) wired to R1 from (4, 0) to (8, 0), and R1 wired down to ground at (8, 4): node 1 is the
-// source and R1 top, ground is node 0
+/// A source V1 at (0, 0) wired to R1 from (4, 0) to (8, 0), and R1 wired down to ground at (8, 4): node 1 is the
+/// source and R1 top, ground is node 0.
 struct SeriesLoop {
     std::vector<std::unique_ptr<GUI::UIElement>> Elements;
     std::vector<GUI::UIWire> Wires = {{{0, 0}, {4, 0}}, {{8, 0}, {8, 4}}};
@@ -37,7 +37,9 @@ struct SeriesLoop {
     }
 };
 
-// Two samples, 0 s and 2 s: the source goes from 0 V to 4 V and delivers 0 to 2 mA
+/**
+ * @brief   Two samples, 0 s and 2 s: the source goes from 0 V to 4 V and delivers 0 to 2 mA.
+ */
 Core::Transient RampingLoop() {
     Core::Transient transient;
     transient.Times = {0.0, 2.0};

@@ -3,7 +3,7 @@
  * @brief   A resistor in the simulation model.
  */
 
-#include "resistor.h"
+#include "components/resistor.h"
 #include <memory>
 
 namespace Core {

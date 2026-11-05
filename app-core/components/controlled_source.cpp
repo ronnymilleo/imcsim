@@ -3,7 +3,7 @@
  * @brief   Sources whose output follows a voltage or a current elsewhere in the circuit (SPICE E, F, G and H).
  */
 
-#include "controlled_source.h"
+#include "components/controlled_source.h"
 
 #include <memory>
 #include <utility>
@@ -12,7 +12,9 @@ namespace Core {
 
 namespace {
 
-// Gains that give round outputs from typical controlling values: 1 V or 1 mA in, 10 V, 1 mA, 10 mA or 1 V out
+/**
+ * @brief   Gains that give round outputs from typical controlling values: 1 V or 1 mA in, 10 V, 1 mA, 10 mA or 1 V out.
+ */
 double DefaultGain(const ComponentType type) {
     switch (type) {
     case ComponentType::VCVS:
@@ -28,6 +30,8 @@ double DefaultGain(const ComponentType type) {
     case ComponentType::GROUND:
     case ComponentType::NET_LABEL:
     case ComponentType::PIN:
+    case ComponentType::LOGIC_OUTPUT:
+    case ComponentType::SEVEN_SEGMENT:
     case ComponentType::VCC:
     case ComponentType::VOLTAGE_SOURCE:
     case ComponentType::CURRENT_SOURCE:

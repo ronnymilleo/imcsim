@@ -4,13 +4,13 @@
  *          button, sets a logic input or turns a potentiometer.
  */
 
-#include "circuit.h"
 #include "components/logic_input.h"
 #include "components/potentiometer.h"
 #include "components/resistor.h"
 #include "components/switch.h"
-#include "live_change.h"
-#include "spice_value.h"
+#include "model/circuit.h"
+#include "simulation/live_change.h"
+#include "spice/spice_value.h"
 #include "test_printers.h"
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
@@ -19,7 +19,9 @@
 
 namespace {
 
-// Whether the netlist writes the element of a change with the value the change gives it
+/**
+ * @brief   Whether the netlist writes the element of a change with the value the change gives it.
+ */
 bool NetlistAgrees(const Core::Circuit &circuit, const Core::LiveChange &change) {
     const std::string netlist = circuit.ToSpiceNetlist();
     const std::string value = Core::FormatSpiceValue(change.Value);

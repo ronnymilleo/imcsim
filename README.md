@@ -21,8 +21,9 @@ New to imcsim? The [tutorial](docs/tutorial.md) builds, simulates and exports a 
 - Diodes, Zener diodes, LEDs, NPN and PNP bipolar transistors, and N- and P-channel MOSFETs, each with ready models,
   custom SPICE parameters or a vendor's `.model` imported from a library
 - Blocks: part of a schematic grouped into a reusable part with named pins on any edge and parameters each instance
-  can set, edited in place; and a vendor's subcircuits, such as op-amp models, imported from a SPICE library as blocks
-  kept as text. The schematic file keeps them all, so it opens anywhere
+  can set, edited in place, with its wires routed around it; blocks inside blocks, entered level by level; and a
+  vendor's subcircuits, such as op-amp models, imported from a SPICE library as blocks kept as text, following its
+  `.include` and `.lib` lines. The schematic file keeps them all, so it opens anywhere
 - Controlled sources (VCVS, VCCS, CCCS, CCVS), and op-amps: ideal with a gain-bandwidth product and an output
   limited by its supply pins, or a uA741 or custom part built as a Boyle macromodel from datasheet values (slew rate,
   bias current, output swing, current limit)
@@ -51,7 +52,8 @@ New to imcsim? The [tutorial](docs/tutorial.md) builds, simulates and exports a 
   named nets
 - Operating point and transient results on the schematic: values on hover, wires colored by node, by voltage or by a
   current heat map that shows the path of the current, parts colored by power, and a time bar to play a transient
-- Logic signals plot as stacked lanes under the analog traces, like a logic analyzer
+- Logic signals plot as stacked lanes under the analog traces, like a logic analyzer, and named buses read several of
+  them together as one value in binary, hexadecimal or decimal
 - Exports for reports: plots as SVG images (light for print or dark, at any size) or CSV tables, and the schematic
   as an SVG image with its probes, so the two figures can be shown side by side
 - Nine color themes, seven dark and two light, switched in Edit > Preferences or from View > Theme (see
@@ -67,6 +69,9 @@ New to imcsim? The [tutorial](docs/tutorial.md) builds, simulates and exports a 
   flip-flops, driven by a Clock source (frequency, duty cycle, logic level and start delay, written as a pulse so there
   are no rise or fall times to set) and a Logic input that drives a net high or low, and simulated with the digital
   code models of ngspice behind analog bridges, so their outputs are voltages that plot and probe like any other
+- Logic outputs and 7-segment displays that show the levels of their nets on the schematic, lit by the Logic Lights
+  effect, and eight ready logic blocks built from the gates: a 4-bit counter and shift register, a multiplexer, a
+  demultiplexer, a 2-to-4 decoder, a 4-bit adder and comparator, and a BCD to 7-segment decoder
 - Standard values: an option to take resistors, capacitors and inductors from the E6 to E192 series, typed or stepped
   with the arrows, keys or mouse wheel
 - IEC or ANSI symbols, optional terminal numbers, parts rotated (R) and mirrored left to right (M) or top to bottom
@@ -84,12 +89,13 @@ New to imcsim? The [tutorial](docs/tutorial.md) builds, simulates and exports a 
   a configurable window of points keeps long runs responsive
 - Live transients paced by the clock: flip switches, hold push buttons, change logic inputs and turn potentiometers on
   the schematic while the run continues, then pause, continue or discard the session
-- 33 example circuits sorted by topic, each with its analyses and measurements set up: dividers, RC and RLC
+- 36 example circuits sorted by topic, each with its analyses and measurements set up: dividers, RC and RLC
   filters, diode curves, a Zener regulator and a rectifier, BJT and MOSFET switches and characteristics, a current
   mirror, common-emitter and class AB amplifiers, op-amp amplifiers, an integrator, a Schmitt trigger and a Sallen-Key
   filter, an ideal transformer made of controlled sources, switching circuits, digital ones (gates, a truth
-  table of the basic gates, half and full adders, an SR latch and a ripple counter), and blocks: one RC filter used
-  twice, and a precision rectifier from a vendor's op-amp and diode models
+  table of the basic gates, half and full adders, an SR latch, a ripple counter, a decoder with logic outputs and a
+  decade counter on a 7-segment display), and blocks: one RC filter used twice, an 8-bit counter of two 4-bit blocks,
+  and a precision rectifier from a vendor's op-amp and diode models
 
 ## Screenshots
 
@@ -115,10 +121,7 @@ This is a possible roadmap, not a promise: what comes next depends on what users
 it can change at any time. The ideas below are tracked as tasks in the project's backlog and grouped here by theme,
 roughly in the order they are likely to come.
 
-- **Blocks**: blocks inside blocks, wires routed around a new block, and following the `.include` and `.lib` lines of
-  an imported library
-- **Digital**: counters, shift registers, multiplexers, decoders and the 555 timer; bus and bit-value options for the
-  logic lanes; Verilog modules placed as parts and simulated together with the analog circuit
+- **Digital**: the 555 timer, and Verilog modules placed as parts and simulated together with the analog circuit
 - **Analyses**: poles and zeros with an s-plane view, sensitivity shown on the schematic, S-parameters with a Smith chart
   and Touchstone export, transient noise sources, and Monte Carlo runs on top of the parameter step
 - **Sources, parts and models**: behavioral sources, XSPICE analog blocks, transmission lines, a circuit driven from a

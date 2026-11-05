@@ -6,7 +6,7 @@
 #ifndef IMCSIM_UI_TRANSISTOR_H
 #define IMCSIM_UI_TRANSISTOR_H
 
-#include "ui_element.h"
+#include "ui_elements/ui_element.h"
 
 namespace GUI {
 
@@ -30,6 +30,11 @@ protected:
     LocalBounds GetLocalBounds() const override;
 
     // Helpers for derived classes
+    /**
+     * @brief   Names the model of the transistor, for the label under its name.
+     * @return  The ready model name, such as "2N3904", the name of the library model it uses, or the name shown
+     *          for custom parameters.
+     */
     virtual const char *GetModelName() const = 0;
     void DrawArrowHead(SchematicCanvas &canvas, const ViewTransform &view, ImVec2 tip, ImVec2 direction,
                        ImU32 color) const;

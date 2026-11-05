@@ -6,7 +6,7 @@
 #ifndef IMCSIM_UI_BJT_H
 #define IMCSIM_UI_BJT_H
 
-#include "ui_transistor.h"
+#include "ui_elements/ui_transistor.h"
 
 namespace GUI {
 

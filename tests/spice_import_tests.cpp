@@ -3,16 +3,16 @@
  * @brief   Tests for turning the subcircuits of a SPICE library into blocks of the schematic.
  */
 
-#include "spice_import.h"
+#include "document/spice_import.h"
 
-#include "clipboard.h"
 #include "components/subcircuit.h"
-#include "element_factory.h"
-#include "library_model.h"
-#include "schematic.h"
-#include "schematic_file.h"
-#include "spice_library.h"
-#include "subcircuit_pins.h"
+#include "document/clipboard.h"
+#include "document/schematic.h"
+#include "document/schematic_file.h"
+#include "document/subcircuit_pins.h"
+#include "editing/element_factory.h"
+#include "model/library_model.h"
+#include "spice/spice_library.h"
 #include <catch2/catch_test_macros.hpp>
 #include <memory>
 #include <string>
@@ -20,7 +20,7 @@
 
 namespace {
 
-// An op-amp as a vendor writes it: numbered ports, documented in a comment
+/// An op-amp as a vendor writes it: numbered ports, documented in a comment.
 constexpr std::string_view OP_AMP_LIBRARY = R"(* connections: non-inverting input
 *              | inverting input
 *              | | positive supply
@@ -32,7 +32,9 @@ R1 6 5 10
 .ENDS
 )";
 
-// A library subcircuit whose ports say what they are
+/**
+ * @brief   A library subcircuit whose ports say what they are.
+ */
 Core::LibrarySubcircuit NamedPorts() {
     return {.Name = "AMP",
             .Ports = {"IN+", "IN-", "VCC", "VEE", "OUT", "OUT"},

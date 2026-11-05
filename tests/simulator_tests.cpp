@@ -3,7 +3,6 @@
  * @brief   Tests for the operating point simulation, run through the real ngspice library.
  */
 
-#include "circuit.h"
 #include "components/bjt.h"
 #include "components/capacitor.h"
 #include "components/clock.h"
@@ -24,7 +23,8 @@
 #include "components/voltage_controlled_switch.h"
 #include "components/voltage_source.h"
 #include "digital_models.h"
-#include "simulator.h"
+#include "model/circuit.h"
+#include "simulation/simulator.h"
 #include <algorithm>
 #include <array>
 #include <catch2/catch_test_macros.hpp>
@@ -173,7 +173,9 @@ struct LowSideSwitch {
     }
 };
 
-// Rebuilds a complex current from the decibels and degrees an AC sweep reports
+/**
+ * @brief   Rebuilds a complex current from the decibels and degrees an AC sweep reports.
+ */
 std::complex<double> FromDecibels(const double decibels, const double degrees) {
     return std::polar(std::pow(10.0, decibels / 20.0), degrees * std::numbers::pi / 180.0);
 }
@@ -1197,7 +1199,9 @@ TEST_CASE("An AC sweep gives the small-signal gain and currents of a common-emit
     }
 }
 
-// True when some warning starts with the text, so tests can check one rating at a time
+/**
+ * @brief   True when some warning starts with the text, so tests can check one rating at a time.
+ */
 bool HasWarning(const std::vector<std::string> &warnings, const std::string &start) {
     return std::ranges::any_of(warnings, [&start](const std::string &warning) { return warning.starts_with(start); });
 }
@@ -2289,7 +2293,9 @@ TEST_CASE("An AC sweep runs with a gate in the circuit", "[simulator][digital]")
 
 namespace {
 
-// Thermal noise density of a resistor at the 27 C ngspice simulates at, in V/sqrt(Hz)
+/**
+ * @brief   Thermal noise density of a resistor at the 27 C ngspice simulates at, in V/sqrt(Hz).
+ */
 double ThermalNoise(const double resistance) {
     constexpr double BOLTZMANN = 1.380649e-23;
     constexpr double TEMPERATURE = 300.15;
@@ -2900,7 +2906,7 @@ TEST_CASE("Gates with three inputs follow their truth tables, an XOR giving odd 
     SKIP_WITHOUT_DIGITAL_MODELS();
     struct GateCase {
         Core::ComponentType Type;
-        // Whether the output is high for 0, 1, 2 and 3 high inputs
+        /// Whether the output is high for 0, 1, 2 and 3 high inputs.
         std::array<bool, 4> HighForCount;
     };
     constexpr std::array<GateCase, 6> CASES = {{{Core::ComponentType::AND, {false, false, false, true}},

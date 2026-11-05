@@ -3,21 +3,24 @@
  * @brief   Tests for the checks of a circuit and of the settings of an analysis, which no backend takes part in.
  */
 
-#include "circuit_checks.h"
+#include "simulation/circuit_checks.h"
 
 #include "components/clock.h"
 #include "components/ground.h"
 #include "components/logic_input.h"
 #include "components/logic_part.h"
 #include "components/resistor.h"
+#include "components/subcircuit.h"
 #include "components/voltage_source.h"
+#include "model/subcircuit.h"
 #include <catch2/catch_test_macros.hpp>
+#include <memory>
 #include <string>
 #include <vector>
 
 namespace {
 
-// A 5 V source across a 1k resistor to ground: node 1 is the source, ground is node 0
+/// A 5 V source across a 1k resistor to ground: node 1 is the source, ground is node 0.
 struct SourceAndResistor {
     Core::VoltageSource Source;
     Core::Resistor Load;
@@ -55,6 +58,21 @@ TEST_CASE("A circuit needs parts, and a ground unless it is only digital", "[cir
     digital.Add(input, {1});
     digital.Add(gate, {1, 2, 3});
     CHECK_FALSE(Core::CheckCircuit(digital).has_value());
+
+    // A block holding only logic parts counts as digital too, but not one with a resistor inside
+    auto logic_block = std::make_shared<Core::SubcircuitDefinition>();
+    logic_block->Name = "logic";
+    logic_block->Pins = {{"A", 1}, {"Y", 3}};
+    logic_block->Body.Add(gate, {1, 2, 3});
+    Core::SubcircuitInstance instance("logic", {"A", "Y"});
+    instance.SetName("X1");
+    Core::Circuit with_block;
+    with_block.Add(input, {1});
+    with_block.Add(instance, {1, 2});
+    with_block.AddSubcircuit(logic_block);
+    CHECK_FALSE(Core::CheckCircuit(with_block).has_value());
+    logic_block->Body.Add(valid.Load, {3, 0});
+    CHECK(Core::CheckCircuit(with_block).value_or("").contains("no ground"));
 }
 
 TEST_CASE("Transient settings need a positive span and step, and not too many points", "[circuit_checks]") {

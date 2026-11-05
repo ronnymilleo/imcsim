@@ -6,19 +6,21 @@
 #ifndef IMCSIM_LOGIC_PART_H
 #define IMCSIM_LOGIC_PART_H
 
-#include "component.h"
+#include "components/component.h"
 #include <memory>
 #include <string>
 #include <vector>
 
 namespace Core {
 
-// Where a voltage reads as 0 and as 1, as fractions of the logic level; between them it is unknown
+/// Highest voltage that reads as 0, as a fraction of the logic level.
 inline constexpr double LOGIC_LOW_FRACTION = 0.3;
+/// Lowest voltage that reads as 1, as a fraction of the logic level; between the two a voltage is unknown.
 inline constexpr double LOGIC_HIGH_FRACTION = 0.7;
 
-// A gate with several inputs takes from 2 to 8 of them
+/// Fewest inputs a gate with several inputs takes.
 inline constexpr int MIN_LOGIC_INPUTS = 2;
+/// Most inputs a gate with several inputs takes.
 inline constexpr int MAX_LOGIC_INPUTS = 8;
 
 /**
