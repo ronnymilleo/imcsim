@@ -113,6 +113,8 @@ private:
     void UpdateFullMath();
     FrameResults EvaluateFrame(std::size_t node_count, const std::vector<Core::ComponentTrace> &currents) const;
     void DrawTraceList(std::size_t node_count, const std::vector<Core::ComponentTrace> &currents);
+    void DrawMathPanel(std::size_t node_count, const std::vector<Core::ComponentTrace> &currents);
+    void DrawBusPanel(std::size_t node_count);
 
     // Tabs
     void DrawTabs(const FrameResults &frame);
