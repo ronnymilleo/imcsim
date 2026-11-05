@@ -33,6 +33,12 @@ How to read what imcsim measures, plots and exports. The [README](../README.md) 
 - **Switches that follow a voltage**: a voltage-controlled switch has its threshold, hysteresis and resistances in its
   properties, and a relay its coil and contact figures. Both are drawn open, since they open and close during a run.
   The Switching examples use them: a buck converter and a relay driver with a flyback diode.
+- **Fuses**: a fuse is in the Switches and fuses group of the toolbar. Its properties pick a ready fuse (100 mA, 500 mA,
+  1 A and 5 A fast, 1 A slow-blow) or set its rated current, melting I2t and cold and blown resistance, and show the
+  cooling time constant they imply. A fuse carries its rated current for ever and blows above it, open for the rest of
+  the run: the branch loses its current at that instant, the symbol breaks with a gap, and the Output window warns when
+  it blew. A fuse inside a block is simulated, but its blow is not drawn or warned about. Every run starts with a whole fuse, and an operating point, a DC sweep and an AC sweep always see it closed.
+  The Protection example compares a fast and a slow-blow fuse (see docs/models.md).
 - **Transformers**: the value of a transformer is its primary inductance, and its properties set the turns ratio, the
   coupling and the resistance of the windings. The secondary needs a path to ground, such as the bridge of the
   Transformers examples.
@@ -321,7 +327,7 @@ edited.
 
 ## Live effects
 
-**View > Live Effects** turns on effects drawn over any wire coloring, each on its own. Both read what the schematic
+**View > Live Effects** turns on effects drawn over any wire coloring, each on its own. Each reads what the schematic
 shows, an operating point or an instant of a transient, so they show nothing until one runs.
 
 - **Current Flow** slides arrows along the wires in the direction each current goes: the arrows all look and move the
@@ -337,6 +343,10 @@ shows, an operating point or an instant of a transient, so they show nothing unt
 - **Logic Lights** fills the box of every logic input that is high and every logic output that reads 1 with the
   accent color of the theme, as a lit indicator, and lights the segments of the 7-segment displays in that color too;
   with it off, the lit segments take the color of the symbol.
+- **Fuse** bursts a few rays from a fuse for about 150 ms of the screen clock when it blows, as the result on display
+  passes the instant it did (a result that is already open when it appears does not flash). It is on for a new user; the
+  open symbol, with its gap and the word "blown" under it, shows whether the effect is on or not, and hovering the part
+  says when it blew.
 
 ## Terminals
 
@@ -347,7 +357,7 @@ Every part with more than one terminal numbers them in the order the SPICE netli
 |---|---|---|---|
 | Resistor, capacitor, inductor | left end, before rotating | right end | |
 | Potentiometer | end at the left, before rotating | end at the right | wiper, on top |
-| Switch, push button | left contact, before rotating | right contact | |
+| Switch, push button, fuse | left contact, before rotating | right contact | |
 | Voltage-controlled switch (S) | contact, top | contact, bottom | control + (4: control -) |
 | Relay (K) | contact, top | contact, bottom | coil + (4: coil -) |
 | Transformer (T) | primary +, upper left | primary -, lower left | secondary + (4: secondary -), on the right |
@@ -387,6 +397,7 @@ imcsim reports currents as ngspice computes them:
   `I(RV1.W)` for the wiper, each positive into its terminal. The three always add up to zero.
 - **Switches and push buttons** report one current like a two-terminal part, positive from terminal 1 to terminal 2;
   an open one carries picoamperes.
+- **Fuses** report one current like a switch, positive from terminal 1 to terminal 2; a blown one carries nanoamperes.
 - **Relays** report two currents, `I(K1.S)` into the first contact terminal and `I(K1.C)` into the coil +. A
   voltage-controlled switch reports the current into its first contact terminal, like a two-terminal part.
 - **Transformers** report `I(T1.P)` into the primary + and `I(T1.S)` into the secondary +, each positive into its

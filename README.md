@@ -63,8 +63,8 @@ New to imcsim? The [tutorial](docs/tutorial.md) builds, simulates and exports a 
   the file on the window), net labels that join distant points by name, and an option to turn parts and leave their
   wires in place
 - Potentiometers, with the wiper set in the properties, and switches and push buttons that are open or closed,
-  voltage-controlled switches and relays whose coil current sets when the contact closes, and transformers of two
-  coupled inductors with a turns ratio
+  voltage-controlled switches and relays whose coil current sets when the contact closes, fuses that blow by their
+  I2t and cool between overloads, and transformers of two coupled inductors with a turns ratio
 - Logic gates (AND, OR, NAND, NOR, XOR and XNOR with 2 to 8 inputs, NOT and a buffer) and D, JK, T and SR
   flip-flops, driven by a Clock source (frequency, duty cycle, logic level and start delay, written as a pulse so there
   are no rise or fall times to set) and a Logic input that drives a net high or low, and simulated with the digital
@@ -126,7 +126,7 @@ roughly in the order they are likely to come.
   and Touchstone export, transient noise sources, and Monte Carlo runs on top of the parameter step
 - **Sources, parts and models**: behavioral sources, XSPICE analog blocks, transmission lines, a circuit driven from a
   WAV or CSV file, more ready op-amp macromodels, and a MOSFET body diode and higher-level MOSFET models
-- **Live effects and plots**: a fuse that blows, safe operating area warnings, and math channels in AC sweeps
+- **Live effects and plots**: safe operating area warnings, and math channels in AC sweeps
 - **Longer term, a native simulation backend**: a solver written from published circuit theory that sits beside ngspice,
   which stays available, tested against closed-form results and built to use modern CPUs well. With the backend
   interface and capability matrix in place, it would come in steps: a linear core (operating point, DC and AC),
