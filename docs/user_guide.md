@@ -120,7 +120,7 @@ How to read what imcsim measures, plots and exports. The [README](../README.md) 
 - **Find a part**: press Space over the editor, type part of a name (`mos`, `zener`, `opamp`, `nmos`, `vcvs`), move
   with Up and Down, and press Enter to start placing it.
 - **Running**: the ▶ button at the end of the toolbar, or F5, runs the analysis named beside it. That button opens
-  the list of analyses (operating point, transient, AC sweep, DC sweep, noise, transfer function, sensitivity, poles and zeros and truth table) and the settings
+  the list of analyses (operating point, transient, AC sweep, DC sweep, noise, transfer function, sensitivity, poles and zeros, S-parameters and truth table) and the settings
   of the one picked, saved with the schematic. Suggest fills the transient times (five periods of the slowest source with a waveform, 200
   points in a period of the fastest) or the AC range (two decades past the RC, RL and LC corners and the op-amp
   bandwidths). By default nothing runs by itself: edit the circuit, then run again, or turn on Run again after edits
@@ -752,6 +752,63 @@ op-amp circuits at certain gain-bandwidth products (try another product or a rea
 roots or return wrong ones; treat the result as a check on the AC sweep rather than as the last word. The table is a
 readout like the operating point, so it is not exported.
 
+## S-parameters
+
+The S-parameters analysis measures how a circuit scatters a signal between its ports, as a network analyzer does:
+S11 is the share of the wave sent into port 1 that comes back (the reflection), and S21 the share that arrives at
+port 2 (the transmission). Waves are normalized to the reference impedance of each port, 50 ohm by default, so an S11
+of 0 is a perfect match and an S21 of 0 dB passes everything.
+
+**Ports**: the ports are Block pin markers of the top-level schematic. Select a marker, turn on **S-parameter port**
+in its properties, and set its **Number** and **Z0**. A new port takes the lowest number no other marker uses; the
+numbers must run from 1 to N with no gap and no repeat, and the symbol reads `P1`, `P2 (OUT)`. A marker that is not a
+port does nothing here, and a port is invisible to every other analysis: only in an S-parameter run does imcsim put a
+source and the reference impedance at its node. Inside a block, port settings are kept and ignored. The analysis needs two
+or more ports in all, a Ground in the circuit, a node of its own for each port (not ground, not shared) and a Z0 above
+zero; imcsim says which is wrong before it runs.
+
+**Measuring a one-port**: the analysis needs two ports, as ngspice refuses a single one. Add a second port on an
+isolated node, with nothing connected to it: S11 is then the reflection of the first port, and S22 reads 1.
+
+**Bias**: a port holds its node at 0 V in DC and loads the circuit with its reference impedance, so a node that has a
+bias belongs behind a capacitor (or an inductor, for a port on a supply line), as the bias tee of a network analyzer
+does. The circuit's own sources keep their DC value and are AC ground for the measurement.
+
+**Settings**: pick S-parameters beside Run, then the **Start** and **Stop** frequencies (1 MHz to 1 GHz by default),
+the **Sweep** type and the points: log with points per decade (100 by default), or linear with the number of points in all (at least 3,
+since ngspice gives a single point for two). The settings are saved with the schematic. Circuits with logic gates or
+flip-flops cannot run it, and the analysis is disabled with that reason as its tooltip.
+
+The **S-parameters** tab of the Output window has:
+
+- **Entries shown**: a checkbox for every entry S(row, column) of the matrix. Each view keeps its own choice: the
+  Smith chart is for reflections, so it starts with S11, S22... checked and no transmission, while the magnitude and
+  phase plots start with S11 and S21. Check S21 on the chart too if you want it.
+- **Smith chart**: each checked entry is a curve of its reflection coefficient over the circles of constant resistance
+  (0.2, 0.5, 1, 2 and 5 times the reference) and the arcs of constant reactance (labelled `+j0.5`, `-j2`...), on
+  equal axes; a dot marks the first frequency. A point inside the chart is passive; an S21 above 1 leaves the outer
+  circle, and the chart grows to show it.
+- **Magnitude and phase**: the checked entries in decibels (20 log |S|) over their phase in degrees, on a logarithmic
+  frequency axis shared by both plots.
+- **Readings**: hover a curve for its frequency, magnitude in decibels and angle. A reflection (S11, S22...) also reads
+  the impedance the port sees, absolute and normalized, computed from S as Z0 (1 + S) / (1 - S), the VSWR,
+  (1 + |S|) / (1 - |S|), and the return loss, -20 log |S| (positive when the port absorbs power); an open circuit or a
+  perfect match reads infinite.
+
+**Exports**: Export... saves the plot shown as an SVG image (the Smith chart or the magnitude and phase panels, redrawn
+from the data, in the light or dark theme) or as a CSV table with the frequency and the real and imaginary parts of each
+checked entry. **Save Touchstone...** opens a small popup for the frequency unit and format, then writes the whole
+matrix as a Touchstone version 1 file, `.sNp` for N ports, in the frequency unit (Hz, kHz, MHz or GHz) and format you
+pick there: RI (real and imaginary parts), MA (magnitude and angle in
+degrees) or DB (decibels and angle in degrees). The default, the one most tools write, is `# GHz S MA R 50`. A two-port
+lists its entries as S11 S21 S12 S22, as the format says, which is not the order of the matrix; larger matrices go row
+by row, four pairs to a line. The file holds one reference impedance, so ports with different Z0 cannot be exported
+and the message names them.
+
+The S-parameters example (Examples > Basics) is a T low-pass of two 8 uH inductors and a 3.18 nF capacitor between two
+50 ohm ports: S11 starts at the center of the chart, matched, and sweeps out to the rim as the inductors block the
+signal, while S21 stays near 0 dB up to about 1 MHz.
+
 ## Truth table
 
 The Truth table analysis builds the truth table of a digital circuit: it sets the logic inputs to every combination,
@@ -780,7 +837,8 @@ the Run report says how many. The table is not exported as a figure, like the op
 - **SVG image**: redrawn from the data, not captured from the screen, so it stays sharp at any size. It shows the
   visible X range, so zoom in first to export a detail. Choose its size in pixels and its theme: light for print,
   which darkens trace colors too light for white paper, or dark, in the colors of the Graphite theme.
-- **CSV table**: every sample of every measured trace, including math channels, whatever the zoom. The first column
+- **CSV table**: every sample of every measured trace, including math channels, whatever the zoom (the S-parameters
+  tab lists the real and imaginary parts of the checked entries, and also saves Touchstone files). The first column
   is the X axis; each header carries its unit, and on a Bode plot its panel (`Magnitude V(2) (dB)`). Missing
   samples, such as a division by zero in a math channel, are empty cells.
 
