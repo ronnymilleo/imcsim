@@ -177,6 +177,10 @@ the supplies and the bridges of the logic parts all refer to node 0 in the netli
 the symbol, and the gate outputs need no load. Any other part brings the rule back: a resistor or an analog source
 would have no node to return to, so the run stops with "The circuit has no ground".
 
+A **logic output** has no model: it writes no netlist line and only reads the voltage of its node from the result,
+against its own logic level, as a gate input would (1 at 70% of the level or above, 0 at 30% or below, unknown in
+between). It loads nothing and needs no Ground.
+
 ## Independent sources
 
 **Voltage source** (`V`, named Vin) and **current source** (`I`) take one of seven waveforms:

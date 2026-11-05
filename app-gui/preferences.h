@@ -40,6 +40,8 @@ enum class LiveEffect {
     CURRENT_FLOW,
     LED_GLOW,
     HEAT_GLOW,
+    /// Lights the box of a logic input that is high and of a logic output that reads 1.
+    LOGIC_LIGHTS,
     COUNT
 };
 

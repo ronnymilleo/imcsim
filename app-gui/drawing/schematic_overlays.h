@@ -16,6 +16,7 @@
 #include "editing/probing.h"
 #include "helpers.h"
 #include "imgui.h"
+#include "plots/logic_trace.h"
 #include "preferences.h"
 #include "simulation/simulation_results.h"
 #include <cstddef>
@@ -35,6 +36,9 @@ struct DisplayedState {
     HeatScale Scale;
     std::vector<ComponentPower> Powers;
     std::optional<double> Time;
+    /// What each logic output reads, by the index of its element; none for the other parts and for an output whose
+    /// node the result has no voltage for.
+    std::vector<std::optional<LogicState>> LogicReadings;
 };
 
 /**
@@ -90,6 +94,8 @@ private:
 
     // Parts
     ImU32 GetElementColor(const Schematic &schematic, std::size_t index) const;
+    void DrawLogicReading(SchematicCanvas &canvas, const ViewTransform &view, const UIElement &element,
+                          std::size_t index) const;
 
     // Heat colors
     bool AreWiresHeatColored() const;

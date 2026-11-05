@@ -9,6 +9,7 @@ add_library(imcsim-gui-lib
             analysis/analysis_settings_panel.cpp
             analysis/auto_rerun.cpp
             analysis/circuit_snapshot.cpp
+            analysis/logic_outputs.cpp
             analysis/parameter_step.cpp
             analysis/playback.cpp
             analysis/point_window.cpp
@@ -73,7 +74,9 @@ add_library(imcsim-gui-lib
             ui_elements/ui_element.cpp
             ui_elements/ui_ground.cpp
             ui_elements/ui_inductor.cpp
+            ui_elements/ui_logic_box.cpp
             ui_elements/ui_logic_input.cpp
+            ui_elements/ui_logic_output.cpp
             ui_elements/ui_logic_part.cpp
             ui_elements/ui_mosfet.cpp
             ui_elements/ui_net_label.cpp

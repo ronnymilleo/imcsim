@@ -188,6 +188,10 @@ constexpr auto LOGIC_INPUT_FIELDS = std::to_array<ParameterField<Core::LogicInpu
     {"Logic level", &Core::LogicInputParameters::LogicLevel, "V"},
 });
 
+constexpr auto LOGIC_OUTPUT_FIELDS = std::to_array<ParameterField<Core::LogicOutputParameters>>({
+    {"Logic level", &Core::LogicOutputParameters::LogicLevel, "V"},
+});
+
 template <typename Parameters, std::size_t Count>
 void LoadParameterFields(const std::array<ParameterField<Parameters>, Count> &fields,
                          std::array<ValueField, Count> &value_fields, const Parameters &parameters) {
@@ -299,7 +303,8 @@ bool HasFields(const Core::Component &component) {
     }
     static constexpr auto OTHER_TYPES =
         std::to_array({Core::ComponentType::NET_LABEL, Core::ComponentType::SUBCIRCUIT, Core::ComponentType::V_SWITCH,
-                       Core::ComponentType::RELAY, Core::ComponentType::CLOCK, Core::ComponentType::LOGIC_INPUT});
+                       Core::ComponentType::RELAY, Core::ComponentType::CLOCK, Core::ComponentType::LOGIC_INPUT,
+                       Core::ComponentType::LOGIC_OUTPUT});
     return std::ranges::contains(OTHER_TYPES, type);
 }
 
@@ -326,9 +331,11 @@ bool ShowsValueFields(const Core::Component &component) {
         const auto &op_amp = static_cast<const Core::OpAmp &>(component);
         return op_amp.IsCustom() || op_amp.IsIdeal();
     }
-    // The switches that follow a voltage, the logic parts, a clock and a logic input have only their parameters
+    // The switches that follow a voltage, the logic parts, a clock and the logic inputs and outputs have only their
+    // parameters
     if (type == Core::ComponentType::V_SWITCH || type == Core::ComponentType::RELAY || Core::IsLogicPart(type) ||
-        type == Core::ComponentType::CLOCK || type == Core::ComponentType::LOGIC_INPUT) {
+        type == Core::ComponentType::CLOCK || type == Core::ComponentType::LOGIC_INPUT ||
+        type == Core::ComponentType::LOGIC_OUTPUT) {
         return true;
     }
     return component.HasValue();
@@ -501,6 +508,8 @@ bool PartEditor::DrawSettingPart(Core::Component &component) {
         DrawClock(static_cast<Core::Clock &>(component));
     } else if (type == Core::ComponentType::LOGIC_INPUT) {
         DrawLogicInput(static_cast<Core::LogicInput &>(component));
+    } else if (type == Core::ComponentType::LOGIC_OUTPUT) {
+        DrawLogicOutput(static_cast<Core::LogicOutput &>(component));
     } else {
         return false;
     }
@@ -655,6 +664,9 @@ void PartEditor::LoadSettingFields(const Core::Component &component) {
     } else if (type == Core::ComponentType::LOGIC_INPUT) {
         LoadParameterFields(LOGIC_INPUT_FIELDS, m_LogicInputFields,
                             static_cast<const Core::LogicInput &>(component).GetParameters());
+    } else if (type == Core::ComponentType::LOGIC_OUTPUT) {
+        LoadParameterFields(LOGIC_OUTPUT_FIELDS, m_LogicOutputFields,
+                            static_cast<const Core::LogicOutput &>(component).GetParameters());
     } else if (type == Core::ComponentType::TRANSFORMER) {
         LoadParameterFields(TRANSFORMER_FIELDS, m_TransformerFields,
                             static_cast<const Core::Transformer &>(component).GetParameters());
@@ -876,6 +888,22 @@ void PartEditor::DrawLogicInput(Core::LogicInput &input) {
         m_Schematic->MarkModified();
     }
     ImGui::TextDisabled("A source from its terminal to ground, so it gives a gate a defined level");
+}
+
+/**
+ * @brief   The logic level the output reads its node against; it changes no result, only the reading.
+ */
+void PartEditor::DrawLogicOutput(Core::LogicOutput &output) {
+    Core::LogicOutputParameters parameters = output.GetParameters();
+    const auto is_valid = [](const Core::LogicOutputParameters &candidate) {
+        return Core::LogicOutput::IsValidParameters(candidate);
+    };
+    if (DrawParameterFields(LOGIC_OUTPUT_FIELDS, m_LogicOutputFields, "", is_valid, parameters)) {
+        output.SetParameters(parameters);
+        m_Schematic->MarkModified();
+    }
+    ImGui::TextDisabled("Shows 1 at 70%% of the level or above, 0 at 30%% or below, X between; it adds nothing to the "
+                        "circuit");
 }
 
 /**

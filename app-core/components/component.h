@@ -61,6 +61,7 @@ enum class ComponentType {
     SR_FLIP_FLOP,
     CLOCK,
     LOGIC_INPUT,
+    LOGIC_OUTPUT,
 };
 
 /**

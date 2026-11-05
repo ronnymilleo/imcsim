@@ -42,7 +42,7 @@ TEST_CASE("FindParts ignores case, spaces and punctuation", "[element_factory]")
     }
     SECTION("an empty query lists every part") {
         const std::vector<ComponentType> all = GUI::FindParts("");
-        CHECK(all.size() == 41);
+        CHECK(all.size() == 42);
         CHECK(std::ranges::contains(all, ComponentType::RESISTOR));
         CHECK(std::ranges::contains(all, ComponentType::CLOCK));
         CHECK(std::ranges::contains(all, ComponentType::LOGIC_INPUT));

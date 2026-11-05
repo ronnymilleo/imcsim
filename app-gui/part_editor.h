@@ -12,6 +12,7 @@
 #include "components/controlled_source.h"
 #include "components/diode.h"
 #include "components/logic_input.h"
+#include "components/logic_output.h"
 #include "components/logic_part.h"
 #include "components/mosfet.h"
 #include "components/net_label.h"
@@ -104,6 +105,8 @@ private:
     std::array<ValueField, 4> m_ClockFields;
     /// One per member of Core::LogicInputParameters.
     std::array<ValueField, 1> m_LogicInputFields;
+    /// One per member of Core::LogicOutputParameters.
+    std::array<ValueField, 1> m_LogicOutputFields;
     std::vector<ValueField> m_SubcircuitFields;
     /// Parameters of the block being edited, which a resistor, capacitor or inductor can take its value from.
     std::vector<std::string> m_BlockParameters;
@@ -129,6 +132,7 @@ private:
     void DrawLogicPart(Core::LogicPart &part);
     void DrawClock(Core::Clock &clock);
     void DrawLogicInput(Core::LogicInput &input);
+    void DrawLogicOutput(Core::LogicOutput &output);
     void DrawNetLabel(Core::NetLabel &label);
     void DrawDiode(Core::Diode &diode);
     void DrawBJT(Core::BJT &bjt);
