@@ -113,6 +113,10 @@ void DrawMeasuredValue(const char *name, double value, double scale, const char 
 bool BeginStatisticsTable(const std::string &id);
 void DrawWithStatistics(const std::function<void()> &draw_plots, const std::function<void()> &draw_statistics);
 
+// Poles and zeros
+ImVec4 GetPoleZeroColor(bool is_pole, bool is_right_half_plane);
+void DrawRootMarkers(const Core::PoleZero &result, bool has_labels);
+
 // Lists
 std::optional<bool> DrawAllNoneButtons(const char *id);
 

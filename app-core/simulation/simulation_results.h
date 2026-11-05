@@ -171,6 +171,41 @@ struct TransferFunction {
 };
 
 /**
+ * @struct  PoleZeroRoot
+ * @brief   One pole or zero of a transfer function, with a conjugate pair kept as one row.
+ * @details Real and Imaginary are in rad/s. A complex root is stored once, with the positive imaginary part, and
+ *          stands for its conjugate too; a real root has no imaginary part. Quality factor and damping ratio belong to
+ *          complex roots only, and a root on the imaginary axis has an infinite quality factor, kept as no value.
+ */
+struct PoleZeroRoot {
+    bool IsPole = true;
+    double Real = 0.0;
+    double Imaginary = 0.0;
+    double NaturalFrequencyHertz = 0.0;
+    std::optional<double> QualityFactor;
+    std::optional<double> DampingRatio;
+    /// A pole there makes the circuit unstable, or the solver failed to find it right.
+    bool IsRightHalfPlane = false;
+};
+
+/**
+ * @struct  PoleZero
+ * @brief   The poles and zeros from an input source to the voltage of an output node.
+ * @details Poles come first, then zeros, each by growing natural frequency. A pole and a zero at the same place cancel
+ *          and are left out; CancelledPairs counts them, since ngspice reports them for parts the signal never reaches.
+ *          Warnings tell what makes the list doubtful, such as roots the solver gave up on.
+ */
+struct PoleZero {
+    int OutputNode = 0;
+    std::string InputSource;
+    /// Unit of the input source, "V" or "A", which tells whether the transfer is a gain or a transimpedance.
+    std::string InputUnit;
+    std::vector<PoleZeroRoot> Roots;
+    int CancelledPairs = 0;
+    std::vector<std::string> Warnings;
+};
+
+/**
  * @struct  PartSensitivity
  * @brief   How much the output node voltage changes with the value of one part.
  * @details Absolute is in volts per unit of the part (V/Ohm, V/F, V/V...). Normalized is the change in volts for a
@@ -246,6 +281,7 @@ using ACSweepRun = SimulationRun<ACSweep>;
 using DCSweepRun = SimulationRun<DCSweep>;
 using NoiseRun = SimulationRun<Noise>;
 using SensitivityRun = SimulationRun<Sensitivity>;
+using PoleZeroRun = SimulationRun<PoleZero>;
 using TransferFunctionRun = SimulationRun<TransferFunction>;
 using TruthTableRun = SimulationRun<TruthTable>;
 

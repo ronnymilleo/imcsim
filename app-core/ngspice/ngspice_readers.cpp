@@ -9,6 +9,7 @@
 #include "components/source.h"
 #include "ngspice/ngspice_library.h"
 #include "simulation/circuit_checks.h"
+#include "simulation/pole_zero.h"
 #include "simulation/ratings.h"
 #include "simulation/sensitivity.h"
 #include <algorithm>
@@ -370,6 +371,38 @@ std::expected<double, std::string> ReadTransferFunctionValue(const std::string &
 }
 
 /**
+ * @brief   The plot a pole-zero analysis leaves; its name starts with "pz".
+ */
+std::optional<std::string> FindPoleZeroPlot() {
+    char *const *names = ngSpice_AllPlots();
+    for (; names != nullptr && *names != nullptr; ++names) {
+        const std::string name(*names);
+        if (name.starts_with("pz")) {
+            return name;
+        }
+    }
+    return std::nullopt;
+}
+
+/**
+ * @brief   The roots of one kind in the plot, from its vectors "pole(1)", "pole(2)"... or "zero(1)"...
+ */
+ComplexRoots ReadRoots(const std::string &plot, const std::string_view kind) {
+    ComplexRoots roots;
+    const std::string prefix = std::format("{}(", kind);
+    for (const std::string &name : ListVectors(plot)) {
+        if (!name.starts_with(prefix)) {
+            continue;
+        }
+        const pvector_info vector = FindVector(std::format("{}.{}", plot, name));
+        if (vector != nullptr) {
+            roots.push_back(ComplexValues(*vector).front());
+        }
+    }
+    return roots;
+}
+
+/**
  * @brief   The plot a sensitivity analysis leaves; its name starts with "sens".
  */
 std::optional<std::string> FindSensitivityPlot() {
@@ -716,6 +749,26 @@ std::expected<TransferFunction, std::string> ReadTransferFunction(const Circuit 
         return std::unexpected("ngspice returned a transfer function that is not a number");
     }
     return result;
+}
+
+/**
+ * @brief   Reads the poles and zeros of the transfer function the run found.
+ * @param[in] circuit   Circuit that was simulated.
+ * @param[in] settings  Output node and input source the run used.
+ * @return  The poles and zeros, or the error when ngspice left none, which it does without a message when its solver
+ *          fails.
+ */
+std::expected<PoleZero, std::string> ReadPoleZero(const Circuit &circuit, const PoleZeroSettings &settings) {
+    const std::optional<std::string> plot = FindPoleZeroPlot();
+    if (!plot) {
+        return std::unexpected("ngspice returned no pole-zero plot");
+    }
+    const ComplexRoots poles = ReadRoots(*plot, "pole");
+    const ComplexRoots zeros = ReadRoots(*plot, "zero");
+    if (poles.empty() && zeros.empty()) {
+        return std::unexpected(std::string(NO_POLE_ZERO_RESULT));
+    }
+    return BuildPoleZero(circuit, settings, poles, zeros);
 }
 
 /**

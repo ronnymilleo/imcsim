@@ -10,6 +10,7 @@
 #include "ngspice/ngspice_library.h"
 #include "ngspice/ngspice_readers.h"
 #include "simulation/live_change.h"
+#include "simulation/pole_zero.h"
 #include "spice/spice_value.h"
 #include <algorithm>
 #include <chrono>
@@ -303,11 +304,13 @@ std::optional<std::string> RunInChunks(const Circuit &circuit, const TransientSe
  * @brief   Runs one analysis on a clean library.
  * @details Return codes stay 0 even when the netlist is rejected, so success is told by the plot the run created, whose
  *          name starts with the analysis (op1, tran1, ac1). execute runs the loaded analysis and returns why it failed,
- *          if it did on its own account.
+ *          if it did on its own account. add_current_probes is false for an analysis whose solver the extra 0 V sources
+ *          disturb.
  */
 template <typename Data, typename Reader, typename Execute = decltype(&RunToTheEnd)>
 SimulationRun<Data> Simulate(const Circuit &circuit, const std::string_view analysis,
-                             const std::string_view plot_prefix, Reader read_result, Execute execute = &RunToTheEnd) {
+                             const std::string_view plot_prefix, Reader read_result, Execute execute = &RunToTheEnd,
+                             const bool add_current_probes = true) {
     SimulationRun<Data> run;
     if (!EnsureInitialized()) {
         run.Result = std::unexpected("ngspice stopped after a fatal error; restart imcsim to simulate again");
@@ -317,7 +320,7 @@ SimulationRun<Data> Simulate(const Circuit &circuit, const std::string_view anal
     SetMessageTarget(&run.Messages);
     // savecurrents makes ngspice keep the current through every component, not only through voltage sources;
     // diodes get probes instead, since ngspice saves no usable diode current in .ac
-    LoadCircuit(circuit.ToSpiceNetlist(std::format(".options savecurrents\n{}", analysis), true));
+    LoadCircuit(circuit.ToSpiceNetlist(std::format(".options savecurrents\n{}", analysis), add_current_probes));
     const std::optional<std::string> failure = execute(run.Messages);
     const char *plot = ngSpice_CurPlot();
     if (failure) {
@@ -355,16 +358,19 @@ const BackendCapabilities &NgspiceBackend::GetCapabilities() const {
     std::call_once(m_CapabilitiesReady, [this] {
         m_Capabilities = {.Analyses = {AnalysisKind::OPERATING_POINT, AnalysisKind::TRANSIENT, AnalysisKind::AC_SWEEP,
                                        AnalysisKind::DC_SWEEP, AnalysisKind::NOISE, AnalysisKind::TRANSFER_FUNCTION,
-                                       AnalysisKind::SENSITIVITY},
+                                       AnalysisKind::SENSITIVITY, AnalysisKind::POLE_ZERO},
                           .UnsupportedParts = {},
                           .UnsupportedPartsByAnalysis = {}};
         // The digital models allocate nodes while ngspice sets up the sensitivity analysis, which it cannot recover
-        // from; the parts are told apart by type, from the first to the last of the enumeration
+        // from, and they leave the pole-zero solver nothing to follow; the parts are told apart by type, from the
+        // first to the last of the enumeration
         for (int index = 0; index <= static_cast<int>(ComponentType::SEVEN_SEGMENT); ++index) {
             const auto type = static_cast<ComponentType>(index);
             if (IsLogicPart(type)) {
                 m_Capabilities.UnsupportedPartsByAnalysis[AnalysisKind::SENSITIVITY][type] =
                     "ngspice cannot run a sensitivity analysis on logic gates and flip-flops";
+                m_Capabilities.UnsupportedPartsByAnalysis[AnalysisKind::POLE_ZERO][type] =
+                    "ngspice finds no poles or zeros through digital parts";
             }
         }
         if (!AreDigitalModelsAvailable()) {
@@ -519,6 +525,43 @@ TransferFunctionRun NgspiceBackend::RunTransferFunction(const Circuit &circuit,
     const std::string analysis = std::format(".tf v({}) {}", settings.OutputNode, settings.InputSource);
     return Simulate<TransferFunction>(circuit, analysis, "tf",
                                       [&circuit, &settings] { return ReadTransferFunction(circuit, settings); });
+}
+
+/**
+ * @brief   Finds the poles and zeros of the transfer function from an input source to the voltage of a node.
+ * @param[in] circuit   Circuit to simulate, already checked.
+ * @param[in] settings  Output node and input source, already checked.
+ * @return  The poles and zeros, or an error, plus every line ngspice printed.
+ * @details The input port is the terminals of the source, with a voltage input for a voltage source and a current input
+ *          for a current source, as the solver treats the port like that. The source is given an AC magnitude of 1,
+ *          which the solver needs to accept it. The run leaves out the current probes: their 0 V sources change the
+ *          equations enough that the solver loses the poles of the fast parts.
+ */
+PoleZeroRun NgspiceBackend::RunPoleZero(const Circuit &circuit, const PoleZeroSettings &settings) {
+    const std::optional<PoleZeroInput> input = FindPoleZeroInput(circuit, settings.InputSource);
+    if (!input) {
+        return {std::unexpected(std::format("The input source {} is not in the circuit", settings.InputSource)), {}};
+    }
+    const std::string analysis = std::format(".pz {} {} {} 0 {} pz", input->PositiveNode, input->NegativeNode,
+                                             settings.OutputNode, input->IsCurrent ? "cur" : "vol");
+    // ngspice calls a voltage input shorted, and finds nothing, unless the source has an AC magnitude, which a DC
+    // source or a pulse has not; the analysis does not depend on its value
+    const auto run_with_ac_input = [&settings](const std::vector<SimulatorMessage> & /*messages*/) {
+        SendCommand(std::format("alter {} acmag=1", settings.InputSource));
+        SendCommand("run");
+        return std::optional<std::string>();
+    };
+    PoleZeroRun run = Simulate<PoleZero>(
+        circuit, analysis, "pz", [&circuit, &settings] { return ReadPoleZero(circuit, settings); }, run_with_ac_input,
+        false);
+    if (!run.Result) {
+        if (const std::optional<std::string> explanation = DescribePoleZeroFailure(run.Messages)) {
+            run.Result = std::unexpected(*explanation);
+        }
+    } else if (const std::optional<std::string> warning = FindPoleZeroWarning(run.Messages)) {
+        run.Result->Warnings.push_back(*warning);
+    }
+    return run;
 }
 
 /**

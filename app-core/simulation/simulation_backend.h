@@ -35,6 +35,7 @@ enum class AnalysisKind {
     NOISE,
     TRANSFER_FUNCTION,
     SENSITIVITY,
+    POLE_ZERO,
     TRUTH_TABLE
 };
 
@@ -154,6 +155,13 @@ public:
      * @return  The sensitivity of every part with a value, or an error, plus the messages of the backend.
      */
     virtual SensitivityRun RunSensitivity(const Circuit &circuit, const SensitivitySettings &settings) = 0;
+    /**
+     * @brief   Finds the poles and zeros of the transfer function from an input source to the voltage of a node.
+     * @param[in] circuit   Circuit to simulate, already checked.
+     * @param[in] settings  Output node and input source, already checked.
+     * @return  The poles and zeros, or an error, plus the messages of the backend.
+     */
+    virtual PoleZeroRun RunPoleZero(const Circuit &circuit, const PoleZeroSettings &settings) = 0;
 };
 
 // Backend in use

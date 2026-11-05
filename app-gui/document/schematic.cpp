@@ -1248,6 +1248,7 @@ void Schematic::MarkLiveChanged(const Core::Component &component) {
     m_Noise.reset();
     m_TransferFunction.reset();
     m_Sensitivity.reset();
+    m_PoleZero.reset();
     m_TruthTable.reset();
 }
 
@@ -1619,6 +1620,24 @@ const std::optional<Core::Sensitivity> &Schematic::GetSensitivity() const {
 }
 
 /**
+ * @brief   Stores the result of a pole-zero analysis of the current schematic.
+ * @param[in] pole_zero  Poles and zeros from the input source to the output node, or no value to clear them.
+ * @note    The result is dropped on the next change, since it no longer matches the circuit.
+ */
+void Schematic::SetPoleZero(std::optional<Core::PoleZero> pole_zero) {
+    m_PoleZero = std::move(pole_zero);
+    ++m_PoleZeroVersion;
+}
+
+/**
+ * @brief   Returns the last pole-zero analysis run for the current schematic.
+ * @return  The poles and zeros, or no value when there was no analysis since the last change.
+ */
+const std::optional<Core::PoleZero> &Schematic::GetPoleZero() const {
+    return m_PoleZero;
+}
+
+/**
  * @brief   Returns the last transfer function simulated for the current schematic.
  * @return  The transfer function result, or no value when there was no simulation since the last change.
  */
@@ -1709,6 +1728,14 @@ std::size_t Schematic::GetSensitivityVersion() const {
 }
 
 /**
+ * @brief   Returns a number that changes whenever a pole-zero result is stored.
+ * @return  The pole-zero version; compare it with a stored one to know whether the result was replaced.
+ */
+std::size_t Schematic::GetPoleZeroVersion() const {
+    return m_PoleZeroVersion;
+}
+
+/**
  * @brief   Returns a number that changes whenever a truth table result is stored.
  * @return  The truth table version; compare it with a stored one to know whether the result was replaced.
  */
@@ -1728,6 +1755,7 @@ void Schematic::InvalidateDerivedData() {
     m_Noise.reset();
     m_TransferFunction.reset();
     m_Sensitivity.reset();
+    m_PoleZero.reset();
     m_TruthTable.reset();
 }
 

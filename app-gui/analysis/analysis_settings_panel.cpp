@@ -52,6 +52,8 @@ Core::AnalysisKind ToKind(const Analysis analysis) {
         return Core::AnalysisKind::TRANSFER_FUNCTION;
     case Analysis::SENSITIVITY:
         return Core::AnalysisKind::SENSITIVITY;
+    case Analysis::POLE_ZERO:
+        return Core::AnalysisKind::POLE_ZERO;
     case Analysis::TRUTH_TABLE:
         return Core::AnalysisKind::TRUTH_TABLE;
     default:
@@ -212,6 +214,9 @@ void AnalysisSettingsPanel::DrawSettings() {
         break;
     case Analysis::SENSITIVITY:
         DrawSensitivitySettings(settings);
+        break;
+    case Analysis::POLE_ZERO:
+        DrawPoleZeroSettings(settings);
         break;
     case Analysis::TRUTH_TABLE:
         DrawTruthTableSettings(settings);
@@ -381,20 +386,48 @@ void AnalysisSettingsPanel::DrawNoiseSettings(SimulationSettings &settings) {
  *          lists every source a DC sweep could drive, whatever its waveform.
  */
 void AnalysisSettingsPanel::DrawTransferFunctionSettings(SimulationSettings &settings) {
+    DrawSourceAndOutputPickers(
+        settings.TransferFunctionSource, settings.TransferFunctionOutput, "tf",
+        "Connect some parts to measure their transfer function",
+        "The DC gain, the input impedance and the output impedance from this source to the output");
+}
+
+/**
+ * @brief   The pickers of the transfer function: the poles and zeros are those between a source and an output node.
+ */
+void AnalysisSettingsPanel::DrawPoleZeroSettings(SimulationSettings &settings) {
+    DrawSourceAndOutputPickers(settings.PoleZeroSource, settings.PoleZeroOutput, "pole_zero",
+                               "Connect some parts to find their poles and zeros",
+                               "The poles and zeros of the transfer function from this source to the output; a voltage "
+                               "source gives a voltage gain and a current source a transimpedance");
+}
+
+/**
+ * @brief   An output picker over every node, labelled as the plots label them, and an input picker over the sources.
+ * @param[in,out] source       Stored input source; changed when the user picks another.
+ * @param[in,out] output       Stored output point; changed when the user picks another node.
+ * @param[in]     id           Prefix that tells the combos of this analysis from those of the others.
+ * @param[in]     empty_text   Shown in place of the pickers when the circuit has no node to pick.
+ * @param[in]     tooltip      What the input picker is for.
+ */
+void AnalysisSettingsPanel::DrawSourceAndOutputPickers(std::string &source, std::optional<GridPoint> &output,
+                                                       const std::string &id, const char *empty_text,
+                                                       const char *tooltip) {
     const Core::Circuit circuit = m_Schematic.BuildCircuit();
     const std::vector<std::string> sources = Core::GetTransferFunctionInputSources(circuit);
-    const std::string input = ResolveOptionalInput(settings.TransferFunctionSource, sources);
-    const std::optional<int> output = ResolveOutputNode(settings.TransferFunctionOutput, circuit, m_Schematic);
-    if (!output) {
-        ImGui::TextDisabled("Connect some parts to measure their transfer function");
+    const std::string input = ResolveOptionalInput(source, sources);
+    const std::optional<int> output_node = ResolveOutputNode(output, circuit, m_Schematic);
+    if (!output_node) {
+        ImGui::TextDisabled("%s", empty_text);
         return;
     }
     const Connectivity &connectivity = m_Schematic.GetConnectivity();
     DrawFieldLabel("Output");
-    if (ImGui::BeginCombo("##tf_output", GetVoltageLabel(connectivity, *output).c_str())) {
+    if (ImGui::BeginCombo(std::format("##{}_output", id).c_str(),
+                          GetVoltageLabel(connectivity, *output_node).c_str())) {
         for (int node = 1; node < circuit.GetNodeCount(); ++node) {
-            if (ImGui::Selectable(GetVoltageLabel(connectivity, node).c_str(), node == *output)) {
-                settings.TransferFunctionOutput = connectivity.FindPointOfNode(node);
+            if (ImGui::Selectable(GetVoltageLabel(connectivity, node).c_str(), node == *output_node)) {
+                output = connectivity.FindPointOfNode(node);
             }
         }
         ImGui::EndCombo();
@@ -402,15 +435,15 @@ void AnalysisSettingsPanel::DrawTransferFunctionSettings(SimulationSettings &set
     DrawFieldLabel("Input");
     if (sources.empty()) {
         ImGui::TextDisabled("%s", std::format("Add {}", Core::SWEEPABLE_SOURCES).c_str());
-    } else if (ImGui::BeginCombo("##tf_input", input.c_str())) {
-        for (const std::string &source : sources) {
-            if (ImGui::Selectable(source.c_str(), source == input)) {
-                settings.TransferFunctionSource = source;
+    } else if (ImGui::BeginCombo(std::format("##{}_input", id).c_str(), input.c_str())) {
+        for (const std::string &candidate : sources) {
+            if (ImGui::Selectable(candidate.c_str(), candidate == input)) {
+                source = candidate;
             }
         }
         ImGui::EndCombo();
     }
-    ImGui::SetItemTooltip("The DC gain, the input impedance and the output impedance from this source to the output");
+    ImGui::SetItemTooltip("%s", tooltip);
 }
 
 /**

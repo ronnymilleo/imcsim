@@ -285,6 +285,24 @@ SensitivityRun RunSensitivity(const Circuit &circuit, const SensitivitySettings 
 }
 
 /**
+ * @brief   Finds the poles and zeros of the transfer function from an input source to the voltage of a node.
+ * @param[in] circuit   Circuit to simulate; it needs a ground component.
+ * @param[in] settings  Output node and input source.
+ * @return  The poles and zeros, with the natural frequency, quality factor and damping ratio of each, or an error, plus
+ *          every line ngspice printed. Invalid settings are rejected before reaching the backend.
+ * @note    The poles belong to the circuit linearized at its DC operating point, and only to the part of it between the
+ *          input and the output; a circuit with no capacitor or inductor between them has none. Not thread-safe: the
+ *          backend in use may be a single global instance, as ngspice is.
+ */
+PoleZeroRun RunPoleZero(const Circuit &circuit, const PoleZeroSettings &settings) {
+    if (const std::optional<std::string> error =
+            FindProblem(circuit, CheckPoleZeroSettings(circuit, settings), AnalysisKind::POLE_ZERO)) {
+        return {std::unexpected(*error), {}};
+    }
+    return GetBackend().RunPoleZero(circuit, settings);
+}
+
+/**
  * @brief   Runs every combination of some logic inputs and reads what the output nodes give.
  * @param[in] circuit   Circuit to simulate; it needs a ground component, unless it holds only clocks, logic inputs,
  *                      logic parts and supply rails.

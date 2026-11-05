@@ -108,6 +108,20 @@ struct TransferFunctionSettings {
 };
 
 /**
+ * @struct  PoleZeroSettings
+ * @brief   Where a pole-zero analysis measures its output, and which source drives the circuit.
+ * @details The input must be an independent source: a voltage or current source, supply rail, clock or logic input.
+ *          Its terminals are the input port, and the kind of source tells ngspice whether the input is a voltage or a
+ *          current, since poles and zeros depend on what the port is held to.
+ */
+struct PoleZeroSettings {
+    int OutputNode = 0;
+    std::string InputSource;
+
+    bool operator==(const PoleZeroSettings &) const = default;
+};
+
+/**
  * @struct  SensitivitySettings
  * @brief   The node whose DC voltage a sensitivity analysis measures.
  * @details Every part with a value is varied one at a time around the DC operating point; there is nothing else to set.

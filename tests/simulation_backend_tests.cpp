@@ -86,6 +86,10 @@ public:
         return {std::unexpected("not run by the fake"), {}};
     }
 
+    Core::PoleZeroRun RunPoleZero(const Core::Circuit &, const Core::PoleZeroSettings &) override {
+        return {std::unexpected("not run by the fake"), {}};
+    }
+
     int OperatingPointRuns = 0;
     std::optional<Core::TransientSettings> LastTransientSettings;
     std::optional<double> LastTemperatureCelsius;
@@ -288,7 +292,7 @@ TEST_CASE("ngspice is the backend until another one is set, and runs every analy
     CHECK(backend.GetName() == "ngspice");
     CHECK(dynamic_cast<const Core::NgspiceBackend *>(&backend) != nullptr);
     const Core::BackendCapabilities &capabilities = backend.GetCapabilities();
-    CHECK(capabilities.Analyses.size() == 7);
+    CHECK(capabilities.Analyses.size() == 8);
     // Logic parts are refused only when the digital models are missing, whatever the system ngspice has
     CHECK(capabilities.UnsupportedParts.empty() == Core::AreDigitalModelsAvailable());
     // ngspice cannot recover from a sensitivity analysis of logic parts, with its digital models or without
@@ -300,5 +304,6 @@ TEST_CASE("ngspice is the backend until another one is set, and runs every analy
 TEST_CASE("Analyses have names for the messages that refuse them", "[simulation_backend]") {
     CHECK(Core::GetAnalysisKindName(Core::AnalysisKind::OPERATING_POINT) == "operating point");
     CHECK(Core::GetAnalysisKindName(Core::AnalysisKind::AC_SWEEP) == "AC sweep");
+    CHECK(Core::GetAnalysisKindName(Core::AnalysisKind::POLE_ZERO) == "pole-zero");
     CHECK(Core::GetAnalysisKindName(Core::AnalysisKind::TRUTH_TABLE) == "truth table");
 }

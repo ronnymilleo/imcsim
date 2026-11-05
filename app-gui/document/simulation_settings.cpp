@@ -13,7 +13,7 @@ namespace {
 
 constexpr auto ANALYSIS_NAMES =
     std::to_array<const char *>({"Operating point", "Transient", "AC sweep", "DC sweep", "Noise", "Transfer function",
-                                 "Sensitivity", "Truth table"});
+                                 "Sensitivity", "Poles and zeros", "Truth table"});
 
 } // namespace
 

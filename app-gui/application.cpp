@@ -488,6 +488,8 @@ void Application::ShowNewResults() {
                 m_Schematic.GetTransferFunction().has_value(), PlotTab::TRANSFER_FUNCTION);
     show_if_new(m_ShownSensitivityVersion, m_Schematic.GetSensitivityVersion(),
                 m_Schematic.GetSensitivity().has_value(), PlotTab::SENSITIVITY);
+    show_if_new(m_ShownPoleZeroVersion, m_Schematic.GetPoleZeroVersion(), m_Schematic.GetPoleZero().has_value(),
+                PlotTab::POLE_ZERO);
     show_if_new(m_ShownTruthTableVersion, m_Schematic.GetTruthTableVersion(), m_Schematic.GetTruthTable().has_value(),
                 PlotTab::TRUTH_TABLE);
 }

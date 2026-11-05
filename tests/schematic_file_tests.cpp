@@ -458,6 +458,8 @@ TEST_CASE("Simulation settings load back unchanged", "[schematic_file]") {
     settings.TransferFunctionSource = "V2";
     settings.TransferFunctionOutput = GUI::GridPoint{6, 3};
     settings.SensitivityOutput = GUI::GridPoint{10, 14};
+    settings.PoleZeroSource = "Vin1";
+    settings.PoleZeroOutput = GUI::GridPoint{8, 2};
     settings.TruthTableInputs = {"V1", "V3"};
     settings.ParameterStep = {
         .Enabled = true, .Part = "R2", .UsesList = true, .Start = 1e3, .Stop = 4e3, .Step = 1e3, .List = "1k, 2.2k"};
@@ -470,10 +472,11 @@ TEST_CASE("Simulation settings load back unchanged", "[schematic_file]") {
     settings.NoiseOutput.reset();
     settings.TransferFunctionOutput.reset();
     settings.SensitivityOutput.reset();
-    settings.Selected = GUI::Analysis::SENSITIVITY;
+    settings.PoleZeroOutput.reset();
+    settings.Selected = GUI::Analysis::POLE_ZERO;
     const GUI::LoadedSchematic without_output = LoadOrFail(GUI::SaveSchematic({}, {}, settings, {}));
     CHECK(without_output.Settings == settings);
-    CHECK(without_output.Settings.Selected == GUI::Analysis::SENSITIVITY);
+    CHECK(without_output.Settings.Selected == GUI::Analysis::POLE_ZERO);
 }
 
 TEST_CASE("Invalid noise settings fall back to their defaults with a warning", "[schematic_file]") {
@@ -501,6 +504,25 @@ TEST_CASE("Invalid sensitivity settings fall back to their defaults with a warni
     const GUI::LoadedSchematic loaded = LoadOrFail(text);
     CHECK(loaded.Warnings.size() == 1);
     CHECK_FALSE(loaded.Settings.SensitivityOutput);
+}
+
+TEST_CASE("Invalid pole-zero settings fall back to their defaults with a warning", "[schematic_file]") {
+    const std::string text = R"({"format": "imcsim-schematic", "version": 1, "simulation": {)"
+                             R"("pole_zero": {"source": 3, "output": [1, 2]}}})";
+    const GUI::LoadedSchematic loaded = LoadOrFail(text);
+    CHECK(loaded.Warnings.size() == 1);
+    CHECK(loaded.Settings.PoleZeroSource.empty());
+    CHECK_FALSE(loaded.Settings.PoleZeroOutput);
+}
+
+TEST_CASE("A file saved before the pole-zero analysis loads it as its defaults", "[schematic_file]") {
+    const std::string text = R"({"format": "imcsim-schematic", "version": 1, "simulation": {)"
+                             R"("analysis": "sensitivity", "sensitivity": {}}})";
+    const GUI::LoadedSchematic loaded = LoadOrFail(text);
+    CHECK(loaded.Warnings.empty());
+    CHECK(loaded.Settings.Selected == GUI::Analysis::SENSITIVITY);
+    CHECK(loaded.Settings.PoleZeroSource.empty());
+    CHECK_FALSE(loaded.Settings.PoleZeroOutput);
 }
 
 TEST_CASE("A file saved before the sensitivity analysis loads it as its defaults", "[schematic_file]") {
@@ -570,7 +592,7 @@ TEST_CASE("A live duration out of its range resets the transient settings with a
 
 TEST_CASE("An unknown selected analysis falls back to the transient with a warning", "[schematic_file]") {
     const std::string text = R"({"format": "imcsim-schematic", "version": 1, "simulation": {)"
-                             R"("analysis": "pole_zero", "ac_sweep": {"start": 10.0, "stop": 1e3}}})";
+                             R"("analysis": "bode_plotter", "ac_sweep": {"start": 10.0, "stop": 1e3}}})";
     const GUI::LoadedSchematic loaded = LoadOrFail(text);
     CHECK(loaded.Warnings.size() == 1);
     CHECK(loaded.Settings.Selected == GUI::Analysis::TRANSIENT);
