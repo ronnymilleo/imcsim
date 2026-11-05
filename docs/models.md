@@ -179,7 +179,7 @@ would have no node to return to, so the run stops with "The circuit has no groun
 
 A **logic output** has no model: it writes no netlist line and only reads the voltage of its node from the result,
 against its own logic level, as a gate input would (1 at 70% of the level or above, 0 at 30% or below, unknown in
-between). It loads nothing and needs no Ground.
+between). It loads nothing and needs no Ground. A **7-segment display** is the same with one input per segment.
 
 ## Independent sources
 

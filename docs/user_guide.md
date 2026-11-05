@@ -60,6 +60,10 @@ How to read what imcsim measures, plots and exports. The [README](../README.md) 
   editable in its properties). It shows the operating point, or the transient at the instant of the time bar, and
   follows a live run; it is empty before there is a result. It takes no part in the simulation, so a digital circuit
   can be tried with logic inputs and outputs alone, with no LED, resistor or Ground.
+- **7-segment display**: the box after the logic output has the inputs a to g down its left side (a the top segment,
+  b to f around it clockwise, g across the middle) and lights each segment whose input reads 1, read as the logic output
+  reads its node. A segment whose input is between the levels is filled faintly. Like the logic output, it takes no part
+  in the simulation; wired to the BCD to 7-segment decoder block, it shows the digit the decoder gets.
 - **Standard values**: Standard values in Edit > Preferences restricts resistors, capacitors and inductors to one of
   the E series (E6, E12, E24, E48, E96 or E192, with their tolerances of 20% down to 0.5%), or leaves any value
   allowed, which is the default. With a series chosen, a typed value becomes the nearest one of the series on a log scale (`5000` is
@@ -321,7 +325,8 @@ shows, an operating point or an instant of a transient, so they show nothing unt
   largest power of the circuit (of the whole run, for a transient) is full brightness, and the glow fades out two
   decades below it, so it shows where the power is lost and, while a transient plays, when.
 - **Logic Lights** fills the box of every logic input that is high and every logic output that reads 1 with the
-  accent color of the theme, as a lit indicator.
+  accent color of the theme, as a lit indicator, and lights the segments of the 7-segment displays in that color too;
+  with it off, the lit segments take the color of the symbol.
 
 ## Terminals
 
