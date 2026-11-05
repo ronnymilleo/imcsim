@@ -73,6 +73,10 @@ struct ExportSeries {
     ExportColor Color;
     bool Dashed = false;
     bool Heavy = false;
+    /// Whether the CSV lists it; false for a line that only helps draw another, as the bottom edge of a bus lane.
+    bool InTable = true;
+    /// The unit its CSV column names in place of the one of its axis, as for the values of a bus, which are numbers.
+    std::optional<std::string> TableUnit;
 };
 
 /**

@@ -451,6 +451,13 @@ their statistics and the exports always agree.
   show. The Logic lanes box beside the statistics turns the lanes off, which draws every voltage on the analog
   axis again. The plot is left out when only logic signals are measured. The SVG export has the same panels and bit
   labels; the CSV lists the voltages.
+- A logic bus reads several logic signals as one number, as a logic analyzer does, so a counter reads 0, 1, 2...
+  instead of a lane per bit. Buses, under Math in the trace list when the circuit has logic parts, adds one and opens
+  its editor: its name, its format (bin, hex or dec) and its bits, the most significant first, picked from the signals
+  of the logic parts and moved with Up and Down. Each shown bus takes a lane over the others, drawn as a band that
+  pinches at every change of its value, with the value written in it where it fits; a value is X while any of its
+  bits is unknown. A bit names its net, such as `V(Q0)`, so the bus survives edits of the circuit, and buses are saved
+  with the file. The SVG export draws them the same way, and the CSV lists their values as numbers.
 - Math channels are heavier lines; volts and amperes share the axes above, any other unit or none goes on a third
   axis. Their trace pickers offer a labeled node by its name, and a typed expression may name it as `V(OUT)` or
   `V(OUT, IN)`; a name of digits alone, such as `V(3)`, is a node number. The channels are saved with the schematic,

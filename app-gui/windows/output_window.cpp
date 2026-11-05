@@ -107,8 +107,9 @@ const char *GetTabTitle(const PlotTab tab) {
 OutputWindow::OutputWindow(Schematic &schematic, AnalysisControls &controls, TransientPlayback &playback,
                            const Preferences &preferences)
     : AppWindow("Output", true), m_Schematic(schematic), m_Controls(controls), m_Playback(playback),
-      m_Preferences(preferences), m_MathChannels(schematic), m_TransientTab(schematic, controls, playback),
-      m_SpectrumTab(schematic), m_ACSweepTab(schematic), m_DCSweepTab(schematic), m_NoiseTab(schematic) {
+      m_Preferences(preferences), m_MathChannels(schematic), m_Buses(schematic),
+      m_TransientTab(schematic, controls, playback), m_SpectrumTab(schematic), m_ACSweepTab(schematic),
+      m_DCSweepTab(schematic), m_NoiseTab(schematic) {
     SetInitialSize(INITIAL_SIZE);
     // Nothing to plot yet; the first result opens it
     SetOpen(false);
@@ -308,6 +309,15 @@ void OutputWindow::DrawTraceList(const std::size_t node_count, const std::vector
         }
     }
 
+    DrawMathPanel(node_count, currents);
+    DrawBusPanel(node_count);
+    ImGui::EndChild();
+}
+
+/**
+ * @brief   The math channels, which take any voltage or current of the list as an operand.
+ */
+void OutputWindow::DrawMathPanel(const std::size_t node_count, const std::vector<Core::ComponentTrace> &currents) {
     // A node a label names is offered by its name, so a channel saved with the file still finds it after edits that
     // number the nodes again
     std::vector<std::string> operands;
@@ -328,7 +338,22 @@ void OutputWindow::DrawTraceList(const std::size_t node_count, const std::vector
         ImGui::TextDisabled("Math waits for the end of the run");
         ImGui::PopTextWrapPos();
     }
-    ImGui::EndChild();
+}
+
+/**
+ * @brief   The logic buses, whose bits are the voltages of the nodes of logic parts.
+ */
+void OutputWindow::DrawBusPanel(const std::size_t node_count) {
+    // Buses read the signals of logic parts, so a circuit without any has none to offer
+    std::vector<std::string> signals;
+    for (const LogicNode &logic_node : FindLogicNodes(m_Schematic.BuildCircuit())) {
+        if (static_cast<std::size_t>(logic_node.Node) < node_count) {
+            signals.push_back(GetVoltageLabel(m_Schematic.GetConnectivity(), logic_node.Node));
+        }
+    }
+    if (!signals.empty() || !m_Schematic.GetBuses().empty()) {
+        m_Buses.Draw(signals);
+    }
 }
 
 /**

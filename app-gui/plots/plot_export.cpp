@@ -733,10 +733,14 @@ std::string RenderCsv(const ExportFigure &figure) {
     std::string text = CsvHeader(figure.XAxis.Name, figure.XAxis.Unit);
     for (const ExportPanel &panel : figure.Panels) {
         for (const ExportSeries &series : panel.Series) {
+            if (!series.InTable) {
+                continue;
+            }
             const std::string name = figure.Panels.size() > 1 && !panel.Title.empty()
                                          ? std::format("{} {}", panel.Title, series.Name)
                                          : series.Name;
-            const std::string unit = series.Axis < panel.YAxes.size() ? panel.YAxes[series.Axis].Unit : "";
+            const std::string unit =
+                series.TableUnit.value_or(series.Axis < panel.YAxes.size() ? panel.YAxes[series.Axis].Unit : "");
             text += "," + CsvHeader(name, unit);
             columns.push_back(&series);
         }

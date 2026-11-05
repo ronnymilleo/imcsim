@@ -52,6 +52,8 @@ add_library(imcsim-gui-lib
             editing/wire_routing.cpp
             helpers.cpp
             part_editor.cpp
+            plots/logic_bus.cpp
+            plots/logic_buses.cpp
             plots/logic_trace.cpp
             plots/math_channel.cpp
             plots/math_channels.cpp

@@ -10,6 +10,7 @@
 #include "analysis/playback.h"
 #include "document/schematic.h"
 #include "imgui.h"
+#include "plots/logic_buses.h"
 #include "plots/math_channels.h"
 #include "plots/plot_export.h"
 #include "plots/plot_exporter.h"
@@ -87,6 +88,8 @@ private:
 
     // Math channels
     MathChannels m_MathChannels;
+    /// The panel of the logic buses, which the transient plot draws as lanes of numbers.
+    LogicBuses m_Buses;
     /// Over the whole run, or none while it grows; the plot of a run in progress evaluates the window instead.
     std::optional<FullMath> m_FullMath;
 
@@ -110,6 +113,8 @@ private:
     void UpdateFullMath();
     FrameResults EvaluateFrame(std::size_t node_count, const std::vector<Core::ComponentTrace> &currents) const;
     void DrawTraceList(std::size_t node_count, const std::vector<Core::ComponentTrace> &currents);
+    void DrawMathPanel(std::size_t node_count, const std::vector<Core::ComponentTrace> &currents);
+    void DrawBusPanel(std::size_t node_count);
 
     // Tabs
     void DrawTabs(const FrameResults &frame);
