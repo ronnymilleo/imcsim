@@ -453,11 +453,12 @@ their statistics and the exports always agree.
 
 - Voltages are solid lines on the left axis, in the color of their node, the same color as in the editor.
 - Currents are dashed lines on the right axis.
-- The transient plots the measured nodes that gates and flip-flops are connected to as lanes of their own, in a plot
-  under the analog traces with the same time axis, cursors and playhead. Each lane is named at its left, high is the
-  upper level and low the lower, and a voltage between 30% and 70% of the logic level, which a gate reads as unknown,
-  is drawn halfway. Hovering a lane reads its state and voltage, such as `1 (4.72V)`. The Bit values box, off by
-  default, divides the lanes into cells as wide as the shortest steady stretch of any of them, which is half a period
+- The transient plots the measured nodes that gates and flip-flops are connected to, directly or through the pins of a
+  block that holds them, as lanes of their own, in a plot under the analog traces with the same time axis, cursors and
+  playhead. Each lane is named at its left, high is the upper level and low the lower, and a voltage between 30% and
+  70% of the logic level, which a gate reads as unknown, is drawn halfway. Hovering a lane reads its state and voltage,
+  such as `1 (4.72V)`. The Bit values box, off by default, divides the lanes into cells as wide as the shortest steady
+  stretch of any of them, which is half a period
   when there is a clock, starting at the first change, and writes 0, 1 or X in a box at the middle of each cell that has
   room for it at the current zoom. A stretch that lasts several cells reads `1 1 1`, and a glitch inside a cell does not
   show. The Logic lanes box beside the statistics turns the lanes off, which draws every voltage on the analog

@@ -389,6 +389,10 @@ Limitations:
   global and two blocks with a custom part of the same name would otherwise share one model.
 - A block kept as SPICE text is written as it came from its library, between a `.subckt` line with its own ports and
   `.ends`; imcsim reads none of it, so it simulates whatever the vendor modeled, and only what ngspice understands.
+- The ready logic blocks are ordinary blocks of the gates and flip-flops above, at a 5 V logic level and a 10 ns
+  propagation delay per part. They inherit the timing of their parts: the 4-bit counter is a ripple counter, so its
+  outputs change one after another and pass through other values for a few tens of nanoseconds, which a bus lane shows
+  as a short sliver; the adder's carry ripples through its four stages in the same way.
 - A library model is written once as `LIB_` and its name, which no ready model uses. imcsim does not read its
   parameters: a part with one gets no rating warnings, since a `.model` holds no datasheet ratings, and a MOSFET with
   one takes its channel width and length from the model, or the ngspice defaults, instead of the W and L of the

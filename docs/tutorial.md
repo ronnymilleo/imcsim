@@ -18,10 +18,10 @@ The toolbar groups its buttons:
 
 - Select, Wire and Probe, then Undo, Redo and Fit;
 - resistor, capacitor and inductor;
-- ground, VCC and the net label;
+- ground, VCC, the net label, the block pin, the logic input and output and the 7-segment display;
 - sources, diodes, transistors, controlled sources, adjustable parts (potentiometer and transformer), switches (switch,
-  push button, voltage-controlled switch and relay), logic gates and flip-flops, each a button with a dropdown arrow
-  beside it that picks the part it places;
+  push button, voltage-controlled switch and relay), logic gates and flip-flops, and the ready logic blocks, each a
+  button with a dropdown arrow beside it that picks the part it places;
 - the op-amp;
 - Run, with the analysis it runs.
 
