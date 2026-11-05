@@ -120,7 +120,7 @@ How to read what imcsim measures, plots and exports. The [README](../README.md) 
 - **Find a part**: press Space over the editor, type part of a name (`mos`, `zener`, `opamp`, `nmos`, `vcvs`), move
   with Up and Down, and press Enter to start placing it.
 - **Running**: the ▶ button at the end of the toolbar, or F5, runs the analysis named beside it. That button opens
-  the list of analyses (operating point, transient, AC sweep, DC sweep, noise, transfer function, sensitivity and truth table) and the settings
+  the list of analyses (operating point, transient, AC sweep, DC sweep, noise, transfer function, sensitivity, poles and zeros and truth table) and the settings
   of the one picked, saved with the schematic. Suggest fills the transient times (five periods of the slowest source with a waveform, 200
   points in a period of the fastest) or the AC range (two decades past the RC, RL and LC corners and the op-amp
   bandwidths). By default nothing runs by itself: edit the circuit, then run again, or turn on Run again after edits
@@ -660,6 +660,49 @@ operating point, so it is not exported. To see the same values on the schematic,
 **View > Wire Colors > Sensitivity**; untick it to go back to plain wires. The legend then reads "Change of V(out) per
 1 %", with the volts for a 1 % change at its two ends. A supply rail is named in the table as on the schematic, such
 as `VCC 12V`; clicking its row still selects it.
+
+## Poles and zeros
+
+The Poles and zeros analysis finds where the transfer function from a source to a node has its poles and zeros, which
+say how the circuit responds: poles set the corners of a Bode plot and its resonances, zeros its notches and where it
+turns up. Pick it beside Run, then set **Output**, the node whose voltage is measured, and **Input**, the source that
+drives the circuit, both picked as in the Transfer function analysis. A voltage source (or supply rail, clock or logic
+input) gives the voltage gain from it to the node, and a current source the transimpedance in ohms.
+
+The roots belong to the circuit linearized at its DC operating point and only to the part between the input and the
+output, with the source's other terminal and every supply rail taken as AC ground. A circuit with no capacitor or
+inductor between them has none, which reads as an error. Circuits with logic gates or flip-flops cannot run it, and the
+analysis is disabled with that reason as its tooltip.
+
+The Poles and zeros tab of the Output window has the s-plane at the top, with the table under it. Real parts run across and imaginary parts up,
+both in rad/s, with a **×** for each pole and a **○** for each zero; a complex pair is drawn as its two members.
+The axes are symmetric logarithmic, so roots decades apart stay visible (they start at 10 rad/s, with 0 in the middle),
+and **Linear axes** shows their true spacing.
+Hover a mark to read its kind and frequency. A root in the right half-plane is drawn and listed in the warning color:
+it means the circuit is unstable at its operating point, or that ngspice's solver got it wrong; compare it with an AC
+sweep.
+
+The table has one row per real root and per complex pair:
+
+- **Real** and **Imaginary**: the root in rad/s; a pair reads `+/-` before its imaginary part.
+- **Frequency**: the natural frequency, the size of the root over 2π, in Hz. For a first-order pole it is the corner of
+  the Bode plot.
+- **Q** and **Damping**: the quality factor, the size of the root over twice its real part, and the damping ratio, one
+  over twice Q, for complex pairs; a real root reads a dash, and a pair on the imaginary axis an infinite Q.
+
+A pole and a zero at the same place cancel, so they are left out and the note under the plot counts them: ngspice
+reports such pairs for parts the signal never reaches. A warning above the plot says when ngspice gave up searching for
+some roots, so some may be missing.
+
+To compare with the Bode plot, run the AC sweep too and tick **Show poles and zeros** on its tab: each pole and zero is
+a dashed vertical line at its natural frequency on both plots, colored as in the s-plane, and labelled on the magnitude
+plot (`p 5.03k` for a pole, `z` for a zero). A second-order low-pass reaches
+its -3 dB point near its natural frequency, a little above it when Q is over 0.71.
+
+ngspice's pole-zero solver is not reliable on every circuit. It can find nothing without saying why, as with some ideal
+op-amp circuits at certain gain-bandwidth products (try another product or a real op-amp model), and it may leave out
+roots or return wrong ones; treat the result as a check on the AC sweep rather than as the last word. The table is a
+readout like the operating point, so it is not exported.
 
 ## Truth table
 
