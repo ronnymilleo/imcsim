@@ -20,6 +20,8 @@ class UISubcircuit : public UIElement {
 public:
     UISubcircuit(GridPoint position, Rotation rotation);
 
+    std::vector<GridPoint> GetNameLabelPoints() const;
+
 protected:
     void DrawTerminals(SchematicCanvas &canvas, const ViewTransform &view, ImU32 color) const override;
     void DrawSymbol(SchematicCanvas &canvas, const ViewTransform &view, ImU32 color, SymbolStyle style) const override;
