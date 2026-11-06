@@ -12,6 +12,8 @@
 #include "plots/trace_fit_state.h"
 #include "simulation/simulation_results.h"
 #include "windows/output_tabs/frame_results.h"
+#include <string>
+#include <vector>
 
 namespace GUI {
 
@@ -34,6 +36,39 @@ public:
     ExportFigure BuildFigure(const FrameResults &frame) const;
 
 private:
+    /**
+     * @struct  BodePlot
+     * @brief   What sets one of the two plots apart: its axes, the values of the sweep it reads and its math traces.
+     */
+    struct BodePlot {
+        const char *Id;
+        const char *VoltageAxis;
+        const char *CurrentAxis;
+        std::string ThirdAxis;
+        /// Unit of the cursor readout, such as " dB".
+        const char *Unit;
+        std::vector<std::vector<double>> Core::ACSweep::*Nodes;
+        std::vector<Core::ComponentTrace> Core::ACSweep::*Currents;
+        const std::vector<MathTrace> *Math;
+        /// The magnitude plot labels the steps and the poles and zeros; the phase plot only marks them.
+        bool HasLabels;
+    };
+
+    /**
+     * @struct  PlotFits
+     * @brief   What both plots share in a frame: which axes fit and which traces they show.
+     */
+    struct PlotFits {
+        bool IsNewResult;
+        bool HaveVoltagesChanged;
+        bool HaveCurrentsChanged;
+        bool HasMathChanged;
+        bool ShowsCurrents;
+        bool HasCurrentAxis;
+        ImPlotAxisFlags VoltageAxisFlags;
+        float Height;
+    };
+
     Schematic &m_Schematic;
     /// What the plots showed last frame, so their axes fit for a new result and when their traces change.
     TraceFitState m_Fit;
@@ -45,6 +80,7 @@ private:
     bool m_ShowPoleZero = false;
 
     void DrawPlots(const Core::ACSweep &sweep, const ACMathTraces &math);
+    void DrawPlot(const Core::ACSweep &sweep, const BodePlot &plot, const PlotFits &fits);
     void DrawRoots(bool has_labels);
     void DrawStatistics(const Core::ACSweep &sweep, const ACMathTraces &math);
 };

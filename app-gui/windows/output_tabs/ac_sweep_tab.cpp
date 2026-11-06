@@ -87,93 +87,91 @@ ExportFigure ACSweepTab::BuildFigure(const FrameResults &frame) const {
  * @details Both plots share their frequency range and cursors, so zooming one zooms the other.
  */
 void ACSweepTab::DrawPlots(const Core::ACSweep &sweep, const ACMathTraces &math) {
-    const bool fit = m_Fit.TakeNewResult(m_Schematic.GetACSweepVersion());
-    const auto &steps = m_Schematic.GetACSweepSteps();
     std::vector<std::string> measured_currents = ListMeasuredCurrents(sweep.CurrentMagnitudesDecibels, m_Schematic);
-    const bool show_currents = !measured_currents.empty();
-    const bool currents_changed = m_Fit.TakeCurrentsChanged(std::move(measured_currents));
-    const bool voltages_changed =
-        m_Fit.TakeNodesChanged(ListMeasuredNodes(sweep.NodeMagnitudesDecibels.size(), m_Schematic));
-    const bool math_changed = m_Fit.TakeMathChanged(ListMathLabels(math.Magnitudes));
+    const bool shows_currents = !measured_currents.empty();
     const bool has_voltages =
         HasMeasuredVoltage(sweep.NodeMagnitudesDecibels.size(), m_Schematic) || UsesAxis(math.Magnitudes, ImAxis_Y1);
-    const bool has_currents = show_currents || UsesAxis(math.Magnitudes, ImAxis_Y2);
-    const ImPlotAxisFlags voltage_axis_flags =
-        VoltageAxisFlags(has_voltages, has_currents || UsesAxis(math.Magnitudes, ImAxis_Y3));
+    const bool has_current_axis = shows_currents || UsesAxis(math.Magnitudes, ImAxis_Y2);
+    const PlotFits fits{.IsNewResult = m_Fit.TakeNewResult(m_Schematic.GetACSweepVersion()),
+                        .HaveVoltagesChanged =
+                            m_Fit.TakeNodesChanged(ListMeasuredNodes(sweep.NodeMagnitudesDecibels.size(), m_Schematic)),
+                        .HaveCurrentsChanged = m_Fit.TakeCurrentsChanged(std::move(measured_currents)),
+                        .HasMathChanged = m_Fit.TakeMathChanged(ListMathLabels(math.Magnitudes)),
+                        .ShowsCurrents = shows_currents,
+                        .HasCurrentAxis = has_current_axis,
+                        .VoltageAxisFlags =
+                            VoltageAxisFlags(has_voltages, has_current_axis || UsesAxis(math.Magnitudes, ImAxis_Y3)),
+                        .Height = PlotHeight(2)};
     const std::string third_unit = ThirdAxisUnit(math.Magnitudes);
     const std::string third_name = third_unit.empty() ? "Math" : third_unit;
-    const float height = PlotHeight(2);
-    SetNextFits(fit, voltages_changed, currents_changed);
-    if (math_changed) {
-        FitMathAxes(math.Magnitudes);
+    DrawPlot(sweep,
+             {.Id = "Magnitude##ac",
+              .VoltageAxis = "Voltage (dB)",
+              .CurrentAxis = "Current (dB)",
+              .ThirdAxis = std::format("{} (dB)", third_name),
+              .Unit = " dB",
+              .Nodes = &Core::ACSweep::NodeMagnitudesDecibels,
+              .Currents = &Core::ACSweep::CurrentMagnitudesDecibels,
+              .Math = &math.Magnitudes,
+              .HasLabels = true},
+             fits);
+    DrawPlot(sweep,
+             {.Id = "Phase##ac",
+              .VoltageAxis = "Phase (deg)",
+              .CurrentAxis = "Current phase (deg)",
+              .ThirdAxis = std::format("{} phase (deg)", third_name),
+              .Unit = " deg",
+              .Nodes = &Core::ACSweep::NodePhasesDegrees,
+              .Currents = &Core::ACSweep::CurrentPhasesDegrees,
+              .Math = &math.Phases,
+              .HasLabels = false},
+             fits);
+}
+
+/**
+ * @brief   One of the two plots: the other steps faint, the measured traces, the math channels, the poles and zeros
+ *          and the cursors, on a logarithmic frequency axis.
+ */
+void ACSweepTab::DrawPlot(const Core::ACSweep &sweep, const BodePlot &plot, const PlotFits &fits) {
+    SetNextFits(fits.IsNewResult, fits.HaveVoltagesChanged, fits.HaveCurrentsChanged);
+    if (fits.HasMathChanged) {
+        FitMathAxes(*plot.Math);
     }
-    if (BeginTracePlot("Magnitude##ac", ImVec2(-1.0f, height))) {
-        ImPlot::SetupAxes("Frequency", "Voltage (dB)", ImPlotAxisFlags_None, voltage_axis_flags);
-        ImPlot::SetupAxisScale(ImAxis_X1, ImPlotScale_Log10);
-        ImPlot::SetupAxisLinks(ImAxis_X1, &m_View.From, &m_View.To);
-        ImPlot::SetupAxisFormat(ImAxis_X1, FormatAxisValue, const_cast<char *>("Hz"));
-        if (has_currents) {
-            ImPlot::SetupAxis(ImAxis_Y2, "Current (dB)", ImPlotAxisFlags_AuxDefault);
-        }
-        if (UsesAxis(math.Magnitudes, ImAxis_Y3)) {
-            ImPlot::SetupAxis(ImAxis_Y3, std::format("{} (dB)", third_name).c_str(), ImPlotAxisFlags_AuxDefault);
-        }
-        std::vector<StepTraces> step_traces;
-        if (steps) {
-            for (const Core::ACSweep &step : steps->Results) {
-                step_traces.push_back(
-                    {&step.Frequencies, &step.NodeMagnitudesDecibels, &step.CurrentMagnitudesDecibels});
-            }
-            PlotOtherSteps(step_traces, steps->Selected, m_Schematic, show_currents, {});
-        }
-        std::vector<PlottedTrace> plotted;
-        PlotNodes(sweep.Frequencies, sweep.NodeMagnitudesDecibels, m_Schematic, " dB", "", plotted);
-        if (show_currents) {
-            PlotCurrents(sweep.Frequencies, sweep.CurrentMagnitudesDecibels, m_Schematic, " dB", "", plotted);
-        }
-        PlotMath(sweep.Frequencies, math.Magnitudes, "", plotted, " dB");
-        if (steps) {
-            LabelSteps(step_traces, steps->Selected, ListStepLabels(steps->Parameter, steps->Unit, steps->Values),
-                       m_Schematic, show_currents, {});
-        }
-        DrawRoots(true);
-        DrawCursors(m_Cursors, true);
-        DrawCursorReadout(sweep.Frequencies, "Hz", true, plotted);
-        ImPlot::EndPlot();
+    if (!BeginTracePlot(plot.Id, ImVec2(-1.0f, fits.Height))) {
+        return;
     }
-    SetNextFits(fit, voltages_changed, currents_changed);
-    if (math_changed) {
-        FitMathAxes(math.Phases);
+    ImPlot::SetupAxes("Frequency", plot.VoltageAxis, ImPlotAxisFlags_None, fits.VoltageAxisFlags);
+    ImPlot::SetupAxisScale(ImAxis_X1, ImPlotScale_Log10);
+    ImPlot::SetupAxisLinks(ImAxis_X1, &m_View.From, &m_View.To);
+    ImPlot::SetupAxisFormat(ImAxis_X1, FormatAxisValue, const_cast<char *>("Hz"));
+    if (fits.HasCurrentAxis) {
+        ImPlot::SetupAxis(ImAxis_Y2, plot.CurrentAxis, ImPlotAxisFlags_AuxDefault);
     }
-    if (BeginTracePlot("Phase##ac", ImVec2(-1.0f, height))) {
-        ImPlot::SetupAxes("Frequency", "Phase (deg)", ImPlotAxisFlags_None, voltage_axis_flags);
-        ImPlot::SetupAxisScale(ImAxis_X1, ImPlotScale_Log10);
-        ImPlot::SetupAxisLinks(ImAxis_X1, &m_View.From, &m_View.To);
-        ImPlot::SetupAxisFormat(ImAxis_X1, FormatAxisValue, const_cast<char *>("Hz"));
-        if (has_currents) {
-            ImPlot::SetupAxis(ImAxis_Y2, "Current phase (deg)", ImPlotAxisFlags_AuxDefault);
-        }
-        if (UsesAxis(math.Phases, ImAxis_Y3)) {
-            ImPlot::SetupAxis(ImAxis_Y3, std::format("{} phase (deg)", third_name).c_str(), ImPlotAxisFlags_AuxDefault);
-        }
-        if (steps) {
-            std::vector<StepTraces> step_traces;
-            for (const Core::ACSweep &step : steps->Results) {
-                step_traces.push_back({&step.Frequencies, &step.NodePhasesDegrees, &step.CurrentPhasesDegrees});
-            }
-            PlotOtherSteps(step_traces, steps->Selected, m_Schematic, show_currents, {});
-        }
-        std::vector<PlottedTrace> plotted;
-        PlotNodes(sweep.Frequencies, sweep.NodePhasesDegrees, m_Schematic, " deg", "", plotted);
-        if (show_currents) {
-            PlotCurrents(sweep.Frequencies, sweep.CurrentPhasesDegrees, m_Schematic, " deg", "", plotted);
-        }
-        PlotMath(sweep.Frequencies, math.Phases, "", plotted, " deg");
-        DrawRoots(false);
-        DrawCursors(m_Cursors, true);
-        DrawCursorReadout(sweep.Frequencies, "Hz", true, plotted);
-        ImPlot::EndPlot();
+    if (UsesAxis(*plot.Math, ImAxis_Y3)) {
+        ImPlot::SetupAxis(ImAxis_Y3, plot.ThirdAxis.c_str(), ImPlotAxisFlags_AuxDefault);
     }
+    const auto &steps = m_Schematic.GetACSweepSteps();
+    std::vector<StepTraces> step_traces;
+    if (steps) {
+        for (const Core::ACSweep &step : steps->Results) {
+            step_traces.push_back({&step.Frequencies, &(step.*plot.Nodes), &(step.*plot.Currents)});
+        }
+        PlotOtherSteps(step_traces, steps->Selected, m_Schematic, fits.ShowsCurrents, {});
+    }
+    std::vector<PlottedTrace> plotted;
+    PlotNodes(sweep.Frequencies, sweep.*plot.Nodes, m_Schematic, plot.Unit, "", plotted);
+    if (fits.ShowsCurrents) {
+        PlotCurrents(sweep.Frequencies, sweep.*plot.Currents, m_Schematic, plot.Unit, "", plotted);
+    }
+    PlotMath(sweep.Frequencies, *plot.Math, "", plotted, plot.Unit);
+    if (steps && plot.HasLabels) {
+        LabelSteps(step_traces, steps->Selected, ListStepLabels(steps->Parameter, steps->Unit, steps->Values),
+                   m_Schematic, fits.ShowsCurrents, {});
+    }
+    DrawRoots(plot.HasLabels);
+    DrawCursors(m_Cursors, true);
+    DrawCursorReadout(sweep.Frequencies, "Hz", true, plotted);
+    ImPlot::EndPlot();
 }
 
 /**
