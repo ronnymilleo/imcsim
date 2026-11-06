@@ -5,6 +5,7 @@
 
 #include "document/schematic_file.h"
 
+#include "components/behavioral_source.h"
 #include "components/bjt.h"
 #include "components/clock.h"
 #include "components/controlled_source.h"
@@ -467,6 +468,8 @@ void WriteKindFields(const Core::Component &component, nlohmann::json &object) {
     const Core::ComponentType type = component.GetType();
     if (Core::IsCurrentControlled(type)) {
         object["control"] = static_cast<const Core::ControlledSource &>(component).GetControllingCurrent();
+    } else if (Core::IsBehavioralSource(type)) {
+        object["expression"] = static_cast<const Core::BehavioralSource &>(component).GetExpression();
     } else if (type == Core::ComponentType::SUBCIRCUIT) {
         const auto &instance = static_cast<const Core::SubcircuitInstance &>(component);
         object["definition"] = instance.GetDefinitionName();
@@ -811,6 +814,21 @@ std::expected<void, std::string> ReadControllingCurrent(const nlohmann::json &ob
     return {};
 }
 
+/**
+ * @brief   The expression of a behavioral source, kept as written; a missing one loads as the default.
+ */
+std::expected<void, std::string> ReadBehavioralExpression(const nlohmann::json &object, Core::Component &component) {
+    if (!Core::IsBehavioralSource(component.GetType()) || !object.contains("expression")) {
+        return {};
+    }
+    const std::optional<std::string> expression = ReadString(object, "expression");
+    if (!expression) {
+        return std::unexpected("has an expression that is not text");
+    }
+    static_cast<Core::BehavioralSource &>(component).SetExpression(*expression);
+    return {};
+}
+
 std::expected<void, std::string> ReadNetName(const nlohmann::json &object, Core::Component &component) {
     const Core::ComponentType type = component.GetType();
     if ((type != Core::ComponentType::NET_LABEL && !Core::IsSubcircuitPin(type)) || !object.contains("net")) {
@@ -893,8 +911,9 @@ std::expected<void, std::string> ReadLogicInputState(const nlohmann::json &objec
 
 using StateReader = std::expected<void, std::string> (*)(const nlohmann::json &, Core::Component &);
 
-constexpr auto STATE_READERS = std::to_array<StateReader>(
-    {&ReadControllingCurrent, &ReadNetName, &ReadPortSettings, &ReadSwitchState, &ReadWiper, &ReadLogicInputState});
+constexpr auto STATE_READERS =
+    std::to_array<StateReader>({&ReadControllingCurrent, &ReadBehavioralExpression, &ReadNetName, &ReadPortSettings,
+                                &ReadSwitchState, &ReadWiper, &ReadLogicInputState});
 
 /**
  * @brief   What only some kinds of part carry: the current a controlled source follows, a net name, a switch state, a

@@ -37,6 +37,8 @@ enum class ComponentType {
     VCCS,
     CCCS,
     CCVS,
+    BEHAVIORAL_VOLTAGE,
+    BEHAVIORAL_CURRENT,
     OP_AMP,
     SUBCIRCUIT,
     NET_LABEL,

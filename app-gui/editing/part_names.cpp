@@ -71,7 +71,7 @@ std::string RenameCurrent(const std::string_view current, const std::string_view
 }
 
 /**
- * @brief   An expression of a math channel after a part is renamed.
+ * @brief   An expression of a math channel or a behavioral source after a part is renamed.
  * @param[in] expression  Such as "I(R1)*V(OUT)" or "I(Q1.C)".
  * @param[in] old_name    The name the part had.
  * @param[in] new_name    The name it has now.

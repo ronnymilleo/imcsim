@@ -35,6 +35,8 @@ constexpr auto ALL_TYPES = std::to_array<ComponentType>({
     ComponentType::VCCS,
     ComponentType::CCCS,
     ComponentType::CCVS,
+    ComponentType::BEHAVIORAL_VOLTAGE,
+    ComponentType::BEHAVIORAL_CURRENT,
     ComponentType::OP_AMP,
     ComponentType::SUBCIRCUIT,
     ComponentType::NET_LABEL,
@@ -130,6 +132,9 @@ const char *Component::GetNamePrefix() const {
         return "F";
     case ComponentType::CCVS:
         return "H";
+    case ComponentType::BEHAVIORAL_VOLTAGE:
+    case ComponentType::BEHAVIORAL_CURRENT:
+        return "B";
     case ComponentType::SUBCIRCUIT:
         return "X";
     case ComponentType::OP_AMP:
@@ -191,7 +196,10 @@ const char *Component::GetUnit() const {
     case ComponentType::LOGIC_INPUT:
         return "V";
     case ComponentType::CURRENT_SOURCE:
+    case ComponentType::BEHAVIORAL_CURRENT:
         return "A";
+    case ComponentType::BEHAVIORAL_VOLTAGE:
+        return "V";
     case ComponentType::VCVS:
         return "V/V";
     case ComponentType::VCCS:
@@ -243,6 +251,8 @@ const char *Component::GetUnit() const {
  */
 bool Component::HasValue() const {
     switch (m_Type) {
+    case ComponentType::BEHAVIORAL_VOLTAGE:
+    case ComponentType::BEHAVIORAL_CURRENT:
     case ComponentType::GROUND:
     case ComponentType::NET_LABEL:
     case ComponentType::PIN:
@@ -316,6 +326,8 @@ bool Component::IsValidValue(const double value) const {
     case ComponentType::CCCS:
     case ComponentType::CCVS:
         return true;
+    case ComponentType::BEHAVIORAL_VOLTAGE:
+    case ComponentType::BEHAVIORAL_CURRENT:
     case ComponentType::GROUND:
     case ComponentType::NET_LABEL:
     case ComponentType::PIN:
@@ -617,6 +629,10 @@ const char *GetTypeName(const ComponentType type) {
         return "CCCS";
     case ComponentType::CCVS:
         return "CCVS";
+    case ComponentType::BEHAVIORAL_VOLTAGE:
+        return "BehavioralVoltage";
+    case ComponentType::BEHAVIORAL_CURRENT:
+        return "BehavioralCurrent";
     case ComponentType::OP_AMP:
         return "OpAmp";
     case ComponentType::SUBCIRCUIT:

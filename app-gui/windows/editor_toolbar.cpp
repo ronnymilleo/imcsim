@@ -40,7 +40,8 @@ constexpr auto DIODE_PARTS =
 constexpr auto TRANSISTOR_PARTS = std::to_array(
     {Core::ComponentType::NPN, Core::ComponentType::PNP, Core::ComponentType::NMOS, Core::ComponentType::PMOS});
 constexpr auto CONTROLLED_PARTS = std::to_array(
-    {Core::ComponentType::VCVS, Core::ComponentType::VCCS, Core::ComponentType::CCCS, Core::ComponentType::CCVS});
+    {Core::ComponentType::VCVS, Core::ComponentType::VCCS, Core::ComponentType::CCCS, Core::ComponentType::CCVS,
+     Core::ComponentType::BEHAVIORAL_VOLTAGE, Core::ComponentType::BEHAVIORAL_CURRENT});
 constexpr auto ADJUSTABLE_PARTS = std::to_array({Core::ComponentType::POTENTIOMETER, Core::ComponentType::TRANSFORMER});
 constexpr auto SWITCH_PARTS =
     std::to_array({Core::ComponentType::SWITCH, Core::ComponentType::PUSH_BUTTON, Core::ComponentType::V_SWITCH,

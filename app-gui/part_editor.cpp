@@ -10,7 +10,9 @@
 #include "editing/element_factory.h"
 #include "editing/live_input.h"
 #include "misc/cpp/imgui_stdlib.h"
+#include "simulation/circuit_checks.h"
 #include "simulation/simulator.h"
+#include "spice/behavioral_expression.h"
 #include "spice/spice_value.h"
 #include <algorithm>
 #include <array>
@@ -26,6 +28,11 @@
 namespace GUI {
 
 namespace {
+
+/// Width of the expression field of a behavioral source, in font sizes, so a typical expression shows whole.
+constexpr float EXPRESSION_FIELD_WIDTH = 20.0f;
+/// Width at which the help below the expression wraps, in font sizes.
+constexpr float EXPRESSION_HELP_WIDTH = 24.0f;
 
 bool AnyValue(double /*value*/) {
     return true;
@@ -356,7 +363,8 @@ bool HasFields(const Core::Component &component) {
     static constexpr auto OTHER_TYPES = std::to_array(
         {Core::ComponentType::NET_LABEL, Core::ComponentType::SUBCIRCUIT, Core::ComponentType::V_SWITCH,
          Core::ComponentType::RELAY, Core::ComponentType::FUSE, Core::ComponentType::CLOCK,
-         Core::ComponentType::LOGIC_INPUT, Core::ComponentType::LOGIC_OUTPUT, Core::ComponentType::SEVEN_SEGMENT});
+         Core::ComponentType::LOGIC_INPUT, Core::ComponentType::LOGIC_OUTPUT, Core::ComponentType::SEVEN_SEGMENT,
+         Core::ComponentType::BEHAVIORAL_VOLTAGE, Core::ComponentType::BEHAVIORAL_CURRENT});
     return std::ranges::contains(OTHER_TYPES, type);
 }
 
@@ -510,6 +518,8 @@ void PartEditor::DrawFields(Core::Component &component) {
         DrawSource(static_cast<Core::Source &>(component));
     } else if (Core::IsControlledSource(type)) {
         DrawControlledSource(static_cast<Core::ControlledSource &>(component));
+    } else if (Core::IsBehavioralSource(type)) {
+        DrawBehavioralSource(static_cast<Core::BehavioralSource &>(component));
     } else if (type == Core::ComponentType::TRANSFORMER) {
         DrawValue(component);
         DrawTransformer(static_cast<Core::Transformer &>(component));
@@ -670,6 +680,9 @@ void PartEditor::LoadFields(const Core::Component &component) {
         m_RandomFields[2].Load(source.GetRandom().First);
         m_RandomFields[3].Load(source.GetRandom().Second);
         m_PWLText = Core::FormatPWLPoints(source.GetPWL().Points);
+    }
+    if (Core::IsBehavioralSource(component.GetType())) {
+        m_ExpressionText = static_cast<const Core::BehavioralSource &>(component).GetExpression();
     }
     LoadModelFields(component);
     LoadSettingFields(component);
@@ -1458,6 +1471,33 @@ void PartEditor::DrawControllingCurrent(Core::ControlledSource &source) {
     if (current.empty()) {
         ImGui::TextColored(GetWarningTextColor(), "Pick the current the source follows");
     }
+}
+
+/**
+ * @brief   The expression applies as soon as it parses, so a half-typed one keeps the last that did; below it, what is
+ *          wrong with it in the circuit as it is now, or what it may use.
+ */
+void PartEditor::DrawBehavioralSource(Core::BehavioralSource &source) {
+    const bool is_voltage = source.GetType() == Core::ComponentType::BEHAVIORAL_VOLTAGE;
+    DrawFieldLabel(is_voltage ? "V =" : "I =");
+    ImGui::SetNextItemWidth(ImGui::GetFontSize() * EXPRESSION_FIELD_WIDTH);
+    const bool changed = ImGui::InputText("##expression", &m_ExpressionText);
+    const auto parsed = Core::ParseBehavioralExpression(m_ExpressionText);
+    if (changed && parsed) {
+        source.SetExpression(m_ExpressionText);
+        m_Schematic->MarkModified();
+    }
+    ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + ImGui::GetFontSize() * EXPRESSION_HELP_WIDTH);
+    if (!parsed) {
+        ImGui::TextColored(GetErrorTextColor(), "%s", parsed.error().c_str());
+    } else if (const std::optional<std::string> problem =
+                   Core::CheckBehavioralExpression(m_Schematic->BuildCircuit(), source)) {
+        ImGui::TextColored(GetErrorTextColor(), "%s", problem->c_str());
+    }
+    ImGui::TextDisabled("%s", is_voltage ? "Drives this voltage from + to -" : "Pushes this current from + to -");
+    ImGui::TextDisabled("V(OUT), V(IN, OUT) by net label, I(R1), I(Q1.C), numbers such as 2.2k, + - * / ^, and "
+                        "ngspice functions such as tanh(), exp(), abs(), min(), max(), x > 1 ? a : b, time, temper");
+    ImGui::PopTextWrapPos();
 }
 
 } // namespace GUI

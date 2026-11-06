@@ -3,6 +3,7 @@
  * @brief   Tests for saving schematics to JSON and loading them back.
  */
 
+#include "components/behavioral_source.h"
 #include "components/bjt.h"
 #include "components/clock.h"
 #include "components/controlled_source.h"
@@ -1297,4 +1298,25 @@ TEST_CASE("A file saved before the S-parameter analysis loads it as its defaults
     CHECK(loaded.Warnings.empty());
     CHECK(loaded.Settings.Selected == GUI::Analysis::POLE_ZERO);
     CHECK(loaded.Settings.SParameters == Core::SParameterSettings{});
+}
+
+TEST_CASE("A behavioral source keeps its expression as written, and loads with the default when it has none",
+          "[schematic_file]") {
+    std::vector<std::unique_ptr<GUI::UIElement>> elements;
+    elements.push_back(GUI::CreateElement(Core::ComponentType::BEHAVIORAL_CURRENT, {3, 3}, GUI::Rotation::R90));
+    auto &source = static_cast<Core::BehavioralSource &>(elements.back()->GetComponent());
+    source.SetName("B1");
+    source.SetExpression("1m*tanh(V(IN, REF)/26m)");
+
+    const GUI::LoadedSchematic loaded = LoadOrFail(GUI::SaveSchematic(elements, {}, {}, {}));
+    CHECK(loaded.Warnings.empty());
+    REQUIRE(loaded.Elements.size() == 1);
+    CHECK(loaded.Elements[0]->GetComponent().GetType() == Core::ComponentType::BEHAVIORAL_CURRENT);
+    CHECK(static_cast<const Core::BehavioralSource &>(loaded.Elements[0]->GetComponent()).GetExpression() ==
+          "1m*tanh(V(IN, REF)/26m)");
+
+    const std::string plain = R"({"type": "BehavioralVoltage", "x": 1, "y": 1, "rotation": 0, "name": "B1"})";
+    const GUI::LoadedSchematic defaults = LoadOrFail(Document(plain, ""));
+    REQUIRE(defaults.Elements.size() == 1);
+    CHECK(static_cast<const Core::BehavioralSource &>(defaults.Elements[0]->GetComponent()).GetExpression() == "1");
 }

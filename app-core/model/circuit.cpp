@@ -5,6 +5,7 @@
 
 #include "model/circuit.h"
 
+#include "components/behavioral_source.h"
 #include "components/bjt.h"
 #include "components/clock.h"
 #include "components/controlled_source.h"
@@ -13,6 +14,7 @@
 #include "components/logic_input.h"
 #include "components/logic_part.h"
 #include "components/mosfet.h"
+#include "components/net_label.h"
 #include "components/op_amp.h"
 #include "components/potentiometer.h"
 #include "components/relay.h"
@@ -22,6 +24,7 @@
 #include "components/transformer.h"
 #include "components/voltage_controlled_switch.h"
 #include "model/subcircuit.h"
+#include "spice/behavioral_expression.h"
 #include "spice/spice_value.h"
 #include <algorithm>
 #include <array>
@@ -142,13 +145,17 @@ bool HasBranchCurrent(const ComponentType type) {
 }
 
 /**
- * @brief   The currents that CCCS and CCVS sources of the circuit follow.
+ * @brief   The currents that CCCS and CCVS sources of the circuit follow and that behavioral sources read.
  */
 std::vector<std::string> ListControllingCurrents(const std::vector<CircuitEntry> &entries) {
     std::vector<std::string> currents;
     for (const CircuitEntry &entry : entries) {
         if (IsCurrentControlled(entry.Part->GetType())) {
             currents.push_back(static_cast<const ControlledSource &>(*entry.Part).GetControllingCurrent());
+        } else if (IsBehavioralSource(entry.Part->GetType())) {
+            std::ranges::move(
+                ListBehavioralCurrents(static_cast<const BehavioralSource &>(*entry.Part).GetExpression()),
+                std::back_inserter(currents));
         }
     }
     return currents;
@@ -570,8 +577,18 @@ void Circuit::AddPort(const CircuitPort &port) {
 }
 
 /**
- * @brief   Adds the subcircuit definitions and library models of another circuit, as a circuit derived from it needs.
- * @param[in] other  Circuit whose definitions are shared and whose models are copied.
+ * @brief   Gives a node the name a net label gave it, so expressions can name it.
+ * @param[in] net   Name of the net, compared without regard to case.
+ * @param[in] node  Its node.
+ */
+void Circuit::NameNet(const std::string_view net, const int node) {
+    m_NodeOfNet[NetLabel::NormalizeNet(net)] = node;
+}
+
+/**
+ * @brief   Adds the subcircuit definitions, library models and net names of another circuit, as a circuit derived from
+ *          it needs.
+ * @param[in] other  Circuit whose definitions are shared and whose models and net names are copied.
  */
 void Circuit::AddDefinitionsOf(const Circuit &other) {
     for (const auto &definition : other.m_Subcircuits) {
@@ -579,6 +596,9 @@ void Circuit::AddDefinitionsOf(const Circuit &other) {
     }
     for (const LibraryModel &model : other.m_LibraryModels) {
         m_LibraryModels.push_back(model);
+    }
+    for (const auto &[net, node] : other.m_NodeOfNet) {
+        m_NodeOfNet[net] = node;
     }
 }
 
@@ -632,6 +652,32 @@ const std::vector<CircuitPort> &Circuit::GetPorts() const {
 const LibraryModel *Circuit::FindLibraryModel(const std::string_view name) const {
     const auto found = std::ranges::find(m_LibraryModels, name, &LibraryModel::Name);
     return found != m_LibraryModels.end() ? &*found : nullptr;
+}
+
+/**
+ * @brief   Finds the node of a net by its name.
+ * @param[in] net  Name as written, in any case.
+ * @return  The node a label named so is on; 0 for "0" and "GND", which always mean ground; no value for a name no
+ *          label gives.
+ */
+std::optional<int> Circuit::FindNodeOfNet(const std::string_view net) const {
+    const std::string compared = NetLabel::NormalizeNet(net);
+    if (compared == "0" || compared == "gnd") {
+        return 0;
+    }
+    const auto found = m_NodeOfNet.find(compared);
+    if (found == m_NodeOfNet.end()) {
+        return std::nullopt;
+    }
+    return found->second;
+}
+
+/**
+ * @brief   Returns the names of the nets, for a copy of the circuit.
+ * @return  The node of each named net, by the name in the form nets are compared in.
+ */
+const std::map<std::string, int, std::less<>> &Circuit::GetNets() const {
+    return m_NodeOfNet;
 }
 
 /**
@@ -767,6 +813,18 @@ std::string Circuit::ToSpiceNetlist(const std::string_view analysis, const bool 
             const std::string &current = static_cast<const ControlledSource &>(component).GetControllingCurrent();
             const std::string control = FindControllingSource(*this, current).value_or(current);
             netlist += std::format("{} {} {} {} {}\n", component.GetName(), nodes[0], nodes[1], control, value);
+            break;
+        }
+        case ComponentType::BEHAVIORAL_VOLTAGE:
+        case ComponentType::BEHAVIORAL_CURRENT: {
+            const auto &source = static_cast<const BehavioralSource &>(component);
+            const auto expression = TranslateBehavioralExpression(
+                source.GetExpression(), [this](const std::string_view net) { return FindNodeOfNet(net); },
+                [this](const std::string_view current) { return FindControllingSource(*this, current); });
+            // A source the checks refuse still shows in the Netlist window, as the user wrote it
+            netlist += std::format("{} {} {} {}={}\n", component.GetName(), nodes[0], nodes[1],
+                                   component.GetType() == ComponentType::BEHAVIORAL_VOLTAGE ? "V" : "I",
+                                   expression.value_or(source.GetExpression()));
             break;
         }
         case ComponentType::SUBCIRCUIT: {
@@ -949,8 +1007,8 @@ std::vector<const Component *> CollectParts(const Circuit &circuit) {
  */
 std::vector<CurrentProbe> GetCurrentProbes(const Component &component) {
     const ComponentType type = component.GetType();
-    if (IsDiode(type) || IsControlledSource(type) || IsSwitch(type) || type == ComponentType::V_SWITCH ||
-        type == ComponentType::FUSE || type == ComponentType::OP_AMP) {
+    if (IsDiode(type) || IsControlledSource(type) || IsBehavioralSource(type) || IsSwitch(type) ||
+        type == ComponentType::V_SWITCH || type == ComponentType::FUSE || type == ComponentType::OP_AMP) {
         return {{0, ""}};
     }
     if (IsLogicGate(type)) {
