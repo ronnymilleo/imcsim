@@ -27,8 +27,8 @@ New to imcsim? The [tutorial](docs/tutorial.md) builds, simulates and exports a 
   vendor's subcircuits, such as op-amp models, imported from a SPICE library as blocks kept as text, following its
   `.include` and `.lib` lines. The schematic file keeps them all, so it opens anywhere
 - Controlled sources (VCVS, VCCS, CCCS, CCVS), and op-amps: ideal with a gain-bandwidth product and an output
-  limited by its supply pins, or a uA741 or custom part built as a Boyle macromodel from datasheet values (slew rate,
-  bias current, output swing, current limit)
+  limited by its supply pins, or a uA741, LM358 (PNP input), TL072 (JFET input) or custom part built as a Boyle
+  macromodel from datasheet values (slew rate, bias current, output swing, current limit, input offset)
 - Warnings when a diode goes into reverse breakdown or past its average forward current or power rating, or a
   transistor exceeds its voltage, current or power ratings
 - Operating point, transient, AC sweep, DC sweep, noise, transfer function, sensitivity, pole-zero, S-parameter and truth table analyses, with node

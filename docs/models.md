@@ -152,16 +152,16 @@ instance of the subcircuit `imcsim_fuse`, defined once in the netlist, and has t
 terminals, and a thermal state that decides it. You set the figures a datasheet gives, and the model derives the rest.
 
 - **Rated current** (`Ih`, 1 A): the largest current the fuse carries for ever. It never blows below it.
-- **Melting I2t** (`I2t`, 0.15 A2s): the current squared times the time that melts the element in a short overload.
-- **Cold resistance** (150 mOhm) and **blown resistance** (1 GOhm).
+- **Melting I2t** (`I2t`, 1.045 A2s): the current squared times the time that melts the element in a short overload.
+- **Cold resistance** (96.4 mOhm) and **blown resistance** (1 GOhm).
 - The **cooling time constant** `tau = I2t / Ih^2` follows from the two ratings, and the part editor shows it as a
-  read-only line (0.15 s for the 1 A fast fuse).
+  read-only line (1.045 s for the 1 A fast fuse).
 
 The element heats with the square of the current and loses its heat with the time constant `tau`:
 `dT/dt = (i^2 / Ih^2 - T) / tau`, with `T` in units of the melting point, so the fuse melts when `T` reaches 1. In
 steady state `T = i^2 / Ih^2`, so a current below the rated one never melts it, and a short overload (much shorter than
 `tau`) melts it when the integral of `i^2` over time reaches `Ih^2 tau`, the melting I2t. In between, the time to blow
-is `-tau ln(1 - Ih^2 / i^2)`: 0.045 s at 1.96 A for the default fuse. Each overload leaves heat that the fuse loses
+is `-tau ln(1 - Ih^2 / i^2)`: 0.32 s at 1.96 A for the default fuse. Each overload leaves heat that the fuse loses
 again with `tau`, so overloads spaced several time constants apart do not add up, and overloads close together do. In
 the netlist `T` is the voltage of a capacitor of 1 F with a resistor of `tau` across it, charged by a behavioral
 current source.
@@ -186,9 +186,10 @@ blows when the heat reaches 1.015, a margin above the 1 that the rated current s
   turns into an oscillation that never dies. A circuit with a fuse, in a block or not, therefore writes
   `.options method=gear` once, and the Gear integration settles the node. Gear damps fast ringing a little, so a lightly
   damped resonance in the same circuit loses some of its ring.
-- **The ready fuses** (the 100 mA, 500 mA, 1 A and 5 A fast fuses and the 1 A slow-blow) carry typical figures: about
-  0.15 s of I2t per A2 of rating for a fast fuse and 1 s for a slow-blow, and cold resistances of 4 Ohm (100 mA) down to
-  20 mOhm (5 A). They are not taken from one vendor's datasheet.
+- **The ready fuses** are 5x20 mm glass fuses of Littelfuse, with the nominal melting I2t and cold resistance of their
+  datasheets: the 100 mA, 500 mA, 1 A and 5 A fast fuses of the 217 Series (0.0026, 0.215, 1.045 and 42.8 A2s; 5.70 Ohm,
+  207, 96.4 and 13.7 mOhm) and the 1 A slow-blow of the 218 Series (6.73 A2s, 61.3 mOhm). A datasheet measures the
+  melting I2t at ten times the rated current; the model takes it as the adiabatic limit of a short overload.
 - A fuse is a model of the thermal state, not of the arc: there is no breaking capacity, arc voltage or voltage rating,
   no temperature dependence of the cold resistance, and the part carries a current through its probe like a switch.
   In a noise analysis the model adds none.
@@ -393,8 +394,9 @@ Any of them can switch to **Custom** and edit the parameters, starting from the 
   above it into a capacitor is fine; only the forward part of the current counts), the voltages and currents of
   transistors at their peak, with the same warnings. A Zener regulating in reverse is judged
   on power alone, since its rating is the dissipation. A diode imported from a library has no ratings. The ready
-  models carry the datasheet values (for example 200 mA and 500 mW for the 1N4148, 1 A and 3 W for the 1N4007, 30 mA
-  and 100 mW for the red LED), and a custom diode starts from those of the model it replaces; files saved before the
+  models carry the values of a named datasheet (for example 200 mA and 500 mW for the 1N4148 from onsemi, 1 A and
+  1.25 W for the 1N4007 from Diodes Inc, 30 mA and 75 mW for the red LED from Kingbright), listed in
+  [Datasheets of the ready models](#datasheets-of-the-ready-models), and a custom diode starts from those of the model it replaces; files saved before the
   ratings existed take them from the default model.
 - An LED is a diode whose parameters give its forward voltage; light output is not modeled.
 - Not modeled: temperature, forward recovery and package parasitics. The gradual knee of a real Zener at low
@@ -468,13 +470,16 @@ It has no slew rate, offset or current limit, and its output current returns thr
 the supply pins. It is noiseless: its internal resistor is marked `noisy=0`, and only the leakage of its clamp diodes
 remains, picovolts per root hertz, which the noise analysis lists at 0.00%.
 
-### Boyle macromodel (uA741 and Custom)
+### Boyle macromodel (uA741, LM358, TL072 and Custom)
 
 The macromodel of G. Boyle, B. Cohn, D. Pederson and J. Solomon (IEEE Journal of Solid-State Circuits, 1974), the
 basis of most SPICE op-amp models from vendors for decades:
 
-1. **Input stage**: an NPN differential pair with resistive loads and a tail current. It sets the input bias
-   current, and with the compensation capacitor, the slew rate and the gain-bandwidth product.
+1. **Input stage**: a differential pair with resistive loads and a tail current. It sets the input bias current,
+   and with the compensation capacitor, the slew rate and the gain-bandwidth product. The pair is NPN (the uA741),
+   hanging from V+, or PNP (the LM358) or P-channel JFET (the TL072), hanging from V- with its tail current from V+,
+   which lets the inputs go down to V-. A source in series with the non-inverting input adds the input offset
+   voltage.
 2. **Gain stage**: a transconductance into a 100 kΩ resistor, with a 30 pF Miller capacitor, plus a second
    transconductance from the common-mode voltage that sets the CMRR.
 3. **Output stage**: a transconductance into the output resistance, and the voltage and current limiters of Linear
@@ -489,7 +494,7 @@ application note AN48:
 |---|---|
 | Slew rate | tail current, IEE = SR x C2 |
 | Gain-bandwidth product | load resistances, RC = 1 / (2π x GBW x C2) |
-| Input bias current | transistor gain, β = IEE / 2 / IB |
+| Input bias current | transistor gain, β = IEE / 2 / IB; for a JFET pair, the gate leakage IS = IB / 2 |
 | Phase margin | excess-phase capacitor, C1 = C2 / 2 x tan(90° - PM) |
 | Open-loop gain | second-stage gain, GB = Avol / (GA x R2 x RO2) |
 | CMRR | common-mode transconductance, GCM = GA / CMRR |
@@ -500,18 +505,51 @@ application note AN48:
 
 **uA741** uses typical datasheet values (106 dB, 1 MHz, 0.5 V/µs, 80 nA of bias current, 90 dB of CMRR, 75 Ω,
 25 mA, an output 1 V short of each supply, 1.7 mA of supply current) and an assumed 60° of phase margin. Simulated, it gives
-105.9 dB, 0.505 V/µs, 13.98 V of swing from ±15 V into 10 kΩ and 24.7 mA into a short. **Custom** takes the same
-specifications from any datasheet.
+105.9 dB, 0.505 V/µs, 13.98 V of swing from ±15 V into 10 kΩ and 24.7 mA into a short. **LM358** (PNP input) and
+**TL072** (JFET input) take the typical values of their TI datasheets, SLOS068AB and SLOS080W: 100 dB, 0.7 MHz,
+0.3 V/µs, 20 nA, an output 1.5 V short of V+ and 5 mV short of V- for the LM358, and 106 dB, 5.25 MHz, 20 V/µs, 56°,
+65 pA, an output 1.5 V short of each supply for the TL072. The ready models have no offset; a datasheet gives only its
+typical size, not its sign. **Custom** takes the same specifications from any datasheet, with the input stage and an
+input offset voltage.
 
 Limitations:
 
 - Its GBW comes out about 10% low, since the equations leave out the second pole that sets the phase margin.
-- The input pair is NPN: parts with a PNP input (LM358, whose input range includes the negative supply) or a JFET
-  input (TL072) are only approximated.
-- Not modeled: input offset voltage and current, temperature, the common-mode input range, power supply
+- The JFET pair sets its gain through BETA with no source resistors, so its gain-bandwidth product holds at small
+  signals; its transconductance falls when a large step steers the tail current, which the slew rate covers.
+- The LM358 output is a plain class AB stage here: its crossover distortion and the weak sinking near V- of the real
+  part are not modeled. Its output gets within about 50 mV of V- into 10 kΩ, not the 5 mV of the datasheet, since the
+  diodes of the voltage limiter turn on gradually.
+- Not modeled: input offset current, temperature, the common-mode input range, power supply
   rejection, more than two poles, and an output current drawn from the supply pins (it returns through ground).
 - Noise comes from its input transistors and internal resistors, so it has the right shape (shot and thermal noise
   of the input pair) but not the voltage and current noise densities of a datasheet.
+
+## Datasheets of the ready models
+
+The ratings imcsim checks the results against, and the specifications of the ready op-amps and fuses, come from these
+datasheets:
+
+| Part | Datasheet | Figures |
+|---|---|---|
+| 1N4148 | onsemi 1N914/D Rev. 6 | 200 mA, 500 mW |
+| 1N4007 | Diodes Inc DS28002 Rev. 11 | 1 A; 1.25 W from 100 K/W to ambient and a 150 °C junction |
+| 1N5819 | onsemi 1N5817/D | 1 A; 1.25 W from 80 °C/W and a 125 °C junction |
+| Zeners (3V3, 5V1, 12V) | Vishay BZX55, document 85604 Rev. 2.0 | 500 mW; 200 mA forward, where its forward voltage is specified |
+| Red, green and blue LEDs | Kingbright WP7113SRD/D V.9A, WP7113SGD V.11B, WP7113QBC/D V.18B | 30 mA and 75 mW, 25 mA and 62.5 mW, 30 mA and 120 mW |
+| 2N3904, 2N2222A, BC547B, 2N3906, 2N2907A, BC557B | onsemi 2N3904/D Rev. 3, P2N2222A/D Rev. 7, BC546/D Rev. 8, 2N3906/D Rev. 4, P2N2907A/D Rev. 6, BC556B/D Rev. 3 | VCEO and IC of each; 625 mW in TO-92 |
+| 2N7000 | onsemi 2N7000TA/D Rev. 1 | 60 V, 30 V, 200 mA, 400 mW |
+| BS170 | onsemi BS170/D Rev. 7 | 60 V, 20 V, 500 mA, 350 mW |
+| IRF540N | Fairchild IRF540N Rev. C | 100 V, 20 V, 33 A, 120 W |
+| BS250 | Philips BS250, April 1995 | 45 V, 250 mA, 830 mW |
+| IRF9540N | International Rectifier PD-91437B | 100 V, 20 V, 23 A, 140 W (not checked against a copy) |
+| LM358 | TI SLOS068AB, October 2024 | table 5.7 |
+| TL072 | TI SLOS080W, July 2025 | tables 5.8 and 5.9 (TL07xC and TL07xI); short-circuit current of the TL07xH |
+| Fast fuses | Littelfuse 217 Series, revised 10/30/20 | nominal melting I2t and cold resistance |
+| 1 A slow-blow fuse | Littelfuse 218 Series, revised 02/23/15 | 6.73 A2s, 61.3 mOhm |
+
+The uA741 keeps the classic typical values of the part. TI's revision of February 2026 (SLOS094H) describes a newer
+die, with 0.13 mA of supply current and picoamperes of bias current, which is not the part most circuits were drawn for.
 
 ## Blocks and library models
 
