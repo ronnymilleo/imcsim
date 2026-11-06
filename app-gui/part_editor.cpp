@@ -33,6 +33,8 @@ bool AnyValue(double /*value*/) {
 
 /// Custom model parameters beyond this many scroll.
 constexpr float MAX_VISIBLE_PARAMETERS = 10.0f;
+/// Width, in font sizes, at which the description of a ready model wraps, so a long one does not widen the popover.
+constexpr float DESCRIPTION_WRAP_FONT_SIZES = 26.0f;
 
 /**
  * @struct  ParameterField
@@ -324,7 +326,9 @@ bool DrawModelChoice(Part &part, const std::span<const Model> models, const char
         return changed;
     }
     if (!part.IsCustom()) {
+        ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + ImGui::GetFontSize() * DESCRIPTION_WRAP_FONT_SIZES);
         ImGui::TextDisabled("%s", part.GetModel()->Description);
+        ImGui::PopTextWrapPos();
         return changed;
     }
     Parameters parameters = part.GetParameters();
