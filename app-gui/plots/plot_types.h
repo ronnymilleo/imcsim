@@ -52,6 +52,9 @@ struct SpectrumTrace {
     /// Of the mean and every frequency, so a negligible mean reads as about zero.
     double LargestAmplitude = 0.0;
     HarmonicAnalysis Harmonics;
+    /// One-sided noise density of each frequency, in the unit of the trace per square root of hertz; empty when the
+    /// trace is undefined somewhere in the span.
+    std::vector<double> Densities;
 };
 
 /**
