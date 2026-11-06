@@ -1894,6 +1894,8 @@ TEST_CASE("Every ready macromodel op-amp slews at its datasheet rate", "[simulat
         {"uA741", 0.5e6},
         {"LM358", 0.3e6},
         {"TL072", 20e6},
+        {"NE5532", 5e6},
+        {"OP07", 0.3e6},
     }));
     CAPTURE(model);
     // A unity-gain follower driven by a 10 V step, so the output can only follow at the slew rate
@@ -1943,12 +1945,15 @@ TEST_CASE("Every ready macromodel op-amp slews at its datasheet rate", "[simulat
 }
 
 TEST_CASE("Every ready macromodel op-amp amplifies with the gain its resistors set", "[simulator]") {
-    const std::string model = GENERATE("uA741", "LM358", "TL072");
+    const std::string model = GENERATE("uA741", "LM358", "TL072", "NE5532", "OP07");
     CAPTURE(model);
     InvertingAmplifier amplifier(0.5);
-    amplifier.Amplifier.SetModel(*Core::FindOpAmpModel(Core::ComponentType::OP_AMP, model));
-    // R2 / R1 is 10, and every model has 100 dB or more of open-loop gain
-    CHECK_THAT(OperatingPointVoltages(amplifier.Circuit)[3], Catch::Matchers::WithinAbs(-5.0, 5e-3));
+    const Core::OpAmpModel &ready = *Core::FindOpAmpModel(Core::ComponentType::OP_AMP, model);
+    amplifier.Amplifier.SetModel(ready);
+    // R2 / R1 is 10, every model has 100 dB or more of open-loop gain, and the offset at the + input comes out
+    // multiplied by the noise gain, 1 + R2 / R1
+    const double expected = -10.0 * 0.5 + 11.0 * ready.Parameters.InputOffsetVoltage;
+    CHECK_THAT(OperatingPointVoltages(amplifier.Circuit)[3], Catch::Matchers::WithinAbs(expected, 5e-3));
 }
 
 TEST_CASE("An LM358 follows its input down to its negative supply, where the NPN input of a uA741 cannot",
@@ -1956,8 +1961,10 @@ TEST_CASE("An LM358 follows its input down to its negative supply, where the NPN
     // A single 5 V supply with V- at ground, and an input 200 mV above it; closer to V- the soft knee of the limiters
     // holds the output about 50 mV up
     Follower lm358(0.2, 5.0, 0.0, 1e3);
-    lm358.Amplifier.SetModel(*Core::FindOpAmpModel(Core::ComponentType::OP_AMP, "LM358"));
-    CHECK_THAT(OperatingPointVoltages(lm358.Circuit)[3], Catch::Matchers::WithinAbs(0.2, 1e-3));
+    const Core::OpAmpModel &ready = *Core::FindOpAmpModel(Core::ComponentType::OP_AMP, "LM358");
+    lm358.Amplifier.SetModel(ready);
+    CHECK_THAT(OperatingPointVoltages(lm358.Circuit)[3],
+               Catch::Matchers::WithinAbs(0.2 + ready.Parameters.InputOffsetVoltage, 1e-3));
 
     Follower ua741(0.2, 5.0, 0.0, 1e3);
     ua741.Amplifier.SetModel(*Core::FindOpAmpModel(Core::ComponentType::OP_AMP, "uA741"));

@@ -63,19 +63,20 @@ constexpr auto MODELS = std::to_array<OpAmpModel>({
      "",
      true,
      {}},
+    // Classic typical values of the part; its offset is the 0.3 mV typical of TI SLOS094H (February 2026)
     {"uA741",
      "General-purpose bipolar op-amp, as a Boyle macromodel with typical datasheet values: 106 dB of gain, "
-     "1 MHz, 0.5 V/us, 80 nA of bias current, and an output 1 V short of each supply.",
+     "1 MHz, 0.5 V/us, 80 nA of bias current, 0.3 mV of offset, and an output 1 V short of each supply.",
      "imcsim_uA741",
      false,
-     {}},
+     {.InputOffsetVoltage = 0.3e-3}},
     // TI LM358 datasheet, SLOS068AB (October 2024), table 5.7 at 25 C: AOL 100 V/mV, GBW 0.7 MHz, SR 0.3 V/us, IB
-    // 20 nA, CMRR 80 dB, ISC 40 mA, IQ 350 uA per amplifier, output 1.5 V from V+ (RL >= 2k, VS = 5 V) and 5 mV from
-    // V-. It gives no phase margin or output resistance, so those keep the defaults of the uA741
+    // 20 nA, VOS 3 mV, CMRR 80 dB, ISC 40 mA, IQ 350 uA per amplifier, output 1.5 V from V+ (RL >= 2k, VS = 5 V) and
+    // 5 mV from V-. It gives no phase margin or output resistance, so those keep the defaults of the uA741
     {"LM358",
      "Single-supply dual op-amp with a PNP input that takes inputs down to its negative supply, as a Boyle "
-     "macromodel with TI datasheet values: 100 dB of gain, 0.7 MHz, 0.3 V/us, 20 nA of bias current, and an output "
-     "1.5 V short of V+ and 5 mV short of V-.",
+     "macromodel with TI datasheet values: 100 dB of gain, 0.7 MHz, 0.3 V/us, 20 nA of bias current, 3 mV of offset, "
+     "and an output 1.5 V short of V+ and 5 mV short of V-.",
      "imcsim_LM358",
      false,
      {.InputStage = OpAmpInputStage::PNP,
@@ -87,14 +88,15 @@ constexpr auto MODELS = std::to_array<OpAmpModel>({
       .ShortCircuitCurrent = 40e-3,
       .PositiveHeadroom = 1.5,
       .NegativeHeadroom = 5e-3,
-      .SupplyCurrent = 350e-6}},
+      .SupplyCurrent = 350e-6,
+      .InputOffsetVoltage = 3e-3}},
     // TI TL07xx datasheet, SLOS080W (July 2025), tables 5.8 and 5.9 for the TL07xC and TL07xI at +-15 V: AOL 200
-    // V/mV, GBW 5.25 MHz, SR 20 V/us, phase margin 56 degrees, IB 65 pA, CMRR 100 dB, ZO 125 Ohm, VOM +-13.5 V into
-    // 10k, IQ 1.4 mA per amplifier; the short-circuit current, 26 mA, is that of the TL07xH table
+    // V/mV, GBW 5.25 MHz, SR 20 V/us, phase margin 56 degrees, IB 65 pA, VOS 3 mV, CMRR 100 dB, ZO 125 Ohm, VOM +-13.5
+    // V into 10k, IQ 1.4 mA per amplifier; the short-circuit current, 26 mA, is that of the TL07xH table
     {"TL072",
      "Low-noise dual op-amp with a JFET input of picoamperes of bias current, as a Boyle macromodel with TI "
-     "datasheet values: 106 dB of gain, 5.25 MHz, 20 V/us, 65 pA of bias current, and an output 1.5 V short of each "
-     "supply.",
+     "datasheet values: 106 dB of gain, 5.25 MHz, 20 V/us, 65 pA of bias current, 3 mV of offset, and an output "
+     "1.5 V short of each supply.",
      "imcsim_TL072",
      false,
      {.InputStage = OpAmpInputStage::JFET,
@@ -108,7 +110,43 @@ constexpr auto MODELS = std::to_array<OpAmpModel>({
       .ShortCircuitCurrent = 26e-3,
       .PositiveHeadroom = 1.5,
       .NegativeHeadroom = 1.5,
-      .SupplyCurrent = 1.4e-3}},
+      .SupplyCurrent = 1.4e-3,
+      .InputOffsetVoltage = 3e-3}},
+    // TI NE5532 datasheet, SLOS075K, tables 5.5 and 5.6 at +-15 V: AVD 100 V/mV (RL >= 2k), B1 12 MHz, SR 5 V/us, IIB
+    // 200 nA, VIO 0.5 mV, CMRR 100 dB, IOS 38 mA, ICC 6 mA for both amplifiers. This revision gives no output swing,
+    // so the output keeps 2 V from each supply, as its +-13 V common-mode range does
+    {"NE5532",
+     "Low-noise audio dual op-amp, as a Boyle macromodel with TI datasheet values: 100 dB of gain, 12 MHz, 5 V/us, "
+     "200 nA of bias current, 0.5 mV of offset, 38 mA into a short, and an output 2 V short of each supply.",
+     "imcsim_NE5532",
+     false,
+     {.OpenLoopGainDecibels = 100.0,
+      .GainBandwidth = 12e6,
+      .SlewRate = 5.0,
+      .InputBiasCurrent = 200e-9,
+      .CommonModeRejectionDecibels = 100.0,
+      .ShortCircuitCurrent = 38e-3,
+      .PositiveHeadroom = 2.0,
+      .NegativeHeadroom = 2.0,
+      .SupplyCurrent = 3e-3,
+      .InputOffsetVoltage = 0.5e-3}},
+    // TI OP07 datasheet, SLOS099H (March 2023), table 6.5 for the OP07C at +-15 V: AOL 400 V/mV, GBW 0.6 MHz, SR
+    // 0.3 V/us, IB 1.8 nA, VOS 60 uV, CMRR 120 dB, swing +-13 V into 10k and 80 mW from the supplies, 2.7 mA. It gives
+    // no short-circuit current or output resistance, so those keep the defaults of the uA741
+    {"OP07",
+     "Precision bipolar op-amp with a low offset, as a Boyle macromodel with TI datasheet values: 112 dB of gain, "
+     "0.6 MHz, 0.3 V/us, 1.8 nA of bias current, 60 uV of offset, and an output 2 V short of each supply.",
+     "imcsim_OP07",
+     false,
+     {.OpenLoopGainDecibels = 112.0,
+      .GainBandwidth = 0.6e6,
+      .SlewRate = 0.3,
+      .InputBiasCurrent = 1.8e-9,
+      .CommonModeRejectionDecibels = 120.0,
+      .PositiveHeadroom = 2.0,
+      .NegativeHeadroom = 2.0,
+      .SupplyCurrent = 2.7e-3,
+      .InputOffsetVoltage = 60e-6}},
 });
 
 std::string FormatNumber(const double value) {
