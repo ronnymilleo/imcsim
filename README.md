@@ -17,7 +17,9 @@ New to imcsim? The [tutorial](docs/tutorial.md) builds, simulates and exports a 
 
 ## Features
 
-- Resistors, capacitors, inductors, ground, a VCC rail, and voltage and current sources (DC, sine or pulse)
+- Resistors, capacitors, inductors, ground, a VCC rail, and voltage and current sources (DC, sine or pulse), and Noise
+  and Random sources for the transient: white, 1/f and telegraph noise, or values drawn from a distribution and held
+  for each step
 - Diodes, Zener diodes, LEDs, NPN and PNP bipolar transistors, and N- and P-channel MOSFETs, each with ready models,
   custom SPICE parameters or a vendor's `.model` imported from a library
 - Blocks: part of a schematic grouped into a reusable part with named pins on any edge and parameters each instance
@@ -27,11 +29,15 @@ New to imcsim? The [tutorial](docs/tutorial.md) builds, simulates and exports a 
 - Controlled sources (VCVS, VCCS, CCCS, CCVS), and op-amps: ideal with a gain-bandwidth product and an output
   limited by its supply pins, or a uA741 or custom part built as a Boyle macromodel from datasheet values (slew rate,
   bias current, output swing, current limit)
-- Warnings when a diode goes into reverse breakdown or a transistor exceeds its voltage, current or power ratings
+- Warnings when a diode goes into reverse breakdown or past its average forward current or power rating, or a
+  transistor exceeds its voltage, current or power ratings
 - Operating point, transient, AC sweep, DC sweep, noise, transfer function, sensitivity, pole-zero, S-parameter and truth table analyses, with node
   voltages and component currents
 - Stepping a resistor, capacitor, inductor or the temperature over a range or a list, as SPICE's `.step`: the
   transient, AC sweep and DC sweep plot every step as a family of curves
+- Monte Carlo runs of the transient, AC sweep or DC sweep, with each part that has a tolerance drawn within it
+  (Gaussian or uniform, from a seed that repeats on every platform): every run as a faint curve beside the nominal one,
+  a histogram of any measurement, such as the -3 dB frequency, and a table of the values each run drew
 - Plots of transients, Bode diagrams and DC sweeps (including curve families, such as transistor characteristics):
   pick what to measure with the Probe tool, read every trace under the cursor, currents dashed apart from voltages;
   measured voltages and currents are marked on the schematic in the colors of their traces, currents with an arrow
@@ -41,7 +47,7 @@ New to imcsim? The [tutorial](docs/tutorial.md) builds, simulates and exports a 
   DC sweep, peak-to-peak, RMS and frequency on a transient, and peak, -3 dB band, unity gain frequency and phase
   margin on a response
 - A spectrum of the transient traces, as on a spectrum analyzer, with the fundamental, the harmonics and the THD of
-  each, over a Hann or rectangular window
+  each, over a Hann or rectangular window, or the noise density of a trace with no tone in it
 - Noise at one node across frequency, at the output and referred to the input, with the share of each part
 - A transfer function from an input source to an output: the DC gain, the input impedance and the output impedance
 - A sensitivity analysis: how much the DC voltage of a node changes with the value of each part, as a table and as
@@ -128,10 +134,10 @@ it can change at any time. The ideas below are tracked as tasks in the project's
 roughly in the order they are likely to come.
 
 - **Digital**: Verilog modules placed as parts and simulated together with the analog circuit
-- **Analyses**: transient noise sources, and Monte Carlo runs on top of the parameter step
+- **Analyses**: the parameter step and Monte Carlo runs on the operating point
 - **Sources, parts and models**: behavioral sources, XSPICE analog blocks, transmission lines, a circuit driven from a
   WAV or CSV file, more ready op-amp macromodels, and a MOSFET body diode and higher-level MOSFET models
-- **Live effects and plots**: safe operating area warnings, and math channels in AC sweeps
+- **Plots**: math channels in AC sweeps
 - **Longer term, a native simulation backend**: a solver written from published circuit theory that sits beside ngspice,
   which stays available, tested against closed-form results and built to use modern CPUs well. With the backend
   interface and capability matrix in place, it would come in steps: a linear core (operating point, DC and AC),
