@@ -16,10 +16,12 @@ namespace Core {
 namespace {
 
 /// Grouped by part, default model first. LEDs are tuned for their forward voltage at 20 mA, Zeners break down at
-/// their voltage at 5 mA. Ratings are the average forward current and the power dissipation of the datasheet: the
-/// Fairchild 1N4148 (200 mA, 500 mW) and 1N4001-1N4007 (1 A, 3 W) series, the 1N5819 (1 A, 1.25 W), the 500 mW
-/// BZX55 Zener series (200 mA forward) and typical 5 mm LEDs (30 mA and 100 mW red, 25 mA and 100 mW green, 20 mA and
-/// 80 mW blue).
+/// their voltage at 5 mA. Ratings are the average forward current and the power dissipation of these datasheets:
+/// onsemi 1N914/D Rev. 6 (1N4148: 200 mA, 500 mW); Diodes Inc DS28002 Rev. 11 (1N4001-1N4007: 1 A, and 1.25 W from
+/// its 100 K/W to ambient and 150 C junction); onsemi 1N5817/D (1N5819: 1 A, and 1.25 W from its 80 C/W and 125 C
+/// junction); Vishay BZX55 document 85604 Rev. 2.0 (500 mW; it gives no forward current limit, so the 200 mA its
+/// forward voltage is specified at stands in); Kingbright WP7113SRD/D V.9A (red: 30 mA, 75 mW), WP7113SGD V.11B
+/// (green: 25 mA, 62.5 mW) and WP7113QBC/D V.18B (blue: 30 mA, 120 mW).
 constexpr auto DIODE_MODELS = std::to_array<DiodeModel>({
     {"1N4148",
      "Small-signal switching diode, 100 V",
@@ -48,7 +50,7 @@ constexpr auto DIODE_MODELS = std::to_array<DiodeModel>({
       .JunctionPotential = 0.7,
       .TransitTime = 100e-9,
       .MaxForwardCurrent = 1.0,
-      .MaxPower = 3.0},
+      .MaxPower = 1.25},
      ComponentType::DIODE,
      LEDColor::NONE},
     {"1N5819",
@@ -115,7 +117,7 @@ constexpr auto DIODE_MODELS = std::to_array<DiodeModel>({
       .BreakdownCurrent = 10e-6,
       .JunctionCapacitance = 40e-12,
       .MaxForwardCurrent = 30e-3,
-      .MaxPower = 0.1},
+      .MaxPower = 75e-3},
      ComponentType::LED,
      LEDColor::RED},
     {"Green",
@@ -128,7 +130,7 @@ constexpr auto DIODE_MODELS = std::to_array<DiodeModel>({
       .BreakdownCurrent = 10e-6,
       .JunctionCapacitance = 40e-12,
       .MaxForwardCurrent = 25e-3,
-      .MaxPower = 0.1},
+      .MaxPower = 62.5e-3},
      ComponentType::LED,
      LEDColor::GREEN},
     {"Blue",
@@ -140,8 +142,8 @@ constexpr auto DIODE_MODELS = std::to_array<DiodeModel>({
       .BreakdownVoltage = 5.0,
       .BreakdownCurrent = 10e-6,
       .JunctionCapacitance = 40e-12,
-      .MaxForwardCurrent = 20e-3,
-      .MaxPower = 0.08},
+      .MaxForwardCurrent = 30e-3,
+      .MaxPower = 0.12},
      ComponentType::LED,
      LEDColor::BLUE},
 });

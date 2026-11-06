@@ -40,7 +40,11 @@ namespace {
 using Catch::Matchers::WithinAbs;
 using Catch::Matchers::WithinRel;
 
-/// A 5 V supply on node 1 feeding a fuse to node 2, where a load goes to ground.
+/// A 1 A fuse with a time constant of 150 ms, shorter than the ready ones, so the runs that blow it stay short.
+constexpr Core::FuseParameters QUICK_FUSE = {
+    .RatedCurrent = 1.0, .MeltingI2t = 0.15, .ColdResistance = 0.15, .BlownResistance = 1e9};
+
+/// A 5 V supply on node 1 feeding a quick fuse to node 2, where a load goes to ground.
 struct FuseLoop {
     Core::VCC Supply;
     Core::Fuse Part;
@@ -52,6 +56,7 @@ struct FuseLoop {
         Supply.SetName("V1");
         Supply.SetValue(5.0);
         Part.SetName("FU1");
+        Part.SetParameters(QUICK_FUSE);
         Load.SetName("R1");
         Load.SetValue(load_resistance);
         Circuit.Add(Supply, {1});
@@ -61,7 +66,7 @@ struct FuseLoop {
     }
 };
 
-/// A pulse train on node 1 feeding the fuse to a load of 2.5 Ohm: 12.5 V is 5 A, a short overload of the default fuse.
+/// A pulse train on node 1 feeding the fuse to a load of 2.5 Ohm: 12.5 V is 5 A, a short overload of the quick fuse.
 struct PulsedFuseLoop {
     Core::VoltageSource Source;
     Core::Fuse Part;
@@ -80,6 +85,7 @@ struct PulsedFuseLoop {
                          .Width = width,
                          .Period = period});
         Part.SetName("FU1");
+        Part.SetParameters(QUICK_FUSE);
         Load.SetName("R1");
         Load.SetValue(2.5);
         Circuit.Add(Source, {1, 0});
@@ -107,7 +113,7 @@ constexpr double LATCH_HEAT = 1.015;
 
 /// The time the default fuse takes to blow at a current: the heat settles at the current squared over the rated one
 /// squared, with the cooling time constant, and the latch fires when it reaches LATCH_HEAT.
-double BlowTime(const double current, const Core::FuseParameters &parameters = {}) {
+double BlowTime(const double current, const Core::FuseParameters &parameters = QUICK_FUSE) {
     const double ratio = LATCH_HEAT * parameters.RatedCurrent * parameters.RatedCurrent / (current * current);
     return -Core::GetCoolingTimeConstant(parameters) * std::log(1.0 - ratio);
 }

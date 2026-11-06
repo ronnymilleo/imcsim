@@ -18,7 +18,10 @@ namespace {
 /// Grouped by part, default model first. Level 1 approximations: VTO is the typical threshold, KP sets the
 /// datasheet RDS(on) at |VGS| = 10 V, and the overlaps, in F per meter of width, give the typical input and reverse
 /// transfer capacitances with the default 100 um width (20 pF is 2e-7 F/m). Ratings are the absolute maximum VDS, VGS
-/// and continuous ID, and the dissipation in free air, or with an ideal heatsink for the power parts.
+/// and continuous ID, and the dissipation in free air, or with an ideal heatsink for the power parts, from these
+/// datasheets: onsemi 2N7000TA/D Rev. 1 (60 V, 30 V, 200 mA, 400 mW), onsemi BS170/D Rev. 7 (60 V, 20 V, 500 mA,
+/// 350 mW), Fairchild IRF540N Rev. C (100 V, 20 V, 33 A, 120 W), Philips BS250 of April 1995 (45 V, 250 mA,
+/// 830 mW). The IRF9540N ratings are those of International Rectifier's PD-91437B, not checked against a copy.
 constexpr auto MOSFET_MODELS = std::to_array<MOSFETModel>({
     {"2N7000",
      "Small-signal N-channel, 60 V 200 mA, 1.8 Ohm",
@@ -29,7 +32,7 @@ constexpr auto MOSFET_MODELS = std::to_array<MOSFETModel>({
       .GateSourceOverlap = 2e-07,
       .GateDrainOverlap = 5e-08,
       .MaxDrainSourceVoltage = 60.0,
-      .MaxGateSourceVoltage = 20.0,
+      .MaxGateSourceVoltage = 30.0,
       .MaxDrainCurrent = 0.2,
       .MaxPower = 0.4},
      ComponentType::NMOS},
@@ -44,7 +47,7 @@ constexpr auto MOSFET_MODELS = std::to_array<MOSFETModel>({
       .MaxDrainSourceVoltage = 60.0,
       .MaxGateSourceVoltage = 20.0,
       .MaxDrainCurrent = 0.5,
-      .MaxPower = 0.83},
+      .MaxPower = 0.35},
      ComponentType::NMOS},
     {"IRF540N",
      "Power N-channel, 100 V 33 A, 44 mOhm, simplified body diode",
@@ -57,7 +60,7 @@ constexpr auto MOSFET_MODELS = std::to_array<MOSFETModel>({
       .MaxDrainSourceVoltage = 100.0,
       .MaxGateSourceVoltage = 20.0,
       .MaxDrainCurrent = 33,
-      .MaxPower = 130.0},
+      .MaxPower = 120.0},
      ComponentType::NMOS},
     {"BS250",
      "Small-signal P-channel, 45 V 250 mA, 14 Ohm",
@@ -69,7 +72,7 @@ constexpr auto MOSFET_MODELS = std::to_array<MOSFETModel>({
       .GateDrainOverlap = 1e-07,
       .MaxDrainSourceVoltage = 45.0,
       .MaxGateSourceVoltage = 20.0,
-      .MaxDrainCurrent = 0.23,
+      .MaxDrainCurrent = 0.25,
       .MaxPower = 0.83},
      ComponentType::PMOS},
     {"IRF9540N",
