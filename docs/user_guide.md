@@ -619,8 +619,9 @@ A voltage or current source set to **Noise** adds noise to a transient on top of
 - The dB plot shows the floor as the peak of a sine per bin, so it depends on the stretch: with the Hann window a bin
   of width `df` reads `sqrt(2 * density^2 * 1.5 * df)`, and a longer stretch lowers the floor. The tab does the
   division for you, `density = amplitude / sqrt(2 * 1.5 * df)` (1 in place of 1.5 for the Rectangular window): its
-  **Density** is the level of the floor over the frequencies the plot shows (the highest of the medians of up to 8
-  slices of that band, so a part of it past where the noise rolls off does not pull it down; the first bins, where the
+  **Density** is the level of the floor over the frequencies the plot shows (the band is cut in up to 8 slices,
+  and the middle of the medians of the slices within 3 dB of the highest one is the level, so a part of the band past
+  where the noise rolls off does not pull it down; the first bins, where the
   window spreads the mean, are left out), and **Noise** the rms of the noise over the whole band, which does
   include that part. The noise example's input is a flat 1 mV/√Hz, and its Density reads a little under that (about
   0.7 to 1 mV/√Hz), since the straight lines between the samples already take some off from 4 kHz.
