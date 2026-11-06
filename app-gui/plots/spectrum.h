@@ -9,6 +9,7 @@
 #include <cstddef>
 #include <optional>
 #include <span>
+#include <utility>
 #include <vector>
 
 namespace GUI {
@@ -59,6 +60,22 @@ struct HarmonicAnalysis {
     /// Periods of the fundamental the span must hold, when it holds fewer: the peaks of the mean, the fundamental and
     /// its harmonics would overlap, so no harmonic is measured.
     std::optional<int> PeriodsNeeded;
+    /// Set when the trace varies but no tone stands out of the floor around its strongest peak, as in noise: it has no
+    /// fundamental or distortion to measure, and its density tells more.
+    bool IsBroadband = false;
+};
+
+/**
+ * @struct  NoiseBand
+ * @brief   The noise of a trace over a band of frequencies.
+ */
+struct NoiseBand {
+    /// Level of the density over the band, in the unit of the trace per square root of hertz: the floor a user sees,
+    /// the middle median of the slices of the band within 3 dB of the highest, so that a part of the band past the
+    /// noise does not pull it down.
+    double Density = 0.0;
+    /// Root of the noise power in the band, in the unit of the trace.
+    double TotalRms = 0.0;
 };
 
 std::size_t ChooseSpectrumSampleCount(std::span<const double> xs, double from, double to);
@@ -66,6 +83,12 @@ std::optional<Spectrum> ComputeSpectrum(std::span<const double> xs, std::span<co
                                         std::size_t sample_count, SpectrumWindow window);
 HarmonicAnalysis AnalyzeHarmonics(const Spectrum &spectrum, int highest_order);
 std::vector<double> ToDecibels(std::span<const double> amplitudes);
+
+// Noise
+std::vector<double> ComputeNoiseDensities(const Spectrum &spectrum);
+std::optional<NoiseBand> MeasureNoiseBand(std::span<const double> frequencies, std::span<const double> densities,
+                                          double from, double to);
+std::optional<std::pair<double, double>> FindDensityRange(std::span<const double> densities);
 
 } // namespace GUI
 

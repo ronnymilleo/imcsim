@@ -597,6 +597,12 @@ measures their harmonic distortion.
 - **Hann** window (default): suits any stretch, but needs at least 5 periods of the fundamental in it.
   **Rectangular**: sharper peaks, and works from 3 periods, but only reads right over a whole number of periods,
   such as cursors placed exactly some periods apart; otherwise each tone leaks across the spectrum.
+- A trace with no tone standing out of the floor around its strongest peak (at least 20 dB above the median of the
+  bins next to it) is read as noise: the panel then gives its **Density** and **Noise** instead of a fundamental, THD
+  and harmonics, and asks for no periods. The **Noise density** checkbox, which opens by itself when every trace is
+  noise (and then also turns the frequency axis logarithmic), plots the spectrum of the noise traces as a density in
+  V/√Hz (A/√Hz) on logarithmic axes; traces with a tone have no density and are left out of that view. The density
+  does not depend on the stretch or the window; hover the plot for the density at a frequency.
 - The resolution is one over the stretch: 10 ms resolves 100 Hz. The transient is read between its points by
   straight lines, which leaves a floor around -130 dB for a sine at 200 points per period; a smaller time step
   lowers it.
@@ -610,9 +616,15 @@ A voltage or current source set to **Noise** adds noise to a transient on top of
   a straight line between them. The line under the fields gives the density, the white rms times the square root of
   twice the step (`rms * sqrt(2 * step)` in V/√Hz or A/√Hz), and says it is flat up to `1 / (2 * step)`. For 100 mV
   and 10 us that is 447 uV/√Hz up to 50 kHz.
-- The Spectrum tab shows the floor as the peak of a sine per bin, not as a density, so it depends on the stretch: with
-  the Hann window a bin of width `df` reads `sqrt(2 * density^2 * 1.5 * df)`, and a longer stretch lowers the floor.
-  Divide by that to read the density back.
+- The dB plot shows the floor as the peak of a sine per bin, so it depends on the stretch: with the Hann window a bin
+  of width `df` reads `sqrt(2 * density^2 * 1.5 * df)`, and a longer stretch lowers the floor. The tab does the
+  division for you, `density = amplitude / sqrt(2 * 1.5 * df)` (1 in place of 1.5 for the Rectangular window): its
+  **Density** is the level of the floor over the frequencies the plot shows (the band is cut in up to 8 slices,
+  and the middle of the medians of the slices within 3 dB of the highest one is the level, so a part of the band past
+  where the noise rolls off does not pull it down; the first bins, where the
+  window spreads the mean, are left out), and **Noise** the rms of the noise over the whole band, which does
+  include that part. The noise example's input is a flat 1 mV/√Hz, and its Density reads a little under that (about
+  0.7 to 1 mV/√Hz), since the straight lines between the samples already take some off from 4 kHz.
 - **1/f amplitude** with an **exponent** between 0 and 2 (both excluded) adds flicker noise, which falls 10 dB per
   decade of frequency at an exponent of 1. **Telegraph** adds a signal that jumps between 0 and its amplitude, staying
   up **Capture time** and down **Emission time** on average. An amplitude of 0 turns the part off.

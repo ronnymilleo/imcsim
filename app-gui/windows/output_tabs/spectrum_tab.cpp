@@ -27,10 +27,60 @@ namespace {
 /// The harmonics the spectrum measures, and how many the plot shows when it fits: a linear axis spans them, plus one
 /// harmonic of room, from 0 Hz.
 constexpr int HIGHEST_HARMONIC = 10;
+/// Room around the densities a density axis fits to, as a factor.
+constexpr double DENSITY_AXIS_MARGIN = 2.0;
 constexpr float HARMONIC_MARKER_SIZE = 3.0f;
 constexpr double MIN_SHOWN_DISTORTION_PERCENT = 0.001;
 /// The first bins above 0 Hz, where the Hann window spreads the mean.
 constexpr std::ptrdiff_t SPECTRUM_SKIRT_BINS = 2;
+
+bool IsBroadband(const SpectrumTrace &trace) {
+    return trace.Decibels && trace.Harmonics.IsBroadband;
+}
+
+bool HasBroadband(const TransientSpectra &spectra) {
+    return std::ranges::any_of(spectra.Traces, IsBroadband);
+}
+
+/**
+ * @brief   The density view draws only noise, since a tone has no density; the decibel view draws every spectrum.
+ */
+bool IsShown(const SpectrumTrace &trace, const bool is_density) {
+    return trace.Decibels && (!is_density || IsBroadband(trace));
+}
+
+/**
+ * @brief   Fits a density axis to the densities of the noise traces on it, a few decades at most, since a bin at zero
+ *          would otherwise stretch a logarithmic axis down to nothing.
+ * @return  False when no trace on the axis has a density to fit.
+ */
+bool SetNextDensityLimits(const TransientSpectra &spectra, const ImAxis axis) {
+    std::optional<std::pair<double, double>> range;
+    for (const SpectrumTrace &trace : spectra.Traces) {
+        const std::optional<std::pair<double, double>> own =
+            IsShown(trace, true) && trace.Axis == axis ? FindDensityRange(trace.Densities) : std::nullopt;
+        if (own) {
+            range = range ? std::pair{std::min(range->first, own->first), std::max(range->second, own->second)} : own;
+        }
+    }
+    if (!range) {
+        return false;
+    }
+    ImPlot::SetNextAxisLimits(axis, range->first / DENSITY_AXIS_MARGIN, range->second * DENSITY_AXIS_MARGIN,
+                              ImPlotCond_Always);
+    return true;
+}
+
+/**
+ * @brief   True when every trace that has a spectrum is broadband, and at least one has.
+ */
+bool AreAllBroadband(const TransientSpectra &spectra) {
+    const auto has_spectrum = [](const SpectrumTrace &trace) { return trace.Decibels.has_value(); };
+    return std::ranges::any_of(spectra.Traces, has_spectrum) &&
+           std::ranges::all_of(spectra.Traces, [&has_spectrum](const SpectrumTrace &trace) {
+               return !has_spectrum(trace) || IsBroadband(trace);
+           });
+}
 
 /**
  * @brief   Decibels relative to 1 of the unit of the trace, as spectrum analyzers write dBV.
@@ -75,12 +125,42 @@ void DrawPeriodsWarning(const TransientSpectra &spectra) {
 }
 
 /**
- * @brief   The rows of one trace in its statistics table: its mean, its fundamental and THD, then each harmonic in dBc.
+ * @brief   The rows of a broadband trace: the density and the total noise over the band the plot shows, which has no
+ *          fundamental or harmonics.
  */
-void DrawHarmonics(const SpectrumTrace &trace) {
+void DrawNoise(const SpectrumTrace &trace, const std::vector<double> &frequencies, const PlotSpan &band) {
+    const std::string density_unit = trace.Unit + "/√Hz";
+    DrawStatistic("Tone", "none, noise");
+    ImGui::SetItemTooltip("No tone stands out of the floor, so the trace is read as noise");
+    const double from = band.To > band.From ? band.From : frequencies.front();
+    const double to = band.To > band.From ? band.To : frequencies.back();
+    const std::optional<NoiseBand> noise = MeasureNoiseBand(frequencies, trace.Densities, from, to);
+    if (!noise) {
+        DrawStatistic("Density", "-");
+        return;
+    }
+    DrawStatistic("Density", FormatQuantity(noise->Density, density_unit.c_str()));
+    ImGui::SetItemTooltip(
+        "%s", std::format("Level of the density (the median of its plateau) from {}Hz to {}Hz, the part of the "
+                          "spectrum the plot shows",
+                          Core::FormatValue(from), Core::FormatValue(to))
+                  .c_str());
+    DrawStatistic("Noise", FormatQuantity(noise->TotalRms, trace.Unit.c_str()));
+    ImGui::SetItemTooltip("Root mean square of the noise over the same band");
+}
+
+/**
+ * @brief   The rows of one trace in its statistics table: its mean, its fundamental and THD, then each harmonic in dBc;
+ *          the noise over the band for a broadband trace.
+ */
+void DrawHarmonics(const SpectrumTrace &trace, const std::vector<double> &frequencies, const PlotSpan &band) {
     const HarmonicAnalysis &analysis = trace.Harmonics;
     const char *unit = trace.Unit.c_str();
     DrawMeasuredValue("Mean", analysis.Mean, trace.LargestAmplitude, unit);
+    if (analysis.IsBroadband) {
+        DrawNoise(trace, frequencies, band);
+        return;
+    }
     if (analysis.Harmonics.empty()) {
         DrawStatistic("Freq", "-");
         return;
@@ -125,7 +205,8 @@ PlotSpan GetSpectrumFitRange(const TransientSpectra &spectra, const bool logarit
     // Without a measured fundamental, as in a stretch of too few periods, the strongest bin past the skirt of the
     // mean stands in for it
     for (const SpectrumTrace &trace : spectra.Traces) {
-        if (trace.Decibels && trace.Decibels->size() > static_cast<std::size_t>(SPECTRUM_SKIRT_BINS)) {
+        if (trace.Decibels && !IsBroadband(trace) &&
+            trace.Decibels->size() > static_cast<std::size_t>(SPECTRUM_SKIRT_BINS)) {
             const auto strongest =
                 std::max_element(trace.Decibels->begin() + SPECTRUM_SKIRT_BINS, trace.Decibels->end());
             const double frequency = spectra.Frequencies[static_cast<std::size_t>(strongest - trace.Decibels->begin())];
@@ -133,6 +214,141 @@ PlotSpan GetSpectrumFitRange(const TransientSpectra &spectra, const bool logarit
         }
     }
     return {.From = 0.0, .To = whole.To};
+}
+
+/**
+ * @brief   Sets the axes of the decibel view: voltage on the left, currents and math channels on the others.
+ */
+void SetupDecibelAxes(const bool has_voltages, const bool has_currents, const bool has_math) {
+    ImPlot::SetupAxes("Frequency", "Voltage (dBV)", ImPlotAxisFlags_None,
+                      VoltageAxisFlags(has_voltages, has_currents || has_math));
+    if (has_currents) {
+        ImPlot::SetupAxis(ImAxis_Y2, "Current (dBA)", ImPlotAxisFlags_AuxDefault);
+    }
+    if (has_math) {
+        ImPlot::SetupAxis(ImAxis_Y3, "Math (dB)", ImPlotAxisFlags_AuxDefault);
+    }
+}
+
+/**
+ * @brief   Sets the axes of the density view, all logarithmic since a floor spans decades.
+ */
+void SetupDensityAxes(const bool has_voltages, const bool has_currents, const bool has_math) {
+    ImPlot::SetupAxes("Frequency", "Voltage density (V/√Hz)", ImPlotAxisFlags_None,
+                      VoltageAxisFlags(has_voltages, has_currents || has_math));
+    ImPlot::SetupAxisScale(ImAxis_Y1, ImPlotScale_Log10);
+    if (has_currents) {
+        ImPlot::SetupAxis(ImAxis_Y2, "Current density (A/√Hz)", ImPlotAxisFlags_AuxDefault);
+        ImPlot::SetupAxisScale(ImAxis_Y2, ImPlotScale_Log10);
+    }
+    if (has_math) {
+        ImPlot::SetupAxis(ImAxis_Y3, "Math density", ImPlotAxisFlags_AuxDefault);
+        ImPlot::SetupAxisScale(ImAxis_Y3, ImPlotScale_Log10);
+    }
+}
+
+/**
+ * @brief   The markers of a trace's harmonics in decibels.
+ */
+void PlotHarmonicMarkers(const SpectrumTrace &trace) {
+    std::vector<double> harmonic_frequencies;
+    std::vector<double> harmonic_levels;
+    for (const Harmonic &harmonic : trace.Harmonics.Harmonics) {
+        harmonic_frequencies.push_back(harmonic.Frequency);
+        harmonic_levels.push_back(20.0 * std::log10(std::max(harmonic.Amplitude, 1e-15)));
+    }
+    ImPlotSpec marker_spec;
+    marker_spec.LineColor = ImGui::ColorConvertU32ToFloat4(trace.Color);
+    marker_spec.Marker = ImPlotMarker_Circle;
+    marker_spec.MarkerSize = HARMONIC_MARKER_SIZE;
+    ImPlot::PlotScatter(std::format("##{} harmonics", trace.Label).c_str(), harmonic_frequencies.data(),
+                        harmonic_levels.data(), static_cast<int>(harmonic_frequencies.size()), marker_spec);
+}
+
+/**
+ * @brief   One spectrum trace per measured voltage or current and per math channel, in the order of the sources.
+ * @details The math channels are appended to the sources, so both lists keep the same order.
+ */
+std::vector<SpectrumTrace> MakeSpectrumTraces(std::vector<PlottedTrace> &sources, const std::vector<MathTrace> &math) {
+    std::vector<SpectrumTrace> traces;
+    for (const PlottedTrace &source : sources) {
+        const bool current = std::string_view(source.Unit) == "A";
+        traces.push_back({.Label = source.Label,
+                          .Unit = source.Unit,
+                          .Axis = current ? ImAxis_Y2 : ImAxis_Y1,
+                          .Color = source.Color,
+                          .Dashed = current,
+                          .Decibels = std::nullopt,
+                          .LargestAmplitude = 0.0,
+                          .Harmonics = {},
+                          .Densities = {}});
+    }
+    for (const MathTrace &trace : math) {
+        sources.push_back({trace.Label, &trace.Values, trace.Unit.c_str(), trace.Color});
+        traces.push_back({.Label = trace.Label,
+                          .Unit = trace.Unit,
+                          .Axis = trace.Axis,
+                          .Color = trace.Color,
+                          .Dashed = false,
+                          .Decibels = std::nullopt,
+                          .LargestAmplitude = 0.0,
+                          .Harmonics = {},
+                          .Densities = {}});
+    }
+    return traces;
+}
+
+/**
+ * @brief   Fills a trace from its spectrum: decibels, largest amplitude, harmonics and noise densities.
+ */
+void AnalyzeTrace(const Spectrum &spectrum, SpectrumTrace &trace) {
+    // The mean has no place on a logarithmic axis; the statistics show it instead
+    const std::span<const double> above_zero = std::span(spectrum.Amplitudes).subspan(1);
+    trace.Decibels = ToDecibels(above_zero);
+    for (const double amplitude : spectrum.Amplitudes) {
+        trace.LargestAmplitude = std::max(trace.LargestAmplitude, std::abs(amplitude));
+    }
+    trace.Harmonics = AnalyzeHarmonics(spectrum, HIGHEST_HARMONIC);
+    trace.Densities = ComputeNoiseDensities(spectrum);
+}
+
+void FitSpectrumAxes(const TransientSpectra &spectra, const bool is_density, const bool logarithmic) {
+    const PlotSpan range = GetSpectrumFitRange(spectra, logarithmic);
+    ImPlot::SetNextAxisLimits(ImAxis_X1, range.From, range.To, ImPlotCond_Always);
+    for (const ImAxis axis : {ImAxis_Y1, ImAxis_Y2, ImAxis_Y3}) {
+        if (!is_density || !SetNextDensityLimits(spectra, axis)) {
+            ImPlot::SetNextAxisToFit(axis);
+        }
+    }
+}
+
+void SetupSpectrumAxes(const TransientSpectra &spectra, const bool is_density, const bool logarithmic) {
+    const auto uses_axis = [&spectra, is_density](const ImAxis axis) {
+        return std::ranges::any_of(spectra.Traces, [axis, is_density](const SpectrumTrace &trace) {
+            return IsShown(trace, is_density) && trace.Axis == axis;
+        });
+    };
+    if (is_density) {
+        SetupDensityAxes(uses_axis(ImAxis_Y1), uses_axis(ImAxis_Y2), uses_axis(ImAxis_Y3));
+    } else {
+        SetupDecibelAxes(uses_axis(ImAxis_Y1), uses_axis(ImAxis_Y2), uses_axis(ImAxis_Y3));
+    }
+    ImPlot::SetupAxisFormat(ImAxis_X1, FormatAxisValue, const_cast<char *>("Hz"));
+    if (logarithmic) {
+        ImPlot::SetupAxisScale(ImAxis_X1, ImPlotScale_Log10);
+    }
+}
+
+void PlotSpectrumLine(const SpectrumTrace &trace, const std::vector<double> &frequencies,
+                      const std::vector<double> &values) {
+    if (trace.Dashed) {
+        PlotDashedLine(trace.Label, frequencies, values, trace.Color);
+        return;
+    }
+    ImPlotSpec spec;
+    spec.LineColor = ImGui::ColorConvertU32ToFloat4(trace.Color);
+    ImPlot::PlotLine(trace.Label.c_str(), frequencies.data(), values.data(), static_cast<int>(frequencies.size()),
+                     spec);
 }
 
 } // namespace
@@ -189,7 +405,7 @@ ExportFigure SpectrumTab::BuildFigure() const {
     if (!m_Spectra) {
         return {};
     }
-    return BuildSpectrumFigure(*m_Spectra, m_IsLogarithmic, m_View);
+    return BuildSpectrumFigure(*m_Spectra, m_IsLogarithmic, IsDensityShown(), m_View);
 }
 
 /**
@@ -198,29 +414,7 @@ ExportFigure SpectrumTab::BuildFigure() const {
  */
 void SpectrumTab::Update(const Core::Transient &transient, const std::vector<MathTrace> &math, const PlotSpan span) {
     std::vector<PlottedTrace> sources = ListTraces(transient.NodeVoltages, transient.Currents, m_Schematic, "V", "A");
-    std::vector<SpectrumTrace> traces;
-    for (const PlottedTrace &source : sources) {
-        const bool current = std::string_view(source.Unit) == "A";
-        traces.push_back({.Label = source.Label,
-                          .Unit = source.Unit,
-                          .Axis = current ? ImAxis_Y2 : ImAxis_Y1,
-                          .Color = source.Color,
-                          .Dashed = current,
-                          .Decibels = std::nullopt,
-                          .LargestAmplitude = 0.0,
-                          .Harmonics = {}});
-    }
-    for (const MathTrace &trace : math) {
-        sources.push_back({trace.Label, &trace.Values, trace.Unit.c_str(), trace.Color});
-        traces.push_back({.Label = trace.Label,
-                          .Unit = trace.Unit,
-                          .Axis = trace.Axis,
-                          .Color = trace.Color,
-                          .Dashed = false,
-                          .Decibels = std::nullopt,
-                          .LargestAmplitude = 0.0,
-                          .Harmonics = {}});
-    }
+    std::vector<SpectrumTrace> traces = MakeSpectrumTraces(sources, math);
     std::vector<std::string> labels;
     for (const SpectrumTrace &trace : traces) {
         labels.push_back(trace.Label + trace.Unit);
@@ -245,25 +439,26 @@ void SpectrumTab::Update(const Core::Transient &transient, const std::vector<Mat
         if (!spectrum) {
             continue;
         }
-        // The mean has no place on a logarithmic axis; the statistics show it instead
-        const std::span<const double> above_zero = std::span(spectrum->Amplitudes).subspan(1);
-        trace.Decibels = ToDecibels(above_zero);
-        for (const double amplitude : spectrum->Amplitudes) {
-            trace.LargestAmplitude = std::max(trace.LargestAmplitude, std::abs(amplitude));
-        }
-        trace.Harmonics = AnalyzeHarmonics(*spectrum, HIGHEST_HARMONIC);
+        AnalyzeTrace(*spectrum, trace);
         if (spectra.Frequencies.empty()) {
             spectra.Frequencies.assign(spectrum->Frequencies.begin() + 1, spectrum->Frequencies.end());
         }
     }
     spectra.Traces = std::move(traces);
+    // Noise reads best as a density, so the view opens on it when the traces turn into noise
+    const bool are_all_broadband = AreAllBroadband(spectra);
+    if (are_all_broadband && !m_WereAllBroadband) {
+        m_IsDensity = true;
+        m_IsLogarithmic = true;
+    }
+    m_WereAllBroadband = are_all_broadband;
     m_Spectra = std::move(spectra);
     m_HasChanged = true;
 }
 
 /**
- * @brief   Voltages, currents and math channels keep the axes they have in the transient, in decibels; each trace marks
- *          its harmonics.
+ * @brief   Voltages, currents and math channels keep the axes they have in the transient, in decibels or, as noise, in
+ *          densities; each trace marks its harmonics in decibels.
  * @details A new spectrum fits its axes, and a linear one opens on the harmonics of the first trace that has some.
  */
 void SpectrumTab::DrawPlot() {
@@ -280,64 +475,29 @@ void SpectrumTab::DrawPlot() {
     if (spectra.Frequencies.empty()) {
         return;
     }
-    const bool fit = std::exchange(m_HasChanged, false);
-    if (fit) {
-        const PlotSpan range = GetSpectrumFitRange(spectra, m_IsLogarithmic);
-        ImPlot::SetNextAxisLimits(ImAxis_X1, range.From, range.To, ImPlotCond_Always);
-        for (const ImAxis axis : {ImAxis_Y1, ImAxis_Y2, ImAxis_Y3}) {
-            ImPlot::SetNextAxisToFit(axis);
-        }
+    const bool is_density = IsDensityShown();
+    if (std::exchange(m_HasChanged, false)) {
+        FitSpectrumAxes(spectra, is_density, m_IsLogarithmic);
     }
     if (!BeginTracePlot("##spectrum", ImVec2(-1.0f, PlotHeight(1)))) {
         return;
     }
-    const auto uses_axis = [&spectra](const ImAxis axis) {
-        return std::ranges::any_of(spectra.Traces,
-                                   [axis](const SpectrumTrace &trace) { return trace.Decibels && trace.Axis == axis; });
-    };
-    ImPlot::SetupAxes("Frequency", "Voltage (dBV)", ImPlotAxisFlags_None,
-                      VoltageAxisFlags(uses_axis(ImAxis_Y1), uses_axis(ImAxis_Y2) || uses_axis(ImAxis_Y3)));
-    ImPlot::SetupAxisFormat(ImAxis_X1, FormatAxisValue, const_cast<char *>("Hz"));
-    if (m_IsLogarithmic) {
-        ImPlot::SetupAxisScale(ImAxis_X1, ImPlotScale_Log10);
-    }
-    if (uses_axis(ImAxis_Y2)) {
-        ImPlot::SetupAxis(ImAxis_Y2, "Current (dBA)", ImPlotAxisFlags_AuxDefault);
-    }
-    if (uses_axis(ImAxis_Y3)) {
-        ImPlot::SetupAxis(ImAxis_Y3, "Math (dB)", ImPlotAxisFlags_AuxDefault);
-    }
+    SetupSpectrumAxes(spectra, is_density, m_IsLogarithmic);
     std::vector<PlottedTrace> plotted;
     std::vector<std::string> units;
     units.reserve(spectra.Traces.size());
     for (const SpectrumTrace &trace : spectra.Traces) {
-        if (!trace.Decibels) {
+        if (!IsShown(trace, is_density) || !trace.Decibels) {
             continue;
         }
-        const std::vector<double> &decibels = *trace.Decibels;
+        const std::vector<double> &values = is_density ? trace.Densities : *trace.Decibels;
         ImPlot::SetAxes(ImAxis_X1, trace.Axis);
-        if (trace.Dashed) {
-            PlotDashedLine(trace.Label, spectra.Frequencies, decibels, trace.Color);
-        } else {
-            ImPlotSpec spec;
-            spec.LineColor = ImGui::ColorConvertU32ToFloat4(trace.Color);
-            ImPlot::PlotLine(trace.Label.c_str(), spectra.Frequencies.data(), decibels.data(),
-                             static_cast<int>(spectra.Frequencies.size()), spec);
+        PlotSpectrumLine(trace, spectra.Frequencies, values);
+        if (!is_density) {
+            PlotHarmonicMarkers(trace);
         }
-        std::vector<double> harmonic_frequencies;
-        std::vector<double> harmonic_levels;
-        for (const Harmonic &harmonic : trace.Harmonics.Harmonics) {
-            harmonic_frequencies.push_back(harmonic.Frequency);
-            harmonic_levels.push_back(20.0 * std::log10(std::max(harmonic.Amplitude, 1e-15)));
-        }
-        ImPlotSpec marker_spec;
-        marker_spec.LineColor = ImGui::ColorConvertU32ToFloat4(trace.Color);
-        marker_spec.Marker = ImPlotMarker_Circle;
-        marker_spec.MarkerSize = HARMONIC_MARKER_SIZE;
-        ImPlot::PlotScatter(std::format("##{} harmonics", trace.Label).c_str(), harmonic_frequencies.data(),
-                            harmonic_levels.data(), static_cast<int>(harmonic_frequencies.size()), marker_spec);
-        units.push_back(GetDecibelUnit(trace));
-        plotted.push_back({trace.Label, &decibels, units.back().c_str(), trace.Color});
+        units.push_back(is_density ? trace.Unit + "/√Hz" : GetDecibelUnit(trace));
+        plotted.push_back({trace.Label, &values, units.back().c_str(), trace.Color});
     }
     ImPlot::SetAxes(ImAxis_X1, ImAxis_Y1);
     DrawCursorReadout(spectra.Frequencies, "Hz", m_IsLogarithmic, plotted);
@@ -371,7 +531,7 @@ void SpectrumTab::DrawStatistics() {
         if (!trace.Decibels) {
             ImGui::TextDisabled("Undefined in the stretch");
         } else if (BeginStatisticsTable(trace.Label)) {
-            DrawHarmonics(trace);
+            DrawHarmonics(trace, spectra.Frequencies, m_View);
             ImGui::EndTable();
         }
     }
@@ -398,6 +558,20 @@ void SpectrumTab::DrawControls() {
     if (ImGui::Checkbox("Logarithmic frequency", &m_IsLogarithmic)) {
         m_HasChanged = true;
     }
+    if (m_Spectra && HasBroadband(*m_Spectra)) {
+        if (ImGui::Checkbox("Noise density", &m_IsDensity)) {
+            m_HasChanged = true;
+        }
+        ImGui::SetItemTooltip("Plots the density of the noise in V/√Hz (A/√Hz) on logarithmic axes, which does not "
+                              "depend on the stretch or the window, instead of the level of each bin in dB");
+    }
+}
+
+/**
+ * @brief   Tells whether the plot shows densities: the view is chosen and some trace is noise.
+ */
+bool SpectrumTab::IsDensityShown() const {
+    return m_IsDensity && m_Spectra && HasBroadband(*m_Spectra);
 }
 
 } // namespace GUI

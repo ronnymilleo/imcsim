@@ -49,7 +49,12 @@ ExportAxes GetLinearExportAxes(const std::string &third_unit) {
             .Third = {.Name = third_unit.empty() ? "Math" : third_unit, .Unit = third_unit}};
 }
 
-ExportAxes GetSpectrumExportAxes() {
+ExportAxes GetSpectrumExportAxes(const bool is_density) {
+    if (is_density) {
+        return {.Voltage = {.Name = "Voltage density (V/√Hz)", .Unit = "V/√Hz", .Logarithmic = true},
+                .Current = {.Name = "Current density (A/√Hz)", .Unit = "A/√Hz", .Logarithmic = true},
+                .Third = {.Name = "Math density", .Unit = "", .Logarithmic = true}};
+    }
     return {.Voltage = {.Name = "Voltage (dBV)", .Unit = "dBV", .UsesPrefixes = false},
             .Current = {.Name = "Current (dBA)", .Unit = "dBA", .UsesPrefixes = false},
             .Third = {.Name = "Math (dB)", .Unit = "dB", .UsesPrefixes = false}};
@@ -410,21 +415,24 @@ ExportFigure BuildTransientFigure(const Core::Transient &transient, const std::v
  * @brief   Builds the figure of the spectra as plotted.
  * @param[in] spectra      Spectra of the measured traces.
  * @param[in] logarithmic  Whether the frequency axis is logarithmic.
+ * @param[in] is_density   Whether the plot shows noise densities, on logarithmic axes, rather than decibels.
  * @param[in] view         The frequencies the plot shows.
  * @return  One panel with every spectrum that is defined over the span.
  */
-ExportFigure BuildSpectrumFigure(const TransientSpectra &spectra, const bool logarithmic, const PlotSpan &view) {
+ExportFigure BuildSpectrumFigure(const TransientSpectra &spectra, const bool logarithmic, const bool is_density,
+                                 const PlotSpan &view) {
     ExportFigure figure;
     figure.XAxis = {.Name = "Frequency", .Unit = "Hz"};
     figure.XLogarithmic = logarithmic;
     figure.Xs = spectra.Frequencies;
     figure.XRange = ExportRange{.From = view.From, .To = view.To};
-    PanelBuilder builder("", GetSpectrumExportAxes());
+    PanelBuilder builder("", GetSpectrumExportAxes(is_density));
     for (const SpectrumTrace &trace : spectra.Traces) {
-        if (trace.Decibels) {
+        // A tone has no density, so the density view leaves it out
+        if (trace.Decibels && (!is_density || trace.Harmonics.IsBroadband)) {
             builder.Add({.Name = trace.Label,
                          .LegendLabel = trace.Label,
-                         .Values = *trace.Decibels,
+                         .Values = is_density ? trace.Densities : *trace.Decibels,
                          .Color = ToExportColor(trace.Color),
                          .Dashed = trace.Dashed},
                         trace.Axis);

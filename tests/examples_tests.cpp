@@ -179,6 +179,38 @@ TEST_CASE("The noise example shows a flat floor at the input that the low-pass c
     CHECK(band_rms(output, 8e3, 9.5e3) < 0.25 * band_rms(input, 8e3, 9.5e3));
 }
 
+TEST_CASE("The noise example reads as broadband noise of 1 mV/sqrt(Hz) at its input", "[examples]") {
+    GUI::Schematic schematic;
+    OpenExample("noise_through_rc_low_pass.imcsim", schematic);
+    const Core::TransientRun run =
+        Core::RunTransient(schematic.BuildCircuit(), schematic.GetSimulationSettings().Transient);
+    REQUIRE(run.Result.has_value());
+    const Core::Transient &transient = *run.Result;
+    const std::size_t input = NodeAt(schematic, {4, 4});
+
+    const double end = transient.Times.back();
+    const auto spectrum =
+        GUI::ComputeSpectrum(transient.Times, transient.NodeVoltages[input], 0.0, end,
+                             GUI::ChooseSpectrumSampleCount(transient.Times, 0.0, end), GUI::SpectrumWindow::HANN);
+    REQUIRE(spectrum.has_value());
+    CHECK(GUI::AnalyzeHarmonics(*spectrum, 10).IsBroadband);
+
+    // 100 mV rms sampled every 50 us is 0.1 * sqrt(2 * 50u) = 1 mV/sqrt(Hz) up to 10 kHz; the straight lines between
+    // samples take a little off the top of the band, and a few dozen bins scatter by 10%, so the band is wide
+    const std::vector<double> densities = GUI::ComputeNoiseDensities(*spectrum);
+    const std::span<const double> frequencies = std::span(spectrum->Frequencies).subspan(1);
+    const auto band = GUI::MeasureNoiseBand(frequencies, densities, 200.0, 5e3);
+    REQUIRE(band.has_value());
+    CHECK_THAT(band->Density, Catch::Matchers::WithinRel(1e-3, 0.3));
+    // The tab reads the whole spectrum, much of it past the 10 kHz where the sampled noise rolls off from about 4 kHz;
+    // the highest slice median still gives the floor, a little low (0.7 to 1.0 mV/sqrt(Hz) in runs), against the
+    // 0.35 mV/sqrt(Hz) the rms over that band gave
+    const auto whole = GUI::MeasureNoiseBand(frequencies, densities, 0.0, frequencies.back());
+    REQUIRE(whole.has_value());
+    INFO(whole->Density);
+    CHECK_THAT(whole->Density, Catch::Matchers::WithinRel(1e-3, 0.35));
+}
+
 TEST_CASE("The RC example measures its corner frequency over the whole sweep", "[examples]") {
     const auto example =
         std::ranges::find(GUI::GetExamples(), std::string_view("rc_low_pass_filter.imcsim"), &GUI::Example::FileName);
