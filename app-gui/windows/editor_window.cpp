@@ -141,11 +141,9 @@ std::optional<char> FindTypedValueStart() {
 }
 
 constexpr const char *PART_POPOVER = "Part properties";
+/// How far below the top of the canvas the properties popover opens, in font sizes.
+constexpr float POPOVER_TOP_MARGIN_FONT_SIZES = 1.0f;
 constexpr const char *CONTEXT_MENU = "Schematic actions";
-/// The properties popover opens this many grid units beside the part.
-constexpr float POPOVER_MARGIN = 1.0f;
-/// Width of the properties popover, in font sizes.
-constexpr float POPOVER_WIDTH = 18.0f;
 
 void DrawGrid(ImDrawList *draw_list, const ViewTransform &view, const ImVec2 origin, const ImVec2 size,
               const float zoom) {
@@ -380,6 +378,8 @@ void EditorWindow::Draw() {
 
     const ImVec2 origin = ImGui::GetCursorScreenPos();
     const ImVec2 size = GetCanvasSize();
+    m_CanvasCenter = {origin.x + size.x / 2.0f, origin.y + size.y / 2.0f};
+    m_CanvasTop = origin.y;
     m_View.FrameIfRequested(*m_Schematic, size, m_Preferences.Symbols, m_Preferences.ShowTerminalNumbers);
 
     // The way back from a block sits over the canvas, and takes the clicks that land on it
@@ -1203,7 +1203,7 @@ std::optional<EditorMode> EditorWindow::HandleMode(PlacingMode &mode, SchematicC
     }
     m_Schematic->SelectElement(m_Schematic->GetElements().size() - 1);
     m_PartEditor.FocusNetName();
-    PlacePartPopover(view);
+    PlacePartPopover();
     m_PartPopoverRequested = true;
     return SelectingMode{};
 }
@@ -1506,7 +1506,7 @@ void EditorWindow::HandleSelection(const ViewTransform &view, const bool hovered
             if (m_Schematic->GetSelectedElement()->GetComponent().GetType() == Core::ComponentType::SUBCIRCUIT) {
                 RequestEditSelectedSubcircuit();
             } else {
-                PlacePartPopover(view);
+                PlacePartPopover();
                 m_PartPopoverRequested = true;
             }
         } else if (m_Schematic->GetSelectedElements().empty() && m_Schematic->GetSelectedWires().size() == 1) {
@@ -1543,7 +1543,7 @@ void EditorWindow::HandleSelection(const ViewTransform &view, const bool hovered
         const bool enter =
             ImGui::IsKeyPressed(ImGuiKey_Enter, false) || ImGui::IsKeyPressed(ImGuiKey_KeypadEnter, false);
         if (enter && m_Schematic->GetSelectedElement() != nullptr && !ImGui::IsAnyItemActive()) {
-            PlacePartPopover(view);
+            PlacePartPopover();
             m_PartPopoverRequested = true;
         }
         if (ImGui::IsKeyPressed(ImGuiKey_M)) {
@@ -1805,23 +1805,12 @@ void EditorWindow::ReleaseHeldButton() {
     m_Schematic->MarkLiveChanged(component);
 }
 
-void EditorWindow::PlacePartPopover(const ViewTransform &view) {
-    const UIElement *element = m_Schematic->GetSelectedElement();
-    if (element == nullptr) {
-        return;
-    }
-    ImVec2 min = {FLT_MAX, FLT_MAX};
-    ImVec2 max = {-FLT_MAX, -FLT_MAX};
-    for (const GridPoint terminal : element->GetTerminals()) {
-        const ImVec2 point = view.ToScreen(ToVec2(terminal));
-        min = {std::min(min.x, point.x), std::min(min.y, point.y)};
-        max = {std::max(max.x, point.x), std::max(max.y, point.y)};
-    }
-    const float margin = m_View.GetZoom() * POPOVER_MARGIN;
-    const float right_edge = ImGui::GetWindowPos().x + ImGui::GetWindowWidth();
-    const bool fits_right = max.x + margin + ImGui::GetFontSize() * POPOVER_WIDTH <= right_edge;
-    m_PartPopoverAnchor = {fits_right ? max.x + margin : min.x - margin, min.y - margin};
-    m_PartPopoverPivotX = fits_right ? 0.0f : 1.0f;
+/**
+ * @brief   Opens the popover at the top of the canvas, centered across it, so it fits whatever part asked for it and
+ *          has the height of the canvas to grow into when a part turns custom.
+ */
+void EditorWindow::PlacePartPopover() {
+    m_PartPopoverAnchor = {m_CanvasCenter.x, m_CanvasTop + ImGui::GetFontSize() * POPOVER_TOP_MARGIN_FONT_SIZES};
 }
 
 /**
@@ -1840,19 +1829,19 @@ void EditorWindow::HandleValueTyping(const ViewTransform &view) {
         return;
     }
     m_PartEditor.StartTypingValue(*first);
-    PlacePartPopover(view);
+    PlacePartPopover();
     m_PartPopoverRequested = true;
 }
 
 /**
- * @brief   Draws the properties of the selected part in a popover beside it. Edits apply as they are typed; Enter or
- *          Esc closes it, and so does a click outside.
+ * @brief   Draws the properties of the selected part in a popover at the top of the canvas. Edits apply as they
+ * are typed; Enter or Esc closes it, and so does a click outside.
  */
 void EditorWindow::DrawPartPopover() {
     if (std::exchange(m_PartPopoverRequested, false)) {
         ImGui::OpenPopup(PART_POPOVER);
     }
-    ImGui::SetNextWindowPos(m_PartPopoverAnchor, ImGuiCond_Appearing, {m_PartPopoverPivotX, 0.0f});
+    ImGui::SetNextWindowPos(m_PartPopoverAnchor, ImGuiCond_Appearing, {0.5f, 0.0f});
     if (!ImGui::BeginPopup(PART_POPOVER)) {
         return;
     }
@@ -1892,7 +1881,7 @@ void EditorWindow::HandleContextMenu(const ViewTransform &view, const bool hover
     m_ContextTarget =
         FindMeasurementTarget(m_Schematic->GetElements(), m_Schematic->GetWires(), m_Schematic->GetConnectivity(),
                               cursor_world, WIRE_PICK_DISTANCE / m_View.GetZoom());
-    PlacePartPopover(view);
+    PlacePartPopover();
     ImGui::OpenPopup(CONTEXT_MENU);
 }
 

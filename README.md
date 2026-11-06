@@ -27,8 +27,8 @@ New to imcsim? The [tutorial](docs/tutorial.md) builds, simulates and exports a 
   vendor's subcircuits, such as op-amp models, imported from a SPICE library as blocks kept as text, following its
   `.include` and `.lib` lines. The schematic file keeps them all, so it opens anywhere
 - Controlled sources (VCVS, VCCS, CCCS, CCVS), and op-amps: ideal with a gain-bandwidth product and an output
-  limited by its supply pins, or a uA741 or custom part built as a Boyle macromodel from datasheet values (slew rate,
-  bias current, output swing, current limit)
+  limited by its supply pins, or a uA741, LM358 (PNP input), TL072 (JFET input), NE5532, OP07 or custom part built
+  as a Boyle macromodel from datasheet values (slew rate, bias current, output swing, current limit, input offset)
 - Warnings when a diode goes into reverse breakdown or past its average forward current or power rating, or a
   transistor exceeds its voltage, current or power ratings
 - Operating point, transient, AC sweep, DC sweep, noise, transfer function, sensitivity, pole-zero, S-parameter and truth table analyses, with node
@@ -93,7 +93,7 @@ New to imcsim? The [tutorial](docs/tutorial.md) builds, simulates and exports a 
   below or as tabs of each other, and the layout is kept between sessions
 - A toolbar of part icons drawn from the symbols themselves, a part search (Space), menus with shortcuts, a status
   bar with the keys of the current mode, and the Output window opening on each new result
-- Part properties in a popover beside the part (double click or Enter), values typed straight onto a selected
+- Part properties in a popover over the schematic (double click or Enter), values typed straight onto a selected
   part (`4k7`), a right-click menu, and Fit (Home)
 - Run (F5) from the toolbar, with the analysis and its settings beside it, settings suggested from the sources and
   parts, and the result of the last run in the status bar; an optional preference runs the analysis again after edits

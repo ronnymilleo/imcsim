@@ -160,10 +160,12 @@ private:
     std::optional<std::size_t> m_HeldButton;
 
     // Properties popover
-    /// The corner the popover hangs from.
+    /// The point the middle of the top edge of the popover opens on.
     ImVec2 m_PartPopoverAnchor = {0.0f, 0.0f};
-    /// Which side of the part the popover opens on.
-    float m_PartPopoverPivotX = 0.0f;
+    /// The middle of the canvas on screen, as drawn last.
+    ImVec2 m_CanvasCenter = {0.0f, 0.0f};
+    /// The top edge of the canvas on screen, as drawn last.
+    float m_CanvasTop = 0.0f;
     /// Whether a menu asked to open the popover.
     bool m_PartPopoverRequested = false;
     // Context menu
@@ -253,7 +255,7 @@ private:
     void ReleaseHeldButton();
 
     // Properties popover and context menu
-    void PlacePartPopover(const ViewTransform &view);
+    void PlacePartPopover();
     void HandleValueTyping(const ViewTransform &view);
     void DrawPartPopover();
     void HandleContextMenu(const ViewTransform &view, bool hovered);

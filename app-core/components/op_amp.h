@@ -8,6 +8,7 @@
 
 #include "components/component.h"
 #include <memory>
+#include <optional>
 #include <span>
 #include <string>
 #include <string_view>
@@ -16,12 +17,27 @@
 namespace Core {
 
 /**
+ * @enum    OpAmpInputStage
+ * @brief   The transistors of the input pair of a macromodel op-amp.
+ * @details An NPN pair, as in the uA741, needs its inputs some way above the negative supply. A PNP pair, as in the
+ *          LM358, takes inputs down to the negative supply. A P-channel JFET pair, as in the TL072, draws a bias
+ *          current of picoamperes.
+ */
+enum class OpAmpInputStage {
+    NPN,
+    PNP,
+    JFET,
+};
+
+/**
  * @struct  OpAmpParameters
  * @brief   Datasheet specifications of an op-amp, from which its Boyle macromodel is built.
  * @details Headrooms are how close the output gets to each supply pin. The supply current is the quiescent
- *          current the part draws from its supply pins.
+ *          current the part draws from its supply pins. The input offset voltage adds to the non-inverting input, so
+ *          a positive one drives the output up when both inputs are at the same voltage.
  */
 struct OpAmpParameters {
+    OpAmpInputStage InputStage = OpAmpInputStage::NPN;
     double OpenLoopGainDecibels = 106.0;
     double GainBandwidth = 1e6;
     /// Volts per microsecond, as datasheets give it.
@@ -34,6 +50,7 @@ struct OpAmpParameters {
     double PositiveHeadroom = 1.0;
     double NegativeHeadroom = 1.0;
     double SupplyCurrent = 1.7e-3;
+    double InputOffsetVoltage = 0.0;
 };
 
 /**
@@ -100,6 +117,11 @@ private:
 std::span<const OpAmpModel> GetOpAmpModels(ComponentType type);
 const OpAmpModel *FindOpAmpModel(ComponentType type, std::string_view name);
 bool IsValidIdealBandwidth(double bandwidth);
+
+// Input stages
+std::span<const OpAmpInputStage> GetOpAmpInputStages();
+const char *GetOpAmpInputStageName(OpAmpInputStage stage);
+std::optional<OpAmpInputStage> FindOpAmpInputStage(std::string_view name);
 
 // Netlist
 std::string FormatIdealOpAmp(const OpAmp &op_amp, const std::vector<int> &nodes, int internal_node);

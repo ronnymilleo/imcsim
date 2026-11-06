@@ -33,6 +33,8 @@ bool AnyValue(double /*value*/) {
 
 /// Custom model parameters beyond this many scroll.
 constexpr float MAX_VISIBLE_PARAMETERS = 10.0f;
+/// Width, in font sizes, at which the description of a ready model wraps, so a long one does not widen the popover.
+constexpr float DESCRIPTION_WRAP_FONT_SIZES = 26.0f;
 
 /**
  * @struct  ParameterField
@@ -184,6 +186,7 @@ constexpr auto OP_AMP_FIELDS = std::to_array<ParameterField<Core::OpAmpParameter
     {"V+ headroom", &Core::OpAmpParameters::PositiveHeadroom, "V"},
     {"V- headroom", &Core::OpAmpParameters::NegativeHeadroom, "V"},
     {"Supply current", &Core::OpAmpParameters::SupplyCurrent, "A"},
+    {"VOS", &Core::OpAmpParameters::InputOffsetVoltage, "V"},
 });
 
 constexpr auto SWITCH_FIELDS = std::to_array<ParameterField<Core::SwitchParameters>>({
@@ -323,7 +326,9 @@ bool DrawModelChoice(Part &part, const std::span<const Model> models, const char
         return changed;
     }
     if (!part.IsCustom()) {
+        ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + ImGui::GetFontSize() * DESCRIPTION_WRAP_FONT_SIZES);
         ImGui::TextDisabled("%s", part.GetModel()->Description);
+        ImGui::PopTextWrapPos();
         return changed;
     }
     Parameters parameters = part.GetParameters();
@@ -1172,8 +1177,30 @@ void PartEditor::DrawOpAmp(Core::OpAmp &op_amp) {
         }
         ImGui::TextDisabled("The open-loop gain falls to 1 at the GBW");
     } else if (op_amp.IsCustom()) {
+        DrawOpAmpInputStage(op_amp);
         ImGui::TextDisabled("Headrooms: how close the output gets to V+ and V-");
+        ImGui::TextDisabled("VOS adds to the + input; PNP and JFET inputs reach V-");
         ImGui::TextDisabled("Built as a Boyle macromodel from these specs");
+    }
+}
+
+/**
+ * @brief   The transistors of the input pair of a custom macromodel, which the specification fields leave out since
+ *          they are not a number.
+ */
+void PartEditor::DrawOpAmpInputStage(Core::OpAmp &op_amp) {
+    Core::OpAmpParameters parameters = op_amp.GetParameters();
+    DrawFieldLabel("Input stage");
+    if (ImGui::BeginCombo("##input_stage", Core::GetOpAmpInputStageName(parameters.InputStage))) {
+        for (const Core::OpAmpInputStage stage : Core::GetOpAmpInputStages()) {
+            const bool is_selected = stage == parameters.InputStage;
+            if (ImGui::Selectable(Core::GetOpAmpInputStageName(stage), is_selected) && !is_selected) {
+                parameters.InputStage = stage;
+                op_amp.SetCustomParameters(parameters);
+                m_Schematic->MarkModified();
+            }
+        }
+        ImGui::EndCombo();
     }
 }
 

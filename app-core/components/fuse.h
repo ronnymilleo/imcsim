@@ -24,8 +24,8 @@ struct FuseParameters {
     /// Largest current the fuse carries for ever, in amperes.
     double RatedCurrent = 1.0;
     /// Current squared times time that melts the element in a short overload, in A^2 s.
-    double MeltingI2t = 0.15;
-    double ColdResistance = 0.15;
+    double MeltingI2t = 1.045;
+    double ColdResistance = 0.0964;
     double BlownResistance = 1e9;
 
     bool operator==(const FuseParameters &) const = default;

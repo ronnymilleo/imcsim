@@ -55,9 +55,9 @@ the cathode to the top of the capacitor and the resistor, and their bottoms to t
 
 ## 3. Edit a part
 
-A double click on a part opens its properties in a popover beside it, as does Enter with the part selected. Edits
-apply as you type; Enter, Esc or a click outside closes it. A right click opens everything else the part can do:
-its properties, rotate, mirror, flip, measure its current and delete.
+A double click on a part opens its properties in a popover at the top of the schematic, as does Enter with the
+part selected. Edits apply as you type; Enter, Esc or a click outside closes it. A right click opens everything else
+the part can do: its properties, rotate, mirror, flip, measure its current and delete.
 
 ![The voltage source set to Pulse, with its default 0 to 5 V, 1 kHz settings](images/tutorial_properties.png)
 

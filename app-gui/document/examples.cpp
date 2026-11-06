@@ -290,8 +290,9 @@ constexpr auto EXAMPLES = std::to_array<Example>({
         .Title = "Fast and slow-blow fuses",
         .Group = "Protection",
         .Description =
-            "A 5 V supply feeds two 4 Ohm loads, 1.2 A each, through a 1 A fast fuse (FU1) and a 1 A slow-blow "
-            "fuse (FU2). Run the transient: FU1 blows after about 0.18 s and FU2 after about 1.2 s, for the same "
+            "A 5 V supply feeds two 2.5 Ohm loads, about 1.9 A each, through a 1 A fast fuse (FU1) and a 1 A "
+            "slow-blow fuse (FU2), Littelfuse 217 and 218 parts. Run the transient: FU1 blows after about 0.33 s and "
+            "FU2 after about 2.1 s, for the same "
             "overload, and each branch loses its current in the same run; the Output window warns when each blew, "
             "and a flash marks it on the schematic. A fuse never blows below its rating, and every run starts with "
             "both whole, so the operating point, a DC sweep and an AC sweep always see them closed.",

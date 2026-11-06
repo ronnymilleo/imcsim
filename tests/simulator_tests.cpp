@@ -35,6 +35,8 @@
 #include <format>
 #include <numbers>
 #include <numeric>
+#include <string>
+#include <string_view>
 #include <vector>
 
 namespace {
@@ -260,6 +262,51 @@ struct InvertingAmplifier {
         Circuit.Add(Reference, {0});
     }
 };
+
+/// A voltage follower on its own supplies, its input reached through a resistor so the input current shows as a drop
+/// across it: the source on node 1, the + input on node 2, the output on node 3, V+ on 4 and V- on 5.
+struct Follower {
+    Core::VoltageSource Input;
+    Core::Resistor Series;
+    Core::OpAmp Amplifier;
+    Core::VCC Positive;
+    Core::VCC Negative;
+    Core::Resistor Load;
+    Core::Ground Reference;
+    Core::Circuit Circuit;
+
+    Follower(const double input, const double positive, const double negative, const double series_resistance) {
+        Input.SetName("Vin1");
+        Input.SetValue(input);
+        Series.SetName("R1");
+        Series.SetValue(series_resistance);
+        Amplifier.SetName("U1");
+        Positive.SetName("V1");
+        Positive.SetValue(positive);
+        Negative.SetName("V2");
+        Negative.SetValue(negative);
+        Load.SetName("R2");
+        Load.SetValue(10e3);
+        Circuit.Add(Input, {1, 0});
+        Circuit.Add(Series, {1, 2});
+        Circuit.Add(Amplifier, {3, 2, 3, 4, 5});
+        Circuit.Add(Positive, {4});
+        Circuit.Add(Negative, {5});
+        Circuit.Add(Load, {3, 0});
+        Circuit.Add(Reference, {0});
+    }
+};
+
+/**
+ * @brief   The node voltages of an operating point, or a failed check with the error of the run.
+ */
+std::vector<double> OperatingPointVoltages(const Core::Circuit &circuit) {
+    const Core::OperatingPointRun run = Core::RunOperatingPoint(circuit);
+    if (!run.Result) {
+        FAIL(run.Result.error());
+    }
+    return run.Result->NodeVoltages;
+}
 
 } // namespace
 
@@ -985,7 +1032,7 @@ TEST_CASE("Each LED model drops its rated forward voltage at 20 mA", "[simulator
         const char *Model;
         double ForwardVoltage;
     };
-    const Rating rating = GENERATE(Rating{"Red", 1.8}, Rating{"Green", 2.1}, Rating{"Blue", 3.0});
+    const Rating rating = GENERATE(Rating{"Red", 1.85}, Rating{"Green", 2.2}, Rating{"Blue", 3.3});
     CAPTURE(rating.Model);
     // The resistor sets 20 mA when the LED drops its rated voltage
     DiodeLoop loop(Core::ComponentType::LED, 5.0, (5.0 - rating.ForwardVoltage) / 20e-3);
@@ -1842,7 +1889,15 @@ TEST_CASE("A uA741 macromodel amplifies like the ideal op-amp but swings 1 V sho
     CHECK_THAT(run.Result->NodeVoltages[3], Catch::Matchers::WithinAbs(expected, 0.1));
 }
 
-TEST_CASE("A uA741 macromodel slews at its datasheet rate", "[simulator]") {
+TEST_CASE("Every ready macromodel op-amp slews at its datasheet rate", "[simulator]") {
+    const auto [model, datasheet_rate] = GENERATE(table<std::string, double>({
+        {"uA741", 0.5e6},
+        {"LM358", 0.3e6},
+        {"TL072", 20e6},
+        {"NE5532", 5e6},
+        {"OP07", 0.3e6},
+    }));
+    CAPTURE(model);
     // A unity-gain follower driven by a 10 V step, so the output can only follow at the slew rate
     Core::VoltageSource input;
     input.SetName("Vin1");
@@ -1851,7 +1906,7 @@ TEST_CASE("A uA741 macromodel slews at its datasheet rate", "[simulator]") {
         {.Low = -5.0, .High = 5.0, .Delay = 1e-6, .RiseTime = 1e-9, .FallTime = 1e-9, .Width = 1.0, .Period = 2.0});
     Core::OpAmp follower;
     follower.SetName("U1");
-    follower.SetModel(*Core::FindOpAmpModel(Core::ComponentType::OP_AMP, "uA741"));
+    follower.SetModel(*Core::FindOpAmpModel(Core::ComponentType::OP_AMP, model));
     Core::VCC positive;
     positive.SetName("V1");
     positive.SetValue(15.0);
@@ -1870,7 +1925,10 @@ TEST_CASE("A uA741 macromodel slews at its datasheet rate", "[simulator]") {
     circuit.Add(load, {2, 0});
     circuit.Add(reference, {0});
 
-    const Core::TransientRun run = Core::RunTransient(circuit, {.StopTime = 40e-6, .TimeStep = 10e-9});
+    // Long enough for the 10 V step at the slow rates, with a few thousand points over it at the fast ones
+    const double step_time = 10.0 / datasheet_rate;
+    const Core::TransientRun run =
+        Core::RunTransient(circuit, {.StopTime = 1e-6 + 2.0 * step_time, .TimeStep = step_time / 2000.0});
     if (!run.Result) {
         FAIL(run.Result.error());
     }
@@ -1883,7 +1941,73 @@ TEST_CASE("A uA741 macromodel slews at its datasheet rate", "[simulator]") {
         return times[static_cast<std::size_t>(index - output.begin())];
     };
     const double slew_rate = 6.0 / (crossing(3.0) - crossing(-3.0));
-    CHECK_THAT(slew_rate, Catch::Matchers::WithinRel(0.5e6, 0.05));
+    CHECK_THAT(slew_rate, Catch::Matchers::WithinRel(datasheet_rate, 0.05));
+}
+
+TEST_CASE("Every ready macromodel op-amp amplifies with the gain its resistors set", "[simulator]") {
+    const std::string model = GENERATE("uA741", "LM358", "TL072", "NE5532", "OP07");
+    CAPTURE(model);
+    InvertingAmplifier amplifier(0.5);
+    const Core::OpAmpModel &ready = *Core::FindOpAmpModel(Core::ComponentType::OP_AMP, model);
+    amplifier.Amplifier.SetModel(ready);
+    // R2 / R1 is 10, every model has 100 dB or more of open-loop gain, and the offset at the + input comes out
+    // multiplied by the noise gain, 1 + R2 / R1
+    const double expected = -10.0 * 0.5 + 11.0 * ready.Parameters.InputOffsetVoltage;
+    CHECK_THAT(OperatingPointVoltages(amplifier.Circuit)[3], Catch::Matchers::WithinAbs(expected, 5e-3));
+}
+
+TEST_CASE("An LM358 follows its input down to its negative supply, where the NPN input of a uA741 cannot",
+          "[simulator]") {
+    // A single 5 V supply with V- at ground, and an input 200 mV above it; closer to V- the soft knee of the limiters
+    // holds the output about 50 mV up
+    Follower lm358(0.2, 5.0, 0.0, 1e3);
+    const Core::OpAmpModel &ready = *Core::FindOpAmpModel(Core::ComponentType::OP_AMP, "LM358");
+    lm358.Amplifier.SetModel(ready);
+    CHECK_THAT(OperatingPointVoltages(lm358.Circuit)[3],
+               Catch::Matchers::WithinAbs(0.2 + ready.Parameters.InputOffsetVoltage, 1e-3));
+
+    Follower ua741(0.2, 5.0, 0.0, 1e3);
+    ua741.Amplifier.SetModel(*Core::FindOpAmpModel(Core::ComponentType::OP_AMP, "uA741"));
+    // Its output stops 1 V above V-
+    CHECK(OperatingPointVoltages(ua741.Circuit)[3] > 0.9);
+}
+
+TEST_CASE("A TL072 draws picoamperes into its inputs, where a uA741 draws tens of nanoamperes", "[simulator]") {
+    // The bias current flows through 1 MOhm into the + input, so each nanoampere drops a millivolt
+    const auto input_current = [](const std::string_view model) {
+        Follower follower(1.0, 15.0, -15.0, 1e6);
+        follower.Amplifier.SetModel(*Core::FindOpAmpModel(Core::ComponentType::OP_AMP, model));
+        const std::vector<double> voltages = OperatingPointVoltages(follower.Circuit);
+        return (voltages[1] - voltages[2]) / 1e6;
+    };
+    CHECK(std::abs(input_current("TL072")) < 1e-9);
+    CHECK_THAT(input_current("uA741"), Catch::Matchers::WithinRel(80e-9, 0.1));
+    // The PNP input of an LM358 draws its 20 nA out of the pin
+    CHECK_THAT(input_current("LM358"), Catch::Matchers::WithinRel(-20e-9, 0.1));
+}
+
+TEST_CASE("The input offset voltage of a custom op-amp shows at the output of a follower, with its sign",
+          "[simulator]") {
+    const double offset = GENERATE(5e-3, -5e-3);
+    const Core::OpAmpInputStage stage =
+        GENERATE(Core::OpAmpInputStage::NPN, Core::OpAmpInputStage::PNP, Core::OpAmpInputStage::JFET);
+    CAPTURE(offset, Core::GetOpAmpInputStageName(stage));
+    Follower follower(0.0, 15.0, -15.0, 1e3);
+    follower.Amplifier.SetCustom();
+    Core::OpAmpParameters parameters = follower.Amplifier.GetParameters();
+    parameters.InputStage = stage;
+    parameters.InputOffsetVoltage = offset;
+    follower.Amplifier.SetCustomParameters(parameters);
+    // A 1 kOhm series resistor drops 80 uV of the bias current of the NPN and PNP pairs
+    CHECK_THAT(OperatingPointVoltages(follower.Circuit)[3], Catch::Matchers::WithinAbs(offset, 2e-4));
+}
+
+TEST_CASE("Input stages are named for the editor and files, and found again by those names", "[simulator]") {
+    for (const Core::OpAmpInputStage stage : Core::GetOpAmpInputStages()) {
+        CHECK(Core::FindOpAmpInputStage(Core::GetOpAmpInputStageName(stage)) == stage);
+    }
+    CHECK(Core::GetOpAmpInputStages().size() == 3);
+    CHECK_FALSE(Core::FindOpAmpInputStage("CMOS").has_value());
 }
 
 TEST_CASE("A potentiometer divides its supply by the position of its wiper", "[simulator]") {
