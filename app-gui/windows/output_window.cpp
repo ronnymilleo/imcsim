@@ -284,8 +284,10 @@ FrameResults OutputWindow::EvaluateFrame(const std::size_t node_count,
             }
         }
     }
+    if (const auto &sweep = m_Schematic.GetACSweep()) {
+        frame.ACSweepMath = m_MathChannels.EvaluateAC(*sweep, frame.ACSweepErrors);
+    }
     frame.AnythingMeasured = HasMeasuredVoltage(node_count, m_Schematic) || HasMeasuredCurrent(currents, m_Schematic);
-    frame.HasMathChannels = !m_MathChannels.IsEmpty();
     return frame;
 }
 
@@ -531,7 +533,7 @@ ExportFigure OutputWindow::BuildShownFigure(const FrameResults &frame, const boo
     case PlotTab::SPECTRUM:
         return m_SpectrumTab.BuildFigure();
     case PlotTab::AC_SWEEP:
-        return m_ACSweepTab.BuildFigure();
+        return m_ACSweepTab.BuildFigure(frame);
     case PlotTab::DC_SWEEP:
         return m_DCSweepTab.BuildFigure(frame);
     case PlotTab::NOISE:

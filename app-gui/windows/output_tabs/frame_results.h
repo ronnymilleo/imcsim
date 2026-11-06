@@ -44,9 +44,10 @@ struct FrameResults {
     /// One list of channels per curve of the DC sweep.
     std::vector<std::vector<MathTrace>> DCSweepMath;
     std::vector<std::string> DCSweepErrors;
+    /// The math channels over the AC sweep shown, on the complex values of its traces.
+    ACMathTraces ACSweepMath;
+    std::vector<std::string> ACSweepErrors;
     bool AnythingMeasured = false;
-    /// Whether the user made any math channel, which the AC sweep does not evaluate yet.
-    bool HasMathChannels = false;
 };
 
 } // namespace GUI

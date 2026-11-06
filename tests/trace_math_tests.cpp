@@ -6,6 +6,8 @@
 #include "plots/trace_math.h"
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
+#include <cmath>
+#include <numbers>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -145,4 +147,102 @@ TEST_CASE("Operator channels write expressions that compile", "[trace_math]") {
     CHECK(GUI::BuildOperatorExpression("V(1)", GUI::MathOperator::SUBTRACT, "V(2)") == "V(1)-V(2)");
     const std::string power = GUI::BuildOperatorExpression("V(1)", GUI::MathOperator::MULTIPLY, "I(Q1.C)");
     CHECK(GUI::FormatUnit(EvaluateOrFail(power).Unit) == "W");
+}
+
+namespace {
+
+/**
+ * @brief   An AC sweep at two frequencies: V(1) is 1 V at 0 degrees, V(2) is 0.5 V lagging 90 degrees, and I(R1) is
+ *          2 A leading 45 degrees.
+ */
+Core::ACSweep MakeACSweep() {
+    const double half = 20.0 * std::log10(0.5);
+    const double two = 20.0 * std::log10(2.0);
+    return {.Frequencies = {1.0, 1000.0},
+            .NodeMagnitudesDecibels = {{}, {0.0, 0.0}, {half, half}},
+            .NodePhasesDegrees = {{}, {0.0, 0.0}, {-90.0, -90.0}},
+            .CurrentMagnitudesDecibels = {{"R1", {two, two}}},
+            .CurrentPhasesDegrees = {{"R1", {45.0, 45.0}}}};
+}
+
+GUI::ACMathResult EvaluateACOrFail(const std::string &text, const Core::ACSweep &sweep = MakeACSweep()) {
+    const auto program = GUI::CompileExpression(text);
+    if (!program) {
+        FAIL(program.error());
+    }
+    auto evaluated = GUI::EvaluateACExpression(*program, sweep);
+    if (!evaluated) {
+        FAIL(evaluated.error());
+    }
+    return std::move(*evaluated);
+}
+
+void CheckValuesWithin(const std::vector<double> &actual, const std::vector<double> &expected, const double margin) {
+    REQUIRE(actual.size() == expected.size());
+    for (std::size_t index = 0; index < actual.size(); ++index) {
+        CHECK_THAT(actual[index], WithinAbs(expected[index], margin));
+    }
+}
+
+} // namespace
+
+TEST_CASE("On an AC sweep, math works on the complex values of the traces", "[trace_math]") {
+    // 1 - (-0.5j) is 1 + 0.5j: its magnitude is sqrt(1.25) and its phase atan(0.5)
+    const GUI::ACMathResult difference = EvaluateACOrFail("V(1)-V(2)");
+    const double magnitude = 20.0 * std::log10(std::sqrt(1.25));
+    const double phase = std::atan(0.5) * 180.0 / std::numbers::pi;
+    CheckValuesWithin(difference.MagnitudesDecibels, {magnitude, magnitude}, 1e-9);
+    CheckValuesWithin(difference.PhasesDegrees, {phase, phase}, 1e-9);
+    CHECK(GUI::FormatUnit(difference.Unit) == "V");
+
+    // A ratio of two nodes is the gain and phase shift between them, without a unit
+    const GUI::ACMathResult gain = EvaluateACOrFail("V(2)/V(1)");
+    CheckValuesWithin(gain.MagnitudesDecibels, {-6.0206, -6.0206}, 1e-4);
+    CheckValuesWithin(gain.PhasesDegrees, {-90.0, -90.0}, 1e-9);
+    CHECK(GUI::FormatUnit(gain.Unit).empty());
+
+    // An impedance divides a voltage by a current, phases included
+    const GUI::ACMathResult impedance = EvaluateACOrFail("V(1)/I(R1)");
+    CheckValuesWithin(impedance.MagnitudesDecibels, {-6.0206, -6.0206}, 1e-4);
+    CheckValuesWithin(impedance.PhasesDegrees, {-45.0, -45.0}, 1e-9);
+    CHECK(GUI::FormatUnit(impedance.Unit) == "Ohm");
+
+    // abs() keeps the magnitude and drops the phase
+    CheckValuesWithin(EvaluateACOrFail("abs(V(2))").PhasesDegrees, {0.0, 0.0}, 1e-9);
+}
+
+TEST_CASE("On an AC sweep, a derivative multiplies by j*omega and an integral divides by it", "[trace_math]") {
+    // At 1 Hz omega is 2*pi, at 1 kHz a thousand times more, 60 dB higher
+    const double one_hertz = 20.0 * std::log10(2.0 * std::numbers::pi);
+    const GUI::ACMathResult derivative = EvaluateACOrFail("ddt(V(1))");
+    CheckValuesWithin(derivative.MagnitudesDecibels, {one_hertz, one_hertz + 60.0}, 1e-9);
+    CheckValuesWithin(derivative.PhasesDegrees, {90.0, 90.0}, 1e-9);
+    CHECK(GUI::FormatUnit(derivative.Unit) == "V/s");
+
+    const GUI::ACMathResult integral = EvaluateACOrFail("integ(V(1))");
+    CheckValuesWithin(integral.MagnitudesDecibels, {-one_hertz, -one_hertz - 60.0}, 1e-9);
+    CheckValuesWithin(integral.PhasesDegrees, {-90.0, -90.0}, 1e-9);
+    CHECK(GUI::FormatUnit(integral.Unit) == "V*s");
+
+    // At 0 Hz the integral has no finite value, which the plot skips
+    Core::ACSweep at_zero = MakeACSweep();
+    at_zero.Frequencies.front() = 0.0;
+    const GUI::ACMathResult unbounded = EvaluateACOrFail("integ(V(1))", at_zero);
+    CHECK(std::isnan(unbounded.MagnitudesDecibels.front()));
+    CHECK(std::isnan(unbounded.PhasesDegrees.front()));
+    CHECK(std::isfinite(unbounded.MagnitudesDecibels.back()));
+}
+
+TEST_CASE("On an AC sweep, ground reads zero and a missing trace is reported", "[trace_math]") {
+    CheckValuesWithin(EvaluateACOrFail("V(1,0)").MagnitudesDecibels, {0.0, 0.0}, 1e-12);
+    // Zero has no magnitude in decibels
+    CHECK(std::isnan(EvaluateACOrFail("V(0)").MagnitudesDecibels.front()));
+
+    const Core::ACSweep sweep = MakeACSweep();
+    const auto missing_node = GUI::EvaluateACExpression(*GUI::CompileExpression("V(7)"), sweep);
+    REQUIRE_FALSE(missing_node);
+    CHECK(missing_node.error().contains("node 7"));
+    const auto missing_current = GUI::EvaluateACExpression(*GUI::CompileExpression("I(C9)"), sweep);
+    REQUIRE_FALSE(missing_current);
+    CHECK(missing_current.error().contains("I(C9)"));
 }

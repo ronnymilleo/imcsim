@@ -12,8 +12,11 @@
 #include <cctype>
 #include <charconv>
 #include <cmath>
+#include <complex>
 #include <format>
 #include <functional>
+#include <limits>
+#include <numbers>
 #include <optional>
 #include <utility>
 
@@ -22,6 +25,10 @@ namespace GUI {
 namespace {
 
 using Kind = MathInstruction::Kind;
+
+/// Decibels of a ratio of amplitudes, such as voltages, per decade of the ratio.
+constexpr double DECIBELS_PER_DECADE = 20.0;
+constexpr double HALF_TURN_DEGREES = 180.0;
 
 /**
  * @struct  FunctionName
@@ -344,20 +351,229 @@ std::vector<double> Integrate(const std::span<const double> xs, const std::vecto
  * @struct  StackEntry
  * @brief   A value on the evaluation stack: a trace or a number spread over every sample, and its unit.
  */
-struct StackEntry {
-    std::vector<double> Values;
+template <typename Value> struct StackEntry {
+    std::vector<Value> Values;
     Dimension Unit;
     bool IsNumber = false;
 };
 
-template <typename Operation>
-StackEntry ApplyBinary(StackEntry first, const StackEntry &second, const Operation &operation, const Dimension unit) {
+template <typename Value, typename Operation>
+StackEntry<Value> ApplyBinary(StackEntry<Value> first, const StackEntry<Value> &second, const Operation &operation,
+                              const Dimension unit) {
     for (std::size_t index = 0; index < first.Values.size(); ++index) {
         first.Values[index] = operation(first.Values[index], second.Values[index]);
     }
     first.Unit = unit;
     first.IsNumber = first.IsNumber && second.IsNumber;
     return first;
+}
+
+/**
+ * @class   RealSamples
+ * @brief   The samples of a transient or a DC sweep, where every trace is a real value at each X value.
+ */
+class RealSamples {
+public:
+    using Value = double;
+
+    RealSamples(const std::span<const double> xs, const Dimension x_unit,
+                const std::vector<std::vector<double>> &node_voltages,
+                const std::vector<Core::ComponentTrace> &currents)
+        : m_Xs(xs), m_XUnit(x_unit), m_NodeVoltages(node_voltages), m_Currents(currents) {}
+
+    std::size_t GetCount() const { return m_Xs.size(); }
+
+    Dimension GetXUnit() const { return m_XUnit; }
+
+    std::expected<std::vector<double>, std::string> GetVoltage(const int node) const {
+        if (node < 0 || static_cast<std::size_t>(node) >= m_NodeVoltages.size()) {
+            return std::unexpected(std::format("The circuit has no node {}", node));
+        }
+        return m_NodeVoltages[static_cast<std::size_t>(node)];
+    }
+
+    std::expected<std::vector<double>, std::string> GetCurrent(const std::string_view name) const {
+        const auto current = std::ranges::find(m_Currents, name, &Core::ComponentTrace::Name);
+        if (current == m_Currents.end()) {
+            return std::unexpected(std::format("The circuit has no current I({})", name));
+        }
+        return current->Values;
+    }
+
+    std::vector<double> GetDerivative(const std::vector<double> &values) const { return Differentiate(m_Xs, values); }
+
+    std::vector<double> GetIntegral(const std::vector<double> &values) const { return Integrate(m_Xs, values); }
+
+private:
+    std::span<const double> m_Xs;
+    Dimension m_XUnit;
+    const std::vector<std::vector<double>> &m_NodeVoltages;
+    const std::vector<Core::ComponentTrace> &m_Currents;
+};
+
+/**
+ * @class   PhasorSamples
+ * @brief   The samples of an AC sweep, where every trace is a phasor at each frequency, rebuilt from its magnitude in
+ *          decibels and its phase in degrees.
+ * @details A derivative multiplies by j*omega and an integral divides by it, which is what they are on a sine wave,
+ *          so both stay exact at every frequency.
+ */
+class PhasorSamples {
+public:
+    using Value = std::complex<double>;
+
+    explicit PhasorSamples(const Core::ACSweep &sweep) : m_Sweep(sweep) {}
+
+    std::size_t GetCount() const { return m_Sweep.Frequencies.size(); }
+
+    static Dimension GetXUnit() { return {.Seconds = 1}; }
+
+    std::expected<std::vector<Value>, std::string> GetVoltage(const int node) const {
+        if (node < 0 || static_cast<std::size_t>(node) >= m_Sweep.NodeMagnitudesDecibels.size()) {
+            return std::unexpected(std::format("The circuit has no node {}", node));
+        }
+        // Ground keeps no samples in an AC sweep
+        if (node == 0) {
+            return std::vector<Value>(GetCount());
+        }
+        const auto index = static_cast<std::size_t>(node);
+        return ToPhasors(m_Sweep.NodeMagnitudesDecibels[index], m_Sweep.NodePhasesDegrees[index]);
+    }
+
+    std::expected<std::vector<Value>, std::string> GetCurrent(const std::string_view name) const {
+        const auto magnitude = std::ranges::find(m_Sweep.CurrentMagnitudesDecibels, name, &Core::ComponentTrace::Name);
+        const auto phase = std::ranges::find(m_Sweep.CurrentPhasesDegrees, name, &Core::ComponentTrace::Name);
+        if (magnitude == m_Sweep.CurrentMagnitudesDecibels.end() || phase == m_Sweep.CurrentPhasesDegrees.end()) {
+            return std::unexpected(std::format("The circuit has no current I({})", name));
+        }
+        return ToPhasors(magnitude->Values, phase->Values);
+    }
+
+    std::vector<Value> GetDerivative(std::vector<Value> values) const {
+        for (std::size_t index = 0; index < values.size(); ++index) {
+            values[index] *= GetJOmega(index);
+        }
+        return values;
+    }
+
+    std::vector<Value> GetIntegral(std::vector<Value> values) const {
+        for (std::size_t index = 0; index < values.size(); ++index) {
+            values[index] /= GetJOmega(index);
+        }
+        return values;
+    }
+
+private:
+    const Core::ACSweep &m_Sweep;
+
+    Value GetJOmega(const std::size_t index) const {
+        return {0.0, 2.0 * std::numbers::pi * m_Sweep.Frequencies[index]};
+    }
+
+    static std::vector<Value> ToPhasors(const std::vector<double> &magnitudes_decibels,
+                                        const std::vector<double> &phases_degrees) {
+        std::vector<Value> phasors;
+        phasors.reserve(magnitudes_decibels.size());
+        for (std::size_t index = 0; index < magnitudes_decibels.size(); ++index) {
+            phasors.push_back(std::polar(std::pow(10.0, magnitudes_decibels[index] / DECIBELS_PER_DECADE),
+                                         phases_degrees[index] * std::numbers::pi / HALF_TURN_DEGREES));
+        }
+        return phasors;
+    }
+};
+
+/**
+ * @brief   Runs a compiled expression on a stack of traces, for real samples or for phasors alike.
+ * @details Every instruction but the loads takes its operands from the stack, which the parser always fills.
+ */
+template <typename Samples>
+std::expected<StackEntry<typename Samples::Value>, std::string> RunProgram(const MathProgram &program,
+                                                                           const Samples &samples) {
+    using Value = typename Samples::Value;
+    using Entry = StackEntry<Value>;
+    std::vector<Entry> stack;
+    for (const MathInstruction &instruction : program.Instructions) {
+        switch (instruction.Type) {
+        case Kind::NUMBER:
+            stack.push_back({std::vector<Value>(samples.GetCount(), Value(instruction.Number)), {}, true});
+            continue;
+        case Kind::VOLTAGE: {
+            if (!instruction.Net.empty()) {
+                return std::unexpected(std::format("The net {} was not resolved to a node", instruction.Net));
+            }
+            auto voltage = samples.GetVoltage(instruction.Node);
+            if (!voltage) {
+                return std::unexpected(voltage.error());
+            }
+            stack.push_back({std::move(*voltage), {.Volts = 1}, false});
+            continue;
+        }
+        case Kind::CURRENT: {
+            auto current = samples.GetCurrent(instruction.Current);
+            if (!current) {
+                return std::unexpected(current.error());
+            }
+            stack.push_back({std::move(*current), {.Amperes = 1}, false});
+            continue;
+        }
+        default:
+            break;
+        }
+
+        Entry operand = std::move(stack.back());
+        stack.pop_back();
+        switch (instruction.Type) {
+        case Kind::NEGATE:
+            std::ranges::transform(operand.Values, operand.Values.begin(), [](const Value value) { return -value; });
+            break;
+        case Kind::ABS:
+            std::ranges::transform(operand.Values, operand.Values.begin(),
+                                   [](const Value value) { return Value(std::abs(value)); });
+            break;
+        case Kind::SQUARE_ROOT:
+            std::ranges::transform(operand.Values, operand.Values.begin(),
+                                   [](const Value value) { return std::sqrt(value); });
+            operand.Unit = {.Known = operand.Unit == Dimension{}};
+            break;
+        case Kind::DERIVATIVE:
+            operand.Values = samples.GetDerivative(operand.Values);
+            operand.Unit = Combine(operand.Unit, samples.GetXUnit(), -1);
+            operand.IsNumber = false;
+            break;
+        case Kind::INTEGRAL:
+            operand.Values = samples.GetIntegral(operand.Values);
+            operand.Unit = Combine(operand.Unit, samples.GetXUnit(), 1);
+            operand.IsNumber = false;
+            break;
+        default: {
+            Entry first = std::move(stack.back());
+            stack.pop_back();
+            const Dimension first_unit = first.Unit;
+            const bool first_is_number = first.IsNumber;
+            switch (instruction.Type) {
+            case Kind::ADD:
+                operand = ApplyBinary(std::move(first), operand, std::plus<>(),
+                                      AddUnits(first_unit, first_is_number, operand.Unit, operand.IsNumber));
+                break;
+            case Kind::SUBTRACT:
+                operand = ApplyBinary(std::move(first), operand, std::minus<>(),
+                                      AddUnits(first_unit, first_is_number, operand.Unit, operand.IsNumber));
+                break;
+            case Kind::MULTIPLY:
+                operand =
+                    ApplyBinary(std::move(first), operand, std::multiplies<>(), Combine(first_unit, operand.Unit, 1));
+                break;
+            default:
+                operand =
+                    ApplyBinary(std::move(first), operand, std::divides<>(), Combine(first_unit, operand.Unit, -1));
+                break;
+            }
+            break;
+        }
+        }
+        stack.push_back(std::move(operand));
+    }
+    return std::move(stack.back());
 }
 
 } // namespace
@@ -408,91 +624,40 @@ std::expected<MathResult, std::string> EvaluateExpression(const MathProgram &pro
                                                           const Dimension x_unit,
                                                           const std::vector<std::vector<double>> &node_voltages,
                                                           const std::vector<Core::ComponentTrace> &currents) {
-    const std::size_t count = xs.size();
-    std::vector<StackEntry> stack;
-    for (const MathInstruction &instruction : program.Instructions) {
-        switch (instruction.Type) {
-        case Kind::NUMBER:
-            stack.push_back({std::vector<double>(count, instruction.Number), {}, true});
-            continue;
-        case Kind::VOLTAGE:
-            if (!instruction.Net.empty()) {
-                return std::unexpected(std::format("The net {} was not resolved to a node", instruction.Net));
-            }
-            if (instruction.Node < 0 || static_cast<std::size_t>(instruction.Node) >= node_voltages.size()) {
-                return std::unexpected(std::format("The circuit has no node {}", instruction.Node));
-            }
-            stack.push_back({node_voltages[static_cast<std::size_t>(instruction.Node)], {.Volts = 1}, false});
-            continue;
-        case Kind::CURRENT: {
-            const auto current = std::ranges::find_if(currents, [&instruction](const Core::ComponentTrace &trace) {
-                return trace.Name == instruction.Current;
-            });
-            if (current == currents.end()) {
-                return std::unexpected(std::format("The circuit has no current I({})", instruction.Current));
-            }
-            stack.push_back({current->Values, {.Amperes = 1}, false});
-            continue;
-        }
-        default:
-            break;
-        }
-
-        // Every other instruction takes its operands from the stack, which the parser always fills
-        StackEntry operand = std::move(stack.back());
-        stack.pop_back();
-        switch (instruction.Type) {
-        case Kind::NEGATE:
-            std::ranges::transform(operand.Values, operand.Values.begin(), [](const double value) { return -value; });
-            break;
-        case Kind::ABS:
-            std::ranges::transform(operand.Values, operand.Values.begin(),
-                                   [](const double value) { return std::abs(value); });
-            break;
-        case Kind::SQUARE_ROOT:
-            std::ranges::transform(operand.Values, operand.Values.begin(),
-                                   [](const double value) { return std::sqrt(value); });
-            operand.Unit = {.Known = operand.Unit == Dimension{}};
-            break;
-        case Kind::DERIVATIVE:
-            operand.Values = Differentiate(xs, operand.Values);
-            operand.Unit = Combine(operand.Unit, x_unit, -1);
-            operand.IsNumber = false;
-            break;
-        case Kind::INTEGRAL:
-            operand.Values = Integrate(xs, operand.Values);
-            operand.Unit = Combine(operand.Unit, x_unit, 1);
-            operand.IsNumber = false;
-            break;
-        default: {
-            StackEntry first = std::move(stack.back());
-            stack.pop_back();
-            const Dimension first_unit = first.Unit;
-            const bool first_is_number = first.IsNumber;
-            switch (instruction.Type) {
-            case Kind::ADD:
-                operand = ApplyBinary(std::move(first), operand, std::plus<>(),
-                                      AddUnits(first_unit, first_is_number, operand.Unit, operand.IsNumber));
-                break;
-            case Kind::SUBTRACT:
-                operand = ApplyBinary(std::move(first), operand, std::minus<>(),
-                                      AddUnits(first_unit, first_is_number, operand.Unit, operand.IsNumber));
-                break;
-            case Kind::MULTIPLY:
-                operand =
-                    ApplyBinary(std::move(first), operand, std::multiplies<>(), Combine(first_unit, operand.Unit, 1));
-                break;
-            default:
-                operand =
-                    ApplyBinary(std::move(first), operand, std::divides<>(), Combine(first_unit, operand.Unit, -1));
-                break;
-            }
-            break;
-        }
-        }
-        stack.push_back(std::move(operand));
+    auto result = RunProgram(program, RealSamples(xs, x_unit, node_voltages, currents));
+    if (!result) {
+        return std::unexpected(result.error());
     }
-    return MathResult{.Values = std::move(stack.back().Values), .Unit = stack.back().Unit};
+    return MathResult{.Values = std::move(result->Values), .Unit = result->Unit};
+}
+
+/**
+ * @brief   Evaluates a compiled expression over an AC sweep, on the phasors of its traces.
+ * @details V(2)/V(1) so divides the complex values, which gives the gain and the phase shift between two nodes, and
+ *          ddt() and integ() multiply and divide by j*omega. The result reads as a magnitude in decibels, relative to 1
+ *          of its unit (20*log10, as for every trace of an AC sweep), and a phase in degrees.
+ * @param[in] program  Compiled expression, with its net names resolved.
+ * @param[in] sweep    The AC sweep.
+ * @return  The magnitude and phase at each frequency and their unit, or an error naming a node or part the sweep does
+ *          not have. A magnitude of zero or one that is not finite, such as integ() at 0 Hz, gives NaN in both.
+ */
+std::expected<ACMathResult, std::string> EvaluateACExpression(const MathProgram &program, const Core::ACSweep &sweep) {
+    const auto result = RunProgram(program, PhasorSamples(sweep));
+    if (!result) {
+        return std::unexpected(result.error());
+    }
+    ACMathResult phasors{.MagnitudesDecibels = {}, .PhasesDegrees = {}, .Unit = result->Unit};
+    for (const std::complex<double> value : result->Values) {
+        const double magnitude = std::abs(value);
+        if (!std::isfinite(magnitude) || magnitude == 0.0) {
+            phasors.MagnitudesDecibels.push_back(std::numeric_limits<double>::quiet_NaN());
+            phasors.PhasesDegrees.push_back(std::numeric_limits<double>::quiet_NaN());
+            continue;
+        }
+        phasors.MagnitudesDecibels.push_back(DECIBELS_PER_DECADE * std::log10(magnitude));
+        phasors.PhasesDegrees.push_back(std::arg(value) * HALF_TURN_DEGREES / std::numbers::pi);
+    }
+    return phasors;
 }
 
 /**

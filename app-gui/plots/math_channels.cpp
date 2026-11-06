@@ -43,6 +43,17 @@ ImAxis AxisForUnit(const Dimension unit) {
     return ImAxis_Y3;
 }
 
+/**
+ * @brief   The voltages of an AC sweep read as gains, relative to sources of magnitude 1, so a ratio without a unit,
+ * such as V(OUT)/V(IN), shares their axis.
+ */
+ImAxis AxisForACUnit(const Dimension unit) {
+    if (unit == Dimension{}) {
+        return ImAxis_Y1;
+    }
+    return AxisForUnit(unit);
+}
+
 void DrawOperandCombo(const char *id, std::string &operand, const std::vector<std::string> &operands) {
     ImGui::SetNextItemWidth(ImGui::GetFontSize() * OPERAND_WIDTH);
     if (ImGui::BeginCombo(id, operand.empty() ? "(none)" : operand.c_str())) {
@@ -124,14 +135,6 @@ void MathChannels::Draw(const std::vector<std::string> &operands) {
 }
 
 /**
- * @brief   Tells whether there is any channel, shown or not.
- * @return  True when the user has added none, or removed them all.
- */
-bool MathChannels::IsEmpty() const {
-    return m_Schematic.GetMathChannels().empty();
-}
-
-/**
  * @brief   Describes the channels, so a result evaluated with them can tell whether they changed since.
  * @return  A text that differs whenever a channel is added, removed, shown or hidden, renamed or edited.
  * @note    The nodes its net names stand for are not part of it: an edit that numbers the nodes again also drops the
@@ -163,14 +166,8 @@ std::vector<MathTrace> MathChannels::Evaluate(const std::span<const double> xs, 
     const NetResolver find_node = GetNetResolver();
     for (std::size_t index = 0; index < channels.size(); ++index) {
         const MathChannel &channel = channels[index];
-        // A channel that does not compile has its mark in the panel and nothing to add here
-        const std::expected<MathProgram, std::string> compiled = CompileExpression(GetChannelExpression(channel));
-        if (!channel.Shown || !compiled) {
-            continue;
-        }
-        const std::expected<MathProgram, std::string> program = ResolveNetNames(*compiled, find_node);
+        const std::optional<MathProgram> program = GetShownProgram(channel, find_node, errors);
         if (!program) {
-            errors.push_back(std::format("{}: {}", channel.Name, program.error()));
             continue;
         }
         auto result = EvaluateExpression(*program, xs, x_unit, node_voltages, currents);
@@ -188,12 +185,65 @@ std::vector<MathTrace> MathChannels::Evaluate(const std::span<const double> xs, 
 }
 
 /**
+ * @brief   Evaluates every shown channel over an AC sweep, on the complex values of its traces.
+ * @param[in]  sweep   The AC sweep, whose magnitudes and phases make the phasors.
+ * @param[out] errors  Gets a line for each channel that names a net, node or part the sweep lacks.
+ * @return  The magnitude and phase traces of the shown channels that compile and evaluate; the others are left out.
+ */
+ACMathTraces MathChannels::EvaluateAC(const Core::ACSweep &sweep, std::vector<std::string> &errors) const {
+    ACMathTraces traces;
+    const std::vector<MathChannel> &channels = m_Schematic.GetMathChannels();
+    const NetResolver find_node = GetNetResolver();
+    for (std::size_t index = 0; index < channels.size(); ++index) {
+        const MathChannel &channel = channels[index];
+        const std::optional<MathProgram> program = GetShownProgram(channel, find_node, errors);
+        if (!program) {
+            continue;
+        }
+        auto result = EvaluateACExpression(*program, sweep);
+        if (!result) {
+            errors.push_back(std::format("{}: {}", channel.Name, result.error()));
+            continue;
+        }
+        const MathTrace trace{.Label = std::format("{}: {}", channel.Name, GetChannelExpression(channel)),
+                              .Values = {},
+                              .Unit = FormatUnit(result->Unit),
+                              .Axis = AxisForACUnit(result->Unit),
+                              .Color = AdaptToBackground(MATH_COLORS[index % MATH_COLORS.size()])};
+        traces.Magnitudes.push_back(trace);
+        traces.Magnitudes.back().Values = std::move(result->MagnitudesDecibels);
+        traces.Phases.push_back(trace);
+        traces.Phases.back().Values = std::move(result->PhasesDegrees);
+    }
+    return traces;
+}
+
+/**
  * @brief   Net names are looked up in the connectivity of the moment, which the schematic keeps up to date.
  */
 NetResolver MathChannels::GetNetResolver() const {
     return [&schematic = m_Schematic](const std::string_view net) {
         return schematic.GetConnectivity().FindNodeOfNet(net);
     };
+}
+
+/**
+ * @brief   Compiles a shown channel and finds the nodes of its net names.
+ * @details A channel that does not compile has its mark in the panel and nothing to add to the errors; one that names
+ *          a net the circuit lacks adds a line. Returns no program for a hidden channel or either failure.
+ */
+std::optional<MathProgram> MathChannels::GetShownProgram(const MathChannel &channel, const NetResolver &find_node,
+                                                         std::vector<std::string> &errors) const {
+    const std::expected<MathProgram, std::string> compiled = CompileExpression(GetChannelExpression(channel));
+    if (!channel.Shown || !compiled) {
+        return std::nullopt;
+    }
+    std::expected<MathProgram, std::string> program = ResolveNetNames(*compiled, find_node);
+    if (!program) {
+        errors.push_back(std::format("{}: {}", channel.Name, program.error()));
+        return std::nullopt;
+    }
+    return std::move(*program);
 }
 
 /**
