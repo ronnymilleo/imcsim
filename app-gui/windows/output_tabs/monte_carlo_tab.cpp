@@ -24,7 +24,7 @@ constexpr float RUN_TABLE_HEIGHT = 16.0f;
 constexpr float BAR_FILL = 0.9f;
 constexpr const char *NO_RESULT =
     "No Monte Carlo analysis for the current circuit; pick Monte Carlo as the run mode in the analysis settings, give "
-    "the parts a tolerance and run a transient, AC sweep or DC sweep";
+    "the parts a tolerance and run an operating point, a transient, an AC sweep or a DC sweep";
 
 std::string FormatMeasure(const std::optional<double> value, const char *unit) {
     return value ? FormatQuantity(*value, unit) : std::string("-");
@@ -91,53 +91,82 @@ std::string MonteCarloTab::BuildCsv() const {
 }
 
 /**
- * @brief   Finds the column of the node and quantity picked, falling back to the first reading of the measured nodes
- *          when the pick is not in the table, as after a run of another analysis.
+ * @brief   Finds the column of the node or current and the quantity picked, falling back to the column that spreads
+ * most, the measured nodes first, when the pick is not in the table, as after a run of another analysis.
  */
 std::optional<std::size_t> MonteCarloTab::ResolveColumn(const MonteCarloTable &table) {
-    const std::vector<int> nodes = ListTableNodes(table);
-    if (nodes.empty()) {
+    if (table.Columns.empty()) {
         return std::nullopt;
     }
-    if (m_Node && std::ranges::contains(nodes, *m_Node)) {
-        for (const std::size_t column : ListNodeColumns(table, *m_Node)) {
-            if (table.Columns[column].Kind == m_Kind) {
-                return column;
-            }
+    const std::vector<std::size_t> picked = m_Current ? ListCurrentColumns(table, *m_Current)
+                                            : m_Node  ? ListNodeColumns(table, *m_Node)
+                                                      : std::vector<std::size_t>{};
+    for (const std::size_t column : picked) {
+        if (table.Columns[column].Kind == m_Kind) {
+            return column;
         }
     }
-    const std::vector<int> measured = ListMeasuredNodes(static_cast<std::size_t>(nodes.back()) + 1, m_Schematic);
+    const std::vector<int> nodes = ListTableNodes(table);
+    const std::vector<int> measured =
+        nodes.empty() ? std::vector<int>{} : ListMeasuredNodes(static_cast<std::size_t>(nodes.back()) + 1, m_Schematic);
     const std::size_t column = FindDefaultColumn(table, measured);
-    m_Node = table.Columns[column].Node;
-    m_Kind = table.Columns[column].Kind;
+    PickTrace(table.Columns[column]);
     return column;
 }
 
+/**
+ * @brief   Remembers the node or current of a column and its quantity as the pick.
+ */
+void MonteCarloTab::PickTrace(const MeasureColumn &column) {
+    m_Node = column.Current.empty() ? std::optional<int>(column.Node) : std::nullopt;
+    m_Current = column.Current.empty() ? std::nullopt : std::optional<std::string>(column.Current);
+    m_Kind = column.Kind;
+}
+
 std::string MonteCarloTab::LabelColumn(const MeasureColumn &column) const {
-    return std::format("{} {}", GetVoltageLabel(m_Schematic.GetConnectivity(), column.Node),
-                       GetMeasureName(column.Kind));
+    return std::format("{} {}", LabelTrace(column), GetMeasureName(column.Kind));
 }
 
 /**
- * @brief   Two lists: the node, and the quantities measured on it.
+ * @brief   Names the node or the current of a column, as the trace list does: V(OUT) or I(R1).
+ */
+std::string MonteCarloTab::LabelTrace(const MeasureColumn &column) const {
+    if (!column.Current.empty()) {
+        return std::format("I({})", column.Current);
+    }
+    return GetVoltageLabel(m_Schematic.GetConnectivity(), column.Node);
+}
+
+/**
+ * @brief   Two lists: the node or current, and the quantities measured on it.
  */
 void MonteCarloTab::DrawColumnPicker(const MonteCarloTable &table, std::size_t &column) {
-    const int shown_node = m_Node.value_or(table.Columns[column].Node);
+    const MeasureColumn &shown = table.Columns[column];
     ImGui::SetNextItemWidth(ImGui::GetFontSize() * 8.0f);
-    if (ImGui::BeginCombo("##monte_carlo_node", GetVoltageLabel(m_Schematic.GetConnectivity(), shown_node).c_str())) {
+    if (ImGui::BeginCombo("##monte_carlo_node", LabelTrace(shown).c_str())) {
         for (const int node : ListTableNodes(table)) {
-            if (ImGui::Selectable(GetVoltageLabel(m_Schematic.GetConnectivity(), node).c_str(), node == shown_node)) {
-                m_Node = node;
-                m_Kind = table.Columns[ListNodeColumns(table, node).front()].Kind;
+            const bool is_shown = shown.Current.empty() && node == shown.Node;
+            if (ImGui::Selectable(GetVoltageLabel(m_Schematic.GetConnectivity(), node).c_str(), is_shown)) {
+                column = ListNodeColumns(table, node).front();
+                PickTrace(table.Columns[column]);
+            }
+        }
+        for (const std::string &current : ListTableCurrents(table)) {
+            if (ImGui::Selectable(std::format("I({})", current).c_str(), current == shown.Current)) {
+                column = ListCurrentColumns(table, current).front();
+                PickTrace(table.Columns[column]);
             }
         }
         ImGui::EndCombo();
     }
-    ImGui::SetItemTooltip("Node whose voltage is measured in every run");
+    ImGui::SetItemTooltip("Node voltage or current measured in every run");
     ImGui::SameLine();
     ImGui::SetNextItemWidth(ImGui::GetFontSize() * 12.0f);
     if (ImGui::BeginCombo("##monte_carlo_quantity", GetMeasureName(table.Columns[column].Kind))) {
-        for (const std::size_t candidate : ListNodeColumns(table, shown_node)) {
+        const MeasureColumn &trace = table.Columns[column];
+        const std::vector<std::size_t> candidates =
+            trace.Current.empty() ? ListNodeColumns(table, trace.Node) : ListCurrentColumns(table, trace.Current);
+        for (const std::size_t candidate : candidates) {
             const MeasureKind kind = table.Columns[candidate].Kind;
             if (ImGui::Selectable(GetMeasureName(kind), kind == m_Kind)) {
                 m_Kind = kind;
@@ -146,7 +175,7 @@ void MonteCarloTab::DrawColumnPicker(const MonteCarloTable &table, std::size_t &
         }
         ImGui::EndCombo();
     }
-    ImGui::SetItemTooltip("What is measured on the node in every run, as the statistics of the other tabs read it");
+    ImGui::SetItemTooltip("What is measured in every run, as the statistics of the other tabs read it");
 }
 
 /**
@@ -192,6 +221,9 @@ void MonteCarloTab::DrawHistogram(const MonteCarloTable &table, const std::size_
  * @brief   The run shown in the other tabs, as a run number, or none without a stepped result to take it from.
  */
 std::optional<double> MonteCarloTab::GetShownRun() const {
+    if (const auto &steps = m_Schematic.GetOperatingPointSteps(); steps && steps->Parameter == MONTE_CARLO_PARAMETER) {
+        return steps->Values[steps->Selected];
+    }
     if (const auto &steps = m_Schematic.GetTransientSteps(); steps && steps->Parameter == MONTE_CARLO_PARAMETER) {
         return steps->Values[steps->Selected];
     }
@@ -212,7 +244,9 @@ void MonteCarloTab::ShowRun(const std::size_t run) {
         const auto found = std::ranges::find(steps->Values, static_cast<double>(run));
         return found == steps->Values.end() ? std::nullopt : std::optional<std::size_t>(found - steps->Values.begin());
     };
-    if (const std::optional<std::size_t> step = find_step(m_Schematic.GetTransientSteps())) {
+    if (const std::optional<std::size_t> point_step = find_step(m_Schematic.GetOperatingPointSteps())) {
+        m_Schematic.SelectOperatingPointStep(*point_step);
+    } else if (const std::optional<std::size_t> step = find_step(m_Schematic.GetTransientSteps())) {
         m_Schematic.SelectTransientStep(*step);
     } else if (const std::optional<std::size_t> ac_step = find_step(m_Schematic.GetACSweepSteps())) {
         m_Schematic.SelectACSweepStep(*ac_step);
@@ -221,7 +255,7 @@ void MonteCarloTab::ShowRun(const std::size_t run) {
 
 /**
  * @brief   One row per run with the values its parts took and the quantity shown; the header sorts, and a click shows
- *          the run in the transient or AC sweep tab.
+ *          the run in the operating point, transient or AC sweep tab, and on the schematic.
  * @details Runs past the first ones kept no traces, and the DC sweep draws every run, so those rows only list.
  */
 void MonteCarloTab::DrawRunTable(const MonteCarloTable &table, const std::size_t column) {

@@ -238,12 +238,10 @@ void AnalysisControls::RunSelected() {
     const SimulationSettings &settings = m_Schematic.GetSimulationSettings();
     const Analysis analysis = settings.Selected;
     const Core::Circuit circuit = m_Schematic.BuildCircuit();
-    // The operating point, the noise, the transfer function and the sensitivity analyses run once, whatever the step
-    // and Monte Carlo settings
+    // The noise, the transfer function and the other analyses run once, whatever the step and Monte Carlo settings
     std::optional<StepPlan> steps;
     std::optional<Core::MonteCarloSettings> monte_carlo;
-    const bool is_repeated =
-        analysis == Analysis::TRANSIENT || analysis == Analysis::AC_SWEEP || analysis == Analysis::DC_SWEEP;
+    const bool is_repeated = IsRepeatable(analysis);
     if (is_repeated && settings.MonteCarlo.Enabled) {
         ClearResult(analysis);
         if (const std::optional<std::string> problem = Core::CheckMonteCarlo(circuit, settings.MonteCarlo)) {
@@ -551,7 +549,7 @@ void AnalysisControls::StartAnalysis(const Analysis analysis, const Core::Circui
                                      const std::optional<Core::MonteCarloSettings> &monte_carlo) {
     switch (analysis) {
     case Analysis::OPERATING_POINT:
-        RunOperatingPointAnalysis(circuit);
+        RunOperatingPointAnalysis(circuit, steps, monte_carlo);
         break;
     case Analysis::TRANSIENT:
         RunTransientAnalysis(circuit, steps, monte_carlo);
@@ -585,7 +583,48 @@ void AnalysisControls::StartAnalysis(const Analysis analysis, const Core::Circui
     }
 }
 
-void AnalysisControls::RunOperatingPointAnalysis(const Core::Circuit &circuit) {
+/**
+ * @brief   A stepped or Monte Carlo operating point keeps every step, and the schematic shows the selected one.
+ */
+void AnalysisControls::RunOperatingPointAnalysis(const Core::Circuit &circuit, const std::optional<StepPlan> &steps,
+                                                 const std::optional<Core::MonteCarloSettings> &monte_carlo) {
+    if (monte_carlo) {
+        StartRun(Analysis::OPERATING_POINT,
+                 MakeJob<MonteCarloRuns<Core::OperatingPoint>, true>(
+                     circuit,
+                     [monte_carlo = *monte_carlo](const Core::Circuit &copy, Core::RunControl &control) {
+                         return RunMonteCarlo<Core::OperatingPoint>(
+                             monte_carlo, copy, control,
+                             [](const Core::Circuit &varied) { return Core::RunOperatingPoint(varied); },
+                             MeasureOperatingPoint);
+                     },
+                     [this](MonteCarloRuns<Core::OperatingPoint> runs) {
+                         Finish(Analysis::OPERATING_POINT,
+                                StoreMonteCarlo(
+                                    std::move(runs.Family), std::move(runs.Table), m_Schematic,
+                                    [this](auto family) { m_Schematic.SetOperatingPointSteps(std::move(family)); }),
+                                std::move(runs.Messages));
+                     }));
+        return;
+    }
+    if (steps) {
+        StartRun(Analysis::OPERATING_POINT,
+                 MakeJob<SteppedRuns<Core::OperatingPoint>>(
+                     circuit,
+                     [plan = *steps](const Core::Circuit &copy, Core::RunControl &control) {
+                         return RunSteps<Core::OperatingPoint>(
+                             plan.Settings, plan.Unit, plan.Values, control,
+                             [&](const Core::ParameterValue &value) { return Core::RunOperatingPoint(copy, value); });
+                     },
+                     [this](SteppedRuns<Core::OperatingPoint> runs) {
+                         Finish(
+                             Analysis::OPERATING_POINT,
+                             StoreSteps(std::move(runs.Family),
+                                        [this](auto family) { m_Schematic.SetOperatingPointSteps(std::move(family)); }),
+                             std::move(runs.Messages));
+                     }));
+        return;
+    }
     StartRun(Analysis::OPERATING_POINT,
              MakeJob<Core::OperatingPointRun>(
                  circuit, [](const Core::Circuit &copy, Core::RunControl &) { return Core::RunOperatingPoint(copy); },
@@ -1021,12 +1060,13 @@ void AnalysisControls::Finish(const Analysis analysis, std::optional<std::string
  *          analysis that failed or did not run.
  */
 std::vector<std::string> AnalysisControls::GetResultWarnings(const Analysis analysis) const {
-    if (const auto &monte_carlo = m_Schematic.GetMonteCarlo();
-        monte_carlo &&
-        (analysis == Analysis::TRANSIENT || analysis == Analysis::AC_SWEEP || analysis == Analysis::DC_SWEEP)) {
+    if (const auto &monte_carlo = m_Schematic.GetMonteCarlo(); monte_carlo && IsRepeatable(analysis)) {
         std::vector<std::string> warnings = ListMonteCarloWarnings(*monte_carlo);
         if (analysis == Analysis::TRANSIENT && m_Schematic.GetTransient()) {
             std::ranges::copy(m_Schematic.GetTransient()->Warnings, std::back_inserter(warnings));
+        }
+        if (analysis == Analysis::OPERATING_POINT && m_Schematic.GetOperatingPoint()) {
+            std::ranges::copy(m_Schematic.GetOperatingPoint()->Warnings, std::back_inserter(warnings));
         }
         return warnings;
     }

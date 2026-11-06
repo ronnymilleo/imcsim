@@ -235,6 +235,21 @@ TEST_CASE("A loop gain shows its unity gain frequency and phase margin", "[trace
     CHECK_THAT(*statistics->PhaseMargin, WithinAbs(90.6, 0.2));
 }
 
+TEST_CASE("A response with samples of no magnitude is measured on the others", "[trace_statistics]") {
+    // A math channel such as integ() has no magnitude at 0 Hz; a NaN first sample must not become the peak
+    std::vector<double> frequencies;
+    std::vector<double> magnitudes;
+    std::vector<double> phases;
+    LowPass(1e3, frequencies, magnitudes, phases);
+    magnitudes.front() = std::numeric_limits<double>::quiet_NaN();
+    magnitudes[magnitudes.size() / 2] = std::numeric_limits<double>::quiet_NaN();
+    const auto statistics = GUI::ComputeBodeStatistics(frequencies, magnitudes, phases, 1.0, 1e6);
+    REQUIRE(statistics);
+    CHECK_THAT(statistics->PeakGain, WithinAbs(0.0, 1e-3));
+    REQUIRE(statistics->UpperCutoff);
+    CHECK_THAT(*statistics->UpperCutoff, WithinRel(1e3, 1e-2));
+}
+
 TEST_CASE("A band-pass shows both cutoffs around its peak", "[trace_statistics]") {
     // Gain rises 20 dB per decade up to 100 Hz, stays flat, and falls 20 dB per decade from 10 kHz
     std::vector<double> frequencies;

@@ -40,6 +40,7 @@ add_executable(imcsim-tests
             part_names_tests.cpp
             playback_tests.cpp
             plot_export_tests.cpp
+            plot_figures_tests.cpp
             plot_helpers_tests.cpp
             point_window_tests.cpp
             pole_zero_tests.cpp

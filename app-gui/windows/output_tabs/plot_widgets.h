@@ -94,7 +94,7 @@ std::vector<std::string> ListStepLabels(const std::string &parameter, const std:
 void SetupMathAxes(const std::vector<MathTrace> &math, bool current_axis_ready, const std::string &third_unit);
 void FitMathAxes(const std::vector<MathTrace> &math);
 void PlotMath(const std::vector<double> &xs, const std::vector<MathTrace> &math, const std::string &suffix,
-              std::vector<PlottedTrace> &plotted);
+              std::vector<PlottedTrace> &plotted, const char *readout_unit = nullptr);
 void DrawMathErrors(const std::vector<std::string> &errors);
 
 // Cursors

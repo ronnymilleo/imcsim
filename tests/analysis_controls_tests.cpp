@@ -4,6 +4,7 @@
  */
 
 #include "analysis/analysis_controls.h"
+#include "analysis/monte_carlo_results.h"
 
 #include "components/subcircuit_pin.h"
 #include "document/examples.h"
@@ -196,7 +197,9 @@ public:
 
     std::string_view GetName() const override { return "failing"; }
     const Core::BackendCapabilities &GetCapabilities() const override { return m_Capabilities; }
-    Core::OperatingPointRun RunOperatingPoint(const Core::Circuit &) override { return {std::unexpected("no"), {}}; }
+    Core::OperatingPointRun RunOperatingPoint(const Core::Circuit &, const std::optional<double> &) override {
+        return {std::unexpected("no"), {}};
+    }
     Core::TransientRun RunTransient(const Core::Circuit &circuit, const Core::TransientSettings &,
                                     const std::optional<double> &, const Core::RunMonitor &) override {
         for (const Core::CircuitEntry &entry : circuit.GetEntries()) {
@@ -450,6 +453,43 @@ TEST_CASE("A stepped AC sweep and a stepped DC sweep deliver one result per valu
     schematic.SetSimulationSettings(settings);
     RunAndWait(controls);
     CHECK(schematic.GetDCSweep().has_value());
+}
+
+TEST_CASE("A stepped operating point delivers one result per value and shows the first", "[analysis_controls]") {
+    GUI::Schematic schematic;
+    OpenRCFilter(schematic);
+    GUI::AnalysisControls controls(schematic);
+    GUI::SimulationSettings settings = schematic.GetSimulationSettings();
+    settings.Selected = GUI::Analysis::OPERATING_POINT;
+    settings.ParameterStep = {
+        .Enabled = true, .Part = "R1", .UsesList = true, .Start = 0.0, .Stop = 0.0, .Step = 0.0, .List = "1k, 2k, 5k"};
+    schematic.SetSimulationSettings(settings);
+    RunAndWait(controls);
+    REQUIRE_FALSE(controls.GetError(GUI::Analysis::OPERATING_POINT));
+    REQUIRE(schematic.GetOperatingPointSteps().has_value());
+    const GUI::StepFamily<Core::OperatingPoint> &steps = *schematic.GetOperatingPointSteps();
+    CHECK(steps.Parameter == "R1");
+    CHECK(steps.Values == std::vector<double>{1e3, 2e3, 5e3});
+    CHECK(steps.Results.size() == 3);
+    CHECK(steps.Selected == 0);
+    CHECK(schematic.GetOperatingPoint().has_value());
+}
+
+TEST_CASE("A Monte Carlo operating point measures every node voltage and every current in each run",
+          "[analysis_controls][monte_carlo]") {
+    GUI::Schematic schematic;
+    OpenMonteCarloFilter(schematic, GUI::Analysis::OPERATING_POINT, 4);
+    GUI::AnalysisControls controls(schematic);
+    RunAndWait(controls);
+    REQUIRE_FALSE(controls.GetError(GUI::Analysis::OPERATING_POINT));
+    REQUIRE(schematic.GetOperatingPointSteps().has_value());
+    CHECK(schematic.GetOperatingPointSteps()->Parameter == GUI::MONTE_CARLO_PARAMETER);
+    CHECK(schematic.GetOperatingPointSteps()->Results.size() == 5);
+    REQUIRE(schematic.GetMonteCarlo().has_value());
+    const GUI::MonteCarloTable &table = *schematic.GetMonteCarlo();
+    CHECK(table.Runs.size() == 5);
+    CHECK_FALSE(GUI::ListTableNodes(table).empty());
+    CHECK(std::ranges::contains(GUI::ListTableCurrents(table), "R1"));
 }
 
 TEST_CASE("A run that cannot start says why, and a circuit that cannot run fails with the reason",

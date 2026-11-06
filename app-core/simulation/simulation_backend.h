@@ -96,10 +96,12 @@ public:
 
     /**
      * @brief   Computes the DC operating point of a circuit.
-     * @param[in] circuit  Circuit to simulate, already checked.
+     * @param[in] circuit              Circuit to simulate, already checked.
+     * @param[in] temperature_celsius  Temperature of the run in degrees Celsius, or none for the default one.
      * @return  The node voltages and currents or an error, plus the messages of the backend.
      */
-    virtual OperatingPointRun RunOperatingPoint(const Circuit &circuit) = 0;
+    virtual OperatingPointRun RunOperatingPoint(const Circuit &circuit,
+                                                const std::optional<double> &temperature_celsius) = 0;
     /**
      * @brief   Simulates how the node voltages and currents of a circuit change over time.
      * @param[in] circuit              Circuit to simulate, already checked.

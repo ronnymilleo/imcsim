@@ -1,7 +1,6 @@
 /**
  * @file    result_tables.h
- * @brief   The tabs of the Output window that are tables: the operating point, the transfer function, the sensitivity
- *          and the truth table.
+ * @brief   The tabs of the Output window that are tables: the transfer function, the sensitivity and the truth table.
  */
 
 #ifndef IMCSIM_RESULT_TABLES_H
@@ -13,7 +12,6 @@
 namespace GUI {
 
 // Tables
-void DrawOperatingPointTab(Schematic &schematic);
 void DrawTransferFunctionTab(Schematic &schematic);
 void DrawSensitivityTab(Schematic &schematic, Preferences &preferences);
 void DrawTruthTableTab(Schematic &schematic);

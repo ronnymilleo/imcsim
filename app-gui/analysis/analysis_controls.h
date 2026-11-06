@@ -136,7 +136,8 @@ private:
     void StartRun(Analysis analysis, Core::Job job);
     void StartAnalysis(Analysis analysis, const Core::Circuit &circuit, const std::optional<StepPlan> &steps,
                        const std::optional<Core::MonteCarloSettings> &monte_carlo);
-    void RunOperatingPointAnalysis(const Core::Circuit &circuit);
+    void RunOperatingPointAnalysis(const Core::Circuit &circuit, const std::optional<StepPlan> &steps,
+                                   const std::optional<Core::MonteCarloSettings> &monte_carlo);
     void RunTransientAnalysis(const Core::Circuit &circuit, const std::optional<StepPlan> &steps,
                               const std::optional<Core::MonteCarloSettings> &monte_carlo);
     void RunACSweepAnalysis(const Core::Circuit &circuit, const std::optional<StepPlan> &steps,

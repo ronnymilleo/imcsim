@@ -12,6 +12,7 @@
 #include "plots/trace_math.h"
 #include "simulation/simulator.h"
 #include <expected>
+#include <optional>
 #include <span>
 #include <string>
 #include <vector>
@@ -31,6 +32,17 @@ struct MathTrace {
 };
 
 /**
+ * @struct  ACMathTraces
+ * @brief   The math channels evaluated over an AC sweep, one magnitude and one phase trace per channel, in the same
+ *          order.
+ * @details Each trace keeps the unit of the channel, such as "Ohm", while its values are decibels or degrees.
+ */
+struct ACMathTraces {
+    std::vector<MathTrace> Magnitudes;
+    std::vector<MathTrace> Phases;
+};
+
+/**
  * @class   MathChannels
  * @brief   The panel and evaluation of the math channels, numbered M1, M2... as they are added, each with its own
  * color.
@@ -45,17 +57,19 @@ public:
     void Draw(const std::vector<std::string> &operands);
 
     // Evaluation
-    bool IsEmpty() const;
     std::string GetSignature() const;
     std::vector<MathTrace> Evaluate(std::span<const double> xs, Dimension x_unit,
                                     const std::vector<std::vector<double>> &node_voltages,
                                     const std::vector<Core::ComponentTrace> &currents,
                                     std::vector<std::string> &errors) const;
+    ACMathTraces EvaluateAC(const Core::ACSweep &sweep, std::vector<std::string> &errors) const;
 
 private:
     Schematic &m_Schematic;
 
     NetResolver GetNetResolver() const;
+    std::optional<MathProgram> GetShownProgram(const MathChannel &channel, const NetResolver &find_node,
+                                               std::vector<std::string> &errors) const;
     bool DrawEditor(MathChannel &channel, const std::vector<std::string> &operands) const;
 };
 

@@ -2842,6 +2842,37 @@ TEST_CASE("A stepped temperature changes the forward voltage of a diode", "[simu
     CHECK(cold - hot < 0.3);
 }
 
+TEST_CASE("A stepped operating point runs at the step value of a part or of the temperature", "[simulator]") {
+    Core::VCC supply;
+    supply.SetName("V1");
+    supply.SetValue(5.0);
+    Core::Resistor series;
+    series.SetName("R1");
+    Core::Diode diode(Core::ComponentType::DIODE);
+    diode.SetName("D1");
+    const Core::Ground reference;
+    Core::Circuit circuit;
+    circuit.Add(supply, {1});
+    circuit.Add(series, {1, 2});
+    circuit.Add(diode, {2, 0});
+    circuit.Add(reference, {0});
+    const auto read_diode = [&](const Core::ParameterValue &parameter) {
+        const Core::OperatingPointRun run = Core::RunOperatingPoint(circuit, parameter);
+        REQUIRE(run.Result);
+        return run.Result->NodeVoltages[2];
+    };
+    // About -2 mV per degree, as for any silicon junction
+    const double cold = read_diode({"", 0.0});
+    const double hot = read_diode({"", 100.0});
+    CHECK(cold - hot > 0.1);
+    CHECK(cold - hot < 0.3);
+    // Less current through a larger resistor gives a lower forward voltage, by about 60 mV per decade
+    const double small = read_diode({"R1", 1e3});
+    const double large = read_diode({"R1", 100e3});
+    CHECK(small - large > 0.06);
+    CHECK(series.GetValue() == 1e3);
+}
+
 TEST_CASE("A stepped parameter rejects a part that cannot step and values out of range", "[simulator]") {
     const LowPass low_pass;
     const Core::TransientSettings settings{.StopTime = 1e-3, .TimeStep = 1e-5};
