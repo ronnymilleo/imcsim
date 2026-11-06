@@ -4,6 +4,8 @@
  */
 
 #include "plots/spectrum.h"
+
+#include "simulation/monte_carlo.h"
 #include <array>
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
@@ -59,12 +61,12 @@ constexpr double NOISE_STEP = 1e-3;
  * @brief   Gaussian white noise on an even grid.
  */
 Trace WhiteNoise(const double sigma, const unsigned seed) {
-    std::mt19937 generator(seed);
-    std::normal_distribution<double> gauss(0.0, sigma);
+    // The draws of the Monte Carlo runs are the same on every standard library, unlike std::normal_distribution
+    std::mt19937_64 generator(seed);
     Trace trace;
     for (int index = 0; index < NOISE_SAMPLE_COUNT; ++index) {
         trace.Xs.push_back(index * NOISE_STEP);
-        trace.Ys.push_back(gauss(generator));
+        trace.Ys.push_back(sigma * Core::DrawStandardNormal(generator));
     }
     return trace;
 }
@@ -74,9 +76,9 @@ Trace WhiteNoise(const double sigma, const unsigned seed) {
  *          components at the frequency of each bin below 450 Hz.
  */
 Trace SlopedNoise(const double power, const unsigned seed) {
-    std::mt19937 generator(seed);
-    std::normal_distribution<double> gauss(0.0, 1.0);
-    std::uniform_real_distribution<double> phase(0.0, 2.0 * std::numbers::pi);
+    std::mt19937_64 generator(seed);
+    const auto gauss = [](std::mt19937_64 &engine) { return Core::DrawStandardNormal(engine); };
+    const auto phase = [](std::mt19937_64 &engine) { return 2.0 * std::numbers::pi * Core::DrawUniform(engine); };
     const double span = (NOISE_SAMPLE_COUNT - 1) * NOISE_STEP;
     std::vector<std::array<double, 3>> components;
     for (int bin = 1; bin < 1800; ++bin) {
@@ -297,7 +299,6 @@ TEST_CASE("The noise density of white noise is sigma times the root of twice the
         const std::span<const double> frequencies = std::span(spectrum->Frequencies).subspan(1);
         const auto band = GUI::MeasureNoiseBand(frequencies, densities, 0.0, 1e6);
         REQUIRE(band);
-        // The highest of the slice medians reads a few percent over the level
         CHECK_THAT(band->Density, WithinRel(expected, 0.12));
         // The whole band holds the whole variance, up to the mean and the bin at 0 Hz
         CHECK_THAT(band->TotalRms, WithinRel(sigma, 0.05));

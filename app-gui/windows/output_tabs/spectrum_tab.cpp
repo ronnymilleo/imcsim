@@ -141,7 +141,7 @@ void DrawNoise(const SpectrumTrace &trace, const std::vector<double> &frequencie
     }
     DrawStatistic("Density", FormatQuantity(noise->Density, density_unit.c_str()));
     ImGui::SetItemTooltip(
-        "%s", std::format("Level of the density (the median of its highest slice) from {}Hz to {}Hz, the part of the "
+        "%s", std::format("Level of the density (the median of its plateau) from {}Hz to {}Hz, the part of the "
                           "spectrum the plot shows",
                           Core::FormatValue(from), Core::FormatValue(to))
                   .c_str());

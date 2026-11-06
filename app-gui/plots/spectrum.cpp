@@ -62,6 +62,8 @@ constexpr double MAX_DENSITY_RATIO = 1e6;
 /// Slices a band is cut in to find its floor, and the fewest bins that make one.
 constexpr std::size_t MAX_BAND_SLICES = 8;
 constexpr std::size_t MIN_SLICE_BINS = 128;
+/// A slice belongs to the plateau of the noise when its median is within 3 dB of the highest one.
+const double PLATEAU_RATIO = 1.0 / std::numbers::sqrt2;
 /// Floor of a density, so a trace of zeros still plots on a logarithmic axis.
 constexpr double MIN_NOISE_DENSITY = 1e-18;
 
@@ -142,6 +144,29 @@ bool StandsOutOfFloor(const std::vector<double> &amplitudes, const std::size_t p
     return amplitudes[peak_bin] > *middle * std::pow(10.0, TONE_PROMINENCE_DECIBELS / 20.0);
 }
 
+/**
+ * @brief   The level of the plateau of densities given in order of frequency.
+ * @details The band is cut in slices and the median of each is taken; the slices within 3 dB of the highest one make
+ *          the plateau, and their middle median is the level. A part of the band where the noise has rolled off, or
+ *          has not risen yet, does not set it, and on flat noise every slice counts, so the level is not biased up
+ *          the way the highest median alone would be.
+ */
+double FindPlateauLevel(std::vector<double> &in_band) {
+    const std::size_t slice_count = std::clamp<std::size_t>(in_band.size() / MIN_SLICE_BINS, 1, MAX_BAND_SLICES);
+    std::vector<double> medians;
+    for (std::size_t slice = 0; slice < slice_count; ++slice) {
+        const auto first = in_band.begin() + static_cast<std::ptrdiff_t>(slice * in_band.size() / slice_count);
+        const auto last = in_band.begin() + static_cast<std::ptrdiff_t>((slice + 1) * in_band.size() / slice_count);
+        const auto middle = first + (last - first) / 2;
+        std::nth_element(first, middle, last);
+        medians.push_back(*middle);
+    }
+    const double highest = std::ranges::max(medians);
+    std::erase_if(medians, [highest](const double median) { return median < highest * PLATEAU_RATIO; });
+    const auto middle = medians.begin() + static_cast<std::ptrdiff_t>(medians.size() / 2);
+    std::ranges::nth_element(medians, middle);
+    return *middle;
+}
 } // namespace
 
 /**
@@ -341,9 +366,10 @@ std::vector<double> ComputeNoiseDensities(const Spectrum &spectrum) {
  * @param[in] densities    Density of each of them, as ComputeNoiseDensities() gives.
  * @param[in] from         One end of the band; the ends may come in any order.
  * @param[in] to           The other end.
- * @return  The level of the density (the highest median of up to 8 slices of the band, corrected so white noise
- *          reads its rms: robust to a band that is partly past where the noise rolls off) and the root of the power in
- * the band, or no value when the band holds no bin. The first bins, where the window spreads the mean, are left out.
+ * @return  The level of the density (the middle median of the slices of the band within 3 dB of the highest, corrected
+ *          so white noise reads its rms: robust to a band that is partly past where the noise rolls off) and the root
+ * of the power in the band, or no value when the band holds no bin. The first bins, where the window spreads the mean,
+ * are left out.
  */
 std::optional<NoiseBand> MeasureNoiseBand(const std::span<const double> frequencies,
                                           const std::span<const double> densities, double from, double to) {
@@ -366,18 +392,7 @@ std::optional<NoiseBand> MeasureNoiseBand(const std::span<const double> frequenc
     if (in_band.empty()) {
         return std::nullopt;
     }
-    // The bins come in order of frequency; the floor is the highest median of the slices, so a part of the band where
-    // the noise has rolled off, or has not risen yet, does not set the level
-    const std::size_t slice_count = std::clamp<std::size_t>(in_band.size() / MIN_SLICE_BINS, 1, MAX_BAND_SLICES);
-    double highest_median = 0.0;
-    for (std::size_t slice = 0; slice < slice_count; ++slice) {
-        const auto first = in_band.begin() + static_cast<std::ptrdiff_t>(slice * in_band.size() / slice_count);
-        const auto last = in_band.begin() + static_cast<std::ptrdiff_t>((slice + 1) * in_band.size() / slice_count);
-        const auto middle = first + (last - first) / 2;
-        std::nth_element(first, middle, last);
-        highest_median = std::max(highest_median, *middle);
-    }
-    return NoiseBand{.Density = highest_median / MEDIAN_TO_RMS_RATIO,
+    return NoiseBand{.Density = FindPlateauLevel(in_band) / MEDIAN_TO_RMS_RATIO,
                      .TotalRms = std::sqrt(power_density_sum * resolution)};
 }
 

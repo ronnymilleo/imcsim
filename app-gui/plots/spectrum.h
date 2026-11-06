@@ -71,8 +71,8 @@ struct HarmonicAnalysis {
  */
 struct NoiseBand {
     /// Level of the density over the band, in the unit of the trace per square root of hertz: the floor a user sees,
-    /// found by the median of the bins of the highest slice, so that a part of the band past the noise does not pull it
-    /// down.
+    /// the middle median of the slices of the band within 3 dB of the highest, so that a part of the band past the
+    /// noise does not pull it down.
     double Density = 0.0;
     /// Root of the noise power in the band, in the unit of the trace.
     double TotalRms = 0.0;
