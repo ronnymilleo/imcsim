@@ -22,7 +22,8 @@ public:
     std::string_view GetName() const override;
     const BackendCapabilities &GetCapabilities() const override;
 
-    OperatingPointRun RunOperatingPoint(const Circuit &circuit) override;
+    OperatingPointRun RunOperatingPoint(const Circuit &circuit,
+                                        const std::optional<double> &temperature_celsius) override;
     TransientRun RunTransient(const Circuit &circuit, const TransientSettings &settings,
                               const std::optional<double> &temperature_celsius, const RunMonitor &monitor) override;
     ACSweepRun RunACSweep(const Circuit &circuit, const ACSweepSettings &settings,

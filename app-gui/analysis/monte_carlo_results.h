@@ -14,14 +14,16 @@
 #include <optional>
 #include <span>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace GUI {
 
 /**
  * @enum    MeasureKind
- * @brief   What is measured on the voltage of a node in each run, after the analysis: the readings of the oscilloscope
- *          for a transient, of the Bode plot for an AC sweep and of the curve tracer for a DC sweep.
+ * @brief   What is measured in each run, after the analysis: the readings of the oscilloscope for a transient, of the
+ *          Bode plot for an AC sweep and of the curve tracer for a DC sweep on the voltage of a node, and the DC value
+ *          of a node voltage or a current for an operating point.
  */
 enum class MeasureKind {
     MEAN,
@@ -35,15 +37,19 @@ enum class MeasureKind {
     PHASE_MARGIN,
     MINIMUM,
     MAXIMUM,
+    DC_VOLTAGE,
+    DC_CURRENT,
 };
 
 /**
  * @struct  MeasureColumn
- * @brief   One quantity measured on one node.
+ * @brief   One quantity measured on one node, or on one current.
  */
 struct MeasureColumn {
     int Node = 0;
     MeasureKind Kind = MeasureKind::MEAN;
+    /// The current measured, as the results name it, such as "R1" or "Q1.C"; empty for a quantity of a node.
+    std::string Current;
 
     bool operator==(const MeasureColumn &) const = default;
 };
@@ -135,12 +141,15 @@ struct RunSort {
 Measurement MeasureTransient(const Core::Transient &transient);
 Measurement MeasureACSweep(const Core::ACSweep &sweep);
 Measurement MeasureDCSweep(const Core::DCSweep &sweep);
+Measurement MeasureOperatingPoint(const Core::OperatingPoint &operating_point);
 const char *GetMeasureName(MeasureKind kind);
 const char *GetMeasureUnit(MeasureKind kind);
 
 // Columns
 std::vector<int> ListTableNodes(const MonteCarloTable &table);
 std::vector<std::size_t> ListNodeColumns(const MonteCarloTable &table, int node);
+std::vector<std::string> ListTableCurrents(const MonteCarloTable &table);
+std::vector<std::size_t> ListCurrentColumns(const MonteCarloTable &table, std::string_view current);
 std::size_t FindDefaultColumn(const MonteCarloTable &table, std::span<const int> preferred_nodes);
 
 // Statistics

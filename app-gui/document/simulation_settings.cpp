@@ -36,15 +36,36 @@ bool IsValidLiveSeconds(const double seconds) {
 }
 
 /**
+ * @brief   Tells whether an analysis can run once per value of a parameter or once per Monte Carlo draw.
+ * @param[in] analysis  Analysis to ask about.
+ * @return  True for the operating point, the transient, the AC sweep and the DC sweep; the others run once, whatever
+ *          the run mode.
+ */
+bool IsRepeatable(const Analysis analysis) {
+    switch (analysis) {
+    case Analysis::OPERATING_POINT:
+    case Analysis::TRANSIENT:
+    case Analysis::AC_SWEEP:
+    case Analysis::DC_SWEEP:
+        return true;
+    case Analysis::NOISE:
+    case Analysis::TRANSFER_FUNCTION:
+    case Analysis::SENSITIVITY:
+    case Analysis::POLE_ZERO:
+    case Analysis::S_PARAMETERS:
+    case Analysis::TRUTH_TABLE:
+    default:
+        return false;
+    }
+}
+
+/**
  * @brief   Tells whether Run would start a Monte Carlo analysis.
  * @param[in] settings  Settings of the schematic.
- * @return  True when Monte Carlo is the run mode and the selected analysis is one that it repeats: the transient, the
- * AC sweep or the DC sweep.
+ * @return  True when Monte Carlo is the run mode and the selected analysis is one that it repeats (IsRepeatable()).
  */
 bool IsMonteCarloRun(const SimulationSettings &settings) {
-    return settings.MonteCarlo.Enabled &&
-           (settings.Selected == Analysis::TRANSIENT || settings.Selected == Analysis::AC_SWEEP ||
-            settings.Selected == Analysis::DC_SWEEP);
+    return settings.MonteCarlo.Enabled && IsRepeatable(settings.Selected);
 }
 
 } // namespace GUI

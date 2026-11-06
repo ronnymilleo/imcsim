@@ -228,8 +228,7 @@ void AnalysisSettingsPanel::DrawSettings() {
     }
     SimulationSettings settings = m_Schematic.GetSimulationSettings();
     DrawSelectedSettings(settings);
-    if (settings.Selected == Analysis::TRANSIENT || settings.Selected == Analysis::AC_SWEEP ||
-        settings.Selected == Analysis::DC_SWEEP) {
+    if (IsRepeatable(settings.Selected)) {
         DrawRunModeSettings(settings);
     }
     m_Schematic.SetSimulationSettings(settings);
@@ -242,8 +241,7 @@ void AnalysisSettingsPanel::DrawSelectedSettings(SimulationSettings &settings) {
     switch (settings.Selected) {
     case Analysis::OPERATING_POINT:
         ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + ImGui::GetFontSize() * 20.0f);
-        ImGui::TextDisabled("No settings: the DC voltages show on the schematic and, with the currents, in the "
-                            "Output window");
+        ImGui::TextDisabled("The DC voltages show on the schematic and, with the currents, in the Output window");
         ImGui::PopTextWrapPos();
         break;
     case Analysis::TRANSIENT:
@@ -621,8 +619,8 @@ void AnalysisSettingsPanel::DrawTruthTableSettings(SimulationSettings &settings)
 }
 
 /**
- * @brief   Below the settings of the transient, the AC sweep and the DC sweep: how they repeat, which is not at all,
- * once per value of a parameter or once per draw of the parts within their tolerances.
+ * @brief   Below the settings of the operating point, the transient, the AC sweep and the DC sweep: how they repeat,
+ * which is not at all, once per value of a parameter or once per draw of the parts within their tolerances.
  * @details The fields share their labels with those of the analysis above, so they get an ID of their own.
  */
 void AnalysisSettingsPanel::DrawRunModeSettings(SimulationSettings &settings) {

@@ -166,6 +166,9 @@ public:
     std::string BuildSpiceNetlist();
     void SetOperatingPoint(std::optional<Core::OperatingPoint> operating_point);
     const std::optional<Core::OperatingPoint> &GetOperatingPoint() const;
+    void SetOperatingPointSteps(StepFamily<Core::OperatingPoint> steps);
+    const std::optional<StepFamily<Core::OperatingPoint>> &GetOperatingPointSteps() const;
+    void SelectOperatingPointStep(std::size_t step);
     void SetTransient(std::optional<Core::Transient> transient);
     void AppendTransient(Core::Transient chunk);
     const std::optional<Core::Transient> &GetTransient() const;
@@ -274,6 +277,8 @@ private:
     // Derived data, dropped on every change: nodes are rebuilt on first use, results by the next simulation
     std::optional<Connectivity> m_Connectivity;
     std::optional<Core::OperatingPoint> m_OperatingPoint;
+    /// Every step of the last stepped operating point; m_OperatingPoint holds the selected one.
+    std::optional<StepFamily<Core::OperatingPoint>> m_OperatingPointSteps;
     /// The transient the views read; for a stepped run, its selected step.
     std::optional<Core::Transient> m_Transient;
     /// Every step of a stepped transient, or none.

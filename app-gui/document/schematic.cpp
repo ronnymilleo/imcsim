@@ -1243,6 +1243,7 @@ void Schematic::MarkLiveChanged(const Core::Component &component) {
     m_ChangedSinceCommit = true;
     std::ranges::move(Core::DescribeLiveChange(component), std::back_inserter(m_LiveChanges));
     m_OperatingPoint.reset();
+    m_OperatingPointSteps.reset();
     m_ACSweep.reset();
     m_ACSweepSteps.reset();
     m_DCSweep.reset();
@@ -1405,6 +1406,8 @@ std::string Schematic::BuildSpiceNetlist() {
  * @note    The result is dropped on the next change, since it no longer matches the circuit.
  */
 void Schematic::SetOperatingPoint(std::optional<Core::OperatingPoint> operating_point) {
+    m_OperatingPointSteps.reset();
+    ClearMonteCarlo();
     m_OperatingPoint = std::move(operating_point);
     ++m_OperatingPointVersion;
 }
@@ -1415,6 +1418,43 @@ void Schematic::SetOperatingPoint(std::optional<Core::OperatingPoint> operating_
  */
 const std::optional<Core::OperatingPoint> &Schematic::GetOperatingPoint() const {
     return m_OperatingPoint;
+}
+
+/**
+ * @brief   Stores the operating points of a stepped run, one per value of its parameter or per Monte Carlo run.
+ * @param[in] steps  Every step, with at least one result, and the selected one, which GetOperatingPoint() returns, so
+ *                   the schematic shows it.
+ * @note    The results are dropped on the next change, like those of a single run.
+ */
+void Schematic::SetOperatingPointSteps(StepFamily<Core::OperatingPoint> steps) {
+    ClearMonteCarlo();
+    steps.Selected = std::min(steps.Selected, steps.Results.size() - 1);
+    m_OperatingPoint = steps.Results[steps.Selected];
+    m_OperatingPointSteps = std::move(steps);
+    ++m_OperatingPointVersion;
+}
+
+/**
+ * @brief   Returns every step of the last stepped operating point.
+ * @return  The steps, or no value when the last operating point was a single run or there is none.
+ */
+const std::optional<StepFamily<Core::OperatingPoint>> &Schematic::GetOperatingPointSteps() const {
+    return m_OperatingPointSteps;
+}
+
+/**
+ * @brief   Shows another step of the stepped operating point wherever one result is shown: the schematic and the
+ *          tables of the Operating point tab.
+ * @param[in] step  Index of the step; ignored when out of range or without steps.
+ */
+void Schematic::SelectOperatingPointStep(const std::size_t step) {
+    if (!m_OperatingPointSteps || step >= m_OperatingPointSteps->Results.size() ||
+        step == m_OperatingPointSteps->Selected) {
+        return;
+    }
+    m_OperatingPointSteps->Selected = step;
+    m_OperatingPoint = m_OperatingPointSteps->Results[step];
+    ++m_OperatingPointVersion;
 }
 
 /**
@@ -1817,6 +1857,7 @@ void Schematic::InvalidateDerivedData() {
     ++m_CircuitVersion;
     m_Connectivity.reset();
     m_OperatingPoint.reset();
+    m_OperatingPointSteps.reset();
     m_Transient.reset();
     m_TransientSteps.reset();
     m_ACSweep.reset();

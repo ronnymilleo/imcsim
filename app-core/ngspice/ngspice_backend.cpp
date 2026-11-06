@@ -393,12 +393,15 @@ const BackendCapabilities &NgspiceBackend::GetCapabilities() const {
 
 /**
  * @brief   Computes the DC operating point of a circuit with ngspice.
- * @param[in] circuit  Circuit to simulate, already checked.
+ * @param[in] circuit              Circuit to simulate, already checked.
+ * @param[in] temperature_celsius  Temperature of the run in degrees Celsius, or none for the default one.
  * @return  The node voltages or an error, plus every line ngspice printed. Warnings such as "singular matrix"
  *          can come with a successful result whose values are meaningless.
  */
-OperatingPointRun NgspiceBackend::RunOperatingPoint(const Circuit &circuit) {
-    return Simulate<OperatingPoint>(circuit, ".op", "op", [&circuit] { return ReadOperatingPoint(circuit); });
+OperatingPointRun NgspiceBackend::RunOperatingPoint(const Circuit &circuit,
+                                                    const std::optional<double> &temperature_celsius) {
+    return Simulate<OperatingPoint>(circuit, std::format("{}.op", TemperatureCard(temperature_celsius)), "op",
+                                    [&circuit] { return ReadOperatingPoint(circuit); });
 }
 
 /**

@@ -131,17 +131,23 @@ TruthTableRun ConcludeTable(TruthTable table, TruthTableRun run, FirstFailure fa
 
 /**
  * @brief   Computes the DC operating point of a circuit with ngspice.
- * @param[in] circuit  Circuit to simulate; it needs a ground component, unless it holds only logic parts, logic inputs
- * and supply rails.
+ * @param[in] circuit    Circuit to simulate; it needs a ground component, unless it holds only logic parts, logic
+ *                       inputs and supply rails.
+ * @param[in] parameter  Value of the stepped parameter for this run, a part value or the temperature; none runs the
+ *                       circuit as it is.
  * @return  The node voltages or an error, plus every line ngspice printed. Warnings such as "singular matrix"
  *          can come with a successful result whose values are meaningless, so show the messages to the user.
  * @note    Not thread-safe: the backend in use may be a single global instance, as ngspice is.
  */
-OperatingPointRun RunOperatingPoint(const Circuit &circuit) {
+OperatingPointRun RunOperatingPoint(const Circuit &circuit, const std::optional<ParameterValue> &parameter) {
     if (const std::optional<std::string> error = FindProblem(circuit, std::nullopt, AnalysisKind::OPERATING_POINT)) {
         return {std::unexpected(*error), {}};
     }
-    return GetBackend().RunOperatingPoint(circuit);
+    const auto applied = ApplyParameter(circuit, parameter);
+    if (!applied) {
+        return {std::unexpected(applied.error()), {}};
+    }
+    return GetBackend().RunOperatingPoint(applied->Simulated, applied->Temperature);
 }
 
 /**

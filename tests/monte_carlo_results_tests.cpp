@@ -88,11 +88,28 @@ TEST_CASE("A DC sweep is measured by the extremes and the mean of its first curv
     CHECK_THAT(*measured.Values[2], Catch::Matchers::WithinAbs(2.0, 1e-9));
 }
 
+TEST_CASE("An operating point is measured by the DC value of every node and every current", "[monte_carlo_results]") {
+    const Core::OperatingPoint point{.NodeVoltages = {0.0, 5.0, 2.5},
+                                     .Currents = {{.Name = "R1", .Current = 2.5e-3}, {.Name = "Q1.C", .Current = 1e-3}},
+                                     .Warnings = {}};
+    const GUI::Measurement measured = GUI::MeasureOperatingPoint(point);
+    REQUIRE(measured.Columns.size() == 4);
+    // Ground is left out, as for the other analyses
+    CHECK(measured.Columns[0] == GUI::MeasureColumn{.Node = 1, .Kind = GUI::MeasureKind::DC_VOLTAGE, .Current = ""});
+    CHECK(measured.Values[1] == 2.5);
+    CHECK(measured.Columns[2].Current == "R1");
+    CHECK(measured.Columns[2].Kind == GUI::MeasureKind::DC_CURRENT);
+    CHECK(measured.Values[3] == 1e-3);
+}
+
 TEST_CASE("Measured quantities have names and units", "[monte_carlo_results]") {
     CHECK(std::string(GUI::GetMeasureName(GUI::MeasureKind::UPPER_CUTOFF)) == "Upper -3 dB frequency");
     CHECK(std::string(GUI::GetMeasureUnit(GUI::MeasureKind::UPPER_CUTOFF)) == "Hz");
     CHECK(std::string(GUI::GetMeasureUnit(GUI::MeasureKind::PEAK_GAIN)) == "dB");
     CHECK(std::string(GUI::GetMeasureUnit(GUI::MeasureKind::MEAN)) == "V");
+    CHECK(std::string(GUI::GetMeasureName(GUI::MeasureKind::DC_CURRENT)) == "DC current");
+    CHECK(std::string(GUI::GetMeasureUnit(GUI::MeasureKind::DC_CURRENT)) == "A");
+    CHECK(std::string(GUI::GetMeasureUnit(GUI::MeasureKind::DC_VOLTAGE)) == "V");
 }
 
 TEST_CASE("The samples of a column leave out the nominal run, failed runs and missing readings",
@@ -187,6 +204,19 @@ TEST_CASE("The nodes and columns of a table are listed", "[monte_carlo_results]"
     CHECK(GUI::ListNodeColumns(table, 2) == std::vector<std::size_t>{2, 3});
 }
 
+TEST_CASE("The currents of a table are listed apart from its nodes", "[monte_carlo_results]") {
+    GUI::MonteCarloTable table;
+    table.Columns = {{.Node = 1, .Kind = GUI::MeasureKind::DC_VOLTAGE},
+                     {.Node = 0, .Kind = GUI::MeasureKind::DC_CURRENT, .Current = "R1"},
+                     {.Node = 0, .Kind = GUI::MeasureKind::DC_CURRENT, .Current = "C1"}};
+    // A current column takes no node, so node 0 is not listed for it
+    CHECK(GUI::ListTableNodes(table) == std::vector<int>{1});
+    CHECK(GUI::ListNodeColumns(table, 0).empty());
+    CHECK(GUI::ListTableCurrents(table) == std::vector<std::string>{"R1", "C1"});
+    CHECK(GUI::ListCurrentColumns(table, "C1") == std::vector<std::size_t>{2});
+    CHECK(GUI::ListCurrentColumns(table, "R9").empty());
+}
+
 TEST_CASE("Samples that differ only by rounding noise have no spread", "[monte_carlo_results]") {
     constexpr double FLOOR = 1e-3;
     CHECK(GUI::ComputeRelativeSpread(std::vector<double>{1.0}, FLOOR) == 0.0);
@@ -237,6 +267,7 @@ TEST_CASE("The smallest readable difference follows the unit of the quantity", "
     CHECK(GUI::GetMeasureFloor(GUI::MeasureKind::UPPER_CUTOFF) == 1e-3);
     CHECK(GUI::GetMeasureFloor(GUI::MeasureKind::PEAK_GAIN) == 1e-3);
     CHECK(GUI::GetMeasureFloor(GUI::MeasureKind::PHASE_MARGIN) == 1e-3);
+    CHECK(GUI::GetMeasureFloor(GUI::MeasureKind::DC_CURRENT) == 1e-9);
 }
 
 TEST_CASE("A reading every run gives alike, and runs without a reading, are worded", "[monte_carlo_results]") {

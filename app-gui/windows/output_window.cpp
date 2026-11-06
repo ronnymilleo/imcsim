@@ -124,7 +124,7 @@ const char *GetTabTitle(const PlotTab tab) {
 OutputWindow::OutputWindow(Schematic &schematic, AnalysisControls &controls, TransientPlayback &playback,
                            Preferences &preferences)
     : AppWindow("Output", true), m_Schematic(schematic), m_Controls(controls), m_Playback(playback),
-      m_Preferences(preferences), m_MathChannels(schematic), m_Buses(schematic),
+      m_Preferences(preferences), m_MathChannels(schematic), m_Buses(schematic), m_OperatingPointTab(schematic),
       m_TransientTab(schematic, controls, playback), m_SpectrumTab(schematic), m_ACSweepTab(schematic),
       m_DCSweepTab(schematic), m_NoiseTab(schematic), m_PoleZeroTab(schematic), m_SParameterTab(schematic),
       m_MonteCarloTab(schematic) {
@@ -160,6 +160,7 @@ void OutputWindow::Draw() {
     }
     m_Exporter.Update();
     m_Exporter.DrawError();
+    m_OperatingPointTab.Update();
     const std::size_t node_count = GetListedNodeCount();
     const std::vector<Core::ComponentTrace> &currents = GetListedCurrents();
     if (node_count > 1 || !currents.empty()) {
@@ -205,6 +206,9 @@ const std::vector<Core::ComponentTrace> &OutputWindow::GetListedCurrents() const
     if (const auto &dc_sweep = m_Schematic.GetDCSweep()) {
         return dc_sweep->Curves.front().Currents;
     }
+    if (const Core::DCSweep *steps = m_OperatingPointTab.GetStepSweep()) {
+        return steps->Curves.front().Currents;
+    }
     return no_currents;
 }
 
@@ -215,8 +219,10 @@ std::size_t OutputWindow::GetListedNodeCount() const {
     const auto &transient = m_Schematic.GetTransient();
     const auto &sweep = m_Schematic.GetACSweep();
     const auto &dc_sweep = m_Schematic.GetDCSweep();
+    const Core::DCSweep *point_steps = m_OperatingPointTab.GetStepSweep();
     return std::max({transient ? transient->NodeVoltages.size() : 0, sweep ? sweep->NodeMagnitudesDecibels.size() : 0,
-                     dc_sweep ? dc_sweep->Curves.front().NodeVoltages.size() : 0});
+                     dc_sweep ? dc_sweep->Curves.front().NodeVoltages.size() : 0,
+                     point_steps ? point_steps->Curves.front().NodeVoltages.size() : 0});
 }
 
 /**
@@ -403,7 +409,7 @@ bool OutputWindow::BeginTab(const char *label, const PlotTab tab, const std::opt
  */
 void OutputWindow::DrawTimeAndFrequencyTabs(const FrameResults &frame, const std::optional<PlotTab> &tab_to_show) {
     if (BeginTab("Operating point", PlotTab::OPERATING_POINT, tab_to_show)) {
-        DrawOperatingPointTab(m_Schematic);
+        m_OperatingPointTab.Draw();
         ImGui::EndTabItem();
     }
     if (BeginTab("Transient", PlotTab::TRANSIENT, tab_to_show)) {

@@ -57,6 +57,7 @@ std::expected<std::vector<double>, std::string> ListStepValues(const ParameterSt
 std::string GetParameterLabel(const ParameterStepSettings &settings);
 std::string FormatStepValue(const std::string &parameter, double value, const std::string &unit);
 Core::DCSweep JoinDCSweepSteps(StepFamily<Core::DCSweep> family);
+Core::DCSweep JoinOperatingPointSteps(const StepFamily<Core::OperatingPoint> &family);
 
 } // namespace GUI
 

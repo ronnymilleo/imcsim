@@ -98,6 +98,7 @@ const char *GetAnalysisName(Analysis analysis);
 bool IsValidLiveSeconds(double seconds);
 
 // Run modes
+bool IsRepeatable(Analysis analysis);
 bool IsMonteCarloRun(const SimulationSettings &settings);
 
 } // namespace GUI

@@ -23,6 +23,8 @@ constexpr double NOISE_FRACTION = 1e-6;
 /// Differences below these are too small to read in the unit of the quantity: a microvolt, a millihertz, a thousandth
 /// of a decibel or of a degree, such as the -0.0001 dB of a filter far below its corner.
 constexpr double VOLTAGE_FLOOR = 1e-6;
+/// A nanoampere, as small a difference of current as the voltage floor is of voltage across a kilohm.
+constexpr double CURRENT_FLOOR = 1e-9;
 constexpr double FREQUENCY_FLOOR = 1e-3;
 constexpr double LOGARITHMIC_FLOOR = 1e-3;
 constexpr double LOWER_PERCENTILE = 0.01;
@@ -161,6 +163,23 @@ Measurement MeasureDCSweep(const Core::DCSweep &sweep) {
 }
 
 /**
+ * @brief   Reads every node voltage and every current of an operating point, as its tables list them.
+ * @param[in] operating_point  The result of one run.
+ * @return  The DC voltage of every node but ground, then the DC current of every part, in the order of the result.
+ */
+Measurement MeasureOperatingPoint(const Core::OperatingPoint &operating_point) {
+    Measurement measurement;
+    for (std::size_t node = 1; node < operating_point.NodeVoltages.size(); ++node) {
+        AddColumn(measurement, static_cast<int>(node), MeasureKind::DC_VOLTAGE, operating_point.NodeVoltages[node]);
+    }
+    for (const Core::ComponentCurrent &current : operating_point.Currents) {
+        measurement.Columns.push_back({.Node = 0, .Kind = MeasureKind::DC_CURRENT, .Current = current.Name});
+        measurement.Values.emplace_back(current.Current);
+    }
+    return measurement;
+}
+
+/**
  * @brief   Names a measured quantity, as the panel and the table headers show it.
  * @param[in] kind  Quantity to name.
  * @return  Such as "Mean" or "Upper -3 dB frequency".
@@ -189,6 +208,10 @@ const char *GetMeasureName(const MeasureKind kind) {
         return "Minimum";
     case MeasureKind::MAXIMUM:
         return "Maximum";
+    case MeasureKind::DC_VOLTAGE:
+        return "DC voltage";
+    case MeasureKind::DC_CURRENT:
+        return "DC current";
     default:
         return "";
     }
@@ -197,10 +220,12 @@ const char *GetMeasureName(const MeasureKind kind) {
 /**
  * @brief   Gives the unit of a measured quantity.
  * @param[in] kind  Quantity to give the unit of.
- * @return  "V", "Hz", "dB" or the degree sign.
+ * @return  "V", "A", "Hz", "dB" or the degree sign.
  */
 const char *GetMeasureUnit(const MeasureKind kind) {
     switch (kind) {
+    case MeasureKind::DC_CURRENT:
+        return "A";
     case MeasureKind::FREQUENCY:
     case MeasureKind::LOWER_CUTOFF:
     case MeasureKind::UPPER_CUTOFF:
@@ -215,6 +240,7 @@ const char *GetMeasureUnit(const MeasureKind kind) {
     case MeasureKind::PEAK_TO_PEAK:
     case MeasureKind::MINIMUM:
     case MeasureKind::MAXIMUM:
+    case MeasureKind::DC_VOLTAGE:
     default:
         return "V";
     }
@@ -223,12 +249,12 @@ const char *GetMeasureUnit(const MeasureKind kind) {
 /**
  * @brief   Lists the nodes the table measured.
  * @param[in] table  The runs.
- * @return  Node numbers in rising order, each once.
+ * @return  Node numbers in rising order, each once; the columns of currents are left out.
  */
 std::vector<int> ListTableNodes(const MonteCarloTable &table) {
     std::vector<int> nodes;
     for (const MeasureColumn &column : table.Columns) {
-        if (!std::ranges::contains(nodes, column.Node)) {
+        if (column.Current.empty() && !std::ranges::contains(nodes, column.Node)) {
             nodes.push_back(column.Node);
         }
     }
@@ -245,7 +271,39 @@ std::vector<int> ListTableNodes(const MonteCarloTable &table) {
 std::vector<std::size_t> ListNodeColumns(const MonteCarloTable &table, const int node) {
     std::vector<std::size_t> columns;
     for (std::size_t index = 0; index < table.Columns.size(); ++index) {
-        if (table.Columns[index].Node == node) {
+        if (table.Columns[index].Current.empty() && table.Columns[index].Node == node) {
+            columns.push_back(index);
+        }
+    }
+    return columns;
+}
+
+/**
+ * @brief   Lists the currents the table measured.
+ * @param[in] table  The runs.
+ * @return  Their names in the order they were measured, each once; empty unless the analysis reads currents, as the
+ *          operating point does.
+ */
+std::vector<std::string> ListTableCurrents(const MonteCarloTable &table) {
+    std::vector<std::string> currents;
+    for (const MeasureColumn &column : table.Columns) {
+        if (!column.Current.empty() && !std::ranges::contains(currents, column.Current)) {
+            currents.push_back(column.Current);
+        }
+    }
+    return currents;
+}
+
+/**
+ * @brief   Finds the columns of one current.
+ * @param[in] table    The runs.
+ * @param[in] current  Name of the current, such as "R1".
+ * @return  Indices into the columns, in the order they were measured.
+ */
+std::vector<std::size_t> ListCurrentColumns(const MonteCarloTable &table, const std::string_view current) {
+    std::vector<std::size_t> columns;
+    for (std::size_t index = 0; index < table.Columns.size(); ++index) {
+        if (!table.Columns[index].Current.empty() && table.Columns[index].Current == current) {
             columns.push_back(index);
         }
     }
@@ -273,7 +331,8 @@ std::size_t FindDefaultColumn(const MonteCarloTable &table, const std::span<cons
         const std::vector<double> samples = CollectMeasure(table, column);
         const double spread =
             samples.empty() ? -1.0 : ComputeRelativeSpread(samples, GetMeasureFloor(table.Columns[column].Kind));
-        const int rank = rank_of(table.Columns[column].Node);
+        // A current is no measured node, so it ranks with the nodes the user does not measure
+        const int rank = table.Columns[column].Current.empty() ? rank_of(table.Columns[column].Node) : -1;
         if (spread > best_spread || (spread == best_spread && rank > best_rank)) {
             best = column;
             best_spread = spread;
@@ -332,6 +391,9 @@ double GetMeasureFloor(const MeasureKind kind) {
     const std::string_view unit = GetMeasureUnit(kind);
     if (unit == "Hz") {
         return FREQUENCY_FLOOR;
+    }
+    if (unit == "A") {
+        return CURRENT_FLOOR;
     }
     return unit == "V" ? VOLTAGE_FLOOR : LOGARITHMIC_FLOOR;
 }
