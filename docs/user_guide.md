@@ -440,15 +440,16 @@ the closed-loop gain. Its gain rolls off at the gain-bandwidth product (GBW, 1 M
 amplifier with a gain of 10 keeps its gain up to about GBW / 11. Its output cannot go past the voltages of its V+
 and V- pins: connect them to supplies, and it clips within about 10 mV of them. It has no slew rate.
 
-The **uA741**, **LM358** and **TL072** models, or **Custom** specifications, make it a real part, simulated with the
+The **uA741**, **LM358**, **TL072**, **NE5532** and **OP07** models, or **Custom** specifications, make it a real part, simulated with the
 Boyle macromodel that SPICE simulators have used since 1974: a transistor input pair draws the bias current and limits
 the slew rate, the
 output swings short of the supplies by its headrooms and limits its current at the short-circuit current, and the
 part draws its supply current. The macromodel is built from datasheet values (open-loop gain, GBW, slew rate, phase
 margin, bias current, CMRR, output resistance, short-circuit current, headrooms and supply current), so a datasheet
 is enough to model another part; its GBW comes out about 10% low. The input pair is NPN in the uA741, PNP in the
-LM358, whose inputs and output go down to V- on a single supply, and a JFET pair in the TL072, which draws picoamperes;
-a Custom part picks its input stage and can add an input offset voltage (VOS) to its + input. It still leaves out
+LM358, whose inputs and output go down to V- on a single supply, and a JFET pair in the TL072, which draws picoamperes.
+Each ready part carries the typical input offset of its datasheet at its + input, from 60 µV for the OP07 to 3 mV for the
+LM358 and TL072, and a Custom part picks its input stage and its input offset voltage (VOS). It still leaves out
 noise densities, temperature, the common-mode input range and the supply rejection, and its output current returns
 through ground.
 

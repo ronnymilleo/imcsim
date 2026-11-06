@@ -383,7 +383,7 @@ Ready models:
 |---|---|
 | Diode | 1N4148 (small-signal switching, 100 V), 1N4007 (rectifier, 1000 V 1 A), 1N5819 (Schottky, 40 V 1 A) |
 | Zener | 5V1, 3V3, 12V (named after their breakdown voltage) |
-| LED | Red (1.8 V at 20 mA), Green (2.1 V at 20 mA), Blue (3.0 V at 20 mA) |
+| LED | Red (1.85 V at 20 mA), Green (2.2 V at 20 mA), Blue (3.3 V at 20 mA), the typical values of their Kingbright datasheets |
 
 Any of them can switch to **Custom** and edit the parameters, starting from the model it replaces.
 
@@ -470,7 +470,7 @@ It has no slew rate, offset or current limit, and its output current returns thr
 the supply pins. It is noiseless: its internal resistor is marked `noisy=0`, and only the leakage of its clamp diodes
 remains, picovolts per root hertz, which the noise analysis lists at 0.00%.
 
-### Boyle macromodel (uA741, LM358, TL072 and Custom)
+### Boyle macromodel (uA741, LM358, TL072, NE5532, OP07 and Custom)
 
 The macromodel of G. Boyle, B. Cohn, D. Pederson and J. Solomon (IEEE Journal of Solid-State Circuits, 1974), the
 basis of most SPICE op-amp models from vendors for decades:
@@ -508,9 +508,13 @@ application note AN48:
 105.9 dB, 0.505 V/µs, 13.98 V of swing from ±15 V into 10 kΩ and 24.7 mA into a short. **LM358** (PNP input) and
 **TL072** (JFET input) take the typical values of their TI datasheets, SLOS068AB and SLOS080W: 100 dB, 0.7 MHz,
 0.3 V/µs, 20 nA, an output 1.5 V short of V+ and 5 mV short of V- for the LM358, and 106 dB, 5.25 MHz, 20 V/µs, 56°,
-65 pA, an output 1.5 V short of each supply for the TL072. The ready models have no offset; a datasheet gives only its
-typical size, not its sign. **Custom** takes the same specifications from any datasheet, with the input stage and an
-input offset voltage.
+65 pA, an output 1.5 V short of each supply for the TL072. **NE5532** (SLOS075K: 100 dB, 12 MHz, 5 V/µs, 200 nA, 38 mA)
+and **OP07** (SLOS099H, the OP07C: 112 dB, 0.6 MHz, 0.3 V/µs, 1.8 nA, 120 dB of CMRR) are NPN parts, both with an
+output 2 V short of each supply. Every ready model carries the typical input offset of its datasheet, as a positive
+voltage at its + input (0.3 mV for the uA741, 3 mV for the LM358 and TL072, 0.5 mV for the NE5532, 60 µV for the OP07):
+a datasheet gives its typical size, not its sign, so a real part may have it either way, and an amplifier with a gain
+of 11 shows eleven times it at its output. **Custom** takes the same specifications from any datasheet, with the input
+stage and an input offset voltage.
 
 Limitations:
 
@@ -536,7 +540,7 @@ datasheets:
 | 1N4007 | Diodes Inc DS28002 Rev. 11 | 1 A; 1.25 W from 100 K/W to ambient and a 150 °C junction |
 | 1N5819 | onsemi 1N5817/D | 1 A; 1.25 W from 80 °C/W and a 125 °C junction |
 | Zeners (3V3, 5V1, 12V) | Vishay BZX55, document 85604 Rev. 2.0 | 500 mW; 200 mA forward, where its forward voltage is specified |
-| Red, green and blue LEDs | Kingbright WP7113SRD/D V.9A, WP7113SGD V.11B, WP7113QBC/D V.18B | 30 mA and 75 mW, 25 mA and 62.5 mW, 30 mA and 120 mW |
+| Red, green and blue LEDs | Kingbright WP7113SRD/D V.9A, WP7113SGD V.11B, WP7113QBC/D V.18B | 30 mA and 75 mW, 25 mA and 62.5 mW, 30 mA and 120 mW; 1.85, 2.2 and 3.3 V typical at 20 mA |
 | 2N3904, 2N2222A, BC547B, 2N3906, 2N2907A, BC557B | onsemi 2N3904/D Rev. 3, P2N2222A/D Rev. 7, BC546/D Rev. 8, 2N3906/D Rev. 4, P2N2907A/D Rev. 6, BC556B/D Rev. 3 | VCEO and IC of each; 625 mW in TO-92 |
 | 2N7000 | onsemi 2N7000TA/D Rev. 1 | 60 V, 30 V, 200 mA, 400 mW |
 | BS170 | onsemi BS170/D Rev. 7 | 60 V, 20 V, 500 mA, 350 mW |
@@ -545,6 +549,9 @@ datasheets:
 | IRF9540N | International Rectifier PD-91437B | 100 V, 20 V, 23 A, 140 W (not checked against a copy) |
 | LM358 | TI SLOS068AB, October 2024 | table 5.7 |
 | TL072 | TI SLOS080W, July 2025 | tables 5.8 and 5.9 (TL07xC and TL07xI); short-circuit current of the TL07xH |
+| NE5532 | TI SLOS075K | tables 5.5 and 5.6; no output swing in this revision, so 2 V from the ±13 V common-mode range |
+| OP07 | TI SLOS099H, March 2023 | table 6.5, OP07C |
+| uA741 offset | TI SLOS094H, February 2026 | 0.3 mV typical |
 | Fast fuses | Littelfuse 217 Series, revised 10/30/20 | nominal melting I2t and cold resistance |
 | 1 A slow-blow fuse | Littelfuse 218 Series, revised 02/23/15 | 6.73 A2s, 61.3 mOhm |
 
