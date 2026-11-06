@@ -1,0 +1,152 @@
+{
+  "format": "imcsim-schematic",
+  "version": 1,
+  "elements": [
+    {
+      "type": "Pin",
+      "net": "IN",
+      "rotation": 0,
+      "x": 4,
+      "y": 4,
+      "port": {
+        "number": 1,
+        "z0": 50
+      }
+    },
+    {
+      "type": "Inductor",
+      "rotation": 0,
+      "x": 9,
+      "y": 4,
+      "value": 8e-06,
+      "name": "L1"
+    },
+    {
+      "type": "Inductor",
+      "rotation": 0,
+      "x": 15,
+      "y": 4,
+      "value": 8e-06,
+      "name": "L2"
+    },
+    {
+      "type": "Pin",
+      "net": "OUT",
+      "rotation": 180,
+      "x": 20,
+      "y": 4,
+      "port": {
+        "number": 2,
+        "z0": 50
+      }
+    },
+    {
+      "type": "Capacitor",
+      "rotation": 90,
+      "x": 12,
+      "y": 7,
+      "value": 3.18e-09,
+      "name": "C1"
+    },
+    {
+      "type": "Ground",
+      "rotation": 0,
+      "x": 12,
+      "y": 11
+    }
+  ],
+  "wires": [
+    {
+      "start": [
+        4,
+        4
+      ],
+      "end": [
+        7,
+        4
+      ]
+    },
+    {
+      "start": [
+        11,
+        4
+      ],
+      "end": [
+        12,
+        4
+      ]
+    },
+    {
+      "start": [
+        12,
+        4
+      ],
+      "end": [
+        13,
+        4
+      ]
+    },
+    {
+      "start": [
+        17,
+        4
+      ],
+      "end": [
+        20,
+        4
+      ]
+    },
+    {
+      "start": [
+        12,
+        4
+      ],
+      "end": [
+        12,
+        5
+      ]
+    },
+    {
+      "start": [
+        12,
+        9
+      ],
+      "end": [
+        12,
+        11
+      ]
+    }
+  ],
+  "simulation": {
+    "analysis": "s_parameters",
+    "transient": {
+      "step": 2e-06,
+      "stop": 0.002
+    },
+    "ac_sweep": {
+      "start": 100,
+      "stop": 100000,
+      "points_per_decade": 50
+    },
+    "s_parameters": {
+      "start": 100000.0,
+      "stop": 10000000.0,
+      "logarithmic": true,
+      "points_per_decade": 200,
+      "linear_points": 101
+    }
+  },
+  "measurements": {
+    "voltages": [
+      [
+        4,
+        4
+      ],
+      [
+        17,
+        4
+      ]
+    ],
+    "currents": []
+  }
+}

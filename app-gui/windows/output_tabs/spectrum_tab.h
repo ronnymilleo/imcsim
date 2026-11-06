@@ -41,6 +41,10 @@ private:
     SpectrumWindow m_Window = SpectrumWindow::HANN;
     /// Whether the frequency scale of the spectrum is logarithmic.
     bool m_IsLogarithmic = false;
+    /// Whether the plot shows noise densities on logarithmic axes instead of decibels.
+    bool m_IsDensity = false;
+    /// Whether every trace of the last spectra was broadband, so the density view opens by itself when they become so.
+    bool m_WereAllBroadband = false;
     /// Visible range of the spectrum plot.
     PlotSpan m_View;
     /// The last spectra computed.
@@ -52,6 +56,7 @@ private:
     void DrawPlot();
     void DrawStatistics();
     void DrawControls();
+    bool IsDensityShown() const;
 };
 
 } // namespace GUI

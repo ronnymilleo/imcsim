@@ -98,9 +98,12 @@ std::string GetParameterLabel(const ParameterStepSettings &settings) {
  * @param[in] parameter  Name of the parameter, from GetParameterLabel().
  * @param[in] value      Value of the step.
  * @param[in] unit       Unit of the value, such as "Ohm" or "°C".
- * @return  Such as "R1=2.2kOhm" or "T=85°C".
+ * @return  Such as "R1=2.2kOhm" or "T=85°C"; for a Monte Carlo run, "Nominal" or "Run 17".
  */
 std::string FormatStepValue(const std::string &parameter, const double value, const std::string &unit) {
+    if (parameter == MONTE_CARLO_PARAMETER) {
+        return value == 0.0 ? "Nominal" : std::format("Run {}", static_cast<int>(value));
+    }
     return std::format("{}={}{}", parameter, Core::FormatValue(value), unit);
 }
 

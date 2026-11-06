@@ -20,7 +20,10 @@
 #include "windows/output_tabs/ac_sweep_tab.h"
 #include "windows/output_tabs/dc_sweep_tab.h"
 #include "windows/output_tabs/frame_results.h"
+#include "windows/output_tabs/monte_carlo_tab.h"
 #include "windows/output_tabs/noise_tab.h"
+#include "windows/output_tabs/pole_zero_tab.h"
+#include "windows/output_tabs/s_parameter_tab.h"
 #include "windows/output_tabs/spectrum_tab.h"
 #include "windows/output_tabs/transient_tab.h"
 #include <cstddef>
@@ -41,7 +44,11 @@ enum class PlotTab {
     DC_SWEEP,
     NOISE,
     TRANSFER_FUNCTION,
-    TRUTH_TABLE
+    SENSITIVITY,
+    POLE_ZERO,
+    S_PARAMETERS,
+    TRUTH_TABLE,
+    MONTE_CARLO
 };
 
 /**
@@ -74,7 +81,7 @@ enum class PlotTab {
 class OutputWindow : public AppWindow {
 public:
     OutputWindow(Schematic &schematic, AnalysisControls &controls, TransientPlayback &playback,
-                 const Preferences &preferences);
+                 Preferences &preferences);
     ~OutputWindow() override = default;
 
     void ShowTab(PlotTab tab, bool may_come_to_front = true);
@@ -83,8 +90,8 @@ private:
     Schematic &m_Schematic;
     AnalysisControls &m_Controls;
     TransientPlayback &m_Playback;
-    /// Whether a new result brings the window to the front.
-    const Preferences &m_Preferences;
+    /// Whether a new result brings the window to the front, and the coloring the Sensitivity tab switches on.
+    Preferences &m_Preferences;
 
     // Math channels
     MathChannels m_MathChannels;
@@ -99,6 +106,9 @@ private:
     ACSweepTab m_ACSweepTab;
     DCSweepTab m_DCSweepTab;
     NoiseTab m_NoiseTab;
+    PoleZeroTab m_PoleZeroTab;
+    SParameterTab m_SParameterTab;
+    MonteCarloTab m_MonteCarloTab;
     /// The tab shown this frame, which Export saves.
     PlotTab m_ShownTab = PlotTab::TRANSIENT;
     /// Tab to bring to the front on the next frame, after a new result.
@@ -118,12 +128,15 @@ private:
 
     // Tabs
     void DrawTabs(const FrameResults &frame);
+    bool BeginTab(const char *label, PlotTab tab, const std::optional<PlotTab> &tab_to_show);
+    void DrawTimeAndFrequencyTabs(const FrameResults &frame, const std::optional<PlotTab> &tab_to_show);
+    void DrawAnalysisTabs(const std::optional<PlotTab> &tab_to_show);
 
     // Export
     void DrawExportButton(ImVec2 tab_row, float tab_row_width, float export_width, const FrameResults &frame);
     bool CanExport(const FrameResults &frame) const;
     bool HasLongerRun() const;
-    ExportFigure BuildShownFigure(const FrameResults &frame, bool is_whole_run) const;
+    ExportFigure BuildShownFigure(const FrameResults &frame, bool is_whole_run, bool is_table) const;
 };
 
 } // namespace GUI

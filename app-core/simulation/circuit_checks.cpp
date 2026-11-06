@@ -50,6 +50,68 @@ std::optional<std::string> CheckFrequencyRange(const double start_frequency, con
     return std::nullopt;
 }
 
+/// Fewest points a linear S-parameter sweep may take: ngspice gives a single point, at the start, for two.
+constexpr int MIN_LINEAR_S_POINTS = 3;
+/// Most points a linear S-parameter sweep may take.
+constexpr int MAX_LINEAR_S_POINTS = 100000;
+
+std::optional<std::string> CheckSParameterRange(const SParameterSettings &settings) {
+    if (!settings.IsLogarithmic) {
+        if (settings.StartFrequency <= 0.0) {
+            return "The start frequency must be positive";
+        }
+        if (settings.StopFrequency <= settings.StartFrequency) {
+            return "The stop frequency must be higher than the start frequency";
+        }
+        if (settings.LinearPoints < MIN_LINEAR_S_POINTS || settings.LinearPoints > MAX_LINEAR_S_POINTS) {
+            return std::format("The number of points must be between {} and {}; ngspice gives only the first point "
+                               "for two",
+                               MIN_LINEAR_S_POINTS, MAX_LINEAR_S_POINTS);
+        }
+        return std::nullopt;
+    }
+    return CheckFrequencyRange(settings.StartFrequency, settings.StopFrequency, settings.PointsPerDecade);
+}
+
+/**
+ * @brief   Ports are numbered from 1 with no gap and no repeat, which ngspice requires and reports as a fatal error,
+ *          while ports on one node it takes without a word.
+ */
+std::optional<std::string> CheckSParameterPortNumbers(const std::vector<CircuitPort> &ports) {
+    std::set<int> numbers;
+    for (const CircuitPort &port : ports) {
+        if (!numbers.insert(port.Number).second) {
+            return std::format("Two S-parameter ports are numbered {}; give each port its own number", port.Number);
+        }
+    }
+    for (int number = 1; number <= static_cast<int>(ports.size()); ++number) {
+        if (!numbers.contains(number)) {
+            return std::format("The S-parameter ports must be numbered 1 to {} with no gap; port {} is missing",
+                               ports.size(), number);
+        }
+    }
+    return std::nullopt;
+}
+
+std::optional<std::string> CheckSParameterPortNodes(const std::vector<CircuitPort> &ports) {
+    for (std::size_t first = 0; first < ports.size(); ++first) {
+        const CircuitPort &port = ports[first];
+        if (port.ReferenceOhms <= 0.0) {
+            return std::format("The reference impedance of port {} must be positive", port.Number);
+        }
+        if (port.Node == 0) {
+            return std::format("Port {} is on ground; an S-parameter port needs a node of its own", port.Number);
+        }
+        for (std::size_t second = first + 1; second < ports.size(); ++second) {
+            if (ports[second].Node == port.Node) {
+                return std::format("Ports {} and {} are on the same node; each port needs a node of its own",
+                                   port.Number, ports[second].Number);
+            }
+        }
+    }
+    return std::nullopt;
+}
+
 /**
  * @brief   The independent sources a DC sweep or a transfer function can drive, whatever their waveform: voltage and
  *          current sources, supply rails, and clocks and logic inputs, which are voltage sources in the netlist whose
@@ -228,6 +290,31 @@ std::optional<std::string> CheckLibraryModels(const Circuit &circuit) {
     return std::nullopt;
 }
 
+/**
+ * @brief   A noise or random source with a value ngspice cannot take is stopped here: a negative noise time step makes
+ *          ngspice loop forever, and it runs inside this process.
+ */
+std::optional<std::string> CheckSourceWaveforms(const Circuit &circuit) {
+    for (const Component *part : CollectParts(circuit)) {
+        if (!IsSource(part->GetType())) {
+            continue;
+        }
+        const auto &source = static_cast<const Source &>(*part);
+        if (source.GetSourceType() == Source::SourceType::NOISE && !source.IsValidNoise(source.GetNoise())) {
+            return std::format("The noise of {} has a value ngspice cannot use: check that the time step is positive "
+                               "with white or 1/f noise, the 1/f exponent is between 0 and 2 and the telegraph times "
+                               "are positive",
+                               part->GetName());
+        }
+        if (source.GetSourceType() == Source::SourceType::RANDOM && !source.IsValidRandom(source.GetRandom())) {
+            return std::format("The random values of {} have a value ngspice cannot use: check that the time step is "
+                               "positive and the first parameter is not negative",
+                               part->GetName());
+        }
+    }
+    return std::nullopt;
+}
+
 } // namespace
 
 /**
@@ -249,6 +336,9 @@ std::optional<std::string> CheckCircuit(const Circuit &circuit) {
         return problem;
     }
     if (std::optional<std::string> problem = CheckLibraryModels(circuit)) {
+        return problem;
+    }
+    if (std::optional<std::string> problem = CheckSourceWaveforms(circuit)) {
         return problem;
     }
     // A current-controlled source needs a current that some other part reports
@@ -289,6 +379,42 @@ std::optional<std::string> CheckTransientSettings(const TransientSettings &setti
     }
     if (settings.StopTime / settings.TimeStep > MAX_TRANSIENT_POINTS) {
         return std::format("The time step is too small for the stop time: it would produce more than {} points",
+                           MAX_TRANSIENT_POINTS);
+    }
+    return std::nullopt;
+}
+
+/**
+ * @brief   Finds the shortest interval at which a noise or random source of the circuit changes.
+ * @param[in] circuit  Circuit to look through, blocks included.
+ * @return  The shortest time step of its noise and random sources; no value when none has one.
+ */
+std::optional<double> FindFinestSignalStep(const Circuit &circuit) {
+    std::optional<double> finest;
+    for (const Component *part : CollectParts(circuit)) {
+        if (!IsSource(part->GetType())) {
+            continue;
+        }
+        const std::optional<double> step = static_cast<const Source &>(*part).GetSignalStep();
+        if (step && (!finest || *step < *finest)) {
+            finest = step;
+        }
+    }
+    return finest;
+}
+
+/**
+ * @brief   Checks that the noise and random sources of a circuit keep a transient within the points it may span.
+ * @param[in] circuit   Circuit to simulate.
+ * @param[in] settings  Stop time and time step.
+ * @return  The reason it would span too many points, since ngspice stops at every sample of a noise or random source
+ *          and not only at the time step; no value when it does not.
+ */
+std::optional<std::string> CheckSourceSteps(const Circuit &circuit, const TransientSettings &settings) {
+    const std::optional<double> finest = FindFinestSignalStep(circuit);
+    if (finest && *finest > 0.0 && settings.StopTime / *finest > MAX_TRANSIENT_POINTS) {
+        return std::format("The time step of a noise or random source is too small for the stop time: it would "
+                           "produce more than {} points",
                            MAX_TRANSIENT_POINTS);
     }
     return std::nullopt;
@@ -378,6 +504,63 @@ std::optional<std::string> CheckTransferFunctionSettings(const Circuit &circuit,
     }
     if (FindTransferFunctionInput(circuit, settings.InputSource) == nullptr) {
         return std::format("The input source {} is not {} of the circuit", settings.InputSource, SWEEPABLE_SOURCES);
+    }
+    return std::nullopt;
+}
+
+/**
+ * @brief   Checks the output node and the input source of a pole-zero analysis.
+ * @param[in] circuit   Circuit to analyze.
+ * @param[in] settings  Output node and input source.
+ * @return  The reason the analysis cannot run; no value when it can.
+ */
+std::optional<std::string> CheckPoleZeroSettings(const Circuit &circuit, const PoleZeroSettings &settings) {
+    if (settings.OutputNode < 1 || settings.OutputNode >= circuit.GetNodeCount()) {
+        return "Pick the output node; ground has no poles or zeros";
+    }
+    if (settings.InputSource.empty()) {
+        return std::format("A pole-zero analysis needs an input source; select {}", SWEEPABLE_SOURCES);
+    }
+    if (FindTransferFunctionInput(circuit, settings.InputSource) == nullptr) {
+        return std::format("The input source {} is not {} of the circuit", settings.InputSource, SWEEPABLE_SOURCES);
+    }
+    return std::nullopt;
+}
+
+/**
+ * @brief   Checks the frequency range of an S-parameter analysis and its ports.
+ * @param[in] circuit   Circuit to analyze; its ports are the pin markers set as ports.
+ * @param[in] settings  Frequency range and points.
+ * @return  The reason the analysis cannot run, such as fewer than two ports or ports numbered with a gap; no value
+ *          when it can.
+ * @note    ngspice stops for good when it finds fewer than two ports, so this must run before it.
+ */
+std::optional<std::string> CheckSParameterSettings(const Circuit &circuit, const SParameterSettings &settings) {
+    if (std::optional<std::string> error = CheckSParameterRange(settings)) {
+        return error;
+    }
+    const std::vector<CircuitPort> &ports = circuit.GetPorts();
+    if (ports.size() < MIN_S_PARAMETER_PORTS) {
+        return "ngspice needs at least two S-parameter ports; turn on S-parameter port in the properties of two or "
+               "more "
+               "Block pin markers";
+    }
+    if (std::optional<std::string> error = CheckSParameterPortNumbers(ports)) {
+        return error;
+    }
+    return CheckSParameterPortNodes(ports);
+}
+
+/**
+ * @brief   Checks the output node of a sensitivity analysis.
+ * @param[in] circuit   Circuit to analyze.
+ * @param[in] settings  Output node.
+ * @return  The reason the analysis cannot run; no value when it can.
+ * @note    ngspice answers a node that does not exist with zeros and no error, so the node is checked here.
+ */
+std::optional<std::string> CheckSensitivitySettings(const Circuit &circuit, const SensitivitySettings &settings) {
+    if (settings.OutputNode < 1 || settings.OutputNode >= circuit.GetNodeCount()) {
+        return "Pick the output node; ground has no sensitivity";
     }
     return std::nullopt;
 }

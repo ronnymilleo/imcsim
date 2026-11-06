@@ -6,7 +6,11 @@
 #ifndef IMCSIM_SIMULATION_RESULTS_H
 #define IMCSIM_SIMULATION_RESULTS_H
 
+#include "components/component.h"
+#include <complex>
+#include <cstddef>
 #include <expected>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -169,6 +173,93 @@ struct TransferFunction {
 };
 
 /**
+ * @struct  PoleZeroRoot
+ * @brief   One pole or zero of a transfer function, with a conjugate pair kept as one row.
+ * @details Real and Imaginary are in rad/s. A complex root is stored once, with the positive imaginary part, and
+ *          stands for its conjugate too; a real root has no imaginary part. Quality factor and damping ratio belong to
+ *          complex roots only, and a root on the imaginary axis has an infinite quality factor, kept as no value.
+ */
+struct PoleZeroRoot {
+    bool IsPole = true;
+    double Real = 0.0;
+    double Imaginary = 0.0;
+    double NaturalFrequencyHertz = 0.0;
+    std::optional<double> QualityFactor;
+    std::optional<double> DampingRatio;
+    /// A pole there makes the circuit unstable, or the solver failed to find it right.
+    bool IsRightHalfPlane = false;
+};
+
+/**
+ * @struct  PoleZero
+ * @brief   The poles and zeros from an input source to the voltage of an output node.
+ * @details Poles come first, then zeros, each by growing natural frequency. A pole and a zero at the same place cancel
+ *          and are left out; CancelledPairs counts them, since ngspice reports them for parts the signal never reaches.
+ *          Warnings tell what makes the list doubtful, such as roots the solver gave up on.
+ */
+struct PoleZero {
+    int OutputNode = 0;
+    std::string InputSource;
+    /// Unit of the input source, "V" or "A", which tells whether the transfer is a gain or a transimpedance.
+    std::string InputUnit;
+    std::vector<PoleZeroRoot> Roots;
+    int CancelledPairs = 0;
+    std::vector<std::string> Warnings;
+};
+
+/**
+ * @struct  SParameters
+ * @brief   The scattering matrix of the ports of a circuit at every frequency of a sweep.
+ * @details The matrix is square, one row and one column per port, numbered from 1 as the ports are. Values holds the
+ *          matrices one after the other, frequency by frequency and row by row, so S(i, j) at a frequency is the wave
+ *          leaving port i for a wave entering port j. The waves are power waves, normalized to the reference impedance
+ *          of each port.
+ */
+struct SParameters {
+    std::vector<double> Frequencies;
+    /// One reference impedance in ohms per port, in the order of the port numbers.
+    std::vector<double> ReferenceOhms;
+    std::vector<std::complex<double>> Values;
+    std::vector<std::string> Warnings;
+
+    int GetPortCount() const;
+    std::complex<double> Get(std::size_t frequency, int row, int column) const;
+};
+
+/**
+ * @struct  PartSensitivity
+ * @brief   How much the output node voltage changes with the value of one part.
+ * @details Absolute is in volts per unit of the part (V/Ohm, V/F, V/V...). Normalized is the change in volts for a
+ *          100 % change of the value, which compares parts of different kinds; its sign is the sign of the change of
+ *          the output when the value grows. A block reports its most influential element inside, named by Element,
+ *          and a potentiometer the two halves together, as its total resistance.
+ */
+struct PartSensitivity {
+    std::string Name;
+    /// Kind of the part, which tells how the schematic labels it.
+    ComponentType Type = ComponentType::RESISTOR;
+    /// The element inside the block that has the largest normalized sensitivity, such as "R1"; empty for other parts.
+    std::string Element;
+    /// Unit of the value of the part, as Component::GetUnit() gives it; empty for a gain.
+    std::string Unit;
+    /// None for an element inside a block, whose value the results do not carry.
+    std::optional<double> Value;
+    double Absolute = 0.0;
+    double Normalized = 0.0;
+};
+
+/**
+ * @struct  Sensitivity
+ * @brief   The DC sensitivity of the voltage of a node to every part with a value, around the operating point.
+ * @details Parts are listed from the largest absolute normalized sensitivity to the smallest. Diodes, transistors,
+ *          op-amps, switches and other parts without a value of their own are not listed.
+ */
+struct Sensitivity {
+    int OutputNode = 0;
+    std::vector<PartSensitivity> Parts;
+};
+
+/**
  * @struct  TruthTableRow
  * @brief   One combination of the inputs and the voltages it gives at the output nodes.
  * @details The voltages are empty when ngspice found no operating point for the combination, as a latch whose
@@ -210,6 +301,9 @@ using TransientRun = SimulationRun<Transient>;
 using ACSweepRun = SimulationRun<ACSweep>;
 using DCSweepRun = SimulationRun<DCSweep>;
 using NoiseRun = SimulationRun<Noise>;
+using SensitivityRun = SimulationRun<Sensitivity>;
+using PoleZeroRun = SimulationRun<PoleZero>;
+using SParametersRun = SimulationRun<SParameters>;
 using TransferFunctionRun = SimulationRun<TransferFunction>;
 using TruthTableRun = SimulationRun<TruthTable>;
 

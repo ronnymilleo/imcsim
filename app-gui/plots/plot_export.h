@@ -9,6 +9,7 @@
 #define IMCSIM_PLOT_EXPORT_H
 
 #include "drawing/svg_writer.h"
+#include <complex>
 #include <cstddef>
 #include <expected>
 #include <optional>
@@ -104,6 +105,29 @@ struct ExportPanel {
 };
 
 /**
+ * @struct  ExportSmithTrace
+ * @brief   One curve of a Smith chart: a reflection coefficient at every frequency of a sweep.
+ */
+struct ExportSmithTrace {
+    /// Names the curve in the legend and heads its CSV columns, such as "S11".
+    std::string Name;
+    ExportColor Color;
+    std::vector<double> Frequencies;
+    /// The reflection coefficient at each frequency, as real and imaginary parts.
+    std::vector<std::complex<double>> Values;
+};
+
+/**
+ * @struct  ExportSmith
+ * @brief   A Smith chart: its curves on the plane of the reflection coefficient, with the grid of normalized
+ *          resistance and reactance.
+ */
+struct ExportSmith {
+    std::string Title;
+    std::vector<ExportSmithTrace> Traces;
+};
+
+/**
  * @struct  ExportFigure
  * @brief   Panels stacked top to bottom that share one X axis and its samples.
  */
@@ -114,6 +138,9 @@ struct ExportFigure {
     /// Empty: the whole X data.
     std::optional<ExportRange> XRange;
     std::vector<ExportPanel> Panels;
+    /// A Smith chart in place of the panels: when set, only it is drawn, and its CSV lists the real and imaginary
+    /// parts.
+    std::optional<ExportSmith> Smith;
 };
 
 /**

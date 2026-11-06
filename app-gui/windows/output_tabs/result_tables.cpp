@@ -1,11 +1,12 @@
 /**
  * @file    result_tables.cpp
- * @brief   The tabs of the Output window that are tables: the operating point, the transfer function and the truth
- *          table.
+ * @brief   The tabs of the Output window that are tables: the operating point, the transfer function, the sensitivity
+ *          and the truth table.
  */
 
 #include "windows/output_tabs/result_tables.h"
 
+#include "analysis/sensitivity_view.h"
 #include "analysis/truth_table.h"
 #include "components/logic_input.h"
 #include "drawing/theme.h"
@@ -15,6 +16,7 @@
 #include "spice/spice_value.h"
 #include "windows/output_tabs/plot_widgets.h"
 #include <algorithm>
+#include <cfloat>
 #include <cmath>
 #include <format>
 #include <optional>
@@ -145,6 +147,69 @@ void DrawTransferFunction(const Core::TransferFunction &transfer, Schematic &sch
 }
 
 /**
+ * @brief   Selects the part with this name in the editor, which a click on its row asks for.
+ */
+void SelectPart(Schematic &schematic, const std::string &name) {
+    const auto &elements = schematic.GetElements();
+    for (std::size_t index = 0; index < elements.size(); ++index) {
+        if (elements[index]->GetComponent().GetName() == name) {
+            schematic.SelectElement(index);
+            return;
+        }
+    }
+}
+
+/**
+ * @brief   Draws the sensitivity as a table of parts, the most influential first; a click on a row selects the part.
+ * @param[in] sensitivity  The result.
+ * @param[in] schematic    The names of nets, for the output node, and the parts a click selects.
+ */
+void DrawSensitivity(const Core::Sensitivity &sensitivity, Schematic &schematic) {
+    ImGui::PushTextWrapPos(0.0f);
+    ImGui::TextDisabled("How the DC voltage of %s changes with the value of each part, around the operating point",
+                        GetVoltageLabel(schematic.GetConnectivity(), sensitivity.OutputNode).c_str());
+    ImGui::PopTextWrapPos();
+    constexpr ImGuiTableFlags TABLE_FLAGS =
+        ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingStretchProp | ImGuiTableFlags_ScrollY;
+    // Leaves a line below the table for the notes
+    const ImVec2 table_size = {0.0f,
+                               std::max(ImGui::GetContentRegionAvail().y - ImGui::GetFrameHeightWithSpacing() * 2.0f,
+                                        ImGui::GetFontSize() * 6.0f)};
+    if (ImGui::BeginTable("sensitivity", 5, TABLE_FLAGS, table_size)) {
+        ImGui::TableSetupScrollFreeze(0, 1);
+        ImGui::TableSetupColumn("Part");
+        ImGui::TableSetupColumn("Value");
+        ImGui::TableSetupColumn("Absolute");
+        ImGui::TableSetupColumn("Per 1 %");
+        ImGui::TableSetupColumn("Share of largest");
+        ImGui::TableHeadersRow();
+        for (const SensitivityRow &row : MakeSensitivityRows(sensitivity)) {
+            ImGui::TableNextRow();
+            ImGui::TableNextColumn();
+            if (ImGui::Selectable(row.Part.c_str(), false, ImGuiSelectableFlags_SpanAllColumns)) {
+                SelectPart(schematic, row.PartName);
+            }
+            ImGui::TableNextColumn();
+            ImGui::TextUnformatted(row.Value.c_str());
+            ImGui::TableNextColumn();
+            ImGui::TextUnformatted(row.Absolute.c_str());
+            ImGui::TableNextColumn();
+            ImGui::TextUnformatted(row.Normalized.c_str());
+            ImGui::TableNextColumn();
+            ImGui::ProgressBar(static_cast<float>(row.Share), {-FLT_MIN, 0.0f},
+                               std::format("{:.1f} %", row.Share * 100.0).c_str());
+        }
+        ImGui::EndTable();
+    }
+    ImGui::PushTextWrapPos(0.0f);
+    // The text holds percent signs, so it goes in as an argument and never as the format
+    ImGui::TextDisabled("%s", "Per 1 % is the change of the voltage for a 1 % higher value, which compares parts of "
+                              "different kinds. Model parameters of diodes and transistors are not shown, and a "
+                              "circuit driven only by AC sources reads zero");
+    ImGui::PopTextWrapPos();
+}
+
+/**
  * @brief   Draws one row per combination of the inputs, in counting order: 0 dimmed, 1 bright and X, which no operating
  *          point or a voltage between the logic levels gives, in the warning color; the row the inputs are in now is
  *          highlighted.
@@ -233,6 +298,25 @@ void DrawTransferFunctionTab(Schematic &schematic) {
         DrawTransferFunction(*transfer, schematic);
     } else {
         ImGui::TextDisabled("No transfer function for the current circuit; pick it beside Run in the editor");
+    }
+}
+
+/**
+ * @brief   Draws the Sensitivity tab: the table of the last sensitivity, or how to get one.
+ * @param[in] schematic    The schematic, whose result is shown.
+ * @param[in,out] preferences  Whose wire coloring the checkbox at the top sets to Sensitivity, or back to Plain.
+ */
+void DrawSensitivityTab(Schematic &schematic, Preferences &preferences) {
+    if (const auto &sensitivity = schematic.GetSensitivity()) {
+        bool is_colored = preferences.WireColors == WireColoring::SENSITIVITY;
+        if (ImGui::Checkbox("Color the schematic", &is_colored)) {
+            preferences.WireColors = is_colored ? WireColoring::SENSITIVITY : WireColoring::PLAIN;
+        }
+        ImGui::SetItemTooltip(
+            "Color the parts by their influence on the output, as View > Wire Colors > Sensitivity does");
+        DrawSensitivity(*sensitivity, schematic);
+    } else {
+        ImGui::TextDisabled("No sensitivity for the current circuit; pick it beside Run in the editor");
     }
 }
 

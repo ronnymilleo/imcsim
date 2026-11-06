@@ -1245,8 +1245,12 @@ void Schematic::MarkLiveChanged(const Core::Component &component) {
     m_ACSweep.reset();
     m_ACSweepSteps.reset();
     m_DCSweep.reset();
+    ClearMonteCarlo();
     m_Noise.reset();
     m_TransferFunction.reset();
+    m_Sensitivity.reset();
+    m_PoleZero.reset();
+    m_SParameters.reset();
     m_TruthTable.reset();
 }
 
@@ -1419,6 +1423,7 @@ const std::optional<Core::OperatingPoint> &Schematic::GetOperatingPoint() const 
  */
 void Schematic::SetTransient(std::optional<Core::Transient> transient) {
     m_TransientSteps.reset();
+    ClearMonteCarlo();
     m_Transient = std::move(transient);
     ++m_TransientVersion;
     ++m_TransientDataVersion;
@@ -1471,6 +1476,7 @@ const std::optional<Core::Transient> &Schematic::GetTransient() const {
  */
 void Schematic::SetACSweep(std::optional<Core::ACSweep> sweep) {
     m_ACSweepSteps.reset();
+    ClearMonteCarlo();
     m_ACSweep = std::move(sweep);
     ++m_ACSweepVersion;
 }
@@ -1489,6 +1495,7 @@ const std::optional<Core::ACSweep> &Schematic::GetACSweep() const {
  * @note    The results are dropped on the next change, like those of a single run.
  */
 void Schematic::SetTransientSteps(StepFamily<Core::Transient> steps) {
+    ClearMonteCarlo();
     steps.Selected = std::min(steps.Selected, steps.Results.size() - 1);
     m_Transient = steps.Results[steps.Selected];
     m_TransientSteps = std::move(steps);
@@ -1525,6 +1532,7 @@ void Schematic::SelectTransientStep(const std::size_t step) {
  * @note    The results are dropped on the next change, like those of a single run.
  */
 void Schematic::SetACSweepSteps(StepFamily<Core::ACSweep> steps) {
+    ClearMonteCarlo();
     steps.Selected = std::min(steps.Selected, steps.Results.size() - 1);
     m_ACSweep = steps.Results[steps.Selected];
     m_ACSweepSteps = std::move(steps);
@@ -1559,8 +1567,28 @@ void Schematic::SelectACSweepStep(const std::size_t step) {
  * @note    The result is dropped on the next change, since it no longer matches the circuit.
  */
 void Schematic::SetDCSweep(std::optional<Core::DCSweep> sweep) {
+    ClearMonteCarlo();
     m_DCSweep = std::move(sweep);
     ++m_DCSweepVersion;
+}
+
+/**
+ * @brief   Stores what the runs of a Monte Carlo analysis drew and measured.
+ * @param[in] table  Every run, the nominal one first.
+ * @note    Call it after storing the traces of the runs, which drop the table of an earlier analysis. It is dropped on
+ *          the next change, like the traces.
+ */
+void Schematic::SetMonteCarlo(MonteCarloTable table) {
+    m_MonteCarlo = std::move(table);
+    ++m_MonteCarloVersion;
+}
+
+/**
+ * @brief   Returns the runs of the last Monte Carlo analysis.
+ * @return  The table, or no value when the last analysis was not a Monte Carlo one or there is none.
+ */
+const std::optional<MonteCarloTable> &Schematic::GetMonteCarlo() const {
+    return m_MonteCarlo;
 }
 
 /**
@@ -1597,6 +1625,60 @@ const std::optional<Core::Noise> &Schematic::GetNoise() const {
 void Schematic::SetTransferFunction(std::optional<Core::TransferFunction> transfer_function) {
     m_TransferFunction = std::move(transfer_function);
     ++m_TransferFunctionVersion;
+}
+
+/**
+ * @brief   Stores the result of a sensitivity analysis of the current schematic.
+ * @param[in] sensitivity  Sensitivity of the output node to each part, or no value to clear it.
+ * @note    The result is dropped on the next change, since it no longer matches the circuit.
+ */
+void Schematic::SetSensitivity(std::optional<Core::Sensitivity> sensitivity) {
+    m_Sensitivity = std::move(sensitivity);
+    ++m_SensitivityVersion;
+}
+
+/**
+ * @brief   Returns the last sensitivity simulated for the current schematic.
+ * @return  The sensitivity result, or no value when there was no simulation since the last change.
+ */
+const std::optional<Core::Sensitivity> &Schematic::GetSensitivity() const {
+    return m_Sensitivity;
+}
+
+/**
+ * @brief   Stores the result of a pole-zero analysis of the current schematic.
+ * @param[in] pole_zero  Poles and zeros from the input source to the output node, or no value to clear them.
+ * @note    The result is dropped on the next change, since it no longer matches the circuit.
+ */
+void Schematic::SetPoleZero(std::optional<Core::PoleZero> pole_zero) {
+    m_PoleZero = std::move(pole_zero);
+    ++m_PoleZeroVersion;
+}
+
+/**
+ * @brief   Returns the last pole-zero analysis run for the current schematic.
+ * @return  The poles and zeros, or no value when there was no analysis since the last change.
+ */
+const std::optional<Core::PoleZero> &Schematic::GetPoleZero() const {
+    return m_PoleZero;
+}
+
+/**
+ * @brief   Stores the result of an S-parameter analysis of the current schematic.
+ * @param[in] s_parameters  The scattering matrix over the sweep, or no value to clear it.
+ * @note    The result is dropped on the next change, since it no longer matches the circuit.
+ */
+void Schematic::SetSParameters(std::optional<Core::SParameters> s_parameters) {
+    m_SParameters = std::move(s_parameters);
+    ++m_SParametersVersion;
+}
+
+/**
+ * @brief   Returns the last S-parameter analysis run for the current schematic.
+ * @return  The scattering matrix, or no value when there was no analysis since the last change.
+ */
+const std::optional<Core::SParameters> &Schematic::GetSParameters() const {
+    return m_SParameters;
 }
 
 /**
@@ -1666,6 +1748,13 @@ std::size_t Schematic::GetDCSweepVersion() const {
 }
 
 /**
+ * @return  The Monte Carlo version; compare it with a stored one to know whether the table was replaced.
+ */
+std::size_t Schematic::GetMonteCarloVersion() const {
+    return m_MonteCarloVersion;
+}
+
+/**
  * @brief   Returns a number that changes whenever a noise result is stored.
  * @return  The noise version; compare it with a stored one to know whether the result was replaced.
  */
@@ -1682,11 +1771,45 @@ std::size_t Schematic::GetTransferFunctionVersion() const {
 }
 
 /**
+ * @brief   Returns a number that changes whenever a sensitivity result is stored.
+ * @return  The sensitivity version; compare it with a stored one to know whether the result was replaced.
+ */
+std::size_t Schematic::GetSensitivityVersion() const {
+    return m_SensitivityVersion;
+}
+
+/**
+ * @brief   Returns a number that changes whenever a pole-zero result is stored.
+ * @return  The pole-zero version; compare it with a stored one to know whether the result was replaced.
+ */
+std::size_t Schematic::GetPoleZeroVersion() const {
+    return m_PoleZeroVersion;
+}
+
+/**
+ * @brief   Returns a number that changes whenever an S-parameter result is stored.
+ * @return  The S-parameter version; compare it with a stored one to know whether the result was replaced.
+ */
+std::size_t Schematic::GetSParametersVersion() const {
+    return m_SParametersVersion;
+}
+
+/**
  * @brief   Returns a number that changes whenever a truth table result is stored.
  * @return  The truth table version; compare it with a stored one to know whether the result was replaced.
  */
 std::size_t Schematic::GetTruthTableVersion() const {
     return m_TruthTableVersion;
+}
+
+/**
+ * @brief   Drops the table of a Monte Carlo analysis, which no longer matches the traces next to it.
+ */
+void Schematic::ClearMonteCarlo() {
+    if (m_MonteCarlo) {
+        m_MonteCarlo.reset();
+        ++m_MonteCarloVersion;
+    }
 }
 
 void Schematic::InvalidateDerivedData() {
@@ -1698,8 +1821,12 @@ void Schematic::InvalidateDerivedData() {
     m_ACSweep.reset();
     m_ACSweepSteps.reset();
     m_DCSweep.reset();
+    ClearMonteCarlo();
     m_Noise.reset();
     m_TransferFunction.reset();
+    m_Sensitivity.reset();
+    m_PoleZero.reset();
+    m_SParameters.reset();
     m_TruthTable.reset();
 }
 

@@ -5,12 +5,14 @@
 
 #include "ui_elements/ui_element.h"
 
+#include "simulation/monte_carlo.h"
 #include "spice/spice_value.h"
 #include <algorithm>
 #include <array>
 #include <cfloat>
 #include <cmath>
 #include <cstdlib>
+#include <format>
 #include <optional>
 #include <string>
 #include <utility>
@@ -321,14 +323,19 @@ ImVec2 UIElement::LocalToScreen(const ViewTransform &view, const float x, const 
 /**
  * @brief   Returns the text a symbol shows for the value of its part.
  * @param[in] component  Part with a value.
- * @return  The value with its scale suffix, such as "4.7k"; the parameter it follows, such as "{R}", for a part inside
- *          a block, since its own value is not used then.
+ * @return  The value with its scale suffix, such as "4.7k", and the tolerance when a Monte Carlo analysis varies the
+ *          part, such as "4.7k ±5%"; the parameter it follows, such as "{R}", for a part inside a block, since its
+ *          own value is not used then.
  */
 std::string GetValueLabel(const Core::Component &component) {
     if (const std::optional<std::string> &expression = component.GetValueExpression()) {
         return *expression;
     }
-    return Core::FormatValue(component.GetValue());
+    const std::string value = Core::FormatValue(component.GetValue());
+    if (const std::optional<double> tolerance = component.GetTolerance(); tolerance && Core::IsVaried(component)) {
+        return std::format("{} ±{}%", value, Core::FormatValue(*tolerance));
+    }
+    return value;
 }
 
 } // namespace GUI

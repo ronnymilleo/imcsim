@@ -9,6 +9,7 @@
 #include "components/net_label.h"
 #include "components/resistor.h"
 #include "components/subcircuit.h"
+#include "components/subcircuit_pin.h"
 #include "components/vcc.h"
 #include "document/schematic.h"
 #include "document/schematic_file.h"
@@ -823,4 +824,31 @@ TEST_CASE("A pin that nothing inside a block uses keeps its node from the extra 
     const std::string netlist = circuit.ToSpiceNetlist();
     CHECK(netlist.contains("A-U1-A [1] [4]"));
     CHECK_FALSE(netlist.contains("[3]"));
+}
+
+TEST_CASE("A new S-parameter port takes the lowest number no other marker uses", "[subcircuit]") {
+    std::vector<std::unique_ptr<GUI::UIElement>> elements;
+    for (int index = 0; index < 4; ++index) {
+        elements.push_back(GUI::CreateElement(Core::ComponentType::PIN, {index * 4, 0}, GUI::Rotation::R0));
+    }
+    elements.push_back(GUI::CreateElement(Core::ComponentType::RESISTOR, {0, 8}, GUI::Rotation::R0));
+    const auto marker = [&elements](const std::size_t index) -> Core::SubcircuitPinMarker & {
+        return static_cast<Core::SubcircuitPinMarker &>(elements[index]->GetComponent());
+    };
+    const Core::Component *edited = &elements[3]->GetComponent();
+
+    // No markers are ports yet
+    CHECK(GUI::FindFreePortNumber(elements, edited) == 1);
+    marker(0).SetPort({.IsPort = true, .Number = 1});
+    marker(1).SetPort({.IsPort = true, .Number = 3});
+    CHECK(GUI::FindFreePortNumber(elements, edited) == 2);
+    CHECK(GUI::IsPortNumberTaken(elements, 3, edited));
+    CHECK_FALSE(GUI::IsPortNumberTaken(elements, 2, edited));
+    // A marker does not clash with its own number, and one that is no port keeps its number to itself
+    CHECK_FALSE(GUI::IsPortNumberTaken(elements, 3, &elements[1]->GetComponent()));
+    marker(2).SetPort({.IsPort = false, .Number = 2});
+    CHECK(GUI::FindFreePortNumber(elements, edited) == 2);
+    marker(2).SetPort({.IsPort = true, .Number = 2});
+    CHECK(GUI::FindFreePortNumber(elements, edited) == 4);
+    CHECK(GUI::FindFreePortNumber({}, nullptr) == 1);
 }

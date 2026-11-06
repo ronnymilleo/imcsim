@@ -9,10 +9,15 @@ add_library(imcsim-gui-lib
             analysis/analysis_settings_panel.cpp
             analysis/auto_rerun.cpp
             analysis/circuit_snapshot.cpp
+            analysis/fuse_readings.cpp
             analysis/logic_outputs.cpp
+            analysis/monte_carlo_results.cpp
             analysis/parameter_step.cpp
             analysis/playback.cpp
             analysis/point_window.cpp
+            analysis/pole_zero_view.cpp
+            analysis/s_parameter_view.cpp
+            analysis/sensitivity_view.cpp
             analysis/transient_window.cpp
             analysis/truth_table.cpp
             application.cpp
@@ -28,6 +33,7 @@ add_library(imcsim-gui-lib
             document/spice_import.cpp
             document/subcircuit_pins.cpp
             drawing/current_flow.cpp
+            drawing/fuse_flash.cpp
             drawing/glow_renderer.cpp
             drawing/heat_glow.cpp
             drawing/led_glow.cpp
@@ -61,7 +67,9 @@ add_library(imcsim-gui-lib
             plots/plot_exporter.cpp
             plots/plot_figures.cpp
             plots/plot_helpers.cpp
+            plots/smith_chart.cpp
             plots/spectrum.cpp
+            plots/touchstone.cpp
             plots/trace_fit_state.cpp
             plots/trace_math.cpp
             plots/trace_statistics.cpp
@@ -74,6 +82,7 @@ add_library(imcsim-gui-lib
             ui_elements/ui_current_source.cpp
             ui_elements/ui_diode.cpp
             ui_elements/ui_element.cpp
+            ui_elements/ui_fuse.cpp
             ui_elements/ui_ground.cpp
             ui_elements/ui_inductor.cpp
             ui_elements/ui_logic_box.cpp
@@ -102,9 +111,12 @@ add_library(imcsim-gui-lib
             windows/netlist_window.cpp
             windows/output_tabs/ac_sweep_tab.cpp
             windows/output_tabs/dc_sweep_tab.cpp
+            windows/output_tabs/monte_carlo_tab.cpp
             windows/output_tabs/noise_tab.cpp
             windows/output_tabs/plot_widgets.cpp
+            windows/output_tabs/pole_zero_tab.cpp
             windows/output_tabs/result_tables.cpp
+            windows/output_tabs/s_parameter_tab.cpp
             windows/output_tabs/spectrum_tab.cpp
             windows/output_tabs/transient_tab.cpp
             windows/output_window.cpp

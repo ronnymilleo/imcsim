@@ -15,6 +15,7 @@ namespace GUI {
  *          what was followed is what the frame before it had.
  */
 bool AutoRerun::Update(const AutoRerunFrame &frame) {
+    const bool is_enabled = frame.IsEnabled && !frame.IsMonteCarlo;
     if (m_SeenDocumentVersion != frame.DocumentVersion) {
         // Another schematic, or the first frame: the edits of the old one are not followed
         m_SeenDocumentVersion = frame.DocumentVersion;
@@ -25,12 +26,12 @@ bool AutoRerun::Update(const AutoRerunFrame &frame) {
     }
     if (m_SeenCircuitVersion != frame.CircuitVersion) {
         m_SeenCircuitVersion = frame.CircuitVersion;
-        if (m_IsFollowing && frame.IsEnabled) {
+        if (m_IsFollowing && is_enabled) {
             m_DueSince = frame.Time;
         }
     }
     m_IsFollowing = frame.HasRunToFollow || m_DueSince.has_value();
-    if (!frame.IsEnabled) {
+    if (!is_enabled) {
         m_DueSince.reset();
         return false;
     }

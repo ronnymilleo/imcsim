@@ -6,6 +6,7 @@
 #ifndef IMCSIM_SCHEMATIC_H
 #define IMCSIM_SCHEMATIC_H
 
+#include "analysis/monte_carlo_results.h"
 #include "analysis/parameter_step.h"
 #include "document/schematic_file.h"
 #include "document/simulation_settings.h"
@@ -178,10 +179,18 @@ public:
     void SelectACSweepStep(std::size_t step);
     void SetDCSweep(std::optional<Core::DCSweep> sweep);
     const std::optional<Core::DCSweep> &GetDCSweep() const;
+    void SetMonteCarlo(MonteCarloTable table);
+    const std::optional<MonteCarloTable> &GetMonteCarlo() const;
     void SetNoise(std::optional<Core::Noise> noise);
     const std::optional<Core::Noise> &GetNoise() const;
     void SetTransferFunction(std::optional<Core::TransferFunction> transfer_function);
     const std::optional<Core::TransferFunction> &GetTransferFunction() const;
+    void SetSensitivity(std::optional<Core::Sensitivity> sensitivity);
+    const std::optional<Core::Sensitivity> &GetSensitivity() const;
+    void SetPoleZero(std::optional<Core::PoleZero> pole_zero);
+    const std::optional<Core::PoleZero> &GetPoleZero() const;
+    void SetSParameters(std::optional<Core::SParameters> s_parameters);
+    const std::optional<Core::SParameters> &GetSParameters() const;
     void SetTruthTable(std::optional<Core::TruthTable> truth_table);
     const std::optional<Core::TruthTable> &GetTruthTable() const;
     std::size_t GetOperatingPointVersion() const;
@@ -189,8 +198,12 @@ public:
     std::size_t GetTransientDataVersion() const;
     std::size_t GetACSweepVersion() const;
     std::size_t GetDCSweepVersion() const;
+    std::size_t GetMonteCarloVersion() const;
     std::size_t GetNoiseVersion() const;
     std::size_t GetTransferFunctionVersion() const;
+    std::size_t GetSensitivityVersion() const;
+    std::size_t GetPoleZeroVersion() const;
+    std::size_t GetSParametersVersion() const;
     std::size_t GetTruthTableVersion() const;
 
 private:
@@ -270,8 +283,13 @@ private:
     /// Every step of a stepped AC sweep, or none.
     std::optional<StepFamily<Core::ACSweep>> m_ACSweepSteps;
     std::optional<Core::DCSweep> m_DCSweep;
+    /// What every run of the last Monte Carlo analysis drew and measured, or none.
+    std::optional<MonteCarloTable> m_MonteCarlo;
     std::optional<Core::Noise> m_Noise;
     std::optional<Core::TransferFunction> m_TransferFunction;
+    std::optional<Core::Sensitivity> m_Sensitivity;
+    std::optional<Core::PoleZero> m_PoleZero;
+    std::optional<Core::SParameters> m_SParameters;
     std::optional<Core::TruthTable> m_TruthTable;
     // Result versions, which change with every new result, so windows can tell a rerun from one they showed
     std::size_t m_OperatingPointVersion = 0;
@@ -280,11 +298,16 @@ private:
     std::size_t m_TransientDataVersion = 0;
     std::size_t m_ACSweepVersion = 0;
     std::size_t m_DCSweepVersion = 0;
+    std::size_t m_MonteCarloVersion = 0;
     std::size_t m_NoiseVersion = 0;
     std::size_t m_TransferFunctionVersion = 0;
+    std::size_t m_SensitivityVersion = 0;
+    std::size_t m_PoleZeroVersion = 0;
+    std::size_t m_SParametersVersion = 0;
     std::size_t m_TruthTableVersion = 0;
 
     void InvalidateDerivedData();
+    void ClearMonteCarlo();
     void FollowVoltageProbes();
     void RefreshInstances(const SavedSubcircuit &definition, const std::vector<std::string> &old_names,
                           const std::vector<std::optional<std::size_t>> &matches);

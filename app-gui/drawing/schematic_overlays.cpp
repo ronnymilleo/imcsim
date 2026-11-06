@@ -5,10 +5,13 @@
 
 #include "drawing/schematic_overlays.h"
 
+#include "analysis/fuse_readings.h"
 #include "analysis/logic_outputs.h"
+#include "analysis/sensitivity_view.h"
 #include "components/logic_input.h"
 #include "components/subcircuit.h"
 #include "drawing/current_flow.h"
+#include "drawing/fuse_flash.h"
 #include "drawing/heat_glow.h"
 #include "drawing/led_glow.h"
 #include "drawing/node_colors.h"
@@ -16,6 +19,7 @@
 #include "drawing/theme.h"
 #include "editing/live_input.h"
 #include "spice/spice_value.h"
+#include "ui_elements/ui_fuse.h"
 #include "ui_elements/ui_logic_input.h"
 #include "ui_elements/ui_logic_output.h"
 #include "ui_elements/ui_seven_segment.h"
@@ -124,6 +128,8 @@ void SchematicOverlays::Update(Schematic &schematic, const AnalysisControls &con
     const auto &transient = schematic.GetTransient();
     const bool show_transient = transient && !transient->Times.empty() &&
                                 (!operating_point || controls.GetLastRun() != Analysis::OPERATING_POINT);
+    UpdateFuses(schematic, show_transient ? &*transient : nullptr,
+                show_transient ? std::optional(m_Playback.Time) : std::nullopt);
     if (!show_transient && !operating_point) {
         return;
     }
@@ -152,11 +158,53 @@ void SchematicOverlays::Update(Schematic &schematic, const AnalysisControls &con
         state.Scale = ScaleOf(state.Point, elements, connectivity);
     }
     state.Powers = ComputePowers(elements, connectivity, state.Point);
+    state.FuseBlowTimes = m_FuseBlowTimes;
     state.LogicReadings.resize(elements.size());
     for (std::size_t index = 0; index < elements.size(); ++index) {
         state.LogicReadings[index] = ReadLogicDisplay(*elements[index], connectivity, state.Point);
     }
     m_Displayed = std::move(state);
+}
+
+/**
+ * @brief   Tells each fuse whether the result on display shows it open, and how strong the flash of its blow still is.
+ * @param[in,out] schematic  The schematic being edited, whose fuses are told.
+ * @param[in]     shown      The transient on display, or none when the schematic shows an operating point or nothing,
+ *                           which see every fuse whole.
+ * @param[in]     instant    Instant of the transient on display.
+ * @details The flash starts when a fuse is seen going from whole to open between two frames, so a result that arrives
+ *          with a fuse already blown does not flash, and it lasts FUSE_FLASH_SECONDS of the screen clock, whatever the
+ *          speed of the playback.
+ */
+void SchematicOverlays::UpdateFuses(Schematic &schematic, const Core::Transient *shown,
+                                    const std::optional<double> instant) {
+    const auto &elements = schematic.GetElements();
+    if (shown == nullptr) {
+        m_FuseBlowTimes.clear();
+        m_FuseBlowTimesVersion.reset();
+    } else if (m_FuseBlowTimesVersion != schematic.GetTransientDataVersion() ||
+               m_FuseBlowTimes.size() != elements.size()) {
+        m_FuseBlowTimes = FindFuseBlowTimes(elements, schematic.GetConnectivity(), *shown);
+        m_FuseBlowTimesVersion = schematic.GetTransientDataVersion();
+    }
+    const bool has_previous_frame = shown != nullptr && m_WasFuseBlown.size() == elements.size();
+    std::vector<bool> is_blown(elements.size(), false);
+    m_FuseBlownSince.resize(elements.size(), 0.0);
+    const bool is_flash_on = m_Preferences.IsEffectOn(LiveEffect::FUSE);
+    const double now = ImGui::GetTime();
+    for (std::size_t index = 0; index < elements.size(); ++index) {
+        if (elements[index]->GetComponent().GetType() != Core::ComponentType::FUSE) {
+            continue;
+        }
+        is_blown[index] = shown != nullptr && IsFuseBlownAt(m_FuseBlowTimes[index], instant);
+        if (is_blown[index] && has_previous_frame && !m_WasFuseBlown[index]) {
+            m_FuseBlownSince[index] = now;
+        }
+        const float flash_level =
+            is_flash_on && is_blown[index] ? GetFuseFlashLevel(now - m_FuseBlownSince[index]) : 0.0f;
+        static_cast<UIFuse &>(*elements[index]).SetDisplayState(is_blown[index], flash_level);
+    }
+    m_WasFuseBlown = shown != nullptr ? std::move(is_blown) : std::vector<bool>();
 }
 
 /**
@@ -237,7 +285,7 @@ void SchematicOverlays::DrawElements(SchematicCanvas &canvas, const ViewTransfor
         elements[index]->Draw(canvas, view, GetElementColor(schematic, index), m_Preferences.Symbols);
         DrawLogicReading(canvas, view, *elements[index], index);
         if (schematic.IsElementSelected(index)) {
-            if (ArePartsHeatColored()) {
+            if (ArePartsHeatColored(schematic)) {
                 elements[index]->DrawOutline(canvas, view, GetPalette().Selected);
             }
         } else if (marks_live_parts && GetLiveAction(elements[index]->GetComponent().GetType()) != LiveAction::NONE) {
@@ -342,42 +390,50 @@ void SchematicOverlays::DrawHoveredValue(const MeasurementTarget &target, Schema
             text += std::format("\nP({}) = {}W", power->Name, Core::FormatValue(power->Power));
         }
     }
+    if (!target.Node) {
+        const auto &elements = schematic.GetElements();
+        for (std::size_t index = 0; index < elements.size() && index < m_Displayed->FuseBlowTimes.size(); ++index) {
+            const std::optional<double> blow_time = m_Displayed->FuseBlowTimes[index];
+            if (blow_time && elements[index]->GetComponent().GetName() == target.Current &&
+                IsFuseBlownAt(blow_time, m_Displayed->Time)) {
+                text += std::format("\n{} blew at t = {}s", target.Current, Core::FormatValue(*blow_time));
+            }
+        }
+    }
     ImGui::SetTooltip("%s", text.c_str());
 }
 
 /**
  * @brief   Draws a gradient with the values at its ends at the bottom left of the canvas, or a reminder to run an
- *          operating point or a transient.
+ *          operating point, a transient or a sensitivity analysis.
  * @param[in] draw_list  Where to draw.
  * @param[in] origin     Top left corner of the canvas, in screen pixels.
  * @param[in] size       Size of the canvas, in pixels.
- * @note    Nothing shows unless the preferences color by voltage, current or power.
+ * @param[in,out] schematic  Whose sensitivity result the legend of the Sensitivity coloring reads, and whose nets name
+ *                          its output.
+ * @note    Nothing shows unless the preferences color by voltage, current, power or sensitivity.
  */
-void SchematicOverlays::DrawColorLegend(ImDrawList *draw_list, const ImVec2 origin, const ImVec2 size) const {
+void SchematicOverlays::DrawColorLegend(ImDrawList *draw_list, const ImVec2 origin, const ImVec2 size,
+                                        Schematic &schematic) const {
     if (m_Preferences.WireColors != WireColoring::VOLTAGE && m_Preferences.WireColors != WireColoring::CURRENT &&
-        m_Preferences.WireColors != WireColoring::POWER) {
+        m_Preferences.WireColors != WireColoring::POWER && m_Preferences.WireColors != WireColoring::SENSITIVITY) {
         return;
     }
     const float font_size = ImGui::GetFontSize();
     const ImVec2 corner = {origin.x + font_size, origin.y + size.y - font_size * 2.0f};
-    if (!m_Displayed) {
+    const std::optional<LegendLabels> labels = GetLegendLabels(schematic);
+    if (!labels) {
+        const bool is_sensitivity = m_Preferences.WireColors == WireColoring::SENSITIVITY;
         draw_list->AddText(corner, GetPalette().CanvasText,
-                           "Run an operating point (.op) or a transient to color by voltage, current or power");
+                           is_sensitivity
+                               ? "Run a sensitivity analysis to color the parts by their influence on its output"
+                               : "Run an operating point (.op) or a transient to color by voltage, current or power");
         return;
     }
-
-    const HeatScale &scale = m_Displayed->Scale;
-    std::string low_label;
-    std::string high_label;
-    if (m_Preferences.WireColors == WireColoring::VOLTAGE) {
-        low_label = std::format("{}V", Core::FormatValue(scale.LowestVoltage));
-        high_label = std::format("{}V", Core::FormatValue(scale.HighestVoltage));
-    } else if (m_Preferences.WireColors == WireColoring::CURRENT) {
-        low_label = std::format("<{}A", Core::FormatValue(scale.LargestCurrent * std::pow(10.0, -CURRENT_DECADES)));
-        high_label = std::format("{}A", Core::FormatValue(scale.LargestCurrent));
-    } else {
-        low_label = std::format("<{}W", Core::FormatValue(scale.LargestPower * std::pow(10.0, -POWER_DECADES)));
-        high_label = std::format("{}W", Core::FormatValue(scale.LargestPower));
+    const std::string &low_label = labels->Low;
+    const std::string &high_label = labels->High;
+    if (!labels->Title.empty()) {
+        draw_list->AddText({corner.x, corner.y - font_size - 2.0f}, GetPalette().CanvasText, labels->Title.c_str());
     }
     const ImVec2 bar_size = {font_size * LEGEND_WIDTH, font_size * LEGEND_HEIGHT};
     for (int step = 0; step < LEGEND_STEPS; ++step) {
@@ -457,8 +513,11 @@ ImU32 SchematicOverlays::GetWireColor(const int node) const {
  *          heats each part by the largest current through its terminals, and coloring by power by the power it absorbs.
  */
 ImU32 SchematicOverlays::GetElementColor(const Schematic &schematic, const std::size_t index) const {
-    if (schematic.IsElementSelected(index) && !ArePartsHeatColored()) {
+    if (schematic.IsElementSelected(index) && !ArePartsHeatColored(schematic)) {
         return GetPalette().Selected;
+    }
+    if (m_Preferences.WireColors == WireColoring::SENSITIVITY) {
+        return GetSensitivityColor(schematic, index);
     }
     const bool by_current = m_Preferences.WireColors == WireColoring::CURRENT;
     if ((!by_current && m_Preferences.WireColors != WireColoring::POWER) || !m_Displayed) {
@@ -482,6 +541,20 @@ ImU32 SchematicOverlays::GetElementColor(const Schematic &schematic, const std::
             current, std::abs(GetTerminalCurrent(component, terminal, m_Displayed->Point.Currents).value_or(0.0)));
     }
     return GetHeatColor(CurrentLevel(current, m_Displayed->Scale.LargestCurrent));
+}
+
+/**
+ * @brief   A part takes the heat color of its influence on the output of the last sensitivity analysis; a part the
+ *          analysis does not list, such as a diode or a ground, keeps the color of the theme.
+ */
+ImU32 SchematicOverlays::GetSensitivityColor(const Schematic &schematic, const std::size_t index) const {
+    const auto &sensitivity = schematic.GetSensitivity();
+    if (!sensitivity) {
+        return GetPalette().Element;
+    }
+    const std::optional<float> level =
+        FindSensitivityLevel(*sensitivity, schematic.GetElements()[index]->GetComponent().GetName());
+    return level ? GetHeatColor(*level) : GetPalette().Element;
 }
 
 /**
@@ -516,6 +589,43 @@ void SchematicOverlays::DrawLogicReading(SchematicCanvas &canvas, const ViewTran
 }
 
 /**
+ * @brief   The values at the two ends of the legend, in the unit of what the schematic is colored by.
+ * @param[in,out] schematic  Whose sensitivity result the Sensitivity coloring reads, and whose nets name its output.
+ * @return  The labels, or no value while there is no result to color by.
+ */
+std::optional<SchematicOverlays::LegendLabels> SchematicOverlays::GetLegendLabels(Schematic &schematic) const {
+    if (m_Preferences.WireColors == WireColoring::SENSITIVITY) {
+        const auto &sensitivity = schematic.GetSensitivity();
+        if (!sensitivity) {
+            return std::nullopt;
+        }
+        // The legend reads the change for 1 % of the value, as the table does
+        const double largest_per_percent = GetLargestSensitivity(*sensitivity) / SENSITIVITY_PERCENT;
+        return LegendLabels{
+            .Low = std::format("<{}V", Core::FormatValue(largest_per_percent * std::pow(10.0, -SENSITIVITY_DECADES))),
+            .High = std::format("{}V", Core::FormatValue(largest_per_percent)),
+            .Title = std::format("Change of {} per 1 %",
+                                 GetVoltageLabel(schematic.GetConnectivity(), sensitivity->OutputNode))};
+    }
+    if (!m_Displayed) {
+        return std::nullopt;
+    }
+    const HeatScale &scale = m_Displayed->Scale;
+    if (m_Preferences.WireColors == WireColoring::VOLTAGE) {
+        return LegendLabels{.Low = std::format("{}V", Core::FormatValue(scale.LowestVoltage)),
+                            .High = std::format("{}V", Core::FormatValue(scale.HighestVoltage))};
+    }
+    if (m_Preferences.WireColors == WireColoring::CURRENT) {
+        return LegendLabels{
+            .Low = std::format("<{}A", Core::FormatValue(scale.LargestCurrent * std::pow(10.0, -CURRENT_DECADES))),
+            .High = std::format("{}A", Core::FormatValue(scale.LargestCurrent))};
+    }
+    return LegendLabels{.Low =
+                            std::format("<{}W", Core::FormatValue(scale.LargestPower * std::pow(10.0, -POWER_DECADES))),
+                        .High = std::format("{}W", Core::FormatValue(scale.LargestPower))};
+}
+
+/**
  * @brief   Voltage and Current color the wires with the heat scale, once there is a result to color them by.
  */
 bool SchematicOverlays::AreWiresHeatColored() const {
@@ -524,9 +634,13 @@ bool SchematicOverlays::AreWiresHeatColored() const {
 }
 
 /**
- * @brief   Current and Power color the parts with the heat scale, once there is a result to color them by.
+ * @brief   Current and Power color the parts with the heat scale, once there is a result to color them by, and
+ *          Sensitivity once there is a sensitivity analysis.
  */
-bool SchematicOverlays::ArePartsHeatColored() const {
+bool SchematicOverlays::ArePartsHeatColored(const Schematic &schematic) const {
+    if (m_Preferences.WireColors == WireColoring::SENSITIVITY) {
+        return schematic.GetSensitivity().has_value();
+    }
     return m_Displayed &&
            (m_Preferences.WireColors == WireColoring::CURRENT || m_Preferences.WireColors == WireColoring::POWER);
 }

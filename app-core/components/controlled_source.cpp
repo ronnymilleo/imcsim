@@ -48,6 +48,7 @@ double DefaultGain(const ComponentType type) {
     case ComponentType::PUSH_BUTTON:
     case ComponentType::V_SWITCH:
     case ComponentType::RELAY:
+    case ComponentType::FUSE:
     case ComponentType::TRANSFORMER:
     case ComponentType::AND:
     case ComponentType::OR:

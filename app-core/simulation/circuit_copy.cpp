@@ -35,6 +35,9 @@ CircuitCopy::CircuitCopy(const Circuit &circuit) {
     for (const LibraryModel &model : circuit.GetLibraryModels()) {
         m_Circuit.AddLibraryModel(model);
     }
+    for (const CircuitPort &port : circuit.GetPorts()) {
+        m_Circuit.AddPort(port);
+    }
 }
 
 /**

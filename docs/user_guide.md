@@ -33,6 +33,12 @@ How to read what imcsim measures, plots and exports. The [README](../README.md) 
 - **Switches that follow a voltage**: a voltage-controlled switch has its threshold, hysteresis and resistances in its
   properties, and a relay its coil and contact figures. Both are drawn open, since they open and close during a run.
   The Switching examples use them: a buck converter and a relay driver with a flyback diode.
+- **Fuses**: a fuse is in the Switches and fuses group of the toolbar. Its properties pick a ready fuse (100 mA, 500 mA,
+  1 A and 5 A fast, 1 A slow-blow) or set its rated current, melting I2t and cold and blown resistance, and show the
+  cooling time constant they imply. A fuse carries its rated current for ever and blows above it, open for the rest of
+  the run: the branch loses its current at that instant, the symbol breaks with a gap, and the Output window warns when
+  it blew. A fuse inside a block is simulated, but its blow is not drawn or warned about. Every run starts with a whole fuse, and an operating point, a DC sweep and an AC sweep always see it closed.
+  The Protection example compares a fast and a slow-blow fuse (see docs/models.md).
 - **Transformers**: the value of a transformer is its primary inductance, and its properties set the turns ratio, the
   coupling and the resistance of the windings. The secondary needs a path to ground, such as the bridge of the
   Transformers examples.
@@ -114,7 +120,7 @@ How to read what imcsim measures, plots and exports. The [README](../README.md) 
 - **Find a part**: press Space over the editor, type part of a name (`mos`, `zener`, `opamp`, `nmos`, `vcvs`), move
   with Up and Down, and press Enter to start placing it.
 - **Running**: the ▶ button at the end of the toolbar, or F5, runs the analysis named beside it. That button opens
-  the list of analyses (operating point, transient, AC sweep, DC sweep, noise, transfer function and truth table) and the settings
+  the list of analyses (operating point, transient, AC sweep, DC sweep, noise, transfer function, sensitivity, poles and zeros, S-parameters and truth table) and the settings
   of the one picked, saved with the schematic. Suggest fills the transient times (five periods of the slowest source with a waveform, 200
   points in a period of the fastest) or the AC range (two decades past the RC, RL and LC corners and the op-amp
   bandwidths). By default nothing runs by itself: edit the circuit, then run again, or turn on Run again after edits
@@ -138,10 +144,13 @@ How to read what imcsim measures, plots and exports. The [README](../README.md) 
   asks. The math channels are worked out over the whole run, so an integral starts at the start of the simulation, and
   they wait, grayed out, for the end of a run that is still going on. The spectrum uses the whole run too. The other analyses stop between their steps (the values
   of a stepped analysis, the combinations of a truth table) and drop their result, and a single simulation finishes
-  first. Editing the circuit also stops the run and drops what it made, since the answer would no longer fit.
+  first; a Monte Carlo analysis keeps the runs made ("Stopped after 40 of 100 runs"). Editing the circuit also stops the run and drops what it made, since the answer would no longer fit.
 - **Status bar**: below the schematic, the keys of the current mode on the left; on the right, the grid position of
   the cursor and how the last run went ("Transient done", with warnings, or failed). Click the result for the
-  errors, the warnings and the ngspice output.
+  errors, the warnings and the ngspice output. Among the warnings are the safe operating area ones: a diode, LED,
+  Zener, transistor or MOSFET that a run pushes past its ratings (diode average forward current and power, and the VCE, IC,
+  VDS, VGS, ID and power of transistors) is named with the value and the rating. Ratings are fields of a part's
+  properties (IF max, the average forward current, P max, ...) and are only checked for ready and custom models, not for library ones.
 - **Menus**: File (files, import of schematics and of SPICE libraries, examples and the schematic export), Edit (undo,
   redo, changes to the selection, blocks and Preferences) and View (fit, wire colors, live effects, theme, and the windows). On macOS the shortcuts use Cmd where
   this guide says Ctrl: Cmd+S saves, Cmd+Z undoes.
@@ -258,7 +267,9 @@ right](images/spice_import.png)
 **View > Wire Colors** picks what the wires show. **Plain** keeps them in the theme color and **Nodes** colors each
 wire by its node, numbered on the canvas. **Voltage**, **Current** and **Power** color the wires (Power only the
 parts, since wires carry none) on a heat scale, with a legend at the bottom left. They need a result on the schematic:
-run an operating point or a transient first, or they have nothing to show.
+run an operating point or a transient first, or they have nothing to show. **Sensitivity** colors the parts by their
+influence on the output of a sensitivity analysis (see below) and leaves the wires plain, so it needs that analysis
+run first.
 
 Over these colors a selected wire gets a halo and a selected part an outline in the selection color, instead of turning that color,
 and the voltage labels switch to the text color of the canvas, so neither passes for a value on the scale.
@@ -270,6 +281,9 @@ and the voltage labels switch to the text color of the canvas, so neither passes
   voltage of each terminal times the current into it, so a resistor shows its dissipation and a source that delivers
   power shows it too: colors follow the size of the power, and the hover tooltip gives its sign (negative when the part
   delivers power).
+- **Sensitivity** colors each part the sensitivity analysis lists by the size of its normalized sensitivity, on a
+  logarithmic scale of four decades below the largest one; the legend gives the volts for a 1 % change of the value (titled with
+  the output it refers to), and marks the floor with `<`. Parts the analysis does not list, such as diodes, transistors and ground, keep the theme color.
 
 ## Transient on the schematic
 
@@ -318,7 +332,7 @@ edited.
 
 ## Live effects
 
-**View > Live Effects** turns on effects drawn over any wire coloring, each on its own. Both read what the schematic
+**View > Live Effects** turns on effects drawn over any wire coloring, each on its own. Each reads what the schematic
 shows, an operating point or an instant of a transient, so they show nothing until one runs.
 
 - **Current Flow** slides arrows along the wires in the direction each current goes: the arrows all look and move the
@@ -334,6 +348,10 @@ shows, an operating point or an instant of a transient, so they show nothing unt
 - **Logic Lights** fills the box of every logic input that is high and every logic output that reads 1 with the
   accent color of the theme, as a lit indicator, and lights the segments of the 7-segment displays in that color too;
   with it off, the lit segments take the color of the symbol.
+- **Fuse** bursts a few rays from a fuse for about 150 ms of the screen clock when it blows, as the result on display
+  passes the instant it did (a result that is already open when it appears does not flash). It is on for a new user; the
+  open symbol, with its gap and the word "blown" under it, shows whether the effect is on or not, and hovering the part
+  says when it blew.
 
 ## Terminals
 
@@ -344,7 +362,7 @@ Every part with more than one terminal numbers them in the order the SPICE netli
 |---|---|---|---|
 | Resistor, capacitor, inductor | left end, before rotating | right end | |
 | Potentiometer | end at the left, before rotating | end at the right | wiper, on top |
-| Switch, push button | left contact, before rotating | right contact | |
+| Switch, push button, fuse | left contact, before rotating | right contact | |
 | Voltage-controlled switch (S) | contact, top | contact, bottom | control + (4: control -) |
 | Relay (K) | contact, top | contact, bottom | coil + (4: coil -) |
 | Transformer (T) | primary +, upper left | primary -, lower left | secondary + (4: secondary -), on the right |
@@ -384,6 +402,7 @@ imcsim reports currents as ngspice computes them:
   `I(RV1.W)` for the wiper, each positive into its terminal. The three always add up to zero.
 - **Switches and push buttons** report one current like a two-terminal part, positive from terminal 1 to terminal 2;
   an open one carries picoamperes.
+- **Fuses** report one current like a switch, positive from terminal 1 to terminal 2; a blown one carries nanoamperes.
 - **Relays** report two currents, `I(K1.S)` into the first contact terminal and `I(K1.C)` into the coil +. A
   voltage-controlled switch reports the current into its first contact terminal, like a two-terminal part.
 - **Transformers** report `I(T1.P)` into the primary + and `I(T1.S)` into the secondary +, each positive into its
@@ -514,6 +533,54 @@ Results:
 - ngspice's output lists each step under a `Step R1=10kOhm` line. A step that fails stops the run and names the
   step.
 
+## Monte Carlo
+
+Real parts are not exact: a 1k resistor with a 5 % tolerance may be anything from 950 to 1050 ohm. A Monte Carlo
+analysis runs the transient, the AC sweep or the DC sweep once with every value as it is (the **nominal** run) and then
+once per **run**, each with the values of the parts drawn within their tolerances, and shows how a result spreads.
+
+**Setting it up**
+
+1. Give the parts a tolerance: select a resistor, capacitor, inductor or DC voltage source and fill **Tolerance** (in
+   percent, above 0 and up to 50) in its properties. With a series picked in Preferences (E12, E24...), the properties
+   offer **Use E24 (5%)**, the tolerance of that series. An empty field means the part keeps its value in every run.
+   In the analysis settings, **Tolerance of all** gives every resistor, capacitor or inductor one percent at once, and
+   **Clear all** takes the tolerances away. A source only varies while it is a DC one.
+2. Pick the transient, AC sweep or DC sweep and set **Run mode** to **Monte Carlo** (the other modes are **Single
+   run** and **Step a parameter**; only one is on). Live mode and a second stepped source of the DC sweep do not go
+   with it.
+3. Set **Runs** (2 to 1000, 100 at first), the **Distribution** and the **Seed**, and run.
+
+**Distribution.** *Gaussian* takes the tolerance as three standard deviations and never draws a value beyond it, so
+most parts land near their value; *uniform* draws any value within the tolerance with the same chance. Every part is
+drawn on its own.
+
+**Seed.** The same seed draws the same values, on any computer, and run 17 of a seed is the same whether or not the
+runs before it were made. **New seed** picks another one. The seed is saved with the schematic, so a saved analysis can
+be repeated.
+
+**Blocks.** The parts inside a block are not varied yet: a block with a toleranced part refuses the run and names the
+block and the parts; clear their tolerance, or take the parts out of the block.
+
+**Results.** The transient and the AC sweep plot the runs as the stepped ones are plotted: the **shown step** is
+**Nominal** or **Run n**, in full colors, and the others are faint; the DC sweep draws one curve per run. Only the
+first 100 runs keep their curves, since a thousand transients would not fit in memory; every run keeps its
+measurements. Runs that fail to converge are skipped, and a warning counts them and lists the first ones; the nominal
+run has to work. Stop keeps the runs made.
+
+The **Monte Carlo** tab of the Output window shows:
+
+- a **histogram** of one quantity measured on one node in every run, with a line at the nominal value. The quantities
+  are the ones the statistics of the other tabs read: for a transient the mean, RMS, peak to peak and frequency; for
+  an AC sweep the upper and lower -3 dB frequency, peak gain, unity-gain frequency and phase margin; for a DC sweep the
+  minimum, maximum and mean;
+- on the right, the nominal reading and, over the drawn runs, their count, mean, standard deviation (with n - 1),
+  minimum, maximum and the 1 % and 99 % percentiles;
+- a **table of runs** with the value each part took and the quantity shown; click a header to sort, which puts the
+  worst case first, and click a row to show that run in the transient or AC sweep tab (a row beyond the first 100
+  runs has no curve to show);
+- **Export runs...** saves every run, the values of the parts and all the measurements as a CSV table.
+
 ## Spectrum
 
 The Spectrum tab shows the frequency content of the measured transient traces, as a spectrum analyzer would, and
@@ -530,9 +597,50 @@ measures their harmonic distortion.
 - **Hann** window (default): suits any stretch, but needs at least 5 periods of the fundamental in it.
   **Rectangular**: sharper peaks, and works from 3 periods, but only reads right over a whole number of periods,
   such as cursors placed exactly some periods apart; otherwise each tone leaks across the spectrum.
+- A trace with no tone standing out of the floor around its strongest peak (at least 20 dB above the median of the
+  bins next to it) is read as noise: the panel then gives its **Density** and **Noise** instead of a fundamental, THD
+  and harmonics, and asks for no periods. The **Noise density** checkbox, which opens by itself when every trace is
+  noise (and then also turns the frequency axis logarithmic), plots the spectrum of the noise traces as a density in
+  V/√Hz (A/√Hz) on logarithmic axes; traces with a tone have no density and are left out of that view. The density
+  does not depend on the stretch or the window; hover the plot for the density at a frequency.
 - The resolution is one over the stretch: 10 ms resolves 100 Hz. The transient is read between its points by
   straight lines, which leaves a floor around -130 dB for a sine at 200 points per period; a smaller time step
   lowers it.
+
+### Noise and random sources
+
+A voltage or current source set to **Noise** adds noise to a transient on top of its Offset, and one set to
+**Random** makes random values. Both show up in the Spectrum tab as a floor.
+
+- **White rms** is the rms of the Gaussian white noise and **Sample step** the time between its samples; the output is
+  a straight line between them. The line under the fields gives the density, the white rms times the square root of
+  twice the step (`rms * sqrt(2 * step)` in V/√Hz or A/√Hz), and says it is flat up to `1 / (2 * step)`. For 100 mV
+  and 10 us that is 447 uV/√Hz up to 50 kHz.
+- The dB plot shows the floor as the peak of a sine per bin, so it depends on the stretch: with the Hann window a bin
+  of width `df` reads `sqrt(2 * density^2 * 1.5 * df)`, and a longer stretch lowers the floor. The tab does the
+  division for you, `density = amplitude / sqrt(2 * 1.5 * df)` (1 in place of 1.5 for the Rectangular window): its
+  **Density** is the level of the floor over the frequencies the plot shows (the band is cut in up to 8 slices,
+  and the middle of the medians of the slices within 3 dB of the highest one is the level, so a part of the band past
+  where the noise rolls off does not pull it down; the first bins, where the
+  window spreads the mean, are left out), and **Noise** the rms of the noise over the whole band, which does
+  include that part. The noise example's input is a flat 1 mV/√Hz, and its Density reads a little under that (about
+  0.7 to 1 mV/√Hz), since the straight lines between the samples already take some off from 4 kHz.
+- **1/f amplitude** with an **exponent** between 0 and 2 (both excluded) adds flicker noise, which falls 10 dB per
+  decade of frequency at an exponent of 1. **Telegraph** adds a signal that jumps between 0 and its amplitude, staying
+  up **Capture time** and down **Emission time** on average. An amplitude of 0 turns the part off.
+- The step also steps the simulation: ngspice computes a point at each sample, so a step much shorter than the time
+  step gives many points. A run that would span more than a million points is refused, noise steps included.
+- The noise changes on each run. The **Seed** of the transient settings (0 draws new ones) makes the Random sources and
+  the telegraph part repeat, but never the white and 1/f noise, which ngspice does not seed. A seeded Gaussian
+  Random source repeats only every other run in one session, since ngspice keeps half of its last pair of Gaussian
+  values for the next run; the other distributions repeat every run.
+- **Random** holds a new value every **Sample step**, after the **Delay**, from a distribution whose two parameters
+  are called after it: uniform (range around the offset), Gaussian (standard deviation, mean), exponential (mean,
+  offset) or Poisson (lambda, offset).
+- A source has one waveform, so noise on top of a sine or a pulse takes a second Noise source in series with the
+  first.
+- The AC sweep, operating point and DC sweep see only the offset. The noise analysis is separate: it computes the
+  noise of the parts and ignores these sources.
 
 ## Noise
 
@@ -581,6 +689,138 @@ The Transfer function tab of the Output window is a table of three values:
 An output an ideal voltage source holds has an output impedance of 0 Ohm, and an input path held open reads as
 `open` rather than a giant number. The table is a readout like the operating point, so it is not exported.
 
+## Sensitivity
+
+The Sensitivity analysis tells which parts matter most for one node voltage: ngspice's `.sens` changes the value of
+every part a little, one at a time, around the DC operating point, and reports how much the voltage of the output moves.
+Pick it beside Run, then set **Output**, the node whose voltage is measured, picked as in the noise analysis and kept by
+a point of its node. A circuit with logic gates or flip-flops cannot run it (ngspice cannot recover from it), and the
+analysis is disabled with that reason as its tooltip.
+
+The parts listed are resistors, capacitors, inductors, voltage and current sources and supply rails (their DC value),
+and the gain of controlled sources. A potentiometer counts as its total resistance, the sum of its two halves. A block
+is listed by the element inside it that matters most, named as `X2.R1`. Diodes, transistors, op-amps, switches, relays,
+fuses, transformers and logic parts are not listed, and the model parameters of diodes and transistors are not shown:
+ngspice reports them, but unreliably.
+
+The Sensitivity tab of the Output window is a table sorted by influence, with a click on a row selecting the part:
+
+- **Value**: the value of the part, when the result carries it (not for an element inside a block).
+- **Absolute**: the change of the output voltage per unit of the value, in V/Ohm, V/F, V/H or V/V.
+- **Per 1 %**: the change of the output voltage, in volts, for a value 1 % higher. This normalized sensitivity compares
+  parts of different kinds, which the absolute one does not, and it is what the colors follow.
+- **Share of largest**: the size of the part's normalized sensitivity as a share of the largest one.
+
+The sign says the direction: negative means a higher value lowers the output voltage, positive that it raises it. A
+voltage source's row is the share of the output it gives, and a capacitor, which is open at DC, reads zero.
+
+It is a small-signal DC analysis at the operating point, so a circuit driven only by AC sources has no DC output to
+move and reads zero everywhere; give it a DC level, or use the AC sweep instead. The table is a readout like the
+operating point, so it is not exported. To see the same values on the schematic, tick **Color the schematic** at the top of the tab, which is the same as
+**View > Wire Colors > Sensitivity**; untick it to go back to plain wires. The legend then reads "Change of V(out) per
+1 %", with the volts for a 1 % change at its two ends. A supply rail is named in the table as on the schematic, such
+as `VCC 12V`; clicking its row still selects it.
+
+## Poles and zeros
+
+The Poles and zeros analysis finds where the transfer function from a source to a node has its poles and zeros, which
+say how the circuit responds: poles set the corners of a Bode plot and its resonances, zeros its notches and where it
+turns up. Pick it beside Run, then set **Output**, the node whose voltage is measured, and **Input**, the source that
+drives the circuit, both picked as in the Transfer function analysis. A voltage source (or supply rail, clock or logic
+input) gives the voltage gain from it to the node, and a current source the transimpedance in ohms.
+
+The roots belong to the circuit linearized at its DC operating point and only to the part between the input and the
+output, with the source's other terminal and every supply rail taken as AC ground. A circuit with no capacitor or
+inductor between them has none, which reads as an error. Circuits with logic gates or flip-flops cannot run it, and the
+analysis is disabled with that reason as its tooltip.
+
+The Poles and zeros tab of the Output window has the s-plane at the top, with the table under it. Real parts run across and imaginary parts up,
+both in rad/s, with a **×** for each pole and a **○** for each zero; a complex pair is drawn as its two members.
+The axes are symmetric logarithmic, so roots decades apart stay visible (they start at 10 rad/s, with 0 in the middle),
+and **Linear axes** shows their true spacing.
+Hover a mark to read its kind and frequency. A root in the right half-plane is drawn and listed in the warning color:
+it means the circuit is unstable at its operating point, or that ngspice's solver got it wrong; compare it with an AC
+sweep.
+
+The table has one row per real root and per complex pair:
+
+- **Real** and **Imaginary**: the root in rad/s; a pair reads `+/-` before its imaginary part.
+- **Frequency**: the natural frequency, the size of the root over 2π, in Hz. For a first-order pole it is the corner of
+  the Bode plot.
+- **Q** and **Damping**: the quality factor, the size of the root over twice its real part, and the damping ratio, one
+  over twice Q, for complex pairs; a real root reads a dash, and a pair on the imaginary axis an infinite Q.
+
+A pole and a zero at the same place cancel, so they are left out and the note under the plot counts them: ngspice
+reports such pairs for parts the signal never reaches. A warning above the plot says when ngspice gave up searching for
+some roots, so some may be missing.
+
+To compare with the Bode plot, run the AC sweep too and tick **Show poles and zeros** on its tab: each pole and zero is
+a dashed vertical line at its natural frequency on both plots, colored as in the s-plane, and labelled on the magnitude
+plot (`p 5.03k` for a pole, `z` for a zero). A second-order low-pass reaches
+its -3 dB point near its natural frequency, a little above it when Q is over 0.71.
+
+ngspice's pole-zero solver is not reliable on every circuit. It can find nothing without saying why, as with some ideal
+op-amp circuits at certain gain-bandwidth products (try another product or a real op-amp model), and it may leave out
+roots or return wrong ones; treat the result as a check on the AC sweep rather than as the last word. The table is a
+readout like the operating point, so it is not exported.
+
+## S-parameters
+
+The S-parameters analysis measures how a circuit scatters a signal between its ports, as a network analyzer does:
+S11 is the share of the wave sent into port 1 that comes back (the reflection), and S21 the share that arrives at
+port 2 (the transmission). Waves are normalized to the reference impedance of each port, 50 ohm by default, so an S11
+of 0 is a perfect match and an S21 of 0 dB passes everything.
+
+**Ports**: the ports are Block pin markers of the top-level schematic. Select a marker, turn on **S-parameter port**
+in its properties, and set its **Number** and **Z0**. A new port takes the lowest number no other marker uses; the
+numbers must run from 1 to N with no gap and no repeat, and the symbol reads `P1`, `P2 (OUT)`. A marker that is not a
+port does nothing here, and a port is invisible to every other analysis: only in an S-parameter run does imcsim put a
+source and the reference impedance at its node. Inside a block, port settings are kept and ignored. The analysis needs two
+or more ports in all, a Ground in the circuit, a node of its own for each port (not ground, not shared) and a Z0 above
+zero; imcsim says which is wrong before it runs.
+
+**Measuring a one-port**: the analysis needs two ports, as ngspice refuses a single one. Add a second port on an
+isolated node, with nothing connected to it: S11 is then the reflection of the first port, and S22 reads 1.
+
+**Bias**: a port holds its node at 0 V in DC and loads the circuit with its reference impedance, so a node that has a
+bias belongs behind a capacitor (or an inductor, for a port on a supply line), as the bias tee of a network analyzer
+does. The circuit's own sources keep their DC value and are AC ground for the measurement.
+
+**Settings**: pick S-parameters beside Run, then the **Start** and **Stop** frequencies (1 MHz to 1 GHz by default),
+the **Sweep** type and the points: log with points per decade (100 by default), or linear with the number of points in all (at least 3,
+since ngspice gives a single point for two). The settings are saved with the schematic. Circuits with logic gates or
+flip-flops cannot run it, and the analysis is disabled with that reason as its tooltip.
+
+The **S-parameters** tab of the Output window has:
+
+- **Entries shown**: a checkbox for every entry S(row, column) of the matrix. Each view keeps its own choice: the
+  Smith chart is for reflections, so it starts with S11, S22... checked and no transmission, while the magnitude and
+  phase plots start with S11 and S21. Check S21 on the chart too if you want it.
+- **Smith chart**: each checked entry is a curve of its reflection coefficient over the circles of constant resistance
+  (0.2, 0.5, 1, 2 and 5 times the reference) and the arcs of constant reactance (labelled `+j0.5`, `-j2`...), on
+  equal axes; a dot marks the first frequency. A point inside the chart is passive; an S21 above 1 leaves the outer
+  circle, and the chart grows to show it.
+- **Magnitude and phase**: the checked entries in decibels (20 log |S|) over their phase in degrees, on a logarithmic
+  frequency axis shared by both plots.
+- **Readings**: hover a curve for its frequency, magnitude in decibels and angle. A reflection (S11, S22...) also reads
+  the impedance the port sees, absolute and normalized, computed from S as Z0 (1 + S) / (1 - S), the VSWR,
+  (1 + |S|) / (1 - |S|), and the return loss, -20 log |S| (positive when the port absorbs power); an open circuit or a
+  perfect match reads infinite.
+
+**Exports**: Export... saves the plot shown as an SVG image (the Smith chart or the magnitude and phase panels, redrawn
+from the data, in the light or dark theme) or as a CSV table with the frequency and the real and imaginary parts of each
+checked entry. **Save Touchstone...** opens a small popup for the frequency unit and format, then writes the whole
+matrix as a Touchstone version 1 file, `.sNp` for N ports, in the frequency unit (Hz, kHz, MHz or GHz) and format you
+pick there: RI (real and imaginary parts), MA (magnitude and angle in
+degrees) or DB (decibels and angle in degrees). The default, the one most tools write, is `# GHz S MA R 50`. A two-port
+lists its entries as S11 S21 S12 S22, as the format says, which is not the order of the matrix; larger matrices go row
+by row, four pairs to a line. The file holds one reference impedance, so ports with different Z0 cannot be exported
+and the message names them.
+
+The S-parameters example (Examples > Basics) is a T low-pass of two 8 uH inductors and a 3.18 nF capacitor between two
+50 ohm ports: S11 starts at the center of the chart, matched, and sweeps out to the rim as the inductors block the
+signal, while S21 stays near 0 dB up to about 1 MHz.
+
 ## Truth table
 
 The Truth table analysis builds the truth table of a digital circuit: it sets the logic inputs to every combination,
@@ -609,7 +849,8 @@ the Run report says how many. The table is not exported as a figure, like the op
 - **SVG image**: redrawn from the data, not captured from the screen, so it stays sharp at any size. It shows the
   visible X range, so zoom in first to export a detail. Choose its size in pixels and its theme: light for print,
   which darkens trace colors too light for white paper, or dark, in the colors of the Graphite theme.
-- **CSV table**: every sample of every measured trace, including math channels, whatever the zoom. The first column
+- **CSV table**: every sample of every measured trace, including math channels, whatever the zoom (the S-parameters
+  tab lists the real and imaginary parts of the checked entries, and also saves Touchstone files). The first column
   is the X axis; each header carries its unit, and on a Bode plot its panel (`Magnitude V(2) (dB)`). Missing
   samples, such as a division by zero in a math channel, are empty cells.
 

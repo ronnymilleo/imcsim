@@ -11,6 +11,7 @@
 #include "components/component.h"
 #include "components/controlled_source.h"
 #include "components/diode.h"
+#include "components/fuse.h"
 #include "components/logic_input.h"
 #include "components/logic_output.h"
 #include "components/logic_part.h"
@@ -22,6 +23,7 @@
 #include "components/seven_segment.h"
 #include "components/source.h"
 #include "components/subcircuit.h"
+#include "components/subcircuit_pin.h"
 #include "components/switch.h"
 #include "components/transformer.h"
 #include "components/voltage_controlled_switch.h"
@@ -73,6 +75,10 @@ private:
     ValueField m_Value;
     /// Voltage a capacitor or current an inductor starts a transient from; empty when none is set.
     ValueField m_InitialCondition;
+    /// Percent the value may be off in a Monte Carlo run; empty when the part keeps its value.
+    ValueField m_Tolerance;
+    /// Reference impedance of the pin marker that is an S-parameter port.
+    ValueField m_PortReference;
     /// The net name being typed for a net label.
     std::array<char, 40> m_Net{};
     /// The name being typed for the part, applied when the field is left.
@@ -87,10 +93,12 @@ private:
     std::array<ValueField, 6> m_EXPFields;
     std::array<ValueField, 5> m_SFFMFields;
     std::array<ValueField, 5> m_AMFields;
+    std::array<ValueField, 8> m_NoiseFields;
+    std::array<ValueField, 4> m_RandomFields;
     /// The "time value" points of a PWL source being typed, as long as the user wants them.
     std::string m_PWLText;
     // One per member of the parameters of custom diodes, transistors and op-amps
-    std::array<ValueField, 9> m_DiodeFields;
+    std::array<ValueField, 11> m_DiodeFields;
     std::array<ValueField, 16> m_BJTFields;
     std::array<ValueField, 13> m_MOSFETFields;
     std::array<ValueField, 11> m_OpAmpFields;
@@ -98,6 +106,8 @@ private:
     std::array<ValueField, 4> m_SwitchFields;
     /// One per member of Core::RelayParameters.
     std::array<ValueField, 5> m_RelayFields;
+    /// One per member of Core::FuseParameters.
+    std::array<ValueField, 4> m_FuseFields;
     /// One per member of Core::TransformerParameters.
     std::array<ValueField, 3> m_TransformerFields;
     /// One per member of Core::LogicParameters.
@@ -124,13 +134,16 @@ private:
     bool DrawModeledPart(Core::Component &component);
     bool DrawSettingPart(Core::Component &component);
     void DrawSubcircuit(Core::SubcircuitInstance &instance);
+    void DrawPortSettings(Core::SubcircuitPinMarker &marker);
     void DrawValue(Core::Component &component);
     bool DrawParameterChoice(Core::Component &component);
     void DrawInitialCondition(Core::Component &component);
+    void DrawTolerance(Core::Component &component);
     void DrawWiper(Core::Potentiometer &pot);
     void DrawSwitch(Core::Switch &contact);
     void DrawControlledSwitch(Core::VoltageControlledSwitch &controlled);
     void DrawRelay(Core::Relay &relay);
+    void DrawFuse(Core::Fuse &fuse);
     void DrawTransformer(Core::Transformer &transformer);
     void DrawLogicPart(Core::LogicPart &part);
     void DrawClock(Core::Clock &clock);
@@ -143,12 +156,15 @@ private:
     void DrawMOSFET(Core::MOSFET &mosfet);
     void DrawOpAmp(Core::OpAmp &op_amp);
     void DrawSource(Core::Source &source);
+    void DrawSourceTypes(Core::Source &source);
     void DrawSine(Core::Source &source);
     void DrawPulse(Core::Source &source);
     void DrawEXP(Core::Source &source);
     void DrawSFFM(Core::Source &source);
     void DrawAM(Core::Source &source);
     void DrawPWL(Core::Source &source);
+    void DrawNoise(Core::Source &source);
+    void DrawRandom(Core::Source &source);
     void DrawControlledSource(Core::ControlledSource &source);
     void DrawControllingCurrent(Core::ControlledSource &source);
 };

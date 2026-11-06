@@ -5,6 +5,7 @@
 
 #include "part_editor.h"
 
+#include "document/subcircuit_pins.h"
 #include "drawing/theme.h"
 #include "editing/element_factory.h"
 #include "editing/live_input.h"
@@ -14,6 +15,7 @@
 #include <algorithm>
 #include <array>
 #include <cfloat>
+#include <cmath>
 #include <cstddef>
 #include <format>
 #include <optional>
@@ -71,6 +73,38 @@ constexpr auto EXP_FIELDS = std::to_array<ParameterField<Core::EXPParameters>>({
     {"Fall tau", &Core::EXPParameters::FallTimeConstant, "s"},
 });
 
+constexpr auto NOISE_FIELDS = std::to_array<ParameterField<Core::NoiseParameters>>({
+    {"Offset", &Core::NoiseParameters::Offset, nullptr},
+    {"White rms", &Core::NoiseParameters::WhiteAmplitude, nullptr},
+    {"Sample step", &Core::NoiseParameters::TimeStep, "s"},
+    {"1/f exponent", &Core::NoiseParameters::FlickerExponent, ""},
+    {"1/f amplitude", &Core::NoiseParameters::FlickerAmplitude, nullptr},
+    {"Telegraph", &Core::NoiseParameters::TelegraphAmplitude, nullptr},
+    {"Capture time", &Core::NoiseParameters::CaptureTime, "s"},
+    {"Emission time", &Core::NoiseParameters::EmissionTime, "s"},
+});
+
+/// What the first and second parameters of each distribution are called; Poisson lambda is a count, with no unit.
+struct RandomLabels {
+    const char *First;
+    const char *Second;
+    const char *FirstUnit;
+};
+
+constexpr RandomLabels GetRandomLabels(const Core::RandomDistribution distribution) {
+    switch (distribution) {
+    case Core::RandomDistribution::UNIFORM:
+        return {"Range +/-", "Offset", nullptr};
+    case Core::RandomDistribution::EXPONENTIAL:
+        return {"Mean", "Offset", nullptr};
+    case Core::RandomDistribution::POISSON:
+        return {"Lambda", "Offset", ""};
+    case Core::RandomDistribution::GAUSSIAN:
+    default:
+        return {"Std deviation", "Mean", nullptr};
+    }
+}
+
 constexpr auto SFFM_FIELDS = std::to_array<ParameterField<Core::SFFMParameters>>({
     {"Offset", &Core::SFFMParameters::Offset, nullptr},
     {"Amplitude", &Core::SFFMParameters::Amplitude, nullptr},
@@ -98,6 +132,8 @@ constexpr auto DIODE_FIELDS = std::to_array<ParameterField<Core::DiodeParameters
     {"VJ", &Core::DiodeParameters::JunctionPotential, "V"},
     {"M", &Core::DiodeParameters::GradingCoefficient, ""},
     {"TT", &Core::DiodeParameters::TransitTime, "s"},
+    {"IF max", &Core::DiodeParameters::MaxForwardCurrent, "A"},
+    {"P max", &Core::DiodeParameters::MaxPower, "W"},
 });
 
 constexpr auto BJT_FIELDS = std::to_array<ParameterField<Core::BJTParameters>>({
@@ -163,6 +199,13 @@ constexpr auto RELAY_FIELDS = std::to_array<ParameterField<Core::RelayParameters
     {"Pull-in", &Core::RelayParameters::PullInVoltage, "V"},
     {"Drop-out", &Core::RelayParameters::DropOutVoltage, "V"},
     {"Contact R", &Core::RelayParameters::ContactResistance, "Ohm"},
+});
+
+constexpr auto FUSE_FIELDS = std::to_array<ParameterField<Core::FuseParameters>>({
+    {"Rated current", &Core::FuseParameters::RatedCurrent, "A"},
+    {"Melting I2t", &Core::FuseParameters::MeltingI2t, "A2s"},
+    {"Cold R", &Core::FuseParameters::ColdResistance, "Ohm"},
+    {"Blown R", &Core::FuseParameters::BlownResistance, "Ohm"},
 });
 
 constexpr auto TRANSFORMER_FIELDS = std::to_array<ParameterField<Core::TransformerParameters>>({
@@ -305,10 +348,10 @@ bool HasFields(const Core::Component &component) {
     if (component.HasValue() || Core::IsSwitch(type) || Core::IsLogicPart(type) || Core::IsSubcircuitPin(type)) {
         return true;
     }
-    static constexpr auto OTHER_TYPES =
-        std::to_array({Core::ComponentType::NET_LABEL, Core::ComponentType::SUBCIRCUIT, Core::ComponentType::V_SWITCH,
-                       Core::ComponentType::RELAY, Core::ComponentType::CLOCK, Core::ComponentType::LOGIC_INPUT,
-                       Core::ComponentType::LOGIC_OUTPUT, Core::ComponentType::SEVEN_SEGMENT});
+    static constexpr auto OTHER_TYPES = std::to_array(
+        {Core::ComponentType::NET_LABEL, Core::ComponentType::SUBCIRCUIT, Core::ComponentType::V_SWITCH,
+         Core::ComponentType::RELAY, Core::ComponentType::FUSE, Core::ComponentType::CLOCK,
+         Core::ComponentType::LOGIC_INPUT, Core::ComponentType::LOGIC_OUTPUT, Core::ComponentType::SEVEN_SEGMENT});
     return std::ranges::contains(OTHER_TYPES, type);
 }
 
@@ -337,8 +380,9 @@ bool ShowsValueFields(const Core::Component &component) {
     }
     // The switches that follow a voltage, the logic parts, a clock and the logic inputs and outputs have only their
     // parameters
-    if (type == Core::ComponentType::V_SWITCH || type == Core::ComponentType::RELAY || Core::IsLogicPart(type) ||
-        type == Core::ComponentType::CLOCK || type == Core::ComponentType::LOGIC_INPUT || Core::IsLogicDisplay(type)) {
+    if (type == Core::ComponentType::V_SWITCH || type == Core::ComponentType::RELAY ||
+        type == Core::ComponentType::FUSE || Core::IsLogicPart(type) || type == Core::ComponentType::CLOCK ||
+        type == Core::ComponentType::LOGIC_INPUT || Core::IsLogicDisplay(type)) {
         return true;
     }
     return component.HasValue();
@@ -472,6 +516,9 @@ void PartEditor::DrawFields(Core::Component &component) {
             DrawInitialCondition(component);
         }
     }
+    if (component.SupportsTolerance()) {
+        DrawTolerance(component);
+    }
 }
 
 /**
@@ -505,6 +552,8 @@ bool PartEditor::DrawSettingPart(Core::Component &component) {
         DrawControlledSwitch(static_cast<Core::VoltageControlledSwitch &>(component));
     } else if (type == Core::ComponentType::RELAY) {
         DrawRelay(static_cast<Core::Relay &>(component));
+    } else if (type == Core::ComponentType::FUSE) {
+        DrawFuse(static_cast<Core::Fuse &>(component));
     } else if (Core::IsLogicPart(type)) {
         DrawLogicPart(static_cast<Core::LogicPart &>(component));
     } else if (type == Core::ComponentType::CLOCK) {
@@ -591,6 +640,10 @@ void PartEditor::LoadFields(const Core::Component &component) {
     m_NameError.clear();
     m_Value.Load(component.GetValue());
     m_InitialCondition.LoadOptional(component.GetInitialCondition());
+    m_Tolerance.LoadOptional(component.GetTolerance());
+    if (Core::IsSubcircuitPin(component.GetType())) {
+        m_PortReference.Load(static_cast<const Core::SubcircuitPinMarker &>(component).GetPort().ReferenceOhms);
+    }
     if (component.GetType() == Core::ComponentType::NET_LABEL || Core::IsSubcircuitPin(component.GetType())) {
         const std::string &net = static_cast<const Core::NetLabel &>(component).GetNet();
         m_Net.fill('\0');
@@ -606,6 +659,11 @@ void PartEditor::LoadFields(const Core::Component &component) {
         LoadParameterFields(EXP_FIELDS, m_EXPFields, source.GetEXP());
         LoadParameterFields(SFFM_FIELDS, m_SFFMFields, source.GetSFFM());
         LoadParameterFields(AM_FIELDS, m_AMFields, source.GetAM());
+        LoadParameterFields(NOISE_FIELDS, m_NoiseFields, source.GetNoise());
+        m_RandomFields[0].Load(source.GetRandom().TimeStep);
+        m_RandomFields[1].Load(source.GetRandom().Delay);
+        m_RandomFields[2].Load(source.GetRandom().First);
+        m_RandomFields[3].Load(source.GetRandom().Second);
         m_PWLText = Core::FormatPWLPoints(source.GetPWL().Points);
     }
     LoadModelFields(component);
@@ -661,6 +719,8 @@ void PartEditor::LoadSettingFields(const Core::Component &component) {
                             static_cast<const Core::VoltageControlledSwitch &>(component).GetParameters());
     } else if (type == Core::ComponentType::RELAY) {
         LoadParameterFields(RELAY_FIELDS, m_RelayFields, static_cast<const Core::Relay &>(component).GetParameters());
+    } else if (type == Core::ComponentType::FUSE) {
+        LoadParameterFields(FUSE_FIELDS, m_FuseFields, static_cast<const Core::Fuse &>(component).GetParameters());
     } else if (Core::IsLogicPart(type)) {
         LoadParameterFields(LOGIC_FIELDS, m_LogicFields,
                             static_cast<const Core::LogicPart &>(component).GetParameters());
@@ -704,9 +764,51 @@ void PartEditor::DrawNetLabel(Core::NetLabel &label) {
                                   : "1 to 32 letters, digits, _, - or .");
     } else if (is_pin) {
         ImGui::TextDisabled("The arrow points from the block's edge into the circuit; turn it to pick the edge");
+        DrawPortSettings(static_cast<Core::SubcircuitPinMarker &>(label));
     } else {
         ImGui::TextDisabled("Labels with the same name are one net; 0 and GND are ground, VCC is the supplies");
     }
+}
+
+/**
+ * @brief   Whether the marker is a port of the S-parameter analysis, with its number and reference impedance.
+ * @details Turning it on takes the lowest number no other port has. Only the markers of the top-level schematic count;
+ *          inside a block they are ignored. A port holds its node at 0 V in DC, so it belongs behind a capacitor where
+ *          the node is biased.
+ */
+void PartEditor::DrawPortSettings(Core::SubcircuitPinMarker &marker) {
+    Core::PortSettings port = marker.GetPort();
+    ImGui::Separator();
+    if (ImGui::Checkbox("S-parameter port", &port.IsPort)) {
+        if (port.IsPort) {
+            port.Number = FindFreePortNumber(m_Schematic->GetElements(), &marker);
+        }
+        marker.SetPort(port);
+        m_Schematic->MarkModified();
+    }
+    ImGui::SetItemTooltip("Makes this marker a port of the S-parameter analysis, with a source and a reference "
+                          "impedance at its node. The port holds the node at 0 V in DC and loads the circuit with its "
+                          "impedance, so couple it through a capacitor where the node has a bias. It counts only in "
+                          "the top-level schematic and is invisible in every other analysis");
+    if (!port.IsPort) {
+        return;
+    }
+    DrawFieldLabel("Number");
+    if (ImGui::InputInt("##port_number", &port.Number, 0)) {
+        port.Number = std::max(port.Number, 1);
+        marker.SetPort(port);
+        m_Schematic->MarkModified();
+    }
+    if (IsPortNumberTaken(m_Schematic->GetElements(), port.Number, &marker)) {
+        ImGui::TextColored(GetErrorTextColor(), "Port %d is already used by another marker", port.Number);
+    }
+    if (const std::optional<double> reference =
+            m_PortReference.Draw("Z0", "Ohm", [](const double value) { return value > 0.0; })) {
+        port.ReferenceOhms = *reference;
+        marker.SetPort(port);
+        m_Schematic->MarkModified();
+    }
+    ImGui::TextDisabled("Ports are numbered 1 to N with no gap; the analysis needs two or more");
 }
 
 void PartEditor::DrawValue(Core::Component &component) {
@@ -784,6 +886,37 @@ void PartEditor::DrawInitialCondition(Core::Component &component) {
 }
 
 /**
+ * @brief   The percent the value may be off in a Monte Carlo run; an empty field means the part keeps its value. A
+ *          voltage source only varies while it is a DC one, and the series of standard values of the preferences
+ *          offers its own tolerance for a resistor, capacitor or inductor.
+ */
+void PartEditor::DrawTolerance(Core::Component &component) {
+    const bool is_source = Core::IsSource(component.GetType());
+    if (is_source && static_cast<const Core::Source &>(component).GetSourceType() != Core::Source::SourceType::DC) {
+        return;
+    }
+    const GUI::OptionalValueEdit edit = m_Tolerance.DrawOptional(
+        "Tolerance", "%", [](const double percent) { return percent > 0.0 && percent <= Core::MAX_TOLERANCE_PERCENT; });
+    if (edit.Changed) {
+        if (edit.Value) {
+            component.SetTolerance(*edit.Value);
+        } else {
+            component.ClearTolerance();
+        }
+        m_Schematic->MarkModified();
+    }
+    const double series_percent = Core::GetSeriesTolerancePercent(m_Preferences.ValueSeries);
+    if (!is_source && !component.HasTolerance() && series_percent > 0.0 &&
+        ImGui::SmallButton(
+            std::format("Use {} ({:g}%)", Core::GetSeriesName(m_Preferences.ValueSeries), series_percent).c_str())) {
+        component.SetTolerance(series_percent);
+        m_Tolerance.LoadOptional(component.GetTolerance());
+        m_Schematic->MarkModified();
+    }
+    ImGui::TextDisabled("Monte Carlo draws the value within it; empty keeps the value");
+}
+
+/**
  * @brief   The switch closes above the threshold plus the hysteresis, and opens below the threshold minus it.
  */
 void PartEditor::DrawControlledSwitch(Core::VoltageControlledSwitch &controlled) {
@@ -812,6 +945,40 @@ void PartEditor::DrawRelay(Core::Relay &relay) {
         m_Schematic->MarkModified();
     }
     ImGui::TextDisabled("The contact follows the coil current, so it lags by L over R");
+}
+
+/**
+ * @brief   A combo of ready fuses fills the figures, which stay editable, and the cooling time constant that they
+ *          imply is shown read-only.
+ */
+void PartEditor::DrawFuse(Core::Fuse &fuse) {
+    Core::FuseParameters parameters = fuse.GetParameters();
+    const std::span<const Core::ReadyFuse> ready_fuses = Core::GetReadyFuses();
+    const auto matching = std::ranges::find(ready_fuses, parameters, &Core::ReadyFuse::Parameters);
+    const Core::ReadyFuse *selected = matching != ready_fuses.end() ? &*matching : nullptr;
+    DrawFieldLabel("Ready fuse");
+    if (ImGui::BeginCombo("##ReadyFuse", selected != nullptr ? selected->Name : "Custom")) {
+        for (const Core::ReadyFuse &ready : ready_fuses) {
+            const bool is_selected = &ready == selected;
+            if (ImGui::Selectable(ready.Name, is_selected) && !is_selected) {
+                fuse.SetParameters(ready.Parameters);
+                LoadParameterFields(FUSE_FIELDS, m_FuseFields, ready.Parameters);
+                m_Schematic->MarkModified();
+            }
+        }
+        ImGui::EndCombo();
+    }
+    parameters = fuse.GetParameters();
+    const auto is_valid = [](const Core::FuseParameters &candidate) {
+        return Core::Fuse::IsValidParameters(candidate);
+    };
+    if (DrawParameterFields(FUSE_FIELDS, m_FuseFields, "", is_valid, parameters)) {
+        fuse.SetParameters(parameters);
+        m_Schematic->MarkModified();
+    }
+    ImGui::TextDisabled("Cooling time constant: %ss",
+                        Core::FormatValue(Core::GetCoolingTimeConstant(parameters)).c_str());
+    ImGui::TextDisabled("Never blows below the rated current; blows open for the rest of the run, and starts whole");
 }
 
 /**
@@ -1012,18 +1179,7 @@ void PartEditor::DrawOpAmp(Core::OpAmp &op_amp) {
 
 void PartEditor::DrawSource(Core::Source &source) {
     using SourceType = Core::Source::SourceType;
-    for (const SourceType type : {SourceType::DC, SourceType::AC, SourceType::PULSE, SourceType::EXP, SourceType::SFFM,
-                                  SourceType::AM, SourceType::PWL}) {
-        if (type != SourceType::DC) {
-            ImGui::SameLine();
-        }
-        if (ImGui::RadioButton(Core::GetSourceTypeName(type), source.GetSourceType() == type) &&
-            source.GetSourceType() != type) {
-            source.SetSourceType(type);
-            m_Schematic->MarkModified();
-        }
-    }
-
+    DrawSourceTypes(source);
     switch (source.GetSourceType()) {
     case SourceType::DC: {
         const char *label = source.GetType() == Core::ComponentType::CURRENT_SOURCE ? "Current" : "Voltage";
@@ -1051,6 +1207,34 @@ void PartEditor::DrawSource(Core::Source &source) {
     case SourceType::PWL:
         DrawPWL(source);
         break;
+    case SourceType::NOISE:
+        DrawNoise(source);
+        break;
+    case SourceType::RANDOM:
+        DrawRandom(source);
+        break;
+    default:
+        break;
+    }
+}
+
+/**
+ * @brief   Draws the choice of waveform of a source, one radio button per kind, on two rows.
+ * @param[in,out] source  Source whose waveform is chosen.
+ */
+void PartEditor::DrawSourceTypes(Core::Source &source) {
+    using SourceType = Core::Source::SourceType;
+    for (const SourceType type : {SourceType::DC, SourceType::AC, SourceType::PULSE, SourceType::EXP, SourceType::SFFM,
+                                  SourceType::AM, SourceType::PWL, SourceType::NOISE, SourceType::RANDOM}) {
+        // Nine buttons do not fit one row
+        if (type != SourceType::DC && type != SourceType::NOISE) {
+            ImGui::SameLine();
+        }
+        if (ImGui::RadioButton(Core::GetSourceTypeName(type), source.GetSourceType() == type) &&
+            source.GetSourceType() != type) {
+            source.SetSourceType(type);
+            m_Schematic->MarkModified();
+        }
     }
 }
 
@@ -1125,6 +1309,77 @@ void PartEditor::DrawPWL(Core::Source &source) {
     } else {
         ImGui::TextDisabled("For example: 0 0, 1m 5, 2m 0");
     }
+}
+
+/**
+ * @brief   The density below the fields is what the Spectrum tab of a run shows as a floor: the white noise is flat up
+ * to half the sampling rate.
+ */
+void PartEditor::DrawNoise(Core::Source &source) {
+    Core::NoiseParameters noise = source.GetNoise();
+    const auto is_valid = [&source](const Core::NoiseParameters &candidate) { return source.IsValidNoise(candidate); };
+    if (DrawParameterFields(NOISE_FIELDS, m_NoiseFields, source.GetUnit(), is_valid, noise)) {
+        source.SetNoise(noise);
+        m_Schematic->MarkModified();
+    }
+    if (noise.WhiteAmplitude > 0.0 && noise.TimeStep > 0.0) {
+        const double density = noise.WhiteAmplitude * std::sqrt(2.0 * noise.TimeStep);
+        ImGui::TextDisabled("%s", std::format("White noise: {}{}/rtHz, flat up to {}Hz", Core::FormatValue(density),
+                                              source.GetUnit(), Core::FormatValue(0.5 / noise.TimeStep))
+                                      .c_str());
+    }
+    ImGui::TextDisabled("1/f amplitude, telegraph amplitude and white rms at 0 turn that part off");
+    ImGui::TextDisabled("Noise changes on each run; for noise over a signal, put a second source in series");
+}
+
+/**
+ * @brief   The labels of the two parameters follow the distribution, as the ngspice TRRANDOM source defines them.
+ */
+void PartEditor::DrawRandom(Core::Source &source) {
+    Core::RandomParameters random = source.GetRandom();
+    DrawFieldLabel("Distribution");
+    if (ImGui::BeginCombo("##distribution", Core::GetRandomDistributionName(random.Distribution))) {
+        for (const Core::RandomDistribution distribution :
+             {Core::RandomDistribution::UNIFORM, Core::RandomDistribution::GAUSSIAN,
+              Core::RandomDistribution::EXPONENTIAL, Core::RandomDistribution::POISSON}) {
+            const bool is_selected = distribution == random.Distribution;
+            if (ImGui::Selectable(Core::GetRandomDistributionName(distribution), is_selected) && !is_selected) {
+                random.Distribution = distribution;
+                if (source.IsValidRandom(random)) {
+                    source.SetRandom(random);
+                    m_Schematic->MarkModified();
+                }
+            }
+        }
+        ImGui::EndCombo();
+    }
+    random = source.GetRandom();
+    const RandomLabels labels = GetRandomLabels(random.Distribution);
+    const char *unit = source.GetUnit();
+    const auto is_valid = [&source, &random](double Core::RandomParameters::*member, const double value) {
+        Core::RandomParameters candidate = random;
+        candidate.*member = value;
+        return source.IsValidRandom(candidate);
+    };
+    bool changed = false;
+    const auto draw = [&](ValueField &field, const char *label, const char *field_unit,
+                          double Core::RandomParameters::*member) {
+        if (const std::optional<double> value =
+                field.Draw(label, field_unit, [&](const double candidate) { return is_valid(member, candidate); })) {
+            random.*member = *value;
+            changed = true;
+        }
+    };
+    draw(m_RandomFields[0], "Sample step", "s", &Core::RandomParameters::TimeStep);
+    draw(m_RandomFields[1], "Delay", "s", &Core::RandomParameters::Delay);
+    draw(m_RandomFields[2], labels.First, labels.FirstUnit != nullptr ? labels.FirstUnit : unit,
+         &Core::RandomParameters::First);
+    draw(m_RandomFields[3], labels.Second, unit, &Core::RandomParameters::Second);
+    if (changed) {
+        source.SetRandom(random);
+        m_Schematic->MarkModified();
+    }
+    ImGui::TextDisabled("Each value is held for the sample step; the seed is in the Simulation settings");
 }
 
 /**

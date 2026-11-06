@@ -32,6 +32,27 @@ constexpr auto EXAMPLES = std::to_array<Example>({
         .FileName = "rc_low_pass_filter.imcsim",
     },
     {
+        .Title = "Noise through an RC low-pass filter",
+        .Group = "Basics",
+        .Description = "The 1k and 100n low-pass of the example above, driven by 100 mV rms of white noise, a new "
+                       "sample every 50 us, which is a flat 1 mV per root hertz up to 10 kHz. Run the transient "
+                       "(19 ms, within one window of the plot), then open the Spectrum tab of the Output window: the "
+                       "input floor is flat and the output follows it up to the 1.6 kHz corner and falls beyond it. "
+                       "The noise changes on each run; "
+                       "the seed of the Simulation settings only fixes the Random sources.",
+        .FileName = "noise_through_rc_low_pass.imcsim",
+    },
+    {
+        .Title = "Monte Carlo of an RC low-pass filter",
+        .Group = "Basics",
+        .Description = "The 1k and 100n low-pass again, with the resistor within 5% and the capacitor within 10%. The "
+                       "analysis is an AC sweep run as Monte Carlo: 100 runs with the values drawn within those "
+                       "tolerances, from the seed of the settings, plus the nominal run. Run it and open the Monte "
+                       "Carlo tab of the Output window: the corner frequency spreads over about 11% around the "
+                       "nominal 1.6 kHz, and a click on a row of the table shows that run in the AC sweep tab.",
+        .FileName = "monte_carlo_rc_low_pass.imcsim",
+    },
+    {
         .Title = "LED dimmer with a potentiometer",
         .Group = "Basics",
         .Description =
@@ -59,6 +80,28 @@ constexpr auto EXAMPLES = std::to_array<Example>({
             "for the band-pass response and read its -3 dB band, or the transient to see the output build up "
             "at the 5 kHz of the source.",
         .FileName = "series_rlc.imcsim",
+    },
+    {
+        .Title = "Poles of a series RLC low-pass",
+        .Group = "Basics",
+        .Description =
+            "A 100 Ohm resistor, a 10 mH inductor and a 100n capacitor in series, with the output across the capacitor "
+            "and the Poles and zeros analysis selected. Run it and read the Poles and zeros tab of the Output window: "
+            "one pair of complex poles at -5000 +/- j31225 rad/s, a natural frequency of 5.03 kHz and a quality "
+            "factor of 3.16, and no zeros. Run the AC sweep too and tick Show poles and zeros in its tab: the dashed "
+            "line at 5.03 kHz sits at the peak of the response, which rises about 10 dB there, as Q = 3.16 predicts.",
+        .FileName = "rlc_low_pass_poles_and_zeros.imcsim",
+    },
+    {
+        .Title = "S-parameters of an LC low-pass",
+        .Group = "Basics",
+        .Description =
+            "Two 8 uH inductors and a 3.18 nF capacitor make a T low-pass between two ports, the Block pin markers "
+            "IN and OUT, set as S-parameter ports of 50 Ohm in their properties. Run the S-parameters analysis and "
+            "open its tab: on the Smith chart S11 starts at the center, matched, and sweeps out to the rim as the "
+            "inductors stop the signal, while S21 stays near 0 dB up to about 1 MHz and falls beyond it. Hover a "
+            "point for the impedance, the VSWR and the return loss, or save the matrix as a Touchstone .s2p file.",
+        .FileName = "s_parameters_lc_low_pass.imcsim",
     },
     {
         .Title = "Diode curves",
@@ -134,6 +177,23 @@ constexpr auto EXAMPLES = std::to_array<Example>({
                        "and 18 MHz, from the transistor capacitances. The transient turns a 10 mV, 1 kHz sine into "
                        "an inverted 1.4 V one around 6 V of collector bias.",
         .FileName = "common_emitter_amplifier.imcsim",
+    },
+    {
+        .Title = "Bias sensitivity of a common-emitter stage",
+        .Group = "Transistors",
+        .Description =
+            "The common-emitter amplifier above with the Sensitivity analysis selected and its output at the "
+            "base, where the divider sets the bias. Run it, then tick "
+            "Color the schematic at the top of the Sensitivity tab of the Output window (or choose View > Wire "
+            "Colors > Sensitivity): the parts are colored by how much a change of their value moves "
+            "the DC voltage of the base, hot for the most influential. After the supply, the 51k and 10k "
+            "divider resistors R1 and R2 dominate, by about 1.5 V for 100 % more of either (15 mV per 1 %), with "
+            "opposite "
+            "signs, since a larger R1 lowers the base and a larger R2 raises it; the table of the Sensitivity "
+            "tab in the Output window lists every part with its sign, and the capacitors and the collector "
+            "and load parts barely matter. The transistor itself is not listed: only the values of "
+            "resistors, capacitors, inductors and sources are.",
+        .FileName = "bias_sensitivity.imcsim",
     },
     {
         .Title = "Small-signal model of a BJT",
@@ -225,6 +285,17 @@ constexpr auto EXAMPLES = std::to_array<Example>({
             "after it falls, while the 1N4007 across the coil carries the current that is left and holds "
             "the collector a diode drop above 5 V.",
         .FileName = "relay_driver.imcsim",
+    },
+    {
+        .Title = "Fast and slow-blow fuses",
+        .Group = "Protection",
+        .Description =
+            "A 5 V supply feeds two 4 Ohm loads, 1.2 A each, through a 1 A fast fuse (FU1) and a 1 A slow-blow "
+            "fuse (FU2). Run the transient: FU1 blows after about 0.18 s and FU2 after about 1.2 s, for the same "
+            "overload, and each branch loses its current in the same run; the Output window warns when each blew, "
+            "and a flash marks it on the schematic. A fuse never blows below its rating, and every run starts with "
+            "both whole, so the operating point, a DC sweep and an AC sweep always see them closed.",
+        .FileName = "fuse_fast_and_slow_blow.imcsim",
     },
     {
         .Title = "Transformer power supply",

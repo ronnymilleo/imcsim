@@ -7,6 +7,7 @@
 
 #include "components/subcircuit_pin.h"
 #include <array>
+#include <format>
 #include <memory>
 #include <string>
 
@@ -57,11 +58,17 @@ void UISubcircuitPin::DrawSymbol(SchematicCanvas &canvas, const ViewTransform &v
 }
 
 /**
- * @brief   The name sits beyond the square, outside the circuit, where the block's edge is.
+ * @brief   The name sits beyond the square, outside the circuit, where the block's edge is; a port reads its number
+ *          first, such as "P1" or "P2 (OUT)".
  */
 void UISubcircuitPin::DrawLabels(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color) const {
-    const std::string &name = static_cast<const Core::SubcircuitPinMarker &>(GetComponent()).GetNet();
-    DrawLabel(canvas, view, {SQUARE_FAR - LABEL_GAP, 0.0f}, {-1.0f, 0.0f}, name.empty() ? "?" : name, color);
+    const auto &marker = static_cast<const Core::SubcircuitPinMarker &>(GetComponent());
+    const std::string &name = marker.GetNet();
+    std::string text = name.empty() ? "?" : name;
+    if (const Core::PortSettings &port = marker.GetPort(); port.IsPort) {
+        text = name.empty() ? std::format("P{}", port.Number) : std::format("P{} ({})", port.Number, name);
+    }
+    DrawLabel(canvas, view, {SQUARE_FAR - LABEL_GAP, 0.0f}, {-1.0f, 0.0f}, text, color);
 }
 
 std::vector<GridPoint> UISubcircuitPin::GetLocalTerminals() const {

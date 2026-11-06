@@ -20,7 +20,8 @@ namespace GUI {
  * @brief   Plots the last AC sweep as magnitude and phase on a logarithmic frequency axis, with the response of every
  *          shown trace on the right, as a network analyzer would.
  * @details Both plots share their frequency range and cursors, so zooming one zooms the other. Currents go on the
- *          secondary axis of both, relative to 1 A instead of 1 V.
+ *          secondary axis of both, relative to 1 A instead of 1 V. With a pole-zero result, the plots can mark the
+ *          natural frequency of every pole and zero.
  */
 class ACSweepTab {
 public:
@@ -40,8 +41,11 @@ private:
     PlotCursors m_Cursors;
     /// The visible frequency range, shared by both plots.
     PlotSpan m_View{.From = 1.0, .To = 1e6};
+    /// Whether the plots mark the poles and zeros of the last pole-zero analysis, when there is one.
+    bool m_ShowPoleZero = false;
 
     void DrawPlots(const Core::ACSweep &sweep);
+    void DrawRoots(bool has_labels);
     void DrawStatistics(const Core::ACSweep &sweep);
 };
 

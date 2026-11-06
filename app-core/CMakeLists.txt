@@ -11,6 +11,7 @@ add_library(imcsim-core-lib
             components/controlled_source.cpp
             components/current_source.cpp
             components/diode.cpp
+            components/fuse.cpp
             components/ground.cpp
             components/inductor.cpp
             components/logic_input.cpp
@@ -39,9 +40,14 @@ add_library(imcsim-core-lib
             simulation/analysis_suggestions.cpp
             simulation/circuit_checks.cpp
             simulation/circuit_copy.cpp
+            simulation/fuse_state.cpp
             simulation/live_change.cpp
+            simulation/monte_carlo.cpp
+            simulation/pole_zero.cpp
             simulation/ratings.cpp
             simulation/run_control.cpp
+            simulation/s_parameters.cpp
+            simulation/sensitivity.cpp
             simulation/simulation_backend.cpp
             simulation/simulation_results.cpp
             simulation/simulation_service.cpp

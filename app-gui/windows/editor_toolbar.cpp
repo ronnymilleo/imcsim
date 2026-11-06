@@ -42,8 +42,9 @@ constexpr auto TRANSISTOR_PARTS = std::to_array(
 constexpr auto CONTROLLED_PARTS = std::to_array(
     {Core::ComponentType::VCVS, Core::ComponentType::VCCS, Core::ComponentType::CCCS, Core::ComponentType::CCVS});
 constexpr auto ADJUSTABLE_PARTS = std::to_array({Core::ComponentType::POTENTIOMETER, Core::ComponentType::TRANSFORMER});
-constexpr auto SWITCH_PARTS = std::to_array({Core::ComponentType::SWITCH, Core::ComponentType::PUSH_BUTTON,
-                                             Core::ComponentType::V_SWITCH, Core::ComponentType::RELAY});
+constexpr auto SWITCH_PARTS =
+    std::to_array({Core::ComponentType::SWITCH, Core::ComponentType::PUSH_BUTTON, Core::ComponentType::V_SWITCH,
+                   Core::ComponentType::RELAY, Core::ComponentType::FUSE});
 constexpr auto GATE_PARTS = std::to_array(
     {Core::ComponentType::AND, Core::ComponentType::OR, Core::ComponentType::NOT, Core::ComponentType::NAND,
      Core::ComponentType::NOR, Core::ComponentType::XOR, Core::ComponentType::XNOR, Core::ComponentType::BUFFER});
@@ -55,7 +56,7 @@ constexpr auto PART_GROUPS = std::to_array<PartGroup>({
     {"Transistors", TRANSISTOR_PARTS},
     {"Controlled sources", CONTROLLED_PARTS},
     {"Adjustable parts", ADJUSTABLE_PARTS},
-    {"Switches", SWITCH_PARTS},
+    {"Switches and fuses", SWITCH_PARTS},
     {"Logic gates", GATE_PARTS},
     {"Flip-flops", FLIP_FLOP_PARTS},
 });
@@ -128,7 +129,8 @@ float AnalysisButtonWidth() {
     float widest = 0.0f;
     for (const Analysis analysis :
          {Analysis::OPERATING_POINT, Analysis::TRANSIENT, Analysis::AC_SWEEP, Analysis::DC_SWEEP, Analysis::NOISE,
-          Analysis::TRANSFER_FUNCTION, Analysis::TRUTH_TABLE}) {
+          Analysis::TRANSFER_FUNCTION, Analysis::SENSITIVITY, Analysis::POLE_ZERO, Analysis::S_PARAMETERS,
+          Analysis::TRUTH_TABLE}) {
         widest = std::max(widest, ImGui::CalcTextSize(GetAnalysisName(analysis)).x);
     }
     return widest + ImGui::GetStyle().FramePadding.x * 2.0f + ImGui::GetFontSize();

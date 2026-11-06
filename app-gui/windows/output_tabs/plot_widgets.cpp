@@ -6,6 +6,7 @@
 #include "windows/output_tabs/plot_widgets.h"
 
 #include "analysis/parameter_step.h"
+#include "analysis/pole_zero_view.h"
 #include "drawing/node_colors.h"
 #include "drawing/theme.h"
 #include "editing/probing.h"
@@ -33,6 +34,14 @@ constexpr float DASH_GAP = 0.3f;
 constexpr float DASH_WEIGHT = 1.5f;
 /// Width of the statistics panel, in font sizes.
 constexpr float STATISTICS_WIDTH = 15.0f;
+/// The lines that mark the poles and zeros on a Bode plot are dashed and thin, so they stay visible without hiding the
+/// traces.
+constexpr float ROOT_MARKER_ALPHA = 0.85f;
+constexpr float ROOT_MARKER_DASH = 6.0f;
+constexpr float ROOT_MARKER_GAP = 4.0f;
+constexpr float ROOT_MARKER_WEIGHT = 1.5f;
+/// Labels of the lines take turns in this many rows at the top of the plot.
+constexpr int ROOT_LABEL_ROWS = 3;
 /// Fraction of the visible range where cursor A is placed when turned on.
 constexpr double CURSOR_A_PLACEMENT = 1.0 / 3.0;
 /// Fraction of the visible range where cursor B is placed when turned on.
@@ -743,6 +752,62 @@ void DrawWithStatistics(const std::function<void()> &draw_plots, const std::func
         draw_statistics();
     }
     ImGui::EndChild();
+}
+
+/**
+ * @brief   The color of a pole or a zero, which the s-plane and the Bode plot markers share.
+ * @param[in] is_pole              True for a pole, false for a zero.
+ * @param[in] is_right_half_plane  True for a root with a positive real part, which takes the warning color.
+ * @return  The plot colors one and two for the left half-plane, so a pole and a zero differ.
+ */
+ImVec4 GetPoleZeroColor(const bool is_pole, const bool is_right_half_plane) {
+    if (is_right_half_plane) {
+        return GetWarningTextColor();
+    }
+    return ImPlot::GetColormapColor(is_pole ? 0 : 1);
+}
+
+/**
+ * @brief   Draws a dashed vertical line at the natural frequency of every pole and zero, over a plot with a frequency
+ * in Hz as its X axis, colored as in the s-plane.
+ * @param[in] result      The pole-zero result.
+ * @param[in] has_labels  Whether each line also has its kind and frequency, such as "p 1.07k", at the top of the plot.
+ * @note    Call it inside a plot. Roots at 0 Hz have no place on a logarithmic axis and are left out. The labels are
+ *          staggered in height, so lines close together do not hide each other's.
+ */
+void DrawRootMarkers(const Core::PoleZero &result, const bool has_labels) {
+    ImDrawList *draw_list = ImPlot::GetPlotDrawList();
+    const ImVec2 corner = ImPlot::GetPlotPos();
+    const ImVec2 size = ImPlot::GetPlotSize();
+    const float line_height = ImGui::GetTextLineHeight();
+    ImPlot::PushPlotClipRect();
+    int drawn = 0;
+    for (const bool is_pole : {true, false}) {
+        for (const bool is_right_half_plane : {false, true}) {
+            ImVec4 color = GetPoleZeroColor(is_pole, is_right_half_plane);
+            color.w = ROOT_MARKER_ALPHA;
+            const ImU32 line_color = ImGui::ColorConvertFloat4ToU32(color);
+            for (const double frequency : ListRootFrequencies(result, is_pole, is_right_half_plane)) {
+                const float x = ImPlot::PlotToPixels(frequency, 0.0).x;
+                if (x < corner.x || x > corner.x + size.x) {
+                    continue;
+                }
+                const int dash_count = static_cast<int>(size.y / (ROOT_MARKER_DASH + ROOT_MARKER_GAP)) + 1;
+                for (int dash = 0; dash < dash_count; ++dash) {
+                    const float y = corner.y + static_cast<float>(dash) * (ROOT_MARKER_DASH + ROOT_MARKER_GAP);
+                    draw_list->AddLine({x, y}, {x, std::min(y + ROOT_MARKER_DASH, corner.y + size.y)}, line_color,
+                                       ROOT_MARKER_WEIGHT);
+                }
+                if (has_labels) {
+                    const float label_y = corner.y + 2.0f + static_cast<float>(drawn % ROOT_LABEL_ROWS) * line_height;
+                    const std::string label = std::format("{} {}", is_pole ? "p" : "z", Core::FormatValue(frequency));
+                    draw_list->AddText({x + 3.0f, label_y}, line_color, label.c_str());
+                }
+                ++drawn;
+            }
+        }
+    }
+    ImPlot::PopPlotClipRect();
 }
 
 /**

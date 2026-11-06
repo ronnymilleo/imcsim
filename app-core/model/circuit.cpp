@@ -9,6 +9,7 @@
 #include "components/clock.h"
 #include "components/controlled_source.h"
 #include "components/diode.h"
+#include "components/fuse.h"
 #include "components/logic_input.h"
 #include "components/logic_part.h"
 #include "components/mosfet.h"
@@ -38,6 +39,22 @@ namespace {
 bool IsACSource(const Component &component) {
     return IsSource(component.GetType()) &&
            static_cast<const Source &>(component).GetSourceType() == Source::SourceType::AC;
+}
+
+/**
+ * @brief   The arguments of TRNOISE, with the parts that are off written as 0: ngspice ignores a source with no time
+ *          step and no telegraph amplitude, and takes the step only for the white and 1/f noise.
+ */
+std::string FormatNoiseArguments(const NoiseParameters &noise) {
+    const bool is_flicker_on = noise.FlickerAmplitude != 0.0;
+    const bool is_telegraph_on = noise.TelegraphAmplitude != 0.0;
+    const bool needs_step = noise.WhiteAmplitude != 0.0 || is_flicker_on;
+    return std::format("{} {} {} {} {} {} {}", FormatSpiceValue(noise.WhiteAmplitude),
+                       FormatSpiceValue(needs_step ? noise.TimeStep : 0.0),
+                       FormatSpiceValue(is_flicker_on ? noise.FlickerExponent : 0.0),
+                       FormatSpiceValue(noise.FlickerAmplitude), FormatSpiceValue(noise.TelegraphAmplitude),
+                       FormatSpiceValue(is_telegraph_on ? noise.CaptureTime : 0.0),
+                       FormatSpiceValue(is_telegraph_on ? noise.EmissionTime : 0.0));
 }
 
 /**
@@ -100,8 +117,20 @@ std::string FormatSource(const Source &source, const std::vector<int> &nodes) {
         const std::string first = FormatSpiceValue(pwl.Points.front().Value);
         return std::format("{} DC {} PWL({})\n", start, first, points);
     }
+    case Source::SourceType::NOISE:
+        return std::format("{} DC {} TRNOISE({})\n", start, FormatSpiceValue(source.GetNoise().Offset),
+                           FormatNoiseArguments(source.GetNoise()));
+    case Source::SourceType::RANDOM: {
+        const RandomParameters &random = source.GetRandom();
+        // ngspice adds the DC value to what TRRANDOM gives, so the offset or mean is written once, as the DC value,
+        // which also makes it the operating point; the offset of TRRANDOM itself stays 0
+        return std::format("{} DC {} TRRANDOM({} {} {} {} 0)\n", start, FormatSpiceValue(random.Second),
+                           static_cast<int>(random.Distribution), FormatSpiceValue(random.TimeStep),
+                           FormatSpiceValue(random.Delay), FormatSpiceValue(random.First));
     }
-    return "";
+    default:
+        return "";
+    }
 }
 
 /**
@@ -278,6 +307,9 @@ std::string FormatComponentValue(const Component &component) {
     return FormatSpiceValue(component.GetValue());
 }
 
+/// A fuse needs the Gear integration, since the trapezoidal rule rings for ever on an inductor that an open fuse cuts.
+constexpr std::string_view FUSE_INTEGRATION_OPTION = ".options method=gear\n";
+
 bool IsModelNameCharacter(const char character) {
     return std::isalnum(static_cast<unsigned char>(character)) != 0 || character == '_' || character == '-';
 }
@@ -449,6 +481,10 @@ std::string FormatSubcircuit(const SubcircuitDefinition &definition) {
         if (body.ends_with(".end\n")) {
             body.erase(body.size() - 5);
         }
+        // Options are global and the root netlist writes them once, for the fuses of the blocks too
+        if (const std::size_t option = body.find(FUSE_INTEGRATION_OPTION); option != std::string::npos) {
+            body.erase(option, FUSE_INTEGRATION_OPTION.size());
+        }
     }
     text += ScopeModels(body, definition.Name);
     text += std::format(".ends {}\n", definition.Name);
@@ -524,6 +560,16 @@ void Circuit::AddLibraryModel(LibraryModel model) {
 }
 
 /**
+ * @brief   Adds a port of the S-parameter analysis.
+ * @param[in] port  Port to add; its node counts toward GetNodeCount().
+ * @note    The netlist leaves ports out; the S-parameter run writes them itself.
+ */
+void Circuit::AddPort(const CircuitPort &port) {
+    m_NodeCount = std::max(m_NodeCount, port.Node + 1);
+    m_Ports.push_back(port);
+}
+
+/**
  * @brief   Adds the subcircuit definitions and library models of another circuit, as a circuit derived from it needs.
  * @param[in] other  Circuit whose definitions are shared and whose models are copied.
  */
@@ -568,6 +614,14 @@ std::shared_ptr<const SubcircuitDefinition> Circuit::FindSubcircuit(const std::s
  */
 const std::vector<LibraryModel> &Circuit::GetLibraryModels() const {
     return m_LibraryModels;
+}
+
+/**
+ * @brief   Returns the ports of the S-parameter analysis.
+ * @return  The ports in the order they were added, which is not their number.
+ */
+const std::vector<CircuitPort> &Circuit::GetPorts() const {
+    return m_Ports;
 }
 
 /**
@@ -616,6 +670,15 @@ bool Circuit::HasInitialConditions() const {
 }
 
 /**
+ * @brief   Tells whether the circuit has a fuse.
+ * @return  True when it, or a subcircuit one of its instances uses, contains a fuse, which needs the Gear integration.
+ */
+bool Circuit::HasFuse() const {
+    return std::ranges::any_of(CollectParts(*this),
+                               [](const Component *part) { return part->GetType() == ComponentType::FUSE; });
+}
+
+/**
  * @brief   Writes the circuit as a SPICE netlist, ready to hand to ngspice.
  * @param[in] analysis            Optional analysis command, such as ".op", written right before ".end".
  * @param[in] add_current_probes  Adds a 0 V source in series with every terminal GetCurrentProbes() lists, named
@@ -633,7 +696,8 @@ bool Circuit::HasInitialConditions() const {
  *          both from their terminal to ground. A capacitor or inductor with an initial condition writes it as IC=,
  * which only a transient with uic uses. Probes and the gain stage of each ideal op-amp use nodes numbered after
  * GetNodeCount(), so the circuit nodes keep their numbers. Op-amp macromodels are subcircuits, written after the
- * models.
+ * models. A fuse is an instance of a subcircuit written once with the models, and a circuit with a fuse, in a block or
+ * not, writes ".options method=gear" once.
  */
 std::string Circuit::ToSpiceNetlist(const std::string_view analysis, const bool add_current_probes) const {
     std::string netlist = "* imcsim netlist\n";
@@ -797,6 +861,17 @@ std::string Circuit::ToSpiceNetlist(const std::string_view analysis, const bool 
             AddModelLine(model_name, FormatSwitchModel(model_name, relay.GetContactParameters()), model_names, models);
             break;
         }
+        case ComponentType::FUSE: {
+            // A subcircuit that heats with the current through it; see FormatFuseSubcircuit()
+            const auto &fuse = static_cast<const Fuse &>(component);
+            const FuseParameters &figures = fuse.GetParameters();
+            netlist += std::format("X-{} {} {} {} Ih={} Tau={} Rc={} Rb={}\n", fuse.GetName(), nodes[0], nodes[1],
+                                   GetFuseSubcircuitName(), FormatSpiceValue(figures.RatedCurrent),
+                                   FormatSpiceValue(GetCoolingTimeConstant(figures)),
+                                   FormatSpiceValue(figures.ColdResistance), FormatSpiceValue(figures.BlownResistance));
+            AddModelLine(GetFuseSubcircuitName(), FormatFuseSubcircuit(), model_names, models);
+            break;
+        }
         case ComponentType::TRANSFORMER: {
             // Two inductors, each behind the resistance of its winding, coupled by a K element
             const auto &transformer = static_cast<const Transformer &>(component);
@@ -822,6 +897,9 @@ std::string Circuit::ToSpiceNetlist(const std::string_view analysis, const bool 
         netlist += probes;
     }
     netlist += models;
+    if (HasFuse()) {
+        netlist += FUSE_INTEGRATION_OPTION;
+    }
     netlist += FormatLibraryModels(m_LibraryModels);
     for (const SubcircuitDefinition *definition : OrderByUse(m_Subcircuits)) {
         netlist += FormatSubcircuit(*definition);
@@ -864,7 +942,7 @@ std::vector<const Component *> CollectParts(const Circuit &circuit) {
 /**
  * @brief   Lists the terminals of a component whose current is measured with a probe.
  * @param[in] component  Any component.
- * @return  The anode of a diode part, the first terminal of a switch, every terminal of a transistor or a
+ * @return  The anode of a diode part, the first terminal of a switch or a fuse, every terminal of a transistor or a
  *          potentiometer, the contact and the coil of a relay, the two windings of a transformer, and the first output
  * terminal of a controlled source or the output of an op-amp; nothing for the others, whose currents ngspice reports
  * directly.
@@ -872,7 +950,7 @@ std::vector<const Component *> CollectParts(const Circuit &circuit) {
 std::vector<CurrentProbe> GetCurrentProbes(const Component &component) {
     const ComponentType type = component.GetType();
     if (IsDiode(type) || IsControlledSource(type) || IsSwitch(type) || type == ComponentType::V_SWITCH ||
-        type == ComponentType::OP_AMP) {
+        type == ComponentType::FUSE || type == ComponentType::OP_AMP) {
         return {{0, ""}};
     }
     if (IsLogicGate(type)) {
@@ -1010,8 +1088,8 @@ std::optional<std::string> FindControllingSource(const Circuit &circuit, const s
  * @param[in] component  Any component.
  * @return  The component name for a part that is one element, such as "R1" or "Q1"; the elements of a part written
  *          as several, such as "R-RV1a" and "R-RV1b" for a potentiometer or "X-U1" for an op-amp macromodel, whose
- *          own elements ngspice names after it ("q.x-u1.q1"), and the model, bridges and resistors of a logic part;
- *          nothing for ground, net labels, logic displays and subcircuit pin markers.
+ *          own elements ngspice names after it ("q.x-u1.q1"), "X-FU1" for a fuse subcircuit, and the model, bridges and
+ * resistors of a logic part; nothing for ground, net labels, logic displays and subcircuit pin markers.
  */
 std::vector<std::string> GetElementNames(const Component &component) {
     const std::string &name = component.GetName();
@@ -1027,7 +1105,7 @@ std::vector<std::string> GetElementNames(const Component &component) {
         return {std::format("G-{}", name),   std::format("R-{}", name),   std::format("C-{}", name),
                 std::format("D-{}-P", name), std::format("D-{}-N", name), std::format("E-{}", name)};
     }
-    if (type == ComponentType::OP_AMP) {
+    if (type == ComponentType::OP_AMP || type == ComponentType::FUSE) {
         return {std::format("X-{}", name)};
     }
     if (type == ComponentType::POTENTIOMETER) {

@@ -432,7 +432,7 @@ void EditorWindow::Draw() {
         SetMode(std::move(*next));
     }
     HandleClipboardShortcuts();
-    m_Overlays.DrawColorLegend(draw_list, origin, size);
+    m_Overlays.DrawColorLegend(draw_list, origin, size, *m_Schematic);
 
     draw_list->PopClipRect();
     DrawBlockBar(origin);

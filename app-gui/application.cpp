@@ -486,8 +486,17 @@ void Application::ShowNewResults() {
     show_if_new(m_ShownNoiseVersion, m_Schematic.GetNoiseVersion(), m_Schematic.GetNoise().has_value(), PlotTab::NOISE);
     show_if_new(m_ShownTransferFunctionVersion, m_Schematic.GetTransferFunctionVersion(),
                 m_Schematic.GetTransferFunction().has_value(), PlotTab::TRANSFER_FUNCTION);
+    show_if_new(m_ShownSensitivityVersion, m_Schematic.GetSensitivityVersion(),
+                m_Schematic.GetSensitivity().has_value(), PlotTab::SENSITIVITY);
+    show_if_new(m_ShownPoleZeroVersion, m_Schematic.GetPoleZeroVersion(), m_Schematic.GetPoleZero().has_value(),
+                PlotTab::POLE_ZERO);
+    show_if_new(m_ShownSParametersVersion, m_Schematic.GetSParametersVersion(),
+                m_Schematic.GetSParameters().has_value(), PlotTab::S_PARAMETERS);
     show_if_new(m_ShownTruthTableVersion, m_Schematic.GetTruthTableVersion(), m_Schematic.GetTruthTable().has_value(),
                 PlotTab::TRUTH_TABLE);
+    // After the analyses, so the table of a Monte Carlo run is what shows in front of the traces it came with
+    show_if_new(m_ShownMonteCarloVersion, m_Schematic.GetMonteCarloVersion(), m_Schematic.GetMonteCarlo().has_value(),
+                PlotTab::MONTE_CARLO);
 }
 
 /**
@@ -506,6 +515,7 @@ void Application::RerunAfterEdits() {
         .DocumentVersion = m_Schematic.GetDocumentVersion(),
         .HasRunToFollow = m_AnalysisControls.GetOutcome(selected) != RunOutcome::NONE || running == selected,
         .IsEditing = ImGui::IsAnyItemActive(),
+        .IsMonteCarlo = IsMonteCarloRun(m_Schematic.GetSimulationSettings()),
         .IsRunBlocked = running.has_value() || would_run_live,
     };
     if (m_AutoRerun.Update(frame)) {

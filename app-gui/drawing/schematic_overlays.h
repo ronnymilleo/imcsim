@@ -21,6 +21,7 @@
 #include "simulation/simulation_results.h"
 #include <cstddef>
 #include <optional>
+#include <string>
 #include <vector>
 
 namespace GUI {
@@ -36,6 +37,9 @@ struct DisplayedState {
     HeatScale Scale;
     std::vector<ComponentPower> Powers;
     std::optional<double> Time;
+    /// When each fuse blew in the transient on display, by the index of its element; none for a fuse still whole and
+    /// for the other parts.
+    std::vector<std::optional<double>> FuseBlowTimes;
     /// What the terminals of each logic display read, by the index of its element, in terminal order; empty for the
     /// other parts, and none for a terminal whose node the result has no voltage for.
     std::vector<std::vector<std::optional<LogicState>>> LogicReadings;
@@ -66,9 +70,17 @@ public:
     void DrawGlows(ImDrawList *draw_list, const ViewTransform &view, const Schematic &schematic, float zoom) const;
     void DrawNodeVoltages(ImDrawList *draw_list, const ViewTransform &view, Schematic &schematic) const;
     void DrawHoveredValue(const MeasurementTarget &target, Schematic &schematic) const;
-    void DrawColorLegend(ImDrawList *draw_list, ImVec2 origin, ImVec2 size) const;
+    void DrawColorLegend(ImDrawList *draw_list, ImVec2 origin, ImVec2 size, Schematic &schematic) const;
 
 private:
+    /// The values at the two ends of the legend.
+    struct LegendLabels {
+        std::string Low;
+        std::string High;
+        /// What the colors measure, drawn above the bar, or empty.
+        std::string Title;
+    };
+
     GlowRenderer &m_GlowRenderer;
     /// The instant of the transient shown, and the window of points the scale goes over.
     const TransientPlayback &m_Playback;
@@ -94,12 +106,25 @@ private:
 
     // Parts
     ImU32 GetElementColor(const Schematic &schematic, std::size_t index) const;
+    ImU32 GetSensitivityColor(const Schematic &schematic, std::size_t index) const;
     void DrawLogicReading(SchematicCanvas &canvas, const ViewTransform &view, const UIElement &element,
                           std::size_t index) const;
 
+    // Fuses
+    /// Blow times of the fuses of the transient shown, for the version of its data they were read from.
+    std::vector<std::optional<double>> m_FuseBlowTimes;
+    std::optional<std::size_t> m_FuseBlowTimesVersion;
+    /// Whether each element was a fuse shown open in the last frame; empty when that frame showed no transient.
+    std::vector<bool> m_WasFuseBlown;
+    /// When the screen clock last saw each fuse blow, by element.
+    std::vector<double> m_FuseBlownSince;
+
+    void UpdateFuses(Schematic &schematic, const Core::Transient *shown, std::optional<double> instant);
+
     // Heat colors
+    std::optional<LegendLabels> GetLegendLabels(Schematic &schematic) const;
     bool AreWiresHeatColored() const;
-    bool ArePartsHeatColored() const;
+    bool ArePartsHeatColored(const Schematic &schematic) const;
 };
 
 } // namespace GUI

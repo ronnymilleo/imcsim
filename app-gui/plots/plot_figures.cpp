@@ -49,7 +49,12 @@ ExportAxes GetLinearExportAxes(const std::string &third_unit) {
             .Third = {.Name = third_unit.empty() ? "Math" : third_unit, .Unit = third_unit}};
 }
 
-ExportAxes GetSpectrumExportAxes() {
+ExportAxes GetSpectrumExportAxes(const bool is_density) {
+    if (is_density) {
+        return {.Voltage = {.Name = "Voltage density (V/√Hz)", .Unit = "V/√Hz", .Logarithmic = true},
+                .Current = {.Name = "Current density (A/√Hz)", .Unit = "A/√Hz", .Logarithmic = true},
+                .Third = {.Name = "Math density", .Unit = "", .Logarithmic = true}};
+    }
     return {.Voltage = {.Name = "Voltage (dBV)", .Unit = "dBV", .UsesPrefixes = false},
             .Current = {.Name = "Current (dBA)", .Unit = "dBA", .UsesPrefixes = false},
             .Third = {.Name = "Math (dB)", .Unit = "dB", .UsesPrefixes = false}};
@@ -346,9 +351,12 @@ std::vector<CurveFamily> ListCurveFamilies(const Core::DCSweep &sweep, Schematic
  * @brief   Names a curve of a stepped DC sweep by the value of its stepped source.
  * @param[in] sweep  A stepped DC sweep.
  * @param[in] curve  One of its curves.
- * @return  Such as "V2=5V".
+ * @return  Such as "V2=5V", or "Run 17" for a Monte Carlo run.
  */
 std::string FormatStepLabel(const Core::DCSweep &sweep, const Core::DCSweepCurve &curve) {
+    if (sweep.SteppedSource == MONTE_CARLO_PARAMETER) {
+        return FormatStepValue(sweep.SteppedSource, curve.StepValue, sweep.SteppedUnit);
+    }
     return std::format("{}={}{}", sweep.SteppedSource, Core::FormatValue(curve.StepValue), sweep.SteppedUnit);
 }
 
@@ -407,21 +415,24 @@ ExportFigure BuildTransientFigure(const Core::Transient &transient, const std::v
  * @brief   Builds the figure of the spectra as plotted.
  * @param[in] spectra      Spectra of the measured traces.
  * @param[in] logarithmic  Whether the frequency axis is logarithmic.
+ * @param[in] is_density   Whether the plot shows noise densities, on logarithmic axes, rather than decibels.
  * @param[in] view         The frequencies the plot shows.
  * @return  One panel with every spectrum that is defined over the span.
  */
-ExportFigure BuildSpectrumFigure(const TransientSpectra &spectra, const bool logarithmic, const PlotSpan &view) {
+ExportFigure BuildSpectrumFigure(const TransientSpectra &spectra, const bool logarithmic, const bool is_density,
+                                 const PlotSpan &view) {
     ExportFigure figure;
     figure.XAxis = {.Name = "Frequency", .Unit = "Hz"};
     figure.XLogarithmic = logarithmic;
     figure.Xs = spectra.Frequencies;
     figure.XRange = ExportRange{.From = view.From, .To = view.To};
-    PanelBuilder builder("", GetSpectrumExportAxes());
+    PanelBuilder builder("", GetSpectrumExportAxes(is_density));
     for (const SpectrumTrace &trace : spectra.Traces) {
-        if (trace.Decibels) {
+        // A tone has no density, so the density view leaves it out
+        if (trace.Decibels && (!is_density || trace.Harmonics.IsBroadband)) {
             builder.Add({.Name = trace.Label,
                          .LegendLabel = trace.Label,
-                         .Values = *trace.Decibels,
+                         .Values = is_density ? trace.Densities : *trace.Decibels,
                          .Color = ToExportColor(trace.Color),
                          .Dashed = trace.Dashed},
                         trace.Axis);

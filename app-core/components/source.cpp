@@ -1,7 +1,7 @@
 /**
  * @file    source.cpp
- * @brief   Independent sources with a DC, sine, pulse, exponential, single-frequency FM, amplitude-modulated or
- *          piecewise linear waveform, shared by voltage and current sources.
+ * @brief   Independent sources with a DC, sine, pulse, exponential, single-frequency FM, amplitude-modulated,
+ *          piecewise linear, noise or random waveform, shared by voltage and current sources.
  */
 
 #include "components/source.h"
@@ -13,6 +13,9 @@
 namespace Core {
 
 namespace {
+
+/// The noise and random sources start at this fraction of the sine amplitude of the source, as a small disturbance.
+constexpr double NOISE_SHARE_OF_AMPLITUDE = 10.0;
 
 /**
  * @brief   Splits a text of "time value" pairs on commas and whitespace.
@@ -42,7 +45,8 @@ std::vector<std::string_view> SplitPWLTokens(const std::string_view text) {
  * @brief   Creates a DC source; only derived sources call it, with defaults in their own unit.
  * @param[in] type        Kind of source.
  * @param[in] value       DC level.
- * @param[in] amplitude   Peak of the sine, the SFFM and the AM, which run at 1 kHz from 0.
+ * @param[in] amplitude   Peak of the sine, the SFFM and the AM, which run at 1 kHz from 0; a tenth of it is the rms of
+ *                        the noise and the spread of the random values.
  * @param[in] pulse_high  High level of the pulse and peak of the exponential; the PWL points peak there too.
  */
 Source::Source(const ComponentType type, const double value, const double amplitude, const double pulse_high)
@@ -53,6 +57,8 @@ Source::Source(const ComponentType type, const double value, const double amplit
     m_SFFM.Amplitude = amplitude;
     m_AM.Amplitude = amplitude;
     m_PWL.Points = {{0.0, 0.0}, {1e-3, pulse_high}, {2e-3, 0.0}};
+    m_Noise.WhiteAmplitude = amplitude / NOISE_SHARE_OF_AMPLITUDE;
+    m_Random.First = amplitude / NOISE_SHARE_OF_AMPLITUDE;
 }
 
 /**
@@ -239,6 +245,107 @@ bool Source::IsValidPWL(const PWLParameters &pwl) const {
 }
 
 /**
+ * @brief   Returns the noise of the source.
+ * @return  Levels in the unit of the source and times in seconds.
+ */
+const NoiseParameters &Source::GetNoise() const {
+    return m_Noise;
+}
+
+/**
+ * @brief   Changes the noise of the source.
+ * @param[in] noise  New levels and times; check them with IsValidNoise() first.
+ */
+void Source::SetNoise(const NoiseParameters &noise) {
+    m_Noise = noise;
+}
+
+/**
+ * @brief   Checks whether a noise can be simulated.
+ * @param[in] noise  Candidate levels and times.
+ * @return  True when the white amplitude is not negative, the time step is not negative and is positive while white or
+ *          1/f noise is on, the exponent is between 0 and 2 (both excluded) while 1/f noise is on, and the capture and
+ *          emission times are positive while the telegraph signal is on. The offset can be any value.
+ * @note    ngspice never returns from a negative time step, so it must not reach it.
+ */
+bool Source::IsValidNoise(const NoiseParameters &noise) const {
+    const bool is_flicker_on = noise.FlickerAmplitude != 0.0;
+    const bool is_telegraph_on = noise.TelegraphAmplitude != 0.0;
+    const bool needs_step = noise.WhiteAmplitude != 0.0 || is_flicker_on;
+    if (noise.WhiteAmplitude < 0.0 || noise.TimeStep < 0.0 || (needs_step && noise.TimeStep <= 0.0)) {
+        return false;
+    }
+    if (is_flicker_on && (noise.FlickerExponent <= 0.0 || noise.FlickerExponent >= 2.0)) {
+        return false;
+    }
+    return !is_telegraph_on || (noise.CaptureTime > 0.0 && noise.EmissionTime > 0.0);
+}
+
+/**
+ * @brief   Returns the random values of the source.
+ * @return  The distribution, its parameters and the times.
+ */
+const RandomParameters &Source::GetRandom() const {
+    return m_Random;
+}
+
+/**
+ * @brief   Changes the random values of the source.
+ * @param[in] random  New distribution, parameters and times; check them with IsValidRandom() first.
+ */
+void Source::SetRandom(const RandomParameters &random) {
+    m_Random = random;
+}
+
+/**
+ * @brief   Checks whether random values can be simulated.
+ * @param[in] random  Candidate distribution, parameters and times.
+ * @return  True when the time step is positive, the delay is not negative, and the first parameter is not negative
+ *          (positive for the mean of an exponential and the lambda of a Poisson distribution). The second parameter,
+ *          the offset or mean, can be any value.
+ */
+bool Source::IsValidRandom(const RandomParameters &random) const {
+    if (random.TimeStep <= 0.0 || random.Delay < 0.0) {
+        return false;
+    }
+    switch (random.Distribution) {
+    case RandomDistribution::EXPONENTIAL:
+    case RandomDistribution::POISSON:
+        return random.First > 0.0;
+    case RandomDistribution::UNIFORM:
+    case RandomDistribution::GAUSSIAN:
+    default:
+        return random.First >= 0.0;
+    }
+}
+
+/**
+ * @brief   Tells the interval at which the waveform changes by itself, which the transient must not step over.
+ * @return  The time step of a noise with white or 1/f noise on, or of a random source; no value for the other
+ *          waveforms and for a noise that is off or only a telegraph signal.
+ */
+std::optional<double> Source::GetSignalStep() const {
+    switch (m_Type) {
+    case SourceType::NOISE:
+        if (m_Noise.WhiteAmplitude != 0.0 || m_Noise.FlickerAmplitude != 0.0) {
+            return m_Noise.TimeStep;
+        }
+        return std::nullopt;
+    case SourceType::RANDOM:
+        return m_Random.TimeStep;
+    case SourceType::DC:
+    case SourceType::AC:
+    case SourceType::PULSE:
+    case SourceType::EXP:
+    case SourceType::SFFM:
+    case SourceType::AM:
+    case SourceType::PWL:
+    default:
+        return std::nullopt;
+    }
+}
+
+/**
  * @brief   Tells whether a kind of component is a Source, so it can be cast to one.
  * @param[in] type  Kind of component.
  * @return  True for voltage and current sources. The VCC rail is a fixed DC supply, not a Source.
@@ -250,7 +357,7 @@ bool IsSource(const ComponentType type) {
 /**
  * @brief   Returns a readable name for a source type.
  * @param[in] type  Source type.
- * @return  "DC", "AC", "Pulse", "EXP", "SFFM", "AM" or "PWL"; ParseSourceType() reads it back.
+ * @return  "DC", "AC", "Pulse", "EXP", "SFFM", "AM", "PWL", "Noise" or "Random"; ParseSourceType() reads it back.
  */
 const char *GetSourceTypeName(const Source::SourceType type) {
     switch (type) {
@@ -268,8 +375,13 @@ const char *GetSourceTypeName(const Source::SourceType type) {
         return "AM";
     case Source::SourceType::PWL:
         return "PWL";
+    case Source::SourceType::NOISE:
+        return "Noise";
+    case Source::SourceType::RANDOM:
+        return "Random";
+    default:
+        return "Unknown";
     }
-    return "Unknown";
 }
 
 /**
@@ -280,9 +392,45 @@ const char *GetSourceTypeName(const Source::SourceType type) {
 std::optional<Source::SourceType> ParseSourceType(const std::string_view text) {
     for (const Source::SourceType type :
          {Source::SourceType::DC, Source::SourceType::AC, Source::SourceType::PULSE, Source::SourceType::EXP,
-          Source::SourceType::SFFM, Source::SourceType::AM, Source::SourceType::PWL}) {
+          Source::SourceType::SFFM, Source::SourceType::AM, Source::SourceType::PWL, Source::SourceType::NOISE,
+          Source::SourceType::RANDOM}) {
         if (text == GetSourceTypeName(type)) {
             return type;
+        }
+    }
+    return std::nullopt;
+}
+
+/**
+ * @brief   Returns a readable name for a random distribution.
+ * @param[in] distribution  Distribution.
+ * @return  "Uniform", "Gaussian", "Exponential" or "Poisson"; ParseRandomDistribution() reads it back.
+ */
+const char *GetRandomDistributionName(const RandomDistribution distribution) {
+    switch (distribution) {
+    case RandomDistribution::UNIFORM:
+        return "Uniform";
+    case RandomDistribution::GAUSSIAN:
+        return "Gaussian";
+    case RandomDistribution::EXPONENTIAL:
+        return "Exponential";
+    case RandomDistribution::POISSON:
+        return "Poisson";
+    default:
+        return "Unknown";
+    }
+}
+
+/**
+ * @brief   Finds the random distribution named by a text.
+ * @param[in] text  A name as written by GetRandomDistributionName(), case sensitive.
+ * @return  The matching distribution, or no value for an unknown name.
+ */
+std::optional<RandomDistribution> ParseRandomDistribution(const std::string_view text) {
+    for (const RandomDistribution distribution : {RandomDistribution::UNIFORM, RandomDistribution::GAUSSIAN,
+                                                  RandomDistribution::EXPONENTIAL, RandomDistribution::POISSON}) {
+        if (text == GetRandomDistributionName(distribution)) {
+            return distribution;
         }
     }
     return std::nullopt;
