@@ -1032,7 +1032,7 @@ TEST_CASE("Each LED model drops its rated forward voltage at 20 mA", "[simulator
         const char *Model;
         double ForwardVoltage;
     };
-    const Rating rating = GENERATE(Rating{"Red", 1.8}, Rating{"Green", 2.1}, Rating{"Blue", 3.0});
+    const Rating rating = GENERATE(Rating{"Red", 1.85}, Rating{"Green", 2.2}, Rating{"Blue", 3.3});
     CAPTURE(rating.Model);
     // The resistor sets 20 mA when the LED drops its rated voltage
     DiodeLoop loop(Core::ComponentType::LED, 5.0, (5.0 - rating.ForwardVoltage) / 20e-3);

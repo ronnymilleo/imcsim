@@ -15,7 +15,8 @@ namespace Core {
 
 namespace {
 
-/// Grouped by part, default model first. LEDs are tuned for their forward voltage at 20 mA, Zeners break down at
+/// Grouped by part, default model first. LEDs are tuned for the typical forward voltage at 20 mA of their datasheets
+/// below (1.85 V red, 2.2 V green, 3.3 V blue), Zeners break down at
 /// their voltage at 5 mA. Ratings are the average forward current and the power dissipation of these datasheets:
 /// onsemi 1N914/D Rev. 6 (1N4148: 200 mA, 500 mW); Diodes Inc DS28002 Rev. 11 (1N4001-1N4007: 1 A, and 1.25 W from
 /// its 100 K/W to ambient and 150 C junction); onsemi 1N5817/D (1N5819: 1 A, and 1.25 W from its 80 C/W and 125 C
@@ -108,9 +109,9 @@ constexpr auto DIODE_MODELS = std::to_array<DiodeModel>({
      ComponentType::ZENER_DIODE,
      LEDColor::NONE},
     {"Red",
-     "Red LED, 1.8 V at 20 mA",
+     "Red LED, 1.85 V at 20 mA",
      "DLEDRED",
-     {.SaturationCurrent = 3.3e-17,
+     {.SaturationCurrent = 1.255e-17,
       .EmissionCoefficient = 2.0,
       .SeriesResistance = 2.0,
       .BreakdownVoltage = 5.0,
@@ -121,9 +122,9 @@ constexpr auto DIODE_MODELS = std::to_array<DiodeModel>({
      ComponentType::LED,
      LEDColor::RED},
     {"Green",
-     "Green LED, 2.1 V at 20 mA",
+     "Green LED, 2.2 V at 20 mA",
      "DLEDGREEN",
-     {.SaturationCurrent = 9.9e-20,
+     {.SaturationCurrent = 1.436e-20,
       .EmissionCoefficient = 2.0,
       .SeriesResistance = 2.0,
       .BreakdownVoltage = 5.0,
@@ -134,9 +135,9 @@ constexpr auto DIODE_MODELS = std::to_array<DiodeModel>({
      ComponentType::LED,
      LEDColor::GREEN},
     {"Blue",
-     "Blue LED, 3.0 V at 20 mA",
+     "Blue LED, 3.3 V at 20 mA",
      "DLEDBLUE",
-     {.SaturationCurrent = 5.5e-19,
+     {.SaturationCurrent = 1.109e-20,
       .EmissionCoefficient = 3.0,
       .SeriesResistance = 2.0,
       .BreakdownVoltage = 5.0,
