@@ -243,18 +243,31 @@ jobs:
     runs-on: macos-26
     steps:
       - name: Install build dependencies
-        run: brew install cmake ninja pkgconf libngspice
+        run: brew install cmake ninja pkgconf libngspice ccache
 
       - name: Check out the repository
         uses: actions/checkout@v7
         with:
           submodules: recursive
 
+      - name: Locate the compiler cache
+        run: echo "CCACHE_DIR=$GITHUB_WORKSPACE/.ccache" >> "$GITHUB_ENV"
+
+      - name: Restore the compiler cache
+        uses: actions/cache@v6
+        with:
+          path: .ccache
+          key: ccache-macos-${{ github.sha }}
+          restore-keys: ccache-macos-
+
       - name: Configure
-        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug -DBUILD_TESTS=ON
+        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug -DBUILD_TESTS=ON $COMPILER_LAUNCHER
 
       - name: Build
         run: cmake --build build
+
+      - name: Compiler cache statistics
+        run: ccache --show-stats
 
       - name: Run tests
         run: ctest --test-dir build --output-on-failure
