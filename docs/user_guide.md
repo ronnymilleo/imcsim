@@ -501,6 +501,13 @@ their statistics and the exports always agree.
   like the measured traces, but adding or editing one is not an unsaved change. A channel that names a net no label
   has any longer keeps its expression and reads in red, with the reason in its tooltip and above the plot, instead
   of disappearing.
+- On an AC sweep a math channel works on the complex values of the traces, rebuilt from their magnitude and phase, and
+  plots as a magnitude in dB on the magnitude plot and a phase in degrees on the phase plot. `V(OUT)/V(IN)` so reads
+  the gain and the phase shift between two nodes, on the voltage axis, which reads as gain, and `V(IN)/I(V1)` the
+  impedance a source sees, in ohms on the third axis. The magnitude is 20·log10 of the value relative to 1 of its unit, whatever that unit, as for every trace of
+  the sweep. `ddt()` multiplies by jω and `integ()` divides by it, which is what they do to a sine, and `abs()` keeps
+  the magnitude with a phase of 0. A value of zero, or one with no finite magnitude such as `integ()` at 0 Hz, leaves
+  a gap. The channels are worked out on the step shown, and the statistics read their response like any other trace.
 - The AC sweep is a Bode plot: magnitude in dB and phase in degrees, relative to the AC magnitude of the sources.
   That magnitude is set in Properties apart from the amplitude of the sine, as in SPICE, and is 1 by default, so
   the plot reads as gain while a transient uses the small amplitude a real circuit would see.
