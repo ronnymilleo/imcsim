@@ -524,8 +524,8 @@ their statistics and the exports always agree.
 
 ## Stepping a parameter
 
-The transient, the AC sweep and the DC sweep can run once per value of a parameter, as SPICE's `.step`: check
-**Step a parameter** under their settings, then pick:
+The operating point, the transient, the AC sweep and the DC sweep can run once per value of a parameter, as SPICE's
+`.step`: set **Run mode** to **Step a parameter** under their settings, then pick:
 
 - **Parameter**: the temperature, or a resistor, capacitor or inductor (shown with its value). Picking a part starts
   the range at half its value and ends it at twice its value.
@@ -542,13 +542,17 @@ Results:
   schematic and its playback read the shown step. The AC export includes every step (`V(4) at C1=22nF` columns);
   the transient export has the shown step only, since each step has its own time points.
 - The DC sweep draws one curve per step, as when stepping a second source, so only one of the two can be on.
+- The operating point picks its **shown step** at the top of its tab; the schematic (voltages, currents, wire colors,
+  heat map) and the tables below read that step. Above the tables, a plot draws every measured voltage and current
+  against the step value, with a marker at each step, so `V(OUT)` against R1 from 1k to 10k reads at once; measure the
+  traces with the Probe tool or in the trace list, which lists the nodes and currents of the steps.
 - ngspice's output lists each step under a `Step R1=10kOhm` line. A step that fails stops the run and names the
   step.
 
 ## Monte Carlo
 
 Real parts are not exact: a 1k resistor with a 5 % tolerance may be anything from 950 to 1050 ohm. A Monte Carlo
-analysis runs the transient, the AC sweep or the DC sweep once with every value as it is (the **nominal** run) and then
+analysis runs the operating point, the transient, the AC sweep or the DC sweep once with every value as it is (the **nominal** run) and then
 once per **run**, each with the values of the parts drawn within their tolerances, and shows how a result spreads.
 
 **Setting it up**
@@ -558,7 +562,7 @@ once per **run**, each with the values of the parts drawn within their tolerance
    offer **Use E24 (5%)**, the tolerance of that series. An empty field means the part keeps its value in every run.
    In the analysis settings, **Tolerance of all** gives every resistor, capacitor or inductor one percent at once, and
    **Clear all** takes the tolerances away. A source only varies while it is a DC one.
-2. Pick the transient, AC sweep or DC sweep and set **Run mode** to **Monte Carlo** (the other modes are **Single
+2. Pick the operating point, transient, AC sweep or DC sweep and set **Run mode** to **Monte Carlo** (the other modes are **Single
    run** and **Step a parameter**; only one is on). Live mode and a second stepped source of the DC sweep do not go
    with it.
 3. Set **Runs** (2 to 1000, 100 at first), the **Distribution** and the **Seed**, and run.
@@ -576,7 +580,7 @@ block and the parts; clear their tolerance, or take the parts out of the block.
 
 **Results.** The transient and the AC sweep plot the runs as the stepped ones are plotted: the **shown step** is
 **Nominal** or **Run n**, in full colors, and the others are faint; the DC sweep draws one curve per run. Only the
-first 100 runs keep their curves, since a thousand transients would not fit in memory; every run keeps its
+first 100 runs keep their curves (or, for the operating point, their values to show on the schematic), since a thousand transients would not fit in memory; every run keeps its
 measurements. Runs that fail to converge are skipped, and a warning counts them and lists the first ones; the nominal
 run has to work. Stop keeps the runs made.
 
@@ -585,11 +589,12 @@ The **Monte Carlo** tab of the Output window shows:
 - a **histogram** of one quantity measured on one node in every run, with a line at the nominal value. The quantities
   are the ones the statistics of the other tabs read: for a transient the mean, RMS, peak to peak and frequency; for
   an AC sweep the upper and lower -3 dB frequency, peak gain, unity-gain frequency and phase margin; for a DC sweep the
-  minimum, maximum and mean;
+  minimum, maximum and mean. An operating point measures the DC voltage of every node and the DC current of every
+  part, so the first list offers the currents, such as `I(R1)`, after the nodes;
 - on the right, the nominal reading and, over the drawn runs, their count, mean, standard deviation (with n - 1),
   minimum, maximum and the 1 % and 99 % percentiles;
 - a **table of runs** with the value each part took and the quantity shown; click a header to sort, which puts the
-  worst case first, and click a row to show that run in the transient or AC sweep tab (a row beyond the first 100
+  worst case first, and click a row to show that run in the operating point, transient or AC sweep tab and on the schematic (a row beyond the first 100
   runs has no curve to show);
 - **Export runs...** saves every run, the values of the parts and all the measurements as a CSV table.
 
