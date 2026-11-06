@@ -184,6 +184,7 @@ constexpr auto OP_AMP_FIELDS = std::to_array<ParameterField<Core::OpAmpParameter
     {"V+ headroom", &Core::OpAmpParameters::PositiveHeadroom, "V"},
     {"V- headroom", &Core::OpAmpParameters::NegativeHeadroom, "V"},
     {"Supply current", &Core::OpAmpParameters::SupplyCurrent, "A"},
+    {"VOS", &Core::OpAmpParameters::InputOffsetVoltage, "V"},
 });
 
 constexpr auto SWITCH_FIELDS = std::to_array<ParameterField<Core::SwitchParameters>>({
@@ -1172,8 +1173,30 @@ void PartEditor::DrawOpAmp(Core::OpAmp &op_amp) {
         }
         ImGui::TextDisabled("The open-loop gain falls to 1 at the GBW");
     } else if (op_amp.IsCustom()) {
+        DrawOpAmpInputStage(op_amp);
         ImGui::TextDisabled("Headrooms: how close the output gets to V+ and V-");
+        ImGui::TextDisabled("VOS adds to the + input; PNP and JFET inputs reach V-");
         ImGui::TextDisabled("Built as a Boyle macromodel from these specs");
+    }
+}
+
+/**
+ * @brief   The transistors of the input pair of a custom macromodel, which the specification fields leave out since
+ *          they are not a number.
+ */
+void PartEditor::DrawOpAmpInputStage(Core::OpAmp &op_amp) {
+    Core::OpAmpParameters parameters = op_amp.GetParameters();
+    DrawFieldLabel("Input stage");
+    if (ImGui::BeginCombo("##input_stage", Core::GetOpAmpInputStageName(parameters.InputStage))) {
+        for (const Core::OpAmpInputStage stage : Core::GetOpAmpInputStages()) {
+            const bool is_selected = stage == parameters.InputStage;
+            if (ImGui::Selectable(Core::GetOpAmpInputStageName(stage), is_selected) && !is_selected) {
+                parameters.InputStage = stage;
+                op_amp.SetCustomParameters(parameters);
+                m_Schematic->MarkModified();
+            }
+        }
+        ImGui::EndCombo();
     }
 }
 

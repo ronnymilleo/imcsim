@@ -101,7 +101,7 @@ private:
     std::array<ValueField, 11> m_DiodeFields;
     std::array<ValueField, 16> m_BJTFields;
     std::array<ValueField, 13> m_MOSFETFields;
-    std::array<ValueField, 11> m_OpAmpFields;
+    std::array<ValueField, 12> m_OpAmpFields;
     /// One per member of Core::SwitchParameters.
     std::array<ValueField, 4> m_SwitchFields;
     /// One per member of Core::RelayParameters.
@@ -155,6 +155,7 @@ private:
     void DrawBJT(Core::BJT &bjt);
     void DrawMOSFET(Core::MOSFET &mosfet);
     void DrawOpAmp(Core::OpAmp &op_amp);
+    void DrawOpAmpInputStage(Core::OpAmp &op_amp);
     void DrawSource(Core::Source &source);
     void DrawSourceTypes(Core::Source &source);
     void DrawSine(Core::Source &source);
