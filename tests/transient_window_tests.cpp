@@ -97,17 +97,32 @@ TEST_CASE("A window that follows a run in progress is on its newest points", "[t
     CHECK_FALSE(window.IsLive());
 }
 
-TEST_CASE("The whole run that replaces the chunks keeps the place of the window, and a new run starts over",
+TEST_CASE("A chunked run that grows past the window opens at its start when it completes", "[transient_window]") {
+    constexpr std::size_t SIZE = GUI::DEFAULT_WINDOW_POINTS;
+    GUI::TransientWindow window;
+    const Core::Transient chunks = TransientOf(30'000, false);
+    CHECK(window.Update(&chunks, 1, true).First == 30'000 - SIZE);
+
+    // The run ends: the whole result is a new version and starts at the beginning, not where the chunks were followed
+    const Core::Transient whole = TransientOf(100'000);
+    const GUI::PointWindow shown = window.Update(&whole, 2, false);
+    CHECK(shown.First == 0);
+    CHECK(window.DoesFollow());
+    CHECK_FALSE(window.IsLive());
+}
+
+TEST_CASE("A run the user scrolled during keeps the place of the window, and a new run starts over",
           "[transient_window]") {
     constexpr std::size_t SIZE = GUI::DEFAULT_WINDOW_POINTS;
     GUI::TransientWindow window;
     const Core::Transient chunks = TransientOf(30'000, false);
     window.Update(&chunks, 1, true);
+    window.SetFirst(5000);
+    window.Update(&chunks, 1, true);
 
-    // The run ends: the whole result is a new version, but the window was on the newest points and stays there
     const Core::Transient whole = TransientOf(100'000);
-    CHECK(window.Update(&whole, 2, false).First == 30'000 - SIZE);
-    CHECK_FALSE(window.IsLive());
+    CHECK(window.Update(&whole, 2, false).First == 5000);
+    CHECK_FALSE(window.DoesFollow());
 
     // The user looks elsewhere; a run after it starts at its beginning, following again
     window.SetFirst(60'000);
@@ -115,6 +130,28 @@ TEST_CASE("The whole run that replaces the chunks keeps the place of the window,
     const Core::Transient next_chunks = TransientOf(2 * SIZE, false);
     CHECK(window.Update(&next_chunks, 3, true).First == SIZE);
     CHECK(window.DoesFollow());
+}
+
+TEST_CASE("The whole run that replaces the chunks of a live run stays where the window followed",
+          "[transient_window]") {
+    GUI::TransientWindow window;
+    window.SetSpan(1e-3);
+    const Core::Transient chunks = EvenTransient(5000, 1e-6, false);
+    const GUI::PointWindow followed = window.Update(&chunks, 1, true);
+    CHECK(followed.First + followed.Count == 5000);
+
+    const Core::Transient whole = EvenTransient(5000, 1e-6);
+    CHECK(window.Update(&whole, 2, false).First == followed.First);
+}
+
+TEST_CASE("A run that fits the window starts at the beginning when it completes", "[transient_window]") {
+    GUI::TransientWindow window;
+    const Core::Transient chunks = TransientOf(500, false);
+    CHECK(window.Update(&chunks, 1, true).First == 0);
+    const Core::Transient whole = TransientOf(800);
+    const GUI::PointWindow shown = window.Update(&whole, 2, false);
+    CHECK(shown.First == 0);
+    CHECK(shown.Count == 800);
 }
 
 TEST_CASE("A window with a span holds the points of that stretch of time, wherever it is", "[transient_window]") {
