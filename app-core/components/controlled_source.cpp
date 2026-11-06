@@ -24,6 +24,8 @@ double DefaultGain(const ComponentType type) {
         return 1e-3;
     case ComponentType::CCVS:
         return 1e3;
+    case ComponentType::BEHAVIORAL_VOLTAGE:
+    case ComponentType::BEHAVIORAL_CURRENT:
     case ComponentType::RESISTOR:
     case ComponentType::CAPACITOR:
     case ComponentType::INDUCTOR:

@@ -8,6 +8,8 @@
 
 #include "components/component.h"
 #include "model/library_model.h"
+#include <functional>
+#include <map>
 #include <memory>
 #include <optional>
 #include <string>
@@ -63,6 +65,7 @@ public:
     void AddSubcircuit(std::shared_ptr<SubcircuitDefinition> definition);
     void AddLibraryModel(LibraryModel model);
     void AddPort(const CircuitPort &port);
+    void NameNet(std::string_view net, int node);
     void AddDefinitionsOf(const Circuit &other);
 
     const std::vector<CircuitEntry> &GetEntries() const;
@@ -71,6 +74,8 @@ public:
     const std::vector<LibraryModel> &GetLibraryModels() const;
     const std::vector<CircuitPort> &GetPorts() const;
     const LibraryModel *FindLibraryModel(std::string_view name) const;
+    std::optional<int> FindNodeOfNet(std::string_view net) const;
+    const std::map<std::string, int, std::less<>> &GetNets() const;
     int GetNodeCount() const;
     bool HasGround() const;
     bool HasACSource() const;
@@ -83,6 +88,9 @@ private:
     std::vector<std::shared_ptr<SubcircuitDefinition>> m_Subcircuits;
     std::vector<LibraryModel> m_LibraryModels;
     std::vector<CircuitPort> m_Ports;
+    /// Node of each net a label names, by the name in the form nets are compared in, so a behavioral source can read
+    /// V(OUT).
+    std::map<std::string, int, std::less<>> m_NodeOfNet;
     int m_NodeCount = 0;
 };
 

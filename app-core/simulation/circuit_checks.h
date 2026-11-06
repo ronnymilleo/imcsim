@@ -27,6 +27,7 @@ constexpr std::string_view SWEEPABLE_SOURCES = "a voltage or current source, VCC
 
 // What is wrong with a circuit or with settings, in words for the user, or no value when nothing is
 std::optional<std::string> CheckCircuit(const Circuit &circuit);
+std::optional<std::string> CheckBehavioralExpression(const Circuit &circuit, const Component &source);
 std::optional<std::string> CheckTransientSettings(const TransientSettings &settings);
 
 // Noise and random sources step the transient on their own, so they count in its points

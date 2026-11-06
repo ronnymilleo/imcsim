@@ -6,6 +6,7 @@
 #ifndef IMCSIM_PART_EDITOR_H
 #define IMCSIM_PART_EDITOR_H
 
+#include "components/behavioral_source.h"
 #include "components/bjt.h"
 #include "components/clock.h"
 #include "components/component.h"
@@ -97,6 +98,8 @@ private:
     std::array<ValueField, 4> m_RandomFields;
     /// The "time value" points of a PWL source being typed, as long as the user wants them.
     std::string m_PWLText;
+    /// The expression of a behavioral source being typed, kept while it does not parse.
+    std::string m_ExpressionText;
     // One per member of the parameters of custom diodes, transistors and op-amps
     std::array<ValueField, 11> m_DiodeFields;
     std::array<ValueField, 16> m_BJTFields;
@@ -168,6 +171,7 @@ private:
     void DrawRandom(Core::Source &source);
     void DrawControlledSource(Core::ControlledSource &source);
     void DrawControllingCurrent(Core::ControlledSource &source);
+    void DrawBehavioralSource(Core::BehavioralSource &source);
 };
 
 } // namespace GUI

@@ -5,11 +5,13 @@
 
 #include "simulation/circuit_checks.h"
 
+#include "components/behavioral_source.h"
 #include "components/controlled_source.h"
 #include "components/logic_part.h"
 #include "components/source.h"
 #include "components/subcircuit.h"
 #include "model/subcircuit.h"
+#include "spice/behavioral_expression.h"
 #include <algorithm>
 #include <cmath>
 #include <format>
@@ -315,6 +317,20 @@ std::optional<std::string> CheckSourceWaveforms(const Circuit &circuit) {
     return std::nullopt;
 }
 
+/**
+ * @brief   The first problem of the behavioral sources of one circuit, a block body counting as a circuit of its own.
+ */
+std::optional<std::string> CheckBehavioralSources(const Circuit &circuit) {
+    for (const CircuitEntry &entry : circuit.GetEntries()) {
+        if (IsBehavioralSource(entry.Part->GetType())) {
+            if (std::optional<std::string> problem = CheckBehavioralExpression(circuit, *entry.Part)) {
+                return problem;
+            }
+        }
+    }
+    return std::nullopt;
+}
+
 } // namespace
 
 /**
@@ -357,6 +373,37 @@ std::optional<std::string> CheckCircuit(const Circuit &circuit) {
         if (!FindControllingSource(circuit, current)) {
             return std::format("{} follows I({}), which is not in the circuit", name, current);
         }
+    }
+    if (std::optional<std::string> problem = CheckBehavioralSources(circuit)) {
+        return problem;
+    }
+    for (const auto &definition : circuit.GetSubcircuits()) {
+        if (std::optional<std::string> problem = CheckBehavioralSources(definition->Body)) {
+            return std::format("In block {}: {}", definition->Name, *problem);
+        }
+    }
+    return std::nullopt;
+}
+
+/**
+ * @brief   Checks the expression of a behavioral source against its circuit: what ParseBehavioralExpression() checks,
+ *          and that every net it names has a label and every current it reads is in the circuit.
+ * @param[in] circuit  Circuit the source belongs to, a block body for a source inside a block.
+ * @param[in] source   A behavioral source.
+ * @return  What is wrong, named after the source, such as "B1: the circuit has no net named OUT"; no value when the
+ *          expression can be written for ngspice, whose own errors still show when it runs.
+ */
+std::optional<std::string> CheckBehavioralExpression(const Circuit &circuit, const Component &source) {
+    const std::string &expression = static_cast<const BehavioralSource &>(source).GetExpression();
+    const std::string &name = source.GetName();
+    if (std::ranges::contains(ListBehavioralCurrents(expression), name)) {
+        return std::format("{} cannot read its own current", name);
+    }
+    const auto written = TranslateBehavioralExpression(
+        expression, [&circuit](const std::string_view net) { return circuit.FindNodeOfNet(net); },
+        [&circuit](const std::string_view current) { return FindControllingSource(circuit, current); });
+    if (!written) {
+        return std::format("{}: {}", name, written.error());
     }
     return std::nullopt;
 }

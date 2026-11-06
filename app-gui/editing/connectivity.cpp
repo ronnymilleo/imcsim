@@ -273,6 +273,14 @@ std::optional<int> Connectivity::FindNodeOfNet(const std::string_view net) const
 }
 
 /**
+ * @brief   Returns the nets the labels name.
+ * @return  The node of each net, by its name in the form nets are compared in.
+ */
+const std::map<std::string, int, std::less<>> &Connectivity::GetNets() const {
+    return m_NodeOfNet;
+}
+
+/**
  * @brief   Returns the points where three or more connections meet.
  * @return  Grid points that get a junction dot.
  */
@@ -305,6 +313,10 @@ Core::Circuit BuildCircuit(const std::vector<std::unique_ptr<UIElement>> &elemen
             nodes.push_back(connectivity.GetNode(terminal).value_or(0));
         }
         circuit.Add(element->GetComponent(), std::move(nodes));
+    }
+    // A behavioral source names its nets, which the circuit resolves when it writes the netlist
+    for (const auto &[net, node] : connectivity.GetNets()) {
+        circuit.NameNet(net, node);
     }
     return circuit;
 }

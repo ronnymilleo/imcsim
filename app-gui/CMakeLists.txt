@@ -74,6 +74,7 @@ add_library(imcsim-gui-lib
             plots/trace_math.cpp
             plots/trace_statistics.cpp
             preferences.cpp
+            ui_elements/ui_behavioral_source.cpp
             ui_elements/ui_bjt.cpp
             ui_elements/ui_capacitor.cpp
             ui_elements/ui_clock.cpp

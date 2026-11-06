@@ -5,6 +5,7 @@
 
 #include "document/schematic.h"
 
+#include "components/behavioral_source.h"
 #include "components/component.h"
 #include "components/controlled_source.h"
 #include "components/net_label.h"
@@ -518,6 +519,9 @@ std::expected<void, std::string> Schematic::RenameElement(const std::size_t inde
         if (Core::IsControlledSource(element->GetComponent().GetType())) {
             auto &source = static_cast<Core::ControlledSource &>(element->GetComponent());
             source.SetControllingCurrent(RenameCurrent(source.GetControllingCurrent(), old_name, name));
+        } else if (Core::IsBehavioralSource(element->GetComponent().GetType())) {
+            auto &source = static_cast<Core::BehavioralSource &>(element->GetComponent());
+            source.SetExpression(RenameCurrentsIn(source.GetExpression(), old_name, name));
         }
     }
     std::set<std::string> measured;

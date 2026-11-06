@@ -3,6 +3,7 @@
  * @brief   Tests for the operating point simulation, run through the real ngspice library.
  */
 
+#include "components/behavioral_source.h"
 #include "components/bjt.h"
 #include "components/capacitor.h"
 #include "components/clock.h"
@@ -17,6 +18,7 @@
 #include "components/potentiometer.h"
 #include "components/relay.h"
 #include "components/resistor.h"
+#include "components/subcircuit.h"
 #include "components/switch.h"
 #include "components/transformer.h"
 #include "components/vcc.h"
@@ -24,6 +26,8 @@
 #include "components/voltage_source.h"
 #include "digital_models.h"
 #include "model/circuit.h"
+#include "model/subcircuit.h"
+#include "simulation/circuit_checks.h"
 #include "simulation/simulator.h"
 #include <algorithm>
 #include <array>
@@ -224,6 +228,43 @@ struct ControlledStage {
         }
         Circuit.Add(Load, {2, 0});
         Circuit.Add(Reference, {0});
+    }
+};
+
+/**
+ * @struct  BehavioralStage
+ * @brief   A source of 2 V on net IN with 1k to ground, and a behavioral source from net OUT to ground loaded by 1k.
+ * @details Nodes: IN 1 and OUT 2. The expression is set by each test.
+ */
+struct BehavioralStage {
+    Core::VoltageSource Input;
+    Core::Resistor Sense;
+    Core::BehavioralSource Source;
+    Core::Resistor Load;
+    Core::Ground Reference;
+    Core::Circuit Circuit;
+
+    explicit BehavioralStage(const Core::ComponentType type) : Source(type) {
+        Input.SetName("Vin1");
+        Input.SetValue(2.0);
+        Sense.SetName("R1");
+        Source.SetName("B1");
+        Load.SetName("R2");
+        Circuit.Add(Input, {1, 0});
+        Circuit.Add(Sense, {1, 0});
+        Circuit.Add(Source, {2, 0});
+        Circuit.Add(Load, {2, 0});
+        Circuit.Add(Reference, {0});
+        Circuit.NameNet("IN", 1);
+        Circuit.NameNet("Out", 2);
+    }
+
+    double RunOutput() const {
+        const Core::OperatingPointRun run = Core::RunOperatingPoint(Circuit);
+        if (!run.Result) {
+            FAIL(run.Result.error());
+        }
+        return run.Result->NodeVoltages[2];
     }
 };
 
@@ -3437,4 +3478,93 @@ TEST_CASE("A logic input gives a NAND latch a defined state", "[simulator][digit
     REQUIRE(reset.Result.has_value());
     CHECK_THAT(reset.Result->NodeVoltages[2], Catch::Matchers::WithinAbs(0.0, 0.05));
     CHECK_THAT(reset.Result->NodeVoltages[3], Catch::Matchers::WithinAbs(5.0, 0.05));
+}
+
+TEST_CASE("A behavioral voltage source drives its expression of node voltages, named by net", "[simulator]") {
+    BehavioralStage stage(Core::ComponentType::BEHAVIORAL_VOLTAGE);
+    // Nets ignore case, as labels do
+    stage.Source.SetExpression("3*V(in)*V(IN)");
+    CHECK_THAT(stage.RunOutput(), Catch::Matchers::WithinAbs(12.0, 1e-6));
+    stage.Source.SetExpression("V(IN, 0) - tanh(0)");
+    CHECK_THAT(stage.RunOutput(), Catch::Matchers::WithinAbs(2.0, 1e-6));
+    CHECK(stage.Circuit.ToSpiceNetlist().contains("B1 2 0 V=v(1,0) - tanh(0)"));
+}
+
+TEST_CASE("A behavioral current source pushes its current from + to - through itself", "[simulator]") {
+    BehavioralStage stage(Core::ComponentType::BEHAVIORAL_CURRENT);
+    // 2 mA out of the OUT node into ground, through itself, so the load pulls OUT to -2 V
+    stage.Source.SetExpression("1m*V(IN)");
+    CHECK_THAT(stage.RunOutput(), Catch::Matchers::WithinAbs(-2.0, 1e-6));
+}
+
+TEST_CASE("A behavioral source reads the current of a part through its probe", "[simulator]") {
+    BehavioralStage stage(Core::ComponentType::BEHAVIORAL_VOLTAGE);
+    // 2 mA through R1 times 1k
+    stage.Source.SetExpression("1k*I(R1)");
+    CHECK_THAT(stage.RunOutput(), Catch::Matchers::WithinAbs(2.0, 1e-6));
+    CHECK(stage.Circuit.ToSpiceNetlist().contains("i(Vprobe-R1)"));
+}
+
+TEST_CASE("A behavioral source follows time in a transient and is linearized in an AC sweep", "[simulator]") {
+    BehavioralStage stage(Core::ComponentType::BEHAVIORAL_VOLTAGE);
+    stage.Source.SetExpression("time*1k");
+    const Core::TransientRun ramp = Core::RunTransient(stage.Circuit, {.StopTime = 1e-3, .TimeStep = 1e-5});
+    REQUIRE(ramp.Result);
+    CHECK_THAT(ramp.Result->NodeVoltages[2].back(), Catch::Matchers::WithinAbs(1.0, 1e-3));
+
+    // An AC source has no DC level, so the expression is read at 0 V: 5*V(IN) + V(IN)^2 has a slope of 5, 14 dB
+    stage.Input.SetSourceType(Core::VoltageSource::SourceType::AC);
+    stage.Source.SetExpression("5*V(IN) + V(IN)*V(IN)");
+    const Core::ACSweepRun sweep =
+        Core::RunACSweep(stage.Circuit, {.StartFrequency = 1e3, .StopFrequency = 1e4, .PointsPerDecade = 1});
+    REQUIRE(sweep.Result);
+    CHECK_THAT(sweep.Result->NodeMagnitudesDecibels[2].front(), Catch::Matchers::WithinAbs(13.98, 0.05));
+}
+
+TEST_CASE("A behavioral source inside a block reads the nets and currents of the block", "[simulator]") {
+    // The block doubles the current of its resistor into a voltage: 1 mA through 1k gives 2 V at its output
+    Core::Resistor inner;
+    inner.SetName("R1");
+    Core::BehavioralSource doubler(Core::ComponentType::BEHAVIORAL_VOLTAGE);
+    doubler.SetName("B1");
+    doubler.SetExpression("2k*I(R1) + 0*V(MID)");
+    auto definition = std::make_shared<Core::SubcircuitDefinition>();
+    definition->Name = "doubler";
+    definition->Pins = {{"IN", 1}, {"OUT", 2}};
+    definition->Body.Add(inner, {1, 0});
+    definition->Body.Add(doubler, {2, 0});
+    definition->Body.NameNet("MID", 1);
+
+    Core::VCC supply;
+    supply.SetName("V1");
+    supply.SetValue(1.0);
+    Core::SubcircuitInstance instance("doubler", {"IN", "OUT"});
+    instance.SetName("X1");
+    Core::Resistor load;
+    load.SetName("R9");
+    const Core::Ground reference;
+    Core::Circuit circuit;
+    circuit.Add(supply, {1});
+    circuit.Add(instance, {1, 2});
+    circuit.Add(load, {2, 0});
+    circuit.Add(reference, {0});
+    circuit.AddSubcircuit(definition);
+    const Core::OperatingPointRun run = Core::RunOperatingPoint(circuit);
+    if (!run.Result) {
+        FAIL(run.Result.error());
+    }
+    CHECK_THAT(run.Result->NodeVoltages[2], Catch::Matchers::WithinAbs(2.0, 1e-6));
+}
+
+TEST_CASE("A behavioral source that names a missing net or its own current is refused before ngspice", "[simulator]") {
+    BehavioralStage stage(Core::ComponentType::BEHAVIORAL_VOLTAGE);
+    stage.Source.SetExpression("V(LO)*2");
+    const Core::OperatingPointRun missing = Core::RunOperatingPoint(stage.Circuit);
+    REQUIRE_FALSE(missing.Result);
+    CHECK(missing.Result.error() == "B1: The circuit has no net named LO");
+
+    stage.Source.SetExpression("I(B1)");
+    CHECK(Core::CheckCircuit(stage.Circuit) == "B1 cannot read its own current");
+    stage.Source.SetExpression("I(R7)");
+    CHECK(Core::CheckCircuit(stage.Circuit) == "B1: The circuit has no current I(R7)");
 }

@@ -363,6 +363,21 @@ saturation, so their output can reach any value. A current-controlled source fol
 source, as ngspice requires: the source itself for a voltage source or VCC, or a 0 V probe that imcsim adds in
 series with the controlling part.
 
+## Behavioral sources
+
+A behavioral voltage or current source is an ngspice `B` element whose output is an expression: `B1 n+ n- V=...` or
+`I=...`. imcsim writes each `V(NET)` as `v(node)`, `V(A, B)` as `v(a,b)`, and each `I(R1)` as the current of the voltage
+source ngspice follows it through, the part's own or a 0 V probe in series with it, as for a current-controlled source.
+Everything else, numbers with SPICE suffixes, operators, comparisons, the ternary `a ? b : c` and functions such as
+`tanh`, `exp`, `abs`, `min`, `max`, `time` and `temper`, reaches ngspice as written and follows its rules.
+
+- The output is ideal, as for the controlled sources: no output resistance and no limit, so an expression that grows
+  without bound, such as `exp(V(IN))`, can stop the solver.
+- In `.ac` and `.noise` the source is linearized at the operating point: `V(IN)*V(IN)` has the gain `2*V(IN)` there,
+  and nothing at all around 0 V. A behavioral source adds no noise.
+- `time` is 0 in `.op` and `.dc`; a transient follows it.
+- Inside a block, the expression reads the nets and currents of the block.
+
 ## Diodes, Zener diodes and LEDs
 
 All three use the SPICE diode model (`D`), with these parameters:

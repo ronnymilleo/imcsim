@@ -4,6 +4,7 @@
 
 add_library(imcsim-core-lib
         STATIC
+            components/behavioral_source.cpp
             components/bjt.cpp
             components/capacitor.cpp
             components/clock.cpp
@@ -53,6 +54,7 @@ add_library(imcsim-core-lib
             simulation/simulation_service.cpp
             simulation/simulator.cpp
             simulation/stepped_circuit.cpp
+            spice/behavioral_expression.cpp
             spice/spice_inclusions.cpp
             spice/spice_library.cpp
             spice/spice_text.cpp
