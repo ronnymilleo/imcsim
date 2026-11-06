@@ -19,10 +19,12 @@
 #include "simulation/circuit_checks.h"
 #include "simulation/circuit_copy.h"
 #include "simulation/simulator.h"
+#include "ui_elements/ui_subcircuit.h"
 #include <algorithm>
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 #include <cstddef>
+#include <cstdlib>
 #include <memory>
 #include <optional>
 #include <string>
@@ -63,10 +65,12 @@ void AddMarker(GUI::Schematic &schematic, const GUI::GridPoint point, const std:
 }
 
 /**
- * @brief   Whether no wire goes over the box of a block, but for its leads, where a wire may end or lie.
+ * @brief   Whether no wire goes over the box of a block, but for its leads, where a wire may end or lie, or over the
+ *          rows its names are drawn on.
  */
 bool AreWiresClearOf(const GUI::Schematic &schematic, const GUI::UIElement &block) {
     const GUI::WorldBounds bounds = block.GetWorldBounds();
+    const std::vector<GUI::GridPoint> names = static_cast<const GUI::UISubcircuit &>(block).GetNameLabelPoints();
     std::vector<GUI::GridPoint> leads = block.GetTerminals();
     for (std::size_t terminal = 0; terminal < block.GetTerminals().size(); ++terminal) {
         const GUI::GridPoint inward = block.GetTerminalInward(terminal);
@@ -80,7 +84,7 @@ bool AreWiresClearOf(const GUI::Schematic &schematic, const GUI::UIElement &bloc
             const bool is_inside =
                 static_cast<float>(point.X) >= bounds.Min.x && static_cast<float>(point.X) <= bounds.Max.x &&
                 static_cast<float>(point.Y) >= bounds.Min.y && static_cast<float>(point.Y) <= bounds.Max.y;
-            if (is_inside && !std::ranges::contains(leads, point)) {
+            if ((is_inside && !std::ranges::contains(leads, point)) || std::ranges::contains(names, point)) {
                 return false;
             }
             if (point == end) {
@@ -648,6 +652,31 @@ TEST_CASE("The wires of a new block go around its box, from the edge each pin is
     CHECK(nodes.GetNode({-6, 6}) == nodes.GetNode(terminals[0]));
     CHECK(nodes.GetNode({6, 6}) == nodes.GetNode(terminals[1]));
     CHECK(nodes.GetNode(terminals[0]) != nodes.GetNode(terminals[1]));
+}
+
+TEST_CASE("The names of a block keep wires off the row past each end of its box, but for a way out of each pin",
+          "[subcircuit]") {
+    auto element = GUI::CreateElement(Core::ComponentType::SUBCIRCUIT, {10, 20}, GUI::Rotation::R0);
+    auto &instance = static_cast<Core::SubcircuitInstance &>(element->GetComponent());
+    instance.SetPins({"IN", "OUT"});
+    instance.SetPinSides({{"IN", Core::PinSide::LEFT}, {"OUT", Core::PinSide::TOP}});
+    const auto &block = static_cast<const GUI::UISubcircuit &>(*element);
+    // A pin on a side and one on top make the box 4 wide and 4 high, plus the top lead, so the names lie on the rows
+    // 4 above and 4 below the middle, across the box from x = -2 to 2
+    REQUIRE(block.GetTerminals() == std::vector<GUI::GridPoint>{{7, 20}, {10, 17}});
+    const std::vector<GUI::GridPoint> points = block.GetNameLabelPoints();
+
+    CHECK(points.size() == 9);
+    CHECK(std::ranges::contains(points, GUI::GridPoint{8, 16}));
+    CHECK(std::ranges::contains(points, GUI::GridPoint{12, 24}));
+    // The top pin leaves upward through the row of the instance name
+    CHECK_FALSE(std::ranges::contains(points, GUI::GridPoint{10, 16}));
+    CHECK_FALSE(std::ranges::contains(points, GUI::GridPoint{7, 16}));
+
+    // Turned a quarter, the rows become columns beside the box
+    element->SetRotation(GUI::Rotation::R90);
+    const std::vector<GUI::GridPoint> turned = block.GetNameLabelPoints();
+    CHECK(std::ranges::all_of(turned, [](const GUI::GridPoint point) { return std::abs(point.X - 10) == 4; }));
 }
 
 TEST_CASE("A new block moves aside when its box would cover a point its wires go to", "[subcircuit]") {

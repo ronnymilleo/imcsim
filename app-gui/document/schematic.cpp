@@ -17,6 +17,7 @@
 #include "editing/group_editing.h"
 #include "editing/part_names.h"
 #include "editing/wire_editing.h"
+#include "ui_elements/ui_subcircuit.h"
 #include <algorithm>
 #include <format>
 #include <iterator>
@@ -223,8 +224,8 @@ struct TerminalMoves {
     std::vector<GridPoint> Removed;
     /// Pins that moved to another edge, which get a new wire around the box from where they were.
     std::vector<ReroutedPin> Rerouted;
-    /// The boxes of the instances, which the new wires go around.
-    std::vector<WorldBounds> Boxes;
+    /// The instances, which the new wires go around.
+    RoutingObstacles Blocks;
 };
 
 /**
@@ -248,7 +249,7 @@ void RefreshInstance(UIElement &element, const SavedSubcircuit &definition, cons
     }
     ApplyDefinitionPins(instance, definition);
     const std::vector<GridPoint> new_terminals = element.GetTerminals();
-    moves.Boxes.push_back(element.GetWorldBounds());
+    KeepOffBlock(moves.Blocks, static_cast<const UISubcircuit &>(element));
 
     std::set<std::size_t> kept_terminals;
     for (std::size_t new_index = 0; new_index < matches.size(); ++new_index) {
@@ -314,7 +315,7 @@ void RefreshInstancesIn(std::vector<std::unique_ptr<UIElement>> &elements, std::
             wires = FollowTerminals(wires, {pin.OldPoint}, {pin.NewPoint});
         }
     }
-    const auto routed = RouteLinks(elements, wires, moves.Boxes, links);
+    const auto routed = RouteLinks(elements, wires, moves.Blocks, links);
     for (std::size_t index = 0; index < links.size(); ++index) {
         if (const std::optional<std::vector<UIWire>> &path = routed[index]) {
             std::ranges::copy(*path, std::back_inserter(wires));
@@ -672,7 +673,7 @@ Schematic::CreateSubcircuitFromSelection(std::string name, std::vector<SavedSubc
     DeleteSelection();
     m_Subcircuits.push_back(std::move(definition));
     m_BuiltSubcircuits.reset();
-    MoveToFreeSpot(*instance_element, old_points, m_Elements, m_Wires);
+    MoveToFreeSpot(static_cast<UISubcircuit &>(*instance_element), old_points, m_Elements, m_Wires);
     AddElement(std::move(instance_element));
     WireNewBlock(old_points);
     SelectElement(m_Elements.size() - 1);
@@ -1884,7 +1885,9 @@ void Schematic::WireNewBlock(const std::vector<GridPoint> &old_points) {
     for (std::size_t index = 0; index < new_points.size(); ++index) {
         links.push_back({.From = old_points[index], .To = new_points[index]});
     }
-    const auto routed = RouteLinks(m_Elements, m_Wires, {instance.GetWorldBounds()}, links);
+    RoutingObstacles block;
+    KeepOffBlock(block, static_cast<const UISubcircuit &>(instance));
+    const auto routed = RouteLinks(m_Elements, m_Wires, block, links);
     for (std::size_t index = 0; index < links.size(); ++index) {
         if (const std::optional<std::vector<UIWire>> &path = routed[index]) {
             for (const UIWire &wire : *path) {

@@ -15,8 +15,10 @@
 #include <catch2/catch_test_macros.hpp>
 #include <chrono>
 #include <cmath>
+#include <condition_variable>
 #include <cstddef>
 #include <memory>
+#include <mutex>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -241,6 +243,68 @@ struct FailingBackendInUse {
     FailingBackendInUse &operator=(const FailingBackendInUse &) = delete;
 };
 
+/**
+ * @class   TransientHold
+ * @brief   Holds the worker inside a transient until the test lets it go, so a test can act while a run is surely in
+ *          progress, however slow the build.
+ */
+class TransientHold {
+public:
+    void Enter() {
+        std::unique_lock lock(m_Mutex);
+        m_IsHolding = true;
+        m_Changed.notify_all();
+        m_Changed.wait(lock, [this] { return m_IsReleased; });
+    }
+    [[nodiscard]] bool WaitUntilHolding() {
+        std::unique_lock lock(m_Mutex);
+        return m_Changed.wait_for(lock, WAIT_LIMIT, [this] { return m_IsHolding; });
+    }
+    void Release() {
+        const std::lock_guard lock(m_Mutex);
+        m_IsReleased = true;
+        m_Changed.notify_all();
+    }
+
+private:
+    std::mutex m_Mutex;
+    std::condition_variable m_Changed;
+    bool m_IsHolding = false;
+    bool m_IsReleased = false;
+};
+
+/// Answers as FailingAboveBackend does, once its hold lets the first transient go.
+class HeldBackend : public FailingAboveBackend {
+public:
+    explicit HeldBackend(std::shared_ptr<TransientHold> hold) : m_Hold(std::move(hold)) {}
+
+    Core::TransientRun RunTransient(const Core::Circuit &circuit, const Core::TransientSettings &settings,
+                                    const std::optional<double> &temperature_celsius,
+                                    const Core::RunMonitor &monitor) override {
+        m_Hold->Enter();
+        return FailingAboveBackend::RunTransient(circuit, settings, temperature_celsius, monitor);
+    }
+
+private:
+    std::shared_ptr<TransientHold> m_Hold;
+};
+
+/// Puts the held backend in use for one test and goes back to ngspice at the end.
+struct HeldBackendInUse {
+    explicit HeldBackendInUse(const std::shared_ptr<TransientHold> &hold) {
+        Core::SetBackend(std::make_unique<HeldBackend>(hold));
+    }
+    ~HeldBackendInUse() { Core::SetBackend(nullptr); }
+    HeldBackendInUse(const HeldBackendInUse &) = delete;
+    HeldBackendInUse &operator=(const HeldBackendInUse &) = delete;
+};
+
+/// Lets a held run go when the test ends, before the worker it holds is joined, even when a check throws.
+struct ReleaseAtEnd {
+    std::shared_ptr<TransientHold> Hold;
+    ~ReleaseAtEnd() { Hold->Release(); }
+};
+
 } // namespace
 
 TEST_CASE("A run goes on in the background and its result reaches the schematic when Update takes it in",
@@ -278,14 +342,20 @@ TEST_CASE("Run does nothing while another run is in progress", "[analysis_contro
 }
 
 TEST_CASE("Stopping a stepped run ends it between steps and keeps no result", "[analysis_controls]") {
+    const auto hold = std::make_shared<TransientHold>();
+    const HeldBackendInUse backend(hold);
     GUI::Schematic schematic;
     OpenRCFilter(schematic);
     SelectLongSteppedTransient(schematic);
     GUI::AnalysisControls controls(schematic);
+    const ReleaseAtEnd release{.Hold = hold};
 
+    // The stop comes while the first step is held, so the run cannot end before it
     controls.RunSelected();
+    REQUIRE(hold->WaitUntilHolding());
     controls.StopRun();
     CHECK(controls.IsStopping());
+    hold->Release();
     REQUIRE(UpdateUntilIdle(controls));
 
     CHECK_FALSE(controls.IsStopping());
