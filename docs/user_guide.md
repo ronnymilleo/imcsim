@@ -373,6 +373,7 @@ Every part with more than one terminal numbers them in the order the SPICE netli
 | N- or P-channel MOSFET | drain | gate | source |
 | VCVS or VCCS (E, G) | output, top of the diamond | output, bottom | control + (4: control -) |
 | CCCS or CCVS (F, H) | output, top of the diamond | output, bottom | |
+| Behavioral source (B) | +, top of the diamond | -, bottom | |
 | Op-amp | output | non-inverting input (+) | inverting input (-) (4: V+, 5: V-) |
 | Gate (AND, OR, NAND, NOR, XOR, XNOR) | input A, upper left | input B, lower left | output Y, on the right |
 | NOT, buffer | input A, on the left | output Y, on the right | |
@@ -407,8 +408,8 @@ imcsim reports currents as ngspice computes them:
   voltage-controlled switch reports the current into its first contact terminal, like a two-terminal part.
 - **Transformers** report `I(T1.P)` into the primary + and `I(T1.S)` into the secondary +, each positive into its
   terminal. With a load on the secondary the two have opposite signs, in the ratio of the turns.
-- **Controlled sources** report the current of their output like a two-terminal part; their control pins carry no
-  current. A VCCS or CCCS pushes its current from terminal 1 to terminal 2 through itself, as its arrow shows, so
+- **Controlled and behavioral sources** report the current of their output like a two-terminal part; the control pins
+  of a controlled source carry no current. A VCCS, CCCS or behavioral current source pushes its current from terminal 1 to terminal 2 through itself, as its arrow shows, so
   into a load on terminal 1 it drives the load negative.
 - **Op-amps** report the current into their output, which returns through ground. An ideal op-amp draws no input
   current, and its supply pins only carry a small current while the output saturates; a macromodel draws its bias
@@ -434,6 +435,17 @@ resistor and a VCCS, and **Ideal transformer** builds a 1:2 transformer from a V
 A CCCS or CCVS follows a current picked in Properties among those the plots offer, such as `I(R1)` or `I(Q1.C)`,
 with the sign that current has in the results. Simulating one without a current, or with a current whose part was
 deleted, stops with a message.
+
+A **behavioral source**, in the same menu, drives a free expression instead of a gain: a voltage from its + to its -,
+or a current through itself from + to -. Type it in Properties, such as `V(IN)*V(LO)` for a multiplier,
+`1m*tanh(V(IN)/26m)` for a soft limiter or `10m*V(TEMP)` for a sensor. It names voltages by net label, `V(OUT)` or
+`V(IN, OUT)`, so put a label on every net it reads (`0` and `GND` are ground), and currents as the plots name them,
+`I(R1)` or `I(Q1.C)`. Numbers take SPICE suffixes, and the functions and operators are those of ngspice: `tanh()`,
+`exp()`, `abs()`, `min()`, `max()`, comparisons with `a ? b : c`, `time` and `temper`. Properties says at once what is
+wrong, a net no label names, a current the circuit lacks or a parenthesis that does not close, and keeps the last
+expression that read until the new one does; ngspice reports the rest when it runs. The schematic labels it as
+`V=...` or `I=...`, cut after 24 characters. Renaming a part it reads renames it in the expression too. In an AC
+sweep it is linearized at the operating point (see the models page).
 
 An op-amp starts **Ideal**: no input current, no output resistance and 100 dB of gain, so its feedback network sets
 the closed-loop gain. Its gain rolls off at the gain-bandwidth product (GBW, 1 MHz unless set in Properties): an
