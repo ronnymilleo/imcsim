@@ -8,9 +8,9 @@ How to read what imcsim measures, plots and exports. The [README](../README.md) 
 - **Toolbar**: Select, Wire (W) and Probe (P) on the left, then the parts, each button showing its symbol. Sources,
   diodes, transistors, controlled sources and the adjustable parts share one button per group: it places the part last picked, and the
   arrow beside it (or a right click) lists the others. Hover a button for its name and shortcut.
-- **Editing a part**: double-click it, or select it and press Enter, to open its properties beside it; edits
-  apply as you type, and Enter, Esc or a click outside closes them. With a part selected, typing a number starts
-  editing its main value right away: `4k7` and Enter make a resistor 4.7k. Values take SPICE suffixes, and a whole
+- **Editing a part**: double-click it, or select it and press Enter, to open its properties at the top of the
+  schematic; edits apply as you type, and Enter, Esc or a click outside closes them. With a part selected, typing a
+  number starts editing its main value right away: `4k7` and Enter make a resistor 4.7k. Values take SPICE suffixes, and a whole
   number may put its decimals after the suffix, as resistor codes do (`4k7`, `2M2`, `3u3`). View > Properties keeps
   the same fields in a docked window.
 - **Renaming a part**: the Name field of its properties takes a new name when you press Enter or click away. The name
