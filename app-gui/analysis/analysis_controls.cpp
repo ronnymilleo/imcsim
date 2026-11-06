@@ -189,6 +189,28 @@ std::optional<std::string> StoreSteps(std::expected<StepFamily<Result>, std::str
     return std::nullopt;
 }
 
+/**
+ * @brief   The warnings the stored result of one analysis carries, or none when it has no result or no warnings.
+ */
+std::vector<std::string> ListWarningsOfResult(const Schematic &schematic, const Analysis analysis) {
+    if (analysis == Analysis::OPERATING_POINT && schematic.GetOperatingPoint()) {
+        return schematic.GetOperatingPoint()->Warnings;
+    }
+    if (analysis == Analysis::TRANSIENT && schematic.GetTransient()) {
+        return schematic.GetTransient()->Warnings;
+    }
+    if (analysis == Analysis::POLE_ZERO && schematic.GetPoleZero()) {
+        return schematic.GetPoleZero()->Warnings;
+    }
+    if (analysis == Analysis::S_PARAMETERS && schematic.GetSParameters()) {
+        return schematic.GetSParameters()->Warnings;
+    }
+    if (analysis == Analysis::TRUTH_TABLE && schematic.GetTruthTable()) {
+        return schematic.GetTruthTable()->Warnings;
+    }
+    return {};
+}
+
 } // namespace
 
 /**
@@ -552,6 +574,9 @@ void AnalysisControls::StartAnalysis(const Analysis analysis, const Core::Circui
     case Analysis::POLE_ZERO:
         RunPoleZeroAnalysis(circuit);
         break;
+    case Analysis::S_PARAMETERS:
+        RunSParameterAnalysis(circuit);
+        break;
     case Analysis::TRUTH_TABLE:
         RunTruthTableAnalysis(circuit);
         break;
@@ -905,6 +930,22 @@ void AnalysisControls::RunPoleZeroAnalysis(const Core::Circuit &circuit) {
                  }));
 }
 
+void AnalysisControls::RunSParameterAnalysis(const Core::Circuit &circuit) {
+    const Core::SParameterSettings run_settings = m_Schematic.GetSimulationSettings().SParameters;
+    StartRun(Analysis::S_PARAMETERS,
+             MakeJob<Core::SParametersRun>(
+                 circuit,
+                 [run_settings](const Core::Circuit &copy, Core::RunControl &) {
+                     return Core::RunSParameters(copy, run_settings);
+                 },
+                 [this](Core::SParametersRun run) {
+                     Finish(Analysis::S_PARAMETERS,
+                            StoreResult(std::move(run.Result),
+                                        [this](auto result) { m_Schematic.SetSParameters(std::move(result)); }),
+                            std::move(run.Messages));
+                 }));
+}
+
 void AnalysisControls::RunTruthTableAnalysis(const Core::Circuit &circuit) {
     const std::vector<std::string> available = Core::GetTruthTableInputs(circuit);
     const std::vector<int> outputs = ListMeasuredNodes(circuit, m_Schematic);
@@ -959,6 +1000,9 @@ void AnalysisControls::ClearResult(const Analysis analysis) {
     case Analysis::POLE_ZERO:
         m_Schematic.SetPoleZero(std::nullopt);
         break;
+    case Analysis::S_PARAMETERS:
+        m_Schematic.SetSParameters(std::nullopt);
+        break;
     case Analysis::TRUTH_TABLE:
         m_Schematic.SetTruthTable(std::nullopt);
         break;
@@ -986,19 +1030,7 @@ std::vector<std::string> AnalysisControls::GetResultWarnings(const Analysis anal
         }
         return warnings;
     }
-    if (analysis == Analysis::OPERATING_POINT && m_Schematic.GetOperatingPoint()) {
-        return m_Schematic.GetOperatingPoint()->Warnings;
-    }
-    if (analysis == Analysis::TRANSIENT && m_Schematic.GetTransient()) {
-        return m_Schematic.GetTransient()->Warnings;
-    }
-    if (analysis == Analysis::POLE_ZERO && m_Schematic.GetPoleZero()) {
-        return m_Schematic.GetPoleZero()->Warnings;
-    }
-    if (analysis == Analysis::TRUTH_TABLE && m_Schematic.GetTruthTable()) {
-        return m_Schematic.GetTruthTable()->Warnings;
-    }
-    return {};
+    return ListWarningsOfResult(m_Schematic, analysis);
 }
 
 bool AnalysisControls::HasResult(const Analysis analysis) const {
@@ -1019,6 +1051,8 @@ bool AnalysisControls::HasResult(const Analysis analysis) const {
         return m_Schematic.GetSensitivity().has_value();
     case Analysis::POLE_ZERO:
         return m_Schematic.GetPoleZero().has_value();
+    case Analysis::S_PARAMETERS:
+        return m_Schematic.GetSParameters().has_value();
     case Analysis::TRUTH_TABLE:
         return m_Schematic.GetTruthTable().has_value();
     }

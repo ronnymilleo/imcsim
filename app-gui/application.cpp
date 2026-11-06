@@ -490,6 +490,8 @@ void Application::ShowNewResults() {
                 m_Schematic.GetSensitivity().has_value(), PlotTab::SENSITIVITY);
     show_if_new(m_ShownPoleZeroVersion, m_Schematic.GetPoleZeroVersion(), m_Schematic.GetPoleZero().has_value(),
                 PlotTab::POLE_ZERO);
+    show_if_new(m_ShownSParametersVersion, m_Schematic.GetSParametersVersion(),
+                m_Schematic.GetSParameters().has_value(), PlotTab::S_PARAMETERS);
     show_if_new(m_ShownTruthTableVersion, m_Schematic.GetTruthTableVersion(), m_Schematic.GetTruthTable().has_value(),
                 PlotTab::TRUTH_TABLE);
     // After the analyses, so the table of a Monte Carlo run is what shows in front of the traces it came with

@@ -33,6 +33,7 @@ public:
     TransferFunctionRun RunTransferFunction(const Circuit &circuit, const TransferFunctionSettings &settings) override;
     SensitivityRun RunSensitivity(const Circuit &circuit, const SensitivitySettings &settings) override;
     PoleZeroRun RunPoleZero(const Circuit &circuit, const PoleZeroSettings &settings) override;
+    SParametersRun RunSParameters(const Circuit &circuit, const SParameterSettings &settings) override;
 
 private:
     /// Works the capabilities out once, on first use, by whichever thread asks first, since they are known only after

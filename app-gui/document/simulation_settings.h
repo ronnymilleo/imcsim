@@ -30,10 +30,11 @@ enum class Analysis {
     TRANSFER_FUNCTION,
     SENSITIVITY,
     POLE_ZERO,
+    S_PARAMETERS,
     TRUTH_TABLE
 };
 
-constexpr std::size_t ANALYSIS_COUNT = 9;
+constexpr std::size_t ANALYSIS_COUNT = 10;
 
 /// Wall seconds a live transient takes to cover its stop time, at first.
 constexpr double DEFAULT_LIVE_SECONDS = 10.0;
@@ -77,6 +78,8 @@ struct SimulationSettings {
     std::optional<GridPoint> SensitivityOutput;
     std::string PoleZeroSource;
     std::optional<GridPoint> PoleZeroOutput;
+    /// Frequency range of the S-parameter analysis; its ports are pin markers of the schematic, so it has no sources.
+    Core::SParameterSettings SParameters;
     /// Logic inputs the truth table varies; none listed, or none left in the circuit, means every logic input.
     std::vector<std::string> TruthTableInputs;
     /// Runs the transient, AC sweep or DC sweep once per value of a part or of the temperature.

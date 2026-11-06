@@ -88,6 +88,8 @@ Core::AnalysisKind ToKind(const Analysis analysis) {
         return Core::AnalysisKind::SENSITIVITY;
     case Analysis::POLE_ZERO:
         return Core::AnalysisKind::POLE_ZERO;
+    case Analysis::S_PARAMETERS:
+        return Core::AnalysisKind::S_PARAMETERS;
     case Analysis::TRUTH_TABLE:
         return Core::AnalysisKind::TRUTH_TABLE;
     default:
@@ -225,6 +227,18 @@ void AnalysisSettingsPanel::DrawSettings() {
         LoadSettingsFields();
     }
     SimulationSettings settings = m_Schematic.GetSimulationSettings();
+    DrawSelectedSettings(settings);
+    if (settings.Selected == Analysis::TRANSIENT || settings.Selected == Analysis::AC_SWEEP ||
+        settings.Selected == Analysis::DC_SWEEP) {
+        DrawRunModeSettings(settings);
+    }
+    m_Schematic.SetSimulationSettings(settings);
+}
+
+/**
+ * @brief   Draws the fields of the analysis the settings select.
+ */
+void AnalysisSettingsPanel::DrawSelectedSettings(SimulationSettings &settings) {
     switch (settings.Selected) {
     case Analysis::OPERATING_POINT:
         ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + ImGui::GetFontSize() * 20.0f);
@@ -253,15 +267,13 @@ void AnalysisSettingsPanel::DrawSettings() {
     case Analysis::POLE_ZERO:
         DrawPoleZeroSettings(settings);
         break;
+    case Analysis::S_PARAMETERS:
+        DrawSParameterSettings(settings);
+        break;
     case Analysis::TRUTH_TABLE:
         DrawTruthTableSettings(settings);
         break;
     }
-    if (settings.Selected == Analysis::TRANSIENT || settings.Selected == Analysis::AC_SWEEP ||
-        settings.Selected == Analysis::DC_SWEEP) {
-        DrawRunModeSettings(settings);
-    }
-    m_Schematic.SetSimulationSettings(settings);
 }
 
 void AnalysisSettingsPanel::LoadSettingsFields() {
@@ -275,6 +287,8 @@ void AnalysisSettingsPanel::LoadSettingsFields() {
     LoadSweepFields(settings.SteppedRange, m_SteppedFields);
     m_NoiseStartFrequency.Load(settings.NoiseRange.StartFrequency);
     m_NoiseStopFrequency.Load(settings.NoiseRange.StopFrequency);
+    m_SStartFrequency.Load(settings.SParameters.StartFrequency);
+    m_SStopFrequency.Load(settings.SParameters.StopFrequency);
     LoadParameterStepFields(settings.ParameterStep);
     m_LoadedSettingsVersion = m_Schematic.GetSimulationSettingsVersion();
 }
@@ -425,6 +439,57 @@ void AnalysisSettingsPanel::DrawTransferFunctionSettings(SimulationSettings &set
         settings.TransferFunctionSource, settings.TransferFunctionOutput, "tf",
         "Connect some parts to measure their transfer function",
         "The DC gain, the input impedance and the output impedance from this source to the output");
+}
+
+/**
+ * @brief   The frequency range of the S-parameter analysis, and the ports the circuit has.
+ * @details The ports are the Block pin markers set as ports in their properties, so there is nothing to pick here.
+ */
+void AnalysisSettingsPanel::DrawSParameterSettings(SimulationSettings &settings) {
+    Core::SParameterSettings &range = settings.SParameters;
+    if (const std::optional<double> start = m_SStartFrequency.Draw("Start", "Hz", IsPositive)) {
+        range.StartFrequency = *start;
+    }
+    if (const std::optional<double> stop = m_SStopFrequency.Draw("Stop", "Hz", IsPositive)) {
+        range.StopFrequency = *stop;
+    }
+    DrawFieldLabel("Sweep");
+    if (ImGui::RadioButton("Log", range.IsLogarithmic)) {
+        range.IsLogarithmic = true;
+    }
+    ImGui::SameLine();
+    if (ImGui::RadioButton("Lin", !range.IsLogarithmic)) {
+        range.IsLogarithmic = false;
+    }
+    DrawFieldLabel("Points");
+    // Files reject too few points, so the fields never produce a value that would not load back
+    if (range.IsLogarithmic) {
+        if (ImGui::InputInt("per decade", &range.PointsPerDecade)) {
+            range.PointsPerDecade = std::max(range.PointsPerDecade, 1);
+        }
+    } else if (ImGui::InputInt("in all", &range.LinearPoints)) {
+        range.LinearPoints = std::max(range.LinearPoints, 3);
+    }
+    DrawPortSummary();
+}
+
+/**
+ * @brief   Lists the ports of the circuit, or says how to make them.
+ */
+void AnalysisSettingsPanel::DrawPortSummary() {
+    std::vector<Core::CircuitPort> ports = m_Schematic.BuildCircuit().GetPorts();
+    std::ranges::sort(ports, {}, &Core::CircuitPort::Number);
+    if (ports.size() < Core::MIN_S_PARAMETER_PORTS) {
+        ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + ImGui::GetFontSize() * 20.0f);
+        ImGui::TextColored(GetErrorTextColor(), "%s",
+                           "Needs two or more ports: turn on S-parameter port in the properties of Block pin markers");
+        ImGui::PopTextWrapPos();
+        return;
+    }
+    for (const Core::CircuitPort &port : ports) {
+        ImGui::TextDisabled("%s",
+                            std::format("Port {}: {} ohm", port.Number, Core::FormatValue(port.ReferenceOhms)).c_str());
+    }
 }
 
 /**

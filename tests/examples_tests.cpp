@@ -29,6 +29,7 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 #include <cmath>
+#include <complex>
 #include <format>
 #include <numbers>
 #include <optional>
@@ -1238,4 +1239,38 @@ TEST_CASE("The fuse example blows the fast fuse first and the slow-blow one late
     CHECK_THAT(current("FU1").front(), Catch::Matchers::WithinAbs(1.2, 0.01));
     CHECK_THAT(current("FU1").back(), Catch::Matchers::WithinAbs(0.0, 1e-6));
     CHECK_THAT(current("FU2").back(), Catch::Matchers::WithinAbs(0.0, 1e-6));
+}
+
+TEST_CASE("The S-parameter example is a T low-pass whose matrix is the closed form of its ABCD matrix",
+          "[examples][s_parameters]") {
+    GUI::Schematic schematic;
+    OpenExample("s_parameters_lc_low_pass.imcsim", schematic);
+    const GUI::SimulationSettings &settings = schematic.GetSimulationSettings();
+    CHECK(settings.Selected == GUI::Analysis::S_PARAMETERS);
+
+    const Core::SParametersRun run = Core::RunSParameters(schematic.BuildCircuit(), settings.SParameters);
+    if (!run.Result) {
+        FAIL(run.Result.error());
+    }
+    CHECK(run.Result->Warnings.empty());
+    REQUIRE(run.Result->GetPortCount() == 2);
+    REQUIRE(run.Result->Frequencies.size() == 401);
+    for (std::size_t index = 0; index < run.Result->Frequencies.size(); ++index) {
+        // Series L, shunt C, series L, each as its ABCD matrix, between 50 ohm ports
+        const double omega = 2.0 * std::numbers::pi * run.Result->Frequencies[index];
+        const std::complex<double> series(0.0, omega * 8e-6);
+        const std::complex<double> shunt(0.0, omega * 3.18e-9);
+        const std::complex<double> a = 1.0 + series * shunt;
+        const std::complex<double> b = 2.0 * series + series * series * shunt;
+        const std::complex<double> denominator = a + b / 50.0 + shunt * 50.0 + a;
+        const std::complex<double> reflection = (a + b / 50.0 - shunt * 50.0 - a) / denominator;
+        const std::complex<double> transmission = 2.0 / denominator;
+        CHECK_THAT(std::abs(run.Result->Get(index, 1, 1) - reflection), Catch::Matchers::WithinAbs(0.0, 1e-6));
+        CHECK_THAT(std::abs(run.Result->Get(index, 2, 1) - transmission), Catch::Matchers::WithinAbs(0.0, 1e-6));
+    }
+    // The low frequencies pass and are nearly matched; the high ones are reflected
+    CHECK(std::abs(run.Result->Get(0, 1, 1)) < 0.1);
+    CHECK(std::abs(run.Result->Get(400, 1, 1)) > 0.9);
+    CHECK(std::abs(run.Result->Get(0, 2, 1)) > 0.98);
+    CHECK(std::abs(run.Result->Get(400, 2, 1)) < 0.01);
 }

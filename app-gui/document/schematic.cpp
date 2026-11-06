@@ -1250,6 +1250,7 @@ void Schematic::MarkLiveChanged(const Core::Component &component) {
     m_TransferFunction.reset();
     m_Sensitivity.reset();
     m_PoleZero.reset();
+    m_SParameters.reset();
     m_TruthTable.reset();
 }
 
@@ -1663,6 +1664,24 @@ const std::optional<Core::PoleZero> &Schematic::GetPoleZero() const {
 }
 
 /**
+ * @brief   Stores the result of an S-parameter analysis of the current schematic.
+ * @param[in] s_parameters  The scattering matrix over the sweep, or no value to clear it.
+ * @note    The result is dropped on the next change, since it no longer matches the circuit.
+ */
+void Schematic::SetSParameters(std::optional<Core::SParameters> s_parameters) {
+    m_SParameters = std::move(s_parameters);
+    ++m_SParametersVersion;
+}
+
+/**
+ * @brief   Returns the last S-parameter analysis run for the current schematic.
+ * @return  The scattering matrix, or no value when there was no analysis since the last change.
+ */
+const std::optional<Core::SParameters> &Schematic::GetSParameters() const {
+    return m_SParameters;
+}
+
+/**
  * @brief   Returns the last transfer function simulated for the current schematic.
  * @return  The transfer function result, or no value when there was no simulation since the last change.
  */
@@ -1768,6 +1787,14 @@ std::size_t Schematic::GetPoleZeroVersion() const {
 }
 
 /**
+ * @brief   Returns a number that changes whenever an S-parameter result is stored.
+ * @return  The S-parameter version; compare it with a stored one to know whether the result was replaced.
+ */
+std::size_t Schematic::GetSParametersVersion() const {
+    return m_SParametersVersion;
+}
+
+/**
  * @brief   Returns a number that changes whenever a truth table result is stored.
  * @return  The truth table version; compare it with a stored one to know whether the result was replaced.
  */
@@ -1799,6 +1826,7 @@ void Schematic::InvalidateDerivedData() {
     m_TransferFunction.reset();
     m_Sensitivity.reset();
     m_PoleZero.reset();
+    m_SParameters.reset();
     m_TruthTable.reset();
 }
 

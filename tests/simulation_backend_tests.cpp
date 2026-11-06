@@ -90,6 +90,10 @@ public:
         return {std::unexpected("not run by the fake"), {}};
     }
 
+    Core::SParametersRun RunSParameters(const Core::Circuit &, const Core::SParameterSettings &) override {
+        return {std::unexpected("not run by the fake"), {}};
+    }
+
     int OperatingPointRuns = 0;
     std::optional<Core::TransientSettings> LastTransientSettings;
     std::optional<double> LastTemperatureCelsius;
@@ -292,7 +296,7 @@ TEST_CASE("ngspice is the backend until another one is set, and runs every analy
     CHECK(backend.GetName() == "ngspice");
     CHECK(dynamic_cast<const Core::NgspiceBackend *>(&backend) != nullptr);
     const Core::BackendCapabilities &capabilities = backend.GetCapabilities();
-    CHECK(capabilities.Analyses.size() == 8);
+    CHECK(capabilities.Analyses.size() == 9);
     // Logic parts are refused only when the digital models are missing, whatever the system ngspice has
     CHECK(capabilities.UnsupportedParts.empty() == Core::AreDigitalModelsAvailable());
     // ngspice cannot recover from a sensitivity analysis of logic parts, with its digital models or without

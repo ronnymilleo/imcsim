@@ -560,6 +560,16 @@ void Circuit::AddLibraryModel(LibraryModel model) {
 }
 
 /**
+ * @brief   Adds a port of the S-parameter analysis.
+ * @param[in] port  Port to add; its node counts toward GetNodeCount().
+ * @note    The netlist leaves ports out; the S-parameter run writes them itself.
+ */
+void Circuit::AddPort(const CircuitPort &port) {
+    m_NodeCount = std::max(m_NodeCount, port.Node + 1);
+    m_Ports.push_back(port);
+}
+
+/**
  * @brief   Adds the subcircuit definitions and library models of another circuit, as a circuit derived from it needs.
  * @param[in] other  Circuit whose definitions are shared and whose models are copied.
  */
@@ -604,6 +614,14 @@ std::shared_ptr<const SubcircuitDefinition> Circuit::FindSubcircuit(const std::s
  */
 const std::vector<LibraryModel> &Circuit::GetLibraryModels() const {
     return m_LibraryModels;
+}
+
+/**
+ * @brief   Returns the ports of the S-parameter analysis.
+ * @return  The ports in the order they were added, which is not their number.
+ */
+const std::vector<CircuitPort> &Circuit::GetPorts() const {
+    return m_Ports;
 }
 
 /**

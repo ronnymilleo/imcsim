@@ -46,6 +46,8 @@ add_executable(imcsim-tests
             pole_zero_view_tests.cpp
             preferences_tests.cpp
             probing_tests.cpp
+            s_parameter_view_tests.cpp
+            s_parameters_tests.cpp
             schematic_canvas_tests.cpp
             ready_blocks_tests.cpp
             schematic_file_tests.cpp
@@ -57,6 +59,7 @@ add_executable(imcsim-tests
             simulation_backend_tests.cpp
             simulation_service_tests.cpp
             simulator_tests.cpp
+            smith_chart_tests.cpp
             spectrum_tests.cpp
             spice_import_tests.cpp
             spice_inclusions_tests.cpp
@@ -66,6 +69,7 @@ add_executable(imcsim-tests
             stepped_circuit_tests.cpp
             subcircuit_tests.cpp
             svg_writer_tests.cpp
+            touchstone_tests.cpp
             trace_fit_state_tests.cpp
             transient_chunks_tests.cpp
             transient_window_tests.cpp

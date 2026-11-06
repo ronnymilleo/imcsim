@@ -50,6 +50,8 @@ public:
                const std::string &file_suffix);
     void StartText(std::string csv, const std::optional<std::filesystem::path> &schematic_path,
                    const std::string &file_suffix);
+    void StartTouchstone(std::string text, int port_count, const std::optional<std::filesystem::path> &schematic_path,
+                         const std::string &file_suffix);
     void Update();
     void DrawError();
 
@@ -60,6 +62,8 @@ private:
     /// A table written as it is, in place of a figure.
     std::optional<std::string> m_PendingText;
     ExportFormat m_PendingFormat = ExportFormat::SVG;
+    /// Extension the file takes when the dialog leaves it out.
+    std::string m_PendingExtension;
     std::string m_Error;
 };
 

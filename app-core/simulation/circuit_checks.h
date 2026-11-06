@@ -19,6 +19,9 @@ namespace Core {
 /// Most time steps a transient may span, which keeps a mistyped setting from running for minutes or exhausting memory.
 constexpr int MAX_TRANSIENT_POINTS = 1000000;
 
+/// Fewest ports an S-parameter analysis runs with, since ngspice refuses fewer.
+constexpr std::size_t MIN_S_PARAMETER_PORTS = 2;
+
 /// The parts a DC sweep or a transfer function can drive, as messages name them.
 constexpr std::string_view SWEEPABLE_SOURCES = "a voltage or current source, VCC, clock or logic input";
 
@@ -37,6 +40,7 @@ std::optional<std::string> CheckNoiseSettings(const Circuit &circuit, const Nois
 std::optional<std::string> CheckTransferFunctionSettings(const Circuit &circuit,
                                                          const TransferFunctionSettings &settings);
 std::optional<std::string> CheckPoleZeroSettings(const Circuit &circuit, const PoleZeroSettings &settings);
+std::optional<std::string> CheckSParameterSettings(const Circuit &circuit, const SParameterSettings &settings);
 std::optional<std::string> CheckSensitivitySettings(const Circuit &circuit, const SensitivitySettings &settings);
 std::optional<std::string> CheckTruthTableSettings(const Circuit &circuit, const TruthTableSettings &settings);
 

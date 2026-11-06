@@ -284,3 +284,47 @@ TEST_CASE("A centered note is drawn over its point, a plain one beside it", "[pl
     // The two place the label at different x
     CHECK(*centered != *beside);
 }
+
+namespace {
+
+/// Two curves of a Smith chart: S11 spiraling in from the rim, and S22 sitting at the center.
+GUI::ExportFigure MakeSmithFigure() {
+    GUI::ExportSmith smith{.Title = "Smith chart"};
+    GUI::ExportSmithTrace reflection{.Name = "S11", .Color = {86, 156, 214}};
+    GUI::ExportSmithTrace matched{.Name = "S22", .Color = {230, 126, 80}};
+    for (int step = 0; step < 20; ++step) {
+        const double angle = 0.3 * step;
+        const double radius = 0.95 - 0.04 * step;
+        reflection.Frequencies.push_back(1e6 * (step + 1));
+        reflection.Values.emplace_back(radius * std::cos(angle), radius * std::sin(angle));
+        matched.Frequencies.push_back(1e6 * (step + 1));
+        matched.Values.emplace_back(0.0, 0.0);
+    }
+    smith.Traces = {reflection, matched};
+    GUI::ExportFigure figure;
+    figure.Smith = smith;
+    return figure;
+}
+
+} // namespace
+
+TEST_CASE("A Smith chart draws its grid, its curves and a legend, without any panel", "[plot_export][smith]") {
+    const auto svg = GUI::RenderSvg(MakeSmithFigure(), {});
+    REQUIRE(svg);
+    CHECK_THAT(*svg, ContainsSubstring("<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"1600\" height=\"900\""));
+    CHECK_THAT(*svg, ContainsSubstring(">Smith chart</text>"));
+    CHECK_THAT(*svg, ContainsSubstring(">S11</text>"));
+    CHECK_THAT(*svg, ContainsSubstring(">S22</text>"));
+    // The labels of the circles of resistance and the arcs of reactance
+    for (const char *label :
+         {">0.2</text>", ">0.5</text>", ">1</text>", ">2</text>", ">5</text>", ">+j0.5</text>", ">-j2</text>"}) {
+        CHECK_THAT(*svg, ContainsSubstring(label));
+    }
+    // The curve of S11 has a point for each frequency, in the dark theme where it keeps its own color
+    const auto dark = GUI::RenderSvg(MakeSmithFigure(), {.Dark = true});
+    REQUIRE(dark);
+    CHECK(CountPolylinePoints(*dark, "#569cd6") == 20);
+    // 16 curves of the grid plus the real axis as a line, and the dots that mark the first frequency of each curve
+    CHECK(CountOccurrences(*svg, "<circle") == 2);
+    CHECK(CountOccurrences(*svg, "<polyline") >= 16 + 2 + 2);
+}

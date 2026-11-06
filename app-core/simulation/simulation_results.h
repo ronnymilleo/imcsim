@@ -7,6 +7,8 @@
 #define IMCSIM_SIMULATION_RESULTS_H
 
 #include "components/component.h"
+#include <complex>
+#include <cstddef>
 #include <expected>
 #include <optional>
 #include <string>
@@ -206,6 +208,25 @@ struct PoleZero {
 };
 
 /**
+ * @struct  SParameters
+ * @brief   The scattering matrix of the ports of a circuit at every frequency of a sweep.
+ * @details The matrix is square, one row and one column per port, numbered from 1 as the ports are. Values holds the
+ *          matrices one after the other, frequency by frequency and row by row, so S(i, j) at a frequency is the wave
+ *          leaving port i for a wave entering port j. The waves are power waves, normalized to the reference impedance
+ *          of each port.
+ */
+struct SParameters {
+    std::vector<double> Frequencies;
+    /// One reference impedance in ohms per port, in the order of the port numbers.
+    std::vector<double> ReferenceOhms;
+    std::vector<std::complex<double>> Values;
+    std::vector<std::string> Warnings;
+
+    int GetPortCount() const;
+    std::complex<double> Get(std::size_t frequency, int row, int column) const;
+};
+
+/**
  * @struct  PartSensitivity
  * @brief   How much the output node voltage changes with the value of one part.
  * @details Absolute is in volts per unit of the part (V/Ohm, V/F, V/V...). Normalized is the change in volts for a
@@ -282,6 +303,7 @@ using DCSweepRun = SimulationRun<DCSweep>;
 using NoiseRun = SimulationRun<Noise>;
 using SensitivityRun = SimulationRun<Sensitivity>;
 using PoleZeroRun = SimulationRun<PoleZero>;
+using SParametersRun = SimulationRun<SParameters>;
 using TransferFunctionRun = SimulationRun<TransferFunction>;
 using TruthTableRun = SimulationRun<TruthTable>;
 

@@ -5,6 +5,7 @@
 
 #include "part_editor.h"
 
+#include "document/subcircuit_pins.h"
 #include "drawing/theme.h"
 #include "editing/element_factory.h"
 #include "editing/live_input.h"
@@ -640,6 +641,9 @@ void PartEditor::LoadFields(const Core::Component &component) {
     m_Value.Load(component.GetValue());
     m_InitialCondition.LoadOptional(component.GetInitialCondition());
     m_Tolerance.LoadOptional(component.GetTolerance());
+    if (Core::IsSubcircuitPin(component.GetType())) {
+        m_PortReference.Load(static_cast<const Core::SubcircuitPinMarker &>(component).GetPort().ReferenceOhms);
+    }
     if (component.GetType() == Core::ComponentType::NET_LABEL || Core::IsSubcircuitPin(component.GetType())) {
         const std::string &net = static_cast<const Core::NetLabel &>(component).GetNet();
         m_Net.fill('\0');
@@ -760,9 +764,51 @@ void PartEditor::DrawNetLabel(Core::NetLabel &label) {
                                   : "1 to 32 letters, digits, _, - or .");
     } else if (is_pin) {
         ImGui::TextDisabled("The arrow points from the block's edge into the circuit; turn it to pick the edge");
+        DrawPortSettings(static_cast<Core::SubcircuitPinMarker &>(label));
     } else {
         ImGui::TextDisabled("Labels with the same name are one net; 0 and GND are ground, VCC is the supplies");
     }
+}
+
+/**
+ * @brief   Whether the marker is a port of the S-parameter analysis, with its number and reference impedance.
+ * @details Turning it on takes the lowest number no other port has. Only the markers of the top-level schematic count;
+ *          inside a block they are ignored. A port holds its node at 0 V in DC, so it belongs behind a capacitor where
+ *          the node is biased.
+ */
+void PartEditor::DrawPortSettings(Core::SubcircuitPinMarker &marker) {
+    Core::PortSettings port = marker.GetPort();
+    ImGui::Separator();
+    if (ImGui::Checkbox("S-parameter port", &port.IsPort)) {
+        if (port.IsPort) {
+            port.Number = FindFreePortNumber(m_Schematic->GetElements(), &marker);
+        }
+        marker.SetPort(port);
+        m_Schematic->MarkModified();
+    }
+    ImGui::SetItemTooltip("Makes this marker a port of the S-parameter analysis, with a source and a reference "
+                          "impedance at its node. The port holds the node at 0 V in DC and loads the circuit with its "
+                          "impedance, so couple it through a capacitor where the node has a bias. It counts only in "
+                          "the top-level schematic and is invisible in every other analysis");
+    if (!port.IsPort) {
+        return;
+    }
+    DrawFieldLabel("Number");
+    if (ImGui::InputInt("##port_number", &port.Number, 0)) {
+        port.Number = std::max(port.Number, 1);
+        marker.SetPort(port);
+        m_Schematic->MarkModified();
+    }
+    if (IsPortNumberTaken(m_Schematic->GetElements(), port.Number, &marker)) {
+        ImGui::TextColored(GetErrorTextColor(), "Port %d is already used by another marker", port.Number);
+    }
+    if (const std::optional<double> reference =
+            m_PortReference.Draw("Z0", "Ohm", [](const double value) { return value > 0.0; })) {
+        port.ReferenceOhms = *reference;
+        marker.SetPort(port);
+        m_Schematic->MarkModified();
+    }
+    ImGui::TextDisabled("Ports are numbered 1 to N with no gap; the analysis needs two or more");
 }
 
 void PartEditor::DrawValue(Core::Component &component) {

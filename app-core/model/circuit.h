@@ -42,6 +42,17 @@ struct CurrentProbe {
 };
 
 /**
+ * @struct  CircuitPort
+ * @brief   A port of the S-parameter analysis: a node that is driven and measured through its reference impedance.
+ */
+struct CircuitPort {
+    /// Index in the S matrix, from 1.
+    int Number = 1;
+    int Node = 0;
+    double ReferenceOhms = 50.0;
+};
+
+/**
  * @class   Circuit
  * @brief   Topology of a circuit, without geometry: which nodes each component connects.
  */
@@ -51,12 +62,14 @@ public:
     void ReserveNode(int node);
     void AddSubcircuit(std::shared_ptr<SubcircuitDefinition> definition);
     void AddLibraryModel(LibraryModel model);
+    void AddPort(const CircuitPort &port);
     void AddDefinitionsOf(const Circuit &other);
 
     const std::vector<CircuitEntry> &GetEntries() const;
     const std::vector<std::shared_ptr<SubcircuitDefinition>> &GetSubcircuits() const;
     std::shared_ptr<const SubcircuitDefinition> FindSubcircuit(std::string_view name) const;
     const std::vector<LibraryModel> &GetLibraryModels() const;
+    const std::vector<CircuitPort> &GetPorts() const;
     const LibraryModel *FindLibraryModel(std::string_view name) const;
     int GetNodeCount() const;
     bool HasGround() const;
@@ -69,6 +82,7 @@ private:
     std::vector<CircuitEntry> m_Entries;
     std::vector<std::shared_ptr<SubcircuitDefinition>> m_Subcircuits;
     std::vector<LibraryModel> m_LibraryModels;
+    std::vector<CircuitPort> m_Ports;
     int m_NodeCount = 0;
 };
 

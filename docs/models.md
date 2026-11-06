@@ -47,6 +47,18 @@ elements, so the results are those of ngspice with the models below. Some things
   it can return a wrong list with no warning, such as a ladder of right-half-plane poles for a rectifier at its
   unbiased operating point. `.options` do not help, and imcsim does not retry or work around it. Circuits with logic
   parts are refused, since the digital models leave the solver nothing to follow.
+- An S-parameter analysis is ngspice's `.sp`. Each pin marker set as a port becomes a 0 V source from its node to
+  ground with a port number and a reference impedance, which `.sp` reads: the source has the reference impedance in
+  series, so it loads the circuit (and holds the node at 0 V in DC), which is why the ports are written for this run only
+  and no other analysis sees them. ngspice's S parameters are power waves, so ports with different references give,
+  for a series resistor R between them, S11 = (R + Z2 - Z1) / (R + Z1 + Z2) and S21 = 2 sqrt(Z1 Z2) / (R + Z1 + Z2).
+  imcsim checks the ports before the run, because ngspice stops for good, for the rest of the session, when it finds
+  fewer than two, says nothing when two ports share a node, and gives misleading fatal errors for ports numbered with a
+  gap, a repeat or a Z0 of zero; it also gives one point for a linear sweep of two, and no result and no message when
+  the stop frequency is below the start. The impedance, VSWR and return loss are computed from S, not read from the Z
+  matrix of ngspice, which is meaningless (around 1e17 ohm) when the circuit has no finite impedance matrix, as for a
+  series resistor. Logic parts are refused, since the digital models of ngspice are fixed levels in a small-signal
+  analysis.
 - A truth table runs one operating point per combination of the chosen logic inputs, each on a copy of the circuit
   with the inputs set, so a row never depends on the one before it. That describes combinational logic; a latch or
   flip-flop that holds its state has no operating point for those combinations, and the row reads X.

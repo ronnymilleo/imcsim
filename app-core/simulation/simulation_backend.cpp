@@ -73,6 +73,8 @@ std::string_view GetAnalysisKindName(const AnalysisKind kind) {
         return "sensitivity";
     case AnalysisKind::POLE_ZERO:
         return "pole-zero";
+    case AnalysisKind::S_PARAMETERS:
+        return "S-parameter";
     case AnalysisKind::TRUTH_TABLE:
         return "truth table";
     default:
