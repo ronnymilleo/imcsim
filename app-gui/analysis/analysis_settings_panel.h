@@ -60,6 +60,7 @@ private:
     double m_ToleranceAllPercent = 5.0;
 
     // Settings fields
+    void DrawSelectedSettings(SimulationSettings &settings);
     void LoadSettingsFields();
     void DrawTransientSettings(SimulationSettings &settings);
     void DrawACSweepSettings(SimulationSettings &settings);

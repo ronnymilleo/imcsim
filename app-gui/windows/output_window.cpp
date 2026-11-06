@@ -379,60 +379,79 @@ void OutputWindow::DrawBusPanel(const std::size_t node_count) {
  */
 void OutputWindow::DrawTabs(const FrameResults &frame) {
     const std::optional<PlotTab> tab_to_show = std::exchange(m_TabToShow, std::nullopt);
-    const auto begin_tab = [this, &tab_to_show](const char *label, const PlotTab tab) {
-        if (!ImGui::BeginTabItem(label, nullptr,
-                                 tab_to_show == tab ? ImGuiTabItemFlags_SetSelected : ImGuiTabItemFlags_None)) {
-            return false;
-        }
-        m_ShownTab = tab;
-        return true;
-    };
-    if (begin_tab("Operating point", PlotTab::OPERATING_POINT)) {
+    DrawTimeAndFrequencyTabs(frame, tab_to_show);
+    DrawAnalysisTabs(tab_to_show);
+}
+
+/**
+ * @brief   Opens a tab, selecting it when a new result asked for it, and remembers it as the one shown.
+ * @return  True while the tab is open and its contents are to be drawn.
+ */
+bool OutputWindow::BeginTab(const char *label, const PlotTab tab, const std::optional<PlotTab> &tab_to_show) {
+    if (!ImGui::BeginTabItem(label, nullptr,
+                             tab_to_show == tab ? ImGuiTabItemFlags_SetSelected : ImGuiTabItemFlags_None)) {
+        return false;
+    }
+    m_ShownTab = tab;
+    return true;
+}
+
+/**
+ * @brief   The operating point, the traces over time or frequency and their spectrum.
+ */
+void OutputWindow::DrawTimeAndFrequencyTabs(const FrameResults &frame, const std::optional<PlotTab> &tab_to_show) {
+    if (BeginTab("Operating point", PlotTab::OPERATING_POINT, tab_to_show)) {
         DrawOperatingPointTab(m_Schematic);
         ImGui::EndTabItem();
     }
-    if (begin_tab("Transient", PlotTab::TRANSIENT)) {
+    if (BeginTab("Transient", PlotTab::TRANSIENT, tab_to_show)) {
         m_TransientTab.Draw(frame);
         ImGui::EndTabItem();
     }
-    if (begin_tab("Spectrum", PlotTab::SPECTRUM)) {
+    if (BeginTab("Spectrum", PlotTab::SPECTRUM, tab_to_show)) {
         // The spectrum goes over the stretch the transient statistics measure
         m_SpectrumTab.Draw(frame, m_TransientTab.GetMeasuredSpan());
         ImGui::EndTabItem();
     }
-    if (begin_tab("AC sweep", PlotTab::AC_SWEEP)) {
+    if (BeginTab("AC sweep", PlotTab::AC_SWEEP, tab_to_show)) {
         m_ACSweepTab.Draw(frame);
         ImGui::EndTabItem();
     }
-    if (begin_tab("DC sweep", PlotTab::DC_SWEEP)) {
+    if (BeginTab("DC sweep", PlotTab::DC_SWEEP, tab_to_show)) {
         m_DCSweepTab.Draw(frame);
         ImGui::EndTabItem();
     }
-    if (begin_tab("Noise", PlotTab::NOISE)) {
+}
+
+/**
+ * @brief   The tabs of the other analyses.
+ */
+void OutputWindow::DrawAnalysisTabs(const std::optional<PlotTab> &tab_to_show) {
+    if (BeginTab("Noise", PlotTab::NOISE, tab_to_show)) {
         m_NoiseTab.Draw();
         ImGui::EndTabItem();
     }
-    if (begin_tab("Transfer function", PlotTab::TRANSFER_FUNCTION)) {
+    if (BeginTab("Transfer function", PlotTab::TRANSFER_FUNCTION, tab_to_show)) {
         DrawTransferFunctionTab(m_Schematic);
         ImGui::EndTabItem();
     }
-    if (begin_tab("Sensitivity", PlotTab::SENSITIVITY)) {
+    if (BeginTab("Sensitivity", PlotTab::SENSITIVITY, tab_to_show)) {
         DrawSensitivityTab(m_Schematic, m_Preferences);
         ImGui::EndTabItem();
     }
-    if (begin_tab("Poles and zeros", PlotTab::POLE_ZERO)) {
+    if (BeginTab("Poles and zeros", PlotTab::POLE_ZERO, tab_to_show)) {
         m_PoleZeroTab.Draw();
         ImGui::EndTabItem();
     }
-    if (begin_tab("S-parameters", PlotTab::S_PARAMETERS)) {
+    if (BeginTab("S-parameters", PlotTab::S_PARAMETERS, tab_to_show)) {
         m_SParameterTab.Draw(m_Exporter);
         ImGui::EndTabItem();
     }
-    if (begin_tab("Truth table", PlotTab::TRUTH_TABLE)) {
+    if (BeginTab("Truth table", PlotTab::TRUTH_TABLE, tab_to_show)) {
         DrawTruthTableTab(m_Schematic);
         ImGui::EndTabItem();
     }
-    if (begin_tab("Monte Carlo", PlotTab::MONTE_CARLO)) {
+    if (BeginTab("Monte Carlo", PlotTab::MONTE_CARLO, tab_to_show)) {
         if (m_MonteCarloTab.Draw()) {
             m_Exporter.StartText(m_MonteCarloTab.BuildCsv(), m_Schematic.GetFilePath(),
                                  GetTabFileSuffix(PlotTab::MONTE_CARLO));

@@ -227,6 +227,18 @@ void AnalysisSettingsPanel::DrawSettings() {
         LoadSettingsFields();
     }
     SimulationSettings settings = m_Schematic.GetSimulationSettings();
+    DrawSelectedSettings(settings);
+    if (settings.Selected == Analysis::TRANSIENT || settings.Selected == Analysis::AC_SWEEP ||
+        settings.Selected == Analysis::DC_SWEEP) {
+        DrawRunModeSettings(settings);
+    }
+    m_Schematic.SetSimulationSettings(settings);
+}
+
+/**
+ * @brief   Draws the fields of the analysis the settings select.
+ */
+void AnalysisSettingsPanel::DrawSelectedSettings(SimulationSettings &settings) {
     switch (settings.Selected) {
     case Analysis::OPERATING_POINT:
         ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + ImGui::GetFontSize() * 20.0f);
@@ -262,11 +274,6 @@ void AnalysisSettingsPanel::DrawSettings() {
         DrawTruthTableSettings(settings);
         break;
     }
-    if (settings.Selected == Analysis::TRANSIENT || settings.Selected == Analysis::AC_SWEEP ||
-        settings.Selected == Analysis::DC_SWEEP) {
-        DrawRunModeSettings(settings);
-    }
-    m_Schematic.SetSimulationSettings(settings);
 }
 
 void AnalysisSettingsPanel::LoadSettingsFields() {

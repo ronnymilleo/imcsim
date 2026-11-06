@@ -189,6 +189,28 @@ std::optional<std::string> StoreSteps(std::expected<StepFamily<Result>, std::str
     return std::nullopt;
 }
 
+/**
+ * @brief   The warnings the stored result of one analysis carries, or none when it has no result or no warnings.
+ */
+std::vector<std::string> ListWarningsOfResult(const Schematic &schematic, const Analysis analysis) {
+    if (analysis == Analysis::OPERATING_POINT && schematic.GetOperatingPoint()) {
+        return schematic.GetOperatingPoint()->Warnings;
+    }
+    if (analysis == Analysis::TRANSIENT && schematic.GetTransient()) {
+        return schematic.GetTransient()->Warnings;
+    }
+    if (analysis == Analysis::POLE_ZERO && schematic.GetPoleZero()) {
+        return schematic.GetPoleZero()->Warnings;
+    }
+    if (analysis == Analysis::S_PARAMETERS && schematic.GetSParameters()) {
+        return schematic.GetSParameters()->Warnings;
+    }
+    if (analysis == Analysis::TRUTH_TABLE && schematic.GetTruthTable()) {
+        return schematic.GetTruthTable()->Warnings;
+    }
+    return {};
+}
+
 } // namespace
 
 /**
@@ -1008,22 +1030,7 @@ std::vector<std::string> AnalysisControls::GetResultWarnings(const Analysis anal
         }
         return warnings;
     }
-    if (analysis == Analysis::OPERATING_POINT && m_Schematic.GetOperatingPoint()) {
-        return m_Schematic.GetOperatingPoint()->Warnings;
-    }
-    if (analysis == Analysis::TRANSIENT && m_Schematic.GetTransient()) {
-        return m_Schematic.GetTransient()->Warnings;
-    }
-    if (analysis == Analysis::POLE_ZERO && m_Schematic.GetPoleZero()) {
-        return m_Schematic.GetPoleZero()->Warnings;
-    }
-    if (analysis == Analysis::S_PARAMETERS && m_Schematic.GetSParameters()) {
-        return m_Schematic.GetSParameters()->Warnings;
-    }
-    if (analysis == Analysis::TRUTH_TABLE && m_Schematic.GetTruthTable()) {
-        return m_Schematic.GetTruthTable()->Warnings;
-    }
-    return {};
+    return ListWarningsOfResult(m_Schematic, analysis);
 }
 
 bool AnalysisControls::HasResult(const Analysis analysis) const {

@@ -128,6 +128,9 @@ private:
 
     // Tabs
     void DrawTabs(const FrameResults &frame);
+    bool BeginTab(const char *label, PlotTab tab, const std::optional<PlotTab> &tab_to_show);
+    void DrawTimeAndFrequencyTabs(const FrameResults &frame, const std::optional<PlotTab> &tab_to_show);
+    void DrawAnalysisTabs(const std::optional<PlotTab> &tab_to_show);
 
     // Export
     void DrawExportButton(ImVec2 tab_row, float tab_row_width, float export_width, const FrameResults &frame);
