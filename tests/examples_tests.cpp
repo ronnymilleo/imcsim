@@ -18,6 +18,7 @@
 #include "ngspice/ngspice_library.h"
 #include "plots/logic_trace.h"
 #include "plots/spectrum.h"
+#include "plots/trace_math.h"
 #include "plots/trace_statistics.h"
 #include "simulation/circuit_checks.h"
 #include "simulation/monte_carlo.h"
@@ -1305,4 +1306,93 @@ TEST_CASE("The S-parameter example is a T low-pass whose matrix is the closed fo
     CHECK(std::abs(run.Result->Get(400, 1, 1)) > 0.9);
     CHECK(std::abs(run.Result->Get(0, 2, 1)) > 0.98);
     CHECK(std::abs(run.Result->Get(400, 2, 1)) < 0.01);
+}
+
+TEST_CASE("The series RLC example plots its impedance, resistive at resonance", "[examples]") {
+    GUI::Schematic schematic;
+    OpenExample("series_rlc.imcsim", schematic);
+    REQUIRE(schematic.GetMathChannels().size() == 1);
+    const auto compiled = GUI::CompileExpression(schematic.GetMathChannels().front().Expression);
+    REQUIRE(compiled.has_value());
+    const auto program = GUI::ResolveNetNames(
+        *compiled, [&schematic](const std::string_view net) { return schematic.GetConnectivity().FindNodeOfNet(net); });
+    REQUIRE(program.has_value());
+    const Core::ACSweepRun run = Core::RunACSweep(schematic.BuildCircuit(), schematic.GetSimulationSettings().ACSweep);
+    REQUIRE(run.Result.has_value());
+    const auto impedance = GUI::EvaluateACExpression(*program, *run.Result);
+    REQUIRE(impedance.has_value());
+    CHECK(GUI::FormatUnit(impedance->Unit) == "Ohm");
+
+    const std::vector<double> &frequencies = run.Result->Frequencies;
+    const auto index_of = [&frequencies](const double frequency) {
+        return static_cast<std::size_t>(std::ranges::lower_bound(frequencies, frequency) - frequencies.begin());
+    };
+    // At resonance L and C cancel and the source sees R1 alone, 100 Ohm or 40 dB, in phase
+    const std::size_t resonance = index_of(5.03e3);
+    CHECK_THAT(impedance->MagnitudesDecibels[resonance], Catch::Matchers::WithinAbs(40.0, 0.5));
+    CHECK_THAT(impedance->PhasesDegrees[resonance], Catch::Matchers::WithinAbs(0.0, 15.0));
+    // Below it the capacitor rules and the current leads, above it the inductor and the current lags
+    CHECK(impedance->PhasesDegrees.front() < -80.0);
+    CHECK(impedance->PhasesDegrees.back() > 80.0);
+}
+
+TEST_CASE("The behavioral source multiplies the carrier by the message, an amplitude modulation", "[examples]") {
+    GUI::Schematic schematic;
+    OpenExample("behavioral_am_modulator.imcsim", schematic);
+    const Core::TransientRun run =
+        Core::RunTransient(schematic.BuildCircuit(), schematic.GetSimulationSettings().Transient);
+    REQUIRE(run.Result.has_value());
+    const Core::Transient &transient = *run.Result;
+    const std::vector<double> &carrier = transient.NodeVoltages[NodeAt(schematic, {4, 4})];
+    const std::vector<double> &message = transient.NodeVoltages[NodeAt(schematic, {12, 4})];
+    const std::vector<double> &output = transient.NodeVoltages[NodeAt(schematic, {32, 4})];
+    // ngspice solves the expression to its tolerance, a few tenths of a millivolt
+    for (std::size_t index = 0; index < output.size(); ++index) {
+        CHECK_THAT(output[index], Catch::Matchers::WithinAbs(carrier[index] * (1.0 + 0.5 * message[index]), 1e-3));
+    }
+    // The envelope swings between half and one and a half times the carrier
+    CHECK_THAT(PeakOf(output), Catch::Matchers::WithinAbs(1.5, 0.02));
+}
+
+TEST_CASE("The offset example shows the input offset of each op-amp times the gain", "[examples]") {
+    GUI::Schematic schematic;
+    OpenExample("op_amp_input_offset.imcsim", schematic);
+    CHECK(schematic.GetSimulationSettings().Selected == GUI::Analysis::OPERATING_POINT);
+    const Core::OperatingPointRun run = Core::RunOperatingPoint(schematic.BuildCircuit());
+    REQUIRE(run.Result.has_value());
+    const double lm358 = run.Result->NodeVoltages[NodeAt(schematic, {20, 8})];
+    const double op07 = run.Result->NodeVoltages[NodeAt(schematic, {20, 22})];
+    INFO(std::format("LM358 {} V, OP07 {} V", lm358, op07));
+    // A gain of 101 on 3 mV and on 60 uV, plus what the bias currents add through 100k
+    CHECK_THAT(std::abs(lm358), Catch::Matchers::WithinRel(0.303, 0.1));
+    CHECK_THAT(std::abs(op07), Catch::Matchers::WithinAbs(6.06e-3, 3e-3));
+}
+
+TEST_CASE("The Monte Carlo bias example spreads the collector voltage around its nominal value", "[examples]") {
+    GUI::Schematic schematic;
+    OpenExample("monte_carlo_bias_point.imcsim", schematic);
+    const GUI::SimulationSettings &settings = schematic.GetSimulationSettings();
+    CHECK(settings.Selected == GUI::Analysis::OPERATING_POINT);
+    REQUIRE(settings.MonteCarlo.Enabled);
+    const Core::Circuit circuit = schematic.BuildCircuit();
+    CHECK(Core::FindVariedParts(circuit).size() == 4);
+    CHECK_FALSE(Core::CheckMonteCarlo(circuit, settings.MonteCarlo));
+
+    const std::size_t collector = NodeAt(schematic, {15, 12});
+    const std::size_t emitter = NodeAt(schematic, {15, 20});
+    std::vector<double> collectors;
+    constexpr int CHECKED_RUNS = 40;
+    for (int run_number = 0; run_number <= CHECKED_RUNS; ++run_number) {
+        const Core::MonteCarloCircuit drawn = Core::BuildMonteCarloCircuit(circuit, settings.MonteCarlo, run_number);
+        const Core::OperatingPointRun run = Core::RunOperatingPoint(drawn.Simulated);
+        REQUIRE(run.Result.has_value());
+        collectors.push_back(run.Result->NodeVoltages[collector]);
+        // Every run keeps Q1 out of saturation
+        CHECK(run.Result->NodeVoltages[collector] > run.Result->NodeVoltages[emitter] + 1.0);
+    }
+    const double nominal = collectors.front();
+    const auto [lowest, highest] = std::ranges::minmax(collectors);
+    INFO(std::format("Collector {} V nominal, {} to {} V", nominal, lowest, highest));
+    CHECK(lowest < nominal - 0.2);
+    CHECK(highest > nominal + 0.2);
 }

@@ -78,7 +78,9 @@ constexpr auto EXAMPLES = std::to_array<Example>({
             "A 10 mH inductor, a 100n capacitor and a 100 Ohm resistor in series resonate at 5 kHz, "
             "where the voltage on the resistor peaks with a quality factor of about 3. Run the AC sweep "
             "for the band-pass response and read its -3 dB band, or the transient to see the output build up "
-            "at the 5 kHz of the source.",
+            "at the 5 kHz of the source. The math channel Z, -V(IN)/I(Vin1), is the impedance the source sees: on "
+            "the AC sweep it dips to 40 dB, 100 Ohm, at 0 degrees at resonance, capacitive below it and inductive "
+            "above.",
         .FileName = "series_rlc.imcsim",
     },
     {
@@ -102,6 +104,18 @@ constexpr auto EXAMPLES = std::to_array<Example>({
             "inductors stop the signal, while S21 stays near 0 dB up to about 1 MHz and falls beyond it. Hover a "
             "point for the impedance, the VSWR and the return loss, or save the matrix as a Touchstone .s2p file.",
         .FileName = "s_parameters_lc_low_pass.imcsim",
+    },
+    {
+        .Title = "Amplitude modulator from a behavioral source",
+        .Group = "Basics",
+        .Description =
+            "B1 is a behavioral source whose voltage is a formula of other voltages, named by their net labels: the 10 "
+            "kHz "
+            "CARRIER times one plus half the 500 Hz message MSG. Run the transient: OUT is the carrier with its "
+            "amplitude "
+            "following the message, between 0.5 and 1.5 V, an amplitude modulation at 50%. Select B1 and change the "
+            "expression in its properties, to V(CARRIER)*V(MSG) for a balanced modulator, for one.",
+        .FileName = "behavioral_am_modulator.imcsim",
     },
     {
         .Title = "Diode curves",
@@ -196,6 +210,19 @@ constexpr auto EXAMPLES = std::to_array<Example>({
         .FileName = "bias_sensitivity.imcsim",
     },
     {
+        .Title = "Monte Carlo of a transistor bias point",
+        .Group = "Transistors",
+        .Description =
+            "The divider bias of a common-emitter stage, with every resistor within 5%. The operating point runs as "
+            "Monte "
+            "Carlo: 200 runs with the values drawn from the seed of the settings, plus the nominal one. Run it and "
+            "open "
+            "the Monte Carlo tab of the Output window: the base stays within about 0.1 V of its 1.9 V, while the "
+            "collector, at 6.3 V nominal, spreads from about 5.8 to 6.8 V. A click on a row shows that run on the "
+            "schematic.",
+        .FileName = "monte_carlo_bias_point.imcsim",
+    },
+    {
         .Title = "Small-signal model of a BJT",
         .Group = "Transistors",
         .Description = "A 2N3904 common-emitter stage on top and its hybrid-pi model below: rpi = 3.17k and a VCCS "
@@ -235,6 +262,18 @@ constexpr auto EXAMPLES = std::to_array<Example>({
                        "is flat and then falls at 91 kHz, the gain-bandwidth product divided by the gain. The "
                        "transient shows the output in phase with the input, unlike the inverting amplifier.",
         .FileName = "non_inverting_amplifier.imcsim",
+    },
+    {
+        .Title = "Input offset of two op-amps",
+        .Group = "Op-amps",
+        .Description =
+            "Two non-inverting amplifiers with a gain of 101 and their inputs grounded, so all that reaches the output "
+            "is the "
+            "input offset of each op-amp, amplified. Run the operating point: the LM358, with a typical offset of 3 "
+            "mV, "
+            "settles near 0.29 V, and the precision OP07, with 60 uV, near 6 mV. Pick Custom in the model list of an "
+            "op-amp to set its offset, VOS, by hand.",
+        .FileName = "op_amp_input_offset.imcsim",
     },
     {
         .Title = "Op-amp integrator",
