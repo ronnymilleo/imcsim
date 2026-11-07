@@ -134,9 +134,9 @@ How to read what imcsim measures, plots and exports. The [README](../README.md) 
   status bar shows the run and, for a stepped analysis or a truth table, how much of it is done. A transient runs in
   chunks: its plot opens in the Output window with the first one and grows as the others arrive, with a Stop button
   and "Running, simulated up to 230ms of 1s" above it. Stop keeps the points made so far ("Stopped, simulated up to
-  530ms of 1s", and "Transient stopped" in the status bar). The transient plot shows a window of 2000 points at a time (a field
-  at its top right sets 1000 to 10000), so a long run stays quick to draw and to measure: a scroll bar the width of the
-  plot, with its time span written above it, moves the window along the run (the plot fits itself to every window), and
+  530ms of 1s", and "Transient stopped" in the status bar). The transient plot shows a window of 2000 points at a time (the
+  Points field at its top right sets 1000 to 10000), so a long run stays quick to draw and to measure: a scroll bar the
+  width of the plot, with its time span written above it after Range, moves the window along the run (the plot fits itself to every window), and
   while the run goes on a Follow box keeps the window on the newest points. The schematic plays the same window: its
   time bar, its heat colors and the playhead of the plot all go over the window, and while the window follows a run the
   schematic shows the newest point. The statistics and the cursors work on the
