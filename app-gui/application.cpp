@@ -38,10 +38,11 @@ namespace {
 constexpr float EXAMPLE_TOOLTIP_WIDTH = 30.0f;
 
 // Default layout, as shares of the space being split
-/// Width of the side column that holds Properties, the analysis settings and the netlist.
-constexpr float SIDE_COLUMN_SHARE = 0.22f;
-/// Width of Output beside the schematic, which takes the rest.
-constexpr float OUTPUT_SHARE = 0.5f;
+/// Width of the side column that holds Properties, the analysis settings and the netlist; narrow, since Properties
+/// holds one line until a part is selected.
+constexpr float SIDE_COLUMN_SHARE = 0.18f;
+/// Width of Output beside the schematic, which takes the rest; Output is the widest, as plots need the room.
+constexpr float OUTPUT_SHARE = 0.56f;
 /// Height of the analysis settings and the netlist under Properties.
 constexpr float SIDE_BOTTOM_SHARE = 0.45f;
 
