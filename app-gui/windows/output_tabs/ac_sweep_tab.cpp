@@ -38,10 +38,13 @@ void ACSweepTab::Draw(const FrameResults &frame) {
     }
     DrawWithStatistics(
         [&] {
+            const float right_edge = ImGui::GetCursorPosX() + ImGui::GetContentRegionAvail().x;
+            ImGui::AlignTextToFramePadding();
             ImGui::TextDisabled("%s",
                                 frame.AnythingMeasured || !frame.ACSweepMath.Magnitudes.empty()
                                     ? "Relative to the AC magnitude of the sources: a magnitude of 1 reads as gain"
                                     : NOTHING_MEASURED);
+            DrawCursorToggle(m_Cursors, right_edge);
             DrawMathErrors(frame.ACSweepErrors);
             if (const auto &pole_zero = m_Schematic.GetPoleZero()) {
                 ImGui::Checkbox("Show poles and zeros", &m_ShowPoleZero);

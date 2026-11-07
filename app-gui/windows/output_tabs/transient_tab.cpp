@@ -29,6 +29,13 @@ namespace {
 
 /// Width of the field for the size of the window, in font sizes.
 constexpr float WINDOW_SIZE_WIDTH = 4.5f;
+
+/**
+ * @brief   The width of the labeled field for the size of the window, at the right end of the plot header.
+ */
+float GetWindowSizeWidth() {
+    return ImGui::CalcTextSize("Points").x + ImGui::GetStyle().ItemSpacing.x + ImGui::GetFontSize() * WINDOW_SIZE_WIDTH;
+}
 /// How many points a pixel of dragging adds to the size of the window.
 constexpr float WINDOW_SIZE_DRAG_SPEED = 20.0f;
 /// The instant of the transient shown on the schematic.
@@ -320,10 +327,12 @@ void TransientTab::DrawWindowControls(const Core::Transient &shown) {
     TransientWindow &window = m_Playback.Window;
     const std::size_t total_points = window.GetTotalPoints();
     const bool has_span = window.GetSpan().has_value();
-    if ((!has_span && total_points <= static_cast<std::size_t>(MIN_WINDOW_POINTS)) ||
-        (has_span && window.GetWindow().Count >= total_points) || shown.Times.empty()) {
+    if (shown.Times.empty()) {
         return;
     }
+    // A run too short to cut into windows has no window size or scroll bar, only its range and the cursors
+    const bool has_window = !((!has_span && total_points <= static_cast<std::size_t>(MIN_WINDOW_POINTS)) ||
+                              (has_span && window.GetWindow().Count >= total_points));
     const float width = ImGui::GetContentRegionAvail().x;
     const std::string span =
         std::format("{}s to {}s", Core::FormatValue(shown.Times.front()), Core::FormatValue(shown.Times.back()));
@@ -345,10 +354,13 @@ void TransientTab::DrawWindowControls(const Core::Transient &shown) {
     ImGui::SameLine();
     ImGui::TextUnformatted(span.c_str());
     // A live run is seen a stop time at a time, so its window has no size to pick
-    if (!has_span) {
+    const bool has_size = has_window && !has_span;
+    const float size_width = has_size ? GetWindowSizeWidth() + ImGui::GetFontSize() : 0.0f;
+    DrawCursorToggle(m_Cursors, row_start.x + width - size_width);
+    if (has_size) {
         DrawWindowSize(row_start, width);
     }
-    if (window.GetWindow().Count >= total_points) {
+    if (!has_window || window.GetWindow().Count >= total_points) {
         return;
     }
     const ImRect bar(ImGui::GetCursorScreenPos(),
@@ -368,8 +380,7 @@ void TransientTab::DrawWindowControls(const Core::Transient &shown) {
 void TransientTab::DrawWindowSize(const ImVec2 row_start, const float width) {
     TransientWindow &window = m_Playback.Window;
     const float size_width = ImGui::GetFontSize() * WINDOW_SIZE_WIDTH;
-    const float label_width = ImGui::CalcTextSize("Points").x + ImGui::GetStyle().ItemSpacing.x;
-    ImGui::SetCursorPos({row_start.x + width - size_width - label_width, row_start.y});
+    ImGui::SetCursorPos({row_start.x + width - GetWindowSizeWidth(), row_start.y});
     ImGui::AlignTextToFramePadding();
     ImGui::TextDisabled("Points");
     ImGui::SameLine();

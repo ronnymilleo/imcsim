@@ -102,6 +102,8 @@ void DrawCursorReadout(const std::vector<double> &xs, const char *x_unit, bool l
                        const std::vector<PlottedTrace> &plotted);
 void DrawCursors(PlotCursors &cursors, bool logarithmic);
 PlotSpan MeasuredSpan(const PlotCursors &cursors, const PlotSpan &view);
+float GetCursorToggleWidth();
+void DrawCursorToggle(PlotCursors &cursors, float right_edge);
 
 // Playback
 void DrawPlaybackBar(TransientPlayback &playback, double from, double to);
@@ -113,7 +115,7 @@ std::string FormatOptionalQuantity(std::optional<double> value, const char *unit
 void DrawStatistic(const char *name, const std::string &value);
 void DrawMeasuredValue(const char *name, double value, double scale, const char *unit);
 bool BeginStatisticsTable(const std::string &id);
-void DrawStatisticsHeader(PlotCursors &cursors, const char *span_text,
+void DrawStatisticsHeader(const PlotCursors &cursors, const char *span_text,
                           const std::vector<std::pair<std::string, std::string>> &cursor_readings);
 void DrawTraceTable(const char *id, const std::vector<PlottedTrace> &traces, const std::vector<StatisticsRow> &rows);
 void DrawWithStatistics(const std::function<void()> &draw_plots, const std::function<void()> &draw_statistics);

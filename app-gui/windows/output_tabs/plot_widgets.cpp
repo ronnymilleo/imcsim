@@ -672,6 +672,33 @@ void DrawCursors(PlotCursors &cursors, const bool logarithmic) {
 }
 
 /**
+ * @brief   The width the cursor checkbox takes, for a header that places it at its right end.
+ * @return  The width in pixels.
+ */
+float GetCursorToggleWidth() {
+    return ImGui::GetFrameHeight() + ImGui::GetStyle().ItemInnerSpacing.x + ImGui::CalcTextSize("Cursors").x;
+}
+
+/**
+ * @brief   Draws the checkbox of cursors A and B on the current row of the plot header, ending at an edge; checking it
+ *          places them anew in the view.
+ * @param[in,out] cursors     Cursors of the plot.
+ * @param[in]     right_edge  Where the checkbox ends, in window coordinates.
+ */
+void DrawCursorToggle(PlotCursors &cursors, const float right_edge) {
+    // On the row when it fits after what is there, on a row of its own in a narrow window
+    ImGui::SameLine();
+    if (ImGui::GetCursorPosX() + GetCursorToggleWidth() > right_edge) {
+        ImGui::NewLine();
+    }
+    ImGui::SetCursorPosX(std::max(ImGui::GetCursorPosX(), right_edge - GetCursorToggleWidth()));
+    if (ImGui::Checkbox("Cursors", &cursors.Shown) && cursors.Shown) {
+        cursors.Placed = false;
+    }
+    ImGui::SetItemTooltip("Measure between two cursors, A and B, dragged on the plot");
+}
+
+/**
  * @brief   The span the statistics cover.
  * @param[in] cursors  The cursors of the plot.
  * @param[in] view     What the plot shows.
@@ -780,20 +807,15 @@ bool BeginStatisticsTable(const std::string &id) {
 }
 
 /**
- * @brief   Draws the line over a statistics table: the cursor toggle, what span the readings cover and, with the
- *          cursors shown, where they sit, all on one row so the table keeps the height.
- * @param[in,out] cursors          Cursors of the plot, which the checkbox shows or hides.
+ * @brief   Draws the line over a statistics table: what span the readings cover and, with the cursors shown, where they
+ *          sit, all on one row so the table keeps the height.
+ * @param[in]     cursors          Cursors of the plot.
  * @param[in]     span_text        What the readings cover, such as "Over the visible time".
  * @param[in]     cursor_readings  Name and value of each cursor reading, such as A and its time, shown with the
  *                                 cursors.
  */
-void DrawStatisticsHeader(PlotCursors &cursors, const char *span_text,
+void DrawStatisticsHeader(const PlotCursors &cursors, const char *span_text,
                           const std::vector<std::pair<std::string, std::string>> &cursor_readings) {
-    if (ImGui::Checkbox("Cursors", &cursors.Shown) && cursors.Shown) {
-        cursors.Placed = false;
-    }
-    ImGui::SetItemTooltip("Measure between two cursors, A and B, dragged on the plot");
-    ImGui::SameLine();
     ImGui::TextDisabled("%s", span_text);
     if (!cursors.Shown) {
         return;

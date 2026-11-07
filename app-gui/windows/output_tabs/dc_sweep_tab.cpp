@@ -80,9 +80,12 @@ void DCSweepTab::Draw(const FrameResults &frame) {
     }
     DrawWithStatistics(
         [&] {
-            if (!frame.AnythingMeasured && (frame.DCSweepMath.empty() || frame.DCSweepMath.front().empty())) {
-                ImGui::TextDisabled("%s", NOTHING_MEASURED);
-            }
+            const bool is_empty =
+                !frame.AnythingMeasured && (frame.DCSweepMath.empty() || frame.DCSweepMath.front().empty());
+            const float right_edge = ImGui::GetCursorPosX() + ImGui::GetContentRegionAvail().x;
+            ImGui::AlignTextToFramePadding();
+            ImGui::TextDisabled("%s", is_empty ? NOTHING_MEASURED : "");
+            DrawCursorToggle(m_Cursors, right_edge);
             DrawMathErrors(frame.DCSweepErrors);
             DrawPlot(*dc_sweep, frame.DCSweepMath);
         },
