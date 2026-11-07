@@ -543,8 +543,8 @@ Only the noise and S-parameter plots, whose curves the list does not hold, keep 
 - The statistics sit under the plots, one table with a row per reading and a column per trace, so two traces
   compare across a row; every reading has four significant digits. The transient, AC sweep and DC sweep have
   **Cursors** at the right of the line over their plot. Turning them on places two draggable vertical lines, whose
-  positions show on the line over the table; the table then measures every shown trace between them, or over the visible range when
-  they are off. The transient reads peak-to-peak, mean, RMS and frequency, and the value at each cursor with
+  positions show in a small Cursors table beside the statistics (under them when the panel is narrow); the table then
+  measures every shown trace between them, or over the visible range when they are off. The transient reads peak-to-peak, mean, RMS and frequency, and the value at each cursor with
   the change and the time between them; the AC sweep reads the gain and phase at each cursor and its response over
   the whole sweep; the DC sweep reads the value at each cursor, the change and the slope between them, and the
   minimum, maximum and mean over the span. The slope is in the unit of the trace over that of the sweep: a voltage
