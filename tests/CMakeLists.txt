@@ -42,6 +42,7 @@ add_executable(imcsim-tests
             parameter_step_tests.cpp
             part_names_tests.cpp
             playback_tests.cpp
+            plot_tab_tests.cpp
             plot_export_tests.cpp
             plot_figures_tests.cpp
             plot_helpers_tests.cpp

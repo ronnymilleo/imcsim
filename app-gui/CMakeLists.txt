@@ -120,6 +120,7 @@ add_library(imcsim-gui-lib
             windows/output_tabs/monte_carlo_tab.cpp
             windows/output_tabs/noise_tab.cpp
             windows/output_tabs/operating_point_tab.cpp
+            windows/output_tabs/plot_tab.cpp
             windows/output_tabs/plot_widgets.cpp
             windows/output_tabs/pole_zero_tab.cpp
             windows/output_tabs/result_tables.cpp
