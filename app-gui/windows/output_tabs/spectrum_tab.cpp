@@ -24,6 +24,11 @@ namespace GUI {
 
 namespace {
 
+/// Width of the window choice, in font sizes.
+constexpr float WINDOW_FIELD_WIDTH = 8.0f;
+/// Width of the harmonics table of one trace, in font sizes, so the tables of several traces sit side by side.
+constexpr float HARMONICS_TABLE_WIDTH = 14.0f;
+
 /// The harmonics the spectrum measures, and how many the plot shows when it fits: a linear axis spans them, plus one
 /// harmonic of room, from 0 Hz.
 constexpr int HIGHEST_HARMONIC = 10;
@@ -516,24 +521,32 @@ void SpectrumTab::DrawStatistics() {
         return;
     }
     const TransientSpectra &spectra = *m_Spectra;
+    if (spectra.Frequencies.size() > 1) {
+        ImGui::SameLine(0.0f, ImGui::GetFontSize());
+        ImGui::TextDisabled("%s",
+                            std::format("Resolution {}Hz", Core::FormatValue(spectra.Frequencies.front())).c_str());
+    }
     if (spectra.Traces.empty()) {
         ImGui::TextDisabled("Measure a trace to see its harmonics");
         return;
     }
-    if (spectra.Frequencies.size() > 1) {
-        ImGui::TextDisabled("%s",
-                            std::format("Resolution {}Hz", Core::FormatValue(spectra.Frequencies.front())).c_str());
-    }
     DrawPeriodsWarning(spectra);
-    for (const SpectrumTrace &trace : spectra.Traces) {
-        ImGui::Separator();
+    // Each trace has its own harmonics, so their tables sit side by side rather than share the row names
+    const float table_width = ImGui::GetFontSize() * HARMONICS_TABLE_WIDTH;
+    for (std::size_t index = 0; index < spectra.Traces.size(); ++index) {
+        const SpectrumTrace &trace = spectra.Traces[index];
+        if (index > 0) {
+            ImGui::SameLine(0.0f, ImGui::GetFontSize());
+        }
+        ImGui::BeginGroup();
         ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(trace.Color), "%s", trace.Label.c_str());
         if (!trace.Decibels) {
             ImGui::TextDisabled("Undefined in the stretch");
-        } else if (BeginStatisticsTable(trace.Label)) {
+        } else if (ImGui::BeginTable(trace.Label.c_str(), 2, ImGuiTableFlags_SizingStretchProp, {table_width, 0.0f})) {
             DrawHarmonics(trace, spectra.Frequencies, m_View);
             ImGui::EndTable();
         }
+        ImGui::EndGroup();
     }
 }
 
@@ -543,6 +556,7 @@ void SpectrumTab::DrawStatistics() {
 void SpectrumTab::DrawControls() {
     DrawFieldLabel("Window");
     const char *window_name = m_Window == SpectrumWindow::HANN ? "Hann" : "Rectangular";
+    ImGui::SetNextItemWidth(ImGui::GetFontSize() * WINDOW_FIELD_WIDTH);
     if (ImGui::BeginCombo("##window", window_name)) {
         if (ImGui::Selectable("Hann", m_Window == SpectrumWindow::HANN)) {
             m_Window = SpectrumWindow::HANN;
@@ -555,10 +569,12 @@ void SpectrumTab::DrawControls() {
                               "period apart");
         ImGui::EndCombo();
     }
+    ImGui::SameLine(0.0f, ImGui::GetFontSize());
     if (ImGui::Checkbox("Logarithmic frequency", &m_IsLogarithmic)) {
         m_HasChanged = true;
     }
     if (m_Spectra && HasBroadband(*m_Spectra)) {
+        ImGui::SameLine(0.0f, ImGui::GetFontSize());
         if (ImGui::Checkbox("Noise density", &m_IsDensity)) {
             m_HasChanged = true;
         }

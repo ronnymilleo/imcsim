@@ -418,7 +418,7 @@ void SParameterTab::DrawBodePlot(const Core::SParameters &result, const std::vec
     if (m_IsFitting) {
         ImPlot::SetNextAxesToFit();
     }
-    if (!BeginTracePlot(is_phase ? "Phase##s" : "Magnitude##s", ImVec2(-1.0f, height))) {
+    if (!BeginTracePlot(is_phase ? "Phase##s" : "Magnitude##s", ImVec2(-1.0f, height), true)) {
         return;
     }
     ImPlot::SetupAxes("Frequency", is_phase ? "Phase (deg)" : "Magnitude (dB)");

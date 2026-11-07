@@ -15,6 +15,7 @@
 #include "drawing/heat_glow.h"
 #include "drawing/led_glow.h"
 #include "drawing/node_colors.h"
+#include "drawing/readout_placement.h"
 #include "drawing/schematic_drawing.h"
 #include "drawing/theme.h"
 #include "editing/live_input.h"
@@ -24,8 +25,10 @@
 #include "ui_elements/ui_logic_output.h"
 #include "ui_elements/ui_seven_segment.h"
 #include <algorithm>
+#include <cfloat>
 #include <cmath>
 #include <format>
+#include <optional>
 #include <string>
 #include <utility>
 
@@ -37,8 +40,16 @@ namespace {
 constexpr float JUNCTION_RADIUS_SCALE = 0.15f;
 /// Smallest junction dot radius, so it stays visible when zoomed out.
 constexpr float MIN_JUNCTION_RADIUS = 2.5f;
-/// Voltage labels sit just above and right of their point, clear of the line.
-constexpr ImVec2 VOLTAGE_LABEL_OFFSET = {4.0f, -16.0f};
+
+// Voltage readouts, in font sizes
+/// Space around the text of a readout, across.
+constexpr float READOUT_PADDING_X = 0.35f;
+/// Space around the text of a readout, up and down.
+constexpr float READOUT_PADDING_Y = 0.1f;
+constexpr float READOUT_DOT_RADIUS = 0.22f;
+/// Space between a wire and its readout.
+constexpr float READOUT_GAP = 0.3f;
+
 // Heat legend, in font sizes, at the bottom left of the canvas
 constexpr float LEGEND_WIDTH = 10.0f;
 constexpr float LEGEND_HEIGHT = 0.6f;
@@ -335,11 +346,15 @@ void SchematicOverlays::DrawGlows(ImDrawList *draw_list, const ViewTransform &vi
 }
 
 /**
- * @brief   Draws one voltage label per node, on its first wire or, for terminals joined without wires, on a terminal.
+ * @brief   Draws one voltage readout per node beside its first wire or, for terminals joined without wires, beside a
+ *          terminal: on a pill of the surface color with a border, led by a dot of the node color, so it reads on any
+ *          wire color and theme.
  * @param[in] draw_list  Where to draw.
  * @param[in] view       Pan and zoom of the canvas.
  * @param[in] schematic  The schematic being edited.
- * @details Ground is always 0 V, so it is left out.
+ * @details Ground is always 0 V, so it is left out. The pill sits off the wire, under a level one and right of an
+ *          upright one, so it covers neither the wire, its node dot nor the probe name over it. It takes the size of
+ * the part labels, so it follows the zoom, and is left out when zoomed out too far to read.
  */
 void SchematicOverlays::DrawNodeVoltages(ImDrawList *draw_list, const ViewTransform &view, Schematic &schematic) const {
     if (!m_Displayed) {
@@ -347,10 +362,23 @@ void SchematicOverlays::DrawNodeVoltages(ImDrawList *draw_list, const ViewTransf
     }
     const Connectivity &connectivity = schematic.GetConnectivity();
     const std::vector<double> &voltages = m_Displayed->Point.NodeVoltages;
-    // The theme color of the labels is yellow, which gets lost over the yellow of the heat scale
-    const ImU32 label_color = AreWiresHeatColored() ? GetPalette().CanvasText : GetPalette().VoltageLabel;
+    const ThemePalette &palette = GetPalette();
+    const ImU32 fill = ImGui::ColorConvertFloat4ToU32(palette.Surface);
+    const ImU32 border = ImGui::ColorConvertFloat4ToU32(palette.Border);
+    const float zoom = view.ToScreen({1.0f, 0.0f}).x - view.ToScreen({0.0f, 0.0f}).x;
+    const std::optional<float> readout_font_size = GetReadoutFontSize(zoom);
+    if (!readout_font_size) {
+        return;
+    }
+    const float font_size = *readout_font_size;
+    ImFont *font = ImGui::GetFont();
+    const ImVec2 padding = {font_size * READOUT_PADDING_X, font_size * READOUT_PADDING_Y};
+    const float dot_radius = font_size * READOUT_DOT_RADIUS;
+    const float gap = font_size * READOUT_GAP;
+    // The corners shrink with the pill, so a small one stays a pill and not a circle
+    const float rounding = ImGui::GetStyle().FrameRounding * font_size / ImGui::GetFontSize();
     std::vector<bool> labeled(voltages.size(), false);
-    const auto draw_label = [&](const GridPoint point, const ImVec2 world_pos) {
+    const auto draw_readout = [&](const GridPoint point, const ImVec2 world_start, const ImVec2 world_end) {
         const std::optional<int> node = connectivity.GetNode(point);
         if (!node || *node <= 0 || static_cast<std::size_t>(*node) >= voltages.size()) {
             return;
@@ -360,16 +388,24 @@ void SchematicOverlays::DrawNodeVoltages(ImDrawList *draw_list, const ViewTransf
             return;
         }
         labeled[index] = true;
-        const std::string text = std::format("{}V", Core::FormatValue(voltages[index]));
-        draw_list->AddText(view.ToScreen(world_pos) + VOLTAGE_LABEL_OFFSET, label_color, text.c_str());
+        const std::string text = std::format("{}V", Core::FormatMeasurement(voltages[index]));
+        const ImVec2 text_size = font->CalcTextSizeA(font_size, FLT_MAX, 0.0f, text.c_str());
+        const ImVec2 size = {padding.x * 3.0f + dot_radius * 2.0f + text_size.x, padding.y * 2.0f + text_size.y};
+        const ImVec2 corner = PlaceReadout(view.ToScreen(world_start), view.ToScreen(world_end), size, gap);
+        draw_list->AddRectFilled(corner, corner + size, fill, rounding);
+        draw_list->AddRect(corner, corner + size, border, rounding);
+        const ImVec2 dot_center = {corner.x + padding.x + dot_radius, corner.y + size.y / 2.0f};
+        draw_list->AddCircleFilled(dot_center, dot_radius, GetNodeColor(*node));
+        draw_list->AddText(font, font_size, {dot_center.x + dot_radius + padding.x, corner.y + padding.y},
+                           palette.VoltageLabel, text.c_str());
     };
 
     for (const UIWire &wire : schematic.GetWires()) {
-        draw_label(wire.GetStart(), (ToVec2(wire.GetStart()) + ToVec2(wire.GetEnd())) / 2.0f);
+        draw_readout(wire.GetStart(), ToVec2(wire.GetStart()), ToVec2(wire.GetEnd()));
     }
     for (const auto &element : schematic.GetElements()) {
         for (const GridPoint terminal : element->GetTerminals()) {
-            draw_label(terminal, ToVec2(terminal));
+            draw_readout(terminal, ToVec2(terminal), ToVec2(terminal));
         }
     }
 }

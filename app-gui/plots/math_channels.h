@@ -70,6 +70,8 @@ private:
     NetResolver GetNetResolver() const;
     std::optional<MathProgram> GetShownProgram(const MathChannel &channel, const NetResolver &find_node,
                                                std::vector<std::string> &errors) const;
+    bool DrawChannel(MathChannel &channel, std::size_t index, const std::vector<std::string> &operands,
+                     const NetResolver &find_node, bool opens_editor) const;
     bool DrawEditor(MathChannel &channel, const std::vector<std::string> &operands) const;
 };
 

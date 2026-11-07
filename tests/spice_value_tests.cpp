@@ -104,6 +104,34 @@ TEST_CASE("FormatValue output parses back to the same value", "[spice_value]") {
     CHECK_THAT(ParseOrFail(Core::FormatValue(value), ""), Catch::Matchers::WithinRel(value));
 }
 
+TEST_CASE("A value that rounds up to the next suffix takes that suffix", "[spice_value]") {
+    // 0.99999 is 999.99m, which four digits would write as 1000m
+    CHECK(Core::FormatValue(0.99999) == "1");
+    CHECK(Core::FormatValue(999.96) == "1k");
+    CHECK(Core::FormatSpiceValue(999999.0) == "1Meg");
+}
+
+TEST_CASE("FormatMeasurement always writes four significant digits", "[spice_value]") {
+    CHECK(Core::FormatMeasurement(0.0) == "0");
+    CHECK(Core::FormatMeasurement(1.0) == "1.000");
+    CHECK(Core::FormatMeasurement(2.0) == "2.000");
+    CHECK(Core::FormatMeasurement(0.8622) == "862.2m");
+    CHECK(Core::FormatMeasurement(27.5e3) == "27.50k");
+    CHECK(Core::FormatMeasurement(-0.004541) == "-4.541m");
+    CHECK(Core::FormatMeasurement(1e-3) == "1.000m");
+    // The readings the statistics showed before: Max 1000mV, Period 1000us, Freq 1000Hz
+    CHECK(Core::FormatMeasurement(0.99999) == "1.000");
+    CHECK(Core::FormatMeasurement(999.99e-6) == "1.000m");
+    CHECK(Core::FormatMeasurement(999.97) == "1.000k");
+    CHECK(Core::FormatMeasurement(9.9e-20) == "9.900e-20");
+}
+
+TEST_CASE("FormatMeasurement output parses back to the value it rounds to", "[spice_value]") {
+    const double value = GENERATE(1e3, 4.7e-6, 2.2e6, 5.0, 0.8622, -12.0, 9.9e-20, 123.4e-9);
+    CAPTURE(value);
+    CHECK_THAT(ParseOrFail(Core::FormatMeasurement(value), ""), Catch::Matchers::WithinRel(value, 1e-3));
+}
+
 TEST_CASE("FormatFixed never shows a negative zero", "[spice_value]") {
     CHECK(Core::FormatFixed(-3.0103, 2) == "-3.01");
     CHECK(Core::FormatFixed(-0.004, 2) == "0.00");

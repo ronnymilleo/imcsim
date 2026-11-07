@@ -15,6 +15,7 @@ add_executable(imcsim-tests
             circuit_snapshot_tests.cpp
             behavioral_expression_tests.cpp
             block_nesting_tests.cpp
+            canvas_view_tests.cpp
             clipboard_tests.cpp
             code_models.cpp
             circuit_tests.cpp
@@ -23,6 +24,7 @@ add_executable(imcsim-tests
             editor_mode_tests.cpp
             element_factory_tests.cpp
             current_flow_tests.cpp
+            dock_layout_tests.cpp
             examples_tests.cpp
             fuse_tests.cpp
             group_editing_tests.cpp
@@ -38,8 +40,10 @@ add_executable(imcsim-tests
             monte_carlo_results_tests.cpp
             monte_carlo_tests.cpp
             parameter_step_tests.cpp
+            part_catalog_tests.cpp
             part_names_tests.cpp
             playback_tests.cpp
+            plot_tab_tests.cpp
             plot_export_tests.cpp
             plot_figures_tests.cpp
             plot_helpers_tests.cpp
@@ -48,6 +52,7 @@ add_executable(imcsim-tests
             pole_zero_view_tests.cpp
             preferences_tests.cpp
             probing_tests.cpp
+            readout_placement_tests.cpp
             s_parameter_view_tests.cpp
             s_parameters_tests.cpp
             schematic_canvas_tests.cpp
@@ -63,6 +68,7 @@ add_executable(imcsim-tests
             simulator_tests.cpp
             smith_chart_tests.cpp
             spectrum_tests.cpp
+            statistics_table_tests.cpp
             spice_import_tests.cpp
             spice_inclusions_tests.cpp
             spice_library_tests.cpp
@@ -71,6 +77,8 @@ add_executable(imcsim-tests
             stepped_circuit_tests.cpp
             subcircuit_tests.cpp
             svg_writer_tests.cpp
+            text_fitting_tests.cpp
+            theme_contrast_tests.cpp
             touchstone_tests.cpp
             trace_fit_state_tests.cpp
             transient_chunks_tests.cpp

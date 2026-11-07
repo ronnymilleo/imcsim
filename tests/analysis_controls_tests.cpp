@@ -329,6 +329,22 @@ TEST_CASE("A run goes on in the background and its result reaches the schematic 
     CHECK(controls.GetLastRun() == GUI::Analysis::TRANSIENT);
 }
 
+TEST_CASE("A finished run keeps the time it took, for the status bar", "[analysis_controls]") {
+    GUI::Schematic schematic;
+    OpenRCFilter(schematic);
+    Select(schematic, GUI::Analysis::TRANSIENT);
+    GUI::AnalysisControls controls(schematic);
+    CHECK_FALSE(controls.GetRunSeconds(GUI::Analysis::TRANSIENT).has_value());
+
+    controls.RunSelected();
+    REQUIRE(UpdateUntilIdle(controls));
+    const std::optional<double> seconds = controls.GetRunSeconds(GUI::Analysis::TRANSIENT);
+    REQUIRE(seconds.has_value());
+    CHECK(*seconds >= 0.0);
+    // Only the analysis that ran has a time
+    CHECK_FALSE(controls.GetRunSeconds(GUI::Analysis::AC_SWEEP).has_value());
+}
+
 TEST_CASE("Run does nothing while another run is in progress", "[analysis_controls]") {
     GUI::Schematic schematic;
     OpenRCFilter(schematic);

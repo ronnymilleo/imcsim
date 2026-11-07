@@ -174,7 +174,7 @@ void NoiseTab::DrawPlot(const Core::Noise &noise) {
                                       .c_str());
         ImGui::PopTextWrapPos();
     }
-    if (!BeginTracePlot("##noise", ImVec2(-1.0f, PlotHeight(1)))) {
+    if (!BeginTracePlot("##noise", ImVec2(-1.0f, PlotHeight(1)), true)) {
         return;
     }
     // ImPlot keeps the format strings until the plot ends

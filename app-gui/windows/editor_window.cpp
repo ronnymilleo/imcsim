@@ -10,6 +10,7 @@
 #include "document/block_nesting.h"
 #include "document/subcircuit_pins.h"
 #include "drawing/schematic_drawing.h"
+#include "drawing/text_fitting.h"
 #include "drawing/theme.h"
 #include "editing/element_factory.h"
 #include "editing/group_editing.h"
@@ -26,6 +27,7 @@
 #include <format>
 #include <ranges>
 #include <string>
+#include <string_view>
 #include <utility>
 
 namespace GUI {
@@ -38,11 +40,14 @@ constexpr float MIN_DOT_SPACING = 8.0f;
 constexpr float WIRE_CURSOR_HALF_SIZE = 4.0f;
 /// How close, in pixels, the cursor must be to a wire to select it.
 constexpr float WIRE_PICK_DISTANCE = 5.0f;
-/// The time slider of a transient does not shrink below this, in pixels, so it stays usable in a narrow window.
-constexpr float MIN_TIME_SLIDER_WIDTH = 80.0f;
-/// The instant readout keeps the width of its widest text, so the slider does not resize as the digits change: four
-/// significant digits with a suffix are at most this wide.
-constexpr const char *WIDEST_TIME_READOUT = "t = 888.8ms / 888.8ms";
+/// The middle dot between the run state and its reason, encoded in UTF-8.
+constexpr std::string_view MIDDLE_DOT = "\xC2\xB7";
+/// Space between the edge of the canvas and the instant it shows, in font sizes.
+constexpr float INSTANT_MARGIN = 0.5f;
+/// Space between the parts of the status bar, in font sizes.
+constexpr float STATUS_GAP_FONT_SIZES = 1.5f;
+/// Share of the status bar the run state may take, so a long failure reason leaves room for the hint.
+constexpr float MAX_RUN_STATUS_SHARE = 0.6f;
 /// The edge choice of a block pin, this many font sizes wide.
 constexpr float PIN_SIDE_FIELD_WIDTH = 6.0f;
 
@@ -77,11 +82,32 @@ std::string FormatLiveProgress(const AnalysisControls &controls, const std::opti
  */
 struct RunStatusLine {
     std::string Text;
+    /// What follows the state in a muted color, such as the time a run took or the reason it failed, or empty.
+    std::string Detail;
     ImVec4 Color;
     bool IsRunning = false;
     /// Text as wide as the line can get, whose width it keeps so it does not shift as its figures change, or empty.
     std::string_view WidestText;
+    /// Whether the detail is worth more than the hint, as the reason of a failure is, and takes the whole line.
+    bool TakesWholeLine = false;
 };
+
+/**
+ * @brief   "2000 time steps in 41ms" for a transient, "41ms" for another analysis: how much the last run made and how
+ * long it took, or empty when the run was live and kept pace with the clock.
+ */
+std::string DescribeRunCost(const AnalysisControls &controls, const Analysis analysis,
+                            const std::optional<Core::Transient> &transient) {
+    const std::optional<double> seconds = controls.GetRunSeconds(analysis);
+    if (!seconds) {
+        return {};
+    }
+    const std::string time = std::format("{}s", Core::FormatValue(*seconds));
+    if (analysis == Analysis::TRANSIENT && transient) {
+        return std::format("{} time steps in {}", transient->Times.size(), time);
+    }
+    return time;
+}
 
 /**
  * @brief   What the last run reported, in the color its outcome asks for; a run in progress takes the place of that
@@ -107,18 +133,76 @@ RunStatusLine DescribeRunStatus(const AnalysisControls &controls, const std::opt
     const std::string_view name = GetAnalysisName(*last_run);
     switch (controls.GetOutcome(*last_run)) {
     case RunOutcome::SUCCEEDED:
-        return {.Text = std::format("{} done", name), .Color = plain, .IsRunning = false};
+        return {.Text = std::format("{} done", name),
+                .Detail = DescribeRunCost(controls, *last_run, transient),
+                .Color = plain,
+                .IsRunning = false};
     case RunOutcome::SUCCEEDED_WITH_WARNINGS:
-        return {
-            .Text = std::format("{} done, with warnings", name), .Color = GetWarningTextColor(), .IsRunning = false};
+        return {.Text = std::format("{} done, with warnings", name),
+                .Detail = DescribeRunCost(controls, *last_run, transient),
+                .Color = GetWarningTextColor(),
+                .IsRunning = false};
     case RunOutcome::STOPPED:
         return {.Text = std::format("{} stopped", name), .Color = plain, .IsRunning = false};
-    case RunOutcome::FAILED:
-        return {.Text = std::format("{} failed", name), .Color = GetErrorTextColor(), .IsRunning = false};
+    case RunOutcome::FAILED: {
+        const std::optional<std::string> &error = controls.GetError(*last_run);
+        return {.Text = std::format("{} failed", name),
+                .Detail = error ? std::string(GetFirstLine(*error)) : std::string(),
+                .Color = GetErrorTextColor(),
+                .IsRunning = false,
+                .TakesWholeLine = true};
+    }
     case RunOutcome::NONE:
     default:
         return {.Text = "", .Color = plain, .IsRunning = false};
     }
+}
+
+/**
+ * @brief   "Transient done", in the warning color when something needs a look and in the error color after a failure,
+ *          followed by the reason; a click opens the report of the run, with the ngspice output.
+ * @param[in] line       State of the run, from DescribeRunStatus().
+ * @param[in] controls   Runs, whose report a click opens.
+ * @param[in] max_right  Where the state must end, shortened at a word to fit.
+ * @return  Where the state ends, or where the line starts when there is none.
+ */
+float DrawRunStatus(const RunStatusLine &line, const AnalysisControls &controls, const float max_right) {
+    const std::optional<Analysis> last_run = controls.GetLastRun();
+    const ImVec2 line_start = ImGui::GetCursorScreenPos();
+    if (line.Text.empty()) {
+        return line_start.x;
+    }
+    const auto measure = [](const std::string_view text) {
+        return ImGui::CalcTextSize(text.data(), text.data() + text.size()).x;
+    };
+    const float max_width = max_right - line_start.x;
+    const std::string text = ShortenToWidth(line.Text, max_width, measure);
+    const float text_width = measure(text);
+    // The reason gets what the state leaves
+    const std::string detail = line.Detail.empty() ? std::string()
+                                                   : ShortenToWidth(std::format(" {} {}", MIDDLE_DOT, line.Detail),
+                                                                    max_width - text_width, measure);
+    // A run in progress keeps the width of its widest text, so the hint does not shift as its figures change
+    const float width = std::min(max_width, std::max(text_width + measure(detail), measure(line.WidestText)));
+    if (line.IsRunning) {
+        ImGui::TextDisabled("%s", text.c_str());
+    } else {
+        if (ImGui::Selectable("##run_status", false, ImGuiSelectableFlags_None, {width, 0.0f})) {
+            ImGui::OpenPopup("run_report");
+        }
+        ImGui::SetItemTooltip("Show what the run reported, with the ngspice output");
+        ImDrawList *draw_list = ImGui::GetWindowDrawList();
+        draw_list->AddText(line_start, ImGui::GetColorU32(line.Color), text.c_str());
+        draw_list->AddText({line_start.x + text_width, line_start.y}, ImGui::GetColorU32(ImGuiCol_TextDisabled),
+                           detail.c_str());
+    }
+    if (ImGui::BeginPopup("run_report")) {
+        if (last_run) {
+            controls.DrawRunReport(*last_run);
+        }
+        ImGui::EndPopup();
+    }
+    return line_start.x + width;
 }
 
 /**
@@ -200,7 +284,7 @@ EditorWindow::EditorWindow(Schematic &schematic, AnalysisControls &controls, Ana
                    [this](std::string file_name, Core::SpiceLibrary library) {
                        m_SpiceDialog.OpenImport(std::move(file_name), std::move(library));
                    }}),
-      m_Toolbar(controls, settings_panel, schematic, preferences), m_PartPicker(preferences),
+      m_Toolbar(controls, settings_panel, schematic), m_PartPicker(preferences), m_PartRail(preferences),
       m_Overlays(glow_renderer, playback, preferences) {
 }
 
@@ -229,6 +313,16 @@ void EditorWindow::Update() {
     if (std::optional<SpiceBlockResult> result = m_SpiceDialog.Draw()) {
         ApplySpiceBlockResult(std::move(*result));
     }
+}
+
+/**
+ * @brief   Draws the command bar in the current window, which the application keeps under the menu bar, and carries out
+ *          what its buttons and its part search ask.
+ * @note    It works on the schematic being edited, a block included, whichever window is in front.
+ */
+void EditorWindow::DrawCommandBar() {
+    ApplyToolbarRequest(
+        m_Toolbar.Draw(m_Mode, *m_Schematic, IsEditingSubcircuit(), m_PartPicker, ListPlaceableBlocks()));
 }
 
 /**
@@ -369,17 +463,27 @@ void EditorWindow::Draw() {
     if (ImGui::Shortcut(ImGuiKey_Home)) {
         m_View.RequestFit();
     }
-    if (std::optional<EditorMode> picked = m_PartPicker.Draw(ListPlaceableBlocks())) {
-        SetMode(std::move(*picked));
+    // A part picked in the search of the command bar is placed here, so the editor takes the keys of placing
+    if (m_PartPicker.TakeEditorFocus()) {
+        ImGui::SetWindowFocus();
     }
-    ApplyToolbarRequest(m_Toolbar.Draw(m_Mode, *m_Schematic, IsEditingSubcircuit()));
+    m_PartPicker.WatchShortcut();
     m_Overlays.Update(*m_Schematic, m_Controls);
-    DrawTimeBar();
 
+    // The rail runs down the left of the canvas, as tall as it
+    RailRequest rail = m_PartRail.Draw(m_Mode, GetCanvasSize().y);
+    if (rail.Mode) {
+        SetMode(std::move(*rail.Mode));
+    }
+    if (rail.IsSearchAsked) {
+        m_PartPicker.RequestOpen();
+    }
+    ImGui::SameLine(0.0f, 0.0f);
     const ImVec2 origin = ImGui::GetCursorScreenPos();
     const ImVec2 size = GetCanvasSize();
     m_CanvasCenter = {origin.x + size.x / 2.0f, origin.y + size.y / 2.0f};
     m_CanvasTop = origin.y;
+    m_View.FollowCanvasSize(size);
     m_View.FrameIfRequested(*m_Schematic, size, m_Preferences.Symbols, m_Preferences.ShowTerminalNumbers);
 
     // The way back from a block sits over the canvas, and takes the clicks that land on it
@@ -433,6 +537,7 @@ void EditorWindow::Draw() {
     }
     HandleClipboardShortcuts();
     m_Overlays.DrawColorLegend(draw_list, origin, size, *m_Schematic);
+    DrawShownInstant(draw_list, origin);
 
     draw_list->PopClipRect();
     DrawBlockBar(origin);
@@ -507,50 +612,20 @@ std::optional<EditorWindow::TimeSpan> EditorWindow::GetWindowSpan() const {
 }
 
 /**
- * @brief   A row above the canvas with the playback of the transient on display: play, loop, a slider over the window
- *          and the instant.
- * @details Moving the slider stops the playback, so it holds where the user put it.
+ * @brief   Writes the instant of the transient the schematic shows at the top left of the canvas, so it reads while the
+ *          playback, under the plot of the Output window, moves it.
+ * @param[in] draw_list  Where to draw.
+ * @param[in] origin     Top left corner of the canvas, in screen pixels.
  */
-void EditorWindow::DrawTimeBar() {
+void EditorWindow::DrawShownInstant(ImDrawList *draw_list, const ImVec2 origin) const {
     const std::optional<DisplayedState> &displayed = m_Overlays.GetDisplayed();
-    if (!displayed || !displayed->Time) {
+    const std::optional<double> time = displayed ? displayed->Time : std::nullopt;
+    if (!time || !GetWindowSpan()) {
         return;
     }
-    const std::optional<Core::Transient> &transient = m_Schematic->GetTransient();
-    if (!transient) {
-        return;
-    }
-    const std::optional<TimeSpan> window = GetWindowSpan();
-    if (!window) {
-        return;
-    }
-    const double stop_time = window->To;
-    const ImGuiStyle &style = ImGui::GetStyle();
-    // Play and Pause share the width of the wider label, so the row does not shift when they swap
-    const float play_width =
-        std::max(ImGui::CalcTextSize("Play").x, ImGui::CalcTextSize("Pause").x) + style.FramePadding.x * 2.0f;
-    if (ImGui::Button(m_Playback.Playing ? "Pause" : "Play", ImVec2(play_width, 0.0f))) {
-        if (!m_Playback.Playing && m_Playback.Time >= stop_time) {
-            m_Playback.Time = window->From;
-        }
-        m_Playback.Playing = !m_Playback.Playing;
-    }
-    ImGui::SameLine();
-    ImGui::Checkbox("Loop", &m_Playback.Loop);
-    ImGui::SameLine();
-    const std::string readout =
-        std::format("t = {}s / {}s", Core::FormatValue(m_Playback.Time), Core::FormatValue(stop_time));
-    const float readout_width =
-        std::max(ImGui::CalcTextSize(readout.c_str()).x, ImGui::CalcTextSize(WIDEST_TIME_READOUT).x) +
-        style.ItemSpacing.x;
-    ImGui::SetNextItemWidth(std::max(ImGui::GetContentRegionAvail().x - readout_width, MIN_TIME_SLIDER_WIDTH));
-    ImGui::SliderScalar("##time", ImGuiDataType_Double, &m_Playback.Time, &window->From, &stop_time, "");
-    if (ImGui::IsItemActive()) {
-        m_Playback.Playing = false;
-    }
-    ImGui::SetItemTooltip("Instant of the transient shown on the schematic");
-    ImGui::SameLine();
-    ImGui::TextUnformatted(readout.c_str());
+    const std::string text = std::format("t = {}s", Core::FormatValue(*time));
+    const float margin = ImGui::GetFontSize() * INSTANT_MARGIN;
+    draw_list->AddText({origin.x + margin, origin.y + margin}, ImGui::GetColorU32(ImGuiCol_TextDisabled), text.c_str());
 }
 
 /**
@@ -595,8 +670,10 @@ void EditorWindow::DrawBlockBar(const ImVec2 origin) {
 }
 
 /**
- * @brief   What the current mode does and which keys it takes, so the shortcuts can be learned while working, and the
- *          grid point under the cursor on the right.
+ * @brief   The state of the last run first, then what the current mode does and which keys it takes, so the shortcuts
+ *          can be learned while working, and the grid point under the cursor on the right.
+ * @details The run state leads, so a finished run and a failed one tell apart at a glance; the hint takes the space
+ *          left and is shortened at a word, never cut mid-word.
  */
 void EditorWindow::DrawStatusBar(const ViewTransform &view, const bool hovered) {
     std::string hint;
@@ -612,61 +689,34 @@ void EditorWindow::DrawStatusBar(const ViewTransform &view, const bool hovered) 
         const std::size_t count = m_Schematic->GetSelectedElements().size() + m_Schematic->GetSelectedWires().size();
         hint = DescribeSelecting(m_Controls.IsLive(), selected_part, count);
     }
-    // The right end holds the result of the last run, which stays put, and the grid position before it; the hint is
-    // cut short before them
     const ImVec2 line_start = ImGui::GetCursorScreenPos();
-    float right_edge = DrawRunStatus(line_start.x + ImGui::GetContentRegionAvail().x);
+    const float gap = ImGui::GetFontSize() * STATUS_GAP_FONT_SIZES;
+    float right_edge = line_start.x + ImGui::GetContentRegionAvail().x;
     if (hovered) {
         const GridPoint point = Snap(view.ToWorld(ImGui::GetIO().MousePos));
         const std::string position = std::format("x {}, y {}", point.X, point.Y);
         right_edge -= ImGui::CalcTextSize(position.c_str()).x;
         ImGui::SetCursorScreenPos({right_edge, line_start.y});
         ImGui::TextDisabled("%s", position.c_str());
-        right_edge -= ImGui::GetFontSize() * 1.5f;
+        right_edge -= gap;
     }
     ImGui::SetCursorScreenPos(line_start);
-    ImGui::PushClipRect(line_start, {right_edge, line_start.y + ImGui::GetTextLineHeightWithSpacing()}, true);
-    ImGui::TextDisabled("%s", hint.c_str());
-    ImGui::PopClipRect();
-}
-
-/**
- * @brief   "Transient done", in the warning color when something needs a look and in the error color after a failure; a
- *          click opens the report of the run, with the ngspice output.
- * @details Returns where the space left for the hint ends.
- */
-float EditorWindow::DrawRunStatus(float right_edge) {
-    const std::optional<Analysis> last_run = m_Controls.GetLastRun();
+    // The reason of a failure is worth more than the hint, so it takes the whole line
     const RunStatusLine line = DescribeRunStatus(m_Controls, m_Schematic->GetTransient());
-    const ImVec2 line_start = ImGui::GetCursorScreenPos();
-    if (!line.Text.empty()) {
-        const ImVec2 status_size = ImGui::CalcTextSize(line.Text.c_str());
-        right_edge -=
-            line.WidestText.empty()
-                ? status_size.x
-                : std::max(
-                      status_size.x,
-                      ImGui::CalcTextSize(line.WidestText.data(), line.WidestText.data() + line.WidestText.size()).x);
-        ImGui::SetCursorScreenPos({right_edge, line_start.y});
-        if (line.IsRunning) {
-            ImGui::TextDisabled("%s", line.Text.c_str());
-        } else {
-            ImGui::PushStyleColor(ImGuiCol_Text, line.Color);
-            if (ImGui::Selectable(line.Text.c_str(), false, ImGuiSelectableFlags_None, status_size)) {
-                ImGui::OpenPopup("run_report");
-            }
-            ImGui::PopStyleColor();
-            ImGui::SetItemTooltip("Show what the run reported, with the ngspice output");
-        }
-        right_edge -= ImGui::GetFontSize() * 1.5f;
+    if (line.TakesWholeLine) {
+        DrawRunStatus(line, m_Controls, right_edge);
+        return;
     }
-    if (ImGui::BeginPopup("run_report")) {
-        if (last_run) {
-            m_Controls.DrawRunReport(*last_run);
-        }
-        ImGui::EndPopup();
+    float hint_start =
+        DrawRunStatus(line, m_Controls, line_start.x + (right_edge - line_start.x) * MAX_RUN_STATUS_SHARE);
+    if (hint_start > line_start.x) {
+        hint_start += gap;
     }
-    return right_edge;
+    const std::string fitted = ShortenToWidth(hint, right_edge - hint_start, [](const std::string_view text) {
+        return ImGui::CalcTextSize(text.data(), text.data() + text.size()).x;
+    });
+    ImGui::SetCursorScreenPos({hint_start, line_start.y});
+    ImGui::TextDisabled("%s", fitted.c_str());
 }
 
 /**

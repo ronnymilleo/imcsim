@@ -5,14 +5,19 @@ How to read what imcsim measures, plots and exports. The [README](../README.md) 
 
 ## Editing
 
-- **Toolbar**: Select, Wire (W) and Probe (P) on the left, then the parts, each button showing its symbol. Sources,
-  diodes, transistors, controlled sources and the adjustable parts share one button per group: it places the part last picked, and the
-  arrow beside it (or a right click) lists the others. Hover a button for its name and shortcut.
+- **Command bar**: one row under the menu, across the window. Select, Wire (W) and Probe (P), then Undo, Redo and Fit
+  on the left, the part search after them, and the analysis, Live and Run (F5) at the right end, where Run stays
+  whatever the size of the window. Hover a button for its name and shortcut.
+- **Part rail**: the column of part buttons down the left of the schematic, each showing its symbol. The resistor,
+  capacitor, inductor, ground and op-amp have a button each; sources, supplies and labels, diodes, transistors,
+  controlled sources, adjustable parts, switches, logic inputs and outputs, gates, flip-flops and the ready logic
+  blocks share one button per group, marked in its corner: a click places the part last picked, and holding it (or a
+  right click) lists the others beside the rail. The button at the bottom goes to the part search.
 - **Editing a part**: double-click it, or select it and press Enter, to open its properties at the top of the
   schematic; edits apply as you type, and Enter, Esc or a click outside closes them. With a part selected, typing a
   number starts editing its main value right away: `4k7` and Enter make a resistor 4.7k. Values take SPICE suffixes, and a whole
-  number may put its decimals after the suffix, as resistor codes do (`4k7`, `2M2`, `3u3`). View > Properties keeps
-  the same fields in a docked window.
+  number may put its decimals after the suffix, as resistor codes do (`4k7`, `2M2`, `3u3`). The Properties window
+  beside Output keeps the same fields docked.
 - **Renaming a part**: the Name field of its properties takes a new name when you press Enter or click away. The name
   keeps the letter the part starts with, which tells ngspice what the part is (`R` for a resistor, `X` for a block,
   `U` for a gate), then letters, digits or `_`, such as `RLOAD` or `XCOUNT`; no two parts may share a name, whatever
@@ -33,7 +38,7 @@ How to read what imcsim measures, plots and exports. The [README](../README.md) 
 - **Switches that follow a voltage**: a voltage-controlled switch has its threshold, hysteresis and resistances in its
   properties, and a relay its coil and contact figures. Both are drawn open, since they open and close during a run.
   The Switching examples use them: a buck converter and a relay driver with a flyback diode.
-- **Fuses**: a fuse is in the Switches and fuses group of the toolbar. Its properties pick a ready fuse (100 mA, 500 mA,
+- **Fuses**: a fuse is in the Switches and fuses group of the part rail. Its properties pick a ready fuse (100 mA, 500 mA,
   1 A and 5 A fast, 1 A slow-blow) or set its rated current, melting I2t and cold and blown resistance, and show the
   cooling time constant they imply. A fuse carries its rated current for ever and blows above it, open for the rest of
   the run: the branch loses its current at that instant, the symbol breaks with a gap, and the Output window warns when
@@ -42,7 +47,7 @@ How to read what imcsim measures, plots and exports. The [README](../README.md) 
 - **Transformers**: the value of a transformer is its primary inductance, and its properties set the turns ratio, the
   coupling and the resistance of the windings. The secondary needs a path to ground, such as the bridge of the
   Transformers examples.
-- **Logic gates and flip-flops**: the toolbar has a button for the gates and one for the flip-flops, and Space finds
+- **Logic gates and flip-flops**: the part rail has a button for the gates and one for the flip-flops, and the part search finds
   them by name (`nand`, `flip`). A part has a logic level and a delay in its properties; it reads 1 above 70% of its
   level and 0 below 30%, and an input left unconnected reads 0. AND, OR, NAND, NOR, XOR and XNOR also have an
   **Inputs** setting from 2 to 8. The body grows downward, one input at a time, and adding one leaves the wired inputs
@@ -116,10 +121,11 @@ How to read what imcsim measures, plots and exports. The [README](../README.md) 
 - **Right click**: on a part, its properties, rotate, mirror, flip, measure its current and delete; on a wire,
   measure its voltage and delete; on empty canvas, find a part, run and fit. Right click on an item of a selected
   group keeps the group, and the menu acts on all of it.
-- **Fit**: the frame button in the toolbar, or Home, shows the whole schematic.
-- **Find a part**: press Space over the editor, type part of a name (`mos`, `zener`, `opamp`, `nmos`, `vcvs`), move
-  with Up and Down, and press Enter to start placing it.
-- **Running**: the ▶ button at the end of the toolbar, or F5, runs the analysis named beside it. That button opens
+- **Fit**: the frame button in the command bar, or Home, shows the whole schematic.
+- **Find a part**: press Space over the editor, or click the search field in the command bar, type part of a name
+  (`mos`, `zener`, `opamp`, `nmos`, `vcvs`), move through the list below it with Up and Down, and press Enter or click
+  a match to start placing it; the editor then takes the keys again, so R turns the part at once. Esc leaves the field.
+- **Running**: the ▶ button at the right end of the command bar, or F5, runs the analysis named before Live. That button opens
   the list of analyses (operating point, transient, AC sweep, DC sweep, noise, transfer function, sensitivity, poles and zeros, S-parameters and truth table) and the settings
   of the one picked, saved with the schematic. Suggest fills the transient times (five periods of the slowest source with a waveform, 200
   points in a period of the fastest) or the AC range (two decades past the RC, RL and LC corners and the op-amp
@@ -134,9 +140,9 @@ How to read what imcsim measures, plots and exports. The [README](../README.md) 
   status bar shows the run and, for a stepped analysis or a truth table, how much of it is done. A transient runs in
   chunks: its plot opens in the Output window with the first one and grows as the others arrive, with a Stop button
   and "Running, simulated up to 230ms of 1s" above it. Stop keeps the points made so far ("Stopped, simulated up to
-  530ms of 1s", and "Transient stopped" in the status bar). The transient plot shows a window of 2000 points at a time (a field
-  at its top right sets 1000 to 10000), so a long run stays quick to draw and to measure: a scroll bar the width of the
-  plot, with its time span written above it, moves the window along the run (the plot fits itself to every window), and
+  530ms of 1s", and "Transient stopped" in the status bar). The transient plot shows a window of 2000 points at a time (the
+  Plot points field at its top right sets 1000 to 10000; the run itself may have more time steps), so a long run stays quick to draw and to measure: a scroll bar the
+  width of the plot, with its time span written above it after Range, moves the window along the run (the plot fits itself to every window), and
   while the run goes on a Follow box keeps the window on the newest points. The schematic plays the same window: its
   time bar, its heat colors and the playhead of the plot all go over the window, and while the window follows a run the
   schematic shows the newest point. The statistics and the cursors work on the
@@ -145,8 +151,9 @@ How to read what imcsim measures, plots and exports. The [README](../README.md) 
   they wait, grayed out, for the end of a run that is still going on. The spectrum uses the whole run too. The other analyses stop between their steps (the values
   of a stepped analysis, the combinations of a truth table) and drop their result, and a single simulation finishes
   first; a Monte Carlo analysis keeps the runs made ("Stopped after 40 of 100 runs"). Editing the circuit also stops the run and drops what it made, since the answer would no longer fit.
-- **Status bar**: below the schematic, the keys of the current mode on the left; on the right, the grid position of
-  the cursor and how the last run went ("Transient done", with warnings, or failed). Click the result for the
+- **Status bar**: below the schematic, how the last run went first ("Transient done · 2000 time steps in 41ms", with
+  warnings, or failed, followed by the reason, which then takes the whole line), then the keys of the current mode, shortened at a word
+  when the window is narrow, and the grid position of the cursor on the right. Click the result for the
   errors, the warnings and the ngspice output. Among the warnings are the safe operating area ones: a diode, LED,
   Zener, transistor or MOSFET that a run pushes past its ratings (diode average forward current and power, and the VCE, IC,
   VDS, VGS, ID and power of transistors) is named with the value and the rating. Ratings are fields of a part's
@@ -165,20 +172,24 @@ How to read what imcsim measures, plots and exports. The [README](../README.md) 
   Oscilloscope, Cyber Slate, Blueprint and Amber) and two light (Paper and Vintage); [Themes](themes.md) shows each
   one. Node and trace colors keep their hues in every theme: the light themes darken them to read on their
   background, and Phosphor, Oscilloscope, Cyber Slate, Blueprint and Amber brighten them.
-- **Output window**: hidden until an analysis runs; it then comes to the front on the tab of the new result. Turn
-  off Bring Output to front in Edit > Preferences to keep the schematic in front: a dot on the Output tab then tells a
-  new result is waiting. The operating point tab lists the node voltages and part currents, which also show on the schematic. Reopen it from View.
+- **Output window**: beside the schematic, with a tab for each analysis that has a result and the one you are on;
+  the others wait under **More analyses**. A new result turns it to its tab. If you dock Output among other tabs,
+  it comes to the front with each result; turn off Bring Output to front in Edit > Preferences to keep the schematic
+  in front, and a dot on the Output tab then tells a new result is waiting. The operating point tab lists the node
+  voltages and part currents, which also show on the schematic. Reopen it from View.
 - **Window layout**: every window floats or docks. Drag a window by its title (or a docked one by its tab) onto
   the arrows that appear over another window to dock it on that side or as a tab; drop it anywhere else to let it
-  float. By default the editor, Output, Analysis Settings and Netlist are tabs of the main area and Properties sits
-  on its right. The layout is kept between sessions, and View > Reset Layout restores the default.
+  float. By default the editor and Output sit side by side, and a column on the right holds Properties over
+  Analysis Settings and Netlist, which share it as tabs and open from the View menu; a window opens in its place
+  and the others make room, keeping the circuit centered, and every window keeps its share when the main window
+  changes size. The layout is kept between sessions, and View > Reset Layout restores the default.
 
 ## Blocks
 
 A block groups part of a schematic into a part of its own, with pins, which can be placed as many times as needed. The
 schematic file keeps the definition of each block, so it opens anywhere without other files.
 
-- **Pins**: a Block pin marker (in the supplies group of the toolbar, or Space and `pin`) marks a node of the circuit
+- **Pins**: a Block pin marker (in the supplies and labels group of the part rail, or the part search and `pin`) marks a node of the circuit
   as a pin of the block. Its square stands for the edge of the block and its arrow points from that edge into the
   circuit: a marker whose arrow points right puts its pin on the left of the block, one pointing left on the right, one
   pointing down on the top and one pointing up on the bottom. Name it in its properties (a letter or `_`, then letters,
@@ -211,7 +222,7 @@ schematic file keeps the definition of each block, so it opens anywhere without 
   block to go one level down; the path leads back up a level at a time, each one applied on the way. A block can never
   hold itself, directly or through another block: the part search leaves those out, and a paste or an apply that would
   make one is refused.
-- **Ready logic blocks**: the toolbar button after the flip-flops places one of eight blocks built from the gates and
+- **Ready logic blocks**: the rail button after the flip-flops places one of eight blocks built from the gates and
   flip-flops, the last one picked from its list, and the part search lists them as `Logic block: ...`:
   - a 4-bit counter (a ripple counter whose Q3 Q2 Q1 Q0 count the rising edges of CLK);
   - a 4-bit shift register (each rising edge of CLK moves IN into Q0 and each Q on);
@@ -272,7 +283,9 @@ influence on the output of a sensitivity analysis (see below) and leaves the wir
 run first.
 
 Over these colors a selected wire gets a halo and a selected part an outline in the selection color, instead of turning that color,
-and the voltage labels switch to the text color of the canvas, so neither passes for a value on the scale.
+so it does not pass for a value on the scale. The voltage of each node sits beside its wire, under a level one and
+right of an upright one, on a small box led by a dot of the node color, so it reads over any wire color. The box
+takes the size of the part names, so it follows the zoom, and is left out when zoomed out too far to read it.
 
 - **Voltage** spreads the colors from the lowest to the highest node voltage, ground included.
 - **Current** colors wires and parts by the current through them, on a logarithmic scale that reaches four decades
@@ -288,10 +301,10 @@ and the voltage labels switch to the text color of the canvas, so neither passes
 ## Transient on the schematic
 
 After a transient run, the schematic shows the circuit at one instant of it, with the same colors, labels and live
-effects as an operating point. A bar above the canvas moves that instant: **Play** plays the whole run in about five
-seconds (**Loop** starts it over), and the slider picks any instant and stops the playback where you drop it. In the
-Output window, the red line on the transient plot is the same instant: drag it to move the schematic, and it moves by
-itself while the schematic plays.
+effects as an operating point, and writes that instant at the top left of the canvas. A bar under the transient plot of
+the Output window moves it: **Play** plays the whole run in about five seconds (**Loop** starts it over), and the
+slider picks any instant and stops the playback where you drop it. The red line on the plot above is the same
+instant: drag it to move the schematic, and it moves by itself while the schematic plays.
 
 The colors keep one scale for the whole run, from its lowest to its highest voltage and its largest current and power,
 so a value keeps its color from one instant to the next. A new result starts again at the beginning of the run, paused.
@@ -472,7 +485,7 @@ Sallen-Key low-pass filter.
 
 Plots start empty; pick what to measure in either place:
 
-- **Probe tool** (toolbar button or P): click a wire to measure the voltage of its node, a part to measure its current,
+- **Probe tool** (command bar button or P): click a wire to measure the voltage of its node, a part to measure its current,
   or a transistor near one of its terminals to measure that terminal's current. Clicking a measured item again stops
   measuring it.
 - **Trace list** in the Output window: check voltages `V(n)` and currents `I(name)`, or use All and None.
@@ -482,8 +495,10 @@ Measured items are marked on the schematic, in the colors of their traces:
 - a dot on the first wire of a node for each measured voltage, labeled `V(n)` above or left of the wire;
 - an arrow on a terminal lead for each measured current, labeled `I(name)` below or right of it.
 
-The trace list is the only control for what the plots show; clicking a legend entry does nothing, so the plots,
-their statistics and the exports always agree.
+The trace list is the only control for what the plots show, so the plots, their statistics and the exports always
+agree. It is also their legend: each row shows its trace's color and line style (solid for a voltage, dashed for a
+current, heavier for a math channel), faded while the trace is off, so the plots carry no legend over the curves.
+Only the noise and S-parameter plots, whose curves the list does not hold, keep one.
 
 ## Plots
 
@@ -497,7 +512,7 @@ their statistics and the exports always agree.
   stretch of any of them, which is half a period
   when there is a clock, starting at the first change, and writes 0, 1 or X in a box at the middle of each cell that has
   room for it at the current zoom. A stretch that lasts several cells reads `1 1 1`, and a glitch inside a cell does not
-  show. The Logic lanes box beside the statistics turns the lanes off, which draws every voltage on the analog
+  show. The Logic lanes box on the line over the statistics turns the lanes off, which draws every voltage on the analog
   axis again. The plot is left out when only logic signals are measured. The SVG export has the same panels and bit
   labels; the CSV lists the voltages.
 - A logic bus reads several logic signals as one number, as a logic analyzer does, so a counter reads 0, 1, 2...
@@ -525,9 +540,11 @@ their statistics and the exports always agree.
   the plot reads as gain while a transient uses the small amplitude a real circuit would see.
 - A stepped DC sweep draws one curve per step, labeled with the step value where the curves part most, and lists
   every curve in the statistics, named by its step value.
-- The transient, AC sweep and DC sweep have **Cursors A and B** in the panel on their right. Turning them on places
-  two draggable vertical lines; the panel then measures every shown trace between them, or over the visible range
-  when they are off. The transient reads peak-to-peak, mean, RMS and frequency, and the value at each cursor with
+- The statistics sit under the plots, one table with a row per reading and a column per trace, so two traces
+  compare across a row; every reading has four significant digits. The transient, AC sweep and DC sweep have
+  **Cursors** at the right of the line over their plot. Turning them on places two draggable vertical lines, whose
+  positions show in a small Cursors table beside the statistics (under them when the panel is narrow); the table then
+  measures every shown trace between them, or over the visible range when they are off. The transient reads peak-to-peak, mean, RMS and frequency, and the value at each cursor with
   the change and the time between them; the AC sweep reads the gain and phase at each cursor and its response over
   the whole sweep; the DC sweep reads the value at each cursor, the change and the slope between them, and the
   minimum, maximum and mean over the span. The slope is in the unit of the trace over that of the sweep: a voltage

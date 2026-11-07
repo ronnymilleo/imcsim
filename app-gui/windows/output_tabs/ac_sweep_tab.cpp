@@ -7,6 +7,7 @@
 
 #include "implot.h"
 #include "plots/plot_figures.h"
+#include "plots/statistics_table.h"
 #include "plots/trace_statistics.h"
 #include "windows/output_tabs/plot_widgets.h"
 #include <cmath>
@@ -37,10 +38,13 @@ void ACSweepTab::Draw(const FrameResults &frame) {
     }
     DrawWithStatistics(
         [&] {
+            const float right_edge = ImGui::GetCursorPosX() + ImGui::GetContentRegionAvail().x;
+            ImGui::AlignTextToFramePadding();
             ImGui::TextDisabled("%s",
                                 frame.AnythingMeasured || !frame.ACSweepMath.Magnitudes.empty()
                                     ? "Relative to the AC magnitude of the sources: a magnitude of 1 reads as gain"
                                     : NOTHING_MEASURED);
+            DrawCursorToggle(m_Cursors, right_edge);
             DrawMathErrors(frame.ACSweepErrors);
             if (const auto &pole_zero = m_Schematic.GetPoleZero()) {
                 ImGui::Checkbox("Show poles and zeros", &m_ShowPoleZero);
@@ -106,7 +110,7 @@ void ACSweepTab::DrawPlots(const Core::ACSweep &sweep, const ACMathTraces &math)
     const std::string third_name = third_unit.empty() ? "Math" : third_unit;
     DrawPlot(sweep,
              {.Id = "Magnitude##ac",
-              .VoltageAxis = "Voltage (dB)",
+              .VoltageAxis = "Gain (dB)",
               .CurrentAxis = "Current (dB)",
               .ThirdAxis = std::format("{} (dB)", third_name),
               .Unit = " dB",
@@ -191,14 +195,12 @@ void ACSweepTab::DrawRoots(const bool has_labels) {
  *          that the -3 dB points refer to; the cursors only read the gain and phase at two frequencies.
  */
 void ACSweepTab::DrawStatistics(const Core::ACSweep &sweep, const ACMathTraces &math) {
-    DrawCursorToggle(m_Cursors);
     const PlotCursors &cursors = m_Cursors;
-    if (cursors.Shown && BeginStatisticsTable("cursors")) {
-        DrawStatistic("A", FormatQuantity(cursors.A, "Hz"));
-        DrawStatistic("B", FormatQuantity(cursors.B, "Hz"));
-        DrawStatistic("B/A", cursors.A > 0.0 ? FormatFixed(std::log10(cursors.B / cursors.A), " dec") : "-");
-        ImGui::EndTable();
-    }
+    const CursorReadings cursor_readings = {
+        {"A", FormatQuantity(cursors.A, "Hz")},
+        {"B", FormatQuantity(cursors.B, "Hz")},
+        {"B/A", cursors.A > 0.0 ? FormatFixed(std::log10(cursors.B / cursors.A), " dec") : std::string(NO_VALUE)}};
+    DrawStatisticsHeader("Response over the whole sweep");
     std::vector<PlottedTrace> magnitudes =
         ListTraces(sweep.NodeMagnitudesDecibels, sweep.CurrentMagnitudesDecibels, m_Schematic, " dB", " dB");
     std::vector<PlottedTrace> phases =
@@ -212,39 +214,13 @@ void ACSweepTab::DrawStatistics(const Core::ACSweep &sweep, const ACMathTraces &
         ImGui::TextDisabled("Measure a trace to see its statistics");
         return;
     }
-    ImGui::TextDisabled("Response over the whole sweep");
+    std::vector<BodeTrace> traces;
     for (std::size_t index = 0; index < magnitudes.size(); ++index) {
-        const PlottedTrace &magnitude = magnitudes[index];
-        const std::vector<double> &phase = *phases[index].Values;
-        ImGui::Separator();
-        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(magnitude.Color), "%s", magnitude.Label.c_str());
-        if (!BeginStatisticsTable(magnitude.Label)) {
-            continue;
-        }
-        if (const auto statistics = ComputeBodeStatistics(sweep.Frequencies, *magnitude.Values, phase,
-                                                          sweep.Frequencies.front(), sweep.Frequencies.back())) {
-            DrawStatistic("Peak", FormatFixed(statistics->PeakGain, " dB"));
-            DrawStatistic("at", FormatQuantity(statistics->PeakFrequency, "Hz"));
-            DrawStatistic("-3 dB low", FormatOptionalQuantity(statistics->LowerCutoff, "Hz"));
-            DrawStatistic("-3 dB high", FormatOptionalQuantity(statistics->UpperCutoff, "Hz"));
-            DrawStatistic("0 dB at", FormatOptionalQuantity(statistics->UnityGainFrequency, "Hz"));
-            DrawStatistic("Phase margin",
-                          statistics->PhaseMargin ? FormatFixed(*statistics->PhaseMargin, " deg") : "-");
-        }
-        if (cursors.Shown) {
-            const double gain_a = InterpolateAt(sweep.Frequencies, *magnitude.Values, cursors.A, true);
-            const double gain_b = InterpolateAt(sweep.Frequencies, *magnitude.Values, cursors.B, true);
-            const double phase_a = InterpolateAt(sweep.Frequencies, phase, cursors.A, true);
-            const double phase_b = InterpolateAt(sweep.Frequencies, phase, cursors.B, true);
-            DrawStatistic("Gain at A", FormatFixed(gain_a, " dB"));
-            DrawStatistic("Gain at B", FormatFixed(gain_b, " dB"));
-            DrawStatistic("Gain B-A", FormatFixed(gain_b - gain_a, " dB"));
-            DrawStatistic("Phase at A", FormatFixed(phase_a, " deg"));
-            DrawStatistic("Phase at B", FormatFixed(phase_b, " deg"));
-            DrawStatistic("Phase B-A", FormatFixed(phase_b - phase_a, " deg"));
-        }
-        ImGui::EndTable();
+        traces.push_back({.MagnitudesDecibels = *magnitudes[index].Values, .PhasesDegrees = *phases[index].Values});
     }
+    const std::vector<StatisticsRow> rows =
+        BuildBodeStatistics(sweep.Frequencies, traces, cursors.Shown ? std::optional(cursors) : std::nullopt);
+    DrawTraceTable("bode_statistics", magnitudes, rows, cursors.Shown ? cursor_readings : CursorReadings{});
 }
 
 } // namespace GUI

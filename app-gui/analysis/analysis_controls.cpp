@@ -13,6 +13,7 @@
 #include "simulation/circuit_copy.h"
 #include "simulation/monte_carlo.h"
 #include <algorithm>
+#include <chrono>
 #include <expected>
 #include <format>
 #include <iterator>
@@ -466,6 +467,14 @@ std::optional<Analysis> AnalysisControls::GetLastRun() const {
 }
 
 /**
+ * @brief   Counts the runs that finished, so a caller can tell a new outcome from one it has already seen.
+ * @return  The number of runs finished since the start, failed ones included.
+ */
+std::size_t AnalysisControls::GetFinishedRunCount() const {
+    return m_FinishedRunCount;
+}
+
+/**
  * @brief   Tells how the last run of an analysis went.
  * @param[in] analysis  Analysis to check.
  * @return  Failed while its last run has an error; Stopped for a transient that ended early; with warnings when the
@@ -495,6 +504,16 @@ RunOutcome AnalysisControls::GetOutcome(const Analysis analysis) const {
  */
 const std::optional<std::string> &AnalysisControls::GetError(const Analysis analysis) const {
     return m_Statuses[ToIndex(analysis)].Error;
+}
+
+/**
+ * @brief   How long the last run of an analysis took, from Run to its result.
+ * @param[in] analysis  The analysis.
+ * @return  The wall time in seconds, or none before a run, for a run refused before it started, and for a live run,
+ *          which keeps pace with the clock.
+ */
+std::optional<double> AnalysisControls::GetRunSeconds(const Analysis analysis) const {
+    return m_Statuses[ToIndex(analysis)].Seconds;
 }
 
 /**
@@ -537,6 +556,7 @@ void AnalysisControls::DrawRunReport(const Analysis analysis) const {
  */
 void AnalysisControls::StartRun(const Analysis analysis, Core::Job job) {
     m_RunCircuitVersion = m_Schematic.GetCircuitVersion();
+    m_RunStart = std::chrono::steady_clock::now();
     m_RunningAnalysis = analysis;
     m_Service.Submit(std::move(job));
 }
@@ -1050,8 +1070,12 @@ void AnalysisControls::ClearResult(const Analysis analysis) {
 
 void AnalysisControls::Finish(const Analysis analysis, std::optional<std::string> error,
                               std::vector<Core::SimulatorMessage> messages) {
-    m_Statuses[ToIndex(analysis)] = {.Error = std::move(error), .Messages = std::move(messages)};
+    const std::chrono::duration<double> elapsed = std::chrono::steady_clock::now() - m_RunStart;
+    m_Statuses[ToIndex(analysis)] = {.Error = std::move(error),
+                                     .Messages = std::move(messages),
+                                     .Seconds = m_IsLiveRun ? std::nullopt : std::optional(elapsed.count())};
     m_LastRun = analysis;
+    ++m_FinishedRunCount;
 }
 
 /**

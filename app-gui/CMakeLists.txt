@@ -38,12 +38,15 @@ add_library(imcsim-gui-lib
             drawing/heat_glow.cpp
             drawing/led_glow.cpp
             drawing/node_colors.cpp
+            drawing/readout_placement.cpp
             drawing/schematic_canvas.cpp
             drawing/schematic_drawing.cpp
             drawing/schematic_overlays.cpp
             drawing/svg_writer.cpp
+            drawing/text_fitting.cpp
             drawing/theme.cpp
             drawing/tool_icons.cpp
+            drawing/trace_swatch.cpp
             editing/block_wiring.cpp
             editing/canvas_view.cpp
             editing/connectivity.cpp
@@ -51,6 +54,7 @@ add_library(imcsim-gui-lib
             editing/element_factory.cpp
             editing/group_editing.cpp
             editing/live_input.cpp
+            editing/part_catalog.cpp
             editing/part_names.cpp
             editing/probing.cpp
             editing/selection.cpp
@@ -69,6 +73,7 @@ add_library(imcsim-gui-lib
             plots/plot_helpers.cpp
             plots/smith_chart.cpp
             plots/spectrum.cpp
+            plots/statistics_table.cpp
             plots/touchstone.cpp
             plots/trace_fit_state.cpp
             plots/trace_math.cpp
@@ -107,6 +112,7 @@ add_library(imcsim-gui-lib
             ui_elements/ui_wire.cpp
             value_field.cpp
             windows/app_window.cpp
+            windows/dock_layout.cpp
             windows/editor_toolbar.cpp
             windows/editor_window.cpp
             windows/netlist_window.cpp
@@ -115,6 +121,7 @@ add_library(imcsim-gui-lib
             windows/output_tabs/monte_carlo_tab.cpp
             windows/output_tabs/noise_tab.cpp
             windows/output_tabs/operating_point_tab.cpp
+            windows/output_tabs/plot_tab.cpp
             windows/output_tabs/plot_widgets.cpp
             windows/output_tabs/pole_zero_tab.cpp
             windows/output_tabs/result_tables.cpp
@@ -123,6 +130,7 @@ add_library(imcsim-gui-lib
             windows/output_tabs/transient_tab.cpp
             windows/output_window.cpp
             windows/part_picker.cpp
+            windows/part_rail.cpp
             windows/preferences_window.cpp
             windows/properties_window.cpp
             windows/simulation_window.cpp
