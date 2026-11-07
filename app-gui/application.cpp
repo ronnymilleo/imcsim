@@ -16,6 +16,7 @@
 #include "implot.h"
 #include "ngspice/ngspice_library.h"
 #include "simulation/simulator.h"
+#include "windows/dock_layout.h"
 #include <SDL3/SDL.h>
 #include <array>
 #include <cstdio>
@@ -338,6 +339,7 @@ void Application::Render() {
         ImGui::DockBuilderAddNode(dockspace_id, ImGuiDockNodeFlags_DockSpace);
         SetupDefaultLayout(dockspace_id);
     }
+    FollowWindowSize(dockspace_id);
     ImGui::DockSpaceOverViewport(dockspace_id, ImGui::GetMainViewport());
 
     // Runs even while the editor tab is hidden, so quitting, the menus and the shortcuts work from any window
@@ -534,10 +536,11 @@ void Application::RerunAfterEdits() {
 /**
  * @brief   The editor and Output sit side by side, and a column on the right holds Properties over Analysis Settings
  *          and Netlist, which share a node as tabs.
- * @details Only the editor starts open, filling the window, since ImGui folds away the node of a closed window: the
- *          first result opens Output beside the schematic, and the View menu opens the others in their place. Must run
- *          before the windows are drawn. A split returns the new node in the given direction and leaves the rest in
- *          its last argument.
+ * @details The editor, Output and Properties start open, so the schematic and its results are seen together from the
+ *          first run; the others open from the View menu in their place, and ImGui folds away the node of a closed
+ *          window. They start open because a folded node hands its width to the schematic, which keeps it when the
+ *          node comes back. Must run before the windows are drawn. A split returns the new node in the given direction
+ * and leaves the rest in its last argument.
  */
 void Application::SetupDefaultLayout(ImGuiID dockspace_id) {
     ImGui::DockBuilderSetNodeSize(dockspace_id, ImGui::GetMainViewport()->WorkSize);
@@ -553,6 +556,25 @@ void Application::SetupDefaultLayout(ImGuiID dockspace_id) {
     ImGui::DockBuilderDockWindow(m_SimulationWindow.GetWindowTitle().c_str(), settings_id);
     ImGui::DockBuilderDockWindow(m_NetlistWindow.GetWindowTitle().c_str(), settings_id);
     ImGui::DockBuilderFinish(dockspace_id);
+}
+
+/**
+ * @brief   Scales the dock layout with the main window, so each window keeps its share instead of the schematic taking
+ *          the whole change in size.
+ * @param[in] dockspace_id  ID of the main dockspace, whose node must exist.
+ * @note    A minimized window has no size, so it changes nothing and the layout is scaled from its last real size.
+ */
+void Application::FollowWindowSize(const ImGuiID dockspace_id) {
+    const ImVec2 work_size = ImGui::GetMainViewport()->WorkSize;
+    if (work_size.x <= 0.0f || work_size.y <= 0.0f) {
+        return;
+    }
+    ImGuiDockNode *root = ImGui::DockBuilderGetNode(dockspace_id);
+    const bool has_size = m_LayoutSize.x > 0.0f && m_LayoutSize.y > 0.0f;
+    if (root != nullptr && has_size && (work_size.x != m_LayoutSize.x || work_size.y != m_LayoutSize.y)) {
+        ScaleDockLayout(*root, {work_size.x / m_LayoutSize.x, work_size.y / m_LayoutSize.y});
+    }
+    m_LayoutSize = work_size;
 }
 
 void Application::EndFrame() {

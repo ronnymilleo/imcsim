@@ -24,6 +24,7 @@ add_executable(imcsim-tests
             editor_mode_tests.cpp
             element_factory_tests.cpp
             current_flow_tests.cpp
+            dock_layout_tests.cpp
             examples_tests.cpp
             fuse_tests.cpp
             group_editing_tests.cpp

@@ -108,6 +108,7 @@ add_library(imcsim-gui-lib
             ui_elements/ui_wire.cpp
             value_field.cpp
             windows/app_window.cpp
+            windows/dock_layout.cpp
             windows/editor_toolbar.cpp
             windows/editor_window.cpp
             windows/netlist_window.cpp

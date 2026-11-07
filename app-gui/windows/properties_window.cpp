@@ -8,11 +8,10 @@
 namespace GUI {
 
 /**
- * @brief   Creates the window, closed until the View menu opens it.
+ * @brief   Creates the window, open beside Output in the default layout.
  * @param[in] editor  Part editor shared with the editor popover; it must outlive the window.
  */
 PropertiesWindow::PropertiesWindow(PartEditor &editor) : AppWindow("Properties", true), m_Editor(editor) {
-    SetOpen(false);
 }
 
 void PropertiesWindow::Draw() {

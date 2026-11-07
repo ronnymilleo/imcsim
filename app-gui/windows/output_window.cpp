@@ -129,8 +129,6 @@ OutputWindow::OutputWindow(Schematic &schematic, AnalysisControls &controls, Tra
       m_DCSweepTab(schematic), m_NoiseTab(schematic), m_PoleZeroTab(schematic), m_SParameterTab(schematic),
       m_MonteCarloTab(schematic) {
     SetInitialSize(INITIAL_SIZE);
-    // Nothing to plot yet; the first result opens it
-    SetOpen(false);
 }
 
 /**
