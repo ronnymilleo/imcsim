@@ -486,8 +486,10 @@ Measured items are marked on the schematic, in the colors of their traces:
 - a dot on the first wire of a node for each measured voltage, labeled `V(n)` above or left of the wire;
 - an arrow on a terminal lead for each measured current, labeled `I(name)` below or right of it.
 
-The trace list is the only control for what the plots show; clicking a legend entry does nothing, so the plots,
-their statistics and the exports always agree.
+The trace list is the only control for what the plots show, so the plots, their statistics and the exports always
+agree. It is also their legend: each row shows its trace's color and line style (solid for a voltage, dashed for a
+current, heavier for a math channel), faded while the trace is off, so the plots carry no legend over the curves.
+Only the noise and S-parameter plots, whose curves the list does not hold, keep one.
 
 ## Plots
 
