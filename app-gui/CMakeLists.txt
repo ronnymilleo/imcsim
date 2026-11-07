@@ -42,6 +42,7 @@ add_library(imcsim-gui-lib
             drawing/schematic_drawing.cpp
             drawing/schematic_overlays.cpp
             drawing/svg_writer.cpp
+            drawing/text_fitting.cpp
             drawing/theme.cpp
             drawing/tool_icons.cpp
             editing/block_wiring.cpp

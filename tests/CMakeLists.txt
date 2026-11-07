@@ -72,6 +72,7 @@ add_executable(imcsim-tests
             stepped_circuit_tests.cpp
             subcircuit_tests.cpp
             svg_writer_tests.cpp
+            text_fitting_tests.cpp
             touchstone_tests.cpp
             trace_fit_state_tests.cpp
             transient_chunks_tests.cpp

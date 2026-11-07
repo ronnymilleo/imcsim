@@ -187,7 +187,6 @@ private:
     void DrawTimeBar();
     void DrawBlockBar(ImVec2 origin);
     void DrawStatusBar(const ViewTransform &view, bool hovered);
-    float DrawRunStatus(float right_edge);
     std::optional<MeasurementTarget> FindTargetAt(const ViewTransform &view) const;
 
     // Modes

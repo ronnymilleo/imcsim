@@ -10,6 +10,7 @@
 #include "document/block_nesting.h"
 #include "document/subcircuit_pins.h"
 #include "drawing/schematic_drawing.h"
+#include "drawing/text_fitting.h"
 #include "drawing/theme.h"
 #include "editing/element_factory.h"
 #include "editing/group_editing.h"
@@ -26,6 +27,7 @@
 #include <format>
 #include <ranges>
 #include <string>
+#include <string_view>
 #include <utility>
 
 namespace GUI {
@@ -43,6 +45,12 @@ constexpr float MIN_TIME_SLIDER_WIDTH = 80.0f;
 /// The instant readout keeps the width of its widest text, so the slider does not resize as the digits change: four
 /// significant digits with a suffix are at most this wide.
 constexpr const char *WIDEST_TIME_READOUT = "t = 888.8ms / 888.8ms";
+/// The middle dot between the run state and its reason, encoded in UTF-8.
+constexpr std::string_view MIDDLE_DOT = "\xC2\xB7";
+/// Space between the parts of the status bar, in font sizes.
+constexpr float STATUS_GAP_FONT_SIZES = 1.5f;
+/// Share of the status bar the run state may take, so a long failure reason leaves room for the hint.
+constexpr float MAX_RUN_STATUS_SHARE = 0.6f;
 /// The edge choice of a block pin, this many font sizes wide.
 constexpr float PIN_SIDE_FIELD_WIDTH = 6.0f;
 
@@ -77,6 +85,8 @@ std::string FormatLiveProgress(const AnalysisControls &controls, const std::opti
  */
 struct RunStatusLine {
     std::string Text;
+    /// What follows the state in a muted color, such as the reason a run failed, or empty.
+    std::string Detail;
     ImVec4 Color;
     bool IsRunning = false;
     /// Text as wide as the line can get, whose width it keeps so it does not shift as its figures change, or empty.
@@ -113,12 +123,64 @@ RunStatusLine DescribeRunStatus(const AnalysisControls &controls, const std::opt
             .Text = std::format("{} done, with warnings", name), .Color = GetWarningTextColor(), .IsRunning = false};
     case RunOutcome::STOPPED:
         return {.Text = std::format("{} stopped", name), .Color = plain, .IsRunning = false};
-    case RunOutcome::FAILED:
-        return {.Text = std::format("{} failed", name), .Color = GetErrorTextColor(), .IsRunning = false};
+    case RunOutcome::FAILED: {
+        const std::optional<std::string> &error = controls.GetError(*last_run);
+        return {.Text = std::format("{} failed", name),
+                .Detail = error ? std::string(GetFirstLine(*error)) : std::string(),
+                .Color = GetErrorTextColor(),
+                .IsRunning = false};
+    }
     case RunOutcome::NONE:
     default:
         return {.Text = "", .Color = plain, .IsRunning = false};
     }
+}
+
+/**
+ * @brief   "Transient done", in the warning color when something needs a look and in the error color after a failure,
+ *          followed by the reason; a click opens the report of the run, with the ngspice output.
+ * @param[in] line       State of the run, from DescribeRunStatus().
+ * @param[in] controls   Runs, whose report a click opens.
+ * @param[in] max_right  Where the state must end, shortened at a word to fit.
+ * @return  Where the state ends, or where the line starts when there is none.
+ */
+float DrawRunStatus(const RunStatusLine &line, const AnalysisControls &controls, const float max_right) {
+    const std::optional<Analysis> last_run = controls.GetLastRun();
+    const ImVec2 line_start = ImGui::GetCursorScreenPos();
+    if (line.Text.empty()) {
+        return line_start.x;
+    }
+    const auto measure = [](const std::string_view text) {
+        return ImGui::CalcTextSize(text.data(), text.data() + text.size()).x;
+    };
+    const float max_width = max_right - line_start.x;
+    const std::string text = ShortenToWidth(line.Text, max_width, measure);
+    const float text_width = measure(text);
+    // The reason gets what the state leaves
+    const std::string detail = line.Detail.empty() ? std::string()
+                                                   : ShortenToWidth(std::format(" {} {}", MIDDLE_DOT, line.Detail),
+                                                                    max_width - text_width, measure);
+    // A run in progress keeps the width of its widest text, so the hint does not shift as its figures change
+    const float width = std::min(max_width, std::max(text_width + measure(detail), measure(line.WidestText)));
+    if (line.IsRunning) {
+        ImGui::TextDisabled("%s", text.c_str());
+    } else {
+        if (ImGui::Selectable("##run_status", false, ImGuiSelectableFlags_None, {width, 0.0f})) {
+            ImGui::OpenPopup("run_report");
+        }
+        ImGui::SetItemTooltip("Show what the run reported, with the ngspice output");
+        ImDrawList *draw_list = ImGui::GetWindowDrawList();
+        draw_list->AddText(line_start, ImGui::GetColorU32(line.Color), text.c_str());
+        draw_list->AddText({line_start.x + text_width, line_start.y}, ImGui::GetColorU32(ImGuiCol_TextDisabled),
+                           detail.c_str());
+    }
+    if (ImGui::BeginPopup("run_report")) {
+        if (last_run) {
+            controls.DrawRunReport(*last_run);
+        }
+        ImGui::EndPopup();
+    }
+    return line_start.x + width;
 }
 
 /**
@@ -596,8 +658,10 @@ void EditorWindow::DrawBlockBar(const ImVec2 origin) {
 }
 
 /**
- * @brief   What the current mode does and which keys it takes, so the shortcuts can be learned while working, and the
- *          grid point under the cursor on the right.
+ * @brief   The state of the last run first, then what the current mode does and which keys it takes, so the shortcuts
+ *          can be learned while working, and the grid point under the cursor on the right.
+ * @details The run state leads, so a finished run and a failed one tell apart at a glance; the hint takes the space
+ *          left and is shortened at a word, never cut mid-word.
  */
 void EditorWindow::DrawStatusBar(const ViewTransform &view, const bool hovered) {
     std::string hint;
@@ -613,61 +677,34 @@ void EditorWindow::DrawStatusBar(const ViewTransform &view, const bool hovered) 
         const std::size_t count = m_Schematic->GetSelectedElements().size() + m_Schematic->GetSelectedWires().size();
         hint = DescribeSelecting(m_Controls.IsLive(), selected_part, count);
     }
-    // The right end holds the result of the last run, which stays put, and the grid position before it; the hint is
-    // cut short before them
     const ImVec2 line_start = ImGui::GetCursorScreenPos();
-    float right_edge = DrawRunStatus(line_start.x + ImGui::GetContentRegionAvail().x);
+    const float gap = ImGui::GetFontSize() * STATUS_GAP_FONT_SIZES;
+    float right_edge = line_start.x + ImGui::GetContentRegionAvail().x;
     if (hovered) {
         const GridPoint point = Snap(view.ToWorld(ImGui::GetIO().MousePos));
         const std::string position = std::format("x {}, y {}", point.X, point.Y);
         right_edge -= ImGui::CalcTextSize(position.c_str()).x;
         ImGui::SetCursorScreenPos({right_edge, line_start.y});
         ImGui::TextDisabled("%s", position.c_str());
-        right_edge -= ImGui::GetFontSize() * 1.5f;
+        right_edge -= gap;
     }
     ImGui::SetCursorScreenPos(line_start);
-    ImGui::PushClipRect(line_start, {right_edge, line_start.y + ImGui::GetTextLineHeightWithSpacing()}, true);
-    ImGui::TextDisabled("%s", hint.c_str());
-    ImGui::PopClipRect();
-}
-
-/**
- * @brief   "Transient done", in the warning color when something needs a look and in the error color after a failure; a
- *          click opens the report of the run, with the ngspice output.
- * @details Returns where the space left for the hint ends.
- */
-float EditorWindow::DrawRunStatus(float right_edge) {
-    const std::optional<Analysis> last_run = m_Controls.GetLastRun();
+    // The reason of a failure is worth more than the hint, so it takes the whole line
     const RunStatusLine line = DescribeRunStatus(m_Controls, m_Schematic->GetTransient());
-    const ImVec2 line_start = ImGui::GetCursorScreenPos();
-    if (!line.Text.empty()) {
-        const ImVec2 status_size = ImGui::CalcTextSize(line.Text.c_str());
-        right_edge -=
-            line.WidestText.empty()
-                ? status_size.x
-                : std::max(
-                      status_size.x,
-                      ImGui::CalcTextSize(line.WidestText.data(), line.WidestText.data() + line.WidestText.size()).x);
-        ImGui::SetCursorScreenPos({right_edge, line_start.y});
-        if (line.IsRunning) {
-            ImGui::TextDisabled("%s", line.Text.c_str());
-        } else {
-            ImGui::PushStyleColor(ImGuiCol_Text, line.Color);
-            if (ImGui::Selectable(line.Text.c_str(), false, ImGuiSelectableFlags_None, status_size)) {
-                ImGui::OpenPopup("run_report");
-            }
-            ImGui::PopStyleColor();
-            ImGui::SetItemTooltip("Show what the run reported, with the ngspice output");
-        }
-        right_edge -= ImGui::GetFontSize() * 1.5f;
+    if (!line.Detail.empty()) {
+        DrawRunStatus(line, m_Controls, right_edge);
+        return;
     }
-    if (ImGui::BeginPopup("run_report")) {
-        if (last_run) {
-            m_Controls.DrawRunReport(*last_run);
-        }
-        ImGui::EndPopup();
+    float hint_start =
+        DrawRunStatus(line, m_Controls, line_start.x + (right_edge - line_start.x) * MAX_RUN_STATUS_SHARE);
+    if (hint_start > line_start.x) {
+        hint_start += gap;
     }
-    return right_edge;
+    const std::string fitted = ShortenToWidth(hint, right_edge - hint_start, [](const std::string_view text) {
+        return ImGui::CalcTextSize(text.data(), text.data() + text.size()).x;
+    });
+    ImGui::SetCursorScreenPos({hint_start, line_start.y});
+    ImGui::TextDisabled("%s", fitted.c_str());
 }
 
 /**
