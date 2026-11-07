@@ -40,6 +40,8 @@ constexpr float MIN_TIME_SLIDER_WIDTH = 5.0f;
 constexpr const char *WIDEST_TIME_READOUT = "t = 888.8ms / 888.8ms";
 /// Gap on the left of each trace column of a statistics table, in font sizes.
 constexpr float TRACE_COLUMN_GAP = 1.0f;
+/// Space between the table of the traces and that of the cursors beside it, in font sizes.
+constexpr float CURSOR_TABLE_GAP = 1.5f;
 /// Most of the height of a tab the statistics under the plots take before they scroll.
 constexpr float MAX_STATISTICS_SHARE = 0.4f;
 /// The lines that mark the poles and zeros on a Bode plot are dashed and thin, so they stay visible without hiding the
@@ -118,6 +120,49 @@ std::size_t FindSteadySpread(const std::vector<std::vector<double>> &curves) {
         }
     }
     return widest;
+}
+
+/**
+ * @brief   The readings of the cursors themselves, a name and a value per row, beside the table just drawn when the
+ *          panel has room for them and under it otherwise, so the line over the table never runs past the panel.
+ */
+void DrawCursorTable(const CursorReadings &readings) {
+    if (readings.empty()) {
+        return;
+    }
+    const auto measure = [](const std::string &text) { return ImGui::CalcTextSize(text.c_str()).x; };
+    float name_width = 0.0f;
+    float value_width = 0.0f;
+    for (const auto &[name, value] : readings) {
+        name_width = std::max(name_width, measure(name));
+        value_width = std::max(value_width, measure(value));
+    }
+    const float column_gap = ImGui::GetFontSize() * TRACE_COLUMN_GAP;
+    value_width += column_gap;
+    const float table_width = name_width + value_width + ImGui::GetStyle().CellPadding.x * 4.0f;
+    const float gap = ImGui::GetFontSize() * CURSOR_TABLE_GAP;
+    ImGui::SameLine(0.0f, gap);
+    if (ImGui::GetContentRegionAvail().x < table_width) {
+        ImGui::NewLine();
+    }
+    if (!ImGui::BeginTable("cursor_readings", 2, ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_RowBg,
+                           {table_width, 0.0f})) {
+        return;
+    }
+    ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed, name_width);
+    ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed, value_width);
+    ImGui::TableNextRow(ImGuiTableRowFlags_Headers);
+    ImGui::TableNextColumn();
+    ImGui::TextDisabled("Cursors");
+    for (const auto &[name, value] : readings) {
+        ImGui::TableNextRow();
+        ImGui::TableNextColumn();
+        ImGui::TextDisabled("%s", name.c_str());
+        ImGui::TableNextColumn();
+        ImGui::SetCursorPosX(ImGui::GetCursorPosX() + value_width - measure(value));
+        ImGui::TextUnformatted(value.c_str());
+    }
+    ImGui::EndTable();
 }
 
 } // namespace
@@ -815,37 +860,27 @@ bool BeginStatisticsTable(const std::string &id) {
 }
 
 /**
- * @brief   Draws the line over a statistics table: what span the readings cover and, with the cursors shown, where they
- *          sit, all on one row so the table keeps the height.
- * @param[in]     cursors          Cursors of the plot.
- * @param[in]     span_text        What the readings cover, such as "Over the visible time".
- * @param[in]     cursor_readings  Name and value of each cursor reading, such as A and its time, shown with the
- *                                 cursors.
+ * @brief   Draws the line over a statistics table: what span the readings cover.
+ * @param[in] span_text  What the readings cover, such as "Over the visible time".
  */
-void DrawStatisticsHeader(const PlotCursors &cursors, const char *span_text,
-                          const std::vector<std::pair<std::string, std::string>> &cursor_readings) {
+void DrawStatisticsHeader(const char *span_text) {
     ImGui::TextDisabled("%s", span_text);
-    if (!cursors.Shown) {
-        return;
-    }
-    for (const auto &[name, value] : cursor_readings) {
-        ImGui::SameLine(0.0f, ImGui::GetFontSize());
-        ImGui::TextDisabled("%s", name.c_str());
-        ImGui::SameLine();
-        ImGui::TextUnformatted(value.c_str());
-    }
 }
 
 /**
  * @brief   Draws readings as one table with a row per quantity and a column per trace, headed by the trace labels in
  *          their colors, with the figures right-aligned so their digits line up.
- * @param[in] id      ImGui ID of the table.
- * @param[in] traces  Traces of the columns, for their labels and colors.
- * @param[in] rows    Readings, each row holding one cell per trace in the same order.
+ * @param[in] id               ImGui ID of the table.
+ * @param[in] traces           Traces of the columns, for their labels and colors.
+ * @param[in] rows             Readings, each row holding one cell per trace in the same order.
+ * @param[in] cursor_readings  Name and value of each reading of the cursors themselves, such as A and its time, drawn
+ *                             as a table of their own beside the traces, or under them when the panel is too narrow;
+ *                             empty while the cursors are hidden.
  * @note    The table is as wide as its widest cells, and the statistics panel scrolls sideways when the traces do not
  *          fit.
  */
-void DrawTraceTable(const char *id, const std::vector<PlottedTrace> &traces, const std::vector<StatisticsRow> &rows) {
+void DrawTraceTable(const char *id, const std::vector<PlottedTrace> &traces, const std::vector<StatisticsRow> &rows,
+                    const CursorReadings &cursor_readings) {
     const auto measure = [](const std::string &text) { return ImGui::CalcTextSize(text.c_str()).x; };
     // Each column is as wide as its widest text, so the table width is known before it begins
     std::vector<float> widths(traces.size() + 1, 0.0f);
@@ -900,6 +935,7 @@ void DrawTraceTable(const char *id, const std::vector<PlottedTrace> &traces, con
         }
     }
     ImGui::EndTable();
+    DrawCursorTable(cursor_readings);
 }
 
 /**

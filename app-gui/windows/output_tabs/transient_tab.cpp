@@ -613,12 +613,12 @@ std::vector<BusLane> TransientTab::FindShownBuses(const std::size_t node_count) 
  */
 void TransientTab::DrawStatistics(const Core::Transient &transient, const std::vector<MathTrace> &math) {
     const PlotCursors &cursors = m_Cursors;
-    const std::vector<std::pair<std::string, std::string>> cursor_readings = {
+    const CursorReadings cursor_readings = {
         {"A", FormatQuantity(cursors.A, "s")},
         {"B", FormatQuantity(cursors.B, "s")},
         {"B-A", FormatQuantity(cursors.B - cursors.A, "s")},
         {"1/(B-A)", cursors.B != cursors.A ? FormatQuantity(1.0 / std::abs(cursors.B - cursors.A), "Hz") : "-"}};
-    DrawStatisticsHeader(m_Cursors, cursors.Shown ? "Between the cursors" : "Over the visible time", cursor_readings);
+    DrawStatisticsHeader(cursors.Shown ? "Between the cursors" : "Over the visible time");
     if (!FindLogicNodes(m_Schematic.BuildCircuit()).empty()) {
         ImGui::SameLine(0.0f, ImGui::GetFontSize());
         ImGui::Checkbox("Logic lanes", &m_ShowLogicLanes);
@@ -645,7 +645,7 @@ void TransientTab::DrawStatistics(const Core::Transient &transient, const std::v
     const std::vector<StatisticsRow> rows =
         BuildTransientStatistics(transient.Times, measured, MeasuredSpan(cursors, m_View),
                                  cursors.Shown ? std::optional(cursors) : std::nullopt);
-    DrawTraceTable("trace_statistics", traces, rows);
+    DrawTraceTable("trace_statistics", traces, rows, cursors.Shown ? cursor_readings : CursorReadings{});
 }
 
 } // namespace GUI

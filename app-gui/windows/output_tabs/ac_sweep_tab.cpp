@@ -196,11 +196,11 @@ void ACSweepTab::DrawRoots(const bool has_labels) {
  */
 void ACSweepTab::DrawStatistics(const Core::ACSweep &sweep, const ACMathTraces &math) {
     const PlotCursors &cursors = m_Cursors;
-    const std::vector<std::pair<std::string, std::string>> cursor_readings = {
+    const CursorReadings cursor_readings = {
         {"A", FormatQuantity(cursors.A, "Hz")},
         {"B", FormatQuantity(cursors.B, "Hz")},
         {"B/A", cursors.A > 0.0 ? FormatFixed(std::log10(cursors.B / cursors.A), " dec") : "-"}};
-    DrawStatisticsHeader(m_Cursors, "Response over the whole sweep", cursor_readings);
+    DrawStatisticsHeader("Response over the whole sweep");
     std::vector<PlottedTrace> magnitudes =
         ListTraces(sweep.NodeMagnitudesDecibels, sweep.CurrentMagnitudesDecibels, m_Schematic, " dB", " dB");
     std::vector<PlottedTrace> phases =
@@ -220,7 +220,7 @@ void ACSweepTab::DrawStatistics(const Core::ACSweep &sweep, const ACMathTraces &
     }
     const std::vector<StatisticsRow> rows =
         BuildBodeStatistics(sweep.Frequencies, traces, cursors.Shown ? std::optional(cursors) : std::nullopt);
-    DrawTraceTable("bode_statistics", magnitudes, rows);
+    DrawTraceTable("bode_statistics", magnitudes, rows, cursors.Shown ? cursor_readings : CursorReadings{});
 }
 
 } // namespace GUI

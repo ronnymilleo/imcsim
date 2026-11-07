@@ -184,11 +184,10 @@ void DCSweepTab::DrawPlot(const Core::DCSweep &sweep, const std::vector<std::vec
 void DCSweepTab::DrawStatistics(const Core::DCSweep &sweep, const std::vector<std::vector<MathTrace>> &math) {
     const PlotCursors &cursors = m_Cursors;
     const char *swept_unit = sweep.SweptUnit.c_str();
-    const std::vector<std::pair<std::string, std::string>> cursor_readings = {
-        {"A", FormatQuantity(cursors.A, swept_unit)},
-        {"B", FormatQuantity(cursors.B, swept_unit)},
-        {"B-A", FormatQuantity(cursors.B - cursors.A, swept_unit)}};
-    DrawStatisticsHeader(m_Cursors, cursors.Shown ? "Between the cursors" : "Over the visible sweep", cursor_readings);
+    const CursorReadings cursor_readings = {{"A", FormatQuantity(cursors.A, swept_unit)},
+                                            {"B", FormatQuantity(cursors.B, swept_unit)},
+                                            {"B-A", FormatQuantity(cursors.B - cursors.A, swept_unit)}};
+    DrawStatisticsHeader(cursors.Shown ? "Between the cursors" : "Over the visible sweep");
     const bool show_currents = HasMeasuredCurrent(sweep.Curves.front().Currents, m_Schematic);
     const std::vector<CurveFamily> families = ListCurveFamilies(sweep, m_Schematic, show_currents, math);
     if (families.empty()) {
@@ -211,7 +210,7 @@ void DCSweepTab::DrawStatistics(const Core::DCSweep &sweep, const std::vector<st
     const std::vector<StatisticsRow> rows =
         BuildSweepStatistics(sweep.SweptValues, sweep.SweptUnit, traces, MeasuredSpan(cursors, m_View),
                              cursors.Shown ? std::optional(cursors) : std::nullopt);
-    DrawTraceTable("sweep_statistics", columns, rows);
+    DrawTraceTable("sweep_statistics", columns, rows, cursors.Shown ? cursor_readings : CursorReadings{});
 }
 
 } // namespace GUI
