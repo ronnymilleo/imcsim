@@ -193,7 +193,17 @@ void TransientTab::Draw(const FrameResults &frame) {
                 ImGui::TextDisabled("%s", NOTHING_MEASURED);
             }
             DrawMathErrors(frame.TransientErrors);
-            DrawPlots(*frame.TransientWindow, frame.TransientMath, frame.StepWindows);
+            // The playback sits under the plot it moves the playhead of, sharing its width
+            const Core::Transient &shown = *frame.TransientWindow;
+            const bool has_playback = !shown.Times.empty();
+            const float playback_height = has_playback ? ImGui::GetFrameHeightWithSpacing() : 0.0f;
+            if (ImGui::BeginChild("transient_plots", ImVec2(0.0f, -playback_height))) {
+                DrawPlots(shown, frame.TransientMath, frame.StepWindows);
+            }
+            ImGui::EndChild();
+            if (has_playback) {
+                DrawPlaybackBar(m_Playback, shown.Times.front(), shown.Times.back());
+            }
         },
         [&] { DrawStatistics(*frame.TransientWindow, frame.TransientMath); });
 }

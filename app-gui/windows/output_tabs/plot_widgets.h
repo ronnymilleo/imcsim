@@ -6,6 +6,7 @@
 #ifndef IMCSIM_PLOT_WIDGETS_H
 #define IMCSIM_PLOT_WIDGETS_H
 
+#include "analysis/playback.h"
 #include "document/schematic.h"
 #include "imgui.h"
 #include "implot.h"
@@ -101,6 +102,9 @@ void DrawCursorReadout(const std::vector<double> &xs, const char *x_unit, bool l
                        const std::vector<PlottedTrace> &plotted);
 void DrawCursors(PlotCursors &cursors, bool logarithmic);
 PlotSpan MeasuredSpan(const PlotCursors &cursors, const PlotSpan &view);
+
+// Playback
+void DrawPlaybackBar(TransientPlayback &playback, double from, double to);
 
 // Statistics
 std::string FormatQuantity(double value, const char *unit);

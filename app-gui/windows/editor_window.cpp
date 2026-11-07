@@ -40,13 +40,10 @@ constexpr float MIN_DOT_SPACING = 8.0f;
 constexpr float WIRE_CURSOR_HALF_SIZE = 4.0f;
 /// How close, in pixels, the cursor must be to a wire to select it.
 constexpr float WIRE_PICK_DISTANCE = 5.0f;
-/// The time slider of a transient does not shrink below this, in pixels, so it stays usable in a narrow window.
-constexpr float MIN_TIME_SLIDER_WIDTH = 80.0f;
-/// The instant readout keeps the width of its widest text, so the slider does not resize as the digits change: four
-/// significant digits with a suffix are at most this wide.
-constexpr const char *WIDEST_TIME_READOUT = "t = 888.8ms / 888.8ms";
 /// The middle dot between the run state and its reason, encoded in UTF-8.
 constexpr std::string_view MIDDLE_DOT = "\xC2\xB7";
+/// Space between the edge of the canvas and the instant it shows, in font sizes.
+constexpr float INSTANT_MARGIN = 0.5f;
 /// Space between the parts of the status bar, in font sizes.
 constexpr float STATUS_GAP_FONT_SIZES = 1.5f;
 /// Share of the status bar the run state may take, so a long failure reason leaves room for the hint.
@@ -436,7 +433,6 @@ void EditorWindow::Draw() {
     }
     ApplyToolbarRequest(m_Toolbar.Draw(m_Mode, *m_Schematic, IsEditingSubcircuit()));
     m_Overlays.Update(*m_Schematic, m_Controls);
-    DrawTimeBar();
 
     const ImVec2 origin = ImGui::GetCursorScreenPos();
     const ImVec2 size = GetCanvasSize();
@@ -496,6 +492,7 @@ void EditorWindow::Draw() {
     }
     HandleClipboardShortcuts();
     m_Overlays.DrawColorLegend(draw_list, origin, size, *m_Schematic);
+    DrawShownInstant(draw_list, origin);
 
     draw_list->PopClipRect();
     DrawBlockBar(origin);
@@ -570,50 +567,20 @@ std::optional<EditorWindow::TimeSpan> EditorWindow::GetWindowSpan() const {
 }
 
 /**
- * @brief   A row above the canvas with the playback of the transient on display: play, loop, a slider over the window
- *          and the instant.
- * @details Moving the slider stops the playback, so it holds where the user put it.
+ * @brief   Writes the instant of the transient the schematic shows at the top left of the canvas, so it reads while the
+ *          playback, under the plot of the Output window, moves it.
+ * @param[in] draw_list  Where to draw.
+ * @param[in] origin     Top left corner of the canvas, in screen pixels.
  */
-void EditorWindow::DrawTimeBar() {
+void EditorWindow::DrawShownInstant(ImDrawList *draw_list, const ImVec2 origin) const {
     const std::optional<DisplayedState> &displayed = m_Overlays.GetDisplayed();
-    if (!displayed || !displayed->Time) {
+    const std::optional<double> time = displayed ? displayed->Time : std::nullopt;
+    if (!time || !GetWindowSpan()) {
         return;
     }
-    const std::optional<Core::Transient> &transient = m_Schematic->GetTransient();
-    if (!transient) {
-        return;
-    }
-    const std::optional<TimeSpan> window = GetWindowSpan();
-    if (!window) {
-        return;
-    }
-    const double stop_time = window->To;
-    const ImGuiStyle &style = ImGui::GetStyle();
-    // Play and Pause share the width of the wider label, so the row does not shift when they swap
-    const float play_width =
-        std::max(ImGui::CalcTextSize("Play").x, ImGui::CalcTextSize("Pause").x) + style.FramePadding.x * 2.0f;
-    if (ImGui::Button(m_Playback.Playing ? "Pause" : "Play", ImVec2(play_width, 0.0f))) {
-        if (!m_Playback.Playing && m_Playback.Time >= stop_time) {
-            m_Playback.Time = window->From;
-        }
-        m_Playback.Playing = !m_Playback.Playing;
-    }
-    ImGui::SameLine();
-    ImGui::Checkbox("Loop", &m_Playback.Loop);
-    ImGui::SameLine();
-    const std::string readout =
-        std::format("t = {}s / {}s", Core::FormatValue(m_Playback.Time), Core::FormatValue(stop_time));
-    const float readout_width =
-        std::max(ImGui::CalcTextSize(readout.c_str()).x, ImGui::CalcTextSize(WIDEST_TIME_READOUT).x) +
-        style.ItemSpacing.x;
-    ImGui::SetNextItemWidth(std::max(ImGui::GetContentRegionAvail().x - readout_width, MIN_TIME_SLIDER_WIDTH));
-    ImGui::SliderScalar("##time", ImGuiDataType_Double, &m_Playback.Time, &window->From, &stop_time, "");
-    if (ImGui::IsItemActive()) {
-        m_Playback.Playing = false;
-    }
-    ImGui::SetItemTooltip("Instant of the transient shown on the schematic");
-    ImGui::SameLine();
-    ImGui::TextUnformatted(readout.c_str());
+    const std::string text = std::format("t = {}s", Core::FormatValue(*time));
+    const float margin = ImGui::GetFontSize() * INSTANT_MARGIN;
+    draw_list->AddText({origin.x + margin, origin.y + margin}, ImGui::GetColorU32(ImGuiCol_TextDisabled), text.c_str());
 }
 
 /**

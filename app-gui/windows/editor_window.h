@@ -184,7 +184,7 @@ private:
     void HandleModeKeys();
     void ApplyToolbarRequest(ToolbarRequest request);
     std::optional<TimeSpan> GetWindowSpan() const;
-    void DrawTimeBar();
+    void DrawShownInstant(ImDrawList *draw_list, ImVec2 origin) const;
     void DrawBlockBar(ImVec2 origin);
     void DrawStatusBar(const ViewTransform &view, bool hovered);
     std::optional<MeasurementTarget> FindTargetAt(const ViewTransform &view) const;

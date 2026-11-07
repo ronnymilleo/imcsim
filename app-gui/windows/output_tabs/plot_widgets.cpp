@@ -33,6 +33,11 @@ namespace {
 constexpr float DASH_LENGTH = 0.5f;
 constexpr float DASH_GAP = 0.3f;
 constexpr float DASH_WEIGHT = 1.5f;
+/// The time slider of a transient does not shrink below this, in font sizes, so it stays usable in a narrow window.
+constexpr float MIN_TIME_SLIDER_WIDTH = 5.0f;
+/// The instant readout keeps the width of its widest text, so the slider does not resize as the digits change: four
+/// significant digits with a suffix are at most this wide.
+constexpr const char *WIDEST_TIME_READOUT = "t = 888.8ms / 888.8ms";
 /// Gap on the left of each trace column of a statistics table, in font sizes.
 constexpr float TRACE_COLUMN_GAP = 1.0f;
 /// Most of the height of a tab the statistics under the plots take before they scroll.
@@ -674,6 +679,44 @@ void DrawCursors(PlotCursors &cursors, const bool logarithmic) {
  */
 PlotSpan MeasuredSpan(const PlotCursors &cursors, const PlotSpan &view) {
     return cursors.Shown ? PlotSpan{.From = cursors.A, .To = cursors.B} : view;
+}
+
+/**
+ * @brief   Draws the playback of the transient under its plot: play, loop, a slider over the window of points the plot
+ *          shows and the instant, which the schematic and the playhead of the plot follow.
+ * @param[in,out] playback  The instant shown and whether it plays.
+ * @param[in]     from      Start of the window, in seconds.
+ * @param[in]     to        End of the window, in seconds.
+ * @note    Moving the slider stops the playback, so it holds where the user put it.
+ */
+void DrawPlaybackBar(TransientPlayback &playback, const double from, const double to) {
+    const ImGuiStyle &style = ImGui::GetStyle();
+    // Play and Pause share the width of the wider label, so the row does not shift when they swap
+    const float play_width =
+        std::max(ImGui::CalcTextSize("Play").x, ImGui::CalcTextSize("Pause").x) + style.FramePadding.x * 2.0f;
+    if (ImGui::Button(playback.Playing ? "Pause" : "Play", ImVec2(play_width, 0.0f))) {
+        if (!playback.Playing && playback.Time >= to) {
+            playback.Time = from;
+        }
+        playback.Playing = !playback.Playing;
+    }
+    ImGui::SetItemTooltip("Play the window of the transient on the schematic");
+    ImGui::SameLine();
+    ImGui::Checkbox("Loop", &playback.Loop);
+    ImGui::SameLine();
+    const std::string readout = std::format("t = {}s / {}s", Core::FormatValue(playback.Time), Core::FormatValue(to));
+    const float readout_width =
+        std::max(ImGui::CalcTextSize(readout.c_str()).x, ImGui::CalcTextSize(WIDEST_TIME_READOUT).x) +
+        style.ItemSpacing.x;
+    ImGui::SetNextItemWidth(
+        std::max(ImGui::GetContentRegionAvail().x - readout_width, ImGui::GetFontSize() * MIN_TIME_SLIDER_WIDTH));
+    ImGui::SliderScalar("##time", ImGuiDataType_Double, &playback.Time, &from, &to, "");
+    if (ImGui::IsItemActive()) {
+        playback.Playing = false;
+    }
+    ImGui::SetItemTooltip("Instant of the transient shown on the schematic and by the playhead of the plot");
+    ImGui::SameLine();
+    ImGui::TextUnformatted(readout.c_str());
 }
 
 /**
