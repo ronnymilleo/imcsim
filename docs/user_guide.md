@@ -151,8 +151,8 @@ How to read what imcsim measures, plots and exports. The [README](../README.md) 
   they wait, grayed out, for the end of a run that is still going on. The spectrum uses the whole run too. The other analyses stop between their steps (the values
   of a stepped analysis, the combinations of a truth table) and drop their result, and a single simulation finishes
   first; a Monte Carlo analysis keeps the runs made ("Stopped after 40 of 100 runs"). Editing the circuit also stops the run and drops what it made, since the answer would no longer fit.
-- **Status bar**: below the schematic, how the last run went first ("Transient done", with warnings, or failed,
-  followed by the reason, which then takes the whole line), then the keys of the current mode, shortened at a word
+- **Status bar**: below the schematic, how the last run went first ("Transient done · 2000 points in 41ms", with
+  warnings, or failed, followed by the reason, which then takes the whole line), then the keys of the current mode, shortened at a word
   when the window is narrow, and the grid position of the cursor on the right. Click the result for the
   errors, the warnings and the ngspice output. Among the warnings are the safe operating area ones: a diode, LED,
   Zener, transistor or MOSFET that a run pushes past its ratings (diode average forward current and power, and the VCE, IC,
@@ -173,7 +173,7 @@ How to read what imcsim measures, plots and exports. The [README](../README.md) 
   one. Node and trace colors keep their hues in every theme: the light themes darken them to read on their
   background, and Phosphor, Oscilloscope, Cyber Slate, Blueprint and Amber brighten them.
 - **Output window**: beside the schematic, with a tab for each analysis that has a result and the one you are on;
-  the others wait under **Other analyses**. A new result turns it to its tab. If you dock Output among other tabs,
+  the others wait under **More**. A new result turns it to its tab. If you dock Output among other tabs,
   it comes to the front with each result; turn off Bring Output to front in Edit > Preferences to keep the schematic
   in front, and a dot on the Output tab then tells a new result is waiting. The operating point tab lists the node
   voltages and part currents, which also show on the schematic. Reopen it from View.
@@ -541,8 +541,8 @@ Only the noise and S-parameter plots, whose curves the list does not hold, keep 
   every curve in the statistics, named by its step value.
 - The statistics sit under the plots, one table with a row per reading and a column per trace, so two traces
   compare across a row; every reading has four significant digits. The transient, AC sweep and DC sweep have
-  **Cursors** on the line over that table. Turning them on places two draggable vertical lines, whose positions
-  show on the same line; the table then measures every shown trace between them, or over the visible range when
+  **Cursors** at the right of the line over their plot. Turning them on places two draggable vertical lines, whose
+  positions show on the line over the table; the table then measures every shown trace between them, or over the visible range when
   they are off. The transient reads peak-to-peak, mean, RMS and frequency, and the value at each cursor with
   the change and the time between them; the AC sweep reads the gain and phase at each cursor and its response over
   the whole sweep; the DC sweep reads the value at each cursor, the change and the slope between them, and the

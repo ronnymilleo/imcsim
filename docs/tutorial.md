@@ -122,7 +122,7 @@ output. The next plots use this transient.
 
 - **Zoom and pan**: drag a box or use the wheel on the plot; double-click fits it again.
 - **Trace list**: the column on the left turns traces on and off, voltages and currents apart.
-- **Cursors**: check "Cursors" over the statistics under the plot and drag the two vertical lines. The line shows the
+- **Cursors**: check "Cursors" at the right of the line over the plot and drag the two vertical lines. The line shows the
   time between them, and the table the statistics over that span only, with the value of each trace at each cursor. Put A on a peak of V(2) and B at the
   bottom of the sag to read the ripple and how long it takes.
 
