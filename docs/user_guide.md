@@ -275,7 +275,8 @@ influence on the output of a sensitivity analysis (see below) and leaves the wir
 run first.
 
 Over these colors a selected wire gets a halo and a selected part an outline in the selection color, instead of turning that color,
-and the voltage labels switch to the text color of the canvas, so neither passes for a value on the scale.
+so it does not pass for a value on the scale. The voltage of each node sits beside its wire, under a level one and
+right of an upright one, on a small box led by a dot of the node color, so it reads over any wire color.
 
 - **Voltage** spreads the colors from the lowest to the highest node voltage, ground included.
 - **Current** colors wires and parts by the current through them, on a logarithmic scale that reaches four decades
