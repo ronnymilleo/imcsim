@@ -38,6 +38,7 @@ add_library(imcsim-gui-lib
             drawing/heat_glow.cpp
             drawing/led_glow.cpp
             drawing/node_colors.cpp
+            drawing/readout_placement.cpp
             drawing/schematic_canvas.cpp
             drawing/schematic_drawing.cpp
             drawing/schematic_overlays.cpp

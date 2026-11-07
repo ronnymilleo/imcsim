@@ -50,6 +50,7 @@ add_executable(imcsim-tests
             pole_zero_view_tests.cpp
             preferences_tests.cpp
             probing_tests.cpp
+            readout_placement_tests.cpp
             s_parameter_view_tests.cpp
             s_parameters_tests.cpp
             schematic_canvas_tests.cpp
