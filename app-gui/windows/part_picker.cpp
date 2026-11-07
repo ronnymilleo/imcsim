@@ -1,6 +1,6 @@
 /**
  * @file    part_picker.cpp
- * @brief   The list of every part that Space opens over the editor, filtered by what is typed.
+ * @brief   The part search of the command bar: a field whose list of matches hangs below it as the user types.
  */
 
 #include "windows/part_picker.h"
@@ -18,12 +18,9 @@ namespace GUI {
 
 namespace {
 
-constexpr const char *PART_PICKER_POPUP = "Find a part";
-/// How many matches the picker shows at once.
-constexpr std::size_t PART_PICKER_ROWS = 5;
-/// How far down the editor the top of the picker sits, as a share of it.
-constexpr float PART_PICKER_TOP = 0.3f;
-/// Width of the query and of the list, in font sizes.
+/// How many matches the list shows at once.
+constexpr std::size_t PART_PICKER_ROWS = 6;
+/// Width of the list, in font sizes.
 constexpr float PART_PICKER_WIDTH = 16.0f;
 
 } // namespace
@@ -36,60 +33,103 @@ PartPicker::PartPicker(const Preferences &preferences) : m_Preferences(preferenc
 }
 
 /**
- * @brief   Asks to open the picker on the next frame, as Find a Part in the context menu does.
+ * @brief   Asks to focus the field on the next frame, as All parts on the rail and Find a part in the context menu do.
  */
 void PartPicker::RequestOpen() {
     m_IsOpenRequested = true;
 }
 
 /**
- * @brief   Opens the picker on Space or when asked, and draws it while it is open.
+ * @brief   Focuses the field on Space, while the calling window has the focus and no field of it is active.
+ * @note    Call it inside the editor window, every frame it draws.
+ */
+void PartPicker::WatchShortcut() {
+    if (ImGui::IsWindowFocused() && !ImGui::IsAnyItemActive() && ImGui::IsKeyPressed(ImGuiKey_Space, false)) {
+        m_IsOpenRequested = true;
+    }
+}
+
+/**
+ * @brief   Draws the field at the cursor and, while it is in use, the list of what it finds below it.
  * @param[in] blocks  The blocks that can be placed where the editor is, listed after the parts.
+ * @param[in] width   Width of the field, in pixels.
  * @return  The mode that places the part or the block picked, on the frame it is picked, or no value: placing for a
  *          part or a block of the document, pasting for a ready block, which brings its definition along.
- * @note    Call it inside the editor window, before anything that reads Esc: Esc only closes the list.
  */
-std::optional<EditorMode> PartPicker::Draw(const std::vector<const SavedSubcircuit *> &blocks) {
-    OpenIfAsked();
-    // Hangs from its top edge, a third of the way down the editor, so it stays put as the list filters
-    const ImVec2 anchor = {ImGui::GetWindowPos().x + ImGui::GetWindowWidth() / 2.0f,
-                           ImGui::GetWindowPos().y + ImGui::GetWindowHeight() * PART_PICKER_TOP};
-    ImGui::SetNextWindowPos(anchor, ImGuiCond_Appearing, {0.5f, 0.0f});
-    // Without navigation the arrow keys move the highlight below instead of taking focus from the query
-    if (!ImGui::BeginPopup(PART_PICKER_POPUP, ImGuiWindowFlags_NoNav)) {
-        return std::nullopt;
-    }
-
-    if (ImGui::IsWindowAppearing()) {
+std::optional<EditorMode> PartPicker::Draw(const std::vector<const SavedSubcircuit *> &blocks, const float width) {
+    if (std::exchange(m_IsOpenRequested, false)) {
+        m_Query.clear();
+        m_Highlighted = 0;
         ImGui::SetKeyboardFocusHere();
     }
-    ImGui::SetNextItemWidth(ImGui::GetFontSize() * PART_PICKER_WIDTH);
-    if (ImGui::InputTextWithHint("##query", "Find a part", &m_Query)) {
+    ImGui::SetNextItemWidth(width);
+    const bool is_entered = ImGui::InputTextWithHint("##part_search", "Find a part (Space)", &m_Query,
+                                                     ImGuiInputTextFlags_EnterReturnsTrue);
+    if (ImGui::IsItemEdited()) {
         m_Highlighted = 0;
     }
+    const bool is_active = ImGui::IsItemActive();
+    const ImVec2 list_position = {ImGui::GetItemRectMin().x, ImGui::GetItemRectMax().y};
+    if (ImGui::IsItemActivated()) {
+        m_IsListShown = true;
+    }
+    if (!m_IsListShown) {
+        return std::nullopt;
+    }
     const PartMatches matches = FindMatches(m_Query, blocks);
-    const bool moved = MoveHighlight(matches.GetCount());
+    const bool moved = is_active && MoveHighlight(matches.GetCount());
     std::optional<EditorMode> picked;
-    const bool enter = ImGui::IsKeyPressed(ImGuiKey_Enter) || ImGui::IsKeyPressed(ImGuiKey_KeypadEnter);
-    if (matches.GetCount() > 0 && enter) {
+    if (is_entered && matches.GetCount() > 0) {
         picked = matches.Get(m_Highlighted);
     }
-    if (matches.GetCount() == 0) {
-        ImGui::TextDisabled("No part matches");
-    }
-    if (std::optional<EditorMode> clicked = DrawMatches(matches, moved)) {
+    if (std::optional<EditorMode> clicked = DrawList(matches, list_position, moved)) {
         picked = std::move(clicked);
     }
-
-    if (picked) {
-        ImGui::CloseCurrentPopup();
-    } else if (ImGui::IsKeyPressed(ImGuiKey_Escape)) {
-        // Esc only closes the list; the lock keeps the editor below from also leaving its mode this frame
-        ImGui::SetKeyOwner(ImGuiKey_Escape, ImGui::GetCurrentWindow()->ID, ImGuiInputFlags_LockThisFrame);
-        ImGui::CloseCurrentPopup();
+    // The list stays while the field is in use or the mouse is on it, so a click on a match lands before it closes
+    if (picked || ImGui::IsKeyPressed(ImGuiKey_Escape) || (!is_active && !m_IsListHovered)) {
+        m_IsListShown = false;
     }
-    ImGui::EndPopup();
+    if (picked) {
+        m_Query.clear();
+        m_IsEditorFocusRequested = true;
+        ImGui::ClearActiveID();
+    }
     return picked;
+}
+
+/**
+ * @brief   Tells the editor to take the focus back after a pick, once.
+ * @return  True on the first call after a part was picked.
+ */
+bool PartPicker::TakeEditorFocus() {
+    return std::exchange(m_IsEditorFocusRequested, false);
+}
+
+/**
+ * @brief   The list of matches in a window of its own below the field, over the windows under it, which never takes the
+ *          focus from the field.
+ * @details Returns the match clicked this frame, or none.
+ */
+std::optional<EditorMode> PartPicker::DrawList(const PartMatches &matches, const ImVec2 position, const bool moved) {
+    ImGui::SetNextWindowPos(position);
+    constexpr ImGuiWindowFlags LIST_FLAGS = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove |
+                                            ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoFocusOnAppearing |
+                                            ImGuiWindowFlags_NoNav | ImGuiWindowFlags_AlwaysAutoResize |
+                                            ImGuiWindowFlags_NoDocking;
+    std::optional<EditorMode> clicked;
+    if (ImGui::Begin("##part_matches", nullptr, LIST_FLAGS)) {
+        ImGui::BringWindowToDisplayFront(ImGui::GetCurrentWindow());
+        // The field is still the active item on the frame of the click, which must not hide the list under the mouse
+        m_IsListHovered =
+            ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows | ImGuiHoveredFlags_AllowWhenBlockedByActiveItem);
+        if (matches.GetCount() == 0) {
+            ImGui::TextDisabled("No part matches");
+        } else {
+            clicked = DrawMatches(matches, moved);
+        }
+    }
+    ImGui::End();
+    return clicked;
 }
 
 /**
@@ -131,20 +171,6 @@ PartPicker::PartMatches PartPicker::FindMatches(const std::string &query,
         }
     }
     return matches;
-}
-
-/**
- * @brief   Opens the picker with an empty query on Space, while the editor has the focus and no field is active, or
- *          when a menu asked for it.
- */
-void PartPicker::OpenIfAsked() {
-    const bool space_pressed =
-        ImGui::IsWindowFocused() && !ImGui::IsAnyItemActive() && ImGui::IsKeyPressed(ImGuiKey_Space, false);
-    if (std::exchange(m_IsOpenRequested, false) || space_pressed) {
-        m_Query.clear();
-        m_Highlighted = 0;
-        ImGui::OpenPopup(PART_PICKER_POPUP);
-    }
 }
 
 /**

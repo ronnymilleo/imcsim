@@ -118,6 +118,7 @@ private:
     void UpdateWindowTitle();
     void ShowNewResults();
     void RerunAfterEdits();
+    void DrawCommandBar();
     void SetupDefaultLayout(ImGuiID dockspace_id);
     void FollowWindowSize(ImGuiID dockspace_id);
     void EndFrame();

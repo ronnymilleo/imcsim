@@ -259,7 +259,7 @@ EditorWindow::EditorWindow(Schematic &schematic, AnalysisControls &controls, Ana
                    [this](std::string file_name, Core::SpiceLibrary library) {
                        m_SpiceDialog.OpenImport(std::move(file_name), std::move(library));
                    }}),
-      m_Toolbar(controls, settings_panel, schematic, preferences), m_PartPicker(preferences), m_PartRail(preferences),
+      m_Toolbar(controls, settings_panel, schematic), m_PartPicker(preferences), m_PartRail(preferences),
       m_Overlays(glow_renderer, playback, preferences) {
 }
 
@@ -288,6 +288,16 @@ void EditorWindow::Update() {
     if (std::optional<SpiceBlockResult> result = m_SpiceDialog.Draw()) {
         ApplySpiceBlockResult(std::move(*result));
     }
+}
+
+/**
+ * @brief   Draws the command bar in the current window, which the application keeps under the menu bar, and carries out
+ *          what its buttons and its part search ask.
+ * @note    It works on the schematic being edited, a block included, whichever window is in front.
+ */
+void EditorWindow::DrawCommandBar() {
+    ApplyToolbarRequest(
+        m_Toolbar.Draw(m_Mode, *m_Schematic, IsEditingSubcircuit(), m_PartPicker, ListPlaceableBlocks()));
 }
 
 /**
@@ -428,10 +438,11 @@ void EditorWindow::Draw() {
     if (ImGui::Shortcut(ImGuiKey_Home)) {
         m_View.RequestFit();
     }
-    if (std::optional<EditorMode> picked = m_PartPicker.Draw(ListPlaceableBlocks())) {
-        SetMode(std::move(*picked));
+    // A part picked in the search of the command bar is placed here, so the editor takes the keys of placing
+    if (m_PartPicker.TakeEditorFocus()) {
+        ImGui::SetWindowFocus();
     }
-    ApplyToolbarRequest(m_Toolbar.Draw(m_Mode, *m_Schematic, IsEditingSubcircuit()));
+    m_PartPicker.WatchShortcut();
     m_Overlays.Update(*m_Schematic, m_Controls);
 
     // The rail runs down the left of the canvas, as tall as it

@@ -8,6 +8,7 @@
 #include "document/examples.h"
 #include "document/schematic_file.h"
 #include "drawing/theme.h"
+#include "drawing/tool_icons.h"
 #include "editing/shortcuts.h"
 #include "imgui.h"
 #include "imgui_impl_sdl3.h"
@@ -328,6 +329,8 @@ void Application::Render() {
                              m_AnalysisControls.IsRunning());
     ShowNewResults();
 
+    DrawCommandBar();
+
     // A fixed ID lets the layout be rebuilt before the dockspace is submitted this frame
     const ImGuiID dockspace_id = ImGui::GetID("MainDockSpace");
     if (m_ResetLayout) {
@@ -531,6 +534,22 @@ void Application::RerunAfterEdits() {
     if (m_AutoRerun.Update(frame)) {
         m_AnalysisControls.RunSelected();
     }
+}
+
+/**
+ * @brief   The command bar of the editor, as one fixed row under the menu bar across the whole window, so Run stays in
+ * one place whatever the docking.
+ * @note    Call it before the dockspace, which takes the room the bar leaves.
+ */
+void Application::DrawCommandBar() {
+    const ImGuiStyle &style = ImGui::GetStyle();
+    const float height = GetToolButtonSide() + style.WindowPadding.y * 2.0f;
+    constexpr ImGuiWindowFlags BAR_FLAGS =
+        ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoScrollWithMouse;
+    if (ImGui::BeginViewportSideBar("##command_bar", ImGui::GetMainViewport(), ImGuiDir_Up, height, BAR_FLAGS)) {
+        m_EditorWindow.DrawCommandBar();
+    }
+    ImGui::End();
 }
 
 /**

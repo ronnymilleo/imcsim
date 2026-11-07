@@ -1,6 +1,6 @@
 /**
  * @file    editor_toolbar.cpp
- * @brief   The icon toolbar above the schematic: tools, history, view, parts and the run controls.
+ * @brief   The command bar under the menu: tools, history and view, the part search, and the run controls at its right.
  */
 
 #include "windows/editor_toolbar.h"
@@ -22,36 +22,27 @@ namespace {
 /// Width of the analysis settings that hang below Run, in font sizes.
 constexpr float SETTINGS_POPOVER_WIDTH = 20.0f;
 
+// Spacing of the bar, in font sizes
+constexpr float BUTTON_SPACING = 0.25f;
+constexpr float GROUP_GAP = 0.6f;
+/// Widest the part search grows, in font sizes; it shrinks first when the bar is short of room.
+constexpr float SEARCH_MAX_WIDTH = 18.0f;
+/// Narrowest the part search gets, in font sizes.
+constexpr float SEARCH_MIN_WIDTH = 8.0f;
+
 /**
- * @class   ToolbarRow
- * @brief   Lays toolbar items out left to right, moving the next item to a new line when it does not fit.
- * @details Call Place() with the width of each item right before drawing it. A gap separates groups of items
- *          and disappears when the group starts a new line.
+ * @brief   A thin upright line between two groups of buttons, centered in the gap.
  */
-class ToolbarRow {
-public:
-    ToolbarRow() : m_RightEdge(ImGui::GetCursorScreenPos().x + ImGui::GetContentRegionAvail().x) {}
-
-    void Place(const float width, const float gap = 0.0f) {
-        if (std::exchange(m_First, false)) {
-            return;
-        }
-        const float spacing = ButtonSpacing() + gap;
-        if (ImGui::GetItemRectMax().x + spacing + width <= m_RightEdge) {
-            ImGui::SameLine(0.0f, spacing);
-        }
-    }
-
-    /**
-     * @brief   Space between buttons, and the extra space between groups, in font sizes.
-     */
-    static float ButtonSpacing() { return ImGui::GetFontSize() * 0.25f; }
-    static float GroupGap() { return ImGui::GetFontSize() * 0.6f; }
-
-private:
-    float m_RightEdge;
-    bool m_First = true;
-};
+void DrawGroupSeparator() {
+    const float gap = ImGui::GetFontSize() * GROUP_GAP;
+    ImGui::SameLine(0.0f, gap / 2.0f);
+    const ImVec2 top = ImGui::GetCursorScreenPos();
+    const float side = GetToolButtonSide();
+    ImGui::GetWindowDrawList()->AddLine({top.x, top.y + side * 0.2f}, {top.x, top.y + side * 0.8f},
+                                        ImGui::GetColorU32(ImGuiCol_Separator));
+    ImGui::Dummy({1.0f, side});
+    ImGui::SameLine(0.0f, gap / 2.0f);
+}
 
 /**
  * @brief   Square toolbar button; the active one uses the primary colors, as the tool in use.
@@ -132,34 +123,41 @@ const char *GetRunButtonLabel(const RunAction action) {
 } // namespace
 
 /**
- * @brief   Creates the toolbar of the editor.
+ * @brief   Creates the command bar of the editor.
  * @param[in] controls        Runs of the analyses, for the Run button; they must outlive the toolbar.
  * @param[in] settings_panel  Analysis picker and settings, for the popover beside Run; it must outlive the toolbar.
  * @param[in] root_schematic  The document, whose settings name the analysis to run; it must outlive the toolbar.
- * @param[in] preferences     The symbol standard of the part icons; they must outlive the toolbar.
  */
 EditorToolbar::EditorToolbar(AnalysisControls &controls, AnalysisSettingsPanel &settings_panel,
-                             const Schematic &root_schematic, const Preferences &preferences)
-    : m_Controls(controls), m_SettingsPanel(settings_panel), m_RootSchematic(root_schematic),
-      m_Preferences(preferences) {
+                             const Schematic &root_schematic)
+    : m_Controls(controls), m_SettingsPanel(settings_panel), m_RootSchematic(root_schematic) {
 }
 
 /**
- * @brief   Draws the toolbar at the cursor of the editor window.
- * @param[in] mode              The mode of the editor, whose tool shows as the one in use.
- * @param[in] schematic         The schematic being edited, for the state of Undo and Redo.
- * @param[in] is_editing_block  Whether a block is open, which disables the run controls.
+ * @brief   Draws the bar on one row that never wraps: the tools and the history on the left, the part search after
+ * them, and the analysis, Live and Run at the right end, where Run stays whatever the width of the window.
+ * @param[in]     mode              The mode of the editor, whose tool shows as the one in use.
+ * @param[in]     schematic         The schematic being edited, for the state of Undo and Redo.
+ * @param[in]     is_editing_block  Whether a block is open, which disables the run controls.
+ * @param[in,out] search            The part search, drawn in the bar.
+ * @param[in]     blocks            The blocks that can be placed where the editor is, which the search finds too.
  * @return  The mode or the command the buttons pressed this frame ask for, which the editor carries out.
  */
-ToolbarRequest EditorToolbar::Draw(const EditorMode &mode, const Schematic &schematic, const bool is_editing_block) {
+ToolbarRequest EditorToolbar::Draw(const EditorMode &mode, const Schematic &schematic, const bool is_editing_block,
+                                   PartPicker &search, const std::vector<const SavedSubcircuit *> &blocks) {
     ToolbarRequest request;
-    ToolbarRow row;
-    const float gap = ToolbarRow::GroupGap();
+    const float font_size = ImGui::GetFontSize();
+    const float spacing = font_size * BUTTON_SPACING;
     const float side = GetToolButtonSide();
+    const float row_left = ImGui::GetCursorScreenPos().x;
+    const float row_right = row_left + ImGui::GetContentRegionAvail().x;
     ImDrawList *draw_list = ImGui::GetWindowDrawList();
+    bool is_first = true;
     const auto tool_button = [&](const char *id, const ToolIcon icon, const bool active, const bool enabled,
                                  const char *tooltip) {
-        row.Place(side);
+        if (!std::exchange(is_first, false)) {
+            ImGui::SameLine(0.0f, spacing);
+        }
         ImGui::BeginDisabled(!enabled);
         const bool clicked = ToolButton(id, active);
         ImGui::EndDisabled();
@@ -168,7 +166,7 @@ ToolbarRequest EditorToolbar::Draw(const EditorMode &mode, const Schematic &sche
         return clicked;
     };
 
-    // Tools, history and view
+    // Tools
     if (tool_button("##select", ToolIcon::SELECT, IsSelecting(mode), true, "Select (Esc)")) {
         request.Mode = SelectingMode{};
     }
@@ -179,6 +177,10 @@ ToolbarRequest EditorToolbar::Draw(const EditorMode &mode, const Schematic &sche
                     "Probe (P): pick what the plots measure")) {
         request.Mode = ProbingMode{};
     }
+    DrawGroupSeparator();
+    is_first = true;
+
+    // History and view
     if (tool_button("##undo", ToolIcon::UNDO, false, schematic.CanUndo(), "Undo (" IMCSIM_SHORTCUT "Z)")) {
         request.Command = ToolbarCommand::UNDO;
     }
@@ -188,40 +190,55 @@ ToolbarRequest EditorToolbar::Draw(const EditorMode &mode, const Schematic &sche
     if (tool_button("##fit", ToolIcon::FIT, false, true, "Fit the schematic in view (Home)")) {
         request.Command = ToolbarCommand::FIT;
     }
+    DrawGroupSeparator();
 
-    // Simulation
-    row.Place(side + ToolbarRow::ButtonSpacing() * 2.0f + AnalysisButtonWidth() + LiveButtonWidth(), gap);
+    // Part search, as wide as the room before the run controls allows
+    const float run_width = AnalysisButtonWidth() + LiveButtonWidth() + side + spacing * 2.0f;
+    const float search_left = ImGui::GetCursorScreenPos().x;
+    const float room = row_right - run_width - font_size * GROUP_GAP - search_left;
+    const float search_width = std::clamp(room, font_size * SEARCH_MIN_WIDTH, font_size * SEARCH_MAX_WIDTH);
+    // The field is a frame tall and the buttons a little more, so it sits in the middle of the row
+    const float row_top = ImGui::GetCursorPosY();
+    ImGui::SetCursorPosY(row_top + (side - ImGui::GetFrameHeight()) / 2.0f);
+    if (std::optional<EditorMode> picked = search.Draw(blocks, search_width)) {
+        request.Mode = std::move(picked);
+    }
+
+    // Simulation, pinned to the right end
+    ImGui::SameLine(0.0f, 0.0f);
+    ImGui::SetCursorScreenPos({std::max(row_right - run_width, ImGui::GetCursorScreenPos().x + font_size * GROUP_GAP),
+                               ImGui::GetWindowPos().y + row_top});
     ImGui::BeginDisabled(is_editing_block);
-    DrawRunControls();
-    ImGui::SameLine(0.0f, ToolbarRow::ButtonSpacing());
+    DrawAnalysisButton();
+    ImGui::SameLine(0.0f, spacing);
     DrawLiveToggle();
+    ImGui::SameLine(0.0f, spacing);
+    DrawRunButton();
     ImGui::EndDisabled();
     return request;
 }
 
 /**
- * @brief   Run starts the selected analysis; the button beside it names that analysis and opens its settings, where
- *          another one can be picked.
+ * @brief   Run starts the selected analysis, Stop ends the one going on and Continue takes a stopped live run on; the
+ *          one primary button of the bar.
  */
-void EditorToolbar::DrawRunControls() {
+void EditorToolbar::DrawRunButton() {
     const float side = GetToolButtonSide();
     const Analysis selected = m_RootSchematic.GetSimulationSettings().Selected;
     const RunAction action = m_Controls.GetRunAction();
     if (PrimaryButton("##run", {side, side})) {
         m_Controls.PressRun();
     }
-    const float run_left = ImGui::GetItemRectMin().x;
     DrawToolIcon(ImGui::GetWindowDrawList(), action == RunAction::STOP ? ToolIcon::STOP : ToolIcon::RUN,
                  GetItemCenter(), GetIconSize(), GetIconColor(true));
     ImGui::SetItemTooltip("%s", DescribeRunAction(m_Controls, selected).c_str());
-    ImGui::SameLine(0.0f, ToolbarRow::ButtonSpacing());
-    DrawAnalysisButton(run_left);
 }
 
 /**
- * @brief   The analysis picker beside Run, whose popover holds the settings of the analysis and its own Run button.
+ * @brief   The analysis picker before Live and Run, whose popover holds the settings of the analysis and its own Run
+ *          button.
  */
-void EditorToolbar::DrawAnalysisButton(const float run_left) {
+void EditorToolbar::DrawAnalysisButton() {
     const float side = GetToolButtonSide();
     const Analysis selected = m_RootSchematic.GetSimulationSettings().Selected;
     ImGui::PushStyleVar(ImGuiStyleVar_ButtonTextAlign, {0.0f, 0.5f});
@@ -231,10 +248,11 @@ void EditorToolbar::DrawAnalysisButton(const float run_left) {
     ImGui::SetItemTooltip("Pick the analysis and set it up");
     DrawDropdownArrow({ImGui::GetItemRectMax().x - ImGui::GetFontSize() * 0.75f, GetItemCenter().y});
     if (open) {
-        // Hangs below Run, moved left when the settings would not fit before the right edge of the editor
+        // Hangs below the picker, moved left when the settings would not fit before the right edge of the window
         const float settings_width = ImGui::GetFontSize() * SETTINGS_POPOVER_WIDTH;
         const float right_edge = ImGui::GetWindowPos().x + ImGui::GetWindowWidth();
-        ImGui::SetNextWindowPos({std::min(run_left, right_edge - settings_width), ImGui::GetItemRectMax().y});
+        ImGui::SetNextWindowPos(
+            {std::min(ImGui::GetItemRectMin().x, right_edge - settings_width), ImGui::GetItemRectMax().y});
         ImGui::OpenPopup("analysis");
     }
     if (ImGui::BeginPopup("analysis")) {

@@ -64,6 +64,9 @@ public:
     // Requests, global shortcuts and file popups, whichever window is in front
     void Update();
 
+    // Command bar, drawn by the application under the menu bar
+    void DrawCommandBar();
+
     // Quitting
     void RequestQuit();
     bool IsQuitConfirmed() const;

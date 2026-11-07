@@ -1,6 +1,6 @@
 /**
  * @file    editor_toolbar.h
- * @brief   The icon toolbar above the schematic: tools, history, view, parts and the run controls.
+ * @brief   The command bar under the menu: tools, history and view, the part search, and the run controls at its right.
  */
 
 #ifndef IMCSIM_EDITOR_TOOLBAR_H
@@ -11,11 +11,7 @@
 #include "components/component.h"
 #include "document/schematic.h"
 #include "editing/editor_mode.h"
-#include "preferences.h"
-#include "ui_elements/ui_element.h"
-#include <cstddef>
-#include <functional>
-#include <memory>
+#include "windows/part_picker.h"
 #include <optional>
 #include <vector>
 
@@ -42,28 +38,28 @@ struct ToolbarRequest {
 
 /**
  * @class   EditorToolbar
- * @brief   One row of icon buttons whose groups wrap onto new lines when the window is narrow.
- * @details The tool and part buttons only ask for a mode, which the editor starts; the run controls drive the analyses
- *          directly, since they belong to the whole document. Related parts share a button that places the last one
- *          picked from its list, and so do the ready logic blocks.
+ * @brief   The command bar: one fixed row across the window, under the menu bar.
+ * @details The tool buttons only ask for a mode, which the editor starts, and so does the part search; the run controls
+ *          drive the analyses directly, since they belong to the whole document. Run sits at the right end whatever
+ *          the width of the window, and the search shrinks first when room runs short.
  */
 class EditorToolbar {
 public:
-    EditorToolbar(AnalysisControls &controls, AnalysisSettingsPanel &settings_panel, const Schematic &root_schematic,
-                  const Preferences &preferences);
+    EditorToolbar(AnalysisControls &controls, AnalysisSettingsPanel &settings_panel, const Schematic &root_schematic);
 
-    ToolbarRequest Draw(const EditorMode &mode, const Schematic &schematic, bool is_editing_block);
+    ToolbarRequest Draw(const EditorMode &mode, const Schematic &schematic, bool is_editing_block, PartPicker &search,
+                        const std::vector<const SavedSubcircuit *> &blocks);
 
 private:
     AnalysisControls &m_Controls;
     AnalysisSettingsPanel &m_SettingsPanel;
     /// The document, whose simulation settings name the analysis Run starts.
     const Schematic &m_RootSchematic;
-    const Preferences &m_Preferences;
+
     // Simulation
-    void DrawRunControls();
-    void DrawAnalysisButton(float run_left);
+    void DrawAnalysisButton();
     void DrawLiveToggle();
+    void DrawRunButton();
 };
 
 } // namespace GUI
