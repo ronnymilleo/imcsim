@@ -500,7 +500,7 @@ their statistics and the exports always agree.
   stretch of any of them, which is half a period
   when there is a clock, starting at the first change, and writes 0, 1 or X in a box at the middle of each cell that has
   room for it at the current zoom. A stretch that lasts several cells reads `1 1 1`, and a glitch inside a cell does not
-  show. The Logic lanes box beside the statistics turns the lanes off, which draws every voltage on the analog
+  show. The Logic lanes box on the line over the statistics turns the lanes off, which draws every voltage on the analog
   axis again. The plot is left out when only logic signals are measured. The SVG export has the same panels and bit
   labels; the CSV lists the voltages.
 - A logic bus reads several logic signals as one number, as a logic analyzer does, so a counter reads 0, 1, 2...
@@ -528,9 +528,11 @@ their statistics and the exports always agree.
   the plot reads as gain while a transient uses the small amplitude a real circuit would see.
 - A stepped DC sweep draws one curve per step, labeled with the step value where the curves part most, and lists
   every curve in the statistics, named by its step value.
-- The transient, AC sweep and DC sweep have **Cursors A and B** in the panel on their right. Turning them on places
-  two draggable vertical lines; the panel then measures every shown trace between them, or over the visible range
-  when they are off. The transient reads peak-to-peak, mean, RMS and frequency, and the value at each cursor with
+- The statistics sit under the plots, one table with a row per reading and a column per trace, so two traces
+  compare across a row; every reading has four significant digits. The transient, AC sweep and DC sweep have
+  **Cursors** on the line over that table. Turning them on places two draggable vertical lines, whose positions
+  show on the same line; the table then measures every shown trace between them, or over the visible range when
+  they are off. The transient reads peak-to-peak, mean, RMS and frequency, and the value at each cursor with
   the change and the time between them; the AC sweep reads the gain and phase at each cursor and its response over
   the whole sweep; the DC sweep reads the value at each cursor, the change and the slope between them, and the
   minimum, maximum and mean over the span. The slope is in the unit of the trace over that of the sweep: a voltage
