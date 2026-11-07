@@ -12,6 +12,7 @@
 #include "editing/probing.h"
 #include "imgui.h"
 #include "plots/logic_trace.h"
+#include "plots/trace_statistics.h"
 #include "spice/spice_value.h"
 #include "windows/output_tabs/plot_widgets.h"
 #include <algorithm>

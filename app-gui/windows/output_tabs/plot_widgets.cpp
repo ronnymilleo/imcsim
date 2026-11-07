@@ -18,6 +18,7 @@
 #include "spice/spice_value.h"
 #include "value_field.h"
 #include <algorithm>
+#include <cfloat>
 #include <cmath>
 #include <cstdio>
 #include <format>
@@ -32,8 +33,10 @@ namespace {
 constexpr float DASH_LENGTH = 0.5f;
 constexpr float DASH_GAP = 0.3f;
 constexpr float DASH_WEIGHT = 1.5f;
-/// Width of the statistics panel, in font sizes.
-constexpr float STATISTICS_WIDTH = 15.0f;
+/// Gap on the left of each trace column of a statistics table, in font sizes.
+constexpr float TRACE_COLUMN_GAP = 1.0f;
+/// Most of the height of a tab the statistics under the plots take before they scroll.
+constexpr float MAX_STATISTICS_SHARE = 0.4f;
 /// The lines that mark the poles and zeros on a Bode plot are dashed and thin, so they stay visible without hiding the
 /// traces.
 constexpr float ROOT_MARKER_ALPHA = 0.85f;
@@ -659,17 +662,6 @@ void DrawCursors(PlotCursors &cursors, const bool logarithmic) {
 }
 
 /**
- * @brief   The checkbox that shows the cursors; turning them on places them again in the current view, so they are
- *          never lost off screen.
- * @param[in,out] cursors  The cursors of the plot.
- */
-void DrawCursorToggle(PlotCursors &cursors) {
-    if (ImGui::Checkbox("Cursors A and B", &cursors.Shown) && cursors.Shown) {
-        cursors.Placed = false;
-    }
-}
-
-/**
  * @brief   The span the statistics cover.
  * @param[in] cursors  The cursors of the plot.
  * @param[in] view     What the plot shows.
@@ -740,6 +732,33 @@ bool BeginStatisticsTable(const std::string &id) {
 }
 
 /**
+ * @brief   Draws the line over a statistics table: the cursor toggle, what span the readings cover and, with the
+ *          cursors shown, where they sit, all on one row so the table keeps the height.
+ * @param[in,out] cursors          Cursors of the plot, which the checkbox shows or hides.
+ * @param[in]     span_text        What the readings cover, such as "Over the visible time".
+ * @param[in]     cursor_readings  Name and value of each cursor reading, such as A and its time, shown with the
+ *                                 cursors.
+ */
+void DrawStatisticsHeader(PlotCursors &cursors, const char *span_text,
+                          const std::vector<std::pair<std::string, std::string>> &cursor_readings) {
+    if (ImGui::Checkbox("Cursors", &cursors.Shown) && cursors.Shown) {
+        cursors.Placed = false;
+    }
+    ImGui::SetItemTooltip("Measure between two cursors, A and B, dragged on the plot");
+    ImGui::SameLine();
+    ImGui::TextDisabled("%s", span_text);
+    if (!cursors.Shown) {
+        return;
+    }
+    for (const auto &[name, value] : cursor_readings) {
+        ImGui::SameLine(0.0f, ImGui::GetFontSize());
+        ImGui::TextDisabled("%s", name.c_str());
+        ImGui::SameLine();
+        ImGui::TextUnformatted(value.c_str());
+    }
+}
+
+/**
  * @brief   Draws readings as one table with a row per quantity and a column per trace, headed by the trace labels in
  *          their colors, with the figures right-aligned so their digits line up.
  * @param[in] id      ImGui ID of the table.
@@ -755,11 +774,16 @@ void DrawTraceTable(const char *id, const std::vector<PlottedTrace> &traces, con
     for (std::size_t column = 0; column < traces.size(); ++column) {
         widths[column + 1] = measure(traces[column].Label);
     }
+    // The figures of neighboring columns would run together, so each trace column keeps a gap on its left
+    const float column_gap = ImGui::GetFontSize() * TRACE_COLUMN_GAP;
     for (const StatisticsRow &row : rows) {
         widths[0] = std::max(widths[0], measure(row.Name));
         for (std::size_t column = 0; column < row.Cells.size() && column < traces.size(); ++column) {
             widths[column + 1] = std::max(widths[column + 1], measure(row.Cells[column].Text));
         }
+    }
+    for (std::size_t column = 1; column < widths.size(); ++column) {
+        widths[column] += column_gap;
     }
     const float padding = ImGui::GetStyle().CellPadding.x * 2.0f;
     float table_width = 0.0f;
@@ -801,22 +825,32 @@ void DrawTraceTable(const char *id, const std::vector<PlottedTrace> &traces, con
 }
 
 /**
- * @brief   Splits a tab into the plots and the statistics panel on their right.
- * @param[in] draw_plots       Draws the plots, in the left column.
- * @param[in] draw_statistics  Draws the statistics, in the bordered panel on the right.
+ * @brief   Splits a tab into the plots and the statistics panel under them, which reads across the traces and is as
+ *          tall as its content, up to a share of the tab.
+ * @param[in] draw_plots       Draws the plots, above, in the height the statistics leave.
+ * @param[in] draw_statistics  Draws the statistics, in the bordered panel below, which scrolls when it is taller than
+ *                             its share or wider than the tab.
+ * @details The panel fits its content, which is only known once drawn, so the plots take the height the panel had
+ *          the frame before, kept in the ImGui storage of the tab.
  */
 void DrawWithStatistics(const std::function<void()> &draw_plots, const std::function<void()> &draw_statistics) {
-    const float statistics_width = ImGui::GetFontSize() * STATISTICS_WIDTH;
-    if (ImGui::BeginChild("plots_column", ImVec2(-statistics_width - ImGui::GetStyle().ItemSpacing.x, 0.0f))) {
+    const ImGuiID height_id = ImGui::GetID("statistics_height");
+    ImGuiStorage *storage = ImGui::GetStateStorage();
+    const float available = ImGui::GetContentRegionAvail().y;
+    const float max_height = available * MAX_STATISTICS_SHARE;
+    const float statistics_height = std::min(storage->GetFloat(height_id, 0.0f), max_height);
+    const float plots_height = std::max(available - statistics_height - ImGui::GetStyle().ItemSpacing.y, 0.0f);
+    if (ImGui::BeginChild("plots_area", ImVec2(0.0f, plots_height))) {
         draw_plots();
     }
     ImGui::EndChild();
-    ImGui::SameLine();
-    if (ImGui::BeginChild("statistics", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Borders,
+    ImGui::SetNextWindowSizeConstraints({0.0f, 0.0f}, {FLT_MAX, max_height});
+    if (ImGui::BeginChild("statistics", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Borders | ImGuiChildFlags_AutoResizeY,
                           ImGuiWindowFlags_HorizontalScrollbar)) {
         draw_statistics();
     }
     ImGui::EndChild();
+    storage->SetFloat(height_id, ImGui::GetItemRectSize().y);
 }
 
 /**

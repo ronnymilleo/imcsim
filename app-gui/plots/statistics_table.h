@@ -1,6 +1,6 @@
 /**
  * @file    statistics_table.h
- * @brief   The statistics of the transient traces as one table, with a column per trace.
+ * @brief   The statistics of the plotted traces as tables with a column per trace.
  */
 
 #ifndef IMCSIM_STATISTICS_TABLE_H
@@ -43,9 +43,33 @@ struct StatisticsRow {
     std::vector<StatisticsCell> Cells;
 };
 
+/**
+ * @struct  BodeTrace
+ * @brief   A trace of an AC sweep: its magnitude in decibels and its phase in degrees, at the swept frequencies.
+ */
+struct BodeTrace {
+    std::span<const double> MagnitudesDecibels;
+    std::span<const double> PhasesDegrees;
+};
+
+/**
+ * @struct  SweptTrace
+ * @brief   A curve of a DC sweep, at the swept values, and its unit.
+ */
+struct SweptTrace {
+    std::span<const double> Values;
+    std::string_view Unit;
+};
+
 std::vector<StatisticsRow> BuildTransientStatistics(std::span<const double> times,
                                                     const std::vector<MeasuredTrace> &traces, PlotSpan span,
                                                     const std::optional<PlotCursors> &cursors);
+std::vector<StatisticsRow> BuildBodeStatistics(std::span<const double> frequencies,
+                                               const std::vector<BodeTrace> &traces,
+                                               const std::optional<PlotCursors> &cursors);
+std::vector<StatisticsRow> BuildSweepStatistics(std::span<const double> swept, std::string_view swept_unit,
+                                                const std::vector<SweptTrace> &traces, PlotSpan span,
+                                                const std::optional<PlotCursors> &cursors);
 
 } // namespace GUI
 

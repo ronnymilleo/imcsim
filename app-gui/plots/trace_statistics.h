@@ -11,6 +11,10 @@
 
 namespace GUI {
 
+/// ngspice reports an open path with a resistance around 1e20 ohm, which no readable suffix shows; it is drawn as an
+/// open circuit instead.
+inline constexpr double OPEN_RESISTANCE = 1e15;
+
 /**
  * @struct  TraceStatistics
  * @brief   What an oscilloscope measures on a trace: extremes, mean, RMS and frequency.

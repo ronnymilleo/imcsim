@@ -1,13 +1,16 @@
 /**
  * @file    statistics_table_tests.cpp
- * @brief   Tests for the statistics of the transient traces as one table, with a column per trace.
+ * @brief   Tests for the statistics of the plotted traces as tables with a column per trace.
  */
 
 #include "plots/statistics_table.h"
 
+#include "spice/spice_value.h"
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/matchers/catch_matchers_floating_point.hpp>
 #include <cmath>
 #include <numbers>
+#include <optional>
 #include <vector>
 
 namespace {
@@ -97,4 +100,70 @@ TEST_CASE("A trace with no points in the span reads - in every measured row", "[
         REQUIRE(row.Cells.size() == 1);
         CHECK(row.Cells[0].Text == "-");
     }
+}
+
+TEST_CASE("The Bode statistics read across, with the cutoff of each trace in its column", "[statistics_table]") {
+    // A first-order low-pass at 1.59 kHz beside a flat trace, from 10 Hz to 1 MHz
+    std::vector<double> frequencies;
+    std::vector<double> flat_magnitudes;
+    std::vector<double> flat_phases;
+    std::vector<double> low_pass_magnitudes;
+    std::vector<double> low_pass_phases;
+    constexpr double CUTOFF = 1591.5;
+    // Five decades at 50 points per decade
+    constexpr int POINTS = 250;
+    for (int point = 0; point <= POINTS; ++point) {
+        const double frequency = 10.0 * std::pow(10.0, 5.0 * point / POINTS);
+        const double ratio = frequency / CUTOFF;
+        frequencies.push_back(frequency);
+        flat_magnitudes.push_back(0.0);
+        flat_phases.push_back(0.0);
+        low_pass_magnitudes.push_back(-10.0 * std::log10(1.0 + ratio * ratio));
+        low_pass_phases.push_back(-std::atan(ratio) * 180.0 / std::numbers::pi);
+    }
+    const std::vector<GUI::StatisticsRow> rows =
+        GUI::BuildBodeStatistics(frequencies,
+                                 {{.MagnitudesDecibels = flat_magnitudes, .PhasesDegrees = flat_phases},
+                                  {.MagnitudesDecibels = low_pass_magnitudes, .PhasesDegrees = low_pass_phases}},
+                                 std::nullopt);
+    REQUIRE(rows.size() == 6);
+    CHECK(FindRow(rows, "Peak").Cells[0].Text == "0.00 dB");
+    CHECK(FindRow(rows, "-3 dB high").Cells[0].Text == "-");
+    // The cutoff is interpolated between sweep points, so it reads close to the exact one, not equal
+    const std::optional<double> cutoff = Core::ParseValue(FindRow(rows, "-3 dB high").Cells[1].Text, "Hz");
+    REQUIRE(cutoff.has_value());
+    CHECK_THAT(*cutoff, Catch::Matchers::WithinRel(CUTOFF, 0.01));
+}
+
+TEST_CASE("A swept current reads its slope as a resistance, other curves read -", "[statistics_table]") {
+    // The current of a 1k resistor and the voltage across it, swept from 0 V to 10 V
+    std::vector<double> swept;
+    std::vector<double> currents;
+    std::vector<double> voltages;
+    for (int step = 0; step <= 100; ++step) {
+        const double volts = 0.1 * step;
+        swept.push_back(volts);
+        currents.push_back(volts / 1e3);
+        voltages.push_back(volts);
+    }
+    const GUI::PlotCursors cursors = {.Shown = true, .Placed = true, .A = 2.0, .B = 8.0};
+    const std::vector<GUI::StatisticsRow> rows =
+        GUI::BuildSweepStatistics(swept, "V", {{.Values = currents, .Unit = "A"}, {.Values = voltages, .Unit = "V"}},
+                                  {.From = 2.0, .To = 8.0}, cursors);
+    REQUIRE(rows.size() == 8);
+    CHECK(FindRow(rows, "At A").Cells[0].Text == "2.000mA");
+    CHECK(FindRow(rows, "Slope").Cells[0].Text == "1.000mA/V");
+    CHECK(FindRow(rows, "Resistance").Cells[0].Text == "1.000kOhm");
+    CHECK(FindRow(rows, "Resistance").Cells[1].Text == "-");
+    CHECK(FindRow(rows, "Max").Cells[1].Text == "8.000V");
+}
+
+TEST_CASE("Without cursors a DC sweep reads only its extremes and mean", "[statistics_table]") {
+    const std::vector<double> swept = {0.0, 1.0, 2.0};
+    const std::vector<double> values = {0.0, 0.5, 1.0};
+    const std::vector<GUI::StatisticsRow> rows = GUI::BuildSweepStatistics(
+        swept, "V", {{.Values = values, .Unit = "V"}}, {.From = 0.0, .To = 2.0}, std::nullopt);
+    REQUIRE(rows.size() == 3);
+    CHECK(rows[0].Name == "Min");
+    CHECK(rows[2].Name == "Mean");
 }

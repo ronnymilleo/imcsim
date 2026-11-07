@@ -18,6 +18,7 @@
 #include <optional>
 #include <span>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace GUI {
@@ -26,9 +27,6 @@ namespace GUI {
 inline constexpr float MIN_PLOT_HEIGHT = 12.0f;
 /// Math channels, and the noise at the output, are drawn with a heavier line than the traces they come from.
 inline constexpr float MATH_LINE_WEIGHT = 2.0f;
-/// ngspice reports an open path with a resistance around 1e20 ohm, which no readable suffix shows; it is drawn as an
-/// open circuit instead.
-inline constexpr double OPEN_RESISTANCE = 1e15;
 /// A new result starts with empty plots until the user picks what to measure.
 inline constexpr const char *NOTHING_MEASURED =
     "Nothing is measured yet: pick nodes and parts with Probe in the editor, or check traces in the list";
@@ -102,7 +100,6 @@ void DrawMathErrors(const std::vector<std::string> &errors);
 void DrawCursorReadout(const std::vector<double> &xs, const char *x_unit, bool logarithmic,
                        const std::vector<PlottedTrace> &plotted);
 void DrawCursors(PlotCursors &cursors, bool logarithmic);
-void DrawCursorToggle(PlotCursors &cursors);
 PlotSpan MeasuredSpan(const PlotCursors &cursors, const PlotSpan &view);
 
 // Statistics
@@ -112,6 +109,8 @@ std::string FormatOptionalQuantity(std::optional<double> value, const char *unit
 void DrawStatistic(const char *name, const std::string &value);
 void DrawMeasuredValue(const char *name, double value, double scale, const char *unit);
 bool BeginStatisticsTable(const std::string &id);
+void DrawStatisticsHeader(PlotCursors &cursors, const char *span_text,
+                          const std::vector<std::pair<std::string, std::string>> &cursor_readings);
 void DrawTraceTable(const char *id, const std::vector<PlottedTrace> &traces, const std::vector<StatisticsRow> &rows);
 void DrawWithStatistics(const std::function<void()> &draw_plots, const std::function<void()> &draw_statistics);
 

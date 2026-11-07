@@ -563,24 +563,23 @@ std::vector<BusLane> TransientTab::FindShownBuses(const std::size_t node_count) 
  *          trace at both and their difference, and the time between them with its frequency.
  */
 void TransientTab::DrawStatistics(const Core::Transient &transient, const std::vector<MathTrace> &math) {
-    DrawCursorToggle(m_Cursors);
+    const PlotCursors &cursors = m_Cursors;
+    const std::vector<std::pair<std::string, std::string>> cursor_readings = {
+        {"A", FormatQuantity(cursors.A, "s")},
+        {"B", FormatQuantity(cursors.B, "s")},
+        {"B-A", FormatQuantity(cursors.B - cursors.A, "s")},
+        {"1/(B-A)", cursors.B != cursors.A ? FormatQuantity(1.0 / std::abs(cursors.B - cursors.A), "Hz") : "-"}};
+    DrawStatisticsHeader(m_Cursors, cursors.Shown ? "Between the cursors" : "Over the visible time", cursor_readings);
     if (!FindLogicNodes(m_Schematic.BuildCircuit()).empty()) {
+        ImGui::SameLine(0.0f, ImGui::GetFontSize());
         ImGui::Checkbox("Logic lanes", &m_ShowLogicLanes);
         ImGui::SetItemTooltip("Plot the signals of gates and flip-flops as lanes under the analog traces");
         if (m_ShowLogicLanes) {
+            ImGui::SameLine();
             ImGui::Checkbox("Bit values", &m_ShowBitValues);
             ImGui::SetItemTooltip("Write 0, 1 or X in every cell of a lane, a cell being as wide as the shortest "
                                   "steady stretch, such as half a clock period");
         }
-    }
-    const PlotCursors &cursors = m_Cursors;
-    if (cursors.Shown && BeginStatisticsTable("cursors")) {
-        DrawStatistic("A", FormatQuantity(cursors.A, "s"));
-        DrawStatistic("B", FormatQuantity(cursors.B, "s"));
-        DrawStatistic("B-A", FormatQuantity(cursors.B - cursors.A, "s"));
-        DrawStatistic("1/(B-A)",
-                      cursors.B != cursors.A ? FormatQuantity(1.0 / std::abs(cursors.B - cursors.A), "Hz") : "-");
-        ImGui::EndTable();
     }
     std::vector<PlottedTrace> traces = ListTraces(transient.NodeVoltages, transient.Currents, m_Schematic, "V", "A");
     for (const MathTrace &trace : math) {
@@ -590,7 +589,6 @@ void TransientTab::DrawStatistics(const Core::Transient &transient, const std::v
         ImGui::TextDisabled("Measure a trace to see its statistics");
         return;
     }
-    ImGui::TextDisabled("%s", cursors.Shown ? "Between the cursors" : "Over the visible time");
     std::vector<MeasuredTrace> measured;
     for (const PlottedTrace &trace : traces) {
         measured.push_back({.Values = *trace.Values, .Unit = trace.Unit});
