@@ -596,9 +596,13 @@ void Application::FollowWindowSize(const ImGuiID dockspace_id) {
         return;
     }
     ImGuiDockNode *root = ImGui::DockBuilderGetNode(dockspace_id);
-    const bool has_size = m_LayoutSize.x > 0.0f && m_LayoutSize.y > 0.0f;
-    if (root != nullptr && has_size && (work_size.x != m_LayoutSize.x || work_size.y != m_LayoutSize.y)) {
-        ScaleDockLayout(*root, {work_size.x / m_LayoutSize.x, work_size.y / m_LayoutSize.y});
+    if (root == nullptr) {
+        return;
+    }
+    const ImVec2 laid_out_size = GetLaidOutSize(*root, m_LayoutSize);
+    const bool has_size = laid_out_size.x > 0.0f && laid_out_size.y > 0.0f;
+    if (has_size && (work_size.x != laid_out_size.x || work_size.y != laid_out_size.y)) {
+        ScaleDockLayout(*root, {work_size.x / laid_out_size.x, work_size.y / laid_out_size.y});
     }
     m_LayoutSize = work_size;
 }

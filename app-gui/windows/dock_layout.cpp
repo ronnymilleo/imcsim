@@ -27,4 +27,18 @@ void ScaleDockLayout(ImGuiDockNode &node, const ImVec2 ratio) {
     }
 }
 
+/**
+ * @brief   The size of the main window the layout was laid out for, which a change in size is scaled from.
+ * @param[in] root           Root of the tree, the dockspace node.
+ * @param[in] followed_size  The size the layout last followed, or zero before the first frame.
+ * @return  The followed size, or, on the first frame, the size the root node was saved with in imgui.ini, so a window
+ *          that opens at another size before the window manager resizes it scales the saved layout from its own size.
+ */
+ImVec2 GetLaidOutSize(const ImGuiDockNode &root, const ImVec2 followed_size) {
+    if (followed_size.x > 0.0f && followed_size.y > 0.0f) {
+        return followed_size;
+    }
+    return root.Size;
+}
+
 } // namespace GUI

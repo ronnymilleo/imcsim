@@ -12,6 +12,7 @@
 namespace GUI {
 
 void ScaleDockLayout(ImGuiDockNode &node, ImVec2 ratio);
+ImVec2 GetLaidOutSize(const ImGuiDockNode &root, ImVec2 followed_size);
 
 } // namespace GUI
 

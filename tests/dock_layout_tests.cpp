@@ -32,3 +32,15 @@ TEST_CASE("Every node of a dock tree keeps its share when the main window grows"
     CHECK(side.SizeRef.x == 414.0f);
     CHECK(output.SizeRef.y == 500.0f);
 }
+
+TEST_CASE("A layout read from imgui.ini scales from the size it was saved at", "[dock_layout]") {
+    ImGuiDockNode root(1);
+    root.Size = {1896.0f, 932.0f};
+    // The first frame has followed nothing yet, so the saved size is the reference, not the size the window opened at
+    const ImVec2 first = GUI::GetLaidOutSize(root, {0.0f, 0.0f});
+    CHECK(first.x == 1896.0f);
+    CHECK(first.y == 932.0f);
+    // Afterwards the size followed last is
+    const ImVec2 later = GUI::GetLaidOutSize(root, {941.0f, 932.0f});
+    CHECK(later.x == 941.0f);
+}
