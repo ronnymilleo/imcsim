@@ -15,6 +15,10 @@
 
 namespace GUI {
 
+/// What a cell reads when the trace has no such value, such as the frequency of a trace that does not repeat: an em
+/// dash, drawn muted, so it does not pass for a minus sign.
+inline constexpr std::string_view NO_VALUE = "\xE2\x80\x94";
+
 /**
  * @struct  MeasuredTrace
  * @brief   A trace the statistics read: its values at the times of the transient and its unit.

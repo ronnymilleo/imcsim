@@ -16,8 +16,6 @@ namespace GUI {
 
 namespace {
 
-/// What a cell reads when the trace has no such value, such as the frequency of a trace that does not repeat.
-constexpr std::string_view NO_VALUE = "-";
 /// Quantities measured over the span, a row each, in the order the table shows them.
 constexpr auto MEASURED_ROWS =
     std::to_array<std::string_view>({"Pk-Pk", "Max", "Min", "Mean", "RMS", "Freq", "Period"});
@@ -25,7 +23,7 @@ constexpr auto MEASURED_ROWS =
 constexpr auto CURSOR_ROWS = std::to_array<std::string_view>({"At A", "At B", "B-A"});
 /// What a Bode plot reads over the whole sweep, a row each.
 constexpr auto BODE_ROWS =
-    std::to_array<std::string_view>({"Peak", "at", "-3 dB low", "-3 dB high", "0 dB at", "Phase margin"});
+    std::to_array<std::string_view>({"Peak gain", "Peak at", "-3 dB low", "-3 dB high", "0 dB at", "Phase margin"});
 /// Gain and phase at the cursors of a Bode plot, a row each after those of the whole sweep.
 constexpr auto BODE_CURSOR_ROWS =
     std::to_array<std::string_view>({"Gain at A", "Gain at B", "Gain B-A", "Phase at A", "Phase at B", "Phase B-A"});
@@ -33,6 +31,8 @@ constexpr auto BODE_CURSOR_ROWS =
 constexpr auto SWEEP_CURSOR_ROWS = std::to_array<std::string_view>({"At A", "At B", "B-A", "Slope"});
 /// The extremes and mean of a DC sweep over its span, a row each.
 constexpr auto SWEEP_ROWS = std::to_array<std::string_view>({"Min", "Max", "Mean"});
+/// The unit of phases, written right after the figure as decibels are.
+constexpr std::string_view DEGREE_SIGN = "\xC2\xB0";
 /// Decimals of decibels and degrees, which read better fixed than with suffixes.
 constexpr int FIXED_DECIMALS = 2;
 
@@ -49,7 +49,7 @@ StatisticsCell MeasureCell(const double value, const double scale, const std::st
 }
 
 /**
- * @brief   A reading that is never negligible, such as a frequency, or "-" without one.
+ * @brief   A reading that is never negligible, such as a frequency, or a dash without one.
  */
 StatisticsCell PlainCell(const std::optional<double> value, const std::string_view unit) {
     if (!value) {
@@ -59,7 +59,7 @@ StatisticsCell PlainCell(const std::optional<double> value, const std::string_vi
 }
 
 /**
- * @brief   Decibels or degrees with two decimals, or "-" without a value.
+ * @brief   Decibels or degrees with two decimals, or a dash without a value.
  */
 StatisticsCell FixedCell(const std::optional<double> value, const std::string_view unit) {
     if (!value) {
@@ -88,7 +88,7 @@ void AddRows(std::vector<StatisticsRow> &rows, const std::array<std::string_view
  * @param[in] span     Span the statistics cover: between the cursors, or what the plot shows.
  * @param[in] cursors  The cursors when shown, which add the value of each trace at both and their difference.
  * @return  The rows Pk-Pk, Max, Min, Mean, RMS, Freq and Period, then At A, At B and B-A with the cursors; a trace
- *          without points in the span reads "-" in the measured rows.
+ *          without points in the span reads a dash in the measured rows.
  */
 std::vector<StatisticsRow> BuildTransientStatistics(const std::span<const double> times,
                                                     const std::vector<MeasuredTrace> &traces, const PlotSpan span,
@@ -136,7 +136,7 @@ std::vector<StatisticsRow> BuildTransientStatistics(const std::span<const double
  * @param[in] cursors      The cursors when shown, which add the gain and phase of each trace at both and their
  *                         differences.
  * @return  The rows Peak, at, -3 dB low, -3 dB high, 0 dB at and Phase margin, then the six cursor rows with the
- *          cursors; a trace the sweep cannot measure reads "-" in the first six.
+ *          cursors; a trace the sweep cannot measure reads a dash in the first six.
  */
 std::vector<StatisticsRow> BuildBodeStatistics(const std::span<const double> frequencies,
                                                const std::vector<BodeTrace> &traces,
@@ -154,12 +154,12 @@ std::vector<StatisticsRow> BuildBodeStatistics(const std::span<const double> fre
                                 : ComputeBodeStatistics(frequencies, trace.MagnitudesDecibels, trace.PhasesDegrees,
                                                         frequencies.front(), frequencies.back());
         if (statistics) {
-            add(FixedCell(statistics->PeakGain, " dB"));
+            add(FixedCell(statistics->PeakGain, "dB"));
             add(PlainCell(statistics->PeakFrequency, "Hz"));
             add(PlainCell(statistics->LowerCutoff, "Hz"));
             add(PlainCell(statistics->UpperCutoff, "Hz"));
             add(PlainCell(statistics->UnityGainFrequency, "Hz"));
-            add(FixedCell(statistics->PhaseMargin, " deg"));
+            add(FixedCell(statistics->PhaseMargin, DEGREE_SIGN));
         } else {
             while (row < BODE_ROWS.size()) {
                 add(PlainCell(std::nullopt, ""));
@@ -170,12 +170,12 @@ std::vector<StatisticsRow> BuildBodeStatistics(const std::span<const double> fre
             const double gain_b = InterpolateAt(frequencies, trace.MagnitudesDecibels, cursors->B, true);
             const double phase_a = InterpolateAt(frequencies, trace.PhasesDegrees, cursors->A, true);
             const double phase_b = InterpolateAt(frequencies, trace.PhasesDegrees, cursors->B, true);
-            add(FixedCell(gain_a, " dB"));
-            add(FixedCell(gain_b, " dB"));
-            add(FixedCell(gain_b - gain_a, " dB"));
-            add(FixedCell(phase_a, " deg"));
-            add(FixedCell(phase_b, " deg"));
-            add(FixedCell(phase_b - phase_a, " deg"));
+            add(FixedCell(gain_a, "dB"));
+            add(FixedCell(gain_b, "dB"));
+            add(FixedCell(gain_b - gain_a, "dB"));
+            add(FixedCell(phase_a, DEGREE_SIGN));
+            add(FixedCell(phase_b, DEGREE_SIGN));
+            add(FixedCell(phase_b - phase_a, DEGREE_SIGN));
         }
     }
     return rows;
@@ -191,7 +191,7 @@ std::vector<StatisticsRow> BuildBodeStatistics(const std::span<const double> fre
  *                        slope between them.
  * @return  With the cursors, the rows At A, At B, B-A and Slope, and Resistance when a current is swept over a
  *          voltage; then Min, Max and Mean. A current over a swept voltage reads its slope as a resistance too, "open"
- *          when it carries nothing; other curves read "-" there.
+ *          when it carries nothing; other curves read a dash there.
  */
 std::vector<StatisticsRow> BuildSweepStatistics(const std::span<const double> swept, const std::string_view swept_unit,
                                                 const std::vector<SweptTrace> &traces, const PlotSpan span,

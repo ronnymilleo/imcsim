@@ -620,7 +620,8 @@ void TransientTab::DrawStatistics(const Core::Transient &transient, const std::v
         {"A", FormatQuantity(cursors.A, "s")},
         {"B", FormatQuantity(cursors.B, "s")},
         {"B-A", FormatQuantity(cursors.B - cursors.A, "s")},
-        {"1/(B-A)", cursors.B != cursors.A ? FormatQuantity(1.0 / std::abs(cursors.B - cursors.A), "Hz") : "-"}};
+        {"1/(B-A)",
+         cursors.B != cursors.A ? FormatQuantity(1.0 / std::abs(cursors.B - cursors.A), "Hz") : std::string(NO_VALUE)}};
     DrawStatisticsHeader(cursors.Shown ? "Between the cursors" : "Over the visible time");
     if (!FindLogicNodes(m_Schematic.BuildCircuit()).empty()) {
         ImGui::SameLine(0.0f, ImGui::GetFontSize());

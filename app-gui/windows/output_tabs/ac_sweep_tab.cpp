@@ -199,7 +199,7 @@ void ACSweepTab::DrawStatistics(const Core::ACSweep &sweep, const ACMathTraces &
     const CursorReadings cursor_readings = {
         {"A", FormatQuantity(cursors.A, "Hz")},
         {"B", FormatQuantity(cursors.B, "Hz")},
-        {"B/A", cursors.A > 0.0 ? FormatFixed(std::log10(cursors.B / cursors.A), " dec") : "-"}};
+        {"B/A", cursors.A > 0.0 ? FormatFixed(std::log10(cursors.B / cursors.A), " dec") : std::string(NO_VALUE)}};
     DrawStatisticsHeader("Response over the whole sweep");
     std::vector<PlottedTrace> magnitudes =
         ListTraces(sweep.NodeMagnitudesDecibels, sweep.CurrentMagnitudesDecibels, m_Schematic, " dB", " dB");

@@ -92,13 +92,13 @@ TEST_CASE("Shown cursors add the value of each trace at both and their differenc
     CHECK(FindRow(rows, "B-A").Cells[0].Text == "-2.000V");
 }
 
-TEST_CASE("A trace with no points in the span reads - in every measured row", "[statistics_table]") {
+TEST_CASE("A trace with no points in the span reads a dash in every measured row", "[statistics_table]") {
     const Waves waves = MakeWaves();
     const std::vector<GUI::StatisticsRow> rows = GUI::BuildTransientStatistics(
         waves.Times, {{.Values = waves.Input, .Unit = "V"}}, {.From = 1.0, .To = 2.0}, std::nullopt);
     for (const GUI::StatisticsRow &row : rows) {
         REQUIRE(row.Cells.size() == 1);
-        CHECK(row.Cells[0].Text == "-");
+        CHECK(row.Cells[0].Text == GUI::NO_VALUE);
     }
 }
 
@@ -127,8 +127,10 @@ TEST_CASE("The Bode statistics read across, with the cutoff of each trace in its
                                   {.MagnitudesDecibels = low_pass_magnitudes, .PhasesDegrees = low_pass_phases}},
                                  std::nullopt);
     REQUIRE(rows.size() == 6);
-    CHECK(FindRow(rows, "Peak").Cells[0].Text == "0.00 dB");
-    CHECK(FindRow(rows, "-3 dB high").Cells[0].Text == "-");
+    // No space between a figure and its unit, as in every other reading
+    CHECK(FindRow(rows, "Peak gain").Cells[0].Text == "0.00dB");
+    CHECK(FindRow(rows, "Peak at").Cells[0].Text == "10.00Hz");
+    CHECK(FindRow(rows, "-3 dB high").Cells[0].Text == GUI::NO_VALUE);
     // The cutoff is interpolated between sweep points, so it reads close to the exact one, not equal
     const std::optional<double> cutoff = Core::ParseValue(FindRow(rows, "-3 dB high").Cells[1].Text, "Hz");
     REQUIRE(cutoff.has_value());
@@ -154,7 +156,7 @@ TEST_CASE("A swept current reads its slope as a resistance, other curves read -"
     CHECK(FindRow(rows, "At A").Cells[0].Text == "2.000mA");
     CHECK(FindRow(rows, "Slope").Cells[0].Text == "1.000mA/V");
     CHECK(FindRow(rows, "Resistance").Cells[0].Text == "1.000kOhm");
-    CHECK(FindRow(rows, "Resistance").Cells[1].Text == "-");
+    CHECK(FindRow(rows, "Resistance").Cells[1].Text == GUI::NO_VALUE);
     CHECK(FindRow(rows, "Max").Cells[1].Text == "8.000V");
 }
 

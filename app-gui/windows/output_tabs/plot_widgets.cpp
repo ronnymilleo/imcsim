@@ -123,6 +123,17 @@ std::size_t FindSteadySpread(const std::vector<std::vector<double>> &curves) {
 }
 
 /**
+ * @brief   The text of a table cell, muted when it stands for no value.
+ */
+void DrawCellText(const std::string &text) {
+    if (text == NO_VALUE) {
+        ImGui::TextDisabled("%s", text.c_str());
+    } else {
+        ImGui::TextUnformatted(text.c_str());
+    }
+}
+
+/**
  * @brief   The readings of the cursors themselves, a name and a value per row, beside the table just drawn when the
  *          panel has room for them and under it otherwise, so the line over the table never runs past the panel.
  */
@@ -160,7 +171,7 @@ void DrawCursorTable(const CursorReadings &readings) {
         ImGui::TextDisabled("%s", name.c_str());
         ImGui::TableNextColumn();
         ImGui::SetCursorPosX(ImGui::GetCursorPosX() + value_width - measure(value));
-        ImGui::TextUnformatted(value.c_str());
+        DrawCellText(value);
     }
     ImGui::EndTable();
 }
@@ -928,7 +939,7 @@ void DrawTraceTable(const char *id, const std::vector<PlottedTrace> &traces, con
             const StatisticsCell &cell = row.Cells[column];
             ImGui::TableNextColumn();
             right_aligned(cell.Text, widths[column + 1]);
-            ImGui::TextUnformatted(cell.Text.c_str());
+            DrawCellText(cell.Text);
             if (!cell.Tooltip.empty()) {
                 ImGui::SetItemTooltip("%s", cell.Tooltip.c_str());
             }
