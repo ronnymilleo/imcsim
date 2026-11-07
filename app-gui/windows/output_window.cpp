@@ -6,6 +6,7 @@
 #include "windows/output_window.h"
 
 #include "drawing/node_colors.h"
+#include "drawing/trace_swatch.h"
 #include "editing/probing.h"
 #include "imgui_internal.h"
 #include "implot.h"
@@ -296,7 +297,8 @@ FrameResults OutputWindow::EvaluateFrame(const std::size_t node_count,
 }
 
 /**
- * @brief   The check marks take the colors of the curves, which match the probes in the editor.
+ * @brief   Each row shows the color and line style of its curve, which match the probes in the editor, so the list is
+ * the legend of the plots.
  */
 void OutputWindow::DrawTraceList(const std::size_t node_count, const std::vector<Core::ComponentTrace> &currents) {
     ImGui::BeginChild("traces", ImVec2(ImGui::GetFontSize() * TRACE_LIST_WIDTH, 0.0f), ImGuiChildFlags_Borders);
@@ -308,11 +310,10 @@ void OutputWindow::DrawTraceList(const std::size_t node_count, const std::vector
                 m_Schematic.SetVoltageMeasured(node, *measure_all);
             }
             bool measured = m_Schematic.IsVoltageMeasured(node);
-            ImGui::PushStyleColor(ImGuiCol_CheckMark, GetNodeColor(node));
-            if (ImGui::Checkbox(GetVoltageLabel(m_Schematic.GetConnectivity(), node).c_str(), &measured)) {
+            if (DrawTraceCheckbox(GetVoltageLabel(m_Schematic.GetConnectivity(), node).c_str(), &measured,
+                                  GetNodeColor(node), TraceStyle::SOLID)) {
                 m_Schematic.SetVoltageMeasured(node, measured);
             }
-            ImGui::PopStyleColor();
         }
     }
 
@@ -325,11 +326,10 @@ void OutputWindow::DrawTraceList(const std::size_t node_count, const std::vector
                 m_Schematic.SetCurrentMeasured(name, *measure_all);
             }
             bool measured = m_Schematic.IsCurrentMeasured(name);
-            ImGui::PushStyleColor(ImGuiCol_CheckMark, GetCurrentColor(index));
-            if (ImGui::Checkbox(std::format("I({})", name).c_str(), &measured)) {
+            if (DrawTraceCheckbox(std::format("I({})", name).c_str(), &measured, GetCurrentColor(index),
+                                  TraceStyle::DASHED)) {
                 m_Schematic.SetCurrentMeasured(name, measured);
             }
-            ImGui::PopStyleColor();
         }
     }
 

@@ -56,7 +56,7 @@ struct StepTraces {
 
 // Plots
 int FormatAxisValue(double value, char *buffer, int size, void *unit);
-bool BeginTracePlot(const char *id, ImVec2 size);
+bool BeginTracePlot(const char *id, ImVec2 size, bool has_legend = false);
 float PlotHeight(int plot_count);
 ImPlotAxisFlags VoltageAxisFlags(bool has_voltages, bool has_other_traces);
 void SetNextFits(bool new_result, bool voltages_changed, bool currents_changed);

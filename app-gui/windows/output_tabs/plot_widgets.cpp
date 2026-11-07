@@ -133,18 +133,23 @@ int FormatAxisValue(const double value, char *buffer, const int size, void *unit
 }
 
 /**
- * @brief   Begins a plot whose legend only names the traces: clicking an entry would hide a curve from the plot alone,
- *          while the statistics and the export still showed it.
- * @param[in] id    ImPlot ID of the plot.
- * @param[in] size  Size of the plot, in pixels.
+ * @brief   Begins a plot of traces, without a legend when a list beside it shows the color and style of each trace, so
+ *          nothing covers the curves.
+ * @param[in] id          ImPlot ID of the plot.
+ * @param[in] size        Size of the plot, in pixels.
+ * @param[in] has_legend  True for a plot whose traces no list shows, such as the noise of each part; its legend only
+ *                        names them, since clicking an entry would hide a curve from the plot alone while the
+ *                        statistics and the export still showed it.
  * @return  True when the plot is drawn; then call ImPlot::EndPlot().
  * @note    The trace list is the one place that picks what is shown.
  */
-bool BeginTracePlot(const char *id, const ImVec2 size) {
-    if (!ImPlot::BeginPlot(id, size)) {
+bool BeginTracePlot(const char *id, const ImVec2 size, const bool has_legend) {
+    if (!ImPlot::BeginPlot(id, size, has_legend ? ImPlotFlags_None : ImPlotFlags_NoLegend)) {
         return false;
     }
-    ImPlot::SetupLegend(ImPlotLocation_NorthWest, ImPlotLegendFlags_NoButtons);
+    if (has_legend) {
+        ImPlot::SetupLegend(ImPlotLocation_NorthWest, ImPlotLegendFlags_NoButtons);
+    }
     return true;
 }
 

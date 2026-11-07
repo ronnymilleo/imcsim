@@ -46,6 +46,7 @@ add_library(imcsim-gui-lib
             drawing/text_fitting.cpp
             drawing/theme.cpp
             drawing/tool_icons.cpp
+            drawing/trace_swatch.cpp
             editing/block_wiring.cpp
             editing/canvas_view.cpp
             editing/connectivity.cpp

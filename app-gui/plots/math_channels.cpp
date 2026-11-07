@@ -6,6 +6,7 @@
 #include "plots/math_channels.h"
 
 #include "drawing/theme.h"
+#include "drawing/trace_swatch.h"
 #include "misc/cpp/imgui_stdlib.h"
 #include <algorithm>
 #include <array>
@@ -104,12 +105,14 @@ void MathChannels::Draw(const std::vector<std::string> &operands) {
         ImGui::AlignTextToFramePadding();
         const bool is_edit_pressed = ImGui::SmallButton("Edit");
         ImGui::SameLine();
-        ImGui::PushStyleColor(ImGuiCol_CheckMark, AdaptToBackground(MATH_COLORS[index % MATH_COLORS.size()]));
         if (!program) {
             ImGui::PushStyleColor(ImGuiCol_Text, GetErrorTextColor());
         }
-        ImGui::Checkbox(channel.Name.c_str(), &channel.Shown);
-        ImGui::PopStyleColor(program ? 1 : 2);
+        DrawTraceCheckbox(channel.Name.c_str(), &channel.Shown,
+                          AdaptToBackground(MATH_COLORS[index % MATH_COLORS.size()]), TraceStyle::HEAVY);
+        if (!program) {
+            ImGui::PopStyleColor();
+        }
         if (program) {
             ImGui::SetItemTooltip("%s", GetChannelExpression(channel).c_str());
         } else {
