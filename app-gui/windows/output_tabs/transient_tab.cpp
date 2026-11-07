@@ -356,9 +356,27 @@ void TransientTab::DrawWindowControls(const Core::Transient &shown) {
     // A live run is seen a stop time at a time, so its window has no size to pick
     const bool has_size = has_window && !has_span;
     const float size_width = has_size ? GetWindowSizeWidth() + ImGui::GetFontSize() : 0.0f;
-    DrawCursorToggle(m_Cursors, row_start.x + width - size_width);
-    if (has_size) {
-        DrawWindowSize(row_start, width);
+    // At the right end of the row; in a narrow window, one after the other on rows of their own rather than over the
+    // range
+    ImGui::SameLine();
+    const float right_edge = row_start.x + width;
+    if (ImGui::GetCursorPosX() + ImGui::GetFontSize() + GetCursorToggleWidth() + size_width <= right_edge) {
+        DrawCursorToggle(m_Cursors, right_edge - size_width);
+        if (has_size) {
+            ImGui::SameLine();
+            ImGui::SetCursorPosX(right_edge - GetWindowSizeWidth());
+            DrawWindowSize();
+        }
+    } else {
+        ImGui::NewLine();
+        DrawCursorCheckbox(m_Cursors);
+        if (has_size) {
+            ImGui::SameLine(0.0f, ImGui::GetFontSize());
+            if (ImGui::GetCursorPosX() + GetWindowSizeWidth() > right_edge) {
+                ImGui::NewLine();
+            }
+            DrawWindowSize();
+        }
     }
     if (!has_window || window.GetWindow().Count >= total_points) {
         return;
@@ -375,12 +393,11 @@ void TransientTab::DrawWindowControls(const Core::Transient &shown) {
 }
 
 /**
- * @brief   The size of the window, labeled, at the right end of the row above its scroll bar.
+ * @brief   The size of the window, labeled, at the cursor, which the header row places.
  */
-void TransientTab::DrawWindowSize(const ImVec2 row_start, const float width) {
+void TransientTab::DrawWindowSize() {
     TransientWindow &window = m_Playback.Window;
     const float size_width = ImGui::GetFontSize() * WINDOW_SIZE_WIDTH;
-    ImGui::SetCursorPos({row_start.x + width - GetWindowSizeWidth(), row_start.y});
     ImGui::AlignTextToFramePadding();
     ImGui::TextDisabled("Points");
     ImGui::SameLine();

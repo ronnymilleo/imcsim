@@ -104,6 +104,7 @@ void DrawCursors(PlotCursors &cursors, bool logarithmic);
 PlotSpan MeasuredSpan(const PlotCursors &cursors, const PlotSpan &view);
 float GetCursorToggleWidth();
 void DrawCursorToggle(PlotCursors &cursors, float right_edge);
+void DrawCursorCheckbox(PlotCursors &cursors);
 
 // Playback
 void DrawPlaybackBar(TransientPlayback &playback, double from, double to);

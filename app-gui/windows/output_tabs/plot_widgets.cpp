@@ -692,6 +692,14 @@ void DrawCursorToggle(PlotCursors &cursors, const float right_edge) {
         ImGui::NewLine();
     }
     ImGui::SetCursorPosX(std::max(ImGui::GetCursorPosX(), right_edge - GetCursorToggleWidth()));
+    DrawCursorCheckbox(cursors);
+}
+
+/**
+ * @brief   Draws the checkbox of cursors A and B at the cursor; checking it places them anew in the view.
+ * @param[in,out] cursors  Cursors of the plot.
+ */
+void DrawCursorCheckbox(PlotCursors &cursors) {
     if (ImGui::Checkbox("Cursors", &cursors.Shown) && cursors.Shown) {
         cursors.Placed = false;
     }
