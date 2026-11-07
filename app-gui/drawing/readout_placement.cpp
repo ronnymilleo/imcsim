@@ -5,6 +5,8 @@
 
 #include "drawing/readout_placement.h"
 
+#include "helpers.h"
+
 #include <cmath>
 
 namespace GUI {
@@ -30,6 +32,20 @@ ImVec2 PlaceReadout(const ImVec2 wire_start, const ImVec2 wire_end, const ImVec2
         return {middle.x + gap, middle.y - readout_size.y / 2.0f};
     }
     return {middle.x - readout_size.x / 2.0f, middle.y + gap};
+}
+
+/**
+ * @brief   The font size of the readouts at a zoom: that of the part labels, so a readout keeps its size next to the
+ *          parts and never grows over them when zoomed out.
+ * @param[in] zoom  Pixels per grid unit.
+ * @return  The font size in pixels, or none below MIN_READOUT_FONT_SIZE, where the readouts are left out.
+ */
+std::optional<float> GetReadoutFontSize(const float zoom) {
+    const float font_size = zoom * LABEL_SCALE;
+    if (font_size < MIN_READOUT_FONT_SIZE) {
+        return std::nullopt;
+    }
+    return font_size;
 }
 
 } // namespace GUI

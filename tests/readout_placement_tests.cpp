@@ -5,7 +5,10 @@
 
 #include "drawing/readout_placement.h"
 
+#include "helpers.h"
+
 #include <catch2/catch_test_macros.hpp>
+#include <optional>
 
 namespace {
 
@@ -31,4 +34,18 @@ TEST_CASE("A readout at a terminal sits under and right of it", "[readout_placem
     const ImVec2 corner = GUI::PlaceReadout({100.0f, 100.0f}, {100.0f, 100.0f}, READOUT_SIZE, GAP);
     CHECK(corner.x == 105.0f);
     CHECK(corner.y == 105.0f);
+}
+
+TEST_CASE("A readout takes the size of the part labels at any zoom", "[readout_placement]") {
+    // At 20 pixels per grid unit the part labels are 14 pixels high
+    const std::optional<float> font_size = GUI::GetReadoutFontSize(20.0f);
+    REQUIRE(font_size.has_value());
+    CHECK(*font_size == 20.0f * GUI::LABEL_SCALE);
+    CHECK(*GUI::GetReadoutFontSize(40.0f) == 2.0f * *font_size);
+}
+
+TEST_CASE("Readouts are left out when zoomed out too far to read them", "[readout_placement]") {
+    const float threshold_zoom = GUI::MIN_READOUT_FONT_SIZE / GUI::LABEL_SCALE;
+    CHECK(GUI::GetReadoutFontSize(threshold_zoom).has_value());
+    CHECK_FALSE(GUI::GetReadoutFontSize(threshold_zoom * 0.9f).has_value());
 }

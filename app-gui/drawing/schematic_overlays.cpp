@@ -25,8 +25,10 @@
 #include "ui_elements/ui_logic_output.h"
 #include "ui_elements/ui_seven_segment.h"
 #include <algorithm>
+#include <cfloat>
 #include <cmath>
 #include <format>
+#include <optional>
 #include <string>
 #include <utility>
 
@@ -351,7 +353,8 @@ void SchematicOverlays::DrawGlows(ImDrawList *draw_list, const ViewTransform &vi
  * @param[in] view       Pan and zoom of the canvas.
  * @param[in] schematic  The schematic being edited.
  * @details Ground is always 0 V, so it is left out. The pill sits off the wire, under a level one and right of an
- *          upright one, so it covers neither the wire, its node dot nor the probe name over it.
+ *          upright one, so it covers neither the wire, its node dot nor the probe name over it. It takes the size of
+ * the part labels, so it follows the zoom, and is left out when zoomed out too far to read.
  */
 void SchematicOverlays::DrawNodeVoltages(ImDrawList *draw_list, const ViewTransform &view, Schematic &schematic) const {
     if (!m_Displayed) {
@@ -362,11 +365,18 @@ void SchematicOverlays::DrawNodeVoltages(ImDrawList *draw_list, const ViewTransf
     const ThemePalette &palette = GetPalette();
     const ImU32 fill = ImGui::ColorConvertFloat4ToU32(palette.Surface);
     const ImU32 border = ImGui::ColorConvertFloat4ToU32(palette.Border);
-    const float font_size = ImGui::GetFontSize();
+    const float zoom = view.ToScreen({1.0f, 0.0f}).x - view.ToScreen({0.0f, 0.0f}).x;
+    const std::optional<float> readout_font_size = GetReadoutFontSize(zoom);
+    if (!readout_font_size) {
+        return;
+    }
+    const float font_size = *readout_font_size;
+    ImFont *font = ImGui::GetFont();
     const ImVec2 padding = {font_size * READOUT_PADDING_X, font_size * READOUT_PADDING_Y};
     const float dot_radius = font_size * READOUT_DOT_RADIUS;
     const float gap = font_size * READOUT_GAP;
-    const float rounding = ImGui::GetStyle().FrameRounding;
+    // The corners shrink with the pill, so a small one stays a pill and not a circle
+    const float rounding = ImGui::GetStyle().FrameRounding * font_size / ImGui::GetFontSize();
     std::vector<bool> labeled(voltages.size(), false);
     const auto draw_readout = [&](const GridPoint point, const ImVec2 world_start, const ImVec2 world_end) {
         const std::optional<int> node = connectivity.GetNode(point);
@@ -379,15 +389,15 @@ void SchematicOverlays::DrawNodeVoltages(ImDrawList *draw_list, const ViewTransf
         }
         labeled[index] = true;
         const std::string text = std::format("{}V", Core::FormatMeasurement(voltages[index]));
-        const ImVec2 text_size = ImGui::CalcTextSize(text.c_str());
+        const ImVec2 text_size = font->CalcTextSizeA(font_size, FLT_MAX, 0.0f, text.c_str());
         const ImVec2 size = {padding.x * 3.0f + dot_radius * 2.0f + text_size.x, padding.y * 2.0f + text_size.y};
         const ImVec2 corner = PlaceReadout(view.ToScreen(world_start), view.ToScreen(world_end), size, gap);
         draw_list->AddRectFilled(corner, corner + size, fill, rounding);
         draw_list->AddRect(corner, corner + size, border, rounding);
         const ImVec2 dot_center = {corner.x + padding.x + dot_radius, corner.y + size.y / 2.0f};
         draw_list->AddCircleFilled(dot_center, dot_radius, GetNodeColor(*node));
-        draw_list->AddText({dot_center.x + dot_radius + padding.x, corner.y + padding.y}, palette.VoltageLabel,
-                           text.c_str());
+        draw_list->AddText(font, font_size, {dot_center.x + dot_radius + padding.x, corner.y + padding.y},
+                           palette.VoltageLabel, text.c_str());
     };
 
     for (const UIWire &wire : schematic.GetWires()) {
