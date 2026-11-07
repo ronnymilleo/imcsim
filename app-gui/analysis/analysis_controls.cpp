@@ -467,6 +467,14 @@ std::optional<Analysis> AnalysisControls::GetLastRun() const {
 }
 
 /**
+ * @brief   Counts the runs that finished, so a caller can tell a new outcome from one it has already seen.
+ * @return  The number of runs finished since the start, failed ones included.
+ */
+std::size_t AnalysisControls::GetFinishedRunCount() const {
+    return m_FinishedRunCount;
+}
+
+/**
  * @brief   Tells how the last run of an analysis went.
  * @param[in] analysis  Analysis to check.
  * @return  Failed while its last run has an error; Stopped for a transient that ended early; with warnings when the
@@ -1067,6 +1075,7 @@ void AnalysisControls::Finish(const Analysis analysis, std::optional<std::string
                                      .Messages = std::move(messages),
                                      .Seconds = m_IsLiveRun ? std::nullopt : std::optional(elapsed.count())};
     m_LastRun = analysis;
+    ++m_FinishedRunCount;
 }
 
 /**

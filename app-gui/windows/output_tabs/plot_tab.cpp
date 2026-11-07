@@ -71,4 +71,71 @@ TabListing ListTabs(const TabResults &has_result, const std::optional<PlotTab> k
     return listing;
 }
 
+/**
+ * @brief   The analysis whose last run a tab reports.
+ * @param[in] tab  The tab.
+ * @return  The analysis, or none for the spectrum, which transforms the transient, and for Monte Carlo, a run mode of
+ *          the analysis it repeats.
+ */
+std::optional<Analysis> GetTabAnalysis(const PlotTab tab) {
+    switch (tab) {
+    case PlotTab::OPERATING_POINT:
+        return Analysis::OPERATING_POINT;
+    case PlotTab::TRANSIENT:
+        return Analysis::TRANSIENT;
+    case PlotTab::AC_SWEEP:
+        return Analysis::AC_SWEEP;
+    case PlotTab::DC_SWEEP:
+        return Analysis::DC_SWEEP;
+    case PlotTab::NOISE:
+        return Analysis::NOISE;
+    case PlotTab::TRANSFER_FUNCTION:
+        return Analysis::TRANSFER_FUNCTION;
+    case PlotTab::SENSITIVITY:
+        return Analysis::SENSITIVITY;
+    case PlotTab::POLE_ZERO:
+        return Analysis::POLE_ZERO;
+    case PlotTab::S_PARAMETERS:
+        return Analysis::S_PARAMETERS;
+    case PlotTab::TRUTH_TABLE:
+        return Analysis::TRUTH_TABLE;
+    case PlotTab::SPECTRUM:
+    case PlotTab::MONTE_CARLO:
+    default:
+        return std::nullopt;
+    }
+}
+
+/**
+ * @brief   The tab that shows the result of an analysis, or why its last run failed.
+ * @param[in] analysis  The analysis.
+ * @return  Its tab.
+ */
+PlotTab GetAnalysisTab(const Analysis analysis) {
+    switch (analysis) {
+    case Analysis::OPERATING_POINT:
+        return PlotTab::OPERATING_POINT;
+    case Analysis::TRANSIENT:
+        return PlotTab::TRANSIENT;
+    case Analysis::AC_SWEEP:
+        return PlotTab::AC_SWEEP;
+    case Analysis::DC_SWEEP:
+        return PlotTab::DC_SWEEP;
+    case Analysis::NOISE:
+        return PlotTab::NOISE;
+    case Analysis::TRANSFER_FUNCTION:
+        return PlotTab::TRANSFER_FUNCTION;
+    case Analysis::SENSITIVITY:
+        return PlotTab::SENSITIVITY;
+    case Analysis::POLE_ZERO:
+        return PlotTab::POLE_ZERO;
+    case Analysis::S_PARAMETERS:
+        return PlotTab::S_PARAMETERS;
+    case Analysis::TRUTH_TABLE:
+        return PlotTab::TRUTH_TABLE;
+    default:
+        return PlotTab::OPERATING_POINT;
+    }
+}
+
 } // namespace GUI

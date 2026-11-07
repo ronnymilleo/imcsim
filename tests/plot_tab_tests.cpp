@@ -6,6 +6,7 @@
 #include "windows/output_tabs/plot_tab.h"
 
 #include <catch2/catch_test_macros.hpp>
+#include <cstddef>
 #include <string_view>
 #include <vector>
 
@@ -36,4 +37,16 @@ TEST_CASE("Every tab has a label", "[plot_tab]") {
     for (const GUI::PlotTab tab : GUI::PLOT_TABS) {
         CHECK(std::string_view(GUI::GetTabLabel(tab)).size() > 0);
     }
+}
+
+TEST_CASE("Every analysis has a tab that reports it back", "[plot_tab]") {
+    for (std::size_t index = 0; index < GUI::ANALYSIS_COUNT; ++index) {
+        const auto analysis = static_cast<GUI::Analysis>(index);
+        CHECK(GUI::GetTabAnalysis(GUI::GetAnalysisTab(analysis)) == analysis);
+    }
+}
+
+TEST_CASE("The spectrum and Monte Carlo tabs report no analysis of their own", "[plot_tab]") {
+    CHECK_FALSE(GUI::GetTabAnalysis(GUI::PlotTab::SPECTRUM).has_value());
+    CHECK_FALSE(GUI::GetTabAnalysis(GUI::PlotTab::MONTE_CARLO).has_value());
 }

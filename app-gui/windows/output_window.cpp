@@ -6,6 +6,7 @@
 #include "windows/output_window.h"
 
 #include "drawing/node_colors.h"
+#include "drawing/theme.h"
 #include "drawing/trace_swatch.h"
 #include "editing/probing.h"
 #include "imgui_internal.h"
@@ -400,7 +401,13 @@ bool OutputWindow::DrawTabs(const FrameResults &frame) {
     if (tab_to_show) {
         m_KeptTab = tab_to_show;
     }
-    const TabListing listing = ListTabs(FindTabResults(), m_KeptTab);
+    const TabResults has_result = FindTabResults();
+    // A failed run gets its tab too, so the reason shows where its result would have been
+    TabResults has_content = has_result;
+    for (const PlotTab tab : PLOT_TABS) {
+        has_content[ToIndex(tab)] = has_content[ToIndex(tab)] || FindFailedAnalysis(tab).has_value();
+    }
+    const TabListing listing = ListTabs(has_content, m_KeptTab);
     for (const PlotTab tab : listing.Shown) {
         if (!ImGui::BeginTabItem(GetTabLabel(tab), nullptr,
                                  tab_to_show == tab ? ImGuiTabItemFlags_SetSelected : ImGuiTabItemFlags_None)) {
@@ -411,7 +418,11 @@ bool OutputWindow::DrawTabs(const FrameResults &frame) {
         if (!tab_to_show) {
             m_KeptTab = tab;
         }
-        DrawTab(tab, frame);
+        if (const std::optional<Analysis> failed = FindFailedAnalysis(tab); failed && !has_result[ToIndex(tab)]) {
+            DrawRunFailure(*failed);
+        } else {
+            DrawTab(tab, frame);
+        }
         ImGui::EndTabItem();
     }
     m_OtherTabs = listing.Others;
@@ -438,6 +449,34 @@ TabResults OutputWindow::FindTabResults() const {
     set(PlotTab::TRUTH_TABLE, m_Schematic.GetTruthTable().has_value());
     set(PlotTab::MONTE_CARLO, m_Schematic.GetMonteCarlo().has_value());
     return has_result;
+}
+
+/**
+ * @brief   The analysis a tab shows, when its last run failed.
+ * @return  The analysis, or none when its last run did not fail or the tab shows no analysis of its own.
+ */
+std::optional<Analysis> OutputWindow::FindFailedAnalysis(const PlotTab tab) const {
+    const std::optional<Analysis> analysis = GetTabAnalysis(tab);
+    if (analysis && m_Controls.GetOutcome(*analysis) == RunOutcome::FAILED) {
+        return analysis;
+    }
+    return std::nullopt;
+}
+
+/**
+ * @brief   Draws why the last run of an analysis failed, whole and wrapped, in place of its result, so the reason the
+ *          status line shortens can be read where the user looks for the result.
+ * @param[in] analysis  The analysis, whose last run failed.
+ */
+void OutputWindow::DrawRunFailure(const Analysis analysis) const {
+    ImGui::TextColored(GetErrorTextColor(), "%s failed", GetAnalysisName(analysis));
+    if (const std::optional<std::string> &error = m_Controls.GetError(analysis)) {
+        ImGui::PushTextWrapPos(0.0f);
+        ImGui::TextUnformatted(error->c_str());
+        ImGui::PopTextWrapPos();
+    }
+    ImGui::Spacing();
+    ImGui::TextDisabled("Fix it and press Run (F5) again; a click on the status line shows the ngspice output");
 }
 
 /**

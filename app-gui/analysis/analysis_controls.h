@@ -86,6 +86,7 @@ public:
 
     // Last run
     std::optional<Analysis> GetLastRun() const;
+    std::size_t GetFinishedRunCount() const;
     RunOutcome GetOutcome(Analysis analysis) const;
     const std::optional<std::string> &GetError(Analysis analysis) const;
     std::optional<double> GetRunSeconds(Analysis analysis) const;
@@ -137,6 +138,8 @@ private:
     /// Last run of each analysis, in the order of the Analysis enum.
     std::array<RunStatus, ANALYSIS_COUNT> m_Statuses;
     std::optional<Analysis> m_LastRun;
+    /// Runs finished so far, which tells a new outcome from the same one seen again.
+    std::size_t m_FinishedRunCount = 0;
 
     // Runs of one analysis
     void StartRun(Analysis analysis, Core::Job job);

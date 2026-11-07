@@ -78,6 +78,8 @@ private:
     std::size_t m_ShownSParametersVersion = 0;
     std::size_t m_ShownTruthTableVersion = 0;
     std::size_t m_ShownMonteCarloVersion = 0;
+    /// Finished runs seen, so a new failure opens the tab that tells why once.
+    std::size_t m_ShownRunCount = 0;
     /// Runs the selected analysis again after edits, when the preference asks for it.
     AutoRerun m_AutoRerun;
 

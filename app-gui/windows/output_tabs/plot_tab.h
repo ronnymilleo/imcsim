@@ -6,6 +6,7 @@
 #ifndef IMCSIM_PLOT_TAB_H
 #define IMCSIM_PLOT_TAB_H
 
+#include "document/simulation_settings.h"
 #include <array>
 #include <cstddef>
 #include <optional>
@@ -54,6 +55,10 @@ struct TabListing {
 std::size_t ToIndex(PlotTab tab);
 const char *GetTabLabel(PlotTab tab);
 TabListing ListTabs(const TabResults &has_result, std::optional<PlotTab> kept);
+
+// Analyses
+std::optional<Analysis> GetTabAnalysis(PlotTab tab);
+PlotTab GetAnalysisTab(Analysis analysis);
 
 } // namespace GUI
 

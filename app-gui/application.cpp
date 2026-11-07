@@ -472,9 +472,9 @@ void Application::UpdateWindowTitle() {
 }
 
 /**
- * @brief   A new result of any analysis opens the Output window on its tab, in front unless the user turned that off;
- *          the operating point and the transient also show on the schematic, so running one is enough to see it, and a
- *          new transient plays from its start.
+ * @brief   A new result of any analysis, or a failed run, opens the Output window on its tab, in front unless the user
+ *          turned that off; the operating point and the transient also show on the schematic, so running one is enough
+ *          to see it, and a new transient plays from its start.
  * @details Versions also change when results are dropped, which opens nothing.
  */
 void Application::ShowNewResults() {
@@ -510,6 +510,12 @@ void Application::ShowNewResults() {
     // After the analyses, so the table of a Monte Carlo run is what shows in front of the traces it came with
     show_if_new(m_ShownMonteCarloVersion, m_Schematic.GetMonteCarloVersion(), m_Schematic.GetMonteCarlo().has_value(),
                 PlotTab::MONTE_CARLO);
+    const std::optional<Analysis> last_run = m_AnalysisControls.GetLastRun();
+    if (std::exchange(m_ShownRunCount, m_AnalysisControls.GetFinishedRunCount()) !=
+            m_AnalysisControls.GetFinishedRunCount() &&
+        last_run && m_AnalysisControls.GetOutcome(*last_run) == RunOutcome::FAILED) {
+        m_OutputWindow.ShowTab(GetAnalysisTab(*last_run));
+    }
 }
 
 /**

@@ -117,6 +117,8 @@ private:
     // Tabs
     bool DrawTabs(const FrameResults &frame);
     TabResults FindTabResults() const;
+    std::optional<Analysis> FindFailedAnalysis(PlotTab tab) const;
+    void DrawRunFailure(Analysis analysis) const;
     void DrawTab(PlotTab tab, const FrameResults &frame);
     void DrawOtherAnalyses(float width);
 
