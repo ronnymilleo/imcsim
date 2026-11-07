@@ -5,9 +5,14 @@ How to read what imcsim measures, plots and exports. The [README](../README.md) 
 
 ## Editing
 
-- **Toolbar**: Select, Wire (W) and Probe (P) on the left, then the parts, each button showing its symbol. Sources,
-  diodes, transistors, controlled sources and the adjustable parts share one button per group: it places the part last picked, and the
-  arrow beside it (or a right click) lists the others. Hover a button for its name and shortcut.
+- **Command bar**: one row under the menu, across the window. Select, Wire (W) and Probe (P), then Undo, Redo and Fit
+  on the left, the part search after them, and the analysis, Live and Run (F5) at the right end, where Run stays
+  whatever the size of the window. Hover a button for its name and shortcut.
+- **Part rail**: the column of part buttons down the left of the schematic, each showing its symbol. The resistor,
+  capacitor, inductor, ground and op-amp have a button each; sources, supplies and labels, diodes, transistors,
+  controlled sources, adjustable parts, switches, logic inputs and outputs, gates, flip-flops and the ready logic
+  blocks share one button per group, marked in its corner: a click places the part last picked, and holding it (or a
+  right click) lists the others beside the rail. The button at the bottom goes to the part search.
 - **Editing a part**: double-click it, or select it and press Enter, to open its properties at the top of the
   schematic; edits apply as you type, and Enter, Esc or a click outside closes them. With a part selected, typing a
   number starts editing its main value right away: `4k7` and Enter make a resistor 4.7k. Values take SPICE suffixes, and a whole
@@ -33,7 +38,7 @@ How to read what imcsim measures, plots and exports. The [README](../README.md) 
 - **Switches that follow a voltage**: a voltage-controlled switch has its threshold, hysteresis and resistances in its
   properties, and a relay its coil and contact figures. Both are drawn open, since they open and close during a run.
   The Switching examples use them: a buck converter and a relay driver with a flyback diode.
-- **Fuses**: a fuse is in the Switches and fuses group of the toolbar. Its properties pick a ready fuse (100 mA, 500 mA,
+- **Fuses**: a fuse is in the Switches and fuses group of the part rail. Its properties pick a ready fuse (100 mA, 500 mA,
   1 A and 5 A fast, 1 A slow-blow) or set its rated current, melting I2t and cold and blown resistance, and show the
   cooling time constant they imply. A fuse carries its rated current for ever and blows above it, open for the rest of
   the run: the branch loses its current at that instant, the symbol breaks with a gap, and the Output window warns when
@@ -42,7 +47,7 @@ How to read what imcsim measures, plots and exports. The [README](../README.md) 
 - **Transformers**: the value of a transformer is its primary inductance, and its properties set the turns ratio, the
   coupling and the resistance of the windings. The secondary needs a path to ground, such as the bridge of the
   Transformers examples.
-- **Logic gates and flip-flops**: the toolbar has a button for the gates and one for the flip-flops, and Space finds
+- **Logic gates and flip-flops**: the part rail has a button for the gates and one for the flip-flops, and the part search finds
   them by name (`nand`, `flip`). A part has a logic level and a delay in its properties; it reads 1 above 70% of its
   level and 0 below 30%, and an input left unconnected reads 0. AND, OR, NAND, NOR, XOR and XNOR also have an
   **Inputs** setting from 2 to 8. The body grows downward, one input at a time, and adding one leaves the wired inputs
@@ -116,10 +121,11 @@ How to read what imcsim measures, plots and exports. The [README](../README.md) 
 - **Right click**: on a part, its properties, rotate, mirror, flip, measure its current and delete; on a wire,
   measure its voltage and delete; on empty canvas, find a part, run and fit. Right click on an item of a selected
   group keeps the group, and the menu acts on all of it.
-- **Fit**: the frame button in the toolbar, or Home, shows the whole schematic.
-- **Find a part**: press Space over the editor, type part of a name (`mos`, `zener`, `opamp`, `nmos`, `vcvs`), move
-  with Up and Down, and press Enter to start placing it.
-- **Running**: the ▶ button at the end of the toolbar, or F5, runs the analysis named beside it. That button opens
+- **Fit**: the frame button in the command bar, or Home, shows the whole schematic.
+- **Find a part**: press Space over the editor, or click the search field in the command bar, type part of a name
+  (`mos`, `zener`, `opamp`, `nmos`, `vcvs`), move through the list below it with Up and Down, and press Enter or click
+  a match to start placing it; the editor then takes the keys again, so R turns the part at once. Esc leaves the field.
+- **Running**: the ▶ button at the right end of the command bar, or F5, runs the analysis named before Live. That button opens
   the list of analyses (operating point, transient, AC sweep, DC sweep, noise, transfer function, sensitivity, poles and zeros, S-parameters and truth table) and the settings
   of the one picked, saved with the schematic. Suggest fills the transient times (five periods of the slowest source with a waveform, 200
   points in a period of the fastest) or the AC range (two decades past the RC, RL and LC corners and the op-amp
@@ -183,7 +189,7 @@ How to read what imcsim measures, plots and exports. The [README](../README.md) 
 A block groups part of a schematic into a part of its own, with pins, which can be placed as many times as needed. The
 schematic file keeps the definition of each block, so it opens anywhere without other files.
 
-- **Pins**: a Block pin marker (in the supplies group of the toolbar, or Space and `pin`) marks a node of the circuit
+- **Pins**: a Block pin marker (in the supplies and labels group of the part rail, or the part search and `pin`) marks a node of the circuit
   as a pin of the block. Its square stands for the edge of the block and its arrow points from that edge into the
   circuit: a marker whose arrow points right puts its pin on the left of the block, one pointing left on the right, one
   pointing down on the top and one pointing up on the bottom. Name it in its properties (a letter or `_`, then letters,
@@ -216,7 +222,7 @@ schematic file keeps the definition of each block, so it opens anywhere without 
   block to go one level down; the path leads back up a level at a time, each one applied on the way. A block can never
   hold itself, directly or through another block: the part search leaves those out, and a paste or an apply that would
   make one is refused.
-- **Ready logic blocks**: the toolbar button after the flip-flops places one of eight blocks built from the gates and
+- **Ready logic blocks**: the rail button after the flip-flops places one of eight blocks built from the gates and
   flip-flops, the last one picked from its list, and the part search lists them as `Logic block: ...`:
   - a 4-bit counter (a ripple counter whose Q3 Q2 Q1 Q0 count the rising edges of CLK);
   - a 4-bit shift register (each rising edge of CLK moves IN into Q0 and each Q on);
@@ -478,7 +484,7 @@ Sallen-Key low-pass filter.
 
 Plots start empty; pick what to measure in either place:
 
-- **Probe tool** (toolbar button or P): click a wire to measure the voltage of its node, a part to measure its current,
+- **Probe tool** (command bar button or P): click a wire to measure the voltage of its node, a part to measure its current,
   or a transistor near one of its terminals to measure that terminal's current. Clicking a measured item again stops
   measuring it.
 - **Trace list** in the Output window: check voltages `V(n)` and currents `I(name)`, or use All and None.

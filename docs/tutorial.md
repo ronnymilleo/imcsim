@@ -11,21 +11,21 @@ the output sags until the next pulse. That sag, the ripple, is what the plots me
 
 ## 1. Draw a circuit
 
-Start with File > New (Ctrl+N; on macOS, every Ctrl shortcut is Cmd). The window is the schematic editor: a toolbar
-on top, the grid in the middle and a status bar at the bottom that always lists the keys of what you are doing.
+Start with File > New (Ctrl+N; on macOS, every Ctrl shortcut is Cmd). Under the menu, the command bar holds Select, Wire and Probe, then Undo, Redo and Fit, the part search, and at its
+right end the analysis to run, Live and Run. Below it, the schematic editor has the part rail down its left, the grid
+in the middle and a status bar at the bottom that tells how the last run went and the keys of what you are doing.
 
-The toolbar groups its buttons:
+The part rail groups the parts:
 
-- Select, Wire and Probe, then Undo, Redo and Fit;
 - resistor, capacitor and inductor;
-- ground, VCC, the net label, the block pin, the logic input and output and the 7-segment display;
-- sources, diodes, transistors, controlled sources, adjustable parts (potentiometer and transformer), switches (switch,
-  push button, voltage-controlled switch and relay), logic gates and flip-flops, and the ready logic blocks, each a
-  button with a dropdown arrow beside it that picks the part it places;
-- the op-amp;
-- Run, with the analysis it runs.
+- ground, the sources and the supplies and labels (VCC, net label and block pin);
+- diodes, transistors, the op-amp and the controlled sources;
+- adjustable parts (potentiometer and transformer) and switches (switch, push button, voltage-controlled switch, relay
+  and fuse);
+- logic inputs and outputs, gates, flip-flops and the ready logic blocks.
 
-Hover any button for its name and shortcut.
+A button with a mark in its corner is a group: a click places the part last picked, and holding it or a right click
+lists the others. Hover any button for its name and shortcut.
 
 ![The completed source, resistor, capacitor and ground circuit](images/tutorial_build.png)
 
@@ -43,8 +43,9 @@ meet. Press Esc to leave wire mode; Ctrl+Z undoes any step.
 
 ## 2. Find a part
 
-Instead of the toolbar, press Space over the editor and type part of a name, such as `dio`, `cap` or `mos`. Up and
-Down move through the list and Enter, or a click, starts placing the part, which can be rotated with R before the
+Instead of the rail, press Space over the editor, or click the search field in the command bar, and type part of a
+name, such as `dio`, `cap` or `mos`. Up and Down move through the list below the field and Enter, or a click, starts
+placing the part, which can be rotated with R before the
 click that places it.
 
 Start over with File > New and draw the rectifier: a voltage source, a diode found with `dio` to the right of it, a
@@ -81,7 +82,7 @@ Press Esc to leave probe mode. You can also pick traces later in the Output wind
 
 ## 5. Run
 
-The button beside Run names the analysis it runs. Click it to open the analysis list with the settings of the
+The button before Live and Run names the analysis Run runs. Click it to open the analysis list with the settings of the
 selected one: pick Transient and click Suggest, which proposes settings from the sources and parts, here five periods
 of the source (5 ms) with a 5 µs step.
 
