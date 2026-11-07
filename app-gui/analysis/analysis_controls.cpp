@@ -13,6 +13,7 @@
 #include "simulation/circuit_copy.h"
 #include "simulation/monte_carlo.h"
 #include <algorithm>
+#include <chrono>
 #include <expected>
 #include <format>
 #include <iterator>
@@ -498,6 +499,16 @@ const std::optional<std::string> &AnalysisControls::GetError(const Analysis anal
 }
 
 /**
+ * @brief   How long the last run of an analysis took, from Run to its result.
+ * @param[in] analysis  The analysis.
+ * @return  The wall time in seconds, or none before a run, for a run refused before it started, and for a live run,
+ *          which keeps pace with the clock.
+ */
+std::optional<double> AnalysisControls::GetRunSeconds(const Analysis analysis) const {
+    return m_Statuses[ToIndex(analysis)].Seconds;
+}
+
+/**
  * @brief   Draws what the last run of an analysis reported: its error or its warnings, and the ngspice output.
  * @param[in] analysis  Analysis whose last run is shown.
  */
@@ -537,6 +548,7 @@ void AnalysisControls::DrawRunReport(const Analysis analysis) const {
  */
 void AnalysisControls::StartRun(const Analysis analysis, Core::Job job) {
     m_RunCircuitVersion = m_Schematic.GetCircuitVersion();
+    m_RunStart = std::chrono::steady_clock::now();
     m_RunningAnalysis = analysis;
     m_Service.Submit(std::move(job));
 }
@@ -1050,7 +1062,10 @@ void AnalysisControls::ClearResult(const Analysis analysis) {
 
 void AnalysisControls::Finish(const Analysis analysis, std::optional<std::string> error,
                               std::vector<Core::SimulatorMessage> messages) {
-    m_Statuses[ToIndex(analysis)] = {.Error = std::move(error), .Messages = std::move(messages)};
+    const std::chrono::duration<double> elapsed = std::chrono::steady_clock::now() - m_RunStart;
+    m_Statuses[ToIndex(analysis)] = {.Error = std::move(error),
+                                     .Messages = std::move(messages),
+                                     .Seconds = m_IsLiveRun ? std::nullopt : std::optional(elapsed.count())};
     m_LastRun = analysis;
 }
 

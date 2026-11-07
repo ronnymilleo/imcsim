@@ -82,13 +82,32 @@ std::string FormatLiveProgress(const AnalysisControls &controls, const std::opti
  */
 struct RunStatusLine {
     std::string Text;
-    /// What follows the state in a muted color, such as the reason a run failed, or empty.
+    /// What follows the state in a muted color, such as the time a run took or the reason it failed, or empty.
     std::string Detail;
     ImVec4 Color;
     bool IsRunning = false;
     /// Text as wide as the line can get, whose width it keeps so it does not shift as its figures change, or empty.
     std::string_view WidestText;
+    /// Whether the detail is worth more than the hint, as the reason of a failure is, and takes the whole line.
+    bool TakesWholeLine = false;
 };
+
+/**
+ * @brief   "2000 points in 41ms" for a transient, "41ms" for another analysis: how much the last run made and how long
+ * it took, or empty when the run was live and kept pace with the clock.
+ */
+std::string DescribeRunCost(const AnalysisControls &controls, const Analysis analysis,
+                            const std::optional<Core::Transient> &transient) {
+    const std::optional<double> seconds = controls.GetRunSeconds(analysis);
+    if (!seconds) {
+        return {};
+    }
+    const std::string time = std::format("{}s", Core::FormatValue(*seconds));
+    if (analysis == Analysis::TRANSIENT && transient) {
+        return std::format("{} points in {}", transient->Times.size(), time);
+    }
+    return time;
+}
 
 /**
  * @brief   What the last run reported, in the color its outcome asks for; a run in progress takes the place of that
@@ -114,10 +133,15 @@ RunStatusLine DescribeRunStatus(const AnalysisControls &controls, const std::opt
     const std::string_view name = GetAnalysisName(*last_run);
     switch (controls.GetOutcome(*last_run)) {
     case RunOutcome::SUCCEEDED:
-        return {.Text = std::format("{} done", name), .Color = plain, .IsRunning = false};
+        return {.Text = std::format("{} done", name),
+                .Detail = DescribeRunCost(controls, *last_run, transient),
+                .Color = plain,
+                .IsRunning = false};
     case RunOutcome::SUCCEEDED_WITH_WARNINGS:
-        return {
-            .Text = std::format("{} done, with warnings", name), .Color = GetWarningTextColor(), .IsRunning = false};
+        return {.Text = std::format("{} done, with warnings", name),
+                .Detail = DescribeRunCost(controls, *last_run, transient),
+                .Color = GetWarningTextColor(),
+                .IsRunning = false};
     case RunOutcome::STOPPED:
         return {.Text = std::format("{} stopped", name), .Color = plain, .IsRunning = false};
     case RunOutcome::FAILED: {
@@ -125,7 +149,8 @@ RunStatusLine DescribeRunStatus(const AnalysisControls &controls, const std::opt
         return {.Text = std::format("{} failed", name),
                 .Detail = error ? std::string(GetFirstLine(*error)) : std::string(),
                 .Color = GetErrorTextColor(),
-                .IsRunning = false};
+                .IsRunning = false,
+                .TakesWholeLine = true};
     }
     case RunOutcome::NONE:
     default:
@@ -678,7 +703,7 @@ void EditorWindow::DrawStatusBar(const ViewTransform &view, const bool hovered) 
     ImGui::SetCursorScreenPos(line_start);
     // The reason of a failure is worth more than the hint, so it takes the whole line
     const RunStatusLine line = DescribeRunStatus(m_Controls, m_Schematic->GetTransient());
-    if (!line.Detail.empty()) {
+    if (line.TakesWholeLine) {
         DrawRunStatus(line, m_Controls, right_edge);
         return;
     }
