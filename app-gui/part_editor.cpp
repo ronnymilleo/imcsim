@@ -1259,17 +1259,23 @@ void PartEditor::DrawSource(Core::Source &source) {
 }
 
 /**
- * @brief   Draws the choice of waveform of a source, one radio button per kind, on two rows.
+ * @brief   Draws the choice of waveform of a source, one radio button per kind, in rows as wide as the window.
  * @param[in,out] source  Source whose waveform is chosen.
  */
 void PartEditor::DrawSourceTypes(Core::Source &source) {
     using SourceType = Core::Source::SourceType;
+    const ImGuiStyle &style = ImGui::GetStyle();
+    const float right_edge = ImGui::GetCursorScreenPos().x + ImGui::GetContentRegionAvail().x;
+    bool is_first = true;
     for (const SourceType type : {SourceType::DC, SourceType::AC, SourceType::PULSE, SourceType::EXP, SourceType::SFFM,
                                   SourceType::AM, SourceType::PWL, SourceType::NOISE, SourceType::RANDOM}) {
-        // Nine buttons do not fit one row
-        if (type != SourceType::DC && type != SourceType::NOISE) {
+        const float button_width =
+            ImGui::GetFrameHeight() + style.ItemInnerSpacing.x + ImGui::CalcTextSize(Core::GetSourceTypeName(type)).x;
+        // A button that would cross the edge starts the next row, so a narrow Properties column cuts none of them
+        if (!is_first && ImGui::GetItemRectMax().x + style.ItemSpacing.x + button_width <= right_edge) {
             ImGui::SameLine();
         }
+        is_first = false;
         if (ImGui::RadioButton(Core::GetSourceTypeName(type), source.GetSourceType() == type) &&
             source.GetSourceType() != type) {
             source.SetSourceType(type);
