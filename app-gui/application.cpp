@@ -35,6 +35,14 @@ namespace {
 /// Wrap width of the example descriptions, in characters of the current font size.
 constexpr float EXAMPLE_TOOLTIP_WIDTH = 30.0f;
 
+// Default layout, as shares of the space being split
+/// Width of the side column that holds Properties, the analysis settings and the netlist.
+constexpr float SIDE_COLUMN_SHARE = 0.22f;
+/// Width of Output beside the schematic, which takes the rest.
+constexpr float OUTPUT_SHARE = 0.5f;
+/// Height of the analysis settings and the netlist under Properties.
+constexpr float SIDE_BOTTOM_SHARE = 0.45f;
+
 // Debug builds ask for the validation layers of the GPU API; SDL runs without them when they are not installed
 #ifdef NDEBUG
 constexpr bool GPU_DEBUG_MODE = false;
@@ -524,23 +532,26 @@ void Application::RerunAfterEdits() {
 }
 
 /**
- * @brief   The editor, Output, Analysis Settings and Netlist share the main node as tabs, and Properties sits on the
- *          right.
- * @details Only the editor starts open: the View menu opens the others in their place, and each result brings Output to
- *          the front. Must run before the windows are drawn. A split returns the new node in the given direction and
- *          leaves the rest in its last argument.
+ * @brief   The editor and Output sit side by side, and a column on the right holds Properties over Analysis Settings
+ *          and Netlist, which share a node as tabs.
+ * @details Only the editor starts open, filling the window, since ImGui folds away the node of a closed window: the
+ *          first result opens Output beside the schematic, and the View menu opens the others in their place. Must run
+ *          before the windows are drawn. A split returns the new node in the given direction and leaves the rest in
+ *          its last argument.
  */
 void Application::SetupDefaultLayout(ImGuiID dockspace_id) {
     ImGui::DockBuilderSetNodeSize(dockspace_id, ImGui::GetMainViewport()->WorkSize);
-    ImGuiID main_id = dockspace_id;
-    const ImGuiID properties_id = ImGui::DockBuilderSplitNode(main_id, ImGuiDir_Right, 0.25f, nullptr, &main_id);
-    // The other windows share the main node as tabs
-    const std::array<const AppWindow *, 4> tabbed_windows{&m_EditorWindow, &m_OutputWindow, &m_SimulationWindow,
-                                                          &m_NetlistWindow};
-    for (const AppWindow *window : tabbed_windows) {
-        ImGui::DockBuilderDockWindow(window->GetWindowTitle().c_str(), main_id);
-    }
+    ImGuiID editor_id = dockspace_id;
+    ImGuiID properties_id =
+        ImGui::DockBuilderSplitNode(editor_id, ImGuiDir_Right, SIDE_COLUMN_SHARE, nullptr, &editor_id);
+    const ImGuiID settings_id =
+        ImGui::DockBuilderSplitNode(properties_id, ImGuiDir_Down, SIDE_BOTTOM_SHARE, nullptr, &properties_id);
+    const ImGuiID output_id = ImGui::DockBuilderSplitNode(editor_id, ImGuiDir_Right, OUTPUT_SHARE, nullptr, &editor_id);
+    ImGui::DockBuilderDockWindow(m_EditorWindow.GetWindowTitle().c_str(), editor_id);
+    ImGui::DockBuilderDockWindow(m_OutputWindow.GetWindowTitle().c_str(), output_id);
     ImGui::DockBuilderDockWindow(m_PropertiesWindow.GetWindowTitle().c_str(), properties_id);
+    ImGui::DockBuilderDockWindow(m_SimulationWindow.GetWindowTitle().c_str(), settings_id);
+    ImGui::DockBuilderDockWindow(m_NetlistWindow.GetWindowTitle().c_str(), settings_id);
     ImGui::DockBuilderFinish(dockspace_id);
 }
 
