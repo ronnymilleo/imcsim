@@ -1,7 +1,10 @@
 name: CI
 
+# A pull request runs the checks on its branch, so a push runs them only on the branches that take merges; with both
+# on every push, each push to a pull request ran everything twice
 on:
   push:
+    branches: [main, develop]
   pull_request:
 
 permissions:
@@ -23,6 +26,9 @@ env:
   # Compiled objects are kept between runs, so a push only recompiles what changed
   CCACHE_MAXSIZE: 500M
   COMPILER_LAUNCHER: -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+  # Every test case is a process of its own and ngspice is global only within one, so the tests run side by side; the
+  # runners have 3 or 4 cores
+  CTEST_PARALLEL_LEVEL: 4
 
 jobs:
   linux:
@@ -79,14 +85,44 @@ jobs:
         env:
           COVERALLS_REPO_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Compiler cache statistics
+        run: ccache --show-stats
+
+  # clang-tidy takes longer than the build and the tests together, so it runs beside them; it needs a build for the
+  # compile database and the generated headers, which the compiler cache of its own makes quick
+  linux-naming:
+    runs-on: ubuntu-latest
+    container: archlinux:latest
+    steps:
+      - name: Install build dependencies
+        run: pacman -Syu --noconfirm --needed $PACKAGES
+
+      - name: Check out the repository
+        uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - name: Locate the compiler cache
+        run: echo "CCACHE_DIR=$GITHUB_WORKSPACE/.ccache" >> "$GITHUB_ENV"
+
+      - name: Restore the compiler cache
+        uses: actions/cache@v6
+        with:
+          path: .ccache
+          key: ccache-naming-${{ github.sha }}
+          restore-keys: ccache-naming-
+
+      - name: Configure
+        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug -DBUILD_TESTS=ON $COMPILER_LAUNCHER
+
+      - name: Build
+        run: cmake --build build
+
       # One clang-tidy per core, on the sources of the project only (the vendor libraries are in the database too)
       - name: Check naming
         run: >-
           run-clang-tidy -p build -quiet -j "$(nproc)" -warnings-as-errors='*'
           '/(app-core|app-gui|tests)/|/main\.cpp$'
-
-      - name: Compiler cache statistics
-        run: ccache --show-stats
 
   linux-sanitizers:
     runs-on: ubuntu-latest
@@ -177,11 +213,26 @@ jobs:
       - name: Set up the MSVC environment
         uses: ilammy/msvc-dev-cmd@v1
 
+      # sccache keeps the compiled objects in the GitHub cache, as ccache does for the Linux jobs
+      - name: Set up the compiler cache
+        uses: mozilla-actions/sccache-action@v0.0.9
+
+      # sccache cannot cache objects whose debug information goes to a shared PDB (/Zi), so it is embedded (/Z7)
       - name: Configure
-        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug -DBUILD_TESTS=ON
+        run: >-
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug -DBUILD_TESTS=ON
+          -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache
+          -DCMAKE_MSVC_DEBUG_INFORMATION_FORMAT=Embedded
+        env:
+          SCCACHE_GHA_ENABLED: "true"
 
       - name: Build
         run: cmake --build build
+        env:
+          SCCACHE_GHA_ENABLED: "true"
+
+      - name: Compiler cache statistics
+        run: sccache --show-stats
 
       - name: Run tests
         run: ctest --test-dir build --output-on-failure
@@ -192,18 +243,31 @@ jobs:
     runs-on: macos-26
     steps:
       - name: Install build dependencies
-        run: brew install cmake ninja pkgconf libngspice
+        run: brew install cmake ninja pkgconf libngspice ccache
 
       - name: Check out the repository
         uses: actions/checkout@v7
         with:
           submodules: recursive
 
+      - name: Locate the compiler cache
+        run: echo "CCACHE_DIR=$GITHUB_WORKSPACE/.ccache" >> "$GITHUB_ENV"
+
+      - name: Restore the compiler cache
+        uses: actions/cache@v6
+        with:
+          path: .ccache
+          key: ccache-macos-${{ github.sha }}
+          restore-keys: ccache-macos-
+
       - name: Configure
-        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug -DBUILD_TESTS=ON
+        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug -DBUILD_TESTS=ON $COMPILER_LAUNCHER
 
       - name: Build
         run: cmake --build build
+
+      - name: Compiler cache statistics
+        run: ccache --show-stats
 
       - name: Run tests
         run: ctest --test-dir build --output-on-failure
