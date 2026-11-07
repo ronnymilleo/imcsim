@@ -99,6 +99,8 @@ private:
     std::optional<PlotTab> m_TabToShow;
     /// The tab the user is on, which the bar keeps while its result is gone; none before the first result.
     std::optional<PlotTab> m_KeptTab;
+    /// The tabs without a result, which More lists.
+    std::vector<PlotTab> m_OtherTabs;
 
     PlotExporter m_Exporter;
 
@@ -116,7 +118,7 @@ private:
     bool DrawTabs(const FrameResults &frame);
     TabResults FindTabResults() const;
     void DrawTab(PlotTab tab, const FrameResults &frame);
-    void DrawOtherAnalyses(const std::vector<PlotTab> &others);
+    void DrawOtherAnalyses(float width);
 
     // Export
     void DrawExportButton(ImVec2 tab_row, float tab_row_width, float export_width, const FrameResults &frame);

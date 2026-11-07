@@ -27,6 +27,8 @@ constexpr float TRACE_LIST_WIDTH = 8.0f;
 constexpr ImVec2 INITIAL_SIZE = {65.0f, 35.0f};
 /// ImPlot adds half of it on each side, so 0.4 leaves 20% of the data range above and below the curves.
 constexpr ImVec2 FIT_PADDING = {0.0f, 0.4f};
+/// The button that lists the analyses without a result.
+constexpr const char *MORE_LABEL = "More";
 constexpr const char *EXPORT_LABEL = "Export...";
 
 /**
@@ -175,7 +177,10 @@ void OutputWindow::Draw() {
     const ImVec2 tab_row = ImGui::GetCursorScreenPos();
     const float tab_row_width = ImGui::GetContentRegionAvail().x;
     const float export_width = ImGui::CalcTextSize(EXPORT_LABEL).x + ImGui::GetStyle().FramePadding.x * 2.0f;
-    if (!BeginTabBarBefore("plots", export_width + ImGui::GetStyle().ItemSpacing.x)) {
+    const float more_width = ImGui::CalcTextSize(MORE_LABEL).x + ImGui::GetStyle().FramePadding.x * 2.0f;
+    const float spacing = ImGui::GetStyle().ItemSpacing.x;
+    // More and Export sit after the tabs, outside the bar, so the tabs with results keep the rest of the row
+    if (!BeginTabBarBefore("plots", more_width + export_width + spacing * 2.0f)) {
         ImGui::EndChild();
         return;
     }
@@ -189,6 +194,8 @@ void OutputWindow::Draw() {
     if (!has_tabs) {
         ImGui::TextDisabled("Run an analysis (F5) to see its results here; pick it beside Run in the editor");
     }
+    ImGui::SetCursorScreenPos({tab_row.x + tab_row_width - export_width - spacing - more_width, tab_row.y});
+    DrawOtherAnalyses(more_width);
     DrawExportButton(tab_row, tab_row_width, export_width, frame);
     ImGui::EndChild();
 }
@@ -407,7 +414,7 @@ bool OutputWindow::DrawTabs(const FrameResults &frame) {
         DrawTab(tab, frame);
         ImGui::EndTabItem();
     }
-    DrawOtherAnalyses(listing.Others);
+    m_OtherTabs = listing.Others;
     return !listing.Shown.empty();
 }
 
@@ -486,28 +493,24 @@ void OutputWindow::DrawTab(const PlotTab tab, const FrameResults &frame) {
 }
 
 /**
- * @brief   A button after the tabs that lists the analyses without a result; picking one opens its tab, which tells
- *          how to run it.
- * @param[in] others  The tabs the bar leaves out.
+ * @brief   A button between the tabs and Export that lists the analyses without a result; picking one opens its tab,
+ *          which tells how to run it.
+ * @param[in] width  Width of the button, which the tab bar left free.
  */
-void OutputWindow::DrawOtherAnalyses(const std::vector<PlotTab> &others) {
-    if (others.empty()) {
-        return;
-    }
-    const std::string label = std::format("Other analyses ({})", others.size());
-    // Muted and without a tab fill, so it reads as a menu rather than one more page
-    ImGui::PushStyleColor(ImGuiCol_Tab, IM_COL32(0, 0, 0, 0));
-    ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
-    const bool is_pressed =
-        ImGui::TabItemButton(label.c_str(), ImGuiTabItemFlags_Trailing | ImGuiTabItemFlags_NoTooltip);
-    ImGui::PopStyleColor(2);
-    ImGui::SetItemTooltip("Analyses without a result yet; pick one to see how to run it");
+void OutputWindow::DrawOtherAnalyses(const float width) {
+    ImGui::BeginDisabled(m_OtherTabs.empty());
+    const bool is_pressed = ImGui::Button(MORE_LABEL, {width, 0.0f});
+    ImGui::EndDisabled();
+    ImGui::SetItemTooltip(
+        "%s", std::format("{} other analyses, without a result yet; pick one to see how to run it", m_OtherTabs.size())
+                  .c_str());
     if (is_pressed) {
+        ImGui::SetNextWindowPos({ImGui::GetItemRectMin().x, ImGui::GetItemRectMax().y});
         ImGui::OpenPopup("other_analyses");
     }
     if (ImGui::BeginPopup("other_analyses")) {
         ImGui::TextDisabled("No result yet");
-        for (const PlotTab tab : others) {
+        for (const PlotTab tab : m_OtherTabs) {
             if (ImGui::Selectable(GetTabLabel(tab))) {
                 m_TabToShow = tab;
             }
