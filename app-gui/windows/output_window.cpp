@@ -29,7 +29,7 @@ constexpr ImVec2 INITIAL_SIZE = {65.0f, 35.0f};
 /// ImPlot adds half of it on each side, so 0.4 leaves 20% of the data range above and below the curves.
 constexpr ImVec2 FIT_PADDING = {0.0f, 0.4f};
 /// The button that lists the analyses without a result.
-constexpr const char *MORE_LABEL = "More";
+constexpr const char *MORE_LABEL = "More analyses";
 constexpr const char *EXPORT_LABEL = "Export...";
 
 /**
