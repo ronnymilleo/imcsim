@@ -28,7 +28,7 @@ namespace GUI {
 namespace {
 
 /// Width of the field for the size of the window, in font sizes.
-constexpr float WINDOW_SIZE_WIDTH = 8.0f;
+constexpr float WINDOW_SIZE_WIDTH = 4.5f;
 /// How many points a pixel of dragging adds to the size of the window.
 constexpr float WINDOW_SIZE_DRAG_SPEED = 20.0f;
 /// The instant of the transient shown on the schematic.
@@ -325,8 +325,15 @@ void TransientTab::DrawWindowControls(const Core::Transient &shown) {
         }
         ImGui::SetItemTooltip("Keep the window on the newest points of the run");
     }
-    ImGui::SetCursorPos({row_start.x + (width - ImGui::CalcTextSize(span.c_str()).x) / 2.0f, row_start.y});
-    ImGui::TextDisabled("%s", span.c_str());
+    if (m_Controls.IsRunning()) {
+        ImGui::SameLine(0.0f, ImGui::GetFontSize());
+    } else {
+        ImGui::SetCursorPos(row_start);
+    }
+    ImGui::AlignTextToFramePadding();
+    ImGui::TextDisabled("Range");
+    ImGui::SameLine();
+    ImGui::TextUnformatted(span.c_str());
     // A live run is seen a stop time at a time, so its window has no size to pick
     if (!has_span) {
         DrawWindowSize(row_start, width);
@@ -346,16 +353,20 @@ void TransientTab::DrawWindowControls(const Core::Transient &shown) {
 }
 
 /**
- * @brief   The size of the window, at the right end of the row above its scroll bar.
+ * @brief   The size of the window, labeled, at the right end of the row above its scroll bar.
  */
 void TransientTab::DrawWindowSize(const ImVec2 row_start, const float width) {
     TransientWindow &window = m_Playback.Window;
     const float size_width = ImGui::GetFontSize() * WINDOW_SIZE_WIDTH;
-    ImGui::SetCursorPos({row_start.x + width - size_width, row_start.y});
+    const float label_width = ImGui::CalcTextSize("Points").x + ImGui::GetStyle().ItemSpacing.x;
+    ImGui::SetCursorPos({row_start.x + width - size_width - label_width, row_start.y});
+    ImGui::AlignTextToFramePadding();
+    ImGui::TextDisabled("Points");
+    ImGui::SameLine();
     ImGui::SetNextItemWidth(size_width);
     int points = window.GetPoints();
-    if (ImGui::DragInt("##window_points", &points, WINDOW_SIZE_DRAG_SPEED, MIN_WINDOW_POINTS, MAX_WINDOW_POINTS,
-                       "%d points", ImGuiSliderFlags_AlwaysClamp)) {
+    if (ImGui::DragInt("##window_points", &points, WINDOW_SIZE_DRAG_SPEED, MIN_WINDOW_POINTS, MAX_WINDOW_POINTS, "%d",
+                       ImGuiSliderFlags_AlwaysClamp)) {
         window.SetPoints(points);
     }
     ImGui::SetItemTooltip("%s", std::format("How many points the plot and the schematic show at a time, from {} to "
