@@ -95,9 +95,9 @@ for a mean of about 3.88 V. I(D1) is a train of spikes: the source has no resist
 edge refills the capacitor through the diode in a burst of about 1.9 A, and the first, from an empty capacitor,
 reaches 3.8 A. The panel lists the peak-to-peak, mean, RMS and frequency of each trace.
 
-Back on the schematic, a bar above the canvas holds the instant it shows: Play runs through the transient, with the
-voltage labels and, under View > Wire Colors > Current, the wires following each spike. Drag the slider, or the red
-line on the plot, to stop at any instant.
+The schematic shows one instant of the transient, written at the top left of the canvas. A bar under the plot moves
+it: Play runs through the transient, with the voltages and, under View > Wire Colors > Current, the wires following
+each spike. Drag the slider, or the red line on the plot, to stop at any instant.
 
 Every window can float or dock: drag it by its title or tab and drop it on one of the arrows that appear, to place it
 beside, above or below another window or as a tab of it. The layout is kept for the next session, and View > Reset

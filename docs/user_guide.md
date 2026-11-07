@@ -294,10 +294,10 @@ right of an upright one, on a small box led by a dot of the node color, so it re
 ## Transient on the schematic
 
 After a transient run, the schematic shows the circuit at one instant of it, with the same colors, labels and live
-effects as an operating point. A bar above the canvas moves that instant: **Play** plays the whole run in about five
-seconds (**Loop** starts it over), and the slider picks any instant and stops the playback where you drop it. In the
-Output window, the red line on the transient plot is the same instant: drag it to move the schematic, and it moves by
-itself while the schematic plays.
+effects as an operating point, and writes that instant at the top left of the canvas. A bar under the transient plot of
+the Output window moves it: **Play** plays the whole run in about five seconds (**Loop** starts it over), and the
+slider picks any instant and stops the playback where you drop it. The red line on the plot above is the same
+instant: drag it to move the schematic, and it moves by itself while the schematic plays.
 
 The colors keep one scale for the whole run, from its lowest to its highest voltage and its largest current and power,
 so a value keeps its color from one instant to the next. A new result starts again at the beginning of the run, paused.
