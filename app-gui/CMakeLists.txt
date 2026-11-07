@@ -130,6 +130,7 @@ add_library(imcsim-gui-lib
             windows/output_tabs/transient_tab.cpp
             windows/output_window.cpp
             windows/part_picker.cpp
+            windows/part_rail.cpp
             windows/preferences_window.cpp
             windows/properties_window.cpp
             windows/simulation_window.cpp

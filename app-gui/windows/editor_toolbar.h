@@ -60,20 +60,6 @@ private:
     /// The document, whose simulation settings name the analysis Run starts.
     const Schematic &m_RootSchematic;
     const Preferences &m_Preferences;
-    /// Part each toolbar group places, the last one picked from its list.
-    std::vector<Core::ComponentType> m_PartGroupChoices;
-    /// An instance of each ready block, read once, which its button and its row draw as their icon.
-    std::vector<std::unique_ptr<UIElement>> m_ReadyBlockIcons;
-    /// The ready block the button places, the last one picked from its list.
-    std::size_t m_ReadyBlockChoice = 0;
-
-    // Parts
-    std::optional<EditorMode> DrawParts(const EditorMode &mode, const std::function<void(float, float)> &place);
-    bool DrawPartButton(Core::ComponentType type, const EditorMode &mode);
-    std::optional<Core::ComponentType> DrawPartGroup(std::size_t index, const EditorMode &mode);
-    std::optional<EditorMode> DrawReadyBlockGroup();
-    void DrawReadyBlockIcon(std::size_t index, ImVec2 center) const;
-
     // Simulation
     void DrawRunControls();
     void DrawAnalysisButton(float run_left);

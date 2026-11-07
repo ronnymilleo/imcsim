@@ -29,6 +29,7 @@
 #include "windows/app_window.h"
 #include "windows/editor_toolbar.h"
 #include "windows/part_picker.h"
+#include "windows/part_rail.h"
 #include "windows/spice_block_dialog.h"
 #include <cstddef>
 #include <filesystem>
@@ -150,6 +151,7 @@ private:
     SchematicFileActions m_Files;
     EditorToolbar m_Toolbar;
     PartPicker m_PartPicker;
+    PartRail m_PartRail;
     SchematicOverlays m_Overlays;
 
     /// What clicks and keys on the canvas do now.

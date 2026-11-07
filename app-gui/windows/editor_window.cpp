@@ -259,7 +259,7 @@ EditorWindow::EditorWindow(Schematic &schematic, AnalysisControls &controls, Ana
                    [this](std::string file_name, Core::SpiceLibrary library) {
                        m_SpiceDialog.OpenImport(std::move(file_name), std::move(library));
                    }}),
-      m_Toolbar(controls, settings_panel, schematic, preferences), m_PartPicker(preferences),
+      m_Toolbar(controls, settings_panel, schematic, preferences), m_PartPicker(preferences), m_PartRail(preferences),
       m_Overlays(glow_renderer, playback, preferences) {
 }
 
@@ -434,6 +434,15 @@ void EditorWindow::Draw() {
     ApplyToolbarRequest(m_Toolbar.Draw(m_Mode, *m_Schematic, IsEditingSubcircuit()));
     m_Overlays.Update(*m_Schematic, m_Controls);
 
+    // The rail runs down the left of the canvas, as tall as it
+    RailRequest rail = m_PartRail.Draw(m_Mode, GetCanvasSize().y);
+    if (rail.Mode) {
+        SetMode(std::move(*rail.Mode));
+    }
+    if (rail.IsSearchAsked) {
+        m_PartPicker.RequestOpen();
+    }
+    ImGui::SameLine(0.0f, 0.0f);
     const ImVec2 origin = ImGui::GetCursorScreenPos();
     const ImVec2 size = GetCanvasSize();
     m_CanvasCenter = {origin.x + size.x / 2.0f, origin.y + size.y / 2.0f};
