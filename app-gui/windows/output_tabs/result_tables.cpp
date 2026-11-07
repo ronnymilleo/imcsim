@@ -60,7 +60,7 @@ void DrawTransferFunction(const Core::TransferFunction &transfer, Schematic &sch
         ImGui::TableNextColumn();
         ImGui::TextDisabled("Gain");
         ImGui::TableNextColumn();
-        ImGui::TextUnformatted(Core::FormatValue(transfer.Gain).c_str());
+        ImGui::TextUnformatted(Core::FormatMeasurement(transfer.Gain).c_str());
         ImGui::TableNextColumn();
         // The gain is a ratio of like units for a voltage source and a transimpedance for a current source
         ImGui::TextUnformatted(std::format("V/{}", transfer.InputUnit).c_str());
@@ -70,7 +70,7 @@ void DrawTransferFunction(const Core::TransferFunction &transfer, Schematic &sch
             ImGui::TextDisabled("%s", name);
             ImGui::TableNextColumn();
             const bool open = !std::isfinite(ohms) || std::abs(ohms) >= OPEN_RESISTANCE;
-            ImGui::TextUnformatted(open ? "open" : Core::FormatValue(ohms).c_str());
+            ImGui::TextUnformatted(open ? "open" : Core::FormatMeasurement(ohms).c_str());
             ImGui::TableNextColumn();
             if (!open) {
                 ImGui::TextUnformatted("Ohm");

@@ -619,11 +619,11 @@ void DrawCursorReadout(const std::vector<double> &xs, const char *x_unit, const 
     ImGui::TextDisabled("%s", std::format("at {}{}", Core::FormatValue(xs[sample]), x_unit).c_str());
     for (const PlottedTrace &trace : plotted) {
         const double value = (*trace.Values)[sample];
-        std::string text = std::format("{}: {}{}", trace.Label, Core::FormatValue(value), trace.Unit);
+        std::string text = std::format("{}: {}{}", trace.Label, Core::FormatMeasurement(value), trace.Unit);
         if (trace.LogicLevel) {
             text =
                 std::format("{}: {} ({}{})", trace.Label, GetLogicStateName(ReadLogicState(value, *trace.LogicLevel)),
-                            Core::FormatValue(value), trace.Unit);
+                            Core::FormatMeasurement(value), trace.Unit);
         }
         ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(trace.Color), "%s", text.c_str());
     }
@@ -680,10 +680,10 @@ PlotSpan MeasuredSpan(const PlotCursors &cursors, const PlotSpan &view) {
 }
 
 /**
- * @brief   Writes a value with a SPICE suffix and its unit, such as "4.7kOhm".
+ * @brief   Writes a measured value with four significant digits, a SPICE suffix and its unit, such as "4.700kOhm".
  */
 std::string FormatQuantity(const double value, const char *unit) {
-    return std::format("{}{}", Core::FormatValue(value), unit);
+    return std::format("{}{}", Core::FormatMeasurement(value), unit);
 }
 
 /**
@@ -726,8 +726,8 @@ void DrawMeasuredValue(const char *name, const double value, const double scale,
         return;
     }
     DrawStatistic(name, std::format("~0{}", unit));
-    ImGui::SetItemTooltip("%s",
-                          std::format("{}{}, negligible next to the trace", Core::FormatValue(value), unit).c_str());
+    ImGui::SetItemTooltip(
+        "%s", std::format("{}{}, negligible next to the trace", Core::FormatMeasurement(value), unit).c_str());
 }
 
 /**
