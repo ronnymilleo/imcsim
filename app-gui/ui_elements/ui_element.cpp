@@ -238,17 +238,20 @@ void UIElement::DrawTerminals(SchematicCanvas &canvas, const ViewTransform &view
 }
 
 /**
- * @brief   Draws the component name above the symbol and its value below, in local orientation; the value is the
- *          parameter it follows, such as "{R}", for a part inside a block.
+ * @brief   Draws the component name and its value on one line above the symbol, in local orientation, such as "R1 1k",
+ *          so the part reads in one glance and the side below stays free; the value is the parameter it follows, such
+ * as
+ *          "{R}", for a part inside a block.
  * @param[in,out] canvas Where it is drawn: the editor window or an exported image.
  * @param[in] view       Transform of the current frame.
  * @param[in] color      Text color.
  */
 void UIElement::DrawLabels(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color) const {
-    DrawLabel(canvas, view, {0.0f, -LABEL_OFFSET}, {0.0f, -1.0f}, m_Component->GetName(), color);
+    std::string text = m_Component->GetName();
     if (m_Component->HasValue()) {
-        DrawLabel(canvas, view, {0.0f, LABEL_OFFSET}, {0.0f, 1.0f}, GetValueLabel(*m_Component), color);
+        text += " " + GetValueLabel(*m_Component);
     }
+    DrawLabel(canvas, view, {0.0f, -LABEL_OFFSET}, {0.0f, -1.0f}, text, color);
 }
 
 /**
