@@ -284,7 +284,8 @@ run first.
 
 Over these colors a selected wire gets a halo and a selected part an outline in the selection color, instead of turning that color,
 so it does not pass for a value on the scale. The voltage of each node sits beside its wire, under a level one and
-right of an upright one, on a small box led by a dot of the node color, so it reads over any wire color.
+right of an upright one, on a small box led by a dot of the node color, so it reads over any wire color. The box
+takes the size of the part names, so it follows the zoom, and is left out when zoomed out too far to read it.
 
 - **Voltage** spreads the colors from the lowest to the highest node voltage, ground included.
 - **Current** colors wires and parts by the current through them, on a logarithmic scale that reaches four decades
