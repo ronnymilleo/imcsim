@@ -47,6 +47,14 @@ constexpr double OUTPUT_SENSE_RESISTANCE = 1.0;
 constexpr double CURRENT_LIMIT_THRESHOLD = 0.853;
 /// Two limiter diodes in series drop this much at the limit, so the swing limit sources add it to the headroom.
 constexpr double LIMITER_DIODE_DROPS = 1.3831;
+/// Pinch-off voltage of the JFET input pair; any value works, as the pair's gain comes from its BETA.
+constexpr double JFET_PINCH_OFF_VOLTAGE = -1.0;
+
+constexpr auto INPUT_STAGES = std::to_array<OpAmpInputStage>({
+    OpAmpInputStage::NPN,
+    OpAmpInputStage::PNP,
+    OpAmpInputStage::JFET,
+});
 
 constexpr auto MODELS = std::to_array<OpAmpModel>({
     {"Ideal",
@@ -55,16 +63,131 @@ constexpr auto MODELS = std::to_array<OpAmpModel>({
      "",
      true,
      {}},
+    // Classic typical values of the part; its offset is the 0.3 mV typical of TI SLOS094H (February 2026)
     {"uA741",
      "General-purpose bipolar op-amp, as a Boyle macromodel with typical datasheet values: 106 dB of gain, "
-     "1 MHz, 0.5 V/us, 80 nA of bias current, and an output 1 V short of each supply.",
+     "1 MHz, 0.5 V/us, 80 nA of bias current, 0.3 mV of offset, and an output 1 V short of each supply.",
      "imcsim_uA741",
      false,
-     {}},
+     {.InputOffsetVoltage = 0.3e-3}},
+    // TI LM358 datasheet, SLOS068AB (October 2024), table 5.7 at 25 C: AOL 100 V/mV, GBW 0.7 MHz, SR 0.3 V/us, IB
+    // 20 nA, VOS 3 mV, CMRR 80 dB, ISC 40 mA, IQ 350 uA per amplifier, output 1.5 V from V+ (RL >= 2k, VS = 5 V) and
+    // 5 mV from V-. It gives no phase margin or output resistance, so those keep the defaults of the uA741
+    {"LM358",
+     "Single-supply dual op-amp with a PNP input that takes inputs down to its negative supply, as a Boyle "
+     "macromodel with TI datasheet values: 100 dB of gain, 0.7 MHz, 0.3 V/us, 20 nA of bias current, 3 mV of offset, "
+     "and an output 1.5 V short of V+ and 5 mV short of V-.",
+     "imcsim_LM358",
+     false,
+     {.InputStage = OpAmpInputStage::PNP,
+      .OpenLoopGainDecibels = 100.0,
+      .GainBandwidth = 0.7e6,
+      .SlewRate = 0.3,
+      .InputBiasCurrent = 20e-9,
+      .CommonModeRejectionDecibels = 80.0,
+      .ShortCircuitCurrent = 40e-3,
+      .PositiveHeadroom = 1.5,
+      .NegativeHeadroom = 5e-3,
+      .SupplyCurrent = 350e-6,
+      .InputOffsetVoltage = 3e-3}},
+    // TI TL07xx datasheet, SLOS080W (July 2025), tables 5.8 and 5.9 for the TL07xC and TL07xI at +-15 V: AOL 200
+    // V/mV, GBW 5.25 MHz, SR 20 V/us, phase margin 56 degrees, IB 65 pA, VOS 3 mV, CMRR 100 dB, ZO 125 Ohm, VOM +-13.5
+    // V into 10k, IQ 1.4 mA per amplifier; the short-circuit current, 26 mA, is that of the TL07xH table
+    {"TL072",
+     "Low-noise dual op-amp with a JFET input of picoamperes of bias current, as a Boyle macromodel with TI "
+     "datasheet values: 106 dB of gain, 5.25 MHz, 20 V/us, 65 pA of bias current, 3 mV of offset, and an output "
+     "1.5 V short of each supply.",
+     "imcsim_TL072",
+     false,
+     {.InputStage = OpAmpInputStage::JFET,
+      .OpenLoopGainDecibels = 106.0,
+      .GainBandwidth = 5.25e6,
+      .SlewRate = 20.0,
+      .PhaseMarginDegrees = 56.0,
+      .InputBiasCurrent = 65e-12,
+      .CommonModeRejectionDecibels = 100.0,
+      .OutputResistance = 125.0,
+      .ShortCircuitCurrent = 26e-3,
+      .PositiveHeadroom = 1.5,
+      .NegativeHeadroom = 1.5,
+      .SupplyCurrent = 1.4e-3,
+      .InputOffsetVoltage = 3e-3}},
+    // TI NE5532 datasheet, SLOS075K, tables 5.5 and 5.6 at +-15 V: AVD 100 V/mV (RL >= 2k), B1 12 MHz, SR 5 V/us, IIB
+    // 200 nA, VIO 0.5 mV, CMRR 100 dB, IOS 38 mA, ICC 6 mA for both amplifiers. This revision gives no output swing,
+    // so the output keeps 2 V from each supply, as its +-13 V common-mode range does
+    {"NE5532",
+     "Low-noise audio dual op-amp, as a Boyle macromodel with TI datasheet values: 100 dB of gain, 12 MHz, 5 V/us, "
+     "200 nA of bias current, 0.5 mV of offset, 38 mA into a short, and an output 2 V short of each supply.",
+     "imcsim_NE5532",
+     false,
+     {.OpenLoopGainDecibels = 100.0,
+      .GainBandwidth = 12e6,
+      .SlewRate = 5.0,
+      .InputBiasCurrent = 200e-9,
+      .CommonModeRejectionDecibels = 100.0,
+      .ShortCircuitCurrent = 38e-3,
+      .PositiveHeadroom = 2.0,
+      .NegativeHeadroom = 2.0,
+      .SupplyCurrent = 3e-3,
+      .InputOffsetVoltage = 0.5e-3}},
+    // TI OP07 datasheet, SLOS099H (March 2023), table 6.5 for the OP07C at +-15 V: AOL 400 V/mV, GBW 0.6 MHz, SR
+    // 0.3 V/us, IB 1.8 nA, VOS 60 uV, CMRR 120 dB, swing +-13 V into 10k and 80 mW from the supplies, 2.7 mA. It gives
+    // no short-circuit current or output resistance, so those keep the defaults of the uA741
+    {"OP07",
+     "Precision bipolar op-amp with a low offset, as a Boyle macromodel with TI datasheet values: 112 dB of gain, "
+     "0.6 MHz, 0.3 V/us, 1.8 nA of bias current, 60 uV of offset, and an output 2 V short of each supply.",
+     "imcsim_OP07",
+     false,
+     {.OpenLoopGainDecibels = 112.0,
+      .GainBandwidth = 0.6e6,
+      .SlewRate = 0.3,
+      .InputBiasCurrent = 1.8e-9,
+      .CommonModeRejectionDecibels = 120.0,
+      .PositiveHeadroom = 2.0,
+      .NegativeHeadroom = 2.0,
+      .SupplyCurrent = 2.7e-3,
+      .InputOffsetVoltage = 60e-6}},
 });
 
 std::string FormatNumber(const double value) {
     return std::format("{:.6g}", value);
+}
+
+/**
+ * @brief   The input pair of a macromodel, its load resistors and tail current, and the model of its transistors.
+ * @details The pair takes the inverting input on its left side (node 80) and, through the offset source, the
+ *          non-inverting one on its right (node 90), and its tail is node 12. An NPN pair hangs from V+ with its tail
+ *          current to V-; a PNP or JFET pair hangs from V- with its tail current from V+, which is what lets its
+ *          inputs reach V-. Either way the input difference reaches the load resistors with a gain of exactly 1:
+ *          a bipolar pair through its emitter resistors, as in AN48, a JFET pair through its BETA, since a JFET
+ *          has a transconductance of 2 sqrt(BETA ID). The gate leakage of the two JFET junctions, IS each, is the
+ *          bias current.
+ */
+std::string FormatInputStage(const OpAmpParameters &parameters, const double tail_current,
+                             const double collector_resistance) {
+    const double collector_current = tail_current / 2.0;
+    const bool hangs_from_negative = parameters.InputStage != OpAmpInputStage::NPN;
+    const char *load_node = hangs_from_negative ? "4" : "7";
+    const std::string tail = hangs_from_negative ? std::format("IEE 7 12 {}\n", FormatNumber(tail_current))
+                                                 : std::format("IEE 12 4 {}\n", FormatNumber(tail_current));
+    const std::string loads =
+        std::format("RC1 {0} 80 {1}\nRC2 {0} 90 {1}\n", load_node, FormatNumber(collector_resistance));
+    if (parameters.InputStage == OpAmpInputStage::JFET) {
+        const double beta = 1.0 / (4.0 * collector_current * collector_resistance * collector_resistance);
+        return loads + "J1 80 2 12 JM\nJ2 90 30 12 JM\n" + tail +
+               std::format(".model JM PJF(IS={} BETA={} VTO={})\n", FormatNumber(parameters.InputBiasCurrent / 2.0),
+                           FormatNumber(beta), FormatNumber(JFET_PINCH_OFF_VOLTAGE));
+    }
+    const double beta = collector_current / parameters.InputBiasCurrent;
+    // The pair amplifies its input difference by exactly 1 into the collectors
+    const double emitter_resistance = beta / (beta + 1.0) * collector_resistance - THERMAL_VOLTAGE / collector_current;
+    const char *polarity = hangs_from_negative ? "PNP" : "NPN";
+    return loads +
+           std::format("Q1 80 2 10 QM\nQ2 90 30 11 QM\nRE1 10 12 {0}\nRE2 11 12 {0}\n",
+                       FormatNumber(emitter_resistance)) +
+           tail +
+           std::format(".model QM {}(IS={} BF={})\n", polarity, FormatNumber(INPUT_SATURATION_CURRENT),
+                       FormatNumber(beta));
 }
 
 } // namespace
@@ -160,14 +283,15 @@ void OpAmp::SetCustomParameters(const OpAmpParameters &parameters) {
  * @param[in] parameters  Candidate specifications.
  * @return  True when the gains, the gain-bandwidth product, the slew rate, the bias and short-circuit currents are
  *          positive, the phase margin is between 0 and 90 degrees, the output resistance is above the 1 Ohm sense
- *          resistance and the headrooms and supply current are not negative.
+ *          resistance, the headrooms and supply current are not negative and the input offset voltage is finite.
  */
 bool OpAmp::IsValidParameters(const OpAmpParameters &parameters) const {
     return parameters.OpenLoopGainDecibels > 0.0 && parameters.GainBandwidth > 0.0 && parameters.SlewRate > 0.0 &&
            parameters.PhaseMarginDegrees > 0.0 && parameters.PhaseMarginDegrees < 90.0 &&
            parameters.InputBiasCurrent > 0.0 && parameters.CommonModeRejectionDecibels > 0.0 &&
            parameters.OutputResistance > OUTPUT_SENSE_RESISTANCE && parameters.ShortCircuitCurrent > 0.0 &&
-           parameters.PositiveHeadroom >= 0.0 && parameters.NegativeHeadroom >= 0.0 && parameters.SupplyCurrent >= 0.0;
+           parameters.PositiveHeadroom >= 0.0 && parameters.NegativeHeadroom >= 0.0 &&
+           parameters.SupplyCurrent >= 0.0 && std::isfinite(parameters.InputOffsetVoltage);
 }
 
 /**
@@ -235,6 +359,45 @@ bool IsValidIdealBandwidth(const double bandwidth) {
 }
 
 /**
+ * @brief   Lists the input stages a macromodel op-amp can have.
+ * @return  NPN, PNP and JFET, in the order the editor offers them.
+ */
+std::span<const OpAmpInputStage> GetOpAmpInputStages() {
+    return INPUT_STAGES;
+}
+
+/**
+ * @brief   Names an input stage, as the editor shows it and files save it.
+ * @param[in] stage  Input stage to name.
+ * @return  "NPN", "PNP" or "JFET".
+ */
+const char *GetOpAmpInputStageName(const OpAmpInputStage stage) {
+    switch (stage) {
+    case OpAmpInputStage::PNP:
+        return "PNP";
+    case OpAmpInputStage::JFET:
+        return "JFET";
+    case OpAmpInputStage::NPN:
+    default:
+        return "NPN";
+    }
+}
+
+/**
+ * @brief   Finds an input stage by the name GetOpAmpInputStageName() gives it.
+ * @param[in] name  Name to look up, case sensitive.
+ * @return  The input stage, or none for an unknown name.
+ */
+std::optional<OpAmpInputStage> FindOpAmpInputStage(const std::string_view name) {
+    for (const OpAmpInputStage stage : INPUT_STAGES) {
+        if (name == GetOpAmpInputStageName(stage)) {
+            return stage;
+        }
+    }
+    return std::nullopt;
+}
+
+/**
  * @brief   Writes the netlist lines of an ideal op-amp.
  * @param[in] op_amp        Op-amp to write, while ideal.
  * @param[in] nodes         Nodes of its output, +, -, V+ and V- terminals.
@@ -284,20 +447,16 @@ const char *GetIdealOpAmpModelName() {
  * @param[in] name        Subcircuit name.
  * @param[in] parameters  Datasheet specifications, checked with OpAmp::IsValidParameters().
  * @return  A ".subckt" whose pins follow the op-amp terminals (output, +, -, V+, V-), ending in ".ends".
- * @note    An NPN pair with a unit-gain normalized input stage sets the input bias current and, with C2, the slew
- *          rate and the gain-bandwidth product; GA, R2, GB and RO2 the open-loop gain; GCM the common-mode
- *          rejection; C1 the excess phase that gives the phase margin. Past the swing limits or the short-circuit
- *          current, buffered diode limiters steal the drive of the gain stage. IP draws the rest of the supply
- *          current. Values follow the equations of AN48, which reproduce its LTC 8741 listing.
+ * @note    The input pair (FormatInputStage()), normalized to a gain of 1, sets the input bias current and, with
+ *          C2, the slew rate and the gain-bandwidth product; VOS adds the input offset voltage; GA, R2, GB and RO2 the
+ * open-loop gain; GCM the common-mode rejection; C1 the excess phase that gives the phase margin. Past the swing limits
+ * or the short-circuit current, buffered diode limiters steal the drive of the gain stage. IP draws the rest of the
+ * supply current. Values follow the equations of AN48, which reproduce its LTC 8741 listing.
  */
 std::string FormatOpAmpSubcircuit(const std::string_view name, const OpAmpParameters &parameters) {
     const double tail_current = parameters.SlewRate * 1e6 * COMPENSATION_CAPACITANCE;
-    const double collector_current = tail_current / 2.0;
-    const double beta = collector_current / parameters.InputBiasCurrent;
     const double collector_resistance =
         1.0 / (2.0 * std::numbers::pi * parameters.GainBandwidth * COMPENSATION_CAPACITANCE);
-    // The pair amplifies its input difference by exactly 1 into the collectors
-    const double emitter_resistance = beta / (beta + 1.0) * collector_resistance - THERMAL_VOLTAGE / collector_current;
     const double excess_phase = (90.0 - parameters.PhaseMarginDegrees) * std::numbers::pi / 180.0;
     const double collector_capacitance = COMPENSATION_CAPACITANCE / 2.0 * std::tan(excess_phase);
     const double transconductance = 1.0 / collector_resistance;
@@ -311,33 +470,31 @@ std::string FormatOpAmpSubcircuit(const std::string_view name, const OpAmpParame
     const double rest_of_supply_current = std::max(parameters.SupplyCurrent - tail_current, 0.0);
 
     // Pins: output 6, + input 3, - input 2, V+ 7, V- 4, as in the LTC listings
-    return std::format(
-        ".subckt {0} 6 3 2 7 4\n"
-        "RC1 7 80 {1}\nRC2 7 90 {1}\n"
-        "Q1 80 2 10 QM\nQ2 90 3 11 QM\n"
-        "C1 80 90 {2}\n"
-        "RE1 10 12 {3}\nRE2 11 12 {3}\n"
-        "IEE 12 4 {4}\nREE 12 0 {5}\n"
-        "GCM 0 8 12 0 {6}\nGA 8 0 80 90 {7}\n"
-        "R2 8 0 {8}\nC2 1 8 {9}\n"
-        "GB 1 0 8 0 {10}\nRO2 1 0 {11}\n"
-        "RSO 1 6 {12}\n"
-        "ECL 18 0 1 6 {13}\nGCL 0 8 20 0 1\nRCL 20 0 10\nD1 18 20 DM1\nD2 20 18 DM1\n"
-        "D3A 131 70 DM3\nD3B 13 131 DM3\nGPL 0 8 70 7 1\nVC 13 6 {14}\nRPLA 7 70 10\nRPLB 7 131 1k\n"
-        "D4A 60 141 DM3\nD4B 141 14 DM3\nGNL 0 8 60 4 1\nVE 6 14 {15}\nRNLA 60 4 10\nRNLB 141 4 1k\n"
-        "IP 7 4 {16}\n"
-        ".model QM NPN(IS={17} BF={18})\n"
-        ".model DM1 D(IS=1e-20)\n"
-        ".model DM3 D(IS=1e-16)\n"
-        ".ends {0}\n",
-        name, FormatNumber(collector_resistance), FormatNumber(collector_capacitance), FormatNumber(emitter_resistance),
-        FormatNumber(tail_current), FormatNumber(TAIL_EARLY_VOLTAGE / tail_current),
-        FormatNumber(common_mode_transconductance), FormatNumber(transconductance), FormatNumber(GAIN_STAGE_RESISTANCE),
-        FormatNumber(COMPENSATION_CAPACITANCE), FormatNumber(output_gain), FormatNumber(gain_stage_load),
-        FormatNumber(OUTPUT_SENSE_RESISTANCE), FormatNumber(current_limit_gain),
-        FormatNumber(parameters.PositiveHeadroom + LIMITER_DIODE_DROPS),
-        FormatNumber(parameters.NegativeHeadroom + LIMITER_DIODE_DROPS), FormatNumber(rest_of_supply_current),
-        FormatNumber(INPUT_SATURATION_CURRENT), FormatNumber(beta));
+    return std::format(".subckt {0} 6 3 2 7 4\n"
+                       "VOS 30 3 {1}\n",
+                       name, FormatNumber(parameters.InputOffsetVoltage)) +
+           FormatInputStage(parameters, tail_current, collector_resistance) +
+           std::format("C1 80 90 {0}\n"
+                       "REE 12 0 {1}\n"
+                       "GCM 0 8 12 0 {2}\nGA 8 0 80 90 {3}\n"
+                       "R2 8 0 {4}\nC2 1 8 {5}\n"
+                       "GB 1 0 8 0 {6}\nRO2 1 0 {7}\n"
+                       "RSO 1 6 {8}\n"
+                       "ECL 18 0 1 6 {9}\nGCL 0 8 20 0 1\nRCL 20 0 10\nD1 18 20 DM1\nD2 20 18 DM1\n"
+                       "D3A 131 70 DM3\nD3B 13 131 DM3\nGPL 0 8 70 7 1\nVC 13 6 {10}\nRPLA 7 70 10\nRPLB 7 131 1k\n"
+                       "D4A 60 141 DM3\nD4B 141 14 DM3\nGNL 0 8 60 4 1\nVE 6 14 {11}\nRNLA 60 4 10\nRNLB 141 4 1k\n"
+                       "IP 7 4 {12}\n"
+                       ".model DM1 D(IS=1e-20)\n"
+                       ".model DM3 D(IS=1e-16)\n"
+                       ".ends {13}\n",
+                       FormatNumber(collector_capacitance), FormatNumber(TAIL_EARLY_VOLTAGE / tail_current),
+                       FormatNumber(common_mode_transconductance), FormatNumber(transconductance),
+                       FormatNumber(GAIN_STAGE_RESISTANCE), FormatNumber(COMPENSATION_CAPACITANCE),
+                       FormatNumber(output_gain), FormatNumber(gain_stage_load), FormatNumber(OUTPUT_SENSE_RESISTANCE),
+                       FormatNumber(current_limit_gain),
+                       FormatNumber(parameters.PositiveHeadroom + LIMITER_DIODE_DROPS),
+                       FormatNumber(parameters.NegativeHeadroom + LIMITER_DIODE_DROPS),
+                       FormatNumber(rest_of_supply_current), name);
 }
 
 } // namespace Core

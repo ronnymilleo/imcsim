@@ -59,6 +59,13 @@
       "rotation": 0,
       "x": 20,
       "y": 11
+    },
+    {
+      "type": "NetLabel",
+      "rotation": 0,
+      "x": 4,
+      "y": 4,
+      "net": "IN"
     }
   ],
   "wires": [
@@ -171,6 +178,14 @@
         4
       ]
     ],
-    "currents": []
+    "currents": [],
+    "math": [
+      {
+        "name": "Z",
+        "shown": true,
+        "uses_expression": true,
+        "expression": "-V(IN)/I(Vin1)"
+      }
+    ]
   }
 }

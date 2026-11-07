@@ -3,6 +3,7 @@
  * @brief   Tests for saving schematics to JSON and loading them back.
  */
 
+#include "components/behavioral_source.h"
 #include "components/bjt.h"
 #include "components/clock.h"
 #include "components/controlled_source.h"
@@ -688,6 +689,8 @@ TEST_CASE("Op-amps keep their model, the bandwidth of an ideal one and custom sp
     Core::OpAmpParameters parameters;
     parameters.SlewRate = 13.0;
     parameters.PositiveHeadroom = 0.05;
+    parameters.InputStage = Core::OpAmpInputStage::JFET;
+    parameters.InputOffsetVoltage = -2e-3;
     custom.SetCustomParameters(parameters);
 
     const GUI::LoadedSchematic loaded = LoadOrFail(GUI::SaveSchematic(elements, {}, {}, {}));
@@ -702,6 +705,28 @@ TEST_CASE("Op-amps keep their model, the bandwidth of an ideal one and custom sp
     CHECK(custom_copy.IsCustom());
     CHECK(custom_copy.GetParameters().SlewRate == 13.0);
     CHECK(custom_copy.GetParameters().PositiveHeadroom == 0.05);
+    CHECK(custom_copy.GetParameters().InputStage == Core::OpAmpInputStage::JFET);
+    CHECK(custom_copy.GetParameters().InputOffsetVoltage == -2e-3);
+}
+
+TEST_CASE("A custom op-amp saved before it had an input stage keeps the NPN pair, and an unknown one is refused",
+          "[schematic_file]") {
+    const auto load_with = [](const std::string_view parameters) {
+        return LoadOrFail(std::format(R"({{"format": "imcsim-schematic", "version": 1, "wires": [],
+            "elements": [{{"type": "OpAmp", "name": "U1", "x": 0, "y": 0, "rotation": 0, "model": "Custom",
+            "parameters": {}}}]}})",
+                                      parameters));
+    };
+    const GUI::LoadedSchematic old = load_with(R"({"slew_v_per_us": 2})");
+    CHECK(old.Warnings.empty());
+    REQUIRE(old.Elements.size() == 1);
+    const auto &old_op_amp = static_cast<const Core::OpAmp &>(old.Elements[0]->GetComponent());
+    CHECK(old_op_amp.GetParameters().InputStage == Core::OpAmpInputStage::NPN);
+    CHECK(old_op_amp.GetParameters().InputOffsetVoltage == 0.0);
+
+    const GUI::LoadedSchematic unknown = load_with(R"({"input": "CMOS"})");
+    REQUIRE_FALSE(unknown.Warnings.empty());
+    CHECK(unknown.Warnings.front().contains("input stage"));
 }
 
 TEST_CASE("Op-amps saved before they had models load as ideal", "[schematic_file]") {
@@ -1273,4 +1298,25 @@ TEST_CASE("A file saved before the S-parameter analysis loads it as its defaults
     CHECK(loaded.Warnings.empty());
     CHECK(loaded.Settings.Selected == GUI::Analysis::POLE_ZERO);
     CHECK(loaded.Settings.SParameters == Core::SParameterSettings{});
+}
+
+TEST_CASE("A behavioral source keeps its expression as written, and loads with the default when it has none",
+          "[schematic_file]") {
+    std::vector<std::unique_ptr<GUI::UIElement>> elements;
+    elements.push_back(GUI::CreateElement(Core::ComponentType::BEHAVIORAL_CURRENT, {3, 3}, GUI::Rotation::R90));
+    auto &source = static_cast<Core::BehavioralSource &>(elements.back()->GetComponent());
+    source.SetName("B1");
+    source.SetExpression("1m*tanh(V(IN, REF)/26m)");
+
+    const GUI::LoadedSchematic loaded = LoadOrFail(GUI::SaveSchematic(elements, {}, {}, {}));
+    CHECK(loaded.Warnings.empty());
+    REQUIRE(loaded.Elements.size() == 1);
+    CHECK(loaded.Elements[0]->GetComponent().GetType() == Core::ComponentType::BEHAVIORAL_CURRENT);
+    CHECK(static_cast<const Core::BehavioralSource &>(loaded.Elements[0]->GetComponent()).GetExpression() ==
+          "1m*tanh(V(IN, REF)/26m)");
+
+    const std::string plain = R"({"type": "BehavioralVoltage", "x": 1, "y": 1, "rotation": 0, "name": "B1"})";
+    const GUI::LoadedSchematic defaults = LoadOrFail(Document(plain, ""));
+    REQUIRE(defaults.Elements.size() == 1);
+    CHECK(static_cast<const Core::BehavioralSource &>(defaults.Elements[0]->GetComponent()).GetExpression() == "1");
 }

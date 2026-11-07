@@ -317,7 +317,7 @@ std::optional<TraceStatistics> ComputeTraceStatistics(const std::span<const doub
 /**
  * @brief   Measures a frequency response between two frequencies.
  * @param[in] frequencies  Frequencies of the samples, rising and positive.
- * @param[in] magnitudes   Gain at each frequency, in dB.
+ * @param[in] magnitudes   Gain at each frequency, in dB; samples that are not finite are skipped.
  * @param[in] phases       Phase at each frequency, in degrees between -180 and 180.
  * @param[in] from         One end of the span; the ends may come in any order and are clipped to the sweep.
  * @param[in] to           The other end.
@@ -329,7 +329,10 @@ std::optional<BodeStatistics> ComputeBodeStatistics(const std::span<const double
                                                     const std::span<const double> magnitudes,
                                                     const std::span<const double> phases, const double from,
                                                     const double to) {
-    const std::vector<Sample> samples = ClipSamples(frequencies, magnitudes, from, to, true);
+    std::vector<Sample> samples = ClipSamples(frequencies, magnitudes, from, to, true);
+    // A math channel has no magnitude where it divides by zero, such as integ() at 0 Hz; the peak and the crossings
+    // are read on the samples around it
+    std::erase_if(samples, [](const Sample &sample) { return !std::isfinite(sample.Y); });
     if (samples.size() < 2) {
         return std::nullopt;
     }

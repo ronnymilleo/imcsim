@@ -5,6 +5,7 @@
 
 #include "editing/element_factory.h"
 
+#include "ui_elements/ui_behavioral_source.h"
 #include "ui_elements/ui_bjt.h"
 #include "ui_elements/ui_capacitor.h"
 #include "ui_elements/ui_clock.h"
@@ -67,6 +68,8 @@ constexpr auto PARTS = std::to_array<PartInfo>({
     {Core::ComponentType::VCCS, "VCCS (G)"},
     {Core::ComponentType::CCCS, "CCCS (F)"},
     {Core::ComponentType::CCVS, "CCVS (H)"},
+    {Core::ComponentType::BEHAVIORAL_VOLTAGE, "Behavioral voltage source (B)"},
+    {Core::ComponentType::BEHAVIORAL_CURRENT, "Behavioral current source (B)"},
     {Core::ComponentType::OP_AMP, "Op-amp"},
     {Core::ComponentType::NET_LABEL, "Net label"},
     {Core::ComponentType::PIN, "Block pin"},
@@ -136,6 +139,9 @@ std::unique_ptr<UIElement> CreateElement(const Core::ComponentType type, const G
     case Core::ComponentType::CCCS:
     case Core::ComponentType::CCVS:
         return std::make_unique<UIControlledSource>(type, position, rotation);
+    case Core::ComponentType::BEHAVIORAL_VOLTAGE:
+    case Core::ComponentType::BEHAVIORAL_CURRENT:
+        return std::make_unique<UIBehavioralSource>(type, position, rotation);
     case Core::ComponentType::OP_AMP:
         return std::make_unique<UIOpAmp>(position, rotation);
     case Core::ComponentType::SUBCIRCUIT:

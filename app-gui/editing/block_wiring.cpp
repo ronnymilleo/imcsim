@@ -55,13 +55,32 @@ std::vector<GridPoint> ListPointsInside(const UIWire &wire, const WorldBounds &b
 }
 
 /**
+ * @brief   Whether the names of a block at its current spot leave the points its wires start from free.
+ * @details A name over a pin point, a terminal or a wire would wall in the routes that start there.
+ */
+bool AreNamesClear(const UISubcircuit &block, const std::vector<GridPoint> &pin_points,
+                   const std::vector<std::unique_ptr<UIElement>> &elements, const std::vector<UIWire> &wires) {
+    return std::ranges::none_of(block.GetNameLabelPoints(), [&](const GridPoint point) {
+        return std::ranges::contains(pin_points, point) ||
+               std::ranges::any_of(
+                   elements,
+                   [&](const auto &element) { return std::ranges::contains(element->GetTerminals(), point); }) ||
+               std::ranges::any_of(wires, [&](const UIWire &wire) { return IsOnWire(wire, point); });
+    });
+}
+
+/**
  * @brief   Whether a block at its current spot leaves room for its wires.
  * @details Its box may cover no terminal and no wire, as a terminal on the middle of a wire would join them, and no
  *          point a pin is wired to. The exception is a pin wired from a point on its own lead, the usual case of
- *          markers where the terminals end up: the wire there, and what ends on it, lies over the lead.
+ *          markers where the terminals end up: the wire there, and what ends on it, lies over the lead. Its names
+ *          keep off the same points.
  */
-bool IsFreeSpot(const UIElement &block, const std::vector<GridPoint> &pin_points,
+bool IsFreeSpot(const UISubcircuit &block, const std::vector<GridPoint> &pin_points,
                 const std::vector<std::unique_ptr<UIElement>> &elements, const std::vector<UIWire> &wires) {
+    if (!AreNamesClear(block, pin_points, elements, wires)) {
+        return false;
+    }
     const WorldBounds bounds = block.GetWorldBounds();
     const std::vector<GridPoint> terminals = block.GetTerminals();
     // The lead of each pin whose point lies on it, or nothing
@@ -157,10 +176,11 @@ std::vector<UIWire> CutAtBox(const std::vector<UIWire> &wires, const GridPoint p
  * @param[in]     pin_points  Where each of its pins is to be wired, in the order of its terminals.
  * @param[in]     elements    The other parts, whose terminals the box keeps off.
  * @param[in]     wires       The wires, which the box keeps off.
- * @note    The box may cover no terminal, wire or pin point, but for a pin point on the lead of its own pin; the block
+ * @note    The box may cover no terminal, wire or pin point, but for a pin point on the lead of its own pin, and its
+ *          names none at all; the block
  *          stays where it was when no spot within MAX_BLOCK_SHIFT steps is free.
  */
-void MoveToFreeSpot(UIElement &block, const std::vector<GridPoint> &pin_points,
+void MoveToFreeSpot(UISubcircuit &block, const std::vector<GridPoint> &pin_points,
                     const std::vector<std::unique_ptr<UIElement>> &elements, const std::vector<UIWire> &wires) {
     const GridPoint middle = block.GetPosition();
     const auto is_free = [&](const GridPoint position) {
@@ -200,25 +220,35 @@ std::optional<GridPoint> DetachFromBox(std::vector<UIWire> &wires, const GridPoi
 }
 
 /**
- * @brief   Routes new wires around some boxes and clear of the parts, the wires there and each other.
- * @param[in] elements  Every part, whose terminals the wires keep off but for the one each ends on.
- * @param[in] wires     The wires already there.
- * @param[in] boxes     Boxes no wire may cross, such as the bodies of the blocks the wires go to.
- * @param[in] links     Where each wire starts and ends.
+ * @brief   Adds a block to what new wires go around: its box, leads included, and the rows its names are drawn on.
+ * @param[in,out] obstacles  Where the block goes.
+ * @param[in]     block      The block, as it is now.
+ */
+void KeepOffBlock(RoutingObstacles &obstacles, const UISubcircuit &block) {
+    obstacles.Boxes.push_back(block.GetWorldBounds());
+    std::ranges::copy(block.GetNameLabelPoints(), std::back_inserter(obstacles.Points));
+}
+
+/**
+ * @brief   Routes new wires around some obstacles and clear of the parts, the wires there and each other.
+ * @param[in] elements   Every part, whose terminals the wires keep off but for the one each ends on.
+ * @param[in] wires      The wires already there.
+ * @param[in] obstacles  Boxes and points no wire may cross, such as the blocks the wires go to.
+ * @param[in] links      Where each wire starts and ends.
  * @return  The wires of each link, in order, or none for a link that found no route.
  */
 std::vector<std::optional<std::vector<UIWire>>> RouteLinks(const std::vector<std::unique_ptr<UIElement>> &elements,
                                                            const std::vector<UIWire> &wires,
-                                                           const std::vector<WorldBounds> &boxes,
+                                                           const RoutingObstacles &obstacles,
                                                            const std::vector<WireLink> &links) {
     // Every start is kept off too, so no route runs over the point another one starts from
-    std::vector<GridPoint> obstacles;
+    std::vector<GridPoint> blocked = obstacles.Points;
     for (const auto &element : elements) {
-        std::ranges::copy(element->GetTerminals(), std::back_inserter(obstacles));
+        std::ranges::copy(element->GetTerminals(), std::back_inserter(blocked));
     }
-    std::ranges::transform(links, std::back_inserter(obstacles), &WireLink::From);
-    RoutingGrid grid(wires, obstacles);
-    for (const WorldBounds &box : boxes) {
+    std::ranges::transform(links, std::back_inserter(blocked), &WireLink::From);
+    RoutingGrid grid(wires, blocked);
+    for (const WorldBounds &box : obstacles.Boxes) {
         grid.BlockArea({static_cast<int>(std::ceil(box.Min.x)), static_cast<int>(std::ceil(box.Min.y))},
                        {static_cast<int>(std::floor(box.Max.x)), static_cast<int>(std::floor(box.Max.y))});
     }

@@ -444,26 +444,34 @@ ExportFigure BuildSpectrumFigure(const TransientSpectra &spectra, const bool log
 
 /**
  * @brief   Builds the figure of the Bode plots: both panels list the same traces, as the two plots do, with every step
- *          of a stepped sweep.
+ *          of a stepped sweep, and the math channels of the step shown.
  * @param[in] sweep      The AC sweep shown.
+ * @param[in] math       Math traces over the sweep shown.
  * @param[in] schematic  Schematic that keeps the measurements and the other steps.
  * @param[in] view       The frequencies the plots show.
  * @return  The magnitude and phase panels.
  */
-ExportFigure BuildACSweepFigure(const Core::ACSweep &sweep, Schematic &schematic, const PlotSpan &view) {
+ExportFigure BuildACSweepFigure(const Core::ACSweep &sweep, const ACMathTraces &math, Schematic &schematic,
+                                const PlotSpan &view) {
+    const std::string third_unit = ThirdAxisUnit(math.Magnitudes);
+    const std::string third_name = third_unit.empty() ? "Math" : third_unit;
     ExportFigure figure;
     figure.XAxis = {.Name = "Frequency", .Unit = "Hz"};
     figure.XLogarithmic = true;
     figure.Xs = sweep.Frequencies;
     figure.XRange = ExportRange{.From = view.From, .To = view.To};
-    PanelBuilder magnitude("Magnitude", {.Voltage = {.Name = "Voltage (dB)", .Unit = "dB", .UsesPrefixes = false},
-                                         .Current = {.Name = "Current (dB)", .Unit = "dB", .UsesPrefixes = false},
-                                         .Third = {}});
+    PanelBuilder magnitude(
+        "Magnitude", {.Voltage = {.Name = "Voltage (dB)", .Unit = "dB", .UsesPrefixes = false},
+                      .Current = {.Name = "Current (dB)", .Unit = "dB", .UsesPrefixes = false},
+                      .Third = {.Name = std::format("{} (dB)", third_name), .Unit = "dB", .UsesPrefixes = false}});
     AddExportTraces(magnitude, sweep.NodeMagnitudesDecibels, sweep.CurrentMagnitudesDecibels, schematic, "", true);
-    PanelBuilder phase("Phase", {.Voltage = {.Name = "Phase (deg)", .Unit = "deg", .UsesPrefixes = false},
-                                 .Current = {.Name = "Current phase (deg)", .Unit = "deg", .UsesPrefixes = false},
-                                 .Third = {}});
+    AddExportMath(magnitude, math.Magnitudes, "", true);
+    PanelBuilder phase(
+        "Phase", {.Voltage = {.Name = "Phase (deg)", .Unit = "deg", .UsesPrefixes = false},
+                  .Current = {.Name = "Current phase (deg)", .Unit = "deg", .UsesPrefixes = false},
+                  .Third = {.Name = std::format("{} phase (deg)", third_name), .Unit = "deg", .UsesPrefixes = false}});
     AddExportTraces(phase, sweep.NodePhasesDegrees, sweep.CurrentPhasesDegrees, schematic, "", true);
+    AddExportMath(phase, math.Phases, "", true);
     // The other steps share the frequencies, so they go in as more columns, without legend entries
     if (const auto &steps = schematic.GetACSweepSteps()) {
         for (std::size_t step = 0; step < steps->Results.size(); ++step) {

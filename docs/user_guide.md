@@ -8,9 +8,9 @@ How to read what imcsim measures, plots and exports. The [README](../README.md) 
 - **Toolbar**: Select, Wire (W) and Probe (P) on the left, then the parts, each button showing its symbol. Sources,
   diodes, transistors, controlled sources and the adjustable parts share one button per group: it places the part last picked, and the
   arrow beside it (or a right click) lists the others. Hover a button for its name and shortcut.
-- **Editing a part**: double-click it, or select it and press Enter, to open its properties beside it; edits
-  apply as you type, and Enter, Esc or a click outside closes them. With a part selected, typing a number starts
-  editing its main value right away: `4k7` and Enter make a resistor 4.7k. Values take SPICE suffixes, and a whole
+- **Editing a part**: double-click it, or select it and press Enter, to open its properties at the top of the
+  schematic; edits apply as you type, and Enter, Esc or a click outside closes them. With a part selected, typing a
+  number starts editing its main value right away: `4k7` and Enter make a resistor 4.7k. Values take SPICE suffixes, and a whole
   number may put its decimals after the suffix, as resistor codes do (`4k7`, `2M2`, `3u3`). View > Properties keeps
   the same fields in a docked window.
 - **Renaming a part**: the Name field of its properties takes a new name when you press Enter or click away. The name
@@ -373,6 +373,7 @@ Every part with more than one terminal numbers them in the order the SPICE netli
 | N- or P-channel MOSFET | drain | gate | source |
 | VCVS or VCCS (E, G) | output, top of the diamond | output, bottom | control + (4: control -) |
 | CCCS or CCVS (F, H) | output, top of the diamond | output, bottom | |
+| Behavioral source (B) | +, top of the diamond | -, bottom | |
 | Op-amp | output | non-inverting input (+) | inverting input (-) (4: V+, 5: V-) |
 | Gate (AND, OR, NAND, NOR, XOR, XNOR) | input A, upper left | input B, lower left | output Y, on the right |
 | NOT, buffer | input A, on the left | output Y, on the right | |
@@ -407,8 +408,8 @@ imcsim reports currents as ngspice computes them:
   voltage-controlled switch reports the current into its first contact terminal, like a two-terminal part.
 - **Transformers** report `I(T1.P)` into the primary + and `I(T1.S)` into the secondary +, each positive into its
   terminal. With a load on the secondary the two have opposite signs, in the ratio of the turns.
-- **Controlled sources** report the current of their output like a two-terminal part; their control pins carry no
-  current. A VCCS or CCCS pushes its current from terminal 1 to terminal 2 through itself, as its arrow shows, so
+- **Controlled and behavioral sources** report the current of their output like a two-terminal part; the control pins
+  of a controlled source carry no current. A VCCS, CCCS or behavioral current source pushes its current from terminal 1 to terminal 2 through itself, as its arrow shows, so
   into a load on terminal 1 it drives the load negative.
 - **Op-amps** report the current into their output, which returns through ground. An ideal op-amp draws no input
   current, and its supply pins only carry a small current while the output saturates; a macromodel draws its bias
@@ -435,18 +436,34 @@ A CCCS or CCVS follows a current picked in Properties among those the plots offe
 with the sign that current has in the results. Simulating one without a current, or with a current whose part was
 deleted, stops with a message.
 
+A **behavioral source**, in the same menu, drives a free expression instead of a gain: a voltage from its + to its -,
+or a current through itself from + to -. Type it in Properties, such as `V(IN)*V(LO)` for a multiplier,
+`1m*tanh(V(IN)/26m)` for a soft limiter or `10m*V(TEMP)` for a sensor. It names voltages by net label, `V(OUT)` or
+`V(IN, OUT)`, so put a label on every net it reads (`0` and `GND` are ground), and currents as the plots name them,
+`I(R1)` or `I(Q1.C)`. Numbers take SPICE suffixes, and the functions and operators are those of ngspice: `tanh()`,
+`exp()`, `abs()`, `min()`, `max()`, comparisons with `a ? b : c`, `time` and `temper`. Properties says at once what is
+wrong, a net no label names, a current the circuit lacks or a parenthesis that does not close, and keeps the last
+expression that read until the new one does; ngspice reports the rest when it runs. The schematic labels it as
+`V=...` or `I=...`, cut after 24 characters. Renaming a part it reads renames it in the expression too. In an AC
+sweep it is linearized at the operating point (see the models page).
+
 An op-amp starts **Ideal**: no input current, no output resistance and 100 dB of gain, so its feedback network sets
 the closed-loop gain. Its gain rolls off at the gain-bandwidth product (GBW, 1 MHz unless set in Properties): an
 amplifier with a gain of 10 keeps its gain up to about GBW / 11. Its output cannot go past the voltages of its V+
 and V- pins: connect them to supplies, and it clips within about 10 mV of them. It has no slew rate.
 
-The **uA741** model, or **Custom** specifications, make it a real part, simulated with the Boyle macromodel that
-SPICE simulators have used since 1974: a transistor input pair draws the bias current and limits the slew rate, the
+The **uA741**, **LM358**, **TL072**, **NE5532** and **OP07** models, or **Custom** specifications, make it a real part, simulated with the
+Boyle macromodel that SPICE simulators have used since 1974: a transistor input pair draws the bias current and limits
+the slew rate, the
 output swings short of the supplies by its headrooms and limits its current at the short-circuit current, and the
 part draws its supply current. The macromodel is built from datasheet values (open-loop gain, GBW, slew rate, phase
 margin, bias current, CMRR, output resistance, short-circuit current, headrooms and supply current), so a datasheet
-is enough to model another part; its GBW comes out about 10% low. It still leaves out offset voltage, noise,
-temperature, the common-mode input range and the supply rejection, and its output current returns through ground.
+is enough to model another part; its GBW comes out about 10% low. The input pair is NPN in the uA741, PNP in the
+LM358, whose inputs and output go down to V- on a single supply, and a JFET pair in the TL072, which draws picoamperes.
+Each ready part carries the typical input offset of its datasheet at its + input, from 60 µV for the OP07 to 3 mV for the
+LM358 and TL072, and a Custom part picks its input stage and its input offset voltage (VOS). It still leaves out
+noise densities, temperature, the common-mode input range and the supply rejection, and its output current returns
+through ground.
 
 The Op-amps examples are an inverting and a non-inverting amplifier, an integrator, a Schmitt trigger and a
 Sallen-Key low-pass filter.
@@ -496,6 +513,13 @@ their statistics and the exports always agree.
   like the measured traces, but adding or editing one is not an unsaved change. A channel that names a net no label
   has any longer keeps its expression and reads in red, with the reason in its tooltip and above the plot, instead
   of disappearing.
+- On an AC sweep a math channel works on the complex values of the traces, rebuilt from their magnitude and phase, and
+  plots as a magnitude in dB on the magnitude plot and a phase in degrees on the phase plot. `V(OUT)/V(IN)` so reads
+  the gain and the phase shift between two nodes, on the voltage axis, which reads as gain, and `V(IN)/I(V1)` the
+  impedance a source sees, in ohms on the third axis. The magnitude is 20·log10 of the value relative to 1 of its unit, whatever that unit, as for every trace of
+  the sweep. `ddt()` multiplies by jω and `integ()` divides by it, which is what they do to a sine, and `abs()` keeps
+  the magnitude with a phase of 0. A value of zero, or one with no finite magnitude such as `integ()` at 0 Hz, leaves
+  a gap. The channels are worked out on the step shown, and the statistics read their response like any other trace.
 - The AC sweep is a Bode plot: magnitude in dB and phase in degrees, relative to the AC magnitude of the sources.
   That magnitude is set in Properties apart from the amplitude of the sine, as in SPICE, and is 1 by default, so
   the plot reads as gain while a transient uses the small amplitude a real circuit would see.
@@ -512,8 +536,8 @@ their statistics and the exports always agree.
 
 ## Stepping a parameter
 
-The transient, the AC sweep and the DC sweep can run once per value of a parameter, as SPICE's `.step`: check
-**Step a parameter** under their settings, then pick:
+The operating point, the transient, the AC sweep and the DC sweep can run once per value of a parameter, as SPICE's
+`.step`: set **Run mode** to **Step a parameter** under their settings, then pick:
 
 - **Parameter**: the temperature, or a resistor, capacitor or inductor (shown with its value). Picking a part starts
   the range at half its value and ends it at twice its value.
@@ -530,13 +554,17 @@ Results:
   schematic and its playback read the shown step. The AC export includes every step (`V(4) at C1=22nF` columns);
   the transient export has the shown step only, since each step has its own time points.
 - The DC sweep draws one curve per step, as when stepping a second source, so only one of the two can be on.
+- The operating point picks its **shown step** at the top of its tab; the schematic (voltages, currents, wire colors,
+  heat map) and the tables below read that step. Above the tables, a plot draws every measured voltage and current
+  against the step value, with a marker at each step, so `V(OUT)` against R1 from 1k to 10k reads at once; measure the
+  traces with the Probe tool or in the trace list, which lists the nodes and currents of the steps.
 - ngspice's output lists each step under a `Step R1=10kOhm` line. A step that fails stops the run and names the
   step.
 
 ## Monte Carlo
 
 Real parts are not exact: a 1k resistor with a 5 % tolerance may be anything from 950 to 1050 ohm. A Monte Carlo
-analysis runs the transient, the AC sweep or the DC sweep once with every value as it is (the **nominal** run) and then
+analysis runs the operating point, the transient, the AC sweep or the DC sweep once with every value as it is (the **nominal** run) and then
 once per **run**, each with the values of the parts drawn within their tolerances, and shows how a result spreads.
 
 **Setting it up**
@@ -546,7 +574,7 @@ once per **run**, each with the values of the parts drawn within their tolerance
    offer **Use E24 (5%)**, the tolerance of that series. An empty field means the part keeps its value in every run.
    In the analysis settings, **Tolerance of all** gives every resistor, capacitor or inductor one percent at once, and
    **Clear all** takes the tolerances away. A source only varies while it is a DC one.
-2. Pick the transient, AC sweep or DC sweep and set **Run mode** to **Monte Carlo** (the other modes are **Single
+2. Pick the operating point, transient, AC sweep or DC sweep and set **Run mode** to **Monte Carlo** (the other modes are **Single
    run** and **Step a parameter**; only one is on). Live mode and a second stepped source of the DC sweep do not go
    with it.
 3. Set **Runs** (2 to 1000, 100 at first), the **Distribution** and the **Seed**, and run.
@@ -564,7 +592,7 @@ block and the parts; clear their tolerance, or take the parts out of the block.
 
 **Results.** The transient and the AC sweep plot the runs as the stepped ones are plotted: the **shown step** is
 **Nominal** or **Run n**, in full colors, and the others are faint; the DC sweep draws one curve per run. Only the
-first 100 runs keep their curves, since a thousand transients would not fit in memory; every run keeps its
+first 100 runs keep their curves (or, for the operating point, their values to show on the schematic), since a thousand transients would not fit in memory; every run keeps its
 measurements. Runs that fail to converge are skipped, and a warning counts them and lists the first ones; the nominal
 run has to work. Stop keeps the runs made.
 
@@ -573,11 +601,12 @@ The **Monte Carlo** tab of the Output window shows:
 - a **histogram** of one quantity measured on one node in every run, with a line at the nominal value. The quantities
   are the ones the statistics of the other tabs read: for a transient the mean, RMS, peak to peak and frequency; for
   an AC sweep the upper and lower -3 dB frequency, peak gain, unity-gain frequency and phase margin; for a DC sweep the
-  minimum, maximum and mean;
+  minimum, maximum and mean. An operating point measures the DC voltage of every node and the DC current of every
+  part, so the first list offers the currents, such as `I(R1)`, after the nodes;
 - on the right, the nominal reading and, over the drawn runs, their count, mean, standard deviation (with n - 1),
   minimum, maximum and the 1 % and 99 % percentiles;
 - a **table of runs** with the value each part took and the quantity shown; click a header to sort, which puts the
-  worst case first, and click a row to show that run in the transient or AC sweep tab (a row beyond the first 100
+  worst case first, and click a row to show that run in the operating point, transient or AC sweep tab and on the schematic (a row beyond the first 100
   runs has no curve to show);
 - **Export runs...** saves every run, the values of the parts and all the measurements as a CSV table.
 

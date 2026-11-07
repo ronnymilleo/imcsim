@@ -13,6 +13,7 @@ add_executable(imcsim-tests
             circuit_checks_tests.cpp
             circuit_copy_tests.cpp
             circuit_snapshot_tests.cpp
+            behavioral_expression_tests.cpp
             block_nesting_tests.cpp
             clipboard_tests.cpp
             code_models.cpp
@@ -40,6 +41,7 @@ add_executable(imcsim-tests
             part_names_tests.cpp
             playback_tests.cpp
             plot_export_tests.cpp
+            plot_figures_tests.cpp
             plot_helpers_tests.cpp
             point_window_tests.cpp
             pole_zero_tests.cpp

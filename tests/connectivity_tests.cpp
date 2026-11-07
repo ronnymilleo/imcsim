@@ -191,6 +191,20 @@ TEST_CASE("A net name finds its node in any case, whichever label on the node ga
     CHECK_FALSE(connectivity.FindNodeOfNet("Third"));
 }
 
+TEST_CASE("The circuit built from a schematic knows the nets its labels name", "[connectivity]") {
+    Schematic schematic;
+    schematic.Label({10, 0}, "Second");
+    schematic.Label({0, 0}, "First");
+    schematic.Wires.emplace_back(GUI::GridPoint{0, 0}, GUI::GridPoint{10, 0});
+    const GUI::Connectivity connectivity = schematic.Connect();
+    const Core::Circuit circuit = GUI::BuildCircuit(schematic.Elements, connectivity);
+    // A behavioral source names its nets, which the circuit resolves in any case, ground included
+    CHECK(circuit.FindNodeOfNet("FIRST") == connectivity.GetNode({0, 0}));
+    CHECK(circuit.FindNodeOfNet("second") == connectivity.GetNode({0, 0}));
+    CHECK(circuit.FindNodeOfNet("GND") == 0);
+    CHECK_FALSE(circuit.FindNodeOfNet("Third"));
+}
+
 TEST_CASE("A label named 0 or GND, in any case, is ground", "[connectivity]") {
     Schematic schematic;
     schematic.Elements.push_back(std::make_unique<GUI::UIGround>(GUI::GridPoint{0, 0}, GUI::Rotation::R0));

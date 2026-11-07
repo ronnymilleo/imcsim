@@ -3,6 +3,7 @@
  * @brief   Tests for renaming a part and keeping what refers to it by name on it.
  */
 
+#include "components/behavioral_source.h"
 #include "components/controlled_source.h"
 #include "document/schematic.h"
 #include "editing/element_factory.h"
@@ -60,6 +61,9 @@ TEST_CASE("Renaming a part carries its measured current, the sources that follow
     schematic.AddElement(GUI::CreateElement(Core::ComponentType::CCCS, {8, 0}, GUI::Rotation::R0));
     auto &follower = static_cast<Core::ControlledSource &>(schematic.GetElement(2).GetComponent());
     follower.SetControllingCurrent("R1");
+    schematic.AddElement(GUI::CreateElement(Core::ComponentType::BEHAVIORAL_VOLTAGE, {12, 0}, GUI::Rotation::R0));
+    auto &behavioral = static_cast<Core::BehavioralSource &>(schematic.GetElement(3).GetComponent());
+    behavioral.SetExpression("1k*I(R1) + I(R10)");
     schematic.SetCurrentMeasured("R1", true);
     schematic.SetCurrentMeasured("R2", true);
     schematic.SetMathChannels({{.Name = "M1", .Expression = "I(R1)*2"}});
@@ -68,6 +72,7 @@ TEST_CASE("Renaming a part carries its measured current, the sources that follow
     REQUIRE(schematic.RenameElement(0, "RLOAD"));
     CHECK(schematic.GetElement(0).GetComponent().GetName() == "RLOAD");
     CHECK(follower.GetControllingCurrent() == "RLOAD");
+    CHECK(behavioral.GetExpression() == "1k*I(RLOAD) + I(R10)");
     CHECK(schematic.IsCurrentMeasured("RLOAD"));
     CHECK_FALSE(schematic.IsCurrentMeasured("R1"));
     CHECK(schematic.IsCurrentMeasured("R2"));

@@ -405,7 +405,7 @@ TEST_CASE("ToSpiceNetlist writes diodes from anode to cathode and each model onc
                                            "D3 1 0 DLEDRED\n"
                                            ".model D1N4148 D(IS=2.52e-09 N=1.752 RS=0.568 BV=100 IBV=0.0001 "
                                            "CJO=4e-12 VJ=1 M=0.4 TT=2e-08)\n"
-                                           ".model DLEDRED D(IS=3.3e-17 N=2 RS=2 BV=5 IBV=1e-05 CJO=4e-11 VJ=1 M=0.5 "
+                                           ".model DLEDRED D(IS=1.255e-17 N=2 RS=2 BV=5 IBV=1e-05 CJO=4e-11 VJ=1 M=0.5 "
                                            "TT=0)\n"
                                            ".op\n"
                                            ".end\n");

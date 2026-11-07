@@ -4,6 +4,7 @@
  */
 
 #include "analysis/analysis_controls.h"
+#include "analysis/monte_carlo_results.h"
 
 #include "components/subcircuit_pin.h"
 #include "document/examples.h"
@@ -15,8 +16,10 @@
 #include <catch2/catch_test_macros.hpp>
 #include <chrono>
 #include <cmath>
+#include <condition_variable>
 #include <cstddef>
 #include <memory>
+#include <mutex>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -194,7 +197,9 @@ public:
 
     std::string_view GetName() const override { return "failing"; }
     const Core::BackendCapabilities &GetCapabilities() const override { return m_Capabilities; }
-    Core::OperatingPointRun RunOperatingPoint(const Core::Circuit &) override { return {std::unexpected("no"), {}}; }
+    Core::OperatingPointRun RunOperatingPoint(const Core::Circuit &, const std::optional<double> &) override {
+        return {std::unexpected("no"), {}};
+    }
     Core::TransientRun RunTransient(const Core::Circuit &circuit, const Core::TransientSettings &,
                                     const std::optional<double> &, const Core::RunMonitor &) override {
         for (const Core::CircuitEntry &entry : circuit.GetEntries()) {
@@ -241,6 +246,68 @@ struct FailingBackendInUse {
     FailingBackendInUse &operator=(const FailingBackendInUse &) = delete;
 };
 
+/**
+ * @class   TransientHold
+ * @brief   Holds the worker inside a transient until the test lets it go, so a test can act while a run is surely in
+ *          progress, however slow the build.
+ */
+class TransientHold {
+public:
+    void Enter() {
+        std::unique_lock lock(m_Mutex);
+        m_IsHolding = true;
+        m_Changed.notify_all();
+        m_Changed.wait(lock, [this] { return m_IsReleased; });
+    }
+    [[nodiscard]] bool WaitUntilHolding() {
+        std::unique_lock lock(m_Mutex);
+        return m_Changed.wait_for(lock, WAIT_LIMIT, [this] { return m_IsHolding; });
+    }
+    void Release() {
+        const std::lock_guard lock(m_Mutex);
+        m_IsReleased = true;
+        m_Changed.notify_all();
+    }
+
+private:
+    std::mutex m_Mutex;
+    std::condition_variable m_Changed;
+    bool m_IsHolding = false;
+    bool m_IsReleased = false;
+};
+
+/// Answers as FailingAboveBackend does, once its hold lets the first transient go.
+class HeldBackend : public FailingAboveBackend {
+public:
+    explicit HeldBackend(std::shared_ptr<TransientHold> hold) : m_Hold(std::move(hold)) {}
+
+    Core::TransientRun RunTransient(const Core::Circuit &circuit, const Core::TransientSettings &settings,
+                                    const std::optional<double> &temperature_celsius,
+                                    const Core::RunMonitor &monitor) override {
+        m_Hold->Enter();
+        return FailingAboveBackend::RunTransient(circuit, settings, temperature_celsius, monitor);
+    }
+
+private:
+    std::shared_ptr<TransientHold> m_Hold;
+};
+
+/// Puts the held backend in use for one test and goes back to ngspice at the end.
+struct HeldBackendInUse {
+    explicit HeldBackendInUse(const std::shared_ptr<TransientHold> &hold) {
+        Core::SetBackend(std::make_unique<HeldBackend>(hold));
+    }
+    ~HeldBackendInUse() { Core::SetBackend(nullptr); }
+    HeldBackendInUse(const HeldBackendInUse &) = delete;
+    HeldBackendInUse &operator=(const HeldBackendInUse &) = delete;
+};
+
+/// Lets a held run go when the test ends, before the worker it holds is joined, even when a check throws.
+struct ReleaseAtEnd {
+    std::shared_ptr<TransientHold> Hold;
+    ~ReleaseAtEnd() { Hold->Release(); }
+};
+
 } // namespace
 
 TEST_CASE("A run goes on in the background and its result reaches the schematic when Update takes it in",
@@ -278,14 +345,20 @@ TEST_CASE("Run does nothing while another run is in progress", "[analysis_contro
 }
 
 TEST_CASE("Stopping a stepped run ends it between steps and keeps no result", "[analysis_controls]") {
+    const auto hold = std::make_shared<TransientHold>();
+    const HeldBackendInUse backend(hold);
     GUI::Schematic schematic;
     OpenRCFilter(schematic);
     SelectLongSteppedTransient(schematic);
     GUI::AnalysisControls controls(schematic);
+    const ReleaseAtEnd release{.Hold = hold};
 
+    // The stop comes while the first step is held, so the run cannot end before it
     controls.RunSelected();
+    REQUIRE(hold->WaitUntilHolding());
     controls.StopRun();
     CHECK(controls.IsStopping());
+    hold->Release();
     REQUIRE(UpdateUntilIdle(controls));
 
     CHECK_FALSE(controls.IsStopping());
@@ -380,6 +453,43 @@ TEST_CASE("A stepped AC sweep and a stepped DC sweep deliver one result per valu
     schematic.SetSimulationSettings(settings);
     RunAndWait(controls);
     CHECK(schematic.GetDCSweep().has_value());
+}
+
+TEST_CASE("A stepped operating point delivers one result per value and shows the first", "[analysis_controls]") {
+    GUI::Schematic schematic;
+    OpenRCFilter(schematic);
+    GUI::AnalysisControls controls(schematic);
+    GUI::SimulationSettings settings = schematic.GetSimulationSettings();
+    settings.Selected = GUI::Analysis::OPERATING_POINT;
+    settings.ParameterStep = {
+        .Enabled = true, .Part = "R1", .UsesList = true, .Start = 0.0, .Stop = 0.0, .Step = 0.0, .List = "1k, 2k, 5k"};
+    schematic.SetSimulationSettings(settings);
+    RunAndWait(controls);
+    REQUIRE_FALSE(controls.GetError(GUI::Analysis::OPERATING_POINT));
+    REQUIRE(schematic.GetOperatingPointSteps().has_value());
+    const GUI::StepFamily<Core::OperatingPoint> &steps = *schematic.GetOperatingPointSteps();
+    CHECK(steps.Parameter == "R1");
+    CHECK(steps.Values == std::vector<double>{1e3, 2e3, 5e3});
+    CHECK(steps.Results.size() == 3);
+    CHECK(steps.Selected == 0);
+    CHECK(schematic.GetOperatingPoint().has_value());
+}
+
+TEST_CASE("A Monte Carlo operating point measures every node voltage and every current in each run",
+          "[analysis_controls][monte_carlo]") {
+    GUI::Schematic schematic;
+    OpenMonteCarloFilter(schematic, GUI::Analysis::OPERATING_POINT, 4);
+    GUI::AnalysisControls controls(schematic);
+    RunAndWait(controls);
+    REQUIRE_FALSE(controls.GetError(GUI::Analysis::OPERATING_POINT));
+    REQUIRE(schematic.GetOperatingPointSteps().has_value());
+    CHECK(schematic.GetOperatingPointSteps()->Parameter == GUI::MONTE_CARLO_PARAMETER);
+    CHECK(schematic.GetOperatingPointSteps()->Results.size() == 5);
+    REQUIRE(schematic.GetMonteCarlo().has_value());
+    const GUI::MonteCarloTable &table = *schematic.GetMonteCarlo();
+    CHECK(table.Runs.size() == 5);
+    CHECK_FALSE(GUI::ListTableNodes(table).empty());
+    CHECK(std::ranges::contains(GUI::ListTableCurrents(table), "R1"));
 }
 
 TEST_CASE("A run that cannot start says why, and a circuit that cannot run fails with the reason",

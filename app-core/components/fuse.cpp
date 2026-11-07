@@ -12,14 +12,14 @@ namespace Core {
 
 namespace {
 
-/// Typical figures of glass fuses, not one vendor's datasheet: a fast one melts in about 0.15 s of I^2 t per A^2 of its
-/// rating and a slow-blow one in about 1 s.
+/// 5x20 mm glass fuses of Littelfuse: the fast ones of the 217 Series (revised 10/30/20) and the slow-blow one of the
+/// 218 Series (revised 02/23/15), with the nominal melting I^2 t and cold resistance of their datasheets.
 constexpr auto READY_FUSES = std::to_array<ReadyFuse>({
-    {"100 mA fast", {.RatedCurrent = 0.1, .MeltingI2t = 0.0015, .ColdResistance = 4.0, .BlownResistance = 1e9}},
-    {"500 mA fast", {.RatedCurrent = 0.5, .MeltingI2t = 0.0375, .ColdResistance = 0.5, .BlownResistance = 1e9}},
-    {"1 A fast", {.RatedCurrent = 1.0, .MeltingI2t = 0.15, .ColdResistance = 0.15, .BlownResistance = 1e9}},
-    {"5 A fast", {.RatedCurrent = 5.0, .MeltingI2t = 3.75, .ColdResistance = 0.02, .BlownResistance = 1e9}},
-    {"1 A slow-blow", {.RatedCurrent = 1.0, .MeltingI2t = 1.0, .ColdResistance = 0.15, .BlownResistance = 1e9}},
+    {"100 mA fast", {.RatedCurrent = 0.1, .MeltingI2t = 0.0026, .ColdResistance = 5.6965, .BlownResistance = 1e9}},
+    {"500 mA fast", {.RatedCurrent = 0.5, .MeltingI2t = 0.215, .ColdResistance = 0.2065, .BlownResistance = 1e9}},
+    {"1 A fast", {.RatedCurrent = 1.0, .MeltingI2t = 1.045, .ColdResistance = 0.0964, .BlownResistance = 1e9}},
+    {"5 A fast", {.RatedCurrent = 5.0, .MeltingI2t = 42.795, .ColdResistance = 0.0137, .BlownResistance = 1e9}},
+    {"1 A slow-blow", {.RatedCurrent = 1.0, .MeltingI2t = 6.73, .ColdResistance = 0.0613, .BlownResistance = 1e9}},
 });
 
 /// Not a name a user can give a block, so the model never replaces one of theirs.

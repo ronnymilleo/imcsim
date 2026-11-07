@@ -17,7 +17,8 @@
 
 namespace Core {
 
-OperatingPointRun RunOperatingPoint(const Circuit &circuit);
+OperatingPointRun RunOperatingPoint(const Circuit &circuit,
+                                    const std::optional<ParameterValue> &parameter = std::nullopt);
 TransientRun RunTransient(const Circuit &circuit, const TransientSettings &settings,
                           const std::optional<ParameterValue> &parameter = std::nullopt,
                           const RunMonitor &monitor = {});

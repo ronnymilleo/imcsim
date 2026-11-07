@@ -87,6 +87,17 @@ struct MathResult {
     Dimension Unit;
 };
 
+/**
+ * @struct  ACMathResult
+ * @brief   An expression evaluated over an AC sweep: its magnitude and phase at each frequency, and its unit.
+ */
+struct ACMathResult {
+    /// Relative to 1 of the unit, as 20*log10 of the magnitude.
+    std::vector<double> MagnitudesDecibels;
+    std::vector<double> PhasesDegrees;
+    Dimension Unit;
+};
+
 /// Finds the node of a net name, or no value when no label gives that name.
 using NetResolver = std::function<std::optional<int>(std::string_view)>;
 
@@ -96,6 +107,7 @@ std::expected<MathResult, std::string> EvaluateExpression(const MathProgram &pro
                                                           Dimension x_unit,
                                                           const std::vector<std::vector<double>> &node_voltages,
                                                           const std::vector<Core::ComponentTrace> &currents);
+std::expected<ACMathResult, std::string> EvaluateACExpression(const MathProgram &program, const Core::ACSweep &sweep);
 std::string BuildOperatorExpression(std::string_view first, MathOperator math_operator, std::string_view second);
 std::string FormatUnit(Dimension unit);
 const char *GetOperatorSymbol(MathOperator math_operator);

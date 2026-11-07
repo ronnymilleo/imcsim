@@ -5,6 +5,7 @@
 
 #include "components/logic_part.h"
 #include "test_printers.h"
+#include "ui_elements/ui_behavioral_source.h"
 #include "ui_elements/ui_bjt.h"
 #include "ui_elements/ui_controlled_source.h"
 #include "ui_elements/ui_controlled_switch.h"
@@ -190,6 +191,19 @@ TEST_CASE("Controlled sources have their output vertical and their control pins 
     CHECK(cccs.GetTerminals() == std::vector<GUI::GridPoint>{{0, -2}, {0, 2}});
     CHECK(cccs.Contains({0.0f, 0.0f}));
     CHECK_FALSE(cccs.Contains({-1.5f, 0.0f}));
+}
+
+TEST_CASE("A behavioral source has its + on top and its - below, and labels what it drives", "[ui_element]") {
+    GUI::UIBehavioralSource source(Core::ComponentType::BEHAVIORAL_VOLTAGE, {0, 0}, GUI::Rotation::R0);
+    CHECK(source.GetTerminals() == std::vector<GUI::GridPoint>{{0, -2}, {0, 2}});
+    CHECK(source.Contains({0.0f, 0.0f}));
+    auto &component = static_cast<Core::BehavioralSource &>(source.GetComponent());
+    CHECK(GUI::FormatBehavioralLabel(component) == "V=1");
+    // A long expression is cut after 24 characters, which the part editor shows whole
+    component.SetExpression("V(IN)*V(LO)*0.5 + 1m*tanh(V(IN))");
+    CHECK(GUI::FormatBehavioralLabel(component) == "V=V(IN)*V(LO)*0.5 + 1m*tan\xE2\x80\xA6");
+    const GUI::UIBehavioralSource current(Core::ComponentType::BEHAVIORAL_CURRENT, {0, 0}, GUI::Rotation::R0);
+    CHECK(GUI::FormatBehavioralLabel(static_cast<const Core::BehavioralSource &>(current.GetComponent())) == "I=1m");
 }
 
 TEST_CASE("A potentiometer has its two ends on the sides and its wiper above, turning with it", "[ui_element]") {

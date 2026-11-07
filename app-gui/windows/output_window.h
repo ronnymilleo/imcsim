@@ -22,6 +22,7 @@
 #include "windows/output_tabs/frame_results.h"
 #include "windows/output_tabs/monte_carlo_tab.h"
 #include "windows/output_tabs/noise_tab.h"
+#include "windows/output_tabs/operating_point_tab.h"
 #include "windows/output_tabs/pole_zero_tab.h"
 #include "windows/output_tabs/s_parameter_tab.h"
 #include "windows/output_tabs/spectrum_tab.h"
@@ -101,6 +102,7 @@ private:
     std::optional<FullMath> m_FullMath;
 
     // Tabs
+    OperatingPointTab m_OperatingPointTab;
     TransientTab m_TransientTab;
     SpectrumTab m_SpectrumTab;
     ACSweepTab m_ACSweepTab;

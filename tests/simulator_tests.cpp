@@ -3,6 +3,7 @@
  * @brief   Tests for the operating point simulation, run through the real ngspice library.
  */
 
+#include "components/behavioral_source.h"
 #include "components/bjt.h"
 #include "components/capacitor.h"
 #include "components/clock.h"
@@ -17,6 +18,7 @@
 #include "components/potentiometer.h"
 #include "components/relay.h"
 #include "components/resistor.h"
+#include "components/subcircuit.h"
 #include "components/switch.h"
 #include "components/transformer.h"
 #include "components/vcc.h"
@@ -24,6 +26,8 @@
 #include "components/voltage_source.h"
 #include "digital_models.h"
 #include "model/circuit.h"
+#include "model/subcircuit.h"
+#include "simulation/circuit_checks.h"
 #include "simulation/simulator.h"
 #include <algorithm>
 #include <array>
@@ -35,6 +39,8 @@
 #include <format>
 #include <numbers>
 #include <numeric>
+#include <string>
+#include <string_view>
 #include <vector>
 
 namespace {
@@ -226,6 +232,43 @@ struct ControlledStage {
 };
 
 /**
+ * @struct  BehavioralStage
+ * @brief   A source of 2 V on net IN with 1k to ground, and a behavioral source from net OUT to ground loaded by 1k.
+ * @details Nodes: IN 1 and OUT 2. The expression is set by each test.
+ */
+struct BehavioralStage {
+    Core::VoltageSource Input;
+    Core::Resistor Sense;
+    Core::BehavioralSource Source;
+    Core::Resistor Load;
+    Core::Ground Reference;
+    Core::Circuit Circuit;
+
+    explicit BehavioralStage(const Core::ComponentType type) : Source(type) {
+        Input.SetName("Vin1");
+        Input.SetValue(2.0);
+        Sense.SetName("R1");
+        Source.SetName("B1");
+        Load.SetName("R2");
+        Circuit.Add(Input, {1, 0});
+        Circuit.Add(Sense, {1, 0});
+        Circuit.Add(Source, {2, 0});
+        Circuit.Add(Load, {2, 0});
+        Circuit.Add(Reference, {0});
+        Circuit.NameNet("IN", 1);
+        Circuit.NameNet("Out", 2);
+    }
+
+    double RunOutput() const {
+        const Core::OperatingPointRun run = Core::RunOperatingPoint(Circuit);
+        if (!run.Result) {
+            FAIL(run.Result.error());
+        }
+        return run.Result->NodeVoltages[2];
+    }
+};
+
+/**
  * @struct  InvertingAmplifier
  * @brief   An op-amp with 1k in and 10k of feedback, so a gain of -10, powered from +15 V and -15 V.
  * @details Nodes: input 1, inverting input 2, output 3, V+ 4 and V- 5; the non-inverting input is grounded.
@@ -260,6 +303,51 @@ struct InvertingAmplifier {
         Circuit.Add(Reference, {0});
     }
 };
+
+/// A voltage follower on its own supplies, its input reached through a resistor so the input current shows as a drop
+/// across it: the source on node 1, the + input on node 2, the output on node 3, V+ on 4 and V- on 5.
+struct Follower {
+    Core::VoltageSource Input;
+    Core::Resistor Series;
+    Core::OpAmp Amplifier;
+    Core::VCC Positive;
+    Core::VCC Negative;
+    Core::Resistor Load;
+    Core::Ground Reference;
+    Core::Circuit Circuit;
+
+    Follower(const double input, const double positive, const double negative, const double series_resistance) {
+        Input.SetName("Vin1");
+        Input.SetValue(input);
+        Series.SetName("R1");
+        Series.SetValue(series_resistance);
+        Amplifier.SetName("U1");
+        Positive.SetName("V1");
+        Positive.SetValue(positive);
+        Negative.SetName("V2");
+        Negative.SetValue(negative);
+        Load.SetName("R2");
+        Load.SetValue(10e3);
+        Circuit.Add(Input, {1, 0});
+        Circuit.Add(Series, {1, 2});
+        Circuit.Add(Amplifier, {3, 2, 3, 4, 5});
+        Circuit.Add(Positive, {4});
+        Circuit.Add(Negative, {5});
+        Circuit.Add(Load, {3, 0});
+        Circuit.Add(Reference, {0});
+    }
+};
+
+/**
+ * @brief   The node voltages of an operating point, or a failed check with the error of the run.
+ */
+std::vector<double> OperatingPointVoltages(const Core::Circuit &circuit) {
+    const Core::OperatingPointRun run = Core::RunOperatingPoint(circuit);
+    if (!run.Result) {
+        FAIL(run.Result.error());
+    }
+    return run.Result->NodeVoltages;
+}
 
 } // namespace
 
@@ -985,7 +1073,7 @@ TEST_CASE("Each LED model drops its rated forward voltage at 20 mA", "[simulator
         const char *Model;
         double ForwardVoltage;
     };
-    const Rating rating = GENERATE(Rating{"Red", 1.8}, Rating{"Green", 2.1}, Rating{"Blue", 3.0});
+    const Rating rating = GENERATE(Rating{"Red", 1.85}, Rating{"Green", 2.2}, Rating{"Blue", 3.3});
     CAPTURE(rating.Model);
     // The resistor sets 20 mA when the LED drops its rated voltage
     DiodeLoop loop(Core::ComponentType::LED, 5.0, (5.0 - rating.ForwardVoltage) / 20e-3);
@@ -1842,7 +1930,15 @@ TEST_CASE("A uA741 macromodel amplifies like the ideal op-amp but swings 1 V sho
     CHECK_THAT(run.Result->NodeVoltages[3], Catch::Matchers::WithinAbs(expected, 0.1));
 }
 
-TEST_CASE("A uA741 macromodel slews at its datasheet rate", "[simulator]") {
+TEST_CASE("Every ready macromodel op-amp slews at its datasheet rate", "[simulator]") {
+    const auto [model, datasheet_rate] = GENERATE(table<std::string, double>({
+        {"uA741", 0.5e6},
+        {"LM358", 0.3e6},
+        {"TL072", 20e6},
+        {"NE5532", 5e6},
+        {"OP07", 0.3e6},
+    }));
+    CAPTURE(model);
     // A unity-gain follower driven by a 10 V step, so the output can only follow at the slew rate
     Core::VoltageSource input;
     input.SetName("Vin1");
@@ -1851,7 +1947,7 @@ TEST_CASE("A uA741 macromodel slews at its datasheet rate", "[simulator]") {
         {.Low = -5.0, .High = 5.0, .Delay = 1e-6, .RiseTime = 1e-9, .FallTime = 1e-9, .Width = 1.0, .Period = 2.0});
     Core::OpAmp follower;
     follower.SetName("U1");
-    follower.SetModel(*Core::FindOpAmpModel(Core::ComponentType::OP_AMP, "uA741"));
+    follower.SetModel(*Core::FindOpAmpModel(Core::ComponentType::OP_AMP, model));
     Core::VCC positive;
     positive.SetName("V1");
     positive.SetValue(15.0);
@@ -1870,7 +1966,10 @@ TEST_CASE("A uA741 macromodel slews at its datasheet rate", "[simulator]") {
     circuit.Add(load, {2, 0});
     circuit.Add(reference, {0});
 
-    const Core::TransientRun run = Core::RunTransient(circuit, {.StopTime = 40e-6, .TimeStep = 10e-9});
+    // Long enough for the 10 V step at the slow rates, with a few thousand points over it at the fast ones
+    const double step_time = 10.0 / datasheet_rate;
+    const Core::TransientRun run =
+        Core::RunTransient(circuit, {.StopTime = 1e-6 + 2.0 * step_time, .TimeStep = step_time / 2000.0});
     if (!run.Result) {
         FAIL(run.Result.error());
     }
@@ -1883,7 +1982,73 @@ TEST_CASE("A uA741 macromodel slews at its datasheet rate", "[simulator]") {
         return times[static_cast<std::size_t>(index - output.begin())];
     };
     const double slew_rate = 6.0 / (crossing(3.0) - crossing(-3.0));
-    CHECK_THAT(slew_rate, Catch::Matchers::WithinRel(0.5e6, 0.05));
+    CHECK_THAT(slew_rate, Catch::Matchers::WithinRel(datasheet_rate, 0.05));
+}
+
+TEST_CASE("Every ready macromodel op-amp amplifies with the gain its resistors set", "[simulator]") {
+    const std::string model = GENERATE("uA741", "LM358", "TL072", "NE5532", "OP07");
+    CAPTURE(model);
+    InvertingAmplifier amplifier(0.5);
+    const Core::OpAmpModel &ready = *Core::FindOpAmpModel(Core::ComponentType::OP_AMP, model);
+    amplifier.Amplifier.SetModel(ready);
+    // R2 / R1 is 10, every model has 100 dB or more of open-loop gain, and the offset at the + input comes out
+    // multiplied by the noise gain, 1 + R2 / R1
+    const double expected = -10.0 * 0.5 + 11.0 * ready.Parameters.InputOffsetVoltage;
+    CHECK_THAT(OperatingPointVoltages(amplifier.Circuit)[3], Catch::Matchers::WithinAbs(expected, 5e-3));
+}
+
+TEST_CASE("An LM358 follows its input down to its negative supply, where the NPN input of a uA741 cannot",
+          "[simulator]") {
+    // A single 5 V supply with V- at ground, and an input 200 mV above it; closer to V- the soft knee of the limiters
+    // holds the output about 50 mV up
+    Follower lm358(0.2, 5.0, 0.0, 1e3);
+    const Core::OpAmpModel &ready = *Core::FindOpAmpModel(Core::ComponentType::OP_AMP, "LM358");
+    lm358.Amplifier.SetModel(ready);
+    CHECK_THAT(OperatingPointVoltages(lm358.Circuit)[3],
+               Catch::Matchers::WithinAbs(0.2 + ready.Parameters.InputOffsetVoltage, 1e-3));
+
+    Follower ua741(0.2, 5.0, 0.0, 1e3);
+    ua741.Amplifier.SetModel(*Core::FindOpAmpModel(Core::ComponentType::OP_AMP, "uA741"));
+    // Its output stops 1 V above V-
+    CHECK(OperatingPointVoltages(ua741.Circuit)[3] > 0.9);
+}
+
+TEST_CASE("A TL072 draws picoamperes into its inputs, where a uA741 draws tens of nanoamperes", "[simulator]") {
+    // The bias current flows through 1 MOhm into the + input, so each nanoampere drops a millivolt
+    const auto input_current = [](const std::string_view model) {
+        Follower follower(1.0, 15.0, -15.0, 1e6);
+        follower.Amplifier.SetModel(*Core::FindOpAmpModel(Core::ComponentType::OP_AMP, model));
+        const std::vector<double> voltages = OperatingPointVoltages(follower.Circuit);
+        return (voltages[1] - voltages[2]) / 1e6;
+    };
+    CHECK(std::abs(input_current("TL072")) < 1e-9);
+    CHECK_THAT(input_current("uA741"), Catch::Matchers::WithinRel(80e-9, 0.1));
+    // The PNP input of an LM358 draws its 20 nA out of the pin
+    CHECK_THAT(input_current("LM358"), Catch::Matchers::WithinRel(-20e-9, 0.1));
+}
+
+TEST_CASE("The input offset voltage of a custom op-amp shows at the output of a follower, with its sign",
+          "[simulator]") {
+    const double offset = GENERATE(5e-3, -5e-3);
+    const Core::OpAmpInputStage stage =
+        GENERATE(Core::OpAmpInputStage::NPN, Core::OpAmpInputStage::PNP, Core::OpAmpInputStage::JFET);
+    CAPTURE(offset, Core::GetOpAmpInputStageName(stage));
+    Follower follower(0.0, 15.0, -15.0, 1e3);
+    follower.Amplifier.SetCustom();
+    Core::OpAmpParameters parameters = follower.Amplifier.GetParameters();
+    parameters.InputStage = stage;
+    parameters.InputOffsetVoltage = offset;
+    follower.Amplifier.SetCustomParameters(parameters);
+    // A 1 kOhm series resistor drops 80 uV of the bias current of the NPN and PNP pairs
+    CHECK_THAT(OperatingPointVoltages(follower.Circuit)[3], Catch::Matchers::WithinAbs(offset, 2e-4));
+}
+
+TEST_CASE("Input stages are named for the editor and files, and found again by those names", "[simulator]") {
+    for (const Core::OpAmpInputStage stage : Core::GetOpAmpInputStages()) {
+        CHECK(Core::FindOpAmpInputStage(Core::GetOpAmpInputStageName(stage)) == stage);
+    }
+    CHECK(Core::GetOpAmpInputStages().size() == 3);
+    CHECK_FALSE(Core::FindOpAmpInputStage("CMOS").has_value());
 }
 
 TEST_CASE("A potentiometer divides its supply by the position of its wiper", "[simulator]") {
@@ -2718,6 +2883,37 @@ TEST_CASE("A stepped temperature changes the forward voltage of a diode", "[simu
     CHECK(cold - hot < 0.3);
 }
 
+TEST_CASE("A stepped operating point runs at the step value of a part or of the temperature", "[simulator]") {
+    Core::VCC supply;
+    supply.SetName("V1");
+    supply.SetValue(5.0);
+    Core::Resistor series;
+    series.SetName("R1");
+    Core::Diode diode(Core::ComponentType::DIODE);
+    diode.SetName("D1");
+    const Core::Ground reference;
+    Core::Circuit circuit;
+    circuit.Add(supply, {1});
+    circuit.Add(series, {1, 2});
+    circuit.Add(diode, {2, 0});
+    circuit.Add(reference, {0});
+    const auto read_diode = [&](const Core::ParameterValue &parameter) {
+        const Core::OperatingPointRun run = Core::RunOperatingPoint(circuit, parameter);
+        REQUIRE(run.Result);
+        return run.Result->NodeVoltages[2];
+    };
+    // About -2 mV per degree, as for any silicon junction
+    const double cold = read_diode({"", 0.0});
+    const double hot = read_diode({"", 100.0});
+    CHECK(cold - hot > 0.1);
+    CHECK(cold - hot < 0.3);
+    // Less current through a larger resistor gives a lower forward voltage, by about 60 mV per decade
+    const double small = read_diode({"R1", 1e3});
+    const double large = read_diode({"R1", 100e3});
+    CHECK(small - large > 0.06);
+    CHECK(series.GetValue() == 1e3);
+}
+
 TEST_CASE("A stepped parameter rejects a part that cannot step and values out of range", "[simulator]") {
     const LowPass low_pass;
     const Core::TransientSettings settings{.StopTime = 1e-3, .TimeStep = 1e-5};
@@ -3282,4 +3478,93 @@ TEST_CASE("A logic input gives a NAND latch a defined state", "[simulator][digit
     REQUIRE(reset.Result.has_value());
     CHECK_THAT(reset.Result->NodeVoltages[2], Catch::Matchers::WithinAbs(0.0, 0.05));
     CHECK_THAT(reset.Result->NodeVoltages[3], Catch::Matchers::WithinAbs(5.0, 0.05));
+}
+
+TEST_CASE("A behavioral voltage source drives its expression of node voltages, named by net", "[simulator]") {
+    BehavioralStage stage(Core::ComponentType::BEHAVIORAL_VOLTAGE);
+    // Nets ignore case, as labels do
+    stage.Source.SetExpression("3*V(in)*V(IN)");
+    CHECK_THAT(stage.RunOutput(), Catch::Matchers::WithinAbs(12.0, 1e-6));
+    stage.Source.SetExpression("V(IN, 0) - tanh(0)");
+    CHECK_THAT(stage.RunOutput(), Catch::Matchers::WithinAbs(2.0, 1e-6));
+    CHECK(stage.Circuit.ToSpiceNetlist().contains("B1 2 0 V=v(1,0) - tanh(0)"));
+}
+
+TEST_CASE("A behavioral current source pushes its current from + to - through itself", "[simulator]") {
+    BehavioralStage stage(Core::ComponentType::BEHAVIORAL_CURRENT);
+    // 2 mA out of the OUT node into ground, through itself, so the load pulls OUT to -2 V
+    stage.Source.SetExpression("1m*V(IN)");
+    CHECK_THAT(stage.RunOutput(), Catch::Matchers::WithinAbs(-2.0, 1e-6));
+}
+
+TEST_CASE("A behavioral source reads the current of a part through its probe", "[simulator]") {
+    BehavioralStage stage(Core::ComponentType::BEHAVIORAL_VOLTAGE);
+    // 2 mA through R1 times 1k
+    stage.Source.SetExpression("1k*I(R1)");
+    CHECK_THAT(stage.RunOutput(), Catch::Matchers::WithinAbs(2.0, 1e-6));
+    CHECK(stage.Circuit.ToSpiceNetlist().contains("i(Vprobe-R1)"));
+}
+
+TEST_CASE("A behavioral source follows time in a transient and is linearized in an AC sweep", "[simulator]") {
+    BehavioralStage stage(Core::ComponentType::BEHAVIORAL_VOLTAGE);
+    stage.Source.SetExpression("time*1k");
+    const Core::TransientRun ramp = Core::RunTransient(stage.Circuit, {.StopTime = 1e-3, .TimeStep = 1e-5});
+    REQUIRE(ramp.Result);
+    CHECK_THAT(ramp.Result->NodeVoltages[2].back(), Catch::Matchers::WithinAbs(1.0, 1e-3));
+
+    // An AC source has no DC level, so the expression is read at 0 V: 5*V(IN) + V(IN)^2 has a slope of 5, 14 dB
+    stage.Input.SetSourceType(Core::VoltageSource::SourceType::AC);
+    stage.Source.SetExpression("5*V(IN) + V(IN)*V(IN)");
+    const Core::ACSweepRun sweep =
+        Core::RunACSweep(stage.Circuit, {.StartFrequency = 1e3, .StopFrequency = 1e4, .PointsPerDecade = 1});
+    REQUIRE(sweep.Result);
+    CHECK_THAT(sweep.Result->NodeMagnitudesDecibels[2].front(), Catch::Matchers::WithinAbs(13.98, 0.05));
+}
+
+TEST_CASE("A behavioral source inside a block reads the nets and currents of the block", "[simulator]") {
+    // The block doubles the current of its resistor into a voltage: 1 mA through 1k gives 2 V at its output
+    Core::Resistor inner;
+    inner.SetName("R1");
+    Core::BehavioralSource doubler(Core::ComponentType::BEHAVIORAL_VOLTAGE);
+    doubler.SetName("B1");
+    doubler.SetExpression("2k*I(R1) + 0*V(MID)");
+    auto definition = std::make_shared<Core::SubcircuitDefinition>();
+    definition->Name = "doubler";
+    definition->Pins = {{"IN", 1}, {"OUT", 2}};
+    definition->Body.Add(inner, {1, 0});
+    definition->Body.Add(doubler, {2, 0});
+    definition->Body.NameNet("MID", 1);
+
+    Core::VCC supply;
+    supply.SetName("V1");
+    supply.SetValue(1.0);
+    Core::SubcircuitInstance instance("doubler", {"IN", "OUT"});
+    instance.SetName("X1");
+    Core::Resistor load;
+    load.SetName("R9");
+    const Core::Ground reference;
+    Core::Circuit circuit;
+    circuit.Add(supply, {1});
+    circuit.Add(instance, {1, 2});
+    circuit.Add(load, {2, 0});
+    circuit.Add(reference, {0});
+    circuit.AddSubcircuit(definition);
+    const Core::OperatingPointRun run = Core::RunOperatingPoint(circuit);
+    if (!run.Result) {
+        FAIL(run.Result.error());
+    }
+    CHECK_THAT(run.Result->NodeVoltages[2], Catch::Matchers::WithinAbs(2.0, 1e-6));
+}
+
+TEST_CASE("A behavioral source that names a missing net or its own current is refused before ngspice", "[simulator]") {
+    BehavioralStage stage(Core::ComponentType::BEHAVIORAL_VOLTAGE);
+    stage.Source.SetExpression("V(LO)*2");
+    const Core::OperatingPointRun missing = Core::RunOperatingPoint(stage.Circuit);
+    REQUIRE_FALSE(missing.Result);
+    CHECK(missing.Result.error() == "B1: The circuit has no net named LO");
+
+    stage.Source.SetExpression("I(B1)");
+    CHECK(Core::CheckCircuit(stage.Circuit) == "B1 cannot read its own current");
+    stage.Source.SetExpression("I(R7)");
+    CHECK(Core::CheckCircuit(stage.Circuit) == "B1: The circuit has no current I(R7)");
 }

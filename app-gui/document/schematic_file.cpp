@@ -5,6 +5,7 @@
 
 #include "document/schematic_file.h"
 
+#include "components/behavioral_source.h"
 #include "components/bjt.h"
 #include "components/clock.h"
 #include "components/controlled_source.h"
@@ -217,6 +218,7 @@ constexpr auto OP_AMP_KEYS = std::to_array<ParameterKey<Core::OpAmpParameters>>(
     {"headroom_positive", &Core::OpAmpParameters::PositiveHeadroom},
     {"headroom_negative", &Core::OpAmpParameters::NegativeHeadroom},
     {"iq", &Core::OpAmpParameters::SupplyCurrent},
+    {"vos", &Core::OpAmpParameters::InputOffsetVoltage},
 });
 
 constexpr auto NOISE_KEYS = std::to_array<ParameterKey<Core::NoiseParameters>>({
@@ -440,6 +442,10 @@ void WriteModelFields(const Core::Component &component, nlohmann::json &object) 
     } else if (type == Core::ComponentType::OP_AMP) {
         const auto &op_amp = static_cast<const Core::OpAmp &>(component);
         WriteModelChoice(op_amp, OP_AMP_KEYS, object);
+        // The input stage is a name, so it is written apart from the numbers
+        if (op_amp.IsCustom()) {
+            object["parameters"]["input"] = Core::GetOpAmpInputStageName(op_amp.GetParameters().InputStage);
+        }
         if (op_amp.IsIdeal()) {
             object["gbw"] = op_amp.GetIdealBandwidth();
         }
@@ -462,6 +468,8 @@ void WriteKindFields(const Core::Component &component, nlohmann::json &object) {
     const Core::ComponentType type = component.GetType();
     if (Core::IsCurrentControlled(type)) {
         object["control"] = static_cast<const Core::ControlledSource &>(component).GetControllingCurrent();
+    } else if (Core::IsBehavioralSource(type)) {
+        object["expression"] = static_cast<const Core::BehavioralSource &>(component).GetExpression();
     } else if (type == Core::ComponentType::SUBCIRCUIT) {
         const auto &instance = static_cast<const Core::SubcircuitInstance &>(component);
         object["definition"] = instance.GetDefinitionName();
@@ -731,6 +739,26 @@ std::expected<void, std::string> ReadModelChoice(const nlohmann::json &object, P
     return {};
 }
 
+/**
+ * @brief   The input stage of a custom op-amp; a file saved before op-amps had one keeps the NPN pair.
+ */
+std::expected<void, std::string> ReadOpAmpInputStage(const nlohmann::json &object, Core::OpAmp &op_amp) {
+    const auto parameters_object = object.find("parameters");
+    if (!op_amp.IsCustom() || parameters_object == object.end() || !parameters_object->contains("input")) {
+        return {};
+    }
+    const std::optional<std::string> name = ReadString(*parameters_object, "input");
+    const std::optional<Core::OpAmpInputStage> stage =
+        name ? Core::FindOpAmpInputStage(*name) : std::optional<Core::OpAmpInputStage>{};
+    if (!stage) {
+        return std::unexpected("has no valid op-amp input stage");
+    }
+    Core::OpAmpParameters parameters = op_amp.GetParameters();
+    parameters.InputStage = *stage;
+    op_amp.SetCustomParameters(parameters);
+    return {};
+}
+
 std::expected<void, std::string> ReadModel(const nlohmann::json &object, Core::Component &component) {
     const Core::ComponentType type = component.GetType();
     if (Core::IsDiode(type)) {
@@ -752,6 +780,9 @@ std::expected<void, std::string> ReadModel(const nlohmann::json &object, Core::C
             if (const auto read =
                     ReadModelChoice(object, op_amp, &Core::FindOpAmpModel, Core::CUSTOM_OP_AMP_MODEL_NAME, OP_AMP_KEYS);
                 !read) {
+                return read;
+            }
+            if (const auto read = ReadOpAmpInputStage(object, op_amp); !read) {
                 return read;
             }
         }
@@ -780,6 +811,21 @@ std::expected<void, std::string> ReadControllingCurrent(const nlohmann::json &ob
         return std::unexpected("has a controlling current that is not text");
     }
     static_cast<Core::ControlledSource &>(component).SetControllingCurrent(*current);
+    return {};
+}
+
+/**
+ * @brief   The expression of a behavioral source, kept as written; a missing one loads as the default.
+ */
+std::expected<void, std::string> ReadBehavioralExpression(const nlohmann::json &object, Core::Component &component) {
+    if (!Core::IsBehavioralSource(component.GetType()) || !object.contains("expression")) {
+        return {};
+    }
+    const std::optional<std::string> expression = ReadString(object, "expression");
+    if (!expression) {
+        return std::unexpected("has an expression that is not text");
+    }
+    static_cast<Core::BehavioralSource &>(component).SetExpression(*expression);
     return {};
 }
 
@@ -865,8 +911,9 @@ std::expected<void, std::string> ReadLogicInputState(const nlohmann::json &objec
 
 using StateReader = std::expected<void, std::string> (*)(const nlohmann::json &, Core::Component &);
 
-constexpr auto STATE_READERS = std::to_array<StateReader>(
-    {&ReadControllingCurrent, &ReadNetName, &ReadPortSettings, &ReadSwitchState, &ReadWiper, &ReadLogicInputState});
+constexpr auto STATE_READERS =
+    std::to_array<StateReader>({&ReadControllingCurrent, &ReadBehavioralExpression, &ReadNetName, &ReadPortSettings,
+                                &ReadSwitchState, &ReadWiper, &ReadLogicInputState});
 
 /**
  * @brief   What only some kinds of part carry: the current a controlled source follows, a net name, a switch state, a

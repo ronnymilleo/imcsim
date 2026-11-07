@@ -563,13 +563,15 @@ void FitMathAxes(const std::vector<MathTrace> &math) {
 /**
  * @brief   Plots the math channels on their axes; division by zero leaves NaN samples, which are skipped instead of
  *          breaking the line.
- * @param[in]     xs       X values of the samples.
- * @param[in]     math     The math channels.
- * @param[in]     suffix   Tells the curves of a DC sweep family apart in the cursor readout.
- * @param[in,out] plotted  The traces drawn, for the cursor readout.
+ * @param[in]     xs            X values of the samples.
+ * @param[in]     math          The math channels.
+ * @param[in]     suffix        Tells the curves of a DC sweep family apart in the cursor readout.
+ * @param[in,out] plotted       The traces drawn, for the cursor readout.
+ * @param[in]     readout_unit  Unit the cursor readout gives the values, such as " dB" for the magnitudes of an AC
+ *                              sweep, or null for the unit of each channel.
  */
 void PlotMath(const std::vector<double> &xs, const std::vector<MathTrace> &math, const std::string &suffix,
-              std::vector<PlottedTrace> &plotted) {
+              std::vector<PlottedTrace> &plotted, const char *readout_unit) {
     for (const MathTrace &trace : math) {
         ImPlot::SetAxes(ImAxis_X1, trace.Axis);
         ImPlotSpec spec;
@@ -577,7 +579,8 @@ void PlotMath(const std::vector<double> &xs, const std::vector<MathTrace> &math,
         spec.LineWeight = MATH_LINE_WEIGHT;
         spec.Flags = ImPlotLineFlags_SkipNaN;
         ImPlot::PlotLine(trace.Label.c_str(), xs.data(), trace.Values.data(), static_cast<int>(xs.size()), spec);
-        plotted.push_back({trace.Label + suffix, &trace.Values, trace.Unit.c_str(), trace.Color});
+        plotted.push_back({trace.Label + suffix, &trace.Values,
+                           readout_unit != nullptr ? readout_unit : trace.Unit.c_str(), trace.Color});
     }
     ImPlot::SetAxes(ImAxis_X1, ImAxis_Y1);
 }

@@ -17,7 +17,8 @@ namespace {
 
 /// Grouped by part, default model first. Common vendor cards reduced to the parameters of BJTParameters; the gain
 /// stays within the datasheet range at the test currents of each part. Ratings are the absolute maximum VCEO and
-/// IC and the free-air dissipation.
+/// IC and the dissipation at 25 C in free air of the TO-92 onsemi datasheets: 2N3904/D Rev. 3, P2N2222A/D Rev. 7,
+/// BC546/D Rev. 8, 2N3906/D Rev. 4, P2N2907A/D Rev. 6 and BC556B/D Rev. 3, all 625 mW.
 constexpr auto BJT_MODELS = std::to_array<BJTModel>({
     {"2N3904",
      "General-purpose NPN, 40 V 200 mA",
@@ -55,7 +56,7 @@ constexpr auto BJT_MODELS = std::to_array<BJTModel>({
       .TransitTime = 411.1e-12,
       .MaxCollectorEmitterVoltage = 40.0,
       .MaxCollectorCurrent = 0.6,
-      .MaxPower = 0.5},
+      .MaxPower = 0.625},
      ComponentType::NPN},
     {"BC547B",
      "Small-signal NPN, 45 V 100 mA, high gain",
@@ -75,7 +76,7 @@ constexpr auto BJT_MODELS = std::to_array<BJTModel>({
       .TransitTime = 439.1e-12,
       .MaxCollectorEmitterVoltage = 45.0,
       .MaxCollectorCurrent = 0.1,
-      .MaxPower = 0.5},
+      .MaxPower = 0.625},
      ComponentType::NPN},
     {"2N3906",
      "General-purpose PNP, 40 V 200 mA",
@@ -111,7 +112,7 @@ constexpr auto BJT_MODELS = std::to_array<BJTModel>({
       .TransitTime = 603.7e-12,
       .MaxCollectorEmitterVoltage = 60.0,
       .MaxCollectorCurrent = 0.6,
-      .MaxPower = 0.4},
+      .MaxPower = 0.625},
      ComponentType::PNP},
     {"BC557B",
      "Small-signal PNP, 45 V 100 mA, high gain",
@@ -131,7 +132,7 @@ constexpr auto BJT_MODELS = std::to_array<BJTModel>({
       .TransitTime = 636e-12,
       .MaxCollectorEmitterVoltage = 45.0,
       .MaxCollectorCurrent = 0.1,
-      .MaxPower = 0.5},
+      .MaxPower = 0.625},
      ComponentType::PNP},
 });
 

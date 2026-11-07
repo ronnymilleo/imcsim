@@ -180,10 +180,15 @@ TEST_CASE("Monte Carlo is the run mode only for the analyses it repeats", "[auto
     GUI::SimulationSettings settings;
     CHECK_FALSE(GUI::IsMonteCarloRun(settings));
     settings.MonteCarlo.Enabled = true;
-    for (const GUI::Analysis analysis : {GUI::Analysis::TRANSIENT, GUI::Analysis::AC_SWEEP, GUI::Analysis::DC_SWEEP}) {
+    for (const GUI::Analysis analysis :
+         {GUI::Analysis::OPERATING_POINT, GUI::Analysis::TRANSIENT, GUI::Analysis::AC_SWEEP, GUI::Analysis::DC_SWEEP}) {
         settings.Selected = analysis;
         CHECK(GUI::IsMonteCarloRun(settings));
+        CHECK(GUI::IsRepeatable(analysis));
     }
-    settings.Selected = GUI::Analysis::OPERATING_POINT;
-    CHECK_FALSE(GUI::IsMonteCarloRun(settings));
+    for (const GUI::Analysis analysis : {GUI::Analysis::NOISE, GUI::Analysis::TRUTH_TABLE}) {
+        settings.Selected = analysis;
+        CHECK_FALSE(GUI::IsMonteCarloRun(settings));
+        CHECK_FALSE(GUI::IsRepeatable(analysis));
+    }
 }
