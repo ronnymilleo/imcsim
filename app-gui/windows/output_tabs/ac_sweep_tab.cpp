@@ -110,7 +110,7 @@ void ACSweepTab::DrawPlots(const Core::ACSweep &sweep, const ACMathTraces &math)
     const std::string third_name = third_unit.empty() ? "Math" : third_unit;
     DrawPlot(sweep,
              {.Id = "Magnitude##ac",
-              .VoltageAxis = "Voltage (dB)",
+              .VoltageAxis = "Gain (dB)",
               .CurrentAxis = "Current (dB)",
               .ThirdAxis = std::format("{} (dB)", third_name),
               .Unit = " dB",
