@@ -380,6 +380,7 @@ void EditorWindow::Draw() {
     const ImVec2 size = GetCanvasSize();
     m_CanvasCenter = {origin.x + size.x / 2.0f, origin.y + size.y / 2.0f};
     m_CanvasTop = origin.y;
+    m_View.FollowCanvasSize(size);
     m_View.FrameIfRequested(*m_Schematic, size, m_Preferences.Symbols, m_Preferences.ShowTerminalNumbers);
 
     // The way back from a block sits over the canvas, and takes the clicks that land on it
