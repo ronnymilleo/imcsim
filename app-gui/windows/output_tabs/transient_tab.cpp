@@ -29,12 +29,15 @@ namespace {
 
 /// Width of the field for the size of the window, in font sizes.
 constexpr float WINDOW_SIZE_WIDTH = 4.5f;
+/// The label of that field: points of the plot, not the time steps of the run, which the status bar counts.
+constexpr const char *WINDOW_SIZE_LABEL = "Plot points";
 
 /**
  * @brief   The width of the labeled field for the size of the window, at the right end of the plot header.
  */
 float GetWindowSizeWidth() {
-    return ImGui::CalcTextSize("Points").x + ImGui::GetStyle().ItemSpacing.x + ImGui::GetFontSize() * WINDOW_SIZE_WIDTH;
+    return ImGui::CalcTextSize(WINDOW_SIZE_LABEL).x + ImGui::GetStyle().ItemSpacing.x +
+           ImGui::GetFontSize() * WINDOW_SIZE_WIDTH;
 }
 /// How many points a pixel of dragging adds to the size of the window.
 constexpr float WINDOW_SIZE_DRAG_SPEED = 20.0f;
@@ -399,7 +402,7 @@ void TransientTab::DrawWindowSize() {
     TransientWindow &window = m_Playback.Window;
     const float size_width = ImGui::GetFontSize() * WINDOW_SIZE_WIDTH;
     ImGui::AlignTextToFramePadding();
-    ImGui::TextDisabled("Points");
+    ImGui::TextDisabled("%s", WINDOW_SIZE_LABEL);
     ImGui::SameLine();
     ImGui::SetNextItemWidth(size_width);
     int points = window.GetPoints();
@@ -408,7 +411,7 @@ void TransientTab::DrawWindowSize() {
         window.SetPoints(points);
     }
     ImGui::SetItemTooltip("%s", std::format("How many points the plot and the schematic show at a time, from {} to "
-                                            "{}; drag, or double-click to type. The run has {} points",
+                                            "{}; drag, or double-click to type. The run has {} time steps",
                                             MIN_WINDOW_POINTS, MAX_WINDOW_POINTS, window.GetTotalPoints())
                                     .c_str());
 }
