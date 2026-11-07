@@ -145,8 +145,9 @@ How to read what imcsim measures, plots and exports. The [README](../README.md) 
   they wait, grayed out, for the end of a run that is still going on. The spectrum uses the whole run too. The other analyses stop between their steps (the values
   of a stepped analysis, the combinations of a truth table) and drop their result, and a single simulation finishes
   first; a Monte Carlo analysis keeps the runs made ("Stopped after 40 of 100 runs"). Editing the circuit also stops the run and drops what it made, since the answer would no longer fit.
-- **Status bar**: below the schematic, the keys of the current mode on the left; on the right, the grid position of
-  the cursor and how the last run went ("Transient done", with warnings, or failed). Click the result for the
+- **Status bar**: below the schematic, how the last run went first ("Transient done", with warnings, or failed,
+  followed by the reason, which then takes the whole line), then the keys of the current mode, shortened at a word
+  when the window is narrow, and the grid position of the cursor on the right. Click the result for the
   errors, the warnings and the ngspice output. Among the warnings are the safe operating area ones: a diode, LED,
   Zener, transistor or MOSFET that a run pushes past its ratings (diode average forward current and power, and the VCE, IC,
   VDS, VGS, ID and power of transistors) is named with the value and the rating. Ratings are fields of a part's
@@ -170,8 +171,9 @@ How to read what imcsim measures, plots and exports. The [README](../README.md) 
   new result is waiting. The operating point tab lists the node voltages and part currents, which also show on the schematic. Reopen it from View.
 - **Window layout**: every window floats or docks. Drag a window by its title (or a docked one by its tab) onto
   the arrows that appear over another window to dock it on that side or as a tab; drop it anywhere else to let it
-  float. By default the editor, Output, Analysis Settings and Netlist are tabs of the main area and Properties sits
-  on its right. The layout is kept between sessions, and View > Reset Layout restores the default.
+  float. By default the editor and Output sit side by side, and a column on the right holds Properties over
+  Analysis Settings and Netlist, which share it as tabs; a window opens in its place and the others make room, so
+  the editor fills the window until the first result opens Output beside it, keeping the circuit centered. The layout is kept between sessions, and View > Reset Layout restores the default.
 
 ## Blocks
 

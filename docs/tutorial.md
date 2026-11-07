@@ -86,7 +86,7 @@ selected one: pick Transient and click Suggest, which proposes settings from the
 of the source (5 ms) with a 5 µs step.
 
 Click Run, or press F5. ngspice runs the circuit, the status bar reports the result, and the Output window opens by
-itself, as a tab beside the schematic, on the tab of the new analysis.
+itself beside the schematic, on the tab of the new analysis.
 
 ![The transient result for the rectifier: output voltage and diode current](images/tutorial_run.png)
 
@@ -103,7 +103,7 @@ Every window can float or dock: drag it by its title or tab and drop it on one o
 beside, above or below another window or as a tab of it. The layout is kept for the next session, and View > Reset
 Layout brings back the default one.
 
-If a run fails, the status bar says so in red; click it for the error and the ngspice output.
+If a run fails, the status bar says so in red, with the reason; click it for the whole error and the ngspice output.
 
 ## 6. Change a value
 
