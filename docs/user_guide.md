@@ -11,8 +11,8 @@ How to read what imcsim measures, plots and exports. The [README](../README.md) 
 - **Editing a part**: double-click it, or select it and press Enter, to open its properties at the top of the
   schematic; edits apply as you type, and Enter, Esc or a click outside closes them. With a part selected, typing a
   number starts editing its main value right away: `4k7` and Enter make a resistor 4.7k. Values take SPICE suffixes, and a whole
-  number may put its decimals after the suffix, as resistor codes do (`4k7`, `2M2`, `3u3`). View > Properties keeps
-  the same fields in a docked window.
+  number may put its decimals after the suffix, as resistor codes do (`4k7`, `2M2`, `3u3`). The Properties window
+  beside Output keeps the same fields docked.
 - **Renaming a part**: the Name field of its properties takes a new name when you press Enter or click away. The name
   keeps the letter the part starts with, which tells ngspice what the part is (`R` for a resistor, `X` for a block,
   `U` for a gate), then letters, digits or `_`, such as `RLOAD` or `XCOUNT`; no two parts may share a name, whatever
@@ -172,8 +172,9 @@ How to read what imcsim measures, plots and exports. The [README](../README.md) 
 - **Window layout**: every window floats or docks. Drag a window by its title (or a docked one by its tab) onto
   the arrows that appear over another window to dock it on that side or as a tab; drop it anywhere else to let it
   float. By default the editor and Output sit side by side, and a column on the right holds Properties over
-  Analysis Settings and Netlist, which share it as tabs; a window opens in its place and the others make room, so
-  the editor fills the window until the first result opens Output beside it, keeping the circuit centered. The layout is kept between sessions, and View > Reset Layout restores the default.
+  Analysis Settings and Netlist, which share it as tabs and open from the View menu; a window opens in its place
+  and the others make room, keeping the circuit centered, and every window keeps its share when the main window
+  changes size. The layout is kept between sessions, and View > Reset Layout restores the default.
 
 ## Blocks
 

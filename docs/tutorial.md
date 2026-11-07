@@ -85,8 +85,8 @@ The button beside Run names the analysis it runs. Click it to open the analysis 
 selected one: pick Transient and click Suggest, which proposes settings from the sources and parts, here five periods
 of the source (5 ms) with a 5 µs step.
 
-Click Run, or press F5. ngspice runs the circuit, the status bar reports the result, and the Output window opens by
-itself beside the schematic, on the tab of the new analysis.
+Click Run, or press F5. ngspice runs the circuit, the status bar reports the result, and the Output window beside the
+schematic turns to the tab of the new analysis.
 
 ![The transient result for the rectifier: output voltage and diode current](images/tutorial_run.png)
 
