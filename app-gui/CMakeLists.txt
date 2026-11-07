@@ -54,6 +54,7 @@ add_library(imcsim-gui-lib
             editing/element_factory.cpp
             editing/group_editing.cpp
             editing/live_input.cpp
+            editing/part_catalog.cpp
             editing/part_names.cpp
             editing/probing.cpp
             editing/selection.cpp

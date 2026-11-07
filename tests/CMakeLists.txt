@@ -40,6 +40,7 @@ add_executable(imcsim-tests
             monte_carlo_results_tests.cpp
             monte_carlo_tests.cpp
             parameter_step_tests.cpp
+            part_catalog_tests.cpp
             part_names_tests.cpp
             playback_tests.cpp
             plot_tab_tests.cpp
