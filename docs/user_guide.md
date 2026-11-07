@@ -141,7 +141,7 @@ How to read what imcsim measures, plots and exports. The [README](../README.md) 
   chunks: its plot opens in the Output window with the first one and grows as the others arrive, with a Stop button
   and "Running, simulated up to 230ms of 1s" above it. Stop keeps the points made so far ("Stopped, simulated up to
   530ms of 1s", and "Transient stopped" in the status bar). The transient plot shows a window of 2000 points at a time (the
-  Points field at its top right sets 1000 to 10000), so a long run stays quick to draw and to measure: a scroll bar the
+  Plot points field at its top right sets 1000 to 10000; the run itself may have more time steps), so a long run stays quick to draw and to measure: a scroll bar the
   width of the plot, with its time span written above it after Range, moves the window along the run (the plot fits itself to every window), and
   while the run goes on a Follow box keeps the window on the newest points. The schematic plays the same window: its
   time bar, its heat colors and the playhead of the plot all go over the window, and while the window follows a run the
@@ -151,7 +151,7 @@ How to read what imcsim measures, plots and exports. The [README](../README.md) 
   they wait, grayed out, for the end of a run that is still going on. The spectrum uses the whole run too. The other analyses stop between their steps (the values
   of a stepped analysis, the combinations of a truth table) and drop their result, and a single simulation finishes
   first; a Monte Carlo analysis keeps the runs made ("Stopped after 40 of 100 runs"). Editing the circuit also stops the run and drops what it made, since the answer would no longer fit.
-- **Status bar**: below the schematic, how the last run went first ("Transient done · 2000 points in 41ms", with
+- **Status bar**: below the schematic, how the last run went first ("Transient done · 2000 time steps in 41ms", with
   warnings, or failed, followed by the reason, which then takes the whole line), then the keys of the current mode, shortened at a word
   when the window is narrow, and the grid position of the cursor on the right. Click the result for the
   errors, the warnings and the ngspice output. Among the warnings are the safe operating area ones: a diode, LED,
