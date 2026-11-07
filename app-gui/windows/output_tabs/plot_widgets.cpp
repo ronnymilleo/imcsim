@@ -740,6 +740,67 @@ bool BeginStatisticsTable(const std::string &id) {
 }
 
 /**
+ * @brief   Draws readings as one table with a row per quantity and a column per trace, headed by the trace labels in
+ *          their colors, with the figures right-aligned so their digits line up.
+ * @param[in] id      ImGui ID of the table.
+ * @param[in] traces  Traces of the columns, for their labels and colors.
+ * @param[in] rows    Readings, each row holding one cell per trace in the same order.
+ * @note    The table is as wide as its widest cells, and the statistics panel scrolls sideways when the traces do not
+ *          fit.
+ */
+void DrawTraceTable(const char *id, const std::vector<PlottedTrace> &traces, const std::vector<StatisticsRow> &rows) {
+    const auto measure = [](const std::string &text) { return ImGui::CalcTextSize(text.c_str()).x; };
+    // Each column is as wide as its widest text, so the table width is known before it begins
+    std::vector<float> widths(traces.size() + 1, 0.0f);
+    for (std::size_t column = 0; column < traces.size(); ++column) {
+        widths[column + 1] = measure(traces[column].Label);
+    }
+    for (const StatisticsRow &row : rows) {
+        widths[0] = std::max(widths[0], measure(row.Name));
+        for (std::size_t column = 0; column < row.Cells.size() && column < traces.size(); ++column) {
+            widths[column + 1] = std::max(widths[column + 1], measure(row.Cells[column].Text));
+        }
+    }
+    const float padding = ImGui::GetStyle().CellPadding.x * 2.0f;
+    float table_width = 0.0f;
+    for (const float width : widths) {
+        table_width += width + padding;
+    }
+    if (!ImGui::BeginTable(id, static_cast<int>(widths.size()), ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_RowBg,
+                           {table_width, 0.0f})) {
+        return;
+    }
+    for (const float width : widths) {
+        ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed, width);
+    }
+    const auto right_aligned = [&measure](const std::string &text, const float column_width) {
+        ImGui::SetCursorPosX(ImGui::GetCursorPosX() + column_width - measure(text));
+    };
+    ImGui::TableNextRow(ImGuiTableRowFlags_Headers);
+    ImGui::TableNextColumn();
+    for (std::size_t column = 0; column < traces.size(); ++column) {
+        ImGui::TableNextColumn();
+        right_aligned(traces[column].Label, widths[column + 1]);
+        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(traces[column].Color), "%s", traces[column].Label.c_str());
+    }
+    for (const StatisticsRow &row : rows) {
+        ImGui::TableNextRow();
+        ImGui::TableNextColumn();
+        ImGui::TextDisabled("%s", row.Name.c_str());
+        for (std::size_t column = 0; column < row.Cells.size() && column < traces.size(); ++column) {
+            const StatisticsCell &cell = row.Cells[column];
+            ImGui::TableNextColumn();
+            right_aligned(cell.Text, widths[column + 1]);
+            ImGui::TextUnformatted(cell.Text.c_str());
+            if (!cell.Tooltip.empty()) {
+                ImGui::SetItemTooltip("%s", cell.Tooltip.c_str());
+            }
+        }
+    }
+    ImGui::EndTable();
+}
+
+/**
  * @brief   Splits a tab into the plots and the statistics panel on their right.
  * @param[in] draw_plots       Draws the plots, in the left column.
  * @param[in] draw_statistics  Draws the statistics, in the bordered panel on the right.
@@ -751,7 +812,8 @@ void DrawWithStatistics(const std::function<void()> &draw_plots, const std::func
     }
     ImGui::EndChild();
     ImGui::SameLine();
-    if (ImGui::BeginChild("statistics", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Borders)) {
+    if (ImGui::BeginChild("statistics", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Borders,
+                          ImGuiWindowFlags_HorizontalScrollbar)) {
         draw_statistics();
     }
     ImGui::EndChild();

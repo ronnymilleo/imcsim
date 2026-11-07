@@ -11,6 +11,7 @@
 #include "implot.h"
 #include "plots/math_channels.h"
 #include "plots/plot_types.h"
+#include "plots/statistics_table.h"
 #include "simulation/simulation_results.h"
 #include <cstddef>
 #include <functional>
@@ -111,6 +112,7 @@ std::string FormatOptionalQuantity(std::optional<double> value, const char *unit
 void DrawStatistic(const char *name, const std::string &value);
 void DrawMeasuredValue(const char *name, double value, double scale, const char *unit);
 bool BeginStatisticsTable(const std::string &id);
+void DrawTraceTable(const char *id, const std::vector<PlottedTrace> &traces, const std::vector<StatisticsRow> &rows);
 void DrawWithStatistics(const std::function<void()> &draw_plots, const std::function<void()> &draw_statistics);
 
 // Poles and zeros

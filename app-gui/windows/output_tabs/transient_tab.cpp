@@ -11,6 +11,7 @@
 #include "imgui_internal.h"
 #include "implot.h"
 #include "plots/plot_figures.h"
+#include "plots/statistics_table.h"
 #include "plots/trace_statistics.h"
 #include "spice/spice_value.h"
 #include "windows/output_tabs/plot_widgets.h"
@@ -590,34 +591,14 @@ void TransientTab::DrawStatistics(const Core::Transient &transient, const std::v
         return;
     }
     ImGui::TextDisabled("%s", cursors.Shown ? "Between the cursors" : "Over the visible time");
-    const PlotSpan span = MeasuredSpan(cursors, m_View);
+    std::vector<MeasuredTrace> measured;
     for (const PlottedTrace &trace : traces) {
-        ImGui::Separator();
-        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(trace.Color), "%s", trace.Label.c_str());
-        if (!BeginStatisticsTable(trace.Label)) {
-            continue;
-        }
-        // The size of the trace in the span tells residue from real values in every readout
-        const auto statistics = ComputeTraceStatistics(transient.Times, *trace.Values, span.From, span.To);
-        const double scale = statistics ? std::max(std::abs(statistics->Maximum), std::abs(statistics->Minimum)) : 0.0;
-        if (statistics) {
-            DrawMeasuredValue("Pk-Pk", statistics->PeakToPeak, scale, trace.Unit);
-            DrawMeasuredValue("Max", statistics->Maximum, scale, trace.Unit);
-            DrawMeasuredValue("Min", statistics->Minimum, scale, trace.Unit);
-            DrawMeasuredValue("Mean", statistics->Mean, scale, trace.Unit);
-            DrawMeasuredValue("RMS", statistics->RMS, scale, trace.Unit);
-            DrawStatistic("Freq", FormatOptionalQuantity(statistics->Frequency, "Hz"));
-            DrawStatistic("Period", statistics->Frequency ? FormatQuantity(1.0 / *statistics->Frequency, "s") : "-");
-        }
-        if (cursors.Shown) {
-            const double at_a = InterpolateAt(transient.Times, *trace.Values, cursors.A, false);
-            const double at_b = InterpolateAt(transient.Times, *trace.Values, cursors.B, false);
-            DrawMeasuredValue("At A", at_a, scale, trace.Unit);
-            DrawMeasuredValue("At B", at_b, scale, trace.Unit);
-            DrawMeasuredValue("B-A", at_b - at_a, scale, trace.Unit);
-        }
-        ImGui::EndTable();
+        measured.push_back({.Values = *trace.Values, .Unit = trace.Unit});
     }
+    const std::vector<StatisticsRow> rows =
+        BuildTransientStatistics(transient.Times, measured, MeasuredSpan(cursors, m_View),
+                                 cursors.Shown ? std::optional(cursors) : std::nullopt);
+    DrawTraceTable("trace_statistics", traces, rows);
 }
 
 } // namespace GUI

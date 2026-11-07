@@ -70,6 +70,7 @@ add_library(imcsim-gui-lib
             plots/plot_helpers.cpp
             plots/smith_chart.cpp
             plots/spectrum.cpp
+            plots/statistics_table.cpp
             plots/touchstone.cpp
             plots/trace_fit_state.cpp
             plots/trace_math.cpp
