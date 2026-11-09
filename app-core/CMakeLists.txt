@@ -1,4 +1,29 @@
 # =============================================================================
+# Native simulation engine (clean-room solver, no external dependencies)
+# =============================================================================
+
+add_library(nodebase
+        STATIC
+            native/analyses.cpp
+            native/compiler.cpp
+            native/devices.cpp
+            native/linear/dense_matrix.cpp
+            native/mna_system.cpp
+            native/model_parser.cpp
+            native/native_backend.cpp
+            native/newton.cpp
+            native/nonlinear.cpp
+            native/waveforms.cpp
+)
+
+target_include_directories(nodebase
+        PUBLIC
+            ${CMAKE_CURRENT_SOURCE_DIR}
+)
+
+imcsim_target_coverage(nodebase)
+
+# =============================================================================
 # Application Core
 # =============================================================================
 
@@ -91,6 +116,7 @@ find_package(Threads REQUIRED)
 target_link_libraries(imcsim-core-lib
         PUBLIC
             Threads::Threads
+            nodebase
         PRIVATE
             ${NGSPICE_LINK_TARGET}
 )
