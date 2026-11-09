@@ -23,6 +23,7 @@
 #include "windows/output_tabs/monte_carlo_tab.h"
 #include "windows/output_tabs/noise_tab.h"
 #include "windows/output_tabs/operating_point_tab.h"
+#include "windows/output_tabs/plot_tab.h"
 #include "windows/output_tabs/pole_zero_tab.h"
 #include "windows/output_tabs/s_parameter_tab.h"
 #include "windows/output_tabs/spectrum_tab.h"
@@ -32,25 +33,6 @@
 #include <vector>
 
 namespace GUI {
-
-/**
- * @enum    PlotTab
- * @brief   The tabs of the Output window, one per analysis, and the spectrum of the transient.
- */
-enum class PlotTab {
-    OPERATING_POINT,
-    TRANSIENT,
-    SPECTRUM,
-    AC_SWEEP,
-    DC_SWEEP,
-    NOISE,
-    TRANSFER_FUNCTION,
-    SENSITIVITY,
-    POLE_ZERO,
-    S_PARAMETERS,
-    TRUTH_TABLE,
-    MONTE_CARLO
-};
 
 /**
  * @class   OutputWindow
@@ -115,6 +97,10 @@ private:
     PlotTab m_ShownTab = PlotTab::TRANSIENT;
     /// Tab to bring to the front on the next frame, after a new result.
     std::optional<PlotTab> m_TabToShow;
+    /// The tab the user is on, which the bar keeps while its result is gone; none before the first result.
+    std::optional<PlotTab> m_KeptTab;
+    /// The tabs without a result, which More lists.
+    std::vector<PlotTab> m_OtherTabs;
 
     PlotExporter m_Exporter;
 
@@ -129,10 +115,12 @@ private:
     void DrawBusPanel(std::size_t node_count);
 
     // Tabs
-    void DrawTabs(const FrameResults &frame);
-    bool BeginTab(const char *label, PlotTab tab, const std::optional<PlotTab> &tab_to_show);
-    void DrawTimeAndFrequencyTabs(const FrameResults &frame, const std::optional<PlotTab> &tab_to_show);
-    void DrawAnalysisTabs(const std::optional<PlotTab> &tab_to_show);
+    bool DrawTabs(const FrameResults &frame);
+    TabResults FindTabResults() const;
+    std::optional<Analysis> FindFailedAnalysis(PlotTab tab) const;
+    void DrawRunFailure(Analysis analysis) const;
+    void DrawTab(PlotTab tab, const FrameResults &frame);
+    void DrawOtherAnalyses(float width);
 
     // Export
     void DrawExportButton(ImVec2 tab_row, float tab_row_width, float export_width, const FrameResults &frame);

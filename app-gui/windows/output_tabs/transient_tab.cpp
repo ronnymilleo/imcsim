@@ -11,6 +11,7 @@
 #include "imgui_internal.h"
 #include "implot.h"
 #include "plots/plot_figures.h"
+#include "plots/statistics_table.h"
 #include "plots/trace_statistics.h"
 #include "spice/spice_value.h"
 #include "windows/output_tabs/plot_widgets.h"
@@ -27,7 +28,17 @@ namespace GUI {
 namespace {
 
 /// Width of the field for the size of the window, in font sizes.
-constexpr float WINDOW_SIZE_WIDTH = 8.0f;
+constexpr float WINDOW_SIZE_WIDTH = 4.5f;
+/// The label of that field: points of the plot, not the time steps of the run, which the status bar counts.
+constexpr const char *WINDOW_SIZE_LABEL = "Plot points";
+
+/**
+ * @brief   The width of the labeled field for the size of the window, at the right end of the plot header.
+ */
+float GetWindowSizeWidth() {
+    return ImGui::CalcTextSize(WINDOW_SIZE_LABEL).x + ImGui::GetStyle().ItemSpacing.x +
+           ImGui::GetFontSize() * WINDOW_SIZE_WIDTH;
+}
 /// How many points a pixel of dragging adds to the size of the window.
 constexpr float WINDOW_SIZE_DRAG_SPEED = 20.0f;
 /// The instant of the transient shown on the schematic.
@@ -192,7 +203,17 @@ void TransientTab::Draw(const FrameResults &frame) {
                 ImGui::TextDisabled("%s", NOTHING_MEASURED);
             }
             DrawMathErrors(frame.TransientErrors);
-            DrawPlots(*frame.TransientWindow, frame.TransientMath, frame.StepWindows);
+            // The playback sits under the plot it moves the playhead of, sharing its width
+            const Core::Transient &shown = *frame.TransientWindow;
+            const bool has_playback = !shown.Times.empty();
+            const float playback_height = has_playback ? ImGui::GetFrameHeightWithSpacing() : 0.0f;
+            if (ImGui::BeginChild("transient_plots", ImVec2(0.0f, -playback_height))) {
+                DrawPlots(shown, frame.TransientMath, frame.StepWindows);
+            }
+            ImGui::EndChild();
+            if (has_playback) {
+                DrawPlaybackBar(m_Playback, shown.Times.front(), shown.Times.back());
+            }
         },
         [&] { DrawStatistics(*frame.TransientWindow, frame.TransientMath); });
 }
@@ -309,10 +330,12 @@ void TransientTab::DrawWindowControls(const Core::Transient &shown) {
     TransientWindow &window = m_Playback.Window;
     const std::size_t total_points = window.GetTotalPoints();
     const bool has_span = window.GetSpan().has_value();
-    if ((!has_span && total_points <= static_cast<std::size_t>(MIN_WINDOW_POINTS)) ||
-        (has_span && window.GetWindow().Count >= total_points) || shown.Times.empty()) {
+    if (shown.Times.empty()) {
         return;
     }
+    // A run too short to cut into windows has no window size or scroll bar, only its range and the cursors
+    const bool has_window = !((!has_span && total_points <= static_cast<std::size_t>(MIN_WINDOW_POINTS)) ||
+                              (has_span && window.GetWindow().Count >= total_points));
     const float width = ImGui::GetContentRegionAvail().x;
     const std::string span =
         std::format("{}s to {}s", Core::FormatValue(shown.Times.front()), Core::FormatValue(shown.Times.back()));
@@ -324,13 +347,41 @@ void TransientTab::DrawWindowControls(const Core::Transient &shown) {
         }
         ImGui::SetItemTooltip("Keep the window on the newest points of the run");
     }
-    ImGui::SetCursorPos({row_start.x + (width - ImGui::CalcTextSize(span.c_str()).x) / 2.0f, row_start.y});
-    ImGui::TextDisabled("%s", span.c_str());
-    // A live run is seen a stop time at a time, so its window has no size to pick
-    if (!has_span) {
-        DrawWindowSize(row_start, width);
+    if (m_Controls.IsRunning()) {
+        ImGui::SameLine(0.0f, ImGui::GetFontSize());
+    } else {
+        ImGui::SetCursorPos(row_start);
     }
-    if (window.GetWindow().Count >= total_points) {
+    ImGui::AlignTextToFramePadding();
+    ImGui::TextDisabled("Range");
+    ImGui::SameLine();
+    ImGui::TextUnformatted(span.c_str());
+    // A live run is seen a stop time at a time, so its window has no size to pick
+    const bool has_size = has_window && !has_span;
+    const float size_width = has_size ? GetWindowSizeWidth() + ImGui::GetFontSize() : 0.0f;
+    // At the right end of the row; in a narrow window, one after the other on rows of their own rather than over the
+    // range
+    ImGui::SameLine();
+    const float right_edge = row_start.x + width;
+    if (ImGui::GetCursorPosX() + ImGui::GetFontSize() + GetCursorToggleWidth() + size_width <= right_edge) {
+        DrawCursorToggle(m_Cursors, right_edge - size_width);
+        if (has_size) {
+            ImGui::SameLine();
+            ImGui::SetCursorPosX(right_edge - GetWindowSizeWidth());
+            DrawWindowSize();
+        }
+    } else {
+        ImGui::NewLine();
+        DrawCursorCheckbox(m_Cursors);
+        if (has_size) {
+            ImGui::SameLine(0.0f, ImGui::GetFontSize());
+            if (ImGui::GetCursorPosX() + GetWindowSizeWidth() > right_edge) {
+                ImGui::NewLine();
+            }
+            DrawWindowSize();
+        }
+    }
+    if (!has_window || window.GetWindow().Count >= total_points) {
         return;
     }
     const ImRect bar(ImGui::GetCursorScreenPos(),
@@ -345,20 +396,22 @@ void TransientTab::DrawWindowControls(const Core::Transient &shown) {
 }
 
 /**
- * @brief   The size of the window, at the right end of the row above its scroll bar.
+ * @brief   The size of the window, labeled, at the cursor, which the header row places.
  */
-void TransientTab::DrawWindowSize(const ImVec2 row_start, const float width) {
+void TransientTab::DrawWindowSize() {
     TransientWindow &window = m_Playback.Window;
     const float size_width = ImGui::GetFontSize() * WINDOW_SIZE_WIDTH;
-    ImGui::SetCursorPos({row_start.x + width - size_width, row_start.y});
+    ImGui::AlignTextToFramePadding();
+    ImGui::TextDisabled("%s", WINDOW_SIZE_LABEL);
+    ImGui::SameLine();
     ImGui::SetNextItemWidth(size_width);
     int points = window.GetPoints();
-    if (ImGui::DragInt("##window_points", &points, WINDOW_SIZE_DRAG_SPEED, MIN_WINDOW_POINTS, MAX_WINDOW_POINTS,
-                       "%d points", ImGuiSliderFlags_AlwaysClamp)) {
+    if (ImGui::DragInt("##window_points", &points, WINDOW_SIZE_DRAG_SPEED, MIN_WINDOW_POINTS, MAX_WINDOW_POINTS, "%d",
+                       ImGuiSliderFlags_AlwaysClamp)) {
         window.SetPoints(points);
     }
     ImGui::SetItemTooltip("%s", std::format("How many points the plot and the schematic show at a time, from {} to "
-                                            "{}; drag, or double-click to type. The run has {} points",
+                                            "{}; drag, or double-click to type. The run has {} time steps",
                                             MIN_WINDOW_POINTS, MAX_WINDOW_POINTS, window.GetTotalPoints())
                                     .c_str());
 }
@@ -562,24 +615,24 @@ std::vector<BusLane> TransientTab::FindShownBuses(const std::size_t node_count) 
  *          trace at both and their difference, and the time between them with its frequency.
  */
 void TransientTab::DrawStatistics(const Core::Transient &transient, const std::vector<MathTrace> &math) {
-    DrawCursorToggle(m_Cursors);
+    const PlotCursors &cursors = m_Cursors;
+    const CursorReadings cursor_readings = {
+        {"A", FormatQuantity(cursors.A, "s")},
+        {"B", FormatQuantity(cursors.B, "s")},
+        {"B-A", FormatQuantity(cursors.B - cursors.A, "s")},
+        {"1/(B-A)",
+         cursors.B != cursors.A ? FormatQuantity(1.0 / std::abs(cursors.B - cursors.A), "Hz") : std::string(NO_VALUE)}};
+    DrawStatisticsHeader(cursors.Shown ? "Between the cursors" : "Over the visible time");
     if (!FindLogicNodes(m_Schematic.BuildCircuit()).empty()) {
+        ImGui::SameLine(0.0f, ImGui::GetFontSize());
         ImGui::Checkbox("Logic lanes", &m_ShowLogicLanes);
         ImGui::SetItemTooltip("Plot the signals of gates and flip-flops as lanes under the analog traces");
         if (m_ShowLogicLanes) {
+            ImGui::SameLine();
             ImGui::Checkbox("Bit values", &m_ShowBitValues);
             ImGui::SetItemTooltip("Write 0, 1 or X in every cell of a lane, a cell being as wide as the shortest "
                                   "steady stretch, such as half a clock period");
         }
-    }
-    const PlotCursors &cursors = m_Cursors;
-    if (cursors.Shown && BeginStatisticsTable("cursors")) {
-        DrawStatistic("A", FormatQuantity(cursors.A, "s"));
-        DrawStatistic("B", FormatQuantity(cursors.B, "s"));
-        DrawStatistic("B-A", FormatQuantity(cursors.B - cursors.A, "s"));
-        DrawStatistic("1/(B-A)",
-                      cursors.B != cursors.A ? FormatQuantity(1.0 / std::abs(cursors.B - cursors.A), "Hz") : "-");
-        ImGui::EndTable();
     }
     std::vector<PlottedTrace> traces = ListTraces(transient.NodeVoltages, transient.Currents, m_Schematic, "V", "A");
     for (const MathTrace &trace : math) {
@@ -589,35 +642,14 @@ void TransientTab::DrawStatistics(const Core::Transient &transient, const std::v
         ImGui::TextDisabled("Measure a trace to see its statistics");
         return;
     }
-    ImGui::TextDisabled("%s", cursors.Shown ? "Between the cursors" : "Over the visible time");
-    const PlotSpan span = MeasuredSpan(cursors, m_View);
+    std::vector<MeasuredTrace> measured;
     for (const PlottedTrace &trace : traces) {
-        ImGui::Separator();
-        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(trace.Color), "%s", trace.Label.c_str());
-        if (!BeginStatisticsTable(trace.Label)) {
-            continue;
-        }
-        // The size of the trace in the span tells residue from real values in every readout
-        const auto statistics = ComputeTraceStatistics(transient.Times, *trace.Values, span.From, span.To);
-        const double scale = statistics ? std::max(std::abs(statistics->Maximum), std::abs(statistics->Minimum)) : 0.0;
-        if (statistics) {
-            DrawMeasuredValue("Pk-Pk", statistics->PeakToPeak, scale, trace.Unit);
-            DrawMeasuredValue("Max", statistics->Maximum, scale, trace.Unit);
-            DrawMeasuredValue("Min", statistics->Minimum, scale, trace.Unit);
-            DrawMeasuredValue("Mean", statistics->Mean, scale, trace.Unit);
-            DrawMeasuredValue("RMS", statistics->RMS, scale, trace.Unit);
-            DrawStatistic("Freq", FormatOptionalQuantity(statistics->Frequency, "Hz"));
-            DrawStatistic("Period", statistics->Frequency ? FormatQuantity(1.0 / *statistics->Frequency, "s") : "-");
-        }
-        if (cursors.Shown) {
-            const double at_a = InterpolateAt(transient.Times, *trace.Values, cursors.A, false);
-            const double at_b = InterpolateAt(transient.Times, *trace.Values, cursors.B, false);
-            DrawMeasuredValue("At A", at_a, scale, trace.Unit);
-            DrawMeasuredValue("At B", at_b, scale, trace.Unit);
-            DrawMeasuredValue("B-A", at_b - at_a, scale, trace.Unit);
-        }
-        ImGui::EndTable();
+        measured.push_back({.Values = *trace.Values, .Unit = trace.Unit});
     }
+    const std::vector<StatisticsRow> rows =
+        BuildTransientStatistics(transient.Times, measured, MeasuredSpan(cursors, m_View),
+                                 cursors.Shown ? std::optional(cursors) : std::nullopt);
+    DrawTraceTable("trace_statistics", traces, rows, cursors.Shown ? cursor_readings : CursorReadings{});
 }
 
 } // namespace GUI

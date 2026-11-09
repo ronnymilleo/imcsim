@@ -6,6 +6,7 @@
 #include "plots/math_channels.h"
 
 #include "drawing/theme.h"
+#include "drawing/trace_swatch.h"
 #include "misc/cpp/imgui_stdlib.h"
 #include <algorithm>
 #include <array>
@@ -95,34 +96,10 @@ void MathChannels::Draw(const std::vector<std::string> &operands) {
     }
     std::optional<std::size_t> removed;
     for (std::size_t index = 0; index < channels.size(); ++index) {
-        MathChannel &channel = channels[index];
         ImGui::PushID(static_cast<int>(index));
-        // The list is as narrow as the trace names, so a mark after the Edit button would be cut off; the name of a
-        // channel in error takes the error color instead
-        const auto program = CompileChannel(channel, find_node);
-        // Edit comes first, so a long name is what the narrow list clips, not the button
-        ImGui::AlignTextToFramePadding();
-        const bool is_edit_pressed = ImGui::SmallButton("Edit");
-        ImGui::SameLine();
-        ImGui::PushStyleColor(ImGuiCol_CheckMark, AdaptToBackground(MATH_COLORS[index % MATH_COLORS.size()]));
-        if (!program) {
-            ImGui::PushStyleColor(ImGuiCol_Text, GetErrorTextColor());
-        }
-        ImGui::Checkbox(channel.Name.c_str(), &channel.Shown);
-        ImGui::PopStyleColor(program ? 1 : 2);
-        if (program) {
-            ImGui::SetItemTooltip("%s", GetChannelExpression(channel).c_str());
-        } else {
-            ImGui::SetItemTooltip("%s\n%s", GetChannelExpression(channel).c_str(), program.error().c_str());
-        }
-        if (is_edit_pressed || (open_new_editor && index + 1 == channels.size())) {
-            ImGui::OpenPopup("math_editor");
-        }
-        if (ImGui::BeginPopup("math_editor")) {
-            if (!DrawEditor(channel, operands)) {
-                removed = index;
-            }
-            ImGui::EndPopup();
+        const bool opens_editor = open_new_editor && index + 1 == channels.size();
+        if (!DrawChannel(channels[index], index, operands, find_node, opens_editor)) {
+            removed = index;
         }
         ImGui::PopID();
     }
@@ -244,6 +221,47 @@ std::optional<MathProgram> MathChannels::GetShownProgram(const MathChannel &chan
         return std::nullopt;
     }
     return std::move(*program);
+}
+
+/**
+ * @brief   Draws one channel of the list: its Edit button, its check box in the color of its place, and its editor
+ *          while open.
+ * @param[in,out] channel       The channel, which the check box and the editor change.
+ * @param[in]     index         Its place in the list, which picks its color.
+ * @param[in]     operands      Traces the channel may combine.
+ * @param[in]     find_node     Looks up the nets its expression names.
+ * @param[in]     opens_editor  Whether its editor opens now, as for a channel just added.
+ * @return  False when the user removed the channel in its editor.
+ */
+bool MathChannels::DrawChannel(MathChannel &channel, const std::size_t index, const std::vector<std::string> &operands,
+                               const NetResolver &find_node, const bool opens_editor) const {
+    // The list is as narrow as the trace names, so a mark after the Edit button would be cut off; the name of a
+    // channel in error takes the error color instead
+    const auto program = CompileChannel(channel, find_node);
+    // Edit comes first, so a long name is what the narrow list clips, not the button
+    ImGui::AlignTextToFramePadding();
+    const bool is_edit_pressed = ImGui::SmallButton("Edit");
+    ImGui::SameLine();
+    if (!program) {
+        ImGui::PushStyleColor(ImGuiCol_Text, GetErrorTextColor());
+    }
+    DrawTraceCheckbox(channel.Name.c_str(), &channel.Shown, AdaptToBackground(MATH_COLORS[index % MATH_COLORS.size()]),
+                      TraceStyle::HEAVY);
+    if (!program) {
+        ImGui::PopStyleColor();
+        ImGui::SetItemTooltip("%s\n%s", GetChannelExpression(channel).c_str(), program.error().c_str());
+    } else {
+        ImGui::SetItemTooltip("%s", GetChannelExpression(channel).c_str());
+    }
+    if (is_edit_pressed || opens_editor) {
+        ImGui::OpenPopup("math_editor");
+    }
+    bool is_kept = true;
+    if (ImGui::BeginPopup("math_editor")) {
+        is_kept = DrawEditor(channel, operands);
+        ImGui::EndPopup();
+    }
+    return is_kept;
 }
 
 /**

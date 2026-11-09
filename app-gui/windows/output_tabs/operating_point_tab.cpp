@@ -60,7 +60,8 @@ void DrawOperatingPoint(const Core::OperatingPoint &operating_point, Schematic &
             }
             ImGui::TextUnformatted(name.c_str());
             ImGui::TableNextColumn();
-            ImGui::TextUnformatted(std::format("{}V", Core::FormatValue(operating_point.NodeVoltages[node])).c_str());
+            ImGui::TextUnformatted(
+                std::format("{}V", Core::FormatMeasurement(operating_point.NodeVoltages[node])).c_str());
         }
         ImGui::EndTable();
     }
@@ -77,7 +78,7 @@ void DrawOperatingPoint(const Core::OperatingPoint &operating_point, Schematic &
             ImGui::TableNextColumn();
             ImGui::TextUnformatted(current.Name.c_str());
             ImGui::TableNextColumn();
-            ImGui::TextUnformatted(std::format("{}A", Core::FormatValue(current.Current)).c_str());
+            ImGui::TextUnformatted(std::format("{}A", Core::FormatMeasurement(current.Current)).c_str());
         }
         ImGui::EndTable();
     }

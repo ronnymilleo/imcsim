@@ -6,17 +6,20 @@
 #ifndef IMCSIM_PLOT_WIDGETS_H
 #define IMCSIM_PLOT_WIDGETS_H
 
+#include "analysis/playback.h"
 #include "document/schematic.h"
 #include "imgui.h"
 #include "implot.h"
 #include "plots/math_channels.h"
 #include "plots/plot_types.h"
+#include "plots/statistics_table.h"
 #include "simulation/simulation_results.h"
 #include <cstddef>
 #include <functional>
 #include <optional>
 #include <span>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace GUI {
@@ -25,9 +28,6 @@ namespace GUI {
 inline constexpr float MIN_PLOT_HEIGHT = 12.0f;
 /// Math channels, and the noise at the output, are drawn with a heavier line than the traces they come from.
 inline constexpr float MATH_LINE_WEIGHT = 2.0f;
-/// ngspice reports an open path with a resistance around 1e20 ohm, which no readable suffix shows; it is drawn as an
-/// open circuit instead.
-inline constexpr double OPEN_RESISTANCE = 1e15;
 /// A new result starts with empty plots until the user picks what to measure.
 inline constexpr const char *NOTHING_MEASURED =
     "Nothing is measured yet: pick nodes and parts with Probe in the editor, or check traces in the list";
@@ -57,7 +57,7 @@ struct StepTraces {
 
 // Plots
 int FormatAxisValue(double value, char *buffer, int size, void *unit);
-bool BeginTracePlot(const char *id, ImVec2 size);
+bool BeginTracePlot(const char *id, ImVec2 size, bool has_legend = false);
 float PlotHeight(int plot_count);
 ImPlotAxisFlags VoltageAxisFlags(bool has_voltages, bool has_other_traces);
 void SetNextFits(bool new_result, bool voltages_changed, bool currents_changed);
@@ -101,16 +101,27 @@ void DrawMathErrors(const std::vector<std::string> &errors);
 void DrawCursorReadout(const std::vector<double> &xs, const char *x_unit, bool logarithmic,
                        const std::vector<PlottedTrace> &plotted);
 void DrawCursors(PlotCursors &cursors, bool logarithmic);
-void DrawCursorToggle(PlotCursors &cursors);
 PlotSpan MeasuredSpan(const PlotCursors &cursors, const PlotSpan &view);
+float GetCursorToggleWidth();
+void DrawCursorToggle(PlotCursors &cursors, float right_edge);
+void DrawCursorCheckbox(PlotCursors &cursors);
+
+// Playback
+void DrawPlaybackBar(TransientPlayback &playback, double from, double to);
 
 // Statistics
+/// The readings of the cursors themselves, a name and a value each, such as A and its time.
+using CursorReadings = std::vector<std::pair<std::string, std::string>>;
+
 std::string FormatQuantity(double value, const char *unit);
 std::string FormatFixed(double value, const char *unit);
 std::string FormatOptionalQuantity(std::optional<double> value, const char *unit);
 void DrawStatistic(const char *name, const std::string &value);
 void DrawMeasuredValue(const char *name, double value, double scale, const char *unit);
 bool BeginStatisticsTable(const std::string &id);
+void DrawStatisticsHeader(const char *span_text);
+void DrawTraceTable(const char *id, const std::vector<PlottedTrace> &traces, const std::vector<StatisticsRow> &rows,
+                    const CursorReadings &cursor_readings);
 void DrawWithStatistics(const std::function<void()> &draw_plots, const std::function<void()> &draw_statistics);
 
 // Poles and zeros

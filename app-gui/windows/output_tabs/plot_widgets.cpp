@@ -18,6 +18,7 @@
 #include "spice/spice_value.h"
 #include "value_field.h"
 #include <algorithm>
+#include <cfloat>
 #include <cmath>
 #include <cstdio>
 #include <format>
@@ -32,8 +33,17 @@ namespace {
 constexpr float DASH_LENGTH = 0.5f;
 constexpr float DASH_GAP = 0.3f;
 constexpr float DASH_WEIGHT = 1.5f;
-/// Width of the statistics panel, in font sizes.
-constexpr float STATISTICS_WIDTH = 15.0f;
+/// The time slider of a transient does not shrink below this, in font sizes, so it stays usable in a narrow window.
+constexpr float MIN_TIME_SLIDER_WIDTH = 5.0f;
+/// The instant readout keeps the width of its widest text, so the slider does not resize as the digits change: four
+/// significant digits with a suffix are at most this wide.
+constexpr const char *WIDEST_TIME_READOUT = "t = 888.8ms / 888.8ms";
+/// Gap on the left of each trace column of a statistics table, in font sizes.
+constexpr float TRACE_COLUMN_GAP = 1.0f;
+/// Space between the table of the traces and that of the cursors beside it, in font sizes.
+constexpr float CURSOR_TABLE_GAP = 1.5f;
+/// Most of the height of a tab the statistics under the plots take before they scroll.
+constexpr float MAX_STATISTICS_SHARE = 0.4f;
 /// The lines that mark the poles and zeros on a Bode plot are dashed and thin, so they stay visible without hiding the
 /// traces.
 constexpr float ROOT_MARKER_ALPHA = 0.85f;
@@ -112,6 +122,60 @@ std::size_t FindSteadySpread(const std::vector<std::vector<double>> &curves) {
     return widest;
 }
 
+/**
+ * @brief   The text of a table cell, muted when it stands for no value.
+ */
+void DrawCellText(const std::string &text) {
+    if (text == NO_VALUE) {
+        ImGui::TextDisabled("%s", text.c_str());
+    } else {
+        ImGui::TextUnformatted(text.c_str());
+    }
+}
+
+/**
+ * @brief   The readings of the cursors themselves, a name and a value per row, beside the table just drawn when the
+ *          panel has room for them and under it otherwise, so the line over the table never runs past the panel.
+ */
+void DrawCursorTable(const CursorReadings &readings) {
+    if (readings.empty()) {
+        return;
+    }
+    const auto measure = [](const std::string &text) { return ImGui::CalcTextSize(text.c_str()).x; };
+    float name_width = 0.0f;
+    float value_width = 0.0f;
+    for (const auto &[name, value] : readings) {
+        name_width = std::max(name_width, measure(name));
+        value_width = std::max(value_width, measure(value));
+    }
+    const float column_gap = ImGui::GetFontSize() * TRACE_COLUMN_GAP;
+    value_width += column_gap;
+    const float table_width = name_width + value_width + ImGui::GetStyle().CellPadding.x * 4.0f;
+    const float gap = ImGui::GetFontSize() * CURSOR_TABLE_GAP;
+    ImGui::SameLine(0.0f, gap);
+    if (ImGui::GetContentRegionAvail().x < table_width) {
+        ImGui::NewLine();
+    }
+    if (!ImGui::BeginTable("cursor_readings", 2, ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_RowBg,
+                           {table_width, 0.0f})) {
+        return;
+    }
+    ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed, name_width);
+    ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed, value_width);
+    ImGui::TableNextRow(ImGuiTableRowFlags_Headers);
+    ImGui::TableNextColumn();
+    ImGui::TextDisabled("Cursors");
+    for (const auto &[name, value] : readings) {
+        ImGui::TableNextRow();
+        ImGui::TableNextColumn();
+        ImGui::TextDisabled("%s", name.c_str());
+        ImGui::TableNextColumn();
+        ImGui::SetCursorPosX(ImGui::GetCursorPosX() + value_width - measure(value));
+        DrawCellText(value);
+    }
+    ImGui::EndTable();
+}
+
 } // namespace
 
 /**
@@ -130,18 +194,23 @@ int FormatAxisValue(const double value, char *buffer, const int size, void *unit
 }
 
 /**
- * @brief   Begins a plot whose legend only names the traces: clicking an entry would hide a curve from the plot alone,
- *          while the statistics and the export still showed it.
- * @param[in] id    ImPlot ID of the plot.
- * @param[in] size  Size of the plot, in pixels.
+ * @brief   Begins a plot of traces, without a legend when a list beside it shows the color and style of each trace, so
+ *          nothing covers the curves.
+ * @param[in] id          ImPlot ID of the plot.
+ * @param[in] size        Size of the plot, in pixels.
+ * @param[in] has_legend  True for a plot whose traces no list shows, such as the noise of each part; its legend only
+ *                        names them, since clicking an entry would hide a curve from the plot alone while the
+ *                        statistics and the export still showed it.
  * @return  True when the plot is drawn; then call ImPlot::EndPlot().
  * @note    The trace list is the one place that picks what is shown.
  */
-bool BeginTracePlot(const char *id, const ImVec2 size) {
-    if (!ImPlot::BeginPlot(id, size)) {
+bool BeginTracePlot(const char *id, const ImVec2 size, const bool has_legend) {
+    if (!ImPlot::BeginPlot(id, size, has_legend ? ImPlotFlags_None : ImPlotFlags_NoLegend)) {
         return false;
     }
-    ImPlot::SetupLegend(ImPlotLocation_NorthWest, ImPlotLegendFlags_NoButtons);
+    if (has_legend) {
+        ImPlot::SetupLegend(ImPlotLocation_NorthWest, ImPlotLegendFlags_NoButtons);
+    }
     return true;
 }
 
@@ -619,11 +688,11 @@ void DrawCursorReadout(const std::vector<double> &xs, const char *x_unit, const 
     ImGui::TextDisabled("%s", std::format("at {}{}", Core::FormatValue(xs[sample]), x_unit).c_str());
     for (const PlottedTrace &trace : plotted) {
         const double value = (*trace.Values)[sample];
-        std::string text = std::format("{}: {}{}", trace.Label, Core::FormatValue(value), trace.Unit);
+        std::string text = std::format("{}: {}{}", trace.Label, Core::FormatMeasurement(value), trace.Unit);
         if (trace.LogicLevel) {
             text =
                 std::format("{}: {} ({}{})", trace.Label, GetLogicStateName(ReadLogicState(value, *trace.LogicLevel)),
-                            Core::FormatValue(value), trace.Unit);
+                            Core::FormatMeasurement(value), trace.Unit);
         }
         ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(trace.Color), "%s", text.c_str());
     }
@@ -659,14 +728,38 @@ void DrawCursors(PlotCursors &cursors, const bool logarithmic) {
 }
 
 /**
- * @brief   The checkbox that shows the cursors; turning them on places them again in the current view, so they are
- *          never lost off screen.
- * @param[in,out] cursors  The cursors of the plot.
+ * @brief   The width the cursor checkbox takes, for a header that places it at its right end.
+ * @return  The width in pixels.
  */
-void DrawCursorToggle(PlotCursors &cursors) {
-    if (ImGui::Checkbox("Cursors A and B", &cursors.Shown) && cursors.Shown) {
+float GetCursorToggleWidth() {
+    return ImGui::GetFrameHeight() + ImGui::GetStyle().ItemInnerSpacing.x + ImGui::CalcTextSize("Cursors").x;
+}
+
+/**
+ * @brief   Draws the checkbox of cursors A and B on the current row of the plot header, ending at an edge; checking it
+ *          places them anew in the view.
+ * @param[in,out] cursors     Cursors of the plot.
+ * @param[in]     right_edge  Where the checkbox ends, in window coordinates.
+ */
+void DrawCursorToggle(PlotCursors &cursors, const float right_edge) {
+    // On the row when it fits after what is there, on a row of its own in a narrow window
+    ImGui::SameLine();
+    if (ImGui::GetCursorPosX() + GetCursorToggleWidth() > right_edge) {
+        ImGui::NewLine();
+    }
+    ImGui::SetCursorPosX(std::max(ImGui::GetCursorPosX(), right_edge - GetCursorToggleWidth()));
+    DrawCursorCheckbox(cursors);
+}
+
+/**
+ * @brief   Draws the checkbox of cursors A and B at the cursor; checking it places them anew in the view.
+ * @param[in,out] cursors  Cursors of the plot.
+ */
+void DrawCursorCheckbox(PlotCursors &cursors) {
+    if (ImGui::Checkbox("Cursors", &cursors.Shown) && cursors.Shown) {
         cursors.Placed = false;
     }
+    ImGui::SetItemTooltip("Measure between two cursors, A and B, dragged on the plot");
 }
 
 /**
@@ -680,10 +773,48 @@ PlotSpan MeasuredSpan(const PlotCursors &cursors, const PlotSpan &view) {
 }
 
 /**
- * @brief   Writes a value with a SPICE suffix and its unit, such as "4.7kOhm".
+ * @brief   Draws the playback of the transient under its plot: play, loop, a slider over the window of points the plot
+ *          shows and the instant, which the schematic and the playhead of the plot follow.
+ * @param[in,out] playback  The instant shown and whether it plays.
+ * @param[in]     from      Start of the window, in seconds.
+ * @param[in]     to        End of the window, in seconds.
+ * @note    Moving the slider stops the playback, so it holds where the user put it.
+ */
+void DrawPlaybackBar(TransientPlayback &playback, const double from, const double to) {
+    const ImGuiStyle &style = ImGui::GetStyle();
+    // Play and Pause share the width of the wider label, so the row does not shift when they swap
+    const float play_width =
+        std::max(ImGui::CalcTextSize("Play").x, ImGui::CalcTextSize("Pause").x) + style.FramePadding.x * 2.0f;
+    if (ImGui::Button(playback.Playing ? "Pause" : "Play", ImVec2(play_width, 0.0f))) {
+        if (!playback.Playing && playback.Time >= to) {
+            playback.Time = from;
+        }
+        playback.Playing = !playback.Playing;
+    }
+    ImGui::SetItemTooltip("Play the window of the transient on the schematic");
+    ImGui::SameLine();
+    ImGui::Checkbox("Loop", &playback.Loop);
+    ImGui::SameLine();
+    const std::string readout = std::format("t = {}s / {}s", Core::FormatValue(playback.Time), Core::FormatValue(to));
+    const float readout_width =
+        std::max(ImGui::CalcTextSize(readout.c_str()).x, ImGui::CalcTextSize(WIDEST_TIME_READOUT).x) +
+        style.ItemSpacing.x;
+    ImGui::SetNextItemWidth(
+        std::max(ImGui::GetContentRegionAvail().x - readout_width, ImGui::GetFontSize() * MIN_TIME_SLIDER_WIDTH));
+    ImGui::SliderScalar("##time", ImGuiDataType_Double, &playback.Time, &from, &to, "");
+    if (ImGui::IsItemActive()) {
+        playback.Playing = false;
+    }
+    ImGui::SetItemTooltip("Instant of the transient shown on the schematic and by the playhead of the plot");
+    ImGui::SameLine();
+    ImGui::TextUnformatted(readout.c_str());
+}
+
+/**
+ * @brief   Writes a measured value with four significant digits, a SPICE suffix and its unit, such as "4.700kOhm".
  */
 std::string FormatQuantity(const double value, const char *unit) {
-    return std::format("{}{}", Core::FormatValue(value), unit);
+    return std::format("{}{}", Core::FormatMeasurement(value), unit);
 }
 
 /**
@@ -726,8 +857,8 @@ void DrawMeasuredValue(const char *name, const double value, const double scale,
         return;
     }
     DrawStatistic(name, std::format("~0{}", unit));
-    ImGui::SetItemTooltip("%s",
-                          std::format("{}{}, negligible next to the trace", Core::FormatValue(value), unit).c_str());
+    ImGui::SetItemTooltip(
+        "%s", std::format("{}{}, negligible next to the trace", Core::FormatMeasurement(value), unit).c_str());
 }
 
 /**
@@ -740,21 +871,111 @@ bool BeginStatisticsTable(const std::string &id) {
 }
 
 /**
- * @brief   Splits a tab into the plots and the statistics panel on their right.
- * @param[in] draw_plots       Draws the plots, in the left column.
- * @param[in] draw_statistics  Draws the statistics, in the bordered panel on the right.
+ * @brief   Draws the line over a statistics table: what span the readings cover.
+ * @param[in] span_text  What the readings cover, such as "Over the visible time".
+ */
+void DrawStatisticsHeader(const char *span_text) {
+    ImGui::TextDisabled("%s", span_text);
+}
+
+/**
+ * @brief   Draws readings as one table with a row per quantity and a column per trace, headed by the trace labels in
+ *          their colors, with the figures right-aligned so their digits line up.
+ * @param[in] id               ImGui ID of the table.
+ * @param[in] traces           Traces of the columns, for their labels and colors.
+ * @param[in] rows             Readings, each row holding one cell per trace in the same order.
+ * @param[in] cursor_readings  Name and value of each reading of the cursors themselves, such as A and its time, drawn
+ *                             as a table of their own beside the traces, or under them when the panel is too narrow;
+ *                             empty while the cursors are hidden.
+ * @note    The table is as wide as its widest cells, and the statistics panel scrolls sideways when the traces do not
+ *          fit.
+ */
+void DrawTraceTable(const char *id, const std::vector<PlottedTrace> &traces, const std::vector<StatisticsRow> &rows,
+                    const CursorReadings &cursor_readings) {
+    const auto measure = [](const std::string &text) { return ImGui::CalcTextSize(text.c_str()).x; };
+    // Each column is as wide as its widest text, so the table width is known before it begins
+    std::vector<float> widths(traces.size() + 1, 0.0f);
+    for (std::size_t column = 0; column < traces.size(); ++column) {
+        widths[column + 1] = measure(traces[column].Label);
+    }
+    // The figures of neighboring columns would run together, so each trace column keeps a gap on its left
+    const float column_gap = ImGui::GetFontSize() * TRACE_COLUMN_GAP;
+    for (const StatisticsRow &row : rows) {
+        widths[0] = std::max(widths[0], measure(row.Name));
+        for (std::size_t column = 0; column < row.Cells.size() && column < traces.size(); ++column) {
+            widths[column + 1] = std::max(widths[column + 1], measure(row.Cells[column].Text));
+        }
+    }
+    for (std::size_t column = 1; column < widths.size(); ++column) {
+        widths[column] += column_gap;
+    }
+    const float padding = ImGui::GetStyle().CellPadding.x * 2.0f;
+    float table_width = 0.0f;
+    for (const float width : widths) {
+        table_width += width + padding;
+    }
+    if (!ImGui::BeginTable(id, static_cast<int>(widths.size()), ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_RowBg,
+                           {table_width, 0.0f})) {
+        return;
+    }
+    for (const float width : widths) {
+        ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed, width);
+    }
+    const auto right_aligned = [&measure](const std::string &text, const float column_width) {
+        ImGui::SetCursorPosX(ImGui::GetCursorPosX() + column_width - measure(text));
+    };
+    ImGui::TableNextRow(ImGuiTableRowFlags_Headers);
+    ImGui::TableNextColumn();
+    for (std::size_t column = 0; column < traces.size(); ++column) {
+        ImGui::TableNextColumn();
+        right_aligned(traces[column].Label, widths[column + 1]);
+        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(traces[column].Color), "%s", traces[column].Label.c_str());
+    }
+    for (const StatisticsRow &row : rows) {
+        ImGui::TableNextRow();
+        ImGui::TableNextColumn();
+        ImGui::TextDisabled("%s", row.Name.c_str());
+        for (std::size_t column = 0; column < row.Cells.size() && column < traces.size(); ++column) {
+            const StatisticsCell &cell = row.Cells[column];
+            ImGui::TableNextColumn();
+            right_aligned(cell.Text, widths[column + 1]);
+            DrawCellText(cell.Text);
+            if (!cell.Tooltip.empty()) {
+                ImGui::SetItemTooltip("%s", cell.Tooltip.c_str());
+            }
+        }
+    }
+    ImGui::EndTable();
+    DrawCursorTable(cursor_readings);
+}
+
+/**
+ * @brief   Splits a tab into the plots and the statistics panel under them, which reads across the traces and is as
+ *          tall as its content, up to a share of the tab.
+ * @param[in] draw_plots       Draws the plots, above, in the height the statistics leave.
+ * @param[in] draw_statistics  Draws the statistics, in the bordered panel below, which scrolls when it is taller than
+ *                             its share or wider than the tab.
+ * @details The panel fits its content, which is only known once drawn, so the plots take the height the panel had
+ *          the frame before, kept in the ImGui storage of the tab.
  */
 void DrawWithStatistics(const std::function<void()> &draw_plots, const std::function<void()> &draw_statistics) {
-    const float statistics_width = ImGui::GetFontSize() * STATISTICS_WIDTH;
-    if (ImGui::BeginChild("plots_column", ImVec2(-statistics_width - ImGui::GetStyle().ItemSpacing.x, 0.0f))) {
+    const ImGuiID height_id = ImGui::GetID("statistics_height");
+    ImGuiStorage *storage = ImGui::GetStateStorage();
+    const float available = ImGui::GetContentRegionAvail().y;
+    const float max_height = available * MAX_STATISTICS_SHARE;
+    const float statistics_height = std::min(storage->GetFloat(height_id, 0.0f), max_height);
+    const float plots_height = std::max(available - statistics_height - ImGui::GetStyle().ItemSpacing.y, 0.0f);
+    if (ImGui::BeginChild("plots_area", ImVec2(0.0f, plots_height))) {
         draw_plots();
     }
     ImGui::EndChild();
-    ImGui::SameLine();
-    if (ImGui::BeginChild("statistics", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Borders)) {
+    ImGui::SetNextWindowSizeConstraints({0.0f, 0.0f}, {FLT_MAX, max_height});
+    if (ImGui::BeginChild("statistics", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Borders | ImGuiChildFlags_AutoResizeY,
+                          ImGuiWindowFlags_HorizontalScrollbar)) {
         draw_statistics();
     }
     ImGui::EndChild();
+    storage->SetFloat(height_id, ImGui::GetItemRectSize().y);
 }
 
 /**

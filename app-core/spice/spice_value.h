@@ -16,6 +16,7 @@ std::optional<double> ParseValue(std::string_view text, std::string_view unit);
 std::string FormatValue(double value);
 std::string FormatSpiceValue(double value);
 std::string FormatFixed(double value, int decimals);
+std::string FormatMeasurement(double value);
 
 } // namespace Core
 
