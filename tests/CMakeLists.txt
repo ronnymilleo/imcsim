@@ -29,6 +29,12 @@ add_executable(imcsim-tests
             live_input_tests.cpp
             logic_trace_tests.cpp
             math_channel_tests.cpp
+            native_backend_tests.cpp
+            controlled_sources_tests.cpp
+            nonlinear_tests.cpp
+            op_amp_tests.cpp
+            backend_comparison_tests.cpp
+            switches_tests.cpp
             parameter_step_tests.cpp
             playback_tests.cpp
             plot_export_tests.cpp
