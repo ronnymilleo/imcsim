@@ -22,6 +22,10 @@
 6. **[Small-Signal AC Noise Analysis (`.noise`)](./noise_analysis.md)**
    - Algorithms: Transposed complex adjoint solver $\mathbf{Y}(j\omega)^T \lambda = \mathbf{e}_{\text{out}}$, thermal ($4k_BTR, \frac{8}{3}k_BTg_m$) and shot ($2qI$) noise spectral densities, SPICE3f5 log-log power-law integration (`Nintegrate`), and hierarchical component noise grouping.
    - Benchmark tables: **Analytical Golden vs. `ngspice` vs. `Nodalys`**.
+7. **[Architecture Plan: Continuous Behavioral Logic Models and Verilog Integration](./behavioral_logic_and_verilog_plan.md)**
+   - Rationale and differentiation against `ngspice` XSPICE `digital.cm`.
+   - Mathematical formulation of smooth $C^\infty$ Boolean operators, dynamic inertial delay ($t_{\text{pd}}$), and Thévenin drive stages.
+   - Architectural blueprint for future Verilog-A (compact device DAEs via OSDI) and Verilog-HDL (event-driven co-simulation via A2D/D2A bridges and breakpoint synchronization).
 
 ---
 
@@ -58,7 +62,7 @@ All **6 analog solver analyses** in [`SimulationBackend`](../../app-core/simulat
 | **AC Sweep (Bode)** | `.ac` | ✅ | ✅ **Ready** | [`ac_analysis.cpp`](../../app-core/native/ac_analysis.cpp) — DC operating point linearization + complex MNA solver $\mathbf{Y}(j\omega)\mathbf{V} = \mathbf{I}$ (dB & unwrapped phase). |
 | **Transfer Function** | `.tf` | ✅ | ✅ **Ready** | [`tf_analysis.cpp`](../../app-core/native/tf_analysis.cpp) — Small-signal DC gain ($A_v$ or $R_m$), $Z_{\text{in}}$, and $Z_{\text{out}}$. |
 | **Noise Analysis** | `.noise` | ✅ | ✅ **Ready** | [`noise_analysis.cpp`](../../app-core/native/noise_analysis.cpp) — Adjoint complex solver $\mathbf{Y}(j\omega)^T \lambda = \mathbf{e}_{\text{out}}$, output & input-referred spectral density ($\text{V}/\sqrt{\text{Hz}}$), log-log power-law RMS integration, and per-part breakdown. |
-| **Truth Table** | Multiple `.op` | ✅ | 🟡 **Partial** (`#133`) | Runs on `Nodalys` for transistor/diode logic circuits; primitive digital gates (`AND`, `OR`, Flip-Flops) still use `ngspice` (`digital.cm`). |
+| **Truth Table** | Multiple `.op` | ✅ | 🟡 **In Progress** (`#133`) | Runs on `Nodalys` for transistor/diode logic circuits; primitive digital gates (`AND`, `OR`, Flip-Flops) transitioning to native behavioral models (see [Behavioral Logic Plan](./behavioral_logic_and_verilog_plan.md)). |
 
 ---
 
