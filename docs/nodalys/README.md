@@ -26,6 +26,11 @@
    - Rationale and differentiation against `ngspice` XSPICE `digital.cm`.
    - Mathematical formulation of smooth $C^\infty$ Boolean operators, dynamic inertial delay ($t_{\text{pd}}$), and Thévenin drive stages.
    - Architectural blueprint for future Verilog-A (compact device DAEs via OSDI) and Verilog-HDL (event-driven co-simulation via A2D/D2A bridges and breakpoint synchronization).
+8. **[Modularization, Public API & CLI Architecture Plan](./modularization_and_cli_plan.md)**
+   - Monorepo extraction of Nodalys to root `/nodalys` (`libnodalys.a`).
+   - Clean C++23 public builder API (`CircuitBuilder`), SPICE netlist parser (`.cir`, `.sp`, `.net`), and contiguous exporters (Raw, CSV, JSON).
+   - Standalone CLI executable `nodalys` powered by `vendor/CLI11`.
+   - Phased feature branch workflow based on epic trunk `dev/nodalys`.
 
 ---
 
