@@ -1,7 +1,7 @@
 /**
- * @file    analyses.cpp
- * @brief   The analyses the native backend runs on a compiled circuit: the operating point, the DC sweep and the
- *          transient with trapezoidal integration.
+ * @file    transient_analysis.cpp
+ * @brief   Time-domain transient analysis (`ComputeTransient`) of the Nodalys solver using Backward-Euler startup,
+ *          Trapezoidal integration, and SPICE 3rd divided-difference local truncation error (LTE) step control.
  */
 
 #include "native/analyses.h"
@@ -11,7 +11,6 @@
 #include <algorithm>
 #include <chrono>
 #include <cmath>
-#include <cstdio>
 #include <format>
 #include <thread>
 #include <utility>
@@ -38,11 +37,11 @@ constexpr std::chrono::duration<double> PACE_WAIT_SLICE{0.01};
 
 /**
  * @class   TransientCollector
- * @brief   Accumulates the output points of a transient, interpolating them onto the output grid.
+ * @brief   Accumulates the output points of a transient, interpolating internal solver steps onto the uniform output grid.
  */
 class TransientCollector {
 public:
-    TransientCollector(const CompiledCircuit &compiled, double output_step)
+    TransientCollector(const CompiledCircuit &compiled, const double output_step)
         : m_Compiled(compiled), m_OutputStep(output_step) {
         m_Result.NodeVoltages.resize(static_cast<std::size_t>(compiled.CircuitNodeCount));
         for (const CurrentRef &current : compiled.Currents) {
@@ -62,8 +61,8 @@ public:
         return currents;
     }
 
-    /// Appends the point of time t with solution x and precomputed currents.
-    void Append(double time, const std::vector<double> &x, const std::vector<double> &currents) {
+    /// Appends the point of time `t` with solution `x` and precomputed currents.
+    void Append(const double time, const std::vector<double> &x, const std::vector<double> &currents) {
         m_Result.Times.push_back(time);
         for (int node = 0; node < m_Compiled.CircuitNodeCount; ++node) {
             m_Result.NodeVoltages[static_cast<std::size_t>(node)].push_back(NodeVoltage(x, node));
@@ -73,11 +72,11 @@ public:
         }
     }
 
-    /// Appends the output-grid points of the segment (t0, x0, i0) → (t1, x1, i1); t0 itself is already stored. Grid
-    /// points strictly inside the segment are stored by linear interpolation; when the segment end lands on the grid
-    /// it is stored with the exact solution and currents. The next grid index is state, so a point is never stored twice.
-    void AppendSegment(double t0, const std::vector<double> &x0, const std::vector<double> &i0,
-                       double t1, const std::vector<double> &x1, const std::vector<double> &i1) {
+    /// Appends the output-grid points of the segment `(t0, x0, i0) -> (t1, x1, i1)`; `t0` itself is already stored.
+    /// Grid points strictly inside the segment are stored by linear interpolation; when the segment end lands on the
+    /// grid it is stored with the exact solution and currents.
+    void AppendSegment(const double t0, const std::vector<double> &x0, const std::vector<double> &i0,
+                       const double t1, const std::vector<double> &x1, const std::vector<double> &i1) {
         const double h = m_OutputStep;
         const double eps = 1e-9 * std::max(1.0, std::fabs(t1));
         while (static_cast<double>(m_NextGrid) * h < t1 - eps) {
@@ -107,7 +106,7 @@ public:
     Transient Take() { return std::move(m_Result); }
 
 private:
-    double NodeVoltage(const std::vector<double> &x, int node) const {
+    double NodeVoltage(const std::vector<double> &x, const int node) const {
         const int index = m_Compiled.System->NodeIndex(node);
         return index < 0 ? 0.0 : x[static_cast<std::size_t>(index)];
     }
@@ -120,74 +119,6 @@ private:
     std::vector<double> m_Scratch;
     std::vector<double> m_CurrentsScratch;
 };
-
-std::vector<ComponentCurrent> ReadCurrents(const CompiledCircuit &compiled, const std::vector<double> &x) {
-    std::vector<ComponentCurrent> currents;
-    currents.reserve(compiled.Currents.size());
-    for (const CurrentRef &ref : compiled.Currents) {
-        double value = 0.0;
-        for (const CurrentContribution &contribution : ref.Contributions) {
-            value += contribution.Element->TerminalCurrent(contribution.Terminal, x);
-        }
-        currents.push_back({ref.Name, value});
-    }
-    return currents;
-}
-
-std::vector<double> ReadNodeVoltages(const CompiledCircuit &compiled, const std::vector<double> &x) {
-    std::vector<double> voltages(static_cast<std::size_t>(compiled.CircuitNodeCount), 0.0);
-    for (int node = 1; node < compiled.CircuitNodeCount; ++node) {
-        voltages[static_cast<std::size_t>(node)] = x[static_cast<std::size_t>(compiled.System->NodeIndex(node))];
-    }
-    return voltages;
-}
-
-void DescribeOutcome(const NewtonOutcome &outcome, const char *analysis, std::vector<SimulatorMessage> &messages) {
-    std::string text = std::format("native: {} converged in {} iterations", analysis, outcome.Iterations);
-    if (!outcome.Strategy.empty()) {
-        text += std::format(" (with {})", outcome.Strategy);
-    }
-    messages.push_back({std::move(text), false});
-}
-
-/// The values a sweep visits, from Start to Stop in steps of Step, the stop value included.
-std::vector<double> SweepValues(const SweepRange &range) {
-    std::vector<double> values;
-    const double direction = range.Stop >= range.Start ? 1.0 : -1.0;
-    const double step = std::fabs(range.Step) * direction;
-    if (step == 0.0) {
-        return values;
-    }
-    const double tolerance = 1e-12 * std::max(1.0, std::fabs(range.Stop));
-    for (double value = range.Start; direction > 0 ? value <= range.Stop + tolerance : value >= range.Stop - tolerance;
-         value += step) {
-        values.push_back(value);
-    }
-    return values;
-}
-
-/// Sets the DC value a compiled source device contributes, whether it is a voltage or a current source.
-bool SetSourceValue(Device *device, double value) {
-    if (auto *voltage = dynamic_cast<VoltageSourceDevice *>(device)) {
-        voltage->SetDcValue(value);
-        return true;
-    }
-    if (auto *current = dynamic_cast<CurrentSourceDevice *>(device)) {
-        current->SetDcValue(value);
-        return true;
-    }
-    return false;
-}
-
-/// The unit ("V" or "A") of a source the sweep names, for the result to label its axes.
-std::string SourceUnit(const Circuit &circuit, const std::string &name) {
-    for (const CircuitEntry &entry : circuit.GetEntries()) {
-        if (entry.Part->GetName() == name) {
-            return entry.Part->GetType() == ComponentType::CURRENT_SOURCE ? "A" : "V";
-        }
-    }
-    return "V";
-}
 
 /// Applies the live changes a run received since the last chunk, by the element name they address.
 void ApplyLiveChanges(CompiledCircuit &compiled, RunControl &control, std::vector<SimulatorMessage> &messages) {
@@ -218,7 +149,7 @@ void ApplyLiveChanges(CompiledCircuit &compiled, RunControl &control, std::vecto
  * @brief   Holds a live run at its pace: waits until the clock reaches the simulated time, then while it is paused,
  *          moving the clock start by the pause so the run never catches up, and returns whether the run goes on.
  */
-bool KeepLivePace(std::chrono::steady_clock::time_point &start, double reached, double pace,
+bool KeepLivePace(std::chrono::steady_clock::time_point &start, const double reached, const double pace,
                   const RunControl *control) {
     const auto due = start + std::chrono::duration_cast<std::chrono::steady_clock::duration>(
                                  std::chrono::duration<double>(reached / pace));
@@ -243,7 +174,7 @@ bool KeepLivePace(std::chrono::steady_clock::time_point &start, double reached, 
 /**
  * @brief   Sends the points made since the last chunk, if the monitor wants them, and reports the progress.
  */
-bool PublishChunk(Transient &accumulated, const RunMonitor &monitor, double progress, std::size_t &sent) {
+bool PublishChunk(Transient &accumulated, const RunMonitor &monitor, const double progress, std::size_t &sent) {
     if (monitor.Control != nullptr) {
         monitor.Control->SetProgress(progress);
     }
@@ -272,104 +203,6 @@ bool PublishChunk(Transient &accumulated, const RunMonitor &monitor, double prog
 
 } // namespace
 
-/**
- * @brief   Computes the DC operating point of a compiled circuit.
- */
-std::expected<OperatingPoint, std::string> ComputeOperatingPoint(CompiledCircuit &compiled,
-                                                                 const ConvergenceOptions &options,
-                                                                 std::vector<SimulatorMessage> &messages) {
-    std::vector<double> x(static_cast<std::size_t>(compiled.System->Size()), 0.0);
-    const NewtonOutcome outcome = SolveDc(*compiled.System, compiled.Devices, x, options, TimeContext{});
-    if (!outcome.Converged) {
-        return std::unexpected("The native solver found no operating point; the circuit may have no DC path to "
-                               "ground or need initial conditions");
-    }
-    DescribeOutcome(outcome, "operating point", messages);
-    OperatingPoint point;
-    point.NodeVoltages = ReadNodeVoltages(compiled, x);
-    point.Currents = ReadCurrents(compiled, x);
-    return point;
-}
-
-/**
- * @brief   Sweeps a source through DC values and solves the operating point at each one.
- */
-std::expected<DCSweep, std::string> ComputeDCSweep(const Circuit &circuit, CompiledCircuit &compiled,
-                                                   const DCSweepSettings &settings, const ConvergenceOptions &options,
-                                                   std::vector<SimulatorMessage> &messages) {
-    const auto swept = compiled.SourcesByName.find(settings.Swept.Source);
-    if (swept == compiled.SourcesByName.end()) {
-        const bool exists = std::ranges::any_of(circuit.GetEntries(), [&](const CircuitEntry &entry) {
-            return entry.Part->GetName() == settings.Swept.Source;
-        });
-        return std::unexpected(
-            exists ? std::format("The source {} cannot be swept by the native backend", settings.Swept.Source)
-                   : std::format("The circuit has no source named {}", settings.Swept.Source));
-    }
-    Device *stepped_device = nullptr;
-    if (settings.Stepped) {
-        const auto stepped = compiled.SourcesByName.find(settings.Stepped->Source);
-        if (stepped == compiled.SourcesByName.end()) {
-            return std::unexpected(std::format("The circuit has no source named {}", settings.Stepped->Source));
-        }
-        stepped_device = stepped->second;
-    }
-
-    DCSweep sweep;
-    sweep.SweptSource = settings.Swept.Source;
-    sweep.SweptUnit = SourceUnit(circuit, settings.Swept.Source);
-    sweep.SweptValues = SweepValues(settings.Swept);
-    if (sweep.SweptValues.empty()) {
-        return std::unexpected("The DC sweep has no points; check its start, stop and step");
-    }
-    const std::vector<double> step_values =
-        settings.Stepped ? SweepValues(*settings.Stepped) : std::vector<double>{0.0};
-    if (settings.Stepped) {
-        sweep.SteppedSource = settings.Stepped->Source;
-        sweep.SteppedUnit = SourceUnit(circuit, settings.Stepped->Source);
-    }
-
-    std::vector<double> x(static_cast<std::size_t>(compiled.System->Size()), 0.0);
-    NewtonOutcome outcome;
-    for (const double step_value : step_values) {
-        if (stepped_device && !SetSourceValue(stepped_device, step_value)) {
-            return std::unexpected(std::format("Nodalys cannot step the source {}", sweep.SteppedSource));
-        }
-        DCSweepCurve curve;
-        curve.StepValue = settings.Stepped ? step_value : 0.0;
-        curve.NodeVoltages.resize(static_cast<std::size_t>(compiled.CircuitNodeCount));
-        for (const double swept_value : sweep.SweptValues) {
-            if (!SetSourceValue(swept->second, swept_value)) {
-                return std::unexpected(std::format("Nodalys cannot sweep the source {}", sweep.SweptSource));
-            }
-            outcome = SolveDc(*compiled.System, compiled.Devices, x, options, TimeContext{});
-            if (!outcome.Converged) {
-                return std::unexpected(std::format("Nodalys found no operating point at {} = {}",
-                                                   sweep.SweptSource, swept_value));
-            }
-            const std::vector<double> voltages = ReadNodeVoltages(compiled, x);
-            for (int node = 0; node < compiled.CircuitNodeCount; ++node) {
-                curve.NodeVoltages[static_cast<std::size_t>(node)].push_back(voltages[static_cast<std::size_t>(node)]);
-            }
-            const std::vector<ComponentCurrent> currents = ReadCurrents(compiled, x);
-            if (curve.Currents.empty()) {
-                for (const ComponentCurrent &current : currents) {
-                    curve.Currents.push_back({current.Name, {}});
-                }
-            }
-            for (std::size_t index = 0; index < currents.size(); ++index) {
-                curve.Currents[index].Values.push_back(currents[index].Current);
-            }
-        }
-        sweep.Curves.push_back(std::move(curve));
-    }
-    DescribeOutcome(outcome, "DC sweep", messages);
-    return sweep;
-}
-
-/**
- * @brief   Simulates the circuit over time with trapezoidal integration and LTE step control.
- */
 std::expected<Transient, std::string> ComputeTransient(CompiledCircuit &compiled, const TransientSettings &settings,
                                                        const bool has_initial_conditions, const RunMonitor &monitor,
                                                        const ConvergenceOptions &options,

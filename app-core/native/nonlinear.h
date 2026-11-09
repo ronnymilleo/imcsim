@@ -51,9 +51,12 @@ public:
     DiodeDevice(int anode, int cathode, int internal, DiodeParameters parameters);
 
     void Stamp(MnaSystem &sys, const std::vector<double> &x, const TimeContext &time) override;
+    void StampAc(MnaSystem &reactive, const std::vector<double> &x_dc) const override;
     bool Limit(std::vector<double> &x_new, const std::vector<double> &x_old) const override;
     void SeedOperatingPoint(std::vector<double> &x) const override;
     double TerminalCurrent(int terminal, const std::vector<double> &x) const override;
+    std::complex<double> AcTerminalCurrent(int terminal, const std::vector<double> &x_dc,
+                                           const std::vector<std::complex<double>> &x_ac, double omega) const override;
     bool HasTransientState() const override;
     void AcceptStep(const std::vector<double> &x) override;
     void RejectStep() override;
@@ -99,9 +102,12 @@ public:
               BJTParameters parameters, bool pnp);
 
     void Stamp(MnaSystem &sys, const std::vector<double> &x, const TimeContext &time) override;
+    void StampAc(MnaSystem &reactive, const std::vector<double> &x_dc) const override;
     bool Limit(std::vector<double> &x_new, const std::vector<double> &x_old) const override;
     void SeedOperatingPoint(std::vector<double> &x) const override;
     double TerminalCurrent(int terminal, const std::vector<double> &x) const override;
+    std::complex<double> AcTerminalCurrent(int terminal, const std::vector<double> &x_dc,
+                                           const std::vector<std::complex<double>> &x_ac, double omega) const override;
     bool HasTransientState() const override;
     void AcceptStep(const std::vector<double> &x) override;
     void RejectStep() override;
@@ -115,6 +121,9 @@ private:
         double GcBc; ///< $\partial I_C / \partial v_{bc}$.
         double GbBe; ///< $\partial I_B / \partial v_{be}$.
         double GbBc; ///< $\partial I_B / \partial v_{bc}$.
+        double IfwdQb;      ///< $I_{\text{fwd}} / q_b$ for Gummel-Poon forward transit-time charge $Q_{DE} = \tau_F I_{\text{fwd}} / q_b$.
+        double DIfwdQbDvbe; ///< $\partial (I_{\text{fwd}} / q_b) / \partial v_{be}$ for Gummel-Poon diffusion capacitance.
+        double DIfwdQbDvbc; ///< $\partial (I_{\text{fwd}} / q_b) / \partial v_{bc}$ for SPICE `geqcb` base-width modulation transcapacitance.
     };
     /// Evaluates the intrinsic transport equations in NPN polarity ($v_{be}, v_{bc}$ forward-positive).
     Intrinsic Evaluate(double vbe, double vbc) const;
@@ -150,9 +159,12 @@ public:
                  bool pmos);
 
     void Stamp(MnaSystem &sys, const std::vector<double> &x, const TimeContext &time) override;
+    void StampAc(MnaSystem &reactive, const std::vector<double> &x_dc) const override;
     bool Limit(std::vector<double> &x_new, const std::vector<double> &x_old) const override;
     void SeedOperatingPoint(std::vector<double> &x) const override;
     double TerminalCurrent(int terminal, const std::vector<double> &x) const override;
+    std::complex<double> AcTerminalCurrent(int terminal, const std::vector<double> &x_dc,
+                                           const std::vector<std::complex<double>> &x_ac, double omega) const override;
     bool HasTransientState() const override;
     void AcceptStep(const std::vector<double> &x) override;
     void RejectStep() override;

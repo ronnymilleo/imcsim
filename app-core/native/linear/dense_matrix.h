@@ -11,24 +11,26 @@
 #ifndef IMCSIM_NATIVE_DENSE_MATRIX_H
 #define IMCSIM_NATIVE_DENSE_MATRIX_H
 
+#include <complex>
 #include <cstddef>
 #include <vector>
 
 namespace Core::Native {
 
 /**
- * @class   DenseMatrix
- * @brief   A dense matrix of doubles that factorizes itself in place and solves linear systems.
+ * @class   BasicDenseMatrix
+ * @brief   A dense matrix of real (`double`) or complex (`std::complex<double>`) scalars that factorizes itself in
+ *          place and solves linear systems.
  */
-class DenseMatrix {
+template <typename Scalar> class BasicDenseMatrix {
 public:
-    DenseMatrix(std::size_t rows, std::size_t cols);
+    BasicDenseMatrix(std::size_t rows, std::size_t cols);
 
     std::size_t Rows() const;
     std::size_t Cols() const;
-    double &At(std::size_t row, std::size_t col);
-    double At(std::size_t row, std::size_t col) const;
-    void Add(std::size_t row, std::size_t col, double value);
+    Scalar &At(std::size_t row, std::size_t col);
+    Scalar At(std::size_t row, std::size_t col) const;
+    void Add(std::size_t row, std::size_t col, Scalar value);
     void Reset();
 
     /**
@@ -44,16 +46,19 @@ public:
      * @param[out] x    Solution; sized by the call.
      * @return  False when the matrix was not factorized or the size mismatches.
      */
-    bool Solve(const std::vector<double> &rhs, std::vector<double> &x) const;
+    bool Solve(const std::vector<Scalar> &rhs, std::vector<Scalar> &x) const;
 
 private:
     std::size_t m_Rows;
     std::size_t m_Cols;
-    std::vector<double> m_Data;
+    std::vector<Scalar> m_Data;
     /// Row permutation of the pivoting: pivot order, one entry per row, set by FactorizeLU().
     std::vector<std::size_t> m_Pivot;
     bool m_Factored = false;
 };
+
+using DenseMatrix = BasicDenseMatrix<double>;
+using ComplexDenseMatrix = BasicDenseMatrix<std::complex<double>>;
 
 } // namespace Core::Native
 

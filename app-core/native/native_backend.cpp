@@ -15,7 +15,8 @@ namespace Core {
 namespace {
 
 /// The analyses Nodalys runs so far; the rest of the seam returns a clear "not yet".
-constexpr auto NATIVE_ANALYSES = {AnalysisKind::OPERATING_POINT, AnalysisKind::TRANSIENT, AnalysisKind::DC_SWEEP};
+constexpr auto NATIVE_ANALYSES = {AnalysisKind::OPERATING_POINT, AnalysisKind::TRANSIENT, AnalysisKind::DC_SWEEP,
+                                  AnalysisKind::AC_SWEEP, AnalysisKind::TRANSFER_FUNCTION};
 
 /// Why the logic parts are not runnable yet, one reason for every gate and flip-flop type.
 constexpr const char *DIGITAL_REASON = "Nodalys has no event-driven digital engine yet; the logic parts "
@@ -109,10 +110,15 @@ DCSweepRun NativeBackend::RunDCSweep(const Circuit &circuit, const DCSweepSettin
 
 ACSweepRun NativeBackend::RunACSweep(const Circuit &circuit, const ACSweepSettings &settings,
                                      const std::optional<double> &temperature_celsius) {
-    (void)circuit;
-    (void)settings;
     (void)temperature_celsius;
-    return {std::unexpected("Nodalys does not run the AC sweep yet"), {}};
+    ACSweepRun run;
+    auto compiled = CompileOrFail(circuit);
+    if (!compiled) {
+        run.Result = std::unexpected(compiled.error());
+        return run;
+    }
+    run.Result = Native::ComputeACSweep(*compiled, settings, {}, run.Messages);
+    return run;
 }
 
 NoiseRun NativeBackend::RunNoise(const Circuit &circuit, const NoiseSettings &settings) {
@@ -123,9 +129,14 @@ NoiseRun NativeBackend::RunNoise(const Circuit &circuit, const NoiseSettings &se
 
 TransferFunctionRun NativeBackend::RunTransferFunction(const Circuit &circuit,
                                                        const TransferFunctionSettings &settings) {
-    (void)circuit;
-    (void)settings;
-    return {std::unexpected("Nodalys does not run the transfer function analysis yet"), {}};
+    TransferFunctionRun run;
+    auto compiled = CompileOrFail(circuit);
+    if (!compiled) {
+        run.Result = std::unexpected(compiled.error());
+        return run;
+    }
+    run.Result = Native::ComputeTransferFunction(circuit, *compiled, settings, {}, run.Messages);
+    return run;
 }
 
 } // namespace Core

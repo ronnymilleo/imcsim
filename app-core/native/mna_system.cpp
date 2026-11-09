@@ -75,6 +75,10 @@ void MnaSystem::Clear() {
     std::ranges::fill(m_Rhs, 0.0);
 }
 
+void MnaSystem::ClearRhs() {
+    std::ranges::fill(m_Rhs, 0.0);
+}
+
 bool MnaSystem::Solve(std::vector<double> &x) const {
     const std::size_t n = m_A.Rows();
     DenseMatrix factors = m_A;
@@ -114,6 +118,64 @@ bool MnaSystem::Solve(std::vector<double> &x) const {
     if (factors.Solve(scaled_residual, dx)) {
         for (std::size_t i = 0; i < n; ++i) {
             x[i] += dx[i];
+        }
+    }
+    return true;
+}
+
+bool MnaSystem::SolveAc(const MnaSystem &reactive, const double omega,
+                        std::vector<std::complex<double>> &x_ac) const {
+    const std::size_t n = m_A.Rows();
+    if (reactive.m_A.Rows() != n) {
+        return false;
+    }
+
+    // Assemble Y(j * omega) = A_dc + j * omega * C_ac and complex RHS b_ac
+    ComplexDenseMatrix y_orig(n, n);
+    std::vector<std::complex<double>> b_orig(n);
+    for (std::size_t r = 0; r < n; ++r) {
+        b_orig[r] = std::complex<double>(reactive.m_Rhs[r], 0.0);
+        for (std::size_t c = 0; c < n; ++c) {
+            y_orig.At(r, c) = std::complex<double>(m_A.At(r, c), omega * reactive.m_A.At(r, c));
+        }
+    }
+
+    ComplexDenseMatrix factors = y_orig;
+    std::vector<double> row_scale(n, 1.0);
+    std::vector<std::complex<double>> scaled_rhs = b_orig;
+
+    // 1. Row equilibration scaling
+    for (std::size_t r = 0; r < n; ++r) {
+        double max_entry = 0.0;
+        for (std::size_t c = 0; c < n; ++c) {
+            max_entry = std::max(max_entry, std::abs(factors.At(r, c)));
+        }
+        if (max_entry > 0.0) {
+            row_scale[r] = 1.0 / max_entry;
+            for (std::size_t c = 0; c < n; ++c) {
+                factors.At(r, c) *= row_scale[r];
+            }
+            scaled_rhs[r] *= row_scale[r];
+        }
+    }
+
+    if (!factors.FactorizeLU() || !factors.Solve(scaled_rhs, x_ac)) {
+        return false;
+    }
+
+    // 2. One step of complex iterative refinement: r = b - Y * x, solve Y * dx = r, x += dx
+    std::vector<std::complex<double>> scaled_residual(n, std::complex<double>(0.0, 0.0));
+    for (std::size_t r = 0; r < n; ++r) {
+        std::complex<double> yx(0.0, 0.0);
+        for (std::size_t c = 0; c < n; ++c) {
+            yx += y_orig.At(r, c) * x_ac[c];
+        }
+        scaled_residual[r] = (b_orig[r] - yx) * row_scale[r];
+    }
+    std::vector<std::complex<double>> dx;
+    if (factors.Solve(scaled_residual, dx)) {
+        for (std::size_t i = 0; i < n; ++i) {
+            x_ac[i] += dx[i];
         }
     }
     return true;

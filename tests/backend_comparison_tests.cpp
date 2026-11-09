@@ -30,6 +30,7 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators.hpp>
 #include <cmath>
+#include <complex>
 #include <format>
 #include <numbers>
 #include <string>
@@ -176,6 +177,57 @@ void CheckTransientParity(const Core::Circuit &circuit, const Core::TransientSet
     }
 }
 
+/**
+ * @brief   Runs an AC sweep through both backends and compares frequencies, node magnitudes/phases, and currents.
+ */
+void CheckACSweepParity(const Core::Circuit &circuit, const Core::ACSweepSettings &settings) {
+    Core::NativeBackend native;
+    const Core::ACSweepRun expected = Ngspice().RunACSweep(circuit, settings, std::nullopt);
+    INFO("ngspice: " + (expected.Result ? std::string("ok") : expected.Result.error()));
+    REQUIRE(expected.Result.has_value());
+    const Core::ACSweepRun actual = native.RunACSweep(circuit, settings, std::nullopt);
+    INFO("native: " + (actual.Result ? std::string("ok") : actual.Result.error()));
+    REQUIRE(actual.Result.has_value());
+    REQUIRE(actual.Result->Frequencies.size() == expected.Result->Frequencies.size());
+    REQUIRE(actual.Result->NodeMagnitudesDecibels.size() == expected.Result->NodeMagnitudesDecibels.size());
+    for (std::size_t i = 0; i < expected.Result->Frequencies.size(); ++i) {
+        REQUIRE(Close(actual.Result->Frequencies[i], expected.Result->Frequencies[i], 1e-9, 1e-12));
+        for (std::size_t node = 1; node < expected.Result->NodeMagnitudesDecibels.size(); ++node) {
+            const double exp_mag = expected.Result->NodeMagnitudesDecibels[node][i];
+            const double act_mag = actual.Result->NodeMagnitudesDecibels[node][i];
+            INFO(std::format("f = {:.3g} Hz node {} mag: ngspice {:.4f} dB, native {:.4f} dB",
+                             expected.Result->Frequencies[i], node, exp_mag, act_mag));
+            if (exp_mag > -200.0) {
+                REQUIRE(Close(act_mag, exp_mag, 1e-3, 0.05));
+                double phase_diff =
+                    std::fmod(actual.Result->NodePhasesDegrees[node][i] - expected.Result->NodePhasesDegrees[node][i],
+                              360.0);
+                if (phase_diff > 180.0) {
+                    phase_diff -= 360.0;
+                } else if (phase_diff < -180.0) {
+                    phase_diff += 360.0;
+                }
+                INFO(std::format("f = {:.3g} Hz node {} phase: ngspice {:.4f} deg, native {:.4f} deg",
+                                 expected.Result->Frequencies[i], node, expected.Result->NodePhasesDegrees[node][i],
+                                 actual.Result->NodePhasesDegrees[node][i]));
+                REQUIRE(std::fabs(phase_diff) <= 0.5);
+            }
+        }
+    }
+    for (const Core::ComponentTrace &exp_cur : expected.Result->CurrentMagnitudesDecibels) {
+        const std::vector<double> *act_mag = TraceOf(actual.Result->CurrentMagnitudesDecibels, exp_cur.Name);
+        INFO(std::format("AC current {}", exp_cur.Name));
+        REQUIRE(act_mag != nullptr);
+        for (std::size_t i = 0; i < expected.Result->Frequencies.size(); ++i) {
+            if (exp_cur.Values[i] > -200.0) {
+                INFO(std::format("f = {:.3g} Hz current {} mag: ngspice {:.4f} dB, native {:.4f} dB",
+                                 expected.Result->Frequencies[i], exp_cur.Name, exp_cur.Values[i], (*act_mag)[i]));
+                REQUIRE(Close((*act_mag)[i], exp_cur.Values[i], 1e-3, 0.05));
+            }
+        }
+    }
+}
+
 } // namespace
 
 TEST_CASE("Both backends agree on the operating point of a divider") {
@@ -197,6 +249,9 @@ TEST_CASE("Both backends agree on the operating point of a divider") {
     CheckOperatingPointParity(circuit);
     CheckDCSweepParity(circuit, {.Swept = {.Source = "V1", .Start = 0.0, .Stop = 12.0, .Step = 2.0}});
 }
+
+
+
 
 TEST_CASE("Both backends agree on the operating point and transient of an RC charge") {
     Core::VCC supply;
@@ -328,6 +383,9 @@ TEST_CASE("Both backends agree on the operating point of a common-source MOSFET 
     CheckDCSweepParity(circuit, {.Swept = {.Source = "V1", .Start = 0.0, .Stop = 12.0, .Step = 2.0}});
 }
 
+
+
+
 TEST_CASE("Both backends agree on the operating point and transient of an ideal op-amp amplifier") {
     Core::VoltageSource input;
     input.SetName("Vin1");
@@ -446,6 +504,9 @@ TEST_CASE("Both backends agree on the operating point of controlled sources") {
     CheckDCSweepParity(circuit, {.Swept = {.Source = "V1", .Start = 0.0, .Stop = 12.0, .Step = 2.0}});
 }
 
+
+
+
 TEST_CASE("Both backends agree on the operating point of a voltage-controlled switch") {
     const double control = GENERATE(0.0, 5.0);
     CAPTURE(control);
@@ -476,6 +537,9 @@ TEST_CASE("Both backends agree on the operating point of a voltage-controlled sw
     CheckDCSweepParity(circuit, {.Swept = {.Source = "V1", .Start = 0.0, .Stop = 12.0, .Step = 2.0}});
 }
 
+
+
+
 TEST_CASE("Both backends agree on the operating point of a potentiometer divider") {
     Core::VCC supply;
     supply.SetName("V1");
@@ -496,3 +560,194 @@ TEST_CASE("Both backends agree on the operating point of a potentiometer divider
     CheckOperatingPointParity(circuit);
     CheckDCSweepParity(circuit, {.Swept = {.Source = "V1", .Start = 0.0, .Stop = 12.0, .Step = 2.0}});
 }
+
+TEST_CASE("Both backends agree on the AC sweep of passive, semiconductor, and op-amp circuits") {
+    const Core::ACSweepSettings sweep_settings{
+        .StartFrequency = 10.0, .StopFrequency = 1e6, .PointsPerDecade = 10};
+
+    SECTION("RC low-pass and series RLC filters") {
+        Core::VoltageSource source;
+        source.SetName("V1");
+        source.SetSourceType(Core::Source::SourceType::AC);
+        source.SetAC({.Amplitude = 1.0, .Frequency = 1e3, .Offset = 0.0, .Magnitude = 1.0});
+        Core::Resistor r1;
+        r1.SetName("R1");
+        r1.SetValue(100.0);
+        Core::Inductor l1;
+        l1.SetName("L1");
+        l1.SetValue(10e-3);
+        Core::Capacitor c1;
+        c1.SetName("C1");
+        c1.SetValue(100e-9);
+        Core::Ground ground;
+        Core::Circuit circuit;
+        circuit.Add(source, {1, 0});
+        circuit.Add(r1, {1, 2});
+        circuit.Add(l1, {2, 3});
+        circuit.Add(c1, {3, 0});
+        circuit.Add(ground, {0});
+        CheckACSweepParity(circuit, sweep_settings);
+    }
+
+    SECTION("Common-emitter BJT amplifier with junction capacitances") {
+        Core::VCC vcc;
+        vcc.SetName("V1");
+        vcc.SetValue(12.0);
+        Core::VoltageSource ac_in;
+        ac_in.SetName("V2");
+        ac_in.SetSourceType(Core::Source::SourceType::AC);
+        ac_in.SetAC({.Amplitude = 10e-3, .Frequency = 1e3, .Offset = 1.5, .Magnitude = 1.0});
+        Core::Resistor rb;
+        rb.SetName("R1");
+        rb.SetValue(10e3);
+        Core::Resistor rc;
+        rc.SetName("R2");
+        rc.SetValue(2.2e3);
+        Core::Resistor re;
+        re.SetName("R3");
+        re.SetValue(470.0);
+        Core::BJT q1(Core::ComponentType::NPN);
+        q1.SetName("Q1");
+        Core::Ground ground;
+        Core::Circuit circuit;
+        circuit.Add(vcc, {1});
+        circuit.Add(ac_in, {2, 0});
+        circuit.Add(rb, {2, 3});
+        circuit.Add(rc, {1, 4});
+        circuit.Add(re, {5, 0});
+        circuit.Add(q1, {4, 3, 5});
+        circuit.Add(ground, {0});
+        CheckACSweepParity(circuit, {.StartFrequency = 100.0, .StopFrequency = 100e6, .PointsPerDecade = 5});
+    }
+
+    SECTION("Non-inverting uA741 op-amp amplifier") {
+        Core::VCC vcc;
+        vcc.SetName("V1");
+        vcc.SetValue(15.0);
+        Core::VoltageSource vee;
+        vee.SetName("V2");
+        vee.SetValue(-15.0);
+        Core::VoltageSource ac_in;
+        ac_in.SetName("V3");
+        ac_in.SetSourceType(Core::Source::SourceType::AC);
+        ac_in.SetAC({.Amplitude = 0.1, .Frequency = 1e3, .Offset = 0.0, .Magnitude = 1.0});
+        Core::Resistor r1;
+        r1.SetName("R1");
+        r1.SetValue(1e3);
+        Core::Resistor r2;
+        r2.SetName("R2");
+        r2.SetValue(9e3);
+        Core::OpAmp op_amp;
+        op_amp.SetName("U1");
+        op_amp.SetModel(*Core::FindOpAmpModel(Core::ComponentType::OP_AMP, "uA741"));
+        Core::Ground ground;
+        Core::Circuit circuit;
+        circuit.Add(vcc, {1});
+        circuit.Add(vee, {2, 0});
+        circuit.Add(ac_in, {3, 0});
+        circuit.Add(r1, {4, 0});
+        circuit.Add(r2, {5, 4});
+        circuit.Add(op_amp, {5, 3, 4, 1, 2});
+        circuit.Add(ground, {0});
+        CheckACSweepParity(circuit, sweep_settings);
+    }
+}
+
+TEST_CASE("Both backends agree on the small-signal transfer function and impedances") {
+    auto check_tf_parity = [](const Core::Circuit &circuit, const Core::TransferFunctionSettings &settings) {
+        Core::NativeBackend native;
+        const Core::TransferFunctionRun expected = Ngspice().RunTransferFunction(circuit, settings);
+        REQUIRE(expected.Result.has_value());
+        const Core::TransferFunctionRun actual = native.RunTransferFunction(circuit, settings);
+        INFO("native: " + (actual.Result ? std::string("ok") : actual.Result.error()));
+        REQUIRE(actual.Result.has_value());
+        REQUIRE(actual.Result->InputUnit == expected.Result->InputUnit);
+        INFO(std::format("Gain: ngspice {:.6e}, native {:.6e}", expected.Result->Gain, actual.Result->Gain));
+        REQUIRE(Close(actual.Result->Gain, expected.Result->Gain, 1e-4, 1e-6));
+        INFO(std::format("Zin: ngspice {:.6e}, native {:.6e}", expected.Result->InputImpedance,
+                         actual.Result->InputImpedance));
+        REQUIRE(Close(actual.Result->InputImpedance, expected.Result->InputImpedance, 1e-4, 1e-6));
+        INFO(std::format("Zout: ngspice {:.6e}, native {:.6e}", expected.Result->OutputImpedance,
+                         actual.Result->OutputImpedance));
+        REQUIRE(Close(actual.Result->OutputImpedance, expected.Result->OutputImpedance, 1e-4, 5e-5));
+    };
+
+    SECTION("Resistive divider") {
+        Core::VCC supply;
+        supply.SetName("V1");
+        supply.SetValue(12.0);
+        Core::Resistor r1;
+        r1.SetName("R1");
+        r1.SetValue(1e3);
+        Core::Resistor r2;
+        r2.SetName("R2");
+        r2.SetValue(2.2e3);
+        Core::Ground ground;
+        Core::Circuit circuit;
+        circuit.Add(supply, {1});
+        circuit.Add(r1, {1, 2});
+        circuit.Add(r2, {2, 0});
+        circuit.Add(ground, {0});
+        check_tf_parity(circuit, {.OutputNode = 2, .InputSource = "V1"});
+    }
+
+    SECTION("BJT emitter follower") {
+        Core::VCC vcc;
+        vcc.SetName("V1");
+        vcc.SetValue(12.0);
+        Core::VoltageSource vin;
+        vin.SetName("V2");
+        vin.SetValue(5.0);
+        Core::Resistor rb;
+        rb.SetName("R1");
+        rb.SetValue(10e3);
+        Core::Resistor re;
+        re.SetName("R2");
+        re.SetValue(1e3);
+        Core::BJT q1(Core::ComponentType::NPN);
+        q1.SetName("Q1");
+        Core::Ground ground;
+        Core::Circuit circuit;
+        circuit.Add(vcc, {1});
+        circuit.Add(vin, {2, 0});
+        circuit.Add(rb, {2, 3});
+        circuit.Add(re, {4, 0});
+        circuit.Add(q1, {1, 3, 4});
+        circuit.Add(ground, {0});
+        check_tf_parity(circuit, {.OutputNode = 4, .InputSource = "V2"});
+    }
+
+    SECTION("Non-inverting uA741 op-amp amplifier") {
+        Core::VCC vcc;
+        vcc.SetName("V1");
+        vcc.SetValue(15.0);
+        Core::VoltageSource vee;
+        vee.SetName("V2");
+        vee.SetValue(-15.0);
+        Core::VoltageSource vin;
+        vin.SetName("V3");
+        vin.SetValue(0.1);
+        Core::Resistor r1;
+        r1.SetName("R1");
+        r1.SetValue(1e3);
+        Core::Resistor r2;
+        r2.SetName("R2");
+        r2.SetValue(9e3);
+        Core::OpAmp op_amp;
+        op_amp.SetName("U1");
+        op_amp.SetModel(*Core::FindOpAmpModel(Core::ComponentType::OP_AMP, "uA741"));
+        Core::Ground ground;
+        Core::Circuit circuit;
+        circuit.Add(vcc, {1});
+        circuit.Add(vee, {2, 0});
+        circuit.Add(vin, {3, 0});
+        circuit.Add(r1, {4, 0});
+        circuit.Add(r2, {5, 4});
+        circuit.Add(op_amp, {5, 3, 4, 1, 2});
+        circuit.Add(ground, {0});
+        check_tf_parity(circuit, {.OutputNode = 5, .InputSource = "V3"});
+    }
+}
+
+
+

@@ -87,8 +87,21 @@ public:
     /// Zeros both $A$ and $\text{rhs}$ before stamping a new Newton iteration.
     void Clear();
 
+    /// Zeros only $\text{rhs}$ while preserving the linearized matrix $A$ (used for small-signal `.tf` solves).
+    void ClearRhs();
+
     /// Solves $A \cdot x = \text{rhs}$ via LU decomposition with partial pivoting; returns false if singular.
     bool Solve(std::vector<double> &x) const;
+
+    /**
+     * @brief   Solves the small-signal complex AC system $(A_{\text{DC}} + j \omega C_{\text{AC}}) \cdot x_{\text{AC}} = b_{\text{AC}}$.
+     * @param[in]  reactive  System whose matrix holds the reactive coefficients $C_{\text{AC}}$ and whose RHS holds the
+     *                       small-signal AC source excitation $b_{\text{AC}}$.
+     * @param[in]  omega     Angular frequency $\omega = 2\pi f$ in rad/s.
+     * @param[out] x_ac      Complex small-signal solution vector (node phasors and branch current phasors).
+     * @return  False if the complex matrix at frequency $\omega$ is singular.
+     */
+    bool SolveAc(const MnaSystem &reactive, double omega, std::vector<std::complex<double>> &x_ac) const;
 
     /// Verifies that the equation residual $|A \cdot x - \text{rhs}|$ satisfies KCL and branch tolerances.
     bool CheckResidual(const std::vector<double> &x, double voltage_abstol, double current_abstol, double reltol) const;

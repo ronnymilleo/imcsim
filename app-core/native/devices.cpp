@@ -50,6 +50,14 @@ double BranchVoltage(const std::vector<double> &x, const int node_a, const int n
     return NodeVoltage(x, node_a) - NodeVoltage(x, node_b);
 }
 
+std::complex<double> AcNodeVoltage(const std::vector<std::complex<double>> &x, const int index) {
+    return index < 0 ? std::complex<double>(0.0, 0.0) : x[static_cast<std::size_t>(index)];
+}
+
+std::complex<double> AcBranchVoltage(const std::vector<std::complex<double>> &x, const int node_a, const int node_b) {
+    return AcNodeVoltage(x, node_a) - AcNodeVoltage(x, node_b);
+}
+
 void StampConductance(MnaSystem &sys, const int node_a, const int node_b, const double conductance) {
     sys.AddA(node_a, node_a, conductance);
     sys.AddA(node_b, node_b, conductance);
@@ -87,6 +95,13 @@ void ResistorDevice::Stamp(MnaSystem &sys, const std::vector<double> & /*x*/, co
 
 double ResistorDevice::TerminalCurrent(const int terminal, const std::vector<double> &x) const {
     const double current = m_Conductance * BranchVoltage(x, m_NodeA, m_NodeB);
+    return terminal == 0 ? current : -current;
+}
+
+std::complex<double> ResistorDevice::AcTerminalCurrent(const int terminal, const std::vector<double> & /*x_dc*/,
+                                                       const std::vector<std::complex<double>> &x_ac,
+                                                       const double /*omega*/) const {
+    const std::complex<double> current = m_Conductance * AcBranchVoltage(x_ac, m_NodeA, m_NodeB);
     return terminal == 0 ? current : -current;
 }
 
@@ -129,9 +144,21 @@ void CapacitorDevice::Stamp(MnaSystem &sys, const std::vector<double> &, const T
     StampCurrentSource(sys, m_NodeA, m_NodeB, m_EquivalentCurrent);
 }
 
+void CapacitorDevice::StampAc(MnaSystem &reactive, const std::vector<double> & /*x_dc*/) const {
+    StampConductance(reactive, m_NodeA, m_NodeB, m_Capacitance);
+}
+
 double CapacitorDevice::TerminalCurrent(const int terminal, const std::vector<double> &x) const {
     const double voltage = BranchVoltage(x, m_NodeA, m_NodeB);
     const double current = m_LastConductance * voltage + m_EquivalentCurrent;
+    return terminal == 0 ? current : -current;
+}
+
+std::complex<double> CapacitorDevice::AcTerminalCurrent(const int terminal, const std::vector<double> & /*x_dc*/,
+                                                        const std::vector<std::complex<double>> &x_ac,
+                                                        const double omega) const {
+    const std::complex<double> current =
+        std::complex<double>(0.0, omega * m_Capacitance) * AcBranchVoltage(x_ac, m_NodeA, m_NodeB);
     return terminal == 0 ? current : -current;
 }
 
@@ -191,8 +218,19 @@ void InductorDevice::Stamp(MnaSystem &sys, const std::vector<double> &, const Ti
     sys.AddRhs(m_Branch, equivalent_voltage);
 }
 
+void InductorDevice::StampAc(MnaSystem &reactive, const std::vector<double> & /*x_dc*/) const {
+    reactive.AddA(m_Branch, m_Branch, -m_Inductance);
+}
+
 double InductorDevice::TerminalCurrent(const int terminal, const std::vector<double> &x) const {
     const double current = x[static_cast<std::size_t>(m_Branch)];
+    return terminal == 0 ? current : -current;
+}
+
+std::complex<double> InductorDevice::AcTerminalCurrent(const int terminal, const std::vector<double> & /*x_dc*/,
+                                                       const std::vector<std::complex<double>> &x_ac,
+                                                       const double /*omega*/) const {
+    const std::complex<double> current = x_ac[static_cast<std::size_t>(m_Branch)];
     return terminal == 0 ? current : -current;
 }
 
@@ -217,8 +255,9 @@ void InductorDevice::RejectStep() {
 // ============================================================================
 
 VoltageSourceDevice::VoltageSourceDevice(const int node_a, const int node_b, const int branch, const double dc_value,
-                                         Waveform waveform)
-    : m_NodeA(node_a), m_NodeB(node_b), m_Branch(branch), m_DcValue(dc_value), m_Waveform(std::move(waveform)) {
+                                         Waveform waveform, const double ac_magnitude)
+    : m_NodeA(node_a), m_NodeB(node_b), m_Branch(branch), m_DcValue(dc_value), m_Waveform(std::move(waveform)),
+      m_AcMagnitude(ac_magnitude) {
 }
 
 double VoltageSourceDevice::GetDcValue() const {
@@ -237,6 +276,10 @@ void VoltageSourceDevice::Stamp(MnaSystem &sys, const std::vector<double> & /*x*
     sys.AddRhs(m_Branch, m_Scale * m_Waveform(m_DcValue, time));
 }
 
+void VoltageSourceDevice::StampAc(MnaSystem &reactive, const std::vector<double> & /*x_dc*/) const {
+    reactive.AddRhs(m_Branch, m_AcMagnitude);
+}
+
 void VoltageSourceDevice::SetSourceScale(const double scale) {
     m_Scale = scale;
 }
@@ -246,9 +289,17 @@ double VoltageSourceDevice::TerminalCurrent(const int terminal, const std::vecto
     return terminal == 0 ? current : -current;
 }
 
+std::complex<double> VoltageSourceDevice::AcTerminalCurrent(const int terminal, const std::vector<double> & /*x_dc*/,
+                                                            const std::vector<std::complex<double>> &x_ac,
+                                                            const double /*omega*/) const {
+    const std::complex<double> current = x_ac[static_cast<std::size_t>(m_Branch)];
+    return terminal == 0 ? current : -current;
+}
+
 CurrentSourceDevice::CurrentSourceDevice(const int node_a, const int node_b, const double dc_value,
-                                         VoltageSourceDevice::Waveform waveform)
-    : m_NodeA(node_a), m_NodeB(node_b), m_DcValue(dc_value), m_Waveform(std::move(waveform)) {
+                                         VoltageSourceDevice::Waveform waveform, const double ac_magnitude)
+    : m_NodeA(node_a), m_NodeB(node_b), m_DcValue(dc_value), m_Waveform(std::move(waveform)),
+      m_AcMagnitude(ac_magnitude) {
 }
 
 double CurrentSourceDevice::GetDcValue() const {
@@ -264,12 +315,23 @@ void CurrentSourceDevice::Stamp(MnaSystem &sys, const std::vector<double> & /*x*
     StampCurrentSource(sys, m_NodeA, m_NodeB, m_Value);
 }
 
+void CurrentSourceDevice::StampAc(MnaSystem &reactive, const std::vector<double> & /*x_dc*/) const {
+    StampCurrentSource(reactive, m_NodeA, m_NodeB, m_AcMagnitude);
+}
+
 void CurrentSourceDevice::SetSourceScale(const double scale) {
     m_Scale = scale;
 }
 
 double CurrentSourceDevice::TerminalCurrent(const int terminal, const std::vector<double> & /*x*/) const {
     return terminal == 0 ? m_Value : -m_Value;
+}
+
+std::complex<double> CurrentSourceDevice::AcTerminalCurrent(const int terminal, const std::vector<double> & /*x_dc*/,
+                                                            const std::vector<std::complex<double>> & /*x_ac*/,
+                                                            const double /*omega*/) const {
+    const std::complex<double> current(m_AcMagnitude, 0.0);
+    return terminal == 0 ? current : -current;
 }
 
 // ============================================================================
@@ -297,6 +359,13 @@ double VcvsDevice::TerminalCurrent(const int terminal, const std::vector<double>
     return terminal == 0 ? current : -current;
 }
 
+std::complex<double> VcvsDevice::AcTerminalCurrent(const int terminal, const std::vector<double> & /*x_dc*/,
+                                                   const std::vector<std::complex<double>> &x_ac,
+                                                   const double /*omega*/) const {
+    const std::complex<double> current = x_ac[static_cast<std::size_t>(m_Branch)];
+    return terminal == 0 ? current : -current;
+}
+
 VccsDevice::VccsDevice(const int node_a, const int node_b, const int control_positive, const int control_negative,
                        const double gain)
     : m_NodeA(node_a), m_NodeB(node_b), m_ControlPositive(control_positive), m_ControlNegative(control_negative),
@@ -317,6 +386,13 @@ double VccsDevice::TerminalCurrent(const int terminal, const std::vector<double>
     return terminal == 0 ? current : -current;
 }
 
+std::complex<double> VccsDevice::AcTerminalCurrent(const int terminal, const std::vector<double> & /*x_dc*/,
+                                                   const std::vector<std::complex<double>> &x_ac,
+                                                   const double /*omega*/) const {
+    const std::complex<double> current = m_Gain * AcBranchVoltage(x_ac, m_ControlPositive, m_ControlNegative);
+    return terminal == 0 ? current : -current;
+}
+
 CccsDevice::CccsDevice(const int node_a, const int node_b, const int control_branch, const double gain)
     : m_NodeA(node_a), m_NodeB(node_b), m_ControlBranch(control_branch), m_Gain(gain) {
 }
@@ -329,6 +405,13 @@ void CccsDevice::Stamp(MnaSystem &sys, const std::vector<double> &, const TimeCo
 
 double CccsDevice::TerminalCurrent(const int terminal, const std::vector<double> &x) const {
     const double current = m_Gain * x[static_cast<std::size_t>(m_ControlBranch)];
+    return terminal == 0 ? current : -current;
+}
+
+std::complex<double> CccsDevice::AcTerminalCurrent(const int terminal, const std::vector<double> & /*x_dc*/,
+                                                   const std::vector<std::complex<double>> &x_ac,
+                                                   const double /*omega*/) const {
+    const std::complex<double> current = m_Gain * x_ac[static_cast<std::size_t>(m_ControlBranch)];
     return terminal == 0 ? current : -current;
 }
 
@@ -348,6 +431,13 @@ void CcvsDevice::Stamp(MnaSystem &sys, const std::vector<double> &, const TimeCo
 
 double CcvsDevice::TerminalCurrent(const int terminal, const std::vector<double> &x) const {
     const double current = x[static_cast<std::size_t>(m_Branch)];
+    return terminal == 0 ? current : -current;
+}
+
+std::complex<double> CcvsDevice::AcTerminalCurrent(const int terminal, const std::vector<double> & /*x_dc*/,
+                                                   const std::vector<std::complex<double>> &x_ac,
+                                                   const double /*omega*/) const {
+    const std::complex<double> current = x_ac[static_cast<std::size_t>(m_Branch)];
     return terminal == 0 ? current : -current;
 }
 
@@ -375,6 +465,13 @@ void SwitchDevice::Stamp(MnaSystem &sys, const std::vector<double> &x, const Tim
 
 double SwitchDevice::TerminalCurrent(const int terminal, const std::vector<double> &x) const {
     const double current = BranchVoltage(x, m_NodeA, m_NodeB) / m_Resistance;
+    return terminal == 0 ? current : -current;
+}
+
+std::complex<double> SwitchDevice::AcTerminalCurrent(const int terminal, const std::vector<double> & /*x_dc*/,
+                                                     const std::vector<std::complex<double>> &x_ac,
+                                                     const double /*omega*/) const {
+    const std::complex<double> current = AcBranchVoltage(x_ac, m_NodeA, m_NodeB) / m_Resistance;
     return terminal == 0 ? current : -current;
 }
 
@@ -427,9 +524,23 @@ void CoupledInductorDevice::Stamp(MnaSystem &sys, const std::vector<double> &, c
     }
 }
 
+void CoupledInductorDevice::StampAc(MnaSystem &reactive, const std::vector<double> & /*x_dc*/) const {
+    reactive.AddA(m_Branch1, m_Branch1, -m_L1);
+    reactive.AddA(m_Branch1, m_Branch2, -m_M);
+    reactive.AddA(m_Branch2, m_Branch1, -m_M);
+    reactive.AddA(m_Branch2, m_Branch2, -m_L2);
+}
+
 double CoupledInductorDevice::TerminalCurrent(const int terminal, const std::vector<double> &x) const {
     const int branch = terminal == 0 ? m_Branch1 : m_Branch2;
     return x[static_cast<std::size_t>(branch)];
+}
+
+std::complex<double> CoupledInductorDevice::AcTerminalCurrent(const int terminal, const std::vector<double> & /*x_dc*/,
+                                                              const std::vector<std::complex<double>> &x_ac,
+                                                              const double /*omega*/) const {
+    const int branch = terminal == 0 ? m_Branch1 : m_Branch2;
+    return x_ac[static_cast<std::size_t>(branch)];
 }
 
 bool CoupledInductorDevice::HasTransientState() const {

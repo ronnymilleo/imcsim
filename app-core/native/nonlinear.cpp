@@ -34,6 +34,10 @@ double NodeVoltage(const std::vector<double> &x, const int index) {
     return index < 0 ? 0.0 : x[static_cast<std::size_t>(index)];
 }
 
+std::complex<double> AcNodeVoltage(const std::vector<std::complex<double>> &x, const int index) {
+    return index < 0 ? std::complex<double>{0.0, 0.0} : x[static_cast<std::size_t>(index)];
+}
+
 void StampConductance(MnaSystem &sys, const int node_a, const int node_b, const double conductance) {
     sys.AddA(node_a, node_a, conductance);
     sys.AddA(node_b, node_b, conductance);
@@ -80,15 +84,25 @@ DepletionCharge EvaluateDepletion(const double voltage, const double cj0, const 
     if (cj0 <= 0.0) {
         return {0.0, 0.0};
     }
-    const double charge_factor = cj0 * vj / (1.0 - m);
-    if (voltage < fc * vj) {
+    const double fc_vj = fc * vj;
+    if (voltage < fc_vj) {
         const double ratio = std::max(1.0 - voltage / vj, 1e-6);
-        return {charge_factor * (1.0 - std::pow(ratio, 1.0 - m)), cj0 * std::pow(ratio, -m)};
+        const double charge = (cj0 * vj / (1.0 - m)) * (1.0 - std::pow(ratio, 1.0 - m));
+        const double capacitance = cj0 * std::pow(ratio, -m);
+        return {charge, capacitance};
     }
-    const double fcp = std::pow(1.0 - fc, 1.0 - m);
-    const double slope = (1.0 - m) / (vj * (1.0 - fc));
-    return {charge_factor * (1.0 - fcp) * (1.0 + slope * (voltage - fc * vj)),
-            cj0 * fcp * (1.0 + m * (voltage / vj - fc) / (1.0 - fc))};
+    // SPICE forward-bias linear capacitance extrapolation for v >= FC * VJ (C^1-continuous at v = FC * VJ):
+    //   f1 = (VJ / (1 - M)) * (1 - (1 - FC)^(1 - M))
+    //   f2 = (1 - FC)^(1 + M)
+    //   f3 = 1 - FC * (1 + M)
+    const double f1 = (vj / (1.0 - m)) * (1.0 - std::pow(1.0 - fc, 1.0 - m));
+    const double f2 = std::pow(1.0 - fc, 1.0 + m);
+    const double f3 = 1.0 - fc * (1.0 + m);
+    const double czof2 = cj0 / f2;
+    const double dv = voltage - fc_vj;
+    const double charge = cj0 * f1 + czof2 * (f3 * dv + (0.5 * m / vj) * (voltage * voltage - fc_vj * fc_vj));
+    const double capacitance = czof2 * (f3 + m * voltage / vj);
+    return {charge, capacitance};
 }
 
 /**
@@ -210,6 +224,23 @@ double DiodeDevice::TerminalCurrent(const int terminal, const std::vector<double
     return terminal == 0 ? current : -current;
 }
 
+void DiodeDevice::StampAc(MnaSystem &reactive, const std::vector<double> &x_dc) const {
+    if (HasTransientState()) {
+        StampConductance(reactive, m_Anode, m_JunctionNode, Capacitance(VoltageAt(x_dc)));
+    }
+}
+
+std::complex<double> DiodeDevice::AcTerminalCurrent(const int terminal, const std::vector<double> &x_dc,
+                                                    const std::vector<std::complex<double>> &x_ac,
+                                                    const double omega) const {
+    const double v_dc = VoltageAt(x_dc);
+    const double gd = Evaluate(v_dc).Conductance;
+    const double cj = HasTransientState() ? Capacitance(v_dc) : 0.0;
+    const std::complex<double> v_ac = AcNodeVoltage(x_ac, m_Anode) - AcNodeVoltage(x_ac, m_JunctionNode);
+    const std::complex<double> current = std::complex<double>(gd, omega * cj) * v_ac;
+    return terminal == 0 ? current : -current;
+}
+
 bool DiodeDevice::HasTransientState() const {
     return m_Parameters.JunctionCapacitance > 0.0 || m_Parameters.TransitTime > 0.0;
 }
@@ -302,6 +333,9 @@ BjtDevice::Intrinsic BjtDevice::Evaluate(const double vbe, const double vbc) con
     result.GcBc = dicc_dvbc - dibc;
     result.GbBe = dibe;
     result.GbBc = dibc;
+    result.IfwdQb = ifwd / qb;
+    result.DIfwdQbDvbe = (difwd * qb - ifwd * dqb_dvbe) / (qb * qb);
+    result.DIfwdQbDvbc = (-ifwd * dqb_dvbc) / (qb * qb);
     return result;
 }
 
@@ -357,16 +391,13 @@ void BjtDevice::Stamp(MnaSystem &sys, const std::vector<double> &x, const TimeCo
     if (time.IsTransient && HasTransientState()) {
         const double vbe_signed = m_Pnp ? -vbe : vbe;
         const double vbc_signed = m_Pnp ? -vbc : vbc;
-        const double exp_be = Exponential(vbe_signed / m_Vt);
-        const double ifwd = p.SaturationCurrent * (exp_be - 1.0);
-        const double difwd = p.SaturationCurrent * exp_be / m_Vt;
         const DepletionCharge qbe = EvaluateDepletion(vbe_signed, p.EmitterCapacitance, BJT_JUNCTION_POTENTIAL,
                                                       BJT_GRADING_COEFFICIENT, JUNCTION_FORWARD_LIMIT);
         const DepletionCharge qbc = EvaluateDepletion(vbc_signed, p.CollectorCapacitance, BJT_JUNCTION_POTENTIAL,
                                                       BJT_GRADING_COEFFICIENT, JUNCTION_FORWARD_LIMIT);
         const ChargeCompanion cap_be =
-            ChargeModel(qbe.Capacitance + p.TransitTime * difwd, qbe.Charge + p.TransitTime * ifwd, vbe_signed,
-                        m_Qbe, m_IQbe, time.TimeStep, time.BackwardEuler);
+            ChargeModel(qbe.Capacitance + p.TransitTime * dc.DIfwdQbDvbe, qbe.Charge + p.TransitTime * dc.IfwdQb,
+                        vbe_signed, m_Qbe, m_IQbe, time.TimeStep, time.BackwardEuler);
         const ChargeCompanion cap_bc =
             ChargeModel(qbc.Capacitance, qbc.Charge, vbc_signed, m_Qbc, m_IQbc, time.TimeStep, time.BackwardEuler);
         m_Gqbe = cap_be.Conductance;
@@ -397,6 +428,67 @@ double BjtDevice::TerminalCurrent(const int terminal, const std::vector<double> 
         return dc.Ib + iqbe + iqbc;
     default: // Emitter
         return dc.Ie - iqbe;
+    }
+}
+
+void BjtDevice::StampAc(MnaSystem &reactive, const std::vector<double> &x_dc) const {
+    if (!HasTransientState()) {
+        return;
+    }
+    const BJTParameters &p = m_Parameters;
+    const Intrinsic dc = EvaluateAt(x_dc);
+    const double vbe = NodeVoltage(x_dc, m_B) - NodeVoltage(x_dc, m_E);
+    const double vbc = NodeVoltage(x_dc, m_B) - NodeVoltage(x_dc, m_C);
+    const double vbe_signed = m_Pnp ? -vbe : vbe;
+    const double vbc_signed = m_Pnp ? -vbc : vbc;
+    const DepletionCharge qbe = EvaluateDepletion(vbe_signed, p.EmitterCapacitance, BJT_JUNCTION_POTENTIAL,
+                                                  BJT_GRADING_COEFFICIENT, JUNCTION_FORWARD_LIMIT);
+    const DepletionCharge qbc = EvaluateDepletion(vbc_signed, p.CollectorCapacitance, BJT_JUNCTION_POTENTIAL,
+                                                  BJT_GRADING_COEFFICIENT, JUNCTION_FORWARD_LIMIT);
+    StampConductance(reactive, m_B, m_E, qbe.Capacitance + p.TransitTime * dc.DIfwdQbDvbe);
+    StampConductance(reactive, m_B, m_C, qbc.Capacitance);
+    // SPICE geqcb = d(TF * Ifwd / qb) / dvbc: transcapacitance from vbc into the BE charge (Base -> Emitter)
+    const double geqcb = p.TransitTime * dc.DIfwdQbDvbc;
+    reactive.AddA(m_B, m_B, geqcb);
+    reactive.AddA(m_B, m_C, -geqcb);
+    reactive.AddA(m_E, m_B, -geqcb);
+    reactive.AddA(m_E, m_C, geqcb);
+}
+
+std::complex<double> BjtDevice::AcTerminalCurrent(const int terminal, const std::vector<double> &x_dc,
+                                                  const std::vector<std::complex<double>> &x_ac,
+                                                  const double omega) const {
+    const Intrinsic dc = EvaluateAt(x_dc);
+    const std::complex<double> vbe_ac = AcNodeVoltage(x_ac, m_B) - AcNodeVoltage(x_ac, m_E);
+    const std::complex<double> vbc_ac = AcNodeVoltage(x_ac, m_B) - AcNodeVoltage(x_ac, m_C);
+    const std::complex<double> ic_ac = dc.GcBe * vbe_ac + dc.GcBc * vbc_ac;
+    const std::complex<double> ib_ac = dc.GbBe * vbe_ac + dc.GbBc * vbc_ac;
+
+    std::complex<double> iqbe_ac{0.0, 0.0};
+    std::complex<double> iqbc_ac{0.0, 0.0};
+    if (HasTransientState()) {
+        const BJTParameters &p = m_Parameters;
+        const double vbe = NodeVoltage(x_dc, m_B) - NodeVoltage(x_dc, m_E);
+        const double vbc = NodeVoltage(x_dc, m_B) - NodeVoltage(x_dc, m_C);
+        const double vbe_signed = m_Pnp ? -vbe : vbe;
+        const double vbc_signed = m_Pnp ? -vbc : vbc;
+        const DepletionCharge qbe = EvaluateDepletion(vbe_signed, p.EmitterCapacitance, BJT_JUNCTION_POTENTIAL,
+                                                      BJT_GRADING_COEFFICIENT, JUNCTION_FORWARD_LIMIT);
+        const DepletionCharge qbc = EvaluateDepletion(vbc_signed, p.CollectorCapacitance, BJT_JUNCTION_POTENTIAL,
+                                                      BJT_GRADING_COEFFICIENT, JUNCTION_FORWARD_LIMIT);
+        iqbe_ac = std::complex<double>(0.0, omega) *
+                  ((qbe.Capacitance + p.TransitTime * dc.DIfwdQbDvbe) * vbe_ac +
+                   (p.TransitTime * dc.DIfwdQbDvbc) * vbc_ac);
+        iqbc_ac = std::complex<double>(0.0, omega * qbc.Capacitance) * vbc_ac;
+    }
+
+    switch (terminal) {
+    case 0: // Collector
+        return ic_ac - iqbc_ac;
+    case 1: // Base
+        return ib_ac + iqbe_ac + iqbc_ac;
+    default: // Emitter
+        return -(ic_ac + ib_ac) - iqbe_ac;
     }
 }
 
@@ -452,11 +544,11 @@ void BjtDevice::AcceptStep(const std::vector<double> &x) {
     const double vbe_signed = m_Pnp ? -vbe : vbe;
     const double vbc_signed = m_Pnp ? -vbc : vbc;
     const BJTParameters &p = m_Parameters;
-    const double ifwd = p.SaturationCurrent * (Exponential(vbe_signed / m_Vt) - 1.0);
+    const Intrinsic dc = EvaluateAt(x);
     m_Qbe = EvaluateDepletion(vbe_signed, p.EmitterCapacitance, BJT_JUNCTION_POTENTIAL, BJT_GRADING_COEFFICIENT,
                               JUNCTION_FORWARD_LIMIT)
                 .Charge +
-            p.TransitTime * ifwd;
+            p.TransitTime * dc.IfwdQb;
     m_Qbc = EvaluateDepletion(vbc_signed, p.CollectorCapacitance, BJT_JUNCTION_POTENTIAL, BJT_GRADING_COEFFICIENT,
                               JUNCTION_FORWARD_LIMIT)
                 .Charge;
@@ -625,6 +717,59 @@ double MosfetDevice::TerminalCurrent(const int terminal, const std::vector<doubl
         return igs + igd;
     default: // Source
         return -(channel_into_drain + diode_into_drain) - igs;
+    }
+}
+
+void MosfetDevice::StampAc(MnaSystem &reactive, const std::vector<double> &) const {
+    if (m_Cgs > 0.0) {
+        StampConductance(reactive, m_Gate, m_Source, m_Cgs);
+    }
+    if (m_Cgd > 0.0) {
+        StampConductance(reactive, m_Gate, m_Drain, m_Cgd);
+    }
+}
+
+std::complex<double> MosfetDevice::AcTerminalCurrent(const int terminal, const std::vector<double> &x_dc,
+                                                     const std::vector<std::complex<double>> &x_ac,
+                                                     const double omega) const {
+    const double vg = NodeVoltage(x_dc, m_Gate);
+    const double vd = NodeVoltage(x_dc, m_D);
+    const double vs = NodeVoltage(x_dc, m_S);
+
+    const double pol = m_Pmos ? -1.0 : 1.0;
+    const bool reversed = (pol * (vd - vs)) < 0.0;
+    const int d_eff = reversed ? m_S : m_D;
+    const int s_eff = reversed ? m_D : m_S;
+    const double vgs_eff = pol * (vg - NodeVoltage(x_dc, s_eff));
+    const double vds_eff = pol * (NodeVoltage(x_dc, d_eff) - NodeVoltage(x_dc, s_eff));
+    const Channel channel = Evaluate(vgs_eff, vds_eff);
+
+    const std::complex<double> vg_ac = AcNodeVoltage(x_ac, m_Gate);
+    const std::complex<double> vd_eff_ac = AcNodeVoltage(x_ac, d_eff);
+    const std::complex<double> vs_eff_ac = AcNodeVoltage(x_ac, s_eff);
+    const std::complex<double> i_d_eff_to_s_eff =
+        channel.Gm * (vg_ac - vs_eff_ac) + channel.Gds * (vd_eff_ac - vs_eff_ac);
+    const std::complex<double> channel_into_drain = reversed ? -i_d_eff_to_s_eff : i_d_eff_to_s_eff;
+
+    const int body_anode = m_Pmos ? m_D : m_Source;
+    const int body_cathode = m_Pmos ? m_Source : m_D;
+    const double vbody_dc = NodeVoltage(x_dc, body_anode) - NodeVoltage(x_dc, body_cathode);
+    const double diode_cond = MOSFET_BODY_SATURATION_CURRENT * Exponential(vbody_dc / m_Vt) / m_Vt;
+    const std::complex<double> vbody_ac = AcNodeVoltage(x_ac, body_anode) - AcNodeVoltage(x_ac, body_cathode);
+    const std::complex<double> diode_into_drain = (m_Pmos ? diode_cond : -diode_cond) * vbody_ac;
+
+    const std::complex<double> igs_ac =
+        std::complex<double>(0.0, omega * m_Cgs) * (vg_ac - AcNodeVoltage(x_ac, m_Source));
+    const std::complex<double> igd_ac =
+        std::complex<double>(0.0, omega * m_Cgd) * (vg_ac - AcNodeVoltage(x_ac, m_Drain));
+
+    switch (terminal) {
+    case 0: // Drain
+        return channel_into_drain + diode_into_drain - igd_ac;
+    case 1: // Gate
+        return igs_ac + igd_ac;
+    default: // Source
+        return -(channel_into_drain + diode_into_drain) - igs_ac;
     }
 }
 

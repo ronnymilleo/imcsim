@@ -16,9 +16,25 @@
 #include "native/newton.h"
 #include "simulation/simulation_backend.h"
 #include <expected>
+#include <format>
+#include <string>
+#include <utility>
 #include <vector>
 
 namespace Core::Native {
+
+/**
+ * @brief   Formats a diagnostic message reporting how many Newton-Raphson iterations a DC solve took (and which
+ *          homotopy fallback was used, if any).
+ */
+inline void DescribeOutcome(const NewtonOutcome &outcome, const char *analysis,
+                            std::vector<SimulatorMessage> &messages) {
+    std::string text = std::format("native: {} converged in {} iterations", analysis, outcome.Iterations);
+    if (!outcome.Strategy.empty()) {
+        text += std::format(" (with {})", outcome.Strategy);
+    }
+    messages.push_back({std::move(text), false});
+}
 
 /**
  * @brief   Computes the DC operating point of a compiled circuit.
@@ -65,6 +81,27 @@ std::expected<Transient, std::string> ComputeTransient(CompiledCircuit &compiled
                                                        bool has_initial_conditions, const RunMonitor &monitor,
                                                        const ConvergenceOptions &options,
                                                        std::vector<SimulatorMessage> &messages);
+
+/**
+ * @brief   Computes the small-signal AC frequency response (Bode magnitude and phase) around the DC operating point.
+ * @param[in,out] compiled  The compiled circuit.
+ * @param[in]     settings  Start frequency, stop frequency, and points per decade (decade-logarithmic spacing).
+ * @param[in]     options   DC operating-point convergence tolerances.
+ * @param[out]    messages  Diagnostic messages from the DC operating point and AC sweep.
+ * @return  Node voltage and component current magnitudes (dB) and phases (degrees), or the reason the sweep failed.
+ */
+std::expected<ACSweep, std::string> ComputeACSweep(CompiledCircuit &compiled, const ACSweepSettings &settings,
+                                                   const ConvergenceOptions &options,
+                                                   std::vector<SimulatorMessage> &messages);
+
+/**
+ * @brief   Computes the small-signal DC transfer function (gain, input impedance, output impedance) from an
+ *          independent input source to an output node around the DC operating point.
+ */
+std::expected<TransferFunction, std::string> ComputeTransferFunction(const Circuit &circuit, CompiledCircuit &compiled,
+                                                                     const TransferFunctionSettings &settings,
+                                                                     const ConvergenceOptions &options,
+                                                                     std::vector<SimulatorMessage> &messages);
 
 } // namespace Core::Native
 

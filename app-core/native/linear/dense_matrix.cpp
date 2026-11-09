@@ -13,32 +13,34 @@
 
 namespace Core::Native {
 
-DenseMatrix::DenseMatrix(const std::size_t rows, const std::size_t cols)
-    : m_Rows(rows), m_Cols(cols), m_Data(rows * cols, 0.0), m_Pivot(rows) {
+template <typename Scalar>
+BasicDenseMatrix<Scalar>::BasicDenseMatrix(const std::size_t rows, const std::size_t cols)
+    : m_Rows(rows), m_Cols(cols), m_Data(rows * cols, Scalar{0.0}), m_Pivot(rows) {
 }
 
-std::size_t DenseMatrix::Rows() const {
+template <typename Scalar> std::size_t BasicDenseMatrix<Scalar>::Rows() const {
     return m_Rows;
 }
 
-std::size_t DenseMatrix::Cols() const {
+template <typename Scalar> std::size_t BasicDenseMatrix<Scalar>::Cols() const {
     return m_Cols;
 }
 
-double &DenseMatrix::At(const std::size_t row, const std::size_t col) {
+template <typename Scalar> Scalar &BasicDenseMatrix<Scalar>::At(const std::size_t row, const std::size_t col) {
     return m_Data[row * m_Cols + col];
 }
 
-double DenseMatrix::At(const std::size_t row, const std::size_t col) const {
+template <typename Scalar> Scalar BasicDenseMatrix<Scalar>::At(const std::size_t row, const std::size_t col) const {
     return m_Data[row * m_Cols + col];
 }
 
-void DenseMatrix::Add(const std::size_t row, const std::size_t col, const double value) {
+template <typename Scalar>
+void BasicDenseMatrix<Scalar>::Add(const std::size_t row, const std::size_t col, const Scalar value) {
     At(row, col) += value;
 }
 
-void DenseMatrix::Reset() {
-    std::ranges::fill(m_Data, 0.0);
+template <typename Scalar> void BasicDenseMatrix<Scalar>::Reset() {
+    std::ranges::fill(m_Data, Scalar{0.0});
     m_Factored = false;
 }
 
@@ -49,21 +51,21 @@ void DenseMatrix::Reset() {
  * @note    A zero pivot is tested against a floor scaled by the largest matrix entry, so tiny but usable
  *          conductances keep working while exact singularities are caught.
  */
-bool DenseMatrix::FactorizeLU() {
+template <typename Scalar> bool BasicDenseMatrix<Scalar>::FactorizeLU() {
     const std::size_t n = std::min(m_Rows, m_Cols);
     const double largest =
-        std::ranges::max(m_Data | std::views::transform([](const double v) { return std::fabs(v); }));
+        std::ranges::max(m_Data | std::views::transform([](const Scalar v) { return std::abs(v); }));
     const double pivot_floor = largest * 1e-30;
     for (std::size_t col = 0; col < n; ++col) {
         // Partial pivoting: the row with the largest entry in this column leads, which bounds the error growth
         std::size_t pivot = col;
         for (std::size_t row = col + 1; row < m_Rows; ++row) {
-            if (std::fabs(At(row, col)) > std::fabs(At(pivot, col))) {
+            if (std::abs(At(row, col)) > std::abs(At(pivot, col))) {
                 pivot = row;
             }
         }
         m_Pivot[col] = pivot;
-        if (std::fabs(At(pivot, col)) <= pivot_floor) {
+        if (std::abs(At(pivot, col)) <= pivot_floor) {
             m_Factored = false;
             return false;
         }
@@ -74,9 +76,9 @@ bool DenseMatrix::FactorizeLU() {
         }
         // Eliminate the rows below the pivot
         for (std::size_t row = col + 1; row < m_Rows; ++row) {
-            const double factor = At(row, col) / At(col, col);
+            const Scalar factor = At(row, col) / At(col, col);
             At(row, col) = factor;
-            if (factor == 0.0) {
+            if (factor == Scalar{0.0}) {
                 continue;
             }
             for (std::size_t c = col + 1; c < m_Cols; ++c) {
@@ -94,7 +96,8 @@ bool DenseMatrix::FactorizeLU() {
  * @param[out] x    Solution; sized by the call.
  * @return  False when the matrix was not factorized or the size mismatches.
  */
-bool DenseMatrix::Solve(const std::vector<double> &rhs, std::vector<double> &x) const {
+template <typename Scalar>
+bool BasicDenseMatrix<Scalar>::Solve(const std::vector<Scalar> &rhs, std::vector<Scalar> &x) const {
     if (!m_Factored || rhs.size() != m_Rows) {
         return false;
     }
@@ -118,5 +121,8 @@ bool DenseMatrix::Solve(const std::vector<double> &rhs, std::vector<double> &x) 
     }
     return true;
 }
+
+template class BasicDenseMatrix<double>;
+template class BasicDenseMatrix<std::complex<double>>;
 
 } // namespace Core::Native

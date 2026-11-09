@@ -79,9 +79,9 @@ TEST_CASE("Nodalys names itself and lists what it runs") {
     REQUIRE(capabilities.Analyses.contains(Core::AnalysisKind::OPERATING_POINT));
     REQUIRE(capabilities.Analyses.contains(Core::AnalysisKind::TRANSIENT));
     REQUIRE(capabilities.Analyses.contains(Core::AnalysisKind::DC_SWEEP));
-    REQUIRE(!capabilities.Analyses.contains(Core::AnalysisKind::AC_SWEEP));
+    REQUIRE(capabilities.Analyses.contains(Core::AnalysisKind::AC_SWEEP));
     REQUIRE(!capabilities.Analyses.contains(Core::AnalysisKind::NOISE));
-    REQUIRE(!capabilities.Analyses.contains(Core::AnalysisKind::TRANSFER_FUNCTION));
+    REQUIRE(capabilities.Analyses.contains(Core::AnalysisKind::TRANSFER_FUNCTION));
 }
 
 TEST_CASE("The native backend reports the logic parts as unsupported") {
@@ -415,10 +415,52 @@ TEST_CASE("A circuit with a digital part fails with the reason, not a crash") {
     REQUIRE(!run.Result.has_value());
 }
 
+TEST_CASE("The AC sweep of an RC low-pass filter hits -3 dB and -45 deg at the corner frequency") {
+    // f_c = 1 / (2*pi*R*C) with R = 1 kOhm, C = 1 / (2*pi * 1e6) F -> f_c = 1 kHz exactly
+    Core::VoltageSource source;
+    source.SetName("V1");
+    source.SetSourceType(Core::Source::SourceType::AC);
+    source.SetAC({.Amplitude = 1.0, .Frequency = 1e3, .Offset = 0.0, .Magnitude = 1.0});
+    Core::Resistor resistor;
+    resistor.SetName("R1");
+    resistor.SetValue(1e3);
+    Core::Capacitor capacitor;
+    capacitor.SetName("C1");
+    capacitor.SetValue(1.0 / (2.0 * std::numbers::pi * 1e6));
+    Core::Ground ground;
+    Core::Circuit circuit;
+    circuit.Add(source, {1, 0});
+    circuit.Add(resistor, {1, 2});
+    circuit.Add(capacitor, {2, 0});
+    circuit.Add(ground, {0});
+
+    Core::NativeBackend backend;
+    const Core::ACSweepRun run = backend.RunACSweep(
+        circuit, {.StartFrequency = 10.0, .StopFrequency = 100e3, .PointsPerDecade = 10}, std::nullopt);
+    REQUIRE(run.Result.has_value());
+    const Core::ACSweep &ac = *run.Result;
+    // Index 20 is 10 * 10^(20/10) = 1000 Hz
+    REQUIRE(ac.Frequencies.size() == 41);
+    REQUIRE_THAT(ac.Frequencies[20], WithinRel(1e3, 1e-12));
+    REQUIRE_THAT(ac.NodeMagnitudesDecibels[2][20], WithinAbs(-10.0 * std::log10(2.0), 1e-6));
+    REQUIRE_THAT(ac.NodePhasesDegrees[2][20], WithinAbs(-45.0, 1e-5));
+}
+
+TEST_CASE("The transfer function of a divider matches its closed-form gain and impedances") {
+    const Divider divider;
+    Core::NativeBackend backend;
+    const Core::TransferFunctionRun run =
+        backend.RunTransferFunction(divider.Circuit, {.OutputNode = 2, .InputSource = "V1"});
+    REQUIRE(run.Result.has_value());
+    REQUIRE(run.Result->InputUnit == "V");
+    // 1k and 3k divider: Gain = 3k / 4k = 0.75, Zin = 1k + 3k = 4k, Zout = 1k || 3k = 750 Ohm
+    REQUIRE_THAT(run.Result->Gain, WithinRel(0.75, 1e-6));
+    REQUIRE_THAT(run.Result->InputImpedance, WithinRel(4e3, 1e-6));
+    REQUIRE_THAT(run.Result->OutputImpedance, WithinRel(750.0, 1e-6));
+}
+
 TEST_CASE("Analyses the native backend lacks fail clearly") {
     const Divider divider;
     Core::NativeBackend backend;
-    REQUIRE(!backend.RunACSweep(divider.Circuit, {}, std::nullopt).Result.has_value());
     REQUIRE(!backend.RunNoise(divider.Circuit, {}).Result.has_value());
-    REQUIRE(!backend.RunTransferFunction(divider.Circuit, {}).Result.has_value());
 }

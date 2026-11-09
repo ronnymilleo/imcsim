@@ -310,8 +310,10 @@ private:
 
         case ComponentType::VOLTAGE_SOURCE: {
             const auto &source = static_cast<const Source &>(part);
+            const double ac_magnitude =
+                source.GetSourceType() == Source::SourceType::AC ? source.GetAC().Magnitude : 0.0;
             Device *raw = AddDevice(std::make_unique<VoltageSourceDevice>(
-                nodes[0], nodes[1], AllocateBranch(), SourceDcValue(source), MakeSourceWaveform(source)));
+                nodes[0], nodes[1], AllocateBranch(), SourceDcValue(source), MakeSourceWaveform(source), ac_magnitude));
             m_Result.SourcesByName[part.GetName()] = raw;
             m_Result.ElementsByName[part.GetName()] = raw;
             AddSingleCurrents(part, raw);
@@ -320,8 +322,10 @@ private:
 
         case ComponentType::CURRENT_SOURCE: {
             const auto &source = static_cast<const Source &>(part);
+            const double ac_magnitude =
+                source.GetSourceType() == Source::SourceType::AC ? source.GetAC().Magnitude : 0.0;
             Device *raw = AddDevice(std::make_unique<CurrentSourceDevice>(
-                nodes[0], nodes[1], SourceDcValue(source), MakeSourceWaveform(source)));
+                nodes[0], nodes[1], SourceDcValue(source), MakeSourceWaveform(source), ac_magnitude));
             m_Result.SourcesByName[part.GetName()] = raw;
             m_Result.ElementsByName[part.GetName()] = raw;
             AddSingleCurrents(part, raw);

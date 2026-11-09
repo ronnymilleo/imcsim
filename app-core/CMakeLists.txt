@@ -4,8 +4,9 @@
 
 add_library(nodalys
         STATIC
-            native/analyses.cpp
+            native/ac_analysis.cpp
             native/compiler.cpp
+            native/dc_analysis.cpp
             native/devices.cpp
             native/linear/dense_matrix.cpp
             native/mna_system.cpp
@@ -13,6 +14,8 @@ add_library(nodalys
             native/native_backend.cpp
             native/newton.cpp
             native/nonlinear.cpp
+            native/tf_analysis.cpp
+            native/transient_analysis.cpp
             native/waveforms.cpp
 )
 

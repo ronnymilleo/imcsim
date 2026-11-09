@@ -141,6 +141,11 @@ TEST_CASE("Every example either runs on Nodalys or is flagged unsupported", "[ex
             INFO((dc_sweep.Result ? std::string{} : dc_sweep.Result.error()));
             CHECK(dc_sweep.Result.has_value());
         }
+        if (settings.Selected == GUI::Analysis::AC_SWEEP) {
+            const Core::ACSweepRun ac_sweep = nodalys.RunACSweep(circuit, settings.ACSweep, std::nullopt);
+            INFO((ac_sweep.Result ? std::string{} : ac_sweep.Result.error()));
+            CHECK(ac_sweep.Result.has_value());
+        }
     }
 }
 

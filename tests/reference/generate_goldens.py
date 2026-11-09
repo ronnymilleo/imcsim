@@ -136,8 +136,69 @@ def generate_diode_dc_curve() -> None:
     write_csv("diode_shockley_dc.csv", ["v_source_V", "v_anode_V", "i_diode_A"], rows)
 
 
+def generate_rc_bode() -> None:
+    """First-order RC low-pass AC frequency response: R = 1 kOhm, C = 100 nF (f_c = 1591.5494 Hz).
+
+    Closed form:
+        H(j*omega) = 1 / (1 + j * omega * R * C)
+        |H|_dB = -10 * log10(1 + (omega * R * C)^2)
+        phase_deg = -atan(omega * R * C) * 180 / pi
+        I(j*omega) = j * omega * C / (1 + j * omega * R * C)
+    """
+    r = 1.0e3
+    c = 100.0e-9
+    f_start = 10.0
+    points_per_dec = 10
+    rows = []
+    for k in range(41):  # 10 Hz to 100 kHz
+        f = f_start * (10.0 ** (k / points_per_dec))
+        omega = 2.0 * math.pi * f
+        x = omega * r * c
+        denom = complex(1.0, x)
+        v_out = 1.0 / denom
+        i_branch = complex(0.0, omega * c) / denom
+        v_mag_db = 20.0 * math.log10(abs(v_out))
+        v_phase_deg = math.atan2(v_out.imag, v_out.real) * 180.0 / math.pi
+        i_mag_db = 20.0 * math.log10(abs(i_branch))
+        i_phase_deg = math.atan2(i_branch.imag, i_branch.real) * 180.0 / math.pi
+        rows.append([f, v_mag_db, v_phase_deg, i_mag_db, i_phase_deg])
+    write_csv("rc_bode.csv", ["freq_Hz", "v_out_dB", "v_out_deg", "i_dB", "i_deg"], rows)
+
+
+def generate_rlc_bode() -> None:
+    """Second-order series RLC AC frequency response: R = 100 Ohm, L = 10 mH, C = 100 nF.
+
+    Closed form:
+        Z(j*omega) = R + j * (omega * L - 1 / (omega * C))
+        I(j*omega) = 1 / Z(j*omega)
+        V_C(j*omega) = I(j*omega) / (j * omega * C)
+    """
+    r = 100.0
+    ind = 10.0e-3
+    c = 100.0e-9
+    f_start = 10.0
+    points_per_dec = 10
+    rows = []
+    for k in range(51):  # 10 Hz to 1 MHz
+        f = f_start * (10.0 ** (k / points_per_dec))
+        omega = 2.0 * math.pi * f
+        z_c = complex(0.0, -1.0 / (omega * c))
+        z_l = complex(0.0, omega * ind)
+        z_total = r + z_l + z_c
+        i_branch = 1.0 / z_total
+        v_cap = i_branch * z_c
+        vc_mag_db = 20.0 * math.log10(abs(v_cap))
+        vc_phase_deg = math.atan2(v_cap.imag, v_cap.real) * 180.0 / math.pi
+        i_mag_db = 20.0 * math.log10(abs(i_branch))
+        i_phase_deg = math.atan2(i_branch.imag, i_branch.real) * 180.0 / math.pi
+        rows.append([f, vc_mag_db, vc_phase_deg, i_mag_db, i_phase_deg])
+    write_csv("rlc_bode.csv", ["freq_Hz", "v_cap_dB", "v_cap_deg", "i_dB", "i_deg"], rows)
+
+
 if __name__ == "__main__":
     generate_rc_step()
     generate_rl_step()
     generate_rlc_underdamped()
     generate_diode_dc_curve()
+    generate_rc_bode()
+    generate_rlc_bode()
