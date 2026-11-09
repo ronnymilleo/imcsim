@@ -21,11 +21,11 @@ Small-signal noise analysis (`.noise V(out) Vin dec N fstart fstop`) computes:
 A circuit may contain hundreds of noisy resistors, diodes, and transistors. Solving a forward AC system $\mathbf{Y}(j\omega)\mathbf{x} = \mathbf{b}_m$ for each individual noise source $m$ would require $O(N_{\text{sources}})$ matrix solves per frequency.
 
 Instead, by **Tellegen's theorem** (adjoint network sensitivity), `Nodalys` solves a **single** transposed complex linear system per frequency $\omega_k = 2\pi f_k$:
-$$\left(A_{\text{DC}}(\mathbf{x}_{\text{dc}}) + j\omega_k C_{\text{AC}}(\mathbf{x}_{\text{dc}})\right)^T \boldsymbol{\lambda}(\omega_k) = \mathbf{e}_{n_{\text{out}}}$$
-where $\mathbf{e}_{n_{\text{out}}}$ is the unit basis vector at output unknown $n_{\text{out}}$. Because $\boldsymbol{\lambda}(\omega_k)^T = \mathbf{e}_{n_{\text{out}}}^T \mathbf{Y}(j\omega_k)^{-1}$, the complex transfer impedance from **any** internal current source between nodes $a$ and $b$ to the output node $n_{\text{out}}$ is simply:
+$$\left(A_{\text{DC}}(\mathbf{x}_{\text{dc}}) + j\omega_k C_{\text{AC}}(\mathbf{x}_{\text{dc}})\right)^T \lambda(\omega_k) = \mathbf{e}_{n_{\text{out}}}$$
+where $\mathbf{e}_{n_{\text{out}}}$ is the unit basis vector at output unknown $n_{\text{out}}$. Because $\lambda(\omega_k)^T = \mathbf{e}_{n_{\text{out}}}^T \mathbf{Y}(j\omega_k)^{-1}$, the complex transfer impedance from **any** internal current source between nodes $a$ and $b$ to the output node $n_{\text{out}}$ is simply:
 $$Z_{\text{tf}}(a, b; \omega_k) = \lambda_a(\omega_k) - \lambda_b(\omega_k)$$
 
-Simultaneously, the small-signal transfer gain $G_{\text{in}}(j\omega_k) = \tilde{V}_{n_{\text{out}}} / \tilde{S}_{\text{in}}$ from the independent input source $S_{\text{in}}$ to $n_{\text{out}}$ is extracted **directly from the same adjoint vector** $\boldsymbol{\lambda}(\omega_k)$ without a second matrix solve:
+Simultaneously, the small-signal transfer gain $G_{\text{in}}(j\omega_k) = \tilde{V}_{n_{\text{out}}} / \tilde{S}_{\text{in}}$ from the independent input source $S_{\text{in}}$ to $n_{\text{out}}$ is extracted **directly from the same adjoint vector** $\lambda(\omega_k)$ without a second matrix solve:
 $$G_{\text{in}}(j\omega_k) = \begin{cases} \lambda_{b_{\text{in}}}(\omega_k) & \text{if } S_{\text{in}} \text{ is a voltage source on MNA branch } b_{\text{in}} \\ \lambda_{n_-}(\omega_k) - \lambda_{n_+}(\omega_k) & \text{if } S_{\text{in}} \text{ is a current source from } n_+ \text{ to } n_- \end{cases}$$
 
 ### 1.2 Physical Device Noise Sources (`OutputNoiseVariance`)

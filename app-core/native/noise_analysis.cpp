@@ -12,13 +12,13 @@
  * 3. **Single Adjoint Solve per Frequency ($\omega_k = 2\pi f_k$)**:
  *    Instead of solving one linear system per noisy resistor/semiconductor, we solve the **transposed** complex system
  *    once per frequency:
- *    $$\left(A_{\text{DC}}(\mathbf{x}_{\text{dc}}) + j\omega_k C_{\text{AC}}(\mathbf{x}_{\text{dc}})\right)^T \boldsymbol{\lambda}(\omega_k) = \mathbf{e}_{n_{\text{out}}}$$
- *    By Tellegen's theorem / linear algebra duality ($\boldsymbol{\lambda}^T = \mathbf{e}_{n_{\text{out}}}^T \mathbf{Y}(j\omega_k)^{-1}$):
+ *    $$\left(A_{\text{DC}}(\mathbf{x}_{\text{dc}}) + j\omega_k C_{\text{AC}}(\mathbf{x}_{\text{dc}})\right)^T \lambda(\omega_k) = \mathbf{e}_{n_{\text{out}}}$$
+ *    By Tellegen's theorem / linear algebra duality ($\lambda^T = \mathbf{e}_{n_{\text{out}}}^T \mathbf{Y}(j\omega_k)^{-1}$):
  *    - Any uncorrelated current noise source $i_n$ connected between nodes $a$ and $b$ produces an output voltage
  *      mean-square spectral density:
  *      $$S_{v,\text{out}}^{(i_n)}(f_k) = S_{i_n}(f_k) \cdot \left|\lambda_a(\omega_k) - \lambda_b(\omega_k)\right|^2 \quad (\text{V}^2/\text{Hz})$$
  *    - Simultaneously, the small-signal transfer gain $G_{\text{in}}(j\omega_k) = \tilde{V}_{n_{\text{out}}} / \tilde{S}_{\text{in}}$
- *      from the input source $S_{\text{in}}$ to the output node is obtained directly from $\boldsymbol{\lambda}(\omega_k)$
+ *      from the input source $S_{\text{in}}$ to the output node is obtained directly from $\lambda(\omega_k)$
  *      without a second matrix solve:
  *      $$G_{\text{in}}(j\omega_k) = \begin{cases} \lambda_{b_{\text{in}}}(\omega_k) & \text{voltage source on branch } b_{\text{in}} \\ \lambda_{n_-}(\omega_k) - \lambda_{n_+}(\omega_k) & \text{current source from } n_+ \text{ to } n_- \end{cases}$$
  *    - The input-referred noise power spectral density is then:

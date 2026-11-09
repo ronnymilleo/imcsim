@@ -20,7 +20,7 @@
    - Algorithms: Tangent Jacobian $\mathbf{J}(\mathbf{x}_{\text{DC}})$, unit input excitation ($\delta u_{\text{in}} = 1 \implies \text{Gain}, Z_{\text{in}}$), and unit output test current injection ($\delta I_{\text{out}} = 1\text{ A} \implies Z_{\text{out}}$).
    - Benchmark tables: **Analytical Golden vs. `ngspice` vs. `Nodalys`**.
 6. **[Small-Signal AC Noise Analysis (`.noise`)](./noise_analysis.md)**
-   - Algorithms: Transposed complex adjoint solver $\mathbf{Y}(j\omega)^T \boldsymbol{\lambda} = \mathbf{e}_{\text{out}}$, thermal ($4k_BTR, \frac{8}{3}k_BTg_m$) and shot ($2qI$) noise spectral densities, SPICE3f5 log-log power-law integration (`Nintegrate`), and hierarchical component noise grouping.
+   - Algorithms: Transposed complex adjoint solver $\mathbf{Y}(j\omega)^T \lambda = \mathbf{e}_{\text{out}}$, thermal ($4k_BTR, \frac{8}{3}k_BTg_m$) and shot ($2qI$) noise spectral densities, SPICE3f5 log-log power-law integration (`Nintegrate`), and hierarchical component noise grouping.
    - Benchmark tables: **Analytical Golden vs. `ngspice` vs. `Nodalys`**.
 
 ---
@@ -57,7 +57,7 @@ All **6 analog solver analyses** in [`SimulationBackend`](../../app-core/simulat
 | **Transient** | `.tran` | ✅ | ✅ **Ready** | [`transient_analysis.cpp`](../../app-core/native/transient_analysis.cpp) — Trapezoidal + Backward Euler, *breakpoints*, chunk streaming, cancel, and *Live* mode. |
 | **AC Sweep (Bode)** | `.ac` | ✅ | ✅ **Ready** | [`ac_analysis.cpp`](../../app-core/native/ac_analysis.cpp) — DC operating point linearization + complex MNA solver $\mathbf{Y}(j\omega)\mathbf{V} = \mathbf{I}$ (dB & unwrapped phase). |
 | **Transfer Function** | `.tf` | ✅ | ✅ **Ready** | [`tf_analysis.cpp`](../../app-core/native/tf_analysis.cpp) — Small-signal DC gain ($A_v$ or $R_m$), $Z_{\text{in}}$, and $Z_{\text{out}}$. |
-| **Noise Analysis** | `.noise` | ✅ | ✅ **Ready** | [`noise_analysis.cpp`](../../app-core/native/noise_analysis.cpp) — Adjoint complex solver $\mathbf{Y}(j\omega)^T\boldsymbol{\lambda} = \mathbf{e}_{\text{out}}$, output & input-referred spectral density ($\text{V}/\sqrt{\text{Hz}}$), log-log power-law RMS integration, and per-part breakdown. |
+| **Noise Analysis** | `.noise` | ✅ | ✅ **Ready** | [`noise_analysis.cpp`](../../app-core/native/noise_analysis.cpp) — Adjoint complex solver $\mathbf{Y}(j\omega)^T \lambda = \mathbf{e}_{\text{out}}$, output & input-referred spectral density ($\text{V}/\sqrt{\text{Hz}}$), log-log power-law RMS integration, and per-part breakdown. |
 | **Truth Table** | Multiple `.op` | ✅ | 🟡 **Partial** (`#133`) | Runs on `Nodalys` for transistor/diode logic circuits; primitive digital gates (`AND`, `OR`, Flip-Flops) still use `ngspice` (`digital.cm`). |
 
 ---
@@ -80,7 +80,7 @@ All **6 analog solver analyses** in [`SimulationBackend`](../../app-core/simulat
 | Analysis | SPICE Command | `ngspice` | `Nodalys` (`jay` Roadmap) | Brief Description |
 | :--- | :---: | :---: | :---: | :--- |
 | **Pole-Zero Analysis** | `.pz` | ✅ | ❌ Planned (`#136`, `#182`) | Generalized eigenvalues $(\mathbf{G} + s\mathbf{C})\mathbf{x} = \mathbf{0}$ via the QZ algorithm to extract poles and zeros of $H(s)$. |
-| **DC / AC Sensitivity** | `.sens` | ✅ | ❌ Planned (`#109`, `#135`, `#180`) | Per-component sensitivity $\partial V_{\text{out}} / \partial p_i$ solved via the adjoint system $\mathbf{J}^T \boldsymbol{\lambda} = \mathbf{e}_{\text{out}}$. |
+| **DC / AC Sensitivity** | `.sens` | ✅ | ❌ Planned (`#109`, `#135`, `#180`) | Per-component sensitivity $\partial V_{\text{out}} / \partial p_i$ solved via the adjoint system $\mathbf{J}^T \lambda = \mathbf{e}_{\text{out}}$. |
 | **S-Parameters (RF)** | `.sp` | ✅ | ❌ Planned (`#96`, `#97`, `#185`, `#186`) | Scattering matrix $S_{ij}(f)$, $Z(f)$, $Y(f)$, and Smith chart with $Z_0$ port elements. |
 | **Distortion / Harmonic Balance** | `.disto` / HB | 🟡 (`.disto`) | ❌ Planned (`#113`, `#114`) | Frequency-domain periodic steady state for nonlinear RF circuits (single-tone and multi-tone). |
 | **Parallel Monte Carlo** | `.control` scripts | 🟡 | ❌ Planned (`#107`, `#184`) | Parallel statistical tolerance sweeps across independent `Nodalys` solver instances. |
