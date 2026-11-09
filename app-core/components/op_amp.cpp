@@ -235,6 +235,19 @@ bool IsValidIdealBandwidth(const double bandwidth) {
 }
 
 /**
+ * @brief   Computes the element values of the equivalent circuit of the ideal op-amp.
+ * @param[in] bandwidth  Gain-bandwidth product in hertz.
+ * @return  Gain stage, compensation capacitance and clamp diode model, as FormatIdealOpAmp() writes them.
+ */
+IdealOpAmpValues ComputeIdealOpAmpValues(const double bandwidth) {
+    return {.Gain = IDEAL_GAIN,
+            .Transconductance = IDEAL_TRANSCONDUCTANCE,
+            .Resistance = IDEAL_RESISTANCE,
+            .Capacitance = IDEAL_GAIN / (2.0 * std::numbers::pi * IDEAL_RESISTANCE * bandwidth),
+            .Clamp = {.SaturationCurrent = 1e-15, .EmissionCoefficient = 0.01}};
+}
+
+/**
  * @brief   Writes the netlist lines of an ideal op-amp.
  * @param[in] op_amp        Op-amp to write, while ideal.
  * @param[in] nodes         Nodes of its output, +, -, V+ and V- terminals.
@@ -249,18 +262,17 @@ bool IsValidIdealBandwidth(const double bandwidth) {
  *          starts saturated and swings from rail to rail. Diodes are what its solver handles best.
  */
 std::string FormatIdealOpAmp(const OpAmp &op_amp, const std::vector<int> &nodes, const int internal_node) {
-    const std::string &name = op_amp.GetName();
+    const IdealOpAmpValues figures = ComputeIdealOpAmpValues(op_amp.GetIdealBandwidth());
     // The pole sits at the gain-bandwidth product over the open-loop gain
-    const double capacitance = IDEAL_GAIN / (2.0 * std::numbers::pi * IDEAL_RESISTANCE * op_amp.GetIdealBandwidth());
     return std::format("G-{0} 0 {1} {2} {3} {4}\n"
                        "R-{0} {1} 0 {5} noisy=0\n"
                        "C-{0} {1} 0 {6}\n"
                        "D-{0}-P {1} {7} {8}\n"
                        "D-{0}-N {9} {1} {8}\n"
                        "E-{0} {10} 0 {1} 0 1\n",
-                       name, internal_node, nodes[1], nodes[2], FormatNumber(IDEAL_TRANSCONDUCTANCE),
-                       FormatNumber(IDEAL_RESISTANCE), FormatNumber(capacitance), nodes[3], IDEAL_CLAMP_MODEL_NAME,
-                       nodes[4], nodes[0]);
+                       op_amp.GetName(), internal_node, nodes[1], nodes[2],
+                       FormatNumber(figures.Transconductance), FormatNumber(figures.Resistance),
+                       FormatNumber(figures.Capacitance), nodes[3], IDEAL_CLAMP_MODEL_NAME, nodes[4], nodes[0]);
 }
 
 /**
@@ -280,6 +292,44 @@ const char *GetIdealOpAmpModelName() {
 }
 
 /**
+ * @brief   Computes the element values of the Boyle macromodel of an op-amp.
+ * @param[in] parameters  Datasheet specifications, checked with OpAmp::IsValidParameters().
+ * @return  Every element value of FormatOpAmpSubcircuit()'s subcircuit.
+ */
+BoyleOpAmpValues ComputeBoyleOpAmpValues(const OpAmpParameters &parameters) {
+    const double tail_current = parameters.SlewRate * 1e6 * COMPENSATION_CAPACITANCE;
+    const double collector_current = tail_current / 2.0;
+    const double beta = collector_current / parameters.InputBiasCurrent;
+    const double collector_resistance =
+        1.0 / (2.0 * std::numbers::pi * parameters.GainBandwidth * COMPENSATION_CAPACITANCE);
+    // The pair amplifies its input difference by exactly 1 into the collectors
+    const double emitter_resistance = beta / (beta + 1.0) * collector_resistance - THERMAL_VOLTAGE / collector_current;
+    const double excess_phase = (90.0 - parameters.PhaseMarginDegrees) * std::numbers::pi / 180.0;
+    const double collector_capacitance = COMPENSATION_CAPACITANCE / 2.0 * std::tan(excess_phase);
+    const double transconductance = 1.0 / collector_resistance;
+    const double gain_stage_load = parameters.OutputResistance - OUTPUT_SENSE_RESISTANCE;
+    return {.CollectorResistance = collector_resistance,
+            .CollectorCapacitance = collector_capacitance,
+            .EmitterResistance = emitter_resistance,
+            .TailCurrent = tail_current,
+            .TailResistance = TAIL_EARLY_VOLTAGE / tail_current,
+            .CommonModeTransconductance = transconductance / std::pow(10.0, parameters.CommonModeRejectionDecibels / 20.0),
+            .Transconductance = transconductance,
+            .OutputGain = std::pow(10.0, parameters.OpenLoopGainDecibels / 20.0) /
+                          (transconductance * GAIN_STAGE_RESISTANCE * gain_stage_load),
+            .GainStageLoad = gain_stage_load,
+            .CurrentLimitGain = CURRENT_LIMIT_THRESHOLD / (parameters.ShortCircuitCurrent * OUTPUT_SENSE_RESISTANCE),
+            .PositiveSwing = parameters.PositiveHeadroom + LIMITER_DIODE_DROPS,
+            .NegativeSwing = parameters.NegativeHeadroom + LIMITER_DIODE_DROPS,
+            .RestOfSupplyCurrent = std::max(parameters.SupplyCurrent - tail_current, 0.0),
+            .InputSaturationCurrent = INPUT_SATURATION_CURRENT,
+            .Beta = beta,
+            .CompensationCapacitance = COMPENSATION_CAPACITANCE,
+            .GainStageResistance = GAIN_STAGE_RESISTANCE,
+            .OutputSenseResistance = OUTPUT_SENSE_RESISTANCE};
+}
+
+/**
  * @brief   Writes the Boyle macromodel of an op-amp as a subcircuit.
  * @param[in] name        Subcircuit name.
  * @param[in] parameters  Datasheet specifications, checked with OpAmp::IsValidParameters().
@@ -291,24 +341,7 @@ const char *GetIdealOpAmpModelName() {
  *          current. Values follow the equations of AN48, which reproduce its LTC 8741 listing.
  */
 std::string FormatOpAmpSubcircuit(const std::string_view name, const OpAmpParameters &parameters) {
-    const double tail_current = parameters.SlewRate * 1e6 * COMPENSATION_CAPACITANCE;
-    const double collector_current = tail_current / 2.0;
-    const double beta = collector_current / parameters.InputBiasCurrent;
-    const double collector_resistance =
-        1.0 / (2.0 * std::numbers::pi * parameters.GainBandwidth * COMPENSATION_CAPACITANCE);
-    // The pair amplifies its input difference by exactly 1 into the collectors
-    const double emitter_resistance = beta / (beta + 1.0) * collector_resistance - THERMAL_VOLTAGE / collector_current;
-    const double excess_phase = (90.0 - parameters.PhaseMarginDegrees) * std::numbers::pi / 180.0;
-    const double collector_capacitance = COMPENSATION_CAPACITANCE / 2.0 * std::tan(excess_phase);
-    const double transconductance = 1.0 / collector_resistance;
-    const double common_mode_transconductance =
-        transconductance / std::pow(10.0, parameters.CommonModeRejectionDecibels / 20.0);
-    const double gain_stage_load = parameters.OutputResistance - OUTPUT_SENSE_RESISTANCE;
-    const double output_gain = std::pow(10.0, parameters.OpenLoopGainDecibels / 20.0) /
-                               (transconductance * GAIN_STAGE_RESISTANCE * gain_stage_load);
-    const double current_limit_gain =
-        CURRENT_LIMIT_THRESHOLD / (parameters.ShortCircuitCurrent * OUTPUT_SENSE_RESISTANCE);
-    const double rest_of_supply_current = std::max(parameters.SupplyCurrent - tail_current, 0.0);
+    const BoyleOpAmpValues v = ComputeBoyleOpAmpValues(parameters);
 
     // Pins: output 6, + input 3, - input 2, V+ 7, V- 4, as in the LTC listings
     return std::format(
@@ -330,14 +363,13 @@ std::string FormatOpAmpSubcircuit(const std::string_view name, const OpAmpParame
         ".model DM1 D(IS=1e-20)\n"
         ".model DM3 D(IS=1e-16)\n"
         ".ends {0}\n",
-        name, FormatNumber(collector_resistance), FormatNumber(collector_capacitance), FormatNumber(emitter_resistance),
-        FormatNumber(tail_current), FormatNumber(TAIL_EARLY_VOLTAGE / tail_current),
-        FormatNumber(common_mode_transconductance), FormatNumber(transconductance), FormatNumber(GAIN_STAGE_RESISTANCE),
-        FormatNumber(COMPENSATION_CAPACITANCE), FormatNumber(output_gain), FormatNumber(gain_stage_load),
-        FormatNumber(OUTPUT_SENSE_RESISTANCE), FormatNumber(current_limit_gain),
-        FormatNumber(parameters.PositiveHeadroom + LIMITER_DIODE_DROPS),
-        FormatNumber(parameters.NegativeHeadroom + LIMITER_DIODE_DROPS), FormatNumber(rest_of_supply_current),
-        FormatNumber(INPUT_SATURATION_CURRENT), FormatNumber(beta));
+        name, FormatNumber(v.CollectorResistance), FormatNumber(v.CollectorCapacitance),
+        FormatNumber(v.EmitterResistance), FormatNumber(v.TailCurrent), FormatNumber(v.TailResistance),
+        FormatNumber(v.CommonModeTransconductance), FormatNumber(v.Transconductance), FormatNumber(v.GainStageResistance),
+        FormatNumber(v.CompensationCapacitance), FormatNumber(v.OutputGain), FormatNumber(v.GainStageLoad),
+        FormatNumber(v.OutputSenseResistance), FormatNumber(v.CurrentLimitGain), FormatNumber(v.PositiveSwing),
+        FormatNumber(v.NegativeSwing), FormatNumber(v.RestOfSupplyCurrent), FormatNumber(v.InputSaturationCurrent),
+        FormatNumber(v.Beta));
 }
 
 } // namespace Core

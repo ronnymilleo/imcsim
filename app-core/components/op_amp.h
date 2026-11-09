@@ -7,6 +7,7 @@
 #define IMCSIM_OP_AMP_H
 
 #include "components/component.h"
+#include "components/diode.h"
 #include <memory>
 #include <span>
 #include <string>
@@ -106,6 +107,53 @@ std::string FormatIdealOpAmp(const OpAmp &op_amp, const std::vector<int> &nodes,
 std::string FormatIdealOpAmpModel();
 const char *GetIdealOpAmpModelName();
 std::string FormatOpAmpSubcircuit(std::string_view name, const OpAmpParameters &parameters);
+
+/**
+ * @struct  IdealOpAmpValues
+ * @brief   Element values of the equivalent circuit of the ideal op-amp, from its gain-bandwidth product.
+ * @details Shared by FormatIdealOpAmp(), which writes them as a netlist, and the native backend, which builds the
+ *          same circuit from devices, so both agree element for element.
+ */
+struct IdealOpAmpValues {
+    double Gain;             ///< Open-loop gain, 100 dB.
+    double Transconductance; ///< Transconductance of the gain stage.
+    double Resistance;       ///< Resistance the gain stage drives, Gain / Transconductance.
+    double Capacitance;      ///< Compensation capacitance; the pole sits at Gain / (2 pi R C).
+    DiodeParameters Clamp;   ///< Model of the clamp diodes that stop the output at the supply pins.
+};
+
+/// Element values of the ideal op-amp circuit for a gain-bandwidth product, checked with IsValidIdealBandwidth().
+IdealOpAmpValues ComputeIdealOpAmpValues(double bandwidth);
+
+/**
+ * @struct  BoyleOpAmpValues
+ * @brief   Element values of the Boyle macromodel of an op-amp, from datasheet specifications.
+ * @details The values follow the equations of AN48, which reproduce its LTC 8741 listing. Shared by
+ *          FormatOpAmpSubcircuit() and the native backend, which builds the same circuit from devices.
+ */
+struct BoyleOpAmpValues {
+    double CollectorResistance;
+    double CollectorCapacitance;
+    double EmitterResistance;
+    double TailCurrent;
+    double TailResistance;
+    double CommonModeTransconductance;
+    double Transconductance;
+    double OutputGain;
+    double GainStageLoad;
+    double CurrentLimitGain;
+    double PositiveSwing;
+    double NegativeSwing;
+    double RestOfSupplyCurrent;
+    double InputSaturationCurrent;
+    double Beta;
+    double CompensationCapacitance;
+    double GainStageResistance;
+    double OutputSenseResistance;
+};
+
+/// Element values of the Boyle macromodel for datasheet specifications, checked with OpAmp::IsValidParameters().
+BoyleOpAmpValues ComputeBoyleOpAmpValues(const OpAmpParameters &parameters);
 
 } // namespace Core
 
