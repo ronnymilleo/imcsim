@@ -76,9 +76,47 @@ void MnaSystem::Clear() {
 }
 
 bool MnaSystem::Solve(std::vector<double> &x) const {
-    // Factorize a copy of m_A so that m_A remains intact if CheckResidual() needs to inspect it
+    const std::size_t n = m_A.Rows();
     DenseMatrix factors = m_A;
-    return factors.FactorizeLU() && factors.Solve(m_Rhs, x);
+    std::vector<double> row_scale(n, 1.0);
+    std::vector<double> scaled_rhs = m_Rhs;
+
+    // 1. Row equilibration: scale each row by its largest entry magnitude so tiny conductances (e.g. Gmin = 1e-12)
+    //    and unit branch coefficients (1.0) compete fairly during partial pivoting.
+    for (std::size_t r = 0; r < n; ++r) {
+        double max_entry = 0.0;
+        for (std::size_t c = 0; c < n; ++c) {
+            max_entry = std::max(max_entry, std::fabs(factors.At(r, c)));
+        }
+        if (max_entry > 0.0) {
+            row_scale[r] = 1.0 / max_entry;
+            for (std::size_t c = 0; c < n; ++c) {
+                factors.At(r, c) *= row_scale[r];
+            }
+            scaled_rhs[r] *= row_scale[r];
+        }
+    }
+
+    if (!factors.FactorizeLU() || !factors.Solve(scaled_rhs, x)) {
+        return false;
+    }
+
+    // 2. One step of iterative refinement: r = b - A * x, solve A * dx = r, x += dx
+    std::vector<double> scaled_residual(n, 0.0);
+    for (std::size_t r = 0; r < n; ++r) {
+        double ax = 0.0;
+        for (std::size_t c = 0; c < n; ++c) {
+            ax += m_A.At(r, c) * x[c];
+        }
+        scaled_residual[r] = (m_Rhs[r] - ax) * row_scale[r];
+    }
+    std::vector<double> dx;
+    if (factors.Solve(scaled_residual, dx)) {
+        for (std::size_t i = 0; i < n; ++i) {
+            x[i] += dx[i];
+        }
+    }
+    return true;
 }
 
 bool MnaSystem::CheckResidual(const std::vector<double> &x, const double voltage_abstol,
