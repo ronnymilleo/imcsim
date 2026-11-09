@@ -381,7 +381,7 @@ private:
             }
             if (definition->Spice) {
                 return std::unexpected(
-                    std::format("The native backend cannot simulate the subcircuit {}, which is kept as SPICE text",
+                    std::format("Nodalys cannot simulate the subcircuit {}, which is kept as SPICE text",
                                 definition->Name));
             }
             // Map subcircuit pins to the instance's external unknown indices, and allocate fresh internal node
@@ -548,7 +548,7 @@ private:
             return AddOpAmp(static_cast<const OpAmp &>(part), nodes);
 
         default:
-            return std::unexpected(std::format("The native backend has no device for {} (a {} part) yet",
+            return std::unexpected(std::format("Nodalys has no device for {} (a {} part) yet",
                                                part.GetName(), GetTypeName(type)));
         }
     }

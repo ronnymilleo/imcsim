@@ -268,7 +268,7 @@ void Application::ApplyPreferences() {
     const std::string_view wanted_backend = m_Preferences.SimulationBackend;
     if (wanted_backend != Core::GetBackend().GetName()) {
         // SetBackend is safe while no simulation runs; ApplyPreferences runs on the frame thread between runs
-        Core::SetBackend(wanted_backend == "native" ? std::make_unique<Core::NativeBackend>() : nullptr);
+        Core::SetBackend(wanted_backend == "Nodalys" ? std::make_unique<Core::NativeBackend>() : nullptr);
     }
     if (m_Preferences == m_SavedPreferences) {
         return;

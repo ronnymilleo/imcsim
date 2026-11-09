@@ -19,6 +19,7 @@ TEST_CASE("Preferences load back unchanged from the file they save", "[preferenc
     preferences.SetEffectOn(GUI::LiveEffect::HEAT_GLOW, true);
     preferences.ValueSeries = Core::ValueSeries::E24;
     preferences.BringOutputToFront = false;
+    preferences.SimulationBackend = "Nodalys";
     preferences.RerunOnEdit = true;
     preferences.RerunDelaySeconds = 1.5;
 

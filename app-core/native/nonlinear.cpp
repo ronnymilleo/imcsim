@@ -127,14 +127,15 @@ DiodeDevice::DiodeDevice(const int anode, const int cathode, const int internal,
 
 DiodeDevice::Junction DiodeDevice::Evaluate(const double voltage) const {
     const DiodeParameters &p = m_Parameters;
-    if (voltage >= -p.BreakdownVoltage) {
-        // Forward and normal reverse bias: Shockley equation I = IS * (exp(v / (N * Vt)) - 1)
-        const double exponential = Exponential(voltage / m_Vt);
-        return {p.SaturationCurrent * (exponential - 1.0), p.SaturationCurrent * exponential / m_Vt};
-    }
-    // Reverse breakdown past -BV: I = -IBV * exp(-(v + BV) / (N * Vt))
-    const double exponential = Exponential(-(voltage + p.BreakdownVoltage) / m_Vt);
-    return {-p.BreakdownCurrent * exponential, p.BreakdownCurrent * exponential / m_Vt};
+    // Forward and reverse Shockley current + smooth reverse breakdown current:
+    //   I(v) = IS * (exp(v / m_Vt) - 1) - IBV * (exp(-(v + BV) / m_Vt) - exp(-BV / m_Vt))
+    // Subtracting exp(-BV / m_Vt) keeps I(0) = 0 exact while avoiding any jump discontinuity at v = -BV.
+    const double fwd_exp = Exponential(voltage / m_Vt);
+    const double rev_exp = Exponential(-(voltage + p.BreakdownVoltage) / m_Vt);
+    const double rev_zero = Exponential(-p.BreakdownVoltage / m_Vt);
+    const double current = p.SaturationCurrent * (fwd_exp - 1.0) - p.BreakdownCurrent * (rev_exp - rev_zero);
+    const double conductance = (p.SaturationCurrent * fwd_exp + p.BreakdownCurrent * rev_exp) / m_Vt;
+    return {current, conductance};
 }
 
 double DiodeDevice::Charge(const double voltage) const {
@@ -178,14 +179,16 @@ bool DiodeDevice::Limit(std::vector<double> &x_new, const std::vector<double> &x
     const double voltage_new = VoltageAt(x_new);
     const double voltage_old = VoltageAt(x_old);
     const DiodeParameters &p = m_Parameters;
+    // SPICE effective breakdown knee where I_rev(-bv_eff) == IS, so PNJLIM uses m_Critical symmetrically:
+    const double bv_eff =
+        p.BreakdownVoltage - m_Vt * std::log(std::max(p.BreakdownCurrent, 1e-30) / std::max(p.SaturationCurrent, 1e-30));
     double limited;
-    if (voltage_new >= -p.BreakdownVoltage && voltage_old >= -p.BreakdownVoltage) {
+    if (voltage_new >= -0.5 * bv_eff && voltage_old >= -0.5 * bv_eff) {
         limited = PnLimit(voltage_new, voltage_old, m_Critical, m_Vt);
     } else {
-        const double critical = PnCriticalVoltage(std::max(p.BreakdownCurrent, 1e-30), m_Vt);
-        const double magnitude_new = -(voltage_new + p.BreakdownVoltage);
-        const double magnitude_old = -(voltage_old + p.BreakdownVoltage);
-        limited = -PnLimit(magnitude_new, magnitude_old, critical, m_Vt) - p.BreakdownVoltage;
+        const double magnitude_new = -(voltage_new + bv_eff);
+        const double magnitude_old = -(voltage_old + bv_eff);
+        limited = -PnLimit(magnitude_new, magnitude_old, m_Critical, m_Vt) - bv_eff;
     }
     const double delta = limited - voltage_new;
     if (delta == 0.0) {
@@ -215,11 +218,11 @@ void DiodeDevice::AcceptStep(const std::vector<double> &x) {
     if (!HasTransientState()) {
         return;
     }
-    m_SavedCharge = m_Charge;
-    m_SavedChargeCurrent = m_ChargeCurrent;
     const double voltage = VoltageAt(x);
     m_Charge = Charge(voltage);
     m_ChargeCurrent = m_CapConductance * voltage + m_CapEquivalent;
+    m_SavedCharge = m_Charge;
+    m_SavedChargeCurrent = m_ChargeCurrent;
 }
 
 void DiodeDevice::RejectStep() {
@@ -444,10 +447,6 @@ void BjtDevice::AcceptStep(const std::vector<double> &x) {
     if (!HasTransientState()) {
         return;
     }
-    m_SavedQbe = m_Qbe;
-    m_SavedIQbe = m_IQbe;
-    m_SavedQbc = m_Qbc;
-    m_SavedIQbc = m_IQbc;
     const double vbe = NodeVoltage(x, m_B) - NodeVoltage(x, m_E);
     const double vbc = NodeVoltage(x, m_B) - NodeVoltage(x, m_C);
     const double vbe_signed = m_Pnp ? -vbe : vbe;
@@ -463,6 +462,10 @@ void BjtDevice::AcceptStep(const std::vector<double> &x) {
                 .Charge;
     m_IQbe = m_Gqbe * vbe_signed + m_Ieqbe;
     m_IQbc = m_Gqbc * vbc_signed + m_Ieqbc;
+    m_SavedQbe = m_Qbe;
+    m_SavedIQbe = m_IQbe;
+    m_SavedQbc = m_Qbc;
+    m_SavedIQbc = m_IQbc;
 }
 
 void BjtDevice::RejectStep() {
@@ -571,9 +574,9 @@ void MosfetDevice::Stamp(MnaSystem &sys, const std::vector<double> &x, const Tim
         const double vgs = NodeVoltage(x, m_Gate) - NodeVoltage(x, m_Source);
         const double vgd = NodeVoltage(x, m_Gate) - NodeVoltage(x, m_Drain);
         const ChargeCompanion cap_gs =
-            ChargeModel(m_Cgs, m_Cgs * vgs, vgs, m_Vgs, m_Igs, time.TimeStep, time.BackwardEuler);
+            ChargeModel(m_Cgs, m_Cgs * vgs, vgs, m_Cgs * m_Vgs, m_Igs, time.TimeStep, time.BackwardEuler);
         const ChargeCompanion cap_gd =
-            ChargeModel(m_Cgd, m_Cgd * vgd, vgd, m_Vgd, m_Igd, time.TimeStep, time.BackwardEuler);
+            ChargeModel(m_Cgd, m_Cgd * vgd, vgd, m_Cgd * m_Vgd, m_Igd, time.TimeStep, time.BackwardEuler);
         m_Gcgs = cap_gs.Conductance;
         m_Ieqgs = cap_gs.EquivalentCurrent;
         m_Gcgd = cap_gd.Conductance;
@@ -647,16 +650,16 @@ void MosfetDevice::AcceptStep(const std::vector<double> &x) {
     if (!HasTransientState()) {
         return;
     }
-    m_SavedVgs = m_Vgs;
-    m_SavedIgs = m_Igs;
-    m_SavedVgd = m_Vgd;
-    m_SavedIgd = m_Igd;
     const double vgs = NodeVoltage(x, m_Gate) - NodeVoltage(x, m_Source);
     const double vgd = NodeVoltage(x, m_Gate) - NodeVoltage(x, m_Drain);
     m_Vgs = vgs;
     m_Vgd = vgd;
     m_Igs = m_Gcgs * vgs + m_Ieqgs;
     m_Igd = m_Gcgd * vgd + m_Ieqgd;
+    m_SavedVgs = m_Vgs;
+    m_SavedIgs = m_Igs;
+    m_SavedVgd = m_Vgd;
+    m_SavedIgd = m_Igd;
 }
 
 void MosfetDevice::RejectStep() {

@@ -1,11 +1,11 @@
 /**
  * @file    native_backend.h
- * @brief   The simulation backend that solves circuits with the native solver of imcsim, a clean-room engine written
- *          from published circuit theory to sit beside the ngspice backend.
- * @details The backend compiles the Circuit into its equation system (compiler.h) and runs the analysis on it
- *          (analyses.h). The analyses it has so far are the DC operating point, the DC sweep and the transient; the
- *          AC sweep, the noise and the transfer function, and the logic parts, are on the roadmap and reported as
- *          unsupported.
+ * @brief   The Nodalys simulation backend, which solves circuits with the clean-room native solver of imcsim.
+ * @details The library is named **Nodalys** — a contraction of *nodal analysis* (`nodal` + the `-lys` of `analysis`),
+ *          after the Modified Nodal Analysis (MNA) at its core. It compiles the Circuit directly into its MNA equation
+ *          system (compiler.h) and runs the requested analysis on it (analyses.h). The analyses it runs so far are the
+ *          DC operating point, the DC sweep and the transient; the AC sweep, the noise, the transfer function and the
+ *          logic parts are on the roadmap and reported as unsupported.
  */
 
 #ifndef IMCSIM_NATIVE_BACKEND_H
@@ -17,7 +17,7 @@ namespace Core {
 
 /**
  * @class   NativeBackend
- * @brief   The imcsim-native circuit simulator as a SimulationBackend.
+ * @brief   The Nodalys circuit simulator as a SimulationBackend.
  */
 class NativeBackend : public SimulationBackend {
 public:

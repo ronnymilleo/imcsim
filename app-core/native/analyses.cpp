@@ -333,18 +333,18 @@ std::expected<DCSweep, std::string> ComputeDCSweep(const Circuit &circuit, Compi
     NewtonOutcome outcome;
     for (const double step_value : step_values) {
         if (stepped_device && !SetSourceValue(stepped_device, step_value)) {
-            return std::unexpected(std::format("The native backend cannot step the source {}", sweep.SteppedSource));
+            return std::unexpected(std::format("Nodalys cannot step the source {}", sweep.SteppedSource));
         }
         DCSweepCurve curve;
         curve.StepValue = settings.Stepped ? step_value : 0.0;
         curve.NodeVoltages.resize(static_cast<std::size_t>(compiled.CircuitNodeCount));
         for (const double swept_value : sweep.SweptValues) {
             if (!SetSourceValue(swept->second, swept_value)) {
-                return std::unexpected(std::format("The native backend cannot sweep the source {}", sweep.SweptSource));
+                return std::unexpected(std::format("Nodalys cannot sweep the source {}", sweep.SweptSource));
             }
             outcome = SolveDc(*compiled.System, compiled.Devices, x, options, TimeContext{});
             if (!outcome.Converged) {
-                return std::unexpected(std::format("The native solver found no operating point at {} = {}",
+                return std::unexpected(std::format("Nodalys found no operating point at {} = {}",
                                                    sweep.SweptSource, swept_value));
             }
             const std::vector<double> voltages = ReadNodeVoltages(compiled, x);
@@ -407,8 +407,10 @@ std::expected<Transient, std::string> ComputeTransient(CompiledCircuit &compiled
     double time = 0.0;
     double step = std::min(settings.TimeStep, settings.StopTime);
     double previous_step = 0.0;
+    double older_step = 0.0;
     bool first_step = true;
     std::vector<double> x_old = x_now;
+    std::vector<double> x_older = x_now;
     bool stopped = false;
     std::string failure;
 
@@ -435,21 +437,24 @@ std::expected<Transient, std::string> ComputeTransient(CompiledCircuit &compiled
             continue;
         }
 
-        // Local truncation error of the trapezoidal step against the linear predictor through the last two points,
-        // watched on the nodes that carry energy-storage devices, like the device-driven truncation of SPICE:
-        // nodes held by sources follow their waveforms and have no integration error
+        // Local truncation error of the trapezoidal step from the 3rd divided difference across the last three points
+        // (Nagel SPICE2 Eq. 5.26 / SPICE3f5 CKTterr: LTE_trap = (h^3 / 12) * |x'''| = (h^3 / 2) * |d123|).
         double ratio = 0.0;
-        if (previous_step > 0.0) {
-            const double scale = step / previous_step;
+        if (previous_step > 0.0 && older_step > 0.0) {
             for (int index = 0; index < size; ++index) {
                 if (!compiled.DynamicNode[static_cast<std::size_t>(index)]) {
                     continue;
                 }
                 const std::size_t i = static_cast<std::size_t>(index);
-                const double predicted = x_now[i] + scale * (x_now[i] - x_old[i]);
-                // For the constant step the trapezoidal LTE is |x − x̂| / 4 (Vlach & Singhal, Kundert ch. 5)
-                const double error = std::fabs(x_new[i] - predicted) / 4.0;
-                const double tolerance = options.RelTol * std::fabs(x_new[i]) + options.VoltageAbsTol;
+                const double d1 = (x_new[i] - x_now[i]) / step;
+                const double d2 = (x_now[i] - x_old[i]) / previous_step;
+                const double d3 = (x_old[i] - x_older[i]) / older_step;
+                const double d12 = (d1 - d2) / (step + previous_step);
+                const double d23 = (d2 - d3) / (previous_step + older_step);
+                const double d123 = (d12 - d23) / (step + previous_step + older_step);
+                const double error = 0.5 * step * step * step * std::fabs(d123);
+                const double scale_v = std::max({std::fabs(x_new[i]), std::fabs(x_now[i]), std::fabs(x_old[i])});
+                const double tolerance = 7.0 * (options.RelTol * scale_v + options.VoltageAbsTol);
                 ratio = std::max(ratio, error / tolerance);
             }
         }
@@ -472,9 +477,9 @@ std::expected<Transient, std::string> ComputeTransient(CompiledCircuit &compiled
         std::vector<double> currents_new = collector.ComputeCurrents(x_new);
         collector.AppendSegment(time, x_now, currents_now, time + step, x_new, currents_new);
         currents_now = std::move(currents_new);
-        x_old = std::exchange(x_now, x_new);
+        x_older = std::exchange(x_old, std::exchange(x_now, x_new));
         time += step;
-        previous_step = step;
+        older_step = std::exchange(previous_step, step);
         first_step = false;
         const double next = step * std::clamp(LTE_SAFETY * std::pow(std::max(ratio, 1e-3), -1.0 / 3.0),
                                               STEP_SHRINK_LIMIT, STEP_GROW_LIMIT);

@@ -199,11 +199,11 @@ void PreferencesWindow::DrawResults() {
             m_Preferences.SimulationBackend = "ngspice";
         }
         ImGui::SetItemTooltip("The reference simulator, ngspice, as a shared library");
-        if (ImGui::Selectable("native", m_Preferences.SimulationBackend == "native")) {
-            m_Preferences.SimulationBackend = "native";
+        if (ImGui::Selectable("Nodalys", m_Preferences.SimulationBackend == "Nodalys")) {
+            m_Preferences.SimulationBackend = "Nodalys";
         }
-        ImGui::SetItemTooltip("The built-in solver of imcsim; it runs the operating point, the transient and the DC "
-                              "sweep, without the logic parts for now");
+        ImGui::SetItemTooltip("Nodalys, the built-in solver of imcsim; it runs the operating point, the transient and "
+                              "the DC sweep, without the logic parts for now");
         ImGui::EndCombo();
     }
     ImGui::EndTable();

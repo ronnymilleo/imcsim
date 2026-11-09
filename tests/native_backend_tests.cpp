@@ -72,9 +72,9 @@ Core::Transient RunTransient(Core::SimulationBackend &backend, const Core::Circu
 
 } // namespace
 
-TEST_CASE("The native backend names itself and lists what it runs") {
+TEST_CASE("Nodalys names itself and lists what it runs") {
     const Core::NativeBackend backend;
-    REQUIRE(backend.GetName() == "native");
+    REQUIRE(backend.GetName() == "Nodalys");
     const Core::BackendCapabilities &capabilities = backend.GetCapabilities();
     REQUIRE(capabilities.Analyses.contains(Core::AnalysisKind::OPERATING_POINT));
     REQUIRE(capabilities.Analyses.contains(Core::AnalysisKind::TRANSIENT));

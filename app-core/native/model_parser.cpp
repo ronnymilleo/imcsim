@@ -74,7 +74,7 @@ std::map<std::string, std::string> ParameterList(const std::string &text) {
  */
 std::expected<double, std::string> Number(const LibraryModel &model, const std::string &key, const std::string &text) {
     if (text.starts_with('{')) {
-        return std::unexpected(std::format("The native backend cannot evaluate the expression {} of the parameter {} "
+        return std::unexpected(std::format("Nodalys cannot evaluate the expression {} of the parameter {} "
                                            "in the model {}",
                                            text, key, model.Name));
     }
@@ -82,7 +82,7 @@ std::expected<double, std::string> Number(const LibraryModel &model, const std::
         return *parsed;
     }
     return std::unexpected(
-        std::format("The native backend cannot read {} as the parameter {} in the model {}", text, key, model.Name));
+        std::format("Nodalys cannot read {} as the parameter {} in the model {}", text, key, model.Name));
 }
 
 /**
@@ -223,7 +223,7 @@ std::expected<MOSFETParameters, std::string> ResolveParameters(const Circuit &ci
             return std::unexpected(number.error());
         }
         if (*number != 1.0) {
-            return std::unexpected(std::format("The native backend simulates MOSFETs with the level 1 model only, and "
+            return std::unexpected(std::format("Nodalys simulates MOSFETs with the level 1 model only, and "
                                                "the model {} is level {}",
                                                (*model)->Name, *number));
         }

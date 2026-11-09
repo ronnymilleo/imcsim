@@ -214,7 +214,7 @@ LoadedPreferences LoadPreferences(const std::string_view text) {
         return true;
     });
     reader.Read<std::string>("simulation_backend", Type::string, [&choices](const std::string &name) {
-        if (name != "ngspice" && name != "native") {
+        if (name != "ngspice" && name != "Nodalys") {
             return false;
         }
         choices.SimulationBackend = name;

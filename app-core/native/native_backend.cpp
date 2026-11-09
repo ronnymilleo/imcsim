@@ -1,6 +1,6 @@
 /**
  * @file    native_backend.cpp
- * @brief   The simulation backend that solves circuits with the native solver of imcsim.
+ * @brief   The Nodalys simulation backend, which solves circuits with the native solver of imcsim.
  */
 
 #include "native/native_backend.h"
@@ -14,11 +14,11 @@ namespace Core {
 
 namespace {
 
-/// The analyses the native solver runs so far; the rest of the seam returns a clear "not yet".
+/// The analyses Nodalys runs so far; the rest of the seam returns a clear "not yet".
 constexpr auto NATIVE_ANALYSES = {AnalysisKind::OPERATING_POINT, AnalysisKind::TRANSIENT, AnalysisKind::DC_SWEEP};
 
 /// Why the logic parts are not runnable yet, one reason for every gate and flip-flop type.
-constexpr const char *DIGITAL_REASON = "The native backend has no event-driven digital engine yet; the logic parts "
+constexpr const char *DIGITAL_REASON = "Nodalys has no event-driven digital engine yet; the logic parts "
                                        "run with the ngspice backend";
 
 /**
@@ -27,7 +27,7 @@ constexpr const char *DIGITAL_REASON = "The native backend has no event-driven d
 std::expected<Native::CompiledCircuit, std::string> CompileOrFail(const Circuit &circuit) {
     std::expected<Native::CompiledCircuit, std::string> compiled = Native::CompileCircuit(circuit);
     if (!compiled) {
-        return std::unexpected(std::format("The native backend cannot simulate this circuit: {}", compiled.error()));
+        return std::unexpected(std::format("Nodalys cannot simulate this circuit: {}", compiled.error()));
     }
     return std::move(*compiled);
 }
@@ -49,14 +49,14 @@ NativeBackend::NativeBackend() {
 
 /**
  * @brief   Names the backend in the messages that say what it cannot run.
- * @return  "native".
+ * @return  "Nodalys".
  */
 std::string_view NativeBackend::GetName() const {
-    return "native";
+    return "Nodalys";
 }
 
 /**
- * @brief   Tells what the native solver runs.
+ * @brief   Tells what Nodalys runs.
  * @return  The operating point, the transient and the DC sweep, with the logic parts listed as unsupported.
  * @note    Fixed at construction, so any thread may ask any time.
  */
@@ -112,20 +112,20 @@ ACSweepRun NativeBackend::RunACSweep(const Circuit &circuit, const ACSweepSettin
     (void)circuit;
     (void)settings;
     (void)temperature_celsius;
-    return {std::unexpected("The native backend does not run the AC sweep yet"), {}};
+    return {std::unexpected("Nodalys does not run the AC sweep yet"), {}};
 }
 
 NoiseRun NativeBackend::RunNoise(const Circuit &circuit, const NoiseSettings &settings) {
     (void)circuit;
     (void)settings;
-    return {std::unexpected("The native backend does not run the noise analysis yet"), {}};
+    return {std::unexpected("Nodalys does not run the noise analysis yet"), {}};
 }
 
 TransferFunctionRun NativeBackend::RunTransferFunction(const Circuit &circuit,
                                                        const TransferFunctionSettings &settings) {
     (void)circuit;
     (void)settings;
-    return {std::unexpected("The native backend does not run the transfer function analysis yet"), {}};
+    return {std::unexpected("Nodalys does not run the transfer function analysis yet"), {}};
 }
 
 } // namespace Core

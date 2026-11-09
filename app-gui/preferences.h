@@ -77,7 +77,7 @@ struct Preferences {
 
     /// Results: a new result brings the Output window to the front, or only marks it.
     bool BringOutputToFront = true;
-    /// Which simulation engine solves the circuits: "ngspice" or the native solver "native".
+    /// Which simulation engine solves the circuits: "ngspice" or the native solver "Nodalys".
     std::string SimulationBackend = "ngspice";
     /// The selected analysis runs again by itself once an edit of the circuit settles, if it was already run.
     bool RerunOnEdit = false;

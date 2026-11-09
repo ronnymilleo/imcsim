@@ -9,8 +9,10 @@
 #include "digital_models.h"
 #include "document/examples.h"
 #include "document/schematic.h"
+#include "native/native_backend.h"
 #include "ngspice/ngspice_library.h"
 #include "plots/trace_statistics.h"
+#include "simulation/simulation_backend.h"
 #include "simulation/simulator.h"
 #include "test_printers.h"
 #include <algorithm>
@@ -90,6 +92,55 @@ TEST_CASE("Every example opens without warnings, measures existing traces and ru
         const Core::TransientRun transient =
             Core::RunTransient(schematic.BuildCircuit(), schematic.GetSimulationSettings().Transient);
         CHECK(transient.Result.has_value());
+    }
+}
+
+TEST_CASE("Every example either runs on Nodalys or is flagged unsupported", "[examples]") {
+    Core::NativeBackend nodalys;
+    for (const GUI::Example &example : GUI::GetExamples()) {
+        INFO(example.Title);
+        GUI::Schematic schematic;
+        OpenOrFail(example, schematic);
+        const Core::Circuit circuit = schematic.BuildCircuit();
+
+        // Digital examples use logic gates and flip-flops, which Nodalys flags in its capability matrix
+        if (std::string_view(example.Group) == "Digital") {
+            CHECK(Core::FindUnsupported(nodalys, circuit, Core::AnalysisKind::OPERATING_POINT).has_value());
+            continue;
+        }
+        CHECK_FALSE(Core::FindUnsupported(nodalys, circuit, Core::AnalysisKind::OPERATING_POINT).has_value());
+
+        // The precision rectifier example uses a vendor op-amp subcircuit kept as raw SPICE text
+        if (std::string_view(example.FileName) == "precision_rectifier.imcsim") {
+            const Core::OperatingPointRun op = nodalys.RunOperatingPoint(circuit);
+            REQUIRE_FALSE(op.Result.has_value());
+            CHECK(op.Result.error().find("SPICE text") != std::string::npos);
+            continue;
+        }
+
+        const Core::OperatingPointRun operating_point = nodalys.RunOperatingPoint(circuit);
+        INFO((operating_point.Result ? std::string{} : operating_point.Result.error()));
+        REQUIRE(operating_point.Result.has_value());
+        const GUI::SavedMeasurements measurements = schematic.SaveMeasurements();
+        for (const std::string &name : measurements.Currents) {
+            INFO(name);
+            CHECK(std::ranges::contains(operating_point.Result->Currents, name, &Core::ComponentCurrent::Name));
+        }
+
+        const GUI::SimulationSettings &settings = schematic.GetSimulationSettings();
+        const Core::TransientRun transient = nodalys.RunTransient(circuit, settings.Transient, std::nullopt, {});
+        INFO((transient.Result ? std::string{} : transient.Result.error()));
+        CHECK(transient.Result.has_value());
+
+        if (settings.Selected == GUI::Analysis::DC_SWEEP) {
+            const Core::DCSweepRun dc_sweep = nodalys.RunDCSweep(
+                circuit,
+                {.Swept = settings.SweptRange,
+                 .Stepped = settings.StepSource ? std::optional(settings.SteppedRange) : std::nullopt},
+                std::nullopt);
+            INFO((dc_sweep.Result ? std::string{} : dc_sweep.Result.error()));
+            CHECK(dc_sweep.Result.has_value());
+        }
     }
 }
 

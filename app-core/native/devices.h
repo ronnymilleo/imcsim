@@ -305,6 +305,8 @@ public:
 
     void Stamp(MnaSystem &sys, const std::vector<double> &x, const TimeContext &time) override;
     double TerminalCurrent(int terminal, const std::vector<double> &x) const override;
+    void AcceptStep(const std::vector<double> &x) override;
+    void RejectStep() override;
 
 private:
     int m_NodeA;
@@ -313,6 +315,7 @@ private:
     int m_ControlNegative;
     SwitchParameters m_Parameters;
     bool m_IsClosed = false;
+    bool m_SavedIsClosed = false;
     double m_Resistance;
 };
 

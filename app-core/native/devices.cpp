@@ -140,11 +140,11 @@ bool CapacitorDevice::HasTransientState() const {
 }
 
 void CapacitorDevice::AcceptStep(const std::vector<double> &x) {
-    m_SavedVoltage = m_Voltage;
-    m_SavedCurrent = m_Current;
     const double voltage = BranchVoltage(x, m_NodeA, m_NodeB);
     m_Current = m_LastConductance * voltage + m_EquivalentCurrent;
     m_Voltage = voltage;
+    m_SavedVoltage = m_Voltage;
+    m_SavedCurrent = m_Current;
 }
 
 void CapacitorDevice::RejectStep() {
@@ -201,10 +201,10 @@ bool InductorDevice::HasTransientState() const {
 }
 
 void InductorDevice::AcceptStep(const std::vector<double> &x) {
-    m_SavedCurrent = m_Current;
-    m_SavedVoltage = m_Voltage;
     m_Current = x[static_cast<std::size_t>(m_Branch)];
     m_Voltage = BranchVoltage(x, m_NodeA, m_NodeB);
+    m_SavedCurrent = m_Current;
+    m_SavedVoltage = m_Voltage;
 }
 
 void InductorDevice::RejectStep() {
@@ -378,6 +378,15 @@ double SwitchDevice::TerminalCurrent(const int terminal, const std::vector<doubl
     return terminal == 0 ? current : -current;
 }
 
+void SwitchDevice::AcceptStep(const std::vector<double> & /*x*/) {
+    m_SavedIsClosed = m_IsClosed;
+}
+
+void SwitchDevice::RejectStep() {
+    m_IsClosed = m_SavedIsClosed;
+    m_Resistance = m_IsClosed ? m_Parameters.OnResistance : m_Parameters.OffResistance;
+}
+
 // ============================================================================
 // CoupledInductorDevice (Transformer windings)
 // ============================================================================
@@ -428,14 +437,14 @@ bool CoupledInductorDevice::HasTransientState() const {
 }
 
 void CoupledInductorDevice::AcceptStep(const std::vector<double> &x) {
-    m_SavedI1 = m_I1;
-    m_SavedI2 = m_I2;
-    m_SavedV1 = m_V1;
-    m_SavedV2 = m_V2;
     m_I1 = x[static_cast<std::size_t>(m_Branch1)];
     m_I2 = x[static_cast<std::size_t>(m_Branch2)];
     m_V1 = BranchVoltage(x, m_PrimaryA, m_PrimaryB);
     m_V2 = BranchVoltage(x, m_SecondaryA, m_SecondaryB);
+    m_SavedI1 = m_I1;
+    m_SavedI2 = m_I2;
+    m_SavedV1 = m_V1;
+    m_SavedV2 = m_V2;
 }
 
 void CoupledInductorDevice::RejectStep() {
