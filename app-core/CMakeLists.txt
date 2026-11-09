@@ -13,6 +13,7 @@ add_library(nodalys
             native/model_parser.cpp
             native/native_backend.cpp
             native/newton.cpp
+            native/noise_analysis.cpp
             native/nonlinear.cpp
             native/tf_analysis.cpp
             native/transient_analysis.cpp

@@ -95,6 +95,14 @@ std::expected<ACSweep, std::string> ComputeACSweep(CompiledCircuit &compiled, co
                                                    std::vector<SimulatorMessage> &messages);
 
 /**
+ * @brief   Computes the small-signal noise spectral density and integrated RMS noise at an output node, referred to
+ *          an input AC source, around the DC operating point (SPICE `.noise`).
+ */
+std::expected<Noise, std::string> ComputeNoise(const Circuit &circuit, CompiledCircuit &compiled,
+                                               const NoiseSettings &settings, const ConvergenceOptions &options,
+                                               std::vector<SimulatorMessage> &messages);
+
+/**
  * @brief   Computes the small-signal DC transfer function (gain, input impedance, output impedance) from an
  *          independent input source to an output node around the DC operating point.
  */

@@ -49,6 +49,16 @@ struct CurrentRef {
 };
 
 /**
+ * @struct  NoiseGroup
+ * @brief   Maps a top-level schematic part name (e.g. `"R1"`, `"U1"`, `"X1"`) to all internal MNA devices that
+ *          contribute to its noise in a `.noise` analysis.
+ */
+struct NoiseGroup {
+    std::string Name;
+    std::vector<const Device *> Devices;
+};
+
+/**
  * @struct  CompiledCircuit
  * @brief   Everything an analysis needs to simulate a compiled circuit.
  */
@@ -61,6 +71,8 @@ struct CompiledCircuit {
     int CircuitNodeCount = 0;
     /// Every reported current, in the order of `GetCurrentNames()` for each top-level component.
     std::vector<CurrentRef> Currents;
+    /// Top-level components and the internal devices that belong to each one, used by `.noise` analysis.
+    std::vector<NoiseGroup> NoiseGroups;
     /// Indexed by unknown index (`0 .. System->Size() - 1`): true when a capacitor connects to that node unknown,
     /// so the transient Local Truncation Error (LTE) step controller monitors its voltage trajectory.
     std::vector<bool> DynamicNode;

@@ -73,6 +73,20 @@ public:
                                                    const std::vector<std::complex<double>> &x_ac,
                                                    double omega) const = 0;
 
+    /**
+     * @brief   Output voltage noise power spectral density ($\text{V}^2/\text{Hz}$) contributed by this device at the
+     *          operating point `x_dc` and frequency `frequency_hz`, given the adjoint vector `adjoint` (solution of
+     *          $Y(j\omega)^T \cdot \lambda = e_{\text{out}}$).
+     */
+    virtual double OutputNoiseVariance(const std::vector<double> &x_dc,
+                                       const std::vector<std::complex<double>> &adjoint,
+                                       double frequency_hz) const {
+        (void)x_dc;
+        (void)adjoint;
+        (void)frequency_hz;
+        return 0.0;
+    }
+
     /// True when the device carries state between time points (companion models of C, L and junction charges).
     virtual bool HasTransientState() const { return false; }
     /// Saves the state of the accepted point x (called after each converged transient step).
@@ -99,7 +113,7 @@ public:
  */
 class ResistorDevice : public Device {
 public:
-    ResistorDevice(int node_a, int node_b, double resistance);
+    ResistorDevice(int node_a, int node_b, double resistance, bool noisy = true);
 
     double GetResistance() const;
     void SetResistance(double resistance);
@@ -109,11 +123,14 @@ public:
     std::complex<double> AcTerminalCurrent(int terminal, const std::vector<double> &x_dc,
                                            const std::vector<std::complex<double>> &x_ac,
                                            double omega) const override;
+    double OutputNoiseVariance(const std::vector<double> &x_dc, const std::vector<std::complex<double>> &adjoint,
+                               double frequency_hz) const override;
 
 private:
     int m_NodeA;
     int m_NodeB;
     double m_Conductance;
+    bool m_Noisy;
 };
 
 /**

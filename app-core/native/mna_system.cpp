@@ -123,23 +123,11 @@ bool MnaSystem::Solve(std::vector<double> &x) const {
     return true;
 }
 
-bool MnaSystem::SolveAc(const MnaSystem &reactive, const double omega,
-                        std::vector<std::complex<double>> &x_ac) const {
-    const std::size_t n = m_A.Rows();
-    if (reactive.m_A.Rows() != n) {
-        return false;
-    }
+namespace {
 
-    // Assemble Y(j * omega) = A_dc + j * omega * C_ac and complex RHS b_ac
-    ComplexDenseMatrix y_orig(n, n);
-    std::vector<std::complex<double>> b_orig(n);
-    for (std::size_t r = 0; r < n; ++r) {
-        b_orig[r] = std::complex<double>(reactive.m_Rhs[r], 0.0);
-        for (std::size_t c = 0; c < n; ++c) {
-            y_orig.At(r, c) = std::complex<double>(m_A.At(r, c), omega * reactive.m_A.At(r, c));
-        }
-    }
-
+bool SolveComplexSystem(const ComplexDenseMatrix &y_orig, const std::vector<std::complex<double>> &b_orig,
+                        std::vector<std::complex<double>> &x) {
+    const std::size_t n = y_orig.Rows();
     ComplexDenseMatrix factors = y_orig;
     std::vector<double> row_scale(n, 1.0);
     std::vector<std::complex<double>> scaled_rhs = b_orig;
@@ -159,7 +147,7 @@ bool MnaSystem::SolveAc(const MnaSystem &reactive, const double omega,
         }
     }
 
-    if (!factors.FactorizeLU() || !factors.Solve(scaled_rhs, x_ac)) {
+    if (!factors.FactorizeLU() || !factors.Solve(scaled_rhs, x)) {
         return false;
     }
 
@@ -168,17 +156,57 @@ bool MnaSystem::SolveAc(const MnaSystem &reactive, const double omega,
     for (std::size_t r = 0; r < n; ++r) {
         std::complex<double> yx(0.0, 0.0);
         for (std::size_t c = 0; c < n; ++c) {
-            yx += y_orig.At(r, c) * x_ac[c];
+            yx += y_orig.At(r, c) * x[c];
         }
         scaled_residual[r] = (b_orig[r] - yx) * row_scale[r];
     }
     std::vector<std::complex<double>> dx;
     if (factors.Solve(scaled_residual, dx)) {
         for (std::size_t i = 0; i < n; ++i) {
-            x_ac[i] += dx[i];
+            x[i] += dx[i];
         }
     }
     return true;
+}
+
+} // namespace
+
+bool MnaSystem::SolveAc(const MnaSystem &reactive, const double omega,
+                        std::vector<std::complex<double>> &x_ac) const {
+    const std::size_t n = m_A.Rows();
+    if (reactive.m_A.Rows() != n) {
+        return false;
+    }
+
+    // Assemble Y(j * omega) = A_dc + j * omega * C_ac and complex RHS b_ac
+    ComplexDenseMatrix y_orig(n, n);
+    std::vector<std::complex<double>> b_orig(n);
+    for (std::size_t r = 0; r < n; ++r) {
+        b_orig[r] = std::complex<double>(reactive.m_Rhs[r], 0.0);
+        for (std::size_t c = 0; c < n; ++c) {
+            y_orig.At(r, c) = std::complex<double>(m_A.At(r, c), omega * reactive.m_A.At(r, c));
+        }
+    }
+    return SolveComplexSystem(y_orig, b_orig, x_ac);
+}
+
+bool MnaSystem::SolveAcTranspose(const MnaSystem &reactive, const double omega, const int output_unknown,
+                                 std::vector<std::complex<double>> &adjoint) const {
+    const std::size_t n = m_A.Rows();
+    if (reactive.m_A.Rows() != n || output_unknown < 0 || static_cast<std::size_t>(output_unknown) >= n) {
+        return false;
+    }
+
+    // Assemble Y(j * omega)^T and unit basis RHS e_out
+    ComplexDenseMatrix y_transpose(n, n);
+    std::vector<std::complex<double>> b_orig(n, std::complex<double>(0.0, 0.0));
+    b_orig[static_cast<std::size_t>(output_unknown)] = std::complex<double>(1.0, 0.0);
+    for (std::size_t r = 0; r < n; ++r) {
+        for (std::size_t c = 0; c < n; ++c) {
+            y_transpose.At(r, c) = std::complex<double>(m_A.At(c, r), omega * reactive.m_A.At(c, r));
+        }
+    }
+    return SolveComplexSystem(y_transpose, b_orig, adjoint);
 }
 
 bool MnaSystem::CheckResidual(const std::vector<double> &x, const double voltage_abstol,

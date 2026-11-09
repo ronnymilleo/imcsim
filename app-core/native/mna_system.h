@@ -103,6 +103,13 @@ public:
      */
     bool SolveAc(const MnaSystem &reactive, double omega, std::vector<std::complex<double>> &x_ac) const;
 
+    /**
+     * @brief   Solves the transposed (adjoint) small-signal AC system $(A_{\text{DC}} + j \omega C_{\text{AC}})^T \cdot \lambda = e_{\text{out}}$
+     *          for a unit excitation at `output_unknown`, used by small-signal noise analysis (`.noise`).
+     */
+    bool SolveAcTranspose(const MnaSystem &reactive, double omega, int output_unknown,
+                          std::vector<std::complex<double>> &adjoint) const;
+
     /// Verifies that the equation residual $|A \cdot x - \text{rhs}|$ satisfies KCL and branch tolerances.
     bool CheckResidual(const std::vector<double> &x, double voltage_abstol, double current_abstol, double reltol) const;
 

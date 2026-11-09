@@ -749,5 +749,203 @@ TEST_CASE("Both backends agree on the small-signal transfer function and impedan
     }
 }
 
+TEST_CASE("Both backends agree on the small-signal noise spectral densities, totals and device contributions") {
+    auto check_noise_parity = [](const Core::Circuit &circuit, const Core::NoiseSettings &settings) {
+        Core::NativeBackend native;
+        const Core::NoiseRun expected = Ngspice().RunNoise(circuit, settings);
+        INFO("ngspice: " + (expected.Result ? std::string("ok") : expected.Result.error()));
+        REQUIRE(expected.Result.has_value());
+        const Core::NoiseRun actual = native.RunNoise(circuit, settings);
+        INFO("native: " + (actual.Result ? std::string("ok") : actual.Result.error()));
+        REQUIRE(actual.Result.has_value());
+
+        REQUIRE(actual.Result->OutputNode == expected.Result->OutputNode);
+        REQUIRE(actual.Result->InputSource == expected.Result->InputSource);
+        REQUIRE(actual.Result->InputUnit == expected.Result->InputUnit);
+        REQUIRE(actual.Result->Frequencies.size() == expected.Result->Frequencies.size());
+
+        for (std::size_t i = 0; i < expected.Result->Frequencies.size(); ++i) {
+            const double f = expected.Result->Frequencies[i];
+            REQUIRE(Close(actual.Result->Frequencies[i], f, 1e-9, 1e-12));
+            INFO(std::format("f = {:.4g} Hz onoise: ngspice {:.6e}, native {:.6e}", f,
+                             expected.Result->OutputDensities[i], actual.Result->OutputDensities[i]));
+            REQUIRE(Close(actual.Result->OutputDensities[i], expected.Result->OutputDensities[i], 1e-3, 1e-15));
+            INFO(std::format("f = {:.4g} Hz inoise: ngspice {:.6e}, native {:.6e}", f,
+                             expected.Result->InputDensities[i], actual.Result->InputDensities[i]));
+            REQUIRE(Close(actual.Result->InputDensities[i], expected.Result->InputDensities[i], 1e-3, 1e-15));
+        }
+
+        INFO(std::format("OutputTotal: ngspice {:.6e}, native {:.6e}", expected.Result->OutputTotal,
+                         actual.Result->OutputTotal));
+        REQUIRE(Close(actual.Result->OutputTotal, expected.Result->OutputTotal, 1e-3, 1e-15));
+        INFO(std::format("InputTotal: ngspice {:.6e}, native {:.6e}", expected.Result->InputTotal,
+                         actual.Result->InputTotal));
+        REQUIRE(Close(actual.Result->InputTotal, expected.Result->InputTotal, 1e-3, 1e-15));
+
+        REQUIRE(actual.Result->Contributions.size() == expected.Result->Contributions.size());
+        for (std::size_t c = 0; c < expected.Result->Contributions.size(); ++c) {
+            const Core::NoiseContribution &exp_c = expected.Result->Contributions[c];
+            const auto found =
+                std::ranges::find(actual.Result->Contributions, exp_c.Name, &Core::NoiseContribution::Name);
+            INFO(std::format("contribution {}", exp_c.Name));
+            REQUIRE(found != actual.Result->Contributions.end());
+            INFO(std::format("contribution {} OutputTotal: ngspice {:.6e}, native {:.6e}", exp_c.Name,
+                             exp_c.OutputTotal, found->OutputTotal));
+            REQUIRE(Close(found->OutputTotal, exp_c.OutputTotal, 1e-3, 1e-15));
+            for (std::size_t i = 0; i < expected.Result->Frequencies.size(); ++i) {
+                REQUIRE(Close(found->OutputDensities[i], exp_c.OutputDensities[i], 1e-3, 1e-15));
+            }
+        }
+    };
+
+    SECTION("RC low-pass filter") {
+        Core::VoltageSource vin;
+        vin.SetName("V1");
+        vin.SetSourceType(Core::Source::SourceType::AC);
+        vin.SetAC({.Amplitude = 1.0, .Frequency = 1e3, .Offset = 0.0, .Magnitude = 1.0});
+        Core::Resistor r1;
+        r1.SetName("R1");
+        r1.SetValue(1e3);
+        Core::Capacitor c1;
+        c1.SetName("C1");
+        c1.SetValue(100e-9);
+        Core::Ground ground;
+        Core::Circuit circuit;
+        circuit.Add(vin, {1, 0});
+        circuit.Add(r1, {1, 2});
+        circuit.Add(c1, {2, 0});
+        circuit.Add(ground, {0});
+        check_noise_parity(
+            circuit,
+            {.OutputNode = 2, .InputSource = "V1", .StartFrequency = 10.0, .StopFrequency = 100e3, .PointsPerDecade = 10});
+    }
+
+    SECTION("Inverting ideal op-amp amplifier") {
+        Core::VCC vcc;
+        vcc.SetName("V1");
+        vcc.SetValue(15.0);
+        Core::VoltageSource vee;
+        vee.SetName("V2");
+        vee.SetValue(-15.0);
+        Core::VoltageSource vin;
+        vin.SetName("V3");
+        vin.SetSourceType(Core::Source::SourceType::AC);
+        vin.SetAC({.Amplitude = 1.0, .Frequency = 1e3, .Offset = 0.0, .Magnitude = 1.0});
+        Core::Resistor r1;
+        r1.SetName("R1");
+        r1.SetValue(1e3);
+        Core::Resistor r2;
+        r2.SetName("R2");
+        r2.SetValue(10e3);
+        Core::OpAmp op_amp;
+        op_amp.SetName("U1");
+        Core::Ground ground;
+        Core::Circuit circuit;
+        circuit.Add(vcc, {4});
+        circuit.Add(vee, {5, 0});
+        circuit.Add(vin, {1, 0});
+        circuit.Add(r1, {1, 2});
+        circuit.Add(r2, {2, 3});
+        circuit.Add(op_amp, {3, 0, 2, 4, 5});
+        circuit.Add(ground, {0});
+        check_noise_parity(
+            circuit,
+            {.OutputNode = 3, .InputSource = "V3", .StartFrequency = 10.0, .StopFrequency = 100e3, .PointsPerDecade = 5});
+    }
+
+    SECTION("Common-emitter BJT amplifier") {
+        Core::VCC vcc;
+        vcc.SetName("V1");
+        vcc.SetValue(12.0);
+        Core::VoltageSource vin;
+        vin.SetName("V2");
+        vin.SetSourceType(Core::Source::SourceType::AC);
+        vin.SetAC({.Amplitude = 0.01, .Frequency = 1e3, .Offset = 2.0, .Magnitude = 1.0});
+        Core::Resistor rb;
+        rb.SetName("R1");
+        rb.SetValue(10e3);
+        Core::Resistor rc;
+        rc.SetName("R2");
+        rc.SetValue(2.2e3);
+        Core::Resistor re;
+        re.SetName("R3");
+        re.SetValue(470.0);
+        Core::BJT q1(Core::ComponentType::NPN);
+        q1.SetName("Q1");
+        Core::Ground ground;
+        Core::Circuit circuit;
+        circuit.Add(vcc, {1});
+        circuit.Add(vin, {2, 0});
+        circuit.Add(rb, {2, 3});
+        circuit.Add(rc, {1, 4});
+        circuit.Add(re, {5, 0});
+        circuit.Add(q1, {4, 3, 5});
+        circuit.Add(ground, {0});
+        check_noise_parity(
+            circuit,
+            {.OutputNode = 4, .InputSource = "V2", .StartFrequency = 100.0, .StopFrequency = 1e6, .PointsPerDecade = 5});
+    }
+
+    SECTION("Common-source NMOS amplifier") {
+        Core::VCC vdd;
+        vdd.SetName("V1");
+        vdd.SetValue(10.0);
+        Core::VoltageSource vin;
+        vin.SetName("V2");
+        vin.SetSourceType(Core::Source::SourceType::AC);
+        vin.SetAC({.Amplitude = 0.01, .Frequency = 1e3, .Offset = 3.0, .Magnitude = 1.0});
+        Core::Resistor rd;
+        rd.SetName("R1");
+        rd.SetValue(2e3);
+        Core::MOSFET m1(Core::ComponentType::NMOS);
+        m1.SetName("M1");
+        Core::Ground ground;
+        Core::Circuit circuit;
+        circuit.Add(vdd, {1});
+        circuit.Add(vin, {2, 0});
+        circuit.Add(rd, {1, 3});
+        circuit.Add(m1, {3, 2, 0});
+        circuit.Add(ground, {0});
+        check_noise_parity(
+            circuit,
+            {.OutputNode = 3, .InputSource = "V2", .StartFrequency = 10.0, .StopFrequency = 100e3, .PointsPerDecade = 5});
+    }
+
+    SECTION("Non-inverting uA741 op-amp amplifier") {
+        Core::VCC vcc;
+        vcc.SetName("V1");
+        vcc.SetValue(15.0);
+        Core::VoltageSource vee;
+        vee.SetName("V2");
+        vee.SetValue(-15.0);
+        Core::VoltageSource vin;
+        vin.SetName("V3");
+        vin.SetSourceType(Core::Source::SourceType::AC);
+        vin.SetAC({.Amplitude = 0.1, .Frequency = 1e3, .Offset = 0.0, .Magnitude = 1.0});
+        Core::Resistor r1;
+        r1.SetName("R1");
+        r1.SetValue(1e3);
+        Core::Resistor r2;
+        r2.SetName("R2");
+        r2.SetValue(9e3);
+        Core::OpAmp op_amp;
+        op_amp.SetName("U1");
+        op_amp.SetModel(*Core::FindOpAmpModel(Core::ComponentType::OP_AMP, "uA741"));
+        Core::Ground ground;
+        Core::Circuit circuit;
+        circuit.Add(vcc, {1});
+        circuit.Add(vee, {2, 0});
+        circuit.Add(vin, {3, 0});
+        circuit.Add(r1, {4, 0});
+        circuit.Add(r2, {5, 4});
+        circuit.Add(op_amp, {5, 3, 4, 1, 2});
+        circuit.Add(ground, {0});
+        check_noise_parity(
+            circuit,
+            {.OutputNode = 5, .InputSource = "V3", .StartFrequency = 10.0, .StopFrequency = 100e3, .PointsPerDecade = 5});
+    }
+}
+
+
 
 

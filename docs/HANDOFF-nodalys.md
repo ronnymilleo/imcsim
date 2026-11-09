@@ -3,9 +3,9 @@
 ## Project Context
 `imcsim` includes the clean-room native simulation backend **Nodalys** (a contraction of *nodal analysis* —
 `nodal` + `-lys` from `analysis`, after the Modified Nodal Analysis at the core of the engine).
-It implements **Operating Point (`.op`)**, **DC Sweep (`.dc`)**, **Transient (`.tran`)**,
-**AC Sweep / Bode (`.ac`)**, and **Transfer Function (`.tf`)**. Noise (`.noise`) and event-driven digital
-models are scheduled for the next steps. Users select the backend in the GUI (`"ngspice"` or `"Nodalys"`
+It implements all 6 analog analyses of the engine: **Operating Point (`.op`)**, **DC Sweep (`.dc`)**,
+**Transient (`.tran`)**, **AC Sweep / Bode (`.ac`)**, **Transfer Function (`.tf`)**, and **Noise Analysis (`.noise`)**.
+Event-driven digital models are scheduled for the next step. Users select the backend in the GUI (`"ngspice"` or `"Nodalys"`
 in the `SimulationBackend` preference in `preferences.json`, via `PreferencesWindow`).
 The CMake target is `nodalys` (producing `libnodalys.a`; source code in `app-core/native/`, namespace
 `Core::Native`).
@@ -43,6 +43,7 @@ XDG_RUNTIME_DIR=/tmp TMPDIR=/tmp cmake --build build -j$(nproc) --target imcsim-
    - [`transient_analysis.cpp`](../app-core/native/transient_analysis.cpp): `ComputeTransient`
    - [`ac_analysis.cpp`](../app-core/native/ac_analysis.cpp): `ComputeACSweep`
    - [`tf_analysis.cpp`](../app-core/native/tf_analysis.cpp): `ComputeTransferFunction`
+   - [`noise_analysis.cpp`](../app-core/native/noise_analysis.cpp): `ComputeNoise`
 
 ---
 
@@ -50,6 +51,6 @@ XDG_RUNTIME_DIR=/tmp TMPDIR=/tmp cmake --build build -j$(nproc) --target imcsim-
 1. **Layer 1 — Closed-Form Analytical Goldens ([`tests/reference/`](../tests/reference/README.md), [`tests/native_backend_tests.cpp`](../tests/native_backend_tests.cpp))**:
    - Python generator [`tests/reference/generate_goldens.py`](../tests/reference/generate_goldens.py) and CSV reference tables (`rc_step.csv`, `rl_step.csv`, `rlc_underdamped.csv`, `diode_shockley_dc.csv`, `rc_bode.csv`, `rlc_bode.csv`).
 2. **Layer 2 — Dual-Backend Parity ([`tests/backend_comparison_tests.cpp`](../tests/backend_comparison_tests.cpp))**:
-   - Full parity across `.op`, `.dc`, `.tran`, `.ac`, and `.tf`.
+   - Full parity across `.op`, `.dc`, `.tran`, `.ac`, `.tf`, and `.noise`.
 3. **Layer 3 — All Shipped Examples ([`tests/examples_tests.cpp`](../tests/examples_tests.cpp))**:
    - `Every example either runs on Nodalys or is flagged unsupported` validates all 27 shipped schematics.

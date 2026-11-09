@@ -57,6 +57,8 @@ public:
     double TerminalCurrent(int terminal, const std::vector<double> &x) const override;
     std::complex<double> AcTerminalCurrent(int terminal, const std::vector<double> &x_dc,
                                            const std::vector<std::complex<double>> &x_ac, double omega) const override;
+    double OutputNoiseVariance(const std::vector<double> &x_dc, const std::vector<std::complex<double>> &adjoint,
+                               double frequency_hz) const override;
     bool HasTransientState() const override;
     void AcceptStep(const std::vector<double> &x) override;
     void RejectStep() override;
@@ -108,6 +110,8 @@ public:
     double TerminalCurrent(int terminal, const std::vector<double> &x) const override;
     std::complex<double> AcTerminalCurrent(int terminal, const std::vector<double> &x_dc,
                                            const std::vector<std::complex<double>> &x_ac, double omega) const override;
+    double OutputNoiseVariance(const std::vector<double> &x_dc, const std::vector<std::complex<double>> &adjoint,
+                               double frequency_hz) const override;
     bool HasTransientState() const override;
     void AcceptStep(const std::vector<double> &x) override;
     void RejectStep() override;
@@ -165,6 +169,8 @@ public:
     double TerminalCurrent(int terminal, const std::vector<double> &x) const override;
     std::complex<double> AcTerminalCurrent(int terminal, const std::vector<double> &x_dc,
                                            const std::vector<std::complex<double>> &x_ac, double omega) const override;
+    double OutputNoiseVariance(const std::vector<double> &x_dc, const std::vector<std::complex<double>> &adjoint,
+                               double frequency_hz) const override;
     bool HasTransientState() const override;
     void AcceptStep(const std::vector<double> &x) override;
     void RejectStep() override;

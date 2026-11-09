@@ -34,6 +34,7 @@
 
 #include "native/devices.h"
 
+#include "native/pn_junction.h"
 #include <cmath>
 #include <utility>
 
@@ -77,8 +78,8 @@ void StampCurrentSource(MnaSystem &sys, const int node_a, const int node_b, cons
 // ResistorDevice
 // ============================================================================
 
-ResistorDevice::ResistorDevice(const int node_a, const int node_b, const double resistance)
-    : m_NodeA(node_a), m_NodeB(node_b), m_Conductance(1.0 / resistance) {
+ResistorDevice::ResistorDevice(const int node_a, const int node_b, const double resistance, const bool noisy)
+    : m_NodeA(node_a), m_NodeB(node_b), m_Conductance(1.0 / resistance), m_Noisy(noisy) {
 }
 
 double ResistorDevice::GetResistance() const {
@@ -103,6 +104,16 @@ std::complex<double> ResistorDevice::AcTerminalCurrent(const int terminal, const
                                                        const double /*omega*/) const {
     const std::complex<double> current = m_Conductance * AcBranchVoltage(x_ac, m_NodeA, m_NodeB);
     return terminal == 0 ? current : -current;
+}
+
+double ResistorDevice::OutputNoiseVariance(const std::vector<double> & /*x_dc*/,
+                                           const std::vector<std::complex<double>> &adjoint,
+                                           const double /*frequency_hz*/) const {
+    if (!m_Noisy) {
+        return 0.0;
+    }
+    const std::complex<double> transfer = AcBranchVoltage(adjoint, m_NodeA, m_NodeB);
+    return FOUR_KT_NOMINAL * m_Conductance * std::norm(transfer);
 }
 
 // ============================================================================

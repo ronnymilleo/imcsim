@@ -16,7 +16,7 @@ namespace {
 
 /// The analyses Nodalys runs so far; the rest of the seam returns a clear "not yet".
 constexpr auto NATIVE_ANALYSES = {AnalysisKind::OPERATING_POINT, AnalysisKind::TRANSIENT, AnalysisKind::DC_SWEEP,
-                                  AnalysisKind::AC_SWEEP, AnalysisKind::TRANSFER_FUNCTION};
+                                  AnalysisKind::AC_SWEEP,        AnalysisKind::NOISE,     AnalysisKind::TRANSFER_FUNCTION};
 
 /// Why the logic parts are not runnable yet, one reason for every gate and flip-flop type.
 constexpr const char *DIGITAL_REASON = "Nodalys has no event-driven digital engine yet; the logic parts "
@@ -122,9 +122,14 @@ ACSweepRun NativeBackend::RunACSweep(const Circuit &circuit, const ACSweepSettin
 }
 
 NoiseRun NativeBackend::RunNoise(const Circuit &circuit, const NoiseSettings &settings) {
-    (void)circuit;
-    (void)settings;
-    return {std::unexpected("Nodalys does not run the noise analysis yet"), {}};
+    NoiseRun run;
+    auto compiled = CompileOrFail(circuit);
+    if (!compiled) {
+        run.Result = std::unexpected(compiled.error());
+        return run;
+    }
+    run.Result = Native::ComputeNoise(circuit, *compiled, settings, {}, run.Messages);
+    return run;
 }
 
 TransferFunctionRun NativeBackend::RunTransferFunction(const Circuit &circuit,

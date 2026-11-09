@@ -80,7 +80,7 @@ TEST_CASE("Nodalys names itself and lists what it runs") {
     REQUIRE(capabilities.Analyses.contains(Core::AnalysisKind::TRANSIENT));
     REQUIRE(capabilities.Analyses.contains(Core::AnalysisKind::DC_SWEEP));
     REQUIRE(capabilities.Analyses.contains(Core::AnalysisKind::AC_SWEEP));
-    REQUIRE(!capabilities.Analyses.contains(Core::AnalysisKind::NOISE));
+    REQUIRE(capabilities.Analyses.contains(Core::AnalysisKind::NOISE));
     REQUIRE(capabilities.Analyses.contains(Core::AnalysisKind::TRANSFER_FUNCTION));
 }
 
@@ -459,8 +459,41 @@ TEST_CASE("The transfer function of a divider matches its closed-form gain and i
     REQUIRE_THAT(run.Result->OutputImpedance, WithinRel(750.0, 1e-6));
 }
 
-TEST_CASE("Analyses the native backend lacks fail clearly") {
-    const Divider divider;
+TEST_CASE("The noise analysis of an RC low-pass filter matches the Johnson-Nyquist kT/C integral") {
+    // R = 1 kOhm, C = 1 uF -> f_c = 1 / (2*pi*1e-3) ≈ 159.155 Hz
+    // Low-frequency thermal noise density of 1 kOhm at 300.15 K: sqrt(4 * k * T * R) ≈ 4.07152 nV/sqrt(Hz)
+    // Total integrated RMS noise from 0.1 Hz to 10 MHz approaches sqrt(k * T / C) ≈ 64.375 uV RMS
+    Core::VoltageSource source;
+    source.SetName("V1");
+    source.SetSourceType(Core::Source::SourceType::AC);
+    source.SetAC({.Amplitude = 1.0, .Frequency = 1e3, .Offset = 0.0, .Magnitude = 1.0});
+    Core::Resistor resistor;
+    resistor.SetName("R1");
+    resistor.SetValue(1e3);
+    Core::Capacitor capacitor;
+    capacitor.SetName("C1");
+    capacitor.SetValue(1e-6);
+    Core::Ground ground;
+    Core::Circuit circuit;
+    circuit.Add(source, {1, 0});
+    circuit.Add(resistor, {1, 2});
+    circuit.Add(capacitor, {2, 0});
+    circuit.Add(ground, {0});
+
     Core::NativeBackend backend;
-    REQUIRE(!backend.RunNoise(divider.Circuit, {}).Result.has_value());
+    const Core::NoiseRun run = backend.RunNoise(
+        circuit,
+        {.OutputNode = 2, .InputSource = "V1", .StartFrequency = 0.1, .StopFrequency = 10e6, .PointsPerDecade = 20});
+    REQUIRE(run.Result.has_value());
+    const Core::Noise &noise = *run.Result;
+    REQUIRE(noise.InputUnit == "V");
+    constexpr double k_t = 1.380649e-23 * 300.15;
+    const double expected_low_freq_density = std::sqrt(4.0 * k_t * 1e3);
+    REQUIRE_THAT(noise.OutputDensities.front(), WithinRel(expected_low_freq_density, 1e-5));
+    REQUIRE_THAT(noise.InputDensities.front(), WithinRel(expected_low_freq_density, 1e-5));
+    const double expected_kt_over_c = std::sqrt(k_t / 1e-6);
+    REQUIRE_THAT(noise.OutputTotal, WithinRel(expected_kt_over_c, 1e-3));
+    REQUIRE(noise.Contributions.size() == 1);
+    REQUIRE(noise.Contributions[0].Name == "R1");
+    REQUIRE_THAT(noise.Contributions[0].OutputTotal, WithinRel(noise.OutputTotal, 1e-9));
 }

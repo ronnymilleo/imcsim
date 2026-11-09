@@ -157,7 +157,7 @@ public:
             top_node_map[static_cast<std::size_t>(node)] = node - 1;
         }
 
-        if (const auto result = AddCircuit(m_Circuit, top_node_map, {}); !result) {
+        if (const auto result = AddCircuit(m_Circuit, top_node_map, {}, true); !result) {
             return std::unexpected(result.error());
         }
 
@@ -582,8 +582,8 @@ private:
 
         // G-U1 0 {stage} {in+} {in-} {Transconductance}
         AddDevice(std::make_unique<VccsDevice>(ground, n_stage, nodes[1], nodes[2], figures.Transconductance));
-        // R-U1 {stage} 0 {Resistance}
-        AddDevice(std::make_unique<ResistorDevice>(n_stage, ground, figures.Resistance));
+        // R-U1 {stage} 0 {Resistance} noisy=0
+        AddDevice(std::make_unique<ResistorDevice>(n_stage, ground, figures.Resistance, false));
         // C-U1 {stage} 0 {Capacitance}
         AddDevice(std::make_unique<CapacitorDevice>(n_stage, ground, figures.Capacitance, 0.0, false));
         // D-U1-P {stage} {V+} and D-U1-N {V-} {stage}
@@ -733,7 +733,8 @@ private:
     }
 
     std::expected<void, std::string> AddCircuit(const Circuit &circuit, const std::vector<int> &node_map,
-                                                const Parameters &parameters) {
+                                                const Parameters &parameters,
+                                                const bool record_noise_groups = false) {
         // Insert 0 V current-probe sources for any terminals followed by CCCS/CCVS elements in this circuit
         const auto probes = PlanProbes(circuit);
         if (!probes) {
@@ -754,10 +755,19 @@ private:
         }
 
         for (std::size_t index = 0; index < circuit.GetEntries().size(); ++index) {
+            const std::size_t first_device = m_Result.Devices.size();
             if (const auto result = AddEntry(circuit.GetEntries()[index], circuit, static_cast<int>(index), node_map,
                                              parameters, probe_nodes);
                 !result) {
                 return std::unexpected(result.error());
+            }
+            if (record_noise_groups && m_Result.Devices.size() > first_device &&
+                !circuit.GetEntries()[index].Part->GetName().empty()) {
+                NoiseGroup group{circuit.GetEntries()[index].Part->GetName(), {}};
+                for (std::size_t d = first_device; d < m_Result.Devices.size(); ++d) {
+                    group.Devices.push_back(m_Result.Devices[d].get());
+                }
+                m_Result.NoiseGroups.push_back(std::move(group));
             }
         }
         return {};

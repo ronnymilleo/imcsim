@@ -241,6 +241,23 @@ std::complex<double> DiodeDevice::AcTerminalCurrent(const int terminal, const st
     return terminal == 0 ? current : -current;
 }
 
+double DiodeDevice::OutputNoiseVariance(const std::vector<double> &x_dc,
+                                        const std::vector<std::complex<double>> &adjoint,
+                                        const double /*frequency_hz*/) const {
+    double variance = 0.0;
+    if (m_Internal >= 0 && m_Parameters.SeriesResistance > 0.0) {
+        const std::complex<double> rs_tf = AcNodeVoltage(adjoint, m_Internal) - AcNodeVoltage(adjoint, m_Cathode);
+        variance += (FOUR_KT_NOMINAL / m_Parameters.SeriesResistance) * std::norm(rs_tf);
+    }
+    const double vd = VoltageAt(x_dc);
+    // In SPICE3f5 / ngspice (`dioload.c`), `DIOcurrent` includes the parallel junction `CKTgmin * vd` term (1e-12 S),
+    // which dominates the shot noise of reverse-biased rail-clamping diodes (`dionoise.c`).
+    const double current = Evaluate(vd).Current + 1e-12 * vd;
+    const std::complex<double> j_tf = AcNodeVoltage(adjoint, m_Anode) - AcNodeVoltage(adjoint, m_JunctionNode);
+    variance += TWO_Q * std::fabs(current) * std::norm(j_tf);
+    return variance;
+}
+
 bool DiodeDevice::HasTransientState() const {
     return m_Parameters.JunctionCapacitance > 0.0 || m_Parameters.TransitTime > 0.0;
 }
@@ -530,6 +547,31 @@ void BjtDevice::SeedOperatingPoint(std::vector<double> &x) const {
     }
 }
 
+double BjtDevice::OutputNoiseVariance(const std::vector<double> &x_dc,
+                                      const std::vector<std::complex<double>> &adjoint,
+                                      const double /*frequency_hz*/) const {
+    const BJTParameters &p = m_Parameters;
+    double variance = 0.0;
+    if (m_C != m_Collector && p.CollectorResistance > 0.0) {
+        const std::complex<double> rc_tf = AcNodeVoltage(adjoint, m_Collector) - AcNodeVoltage(adjoint, m_C);
+        variance += (FOUR_KT_NOMINAL / p.CollectorResistance) * std::norm(rc_tf);
+    }
+    if (m_B != m_Base && p.BaseResistance > 0.0) {
+        const std::complex<double> rb_tf = AcNodeVoltage(adjoint, m_Base) - AcNodeVoltage(adjoint, m_B);
+        variance += (FOUR_KT_NOMINAL / p.BaseResistance) * std::norm(rb_tf);
+    }
+    if (m_E != m_Emitter && p.EmitterResistance > 0.0) {
+        const std::complex<double> re_tf = AcNodeVoltage(adjoint, m_Emitter) - AcNodeVoltage(adjoint, m_E);
+        variance += (FOUR_KT_NOMINAL / p.EmitterResistance) * std::norm(re_tf);
+    }
+    const Intrinsic op = EvaluateAt(x_dc);
+    const std::complex<double> ic_tf = AcNodeVoltage(adjoint, m_C) - AcNodeVoltage(adjoint, m_E);
+    const std::complex<double> ib_tf = AcNodeVoltage(adjoint, m_B) - AcNodeVoltage(adjoint, m_E);
+    variance += TWO_Q * std::fabs(op.Ic) * std::norm(ic_tf);
+    variance += TWO_Q * std::fabs(op.Ib) * std::norm(ib_tf);
+    return variance;
+}
+
 bool BjtDevice::HasTransientState() const {
     return m_Parameters.TransitTime > 0.0 || m_Parameters.EmitterCapacitance > 0.0 ||
            m_Parameters.CollectorCapacitance > 0.0;
@@ -771,6 +813,34 @@ std::complex<double> MosfetDevice::AcTerminalCurrent(const int terminal, const s
     default: // Source
         return -(channel_into_drain + diode_into_drain) - igs_ac;
     }
+}
+
+double MosfetDevice::OutputNoiseVariance(const std::vector<double> &x_dc,
+                                         const std::vector<std::complex<double>> &adjoint,
+                                         const double /*frequency_hz*/) const {
+    const MOSFETParameters &p = m_Parameters;
+    double variance = 0.0;
+    if (m_D != m_Drain && p.DrainResistance > 0.0) {
+        const std::complex<double> rd_tf = AcNodeVoltage(adjoint, m_Drain) - AcNodeVoltage(adjoint, m_D);
+        variance += (FOUR_KT_NOMINAL / p.DrainResistance) * std::norm(rd_tf);
+    }
+    if (m_S != m_Source && p.SourceResistance > 0.0) {
+        const std::complex<double> rs_tf = AcNodeVoltage(adjoint, m_Source) - AcNodeVoltage(adjoint, m_S);
+        variance += (FOUR_KT_NOMINAL / p.SourceResistance) * std::norm(rs_tf);
+    }
+    const double pol = m_Pmos ? -1.0 : 1.0;
+    const double vd = NodeVoltage(x_dc, m_D);
+    const double vg = NodeVoltage(x_dc, m_Gate);
+    const double vs = NodeVoltage(x_dc, m_S);
+    const bool reversed = (pol * (vd - vs)) < 0.0;
+    const int d_eff = reversed ? m_S : m_D;
+    const int s_eff = reversed ? m_D : m_S;
+    const double vgs_eff = pol * (vg - NodeVoltage(x_dc, s_eff));
+    const double vds_eff = pol * (NodeVoltage(x_dc, d_eff) - NodeVoltage(x_dc, s_eff));
+    const Channel channel = Evaluate(vgs_eff, vds_eff);
+    const std::complex<double> ch_tf = AcNodeVoltage(adjoint, m_D) - AcNodeVoltage(adjoint, m_S);
+    variance += (2.0 / 3.0) * FOUR_KT_NOMINAL * std::fabs(channel.Gm) * std::norm(ch_tf);
+    return variance;
 }
 
 bool MosfetDevice::Limit(std::vector<double> &x_new, const std::vector<double> &x_old) const {

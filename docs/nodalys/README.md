@@ -19,6 +19,9 @@
 5. **[Small-Signal DC Transfer Function Analysis (`.tf`)](./tf_analysis.md)**
    - Algorithms: Tangent Jacobian $\mathbf{J}(\mathbf{x}_{\text{DC}})$, unit input excitation ($\delta u_{\text{in}} = 1 \implies \text{Gain}, Z_{\text{in}}$), and unit output test current injection ($\delta I_{\text{out}} = 1\text{ A} \implies Z_{\text{out}}$).
    - Benchmark tables: **Analytical Golden vs. `ngspice` vs. `Nodalys`**.
+6. **[Small-Signal AC Noise Analysis (`.noise`)](./noise_analysis.md)**
+   - Algorithms: Transposed complex adjoint solver $\mathbf{Y}(j\omega)^T \boldsymbol{\lambda} = \mathbf{e}_{\text{out}}$, thermal ($4k_BTR, \frac{8}{3}k_BTg_m$) and shot ($2qI$) noise spectral densities, SPICE3f5 log-log power-law integration (`Nintegrate`), and hierarchical component noise grouping.
+   - Benchmark tables: **Analytical Golden vs. `ngspice` vs. `Nodalys`**.
 
 ---
 
@@ -37,6 +40,7 @@
 | [`transient_analysis.cpp`](../../app-core/native/transient_analysis.cpp) | Time-domain Transient simulation (`ComputeTransient`) with Backward Euler / Trapezoidal integration, LTE step control, *breakpoints*, and *Live* mode. |
 | [`ac_analysis.cpp`](../../app-core/native/ac_analysis.cpp) | Frequency-domain Small-Signal AC / Bode sweep (`ComputeACSweep`). |
 | [`tf_analysis.cpp`](../../app-core/native/tf_analysis.cpp) | Small-Signal DC Transfer Function (`ComputeTransferFunction`). |
+| [`noise_analysis.cpp`](../../app-core/native/noise_analysis.cpp) | Small-Signal AC Noise spectral density and integrated RMS analysis (`ComputeNoise`). |
 
 ---
 
@@ -44,7 +48,7 @@
 
 ### 1. Core `imcsim` Analyses (`SimulationBackend` / `simulator.h`)
 
-Out of the **6 solver analyses** in [`SimulationBackend`](../../app-core/simulation/simulation_backend.h) (plus `TruthTable` in [`simulator.h`](../../app-core/simulation/simulator.h)), **5 are fully implemented and verified in `Nodalys`**:
+All **6 analog solver analyses** in [`SimulationBackend`](../../app-core/simulation/simulation_backend.h) are now **fully implemented and verified in `Nodalys`** (plus `TruthTable` in [`simulator.h`](../../app-core/simulation/simulator.h) for transistor/diode logic):
 
 | Analysis (`AnalysisKind`) | SPICE Command | `ngspice` | `Nodalys` | `Nodalys` Implementation & Notes |
 | :--- | :---: | :---: | :---: | :--- |
@@ -53,7 +57,7 @@ Out of the **6 solver analyses** in [`SimulationBackend`](../../app-core/simulat
 | **Transient** | `.tran` | ✅ | ✅ **Ready** | [`transient_analysis.cpp`](../../app-core/native/transient_analysis.cpp) — Trapezoidal + Backward Euler, *breakpoints*, chunk streaming, cancel, and *Live* mode. |
 | **AC Sweep (Bode)** | `.ac` | ✅ | ✅ **Ready** | [`ac_analysis.cpp`](../../app-core/native/ac_analysis.cpp) — DC operating point linearization + complex MNA solver $\mathbf{Y}(j\omega)\mathbf{V} = \mathbf{I}$ (dB & unwrapped phase). |
 | **Transfer Function** | `.tf` | ✅ | ✅ **Ready** | [`tf_analysis.cpp`](../../app-core/native/tf_analysis.cpp) — Small-signal DC gain ($A_v$ or $R_m$), $Z_{\text{in}}$, and $Z_{\text{out}}$. |
-| **Noise Analysis** | `.noise` | ✅ | ❌ **Planned** (`#94`) | [`native_backend.cpp`](../../app-core/native/native_backend.cpp) — Output and input-referred noise spectral density ($\text{V}/\sqrt{\text{Hz}}$), integrated RMS noise, and per-part breakdown (thermal $4kTR$, shot $2qI_D$, and flicker $1/f$). |
+| **Noise Analysis** | `.noise` | ✅ | ✅ **Ready** | [`noise_analysis.cpp`](../../app-core/native/noise_analysis.cpp) — Adjoint complex solver $\mathbf{Y}(j\omega)^T\boldsymbol{\lambda} = \mathbf{e}_{\text{out}}$, output & input-referred spectral density ($\text{V}/\sqrt{\text{Hz}}$), log-log power-law RMS integration, and per-part breakdown. |
 | **Truth Table** | Multiple `.op` | ✅ | 🟡 **Partial** (`#133`) | Runs on `Nodalys` for transistor/diode logic circuits; primitive digital gates (`AND`, `OR`, Flip-Flops) still use `ngspice` (`digital.cm`). |
 
 ---
