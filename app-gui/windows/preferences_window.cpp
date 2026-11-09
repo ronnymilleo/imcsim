@@ -190,6 +190,23 @@ void PreferencesWindow::DrawParts() {
 }
 
 void PreferencesWindow::DrawResults() {
+    if (!BeginSection("Simulation")) {
+        return;
+    }
+    BeginChoice("Backend");
+    if (ImGui::BeginCombo("##simulation_backend", m_Preferences.SimulationBackend.c_str())) {
+        if (ImGui::Selectable("ngspice", m_Preferences.SimulationBackend == "ngspice")) {
+            m_Preferences.SimulationBackend = "ngspice";
+        }
+        ImGui::SetItemTooltip("The reference simulator, ngspice, as a shared library");
+        if (ImGui::Selectable("native", m_Preferences.SimulationBackend == "native")) {
+            m_Preferences.SimulationBackend = "native";
+        }
+        ImGui::SetItemTooltip("The built-in solver of imcsim; it runs the operating point, the transient and the DC "
+                              "sweep, without the logic parts for now");
+        ImGui::EndCombo();
+    }
+    ImGui::EndTable();
     if (!BeginSection("Results")) {
         return;
     }

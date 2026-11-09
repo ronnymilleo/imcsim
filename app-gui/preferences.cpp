@@ -139,6 +139,7 @@ std::string SavePreferences(const Preferences &preferences) {
         {"live_effects", live_effects},
         {"value_series", Core::GetSeriesName(preferences.ValueSeries)},
         {"bring_output_to_front", preferences.BringOutputToFront},
+        {"simulation_backend", preferences.SimulationBackend},
         {"rerun_on_edit", preferences.RerunOnEdit},
         {"rerun_delay_seconds", preferences.RerunDelaySeconds},
     };
@@ -210,6 +211,13 @@ LoadedPreferences LoadPreferences(const std::string_view text) {
     });
     reader.Read<bool>("bring_output_to_front", Type::boolean, [&choices](const bool on) {
         choices.BringOutputToFront = on;
+        return true;
+    });
+    reader.Read<std::string>("simulation_backend", Type::string, [&choices](const std::string &name) {
+        if (name != "ngspice" && name != "native") {
+            return false;
+        }
+        choices.SimulationBackend = name;
         return true;
     });
     reader.Read<bool>("rerun_on_edit", Type::boolean, [&choices](const bool on) {

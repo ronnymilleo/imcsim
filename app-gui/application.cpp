@@ -14,6 +14,7 @@
 #include "imgui_impl_sdlgpu3.h"
 #include "imgui_internal.h"
 #include "implot.h"
+#include "native/native_backend.h"
 #include "ngspice/ngspice_library.h"
 #include "simulation/simulator.h"
 #include <SDL3/SDL.h>
@@ -256,13 +257,18 @@ void Application::LoadPreferencesFile() {
 
 /**
  * @brief   The theme is global to ImGui, so it follows the preferences here; the windows read the other choices
- *          themselves.
+ *          themselves; the simulation backend follows here too, switched only when it changed.
  * @details Writing only when something changed keeps the file untouched frame after frame, and a failed write is logged
  *          once.
  */
 void Application::ApplyPreferences() {
     if (const std::optional<std::size_t> theme = FindTheme(m_Preferences.Theme); theme && *theme != GetThemeIndex()) {
         SetTheme(*theme);
+    }
+    const std::string_view wanted_backend = m_Preferences.SimulationBackend;
+    if (wanted_backend != Core::GetBackend().GetName()) {
+        // SetBackend is safe while no simulation runs; ApplyPreferences runs on the frame thread between runs
+        Core::SetBackend(wanted_backend == "native" ? std::make_unique<Core::NativeBackend>() : nullptr);
     }
     if (m_Preferences == m_SavedPreferences) {
         return;
