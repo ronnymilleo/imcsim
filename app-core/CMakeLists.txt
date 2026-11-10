@@ -35,9 +35,9 @@ add_library(imcsim-core-lib
             components/voltage_source.cpp
             model/circuit.cpp
             model/library_model.cpp
-            native/compiler.cpp
-            native/model_parser.cpp
-            native/native_backend.cpp
+            nodalys/compiler.cpp
+            nodalys/model_parser.cpp
+            nodalys/nodalys_backend.cpp
             ngspice/ngspice_backend.cpp
             ngspice/ngspice_library.cpp
             ngspice/ngspice_readers.cpp

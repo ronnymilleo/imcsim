@@ -15,8 +15,8 @@
 #include "digital_models.h"
 #include "document/examples.h"
 #include "document/schematic.h"
-#include "native/native_backend.h"
 #include "ngspice/ngspice_library.h"
+#include "nodalys/nodalys_backend.h"
 #include "plots/logic_trace.h"
 #include "plots/spectrum.h"
 #include "plots/trace_math.h"
@@ -121,7 +121,7 @@ TEST_CASE("Every example opens without warnings, measures existing traces and ru
 }
 
 TEST_CASE("Every example either runs on Nodalys or is flagged unsupported", "[examples]") {
-    Core::NativeBackend nodalys;
+    Core::NodalysBackend nodalys;
     for (const GUI::Example &example : GUI::GetExamples()) {
         INFO(example.Title);
         GUI::Schematic schematic;

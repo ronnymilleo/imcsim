@@ -1,8 +1,8 @@
 # Small-Signal DC Transfer Function Analysis (`.tf`)
 
 **Implementation files:**
-- [`app-core/native/tf_analysis.cpp`](../../app-core/native/tf_analysis.cpp) (`ComputeTransferFunction`)
-- [`app-core/native/native_backend.cpp`](../../app-core/native/native_backend.cpp) (`NativeBackend::RunTransferFunction`)
+- [`nodalys/src/analyses/tf_analysis.cpp`](../../nodalys/src/analyses/tf_analysis.cpp) (`ComputeTransferFunction`)
+- [`app-core/nodalys/nodalys_backend.cpp`](../../app-core/nodalys/nodalys_backend.cpp) (`NodalysBackend::RunTransferFunction`)
 - [`tests/backend_comparison_tests.cpp`](../../tests/backend_comparison_tests.cpp) (`Both backends agree on the small-signal DC transfer function`)
 
 ---

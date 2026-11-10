@@ -1,6 +1,6 @@
 /**
  * @file    controlled_sources_tests.cpp
- * @brief   Theory checks for the native controlled sources: the VCVS, VCCS, CCCS and CCVS against
+ * @brief   Theory checks for the Nodalys controlled sources: the VCVS, VCCS, CCCS and CCVS against
  *          hand-computed gains.
  */
 
@@ -9,7 +9,7 @@
 #include "components/resistor.h"
 #include "components/vcc.h"
 #include "model/circuit.h"
-#include "native/native_backend.h"
+#include "nodalys/nodalys_backend.h"
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 
@@ -47,7 +47,7 @@ TEST_CASE("A VCVS multiplies the controlling voltage") {
     circuit.Add(load, {2, 0});
     circuit.Add(ground, {0});
 
-    Core::NativeBackend backend;
+    Core::NodalysBackend backend;
     const Core::OperatingPointRun run = backend.RunOperatingPoint(circuit);
     REQUIRE(run.Result.has_value());
     REQUIRE_THAT(run.Result->NodeVoltages[2], WithinRel(6.0, 1e-5));
@@ -71,7 +71,7 @@ TEST_CASE("A VCCS drives a current proportional to the controlling voltage") {
     circuit.Add(load, {2, 0});
     circuit.Add(ground, {0});
 
-    Core::NativeBackend backend;
+    Core::NodalysBackend backend;
     const Core::OperatingPointRun run = backend.RunOperatingPoint(circuit);
     REQUIRE(run.Result.has_value());
     REQUIRE_THAT(run.Result->NodeVoltages[2], WithinRel(-20.0, 1e-5));
@@ -100,7 +100,7 @@ TEST_CASE("A CCCS follows the current of a sense resistor") {
     circuit.Add(load, {2, 0});
     circuit.Add(ground, {0});
 
-    Core::NativeBackend backend;
+    Core::NodalysBackend backend;
     const Core::OperatingPointRun run = backend.RunOperatingPoint(circuit);
     REQUIRE(run.Result.has_value());
     REQUIRE_THAT(CurrentOf(*run.Result, "RS"), WithinRel(50e-3, 1e-5));
@@ -130,7 +130,7 @@ TEST_CASE("A CCVS converts a sense current to a voltage") {
     circuit.Add(load, {2, 0});
     circuit.Add(ground, {0});
 
-    Core::NativeBackend backend;
+    Core::NodalysBackend backend;
     const Core::OperatingPointRun run = backend.RunOperatingPoint(circuit);
     REQUIRE(run.Result.has_value());
     REQUIRE_THAT(run.Result->NodeVoltages[2], WithinRel(20.0, 1e-5));

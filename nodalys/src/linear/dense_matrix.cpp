@@ -1,7 +1,6 @@
 /**
  * @file    dense_matrix.cpp
- * @brief   Dense matrix with LU factorization and forward/back substitution, for the equation system of the native
- *          solver.
+ * @brief   Dense matrix with LU factorization and forward/back substitution, for the equation system of Nodalys.
  */
 
 #include "linear/dense_matrix.h"

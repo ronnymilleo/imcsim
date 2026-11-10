@@ -1,7 +1,6 @@
 /**
  * @file    dense_matrix.h
- * @brief   Dense matrix with LU factorization and forward/back substitution, for the equation system of the native
- *          solver.
+ * @brief   Dense matrix with LU factorization and forward/back substitution, for the equation system of Nodalys.
  * @details Algorithm: LU decomposition with partial pivoting (row permutation), then one forward and one backward
  *          substitution, as in Vlach & Singhal, "Computer Methods for Circuit Analysis and Design", chapter on the
  *          solution of linear equations. Partial pivoting keeps the error growth bounded for the diagonally weak

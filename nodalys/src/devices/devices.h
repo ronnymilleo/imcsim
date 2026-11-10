@@ -1,6 +1,6 @@
 /**
  * @file    devices.h
- * @brief   The devices the native solver stamps into the MNA system: one class per element kind, each computing the
+ * @brief   The devices Nodalys stamps into the MNA system: one class per element kind, each computing the
  *          currents and the linearized companion model of its physics.
  * @details The stamp conventions follow the modified nodal analysis of Vlach & Singhal, "Computer Methods for Circuit
  *          Analysis and Design", and the companion models of Chua & Lin, "Computer-Aided Analysis of Electronic

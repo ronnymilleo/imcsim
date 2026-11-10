@@ -6,6 +6,7 @@ add_library(nodalys STATIC
     src/analyses/ac_analysis.cpp
     src/analyses/dc_analysis.cpp
     src/analyses/noise_analysis.cpp
+    src/analyses/sp_analysis.cpp
     src/analyses/tf_analysis.cpp
     src/analyses/transient_analysis.cpp
     src/api/circuit.cpp

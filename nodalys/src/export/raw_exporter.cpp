@@ -204,4 +204,40 @@ std::string ExportRaw(const AcSweepResult &result, std::string_view title) {
     return ss.str();
 }
 
+std::string ExportRaw(const SParameterResult &result, std::string_view title) {
+    std::ostringstream ss;
+    ss << "Title: " << title << "\n";
+    ss << "Date: " << CurrentDateString() << "\n";
+    ss << "Plotname: S-Parameter Analysis\n";
+    ss << "Flags: complex\n";
+
+    const int ports = result.GetPortCount();
+    const std::size_t num_vars = 1 + static_cast<std::size_t>(ports * ports);
+    const std::size_t num_points = result.Frequencies.size();
+
+    ss << "No. Variables: " << num_vars << "\n";
+    ss << "No. Points: " << num_points << "\n";
+    ss << "Variables:\n";
+
+    std::size_t var_idx = 0;
+    ss << "\t" << var_idx++ << "\tfrequency\tfrequency\n";
+    for (int i = 1; i <= ports; ++i) {
+        for (int j = 1; j <= ports; ++j) {
+            ss << "\t" << var_idx++ << "\ts_" << i << "_" << j << "\tS-parameter\n";
+        }
+    }
+
+    ss << "Values:\n";
+    for (std::size_t pt = 0; pt < num_points; ++pt) {
+        ss << pt << "\t" << std::format("{:.15e},{:.15e}\n", result.Frequencies[pt], 0.0);
+        for (int i = 1; i <= ports; ++i) {
+            for (int j = 1; j <= ports; ++j) {
+                const auto s = result.Get(pt, i, j);
+                ss << "\t" << std::format("{:.15e},{:.15e}\n", s.real(), s.imag());
+            }
+        }
+    }
+    return ss.str();
+}
+
 } // namespace nodalys

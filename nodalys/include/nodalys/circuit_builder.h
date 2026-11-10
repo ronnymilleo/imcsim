@@ -32,6 +32,8 @@ public:
     // Node & Reference Management
     void SetCircuitNodeCount(int count);
     NodeId AddNode();
+    void AddPort(int number, NodeId node, double reference_ohms = 50.0);
+    void AddPort(const CircuitPort &port);
 
     // Passive Linear Elements
     void AddResistor(std::string name, NodeId n1, NodeId n2, double resistance_ohms, double temp_c = 27.0);

@@ -1,6 +1,6 @@
 /**
  * @file    nonlinear.h
- * @brief   Nonlinear semiconductor devices of the native solver: diodes (`DiodeDevice`), bipolar junction transistors
+ * @brief   Nonlinear semiconductor devices of Nodalys: diodes (`DiodeDevice`), bipolar junction transistors
  *          (`BjtDevice`, Gummel-Poon model), and MOSFETs (`MosfetDevice`, Shichman-Hodges level-1 model).
  * @details
  * ### How Nonlinear Devices Are Solved in MNA

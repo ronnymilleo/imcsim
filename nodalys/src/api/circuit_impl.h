@@ -22,6 +22,7 @@ public:
     int NodeCount() const { return m_Compiled.CircuitNodeCount; }
     int UnknownCount() const { return m_Compiled.System ? m_Compiled.System->Size() : 0; }
     bool HasInitialConditions() const { return m_Compiled.HasInitialConditions; }
+    const std::vector<CircuitPort> &Ports() const { return m_Compiled.Ports; }
 
 private:
     CompiledCircuit m_Compiled;

@@ -57,6 +57,7 @@ struct CompiledCircuit {
     std::vector<bool> DynamicNode;
     std::map<std::string, Device *> SourcesByName;
     std::map<std::string, Device *> ElementsByName;
+    std::vector<CircuitPort> Ports;
     bool HasInitialConditions = false;
 };
 

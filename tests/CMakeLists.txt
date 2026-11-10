@@ -41,7 +41,7 @@ add_executable(imcsim-tests
             controlled_sources_tests.cpp
             monte_carlo_results_tests.cpp
             monte_carlo_tests.cpp
-            native_backend_tests.cpp
+            nodalys_backend_tests.cpp
             nonlinear_tests.cpp
             op_amp_tests.cpp
             switches_tests.cpp

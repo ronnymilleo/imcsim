@@ -65,4 +65,13 @@ std::expected<NoiseResult, std::string> ComputeNoise(
     return ComputeNoise(impl.Compiled(), config, options, messages);
 }
 
+std::expected<SParameterResult, std::string> ComputeSParameters(
+    const Circuit &circuit,
+    const SParameterConfig &config,
+    const ConvergenceOptions &options,
+    std::vector<DiagnosticMessage> *messages) {
+    auto &impl = const_cast<Circuit &>(circuit).Impl();
+    return ComputeSParameters(impl.Compiled(), config, options, messages);
+}
+
 } // namespace nodalys

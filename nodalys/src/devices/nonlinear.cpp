@@ -1,6 +1,6 @@
 /**
  * @file    nonlinear.cpp
- * @brief   Nonlinear semiconductor devices of the native solver: diodes, bipolar transistors (Gummel-Poon), and
+ * @brief   Nonlinear semiconductor devices of Nodalys: diodes, bipolar transistors (Gummel-Poon), and
  *          level-1 MOSFETs (Shichman-Hodges).
  */
 

@@ -1,6 +1,6 @@
 /**
  * @file    newton.cpp
- * @brief   Newton-Raphson driver of the native solver: the iteration loop, its convergence test, and the homotopy
+ * @brief   Newton-Raphson driver of Nodalys: the iteration loop, its convergence test, and the homotopy
  *          fallback strategies (`gmin stepping` and `source stepping`).
  * @details
  * ### How the Newton-Raphson Loop Works (`RunNewton`)

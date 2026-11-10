@@ -3,7 +3,7 @@
  * @brief   Single-pass circuit compiler: translates a `Core::Circuit` into an autonomous `nodalys::Circuit`.
  */
 
-#include "native/compiler.h"
+#include "nodalys/compiler.h"
 
 #include "components/bjt.h"
 #include "components/clock.h"
@@ -21,7 +21,7 @@
 #include "components/transformer.h"
 #include "components/voltage_controlled_switch.h"
 #include "model/subcircuit.h"
-#include "native/model_parser.h"
+#include "nodalys/model_parser.h"
 #include "spice/spice_library.h"
 #include "spice/spice_value.h"
 #include <algorithm>
@@ -30,7 +30,7 @@
 #include <map>
 #include <set>
 
-namespace Core::Native {
+namespace Core {
 
 namespace {
 
@@ -107,8 +107,8 @@ std::expected<double, std::string> EffectiveValue(const Component &part, const P
     if (const std::optional<double> parsed = ParseSpiceNumber(text)) {
         return *parsed;
     }
-    return std::unexpected(std::format("{} uses the value expression {}, which the native backend cannot evaluate",
-                                       part.GetName(), *expression));
+    return std::unexpected(
+        std::format("{} uses the value expression {}, which Nodalys cannot evaluate", part.GetName(), *expression));
 }
 
 nodalys::SmoothLogicParameters MakeLogicParams(const LogicPart &part) {
@@ -156,6 +156,10 @@ public:
 
         if (const auto result = AddCircuit(m_Circuit, top_node_map, {}); !result) {
             return std::unexpected(result.error());
+        }
+
+        for (const auto &port : m_Circuit.GetPorts()) {
+            m_Builder->AddPort(port.Number, port.Node, port.ReferenceOhms);
         }
 
         return m_Builder->Build();
@@ -604,4 +608,4 @@ std::expected<nodalys::Circuit, std::string> CompileCircuit(const Circuit &circu
     return CircuitCompiler(circuit).Compile();
 }
 
-} // namespace Core::Native
+} // namespace Core

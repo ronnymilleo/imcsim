@@ -89,7 +89,7 @@ std::expected<OperatingPointResult, std::string> ComputeOperatingPoint(
     SeedOperatingPoint(compiled.Devices, x);
     const NewtonOutcome outcome = SolveNewton(*compiled.System, compiled.Devices, x, TimeContext{}, options);
     if (!outcome.Converged) {
-        return std::unexpected("The native solver found no operating point; the circuit may have no DC path to "
+        return std::unexpected("Nodalys found no operating point; the circuit may have no DC path to "
                                "ground or need initial conditions");
     }
     DescribeOutcome(outcome, "operating point", messages);

@@ -16,7 +16,7 @@ namespace nodalys {
 /**
  * @class   SmoothLogicDevice
  * @brief   An infinitely differentiable C^inf smooth logic gate device for continuous MNA simulation.
- * @details Solves logic gates natively within the continuous analog Newton-Raphson solver without code models or
+ * @details Solves logic gates directly within the continuous analog Newton-Raphson solver without code models or
  *          discontinuous events. Supports configurable threshold, transition width, inertial delay, and output
  * resistance.
  */

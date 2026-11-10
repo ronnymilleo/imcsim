@@ -1,6 +1,6 @@
 /**
- * @file    native_backend_tests.cpp
- * @brief   Tests for the native simulation backend: its capabilities, the sign conventions of its results and the
+ * @file    nodalys_backend_tests.cpp
+ * @brief   Tests for the Nodalys simulation backend: its capabilities, the sign conventions of its results and the
  *          operating point, DC sweep and transient against hand-checked theory.
  * @details The reference values are analytic: the divider rule, the RC/RL exponential responses and the sign
  *          conventions documented in simulation_results.h. Each case cites the computation it checks.
@@ -19,7 +19,7 @@
 #include "components/vcc.h"
 #include "components/voltage_source.h"
 #include "model/subcircuit.h"
-#include "native/native_backend.h"
+#include "nodalys/nodalys_backend.h"
 #include "simulation/simulation_backend.h"
 #include "simulation/simulator.h"
 #include <algorithm>
@@ -76,7 +76,7 @@ Core::Transient RunTransient(Core::SimulationBackend &backend, const Core::Circu
 } // namespace
 
 TEST_CASE("Nodalys names itself and lists what it runs") {
-    const Core::NativeBackend backend;
+    const Core::NodalysBackend backend;
     REQUIRE(backend.GetName() == "Nodalys");
     const Core::BackendCapabilities &capabilities = backend.GetCapabilities();
     REQUIRE(capabilities.Analyses.contains(Core::AnalysisKind::OPERATING_POINT));
@@ -87,8 +87,8 @@ TEST_CASE("Nodalys names itself and lists what it runs") {
     REQUIRE(capabilities.Analyses.contains(Core::AnalysisKind::TRANSFER_FUNCTION));
 }
 
-TEST_CASE("The native backend reports logic parts and analog parts as supported") {
-    const Core::NativeBackend backend;
+TEST_CASE("The Nodalys backend reports logic parts and analog parts as supported") {
+    const Core::NodalysBackend backend;
     const std::optional<std::string> gate = Core::FindUnsupported(
         backend, std::set<Core::ComponentType>{Core::ComponentType::AND}, Core::AnalysisKind::OPERATING_POINT);
     REQUIRE(!gate.has_value());
@@ -108,7 +108,7 @@ TEST_CASE("The native backend reports logic parts and analog parts as supported"
 
 TEST_CASE("The operating point of a divider follows the divider rule") {
     const Divider divider;
-    Core::NativeBackend backend;
+    Core::NodalysBackend backend;
     const Core::OperatingPointRun run = backend.RunOperatingPoint(divider.Circuit);
     REQUIRE(run.Result.has_value());
     REQUIRE_THAT(run.Result->NodeVoltages[2], WithinRel(7.5, 1e-5));
@@ -139,7 +139,7 @@ TEST_CASE("A capacitor is open and an inductor is a short at the operating point
     circuit.Add(shunt, {2, 0});
     circuit.Add(inductor, {2, 3});
     circuit.Add(ground, {0});
-    Core::NativeBackend backend;
+    Core::NodalysBackend backend;
     const Core::OperatingPointRun run = backend.RunOperatingPoint(circuit);
     REQUIRE(run.Result.has_value());
     // With the capacitor open no current flows, so the inductor drops no voltage
@@ -149,7 +149,7 @@ TEST_CASE("A capacitor is open and an inductor is a short at the operating point
 
 TEST_CASE("The DC sweep of a divider scales the operating point") {
     const Divider divider;
-    Core::NativeBackend backend;
+    Core::NodalysBackend backend;
     const Core::DCSweepRun run = backend.RunDCSweep(
         divider.Circuit, {.Swept = {.Source = "V1", .Start = 0.0, .Stop = 5.0, .Step = 1.0}}, std::nullopt);
     REQUIRE(run.Result.has_value());
@@ -189,7 +189,7 @@ TEST_CASE("The transient of an RC circuit follows the exponential charge curve")
     circuit.Add(capacitor, {2, 0});
     circuit.Add(ground, {0});
 
-    Core::NativeBackend backend;
+    Core::NodalysBackend backend;
     const Core::Transient result = RunTransient(backend, circuit, /*stop=*/5e-3, /*step=*/5e-6);
     REQUIRE(result.IsComplete);
     // Theory: v(t) = 5 V (1 − e^(−t/RC)) with RC = 1 ms
@@ -236,7 +236,7 @@ TEST_CASE("The transient of an RL circuit follows the exponential current curve"
     circuit.Add(inductor, {2, 0});
     circuit.Add(ground, {0});
 
-    Core::NativeBackend backend;
+    Core::NodalysBackend backend;
     const Core::Transient result = RunTransient(backend, circuit, /*stop=*/1e-3, /*step=*/1e-6);
     REQUIRE(result.IsComplete);
     // Theory: i(t) = V/R (1 − e^(−tR/L)) with L/R = 100 us. The first integration step starts with backward Euler
@@ -269,7 +269,7 @@ TEST_CASE("A sine source gives the sine amplitude in a transient") {
     circuit.Add(resistor, {1, 0});
     circuit.Add(ground, {0});
 
-    Core::NativeBackend backend;
+    Core::NodalysBackend backend;
     const Core::Transient result = RunTransient(backend, circuit, /*stop=*/2e-3, /*step=*/5e-6);
     REQUIRE(result.IsComplete);
     // Steady state on the resistor: v(t) = offset + amplitude sin(2π f t)
@@ -294,7 +294,7 @@ TEST_CASE("A transient with initial conditions starts from them (uic)") {
     circuit.Add(resistor, {1, 0});
     circuit.Add(ground, {0});
 
-    Core::NativeBackend backend;
+    Core::NodalysBackend backend;
     const Core::TransientRun run =
         backend.RunTransient(circuit, {.StopTime = 5e-3, .TimeStep = 5e-6}, std::nullopt, {});
     REQUIRE(run.Result.has_value());
@@ -311,7 +311,7 @@ TEST_CASE("A transient with initial conditions starts from them (uic)") {
 
 TEST_CASE("A stopped transient returns what it made, incomplete") {
     const Divider divider;
-    Core::NativeBackend backend;
+    Core::NodalysBackend backend;
     Core::RunControl control;
     std::size_t chunks = 0;
     const Core::RunMonitor monitor{
@@ -349,7 +349,7 @@ TEST_CASE("A potentiometer reads its three terminal currents") {
     circuit.Add(load, {2, 0});
     circuit.Add(ground, {0});
 
-    Core::NativeBackend backend;
+    Core::NodalysBackend backend;
     const Core::OperatingPointRun run = backend.RunOperatingPoint(circuit);
     REQUIRE(run.Result.has_value());
     // The track splits into 1k (end A to wiper) and 3k (wiper to end B); the wiper loaded by 1k to ground sits
@@ -395,14 +395,14 @@ TEST_CASE("A subcircuit instance flattens with its parameters") {
     circuit.Add(instance, {1, 2});
     circuit.Add(ground, {0});
 
-    Core::NativeBackend backend;
+    Core::NodalysBackend backend;
     const Core::OperatingPointRun run = backend.RunOperatingPoint(circuit);
     REQUIRE(run.Result.has_value());
     // 12 V over 1k (default top) and 3k (parameter): the output sits at 9 V
     REQUIRE_THAT(run.Result->NodeVoltages[2], WithinRel(9.0, 1e-5));
 }
 
-TEST_CASE("A circuit with a digital part simulates its operating point natively") {
+TEST_CASE("A circuit with a digital part simulates its operating point on Nodalys") {
     Core::VCC supply;
     supply.SetName("V1");
     supply.SetValue(5.0);
@@ -413,7 +413,7 @@ TEST_CASE("A circuit with a digital part simulates its operating point natively"
     circuit.Add(supply, {1});
     circuit.Add(gate, {1, 1, 2});
     circuit.Add(ground, {0});
-    Core::NativeBackend backend;
+    Core::NodalysBackend backend;
     const Core::OperatingPointRun run = backend.RunOperatingPoint(circuit);
     REQUIRE(run.Result.has_value());
     REQUIRE(run.Result->NodeVoltages.size() >= 3);
@@ -439,7 +439,7 @@ TEST_CASE("The AC sweep of an RC low-pass filter hits -3 dB and -45 deg at the c
     circuit.Add(capacitor, {2, 0});
     circuit.Add(ground, {0});
 
-    Core::NativeBackend backend;
+    Core::NodalysBackend backend;
     const Core::ACSweepRun run = backend.RunACSweep(
         circuit, {.StartFrequency = 10.0, .StopFrequency = 100e3, .PointsPerDecade = 10}, std::nullopt);
     REQUIRE(run.Result.has_value());
@@ -453,7 +453,7 @@ TEST_CASE("The AC sweep of an RC low-pass filter hits -3 dB and -45 deg at the c
 
 TEST_CASE("The transfer function of a divider matches its closed-form gain and impedances") {
     const Divider divider;
-    Core::NativeBackend backend;
+    Core::NodalysBackend backend;
     const Core::TransferFunctionRun run =
         backend.RunTransferFunction(divider.Circuit, {.OutputNode = 2, .InputSource = "V1"});
     REQUIRE(run.Result.has_value());
@@ -485,7 +485,7 @@ TEST_CASE("The noise analysis of an RC low-pass filter matches the Johnson-Nyqui
     circuit.Add(capacitor, {2, 0});
     circuit.Add(ground, {0});
 
-    Core::NativeBackend backend;
+    Core::NodalysBackend backend;
     const Core::NoiseRun run = backend.RunNoise(
         circuit,
         {.OutputNode = 2, .InputSource = "V1", .StartFrequency = 0.1, .StopFrequency = 10e6, .PointsPerDecade = 20});
@@ -503,7 +503,7 @@ TEST_CASE("The noise analysis of an RC low-pass filter matches the Johnson-Nyqui
     REQUIRE_THAT(noise.Contributions[0].OutputTotal, WithinRel(noise.OutputTotal, 1e-9));
 }
 
-TEST_CASE("A D flip-flop with QN fed back runs on Nodalys", "[native]") {
+TEST_CASE("A D flip-flop with QN fed back runs on Nodalys", "[nodalys]") {
     Core::LogicPart dff(Core::ComponentType::D_FLIP_FLOP);
     dff.SetName("U1");
     Core::Clock clk;
@@ -513,19 +513,19 @@ TEST_CASE("A D flip-flop with QN fed back runs on Nodalys", "[native]") {
     circuit.Add(clk, {2, 0});
     circuit.Add(dff, {1, 2, 3, 4, 5, 1});
     circuit.Add(gnd, {0});
-    Core::NativeBackend backend;
+    Core::NodalysBackend backend;
     auto op = backend.RunOperatingPoint(circuit);
     const std::string msg = op.Result.has_value() ? std::string("OK") : op.Result.error();
     INFO(msg);
     CHECK(op.Result.has_value());
 }
 
-TEST_CASE("The native backend computes digital truth tables directly", "[native][digital]") {
+TEST_CASE("The Nodalys backend computes digital truth tables directly", "[nodalys][digital]") {
     struct BackendRestorer {
         ~BackendRestorer() { Core::SetBackend(nullptr); }
     } restorer;
 
-    Core::SetBackend(std::make_unique<Core::NativeBackend>());
+    Core::SetBackend(std::make_unique<Core::NodalysBackend>());
     REQUIRE(Core::GetBackend().GetName() == "Nodalys");
 
     Core::LogicInput input_a;

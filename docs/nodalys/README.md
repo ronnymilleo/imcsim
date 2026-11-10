@@ -1,6 +1,6 @@
 # **Nodalys** Technical Documentation
 
-**Nodalys** (a contraction of ***nodal** ana**lys**is*) is the clean-room C++23 circuit simulation engine of `imcsim`. It is structured as an autonomous, self-contained library (`nodalys/`) with zero external dependencies, accompanied by a standalone CLI executable (`nodalys`) and an integration bridge connecting it directly into `imcsim` (`app-core/native/`).
+**Nodalys** (a contraction of ***nodal** ana**lys**is*) is the clean-room C++23 circuit simulation engine of `imcsim`. It is structured as an autonomous, self-contained library (`nodalys/`) with zero external dependencies, accompanied by a standalone CLI executable (`nodalys`) and an integration bridge connecting it directly into `imcsim` (`app-core/nodalys/`).
 
 ---
 
@@ -22,6 +22,9 @@
 6. **[Small-Signal AC Noise Analysis (`.noise`)](./noise_analysis.md)**
    - Algorithms: Transposed complex adjoint solver $\mathbf{Y}(j\omega)^T \lambda = \mathbf{e}_{\text{out}}$, thermal ($4k_BTR, \frac{8}{3}k_BTg_m$) and shot ($2qI$) noise spectral densities, SPICE3f5 log-log power-law integration (`Nintegrate`), and hierarchical component noise grouping.
    - Benchmark tables: **Analytical Golden vs. `ngspice` vs. `Nodalys`**.
+7. **[Small-Signal S-Parameter Analysis (`.sp`)](./s_parameters.md)**
+   - Algorithms: Multiport power wave formulation, Norton port excitation ($I_{s,j} = 2\sqrt{G_j}$), single-LU multi-RHS factorization, and derived RF figures of merit (Return Loss, Insertion Loss, VSWR, Input Impedance, Touchstone export).
+   - Benchmark tables: **Analytical Golden vs. `ngspice` vs. `Nodalys`**.
 
 ---
 
@@ -36,41 +39,41 @@
 │   │   └── circuit_builder.h          Fluent CircuitBuilder for components & models
 │   └── src/
 │       ├── api/                       CircuitBuilder implementation and Circuit internals
-│       ├── analyses/                  Solvers: .op, .dc, .tran, .ac, .tf, .noise
+│       ├── analyses/                  Solvers: .op, .dc, .tran, .ac, .tf, .noise, .sp
 │       ├── bridge/                    LogicBridge: Verilog discrete-to-analog co-simulation
 │       ├── cli/                       Standalone CLI binary entry point (`nodalys`)
 │       ├── compiler/                  CompiledCircuit internal representation
 │       ├── devices/                   Passive, source, semiconductor, and smooth logic models
-│       ├── export/                    CSV, JSON, and SPICE Raw multi-format exporters
+│       ├── export/                    CSV, JSON, SPICE Raw, and Touchstone multi-format exporters
 │       ├── linear/                    BasicDenseMatrix (LU, row equilibration, iterative refinement)
 │       ├── mna/                       MnaSystem (real and complex matrix assembly)
 │       ├── newton/                    Damped Newton-Raphson, Gmin/Source stepping
 │       └── parser/                    SPICE netlist lexer, parser, and engineering unit evaluator
-└── app-core/native/                   imcsim Integration Bridge
+└── app-core/nodalys/                  imcsim Integration Bridge
     ├── compiler.h / .cpp              Translates Core::Circuit to nodalys::Circuit
-    └── native_backend.h / .cpp        Core::SimulationBackend implementation (NativeBackend)
+    └── nodalys_backend.h / .cpp       Core::SimulationBackend implementation (NodalysBackend)
 ```
 
 ### 1. Autonomous Engine Modules (`nodalys/`)
 
 | Module / Directory | Responsibility |
 | :--- | :--- |
-| `include/nodalys/` | Public C++23 interface exporting `CircuitBuilder`, `Circuit`, and free analysis functions (`ComputeOperatingPoint`, `ComputeTransient`, `ComputeDCSweep`, `ComputeACSweep`, `ComputeTransferFunction`, `ComputeNoise`). |
+| `include/nodalys/` | Public C++23 interface exporting `CircuitBuilder`, `Circuit`, and free analysis functions (`ComputeOperatingPoint`, `ComputeTransient`, `ComputeDCSweep`, `ComputeACSweep`, `ComputeTransferFunction`, `ComputeNoise`, `ComputeSParameters`). |
 | `src/mna/` | Real and complex Modified Nodal Analysis (MNA) matrix assembly, dynamic $G_{\min}$ stabilization, and residual verification. |
 | `src/linear/` | `BasicDenseMatrix<Scalar>` supporting `double` and `std::complex<double>` with partial-pivoting LU factorization, row equilibration, and iterative refinement. |
 | `src/newton/` | Damped nonlinear Newton-Raphson driver with semiconductor junction damping (`pnjlim`, `fetlim`), logic output limiting, and fallback homotopy strategies (*Gmin stepping* and *Source stepping*). |
 | `src/devices/` | Device models: linear passives, independent/controlled sources, hysteretic switches, relays, transformers, ideal & Boyle op-amps, nonlinear semiconductors (Shockley diode, Gummel-Poon BJT, Shichman-Hodges Level-1 MOSFET), and smooth continuous logic gates. |
-| `src/analyses/` | Complete numerical solvers for DC Operating Point, DC Sweep (1D/2D), Time-Domain Transient, AC Small-Signal Sweep, DC Transfer Function, and AC Adjoint Noise. |
+| `src/analyses/` | Complete numerical solvers for DC Operating Point, DC Sweep (1D/2D), Time-Domain Transient, AC Small-Signal Sweep, DC Transfer Function, AC Adjoint Noise, and Multiport S-Parameters. |
 | `src/bridge/` | `LogicBridge` translating discrete event-driven logic levels (`0`, `1`, `X`, `Z`) into continuous analog waveforms with realistic slew rates and configurable supply rails. |
-| `src/parser/` & `src/export/` | SPICE netlist syntax parser supporting engineering scales (`1k`, `100n`, `4.7u`) and multi-format simulation result export (CSV, JSON, SPICE Raw). |
+| `src/parser/` & `src/export/` | SPICE netlist syntax parser supporting engineering scales (`1k`, `100n`, `4.7u`) and multi-format simulation result export (CSV, JSON, SPICE Raw, Touchstone). |
 | `src/cli/` | Standalone CLI tool (`nodalys`) processing netlists from files or `stdin` with command-line options (`--analysis`, `--format`, `--output`). |
 
-### 2. imcsim GUI & Model Bridge (`app-core/native/`)
+### 2. imcsim GUI & Model Bridge (`app-core/nodalys/`)
 
 | File | Responsibility |
 | :--- | :--- |
-| [`compiler.h`](../../app-core/native/compiler.h) / [`compiler.cpp`](../../app-core/native/compiler.cpp) | Translates `Core::Circuit` components, hierarchical subcircuits, parameter expressions, and logic parts directly into `nodalys::CircuitBuilder`. |
-| [`native_backend.h`](../../app-core/native/native_backend.h) / [`native_backend.cpp`](../../app-core/native/native_backend.cpp) | Implements `Core::SimulationBackend`, reporting capabilities and executing analyses directly on Nodalys with live chunk streaming and diagnostic forwarding. |
+| [`compiler.h`](../../app-core/nodalys/compiler.h) / [`compiler.cpp`](../../app-core/nodalys/compiler.cpp) | Translates `Core::Circuit` components, hierarchical subcircuits, parameter expressions, and logic parts directly into `nodalys::CircuitBuilder`. |
+| [`nodalys_backend.h`](../../app-core/nodalys/nodalys_backend.h) / [`nodalys_backend.cpp`](../../app-core/nodalys/nodalys_backend.cpp) | Implements `Core::SimulationBackend`, reporting capabilities and executing analyses directly on Nodalys with live chunk streaming and diagnostic forwarding. |
 
 ---
 
@@ -86,6 +89,7 @@
 | **AC Sweep (Bode)** | `.ac` | ✅ | ✅ **Ready** | [`ac_analysis.cpp`](../../nodalys/src/analyses/ac_analysis.cpp) — Operating point linearization + complex MNA solver $\mathbf{Y}(j\omega)\mathbf{V} = \mathbf{I}$ (gain in dB and continuous unwrapped phase). |
 | **Transfer Function** | `.tf` | ✅ | ✅ **Ready** | [`tf_analysis.cpp`](../../nodalys/src/analyses/tf_analysis.cpp) — Small-signal DC gain ($A_v$ or $R_m$), input impedance $Z_{\text{in}}$, and output impedance $Z_{\text{out}}$. |
 | **Noise Analysis** | `.noise` | ✅ | ✅ **Ready** | [`noise_analysis.cpp`](../../nodalys/src/analyses/noise_analysis.cpp) — Adjoint complex solver $\mathbf{Y}(j\omega)^T \lambda = \mathbf{e}_{\text{out}}$, input/output spectral densities ($\text{V}/\sqrt{\text{Hz}}$), log-log RMS integration, and per-component noise shares. |
+| **S-Parameters** | `.sp` | ✅ | ✅ **Ready** | [`sp_analysis.cpp`](../../nodalys/src/analyses/sp_analysis.cpp) — Multiport scattering matrix $\mathbf{S}(j\omega)$, single-LU multi-RHS solve, Return Loss, Insertion Loss, VSWR, Input Impedance, and Touchstone export. |
 | **Truth Table** | Multiple `.op` | ✅ | ✅ **Ready** | Fully supported natively in imcsim UI without ngspice via smooth continuous logic macromodels ($C^\infty$). |
 
 ---
@@ -110,7 +114,7 @@
 | Feature / Tool | Status in `Nodalys` | Description |
 | :--- | :---: | :--- |
 | **Standalone CLI (`nodalys`)** | ✅ **Ready** | Command-line tool accepting standard SPICE netlists from arguments or standard input (`stdin`). |
-| **Multi-Format Export** | ✅ **Ready** | Standalone exporter formatting results into CSV, JSON, and SPICE Raw formats (`--format`). |
+| **Multi-Format Export** | ✅ **Ready** | Standalone exporter formatting results into CSV, JSON, SPICE Raw, and Touchstone (.sNp) formats (`--format`). |
 | **Component Parameter Stepping** | ✅ **Ready** | Steps $R, C, L$ across `.tran`, `.ac`, and `.dc` runs directly through `imcsim` controls. |
 | **Fourier / Spectrum Analysis** | ✅ **Ready** | High-resolution FFT post-processed over `ComputeTransient` waveforms. |
 | **Live Simulation Mode** | ✅ **Ready** | Real-time interactive simulation streaming chunk deliveries and altering netlist values on the fly. |
@@ -127,6 +131,6 @@
 | :--- | :---: | :--- | :---: |
 | **Pole-Zero Analysis** | `.pz` | Generalized eigenvalue solver $(\mathbf{G} + s\mathbf{C})\mathbf{x} = \mathbf{0}$ via the QZ algorithm to find transfer function poles and zeros. | Planned |
 | **DC / AC Sensitivity** | `.sens` | Per-component adjoint sensitivity $\partial V_{\text{out}} / \partial p_i$ solved via transposed system $\mathbf{J}^T \lambda = \mathbf{e}_{\text{out}}$. | Planned |
-| **RF S-Parameters** | `.sp` | Scattering matrix $S_{ij}(f)$, return loss, VSWR, and Smith chart generation with $Z_0$ port termination. | Planned |
+| **RF S-Parameters** | `.sp` | Scattering matrix $S_{ij}(f)$, return loss, VSWR, and Smith chart generation with $Z_0$ port termination. | ✅ **Ready** |
 | **Distortion / Harmonic Balance** | `.disto` / HB | Frequency-domain periodic steady-state analysis for nonlinear RF circuits. | Planned |
 | **Parallel Monte Carlo** | Statistical | Multi-threaded statistical parameter tolerance sweeps across independent `nodalys::Circuit` instances. | Planned |

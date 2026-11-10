@@ -1,6 +1,6 @@
 /**
  * @file    switches_tests.cpp
- * @brief   Theory checks for the native switch, relay and transformer: the hysteresis thresholds, the relay
+ * @brief   Theory checks for the Nodalys switch, relay and transformer: the hysteresis thresholds, the relay
  *          pull-in behavior and the transformer turns ratio.
  */
 
@@ -12,7 +12,7 @@
 #include "components/voltage_controlled_switch.h"
 #include "components/voltage_source.h"
 #include "model/circuit.h"
-#include "native/native_backend.h"
+#include "nodalys/nodalys_backend.h"
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 #include <cmath>
@@ -65,7 +65,7 @@ TEST_CASE("A voltage-controlled switch opens and closes with its control voltage
         return bundle;
     };
 
-    Core::NativeBackend backend;
+    Core::NodalysBackend backend;
     const auto open_circuit = build(0.0);
     const Core::OperatingPointRun open = backend.RunOperatingPoint(open_circuit->circuit);
     REQUIRE(open.Result.has_value());
@@ -102,7 +102,7 @@ TEST_CASE("A relay closes its contact when the coil current pulls it in") {
     circuit.Add(coil_supply, {3});
     circuit.Add(ground, {0});
 
-    Core::NativeBackend backend;
+    Core::NodalysBackend backend;
     const Core::OperatingPointRun run = backend.RunOperatingPoint(circuit);
     REQUIRE(run.Result.has_value());
     // The coil takes 5 V / 70 Ohm = 71 mA, well past the 3.5 V pull-in, so the contact is closed and the load
@@ -139,7 +139,7 @@ TEST_CASE("A transformer steps voltage by its turns ratio in a transient") {
     circuit.Add(load, {2, 0});
     circuit.Add(ground, {0});
 
-    Core::NativeBackend backend;
+    Core::NodalysBackend backend;
     const Core::TransientRun run =
         backend.RunTransient(circuit, {.StopTime = 20e-3, .TimeStep = 10e-6}, std::nullopt, {});
     if (!run.Result) {

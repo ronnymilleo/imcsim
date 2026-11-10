@@ -104,6 +104,18 @@ public:
     bool SolveAc(const MnaSystem &reactive, double omega, std::vector<std::complex<double>> &x_ac) const;
 
     /**
+     * @brief   Solves the small-signal complex AC system for multiple right-hand sides, reusing the LU factorization.
+     * @param[in]  reactive  Reactive system (C_ac).
+     * @param[in]  omega     Angular frequency in rad/s.
+     * @param[in]  rhs_list  List of complex right-hand side excitation vectors.
+     * @param[out] solutions Output list of complex solution vectors.
+     * @return  False if the complex matrix at frequency $\omega$ is singular.
+     */
+    bool SolveAcMultiple(const MnaSystem &reactive, double omega,
+                         const std::vector<std::vector<std::complex<double>>> &rhs_list,
+                         std::vector<std::vector<std::complex<double>>> &solutions) const;
+
+    /**
      * @brief   Solves the transposed (adjoint) small-signal AC system $(A_{\text{DC}} + j \omega C_{\text{AC}})^T \cdot \lambda = e_{\text{out}}$
      *          for a unit excitation at `output_unknown`, used by small-signal noise analysis (`.noise`).
      */
