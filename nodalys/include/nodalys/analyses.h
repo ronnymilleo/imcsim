@@ -1,3 +1,8 @@
+/**
+ * @file    analyses.h
+ * @brief   Declarations of simulation analyses and configurations for Nodalys.
+ */
+
 #ifndef NODALYS_ANALYSES_H
 #define NODALYS_ANALYSES_H
 

@@ -1,3 +1,8 @@
+/**
+ * @file    dc_analysis.cpp
+ * @brief   DC operating point and DC sweep analysis solvers.
+ */
+
 #include "analyses/analyses.h"
 
 #include "devices/devices.h"

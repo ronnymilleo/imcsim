@@ -1,3 +1,8 @@
+/**
+ * @file    analyses.h
+ * @brief   Internal solver interfaces and implementations for circuit analyses.
+ */
+
 #ifndef NODALYS_INTERNAL_ANALYSES_H
 #define NODALYS_INTERNAL_ANALYSES_H
 

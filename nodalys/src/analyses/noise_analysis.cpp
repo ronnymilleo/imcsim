@@ -1,3 +1,8 @@
+/**
+ * @file    noise_analysis.cpp
+ * @brief   Frequency-domain thermal and shot noise spectral density solver.
+ */
+
 #include "analyses/analyses.h"
 
 #include "devices/devices.h"

@@ -1,3 +1,8 @@
+/**
+ * @file    waveforms.h
+ * @brief   Factory functions creating time-domain source waveform generators.
+ */
+
 #ifndef NODALYS_WAVEFORMS_H
 #define NODALYS_WAVEFORMS_H
 

@@ -1,3 +1,8 @@
+/**
+ * @file    newton.h
+ * @brief   Newton-Raphson nonlinear solver iteration loop and convergence outcomes.
+ */
+
 #ifndef NODALYS_NEWTON_H
 #define NODALYS_NEWTON_H
 

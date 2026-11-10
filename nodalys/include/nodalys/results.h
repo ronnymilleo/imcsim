@@ -1,3 +1,8 @@
+/**
+ * @file    results.h
+ * @brief   Output data structures for Nodalys numerical simulation analyses.
+ */
+
 #ifndef NODALYS_RESULTS_H
 #define NODALYS_RESULTS_H
 

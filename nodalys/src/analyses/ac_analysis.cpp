@@ -1,3 +1,8 @@
+/**
+ * @file    ac_analysis.cpp
+ * @brief   Small-signal AC frequency response analysis solver.
+ */
+
 #include "analyses/analyses.h"
 
 #include "devices/devices.h"

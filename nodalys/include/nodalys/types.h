@@ -1,3 +1,8 @@
+/**
+ * @file    types.h
+ * @brief   Common types, device parameter structures, and tolerance options for Nodalys.
+ */
+
 #ifndef NODALYS_TYPES_H
 #define NODALYS_TYPES_H
 

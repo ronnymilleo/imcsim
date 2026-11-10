@@ -1,3 +1,8 @@
+/**
+ * @file    nodalys.h
+ * @brief   Single-include umbrella header for the Nodalys simulation engine.
+ */
+
 #ifndef NODALYS_NODALYS_H
 #define NODALYS_NODALYS_H
 

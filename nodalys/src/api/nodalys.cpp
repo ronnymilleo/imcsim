@@ -1,3 +1,8 @@
+/**
+ * @file    nodalys.cpp
+ * @brief   Public entry point forwarding simulation requests to internal solvers.
+ */
+
 #include "nodalys/nodalys.h"
 
 #include "analyses/analyses.h"

@@ -1,3 +1,8 @@
+/**
+ * @file    version.h
+ * @brief   Nodalys simulation engine version macros and definitions.
+ */
+
 #ifndef NODALYS_VERSION_H
 #define NODALYS_VERSION_H
 

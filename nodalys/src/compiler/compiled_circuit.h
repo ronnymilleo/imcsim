@@ -1,3 +1,8 @@
+/**
+ * @file    compiled_circuit.h
+ * @brief   Internal structures holding the assembled MNA system and stamped device models.
+ */
+
 #ifndef NODALYS_COMPILED_CIRCUIT_H
 #define NODALYS_COMPILED_CIRCUIT_H
 

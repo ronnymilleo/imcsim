@@ -1,3 +1,8 @@
+/**
+ * @file    circuit.h
+ * @brief   Compiled immutable circuit representation ready for numerical simulation.
+ */
+
 #ifndef NODALYS_CIRCUIT_H
 #define NODALYS_CIRCUIT_H
 

@@ -1,3 +1,8 @@
+/**
+ * @file    circuit.cpp
+ * @brief   Compiled immutable circuit representation ready for numerical simulation.
+ */
+
 #include "nodalys/circuit.h"
 #include "api/circuit_impl.h"
 

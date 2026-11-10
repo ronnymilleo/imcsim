@@ -1,3 +1,8 @@
+/**
+ * @file    tf_analysis.cpp
+ * @brief   DC small-signal transfer function (gain, input and output impedance) solver.
+ */
+
 #include "analyses/analyses.h"
 
 #include "devices/devices.h"

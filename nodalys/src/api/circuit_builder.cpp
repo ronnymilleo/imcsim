@@ -1,3 +1,8 @@
+/**
+ * @file    circuit_builder.cpp
+ * @brief   Fluent programmatic C++ API to construct a Nodalys circuit.
+ */
+
 #include "nodalys/circuit_builder.h"
 
 #include "api/circuit_impl.h"

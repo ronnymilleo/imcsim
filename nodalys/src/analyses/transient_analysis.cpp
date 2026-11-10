@@ -1,3 +1,8 @@
+/**
+ * @file    transient_analysis.cpp
+ * @brief   Nonlinear time-domain transient analysis solver with adaptive stepping.
+ */
+
 #include "analyses/analyses.h"
 
 #include "devices/devices.h"

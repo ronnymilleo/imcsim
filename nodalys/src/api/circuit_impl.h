@@ -1,3 +1,8 @@
+/**
+ * @file    circuit_impl.h
+ * @brief   Internal implementation class holding the compiled circuit representation.
+ */
+
 #ifndef NODALYS_CIRCUIT_IMPL_H
 #define NODALYS_CIRCUIT_IMPL_H
 

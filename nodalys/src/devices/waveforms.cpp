@@ -1,3 +1,8 @@
+/**
+ * @file    waveforms.cpp
+ * @brief   Factory functions creating time-domain source waveform generators.
+ */
+
 #include "devices/waveforms.h"
 
 #include <algorithm>
