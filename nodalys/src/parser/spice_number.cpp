@@ -1,3 +1,8 @@
+/**
+ * @file    spice_number.cpp
+ * @brief   Parses SPICE numeric literals with engineering scale suffixes.
+ */
+
 #include "parser/spice_number.h"
 
 #include <algorithm>

@@ -1,3 +1,8 @@
+/**
+ * @file    exporters.cpp
+ * @brief   Unified simulation result dispatchers and file writer helpers.
+ */
+
 #include "nodalys/exporters.h"
 
 #include <fstream>

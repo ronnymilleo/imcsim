@@ -1,3 +1,8 @@
+/**
+ * @file    exporters.h
+ * @brief   Exports simulation results in Nutmeg SPICE rawfile, CSV, and JSON formats.
+ */
+
 #ifndef NODALYS_EXPORTERS_H
 #define NODALYS_EXPORTERS_H
 
@@ -33,7 +38,7 @@ std::string ExportJson(const NoiseResult &result);
 std::string ExportJson(const SimulationResult &result);
 
 // File helper functions
-bool SaveStringToFile(std::string_view filepath, std::string_view content);
+[[nodiscard]] bool SaveStringToFile(std::string_view filepath, std::string_view content);
 
 } // namespace nodalys
 

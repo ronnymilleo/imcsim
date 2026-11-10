@@ -1,3 +1,8 @@
+/**
+ * @file    csv_exporter.cpp
+ * @brief   Exports simulation results in CSV tabular format.
+ */
+
 #include "nodalys/exporters.h"
 
 #include <format>

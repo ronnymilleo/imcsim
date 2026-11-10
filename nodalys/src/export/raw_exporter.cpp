@@ -1,3 +1,8 @@
+/**
+ * @file    raw_exporter.cpp
+ * @brief   Exports simulation results in Nutmeg SPICE rawfile format.
+ */
+
 #include "nodalys/exporters.h"
 
 #include <cmath>

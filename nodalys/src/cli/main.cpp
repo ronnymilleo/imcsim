@@ -1,3 +1,8 @@
+/**
+ * @file    main.cpp
+ * @brief   Nodalys standalone command-line SPICE simulation tool.
+ */
+
 #include "nodalys/nodalys.h"
 #include "nodalys/version.h"
 

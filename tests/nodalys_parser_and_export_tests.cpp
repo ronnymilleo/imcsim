@@ -1,3 +1,8 @@
+/**
+ * @file    nodalys_parser_and_export_tests.cpp
+ * @brief   Tests for SPICE netlist parsing, number scales, result exporters, and CLI.
+ */
+
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 
@@ -9,7 +14,7 @@
 using Catch::Matchers::WithinAbs;
 using Catch::Matchers::WithinRel;
 
-TEST_CASE("Nodalys ParseSpiceNumber parses engineering scales and ignores units") {
+TEST_CASE("Engineering scale suffixes and units parse into numeric values", "[nodalys][parser]") {
     SECTION("Standard metric scales") {
         CHECK(nodalys::ParseSpiceNumber("0").value_or(-1) == 0.0);
         CHECK(nodalys::ParseSpiceNumber("12").value_or(-1) == 12.0);
@@ -47,7 +52,7 @@ TEST_CASE("Nodalys ParseSpiceNumber parses engineering scales and ignores units"
     }
 }
 
-TEST_CASE("Nodalys ParseNetlist parses and simulates SPICE netlists") {
+TEST_CASE("SPICE netlists parse into runnable circuits and simulation directives", "[nodalys][parser]") {
     SECTION("Resistive voltage divider with .op") {
         constexpr std::string_view netlist = "* Resistive Divider Test\n"
                                              "V1 1 0 10V\n"
@@ -175,7 +180,7 @@ TEST_CASE("Nodalys ParseNetlist parses and simulates SPICE netlists") {
     }
 }
 
-TEST_CASE("Nodalys Exporters export results in RAW, CSV, and JSON formats") {
+TEST_CASE("Simulation results export to RAW, CSV, and JSON formats", "[nodalys][export]") {
     // Set up a simple simulated circuit to generate results
     constexpr std::string_view netlist = "* Exporter Verification Circuit\n"
                                          "V1 1 0 10V\n"
@@ -243,7 +248,7 @@ TEST_CASE("Nodalys Exporters export results in RAW, CSV, and JSON formats") {
     }
 }
 
-TEST_CASE("Nodalys CLI binary executes netlists and generates formatted outputs") {
+TEST_CASE("The Nodalys standalone binary runs netlists from arguments or standard input", "[nodalys][cli]") {
     const std::string cli_path = "./out/debug/bin/nodalys";
     if (!std::filesystem::exists(cli_path)) {
         SKIP("Nodalys CLI binary not present in default build directory");

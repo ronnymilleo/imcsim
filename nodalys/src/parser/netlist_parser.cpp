@@ -1,3 +1,8 @@
+/**
+ * @file    netlist_parser.cpp
+ * @brief   Parses SPICE netlists into compiled circuits and simulation requests.
+ */
+
 #include "nodalys/netlist_parser.h"
 #include "nodalys/circuit_builder.h"
 #include "parser/spice_number.h"

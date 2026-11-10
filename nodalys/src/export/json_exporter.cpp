@@ -1,3 +1,8 @@
+/**
+ * @file    json_exporter.cpp
+ * @brief   Exports simulation results in JSON structured format.
+ */
+
 #include "nodalys/exporters.h"
 
 #include <format>
