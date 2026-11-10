@@ -2,6 +2,7 @@
 #define NODALYS_RESULTS_H
 
 #include <string>
+#include <variant>
 #include <vector>
 
 namespace nodalys {
@@ -127,6 +128,15 @@ struct NoiseResult {
     double InputTotal = 0.0;
     std::vector<NoiseContribution> Contributions;
 };
+
+using SimulationResult = std::variant<
+    OperatingPointResult,
+    TransientResult,
+    DcSweepResult,
+    AcSweepResult,
+    TransferFunctionResult,
+    NoiseResult
+>;
 
 } // namespace nodalys
 

@@ -53,6 +53,7 @@ struct TransientConfig {
     double StopTime = 0.0;
     double TimeStep = 0.0;
     double MaxStep = 0.0;
+    bool UseInitialConditions = false;
 };
 
 /**

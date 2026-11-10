@@ -110,7 +110,7 @@ public:
     }
 
     void SetCircuitNodeCount(int count) {
-        m_CircuitNodeCount = std::max(count, 0);
+        m_CircuitNodeCount = std::max(count, 1);
         const int top_node_unknowns = std::max(0, m_CircuitNodeCount - 1);
         m_IsNodeUnknown.assign(static_cast<std::size_t>(top_node_unknowns), true);
         m_DynamicUnknown.assign(static_cast<std::size_t>(top_node_unknowns), false);
@@ -118,10 +118,8 @@ public:
 
     NodeId AddNode() {
         const NodeId id = m_CircuitNodeCount++;
-        if (id > 0) {
-            m_IsNodeUnknown.push_back(true);
-            m_DynamicUnknown.push_back(false);
-        }
+        m_IsNodeUnknown.push_back(true);
+        m_DynamicUnknown.push_back(false);
         return id;
     }
 

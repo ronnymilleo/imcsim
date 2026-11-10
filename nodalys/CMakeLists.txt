@@ -17,6 +17,12 @@ add_library(nodalys STATIC
     src/api/circuit.cpp
     src/api/circuit_builder.cpp
     src/api/nodalys.cpp
+    src/parser/spice_number.cpp
+    src/parser/netlist_parser.cpp
+    src/export/raw_exporter.cpp
+    src/export/csv_exporter.cpp
+    src/export/json_exporter.cpp
+    src/export/exporters.cpp
 )
 
 target_include_directories(nodalys
