@@ -91,6 +91,17 @@ public:
     void AddIdealOpAmp(std::string name, NodeId out, NodeId in_pos, NodeId in_neg, NodeId vcc_pos, NodeId vcc_neg, double bandwidth_hz);
     void AddBoyleOpAmp(std::string name, NodeId out, NodeId in_pos, NodeId in_neg, NodeId vcc_pos, NodeId vcc_neg, const BoyleOpAmpParameters &params);
 
+    // Smooth Continuous Logic
+    void AddLogicGate(std::string name, LogicGateType type, NodeId out, std::vector<NodeId> inputs,
+                      const SmoothLogicParameters &params = {});
+    void AddInverter(std::string name, NodeId out, NodeId in, const SmoothLogicParameters &params = {});
+    void AddLogicBuffer(std::string name, NodeId out, NodeId in, const SmoothLogicParameters &params = {});
+    void AddSchmittTrigger(std::string name, NodeId out, NodeId in, const SmoothLogicParameters &params = {});
+    void AddSRLatch(std::string name, NodeId q, NodeId q_bar, NodeId set, NodeId reset,
+                    const SmoothLogicParameters &params = {});
+    void AddDFlipFlop(std::string name, NodeId q, NodeId q_bar, NodeId d, NodeId clk,
+                      const SmoothLogicParameters &params = {});
+
     // Build finalized Circuit
     std::expected<Circuit, std::string> Build();
 
