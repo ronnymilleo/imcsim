@@ -72,6 +72,12 @@ public:
     /// Number of node-voltage unknowns in the system.
     int NodeUnknowns() const;
 
+    /// The assembled linearized dense matrix A.
+    const DenseMatrix &Matrix() const;
+
+    /// The assembled right-hand side vector.
+    const std::vector<double> &Rhs() const;
+
     /// True when unknown `index` is a node voltage (KCL row); false when it is a branch current (branch voltage row).
     bool IsNodeUnknown(int index) const;
 

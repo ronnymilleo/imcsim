@@ -6,6 +6,7 @@
 #include "nodalys/exporters.h"
 
 #include <format>
+#include <numbers>
 #include <sstream>
 
 namespace nodalys {
@@ -171,6 +172,27 @@ std::string ExportCsv(const SParameterResult &result) {
             }
         }
         ss << "\n";
+    }
+    return ss.str();
+}
+
+std::string ExportCsv(const PoleZeroResult &result) {
+    std::ostringstream ss;
+    constexpr double TWO_PI = 2.0 * std::numbers::pi;
+    ss << "Type,Index,Real (rad/s),Imag (rad/s),Frequency (Hz)\n";
+    for (std::size_t i = 0; i < result.Poles.size(); ++i) {
+        const double f_hz = std::abs(result.Poles[i]) / TWO_PI;
+        ss << "Pole," << (i + 1) << ","
+           << std::format("{:.8g}", result.Poles[i].real()) << ","
+           << std::format("{:.8g}", result.Poles[i].imag()) << ","
+           << std::format("{:.8g}", f_hz) << "\n";
+    }
+    for (std::size_t i = 0; i < result.Zeros.size(); ++i) {
+        const double f_hz = std::abs(result.Zeros[i]) / TWO_PI;
+        ss << "Zero," << (i + 1) << ","
+           << std::format("{:.8g}", result.Zeros[i].real()) << ","
+           << std::format("{:.8g}", result.Zeros[i].imag()) << ","
+           << std::format("{:.8g}", f_hz) << "\n";
     }
     return ss.str();
 }

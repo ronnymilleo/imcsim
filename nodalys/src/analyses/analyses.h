@@ -71,6 +71,12 @@ std::expected<SParameterResult, std::string> ComputeSParameters(
     const ConvergenceOptions &options,
     std::vector<DiagnosticMessage> *messages);
 
+std::expected<PoleZeroResult, std::string> ComputePoleZero(
+    CompiledCircuit &compiled,
+    const PoleZeroConfig &settings,
+    const ConvergenceOptions &options,
+    std::vector<DiagnosticMessage> *messages);
+
 } // namespace nodalys
 
 #endif // NODALYS_INTERNAL_ANALYSES_H

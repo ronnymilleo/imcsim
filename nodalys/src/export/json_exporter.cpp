@@ -6,6 +6,7 @@
 #include "nodalys/exporters.h"
 
 #include <format>
+#include <numbers>
 #include <sstream>
 
 namespace nodalys {
@@ -161,6 +162,34 @@ std::string ExportJson(const SParameterResult &result) {
         ss << (pt + 1 < result.Frequencies.size() ? "],\n" : "]\n");
     }
     ss << "  ]\n}\n";
+    return ss.str();
+}
+
+std::string ExportJson(const PoleZeroResult &result) {
+    std::ostringstream ss;
+    constexpr double TWO_PI = 2.0 * std::numbers::pi;
+    ss << "{\n  \"analysis\": \"pole_zero\",\n";
+    ss << "  \"poles\": [";
+    for (std::size_t i = 0; i < result.Poles.size(); ++i) {
+        if (i > 0) {
+            ss << ", ";
+        }
+        const double f_hz = std::abs(result.Poles[i]) / TWO_PI;
+        ss << "{\"real\": " << std::format("{:.8g}", result.Poles[i].real())
+           << ", \"imag\": " << std::format("{:.8g}", result.Poles[i].imag())
+           << ", \"frequency_hz\": " << std::format("{:.8g}", f_hz) << "}";
+    }
+    ss << "],\n  \"zeros\": [";
+    for (std::size_t i = 0; i < result.Zeros.size(); ++i) {
+        if (i > 0) {
+            ss << ", ";
+        }
+        const double f_hz = std::abs(result.Zeros[i]) / TWO_PI;
+        ss << "{\"real\": " << std::format("{:.8g}", result.Zeros[i].real())
+           << ", \"imag\": " << std::format("{:.8g}", result.Zeros[i].imag())
+           << ", \"frequency_hz\": " << std::format("{:.8g}", f_hz) << "}";
+    }
+    ss << "]\n}\n";
     return ss.str();
 }
 

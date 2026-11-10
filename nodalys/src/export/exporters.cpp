@@ -18,7 +18,8 @@ std::string ExportRaw(const SimulationResult &result, std::string_view title) {
                       std::is_same_v<T, TransientResult> ||
                       std::is_same_v<T, DcSweepResult> ||
                       std::is_same_v<T, AcSweepResult> ||
-                      std::is_same_v<T, SParameterResult>) {
+                      std::is_same_v<T, SParameterResult> ||
+                      std::is_same_v<T, PoleZeroResult>) {
             return ExportRaw(res, title);
         } else {
             // SPICE raw files do not standardly represent .TF or .NOISE direct summaries without vectors

@@ -117,6 +117,17 @@ struct SParameterConfig {
 };
 
 /**
+ * @struct  PoleZeroConfig
+ * @brief   Configuration for small-signal pole-zero analysis (.pz).
+ */
+struct PoleZeroConfig {
+    int OutputNode = 0;
+    std::string InputSource;
+    bool FindPoles = true;
+    bool FindZeros = true;
+};
+
+/**
  * @struct  RunMonitor
  * @brief   Asynchronous control and streaming callbacks for interactive/live simulation.
  */
@@ -168,6 +179,12 @@ std::expected<NoiseResult, std::string> ComputeNoise(
 std::expected<SParameterResult, std::string> ComputeSParameters(
     const Circuit &circuit,
     const SParameterConfig &config,
+    const ConvergenceOptions &options = {},
+    std::vector<DiagnosticMessage> *messages = nullptr);
+
+std::expected<PoleZeroResult, std::string> ComputePoleZero(
+    const Circuit &circuit,
+    const PoleZeroConfig &config,
     const ConvergenceOptions &options = {},
     std::vector<DiagnosticMessage> *messages = nullptr);
 

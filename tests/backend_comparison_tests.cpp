@@ -27,6 +27,7 @@
 #include "ngspice/ngspice_backend.h"
 #include "nodalys/nodalys_backend.h"
 #include "plots/touchstone.h"
+#include "simulation/pole_zero.h"
 #include "simulation/s_parameters.h"
 #include <algorithm>
 #include <catch2/catch_test_macros.hpp>
@@ -276,6 +277,40 @@ void CheckSParameterParity(const Core::Circuit &circuit, const Core::SParameterS
                     REQUIRE(std::fabs(phase_diff) <= tol_phase_deg);
                 }
             }
+        }
+    }
+}
+
+/**
+ * @brief   Runs a pole-zero analysis through both backends and compares the resulting poles and zeros.
+ */
+void CheckPoleZeroParity(const Core::Circuit &circuit, const Core::PoleZeroSettings &settings,
+                         const double relative_tol = 1e-3, const double abs_tol = 1e-3) {
+    Core::NodalysBackend nodalys;
+    const Core::PoleZeroRun expected = Ngspice().RunPoleZero(circuit, settings);
+    INFO("ngspice: " + (expected.Result ? std::string("ok") : expected.Result.error()));
+    REQUIRE(expected.Result.has_value());
+    const Core::PoleZeroRun actual = nodalys.RunPoleZero(circuit, settings);
+    INFO("nodalys: " + (actual.Result ? std::string("ok") : actual.Result.error()));
+    REQUIRE(actual.Result.has_value());
+
+    REQUIRE(actual.Result->OutputNode == expected.Result->OutputNode);
+    REQUIRE(actual.Result->InputSource == expected.Result->InputSource);
+    REQUIRE(actual.Result->InputUnit == expected.Result->InputUnit);
+    REQUIRE(actual.Result->Roots.size() == expected.Result->Roots.size());
+
+    for (std::size_t i = 0; i < expected.Result->Roots.size(); ++i) {
+        const auto &exp_root = expected.Result->Roots[i];
+        const auto &act_root = actual.Result->Roots[i];
+        INFO(std::format("Root {}: type={}/{}, exp=({:.6e}, {:.6e}), act=({:.6e}, {:.6e})", i,
+                         exp_root.IsPole ? "pole" : "zero", act_root.IsPole ? "pole" : "zero", exp_root.Real,
+                         exp_root.Imaginary, act_root.Real, act_root.Imaginary));
+        REQUIRE(act_root.IsPole == exp_root.IsPole);
+        CHECK(Close(act_root.Real, exp_root.Real, relative_tol, abs_tol));
+        CHECK(Close(act_root.Imaginary, exp_root.Imaginary, relative_tol, abs_tol));
+        CHECK(Close(act_root.NaturalFrequencyHertz, exp_root.NaturalFrequencyHertz, relative_tol, abs_tol));
+        if (exp_root.QualityFactor.has_value() && act_root.QualityFactor.has_value() && *exp_root.QualityFactor < 1e6) {
+            CHECK(Close(*act_root.QualityFactor, *exp_root.QualityFactor, relative_tol, abs_tol));
         }
     }
 }
@@ -1179,5 +1214,119 @@ TEST_CASE("Both backends agree on S-parameters", "[s_parameters][backend_compari
 
         CheckSParameterParity(
             circuit, {.StartFrequency = 10e6, .StopFrequency = 500e6, .IsLogarithmic = true, .PointsPerDecade = 3});
+    }
+}
+
+TEST_CASE("Both backends agree on small-signal pole-zero analysis", "[backend][comparison][pole_zero]") {
+    SECTION("First-order RC low-pass filter") {
+        Core::Circuit circuit;
+        Core::VoltageSource source;
+        source.SetName("Vin1");
+        Core::Resistor resistor;
+        resistor.SetName("R1");
+        resistor.SetValue(1e3);
+        Core::Capacitor capacitor;
+        capacitor.SetName("C1");
+        capacitor.SetValue(1e-6);
+        Core::Ground ground;
+        circuit.Add(source, {1, 0});
+        circuit.Add(resistor, {1, 2});
+        circuit.Add(capacitor, {2, 0});
+        circuit.Add(ground, {0});
+
+        CheckPoleZeroParity(circuit, {.OutputNode = 2, .InputSource = "Vin1"});
+    }
+
+    SECTION("Second-order series RLC resonator / bandpass filter") {
+        Core::Circuit circuit;
+        Core::VoltageSource source;
+        source.SetName("Vin1");
+        Core::Inductor coil;
+        coil.SetName("L1");
+        coil.SetValue(10e-3);
+        Core::Capacitor plate;
+        plate.SetName("C1");
+        plate.SetValue(100e-9);
+        Core::Resistor load;
+        load.SetName("R1");
+        load.SetValue(100.0);
+        Core::Ground ground;
+        circuit.Add(source, {1, 0});
+        circuit.Add(coil, {1, 2});
+        circuit.Add(plate, {2, 3});
+        circuit.Add(load, {3, 0});
+        circuit.Add(ground, {0});
+
+        CheckPoleZeroParity(circuit, {.OutputNode = 3, .InputSource = "Vin1"});
+    }
+
+    SECTION("Sallen-Key active low-pass filter") {
+        Core::Circuit circuit;
+        Core::VoltageSource source;
+        source.SetName("Vin1");
+        Core::Resistor r1;
+        r1.SetName("R1");
+        r1.SetValue(10e3);
+        Core::Resistor r2;
+        r2.SetName("R2");
+        r2.SetValue(10e3);
+        Core::Capacitor c1;
+        c1.SetName("C1");
+        c1.SetValue(20e-9);
+        Core::Capacitor c2;
+        c2.SetName("C2");
+        c2.SetValue(10e-9);
+        Core::ControlledSource vcvs(Core::ComponentType::VCVS);
+        vcvs.SetName("E1");
+        vcvs.SetValue(1.0);
+        Core::Ground ground;
+        circuit.Add(source, {1, 0});
+        circuit.Add(r1, {1, 2});
+        circuit.Add(r2, {2, 3});
+        circuit.Add(c1, {2, 4});
+        circuit.Add(c2, {3, 0});
+        circuit.Add(vcvs, {4, 0, 3, 0});
+        circuit.Add(ground, {0});
+
+        CheckPoleZeroParity(circuit, {.OutputNode = 4, .InputSource = "Vin1"});
+    }
+
+    SECTION("Twin-T notch filter") {
+        Core::Circuit circuit;
+        Core::VoltageSource source;
+        source.SetName("Vin1");
+        Core::Resistor r1;
+        r1.SetName("R1");
+        r1.SetValue(10e3);
+        Core::Resistor r2;
+        r2.SetName("R2");
+        r2.SetValue(10e3);
+        Core::Capacitor c3;
+        c3.SetName("C3");
+        c3.SetValue(20e-9);
+        Core::Capacitor c1;
+        c1.SetName("C1");
+        c1.SetValue(10e-9);
+        Core::Capacitor c2;
+        c2.SetName("C2");
+        c2.SetValue(10e-9);
+        Core::Resistor r3;
+        r3.SetName("R3");
+        r3.SetValue(5e3);
+        Core::Resistor load;
+        load.SetName("RL");
+        load.SetValue(100e3);
+        Core::Ground ground;
+        circuit.Add(source, {1, 0});
+        circuit.Add(r1, {1, 3});
+        circuit.Add(r2, {3, 2});
+        circuit.Add(c3, {3, 0});
+        circuit.Add(c1, {1, 4});
+        circuit.Add(c2, {4, 2});
+        circuit.Add(r3, {4, 0});
+        circuit.Add(load, {2, 0});
+        circuit.Add(ground, {0});
+
+        CheckPoleZeroParity(circuit, {.OutputNode = 2, .InputSource = "Vin1"});
     }
 }

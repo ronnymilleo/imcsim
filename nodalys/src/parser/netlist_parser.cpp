@@ -572,6 +572,17 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
                 const auto [pos_str, neg_str] = ParseVoltageNodes(tokens[1]);
                 nodes.Register(pos_str);
                 nodes.Register(neg_str);
+            } else if (dir == ".PZ") {
+                if (tokens.size() >= 5) {
+                    nodes.Register(tokens[1]);
+                    nodes.Register(tokens[2]);
+                    nodes.Register(tokens[3]);
+                    nodes.Register(tokens[4]);
+                } else if (tokens.size() >= 2) {
+                    const auto [pos_str, neg_str] = ParseVoltageNodes(tokens[1]);
+                    nodes.Register(pos_str);
+                    nodes.Register(neg_str);
+                }
             }
             continue;
         }
@@ -764,6 +775,57 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
                 cfg.StartFrequency = ParseSpiceNumber(tokens[start_idx + 1]).value_or(1e6);
                 cfg.StopFrequency = ParseSpiceNumber(tokens[start_idx + 2]).value_or(1e9);
                 result.Analyses.push_back({AnalysisKind::SParameters, cfg});
+            } else if (dir == ".PZ") {
+                // .PZ <out_var> <in_src> [POL|ZER|PZ]
+                // or .PZ <in_pos> <in_neg> <out_pos> <out_neg> [VOL|CUR] [POL|ZER|PZ]
+                if (tokens.size() < 3) {
+                    return std::unexpected(std::format("Malformed .pz directive: '{}'", line));
+                }
+                PoleZeroConfig cfg;
+                if (tokens.size() >= 6) {
+                    const std::string in_pos = tokens[1];
+                    const std::string in_neg = tokens[2];
+                    const std::string out_pos = tokens[3];
+                    cfg.OutputNode = nodes.Resolve(out_pos);
+                    // Search flat_lines for a source connected between in_pos and in_neg
+                    for (const auto &cand_line : flat_lines) {
+                        const auto cand_toks = TokenizeLine(cand_line);
+                        if (cand_toks.size() >= 3) {
+                            const char fc = static_cast<char>(std::toupper(static_cast<unsigned char>(cand_toks[0].front())));
+                            if (fc == 'V' || fc == 'I') {
+                                if ((cand_toks[1] == in_pos && cand_toks[2] == in_neg) ||
+                                    (cand_toks[1] == in_neg && cand_toks[2] == in_pos)) {
+                                    cfg.InputSource = cand_toks[0];
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    if (cfg.InputSource.empty()) {
+                        return std::unexpected(std::format("Could not find source between nodes '{}' and '{}' for .pz", in_pos, in_neg));
+                    }
+                    if (tokens.size() >= 7) {
+                        const std::string type = ToUpper(tokens[6]);
+                        if (type == "POL") {
+                            cfg.FindZeros = false;
+                        } else if (type == "ZER") {
+                            cfg.FindPoles = false;
+                        }
+                    }
+                } else {
+                    const auto [pos_str, neg_str] = ParseVoltageNodes(tokens[1]);
+                    cfg.OutputNode = nodes.Resolve(pos_str);
+                    cfg.InputSource = tokens[2];
+                    if (tokens.size() >= 4) {
+                        const std::string type = ToUpper(tokens[3]);
+                        if (type == "POL") {
+                            cfg.FindZeros = false;
+                        } else if (type == "ZER") {
+                            cfg.FindPoles = false;
+                        }
+                    }
+                }
+                result.Analyses.push_back({AnalysisKind::PoleZero, cfg});
             } else if (dir == ".OPTIONS") {
                 for (std::size_t i = 1; i < tokens.size(); ++i) {
                     const auto eq = tokens[i].find('=');
