@@ -32,13 +32,13 @@
  *    ```
  */
 
-#include "native/devices.h"
+#include "devices/devices.h"
 
-#include "native/pn_junction.h"
+#include "devices/pn_junction.h"
 #include <cmath>
 #include <utility>
 
-namespace Core::Native {
+namespace nodalys {
 
 namespace {
 
@@ -576,4 +576,4 @@ void CoupledInductorDevice::RejectStep() {
     m_V2 = m_SavedV2;
 }
 
-} // namespace Core::Native
+} // namespace nodalys

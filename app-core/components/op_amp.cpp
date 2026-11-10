@@ -270,9 +270,9 @@ std::string FormatIdealOpAmp(const OpAmp &op_amp, const std::vector<int> &nodes,
                        "D-{0}-P {1} {7} {8}\n"
                        "D-{0}-N {9} {1} {8}\n"
                        "E-{0} {10} 0 {1} 0 1\n",
-                       op_amp.GetName(), internal_node, nodes[1], nodes[2],
-                       FormatNumber(figures.Transconductance), FormatNumber(figures.Resistance),
-                       FormatNumber(figures.Capacitance), nodes[3], IDEAL_CLAMP_MODEL_NAME, nodes[4], nodes[0]);
+                       op_amp.GetName(), internal_node, nodes[1], nodes[2], FormatNumber(figures.Transconductance),
+                       FormatNumber(figures.Resistance), FormatNumber(figures.Capacitance), nodes[3],
+                       IDEAL_CLAMP_MODEL_NAME, nodes[4], nodes[0]);
 }
 
 /**
@@ -313,7 +313,8 @@ BoyleOpAmpValues ComputeBoyleOpAmpValues(const OpAmpParameters &parameters) {
             .EmitterResistance = emitter_resistance,
             .TailCurrent = tail_current,
             .TailResistance = TAIL_EARLY_VOLTAGE / tail_current,
-            .CommonModeTransconductance = transconductance / std::pow(10.0, parameters.CommonModeRejectionDecibels / 20.0),
+            .CommonModeTransconductance =
+                transconductance / std::pow(10.0, parameters.CommonModeRejectionDecibels / 20.0),
             .Transconductance = transconductance,
             .OutputGain = std::pow(10.0, parameters.OpenLoopGainDecibels / 20.0) /
                           (transconductance * GAIN_STAGE_RESISTANCE * gain_stage_load),
@@ -344,32 +345,32 @@ std::string FormatOpAmpSubcircuit(const std::string_view name, const OpAmpParame
     const BoyleOpAmpValues v = ComputeBoyleOpAmpValues(parameters);
 
     // Pins: output 6, + input 3, - input 2, V+ 7, V- 4, as in the LTC listings
-    return std::format(
-        ".subckt {0} 6 3 2 7 4\n"
-        "RC1 7 80 {1}\nRC2 7 90 {1}\n"
-        "Q1 80 2 10 QM\nQ2 90 3 11 QM\n"
-        "C1 80 90 {2}\n"
-        "RE1 10 12 {3}\nRE2 11 12 {3}\n"
-        "IEE 12 4 {4}\nREE 12 0 {5}\n"
-        "GCM 0 8 12 0 {6}\nGA 8 0 80 90 {7}\n"
-        "R2 8 0 {8}\nC2 1 8 {9}\n"
-        "GB 1 0 8 0 {10}\nRO2 1 0 {11}\n"
-        "RSO 1 6 {12}\n"
-        "ECL 18 0 1 6 {13}\nGCL 0 8 20 0 1\nRCL 20 0 10\nD1 18 20 DM1\nD2 20 18 DM1\n"
-        "D3A 131 70 DM3\nD3B 13 131 DM3\nGPL 0 8 70 7 1\nVC 13 6 {14}\nRPLA 7 70 10\nRPLB 7 131 1k\n"
-        "D4A 60 141 DM3\nD4B 141 14 DM3\nGNL 0 8 60 4 1\nVE 6 14 {15}\nRNLA 60 4 10\nRNLB 141 4 1k\n"
-        "IP 7 4 {16}\n"
-        ".model QM NPN(IS={17} BF={18})\n"
-        ".model DM1 D(IS=1e-20)\n"
-        ".model DM3 D(IS=1e-16)\n"
-        ".ends {0}\n",
-        name, FormatNumber(v.CollectorResistance), FormatNumber(v.CollectorCapacitance),
-        FormatNumber(v.EmitterResistance), FormatNumber(v.TailCurrent), FormatNumber(v.TailResistance),
-        FormatNumber(v.CommonModeTransconductance), FormatNumber(v.Transconductance), FormatNumber(v.GainStageResistance),
-        FormatNumber(v.CompensationCapacitance), FormatNumber(v.OutputGain), FormatNumber(v.GainStageLoad),
-        FormatNumber(v.OutputSenseResistance), FormatNumber(v.CurrentLimitGain), FormatNumber(v.PositiveSwing),
-        FormatNumber(v.NegativeSwing), FormatNumber(v.RestOfSupplyCurrent), FormatNumber(v.InputSaturationCurrent),
-        FormatNumber(v.Beta));
+    return std::format(".subckt {0} 6 3 2 7 4\n"
+                       "RC1 7 80 {1}\nRC2 7 90 {1}\n"
+                       "Q1 80 2 10 QM\nQ2 90 3 11 QM\n"
+                       "C1 80 90 {2}\n"
+                       "RE1 10 12 {3}\nRE2 11 12 {3}\n"
+                       "IEE 12 4 {4}\nREE 12 0 {5}\n"
+                       "GCM 0 8 12 0 {6}\nGA 8 0 80 90 {7}\n"
+                       "R2 8 0 {8}\nC2 1 8 {9}\n"
+                       "GB 1 0 8 0 {10}\nRO2 1 0 {11}\n"
+                       "RSO 1 6 {12}\n"
+                       "ECL 18 0 1 6 {13}\nGCL 0 8 20 0 1\nRCL 20 0 10\nD1 18 20 DM1\nD2 20 18 DM1\n"
+                       "D3A 131 70 DM3\nD3B 13 131 DM3\nGPL 0 8 70 7 1\nVC 13 6 {14}\nRPLA 7 70 10\nRPLB 7 131 1k\n"
+                       "D4A 60 141 DM3\nD4B 141 14 DM3\nGNL 0 8 60 4 1\nVE 6 14 {15}\nRNLA 60 4 10\nRNLB 141 4 1k\n"
+                       "IP 7 4 {16}\n"
+                       ".model QM NPN(IS={17} BF={18})\n"
+                       ".model DM1 D(IS=1e-20)\n"
+                       ".model DM3 D(IS=1e-16)\n"
+                       ".ends {0}\n",
+                       name, FormatNumber(v.CollectorResistance), FormatNumber(v.CollectorCapacitance),
+                       FormatNumber(v.EmitterResistance), FormatNumber(v.TailCurrent), FormatNumber(v.TailResistance),
+                       FormatNumber(v.CommonModeTransconductance), FormatNumber(v.Transconductance),
+                       FormatNumber(v.GainStageResistance), FormatNumber(v.CompensationCapacitance),
+                       FormatNumber(v.OutputGain), FormatNumber(v.GainStageLoad), FormatNumber(v.OutputSenseResistance),
+                       FormatNumber(v.CurrentLimitGain), FormatNumber(v.PositiveSwing), FormatNumber(v.NegativeSwing),
+                       FormatNumber(v.RestOfSupplyCurrent), FormatNumber(v.InputSaturationCurrent),
+                       FormatNumber(v.Beta));
 }
 
 } // namespace Core

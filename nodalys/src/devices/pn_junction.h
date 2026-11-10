@@ -7,12 +7,12 @@
  *          thermal voltage per Newton iteration, which damps the oscillations of forward-biased exponentials.
  */
 
-#ifndef IMCSIM_NATIVE_PN_JUNCTION_H
-#define IMCSIM_NATIVE_PN_JUNCTION_H
+#ifndef NODALYS_PN_JUNCTION_H
+#define NODALYS_PN_JUNCTION_H
 
 #include <cmath>
 
-namespace Core::Native {
+namespace nodalys {
 
 /// Elementary charge $q$ (C) and Boltzmann constant $k_B$ (J/K) matching modern ngspice (`ngspice/const.h`),
 /// evaluated at nominal temperature $T_{\text{nom}} = 300.15\text{ K}$ ($27\,^\circ\text{C}$).
@@ -52,6 +52,6 @@ inline double PnLimit(const double voltage_new, const double voltage_old, const 
     return voltage_new;
 }
 
-} // namespace Core::Native
+} // namespace nodalys
 
-#endif // IMCSIM_NATIVE_PN_JUNCTION_H
+#endif // NODALYS_PN_JUNCTION_H

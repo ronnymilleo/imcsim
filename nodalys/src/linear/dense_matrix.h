@@ -8,14 +8,14 @@
  *          systems MNA produces.
  */
 
-#ifndef IMCSIM_NATIVE_DENSE_MATRIX_H
-#define IMCSIM_NATIVE_DENSE_MATRIX_H
+#ifndef NODALYS_DENSE_MATRIX_H
+#define NODALYS_DENSE_MATRIX_H
 
 #include <complex>
 #include <cstddef>
 #include <vector>
 
-namespace Core::Native {
+namespace nodalys {
 
 /**
  * @class   BasicDenseMatrix
@@ -60,6 +60,6 @@ private:
 using DenseMatrix = BasicDenseMatrix<double>;
 using ComplexDenseMatrix = BasicDenseMatrix<std::complex<double>>;
 
-} // namespace Core::Native
+} // namespace nodalys
 
-#endif // IMCSIM_NATIVE_DENSE_MATRIX_H
+#endif // NODALYS_DENSE_MATRIX_H

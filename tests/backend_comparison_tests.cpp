@@ -24,8 +24,8 @@
 #include "components/vcc.h"
 #include "components/voltage_controlled_switch.h"
 #include "components/voltage_source.h"
-#include "ngspice/ngspice_backend.h"
 #include "native/native_backend.h"
+#include "ngspice/ngspice_backend.h"
 #include <algorithm>
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators.hpp>
@@ -79,8 +79,7 @@ void CheckOperatingPointParity(const Core::Circuit &circuit) {
         REQUIRE(Close(actual.Result->NodeVoltages[node], expected.Result->NodeVoltages[node], 1e-4, 1e-6));
     }
     for (const Core::ComponentCurrent &current : expected.Result->Currents) {
-        const auto found =
-            std::ranges::find(actual.Result->Currents, current.Name, &Core::ComponentCurrent::Name);
+        const auto found = std::ranges::find(actual.Result->Currents, current.Name, &Core::ComponentCurrent::Name);
         REQUIRE(found != actual.Result->Currents.end());
         INFO(std::format("current {}: ngspice {:.4e} A, native {:.4e} A", current.Name, current.Current,
                          found->Current));
@@ -145,7 +144,8 @@ double Interpolate(const Core::Transient &trace, const std::vector<double> &valu
  * @brief   Runs the transient through both backends and compares every trace at the native time points.
  * @param[in] skip  Points to skip at the start, while the first-step backward Euler error decays.
  */
-void CheckTransientParity(const Core::Circuit &circuit, const Core::TransientSettings &settings, const std::size_t skip = 2) {
+void CheckTransientParity(const Core::Circuit &circuit, const Core::TransientSettings &settings,
+                          const std::size_t skip = 2) {
     Core::NativeBackend native;
     const Core::TransientRun expected = Ngspice().RunTransient(circuit, settings, std::nullopt, {});
     INFO("ngspice: " + (expected.Result ? std::string("ok") : expected.Result.error()));
@@ -199,9 +199,8 @@ void CheckACSweepParity(const Core::Circuit &circuit, const Core::ACSweepSetting
                              expected.Result->Frequencies[i], node, exp_mag, act_mag));
             if (exp_mag > -200.0) {
                 REQUIRE(Close(act_mag, exp_mag, 1e-3, 0.05));
-                double phase_diff =
-                    std::fmod(actual.Result->NodePhasesDegrees[node][i] - expected.Result->NodePhasesDegrees[node][i],
-                              360.0);
+                double phase_diff = std::fmod(
+                    actual.Result->NodePhasesDegrees[node][i] - expected.Result->NodePhasesDegrees[node][i], 360.0);
                 if (phase_diff > 180.0) {
                     phase_diff -= 360.0;
                 } else if (phase_diff < -180.0) {
@@ -249,9 +248,6 @@ TEST_CASE("Both backends agree on the operating point of a divider") {
     CheckOperatingPointParity(circuit);
     CheckDCSweepParity(circuit, {.Swept = {.Source = "V1", .Start = 0.0, .Stop = 12.0, .Step = 2.0}});
 }
-
-
-
 
 TEST_CASE("Both backends agree on the operating point and transient of an RC charge") {
     Core::VCC supply;
@@ -383,9 +379,6 @@ TEST_CASE("Both backends agree on the operating point of a common-source MOSFET 
     CheckDCSweepParity(circuit, {.Swept = {.Source = "V1", .Start = 0.0, .Stop = 12.0, .Step = 2.0}});
 }
 
-
-
-
 TEST_CASE("Both backends agree on the operating point and transient of an ideal op-amp amplifier") {
     Core::VoltageSource input;
     input.SetName("Vin1");
@@ -504,9 +497,6 @@ TEST_CASE("Both backends agree on the operating point of controlled sources") {
     CheckDCSweepParity(circuit, {.Swept = {.Source = "V1", .Start = 0.0, .Stop = 12.0, .Step = 2.0}});
 }
 
-
-
-
 TEST_CASE("Both backends agree on the operating point of a voltage-controlled switch") {
     const double control = GENERATE(0.0, 5.0);
     CAPTURE(control);
@@ -537,9 +527,6 @@ TEST_CASE("Both backends agree on the operating point of a voltage-controlled sw
     CheckDCSweepParity(circuit, {.Swept = {.Source = "V1", .Start = 0.0, .Stop = 12.0, .Step = 2.0}});
 }
 
-
-
-
 TEST_CASE("Both backends agree on the operating point of a potentiometer divider") {
     Core::VCC supply;
     supply.SetName("V1");
@@ -562,8 +549,7 @@ TEST_CASE("Both backends agree on the operating point of a potentiometer divider
 }
 
 TEST_CASE("Both backends agree on the AC sweep of passive, semiconductor, and op-amp circuits") {
-    const Core::ACSweepSettings sweep_settings{
-        .StartFrequency = 10.0, .StopFrequency = 1e6, .PointsPerDecade = 10};
+    const Core::ACSweepSettings sweep_settings{.StartFrequency = 10.0, .StopFrequency = 1e6, .PointsPerDecade = 10};
 
     SECTION("RC low-pass and series RLC filters") {
         Core::VoltageSource source;
@@ -815,9 +801,11 @@ TEST_CASE("Both backends agree on the small-signal noise spectral densities, tot
         circuit.Add(r1, {1, 2});
         circuit.Add(c1, {2, 0});
         circuit.Add(ground, {0});
-        check_noise_parity(
-            circuit,
-            {.OutputNode = 2, .InputSource = "V1", .StartFrequency = 10.0, .StopFrequency = 100e3, .PointsPerDecade = 10});
+        check_noise_parity(circuit, {.OutputNode = 2,
+                                     .InputSource = "V1",
+                                     .StartFrequency = 10.0,
+                                     .StopFrequency = 100e3,
+                                     .PointsPerDecade = 10});
     }
 
     SECTION("Inverting ideal op-amp amplifier") {
@@ -848,9 +836,11 @@ TEST_CASE("Both backends agree on the small-signal noise spectral densities, tot
         circuit.Add(r2, {2, 3});
         circuit.Add(op_amp, {3, 0, 2, 4, 5});
         circuit.Add(ground, {0});
-        check_noise_parity(
-            circuit,
-            {.OutputNode = 3, .InputSource = "V3", .StartFrequency = 10.0, .StopFrequency = 100e3, .PointsPerDecade = 5});
+        check_noise_parity(circuit, {.OutputNode = 3,
+                                     .InputSource = "V3",
+                                     .StartFrequency = 10.0,
+                                     .StopFrequency = 100e3,
+                                     .PointsPerDecade = 5});
     }
 
     SECTION("Common-emitter BJT amplifier") {
@@ -881,9 +871,11 @@ TEST_CASE("Both backends agree on the small-signal noise spectral densities, tot
         circuit.Add(re, {5, 0});
         circuit.Add(q1, {4, 3, 5});
         circuit.Add(ground, {0});
-        check_noise_parity(
-            circuit,
-            {.OutputNode = 4, .InputSource = "V2", .StartFrequency = 100.0, .StopFrequency = 1e6, .PointsPerDecade = 5});
+        check_noise_parity(circuit, {.OutputNode = 4,
+                                     .InputSource = "V2",
+                                     .StartFrequency = 100.0,
+                                     .StopFrequency = 1e6,
+                                     .PointsPerDecade = 5});
     }
 
     SECTION("Common-source NMOS amplifier") {
@@ -906,9 +898,11 @@ TEST_CASE("Both backends agree on the small-signal noise spectral densities, tot
         circuit.Add(rd, {1, 3});
         circuit.Add(m1, {3, 2, 0});
         circuit.Add(ground, {0});
-        check_noise_parity(
-            circuit,
-            {.OutputNode = 3, .InputSource = "V2", .StartFrequency = 10.0, .StopFrequency = 100e3, .PointsPerDecade = 5});
+        check_noise_parity(circuit, {.OutputNode = 3,
+                                     .InputSource = "V2",
+                                     .StartFrequency = 10.0,
+                                     .StopFrequency = 100e3,
+                                     .PointsPerDecade = 5});
     }
 
     SECTION("Non-inverting uA741 op-amp amplifier") {
@@ -940,12 +934,10 @@ TEST_CASE("Both backends agree on the small-signal noise spectral densities, tot
         circuit.Add(r2, {5, 4});
         circuit.Add(op_amp, {5, 3, 4, 1, 2});
         circuit.Add(ground, {0});
-        check_noise_parity(
-            circuit,
-            {.OutputNode = 5, .InputSource = "V3", .StartFrequency = 10.0, .StopFrequency = 100e3, .PointsPerDecade = 5});
+        check_noise_parity(circuit, {.OutputNode = 5,
+                                     .InputSource = "V3",
+                                     .StartFrequency = 10.0,
+                                     .StopFrequency = 100e3,
+                                     .PointsPerDecade = 5});
     }
 }
-
-
-
-

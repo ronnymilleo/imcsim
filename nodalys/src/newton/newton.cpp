@@ -17,12 +17,12 @@
  *    satisfies KCL at every node and voltage law on every branch.
  */
 
-#include "native/newton.h"
+#include "newton/newton.h"
 
 #include <algorithm>
 #include <cmath>
 
-namespace Core::Native {
+namespace nodalys {
 
 namespace {
 
@@ -83,8 +83,8 @@ int RunNewton(MnaSystem &sys, const std::vector<std::unique_ptr<Device>> &device
 
 } // namespace
 
-NewtonOutcome SolveDc(MnaSystem &sys, const std::vector<std::unique_ptr<Device>> &devices, std::vector<double> &x,
-                      const ConvergenceOptions &options, const TimeContext &time) {
+NewtonOutcome SolveNewton(MnaSystem &sys, const std::vector<std::unique_ptr<Device>> &devices, std::vector<double> &x,
+                          const TimeContext &time, const ConvergenceOptions &options) {
     if (!time.IsTransient) {
         for (const std::unique_ptr<Device> &device : devices) {
             device->SeedOperatingPoint(x);
@@ -155,4 +155,4 @@ NewtonOutcome SolveDc(MnaSystem &sys, const std::vector<std::unique_ptr<Device>>
     return outcome;
 }
 
-} // namespace Core::Native
+} // namespace nodalys

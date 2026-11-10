@@ -1,23 +1,11 @@
-/**
- * @file    dc_analysis.cpp
- * @brief   DC Operating Point (`ComputeOperatingPoint`) and DC Sweep (`ComputeDCSweep`) analyses of the Nodalys solver.
- * @details
- * Both analyses solve the nonlinear steady-state MNA equations $F(x) = 0$ (where capacitors are open circuits and
- * inductors are short circuits) via `SolveDc()` (`newton.h`):
- * - **Operating Point**: Solves once starting from zero (with `SeedOperatingPoint` hints on BJTs) and extracts node
- *   voltages and terminal currents.
- * - **DC Sweep**: Steps a primary source (and optionally a secondary nested source) across a linear grid, warm-starting
- *   each point from the previous converged solution $x$ for fast convergence along the curve.
- */
+#include "analyses/analyses.h"
 
-#include "native/analyses.h"
-
-#include "native/devices.h"
+#include "devices/devices.h"
 #include <algorithm>
 #include <cmath>
 #include <format>
 
-namespace Core::Native {
+namespace nodalys {
 
 namespace {
 
@@ -42,23 +30,12 @@ std::vector<double> ReadNodeVoltages(const CompiledCircuit &compiled, const std:
     return voltages;
 }
 
-/// Generates the linear grid of values visited by a DC sweep, from `Start` to `Stop` inclusive in steps of `Step`.
-std::vector<double> SweepValues(const SweepRange &range) {
-    std::vector<double> values;
-    const double direction = range.Stop >= range.Start ? 1.0 : -1.0;
-    const double step = std::fabs(range.Step) * direction;
-    if (step == 0.0) {
-        return values;
+void SeedOperatingPoint(const std::vector<std::unique_ptr<Device>> &devices, std::vector<double> &x) {
+    for (const auto &device : devices) {
+        device->SeedOperatingPoint(x);
     }
-    const double tolerance = 1e-12 * std::max(1.0, std::fabs(range.Stop));
-    for (double value = range.Start; direction > 0 ? value <= range.Stop + tolerance : value >= range.Stop - tolerance;
-         value += step) {
-        values.push_back(value);
-    }
-    return values;
 }
 
-/// Sets the DC value of a compiled independent voltage or current source.
 bool SetSourceValue(Device *device, const double value) {
     if (auto *voltage = dynamic_cast<VoltageSourceDevice *>(device)) {
         voltage->SetDcValue(value);
@@ -71,67 +48,84 @@ bool SetSourceValue(Device *device, const double value) {
     return false;
 }
 
-/// Returns the physical unit (`"V"` or `"A"`) of a swept source for axis labeling.
-std::string SourceUnit(const Circuit &circuit, const std::string &name) {
-    for (const CircuitEntry &entry : circuit.GetEntries()) {
-        if (entry.Part->GetName() == name) {
-            return entry.Part->GetType() == ComponentType::CURRENT_SOURCE ? "A" : "V";
-        }
+std::string SourceUnit(const Device *device) {
+    if (dynamic_cast<const VoltageSourceDevice *>(device)) {
+        return "V";
+    }
+    if (dynamic_cast<const CurrentSourceDevice *>(device)) {
+        return "A";
     }
     return "V";
 }
 
+std::vector<double> GenerateSweepValues(const double start, const double stop, const double step) {
+    std::vector<double> values;
+    if (step <= 0.0) {
+        values.push_back(start);
+        return values;
+    }
+    const double span = stop - start;
+    const double direction = span >= 0.0 ? 1.0 : -1.0;
+    const double signed_step = direction * std::abs(step);
+    const int count = static_cast<int>(std::floor(std::abs(span) / std::abs(step) + 0.5));
+    for (int i = 0; i <= count; ++i) {
+        values.push_back(start + i * signed_step);
+    }
+    return values;
+}
+
 } // namespace
 
-std::expected<OperatingPoint, std::string> ComputeOperatingPoint(CompiledCircuit &compiled,
-                                                                 const ConvergenceOptions &options,
-                                                                 std::vector<SimulatorMessage> &messages) {
+std::expected<OperatingPointResult, std::string> ComputeOperatingPoint(
+    CompiledCircuit &compiled,
+    const ConvergenceOptions &options,
+    std::vector<DiagnosticMessage> *messages) {
     std::vector<double> x(static_cast<std::size_t>(compiled.System->Size()), 0.0);
-    const NewtonOutcome outcome = SolveDc(*compiled.System, compiled.Devices, x, options, TimeContext{});
+    SeedOperatingPoint(compiled.Devices, x);
+    const NewtonOutcome outcome = SolveNewton(*compiled.System, compiled.Devices, x, TimeContext{}, options);
     if (!outcome.Converged) {
         return std::unexpected("The native solver found no operating point; the circuit may have no DC path to "
                                "ground or need initial conditions");
     }
     DescribeOutcome(outcome, "operating point", messages);
-    OperatingPoint point;
+    OperatingPointResult point;
     point.NodeVoltages = ReadNodeVoltages(compiled, x);
     point.Currents = ReadCurrents(compiled, x);
     return point;
 }
 
-std::expected<DCSweep, std::string> ComputeDCSweep(const Circuit &circuit, CompiledCircuit &compiled,
-                                                   const DCSweepSettings &settings, const ConvergenceOptions &options,
-                                                   std::vector<SimulatorMessage> &messages) {
-    const auto swept = compiled.SourcesByName.find(settings.Swept.Source);
+std::expected<DcSweepResult, std::string> ComputeDCSweep(
+    CompiledCircuit &compiled,
+    const DcSweepConfig &settings,
+    const ConvergenceOptions &options,
+    std::vector<DiagnosticMessage> *messages) {
+    const auto swept = compiled.SourcesByName.find(settings.SweptSource);
     if (swept == compiled.SourcesByName.end()) {
-        const bool exists = std::ranges::any_of(circuit.GetEntries(), [&](const CircuitEntry &entry) {
-            return entry.Part->GetName() == settings.Swept.Source;
-        });
-        return std::unexpected(
-            exists ? std::format("The source {} cannot be swept by the native backend", settings.Swept.Source)
-                   : std::format("The circuit has no source named {}", settings.Swept.Source));
+        return std::unexpected(std::format("The circuit has no source named {}", settings.SweptSource));
     }
     Device *stepped_device = nullptr;
-    if (settings.Stepped) {
-        const auto stepped = compiled.SourcesByName.find(settings.Stepped->Source);
+    if (!settings.SteppedSource.empty()) {
+        const auto stepped = compiled.SourcesByName.find(settings.SteppedSource);
         if (stepped == compiled.SourcesByName.end()) {
-            return std::unexpected(std::format("The circuit has no source named {}", settings.Stepped->Source));
+            return std::unexpected(std::format("The circuit has no source named {}", settings.SteppedSource));
         }
         stepped_device = stepped->second;
     }
 
-    DCSweep sweep;
-    sweep.SweptSource = settings.Swept.Source;
-    sweep.SweptUnit = SourceUnit(circuit, settings.Swept.Source);
-    sweep.SweptValues = SweepValues(settings.Swept);
+    DcSweepResult sweep;
+    sweep.SweptSource = settings.SweptSource;
+    sweep.SweptUnit = SourceUnit(swept->second);
+    sweep.SweptValues = GenerateSweepValues(settings.SweptStart, settings.SweptStop, settings.SweptStep);
     if (sweep.SweptValues.empty()) {
         return std::unexpected("The DC sweep has no points; check its start, stop and step");
     }
     const std::vector<double> step_values =
-        settings.Stepped ? SweepValues(*settings.Stepped) : std::vector<double>{0.0};
-    if (settings.Stepped) {
-        sweep.SteppedSource = settings.Stepped->Source;
-        sweep.SteppedUnit = SourceUnit(circuit, settings.Stepped->Source);
+        !settings.SteppedSource.empty()
+            ? GenerateSweepValues(settings.SteppedStart, settings.SteppedStop, settings.SteppedStep)
+            : std::vector<double>{0.0};
+    if (!settings.SteppedSource.empty()) {
+        sweep.SteppedSource = settings.SteppedSource;
+        sweep.SteppedUnit = SourceUnit(stepped_device);
     }
 
     std::vector<double> x(static_cast<std::size_t>(compiled.System->Size()), 0.0);
@@ -140,14 +134,14 @@ std::expected<DCSweep, std::string> ComputeDCSweep(const Circuit &circuit, Compi
         if (stepped_device && !SetSourceValue(stepped_device, step_value)) {
             return std::unexpected(std::format("Nodalys cannot step the source {}", sweep.SteppedSource));
         }
-        DCSweepCurve curve;
-        curve.StepValue = settings.Stepped ? step_value : 0.0;
+        DcSweepCurve curve;
+        curve.StepValue = !settings.SteppedSource.empty() ? step_value : 0.0;
         curve.NodeVoltages.resize(static_cast<std::size_t>(compiled.CircuitNodeCount));
         for (const double swept_value : sweep.SweptValues) {
             if (!SetSourceValue(swept->second, swept_value)) {
                 return std::unexpected(std::format("Nodalys cannot sweep the source {}", sweep.SweptSource));
             }
-            outcome = SolveDc(*compiled.System, compiled.Devices, x, options, TimeContext{});
+            outcome = SolveNewton(*compiled.System, compiled.Devices, x, TimeContext{}, options);
             if (!outcome.Converged) {
                 return std::unexpected(std::format("Nodalys found no operating point at {} = {}",
                                                    sweep.SweptSource, swept_value));
@@ -172,4 +166,4 @@ std::expected<DCSweep, std::string> ComputeDCSweep(const Circuit &circuit, Compi
     return sweep;
 }
 
-} // namespace Core::Native
+} // namespace nodalys

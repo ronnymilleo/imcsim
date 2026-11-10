@@ -4,13 +4,13 @@
  *          level-1 MOSFETs (Shichman-Hodges).
  */
 
-#include "native/nonlinear.h"
+#include "devices/nonlinear.h"
 
-#include "native/pn_junction.h"
+#include "devices/pn_junction.h"
 #include <algorithm>
 #include <cmath>
 
-namespace Core::Native {
+namespace nodalys {
 
 namespace {
 
@@ -283,7 +283,7 @@ void DiodeDevice::RejectStep() {
 // ============================================================================
 
 BjtDevice::BjtDevice(const int collector, const int base, const int emitter, const int internal_collector,
-                     const int internal_base, const int internal_emitter, BJTParameters parameters, const bool pnp)
+                     const int internal_base, const int internal_emitter, BjtParameters parameters, const bool pnp)
     : m_Collector(collector), m_Base(base), m_Emitter(emitter),
       m_C(internal_collector >= 0 ? internal_collector : collector),
       m_B(internal_base >= 0 ? internal_base : base),
@@ -293,7 +293,7 @@ BjtDevice::BjtDevice(const int collector, const int base, const int emitter, con
 }
 
 BjtDevice::Intrinsic BjtDevice::Evaluate(const double vbe, const double vbc) const {
-    const BJTParameters &p = m_Parameters;
+    const BjtParameters &p = m_Parameters;
     Intrinsic result{};
 
     // 1. Forward (BE) and reverse (BC) ideal diode currents:
@@ -369,7 +369,7 @@ BjtDevice::Intrinsic BjtDevice::EvaluateAt(const std::vector<double> &x) const {
 }
 
 void BjtDevice::Stamp(MnaSystem &sys, const std::vector<double> &x, const TimeContext &time) {
-    const BJTParameters &p = m_Parameters;
+    const BjtParameters &p = m_Parameters;
     StampSeriesResistor(sys, m_Collector, m_C, p.CollectorResistance);
     StampSeriesResistor(sys, m_Base, m_B, p.BaseResistance);
     StampSeriesResistor(sys, m_Emitter, m_E, p.EmitterResistance);
@@ -452,7 +452,7 @@ void BjtDevice::StampAc(MnaSystem &reactive, const std::vector<double> &x_dc) co
     if (!HasTransientState()) {
         return;
     }
-    const BJTParameters &p = m_Parameters;
+    const BjtParameters &p = m_Parameters;
     const Intrinsic dc = EvaluateAt(x_dc);
     const double vbe = NodeVoltage(x_dc, m_B) - NodeVoltage(x_dc, m_E);
     const double vbc = NodeVoltage(x_dc, m_B) - NodeVoltage(x_dc, m_C);
@@ -484,7 +484,7 @@ std::complex<double> BjtDevice::AcTerminalCurrent(const int terminal, const std:
     std::complex<double> iqbe_ac{0.0, 0.0};
     std::complex<double> iqbc_ac{0.0, 0.0};
     if (HasTransientState()) {
-        const BJTParameters &p = m_Parameters;
+        const BjtParameters &p = m_Parameters;
         const double vbe = NodeVoltage(x_dc, m_B) - NodeVoltage(x_dc, m_E);
         const double vbc = NodeVoltage(x_dc, m_B) - NodeVoltage(x_dc, m_C);
         const double vbe_signed = m_Pnp ? -vbe : vbe;
@@ -550,7 +550,7 @@ void BjtDevice::SeedOperatingPoint(std::vector<double> &x) const {
 double BjtDevice::OutputNoiseVariance(const std::vector<double> &x_dc,
                                       const std::vector<std::complex<double>> &adjoint,
                                       const double /*frequency_hz*/) const {
-    const BJTParameters &p = m_Parameters;
+    const BjtParameters &p = m_Parameters;
     double variance = 0.0;
     if (m_C != m_Collector && p.CollectorResistance > 0.0) {
         const std::complex<double> rc_tf = AcNodeVoltage(adjoint, m_Collector) - AcNodeVoltage(adjoint, m_C);
@@ -585,7 +585,7 @@ void BjtDevice::AcceptStep(const std::vector<double> &x) {
     const double vbc = NodeVoltage(x, m_B) - NodeVoltage(x, m_C);
     const double vbe_signed = m_Pnp ? -vbe : vbe;
     const double vbc_signed = m_Pnp ? -vbc : vbc;
-    const BJTParameters &p = m_Parameters;
+    const BjtParameters &p = m_Parameters;
     const Intrinsic dc = EvaluateAt(x);
     m_Qbe = EvaluateDepletion(vbe_signed, p.EmitterCapacitance, BJT_JUNCTION_POTENTIAL, BJT_GRADING_COEFFICIENT,
                               JUNCTION_FORWARD_LIMIT)
@@ -614,7 +614,7 @@ void BjtDevice::RejectStep() {
 // ============================================================================
 
 MosfetDevice::MosfetDevice(const int drain, const int gate, const int source, const int internal_drain,
-                           const int internal_source, MOSFETParameters parameters, const bool pmos)
+                           const int internal_source, MosfetParameters parameters, const bool pmos)
     : m_Drain(drain), m_Gate(gate), m_Source(source),
       m_D(internal_drain >= 0 ? internal_drain : drain),
       m_S(internal_source >= 0 ? internal_source : source),
@@ -818,7 +818,7 @@ std::complex<double> MosfetDevice::AcTerminalCurrent(const int terminal, const s
 double MosfetDevice::OutputNoiseVariance(const std::vector<double> &x_dc,
                                          const std::vector<std::complex<double>> &adjoint,
                                          const double /*frequency_hz*/) const {
-    const MOSFETParameters &p = m_Parameters;
+    const MosfetParameters &p = m_Parameters;
     double variance = 0.0;
     if (m_D != m_Drain && p.DrainResistance > 0.0) {
         const std::complex<double> rd_tf = AcNodeVoltage(adjoint, m_Drain) - AcNodeVoltage(adjoint, m_D);
@@ -886,4 +886,4 @@ void MosfetDevice::RejectStep() {
 
 void MosfetDevice::SeedOperatingPoint(std::vector<double> &) const {}
 
-} // namespace Core::Native
+} // namespace nodalys

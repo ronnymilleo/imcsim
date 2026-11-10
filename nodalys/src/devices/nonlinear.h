@@ -25,15 +25,13 @@
  * single iteration, preventing exponential overflow.
  */
 
-#ifndef IMCSIM_NATIVE_NONLINEAR_H
-#define IMCSIM_NATIVE_NONLINEAR_H
+#ifndef NODALYS_NONLINEAR_H
+#define NODALYS_NONLINEAR_H
 
-#include "components/bjt.h"
-#include "components/diode.h"
-#include "components/mosfet.h"
-#include "native/devices.h"
+#include "devices/devices.h"
+#include "nodalys/types.h"
 
-namespace Core::Native {
+namespace nodalys {
 
 /**
  * @class   DiodeDevice
@@ -101,7 +99,7 @@ private:
 class BjtDevice : public Device {
 public:
     BjtDevice(int collector, int base, int emitter, int internal_collector, int internal_base, int internal_emitter,
-              BJTParameters parameters, bool pnp);
+              BjtParameters parameters, bool pnp);
 
     void Stamp(MnaSystem &sys, const std::vector<double> &x, const TimeContext &time) override;
     void StampAc(MnaSystem &reactive, const std::vector<double> &x_dc) const override;
@@ -140,7 +138,7 @@ private:
     int m_C; ///< Intrinsic collector node (`internal_collector` if $R_C > 0$, else `m_Collector`).
     int m_B; ///< Intrinsic base node (`internal_base` if $R_B > 0$, else `m_Base`).
     int m_E; ///< Intrinsic emitter node (`internal_emitter` if $R_E > 0$, else `m_Emitter`).
-    BJTParameters m_Parameters;
+    BjtParameters m_Parameters;
     bool m_Pnp;
     double m_Vt;
     double m_Critical;
@@ -159,7 +157,7 @@ private:
  */
 class MosfetDevice : public Device {
 public:
-    MosfetDevice(int drain, int gate, int source, int internal_drain, int internal_source, MOSFETParameters parameters,
+    MosfetDevice(int drain, int gate, int source, int internal_drain, int internal_source, MosfetParameters parameters,
                  bool pmos);
 
     void Stamp(MnaSystem &sys, const std::vector<double> &x, const TimeContext &time) override;
@@ -191,7 +189,7 @@ private:
     int m_Source;
     int m_D; ///< Intrinsic drain node (`internal_drain` if $R_D > 0$, else `m_Drain`).
     int m_S; ///< Intrinsic source node (`internal_source` if $R_S > 0$, else `m_Source`).
-    MOSFETParameters m_Parameters;
+    MosfetParameters m_Parameters;
     bool m_Pmos;
     double m_Beta; ///< $\text{KP} \cdot (W / L)$.
     double m_Vt;
@@ -204,6 +202,6 @@ private:
     double m_Critical; ///< `PNJLIM` critical voltage of the body-drain junction diode.
 };
 
-} // namespace Core::Native
+} // namespace nodalys
 
-#endif // IMCSIM_NATIVE_NONLINEAR_H
+#endif // NODALYS_NONLINEAR_H

@@ -1,33 +1,4 @@
 # =============================================================================
-# Nodalys simulation engine (clean-room solver, no external dependencies)
-# =============================================================================
-
-add_library(nodalys
-        STATIC
-            native/ac_analysis.cpp
-            native/compiler.cpp
-            native/dc_analysis.cpp
-            native/devices.cpp
-            native/linear/dense_matrix.cpp
-            native/mna_system.cpp
-            native/model_parser.cpp
-            native/native_backend.cpp
-            native/newton.cpp
-            native/noise_analysis.cpp
-            native/nonlinear.cpp
-            native/tf_analysis.cpp
-            native/transient_analysis.cpp
-            native/waveforms.cpp
-)
-
-target_include_directories(nodalys
-        PUBLIC
-            ${CMAKE_CURRENT_SOURCE_DIR}
-)
-
-imcsim_target_coverage(nodalys)
-
-# =============================================================================
 # Application Core
 # =============================================================================
 
@@ -60,6 +31,9 @@ add_library(imcsim-core-lib
             components/voltage_source.cpp
             model/circuit.cpp
             model/library_model.cpp
+            native/compiler.cpp
+            native/model_parser.cpp
+            native/native_backend.cpp
             ngspice/ngspice_backend.cpp
             ngspice/ngspice_library.cpp
             ngspice/ngspice_readers.cpp

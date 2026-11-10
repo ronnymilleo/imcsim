@@ -8,6 +8,7 @@
 
 #include "components/component.h"
 #include <memory>
+#include <nodalys/types.h>
 #include <string>
 #include <string_view>
 
@@ -19,12 +20,7 @@ namespace Core {
  * @details The switch closes when its control voltage rises past Threshold + Hysteresis and opens again when it
  *          falls below Threshold - Hysteresis, so noise around the threshold does not make it chatter.
  */
-struct SwitchParameters {
-    double Threshold = 2.5;
-    double Hysteresis = 0.1;
-    double OnResistance = 0.01;
-    double OffResistance = 1e9;
-};
+using SwitchParameters = nodalys::SwitchParameters;
 
 /**
  * @class   VoltageControlledSwitch

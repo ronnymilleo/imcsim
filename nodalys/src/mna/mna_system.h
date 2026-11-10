@@ -25,13 +25,13 @@
  * - Chua & Lin, *Computer-Aided Analysis of Electronic Circuits*
  */
 
-#ifndef IMCSIM_NATIVE_MNA_SYSTEM_H
-#define IMCSIM_NATIVE_MNA_SYSTEM_H
+#ifndef NODALYS_MNA_SYSTEM_H
+#define NODALYS_MNA_SYSTEM_H
 
-#include "native/linear/dense_matrix.h"
+#include "linear/dense_matrix.h"
 #include <vector>
 
-namespace Core::Native {
+namespace nodalys {
 
 /**
  * @struct  TimeContext
@@ -120,6 +120,6 @@ private:
     int m_NodeUnknowns = 0;
 };
 
-} // namespace Core::Native
+} // namespace nodalys
 
-#endif // IMCSIM_NATIVE_MNA_SYSTEM_H
+#endif // NODALYS_MNA_SYSTEM_H

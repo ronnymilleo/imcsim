@@ -8,6 +8,7 @@
 
 #include "components/component.h"
 #include <memory>
+#include <nodalys/types.h>
 
 namespace Core {
 
@@ -19,12 +20,7 @@ namespace Core {
  *          period, so the shape is the same at every frequency. The duty cycle is the share of each period the clock
  *          spends above half the logic level, which is the high phase plus half of the rising and falling edges.
  */
-struct ClockParameters {
-    double Frequency = 1e3;
-    double DutyCycle = 0.5;
-    double LogicLevel = 5.0;
-    double StartDelay = 0.0;
-};
+using ClockParameters = nodalys::ClockParameters;
 
 /**
  * @class   Clock
