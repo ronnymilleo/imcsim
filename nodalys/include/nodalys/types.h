@@ -1,0 +1,254 @@
+#ifndef NODALYS_TYPES_H
+#define NODALYS_TYPES_H
+
+#include <cstddef>
+#include <string>
+#include <utility>
+#include <vector>
+
+namespace nodalys {
+
+/// Unique integer identifier for a circuit node. Ground is always node 0.
+using NodeId = int;
+inline constexpr NodeId GroundNode = 0;
+
+/**
+ * @struct  DiagnosticMessage
+ * @brief   A message emitted by the simulator (e.g. convergence statistics, warnings).
+ */
+struct DiagnosticMessage {
+    std::string Text;
+    bool IsError = false;
+};
+
+/**
+ * @struct  DiodeParameters
+ * @brief   Shockley diode and junction charge parameters matching Berkeley SPICE3.
+ */
+struct DiodeParameters {
+    double SaturationCurrent = 1e-14;
+    double EmissionCoefficient = 1.0;
+    double SeriesResistance = 0.0;
+    double BreakdownVoltage = 100.0;
+    double BreakdownCurrent = 1e-3;
+    double JunctionCapacitance = 0.0;
+    double JunctionPotential = 1.0;
+    double GradingCoefficient = 0.5;
+    double TransitTime = 0.0;
+
+    bool operator==(const DiodeParameters &) const = default;
+};
+
+/**
+ * @struct  BjtParameters
+ * @brief   Gummel-Poon BJT device parameters.
+ */
+struct BjtParameters {
+    double SaturationCurrent = 1e-16;
+    double ForwardBeta = 100.0;
+    double ReverseBeta = 1.0;
+    double EarlyVoltage = 0.0;
+    double ForwardKneeCurrent = 0.0;
+    double LeakageSaturationCurrent = 0.0;
+    double LeakageEmissionCoefficient = 1.5;
+    double BaseResistance = 0.0;
+    double CollectorResistance = 0.0;
+    double EmitterResistance = 0.0;
+    double EmitterCapacitance = 0.0;
+    double CollectorCapacitance = 0.0;
+    double TransitTime = 0.0;
+    // Maximum ratings
+    double MaxCollectorEmitterVoltage = 40.0;
+    double MaxCollectorCurrent = 0.2;
+    double MaxPower = 0.5;
+
+    bool operator==(const BjtParameters &) const = default;
+};
+
+/**
+ * @struct  MosfetParameters
+ * @brief   Level-1 Shichman-Hodges MOSFET parameters.
+ */
+struct MosfetParameters {
+    double ThresholdVoltage = 0.0;
+    double Transconductance = 2e-5;
+    double ChannelModulation = 0.0;
+    double DrainResistance = 0.0;
+    double SourceResistance = 0.0;
+    double GateSourceOverlap = 0.0;
+    double GateDrainOverlap = 0.0;
+    double Width = 100e-6;
+    double Length = 100e-6;
+    // Maximum ratings
+    double MaxDrainSourceVoltage = 60.0;
+    double MaxGateSourceVoltage = 20.0;
+    double MaxDrainCurrent = 0.2;
+    double MaxPower = 0.4;
+
+    bool operator==(const MosfetParameters &) const = default;
+};
+
+/**
+ * @struct  SwitchParameters
+ * @brief   Voltage-controlled hysteretic switch parameters.
+ */
+struct SwitchParameters {
+    double Threshold = 2.5;
+    double Hysteresis = 0.1;
+    double OnResistance = 0.01;
+    double OffResistance = 1e9;
+
+    bool operator==(const SwitchParameters &) const = default;
+};
+
+/**
+ * @struct  PulseParameters
+ * @brief   SPICE PULSE(V1 V2 TD TR TF PW PER) parameters.
+ */
+struct PulseParameters {
+    double Low = 0.0;
+    double High = 5.0;
+    double Delay = 0.0;
+    double RiseTime = 1e-6;
+    double FallTime = 1e-6;
+    double Width = 0.5e-3;
+    double Period = 1e-3;
+
+    bool operator==(const PulseParameters &) const = default;
+};
+
+/**
+ * @struct  SineParameters
+ * @brief   SPICE SIN(VO VA FREQ TD THETA) parameters.
+ */
+struct SineParameters {
+    double Amplitude = 1.0;
+    double Frequency = 1e3;
+    double Offset = 0.0;
+    double Magnitude = 1.0;
+    double Phase = 0.0; // degrees
+
+    bool operator==(const SineParameters &) const = default;
+};
+
+/**
+ * @struct  ExpParameters
+ * @brief   SPICE EXP(V1 V2 TD1 TAU1 TD2 TAU2) parameters.
+ */
+struct ExpParameters {
+    double InitialValue = 0.0;
+    double PeakValue = 5.0;
+    double RiseDelay = 1e-3;
+    double RiseTimeConstant = 0.5e-3;
+    double FallDelay = 5e-3;
+    double FallTimeConstant = 1e-3;
+
+    bool operator==(const ExpParameters &) const = default;
+};
+
+/**
+ * @struct  PwlPoint
+ * @brief   One time/voltage point of a piece-wise linear waveform.
+ */
+struct PwlPoint {
+    double Time = 0.0;
+    double Value = 0.0;
+
+    bool operator==(const PwlPoint &) const = default;
+};
+
+/**
+ * @struct  PwlParameters
+ * @brief   SPICE PWL(T1 V1 T2 V2 ...) piece-wise linear parameters.
+ */
+struct PwlParameters {
+    std::vector<PwlPoint> Points = {{0.0, 0.0}, {1e-3, 5.0}, {2e-3, 0.0}};
+
+    bool operator==(const PwlParameters &) const = default;
+};
+
+/**
+ * @struct  SffmParameters
+ * @brief   SPICE SFFM(VO VA FC MDI FS) single-frequency FM parameters.
+ */
+struct SffmParameters {
+    double Offset = 0.0;
+    double Amplitude = 1.0;
+    double CarrierFrequency = 1e3;
+    double ModulationIndex = 5.0;
+    double SignalFrequency = 100.0;
+
+    bool operator==(const SffmParameters &) const = default;
+};
+
+/**
+ * @struct  AmParameters
+ * @brief   SPICE AM(SA FC MF FS TD) amplitude-modulation parameters.
+ */
+struct AmParameters {
+    double Amplitude = 1.0;
+    double Offset = 0.0;
+    double ModulatingFrequency = 100.0;
+    double CarrierFrequency = 1e3;
+    double Delay = 0.0;
+
+    bool operator==(const AmParameters &) const = default;
+};
+
+/**
+ * @struct  ClockParameters
+ * @brief   Digital clock pulse train parameters.
+ */
+struct ClockParameters {
+    double Frequency = 1e3;
+    double DutyCycle = 0.5;
+    double LogicLevel = 5.0;
+    double StartDelay = 0.0;
+
+    bool operator==(const ClockParameters &) const = default;
+};
+
+/**
+ * @struct  BoyleOpAmpParameters
+ * @brief   Datasheet specifications for the Boyle op-amp macromodel (IEEE JSSC 1974).
+ */
+struct BoyleOpAmpParameters {
+    double OpenLoopGainDecibels = 106.0;
+    double GainBandwidth = 1e6;
+    /// Volts per microsecond, as datasheets specify.
+    double SlewRate = 0.5;
+    double PhaseMarginDegrees = 60.0;
+    double InputBiasCurrent = 80e-9;
+    double CommonModeRejectionDecibels = 90.0;
+    double OutputResistance = 75.0;
+    double ShortCircuitCurrent = 25e-3;
+    double PositiveHeadroom = 1.0;
+    double NegativeHeadroom = 1.0;
+    double SupplyCurrent = 1.7e-3;
+
+    bool operator==(const BoyleOpAmpParameters &) const = default;
+};
+
+enum class SemiconductorPolarity {
+    Npn,
+    Pnp,
+    Nmos,
+    Pmos
+};
+
+enum class LiveQuantity {
+    Resistance,
+    DcVoltage
+};
+
+struct LiveChange {
+    std::string Element;
+    LiveQuantity Quantity = LiveQuantity::Resistance;
+    double Value = 0.0;
+
+    bool operator==(const LiveChange &) const = default;
+};
+
+} // namespace nodalys
+
+#endif // NODALYS_TYPES_H

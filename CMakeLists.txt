@@ -84,6 +84,7 @@ function(imcsim_target_coverage target)
 endfunction()
 
 add_subdirectory(vendor)
+add_subdirectory(nodalys)
 add_subdirectory(app-core)
 add_subdirectory(app-gui)
 

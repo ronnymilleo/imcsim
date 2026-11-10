@@ -8,17 +8,17 @@
  *          conductance and an equivalent current source, so the assembled system stays linear at every iteration.
  */
 
-#ifndef IMCSIM_NATIVE_DEVICES_H
-#define IMCSIM_NATIVE_DEVICES_H
+#ifndef NODALYS_DEVICES_H
+#define NODALYS_DEVICES_H
 
-#include "components/voltage_controlled_switch.h"
-#include "native/mna_system.h"
+#include "mna/mna_system.h"
+#include "nodalys/types.h"
 #include <complex>
 #include <functional>
 #include <string>
 #include <vector>
 
-namespace Core::Native {
+namespace nodalys {
 
 /**
  * @class   Device
@@ -434,6 +434,6 @@ private:
     double m_SavedI1 = 0.0, m_SavedI2 = 0.0, m_SavedV1 = 0.0, m_SavedV2 = 0.0;
 };
 
-} // namespace Core::Native
+} // namespace nodalys
 
-#endif // IMCSIM_NATIVE_DEVICES_H
+#endif // NODALYS_DEVICES_H

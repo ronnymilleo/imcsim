@@ -58,8 +58,9 @@ std::map<std::string, std::string> ParameterList(const std::string &text) {
             ++position;
         }
         std::string upper = key;
-        std::ranges::transform(upper, upper.begin(),
-                               [](const unsigned char character) { return static_cast<char>(std::toupper(character)); });
+        std::ranges::transform(upper, upper.begin(), [](const unsigned char character) {
+            return static_cast<char>(std::toupper(character));
+        });
         values[upper] = text.substr(value_start, position - value_start);
     }
     return values;
@@ -98,8 +99,8 @@ std::expected<const LibraryModel *, std::string> FindModel(const Circuit &circui
                                            part.GetLibraryModel()));
     }
     if (!CanUseLibraryModel(part.GetType(), model->Kind)) {
-        return std::unexpected(std::format("{} cannot use the {} model {}", part.GetName(),
-                                           GetModelKindName(model->Kind), model->Name));
+        return std::unexpected(
+            std::format("{} cannot use the {} model {}", part.GetName(), GetModelKindName(model->Kind), model->Name));
     }
     return model;
 }
@@ -131,14 +132,14 @@ std::expected<DiodeParameters, std::string> ResolveParameters(const Circuit &cir
     };
     for (const auto &[key, target] :
          std::vector<std::pair<const char *, double *>>{{"IS", &parameters.SaturationCurrent},
-                                                         {"N", &parameters.EmissionCoefficient},
-                                                         {"RS", &parameters.SeriesResistance},
-                                                         {"CJO", &parameters.JunctionCapacitance},
-                                                         {"VJ", &parameters.JunctionPotential},
-                                                         {"M", &parameters.GradingCoefficient},
-                                                         {"TT", &parameters.TransitTime},
-                                                         {"BV", &parameters.BreakdownVoltage},
-                                                         {"IBV", &parameters.BreakdownCurrent}}) {
+                                                        {"N", &parameters.EmissionCoefficient},
+                                                        {"RS", &parameters.SeriesResistance},
+                                                        {"CJO", &parameters.JunctionCapacitance},
+                                                        {"VJ", &parameters.JunctionPotential},
+                                                        {"M", &parameters.GradingCoefficient},
+                                                        {"TT", &parameters.TransitTime},
+                                                        {"BV", &parameters.BreakdownVoltage},
+                                                        {"IBV", &parameters.BreakdownCurrent}}) {
         if (const auto error = set(key, *target); !error) {
             return std::unexpected(error.error());
         }
@@ -172,18 +173,18 @@ std::expected<BJTParameters, std::string> ResolveParameters(const Circuit &circu
     };
     for (const auto &[key, target] :
          std::vector<std::pair<const char *, double *>>{{"IS", &parameters.SaturationCurrent},
-                                                         {"BF", &parameters.ForwardBeta},
-                                                         {"BR", &parameters.ReverseBeta},
-                                                         {"VAF", &parameters.EarlyVoltage},
-                                                         {"IKF", &parameters.ForwardKneeCurrent},
-                                                         {"ISE", &parameters.LeakageSaturationCurrent},
-                                                         {"NE", &parameters.LeakageEmissionCoefficient},
-                                                         {"RB", &parameters.BaseResistance},
-                                                         {"RC", &parameters.CollectorResistance},
-                                                         {"RE", &parameters.EmitterResistance},
-                                                         {"CJE", &parameters.EmitterCapacitance},
-                                                         {"CJC", &parameters.CollectorCapacitance},
-                                                         {"TF", &parameters.TransitTime}}) {
+                                                        {"BF", &parameters.ForwardBeta},
+                                                        {"BR", &parameters.ReverseBeta},
+                                                        {"VAF", &parameters.EarlyVoltage},
+                                                        {"IKF", &parameters.ForwardKneeCurrent},
+                                                        {"ISE", &parameters.LeakageSaturationCurrent},
+                                                        {"NE", &parameters.LeakageEmissionCoefficient},
+                                                        {"RB", &parameters.BaseResistance},
+                                                        {"RC", &parameters.CollectorResistance},
+                                                        {"RE", &parameters.EmitterResistance},
+                                                        {"CJE", &parameters.EmitterCapacitance},
+                                                        {"CJC", &parameters.CollectorCapacitance},
+                                                        {"TF", &parameters.TransitTime}}) {
         if (const auto error = set(key, *target); !error) {
             return std::unexpected(error.error());
         }
@@ -230,14 +231,14 @@ std::expected<MOSFETParameters, std::string> ResolveParameters(const Circuit &ci
     }
     for (const auto &[key, target] :
          std::vector<std::pair<const char *, double *>>{{"VTO", &parameters.ThresholdVoltage},
-                                                         {"KP", &parameters.Transconductance},
-                                                         {"LAMBDA", &parameters.ChannelModulation},
-                                                         {"RD", &parameters.DrainResistance},
-                                                         {"RS", &parameters.SourceResistance},
-                                                         {"CGSO", &parameters.GateSourceOverlap},
-                                                         {"CGDO", &parameters.GateDrainOverlap},
-                                                         {"W", &parameters.Width},
-                                                         {"L", &parameters.Length}}) {
+                                                        {"KP", &parameters.Transconductance},
+                                                        {"LAMBDA", &parameters.ChannelModulation},
+                                                        {"RD", &parameters.DrainResistance},
+                                                        {"RS", &parameters.SourceResistance},
+                                                        {"CGSO", &parameters.GateSourceOverlap},
+                                                        {"CGDO", &parameters.GateDrainOverlap},
+                                                        {"W", &parameters.Width},
+                                                        {"L", &parameters.Length}}) {
         if (const auto error = set(key, *target); !error) {
             return std::unexpected(error.error());
         }

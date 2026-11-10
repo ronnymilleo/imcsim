@@ -4,14 +4,14 @@
  *          solver.
  */
 
-#include "native/linear/dense_matrix.h"
+#include "linear/dense_matrix.h"
 
 #include <algorithm>
 #include <cmath>
 #include <ranges>
 #include <utility>
 
-namespace Core::Native {
+namespace nodalys {
 
 template <typename Scalar>
 BasicDenseMatrix<Scalar>::BasicDenseMatrix(const std::size_t rows, const std::size_t cols)
@@ -125,4 +125,4 @@ bool BasicDenseMatrix<Scalar>::Solve(const std::vector<Scalar> &rhs, std::vector
 template class BasicDenseMatrix<double>;
 template class BasicDenseMatrix<std::complex<double>>;
 
-} // namespace Core::Native
+} // namespace nodalys

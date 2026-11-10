@@ -9,6 +9,7 @@
 #include "components/component.h"
 #include "components/diode.h"
 #include <memory>
+#include <nodalys/types.h>
 #include <span>
 #include <string>
 #include <string_view>
@@ -22,20 +23,7 @@ namespace Core {
  * @details Headrooms are how close the output gets to each supply pin. The supply current is the quiescent
  *          current the part draws from its supply pins.
  */
-struct OpAmpParameters {
-    double OpenLoopGainDecibels = 106.0;
-    double GainBandwidth = 1e6;
-    /// Volts per microsecond, as datasheets give it.
-    double SlewRate = 0.5;
-    double PhaseMarginDegrees = 60.0;
-    double InputBiasCurrent = 80e-9;
-    double CommonModeRejectionDecibels = 90.0;
-    double OutputResistance = 75.0;
-    double ShortCircuitCurrent = 25e-3;
-    double PositiveHeadroom = 1.0;
-    double NegativeHeadroom = 1.0;
-    double SupplyCurrent = 1.7e-3;
-};
+using OpAmpParameters = nodalys::BoyleOpAmpParameters;
 
 /**
  * @struct  OpAmpModel

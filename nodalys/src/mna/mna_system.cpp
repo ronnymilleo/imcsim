@@ -3,13 +3,13 @@
  * @brief   The Modified Nodal Analysis (MNA) linear system assembled and solved at each Newton-Raphson iteration.
  */
 
-#include "native/mna_system.h"
+#include "mna/mna_system.h"
 
 #include <algorithm>
 #include <cmath>
 #include <utility>
 
-namespace Core::Native {
+namespace nodalys {
 
 MnaSystem::MnaSystem(const int node_count, const int branch_count)
     : m_A(static_cast<std::size_t>(node_count + branch_count), static_cast<std::size_t>(node_count + branch_count)),
@@ -233,4 +233,4 @@ bool MnaSystem::CheckResidual(const std::vector<double> &x, const double voltage
     return true;
 }
 
-} // namespace Core::Native
+} // namespace nodalys

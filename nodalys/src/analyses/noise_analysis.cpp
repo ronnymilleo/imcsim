@@ -1,39 +1,6 @@
-/**
- * @file    noise_analysis.cpp
- * @brief   Small-signal AC noise spectral density and integrated RMS noise analysis (`ComputeNoise`, SPICE `.noise`)
- *          of the Nodalys solver using the transposed complex adjoint method.
- * @details
- * ### How Small-Signal Adjoint Noise Analysis Works
- * Given an output node $n_{\text{out}}$, an input AC source $S_{\text{in}}$, and a decade frequency grid $\{f_k\}$:
- * 1. **DC Operating Point ($\mathbf{x}_{\text{dc}}$)**: Solves the nonlinear DC equations $\mathbf{F}(\mathbf{x}_{\text{dc}}) = \mathbf{0}$
- *    via `SolveDc()`. On return, `compiled.System` holds the real small-signal Jacobian $A_{\text{DC}}(\mathbf{x}_{\text{dc}})$.
- * 2. **Reactive Matrix Stamp ($C_{\text{AC}}$)**: Each device stamps its frequency-independent reactive sensitivities
- *    into a companion `MnaSystem reactive`.
- * 3. **Single Adjoint Solve per Frequency ($\omega_k = 2\pi f_k$)**:
- *    Instead of solving one linear system per noisy resistor/semiconductor, we solve the **transposed** complex system
- *    once per frequency:
- *    $$\left(A_{\text{DC}}(\mathbf{x}_{\text{dc}}) + j\omega_k C_{\text{AC}}(\mathbf{x}_{\text{dc}})\right)^T \lambda(\omega_k) = \mathbf{e}_{n_{\text{out}}}$$
- *    By Tellegen's theorem / linear algebra duality ($\lambda^T = \mathbf{e}_{n_{\text{out}}}^T \mathbf{Y}(j\omega_k)^{-1}$):
- *    - Any uncorrelated current noise source $i_n$ connected between nodes $a$ and $b$ produces an output voltage
- *      mean-square spectral density:
- *      $$S_{v,\text{out}}^{(i_n)}(f_k) = S_{i_n}(f_k) \cdot \left|\lambda_a(\omega_k) - \lambda_b(\omega_k)\right|^2 \quad (\text{V}^2/\text{Hz})$$
- *    - Simultaneously, the small-signal transfer gain $G_{\text{in}}(j\omega_k) = \tilde{V}_{n_{\text{out}}} / \tilde{S}_{\text{in}}$
- *      from the input source $S_{\text{in}}$ to the output node is obtained directly from $\lambda(\omega_k)$
- *      without a second matrix solve:
- *      $$G_{\text{in}}(j\omega_k) = \begin{cases} \lambda_{b_{\text{in}}}(\omega_k) & \text{voltage source on branch } b_{\text{in}} \\ \lambda_{n_-}(\omega_k) - \lambda_{n_+}(\omega_k) & \text{current source from } n_+ \text{ to } n_- \end{cases}$$
- *    - The input-referred noise power spectral density is then:
- *      $$S_{\text{in}}(f_k) = \frac{S_{\text{out}}(f_k)}{\left|G_{\text{in}}(j\omega_k)\right|^2}$$
- * 4. **SPICE3f5 Log-Log Power-Law Integration (`Nintegrate`)**:
- *    Over each frequency interval $[f_{k-1}, f_k]$, the noise power spectral density $S(f)$ is modeled locally as a
- *    power law $S(f) = S(f_{k-1}) (f / f_{k-1})^\alpha$ with $\alpha = \ln(S_k / S_{k-1}) / \ln(f_k / f_{k-1})$, which
- *    integrates both white noise ($\alpha = 0$), $1/f$ flicker noise ($\alpha = -1$), and single-pole RC roll-off
- *    ($\alpha = -2$) analytically:
- *    $$\int_{f_{k-1}}^{f_k} S(f)\,df = \begin{cases} S_k f_k \ln(f_k / f_{k-1}) & |\alpha + 1| < 10^{-10} \\ \dfrac{S_k f_k - S_{k-1} f_{k-1}}{\alpha + 1} & \text{otherwise} \end{cases}$$
- */
+#include "analyses/analyses.h"
 
-#include "native/analyses.h"
-
-#include "native/devices.h"
+#include "devices/devices.h"
 #include <algorithm>
 #include <cmath>
 #include <complex>
@@ -41,74 +8,74 @@
 #include <numbers>
 #include <unordered_map>
 
-namespace Core::Native {
+namespace nodalys {
 
 namespace {
 
-/// Floor power spectral density ($10^{-38}\text{ V}^2/\text{Hz}$) used by SPICE3f5 `Nintegrate` when taking logarithms.
 constexpr double MIN_NOISE_VARIANCE = 1e-38;
-/// Floor squared transfer gain to prevent division by zero when input-referring noise through a transmission zero.
 constexpr double MIN_GAIN_SQUARED = 1e-38;
 
-/**
- * @brief   Integrates a noise power spectral density $S(f)$ over $[f_1, f_2]$ using the SPICE3f5 log-log power-law rule.
- */
 double IntegrateNoiseStep(const double f1, const double f2, const double s1, const double s2) {
     if (s1 <= 0.0 && s2 <= 0.0) {
         return 0.0;
     }
     const double d_ln_f = std::log(f2 / f1);
-    if (std::fabs(d_ln_f) < 1e-15) {
+    if (std::fabs(d_ln_f) < 1e-12) {
         return 0.5 * (s1 + s2) * (f2 - f1);
     }
-    const double clamped_s1 = std::max(s1, MIN_NOISE_VARIANCE);
-    const double clamped_s2 = std::max(s2, MIN_NOISE_VARIANCE);
-    const double exponent = std::log(clamped_s2 / clamped_s1) / d_ln_f;
-    if (std::fabs(exponent + 1.0) < 1e-10) {
-        return clamped_s2 * f2 * d_ln_f;
+    if (s1 <= MIN_NOISE_VARIANCE && s2 <= MIN_NOISE_VARIANCE) {
+        return 0.5 * (s1 + s2) * (f2 - f1);
     }
-    return (clamped_s2 * f2 - clamped_s1 * f1) / (exponent + 1.0);
+    if (s1 <= MIN_NOISE_VARIANCE) {
+        return s2 * (f2 - f1) / 2.0;
+    }
+    if (s2 <= MIN_NOISE_VARIANCE) {
+        return s1 * (f2 - f1) / 2.0;
+    }
+    const double d_ln_s = std::log(s2 / s1);
+    const double alpha = d_ln_s / d_ln_f;
+    if (std::fabs(alpha + 1.0) < 1e-10) {
+        return s2 * f2 * d_ln_f;
+    }
+    return (s2 * f2 - s1 * f1) / (alpha + 1.0);
 }
 
 } // namespace
 
-std::expected<Noise, std::string> ComputeNoise(const Circuit &circuit, CompiledCircuit &compiled,
-                                               const NoiseSettings &settings, const ConvergenceOptions &options,
-                                               std::vector<SimulatorMessage> &messages) {
-    if (settings.StartFrequency <= 0.0 || settings.StopFrequency <= settings.StartFrequency ||
+std::expected<NoiseResult, std::string> ComputeNoise(
+    CompiledCircuit &compiled,
+    const NoiseConfig &settings,
+    const ConvergenceOptions &options,
+    std::vector<DiagnosticMessage> *messages) {
+
+    const int out_node = settings.OutputPositiveNode;
+    if (out_node <= 0 || out_node >= compiled.CircuitNodeCount) {
+        return std::unexpected(std::format("The circuit has no output node {}", out_node));
+    }
+    if (settings.StartFrequency <= 0.0 || settings.StopFrequency < settings.StartFrequency ||
         settings.PointsPerDecade <= 0) {
         return std::unexpected("The noise analysis has invalid frequency settings; check start, stop and points per decade");
-    }
-    if (settings.OutputNode <= 0 || settings.OutputNode >= compiled.CircuitNodeCount) {
-        return std::unexpected(std::format("The circuit has no output node {}", settings.OutputNode));
     }
 
     const auto source_it = compiled.SourcesByName.find(settings.InputSource);
     if (source_it == compiled.SourcesByName.end()) {
-        const bool exists = std::ranges::any_of(circuit.GetEntries(), [&](const CircuitEntry &entry) {
-            return entry.Part->GetName() == settings.InputSource;
-        });
-        return std::unexpected(
-            exists ? std::format("The source {} cannot be the input of a noise analysis", settings.InputSource)
-                   : std::format("The circuit has no source named {}", settings.InputSource));
+        return std::unexpected(std::format("The circuit has no source named {}", settings.InputSource));
     }
 
-    const auto *voltage_source = dynamic_cast<const VoltageSourceDevice *>(source_it->second);
-    const auto *current_source = dynamic_cast<const CurrentSourceDevice *>(source_it->second);
+    auto *voltage_source = dynamic_cast<VoltageSourceDevice *>(source_it->second);
+    auto *current_source = dynamic_cast<CurrentSourceDevice *>(source_it->second);
     if (voltage_source == nullptr && current_source == nullptr) {
-        return std::unexpected(std::format("The source {} cannot be the input of a noise analysis", settings.InputSource));
+        return std::unexpected(std::format("The source {} cannot drive a noise analysis", settings.InputSource));
     }
 
-    // Step 1: Solve the DC operating point to linearize all nonlinear devices around x_dc
     const int size = compiled.System->Size();
     std::vector<double> x_dc(static_cast<std::size_t>(size), 0.0);
-    const NewtonOutcome outcome = SolveDc(*compiled.System, compiled.Devices, x_dc, options, TimeContext{});
+    const NewtonOutcome outcome = SolveNewton(*compiled.System, compiled.Devices, x_dc, TimeContext{}, options);
     if (!outcome.Converged) {
         return std::unexpected("The native solver found no operating point to linearize the noise analysis around");
     }
     DescribeOutcome(outcome, "operating point", messages);
 
-    // Step 2: Stamp the frequency-independent reactive matrix C_ac
     std::vector<bool> node_flags(static_cast<std::size_t>(size), false);
     for (int i = 0; i < size; ++i) {
         node_flags[static_cast<std::size_t>(i)] = compiled.System->IsNodeUnknown(i);
@@ -118,9 +85,8 @@ std::expected<Noise, std::string> ComputeNoise(const Circuit &circuit, CompiledC
         device->StampAc(reactive, x_dc);
     }
 
-    // Step 3: Build the decade-logarithmic frequency grid matching ngspice (`.noise ... dec <N> <Start> <Stop>`)
-    Noise result;
-    result.OutputNode = settings.OutputNode;
+    NoiseResult result;
+    result.OutputNode = out_node;
     result.InputSource = settings.InputSource;
     result.InputUnit = voltage_source != nullptr ? "V" : "A";
     for (int index = 0;; ++index) {
@@ -155,10 +121,9 @@ std::expected<Noise, std::string> ComputeNoise(const Circuit &circuit, CompiledC
     const std::size_t group_count = compiled.NoiseGroups.size();
     std::vector<std::vector<double>> group_variances(group_count, std::vector<double>(point_count, 0.0));
 
-    const int out_unknown = compiled.System->NodeIndex(settings.OutputNode);
+    const int out_unknown = compiled.System->NodeIndex(out_node);
     std::vector<std::complex<double>> adjoint(static_cast<std::size_t>(size));
 
-    // Step 4: Sweep frequency and solve the transposed adjoint system at each point
     for (std::size_t k = 0; k < point_count; ++k) {
         const double frequency = result.Frequencies[k];
         const double omega = 2.0 * std::numbers::pi * frequency;
@@ -167,7 +132,6 @@ std::expected<Noise, std::string> ComputeNoise(const Circuit &circuit, CompiledC
                                                frequency));
         }
 
-        // Compute the small-signal transfer gain G_in(jw) from the input source to the output node via the adjoint vector
         std::complex<double> gain{0.0, 0.0};
         if (voltage_source != nullptr) {
             gain = adjoint[static_cast<std::size_t>(voltage_source->Branch())];
@@ -189,8 +153,6 @@ std::expected<Noise, std::string> ComputeNoise(const Circuit &circuit, CompiledC
             if (k > 0) {
                 const double step_out =
                     IntegrateNoiseStep(result.Frequencies[k - 1], frequency, prev_device_out_var[d], out_var);
-                // Matches SPICE3f5 / ngspice (`resnoise.c`, `bjtnoise.c`, etc.): each step's integrated output
-                // variance `tempOnoise` is referred to the input by multiplying by `data->GainSqInv` at the step end.
                 const double step_in = step_out * inv_gain_sq;
                 integrated_device_out_var[d] += step_out;
                 integrated_total_out_var += step_out;
@@ -217,7 +179,6 @@ std::expected<Noise, std::string> ComputeNoise(const Circuit &circuit, CompiledC
     result.OutputTotal = std::sqrt(integrated_total_out_var);
     result.InputTotal = std::sqrt(integrated_total_in_var);
 
-    // Step 5: Assemble per-component noise contributions and sort descending by total output RMS noise
     for (std::size_t g = 0; g < group_count; ++g) {
         double group_total_var = 0.0;
         for (const Device *dev : compiled.NoiseGroups[g].Devices) {
@@ -240,8 +201,10 @@ std::expected<Noise, std::string> ComputeNoise(const Circuit &circuit, CompiledC
     }
     std::ranges::stable_sort(result.Contributions, std::ranges::greater{}, &NoiseContribution::OutputTotal);
 
-    messages.push_back({std::format("native: noise analysis computed {} frequency points", point_count), false});
+    if (messages) {
+        messages->push_back({std::format("nodalys: noise analysis computed {} frequency points", point_count), false});
+    }
     return result;
 }
 
-} // namespace Core::Native
+} // namespace nodalys
