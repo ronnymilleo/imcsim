@@ -37,8 +37,7 @@ void StampConductance(MnaSystem &sys, const int node_a, const int node_b, const 
  */
 SmoothLogicDevice::SmoothLogicDevice(const LogicGateType type, const int output, std::vector<int> inputs,
                                      const int internal, SmoothLogicParameters params)
-    : m_Type(type), m_Output(output), m_Inputs(std::move(inputs)), m_Internal(internal),
-      m_Params(std::move(params)) {
+    : m_Type(type), m_Output(output), m_Inputs(std::move(inputs)), m_Internal(internal), m_Params(std::move(params)) {
     if (m_Params.PropagationDelay > 0.0 && m_Internal >= 0) {
         constexpr double LN2 = 0.6931471805599453;
         m_FilterCapacitance = (m_Params.PropagationDelay / LN2) * m_FilterConductance;
@@ -65,8 +64,8 @@ void SmoothLogicDevice::Stamp(MnaSystem &sys, const std::vector<double> &x, cons
     if (m_Internal >= 0 && m_FilterCapacitance > 0.0) {
         // Internal low-pass RC inertial delay stage
         if (time.IsTransient) {
-            m_CapConductance = time.BackwardEuler ? m_FilterCapacitance / time.TimeStep
-                                                  : 2.0 * m_FilterCapacitance / time.TimeStep;
+            m_CapConductance =
+                time.BackwardEuler ? m_FilterCapacitance / time.TimeStep : 2.0 * m_FilterCapacitance / time.TimeStep;
             m_CapEquivalent = -m_CapConductance * m_Voltage - (time.BackwardEuler ? 0.0 : m_Current);
             sys.AddA(m_Internal, m_Internal, m_CapConductance);
             sys.AddRhs(m_Internal, -m_CapEquivalent);
@@ -128,6 +127,32 @@ void SmoothLogicDevice::StampAc(MnaSystem &reactive, const std::vector<double> &
     if (m_Internal >= 0 && m_FilterCapacitance > 0.0) {
         reactive.AddA(m_Internal, m_Internal, m_FilterCapacitance);
     }
+}
+
+/**
+ * @brief   Limits voltage changes at the gate's output and delay nodes to ensure Newton-Raphson convergence.
+ * @param[in,out] x_new  Candidate solution vector to limit.
+ * @param[in]     x_old  Previous iterate solution vector.
+ * @return  True if any node voltage was limited.
+ */
+bool SmoothLogicDevice::Limit(std::vector<double> &x_new, const std::vector<double> &x_old) const {
+    bool limited = false;
+    const double span = std::abs(m_Params.VHigh - m_Params.VLow);
+    const double max_step = 0.35 * std::max(span, 1.0);
+    const auto limit_node = [&](const int node) {
+        if (node < 0 || static_cast<std::size_t>(node) >= x_new.size()) {
+            return;
+        }
+        const double delta = x_new[static_cast<std::size_t>(node)] - x_old[static_cast<std::size_t>(node)];
+        if (std::abs(delta) > max_step) {
+            x_new[static_cast<std::size_t>(node)] =
+                x_old[static_cast<std::size_t>(node)] + std::copysign(max_step, delta);
+            limited = true;
+        }
+    };
+    limit_node(m_Internal);
+    limit_node(m_Output);
+    return limited;
 }
 
 /**

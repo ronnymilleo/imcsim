@@ -17,7 +17,8 @@ namespace nodalys {
  * @class   SmoothLogicDevice
  * @brief   An infinitely differentiable C^inf smooth logic gate device for continuous MNA simulation.
  * @details Solves logic gates natively within the continuous analog Newton-Raphson solver without code models or
- *          discontinuous events. Supports configurable threshold, transition width, inertial delay, and output resistance.
+ *          discontinuous events. Supports configurable threshold, transition width, inertial delay, and output
+ * resistance.
  */
 class SmoothLogicDevice : public Device {
 public:
@@ -27,6 +28,7 @@ public:
     // Simulation
     void Stamp(MnaSystem &sys, const std::vector<double> &x, const TimeContext &time) override;
     void StampAc(MnaSystem &reactive, const std::vector<double> &x_dc) const override;
+    bool Limit(std::vector<double> &x_new, const std::vector<double> &x_old) const override;
 
     // Terminal Currents
     double TerminalCurrent(int terminal, const std::vector<double> &x) const override;
