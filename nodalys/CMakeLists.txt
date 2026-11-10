@@ -36,3 +36,25 @@ target_include_directories(nodalys
 if(COMMAND imcsim_target_coverage)
     imcsim_target_coverage(nodalys)
 endif()
+
+# =============================================================================
+# nodalys-cli executable (Standalone SPICE CLI)
+# =============================================================================
+
+add_executable(nodalys-cli
+    src/cli/main.cpp
+)
+
+set_target_properties(nodalys-cli PROPERTIES
+    OUTPUT_NAME "nodalys"
+)
+
+target_link_libraries(nodalys-cli
+    PRIVATE
+        nodalys
+        CLI11::CLI11
+)
+
+if(COMMAND imcsim_target_coverage)
+    imcsim_target_coverage(nodalys-cli)
+endif()
