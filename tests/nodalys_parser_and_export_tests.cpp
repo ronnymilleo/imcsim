@@ -211,6 +211,53 @@ TEST_CASE("SPICE netlists parse into runnable circuits and simulation directives
         CHECK(sp->GetPortCount() == 2);
         CHECK(sp->Frequencies.size() == 11);
     }
+
+    SECTION("Pole-Zero analysis directives (.pz)") {
+        constexpr std::string_view netlist = "* RC Pole-Zero Netlist\n"
+                                             "Vin 1 0 0V\n"
+                                             "R1 1 2 1k\n"
+                                             "C1 2 0 1u\n"
+                                             ".pz 2 Vin pz\n"
+                                             ".end\n";
+
+        const auto parsed = nodalys::ParseNetlist(netlist);
+        REQUIRE(parsed.has_value());
+        REQUIRE(parsed->Analyses.size() == 1);
+        CHECK(parsed->Analyses[0].Kind == nodalys::AnalysisKind::PoleZero);
+
+        const auto &cfg = std::get<nodalys::PoleZeroConfig>(parsed->Analyses[0].Config);
+        CHECK(cfg.OutputNode == 2);
+        CHECK(cfg.InputSource == "Vin");
+        CHECK(cfg.FindPoles);
+        CHECK(cfg.FindZeros);
+
+        const auto pz = nodalys::ComputePoleZero(parsed->CircuitInstance, cfg);
+        REQUIRE(pz.has_value());
+        REQUIRE(pz->Poles.size() == 1);
+        CHECK_THAT(pz->Poles[0].real(), WithinRel(-1000.0, 1e-4));
+        CHECK_THAT(pz->Poles[0].imag(), WithinAbs(0.0, 1e-6));
+        CHECK(pz->Zeros.empty());
+    }
+
+    SECTION("Pole-Zero 4-node standard SPICE syntax") {
+        constexpr std::string_view netlist = "* RC Pole-Zero Standard Syntax\n"
+                                             "Vin 1 0 0V\n"
+                                             "R1 1 2 1k\n"
+                                             "C1 2 0 1u\n"
+                                             ".pz 1 0 2 0 vol pol\n"
+                                             ".end\n";
+
+        const auto parsed = nodalys::ParseNetlist(netlist);
+        REQUIRE(parsed.has_value());
+        REQUIRE(parsed->Analyses.size() == 1);
+        CHECK(parsed->Analyses[0].Kind == nodalys::AnalysisKind::PoleZero);
+
+        const auto &cfg = std::get<nodalys::PoleZeroConfig>(parsed->Analyses[0].Config);
+        CHECK(cfg.OutputNode == 2);
+        CHECK(cfg.InputSource == "Vin");
+        CHECK(cfg.FindPoles);
+        CHECK_FALSE(cfg.FindZeros);
+    }
 }
 
 TEST_CASE("Simulation results export to RAW, CSV, and JSON formats", "[nodalys][export]") {
@@ -296,6 +343,28 @@ TEST_CASE("Simulation results export to RAW, CSV, and JSON formats", "[nodalys][
         const std::string raw = nodalys::ExportRaw(sp_res);
         CHECK(raw.contains("Plotname: S-Parameter Analysis"));
         CHECK(raw.contains("Flags: complex"));
+    }
+
+    SECTION("Pole-Zero result export (RAW, CSV, JSON)") {
+        nodalys::PoleZeroResult pz_res;
+        pz_res.Poles = {{-1000.0, 0.0}};
+        pz_res.Zeros = {{0.0, 10000.0}, {0.0, -10000.0}};
+
+        const std::string raw = nodalys::ExportRaw(pz_res, "PZ Test");
+        CHECK(raw.contains("Plotname: Pole-Zero Analysis"));
+        CHECK(raw.contains("Flags: complex"));
+        CHECK(raw.contains("No. Variables: 2"));
+        CHECK(raw.contains("No. Points: 2"));
+
+        const std::string csv = nodalys::ExportCsv(pz_res);
+        CHECK(csv.contains("Type,Index,Real (rad/s),Imag (rad/s),Frequency (Hz)"));
+        CHECK(csv.contains("Pole,1,-1000,0,159.15494"));
+        CHECK(csv.contains("Zero,1,0,10000,1591.5494"));
+
+        const std::string json = nodalys::ExportJson(pz_res);
+        CHECK(json.contains("\"analysis\": \"pole_zero\""));
+        CHECK(json.contains("\"poles\": [{\"real\": -1000, \"imag\": 0, \"frequency_hz\": 159.15494}]"));
+        CHECK(json.contains("\"zeros\": ["));
     }
 
     SECTION("SaveStringToFile") {
@@ -436,6 +505,33 @@ TEST_CASE("The Nodalys standalone binary runs netlists from arguments or standar
         std::string ts_content((std::istreambuf_iterator<char>(out_file)), std::istreambuf_iterator<char>());
         CHECK(ts_content.contains("# HZ S RI R 50"));
         CHECK(ts_content.contains("! Nodalys S-Parameter Simulation"));
+
+        std::filesystem::remove(test_netlist_path);
+        std::filesystem::remove(test_output_path);
+    }
+
+    SECTION("CLI execution with .pz analysis and JSON output") {
+        const std::string test_netlist_path = "/tmp/nodalys_cli_pz_in.cir";
+        const std::string test_output_path = "/tmp/nodalys_cli_pz_out.json";
+
+        const std::string netlist = "* Test Pole-Zero\n"
+                                    "Vin 1 0 0V\n"
+                                    "R1 1 2 1k\n"
+                                    "C1 2 0 1u\n"
+                                    ".pz 2 Vin pz\n"
+                                    ".end\n";
+        REQUIRE(nodalys::SaveStringToFile(test_netlist_path, netlist));
+
+        const std::string cmd =
+            std::format("{} -b -a pz -f json -o {} {}", cli_path, test_output_path, test_netlist_path);
+        const int rc = std::system(cmd.c_str());
+        CHECK(rc == 0);
+        REQUIRE(std::filesystem::exists(test_output_path));
+
+        std::ifstream out_file(test_output_path);
+        std::string json_content((std::istreambuf_iterator<char>(out_file)), std::istreambuf_iterator<char>());
+        CHECK(json_content.contains("\"analysis\": \"pole_zero\""));
+        CHECK(json_content.contains("\"poles\""));
 
         std::filesystem::remove(test_netlist_path);
         std::filesystem::remove(test_output_path);

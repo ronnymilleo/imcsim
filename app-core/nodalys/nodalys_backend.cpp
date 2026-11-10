@@ -7,6 +7,7 @@
 
 #include "components/logic_part.h"
 #include "nodalys/compiler.h"
+#include "simulation/pole_zero.h"
 #include <format>
 #include <nodalys/nodalys.h>
 #include <utility>
@@ -15,9 +16,10 @@ namespace Core {
 
 namespace {
 
-constexpr auto NODALYS_ANALYSES = {
-    AnalysisKind::OPERATING_POINT, AnalysisKind::TRANSIENT,         AnalysisKind::DC_SWEEP,    AnalysisKind::AC_SWEEP,
-    AnalysisKind::NOISE,           AnalysisKind::TRANSFER_FUNCTION, AnalysisKind::S_PARAMETERS};
+constexpr auto NODALYS_ANALYSES = {AnalysisKind::OPERATING_POINT, AnalysisKind::TRANSIENT,
+                                   AnalysisKind::DC_SWEEP,        AnalysisKind::AC_SWEEP,
+                                   AnalysisKind::NOISE,           AnalysisKind::TRANSFER_FUNCTION,
+                                   AnalysisKind::POLE_ZERO,       AnalysisKind::S_PARAMETERS};
 
 std::expected<nodalys::Circuit, std::string> CompileOrFail(const Circuit &circuit) {
     auto compiled = CompileCircuit(circuit);
@@ -44,6 +46,8 @@ NodalysBackend::NodalysBackend() {
     for (int index = 0; index <= static_cast<int>(ComponentType::SEVEN_SEGMENT); ++index) {
         const auto type = static_cast<ComponentType>(index);
         if (IsLogicPart(type)) {
+            m_Capabilities.UnsupportedPartsByAnalysis[AnalysisKind::POLE_ZERO][type] =
+                "Pole-zero analysis is small-signal, and digital parts have no small-signal model";
             m_Capabilities.UnsupportedPartsByAnalysis[AnalysisKind::S_PARAMETERS][type] =
                 "S-parameters are small-signal, and digital parts have no small-signal RF model";
         }
@@ -322,8 +326,36 @@ SensitivityRun NodalysBackend::RunSensitivity(const Circuit & /*circuit*/, const
  * @param[in] settings  Output node and input source.
  * @return  The poles and zeros, or an error.
  */
-PoleZeroRun NodalysBackend::RunPoleZero(const Circuit & /*circuit*/, const PoleZeroSettings & /*settings*/) {
-    return {std::unexpected("Nodalys has no pole-zero analysis yet; it runs with the ngspice backend"), {}};
+PoleZeroRun NodalysBackend::RunPoleZero(const Circuit &circuit, const PoleZeroSettings &settings) {
+    PoleZeroRun run;
+    auto compiled = CompileOrFail(circuit);
+    if (!compiled) {
+        run.Result = std::unexpected(compiled.error());
+        return run;
+    }
+
+    nodalys::PoleZeroConfig config{
+        .OutputNode = settings.OutputNode,
+        .InputSource = settings.InputSource,
+        .FindPoles = true,
+        .FindZeros = true,
+    };
+
+    std::vector<nodalys::DiagnosticMessage> messages;
+    auto result = nodalys::ComputePoleZero(*compiled, config, {}, &messages);
+    ForwardMessages(messages, run.Messages);
+    if (!result) {
+        run.Result = std::unexpected(result.error());
+        return run;
+    }
+
+    if (result->Poles.empty() && result->Zeros.empty()) {
+        run.Result = std::unexpected(std::string(NO_POLE_ZERO_RESULT));
+        return run;
+    }
+
+    run.Result = Core::BuildPoleZero(circuit, settings, result->Poles, result->Zeros);
+    return run;
 }
 
 /**

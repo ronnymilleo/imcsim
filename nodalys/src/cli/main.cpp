@@ -73,8 +73,8 @@ int main(int argc, char **argv) {
     app.add_option("-o,--output", output_file, "Destination output file (default: stdout)");
     app.add_option("-f,--format", format_str, "Output format: raw (Nutmeg ASCII), csv, json, touchstone (default: raw)")
         ->check(CLI::IsMember({"raw", "raw-ascii", "csv", "json", "touchstone", "s2p"}, CLI::ignore_case));
-    app.add_option("-a,--analysis", analysis_override, "Override analysis: op, tran, dc, ac, tf, noise, sp")
-        ->check(CLI::IsMember({"op", "tran", "dc", "ac", "tf", "noise", "sp"}, CLI::ignore_case));
+    app.add_option("-a,--analysis", analysis_override, "Override analysis: op, tran, dc, ac, tf, noise, sp, pz")
+        ->check(CLI::IsMember({"op", "tran", "dc", "ac", "tf", "noise", "sp", "pz"}, CLI::ignore_case));
     app.add_option("-s,--step", step_override, "Override transient step time / sweep step");
     app.add_option("-t,--stop", stop_override, "Override transient stop time");
 
@@ -135,17 +135,37 @@ int main(int argc, char **argv) {
     // Apply analysis overrides
     if (!analysis_override.empty()) {
         const std::string a_lower = ToLower(analysis_override);
-        parsed.Analyses.clear();
-        if (a_lower == "op") {
-            parsed.Analyses.push_back({nodalys::AnalysisKind::OperatingPoint, std::monostate{}});
-        } else if (a_lower == "tran") {
-            nodalys::TransientConfig cfg;
-            cfg.TimeStep = step_override.value_or(1e-6);
-            cfg.StopTime = stop_override.value_or(1e-3);
-            cfg.MaxStep = cfg.TimeStep;
-            parsed.Analyses.push_back({nodalys::AnalysisKind::Transient, cfg});
-        } else if (a_lower == "sp") {
-            parsed.Analyses.push_back({nodalys::AnalysisKind::SParameters, nodalys::SParameterConfig{}});
+        auto it = std::ranges::find_if(parsed.Analyses, [&](const auto &an) {
+            if (a_lower == "op") return an.Kind == nodalys::AnalysisKind::OperatingPoint;
+            if (a_lower == "tran") return an.Kind == nodalys::AnalysisKind::Transient;
+            if (a_lower == "dc") return an.Kind == nodalys::AnalysisKind::DcSweep;
+            if (a_lower == "ac") return an.Kind == nodalys::AnalysisKind::AcSweep;
+            if (a_lower == "tf") return an.Kind == nodalys::AnalysisKind::TransferFunction;
+            if (a_lower == "noise") return an.Kind == nodalys::AnalysisKind::Noise;
+            if (a_lower == "sp") return an.Kind == nodalys::AnalysisKind::SParameters;
+            if (a_lower == "pz") return an.Kind == nodalys::AnalysisKind::PoleZero;
+            return false;
+        });
+
+        if (it != parsed.Analyses.end()) {
+            nodalys::ParsedAnalysis match = *it;
+            parsed.Analyses.clear();
+            parsed.Analyses.push_back(std::move(match));
+        } else {
+            parsed.Analyses.clear();
+            if (a_lower == "op") {
+                parsed.Analyses.push_back({nodalys::AnalysisKind::OperatingPoint, std::monostate{}});
+            } else if (a_lower == "tran") {
+                nodalys::TransientConfig cfg;
+                cfg.TimeStep = step_override.value_or(1e-6);
+                cfg.StopTime = stop_override.value_or(1e-3);
+                cfg.MaxStep = cfg.TimeStep;
+                parsed.Analyses.push_back({nodalys::AnalysisKind::Transient, cfg});
+            } else if (a_lower == "sp") {
+                parsed.Analyses.push_back({nodalys::AnalysisKind::SParameters, nodalys::SParameterConfig{}});
+            } else if (a_lower == "pz") {
+                parsed.Analyses.push_back({nodalys::AnalysisKind::PoleZero, nodalys::PoleZeroConfig{}});
+            }
         }
     }
 
@@ -259,6 +279,21 @@ int main(int argc, char **argv) {
                                          cfg.StartFrequency, cfg.StopFrequency);
             }
             auto res = nodalys::ComputeSParameters(parsed.CircuitInstance, cfg, parsed.Options, verbose ? &diagnostics : nullptr);
+            if (!res) {
+                std::cerr << std::format("Simulation Error: {}\n", res.error());
+                return EXIT_FAILURE;
+            }
+            sim_result = std::move(*res);
+            break;
+        }
+
+        case nodalys::AnalysisKind::PoleZero: {
+            const auto &cfg = std::get<nodalys::PoleZeroConfig>(analysis.Config);
+            if (verbose && !batch_mode) {
+                std::cout << std::format("Running Pole-Zero (.pz) analysis: output={}, input={}\n",
+                                         cfg.OutputNode, cfg.InputSource);
+            }
+            auto res = nodalys::ComputePoleZero(parsed.CircuitInstance, cfg, parsed.Options, verbose ? &diagnostics : nullptr);
             if (!res) {
                 std::cerr << std::format("Simulation Error: {}\n", res.error());
                 return EXIT_FAILURE;

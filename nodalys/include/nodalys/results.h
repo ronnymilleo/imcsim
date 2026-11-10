@@ -206,6 +206,15 @@ struct SParameterResult {
     }
 };
 
+/**
+ * @struct  PoleZeroResult
+ * @brief   Small-Signal Pole-Zero (.pz) finite poles and zeros in rad/s.
+ */
+struct PoleZeroResult {
+    std::vector<std::complex<double>> Poles;
+    std::vector<std::complex<double>> Zeros;
+};
+
 using SimulationResult = std::variant<
     OperatingPointResult,
     TransientResult,
@@ -213,7 +222,8 @@ using SimulationResult = std::variant<
     AcSweepResult,
     TransferFunctionResult,
     NoiseResult,
-    SParameterResult
+    SParameterResult,
+    PoleZeroResult
 >;
 
 } // namespace nodalys

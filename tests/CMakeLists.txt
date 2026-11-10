@@ -99,11 +99,13 @@ add_executable(imcsim-tests
             nodalys_parser_and_export_tests.cpp
             nodalys_smooth_logic_tests.cpp
             wire_routing_tests.cpp
+            ${PROJECT_SOURCE_DIR}/nodalys/tests/linear_tests.cpp
 )
 
 target_include_directories(imcsim-tests
         PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}
+            ${PROJECT_SOURCE_DIR}/nodalys/src
 )
 
 target_link_libraries(imcsim-tests

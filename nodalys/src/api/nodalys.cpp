@@ -74,4 +74,13 @@ std::expected<SParameterResult, std::string> ComputeSParameters(
     return ComputeSParameters(impl.Compiled(), config, options, messages);
 }
 
+std::expected<PoleZeroResult, std::string> ComputePoleZero(
+    const Circuit &circuit,
+    const PoleZeroConfig &config,
+    const ConvergenceOptions &options,
+    std::vector<DiagnosticMessage> *messages) {
+    auto &impl = const_cast<Circuit &>(circuit).Impl();
+    return ComputePoleZero(impl.Compiled(), config, options, messages);
+}
+
 } // namespace nodalys

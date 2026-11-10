@@ -30,7 +30,8 @@ enum class AnalysisKind {
     AcSweep,              ///< .ac
     TransferFunction,     ///< .tf
     Noise,                ///< .noise
-    SParameters           ///< .sp
+    SParameters,          ///< .sp
+    PoleZero              ///< .pz
 };
 
 /**
@@ -46,7 +47,8 @@ struct ParsedAnalysis {
         AcSweepConfig,          // AcSweep (.ac)
         TransferFunctionConfig, // TransferFunction (.tf)
         NoiseConfig,            // Noise (.noise)
-        SParameterConfig        // SParameters (.sp)
+        SParameterConfig,       // SParameters (.sp)
+        PoleZeroConfig          // PoleZero (.pz)
     > Config;
 };
 

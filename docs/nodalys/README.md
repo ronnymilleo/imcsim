@@ -25,6 +25,9 @@
 7. **[Small-Signal S-Parameter Analysis (`.sp`)](./s_parameters.md)**
    - Algorithms: Multiport power wave formulation, Norton port excitation ($I_{s,j} = 2\sqrt{G_j}$), single-LU multi-RHS factorization, and derived RF figures of merit (Return Loss, Insertion Loss, VSWR, Input Impedance, Touchstone export).
    - Benchmark tables: **Analytical Golden vs. `ngspice` vs. `Nodalys`**.
+8. **[Small-Signal Pole-Zero Analysis (`.pz`)](./pz_analysis.md)**
+   - Algorithms: Generalized eigenvalue problem $(\mathbf{G}, -\mathbf{C})$ and Rosenbrock system pencil $(\mathbf{A}_z, -\mathbf{B}_z)$ via the Moler-Stewart QZ algorithm, finite root filtering, natural frequency $\omega_0$, quality factor $Q$, and damping ratio $\zeta$.
+   - Benchmark tables: **Analytical Golden vs. `ngspice` vs. `Nodalys`**.
 
 ---
 
@@ -39,13 +42,13 @@
 │   │   └── circuit_builder.h          Fluent CircuitBuilder for components & models
 │   └── src/
 │       ├── api/                       CircuitBuilder implementation and Circuit internals
-│       ├── analyses/                  Solvers: .op, .dc, .tran, .ac, .tf, .noise, .sp
+│       ├── analyses/                  Solvers: .op, .dc, .tran, .ac, .tf, .noise, .sp, .pz
 │       ├── bridge/                    LogicBridge: Verilog discrete-to-analog co-simulation
 │       ├── cli/                       Standalone CLI binary entry point (`nodalys`)
 │       ├── compiler/                  CompiledCircuit internal representation
 │       ├── devices/                   Passive, source, semiconductor, and smooth logic models
 │       ├── export/                    CSV, JSON, SPICE Raw, and Touchstone multi-format exporters
-│       ├── linear/                    BasicDenseMatrix (LU, row equilibration, iterative refinement)
+│       ├── linear/                    BasicDenseMatrix (LU) and QZ generalized eigenvalue solver
 │       ├── mna/                       MnaSystem (real and complex matrix assembly)
 │       ├── newton/                    Damped Newton-Raphson, Gmin/Source stepping
 │       └── parser/                    SPICE netlist lexer, parser, and engineering unit evaluator
@@ -58,12 +61,12 @@
 
 | Module / Directory | Responsibility |
 | :--- | :--- |
-| `include/nodalys/` | Public C++23 interface exporting `CircuitBuilder`, `Circuit`, and free analysis functions (`ComputeOperatingPoint`, `ComputeTransient`, `ComputeDCSweep`, `ComputeACSweep`, `ComputeTransferFunction`, `ComputeNoise`, `ComputeSParameters`). |
+| `include/nodalys/` | Public C++23 interface exporting `CircuitBuilder`, `Circuit`, and free analysis functions (`ComputeOperatingPoint`, `ComputeTransient`, `ComputeDCSweep`, `ComputeACSweep`, `ComputeTransferFunction`, `ComputeNoise`, `ComputeSParameters`, `ComputePoleZero`). |
 | `src/mna/` | Real and complex Modified Nodal Analysis (MNA) matrix assembly, dynamic $G_{\min}$ stabilization, and residual verification. |
-| `src/linear/` | `BasicDenseMatrix<Scalar>` supporting `double` and `std::complex<double>` with partial-pivoting LU factorization, row equilibration, and iterative refinement. |
+| `src/linear/` | `BasicDenseMatrix<Scalar>` (LU decomposition) and Moler-Stewart QZ generalized eigenvalue solver (`ComputeGeneralizedEigenvalues`). |
 | `src/newton/` | Damped nonlinear Newton-Raphson driver with semiconductor junction damping (`pnjlim`, `fetlim`), logic output limiting, and fallback homotopy strategies (*Gmin stepping* and *Source stepping*). |
 | `src/devices/` | Device models: linear passives, independent/controlled sources, hysteretic switches, relays, transformers, ideal & Boyle op-amps, nonlinear semiconductors (Shockley diode, Gummel-Poon BJT, Shichman-Hodges Level-1 MOSFET), and smooth continuous logic gates. |
-| `src/analyses/` | Complete numerical solvers for DC Operating Point, DC Sweep (1D/2D), Time-Domain Transient, AC Small-Signal Sweep, DC Transfer Function, AC Adjoint Noise, and Multiport S-Parameters. |
+| `src/analyses/` | Complete numerical solvers for DC Operating Point, DC Sweep (1D/2D), Time-Domain Transient, AC Small-Signal Sweep, DC Transfer Function, AC Adjoint Noise, Multiport S-Parameters, and Pole-Zero. |
 | `src/bridge/` | `LogicBridge` translating discrete event-driven logic levels (`0`, `1`, `X`, `Z`) into continuous analog waveforms with realistic slew rates and configurable supply rails. |
 | `src/parser/` & `src/export/` | SPICE netlist syntax parser supporting engineering scales (`1k`, `100n`, `4.7u`) and multi-format simulation result export (CSV, JSON, SPICE Raw, Touchstone). |
 | `src/cli/` | Standalone CLI tool (`nodalys`) processing netlists from files or `stdin` with command-line options (`--analysis`, `--format`, `--output`). |
@@ -90,6 +93,7 @@
 | **Transfer Function** | `.tf` | ✅ | ✅ **Ready** | [`tf_analysis.cpp`](../../nodalys/src/analyses/tf_analysis.cpp) — Small-signal DC gain ($A_v$ or $R_m$), input impedance $Z_{\text{in}}$, and output impedance $Z_{\text{out}}$. |
 | **Noise Analysis** | `.noise` | ✅ | ✅ **Ready** | [`noise_analysis.cpp`](../../nodalys/src/analyses/noise_analysis.cpp) — Adjoint complex solver $\mathbf{Y}(j\omega)^T \lambda = \mathbf{e}_{\text{out}}$, input/output spectral densities ($\text{V}/\sqrt{\text{Hz}}$), log-log RMS integration, and per-component noise shares. |
 | **S-Parameters** | `.sp` | ✅ | ✅ **Ready** | [`sp_analysis.cpp`](../../nodalys/src/analyses/sp_analysis.cpp) — Multiport scattering matrix $\mathbf{S}(j\omega)$, single-LU multi-RHS solve, Return Loss, Insertion Loss, VSWR, Input Impedance, and Touchstone export. |
+| **Pole-Zero** | `.pz` | ✅ | ✅ **Ready** | [`pz_analysis.cpp`](../../nodalys/src/analyses/pz_analysis.cpp) — Generalized eigenvalue solver $(\mathbf{G}, -\mathbf{C})$ and Rosenbrock pencil $(\mathbf{A}_z, -\mathbf{B}_z)$ via pure C++23 QZ algorithm. |
 | **Truth Table** | Multiple `.op` | ✅ | ✅ **Ready** | Fully supported natively in imcsim UI without ngspice via smooth continuous logic macromodels ($C^\infty$). |
 
 ---
@@ -129,7 +133,7 @@
 
 | Analysis | SPICE Command | Description | Status |
 | :--- | :---: | :--- | :---: |
-| **Pole-Zero Analysis** | `.pz` | Generalized eigenvalue solver $(\mathbf{G} + s\mathbf{C})\mathbf{x} = \mathbf{0}$ via the QZ algorithm to find transfer function poles and zeros. | Planned |
+| **Pole-Zero Analysis** | `.pz` | Generalized eigenvalue solver $(\mathbf{G} + s\mathbf{C})\mathbf{x} = \mathbf{0}$ via the QZ algorithm to find transfer function poles and zeros. | ✅ **Ready** |
 | **DC / AC Sensitivity** | `.sens` | Per-component adjoint sensitivity $\partial V_{\text{out}} / \partial p_i$ solved via transposed system $\mathbf{J}^T \lambda = \mathbf{e}_{\text{out}}$. | Planned |
 | **RF S-Parameters** | `.sp` | Scattering matrix $S_{ij}(f)$, return loss, VSWR, and Smith chart generation with $Z_0$ port termination. | ✅ **Ready** |
 | **Distortion / Harmonic Balance** | `.disto` / HB | Frequency-domain periodic steady-state analysis for nonlinear RF circuits. | Planned |

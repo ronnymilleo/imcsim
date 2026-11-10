@@ -240,4 +240,34 @@ std::string ExportRaw(const SParameterResult &result, std::string_view title) {
     return ss.str();
 }
 
+std::string ExportRaw(const PoleZeroResult &result, std::string_view title) {
+    std::ostringstream ss;
+    ss << "Title: " << title << "\n";
+    ss << "Date: " << CurrentDateString() << "\n";
+    ss << "Plotname: Pole-Zero Analysis\n";
+    ss << "Flags: complex\n";
+
+    const std::size_t num_points = std::max(result.Poles.size(), result.Zeros.size());
+    ss << "No. Variables: 2\n";
+    ss << "No. Points: " << num_points << "\n";
+    ss << "Variables:\n";
+    ss << "\t0\tpole\tcomplex\n";
+    ss << "\t1\tzero\tcomplex\n";
+    ss << "Values:\n";
+    for (std::size_t pt = 0; pt < num_points; ++pt) {
+        ss << pt << "\t";
+        if (pt < result.Poles.size()) {
+            ss << std::format("{:.15e},{:.15e}\n", result.Poles[pt].real(), result.Poles[pt].imag());
+        } else {
+            ss << "0.0,0.0\n";
+        }
+        if (pt < result.Zeros.size()) {
+            ss << "\t" << std::format("{:.15e},{:.15e}\n", result.Zeros[pt].real(), result.Zeros[pt].imag());
+        } else {
+            ss << "\t0.0,0.0\n";
+        }
+    }
+    return ss.str();
+}
+
 } // namespace nodalys

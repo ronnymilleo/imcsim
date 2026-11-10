@@ -42,6 +42,14 @@ int MnaSystem::NodeUnknowns() const {
     return m_NodeUnknowns;
 }
 
+const DenseMatrix &MnaSystem::Matrix() const {
+    return m_A;
+}
+
+const std::vector<double> &MnaSystem::Rhs() const {
+    return m_Rhs;
+}
+
 bool MnaSystem::IsNodeUnknown(const int index) const {
     return index >= 0 && static_cast<std::size_t>(index) < m_IsNodeUnknown.size() &&
            m_IsNodeUnknown[static_cast<std::size_t>(index)];
