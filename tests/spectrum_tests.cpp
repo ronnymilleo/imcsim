@@ -4,11 +4,17 @@
  */
 
 #include "plots/spectrum.h"
+
+#include "simulation/monte_carlo.h"
+#include <array>
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 #include <cmath>
 #include <functional>
+#include <limits>
 #include <numbers>
+#include <random>
+#include <span>
 #include <vector>
 
 namespace {
@@ -44,6 +50,59 @@ Trace Sample(const std::function<double(double)> &signal, const double stop_time
 
 double Sine(const double amplitude, const double frequency, const double time) {
     return amplitude * std::sin(2.0 * std::numbers::pi * frequency * time);
+}
+
+/// Samples per noise trace; with the 1 ms step the spectrum covers 0 to 500 Hz. One more point closes the span, so
+/// the transform reads exactly the samples, without the smoothing of interpolating between them.
+constexpr int NOISE_SAMPLE_COUNT = 4097;
+constexpr double NOISE_STEP = 1e-3;
+
+/**
+ * @brief   Gaussian white noise on an even grid.
+ */
+Trace WhiteNoise(const double sigma, const unsigned seed) {
+    // The draws of the Monte Carlo runs are the same on every standard library, unlike std::normal_distribution
+    std::mt19937_64 generator(seed);
+    Trace trace;
+    for (int index = 0; index < NOISE_SAMPLE_COUNT; ++index) {
+        trace.Xs.push_back(index * NOISE_STEP);
+        trace.Ys.push_back(sigma * Core::DrawStandardNormal(generator));
+    }
+    return trace;
+}
+
+/**
+ * @brief   Noise whose amplitude per bin falls as 1/f^(power/2) (power 1 is 1/f noise, 2 is brown noise): random
+ *          components at the frequency of each bin below 450 Hz.
+ */
+Trace SlopedNoise(const double power, const unsigned seed) {
+    std::mt19937_64 generator(seed);
+    const auto gauss = [](std::mt19937_64 &engine) { return Core::DrawStandardNormal(engine); };
+    const auto phase = [](std::mt19937_64 &engine) { return 2.0 * std::numbers::pi * Core::DrawUniform(engine); };
+    const double span = (NOISE_SAMPLE_COUNT - 1) * NOISE_STEP;
+    std::vector<std::array<double, 3>> components;
+    for (int bin = 1; bin < 1800; ++bin) {
+        const double amplitude = std::hypot(gauss(generator), gauss(generator)) / std::pow(bin, power / 2.0);
+        components.push_back({bin / span, amplitude, phase(generator)});
+    }
+    Trace trace;
+    for (int index = 0; index < NOISE_SAMPLE_COUNT; ++index) {
+        const double time = index * NOISE_STEP;
+        double value = 0.0;
+        for (const auto &[frequency, amplitude, offset] : components) {
+            value += amplitude * std::sin(2.0 * std::numbers::pi * frequency * time + offset);
+        }
+        trace.Xs.push_back(time);
+        trace.Ys.push_back(value);
+    }
+    return trace;
+}
+
+GUI::HarmonicAnalysis AnalyzeTrace(const Trace &trace) {
+    const auto spectrum =
+        GUI::ComputeSpectrum(trace.Xs, trace.Ys, 0.0, trace.Xs.back(), 4096, GUI::SpectrumWindow::HANN);
+    REQUIRE(spectrum);
+    return GUI::AnalyzeHarmonics(*spectrum, 10);
 }
 
 } // namespace
@@ -173,4 +232,131 @@ TEST_CASE("AnalyzeHarmonics asks for more periods when the peaks would overlap",
     CHECK_THAT(rectangular_analysis.Harmonics[0].Amplitude, WithinRel(1.0, 1e-3));
     REQUIRE(rectangular_analysis.TotalDistortion);
     CHECK(*rectangular_analysis.TotalDistortion < 1e-3);
+}
+
+TEST_CASE("AnalyzeHarmonics sees a tone in a sine, with or without noise", "[spectrum]") {
+    const Trace pure = Sample([](const double time) { return Sine(1.0, 100.0, time); }, 4.0, 4000);
+    CHECK_FALSE(AnalyzeTrace(pure).IsBroadband);
+    CHECK_FALSE(AnalyzeTrace(pure).Harmonics.empty());
+
+    // 5% of white noise, about -26 dB below the tone and far more per bin: the tone stands well out of the floor
+    for (unsigned seed = 1; seed <= 10; ++seed) {
+        Trace noisy = WhiteNoise(0.05, seed);
+        for (std::size_t index = 0; index < noisy.Xs.size(); ++index) {
+            noisy.Ys[index] += Sine(1.0, 100.0, noisy.Xs[index]);
+        }
+        const GUI::HarmonicAnalysis analysis = AnalyzeTrace(noisy);
+        INFO(seed);
+        CHECK_FALSE(analysis.IsBroadband);
+        REQUIRE_FALSE(analysis.Harmonics.empty());
+        CHECK_THAT(analysis.Harmonics.front().Frequency, WithinRel(100.0, 1e-2));
+    }
+}
+
+TEST_CASE("AnalyzeHarmonics sees a tone in a square wave", "[spectrum]") {
+    const Trace trace =
+        Sample([](const double time) { return Sine(1.0, 100.0, time) >= 0.0 ? 1.0 : -1.0; }, 4.0, 40000);
+    const GUI::HarmonicAnalysis analysis = AnalyzeTrace(trace);
+    CHECK_FALSE(analysis.IsBroadband);
+    REQUIRE_FALSE(analysis.Harmonics.empty());
+    CHECK_THAT(analysis.Harmonics.front().Frequency, WithinRel(100.0, 1e-2));
+}
+
+TEST_CASE("AnalyzeHarmonics calls white, 1/f and brown noise broadband and measures no harmonics", "[spectrum]") {
+    for (unsigned seed = 1; seed <= 20; ++seed) {
+        INFO(seed);
+        const GUI::HarmonicAnalysis white = AnalyzeTrace(WhiteNoise(1.0, seed));
+        CHECK(white.IsBroadband);
+        CHECK(white.Harmonics.empty());
+        CHECK_FALSE(white.PeriodsNeeded);
+        CHECK_FALSE(white.TotalDistortion);
+        CHECK(AnalyzeTrace(SlopedNoise(1.0, seed)).IsBroadband);
+    }
+    for (unsigned seed = 1; seed <= 5; ++seed) {
+        INFO(seed);
+        CHECK(AnalyzeTrace(SlopedNoise(2.0, seed)).IsBroadband);
+    }
+}
+
+TEST_CASE("A constant trace is not broadband noise", "[spectrum]") {
+    const Trace trace = Sample([](double) { return 5.0; }, 1e-3, 1000);
+    const auto spectrum = GUI::ComputeSpectrum(trace.Xs, trace.Ys, 0.0, 1e-3, 1024, GUI::SpectrumWindow::HANN);
+    REQUIRE(spectrum);
+    CHECK_FALSE(GUI::AnalyzeHarmonics(*spectrum, 10).IsBroadband);
+}
+
+TEST_CASE("The noise density of white noise is sigma times the root of twice the step, whatever the window",
+          "[spectrum]") {
+    const double sigma = 0.1;
+    // One-sided density: variance sigma^2 spread over half the sampling rate, 1 / (2 step)
+    const double expected = sigma * std::sqrt(2.0 * NOISE_STEP);
+    for (const GUI::SpectrumWindow window : {GUI::SpectrumWindow::HANN, GUI::SpectrumWindow::RECTANGULAR}) {
+        const Trace trace = WhiteNoise(sigma, 7);
+        const auto spectrum = GUI::ComputeSpectrum(trace.Xs, trace.Ys, 0.0, trace.Xs.back(), 4096, window);
+        REQUIRE(spectrum);
+        const std::vector<double> densities = GUI::ComputeNoiseDensities(*spectrum);
+        REQUIRE(densities.size() == spectrum->Frequencies.size() - 1);
+        const std::span<const double> frequencies = std::span(spectrum->Frequencies).subspan(1);
+        const auto band = GUI::MeasureNoiseBand(frequencies, densities, 0.0, 1e6);
+        REQUIRE(band);
+        CHECK_THAT(band->Density, WithinRel(expected, 0.12));
+        // The whole band holds the whole variance, up to the mean and the bin at 0 Hz
+        CHECK_THAT(band->TotalRms, WithinRel(sigma, 0.05));
+        // A narrower band has the same density but less noise
+        const auto narrow = GUI::MeasureNoiseBand(frequencies, densities, 100.0, 200.0);
+        REQUIRE(narrow);
+        CHECK_THAT(narrow->Density, WithinRel(expected, 0.25));
+        CHECK(narrow->TotalRms < band->TotalRms);
+    }
+}
+
+TEST_CASE("MeasureNoiseBand has no value for a band without bins", "[spectrum]") {
+    const std::vector<double> frequencies{1.0, 2.0, 3.0, 4.0, 5.0};
+    const std::vector<double> densities(5, 1.0);
+    CHECK_FALSE(GUI::MeasureNoiseBand(frequencies, densities, 10.0, 20.0));
+    CHECK_FALSE(GUI::MeasureNoiseBand({}, {}, 0.0, 1.0));
+    // The ends come in any order, and the two bins next to 0 Hz are left out
+    const auto band = GUI::MeasureNoiseBand(frequencies, densities, 5.0, 1.0);
+    REQUIRE(band);
+    // The median of three equal bins is the bin, which white noise would read sqrt(ln 2) lower
+    CHECK_THAT(band->Density, WithinRel(1.0 / std::sqrt(std::numbers::ln2), 1e-12));
+    CHECK_THAT(band->TotalRms, WithinAbs(std::sqrt(3.0), 1e-12));
+}
+
+TEST_CASE("The density level is the floor even when part of the band lies past the noise", "[spectrum]") {
+    // White noise to 400 Hz, then a roll-off to a thousandth of it, as sampled noise shows past its own bandwidth
+    const Trace trace = WhiteNoise(0.1, 3);
+    const auto spectrum =
+        GUI::ComputeSpectrum(trace.Xs, trace.Ys, 0.0, trace.Xs.back(), 4096, GUI::SpectrumWindow::HANN);
+    REQUIRE(spectrum);
+    std::vector<double> densities = GUI::ComputeNoiseDensities(*spectrum);
+    const std::span<const double> frequencies = std::span(spectrum->Frequencies).subspan(1);
+    const double expected = 0.1 * std::sqrt(2.0 * NOISE_STEP);
+    for (std::size_t index = 0; index < densities.size(); ++index) {
+        if (frequencies[index] > 400.0) {
+            densities[index] *= 1e-3;
+        }
+    }
+    const auto band = GUI::MeasureNoiseBand(frequencies, densities, 0.0, 500.0);
+    REQUIRE(band);
+    CHECK_THAT(band->Density, WithinRel(expected, 0.12));
+}
+
+TEST_CASE("FindDensityRange leaves out the mean skirt, empty bins and the decades below the curve", "[spectrum]") {
+    const double floor = 1e-18;
+    // The first two bins are the skirt of the mean, then a curve from 1e-3 to 1e-4 with a bin at the floor and one
+    // that is not finite
+    const std::vector<double> densities{1.0, 1.0, 1e-3, 5e-4, floor, 1e-4, std::numeric_limits<double>::quiet_NaN()};
+    const auto range = GUI::FindDensityRange(densities);
+    REQUIRE(range);
+    CHECK_THAT(range->first, WithinRel(1e-4, 1e-12));
+    CHECK_THAT(range->second, WithinRel(1e-3, 1e-12));
+    // A bin far below the others is cut at 6 decades under the highest
+    const std::vector<double> wide{0.0, 0.0, 1.0, 1e-9, 1e-2};
+    const auto clamped = GUI::FindDensityRange(wide);
+    REQUIRE(clamped);
+    CHECK_THAT(clamped->first, WithinRel(1e-6, 1e-12));
+    CHECK_THAT(clamped->second, WithinRel(1.0, 1e-12));
+    CHECK_FALSE(GUI::FindDensityRange(std::vector<double>{1.0, 1.0, floor, 0.0}));
+    CHECK_FALSE(GUI::FindDensityRange({}));
 }

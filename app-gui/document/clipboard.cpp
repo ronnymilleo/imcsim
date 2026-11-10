@@ -6,8 +6,10 @@
 #include "document/clipboard.h"
 
 #include "components/subcircuit.h"
+#include "document/block_nesting.h"
 #include "document/schematic_file.h"
 #include "editing/group_editing.h"
+#include <algorithm>
 #include <set>
 
 namespace GUI {
@@ -33,7 +35,8 @@ GridPoint FindGroupPivot(const PastedGroup &group) {
  * @param[in] elements     Parts of the schematic.
  * @param[in] wires        Wires of the schematic.
  * @param[in] selection    What to copy.
- * @param[in] subcircuits  Block definitions of the schematic; those the copied instances use go with them.
+ * @param[in] subcircuits  Block definitions of the schematic; those the copied instances use go with them, with the
+ *                         blocks inside them.
  * @param[in] models       Library models of the schematic; those the copied parts use go with them.
  * @return  A schematic of just those items, in the format of the files, so it pastes into another copy of the program
  *          as well as this one.
@@ -55,14 +58,18 @@ std::string CopySelection(const std::vector<std::unique_ptr<UIElement>> &element
     for (const std::size_t index : selection.Wires) {
         copied_wires.push_back(wires[index]);
     }
+    // The blocks the copied blocks place go along, at any depth; every definition is read back together, so their
+    // instances find each other
     std::vector<SavedSubcircuit> copied_definitions;
-    for (const SavedSubcircuit &definition : subcircuits) {
-        if (!needed_definitions.contains(definition.Name)) {
-            continue;
-        }
-        auto loaded = LoadSchematic(SaveSchematic({}, {}, {}, {}, std::span<const SavedSubcircuit>(&definition, 1)));
-        if (loaded && loaded->Subcircuits.size() == 1) {
-            copied_definitions.push_back(std::move(loaded->Subcircuits.front()));
+    if (auto loaded = LoadSchematic(SaveSchematic({}, {}, {}, {}, subcircuits));
+        loaded && !needed_definitions.empty()) {
+        for (SavedSubcircuit &definition : loaded->Subcircuits) {
+            const bool is_needed = std::ranges::any_of(needed_definitions, [&](const std::string &name) {
+                return ContainsBlock(subcircuits, name, definition.Name);
+            });
+            if (is_needed) {
+                copied_definitions.push_back(std::move(definition));
+            }
         }
     }
     // The library models the copied parts use, those inside the copied blocks included

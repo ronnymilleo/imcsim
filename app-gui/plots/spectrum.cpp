@@ -10,6 +10,7 @@
 #include <bit>
 #include <cmath>
 #include <complex>
+#include <limits>
 #include <numbers>
 #include <utility>
 
@@ -42,6 +43,29 @@ std::size_t LobeHalfWidth(const SpectrumWindow window) {
 double NoiseBandwidth(const SpectrumWindow window) {
     return window == SpectrumWindow::HANN ? 1.5 : 1.0;
 }
+
+/// Bins on each side of the strongest peak whose median stands for the floor around it, which follows a sloping
+/// floor such as 1/f noise where one median of the whole spectrum would not.
+constexpr std::size_t FLOOR_NEIGHBORHOOD_BINS = 16;
+/// How far the strongest peak must stand above the floor around it to be a tone. The strongest bin of white noise
+/// reads about 10 dB over the median, and that of 1/f^2 noise a few more.
+constexpr double TONE_PROMINENCE_DECIBELS = 20.0;
+/// Fewer floor bins than this are too few to tell a tone from noise, so the peak counts as a tone.
+constexpr std::size_t MIN_FLOOR_BINS = 8;
+/// The bins just above 0 Hz, where the Hann window spreads the mean, which noise has no say in.
+constexpr std::size_t MEAN_SKIRT_BINS = 2;
+/// The median of the density of white noise reads this fraction of its rms (sqrt(ln 2), as the amplitude of each bin
+/// is Rayleigh distributed), so dividing by it gives the level of the noise.
+const double MEDIAN_TO_RMS_RATIO = std::sqrt(std::numbers::ln2);
+/// Decades of density a plot spans at most, below its highest.
+constexpr double MAX_DENSITY_RATIO = 1e6;
+/// Slices a band is cut in to find its floor, and the fewest bins that make one.
+constexpr std::size_t MAX_BAND_SLICES = 8;
+constexpr std::size_t MIN_SLICE_BINS = 128;
+/// A slice belongs to the plateau of the noise when its median is within 3 dB of the highest one.
+const double PLATEAU_RATIO = 1.0 / std::numbers::sqrt2;
+/// Floor of a density, so a trace of zeros still plots on a logarithmic axis.
+constexpr double MIN_NOISE_DENSITY = 1e-18;
 
 /**
  * @brief   The periodic form, which leaves the sample after the span out, as the transform repeats the span.
@@ -97,6 +121,52 @@ double LobePower(const std::vector<double> &amplitudes, const std::size_t center
     return power;
 }
 
+/**
+ * @brief   Tells whether a peak stands out of the median of the bins around it, outside its own lobe.
+ */
+bool StandsOutOfFloor(const std::vector<double> &amplitudes, const std::size_t peak_bin, const std::size_t half_width,
+                      const std::size_t first_bin) {
+    const std::size_t first =
+        std::max(first_bin, peak_bin > FLOOR_NEIGHBORHOOD_BINS ? peak_bin - FLOOR_NEIGHBORHOOD_BINS : 0);
+    const std::size_t last = std::min(peak_bin + FLOOR_NEIGHBORHOOD_BINS, amplitudes.size() - 1);
+    std::vector<double> floor_bins;
+    for (std::size_t bin = first; bin <= last; ++bin) {
+        const std::size_t distance = bin > peak_bin ? bin - peak_bin : peak_bin - bin;
+        if (distance > half_width) {
+            floor_bins.push_back(amplitudes[bin]);
+        }
+    }
+    if (floor_bins.size() < MIN_FLOOR_BINS) {
+        return true;
+    }
+    const auto middle = floor_bins.begin() + static_cast<std::ptrdiff_t>(floor_bins.size() / 2);
+    std::nth_element(floor_bins.begin(), middle, floor_bins.end());
+    return amplitudes[peak_bin] > *middle * std::pow(10.0, TONE_PROMINENCE_DECIBELS / 20.0);
+}
+
+/**
+ * @brief   The level of the plateau of densities given in order of frequency.
+ * @details The band is cut in slices and the median of each is taken; the slices within 3 dB of the highest one make
+ *          the plateau, and their middle median is the level. A part of the band where the noise has rolled off, or
+ *          has not risen yet, does not set it, and on flat noise every slice counts, so the level is not biased up
+ *          the way the highest median alone would be.
+ */
+double FindPlateauLevel(std::vector<double> &in_band) {
+    const std::size_t slice_count = std::clamp<std::size_t>(in_band.size() / MIN_SLICE_BINS, 1, MAX_BAND_SLICES);
+    std::vector<double> medians;
+    for (std::size_t slice = 0; slice < slice_count; ++slice) {
+        const auto first = in_band.begin() + static_cast<std::ptrdiff_t>(slice * in_band.size() / slice_count);
+        const auto last = in_band.begin() + static_cast<std::ptrdiff_t>((slice + 1) * in_band.size() / slice_count);
+        const auto middle = first + (last - first) / 2;
+        std::nth_element(first, middle, last);
+        medians.push_back(*middle);
+    }
+    const double highest = std::ranges::max(medians);
+    std::erase_if(medians, [highest](const double median) { return median < highest * PLATEAU_RATIO; });
+    const auto middle = medians.begin() + static_cast<std::ptrdiff_t>(medians.size() / 2);
+    std::ranges::nth_element(medians, middle);
+    return *middle;
+}
 } // namespace
 
 /**
@@ -183,6 +253,7 @@ std::optional<Spectrum> ComputeSpectrum(const std::span<const double> xs, const 
  * @param[in] spectrum       Spectrum of a trace, as ComputeSpectrum() gives.
  * @param[in] highest_order  Last harmonic measured, such as 10; harmonics past half the sampling rate are left out.
  * @return  The mean, then the fundamental (the strongest tone above 0 Hz) and each harmonic up to the highest order;
+ *          only the mean, flagged as broadband, when no tone stands out of the floor around the strongest peak;
  *          only the mean and the periods needed when the span holds too few periods of the fundamental (5 with the
  *          Hann window, 3 with the rectangular one).
  * @note    Each tone is measured as the power of the bins of its lobe, so it reads its amplitude even between two
@@ -206,6 +277,10 @@ HarmonicAnalysis AnalyzeHarmonics(const Spectrum &spectrum, const int highest_or
     const auto peak_bin = static_cast<std::size_t>(strongest - amplitudes.begin());
     const double largest = std::max(std::abs(analysis.Mean), *strongest);
     if (*strongest <= 0.0 || IsNegligible(*strongest, largest)) {
+        return analysis;
+    }
+    if (!StandsOutOfFloor(amplitudes, peak_bin, half_width, first_bin)) {
+        analysis.IsBroadband = true;
         return analysis;
     }
     // Bin k holds k periods; the lobes of the mean, the fundamental and each harmonic stay apart past 2 half widths
@@ -261,6 +336,87 @@ std::vector<double> ToDecibels(const std::span<const double> amplitudes) {
         decibels.push_back(20.0 * std::log10(std::max(std::abs(amplitude), floor)));
     }
     return decibels;
+}
+
+/**
+ * @brief   Converts the amplitudes of a spectrum to a one-sided noise density.
+ * @param[in] spectrum  Spectrum of a trace, as ComputeSpectrum() gives.
+ * @return  The density of each bin above 0 Hz, in the unit of the trace per square root of hertz, floored at 1e-18 so a
+ *          trace of zeros plots on a logarithmic axis; empty without a bin above 0 Hz.
+ * @note    The peak of a sine per bin stands for the power of the noise in the equivalent noise bandwidth of the window
+ *          (1.5 bins for Hann, 1 for rectangular): density = amplitude / sqrt(2 * bandwidth * resolution).
+ */
+std::vector<double> ComputeNoiseDensities(const Spectrum &spectrum) {
+    std::vector<double> densities;
+    if (spectrum.Amplitudes.size() < 2 || spectrum.Frequencies.size() < 2) {
+        return densities;
+    }
+    const double resolution = spectrum.Frequencies[1];
+    const double scale = std::sqrt(2.0 * NoiseBandwidth(spectrum.Window) * resolution);
+    densities.reserve(spectrum.Amplitudes.size() - 1);
+    for (std::size_t bin = 1; bin < spectrum.Amplitudes.size(); ++bin) {
+        densities.push_back(std::max(std::abs(spectrum.Amplitudes[bin]) / scale, MIN_NOISE_DENSITY));
+    }
+    return densities;
+}
+
+/**
+ * @brief   Measures the noise of a trace over a band, from its densities.
+ * @param[in] frequencies  Frequencies of the bins above 0 Hz, evenly spaced from the resolution.
+ * @param[in] densities    Density of each of them, as ComputeNoiseDensities() gives.
+ * @param[in] from         One end of the band; the ends may come in any order.
+ * @param[in] to           The other end.
+ * @return  The level of the density (the middle median of the slices of the band within 3 dB of the highest, corrected
+ *          so white noise reads its rms: robust to a band that is partly past where the noise rolls off) and the root
+ * of the power in the band, or no value when the band holds no bin. The first bins, where the window spreads the mean,
+ * are left out.
+ */
+std::optional<NoiseBand> MeasureNoiseBand(const std::span<const double> frequencies,
+                                          const std::span<const double> densities, double from, double to) {
+    const std::size_t count = std::min(frequencies.size(), densities.size());
+    if (count <= MEAN_SKIRT_BINS) {
+        return std::nullopt;
+    }
+    if (from > to) {
+        std::swap(from, to);
+    }
+    const double resolution = frequencies.front();
+    double power_density_sum = 0.0;
+    std::vector<double> in_band;
+    for (std::size_t index = MEAN_SKIRT_BINS; index < count; ++index) {
+        if (frequencies[index] >= from && frequencies[index] <= to) {
+            power_density_sum += densities[index] * densities[index];
+            in_band.push_back(densities[index]);
+        }
+    }
+    if (in_band.empty()) {
+        return std::nullopt;
+    }
+    return NoiseBand{.Density = FindPlateauLevel(in_band) / MEDIAN_TO_RMS_RATIO,
+                     .TotalRms = std::sqrt(power_density_sum * resolution)};
+}
+
+/**
+ * @brief   Finds the range of densities worth plotting on a logarithmic axis.
+ * @param[in] densities  Densities of the bins above 0 Hz, as ComputeNoiseDensities() gives.
+ * @return  The smallest and largest density, leaving out the first bins, where the window spreads the mean, and bins
+ *          at the floor of ComputeNoiseDensities() or not finite; the smallest is raised to at most 6 decades below the
+ *          largest, so a few empty bins do not squeeze the curve. No value when no bin is left.
+ */
+std::optional<std::pair<double, double>> FindDensityRange(const std::span<const double> densities) {
+    double lowest = std::numeric_limits<double>::infinity();
+    double highest = 0.0;
+    for (std::size_t index = MEAN_SKIRT_BINS; index < densities.size(); ++index) {
+        const double density = densities[index];
+        if (std::isfinite(density) && density > MIN_NOISE_DENSITY) {
+            lowest = std::min(lowest, density);
+            highest = std::max(highest, density);
+        }
+    }
+    if (highest <= 0.0) {
+        return std::nullopt;
+    }
+    return std::pair{std::max(lowest, highest / MAX_DENSITY_RATIO), highest};
 }
 
 } // namespace GUI

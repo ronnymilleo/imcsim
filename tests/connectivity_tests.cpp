@@ -4,6 +4,7 @@
  */
 
 #include "components/net_label.h"
+#include "components/subcircuit_pin.h"
 #include "editing/connectivity.h"
 #include "test_printers.h"
 #include "ui_elements/ui_ground.h"
@@ -190,6 +191,20 @@ TEST_CASE("A net name finds its node in any case, whichever label on the node ga
     CHECK_FALSE(connectivity.FindNodeOfNet("Third"));
 }
 
+TEST_CASE("The circuit built from a schematic knows the nets its labels name", "[connectivity]") {
+    Schematic schematic;
+    schematic.Label({10, 0}, "Second");
+    schematic.Label({0, 0}, "First");
+    schematic.Wires.emplace_back(GUI::GridPoint{0, 0}, GUI::GridPoint{10, 0});
+    const GUI::Connectivity connectivity = schematic.Connect();
+    const Core::Circuit circuit = GUI::BuildCircuit(schematic.Elements, connectivity);
+    // A behavioral source names its nets, which the circuit resolves in any case, ground included
+    CHECK(circuit.FindNodeOfNet("FIRST") == connectivity.GetNode({0, 0}));
+    CHECK(circuit.FindNodeOfNet("second") == connectivity.GetNode({0, 0}));
+    CHECK(circuit.FindNodeOfNet("GND") == 0);
+    CHECK_FALSE(circuit.FindNodeOfNet("Third"));
+}
+
 TEST_CASE("A label named 0 or GND, in any case, is ground", "[connectivity]") {
     Schematic schematic;
     schematic.Elements.push_back(std::make_unique<GUI::UIGround>(GUI::GridPoint{0, 0}, GUI::Rotation::R0));
@@ -271,4 +286,25 @@ TEST_CASE("A label named VCC joins every VCC supply, and only when there is one"
     const Schematic plain = make(false);
     const GUI::Connectivity apart = plain.Connect();
     CHECK(apart.GetNode({0, 0}) != apart.GetNode({20, 0}));
+}
+
+TEST_CASE("Only the pin markers set as S-parameter ports become ports of the circuit, with the node they touch",
+          "[connectivity]") {
+    Schematic schematic;
+    schematic.Elements.push_back(std::make_unique<GUI::UIResistor>(GUI::GridPoint{0, 0}, GUI::Rotation::R0));
+    schematic.Elements.push_back(std::make_unique<GUI::UISubcircuitPin>(GUI::GridPoint{-2, 0}, GUI::Rotation::R0));
+    schematic.Elements.push_back(std::make_unique<GUI::UISubcircuitPin>(GUI::GridPoint{2, 0}, GUI::Rotation::R180));
+    schematic.Elements.push_back(std::make_unique<GUI::UIGround>(GUI::GridPoint{2, 3}, GUI::Rotation::R0));
+    static_cast<Core::SubcircuitPinMarker &>(schematic.Elements[1]->GetComponent())
+        .SetPort({.IsPort = true, .Number = 3, .ReferenceOhms = 75.0});
+
+    const GUI::Connectivity connectivity = schematic.Connect();
+    const Core::Circuit circuit = GUI::BuildCircuit(schematic.Elements, connectivity);
+    // The markers never become parts, and the second one is no port
+    CHECK(circuit.GetEntries().size() == 2);
+    REQUIRE(circuit.GetPorts().size() == 1);
+    CHECK(circuit.GetPorts()[0].Number == 3);
+    CHECK(circuit.GetPorts()[0].ReferenceOhms == 75.0);
+    CHECK(circuit.GetPorts()[0].Node == connectivity.GetNode({-2, 0}).value());
+    CHECK_FALSE(circuit.ToSpiceNetlist().contains("portnum"));
 }

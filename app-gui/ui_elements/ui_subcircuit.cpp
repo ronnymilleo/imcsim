@@ -11,6 +11,7 @@
 #include <map>
 #include <memory>
 #include <string>
+#include <vector>
 
 namespace GUI {
 
@@ -85,6 +86,39 @@ ImVec2 GetEdgePoint(const GridPoint terminal, const BoxSize box) {
  */
 UISubcircuit::UISubcircuit(const GridPoint position, const Rotation rotation)
     : UIElement(std::make_unique<Core::SubcircuitInstance>(), position, rotation) {
+}
+
+/**
+ * @brief   The grid points that the instance name above the box and the block name below it cover, so routed wires
+ *          keep off them.
+ * @return  World points of the row just past each end of the box, leads included, across the width of the box; the
+ *          point just outside each terminal is left out, so a wire can always reach it. A name wider than the box
+ *          goes past the points, as its width depends on the font.
+ */
+std::vector<GridPoint> UISubcircuit::GetNameLabelPoints() const {
+    const LocalBounds bounds = GetLocalBounds();
+    const int half_width = MeasureBox(Instance(GetComponent())).HalfWidth;
+    const auto half_height = static_cast<int>(bounds.Max.y);
+    const std::vector<GridPoint> terminals = GetLocalTerminals();
+    std::vector<GridPoint> ways_out;
+    for (std::size_t terminal = 0; terminal < terminals.size(); ++terminal) {
+        ways_out.push_back(terminals[terminal] - GetLocalTerminalInward(terminal));
+    }
+    std::vector<GridPoint> points;
+    // The names are drawn half a unit past the bounds and are shorter than a unit, so each covers one row
+    for (const int row : {-half_height - 1, half_height + 1}) {
+        for (int column = -half_width; column <= half_width; ++column) {
+            GridPoint point = {column, row};
+            if (std::ranges::contains(ways_out, point)) {
+                continue;
+            }
+            if (IsMirrored()) {
+                point.X = -point.X;
+            }
+            points.push_back(GetPosition() + Rotate(point, GetRotation()));
+        }
+    }
+    return points;
 }
 
 void UISubcircuit::DrawTerminals(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color) const {

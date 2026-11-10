@@ -6,6 +6,7 @@
 #include "plots/math_channels.h"
 
 #include "drawing/theme.h"
+#include "drawing/trace_swatch.h"
 #include "misc/cpp/imgui_stdlib.h"
 #include <algorithm>
 #include <array>
@@ -41,6 +42,17 @@ ImAxis AxisForUnit(const Dimension unit) {
         return ImAxis_Y2;
     }
     return ImAxis_Y3;
+}
+
+/**
+ * @brief   The voltages of an AC sweep read as gains, relative to sources of magnitude 1, so a ratio without a unit,
+ * such as V(OUT)/V(IN), shares their axis.
+ */
+ImAxis AxisForACUnit(const Dimension unit) {
+    if (unit == Dimension{}) {
+        return ImAxis_Y1;
+    }
+    return AxisForUnit(unit);
 }
 
 void DrawOperandCombo(const char *id, std::string &operand, const std::vector<std::string> &operands) {
@@ -84,31 +96,10 @@ void MathChannels::Draw(const std::vector<std::string> &operands) {
     }
     std::optional<std::size_t> removed;
     for (std::size_t index = 0; index < channels.size(); ++index) {
-        MathChannel &channel = channels[index];
         ImGui::PushID(static_cast<int>(index));
-        // The list is as narrow as the trace names, so a mark after the Edit button would be cut off; the name of a
-        // channel in error takes the error color instead
-        const auto program = CompileChannel(channel, find_node);
-        ImGui::PushStyleColor(ImGuiCol_CheckMark, AdaptToBackground(MATH_COLORS[index % MATH_COLORS.size()]));
-        if (!program) {
-            ImGui::PushStyleColor(ImGuiCol_Text, GetErrorTextColor());
-        }
-        ImGui::Checkbox(channel.Name.c_str(), &channel.Shown);
-        ImGui::PopStyleColor(program ? 1 : 2);
-        if (program) {
-            ImGui::SetItemTooltip("%s", GetChannelExpression(channel).c_str());
-        } else {
-            ImGui::SetItemTooltip("%s\n%s", GetChannelExpression(channel).c_str(), program.error().c_str());
-        }
-        ImGui::SameLine();
-        if (ImGui::SmallButton("Edit") || (open_new_editor && index + 1 == channels.size())) {
-            ImGui::OpenPopup("math_editor");
-        }
-        if (ImGui::BeginPopup("math_editor")) {
-            if (!DrawEditor(channel, operands)) {
-                removed = index;
-            }
-            ImGui::EndPopup();
+        const bool opens_editor = open_new_editor && index + 1 == channels.size();
+        if (!DrawChannel(channels[index], index, operands, find_node, opens_editor)) {
+            removed = index;
         }
         ImGui::PopID();
     }
@@ -118,14 +109,6 @@ void MathChannels::Draw(const std::vector<std::string> &operands) {
     if (channels != m_Schematic.GetMathChannels()) {
         m_Schematic.SetMathChannels(std::move(channels));
     }
-}
-
-/**
- * @brief   Tells whether there is any channel, shown or not.
- * @return  True when the user has added none, or removed them all.
- */
-bool MathChannels::IsEmpty() const {
-    return m_Schematic.GetMathChannels().empty();
 }
 
 /**
@@ -160,14 +143,8 @@ std::vector<MathTrace> MathChannels::Evaluate(const std::span<const double> xs, 
     const NetResolver find_node = GetNetResolver();
     for (std::size_t index = 0; index < channels.size(); ++index) {
         const MathChannel &channel = channels[index];
-        // A channel that does not compile has its mark in the panel and nothing to add here
-        const std::expected<MathProgram, std::string> compiled = CompileExpression(GetChannelExpression(channel));
-        if (!channel.Shown || !compiled) {
-            continue;
-        }
-        const std::expected<MathProgram, std::string> program = ResolveNetNames(*compiled, find_node);
+        const std::optional<MathProgram> program = GetShownProgram(channel, find_node, errors);
         if (!program) {
-            errors.push_back(std::format("{}: {}", channel.Name, program.error()));
             continue;
         }
         auto result = EvaluateExpression(*program, xs, x_unit, node_voltages, currents);
@@ -185,12 +162,106 @@ std::vector<MathTrace> MathChannels::Evaluate(const std::span<const double> xs, 
 }
 
 /**
+ * @brief   Evaluates every shown channel over an AC sweep, on the complex values of its traces.
+ * @param[in]  sweep   The AC sweep, whose magnitudes and phases make the phasors.
+ * @param[out] errors  Gets a line for each channel that names a net, node or part the sweep lacks.
+ * @return  The magnitude and phase traces of the shown channels that compile and evaluate; the others are left out.
+ */
+ACMathTraces MathChannels::EvaluateAC(const Core::ACSweep &sweep, std::vector<std::string> &errors) const {
+    ACMathTraces traces;
+    const std::vector<MathChannel> &channels = m_Schematic.GetMathChannels();
+    const NetResolver find_node = GetNetResolver();
+    for (std::size_t index = 0; index < channels.size(); ++index) {
+        const MathChannel &channel = channels[index];
+        const std::optional<MathProgram> program = GetShownProgram(channel, find_node, errors);
+        if (!program) {
+            continue;
+        }
+        auto result = EvaluateACExpression(*program, sweep);
+        if (!result) {
+            errors.push_back(std::format("{}: {}", channel.Name, result.error()));
+            continue;
+        }
+        const MathTrace trace{.Label = std::format("{}: {}", channel.Name, GetChannelExpression(channel)),
+                              .Values = {},
+                              .Unit = FormatUnit(result->Unit),
+                              .Axis = AxisForACUnit(result->Unit),
+                              .Color = AdaptToBackground(MATH_COLORS[index % MATH_COLORS.size()])};
+        traces.Magnitudes.push_back(trace);
+        traces.Magnitudes.back().Values = std::move(result->MagnitudesDecibels);
+        traces.Phases.push_back(trace);
+        traces.Phases.back().Values = std::move(result->PhasesDegrees);
+    }
+    return traces;
+}
+
+/**
  * @brief   Net names are looked up in the connectivity of the moment, which the schematic keeps up to date.
  */
 NetResolver MathChannels::GetNetResolver() const {
     return [&schematic = m_Schematic](const std::string_view net) {
         return schematic.GetConnectivity().FindNodeOfNet(net);
     };
+}
+
+/**
+ * @brief   Compiles a shown channel and finds the nodes of its net names.
+ * @details A channel that does not compile has its mark in the panel and nothing to add to the errors; one that names
+ *          a net the circuit lacks adds a line. Returns no program for a hidden channel or either failure.
+ */
+std::optional<MathProgram> MathChannels::GetShownProgram(const MathChannel &channel, const NetResolver &find_node,
+                                                         std::vector<std::string> &errors) const {
+    const std::expected<MathProgram, std::string> compiled = CompileExpression(GetChannelExpression(channel));
+    if (!channel.Shown || !compiled) {
+        return std::nullopt;
+    }
+    std::expected<MathProgram, std::string> program = ResolveNetNames(*compiled, find_node);
+    if (!program) {
+        errors.push_back(std::format("{}: {}", channel.Name, program.error()));
+        return std::nullopt;
+    }
+    return std::move(*program);
+}
+
+/**
+ * @brief   Draws one channel of the list: its Edit button, its check box in the color of its place, and its editor
+ *          while open.
+ * @param[in,out] channel       The channel, which the check box and the editor change.
+ * @param[in]     index         Its place in the list, which picks its color.
+ * @param[in]     operands      Traces the channel may combine.
+ * @param[in]     find_node     Looks up the nets its expression names.
+ * @param[in]     opens_editor  Whether its editor opens now, as for a channel just added.
+ * @return  False when the user removed the channel in its editor.
+ */
+bool MathChannels::DrawChannel(MathChannel &channel, const std::size_t index, const std::vector<std::string> &operands,
+                               const NetResolver &find_node, const bool opens_editor) const {
+    // The list is as narrow as the trace names, so a mark after the Edit button would be cut off; the name of a
+    // channel in error takes the error color instead
+    const auto program = CompileChannel(channel, find_node);
+    // Edit comes first, so a long name is what the narrow list clips, not the button
+    ImGui::AlignTextToFramePadding();
+    const bool is_edit_pressed = ImGui::SmallButton("Edit");
+    ImGui::SameLine();
+    if (!program) {
+        ImGui::PushStyleColor(ImGuiCol_Text, GetErrorTextColor());
+    }
+    DrawTraceCheckbox(channel.Name.c_str(), &channel.Shown, AdaptToBackground(MATH_COLORS[index % MATH_COLORS.size()]),
+                      TraceStyle::HEAVY);
+    if (!program) {
+        ImGui::PopStyleColor();
+        ImGui::SetItemTooltip("%s\n%s", GetChannelExpression(channel).c_str(), program.error().c_str());
+    } else {
+        ImGui::SetItemTooltip("%s", GetChannelExpression(channel).c_str());
+    }
+    if (is_edit_pressed || opens_editor) {
+        ImGui::OpenPopup("math_editor");
+    }
+    bool is_kept = true;
+    if (ImGui::BeginPopup("math_editor")) {
+        is_kept = DrawEditor(channel, operands);
+        ImGui::EndPopup();
+    }
+    return is_kept;
 }
 
 /**

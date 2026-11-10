@@ -36,6 +36,10 @@ void ForwardMessages(const std::vector<nodalys::DiagnosticMessage> &source, std:
 
 NativeBackend::NativeBackend() {
     m_Capabilities.Analyses = NATIVE_ANALYSES;
+    for (const ComponentType type : {ComponentType::BEHAVIORAL_VOLTAGE, ComponentType::BEHAVIORAL_CURRENT}) {
+        m_Capabilities.UnsupportedParts[type] = "Nodalys has no device for behavioral sources yet";
+    }
+    m_Capabilities.UnsupportedParts[ComponentType::FUSE] = "Nodalys has no device for fuses yet";
 }
 
 std::string_view NativeBackend::GetName() const {
@@ -46,7 +50,9 @@ const BackendCapabilities &NativeBackend::GetCapabilities() const {
     return m_Capabilities;
 }
 
-OperatingPointRun NativeBackend::RunOperatingPoint(const Circuit &circuit) {
+OperatingPointRun NativeBackend::RunOperatingPoint(const Circuit &circuit,
+                                                   const std::optional<double> &temperature_celsius) {
+    (void)temperature_celsius;
     OperatingPointRun run;
     auto compiled = CompileOrFail(circuit);
     if (!compiled) {
@@ -290,6 +296,36 @@ TransferFunctionRun NativeBackend::RunTransferFunction(const Circuit &circuit,
     tf.OutputImpedance = result->OutputImpedance;
     run.Result = std::move(tf);
     return run;
+}
+
+/**
+ * @brief   Finds how much the DC voltage of a node changes with the value of each part.
+ * @param[in] circuit   Circuit to simulate.
+ * @param[in] settings  Output node.
+ * @return  The sensitivity of each part, or an error.
+ */
+SensitivityRun NativeBackend::RunSensitivity(const Circuit & /*circuit*/, const SensitivitySettings & /*settings*/) {
+    return {std::unexpected("Nodalys has no sensitivity analysis yet; it runs with the ngspice backend"), {}};
+}
+
+/**
+ * @brief   Finds the poles and zeros of the transfer function from an input source to a node voltage.
+ * @param[in] circuit   Circuit to simulate.
+ * @param[in] settings  Output node and input source.
+ * @return  The poles and zeros, or an error.
+ */
+PoleZeroRun NativeBackend::RunPoleZero(const Circuit & /*circuit*/, const PoleZeroSettings & /*settings*/) {
+    return {std::unexpected("Nodalys has no pole-zero analysis yet; it runs with the ngspice backend"), {}};
+}
+
+/**
+ * @brief   Measures the scattering matrix of the ports of a circuit across frequency.
+ * @param[in] circuit   Circuit to simulate.
+ * @param[in] settings  Frequency range and points.
+ * @return  The S-parameter matrix at each frequency, or an error.
+ */
+SParametersRun NativeBackend::RunSParameters(const Circuit & /*circuit*/, const SParameterSettings & /*settings*/) {
+    return {std::unexpected("Nodalys has no S-parameter analysis yet; it runs with the ngspice backend"), {}};
 }
 
 } // namespace Core

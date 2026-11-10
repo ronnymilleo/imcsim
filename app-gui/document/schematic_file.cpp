@@ -5,19 +5,24 @@
 
 #include "document/schematic_file.h"
 
+#include "components/behavioral_source.h"
 #include "components/bjt.h"
 #include "components/clock.h"
 #include "components/controlled_source.h"
 #include "components/diode.h"
+#include "components/fuse.h"
 #include "components/logic_input.h"
+#include "components/logic_output.h"
 #include "components/logic_part.h"
 #include "components/mosfet.h"
 #include "components/net_label.h"
 #include "components/op_amp.h"
 #include "components/potentiometer.h"
 #include "components/relay.h"
+#include "components/seven_segment.h"
 #include "components/source.h"
 #include "components/subcircuit.h"
+#include "components/subcircuit_pin.h"
 #include "components/switch.h"
 #include "components/transformer.h"
 #include "components/voltage_controlled_switch.h"
@@ -25,11 +30,18 @@
 #include "editing/connectivity.h"
 #include "editing/element_factory.h"
 #include "nlohmann/json.hpp"
+#include <algorithm>
 #include <array>
+#include <cmath>
 #include <format>
 #include <fstream>
+#include <functional>
+#include <limits>
+#include <map>
 #include <optional>
+#include <set>
 #include <sstream>
+#include <string_view>
 #include <utility>
 
 namespace GUI {
@@ -63,6 +75,13 @@ constexpr auto SWITCH_KEYS = std::to_array<ParameterKey<Core::SwitchParameters>>
     {"off_resistance", &Core::SwitchParameters::OffResistance},
 });
 
+constexpr auto FUSE_KEYS = std::to_array<ParameterKey<Core::FuseParameters>>({
+    {"rated_current", &Core::FuseParameters::RatedCurrent},
+    {"melting_i2t", &Core::FuseParameters::MeltingI2t},
+    {"cold_resistance", &Core::FuseParameters::ColdResistance},
+    {"blown_resistance", &Core::FuseParameters::BlownResistance},
+});
+
 constexpr auto RELAY_KEYS = std::to_array<ParameterKey<Core::RelayParameters>>({
     {"coil_resistance", &Core::RelayParameters::CoilResistance},
     {"coil_inductance", &Core::RelayParameters::CoilInductance},
@@ -91,6 +110,14 @@ constexpr auto CLOCK_KEYS = std::to_array<ParameterKey<Core::ClockParameters>>({
 
 constexpr auto LOGIC_INPUT_KEYS = std::to_array<ParameterKey<Core::LogicInputParameters>>({
     {"logic_level", &Core::LogicInputParameters::LogicLevel},
+});
+
+constexpr auto LOGIC_OUTPUT_KEYS = std::to_array<ParameterKey<Core::LogicOutputParameters>>({
+    {"logic_level", &Core::LogicOutputParameters::LogicLevel},
+});
+
+constexpr auto SEVEN_SEGMENT_KEYS = std::to_array<ParameterKey<Core::SevenSegmentParameters>>({
+    {"logic_level", &Core::SevenSegmentParameters::LogicLevel},
 });
 
 constexpr auto PULSE_KEYS = std::to_array<ParameterKey<Core::PulseParameters>>({
@@ -140,6 +167,8 @@ constexpr auto DIODE_KEYS = std::to_array<ParameterKey<Core::DiodeParameters>>({
     {"vj", &Core::DiodeParameters::JunctionPotential},
     {"m", &Core::DiodeParameters::GradingCoefficient},
     {"tt", &Core::DiodeParameters::TransitTime},
+    {"ifmax", &Core::DiodeParameters::MaxForwardCurrent},
+    {"pmax", &Core::DiodeParameters::MaxPower},
 });
 
 constexpr auto BJT_KEYS = std::to_array<ParameterKey<Core::BJTParameters>>({
@@ -189,6 +218,26 @@ constexpr auto OP_AMP_KEYS = std::to_array<ParameterKey<Core::OpAmpParameters>>(
     {"headroom_positive", &Core::OpAmpParameters::PositiveHeadroom},
     {"headroom_negative", &Core::OpAmpParameters::NegativeHeadroom},
     {"iq", &Core::OpAmpParameters::SupplyCurrent},
+    {"vos", &Core::OpAmpParameters::InputOffsetVoltage},
+});
+
+constexpr auto NOISE_KEYS = std::to_array<ParameterKey<Core::NoiseParameters>>({
+    {"offset", &Core::NoiseParameters::Offset},
+    {"white", &Core::NoiseParameters::WhiteAmplitude},
+    {"step", &Core::NoiseParameters::TimeStep},
+    {"flicker_exponent", &Core::NoiseParameters::FlickerExponent},
+    {"flicker", &Core::NoiseParameters::FlickerAmplitude},
+    {"telegraph", &Core::NoiseParameters::TelegraphAmplitude},
+    {"capture", &Core::NoiseParameters::CaptureTime},
+    {"emission", &Core::NoiseParameters::EmissionTime},
+});
+
+/// The distribution is a name, so it is written and read apart.
+constexpr auto RANDOM_KEYS = std::to_array<ParameterKey<Core::RandomParameters>>({
+    {"step", &Core::RandomParameters::TimeStep},
+    {"delay", &Core::RandomParameters::Delay},
+    {"first", &Core::RandomParameters::First},
+    {"second", &Core::RandomParameters::Second},
 });
 
 constexpr auto TRANSIENT_KEYS = std::to_array<ParameterKey<Core::TransientSettings>>({
@@ -200,6 +249,12 @@ constexpr auto TRANSIENT_KEYS = std::to_array<ParameterKey<Core::TransientSettin
 constexpr auto AC_SWEEP_KEYS = std::to_array<ParameterKey<Core::ACSweepSettings>>({
     {"start", &Core::ACSweepSettings::StartFrequency},
     {"stop", &Core::ACSweepSettings::StopFrequency},
+});
+
+/// The sweep type and the points are written and read apart.
+constexpr auto S_PARAMETER_KEYS = std::to_array<ParameterKey<Core::SParameterSettings>>({
+    {"start", &Core::SParameterSettings::StartFrequency},
+    {"stop", &Core::SParameterSettings::StopFrequency},
 });
 
 constexpr auto PARAMETER_STEP_KEYS = std::to_array<ParameterKey<ParameterStepSettings>>({
@@ -387,9 +442,22 @@ void WriteModelFields(const Core::Component &component, nlohmann::json &object) 
     } else if (type == Core::ComponentType::OP_AMP) {
         const auto &op_amp = static_cast<const Core::OpAmp &>(component);
         WriteModelChoice(op_amp, OP_AMP_KEYS, object);
+        // The input stage is a name, so it is written apart from the numbers
+        if (op_amp.IsCustom()) {
+            object["parameters"]["input"] = Core::GetOpAmpInputStageName(op_amp.GetParameters().InputStage);
+        }
         if (op_amp.IsIdeal()) {
             object["gbw"] = op_amp.GetIdealBandwidth();
         }
+    }
+}
+
+/**
+ * @brief   A marker that is a port saves its number and reference impedance; one that is not saves nothing.
+ */
+void WritePortSettings(const Core::PortSettings &port, nlohmann::json &object) {
+    if (port.IsPort) {
+        object["port"] = {{"number", port.Number}, {"z0", port.ReferenceOhms}};
     }
 }
 
@@ -400,6 +468,8 @@ void WriteKindFields(const Core::Component &component, nlohmann::json &object) {
     const Core::ComponentType type = component.GetType();
     if (Core::IsCurrentControlled(type)) {
         object["control"] = static_cast<const Core::ControlledSource &>(component).GetControllingCurrent();
+    } else if (Core::IsBehavioralSource(type)) {
+        object["expression"] = static_cast<const Core::BehavioralSource &>(component).GetExpression();
     } else if (type == Core::ComponentType::SUBCIRCUIT) {
         const auto &instance = static_cast<const Core::SubcircuitInstance &>(component);
         object["definition"] = instance.GetDefinitionName();
@@ -411,6 +481,9 @@ void WriteKindFields(const Core::Component &component, nlohmann::json &object) {
         if (const std::string &net = static_cast<const Core::NetLabel &>(component).GetNet(); !net.empty()) {
             object["net"] = net;
         }
+        if (Core::IsSubcircuitPin(type)) {
+            WritePortSettings(static_cast<const Core::SubcircuitPinMarker &>(component).GetPort(), object);
+        }
     } else if (Core::IsSwitch(type)) {
         object["closed"] = static_cast<const Core::Switch &>(component).IsClosed();
     } else if (type == Core::ComponentType::LOGIC_INPUT) {
@@ -421,8 +494,8 @@ void WriteKindFields(const Core::Component &component, nlohmann::json &object) {
 }
 
 /**
- * @brief   Parts whose figures are all there is to them: the switch that follows a voltage, the relay, the transformer,
- *          the gates and flip-flops with their logic family, a clock and a logic input.
+ * @brief   Parts whose figures are all there is to them: the switch that follows a voltage, the relay, the fuse, the
+ * transformer, the gates and flip-flops with their logic family, a clock and a logic input.
  */
 void WriteFigureFields(const Core::Component &component, nlohmann::json &object) {
     const Core::ComponentType type = component.GetType();
@@ -430,6 +503,8 @@ void WriteFigureFields(const Core::Component &component, nlohmann::json &object)
         WritePartParameters(static_cast<const Core::VoltageControlledSwitch &>(component), SWITCH_KEYS, object);
     } else if (type == Core::ComponentType::RELAY) {
         WritePartParameters(static_cast<const Core::Relay &>(component), RELAY_KEYS, object);
+    } else if (type == Core::ComponentType::FUSE) {
+        WritePartParameters(static_cast<const Core::Fuse &>(component), FUSE_KEYS, object);
     } else if (type == Core::ComponentType::TRANSFORMER) {
         WritePartParameters(static_cast<const Core::Transformer &>(component), TRANSFORMER_KEYS, object);
     } else if (Core::IsLogicPart(type)) {
@@ -442,6 +517,10 @@ void WriteFigureFields(const Core::Component &component, nlohmann::json &object)
         WritePartParameters(static_cast<const Core::Clock &>(component), CLOCK_KEYS, object);
     } else if (type == Core::ComponentType::LOGIC_INPUT) {
         WritePartParameters(static_cast<const Core::LogicInput &>(component), LOGIC_INPUT_KEYS, object);
+    } else if (type == Core::ComponentType::LOGIC_OUTPUT) {
+        WritePartParameters(static_cast<const Core::LogicOutput &>(component), LOGIC_OUTPUT_KEYS, object);
+    } else if (type == Core::ComponentType::SEVEN_SEGMENT) {
+        WritePartParameters(static_cast<const Core::SevenSegmentDisplay &>(component), SEVEN_SEGMENT_KEYS, object);
     }
 }
 
@@ -471,6 +550,9 @@ nlohmann::json WriteElement(const UIElement &element) {
     if (const std::optional<double> initial = component.GetInitialCondition()) {
         object["ic"] = *initial;
     }
+    if (const std::optional<double> tolerance = component.GetTolerance()) {
+        object["tolerance"] = *tolerance;
+    }
     // Every waveform is saved, so switching type after loading keeps the parameters of the others
     if (Core::IsSource(component.GetType())) {
         const auto &source = static_cast<const Core::Source &>(component);
@@ -485,6 +567,9 @@ nlohmann::json WriteElement(const UIElement &element) {
             pwl.push_back({{"time", point.Time}, {"value", point.Value}});
         }
         object["pwl"] = pwl;
+        WriteSourceParameters(NOISE_KEYS, source.GetNoise(), "noise", object);
+        WriteSourceParameters(RANDOM_KEYS, source.GetRandom(), "random", object);
+        object["random"]["distribution"] = Core::GetRandomDistributionName(source.GetRandom().Distribution);
     }
     WriteModelFields(component, object);
     WriteKindFields(component, object);
@@ -501,7 +586,7 @@ std::expected<void, std::string> ReadSource(const nlohmann::json &object, Core::
         const std::optional<Core::Source::SourceType> type =
             type_name ? Core::ParseSourceType(*type_name) : std::nullopt;
         if (!type) {
-            return std::unexpected("has a source type other than DC, AC, Pulse, EXP, SFFM, AM or PWL");
+            return std::unexpected("has a source type other than DC, AC, Pulse, EXP, SFFM, AM, PWL, Noise or Random");
         }
         source.SetSourceType(*type);
     }
@@ -576,6 +661,35 @@ std::expected<void, std::string> ReadSource(const nlohmann::json &object, Core::
         }
         source.SetPWL(pwl);
     }
+
+    Core::NoiseParameters noise = source.GetNoise();
+    if (const auto read = ReadSourceParameters(object, "noise", NOISE_KEYS, noise); !read) {
+        return read;
+    }
+    if (!source.IsValidNoise(noise)) {
+        return std::unexpected("has a noise with a time step that is negative or missing, a 1/f exponent outside 0 to "
+                               "2 or a telegraph time that is not positive");
+    }
+    source.SetNoise(noise);
+
+    Core::RandomParameters random = source.GetRandom();
+    if (const auto read = ReadSourceParameters(object, "random", RANDOM_KEYS, random); !read) {
+        return read;
+    }
+    if (const auto entry = object.find("random"); entry != object.end() && entry->contains("distribution")) {
+        const std::optional<std::string> name = ReadString(*entry, "distribution");
+        const std::optional<Core::RandomDistribution> distribution =
+            name ? Core::ParseRandomDistribution(*name) : std::nullopt;
+        if (!distribution) {
+            return std::unexpected("has a random distribution other than Uniform, Gaussian, Exponential or Poisson");
+        }
+        random.Distribution = *distribution;
+    }
+    if (!source.IsValidRandom(random)) {
+        return std::unexpected("has random values with a time step that is not positive, a negative delay or a first "
+                               "parameter that is not valid for the distribution");
+    }
+    source.SetRandom(random);
     return {};
 }
 
@@ -625,6 +739,26 @@ std::expected<void, std::string> ReadModelChoice(const nlohmann::json &object, P
     return {};
 }
 
+/**
+ * @brief   The input stage of a custom op-amp; a file saved before op-amps had one keeps the NPN pair.
+ */
+std::expected<void, std::string> ReadOpAmpInputStage(const nlohmann::json &object, Core::OpAmp &op_amp) {
+    const auto parameters_object = object.find("parameters");
+    if (!op_amp.IsCustom() || parameters_object == object.end() || !parameters_object->contains("input")) {
+        return {};
+    }
+    const std::optional<std::string> name = ReadString(*parameters_object, "input");
+    const std::optional<Core::OpAmpInputStage> stage =
+        name ? Core::FindOpAmpInputStage(*name) : std::optional<Core::OpAmpInputStage>{};
+    if (!stage) {
+        return std::unexpected("has no valid op-amp input stage");
+    }
+    Core::OpAmpParameters parameters = op_amp.GetParameters();
+    parameters.InputStage = *stage;
+    op_amp.SetCustomParameters(parameters);
+    return {};
+}
+
 std::expected<void, std::string> ReadModel(const nlohmann::json &object, Core::Component &component) {
     const Core::ComponentType type = component.GetType();
     if (Core::IsDiode(type)) {
@@ -646,6 +780,9 @@ std::expected<void, std::string> ReadModel(const nlohmann::json &object, Core::C
             if (const auto read =
                     ReadModelChoice(object, op_amp, &Core::FindOpAmpModel, Core::CUSTOM_OP_AMP_MODEL_NAME, OP_AMP_KEYS);
                 !read) {
+                return read;
+            }
+            if (const auto read = ReadOpAmpInputStage(object, op_amp); !read) {
                 return read;
             }
         }
@@ -677,6 +814,21 @@ std::expected<void, std::string> ReadControllingCurrent(const nlohmann::json &ob
     return {};
 }
 
+/**
+ * @brief   The expression of a behavioral source, kept as written; a missing one loads as the default.
+ */
+std::expected<void, std::string> ReadBehavioralExpression(const nlohmann::json &object, Core::Component &component) {
+    if (!Core::IsBehavioralSource(component.GetType()) || !object.contains("expression")) {
+        return {};
+    }
+    const std::optional<std::string> expression = ReadString(object, "expression");
+    if (!expression) {
+        return std::unexpected("has an expression that is not text");
+    }
+    static_cast<Core::BehavioralSource &>(component).SetExpression(*expression);
+    return {};
+}
+
 std::expected<void, std::string> ReadNetName(const nlohmann::json &object, Core::Component &component) {
     const Core::ComponentType type = component.GetType();
     if ((type != Core::ComponentType::NET_LABEL && !Core::IsSubcircuitPin(type)) || !object.contains("net")) {
@@ -691,6 +843,24 @@ std::expected<void, std::string> ReadNetName(const nlohmann::json &object, Core:
                                       : "has a net name that is not 1 to 32 letters, digits, _, - or .");
     }
     static_cast<Core::NetLabel &>(component).SetNet(*net);
+    return {};
+}
+
+/**
+ * @brief   A pin marker saved without a port is no port.
+ */
+std::expected<void, std::string> ReadPortSettings(const nlohmann::json &object, Core::Component &component) {
+    if (!Core::IsSubcircuitPin(component.GetType()) || !object.contains("port")) {
+        return {};
+    }
+    const nlohmann::json &port = object["port"];
+    const std::optional<int> number = port.is_object() ? ReadInt(port, "number") : std::nullopt;
+    const std::optional<double> reference = port.is_object() ? ReadNumber(port, "z0") : std::nullopt;
+    if (!number || !reference || *number < 1 || *reference <= 0.0) {
+        return std::unexpected("has an S-parameter port without a valid number and reference impedance");
+    }
+    static_cast<Core::SubcircuitPinMarker &>(component).SetPort(
+        {.IsPort = true, .Number = *number, .ReferenceOhms = *reference});
     return {};
 }
 
@@ -741,8 +911,9 @@ std::expected<void, std::string> ReadLogicInputState(const nlohmann::json &objec
 
 using StateReader = std::expected<void, std::string> (*)(const nlohmann::json &, Core::Component &);
 
-constexpr auto STATE_READERS = std::to_array<StateReader>(
-    {&ReadControllingCurrent, &ReadNetName, &ReadSwitchState, &ReadWiper, &ReadLogicInputState});
+constexpr auto STATE_READERS =
+    std::to_array<StateReader>({&ReadControllingCurrent, &ReadBehavioralExpression, &ReadNetName, &ReadPortSettings,
+                                &ReadSwitchState, &ReadWiper, &ReadLogicInputState});
 
 /**
  * @brief   What only some kinds of part carry: the current a controlled source follows, a net name, a switch state, a
@@ -773,6 +944,13 @@ std::expected<void, std::string> ReadRelayFigures(const nlohmann::json &object, 
         return {};
     }
     return ReadPartParameters(object, static_cast<Core::Relay &>(component), RELAY_KEYS);
+}
+
+std::expected<void, std::string> ReadFuseFigures(const nlohmann::json &object, Core::Component &component) {
+    if (component.GetType() != Core::ComponentType::FUSE) {
+        return {};
+    }
+    return ReadPartParameters(object, static_cast<Core::Fuse &>(component), FUSE_KEYS);
 }
 
 std::expected<void, std::string> ReadTransformerFigures(const nlohmann::json &object, Core::Component &component) {
@@ -819,13 +997,27 @@ std::expected<void, std::string> ReadLogicInputFigures(const nlohmann::json &obj
     return ReadPartParameters(object, static_cast<Core::LogicInput &>(component), LOGIC_INPUT_KEYS);
 }
 
-constexpr auto FIGURE_READERS =
-    std::to_array<StateReader>({&ReadSwitchFigures, &ReadRelayFigures, &ReadTransformerFigures, &ReadLogicFigures,
-                                &ReadClockFigures, &ReadLogicInputFigures});
+std::expected<void, std::string> ReadLogicOutputFigures(const nlohmann::json &object, Core::Component &component) {
+    if (component.GetType() != Core::ComponentType::LOGIC_OUTPUT) {
+        return {};
+    }
+    return ReadPartParameters(object, static_cast<Core::LogicOutput &>(component), LOGIC_OUTPUT_KEYS);
+}
+
+std::expected<void, std::string> ReadSevenSegmentFigures(const nlohmann::json &object, Core::Component &component) {
+    if (component.GetType() != Core::ComponentType::SEVEN_SEGMENT) {
+        return {};
+    }
+    return ReadPartParameters(object, static_cast<Core::SevenSegmentDisplay &>(component), SEVEN_SEGMENT_KEYS);
+}
+
+constexpr auto FIGURE_READERS = std::to_array<StateReader>(
+    {&ReadSwitchFigures, &ReadRelayFigures, &ReadFuseFigures, &ReadTransformerFigures, &ReadLogicFigures,
+     &ReadClockFigures, &ReadLogicInputFigures, &ReadLogicOutputFigures, &ReadSevenSegmentFigures});
 
 /**
- * @brief   Parts whose figures are all there is to them: the switch that follows a voltage, the relay, the transformer,
- *          the gates and flip-flops with their logic family, a clock and a logic input.
+ * @brief   Parts whose figures are all there is to them: the switch that follows a voltage, the relay, the fuse, the
+ * transformer, the gates and flip-flops with their logic family, a clock and a logic input.
  */
 std::expected<void, std::string> ReadFigureFields(const nlohmann::json &object, Core::Component &component) {
     for (const StateReader reader : FIGURE_READERS) {
@@ -930,6 +1122,15 @@ ReadElement(const nlohmann::json &object, const std::span<const SavedSubcircuit>
         }
         component.SetInitialCondition(*initial);
     }
+    // A file saved before tolerances had no key, so the part has none
+    if (component.SupportsTolerance() && object.contains("tolerance")) {
+        const std::optional<double> tolerance = ReadNumber(object, "tolerance");
+        if (!tolerance || !(*tolerance > 0.0 && *tolerance <= Core::MAX_TOLERANCE_PERCENT)) {
+            return std::unexpected(
+                std::format("has a tolerance that is not a percent above 0 and up to {}", Core::MAX_TOLERANCE_PERCENT));
+        }
+        component.SetTolerance(*tolerance);
+    }
     if (Core::IsSource(component.GetType())) {
         const std::expected<void, std::string> source = ReadSource(object, static_cast<Core::Source &>(component));
         if (!source) {
@@ -991,13 +1192,37 @@ nlohmann::json WriteSweepRange(const Core::SweepRange &range) {
 }
 
 /// File names of the analyses, in the order of the Analysis enum.
-constexpr auto ANALYSIS_KEYS = std::to_array<std::string_view>(
-    {"operating_point", "transient", "ac_sweep", "dc_sweep", "noise", "transfer_function", "truth_table"});
+constexpr auto ANALYSIS_KEYS =
+    std::to_array<std::string_view>({"operating_point", "transient", "ac_sweep", "dc_sweep", "noise",
+                                     "transfer_function", "sensitivity", "pole_zero", "s_parameters", "truth_table"});
+
+const char *ToFileName(const Core::ToleranceDistribution distribution) {
+    return distribution == Core::ToleranceDistribution::UNIFORM ? "uniform" : "gaussian";
+}
+
+std::optional<Core::ToleranceDistribution> ParseDistributionName(const std::string_view name) {
+    if (name == "gaussian") {
+        return Core::ToleranceDistribution::GAUSSIAN;
+    }
+    if (name == "uniform") {
+        return Core::ToleranceDistribution::UNIFORM;
+    }
+    return std::nullopt;
+}
+
+nlohmann::json WriteSParameterSettings(const Core::SParameterSettings &settings) {
+    nlohmann::json object = {{"logarithmic", settings.IsLogarithmic},
+                             {"points_per_decade", settings.PointsPerDecade},
+                             {"linear_points", settings.LinearPoints}};
+    WriteParameters(S_PARAMETER_KEYS, settings, object);
+    return object;
+}
 
 nlohmann::json WriteSettings(const SimulationSettings &settings) {
     nlohmann::json transient = nlohmann::json::object();
     WriteParameters(TRANSIENT_KEYS, settings.Transient, transient);
     transient["live_seconds"] = settings.LiveSeconds;
+    transient["seed"] = settings.Transient.Seed;
     nlohmann::json ac_sweep = nlohmann::json::object();
     WriteParameters(AC_SWEEP_KEYS, settings.ACSweep, ac_sweep);
     ac_sweep["points_per_decade"] = settings.ACSweep.PointsPerDecade;
@@ -1011,11 +1236,26 @@ nlohmann::json WriteSettings(const SimulationSettings &settings) {
     if (settings.TransferFunctionOutput) {
         transfer_function["output"] = {settings.TransferFunctionOutput->X, settings.TransferFunctionOutput->Y};
     }
+    nlohmann::json sensitivity = nlohmann::json::object();
+    if (settings.SensitivityOutput) {
+        sensitivity["output"] = {settings.SensitivityOutput->X, settings.SensitivityOutput->Y};
+    }
+    nlohmann::json pole_zero = {{"source", settings.PoleZeroSource}};
+    if (settings.PoleZeroOutput) {
+        pole_zero["output"] = {settings.PoleZeroOutput->X, settings.PoleZeroOutput->Y};
+    }
     const nlohmann::json truth_table = {{"inputs", settings.TruthTableInputs}};
     const ParameterStepSettings &step = settings.ParameterStep;
     nlohmann::json parameter_step = {
         {"enabled", step.Enabled}, {"part", step.Part}, {"uses_list", step.UsesList}, {"list", step.List}};
     WriteParameters(PARAMETER_STEP_KEYS, step, parameter_step);
+    const Core::MonteCarloSettings &monte_carlo = settings.MonteCarlo;
+    const nlohmann::json monte_carlo_object = {
+        {"enabled", monte_carlo.Enabled},
+        {"runs", monte_carlo.Runs},
+        {"distribution", ToFileName(monte_carlo.Distribution)},
+        {"seed", monte_carlo.Seed},
+    };
     return {
         {"analysis", ANALYSIS_KEYS[static_cast<std::size_t>(settings.Selected)]},
         {"transient", transient},
@@ -1028,8 +1268,12 @@ nlohmann::json WriteSettings(const SimulationSettings &settings) {
          }},
         {"noise", noise},
         {"transfer_function", transfer_function},
+        {"sensitivity", sensitivity},
+        {"pole_zero", pole_zero},
+        {"s_parameters", WriteSParameterSettings(settings.SParameters)},
         {"truth_table", truth_table},
         {"parameter_step", parameter_step},
+        {"monte_carlo", monte_carlo_object},
     };
 }
 
@@ -1049,6 +1293,13 @@ std::expected<void, std::string> ReadTransientSettings(const nlohmann::json &obj
             return std::unexpected("have no valid live_seconds");
         }
         settings.LiveSeconds = *live_seconds;
+    }
+    if (object.contains("seed")) {
+        const std::optional<int> seed = ReadInt(object, "seed");
+        if (!seed || *seed < 0) {
+            return std::unexpected("have no valid seed");
+        }
+        settings.Transient.Seed = static_cast<unsigned int>(*seed);
     }
     return {};
 }
@@ -1158,6 +1409,67 @@ std::expected<void, std::string> ReadTransferFunctionSettings(const nlohmann::js
     return {};
 }
 
+std::expected<void, std::string> ReadPoleZeroSettings(const nlohmann::json &object, SimulationSettings &settings) {
+    if (object.contains("source")) {
+        const std::optional<std::string> source = ReadString(object, "source");
+        if (!source) {
+            return std::unexpected("have no valid source");
+        }
+        settings.PoleZeroSource = *source;
+    }
+    if (object.contains("output")) {
+        const std::optional<GridPoint> output = ReadPoint(object, "output");
+        if (!output) {
+            return std::unexpected("have no valid output point");
+        }
+        settings.PoleZeroOutput = *output;
+    }
+    return {};
+}
+
+std::expected<void, std::string> ReadSParameterSettings(const nlohmann::json &object, SimulationSettings &settings) {
+    Core::SParameterSettings &range = settings.SParameters;
+    if (const auto read = ReadParameters(S_PARAMETER_KEYS, object, range); !read) {
+        return read;
+    }
+    if (range.StartFrequency <= 0.0 || range.StopFrequency <= 0.0) {
+        return std::unexpected("have a frequency that is not positive");
+    }
+    if (object.contains("logarithmic")) {
+        const std::optional<bool> is_logarithmic = ReadBool(object, "logarithmic");
+        if (!is_logarithmic) {
+            return std::unexpected("have a logarithmic flag that is not true or false");
+        }
+        range.IsLogarithmic = *is_logarithmic;
+    }
+    if (object.contains("points_per_decade")) {
+        const std::optional<int> points = ReadInt(object, "points_per_decade");
+        if (!points || *points < 1) {
+            return std::unexpected("have no valid points_per_decade");
+        }
+        range.PointsPerDecade = *points;
+    }
+    if (object.contains("linear_points")) {
+        const std::optional<int> points = ReadInt(object, "linear_points");
+        if (!points || *points < 3) {
+            return std::unexpected("have no valid linear_points");
+        }
+        range.LinearPoints = *points;
+    }
+    return {};
+}
+
+std::expected<void, std::string> ReadSensitivitySettings(const nlohmann::json &object, SimulationSettings &settings) {
+    if (object.contains("output")) {
+        const std::optional<GridPoint> output = ReadPoint(object, "output");
+        if (!output) {
+            return std::unexpected("have no valid output point");
+        }
+        settings.SensitivityOutput = *output;
+    }
+    return {};
+}
+
 std::expected<void, std::string> ReadTruthTableSettings(const nlohmann::json &object, SimulationSettings &settings) {
     const auto inputs = object.find("inputs");
     if (inputs == object.end()) {
@@ -1203,6 +1515,43 @@ std::expected<void, std::string> ReadParameterStepSettings(const nlohmann::json 
     return {};
 }
 
+std::expected<void, std::string> ReadMonteCarloSettings(const nlohmann::json &object, SimulationSettings &settings) {
+    Core::MonteCarloSettings &monte_carlo = settings.MonteCarlo;
+    if (object.contains("enabled")) {
+        const std::optional<bool> enabled = ReadBool(object, "enabled");
+        if (!enabled) {
+            return std::unexpected("have an enabled flag that is not true or false");
+        }
+        monte_carlo.Enabled = *enabled;
+    }
+    if (object.contains("runs")) {
+        const std::optional<int> runs = ReadInt(object, "runs");
+        if (!runs || *runs < Core::MIN_MONTE_CARLO_RUNS || *runs > Core::MAX_MONTE_CARLO_RUNS) {
+            return std::unexpected(
+                std::format("have no valid runs, {} to {}", Core::MIN_MONTE_CARLO_RUNS, Core::MAX_MONTE_CARLO_RUNS));
+        }
+        monte_carlo.Runs = *runs;
+    }
+    if (object.contains("distribution")) {
+        const std::optional<std::string> name = ReadString(object, "distribution");
+        const std::optional<Core::ToleranceDistribution> distribution =
+            name ? ParseDistributionName(*name) : std::nullopt;
+        if (!distribution) {
+            return std::unexpected("have an unknown distribution");
+        }
+        monte_carlo.Distribution = *distribution;
+    }
+    if (object.contains("seed")) {
+        const std::optional<double> seed = ReadNumber(object, "seed");
+        if (!seed || *seed < 0.0 || *seed > static_cast<double>(std::numeric_limits<unsigned int>::max()) ||
+            *seed != std::floor(*seed)) {
+            return std::unexpected("have no valid seed");
+        }
+        monte_carlo.Seed = static_cast<unsigned int>(*seed);
+    }
+    return {};
+}
+
 /**
  * @struct  AnalysisReader
  * @brief   JSON key of the settings of one analysis, its name in warnings and the function that reads them.
@@ -1219,8 +1568,12 @@ constexpr auto ANALYSIS_READERS = std::to_array<AnalysisReader>({
     {"dc_sweep", "DC sweep", &ReadDCSweepSettings},
     {"noise", "noise", &ReadNoiseSettings},
     {"transfer_function", "transfer function", &ReadTransferFunctionSettings},
+    {"sensitivity", "sensitivity", &ReadSensitivitySettings},
+    {"pole_zero", "pole-zero", &ReadPoleZeroSettings},
+    {"s_parameters", "S-parameter", &ReadSParameterSettings},
     {"truth_table", "truth table", &ReadTruthTableSettings},
     {"parameter_step", "parameter step", &ReadParameterStepSettings},
+    {"monte_carlo", "Monte Carlo", &ReadMonteCarloSettings},
 });
 
 /**
@@ -1282,6 +1635,15 @@ nlohmann::json WriteMathChannel(const MathChannel &channel) {
     };
 }
 
+nlohmann::json WriteBus(const LogicBus &bus) {
+    return {
+        {"name", bus.Name},
+        {"shown", bus.Shown},
+        {"bits", bus.Bits},
+        {"format", GetBusFormatName(bus.Format)},
+    };
+}
+
 nlohmann::json WriteMeasurements(const SavedMeasurements &measurements) {
     nlohmann::json voltages = nlohmann::json::array();
     for (const GridPoint point : measurements.Voltages) {
@@ -1294,6 +1656,13 @@ nlohmann::json WriteMeasurements(const SavedMeasurements &measurements) {
             channels.push_back(WriteMathChannel(channel));
         }
         measurements_object["math"] = channels;
+    }
+    if (!measurements.Buses.empty()) {
+        nlohmann::json buses = nlohmann::json::array();
+        for (const LogicBus &bus : measurements.Buses) {
+            buses.push_back(WriteBus(bus));
+        }
+        measurements_object["buses"] = buses;
     }
     return measurements_object;
 }
@@ -1358,6 +1727,37 @@ std::optional<MathChannel> ReadMathChannelValue(const nlohmann::json &value) {
 }
 
 /**
+ * @brief   A bus needs its name and a list of bit names; a format it does not know rejects it, since it would show
+ *          other values.
+ */
+std::optional<LogicBus> ReadBusValue(const nlohmann::json &value) {
+    if (!value.is_object()) {
+        return std::nullopt;
+    }
+    const std::optional<std::string> name = ReadString(value, "name");
+    const auto bits = value.find("bits");
+    if (!name || name->empty() || bits == value.end() || !bits->is_array()) {
+        return std::nullopt;
+    }
+    LogicBus bus{.Name = *name};
+    bus.Shown = ReadBool(value, "shown").value_or(bus.Shown);
+    for (const nlohmann::json &bit : *bits) {
+        if (!bit.is_string()) {
+            return std::nullopt;
+        }
+        bus.Bits.push_back(bit.get<std::string>());
+    }
+    if (const std::optional<std::string> format_name = ReadString(value, "format")) {
+        const std::optional<BusFormat> format = ParseBusFormat(*format_name);
+        if (!format) {
+            return std::nullopt;
+        }
+        bus.Format = *format;
+    }
+    return bus;
+}
+
+/**
  * @brief   Entries that cannot be read are skipped with one warning per list, since a lost trace is easy to probe
  *          again.
  */
@@ -1379,6 +1779,9 @@ SavedMeasurements ReadMeasurements(const nlohmann::json &document, std::vector<s
     }
     if (!ReadList(*object, "math", ReadMathChannelValue, measurements.MathChannels)) {
         warnings.push_back("Some math channels could not be read and were skipped");
+    }
+    if (!ReadList(*object, "buses", ReadBusValue, measurements.Buses)) {
+        warnings.push_back("Some logic buses could not be read and were skipped");
     }
     return measurements;
 }
@@ -1457,7 +1860,8 @@ std::string WriteDocument(const std::span<const UIElement *const> elements, cons
             document["models"].push_back({{"text", model.Text}});
         }
     }
-    if (!measurements.Voltages.empty() || !measurements.Currents.empty() || !measurements.MathChannels.empty()) {
+    if (!measurements.Voltages.empty() || !measurements.Currents.empty() || !measurements.MathChannels.empty() ||
+        !measurements.Buses.empty()) {
         document["measurements"] = WriteMeasurements(measurements);
     }
     return document.dump(2) + "\n";
@@ -1540,8 +1944,13 @@ std::expected<SavedSubcircuit, std::string> ReadSubcircuitText(const nlohmann::j
     return definition;
 }
 
+/**
+ * @brief   Reads one block definition; the blocks its parts place must be read already, since their instances take
+ *          their pins from them.
+ */
 std::expected<SavedSubcircuit, std::string> ReadSubcircuit(const nlohmann::json &object,
-                                                           std::vector<std::string> &warnings) {
+                                                           std::vector<std::string> &warnings,
+                                                           const std::span<const SavedSubcircuit> definitions) {
     if (!object.is_object()) {
         return std::unexpected("is not an object");
     }
@@ -1579,7 +1988,7 @@ std::expected<SavedSubcircuit, std::string> ReadSubcircuit(const nlohmann::json 
     const auto elements = object.find("elements");
     if (elements != object.end() && elements->is_array()) {
         for (std::size_t index = 0; index < elements->size(); ++index) {
-            auto element = ReadElement((*elements)[index]);
+            auto element = ReadElement((*elements)[index], definitions);
             if (element) {
                 definition.Elements.push_back(std::move(*element));
             } else {
@@ -1637,6 +2046,62 @@ std::vector<Core::LibraryModel> ReadLibraryModels(const nlohmann::json &document
     return models;
 }
 
+/**
+ * @brief   The names of the blocks the parts of a block definition place, as the file lists them.
+ */
+std::set<std::string> ListPlacedDefinitions(const nlohmann::json &object) {
+    std::set<std::string> names;
+    const auto elements = object.is_object() ? object.find("elements") : object.end();
+    if (elements == object.end() || !elements->is_array()) {
+        return names;
+    }
+    for (const nlohmann::json &element : *elements) {
+        if (const std::optional<std::string> name =
+                element.is_object() ? ReadString(element, "definition") : std::nullopt) {
+            names.insert(*name);
+        }
+    }
+    return names;
+}
+
+/**
+ * @brief   The order to read the definitions in, so each block is read after the blocks it places, whatever order the
+ *          file lists them in; a block in a cycle, which only a damaged file can hold, comes after the others it can.
+ */
+std::vector<std::size_t> OrderDefinitionsForReading(const nlohmann::json &list) {
+    std::map<std::string, std::size_t, std::less<>> first_of_name;
+    for (std::size_t index = 0; index < list.size(); ++index) {
+        if (const std::optional<std::string> name =
+                list[index].is_object() ? ReadString(list[index], "name") : std::nullopt) {
+            first_of_name.try_emplace(*name, index);
+        }
+    }
+    std::vector<std::size_t> order;
+    std::vector<bool> is_placed(list.size(), false);
+    std::vector<bool> is_open(list.size(), false);
+    const std::function<void(std::size_t)> place = [&](const std::size_t index) {
+        if (is_placed[index] || is_open[index]) {
+            return;
+        }
+        is_open[index] = true;
+        for (const std::string &used : ListPlacedDefinitions(list[index])) {
+            if (const auto inner = first_of_name.find(used); inner != first_of_name.end()) {
+                place(inner->second);
+            }
+        }
+        is_open[index] = false;
+        is_placed[index] = true;
+        order.push_back(index);
+    };
+    for (std::size_t index = 0; index < list.size(); ++index) {
+        place(index);
+    }
+    return order;
+}
+
+/**
+ * @brief   Reads every block definition, each after the blocks it places, and keeps them in the order of the file.
+ */
 std::vector<SavedSubcircuit> ReadSubcircuits(const nlohmann::json &document, std::vector<std::string> &warnings) {
     std::vector<SavedSubcircuit> definitions;
     const auto list = document.find("subcircuits");
@@ -1647,17 +2112,36 @@ std::vector<SavedSubcircuit> ReadSubcircuits(const nlohmann::json &document, std
         warnings.push_back("The subcircuit definitions are not a list and were skipped");
         return definitions;
     }
-    for (std::size_t index = 0; index < list->size(); ++index) {
-        auto definition = ReadSubcircuit((*list)[index], warnings);
+    std::vector<std::size_t> file_positions;
+    for (const std::size_t index : OrderDefinitionsForReading(*list)) {
+        auto definition = ReadSubcircuit((*list)[index], warnings, definitions);
         if (!definition) {
             warnings.push_back(std::format("Subcircuit {} {} and was skipped", index + 1, definition.error()));
-        } else if (std::ranges::contains(definitions, definition->Name, &SavedSubcircuit::Name)) {
+        } else if (const auto existing = std::ranges::find(definitions, definition->Name, &SavedSubcircuit::Name);
+                   existing != definitions.end()) {
+            // The first in the file wins, whichever was read first
             warnings.push_back(std::format("Subcircuit {} is repeated and was skipped", definition->Name));
+            const auto position = static_cast<std::size_t>(existing - definitions.begin());
+            if (index < file_positions[position]) {
+                *existing = std::move(*definition);
+                file_positions[position] = index;
+            }
         } else {
             definitions.push_back(std::move(*definition));
+            file_positions.push_back(index);
         }
     }
-    return definitions;
+    // Back to the order of the file, so saving writes them where they were
+    std::vector<std::size_t> by_file(definitions.size());
+    for (std::size_t position = 0; position < by_file.size(); ++position) {
+        by_file[position] = position;
+    }
+    std::ranges::sort(by_file, {}, [&](const std::size_t position) { return file_positions[position]; });
+    std::vector<SavedSubcircuit> ordered;
+    for (const std::size_t position : by_file) {
+        ordered.push_back(std::move(definitions[position]));
+    }
+    return ordered;
 }
 
 } // namespace

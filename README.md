@@ -17,20 +17,29 @@ New to imcsim? The [tutorial](docs/tutorial.md) builds, simulates and exports a 
 
 ## Features
 
-- Resistors, capacitors, inductors, ground, a VCC rail, and voltage and current sources (DC, sine or pulse)
+- Resistors, capacitors, inductors, ground, a VCC rail, and voltage and current sources (DC, sine or pulse), and Noise
+  and Random sources for the transient: white, 1/f and telegraph noise, or values drawn from a distribution and held
+  for each step
 - Diodes, Zener diodes, LEDs, NPN and PNP bipolar transistors, and N- and P-channel MOSFETs, each with ready models,
   custom SPICE parameters or a vendor's `.model` imported from a library
 - Blocks: part of a schematic grouped into a reusable part with named pins on any edge and parameters each instance
-  can set, edited in place; and a vendor's subcircuits, such as op-amp models, imported from a SPICE library as blocks
-  kept as text. The schematic file keeps them all, so it opens anywhere
-- Controlled sources (VCVS, VCCS, CCCS, CCVS), and op-amps: ideal with a gain-bandwidth product and an output
-  limited by its supply pins, or a uA741 or custom part built as a Boyle macromodel from datasheet values (slew rate,
-  bias current, output swing, current limit)
-- Warnings when a diode goes into reverse breakdown or a transistor exceeds its voltage, current or power ratings
-- Operating point, transient, AC sweep, DC sweep, noise, transfer function and truth table analyses, with node
+  can set, edited in place, with its wires routed around it; blocks inside blocks, entered level by level; and a
+  vendor's subcircuits, such as op-amp models, imported from a SPICE library as blocks kept as text, following its
+  `.include` and `.lib` lines. The schematic file keeps them all, so it opens anywhere
+- Controlled sources (VCVS, VCCS, CCCS, CCVS), behavioral voltage and current sources that follow a free expression of
+  named nets and currents, such as `V(CARRIER)*(1+V(MSG)/2)`, and op-amps: ideal with a gain-bandwidth product and an output
+  limited by its supply pins, or a uA741, LM358 (PNP input), TL072 (JFET input), NE5532, OP07 or custom part built
+  as a Boyle macromodel from datasheet values (slew rate, bias current, output swing, current limit, input offset)
+- Warnings when a diode goes into reverse breakdown or past its average forward current or power rating, or a
+  transistor exceeds its voltage, current or power ratings
+- Operating point, transient, AC sweep, DC sweep, noise, transfer function, sensitivity, pole-zero, S-parameter and truth table analyses, with node
   voltages and component currents
 - Stepping a resistor, capacitor, inductor or the temperature over a range or a list, as SPICE's `.step`: the
-  transient, AC sweep and DC sweep plot every step as a family of curves
+  transient, AC sweep and DC sweep plot every step as a family of curves, and the operating point plots each measured
+  value against the step
+- Monte Carlo runs of the operating point, transient, AC sweep or DC sweep, with each part that has a tolerance drawn within it
+  (Gaussian or uniform, from a seed that repeats on every platform): every run as a faint curve beside the nominal one,
+  a histogram of any measurement, such as the -3 dB frequency, and a table of the values each run drew
 - Plots of transients, Bode diagrams and DC sweeps (including curve families, such as transistor characteristics):
   pick what to measure with the Probe tool, read every trace under the cursor, currents dashed apart from voltages;
   measured voltages and currents are marked on the schematic in the colors of their traces, currents with an arrow
@@ -40,18 +49,26 @@ New to imcsim? The [tutorial](docs/tutorial.md) builds, simulates and exports a 
   DC sweep, peak-to-peak, RMS and frequency on a transient, and peak, -3 dB band, unity gain frequency and phase
   margin on a response
 - A spectrum of the transient traces, as on a spectrum analyzer, with the fundamental, the harmonics and the THD of
-  each, over a Hann or rectangular window
+  each, over a Hann or rectangular window, or the noise density of a trace with no tone in it
 - Noise at one node across frequency, at the output and referred to the input, with the share of each part
 - A transfer function from an input source to an output: the DC gain, the input impedance and the output impedance
+- A sensitivity analysis: how much the DC voltage of a node changes with the value of each part, as a table and as
+  colors on the schematic
+- Poles and zeros from an input source to a node, on an s-plane with their frequency, quality factor and damping, and
+  marked on the Bode plot of an AC sweep
+- S-parameters of two or more ports, set on Block pin markers: a Smith chart with the impedance, VSWR and return loss
+  under the pointer, magnitude and phase plots, and the whole matrix saved as a Touchstone `.sNp` file
 - A truth table of a digital circuit: every combination of the chosen logic inputs and the 0, 1 or X it gives at the
   measured outputs
-- Math channels on transient and DC sweep plots, as on an oscilloscope: an operation between two traces picked
+- Math channels on transient, DC sweep and AC sweep plots, as on an oscilloscope: an operation between two traces picked
   with buttons, or a typed expression such as `V(OUT, IN)`, `V(3)*I(R1)` or `ddt(V(2))`, with units followed (W, Ohm,
-  V/s) and a third axis for any unit other than volts and amperes; channels are saved with the schematic and can use
-  named nets
+  V/s) and a third axis for any unit other than volts and amperes; on an AC sweep they work on complex values, so
+  `V(IN)/I(V1)` plots an impedance in magnitude and phase; channels are saved with the schematic and can use named
+  nets
 - Operating point and transient results on the schematic: values on hover, wires colored by node, by voltage or by a
   current heat map that shows the path of the current, parts colored by power, and a time bar to play a transient
-- Logic signals plot as stacked lanes under the analog traces, like a logic analyzer
+- Logic signals plot as stacked lanes under the analog traces, like a logic analyzer, and named buses read several of
+  them together as one value in binary, hexadecimal or decimal
 - Exports for reports: plots as SVG images (light for print or dark, at any size) or CSV tables, and the schematic
   as an SVG image with its probes, so the two figures can be shown side by side
 - Nine color themes, seven dark and two light, switched in Edit > Preferences or from View > Theme (see
@@ -61,12 +78,15 @@ New to imcsim? The [tutorial](docs/tutorial.md) builds, simulates and exports a 
   the file on the window), net labels that join distant points by name, and an option to turn parts and leave their
   wires in place
 - Potentiometers, with the wiper set in the properties, and switches and push buttons that are open or closed,
-  voltage-controlled switches and relays whose coil current sets when the contact closes, and transformers of two
-  coupled inductors with a turns ratio
+  voltage-controlled switches and relays whose coil current sets when the contact closes, fuses that blow by their
+  I2t and cool between overloads, and transformers of two coupled inductors with a turns ratio
 - Logic gates (AND, OR, NAND, NOR, XOR and XNOR with 2 to 8 inputs, NOT and a buffer) and D, JK, T and SR
   flip-flops, driven by a Clock source (frequency, duty cycle, logic level and start delay, written as a pulse so there
   are no rise or fall times to set) and a Logic input that drives a net high or low, and simulated with the digital
   code models of ngspice behind analog bridges, so their outputs are voltages that plot and probe like any other
+- Logic outputs and 7-segment displays that show the levels of their nets on the schematic, lit by the Logic Lights
+  effect, and eight ready logic blocks built from the gates: a 4-bit counter and shift register, a multiplexer, a
+  demultiplexer, a 2-to-4 decoder, a 4-bit adder and comparator, and a BCD to 7-segment decoder
 - Standard values: an option to take resistors, capacitors and inductors from the E6 to E192 series, typed or stepped
   with the arrows, keys or mouse wheel
 - IEC or ANSI symbols, optional terminal numbers, parts rotated (R) and mirrored left to right (M) or top to bottom
@@ -74,22 +94,25 @@ New to imcsim? The [tutorial](docs/tutorial.md) builds, simulates and exports a 
   measured traces
 - Dockable windows: the schematic, plots, properties, analysis settings and netlist float or dock beside, above,
   below or as tabs of each other, and the layout is kept between sessions
-- A toolbar of part icons drawn from the symbols themselves, a part search (Space), menus with shortcuts, a status
-  bar with the keys of the current mode, and the Output window opening on each new result
-- Part properties in a popover beside the part (double click or Enter), values typed straight onto a selected
+- A command bar with Run always at its right end, a part rail of icons drawn from the symbols themselves, a part
+  search (Space), menus with shortcuts, a status bar that leads with the run state, and the Output window beside the
+  schematic
+- Part properties in a popover over the schematic (double click or Enter), values typed straight onto a selected
   part (`4k7`), a right-click menu, and Fit (Home)
-- Run (F5) from the toolbar, with the analysis and its settings beside it, settings suggested from the sources and
+- Run (F5) from the command bar, with the analysis and its settings beside it, settings suggested from the sources and
   parts, and the result of the last run in the status bar; an optional preference runs the analysis again after edits
 - Analyses run in the background with progress and Stop; transient plots and the schematic grow as chunks arrive, and
   a configurable window of points keeps long runs responsive
 - Live transients paced by the clock: flip switches, hold push buttons, change logic inputs and turn potentiometers on
   the schematic while the run continues, then pause, continue or discard the session
-- 33 example circuits sorted by topic, each with its analyses and measurements set up: dividers, RC and RLC
-  filters, diode curves, a Zener regulator and a rectifier, BJT and MOSFET switches and characteristics, a current
-  mirror, common-emitter and class AB amplifiers, op-amp amplifiers, an integrator, a Schmitt trigger and a Sallen-Key
+- 45 example circuits sorted by topic, each with its analyses and measurements set up: dividers, RC and RLC
+  filters, an amplitude modulator from a behavioral source, diode curves, a Zener regulator and a rectifier, BJT and
+  MOSFET switches and characteristics, a current mirror, common-emitter and class AB amplifiers, the Monte Carlo spread
+  of a bias point, op-amp amplifiers and their input offsets, an integrator, a Schmitt trigger and a Sallen-Key
   filter, an ideal transformer made of controlled sources, switching circuits, digital ones (gates, a truth
-  table of the basic gates, half and full adders, an SR latch and a ripple counter), and blocks: one RC filter used
-  twice, and a precision rectifier from a vendor's op-amp and diode models
+  table of the basic gates, half and full adders, an SR latch, a ripple counter, a decoder with logic outputs and a
+  decade counter on a 7-segment display), and blocks: one RC filter used twice, an 8-bit counter of two 4-bit blocks,
+  and a precision rectifier from a vendor's op-amp and diode models
 
 ## Screenshots
 
@@ -115,17 +138,10 @@ This is a possible roadmap, not a promise: what comes next depends on what users
 it can change at any time. The ideas below are tracked as tasks in the project's backlog and grouped here by theme,
 roughly in the order they are likely to come.
 
-- **Blocks**: blocks inside blocks, wires routed around a new block, and following the `.include` and `.lib` lines of
-  an imported library
-- **Digital**: counters, shift registers, multiplexers, decoders and the 555 timer; bus and bit-value options for the
-  logic lanes; Verilog modules placed as parts and simulated together with the analog circuit
-- **Analyses**: poles and zeros with an s-plane view, sensitivity shown on the schematic, S-parameters with a Smith chart
-  and Touchstone export, transient noise sources, and Monte Carlo runs on top of the parameter step
-- **Sources, parts and models**: behavioral sources, XSPICE analog blocks, transmission lines, a circuit driven from a
-  WAV or CSV file, more ready op-amp macromodels, and a MOSFET body diode and higher-level MOSFET models
-- **Live effects and plots**: overload sparks, a capacitor charge bar, inductor field lines, an animated lamp, motor and
-  buzzer, a fuse that blows, safe operating area warnings, and math channels in AC sweeps
-- **Platform**: a Flatpak release, and a web version with sharing by link
+- **Digital**: Verilog modules placed as parts and simulated together with the analog circuit
+- **Sources, parts and models**: XSPICE analog blocks (transfer functions, limiters, integrators), transmission lines,
+  a circuit driven from a WAV or CSV file, PWL points read from a CSV file, and a MOSFET body diode and higher-level
+  MOSFET models
 - **Longer term, a native simulation backend**: a solver written from published circuit theory that sits beside ngspice,
   which stays available, tested against closed-form results and built to use modern CPUs well. With the backend
   interface and capability matrix in place, it would come in steps: a linear core (operating point, DC and AC),

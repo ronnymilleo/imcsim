@@ -34,6 +34,9 @@ enum class AnalysisKind {
     DC_SWEEP,
     NOISE,
     TRANSFER_FUNCTION,
+    SENSITIVITY,
+    POLE_ZERO,
+    S_PARAMETERS,
     TRUTH_TABLE
 };
 
@@ -46,6 +49,8 @@ struct BackendCapabilities {
     std::set<AnalysisKind> Analyses;
     /// Parts the backend cannot simulate, each with the reason shown to the user.
     std::map<ComponentType, std::string> UnsupportedParts;
+    /// Parts the backend cannot simulate in one analysis only, each with the reason shown to the user.
+    std::map<AnalysisKind, std::map<ComponentType, std::string>> UnsupportedPartsByAnalysis;
 };
 
 /**
@@ -91,10 +96,12 @@ public:
 
     /**
      * @brief   Computes the DC operating point of a circuit.
-     * @param[in] circuit  Circuit to simulate, already checked.
+     * @param[in] circuit              Circuit to simulate, already checked.
+     * @param[in] temperature_celsius  Temperature of the run in degrees Celsius, or none for the default one.
      * @return  The node voltages and currents or an error, plus the messages of the backend.
      */
-    virtual OperatingPointRun RunOperatingPoint(const Circuit &circuit) = 0;
+    virtual OperatingPointRun RunOperatingPoint(const Circuit &circuit,
+                                                const std::optional<double> &temperature_celsius = std::nullopt) = 0;
     /**
      * @brief   Simulates how the node voltages and currents of a circuit change over time.
      * @param[in] circuit              Circuit to simulate, already checked.
@@ -144,6 +151,27 @@ public:
      */
     virtual TransferFunctionRun RunTransferFunction(const Circuit &circuit,
                                                     const TransferFunctionSettings &settings) = 0;
+    /**
+     * @brief   Finds how much the DC voltage of a node changes with the value of each part of the circuit.
+     * @param[in] circuit   Circuit to simulate, already checked.
+     * @param[in] settings  Output node, already checked.
+     * @return  The sensitivity of every part with a value, or an error, plus the messages of the backend.
+     */
+    virtual SensitivityRun RunSensitivity(const Circuit &circuit, const SensitivitySettings &settings) = 0;
+    /**
+     * @brief   Finds the poles and zeros of the transfer function from an input source to the voltage of a node.
+     * @param[in] circuit   Circuit to simulate, already checked.
+     * @param[in] settings  Output node and input source, already checked.
+     * @return  The poles and zeros, or an error, plus the messages of the backend.
+     */
+    virtual PoleZeroRun RunPoleZero(const Circuit &circuit, const PoleZeroSettings &settings) = 0;
+    /**
+     * @brief   Measures the scattering matrix of the ports of a circuit across frequency.
+     * @param[in] circuit   Circuit to simulate, already checked: it holds at least two ports, numbered 1 to N.
+     * @param[in] settings  Frequency range and points, already checked.
+     * @return  The matrix at every frequency or an error, plus the messages of the backend.
+     */
+    virtual SParametersRun RunSParameters(const Circuit &circuit, const SParameterSettings &settings) = 0;
 };
 
 // Backend in use

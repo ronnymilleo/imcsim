@@ -23,11 +23,47 @@ elements, so the results are those of ngspice with the models below. Some things
   independent source to an output node, with the resistance seen by the source and the resistance looking back into
   the output. It is the same small-signal model an AC sweep uses, so the gain agrees with what the sweep would show
   at 0 Hz.
+- A sensitivity analysis is ngspice's DC `.sens`: it differentiates the voltage of one node with respect to the value
+  of each element at the DC operating point. imcsim lists the value of resistors, capacitors, inductors, sources and
+  supply rails, the gain of controlled sources, the two halves of a potentiometer together (the sum of their normalized
+  sensitivities, which is the sensitivity to its total resistance), and for a block its most influential element.
+  Parts that are several elements in the netlist, such as op-amps, fuses, relays and transformers, and parts with no
+  value, such as switches, are not listed. ngspice also reports model parameters of diodes and transistors, but most
+  read the same meaningless number or nan, so they are left out. Logic parts are refused, since ngspice cannot recover
+  from a sensitivity analysis that holds them. The AC form of `.sens` is not used: ngspice leaves the small-signal
+  conductance of forward-biased diodes and transistors out of it, so it is wrong for nonlinear circuits.
+- A pole-zero analysis is ngspice's `.pz`: it finds the poles and zeros of the small-signal transfer function from an
+  independent source to the voltage of a node, with the circuit linearized at its DC operating point, so a diode or
+  transistor contributes its bias-point conductance and capacitances. The input port is the source's terminals, and
+  the kind of source sets the transfer: a voltage source gives a voltage gain (ngspice's `vol`) and a current source a
+  transimpedance (`cur`), since poles and zeros depend on whether the port is held to a voltage or a current. ngspice
+  accepts a voltage source as the input only when it has an AC magnitude, so imcsim sets it to 1 for the run, which
+  changes nothing else. The run leaves out the 0 V current probes, whose extra branch equations make the solver lose
+  the poles of fast parts. Roots are in rad/s; a pole and a zero that coincide within a thousandth of the larger are
+  dropped as cancelling, since ngspice reports them for parts the signal never reaches. Pole-zero relies on ngspice's
+  root-finding, which has known failures: it can find nothing without saying why (the ideal op-amp Sallen-Key at
+  gain-bandwidth products around 10 kHz to 30 kHz and 500 kHz to 1 MHz, for one; a uA741 or another product works), it
+  can stop early with "iteration limit reached", which the tab shows as a warning that some roots may be missing, and
+  it can return a wrong list with no warning, such as a ladder of right-half-plane poles for a rectifier at its
+  unbiased operating point. `.options` do not help, and imcsim does not retry or work around it. Circuits with logic
+  parts are refused, since the digital models leave the solver nothing to follow.
+- An S-parameter analysis is ngspice's `.sp`. Each pin marker set as a port becomes a 0 V source from its node to
+  ground with a port number and a reference impedance, which `.sp` reads: the source has the reference impedance in
+  series, so it loads the circuit (and holds the node at 0 V in DC), which is why the ports are written for this run only
+  and no other analysis sees them. ngspice's S parameters are power waves, so ports with different references give,
+  for a series resistor R between them, S11 = (R + Z2 - Z1) / (R + Z1 + Z2) and S21 = 2 sqrt(Z1 Z2) / (R + Z1 + Z2).
+  imcsim checks the ports before the run, because ngspice stops for good, for the rest of the session, when it finds
+  fewer than two, says nothing when two ports share a node, and gives misleading fatal errors for ports numbered with a
+  gap, a repeat or a Z0 of zero; it also gives one point for a linear sweep of two, and no result and no message when
+  the stop frequency is below the start. The impedance, VSWR and return loss are computed from S, not read from the Z
+  matrix of ngspice, which is meaningless (around 1e17 ohm) when the circuit has no finite impedance matrix, as for a
+  series resistor. Logic parts are refused, since the digital models of ngspice are fixed levels in a small-signal
+  analysis.
 - A truth table runs one operating point per combination of the chosen logic inputs, each on a copy of the circuit
   with the inputs set, so a row never depends on the one before it. That describes combinational logic; a latch or
   flip-flop that holds its state has no operating point for those combinations, and the row reads X.
 - To report terminal currents in every analysis, the netlist adds a 0 V source in series with diodes, transistors,
-  potentiometers, switches, relays, transformers, controlled sources, op-amp outputs and the outputs of logic parts. It does not change the circuit; the Netlist window leaves it out unless a
+  potentiometers, switches, relays, fuses, transformers, controlled sources, op-amp outputs and the outputs of logic parts. It does not change the circuit; the Netlist window leaves it out unless a
   current-controlled source needs it.
 
 - The power shown on the schematic is what a part absorbs: the sum over its terminals of the node voltage times the
@@ -61,6 +97,24 @@ All three are ideal:
   no log taper, no wiper resistance and no power rating, and the wiper moves only by editing the part, not during a
   run.
 
+### Tolerance and Monte Carlo
+
+A resistor, capacitor, inductor or DC voltage source may carry a tolerance in percent, which does nothing in an
+ordinary run: the part is as ideal as before, at exactly its value. In a Monte Carlo analysis each run simulates a copy
+of the circuit in which every toleranced part takes its value times a factor drawn within the tolerance, so the
+spread of a result comes from the values alone:
+
+- The Gaussian factor is `1 + t * z / 3`, with `t` the tolerance and `z` a normal number drawn again whenever it
+  passes 3 in size; the uniform factor is `1 + t * (2u - 1)` with `u` from 0 up to 1.
+- The numbers come from a Mersenne Twister (64 bits) started from the seed and the run number, a Box-Muller
+  transform and the top 53 bits for `u`, written here instead of taken from the C++ distributions, whose results
+  differ between standard libraries. The generator is exact everywhere; the logarithm and cosine of the transform may
+  differ from platform to platform in the last digits.
+- Only the main value varies: not the initial conditions, the model parameters of diodes and transistors, nor
+  the parts inside blocks, which refuse the run. Parts are independent; there is no matching or correlation between
+  two resistors of the same lot, and no temperature coefficient.
+- ngspice runs one simulation at a time, so the runs are made one after the other.
+
 ## Switches and push buttons
 
 A switch and a push button are the same part for the simulation: a resistor, `R-SW1` in the netlist, of 1 mOhm when
@@ -90,6 +144,57 @@ contact is 1 GOhm.
   coil heating, and the pull-in and drop-out voltages are steady-state ones.
 - A switch or a relay that is open or closed at the operating point stays so in an AC sweep, since the sweep is
   linear around it. Fast switching can fail to converge in a transient; a smaller time step helps.
+
+## Fuses
+
+A fuse is a low resistance that opens for good once the current has run through it long enough. It is written as an
+instance of the subcircuit `imcsim_fuse`, defined once in the netlist, and has two parts: a resistance between its
+terminals, and a thermal state that decides it. You set the figures a datasheet gives, and the model derives the rest.
+
+- **Rated current** (`Ih`, 1 A): the largest current the fuse carries for ever. It never blows below it.
+- **Melting I2t** (`I2t`, 1.045 A2s): the current squared times the time that melts the element in a short overload.
+- **Cold resistance** (96.4 mOhm) and **blown resistance** (1 GOhm).
+- The **cooling time constant** `tau = I2t / Ih^2` follows from the two ratings, and the part editor shows it as a
+  read-only line (1.045 s for the 1 A fast fuse).
+
+The element heats with the square of the current and loses its heat with the time constant `tau`:
+`dT/dt = (i^2 / Ih^2 - T) / tau`, with `T` in units of the melting point, so the fuse melts when `T` reaches 1. In
+steady state `T = i^2 / Ih^2`, so a current below the rated one never melts it, and a short overload (much shorter than
+`tau`) melts it when the integral of `i^2` over time reaches `Ih^2 tau`, the melting I2t. In between, the time to blow
+is `-tau ln(1 - Ih^2 / i^2)`: 0.32 s at 1.96 A for the default fuse. Each overload leaves heat that the fuse loses
+again with `tau`, so overloads spaced several time constants apart do not add up, and overloads close together do. In
+the netlist `T` is the voltage of a capacitor of 1 F with a resistor of `tau` across it, charged by a behavioral
+current source.
+
+When `T` passes 1.015 a second node, the latch, starts to charge. It has no discharge path, so the fuse cannot close
+again, and once it is under way it keeps charging by itself, since the open fuse stops carrying current and `T`
+falls. The latch sets the resistance, from the cold to the blown value, through an exponential, so the resistance
+changes by parts per million where the latch is far from its steps and the transition converges in ngspice. The part
+blows when the heat reaches 1.015, a margin above the 1 that the rated current settles at, so a 1 A fuse carries
+1 A for ever, and the time to blow and the melting I2t come out about 1.5% longer than the figures above.
+
+- **The branch really opens**: the blown resistance goes into the same run, so the current in the branch and the
+  voltages around it change from that instant, and the Output window warns "FU1 blew at 176ms". The instant is read
+  from the results as the first point where the voltage across the fuse over its current is above the geometric mean of
+  the cold and blown resistances.
+- **Every run starts with a whole fuse**: the thermal state is not saved with the file nor kept from one run to the
+  next, and there is no replace action. A gate source inside the model is 0 in an operating point, a DC sweep and an
+  AC sweep, so they always see a whole fuse, even at a current far above its rating, and rises a nanosecond into a
+  transient. A stepped transient or AC sweep starts each step whole. In a live run the fuse blows when the circuit
+  makes it, and stays open until the run ends.
+- **Inductive loads**: the open fuse cuts an inductor current at once, which the trapezoidal integration of ngspice
+  turns into an oscillation that never dies. A circuit with a fuse, in a block or not, therefore writes
+  `.options method=gear` once, and the Gear integration settles the node. Gear damps fast ringing a little, so a lightly
+  damped resonance in the same circuit loses some of its ring.
+- **The ready fuses** are 5x20 mm glass fuses of Littelfuse, with the nominal melting I2t and cold resistance of their
+  datasheets: the 100 mA, 500 mA, 1 A and 5 A fast fuses of the 217 Series (0.0026, 0.215, 1.045 and 42.8 A2s; 5.70 Ohm,
+  207, 96.4 and 13.7 mOhm) and the 1 A slow-blow of the 218 Series (6.73 A2s, 61.3 mOhm). A datasheet measures the
+  melting I2t at ten times the rated current; the model takes it as the adiabatic limit of a short overload.
+- A fuse is a model of the thermal state, not of the arc: there is no breaking capacity, arc voltage or voltage rating,
+  no temperature dependence of the cold resistance, and the part carries a current through its probe like a switch.
+  In a noise analysis the model adds none.
+- The blown state is read from the voltage across the fuse and its current, so a fuse inside a block is simulated, but
+  its blow is not shown on the schematic or warned about; the fuses of the main schematic are.
 
 ## Transformers
 
@@ -177,9 +282,13 @@ the supplies and the bridges of the logic parts all refer to node 0 in the netli
 the symbol, and the gate outputs need no load. Any other part brings the rule back: a resistor or an analog source
 would have no node to return to, so the run stops with "The circuit has no ground".
 
+A **logic output** has no model: it writes no netlist line and only reads the voltage of its node from the result,
+against its own logic level, as a gate input would (1 at 70% of the level or above, 0 at 30% or below, unknown in
+between). It loads nothing and needs no Ground. A **7-segment display** is the same with one input per segment.
+
 ## Independent sources
 
-**Voltage source** (`V`, named Vin) and **current source** (`I`) take one of seven waveforms:
+**Voltage source** (`V`, named Vin) and **current source** (`I`) take one of nine waveforms:
 
 | Waveform | Transient | Operating point and DC sweep | AC sweep |
 |---|---|---|---|
@@ -190,6 +299,8 @@ would have no node to return to, so the run stops with "The circuit has no groun
 | SFFM | `SFFM(vo va fc mdi fs)` | vo, the offset | not excited |
 | AM | `AM(vo 0 va mf fc td)` | vo, the offset | not excited |
 | PWL | `PWL(t1 v1 t2 v2 ...)` | v1, the first point | not excited |
+| Noise | `TRNOISE(na nt alpha namp rtsam capt emt)` | the offset | not excited |
+| Random | `TRRANDOM(type ts td p1 0)` | the offset or mean | not excited |
 
 - The AC magnitude is set apart from the sine amplitude, as in SPICE, and is 1 by default so a Bode plot reads as
   gain. The sine has no phase, delay or damping.
@@ -210,6 +321,24 @@ would have no node to return to, so the run stops with "The circuit has no groun
   last value after the last point. It defaults to `0 0, 1m 5, 2m 0` (1 mA instead of 5 for a current source). The
   points are edited as one text of "time value" pairs in the part editor; at least two are needed, times are not
   negative and strictly increase.
+- The noise source `TRNOISE(na nt alpha namp rtsam capt emt)` is `DC offset` plus transient noise: Gaussian white
+  noise of rms na with a new sample every nt (the output is a straight line between samples, so its rms over time is
+  sqrt(2/3) of na and its density is na times sqrt(2 nt) per root hertz, flat up to 1 / (2 nt)), 1/f noise of
+  amplitude namp with the exponent alpha, and a telegraph signal between 0 and rtsam with mean capture and emission
+  times capt and emt. A part whose amplitude is 0 is written as 0, and nt is 0 when the white and 1/f parts are both
+  off, which ngspice then ignores. nt must be positive otherwise: a negative one makes ngspice loop forever, so it never
+  reaches it, and alpha must be between 0 and 2. It defaults to 100 mV rms (100 uA for a current source) at 10 us, with
+  the 1/f and telegraph parts off. ngspice 47 does not seed the white and 1/f noise, so they change on each run; the
+  telegraph part follows the seed.
+- The random source `TRRANDOM(type ts td p1 0)` holds a value for ts, from td on: type 1 is uniform (p1 the range
+  either side of the offset), 2 Gaussian (p1 the standard deviation), 3 exponential (p1 the mean) and 4 Poisson (p1
+  lambda). The offset or mean is the DC value of the source, since ngspice adds that to what TRRANDOM gives, and it is
+  what the source holds before td. It defaults to a Gaussian with 100 mV at 10 us. The seed option makes it repeat.
+- Both stop the transient at every sample, so a transient may not span more than a million points counting the
+  finest step of a noise or random source, and a live run's stop time is cut to keep within it. The Seed of the
+  transient settings is written as `.options seed=N` only when it is not 0. ngspice draws the Gaussian values in
+  pairs and keeps the second across runs, so a seeded Gaussian random source repeats only every other run in one
+  session; the uniform, exponential and Poisson ones, and the telegraph signal, repeat every run.
 - Both sources are ideal: a voltage source has no internal resistance and a current source no output resistance,
   so they deliver any current or voltage the circuit asks for.
 - A current source pushes its current from terminal 1 to terminal 2 through itself, into the node at terminal 2.
@@ -234,6 +363,21 @@ saturation, so their output can reach any value. A current-controlled source fol
 source, as ngspice requires: the source itself for a voltage source or VCC, or a 0 V probe that imcsim adds in
 series with the controlling part.
 
+## Behavioral sources
+
+A behavioral voltage or current source is an ngspice `B` element whose output is an expression: `B1 n+ n- V=...` or
+`I=...`. imcsim writes each `V(NET)` as `v(node)`, `V(A, B)` as `v(a,b)`, and each `I(R1)` as the current of the voltage
+source ngspice follows it through, the part's own or a 0 V probe in series with it, as for a current-controlled source.
+Everything else, numbers with SPICE suffixes, operators, comparisons, the ternary `a ? b : c` and functions such as
+`tanh`, `exp`, `abs`, `min`, `max`, `time` and `temper`, reaches ngspice as written and follows its rules.
+
+- The output is ideal, as for the controlled sources: no output resistance and no limit, so an expression that grows
+  without bound, such as `exp(V(IN))`, can stop the solver.
+- In `.ac` and `.noise` the source is linearized at the operating point: `V(IN)*V(IN)` has the gain `2*V(IN)` there,
+  and nothing at all around 0 V. A behavioral source adds no noise.
+- `time` is 0 in `.op` and `.dc`; a transient follows it.
+- Inside a block, the expression reads the nets and currents of the block.
+
 ## Diodes, Zener diodes and LEDs
 
 All three use the SPICE diode model (`D`), with these parameters:
@@ -246,6 +390,7 @@ All three use the SPICE diode model (`D`), with these parameters:
 | BV, IBV | reverse breakdown voltage, and the current at which it is reached |
 | CJO, VJ, M | zero-bias junction capacitance, junction potential and grading coefficient |
 | TT | transit time, which sets the reverse recovery charge |
+| IF max, P max | datasheet average forward current and power dissipation, which are not part of the SPICE model |
 
 Ready models:
 
@@ -253,12 +398,21 @@ Ready models:
 |---|---|
 | Diode | 1N4148 (small-signal switching, 100 V), 1N4007 (rectifier, 1000 V 1 A), 1N5819 (Schottky, 40 V 1 A) |
 | Zener | 5V1, 3V3, 12V (named after their breakdown voltage) |
-| LED | Red (1.8 V at 20 mA), Green (2.1 V at 20 mA), Blue (3.0 V at 20 mA) |
+| LED | Red (1.85 V at 20 mA), Green (2.2 V at 20 mA), Blue (3.3 V at 20 mA), the typical values of their Kingbright datasheets |
 
 Any of them can switch to **Custom** and edit the parameters, starting from the model it replaces.
 
 - A Zener regulates at BV in reverse. For the other diodes and LEDs, BV is their rating: the simulation still
   conducts in breakdown, as ngspice does, and imcsim warns when the reverse voltage reaches it.
+- The ratings (forward current, power) are checked after each simulation, as for transistors: the forward current
+  and the power on their average over the run (the forward current is the datasheet IF(AV), so a rectifier that peaks
+  above it into a capacitor is fine; only the forward part of the current counts), the voltages and currents of
+  transistors at their peak, with the same warnings. A Zener regulating in reverse is judged
+  on power alone, since its rating is the dissipation. A diode imported from a library has no ratings. The ready
+  models carry the values of a named datasheet (for example 200 mA and 500 mW for the 1N4148 from onsemi, 1 A and
+  1.25 W for the 1N4007 from Diodes Inc, 30 mA and 75 mW for the red LED from Kingbright), listed in
+  [Datasheets of the ready models](#datasheets-of-the-ready-models), and a custom diode starts from those of the model it replaces; files saved before the
+  ratings existed take them from the default model.
 - An LED is a diode whose parameters give its forward voltage; light output is not modeled.
 - Not modeled: temperature, forward recovery and package parasitics. The gradual knee of a real Zener at low
   current is only approximated, through BV and IBV.
@@ -331,13 +485,16 @@ It has no slew rate, offset or current limit, and its output current returns thr
 the supply pins. It is noiseless: its internal resistor is marked `noisy=0`, and only the leakage of its clamp diodes
 remains, picovolts per root hertz, which the noise analysis lists at 0.00%.
 
-### Boyle macromodel (uA741 and Custom)
+### Boyle macromodel (uA741, LM358, TL072, NE5532, OP07 and Custom)
 
 The macromodel of G. Boyle, B. Cohn, D. Pederson and J. Solomon (IEEE Journal of Solid-State Circuits, 1974), the
 basis of most SPICE op-amp models from vendors for decades:
 
-1. **Input stage**: an NPN differential pair with resistive loads and a tail current. It sets the input bias
-   current, and with the compensation capacitor, the slew rate and the gain-bandwidth product.
+1. **Input stage**: a differential pair with resistive loads and a tail current. It sets the input bias current,
+   and with the compensation capacitor, the slew rate and the gain-bandwidth product. The pair is NPN (the uA741),
+   hanging from V+, or PNP (the LM358) or P-channel JFET (the TL072), hanging from V- with its tail current from V+,
+   which lets the inputs go down to V-. A source in series with the non-inverting input adds the input offset
+   voltage.
 2. **Gain stage**: a transconductance into a 100 kΩ resistor, with a 30 pF Miller capacitor, plus a second
    transconductance from the common-mode voltage that sets the CMRR.
 3. **Output stage**: a transconductance into the output resistance, and the voltage and current limiters of Linear
@@ -352,7 +509,7 @@ application note AN48:
 |---|---|
 | Slew rate | tail current, IEE = SR x C2 |
 | Gain-bandwidth product | load resistances, RC = 1 / (2π x GBW x C2) |
-| Input bias current | transistor gain, β = IEE / 2 / IB |
+| Input bias current | transistor gain, β = IEE / 2 / IB; for a JFET pair, the gate leakage IS = IB / 2 |
 | Phase margin | excess-phase capacitor, C1 = C2 / 2 x tan(90° - PM) |
 | Open-loop gain | second-stage gain, GB = Avol / (GA x R2 x RO2) |
 | CMRR | common-mode transconductance, GCM = GA / CMRR |
@@ -363,18 +520,58 @@ application note AN48:
 
 **uA741** uses typical datasheet values (106 dB, 1 MHz, 0.5 V/µs, 80 nA of bias current, 90 dB of CMRR, 75 Ω,
 25 mA, an output 1 V short of each supply, 1.7 mA of supply current) and an assumed 60° of phase margin. Simulated, it gives
-105.9 dB, 0.505 V/µs, 13.98 V of swing from ±15 V into 10 kΩ and 24.7 mA into a short. **Custom** takes the same
-specifications from any datasheet.
+105.9 dB, 0.505 V/µs, 13.98 V of swing from ±15 V into 10 kΩ and 24.7 mA into a short. **LM358** (PNP input) and
+**TL072** (JFET input) take the typical values of their TI datasheets, SLOS068AB and SLOS080W: 100 dB, 0.7 MHz,
+0.3 V/µs, 20 nA, an output 1.5 V short of V+ and 5 mV short of V- for the LM358, and 106 dB, 5.25 MHz, 20 V/µs, 56°,
+65 pA, an output 1.5 V short of each supply for the TL072. **NE5532** (SLOS075K: 100 dB, 12 MHz, 5 V/µs, 200 nA, 38 mA)
+and **OP07** (SLOS099H, the OP07C: 112 dB, 0.6 MHz, 0.3 V/µs, 1.8 nA, 120 dB of CMRR) are NPN parts, both with an
+output 2 V short of each supply. Every ready model carries the typical input offset of its datasheet, as a positive
+voltage at its + input (0.3 mV for the uA741, 3 mV for the LM358 and TL072, 0.5 mV for the NE5532, 60 µV for the OP07):
+a datasheet gives its typical size, not its sign, so a real part may have it either way, and an amplifier with a gain
+of 11 shows eleven times it at its output. **Custom** takes the same specifications from any datasheet, with the input
+stage and an input offset voltage.
 
 Limitations:
 
 - Its GBW comes out about 10% low, since the equations leave out the second pole that sets the phase margin.
-- The input pair is NPN: parts with a PNP input (LM358, whose input range includes the negative supply) or a JFET
-  input (TL072) are only approximated.
-- Not modeled: input offset voltage and current, temperature, the common-mode input range, power supply
+- The JFET pair sets its gain through BETA with no source resistors, so its gain-bandwidth product holds at small
+  signals; its transconductance falls when a large step steers the tail current, which the slew rate covers.
+- The LM358 output is a plain class AB stage here: its crossover distortion and the weak sinking near V- of the real
+  part are not modeled. Its output gets within about 50 mV of V- into 10 kΩ, not the 5 mV of the datasheet, since the
+  diodes of the voltage limiter turn on gradually.
+- Not modeled: input offset current, temperature, the common-mode input range, power supply
   rejection, more than two poles, and an output current drawn from the supply pins (it returns through ground).
 - Noise comes from its input transistors and internal resistors, so it has the right shape (shot and thermal noise
   of the input pair) but not the voltage and current noise densities of a datasheet.
+
+## Datasheets of the ready models
+
+The ratings imcsim checks the results against, and the specifications of the ready op-amps and fuses, come from these
+datasheets:
+
+| Part | Datasheet | Figures |
+|---|---|---|
+| 1N4148 | onsemi 1N914/D Rev. 6 | 200 mA, 500 mW |
+| 1N4007 | Diodes Inc DS28002 Rev. 11 | 1 A; 1.25 W from 100 K/W to ambient and a 150 °C junction |
+| 1N5819 | onsemi 1N5817/D | 1 A; 1.25 W from 80 °C/W and a 125 °C junction |
+| Zeners (3V3, 5V1, 12V) | Vishay BZX55, document 85604 Rev. 2.0 | 500 mW; 200 mA forward, where its forward voltage is specified |
+| Red, green and blue LEDs | Kingbright WP7113SRD/D V.9A, WP7113SGD V.11B, WP7113QBC/D V.18B | 30 mA and 75 mW, 25 mA and 62.5 mW, 30 mA and 120 mW; 1.85, 2.2 and 3.3 V typical at 20 mA |
+| 2N3904, 2N2222A, BC547B, 2N3906, 2N2907A, BC557B | onsemi 2N3904/D Rev. 3, P2N2222A/D Rev. 7, BC546/D Rev. 8, 2N3906/D Rev. 4, P2N2907A/D Rev. 6, BC556B/D Rev. 3 | VCEO and IC of each; 625 mW in TO-92 |
+| 2N7000 | onsemi 2N7000TA/D Rev. 1 | 60 V, 30 V, 200 mA, 400 mW |
+| BS170 | onsemi BS170/D Rev. 7 | 60 V, 20 V, 500 mA, 350 mW |
+| IRF540N | Fairchild IRF540N Rev. C | 100 V, 20 V, 33 A, 120 W |
+| BS250 | Philips BS250, April 1995 | 45 V, 250 mA, 830 mW |
+| IRF9540N | International Rectifier PD-91437B | 100 V, 20 V, 23 A, 140 W (not checked against a copy) |
+| LM358 | TI SLOS068AB, October 2024 | table 5.7 |
+| TL072 | TI SLOS080W, July 2025 | tables 5.8 and 5.9 (TL07xC and TL07xI); short-circuit current of the TL07xH |
+| NE5532 | TI SLOS075K | tables 5.5 and 5.6; no output swing in this revision, so 2 V from the ±13 V common-mode range |
+| OP07 | TI SLOS099H, March 2023 | table 6.5, OP07C |
+| uA741 offset | TI SLOS094H, February 2026 | 0.3 mV typical |
+| Fast fuses | Littelfuse 217 Series, revised 10/30/20 | nominal melting I2t and cold resistance |
+| 1 A slow-blow fuse | Littelfuse 218 Series, revised 02/23/15 | 6.73 A2s, 61.3 mOhm |
+
+The uA741 keeps the classic typical values of the part. TI's revision of February 2026 (SLOS094H) describes a newer
+die, with 0.13 mA of supply current and picoamperes of bias current, which is not the part most circuits were drawn for.
 
 ## Blocks and library models
 
@@ -385,6 +582,10 @@ Limitations:
   global and two blocks with a custom part of the same name would otherwise share one model.
 - A block kept as SPICE text is written as it came from its library, between a `.subckt` line with its own ports and
   `.ends`; imcsim reads none of it, so it simulates whatever the vendor modeled, and only what ngspice understands.
+- The ready logic blocks are ordinary blocks of the gates and flip-flops above, at a 5 V logic level and a 10 ns
+  propagation delay per part. They inherit the timing of their parts: the 4-bit counter is a ripple counter, so its
+  outputs change one after another and pass through other values for a few tens of nanoseconds, which a bus lane shows
+  as a short sliver; the adder's carry ripples through its four stages in the same way.
 - A library model is written once as `LIB_` and its name, which no ready model uses. imcsim does not read its
   parameters: a part with one gets no rating warnings, since a `.model` holds no datasheet ratings, and a MOSFET with
   one takes its channel width and length from the model, or the ngspice defaults, instead of the W and L of the

@@ -7,9 +7,8 @@
 #define IMCSIM_OP_AMP_H
 
 #include "components/component.h"
-#include "components/diode.h"
 #include <memory>
-#include <nodalys/types.h>
+#include <optional>
 #include <span>
 #include <string>
 #include <string_view>
@@ -18,12 +17,41 @@
 namespace Core {
 
 /**
+ * @enum    OpAmpInputStage
+ * @brief   The transistors of the input pair of a macromodel op-amp.
+ * @details An NPN pair, as in the uA741, needs its inputs some way above the negative supply. A PNP pair, as in the
+ *          LM358, takes inputs down to the negative supply. A P-channel JFET pair, as in the TL072, draws a bias
+ *          current of picoamperes.
+ */
+enum class OpAmpInputStage {
+    NPN,
+    PNP,
+    JFET,
+};
+
+/**
  * @struct  OpAmpParameters
  * @brief   Datasheet specifications of an op-amp, from which its Boyle macromodel is built.
  * @details Headrooms are how close the output gets to each supply pin. The supply current is the quiescent
- *          current the part draws from its supply pins.
+ *          current the part draws from its supply pins. The input offset voltage adds to the non-inverting input, so
+ *          a positive one drives the output up when both inputs are at the same voltage.
  */
-using OpAmpParameters = nodalys::BoyleOpAmpParameters;
+struct OpAmpParameters {
+    OpAmpInputStage InputStage = OpAmpInputStage::NPN;
+    double OpenLoopGainDecibels = 106.0;
+    double GainBandwidth = 1e6;
+    /// Volts per microsecond, as datasheets give it.
+    double SlewRate = 0.5;
+    double PhaseMarginDegrees = 60.0;
+    double InputBiasCurrent = 80e-9;
+    double CommonModeRejectionDecibels = 90.0;
+    double OutputResistance = 75.0;
+    double ShortCircuitCurrent = 25e-3;
+    double PositiveHeadroom = 1.0;
+    double NegativeHeadroom = 1.0;
+    double SupplyCurrent = 1.7e-3;
+    double InputOffsetVoltage = 0.0;
+};
 
 /**
  * @struct  OpAmpModel
@@ -90,58 +118,16 @@ std::span<const OpAmpModel> GetOpAmpModels(ComponentType type);
 const OpAmpModel *FindOpAmpModel(ComponentType type, std::string_view name);
 bool IsValidIdealBandwidth(double bandwidth);
 
+// Input stages
+std::span<const OpAmpInputStage> GetOpAmpInputStages();
+const char *GetOpAmpInputStageName(OpAmpInputStage stage);
+std::optional<OpAmpInputStage> FindOpAmpInputStage(std::string_view name);
+
 // Netlist
 std::string FormatIdealOpAmp(const OpAmp &op_amp, const std::vector<int> &nodes, int internal_node);
 std::string FormatIdealOpAmpModel();
 const char *GetIdealOpAmpModelName();
 std::string FormatOpAmpSubcircuit(std::string_view name, const OpAmpParameters &parameters);
-
-/**
- * @struct  IdealOpAmpValues
- * @brief   Element values of the equivalent circuit of the ideal op-amp, from its gain-bandwidth product.
- * @details Shared by FormatIdealOpAmp(), which writes them as a netlist, and the native backend, which builds the
- *          same circuit from devices, so both agree element for element.
- */
-struct IdealOpAmpValues {
-    double Gain;             ///< Open-loop gain, 100 dB.
-    double Transconductance; ///< Transconductance of the gain stage.
-    double Resistance;       ///< Resistance the gain stage drives, Gain / Transconductance.
-    double Capacitance;      ///< Compensation capacitance; the pole sits at Gain / (2 pi R C).
-    DiodeParameters Clamp;   ///< Model of the clamp diodes that stop the output at the supply pins.
-};
-
-/// Element values of the ideal op-amp circuit for a gain-bandwidth product, checked with IsValidIdealBandwidth().
-IdealOpAmpValues ComputeIdealOpAmpValues(double bandwidth);
-
-/**
- * @struct  BoyleOpAmpValues
- * @brief   Element values of the Boyle macromodel of an op-amp, from datasheet specifications.
- * @details The values follow the equations of AN48, which reproduce its LTC 8741 listing. Shared by
- *          FormatOpAmpSubcircuit() and the native backend, which builds the same circuit from devices.
- */
-struct BoyleOpAmpValues {
-    double CollectorResistance;
-    double CollectorCapacitance;
-    double EmitterResistance;
-    double TailCurrent;
-    double TailResistance;
-    double CommonModeTransconductance;
-    double Transconductance;
-    double OutputGain;
-    double GainStageLoad;
-    double CurrentLimitGain;
-    double PositiveSwing;
-    double NegativeSwing;
-    double RestOfSupplyCurrent;
-    double InputSaturationCurrent;
-    double Beta;
-    double CompensationCapacitance;
-    double GainStageResistance;
-    double OutputSenseResistance;
-};
-
-/// Element values of the Boyle macromodel for datasheet specifications, checked with OpAmp::IsValidParameters().
-BoyleOpAmpValues ComputeBoyleOpAmpValues(const OpAmpParameters &parameters);
 
 } // namespace Core
 

@@ -8,6 +8,7 @@
 
 #include "document/schematic.h"
 #include "implot.h"
+#include "plots/logic_bus.h"
 #include "plots/logic_trace.h"
 #include "plots/math_channels.h"
 #include "plots/plot_export.h"
@@ -52,10 +53,12 @@ std::string GetDensityUnit(const std::string &unit);
 
 // Figures
 ExportFigure BuildTransientFigure(const Core::Transient &transient, const std::vector<MathTrace> &math,
-                                  const std::vector<LogicNode> &lanes, Schematic &schematic, bool bit_values,
-                                  const PlotSpan &view);
-ExportFigure BuildSpectrumFigure(const TransientSpectra &spectra, bool logarithmic, const PlotSpan &view);
-ExportFigure BuildACSweepFigure(const Core::ACSweep &sweep, Schematic &schematic, const PlotSpan &view);
+                                  const std::vector<LogicNode> &lanes, const std::vector<BusLane> &buses,
+                                  Schematic &schematic, bool bit_values, const PlotSpan &view);
+ExportFigure BuildSpectrumFigure(const TransientSpectra &spectra, bool logarithmic, bool is_density,
+                                 const PlotSpan &view);
+ExportFigure BuildACSweepFigure(const Core::ACSweep &sweep, const ACMathTraces &math, Schematic &schematic,
+                                const PlotSpan &view);
 ExportFigure BuildDCSweepFigure(const Core::DCSweep &sweep, const std::vector<std::vector<MathTrace>> &math,
                                 Schematic &schematic, const PlotSpan &view);
 ExportFigure BuildNoiseFigure(const Core::Noise &noise, Schematic &schematic, const std::set<std::string> &shown,

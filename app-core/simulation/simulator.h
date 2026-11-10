@@ -17,7 +17,8 @@
 
 namespace Core {
 
-OperatingPointRun RunOperatingPoint(const Circuit &circuit);
+OperatingPointRun RunOperatingPoint(const Circuit &circuit,
+                                    const std::optional<ParameterValue> &parameter = std::nullopt);
 TransientRun RunTransient(const Circuit &circuit, const TransientSettings &settings,
                           const std::optional<ParameterValue> &parameter = std::nullopt,
                           const RunMonitor &monitor = {});
@@ -27,6 +28,9 @@ DCSweepRun RunDCSweep(const Circuit &circuit, const DCSweepSettings &settings,
                       const std::optional<ParameterValue> &parameter = std::nullopt);
 NoiseRun RunNoise(const Circuit &circuit, const NoiseSettings &settings);
 TransferFunctionRun RunTransferFunction(const Circuit &circuit, const TransferFunctionSettings &settings);
+SensitivityRun RunSensitivity(const Circuit &circuit, const SensitivitySettings &settings);
+PoleZeroRun RunPoleZero(const Circuit &circuit, const PoleZeroSettings &settings);
+SParametersRun RunSParameters(const Circuit &circuit, const SParameterSettings &settings);
 TruthTableRun RunTruthTable(const Circuit &circuit, const TruthTableSettings &settings, RunControl *control = nullptr);
 
 } // namespace Core

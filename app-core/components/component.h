@@ -37,6 +37,8 @@ enum class ComponentType {
     VCCS,
     CCCS,
     CCVS,
+    BEHAVIORAL_VOLTAGE,
+    BEHAVIORAL_CURRENT,
     OP_AMP,
     SUBCIRCUIT,
     NET_LABEL,
@@ -46,6 +48,7 @@ enum class ComponentType {
     PUSH_BUTTON,
     V_SWITCH,
     RELAY,
+    FUSE,
     TRANSFORMER,
     AND,
     OR,
@@ -61,7 +64,13 @@ enum class ComponentType {
     SR_FLIP_FLOP,
     CLOCK,
     LOGIC_INPUT,
+    LOGIC_OUTPUT,
+    SEVEN_SEGMENT,
 };
+
+/// Largest tolerance a part may have, in percent: far beyond any real part, and well short of the 100 % that could take
+/// a value to zero.
+constexpr double MAX_TOLERANCE_PERCENT = 50.0;
 
 /**
  * @class   Component
@@ -72,7 +81,7 @@ enum class ComponentType {
  *          transistors have a model instead of a value, subcircuit instances have a definition and parameters instead,
  *          and controlled sources have a gain as their value. A potentiometer is RV1, RV2..., its value the
  *          resistance between its ends; a switch is SW1 and a push button PB1, with no value;
- *          a voltage-controlled switch is S1 and a relay K1, with no value either;
+ *          a voltage-controlled switch is S1, a relay K1 and a fuse FU1, with no value either;
  *          a transformer is T1, its value the inductance of its primary;
  *          logic gates and flip-flops are U1, U2... like op-amps, with no value;
  *          a clock and a logic input are voltage sources named V1, V2... to ground, with no value either.
@@ -122,6 +131,13 @@ public:
     void SetInitialCondition(double value);
     void ClearInitialCondition();
 
+    // Tolerance
+    bool SupportsTolerance() const;
+    bool HasTolerance() const;
+    std::optional<double> GetTolerance() const;
+    void SetTolerance(double percent);
+    void ClearTolerance();
+
 protected:
     ComponentType m_Type{};
     std::string m_Name;
@@ -132,10 +148,13 @@ protected:
     std::string m_LibraryModel;
     /// Voltage a capacitor starts charged to or current an inductor starts carrying; only these kinds carry one.
     std::optional<double> m_InitialCondition;
+    /// Percent the value may be off, for a Monte Carlo run; empty when the part keeps its value in every run.
+    std::optional<double> m_Tolerance;
 };
 
 // Type names
 bool IsSubcircuitPin(ComponentType type);
+bool IsLogicDisplay(ComponentType type);
 const char *GetTypeName(ComponentType type);
 std::optional<ComponentType> ParseComponentType(std::string_view text);
 

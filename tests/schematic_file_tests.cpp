@@ -3,6 +3,7 @@
  * @brief   Tests for saving schematics to JSON and loading them back.
  */
 
+#include "components/behavioral_source.h"
 #include "components/bjt.h"
 #include "components/clock.h"
 #include "components/controlled_source.h"
@@ -15,6 +16,7 @@
 #include "components/op_amp.h"
 #include "components/potentiometer.h"
 #include "components/relay.h"
+#include "components/subcircuit_pin.h"
 #include "components/switch.h"
 #include "components/transformer.h"
 #include "components/voltage_controlled_switch.h"
@@ -323,6 +325,8 @@ TEST_CASE("A custom diode keeps its parameters", "[schematic_file]") {
     Core::DiodeParameters parameters = led.GetParameters();
     parameters.SaturationCurrent = 1.5e-21;
     parameters.TransitTime = 5e-9;
+    parameters.MaxForwardCurrent = 12e-3;
+    parameters.MaxPower = 45e-3;
     led.SetCustomParameters(parameters);
 
     const GUI::LoadedSchematic loaded = LoadOrFail(GUI::SaveSchematic(elements, {}, {}, {}));
@@ -332,6 +336,8 @@ TEST_CASE("A custom diode keeps its parameters", "[schematic_file]") {
     CHECK(copy.IsCustom());
     CHECK(copy.GetParameters().SaturationCurrent == 1.5e-21);
     CHECK(copy.GetParameters().TransitTime == 5e-9);
+    CHECK(copy.GetParameters().MaxForwardCurrent == 12e-3);
+    CHECK(copy.GetParameters().MaxPower == 45e-3);
     CHECK(copy.GetParameters().EmissionCoefficient == parameters.EmissionCoefficient);
 }
 
@@ -352,6 +358,22 @@ TEST_CASE("Custom diode parameters fill in from the default model and are checke
     CHECK(zener.GetParameters().BreakdownCurrent == 5e-3);
     CAPTURE(loaded.Warnings);
     CHECK(loaded.Warnings.size() == 2);
+}
+
+TEST_CASE("A custom diode from an older file takes its ratings from the default model", "[schematic_file]") {
+    // Files written before the ratings existed list the SPICE parameters only
+    const GUI::LoadedSchematic loaded = LoadOrFail(Document(
+        R"({"type": "Diode", "name": "D1", "model": "Custom", "parameters": {"is": 1e-12}, "x": 0, "y": 0,
+            "rotation": 0})",
+        ""));
+
+    REQUIRE(loaded.Elements.size() == 1);
+    CAPTURE(loaded.Warnings);
+    CHECK(loaded.Warnings.empty());
+    const auto &diode = static_cast<const Core::Diode &>(loaded.Elements[0]->GetComponent());
+    const Core::DiodeParameters &defaults = Core::GetDiodeModels(Core::ComponentType::DIODE).front().Parameters;
+    CHECK(diode.GetParameters().MaxForwardCurrent == defaults.MaxForwardCurrent);
+    CHECK(diode.GetParameters().MaxPower == defaults.MaxPower);
 }
 
 TEST_CASE("Transistors keep their model or custom parameters", "[schematic_file]") {
@@ -426,7 +448,7 @@ TEST_CASE("A mirrored flag that is not a boolean skips the element", "[schematic
 TEST_CASE("Simulation settings load back unchanged", "[schematic_file]") {
     GUI::SimulationSettings settings;
     settings.Selected = GUI::Analysis::DC_SWEEP;
-    settings.Transient = {.StopTime = 50e-3, .TimeStep = 20e-6};
+    settings.Transient = {.StopTime = 50e-3, .TimeStep = 20e-6, .Seed = 42};
     settings.LiveSeconds = 25.0;
     settings.ACSweep = {.StartFrequency = 10.0, .StopFrequency = 100e3, .PointsPerDecade = 50};
     settings.SweptRange = {.Source = "V1", .Start = 5.0, .Stop = 0.0, .Step = -0.05};
@@ -437,9 +459,14 @@ TEST_CASE("Simulation settings load back unchanged", "[schematic_file]") {
     settings.NoiseOutput = GUI::GridPoint{12, -4};
     settings.TransferFunctionSource = "V2";
     settings.TransferFunctionOutput = GUI::GridPoint{6, 3};
+    settings.SensitivityOutput = GUI::GridPoint{10, 14};
+    settings.PoleZeroSource = "Vin1";
+    settings.PoleZeroOutput = GUI::GridPoint{8, 2};
     settings.TruthTableInputs = {"V1", "V3"};
     settings.ParameterStep = {
         .Enabled = true, .Part = "R2", .UsesList = true, .Start = 1e3, .Stop = 4e3, .Step = 1e3, .List = "1k, 2.2k"};
+    settings.MonteCarlo = {
+        .Enabled = true, .Runs = 250, .Distribution = Core::ToleranceDistribution::UNIFORM, .Seed = 4000000000U};
 
     const GUI::LoadedSchematic loaded = LoadOrFail(GUI::SaveSchematic({}, {}, settings, {}));
     CHECK(loaded.Warnings.empty());
@@ -448,10 +475,12 @@ TEST_CASE("Simulation settings load back unchanged", "[schematic_file]") {
     // Without an output point the key is left out and loads as none
     settings.NoiseOutput.reset();
     settings.TransferFunctionOutput.reset();
-    settings.Selected = GUI::Analysis::TRANSFER_FUNCTION;
+    settings.SensitivityOutput.reset();
+    settings.PoleZeroOutput.reset();
+    settings.Selected = GUI::Analysis::POLE_ZERO;
     const GUI::LoadedSchematic without_output = LoadOrFail(GUI::SaveSchematic({}, {}, settings, {}));
     CHECK(without_output.Settings == settings);
-    CHECK(without_output.Settings.Selected == GUI::Analysis::TRANSFER_FUNCTION);
+    CHECK(without_output.Settings.Selected == GUI::Analysis::POLE_ZERO);
 }
 
 TEST_CASE("Invalid noise settings fall back to their defaults with a warning", "[schematic_file]") {
@@ -471,6 +500,42 @@ TEST_CASE("Invalid transfer function settings fall back to their defaults with a
     CHECK(loaded.Warnings.size() == 1);
     CHECK(loaded.Settings.TransferFunctionSource.empty());
     CHECK_FALSE(loaded.Settings.TransferFunctionOutput);
+}
+
+TEST_CASE("Invalid sensitivity settings fall back to their defaults with a warning", "[schematic_file]") {
+    const std::string text = R"({"format": "imcsim-schematic", "version": 1, "simulation": {)"
+                             R"("sensitivity": {"output": [1.5, 2]}}})";
+    const GUI::LoadedSchematic loaded = LoadOrFail(text);
+    CHECK(loaded.Warnings.size() == 1);
+    CHECK_FALSE(loaded.Settings.SensitivityOutput);
+}
+
+TEST_CASE("Invalid pole-zero settings fall back to their defaults with a warning", "[schematic_file]") {
+    const std::string text = R"({"format": "imcsim-schematic", "version": 1, "simulation": {)"
+                             R"("pole_zero": {"source": 3, "output": [1, 2]}}})";
+    const GUI::LoadedSchematic loaded = LoadOrFail(text);
+    CHECK(loaded.Warnings.size() == 1);
+    CHECK(loaded.Settings.PoleZeroSource.empty());
+    CHECK_FALSE(loaded.Settings.PoleZeroOutput);
+}
+
+TEST_CASE("A file saved before the pole-zero analysis loads it as its defaults", "[schematic_file]") {
+    const std::string text = R"({"format": "imcsim-schematic", "version": 1, "simulation": {)"
+                             R"("analysis": "sensitivity", "sensitivity": {}}})";
+    const GUI::LoadedSchematic loaded = LoadOrFail(text);
+    CHECK(loaded.Warnings.empty());
+    CHECK(loaded.Settings.Selected == GUI::Analysis::SENSITIVITY);
+    CHECK(loaded.Settings.PoleZeroSource.empty());
+    CHECK_FALSE(loaded.Settings.PoleZeroOutput);
+}
+
+TEST_CASE("A file saved before the sensitivity analysis loads it as its defaults", "[schematic_file]") {
+    const std::string text = R"({"format": "imcsim-schematic", "version": 1, "simulation": {)"
+                             R"("analysis": "transfer_function", "transfer_function": {"source": "V1"}}})";
+    const GUI::LoadedSchematic loaded = LoadOrFail(text);
+    CHECK(loaded.Warnings.empty());
+    CHECK(loaded.Settings.Selected == GUI::Analysis::TRANSFER_FUNCTION);
+    CHECK_FALSE(loaded.Settings.SensitivityOutput);
 }
 
 TEST_CASE("Invalid truth table settings fall back to their defaults with a warning", "[schematic_file]") {
@@ -531,7 +596,7 @@ TEST_CASE("A live duration out of its range resets the transient settings with a
 
 TEST_CASE("An unknown selected analysis falls back to the transient with a warning", "[schematic_file]") {
     const std::string text = R"({"format": "imcsim-schematic", "version": 1, "simulation": {)"
-                             R"("analysis": "pole_zero", "ac_sweep": {"start": 10.0, "stop": 1e3}}})";
+                             R"("analysis": "bode_plotter", "ac_sweep": {"start": 10.0, "stop": 1e3}}})";
     const GUI::LoadedSchematic loaded = LoadOrFail(text);
     CHECK(loaded.Warnings.size() == 1);
     CHECK(loaded.Settings.Selected == GUI::Analysis::TRANSIENT);
@@ -624,6 +689,8 @@ TEST_CASE("Op-amps keep their model, the bandwidth of an ideal one and custom sp
     Core::OpAmpParameters parameters;
     parameters.SlewRate = 13.0;
     parameters.PositiveHeadroom = 0.05;
+    parameters.InputStage = Core::OpAmpInputStage::JFET;
+    parameters.InputOffsetVoltage = -2e-3;
     custom.SetCustomParameters(parameters);
 
     const GUI::LoadedSchematic loaded = LoadOrFail(GUI::SaveSchematic(elements, {}, {}, {}));
@@ -638,6 +705,28 @@ TEST_CASE("Op-amps keep their model, the bandwidth of an ideal one and custom sp
     CHECK(custom_copy.IsCustom());
     CHECK(custom_copy.GetParameters().SlewRate == 13.0);
     CHECK(custom_copy.GetParameters().PositiveHeadroom == 0.05);
+    CHECK(custom_copy.GetParameters().InputStage == Core::OpAmpInputStage::JFET);
+    CHECK(custom_copy.GetParameters().InputOffsetVoltage == -2e-3);
+}
+
+TEST_CASE("A custom op-amp saved before it had an input stage keeps the NPN pair, and an unknown one is refused",
+          "[schematic_file]") {
+    const auto load_with = [](const std::string_view parameters) {
+        return LoadOrFail(std::format(R"({{"format": "imcsim-schematic", "version": 1, "wires": [],
+            "elements": [{{"type": "OpAmp", "name": "U1", "x": 0, "y": 0, "rotation": 0, "model": "Custom",
+            "parameters": {}}}]}})",
+                                      parameters));
+    };
+    const GUI::LoadedSchematic old = load_with(R"({"slew_v_per_us": 2})");
+    CHECK(old.Warnings.empty());
+    REQUIRE(old.Elements.size() == 1);
+    const auto &old_op_amp = static_cast<const Core::OpAmp &>(old.Elements[0]->GetComponent());
+    CHECK(old_op_amp.GetParameters().InputStage == Core::OpAmpInputStage::NPN);
+    CHECK(old_op_amp.GetParameters().InputOffsetVoltage == 0.0);
+
+    const GUI::LoadedSchematic unknown = load_with(R"({"input": "CMOS"})");
+    REQUIRE_FALSE(unknown.Warnings.empty());
+    CHECK(unknown.Warnings.front().contains("input stage"));
 }
 
 TEST_CASE("Op-amps saved before they had models load as ideal", "[schematic_file]") {
@@ -807,6 +896,54 @@ TEST_CASE("A capacitor and an inductor keep their initial condition, and load wi
     const GUI::LoadedSchematic skipped = LoadOrFail(Document(bad_ic, ""));
     CHECK(skipped.Elements.empty());
     CHECK(skipped.Warnings.size() == 1);
+}
+
+TEST_CASE("A part keeps its tolerance, and loads without one", "[schematic_file]") {
+    std::vector<std::unique_ptr<GUI::UIElement>> elements;
+    elements.push_back(GUI::CreateElement(Core::ComponentType::RESISTOR, {2, 4}, GUI::Rotation::R0));
+    elements.back()->GetComponent().SetName("R1");
+    elements.back()->GetComponent().SetTolerance(5.0);
+    elements.push_back(GUI::CreateElement(Core::ComponentType::VOLTAGE_SOURCE, {6, 4}, GUI::Rotation::R0));
+    elements.back()->GetComponent().SetName("Vin1");
+    elements.back()->GetComponent().SetTolerance(2.5);
+    elements.push_back(GUI::CreateElement(Core::ComponentType::CAPACITOR, {9, 4}, GUI::Rotation::R0));
+    elements.back()->GetComponent().SetName("C1");
+
+    const std::string saved = GUI::SaveSchematic(elements, {}, {}, {});
+    const GUI::LoadedSchematic loaded = LoadOrFail(saved);
+    const std::string first_warning = loaded.Warnings.empty() ? std::string() : loaded.Warnings.front();
+    INFO(first_warning);
+    CHECK(loaded.Warnings.empty());
+    REQUIRE(loaded.Elements.size() == 3);
+    CHECK(loaded.Elements[0]->GetComponent().GetTolerance() == 5.0);
+    CHECK(loaded.Elements[1]->GetComponent().GetTolerance() == 2.5);
+    CHECK_FALSE(loaded.Elements[2]->GetComponent().HasTolerance());
+    // A part without one writes no key, so files of circuits without tolerances stay as they were
+    CHECK(saved.find("\"tolerance\"") != std::string::npos);
+    CHECK(GUI::SaveSchematic({}, {}, {}, {}).find("tolerance") == std::string::npos);
+
+    const std::string bad_tolerance =
+        R"({"type": "Resistor", "x": 1, "y": 1, "rotation": 0, "name": "R1", "value": 1e3, "tolerance": 0})";
+    CHECK(LoadOrFail(Document(bad_tolerance, "")).Elements.empty());
+    const std::string too_large =
+        R"({"type": "Resistor", "x": 1, "y": 1, "rotation": 0, "name": "R1", "value": 1e3, "tolerance": 100})";
+    CHECK(LoadOrFail(Document(too_large, "")).Warnings.size() == 1);
+}
+
+TEST_CASE("Invalid Monte Carlo settings fall back to their defaults with a warning", "[schematic_file]") {
+    const std::string text = R"({"format": "imcsim-schematic", "version": 1, "simulation": {)"
+                             R"("monte_carlo": {"enabled": true, "runs": 5000, "seed": 7}}})";
+    const GUI::LoadedSchematic loaded = LoadOrFail(text);
+    CHECK(loaded.Warnings.size() == 1);
+    CHECK(loaded.Settings.MonteCarlo == Core::MonteCarloSettings{});
+
+    const std::string unknown = R"({"format": "imcsim-schematic", "version": 1, "simulation": {)"
+                                R"("monte_carlo": {"distribution": "triangular"}}})";
+    CHECK(LoadOrFail(unknown).Warnings.size() == 1);
+
+    // A file saved before Monte Carlo has no key and keeps it off
+    const std::string old_file = R"({"format": "imcsim-schematic", "version": 1, "simulation": {}})";
+    CHECK_FALSE(LoadOrFail(old_file).Settings.MonteCarlo.Enabled);
 }
 
 TEST_CASE("A voltage-controlled switch keeps its parameters, and loads with the defaults when it has none",
@@ -1008,4 +1145,178 @@ TEST_CASE("A clock and a logic input load with their defaults when the file leav
         LoadOrFail(Document(R"({"type": "Resistor", "name": "R1", "value": 10, "x": 0, "y": 0, "rotation": 0})", ""));
     CHECK(old.Warnings.empty());
     CHECK(old.Elements.size() == 1);
+}
+
+TEST_CASE("A noise and a random source load back with every parameter", "[schematic_file]") {
+    std::vector<std::unique_ptr<GUI::UIElement>> elements;
+    elements.push_back(GUI::CreateElement(Core::ComponentType::VOLTAGE_SOURCE, {0, 0}, GUI::Rotation::R0));
+    auto &noisy = static_cast<Core::VoltageSource &>(elements.back()->GetComponent());
+    noisy.SetName("Vin1");
+    noisy.SetNoise({.Offset = 1.5,
+                    .WhiteAmplitude = 2e-3,
+                    .TimeStep = 5e-6,
+                    .FlickerExponent = 1.2,
+                    .FlickerAmplitude = 3e-3,
+                    .TelegraphAmplitude = 4e-3,
+                    .CaptureTime = 2e-3,
+                    .EmissionTime = 6e-3});
+    noisy.SetSourceType(Core::VoltageSource::SourceType::NOISE);
+    elements.push_back(GUI::CreateElement(Core::ComponentType::CURRENT_SOURCE, {6, 0}, GUI::Rotation::R0));
+    auto &random = static_cast<Core::CurrentSource &>(elements.back()->GetComponent());
+    random.SetName("Iin1");
+    random.SetRandom({.Distribution = Core::RandomDistribution::POISSON,
+                      .TimeStep = 20e-6,
+                      .Delay = 1e-3,
+                      .First = 4.0,
+                      .Second = 0.5});
+    random.SetSourceType(Core::CurrentSource::SourceType::RANDOM);
+
+    const GUI::LoadedSchematic loaded = LoadOrFail(GUI::SaveSchematic(elements, {}, {}, {}));
+    CAPTURE(loaded.Warnings);
+    CHECK(loaded.Warnings.empty());
+    REQUIRE(loaded.Elements.size() == 2);
+    const auto &noisy_copy = static_cast<const Core::VoltageSource &>(loaded.Elements[0]->GetComponent());
+    CHECK(noisy_copy.GetSourceType() == Core::Source::SourceType::NOISE);
+    CHECK(noisy_copy.GetNoise().Offset == 1.5);
+    CHECK(noisy_copy.GetNoise().WhiteAmplitude == 2e-3);
+    CHECK(noisy_copy.GetNoise().TimeStep == 5e-6);
+    CHECK(noisy_copy.GetNoise().FlickerExponent == 1.2);
+    CHECK(noisy_copy.GetNoise().FlickerAmplitude == 3e-3);
+    CHECK(noisy_copy.GetNoise().TelegraphAmplitude == 4e-3);
+    CHECK(noisy_copy.GetNoise().CaptureTime == 2e-3);
+    CHECK(noisy_copy.GetNoise().EmissionTime == 6e-3);
+    const auto &random_copy = static_cast<const Core::CurrentSource &>(loaded.Elements[1]->GetComponent());
+    CHECK(random_copy.GetSourceType() == Core::Source::SourceType::RANDOM);
+    CHECK(random_copy.GetRandom().Distribution == Core::RandomDistribution::POISSON);
+    CHECK(random_copy.GetRandom().TimeStep == 20e-6);
+    CHECK(random_copy.GetRandom().Delay == 1e-3);
+    CHECK(random_copy.GetRandom().First == 4.0);
+    CHECK(random_copy.GetRandom().Second == 0.5);
+}
+
+TEST_CASE("A source from an older file keeps the default noise and random values", "[schematic_file]") {
+    const GUI::LoadedSchematic loaded = LoadOrFail(Document(
+        R"({"type": "VoltageSource", "name": "Vin1", "x": 0, "y": 0, "rotation": 0, "value": 3, "source": "AC"})", ""));
+    REQUIRE(loaded.Elements.size() == 1);
+    CAPTURE(loaded.Warnings);
+    CHECK(loaded.Warnings.empty());
+    const auto &source = static_cast<const Core::VoltageSource &>(loaded.Elements[0]->GetComponent());
+    CHECK(source.GetNoise().WhiteAmplitude == Core::VoltageSource().GetNoise().WhiteAmplitude);
+    CHECK(source.GetRandom().Distribution == Core::RandomDistribution::GAUSSIAN);
+}
+
+TEST_CASE("A noise with a negative step or a random source with an unknown distribution is skipped",
+          "[schematic_file]") {
+    const GUI::LoadedSchematic loaded = LoadOrFail(Document(
+        R"({"type": "VoltageSource", "name": "Vin1", "x": 0, "y": 0, "rotation": 0, "value": 1, "source": "Noise",
+            "noise": {"white": 1e-3, "step": -1e-5}},
+           {"type": "VoltageSource", "name": "Vin2", "x": 0, "y": 0, "rotation": 0, "value": 1, "source": "Random",
+            "random": {"distribution": "Laplace"}},
+           {"type": "VoltageSource", "name": "Vin3", "x": 0, "y": 0, "rotation": 0, "value": 1, "source": "Random",
+            "random": {"distribution": "Exponential", "step": 1e-5, "first": 2}})",
+        ""));
+    REQUIRE(loaded.Elements.size() == 1);
+    CHECK(loaded.Elements[0]->GetComponent().GetName() == "Vin3");
+    CAPTURE(loaded.Warnings);
+    CHECK(loaded.Warnings.size() == 2);
+}
+
+TEST_CASE("The seed is optional in a file and never negative", "[schematic_file]") {
+    // Files saved before the seed existed have none, which means random each run
+    const GUI::LoadedSchematic without_seed =
+        LoadOrFail(R"({"format": "imcsim-schematic", "version": 1, "elements": [], "wires": [],
+                       "simulation": {"transient": {"stop": 0.01, "step": 1e-5}}})");
+    CHECK(without_seed.Warnings.empty());
+    CHECK(without_seed.Settings.Transient.Seed == 0);
+
+    const GUI::LoadedSchematic negative =
+        LoadOrFail(R"({"format": "imcsim-schematic", "version": 1, "elements": [], "wires": [],
+                       "simulation": {"transient": {"stop": 0.01, "step": 1e-5, "seed": -3}}})");
+    CHECK(negative.Warnings.size() == 1);
+    CHECK(negative.Settings.Transient.Seed == 0);
+}
+
+TEST_CASE("A pin marker that is an S-parameter port saves its number and reference, and one that is not saves nothing",
+          "[schematic_file]") {
+    std::vector<std::unique_ptr<GUI::UIElement>> elements;
+    elements.push_back(GUI::CreateElement(Core::ComponentType::PIN, {0, 0}, GUI::Rotation::R0));
+    elements.push_back(GUI::CreateElement(Core::ComponentType::PIN, {8, 0}, GUI::Rotation::R180));
+    static_cast<Core::SubcircuitPinMarker &>(elements[0]->GetComponent())
+        .SetPort({.IsPort = true, .Number = 2, .ReferenceOhms = 75.0});
+
+    const std::string text = GUI::SaveSchematic(elements, {}, {}, {});
+    const GUI::LoadedSchematic loaded = LoadOrFail(text);
+    CHECK(loaded.Warnings.empty());
+    REQUIRE(loaded.Elements.size() == 2);
+    const Core::PortSettings &port =
+        static_cast<const Core::SubcircuitPinMarker &>(loaded.Elements[0]->GetComponent()).GetPort();
+    CHECK(port == Core::PortSettings{.IsPort = true, .Number = 2, .ReferenceOhms = 75.0});
+    CHECK_FALSE(static_cast<const Core::SubcircuitPinMarker &>(loaded.Elements[1]->GetComponent()).GetPort().IsPort);
+    // Only the port has the key, so the files of markers that are not ports stay as they were
+    CHECK(text.find("\"port\"") == text.rfind("\"port\""));
+}
+
+TEST_CASE("A port without a positive number and a positive impedance leaves the marker out, with a warning",
+          "[schematic_file]") {
+    for (const char *port : {R"("port": {"number": 0, "z0": 50})", R"("port": {"number": 1, "z0": 0})",
+                             R"("port": {"number": 1})", R"("port": 3)"}) {
+        const GUI::LoadedSchematic loaded =
+            LoadOrFail(Document(std::string(R"({"type":"Pin","x":0,"y":0,"rotation":0,"net":"IN",)") + port + "}", ""));
+        CHECK(loaded.Elements.empty());
+        REQUIRE(loaded.Warnings.size() == 1);
+        CHECK(loaded.Warnings[0].contains("S-parameter port"));
+    }
+}
+
+TEST_CASE("The S-parameter settings load back unchanged", "[schematic_file]") {
+    GUI::SimulationSettings settings;
+    settings.SParameters = {
+        .StartFrequency = 2e6, .StopFrequency = 3e9, .IsLogarithmic = false, .PointsPerDecade = 7, .LinearPoints = 55};
+    settings.Selected = GUI::Analysis::S_PARAMETERS;
+    const GUI::LoadedSchematic loaded = LoadOrFail(GUI::SaveSchematic({}, {}, settings, {}));
+    CHECK(loaded.Warnings.empty());
+    CHECK(loaded.Settings == settings);
+    CHECK(loaded.Settings.Selected == GUI::Analysis::S_PARAMETERS);
+}
+
+TEST_CASE("Invalid S-parameter settings fall back to their defaults with a warning", "[schematic_file]") {
+    for (const char *settings : {R"({"start": -1, "stop": 1e9})", R"({"points_per_decade": 0})",
+                                 R"({"linear_points": 2})", R"({"logarithmic": "yes"})"}) {
+        const std::string text = std::string(R"({"format": "imcsim-schematic", "version": 1, "simulation": {)"
+                                             R"("s_parameters": )") +
+                                 settings + "}}";
+        const GUI::LoadedSchematic loaded = LoadOrFail(text);
+        CHECK(loaded.Warnings.size() == 1);
+        CHECK(loaded.Settings.SParameters == Core::SParameterSettings{});
+    }
+}
+
+TEST_CASE("A file saved before the S-parameter analysis loads it as its defaults", "[schematic_file]") {
+    const std::string text = R"({"format": "imcsim-schematic", "version": 1, "simulation": {)"
+                             R"("analysis": "pole_zero", "pole_zero": {}}})";
+    const GUI::LoadedSchematic loaded = LoadOrFail(text);
+    CHECK(loaded.Warnings.empty());
+    CHECK(loaded.Settings.Selected == GUI::Analysis::POLE_ZERO);
+    CHECK(loaded.Settings.SParameters == Core::SParameterSettings{});
+}
+
+TEST_CASE("A behavioral source keeps its expression as written, and loads with the default when it has none",
+          "[schematic_file]") {
+    std::vector<std::unique_ptr<GUI::UIElement>> elements;
+    elements.push_back(GUI::CreateElement(Core::ComponentType::BEHAVIORAL_CURRENT, {3, 3}, GUI::Rotation::R90));
+    auto &source = static_cast<Core::BehavioralSource &>(elements.back()->GetComponent());
+    source.SetName("B1");
+    source.SetExpression("1m*tanh(V(IN, REF)/26m)");
+
+    const GUI::LoadedSchematic loaded = LoadOrFail(GUI::SaveSchematic(elements, {}, {}, {}));
+    CHECK(loaded.Warnings.empty());
+    REQUIRE(loaded.Elements.size() == 1);
+    CHECK(loaded.Elements[0]->GetComponent().GetType() == Core::ComponentType::BEHAVIORAL_CURRENT);
+    CHECK(static_cast<const Core::BehavioralSource &>(loaded.Elements[0]->GetComponent()).GetExpression() ==
+          "1m*tanh(V(IN, REF)/26m)");
+
+    const std::string plain = R"({"type": "BehavioralVoltage", "x": 1, "y": 1, "rotation": 0, "name": "B1"})";
+    const GUI::LoadedSchematic defaults = LoadOrFail(Document(plain, ""));
+    REQUIRE(defaults.Elements.size() == 1);
+    CHECK(static_cast<const Core::BehavioralSource &>(defaults.Elements[0]->GetComponent()).GetExpression() == "1");
 }

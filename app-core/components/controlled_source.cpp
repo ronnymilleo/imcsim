@@ -24,12 +24,16 @@ double DefaultGain(const ComponentType type) {
         return 1e-3;
     case ComponentType::CCVS:
         return 1e3;
+    case ComponentType::BEHAVIORAL_VOLTAGE:
+    case ComponentType::BEHAVIORAL_CURRENT:
     case ComponentType::RESISTOR:
     case ComponentType::CAPACITOR:
     case ComponentType::INDUCTOR:
     case ComponentType::GROUND:
     case ComponentType::NET_LABEL:
     case ComponentType::PIN:
+    case ComponentType::LOGIC_OUTPUT:
+    case ComponentType::SEVEN_SEGMENT:
     case ComponentType::VCC:
     case ComponentType::VOLTAGE_SOURCE:
     case ComponentType::CURRENT_SOURCE:
@@ -46,6 +50,7 @@ double DefaultGain(const ComponentType type) {
     case ComponentType::PUSH_BUTTON:
     case ComponentType::V_SWITCH:
     case ComponentType::RELAY:
+    case ComponentType::FUSE:
     case ComponentType::TRANSFORMER:
     case ComponentType::AND:
     case ComponentType::OR:

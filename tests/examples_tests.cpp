@@ -3,7 +3,13 @@
  * @brief   Tests that every example circuit opens cleanly and simulates with its own settings.
  */
 
+#include "analysis/analysis_inputs.h"
+#include "analysis/circuit_snapshot.h"
+#include "analysis/fuse_readings.h"
+#include "analysis/logic_outputs.h"
+#include "analysis/monte_carlo_results.h"
 #include "components/potentiometer.h"
+#include "components/seven_segment.h"
 #include "components/source.h"
 #include "components/switch.h"
 #include "digital_models.h"
@@ -11,7 +17,12 @@
 #include "document/schematic.h"
 #include "native/native_backend.h"
 #include "ngspice/ngspice_library.h"
+#include "plots/logic_trace.h"
+#include "plots/spectrum.h"
+#include "plots/trace_math.h"
 #include "plots/trace_statistics.h"
+#include "simulation/circuit_checks.h"
+#include "simulation/monte_carlo.h"
 #include "simulation/simulation_backend.h"
 #include "simulation/simulator.h"
 #include "test_printers.h"
@@ -20,6 +31,7 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 #include <cmath>
+#include <complex>
 #include <format>
 #include <numbers>
 #include <optional>
@@ -76,8 +88,9 @@ TEST_CASE("Every example opens without warnings, measures existing traces and ru
         GUI::Schematic schematic;
         OpenOrFail(example, schematic);
         CHECK_FALSE(schematic.GetElements().empty());
-        // The digital examples open everywhere, but run only where ngspice has the digital models
-        if (std::string_view(example.Group) == "Digital" && !Core::AreDigitalModelsAvailable()) {
+        // The examples with logic parts, loose or inside blocks, open everywhere, but run only where ngspice has the
+        // digital models
+        if (Core::FindUnsupported(Core::GetBackend(), schematic.BuildCircuit(), Core::AnalysisKind::TRANSIENT)) {
             continue;
         }
 
@@ -92,6 +105,18 @@ TEST_CASE("Every example opens without warnings, measures existing traces and ru
         const Core::TransientRun transient =
             Core::RunTransient(schematic.BuildCircuit(), schematic.GetSimulationSettings().Transient);
         CHECK(transient.Result.has_value());
+
+        // No example is shown overloading a part
+        for (const std::string &warning : operating_point.Result->Warnings) {
+            INFO(warning);
+            CHECK_FALSE(warning.contains("exceeds its"));
+        }
+        if (transient.Result) {
+            for (const std::string &warning : transient.Result->Warnings) {
+                INFO(warning);
+                CHECK_FALSE(warning.contains("exceeds its"));
+            }
+        }
     }
 }
 
@@ -103,7 +128,11 @@ TEST_CASE("Every example either runs on Nodalys or is flagged unsupported", "[ex
         OpenOrFail(example, schematic);
         const Core::Circuit circuit = schematic.BuildCircuit();
 
-        CHECK_FALSE(Core::FindUnsupported(nodalys, circuit, Core::AnalysisKind::OPERATING_POINT).has_value());
+        const auto unsupported = Core::FindUnsupported(nodalys, circuit, Core::AnalysisKind::OPERATING_POINT);
+        if (unsupported.has_value()) {
+            CHECK(unsupported->find("Nodalys") != std::string::npos);
+            continue;
+        }
 
         // The precision rectifier example uses a vendor op-amp subcircuit kept as raw SPICE text
         if (std::string_view(example.FileName) == "precision_rectifier.imcsim") {
@@ -159,6 +188,84 @@ TEST_CASE("The BJT example draws one collector curve per base current", "[exampl
     CHECK(run.Result->Curves.size() == 5);
 }
 
+TEST_CASE("The noise example shows a flat floor at the input that the low-pass cuts after its corner", "[examples]") {
+    GUI::Schematic schematic;
+    OpenExample("noise_through_rc_low_pass.imcsim", schematic);
+    const GUI::SimulationSettings &settings = schematic.GetSimulationSettings();
+    REQUIRE(settings.Selected == GUI::Analysis::TRANSIENT);
+
+    const Core::TransientRun run = Core::RunTransient(schematic.BuildCircuit(), settings.Transient);
+    REQUIRE(run.Result.has_value());
+    const Core::Transient &transient = *run.Result;
+    // The whole run fits the default window of 2000 points, so the Spectrum tab covers all of it
+    INFO(transient.Times.size());
+    CHECK(transient.Times.size() <= 2000);
+    const std::size_t input = NodeAt(schematic, {4, 4});
+    const std::size_t output = NodeAt(schematic, {11, 4});
+
+    const auto band_rms = [&transient](const std::size_t node, const double from_hertz, const double to_hertz) {
+        const auto spectrum = GUI::ComputeSpectrum(
+            transient.Times, transient.NodeVoltages[node], 0.0, transient.Times.back(),
+            GUI::ChooseSpectrumSampleCount(transient.Times, 0.0, transient.Times.back()), GUI::SpectrumWindow::HANN);
+        REQUIRE(spectrum.has_value());
+        double sum = 0.0;
+        int count = 0;
+        for (std::size_t index = 0; index < spectrum->Frequencies.size(); ++index) {
+            if (spectrum->Frequencies[index] >= from_hertz && spectrum->Frequencies[index] <= to_hertz) {
+                sum += spectrum->Amplitudes[index] * spectrum->Amplitudes[index];
+                ++count;
+            }
+        }
+        REQUIRE(count > 0);
+        return std::sqrt(sum / count);
+    };
+
+    // White noise of 100 mV rms sampled every 50 us is 2 * 0.1^2 * 50u = 1e-6 V^2/Hz one-sided; the Hann window reads
+    // 1.5 bins of 1 / 19 ms of it as a sine of peak sqrt(2 * 1e-6 * 1.5 * df), a little less where the straight lines
+    // between samples attenuate
+    const double resolution = 1.0 / transient.Times.back();
+    const double expected_floor = std::sqrt(2.0 * 1e-6 * 1.5 * resolution);
+    CHECK_THAT(band_rms(input, 200.0, 2000.0), Catch::Matchers::WithinRel(expected_floor, 0.3));
+    // A few dozen bins per band scatter by 10% or more, so the limits are wide enough never to fail by chance
+    // The floor stays flat up to the 10 kHz Nyquist band, losing a little to the straight lines between samples
+    CHECK_THAT(band_rms(input, 3e3, 4.5e3) / band_rms(input, 200.0, 2000.0), Catch::Matchers::WithinRel(0.93, 0.5));
+    // The output follows the floor below the 1.6 kHz corner and is far below it near 10 kHz
+    CHECK_THAT(band_rms(output, 100.0, 500.0) / band_rms(input, 100.0, 500.0), Catch::Matchers::WithinRel(1.0, 0.1));
+    CHECK(band_rms(output, 8e3, 9.5e3) < 0.25 * band_rms(input, 8e3, 9.5e3));
+}
+
+TEST_CASE("The noise example reads as broadband noise of 1 mV/sqrt(Hz) at its input", "[examples]") {
+    GUI::Schematic schematic;
+    OpenExample("noise_through_rc_low_pass.imcsim", schematic);
+    const Core::TransientRun run =
+        Core::RunTransient(schematic.BuildCircuit(), schematic.GetSimulationSettings().Transient);
+    REQUIRE(run.Result.has_value());
+    const Core::Transient &transient = *run.Result;
+    const std::size_t input = NodeAt(schematic, {4, 4});
+
+    const double end = transient.Times.back();
+    const auto spectrum =
+        GUI::ComputeSpectrum(transient.Times, transient.NodeVoltages[input], 0.0, end,
+                             GUI::ChooseSpectrumSampleCount(transient.Times, 0.0, end), GUI::SpectrumWindow::HANN);
+    REQUIRE(spectrum.has_value());
+    CHECK(GUI::AnalyzeHarmonics(*spectrum, 10).IsBroadband);
+
+    // 100 mV rms sampled every 50 us is 0.1 * sqrt(2 * 50u) = 1 mV/sqrt(Hz) up to 10 kHz; the straight lines between
+    // samples take a little off the top of the band, and a few dozen bins scatter by 10%, so the band is wide
+    const std::vector<double> densities = GUI::ComputeNoiseDensities(*spectrum);
+    const std::span<const double> frequencies = std::span(spectrum->Frequencies).subspan(1);
+    const auto band = GUI::MeasureNoiseBand(frequencies, densities, 200.0, 5e3);
+    REQUIRE(band.has_value());
+    CHECK_THAT(band->Density, Catch::Matchers::WithinRel(1e-3, 0.3));
+    // The tab reads the whole spectrum, much of it past the 10 kHz where the sampled noise rolls off from about 4 kHz;
+    // the highest slice median still gives the floor, a little low (0.7 to 1.0 mV/sqrt(Hz) in runs), against the
+    // 0.35 mV/sqrt(Hz) the rms over that band gave
+    const auto whole = GUI::MeasureNoiseBand(frequencies, densities, 0.0, frequencies.back());
+    REQUIRE(whole.has_value());
+    INFO(whole->Density);
+    CHECK_THAT(whole->Density, Catch::Matchers::WithinRel(1e-3, 0.35));
+}
+
 TEST_CASE("The RC example measures its corner frequency over the whole sweep", "[examples]") {
     const auto example =
         std::ranges::find(GUI::GetExamples(), std::string_view("rc_low_pass_filter.imcsim"), &GUI::Example::FileName);
@@ -179,6 +286,40 @@ TEST_CASE("The RC example measures its corner frequency over the whole sweep", "
     const double corner = 1.0 / (2.0 * std::numbers::pi * 1e3 * 100e-9);
     CHECK_THAT(*statistics->UpperCutoff, Catch::Matchers::WithinRel(corner, 2e-2));
     CHECK_FALSE(statistics->LowerCutoff);
+}
+
+TEST_CASE("The Monte Carlo example opens with its tolerances and runs as Monte Carlo", "[examples]") {
+    const auto example = std::ranges::find(GUI::GetExamples(), std::string_view("monte_carlo_rc_low_pass.imcsim"),
+                                           &GUI::Example::FileName);
+    REQUIRE(example != GUI::GetExamples().end());
+    GUI::Schematic schematic;
+    OpenOrFail(*example, schematic);
+
+    const GUI::SimulationSettings &settings = schematic.GetSimulationSettings();
+    CHECK(settings.Selected == GUI::Analysis::AC_SWEEP);
+    CHECK(settings.MonteCarlo.Enabled);
+    CHECK(settings.MonteCarlo.Runs == 100);
+    CHECK_FALSE(settings.ParameterStep.Enabled);
+    const Core::Circuit circuit = schematic.BuildCircuit();
+    const std::vector<const Core::Component *> varied = Core::FindVariedParts(circuit);
+    REQUIRE(varied.size() == 2);
+    CHECK(varied[0]->GetName() == "R1");
+    CHECK(varied[0]->GetTolerance() == 5.0);
+    CHECK(varied[1]->GetName() == "C1");
+    CHECK(varied[1]->GetTolerance() == 10.0);
+    CHECK_FALSE(Core::CheckMonteCarlo(circuit, settings.MonteCarlo));
+
+    // Every run of the sweep reads a corner, and the nominal one is the RC corner
+    const Core::MonteCarloCircuit nominal = Core::BuildMonteCarloCircuit(circuit, settings.MonteCarlo, 0);
+    const Core::ACSweepRun run = Core::RunACSweep(nominal.Simulated, settings.ACSweep);
+    REQUIRE(run.Result.has_value());
+    const GUI::Measurement measured = GUI::MeasureACSweep(*run.Result);
+    const auto column =
+        std::ranges::find(measured.Columns, GUI::MeasureColumn{.Node = 2, .Kind = GUI::MeasureKind::UPPER_CUTOFF});
+    REQUIRE(column != measured.Columns.end());
+    const std::optional<double> corner = measured.Values[static_cast<std::size_t>(column - measured.Columns.begin())];
+    REQUIRE(corner);
+    CHECK_THAT(*corner, Catch::Matchers::WithinRel(1.0 / (2.0 * std::numbers::pi * 1e3 * 100e-9), 2e-2));
 }
 
 TEST_CASE("The hybrid-pi model has the gain of its transistor in the middle band only", "[examples]") {
@@ -486,6 +627,43 @@ TEST_CASE("The Sallen-Key filter has its corner near 1.1 kHz and falls 40 dB per
     CHECK_THAT(GainAt(sweep, output, 1e4) - GainAt(sweep, output, 1e5), Catch::Matchers::WithinAbs(40.0, 1.0));
 }
 
+TEST_CASE(
+    "The pole-zero example finds one clean pair at the natural frequency and Q of the RLC, and the AC sweep agrees",
+    "[examples]") {
+    GUI::Schematic schematic;
+    OpenExample("rlc_low_pass_poles_and_zeros.imcsim", schematic);
+    const GUI::SimulationSettings &settings = schematic.GetSimulationSettings();
+    CHECK(settings.Selected == GUI::Analysis::POLE_ZERO);
+    REQUIRE(settings.PoleZeroOutput.has_value());
+    const int output = static_cast<int>(NodeAt(schematic, *settings.PoleZeroOutput));
+
+    const Core::PoleZeroRun run =
+        Core::RunPoleZero(schematic.BuildCircuit(), {.OutputNode = output, .InputSource = settings.PoleZeroSource});
+    if (!run.Result) {
+        FAIL(run.Result.error());
+    }
+    // A teaching example must be clean: no warning from the solver, and a single pole pair in the left half-plane
+    CHECK(run.Result->Warnings.empty());
+    CHECK(run.Result->CancelledPairs == 0);
+    REQUIRE(run.Result->Roots.size() == 1);
+    const Core::PoleZeroRoot &pair = run.Result->Roots.front();
+    CHECK(pair.IsPole);
+    CHECK_FALSE(pair.IsRightHalfPlane);
+    // f0 = 1 / (2 pi sqrt(LC)) = 5.03 kHz and Q = sqrt(L / C) / R = 3.16
+    CHECK_THAT(pair.NaturalFrequencyHertz, Catch::Matchers::WithinRel(5.033e3, 0.01));
+    REQUIRE(pair.QualityFactor.has_value());
+    CHECK_THAT(*pair.QualityFactor, Catch::Matchers::WithinRel(3.162, 0.01));
+
+    // The response peaks a little below f0, at f0 sqrt(1 - 1 / (2 Q^2)), by Q / sqrt(1 - 1 / (4 Q^2)) in gain
+    const Core::ACSweep sweep = SweepOf(schematic);
+    const GUI::BodeStatistics bode = BodeOf(sweep, static_cast<std::size_t>(output));
+    const double q = *pair.QualityFactor;
+    CHECK_THAT(bode.PeakFrequency,
+               Catch::Matchers::WithinRel(pair.NaturalFrequencyHertz * std::sqrt(1.0 - 1.0 / (2.0 * q * q)), 0.03));
+    CHECK_THAT(bode.PeakGain,
+               Catch::Matchers::WithinAbs(20.0 * std::log10(q / std::sqrt(1.0 - 1.0 / (4.0 * q * q))), 0.3));
+}
+
 TEST_CASE("The common-emitter amplifier has a mid-band gain of about 43 dB between its two corners", "[examples]") {
     GUI::Schematic schematic;
     OpenExample("common_emitter_amplifier.imcsim", schematic);
@@ -504,6 +682,41 @@ TEST_CASE("The common-emitter amplifier has a mid-band gain of about 43 dB betwe
     CHECK(*bode.LowerCutoff > 30.0);
     CHECK(*bode.LowerCutoff < 150.0);
     CHECK(*bode.UpperCutoff > 5e6);
+}
+
+TEST_CASE("The bias example finds the divider resistors the most influential on the base voltage", "[examples]") {
+    GUI::Schematic schematic;
+    OpenExample("bias_sensitivity.imcsim", schematic);
+    const GUI::SimulationSettings &settings = schematic.GetSimulationSettings();
+    CHECK(settings.Selected == GUI::Analysis::SENSITIVITY);
+    REQUIRE(settings.SensitivityOutput.has_value());
+    const int base = static_cast<int>(NodeAt(schematic, *settings.SensitivityOutput));
+
+    const Core::SensitivityRun run = Core::RunSensitivity(schematic.BuildCircuit(), {.OutputNode = base});
+    if (!run.Result) {
+        FAIL(run.Result.error());
+    }
+    // ngspice notes that the sine source is taken at its DC value, which is no warning: a clean run reports none
+    for (const Core::SimulatorMessage &message : run.Messages) {
+        INFO(message.Text);
+        CHECK_FALSE(message.FromErrorStream);
+    }
+    const std::vector<Core::PartSensitivity> &parts = run.Result->Parts;
+    const auto find = [&parts](const std::string_view name) {
+        const auto found = std::ranges::find(parts, name, &Core::PartSensitivity::Name);
+        REQUIRE(found != parts.end());
+        return *found;
+    };
+    // The supply sets the base through the divider, so it leads, and R1 and R2 follow with opposite signs, a larger R1
+    // lowering the base and a larger R2 raising it, by about 1.5 V for 100 %
+    CHECK(parts.front().Name == "V1");
+    CHECK(find("R1").Normalized < 0.0);
+    CHECK(find("R2").Normalized > 0.0);
+    CHECK_THAT(std::abs(find("R1").Normalized), Catch::Matchers::WithinAbs(1.5, 0.2));
+    CHECK_THAT(std::abs(find("R2").Normalized), Catch::Matchers::WithinAbs(1.5, 0.2));
+    // The load and the collector side hardly matter for the bias
+    CHECK(std::abs(find("R5").Normalized) < 0.01 * std::abs(find("R1").Normalized));
+    CHECK(std::abs(find("R3").Normalized) < 0.2 * std::abs(find("R1").Normalized));
 }
 
 TEST_CASE("The current mirror copies the reference current while Q2 is out of saturation", "[examples]") {
@@ -979,4 +1192,261 @@ TEST_CASE("The precision rectifier passes the positive half of the sine without 
     // The capacitance of the diode lets a few tens of millivolts of the edge through when the op-amp output drops to
     // its negative limit; without the loop the output would not reach the peak by about the diode drop instead
     CHECK(lowest > -0.05);
+}
+
+TEST_CASE("The decoder example varies A0 and A1 only, and each row raises the output they select",
+          "[examples][digital]") {
+    SKIP_WITHOUT_DIGITAL_MODELS();
+    GUI::Schematic schematic;
+    OpenExample("decoder_logic_outputs.imcsim", schematic);
+    const GUI::SimulationSettings &settings = schematic.GetSimulationSettings();
+    CHECK(settings.Selected == GUI::Analysis::TRUTH_TABLE);
+    const Core::Circuit circuit = schematic.BuildCircuit();
+    REQUIRE_FALSE(circuit.HasGround());
+    // V1 drives A0 and V2 drives A1; V3 holds EN high
+    const std::vector<std::string> inputs =
+        GUI::ResolveTruthTableInputs(settings.TruthTableInputs, Core::GetTruthTableInputs(circuit));
+    REQUIRE(inputs == std::vector<std::string>{"V1", "V2"});
+    // The logic outputs read Y0 to Y3 from these points
+    std::vector<int> outputs;
+    for (int output = 0; output < 4; ++output) {
+        outputs.push_back(static_cast<int>(NodeAt(schematic, {17, 4 + 2 * output})));
+    }
+    const Core::TruthTableRun run = Core::RunTruthTable(circuit, {.Inputs = inputs, .OutputNodes = outputs});
+    if (!run.Result) {
+        FAIL(run.Result.error());
+    }
+    REQUIRE(run.Result->Rows.size() == 4);
+    for (std::size_t row = 0; row < run.Result->Rows.size(); ++row) {
+        const Core::TruthTableRow &values = run.Result->Rows[row];
+        REQUIRE(values.HasOperatingPoint());
+        const std::size_t address = (values.InputsHigh[0] ? 1U : 0U) + (values.InputsHigh[1] ? 2U : 0U);
+        for (std::size_t output = 0; output < outputs.size(); ++output) {
+            INFO(std::format("row {} output {}", row, output));
+            CHECK((values.OutputVoltages[output] > 4.0) == (output == address));
+        }
+    }
+}
+
+TEST_CASE("The decade counter counts 0 to 9 and over again, and its display shows the digit", "[examples][digital]") {
+    SKIP_WITHOUT_DIGITAL_MODELS();
+    GUI::Schematic schematic;
+    OpenExample("decade_counter.imcsim", schematic);
+    const Core::TransientRun run = RunExampleTransient(schematic);
+    const Core::Transient &transient = *run.Result;
+    // Q0 to Q3, at the points the example measures
+    const std::array<std::size_t, 4> bits = {NodeAt(schematic, {15, -3}), NodeAt(schematic, {8, 13}),
+                                             NodeAt(schematic, {15, 1}), NodeAt(schematic, {8, 11})};
+    const auto display = std::ranges::find_if(schematic.GetElements(), [](const auto &element) {
+        return element->GetComponent().GetType() == Core::ComponentType::SEVEN_SEGMENT;
+    });
+    REQUIRE(display != schematic.GetElements().end());
+    // Segments a to g of each digit, as the decoder lights them
+    constexpr std::array<std::string_view, 10> DIGITS = {"abcdef", "bc",     "abdeg", "abcdg",   "bcfg",
+                                                         "acdfg",  "acdefg", "abc",   "abcdefg", "abcdfg"};
+    // The clock rises at 0.5 ms and every millisecond after; eleven edges go past nine and back to 0
+    for (int edges = 1; edges <= 11; ++edges) {
+        const double time = 0.5e-3 + static_cast<double>(edges - 1) * 1e-3 + 0.3e-3;
+        const int count = edges % 10;
+        INFO(std::format("{} edges", edges));
+        for (std::size_t bit = 0; bit < bits.size(); ++bit) {
+            const bool expected = ((count >> bit) & 1) != 0;
+            CHECK(
+                (expected ? VoltageAt(transient, bits[bit], time) > 4.0 : VoltageAt(transient, bits[bit], time) < 0.5));
+        }
+        const auto segments =
+            GUI::ReadLogicDisplay(**display, schematic.GetConnectivity(), GUI::SampleTransient(transient, time));
+        std::string lit;
+        for (std::size_t segment = 0; segment < segments.size(); ++segment) {
+            if (segments[segment] == GUI::LogicState::HIGH) {
+                lit += Core::SEGMENT_NAMES[segment];
+            }
+        }
+        CHECK(lit == DIGITS[static_cast<std::size_t>(count)]);
+    }
+}
+
+TEST_CASE("The 8-bit counter of two nested 4-bit blocks carries into its high nibble", "[examples][digital]") {
+    SKIP_WITHOUT_DIGITAL_MODELS();
+    GUI::Schematic schematic;
+    OpenExample("counter_8bit_blocks.imcsim", schematic);
+    const Core::TransientRun run = RunExampleTransient(schematic);
+    const Core::Transient &transient = *run.Result;
+    // Q0 to Q7 on the right of the block, two units apart
+    std::vector<std::size_t> bits;
+    for (int bit = 0; bit < 8; ++bit) {
+        bits.push_back(NodeAt(schematic, {15, 2 * bit - 7}));
+    }
+    // 15, 16 and 17 edges cross the carry from the low nibble to the high one, 39 is the last edge in 40 ms
+    for (const int edges : {1, 2, 15, 16, 17, 39}) {
+        const double time = 0.5e-3 + static_cast<double>(edges - 1) * 1e-3 + 0.3e-3;
+        int count = 0;
+        for (std::size_t bit = 0; bit < bits.size(); ++bit) {
+            count |= VoltageAt(transient, bits[bit], time) > 4.0 ? 1 << bit : 0;
+        }
+        CHECK(count == edges);
+    }
+    CHECK(schematic.GetBuses().size() == 1);
+    // The pins of the block reach flip-flops two levels down, so the plot draws them as logic lanes
+    const std::vector<GUI::LogicNode> logic_nodes = GUI::FindLogicNodes(schematic.BuildCircuit());
+    for (const std::size_t bit : bits) {
+        CHECK(std::ranges::contains(logic_nodes, static_cast<int>(bit), &GUI::LogicNode::Node));
+    }
+}
+
+TEST_CASE("The fuse example blows the fast fuse first and the slow-blow one later, each cutting its branch",
+          "[examples][fuse]") {
+    GUI::Schematic schematic;
+    OpenExample("fuse_fast_and_slow_blow.imcsim", schematic);
+
+    const Core::TransientRun run =
+        Core::RunTransient(schematic.BuildCircuit(), schematic.GetSimulationSettings().Transient);
+    REQUIRE(run.Result.has_value());
+    const Core::Transient &transient = *run.Result;
+    const std::vector<std::optional<double>> blow_times =
+        GUI::FindFuseBlowTimes(schematic.GetElements(), schematic.GetConnectivity(), transient);
+    const auto blow_time_of = [&](const std::string_view name) -> std::optional<double> {
+        for (std::size_t index = 0; index < schematic.GetElements().size(); ++index) {
+            if (schematic.GetElements()[index]->GetComponent().GetName() == name) {
+                return blow_times[index];
+            }
+        }
+        return std::nullopt;
+    };
+    const std::optional<double> fast = blow_time_of("FU1");
+    const std::optional<double> slow = blow_time_of("FU2");
+    REQUIRE(fast.has_value());
+    REQUIRE(slow.has_value());
+    CHECK_THAT(*fast, Catch::Matchers::WithinRel(0.33, 0.1));
+    CHECK_THAT(*slow, Catch::Matchers::WithinRel(2.1, 0.1));
+    // Each branch loses its current in the same run, and it was carrying 5 V over 2.6 Ohm before
+    const auto current = [&transient](const std::string &name) -> const std::vector<double> & {
+        return std::ranges::find(transient.Currents, name, &Core::ComponentTrace::Name)->Values;
+    };
+    CHECK_THAT(current("FU1").front(), Catch::Matchers::WithinAbs(1.93, 0.01));
+    CHECK_THAT(current("FU1").back(), Catch::Matchers::WithinAbs(0.0, 1e-6));
+    CHECK_THAT(current("FU2").back(), Catch::Matchers::WithinAbs(0.0, 1e-6));
+}
+
+TEST_CASE("The S-parameter example is a T low-pass whose matrix is the closed form of its ABCD matrix",
+          "[examples][s_parameters]") {
+    GUI::Schematic schematic;
+    OpenExample("s_parameters_lc_low_pass.imcsim", schematic);
+    const GUI::SimulationSettings &settings = schematic.GetSimulationSettings();
+    CHECK(settings.Selected == GUI::Analysis::S_PARAMETERS);
+
+    const Core::SParametersRun run = Core::RunSParameters(schematic.BuildCircuit(), settings.SParameters);
+    if (!run.Result) {
+        FAIL(run.Result.error());
+    }
+    CHECK(run.Result->Warnings.empty());
+    REQUIRE(run.Result->GetPortCount() == 2);
+    REQUIRE(run.Result->Frequencies.size() == 401);
+    for (std::size_t index = 0; index < run.Result->Frequencies.size(); ++index) {
+        // Series L, shunt C, series L, each as its ABCD matrix, between 50 ohm ports
+        const double omega = 2.0 * std::numbers::pi * run.Result->Frequencies[index];
+        const std::complex<double> series(0.0, omega * 8e-6);
+        const std::complex<double> shunt(0.0, omega * 3.18e-9);
+        const std::complex<double> a = 1.0 + series * shunt;
+        const std::complex<double> b = 2.0 * series + series * series * shunt;
+        const std::complex<double> denominator = a + b / 50.0 + shunt * 50.0 + a;
+        const std::complex<double> reflection = (a + b / 50.0 - shunt * 50.0 - a) / denominator;
+        const std::complex<double> transmission = 2.0 / denominator;
+        CHECK_THAT(std::abs(run.Result->Get(index, 1, 1) - reflection), Catch::Matchers::WithinAbs(0.0, 1e-6));
+        CHECK_THAT(std::abs(run.Result->Get(index, 2, 1) - transmission), Catch::Matchers::WithinAbs(0.0, 1e-6));
+    }
+    // The low frequencies pass and are nearly matched; the high ones are reflected
+    CHECK(std::abs(run.Result->Get(0, 1, 1)) < 0.1);
+    CHECK(std::abs(run.Result->Get(400, 1, 1)) > 0.9);
+    CHECK(std::abs(run.Result->Get(0, 2, 1)) > 0.98);
+    CHECK(std::abs(run.Result->Get(400, 2, 1)) < 0.01);
+}
+
+TEST_CASE("The series RLC example plots its impedance, resistive at resonance", "[examples]") {
+    GUI::Schematic schematic;
+    OpenExample("series_rlc.imcsim", schematic);
+    REQUIRE(schematic.GetMathChannels().size() == 1);
+    const auto compiled = GUI::CompileExpression(schematic.GetMathChannels().front().Expression);
+    REQUIRE(compiled.has_value());
+    const auto program = GUI::ResolveNetNames(
+        *compiled, [&schematic](const std::string_view net) { return schematic.GetConnectivity().FindNodeOfNet(net); });
+    REQUIRE(program.has_value());
+    const Core::ACSweepRun run = Core::RunACSweep(schematic.BuildCircuit(), schematic.GetSimulationSettings().ACSweep);
+    REQUIRE(run.Result.has_value());
+    const auto impedance = GUI::EvaluateACExpression(*program, *run.Result);
+    REQUIRE(impedance.has_value());
+    CHECK(GUI::FormatUnit(impedance->Unit) == "Ohm");
+
+    const std::vector<double> &frequencies = run.Result->Frequencies;
+    const auto index_of = [&frequencies](const double frequency) {
+        return static_cast<std::size_t>(std::ranges::lower_bound(frequencies, frequency) - frequencies.begin());
+    };
+    // At resonance L and C cancel and the source sees R1 alone, 100 Ohm or 40 dB, in phase
+    const std::size_t resonance = index_of(5.03e3);
+    CHECK_THAT(impedance->MagnitudesDecibels[resonance], Catch::Matchers::WithinAbs(40.0, 0.5));
+    CHECK_THAT(impedance->PhasesDegrees[resonance], Catch::Matchers::WithinAbs(0.0, 15.0));
+    // Below it the capacitor rules and the current leads, above it the inductor and the current lags
+    CHECK(impedance->PhasesDegrees.front() < -80.0);
+    CHECK(impedance->PhasesDegrees.back() > 80.0);
+}
+
+TEST_CASE("The behavioral source multiplies the carrier by the message, an amplitude modulation", "[examples]") {
+    GUI::Schematic schematic;
+    OpenExample("behavioral_am_modulator.imcsim", schematic);
+    const Core::TransientRun run =
+        Core::RunTransient(schematic.BuildCircuit(), schematic.GetSimulationSettings().Transient);
+    REQUIRE(run.Result.has_value());
+    const Core::Transient &transient = *run.Result;
+    const std::vector<double> &carrier = transient.NodeVoltages[NodeAt(schematic, {4, 4})];
+    const std::vector<double> &message = transient.NodeVoltages[NodeAt(schematic, {12, 4})];
+    const std::vector<double> &output = transient.NodeVoltages[NodeAt(schematic, {32, 4})];
+    // ngspice solves the expression to its tolerance, a few tenths of a millivolt
+    for (std::size_t index = 0; index < output.size(); ++index) {
+        CHECK_THAT(output[index], Catch::Matchers::WithinAbs(carrier[index] * (1.0 + 0.5 * message[index]), 1e-3));
+    }
+    // The envelope swings between half and one and a half times the carrier
+    CHECK_THAT(PeakOf(output), Catch::Matchers::WithinAbs(1.5, 0.02));
+}
+
+TEST_CASE("The offset example shows the input offset of each op-amp times the gain", "[examples]") {
+    GUI::Schematic schematic;
+    OpenExample("op_amp_input_offset.imcsim", schematic);
+    CHECK(schematic.GetSimulationSettings().Selected == GUI::Analysis::OPERATING_POINT);
+    const Core::OperatingPointRun run = Core::RunOperatingPoint(schematic.BuildCircuit());
+    REQUIRE(run.Result.has_value());
+    const double lm358 = run.Result->NodeVoltages[NodeAt(schematic, {20, 8})];
+    const double op07 = run.Result->NodeVoltages[NodeAt(schematic, {20, 22})];
+    INFO(std::format("LM358 {} V, OP07 {} V", lm358, op07));
+    // A gain of 101 on 3 mV and on 60 uV, plus what the bias currents add through 100k
+    CHECK_THAT(std::abs(lm358), Catch::Matchers::WithinRel(0.303, 0.1));
+    CHECK_THAT(std::abs(op07), Catch::Matchers::WithinAbs(6.06e-3, 3e-3));
+}
+
+TEST_CASE("The Monte Carlo bias example spreads the collector voltage around its nominal value", "[examples]") {
+    GUI::Schematic schematic;
+    OpenExample("monte_carlo_bias_point.imcsim", schematic);
+    const GUI::SimulationSettings &settings = schematic.GetSimulationSettings();
+    CHECK(settings.Selected == GUI::Analysis::OPERATING_POINT);
+    REQUIRE(settings.MonteCarlo.Enabled);
+    const Core::Circuit circuit = schematic.BuildCircuit();
+    CHECK(Core::FindVariedParts(circuit).size() == 4);
+    CHECK_FALSE(Core::CheckMonteCarlo(circuit, settings.MonteCarlo));
+
+    const std::size_t collector = NodeAt(schematic, {15, 12});
+    const std::size_t emitter = NodeAt(schematic, {15, 20});
+    std::vector<double> collectors;
+    constexpr int CHECKED_RUNS = 40;
+    for (int run_number = 0; run_number <= CHECKED_RUNS; ++run_number) {
+        const Core::MonteCarloCircuit drawn = Core::BuildMonteCarloCircuit(circuit, settings.MonteCarlo, run_number);
+        const Core::OperatingPointRun run = Core::RunOperatingPoint(drawn.Simulated);
+        REQUIRE(run.Result.has_value());
+        collectors.push_back(run.Result->NodeVoltages[collector]);
+        // Every run keeps Q1 out of saturation
+        CHECK(run.Result->NodeVoltages[collector] > run.Result->NodeVoltages[emitter] + 1.0);
+    }
+    const double nominal = collectors.front();
+    const auto [lowest, highest] = std::ranges::minmax(collectors);
+    INFO(std::format("Collector {} V nominal, {} to {} V", nominal, lowest, highest));
+    CHECK(lowest < nominal - 0.2);
+    CHECK(highest > nominal + 0.2);
 }

@@ -5,12 +5,14 @@
 
 #include "ui_elements/ui_element.h"
 
+#include "simulation/monte_carlo.h"
 #include "spice/spice_value.h"
 #include <algorithm>
 #include <array>
 #include <cfloat>
 #include <cmath>
 #include <cstdlib>
+#include <format>
 #include <optional>
 #include <string>
 #include <utility>
@@ -195,25 +197,33 @@ bool UIElement::Contains(const ImVec2 world_pos) const {
 }
 
 /**
- * @brief   Checks whether the element touches a rectangle in world space, for picking it with a selection box.
- * @param[in] min  Corner of the rectangle with the lowest X and Y.
- * @param[in] max  Corner with the highest X and Y.
- * @return  True when the symbol bounds, terminals included, overlap the rectangle.
+ * @brief   Finds the box the element takes on the grid, after its rotation and mirroring.
+ * @return  The symbol bounds, terminals included, in world units.
  */
-bool UIElement::Intersects(const ImVec2 min, const ImVec2 max) const {
+WorldBounds UIElement::GetWorldBounds() const {
     const LocalBounds bounds = GetLocalBounds();
-    ImVec2 low = {FLT_MAX, FLT_MAX};
-    ImVec2 high = {-FLT_MAX, -FLT_MAX};
+    WorldBounds world_bounds = {.Min = {FLT_MAX, FLT_MAX}, .Max = {-FLT_MAX, -FLT_MAX}};
     for (ImVec2 corner :
          {bounds.Min, ImVec2{bounds.Max.x, bounds.Min.y}, bounds.Max, ImVec2{bounds.Min.x, bounds.Max.y}}) {
         if (m_Mirrored) {
             corner.x = -corner.x;
         }
         const ImVec2 world = ToVec2(m_Position) + Rotate(corner, m_Rotation);
-        low = {std::min(low.x, world.x), std::min(low.y, world.y)};
-        high = {std::max(high.x, world.x), std::max(high.y, world.y)};
+        world_bounds.Min = {std::min(world_bounds.Min.x, world.x), std::min(world_bounds.Min.y, world.y)};
+        world_bounds.Max = {std::max(world_bounds.Max.x, world.x), std::max(world_bounds.Max.y, world.y)};
     }
-    return low.x <= max.x && high.x >= min.x && low.y <= max.y && high.y >= min.y;
+    return world_bounds;
+}
+
+/**
+ * @brief   Checks whether the element touches a rectangle in world space, for picking it with a selection box.
+ * @param[in] min  Corner of the rectangle with the lowest X and Y.
+ * @param[in] max  Corner with the highest X and Y.
+ * @return  True when the symbol bounds, terminals included, overlap the rectangle.
+ */
+bool UIElement::Intersects(const ImVec2 min, const ImVec2 max) const {
+    const WorldBounds bounds = GetWorldBounds();
+    return bounds.Min.x <= max.x && bounds.Max.x >= min.x && bounds.Min.y <= max.y && bounds.Max.y >= min.y;
 }
 
 /**
@@ -228,17 +238,20 @@ void UIElement::DrawTerminals(SchematicCanvas &canvas, const ViewTransform &view
 }
 
 /**
- * @brief   Draws the component name above the symbol and its value below, in local orientation; the value is the
- *          parameter it follows, such as "{R}", for a part inside a block.
+ * @brief   Draws the component name and its value on one line above the symbol, in local orientation, such as "R1 1k",
+ *          so the part reads in one glance and the side below stays free; the value is the parameter it follows, such
+ * as
+ *          "{R}", for a part inside a block.
  * @param[in,out] canvas Where it is drawn: the editor window or an exported image.
  * @param[in] view       Transform of the current frame.
  * @param[in] color      Text color.
  */
 void UIElement::DrawLabels(SchematicCanvas &canvas, const ViewTransform &view, const ImU32 color) const {
-    DrawLabel(canvas, view, {0.0f, -LABEL_OFFSET}, {0.0f, -1.0f}, m_Component->GetName(), color);
+    std::string text = m_Component->GetName();
     if (m_Component->HasValue()) {
-        DrawLabel(canvas, view, {0.0f, LABEL_OFFSET}, {0.0f, 1.0f}, GetValueLabel(*m_Component), color);
+        text += " " + GetValueLabel(*m_Component);
     }
+    DrawLabel(canvas, view, {0.0f, -LABEL_OFFSET}, {0.0f, -1.0f}, text, color);
 }
 
 /**
@@ -313,14 +326,19 @@ ImVec2 UIElement::LocalToScreen(const ViewTransform &view, const float x, const 
 /**
  * @brief   Returns the text a symbol shows for the value of its part.
  * @param[in] component  Part with a value.
- * @return  The value with its scale suffix, such as "4.7k"; the parameter it follows, such as "{R}", for a part inside
- *          a block, since its own value is not used then.
+ * @return  The value with its scale suffix, such as "4.7k", and the tolerance when a Monte Carlo analysis varies the
+ *          part, such as "4.7k ±5%"; the parameter it follows, such as "{R}", for a part inside a block, since its
+ *          own value is not used then.
  */
 std::string GetValueLabel(const Core::Component &component) {
     if (const std::optional<std::string> &expression = component.GetValueExpression()) {
         return *expression;
     }
-    return Core::FormatValue(component.GetValue());
+    const std::string value = Core::FormatValue(component.GetValue());
+    if (const std::optional<double> tolerance = component.GetTolerance(); tolerance && Core::IsVaried(component)) {
+        return std::format("{} ±{}%", value, Core::FormatValue(*tolerance));
+    }
+    return value;
 }
 
 } // namespace GUI

@@ -38,6 +38,7 @@ public:
     std::optional<GridPoint> FindPointOfNode(int node) const;
     std::optional<std::string> GetNetName(int node) const;
     std::optional<int> FindNodeOfNet(std::string_view net) const;
+    const std::map<std::string, int, std::less<>> &GetNets() const;
     std::vector<GridPoint> GetPointsOfNode(int node) const;
     const std::vector<GridPoint> &GetJunctions() const;
 

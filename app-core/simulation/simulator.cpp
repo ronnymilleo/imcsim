@@ -131,17 +131,23 @@ TruthTableRun ConcludeTable(TruthTable table, TruthTableRun run, FirstFailure fa
 
 /**
  * @brief   Computes the DC operating point of a circuit with ngspice.
- * @param[in] circuit  Circuit to simulate; it needs a ground component, unless it holds only logic parts, logic inputs
- * and supply rails.
+ * @param[in] circuit    Circuit to simulate; it needs a ground component, unless it holds only logic parts, logic
+ *                       inputs and supply rails.
+ * @param[in] parameter  Value of the stepped parameter for this run, a part value or the temperature; none runs the
+ *                       circuit as it is.
  * @return  The node voltages or an error, plus every line ngspice printed. Warnings such as "singular matrix"
  *          can come with a successful result whose values are meaningless, so show the messages to the user.
  * @note    Not thread-safe: the backend in use may be a single global instance, as ngspice is.
  */
-OperatingPointRun RunOperatingPoint(const Circuit &circuit) {
+OperatingPointRun RunOperatingPoint(const Circuit &circuit, const std::optional<ParameterValue> &parameter) {
     if (const std::optional<std::string> error = FindProblem(circuit, std::nullopt, AnalysisKind::OPERATING_POINT)) {
         return {std::unexpected(*error), {}};
     }
-    return GetBackend().RunOperatingPoint(circuit);
+    const auto applied = ApplyParameter(circuit, parameter);
+    if (!applied) {
+        return {std::unexpected(applied.error()), {}};
+    }
+    return GetBackend().RunOperatingPoint(applied->Simulated, applied->Temperature);
 }
 
 /**
@@ -164,8 +170,11 @@ OperatingPointRun RunOperatingPoint(const Circuit &circuit) {
  */
 TransientRun RunTransient(const Circuit &circuit, const TransientSettings &settings,
                           const std::optional<ParameterValue> &parameter, const RunMonitor &monitor) {
-    if (const std::optional<std::string> error =
-            FindProblem(circuit, CheckTransientSettings(settings), AnalysisKind::TRANSIENT)) {
+    std::optional<std::string> settings_error = CheckTransientSettings(settings);
+    if (!settings_error) {
+        settings_error = CheckSourceSteps(circuit, settings);
+    }
+    if (const std::optional<std::string> error = FindProblem(circuit, settings_error, AnalysisKind::TRANSIENT)) {
         return {std::unexpected(*error), {}};
     }
     const auto applied = ApplyParameter(circuit, parameter);
@@ -261,6 +270,61 @@ TransferFunctionRun RunTransferFunction(const Circuit &circuit, const TransferFu
         return {std::unexpected(*error), {}};
     }
     return GetBackend().RunTransferFunction(circuit, settings);
+}
+
+/**
+ * @brief   Finds how much the DC voltage of a node changes with the value of each part of the circuit.
+ * @param[in] circuit   Circuit to simulate; it needs a ground component.
+ * @param[in] settings  Output node.
+ * @return  The sensitivity of every resistor, capacitor, inductor, source and potentiometer, and of every block by its
+ *          most influential element, or an error, plus every line ngspice printed. Invalid settings are rejected
+ *          before reaching the backend.
+ * @note    ngspice linearizes the circuit at its DC operating point, so a circuit driven only by AC sources reads zero.
+ *          Not thread-safe: the backend in use may be a single global instance, as ngspice is.
+ */
+SensitivityRun RunSensitivity(const Circuit &circuit, const SensitivitySettings &settings) {
+    if (const std::optional<std::string> error =
+            FindProblem(circuit, CheckSensitivitySettings(circuit, settings), AnalysisKind::SENSITIVITY)) {
+        return {std::unexpected(*error), {}};
+    }
+    return GetBackend().RunSensitivity(circuit, settings);
+}
+
+/**
+ * @brief   Finds the poles and zeros of the transfer function from an input source to the voltage of a node.
+ * @param[in] circuit   Circuit to simulate; it needs a ground component.
+ * @param[in] settings  Output node and input source.
+ * @return  The poles and zeros, with the natural frequency, quality factor and damping ratio of each, or an error, plus
+ *          every line ngspice printed. Invalid settings are rejected before reaching the backend.
+ * @note    The poles belong to the circuit linearized at its DC operating point, and only to the part of it between the
+ *          input and the output; a circuit with no capacitor or inductor between them has none. Not thread-safe: the
+ *          backend in use may be a single global instance, as ngspice is.
+ */
+PoleZeroRun RunPoleZero(const Circuit &circuit, const PoleZeroSettings &settings) {
+    if (const std::optional<std::string> error =
+            FindProblem(circuit, CheckPoleZeroSettings(circuit, settings), AnalysisKind::POLE_ZERO)) {
+        return {std::unexpected(*error), {}};
+    }
+    return GetBackend().RunPoleZero(circuit, settings);
+}
+
+/**
+ * @brief   Measures the scattering matrix of the ports of a circuit across frequency.
+ * @param[in] circuit   Circuit to simulate; it needs a ground component and at least two ports, which are the pin
+ *                      markers set as ports in the top-level schematic.
+ * @param[in] settings  Frequency range and points.
+ * @return  The S matrix at every frequency or an error, plus every line ngspice printed. Invalid settings, and fewer
+ *          than two ports, are rejected before reaching the backend, since ngspice stops for good on them.
+ * @note    The ports load the circuit through their reference impedance and hold their nodes at 0 V in DC, so a port
+ *          belongs behind a capacitor where the node has a bias. Not thread-safe: the backend in use may be a single
+ *          global instance, as ngspice is.
+ */
+SParametersRun RunSParameters(const Circuit &circuit, const SParameterSettings &settings) {
+    if (const std::optional<std::string> error =
+            FindProblem(circuit, CheckSParameterSettings(circuit, settings), AnalysisKind::S_PARAMETERS)) {
+        return {std::unexpected(*error), {}};
+    }
+    return GetBackend().RunSParameters(circuit, settings);
 }
 
 /**

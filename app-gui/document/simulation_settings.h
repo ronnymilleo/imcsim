@@ -8,6 +8,7 @@
 
 #include "analysis/parameter_step.h"
 #include "helpers.h"
+#include "simulation/monte_carlo.h"
 #include "simulation/simulator.h"
 #include <cstddef>
 #include <optional>
@@ -27,10 +28,13 @@ enum class Analysis {
     DC_SWEEP,
     NOISE,
     TRANSFER_FUNCTION,
+    SENSITIVITY,
+    POLE_ZERO,
+    S_PARAMETERS,
     TRUTH_TABLE
 };
 
-constexpr std::size_t ANALYSIS_COUNT = 7;
+constexpr std::size_t ANALYSIS_COUNT = 10;
 
 /// Wall seconds a live transient takes to cover its stop time, at first.
 constexpr double DEFAULT_LIVE_SECONDS = 10.0;
@@ -46,13 +50,15 @@ constexpr double LIVE_RUN_LIMIT_SECONDS = 3600.0;
 /**
  * @struct  SimulationSettings
  * @brief   Which analysis Run starts, and how each one runs: transient times, AC range, DC sweep sources and
- *          ranges, the input source and output node of the noise and transfer function analyses, and the logic
- *          inputs of the truth table, and how long a live transient lasts.
+ *          ranges, the input source and output node of the noise, transfer function and pole-zero analyses, the output
+ *          node of the sensitivity analysis, and the logic inputs of the truth table, and how long a live transient
+ *          lasts.
  * @details The operating point has no settings. A sweep, noise or transfer function source that is empty, or that
  *          left the circuit, is replaced by a default when the analysis runs, so the stored name is never rewritten
- *          behind the user. The noise and transfer function outputs are kept as points of their node, as the voltage
- *          probes are, since node numbers change with any edit; one that no longer lies on a node also falls back to
- *          a default. The truth table reads the voltages the schematic measures, so it keeps no outputs of its own.
+ *          behind the user. The noise, transfer function, pole-zero and sensitivity outputs are kept as points of their
+ * node, as the voltage probes are, since node numbers change with any edit; one that no longer lies on a node also
+ * falls back to a default. The truth table reads the voltages the schematic measures, so it keeps no outputs of its
+ * own.
  */
 struct SimulationSettings {
     Analysis Selected = Analysis::TRANSIENT;
@@ -69,10 +75,18 @@ struct SimulationSettings {
     std::optional<GridPoint> NoiseOutput;
     std::string TransferFunctionSource;
     std::optional<GridPoint> TransferFunctionOutput;
+    std::optional<GridPoint> SensitivityOutput;
+    std::string PoleZeroSource;
+    std::optional<GridPoint> PoleZeroOutput;
+    /// Frequency range of the S-parameter analysis; its ports are pin markers of the schematic, so it has no sources.
+    Core::SParameterSettings SParameters;
     /// Logic inputs the truth table varies; none listed, or none left in the circuit, means every logic input.
     std::vector<std::string> TruthTableInputs;
     /// Runs the transient, AC sweep or DC sweep once per value of a part or of the temperature.
     ParameterStepSettings ParameterStep;
+    /// Runs the transient, AC sweep or DC sweep once with the nominal values and then with values drawn within the
+    /// tolerances of the parts; the step and Monte Carlo are never both on.
+    Core::MonteCarloSettings MonteCarlo;
 
     bool operator==(const SimulationSettings &) const = default;
 };
@@ -82,6 +96,10 @@ const char *GetAnalysisName(Analysis analysis);
 
 // Live runs
 bool IsValidLiveSeconds(double seconds);
+
+// Run modes
+bool IsRepeatable(Analysis analysis);
+bool IsMonteCarloRun(const SimulationSettings &settings);
 
 } // namespace GUI
 

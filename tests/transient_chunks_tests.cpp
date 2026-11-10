@@ -16,7 +16,9 @@
 #include "document/examples.h"
 #include "document/schematic.h"
 #include "ngspice/ngspice_library.h"
+#include "simulation/circuit_checks.h"
 #include "simulation/live_change.h"
+#include "simulation/simulation_backend.h"
 #include "simulation/simulator.h"
 #include "test_printers.h"
 #include <algorithm>
@@ -212,16 +214,20 @@ TEST_CASE("A chunked transient follows the one-piece run, and the RC curve, away
 TEST_CASE("A chunked transient matches the one-piece run on every example", "[transient_chunks][examples]") {
     for (const GUI::Example &example : GUI::GetExamples()) {
         INFO(example.Title);
-        // The digital examples open everywhere, but run only where ngspice has the digital models
-        if (std::string_view(example.Group) == "Digital" && !Core::AreDigitalModelsAvailable()) {
-            continue;
-        }
         auto loaded = GUI::LoadExample(example);
         REQUIRE(loaded.has_value());
         GUI::Schematic schematic;
         schematic.Replace(std::move(loaded->Elements), std::move(loaded->Wires), std::move(loaded->Settings),
                           std::move(loaded->Subcircuits), std::move(loaded->Models));
         const Core::Circuit circuit = schematic.BuildCircuit();
+        // The examples with logic parts, loose or inside blocks, run only where ngspice has the digital models
+        if (Core::FindUnsupported(Core::GetBackend(), circuit, Core::AnalysisKind::TRANSIENT)) {
+            continue;
+        }
+        // The noise of a source changes on each run, so two runs of it never match
+        if (Core::FindFinestSignalStep(circuit)) {
+            continue;
+        }
         const Core::TransientSettings settings = schematic.GetSimulationSettings().Transient;
 
         const Core::TransientRun one_piece = Core::RunTransient(circuit, settings);

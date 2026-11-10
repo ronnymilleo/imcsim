@@ -5,6 +5,7 @@
 
 #include "editing/element_factory.h"
 
+#include "ui_elements/ui_behavioral_source.h"
 #include "ui_elements/ui_bjt.h"
 #include "ui_elements/ui_capacitor.h"
 #include "ui_elements/ui_clock.h"
@@ -12,15 +13,18 @@
 #include "ui_elements/ui_controlled_switch.h"
 #include "ui_elements/ui_current_source.h"
 #include "ui_elements/ui_diode.h"
+#include "ui_elements/ui_fuse.h"
 #include "ui_elements/ui_ground.h"
 #include "ui_elements/ui_inductor.h"
 #include "ui_elements/ui_logic_input.h"
+#include "ui_elements/ui_logic_output.h"
 #include "ui_elements/ui_logic_part.h"
 #include "ui_elements/ui_mosfet.h"
 #include "ui_elements/ui_net_label.h"
 #include "ui_elements/ui_op_amp.h"
 #include "ui_elements/ui_potentiometer.h"
 #include "ui_elements/ui_resistor.h"
+#include "ui_elements/ui_seven_segment.h"
 #include "ui_elements/ui_subcircuit.h"
 #include "ui_elements/ui_subcircuit_pin.h"
 #include "ui_elements/ui_switch.h"
@@ -64,6 +68,8 @@ constexpr auto PARTS = std::to_array<PartInfo>({
     {Core::ComponentType::VCCS, "VCCS (G)"},
     {Core::ComponentType::CCCS, "CCCS (F)"},
     {Core::ComponentType::CCVS, "CCVS (H)"},
+    {Core::ComponentType::BEHAVIORAL_VOLTAGE, "Behavioral voltage source (B)"},
+    {Core::ComponentType::BEHAVIORAL_CURRENT, "Behavioral current source (B)"},
     {Core::ComponentType::OP_AMP, "Op-amp"},
     {Core::ComponentType::NET_LABEL, "Net label"},
     {Core::ComponentType::PIN, "Block pin"},
@@ -72,6 +78,7 @@ constexpr auto PARTS = std::to_array<PartInfo>({
     {Core::ComponentType::PUSH_BUTTON, "Push button"},
     {Core::ComponentType::V_SWITCH, "Voltage-controlled switch"},
     {Core::ComponentType::RELAY, "Relay"},
+    {Core::ComponentType::FUSE, "Fuse"},
     {Core::ComponentType::TRANSFORMER, "Transformer"},
     {Core::ComponentType::AND, "AND gate"},
     {Core::ComponentType::OR, "OR gate"},
@@ -87,20 +94,9 @@ constexpr auto PARTS = std::to_array<PartInfo>({
     {Core::ComponentType::SR_FLIP_FLOP, "SR flip-flop"},
     {Core::ComponentType::CLOCK, "Clock"},
     {Core::ComponentType::LOGIC_INPUT, "Logic input"},
+    {Core::ComponentType::LOGIC_OUTPUT, "Logic output"},
+    {Core::ComponentType::SEVEN_SEGMENT, "7-segment display"},
 });
-
-/**
- * @brief   Lowercase letters and digits only, so "opamp" finds "Op-amp" and "vcc" finds "VCC supply".
- */
-std::string NormalizeSearchText(const std::string_view text) {
-    std::string normalized;
-    for (const char character : text) {
-        if (std::isalnum(static_cast<unsigned char>(character)) != 0) {
-            normalized += static_cast<char>(std::tolower(static_cast<unsigned char>(character)));
-        }
-    }
-    return normalized;
-}
 
 } // namespace
 
@@ -143,6 +139,9 @@ std::unique_ptr<UIElement> CreateElement(const Core::ComponentType type, const G
     case Core::ComponentType::CCCS:
     case Core::ComponentType::CCVS:
         return std::make_unique<UIControlledSource>(type, position, rotation);
+    case Core::ComponentType::BEHAVIORAL_VOLTAGE:
+    case Core::ComponentType::BEHAVIORAL_CURRENT:
+        return std::make_unique<UIBehavioralSource>(type, position, rotation);
     case Core::ComponentType::OP_AMP:
         return std::make_unique<UIOpAmp>(position, rotation);
     case Core::ComponentType::SUBCIRCUIT:
@@ -159,6 +158,8 @@ std::unique_ptr<UIElement> CreateElement(const Core::ComponentType type, const G
     case Core::ComponentType::V_SWITCH:
     case Core::ComponentType::RELAY:
         return std::make_unique<UIControlledSwitch>(type, position, rotation);
+    case Core::ComponentType::FUSE:
+        return std::make_unique<UIFuse>(position, rotation);
     case Core::ComponentType::TRANSFORMER:
         return std::make_unique<UITransformer>(position, rotation);
     case Core::ComponentType::AND:
@@ -178,6 +179,10 @@ std::unique_ptr<UIElement> CreateElement(const Core::ComponentType type, const G
         return std::make_unique<UIClock>(position, rotation);
     case Core::ComponentType::LOGIC_INPUT:
         return std::make_unique<UILogicInput>(position, rotation);
+    case Core::ComponentType::LOGIC_OUTPUT:
+        return std::make_unique<UILogicOutput>(position, rotation);
+    case Core::ComponentType::SEVEN_SEGMENT:
+        return std::make_unique<UISevenSegment>(position, rotation);
     }
     return nullptr;
 }
@@ -208,6 +213,21 @@ std::vector<Core::ComponentType> FindParts(const std::string_view query) {
         }
     }
     return found;
+}
+
+/**
+ * @brief   Reduces a name or a query to what a search compares.
+ * @param[in] text  A name or what the user typed.
+ * @return  Its letters and digits only, in lowercase, so "opamp" finds "Op-amp" and "vcc" finds "VCC supply".
+ */
+std::string NormalizeSearchText(const std::string_view text) {
+    std::string normalized;
+    for (const char character : text) {
+        if (std::isalnum(static_cast<unsigned char>(character)) != 0) {
+            normalized += static_cast<char>(std::tolower(static_cast<unsigned char>(character)));
+        }
+    }
+    return normalized;
 }
 
 } // namespace GUI

@@ -10,8 +10,11 @@
 #include "components/logic_input.h"
 #include "components/logic_part.h"
 #include "components/resistor.h"
+#include "components/subcircuit.h"
 #include "components/voltage_source.h"
+#include "model/subcircuit.h"
 #include <catch2/catch_test_macros.hpp>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -55,6 +58,21 @@ TEST_CASE("A circuit needs parts, and a ground unless it is only digital", "[cir
     digital.Add(input, {1});
     digital.Add(gate, {1, 2, 3});
     CHECK_FALSE(Core::CheckCircuit(digital).has_value());
+
+    // A block holding only logic parts counts as digital too, but not one with a resistor inside
+    auto logic_block = std::make_shared<Core::SubcircuitDefinition>();
+    logic_block->Name = "logic";
+    logic_block->Pins = {{"A", 1}, {"Y", 3}};
+    logic_block->Body.Add(gate, {1, 2, 3});
+    Core::SubcircuitInstance instance("logic", {"A", "Y"});
+    instance.SetName("X1");
+    Core::Circuit with_block;
+    with_block.Add(input, {1});
+    with_block.Add(instance, {1, 2});
+    with_block.AddSubcircuit(logic_block);
+    CHECK_FALSE(Core::CheckCircuit(with_block).has_value());
+    logic_block->Body.Add(valid.Load, {3, 0});
+    CHECK(Core::CheckCircuit(with_block).value_or("").contains("no ground"));
 }
 
 TEST_CASE("Transient settings need a positive span and step, and not too many points", "[circuit_checks]") {
@@ -63,6 +81,66 @@ TEST_CASE("Transient settings need a positive span and step, and not too many po
     CHECK(Core::CheckTransientSettings({.StopTime = 1e-3, .TimeStep = 0.0}).has_value());
     CHECK(Core::CheckTransientSettings({.StopTime = 1e-3, .TimeStep = 2e-3}).value_or("").contains("longer"));
     CHECK(Core::CheckTransientSettings({.StopTime = 1.0, .TimeStep = 1e-9}).value_or("").contains("too small"));
+}
+
+TEST_CASE("A noise with a negative step is refused before any backend sees it", "[circuit_checks]") {
+    SourceAndResistor setup;
+    setup.Source.SetSourceType(Core::VoltageSource::SourceType::NOISE);
+    setup.Source.SetNoise({.WhiteAmplitude = 1e-3, .TimeStep = 10e-6});
+    CHECK_FALSE(Core::CheckCircuit(setup.Circuit).has_value());
+
+    // ngspice never returns from a negative noise step, and it runs inside this process
+    Core::NoiseParameters negative = setup.Source.GetNoise();
+    negative.TimeStep = -10e-6;
+    setup.Source.SetNoise(negative);
+    CHECK(Core::CheckCircuit(setup.Circuit).value_or("").contains("Vin1"));
+
+    // The same holds for a source inside a block
+    Core::VoltageSource inside = setup.Source;
+    auto block = std::make_shared<Core::SubcircuitDefinition>();
+    block->Name = "noisy";
+    block->Pins = {{"A", 1}};
+    block->Body.Add(inside, {1, 0});
+    Core::SubcircuitInstance instance("noisy", {"A"});
+    instance.SetName("X1");
+    Core::Circuit with_block;
+    with_block.Add(setup.Load, {1, 0});
+    with_block.Add(setup.Reference, {0});
+    with_block.Add(instance, {1});
+    with_block.AddSubcircuit(block);
+    CHECK(Core::CheckCircuit(with_block).value_or("").contains("noise"));
+}
+
+TEST_CASE("Random values with a step that is not positive are refused", "[circuit_checks]") {
+    SourceAndResistor setup;
+    setup.Source.SetSourceType(Core::VoltageSource::SourceType::RANDOM);
+    setup.Source.SetRandom({.TimeStep = 0.0});
+    CHECK(Core::CheckCircuit(setup.Circuit).value_or("").contains("random"));
+    setup.Source.SetRandom({.TimeStep = 1e-6});
+    CHECK_FALSE(Core::CheckCircuit(setup.Circuit).has_value());
+}
+
+TEST_CASE("The finest step of the noise and random sources counts in the points of a transient", "[circuit_checks]") {
+    SourceAndResistor setup;
+    const Core::TransientSettings settings{.StopTime = 1.0, .TimeStep = 1e-3};
+    CHECK_FALSE(Core::FindFinestSignalStep(setup.Circuit));
+    CHECK_FALSE(Core::CheckSourceSteps(setup.Circuit, settings).has_value());
+
+    // A million points over the stop time is the limit; the time step alone is far from it
+    setup.Source.SetSourceType(Core::VoltageSource::SourceType::NOISE);
+    setup.Source.SetNoise({.WhiteAmplitude = 1e-3, .TimeStep = 1e-6});
+    CHECK(Core::FindFinestSignalStep(setup.Circuit) == 1e-6);
+    CHECK_FALSE(Core::CheckSourceSteps(setup.Circuit, settings).has_value());
+    setup.Source.SetNoise({.WhiteAmplitude = 1e-3, .TimeStep = 0.5e-6});
+    CHECK(Core::CheckSourceSteps(setup.Circuit, settings).value_or("").contains("too small"));
+
+    // A second source with a coarser step does not hide the finer one
+    Core::VoltageSource coarse;
+    coarse.SetName("Vin2");
+    coarse.SetSourceType(Core::VoltageSource::SourceType::RANDOM);
+    coarse.SetRandom({.TimeStep = 1e-3});
+    setup.Circuit.Add(coarse, {2, 0});
+    CHECK(Core::FindFinestSignalStep(setup.Circuit) == 0.5e-6);
 }
 
 TEST_CASE("An AC sweep needs a frequency range and an AC source", "[circuit_checks]") {

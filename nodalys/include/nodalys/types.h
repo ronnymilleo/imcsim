@@ -40,6 +40,9 @@ struct DiodeParameters {
     double JunctionPotential = 1.0;
     double GradingCoefficient = 0.5;
     double TransitTime = 0.0;
+    // Maximum ratings
+    double MaxForwardCurrent = 0.2;
+    double MaxPower = 0.5;
 
     bool operator==(const DiodeParameters &) const = default;
 };
@@ -230,6 +233,7 @@ struct BoyleOpAmpParameters {
     double PositiveHeadroom = 1.0;
     double NegativeHeadroom = 1.0;
     double SupplyCurrent = 1.7e-3;
+    double InputOffsetVoltage = 0.0;
 
     bool operator==(const BoyleOpAmpParameters &) const = default;
 };

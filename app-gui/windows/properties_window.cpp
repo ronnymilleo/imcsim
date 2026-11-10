@@ -5,18 +5,25 @@
 
 #include "windows/properties_window.h"
 
+#include "imgui.h"
+
 namespace GUI {
 
 /**
- * @brief   Creates the window, closed until the View menu opens it.
+ * @brief   Creates the window, open beside Output in the default layout.
  * @param[in] editor  Part editor shared with the editor popover; it must outlive the window.
  */
 PropertiesWindow::PropertiesWindow(PartEditor &editor) : AppWindow("Properties", true), m_Editor(editor) {
-    SetOpen(false);
 }
 
+/**
+ * @brief   Draws the part editor with its notes wrapped at the edge, since the column is narrow and a note cut off
+ *          would lose its end.
+ */
 void PropertiesWindow::Draw() {
+    ImGui::PushTextWrapPos(0.0f);
     m_Editor.Draw();
+    ImGui::PopTextWrapPos();
 }
 
 } // namespace GUI

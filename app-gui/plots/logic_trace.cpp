@@ -6,13 +6,65 @@
 #include "plots/logic_trace.h"
 
 #include "components/logic_part.h"
+#include "components/subcircuit.h"
+#include "model/subcircuit.h"
 #include <algorithm>
 #include <cmath>
 #include <limits>
 #include <map>
+#include <string>
 #include <utility>
 
 namespace GUI {
+
+namespace {
+
+/**
+ * @brief   The logic level of every node of a body that a logic part is connected to, directly or through a block.
+ * @param[in] body        The circuit or the body of a definition.
+ * @param[in] circuit     The whole circuit, which holds every definition.
+ * @param[in] open_names  Definitions being looked into, so a block that held itself could not recurse forever.
+ * @return  The largest logic level on each such node, ground left out.
+ */
+std::map<int, double> FindLogicLevels(const Core::Circuit &body, const Core::Circuit &circuit,
+                                      std::vector<std::string> open_names) {
+    std::map<int, double> levels;
+    const auto raise = [&levels](const int node, const double level) {
+        if (node != 0) {
+            levels[node] = std::max(levels[node], level);
+        }
+    };
+    for (const Core::CircuitEntry &entry : body.GetEntries()) {
+        const Core::ComponentType type = entry.Part->GetType();
+        if (Core::IsLogicPart(type)) {
+            const double level = static_cast<const Core::LogicPart &>(*entry.Part).GetParameters().LogicLevel;
+            for (const int node : entry.Nodes) {
+                raise(node, level);
+            }
+            continue;
+        }
+        if (type != Core::ComponentType::SUBCIRCUIT) {
+            continue;
+        }
+        const std::string &name = static_cast<const Core::SubcircuitInstance &>(*entry.Part).GetDefinitionName();
+        const auto definition = circuit.FindSubcircuit(name);
+        if (!definition || definition->Spice || std::ranges::contains(open_names, name)) {
+            continue;
+        }
+        open_names.push_back(name);
+        const std::map<int, double> inside = FindLogicLevels(definition->Body, circuit, open_names);
+        open_names.pop_back();
+        // The nodes of an instance follow the pins of its definition
+        for (std::size_t pin = 0; pin < std::min(definition->Pins.size(), entry.Nodes.size()); ++pin) {
+            if (const auto found = inside.find(definition->Pins[pin].Node); found != inside.end()) {
+                raise(entry.Nodes[pin], found->second);
+            }
+        }
+    }
+    return levels;
+}
+
+} // namespace
 
 /**
  * @brief   Reads the logic state of a voltage, with the thresholds of the logic parts.
@@ -76,26 +128,15 @@ std::vector<double> BuildLane(const std::vector<double> &voltages, const double 
 }
 
 /**
- * @brief   Finds the nodes that gates and flip-flops are connected to, which are logic signals.
+ * @brief   Finds the nodes that gates and flip-flops are connected to, which are logic signals, including the pins of
+ *          blocks that reach one inside, at any depth.
  * @param[in] circuit  Circuit of a simulation.
  * @return  One entry per node, in node order and without ground, with the largest logic level among the logic parts
  *          on it.
  */
 std::vector<LogicNode> FindLogicNodes(const Core::Circuit &circuit) {
-    std::map<int, double> levels;
-    for (const Core::CircuitEntry &entry : circuit.GetEntries()) {
-        if (!Core::IsLogicPart(entry.Part->GetType())) {
-            continue;
-        }
-        const double level = static_cast<const Core::LogicPart &>(*entry.Part).GetParameters().LogicLevel;
-        for (const int node : entry.Nodes) {
-            if (node != 0) {
-                levels[node] = std::max(levels[node], level);
-            }
-        }
-    }
     std::vector<LogicNode> nodes;
-    for (const auto &[node, level] : levels) {
+    for (const auto &[node, level] : FindLogicLevels(circuit, circuit, {})) {
         nodes.push_back({.Node = node, .LogicLevel = level});
     }
     return nodes;

@@ -5,6 +5,7 @@
 
 #include "components/logic_part.h"
 #include "test_printers.h"
+#include "ui_elements/ui_behavioral_source.h"
 #include "ui_elements/ui_bjt.h"
 #include "ui_elements/ui_controlled_source.h"
 #include "ui_elements/ui_controlled_switch.h"
@@ -192,6 +193,19 @@ TEST_CASE("Controlled sources have their output vertical and their control pins 
     CHECK_FALSE(cccs.Contains({-1.5f, 0.0f}));
 }
 
+TEST_CASE("A behavioral source has its + on top and its - below, and labels what it drives", "[ui_element]") {
+    GUI::UIBehavioralSource source(Core::ComponentType::BEHAVIORAL_VOLTAGE, {0, 0}, GUI::Rotation::R0);
+    CHECK(source.GetTerminals() == std::vector<GUI::GridPoint>{{0, -2}, {0, 2}});
+    CHECK(source.Contains({0.0f, 0.0f}));
+    auto &component = static_cast<Core::BehavioralSource &>(source.GetComponent());
+    CHECK(GUI::FormatBehavioralLabel(component) == "V=1");
+    // A long expression is cut after 24 characters, which the part editor shows whole
+    component.SetExpression("V(IN)*V(LO)*0.5 + 1m*tanh(V(IN))");
+    CHECK(GUI::FormatBehavioralLabel(component) == "V=V(IN)*V(LO)*0.5 + 1m*tan\xE2\x80\xA6");
+    const GUI::UIBehavioralSource current(Core::ComponentType::BEHAVIORAL_CURRENT, {0, 0}, GUI::Rotation::R0);
+    CHECK(GUI::FormatBehavioralLabel(static_cast<const Core::BehavioralSource &>(current.GetComponent())) == "I=1m");
+}
+
 TEST_CASE("A potentiometer has its two ends on the sides and its wiper above, turning with it", "[ui_element]") {
     GUI::UIPotentiometer pot({5, 5}, GUI::Rotation::R0);
     CHECK(pot.GetComponent().GetType() == Core::ComponentType::POTENTIOMETER);
@@ -321,6 +335,20 @@ TEST_CASE("A part inside a block that follows a parameter shows the parameter as
     Core::Component &component = resistor.GetComponent();
     component.SetValue(4700.0);
     CHECK(GUI::GetValueLabel(component) == "4.7k");
+    component.SetValueExpression("{RTOP}");
+    CHECK(GUI::GetValueLabel(component) == "{RTOP}");
+}
+
+TEST_CASE("A part that Monte Carlo varies shows its tolerance beside its value", "[ui_element]") {
+    GUI::UIResistor resistor({0, 0}, GUI::Rotation::R0);
+    Core::Component &component = resistor.GetComponent();
+    component.SetValue(1000.0);
+    CHECK(GUI::GetValueLabel(component) == "1k");
+    component.SetTolerance(5.0);
+    CHECK(GUI::GetValueLabel(component) == "1k ±5%");
+    component.SetTolerance(2.5);
+    CHECK(GUI::GetValueLabel(component) == "1k ±2.5%");
+    // Inside a block the part follows a parameter and is not varied
     component.SetValueExpression("{RTOP}");
     CHECK(GUI::GetValueLabel(component) == "{RTOP}");
 }

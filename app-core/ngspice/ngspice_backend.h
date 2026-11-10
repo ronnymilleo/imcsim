@@ -22,7 +22,8 @@ public:
     std::string_view GetName() const override;
     const BackendCapabilities &GetCapabilities() const override;
 
-    OperatingPointRun RunOperatingPoint(const Circuit &circuit) override;
+    OperatingPointRun RunOperatingPoint(const Circuit &circuit,
+                                        const std::optional<double> &temperature_celsius = std::nullopt) override;
     TransientRun RunTransient(const Circuit &circuit, const TransientSettings &settings,
                               const std::optional<double> &temperature_celsius, const RunMonitor &monitor) override;
     ACSweepRun RunACSweep(const Circuit &circuit, const ACSweepSettings &settings,
@@ -31,6 +32,9 @@ public:
                           const std::optional<double> &temperature_celsius) override;
     NoiseRun RunNoise(const Circuit &circuit, const NoiseSettings &settings) override;
     TransferFunctionRun RunTransferFunction(const Circuit &circuit, const TransferFunctionSettings &settings) override;
+    SensitivityRun RunSensitivity(const Circuit &circuit, const SensitivitySettings &settings) override;
+    PoleZeroRun RunPoleZero(const Circuit &circuit, const PoleZeroSettings &settings) override;
+    SParametersRun RunSParameters(const Circuit &circuit, const SParameterSettings &settings) override;
 
 private:
     /// Works the capabilities out once, on first use, by whichever thread asks first, since they are known only after

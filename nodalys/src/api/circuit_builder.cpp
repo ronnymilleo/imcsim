@@ -552,12 +552,21 @@ public:
             const DiodeParameters dm1{.SaturationCurrent = 1e-20};
             const DiodeParameters dm3{.SaturationCurrent = 1e-16};
 
+            int u_inp_actual = u_inp;
+            if (params.InputOffsetVoltage != 0.0) {
+                const int n_vos = AllocateInternalNode();
+                AddDevice(std::make_unique<VoltageSourceDevice>(
+                    n_vos, u_inp, AllocateBranch(), params.InputOffsetVoltage,
+                    MakeDcWaveform(params.InputOffsetVoltage)));
+                u_inp_actual = n_vos;
+            }
+
             // 1. Differential Input Stage
             const std::size_t first_device = m_Compiled.Devices.size();
             AddDevice(std::make_unique<ResistorDevice>(u_vcc, n_col1, v.CollectorResistance));
             AddDevice(std::make_unique<ResistorDevice>(u_vcc, n_col2, v.CollectorResistance));
             AddDevice(std::make_unique<BjtDevice>(n_col1, u_inm, n_emit1, -1, -1, -1, pair, false));
-            AddDevice(std::make_unique<BjtDevice>(n_col2, u_inp, n_emit2, -1, -1, -1, pair, false));
+            AddDevice(std::make_unique<BjtDevice>(n_col2, u_inp_actual, n_emit2, -1, -1, -1, pair, false));
             AddDevice(std::make_unique<CapacitorDevice>(n_col1, n_col2, v.CollectorCapacitance, 0.0, false));
             AddDevice(std::make_unique<ResistorDevice>(n_emit1, n_tail, v.EmitterResistance));
             AddDevice(std::make_unique<ResistorDevice>(n_emit2, n_tail, v.EmitterResistance));

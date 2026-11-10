@@ -19,8 +19,9 @@ namespace GUI {
 
 /**
  * @enum    WireColoring
- * @brief   What the colors of wires (and, by current and power, of parts) show.
- * @details Voltage, Current and Power color by the state on display, on a heat scale with a legend.
+ * @brief   What the colors of wires (and, by current, power and sensitivity, of parts) show.
+ * @details Voltage, Current and Power color by the state on display, on a heat scale with a legend. Sensitivity colors
+ *          the parts by their influence on the output of the last sensitivity analysis, and leaves the wires plain.
  */
 enum class WireColoring {
     PLAIN,
@@ -28,6 +29,7 @@ enum class WireColoring {
     VOLTAGE,
     CURRENT,
     POWER,
+    SENSITIVITY,
     COUNT
 };
 
@@ -40,10 +42,21 @@ enum class LiveEffect {
     CURRENT_FLOW,
     LED_GLOW,
     HEAT_GLOW,
+    /// Lights the box of a logic input that is high and of a logic output that reads 1.
+    LOGIC_LIGHTS,
+    /// A short burst of rays at the instant a fuse blows.
+    FUSE,
     COUNT
 };
 
 constexpr std::size_t NUMBER_OF_LIVE_EFFECTS = static_cast<std::size_t>(LiveEffect::COUNT);
+
+/// The effects a new user gets: all off but the fuse flash, which marks an event that is easy to miss otherwise.
+constexpr std::array<bool, NUMBER_OF_LIVE_EFFECTS> DEFAULT_LIVE_EFFECTS = [] {
+    std::array<bool, NUMBER_OF_LIVE_EFFECTS> effects = {};
+    effects[static_cast<std::size_t>(LiveEffect::FUSE)] = true;
+    return effects;
+}();
 
 /// How long an edit must settle before the analysis runs again by itself: long enough for a burst of edits to run once,
 /// short enough to feel like it follows them.
@@ -69,8 +82,8 @@ struct Preferences {
 
     /// Schematic while showing results.
     WireColoring WireColors = WireColoring::PLAIN;
-    /// By enum value, each on its own; all off until asked for.
-    std::array<bool, NUMBER_OF_LIVE_EFFECTS> LiveEffects = {};
+    /// By enum value, each on its own; all off until asked for but the fuse flash.
+    std::array<bool, NUMBER_OF_LIVE_EFFECTS> LiveEffects = DEFAULT_LIVE_EFFECTS;
 
     /// Parts: resistors, capacitors and inductors take the nearest value of the series.
     Core::ValueSeries ValueSeries = Core::ValueSeries::FREE;

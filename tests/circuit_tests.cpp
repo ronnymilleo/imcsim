@@ -26,7 +26,9 @@
 #include "model/circuit.h"
 #include "simulation/simulator.h"
 #include <catch2/catch_test_macros.hpp>
+#include <format>
 #include <string>
+#include <utility>
 #include <vector>
 
 TEST_CASE("Circuit counts nodes including ground", "[circuit]") {
@@ -213,6 +215,82 @@ TEST_CASE("ToSpiceNetlist writes the piecewise linear points from its first valu
                                       ".end\n");
 }
 
+TEST_CASE("ToSpiceNetlist writes a noise with its offset and every part that is on", "[circuit]") {
+    Core::VoltageSource source;
+    source.SetName("Vn1");
+    source.SetSourceType(Core::VoltageSource::SourceType::NOISE);
+    source.SetNoise({.Offset = 2.0,
+                     .WhiteAmplitude = 1e-3,
+                     .TimeStep = 10e-6,
+                     .FlickerExponent = 1.0,
+                     .FlickerAmplitude = 2e-3,
+                     .TelegraphAmplitude = 5e-3,
+                     .CaptureTime = 1e-3,
+                     .EmissionTime = 3e-3});
+
+    Core::Circuit circuit;
+    circuit.Add(source, {1, 0});
+
+    CHECK(circuit.ToSpiceNetlist() == "* imcsim netlist\n"
+                                      "Vn1 1 0 DC 2 TRNOISE(1m 10u 1 2m 5m 1m 3m)\n"
+                                      ".end\n");
+}
+
+TEST_CASE("ToSpiceNetlist writes 0 for the noise parts that are off, and no step without white or 1/f noise",
+          "[circuit]") {
+    Core::CurrentSource source;
+    source.SetName("In1");
+    source.SetSourceType(Core::CurrentSource::SourceType::NOISE);
+    // Only white noise: the exponent, the 1/f amplitude and the telegraph times stay out
+    source.SetNoise({.WhiteAmplitude = 1e-6, .TimeStep = 1e-6, .FlickerExponent = 1.5, .CaptureTime = 2e-3});
+    Core::Circuit white;
+    white.Add(source, {0, 3});
+    CHECK(white.ToSpiceNetlist() == "* imcsim netlist\n"
+                                    "In1 0 3 DC 0 TRNOISE(1u 1u 0 0 0 0 0)\n"
+                                    ".end\n");
+
+    // Only the telegraph signal: ngspice reads it with no step, and a step would only add points
+    source.SetNoise({.WhiteAmplitude = 0.0, .TimeStep = 1e-6, .TelegraphAmplitude = 1e-6});
+    Core::Circuit telegraph;
+    telegraph.Add(source, {0, 3});
+    CHECK(telegraph.ToSpiceNetlist() == "* imcsim netlist\n"
+                                        "In1 0 3 DC 0 TRNOISE(0 0 0 0 1u 1m 1m)\n"
+                                        ".end\n");
+
+    source.SetNoise({.WhiteAmplitude = 0.0});
+    Core::Circuit off;
+    off.Add(source, {0, 3});
+    CHECK(off.ToSpiceNetlist() == "* imcsim netlist\n"
+                                  "In1 0 3 DC 0 TRNOISE(0 0 0 0 0 0 0)\n"
+                                  ".end\n");
+}
+
+TEST_CASE("ToSpiceNetlist writes random values with the type number of the distribution and the offset as the DC value",
+          "[circuit]") {
+    Core::VoltageSource source;
+    source.SetName("Vr1");
+    source.SetSourceType(Core::VoltageSource::SourceType::RANDOM);
+    source.SetRandom({.Distribution = Core::RandomDistribution::UNIFORM,
+                      .TimeStep = 100e-6,
+                      .Delay = 1e-3,
+                      .First = 0.5,
+                      .Second = 2.0});
+    Core::Circuit circuit;
+    circuit.Add(source, {1, 0});
+    CHECK(circuit.ToSpiceNetlist() == "* imcsim netlist\n"
+                                      "Vr1 1 0 DC 2 TRRANDOM(1 100u 1m 500m 0)\n"
+                                      ".end\n");
+
+    for (const auto &[distribution, number] :
+         {std::pair{Core::RandomDistribution::GAUSSIAN, 2}, std::pair{Core::RandomDistribution::EXPONENTIAL, 3},
+          std::pair{Core::RandomDistribution::POISSON, 4}}) {
+        source.SetRandom({.Distribution = distribution, .TimeStep = 1e-6, .Delay = 0.0, .First = 1.0, .Second = 0.0});
+        Core::Circuit other;
+        other.Add(source, {1, 0});
+        CHECK(other.ToSpiceNetlist().contains(std::format("TRRANDOM({} 1u 0 1 0)", number)));
+    }
+}
+
 TEST_CASE("ToSpiceNetlist writes a current source like a voltage source, under its own name", "[circuit]") {
     Core::CurrentSource source;
     source.SetName("I1");
@@ -327,7 +405,7 @@ TEST_CASE("ToSpiceNetlist writes diodes from anode to cathode and each model onc
                                            "D3 1 0 DLEDRED\n"
                                            ".model D1N4148 D(IS=2.52e-09 N=1.752 RS=0.568 BV=100 IBV=0.0001 "
                                            "CJO=4e-12 VJ=1 M=0.4 TT=2e-08)\n"
-                                           ".model DLEDRED D(IS=3.3e-17 N=2 RS=2 BV=5 IBV=1e-05 CJO=4e-11 VJ=1 M=0.5 "
+                                           ".model DLEDRED D(IS=1.255e-17 N=2 RS=2 BV=5 IBV=1e-05 CJO=4e-11 VJ=1 M=0.5 "
                                            "TT=0)\n"
                                            ".op\n"
                                            ".end\n");

@@ -244,6 +244,40 @@ TEST_CASE("Simulation results are dropped when the circuit changes", "[schematic
     }
 }
 
+TEST_CASE("A stepped operating point shows the selected step, and a change or a single run drops the steps",
+          "[schematic]") {
+    GUI::Schematic schematic;
+    schematic.AddWire({0, 0}, {4, 0});
+    GUI::StepFamily<Core::OperatingPoint> steps{.Parameter = "R1",
+                                                .Unit = "Ohm",
+                                                .Values = {1e3, 2e3, 3e3},
+                                                .Results = {{{0.0, 1.0}}, {{0.0, 2.0}}, {{0.0, 3.0}}},
+                                                .Selected = 0};
+    schematic.SetOperatingPointSteps(steps);
+    REQUIRE(schematic.GetOperatingPoint());
+    CHECK(schematic.GetOperatingPoint()->NodeVoltages[1] == 1.0);
+
+    // Picking a step shows it, as the result of the analysis, with a new version so the schematic redraws it
+    const std::size_t version = schematic.GetOperatingPointVersion();
+    schematic.SelectOperatingPointStep(2);
+    CHECK(schematic.GetOperatingPoint()->NodeVoltages[1] == 3.0);
+    CHECK(schematic.GetOperatingPointSteps()->Selected == 2);
+    CHECK(schematic.GetOperatingPointVersion() != version);
+    // A step out of range is ignored
+    schematic.SelectOperatingPointStep(7);
+    CHECK(schematic.GetOperatingPoint()->NodeVoltages[1] == 3.0);
+
+    SECTION("a single run replaces the steps") {
+        schematic.SetOperatingPoint(Core::OperatingPoint{{0.0, 5.0}});
+        CHECK_FALSE(schematic.GetOperatingPointSteps());
+    }
+    SECTION("an edit of the circuit drops them") {
+        schematic.MarkModified();
+        CHECK_FALSE(schematic.GetOperatingPointSteps());
+        CHECK_FALSE(schematic.GetOperatingPoint());
+    }
+}
+
 TEST_CASE("Selecting does not drop simulation results", "[schematic]") {
     GUI::Schematic schematic;
     schematic.AddElement(MakeResistor({0, 0}));

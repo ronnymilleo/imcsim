@@ -13,50 +13,79 @@ add_executable(imcsim-tests
             circuit_checks_tests.cpp
             circuit_copy_tests.cpp
             circuit_snapshot_tests.cpp
+            behavioral_expression_tests.cpp
+            block_nesting_tests.cpp
+            canvas_view_tests.cpp
             clipboard_tests.cpp
             code_models.cpp
             circuit_tests.cpp
             component_tests.cpp
             connectivity_tests.cpp
+            editor_mode_tests.cpp
             element_factory_tests.cpp
             current_flow_tests.cpp
+            dock_layout_tests.cpp
             examples_tests.cpp
+            fuse_tests.cpp
             group_editing_tests.cpp
             heat_glow_tests.cpp
             helpers_tests.cpp
             led_glow_tests.cpp
             live_change_tests.cpp
             live_input_tests.cpp
+            logic_bus_tests.cpp
+            logic_outputs_tests.cpp
             logic_trace_tests.cpp
             math_channel_tests.cpp
-            native_backend_tests.cpp
+            backend_comparison_tests.cpp
             controlled_sources_tests.cpp
+            monte_carlo_results_tests.cpp
+            monte_carlo_tests.cpp
+            native_backend_tests.cpp
             nonlinear_tests.cpp
             op_amp_tests.cpp
-            backend_comparison_tests.cpp
             switches_tests.cpp
             parameter_step_tests.cpp
+            part_catalog_tests.cpp
+            part_names_tests.cpp
             playback_tests.cpp
+            plot_tab_tests.cpp
             plot_export_tests.cpp
+            plot_figures_tests.cpp
             plot_helpers_tests.cpp
             point_window_tests.cpp
+            pole_zero_tests.cpp
+            pole_zero_view_tests.cpp
             preferences_tests.cpp
             probing_tests.cpp
+            readout_placement_tests.cpp
+            s_parameter_view_tests.cpp
+            s_parameters_tests.cpp
             schematic_canvas_tests.cpp
+            ready_blocks_tests.cpp
             schematic_file_tests.cpp
             schematic_tests.cpp
             selection_tests.cpp
+            seven_segment_tests.cpp
+            sensitivity_tests.cpp
+            sensitivity_view_tests.cpp
             simulation_backend_tests.cpp
             simulation_service_tests.cpp
             simulator_tests.cpp
+            smith_chart_tests.cpp
             spectrum_tests.cpp
+            statistics_table_tests.cpp
             spice_import_tests.cpp
+            spice_inclusions_tests.cpp
             spice_library_tests.cpp
             spice_value_tests.cpp
             standard_values_tests.cpp
             stepped_circuit_tests.cpp
             subcircuit_tests.cpp
             svg_writer_tests.cpp
+            text_fitting_tests.cpp
+            theme_contrast_tests.cpp
+            touchstone_tests.cpp
             trace_fit_state_tests.cpp
             transient_chunks_tests.cpp
             transient_window_tests.cpp
@@ -66,9 +95,10 @@ add_executable(imcsim-tests
             ui_element_tests.cpp
             ui_wire_tests.cpp
             wire_editing_tests.cpp
+            nodalys_benchmark_tests.cpp
             nodalys_parser_and_export_tests.cpp
             nodalys_smooth_logic_tests.cpp
-            nodalys_benchmark_tests.cpp
+            wire_routing_tests.cpp
 )
 
 target_include_directories(imcsim-tests

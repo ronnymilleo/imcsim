@@ -1,0 +1,1444 @@
+{
+ "format": "imcsim-schematic",
+ "version": 1,
+ "elements": [
+  {
+   "type": "Subcircuit",
+   "definition": "COUNTER_8BIT",
+   "name": "X1",
+   "rotation": 0,
+   "x": 12,
+   "y": 0
+  },
+  {
+   "type": "Clock",
+   "name": "V1",
+   "rotation": 270,
+   "x": 5,
+   "y": -1,
+   "parameters": {
+    "duty_cycle": 0.5,
+    "frequency": 1000,
+    "logic_level": 5.0,
+    "start_delay": 0.0005
+   }
+  },
+  {
+   "type": "LogicInput",
+   "name": "V2",
+   "rotation": 270,
+   "x": 5,
+   "y": 3,
+   "high": false,
+   "parameters": {
+    "logic_level": 5.0
+   }
+  },
+  {
+   "type": "NetLabel",
+   "net": "Q0",
+   "rotation": 90,
+   "x": 20,
+   "y": -7
+  },
+  {
+   "type": "NetLabel",
+   "net": "Q1",
+   "rotation": 90,
+   "x": 20,
+   "y": -5
+  },
+  {
+   "type": "NetLabel",
+   "net": "Q2",
+   "rotation": 90,
+   "x": 20,
+   "y": -3
+  },
+  {
+   "type": "NetLabel",
+   "net": "Q3",
+   "rotation": 90,
+   "x": 20,
+   "y": -1
+  },
+  {
+   "type": "NetLabel",
+   "net": "Q4",
+   "rotation": 90,
+   "x": 20,
+   "y": 1
+  },
+  {
+   "type": "NetLabel",
+   "net": "Q5",
+   "rotation": 90,
+   "x": 20,
+   "y": 3
+  },
+  {
+   "type": "NetLabel",
+   "net": "Q6",
+   "rotation": 90,
+   "x": 20,
+   "y": 5
+  },
+  {
+   "type": "NetLabel",
+   "net": "Q7",
+   "rotation": 90,
+   "x": 20,
+   "y": 7
+  }
+ ],
+ "wires": [
+  {
+   "start": [
+    5,
+    -1
+   ],
+   "end": [
+    9,
+    -1
+   ]
+  },
+  {
+   "start": [
+    5,
+    3
+   ],
+   "end": [
+    7,
+    3
+   ]
+  },
+  {
+   "start": [
+    7,
+    3
+   ],
+   "end": [
+    7,
+    1
+   ]
+  },
+  {
+   "start": [
+    7,
+    1
+   ],
+   "end": [
+    9,
+    1
+   ]
+  },
+  {
+   "start": [
+    15,
+    -7
+   ],
+   "end": [
+    20,
+    -7
+   ]
+  },
+  {
+   "start": [
+    15,
+    -5
+   ],
+   "end": [
+    20,
+    -5
+   ]
+  },
+  {
+   "start": [
+    15,
+    -3
+   ],
+   "end": [
+    20,
+    -3
+   ]
+  },
+  {
+   "start": [
+    15,
+    -1
+   ],
+   "end": [
+    20,
+    -1
+   ]
+  },
+  {
+   "start": [
+    15,
+    1
+   ],
+   "end": [
+    20,
+    1
+   ]
+  },
+  {
+   "start": [
+    15,
+    3
+   ],
+   "end": [
+    20,
+    3
+   ]
+  },
+  {
+   "start": [
+    15,
+    5
+   ],
+   "end": [
+    20,
+    5
+   ]
+  },
+  {
+   "start": [
+    15,
+    7
+   ],
+   "end": [
+    20,
+    7
+   ]
+  }
+ ],
+ "subcircuits": [
+  {
+   "name": "COUNTER_4BIT",
+   "parameters": [],
+   "pins": [
+    {
+     "name": "CLK",
+     "point": [
+      0,
+      -2
+     ]
+    },
+    {
+     "name": "RESET",
+     "point": [
+      0,
+      2
+     ]
+    },
+    {
+     "name": "Q0",
+     "point": [
+      78,
+      -3
+     ]
+    },
+    {
+     "name": "Q1",
+     "point": [
+      78,
+      -1
+     ]
+    },
+    {
+     "name": "Q2",
+     "point": [
+      78,
+      1
+     ]
+    },
+    {
+     "name": "Q3",
+     "point": [
+      78,
+      3
+     ]
+    }
+   ],
+   "wires": [
+    {
+     "start": [
+      0,
+      -2
+     ],
+     "end": [
+      1,
+      -2
+     ]
+    },
+    {
+     "start": [
+      0,
+      2
+     ],
+     "end": [
+      1,
+      2
+     ]
+    },
+    {
+     "start": [
+      9,
+      -1
+     ],
+     "end": [
+      8,
+      -1
+     ]
+    },
+    {
+     "start": [
+      9,
+      1
+     ],
+     "end": [
+      8,
+      1
+     ]
+    },
+    {
+     "start": [
+      12,
+      3
+     ],
+     "end": [
+      12,
+      4
+     ]
+    },
+    {
+     "start": [
+      15,
+      -1
+     ],
+     "end": [
+      16,
+      -1
+     ]
+    },
+    {
+     "start": [
+      15,
+      1
+     ],
+     "end": [
+      16,
+      1
+     ]
+    },
+    {
+     "start": [
+      27,
+      -1
+     ],
+     "end": [
+      26,
+      -1
+     ]
+    },
+    {
+     "start": [
+      27,
+      1
+     ],
+     "end": [
+      26,
+      1
+     ]
+    },
+    {
+     "start": [
+      30,
+      3
+     ],
+     "end": [
+      30,
+      4
+     ]
+    },
+    {
+     "start": [
+      33,
+      -1
+     ],
+     "end": [
+      34,
+      -1
+     ]
+    },
+    {
+     "start": [
+      33,
+      1
+     ],
+     "end": [
+      34,
+      1
+     ]
+    },
+    {
+     "start": [
+      45,
+      -1
+     ],
+     "end": [
+      44,
+      -1
+     ]
+    },
+    {
+     "start": [
+      45,
+      1
+     ],
+     "end": [
+      44,
+      1
+     ]
+    },
+    {
+     "start": [
+      48,
+      3
+     ],
+     "end": [
+      48,
+      4
+     ]
+    },
+    {
+     "start": [
+      51,
+      -1
+     ],
+     "end": [
+      52,
+      -1
+     ]
+    },
+    {
+     "start": [
+      51,
+      1
+     ],
+     "end": [
+      52,
+      1
+     ]
+    },
+    {
+     "start": [
+      63,
+      -1
+     ],
+     "end": [
+      62,
+      -1
+     ]
+    },
+    {
+     "start": [
+      63,
+      1
+     ],
+     "end": [
+      62,
+      1
+     ]
+    },
+    {
+     "start": [
+      66,
+      3
+     ],
+     "end": [
+      66,
+      4
+     ]
+    },
+    {
+     "start": [
+      69,
+      -1
+     ],
+     "end": [
+      70,
+      -1
+     ]
+    },
+    {
+     "start": [
+      69,
+      1
+     ],
+     "end": [
+      70,
+      1
+     ]
+    },
+    {
+     "start": [
+      78,
+      -3
+     ],
+     "end": [
+      77,
+      -3
+     ]
+    },
+    {
+     "start": [
+      78,
+      -1
+     ],
+     "end": [
+      77,
+      -1
+     ]
+    },
+    {
+     "start": [
+      78,
+      1
+     ],
+     "end": [
+      77,
+      1
+     ]
+    },
+    {
+     "start": [
+      78,
+      3
+     ],
+     "end": [
+      77,
+      3
+     ]
+    }
+   ],
+   "elements": [
+    {
+     "type": "Pin",
+     "net": "CLK",
+     "rotation": 0,
+     "x": 0,
+     "y": -2
+    },
+    {
+     "type": "NetLabel",
+     "net": "CLK",
+     "rotation": 90,
+     "x": 1,
+     "y": -2
+    },
+    {
+     "type": "Pin",
+     "net": "RESET",
+     "rotation": 0,
+     "x": 0,
+     "y": 2
+    },
+    {
+     "type": "NetLabel",
+     "net": "RESET",
+     "rotation": 90,
+     "x": 1,
+     "y": 2
+    },
+    {
+     "type": "DFlipFlop",
+     "name": "U1",
+     "rotation": 0,
+     "x": 12,
+     "y": 0,
+     "parameters": {
+      "logic_level": 5.0,
+      "propagation_delay": 1e-08
+     }
+    },
+    {
+     "type": "NetLabel",
+     "net": "QN0",
+     "rotation": 270,
+     "x": 8,
+     "y": -1
+    },
+    {
+     "type": "NetLabel",
+     "net": "CLK",
+     "rotation": 270,
+     "x": 8,
+     "y": 1
+    },
+    {
+     "type": "NetLabel",
+     "net": "RESET",
+     "rotation": 180,
+     "x": 12,
+     "y": 4
+    },
+    {
+     "type": "NetLabel",
+     "net": "Q0",
+     "rotation": 90,
+     "x": 16,
+     "y": -1
+    },
+    {
+     "type": "NetLabel",
+     "net": "QN0",
+     "rotation": 90,
+     "x": 16,
+     "y": 1
+    },
+    {
+     "type": "DFlipFlop",
+     "name": "U2",
+     "rotation": 0,
+     "x": 30,
+     "y": 0,
+     "parameters": {
+      "logic_level": 5.0,
+      "propagation_delay": 1e-08
+     }
+    },
+    {
+     "type": "NetLabel",
+     "net": "QN1",
+     "rotation": 270,
+     "x": 26,
+     "y": -1
+    },
+    {
+     "type": "NetLabel",
+     "net": "QN0",
+     "rotation": 270,
+     "x": 26,
+     "y": 1
+    },
+    {
+     "type": "NetLabel",
+     "net": "RESET",
+     "rotation": 180,
+     "x": 30,
+     "y": 4
+    },
+    {
+     "type": "NetLabel",
+     "net": "Q1",
+     "rotation": 90,
+     "x": 34,
+     "y": -1
+    },
+    {
+     "type": "NetLabel",
+     "net": "QN1",
+     "rotation": 90,
+     "x": 34,
+     "y": 1
+    },
+    {
+     "type": "DFlipFlop",
+     "name": "U3",
+     "rotation": 0,
+     "x": 48,
+     "y": 0,
+     "parameters": {
+      "logic_level": 5.0,
+      "propagation_delay": 1e-08
+     }
+    },
+    {
+     "type": "NetLabel",
+     "net": "QN2",
+     "rotation": 270,
+     "x": 44,
+     "y": -1
+    },
+    {
+     "type": "NetLabel",
+     "net": "QN1",
+     "rotation": 270,
+     "x": 44,
+     "y": 1
+    },
+    {
+     "type": "NetLabel",
+     "net": "RESET",
+     "rotation": 180,
+     "x": 48,
+     "y": 4
+    },
+    {
+     "type": "NetLabel",
+     "net": "Q2",
+     "rotation": 90,
+     "x": 52,
+     "y": -1
+    },
+    {
+     "type": "NetLabel",
+     "net": "QN2",
+     "rotation": 90,
+     "x": 52,
+     "y": 1
+    },
+    {
+     "type": "DFlipFlop",
+     "name": "U4",
+     "rotation": 0,
+     "x": 66,
+     "y": 0,
+     "parameters": {
+      "logic_level": 5.0,
+      "propagation_delay": 1e-08
+     }
+    },
+    {
+     "type": "NetLabel",
+     "net": "QN3",
+     "rotation": 270,
+     "x": 62,
+     "y": -1
+    },
+    {
+     "type": "NetLabel",
+     "net": "QN2",
+     "rotation": 270,
+     "x": 62,
+     "y": 1
+    },
+    {
+     "type": "NetLabel",
+     "net": "RESET",
+     "rotation": 180,
+     "x": 66,
+     "y": 4
+    },
+    {
+     "type": "NetLabel",
+     "net": "Q3",
+     "rotation": 90,
+     "x": 70,
+     "y": -1
+    },
+    {
+     "type": "NetLabel",
+     "net": "QN3",
+     "rotation": 90,
+     "x": 70,
+     "y": 1
+    },
+    {
+     "type": "Pin",
+     "net": "Q0",
+     "rotation": 180,
+     "x": 78,
+     "y": -3
+    },
+    {
+     "type": "NetLabel",
+     "net": "Q0",
+     "rotation": 270,
+     "x": 77,
+     "y": -3
+    },
+    {
+     "type": "Pin",
+     "net": "Q1",
+     "rotation": 180,
+     "x": 78,
+     "y": -1
+    },
+    {
+     "type": "NetLabel",
+     "net": "Q1",
+     "rotation": 270,
+     "x": 77,
+     "y": -1
+    },
+    {
+     "type": "Pin",
+     "net": "Q2",
+     "rotation": 180,
+     "x": 78,
+     "y": 1
+    },
+    {
+     "type": "NetLabel",
+     "net": "Q2",
+     "rotation": 270,
+     "x": 77,
+     "y": 1
+    },
+    {
+     "type": "Pin",
+     "net": "Q3",
+     "rotation": 180,
+     "x": 78,
+     "y": 3
+    },
+    {
+     "type": "NetLabel",
+     "net": "Q3",
+     "rotation": 270,
+     "x": 77,
+     "y": 3
+    }
+   ]
+  },
+  {
+   "name": "COUNTER_8BIT",
+   "parameters": [],
+   "pins": [
+    {
+     "name": "CLK",
+     "point": [
+      -14,
+      0
+     ]
+    },
+    {
+     "name": "RESET",
+     "point": [
+      -14,
+      2
+     ]
+    },
+    {
+     "name": "Q0",
+     "point": [
+      14,
+      0
+     ]
+    },
+    {
+     "name": "Q1",
+     "point": [
+      14,
+      2
+     ]
+    },
+    {
+     "name": "Q2",
+     "point": [
+      14,
+      4
+     ]
+    },
+    {
+     "name": "Q3",
+     "point": [
+      14,
+      6
+     ]
+    },
+    {
+     "name": "Q4",
+     "point": [
+      14,
+      8
+     ]
+    },
+    {
+     "name": "Q5",
+     "point": [
+      14,
+      10
+     ]
+    },
+    {
+     "name": "Q6",
+     "point": [
+      14,
+      12
+     ]
+    },
+    {
+     "name": "Q7",
+     "point": [
+      14,
+      14
+     ]
+    }
+   ],
+   "wires": [
+    {
+     "start": [
+      -3,
+      -1
+     ],
+     "end": [
+      -5,
+      -1
+     ]
+    },
+    {
+     "start": [
+      -3,
+      1
+     ],
+     "end": [
+      -5,
+      1
+     ]
+    },
+    {
+     "start": [
+      -3,
+      13
+     ],
+     "end": [
+      -5,
+      13
+     ]
+    },
+    {
+     "start": [
+      -3,
+      15
+     ],
+     "end": [
+      -5,
+      15
+     ]
+    },
+    {
+     "start": [
+      3,
+      -3
+     ],
+     "end": [
+      5,
+      -3
+     ]
+    },
+    {
+     "start": [
+      3,
+      11
+     ],
+     "end": [
+      5,
+      11
+     ]
+    },
+    {
+     "start": [
+      3,
+      -1
+     ],
+     "end": [
+      5,
+      -1
+     ]
+    },
+    {
+     "start": [
+      3,
+      13
+     ],
+     "end": [
+      5,
+      13
+     ]
+    },
+    {
+     "start": [
+      3,
+      1
+     ],
+     "end": [
+      5,
+      1
+     ]
+    },
+    {
+     "start": [
+      3,
+      15
+     ],
+     "end": [
+      5,
+      15
+     ]
+    },
+    {
+     "start": [
+      3,
+      3
+     ],
+     "end": [
+      5,
+      3
+     ]
+    },
+    {
+     "start": [
+      3,
+      17
+     ],
+     "end": [
+      5,
+      17
+     ]
+    },
+    {
+     "start": [
+      -3,
+      26
+     ],
+     "end": [
+      -4,
+      26
+     ]
+    },
+    {
+     "start": [
+      3,
+      26
+     ],
+     "end": [
+      4,
+      26
+     ]
+    },
+    {
+     "start": [
+      -14,
+      0
+     ],
+     "end": [
+      -13,
+      0
+     ]
+    },
+    {
+     "start": [
+      -14,
+      2
+     ],
+     "end": [
+      -13,
+      2
+     ]
+    },
+    {
+     "start": [
+      14,
+      0
+     ],
+     "end": [
+      13,
+      0
+     ]
+    },
+    {
+     "start": [
+      14,
+      2
+     ],
+     "end": [
+      13,
+      2
+     ]
+    },
+    {
+     "start": [
+      14,
+      4
+     ],
+     "end": [
+      13,
+      4
+     ]
+    },
+    {
+     "start": [
+      14,
+      6
+     ],
+     "end": [
+      13,
+      6
+     ]
+    },
+    {
+     "start": [
+      14,
+      8
+     ],
+     "end": [
+      13,
+      8
+     ]
+    },
+    {
+     "start": [
+      14,
+      10
+     ],
+     "end": [
+      13,
+      10
+     ]
+    },
+    {
+     "start": [
+      14,
+      12
+     ],
+     "end": [
+      13,
+      12
+     ]
+    },
+    {
+     "start": [
+      14,
+      14
+     ],
+     "end": [
+      13,
+      14
+     ]
+    }
+   ],
+   "elements": [
+    {
+     "type": "Subcircuit",
+     "definition": "COUNTER_4BIT",
+     "name": "X1",
+     "rotation": 0,
+     "x": 0,
+     "y": 0
+    },
+    {
+     "type": "Subcircuit",
+     "definition": "COUNTER_4BIT",
+     "name": "X2",
+     "rotation": 0,
+     "x": 0,
+     "y": 14
+    },
+    {
+     "type": "NetLabel",
+     "net": "CLK",
+     "rotation": 270,
+     "x": -5,
+     "y": -1
+    },
+    {
+     "type": "NetLabel",
+     "net": "RESET",
+     "rotation": 270,
+     "x": -5,
+     "y": 1
+    },
+    {
+     "type": "NetLabel",
+     "net": "CARRY",
+     "rotation": 270,
+     "x": -5,
+     "y": 13
+    },
+    {
+     "type": "NetLabel",
+     "net": "RESET",
+     "rotation": 270,
+     "x": -5,
+     "y": 15
+    },
+    {
+     "type": "NetLabel",
+     "net": "Q0",
+     "rotation": 90,
+     "x": 5,
+     "y": -3
+    },
+    {
+     "type": "NetLabel",
+     "net": "Q4",
+     "rotation": 90,
+     "x": 5,
+     "y": 11
+    },
+    {
+     "type": "NetLabel",
+     "net": "Q1",
+     "rotation": 90,
+     "x": 5,
+     "y": -1
+    },
+    {
+     "type": "NetLabel",
+     "net": "Q5",
+     "rotation": 90,
+     "x": 5,
+     "y": 13
+    },
+    {
+     "type": "NetLabel",
+     "net": "Q2",
+     "rotation": 90,
+     "x": 5,
+     "y": 1
+    },
+    {
+     "type": "NetLabel",
+     "net": "Q6",
+     "rotation": 90,
+     "x": 5,
+     "y": 15
+    },
+    {
+     "type": "NetLabel",
+     "net": "Q3",
+     "rotation": 90,
+     "x": 5,
+     "y": 3
+    },
+    {
+     "type": "NetLabel",
+     "net": "Q7",
+     "rotation": 90,
+     "x": 5,
+     "y": 17
+    },
+    {
+     "type": "Not",
+     "name": "U1",
+     "rotation": 0,
+     "x": 0,
+     "y": 26,
+     "parameters": {
+      "logic_level": 5.0,
+      "propagation_delay": 1e-08
+     }
+    },
+    {
+     "type": "NetLabel",
+     "net": "Q3",
+     "rotation": 270,
+     "x": -4,
+     "y": 26
+    },
+    {
+     "type": "NetLabel",
+     "net": "CARRY",
+     "rotation": 90,
+     "x": 4,
+     "y": 26
+    },
+    {
+     "type": "Pin",
+     "net": "CLK",
+     "rotation": 0,
+     "x": -14,
+     "y": 0
+    },
+    {
+     "type": "NetLabel",
+     "net": "CLK",
+     "rotation": 90,
+     "x": -13,
+     "y": 0
+    },
+    {
+     "type": "Pin",
+     "net": "RESET",
+     "rotation": 0,
+     "x": -14,
+     "y": 2
+    },
+    {
+     "type": "NetLabel",
+     "net": "RESET",
+     "rotation": 90,
+     "x": -13,
+     "y": 2
+    },
+    {
+     "type": "Pin",
+     "net": "Q0",
+     "rotation": 180,
+     "x": 14,
+     "y": 0
+    },
+    {
+     "type": "NetLabel",
+     "net": "Q0",
+     "rotation": 270,
+     "x": 13,
+     "y": 0
+    },
+    {
+     "type": "Pin",
+     "net": "Q1",
+     "rotation": 180,
+     "x": 14,
+     "y": 2
+    },
+    {
+     "type": "NetLabel",
+     "net": "Q1",
+     "rotation": 270,
+     "x": 13,
+     "y": 2
+    },
+    {
+     "type": "Pin",
+     "net": "Q2",
+     "rotation": 180,
+     "x": 14,
+     "y": 4
+    },
+    {
+     "type": "NetLabel",
+     "net": "Q2",
+     "rotation": 270,
+     "x": 13,
+     "y": 4
+    },
+    {
+     "type": "Pin",
+     "net": "Q3",
+     "rotation": 180,
+     "x": 14,
+     "y": 6
+    },
+    {
+     "type": "NetLabel",
+     "net": "Q3",
+     "rotation": 270,
+     "x": 13,
+     "y": 6
+    },
+    {
+     "type": "Pin",
+     "net": "Q4",
+     "rotation": 180,
+     "x": 14,
+     "y": 8
+    },
+    {
+     "type": "NetLabel",
+     "net": "Q4",
+     "rotation": 270,
+     "x": 13,
+     "y": 8
+    },
+    {
+     "type": "Pin",
+     "net": "Q5",
+     "rotation": 180,
+     "x": 14,
+     "y": 10
+    },
+    {
+     "type": "NetLabel",
+     "net": "Q5",
+     "rotation": 270,
+     "x": 13,
+     "y": 10
+    },
+    {
+     "type": "Pin",
+     "net": "Q6",
+     "rotation": 180,
+     "x": 14,
+     "y": 12
+    },
+    {
+     "type": "NetLabel",
+     "net": "Q6",
+     "rotation": 270,
+     "x": 13,
+     "y": 12
+    },
+    {
+     "type": "Pin",
+     "net": "Q7",
+     "rotation": 180,
+     "x": 14,
+     "y": 14
+    },
+    {
+     "type": "NetLabel",
+     "net": "Q7",
+     "rotation": 270,
+     "x": 13,
+     "y": 14
+    }
+   ]
+  }
+ ],
+ "measurements": {
+  "voltages": [
+   [
+    15,
+    -7
+   ],
+   [
+    15,
+    -5
+   ],
+   [
+    15,
+    -3
+   ],
+   [
+    15,
+    -1
+   ],
+   [
+    15,
+    1
+   ],
+   [
+    15,
+    3
+   ],
+   [
+    15,
+    5
+   ],
+   [
+    15,
+    7
+   ]
+  ],
+  "currents": [],
+  "buses": [
+   {
+    "name": "COUNT",
+    "shown": true,
+    "bits": [
+     "V(Q7)",
+     "V(Q6)",
+     "V(Q5)",
+     "V(Q4)",
+     "V(Q3)",
+     "V(Q2)",
+     "V(Q1)",
+     "V(Q0)"
+    ],
+    "format": "hex"
+   }
+  ]
+ },
+ "simulation": {
+  "analysis": "transient",
+  "transient": {
+   "step": 1e-05,
+   "stop": 0.04
+  }
+ }
+}

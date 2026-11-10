@@ -30,6 +30,9 @@ struct AutoRerunFrame {
     bool HasRunToFollow = false;
     /// A field is being typed in or something is being dragged, so the edit is not over yet.
     bool IsEditing = false;
+    /// The next run would be a Monte Carlo analysis, which can take up to a thousand runs, so it is never started by an
+    /// edit; the user starts it with Run.
+    bool IsMonteCarlo = false;
     /// A run is in progress or ending, or the next run would be a live one, which follows edits by itself.
     bool IsRunBlocked = false;
 };

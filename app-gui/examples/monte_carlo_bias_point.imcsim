@@ -1,0 +1,30 @@
+{
+  "format": "imcsim-schematic",
+  "version": 1,
+  "elements": [
+    {"type": "VCC", "rotation": 0, "x": 6, "y": 4, "value": 12, "name": "V1"},
+    {"type": "Resistor", "rotation": 90, "x": 10, "y": 12, "value": 51000, "tolerance": 5.0, "name": "R1"},
+    {"type": "Resistor", "rotation": 90, "x": 10, "y": 24, "value": 10000, "tolerance": 5.0, "name": "R2"},
+    {"type": "Resistor", "rotation": 90, "x": 15, "y": 10, "value": 4700, "tolerance": 5.0, "name": "R3"},
+    {"type": "NPN", "rotation": 0, "x": 14, "y": 18, "model": "2N3904", "name": "Q1"},
+    {"type": "Resistor", "rotation": 90, "x": 15, "y": 23, "value": 1000, "tolerance": 5.0, "name": "R4"},
+    {"type": "Ground", "rotation": 0, "x": 10, "y": 28},
+    {"type": "Ground", "rotation": 0, "x": 15, "y": 27}
+  ],
+  "wires": [
+    {"start": [6, 4], "end": [15, 4]},
+    {"start": [10, 10], "end": [10, 4]},
+    {"start": [15, 8], "end": [15, 4]},
+    {"start": [10, 14], "end": [10, 22]},
+    {"start": [10, 18], "end": [12, 18]},
+    {"start": [15, 12], "end": [15, 16]},
+    {"start": [15, 20], "end": [15, 21]},
+    {"start": [15, 25], "end": [15, 27]},
+    {"start": [10, 26], "end": [10, 28]}
+  ],
+  "measurements": {"voltages": [[10, 14], [15, 12], [15, 20]], "currents": ["Q1.C"]},
+  "simulation": {
+    "analysis": "operating_point",
+    "monte_carlo": {"enabled": true, "runs": 200, "distribution": "gaussian", "seed": 20261107}
+  }
+}

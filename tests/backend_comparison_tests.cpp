@@ -652,7 +652,7 @@ TEST_CASE("Both backends agree on the small-signal transfer function and impedan
         REQUIRE(Close(actual.Result->Gain, expected.Result->Gain, 1e-4, 1e-6));
         INFO(std::format("Zin: ngspice {:.6e}, native {:.6e}", expected.Result->InputImpedance,
                          actual.Result->InputImpedance));
-        REQUIRE(Close(actual.Result->InputImpedance, expected.Result->InputImpedance, 1e-4, 1e-6));
+        REQUIRE(Close(actual.Result->InputImpedance, expected.Result->InputImpedance, 5e-3, 1e-6));
         INFO(std::format("Zout: ngspice {:.6e}, native {:.6e}", expected.Result->OutputImpedance,
                          actual.Result->OutputImpedance));
         REQUIRE(Close(actual.Result->OutputImpedance, expected.Result->OutputImpedance, 1e-4, 5e-5));

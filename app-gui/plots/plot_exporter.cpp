@@ -8,6 +8,7 @@
 #include "document/schematic_file.h"
 #include "drawing/theme.h"
 #include "imgui.h"
+#include "plots/touchstone.h"
 #include <algorithm>
 #include <array>
 #include <expected>
@@ -25,6 +26,9 @@ constexpr float EXPORT_SIZE_WIDTH = 7.0f;
 // Must stay valid until the dialog callback runs, so they live for the whole program
 constexpr std::array<SDL_DialogFileFilter, 1> SVG_FILTERS = {{{"SVG image", "svg"}}};
 constexpr std::array<SDL_DialogFileFilter, 1> CSV_FILTERS = {{{"CSV table", "csv"}}};
+/// Touchstone files take the number of ports in their extension, so the filter lists the usual ones.
+constexpr std::array<SDL_DialogFileFilter, 1> TOUCHSTONE_FILTERS = {
+    {{"Touchstone file", "s1p;s2p;s3p;s4p;s5p;s6p;s7p;s8p;s9p"}}};
 
 std::string GetExtension(const ExportFormat format) {
     return format == ExportFormat::SVG ? ".svg" : ".csv";
@@ -116,7 +120,9 @@ void PlotExporter::Start(ExportFigure figure, const ExportFormat format,
         return;
     }
     m_PendingFigure = std::move(figure);
+    m_PendingText.reset();
     m_PendingFormat = format;
+    m_PendingExtension = GetExtension(format);
     const std::string stem = schematic_path ? schematic_path->stem().string() : "circuit";
     const std::string file_name = std::format("{}-{}{}", stem, file_suffix, GetExtension(format));
     const std::filesystem::path location =
@@ -126,6 +132,52 @@ void PlotExporter::Start(ExportFigure figure, const ExportFormat format,
     } else {
         m_Dialog.ShowSave(CSV_FILTERS, location.string());
     }
+}
+
+/**
+ * @brief   Asks where to save a CSV table that is not a plot, such as the runs of a Monte Carlo analysis.
+ * @param[in] csv             The table, already written.
+ * @param[in] schematic_path  File the schematic was saved to, which names the table and sets the folder; none for an
+ *                            untitled one.
+ * @param[in] file_suffix     Added to the schematic's name.
+ */
+void PlotExporter::StartText(std::string csv, const std::optional<std::filesystem::path> &schematic_path,
+                             const std::string &file_suffix) {
+    if (m_Dialog.IsPending()) {
+        return;
+    }
+    m_PendingText = std::move(csv);
+    m_PendingFormat = ExportFormat::CSV;
+    m_PendingExtension = GetExtension(ExportFormat::CSV);
+    const std::string stem = schematic_path ? schematic_path->stem().string() : "circuit";
+    const std::string file_name = std::format("{}-{}.csv", stem, file_suffix);
+    const std::filesystem::path location =
+        schematic_path ? schematic_path->parent_path() / file_name : std::filesystem::path(file_name);
+    m_Dialog.ShowSave(CSV_FILTERS, location.string());
+}
+
+/**
+ * @brief   Asks where to save the Touchstone file of an S-parameter result.
+ * @param[in] text            The file, already written.
+ * @param[in] port_count      Ports of the result, which the extension counts (.s2p for two).
+ * @param[in] schematic_path  File the schematic was saved to, which names the file and sets the folder; none for an
+ *                            untitled one.
+ * @param[in] file_suffix     Added to the schematic's name.
+ */
+void PlotExporter::StartTouchstone(std::string text, const int port_count,
+                                   const std::optional<std::filesystem::path> &schematic_path,
+                                   const std::string &file_suffix) {
+    if (m_Dialog.IsPending()) {
+        return;
+    }
+    m_PendingText = std::move(text);
+    m_PendingFigure.reset();
+    m_PendingExtension = GetTouchstoneExtension(port_count);
+    const std::string stem = schematic_path ? schematic_path->stem().string() : "circuit";
+    const std::string file_name = std::format("{}-{}{}", stem, file_suffix, m_PendingExtension);
+    const std::filesystem::path location =
+        schematic_path ? schematic_path->parent_path() / file_name : std::filesystem::path(file_name);
+    m_Dialog.ShowSave(TOUCHSTONE_FILTERS, location.string());
 }
 
 /**
@@ -139,16 +191,20 @@ void PlotExporter::Update() {
         return;
     }
     const std::optional<ExportFigure> figure = std::exchange(m_PendingFigure, std::nullopt);
-    if (!*result || !figure) {
+    std::optional<std::string> pending_text = std::exchange(m_PendingText, std::nullopt);
+    if (!*result || (!figure && !pending_text)) {
         return;
     }
     std::filesystem::path path = **result;
-    const std::string extension = GetExtension(m_PendingFormat);
-    if (path.extension() != extension) {
-        path += extension;
+    if (path.extension() != m_PendingExtension) {
+        path += m_PendingExtension;
     }
-    std::expected<std::string, std::string> text =
-        m_PendingFormat == ExportFormat::SVG ? RenderSvg(*figure, m_Style) : RenderCsv(*figure);
+    std::expected<std::string, std::string> text = std::string();
+    if (pending_text) {
+        text = std::move(*pending_text);
+    } else {
+        text = m_PendingFormat == ExportFormat::SVG ? RenderSvg(*figure, m_Style) : RenderCsv(*figure);
+    }
     std::expected<void, std::string> written =
         text ? WriteTextFile(path, *text) : std::expected<void, std::string>(std::unexpected(text.error()));
     if (!written) {

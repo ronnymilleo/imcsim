@@ -59,6 +59,19 @@ void CanvasView::FrameIfRequested(Schematic &schematic, const ImVec2 canvas_size
 }
 
 /**
+ * @brief   Keeps the point at the middle of the canvas in place when the canvas changes size, so the circuit stays in
+ *          view when Output opens beside the schematic or a dock is dragged.
+ * @param[in] canvas_size  Size of the canvas this frame, in pixels.
+ * @note    Call once per frame, before FrameIfRequested(), so a framing works on the new size.
+ */
+void CanvasView::FollowCanvasSize(const ImVec2 canvas_size) {
+    if (m_CanvasSize) {
+        m_Pan += (canvas_size - *m_CanvasSize) * 0.5f;
+    }
+    m_CanvasSize = canvas_size;
+}
+
+/**
  * @brief   Pans while the middle button drags the canvas, and zooms with the wheel around the point under the cursor.
  * @param[in] origin   Top left corner of the canvas on screen.
  * @param[in] hovered  Whether the mouse is over the canvas.

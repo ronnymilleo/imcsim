@@ -4,6 +4,7 @@
 
 add_library(imcsim-core-lib
         STATIC
+            components/behavioral_source.cpp
             components/bjt.cpp
             components/capacitor.cpp
             components/clock.cpp
@@ -11,9 +12,11 @@ add_library(imcsim-core-lib
             components/controlled_source.cpp
             components/current_source.cpp
             components/diode.cpp
+            components/fuse.cpp
             components/ground.cpp
             components/inductor.cpp
             components/logic_input.cpp
+            components/logic_output.cpp
             components/logic_part.cpp
             components/mosfet.cpp
             components/net_label.cpp
@@ -21,6 +24,7 @@ add_library(imcsim-core-lib
             components/potentiometer.cpp
             components/relay.cpp
             components/resistor.cpp
+            components/seven_segment.cpp
             components/source.cpp
             components/subcircuit.cpp
             components/subcircuit_pin.cpp
@@ -40,15 +44,23 @@ add_library(imcsim-core-lib
             simulation/analysis_suggestions.cpp
             simulation/circuit_checks.cpp
             simulation/circuit_copy.cpp
+            simulation/fuse_state.cpp
             simulation/live_change.cpp
+            simulation/monte_carlo.cpp
+            simulation/pole_zero.cpp
             simulation/ratings.cpp
             simulation/run_control.cpp
+            simulation/s_parameters.cpp
+            simulation/sensitivity.cpp
             simulation/simulation_backend.cpp
             simulation/simulation_results.cpp
             simulation/simulation_service.cpp
             simulation/simulator.cpp
             simulation/stepped_circuit.cpp
+            spice/behavioral_expression.cpp
+            spice/spice_inclusions.cpp
             spice/spice_library.cpp
+            spice/spice_text.cpp
             spice/spice_value.cpp
             spice/standard_values.cpp
 )

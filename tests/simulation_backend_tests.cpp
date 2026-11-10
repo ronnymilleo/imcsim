@@ -34,8 +34,10 @@ public:
     std::string_view GetName() const override { return "fake"; }
     const Core::BackendCapabilities &GetCapabilities() const override { return m_Capabilities; }
 
-    Core::OperatingPointRun RunOperatingPoint(const Core::Circuit &circuit) override {
+    Core::OperatingPointRun RunOperatingPoint(const Core::Circuit &circuit,
+                                              const std::optional<double> &temperature_celsius) override {
         ++OperatingPointRuns;
+        RecordRun(circuit, temperature_celsius);
         // Node 2 follows the first logic input of the circuit, as the output of a buffer would
         Core::OperatingPoint point;
         point.NodeVoltages.assign(static_cast<std::size_t>(circuit.GetNodeCount()), 0.0);
@@ -52,14 +54,7 @@ public:
                                     const std::optional<double> &temperature_celsius,
                                     const Core::RunMonitor &) override {
         LastTransientSettings = settings;
-        LastTemperatureCelsius = temperature_celsius;
-        // The circuit of a stepped run is gone after the call, so only what the tests compare is kept
-        LastParts.clear();
-        LastValues.clear();
-        for (const Core::CircuitEntry &entry : circuit.GetEntries()) {
-            LastParts.push_back(entry.Part);
-            LastValues.push_back(entry.Part->GetValue());
-        }
+        RecordRun(circuit, temperature_celsius);
         return {Core::Transient{.Times = {0.0}, .NodeVoltages = {}, .Currents = {}, .Warnings = {}}, {}};
     }
 
@@ -82,6 +77,18 @@ public:
         return {std::unexpected("not run by the fake"), {}};
     }
 
+    Core::SensitivityRun RunSensitivity(const Core::Circuit &, const Core::SensitivitySettings &) override {
+        return {std::unexpected("not run by the fake"), {}};
+    }
+
+    Core::PoleZeroRun RunPoleZero(const Core::Circuit &, const Core::PoleZeroSettings &) override {
+        return {std::unexpected("not run by the fake"), {}};
+    }
+
+    Core::SParametersRun RunSParameters(const Core::Circuit &, const Core::SParameterSettings &) override {
+        return {std::unexpected("not run by the fake"), {}};
+    }
+
     int OperatingPointRuns = 0;
     std::optional<Core::TransientSettings> LastTransientSettings;
     std::optional<double> LastTemperatureCelsius;
@@ -90,6 +97,19 @@ public:
 
 private:
     Core::BackendCapabilities m_Capabilities;
+
+    /**
+     * @brief   The circuit of a stepped run is gone after the call, so only what the tests compare is kept.
+     */
+    void RecordRun(const Core::Circuit &circuit, const std::optional<double> &temperature_celsius) {
+        LastTemperatureCelsius = temperature_celsius;
+        LastParts.clear();
+        LastValues.clear();
+        for (const Core::CircuitEntry &entry : circuit.GetEntries()) {
+            LastParts.push_back(entry.Part);
+            LastValues.push_back(entry.Part->GetValue());
+        }
+    }
 };
 
 /// Puts a fake backend in use for one test and goes back to ngspice at the end.
@@ -226,6 +246,28 @@ TEST_CASE("A stepped temperature and a stepped part reach the backend through th
     CHECK_FALSE(missing.Result.has_value());
 }
 
+TEST_CASE("A stepped operating point reaches the backend with its temperature or its part at the step value",
+          "[simulation_backend]") {
+    BackendInUse backend(AllAnalysesWithoutLogicParts());
+    const SourceAndResistor setup;
+
+    CHECK(Core::RunOperatingPoint(setup.Circuit, Core::ParameterValue{.Part = "", .Value = -40.0}).Result.has_value());
+    CHECK((*backend).LastTemperatureCelsius == -40.0);
+    CHECK((*backend).LastParts[1] == &setup.Load);
+
+    CHECK(
+        Core::RunOperatingPoint(setup.Circuit, Core::ParameterValue{.Part = "R1", .Value = 4.7e3}).Result.has_value());
+    CHECK_FALSE((*backend).LastTemperatureCelsius.has_value());
+    CHECK((*backend).LastValues[1] == 4.7e3);
+    CHECK(setup.Load.GetValue() == 1e3);
+
+    CHECK_FALSE(Core::RunOperatingPoint(setup.Circuit, Core::ParameterValue{.Part = "R9", .Value = 1.0}).Result);
+    // A single run leaves the circuit and the temperature as they are
+    CHECK(Core::RunOperatingPoint(setup.Circuit).Result.has_value());
+    CHECK_FALSE((*backend).LastTemperatureCelsius.has_value());
+    CHECK((*backend).LastParts[1] == &setup.Load);
+}
+
 TEST_CASE("The truth table asks the backend for one operating point per combination", "[simulation_backend]") {
     BackendInUse backend(AllAnalysesWithoutLogicParts());
     Core::LogicInput first;
@@ -284,13 +326,18 @@ TEST_CASE("ngspice is the backend until another one is set, and runs every analy
     CHECK(backend.GetName() == "ngspice");
     CHECK(dynamic_cast<const Core::NgspiceBackend *>(&backend) != nullptr);
     const Core::BackendCapabilities &capabilities = backend.GetCapabilities();
-    CHECK(capabilities.Analyses.size() == 6);
+    CHECK(capabilities.Analyses.size() == 9);
     // Logic parts are refused only when the digital models are missing, whatever the system ngspice has
     CHECK(capabilities.UnsupportedParts.empty() == Core::AreDigitalModelsAvailable());
+    // ngspice cannot recover from a sensitivity analysis of logic parts, with its digital models or without
+    CHECK(Core::FindUnsupported(backend, {Core::ComponentType::NAND}, Core::AnalysisKind::SENSITIVITY).has_value());
+    CHECK_FALSE(
+        Core::FindUnsupported(backend, {Core::ComponentType::DIODE}, Core::AnalysisKind::SENSITIVITY).has_value());
 }
 
 TEST_CASE("Analyses have names for the messages that refuse them", "[simulation_backend]") {
     CHECK(Core::GetAnalysisKindName(Core::AnalysisKind::OPERATING_POINT) == "operating point");
     CHECK(Core::GetAnalysisKindName(Core::AnalysisKind::AC_SWEEP) == "AC sweep");
+    CHECK(Core::GetAnalysisKindName(Core::AnalysisKind::POLE_ZERO) == "pole-zero");
     CHECK(Core::GetAnalysisKindName(Core::AnalysisKind::TRUTH_TABLE) == "truth table");
 }

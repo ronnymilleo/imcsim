@@ -6,6 +6,8 @@
 #include "editing/probing.h"
 
 #include "simulation/simulator.h"
+#include "spice/spice_value.h"
+#include <algorithm>
 #include <cmath>
 #include <format>
 
@@ -102,6 +104,40 @@ std::string GetMeasurementLabel(const MeasurementTarget &target, const Connectiv
         return GetVoltageLabel(connectivity, *target.Node);
     }
     return std::format("I({})", target.Current);
+}
+
+/**
+ * @brief   Reads a measurement in an operating point, or in a transient read at one instant.
+ * @param[in] target           A node voltage or a current.
+ * @param[in] operating_point  The values of the circuit.
+ * @return  The voltage or the current, or no value for a node or a current the operating point lacks.
+ */
+std::optional<double> FindMeasuredValue(const MeasurementTarget &target, const Core::OperatingPoint &operating_point) {
+    if (target.Node) {
+        const auto node = static_cast<std::size_t>(*target.Node);
+        return node < operating_point.NodeVoltages.size() ? std::optional(operating_point.NodeVoltages[node])
+                                                          : std::nullopt;
+    }
+    const auto current = std::ranges::find(operating_point.Currents, target.Current, &Core::ComponentCurrent::Name);
+    return current != operating_point.Currents.end() ? std::optional(current->Current) : std::nullopt;
+}
+
+/**
+ * @brief   Names a measurement with its value, as the tooltips of the editor show it.
+ * @param[in] target           A node voltage or a current.
+ * @param[in] connectivity     Nodes of the schematic, for the names of nets.
+ * @param[in] operating_point  The values on display, or null before a simulation.
+ * @return  "V(3) = 4.5V" or "I(R1) = 2mA" once there is a value, or the label alone, "V(VOUT)".
+ */
+std::string DescribeMeasurement(const MeasurementTarget &target, const Connectivity &connectivity,
+                                const Core::OperatingPoint *operating_point) {
+    const std::optional<double> value =
+        operating_point != nullptr ? FindMeasuredValue(target, *operating_point) : std::nullopt;
+    const std::string label = GetMeasurementLabel(target, connectivity);
+    if (!value) {
+        return label;
+    }
+    return std::format("{} = {}{}", label, Core::FormatValue(*value), target.Node ? "V" : "A");
 }
 
 } // namespace GUI

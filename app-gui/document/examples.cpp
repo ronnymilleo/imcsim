@@ -32,6 +32,27 @@ constexpr auto EXAMPLES = std::to_array<Example>({
         .FileName = "rc_low_pass_filter.imcsim",
     },
     {
+        .Title = "Noise through an RC low-pass filter",
+        .Group = "Basics",
+        .Description = "The 1k and 100n low-pass of the example above, driven by 100 mV rms of white noise, a new "
+                       "sample every 50 us, which is a flat 1 mV per root hertz up to 10 kHz. Run the transient "
+                       "(19 ms, within one window of the plot), then open the Spectrum tab of the Output window: the "
+                       "input floor is flat and the output follows it up to the 1.6 kHz corner and falls beyond it. "
+                       "The noise changes on each run; "
+                       "the seed of the Simulation settings only fixes the Random sources.",
+        .FileName = "noise_through_rc_low_pass.imcsim",
+    },
+    {
+        .Title = "Monte Carlo of an RC low-pass filter",
+        .Group = "Basics",
+        .Description = "The 1k and 100n low-pass again, with the resistor within 5% and the capacitor within 10%. The "
+                       "analysis is an AC sweep run as Monte Carlo: 100 runs with the values drawn within those "
+                       "tolerances, from the seed of the settings, plus the nominal run. Run it and open the Monte "
+                       "Carlo tab of the Output window: the corner frequency spreads over about 11% around the "
+                       "nominal 1.6 kHz, and a click on a row of the table shows that run in the AC sweep tab.",
+        .FileName = "monte_carlo_rc_low_pass.imcsim",
+    },
+    {
         .Title = "LED dimmer with a potentiometer",
         .Group = "Basics",
         .Description =
@@ -57,8 +78,44 @@ constexpr auto EXAMPLES = std::to_array<Example>({
             "A 10 mH inductor, a 100n capacitor and a 100 Ohm resistor in series resonate at 5 kHz, "
             "where the voltage on the resistor peaks with a quality factor of about 3. Run the AC sweep "
             "for the band-pass response and read its -3 dB band, or the transient to see the output build up "
-            "at the 5 kHz of the source.",
+            "at the 5 kHz of the source. The math channel Z, -V(IN)/I(Vin1), is the impedance the source sees: on "
+            "the AC sweep it dips to 40 dB, 100 Ohm, at 0 degrees at resonance, capacitive below it and inductive "
+            "above.",
         .FileName = "series_rlc.imcsim",
+    },
+    {
+        .Title = "Poles of a series RLC low-pass",
+        .Group = "Basics",
+        .Description =
+            "A 100 Ohm resistor, a 10 mH inductor and a 100n capacitor in series, with the output across the capacitor "
+            "and the Poles and zeros analysis selected. Run it and read the Poles and zeros tab of the Output window: "
+            "one pair of complex poles at -5000 +/- j31225 rad/s, a natural frequency of 5.03 kHz and a quality "
+            "factor of 3.16, and no zeros. Run the AC sweep too and tick Show poles and zeros in its tab: the dashed "
+            "line at 5.03 kHz sits at the peak of the response, which rises about 10 dB there, as Q = 3.16 predicts.",
+        .FileName = "rlc_low_pass_poles_and_zeros.imcsim",
+    },
+    {
+        .Title = "S-parameters of an LC low-pass",
+        .Group = "Basics",
+        .Description =
+            "Two 8 uH inductors and a 3.18 nF capacitor make a T low-pass between two ports, the Block pin markers "
+            "IN and OUT, set as S-parameter ports of 50 Ohm in their properties. Run the S-parameters analysis and "
+            "open its tab: on the Smith chart S11 starts at the center, matched, and sweeps out to the rim as the "
+            "inductors stop the signal, while S21 stays near 0 dB up to about 1 MHz and falls beyond it. Hover a "
+            "point for the impedance, the VSWR and the return loss, or save the matrix as a Touchstone .s2p file.",
+        .FileName = "s_parameters_lc_low_pass.imcsim",
+    },
+    {
+        .Title = "Amplitude modulator from a behavioral source",
+        .Group = "Basics",
+        .Description =
+            "B1 is a behavioral source whose voltage is a formula of other voltages, named by their net labels: the 10 "
+            "kHz "
+            "CARRIER times one plus half the 500 Hz message MSG. Run the transient: OUT is the carrier with its "
+            "amplitude "
+            "following the message, between 0.5 and 1.5 V, an amplitude modulation at 50%. Select B1 and change the "
+            "expression in its properties, to V(CARRIER)*V(MSG) for a balanced modulator, for one.",
+        .FileName = "behavioral_am_modulator.imcsim",
     },
     {
         .Title = "Diode curves",
@@ -136,6 +193,36 @@ constexpr auto EXAMPLES = std::to_array<Example>({
         .FileName = "common_emitter_amplifier.imcsim",
     },
     {
+        .Title = "Bias sensitivity of a common-emitter stage",
+        .Group = "Transistors",
+        .Description =
+            "The common-emitter amplifier above with the Sensitivity analysis selected and its output at the "
+            "base, where the divider sets the bias. Run it, then tick "
+            "Color the schematic at the top of the Sensitivity tab of the Output window (or choose View > Wire "
+            "Colors > Sensitivity): the parts are colored by how much a change of their value moves "
+            "the DC voltage of the base, hot for the most influential. After the supply, the 51k and 10k "
+            "divider resistors R1 and R2 dominate, by about 1.5 V for 100 % more of either (15 mV per 1 %), with "
+            "opposite "
+            "signs, since a larger R1 lowers the base and a larger R2 raises it; the table of the Sensitivity "
+            "tab in the Output window lists every part with its sign, and the capacitors and the collector "
+            "and load parts barely matter. The transistor itself is not listed: only the values of "
+            "resistors, capacitors, inductors and sources are.",
+        .FileName = "bias_sensitivity.imcsim",
+    },
+    {
+        .Title = "Monte Carlo of a transistor bias point",
+        .Group = "Transistors",
+        .Description =
+            "The divider bias of a common-emitter stage, with every resistor within 5%. The operating point runs as "
+            "Monte "
+            "Carlo: 200 runs with the values drawn from the seed of the settings, plus the nominal one. Run it and "
+            "open "
+            "the Monte Carlo tab of the Output window: the base stays within about 0.1 V of its 1.9 V, while the "
+            "collector, at 6.3 V nominal, spreads from about 5.8 to 6.8 V. A click on a row shows that run on the "
+            "schematic.",
+        .FileName = "monte_carlo_bias_point.imcsim",
+    },
+    {
         .Title = "Small-signal model of a BJT",
         .Group = "Transistors",
         .Description = "A 2N3904 common-emitter stage on top and its hybrid-pi model below: rpi = 3.17k and a VCCS "
@@ -175,6 +262,18 @@ constexpr auto EXAMPLES = std::to_array<Example>({
                        "is flat and then falls at 91 kHz, the gain-bandwidth product divided by the gain. The "
                        "transient shows the output in phase with the input, unlike the inverting amplifier.",
         .FileName = "non_inverting_amplifier.imcsim",
+    },
+    {
+        .Title = "Input offset of two op-amps",
+        .Group = "Op-amps",
+        .Description =
+            "Two non-inverting amplifiers with a gain of 101 and their inputs grounded, so all that reaches the output "
+            "is the "
+            "input offset of each op-amp, amplified. Run the operating point: the LM358, with a typical offset of 3 "
+            "mV, "
+            "settles near 0.29 V, and the precision OP07, with 60 uV, near 6 mV. Pick Custom in the model list of an "
+            "op-amp to set its offset, VOS, by hand.",
+        .FileName = "op_amp_input_offset.imcsim",
     },
     {
         .Title = "Op-amp integrator",
@@ -225,6 +324,18 @@ constexpr auto EXAMPLES = std::to_array<Example>({
             "after it falls, while the 1N4007 across the coil carries the current that is left and holds "
             "the collector a diode drop above 5 V.",
         .FileName = "relay_driver.imcsim",
+    },
+    {
+        .Title = "Fast and slow-blow fuses",
+        .Group = "Protection",
+        .Description =
+            "A 5 V supply feeds two 2.5 Ohm loads, about 1.9 A each, through a 1 A fast fuse (FU1) and a 1 A "
+            "slow-blow fuse (FU2), Littelfuse 217 and 218 parts. Run the transient: FU1 blows after about 0.33 s and "
+            "FU2 after about 2.1 s, for the same "
+            "overload, and each branch loses its current in the same run; the Output window warns when each blew, "
+            "and a flash marks it on the schematic. A fuse never blows below its rating, and every run starts with "
+            "both whole, so the operating point, a DC sweep and an AC sweep always see them closed.",
+        .FileName = "fuse_fast_and_slow_blow.imcsim",
     },
     {
         .Title = "Transformer power supply",
@@ -313,6 +424,27 @@ constexpr auto EXAMPLES = std::to_array<Example>({
         .FileName = "ripple_counter.imcsim",
     },
     {
+        .Title = "2-to-4 decoder with logic outputs",
+        .Group = "Digital",
+        .Description =
+            "The 2-to-4 decoder block, from the logic blocks of the toolbar, with logic inputs on A0, A1 and EN and "
+            "a logic output on each of Y0 to Y3, so the schematic shows the level of every output with no LED, "
+            "resistor or Ground. The Truth table analysis is picked and varies A0 and A1 only: EN keeps the High it "
+            "has in the schematic, so the table shows one output high per row. Set EN Low and run it again to see "
+            "every output stay low.",
+        .FileName = "decoder_logic_outputs.imcsim",
+    },
+    {
+        .Title = "Decade counter on a 7-segment display",
+        .Group = "Digital",
+        .Description =
+            "A 4-bit counter block counts the rising edges of a 1 kHz clock, and an AND gate clears it the moment it "
+            "reaches ten (Q3 and Q1 high), so it counts 0 to 9 and over again. The BCD to 7-segment decoder block "
+            "turns the count into the segments of the display. Run the transient and move the time bar, or turn "
+            "Live on, to watch the digit count; the Output window reads the count as the DIGIT bus, in decimal.",
+        .FileName = "decade_counter.imcsim",
+    },
+    {
         .Title = "Two RC filters from one block",
         .Group = "Blocks",
         .Description =
@@ -321,6 +453,16 @@ constexpr auto EXAMPLES = std::to_array<Example>({
             "a decade down, to 160 Hz. Run the AC sweep to compare FAST and SLOW, double click a block to see inside "
             "it, or select one and set its parameters in Properties.",
         .FileName = "rc_blocks.imcsim",
+    },
+    {
+        .Title = "8-bit counter from two 4-bit blocks",
+        .Group = "Blocks",
+        .Description =
+            "COUNTER_8BIT is a block that holds two 4-bit counter blocks: the high one steps when Q3 of the low one "
+            "falls, through a NOT gate, as each stage of a ripple counter steps when the one before it falls. Double "
+            "click it to go inside, and double click one of its counters to go a level further. The Output window "
+            "reads Q7 to Q0 together as the COUNT bus, in hexadecimal, over the lanes of each bit.",
+        .FileName = "counter_8bit_blocks.imcsim",
     },
     {
         .Title = "Precision rectifier with vendor models",

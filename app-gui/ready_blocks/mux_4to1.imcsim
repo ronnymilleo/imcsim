@@ -1,0 +1,751 @@
+{
+ "format": "imcsim-schematic",
+ "version": 1,
+ "elements": [
+  {
+   "type": "Subcircuit",
+   "definition": "MUX_4TO1",
+   "name": "X1",
+   "rotation": 0,
+   "x": 0,
+   "y": 0
+  }
+ ],
+ "wires": [],
+ "subcircuits": [
+  {
+   "name": "MUX_4TO1",
+   "parameters": [],
+   "pins": [
+    {
+     "name": "D0",
+     "point": [
+      0,
+      0
+     ]
+    },
+    {
+     "name": "D1",
+     "point": [
+      0,
+      2
+     ]
+    },
+    {
+     "name": "D2",
+     "point": [
+      0,
+      4
+     ]
+    },
+    {
+     "name": "D3",
+     "point": [
+      0,
+      6
+     ]
+    },
+    {
+     "name": "S0",
+     "point": [
+      0,
+      10
+     ]
+    },
+    {
+     "name": "S1",
+     "point": [
+      0,
+      12
+     ]
+    },
+    {
+     "name": "Y",
+     "point": [
+      58,
+      16
+     ]
+    }
+   ],
+   "wires": [
+    {
+     "start": [
+      0,
+      0
+     ],
+     "end": [
+      1,
+      0
+     ]
+    },
+    {
+     "start": [
+      0,
+      2
+     ],
+     "end": [
+      1,
+      2
+     ]
+    },
+    {
+     "start": [
+      0,
+      4
+     ],
+     "end": [
+      1,
+      4
+     ]
+    },
+    {
+     "start": [
+      0,
+      6
+     ],
+     "end": [
+      1,
+      6
+     ]
+    },
+    {
+     "start": [
+      0,
+      10
+     ],
+     "end": [
+      1,
+      10
+     ]
+    },
+    {
+     "start": [
+      0,
+      12
+     ],
+     "end": [
+      1,
+      12
+     ]
+    },
+    {
+     "start": [
+      11,
+      18
+     ],
+     "end": [
+      10,
+      18
+     ]
+    },
+    {
+     "start": [
+      17,
+      18
+     ],
+     "end": [
+      18,
+      18
+     ]
+    },
+    {
+     "start": [
+      11,
+      24
+     ],
+     "end": [
+      10,
+      24
+     ]
+    },
+    {
+     "start": [
+      17,
+      24
+     ],
+     "end": [
+      18,
+      24
+     ]
+    },
+    {
+     "start": [
+      27,
+      -1
+     ],
+     "end": [
+      26,
+      -1
+     ]
+    },
+    {
+     "start": [
+      27,
+      1
+     ],
+     "end": [
+      26,
+      1
+     ]
+    },
+    {
+     "start": [
+      27,
+      3
+     ],
+     "end": [
+      26,
+      3
+     ]
+    },
+    {
+     "start": [
+      33,
+      1
+     ],
+     "end": [
+      34,
+      1
+     ]
+    },
+    {
+     "start": [
+      27,
+      9
+     ],
+     "end": [
+      26,
+      9
+     ]
+    },
+    {
+     "start": [
+      27,
+      11
+     ],
+     "end": [
+      26,
+      11
+     ]
+    },
+    {
+     "start": [
+      27,
+      13
+     ],
+     "end": [
+      26,
+      13
+     ]
+    },
+    {
+     "start": [
+      33,
+      11
+     ],
+     "end": [
+      34,
+      11
+     ]
+    },
+    {
+     "start": [
+      27,
+      19
+     ],
+     "end": [
+      26,
+      19
+     ]
+    },
+    {
+     "start": [
+      27,
+      21
+     ],
+     "end": [
+      26,
+      21
+     ]
+    },
+    {
+     "start": [
+      27,
+      23
+     ],
+     "end": [
+      26,
+      23
+     ]
+    },
+    {
+     "start": [
+      33,
+      21
+     ],
+     "end": [
+      34,
+      21
+     ]
+    },
+    {
+     "start": [
+      27,
+      29
+     ],
+     "end": [
+      26,
+      29
+     ]
+    },
+    {
+     "start": [
+      27,
+      31
+     ],
+     "end": [
+      26,
+      31
+     ]
+    },
+    {
+     "start": [
+      27,
+      33
+     ],
+     "end": [
+      26,
+      33
+     ]
+    },
+    {
+     "start": [
+      33,
+      31
+     ],
+     "end": [
+      34,
+      31
+     ]
+    },
+    {
+     "start": [
+      43,
+      13
+     ],
+     "end": [
+      42,
+      13
+     ]
+    },
+    {
+     "start": [
+      43,
+      15
+     ],
+     "end": [
+      42,
+      15
+     ]
+    },
+    {
+     "start": [
+      43,
+      17
+     ],
+     "end": [
+      42,
+      17
+     ]
+    },
+    {
+     "start": [
+      43,
+      19
+     ],
+     "end": [
+      42,
+      19
+     ]
+    },
+    {
+     "start": [
+      49,
+      16
+     ],
+     "end": [
+      50,
+      16
+     ]
+    },
+    {
+     "start": [
+      58,
+      16
+     ],
+     "end": [
+      57,
+      16
+     ]
+    }
+   ],
+   "elements": [
+    {
+     "type": "Pin",
+     "net": "D0",
+     "rotation": 0,
+     "x": 0,
+     "y": 0
+    },
+    {
+     "type": "NetLabel",
+     "net": "D0",
+     "rotation": 90,
+     "x": 1,
+     "y": 0
+    },
+    {
+     "type": "Pin",
+     "net": "D1",
+     "rotation": 0,
+     "x": 0,
+     "y": 2
+    },
+    {
+     "type": "NetLabel",
+     "net": "D1",
+     "rotation": 90,
+     "x": 1,
+     "y": 2
+    },
+    {
+     "type": "Pin",
+     "net": "D2",
+     "rotation": 0,
+     "x": 0,
+     "y": 4
+    },
+    {
+     "type": "NetLabel",
+     "net": "D2",
+     "rotation": 90,
+     "x": 1,
+     "y": 4
+    },
+    {
+     "type": "Pin",
+     "net": "D3",
+     "rotation": 0,
+     "x": 0,
+     "y": 6
+    },
+    {
+     "type": "NetLabel",
+     "net": "D3",
+     "rotation": 90,
+     "x": 1,
+     "y": 6
+    },
+    {
+     "type": "Pin",
+     "net": "S0",
+     "rotation": 0,
+     "x": 0,
+     "y": 10
+    },
+    {
+     "type": "NetLabel",
+     "net": "S0",
+     "rotation": 90,
+     "x": 1,
+     "y": 10
+    },
+    {
+     "type": "Pin",
+     "net": "S1",
+     "rotation": 0,
+     "x": 0,
+     "y": 12
+    },
+    {
+     "type": "NetLabel",
+     "net": "S1",
+     "rotation": 90,
+     "x": 1,
+     "y": 12
+    },
+    {
+     "type": "Not",
+     "name": "U1",
+     "rotation": 0,
+     "x": 14,
+     "y": 18,
+     "parameters": {
+      "logic_level": 5.0,
+      "propagation_delay": 1e-08
+     }
+    },
+    {
+     "type": "NetLabel",
+     "net": "S0",
+     "rotation": 270,
+     "x": 10,
+     "y": 18
+    },
+    {
+     "type": "NetLabel",
+     "net": "S0N",
+     "rotation": 90,
+     "x": 18,
+     "y": 18
+    },
+    {
+     "type": "Not",
+     "name": "U2",
+     "rotation": 0,
+     "x": 14,
+     "y": 24,
+     "parameters": {
+      "logic_level": 5.0,
+      "propagation_delay": 1e-08
+     }
+    },
+    {
+     "type": "NetLabel",
+     "net": "S1",
+     "rotation": 270,
+     "x": 10,
+     "y": 24
+    },
+    {
+     "type": "NetLabel",
+     "net": "S1N",
+     "rotation": 90,
+     "x": 18,
+     "y": 24
+    },
+    {
+     "type": "And",
+     "name": "U3",
+     "rotation": 0,
+     "x": 30,
+     "y": 0,
+     "parameters": {
+      "logic_level": 5.0,
+      "propagation_delay": 1e-08
+     },
+     "inputs": 3
+    },
+    {
+     "type": "NetLabel",
+     "net": "D0",
+     "rotation": 270,
+     "x": 26,
+     "y": -1
+    },
+    {
+     "type": "NetLabel",
+     "net": "S1N",
+     "rotation": 270,
+     "x": 26,
+     "y": 1
+    },
+    {
+     "type": "NetLabel",
+     "net": "S0N",
+     "rotation": 270,
+     "x": 26,
+     "y": 3
+    },
+    {
+     "type": "NetLabel",
+     "net": "M0",
+     "rotation": 90,
+     "x": 34,
+     "y": 1
+    },
+    {
+     "type": "And",
+     "name": "U4",
+     "rotation": 0,
+     "x": 30,
+     "y": 10,
+     "parameters": {
+      "logic_level": 5.0,
+      "propagation_delay": 1e-08
+     },
+     "inputs": 3
+    },
+    {
+     "type": "NetLabel",
+     "net": "D1",
+     "rotation": 270,
+     "x": 26,
+     "y": 9
+    },
+    {
+     "type": "NetLabel",
+     "net": "S1N",
+     "rotation": 270,
+     "x": 26,
+     "y": 11
+    },
+    {
+     "type": "NetLabel",
+     "net": "S0",
+     "rotation": 270,
+     "x": 26,
+     "y": 13
+    },
+    {
+     "type": "NetLabel",
+     "net": "M1",
+     "rotation": 90,
+     "x": 34,
+     "y": 11
+    },
+    {
+     "type": "And",
+     "name": "U5",
+     "rotation": 0,
+     "x": 30,
+     "y": 20,
+     "parameters": {
+      "logic_level": 5.0,
+      "propagation_delay": 1e-08
+     },
+     "inputs": 3
+    },
+    {
+     "type": "NetLabel",
+     "net": "D2",
+     "rotation": 270,
+     "x": 26,
+     "y": 19
+    },
+    {
+     "type": "NetLabel",
+     "net": "S1",
+     "rotation": 270,
+     "x": 26,
+     "y": 21
+    },
+    {
+     "type": "NetLabel",
+     "net": "S0N",
+     "rotation": 270,
+     "x": 26,
+     "y": 23
+    },
+    {
+     "type": "NetLabel",
+     "net": "M2",
+     "rotation": 90,
+     "x": 34,
+     "y": 21
+    },
+    {
+     "type": "And",
+     "name": "U6",
+     "rotation": 0,
+     "x": 30,
+     "y": 30,
+     "parameters": {
+      "logic_level": 5.0,
+      "propagation_delay": 1e-08
+     },
+     "inputs": 3
+    },
+    {
+     "type": "NetLabel",
+     "net": "D3",
+     "rotation": 270,
+     "x": 26,
+     "y": 29
+    },
+    {
+     "type": "NetLabel",
+     "net": "S1",
+     "rotation": 270,
+     "x": 26,
+     "y": 31
+    },
+    {
+     "type": "NetLabel",
+     "net": "S0",
+     "rotation": 270,
+     "x": 26,
+     "y": 33
+    },
+    {
+     "type": "NetLabel",
+     "net": "M3",
+     "rotation": 90,
+     "x": 34,
+     "y": 31
+    },
+    {
+     "type": "Or",
+     "name": "U7",
+     "rotation": 0,
+     "x": 46,
+     "y": 14,
+     "parameters": {
+      "logic_level": 5.0,
+      "propagation_delay": 1e-08
+     },
+     "inputs": 4
+    },
+    {
+     "type": "NetLabel",
+     "net": "M0",
+     "rotation": 270,
+     "x": 42,
+     "y": 13
+    },
+    {
+     "type": "NetLabel",
+     "net": "M1",
+     "rotation": 270,
+     "x": 42,
+     "y": 15
+    },
+    {
+     "type": "NetLabel",
+     "net": "M2",
+     "rotation": 270,
+     "x": 42,
+     "y": 17
+    },
+    {
+     "type": "NetLabel",
+     "net": "M3",
+     "rotation": 270,
+     "x": 42,
+     "y": 19
+    },
+    {
+     "type": "NetLabel",
+     "net": "Y",
+     "rotation": 90,
+     "x": 50,
+     "y": 16
+    },
+    {
+     "type": "Pin",
+     "net": "Y",
+     "rotation": 180,
+     "x": 58,
+     "y": 16
+    },
+    {
+     "type": "NetLabel",
+     "net": "Y",
+     "rotation": 270,
+     "x": 57,
+     "y": 16
+    }
+   ]
+  }
+ ]
+}

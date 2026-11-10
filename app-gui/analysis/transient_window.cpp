@@ -39,8 +39,9 @@ std::size_t FindSpanStart(const std::vector<double> &times, const double span) {
  * @param[in] result_version Changes whenever a new result replaces the transient.
  * @param[in] is_running     Whether a run is in progress.
  * @return  The window of points. A new result starts at its beginning, unless it is the whole run that replaces the
- *          chunks the window was following, which stays where it was. A window that follows a run in progress is on its
- *          newest points. With a span, the window holds the points of that stretch of time, up to MAX_WINDOW_POINTS.
+ *          chunks of a live run (a span is set) or of a window the user moved, which stays where it was. A window that
+ * follows a run in progress is on its newest points. With a span, the window holds the points of that stretch of time,
+ * up to MAX_WINDOW_POINTS.
  */
 PointWindow TransientWindow::Update(const Core::Transient *transient, const std::size_t result_version,
                                     const bool is_running) {
@@ -55,7 +56,10 @@ PointWindow TransientWindow::Update(const Core::Transient *transient, const std:
     auto points = static_cast<std::size_t>(m_Points);
     if (result_version != m_ResultVersion) {
         m_ResultVersion = result_version;
-        if (!m_WasIncomplete) {
+        // The whole run that replaces the chunks of a live run, or of a window the user moved, stays in place; the
+        // end of a plain chunked run would be a window in the middle of the result
+        const bool keeps_place = m_WasIncomplete && (m_Span.has_value() || !m_Follows);
+        if (!keeps_place) {
             m_First = 0;
             m_Follows = true;
         }

@@ -7,9 +7,11 @@
 
 #include "components/component.h"
 #include "components/net_label.h"
+#include "components/subcircuit_pin.h"
 #include <algorithm>
 #include <array>
 #include <numeric>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -24,6 +26,17 @@ constexpr int MIN_JUNCTION_CONNECTIONS = 3;
 constexpr std::array<std::string_view, 2> GROUND_NETS = {"0", "gnd"};
 /// The net that joins every VCC supply, in the form nets are compared in.
 constexpr std::string_view SUPPLY_NET = "vcc";
+
+/**
+ * @brief   Adds the pin marker to the circuit as an S-parameter port when it is set as one; a marker on no node reads
+ *          as ground, which the checks of the analysis refuse.
+ */
+void AddPort(Core::Circuit &circuit, const Core::Component &marker, const std::optional<int> node) {
+    const Core::PortSettings &port = static_cast<const Core::SubcircuitPinMarker &>(marker).GetPort();
+    if (port.IsPort) {
+        circuit.AddPort({.Number = port.Number, .Node = node.value_or(0), .ReferenceOhms = port.ReferenceOhms});
+    }
+}
 
 /**
  * @class   DisjointSet
@@ -260,6 +273,14 @@ std::optional<int> Connectivity::FindNodeOfNet(const std::string_view net) const
 }
 
 /**
+ * @brief   Returns the nets the labels name.
+ * @return  The node of each net, by its name in the form nets are compared in.
+ */
+const std::map<std::string, int, std::less<>> &Connectivity::GetNets() const {
+    return m_NodeOfNet;
+}
+
+/**
  * @brief   Returns the points where three or more connections meet.
  * @return  Grid points that get a junction dot.
  */
@@ -276,9 +297,14 @@ const std::vector<GridPoint> &Connectivity::GetJunctions() const {
 Core::Circuit BuildCircuit(const std::vector<std::unique_ptr<UIElement>> &elements, const Connectivity &connectivity) {
     Core::Circuit circuit;
     for (const auto &element : elements) {
-        // Labels join points and subcircuit pins mark ports; the simulator never sees either
+        // Labels join points, subcircuit pins mark ports and logic displays only read their nodes; the simulator sees
+        // none of them in its netlist, and takes the pins set as S-parameter ports apart
         const Core::ComponentType type = element->GetComponent().GetType();
-        if (type == Core::ComponentType::NET_LABEL || Core::IsSubcircuitPin(type)) {
+        if (Core::IsSubcircuitPin(type)) {
+            AddPort(circuit, element->GetComponent(), connectivity.GetNode(element->GetTerminals().front()));
+            continue;
+        }
+        if (type == Core::ComponentType::NET_LABEL || Core::IsLogicDisplay(type)) {
             continue;
         }
         std::vector<int> nodes;
@@ -287,6 +313,10 @@ Core::Circuit BuildCircuit(const std::vector<std::unique_ptr<UIElement>> &elemen
             nodes.push_back(connectivity.GetNode(terminal).value_or(0));
         }
         circuit.Add(element->GetComponent(), std::move(nodes));
+    }
+    // A behavioral source names its nets, which the circuit resolves when it writes the netlist
+    for (const auto &[net, node] : connectivity.GetNets()) {
+        circuit.NameNet(net, node);
     }
     return circuit;
 }

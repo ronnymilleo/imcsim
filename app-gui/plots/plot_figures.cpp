@@ -49,7 +49,12 @@ ExportAxes GetLinearExportAxes(const std::string &third_unit) {
             .Third = {.Name = third_unit.empty() ? "Math" : third_unit, .Unit = third_unit}};
 }
 
-ExportAxes GetSpectrumExportAxes() {
+ExportAxes GetSpectrumExportAxes(const bool is_density) {
+    if (is_density) {
+        return {.Voltage = {.Name = "Voltage density (V/√Hz)", .Unit = "V/√Hz", .Logarithmic = true},
+                .Current = {.Name = "Current density (A/√Hz)", .Unit = "A/√Hz", .Logarithmic = true},
+                .Third = {.Name = "Math density", .Unit = "", .Logarithmic = true}};
+    }
     return {.Voltage = {.Name = "Voltage (dBV)", .Unit = "dBV", .UsesPrefixes = false},
             .Current = {.Name = "Current (dBA)", .Unit = "dBA", .UsesPrefixes = false},
             .Third = {.Name = "Math (dB)", .Unit = "dB", .UsesPrefixes = false}};
@@ -152,14 +157,51 @@ void AddBitNotes(ExportPanel &panel, const Core::Transient &transient, const std
 }
 
 /**
+ * @brief   The lanes of the buses, on top: each a band pinched at every change of its value, with the value written in
+ *          every stretch wide enough for it, while the CSV lists the values as numbers.
+ */
+void AddBusLanes(ExportPanel &panel, ExportAxis &axis, const Core::Transient &transient,
+                 const std::vector<BusLane> &buses, const std::size_t lane_count, const PlotSpan &view) {
+    for (std::size_t bus = 0; bus < buses.size(); ++bus) {
+        const std::size_t position = lane_count - 1 - bus;
+        const BusLane &lane = buses[bus];
+        const std::vector<LogicSignal> bits = GetBusSignals(lane, transient.NodeVoltages);
+        BusOutline outline = BuildBusOutline(bits, transient.Times.size(), position);
+        const ExportColor color = ToExportColor(GetNodeColor(lane.Bits.front().Node));
+        const double middle = static_cast<double>(position) * LANE_STRIDE + LANE_HIGH_OFFSET / 2.0;
+        axis.Ticks.push_back({.Value = middle, .Label = lane.Name});
+        panel.Series.push_back({.Name = lane.Name,
+                                .Values = std::move(outline.Top),
+                                .Samples = std::move(outline.Values),
+                                .Color = color,
+                                .TableUnit = ""});
+        panel.Series.push_back(
+            {.Name = lane.Name, .Values = std::move(outline.Bottom), .Color = color, .InTable = false});
+        for (const BusSegment &segment : FindBusSegments(transient.Times, bits)) {
+            const double from = std::max(segment.From, view.From);
+            const double to = std::min(segment.To, view.To);
+            if (to - from >= (view.To - view.From) * MIN_BIT_LABEL_SHARE) {
+                panel.Notes.push_back({.X = (from + to) / 2.0,
+                                       .Y = middle,
+                                       .Text = FormatBusValue(segment.Value, lane.Bits.size(), lane.Format),
+                                       .Centered = true});
+            }
+        }
+    }
+}
+
+/**
  * @brief   The lanes as a panel of their own: each trace is drawn at the height of its lane, and its axis names the
  *          lanes, while the CSV lists the voltages.
- * @details The first lane is on top, as in the plot.
+ * @details The buses take the top lanes and the signals the ones below, in order, as in the plot.
  */
-ExportPanel BuildLanePanel(const Core::Transient &transient, const std::vector<LogicNode> &lanes, Schematic &schematic,
-                           const bool bit_values, const PlotSpan &view) {
+ExportPanel BuildLanePanel(const Core::Transient &transient, const std::vector<LogicNode> &lanes,
+                           const std::vector<BusLane> &buses, Schematic &schematic, const bool bit_values,
+                           const PlotSpan &view) {
     ExportPanel panel;
     ExportAxis axis{.Name = "", .Unit = "V", .UsesPrefixes = false};
+    const std::size_t lane_count = buses.size() + lanes.size();
+    AddBusLanes(panel, axis, transient, buses, lane_count, view);
     for (std::size_t lane = 0; lane < lanes.size(); ++lane) {
         const std::size_t position = lanes.size() - 1 - lane;
         const std::string label = GetVoltageLabel(schematic.GetConnectivity(), lanes[lane].Node);
@@ -174,9 +216,8 @@ ExportPanel BuildLanePanel(const Core::Transient &transient, const std::vector<L
     if (bit_values) {
         AddBitNotes(panel, transient, lanes, view);
     }
-    axis.Range =
-        ExportRange{.From = LANE_LOW_OFFSET - LANE_MARGIN,
-                    .To = static_cast<double>(lanes.size() - 1) * LANE_STRIDE + LANE_HIGH_OFFSET + LANE_MARGIN};
+    axis.Range = ExportRange{.From = LANE_LOW_OFFSET - LANE_MARGIN,
+                             .To = static_cast<double>(lane_count - 1) * LANE_STRIDE + LANE_HIGH_OFFSET + LANE_MARGIN};
     panel.YAxes.push_back(std::move(axis));
     return panel;
 }
@@ -310,9 +351,12 @@ std::vector<CurveFamily> ListCurveFamilies(const Core::DCSweep &sweep, Schematic
  * @brief   Names a curve of a stepped DC sweep by the value of its stepped source.
  * @param[in] sweep  A stepped DC sweep.
  * @param[in] curve  One of its curves.
- * @return  Such as "V2=5V".
+ * @return  Such as "V2=5V", or "Run 17" for a Monte Carlo run.
  */
 std::string FormatStepLabel(const Core::DCSweep &sweep, const Core::DCSweepCurve &curve) {
+    if (sweep.SteppedSource == MONTE_CARLO_PARAMETER) {
+        return FormatStepValue(sweep.SteppedSource, curve.StepValue, sweep.SteppedUnit);
+    }
     return std::format("{}={}{}", sweep.SteppedSource, Core::FormatValue(curve.StepValue), sweep.SteppedUnit);
 }
 
@@ -341,14 +385,15 @@ std::string GetDensityUnit(const std::string &unit) {
  *                        own time points.
  * @param[in] math        Its math traces.
  * @param[in] lanes       Measured nodes of logic parts, drawn as lanes.
+ * @param[in] buses       Logic buses drawn as lanes over the others, with their values written in them.
  * @param[in] schematic   Schematic that keeps the measurements and names the nodes.
  * @param[in] bit_values  Whether the lanes are labeled 0, 1 or X.
  * @param[in] view        The X range the plot shows, so zooming in before exporting crops the image as well.
  * @return  The figure; the analog panel is left out when only logic signals are measured, as on screen.
  */
 ExportFigure BuildTransientFigure(const Core::Transient &transient, const std::vector<MathTrace> &math,
-                                  const std::vector<LogicNode> &lanes, Schematic &schematic, const bool bit_values,
-                                  const PlotSpan &view) {
+                                  const std::vector<LogicNode> &lanes, const std::vector<BusLane> &buses,
+                                  Schematic &schematic, const bool bit_values, const PlotSpan &view) {
     ExportFigure figure;
     figure.XAxis = {.Name = "Time", .Unit = "s"};
     figure.Xs = transient.Times;
@@ -357,11 +402,11 @@ ExportFigure BuildTransientFigure(const Core::Transient &transient, const std::v
     AddExportTraces(builder, transient.NodeVoltages, transient.Currents, schematic, "", true, ListNodes(lanes));
     AddExportMath(builder, math, "", true);
     ExportPanel analog = builder.Take();
-    if (!analog.Series.empty() || lanes.empty()) {
+    if (!analog.Series.empty() || (lanes.empty() && buses.empty())) {
         figure.Panels.push_back(std::move(analog));
     }
-    if (!lanes.empty()) {
-        figure.Panels.push_back(BuildLanePanel(transient, lanes, schematic, bit_values, view));
+    if (!lanes.empty() || !buses.empty()) {
+        figure.Panels.push_back(BuildLanePanel(transient, lanes, buses, schematic, bit_values, view));
     }
     return figure;
 }
@@ -370,21 +415,24 @@ ExportFigure BuildTransientFigure(const Core::Transient &transient, const std::v
  * @brief   Builds the figure of the spectra as plotted.
  * @param[in] spectra      Spectra of the measured traces.
  * @param[in] logarithmic  Whether the frequency axis is logarithmic.
+ * @param[in] is_density   Whether the plot shows noise densities, on logarithmic axes, rather than decibels.
  * @param[in] view         The frequencies the plot shows.
  * @return  One panel with every spectrum that is defined over the span.
  */
-ExportFigure BuildSpectrumFigure(const TransientSpectra &spectra, const bool logarithmic, const PlotSpan &view) {
+ExportFigure BuildSpectrumFigure(const TransientSpectra &spectra, const bool logarithmic, const bool is_density,
+                                 const PlotSpan &view) {
     ExportFigure figure;
     figure.XAxis = {.Name = "Frequency", .Unit = "Hz"};
     figure.XLogarithmic = logarithmic;
     figure.Xs = spectra.Frequencies;
     figure.XRange = ExportRange{.From = view.From, .To = view.To};
-    PanelBuilder builder("", GetSpectrumExportAxes());
+    PanelBuilder builder("", GetSpectrumExportAxes(is_density));
     for (const SpectrumTrace &trace : spectra.Traces) {
-        if (trace.Decibels) {
+        // A tone has no density, so the density view leaves it out
+        if (trace.Decibels && (!is_density || trace.Harmonics.IsBroadband)) {
             builder.Add({.Name = trace.Label,
                          .LegendLabel = trace.Label,
-                         .Values = *trace.Decibels,
+                         .Values = is_density ? trace.Densities : *trace.Decibels,
                          .Color = ToExportColor(trace.Color),
                          .Dashed = trace.Dashed},
                         trace.Axis);
@@ -396,26 +444,34 @@ ExportFigure BuildSpectrumFigure(const TransientSpectra &spectra, const bool log
 
 /**
  * @brief   Builds the figure of the Bode plots: both panels list the same traces, as the two plots do, with every step
- *          of a stepped sweep.
+ *          of a stepped sweep, and the math channels of the step shown.
  * @param[in] sweep      The AC sweep shown.
+ * @param[in] math       Math traces over the sweep shown.
  * @param[in] schematic  Schematic that keeps the measurements and the other steps.
  * @param[in] view       The frequencies the plots show.
  * @return  The magnitude and phase panels.
  */
-ExportFigure BuildACSweepFigure(const Core::ACSweep &sweep, Schematic &schematic, const PlotSpan &view) {
+ExportFigure BuildACSweepFigure(const Core::ACSweep &sweep, const ACMathTraces &math, Schematic &schematic,
+                                const PlotSpan &view) {
+    const std::string third_unit = ThirdAxisUnit(math.Magnitudes);
+    const std::string third_name = third_unit.empty() ? "Math" : third_unit;
     ExportFigure figure;
     figure.XAxis = {.Name = "Frequency", .Unit = "Hz"};
     figure.XLogarithmic = true;
     figure.Xs = sweep.Frequencies;
     figure.XRange = ExportRange{.From = view.From, .To = view.To};
-    PanelBuilder magnitude("Magnitude", {.Voltage = {.Name = "Voltage (dB)", .Unit = "dB", .UsesPrefixes = false},
-                                         .Current = {.Name = "Current (dB)", .Unit = "dB", .UsesPrefixes = false},
-                                         .Third = {}});
+    PanelBuilder magnitude(
+        "Magnitude", {.Voltage = {.Name = "Gain (dB)", .Unit = "dB", .UsesPrefixes = false},
+                      .Current = {.Name = "Current (dB)", .Unit = "dB", .UsesPrefixes = false},
+                      .Third = {.Name = std::format("{} (dB)", third_name), .Unit = "dB", .UsesPrefixes = false}});
     AddExportTraces(magnitude, sweep.NodeMagnitudesDecibels, sweep.CurrentMagnitudesDecibels, schematic, "", true);
-    PanelBuilder phase("Phase", {.Voltage = {.Name = "Phase (deg)", .Unit = "deg", .UsesPrefixes = false},
-                                 .Current = {.Name = "Current phase (deg)", .Unit = "deg", .UsesPrefixes = false},
-                                 .Third = {}});
+    AddExportMath(magnitude, math.Magnitudes, "", true);
+    PanelBuilder phase(
+        "Phase", {.Voltage = {.Name = "Phase (deg)", .Unit = "deg", .UsesPrefixes = false},
+                  .Current = {.Name = "Current phase (deg)", .Unit = "deg", .UsesPrefixes = false},
+                  .Third = {.Name = std::format("{} phase (deg)", third_name), .Unit = "deg", .UsesPrefixes = false}});
     AddExportTraces(phase, sweep.NodePhasesDegrees, sweep.CurrentPhasesDegrees, schematic, "", true);
+    AddExportMath(phase, math.Phases, "", true);
     // The other steps share the frequencies, so they go in as more columns, without legend entries
     if (const auto &steps = schematic.GetACSweepSteps()) {
         for (std::size_t step = 0; step < steps->Results.size(); ++step) {

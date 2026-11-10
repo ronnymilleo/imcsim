@@ -7,6 +7,7 @@
 
 #include "plots/plot_export.h"
 
+#include "plots/smith_chart.h"
 #include "spice/spice_value.h"
 #include <algorithm>
 #include <array>
@@ -576,6 +577,163 @@ void DrawPanel(SvgWriter &svg, const ExportFigure &figure, const ExportPanel &pa
 
 // endregion
 
+// region Smith chart
+
+constexpr double SMITH_LABEL_FONT = 12.0;
+constexpr double SMITH_MARKER_RADIUS = 4.0;
+/// Room left around the unit circle for the labels of the reactance arcs, in label font sizes.
+constexpr double SMITH_LABEL_ROOM = 3.0;
+/// The chart reaches this far past the farthest point when a trace leaves the unit circle, as a gain above 1 does.
+constexpr double SMITH_EXTENT_MARGIN = 1.05;
+
+/**
+ * @struct  SmithFrame
+ * @brief   Where the reflection plane lies in the image: the pixel of its origin and the pixels of one unit.
+ */
+struct SmithFrame {
+    SvgPoint Center;
+    double PixelsPerUnit = 1.0;
+
+    SvgPoint ToPixel(const double x, const double y) const {
+        return {Center.X + x * PixelsPerUnit, Center.Y - y * PixelsPerUnit};
+    }
+};
+
+/**
+ * @brief   Half the side of the plane the chart shows: the unit circle, or more when a trace leaves it.
+ */
+double FindSmithExtent(const ExportSmith &smith) {
+    double extent = 1.0;
+    for (const ExportSmithTrace &trace : smith.Traces) {
+        for (const std::complex<double> value : trace.Values) {
+            if (std::isfinite(std::abs(value))) {
+                extent = std::max(extent, std::abs(value) * SMITH_EXTENT_MARGIN);
+            }
+        }
+    }
+    return extent;
+}
+
+std::vector<SvgPoint> ToPixels(const std::vector<SmithPoint> &points, const SmithFrame &frame) {
+    std::vector<SvgPoint> pixels;
+    pixels.reserve(points.size());
+    for (const SmithPoint &point : points) {
+        pixels.push_back(frame.ToPixel(point.X, point.Y));
+    }
+    return pixels;
+}
+
+/**
+ * @brief   Names a curve of the grid: a resistance circle above the real axis where it crosses it, a reactance arc
+ *          outside the outer circle where it starts.
+ */
+void DrawSmithLabel(SvgWriter &svg, const SmithCurve &curve, const SmithFrame &frame, const ExportTheme &theme,
+                    const double scale) {
+    if (curve.Label.empty()) {
+        return;
+    }
+    const double font_size = SMITH_LABEL_FONT * scale;
+    SvgPoint anchor = frame.ToPixel(curve.LabelPosition.X, curve.LabelPosition.Y);
+    if (curve.IsResistance) {
+        svg.Text({anchor.X - 2.0 * scale, anchor.Y - 3.0 * scale}, curve.Label, font_size, theme.MutedText,
+                 TextAnchor::END);
+        return;
+    }
+    // Pushed outward along the radius, so the label clears the outer circle on either side
+    const double radius = std::hypot(curve.LabelPosition.X, curve.LabelPosition.Y);
+    const double push = font_size * 0.9 / frame.PixelsPerUnit / std::max(radius, 1e-9);
+    anchor = frame.ToPixel(curve.LabelPosition.X * (1.0 + push), curve.LabelPosition.Y * (1.0 + push));
+    svg.Text({anchor.X, anchor.Y + font_size * 0.35}, curve.Label, font_size, theme.MutedText, TextAnchor::MIDDLE);
+}
+
+void DrawSmithGrid(SvgWriter &svg, const SmithFrame &frame, const ExportTheme &theme, const double scale) {
+    svg.Line(frame.ToPixel(-1.0, 0.0), frame.ToPixel(1.0, 0.0), theme.Border, scale);
+    for (const SmithCurve &curve : BuildSmithGrid(SMITH_CURVE_SEGMENTS)) {
+        const bool is_outer = curve.Label.empty();
+        svg.Polyline(ToPixels(curve.Points, frame), theme.Border, (is_outer ? 1.6 : 1.0) * scale);
+        DrawSmithLabel(svg, curve, frame, theme, scale);
+    }
+}
+
+void DrawSmithTraces(SvgWriter &svg, const ExportSmith &smith, const SmithFrame &frame, const ExportStyle &style,
+                     const double scale) {
+    for (const ExportSmithTrace &trace : smith.Traces) {
+        const ExportColor color = style.Dark ? trace.Color : AdjustColorForPrint(trace.Color);
+        std::vector<SvgPoint> run;
+        for (const std::complex<double> value : trace.Values) {
+            if (!std::isfinite(value.real()) || !std::isfinite(value.imag())) {
+                svg.Polyline(run, color, LINE_WIDTH * scale);
+                run.clear();
+                continue;
+            }
+            run.push_back(frame.ToPixel(value.real(), value.imag()));
+        }
+        svg.Polyline(run, color, LINE_WIDTH * scale);
+        // The first frequency is marked with a dot, so the direction the curve runs can be told
+        if (!trace.Values.empty() && std::isfinite(std::abs(trace.Values.front()))) {
+            svg.FilledCircle(frame.ToPixel(trace.Values.front().real(), trace.Values.front().imag()),
+                             SMITH_MARKER_RADIUS * scale, color);
+        }
+    }
+}
+
+double GetSmithLegendWidth(const ExportSmith &smith, const double scale) {
+    double legend_width = 0.0;
+    for (const ExportSmithTrace &trace : smith.Traces) {
+        legend_width +=
+            (LEGEND_SAMPLE + 6.0) * scale + EstimateTextWidth(trace.Name, LEGEND_FONT * scale) + LEGEND_SPACING * scale;
+    }
+    return legend_width;
+}
+
+void DrawSmithLegend(SvgWriter &svg, const ExportSmith &smith, const double baseline, const double right,
+                     const ExportStyle &style, const ExportTheme &theme, const double scale) {
+    double x = right - GetSmithLegendWidth(smith, scale) + LEGEND_SPACING * scale;
+    for (const ExportSmithTrace &trace : smith.Traces) {
+        const ExportColor color = style.Dark ? trace.Color : AdjustColorForPrint(trace.Color);
+        svg.Polyline({{x, baseline}, {x + LEGEND_SAMPLE * scale, baseline}}, color, LINE_WIDTH * scale);
+        svg.Text({x + (LEGEND_SAMPLE + 6.0) * scale, baseline + LEGEND_FONT * scale * 0.35}, trace.Name,
+                 LEGEND_FONT * scale, theme.Text, TextAnchor::START);
+        x +=
+            (LEGEND_SAMPLE + 6.0) * scale + EstimateTextWidth(trace.Name, LEGEND_FONT * scale) + LEGEND_SPACING * scale;
+    }
+}
+
+/**
+ * @brief   Draws the chart in the largest square the image leaves under its header, with room around it for the labels
+ *          of the reactance arcs.
+ */
+std::expected<std::string, std::string> RenderSmith(const ExportSmith &smith, const ExportStyle &style) {
+    const auto width = static_cast<double>(style.Width);
+    const auto height = static_cast<double>(style.Height);
+    const double scale = std::clamp(std::min(width / DESIGN_WIDTH, height / DESIGN_HEIGHT), MIN_SCALE, MAX_SCALE);
+    const double outer = OUTER_MARGIN * scale;
+    const double header = std::max(smith.Title.empty() ? 0.0 : TITLE_FONT * scale * 1.6, LEGEND_FONT * scale * 1.6);
+    const double room = SMITH_LABEL_FONT * scale * SMITH_LABEL_ROOM;
+    const double side = std::min(width - 2.0 * (outer + room), height - 2.0 * outer - header - 2.0 * room);
+    if (side < MIN_PLOT_SIZE * scale) {
+        return std::unexpected("The image is too small for the Smith chart");
+    }
+    const ExportTheme &theme = style.Dark ? DARK_THEME : LIGHT_THEME;
+    const double extent = FindSmithExtent(smith);
+    const SmithFrame frame{.Center = {width / 2.0, outer + header + room + side / 2.0},
+                           .PixelsPerUnit = side / 2.0 / extent};
+    SvgWriter svg;
+    DrawSmithGrid(svg, frame, theme, scale);
+    svg.BeginClip({frame.Center.X - side / 2.0 - room, frame.Center.Y - side / 2.0 - room}, side + 2.0 * room,
+                  side + 2.0 * room);
+    DrawSmithTraces(svg, smith, frame, style, scale);
+    svg.EndClip();
+    if (!smith.Title.empty()) {
+        svg.Text({outer, outer + TITLE_FONT * scale * 1.1}, smith.Title, TITLE_FONT * scale, theme.Text,
+                 TextAnchor::START);
+    }
+    DrawSmithLegend(svg, smith, outer + header / 2.0, width - outer, style, theme, scale);
+    return svg.Finish({0.0, 0.0}, width, height, theme.Background);
+}
+
+// endregion
+
 // region CSV
 
 /**
@@ -606,13 +764,36 @@ std::string FormatCsvValue(const double value) {
     return std::isfinite(value) ? std::format("{}", value) : "";
 }
 
+/**
+ * @brief   The table of a Smith chart: a row per frequency, with the real and imaginary parts of every trace.
+ */
+std::string RenderSmithCsv(const ExportSmith &smith) {
+    std::string text = CsvHeader("Frequency", "Hz");
+    for (const ExportSmithTrace &trace : smith.Traces) {
+        text += "," + CsvHeader(trace.Name + " real", "") + "," + CsvHeader(trace.Name + " imaginary", "");
+    }
+    text += "\n";
+    const std::size_t rows = smith.Traces.empty() ? 0 : smith.Traces.front().Frequencies.size();
+    for (std::size_t row = 0; row < rows; ++row) {
+        text += FormatCsvValue(smith.Traces.front().Frequencies[row]);
+        for (const ExportSmithTrace &trace : smith.Traces) {
+            const bool has_value = row < trace.Values.size();
+            text += "," + (has_value ? FormatCsvValue(trace.Values[row].real()) : "") + "," +
+                    (has_value ? FormatCsvValue(trace.Values[row].imag()) : "");
+        }
+        text += "\n";
+    }
+    return text;
+}
+
 // endregion
 
 } // namespace
 
 /**
  * @brief   Renders a figure as an SVG image.
- * @param[in] figure    Panels and samples to draw; it needs at least one panel and one sample.
+ * @param[in] figure    Panels and samples to draw; it needs at least one panel and one sample, or a Smith chart with
+ *                      a trace, which is drawn alone.
  * @param[in] style     Size, between MinExportSize and MaxExportSize pixels on each side, and theme.
  * @return  The SVG document, or the reason it cannot be drawn.
  * @note    The X axis shows figure.XRange when set, and each Y axis fits the samples in that range. Missing
@@ -623,6 +804,12 @@ std::expected<std::string, std::string> RenderSvg(const ExportFigure &figure, co
         style.Height > MAX_EXPORT_SIZE) {
         return std::unexpected(
             std::format("Width and height must be between {} and {} pixels", MIN_EXPORT_SIZE, MAX_EXPORT_SIZE));
+    }
+    if (figure.Smith) {
+        if (figure.Smith->Traces.empty()) {
+            return std::unexpected("There is nothing to export");
+        }
+        return RenderSmith(*figure.Smith, style);
     }
     if (figure.Panels.empty() || figure.Xs.empty()) {
         return std::unexpected("There is nothing to export");
@@ -723,20 +910,28 @@ std::expected<std::string, std::string> RenderSvg(const ExportFigure &figure, co
 
 /**
  * @brief   Writes the samples of a figure as a CSV table.
- * @param[in] figure    Figure whose X samples and series become the columns; its X range is ignored.
+ * @param[in] figure    Figure whose X samples and series become the columns; its X range is ignored. A Smith chart
+ *                      lists the frequency, then the real and imaginary parts of each trace.
  * @return  A header row, then one row per X sample: the X value, then each series of each panel in order.
  * @note    Headers carry the unit of their axis, and the panel title when the figure has more than one panel,
  *          since the panels of a Bode plot list the same traces. Missing samples are left empty.
  */
 std::string RenderCsv(const ExportFigure &figure) {
+    if (figure.Smith) {
+        return RenderSmithCsv(*figure.Smith);
+    }
     std::vector<const ExportSeries *> columns;
     std::string text = CsvHeader(figure.XAxis.Name, figure.XAxis.Unit);
     for (const ExportPanel &panel : figure.Panels) {
         for (const ExportSeries &series : panel.Series) {
+            if (!series.InTable) {
+                continue;
+            }
             const std::string name = figure.Panels.size() > 1 && !panel.Title.empty()
                                          ? std::format("{} {}", panel.Title, series.Name)
                                          : series.Name;
-            const std::string unit = series.Axis < panel.YAxes.size() ? panel.YAxes[series.Axis].Unit : "";
+            const std::string unit =
+                series.TableUnit.value_or(series.Axis < panel.YAxes.size() ? panel.YAxes[series.Axis].Unit : "");
             text += "," + CsvHeader(name, unit);
             columns.push_back(&series);
         }

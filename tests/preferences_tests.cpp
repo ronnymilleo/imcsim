@@ -14,9 +14,10 @@ TEST_CASE("Preferences load back unchanged from the file they save", "[preferenc
     preferences.Theme = GUI::GetThemes().back().Name;
     preferences.Symbols = GUI::SymbolStyle::ANSI;
     preferences.ShowTerminalNumbers = true;
-    preferences.WireColors = GUI::WireColoring::POWER;
+    preferences.WireColors = GUI::WireColoring::SENSITIVITY;
     preferences.SetEffectOn(GUI::LiveEffect::LED_GLOW, true);
     preferences.SetEffectOn(GUI::LiveEffect::HEAT_GLOW, true);
+    preferences.SetEffectOn(GUI::LiveEffect::LOGIC_LIGHTS, true);
     preferences.ValueSeries = Core::ValueSeries::E24;
     preferences.BringOutputToFront = false;
     preferences.SimulationBackend = "Nodalys";
@@ -29,7 +30,8 @@ TEST_CASE("Preferences load back unchanged from the file they save", "[preferenc
     CHECK_FALSE(loaded.Choices.IsEffectOn(GUI::LiveEffect::CURRENT_FLOW));
 }
 
-TEST_CASE("A new user gets the first theme, plain wires, no effects and any value", "[preferences]") {
+TEST_CASE("A new user gets the first theme, plain wires, no effects but the fuse flash and any value",
+          "[preferences]") {
     const GUI::Preferences preferences;
     CHECK(preferences.Theme == GUI::GetThemes().front().Name);
     CHECK(preferences.WireColors == GUI::WireColoring::PLAIN);
@@ -80,5 +82,6 @@ TEST_CASE("A preferences file that is not a JSON object gives the defaults with 
 
 TEST_CASE("Wire colorings and live effects have the names menus show", "[preferences]") {
     CHECK(std::string(GUI::GetWireColoringName(GUI::WireColoring::NODES)) == "Nodes");
+    CHECK(std::string(GUI::GetWireColoringName(GUI::WireColoring::SENSITIVITY)) == "Sensitivity");
     CHECK(std::string(GUI::GetLiveEffectName(GUI::LiveEffect::CURRENT_FLOW)) == "Current Flow");
 }

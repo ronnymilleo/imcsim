@@ -124,6 +124,23 @@ nodalys::SmoothLogicParameters MakeLogicParams(const LogicPart &part) {
     };
 }
 
+nodalys::BoyleOpAmpParameters MakeBoyleParams(const OpAmpParameters &params) {
+    return {
+        .OpenLoopGainDecibels = params.OpenLoopGainDecibels,
+        .GainBandwidth = params.GainBandwidth,
+        .SlewRate = params.SlewRate,
+        .PhaseMarginDegrees = params.PhaseMarginDegrees,
+        .InputBiasCurrent = params.InputBiasCurrent,
+        .CommonModeRejectionDecibels = params.CommonModeRejectionDecibels,
+        .OutputResistance = params.OutputResistance,
+        .ShortCircuitCurrent = params.ShortCircuitCurrent,
+        .PositiveHeadroom = params.PositiveHeadroom,
+        .NegativeHeadroom = params.NegativeHeadroom,
+        .SupplyCurrent = params.SupplyCurrent,
+        .InputOffsetVoltage = params.InputOffsetVoltage,
+    };
+}
+
 class CircuitCompiler {
 public:
     explicit CircuitCompiler(const Circuit &circuit) : m_Circuit(circuit) {}
@@ -569,7 +586,7 @@ private:
                                          op_amp.GetIdealBandwidth());
             } else {
                 m_Builder->AddBoyleOpAmp(part.GetName(), nodes[0], nodes[1], nodes[2], nodes[3], nodes[4],
-                                         op_amp.GetParameters());
+                                         MakeBoyleParams(op_amp.GetParameters()));
             }
             return {};
         }

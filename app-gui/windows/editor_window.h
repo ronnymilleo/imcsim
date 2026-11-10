@@ -8,7 +8,6 @@
 
 #include "analysis/analysis_controls.h"
 #include "analysis/analysis_settings_panel.h"
-#include "analysis/circuit_snapshot.h"
 #include "analysis/playback.h"
 #include "components/component.h"
 #include "document/clipboard.h"
@@ -16,7 +15,9 @@
 #include "document/schematic.h"
 #include "document/schematic_file_actions.h"
 #include "drawing/glow_renderer.h"
+#include "drawing/schematic_overlays.h"
 #include "editing/canvas_view.h"
+#include "editing/editor_mode.h"
 #include "editing/probing.h"
 #include "editing/selection.h"
 #include "editing/wire_editing.h"
@@ -25,15 +26,17 @@
 #include "part_editor.h"
 #include "preferences.h"
 #include "ui_elements/ui_element.h"
-#include "ui_elements/ui_wire.h"
 #include "windows/app_window.h"
+#include "windows/editor_toolbar.h"
+#include "windows/part_picker.h"
+#include "windows/part_rail.h"
 #include "windows/spice_block_dialog.h"
 #include <cstddef>
 #include <filesystem>
 #include <memory>
 #include <optional>
-#include <set>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace GUI {
@@ -42,13 +45,14 @@ namespace GUI {
  * @class   EditorWindow
  * @brief   Window where the schematic is drawn and edited: components are placed and wired on a grid.
  * @details Positions are stored in world units (one unit per grid cell) and converted to screen pixels
- *          using the current pan offset and zoom factor. The editor is either selecting (the default), placing
- *          a component, drawing wires or probing; starting one mode leaves the others. Modes start from the icon
- *          toolbar, their keys, or the part search that Space opens; a status bar lists the keys of each mode.
- * Schematics are saved to and opened from JSON files by its SchematicFileActions, how it looks is kept by its
- * EditorPreferences, and where it looks by its CanvasView. The root schematic belongs to the application. While a
- * subcircuit is open, this window edits a temporary document and applies it back to the root as one undo step; it
- * otherwise keeps interaction state such as the current mode and drag.
+ *          using the current pan offset and zoom factor. The editor is in one EditorMode at a time: selecting (the
+ *          default), placing a part, drawing wires, probing or pasting; starting one leaves the others. Modes start
+ *          from the EditorToolbar, their keys, or the PartPicker that Space opens, which only ask for them; a status
+ *          bar lists the keys of each mode.
+ * Schematics are saved to and opened from JSON files by its SchematicFileActions, the colors of a result are drawn by
+ * its SchematicOverlays, and where it looks is kept by its CanvasView. The root schematic belongs to the application.
+ * While a subcircuit is open, this window edits a temporary document and applies it back to the root as one undo step;
+ * it otherwise keeps interaction state such as the current mode and drag.
  */
 class EditorWindow : public AppWindow {
 public:
@@ -59,6 +63,9 @@ public:
 
     // Requests, global shortcuts and file popups, whichever window is in front
     void Update();
+
+    // Command bar, drawn by the application under the menu bar
+    void DrawCommandBar();
 
     // Quitting
     void RequestQuit();
@@ -85,48 +92,16 @@ private:
     };
 
     /**
-     * @struct  GroupDrag
-     * @brief   Schematic state captured when a drag of the selection starts; every frame of the drag is computed from
-     * it.
-     * @details A single wire only slides across itself, so Slide tells which way it may go.
+     * @struct  OpenBlock
+     * @brief   A block whose contents the editor opened, on the way down from the schematic.
+     * @details Pins and Parameters hold its settings while a block inside it is open; the innermost block keeps them in
+     *          the dialog fields instead.
      */
-    struct GroupDrag {
-        GridPoint StartCursor;
-        std::set<std::size_t> Elements;
-        std::set<std::size_t> Wires;
-        std::vector<GridPoint> StartPositions;
-        std::vector<GridPoint> StartTerminals;
-        std::vector<GridPoint> FixedTerminals;
-        std::vector<UIWire> StartWires;
-        std::optional<bool> SlidesVertically;
-        /// Moved the mouse far enough to change something.
-        bool Moved = false;
-        GridPoint LastCursor;
-        GridPoint LastDelta;
-        /// What a click without a move leaves selected.
-        std::optional<Selection> CollapseTo;
-    };
-
-    /**
-     * @struct  SelectionBox
-     * @brief   A selection box being dragged on empty canvas: where it started, and what was selected before it.
-     */
-    struct SelectionBox {
-        ImVec2 Start;
-        Selection Base;
-    };
-
-    /**
-     * @struct  DisplayedState
-     * @brief   The voltages, currents and powers the schematic shows this frame, and the scale their colors use.
-     * @details It is the last operating point, or the last transient read at the instant of the playback; the
-     *          drawing code does not tell them apart. Time is set for a transient only.
-     */
-    struct DisplayedState {
-        Core::OperatingPoint Point;
-        HeatScale Scale;
-        std::vector<ComponentPower> Powers;
-        std::optional<double> Time;
+    struct OpenBlock {
+        std::string Name;
+        std::unique_ptr<Schematic> Content;
+        std::vector<SavedSubcircuitPin> Pins;
+        std::vector<Core::SubcircuitParameter> Parameters;
     };
 
     /**
@@ -158,20 +133,18 @@ private:
 
     Schematic &m_RootSchematic;
     Schematic *m_Schematic;
-    std::unique_ptr<Schematic> m_SubcircuitContent;
-    std::string m_EditingSubcircuit;
+    /// The blocks open, from the outermost to the one shown; empty while the schematic is shown.
+    std::vector<OpenBlock> m_OpenBlocks;
     std::vector<SavedSubcircuitPin> m_SubcircuitPins;
     std::vector<Core::SubcircuitParameter> m_SubcircuitParameters;
     std::string m_SubcircuitName;
     std::string m_SubcircuitError;
     bool m_SubcircuitDialogRequested = false;
-    std::string m_PlacingSubcircuit;
     /// Imports SPICE libraries and sets up the pins of the blocks they become.
     SpiceBlockDialog m_SpiceDialog;
     AnalysisControls &m_Controls;
     AnalysisSettingsPanel &m_SettingsPanel;
     PartEditor &m_PartEditor;
-    GlowRenderer &m_GlowRenderer;
     TransientPlayback &m_Playback;
     /// How the schematic is drawn and exported.
     const Preferences &m_Preferences;
@@ -179,60 +152,30 @@ private:
     // Parts of the editor, in the order they are built
     CanvasView m_View;
     SchematicFileActions m_Files;
+    EditorToolbar m_Toolbar;
+    PartPicker m_PartPicker;
+    PartRail m_PartRail;
+    SchematicOverlays m_Overlays;
 
-    // What the schematic shows
-    /// What the schematic shows, resolved at the start of each frame.
-    std::optional<DisplayedState> m_Displayed;
-    /// Version of the transient the heat scale was worked out for, so it is worked out once per result and kept.
-    std::optional<std::size_t> m_ScaledTransientVersion;
-    /// The window of points the scale was worked out over.
-    PointWindow m_ScaledWindow;
-    /// When the heat scale of a transient that is still being made was last worked out.
-    double m_LastScaleTime = 0.0;
-    HeatScale m_TransientScale;
-
-    // Placement
-    std::optional<Core::ComponentType> m_PlacingType;
-    Rotation m_PlacingRotation = Rotation::R0;
-    bool m_PlacingMirrored = false;
-    /// Part each toolbar group places, the last one picked from its list.
-    std::vector<Core::ComponentType> m_PartGroupChoices;
-    // Part picker
-    /// The query typed in the part picker.
-    std::string m_PartQuery;
-    /// The highlighted match of the part picker.
-    std::size_t m_PartPickerIndex = 0;
-
-    // Wiring
-    bool m_DrawingWires = false;
-    std::optional<GridPoint> m_WireStart;
+    /// What clicks and keys on the canvas do now.
+    EditorMode m_Mode;
+    /// Whether wires go up or down before they turn, kept from one wire to the next.
     bool m_WireVerticalFirst = false;
-
-    /// Probing: picks what the plots measure.
-    bool m_Probing = false;
-
-    /// Pasting: what was read from the clipboard, following the cursor until a click places it.
-    std::optional<PastedGroup> m_Pasting;
-
-    // Selection and dragging
-    std::optional<GroupDrag> m_Drag;
-    std::optional<SelectionBox> m_Box;
-
     /// Live runs: the push button the mouse holds down.
     std::optional<std::size_t> m_HeldButton;
 
     // Properties popover
-    /// The corner the popover hangs from.
+    /// The point the middle of the top edge of the popover opens on.
     ImVec2 m_PartPopoverAnchor = {0.0f, 0.0f};
-    /// Which side of the part the popover opens on.
-    float m_PartPopoverPivotX = 0.0f;
+    /// The middle of the canvas on screen, as drawn last.
+    ImVec2 m_CanvasCenter = {0.0f, 0.0f};
+    /// The top edge of the canvas on screen, as drawn last.
+    float m_CanvasTop = 0.0f;
     /// Whether a menu asked to open the popover.
     bool m_PartPopoverRequested = false;
     // Context menu
     /// What the right click was on, for the measure item of the context menu.
     std::optional<MeasurementTarget> m_ContextTarget;
-    /// Whether the context menu asked to open the part picker.
-    bool m_PartPickerRequested = false;
     /// ImGui closes a popup on Esc before the frame starts, so the editor checks the last frame to leave that
     /// Esc alone.
     bool m_PopupOpenLastFrame = false;
@@ -242,63 +185,55 @@ private:
 
     // Frame
     void Draw() override;
-    void DrawToolbar();
-    void DrawPartButton(Core::ComponentType type);
-    void DrawRunControls();
-    void DrawAnalysisButton(float run_left);
-    void DrawLiveToggle();
-    void DrawPartGroup(std::size_t index);
-    void UpdateDisplayedState();
+    static ImVec2 GetCanvasSize();
+    void HandleModeKeys();
+    void ApplyToolbarRequest(ToolbarRequest request);
     std::optional<TimeSpan> GetWindowSpan() const;
-    void DrawTimeBar();
-    void DrawWires(SchematicCanvas &canvas, const ViewTransform &view);
-    void DrawWireSelectionHalos(SchematicCanvas &canvas, const ViewTransform &view);
-    void DrawNodeNumbers(SchematicCanvas &canvas, const ViewTransform &view);
-    ImU32 GetWireColor(int node) const;
-    void DrawWireCurrents(SchematicCanvas &canvas, const ViewTransform &view);
-    void DrawGlows(ImDrawList *draw_list, const ViewTransform &view);
-    void DrawElements(SchematicCanvas &canvas, const ViewTransform &view, std::optional<std::size_t> lit_live_part);
-    ImU32 GetElementColor(std::size_t index) const;
-    bool AreWiresHeatColored() const;
-    bool ArePartsHeatColored() const;
+    void DrawShownInstant(ImDrawList *draw_list, ImVec2 origin) const;
     void DrawBlockBar(ImVec2 origin);
     void DrawStatusBar(const ViewTransform &view, bool hovered);
-    float DrawRunStatus(float right_edge);
-    void DrawColorLegend(ImDrawList *draw_list, ImVec2 origin, ImVec2 size) const;
-    void DrawNodeVoltages(ImDrawList *draw_list, const ViewTransform &view);
-    void DrawHoveredValue(const ViewTransform &view, bool hovered);
+    std::optional<MeasurementTarget> FindTargetAt(const ViewTransform &view) const;
 
     // Modes
-    void StartSelecting();
-    void StartPlacing(Core::ComponentType type);
-    void StartDrawingWires();
-    void StartProbing();
+    void SetMode(EditorMode mode);
+    SelectingMode *GetSelecting();
+    bool IsDragging() const;
     void StopEditing();
+
+    // Blocks
     bool IsEditingSubcircuit() const;
     bool LeaveSubcircuitForDocument();
+    bool ReturnToLevel(std::size_t depth);
+    void ShowSchematic(Schematic &schematic);
+    bool CanPlaceBlock(std::string_view name) const;
+    std::vector<const SavedSubcircuit *> ListPlaceableBlocks() const;
+    void SyncOpenBlockDefinitions();
     void OfferBlockParameters();
     void RequestCreateSubcircuit();
     void RequestEditSelectedSubcircuit();
+    bool SyncSubcircuitPins();
+    bool ApplySubcircuitPinNames();
+    void FinishSubcircuitEditing(bool apply);
     void DrawSubcircuitDialog();
     void DrawSubcircuitPinRows(bool editing);
     void DrawSubcircuitParameterRows();
     void DrawSubcircuitDialogButtons(bool editing);
     void ApplySpiceBlockResult(SpiceBlockResult result);
-    bool SyncSubcircuitPins();
-    bool ApplySubcircuitPinNames();
-    void FinishSubcircuitEditing(bool apply);
 
-    // Placement
-    void DrawPartPicker();
-    void StartPlacingSubcircuit(const std::string &name);
-    void HandlePlacement(SchematicCanvas &canvas, const ViewTransform &view, bool hovered);
-
-    // Wiring
-    void HandleWireDrawing(ImDrawList *draw_list, const ViewTransform &view, bool hovered);
-    void StopWire();
-
-    // Probing
-    void HandleProbing(ImDrawList *draw_list, const ViewTransform &view, bool hovered);
+    // Input of each mode, after the schematic is drawn; each returns the mode to switch to, or none
+    std::optional<EditorMode> HandleMode(SelectingMode &mode, SchematicCanvas &canvas, const ViewTransform &view,
+                                         bool hovered);
+    std::optional<EditorMode> HandleMode(PlacingMode &mode, SchematicCanvas &canvas, const ViewTransform &view,
+                                         bool hovered);
+    std::optional<EditorMode> HandleMode(WiringMode &mode, SchematicCanvas &canvas, const ViewTransform &view,
+                                         bool hovered);
+    std::optional<EditorMode> HandleMode(ProbingMode &mode, SchematicCanvas &canvas, const ViewTransform &view,
+                                         bool hovered);
+    std::optional<EditorMode> HandleMode(PastingMode &mode, SchematicCanvas &canvas, const ViewTransform &view,
+                                         bool hovered);
+    bool HandlePastingKeys(PastedGroup &group);
+    void PlacePastedGroup(PastedGroup &group);
+    std::string FindLastNet() const;
 
     // Clipboard
     void HandleClipboardShortcuts();
@@ -306,9 +241,6 @@ private:
     void CutSelected();
     void StartPasting();
     void StartPastingGroup(PastedGroup group);
-    void HandlePasting(SchematicCanvas &canvas, const ViewTransform &view, bool hovered);
-    bool IsSelecting() const;
-    std::string FindLastNet() const;
 
     // Selection and dragging
     void HandleSelection(const ViewTransform &view, bool hovered);
@@ -327,7 +259,7 @@ private:
     void ReleaseHeldButton();
 
     // Properties popover and context menu
-    void PlacePartPopover(const ViewTransform &view);
+    void PlacePartPopover();
     void HandleValueTyping(const ViewTransform &view);
     void DrawPartPopover();
     void HandleContextMenu(const ViewTransform &view, bool hovered);

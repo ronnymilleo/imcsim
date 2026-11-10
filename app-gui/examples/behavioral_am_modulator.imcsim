@@ -1,0 +1,41 @@
+{
+  "format": "imcsim-schematic",
+  "version": 1,
+  "elements": [
+    {"type": "VoltageSource", "rotation": 90, "x": 4, "y": 8, "source": "AC", "value": 0, "amplitude": 1,
+     "frequency": 10000, "offset": 0, "ac_magnitude": 1,
+     "pulse": {"delay": 0, "fall": 1e-06, "high": 5, "low": 0, "period": 0.001, "rise": 1e-06, "width": 0.0005},
+     "name": "Vin1"},
+    {"type": "VoltageSource", "rotation": 90, "x": 12, "y": 8, "source": "AC", "value": 0, "amplitude": 1,
+     "frequency": 500, "offset": 0, "ac_magnitude": 1,
+     "pulse": {"delay": 0, "fall": 1e-06, "high": 5, "low": 0, "period": 0.001, "rise": 1e-06, "width": 0.0005},
+     "name": "Vin2"},
+    {"type": "BehavioralVoltage", "rotation": 0, "x": 20, "y": 8, "expression": "V(CARRIER)*(1+V(MSG)/2)",
+     "name": "B1"},
+    {"type": "Resistor", "rotation": 90, "x": 38, "y": 7, "value": 10000, "name": "R1"},
+    {"type": "NetLabel", "rotation": 0, "x": 4, "y": 4, "net": "CARRIER"},
+    {"type": "NetLabel", "rotation": 0, "x": 12, "y": 4, "net": "MSG"},
+    {"type": "NetLabel", "rotation": 0, "x": 32, "y": 4, "net": "OUT"},
+    {"type": "Ground", "rotation": 0, "x": 4, "y": 12},
+    {"type": "Ground", "rotation": 0, "x": 12, "y": 12},
+    {"type": "Ground", "rotation": 0, "x": 20, "y": 12},
+    {"type": "Ground", "rotation": 0, "x": 38, "y": 12}
+  ],
+  "wires": [
+    {"start": [4, 6], "end": [4, 4]},
+    {"start": [4, 10], "end": [4, 12]},
+    {"start": [12, 6], "end": [12, 4]},
+    {"start": [12, 10], "end": [12, 12]},
+    {"start": [20, 6], "end": [20, 4]},
+    {"start": [20, 4], "end": [32, 4]},
+    {"start": [32, 4], "end": [38, 4]},
+    {"start": [38, 4], "end": [38, 5]},
+    {"start": [20, 10], "end": [20, 12]},
+    {"start": [38, 9], "end": [38, 12]}
+  ],
+  "measurements": {"voltages": [[12, 4], [20, 4]], "currents": []},
+  "simulation": {
+    "analysis": "transient",
+    "transient": {"stop": 0.004, "step": 4e-06}
+  }
+}

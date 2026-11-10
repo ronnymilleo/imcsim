@@ -8,6 +8,7 @@
 #include "document/examples.h"
 #include "document/schematic_file.h"
 #include "drawing/theme.h"
+#include "drawing/tool_icons.h"
 #include "editing/shortcuts.h"
 #include "imgui.h"
 #include "imgui_impl_sdl3.h"
@@ -17,6 +18,7 @@
 #include "native/native_backend.h"
 #include "ngspice/ngspice_library.h"
 #include "simulation/simulator.h"
+#include "windows/dock_layout.h"
 #include <SDL3/SDL.h>
 #include <array>
 #include <cstdio>
@@ -35,6 +37,15 @@ namespace {
 
 /// Wrap width of the example descriptions, in characters of the current font size.
 constexpr float EXAMPLE_TOOLTIP_WIDTH = 30.0f;
+
+// Default layout, as shares of the space being split
+/// Width of the side column that holds Properties, the analysis settings and the netlist; narrow, since Properties
+/// holds one line until a part is selected.
+constexpr float SIDE_COLUMN_SHARE = 0.18f;
+/// Width of Output beside the schematic, which takes the rest; Output is the widest, as plots need the room.
+constexpr float OUTPUT_SHARE = 0.56f;
+/// Height of the analysis settings and the netlist under Properties.
+constexpr float SIDE_BOTTOM_SHARE = 0.45f;
 
 // Debug builds ask for the validation layers of the GPU API; SDL runs without them when they are not installed
 #ifdef NDEBUG
@@ -325,6 +336,8 @@ void Application::Render() {
                              m_AnalysisControls.IsRunning());
     ShowNewResults();
 
+    DrawCommandBar();
+
     // A fixed ID lets the layout be rebuilt before the dockspace is submitted this frame
     const ImGuiID dockspace_id = ImGui::GetID("MainDockSpace");
     if (m_ResetLayout) {
@@ -336,6 +349,7 @@ void Application::Render() {
         ImGui::DockBuilderAddNode(dockspace_id, ImGuiDockNodeFlags_DockSpace);
         SetupDefaultLayout(dockspace_id);
     }
+    FollowWindowSize(dockspace_id);
     ImGui::DockSpaceOverViewport(dockspace_id, ImGui::GetMainViewport());
 
     // Runs even while the editor tab is hidden, so quitting, the menus and the shortcuts work from any window
@@ -465,9 +479,9 @@ void Application::UpdateWindowTitle() {
 }
 
 /**
- * @brief   A new result of any analysis opens the Output window on its tab, in front unless the user turned that off;
- *          the operating point and the transient also show on the schematic, so running one is enough to see it, and a
- *          new transient plays from its start.
+ * @brief   A new result of any analysis, or a failed run, opens the Output window on its tab, in front unless the user
+ *          turned that off; the operating point and the transient also show on the schematic, so running one is enough
+ *          to see it, and a new transient plays from its start.
  * @details Versions also change when results are dropped, which opens nothing.
  */
 void Application::ShowNewResults() {
@@ -492,8 +506,23 @@ void Application::ShowNewResults() {
     show_if_new(m_ShownNoiseVersion, m_Schematic.GetNoiseVersion(), m_Schematic.GetNoise().has_value(), PlotTab::NOISE);
     show_if_new(m_ShownTransferFunctionVersion, m_Schematic.GetTransferFunctionVersion(),
                 m_Schematic.GetTransferFunction().has_value(), PlotTab::TRANSFER_FUNCTION);
+    show_if_new(m_ShownSensitivityVersion, m_Schematic.GetSensitivityVersion(),
+                m_Schematic.GetSensitivity().has_value(), PlotTab::SENSITIVITY);
+    show_if_new(m_ShownPoleZeroVersion, m_Schematic.GetPoleZeroVersion(), m_Schematic.GetPoleZero().has_value(),
+                PlotTab::POLE_ZERO);
+    show_if_new(m_ShownSParametersVersion, m_Schematic.GetSParametersVersion(),
+                m_Schematic.GetSParameters().has_value(), PlotTab::S_PARAMETERS);
     show_if_new(m_ShownTruthTableVersion, m_Schematic.GetTruthTableVersion(), m_Schematic.GetTruthTable().has_value(),
                 PlotTab::TRUTH_TABLE);
+    // After the analyses, so the table of a Monte Carlo run is what shows in front of the traces it came with
+    show_if_new(m_ShownMonteCarloVersion, m_Schematic.GetMonteCarloVersion(), m_Schematic.GetMonteCarlo().has_value(),
+                PlotTab::MONTE_CARLO);
+    const std::optional<Analysis> last_run = m_AnalysisControls.GetLastRun();
+    if (std::exchange(m_ShownRunCount, m_AnalysisControls.GetFinishedRunCount()) !=
+            m_AnalysisControls.GetFinishedRunCount() &&
+        last_run && m_AnalysisControls.GetOutcome(*last_run) == RunOutcome::FAILED) {
+        m_OutputWindow.ShowTab(GetAnalysisTab(*last_run));
+    }
 }
 
 /**
@@ -512,6 +541,7 @@ void Application::RerunAfterEdits() {
         .DocumentVersion = m_Schematic.GetDocumentVersion(),
         .HasRunToFollow = m_AnalysisControls.GetOutcome(selected) != RunOutcome::NONE || running == selected,
         .IsEditing = ImGui::IsAnyItemActive(),
+        .IsMonteCarlo = IsMonteCarloRun(m_Schematic.GetSimulationSettings()),
         .IsRunBlocked = running.has_value() || would_run_live,
     };
     if (m_AutoRerun.Update(frame)) {
@@ -520,24 +550,67 @@ void Application::RerunAfterEdits() {
 }
 
 /**
- * @brief   The editor, Output, Analysis Settings and Netlist share the main node as tabs, and Properties sits on the
- *          right.
- * @details Only the editor starts open: the View menu opens the others in their place, and each result brings Output to
- *          the front. Must run before the windows are drawn. A split returns the new node in the given direction and
- *          leaves the rest in its last argument.
+ * @brief   The command bar of the editor, as one fixed row under the menu bar across the whole window, so Run stays in
+ * one place whatever the docking.
+ * @note    Call it before the dockspace, which takes the room the bar leaves.
+ */
+void Application::DrawCommandBar() {
+    const ImGuiStyle &style = ImGui::GetStyle();
+    const float height = GetToolButtonSide() + style.WindowPadding.y * 2.0f;
+    constexpr ImGuiWindowFlags BAR_FLAGS =
+        ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoScrollWithMouse;
+    if (ImGui::BeginViewportSideBar("##command_bar", ImGui::GetMainViewport(), ImGuiDir_Up, height, BAR_FLAGS)) {
+        m_EditorWindow.DrawCommandBar();
+    }
+    ImGui::End();
+}
+
+/**
+ * @brief   The editor and Output sit side by side, and a column on the right holds Properties over Analysis Settings
+ *          and Netlist, which share a node as tabs.
+ * @details The editor, Output and Properties start open, so the schematic and its results are seen together from the
+ *          first run; the others open from the View menu in their place, and ImGui folds away the node of a closed
+ *          window. They start open because a folded node hands its width to the schematic, which keeps it when the
+ *          node comes back. Must run before the windows are drawn. A split returns the new node in the given direction
+ * and leaves the rest in its last argument.
  */
 void Application::SetupDefaultLayout(ImGuiID dockspace_id) {
     ImGui::DockBuilderSetNodeSize(dockspace_id, ImGui::GetMainViewport()->WorkSize);
-    ImGuiID main_id = dockspace_id;
-    const ImGuiID properties_id = ImGui::DockBuilderSplitNode(main_id, ImGuiDir_Right, 0.25f, nullptr, &main_id);
-    // The other windows share the main node as tabs
-    const std::array<const AppWindow *, 4> tabbed_windows{&m_EditorWindow, &m_OutputWindow, &m_SimulationWindow,
-                                                          &m_NetlistWindow};
-    for (const AppWindow *window : tabbed_windows) {
-        ImGui::DockBuilderDockWindow(window->GetWindowTitle().c_str(), main_id);
-    }
+    ImGuiID editor_id = dockspace_id;
+    ImGuiID properties_id =
+        ImGui::DockBuilderSplitNode(editor_id, ImGuiDir_Right, SIDE_COLUMN_SHARE, nullptr, &editor_id);
+    const ImGuiID settings_id =
+        ImGui::DockBuilderSplitNode(properties_id, ImGuiDir_Down, SIDE_BOTTOM_SHARE, nullptr, &properties_id);
+    const ImGuiID output_id = ImGui::DockBuilderSplitNode(editor_id, ImGuiDir_Right, OUTPUT_SHARE, nullptr, &editor_id);
+    ImGui::DockBuilderDockWindow(m_EditorWindow.GetWindowTitle().c_str(), editor_id);
+    ImGui::DockBuilderDockWindow(m_OutputWindow.GetWindowTitle().c_str(), output_id);
     ImGui::DockBuilderDockWindow(m_PropertiesWindow.GetWindowTitle().c_str(), properties_id);
+    ImGui::DockBuilderDockWindow(m_SimulationWindow.GetWindowTitle().c_str(), settings_id);
+    ImGui::DockBuilderDockWindow(m_NetlistWindow.GetWindowTitle().c_str(), settings_id);
     ImGui::DockBuilderFinish(dockspace_id);
+}
+
+/**
+ * @brief   Scales the dock layout with the main window, so each window keeps its share instead of the schematic taking
+ *          the whole change in size.
+ * @param[in] dockspace_id  ID of the main dockspace, whose node must exist.
+ * @note    A minimized window has no size, so it changes nothing and the layout is scaled from its last real size.
+ */
+void Application::FollowWindowSize(const ImGuiID dockspace_id) {
+    const ImVec2 work_size = ImGui::GetMainViewport()->WorkSize;
+    if (work_size.x <= 0.0f || work_size.y <= 0.0f) {
+        return;
+    }
+    ImGuiDockNode *root = ImGui::DockBuilderGetNode(dockspace_id);
+    if (root == nullptr) {
+        return;
+    }
+    const ImVec2 laid_out_size = GetLaidOutSize(*root, m_LayoutSize);
+    const bool has_size = laid_out_size.x > 0.0f && laid_out_size.y > 0.0f;
+    if (has_size && (work_size.x != laid_out_size.x || work_size.y != laid_out_size.y)) {
+        ScaleDockLayout(*root, {work_size.x / laid_out_size.x, work_size.y / laid_out_size.y});
+    }
+    m_LayoutSize = work_size;
 }
 
 void Application::EndFrame() {

@@ -11,21 +11,21 @@ the output sags until the next pulse. That sag, the ripple, is what the plots me
 
 ## 1. Draw a circuit
 
-Start with File > New (Ctrl+N; on macOS, every Ctrl shortcut is Cmd). The window is the schematic editor: a toolbar
-on top, the grid in the middle and a status bar at the bottom that always lists the keys of what you are doing.
+Start with File > New (Ctrl+N; on macOS, every Ctrl shortcut is Cmd). Under the menu, the command bar holds Select, Wire and Probe, then Undo, Redo and Fit, the part search, and at its
+right end the analysis to run, Live and Run. Below it, the schematic editor has the part rail down its left, the grid
+in the middle and a status bar at the bottom that tells how the last run went and the keys of what you are doing.
 
-The toolbar groups its buttons:
+The part rail groups the parts:
 
-- Select, Wire and Probe, then Undo, Redo and Fit;
 - resistor, capacitor and inductor;
-- ground, VCC and the net label;
-- sources, diodes, transistors, controlled sources, adjustable parts (potentiometer and transformer), switches (switch,
-  push button, voltage-controlled switch and relay), logic gates and flip-flops, each a button with a dropdown arrow
-  beside it that picks the part it places;
-- the op-amp;
-- Run, with the analysis it runs.
+- ground, the sources and the supplies and labels (VCC, net label and block pin);
+- diodes, transistors, the op-amp and the controlled sources;
+- adjustable parts (potentiometer and transformer) and switches (switch, push button, voltage-controlled switch, relay
+  and fuse);
+- logic inputs and outputs, gates, flip-flops and the ready logic blocks.
 
-Hover any button for its name and shortcut.
+A button with a mark in its corner is a group: a click places the part last picked, and holding it or a right click
+lists the others. Hover any button for its name and shortcut.
 
 ![The completed source, resistor, capacitor and ground circuit](images/tutorial_build.png)
 
@@ -43,8 +43,9 @@ meet. Press Esc to leave wire mode; Ctrl+Z undoes any step.
 
 ## 2. Find a part
 
-Instead of the toolbar, press Space over the editor and type part of a name, such as `dio`, `cap` or `mos`. Up and
-Down move through the list and Enter, or a click, starts placing the part, which can be rotated with R before the
+Instead of the rail, press Space over the editor, or click the search field in the command bar, and type part of a
+name, such as `dio`, `cap` or `mos`. Up and Down move through the list below the field and Enter, or a click, starts
+placing the part, which can be rotated with R before the
 click that places it.
 
 Start over with File > New and draw the rectifier: a voltage source, a diode found with `dio` to the right of it, a
@@ -55,9 +56,9 @@ the cathode to the top of the capacitor and the resistor, and their bottoms to t
 
 ## 3. Edit a part
 
-A double click on a part opens its properties in a popover beside it, as does Enter with the part selected. Edits
-apply as you type; Enter, Esc or a click outside closes it. A right click opens everything else the part can do:
-its properties, rotate, mirror, flip, measure its current and delete.
+A double click on a part opens its properties in a popover at the top of the schematic, as does Enter with the
+part selected. Edits apply as you type; Enter, Esc or a click outside closes it. A right click opens everything else
+the part can do: its properties, rotate, mirror, flip, measure its current and delete.
 
 ![The voltage source set to Pulse, with its default 0 to 5 V, 1 kHz settings](images/tutorial_properties.png)
 
@@ -81,12 +82,12 @@ Press Esc to leave probe mode. You can also pick traces later in the Output wind
 
 ## 5. Run
 
-The button beside Run names the analysis it runs. Click it to open the analysis list with the settings of the
+The button before Live and Run names the analysis Run runs. Click it to open the analysis list with the settings of the
 selected one: pick Transient and click Suggest, which proposes settings from the sources and parts, here five periods
 of the source (5 ms) with a 5 µs step.
 
-Click Run, or press F5. ngspice runs the circuit, the status bar reports the result, and the Output window opens by
-itself, as a tab beside the schematic, on the tab of the new analysis.
+Click Run, or press F5. ngspice runs the circuit, the status bar reports the result, and the Output window beside the
+schematic turns to the tab of the new analysis.
 
 ![The transient result for the rectifier: output voltage and diode current](images/tutorial_run.png)
 
@@ -95,15 +96,15 @@ for a mean of about 3.88 V. I(D1) is a train of spikes: the source has no resist
 edge refills the capacitor through the diode in a burst of about 1.9 A, and the first, from an empty capacitor,
 reaches 3.8 A. The panel lists the peak-to-peak, mean, RMS and frequency of each trace.
 
-Back on the schematic, a bar above the canvas holds the instant it shows: Play runs through the transient, with the
-voltage labels and, under View > Wire Colors > Current, the wires following each spike. Drag the slider, or the red
-line on the plot, to stop at any instant.
+The schematic shows one instant of the transient, written at the top left of the canvas. A bar under the plot moves
+it: Play runs through the transient, with the voltages and, under View > Wire Colors > Current, the wires following
+each spike. Drag the slider, or the red line on the plot, to stop at any instant.
 
 Every window can float or dock: drag it by its title or tab and drop it on one of the arrows that appear, to place it
 beside, above or below another window or as a tab of it. The layout is kept for the next session, and View > Reset
 Layout brings back the default one.
 
-If a run fails, the status bar says so in red; click it for the error and the ngspice output.
+If a run fails, the status bar says so in red, with the reason; click it for the whole error and the ngspice output.
 
 ## 6. Change a value
 
@@ -121,8 +122,8 @@ output. The next plots use this transient.
 
 - **Zoom and pan**: drag a box or use the wheel on the plot; double-click fits it again.
 - **Trace list**: the column on the left turns traces on and off, voltages and currents apart.
-- **Cursors**: check "Cursors A and B" and drag the two vertical lines. The panel shows the time between them and the
-  statistics over that span only, with the value of each trace at each cursor. Put A on a peak of V(2) and B at the
+- **Cursors**: check "Cursors" at the right of the line over the plot and drag the two vertical lines. The line shows the
+  time between them, and the table the statistics over that span only, with the value of each trace at each cursor. Put A on a peak of V(2) and B at the
   bottom of the sag to read the ripple and how long it takes.
 
 ![Cursors A and B over the transient, with statistics for the selected interval](images/tutorial_cursors.png)

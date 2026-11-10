@@ -35,6 +35,8 @@ constexpr auto ALL_TYPES = std::to_array<ComponentType>({
     ComponentType::VCCS,
     ComponentType::CCCS,
     ComponentType::CCVS,
+    ComponentType::BEHAVIORAL_VOLTAGE,
+    ComponentType::BEHAVIORAL_CURRENT,
     ComponentType::OP_AMP,
     ComponentType::SUBCIRCUIT,
     ComponentType::NET_LABEL,
@@ -44,6 +46,7 @@ constexpr auto ALL_TYPES = std::to_array<ComponentType>({
     ComponentType::PUSH_BUTTON,
     ComponentType::V_SWITCH,
     ComponentType::RELAY,
+    ComponentType::FUSE,
     ComponentType::TRANSFORMER,
     ComponentType::AND,
     ComponentType::OR,
@@ -59,6 +62,8 @@ constexpr auto ALL_TYPES = std::to_array<ComponentType>({
     ComponentType::SR_FLIP_FLOP,
     ComponentType::CLOCK,
     ComponentType::LOGIC_INPUT,
+    ComponentType::LOGIC_OUTPUT,
+    ComponentType::SEVEN_SEGMENT,
 });
 
 } // namespace
@@ -127,6 +132,9 @@ const char *Component::GetNamePrefix() const {
         return "F";
     case ComponentType::CCVS:
         return "H";
+    case ComponentType::BEHAVIORAL_VOLTAGE:
+    case ComponentType::BEHAVIORAL_CURRENT:
+        return "B";
     case ComponentType::SUBCIRCUIT:
         return "X";
     case ComponentType::OP_AMP:
@@ -153,11 +161,15 @@ const char *Component::GetNamePrefix() const {
         return "S";
     case ComponentType::RELAY:
         return "K";
+    case ComponentType::FUSE:
+        return "FU";
     case ComponentType::TRANSFORMER:
         return "T";
     case ComponentType::GROUND:
     case ComponentType::NET_LABEL:
     case ComponentType::PIN:
+    case ComponentType::LOGIC_OUTPUT:
+    case ComponentType::SEVEN_SEGMENT:
         return "";
     }
     return "";
@@ -184,7 +196,10 @@ const char *Component::GetUnit() const {
     case ComponentType::LOGIC_INPUT:
         return "V";
     case ComponentType::CURRENT_SOURCE:
+    case ComponentType::BEHAVIORAL_CURRENT:
         return "A";
+    case ComponentType::BEHAVIORAL_VOLTAGE:
+        return "V";
     case ComponentType::VCVS:
         return "V/V";
     case ComponentType::VCCS:
@@ -210,10 +225,13 @@ const char *Component::GetUnit() const {
     case ComponentType::GROUND:
     case ComponentType::NET_LABEL:
     case ComponentType::PIN:
+    case ComponentType::LOGIC_OUTPUT:
+    case ComponentType::SEVEN_SEGMENT:
     case ComponentType::SWITCH:
     case ComponentType::PUSH_BUTTON:
     case ComponentType::V_SWITCH:
     case ComponentType::RELAY:
+    case ComponentType::FUSE:
     case ComponentType::DIODE:
     case ComponentType::ZENER_DIODE:
     case ComponentType::LED:
@@ -233,13 +251,18 @@ const char *Component::GetUnit() const {
  */
 bool Component::HasValue() const {
     switch (m_Type) {
+    case ComponentType::BEHAVIORAL_VOLTAGE:
+    case ComponentType::BEHAVIORAL_CURRENT:
     case ComponentType::GROUND:
     case ComponentType::NET_LABEL:
     case ComponentType::PIN:
+    case ComponentType::LOGIC_OUTPUT:
+    case ComponentType::SEVEN_SEGMENT:
     case ComponentType::SWITCH:
     case ComponentType::PUSH_BUTTON:
     case ComponentType::V_SWITCH:
     case ComponentType::RELAY:
+    case ComponentType::FUSE:
     case ComponentType::DIODE:
     case ComponentType::ZENER_DIODE:
     case ComponentType::LED:
@@ -303,13 +326,18 @@ bool Component::IsValidValue(const double value) const {
     case ComponentType::CCCS:
     case ComponentType::CCVS:
         return true;
+    case ComponentType::BEHAVIORAL_VOLTAGE:
+    case ComponentType::BEHAVIORAL_CURRENT:
     case ComponentType::GROUND:
     case ComponentType::NET_LABEL:
     case ComponentType::PIN:
+    case ComponentType::LOGIC_OUTPUT:
+    case ComponentType::SEVEN_SEGMENT:
     case ComponentType::SWITCH:
     case ComponentType::PUSH_BUTTON:
     case ComponentType::V_SWITCH:
     case ComponentType::RELAY:
+    case ComponentType::FUSE:
     case ComponentType::DIODE:
     case ComponentType::ZENER_DIODE:
     case ComponentType::LED:
@@ -498,12 +526,64 @@ void Component::ClearInitialCondition() {
 }
 
 /**
+ * @brief   Tells whether this kind of component can have a tolerance.
+ * @return  True for a resistor, capacitor, inductor and voltage source; a source only varies while it is a DC one.
+ */
+bool Component::SupportsTolerance() const {
+    return m_Type == ComponentType::RESISTOR || m_Type == ComponentType::CAPACITOR ||
+           m_Type == ComponentType::INDUCTOR || m_Type == ComponentType::VOLTAGE_SOURCE;
+}
+
+/**
+ * @brief   Tells whether a tolerance is set.
+ * @return  True when SetTolerance() has been called and the tolerance has not been cleared.
+ */
+bool Component::HasTolerance() const {
+    return m_Tolerance.has_value();
+}
+
+/**
+ * @brief   Returns the tolerance.
+ * @return  The percent the value may be off in a Monte Carlo run, or no value when the part does not vary.
+ */
+std::optional<double> Component::GetTolerance() const {
+    return m_Tolerance;
+}
+
+/**
+ * @brief   Sets the tolerance.
+ * @param[in] percent  Percent the value may be off, above 0 and up to MAX_TOLERANCE_PERCENT.
+ * @note    Only a part that SupportsTolerance() takes one, and only a valid one; the call does nothing otherwise.
+ */
+void Component::SetTolerance(const double percent) {
+    if (SupportsTolerance() && percent > 0.0 && percent <= MAX_TOLERANCE_PERCENT) {
+        m_Tolerance = percent;
+    }
+}
+
+/**
+ * @brief   Clears the tolerance, so the part keeps its value in every Monte Carlo run.
+ */
+void Component::ClearTolerance() {
+    m_Tolerance.reset();
+}
+
+/**
  * @brief   Tells whether a kind of part is the pin marker of a subcircuit.
  * @param[in] type  Kind of part.
  * @return  True for ComponentType::PIN.
  */
 bool IsSubcircuitPin(const ComponentType type) {
     return type == ComponentType::PIN;
+}
+
+/**
+ * @brief   Tells whether a kind of part only shows the logic levels of its nodes, with no netlist line of its own.
+ * @param[in] type  Kind of part.
+ * @return  True for the logic output and the 7-segment display.
+ */
+bool IsLogicDisplay(const ComponentType type) {
+    return type == ComponentType::LOGIC_OUTPUT || type == ComponentType::SEVEN_SEGMENT;
 }
 
 /**
@@ -549,6 +629,10 @@ const char *GetTypeName(const ComponentType type) {
         return "CCCS";
     case ComponentType::CCVS:
         return "CCVS";
+    case ComponentType::BEHAVIORAL_VOLTAGE:
+        return "BehavioralVoltage";
+    case ComponentType::BEHAVIORAL_CURRENT:
+        return "BehavioralCurrent";
     case ComponentType::OP_AMP:
         return "OpAmp";
     case ComponentType::SUBCIRCUIT:
@@ -567,6 +651,8 @@ const char *GetTypeName(const ComponentType type) {
         return "VSwitch";
     case ComponentType::RELAY:
         return "Relay";
+    case ComponentType::FUSE:
+        return "Fuse";
     case ComponentType::TRANSFORMER:
         return "Transformer";
     case ComponentType::AND:
@@ -597,6 +683,10 @@ const char *GetTypeName(const ComponentType type) {
         return "Clock";
     case ComponentType::LOGIC_INPUT:
         return "LogicInput";
+    case ComponentType::LOGIC_OUTPUT:
+        return "LogicOutput";
+    case ComponentType::SEVEN_SEGMENT:
+        return "SevenSegment";
     }
     return "Unknown";
 }

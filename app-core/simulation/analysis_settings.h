@@ -21,6 +21,10 @@ struct TransientSettings {
     double StopTime = 10e-3;
     /// Largest step between output points; ngspice may take smaller ones where the signals change fast.
     double TimeStep = 10e-6;
+    /// Seed of the random numbers of the Random sources and the telegraph part of the Noise sources, so a run repeats;
+    /// 0 draws new ones each run. The white and 1/f noise of a Noise source change each run whatever the seed, since
+    /// ngspice does not seed them.
+    unsigned int Seed = 0;
 
     bool operator==(const TransientSettings &) const = default;
 };
@@ -101,6 +105,52 @@ struct TransferFunctionSettings {
     std::string InputSource;
 
     bool operator==(const TransferFunctionSettings &) const = default;
+};
+
+/**
+ * @struct  PoleZeroSettings
+ * @brief   Where a pole-zero analysis measures its output, and which source drives the circuit.
+ * @details The input must be an independent source: a voltage or current source, supply rail, clock or logic input.
+ *          Its terminals are the input port, and the kind of source tells ngspice whether the input is a voltage or a
+ *          current, since poles and zeros depend on what the port is held to.
+ */
+struct PoleZeroSettings {
+    int OutputNode = 0;
+    std::string InputSource;
+
+    bool operator==(const PoleZeroSettings &) const = default;
+};
+
+/// Default range of the S-parameter analysis, where the parts of a radio-frequency circuit work.
+constexpr double DEFAULT_S_START_FREQUENCY = 1e6;
+constexpr double DEFAULT_S_STOP_FREQUENCY = 1e9;
+
+/**
+ * @struct  SParameterSettings
+ * @brief   Frequency range and resolution of an S-parameter analysis.
+ * @details The ports are the pin markers of the schematic that are set as ports, so there is nothing else to pick. A
+ *          logarithmic sweep takes PointsPerDecade points per decade; a linear one takes LinearPoints points in all,
+ *          both ends included, and at least 3, since ngspice gives one point for two.
+ */
+struct SParameterSettings {
+    double StartFrequency = DEFAULT_S_START_FREQUENCY;
+    double StopFrequency = DEFAULT_S_STOP_FREQUENCY;
+    bool IsLogarithmic = true;
+    int PointsPerDecade = 100;
+    int LinearPoints = 101;
+
+    bool operator==(const SParameterSettings &) const = default;
+};
+
+/**
+ * @struct  SensitivitySettings
+ * @brief   The node whose DC voltage a sensitivity analysis measures.
+ * @details Every part with a value is varied one at a time around the DC operating point; there is nothing else to set.
+ */
+struct SensitivitySettings {
+    int OutputNode = 0;
+
+    bool operator==(const SensitivitySettings &) const = default;
 };
 
 /**
