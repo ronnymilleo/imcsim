@@ -15,8 +15,8 @@
 #include "imgui_impl_sdlgpu3.h"
 #include "imgui_internal.h"
 #include "implot.h"
-#include "native/native_backend.h"
 #include "ngspice/ngspice_library.h"
+#include "nodalys/nodalys_backend.h"
 #include "simulation/simulator.h"
 #include "windows/dock_layout.h"
 #include <SDL3/SDL.h>
@@ -279,7 +279,7 @@ void Application::ApplyPreferences() {
     const std::string_view wanted_backend = m_Preferences.SimulationBackend;
     if (wanted_backend != Core::GetBackend().GetName()) {
         // SetBackend is safe while no simulation runs; ApplyPreferences runs on the frame thread between runs
-        Core::SetBackend(wanted_backend == "Nodalys" ? std::make_unique<Core::NativeBackend>() : nullptr);
+        Core::SetBackend(wanted_backend == "Nodalys" ? std::make_unique<Core::NodalysBackend>() : nullptr);
     }
     if (m_Preferences == m_SavedPreferences) {
         return;

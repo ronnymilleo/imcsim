@@ -1,6 +1,6 @@
 /**
  * @file    nonlinear_tests.cpp
- * @brief   Theory checks for the native nonlinear devices: the diode equation, the forward-active bipolar
+ * @brief   Theory checks for the Nodalys nonlinear devices: the diode equation, the forward-active bipolar
  *          transistor and the level-1 MOSFET regions, each against hand-computed values.
  * @details The references are analytic: the Shockley diode equation solved for the loop, the Gummel-Poon forward
  *          current gain, and the level-1 saturation current of the parameter documentation in mosfet.h.
@@ -14,7 +14,7 @@
 #include "components/vcc.h"
 #include "components/voltage_source.h"
 #include "model/circuit.h"
-#include "native/native_backend.h"
+#include "nodalys/nodalys_backend.h"
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 #include <cmath>
@@ -25,7 +25,7 @@ namespace {
 using Catch::Matchers::WithinAbs;
 using Catch::Matchers::WithinRel;
 
-/// kT/q at 300.15 K, the temperature the native models are evaluated at (pn_junction.h).
+/// kT/q at 300.15 K, the temperature the Nodalys models are evaluated at (pn_junction.h).
 constexpr double VT = 8.617087399994e-5 * 300.15;
 
 double CurrentOf(const Core::OperatingPoint &point, const std::string &name) {
@@ -56,7 +56,7 @@ TEST_CASE("A diode loop solves the Shockley equation") {
     circuit.Add(diode, {2, 0});
     circuit.Add(ground, {0});
 
-    Core::NativeBackend backend;
+    Core::NodalysBackend backend;
     const Core::OperatingPointRun run = backend.RunOperatingPoint(circuit);
     REQUIRE(run.Result.has_value());
     // Theory: I = (5 V − Vd) / 10k with I = IS·e^(Vd/Vt); the junction sits near 0.6 V
@@ -92,7 +92,7 @@ TEST_CASE("A Zener diode in breakdown holds its breakdown voltage") {
     circuit.Add(zener, {0, 2});
     circuit.Add(ground, {0});
 
-    Core::NativeBackend backend;
+    Core::NodalysBackend backend;
     const Core::OperatingPointRun run = backend.RunOperatingPoint(circuit);
     if (!run.Result) {
         for (const Core::SimulatorMessage &message : run.Messages) {
@@ -133,7 +133,7 @@ TEST_CASE("A common-emitter amplifier sits at its quiescent point") {
     circuit.Add(transistor, {2, 3, 0});
     circuit.Add(ground, {0});
 
-    Core::NativeBackend backend;
+    Core::NodalysBackend backend;
     const Core::OperatingPointRun run = backend.RunOperatingPoint(circuit);
     REQUIRE(run.Result.has_value());
     // Hand analysis: IB ≈ (12 V − 0.7 V) / 470k = 24 uA, IC = beta·IB = 2.4 mA, VC = 12 V − 2.4 V = 9.6 V
@@ -170,7 +170,7 @@ TEST_CASE("An NMOS common-source stage follows the level-1 saturation current") 
     circuit.Add(transistor, {2, 3, 0});
     circuit.Add(ground, {0});
 
-    Core::NativeBackend backend;
+    Core::NodalysBackend backend;
     const Core::OperatingPointRun run = backend.RunOperatingPoint(circuit);
     INFO(std::format("v1={} v2={} v3={}", run.Result->NodeVoltages[1], run.Result->NodeVoltages[2],
                      run.Result->NodeVoltages[3]));
@@ -210,7 +210,7 @@ TEST_CASE("A PMOS with its gate low conducts from the supply") {
     circuit.Add(transistor, {2, 3, 1});
     circuit.Add(ground, {0});
 
-    Core::NativeBackend backend;
+    Core::NodalysBackend backend;
     const Core::OperatingPointRun run = backend.RunOperatingPoint(circuit);
     REQUIRE(run.Result.has_value());
     // VSG = 10 V and a threshold of 2 V give an overdrive of 8 V, but the load pulls the drain up to where the

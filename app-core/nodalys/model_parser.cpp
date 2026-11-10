@@ -1,9 +1,9 @@
 /**
  * @file    model_parser.cpp
- * @brief   Turns the .model text of a library model into the parameter structs the native devices evaluate.
+ * @brief   Turns the .model text of a library model into the parameter structs Nodalys evaluates.
  */
 
-#include "native/model_parser.h"
+#include "nodalys/model_parser.h"
 
 #include "model/circuit.h"
 #include "model/library_model.h"
@@ -16,7 +16,7 @@
 #include <utility>
 #include <vector>
 
-namespace Core::Native {
+namespace Core {
 
 namespace {
 
@@ -71,7 +71,7 @@ std::map<std::string, std::string> ParameterList(const std::string &text) {
  * @param[in] model  Model the parameter belongs to, for the error message.
  * @param[in] key    Upper-case parameter name.
  * @param[in] text   Value text.
- * @return  The value, or the reason the native backend cannot read it.
+ * @return  The value, or the reason Nodalys cannot read it.
  */
 std::expected<double, std::string> Number(const LibraryModel &model, const std::string &key, const std::string &text) {
     if (text.starts_with('{')) {
@@ -156,7 +156,7 @@ std::expected<BJTParameters, std::string> ResolveParameters(const Circuit &circu
         return std::unexpected(model.error());
     }
     // Unset parameters keep the ngspice defaults, which BJTParameters starts from; junction potentials and grading
-    // coefficients a vendor model sets stay at the ngspice defaults, which the native model evaluates with
+    // coefficients a vendor model sets stay at the ngspice defaults, which Nodalys evaluates with
     BJTParameters parameters;
     const std::map<std::string, std::string> values = ParameterList((*model)->Text);
     const auto set = [&](const char *key, double &target) -> std::expected<void, std::string> {
@@ -202,7 +202,7 @@ std::expected<MOSFETParameters, std::string> ResolveParameters(const Circuit &ci
     }
     const std::map<std::string, std::string> values = ParameterList((*model)->Text);
     // The netlist writes no W= and L= with a library model, so ngspice takes the channel size from the model or its
-    // own instance defaults of 100 microns, never from the part; the native backend does the same
+    // own instance defaults of 100 microns, never from the part; Nodalys does the same
     MOSFETParameters parameters;
     parameters.Width = 100e-6;
     parameters.Length = 100e-6;
@@ -246,4 +246,4 @@ std::expected<MOSFETParameters, std::string> ResolveParameters(const Circuit &ci
     return parameters;
 }
 
-} // namespace Core::Native
+} // namespace Core

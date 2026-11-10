@@ -12,8 +12,8 @@
 #include "components/source.h"
 #include "components/vcc.h"
 #include "components/voltage_source.h"
-#include "native/native_backend.h"
 #include "ngspice/ngspice_backend.h"
+#include "nodalys/nodalys_backend.h"
 
 #include <nodalys/circuit_builder.h>
 #include <nodalys/nodalys.h>
@@ -213,7 +213,7 @@ OwnedCircuit BuildCascadedBjtAmplifier(const std::size_t stages) {
 
 TEST_CASE("Nodalys solves 100-node and 500-node RC ladder networks faster than ngspice with exact parity",
           "[benchmark][nodalys]") {
-    Core::NativeBackend native;
+    Core::NodalysBackend nodalys;
 
     SECTION("100-node RC Ladder DC Operating Point") {
         constexpr std::size_t STAGES = 100;
@@ -224,7 +224,7 @@ TEST_CASE("Nodalys solves 100-node and 500-node RC ladder networks faster than n
         REQUIRE(exp.Result.has_value());
 
         Core::OperatingPointRun act;
-        const double nodalys_ms = MeasureMs([&]() { act = native.RunOperatingPoint(circuit.Instance); });
+        const double nodalys_ms = MeasureMs([&]() { act = nodalys.RunOperatingPoint(circuit.Instance); });
         REQUIRE(act.Result.has_value());
 
         REQUIRE(act.Result->NodeVoltages.size() == exp.Result->NodeVoltages.size());
@@ -244,7 +244,7 @@ TEST_CASE("Nodalys solves 100-node and 500-node RC ladder networks faster than n
         REQUIRE(exp.Result.has_value());
 
         Core::OperatingPointRun act;
-        const double nodalys_ms = MeasureMs([&]() { act = native.RunOperatingPoint(circuit.Instance); });
+        const double nodalys_ms = MeasureMs([&]() { act = nodalys.RunOperatingPoint(circuit.Instance); });
         REQUIRE(act.Result.has_value());
 
         REQUIRE(act.Result->NodeVoltages.size() == exp.Result->NodeVoltages.size());
@@ -260,7 +260,7 @@ TEST_CASE("Nodalys solves 100-node RC ladder transient analysis with high-speed 
     constexpr std::size_t STAGES = 100;
     const OwnedCircuit circuit = BuildRcLadder(STAGES, 100.0, 10e3, 1e-9);
     const Core::TransientSettings settings{.StopTime = 50e-6, .TimeStep = 1e-6};
-    Core::NativeBackend native;
+    Core::NodalysBackend nodalys;
 
     Core::TransientRun exp;
     const double ngspice_ms =
@@ -269,7 +269,7 @@ TEST_CASE("Nodalys solves 100-node RC ladder transient analysis with high-speed 
 
     Core::TransientRun act;
     const double nodalys_ms =
-        MeasureMs([&]() { act = native.RunTransient(circuit.Instance, settings, std::nullopt, {}); });
+        MeasureMs([&]() { act = nodalys.RunTransient(circuit.Instance, settings, std::nullopt, {}); });
     REQUIRE(act.Result.has_value());
 
     const std::size_t last_node = STAGES + 1;
@@ -285,7 +285,7 @@ TEST_CASE("Nodalys simulates 50-stage RLC transmission line wave dynamics with l
     constexpr std::size_t STAGES = 50;
     const OwnedCircuit circuit = BuildRlcLine(STAGES, 0.2, 1e-6, 100e-12, 100.0);
     const Core::TransientSettings settings{.StopTime = 100e-9, .TimeStep = 1e-9};
-    Core::NativeBackend native;
+    Core::NodalysBackend nodalys;
 
     Core::TransientRun exp;
     const double ngspice_ms =
@@ -294,7 +294,7 @@ TEST_CASE("Nodalys simulates 50-stage RLC transmission line wave dynamics with l
 
     Core::TransientRun act;
     const double nodalys_ms =
-        MeasureMs([&]() { act = native.RunTransient(circuit.Instance, settings, std::nullopt, {}); });
+        MeasureMs([&]() { act = nodalys.RunTransient(circuit.Instance, settings, std::nullopt, {}); });
     REQUIRE(act.Result.has_value());
 
     const std::size_t total_nodes = 2 * STAGES + 1;
@@ -304,14 +304,14 @@ TEST_CASE("Nodalys simulates 50-stage RLC transmission line wave dynamics with l
 TEST_CASE("Nodalys converges on 30-stage nonlinear diode ladder with rapid Newton iterations", "[benchmark][nodalys]") {
     constexpr std::size_t STAGES = 30;
     const OwnedCircuit circuit = BuildDiodeLadder(STAGES, 25.0, 10e3);
-    Core::NativeBackend native;
+    Core::NodalysBackend nodalys;
 
     Core::OperatingPointRun exp;
     const double ngspice_ms = MeasureMs([&]() { exp = Ngspice().RunOperatingPoint(circuit.Instance); });
     REQUIRE(exp.Result.has_value());
 
     Core::OperatingPointRun act;
-    const double nodalys_ms = MeasureMs([&]() { act = native.RunOperatingPoint(circuit.Instance); });
+    const double nodalys_ms = MeasureMs([&]() { act = nodalys.RunOperatingPoint(circuit.Instance); });
     REQUIRE(act.Result.has_value());
 
     REQUIRE(act.Result->NodeVoltages.size() == exp.Result->NodeVoltages.size());
@@ -328,7 +328,7 @@ TEST_CASE("Nodalys executes DC sweeps across multi-stage cascaded BJT amplifiers
     const OwnedCircuit circuit = BuildCascadedBjtAmplifier(STAGES);
     const Core::DCSweepSettings settings{
         .Swept = {.Source = "VIN", .Start = 0.5, .Stop = 1.5, .Step = 0.05}}; // 21 points
-    Core::NativeBackend native;
+    Core::NodalysBackend nodalys;
 
     Core::DCSweepRun exp;
     const double ngspice_ms =
@@ -337,7 +337,7 @@ TEST_CASE("Nodalys executes DC sweeps across multi-stage cascaded BJT amplifiers
 
     Core::DCSweepRun act;
     const double nodalys_ms =
-        MeasureMs([&]() { act = native.RunDCSweep(circuit.Instance, settings, std::nullopt); }, 2);
+        MeasureMs([&]() { act = nodalys.RunDCSweep(circuit.Instance, settings, std::nullopt); }, 2);
     REQUIRE(act.Result.has_value());
 
     REQUIRE(act.Result->SweptValues.size() == exp.Result->SweptValues.size());
@@ -366,7 +366,7 @@ TEST_CASE("Nodalys computes wideband small-signal AC sweeps on 100-node networks
 
     const Core::ACSweepSettings settings{
         .StartFrequency = 10.0, .StopFrequency = 100e6, .PointsPerDecade = 50}; // ~350 points
-    Core::NativeBackend native;
+    Core::NodalysBackend nodalys;
 
     Core::ACSweepRun exp;
     const double ngspice_ms =
@@ -375,7 +375,7 @@ TEST_CASE("Nodalys computes wideband small-signal AC sweeps on 100-node networks
 
     Core::ACSweepRun act;
     const double nodalys_ms =
-        MeasureMs([&]() { act = native.RunACSweep(circuit.Instance, settings, std::nullopt); }, 2);
+        MeasureMs([&]() { act = nodalys.RunACSweep(circuit.Instance, settings, std::nullopt); }, 2);
     REQUIRE(act.Result.has_value());
 
     REQUIRE(act.Result->Frequencies.size() == exp.Result->Frequencies.size());

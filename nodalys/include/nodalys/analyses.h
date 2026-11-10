@@ -95,6 +95,28 @@ struct NoiseConfig {
 };
 
 /**
+ * @enum    FrequencySweepType
+ * @brief   Frequency spacing mode for AC and S-parameter frequency sweeps.
+ */
+enum class FrequencySweepType {
+    Linear,
+    Decade,
+    Octave
+};
+
+/**
+ * @struct  SParameterConfig
+ * @brief   Configuration for multiport small-signal scattering parameter analysis (.sp).
+ */
+struct SParameterConfig {
+    FrequencySweepType SweepType = FrequencySweepType::Decade;
+    double StartFrequency = 1e6;
+    double StopFrequency = 1e9;
+    int Points = 100;
+    std::vector<CircuitPort> Ports;
+};
+
+/**
  * @struct  RunMonitor
  * @brief   Asynchronous control and streaming callbacks for interactive/live simulation.
  */
@@ -140,6 +162,12 @@ std::expected<TransferFunctionResult, std::string> ComputeTransferFunction(
 std::expected<NoiseResult, std::string> ComputeNoise(
     const Circuit &circuit,
     const NoiseConfig &config,
+    const ConvergenceOptions &options = {},
+    std::vector<DiagnosticMessage> *messages = nullptr);
+
+std::expected<SParameterResult, std::string> ComputeSParameters(
+    const Circuit &circuit,
+    const SParameterConfig &config,
     const ConvergenceOptions &options = {},
     std::vector<DiagnosticMessage> *messages = nullptr);
 

@@ -588,6 +588,7 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
         case 'V':
         case 'I':
         case 'D':
+        case 'P':
             if (tokens.size() >= 3) {
                 nodes.Register(tokens[1]);
                 nodes.Register(tokens[2]);
@@ -741,6 +742,28 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
                 cfg.StartFrequency = ParseSpiceNumber(tokens[sidx + 1]).value_or(1.0);
                 cfg.StopFrequency = ParseSpiceNumber(tokens[sidx + 2]).value_or(1e6);
                 result.Analyses.push_back({AnalysisKind::Noise, cfg});
+            } else if (dir == ".SP") {
+                // .SP [DEC|OCT|LIN] <np> <fstart> <fstop>
+                if (tokens.size() < 4) {
+                    return std::unexpected(std::format("Malformed .sp directive: '{}'", line));
+                }
+                SParameterConfig cfg;
+                int start_idx = 1;
+                const std::string scale_type = ToUpper(tokens[1]);
+                if (scale_type == "DEC") {
+                    cfg.SweepType = FrequencySweepType::Decade;
+                    start_idx = 2;
+                } else if (scale_type == "OCT") {
+                    cfg.SweepType = FrequencySweepType::Octave;
+                    start_idx = 2;
+                } else if (scale_type == "LIN") {
+                    cfg.SweepType = FrequencySweepType::Linear;
+                    start_idx = 2;
+                }
+                cfg.Points = static_cast<int>(ParseSpiceNumber(tokens[start_idx]).value_or(10));
+                cfg.StartFrequency = ParseSpiceNumber(tokens[start_idx + 1]).value_or(1e6);
+                cfg.StopFrequency = ParseSpiceNumber(tokens[start_idx + 2]).value_or(1e9);
+                result.Analyses.push_back({AnalysisKind::SParameters, cfg});
             } else if (dir == ".OPTIONS") {
                 for (std::size_t i = 1; i < tokens.size(); ++i) {
                     const auto eq = tokens[i].find('=');
@@ -820,6 +843,9 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
             double dc_val = 0.0;
             double ac_mag = 0.0;
             double ac_phase = 0.0;
+            bool is_port = false;
+            int port_num = 0;
+            double z0 = 50.0;
 
             enum class WaveformType { None, Pulse, Sine, Exp, Pwl, Sffm, Am };
             WaveformType wtype = WaveformType::None;
@@ -828,6 +854,30 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
             std::size_t idx = 3;
             while (idx < tokens.size()) {
                 const std::string u = ToUpper(tokens[idx]);
+                if (u == "PORTNUM" && idx + 1 < tokens.size()) {
+                    port_num = static_cast<int>(ParseSpiceNumber(tokens[idx + 1]).value_or(1));
+                    idx += 2;
+                    is_port = true;
+                    continue;
+                }
+                if (u.starts_with("PORTNUM=")) {
+                    port_num = static_cast<int>(ParseSpiceNumber(u.substr(8)).value_or(1));
+                    ++idx;
+                    is_port = true;
+                    continue;
+                }
+                if (u == "Z0" && idx + 1 < tokens.size()) {
+                    z0 = ParseSpiceNumber(tokens[idx + 1]).value_or(50.0);
+                    idx += 2;
+                    is_port = true;
+                    continue;
+                }
+                if (u.starts_with("Z0=")) {
+                    z0 = ParseSpiceNumber(u.substr(3)).value_or(50.0);
+                    ++idx;
+                    is_port = true;
+                    continue;
+                }
                 if (u == "DC") {
                     if (idx + 1 < tokens.size()) {
                         dc_val = ParseSpiceNumber(tokens[idx + 1]).value_or(0.0);
@@ -866,6 +916,19 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
                     dc_val = *num;
                 }
                 ++idx;
+            }
+
+            if (is_port) {
+                if (port_num <= 0) {
+                    const auto digits = name.find_first_of("0123456789");
+                    if (digits != std::string::npos) {
+                        port_num = std::atoi(name.c_str() + digits);
+                    } else {
+                        port_num = 1;
+                    }
+                }
+                builder.AddPort(port_num, n_pos, z0);
+                break;
             }
 
             const bool is_voltage = (first_char == 'V');
@@ -951,6 +1014,33 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
                 else builder.AddIdc(name, n_pos, n_neg, dc_val, ac_mag, ac_phase);
                 break;
             }
+            break;
+        }
+
+        case 'P': { // Port element: P<name> <pos> <neg> [portnum=<N>] [z0=<Z>] or P1 <pos> <neg> [Z0]
+            if (tokens.size() < 3) return std::unexpected(std::format("Malformed port: '{}'", line));
+            const NodeId n_pos = nodes.Resolve(tokens[1]);
+            int port_num = 1;
+            const auto digits = name.find_first_of("0123456789");
+            if (digits != std::string::npos) {
+                port_num = std::atoi(name.c_str() + digits);
+            }
+            double z0 = 50.0;
+            for (std::size_t i = 3; i < tokens.size(); ++i) {
+                const std::string u = ToUpper(tokens[i]);
+                if (u.starts_with("PORTNUM=")) {
+                    port_num = static_cast<int>(ParseSpiceNumber(u.substr(8)).value_or(port_num));
+                } else if (u.starts_with("Z0=")) {
+                    z0 = ParseSpiceNumber(u.substr(3)).value_or(z0);
+                } else if (u == "PORTNUM" && i + 1 < tokens.size()) {
+                    port_num = static_cast<int>(ParseSpiceNumber(tokens[++i]).value_or(port_num));
+                } else if (u == "Z0" && i + 1 < tokens.size()) {
+                    z0 = ParseSpiceNumber(tokens[++i]).value_or(z0);
+                } else if (const auto val = ParseSpiceNumber(tokens[i])) {
+                    z0 = *val;
+                }
+            }
+            builder.AddPort(port_num, n_pos, z0);
             break;
         }
 

@@ -147,4 +147,32 @@ std::string ExportCsv(const NoiseResult &result) {
     return ss.str();
 }
 
+std::string ExportCsv(const SParameterResult &result) {
+    std::ostringstream ss;
+    ss << "Frequency_Hz";
+    const int ports = result.GetPortCount();
+    for (int i = 1; i <= ports; ++i) {
+        for (int j = 1; j <= ports; ++j) {
+            ss << std::format(",S{0}{1}_dB,S{0}{1}_deg,S{0}{1}_re,S{0}{1}_im", i, j);
+        }
+    }
+    ss << "\n";
+
+    constexpr double RAD_TO_DEG = 180.0 / std::numbers::pi;
+    for (std::size_t pt = 0; pt < result.Frequencies.size(); ++pt) {
+        ss << std::format("{:.8g}", result.Frequencies[pt]);
+        for (int i = 1; i <= ports; ++i) {
+            for (int j = 1; j <= ports; ++j) {
+                const auto s = result.Get(pt, i, j);
+                const double mag = std::abs(s);
+                const double mag_db = 20.0 * std::log10(std::max(mag, 1e-15));
+                const double phase_deg = std::arg(s) * RAD_TO_DEG;
+                ss << std::format(",{:.8g},{:.8g},{:.8g},{:.8g}", mag_db, phase_deg, s.real(), s.imag());
+            }
+        }
+        ss << "\n";
+    }
+    return ss.str();
+}
+
 } // namespace nodalys

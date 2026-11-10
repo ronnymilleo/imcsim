@@ -3,15 +3,15 @@
  * @brief   Single-pass circuit compiler: translates a `Core::Circuit` into an autonomous `nodalys::Circuit`.
  */
 
-#ifndef IMCSIM_NATIVE_COMPILER_H
-#define IMCSIM_NATIVE_COMPILER_H
+#ifndef IMCSIM_NODALYS_COMPILER_H
+#define IMCSIM_NODALYS_COMPILER_H
 
 #include "model/circuit.h"
 #include <expected>
 #include <nodalys/nodalys.h>
 #include <string>
 
-namespace Core::Native {
+namespace Core {
 
 /**
  * @brief   Compiles a `Core::Circuit` for the Nodalys solver using `nodalys::CircuitBuilder`.
@@ -20,6 +20,6 @@ namespace Core::Native {
  */
 std::expected<nodalys::Circuit, std::string> CompileCircuit(const Circuit &circuit);
 
-} // namespace Core::Native
+} // namespace Core
 
-#endif // IMCSIM_NATIVE_COMPILER_H
+#endif // IMCSIM_NODALYS_COMPILER_H

@@ -1,11 +1,12 @@
 /**
- * @file    native_backend.cpp
+ * @file    nodalys_backend.cpp
  * @brief   The Nodalys simulation backend, which solves circuits with the autonomous Nodalys engine.
  */
 
-#include "native/native_backend.h"
+#include "nodalys/nodalys_backend.h"
 
-#include "native/compiler.h"
+#include "components/logic_part.h"
+#include "nodalys/compiler.h"
 #include <format>
 #include <nodalys/nodalys.h>
 #include <utility>
@@ -14,12 +15,12 @@ namespace Core {
 
 namespace {
 
-constexpr auto NATIVE_ANALYSES = {AnalysisKind::OPERATING_POINT, AnalysisKind::TRANSIENT,
-                                  AnalysisKind::DC_SWEEP,        AnalysisKind::AC_SWEEP,
-                                  AnalysisKind::NOISE,           AnalysisKind::TRANSFER_FUNCTION};
+constexpr auto NODALYS_ANALYSES = {
+    AnalysisKind::OPERATING_POINT, AnalysisKind::TRANSIENT,         AnalysisKind::DC_SWEEP,    AnalysisKind::AC_SWEEP,
+    AnalysisKind::NOISE,           AnalysisKind::TRANSFER_FUNCTION, AnalysisKind::S_PARAMETERS};
 
 std::expected<nodalys::Circuit, std::string> CompileOrFail(const Circuit &circuit) {
-    auto compiled = Native::CompileCircuit(circuit);
+    auto compiled = CompileCircuit(circuit);
     if (!compiled) {
         return std::unexpected(std::format("Nodalys cannot simulate this circuit: {}", compiled.error()));
     }
@@ -34,24 +35,31 @@ void ForwardMessages(const std::vector<nodalys::DiagnosticMessage> &source, std:
 
 } // namespace
 
-NativeBackend::NativeBackend() {
-    m_Capabilities.Analyses = NATIVE_ANALYSES;
+NodalysBackend::NodalysBackend() {
+    m_Capabilities.Analyses = NODALYS_ANALYSES;
     for (const ComponentType type : {ComponentType::BEHAVIORAL_VOLTAGE, ComponentType::BEHAVIORAL_CURRENT}) {
         m_Capabilities.UnsupportedParts[type] = "Nodalys has no device for behavioral sources yet";
     }
     m_Capabilities.UnsupportedParts[ComponentType::FUSE] = "Nodalys has no device for fuses yet";
+    for (int index = 0; index <= static_cast<int>(ComponentType::SEVEN_SEGMENT); ++index) {
+        const auto type = static_cast<ComponentType>(index);
+        if (IsLogicPart(type)) {
+            m_Capabilities.UnsupportedPartsByAnalysis[AnalysisKind::S_PARAMETERS][type] =
+                "S-parameters are small-signal, and digital parts have no small-signal RF model";
+        }
+    }
 }
 
-std::string_view NativeBackend::GetName() const {
+std::string_view NodalysBackend::GetName() const {
     return "Nodalys";
 }
 
-const BackendCapabilities &NativeBackend::GetCapabilities() const {
+const BackendCapabilities &NodalysBackend::GetCapabilities() const {
     return m_Capabilities;
 }
 
-OperatingPointRun NativeBackend::RunOperatingPoint(const Circuit &circuit,
-                                                   const std::optional<double> &temperature_celsius) {
+OperatingPointRun NodalysBackend::RunOperatingPoint(const Circuit &circuit,
+                                                    const std::optional<double> &temperature_celsius) {
     (void)temperature_celsius;
     OperatingPointRun run;
     auto compiled = CompileOrFail(circuit);
@@ -76,8 +84,8 @@ OperatingPointRun NativeBackend::RunOperatingPoint(const Circuit &circuit,
     return run;
 }
 
-TransientRun NativeBackend::RunTransient(const Circuit &circuit, const TransientSettings &settings,
-                                         const std::optional<double> &temperature_celsius, const RunMonitor &monitor) {
+TransientRun NodalysBackend::RunTransient(const Circuit &circuit, const TransientSettings &settings,
+                                          const std::optional<double> &temperature_celsius, const RunMonitor &monitor) {
     (void)temperature_celsius;
     TransientRun run;
     auto compiled = CompileOrFail(circuit);
@@ -143,8 +151,8 @@ TransientRun NativeBackend::RunTransient(const Circuit &circuit, const Transient
     return run;
 }
 
-DCSweepRun NativeBackend::RunDCSweep(const Circuit &circuit, const DCSweepSettings &settings,
-                                     const std::optional<double> &temperature_celsius) {
+DCSweepRun NodalysBackend::RunDCSweep(const Circuit &circuit, const DCSweepSettings &settings,
+                                      const std::optional<double> &temperature_celsius) {
     (void)temperature_celsius;
     DCSweepRun run;
     auto compiled = CompileOrFail(circuit);
@@ -192,8 +200,8 @@ DCSweepRun NativeBackend::RunDCSweep(const Circuit &circuit, const DCSweepSettin
     return run;
 }
 
-ACSweepRun NativeBackend::RunACSweep(const Circuit &circuit, const ACSweepSettings &settings,
-                                     const std::optional<double> &temperature_celsius) {
+ACSweepRun NodalysBackend::RunACSweep(const Circuit &circuit, const ACSweepSettings &settings,
+                                      const std::optional<double> &temperature_celsius) {
     (void)temperature_celsius;
     ACSweepRun run;
     auto compiled = CompileOrFail(circuit);
@@ -228,7 +236,7 @@ ACSweepRun NativeBackend::RunACSweep(const Circuit &circuit, const ACSweepSettin
     return run;
 }
 
-NoiseRun NativeBackend::RunNoise(const Circuit &circuit, const NoiseSettings &settings) {
+NoiseRun NodalysBackend::RunNoise(const Circuit &circuit, const NoiseSettings &settings) {
     NoiseRun run;
     auto compiled = CompileOrFail(circuit);
     if (!compiled) {
@@ -267,8 +275,8 @@ NoiseRun NativeBackend::RunNoise(const Circuit &circuit, const NoiseSettings &se
     return run;
 }
 
-TransferFunctionRun NativeBackend::RunTransferFunction(const Circuit &circuit,
-                                                       const TransferFunctionSettings &settings) {
+TransferFunctionRun NodalysBackend::RunTransferFunction(const Circuit &circuit,
+                                                        const TransferFunctionSettings &settings) {
     TransferFunctionRun run;
     auto compiled = CompileOrFail(circuit);
     if (!compiled) {
@@ -304,7 +312,7 @@ TransferFunctionRun NativeBackend::RunTransferFunction(const Circuit &circuit,
  * @param[in] settings  Output node.
  * @return  The sensitivity of each part, or an error.
  */
-SensitivityRun NativeBackend::RunSensitivity(const Circuit & /*circuit*/, const SensitivitySettings & /*settings*/) {
+SensitivityRun NodalysBackend::RunSensitivity(const Circuit & /*circuit*/, const SensitivitySettings & /*settings*/) {
     return {std::unexpected("Nodalys has no sensitivity analysis yet; it runs with the ngspice backend"), {}};
 }
 
@@ -314,7 +322,7 @@ SensitivityRun NativeBackend::RunSensitivity(const Circuit & /*circuit*/, const 
  * @param[in] settings  Output node and input source.
  * @return  The poles and zeros, or an error.
  */
-PoleZeroRun NativeBackend::RunPoleZero(const Circuit & /*circuit*/, const PoleZeroSettings & /*settings*/) {
+PoleZeroRun NodalysBackend::RunPoleZero(const Circuit & /*circuit*/, const PoleZeroSettings & /*settings*/) {
     return {std::unexpected("Nodalys has no pole-zero analysis yet; it runs with the ngspice backend"), {}};
 }
 
@@ -324,8 +332,38 @@ PoleZeroRun NativeBackend::RunPoleZero(const Circuit & /*circuit*/, const PoleZe
  * @param[in] settings  Frequency range and points.
  * @return  The S-parameter matrix at each frequency, or an error.
  */
-SParametersRun NativeBackend::RunSParameters(const Circuit & /*circuit*/, const SParameterSettings & /*settings*/) {
-    return {std::unexpected("Nodalys has no S-parameter analysis yet; it runs with the ngspice backend"), {}};
+SParametersRun NodalysBackend::RunSParameters(const Circuit &circuit, const SParameterSettings &settings) {
+    SParametersRun run;
+    auto compiled = CompileOrFail(circuit);
+    if (!compiled) {
+        run.Result = std::unexpected(compiled.error());
+        return run;
+    }
+
+    nodalys::SParameterConfig config{
+        .SweepType = settings.IsLogarithmic ? nodalys::FrequencySweepType::Decade : nodalys::FrequencySweepType::Linear,
+        .StartFrequency = settings.StartFrequency,
+        .StopFrequency = settings.StopFrequency,
+        .Points = settings.IsLogarithmic ? settings.PointsPerDecade : settings.LinearPoints};
+    for (const auto &port : circuit.GetPorts()) {
+        config.Ports.push_back({.Number = port.Number, .Node = port.Node, .ReferenceOhms = port.ReferenceOhms});
+    }
+
+    std::vector<nodalys::DiagnosticMessage> messages;
+    auto result = nodalys::ComputeSParameters(*compiled, config, {}, &messages);
+    ForwardMessages(messages, run.Messages);
+    if (!result) {
+        run.Result = std::unexpected(result.error());
+        return run;
+    }
+
+    SParameters sp;
+    sp.Frequencies = std::move(result->Frequencies);
+    sp.ReferenceOhms = std::move(result->ReferenceOhms);
+    sp.Values = std::move(result->Values);
+    sp.Warnings = std::move(result->Warnings);
+    run.Result = std::move(sp);
+    return run;
 }
 
 } // namespace Core

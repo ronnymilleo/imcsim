@@ -65,6 +65,12 @@ std::expected<NoiseResult, std::string> ComputeNoise(
     const ConvergenceOptions &options,
     std::vector<DiagnosticMessage> *messages);
 
+std::expected<SParameterResult, std::string> ComputeSParameters(
+    CompiledCircuit &compiled,
+    const SParameterConfig &settings,
+    const ConvergenceOptions &options,
+    std::vector<DiagnosticMessage> *messages);
+
 } // namespace nodalys
 
 #endif // NODALYS_INTERNAL_ANALYSES_H

@@ -125,6 +125,16 @@ public:
 
     NodeId AddNode() { return ++m_MaxNode; }
 
+    void AddPort(int number, NodeId node, double reference_ohms) {
+        Track(node);
+        m_Compiled.Ports.push_back({number, node, reference_ohms});
+    }
+
+    void AddPort(const CircuitPort &port) {
+        Track(port.Node);
+        m_Compiled.Ports.push_back(port);
+    }
+
     void Track(NodeId node) {
         if (node > m_MaxNode) {
             m_MaxNode = node;
@@ -742,6 +752,14 @@ void CircuitBuilder::SetCircuitNodeCount(int count) {
 }
 NodeId CircuitBuilder::AddNode() {
     return m_Impl->AddNode();
+}
+
+void CircuitBuilder::AddPort(const int number, const NodeId node, const double reference_ohms) {
+    m_Impl->AddPort(number, node, reference_ohms);
+}
+
+void CircuitBuilder::AddPort(const CircuitPort &port) {
+    m_Impl->AddPort(port);
 }
 
 void CircuitBuilder::AddResistor(std::string name, NodeId n1, NodeId n2, double r, double temp_c) {

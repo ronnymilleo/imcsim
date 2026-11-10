@@ -179,13 +179,13 @@ std::expected<TransientResult, std::string> ComputeTransient(
             .IsTransient = true, .UseInitialConditions = true, .Time = 0.0, .TimeStep = output_step};
         const NewtonOutcome outcome = SolveNewton(*compiled.System, compiled.Devices, x_now, initial, options);
         if (!outcome.Converged) {
-            return std::unexpected("The native solver could not start the transient from the initial conditions");
+            return std::unexpected("Nodalys could not start the transient from the initial conditions");
         }
         DescribeOutcome(outcome, "initial point", messages);
     } else {
         const NewtonOutcome outcome = SolveNewton(*compiled.System, compiled.Devices, x_now, TimeContext{}, options);
         if (!outcome.Converged) {
-            return std::unexpected("The native solver found no operating point to start the transient from");
+            return std::unexpected("Nodalys found no operating point to start the transient from");
         }
         DescribeOutcome(outcome, "operating point", messages);
     }
@@ -223,7 +223,7 @@ std::expected<TransientResult, std::string> ComputeTransient(
             step *= 0.1;
             if (step < MIN_STEP) {
                 failure =
-                    std::format("The native solver could not converge at t = {}; the time step collapsed", time + step);
+                    std::format("Nodalys could not converge at t = {}; the time step collapsed", time + step);
                 break;
             }
             continue;
@@ -256,7 +256,7 @@ std::expected<TransientResult, std::string> ComputeTransient(
             step = std::max(step * std::max(LTE_SAFETY * std::pow(ratio, -1.0 / 3.0), STEP_SHRINK_LIMIT), MIN_STEP);
             if (step <= MIN_STEP) {
                 failure =
-                    std::format("The native solver kept rejecting the time step at t = {}; the step collapsed", time);
+                    std::format("Nodalys kept rejecting the time step at t = {}; the step collapsed", time);
                 break;
             }
             continue;

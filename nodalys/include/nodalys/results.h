@@ -6,6 +6,10 @@
 #ifndef NODALYS_RESULTS_H
 #define NODALYS_RESULTS_H
 
+#include <algorithm>
+#include <cmath>
+#include <complex>
+#include <optional>
 #include <string>
 #include <variant>
 #include <vector>
@@ -134,13 +138,82 @@ struct NoiseResult {
     std::vector<NoiseContribution> Contributions;
 };
 
+/**
+ * @struct  SParameterResult
+ * @brief   Multiport Scattering Parameters (S-matrix) and derived RF figures of merit across frequency.
+ */
+struct SParameterResult {
+    std::vector<double> Frequencies;
+    /// Reference impedance in Ohms per port, ordered by 1-based port index.
+    std::vector<double> ReferenceOhms;
+    /// Flattened complex S-matrix values stored as: [freq_idx][row - 1][col - 1].
+    std::vector<std::complex<double>> Values;
+    /// Diagnostic warnings.
+    std::vector<std::string> Warnings;
+
+    int GetPortCount() const {
+        return static_cast<int>(ReferenceOhms.size());
+    }
+
+    std::complex<double> Get(const std::size_t frequency_idx, const int row, const int column) const {
+        const auto ports = static_cast<std::size_t>(GetPortCount());
+        return Values[(frequency_idx * ports + static_cast<std::size_t>(row - 1)) * ports +
+                      static_cast<std::size_t>(column - 1)];
+    }
+
+    std::optional<double> ReturnLossDb(const std::size_t frequency_idx, const int port) const {
+        constexpr double MIN_MAG = 1e-15;
+        const auto s = Get(frequency_idx, port, port);
+        const double mag = std::abs(s);
+        if (mag < MIN_MAG) {
+            return std::nullopt;
+        }
+        return -20.0 * std::log10(mag);
+    }
+
+    std::optional<double> InsertionLossDb(const std::size_t frequency_idx, const int to_port,
+                                          const int from_port) const {
+        constexpr double MIN_MAG = 1e-15;
+        const auto s = Get(frequency_idx, to_port, from_port);
+        const double mag = std::abs(s);
+        if (mag < MIN_MAG) {
+            return std::nullopt;
+        }
+        return -20.0 * std::log10(mag);
+    }
+
+    std::optional<double> Vswr(const std::size_t frequency_idx, const int port) const {
+        constexpr double TOL = 1e-12;
+        const double mag = std::abs(Get(frequency_idx, port, port));
+        if (mag >= 1.0 - TOL) {
+            return std::nullopt;
+        }
+        return (1.0 + mag) / (1.0 - mag);
+    }
+
+    std::optional<std::complex<double>> InputImpedance(const std::size_t frequency_idx, const int port) const {
+        constexpr double TOL = 1e-12;
+        if (port < 1 || static_cast<std::size_t>(port) > ReferenceOhms.size()) {
+            return std::nullopt;
+        }
+        const double z0 = ReferenceOhms[static_cast<std::size_t>(port - 1)];
+        const auto s = Get(frequency_idx, port, port);
+        const std::complex<double> denom = 1.0 - s;
+        if (std::abs(denom) < TOL) {
+            return std::nullopt;
+        }
+        return z0 * (1.0 + s) / denom;
+    }
+};
+
 using SimulationResult = std::variant<
     OperatingPointResult,
     TransientResult,
     DcSweepResult,
     AcSweepResult,
     TransferFunctionResult,
-    NoiseResult
+    NoiseResult,
+    SParameterResult
 >;
 
 } // namespace nodalys

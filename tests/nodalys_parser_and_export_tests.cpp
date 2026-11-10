@@ -178,6 +178,39 @@ TEST_CASE("SPICE netlists parse into runnable circuits and simulation directives
         CHECK(parsed->Analyses[2].Kind == nodalys::AnalysisKind::TransferFunction);
         CHECK(parsed->Analyses[3].Kind == nodalys::AnalysisKind::Noise);
     }
+
+    SECTION("S-parameter directive parsing (.sp) and port sources") {
+        constexpr std::string_view netlist = "* Two-port attenuator\n"
+                                             "Vsport1 1 0 dc 0 portnum 1 z0 50\n"
+                                             "Vsport2 2 0 dc 0 portnum 2 z0 75\n"
+                                             "R1 1 2 100\n"
+                                             ".sp dec 5 1Meg 100Meg\n"
+                                             ".end\n";
+
+        const auto parsed = nodalys::ParseNetlist(netlist);
+        REQUIRE(parsed.has_value());
+        REQUIRE(parsed->Analyses.size() == 1);
+        CHECK(parsed->Analyses[0].Kind == nodalys::AnalysisKind::SParameters);
+
+        const auto &cfg = std::get<nodalys::SParameterConfig>(parsed->Analyses[0].Config);
+        CHECK(cfg.SweepType == nodalys::FrequencySweepType::Decade);
+        CHECK(cfg.Points == 5);
+        CHECK_THAT(cfg.StartFrequency, WithinRel(1e6, 1e-9));
+        CHECK_THAT(cfg.StopFrequency, WithinRel(100e6, 1e-9));
+
+        REQUIRE(parsed->CircuitInstance.Ports().size() == 2);
+        CHECK(parsed->CircuitInstance.Ports()[0].Number == 1);
+        CHECK(parsed->CircuitInstance.Ports()[0].Node == 1);
+        CHECK_THAT(parsed->CircuitInstance.Ports()[0].ReferenceOhms, WithinRel(50.0, 1e-9));
+        CHECK(parsed->CircuitInstance.Ports()[1].Number == 2);
+        CHECK(parsed->CircuitInstance.Ports()[1].Node == 2);
+        CHECK_THAT(parsed->CircuitInstance.Ports()[1].ReferenceOhms, WithinRel(75.0, 1e-9));
+
+        const auto sp = nodalys::ComputeSParameters(parsed->CircuitInstance, cfg);
+        REQUIRE(sp.has_value());
+        CHECK(sp->GetPortCount() == 2);
+        CHECK(sp->Frequencies.size() == 11);
+    }
 }
 
 TEST_CASE("Simulation results export to RAW, CSV, and JSON formats", "[nodalys][export]") {
@@ -239,6 +272,32 @@ TEST_CASE("Simulation results export to RAW, CSV, and JSON formats", "[nodalys][
         CHECK(json_tran.contains("\"node_voltages\""));
     }
 
+    SECTION("Touchstone, CSV, and JSON Exporters for S-Parameters") {
+        nodalys::SParameterResult sp_res;
+        sp_res.Frequencies = {1e9};
+        sp_res.ReferenceOhms = {50.0, 50.0};
+        // Row 1: S11=0.1, S12=0.8; Row 2: S21=0.8, S22=0.1
+        sp_res.Values = {{0.1, 0.0}, {0.8, 0.0}, {0.8, 0.0}, {0.1, 0.0}};
+
+        const std::string ts = nodalys::ExportTouchstone(sp_res);
+        CHECK(ts.contains("# HZ S RI R 50"));
+        CHECK(ts.contains("1000000000 0.1 0 0.8 0 0.8 0 0.1 0"));
+
+        const std::string csv = nodalys::ExportCsv(sp_res);
+        CHECK(csv.contains("Frequency_Hz,S11_dB,S11_deg,S11_re,S11_im"));
+        CHECK(csv.contains(",-20,0,0.1,0"));
+
+        const std::string json = nodalys::ExportJson(sp_res);
+        CHECK(json.contains("\"analysis\": \"s_parameters\""));
+        CHECK(json.contains("\"ports\": 2"));
+        CHECK(json.contains("\"frequencies\""));
+        CHECK(json.contains("\"values\""));
+
+        const std::string raw = nodalys::ExportRaw(sp_res);
+        CHECK(raw.contains("Plotname: S-Parameter Analysis"));
+        CHECK(raw.contains("Flags: complex"));
+    }
+
     SECTION("SaveStringToFile") {
         const std::string temp_path = "/tmp/nodalys_test_export.csv";
         const std::string csv_content = nodalys::ExportCsv(*op);
@@ -248,8 +307,50 @@ TEST_CASE("Simulation results export to RAW, CSV, and JSON formats", "[nodalys][
     }
 }
 
+TEST_CASE("SParameterResult computes derived RF figures of merit", "[nodalys][sp]") {
+    nodalys::SParameterResult result;
+    result.Frequencies = {1e9};
+    result.ReferenceOhms = {50.0, 50.0};
+    // S11 = 0.5 (magnitude 0.5), S12 = 0.5, S21 = 0.5, S22 = 0.5
+    result.Values = {{0.5, 0.0}, {0.5, 0.0}, {0.5, 0.0}, {0.5, 0.0}};
+
+    // Return loss for |S11| = 0.5 is -20*log10(0.5) ~ 6.0206 dB
+    const auto rl = result.ReturnLossDb(0, 1);
+    REQUIRE(rl.has_value());
+    CHECK_THAT(*rl, WithinRel(6.0205999, 1e-5));
+
+    // Insertion loss for |S21| = 0.5 is -20*log10(0.5) ~ 6.0206 dB
+    const auto il = result.InsertionLossDb(0, 2, 1);
+    REQUIRE(il.has_value());
+    CHECK_THAT(*il, WithinRel(6.0205999, 1e-5));
+
+    // VSWR for |S11| = 0.5 is (1 + 0.5) / (1 - 0.5) = 3.0
+    const auto vswr = result.Vswr(0, 1);
+    REQUIRE(vswr.has_value());
+    CHECK_THAT(*vswr, WithinRel(3.0, 1e-6));
+
+    // Input impedance: Zin = Z0 * (1 + S11) / (1 - S11) = 50 * (1.5 / 0.5) = 150 ohms
+    const auto zin = result.InputImpedance(0, 1);
+    REQUIRE(zin.has_value());
+    CHECK_THAT(zin->real(), WithinRel(150.0, 1e-6));
+    CHECK_THAT(zin->imag(), WithinAbs(0.0, 1e-9));
+
+    // Zero reflection |S11| = 0 => VSWR = 1.0, Zin = 50 ohms, ReturnLoss = nullopt
+    result.Values[0] = {0.0, 0.0};
+    const auto vswr0 = result.Vswr(0, 1);
+    REQUIRE(vswr0.has_value());
+    CHECK_THAT(*vswr0, WithinRel(1.0, 1e-6));
+
+    const auto zin0 = result.InputImpedance(0, 1);
+    REQUIRE(zin0.has_value());
+    CHECK_THAT(zin0->real(), WithinRel(50.0, 1e-6));
+
+    CHECK(!result.ReturnLossDb(0, 1).has_value());
+}
+
 TEST_CASE("The Nodalys standalone binary runs netlists from arguments or standard input", "[nodalys][cli]") {
-    const std::string cli_path = "./out/debug/bin/nodalys";
+    const std::string cli_path =
+        std::filesystem::exists("./out/release/bin/nodalys") ? "./out/release/bin/nodalys" : "./out/debug/bin/nodalys";
     if (!std::filesystem::exists(cli_path)) {
         SKIP("Nodalys CLI binary not present in default build directory");
     }
@@ -308,6 +409,33 @@ TEST_CASE("The Nodalys standalone binary runs netlists from arguments or standar
         CHECK(csv_content.contains("Variable,Type,Value,Unit"));
         CHECK(csv_content.contains("V(1),Voltage,12,V"));
         CHECK(csv_content.contains("V(2),Voltage,6,V"));
+
+        std::filesystem::remove(test_netlist_path);
+        std::filesystem::remove(test_output_path);
+    }
+
+    SECTION("CLI execution with .sp analysis and Touchstone output") {
+        const std::string test_netlist_path = "/tmp/nodalys_cli_sp_in.cir";
+        const std::string test_output_path = "/tmp/nodalys_cli_sp_out.s2p";
+
+        const std::string netlist = "* Test SP Attenuator\n"
+                                    "Vsport1 1 0 dc 0 portnum 1 z0 50\n"
+                                    "Vsport2 2 0 dc 0 portnum 2 z0 50\n"
+                                    "R1 1 2 50\n"
+                                    ".sp dec 2 1e6 1e8\n"
+                                    ".end\n";
+        REQUIRE(nodalys::SaveStringToFile(test_netlist_path, netlist));
+
+        const std::string cmd =
+            std::format("{} -b -a sp -f touchstone -o {} {}", cli_path, test_output_path, test_netlist_path);
+        const int rc = std::system(cmd.c_str());
+        CHECK(rc == 0);
+        REQUIRE(std::filesystem::exists(test_output_path));
+
+        std::ifstream out_file(test_output_path);
+        std::string ts_content((std::istreambuf_iterator<char>(out_file)), std::istreambuf_iterator<char>());
+        CHECK(ts_content.contains("# HZ S RI R 50"));
+        CHECK(ts_content.contains("! Nodalys S-Parameter Simulation"));
 
         std::filesystem::remove(test_netlist_path);
         std::filesystem::remove(test_output_path);

@@ -77,7 +77,7 @@ std::expected<NoiseResult, std::string> ComputeNoise(
     std::vector<double> x_dc(static_cast<std::size_t>(size), 0.0);
     const NewtonOutcome outcome = SolveNewton(*compiled.System, compiled.Devices, x_dc, TimeContext{}, options);
     if (!outcome.Converged) {
-        return std::unexpected("The native solver found no operating point to linearize the noise analysis around");
+        return std::unexpected("Nodalys found no operating point to linearize the noise analysis around");
     }
     DescribeOutcome(outcome, "operating point", messages);
 
@@ -133,7 +133,7 @@ std::expected<NoiseResult, std::string> ComputeNoise(
         const double frequency = result.Frequencies[k];
         const double omega = 2.0 * std::numbers::pi * frequency;
         if (!compiled.System->SolveAcTranspose(reactive, omega, out_unknown, adjoint)) {
-            return std::unexpected(std::format("The native noise solver encountered a singular matrix at f = {} Hz",
+            return std::unexpected(std::format("The Nodalys noise solver encountered a singular matrix at f = {} Hz",
                                                frequency));
         }
 

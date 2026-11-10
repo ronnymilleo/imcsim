@@ -125,12 +125,12 @@ bool MnaSystem::Solve(std::vector<double> &x) const {
 
 namespace {
 
-bool SolveComplexSystem(const ComplexDenseMatrix &y_orig, const std::vector<std::complex<double>> &b_orig,
-                        std::vector<std::complex<double>> &x) {
+bool SolveComplexSystemMultiple(const ComplexDenseMatrix &y_orig,
+                                const std::vector<std::vector<std::complex<double>>> &b_orig_list,
+                                std::vector<std::vector<std::complex<double>>> &x_list) {
     const std::size_t n = y_orig.Rows();
     ComplexDenseMatrix factors = y_orig;
     std::vector<double> row_scale(n, 1.0);
-    std::vector<std::complex<double>> scaled_rhs = b_orig;
 
     // 1. Row equilibration scaling
     for (std::size_t r = 0; r < n; ++r) {
@@ -143,29 +143,53 @@ bool SolveComplexSystem(const ComplexDenseMatrix &y_orig, const std::vector<std:
             for (std::size_t c = 0; c < n; ++c) {
                 factors.At(r, c) *= row_scale[r];
             }
-            scaled_rhs[r] *= row_scale[r];
         }
     }
 
-    if (!factors.FactorizeLU() || !factors.Solve(scaled_rhs, x)) {
+    if (!factors.FactorizeLU()) {
         return false;
     }
 
-    // 2. One step of complex iterative refinement: r = b - Y * x, solve Y * dx = r, x += dx
-    std::vector<std::complex<double>> scaled_residual(n, std::complex<double>(0.0, 0.0));
-    for (std::size_t r = 0; r < n; ++r) {
-        std::complex<double> yx(0.0, 0.0);
-        for (std::size_t c = 0; c < n; ++c) {
-            yx += y_orig.At(r, c) * x[c];
+    x_list.resize(b_orig_list.size());
+    for (std::size_t k = 0; k < b_orig_list.size(); ++k) {
+        const auto &b_orig = b_orig_list[k];
+        std::vector<std::complex<double>> scaled_rhs(n);
+        for (std::size_t r = 0; r < n; ++r) {
+            scaled_rhs[r] = b_orig[r] * row_scale[r];
         }
-        scaled_residual[r] = (b_orig[r] - yx) * row_scale[r];
-    }
-    std::vector<std::complex<double>> dx;
-    if (factors.Solve(scaled_residual, dx)) {
-        for (std::size_t i = 0; i < n; ++i) {
-            x[i] += dx[i];
+
+        std::vector<std::complex<double>> &x = x_list[k];
+        if (!factors.Solve(scaled_rhs, x)) {
+            return false;
+        }
+
+        // 2. Complex iterative refinement: r = b - Y * x, solve Y * dx = r, x += dx
+        std::vector<std::complex<double>> scaled_residual(n, std::complex<double>(0.0, 0.0));
+        for (std::size_t r = 0; r < n; ++r) {
+            std::complex<double> yx(0.0, 0.0);
+            for (std::size_t c = 0; c < n; ++c) {
+                yx += y_orig.At(r, c) * x[c];
+            }
+            scaled_residual[r] = (b_orig[r] - yx) * row_scale[r];
+        }
+        std::vector<std::complex<double>> dx;
+        if (factors.Solve(scaled_residual, dx)) {
+            for (std::size_t i = 0; i < n; ++i) {
+                x[i] += dx[i];
+            }
         }
     }
+    return true;
+}
+
+bool SolveComplexSystem(const ComplexDenseMatrix &y_orig, const std::vector<std::complex<double>> &b_orig,
+                        std::vector<std::complex<double>> &x) {
+    const std::vector<std::vector<std::complex<double>>> b_list = {b_orig};
+    std::vector<std::vector<std::complex<double>>> x_list;
+    if (!SolveComplexSystemMultiple(y_orig, b_list, x_list)) {
+        return false;
+    }
+    x = std::move(x_list[0]);
     return true;
 }
 
@@ -188,6 +212,23 @@ bool MnaSystem::SolveAc(const MnaSystem &reactive, const double omega,
         }
     }
     return SolveComplexSystem(y_orig, b_orig, x_ac);
+}
+
+bool MnaSystem::SolveAcMultiple(const MnaSystem &reactive, const double omega,
+                                const std::vector<std::vector<std::complex<double>>> &rhs_list,
+                                std::vector<std::vector<std::complex<double>>> &solutions) const {
+    const std::size_t n = m_A.Rows();
+    if (reactive.m_A.Rows() != n) {
+        return false;
+    }
+
+    ComplexDenseMatrix y_orig(n, n);
+    for (std::size_t r = 0; r < n; ++r) {
+        for (std::size_t c = 0; c < n; ++c) {
+            y_orig.At(r, c) = std::complex<double>(m_A.At(r, c), omega * reactive.m_A.At(r, c));
+        }
+    }
+    return SolveComplexSystemMultiple(y_orig, rhs_list, solutions);
 }
 
 bool MnaSystem::SolveAcTranspose(const MnaSystem &reactive, const double omega, const int output_unknown,

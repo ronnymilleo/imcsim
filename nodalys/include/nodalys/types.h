@@ -27,6 +27,18 @@ struct DiagnosticMessage {
 };
 
 /**
+ * @struct  CircuitPort
+ * @brief   RF scattering parameter port definition.
+ */
+struct CircuitPort {
+    int Number = 1;
+    NodeId Node = 0;
+    double ReferenceOhms = 50.0;
+
+    bool operator==(const CircuitPort &) const = default;
+};
+
+/**
  * @struct  DiodeParameters
  * @brief   Shockley diode and junction charge parameters matching Berkeley SPICE3.
  */

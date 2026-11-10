@@ -50,7 +50,7 @@ std::optional<std::string> ReadFileContent(const std::string &path) {
 
 int main(int argc, char **argv) {
     CLI::App app{"Nodalys - Autonomous SPICE Circuit Simulator\n"
-                 "High-performance native MNA simulation engine with zero external dependencies."};
+                 "High-performance autonomous MNA simulation engine with zero external dependencies."};
 
     std::string input_file;
     std::string output_file;
@@ -71,10 +71,10 @@ int main(int argc, char **argv) {
     app.add_option("netlist", input_file, "Path to SPICE netlist file (.cir, .sp, .net) or '-' for stdin");
     app.add_flag("-b,--batch", batch_mode, "Run in batch mode (suppress interactive messages)");
     app.add_option("-o,--output", output_file, "Destination output file (default: stdout)");
-    app.add_option("-f,--format", format_str, "Output format: raw (Nutmeg ASCII), csv, json (default: raw)")
-        ->check(CLI::IsMember({"raw", "raw-ascii", "csv", "json"}, CLI::ignore_case));
-    app.add_option("-a,--analysis", analysis_override, "Override analysis: op, tran, dc, ac, tf, noise")
-        ->check(CLI::IsMember({"op", "tran", "dc", "ac", "tf", "noise"}, CLI::ignore_case));
+    app.add_option("-f,--format", format_str, "Output format: raw (Nutmeg ASCII), csv, json, touchstone (default: raw)")
+        ->check(CLI::IsMember({"raw", "raw-ascii", "csv", "json", "touchstone", "s2p"}, CLI::ignore_case));
+    app.add_option("-a,--analysis", analysis_override, "Override analysis: op, tran, dc, ac, tf, noise, sp")
+        ->check(CLI::IsMember({"op", "tran", "dc", "ac", "tf", "noise", "sp"}, CLI::ignore_case));
     app.add_option("-s,--step", step_override, "Override transient step time / sweep step");
     app.add_option("-t,--stop", stop_override, "Override transient stop time");
 
@@ -144,6 +144,8 @@ int main(int argc, char **argv) {
             cfg.StopTime = stop_override.value_or(1e-3);
             cfg.MaxStep = cfg.TimeStep;
             parsed.Analyses.push_back({nodalys::AnalysisKind::Transient, cfg});
+        } else if (a_lower == "sp") {
+            parsed.Analyses.push_back({nodalys::AnalysisKind::SParameters, nodalys::SParameterConfig{}});
         }
     }
 
@@ -249,6 +251,21 @@ int main(int argc, char **argv) {
             sim_result = std::move(*res);
             break;
         }
+
+        case nodalys::AnalysisKind::SParameters: {
+            const auto &cfg = std::get<nodalys::SParameterConfig>(analysis.Config);
+            if (verbose && !batch_mode) {
+                std::cout << std::format("Running S-Parameter (.sp) analysis: {} Hz to {} Hz\n",
+                                         cfg.StartFrequency, cfg.StopFrequency);
+            }
+            auto res = nodalys::ComputeSParameters(parsed.CircuitInstance, cfg, parsed.Options, verbose ? &diagnostics : nullptr);
+            if (!res) {
+                std::cerr << std::format("Simulation Error: {}\n", res.error());
+                return EXIT_FAILURE;
+            }
+            sim_result = std::move(*res);
+            break;
+        }
         }
 
         const auto sim_end = std::chrono::steady_clock::now();
@@ -263,6 +280,12 @@ int main(int argc, char **argv) {
             exported = nodalys::ExportCsv(sim_result);
         } else if (fmt_lower == "json") {
             exported = nodalys::ExportJson(sim_result);
+        } else if (fmt_lower == "touchstone" || fmt_lower == "s2p") {
+            if (std::holds_alternative<nodalys::SParameterResult>(sim_result)) {
+                exported = nodalys::ExportTouchstone(std::get<nodalys::SParameterResult>(sim_result));
+            } else {
+                exported = nodalys::ExportCsv(sim_result);
+            }
         } else {
             // raw or raw-ascii
             exported = nodalys::ExportRaw(sim_result, sim_title);

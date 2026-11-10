@@ -48,7 +48,7 @@ XDG_RUNTIME_DIR=/tmp TMPDIR=/tmp cmake --build build -j$(nproc) --target imcsim-
 ---
 
 ## Validation & Test Coverage
-1. **Layer 1 — Closed-Form Analytical Goldens ([`tests/reference/`](../tests/reference/README.md), [`tests/native_backend_tests.cpp`](../tests/native_backend_tests.cpp))**:
+1. **Layer 1 — Closed-Form Analytical Goldens ([`tests/reference/`](../tests/reference/README.md), [`tests/nodalys_backend_tests.cpp`](../tests/nodalys_backend_tests.cpp))**:
    - Python generator [`tests/reference/generate_goldens.py`](../tests/reference/generate_goldens.py) and CSV reference tables (`rc_step.csv`, `rl_step.csv`, `rlc_underdamped.csv`, `diode_shockley_dc.csv`, `rc_bode.csv`, `rlc_bode.csv`).
 2. **Layer 2 — Dual-Backend Parity ([`tests/backend_comparison_tests.cpp`](../tests/backend_comparison_tests.cpp))**:
    - Full parity across `.op`, `.dc`, `.tran`, `.ac`, `.tf`, and `.noise`.

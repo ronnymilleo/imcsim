@@ -39,6 +39,9 @@ public:
     /// Returns true if any reactive element has a non-zero initial condition (uic).
     bool HasInitialConditions() const;
 
+    /// Configured RF ports for S-parameter analysis.
+    const std::vector<CircuitPort> &Ports() const;
+
     /// Internal accessor for solver execution.
     explicit Circuit(std::unique_ptr<CircuitImpl> impl);
     CircuitImpl &Impl();

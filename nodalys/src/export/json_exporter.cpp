@@ -136,4 +136,32 @@ std::string ExportJson(const NoiseResult &result) {
     return ss.str();
 }
 
+std::string ExportJson(const SParameterResult &result) {
+    std::ostringstream ss;
+    ss << "{\n  \"analysis\": \"s_parameters\",\n";
+    ss << "  \"ports\": " << result.GetPortCount() << ",\n";
+    ss << "  \"reference_ohms\": ";
+    WriteDoubleArray(ss, result.ReferenceOhms);
+    ss << ",\n  \"frequencies\": ";
+    WriteDoubleArray(ss, result.Frequencies);
+    ss << ",\n  \"values\": [\n";
+    const int ports = result.GetPortCount();
+    for (std::size_t pt = 0; pt < result.Frequencies.size(); ++pt) {
+        ss << "    [";
+        for (int i = 1; i <= ports; ++i) {
+            for (int j = 1; j <= ports; ++j) {
+                const auto s = result.Get(pt, i, j);
+                if (i > 1 || j > 1) {
+                    ss << ", ";
+                }
+                ss << "{\"re\": " << std::format("{:.8g}", s.real())
+                   << ", \"im\": " << std::format("{:.8g}", s.imag()) << "}";
+            }
+        }
+        ss << (pt + 1 < result.Frequencies.size() ? "],\n" : "]\n");
+    }
+    ss << "  ]\n}\n";
+    return ss.str();
+}
+
 } // namespace nodalys

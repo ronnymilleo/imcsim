@@ -29,7 +29,7 @@ std::expected<AcSweepResult, std::string> ComputeACSweep(
     std::vector<double> x_dc(static_cast<std::size_t>(size), 0.0);
     const NewtonOutcome outcome = SolveNewton(*compiled.System, compiled.Devices, x_dc, TimeContext{}, options);
     if (!outcome.Converged) {
-        return std::unexpected("The native solver found no operating point to linearize the AC sweep around");
+        return std::unexpected("Nodalys found no operating point to linearize the AC sweep around");
     }
     DescribeOutcome(outcome, "operating point", messages);
 
@@ -79,7 +79,7 @@ std::expected<AcSweepResult, std::string> ComputeACSweep(
     for (const double frequency : result.Frequencies) {
         const double omega = 2.0 * std::numbers::pi * frequency;
         if (!compiled.System->SolveAc(reactive, omega, x_ac)) {
-            return std::unexpected(std::format("The native AC solver encountered a singular matrix at f = {} Hz",
+            return std::unexpected(std::format("The Nodalys AC solver encountered a singular matrix at f = {} Hz",
                                                frequency));
         }
 

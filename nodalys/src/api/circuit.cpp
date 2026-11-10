@@ -27,6 +27,11 @@ bool Circuit::HasInitialConditions() const {
     return m_Impl ? m_Impl->HasInitialConditions() : false;
 }
 
+const std::vector<CircuitPort> &Circuit::Ports() const {
+    static const std::vector<CircuitPort> EMPTY_PORTS;
+    return m_Impl ? m_Impl->Ports() : EMPTY_PORTS;
+}
+
 CircuitImpl &Circuit::Impl() {
     return *m_Impl;
 }

@@ -44,7 +44,7 @@ std::expected<TransferFunctionResult, std::string> ComputeTransferFunction(
     std::vector<double> x_dc(static_cast<std::size_t>(size), 0.0);
     const NewtonOutcome outcome = SolveNewton(*compiled.System, compiled.Devices, x_dc, TimeContext{}, options);
     if (!outcome.Converged) {
-        return std::unexpected("The native solver found no operating point for the transfer function");
+        return std::unexpected("Nodalys found no operating point for the transfer function");
     }
     DescribeOutcome(outcome, "operating point", messages);
 
@@ -60,7 +60,7 @@ std::expected<TransferFunctionResult, std::string> ComputeTransferFunction(
 
     std::vector<double> dx_in(static_cast<std::size_t>(size), 0.0);
     if (!compiled.System->Solve(dx_in)) {
-        return std::unexpected("The native solver encountered a singular matrix while computing the transfer function");
+        return std::unexpected("Nodalys encountered a singular matrix while computing the transfer function");
     }
 
     TransferFunctionResult result;
@@ -89,7 +89,7 @@ std::expected<TransferFunctionResult, std::string> ComputeTransferFunction(
     compiled.System->AddRhs(out_idx, 1.0);
     std::vector<double> dx_out(static_cast<std::size_t>(size), 0.0);
     if (!compiled.System->Solve(dx_out)) {
-        return std::unexpected("The native solver encountered a singular matrix while computing the output impedance");
+        return std::unexpected("Nodalys encountered a singular matrix while computing the output impedance");
     }
     const double z_out = dx_out[static_cast<std::size_t>(out_idx)];
     result.OutputImpedance =
