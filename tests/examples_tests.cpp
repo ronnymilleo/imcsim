@@ -103,11 +103,6 @@ TEST_CASE("Every example either runs on Nodalys or is flagged unsupported", "[ex
         OpenOrFail(example, schematic);
         const Core::Circuit circuit = schematic.BuildCircuit();
 
-        // Digital examples use logic gates and flip-flops, which Nodalys flags in its capability matrix
-        if (std::string_view(example.Group) == "Digital") {
-            CHECK(Core::FindUnsupported(nodalys, circuit, Core::AnalysisKind::OPERATING_POINT).has_value());
-            continue;
-        }
         CHECK_FALSE(Core::FindUnsupported(nodalys, circuit, Core::AnalysisKind::OPERATING_POINT).has_value());
 
         // The precision rectifier example uses a vendor op-amp subcircuit kept as raw SPICE text

@@ -202,8 +202,7 @@ void PreferencesWindow::DrawResults() {
         if (ImGui::Selectable("Nodalys", m_Preferences.SimulationBackend == "Nodalys")) {
             m_Preferences.SimulationBackend = "Nodalys";
         }
-        ImGui::SetItemTooltip("Nodalys, the built-in solver of imcsim; it runs the operating point, the transient and "
-                              "the DC sweep, without the logic parts for now");
+        ImGui::SetItemTooltip("Nodalys, the built-in solver of imcsim; it runs native analog and digital simulations");
         ImGui::EndCombo();
     }
     ImGui::EndTable();

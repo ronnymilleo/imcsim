@@ -7,8 +7,10 @@
  */
 
 #include "components/capacitor.h"
+#include "components/clock.h"
 #include "components/ground.h"
 #include "components/inductor.h"
+#include "components/logic_input.h"
 #include "components/logic_part.h"
 #include "components/potentiometer.h"
 #include "components/resistor.h"
@@ -19,6 +21,7 @@
 #include "model/subcircuit.h"
 #include "native/native_backend.h"
 #include "simulation/simulation_backend.h"
+#include "simulation/simulator.h"
 #include <algorithm>
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
@@ -84,14 +87,14 @@ TEST_CASE("Nodalys names itself and lists what it runs") {
     REQUIRE(capabilities.Analyses.contains(Core::AnalysisKind::TRANSFER_FUNCTION));
 }
 
-TEST_CASE("The native backend reports the logic parts as unsupported") {
+TEST_CASE("The native backend reports logic parts and analog parts as supported") {
     const Core::NativeBackend backend;
     const std::optional<std::string> gate = Core::FindUnsupported(
         backend, std::set<Core::ComponentType>{Core::ComponentType::AND}, Core::AnalysisKind::OPERATING_POINT);
-    REQUIRE(gate.has_value());
+    REQUIRE(!gate.has_value());
     const std::optional<std::string> flip_flop = Core::FindUnsupported(
         backend, std::set<Core::ComponentType>{Core::ComponentType::JK_FLIP_FLOP}, Core::AnalysisKind::TRANSIENT);
-    REQUIRE(flip_flop.has_value());
+    REQUIRE(!flip_flop.has_value());
     // Resistors, sources and the other analog parts raise no objection
     const std::optional<std::string> analog = Core::FindUnsupported(
         backend,
@@ -399,7 +402,7 @@ TEST_CASE("A subcircuit instance flattens with its parameters") {
     REQUIRE_THAT(run.Result->NodeVoltages[2], WithinRel(9.0, 1e-5));
 }
 
-TEST_CASE("A circuit with a digital part fails with the reason, not a crash") {
+TEST_CASE("A circuit with a digital part simulates its operating point natively") {
     Core::VCC supply;
     supply.SetName("V1");
     supply.SetValue(5.0);
@@ -412,7 +415,9 @@ TEST_CASE("A circuit with a digital part fails with the reason, not a crash") {
     circuit.Add(ground, {0});
     Core::NativeBackend backend;
     const Core::OperatingPointRun run = backend.RunOperatingPoint(circuit);
-    REQUIRE(!run.Result.has_value());
+    REQUIRE(run.Result.has_value());
+    REQUIRE(run.Result->NodeVoltages.size() >= 3);
+    CHECK(run.Result->NodeVoltages[2] > 4.8);
 }
 
 TEST_CASE("The AC sweep of an RC low-pass filter hits -3 dB and -45 deg at the corner frequency") {
@@ -496,4 +501,72 @@ TEST_CASE("The noise analysis of an RC low-pass filter matches the Johnson-Nyqui
     REQUIRE(noise.Contributions.size() == 1);
     REQUIRE(noise.Contributions[0].Name == "R1");
     REQUIRE_THAT(noise.Contributions[0].OutputTotal, WithinRel(noise.OutputTotal, 1e-9));
+}
+
+TEST_CASE("A D flip-flop with QN fed back runs on Nodalys", "[native]") {
+    Core::LogicPart dff(Core::ComponentType::D_FLIP_FLOP);
+    dff.SetName("U1");
+    Core::Clock clk;
+    clk.SetName("V1");
+    Core::Ground gnd;
+    Core::Circuit circuit;
+    circuit.Add(clk, {2, 0});
+    circuit.Add(dff, {1, 2, 3, 4, 5, 1});
+    circuit.Add(gnd, {0});
+    Core::NativeBackend backend;
+    auto op = backend.RunOperatingPoint(circuit);
+    const std::string msg = op.Result.has_value() ? std::string("OK") : op.Result.error();
+    INFO(msg);
+    CHECK(op.Result.has_value());
+}
+
+TEST_CASE("The native backend computes digital truth tables directly", "[native][digital]") {
+    struct BackendRestorer {
+        ~BackendRestorer() { Core::SetBackend(nullptr); }
+    } restorer;
+
+    Core::SetBackend(std::make_unique<Core::NativeBackend>());
+    REQUIRE(Core::GetBackend().GetName() == "Nodalys");
+
+    Core::LogicInput input_a;
+    input_a.SetName("V1");
+    input_a.SetHigh(true);
+    Core::LogicInput input_b;
+    input_b.SetName("V2");
+    input_b.SetHigh(false);
+
+    Core::LogicPart xor_gate(Core::ComponentType::XOR);
+    xor_gate.SetName("U1");
+    Core::LogicPart and_gate(Core::ComponentType::AND);
+    and_gate.SetName("U2");
+
+    // Half adder: inputs on 1, 2; XOR sum on 3; AND carry on 4; ground on 0
+    Core::Ground ground;
+    Core::Circuit circuit;
+    circuit.Add(input_a, {1});
+    circuit.Add(input_b, {2});
+    circuit.Add(xor_gate, {1, 2, 3});
+    circuit.Add(and_gate, {1, 2, 4});
+    circuit.Add(ground, {0});
+
+    const Core::TruthTableRun run = Core::RunTruthTable(circuit, {.Inputs = {"V1", "V2"}, .OutputNodes = {3, 4}});
+    REQUIRE(run.Result.has_value());
+    const Core::TruthTable &table = *run.Result;
+    REQUIRE(table.Rows.size() == 4);
+
+    // Row 0: 00 -> Sum = 0, Carry = 0
+    CHECK(table.Rows[0].OutputVoltages[0] < 0.5);
+    CHECK(table.Rows[0].OutputVoltages[1] < 0.5);
+
+    // Row 1: 01 -> Sum = 1, Carry = 0
+    CHECK(table.Rows[1].OutputVoltages[0] > 4.5);
+    CHECK(table.Rows[1].OutputVoltages[1] < 0.5);
+
+    // Row 2: 10 -> Sum = 1, Carry = 0
+    CHECK(table.Rows[2].OutputVoltages[0] > 4.5);
+    CHECK(table.Rows[2].OutputVoltages[1] < 0.5);
+
+    // Row 3: 11 -> Sum = 0, Carry = 1
+    CHECK(table.Rows[3].OutputVoltages[0] < 0.5);
+    CHECK(table.Rows[3].OutputVoltages[1] > 4.5);
 }

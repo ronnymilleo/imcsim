@@ -10,6 +10,7 @@
 #include "components/controlled_source.h"
 #include "components/diode.h"
 #include "components/logic_input.h"
+#include "components/logic_part.h"
 #include "components/mosfet.h"
 #include "components/op_amp.h"
 #include "components/potentiometer.h"
@@ -108,6 +109,19 @@ std::expected<double, std::string> EffectiveValue(const Component &part, const P
     }
     return std::unexpected(std::format("{} uses the value expression {}, which the native backend cannot evaluate",
                                        part.GetName(), *expression));
+}
+
+nodalys::SmoothLogicParameters MakeLogicParams(const LogicPart &part) {
+    const auto &params = part.GetParameters();
+    return {
+        .VLow = 0.0,
+        .VHigh = params.LogicLevel,
+        .VThreshold = 0.5 * params.LogicLevel,
+        .TransitionWidth = 0.1 * params.LogicLevel,
+        .PropagationDelay = params.PropagationDelay,
+        .OutputResistance = 50.0,
+        .InputResistance = 1e9,
+    };
 }
 
 class CircuitCompiler {
@@ -446,6 +460,105 @@ private:
             default:
                 break;
             }
+            return {};
+        }
+
+        case ComponentType::NOT: {
+            const auto &logic = static_cast<const LogicPart &>(part);
+            m_Builder->AddInverter(part.GetName(), nodes[1], nodes[0], MakeLogicParams(logic));
+            return {};
+        }
+
+        case ComponentType::BUFFER: {
+            const auto &logic = static_cast<const LogicPart &>(part);
+            m_Builder->AddLogicBuffer(part.GetName(), nodes[1], nodes[0], MakeLogicParams(logic));
+            return {};
+        }
+
+        case ComponentType::AND:
+        case ComponentType::NAND:
+        case ComponentType::OR:
+        case ComponentType::NOR:
+        case ComponentType::XOR:
+        case ComponentType::XNOR: {
+            const auto &logic = static_cast<const LogicPart &>(part);
+            const int input_count = logic.GetInputCount();
+            std::vector<nodalys::NodeId> inputs;
+            inputs.reserve(static_cast<std::size_t>(input_count));
+            for (int i = 0; i < input_count; ++i) {
+                inputs.push_back(nodes[static_cast<std::size_t>(i)]);
+            }
+            const int out_node = nodes[static_cast<std::size_t>(input_count)];
+            nodalys::LogicGateType gate_type = nodalys::LogicGateType::AND;
+            switch (type) {
+            case ComponentType::AND:
+                gate_type = nodalys::LogicGateType::AND;
+                break;
+            case ComponentType::NAND:
+                gate_type = nodalys::LogicGateType::NAND;
+                break;
+            case ComponentType::OR:
+                gate_type = nodalys::LogicGateType::OR;
+                break;
+            case ComponentType::NOR:
+                gate_type = nodalys::LogicGateType::NOR;
+                break;
+            case ComponentType::XOR:
+                gate_type = nodalys::LogicGateType::XOR;
+                break;
+            case ComponentType::XNOR:
+                gate_type = nodalys::LogicGateType::XNOR;
+                break;
+            default:
+                break;
+            }
+            m_Builder->AddLogicGate(part.GetName(), gate_type, out_node, std::move(inputs), MakeLogicParams(logic));
+            return {};
+        }
+
+        case ComponentType::D_FLIP_FLOP: {
+            const auto &logic = static_cast<const LogicPart &>(part);
+            m_Builder->AddDFlipFlop(part.GetName(), nodes[4], nodes[5], nodes[0], nodes[1], MakeLogicParams(logic));
+            return {};
+        }
+
+        case ComponentType::SR_FLIP_FLOP: {
+            const auto &logic = static_cast<const LogicPart &>(part);
+            const int node_not_r = m_Builder->AddNode();
+            const int node_and = m_Builder->AddNode();
+            const int node_d = m_Builder->AddNode();
+            m_Builder->AddInverter(part.GetName() + ".NOT_R", node_not_r, nodes[1], MakeLogicParams(logic));
+            m_Builder->AddLogicGate(part.GetName() + ".AND", nodalys::LogicGateType::AND, node_and,
+                                    {node_not_r, nodes[5]}, MakeLogicParams(logic));
+            m_Builder->AddLogicGate(part.GetName() + ".OR", nodalys::LogicGateType::OR, node_d, {nodes[0], node_and},
+                                    MakeLogicParams(logic));
+            m_Builder->AddDFlipFlop(part.GetName(), nodes[5], nodes[6], node_d, nodes[2], MakeLogicParams(logic));
+            return {};
+        }
+
+        case ComponentType::T_FLIP_FLOP: {
+            const auto &logic = static_cast<const LogicPart &>(part);
+            const int internal_d = m_Builder->AddNode();
+            m_Builder->AddLogicGate(part.GetName() + ".XOR", nodalys::LogicGateType::XOR, internal_d,
+                                    {nodes[0], nodes[4]}, MakeLogicParams(logic));
+            m_Builder->AddDFlipFlop(part.GetName(), nodes[4], nodes[5], internal_d, nodes[1], MakeLogicParams(logic));
+            return {};
+        }
+
+        case ComponentType::JK_FLIP_FLOP: {
+            const auto &logic = static_cast<const LogicPart &>(part);
+            const int node_not_k = m_Builder->AddNode();
+            const int node_and1 = m_Builder->AddNode();
+            const int node_and2 = m_Builder->AddNode();
+            const int node_d = m_Builder->AddNode();
+            m_Builder->AddInverter(part.GetName() + ".NOT_K", node_not_k, nodes[1], MakeLogicParams(logic));
+            m_Builder->AddLogicGate(part.GetName() + ".AND1", nodalys::LogicGateType::AND, node_and1,
+                                    {nodes[0], nodes[6]}, MakeLogicParams(logic));
+            m_Builder->AddLogicGate(part.GetName() + ".AND2", nodalys::LogicGateType::AND, node_and2,
+                                    {node_not_k, nodes[5]}, MakeLogicParams(logic));
+            m_Builder->AddLogicGate(part.GetName() + ".OR", nodalys::LogicGateType::OR, node_d, {node_and1, node_and2},
+                                    MakeLogicParams(logic));
+            m_Builder->AddDFlipFlop(part.GetName(), nodes[5], nodes[6], node_d, nodes[2], MakeLogicParams(logic));
             return {};
         }
 

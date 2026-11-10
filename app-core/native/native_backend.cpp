@@ -18,9 +18,6 @@ constexpr auto NATIVE_ANALYSES = {AnalysisKind::OPERATING_POINT, AnalysisKind::T
                                   AnalysisKind::DC_SWEEP,        AnalysisKind::AC_SWEEP,
                                   AnalysisKind::NOISE,           AnalysisKind::TRANSFER_FUNCTION};
 
-constexpr const char *DIGITAL_REASON = "Nodalys has no event-driven digital engine yet; the logic parts "
-                                       "run with the ngspice backend";
-
 std::expected<nodalys::Circuit, std::string> CompileOrFail(const Circuit &circuit) {
     auto compiled = Native::CompileCircuit(circuit);
     if (!compiled) {
@@ -39,12 +36,6 @@ void ForwardMessages(const std::vector<nodalys::DiagnosticMessage> &source, std:
 
 NativeBackend::NativeBackend() {
     m_Capabilities.Analyses = NATIVE_ANALYSES;
-    for (const ComponentType type :
-         {ComponentType::AND, ComponentType::OR, ComponentType::NOT, ComponentType::NAND, ComponentType::NOR,
-          ComponentType::XOR, ComponentType::XNOR, ComponentType::BUFFER, ComponentType::D_FLIP_FLOP,
-          ComponentType::JK_FLIP_FLOP, ComponentType::T_FLIP_FLOP, ComponentType::SR_FLIP_FLOP}) {
-        m_Capabilities.UnsupportedParts[type] = DIGITAL_REASON;
-    }
 }
 
 std::string_view NativeBackend::GetName() const {
