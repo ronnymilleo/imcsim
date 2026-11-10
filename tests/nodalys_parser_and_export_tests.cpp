@@ -242,3 +242,69 @@ TEST_CASE("Nodalys Exporters export results in RAW, CSV, and JSON formats") {
         std::filesystem::remove(temp_path);
     }
 }
+
+TEST_CASE("Nodalys CLI binary executes netlists and generates formatted outputs") {
+    const std::string cli_path = "./out/debug/bin/nodalys";
+    if (!std::filesystem::exists(cli_path)) {
+        SKIP("Nodalys CLI binary not present in default build directory");
+    }
+
+    SECTION("CLI --version flag") {
+        const int rc = std::system(std::format("{} --version > /dev/null", cli_path).c_str());
+        CHECK(rc == 0);
+    }
+
+    SECTION("CLI execution with netlist file and JSON output") {
+        const std::string test_netlist_path = "/tmp/nodalys_cli_in.cir";
+        const std::string test_output_path = "/tmp/nodalys_cli_out.json";
+
+        const std::string netlist = "* Test Divider\n"
+                                    "V1 1 0 10\n"
+                                    "R1 1 2 1k\n"
+                                    "R2 2 0 1k\n"
+                                    ".op\n"
+                                    ".end\n";
+        REQUIRE(nodalys::SaveStringToFile(test_netlist_path, netlist));
+
+        const std::string cmd = std::format("{} -b -f json -o {} {}", cli_path, test_output_path, test_netlist_path);
+        const int rc = std::system(cmd.c_str());
+        CHECK(rc == 0);
+        REQUIRE(std::filesystem::exists(test_output_path));
+
+        std::ifstream out_file(test_output_path);
+        std::string json_content((std::istreambuf_iterator<char>(out_file)), std::istreambuf_iterator<char>());
+        CHECK(json_content.contains("\"analysis\": \"operating_point\""));
+        CHECK(json_content.contains("\"1\": 10"));
+        CHECK(json_content.contains("\"2\": 5"));
+
+        std::filesystem::remove(test_netlist_path);
+        std::filesystem::remove(test_output_path);
+    }
+
+    SECTION("CLI execution with CSV output") {
+        const std::string test_netlist_path = "/tmp/nodalys_cli_in.cir";
+        const std::string test_output_path = "/tmp/nodalys_cli_out.csv";
+
+        const std::string netlist = "* Test Divider CSV\n"
+                                    "V1 1 0 12\n"
+                                    "R1 1 2 2k\n"
+                                    "R2 2 0 2k\n"
+                                    ".op\n"
+                                    ".end\n";
+        REQUIRE(nodalys::SaveStringToFile(test_netlist_path, netlist));
+
+        const std::string cmd = std::format("{} -b -f csv -o {} {}", cli_path, test_output_path, test_netlist_path);
+        const int rc = std::system(cmd.c_str());
+        CHECK(rc == 0);
+        REQUIRE(std::filesystem::exists(test_output_path));
+
+        std::ifstream out_file(test_output_path);
+        std::string csv_content((std::istreambuf_iterator<char>(out_file)), std::istreambuf_iterator<char>());
+        CHECK(csv_content.contains("Variable,Type,Value,Unit"));
+        CHECK(csv_content.contains("V(1),Voltage,12,V"));
+        CHECK(csv_content.contains("V(2),Voltage,6,V"));
+
+        std::filesystem::remove(test_netlist_path);
+        std::filesystem::remove(test_output_path);
+    }
+}

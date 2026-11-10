@@ -14,3 +14,6 @@
 [submodule "vendor/SDL"]
 	path = vendor/SDL
 	url = https://github.com/libsdl-org/SDL.git
+[submodule "vendor/CLI11"]
+	path = vendor/CLI11
+	url = https://github.com/CLIUtils/CLI11.git

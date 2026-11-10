@@ -80,3 +80,13 @@ target_link_libraries(implot
 
 # Header-only; its own tests and install rules stay off because it is not the top-level project
 add_subdirectory(json)
+
+# =============================================================================
+# CLI11
+# =============================================================================
+
+# Header-only CLI argument parser for Nodalys CLI
+set(CLI11_BUILD_TESTS OFF CACHE BOOL "Build CLI11 tests" FORCE)
+set(CLI11_BUILD_EXAMPLES OFF CACHE BOOL "Build CLI11 examples" FORCE)
+set(CLI11_BUILD_DOCS OFF CACHE BOOL "Build CLI11 docs" FORCE)
+add_subdirectory(CLI11)
