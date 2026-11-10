@@ -622,6 +622,22 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
             }
             break;
 
+        case 'U': {
+            for (std::size_t i = 1; i < tokens.size(); ++i) {
+                if (tokens[i].find('=') != std::string::npos) {
+                    break;
+                }
+                const std::string upper = ToUpper(tokens[i]);
+                if (upper == "AND" || upper == "NAND" || upper == "OR" || upper == "NOR" ||
+                    upper == "XOR" || upper == "XNOR" || upper == "NOT" || upper == "INV" ||
+                    upper == "BUF" || upper == "BUFFER" || upper == "SCHMITT") {
+                    break;
+                }
+                nodes.Register(tokens[i]);
+            }
+            break;
+        }
+
         default:
             break;
         }
@@ -1062,6 +1078,54 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
                 p = BuildSwitchParameters(it->second);
             }
             builder.AddVoltageControlledSwitch(name, a1, a2, c1, c2, p);
+            break;
+        }
+
+        case 'U': { // Logic gate: U<name> <out> <in1> [<in2> ...] <gate_type> [VHIGH=5] [VLOW=0] [VTH=2.5] [TPD=1n] [ROUT=50] [HYST=0.5]
+            if (tokens.size() < 4) return std::unexpected(std::format("Malformed logic gate: '{}'", line));
+            int gate_type_idx = -1;
+            LogicGateType gate_type = LogicGateType::NOT;
+            for (std::size_t i = 2; i < tokens.size(); ++i) {
+                const std::string upper = ToUpper(tokens[i]);
+                if (upper == "NOT" || upper == "INV") { gate_type = LogicGateType::NOT; gate_type_idx = static_cast<int>(i); break; }
+                if (upper == "BUF" || upper == "BUFFER") { gate_type = LogicGateType::BUFFER; gate_type_idx = static_cast<int>(i); break; }
+                if (upper == "AND") { gate_type = LogicGateType::AND; gate_type_idx = static_cast<int>(i); break; }
+                if (upper == "NAND") { gate_type = LogicGateType::NAND; gate_type_idx = static_cast<int>(i); break; }
+                if (upper == "OR") { gate_type = LogicGateType::OR; gate_type_idx = static_cast<int>(i); break; }
+                if (upper == "NOR") { gate_type = LogicGateType::NOR; gate_type_idx = static_cast<int>(i); break; }
+                if (upper == "XOR") { gate_type = LogicGateType::XOR; gate_type_idx = static_cast<int>(i); break; }
+                if (upper == "XNOR") { gate_type = LogicGateType::XNOR; gate_type_idx = static_cast<int>(i); break; }
+                if (upper == "SCHMITT") { gate_type = LogicGateType::SCHMITT_TRIGGER; gate_type_idx = static_cast<int>(i); break; }
+            }
+            if (gate_type_idx < 2) {
+                return std::unexpected(std::format("Missing or unrecognized logic gate type in: '{}'", line));
+            }
+            const NodeId out = nodes.Resolve(tokens[1]);
+            std::vector<NodeId> inputs;
+            for (int i = 2; i < gate_type_idx; ++i) {
+                inputs.push_back(nodes.Resolve(tokens[static_cast<std::size_t>(i)]));
+            }
+            if (inputs.empty()) {
+                return std::unexpected(std::format("Logic gate '{}' has no inputs", name));
+            }
+            SmoothLogicParameters params;
+            for (std::size_t i = static_cast<std::size_t>(gate_type_idx + 1); i < tokens.size(); ++i) {
+                const std::string u = ToUpper(tokens[i]);
+                if (u.starts_with("VHIGH=")) {
+                    if (const auto v = ParseSpiceNumber(u.substr(6))) params.VHigh = *v;
+                } else if (u.starts_with("VLOW=")) {
+                    if (const auto v = ParseSpiceNumber(u.substr(5))) params.VLow = *v;
+                } else if (u.starts_with("VTH=")) {
+                    if (const auto v = ParseSpiceNumber(u.substr(4))) params.VThreshold = *v;
+                } else if (u.starts_with("TPD=")) {
+                    if (const auto v = ParseSpiceNumber(u.substr(4))) params.PropagationDelay = *v;
+                } else if (u.starts_with("ROUT=")) {
+                    if (const auto v = ParseSpiceNumber(u.substr(5))) params.OutputResistance = *v;
+                } else if (u.starts_with("HYST=")) {
+                    if (const auto v = ParseSpiceNumber(u.substr(5))) params.Hysteresis = *v;
+                }
+            }
+            builder.AddLogicGate(name, gate_type, out, std::move(inputs), params);
             break;
         }
 

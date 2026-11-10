@@ -3,26 +3,28 @@
 # =============================================================================
 
 add_library(nodalys STATIC
-    src/linear/dense_matrix.cpp
-    src/mna/mna_system.cpp
-    src/devices/devices.cpp
-    src/devices/nonlinear.cpp
-    src/devices/waveforms.cpp
-    src/newton/newton.cpp
-    src/analyses/dc_analysis.cpp
-    src/analyses/transient_analysis.cpp
     src/analyses/ac_analysis.cpp
-    src/analyses/tf_analysis.cpp
+    src/analyses/dc_analysis.cpp
     src/analyses/noise_analysis.cpp
+    src/analyses/tf_analysis.cpp
+    src/analyses/transient_analysis.cpp
     src/api/circuit.cpp
     src/api/circuit_builder.cpp
     src/api/nodalys.cpp
-    src/parser/spice_number.cpp
-    src/parser/netlist_parser.cpp
-    src/export/raw_exporter.cpp
+    src/bridge/logic_bridge.cpp
+    src/devices/devices.cpp
+    src/devices/nonlinear.cpp
+    src/devices/smooth_logic.cpp
+    src/devices/waveforms.cpp
     src/export/csv_exporter.cpp
-    src/export/json_exporter.cpp
     src/export/exporters.cpp
+    src/export/json_exporter.cpp
+    src/export/raw_exporter.cpp
+    src/linear/dense_matrix.cpp
+    src/mna/mna_system.cpp
+    src/newton/newton.cpp
+    src/parser/netlist_parser.cpp
+    src/parser/spice_number.cpp
 )
 
 target_include_directories(nodalys

@@ -254,6 +254,58 @@ struct LiveChange {
     bool operator==(const LiveChange &) const = default;
 };
 
+/**
+ * @enum    LogicGateType
+ * @brief   Kinds of smooth continuous logic gates.
+ */
+enum class LogicGateType {
+    NOT,
+    BUFFER,
+    AND,
+    NAND,
+    OR,
+    NOR,
+    XOR,
+    XNOR,
+    SCHMITT_TRIGGER,
+};
+
+/**
+ * @enum    DigitalLevel
+ * @brief   Discrete logic states for co-simulation and digital-analog boundary.
+ */
+enum class DigitalLevel {
+    LOW,
+    HIGH,
+    UNKNOWN,
+    HIGH_Z,
+};
+
+/**
+ * @struct  SmoothLogicParameters
+ * @brief   Physical and analog parameters for C^inf smooth continuous logic gates.
+ */
+struct SmoothLogicParameters {
+    /// Low logic level voltage in Volts.
+    double VLow = 0.0;
+    /// High logic level voltage in Volts.
+    double VHigh = 5.0;
+    /// Input switching threshold in Volts.
+    double VThreshold = 2.5;
+    /// Delta transition width in Volts for smooth tanh saturation.
+    double TransitionWidth = 0.1;
+    /// Inertial dynamic propagation delay in seconds.
+    double PropagationDelay = 1e-9;
+    /// Thevenin output stage resistance in Ohms.
+    double OutputResistance = 50.0;
+    /// High-impedance input leakage resistance in Ohms.
+    double InputResistance = 1e9;
+    /// Hysteresis voltage span for Schmitt triggers in Volts.
+    double Hysteresis = 0.5;
+
+    bool operator==(const SmoothLogicParameters &) const = default;
+};
+
 } // namespace nodalys
 
 #endif // NODALYS_TYPES_H
