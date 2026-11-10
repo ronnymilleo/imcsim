@@ -30,7 +30,7 @@ std::expected<TransientResult, std::string> ComputeTransient(
     const ConvergenceOptions &options,
     std::vector<DiagnosticMessage> *messages) {
     auto &impl = const_cast<Circuit &>(circuit).Impl();
-    return ComputeTransient(impl.Compiled(), config, has_initial_conditions, monitor, options, messages);
+    return ComputeTransient(impl.Compiled(), config, has_initial_conditions || config.UseInitialConditions, monitor, options, messages);
 }
 
 std::expected<AcSweepResult, std::string> ComputeACSweep(
