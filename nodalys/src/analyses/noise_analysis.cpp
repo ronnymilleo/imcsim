@@ -47,11 +47,9 @@ double IntegrateNoiseStep(const double f1, const double f2, const double s1, con
 
 } // namespace
 
-std::expected<NoiseResult, std::string> ComputeNoise(
-    CompiledCircuit &compiled,
-    const NoiseConfig &settings,
-    const ConvergenceOptions &options,
-    std::vector<DiagnosticMessage> *messages) {
+std::expected<NoiseResult, std::string> ComputeNoise(CompiledCircuit &compiled, const NoiseConfig &settings,
+                                                     const ConvergenceOptions &options,
+                                                     std::vector<DiagnosticMessage> *messages) {
 
     const int out_node = settings.OutputPositiveNode;
     if (out_node <= 0 || out_node >= compiled.CircuitNodeCount) {
@@ -59,7 +57,8 @@ std::expected<NoiseResult, std::string> ComputeNoise(
     }
     if (settings.StartFrequency <= 0.0 || settings.StopFrequency < settings.StartFrequency ||
         settings.PointsPerDecade <= 0) {
-        return std::unexpected("The noise analysis has invalid frequency settings; check start, stop and points per decade");
+        return std::unexpected(
+            "The noise analysis has invalid frequency settings; check start, stop and points per decade");
     }
 
     const auto source_it = compiled.SourcesByName.find(settings.InputSource);
@@ -133,20 +132,20 @@ std::expected<NoiseResult, std::string> ComputeNoise(
         const double frequency = result.Frequencies[k];
         const double omega = 2.0 * std::numbers::pi * frequency;
         if (!compiled.System->SolveAcTranspose(reactive, omega, out_unknown, adjoint)) {
-            return std::unexpected(std::format("The Nodalys noise solver encountered a singular matrix at f = {} Hz",
-                                               frequency));
+            return std::unexpected(
+                std::format("The Nodalys noise solver encountered a singular matrix at f = {} Hz", frequency));
         }
 
         std::complex<double> gain{0.0, 0.0};
         if (voltage_source != nullptr) {
             gain = adjoint[static_cast<std::size_t>(voltage_source->Branch())];
         } else {
-            const std::complex<double> la =
-                current_source->NodeA() < 0 ? std::complex<double>{0.0, 0.0}
-                                            : adjoint[static_cast<std::size_t>(current_source->NodeA())];
-            const std::complex<double> lb =
-                current_source->NodeB() < 0 ? std::complex<double>{0.0, 0.0}
-                                            : adjoint[static_cast<std::size_t>(current_source->NodeB())];
+            const std::complex<double> la = current_source->NodeA() < 0
+                                                ? std::complex<double>{0.0, 0.0}
+                                                : adjoint[static_cast<std::size_t>(current_source->NodeA())];
+            const std::complex<double> lb = current_source->NodeB() < 0
+                                                ? std::complex<double>{0.0, 0.0}
+                                                : adjoint[static_cast<std::size_t>(current_source->NodeB())];
             gain = lb - la;
         }
         const double inv_gain_sq = 1.0 / std::max(std::norm(gain), MIN_GAIN_SQUARED);

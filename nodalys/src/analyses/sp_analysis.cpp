@@ -97,7 +97,7 @@ std::expected<std::vector<double>, std::string> GenerateFrequencyPoints(const SP
 }
 
 std::expected<std::vector<CircuitPort>, std::string> ValidatePorts(const std::vector<CircuitPort> &raw_ports,
-                                                                  const int circuit_node_count) {
+                                                                   const int circuit_node_count) {
     if (raw_ports.empty()) {
         return std::unexpected("The S-parameter analysis requires at least one port");
     }
@@ -113,8 +113,8 @@ std::expected<std::vector<CircuitPort>, std::string> ValidatePorts(const std::ve
                             expected_number, ports[i].Number));
         }
         if (ports[i].ReferenceOhms <= 0.0) {
-            return std::unexpected(std::format("The reference impedance of port {} must be greater than zero",
-                                               ports[i].Number));
+            return std::unexpected(
+                std::format("The reference impedance of port {} must be greater than zero", ports[i].Number));
         }
         if (ports[i].Node <= 0 || ports[i].Node >= circuit_node_count) {
             return std::unexpected(
@@ -136,11 +136,10 @@ std::expected<std::vector<CircuitPort>, std::string> ValidatePorts(const std::ve
 
 } // namespace
 
-std::expected<SParameterResult, std::string> ComputeSParameters(
-    CompiledCircuit &compiled,
-    const SParameterConfig &settings,
-    const ConvergenceOptions &options,
-    std::vector<DiagnosticMessage> *messages) {
+std::expected<SParameterResult, std::string> ComputeSParameters(CompiledCircuit &compiled,
+                                                                const SParameterConfig &settings,
+                                                                const ConvergenceOptions &options,
+                                                                std::vector<DiagnosticMessage> *messages) {
 
     const auto validated_ports =
         ValidatePorts(settings.Ports.empty() ? compiled.Ports : settings.Ports, compiled.CircuitNodeCount);
@@ -170,7 +169,8 @@ std::expected<SParameterResult, std::string> ComputeSParameters(
     std::vector<double> x_dc(static_cast<std::size_t>(size), 0.0);
     const NewtonOutcome outcome = SolveNewton(*compiled.System, compiled.Devices, x_dc, TimeContext{}, options);
     if (!outcome.Converged) {
-        return std::unexpected("The native solver found no operating point to linearize the S-parameter analysis around");
+        return std::unexpected(
+            "The native solver found no operating point to linearize the S-parameter analysis around");
     }
     DescribeOutcome(outcome, "operating point", messages);
 
@@ -230,9 +230,8 @@ std::expected<SParameterResult, std::string> ComputeSParameters(
                 const double delta_ij = (i == j) ? 1.0 : 0.0;
                 const std::complex<double> s_ij = vi * gi_sqrt - delta_ij;
                 if (!std::isfinite(s_ij.real()) || !std::isfinite(s_ij.imag())) {
-                    return std::unexpected(
-                        std::format("The native solver produced non-finite S({}, {}) at f = {} Hz", i + 1, j + 1,
-                                    frequency));
+                    return std::unexpected(std::format("The native solver produced non-finite S({}, {}) at f = {} Hz",
+                                                       i + 1, j + 1, frequency));
                 }
                 result.Values.push_back(s_ij);
             }

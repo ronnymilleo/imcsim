@@ -4,14 +4,16 @@
  *          (`BjtDevice`, Gummel-Poon model), and MOSFETs (`MosfetDevice`, Shichman-Hodges level-1 model).
  * @details
  * ### How Nonlinear Devices Are Solved in MNA
- * At each Newton-Raphson iteration $k$, every nonlinear branch $I(v)$ is linearized around the current iterate $v^{(k)}$
- * via its first-order Taylor expansion (Norton equivalent companion model):
+ * At each Newton-Raphson iteration $k$, every nonlinear branch $I(v)$ is linearized around the current iterate
+ * $v^{(k)}$ via its first-order Taylor expansion (Norton equivalent companion model):
  *
  * $$I(v) \approx I(v^{(k)}) + G_{\text{eq}} \cdot (v - v^{(k)}) = G_{\text{eq}} \cdot v + I_{\text{eq}}$$
  *
  * where:
- * - $G_{\text{eq}} = \left.\frac{\partial I}{\partial v}\right|_{v^{(k)}}$ is the differential conductance (stamped into $A$),
- * - $I_{\text{eq}} = I(v^{(k)}) - G_{\text{eq}} \cdot v^{(k)}$ is the equivalent independent current source (stamped into $\text{rhs}$).
+ * - $G_{\text{eq}} = \left.\frac{\partial I}{\partial v}\right|_{v^{(k)}}$ is the differential conductance (stamped
+ * into $A$),
+ * - $I_{\text{eq}} = I(v^{(k)}) - G_{\text{eq}} \cdot v^{(k)}$ is the equivalent independent current source (stamped
+ * into $\text{rhs}$).
  *
  * ```text
  *         node_a o----+----[ G_eq ]----+----o node_b
@@ -116,16 +118,19 @@ public:
 
 private:
     struct Intrinsic {
-        double Ic;   ///< DC collector current (entering intrinsic collector).
-        double Ib;   ///< DC base current (entering intrinsic base).
-        double Ie;   ///< DC emitter current, $-(I_C + I_B)$.
-        double GcBe; ///< $\partial I_C / \partial v_{be}$.
-        double GcBc; ///< $\partial I_C / \partial v_{bc}$.
-        double GbBe; ///< $\partial I_B / \partial v_{be}$.
-        double GbBc; ///< $\partial I_B / \partial v_{bc}$.
-        double IfwdQb;      ///< $I_{\text{fwd}} / q_b$ for Gummel-Poon forward transit-time charge $Q_{DE} = \tau_F I_{\text{fwd}} / q_b$.
-        double DIfwdQbDvbe; ///< $\partial (I_{\text{fwd}} / q_b) / \partial v_{be}$ for Gummel-Poon diffusion capacitance.
-        double DIfwdQbDvbc; ///< $\partial (I_{\text{fwd}} / q_b) / \partial v_{bc}$ for SPICE `geqcb` base-width modulation transcapacitance.
+        double Ic;     ///< DC collector current (entering intrinsic collector).
+        double Ib;     ///< DC base current (entering intrinsic base).
+        double Ie;     ///< DC emitter current, $-(I_C + I_B)$.
+        double GcBe;   ///< $\partial I_C / \partial v_{be}$.
+        double GcBc;   ///< $\partial I_C / \partial v_{bc}$.
+        double GbBe;   ///< $\partial I_B / \partial v_{be}$.
+        double GbBc;   ///< $\partial I_B / \partial v_{bc}$.
+        double IfwdQb; ///< $I_{\text{fwd}} / q_b$ for Gummel-Poon forward transit-time charge $Q_{DE} = \tau_F
+                       ///< I_{\text{fwd}} / q_b$.
+        double
+            DIfwdQbDvbe; ///< $\partial (I_{\text{fwd}} / q_b) / \partial v_{be}$ for Gummel-Poon diffusion capacitance.
+        double DIfwdQbDvbc; ///< $\partial (I_{\text{fwd}} / q_b) / \partial v_{bc}$ for SPICE `geqcb` base-width
+                            ///< modulation transcapacitance.
     };
     /// Evaluates the intrinsic transport equations in NPN polarity ($v_{be}, v_{bc}$ forward-positive).
     Intrinsic Evaluate(double vbe, double vbc) const;

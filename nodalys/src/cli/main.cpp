@@ -86,7 +86,8 @@ int main(int argc, char **argv) {
     app.add_option("--maxiter", maxiter_override, "Maximum Newton-Raphson iterations per step (default: 100)");
 
     app.add_flag("-v,--verbose", verbose, "Enable verbose output (solver diagnostics and timings)");
-    app.set_version_flag("--version", std::format("nodalys {} (imcsim engine, standalone SPICE simulator)", NODALYS_VERSION_STRING));
+    app.set_version_flag("--version",
+                         std::format("nodalys {} (imcsim engine, standalone SPICE simulator)", NODALYS_VERSION_STRING));
 
     CLI11_PARSE(app, argc, argv);
 
@@ -119,31 +120,55 @@ int main(int argc, char **argv) {
 
     if (verbose && !batch_mode) {
         const auto parse_ms = std::chrono::duration<double, std::milli>(parse_end - parse_start).count();
-        std::cout << std::format("Netlist parsed in {:.2f} ms: {} nodes, {} MNA unknowns\n",
-                                 parse_ms,
-                                 parsed.CircuitInstance.NodeCount(),
-                                 parsed.CircuitInstance.UnknownCount());
+        std::cout << std::format("Netlist parsed in {:.2f} ms: {} nodes, {} MNA unknowns\n", parse_ms,
+                                 parsed.CircuitInstance.NodeCount(), parsed.CircuitInstance.UnknownCount());
     }
 
     // Apply tolerance overrides if provided
-    if (gmin_override) parsed.Options.Gmin = *gmin_override;
-    if (reltol_override) parsed.Options.RelTol = *reltol_override;
-    if (abstol_override) parsed.Options.CurrentAbsTol = *abstol_override;
-    if (vntol_override) parsed.Options.VoltageAbsTol = *vntol_override;
-    if (maxiter_override) parsed.Options.MaxIterations = *maxiter_override;
+    if (gmin_override) {
+        parsed.Options.Gmin = *gmin_override;
+    }
+    if (reltol_override) {
+        parsed.Options.RelTol = *reltol_override;
+    }
+    if (abstol_override) {
+        parsed.Options.CurrentAbsTol = *abstol_override;
+    }
+    if (vntol_override) {
+        parsed.Options.VoltageAbsTol = *vntol_override;
+    }
+    if (maxiter_override) {
+        parsed.Options.MaxIterations = *maxiter_override;
+    }
 
     // Apply analysis overrides
     if (!analysis_override.empty()) {
         const std::string a_lower = ToLower(analysis_override);
         auto it = std::ranges::find_if(parsed.Analyses, [&](const auto &an) {
-            if (a_lower == "op") return an.Kind == nodalys::AnalysisKind::OperatingPoint;
-            if (a_lower == "tran") return an.Kind == nodalys::AnalysisKind::Transient;
-            if (a_lower == "dc") return an.Kind == nodalys::AnalysisKind::DcSweep;
-            if (a_lower == "ac") return an.Kind == nodalys::AnalysisKind::AcSweep;
-            if (a_lower == "tf") return an.Kind == nodalys::AnalysisKind::TransferFunction;
-            if (a_lower == "noise") return an.Kind == nodalys::AnalysisKind::Noise;
-            if (a_lower == "sp") return an.Kind == nodalys::AnalysisKind::SParameters;
-            if (a_lower == "pz") return an.Kind == nodalys::AnalysisKind::PoleZero;
+            if (a_lower == "op") {
+                return an.Kind == nodalys::AnalysisKind::OperatingPoint;
+            }
+            if (a_lower == "tran") {
+                return an.Kind == nodalys::AnalysisKind::Transient;
+            }
+            if (a_lower == "dc") {
+                return an.Kind == nodalys::AnalysisKind::DcSweep;
+            }
+            if (a_lower == "ac") {
+                return an.Kind == nodalys::AnalysisKind::AcSweep;
+            }
+            if (a_lower == "tf") {
+                return an.Kind == nodalys::AnalysisKind::TransferFunction;
+            }
+            if (a_lower == "noise") {
+                return an.Kind == nodalys::AnalysisKind::Noise;
+            }
+            if (a_lower == "sp") {
+                return an.Kind == nodalys::AnalysisKind::SParameters;
+            }
+            if (a_lower == "pz") {
+                return an.Kind == nodalys::AnalysisKind::PoleZero;
+            }
             return false;
         });
 
@@ -187,8 +212,11 @@ int main(int argc, char **argv) {
 
         switch (analysis.Kind) {
         case nodalys::AnalysisKind::OperatingPoint: {
-            if (verbose && !batch_mode) std::cout << "Running Operating Point (.op) analysis...\n";
-            auto res = nodalys::ComputeOperatingPoint(parsed.CircuitInstance, parsed.Options, verbose ? &diagnostics : nullptr);
+            if (verbose && !batch_mode) {
+                std::cout << "Running Operating Point (.op) analysis...\n";
+            }
+            auto res = nodalys::ComputeOperatingPoint(parsed.CircuitInstance, parsed.Options,
+                                                      verbose ? &diagnostics : nullptr);
             if (!res) {
                 std::cerr << std::format("Simulation Error: {}\n", res.error());
                 return EXIT_FAILURE;
@@ -199,14 +227,21 @@ int main(int argc, char **argv) {
 
         case nodalys::AnalysisKind::Transient: {
             auto &cfg = std::get<nodalys::TransientConfig>(analysis.Config);
-            if (step_override) cfg.TimeStep = *step_override;
-            if (stop_override) cfg.StopTime = *stop_override;
-            if (cfg.MaxStep <= 0.0) cfg.MaxStep = cfg.TimeStep;
-            if (verbose && !batch_mode) {
-                std::cout << std::format("Running Transient (.tran) analysis: tstep={}, tstop={}\n",
-                                         cfg.TimeStep, cfg.StopTime);
+            if (step_override) {
+                cfg.TimeStep = *step_override;
             }
-            auto res = nodalys::ComputeTransient(parsed.CircuitInstance, cfg, cfg.UseInitialConditions, {}, parsed.Options, verbose ? &diagnostics : nullptr);
+            if (stop_override) {
+                cfg.StopTime = *stop_override;
+            }
+            if (cfg.MaxStep <= 0.0) {
+                cfg.MaxStep = cfg.TimeStep;
+            }
+            if (verbose && !batch_mode) {
+                std::cout << std::format("Running Transient (.tran) analysis: tstep={}, tstop={}\n", cfg.TimeStep,
+                                         cfg.StopTime);
+            }
+            auto res = nodalys::ComputeTransient(parsed.CircuitInstance, cfg, cfg.UseInitialConditions, {},
+                                                 parsed.Options, verbose ? &diagnostics : nullptr);
             if (!res) {
                 std::cerr << std::format("Simulation Error: {}\n", res.error());
                 return EXIT_FAILURE;
@@ -220,7 +255,8 @@ int main(int argc, char **argv) {
             if (verbose && !batch_mode) {
                 std::cout << std::format("Running DC Sweep (.dc) analysis on source {}\n", cfg.SweptSource);
             }
-            auto res = nodalys::ComputeDCSweep(parsed.CircuitInstance, cfg, parsed.Options, verbose ? &diagnostics : nullptr);
+            auto res =
+                nodalys::ComputeDCSweep(parsed.CircuitInstance, cfg, parsed.Options, verbose ? &diagnostics : nullptr);
             if (!res) {
                 std::cerr << std::format("Simulation Error: {}\n", res.error());
                 return EXIT_FAILURE;
@@ -232,10 +268,11 @@ int main(int argc, char **argv) {
         case nodalys::AnalysisKind::AcSweep: {
             const auto &cfg = std::get<nodalys::AcSweepConfig>(analysis.Config);
             if (verbose && !batch_mode) {
-                std::cout << std::format("Running AC Sweep (.ac) analysis: {} Hz to {} Hz\n",
-                                         cfg.StartFrequency, cfg.StopFrequency);
+                std::cout << std::format("Running AC Sweep (.ac) analysis: {} Hz to {} Hz\n", cfg.StartFrequency,
+                                         cfg.StopFrequency);
             }
-            auto res = nodalys::ComputeACSweep(parsed.CircuitInstance, cfg, parsed.Options, verbose ? &diagnostics : nullptr);
+            auto res =
+                nodalys::ComputeACSweep(parsed.CircuitInstance, cfg, parsed.Options, verbose ? &diagnostics : nullptr);
             if (!res) {
                 std::cerr << std::format("Simulation Error: {}\n", res.error());
                 return EXIT_FAILURE;
@@ -249,7 +286,8 @@ int main(int argc, char **argv) {
             if (verbose && !batch_mode) {
                 std::cout << std::format("Running Transfer Function (.tf) analysis for source {}\n", cfg.InputSource);
             }
-            auto res = nodalys::ComputeTransferFunction(parsed.CircuitInstance, cfg, parsed.Options, verbose ? &diagnostics : nullptr);
+            auto res = nodalys::ComputeTransferFunction(parsed.CircuitInstance, cfg, parsed.Options,
+                                                        verbose ? &diagnostics : nullptr);
             if (!res) {
                 std::cerr << std::format("Simulation Error: {}\n", res.error());
                 return EXIT_FAILURE;
@@ -263,7 +301,8 @@ int main(int argc, char **argv) {
             if (verbose && !batch_mode) {
                 std::cout << std::format("Running Noise (.noise) analysis for source {}\n", cfg.InputSource);
             }
-            auto res = nodalys::ComputeNoise(parsed.CircuitInstance, cfg, parsed.Options, verbose ? &diagnostics : nullptr);
+            auto res =
+                nodalys::ComputeNoise(parsed.CircuitInstance, cfg, parsed.Options, verbose ? &diagnostics : nullptr);
             if (!res) {
                 std::cerr << std::format("Simulation Error: {}\n", res.error());
                 return EXIT_FAILURE;
@@ -275,10 +314,11 @@ int main(int argc, char **argv) {
         case nodalys::AnalysisKind::SParameters: {
             const auto &cfg = std::get<nodalys::SParameterConfig>(analysis.Config);
             if (verbose && !batch_mode) {
-                std::cout << std::format("Running S-Parameter (.sp) analysis: {} Hz to {} Hz\n",
-                                         cfg.StartFrequency, cfg.StopFrequency);
+                std::cout << std::format("Running S-Parameter (.sp) analysis: {} Hz to {} Hz\n", cfg.StartFrequency,
+                                         cfg.StopFrequency);
             }
-            auto res = nodalys::ComputeSParameters(parsed.CircuitInstance, cfg, parsed.Options, verbose ? &diagnostics : nullptr);
+            auto res = nodalys::ComputeSParameters(parsed.CircuitInstance, cfg, parsed.Options,
+                                                   verbose ? &diagnostics : nullptr);
             if (!res) {
                 std::cerr << std::format("Simulation Error: {}\n", res.error());
                 return EXIT_FAILURE;
@@ -290,10 +330,11 @@ int main(int argc, char **argv) {
         case nodalys::AnalysisKind::PoleZero: {
             const auto &cfg = std::get<nodalys::PoleZeroConfig>(analysis.Config);
             if (verbose && !batch_mode) {
-                std::cout << std::format("Running Pole-Zero (.pz) analysis: output={}, input={}\n",
-                                         cfg.OutputNode, cfg.InputSource);
+                std::cout << std::format("Running Pole-Zero (.pz) analysis: output={}, input={}\n", cfg.OutputNode,
+                                         cfg.InputSource);
             }
-            auto res = nodalys::ComputePoleZero(parsed.CircuitInstance, cfg, parsed.Options, verbose ? &diagnostics : nullptr);
+            auto res =
+                nodalys::ComputePoleZero(parsed.CircuitInstance, cfg, parsed.Options, verbose ? &diagnostics : nullptr);
             if (!res) {
                 std::cerr << std::format("Simulation Error: {}\n", res.error());
                 return EXIT_FAILURE;

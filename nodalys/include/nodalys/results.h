@@ -151,9 +151,7 @@ struct SParameterResult {
     /// Diagnostic warnings.
     std::vector<std::string> Warnings;
 
-    int GetPortCount() const {
-        return static_cast<int>(ReferenceOhms.size());
-    }
+    int GetPortCount() const { return static_cast<int>(ReferenceOhms.size()); }
 
     std::complex<double> Get(const std::size_t frequency_idx, const int row, const int column) const {
         const auto ports = static_cast<std::size_t>(GetPortCount());
@@ -215,16 +213,8 @@ struct PoleZeroResult {
     std::vector<std::complex<double>> Zeros;
 };
 
-using SimulationResult = std::variant<
-    OperatingPointResult,
-    TransientResult,
-    DcSweepResult,
-    AcSweepResult,
-    TransferFunctionResult,
-    NoiseResult,
-    SParameterResult,
-    PoleZeroResult
->;
+using SimulationResult = std::variant<OperatingPointResult, TransientResult, DcSweepResult, AcSweepResult,
+                                      TransferFunctionResult, NoiseResult, SParameterResult, PoleZeroResult>;
 
 } // namespace nodalys
 

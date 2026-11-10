@@ -12,32 +12,27 @@
 namespace nodalys {
 
 std::string ExportRaw(const SimulationResult &result, std::string_view title) {
-    return std::visit([&](const auto &res) -> std::string {
-        using T = std::decay_t<decltype(res)>;
-        if constexpr (std::is_same_v<T, OperatingPointResult> ||
-                      std::is_same_v<T, TransientResult> ||
-                      std::is_same_v<T, DcSweepResult> ||
-                      std::is_same_v<T, AcSweepResult> ||
-                      std::is_same_v<T, SParameterResult> ||
-                      std::is_same_v<T, PoleZeroResult>) {
-            return ExportRaw(res, title);
-        } else {
-            // SPICE raw files do not standardly represent .TF or .NOISE direct summaries without vectors
-            return ExportCsv(res);
-        }
-    }, result);
+    return std::visit(
+        [&](const auto &res) -> std::string {
+            using T = std::decay_t<decltype(res)>;
+            if constexpr (std::is_same_v<T, OperatingPointResult> || std::is_same_v<T, TransientResult> ||
+                          std::is_same_v<T, DcSweepResult> || std::is_same_v<T, AcSweepResult> ||
+                          std::is_same_v<T, SParameterResult> || std::is_same_v<T, PoleZeroResult>) {
+                return ExportRaw(res, title);
+            } else {
+                // SPICE raw files do not standardly represent .TF or .NOISE direct summaries without vectors
+                return ExportCsv(res);
+            }
+        },
+        result);
 }
 
 std::string ExportCsv(const SimulationResult &result) {
-    return std::visit([](const auto &res) {
-        return ExportCsv(res);
-    }, result);
+    return std::visit([](const auto &res) { return ExportCsv(res); }, result);
 }
 
 std::string ExportJson(const SimulationResult &result) {
-    return std::visit([](const auto &res) {
-        return ExportJson(res);
-    }, result);
+    return std::visit([](const auto &res) { return ExportJson(res); }, result);
 }
 
 std::string ExportTouchstone(const SParameterResult &result) {

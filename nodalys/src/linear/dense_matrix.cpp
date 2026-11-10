@@ -52,8 +52,7 @@ template <typename Scalar> void BasicDenseMatrix<Scalar>::Reset() {
  */
 template <typename Scalar> bool BasicDenseMatrix<Scalar>::FactorizeLU() {
     const std::size_t n = std::min(m_Rows, m_Cols);
-    const double largest =
-        std::ranges::max(m_Data | std::views::transform([](const Scalar v) { return std::abs(v); }));
+    const double largest = std::ranges::max(m_Data | std::views::transform([](const Scalar v) { return std::abs(v); }));
     const double pivot_floor = largest * 1e-30;
     for (std::size_t col = 0; col < n; ++col) {
         // Partial pivoting: the row with the largest entry in this column leads, which bounds the error growth

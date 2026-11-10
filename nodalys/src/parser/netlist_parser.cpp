@@ -92,8 +92,8 @@ std::vector<std::string> TokenizeLine(std::string_view line) {
         }
 
         std::size_t start = i;
-        while (i < n && !std::isspace(static_cast<unsigned char>(line[i])) && line[i] != ',' &&
-               line[i] != ';' && line[i] != '$') {
+        while (i < n && !std::isspace(static_cast<unsigned char>(line[i])) && line[i] != ',' && line[i] != ';' &&
+               line[i] != '$') {
             if (line[i] == '(') {
                 // e.g. SIN(...) attached to name
                 int depth = 0;
@@ -119,7 +119,14 @@ std::vector<std::string> TokenizeLine(std::string_view line) {
 }
 
 struct ParsedModel {
-    enum class ModelKind { Diode, BjtNpn, BjtPnp, MosfetNmos, MosfetPmos, Switch };
+    enum class ModelKind {
+        Diode,
+        BjtNpn,
+        BjtPnp,
+        MosfetNmos,
+        MosfetPmos,
+        Switch
+    };
     ModelKind Kind = ModelKind::Diode;
     std::map<std::string, double> Params;
 };
@@ -425,7 +432,8 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
             } else if (type_str == "SW" || type_str == "VSWITCH") {
                 model.Kind = ParsedModel::ModelKind::Switch;
             } else {
-                result.Diagnostics.push_back({std::format("Unsupported .model type '{}' in model '{}'", type_str, model_name)});
+                result.Diagnostics.push_back(
+                    {std::format("Unsupported .model type '{}' in model '{}'", type_str, model_name)});
             }
 
             // Collect all remaining tokens as parameters
@@ -443,16 +451,23 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
                                       all_params[pos] == '(' || all_params[pos] == ')' || all_params[pos] == ',')) {
                     ++pos;
                 }
-                if (pos >= plen) break;
+                if (pos >= plen) {
+                    break;
+                }
                 const std::size_t kstart = pos;
-                while (pos < plen && (std::isalnum(static_cast<unsigned char>(all_params[pos])) || all_params[pos] == '_')) {
+                while (pos < plen &&
+                       (std::isalnum(static_cast<unsigned char>(all_params[pos])) || all_params[pos] == '_')) {
                     ++pos;
                 }
                 const std::string key = ToUpper(all_params.substr(kstart, pos - kstart));
-                while (pos < plen && std::isspace(static_cast<unsigned char>(all_params[pos]))) ++pos;
+                while (pos < plen && std::isspace(static_cast<unsigned char>(all_params[pos]))) {
+                    ++pos;
+                }
                 if (pos < plen && all_params[pos] == '=') {
                     ++pos;
-                    while (pos < plen && std::isspace(static_cast<unsigned char>(all_params[pos]))) ++pos;
+                    while (pos < plen && std::isspace(static_cast<unsigned char>(all_params[pos]))) {
+                        ++pos;
+                    }
                     const std::size_t vstart = pos;
                     while (pos < plen && !std::isspace(static_cast<unsigned char>(all_params[pos])) &&
                            all_params[pos] != ')' && all_params[pos] != ',') {
@@ -479,12 +494,15 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
     // 3. Expand Subcircuits ('X' devices) into flat circuit lines
     std::vector<std::string> flat_lines;
     std::function<std::expected<void, std::string>(const std::string &line, const std::string &prefix,
-                                                   const std::map<std::string, std::string> &pin_map)> expand_line;
+                                                   const std::map<std::string, std::string> &pin_map)>
+        expand_line;
 
     expand_line = [&](const std::string &line, const std::string &prefix,
                       const std::map<std::string, std::string> &pin_map) -> std::expected<void, std::string> {
         const auto tokens = TokenizeLine(line);
-        if (tokens.empty()) return {};
+        if (tokens.empty()) {
+            return {};
+        }
 
         if (ToUpper(tokens[0]).starts_with('X')) {
             // Subcircuit instantiation: X<name> <pins...> <subckt_name>
@@ -503,8 +521,8 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
             const std::size_t formal_pin_count = sub.Pins.size();
             const std::size_t actual_pin_count = tokens.size() - 2;
             if (actual_pin_count != formal_pin_count) {
-                return std::unexpected(std::format("Subcircuit '{}' expects {} pins, got {}",
-                                                   subckt_name, formal_pin_count, actual_pin_count));
+                return std::unexpected(std::format("Subcircuit '{}' expects {} pins, got {}", subckt_name,
+                                                   formal_pin_count, actual_pin_count));
             }
 
             std::map<std::string, std::string> child_pin_map;
@@ -521,7 +539,9 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
 
             for (const auto &sub_line : sub.Lines) {
                 auto exp_res = expand_line(sub_line, inst_name, child_pin_map);
-                if (!exp_res) return exp_res;
+                if (!exp_res) {
+                    return exp_res;
+                }
             }
             return {};
         }
@@ -535,8 +555,8 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
                 auto it = pin_map.find(upper_tok);
                 if (it != pin_map.end()) {
                     rewritten.append(it->second);
-                } else if (i <= 4 && !upper_tok.starts_with('.') && !ParseSpiceNumber(tokens[i]) &&
-                           upper_tok != "0" && upper_tok != "GND") {
+                } else if (i <= 4 && !upper_tok.starts_with('.') && !ParseSpiceNumber(tokens[i]) && upper_tok != "0" &&
+                           upper_tok != "GND") {
                     rewritten.append(prefix + "." + tokens[i]);
                 } else {
                     rewritten.append(tokens[i]);
@@ -563,7 +583,9 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
     // Pre-scan all flat_lines to discover and register all circuit nodes
     for (const auto &line : flat_lines) {
         const auto tokens = TokenizeLine(line);
-        if (tokens.empty()) continue;
+        if (tokens.empty()) {
+            continue;
+        }
 
         const std::string &name = tokens[0];
         if (name.front() == '.') {
@@ -588,8 +610,11 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
         }
 
         const auto dot_pos = name.rfind('.');
-        const std::string_view base_name = (dot_pos != std::string::npos) ? std::string_view(name).substr(dot_pos + 1) : std::string_view(name);
-        if (base_name.empty()) continue;
+        const std::string_view base_name =
+            (dot_pos != std::string::npos) ? std::string_view(name).substr(dot_pos + 1) : std::string_view(name);
+        if (base_name.empty()) {
+            continue;
+        }
         const char first_char = static_cast<char>(std::toupper(static_cast<unsigned char>(base_name.front())));
 
         switch (first_char) {
@@ -640,9 +665,9 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
                     break;
                 }
                 const std::string upper = ToUpper(tokens[i]);
-                if (upper == "AND" || upper == "NAND" || upper == "OR" || upper == "NOR" ||
-                    upper == "XOR" || upper == "XNOR" || upper == "NOT" || upper == "INV" ||
-                    upper == "BUF" || upper == "BUFFER" || upper == "SCHMITT") {
+                if (upper == "AND" || upper == "NAND" || upper == "OR" || upper == "NOR" || upper == "XOR" ||
+                    upper == "XNOR" || upper == "NOT" || upper == "INV" || upper == "BUF" || upper == "BUFFER" ||
+                    upper == "SCHMITT") {
                     break;
                 }
                 nodes.Register(tokens[i]);
@@ -659,7 +684,9 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
 
     for (const auto &line : flat_lines) {
         const auto tokens = TokenizeLine(line);
-        if (tokens.empty()) continue;
+        if (tokens.empty()) {
+            continue;
+        }
 
         const std::string name = tokens[0];
 
@@ -791,7 +818,8 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
                     for (const auto &cand_line : flat_lines) {
                         const auto cand_toks = TokenizeLine(cand_line);
                         if (cand_toks.size() >= 3) {
-                            const char fc = static_cast<char>(std::toupper(static_cast<unsigned char>(cand_toks[0].front())));
+                            const char fc =
+                                static_cast<char>(std::toupper(static_cast<unsigned char>(cand_toks[0].front())));
                             if (fc == 'V' || fc == 'I') {
                                 if ((cand_toks[1] == in_pos && cand_toks[2] == in_neg) ||
                                     (cand_toks[1] == in_neg && cand_toks[2] == in_pos)) {
@@ -802,7 +830,8 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
                         }
                     }
                     if (cfg.InputSource.empty()) {
-                        return std::unexpected(std::format("Could not find source between nodes '{}' and '{}' for .pz", in_pos, in_neg));
+                        return std::unexpected(
+                            std::format("Could not find source between nodes '{}' and '{}' for .pz", in_pos, in_neg));
                     }
                     if (tokens.size() >= 7) {
                         const std::string type = ToUpper(tokens[6]);
@@ -833,11 +862,17 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
                         const std::string opt_name = ToUpper(tokens[i].substr(0, eq));
                         const auto opt_val = ParseSpiceNumber(tokens[i].substr(eq + 1));
                         if (opt_val) {
-                            if (opt_name == "RELTOL") result.Options.RelTol = *opt_val;
-                            else if (opt_name == "VNTOL") result.Options.VoltageAbsTol = *opt_val;
-                            else if (opt_name == "ABSTOL") result.Options.CurrentAbsTol = *opt_val;
-                            else if (opt_name == "GMIN") result.Options.Gmin = *opt_val;
-                            else if (opt_name == "MAXITER" || opt_name == "ITL1") result.Options.MaxIterations = static_cast<int>(*opt_val);
+                            if (opt_name == "RELTOL") {
+                                result.Options.RelTol = *opt_val;
+                            } else if (opt_name == "VNTOL") {
+                                result.Options.VoltageAbsTol = *opt_val;
+                            } else if (opt_name == "ABSTOL") {
+                                result.Options.CurrentAbsTol = *opt_val;
+                            } else if (opt_name == "GMIN") {
+                                result.Options.Gmin = *opt_val;
+                            } else if (opt_name == "MAXITER" || opt_name == "ITL1") {
+                                result.Options.MaxIterations = static_cast<int>(*opt_val);
+                            }
                         }
                     }
                 }
@@ -846,33 +881,46 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
         }
 
         const auto dot_pos = name.rfind('.');
-        const std::string_view base_name = (dot_pos != std::string::npos) ? std::string_view(name).substr(dot_pos + 1) : std::string_view(name);
-        if (base_name.empty()) continue;
+        const std::string_view base_name =
+            (dot_pos != std::string::npos) ? std::string_view(name).substr(dot_pos + 1) : std::string_view(name);
+        if (base_name.empty()) {
+            continue;
+        }
         const char first_char = static_cast<char>(std::toupper(static_cast<unsigned char>(base_name.front())));
 
         // Circuit Components
         switch (first_char) {
         case 'R': { // Resistor: R<name> <n1> <n2> <value>
-            if (tokens.size() < 4) return std::unexpected(std::format("Malformed resistor: '{}'", line));
+            if (tokens.size() < 4) {
+                return std::unexpected(std::format("Malformed resistor: '{}'", line));
+            }
             const NodeId n1 = nodes.Resolve(tokens[1]);
             const NodeId n2 = nodes.Resolve(tokens[2]);
             const auto val = ParseSpiceNumber(tokens[3]);
-            if (!val) return std::unexpected(std::format("Invalid resistor value '{}'", tokens[3]));
+            if (!val) {
+                return std::unexpected(std::format("Invalid resistor value '{}'", tokens[3]));
+            }
             builder.AddResistor(name, n1, n2, *val);
             break;
         }
 
         case 'C': { // Capacitor: C<name> <n1> <n2> <value> [ic=<val>]
-            if (tokens.size() < 4) return std::unexpected(std::format("Malformed capacitor: '{}'", line));
+            if (tokens.size() < 4) {
+                return std::unexpected(std::format("Malformed capacitor: '{}'", line));
+            }
             const NodeId n1 = nodes.Resolve(tokens[1]);
             const NodeId n2 = nodes.Resolve(tokens[2]);
             const auto val = ParseSpiceNumber(tokens[3]);
-            if (!val) return std::unexpected(std::format("Invalid capacitor value '{}'", tokens[3]));
+            if (!val) {
+                return std::unexpected(std::format("Invalid capacitor value '{}'", tokens[3]));
+            }
             double ic = 0.0;
             for (std::size_t i = 4; i < tokens.size(); ++i) {
                 const std::string u = ToUpper(tokens[i]);
                 if (u.starts_with("IC=")) {
-                    if (const auto ic_val = ParseSpiceNumber(u.substr(3))) ic = *ic_val;
+                    if (const auto ic_val = ParseSpiceNumber(u.substr(3))) {
+                        ic = *ic_val;
+                    }
                 }
             }
             builder.AddCapacitor(name, n1, n2, *val, ic);
@@ -880,16 +928,22 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
         }
 
         case 'L': { // Inductor: L<name> <n1> <n2> <value> [ic=<val>]
-            if (tokens.size() < 4) return std::unexpected(std::format("Malformed inductor: '{}'", line));
+            if (tokens.size() < 4) {
+                return std::unexpected(std::format("Malformed inductor: '{}'", line));
+            }
             const NodeId n1 = nodes.Resolve(tokens[1]);
             const NodeId n2 = nodes.Resolve(tokens[2]);
             const auto val = ParseSpiceNumber(tokens[3]);
-            if (!val) return std::unexpected(std::format("Invalid inductor value '{}'", tokens[3]));
+            if (!val) {
+                return std::unexpected(std::format("Invalid inductor value '{}'", tokens[3]));
+            }
             double ic = 0.0;
             for (std::size_t i = 4; i < tokens.size(); ++i) {
                 const std::string u = ToUpper(tokens[i]);
                 if (u.starts_with("IC=")) {
-                    if (const auto ic_val = ParseSpiceNumber(u.substr(3))) ic = *ic_val;
+                    if (const auto ic_val = ParseSpiceNumber(u.substr(3))) {
+                        ic = *ic_val;
+                    }
                 }
             }
             builder.AddInductor(name, n1, n2, *val, ic);
@@ -898,7 +952,9 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
 
         case 'V':
         case 'I': { // Voltage or Current Source
-            if (tokens.size() < 3) return std::unexpected(std::format("Malformed source: '{}'", line));
+            if (tokens.size() < 3) {
+                return std::unexpected(std::format("Malformed source: '{}'", line));
+            }
             const NodeId n_pos = nodes.Resolve(tokens[1]);
             const NodeId n_neg = nodes.Resolve(tokens[2]);
 
@@ -909,7 +965,15 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
             int port_num = 0;
             double z0 = 50.0;
 
-            enum class WaveformType { None, Pulse, Sine, Exp, Pwl, Sffm, Am };
+            enum class WaveformType {
+                None,
+                Pulse,
+                Sine,
+                Exp,
+                Pwl,
+                Sffm,
+                Am
+            };
             WaveformType wtype = WaveformType::None;
             std::string waveform_token;
 
@@ -999,40 +1063,83 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
             case WaveformType::Pulse: {
                 const auto vals = ExtractParenthesizedValues(waveform_token);
                 PulseParameters p;
-                if (vals.size() >= 1) p.Low = vals[0];
-                if (vals.size() >= 2) p.High = vals[1];
-                if (vals.size() >= 3) p.Delay = vals[2];
-                if (vals.size() >= 4) p.RiseTime = vals[3];
-                if (vals.size() >= 5) p.FallTime = vals[4];
-                if (vals.size() >= 6) p.Width = vals[5];
-                if (vals.size() >= 7) p.Period = vals[6];
-                if (is_voltage) builder.AddVpulse(name, n_pos, n_neg, p, ac_mag, ac_phase);
-                else builder.AddIpulse(name, n_pos, n_neg, p, ac_mag, ac_phase);
+                if (vals.size() >= 1) {
+                    p.Low = vals[0];
+                }
+                if (vals.size() >= 2) {
+                    p.High = vals[1];
+                }
+                if (vals.size() >= 3) {
+                    p.Delay = vals[2];
+                }
+                if (vals.size() >= 4) {
+                    p.RiseTime = vals[3];
+                }
+                if (vals.size() >= 5) {
+                    p.FallTime = vals[4];
+                }
+                if (vals.size() >= 6) {
+                    p.Width = vals[5];
+                }
+                if (vals.size() >= 7) {
+                    p.Period = vals[6];
+                }
+                if (is_voltage) {
+                    builder.AddVpulse(name, n_pos, n_neg, p, ac_mag, ac_phase);
+                } else {
+                    builder.AddIpulse(name, n_pos, n_neg, p, ac_mag, ac_phase);
+                }
                 break;
             }
             case WaveformType::Sine: {
                 const auto vals = ExtractParenthesizedValues(waveform_token);
                 SineParameters p;
-                if (vals.size() >= 1) p.Offset = vals[0];
-                if (vals.size() >= 2) p.Amplitude = vals[1];
-                if (vals.size() >= 3) p.Frequency = vals[2];
-                if (vals.size() >= 4) p.Phase = vals[3];
+                if (vals.size() >= 1) {
+                    p.Offset = vals[0];
+                }
+                if (vals.size() >= 2) {
+                    p.Amplitude = vals[1];
+                }
+                if (vals.size() >= 3) {
+                    p.Frequency = vals[2];
+                }
+                if (vals.size() >= 4) {
+                    p.Phase = vals[3];
+                }
                 p.Magnitude = ac_mag > 0.0 ? ac_mag : p.Amplitude;
-                if (is_voltage) builder.AddVsine(name, n_pos, n_neg, p, ac_mag, ac_phase);
-                else builder.AddIsine(name, n_pos, n_neg, p, ac_mag, ac_phase);
+                if (is_voltage) {
+                    builder.AddVsine(name, n_pos, n_neg, p, ac_mag, ac_phase);
+                } else {
+                    builder.AddIsine(name, n_pos, n_neg, p, ac_mag, ac_phase);
+                }
                 break;
             }
             case WaveformType::Exp: {
                 const auto vals = ExtractParenthesizedValues(waveform_token);
                 ExpParameters p;
-                if (vals.size() >= 1) p.InitialValue = vals[0];
-                if (vals.size() >= 2) p.PeakValue = vals[1];
-                if (vals.size() >= 3) p.RiseDelay = vals[2];
-                if (vals.size() >= 4) p.RiseTimeConstant = vals[3];
-                if (vals.size() >= 5) p.FallDelay = vals[4];
-                if (vals.size() >= 6) p.FallTimeConstant = vals[5];
-                if (is_voltage) builder.AddVexp(name, n_pos, n_neg, p, ac_mag, ac_phase);
-                else builder.AddIexp(name, n_pos, n_neg, p, ac_mag, ac_phase);
+                if (vals.size() >= 1) {
+                    p.InitialValue = vals[0];
+                }
+                if (vals.size() >= 2) {
+                    p.PeakValue = vals[1];
+                }
+                if (vals.size() >= 3) {
+                    p.RiseDelay = vals[2];
+                }
+                if (vals.size() >= 4) {
+                    p.RiseTimeConstant = vals[3];
+                }
+                if (vals.size() >= 5) {
+                    p.FallDelay = vals[4];
+                }
+                if (vals.size() >= 6) {
+                    p.FallTimeConstant = vals[5];
+                }
+                if (is_voltage) {
+                    builder.AddVexp(name, n_pos, n_neg, p, ac_mag, ac_phase);
+                } else {
+                    builder.AddIexp(name, n_pos, n_neg, p, ac_mag, ac_phase);
+                }
                 break;
             }
             case WaveformType::Pwl: {
@@ -1042,45 +1149,79 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
                 for (std::size_t i = 0; i + 1 < vals.size(); i += 2) {
                     p.Points.push_back({vals[i], vals[i + 1]});
                 }
-                if (is_voltage) builder.AddVpwl(name, n_pos, n_neg, p, ac_mag, ac_phase);
-                else builder.AddIpwl(name, n_pos, n_neg, p, ac_mag, ac_phase);
+                if (is_voltage) {
+                    builder.AddVpwl(name, n_pos, n_neg, p, ac_mag, ac_phase);
+                } else {
+                    builder.AddIpwl(name, n_pos, n_neg, p, ac_mag, ac_phase);
+                }
                 break;
             }
             case WaveformType::Sffm: {
                 const auto vals = ExtractParenthesizedValues(waveform_token);
                 SffmParameters p;
-                if (vals.size() >= 1) p.Offset = vals[0];
-                if (vals.size() >= 2) p.Amplitude = vals[1];
-                if (vals.size() >= 3) p.CarrierFrequency = vals[2];
-                if (vals.size() >= 4) p.ModulationIndex = vals[3];
-                if (vals.size() >= 5) p.SignalFrequency = vals[4];
-                if (is_voltage) builder.AddVsffm(name, n_pos, n_neg, p, ac_mag, ac_phase);
-                else builder.AddIsffm(name, n_pos, n_neg, p, ac_mag, ac_phase);
+                if (vals.size() >= 1) {
+                    p.Offset = vals[0];
+                }
+                if (vals.size() >= 2) {
+                    p.Amplitude = vals[1];
+                }
+                if (vals.size() >= 3) {
+                    p.CarrierFrequency = vals[2];
+                }
+                if (vals.size() >= 4) {
+                    p.ModulationIndex = vals[3];
+                }
+                if (vals.size() >= 5) {
+                    p.SignalFrequency = vals[4];
+                }
+                if (is_voltage) {
+                    builder.AddVsffm(name, n_pos, n_neg, p, ac_mag, ac_phase);
+                } else {
+                    builder.AddIsffm(name, n_pos, n_neg, p, ac_mag, ac_phase);
+                }
                 break;
             }
             case WaveformType::Am: {
                 const auto vals = ExtractParenthesizedValues(waveform_token);
                 AmParameters p;
-                if (vals.size() >= 1) p.Amplitude = vals[0];
-                if (vals.size() >= 2) p.Offset = vals[1];
-                if (vals.size() >= 3) p.ModulatingFrequency = vals[2];
-                if (vals.size() >= 4) p.CarrierFrequency = vals[3];
-                if (vals.size() >= 5) p.Delay = vals[4];
-                if (is_voltage) builder.AddVam(name, n_pos, n_neg, p, ac_mag, ac_phase);
-                else builder.AddIam(name, n_pos, n_neg, p, ac_mag, ac_phase);
+                if (vals.size() >= 1) {
+                    p.Amplitude = vals[0];
+                }
+                if (vals.size() >= 2) {
+                    p.Offset = vals[1];
+                }
+                if (vals.size() >= 3) {
+                    p.ModulatingFrequency = vals[2];
+                }
+                if (vals.size() >= 4) {
+                    p.CarrierFrequency = vals[3];
+                }
+                if (vals.size() >= 5) {
+                    p.Delay = vals[4];
+                }
+                if (is_voltage) {
+                    builder.AddVam(name, n_pos, n_neg, p, ac_mag, ac_phase);
+                } else {
+                    builder.AddIam(name, n_pos, n_neg, p, ac_mag, ac_phase);
+                }
                 break;
             }
             case WaveformType::None:
             default:
-                if (is_voltage) builder.AddVdc(name, n_pos, n_neg, dc_val, ac_mag, ac_phase);
-                else builder.AddIdc(name, n_pos, n_neg, dc_val, ac_mag, ac_phase);
+                if (is_voltage) {
+                    builder.AddVdc(name, n_pos, n_neg, dc_val, ac_mag, ac_phase);
+                } else {
+                    builder.AddIdc(name, n_pos, n_neg, dc_val, ac_mag, ac_phase);
+                }
                 break;
             }
             break;
         }
 
         case 'P': { // Port element: P<name> <pos> <neg> [portnum=<N>] [z0=<Z>] or P1 <pos> <neg> [Z0]
-            if (tokens.size() < 3) return std::unexpected(std::format("Malformed port: '{}'", line));
+            if (tokens.size() < 3) {
+                return std::unexpected(std::format("Malformed port: '{}'", line));
+            }
             const NodeId n_pos = nodes.Resolve(tokens[1]);
             int port_num = 1;
             const auto digits = name.find_first_of("0123456789");
@@ -1107,53 +1248,71 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
         }
 
         case 'E': { // VCVS: E<name> <pos> <neg> <ctrl_pos> <ctrl_neg> <gain>
-            if (tokens.size() < 6) return std::unexpected(std::format("Malformed VCVS: '{}'", line));
+            if (tokens.size() < 6) {
+                return std::unexpected(std::format("Malformed VCVS: '{}'", line));
+            }
             const NodeId p = nodes.Resolve(tokens[1]);
             const NodeId n = nodes.Resolve(tokens[2]);
             const NodeId cp = nodes.Resolve(tokens[3]);
             const NodeId cn = nodes.Resolve(tokens[4]);
             const auto gain = ParseSpiceNumber(tokens[5]);
-            if (!gain) return std::unexpected(std::format("Invalid VCVS gain '{}'", tokens[5]));
+            if (!gain) {
+                return std::unexpected(std::format("Invalid VCVS gain '{}'", tokens[5]));
+            }
             builder.AddVcvs(name, p, n, cp, cn, *gain);
             break;
         }
 
         case 'G': { // VCCS: G<name> <pos> <neg> <ctrl_pos> <ctrl_neg> <gm>
-            if (tokens.size() < 6) return std::unexpected(std::format("Malformed VCCS: '{}'", line));
+            if (tokens.size() < 6) {
+                return std::unexpected(std::format("Malformed VCCS: '{}'", line));
+            }
             const NodeId p = nodes.Resolve(tokens[1]);
             const NodeId n = nodes.Resolve(tokens[2]);
             const NodeId cp = nodes.Resolve(tokens[3]);
             const NodeId cn = nodes.Resolve(tokens[4]);
             const auto gm = ParseSpiceNumber(tokens[5]);
-            if (!gm) return std::unexpected(std::format("Invalid VCCS transconductance '{}'", tokens[5]));
+            if (!gm) {
+                return std::unexpected(std::format("Invalid VCCS transconductance '{}'", tokens[5]));
+            }
             builder.AddVccs(name, p, n, cp, cn, *gm);
             break;
         }
 
         case 'H': { // CCVS: H<name> <pos> <neg> <v_ctrl> <rm>
-            if (tokens.size() < 5) return std::unexpected(std::format("Malformed CCVS: '{}'", line));
+            if (tokens.size() < 5) {
+                return std::unexpected(std::format("Malformed CCVS: '{}'", line));
+            }
             const NodeId p = nodes.Resolve(tokens[1]);
             const NodeId n = nodes.Resolve(tokens[2]);
             const std::string vctrl = tokens[3];
             const auto rm = ParseSpiceNumber(tokens[4]);
-            if (!rm) return std::unexpected(std::format("Invalid CCVS transresistance '{}'", tokens[4]));
+            if (!rm) {
+                return std::unexpected(std::format("Invalid CCVS transresistance '{}'", tokens[4]));
+            }
             builder.AddCcvs(name, p, n, vctrl, *rm);
             break;
         }
 
         case 'F': { // CCCS: F<name> <pos> <neg> <v_ctrl> <gain>
-            if (tokens.size() < 5) return std::unexpected(std::format("Malformed CCCS: '{}'", line));
+            if (tokens.size() < 5) {
+                return std::unexpected(std::format("Malformed CCCS: '{}'", line));
+            }
             const NodeId p = nodes.Resolve(tokens[1]);
             const NodeId n = nodes.Resolve(tokens[2]);
             const std::string vctrl = tokens[3];
             const auto gain = ParseSpiceNumber(tokens[4]);
-            if (!gain) return std::unexpected(std::format("Invalid CCCS gain '{}'", tokens[4]));
+            if (!gain) {
+                return std::unexpected(std::format("Invalid CCCS gain '{}'", tokens[4]));
+            }
             builder.AddCccs(name, p, n, vctrl, *gain);
             break;
         }
 
         case 'D': { // Diode: D<name> <anode> <cathode> <model> [area]
-            if (tokens.size() < 4) return std::unexpected(std::format("Malformed diode: '{}'", line));
+            if (tokens.size() < 4) {
+                return std::unexpected(std::format("Malformed diode: '{}'", line));
+            }
             const NodeId an = nodes.Resolve(tokens[1]);
             const NodeId cat = nodes.Resolve(tokens[2]);
             const std::string mname = ToUpper(tokens[3]);
@@ -1164,14 +1323,18 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
             }
             double area = 1.0;
             if (tokens.size() >= 5) {
-                if (const auto a = ParseSpiceNumber(tokens[4])) area = *a;
+                if (const auto a = ParseSpiceNumber(tokens[4])) {
+                    area = *a;
+                }
             }
             builder.AddDiode(name, an, cat, p, area);
             break;
         }
 
         case 'Q': { // BJT: Q<name> <c> <b> <e> <model> [area]
-            if (tokens.size() < 5) return std::unexpected(std::format("Malformed BJT: '{}'", line));
+            if (tokens.size() < 5) {
+                return std::unexpected(std::format("Malformed BJT: '{}'", line));
+            }
             const NodeId c = nodes.Resolve(tokens[1]);
             const NodeId b = nodes.Resolve(tokens[2]);
             const NodeId e = nodes.Resolve(tokens[3]);
@@ -1185,14 +1348,18 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
             }
             double area = 1.0;
             if (tokens.size() >= 6) {
-                if (const auto a = ParseSpiceNumber(tokens[5])) area = *a;
+                if (const auto a = ParseSpiceNumber(tokens[5])) {
+                    area = *a;
+                }
             }
             builder.AddBjt(name, c, b, e, is_npn, p, area);
             break;
         }
 
         case 'M': { // MOSFET: M<name> <d> <g> <s> <b> <model> [L=<l>] [W=<w>]
-            if (tokens.size() < 6) return std::unexpected(std::format("Malformed MOSFET: '{}'", line));
+            if (tokens.size() < 6) {
+                return std::unexpected(std::format("Malformed MOSFET: '{}'", line));
+            }
             const NodeId d = nodes.Resolve(tokens[1]);
             const NodeId g = nodes.Resolve(tokens[2]);
             const NodeId s = nodes.Resolve(tokens[3]);
@@ -1208,9 +1375,13 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
             for (std::size_t i = 6; i < tokens.size(); ++i) {
                 const std::string u = ToUpper(tokens[i]);
                 if (u.starts_with("L=")) {
-                    if (const auto lval = ParseSpiceNumber(u.substr(2))) p.Length = *lval;
+                    if (const auto lval = ParseSpiceNumber(u.substr(2))) {
+                        p.Length = *lval;
+                    }
                 } else if (u.starts_with("W=")) {
-                    if (const auto wval = ParseSpiceNumber(u.substr(2))) p.Width = *wval;
+                    if (const auto wval = ParseSpiceNumber(u.substr(2))) {
+                        p.Width = *wval;
+                    }
                 }
             }
             builder.AddMosfet(name, d, g, s, b, is_nmos, p);
@@ -1218,7 +1389,9 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
         }
 
         case 'S': { // Switch: S<name> <a1> <a2> <c1> <c2> <model>
-            if (tokens.size() < 6) return std::unexpected(std::format("Malformed switch: '{}'", line));
+            if (tokens.size() < 6) {
+                return std::unexpected(std::format("Malformed switch: '{}'", line));
+            }
             const NodeId a1 = nodes.Resolve(tokens[1]);
             const NodeId a2 = nodes.Resolve(tokens[2]);
             const NodeId c1 = nodes.Resolve(tokens[3]);
@@ -1233,21 +1406,60 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
             break;
         }
 
-        case 'U': { // Logic gate: U<name> <out> <in1> [<in2> ...] <gate_type> [VHIGH=5] [VLOW=0] [VTH=2.5] [TPD=1n] [ROUT=50] [HYST=0.5]
-            if (tokens.size() < 4) return std::unexpected(std::format("Malformed logic gate: '{}'", line));
+        case 'U': { // Logic gate: U<name> <out> <in1> [<in2> ...] <gate_type> [VHIGH=5] [VLOW=0] [VTH=2.5] [TPD=1n]
+                    // [ROUT=50] [HYST=0.5]
+            if (tokens.size() < 4) {
+                return std::unexpected(std::format("Malformed logic gate: '{}'", line));
+            }
             int gate_type_idx = -1;
             LogicGateType gate_type = LogicGateType::NOT;
             for (std::size_t i = 2; i < tokens.size(); ++i) {
                 const std::string upper = ToUpper(tokens[i]);
-                if (upper == "NOT" || upper == "INV") { gate_type = LogicGateType::NOT; gate_type_idx = static_cast<int>(i); break; }
-                if (upper == "BUF" || upper == "BUFFER") { gate_type = LogicGateType::BUFFER; gate_type_idx = static_cast<int>(i); break; }
-                if (upper == "AND") { gate_type = LogicGateType::AND; gate_type_idx = static_cast<int>(i); break; }
-                if (upper == "NAND") { gate_type = LogicGateType::NAND; gate_type_idx = static_cast<int>(i); break; }
-                if (upper == "OR") { gate_type = LogicGateType::OR; gate_type_idx = static_cast<int>(i); break; }
-                if (upper == "NOR") { gate_type = LogicGateType::NOR; gate_type_idx = static_cast<int>(i); break; }
-                if (upper == "XOR") { gate_type = LogicGateType::XOR; gate_type_idx = static_cast<int>(i); break; }
-                if (upper == "XNOR") { gate_type = LogicGateType::XNOR; gate_type_idx = static_cast<int>(i); break; }
-                if (upper == "SCHMITT") { gate_type = LogicGateType::SCHMITT_TRIGGER; gate_type_idx = static_cast<int>(i); break; }
+                if (upper == "NOT" || upper == "INV") {
+                    gate_type = LogicGateType::NOT;
+                    gate_type_idx = static_cast<int>(i);
+                    break;
+                }
+                if (upper == "BUF" || upper == "BUFFER") {
+                    gate_type = LogicGateType::BUFFER;
+                    gate_type_idx = static_cast<int>(i);
+                    break;
+                }
+                if (upper == "AND") {
+                    gate_type = LogicGateType::AND;
+                    gate_type_idx = static_cast<int>(i);
+                    break;
+                }
+                if (upper == "NAND") {
+                    gate_type = LogicGateType::NAND;
+                    gate_type_idx = static_cast<int>(i);
+                    break;
+                }
+                if (upper == "OR") {
+                    gate_type = LogicGateType::OR;
+                    gate_type_idx = static_cast<int>(i);
+                    break;
+                }
+                if (upper == "NOR") {
+                    gate_type = LogicGateType::NOR;
+                    gate_type_idx = static_cast<int>(i);
+                    break;
+                }
+                if (upper == "XOR") {
+                    gate_type = LogicGateType::XOR;
+                    gate_type_idx = static_cast<int>(i);
+                    break;
+                }
+                if (upper == "XNOR") {
+                    gate_type = LogicGateType::XNOR;
+                    gate_type_idx = static_cast<int>(i);
+                    break;
+                }
+                if (upper == "SCHMITT") {
+                    gate_type = LogicGateType::SCHMITT_TRIGGER;
+                    gate_type_idx = static_cast<int>(i);
+                    break;
+                }
             }
             if (gate_type_idx < 2) {
                 return std::unexpected(std::format("Missing or unrecognized logic gate type in: '{}'", line));
@@ -1264,17 +1476,29 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
             for (std::size_t i = static_cast<std::size_t>(gate_type_idx + 1); i < tokens.size(); ++i) {
                 const std::string u = ToUpper(tokens[i]);
                 if (u.starts_with("VHIGH=")) {
-                    if (const auto v = ParseSpiceNumber(u.substr(6))) params.VHigh = *v;
+                    if (const auto v = ParseSpiceNumber(u.substr(6))) {
+                        params.VHigh = *v;
+                    }
                 } else if (u.starts_with("VLOW=")) {
-                    if (const auto v = ParseSpiceNumber(u.substr(5))) params.VLow = *v;
+                    if (const auto v = ParseSpiceNumber(u.substr(5))) {
+                        params.VLow = *v;
+                    }
                 } else if (u.starts_with("VTH=")) {
-                    if (const auto v = ParseSpiceNumber(u.substr(4))) params.VThreshold = *v;
+                    if (const auto v = ParseSpiceNumber(u.substr(4))) {
+                        params.VThreshold = *v;
+                    }
                 } else if (u.starts_with("TPD=")) {
-                    if (const auto v = ParseSpiceNumber(u.substr(4))) params.PropagationDelay = *v;
+                    if (const auto v = ParseSpiceNumber(u.substr(4))) {
+                        params.PropagationDelay = *v;
+                    }
                 } else if (u.starts_with("ROUT=")) {
-                    if (const auto v = ParseSpiceNumber(u.substr(5))) params.OutputResistance = *v;
+                    if (const auto v = ParseSpiceNumber(u.substr(5))) {
+                        params.OutputResistance = *v;
+                    }
                 } else if (u.starts_with("HYST=")) {
-                    if (const auto v = ParseSpiceNumber(u.substr(5))) params.Hysteresis = *v;
+                    if (const auto v = ParseSpiceNumber(u.substr(5))) {
+                        params.Hysteresis = *v;
+                    }
                 }
             }
             builder.AddLogicGate(name, gate_type, out, std::move(inputs), params);

@@ -81,10 +81,9 @@ std::vector<double> GenerateSweepValues(const double start, const double stop, c
 
 } // namespace
 
-std::expected<OperatingPointResult, std::string> ComputeOperatingPoint(
-    CompiledCircuit &compiled,
-    const ConvergenceOptions &options,
-    std::vector<DiagnosticMessage> *messages) {
+std::expected<OperatingPointResult, std::string> ComputeOperatingPoint(CompiledCircuit &compiled,
+                                                                       const ConvergenceOptions &options,
+                                                                       std::vector<DiagnosticMessage> *messages) {
     std::vector<double> x(static_cast<std::size_t>(compiled.System->Size()), 0.0);
     SeedOperatingPoint(compiled.Devices, x);
     const NewtonOutcome outcome = SolveNewton(*compiled.System, compiled.Devices, x, TimeContext{}, options);
@@ -99,11 +98,9 @@ std::expected<OperatingPointResult, std::string> ComputeOperatingPoint(
     return point;
 }
 
-std::expected<DcSweepResult, std::string> ComputeDCSweep(
-    CompiledCircuit &compiled,
-    const DcSweepConfig &settings,
-    const ConvergenceOptions &options,
-    std::vector<DiagnosticMessage> *messages) {
+std::expected<DcSweepResult, std::string> ComputeDCSweep(CompiledCircuit &compiled, const DcSweepConfig &settings,
+                                                         const ConvergenceOptions &options,
+                                                         std::vector<DiagnosticMessage> *messages) {
     const auto swept = compiled.SourcesByName.find(settings.SweptSource);
     if (swept == compiled.SourcesByName.end()) {
         return std::unexpected(std::format("The circuit has no source named {}", settings.SweptSource));
@@ -148,8 +145,8 @@ std::expected<DcSweepResult, std::string> ComputeDCSweep(
             }
             outcome = SolveNewton(*compiled.System, compiled.Devices, x, TimeContext{}, options);
             if (!outcome.Converged) {
-                return std::unexpected(std::format("Nodalys found no operating point at {} = {}",
-                                                   sweep.SweptSource, swept_value));
+                return std::unexpected(
+                    std::format("Nodalys found no operating point at {} = {}", sweep.SweptSource, swept_value));
             }
             const std::vector<double> voltages = ReadNodeVoltages(compiled, x);
             for (int node = 0; node < compiled.CircuitNodeCount; ++node) {

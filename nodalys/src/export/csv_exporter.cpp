@@ -103,13 +103,17 @@ std::string ExportCsv(const AcSweepResult &result) {
     for (std::size_t pt = 0; pt < num_points; ++pt) {
         ss << std::format("{:.8g}", result.Frequencies[pt]);
         for (std::size_t node = 1; node < result.NodeMagnitudesDecibels.size(); ++node) {
-            const double db = (pt < result.NodeMagnitudesDecibels[node].size()) ? result.NodeMagnitudesDecibels[node][pt] : 0.0;
+            const double db =
+                (pt < result.NodeMagnitudesDecibels[node].size()) ? result.NodeMagnitudesDecibels[node][pt] : 0.0;
             const double deg = (pt < result.NodePhasesDegrees[node].size()) ? result.NodePhasesDegrees[node][pt] : 0.0;
             ss << "," << std::format("{:.8g},{:.8g}", db, deg);
         }
         for (std::size_t c = 0; c < result.CurrentMagnitudesDecibels.size(); ++c) {
-            const double db = (pt < result.CurrentMagnitudesDecibels[c].Values.size()) ? result.CurrentMagnitudesDecibels[c].Values[pt] : 0.0;
-            const double deg = (pt < result.CurrentPhasesDegrees[c].Values.size()) ? result.CurrentPhasesDegrees[c].Values[pt] : 0.0;
+            const double db = (pt < result.CurrentMagnitudesDecibels[c].Values.size())
+                                  ? result.CurrentMagnitudesDecibels[c].Values[pt]
+                                  : 0.0;
+            const double deg =
+                (pt < result.CurrentPhasesDegrees[c].Values.size()) ? result.CurrentPhasesDegrees[c].Values[pt] : 0.0;
             ss << "," << std::format("{:.8g},{:.8g}", db, deg);
         }
         ss << "\n";
@@ -182,17 +186,13 @@ std::string ExportCsv(const PoleZeroResult &result) {
     ss << "Type,Index,Real (rad/s),Imag (rad/s),Frequency (Hz)\n";
     for (std::size_t i = 0; i < result.Poles.size(); ++i) {
         const double f_hz = std::abs(result.Poles[i]) / TWO_PI;
-        ss << "Pole," << (i + 1) << ","
-           << std::format("{:.8g}", result.Poles[i].real()) << ","
-           << std::format("{:.8g}", result.Poles[i].imag()) << ","
-           << std::format("{:.8g}", f_hz) << "\n";
+        ss << "Pole," << (i + 1) << "," << std::format("{:.8g}", result.Poles[i].real()) << ","
+           << std::format("{:.8g}", result.Poles[i].imag()) << "," << std::format("{:.8g}", f_hz) << "\n";
     }
     for (std::size_t i = 0; i < result.Zeros.size(); ++i) {
         const double f_hz = std::abs(result.Zeros[i]) / TWO_PI;
-        ss << "Zero," << (i + 1) << ","
-           << std::format("{:.8g}", result.Zeros[i].real()) << ","
-           << std::format("{:.8g}", result.Zeros[i].imag()) << ","
-           << std::format("{:.8g}", f_hz) << "\n";
+        ss << "Zero," << (i + 1) << "," << std::format("{:.8g}", result.Zeros[i].real()) << ","
+           << std::format("{:.8g}", result.Zeros[i].imag()) << "," << std::format("{:.8g}", f_hz) << "\n";
     }
     return ss.str();
 }

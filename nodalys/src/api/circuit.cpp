@@ -13,7 +13,8 @@ Circuit::~Circuit() = default;
 Circuit::Circuit(Circuit &&) noexcept = default;
 Circuit &Circuit::operator=(Circuit &&) noexcept = default;
 
-Circuit::Circuit(std::unique_ptr<CircuitImpl> impl) : m_Impl(std::move(impl)) {}
+Circuit::Circuit(std::unique_ptr<CircuitImpl> impl) : m_Impl(std::move(impl)) {
+}
 
 int Circuit::NodeCount() const {
     return m_Impl ? m_Impl->NodeCount() : 0;

@@ -24,14 +24,14 @@ namespace nodalys {
  * @brief  Type of simulation directive found in the SPICE netlist.
  */
 enum class AnalysisKind {
-    OperatingPoint,       ///< .op
-    Transient,            ///< .tran
-    DcSweep,              ///< .dc
-    AcSweep,              ///< .ac
-    TransferFunction,     ///< .tf
-    Noise,                ///< .noise
-    SParameters,          ///< .sp
-    PoleZero              ///< .pz
+    OperatingPoint,   ///< .op
+    Transient,        ///< .tran
+    DcSweep,          ///< .dc
+    AcSweep,          ///< .ac
+    TransferFunction, ///< .tf
+    Noise,            ///< .noise
+    SParameters,      ///< .sp
+    PoleZero          ///< .pz
 };
 
 /**
@@ -40,16 +40,16 @@ enum class AnalysisKind {
  */
 struct ParsedAnalysis {
     AnalysisKind Kind = AnalysisKind::OperatingPoint;
-    std::variant<
-        std::monostate,         // OperatingPoint (no parameters)
-        TransientConfig,        // Transient (.tran)
-        DcSweepConfig,          // DcSweep (.dc)
-        AcSweepConfig,          // AcSweep (.ac)
-        TransferFunctionConfig, // TransferFunction (.tf)
-        NoiseConfig,            // Noise (.noise)
-        SParameterConfig,       // SParameters (.sp)
-        PoleZeroConfig          // PoleZero (.pz)
-    > Config;
+    std::variant<std::monostate,         // OperatingPoint (no parameters)
+                 TransientConfig,        // Transient (.tran)
+                 DcSweepConfig,          // DcSweep (.dc)
+                 AcSweepConfig,          // AcSweep (.ac)
+                 TransferFunctionConfig, // TransferFunction (.tf)
+                 NoiseConfig,            // Noise (.noise)
+                 SParameterConfig,       // SParameters (.sp)
+                 PoleZeroConfig          // PoleZero (.pz)
+                 >
+        Config;
 };
 
 /**

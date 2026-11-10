@@ -1,5 +1,5 @@
 /**
- * @file    nodalys_parser_and_export_tests.cpp
+ * @file    parser_and_export_tests.cpp
  * @brief   Tests for SPICE netlist parsing, number scales, result exporters, and CLI.
  */
 
@@ -54,12 +54,12 @@ TEST_CASE("Engineering scale suffixes and units parse into numeric values", "[no
 
 TEST_CASE("SPICE netlists parse into runnable circuits and simulation directives", "[nodalys][parser]") {
     SECTION("Resistive voltage divider with .op") {
-        constexpr std::string_view netlist = "* Resistive Divider Test\n"
-                                             "V1 1 0 10V\n"
-                                             "R1 1 2 1k\n"
-                                             "R2 2 0 1k\n"
-                                             ".op\n"
-                                             ".end\n";
+        const std::string_view netlist = "* Resistive Divider Test\n"
+                                         "V1 1 0 10V\n"
+                                         "R1 1 2 1k\n"
+                                         "R2 2 0 1k\n"
+                                         ".op\n"
+                                         ".end\n";
 
         const auto parsed = nodalys::ParseNetlist(netlist);
         REQUIRE(parsed.has_value());
@@ -75,12 +75,12 @@ TEST_CASE("SPICE netlists parse into runnable circuits and simulation directives
     }
 
     SECTION("RC circuit step response with .tran") {
-        constexpr std::string_view netlist = "* RC Step Response\n"
-                                             "V1 1 0 PULSE(0 5 0 1u 1u 50u 100u)\n"
-                                             "R1 1 2 1k\n"
-                                             "C1 2 0 10n\n"
-                                             ".tran 0.5u 20u\n"
-                                             ".end\n";
+        const std::string_view netlist = "* RC Step Response\n"
+                                         "V1 1 0 PULSE(0 5 0 1u 1u 50u 100u)\n"
+                                         "R1 1 2 1k\n"
+                                         "C1 2 0 10n\n"
+                                         ".tran 0.5u 20u\n"
+                                         ".end\n";
 
         const auto parsed = nodalys::ParseNetlist(netlist);
         REQUIRE(parsed.has_value());
@@ -100,15 +100,15 @@ TEST_CASE("SPICE netlists parse into runnable circuits and simulation directives
     }
 
     SECTION("BJT inverter stage with .model") {
-        constexpr std::string_view netlist = "* BJT Inverter\n"
-                                             "VCC 1 0 5V\n"
-                                             "VIN 2 0 5V\n"
-                                             "RB 2 3 10k\n"
-                                             "RC 1 4 1k\n"
-                                             "Q1 4 3 0 Q2N2222\n"
-                                             ".model Q2N2222 NPN(BF=150 IS=1e-14)\n"
-                                             ".op\n"
-                                             ".end\n";
+        const std::string_view netlist = "* BJT Inverter\n"
+                                         "VCC 1 0 5V\n"
+                                         "VIN 2 0 5V\n"
+                                         "RB 2 3 10k\n"
+                                         "RC 1 4 1k\n"
+                                         "Q1 4 3 0 Q2N2222\n"
+                                         ".model Q2N2222 NPN(BF=150 IS=1e-14)\n"
+                                         ".op\n"
+                                         ".end\n";
 
         const auto parsed = nodalys::ParseNetlist(netlist);
         REQUIRE(parsed.has_value());
@@ -119,14 +119,14 @@ TEST_CASE("SPICE netlists parse into runnable circuits and simulation directives
     }
 
     SECTION("MOSFET switch with .model") {
-        constexpr std::string_view netlist = "* MOSFET Inverter\n"
-                                             "VDD 1 0 5\n"
-                                             "VG 2 0 5\n"
-                                             "RD 1 3 1k\n"
-                                             "M1 3 2 0 0 MOD1 W=100u L=1u\n"
-                                             ".model MOD1 NMOS(VTO=1.0 KP=1e-4)\n"
-                                             ".op\n"
-                                             ".end\n";
+        const std::string_view netlist = "* MOSFET Inverter\n"
+                                         "VDD 1 0 5\n"
+                                         "VG 2 0 5\n"
+                                         "RD 1 3 1k\n"
+                                         "M1 3 2 0 0 MOD1 W=100u L=1u\n"
+                                         ".model MOD1 NMOS(VTO=1.0 KP=1e-4)\n"
+                                         ".op\n"
+                                         ".end\n";
 
         const auto parsed = nodalys::ParseNetlist(netlist);
         REQUIRE(parsed.has_value());
@@ -137,15 +137,15 @@ TEST_CASE("SPICE netlists parse into runnable circuits and simulation directives
     }
 
     SECTION("Subcircuit expansion (.subckt and X)") {
-        constexpr std::string_view netlist = "* Subcircuit Divider\n"
-                                             ".subckt DIVIDER IN OUT GND\n"
-                                             "R1 IN OUT 2k\n"
-                                             "R2 OUT GND 2k\n"
-                                             ".ends DIVIDER\n"
-                                             "V1 1 0 12\n"
-                                             "X1 1 2 0 DIVIDER\n"
-                                             ".op\n"
-                                             ".end\n";
+        const std::string_view netlist = "* Subcircuit Divider\n"
+                                         ".subckt DIVIDER IN OUT GND\n"
+                                         "R1 IN OUT 2k\n"
+                                         "R2 OUT GND 2k\n"
+                                         ".ends DIVIDER\n"
+                                         "V1 1 0 12\n"
+                                         "X1 1 2 0 DIVIDER\n"
+                                         ".op\n"
+                                         ".end\n";
 
         const auto parsed = nodalys::ParseNetlist(netlist);
         REQUIRE(parsed.has_value());
@@ -156,16 +156,16 @@ TEST_CASE("SPICE netlists parse into runnable circuits and simulation directives
     }
 
     SECTION("Analysis directives parsing (.dc, .ac, .tf, .noise)") {
-        constexpr std::string_view netlist = "* Multi-analysis directives\n"
-                                             "V1 1 0 10\n"
-                                             "R1 1 2 1k\n"
-                                             "R2 2 0 1k\n"
-                                             ".dc V1 0 10 1\n"
-                                             ".ac dec 10 10 100k\n"
-                                             ".tf V(2) V1\n"
-                                             ".noise V(2) V1 dec 5 10 100k\n"
-                                             ".options reltol=1e-4 maxiter=200\n"
-                                             ".end\n";
+        const std::string_view netlist = "* Multi-analysis directives\n"
+                                         "V1 1 0 10\n"
+                                         "R1 1 2 1k\n"
+                                         "R2 2 0 1k\n"
+                                         ".dc V1 0 10 1\n"
+                                         ".ac dec 10 10 100k\n"
+                                         ".tf V(2) V1\n"
+                                         ".noise V(2) V1 dec 5 10 100k\n"
+                                         ".options reltol=1e-4 maxiter=200\n"
+                                         ".end\n";
 
         const auto parsed = nodalys::ParseNetlist(netlist);
         REQUIRE(parsed.has_value());
@@ -180,12 +180,12 @@ TEST_CASE("SPICE netlists parse into runnable circuits and simulation directives
     }
 
     SECTION("S-parameter directive parsing (.sp) and port sources") {
-        constexpr std::string_view netlist = "* Two-port attenuator\n"
-                                             "Vsport1 1 0 dc 0 portnum 1 z0 50\n"
-                                             "Vsport2 2 0 dc 0 portnum 2 z0 75\n"
-                                             "R1 1 2 100\n"
-                                             ".sp dec 5 1Meg 100Meg\n"
-                                             ".end\n";
+        const std::string_view netlist = "* Two-port attenuator\n"
+                                         "Vsport1 1 0 dc 0 portnum 1 z0 50\n"
+                                         "Vsport2 2 0 dc 0 portnum 2 z0 75\n"
+                                         "R1 1 2 100\n"
+                                         ".sp dec 5 1Meg 100Meg\n"
+                                         ".end\n";
 
         const auto parsed = nodalys::ParseNetlist(netlist);
         REQUIRE(parsed.has_value());
@@ -213,12 +213,12 @@ TEST_CASE("SPICE netlists parse into runnable circuits and simulation directives
     }
 
     SECTION("Pole-Zero analysis directives (.pz)") {
-        constexpr std::string_view netlist = "* RC Pole-Zero Netlist\n"
-                                             "Vin 1 0 0V\n"
-                                             "R1 1 2 1k\n"
-                                             "C1 2 0 1u\n"
-                                             ".pz 2 Vin pz\n"
-                                             ".end\n";
+        const std::string_view netlist = "* RC Pole-Zero Netlist\n"
+                                         "Vin 1 0 0V\n"
+                                         "R1 1 2 1k\n"
+                                         "C1 2 0 1u\n"
+                                         ".pz 2 Vin pz\n"
+                                         ".end\n";
 
         const auto parsed = nodalys::ParseNetlist(netlist);
         REQUIRE(parsed.has_value());
@@ -240,12 +240,12 @@ TEST_CASE("SPICE netlists parse into runnable circuits and simulation directives
     }
 
     SECTION("Pole-Zero 4-node standard SPICE syntax") {
-        constexpr std::string_view netlist = "* RC Pole-Zero Standard Syntax\n"
-                                             "Vin 1 0 0V\n"
-                                             "R1 1 2 1k\n"
-                                             "C1 2 0 1u\n"
-                                             ".pz 1 0 2 0 vol pol\n"
-                                             ".end\n";
+        const std::string_view netlist = "* RC Pole-Zero Standard Syntax\n"
+                                         "Vin 1 0 0V\n"
+                                         "R1 1 2 1k\n"
+                                         "C1 2 0 1u\n"
+                                         ".pz 1 0 2 0 vol pol\n"
+                                         ".end\n";
 
         const auto parsed = nodalys::ParseNetlist(netlist);
         REQUIRE(parsed.has_value());
@@ -262,13 +262,13 @@ TEST_CASE("SPICE netlists parse into runnable circuits and simulation directives
 
 TEST_CASE("Simulation results export to RAW, CSV, and JSON formats", "[nodalys][export]") {
     // Set up a simple simulated circuit to generate results
-    constexpr std::string_view netlist = "* Exporter Verification Circuit\n"
-                                         "V1 1 0 10V\n"
-                                         "R1 1 2 1k\n"
-                                         "R2 2 0 1k\n"
-                                         ".op\n"
-                                         ".tran 1u 10u\n"
-                                         ".end\n";
+    const std::string_view netlist = "* Exporter Verification Circuit\n"
+                                     "V1 1 0 10V\n"
+                                     "R1 1 2 1k\n"
+                                     "R2 2 0 1k\n"
+                                     ".op\n"
+                                     ".tran 1u 10u\n"
+                                     ".end\n";
 
     const auto parsed = nodalys::ParseNetlist(netlist);
     REQUIRE(parsed.has_value());

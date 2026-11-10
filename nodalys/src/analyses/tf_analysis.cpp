@@ -19,11 +19,10 @@ constexpr double SHORT_CIRCUIT_THRESHOLD = 1e-15;
 
 } // namespace
 
-std::expected<TransferFunctionResult, std::string> ComputeTransferFunction(
-    CompiledCircuit &compiled,
-    const TransferFunctionConfig &settings,
-    const ConvergenceOptions &options,
-    std::vector<DiagnosticMessage> *messages) {
+std::expected<TransferFunctionResult, std::string> ComputeTransferFunction(CompiledCircuit &compiled,
+                                                                           const TransferFunctionConfig &settings,
+                                                                           const ConvergenceOptions &options,
+                                                                           std::vector<DiagnosticMessage> *messages) {
 
     const int out_node = settings.OutputPositiveNode;
     if (out_node <= 0 || out_node >= compiled.CircuitNodeCount) {
@@ -78,10 +77,8 @@ std::expected<TransferFunctionResult, std::string> ComputeTransferFunction(
             result.InputImpedance = 1.0 / current_into_circuit;
         }
     } else {
-        const double va =
-            current_source->NodeA() < 0 ? 0.0 : dx_in[static_cast<std::size_t>(current_source->NodeA())];
-        const double vb =
-            current_source->NodeB() < 0 ? 0.0 : dx_in[static_cast<std::size_t>(current_source->NodeB())];
+        const double va = current_source->NodeA() < 0 ? 0.0 : dx_in[static_cast<std::size_t>(current_source->NodeA())];
+        const double vb = current_source->NodeB() < 0 ? 0.0 : dx_in[static_cast<std::size_t>(current_source->NodeB())];
         result.InputImpedance = std::min(vb - va, OPEN_CIRCUIT_IMPEDANCE);
     }
 
@@ -92,8 +89,7 @@ std::expected<TransferFunctionResult, std::string> ComputeTransferFunction(
         return std::unexpected("Nodalys encountered a singular matrix while computing the output impedance");
     }
     const double z_out = dx_out[static_cast<std::size_t>(out_idx)];
-    result.OutputImpedance =
-        std::fabs(z_out) < SHORT_CIRCUIT_THRESHOLD ? 0.0 : std::min(z_out, OPEN_CIRCUIT_IMPEDANCE);
+    result.OutputImpedance = std::fabs(z_out) < SHORT_CIRCUIT_THRESHOLD ? 0.0 : std::min(z_out, OPEN_CIRCUIT_IMPEDANCE);
 
     if (messages) {
         messages->push_back({"nodalys: computed small-signal transfer function and impedances", false});

@@ -565,9 +565,9 @@ public:
             int u_inp_actual = u_inp;
             if (params.InputOffsetVoltage != 0.0) {
                 const int n_vos = AllocateInternalNode();
-                AddDevice(std::make_unique<VoltageSourceDevice>(
-                    n_vos, u_inp, AllocateBranch(), params.InputOffsetVoltage,
-                    MakeDcWaveform(params.InputOffsetVoltage)));
+                AddDevice(std::make_unique<VoltageSourceDevice>(n_vos, u_inp, AllocateBranch(),
+                                                                params.InputOffsetVoltage,
+                                                                MakeDcWaveform(params.InputOffsetVoltage)));
                 u_inp_actual = n_vos;
             }
 

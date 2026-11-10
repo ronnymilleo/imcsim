@@ -51,8 +51,7 @@ public:
     void Append(const double time, const std::vector<double> &x, const std::vector<double> &currents) {
         m_Result.Times.push_back(time);
         for (int node = 0; node < m_Compiled.CircuitNodeCount; ++node) {
-            const double voltage =
-                node == 0 ? 0.0 : x[static_cast<std::size_t>(m_Compiled.System->NodeIndex(node))];
+            const double voltage = node == 0 ? 0.0 : x[static_cast<std::size_t>(m_Compiled.System->NodeIndex(node))];
             m_Result.NodeVoltages[static_cast<std::size_t>(node)].push_back(voltage);
         }
         for (std::size_t index = 0; index < currents.size(); ++index) {
@@ -61,8 +60,8 @@ public:
     }
 
     void AppendSegment(const double t_start, const std::vector<double> &x_start,
-                       const std::vector<double> &currents_start, const double t_end,
-                       const std::vector<double> &x_end, const std::vector<double> &currents_end) {
+                       const std::vector<double> &currents_start, const double t_end, const std::vector<double> &x_end,
+                       const std::vector<double> &currents_end) {
         if (m_OutputStep <= 0.0) {
             Append(t_end, x_end, currents_end);
             return;
@@ -161,13 +160,11 @@ bool PublishChunk(TransientResult &result, const RunMonitor &monitor, const doub
 
 } // namespace
 
-std::expected<TransientResult, std::string> ComputeTransient(
-    CompiledCircuit &compiled,
-    const TransientConfig &settings,
-    const bool has_initial_conditions,
-    const RunMonitor &monitor,
-    const ConvergenceOptions &options,
-    std::vector<DiagnosticMessage> *messages) {
+std::expected<TransientResult, std::string> ComputeTransient(CompiledCircuit &compiled, const TransientConfig &settings,
+                                                             const bool has_initial_conditions,
+                                                             const RunMonitor &monitor,
+                                                             const ConvergenceOptions &options,
+                                                             std::vector<DiagnosticMessage> *messages) {
 
     const int size = compiled.System->Size();
     const double output_step = settings.TimeStep > 0.0 ? settings.TimeStep : (settings.StopTime / 1000.0);
@@ -222,8 +219,7 @@ std::expected<TransientResult, std::string> ComputeTransient(
             }
             step *= 0.1;
             if (step < MIN_STEP) {
-                failure =
-                    std::format("Nodalys could not converge at t = {}; the time step collapsed", time + step);
+                failure = std::format("Nodalys could not converge at t = {}; the time step collapsed", time + step);
                 break;
             }
             continue;
@@ -255,8 +251,7 @@ std::expected<TransientResult, std::string> ComputeTransient(
             }
             step = std::max(step * std::max(LTE_SAFETY * std::pow(ratio, -1.0 / 3.0), STEP_SHRINK_LIMIT), MIN_STEP);
             if (step <= MIN_STEP) {
-                failure =
-                    std::format("Nodalys kept rejecting the time step at t = {}; the step collapsed", time);
+                failure = std::format("Nodalys kept rejecting the time step at t = {}; the step collapsed", time);
                 break;
             }
             continue;

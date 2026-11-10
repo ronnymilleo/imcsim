@@ -16,7 +16,9 @@ namespace {
 void WriteDoubleArray(std::ostringstream &ss, const std::vector<double> &arr) {
     ss << "[";
     for (std::size_t i = 0; i < arr.size(); ++i) {
-        if (i > 0) ss << ", ";
+        if (i > 0) {
+            ss << ", ";
+        }
         ss << std::format("{:.8g}", arr[i]);
     }
     ss << "]";
@@ -29,14 +31,18 @@ std::string ExportJson(const OperatingPointResult &result) {
     ss << "{\n  \"analysis\": \"operating_point\",\n  \"node_voltages\": {";
     bool first = true;
     for (std::size_t node = 1; node < result.NodeVoltages.size(); ++node) {
-        if (!first) ss << ", ";
+        if (!first) {
+            ss << ", ";
+        }
         first = false;
         ss << "\"" << node << "\": " << std::format("{:.8g}", result.NodeVoltages[node]);
     }
     ss << "},\n  \"currents\": {";
     first = true;
     for (const auto &cur : result.Currents) {
-        if (!first) ss << ", ";
+        if (!first) {
+            ss << ", ";
+        }
         first = false;
         ss << "\"" << cur.Name << "\": " << std::format("{:.8g}", cur.Current);
     }
@@ -52,13 +58,17 @@ std::string ExportJson(const TransientResult &result) {
     WriteDoubleArray(ss, result.Times);
     ss << ",\n  \"node_voltages\": {\n";
     for (std::size_t node = 1; node < result.NodeVoltages.size(); ++node) {
-        if (node > 1) ss << ",\n";
+        if (node > 1) {
+            ss << ",\n";
+        }
         ss << "    \"" << node << "\": ";
         WriteDoubleArray(ss, result.NodeVoltages[node]);
     }
     ss << "\n  },\n  \"currents\": {\n";
     for (std::size_t c = 0; c < result.Currents.size(); ++c) {
-        if (c > 0) ss << ",\n";
+        if (c > 0) {
+            ss << ",\n";
+        }
         ss << "    \"" << result.Currents[c].Name << "\": ";
         WriteDoubleArray(ss, result.Currents[c].Values);
     }
@@ -74,12 +84,16 @@ std::string ExportJson(const DcSweepResult &result) {
     WriteDoubleArray(ss, result.SweptValues);
     ss << ",\n  \"curves\": [\n";
     for (std::size_t idx = 0; idx < result.Curves.size(); ++idx) {
-        if (idx > 0) ss << ",\n";
+        if (idx > 0) {
+            ss << ",\n";
+        }
         const auto &curve = result.Curves[idx];
         ss << "    {\n      \"step_value\": " << std::format("{:.8g}", curve.StepValue) << ",\n";
         ss << "      \"node_voltages\": {\n";
         for (std::size_t node = 1; node < curve.NodeVoltages.size(); ++node) {
-            if (node > 1) ss << ",\n";
+            if (node > 1) {
+                ss << ",\n";
+            }
             ss << "        \"" << node << "\": ";
             WriteDoubleArray(ss, curve.NodeVoltages[node]);
         }
@@ -96,13 +110,17 @@ std::string ExportJson(const AcSweepResult &result) {
     WriteDoubleArray(ss, result.Frequencies);
     ss << ",\n  \"node_magnitudes_db\": {\n";
     for (std::size_t node = 1; node < result.NodeMagnitudesDecibels.size(); ++node) {
-        if (node > 1) ss << ",\n";
+        if (node > 1) {
+            ss << ",\n";
+        }
         ss << "    \"" << node << "\": ";
         WriteDoubleArray(ss, result.NodeMagnitudesDecibels[node]);
     }
     ss << "\n  },\n  \"node_phases_deg\": {\n";
     for (std::size_t node = 1; node < result.NodePhasesDegrees.size(); ++node) {
-        if (node > 1) ss << ",\n";
+        if (node > 1) {
+            ss << ",\n";
+        }
         ss << "    \"" << node << "\": ";
         WriteDoubleArray(ss, result.NodePhasesDegrees[node]);
     }
@@ -155,8 +173,8 @@ std::string ExportJson(const SParameterResult &result) {
                 if (i > 1 || j > 1) {
                     ss << ", ";
                 }
-                ss << "{\"re\": " << std::format("{:.8g}", s.real())
-                   << ", \"im\": " << std::format("{:.8g}", s.imag()) << "}";
+                ss << "{\"re\": " << std::format("{:.8g}", s.real()) << ", \"im\": " << std::format("{:.8g}", s.imag())
+                   << "}";
             }
         }
         ss << (pt + 1 < result.Frequencies.size() ? "],\n" : "]\n");

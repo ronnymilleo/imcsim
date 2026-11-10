@@ -47,6 +47,8 @@ if(CLANG_FORMAT)
             ${CMAKE_CURRENT_SOURCE_DIR}/app-core/*.h
             ${CMAKE_CURRENT_SOURCE_DIR}/app-gui/*.cpp
             ${CMAKE_CURRENT_SOURCE_DIR}/app-gui/*.h
+            ${CMAKE_CURRENT_SOURCE_DIR}/nodalys/*.cpp
+            ${CMAKE_CURRENT_SOURCE_DIR}/nodalys/*.h
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/*.cpp
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/*.h
     )
@@ -82,6 +84,12 @@ function(imcsim_target_coverage target)
         target_link_options(${target} PUBLIC --coverage)
     endif()
 endfunction()
+
+option(BUILD_TESTS "Build tests" OFF)
+if(BUILD_TESTS)
+    enable_testing()
+    list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/vendor/Catch2/extras)
+endif()
 
 add_subdirectory(vendor)
 add_subdirectory(nodalys)
@@ -124,9 +132,7 @@ add_dependencies(imcsim format)
 # Testing
 # =============================================================================
 
-option(BUILD_TESTS "Build tests" OFF)
 if(BUILD_TESTS)
-    enable_testing()
     add_subdirectory(tests)
 endif()
 

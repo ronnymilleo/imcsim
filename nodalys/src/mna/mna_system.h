@@ -100,7 +100,8 @@ public:
     bool Solve(std::vector<double> &x) const;
 
     /**
-     * @brief   Solves the small-signal complex AC system $(A_{\text{DC}} + j \omega C_{\text{AC}}) \cdot x_{\text{AC}} = b_{\text{AC}}$.
+     * @brief   Solves the small-signal complex AC system $(A_{\text{DC}} + j \omega C_{\text{AC}}) \cdot x_{\text{AC}}
+     * = b_{\text{AC}}$.
      * @param[in]  reactive  System whose matrix holds the reactive coefficients $C_{\text{AC}}$ and whose RHS holds the
      *                       small-signal AC source excitation $b_{\text{AC}}$.
      * @param[in]  omega     Angular frequency $\omega = 2\pi f$ in rad/s.
@@ -122,8 +123,9 @@ public:
                          std::vector<std::vector<std::complex<double>>> &solutions) const;
 
     /**
-     * @brief   Solves the transposed (adjoint) small-signal AC system $(A_{\text{DC}} + j \omega C_{\text{AC}})^T \cdot \lambda = e_{\text{out}}$
-     *          for a unit excitation at `output_unknown`, used by small-signal noise analysis (`.noise`).
+     * @brief   Solves the transposed (adjoint) small-signal AC system $(A_{\text{DC}} + j \omega C_{\text{AC}})^T \cdot
+     * \lambda = e_{\text{out}}$ for a unit excitation at `output_unknown`, used by small-signal noise analysis
+     * (`.noise`).
      */
     bool SolveAcTranspose(const MnaSystem &reactive, double omega, int output_unknown,
                           std::vector<std::complex<double>> &adjoint) const;

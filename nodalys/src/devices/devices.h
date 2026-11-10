@@ -43,7 +43,8 @@ public:
     /**
      * @brief   Stamps this device's small-signal reactive coefficients ($C$ or $-L$, multiplied by $j\omega$ during an
      *          AC sweep) into `reactive.AddA()` and its AC source excitation into `reactive.AddRhs()`.
-     * @param[in,out] reactive  System holding the imaginary-part coefficients $C_{\text{AC}}$ and AC excitation $b_{\text{AC}}$.
+     * @param[in,out] reactive  System holding the imaginary-part coefficients $C_{\text{AC}}$ and AC excitation
+     * $b_{\text{AC}}$.
      * @param[in]     x_dc      Converged DC operating point around which the circuit is linearized.
      */
     virtual void StampAc(MnaSystem &reactive, const std::vector<double> &x_dc) const {
@@ -79,8 +80,7 @@ public:
      *          $Y(j\omega)^T \cdot \lambda = e_{\text{out}}$).
      */
     virtual double OutputNoiseVariance(const std::vector<double> &x_dc,
-                                       const std::vector<std::complex<double>> &adjoint,
-                                       double frequency_hz) const {
+                                       const std::vector<std::complex<double>> &adjoint, double frequency_hz) const {
         (void)x_dc;
         (void)adjoint;
         (void)frequency_hz;
@@ -121,8 +121,7 @@ public:
     void Stamp(MnaSystem &sys, const std::vector<double> &x, const TimeContext &time) override;
     double TerminalCurrent(int terminal, const std::vector<double> &x) const override;
     std::complex<double> AcTerminalCurrent(int terminal, const std::vector<double> &x_dc,
-                                           const std::vector<std::complex<double>> &x_ac,
-                                           double omega) const override;
+                                           const std::vector<std::complex<double>> &x_ac, double omega) const override;
     double OutputNoiseVariance(const std::vector<double> &x_dc, const std::vector<std::complex<double>> &adjoint,
                                double frequency_hz) const override;
 
@@ -148,8 +147,7 @@ public:
     void StampAc(MnaSystem &reactive, const std::vector<double> &x_dc) const override;
     double TerminalCurrent(int terminal, const std::vector<double> &x) const override;
     std::complex<double> AcTerminalCurrent(int terminal, const std::vector<double> &x_dc,
-                                           const std::vector<std::complex<double>> &x_ac,
-                                           double omega) const override;
+                                           const std::vector<std::complex<double>> &x_ac, double omega) const override;
     bool HasTransientState() const override;
     void AcceptStep(const std::vector<double> &x) override;
     void RejectStep() override;
@@ -185,8 +183,7 @@ public:
     void StampAc(MnaSystem &reactive, const std::vector<double> &x_dc) const override;
     double TerminalCurrent(int terminal, const std::vector<double> &x) const override;
     std::complex<double> AcTerminalCurrent(int terminal, const std::vector<double> &x_dc,
-                                           const std::vector<std::complex<double>> &x_ac,
-                                           double omega) const override;
+                                           const std::vector<std::complex<double>> &x_ac, double omega) const override;
     bool HasTransientState() const override;
     void AcceptStep(const std::vector<double> &x) override;
     void RejectStep() override;
@@ -231,8 +228,7 @@ public:
     void StampAc(MnaSystem &reactive, const std::vector<double> &x_dc) const override;
     double TerminalCurrent(int terminal, const std::vector<double> &x) const override;
     std::complex<double> AcTerminalCurrent(int terminal, const std::vector<double> &x_dc,
-                                           const std::vector<std::complex<double>> &x_ac,
-                                           double omega) const override;
+                                           const std::vector<std::complex<double>> &x_ac, double omega) const override;
     void SetSourceScale(double scale) override;
 
 private:
@@ -263,8 +259,7 @@ public:
     void StampAc(MnaSystem &reactive, const std::vector<double> &x_dc) const override;
     double TerminalCurrent(int terminal, const std::vector<double> &x) const override;
     std::complex<double> AcTerminalCurrent(int terminal, const std::vector<double> &x_dc,
-                                           const std::vector<std::complex<double>> &x_ac,
-                                           double omega) const override;
+                                           const std::vector<std::complex<double>> &x_ac, double omega) const override;
     void SetSourceScale(double scale) override;
 
 private:
@@ -288,8 +283,7 @@ public:
     void Stamp(MnaSystem &sys, const std::vector<double> &x, const TimeContext &time) override;
     double TerminalCurrent(int terminal, const std::vector<double> &x) const override;
     std::complex<double> AcTerminalCurrent(int terminal, const std::vector<double> &x_dc,
-                                           const std::vector<std::complex<double>> &x_ac,
-                                           double omega) const override;
+                                           const std::vector<std::complex<double>> &x_ac, double omega) const override;
 
 private:
     int m_NodeA;
@@ -311,8 +305,7 @@ public:
     void Stamp(MnaSystem &sys, const std::vector<double> &x, const TimeContext &time) override;
     double TerminalCurrent(int terminal, const std::vector<double> &x) const override;
     std::complex<double> AcTerminalCurrent(int terminal, const std::vector<double> &x_dc,
-                                           const std::vector<std::complex<double>> &x_ac,
-                                           double omega) const override;
+                                           const std::vector<std::complex<double>> &x_ac, double omega) const override;
 
 private:
     int m_NodeA;
@@ -334,8 +327,7 @@ public:
     void Stamp(MnaSystem &sys, const std::vector<double> &x, const TimeContext &time) override;
     double TerminalCurrent(int terminal, const std::vector<double> &x) const override;
     std::complex<double> AcTerminalCurrent(int terminal, const std::vector<double> &x_dc,
-                                           const std::vector<std::complex<double>> &x_ac,
-                                           double omega) const override;
+                                           const std::vector<std::complex<double>> &x_ac, double omega) const override;
 
 private:
     int m_NodeA;
@@ -355,8 +347,7 @@ public:
     void Stamp(MnaSystem &sys, const std::vector<double> &x, const TimeContext &time) override;
     double TerminalCurrent(int terminal, const std::vector<double> &x) const override;
     std::complex<double> AcTerminalCurrent(int terminal, const std::vector<double> &x_dc,
-                                           const std::vector<std::complex<double>> &x_ac,
-                                           double omega) const override;
+                                           const std::vector<std::complex<double>> &x_ac, double omega) const override;
 
 private:
     int m_NodeA;
@@ -380,8 +371,7 @@ public:
     void Stamp(MnaSystem &sys, const std::vector<double> &x, const TimeContext &time) override;
     double TerminalCurrent(int terminal, const std::vector<double> &x) const override;
     std::complex<double> AcTerminalCurrent(int terminal, const std::vector<double> &x_dc,
-                                           const std::vector<std::complex<double>> &x_ac,
-                                           double omega) const override;
+                                           const std::vector<std::complex<double>> &x_ac, double omega) const override;
     void AcceptStep(const std::vector<double> &x) override;
     void RejectStep() override;
 
@@ -413,8 +403,7 @@ public:
     void StampAc(MnaSystem &reactive, const std::vector<double> &x_dc) const override;
     double TerminalCurrent(int terminal, const std::vector<double> &x) const override;
     std::complex<double> AcTerminalCurrent(int terminal, const std::vector<double> &x_dc,
-                                           const std::vector<std::complex<double>> &x_ac,
-                                           double omega) const override;
+                                           const std::vector<std::complex<double>> &x_ac, double omega) const override;
     bool HasTransientState() const override;
     void AcceptStep(const std::vector<double> &x) override;
     void RejectStep() override;

@@ -113,15 +113,13 @@ VoltageSourceDevice::Waveform MakeSineWaveform(const double, const SineParameter
 }
 
 VoltageSourceDevice::Waveform MakeExpWaveform(const double, const ExpParameters &exp) {
-    return [exp](const double dc, const TimeContext &time) {
-        return time.IsTransient ? EvaluateExp(exp, time.Time) : dc;
-    };
+    return
+        [exp](const double dc, const TimeContext &time) { return time.IsTransient ? EvaluateExp(exp, time.Time) : dc; };
 }
 
 VoltageSourceDevice::Waveform MakePwlWaveform(const double, const PwlParameters &pwl) {
-    return [pwl](const double dc, const TimeContext &time) {
-        return time.IsTransient ? EvaluatePwl(pwl, time.Time) : dc;
-    };
+    return
+        [pwl](const double dc, const TimeContext &time) { return time.IsTransient ? EvaluatePwl(pwl, time.Time) : dc; };
 }
 
 VoltageSourceDevice::Waveform MakeSffmWaveform(const double, const SffmParameters &sffm) {
@@ -131,9 +129,7 @@ VoltageSourceDevice::Waveform MakeSffmWaveform(const double, const SffmParameter
 }
 
 VoltageSourceDevice::Waveform MakeAmWaveform(const double, const AmParameters &am) {
-    return [am](const double dc, const TimeContext &time) {
-        return time.IsTransient ? EvaluateAm(am, time.Time) : dc;
-    };
+    return [am](const double dc, const TimeContext &time) { return time.IsTransient ? EvaluateAm(am, time.Time) : dc; };
 }
 
 VoltageSourceDevice::Waveform MakeClockWaveform(const ClockParameters &parameters) {

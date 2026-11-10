@@ -2,8 +2,7 @@
 # Tests
 # =============================================================================
 
-add_subdirectory(${PROJECT_SOURCE_DIR}/vendor/Catch2 ${CMAKE_BINARY_DIR}/vendor/Catch2)
-list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/vendor/Catch2/extras)
+include(Catch)
 
 add_executable(imcsim-tests
             analysis_controls_tests.cpp
@@ -96,16 +95,12 @@ add_executable(imcsim-tests
             ui_wire_tests.cpp
             wire_editing_tests.cpp
             nodalys_benchmark_tests.cpp
-            nodalys_parser_and_export_tests.cpp
-            nodalys_smooth_logic_tests.cpp
             wire_routing_tests.cpp
-            ${PROJECT_SOURCE_DIR}/nodalys/tests/linear_tests.cpp
 )
 
 target_include_directories(imcsim-tests
         PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}
-            ${PROJECT_SOURCE_DIR}/nodalys/src
 )
 
 target_link_libraries(imcsim-tests
@@ -116,7 +111,6 @@ target_link_libraries(imcsim-tests
 
 imcsim_target_coverage(imcsim-tests)
 
-include(Catch)
 # Under LeakSanitizer, the suppression file hides the leaks of libngspice itself; other builds ignore the variable
 catch_discover_tests(imcsim-tests
         PROPERTIES

@@ -63,3 +63,11 @@ target_link_libraries(nodalys-cli
 if(COMMAND imcsim_target_coverage)
     imcsim_target_coverage(nodalys-cli)
 endif()
+
+# =============================================================================
+# Testing
+# =============================================================================
+
+if(BUILD_TESTS)
+    add_subdirectory(tests)
+endif()

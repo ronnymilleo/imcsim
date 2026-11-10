@@ -14,11 +14,9 @@
 
 namespace nodalys {
 
-std::expected<AcSweepResult, std::string> ComputeACSweep(
-    CompiledCircuit &compiled,
-    const AcSweepConfig &settings,
-    const ConvergenceOptions &options,
-    std::vector<DiagnosticMessage> *messages) {
+std::expected<AcSweepResult, std::string> ComputeACSweep(CompiledCircuit &compiled, const AcSweepConfig &settings,
+                                                         const ConvergenceOptions &options,
+                                                         std::vector<DiagnosticMessage> *messages) {
 
     if (settings.StartFrequency <= 0.0 || settings.StopFrequency < settings.StartFrequency ||
         settings.PointsPerDecade <= 0) {
@@ -79,8 +77,8 @@ std::expected<AcSweepResult, std::string> ComputeACSweep(
     for (const double frequency : result.Frequencies) {
         const double omega = 2.0 * std::numbers::pi * frequency;
         if (!compiled.System->SolveAc(reactive, omega, x_ac)) {
-            return std::unexpected(std::format("The Nodalys AC solver encountered a singular matrix at f = {} Hz",
-                                               frequency));
+            return std::unexpected(
+                std::format("The Nodalys AC solver encountered a singular matrix at f = {} Hz", frequency));
         }
 
         for (int node = 1; node < compiled.CircuitNodeCount; ++node) {

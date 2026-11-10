@@ -127,7 +127,8 @@ std::string ExportRaw(const DcSweepResult &result, std::string_view title) {
     ss << "Variables:\n";
 
     std::size_t var_idx = 0;
-    ss << "\t" << var_idx++ << "\t" << result.SweptSource << "\t" << (result.SweptUnit.empty() ? "voltage" : result.SweptUnit) << "\n";
+    ss << "\t" << var_idx++ << "\t" << result.SweptSource << "\t"
+       << (result.SweptUnit.empty() ? "voltage" : result.SweptUnit) << "\n";
     for (std::size_t node = 1; node < first_curve.NodeVoltages.size(); ++node) {
         ss << "\t" << var_idx++ << "\tv(" << node << ")\tvoltage\n";
     }
@@ -160,7 +161,8 @@ std::string ExportRaw(const AcSweepResult &result, std::string_view title) {
     ss << "Plotname: AC Analysis\n";
     ss << "Flags: complex\n";
 
-    const std::size_t num_nodes = result.NodeMagnitudesDecibels.size() > 1 ? result.NodeMagnitudesDecibels.size() - 1 : 0;
+    const std::size_t num_nodes =
+        result.NodeMagnitudesDecibels.size() > 1 ? result.NodeMagnitudesDecibels.size() - 1 : 0;
     const std::size_t num_currents = result.CurrentMagnitudesDecibels.size();
     const std::size_t num_vars = 1 + num_nodes + num_currents;
     const std::size_t num_points = result.Frequencies.size();

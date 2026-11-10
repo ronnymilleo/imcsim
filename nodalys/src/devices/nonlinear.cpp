@@ -52,7 +52,8 @@ void StampCurrentSource(MnaSystem &sys, const int node_a, const int node_b, cons
 
 /**
  * @brief   Stamps the Norton companion of a 2-terminal nonlinear branch $I(v)$ linearized at $v_0 = v_a - v_b$:
- *          $I(v) \approx G_{\text{eq}} \cdot v + I_{\text{eq}}$ with $I_{\text{eq}} = I(v_0) - G_{\text{eq}} \cdot v_0$.
+ *          $I(v) \approx G_{\text{eq}} \cdot v + I_{\text{eq}}$ with $I_{\text{eq}} = I(v_0) - G_{\text{eq}} \cdot
+ * v_0$.
  */
 void StampNortonBranch(MnaSystem &sys, const int node_a, const int node_b, const double conductance,
                        const double current_at_v0, const double v0) {
@@ -108,7 +109,8 @@ DepletionCharge EvaluateDepletion(const double voltage, const double cj0, const 
 /**
  * @struct  ChargeCompanion
  * @brief   Linearized Trapezoidal (or Backward Euler) companion for a nonlinear charge $Q(v)$:
- *          $i(t+h) = \frac{\text{factor}}{h} (Q(v) - Q(t)) - i_{\text{past}} \approx G_{\text{cap}} v + I_{\text{eq,cap}}$.
+ *          $i(t+h) = \frac{\text{factor}}{h} (Q(v) - Q(t)) - i_{\text{past}} \approx G_{\text{cap}} v +
+ * I_{\text{eq,cap}}$.
  */
 struct ChargeCompanion {
     double Conductance;
@@ -133,9 +135,8 @@ ChargeCompanion ChargeModel(const double dQdv, const double charge_at_iterate, c
 // ============================================================================
 
 DiodeDevice::DiodeDevice(const int anode, const int cathode, const int internal, DiodeParameters parameters)
-    : m_Anode(anode), m_Cathode(cathode), m_Internal(internal),
-      m_JunctionNode(internal >= 0 ? internal : cathode), m_Parameters(parameters),
-      m_Vt(parameters.EmissionCoefficient * THERMAL_VOLTAGE),
+    : m_Anode(anode), m_Cathode(cathode), m_Internal(internal), m_JunctionNode(internal >= 0 ? internal : cathode),
+      m_Parameters(parameters), m_Vt(parameters.EmissionCoefficient * THERMAL_VOLTAGE),
       m_Critical(PnCriticalVoltage(std::max(parameters.SaturationCurrent, 1e-30), m_Vt)) {
 }
 
@@ -194,8 +195,8 @@ bool DiodeDevice::Limit(std::vector<double> &x_new, const std::vector<double> &x
     const double voltage_old = VoltageAt(x_old);
     const DiodeParameters &p = m_Parameters;
     // SPICE effective breakdown knee where I_rev(-bv_eff) == IS, so PNJLIM uses m_Critical symmetrically:
-    const double bv_eff =
-        p.BreakdownVoltage - m_Vt * std::log(std::max(p.BreakdownCurrent, 1e-30) / std::max(p.SaturationCurrent, 1e-30));
+    const double bv_eff = p.BreakdownVoltage -
+                          m_Vt * std::log(std::max(p.BreakdownCurrent, 1e-30) / std::max(p.SaturationCurrent, 1e-30));
     double limited;
     if (voltage_new >= -0.5 * bv_eff && voltage_old >= -0.5 * bv_eff) {
         limited = PnLimit(voltage_new, voltage_old, m_Critical, m_Vt);
@@ -216,7 +217,8 @@ bool DiodeDevice::Limit(std::vector<double> &x_new, const std::vector<double> &x
     return true;
 }
 
-void DiodeDevice::SeedOperatingPoint(std::vector<double> &) const {}
+void DiodeDevice::SeedOperatingPoint(std::vector<double> &) const {
+}
 
 double DiodeDevice::TerminalCurrent(const int terminal, const std::vector<double> &x) const {
     const double v = VoltageAt(x);
@@ -285,11 +287,9 @@ void DiodeDevice::RejectStep() {
 BjtDevice::BjtDevice(const int collector, const int base, const int emitter, const int internal_collector,
                      const int internal_base, const int internal_emitter, BjtParameters parameters, const bool pnp)
     : m_Collector(collector), m_Base(base), m_Emitter(emitter),
-      m_C(internal_collector >= 0 ? internal_collector : collector),
-      m_B(internal_base >= 0 ? internal_base : base),
-      m_E(internal_emitter >= 0 ? internal_emitter : emitter),
-      m_Parameters(parameters), m_Pnp(pnp), m_Vt(THERMAL_VOLTAGE),
-      m_Critical(PnCriticalVoltage(std::max(parameters.SaturationCurrent, 1e-30), m_Vt)) {
+      m_C(internal_collector >= 0 ? internal_collector : collector), m_B(internal_base >= 0 ? internal_base : base),
+      m_E(internal_emitter >= 0 ? internal_emitter : emitter), m_Parameters(parameters), m_Pnp(pnp),
+      m_Vt(THERMAL_VOLTAGE), m_Critical(PnCriticalVoltage(std::max(parameters.SaturationCurrent, 1e-30), m_Vt)) {
 }
 
 BjtDevice::Intrinsic BjtDevice::Evaluate(const double vbe, const double vbc) const {
@@ -493,9 +493,8 @@ std::complex<double> BjtDevice::AcTerminalCurrent(const int terminal, const std:
                                                       BJT_GRADING_COEFFICIENT, JUNCTION_FORWARD_LIMIT);
         const DepletionCharge qbc = EvaluateDepletion(vbc_signed, p.CollectorCapacitance, BJT_JUNCTION_POTENTIAL,
                                                       BJT_GRADING_COEFFICIENT, JUNCTION_FORWARD_LIMIT);
-        iqbe_ac = std::complex<double>(0.0, omega) *
-                  ((qbe.Capacitance + p.TransitTime * dc.DIfwdQbDvbe) * vbe_ac +
-                   (p.TransitTime * dc.DIfwdQbDvbc) * vbc_ac);
+        iqbe_ac = std::complex<double>(0.0, omega) * ((qbe.Capacitance + p.TransitTime * dc.DIfwdQbDvbe) * vbe_ac +
+                                                      (p.TransitTime * dc.DIfwdQbDvbc) * vbc_ac);
         iqbc_ac = std::complex<double>(0.0, omega * qbc.Capacitance) * vbc_ac;
     }
 
@@ -547,8 +546,7 @@ void BjtDevice::SeedOperatingPoint(std::vector<double> &x) const {
     }
 }
 
-double BjtDevice::OutputNoiseVariance(const std::vector<double> &x_dc,
-                                      const std::vector<std::complex<double>> &adjoint,
+double BjtDevice::OutputNoiseVariance(const std::vector<double> &x_dc, const std::vector<std::complex<double>> &adjoint,
                                       const double /*frequency_hz*/) const {
     const BjtParameters &p = m_Parameters;
     double variance = 0.0;
@@ -615,10 +613,8 @@ void BjtDevice::RejectStep() {
 
 MosfetDevice::MosfetDevice(const int drain, const int gate, const int source, const int internal_drain,
                            const int internal_source, MosfetParameters parameters, const bool pmos)
-    : m_Drain(drain), m_Gate(gate), m_Source(source),
-      m_D(internal_drain >= 0 ? internal_drain : drain),
-      m_S(internal_source >= 0 ? internal_source : source),
-      m_Parameters(parameters), m_Pmos(pmos),
+    : m_Drain(drain), m_Gate(gate), m_Source(source), m_D(internal_drain >= 0 ? internal_drain : drain),
+      m_S(internal_source >= 0 ? internal_source : source), m_Parameters(parameters), m_Pmos(pmos),
       m_Beta(parameters.Transconductance * parameters.Width / parameters.Length), m_Vt(THERMAL_VOLTAGE),
       m_Cgs(parameters.GateSourceOverlap * parameters.Width), m_Cgd(parameters.GateDrainOverlap * parameters.Width),
       m_Critical(PnCriticalVoltage(MOSFET_BODY_SATURATION_CURRENT, THERMAL_VOLTAGE)) {
@@ -884,6 +880,7 @@ void MosfetDevice::RejectStep() {
     m_Igd = m_SavedIgd;
 }
 
-void MosfetDevice::SeedOperatingPoint(std::vector<double> &) const {}
+void MosfetDevice::SeedOperatingPoint(std::vector<double> &) const {
+}
 
 } // namespace nodalys

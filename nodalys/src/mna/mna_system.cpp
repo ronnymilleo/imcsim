@@ -14,14 +14,12 @@ namespace nodalys {
 MnaSystem::MnaSystem(const int node_count, const int branch_count)
     : m_A(static_cast<std::size_t>(node_count + branch_count), static_cast<std::size_t>(node_count + branch_count)),
       m_Rhs(static_cast<std::size_t>(node_count + branch_count), 0.0),
-      m_IsNodeUnknown(static_cast<std::size_t>(node_count + branch_count), false),
-      m_NodeUnknowns(node_count) {
+      m_IsNodeUnknown(static_cast<std::size_t>(node_count + branch_count), false), m_NodeUnknowns(node_count) {
     std::fill_n(m_IsNodeUnknown.begin(), node_count, true);
 }
 
 MnaSystem::MnaSystem(std::vector<bool> is_node_unknown)
-    : m_A(is_node_unknown.size(), is_node_unknown.size()),
-      m_Rhs(is_node_unknown.size(), 0.0),
+    : m_A(is_node_unknown.size(), is_node_unknown.size()), m_Rhs(is_node_unknown.size(), 0.0),
       m_IsNodeUnknown(std::move(is_node_unknown)),
       m_NodeUnknowns(static_cast<int>(std::ranges::count(m_IsNodeUnknown, true))) {
 }
@@ -203,8 +201,7 @@ bool SolveComplexSystem(const ComplexDenseMatrix &y_orig, const std::vector<std:
 
 } // namespace
 
-bool MnaSystem::SolveAc(const MnaSystem &reactive, const double omega,
-                        std::vector<std::complex<double>> &x_ac) const {
+bool MnaSystem::SolveAc(const MnaSystem &reactive, const double omega, std::vector<std::complex<double>> &x_ac) const {
     const std::size_t n = m_A.Rows();
     if (reactive.m_A.Rows() != n) {
         return false;
@@ -258,8 +255,8 @@ bool MnaSystem::SolveAcTranspose(const MnaSystem &reactive, const double omega, 
     return SolveComplexSystem(y_transpose, b_orig, adjoint);
 }
 
-bool MnaSystem::CheckResidual(const std::vector<double> &x, const double voltage_abstol,
-                              const double current_abstol, const double reltol) const {
+bool MnaSystem::CheckResidual(const std::vector<double> &x, const double voltage_abstol, const double current_abstol,
+                              const double reltol) const {
     const int size = Size();
     for (int row = 0; row < size; ++row) {
         double sum = 0.0;

@@ -1,5 +1,5 @@
 /**
- * @file    nodalys_smooth_logic_tests.cpp
+ * @file    smooth_logic_tests.cpp
  * @brief   Tests for C^inf smooth continuous logic macromodels, Verilog co-simulation bridge, and netlist logic cards.
  */
 
