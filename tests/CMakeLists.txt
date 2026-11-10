@@ -68,6 +68,7 @@ add_executable(imcsim-tests
             wire_editing_tests.cpp
             nodalys_parser_and_export_tests.cpp
             nodalys_smooth_logic_tests.cpp
+            nodalys_benchmark_tests.cpp
 )
 
 target_include_directories(imcsim-tests
