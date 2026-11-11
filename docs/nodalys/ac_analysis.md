@@ -86,3 +86,11 @@ At each frequency $f_k$ on the logarithmic grid ($N_{\text{dec}}$ points per dec
 | `hybrid_pi_model.imcsim` | 161 | 2N3904 BJT ($C_\pi, C_\mu, r_o$) vs. explicit hybrid-$\pi$ ($100\text{ Hz}\text{–}100\text{ MHz}$) | **$4.29 \times 10^{-4}\text{ dB}$** | **$1.37 \times 10^{-3\,\circ}$** |
 | `op_amp_integrator.imcsim` | 201 | Active Miller integrator with op-amp | **$4.35 \times 10^{-4}\text{ dB}$** | **$2.85 \times 10^{-3\,\circ}$** |
 | `common_emitter_amplifier.imcsim` | 161 | Full AC-coupled & bypassed BJT Common-Emitter amplifier | **$9.30 \times 10^{-4}\text{ dB}$** | **$2.99 \times 10^{-3\,\circ}$** |
+
+---
+
+### 2.4 Execution Performance ([`nodalys_benchmark_tests.cpp`](../../tests/nodalys_benchmark_tests.cpp))
+
+| Circuit | Nodes | `ngspice` | **`Nodalys`** | Speedup |
+| :--- | ---: | ---: | ---: | :---: |
+| **RC Filter (100 nodes, AC 350 pts)** | 101 | 19.878 ms | 58.571 ms | 0.34x *(dense complex LU)* |

@@ -123,6 +123,13 @@ The table below summarizes verified test cases comparing analytical RF theory, `
 | **7. 3-Port Resistive Power Splitter** | $1\text{ MHz}\text{--}1\text{ GHz}$ | $S_{11}$ | Delta/Star $16.667\,\Omega$ | `0.000000` | **`0.000000`** | $< 10^{-7}$ |
 | (Symmetrical star, $R_1=R_2=R_3=16.667\,\Omega$) | ($5\text{ pts/dec}$) | $S_{21}, S_{31}$ | $6\text{ dB split} = 0.5000$ | `0.500000` | **`0.500000`** | $< 10^{-7}$ |
 
+### 2.2 Execution Performance ([`nodalys_benchmark_tests.cpp`](../../tests/nodalys_benchmark_tests.cpp))
+
+| Circuit | Non-Ground Nodes | `ngspice` | **`Nodalys`** | Speedup |
+| :--- | :---: | ---: | ---: | :---: |
+| **3-Port Splitter (18 pts)** | 4 | 0.186 ms | **0.014 ms** | **13.21x** |
+| **2-Port LC Resonator (25 pts)** | 2 | 0.154 ms | **0.011 ms** | **14.47x** |
+
 ---
 
 ## 3. Touchstone Export (.sNp Format)

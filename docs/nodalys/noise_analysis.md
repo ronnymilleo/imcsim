@@ -75,3 +75,11 @@ The five benchmark circuits below compare `Nodalys` against closed-form Johnson�
 | **5. Non-Inverting uA741 Amp** | $e_{n,\text{out}}(10\text{ Hz})$ ($\text{V}/\sqrt{\text{Hz}}$) | — *(Boyle macromodel)* | `3.752990e-05` | **`3.752927e-05`** | $1.7 \times 10^{-5}$ ($0.0017\%$) |
 | ($R_1 = 1\text{ k}\Omega, R_2 = 9\text{ k}\Omega$, | `OutputTotal` ($\text{V}_{\text{rms}}$) | — | `1.058298e-02` | **`1.058283e-02`** | $1.4 \times 10^{-5}$ ($0.0014\%$) |
 | $A_v = +10$, $10\text{ Hz}\text{--}100\text{ kHz}$) | `InputTotal` ($\text{V}_{\text{rms}}$) | — | `1.240157e-03` | **`1.240134e-03`** | $1.9 \times 10^{-5}$ ($0.0019\%$) |
+
+---
+
+### 2.2 Execution Performance ([`nodalys_benchmark_tests.cpp`](../../tests/nodalys_benchmark_tests.cpp))
+
+| Circuit | Non-Ground Nodes | `ngspice` | **`Nodalys`** | Speedup |
+| :--- | :---: | ---: | ---: | :---: |
+| **BJT Common-Emitter Amp (41 pts)** | 5 | 0.226 ms | **0.079 ms** | **2.87x** |

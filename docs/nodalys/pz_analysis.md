@@ -5,6 +5,7 @@
 - [`nodalys/src/analyses/pz_analysis.cpp`](../../nodalys/src/analyses/pz_analysis.cpp) (`ComputePoleZero`)
 - [`app-core/nodalys/nodalys_backend.cpp`](../../app-core/nodalys/nodalys_backend.cpp) (`NodalysBackend::RunPoleZero`)
 - [`tests/backend_comparison_tests.cpp`](../../tests/backend_comparison_tests.cpp) (`Both backends agree on small-signal pole-zero analysis`)
+- [`tests/nodalys_benchmark_tests.cpp`](../../tests/nodalys_benchmark_tests.cpp) (`Twin-T Notch Filter`)
 
 ---
 
@@ -79,3 +80,37 @@ The raw poles and zeros are post-processed through `Core::BuildPoleZero`:
 ### 1.6 Stability Comparison: Nodalys vs. ngspice
 In `ngspice`, `.pz` relies on a heuristic numerical root-finding algorithm (Muller's method on determinant evaluations) which frequently fails to converge, diverges, or misses high-frequency poles on feedback op-amp circuits (documented in `AGENTS.md` and jay #182).
 In contrast, **Nodalys** solves the generalized eigenvalue problem globally via the QZ algorithm on the exact linearized MNA pencil. It requires no initial frequency guesses, exhibits no divergence, and finds all theoretical poles and zeros deterministically.
+
+---
+
+## 2. Benchmark Tables: Analytical Golden vs. `ngspice` vs. `Nodalys`
+
+### 2.1 Root Accuracy (`backend_comparison_tests.cpp`)
+
+| Circuit & Topology | Root | Golden (Analytical) | `ngspice` ($\sigma \pm j\omega$, $f_0$) | **`Nodalys`** ($\sigma \pm j\omega$, $f_0$) | Relative Diff (`Nodalys` vs. `ngspice`) |
+| :--- | :---: | :---: | :---: | :---: | :---: |
+| **1. First-Order RC Low-Pass** | Pole | $s = -\frac{1}{RC} = -1000\text{ rad/s}$ | `-1000.000000` | **`-1000.000001`** | $1.0 \times 10^{-9}$ (`Gmin`) |
+| ($R_1 = 1\text{ k}\Omega, C_1 = 1\text{ }\mu\text{F}$) | $f_0$ | `159.155 Hz` | `159.155 Hz` | **`159.155 Hz`** | $< 10^{-8}$ |
+| **2. Series RLC Bandpass** | Pole pair | $-5000 \pm j\,31224.990\text{ rad/s}$ | `-5000.000000 ± j 31224.989992` | **`-5000.000004 ± j 31224.989990`** | $< 10^{-9}$ |
+| ($L_1 = 10\text{ mH}, C_1 = 100\text{ nF}, R_1 = 100\,\Omega$) | $f_0$ | $\frac{1}{2\pi\sqrt{LC}} = 5032.921\text{ Hz}$ | `5032.921 Hz` | **`5032.921 Hz`** | $< 10^{-8}$ |
+| | Zero | $0\text{ rad/s}$ | `0.000000` | **`0.000000`** | Exact |
+| **3. Sallen-Key Active LPF** | Pole pair | $-5000 \pm j\,5000\text{ rad/s}$ ($Q = \frac{1}{\sqrt{2}}$) | `-5000.000000 ± j 5000.000000` | **`-5000.000075 ± j 5000.000075`** | $1.5 \times 10^{-8}$ |
+| ($R_1=R_2=10\text{ k}\Omega, C_1=20\text{ nF}, C_2=10\text{ nF}, E_1=1$) | $f_0$ | $\frac{1}{2\pi\sqrt{R_1R_2C_1C_2}} = 1125.395\text{ Hz}$ | `1125.395 Hz` | **`1125.395 Hz`** | $< 10^{-7}$ |
+| **4. Twin-T Notch Filter** | Pole 1 | Real left-half-plane pole | `-3083.527133` | **`-3083.527194`** | $2.0 \times 10^{-8}$ |
+| ($R_1=R_2=10\text{ k}\Omega, R_3=5\text{ k}\Omega,$ | Pole 2 | Real left-half-plane pole | `-38916.472867` | **`-38916.473106`** | $6.1 \times 10^{-9}$ |
+| $C_1=C_2=10\text{ nF}, C_3=20\text{ nF}, R_L=100\text{ k}\Omega$) | Zero pair | $\pm j\frac{1}{RC} = \pm j\,10000\text{ rad/s}$ (`1591.549 Hz`) | `0.000000 ± j 10000.000000` | **`0.000000 ± j 10000.000000`** | $< 10^{-10}$ |
+
+> [!NOTE]
+> **Why does the 1st-order RC pole differ by $1.0 \times 10^{-9}$ (`-1000.000001` vs `-1000.000000`)?**
+> `Nodalys` includes the diagonal safety conductance `Gmin = 1e-12 S` in $\mathbf{G}$ across node 2, shifting the pole by $-G_{\min}/C_1 = -10^{-12}/10^{-6} = -10^{-6}\text{ rad/s}$ (`-1000.000001 rad/s`).
+
+---
+
+### 2.2 Execution Performance
+
+| Circuit | Non-Ground Nodes | `ngspice` | **`Nodalys`** | Speedup |
+| :--- | :---: | ---: | ---: | :---: |
+| **First-Order RC Low-Pass** | 2 | 0.074 ms | **0.002 ms** | **38.52x** |
+| **Series RLC Bandpass** | 3 | 0.178 ms | **0.005 ms** | **32.64x** |
+| **Sallen-Key Active LPF** | 4 | 0.103 ms | **0.005 ms** | **19.31x** |
+| **Twin-T Notch Filter** ([`nodalys_benchmark_tests.cpp`](../../tests/nodalys_benchmark_tests.cpp)) | 4 | 0.171 ms | **0.008 ms** | **22.19x** |

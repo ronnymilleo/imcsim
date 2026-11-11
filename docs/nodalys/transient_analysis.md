@@ -73,3 +73,13 @@ $$\text{LTE}_{\text{trap}} \approx \frac{1}{2}\,h^3\,\bigl|d_{123}\bigr|$$
 > **Physical and numerical interpretation of the transient results:**
 > - Immediately after the $t = 0$ step ($t = 1\tau$), `ngspice` takes dozens of nanosecond sub-steps across the `PULSE` rise ramp, whereas `Nodalys` takes its initial step in Backward Euler to damp the impulse discontinuity before switching to the 2nd-order Trapezoidal Rule.
 > - In the settling and intermediate oscillation regimes ($t = 5\tau$ in RC and RL, and $t = 1.0\text{ ms}$ in the underdamped RLC), **`Nodalys` is 3.7× to 5.2× closer to the closed-form analytical solution** than `ngspice`.
+
+---
+
+### 2.2 Execution Performance ([`nodalys_benchmark_tests.cpp`](../../tests/nodalys_benchmark_tests.cpp))
+
+| Circuit | Nodes | `ngspice` | **`Nodalys`** | Speedup |
+| :--- | ---: | ---: | ---: | :---: |
+| **RC Ladder (100 nodes, 50 us)** | 101 | 2.297 ms | 8.930 ms | 0.26x *(dense LU)* |
+| **RLC Line (50 stages, 100 ns)** | 101 | 2.597 ms | 39.878 ms | 0.07x *(dense LU)* |
+| **Ring Oscillator (31 smooth gates)** | 31 | N/A | **69.954 ms** | Autonomous |

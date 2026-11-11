@@ -27,7 +27,10 @@
    - Benchmark tables: **Analytical Golden vs. `ngspice` vs. `Nodalys`**.
 8. **[Small-Signal Pole-Zero Analysis (`.pz`)](./pz_analysis.md)**
    - Algorithms: Generalized eigenvalue problem $(\mathbf{G}, -\mathbf{C})$ and Rosenbrock system pencil $(\mathbf{A}_z, -\mathbf{B}_z)$ via the Moler-Stewart QZ algorithm, finite root filtering, natural frequency $\omega_0$, quality factor $Q$, and damping ratio $\zeta$.
-   - Benchmark tables: **Analytical Golden vs. `ngspice` vs. `Nodalys`**.
+   - Benchmark tables: **Analytical Golden vs. `ngspice` vs. `Nodalys`** (accuracy and execution time).
+9. **[Small-Signal DC Sensitivity Analysis (`.sens`)](./sens_analysis.md)**
+   - Algorithms: Converged DC Jacobian adjoint system $\mathbf{J}^T \boldsymbol{\lambda} = \mathbf{d}$ (`MnaSystem::SolveTranspose`), analytical component derivatives ($\mathcal{O}(1)$ linear solve per analysis), 100% normalized scale, and hierarchical subcircuit/potentiometer aggregation.
+   - Benchmark tables: **Analytical Golden vs. `ngspice` vs. `Nodalys`** (accuracy and execution time).
 
 ---
 
@@ -42,7 +45,7 @@
 │   │   └── circuit_builder.h          Fluent CircuitBuilder for components & models
 │   └── src/
 │       ├── api/                       CircuitBuilder implementation and Circuit internals
-│       ├── analyses/                  Solvers: .op, .dc, .tran, .ac, .tf, .noise, .sp, .pz
+│       ├── analyses/                  Solvers: .op, .dc, .tran, .ac, .tf, .noise, .sp, .pz, .sens
 │       ├── bridge/                    LogicBridge: Verilog discrete-to-analog co-simulation
 │       ├── cli/                       Standalone CLI binary entry point (`nodalys`)
 │       ├── compiler/                  CompiledCircuit internal representation
@@ -61,12 +64,12 @@
 
 | Module / Directory | Responsibility |
 | :--- | :--- |
-| `include/nodalys/` | Public C++23 interface exporting `CircuitBuilder`, `Circuit`, and free analysis functions (`ComputeOperatingPoint`, `ComputeTransient`, `ComputeDCSweep`, `ComputeACSweep`, `ComputeTransferFunction`, `ComputeNoise`, `ComputeSParameters`, `ComputePoleZero`). |
-| `src/mna/` | Real and complex Modified Nodal Analysis (MNA) matrix assembly, dynamic $G_{\min}$ stabilization, and residual verification. |
+| `include/nodalys/` | Public C++23 interface exporting `CircuitBuilder`, `Circuit`, and free analysis functions (`ComputeOperatingPoint`, `ComputeTransient`, `ComputeDCSweep`, `ComputeACSweep`, `ComputeTransferFunction`, `ComputeNoise`, `ComputeSParameters`, `ComputePoleZero`, `ComputeSensitivity`). |
+| `src/mna/` | Real and complex Modified Nodal Analysis (MNA) matrix assembly, transpose solve, dynamic $G_{\min}$ stabilization, and residual verification. |
 | `src/linear/` | `BasicDenseMatrix<Scalar>` (LU decomposition) and Moler-Stewart QZ generalized eigenvalue solver (`ComputeGeneralizedEigenvalues`). |
 | `src/newton/` | Damped nonlinear Newton-Raphson driver with semiconductor junction damping (`pnjlim`, `fetlim`), logic output limiting, and fallback homotopy strategies (*Gmin stepping* and *Source stepping*). |
 | `src/devices/` | Device models: linear passives, independent/controlled sources, hysteretic switches, relays, transformers, ideal & Boyle op-amps, nonlinear semiconductors (Shockley diode, Gummel-Poon BJT, Shichman-Hodges Level-1 MOSFET), and smooth continuous logic gates. |
-| `src/analyses/` | Complete numerical solvers for DC Operating Point, DC Sweep (1D/2D), Time-Domain Transient, AC Small-Signal Sweep, DC Transfer Function, AC Adjoint Noise, Multiport S-Parameters, and Pole-Zero. |
+| `src/analyses/` | Complete numerical solvers for DC Operating Point, DC Sweep (1D/2D), Time-Domain Transient, AC Small-Signal Sweep, DC Transfer Function, AC Adjoint Noise, Multiport S-Parameters, Pole-Zero, and DC Sensitivity. |
 | `src/bridge/` | `LogicBridge` translating discrete event-driven logic levels (`0`, `1`, `X`, `Z`) into continuous analog waveforms with realistic slew rates and configurable supply rails. |
 | `src/parser/` & `src/export/` | SPICE netlist syntax parser supporting engineering scales (`1k`, `100n`, `4.7u`) and multi-format simulation result export (CSV, JSON, SPICE Raw, Touchstone). |
 | `src/cli/` | Standalone CLI tool (`nodalys`) processing netlists from files or `stdin` with command-line options (`--analysis`, `--format`, `--output`). |
@@ -94,6 +97,7 @@
 | **Noise Analysis** | `.noise` | ✅ | ✅ **Ready** | [`noise_analysis.cpp`](../../nodalys/src/analyses/noise_analysis.cpp) — Adjoint complex solver $\mathbf{Y}(j\omega)^T \lambda = \mathbf{e}_{\text{out}}$, input/output spectral densities ($\text{V}/\sqrt{\text{Hz}}$), log-log RMS integration, and per-component noise shares. |
 | **S-Parameters** | `.sp` | ✅ | ✅ **Ready** | [`sp_analysis.cpp`](../../nodalys/src/analyses/sp_analysis.cpp) — Multiport scattering matrix $\mathbf{S}(j\omega)$, single-LU multi-RHS solve, Return Loss, Insertion Loss, VSWR, Input Impedance, and Touchstone export. |
 | **Pole-Zero** | `.pz` | ✅ | ✅ **Ready** | [`pz_analysis.cpp`](../../nodalys/src/analyses/pz_analysis.cpp) — Generalized eigenvalue solver $(\mathbf{G}, -\mathbf{C})$ and Rosenbrock pencil $(\mathbf{A}_z, -\mathbf{B}_z)$ via pure C++23 QZ algorithm. |
+| **Sensitivity** | `.sens` | ✅ | ✅ **Ready** | [`sens_analysis.cpp`](../../nodalys/src/analyses/sens_analysis.cpp) — Transposed adjoint solve $\mathbf{J}^T \boldsymbol{\lambda} = \mathbf{d}$, analytical device derivatives, 100% normalized scale, and subcircuit/potentiometer aggregation. |
 | **Truth Table** | Multiple `.op` | ✅ | ✅ **Ready** | Fully supported natively in imcsim UI without ngspice via smooth continuous logic macromodels ($C^\infty$). |
 
 ---
@@ -129,12 +133,40 @@
 
 ---
 
-### 4. Roadmap Analyses (`jay` Epics)
+### 4. Performance Benchmark Summary ([`nodalys_benchmark_tests.cpp`](../../tests/nodalys_benchmark_tests.cpp))
+
+Measured via `./out/release/bin/imcsim-tests "[benchmark]"` across all implemented analyses (`All tests passed`):
+
+| Circuit | Analysis | Nodes | `ngspice` | **`Nodalys`** | Speedup |
+| :--- | :--- | ---: | ---: | ---: | :---: |
+| **RC Ladder (100 nodes)** | DC OP | 101 | 0.910 ms | **0.236 ms** | **3.86x** |
+| **RC Ladder (500 nodes)** | DC OP | 501 | 6.172 ms | **4.949 ms** | **1.25x** |
+| **Diode Ladder (30 diodes)** | DC OP | 31 | 0.388 ms | 0.976 ms | 0.40x |
+| **Full Adder Truth Table (8 rows)** | DC OP ×8 | 8 | N/A | **0.110 ms** | Autonomous |
+| **BJT Cascaded Amp (4 stages)** | DC Sweep | 14 | 0.335 ms | **0.216 ms** | **1.55x** |
+| **RC Ladder (100 nodes, 50 us)** | Transient | 101 | 2.297 ms | 8.930 ms | 0.26x |
+| **RLC Line (50 stages, 100 ns)** | Transient | 101 | 2.597 ms | 39.878 ms | 0.07x |
+| **Ring Oscillator (31 smooth gates)** | Transient | 31 | N/A | **69.954 ms** | Autonomous |
+| **RC Filter (100 nodes, AC 350 pts)** | AC Sweep | 101 | 19.878 ms | 58.571 ms | 0.34x |
+| **BJT Emitter Follower** | Transfer | 4 | 0.072 ms | **0.004 ms** | **18.62x** |
+| **BJT CE Amp (41 pts)** | Noise | 5 | 0.226 ms | **0.079 ms** | **2.87x** |
+| **3-Port Splitter (18 pts)** | S-Params | 4 | 0.186 ms | **0.014 ms** | **13.21x** |
+| **Twin-T Notch Filter** | Pole-Zero | 4 | 0.171 ms | **0.008 ms** | **22.19x** |
+| **BJT Cascaded Amp (4 stages)** | Sensitivity | 14 | 1.367 ms | **0.030 ms** | **44.84x** |
+| **RC Ladder (100 nodes)** | Sensitivity | 101 | 10.334 ms | **0.430 ms** | **24.03x** |
+| **RC Ladder (500 nodes)** | Sensitivity | 501 | 139.776 ms | **7.662 ms** | **18.24x** |
+| **Diode Ladder (30 diodes)** | Sensitivity | 31 | 6.359 ms | **1.013 ms** | **6.28x** |
+
+---
+
+### 5. Roadmap Analyses (`jay` Epics)
 
 | Analysis | SPICE Command | Description | Status |
 | :--- | :---: | :--- | :---: |
 | **Pole-Zero Analysis** | `.pz` | Generalized eigenvalue solver $(\mathbf{G} + s\mathbf{C})\mathbf{x} = \mathbf{0}$ via the QZ algorithm to find transfer function poles and zeros. | ✅ **Ready** |
-| **DC / AC Sensitivity** | `.sens` | Per-component adjoint sensitivity $\partial V_{\text{out}} / \partial p_i$ solved via transposed system $\mathbf{J}^T \lambda = \mathbf{e}_{\text{out}}$. | Planned |
+| **DC Sensitivity** | `.sens` | Per-component adjoint sensitivity $\partial V_{\text{out}} / \partial p_i$ solved via transposed system $\mathbf{J}^T \boldsymbol{\lambda} = \mathbf{d}$. | ✅ **Ready** |
 | **RF S-Parameters** | `.sp` | Scattering matrix $S_{ij}(f)$, return loss, VSWR, and Smith chart generation with $Z_0$ port termination. | ✅ **Ready** |
-| **Distortion / Harmonic Balance** | `.disto` / HB | Frequency-domain periodic steady-state analysis for nonlinear RF circuits. | Planned |
+| **Harmonic Balance (HB)** | `.hb` | Frequency-domain / multi-tone periodic steady-state solver for nonlinear RF circuits *(exclusive to Nodalys)*. | 🔜 **Next** |
+| **AC Sensitivity** | `.sens ac` | Small-signal frequency-domain adjoint sensitivity over complex MNA $\mathbf{Y}(j\omega)^T \boldsymbol{\lambda} = \mathbf{d}$. | Planned |
+| **Sparse MNA Solver** | Infrastructure | Sparse LU decomposition (e.g., KLU-style AMD ordering) for >100-node transient and AC acceleration. | Planned |
 | **Parallel Monte Carlo** | Statistical | Multi-threaded statistical parameter tolerance sweeps across independent `nodalys::Circuit` instances. | Planned |

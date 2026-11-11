@@ -92,3 +92,15 @@ In [`ComputeDCSweep`](../../app-core/native/dc_analysis.cpp), only the first poi
 > In `ngspice`, `Gmin = 1e-12 S` is placed only across nonlinear semiconductor junctions. In `Nodalys`, `Gmin = 1e-12 S` is stamped on the diagonal of every voltage node for unconditional matrix safety. In the $12\text{ V}$ divider with Thévenin resistance $R_{\text{th}} = 1\text{ k}\Omega \parallel 2.2\text{ k}\Omega = 687.5\text{ }\Omega$, the exact analytical voltage pull-down caused by a $1\text{ T}\Omega$ resistor to ground is:
 > $$\Delta V = -V(2)\cdot R_{\text{th}}\cdot G_{\min} = -8.25 \times 687.5 \times 10^{-12} = -5.671875 \times 10^{-9}\text{ V}$$
 > which matches the observed `8.249999994 V` to the last digit.
+
+---
+
+### 2.3 Execution Performance ([`nodalys_benchmark_tests.cpp`](../../tests/nodalys_benchmark_tests.cpp))
+
+| Circuit | Analysis | Nodes | `ngspice` | **`Nodalys`** | Speedup |
+| :--- | :--- | ---: | ---: | ---: | :---: |
+| **RC Ladder (100 nodes)** | DC OP | 101 | 0.910 ms | **0.236 ms** | **3.86x** |
+| **RC Ladder (500 nodes)** | DC OP | 501 | 6.172 ms | **4.949 ms** | **1.25x** |
+| **BJT Cascaded Amp (4 stages)** | DC Sweep | 14 | 0.335 ms | **0.216 ms** | **1.55x** |
+| **Diode Ladder (30 diodes)** | DC OP | 31 | 0.388 ms | 0.976 ms | 0.40x |
+| **Full Adder Truth Table (8 rows)** | DC OP ×8 | 8 | N/A | **0.110 ms** | Autonomous |
