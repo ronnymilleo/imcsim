@@ -1,6 +1,8 @@
 /**
  * @file    nodalys_benchmark_tests.cpp
- * @brief   Performance benchmark suite comparing execution time and scalability between Nodalys and ngspice.
+ * @brief   Benchmarks that time Nodalys against ngspice on larger circuits, checking that both agree.
+ * @details Hidden from the default run, since timings only mean something on a quiet machine; run them with
+ *          `imcsim-tests "[.benchmark]"`.
  */
 
 #include "components/bjt.h"
@@ -67,7 +69,7 @@ void PrintBenchmarkRow(const std::string &name, const std::string &type, const s
     }
 }
 
-/// Helper container holding both the Circuit and the allocated components it references by pointer.
+/// A circuit with the parts it points at, which it does not own.
 struct OwnedCircuit {
     std::vector<std::unique_ptr<Core::Component>> Parts;
     Core::Circuit Instance;
@@ -212,8 +214,8 @@ OwnedCircuit BuildCascadedBjtAmplifier(const std::size_t stages) {
 
 } // namespace
 
-TEST_CASE("Nodalys solves 100-node and 500-node RC ladder networks faster than ngspice with exact parity",
-          "[benchmark][nodalys]") {
+TEST_CASE("The operating point of 100- and 500-node RC ladders matches ngspice, timed against it",
+          "[.benchmark][nodalys]") {
     Core::NodalysBackend nodalys;
 
     SECTION("100-node RC Ladder DC Operating Point") {
@@ -256,8 +258,7 @@ TEST_CASE("Nodalys solves 100-node and 500-node RC ladder networks faster than n
     }
 }
 
-TEST_CASE("Nodalys solves 100-node RC ladder transient analysis with high-speed adaptive stepping",
-          "[benchmark][nodalys]") {
+TEST_CASE("The transient of a 100-node RC ladder matches ngspice, timed against it", "[.benchmark][nodalys]") {
     constexpr std::size_t STAGES = 100;
     const OwnedCircuit circuit = BuildRcLadder(STAGES, 100.0, 10e3, 1e-9);
     const Core::TransientSettings settings{.StopTime = 50e-6, .TimeStep = 1e-6};
@@ -281,8 +282,7 @@ TEST_CASE("Nodalys solves 100-node RC ladder transient analysis with high-speed 
     PrintBenchmarkRow("RC Ladder (100 nodes, 50us)", "Transient", last_node, ngspice_ms, nodalys_ms);
 }
 
-TEST_CASE("Nodalys simulates 50-stage RLC transmission line wave dynamics with lower latency than ngspice",
-          "[benchmark][nodalys]") {
+TEST_CASE("The transient of a 50-stage RLC line matches ngspice, timed against it", "[.benchmark][nodalys]") {
     constexpr std::size_t STAGES = 50;
     const OwnedCircuit circuit = BuildRlcLine(STAGES, 0.2, 1e-6, 100e-12, 100.0);
     const Core::TransientSettings settings{.StopTime = 100e-9, .TimeStep = 1e-9};
@@ -302,7 +302,7 @@ TEST_CASE("Nodalys simulates 50-stage RLC transmission line wave dynamics with l
     PrintBenchmarkRow("RLC Line (50 stages, 100ns)", "Transient", total_nodes, ngspice_ms, nodalys_ms);
 }
 
-TEST_CASE("Nodalys converges on 30-stage nonlinear diode ladder with rapid Newton iterations", "[benchmark][nodalys]") {
+TEST_CASE("The operating point of a 30-stage diode ladder matches ngspice, timed against it", "[.benchmark][nodalys]") {
     constexpr std::size_t STAGES = 30;
     const OwnedCircuit circuit = BuildDiodeLadder(STAGES, 25.0, 10e3);
     Core::NodalysBackend nodalys;
@@ -323,8 +323,7 @@ TEST_CASE("Nodalys converges on 30-stage nonlinear diode ladder with rapid Newto
     PrintBenchmarkRow("Diode Ladder (30 diodes)", "DC OP", STAGES + 1, ngspice_ms, nodalys_ms);
 }
 
-TEST_CASE("Nodalys executes DC sweeps across multi-stage cascaded BJT amplifiers with high throughput",
-          "[benchmark][nodalys]") {
+TEST_CASE("The DC sweep of cascaded BJT amplifiers matches ngspice, timed against it", "[.benchmark][nodalys]") {
     constexpr std::size_t STAGES = 4;
     const OwnedCircuit circuit = BuildCascadedBjtAmplifier(STAGES);
     const Core::DCSweepSettings settings{
@@ -345,8 +344,7 @@ TEST_CASE("Nodalys executes DC sweeps across multi-stage cascaded BJT amplifiers
     PrintBenchmarkRow("BJT Cascaded Amp (4 stages)", "DC Sweep", 3 * STAGES + 2, ngspice_ms, nodalys_ms);
 }
 
-TEST_CASE("Nodalys computes wideband small-signal AC sweeps on 100-node networks with minimal matrix overhead",
-          "[benchmark][nodalys]") {
+TEST_CASE("The AC sweep of a 100-node network matches ngspice, timed against it", "[.benchmark][nodalys]") {
     constexpr std::size_t STAGES = 100;
     OwnedCircuit circuit;
     auto &vac = circuit.AddPart<Core::VoltageSource>({1, 0});
@@ -383,8 +381,7 @@ TEST_CASE("Nodalys computes wideband small-signal AC sweeps on 100-node networks
     PrintBenchmarkRow("RC Filter (100 nodes, AC 350 pts)", "AC Sweep", STAGES + 1, ngspice_ms, nodalys_ms);
 }
 
-TEST_CASE("Nodalys simulates 31-stage smooth logic continuous ring oscillator autonomously in the time domain",
-          "[benchmark][nodalys]") {
+TEST_CASE("A 31-stage ring oscillator of smooth logic gates oscillates, timed", "[.benchmark][nodalys]") {
     constexpr int GATE_COUNT = 31;
     Nodalys::CircuitBuilder builder;
 
@@ -420,8 +417,8 @@ TEST_CASE("Nodalys simulates 31-stage smooth logic continuous ring oscillator au
     PrintBenchmarkRow("Ring Oscillator (31 smooth gates)", "Transient", GATE_COUNT, 0.0, nodalys_ms);
 }
 
-TEST_CASE("Nodalys evaluates digital truth table combinations via DC operating points with high speed",
-          "[benchmark][nodalys]") {
+TEST_CASE("The operating points of every truth table combination read the right outputs, timed",
+          "[.benchmark][nodalys]") {
     const auto solve_adder_row = [](const bool a, const bool b, const bool cin) -> std::pair<double, double> {
         Nodalys::CircuitBuilder builder;
         builder.AddVdc("VA", 1, 0, a ? 5.0 : 0.0);
@@ -475,7 +472,7 @@ TEST_CASE("Nodalys evaluates digital truth table combinations via DC operating p
     PrintBenchmarkRow("Full Adder Truth Table (8 rows)", "DC OP x8", 8, 0.0, nodalys_ms);
 }
 
-TEST_CASE("Nodalys outperforms ngspice on DC sensitivity via single-solve adjoint method", "[benchmark][nodalys]") {
+TEST_CASE("The DC sensitivity from one adjoint solve matches ngspice, timed against it", "[.benchmark][nodalys]") {
     Core::NodalysBackend nodalys;
 
     auto run_sens_bench = [&](const std::string &label, const Core::Circuit &circuit, const int output_node,
@@ -524,8 +521,8 @@ TEST_CASE("Nodalys outperforms ngspice on DC sensitivity via single-solve adjoin
     }
 }
 
-TEST_CASE("Nodalys computes small-signal TF, Noise, SP, and PZ analyses with benchmark parity",
-          "[benchmark][nodalys]") {
+TEST_CASE("The transfer function, noise, S-parameters and poles and zeros match ngspice, timed against it",
+          "[.benchmark][nodalys]") {
     Core::NodalysBackend nodalys;
 
     SECTION("BJT emitter follower DC transfer function") {
