@@ -218,6 +218,7 @@ std::expected<TransientResult, std::string> ComputeTransient(CompiledCircuit &co
     collector.Append(0.0, x_now, currents_now);
 
     auto last_send = std::chrono::steady_clock::now();
+    double chunk_end = monitor.ChunkSpan;
     std::size_t sent = 0;
     double time = 0.0;
     double step = std::min(output_step, settings.StopTime);
@@ -317,15 +318,19 @@ std::expected<TransientResult, std::string> ComputeTransient(CompiledCircuit &co
             }
         }
 
-        if (std::chrono::steady_clock::now() - last_send > CHUNK_INTERVAL ||
+        const bool spans_chunk = monitor.ChunkSpan > 0.0 && time >= chunk_end;
+        if (spans_chunk || std::chrono::steady_clock::now() - last_send > CHUNK_INTERVAL ||
             collector.PointCount() - sent > CHUNK_POINT_LIMIT) {
-            ApplyLiveChanges(compiled, monitor, messages);
             PublishChunk(collector.MutableView(), monitor, std::min(1.0, time / settings.StopTime), sent);
-            last_send = std::chrono::steady_clock::now();
-            if (monitor.ShouldStop && monitor.ShouldStop()) {
+            // The caller may hold here, to pace a live run or while it is paused, so the changes come after
+            const bool goes_on = !monitor.AfterChunk || monitor.AfterChunk(time);
+            if (!goes_on || (monitor.ShouldStop && monitor.ShouldStop())) {
                 stopped = true;
                 break;
             }
+            ApplyLiveChanges(compiled, monitor, messages);
+            last_send = std::chrono::steady_clock::now();
+            chunk_end = time + monitor.ChunkSpan;
         }
     }
 
