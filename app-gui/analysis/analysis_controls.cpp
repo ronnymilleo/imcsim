@@ -361,6 +361,15 @@ bool AnalysisControls::IsStopping() const {
 }
 
 /**
+ * @brief   Tells whether a run still holds the simulation backend, so it must not be replaced yet.
+ * @return  True while a run goes on, is stopping or is a live run on pause, whose worker keeps the backend it started
+ *          on.
+ */
+bool AnalysisControls::IsBackendInUse() const {
+    return m_RunningAnalysis.has_value() || m_Service.IsBusy();
+}
+
+/**
  * @brief   Returns the analysis in progress.
  * @return  The analysis, or no value when none runs.
  */

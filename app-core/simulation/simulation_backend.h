@@ -52,6 +52,8 @@ struct BackendCapabilities {
     std::map<ComponentType, std::string> UnsupportedParts;
     /// Parts the backend cannot simulate in one analysis only, each with the reason shown to the user.
     std::map<AnalysisKind, std::map<ComponentType, std::string>> UnsupportedPartsByAnalysis;
+    /// Why the backend cannot simulate at a temperature other than the default one, or none when it can.
+    std::optional<std::string> TemperatureUnsupported;
 };
 
 /**

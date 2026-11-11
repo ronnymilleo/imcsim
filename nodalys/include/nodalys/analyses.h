@@ -156,6 +156,11 @@ struct RunMonitor {
     std::function<void(double progress)> OnProgress = nullptr;
     std::function<std::vector<LiveChange>()> TakeLiveChanges = nullptr;
     std::function<void(const TransientResult &chunk)> PostTransientChunk = nullptr;
+    /// Simulated seconds after which a chunk ends, besides the clock interval; 0 ends chunks by the clock only.
+    double ChunkSpan = 0.0;
+    /// Called after each chunk with the simulated time reached; it may block, to pace a live run or hold it while
+    /// paused, and returns false to stop the run.
+    std::function<bool(double time)> AfterChunk = nullptr;
 };
 
 // Top-level analysis entry points

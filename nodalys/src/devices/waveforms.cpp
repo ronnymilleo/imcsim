@@ -6,7 +6,9 @@
 #include "devices/waveforms.h"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
+#include <limits>
 #include <numbers>
 
 namespace nodalys {
@@ -14,6 +16,29 @@ namespace nodalys {
 namespace {
 
 constexpr double CLOCK_EDGE_FRACTION = 1e-4;
+constexpr double NO_CORNER = std::numeric_limits<double>::infinity();
+
+/**
+ * @brief   Whether a corner lies after an instant by more than rounding, so the transient never lands twice on one.
+ */
+bool IsAfter(const double corner, const double time) {
+    return corner > time + 1e-12 * std::max(std::fabs(time), std::fabs(corner)) + 1e-21;
+}
+
+/**
+ * @brief   The pulse a clock drives, with edges a fixed share of its period.
+ */
+PulseParameters ClockPulse(const ClockParameters &parameters) {
+    const double period = 1.0 / parameters.Frequency;
+    const double edge = CLOCK_EDGE_FRACTION * period;
+    return {.Low = 0.0,
+            .High = parameters.LogicLevel,
+            .Delay = parameters.StartDelay,
+            .RiseTime = edge,
+            .FallTime = edge,
+            .Width = std::max(parameters.DutyCycle * period - edge, 0.0),
+            .Period = period};
+}
 
 double LinearEdge(const double from, const double to, const double duration, const double progress) {
     if (duration <= 0.0) {
@@ -23,6 +48,69 @@ double LinearEdge(const double from, const double to, const double duration, con
 }
 
 } // namespace
+
+/**
+ * @brief   Finds the next corner of a pulse: the start and end of each edge and of each period.
+ * @param[in] pulse  Pulse to follow; a period of 0 or less makes it a single pulse.
+ * @param[in] time   Instant already reached.
+ * @return  The first corner strictly after `time`, or infinity once a single pulse has ended.
+ */
+double FindNextPulseCorner(const PulseParameters &pulse, const double time) {
+    const std::array<double, 4> offsets = {0.0, pulse.RiseTime, pulse.RiseTime + pulse.Width,
+                                           pulse.RiseTime + pulse.Width + pulse.FallTime};
+    const bool is_periodic = pulse.Period > 0.0 && std::isfinite(pulse.Period);
+    double cycle_start = pulse.Delay;
+    if (is_periodic && time > pulse.Delay) {
+        cycle_start += std::floor((time - pulse.Delay) / pulse.Period) * pulse.Period;
+    }
+    // The corners of this cycle, then those of the next one, cover every instant
+    for (int cycle = 0; cycle < 2; ++cycle) {
+        for (const double offset : offsets) {
+            if (const double corner = cycle_start + offset; IsAfter(corner, time)) {
+                return corner;
+            }
+        }
+        if (!is_periodic) {
+            return NO_CORNER;
+        }
+        cycle_start += pulse.Period;
+    }
+    return NO_CORNER;
+}
+
+VoltageSourceDevice::Breakpoints MakePulseBreakpoints(const PulseParameters &pulse) {
+    return [pulse](const double time) { return FindNextPulseCorner(pulse, time); };
+}
+
+VoltageSourceDevice::Breakpoints MakeExpBreakpoints(const ExpParameters &exp) {
+    return [exp](const double time) {
+        for (const double corner : {exp.RiseDelay, exp.FallDelay}) {
+            if (IsAfter(corner, time)) {
+                return corner;
+            }
+        }
+        return NO_CORNER;
+    };
+}
+
+VoltageSourceDevice::Breakpoints MakePwlBreakpoints(const PwlParameters &pwl) {
+    return [pwl](const double time) {
+        for (const PwlPoint &point : pwl.Points) {
+            if (IsAfter(point.Time, time)) {
+                return point.Time;
+            }
+        }
+        return NO_CORNER;
+    };
+}
+
+VoltageSourceDevice::Breakpoints MakeAmBreakpoints(const AmParameters &am) {
+    return [am](const double time) { return IsAfter(am.Delay, time) ? am.Delay : NO_CORNER; };
+}
+
+VoltageSourceDevice::Breakpoints MakeClockBreakpoints(const ClockParameters &parameters) {
+    return MakePulseBreakpoints(ClockPulse(parameters));
+}
 
 double EvaluatePulse(const PulseParameters &pulse, const double time) {
     if (time < pulse.Delay) {
@@ -142,16 +230,7 @@ VoltageSourceDevice::Waveform MakeAmWaveform(const double, const AmParameters &a
 }
 
 VoltageSourceDevice::Waveform MakeClockWaveform(const ClockParameters &parameters) {
-    const double period = 1.0 / parameters.Frequency;
-    const double edge = CLOCK_EDGE_FRACTION * period;
-    PulseParameters pulse;
-    pulse.Low = 0.0;
-    pulse.High = parameters.LogicLevel;
-    pulse.Delay = parameters.StartDelay;
-    pulse.RiseTime = edge;
-    pulse.FallTime = edge;
-    pulse.Width = std::max(parameters.DutyCycle * period - edge, 0.0);
-    pulse.Period = period;
+    const PulseParameters pulse = ClockPulse(parameters);
     return [pulse](const double, const TimeContext &time) {
         if (time.IsPeriodicSteadyState && !time.IsTransient) {
             const double shift =

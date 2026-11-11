@@ -268,7 +268,7 @@ void Application::LoadPreferencesFile() {
 
 /**
  * @brief   The theme is global to ImGui, so it follows the preferences here; the windows read the other choices
- *          themselves; the simulation backend follows here too, switched only when it changed.
+ *          themselves; the simulation backend follows here too, switched once no run holds it.
  * @details Writing only when something changed keeps the file untouched frame after frame, and a failed write is logged
  *          once.
  */
@@ -277,8 +277,8 @@ void Application::ApplyPreferences() {
         SetTheme(*theme);
     }
     const std::string_view wanted_backend = m_Preferences.SimulationBackend;
-    if (wanted_backend != Core::GetBackend().GetName()) {
-        // SetBackend is safe while no simulation runs; ApplyPreferences runs on the frame thread between runs
+    // The worker of a run, a paused live one too, uses the backend it started on, so the switch waits for its end
+    if (wanted_backend != Core::GetBackend().GetName() && !m_AnalysisControls.IsBackendInUse()) {
         Core::SetBackend(wanted_backend == "Nodalys" ? std::make_unique<Core::NodalysBackend>() : nullptr);
     }
     if (m_Preferences == m_SavedPreferences) {

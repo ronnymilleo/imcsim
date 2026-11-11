@@ -7,8 +7,10 @@
 
 #include "components/logic_part.h"
 #include "nodalys/compiler.h"
+#include "simulation/live_pace.h"
 #include "simulation/pole_zero.h"
 #include "simulation/sensitivity.h"
+#include <chrono>
 #include <format>
 #include <nodalys/nodalys.h>
 #include <utility>
@@ -44,6 +46,8 @@ NodalysBackend::NodalysBackend() {
         m_Capabilities.UnsupportedParts[type] = "Nodalys has no device for behavioral sources yet";
     }
     m_Capabilities.UnsupportedParts[ComponentType::FUSE] = "Nodalys has no device for fuses yet";
+    m_Capabilities.TemperatureUnsupported =
+        "Nodalys simulates at 27 C only: its device models do not follow the temperature yet";
     for (int index = 0; index <= static_cast<int>(ComponentType::SEVEN_SEGMENT); ++index) {
         const auto type = static_cast<ComponentType>(index);
         if (IsLogicPart(type)) {
@@ -109,8 +113,11 @@ TransientRun NodalysBackend::RunTransient(const Circuit &circuit, const Transien
         .StopTime = settings.StopTime, .TimeStep = settings.TimeStep, .MaxStep = settings.TimeStep};
 
     nodalys::RunMonitor nodalys_monitor;
+    // When the clock a live run keeps pace with started, moved later by the time spent paused
+    auto live_start = std::chrono::steady_clock::now();
     if (monitor.Control != nullptr) {
         nodalys_monitor.ShouldStop = [&monitor]() { return monitor.Control->IsCancelled(); };
+        nodalys_monitor.OnProgress = [&monitor](const double progress) { monitor.Control->SetProgress(progress); };
         nodalys_monitor.TakeLiveChanges = [&monitor]() {
             std::vector<nodalys::LiveChange> changes;
             for (const auto &c : monitor.Control->TakeChanges()) {
@@ -120,6 +127,12 @@ TransientRun NodalysBackend::RunTransient(const Circuit &circuit, const Transien
                                    c.Value});
             }
             return changes;
+        };
+    }
+    if (monitor.LivePace > 0.0) {
+        nodalys_monitor.ChunkSpan = monitor.LivePace * LIVE_CHUNK_SECONDS;
+        nodalys_monitor.AfterChunk = [&monitor, &live_start](const double time) {
+            return KeepLivePace(live_start, time, monitor.LivePace, monitor.Control);
         };
     }
     if (monitor.OnChunk) {

@@ -46,6 +46,7 @@ add_library(imcsim-core-lib
             simulation/circuit_copy.cpp
             simulation/fuse_state.cpp
             simulation/live_change.cpp
+            simulation/live_pace.cpp
             simulation/monte_carlo.cpp
             simulation/pole_zero.cpp
             simulation/ratings.cpp
