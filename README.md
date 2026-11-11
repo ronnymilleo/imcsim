@@ -116,7 +116,7 @@ New to imcsim? The [tutorial](docs/tutorial.md) builds, simulates and exports a 
 
 ## Screenshots
 
-Bode plot of a common-emitter stage next to its hybrid-pi model, with the -3 dB band and the peak of each response:
+Bode plot of a common-emitter stage next to its hybrid-pi model, with the peak and the -3 dB band of each response in the table under the plots:
 
 ![The small-signal example: a 2N3904 stage and its hybrid-pi model, and their magnitude and phase from 1 Hz to
 100 MHz](docs/images/bode.png)
