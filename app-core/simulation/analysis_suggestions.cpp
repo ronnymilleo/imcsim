@@ -222,7 +222,6 @@ std::optional<ACSweepSettings> SuggestACSweepSettings(const Circuit &circuit) {
  */
 std::optional<HarmonicBalanceSettings> SuggestHarmonicBalanceSettings(const Circuit &circuit) {
     constexpr int DEFAULT_HB_HARMONICS = 8;
-    constexpr double RATIO_RELTOL = 1e-6;
     std::vector<double> frequencies;
     for (const Component *part : CollectParts(circuit)) {
         if (part->GetType() == ComponentType::CLOCK) {
@@ -258,14 +257,12 @@ std::optional<HarmonicBalanceSettings> SuggestHarmonicBalanceSettings(const Circ
         int max_harmonic = 1;
         bool matches_all = true;
         for (const double frequency : frequencies) {
-            const double ratio = frequency / candidate;
-            const double nearest = std::round(ratio);
-            if (nearest < 1.0 || nearest > static_cast<double>(MAX_HARMONIC_BALANCE_HARMONICS) ||
-                std::abs(ratio - nearest) > RATIO_RELTOL * nearest) {
+            const std::optional<int> harmonic = FindHarmonicNumber(frequency, candidate);
+            if (!harmonic || *harmonic > MAX_HARMONIC_BALANCE_HARMONICS) {
                 matches_all = false;
                 break;
             }
-            max_harmonic = std::max(max_harmonic, static_cast<int>(nearest));
+            max_harmonic = std::max(max_harmonic, *harmonic);
         }
         if (matches_all) {
             return HarmonicBalanceSettings{.FundamentalFrequency = candidate,

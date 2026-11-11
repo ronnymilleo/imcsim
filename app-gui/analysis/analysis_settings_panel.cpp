@@ -631,7 +631,7 @@ void AnalysisSettingsPanel::DrawTruthTableSettings(SimulationSettings &settings)
  */
 void AnalysisSettingsPanel::DrawHarmonicBalanceSettings(SimulationSettings &settings) {
     constexpr int MIN_EXPLICIT_SAMPLES = 32;
-    constexpr int MAX_EXPLICIT_SAMPLES = 65536;
+    constexpr int MAX_EXPLICIT_SAMPLES = Core::MAX_HARMONIC_BALANCE_SAMPLES;
     if (const std::optional<double> fundamental = m_HBFundamental.Draw("Fundamental", "Hz", IsPositive)) {
         settings.HarmonicBalance.FundamentalFrequency = *fundamental;
     }
@@ -657,7 +657,7 @@ void AnalysisSettingsPanel::DrawHarmonicBalanceSettings(SimulationSettings &sett
         if (ImGui::Selectable("Auto", settings.HarmonicBalance.Samples == 0)) {
             settings.HarmonicBalance.Samples = 0;
         }
-        ImGui::SetItemTooltip("Power of two at least max(32, 4 * Harmonics)");
+        ImGui::SetItemTooltip("The smallest power of two of at least 16 and 4 times the harmonics");
         for (int candidate = MIN_EXPLICIT_SAMPLES; candidate <= MAX_EXPLICIT_SAMPLES; candidate *= 2) {
             if (candidate <= 2 * settings.HarmonicBalance.Harmonics) {
                 continue;
