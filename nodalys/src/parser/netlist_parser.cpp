@@ -855,6 +855,16 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
                     }
                 }
                 result.Analyses.push_back({AnalysisKind::PoleZero, cfg});
+            } else if (dir == ".SENS") {
+                // .SENS <out_var> (e.g. .sens v(out) or .sens v(out, ref))
+                if (tokens.size() < 2) {
+                    return std::unexpected(std::format("Malformed .sens directive: '{}'", line));
+                }
+                SensitivityConfig cfg;
+                const auto [pos_str, neg_str] = ParseVoltageNodes(tokens[1]);
+                cfg.OutputPositiveNode = nodes.Resolve(pos_str);
+                cfg.OutputNegativeNode = nodes.Resolve(neg_str);
+                result.Analyses.push_back({AnalysisKind::Sensitivity, cfg});
             } else if (dir == ".OPTIONS") {
                 for (std::size_t i = 1; i < tokens.size(); ++i) {
                     const auto eq = tokens[i].find('=');

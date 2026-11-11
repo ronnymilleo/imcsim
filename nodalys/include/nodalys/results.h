@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <cmath>
 #include <complex>
+#include <map>
 #include <optional>
 #include <string>
 #include <variant>
@@ -213,8 +214,19 @@ struct PoleZeroResult {
     std::vector<std::complex<double>> Zeros;
 };
 
-using SimulationResult = std::variant<OperatingPointResult, TransientResult, DcSweepResult, AcSweepResult,
-                                      TransferFunctionResult, NoiseResult, SParameterResult, PoleZeroResult>;
+/**
+ * @struct  SensitivityResult
+ * @brief   Small-signal DC Sensitivity (.sens) vectors for circuit components and subcircuits.
+ */
+struct SensitivityResult {
+    int OutputPositiveNode = 0;
+    int OutputNegativeNode = 0;
+    std::map<std::string, double> Vectors;
+};
+
+using SimulationResult =
+    std::variant<OperatingPointResult, TransientResult, DcSweepResult, AcSweepResult, TransferFunctionResult,
+                 NoiseResult, SParameterResult, PoleZeroResult, SensitivityResult>;
 
 } // namespace nodalys
 

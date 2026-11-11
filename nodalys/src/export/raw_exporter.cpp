@@ -272,4 +272,34 @@ std::string ExportRaw(const PoleZeroResult &result, std::string_view title) {
     return ss.str();
 }
 
+std::string ExportRaw(const SensitivityResult &result, std::string_view title) {
+    std::ostringstream ss;
+    ss << "Title: " << title << "\n";
+    ss << "Date: " << CurrentDateString() << "\n";
+    ss << "Plotname: DC Sensitivity Analysis\n";
+    ss << "Flags: real\n";
+    ss << "No. Variables: " << result.Vectors.size() << "\n";
+    ss << "No. Points: 1\n";
+    ss << "Variables:\n";
+
+    std::size_t var_idx = 0;
+    for (const auto &[name, val] : result.Vectors) {
+        (void)val;
+        ss << "\t" << var_idx++ << "\t" << name << "\tvoltage\n";
+    }
+
+    ss << "Values:\n";
+    bool first = true;
+    for (const auto &[name, val] : result.Vectors) {
+        (void)name;
+        if (first) {
+            ss << "0\t" << std::format("{:.15e}\n", val);
+            first = false;
+        } else {
+            ss << "\t" << std::format("{:.15e}\n", val);
+        }
+    }
+    return ss.str();
+}
+
 } // namespace nodalys

@@ -128,6 +128,15 @@ struct PoleZeroConfig {
 };
 
 /**
+ * @struct  SensitivityConfig
+ * @brief   Configuration for small-signal DC sensitivity analysis (.sens).
+ */
+struct SensitivityConfig {
+    int OutputPositiveNode = 0;
+    int OutputNegativeNode = 0;
+};
+
+/**
  * @struct  RunMonitor
  * @brief   Asynchronous control and streaming callbacks for interactive/live simulation.
  */
@@ -172,6 +181,11 @@ std::expected<SParameterResult, std::string> ComputeSParameters(const Circuit &c
 std::expected<PoleZeroResult, std::string> ComputePoleZero(const Circuit &circuit, const PoleZeroConfig &config,
                                                            const ConvergenceOptions &options = {},
                                                            std::vector<DiagnosticMessage> *messages = nullptr);
+
+std::expected<SensitivityResult, std::string> ComputeSensitivity(const Circuit &circuit,
+                                                                 const SensitivityConfig &config,
+                                                                 const ConvergenceOptions &options = {},
+                                                                 std::vector<DiagnosticMessage> *messages = nullptr);
 
 } // namespace nodalys
 

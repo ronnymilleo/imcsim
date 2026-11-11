@@ -169,6 +169,9 @@ int main(int argc, char **argv) {
             if (a_lower == "pz") {
                 return an.Kind == nodalys::AnalysisKind::PoleZero;
             }
+            if (a_lower == "sens") {
+                return an.Kind == nodalys::AnalysisKind::Sensitivity;
+            }
             return false;
         });
 
@@ -190,6 +193,8 @@ int main(int argc, char **argv) {
                 parsed.Analyses.push_back({nodalys::AnalysisKind::SParameters, nodalys::SParameterConfig{}});
             } else if (a_lower == "pz") {
                 parsed.Analyses.push_back({nodalys::AnalysisKind::PoleZero, nodalys::PoleZeroConfig{}});
+            } else if (a_lower == "sens") {
+                parsed.Analyses.push_back({nodalys::AnalysisKind::Sensitivity, nodalys::SensitivityConfig{}});
             }
         }
     }
@@ -335,6 +340,22 @@ int main(int argc, char **argv) {
             }
             auto res =
                 nodalys::ComputePoleZero(parsed.CircuitInstance, cfg, parsed.Options, verbose ? &diagnostics : nullptr);
+            if (!res) {
+                std::cerr << std::format("Simulation Error: {}\n", res.error());
+                return EXIT_FAILURE;
+            }
+            sim_result = std::move(*res);
+            break;
+        }
+
+        case nodalys::AnalysisKind::Sensitivity: {
+            const auto &cfg = std::get<nodalys::SensitivityConfig>(analysis.Config);
+            if (verbose && !batch_mode) {
+                std::cout << std::format("Running DC Sensitivity (.sens) analysis: pos={}, neg={}\n",
+                                         cfg.OutputPositiveNode, cfg.OutputNegativeNode);
+            }
+            auto res = nodalys::ComputeSensitivity(parsed.CircuitInstance, cfg, parsed.Options,
+                                                   verbose ? &diagnostics : nullptr);
             if (!res) {
                 std::cerr << std::format("Simulation Error: {}\n", res.error());
                 return EXIT_FAILURE;
