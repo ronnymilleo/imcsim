@@ -67,14 +67,14 @@ TEST_CASE("A voltage-controlled switch opens and closes with its control voltage
 
     Core::NodalysBackend backend;
     const auto open_circuit = build(0.0);
-    const Core::OperatingPointRun open = backend.RunOperatingPoint(open_circuit->Circuit);
+    const Core::OperatingPointRun open = backend.RunOperatingPoint(open_circuit->Circuit, std::nullopt);
     REQUIRE(open.Result.has_value());
     REQUIRE_THAT(open.Result->NodeVoltages[2], WithinRel(10.0, 1e-5));
     // Open, the switch leaks the supply across its off resistance (giga-ohms): nano-amperes, not zero
     REQUIRE_THAT(CurrentOf(*open.Result, "S1"), WithinAbs(0.0, 1e-7));
 
     const auto closed_circuit = build(5.0);
-    const Core::OperatingPointRun closed = backend.RunOperatingPoint(closed_circuit->Circuit);
+    const Core::OperatingPointRun closed = backend.RunOperatingPoint(closed_circuit->Circuit, std::nullopt);
     REQUIRE(closed.Result.has_value());
     REQUIRE_THAT(closed.Result->NodeVoltages[2], WithinRel(10.0 * 0.01 / (1e3 + 0.01), 1e-3));
     REQUIRE_THAT(CurrentOf(*closed.Result, "S1"), WithinRel(10.0 / (1e3 + 0.01), 1e-4));
@@ -103,7 +103,7 @@ TEST_CASE("A relay closes its contact when the coil current pulls it in") {
     circuit.Add(ground, {0});
 
     Core::NodalysBackend backend;
-    const Core::OperatingPointRun run = backend.RunOperatingPoint(circuit);
+    const Core::OperatingPointRun run = backend.RunOperatingPoint(circuit, std::nullopt);
     REQUIRE(run.Result.has_value());
     // The coil takes 5 V / 70 Ohm = 71 mA, well past the 3.5 V pull-in, so the contact is closed and the load
     // sees the full 12 V

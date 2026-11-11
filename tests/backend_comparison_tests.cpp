@@ -72,9 +72,9 @@ Core::NgspiceBackend &Ngspice() {
  */
 void CheckOperatingPointParity(const Core::Circuit &circuit) {
     Core::NodalysBackend nodalys;
-    const Core::OperatingPointRun expected = Ngspice().RunOperatingPoint(circuit);
+    const Core::OperatingPointRun expected = Ngspice().RunOperatingPoint(circuit, std::nullopt);
     REQUIRE(expected.Result.has_value());
-    const Core::OperatingPointRun actual = nodalys.RunOperatingPoint(circuit);
+    const Core::OperatingPointRun actual = nodalys.RunOperatingPoint(circuit, std::nullopt);
     INFO("nodalys: " + (actual.Result ? std::string("ok") : actual.Result.error()));
     REQUIRE(actual.Result.has_value());
     REQUIRE(actual.Result->NodeVoltages.size() == expected.Result->NodeVoltages.size());

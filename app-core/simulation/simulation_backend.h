@@ -104,7 +104,7 @@ public:
      * @return  The node voltages and currents or an error, plus the messages of the backend.
      */
     virtual OperatingPointRun RunOperatingPoint(const Circuit &circuit,
-                                                const std::optional<double> &temperature_celsius = std::nullopt) = 0;
+                                                const std::optional<double> &temperature_celsius) = 0;
     /**
      * @brief   Simulates how the node voltages and currents of a circuit change over time.
      * @param[in] circuit              Circuit to simulate, already checked.

@@ -223,11 +223,12 @@ TEST_CASE("The operating point of 100- and 500-node RC ladders matches ngspice, 
         const OwnedCircuit circuit = BuildRcLadder(STAGES, 100.0, 10e3, 10e-9);
 
         Core::OperatingPointRun exp;
-        const double ngspice_ms = MeasureMs([&]() { exp = Ngspice().RunOperatingPoint(circuit.Instance); });
+        const double ngspice_ms =
+            MeasureMs([&]() { exp = Ngspice().RunOperatingPoint(circuit.Instance, std::nullopt); });
         REQUIRE(exp.Result.has_value());
 
         Core::OperatingPointRun act;
-        const double nodalys_ms = MeasureMs([&]() { act = nodalys.RunOperatingPoint(circuit.Instance); });
+        const double nodalys_ms = MeasureMs([&]() { act = nodalys.RunOperatingPoint(circuit.Instance, std::nullopt); });
         REQUIRE(act.Result.has_value());
 
         REQUIRE(act.Result->NodeVoltages.size() == exp.Result->NodeVoltages.size());
@@ -243,11 +244,12 @@ TEST_CASE("The operating point of 100- and 500-node RC ladders matches ngspice, 
         const OwnedCircuit circuit = BuildRcLadder(STAGES, 50.0, 50e3, 1e-9);
 
         Core::OperatingPointRun exp;
-        const double ngspice_ms = MeasureMs([&]() { exp = Ngspice().RunOperatingPoint(circuit.Instance); });
+        const double ngspice_ms =
+            MeasureMs([&]() { exp = Ngspice().RunOperatingPoint(circuit.Instance, std::nullopt); });
         REQUIRE(exp.Result.has_value());
 
         Core::OperatingPointRun act;
-        const double nodalys_ms = MeasureMs([&]() { act = nodalys.RunOperatingPoint(circuit.Instance); });
+        const double nodalys_ms = MeasureMs([&]() { act = nodalys.RunOperatingPoint(circuit.Instance, std::nullopt); });
         REQUIRE(act.Result.has_value());
 
         REQUIRE(act.Result->NodeVoltages.size() == exp.Result->NodeVoltages.size());
@@ -308,11 +310,11 @@ TEST_CASE("The operating point of a 30-stage diode ladder matches ngspice, timed
     Core::NodalysBackend nodalys;
 
     Core::OperatingPointRun exp;
-    const double ngspice_ms = MeasureMs([&]() { exp = Ngspice().RunOperatingPoint(circuit.Instance); });
+    const double ngspice_ms = MeasureMs([&]() { exp = Ngspice().RunOperatingPoint(circuit.Instance, std::nullopt); });
     REQUIRE(exp.Result.has_value());
 
     Core::OperatingPointRun act;
-    const double nodalys_ms = MeasureMs([&]() { act = nodalys.RunOperatingPoint(circuit.Instance); });
+    const double nodalys_ms = MeasureMs([&]() { act = nodalys.RunOperatingPoint(circuit.Instance, std::nullopt); });
     REQUIRE(act.Result.has_value());
 
     REQUIRE(act.Result->NodeVoltages.size() == exp.Result->NodeVoltages.size());

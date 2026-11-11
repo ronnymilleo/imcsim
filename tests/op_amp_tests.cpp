@@ -79,7 +79,7 @@ struct InvertingAmplifier {
 TEST_CASE("The ideal op-amp amplifies inverting by the resistor ratio") {
     const InvertingAmplifier amplifier(0.5);
     Core::NodalysBackend backend;
-    const Core::OperatingPointRun run = backend.RunOperatingPoint(amplifier.Circuit);
+    const Core::OperatingPointRun run = backend.RunOperatingPoint(amplifier.Circuit, std::nullopt);
     REQUIRE(run.Result.has_value());
     const double gain = 1e5;
     const double expected = -5.0 * gain / (gain + 11.0);
@@ -89,7 +89,7 @@ TEST_CASE("The ideal op-amp amplifies inverting by the resistor ratio") {
 TEST_CASE("The ideal op-amp output stops at its supply pins") {
     const InvertingAmplifier amplifier(2.0); // -20 V wanted, beyond both 15 V rails
     Core::NodalysBackend backend;
-    const Core::OperatingPointRun run = backend.RunOperatingPoint(amplifier.Circuit);
+    const Core::OperatingPointRun run = backend.RunOperatingPoint(amplifier.Circuit, std::nullopt);
     REQUIRE(run.Result.has_value());
     // The clamp diodes with N=0.01 stop the gain stage within about 10 mV of the rail: at the milliampere the
     // feedback network draws, their drop is n·Vt·ln(I/IS) ≈ 7 mV (Shockley)
@@ -102,7 +102,7 @@ TEST_CASE("A uA741 macromodel amplifies like the ideal op-amp but swings 1 V sho
     InvertingAmplifier amplifier(input);
     amplifier.Amplifier.SetModel(*Core::FindOpAmpModel(Core::ComponentType::OP_AMP, "uA741"));
     Core::NodalysBackend backend;
-    const Core::OperatingPointRun run = backend.RunOperatingPoint(amplifier.Circuit);
+    const Core::OperatingPointRun run = backend.RunOperatingPoint(amplifier.Circuit, std::nullopt);
     REQUIRE(run.Result.has_value());
     // The limits stop the output about 1 V from each 15 V supply, as the datasheet swing
     const double expected = input == 0.5 ? -5.0 : (input > 0.0 ? -14.0 : 14.0);
@@ -179,7 +179,7 @@ TEST_CASE("A diode with a library model conducts at its model saturation current
     circuit.Add(ground, {0});
 
     Core::NodalysBackend backend;
-    const Core::OperatingPointRun run = backend.RunOperatingPoint(circuit);
+    const Core::OperatingPointRun run = backend.RunOperatingPoint(circuit, std::nullopt);
     REQUIRE(run.Result.has_value());
     const double thermal = 8.617087399994e-5 * 300.15;
     const double expected = 1.752 * thermal * std::log(1e-3 / 2.52e-9) + 1e-3 * 0.568;
@@ -215,7 +215,7 @@ TEST_CASE("A transistor with a library model amplifies with its model beta") {
     circuit.Add(ground, {0});
 
     Core::NodalysBackend backend;
-    const Core::OperatingPointRun run = backend.RunOperatingPoint(circuit);
+    const Core::OperatingPointRun run = backend.RunOperatingPoint(circuit, std::nullopt);
     REQUIRE(run.Result.has_value());
     // IB ≈ (10 V − 0.65 V)/1 MOhm, IC = BF·IB ≈ 3.9 mA, v(2) = 10 V − IC·1k
     const double base_current = (10.0 - 0.65) / 1e6;
@@ -242,7 +242,7 @@ TEST_CASE("A BSIM MOSFET library model is unsupported, with a message saying so"
     circuit.Add(ground, {0});
 
     Core::NodalysBackend backend;
-    const Core::OperatingPointRun run = backend.RunOperatingPoint(circuit);
+    const Core::OperatingPointRun run = backend.RunOperatingPoint(circuit, std::nullopt);
     REQUIRE(!run.Result.has_value());
     REQUIRE(run.Result.error().find("level 1") != std::string::npos);
 }
@@ -265,7 +265,7 @@ TEST_CASE("A part naming a library model the circuit lacks reports it") {
     circuit.Add(ground, {0});
 
     Core::NodalysBackend backend;
-    const Core::OperatingPointRun run = backend.RunOperatingPoint(circuit);
+    const Core::OperatingPointRun run = backend.RunOperatingPoint(circuit, std::nullopt);
     REQUIRE(!run.Result.has_value());
     REQUIRE(run.Result.error().find("does not have") != std::string::npos);
 }

@@ -57,7 +57,7 @@ TEST_CASE("A diode loop solves the Shockley equation") {
     circuit.Add(ground, {0});
 
     Core::NodalysBackend backend;
-    const Core::OperatingPointRun run = backend.RunOperatingPoint(circuit);
+    const Core::OperatingPointRun run = backend.RunOperatingPoint(circuit, std::nullopt);
     REQUIRE(run.Result.has_value());
     // Theory: I = (5 V − Vd) / 10k with I = IS·e^(Vd/Vt); the junction sits near 0.6 V
     const double current = CurrentOf(*run.Result, "D1");
@@ -93,7 +93,7 @@ TEST_CASE("A Zener diode in breakdown holds its breakdown voltage") {
     circuit.Add(ground, {0});
 
     Core::NodalysBackend backend;
-    const Core::OperatingPointRun run = backend.RunOperatingPoint(circuit);
+    const Core::OperatingPointRun run = backend.RunOperatingPoint(circuit, std::nullopt);
     if (!run.Result) {
         for (const Core::SimulatorMessage &message : run.Messages) {
             INFO(std::format("message: {}", message.Text));
@@ -134,7 +134,7 @@ TEST_CASE("A common-emitter amplifier sits at its quiescent point") {
     circuit.Add(ground, {0});
 
     Core::NodalysBackend backend;
-    const Core::OperatingPointRun run = backend.RunOperatingPoint(circuit);
+    const Core::OperatingPointRun run = backend.RunOperatingPoint(circuit, std::nullopt);
     REQUIRE(run.Result.has_value());
     // Hand analysis: IB ≈ (12 V − 0.7 V) / 470k = 24 uA, IC = beta·IB = 2.4 mA, VC = 12 V − 2.4 V = 9.6 V
     REQUIRE_THAT(CurrentOf(*run.Result, "Q1.B"), WithinRel(24e-6, 2e-2));
@@ -171,7 +171,7 @@ TEST_CASE("An NMOS common-source stage follows the level-1 saturation current") 
     circuit.Add(ground, {0});
 
     Core::NodalysBackend backend;
-    const Core::OperatingPointRun run = backend.RunOperatingPoint(circuit);
+    const Core::OperatingPointRun run = backend.RunOperatingPoint(circuit, std::nullopt);
     INFO(std::format("v1={} v2={} v3={}", run.Result->NodeVoltages[1], run.Result->NodeVoltages[2],
                      run.Result->NodeVoltages[3]));
     REQUIRE(run.Result.has_value());
@@ -211,7 +211,7 @@ TEST_CASE("A PMOS with its gate low conducts from the supply") {
     circuit.Add(ground, {0});
 
     Core::NodalysBackend backend;
-    const Core::OperatingPointRun run = backend.RunOperatingPoint(circuit);
+    const Core::OperatingPointRun run = backend.RunOperatingPoint(circuit, std::nullopt);
     REQUIRE(run.Result.has_value());
     // VSG = 10 V and a threshold of 2 V give an overdrive of 8 V, but the load pulls the drain up to where the
     // transistor works in the linear region: with x = VSD the operating point solves x² − 26x + 100 = 0, so
