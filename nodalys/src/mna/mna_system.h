@@ -13,7 +13,7 @@
  *
  * - **Ground (node 0)** is the reference potential ($0\text{ V}$) and has index `-1`. Passing `-1` to `AddA()` or
  *   `AddRhs()` is a no-op, so device stamps never need special `if (node != ground)` branches.
- * - **Unknown indices (`0 .. Size() - 1`)**:
+ * - **Unknown indices (`0 .. GetSize() - 1`)**:
  *   - Top-level circuit nodes `1 .. CircuitNodeCount - 1` map directly to unknown indices `0 .. CircuitNodeCount - 2`
  *     via `NodeIndex(node) = node - 1`.
  *   - Internal nodes (created for subcircuits, series resistances, or macromodels) and branch current unknowns are
@@ -63,7 +63,7 @@ public:
     explicit MnaSystem(std::vector<bool> is_node_unknown);
 
     /// Total number of unknowns (node voltages + branch currents).
-    int Size() const;
+    int GetSize() const;
 
     /// Maps a 1-based circuit node number to its 0-based unknown index, or -1 for ground (node 0).
     int NodeIndex(int node) const;
@@ -72,7 +72,7 @@ public:
     int BranchIndex(int ordinal) const;
 
     /// Number of node-voltage unknowns in the system.
-    int NodeUnknowns() const;
+    int GetNodeUnknownCount() const;
 
     /// The assembled linearized dense matrix A.
     const DenseMatrix &Matrix() const;

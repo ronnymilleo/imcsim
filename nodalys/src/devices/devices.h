@@ -154,8 +154,8 @@ public:
 
     double GetResistance() const;
     void SetResistance(double resistance);
-    int NodeA() const { return m_NodeA; }
-    int NodeB() const { return m_NodeB; }
+    int GetNodeA() const { return m_NodeA; }
+    int GetNodeB() const { return m_NodeB; }
 
     void Stamp(MnaSystem &sys, const std::vector<double> &x, const TimeContext &time) override;
     double TerminalCurrent(int terminal, const std::vector<double> &x) const override;
@@ -182,8 +182,8 @@ class CapacitorDevice : public Device {
 public:
     CapacitorDevice(int node_a, int node_b, double capacitance, double initial_voltage, bool has_initial);
 
-    int NodeA() const { return m_NodeA; }
-    int NodeB() const { return m_NodeB; }
+    int GetNodeA() const { return m_NodeA; }
+    int GetNodeB() const { return m_NodeB; }
     double GetCapacitance() const { return m_Capacitance; }
 
     void Stamp(MnaSystem &sys, const std::vector<double> &x, const TimeContext &time) override;
@@ -222,9 +222,9 @@ class InductorDevice : public Device {
 public:
     InductorDevice(int node_a, int node_b, int branch, double inductance, double initial_current, bool has_initial);
 
-    int NodeA() const { return m_NodeA; }
-    int NodeB() const { return m_NodeB; }
-    int Branch() const { return m_Branch; }
+    int GetNodeA() const { return m_NodeA; }
+    int GetNodeB() const { return m_NodeB; }
+    int GetBranch() const { return m_Branch; }
     double GetInductance() const { return m_Inductance; }
 
     void Stamp(MnaSystem &sys, const std::vector<double> &x, const TimeContext &time) override;
@@ -293,9 +293,9 @@ public:
 
     double GetDcValue() const;
     void SetDcValue(double value);
-    int NodeA() const { return m_NodeA; }
-    int NodeB() const { return m_NodeB; }
-    int Branch() const { return m_Branch; }
+    int GetNodeA() const { return m_NodeA; }
+    int GetNodeB() const { return m_NodeB; }
+    int GetBranch() const { return m_Branch; }
     const SourcePeriodicity &GetPeriodicity() const { return m_Periodicity; }
     void SetBreakpoints(Breakpoints breakpoints);
 
@@ -331,8 +331,8 @@ public:
 
     double GetDcValue() const;
     void SetDcValue(double value);
-    int NodeA() const { return m_NodeA; }
-    int NodeB() const { return m_NodeB; }
+    int GetNodeA() const { return m_NodeA; }
+    int GetNodeB() const { return m_NodeB; }
     const SourcePeriodicity &GetPeriodicity() const { return m_Periodicity; }
     double SamplePeriodicCurrent(int terminal, double time_seconds) const;
     void SetBreakpoints(VoltageSourceDevice::Breakpoints breakpoints);
@@ -366,11 +366,11 @@ class VcvsDevice : public Device {
 public:
     VcvsDevice(int node_a, int node_b, int control_positive, int control_negative, int branch, double gain);
 
-    int NodeA() const { return m_NodeA; }
-    int NodeB() const { return m_NodeB; }
-    int ControlPositive() const { return m_ControlPositive; }
-    int ControlNegative() const { return m_ControlNegative; }
-    int Branch() const { return m_Branch; }
+    int GetNodeA() const { return m_NodeA; }
+    int GetNodeB() const { return m_NodeB; }
+    int GetControlPositive() const { return m_ControlPositive; }
+    int GetControlNegative() const { return m_ControlNegative; }
+    int GetBranch() const { return m_Branch; }
     double GetGain() const { return m_Gain; }
 
     void Stamp(MnaSystem &sys, const std::vector<double> &x, const TimeContext &time) override;
@@ -395,10 +395,10 @@ class VccsDevice : public Device {
 public:
     VccsDevice(int node_a, int node_b, int control_positive, int control_negative, double gain);
 
-    int NodeA() const { return m_NodeA; }
-    int NodeB() const { return m_NodeB; }
-    int ControlPositive() const { return m_ControlPositive; }
-    int ControlNegative() const { return m_ControlNegative; }
+    int GetNodeA() const { return m_NodeA; }
+    int GetNodeB() const { return m_NodeB; }
+    int GetControlPositive() const { return m_ControlPositive; }
+    int GetControlNegative() const { return m_ControlNegative; }
     double GetGain() const { return m_Gain; }
 
     void Stamp(MnaSystem &sys, const std::vector<double> &x, const TimeContext &time) override;
@@ -423,8 +423,8 @@ class CccsDevice : public Device {
 public:
     CccsDevice(int node_a, int node_b, int control_branch, double gain);
 
-    int NodeA() const { return m_NodeA; }
-    int NodeB() const { return m_NodeB; }
+    int GetNodeA() const { return m_NodeA; }
+    int GetNodeB() const { return m_NodeB; }
     int ControlBranch() const { return m_ControlBranch; }
     double GetGain() const { return m_Gain; }
 
@@ -448,9 +448,9 @@ class CcvsDevice : public Device {
 public:
     CcvsDevice(int node_a, int node_b, int branch, int control_branch, double gain);
 
-    int NodeA() const { return m_NodeA; }
-    int NodeB() const { return m_NodeB; }
-    int Branch() const { return m_Branch; }
+    int GetNodeA() const { return m_NodeA; }
+    int GetNodeB() const { return m_NodeB; }
+    int GetBranch() const { return m_Branch; }
     int ControlBranch() const { return m_ControlBranch; }
     double GetGain() const { return m_Gain; }
 

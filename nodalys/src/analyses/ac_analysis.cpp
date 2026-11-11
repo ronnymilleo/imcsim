@@ -23,7 +23,7 @@ std::expected<AcSweepResult, std::string> ComputeACSweep(CompiledCircuit &compil
         return std::unexpected("The AC sweep has invalid frequency settings; check start, stop and points per decade");
     }
 
-    const int size = compiled.System->Size();
+    const int size = compiled.System->GetSize();
     std::vector<double> x_dc(static_cast<std::size_t>(size), 0.0);
     const NewtonOutcome outcome = SolveNewton(*compiled.System, compiled.Devices, x_dc, TimeContext{}, options);
     if (!outcome.Converged) {

@@ -122,7 +122,7 @@ int main(int argc, char **argv) {
     if (verbose && !batch_mode) {
         const auto parse_ms = std::chrono::duration<double, std::milli>(parse_end - parse_start).count();
         std::cout << std::format("Netlist parsed in {:.2f} ms: {} nodes, {} MNA unknowns\n", parse_ms,
-                                 parsed.CircuitInstance.NodeCount(), parsed.CircuitInstance.UnknownCount());
+                                 parsed.CircuitInstance.GetNodeCount(), parsed.CircuitInstance.GetUnknownCount());
     }
 
     // Apply tolerance overrides if provided

@@ -28,7 +28,7 @@ namespace {
 
 int RunNewton(MnaSystem &sys, const std::vector<std::unique_ptr<Device>> &devices, std::vector<double> &x,
               const ConvergenceOptions &options, const double gmin, const TimeContext &time) {
-    const int size = sys.Size();
+    const int size = sys.GetSize();
     std::vector<double> candidate(static_cast<std::size_t>(size), 0.0);
 
     for (int iteration = 1; iteration <= options.MaxIterations; ++iteration) {
@@ -104,7 +104,7 @@ NewtonOutcome SolveNewton(MnaSystem &sys, const std::vector<std::unique_ptr<Devi
     constexpr double GMIN_STEP_START = 1e-3;
     constexpr double GMIN_STEP_FACTOR = 0.1;
     constexpr int GMIN_STEPS = 10;
-    x.assign(static_cast<std::size_t>(sys.Size()), 0.0);
+    x.assign(static_cast<std::size_t>(sys.GetSize()), 0.0);
     if (!time.IsTransient) {
         for (const std::unique_ptr<Device> &device : devices) {
             device->SeedOperatingPoint(x);
@@ -127,7 +127,7 @@ NewtonOutcome SolveNewton(MnaSystem &sys, const std::vector<std::unique_ptr<Devi
     // Attempt 3: Source stepping — scale all independent sources from 0 up to 100% in 20 linear steps, tracking
     // the operating point continuously from the trivial zero solution.
     constexpr int SOURCE_STEPS = 20;
-    x.assign(static_cast<std::size_t>(sys.Size()), 0.0);
+    x.assign(static_cast<std::size_t>(sys.GetSize()), 0.0);
     if (!time.IsTransient) {
         for (const std::unique_ptr<Device> &device : devices) {
             device->SeedOperatingPoint(x);

@@ -322,7 +322,7 @@ bool SolveLinearCircuit(const HbWorkspace &ws, std::vector<double> &coeffs_out) 
 }
 
 void AddMatrixScaled(MnaSystem &target, const MnaSystem &source) {
-    const int n = source.Size();
+    const int n = source.GetSize();
     const DenseMatrix &src_mat = source.Matrix();
     for (int r = 0; r < n; ++r) {
         for (int c = 0; c < n; ++c) {
@@ -1115,7 +1115,7 @@ std::expected<HarmonicBalanceResult, std::string> ComputeHarmonicBalance(Compile
         return std::unexpected(partitioned.error());
     }
 
-    const int unknown_count = compiled.System->Size();
+    const int unknown_count = compiled.System->GetSize();
     const std::size_t total_unknowns =
         static_cast<std::size_t>(unknown_count) * static_cast<std::size_t>(2 * settings.Harmonics + 1);
     if (total_unknowns > MAX_DENSE_UNKNOWNS) {

@@ -84,7 +84,7 @@ std::vector<double> GenerateSweepValues(const double start, const double stop, c
 std::expected<OperatingPointResult, std::string> ComputeOperatingPoint(CompiledCircuit &compiled,
                                                                        const ConvergenceOptions &options,
                                                                        std::vector<DiagnosticMessage> *messages) {
-    std::vector<double> x(static_cast<std::size_t>(compiled.System->Size()), 0.0);
+    std::vector<double> x(static_cast<std::size_t>(compiled.System->GetSize()), 0.0);
     SeedOperatingPoint(compiled.Devices, x);
     const NewtonOutcome outcome = SolveNewton(*compiled.System, compiled.Devices, x, TimeContext{}, options);
     if (!outcome.Converged) {
@@ -130,7 +130,7 @@ std::expected<DcSweepResult, std::string> ComputeDCSweep(CompiledCircuit &compil
         sweep.SteppedUnit = SourceUnit(stepped_device);
     }
 
-    std::vector<double> x(static_cast<std::size_t>(compiled.System->Size()), 0.0);
+    std::vector<double> x(static_cast<std::size_t>(compiled.System->GetSize()), 0.0);
     NewtonOutcome outcome;
     for (const double step_value : step_values) {
         if (stepped_device && !SetSourceValue(stepped_device, step_value)) {

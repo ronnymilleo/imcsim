@@ -44,7 +44,7 @@ FftPlan::FftPlan(const std::size_t size) {
 
 /**
  * @brief   Computes the unnormalized in-place forward DFT $X[k] = \sum_{m=0}^{M-1} x[m] e^{-j 2\pi k m / M}$.
- * @param[in,out] data  Vector of length `Size()`; ignored when the plan is invalid or size mismatches.
+ * @param[in,out] data  Vector of length `GetSize()`; ignored when the plan is invalid or size mismatches.
  */
 void FftPlan::Forward(std::vector<std::complex<double>> &data) const {
     if (!IsValid() || data.size() != m_Size) {
@@ -55,7 +55,7 @@ void FftPlan::Forward(std::vector<std::complex<double>> &data) const {
 
 /**
  * @brief   Computes the normalized in-place inverse DFT $x[m] = \frac{1}{M} \sum_{k=0}^{M-1} X[k] e^{+j 2\pi k m / M}$.
- * @param[in,out] data  Vector of length `Size()`; ignored when the plan is invalid or size mismatches.
+ * @param[in,out] data  Vector of length `GetSize()`; ignored when the plan is invalid or size mismatches.
  */
 void FftPlan::Inverse(std::vector<std::complex<double>> &data) const {
     if (!IsValid() || data.size() != m_Size) {
@@ -70,11 +70,11 @@ void FftPlan::Inverse(std::vector<std::complex<double>> &data) const {
 
 /**
  * @brief   Converts real time-domain samples over one period into real cosine/sine harmonic coefficients.
- * @param[in]  samples    Time-domain samples of length `Size()` taken at $t_m = m T_0 / M$.
+ * @param[in]  samples    Time-domain samples of length `GetSize()` taken at $t_m = m T_0 / M$.
  * @param[in]  harmonics  Highest harmonic index $H \ge 0$ (must satisfy $2H < M$).
  * @param[out] coeffs     Output vector `[a0, a1, b1, ..., aH, bH]` of size $2H + 1$.
- * @param[out] scratch    Reusable complex buffer resized to `Size()`.
- * @return  False if the plan is invalid, `samples.size() != Size()`, `harmonics < 0`, or $2H \ge M$.
+ * @param[out] scratch    Reusable complex buffer resized to `GetSize()`.
+ * @return  False if the plan is invalid, `samples.size() != GetSize()`, `harmonics < 0`, or $2H \ge M$.
  */
 bool FftPlan::RealToHarmonics(const std::vector<double> &samples, const int harmonics, std::vector<double> &coeffs,
                               std::vector<std::complex<double>> &scratch) const {
@@ -101,9 +101,9 @@ bool FftPlan::RealToHarmonics(const std::vector<double> &samples, const int harm
 
 /**
  * @brief   Computes the $1/M$-normalized DFT spectrum of real samples for harmonic conversion matrices.
- * @param[in]  samples   Real samples of length `Size()`.
- * @param[out] spectrum  Complex spectrum $\hat{g}_k = \frac{1}{M}\text{FFT}(g)[k]$ of length `Size()`.
- * @return  False if the plan is invalid or `samples.size() != Size()`.
+ * @param[in]  samples   Real samples of length `GetSize()`.
+ * @param[out] spectrum  Complex spectrum $\hat{g}_k = \frac{1}{M}\text{FFT}(g)[k]$ of length `GetSize()`.
+ * @return  False if the plan is invalid or `samples.size() != GetSize()`.
  */
 bool FftPlan::RealToNormalizedSpectrum(const std::vector<double> &samples,
                                        std::vector<std::complex<double>> &spectrum) const {
@@ -125,8 +125,8 @@ bool FftPlan::RealToNormalizedSpectrum(const std::vector<double> &samples,
 /**
  * @brief   Reconstructs real time-domain samples over one period from cosine/sine harmonic coefficients.
  * @param[in]  coeffs   Harmonic coefficients `[a0, a1, b1, ..., aH, bH]` of odd size $2H + 1$ with $2H < M$.
- * @param[out] samples  Output real samples of length `Size()`.
- * @param[out] scratch  Reusable complex buffer resized to `Size()`.
+ * @param[out] samples  Output real samples of length `GetSize()`.
+ * @param[out] scratch  Reusable complex buffer resized to `GetSize()`.
  * @return  False if the plan is invalid, `coeffs` size is even, or $2H \ge M$.
  */
 bool FftPlan::HarmonicsToReal(const std::vector<double> &coeffs, std::vector<double> &samples,

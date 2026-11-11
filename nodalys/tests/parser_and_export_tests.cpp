@@ -269,13 +269,13 @@ TEST_CASE("SPICE netlists parse into runnable circuits and simulation directives
         CHECK_THAT(cfg.StartFrequency, WithinRel(1e6, 1e-9));
         CHECK_THAT(cfg.StopFrequency, WithinRel(100e6, 1e-9));
 
-        REQUIRE(parsed->CircuitInstance.Ports().size() == 2);
-        CHECK(parsed->CircuitInstance.Ports()[0].Number == 1);
-        CHECK(parsed->CircuitInstance.Ports()[0].Node == 1);
-        CHECK_THAT(parsed->CircuitInstance.Ports()[0].ReferenceOhms, WithinRel(50.0, 1e-9));
-        CHECK(parsed->CircuitInstance.Ports()[1].Number == 2);
-        CHECK(parsed->CircuitInstance.Ports()[1].Node == 2);
-        CHECK_THAT(parsed->CircuitInstance.Ports()[1].ReferenceOhms, WithinRel(75.0, 1e-9));
+        REQUIRE(parsed->CircuitInstance.GetPorts().size() == 2);
+        CHECK(parsed->CircuitInstance.GetPorts()[0].Number == 1);
+        CHECK(parsed->CircuitInstance.GetPorts()[0].Node == 1);
+        CHECK_THAT(parsed->CircuitInstance.GetPorts()[0].ReferenceOhms, WithinRel(50.0, 1e-9));
+        CHECK(parsed->CircuitInstance.GetPorts()[1].Number == 2);
+        CHECK(parsed->CircuitInstance.GetPorts()[1].Node == 2);
+        CHECK_THAT(parsed->CircuitInstance.GetPorts()[1].ReferenceOhms, WithinRel(75.0, 1e-9));
 
         const auto sp = Nodalys::ComputeSParameters(parsed->CircuitInstance, cfg);
         REQUIRE(sp.has_value());
