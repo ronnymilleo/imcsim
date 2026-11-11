@@ -197,19 +197,20 @@ TEST_CASE("The transient of an RC circuit follows the exponential charge curve")
     REQUIRE(result.IsComplete);
     // Theory: v(t) = 5 V (1 − e^(−t/RC)) with RC = 1 ms
     const double tau = 1e-3;
-    REQUIRE(result.Times.size() == 1001);
-    for (std::size_t index = 1; index < result.Times.size(); index += 97) {
+    // The 1001 points of the grid, plus the end of the 1 ns rise, where the step lands so the edge is kept
+    REQUIRE(result.Times.size() == 1002);
+    REQUIRE_THAT(result.Times[1], WithinAbs(1e-9, 1e-15));
+    for (std::size_t index = 2; index < result.Times.size(); index += 97) {
         INFO(std::format("t = {}", result.Times[index]));
         const double expected = 5.0 * (1.0 - std::exp(-result.Times[index] / tau));
         REQUIRE_THAT(result.NodeVoltages[2][index], WithinRel(expected, 5e-3));
     }
     // The capacitor current is the operating-point current (0, the capacitor is open) at t = 0, as ngspice reports,
-    // and right after takes the backward-Euler value of the first step (Vladimirescu, "The SPICE Book"), which
-    // sits 0.5% low here exactly as in ngspice; both decay with the time constant
+    // and at the first point of the grid sits near 5 mA, as in ngspice; both decay with the time constant
     const auto current = std::ranges::find(result.Currents, "C1", &Core::ComponentTrace::Name);
     REQUIRE(current != result.Currents.end());
     REQUIRE_THAT(current->Values[0], WithinAbs(0.0, 1e-12));
-    REQUIRE_THAT(current->Values[1], WithinRel(5e-3, 1e-2));
+    REQUIRE_THAT(current->Values[2], WithinRel(5e-3, 1e-2));
     REQUIRE_THAT(current->Values.back(), WithinRel(5e-3 * std::exp(-5.0), 2e-2));
 }
 

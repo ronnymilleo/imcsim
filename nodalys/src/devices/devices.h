@@ -15,6 +15,7 @@
 #include "nodalys/types.h"
 #include <complex>
 #include <functional>
+#include <limits>
 #include <string>
 #include <vector>
 
@@ -117,6 +118,18 @@ public:
     virtual void AcceptStep(const std::vector<double> &x) { (void)x; }
     /// Restores the state saved before a step that the LTE control rejected.
     virtual void RejectStep() {}
+
+    /**
+     * @brief   Finds the next instant after `time` where the waveform of the device has a corner.
+     * @details The transient lands a time point on every corner, so an edge narrower than the time step is never
+     *          stepped over, and the step that leaves a corner starts small and uses Backward Euler.
+     * @param[in] time  Instant already reached.
+     * @return  The next corner, strictly after `time`, or infinity when the device has none.
+     */
+    virtual double NextBreakpoint(double time) const {
+        (void)time;
+        return std::numeric_limits<double>::infinity();
+    }
 
     /**
      * @brief   Scales the independent sources of the device, for the source-stepping fallback of Newton-Raphson.
@@ -272,6 +285,8 @@ class VoltageSourceDevice : public Device {
 public:
     /// Value of the source at the stamped point, given its DC level and the time context.
     using Waveform = std::function<double(double dc_value, const TimeContext &time)>;
+    /// Next corner of the waveform strictly after an instant, or infinity; see Device::NextBreakpoint().
+    using Breakpoints = std::function<double(double time)>;
 
     VoltageSourceDevice(int node_a, int node_b, int branch, double dc_value, Waveform waveform,
                         double ac_magnitude = 0.0, SourcePeriodicity periodicity = {});
@@ -282,6 +297,7 @@ public:
     int NodeB() const { return m_NodeB; }
     int Branch() const { return m_Branch; }
     const SourcePeriodicity &GetPeriodicity() const { return m_Periodicity; }
+    void SetBreakpoints(Breakpoints breakpoints);
 
     void Stamp(MnaSystem &sys, const std::vector<double> &x, const TimeContext &time) override;
     void StampAc(MnaSystem &reactive, const std::vector<double> &x_dc) const override;
@@ -290,6 +306,7 @@ public:
     std::complex<double> AcTerminalCurrent(int terminal, const std::vector<double> &x_dc,
                                            const std::vector<std::complex<double>> &x_ac, double omega) const override;
     void SetSourceScale(double scale) override;
+    double NextBreakpoint(double time) const override;
 
 private:
     int m_NodeA;
@@ -297,6 +314,7 @@ private:
     int m_Branch;
     double m_DcValue;
     Waveform m_Waveform;
+    Breakpoints m_Breakpoints;
     double m_AcMagnitude;
     SourcePeriodicity m_Periodicity;
     double m_Scale = 1.0;
@@ -317,6 +335,7 @@ public:
     int NodeB() const { return m_NodeB; }
     const SourcePeriodicity &GetPeriodicity() const { return m_Periodicity; }
     double SamplePeriodicCurrent(int terminal, double time_seconds) const;
+    void SetBreakpoints(VoltageSourceDevice::Breakpoints breakpoints);
 
     void Stamp(MnaSystem &sys, const std::vector<double> &x, const TimeContext &time) override;
     void StampAc(MnaSystem &reactive, const std::vector<double> &x_dc) const override;
@@ -325,12 +344,14 @@ public:
     std::complex<double> AcTerminalCurrent(int terminal, const std::vector<double> &x_dc,
                                            const std::vector<std::complex<double>> &x_ac, double omega) const override;
     void SetSourceScale(double scale) override;
+    double NextBreakpoint(double time) const override;
 
 private:
     int m_NodeA;
     int m_NodeB;
     double m_DcValue;
     VoltageSourceDevice::Waveform m_Waveform;
+    VoltageSourceDevice::Breakpoints m_Breakpoints;
     double m_AcMagnitude;
     SourcePeriodicity m_Periodicity;
     double m_Scale = 1.0;

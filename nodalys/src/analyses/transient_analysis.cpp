@@ -10,6 +10,7 @@
 #include <chrono>
 #include <cmath>
 #include <format>
+#include <limits>
 #include <thread>
 #include <utility>
 
@@ -24,6 +25,8 @@ constexpr double LTE_SAFETY = 0.9;
 constexpr double STEP_GROW_LIMIT = 3.0;
 constexpr double STEP_SHRINK_LIMIT = 0.3;
 constexpr double MIN_STEP = 1e-15;
+/// Share of the way to the following corner that the step leaving a corner covers, as ngspice does.
+constexpr double CORNER_STEP_SHARE = 0.1;
 
 class TransientCollector {
 public:
@@ -91,6 +94,17 @@ public:
         }
     }
 
+    /**
+     * @brief   Keeps the point solved on a corner of a source, which the output grid would otherwise smooth away.
+     */
+    void AppendCorner(const double time, const std::vector<double> &x, const std::vector<double> &currents) {
+        const std::vector<double> &times = m_Result.Times;
+        if (!times.empty() && std::fabs(times.back() - time) <= 1e-12 * std::max(std::fabs(time), m_OutputStep)) {
+            return;
+        }
+        Append(time, x, currents);
+    }
+
     std::size_t PointCount() const { return m_Result.Times.size(); }
     const TransientResult &View() const { return m_Result; }
     TransientResult &MutableView() { return m_Result; }
@@ -130,6 +144,17 @@ void ApplyLiveChanges(CompiledCircuit &compiled, const RunMonitor &monitor, std:
             messages->push_back({std::format("nodalys: cannot apply live change to {}", change.Element), true});
         }
     }
+}
+
+/**
+ * @brief   Finds the next corner of any source waveform after an instant, so the step never jumps over an edge.
+ */
+double FindNextCorner(const CompiledCircuit &compiled, const double time) {
+    double corner = std::numeric_limits<double>::infinity();
+    for (const std::unique_ptr<Device> &device : compiled.Devices) {
+        corner = std::min(corner, device->NextBreakpoint(time));
+    }
+    return corner;
 }
 
 bool PublishChunk(TransientResult &result, const RunMonitor &monitor, const double progress, std::size_t &sent) {
@@ -198,17 +223,23 @@ std::expected<TransientResult, std::string> ComputeTransient(CompiledCircuit &co
     double step = std::min(output_step, settings.StopTime);
     double previous_step = 0.0;
     double older_step = 0.0;
-    bool first_step = true;
+    // Backward Euler starts the run and leaves every corner, where the trapezoidal rule would ring
+    bool is_restart = true;
     std::vector<double> x_old = x_now;
     std::vector<double> x_older = x_now;
     bool stopped = false;
     std::string failure;
+    double next_corner = FindNextCorner(compiled, time);
 
     while (time < settings.StopTime - 1e-12 * std::max(1.0, settings.StopTime)) {
         step = std::min(step, settings.StopTime - time);
+        const bool reaches_corner = time + step >= next_corner;
+        if (reaches_corner) {
+            step = next_corner - time;
+        }
         const TimeContext context{.IsTransient = true,
                                   .UseInitialConditions = false,
-                                  .BackwardEuler = first_step,
+                                  .BackwardEuler = is_restart,
                                   .Time = time + step,
                                   .TimeStep = step};
         std::vector<double> x_new = x_now;
@@ -262,14 +293,29 @@ std::expected<TransientResult, std::string> ComputeTransient(CompiledCircuit &co
         }
         std::vector<double> currents_new = collector.ComputeCurrents(x_new);
         collector.AppendSegment(time, x_now, currents_now, time + step, x_new, currents_new);
+        if (reaches_corner) {
+            collector.AppendCorner(next_corner, x_new, currents_new);
+        }
         currents_now = std::move(currents_new);
         x_older = std::exchange(x_old, std::exchange(x_now, x_new));
-        time += step;
+        time = reaches_corner ? next_corner : time + step;
         older_step = std::exchange(previous_step, step);
-        first_step = false;
+        is_restart = false;
         const double next = step * std::clamp(LTE_SAFETY * std::pow(std::max(ratio, 1e-3), -1.0 / 3.0),
                                               STEP_SHRINK_LIMIT, STEP_GROW_LIMIT);
         step = std::clamp(next, MIN_STEP, output_step);
+        if (reaches_corner) {
+            // The slope changes at a corner, so the points before it say nothing about the error after it
+            next_corner = FindNextCorner(compiled, time);
+            is_restart = true;
+            previous_step = 0.0;
+            older_step = 0.0;
+            x_old = x_now;
+            x_older = x_now;
+            if (std::isfinite(next_corner)) {
+                step = std::max(std::min(step, CORNER_STEP_SHARE * (next_corner - time)), MIN_STEP);
+            }
+        }
 
         if (std::chrono::steady_clock::now() - last_send > CHUNK_INTERVAL ||
             collector.PointCount() - sent > CHUNK_POINT_LIMIT) {

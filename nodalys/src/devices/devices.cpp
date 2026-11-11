@@ -279,6 +279,10 @@ void VoltageSourceDevice::SetDcValue(const double value) {
     m_DcValue = value;
 }
 
+void VoltageSourceDevice::SetBreakpoints(Breakpoints breakpoints) {
+    m_Breakpoints = std::move(breakpoints);
+}
+
 void VoltageSourceDevice::Stamp(MnaSystem &sys, const std::vector<double> & /*x*/, const TimeContext &time) {
     sys.AddA(m_NodeA, m_Branch, 1.0);
     sys.AddA(m_NodeB, m_Branch, -1.0);
@@ -297,6 +301,10 @@ bool VoltageSourceDevice::SupportsHarmonicBalance() const {
 
 void VoltageSourceDevice::SetSourceScale(const double scale) {
     m_Scale = scale;
+}
+
+double VoltageSourceDevice::NextBreakpoint(const double time) const {
+    return m_Breakpoints ? m_Breakpoints(time) : Device::NextBreakpoint(time);
 }
 
 double VoltageSourceDevice::TerminalCurrent(const int terminal, const std::vector<double> &x) const {
@@ -332,6 +340,10 @@ double CurrentSourceDevice::SamplePeriodicCurrent(const int terminal, const doub
     return terminal == 0 ? current : -current;
 }
 
+void CurrentSourceDevice::SetBreakpoints(VoltageSourceDevice::Breakpoints breakpoints) {
+    m_Breakpoints = std::move(breakpoints);
+}
+
 void CurrentSourceDevice::Stamp(MnaSystem &sys, const std::vector<double> & /*x*/, const TimeContext &time) {
     m_Value = m_Scale * m_Waveform(m_DcValue, time);
     StampCurrentSource(sys, m_NodeA, m_NodeB, m_Value);
@@ -347,6 +359,10 @@ bool CurrentSourceDevice::SupportsHarmonicBalance() const {
 
 void CurrentSourceDevice::SetSourceScale(const double scale) {
     m_Scale = scale;
+}
+
+double CurrentSourceDevice::NextBreakpoint(const double time) const {
+    return m_Breakpoints ? m_Breakpoints(time) : Device::NextBreakpoint(time);
 }
 
 double CurrentSourceDevice::TerminalCurrent(const int terminal, const std::vector<double> & /*x*/) const {

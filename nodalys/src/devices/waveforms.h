@@ -20,6 +20,14 @@ VoltageSourceDevice::Waveform MakeSffmWaveform(double dc_value, const SffmParame
 VoltageSourceDevice::Waveform MakeAmWaveform(double dc_value, const AmParameters &am);
 VoltageSourceDevice::Waveform MakeClockWaveform(const ClockParameters &parameters);
 
+// Corners the transient lands on
+VoltageSourceDevice::Breakpoints MakePulseBreakpoints(const PulseParameters &pulse);
+VoltageSourceDevice::Breakpoints MakeExpBreakpoints(const ExpParameters &exp);
+VoltageSourceDevice::Breakpoints MakePwlBreakpoints(const PwlParameters &pwl);
+VoltageSourceDevice::Breakpoints MakeAmBreakpoints(const AmParameters &am);
+VoltageSourceDevice::Breakpoints MakeClockBreakpoints(const ClockParameters &parameters);
+double FindNextPulseCorner(const PulseParameters &pulse, double time);
+
 double EvaluatePulse(const PulseParameters &pulse, double time);
 double EvaluateExp(const ExpParameters &exp, double time);
 double EvaluateSine(const SineParameters &sine, double time);
