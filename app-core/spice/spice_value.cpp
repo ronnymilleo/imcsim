@@ -5,6 +5,7 @@
 
 #include "spice/spice_value.h"
 
+#include <algorithm>
 #include <array>
 #include <cctype>
 #include <charconv>
@@ -60,6 +61,22 @@ std::string_view Trim(std::string_view text) {
  */
 bool IsBelowSuffixes(const double value) {
     return std::abs(value) < SUFFIXES.back().Factor;
+}
+
+/// Significant digits of a formatted value: enough for a reading, few enough to scan.
+constexpr int SIGNIFICANT_DIGITS = 4;
+
+/**
+ * @brief   Rounds a value to the significant digits it is written with, before its suffix is chosen, so 0.99999 reads
+ *          "1" and not "1000m".
+ */
+double RoundToSignificant(const double value) {
+    if (value == 0.0 || !std::isfinite(value)) {
+        return value;
+    }
+    const double exponent = std::floor(std::log10(std::abs(value)));
+    const double step = std::pow(10.0, exponent - (SIGNIFICANT_DIGITS - 1));
+    return std::round(value / step) * step;
 }
 
 const ScaleSuffix &ChooseSuffix(const double value) {
@@ -142,7 +159,7 @@ std::string FormatValue(const double value) {
     if (IsBelowSuffixes(value)) {
         return std::format("{:.4g}", value);
     }
-    const ScaleSuffix &suffix = ChooseSuffix(value);
+    const ScaleSuffix &suffix = ChooseSuffix(RoundToSignificant(value));
     return std::format("{:.4g}{}", value / suffix.Factor, suffix.Text);
 }
 
@@ -158,7 +175,7 @@ std::string FormatSpiceValue(const double value) {
     if (IsBelowSuffixes(value)) {
         return std::format("{:.4g}", value);
     }
-    const ScaleSuffix &suffix = ChooseSuffix(value);
+    const ScaleSuffix &suffix = ChooseSuffix(RoundToSignificant(value));
     return std::format("{:.4g}{}", value / suffix.Factor, suffix.SpiceText);
 }
 
@@ -174,6 +191,29 @@ std::string FormatFixed(const double value, const int decimals) {
         text.erase(0, 1);
     }
     return text;
+}
+
+/**
+ * @brief   Formats a measured value with four significant digits, trailing zeros included, so the readings of a table
+ *          line up and compare at a glance.
+ * @param[in] value  Value to format.
+ * @return  Text such as "1.000", "862.2m" or "27.50k"; "0" for zero, and exponent notation such as "9.900e-20" below
+ *          the femto range. ParseValue() reads it back.
+ */
+std::string FormatMeasurement(const double value) {
+    if (value == 0.0) {
+        return "0";
+    }
+    if (IsBelowSuffixes(value)) {
+        return std::format("{:.{}e}", value, SIGNIFICANT_DIGITS - 1);
+    }
+    const double rounded = RoundToSignificant(value);
+    const ScaleSuffix &suffix = ChooseSuffix(rounded);
+    const double scaled = rounded / suffix.Factor;
+    // One to three digits sit before the point, so the rest of the four go after it
+    const int integer_digits = static_cast<int>(std::floor(std::log10(std::abs(scaled)))) + 1;
+    const int decimals = std::max(0, SIGNIFICANT_DIGITS - integer_digits);
+    return std::format("{:.{}f}{}", scaled, decimals, suffix.Text);
 }
 
 } // namespace Core

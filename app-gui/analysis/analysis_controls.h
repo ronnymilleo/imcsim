@@ -13,6 +13,7 @@
 #include "simulation/simulation_service.h"
 #include "simulation/simulator.h"
 #include <array>
+#include <chrono>
 #include <cstddef>
 #include <optional>
 #include <string>
@@ -85,8 +86,10 @@ public:
 
     // Last run
     std::optional<Analysis> GetLastRun() const;
+    std::size_t GetFinishedRunCount() const;
     RunOutcome GetOutcome(Analysis analysis) const;
     const std::optional<std::string> &GetError(Analysis analysis) const;
+    std::optional<double> GetRunSeconds(Analysis analysis) const;
     void DrawRunReport(Analysis analysis) const;
 
 private:
@@ -97,6 +100,8 @@ private:
     struct RunStatus {
         std::optional<std::string> Error;
         std::vector<Core::SimulatorMessage> Messages;
+        /// Wall time from Run to the result, none for a live run, which keeps pace with the clock.
+        std::optional<double> Seconds;
     };
 
     /**
@@ -117,6 +122,8 @@ private:
     std::optional<Analysis> m_RunningAnalysis;
     /// Version of the circuit the run in progress started from.
     std::size_t m_RunCircuitVersion = 0;
+    /// When the run in progress started, for the time it took.
+    std::chrono::steady_clock::time_point m_RunStart;
     /// Run asked for while a paused live run held the worker, which starts once that run has ended.
     bool m_IsRunPending = false;
 
@@ -131,6 +138,8 @@ private:
     /// Last run of each analysis, in the order of the Analysis enum.
     std::array<RunStatus, ANALYSIS_COUNT> m_Statuses;
     std::optional<Analysis> m_LastRun;
+    /// Runs finished so far, which tells a new outcome from the same one seen again.
+    std::size_t m_FinishedRunCount = 0;
 
     // Runs of one analysis
     void StartRun(Analysis analysis, Core::Job job);

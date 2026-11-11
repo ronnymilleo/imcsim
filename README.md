@@ -94,11 +94,12 @@ New to imcsim? The [tutorial](docs/tutorial.md) builds, simulates and exports a 
   measured traces
 - Dockable windows: the schematic, plots, properties, analysis settings and netlist float or dock beside, above,
   below or as tabs of each other, and the layout is kept between sessions
-- A toolbar of part icons drawn from the symbols themselves, a part search (Space), menus with shortcuts, a status
-  bar with the keys of the current mode, and the Output window opening on each new result
+- A command bar with Run always at its right end, a part rail of icons drawn from the symbols themselves, a part
+  search (Space), menus with shortcuts, a status bar that leads with the run state, and the Output window beside the
+  schematic
 - Part properties in a popover over the schematic (double click or Enter), values typed straight onto a selected
   part (`4k7`), a right-click menu, and Fit (Home)
-- Run (F5) from the toolbar, with the analysis and its settings beside it, settings suggested from the sources and
+- Run (F5) from the command bar, with the analysis and its settings beside it, settings suggested from the sources and
   parts, and the result of the last run in the status bar; an optional preference runs the analysis again after edits
 - Analyses run in the background with progress and Stop; transient plots and the schematic grow as chunks arrive, and
   a configurable window of points keeps long runs responsive
@@ -115,7 +116,7 @@ New to imcsim? The [tutorial](docs/tutorial.md) builds, simulates and exports a 
 
 ## Screenshots
 
-Bode plot of a common-emitter stage next to its hybrid-pi model, with the -3 dB band and the peak of each response:
+Bode plot of a common-emitter stage next to its hybrid-pi model, with the peak and the -3 dB band of each response in the table under the plots:
 
 ![The small-signal example: a 2N3904 stage and its hybrid-pi model, and their magnitude and phase from 1 Hz to
 100 MHz](docs/images/bode.png)
@@ -141,11 +142,11 @@ roughly in the order they are likely to come.
 - **Sources, parts and models**: XSPICE analog blocks (transfer functions, limiters, integrators), transmission lines,
   a circuit driven from a WAV or CSV file, PWL points read from a CSV file, and a MOSFET body diode and higher-level
   MOSFET models
-- **Longer term, a native simulation backend**: a solver written from published circuit theory that sits beside ngspice,
-  which stays available, tested against closed-form results and built to use modern CPUs well. With the backend
-  interface and capability matrix in place, it would come in steps: a linear core (operating point, DC and AC),
-  small-signal and RF analyses (noise, S-parameters, Touchstone blocks), harmonic balance, bipolar transistors with the
-  transient analysis, digital co-simulation, and extras. Nothing else on the roadmap depends on it
+- **Nodalys, a native simulation backend**: a solver written from published circuit theory that sits beside ngspice,
+  which stays available, tested against closed-form results and against ngspice. The next release is planned to bring
+  it as a choice in the preferences, with every analysis of ngspice and a harmonic balance; what it does not cover yet,
+  such as temperature, behavioral sources and fuses, is refused with the reason. Nothing else on the roadmap depends
+  on it
 
 ## Install
 

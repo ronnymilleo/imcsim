@@ -56,6 +56,8 @@ private:
     std::vector<std::string> m_Errors;
     bool m_IsOpen{true};
     bool m_ResetLayout{false};
+    /// Size of the main window the dock layout was last laid out for, none before the first frame.
+    ImVec2 m_LayoutSize{0.0f, 0.0f};
     /// imgui.ini in the user's data folder; ImGui keeps only the pointer, so the path lives here.
     std::string m_SettingsPath;
     /// The user's choices, in a file of their own beside imgui.ini; empty when the data folder is not known.
@@ -76,6 +78,8 @@ private:
     std::size_t m_ShownSParametersVersion = 0;
     std::size_t m_ShownTruthTableVersion = 0;
     std::size_t m_ShownMonteCarloVersion = 0;
+    /// Finished runs seen, so a new failure opens the tab that tells why once.
+    std::size_t m_ShownRunCount = 0;
     /// Runs the selected analysis again after edits, when the preference asks for it.
     AutoRerun m_AutoRerun;
 
@@ -116,7 +120,9 @@ private:
     void UpdateWindowTitle();
     void ShowNewResults();
     void RerunAfterEdits();
+    void DrawCommandBar();
     void SetupDefaultLayout(ImGuiID dockspace_id);
+    void FollowWindowSize(ImGuiID dockspace_id);
     void EndFrame();
 };
 

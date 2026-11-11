@@ -29,6 +29,7 @@
 #include "windows/app_window.h"
 #include "windows/editor_toolbar.h"
 #include "windows/part_picker.h"
+#include "windows/part_rail.h"
 #include "windows/spice_block_dialog.h"
 #include <cstddef>
 #include <filesystem>
@@ -62,6 +63,9 @@ public:
 
     // Requests, global shortcuts and file popups, whichever window is in front
     void Update();
+
+    // Command bar, drawn by the application under the menu bar
+    void DrawCommandBar();
 
     // Quitting
     void RequestQuit();
@@ -150,6 +154,7 @@ private:
     SchematicFileActions m_Files;
     EditorToolbar m_Toolbar;
     PartPicker m_PartPicker;
+    PartRail m_PartRail;
     SchematicOverlays m_Overlays;
 
     /// What clicks and keys on the canvas do now.
@@ -184,10 +189,9 @@ private:
     void HandleModeKeys();
     void ApplyToolbarRequest(ToolbarRequest request);
     std::optional<TimeSpan> GetWindowSpan() const;
-    void DrawTimeBar();
+    void DrawShownInstant(ImDrawList *draw_list, ImVec2 origin) const;
     void DrawBlockBar(ImVec2 origin);
     void DrawStatusBar(const ViewTransform &view, bool hovered);
-    float DrawRunStatus(float right_edge);
     std::optional<MeasurementTarget> FindTargetAt(const ViewTransform &view) const;
 
     // Modes

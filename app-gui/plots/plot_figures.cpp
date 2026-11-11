@@ -461,7 +461,7 @@ ExportFigure BuildACSweepFigure(const Core::ACSweep &sweep, const ACMathTraces &
     figure.Xs = sweep.Frequencies;
     figure.XRange = ExportRange{.From = view.From, .To = view.To};
     PanelBuilder magnitude(
-        "Magnitude", {.Voltage = {.Name = "Voltage (dB)", .Unit = "dB", .UsesPrefixes = false},
+        "Magnitude", {.Voltage = {.Name = "Gain (dB)", .Unit = "dB", .UsesPrefixes = false},
                       .Current = {.Name = "Current (dB)", .Unit = "dB", .UsesPrefixes = false},
                       .Third = {.Name = std::format("{} (dB)", third_name), .Unit = "dB", .UsesPrefixes = false}});
     AddExportTraces(magnitude, sweep.NodeMagnitudesDecibels, sweep.CurrentMagnitudesDecibels, schematic, "", true);

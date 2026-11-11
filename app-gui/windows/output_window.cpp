@@ -6,6 +6,8 @@
 #include "windows/output_window.h"
 
 #include "drawing/node_colors.h"
+#include "drawing/theme.h"
+#include "drawing/trace_swatch.h"
 #include "editing/probing.h"
 #include "imgui_internal.h"
 #include "implot.h"
@@ -26,6 +28,8 @@ constexpr float TRACE_LIST_WIDTH = 8.0f;
 constexpr ImVec2 INITIAL_SIZE = {65.0f, 35.0f};
 /// ImPlot adds half of it on each side, so 0.4 leaves 20% of the data range above and below the curves.
 constexpr ImVec2 FIT_PADDING = {0.0f, 0.4f};
+/// The button that lists the analyses without a result.
+constexpr const char *MORE_LABEL = "More analyses";
 constexpr const char *EXPORT_LABEL = "Export...";
 
 /**
@@ -129,8 +133,6 @@ OutputWindow::OutputWindow(Schematic &schematic, AnalysisControls &controls, Tra
       m_DCSweepTab(schematic), m_NoiseTab(schematic), m_PoleZeroTab(schematic), m_SParameterTab(schematic),
       m_MonteCarloTab(schematic) {
     SetInitialSize(INITIAL_SIZE);
-    // Nothing to plot yet; the first result opens it
-    SetOpen(false);
 }
 
 /**
@@ -176,7 +178,10 @@ void OutputWindow::Draw() {
     const ImVec2 tab_row = ImGui::GetCursorScreenPos();
     const float tab_row_width = ImGui::GetContentRegionAvail().x;
     const float export_width = ImGui::CalcTextSize(EXPORT_LABEL).x + ImGui::GetStyle().FramePadding.x * 2.0f;
-    if (!BeginTabBarBefore("plots", export_width + ImGui::GetStyle().ItemSpacing.x)) {
+    const float more_width = ImGui::CalcTextSize(MORE_LABEL).x + ImGui::GetStyle().FramePadding.x * 2.0f;
+    const float spacing = ImGui::GetStyle().ItemSpacing.x;
+    // More and Export sit after the tabs, outside the bar, so the tabs with results keep the rest of the row
+    if (!BeginTabBarBefore("plots", more_width + export_width + spacing * 2.0f)) {
         ImGui::EndChild();
         return;
     }
@@ -184,9 +189,14 @@ void OutputWindow::Draw() {
     const FrameResults frame = EvaluateFrame(node_count, currents);
     // Applies to the automatic fit of every new result and to the user's double-click fit
     ImPlot::PushStyleVar(ImPlotStyleVar_FitPadding, FIT_PADDING);
-    DrawTabs(frame);
+    const bool has_tabs = DrawTabs(frame);
     ImPlot::PopStyleVar();
     ImGui::EndTabBar();
+    if (!has_tabs) {
+        ImGui::TextDisabled("Run an analysis (F5) to see its results here; pick it beside Run in the editor");
+    }
+    ImGui::SetCursorScreenPos({tab_row.x + tab_row_width - export_width - spacing - more_width, tab_row.y});
+    DrawOtherAnalyses(more_width);
     DrawExportButton(tab_row, tab_row_width, export_width, frame);
     ImGui::EndChild();
 }
@@ -298,7 +308,8 @@ FrameResults OutputWindow::EvaluateFrame(const std::size_t node_count,
 }
 
 /**
- * @brief   The check marks take the colors of the curves, which match the probes in the editor.
+ * @brief   Each row shows the color and line style of its curve, which match the probes in the editor, so the list is
+ * the legend of the plots.
  */
 void OutputWindow::DrawTraceList(const std::size_t node_count, const std::vector<Core::ComponentTrace> &currents) {
     ImGui::BeginChild("traces", ImVec2(ImGui::GetFontSize() * TRACE_LIST_WIDTH, 0.0f), ImGuiChildFlags_Borders);
@@ -310,11 +321,10 @@ void OutputWindow::DrawTraceList(const std::size_t node_count, const std::vector
                 m_Schematic.SetVoltageMeasured(node, *measure_all);
             }
             bool measured = m_Schematic.IsVoltageMeasured(node);
-            ImGui::PushStyleColor(ImGuiCol_CheckMark, GetNodeColor(node));
-            if (ImGui::Checkbox(GetVoltageLabel(m_Schematic.GetConnectivity(), node).c_str(), &measured)) {
+            if (DrawTraceCheckbox(GetVoltageLabel(m_Schematic.GetConnectivity(), node).c_str(), &measured,
+                                  GetNodeColor(node), TraceStyle::SOLID)) {
                 m_Schematic.SetVoltageMeasured(node, measured);
             }
-            ImGui::PopStyleColor();
         }
     }
 
@@ -327,11 +337,10 @@ void OutputWindow::DrawTraceList(const std::size_t node_count, const std::vector
                 m_Schematic.SetCurrentMeasured(name, *measure_all);
             }
             bool measured = m_Schematic.IsCurrentMeasured(name);
-            ImGui::PushStyleColor(ImGuiCol_CheckMark, GetCurrentColor(index));
-            if (ImGui::Checkbox(std::format("I({})", name).c_str(), &measured)) {
+            if (DrawTraceCheckbox(std::format("I({})", name).c_str(), &measured, GetCurrentColor(index),
+                                  TraceStyle::DASHED)) {
                 m_Schematic.SetCurrentMeasured(name, measured);
             }
-            ImGui::PopStyleColor();
         }
     }
 
@@ -383,88 +392,169 @@ void OutputWindow::DrawBusPanel(const std::size_t node_count) {
 }
 
 /**
- * @brief   One tab per analysis, and the spectrum of the transient; a new result brings its tab to the front once.
+ * @brief   Draws a tab for every analysis with a result and the one the user is on, then a menu of the others.
+ * @param[in] frame  The results worked out for this frame.
+ * @return  True when the bar shows a tab; false before any result, when the window shows how to get one instead.
  */
-void OutputWindow::DrawTabs(const FrameResults &frame) {
+bool OutputWindow::DrawTabs(const FrameResults &frame) {
     const std::optional<PlotTab> tab_to_show = std::exchange(m_TabToShow, std::nullopt);
-    DrawTimeAndFrequencyTabs(frame, tab_to_show);
-    DrawAnalysisTabs(tab_to_show);
-}
-
-/**
- * @brief   Opens a tab, selecting it when a new result asked for it, and remembers it as the one shown.
- * @return  True while the tab is open and its contents are to be drawn.
- */
-bool OutputWindow::BeginTab(const char *label, const PlotTab tab, const std::optional<PlotTab> &tab_to_show) {
-    if (!ImGui::BeginTabItem(label, nullptr,
-                             tab_to_show == tab ? ImGuiTabItemFlags_SetSelected : ImGuiTabItemFlags_None)) {
-        return false;
+    if (tab_to_show) {
+        m_KeptTab = tab_to_show;
     }
-    m_ShownTab = tab;
-    return true;
+    const TabResults has_result = FindTabResults();
+    // A failed run gets its tab too, so the reason shows where its result would have been
+    TabResults has_content = has_result;
+    for (const PlotTab tab : PLOT_TABS) {
+        has_content[ToIndex(tab)] = has_content[ToIndex(tab)] || FindFailedAnalysis(tab).has_value();
+    }
+    const TabListing listing = ListTabs(has_content, m_KeptTab);
+    for (const PlotTab tab : listing.Shown) {
+        if (!ImGui::BeginTabItem(GetTabLabel(tab), nullptr,
+                                 tab_to_show == tab ? ImGuiTabItemFlags_SetSelected : ImGuiTabItemFlags_None)) {
+            continue;
+        }
+        m_ShownTab = tab;
+        // The tab selected before still draws in the frame that asks for another, which must stay the kept one
+        if (!tab_to_show) {
+            m_KeptTab = tab;
+        }
+        if (const std::optional<Analysis> failed = FindFailedAnalysis(tab); failed && !has_result[ToIndex(tab)]) {
+            DrawRunFailure(*failed);
+        } else {
+            DrawTab(tab, frame);
+        }
+        ImGui::EndTabItem();
+    }
+    m_OtherTabs = listing.Others;
+    return !listing.Shown.empty();
 }
 
 /**
- * @brief   The operating point, the traces over time or frequency and their spectrum.
+ * @brief   Tells which tabs have a result to show; the spectrum is that of the transient.
  */
-void OutputWindow::DrawTimeAndFrequencyTabs(const FrameResults &frame, const std::optional<PlotTab> &tab_to_show) {
-    if (BeginTab("Operating point", PlotTab::OPERATING_POINT, tab_to_show)) {
+TabResults OutputWindow::FindTabResults() const {
+    TabResults has_result{};
+    const auto set = [&has_result](const PlotTab tab, const bool value) { has_result[ToIndex(tab)] = value; };
+    set(PlotTab::OPERATING_POINT,
+        m_Schematic.GetOperatingPoint().has_value() || m_Schematic.GetOperatingPointSteps().has_value());
+    set(PlotTab::TRANSIENT, m_Schematic.GetTransient().has_value());
+    set(PlotTab::SPECTRUM, m_Schematic.GetTransient().has_value());
+    set(PlotTab::AC_SWEEP, m_Schematic.GetACSweep().has_value());
+    set(PlotTab::DC_SWEEP, m_Schematic.GetDCSweep().has_value());
+    set(PlotTab::NOISE, m_Schematic.GetNoise().has_value());
+    set(PlotTab::TRANSFER_FUNCTION, m_Schematic.GetTransferFunction().has_value());
+    set(PlotTab::SENSITIVITY, m_Schematic.GetSensitivity().has_value());
+    set(PlotTab::POLE_ZERO, m_Schematic.GetPoleZero().has_value());
+    set(PlotTab::S_PARAMETERS, m_Schematic.GetSParameters().has_value());
+    set(PlotTab::TRUTH_TABLE, m_Schematic.GetTruthTable().has_value());
+    set(PlotTab::MONTE_CARLO, m_Schematic.GetMonteCarlo().has_value());
+    return has_result;
+}
+
+/**
+ * @brief   The analysis a tab shows, when its last run failed.
+ * @return  The analysis, or none when its last run did not fail or the tab shows no analysis of its own.
+ */
+std::optional<Analysis> OutputWindow::FindFailedAnalysis(const PlotTab tab) const {
+    const std::optional<Analysis> analysis = GetTabAnalysis(tab);
+    if (analysis && m_Controls.GetOutcome(*analysis) == RunOutcome::FAILED) {
+        return analysis;
+    }
+    return std::nullopt;
+}
+
+/**
+ * @brief   Draws why the last run of an analysis failed, whole and wrapped, in place of its result, so the reason the
+ *          status line shortens can be read where the user looks for the result.
+ * @param[in] analysis  The analysis, whose last run failed.
+ */
+void OutputWindow::DrawRunFailure(const Analysis analysis) const {
+    ImGui::TextColored(GetErrorTextColor(), "%s failed", GetAnalysisName(analysis));
+    if (const std::optional<std::string> &error = m_Controls.GetError(analysis)) {
+        ImGui::PushTextWrapPos(0.0f);
+        ImGui::TextUnformatted(error->c_str());
+        ImGui::PopTextWrapPos();
+    }
+    ImGui::Spacing();
+    ImGui::TextDisabled("Fix it and press Run (F5) again; a click on the status line shows the ngspice output");
+}
+
+/**
+ * @brief   Draws the contents of one tab.
+ * @param[in] tab    The tab, which is open.
+ * @param[in] frame  The results worked out for this frame.
+ */
+void OutputWindow::DrawTab(const PlotTab tab, const FrameResults &frame) {
+    switch (tab) {
+    case PlotTab::OPERATING_POINT:
         m_OperatingPointTab.Draw();
-        ImGui::EndTabItem();
-    }
-    if (BeginTab("Transient", PlotTab::TRANSIENT, tab_to_show)) {
+        break;
+    case PlotTab::TRANSIENT:
         m_TransientTab.Draw(frame);
-        ImGui::EndTabItem();
-    }
-    if (BeginTab("Spectrum", PlotTab::SPECTRUM, tab_to_show)) {
+        break;
+    case PlotTab::SPECTRUM:
         // The spectrum goes over the stretch the transient statistics measure
         m_SpectrumTab.Draw(frame, m_TransientTab.GetMeasuredSpan());
-        ImGui::EndTabItem();
-    }
-    if (BeginTab("AC sweep", PlotTab::AC_SWEEP, tab_to_show)) {
+        break;
+    case PlotTab::AC_SWEEP:
         m_ACSweepTab.Draw(frame);
-        ImGui::EndTabItem();
-    }
-    if (BeginTab("DC sweep", PlotTab::DC_SWEEP, tab_to_show)) {
+        break;
+    case PlotTab::DC_SWEEP:
         m_DCSweepTab.Draw(frame);
-        ImGui::EndTabItem();
-    }
-}
-
-/**
- * @brief   The tabs of the other analyses.
- */
-void OutputWindow::DrawAnalysisTabs(const std::optional<PlotTab> &tab_to_show) {
-    if (BeginTab("Noise", PlotTab::NOISE, tab_to_show)) {
+        break;
+    case PlotTab::NOISE:
         m_NoiseTab.Draw();
-        ImGui::EndTabItem();
-    }
-    if (BeginTab("Transfer function", PlotTab::TRANSFER_FUNCTION, tab_to_show)) {
+        break;
+    case PlotTab::TRANSFER_FUNCTION:
         DrawTransferFunctionTab(m_Schematic);
-        ImGui::EndTabItem();
-    }
-    if (BeginTab("Sensitivity", PlotTab::SENSITIVITY, tab_to_show)) {
+        break;
+    case PlotTab::SENSITIVITY:
         DrawSensitivityTab(m_Schematic, m_Preferences);
-        ImGui::EndTabItem();
-    }
-    if (BeginTab("Poles and zeros", PlotTab::POLE_ZERO, tab_to_show)) {
+        break;
+    case PlotTab::POLE_ZERO:
         m_PoleZeroTab.Draw();
-        ImGui::EndTabItem();
-    }
-    if (BeginTab("S-parameters", PlotTab::S_PARAMETERS, tab_to_show)) {
+        break;
+    case PlotTab::S_PARAMETERS:
         m_SParameterTab.Draw(m_Exporter);
-        ImGui::EndTabItem();
-    }
-    if (BeginTab("Truth table", PlotTab::TRUTH_TABLE, tab_to_show)) {
+        break;
+    case PlotTab::TRUTH_TABLE:
         DrawTruthTableTab(m_Schematic);
-        ImGui::EndTabItem();
-    }
-    if (BeginTab("Monte Carlo", PlotTab::MONTE_CARLO, tab_to_show)) {
+        break;
+    case PlotTab::MONTE_CARLO:
         if (m_MonteCarloTab.Draw()) {
             m_Exporter.StartText(m_MonteCarloTab.BuildCsv(), m_Schematic.GetFilePath(),
                                  GetTabFileSuffix(PlotTab::MONTE_CARLO));
         }
-        ImGui::EndTabItem();
+        break;
+    default:
+        break;
+    }
+}
+
+/**
+ * @brief   A button between the tabs and Export that lists the analyses without a result; picking one opens its tab,
+ *          which tells how to run it.
+ * @param[in] width  Width of the button, which the tab bar left free.
+ */
+void OutputWindow::DrawOtherAnalyses(const float width) {
+    ImGui::BeginDisabled(m_OtherTabs.empty());
+    const bool is_pressed = ImGui::Button(MORE_LABEL, {width, 0.0f});
+    ImGui::EndDisabled();
+    ImGui::SetItemTooltip(
+        "%s", std::format("{} other analyses, without a result yet; pick one to see how to run it", m_OtherTabs.size())
+                  .c_str());
+    if (is_pressed) {
+        ImGui::SetNextWindowPos({ImGui::GetItemRectMin().x, ImGui::GetItemRectMax().y});
+        ImGui::OpenPopup("other_analyses");
+    }
+    if (ImGui::BeginPopup("other_analyses")) {
+        ImGui::TextDisabled("No result yet");
+        for (const PlotTab tab : m_OtherTabs) {
+            if (ImGui::Selectable(GetTabLabel(tab))) {
+                m_TabToShow = tab;
+            }
+        }
+        ImGui::EndPopup();
     }
 }
 

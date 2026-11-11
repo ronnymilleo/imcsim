@@ -68,7 +68,7 @@ private:
     void DrawIncompleteNote(const Core::Transient &transient);
     void DrawLiveNote(const Core::Transient &transient);
     void DrawWindowControls(const Core::Transient &shown);
-    void DrawWindowSize(ImVec2 row_start, float width);
+    void DrawWindowSize();
 
     // Plots
     void DrawPlots(const Core::Transient &transient, const std::vector<MathTrace> &math,

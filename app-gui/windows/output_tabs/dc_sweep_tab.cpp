@@ -9,6 +9,7 @@
 #include "implot.h"
 #include "plots/plot_figures.h"
 #include "plots/plot_helpers.h"
+#include "plots/statistics_table.h"
 #include "plots/trace_statistics.h"
 #include "spice/spice_value.h"
 #include "windows/output_tabs/plot_widgets.h"
@@ -79,9 +80,12 @@ void DCSweepTab::Draw(const FrameResults &frame) {
     }
     DrawWithStatistics(
         [&] {
-            if (!frame.AnythingMeasured && (frame.DCSweepMath.empty() || frame.DCSweepMath.front().empty())) {
-                ImGui::TextDisabled("%s", NOTHING_MEASURED);
-            }
+            const bool is_empty =
+                !frame.AnythingMeasured && (frame.DCSweepMath.empty() || frame.DCSweepMath.front().empty());
+            const float right_edge = ImGui::GetCursorPosX() + ImGui::GetContentRegionAvail().x;
+            ImGui::AlignTextToFramePadding();
+            ImGui::TextDisabled("%s", is_empty ? NOTHING_MEASURED : "");
+            DrawCursorToggle(m_Cursors, right_edge);
             DrawMathErrors(frame.DCSweepErrors);
             DrawPlot(*dc_sweep, frame.DCSweepMath);
         },
@@ -178,64 +182,35 @@ void DCSweepTab::DrawPlot(const Core::DCSweep &sweep, const std::vector<std::vec
  * @details A stepped sweep lists every curve, named by its step value.
  */
 void DCSweepTab::DrawStatistics(const Core::DCSweep &sweep, const std::vector<std::vector<MathTrace>> &math) {
-    DrawCursorToggle(m_Cursors);
     const PlotCursors &cursors = m_Cursors;
-    if (cursors.Shown && BeginStatisticsTable("cursors")) {
-        DrawStatistic("A", FormatQuantity(cursors.A, sweep.SweptUnit.c_str()));
-        DrawStatistic("B", FormatQuantity(cursors.B, sweep.SweptUnit.c_str()));
-        DrawStatistic("B-A", FormatQuantity(cursors.B - cursors.A, sweep.SweptUnit.c_str()));
-        ImGui::EndTable();
-    }
+    const char *swept_unit = sweep.SweptUnit.c_str();
+    const CursorReadings cursor_readings = {{"A", FormatQuantity(cursors.A, swept_unit)},
+                                            {"B", FormatQuantity(cursors.B, swept_unit)},
+                                            {"B-A", FormatQuantity(cursors.B - cursors.A, swept_unit)}};
+    DrawStatisticsHeader(cursors.Shown ? "Between the cursors" : "Over the visible sweep");
     const bool show_currents = HasMeasuredCurrent(sweep.Curves.front().Currents, m_Schematic);
     const std::vector<CurveFamily> families = ListCurveFamilies(sweep, m_Schematic, show_currents, math);
     if (families.empty()) {
         ImGui::TextDisabled("Measure a trace to see its statistics");
         return;
     }
-    ImGui::TextDisabled("%s", cursors.Shown ? "Between the cursors" : "Over the visible sweep");
-    const PlotSpan span = MeasuredSpan(cursors, m_View);
+    // A column per curve: the curves of a stepped sweep are named by their step
     const bool stepped = !sweep.SteppedSource.empty();
+    std::vector<PlottedTrace> columns;
+    std::vector<SweptTrace> traces;
     for (const CurveFamily &family : families) {
-        ImGui::Separator();
-        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(family.Color), "%s", family.Label.c_str());
         for (std::size_t curve = 0; curve < family.Curves.size(); ++curve) {
-            if (stepped) {
-                ImGui::TextDisabled("%s", FormatStepLabel(sweep, sweep.Curves[curve]).c_str());
-            }
-            const std::vector<double> &values = *family.Curves[curve];
-            if (!BeginStatisticsTable(std::format("{} {}", family.Label, curve))) {
-                continue;
-            }
-            // The size of the trace in the span tells residue from real values in every readout
-            const auto statistics = ComputeSweepStatistics(sweep.SweptValues, values, span.From, span.To);
-            const double scale =
-                statistics ? std::max(std::abs(statistics->Maximum), std::abs(statistics->Minimum)) : 0.0;
-            if (cursors.Shown) {
-                const double at_a = InterpolateAt(sweep.SweptValues, values, cursors.A, false);
-                const double at_b = InterpolateAt(sweep.SweptValues, values, cursors.B, false);
-                DrawMeasuredValue("At A", at_a, scale, family.Unit);
-                DrawMeasuredValue("At B", at_b, scale, family.Unit);
-                DrawMeasuredValue("B-A", at_b - at_a, scale, family.Unit);
-                if (const std::optional<double> slope = ComputeSlope(sweep.SweptValues, values, cursors.A, cursors.B)) {
-                    DrawStatistic("Slope",
-                                  std::format("{}{}/{}", Core::FormatValue(*slope), family.Unit, sweep.SweptUnit));
-                    // A conductance, as a current over a swept voltage, is also a resistance, the inverse; a zero
-                    // slope is an open path, shown as such rather than as an infinite value
-                    if (std::string_view(family.Unit) == "A" && sweep.SweptUnit == "V") {
-                        const std::optional<double> resistance = ResistanceFromConductance(*slope);
-                        const bool open = !resistance || std::abs(*resistance) >= OPEN_RESISTANCE;
-                        DrawStatistic("Resistance", open ? "open" : FormatQuantity(*resistance, "Ohm"));
-                    }
-                }
-            }
-            if (statistics) {
-                DrawMeasuredValue("Min", statistics->Minimum, scale, family.Unit);
-                DrawMeasuredValue("Max", statistics->Maximum, scale, family.Unit);
-                DrawMeasuredValue("Mean", statistics->Mean, scale, family.Unit);
-            }
-            ImGui::EndTable();
+            const std::string label =
+                stepped ? std::format("{} {}", family.Label, FormatStepLabel(sweep, sweep.Curves[curve]))
+                        : family.Label;
+            columns.push_back({label, family.Curves[curve], family.Unit, family.Color});
+            traces.push_back({.Values = *family.Curves[curve], .Unit = family.Unit});
         }
     }
+    const std::vector<StatisticsRow> rows =
+        BuildSweepStatistics(sweep.SweptValues, sweep.SweptUnit, traces, MeasuredSpan(cursors, m_View),
+                             cursors.Shown ? std::optional(cursors) : std::nullopt);
+    DrawTraceTable("sweep_statistics", columns, rows, cursors.Shown ? cursor_readings : CursorReadings{});
 }
 
 } // namespace GUI

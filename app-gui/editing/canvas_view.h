@@ -25,6 +25,7 @@ public:
     void RequestFit();
     void RequestDefaultFrame();
     void FrameIfRequested(Schematic &schematic, ImVec2 canvas_size, SymbolStyle style, bool terminal_numbers);
+    void FollowCanvasSize(ImVec2 canvas_size);
 
     // Mouse
     void HandlePanAndZoom(ImVec2 origin, bool hovered, bool active);
@@ -41,6 +42,8 @@ private:
     /// Largest zoom of a framing the next frame does, once the canvas size is known: the default when a schematic is
     /// opened, more for Fit.
     std::optional<float> m_FrameMaxZoom;
+    /// Size of the canvas the last frame, none before the first one.
+    std::optional<ImVec2> m_CanvasSize;
 };
 
 } // namespace GUI
