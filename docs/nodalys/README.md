@@ -173,21 +173,64 @@ Measured on one development machine with `./out/release/bin/imcsim-tests "[.benc
 
 ---
 
-### 5. Roadmap & Analyses Beyond `ngspice`
+### 5. Roadmap
 
-#### Core Infrastructure & Existing Milestones
+The goal of `Nodalys` is to become the default backend of `imcsim`. Until it covers what `ngspice` does, every gap
+sends the user back to `ngspice`, so the phases go from parity to what only `Nodalys` can offer, and each phase
+starts once the one before it is done.
 
-| Analysis / Item | SPICE Command | Description | Status |
-| :--- | :---: | :--- | :---: |
-| **Pole-Zero Analysis** | `.pz` | Generalized eigenvalue solver $(\mathbf{G} + s\mathbf{C})\mathbf{x} = \mathbf{0}$ via the QZ algorithm to find transfer function poles and zeros. | ✅ **Ready** |
-| **DC Sensitivity** | `.sens` | Per-component adjoint sensitivity $\partial V_{\text{out}} / \partial p_i$ solved via transposed system $\mathbf{J}^T \boldsymbol{\lambda} = \mathbf{d}$. | ✅ **Ready** |
-| **RF S-Parameters** | `.sp` | Scattering matrix $S_{ij}(f)$, return loss, VSWR, and Smith chart generation with $Z_0$ port termination. | ✅ **Ready** |
-| **Harmonic Balance (HB)** | `.hb` | Frequency-domain single-tone periodic steady-state AFT solver + `imcsim` exclusive UI integration *(multi-tone HB remains future work)*. | ✅ **Ready** |
-| **AC Sensitivity** | `.sens ac` | Small-signal frequency-domain adjoint sensitivity over complex MNA $\mathbf{Y}(j\omega)^T \boldsymbol{\lambda} = \mathbf{d}$. | Planned |
-| **Sparse MNA Solver** | Infrastructure | Sparse LU decomposition (e.g., KLU-style AMD ordering) for >100-node transient and AC acceleration. | Planned |
-| **Parallel Monte Carlo** | Statistical | Multi-threaded statistical parameter tolerance sweeps across independent `Nodalys::Circuit` instances. | Planned |
+#### Done
 
-#### Analyses Beyond Upstream `ngspice 47`
+| Item | SPICE Command | Notes |
+| :--- | :---: | :--- |
+| **Pole-Zero Analysis** | `.pz` | QZ algorithm over $(\mathbf{G}, -\mathbf{C})$ and the Rosenbrock pencil. |
+| **DC Sensitivity** | `.sens` | One transposed adjoint solve $\mathbf{J}^T \boldsymbol{\lambda} = \mathbf{d}$ for every part. |
+| **RF S-Parameters** | `.sp` | Multiport power waves, Touchstone export, Smith chart in `imcsim`. |
+| **Harmonic Balance (1-Tone)** | `.hb` | AFT Newton with source and gmin stepping; refused above 4000 dense unknowns. |
+| **Live Transient** | — | Paced against the clock and paused through the pace `imcsim` shares with `ngspice`. |
+
+#### Phase 1 — Parity, to Become the Default Backend
+
+| Item | Why | Today |
+| :--- | :--- | :--- |
+| **Sparse MNA Solver** (KLU-style, AMD ordering, symbolic reuse) | The dense LU makes the analyses users run most the slowest: the transient runs at 0.07x to 0.26x of `ngspice` and the AC sweep of a 100-node network at 0.34x (section 4), and it caps harmonic balance at 4000 unknowns. | Dense LU |
+| **Gear-2 / BDF-2 Integration** | The trapezoidal rule rings on stiff switching, and the fuse needs Gear, as the `ngspice` backend writes `method=gear` for it. | Trapezoidal and Backward Euler |
+| **Fuse** | The thermal model and latch of the `imcsim_fuse` subcircuit, after Gear-2. | Refused |
+| **Behavioral Sources** (`B` element) | Free expressions of node voltages and branch currents, already checked by `imcsim`. | Refused |
+| **Temperature** | The SPICE temperature laws of the diode, BJT and MOSFET (`IS`, `VJ`, `EG`, `BF`...), so a stepped temperature runs. | Refused with the reason |
+| **Noise and Random Sources in a Transient** | White, $1/f$ and telegraph noise, and the random distributions, drawn as `ngspice` draws them where possible. | DC level outside a transient; transient refused |
+| **SPICE-Text Subcircuits** | Vendor `.subckt` models kept as SPICE text, such as the op-amp of the precision rectifier example. | Refused |
+| **Node Initial Conditions** (`.ic`, `.nodeset`) | Starting a transient or guiding an operating point from node voltages, not only from parts. | Parts only (`uic`) |
+
+**Done when** every example runs every analysis it offers on `Nodalys` and matches `ngspice` in the parity tests, and
+the transient and AC benchmarks are no slower than `ngspice`.
+
+#### Phase 2 — Cheap Wins for the Users of `imcsim`
+
+| Item | Why |
+| :--- | :--- |
+| **Parallel Monte Carlo, Parameter Steps and Truth Tables** | `ngspice` is one global instance per process, so `imcsim` runs one simulation at a time; `Nodalys` keeps no global state, so independent runs can share the cores, with results that stay reproducible. |
+| **Loop Gain / Stability** (`.stb`, Tian) | Phase and gain margin of a feedback loop without breaking it, over the existing AC solver; it fits the op-amp and regulator circuits `imcsim` is used for. |
+| **Worst-Case (EVA) and RSS Tolerance** | The DC sensitivities times the tolerances `imcsim` already keeps: instant bounds beside Monte Carlo. |
+| **2-Port RF Metrics** (Rollett $K$, $\mu$, MAG/MSG, stability circles, noise figure) | Post-processing of `SParameterResult` shown on the existing Smith chart. |
+
+#### Phase 3 — Extending Harmonic Balance and Sensitivity
+
+| Item | Why |
+| :--- | :--- |
+| **Power Sweep / P1dB / PAE / Large-Signal $S_{ij}$** | An amplitude loop over `ComputeHarmonicBalance`. |
+| **AC Sensitivity** (`.sens ac`) | Adjoint solves over the complex AC MNA $\mathbf{Y}(j\omega)^T \boldsymbol{\lambda} = \mathbf{d}$. |
+| **Modal Analysis and Participation Factors** | Every natural pole of $(\mathbf{G}, \mathbf{C})$ from the QZ solver, with the $L$ and $C$ that take part in each. |
+
+#### Phase 4 — Long Term, Revisited on Demand
+
+HB-AC / HB-Noise / HB-XF (`PAC`, `PNoise`, `PXF`), automatic transient noise, autonomous harmonic balance for
+oscillators and phase noise, multi-tone harmonic balance (IMD, IIP3, mixers), circuit envelope and load-pull. They
+serve RF and IC designers more than the interactive use `imcsim` is built for, they all grow with the dense HB
+Jacobian until the sparse solver of phase 1 lands, and each one also costs `imcsim` an Output tab, its exports, file
+settings and tests, as harmonic balance did.
+
+#### Reference: Analyses Beyond Upstream `ngspice 47`
 
 Comparison against upstream `ngspice 47` (`src/spicelib/analysis/`): upstream ships time-domain shooting `.pss`, small-signal Volterra distortion (`.disto`, up to 3rd order), manual `TRNOISE`/`TRRANDOM` sources, and only an unimplemented `WITH_HB` parser stub.
 
@@ -206,9 +249,3 @@ Comparison against upstream `ngspice 47` (`src/spicelib/analysis/`): upstream sh
 | **Autonomous HB (Oscillators + Phase Noise)** | RF / Oscillators | `.pss` shooting only (needs stabilization time) | Planned *(fixed `f0`)* | High | Solves unknown oscillation frequency $f_0$ jointly in HB Newton with a phase constraint; suited to high-$Q$ crystal and LC oscillators. |
 | **Multi-Tone HB (IMD2 / IMD3 / IIP3 / Mixers)** | RF / Nonlinear | Not available (`.disto` is 3rd-order small-signal only) | Planned *(single-tone)* | High | Multidimensional spectral basis ($k_1 f_1 + k_2 f_2$) for non-commensurate LO+RF tones and large-signal intermodulation. |
 | **Circuit Envelope** | RF / Modulated | Not available | Planned | High | Integrates slow baseband modulation envelopes in time while solving the RF carrier spectrum via HB at each step. |
-
-#### Recommended Prioritization
-
-1. **Quick Wins (Low Effort, Exclusive to Nodalys + imcsim):** `.stb` loop-gain stability (reuses existing AC solver), **Power Sweep / P1dB / PAE** over `ComputeHarmonicBalance`, **Worst-Case (EVA / RSS)** over existing tolerances + sensitivities, and **2-port RF metrics ($K$, $\mu$, MAG/MSG, Smith circles)** over `SParameterResult`.
-2. **Medium-Term:** **AC Sensitivity** + **Modal Participation Factors**, **HB-AC / HB-Noise**, and **Automatic Transient Noise**.
-3. **Long-Term Differentiation:** **Autonomous HB** (oscillators + phase noise), **Multi-Tone HB**, and **Circuit Envelope** alongside **Sparse MNA** and **Parallel Monte Carlo** infrastructure.
