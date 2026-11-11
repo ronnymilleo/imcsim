@@ -116,6 +116,36 @@ TEST_CASE("Nodalys refuses a run at another temperature and says why, rather tha
     CHECK_THAT(stepped.Result->NodeVoltages[2], WithinRel(5.0, 1e-9));
 }
 
+TEST_CASE("A Nodalys transient refuses a noise or random source, which the other analyses hold at its level") {
+    for (const Core::Source::SourceType waveform :
+         {Core::Source::SourceType::NOISE, Core::Source::SourceType::RANDOM}) {
+        Core::VoltageSource source;
+        source.SetName("V1");
+        source.SetSourceType(waveform);
+        Core::Resistor load;
+        load.SetName("R1");
+        Core::Ground ground;
+        Core::Circuit circuit;
+        circuit.Add(source, {1, 0});
+        circuit.Add(load, {1, 0});
+        circuit.Add(ground, {0});
+
+        Core::NodalysBackend backend;
+        const Core::TransientRun run =
+            backend.RunTransient(circuit, {.StopTime = 1e-3, .TimeStep = 1e-5}, std::nullopt, {});
+
+        INFO(Core::GetSourceTypeName(waveform));
+        REQUIRE_FALSE(run.Result.has_value());
+        CHECK(run.Result.error().contains("V1"));
+        CHECK(run.Result.error().contains(Core::GetSourceTypeName(waveform)));
+
+        // The operating point keeps the source, at its offset of 0 V, rather than leaving the node floating
+        const Core::OperatingPointRun point = backend.RunOperatingPoint(circuit);
+        REQUIRE(point.Result.has_value());
+        CHECK_THAT(CurrentOf(*point.Result, "V1"), WithinAbs(0.0, 1e-12));
+    }
+}
+
 TEST_CASE("The Nodalys backend reports logic parts and analog parts as supported") {
     const Core::NodalysBackend backend;
     const std::optional<std::string> gate = Core::FindUnsupported(

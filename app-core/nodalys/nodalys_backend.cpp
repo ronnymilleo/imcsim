@@ -6,6 +6,7 @@
 #include "nodalys/nodalys_backend.h"
 
 #include "components/logic_part.h"
+#include "components/source.h"
 #include "nodalys/compiler.h"
 #include "simulation/live_pace.h"
 #include "simulation/pole_zero.h"
@@ -30,6 +31,24 @@ std::expected<Nodalys::Circuit, std::string> CompileOrFail(const Circuit &circui
         return std::unexpected(std::format("Nodalys cannot simulate this circuit: {}", compiled.error()));
     }
     return std::move(*compiled);
+}
+
+/**
+ * @brief   Why a transient cannot run on Nodalys, which has no device that draws noise or random values yet, or none.
+ */
+std::optional<std::string> FindRandomSource(const Circuit &circuit) {
+    for (const Component *part : CollectParts(circuit)) {
+        if (!IsSource(part->GetType())) {
+            continue;
+        }
+        const auto &source = static_cast<const Source &>(*part);
+        if (source.GetSourceType() == Source::SourceType::NOISE ||
+            source.GetSourceType() == Source::SourceType::RANDOM) {
+            return std::format("{} uses a {} waveform, which a Nodalys transient cannot draw yet", source.GetName(),
+                               GetSourceTypeName(source.GetSourceType()));
+        }
+    }
+    return std::nullopt;
 }
 
 void ForwardMessages(const std::vector<Nodalys::DiagnosticMessage> &source, std::vector<SimulatorMessage> &target) {
@@ -103,6 +122,10 @@ TransientRun NodalysBackend::RunTransient(const Circuit &circuit, const Transien
                                           const std::optional<double> &temperature_celsius, const RunMonitor &monitor) {
     (void)temperature_celsius;
     TransientRun run;
+    if (std::optional<std::string> reason = FindRandomSource(circuit)) {
+        run.Result = std::unexpected(std::move(*reason));
+        return run;
+    }
     auto compiled = CompileOrFail(circuit);
     if (!compiled) {
         run.Result = std::unexpected(compiled.error());
