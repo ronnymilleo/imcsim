@@ -705,3 +705,44 @@ TEST_CASE("Harmonic Balance vs steady-state transient benchmark metrics", "[.ben
 }
 
 } // namespace
+
+TEST_CASE("A harmonic balance asked to stop ends with an error before it converges", "[nodalys][hb]") {
+    // A diode rectifier is nonlinear, so the run goes through Newton iterations, where the stop is asked
+    nodalys::CircuitBuilder builder;
+    builder.AddVsine("V1", 1, 0, {.Amplitude = 5.0, .Frequency = 1e3});
+    builder.AddDiode("D1", 1, 2, {});
+    builder.AddResistor("R1", 2, 0, 1e3);
+    auto circuit = builder.Build();
+    REQUIRE(circuit.has_value());
+    int asked = 0;
+    const nodalys::HarmonicBalanceConfig config{
+        .FundamentalFrequency = 1e3, .Harmonics = 8, .ShouldStop = [&asked]() { return ++asked > 1; }};
+
+    const auto result = nodalys::ComputeHarmonicBalance(*circuit, config);
+
+    REQUIRE_FALSE(result.has_value());
+    CHECK(result.error().contains("stopped"));
+    // Once stopped, the fallback strategies do not run Newton again
+    CHECK(asked == 2);
+}
+
+TEST_CASE("A harmonic balance too large for the dense Jacobian is refused before it allocates it", "[nodalys][hb]") {
+    // A ladder of 40 sections has 41 nodes and a branch, 42 unknowns per harmonic, so 64 harmonics make 5418
+    constexpr int SECTIONS = 40;
+    nodalys::CircuitBuilder builder;
+    builder.AddVsine("V1", 1, 0, {.Amplitude = 1.0, .Frequency = 1e3});
+    for (int section = 1; section <= SECTIONS; ++section) {
+        builder.AddResistor(std::format("R{}", section), section, section + 1, 1e3);
+        builder.AddCapacitor(std::format("C{}", section), section + 1, 0, 1e-9);
+    }
+    auto circuit = builder.Build();
+    REQUIRE(circuit.has_value());
+
+    const auto refused = nodalys::ComputeHarmonicBalance(*circuit, {.FundamentalFrequency = 1e3, .Harmonics = 64});
+    REQUIRE_FALSE(refused.has_value());
+    CHECK(refused.error().contains("fewer harmonics"));
+
+    // The same ladder with a few harmonics fits
+    const auto solved = nodalys::ComputeHarmonicBalance(*circuit, {.FundamentalFrequency = 1e3, .Harmonics = 4});
+    CHECK(solved.has_value());
+}

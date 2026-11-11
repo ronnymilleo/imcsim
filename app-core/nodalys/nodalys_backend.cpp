@@ -439,7 +439,8 @@ SParametersRun NodalysBackend::RunSParameters(const Circuit &circuit, const SPar
     return run;
 }
 
-HarmonicBalanceRun NodalysBackend::RunHarmonicBalance(const Circuit &circuit, const HarmonicBalanceSettings &settings) {
+HarmonicBalanceRun NodalysBackend::RunHarmonicBalance(const Circuit &circuit, const HarmonicBalanceSettings &settings,
+                                                      RunControl *control) {
     HarmonicBalanceRun run;
     auto compiled = CompileOrFail(circuit);
     if (!compiled) {
@@ -447,9 +448,12 @@ HarmonicBalanceRun NodalysBackend::RunHarmonicBalance(const Circuit &circuit, co
         return run;
     }
 
-    const nodalys::HarmonicBalanceConfig config{.FundamentalFrequency = settings.FundamentalFrequency,
-                                                .Harmonics = settings.Harmonics,
-                                                .Samples = settings.Samples};
+    nodalys::HarmonicBalanceConfig config{.FundamentalFrequency = settings.FundamentalFrequency,
+                                          .Harmonics = settings.Harmonics,
+                                          .Samples = settings.Samples};
+    if (control != nullptr) {
+        config.ShouldStop = [control]() { return control->IsCancelled(); };
+    }
 
     std::vector<nodalys::DiagnosticMessage> messages;
     auto result = nodalys::ComputeHarmonicBalance(*compiled, config, {}, &messages);

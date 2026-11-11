@@ -145,6 +145,8 @@ struct HarmonicBalanceConfig {
     int Harmonics = 8;                 ///< Highest harmonic order H >= 0 (solves DC + harmonics 1..H).
     int Samples = 0;                   ///< Time samples M per period (power of two); 0 chooses >= max(4H, 16).
     int SourceSteps = 0;               ///< Amplitude homotopy steps on failure; 0 uses ConvergenceOptions.SourceSteps.
+    /// Asked before each Newton iteration, since one run can take long; returning true stops it with an error.
+    std::function<bool()> ShouldStop = nullptr;
 };
 
 /**

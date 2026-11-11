@@ -1053,8 +1053,8 @@ void AnalysisControls::RunHarmonicBalanceAnalysis(const Core::Circuit &circuit) 
     StartRun(Analysis::HARMONIC_BALANCE,
              MakeJob<Core::HarmonicBalanceRun>(
                  circuit,
-                 [run_settings](const Core::Circuit &copy, Core::RunControl &) {
-                     return Core::RunHarmonicBalance(copy, run_settings);
+                 [run_settings](const Core::Circuit &copy, Core::RunControl &control) {
+                     return Core::RunHarmonicBalance(copy, run_settings, &control);
                  },
                  [this](Core::HarmonicBalanceRun run) {
                      Finish(Analysis::HARMONIC_BALANCE,
