@@ -142,11 +142,11 @@ roughly in the order they are likely to come.
 - **Sources, parts and models**: XSPICE analog blocks (transfer functions, limiters, integrators), transmission lines,
   a circuit driven from a WAV or CSV file, PWL points read from a CSV file, and a MOSFET body diode and higher-level
   MOSFET models
-- **Longer term, a native simulation backend**: a solver written from published circuit theory that sits beside ngspice,
-  which stays available, tested against closed-form results and built to use modern CPUs well. With the backend
-  interface and capability matrix in place, it would come in steps: a linear core (operating point, DC and AC),
-  small-signal and RF analyses (noise, S-parameters, Touchstone blocks), harmonic balance, bipolar transistors with the
-  transient analysis, digital co-simulation, and extras. Nothing else on the roadmap depends on it
+- **Nodalys, a native simulation backend**: a solver written from published circuit theory that sits beside ngspice,
+  which stays available, tested against closed-form results and against ngspice. The next release is planned to bring
+  it as a choice in the preferences, with every analysis of ngspice and a harmonic balance; what it does not cover yet,
+  such as temperature, behavioral sources and fuses, is refused with the reason. Nothing else on the roadmap depends
+  on it
 
 ## Install
 
