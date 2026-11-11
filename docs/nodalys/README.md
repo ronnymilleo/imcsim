@@ -171,9 +171,11 @@ Measured via `./out/release/bin/imcsim-tests "[benchmark]"` across all implement
 
 ---
 
-### 5. Roadmap Analyses (`jay` Epics)
+### 5. Roadmap & Analyses Beyond `ngspice`
 
-| Analysis | SPICE Command | Description | Status |
+#### Core Infrastructure & Existing Milestones
+
+| Analysis / Item | SPICE Command | Description | Status |
 | :--- | :---: | :--- | :---: |
 | **Pole-Zero Analysis** | `.pz` | Generalized eigenvalue solver $(\mathbf{G} + s\mathbf{C})\mathbf{x} = \mathbf{0}$ via the QZ algorithm to find transfer function poles and zeros. | ✅ **Ready** |
 | **DC Sensitivity** | `.sens` | Per-component adjoint sensitivity $\partial V_{\text{out}} / \partial p_i$ solved via transposed system $\mathbf{J}^T \boldsymbol{\lambda} = \mathbf{d}$. | ✅ **Ready** |
@@ -182,3 +184,29 @@ Measured via `./out/release/bin/imcsim-tests "[benchmark]"` across all implement
 | **AC Sensitivity** | `.sens ac` | Small-signal frequency-domain adjoint sensitivity over complex MNA $\mathbf{Y}(j\omega)^T \boldsymbol{\lambda} = \mathbf{d}$. | Planned |
 | **Sparse MNA Solver** | Infrastructure | Sparse LU decomposition (e.g., KLU-style AMD ordering) for >100-node transient and AC acceleration. | Planned |
 | **Parallel Monte Carlo** | Statistical | Multi-threaded statistical parameter tolerance sweeps across independent `nodalys::Circuit` instances. | Planned |
+
+#### Analyses Beyond Upstream `ngspice 47`
+
+Comparison against upstream `ngspice 47` (`src/spicelib/analysis/`): upstream ships time-domain shooting `.pss`, small-signal Volterra distortion (`.disto`, up to 3rd order), manual `TRNOISE`/`TRRANDOM` sources, and only an unimplemented `WITH_HB` parser stub.
+
+| Analysis / Capability | Domain | `ngspice 47` (Upstream) | `Nodalys` / `imcsim` Today | Effort | Notes & Value Over `ngspice` |
+| :--- | :--- | :--- | :--- | :---: | :--- |
+| **Harmonic Balance (1-Tone Driven, `.hb`)** | RF / Nonlinear | Stub only (`WITH_HB` unimplemented; `.pss` uses shooting) | ✅ **Ready** | — | Direct frequency-domain steady state without waiting out long startup transients. |
+| **Power Sweep / P1dB / PAE / LSSP** | RF / Large-Signal | Not available (`.ac`/`.sp` are strictly small-signal) | Planned | Low | Amplitude/power loop over `ComputeHarmonicBalance` for compression (`P1dB`), PAE, and large-signal $S_{ij}$. |
+| **Load-Pull Contours** | RF / Large-Signal | Not available | Planned | Low / Medium | Complex load-impedance sweep via HB plotted as constant-power / efficiency contours on the Smith chart. |
+| **Loop Gain / Stability (`.stb` — Tian)** | Analog / Control | Not available | Planned | Low | Virtual bidirectional V/I probe in feedback loops computing open-loop $T(j\omega)$, phase margin, and gain margin without breaking DC bias or impedance loading. |
+| **Worst-Case (EVA) & RSS Tolerance** | Tolerance / Yield | Not available (manual scripting or Monte Carlo only) | Monte Carlo only | Low | Combines sensitivity vectors with `imcsim` component tolerances for instant RSS bounds and extreme-value corners. |
+| **2-Port RF Stability & Noise (`NF`, `Fmin`, `Rn`, `Sopt`)** | RF / Small-Signal | `.sp` supports `CKTspnoise`, but lacks $K$/$\mu$/circles | `SParameterResult` (no `donoise` or $K$/$\mu$) | Low | Post-processing on `SParameterResult` for Rollett $K$, $\mu$, MAG/MSG, Smith circles, plus multiport RF noise figures. |
+| **Modal / Eigenvalue & Participation Factors** | Linear Dynamics | SISO `.pz` only | SISO `.pz` only | Low / Medium | Computes all natural poles of $(\mathbf{G}, \mathbf{C})$ via QZ and ranks $L$/$C$ participation per mode to pinpoint resonances without choosing an I/O pair. |
+| **AC, HB & Transient Adjoint Sensitivity** | Sensitivity | Has `.sens ac`; legacy `.sens2` transient unmaintained/off | DC `.sens` only | Medium | Adjoint solves over complex AC MNA (`AC Sensitivity` above), periodic HB Jacobian, and time-domain companion matrices. |
+| **HB-AC / HB-Noise / HB-XF (`PAC`/`PNoise`/`PXF`)** | Periodic Small-Signal | Upstream has `.pss` shooting only (no HB conversion) | Planned | Medium / High | Linearizes around the converged HB periodic solution via the harmonic conversion matrix for mixers, choppers, and SMPS. |
+| **Automatic Transient Noise (`.trannoise`)** | Time / Noise | Manual `TRNOISE`/`TRRANDOM` voltage/current sources only | Planned | Medium / High | Automatically injects bandwidth-scaled thermal, shot, and $1/f$ noise per device during `.tran` for SNR and oscillator/comparator jitter. |
+| **Autonomous HB (Oscillators + Phase Noise)** | RF / Oscillators | `.pss` shooting only (needs stabilization time) | Planned *(fixed `f0`)* | High | Solves unknown oscillation frequency $f_0$ jointly in HB Newton with a phase constraint; suited to high-$Q$ crystal and LC oscillators. |
+| **Multi-Tone HB (IMD2 / IMD3 / IIP3 / Mixers)** | RF / Nonlinear | Not available (`.disto` is 3rd-order small-signal only) | Planned *(single-tone)* | High | Multidimensional spectral basis ($k_1 f_1 + k_2 f_2$) for non-commensurate LO+RF tones and large-signal intermodulation. |
+| **Circuit Envelope** | RF / Modulated | Not available | Planned | High | Integrates slow baseband modulation envelopes in time while solving the RF carrier spectrum via HB at each step. |
+
+#### Recommended Prioritization
+
+1. **Quick Wins (Low Effort, Exclusive to Nodalys + imcsim):** `.stb` loop-gain stability (reuses existing AC solver), **Power Sweep / P1dB / PAE** over `ComputeHarmonicBalance`, **Worst-Case (EVA / RSS)** over existing tolerances + sensitivities, and **2-port RF metrics ($K$, $\mu$, MAG/MSG, Smith circles)** over `SParameterResult`.
+2. **Medium-Term:** **AC Sensitivity** + **Modal Participation Factors**, **HB-AC / HB-Noise**, and **Automatic Transient Noise**.
+3. **Long-Term Differentiation:** **Autonomous HB** (oscillators + phase noise), **Multi-Tone HB**, and **Circuit Envelope** alongside **Sparse MNA** and **Parallel Monte Carlo** infrastructure.
