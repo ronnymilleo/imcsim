@@ -8,11 +8,82 @@
 
 #include <nodalys/nodalys.h>
 
+#include <cstdlib>
 #include <filesystem>
+#include <format>
 #include <fstream>
+#include <optional>
+#include <random>
+#include <sstream>
+#include <string>
+#include <string_view>
 
 using Catch::Matchers::WithinAbs;
 using Catch::Matchers::WithinRel;
+
+namespace {
+
+/// How the CLI gets the netlist of a run.
+enum class InputKind {
+    FILE_ARGUMENT,
+    STANDARD_INPUT
+};
+
+/**
+ * @brief   A path in double quotes, so the shell keeps a path with spaces in one piece.
+ */
+std::string Quote(const std::filesystem::path &path) {
+    return std::format("\"{}\"", path.string());
+}
+
+/**
+ * @class   CliFolder
+ * @brief   A folder of its own for the files of the CLI runs of one test, removed at the end.
+ * @details Each test process gets a new folder, so the tests can run side by side, as ctest runs them.
+ */
+class CliFolder {
+public:
+    CliFolder() {
+        std::random_device seed;
+        m_Path = std::filesystem::temp_directory_path() / std::format("nodalys-cli-{:08x}", seed());
+        std::filesystem::create_directories(m_Path);
+    }
+    ~CliFolder() {
+        std::error_code ignored;
+        std::filesystem::remove_all(m_Path, ignored);
+    }
+    CliFolder(const CliFolder &) = delete;
+    CliFolder &operator=(const CliFolder &) = delete;
+
+    /**
+     * @brief   Runs the CLI on a netlist and reads the file it writes.
+     * @return  The contents of the output file, or none when the CLI failed or wrote nothing.
+     */
+    std::optional<std::string> Run(const std::string_view arguments, const std::string_view netlist,
+                                   const InputKind input = InputKind::FILE_ARGUMENT) const {
+        const std::filesystem::path input_path = m_Path / "input.cir";
+        const std::filesystem::path output_path = m_Path / "output";
+        std::filesystem::remove(output_path);
+        if (!nodalys::SaveStringToFile(input_path.string(), std::string(netlist))) {
+            return std::nullopt;
+        }
+        const std::string source = input == InputKind::STANDARD_INPUT ? "- < " + Quote(input_path) : Quote(input_path);
+        const std::string command =
+            std::format("{} {} -o {} {}", Quote(NODALYS_CLI_PATH), arguments, Quote(output_path), source);
+        if (std::system(command.c_str()) != 0 || !std::filesystem::exists(output_path)) {
+            return std::nullopt;
+        }
+        const std::ifstream file(output_path);
+        std::ostringstream contents;
+        contents << file.rdbuf();
+        return contents.str();
+    }
+
+private:
+    std::filesystem::path m_Path;
+};
+
+} // namespace
 
 TEST_CASE("Engineering scale suffixes and units parse into numeric values", "[nodalys][parser]") {
     SECTION("Standard metric scales") {
@@ -489,149 +560,85 @@ TEST_CASE("SParameterResult computes derived RF figures of merit", "[nodalys][sp
 }
 
 TEST_CASE("The Nodalys standalone binary runs netlists from arguments or standard input", "[nodalys][cli]") {
-    const std::string cli_path =
-        std::filesystem::exists("./out/release/bin/nodalys") ? "./out/release/bin/nodalys" : "./out/debug/bin/nodalys";
-    if (!std::filesystem::exists(cli_path)) {
-        SKIP("Nodalys CLI binary not present in default build directory");
+    const CliFolder folder;
+
+    SECTION("It names its version") {
+        CHECK(std::system(Quote(NODALYS_CLI_PATH).append(" --version").c_str()) == 0);
     }
 
-    SECTION("CLI --version flag") {
-        const int rc = std::system(std::format("{} --version > /dev/null", cli_path).c_str());
-        CHECK(rc == 0);
+    SECTION("It writes an operating point as JSON") {
+        const std::optional<std::string> json = folder.Run("-b -f json", "* Divider\n"
+                                                                         "V1 1 0 10\n"
+                                                                         "R1 1 2 1k\n"
+                                                                         "R2 2 0 1k\n"
+                                                                         ".op\n"
+                                                                         ".end\n");
+        REQUIRE(json.has_value());
+        CHECK(json->contains("\"analysis\": \"operating_point\""));
+        CHECK(json->contains("\"1\": 10"));
+        CHECK(json->contains("\"2\": 5"));
     }
 
-    SECTION("CLI execution with netlist file and JSON output") {
-        const std::string test_netlist_path = "/tmp/nodalys_cli_in.cir";
-        const std::string test_output_path = "/tmp/nodalys_cli_out.json";
-
-        const std::string netlist = "* Test Divider\n"
-                                    "V1 1 0 10\n"
-                                    "R1 1 2 1k\n"
-                                    "R2 2 0 1k\n"
-                                    ".op\n"
-                                    ".end\n";
-        REQUIRE(nodalys::SaveStringToFile(test_netlist_path, netlist));
-
-        const std::string cmd = std::format("{} -b -f json -o {} {}", cli_path, test_output_path, test_netlist_path);
-        const int rc = std::system(cmd.c_str());
-        CHECK(rc == 0);
-        REQUIRE(std::filesystem::exists(test_output_path));
-
-        std::ifstream out_file(test_output_path);
-        std::string json_content((std::istreambuf_iterator<char>(out_file)), std::istreambuf_iterator<char>());
-        CHECK(json_content.contains("\"analysis\": \"operating_point\""));
-        CHECK(json_content.contains("\"1\": 10"));
-        CHECK(json_content.contains("\"2\": 5"));
-
-        std::filesystem::remove(test_netlist_path);
-        std::filesystem::remove(test_output_path);
+    SECTION("It writes an operating point as CSV") {
+        const std::optional<std::string> csv = folder.Run("-b -f csv", "* Divider\n"
+                                                                       "V1 1 0 12\n"
+                                                                       "R1 1 2 2k\n"
+                                                                       "R2 2 0 2k\n"
+                                                                       ".op\n"
+                                                                       ".end\n");
+        REQUIRE(csv.has_value());
+        CHECK(csv->contains("Variable,Type,Value,Unit"));
+        CHECK(csv->contains("V(1),Voltage,12,V"));
+        CHECK(csv->contains("V(2),Voltage,6,V"));
     }
 
-    SECTION("CLI execution with CSV output") {
-        const std::string test_netlist_path = "/tmp/nodalys_cli_in.cir";
-        const std::string test_output_path = "/tmp/nodalys_cli_out.csv";
-
-        const std::string netlist = "* Test Divider CSV\n"
-                                    "V1 1 0 12\n"
-                                    "R1 1 2 2k\n"
-                                    "R2 2 0 2k\n"
-                                    ".op\n"
-                                    ".end\n";
-        REQUIRE(nodalys::SaveStringToFile(test_netlist_path, netlist));
-
-        const std::string cmd = std::format("{} -b -f csv -o {} {}", cli_path, test_output_path, test_netlist_path);
-        const int rc = std::system(cmd.c_str());
-        CHECK(rc == 0);
-        REQUIRE(std::filesystem::exists(test_output_path));
-
-        std::ifstream out_file(test_output_path);
-        std::string csv_content((std::istreambuf_iterator<char>(out_file)), std::istreambuf_iterator<char>());
-        CHECK(csv_content.contains("Variable,Type,Value,Unit"));
-        CHECK(csv_content.contains("V(1),Voltage,12,V"));
-        CHECK(csv_content.contains("V(2),Voltage,6,V"));
-
-        std::filesystem::remove(test_netlist_path);
-        std::filesystem::remove(test_output_path);
+    SECTION("It reads the netlist from standard input") {
+        const std::optional<std::string> csv = folder.Run("-b -f csv",
+                                                          "* Divider\n"
+                                                          "V1 1 0 12\n"
+                                                          "R1 1 2 2k\n"
+                                                          "R2 2 0 2k\n"
+                                                          ".op\n"
+                                                          ".end\n",
+                                                          InputKind::STANDARD_INPUT);
+        REQUIRE(csv.has_value());
+        CHECK(csv->contains("V(2),Voltage,6,V"));
     }
 
-    SECTION("CLI execution with .sp analysis and Touchstone output") {
-        const std::string test_netlist_path = "/tmp/nodalys_cli_sp_in.cir";
-        const std::string test_output_path = "/tmp/nodalys_cli_sp_out.s2p";
-
-        const std::string netlist = "* Test SP Attenuator\n"
-                                    "Vsport1 1 0 dc 0 portnum 1 z0 50\n"
-                                    "Vsport2 2 0 dc 0 portnum 2 z0 50\n"
-                                    "R1 1 2 50\n"
-                                    ".sp dec 2 1e6 1e8\n"
-                                    ".end\n";
-        REQUIRE(nodalys::SaveStringToFile(test_netlist_path, netlist));
-
-        const std::string cmd =
-            std::format("{} -b -a sp -f touchstone -o {} {}", cli_path, test_output_path, test_netlist_path);
-        const int rc = std::system(cmd.c_str());
-        CHECK(rc == 0);
-        REQUIRE(std::filesystem::exists(test_output_path));
-
-        std::ifstream out_file(test_output_path);
-        std::string ts_content((std::istreambuf_iterator<char>(out_file)), std::istreambuf_iterator<char>());
-        CHECK(ts_content.contains("# HZ S RI R 50"));
-        CHECK(ts_content.contains("! Nodalys S-Parameter Simulation"));
-
-        std::filesystem::remove(test_netlist_path);
-        std::filesystem::remove(test_output_path);
+    SECTION("It writes S-parameters as Touchstone") {
+        const std::optional<std::string> touchstone =
+            folder.Run("-b -a sp -f touchstone", "* Attenuator\n"
+                                                 "Vsport1 1 0 dc 0 portnum 1 z0 50\n"
+                                                 "Vsport2 2 0 dc 0 portnum 2 z0 50\n"
+                                                 "R1 1 2 50\n"
+                                                 ".sp dec 2 1e6 1e8\n"
+                                                 ".end\n");
+        REQUIRE(touchstone.has_value());
+        CHECK(touchstone->contains("# HZ S RI R 50"));
+        CHECK(touchstone->contains("! Nodalys S-Parameter Simulation"));
     }
 
-    SECTION("CLI execution with .pz analysis and JSON output") {
-        const std::string test_netlist_path = "/tmp/nodalys_cli_pz_in.cir";
-        const std::string test_output_path = "/tmp/nodalys_cli_pz_out.json";
-
-        const std::string netlist = "* Test Pole-Zero\n"
-                                    "Vin 1 0 0V\n"
-                                    "R1 1 2 1k\n"
-                                    "C1 2 0 1u\n"
-                                    ".pz 2 Vin pz\n"
-                                    ".end\n";
-        REQUIRE(nodalys::SaveStringToFile(test_netlist_path, netlist));
-
-        const std::string cmd =
-            std::format("{} -b -a pz -f json -o {} {}", cli_path, test_output_path, test_netlist_path);
-        const int rc = std::system(cmd.c_str());
-        CHECK(rc == 0);
-        REQUIRE(std::filesystem::exists(test_output_path));
-
-        std::ifstream out_file(test_output_path);
-        std::string json_content((std::istreambuf_iterator<char>(out_file)), std::istreambuf_iterator<char>());
-        CHECK(json_content.contains("\"analysis\": \"pole_zero\""));
-        CHECK(json_content.contains("\"poles\""));
-
-        std::filesystem::remove(test_netlist_path);
-        std::filesystem::remove(test_output_path);
+    SECTION("It writes poles and zeros as JSON") {
+        const std::optional<std::string> json = folder.Run("-b -a pz -f json", "* Pole-zero\n"
+                                                                               "Vin 1 0 0V\n"
+                                                                               "R1 1 2 1k\n"
+                                                                               "C1 2 0 1u\n"
+                                                                               ".pz 2 Vin pz\n"
+                                                                               ".end\n");
+        REQUIRE(json.has_value());
+        CHECK(json->contains("\"analysis\": \"pole_zero\""));
+        CHECK(json->contains("\"poles\""));
     }
 
-    SECTION("CLI execution with .hb analysis and JSON/CSV output") {
-        const std::string test_netlist_path = "/tmp/nodalys_cli_hb_in.cir";
-        const std::string test_output_path = "/tmp/nodalys_cli_hb_out.json";
-
-        const std::string netlist = "* Test Harmonic Balance\n"
-                                    "Vin 1 0 SIN(0 4 1k)\n"
-                                    "R1 1 2 1k\n"
-                                    "R2 2 0 1k\n"
-                                    ".hb 1k 4 samples=32\n"
-                                    ".end\n";
-        REQUIRE(nodalys::SaveStringToFile(test_netlist_path, netlist));
-
-        const std::string cmd =
-            std::format("{} -b -a hb -f json -o {} {}", cli_path, test_output_path, test_netlist_path);
-        const int rc = std::system(cmd.c_str());
-        CHECK(rc == 0);
-        REQUIRE(std::filesystem::exists(test_output_path));
-
-        std::ifstream out_file(test_output_path);
-        std::string json_content((std::istreambuf_iterator<char>(out_file)), std::istreambuf_iterator<char>());
-        CHECK(json_content.contains("\"analysis\": \"harmonic_balance\""));
-        CHECK(json_content.contains("\"frequencies\": [0, 1000, 2000, 3000, 4000]"));
-
-        std::filesystem::remove(test_netlist_path);
-        std::filesystem::remove(test_output_path);
+    SECTION("It writes a harmonic balance as JSON") {
+        const std::optional<std::string> json = folder.Run("-b -a hb -f json", "* Harmonic balance\n"
+                                                                               "Vin 1 0 SIN(0 4 1k)\n"
+                                                                               "R1 1 2 1k\n"
+                                                                               "R2 2 0 1k\n"
+                                                                               ".hb 1k 4 samples=32\n"
+                                                                               ".end\n");
+        REQUIRE(json.has_value());
+        CHECK(json->contains("\"analysis\": \"harmonic_balance\""));
+        CHECK(json->contains("\"frequencies\": [0, 1000, 2000, 3000, 4000]"));
     }
 }
