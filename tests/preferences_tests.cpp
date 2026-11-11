@@ -20,7 +20,7 @@ TEST_CASE("Preferences load back unchanged from the file they save", "[preferenc
     preferences.SetEffectOn(GUI::LiveEffect::LOGIC_LIGHTS, true);
     preferences.ValueSeries = Core::ValueSeries::E24;
     preferences.BringOutputToFront = false;
-    preferences.SimulationBackend = "Nodalys";
+    preferences.Engine = GUI::SimulationEngine::NODALYS;
     preferences.RerunOnEdit = true;
     preferences.RerunDelaySeconds = 1.5;
     preferences.HarmonicAmplitudes = GUI::HarmonicAmplitudeUnit::RMS;
@@ -93,4 +93,18 @@ TEST_CASE("An unknown harmonic amplitude unit keeps Peak with a warning", "[pref
     const GUI::LoadedPreferences loaded = GUI::LoadPreferences(R"({"harmonic_amplitudes": "Average"})");
     CHECK(loaded.Warnings.size() == 1);
     CHECK(loaded.Choices.HarmonicAmplitudes == GUI::HarmonicAmplitudeUnit::PEAK);
+}
+
+TEST_CASE("The simulation engine is kept by the name its backend gives itself, and an unknown one is refused",
+          "[preferences]") {
+    CHECK(std::string(GUI::GetSimulationEngineName(GUI::SimulationEngine::NGSPICE)) == "ngspice");
+    CHECK(std::string(GUI::GetSimulationEngineName(GUI::SimulationEngine::NODALYS)) == "Nodalys");
+
+    const GUI::LoadedPreferences nodalys = GUI::LoadPreferences(R"({"simulation_backend": "Nodalys"})");
+    CHECK(nodalys.Warnings.empty());
+    CHECK(nodalys.Choices.Engine == GUI::SimulationEngine::NODALYS);
+
+    const GUI::LoadedPreferences unknown = GUI::LoadPreferences(R"({"simulation_backend": "Xyce"})");
+    CHECK(unknown.Warnings.size() == 1);
+    CHECK(unknown.Choices.Engine == GUI::SimulationEngine::NGSPICE);
 }
