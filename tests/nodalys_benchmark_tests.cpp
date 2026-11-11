@@ -5,6 +5,7 @@
 
 #include "components/bjt.h"
 #include "components/capacitor.h"
+#include "components/controlled_source.h"
 #include "components/diode.h"
 #include "components/ground.h"
 #include "components/inductor.h"
@@ -58,10 +59,10 @@ void PrintBenchmarkRow(const std::string &name, const std::string &type, const s
                        const double ngspice_ms, const double nodalys_ms) {
     if (ngspice_ms > 0.0 && nodalys_ms > 0.0) {
         const double speedup = ngspice_ms / nodalys_ms;
-        std::cout << std::format("  | {:<34} | {:<10} | {:>5} | {:>8.2f} ms | {:>8.2f} ms | {:>8.2f}x |\n", name, type,
+        std::cout << std::format("  | {:<34} | {:<10} | {:>5} | {:>8.3f} ms | {:>8.3f} ms | {:>8.2f}x |\n", name, type,
                                  nodes, ngspice_ms, nodalys_ms, speedup);
     } else {
-        std::cout << std::format("  | {:<34} | {:<10} | {:>5} | {:>11} | {:>8.2f} ms | {:>9} |\n", name, type, nodes,
+        std::cout << std::format("  | {:<34} | {:<10} | {:>5} | {:>11} | {:>8.3f} ms | {:>9} |\n", name, type, nodes,
                                  "N/A", nodalys_ms, "Autonomous");
     }
 }
@@ -472,4 +473,206 @@ TEST_CASE("Nodalys evaluates digital truth table combinations via DC operating p
         5);
 
     PrintBenchmarkRow("Full Adder Truth Table (8 rows)", "DC OP x8", 8, 0.0, nodalys_ms);
+}
+
+TEST_CASE("Nodalys outperforms ngspice on DC sensitivity via single-solve adjoint method", "[benchmark][nodalys]") {
+    Core::NodalysBackend nodalys;
+
+    auto run_sens_bench = [&](const std::string &label, const Core::Circuit &circuit, const int output_node,
+                              const std::size_t node_count, const int repetitions) {
+        const Core::SensitivitySettings settings{.OutputNode = output_node};
+        Core::SensitivityRun exp;
+        const double ngspice_ms = MeasureMs([&]() { exp = Ngspice().RunSensitivity(circuit, settings); }, repetitions);
+        REQUIRE(exp.Result.has_value());
+
+        Core::SensitivityRun act;
+        const double nodalys_ms = MeasureMs([&]() { act = nodalys.RunSensitivity(circuit, settings); }, repetitions);
+        REQUIRE(act.Result.has_value());
+        REQUIRE(act.Result->Parts.size() == exp.Result->Parts.size());
+        for (const auto &ep : exp.Result->Parts) {
+            const auto found = std::ranges::find(act.Result->Parts, ep.Name, &Core::PartSensitivity::Name);
+            REQUIRE(found != act.Result->Parts.end());
+            CHECK(Close(found->Absolute, ep.Absolute, 1e-3, 1e-6));
+        }
+
+        PrintBenchmarkRow(label, "Sens", node_count, ngspice_ms, nodalys_ms);
+    };
+
+    SECTION("100-node RC ladder DC sensitivity") {
+        constexpr std::size_t STAGES = 100;
+        const OwnedCircuit circuit = BuildRcLadder(STAGES, 100.0, 10e3, 1e-9);
+        run_sens_bench("RC Ladder (100 nodes)", circuit.Instance, static_cast<int>(STAGES + 1), STAGES + 1, 10);
+    }
+
+    SECTION("500-node RC ladder DC sensitivity") {
+        constexpr std::size_t STAGES = 500;
+        const OwnedCircuit circuit = BuildRcLadder(STAGES, 100.0, 10e3, 1e-9);
+        run_sens_bench("RC Ladder (500 nodes)", circuit.Instance, static_cast<int>(STAGES + 1), STAGES + 1, 3);
+    }
+
+    SECTION("30-diode nonlinear ladder sensitivity") {
+        constexpr std::size_t STAGES = 30;
+        const OwnedCircuit circuit = BuildDiodeLadder(STAGES, 25.0, 10e3);
+        run_sens_bench("Diode Ladder (30 diodes)", circuit.Instance, static_cast<int>(STAGES + 1), STAGES + 1, 10);
+    }
+
+    SECTION("4-stage cascaded BJT amplifier sensitivity") {
+        constexpr std::size_t STAGES = 4;
+        const OwnedCircuit circuit = BuildCascadedBjtAmplifier(STAGES);
+        run_sens_bench("BJT Cascaded Amp (4 stages)", circuit.Instance, static_cast<int>(3 * STAGES + 1),
+                       3 * STAGES + 2, 15);
+    }
+}
+
+TEST_CASE("Nodalys computes small-signal TF, Noise, SP, and PZ analyses with benchmark parity",
+          "[benchmark][nodalys]") {
+    Core::NodalysBackend nodalys;
+
+    SECTION("BJT emitter follower DC transfer function") {
+        OwnedCircuit circuit;
+        auto &vcc = circuit.AddPart<Core::VCC>({1});
+        vcc.SetName("VCC");
+        vcc.SetValue(12.0);
+        auto &vin = circuit.AddPart<Core::VoltageSource>({2, 0});
+        vin.SetName("VIN");
+        vin.SetValue(2.0);
+        auto &rb = circuit.AddPart<Core::Resistor>({2, 3});
+        rb.SetName("RB");
+        rb.SetValue(10e3);
+        auto &re = circuit.AddPart<Core::Resistor>({4, 0});
+        re.SetName("RE");
+        re.SetValue(1e3);
+        auto &q = circuit.AddPart<Core::BJT>({1, 3, 4}, Core::ComponentType::NPN);
+        q.SetName("Q1");
+        circuit.AddPart<Core::Ground>({0});
+
+        const Core::TransferFunctionSettings settings{.OutputNode = 4, .InputSource = "VIN"};
+        Core::TransferFunctionRun exp;
+        const double ngspice_ms =
+            MeasureMs([&]() { exp = Ngspice().RunTransferFunction(circuit.Instance, settings); }, 20);
+        REQUIRE(exp.Result.has_value());
+
+        Core::TransferFunctionRun act;
+        const double nodalys_ms =
+            MeasureMs([&]() { act = nodalys.RunTransferFunction(circuit.Instance, settings); }, 20);
+        REQUIRE(act.Result.has_value());
+        CHECK(Close(act.Result->Gain, exp.Result->Gain));
+
+        PrintBenchmarkRow("BJT Emitter Follower", "Transfer", 4, ngspice_ms, nodalys_ms);
+    }
+
+    SECTION("BJT common-emitter AC noise analysis") {
+        OwnedCircuit circuit;
+        auto &vcc = circuit.AddPart<Core::VCC>({1});
+        vcc.SetName("VCC");
+        vcc.SetValue(12.0);
+        auto &vin = circuit.AddPart<Core::VoltageSource>({2, 0});
+        vin.SetName("Vin1");
+        vin.SetSourceType(Core::Source::SourceType::AC);
+        vin.SetAC({.Amplitude = 1.0, .Frequency = 1e3, .Offset = 0.0, .Magnitude = 1.0});
+        auto &cin = circuit.AddPart<Core::Capacitor>({2, 3});
+        cin.SetName("CIN");
+        cin.SetValue(10e-6);
+        auto &r1 = circuit.AddPart<Core::Resistor>({1, 3});
+        r1.SetName("R1");
+        r1.SetValue(47e3);
+        auto &r2 = circuit.AddPart<Core::Resistor>({3, 0});
+        r2.SetName("R2");
+        r2.SetValue(10e3);
+        auto &rc = circuit.AddPart<Core::Resistor>({1, 4});
+        rc.SetName("RC");
+        rc.SetValue(2.2e3);
+        auto &re = circuit.AddPart<Core::Resistor>({5, 0});
+        re.SetName("RE");
+        re.SetValue(470.0);
+        auto &q = circuit.AddPart<Core::BJT>({4, 3, 5}, Core::ComponentType::NPN);
+        q.SetName("Q1");
+        circuit.AddPart<Core::Ground>({0});
+
+        const Core::NoiseSettings settings{.OutputNode = 4,
+                                           .InputSource = "Vin1",
+                                           .StartFrequency = 100.0,
+                                           .StopFrequency = 1e6,
+                                           .PointsPerDecade = 10};
+        Core::NoiseRun exp;
+        const double ngspice_ms = MeasureMs([&]() { exp = Ngspice().RunNoise(circuit.Instance, settings); }, 20);
+        REQUIRE(exp.Result.has_value());
+
+        Core::NoiseRun act;
+        const double nodalys_ms = MeasureMs([&]() { act = nodalys.RunNoise(circuit.Instance, settings); }, 20);
+        REQUIRE(act.Result.has_value());
+        CHECK(Close(act.Result->OutputTotal, exp.Result->OutputTotal));
+
+        PrintBenchmarkRow("BJT CE Amp (41 pts)", "Noise", 5, ngspice_ms, nodalys_ms);
+    }
+
+    SECTION("3-port resistive splitter S-parameters") {
+        OwnedCircuit circuit;
+        auto &r1 = circuit.AddPart<Core::Resistor>({1, 4});
+        r1.SetName("R1");
+        r1.SetValue(16.6667);
+        auto &r2 = circuit.AddPart<Core::Resistor>({2, 4});
+        r2.SetName("R2");
+        r2.SetValue(16.6667);
+        auto &r3 = circuit.AddPart<Core::Resistor>({3, 4});
+        r3.SetName("R3");
+        r3.SetValue(16.6667);
+        circuit.AddPart<Core::Ground>({0});
+        circuit.Instance.AddPort({.Number = 1, .Node = 1, .ReferenceOhms = 50.0});
+        circuit.Instance.AddPort({.Number = 2, .Node = 2, .ReferenceOhms = 50.0});
+        circuit.Instance.AddPort({.Number = 3, .Node = 3, .ReferenceOhms = 50.0});
+
+        const Core::SParameterSettings settings{
+            .StartFrequency = 10e6, .StopFrequency = 500e6, .IsLogarithmic = true, .PointsPerDecade = 10};
+        Core::SParametersRun exp;
+        const double ngspice_ms = MeasureMs([&]() { exp = Ngspice().RunSParameters(circuit.Instance, settings); }, 20);
+        REQUIRE(exp.Result.has_value());
+
+        Core::SParametersRun act;
+        const double nodalys_ms = MeasureMs([&]() { act = nodalys.RunSParameters(circuit.Instance, settings); }, 20);
+        REQUIRE(act.Result.has_value());
+        REQUIRE(!act.Result->Values.empty());
+
+        PrintBenchmarkRow("3-Port Splitter (18 pts)", "S-Params", 4, ngspice_ms, nodalys_ms);
+    }
+
+    SECTION("Twin-T notch filter pole-zero analysis") {
+        OwnedCircuit circuit;
+        auto &source = circuit.AddPart<Core::VoltageSource>({1, 0});
+        source.SetName("Vin1");
+        auto &r1 = circuit.AddPart<Core::Resistor>({1, 3});
+        r1.SetName("R1");
+        r1.SetValue(10e3);
+        auto &r2 = circuit.AddPart<Core::Resistor>({3, 2});
+        r2.SetName("R2");
+        r2.SetValue(10e3);
+        auto &c3 = circuit.AddPart<Core::Capacitor>({3, 0});
+        c3.SetName("C3");
+        c3.SetValue(20e-9);
+        auto &c1 = circuit.AddPart<Core::Capacitor>({1, 4});
+        c1.SetName("C1");
+        c1.SetValue(10e-9);
+        auto &c2 = circuit.AddPart<Core::Capacitor>({4, 2});
+        c2.SetName("C2");
+        c2.SetValue(10e-9);
+        auto &r3 = circuit.AddPart<Core::Resistor>({4, 0});
+        r3.SetName("R3");
+        r3.SetValue(5e3);
+        auto &rl = circuit.AddPart<Core::Resistor>({2, 0});
+        rl.SetName("RL");
+        rl.SetValue(100e3);
+        circuit.AddPart<Core::Ground>({0});
+
+        const Core::PoleZeroSettings settings{.OutputNode = 2, .InputSource = "Vin1"};
+        Core::PoleZeroRun exp;
+        const double ngspice_ms = MeasureMs([&]() { exp = Ngspice().RunPoleZero(circuit.Instance, settings); }, 20);
+        REQUIRE(exp.Result.has_value());
+
+        Core::PoleZeroRun act;
+        const double nodalys_ms = MeasureMs([&]() { act = nodalys.RunPoleZero(circuit.Instance, settings); }, 20);
+        REQUIRE(act.Result.has_value());
+        REQUIRE(act.Result->Roots.size() == exp.Result->Roots.size());
+
+        PrintBenchmarkRow("Twin-T Notch Filter", "Pole-Zero", 4, ngspice_ms, nodalys_ms);
+    }
 }

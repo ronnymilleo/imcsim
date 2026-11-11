@@ -1466,4 +1466,60 @@ TEST_CASE("Both backends agree on small-signal DC sensitivity analysis", "[backe
 
         CheckSensitivityParity(circuit, {.OutputNode = 3});
     }
+
+    SECTION("Nonlinear diode circuit around forward-biased operating point") {
+        Core::Circuit circuit;
+        Core::VoltageSource source;
+        source.SetName("V1");
+        source.SetValue(5.0);
+        Core::Resistor r1;
+        r1.SetName("R1");
+        r1.SetValue(1e3);
+        Core::Diode diode(Core::ComponentType::DIODE);
+        diode.SetName("D1");
+        Core::Resistor r2;
+        r2.SetName("R2");
+        r2.SetValue(2e3);
+        Core::Ground ground;
+
+        circuit.Add(source, {1, 0});
+        circuit.Add(r1, {1, 2});
+        circuit.Add(diode, {2, 3});
+        circuit.Add(r2, {3, 0});
+        circuit.Add(ground, {0});
+
+        CheckSensitivityParity(circuit, {.OutputNode = 3});
+    }
+
+    SECTION("BJT common-emitter amplifier bias network") {
+        Core::Circuit circuit;
+        Core::VoltageSource vcc;
+        vcc.SetName("VCC");
+        vcc.SetValue(12.0);
+        Core::Resistor r1;
+        r1.SetName("R1");
+        r1.SetValue(47e3);
+        Core::Resistor r2;
+        r2.SetName("R2");
+        r2.SetValue(10e3);
+        Core::Resistor rc;
+        rc.SetName("RC");
+        rc.SetValue(2.2e3);
+        Core::Resistor re;
+        re.SetName("RE");
+        re.SetValue(470.0);
+        Core::BJT q1(Core::ComponentType::NPN);
+        q1.SetName("Q1");
+        Core::Ground ground;
+
+        circuit.Add(vcc, {1, 0});
+        circuit.Add(r1, {1, 2});
+        circuit.Add(r2, {2, 0});
+        circuit.Add(rc, {1, 3});
+        circuit.Add(re, {4, 0});
+        circuit.Add(q1, {3, 2, 4});
+        circuit.Add(ground, {0});
+
+        CheckSensitivityParity(circuit, {.OutputNode = 3});
+    }
 }
