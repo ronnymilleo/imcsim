@@ -14,6 +14,7 @@ namespace Core {
 
 std::optional<TransientSettings> SuggestTransientSettings(const Circuit &circuit);
 std::optional<ACSweepSettings> SuggestACSweepSettings(const Circuit &circuit);
+std::optional<HarmonicBalanceSettings> SuggestHarmonicBalanceSettings(const Circuit &circuit);
 
 } // namespace Core
 

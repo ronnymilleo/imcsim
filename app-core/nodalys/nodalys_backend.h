@@ -37,6 +37,7 @@ public:
     SensitivityRun RunSensitivity(const Circuit &circuit, const SensitivitySettings &settings) override;
     PoleZeroRun RunPoleZero(const Circuit &circuit, const PoleZeroSettings &settings) override;
     SParametersRun RunSParameters(const Circuit &circuit, const SParameterSettings &settings) override;
+    HarmonicBalanceRun RunHarmonicBalance(const Circuit &circuit, const HarmonicBalanceSettings &settings) override;
 
 private:
     BackendCapabilities m_Capabilities;

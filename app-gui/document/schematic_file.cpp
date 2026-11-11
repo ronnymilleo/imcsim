@@ -32,6 +32,7 @@
 #include "nlohmann/json.hpp"
 #include <algorithm>
 #include <array>
+#include <bit>
 #include <cmath>
 #include <format>
 #include <fstream>
@@ -255,6 +256,11 @@ constexpr auto AC_SWEEP_KEYS = std::to_array<ParameterKey<Core::ACSweepSettings>
 constexpr auto S_PARAMETER_KEYS = std::to_array<ParameterKey<Core::SParameterSettings>>({
     {"start", &Core::SParameterSettings::StartFrequency},
     {"stop", &Core::SParameterSettings::StopFrequency},
+});
+
+/// The harmonic count and oversampling samples are integers, so they are written and read apart.
+constexpr auto HARMONIC_BALANCE_KEYS = std::to_array<ParameterKey<Core::HarmonicBalanceSettings>>({
+    {"fundamental", &Core::HarmonicBalanceSettings::FundamentalFrequency},
 });
 
 constexpr auto PARAMETER_STEP_KEYS = std::to_array<ParameterKey<ParameterStepSettings>>({
@@ -1192,9 +1198,9 @@ nlohmann::json WriteSweepRange(const Core::SweepRange &range) {
 }
 
 /// File names of the analyses, in the order of the Analysis enum.
-constexpr auto ANALYSIS_KEYS =
-    std::to_array<std::string_view>({"operating_point", "transient", "ac_sweep", "dc_sweep", "noise",
-                                     "transfer_function", "sensitivity", "pole_zero", "s_parameters", "truth_table"});
+constexpr auto ANALYSIS_KEYS = std::to_array<std::string_view>(
+    {"operating_point", "transient", "ac_sweep", "dc_sweep", "noise", "transfer_function", "sensitivity", "pole_zero",
+     "s_parameters", "truth_table", "harmonic_balance"});
 
 const char *ToFileName(const Core::ToleranceDistribution distribution) {
     return distribution == Core::ToleranceDistribution::UNIFORM ? "uniform" : "gaussian";
@@ -1208,6 +1214,16 @@ std::optional<Core::ToleranceDistribution> ParseDistributionName(const std::stri
         return Core::ToleranceDistribution::UNIFORM;
     }
     return std::nullopt;
+}
+
+constexpr int MAX_HARMONIC_BALANCE_SAMPLES = 65536;
+
+nlohmann::json WriteHarmonicBalanceSettings(const Core::HarmonicBalanceSettings &settings) {
+    nlohmann::json object = nlohmann::json::object();
+    WriteParameters(HARMONIC_BALANCE_KEYS, settings, object);
+    object["harmonics"] = settings.Harmonics;
+    object["samples"] = settings.Samples;
+    return object;
 }
 
 nlohmann::json WriteSParameterSettings(const Core::SParameterSettings &settings) {
@@ -1272,6 +1288,7 @@ nlohmann::json WriteSettings(const SimulationSettings &settings) {
         {"pole_zero", pole_zero},
         {"s_parameters", WriteSParameterSettings(settings.SParameters)},
         {"truth_table", truth_table},
+        {"harmonic_balance", WriteHarmonicBalanceSettings(settings.HarmonicBalance)},
         {"parameter_step", parameter_step},
         {"monte_carlo", monte_carlo_object},
     };
@@ -1427,6 +1444,44 @@ std::expected<void, std::string> ReadPoleZeroSettings(const nlohmann::json &obje
     return {};
 }
 
+std::expected<void, std::string> ReadHarmonicBalanceSettings(const nlohmann::json &object,
+                                                             SimulationSettings &settings) {
+    Core::HarmonicBalanceSettings range;
+    if (const auto read = ReadParameters(HARMONIC_BALANCE_KEYS, object, range); !read) {
+        return std::unexpected(read.error());
+    }
+    if (object.contains("harmonics")) {
+        const std::optional<int> harmonics = ReadInt(object, "harmonics");
+        if (!harmonics) {
+            return std::unexpected("has no valid harmonics");
+        }
+        range.Harmonics = *harmonics;
+    }
+    if (object.contains("samples")) {
+        const std::optional<int> samples = ReadInt(object, "samples");
+        if (!samples) {
+            return std::unexpected("has no valid samples");
+        }
+        range.Samples = *samples;
+    }
+    if (!std::isfinite(range.FundamentalFrequency) || range.FundamentalFrequency <= 0.0) {
+        return std::unexpected("does not have a positive fundamental frequency");
+    }
+    if (range.Harmonics < 1 || range.Harmonics > Core::MAX_HARMONIC_BALANCE_HARMONICS) {
+        return std::unexpected(
+            std::format("must have between 1 and {} harmonics", Core::MAX_HARMONIC_BALANCE_HARMONICS));
+    }
+    if (range.Samples != 0) {
+        const unsigned int count = range.Samples > 0 ? static_cast<unsigned int>(range.Samples) : 0U;
+        if (range.Samples <= 2 * range.Harmonics || range.Samples > MAX_HARMONIC_BALANCE_SAMPLES ||
+            !std::has_single_bit(count)) {
+            return std::unexpected("must have samples set to 0 or a power of two greater than twice the harmonics");
+        }
+    }
+    settings.HarmonicBalance = range;
+    return {};
+}
+
 std::expected<void, std::string> ReadSParameterSettings(const nlohmann::json &object, SimulationSettings &settings) {
     Core::SParameterSettings &range = settings.SParameters;
     if (const auto read = ReadParameters(S_PARAMETER_KEYS, object, range); !read) {
@@ -1572,6 +1627,7 @@ constexpr auto ANALYSIS_READERS = std::to_array<AnalysisReader>({
     {"pole_zero", "pole-zero", &ReadPoleZeroSettings},
     {"s_parameters", "S-parameter", &ReadSParameterSettings},
     {"truth_table", "truth table", &ReadTruthTableSettings},
+    {"harmonic_balance", "harmonic balance", &ReadHarmonicBalanceSettings},
     {"parameter_step", "parameter step", &ReadParameterStepSettings},
     {"monte_carlo", "Monte Carlo", &ReadMonteCarloSettings},
 });

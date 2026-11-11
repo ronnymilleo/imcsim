@@ -232,6 +232,22 @@ void DiodeDevice::StampAc(MnaSystem &reactive, const std::vector<double> &x_dc) 
     }
 }
 
+void DiodeDevice::StampCharge(MnaSystem &sys, const std::vector<double> &x) const {
+    if (!HasTransientState()) {
+        return;
+    }
+    const double voltage = VoltageAt(x);
+    StampNortonBranch(sys, m_Anode, m_JunctionNode, Capacitance(voltage), Charge(voltage), voltage);
+}
+
+double DiodeDevice::TerminalCharge(const int terminal, const std::vector<double> &x) const {
+    if (!HasTransientState()) {
+        return 0.0;
+    }
+    const double charge = Charge(VoltageAt(x));
+    return terminal == 0 ? charge : -charge;
+}
+
 std::complex<double> DiodeDevice::AcTerminalCurrent(const int terminal, const std::vector<double> &x_dc,
                                                     const std::vector<std::complex<double>> &x_ac,
                                                     const double omega) const {
@@ -470,6 +486,65 @@ void BjtDevice::StampAc(MnaSystem &reactive, const std::vector<double> &x_dc) co
     reactive.AddA(m_B, m_C, -geqcb);
     reactive.AddA(m_E, m_B, -geqcb);
     reactive.AddA(m_E, m_C, geqcb);
+}
+
+void BjtDevice::StampCharge(MnaSystem &sys, const std::vector<double> &x) const {
+    if (!HasTransientState()) {
+        return;
+    }
+    const BjtParameters &p = m_Parameters;
+    const Intrinsic dc = EvaluateAt(x);
+    const double vbe = NodeVoltage(x, m_B) - NodeVoltage(x, m_E);
+    const double vbc = NodeVoltage(x, m_B) - NodeVoltage(x, m_C);
+    const double vbe_signed = m_Pnp ? -vbe : vbe;
+    const double vbc_signed = m_Pnp ? -vbc : vbc;
+    const DepletionCharge qbe = EvaluateDepletion(vbe_signed, p.EmitterCapacitance, BJT_JUNCTION_POTENTIAL,
+                                                  BJT_GRADING_COEFFICIENT, JUNCTION_FORWARD_LIMIT);
+    const DepletionCharge qbc = EvaluateDepletion(vbc_signed, p.CollectorCapacitance, BJT_JUNCTION_POTENTIAL,
+                                                  BJT_GRADING_COEFFICIENT, JUNCTION_FORWARD_LIMIT);
+
+    const double c_be = qbe.Capacitance + p.TransitTime * dc.DIfwdQbDvbe;
+    const double c_bc = qbc.Capacitance;
+    const double geqcb = p.TransitTime * dc.DIfwdQbDvbc;
+    const double sign = m_Pnp ? -1.0 : 1.0;
+    const double q_be_phys = sign * (qbe.Charge + p.TransitTime * dc.IfwdQb);
+    const double q_bc_phys = sign * qbc.Charge;
+
+    StampConductance(sys, m_B, m_E, c_be);
+    sys.AddA(m_B, m_B, geqcb);
+    sys.AddA(m_B, m_C, -geqcb);
+    sys.AddA(m_E, m_B, -geqcb);
+    sys.AddA(m_E, m_C, geqcb);
+    StampCurrentSource(sys, m_B, m_E, q_be_phys - c_be * vbe - geqcb * vbc);
+
+    StampNortonBranch(sys, m_B, m_C, c_bc, q_bc_phys, vbc);
+}
+
+double BjtDevice::TerminalCharge(const int terminal, const std::vector<double> &x) const {
+    if (!HasTransientState()) {
+        return 0.0;
+    }
+    const BjtParameters &p = m_Parameters;
+    const Intrinsic dc = EvaluateAt(x);
+    const double vbe = NodeVoltage(x, m_B) - NodeVoltage(x, m_E);
+    const double vbc = NodeVoltage(x, m_B) - NodeVoltage(x, m_C);
+    const double vbe_signed = m_Pnp ? -vbe : vbe;
+    const double vbc_signed = m_Pnp ? -vbc : vbc;
+    const DepletionCharge qbe = EvaluateDepletion(vbe_signed, p.EmitterCapacitance, BJT_JUNCTION_POTENTIAL,
+                                                  BJT_GRADING_COEFFICIENT, JUNCTION_FORWARD_LIMIT);
+    const DepletionCharge qbc = EvaluateDepletion(vbc_signed, p.CollectorCapacitance, BJT_JUNCTION_POTENTIAL,
+                                                  BJT_GRADING_COEFFICIENT, JUNCTION_FORWARD_LIMIT);
+    const double sign = m_Pnp ? -1.0 : 1.0;
+    const double q_be = sign * (qbe.Charge + p.TransitTime * dc.IfwdQb);
+    const double q_bc = sign * qbc.Charge;
+    switch (terminal) {
+    case 0: // Collector
+        return -q_bc;
+    case 1: // Base
+        return q_be + q_bc;
+    default: // Emitter
+        return -q_be;
+    }
 }
 
 std::complex<double> BjtDevice::AcTerminalCurrent(const int terminal, const std::vector<double> &x_dc,
@@ -764,6 +839,28 @@ void MosfetDevice::StampAc(MnaSystem &reactive, const std::vector<double> &) con
     }
     if (m_Cgd > 0.0) {
         StampConductance(reactive, m_Gate, m_Drain, m_Cgd);
+    }
+}
+
+void MosfetDevice::StampCharge(MnaSystem &sys, const std::vector<double> & /*x*/) const {
+    if (m_Cgs > 0.0) {
+        StampConductance(sys, m_Gate, m_Source, m_Cgs);
+    }
+    if (m_Cgd > 0.0) {
+        StampConductance(sys, m_Gate, m_Drain, m_Cgd);
+    }
+}
+
+double MosfetDevice::TerminalCharge(const int terminal, const std::vector<double> &x) const {
+    const double q_gs = m_Cgs * (NodeVoltage(x, m_Gate) - NodeVoltage(x, m_Source));
+    const double q_gd = m_Cgd * (NodeVoltage(x, m_Gate) - NodeVoltage(x, m_Drain));
+    switch (terminal) {
+    case 0: // Drain
+        return -q_gd;
+    case 1: // Gate
+        return q_gs + q_gd;
+    default: // Source
+        return -q_gs;
     }
 }
 

@@ -92,6 +92,8 @@ Core::AnalysisKind ToKind(const Analysis analysis) {
         return Core::AnalysisKind::S_PARAMETERS;
     case Analysis::TRUTH_TABLE:
         return Core::AnalysisKind::TRUTH_TABLE;
+    case Analysis::HARMONIC_BALANCE:
+        return Core::AnalysisKind::HARMONIC_BALANCE;
     default:
         return Core::AnalysisKind::OPERATING_POINT;
     }
@@ -271,6 +273,9 @@ void AnalysisSettingsPanel::DrawSelectedSettings(SimulationSettings &settings) {
     case Analysis::TRUTH_TABLE:
         DrawTruthTableSettings(settings);
         break;
+    case Analysis::HARMONIC_BALANCE:
+        DrawHarmonicBalanceSettings(settings);
+        break;
     }
 }
 
@@ -287,6 +292,7 @@ void AnalysisSettingsPanel::LoadSettingsFields() {
     m_NoiseStopFrequency.Load(settings.NoiseRange.StopFrequency);
     m_SStartFrequency.Load(settings.SParameters.StartFrequency);
     m_SStopFrequency.Load(settings.SParameters.StopFrequency);
+    m_HBFundamental.Load(settings.HarmonicBalance.FundamentalFrequency);
     LoadParameterStepFields(settings.ParameterStep);
     m_LoadedSettingsVersion = m_Schematic.GetSimulationSettingsVersion();
 }
@@ -623,6 +629,61 @@ void AnalysisSettingsPanel::DrawTruthTableSettings(SimulationSettings &settings)
  * which is not at all, once per value of a parameter or once per draw of the parts within their tolerances.
  * @details The fields share their labels with those of the analysis above, so they get an ID of their own.
  */
+void AnalysisSettingsPanel::DrawHarmonicBalanceSettings(SimulationSettings &settings) {
+    constexpr int MIN_EXPLICIT_SAMPLES = 32;
+    constexpr int MAX_EXPLICIT_SAMPLES = 65536;
+    if (const std::optional<double> fundamental = m_HBFundamental.Draw("Fundamental", "Hz", IsPositive)) {
+        settings.HarmonicBalance.FundamentalFrequency = *fundamental;
+    }
+    DrawFieldLabel("Harmonics");
+    if (ImGui::InputInt("##hb_harmonics", &settings.HarmonicBalance.Harmonics)) {
+        settings.HarmonicBalance.Harmonics =
+            std::clamp(settings.HarmonicBalance.Harmonics, 1, Core::MAX_HARMONIC_BALANCE_HARMONICS);
+    }
+    ImGui::SetItemTooltip("Number of harmonics above DC (1 to %d)", Core::MAX_HARMONIC_BALANCE_HARMONICS);
+    // Keep any explicit sample count strictly above the Nyquist threshold 2 * Harmonics.
+    if (settings.HarmonicBalance.Samples != 0 &&
+        settings.HarmonicBalance.Samples <= 2 * settings.HarmonicBalance.Harmonics) {
+        int next_power = MIN_EXPLICIT_SAMPLES;
+        while (next_power <= 2 * settings.HarmonicBalance.Harmonics && next_power < MAX_EXPLICIT_SAMPLES) {
+            next_power *= 2;
+        }
+        settings.HarmonicBalance.Samples = next_power;
+    }
+    DrawFieldLabel("Samples");
+    const std::string samples_label =
+        settings.HarmonicBalance.Samples == 0 ? "Auto" : std::format("{}", settings.HarmonicBalance.Samples);
+    if (ImGui::BeginCombo("##hb_samples", samples_label.c_str())) {
+        if (ImGui::Selectable("Auto", settings.HarmonicBalance.Samples == 0)) {
+            settings.HarmonicBalance.Samples = 0;
+        }
+        ImGui::SetItemTooltip("Power of two at least max(32, 4 * Harmonics)");
+        for (int candidate = MIN_EXPLICIT_SAMPLES; candidate <= MAX_EXPLICIT_SAMPLES; candidate *= 2) {
+            if (candidate <= 2 * settings.HarmonicBalance.Harmonics) {
+                continue;
+            }
+            const std::string label = std::format("{}", candidate);
+            if (ImGui::Selectable(label.c_str(), settings.HarmonicBalance.Samples == candidate)) {
+                settings.HarmonicBalance.Samples = candidate;
+            }
+        }
+        ImGui::EndCombo();
+    }
+    const Core::Circuit circuit = m_Schematic.BuildCircuit();
+    const auto suggested = Core::SuggestHarmonicBalanceSettings(circuit);
+    ImGui::BeginDisabled(!suggested.has_value());
+    if (ImGui::Button("From sources") && suggested) {
+        settings.HarmonicBalance.FundamentalFrequency = suggested->FundamentalFrequency;
+        settings.HarmonicBalance.Harmonics = suggested->Harmonics;
+        settings.HarmonicBalance.Samples = suggested->Samples;
+        m_HBFundamental.Load(suggested->FundamentalFrequency);
+    }
+    ImGui::EndDisabled();
+    ImGui::SetItemTooltip(
+        "%s", suggested ? "Set the fundamental frequency and harmonic count from the circuit's periodic sources"
+                        : "Needs a sine, AC, pulse or clock source with commensurable frequencies");
+}
+
 void AnalysisSettingsPanel::DrawRunModeSettings(SimulationSettings &settings) {
     ImGui::Separator();
     ImGui::PushID("run_mode");

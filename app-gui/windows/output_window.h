@@ -20,6 +20,7 @@
 #include "windows/output_tabs/ac_sweep_tab.h"
 #include "windows/output_tabs/dc_sweep_tab.h"
 #include "windows/output_tabs/frame_results.h"
+#include "windows/output_tabs/harmonic_balance_tab.h"
 #include "windows/output_tabs/monte_carlo_tab.h"
 #include "windows/output_tabs/noise_tab.h"
 #include "windows/output_tabs/operating_point_tab.h"
@@ -92,6 +93,7 @@ private:
     NoiseTab m_NoiseTab;
     PoleZeroTab m_PoleZeroTab;
     SParameterTab m_SParameterTab;
+    HarmonicBalanceTab m_HarmonicBalanceTab;
     MonteCarloTab m_MonteCarloTab;
     /// The tab shown this frame, which Export saves.
     PlotTab m_ShownTab = PlotTab::TRANSIENT;

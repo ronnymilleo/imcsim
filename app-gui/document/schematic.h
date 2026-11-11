@@ -196,6 +196,8 @@ public:
     const std::optional<Core::SParameters> &GetSParameters() const;
     void SetTruthTable(std::optional<Core::TruthTable> truth_table);
     const std::optional<Core::TruthTable> &GetTruthTable() const;
+    void SetHarmonicBalance(std::optional<Core::HarmonicBalance> harmonic_balance);
+    const std::optional<Core::HarmonicBalance> &GetHarmonicBalance() const;
     std::size_t GetOperatingPointVersion() const;
     std::size_t GetTransientVersion() const;
     std::size_t GetTransientDataVersion() const;
@@ -208,6 +210,7 @@ public:
     std::size_t GetPoleZeroVersion() const;
     std::size_t GetSParametersVersion() const;
     std::size_t GetTruthTableVersion() const;
+    std::size_t GetHarmonicBalanceVersion() const;
 
 private:
     // Content
@@ -296,6 +299,7 @@ private:
     std::optional<Core::PoleZero> m_PoleZero;
     std::optional<Core::SParameters> m_SParameters;
     std::optional<Core::TruthTable> m_TruthTable;
+    std::optional<Core::HarmonicBalance> m_HarmonicBalance;
     // Result versions, which change with every new result, so windows can tell a rerun from one they showed
     std::size_t m_OperatingPointVersion = 0;
     std::size_t m_TransientVersion = 0;
@@ -310,6 +314,7 @@ private:
     std::size_t m_PoleZeroVersion = 0;
     std::size_t m_SParametersVersion = 0;
     std::size_t m_TruthTableVersion = 0;
+    std::size_t m_HarmonicBalanceVersion = 0;
 
     void InvalidateDerivedData();
     void ClearMonteCarlo();

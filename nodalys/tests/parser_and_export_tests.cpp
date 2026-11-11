@@ -258,6 +258,45 @@ TEST_CASE("SPICE netlists parse into runnable circuits and simulation directives
         CHECK(cfg.FindPoles);
         CHECK_FALSE(cfg.FindZeros);
     }
+
+    SECTION("Harmonic Balance directive (.hb)") {
+        const std::string_view netlist = "* HB RC Divider\n"
+                                         "Vin 1 0 SIN(0 5 1k)\n"
+                                         "R1 1 2 1k\n"
+                                         "R2 2 0 1k\n"
+                                         ".hb 1k 8 samples=64\n"
+                                         ".end\n";
+
+        const auto parsed = nodalys::ParseNetlist(netlist);
+        REQUIRE(parsed.has_value());
+        REQUIRE(parsed->Analyses.size() == 1);
+        CHECK(parsed->Analyses[0].Kind == nodalys::AnalysisKind::HarmonicBalance);
+
+        const auto &cfg = std::get<nodalys::HarmonicBalanceConfig>(parsed->Analyses[0].Config);
+        CHECK_THAT(cfg.FundamentalFrequency, WithinRel(1000.0, 1e-9));
+        CHECK(cfg.Harmonics == 8);
+        CHECK(cfg.Samples == 64);
+
+        const auto hb = nodalys::ComputeHarmonicBalance(parsed->CircuitInstance, cfg);
+        REQUIRE(hb.has_value());
+        REQUIRE(hb->Frequencies.size() == 9);
+        CHECK_THAT(std::abs(hb->NodePhasors[2][1]), WithinRel(2.5, 1e-6));
+
+        const std::string_view default_samples_netlist = "V1 1 0 SIN(0 1 2k)\n"
+                                                         "R1 1 0 100\n"
+                                                         ".hb 2k 5\n"
+                                                         ".end\n";
+        const auto parsed_default = nodalys::ParseNetlist(default_samples_netlist);
+        REQUIRE(parsed_default.has_value());
+        const auto &cfg_default = std::get<nodalys::HarmonicBalanceConfig>(parsed_default->Analyses[0].Config);
+        CHECK_THAT(cfg_default.FundamentalFrequency, WithinRel(2000.0, 1e-9));
+        CHECK(cfg_default.Harmonics == 5);
+        CHECK(cfg_default.Samples == 0);
+
+        CHECK_FALSE(nodalys::ParseNetlist("V1 1 0 1\nR1 1 0 1\n.hb 1k\n.end\n").has_value());
+        CHECK_FALSE(nodalys::ParseNetlist("V1 1 0 1\nR1 1 0 1\n.hb -1k 4\n.end\n").has_value());
+        CHECK_FALSE(nodalys::ParseNetlist("V1 1 0 1\nR1 1 0 1\n.hb 1k 4 samples=bad\n.end\n").has_value());
+    }
 }
 
 TEST_CASE("Simulation results export to RAW, CSV, and JSON formats", "[nodalys][export]") {
@@ -365,6 +404,38 @@ TEST_CASE("Simulation results export to RAW, CSV, and JSON formats", "[nodalys][
         CHECK(json.contains("\"analysis\": \"pole_zero\""));
         CHECK(json.contains("\"poles\": [{\"real\": -1000, \"imag\": 0, \"frequency_hz\": 159.15494}]"));
         CHECK(json.contains("\"zeros\": ["));
+    }
+
+    SECTION("Harmonic Balance result export (RAW, CSV, JSON)") {
+        nodalys::HarmonicBalanceResult hb_res;
+        hb_res.Frequencies = {0.0, 1000.0, 2000.0};
+        hb_res.NodePhasors.resize(2);
+        hb_res.NodePhasors[1] = {{0.5, 0.0}, {2.0, 0.0}, {0.2, 0.0}};
+        hb_res.CurrentPhasors.push_back({.Name = "V1", .Phasors = {{-0.5e-3, 0.0}, {-2e-3, 0.0}, {-0.2e-3, 0.0}}});
+        hb_res.Times = {0.0, 250e-6, 500e-6, 750e-6};
+        hb_res.NodeWaveforms.resize(2);
+        hb_res.NodeWaveforms[1] = {2.7, 0.3, -1.3, 0.3};
+        hb_res.CurrentWaveforms.push_back({.Name = "V1", .Values = {-2.7e-3, -0.3e-3, 1.3e-3, -0.3e-3}});
+        hb_res.Iterations = 3;
+        hb_res.Strategy = "direct";
+
+        const std::string raw = nodalys::ExportRaw(hb_res, "HB Test");
+        CHECK(raw.contains("Plotname: Harmonic Balance Spectrum"));
+        CHECK(raw.contains("Flags: complex"));
+        CHECK(raw.contains("Plotname: Harmonic Balance Waveform"));
+        CHECK(raw.contains("Flags: real"));
+
+        const std::string csv = nodalys::ExportCsv(hb_res);
+        CHECK(csv.contains("Harmonic,Frequency_Hz,V(1)_Mag,V(1)_Phase_deg,V(1)_Re,V(1)_Im"));
+        CHECK(csv.contains("Signal,THD_Percent"));
+        CHECK(csv.contains("Time_s,V(1),I(V1)"));
+
+        const std::string json = nodalys::ExportJson(hb_res);
+        CHECK(json.contains("\"analysis\": \"harmonic_balance\""));
+        CHECK(json.contains("\"frequencies\": [0, 1000, 2000]"));
+        CHECK(json.contains("\"node_phasors\""));
+        CHECK(json.contains("\"thd_percent\""));
+        CHECK(json.contains("\"node_waveforms\""));
     }
 
     SECTION("SaveStringToFile") {
@@ -532,6 +603,33 @@ TEST_CASE("The Nodalys standalone binary runs netlists from arguments or standar
         std::string json_content((std::istreambuf_iterator<char>(out_file)), std::istreambuf_iterator<char>());
         CHECK(json_content.contains("\"analysis\": \"pole_zero\""));
         CHECK(json_content.contains("\"poles\""));
+
+        std::filesystem::remove(test_netlist_path);
+        std::filesystem::remove(test_output_path);
+    }
+
+    SECTION("CLI execution with .hb analysis and JSON/CSV output") {
+        const std::string test_netlist_path = "/tmp/nodalys_cli_hb_in.cir";
+        const std::string test_output_path = "/tmp/nodalys_cli_hb_out.json";
+
+        const std::string netlist = "* Test Harmonic Balance\n"
+                                    "Vin 1 0 SIN(0 4 1k)\n"
+                                    "R1 1 2 1k\n"
+                                    "R2 2 0 1k\n"
+                                    ".hb 1k 4 samples=32\n"
+                                    ".end\n";
+        REQUIRE(nodalys::SaveStringToFile(test_netlist_path, netlist));
+
+        const std::string cmd =
+            std::format("{} -b -a hb -f json -o {} {}", cli_path, test_output_path, test_netlist_path);
+        const int rc = std::system(cmd.c_str());
+        CHECK(rc == 0);
+        REQUIRE(std::filesystem::exists(test_output_path));
+
+        std::ifstream out_file(test_output_path);
+        std::string json_content((std::istreambuf_iterator<char>(out_file)), std::istreambuf_iterator<char>());
+        CHECK(json_content.contains("\"analysis\": \"harmonic_balance\""));
+        CHECK(json_content.contains("\"frequencies\": [0, 1000, 2000, 3000, 4000]"));
 
         std::filesystem::remove(test_netlist_path);
         std::filesystem::remove(test_output_path);

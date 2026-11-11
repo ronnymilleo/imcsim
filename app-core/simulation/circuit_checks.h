@@ -58,6 +58,10 @@ std::vector<std::string> GetNoiseInputSources(const Circuit &circuit);
 std::vector<std::string> GetTransferFunctionInputSources(const Circuit &circuit);
 std::vector<std::string> GetTruthTableInputs(const Circuit &circuit);
 
+// Harmonic balance
+std::optional<std::string> CheckHarmonicBalanceSettings(const Circuit &circuit,
+                                                        const HarmonicBalanceSettings &settings);
+
 } // namespace Core
 
 #endif // IMCSIM_CIRCUIT_CHECKS_H

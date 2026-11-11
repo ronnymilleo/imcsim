@@ -78,4 +78,12 @@ std::expected<SensitivityResult, std::string> ComputeSensitivity(const Circuit &
     return ComputeSensitivity(impl.Compiled(), config, options, messages);
 }
 
+std::expected<HarmonicBalanceResult, std::string> ComputeHarmonicBalance(const Circuit &circuit,
+                                                                         const HarmonicBalanceConfig &config,
+                                                                         const ConvergenceOptions &options,
+                                                                         std::vector<DiagnosticMessage> *messages) {
+    auto &impl = const_cast<Circuit &>(circuit).Impl();
+    return ComputeHarmonicBalance(impl.Compiled(), config, options, messages);
+}
+
 } // namespace nodalys

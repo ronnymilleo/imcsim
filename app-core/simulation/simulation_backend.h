@@ -37,7 +37,8 @@ enum class AnalysisKind {
     SENSITIVITY,
     POLE_ZERO,
     S_PARAMETERS,
-    TRUTH_TABLE
+    TRUTH_TABLE,
+    HARMONIC_BALANCE
 };
 
 /**
@@ -172,6 +173,8 @@ public:
      * @return  The matrix at every frequency or an error, plus the messages of the backend.
      */
     virtual SParametersRun RunSParameters(const Circuit &circuit, const SParameterSettings &settings) = 0;
+
+    virtual HarmonicBalanceRun RunHarmonicBalance(const Circuit &circuit, const HarmonicBalanceSettings &settings);
 };
 
 // Backend in use

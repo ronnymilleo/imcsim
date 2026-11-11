@@ -5,6 +5,8 @@
 include(Catch)
 
 add_executable(nodalys-tests
+    fft_tests.cpp
+    hb_analysis_tests.cpp
     linear_tests.cpp
     parser_and_export_tests.cpp
     sens_analysis_tests.cpp

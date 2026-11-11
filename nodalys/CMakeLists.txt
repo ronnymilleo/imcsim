@@ -5,6 +5,7 @@
 add_library(nodalys STATIC
     src/analyses/ac_analysis.cpp
     src/analyses/dc_analysis.cpp
+    src/analyses/hb_analysis.cpp
     src/analyses/noise_analysis.cpp
     src/analyses/pz_analysis.cpp
     src/analyses/sens_analysis.cpp
@@ -24,6 +25,7 @@ add_library(nodalys STATIC
     src/export/json_exporter.cpp
     src/export/raw_exporter.cpp
     src/linear/dense_matrix.cpp
+    src/linear/fft.cpp
     src/linear/qz.cpp
     src/mna/mna_system.cpp
     src/newton/newton.cpp

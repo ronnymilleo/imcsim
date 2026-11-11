@@ -687,6 +687,9 @@ void DrawCursorReadout(const std::vector<double> &xs, const char *x_unit, const 
     ImGui::BeginTooltip();
     ImGui::TextDisabled("%s", std::format("at {}{}", Core::FormatValue(xs[sample]), x_unit).c_str());
     for (const PlottedTrace &trace : plotted) {
+        if (trace.Values == nullptr || sample >= trace.Values->size()) {
+            continue;
+        }
         const double value = (*trace.Values)[sample];
         std::string text = std::format("{}: {}{}", trace.Label, Core::FormatMeasurement(value), trace.Unit);
         if (trace.LogicLevel) {

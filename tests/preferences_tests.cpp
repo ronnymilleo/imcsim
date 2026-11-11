@@ -23,6 +23,7 @@ TEST_CASE("Preferences load back unchanged from the file they save", "[preferenc
     preferences.SimulationBackend = "Nodalys";
     preferences.RerunOnEdit = true;
     preferences.RerunDelaySeconds = 1.5;
+    preferences.HarmonicAmplitudes = GUI::HarmonicAmplitudeUnit::RMS;
 
     const GUI::LoadedPreferences loaded = GUI::LoadPreferences(GUI::SavePreferences(preferences));
     CHECK(loaded.Warnings.empty());
@@ -84,4 +85,12 @@ TEST_CASE("Wire colorings and live effects have the names menus show", "[prefere
     CHECK(std::string(GUI::GetWireColoringName(GUI::WireColoring::NODES)) == "Nodes");
     CHECK(std::string(GUI::GetWireColoringName(GUI::WireColoring::SENSITIVITY)) == "Sensitivity");
     CHECK(std::string(GUI::GetLiveEffectName(GUI::LiveEffect::CURRENT_FLOW)) == "Current Flow");
+    CHECK(std::string(GUI::GetHarmonicAmplitudeUnitName(GUI::HarmonicAmplitudeUnit::PEAK)) == "Peak");
+    CHECK(std::string(GUI::GetHarmonicAmplitudeUnitName(GUI::HarmonicAmplitudeUnit::RMS)) == "RMS");
+}
+
+TEST_CASE("An unknown harmonic amplitude unit keeps Peak with a warning", "[preferences]") {
+    const GUI::LoadedPreferences loaded = GUI::LoadPreferences(R"({"harmonic_amplitudes": "Average"})");
+    CHECK(loaded.Warnings.size() == 1);
+    CHECK(loaded.Choices.HarmonicAmplitudes == GUI::HarmonicAmplitudeUnit::PEAK);
 }

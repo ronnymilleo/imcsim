@@ -45,6 +45,8 @@ struct TimeContext {
     /// True on the first integration step of a transient: uses Backward Euler (1st-order, needs no past derivatives)
     /// to bootstrap the state before switching to the Trapezoidal rule (2nd-order) on subsequent steps.
     bool BackwardEuler = false;
+    /// True while evaluating periodic steady-state waveforms over one Harmonic Balance cycle.
+    bool IsPeriodicSteadyState = false;
     /// Current simulation time $t$, in seconds.
     double Time = 0.0;
     /// Integration step size $h = \Delta t$, in seconds (used only when `IsTransient` is true).

@@ -53,6 +53,7 @@ private:
     ValueField m_NoiseStopFrequency;
     ValueField m_SStartFrequency;
     ValueField m_SStopFrequency;
+    ValueField m_HBFundamental;
     /// Start, stop and step of the stepped parameter.
     std::array<ValueField, 3> m_ParameterFields;
     /// The tolerance in percent that the buttons of Monte Carlo give every part of a kind.
@@ -74,6 +75,7 @@ private:
     void DrawSourceAndOutputPickers(std::string &source, std::optional<GridPoint> &output, const std::string &id,
                                     const char *empty_text, const char *tooltip);
     void DrawTruthTableSettings(SimulationSettings &settings);
+    void DrawHarmonicBalanceSettings(SimulationSettings &settings);
     void DrawRunModeSettings(SimulationSettings &settings);
     void DrawParameterStepSettings(ParameterStepSettings &step);
     void DrawMonteCarloSettings(Core::MonteCarloSettings &monte_carlo);

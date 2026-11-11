@@ -32,7 +32,8 @@ enum class AnalysisKind {
     Noise,            ///< .noise
     SParameters,      ///< .sp
     PoleZero,         ///< .pz
-    Sensitivity       ///< .sens
+    Sensitivity,      ///< .sens
+    HarmonicBalance   ///< .hb
 };
 
 /**
@@ -49,7 +50,8 @@ struct ParsedAnalysis {
                  NoiseConfig,            // Noise (.noise)
                  SParameterConfig,       // SParameters (.sp)
                  PoleZeroConfig,         // PoleZero (.pz)
-                 SensitivityConfig       // Sensitivity (.sens)
+                 SensitivityConfig,      // Sensitivity (.sens)
+                 HarmonicBalanceConfig   // HarmonicBalance (.hb)
                  >
         Config;
 };

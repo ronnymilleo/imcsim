@@ -1298,6 +1298,30 @@ TEST_CASE("A file saved before the S-parameter analysis loads it as its defaults
     CHECK(loaded.Warnings.empty());
     CHECK(loaded.Settings.Selected == GUI::Analysis::POLE_ZERO);
     CHECK(loaded.Settings.SParameters == Core::SParameterSettings{});
+    CHECK(loaded.Settings.HarmonicBalance == Core::HarmonicBalanceSettings{});
+}
+
+TEST_CASE("The harmonic balance settings load back unchanged", "[schematic_file]") {
+    GUI::SimulationSettings settings;
+    settings.HarmonicBalance = {.FundamentalFrequency = 50.0, .Harmonics = 15, .Samples = 64};
+    settings.Selected = GUI::Analysis::HARMONIC_BALANCE;
+    const GUI::LoadedSchematic loaded = LoadOrFail(GUI::SaveSchematic({}, {}, settings, {}));
+    CHECK(loaded.Warnings.empty());
+    CHECK(loaded.Settings == settings);
+    CHECK(loaded.Settings.Selected == GUI::Analysis::HARMONIC_BALANCE);
+}
+
+TEST_CASE("Invalid harmonic balance settings fall back to their defaults with a warning", "[schematic_file]") {
+    for (const char *hb : {R"({"fundamental": 0})", R"({"fundamental": "1k"})", R"({"harmonics": 0})",
+                           R"({"harmonics": 65})", R"({"harmonics": 8, "samples": 16})",
+                           R"({"harmonics": 8, "samples": 30})", R"({"harmonics": 8, "samples": 131072})"}) {
+        const std::string text = std::string(R"({"format": "imcsim-schematic", "version": 1, "simulation": {)"
+                                             R"("harmonic_balance": )") +
+                                 hb + "}}";
+        const GUI::LoadedSchematic loaded = LoadOrFail(text);
+        CHECK(loaded.Warnings.size() == 1);
+        CHECK(loaded.Settings.HarmonicBalance == Core::HarmonicBalanceSettings{});
+    }
 }
 
 TEST_CASE("A behavioral source keeps its expression as written, and loads with the default when it has none",

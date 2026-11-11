@@ -514,6 +514,8 @@ void Application::ShowNewResults() {
                 m_Schematic.GetSParameters().has_value(), PlotTab::S_PARAMETERS);
     show_if_new(m_ShownTruthTableVersion, m_Schematic.GetTruthTableVersion(), m_Schematic.GetTruthTable().has_value(),
                 PlotTab::TRUTH_TABLE);
+    show_if_new(m_ShownHarmonicBalanceVersion, m_Schematic.GetHarmonicBalanceVersion(),
+                m_Schematic.GetHarmonicBalance().has_value(), PlotTab::HARMONIC_BALANCE);
     // After the analyses, so the table of a Monte Carlo run is what shows in front of the traces it came with
     show_if_new(m_ShownMonteCarloVersion, m_Schematic.GetMonteCarloVersion(), m_Schematic.GetMonteCarlo().has_value(),
                 PlotTab::MONTE_CARLO);

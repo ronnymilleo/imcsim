@@ -302,4 +302,85 @@ std::string ExportRaw(const SensitivityResult &result, std::string_view title) {
     return ss.str();
 }
 
+std::string ExportRaw(const HarmonicBalanceResult &result, std::string_view title) {
+    std::ostringstream ss;
+    const std::string date_str = CurrentDateString();
+
+    const std::size_t num_nodes = result.NodePhasors.size() > 1 ? result.NodePhasors.size() - 1 : 0;
+    const std::size_t num_currents = result.CurrentPhasors.size();
+    const std::size_t num_vars = 1 + num_nodes + num_currents;
+    const std::size_t num_freq_pts = result.Frequencies.size();
+
+    // Plot 1: Complex harmonic spectrum
+    ss << "Title: " << title << "\n";
+    ss << "Date: " << date_str << "\n";
+    ss << "Plotname: Harmonic Balance Spectrum\n";
+    ss << "Flags: complex\n";
+    ss << "No. Variables: " << num_vars << "\n";
+    ss << "No. Points: " << num_freq_pts << "\n";
+    ss << "Variables:\n";
+
+    std::size_t var_idx = 0;
+    ss << "\t" << var_idx++ << "\tfrequency\tfrequency\n";
+    for (std::size_t node = 1; node < result.NodePhasors.size(); ++node) {
+        ss << "\t" << var_idx++ << "\tv(" << node << ")\tvoltage\n";
+    }
+    for (const auto &cur : result.CurrentPhasors) {
+        ss << "\t" << var_idx++ << "\ti(" << cur.Name << ")\tcurrent\n";
+    }
+
+    ss << "Values:\n";
+    for (std::size_t pt = 0; pt < num_freq_pts; ++pt) {
+        ss << pt << "\t" << std::format("{:.15e},{:.15e}\n", result.Frequencies[pt], 0.0);
+        for (std::size_t node = 1; node < result.NodePhasors.size(); ++node) {
+            const auto p =
+                (pt < result.NodePhasors[node].size()) ? result.NodePhasors[node][pt] : std::complex<double>{};
+            ss << "\t" << std::format("{:.15e},{:.15e}\n", p.real(), p.imag());
+        }
+        for (const auto &cur : result.CurrentPhasors) {
+            const auto p = (pt < cur.Phasors.size()) ? cur.Phasors[pt] : std::complex<double>{};
+            ss << "\t" << std::format("{:.15e},{:.15e}\n", p.real(), p.imag());
+        }
+    }
+
+    // Plot 2: Reconstructed periodic waveform
+    if (!result.Times.empty()) {
+        const std::size_t wf_nodes = result.NodeWaveforms.size() > 1 ? result.NodeWaveforms.size() - 1 : 0;
+        const std::size_t wf_currents = result.CurrentWaveforms.size();
+        const std::size_t wf_vars = 1 + wf_nodes + wf_currents;
+
+        ss << "Title: " << title << "\n";
+        ss << "Date: " << date_str << "\n";
+        ss << "Plotname: Harmonic Balance Waveform\n";
+        ss << "Flags: real\n";
+        ss << "No. Variables: " << wf_vars << "\n";
+        ss << "No. Points: " << result.Times.size() << "\n";
+        ss << "Variables:\n";
+
+        var_idx = 0;
+        ss << "\t" << var_idx++ << "\ttime\ttime\n";
+        for (std::size_t node = 1; node < result.NodeWaveforms.size(); ++node) {
+            ss << "\t" << var_idx++ << "\tv(" << node << ")\tvoltage\n";
+        }
+        for (const auto &cur : result.CurrentWaveforms) {
+            ss << "\t" << var_idx++ << "\ti(" << cur.Name << ")\tcurrent\n";
+        }
+
+        ss << "Values:\n";
+        for (std::size_t pt = 0; pt < result.Times.size(); ++pt) {
+            ss << pt << "\t" << std::format("{:.15e}\n", result.Times[pt]);
+            for (std::size_t node = 1; node < result.NodeWaveforms.size(); ++node) {
+                const double val = (pt < result.NodeWaveforms[node].size()) ? result.NodeWaveforms[node][pt] : 0.0;
+                ss << "\t" << std::format("{:.15e}\n", val);
+            }
+            for (const auto &cur : result.CurrentWaveforms) {
+                const double val = (pt < cur.Values.size()) ? cur.Values[pt] : 0.0;
+                ss << "\t" << std::format("{:.15e}\n", val);
+            }
+        }
+    }
+
+    return ss.str();
+}
+
 } // namespace nodalys
