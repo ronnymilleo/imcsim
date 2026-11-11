@@ -1,0 +1,22 @@
+* Example library: a generic op-amp and two discrete parts
+*
+* connections:    non-inverting input
+*                 | inverting input
+*                 | | positive supply
+*                 | | | negative supply
+*                 | | | | output
+*                 | | | | |
+.subckt GENERIC_OPAMP INP INN VP VN OUT PARAMS: GAIN=100k RO=75
+RIN INP INN 1Meg
+G1 0 INT INP INN {GAIN/1Meg}
+RP INT 0 1Meg
+CP INT 0 15.9p
+DHIGH INT VP DCLAMP
+DLOW VN INT DCLAMP
+E2 DRIVE 0 INT 0 1
+ROUT DRIVE OUT {RO}
+.model DCLAMP D(IS=1e-15)
+.ends GENERIC_OPAMP
+
+.model 1N4148 D(IS=2.52n RS=0.568 N=1.752 CJO=4p M=0.4 TT=20n BV=100 IBV=100u)
+.model 2N3904 NPN(IS=6.734f BF=416.4 VAF=74.03 IKF=66.78m ISE=6.734f NE=1.259 BR=0.7371 CJE=4.493p CJC=3.638p TF=301.2p TR=239.5n)
