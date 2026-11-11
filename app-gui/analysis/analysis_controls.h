@@ -71,6 +71,7 @@ public:
     void Update();
     bool IsRunning() const;
     bool IsStopping() const;
+    bool IsBackendInUse() const;
     std::optional<Analysis> GetRunningAnalysis() const;
     double GetRunProgress() const;
 

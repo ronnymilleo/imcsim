@@ -205,6 +205,7 @@ void PreferencesWindow::DrawResults() {
         ImGui::SetItemTooltip("Nodalys, the built-in solver of imcsim; it runs analog and digital simulations");
         ImGui::EndCombo();
     }
+    ImGui::SetItemTooltip("The engine that solves the circuits; a run in progress ends on the one it started on");
     ImGui::EndTable();
     if (!BeginSection("Results")) {
         return;

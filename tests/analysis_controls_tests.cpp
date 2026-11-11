@@ -704,6 +704,27 @@ TEST_CASE("A live run goes on past its stop time and a switch flipped on the way
     CHECK(controls.GetOutcome(GUI::Analysis::TRANSIENT) == GUI::RunOutcome::NONE);
 }
 
+TEST_CASE("A run holds the backend until it ends, a paused live run too, so it is not replaced under it",
+          "[analysis_controls][live]") {
+    GUI::Schematic schematic;
+    OpenRCFilter(schematic);
+    SelectLiveTransient(schematic);
+    GUI::AnalysisControls controls(schematic);
+    CHECK_FALSE(controls.IsBackendInUse());
+    controls.SetLiveMode(true);
+
+    controls.RunSelected();
+    CHECK(controls.IsBackendInUse());
+    REQUIRE(UpdateUntil(controls, [&] { return ReachedTime(schematic) > 1e-3; }));
+    controls.StopRun();
+    // Paused, the run is not running, yet its worker still holds the backend
+    CHECK_FALSE(controls.IsRunning());
+    CHECK(controls.IsBackendInUse());
+
+    controls.DiscardLive();
+    REQUIRE(UpdateUntil(controls, [&] { return !controls.IsBackendInUse(); }));
+}
+
 TEST_CASE("Stopping a live run pauses it with its points, Continue takes it on and Run starts over",
           "[analysis_controls][live]") {
     GUI::Schematic schematic;
