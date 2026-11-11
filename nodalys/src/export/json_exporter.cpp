@@ -211,4 +211,22 @@ std::string ExportJson(const PoleZeroResult &result) {
     return ss.str();
 }
 
+std::string ExportJson(const SensitivityResult &result) {
+    std::ostringstream ss;
+    ss << "{\n  \"analysis\": \"sensitivity\",\n";
+    ss << "  \"output_positive_node\": " << result.OutputPositiveNode << ",\n";
+    ss << "  \"output_negative_node\": " << result.OutputNegativeNode << ",\n";
+    ss << "  \"vectors\": {\n";
+    bool first = true;
+    for (const auto &[name, val] : result.Vectors) {
+        if (!first) {
+            ss << ",\n";
+        }
+        first = false;
+        ss << "    \"" << name << "\": " << std::format("{:.8g}", val);
+    }
+    ss << "\n  }\n}\n";
+    return ss.str();
+}
+
 } // namespace nodalys

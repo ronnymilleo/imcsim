@@ -483,6 +483,8 @@ public:
             Device *dev2 = AddDevice(std::make_unique<ResistorDevice>(uw, ub, r2));
             m_Compiled.ElementsByName[name + "-R1"] = dev1;
             m_Compiled.ElementsByName[name + "-R2"] = dev2;
+            m_Compiled.ElementsByName[std::format("R-{}a", name)] = dev1;
+            m_Compiled.ElementsByName[std::format("R-{}b", name)] = dev2;
             m_Compiled.Currents.push_back({name + ".A", {{dev1, 0}}});
             m_Compiled.Currents.push_back({name + ".W", {{dev1, 1}, {dev2, 0}}});
             m_Compiled.Currents.push_back({name + ".B", {{dev2, 1}}});

@@ -99,6 +99,9 @@ public:
     /// Solves $A \cdot x = \text{rhs}$ via LU decomposition with partial pivoting; returns false if singular.
     bool Solve(std::vector<double> &x) const;
 
+    /// Solves the transposed (adjoint) system $A^T \cdot x = \text{rhs}$ via LU decomposition with partial pivoting.
+    bool SolveTranspose(const std::vector<double> &rhs, std::vector<double> &x) const;
+
     /**
      * @brief   Solves the small-signal complex AC system $(A_{\text{DC}} + j \omega C_{\text{AC}}) \cdot x_{\text{AC}}
      * = b_{\text{AC}}$.

@@ -181,7 +181,7 @@ private:
     }
 
     std::expected<void, std::string> AddCircuit(const Circuit &circuit, const std::vector<int> &node_map,
-                                                const Parameters &parameters) {
+                                                const Parameters &parameters, const std::string &prefix = "") {
         const auto probes = PlanProbes(circuit);
         if (!probes) {
             return std::unexpected(probes.error());
@@ -194,14 +194,16 @@ private:
             const int original_node =
                 node_map[static_cast<std::size_t>(target.Nodes[static_cast<std::size_t>(probe.Terminal)])];
             const int probe_node = m_Builder->AddNode();
-            const std::string probe_name = std::format("__probe_{}_{}", probe.Entry, probe.Terminal);
+            const std::string probe_name = prefix.empty()
+                                               ? std::format("__probe_{}_{}", probe.Entry, probe.Terminal)
+                                               : std::format("__probe_{}_{}_{}", prefix, probe.Entry, probe.Terminal);
             m_Builder->AddCurrentProbe(probe_name, original_node, probe_node);
             probe_nodes[probe.Entry][probe.Terminal] = probe_node;
         }
 
         for (std::size_t index = 0; index < circuit.GetEntries().size(); ++index) {
             if (const auto result = AddEntry(circuit.GetEntries()[index], circuit, static_cast<int>(index), node_map,
-                                             parameters, probe_nodes);
+                                             parameters, probe_nodes, prefix);
                 !result) {
                 return std::unexpected(result.error());
             }
@@ -211,9 +213,11 @@ private:
 
     std::expected<void, std::string> AddEntry(const CircuitEntry &entry, const Circuit &owner, const int entry_index,
                                               const std::vector<int> &node_map, const Parameters &parameters,
-                                              const std::map<int, std::map<int, int>> &probe_map) {
+                                              const std::map<int, std::map<int, int>> &probe_map,
+                                              const std::string &prefix = "") {
         const Component &part = *entry.Part;
         const ComponentType type = part.GetType();
+        const std::string name = prefix.empty() ? part.GetName() : std::format("{}.{}", prefix, part.GetName());
 
         std::vector<int> nodes;
         nodes.reserve(entry.Nodes.size());
@@ -238,7 +242,7 @@ private:
             if (!value) {
                 return std::unexpected(value.error());
             }
-            m_Builder->AddResistor(part.GetName(), nodes[0], nodes[1], *value);
+            m_Builder->AddResistor(name, nodes[0], nodes[1], *value);
             return {};
         }
 
@@ -248,7 +252,7 @@ private:
                 return std::unexpected(value.error());
             }
             const std::optional<double> initial = part.GetInitialCondition();
-            m_Builder->AddCapacitor(part.GetName(), nodes[0], nodes[1], *value, initial.value_or(0.0));
+            m_Builder->AddCapacitor(name, nodes[0], nodes[1], *value, initial.value_or(0.0));
             return {};
         }
 
@@ -258,14 +262,16 @@ private:
                 return std::unexpected(value.error());
             }
             const std::optional<double> initial = part.GetInitialCondition();
-            m_Builder->AddInductor(part.GetName(), nodes[0], nodes[1], *value, initial.value_or(0.0));
+            m_Builder->AddInductor(name, nodes[0], nodes[1], *value, initial.value_or(0.0));
             return {};
         }
 
         case ComponentType::SWITCH:
         case ComponentType::PUSH_BUTTON: {
             const auto &contact = static_cast<const Switch &>(part);
-            m_Builder->AddResistor(std::format("R-{}", part.GetName()), nodes[0], nodes[1], contact.GetResistance());
+            m_Builder->AddResistor(prefix.empty() ? std::format("R-{}", part.GetName())
+                                                  : std::format("{}.R-{}", prefix, part.GetName()),
+                                   nodes[0], nodes[1], contact.GetResistance());
             return {};
         }
 
@@ -274,7 +280,7 @@ private:
             if (!value) {
                 return std::unexpected(value.error());
             }
-            m_Builder->AddVdc(part.GetName(), nodes[0], 0, *value);
+            m_Builder->AddVdc(name, nodes[0], 0, *value);
             return {};
         }
 
@@ -284,25 +290,25 @@ private:
                 source.GetSourceType() == Source::SourceType::AC ? source.GetAC().Magnitude : 0.0;
             switch (source.GetSourceType()) {
             case Source::SourceType::DC:
-                m_Builder->AddVdc(part.GetName(), nodes[0], nodes[1], source.GetValue(), ac_magnitude);
+                m_Builder->AddVdc(name, nodes[0], nodes[1], source.GetValue(), ac_magnitude);
                 break;
             case Source::SourceType::AC:
-                m_Builder->AddVsine(part.GetName(), nodes[0], nodes[1], source.GetAC(), ac_magnitude);
+                m_Builder->AddVsine(name, nodes[0], nodes[1], source.GetAC(), ac_magnitude);
                 break;
             case Source::SourceType::PULSE:
-                m_Builder->AddVpulse(part.GetName(), nodes[0], nodes[1], source.GetPulse(), ac_magnitude);
+                m_Builder->AddVpulse(name, nodes[0], nodes[1], source.GetPulse(), ac_magnitude);
                 break;
             case Source::SourceType::EXP:
-                m_Builder->AddVexp(part.GetName(), nodes[0], nodes[1], source.GetEXP(), ac_magnitude);
+                m_Builder->AddVexp(name, nodes[0], nodes[1], source.GetEXP(), ac_magnitude);
                 break;
             case Source::SourceType::PWL:
-                m_Builder->AddVpwl(part.GetName(), nodes[0], nodes[1], source.GetPWL(), ac_magnitude);
+                m_Builder->AddVpwl(name, nodes[0], nodes[1], source.GetPWL(), ac_magnitude);
                 break;
             case Source::SourceType::SFFM:
-                m_Builder->AddVsffm(part.GetName(), nodes[0], nodes[1], source.GetSFFM(), ac_magnitude);
+                m_Builder->AddVsffm(name, nodes[0], nodes[1], source.GetSFFM(), ac_magnitude);
                 break;
             case Source::SourceType::AM:
-                m_Builder->AddVam(part.GetName(), nodes[0], nodes[1], source.GetAM(), ac_magnitude);
+                m_Builder->AddVam(name, nodes[0], nodes[1], source.GetAM(), ac_magnitude);
                 break;
             }
             return {};
@@ -314,25 +320,25 @@ private:
                 source.GetSourceType() == Source::SourceType::AC ? source.GetAC().Magnitude : 0.0;
             switch (source.GetSourceType()) {
             case Source::SourceType::DC:
-                m_Builder->AddIdc(part.GetName(), nodes[0], nodes[1], source.GetValue(), ac_magnitude);
+                m_Builder->AddIdc(name, nodes[0], nodes[1], source.GetValue(), ac_magnitude);
                 break;
             case Source::SourceType::AC:
-                m_Builder->AddIsine(part.GetName(), nodes[0], nodes[1], source.GetAC(), ac_magnitude);
+                m_Builder->AddIsine(name, nodes[0], nodes[1], source.GetAC(), ac_magnitude);
                 break;
             case Source::SourceType::PULSE:
-                m_Builder->AddIpulse(part.GetName(), nodes[0], nodes[1], source.GetPulse(), ac_magnitude);
+                m_Builder->AddIpulse(name, nodes[0], nodes[1], source.GetPulse(), ac_magnitude);
                 break;
             case Source::SourceType::EXP:
-                m_Builder->AddIexp(part.GetName(), nodes[0], nodes[1], source.GetEXP(), ac_magnitude);
+                m_Builder->AddIexp(name, nodes[0], nodes[1], source.GetEXP(), ac_magnitude);
                 break;
             case Source::SourceType::PWL:
-                m_Builder->AddIpwl(part.GetName(), nodes[0], nodes[1], source.GetPWL(), ac_magnitude);
+                m_Builder->AddIpwl(name, nodes[0], nodes[1], source.GetPWL(), ac_magnitude);
                 break;
             case Source::SourceType::SFFM:
-                m_Builder->AddIsffm(part.GetName(), nodes[0], nodes[1], source.GetSFFM(), ac_magnitude);
+                m_Builder->AddIsffm(name, nodes[0], nodes[1], source.GetSFFM(), ac_magnitude);
                 break;
             case Source::SourceType::AM:
-                m_Builder->AddIam(part.GetName(), nodes[0], nodes[1], source.GetAM(), ac_magnitude);
+                m_Builder->AddIam(name, nodes[0], nodes[1], source.GetAM(), ac_magnitude);
                 break;
             }
             return {};
@@ -340,14 +346,13 @@ private:
 
         case ComponentType::CLOCK: {
             const auto &clock = static_cast<const Clock &>(part);
-            m_Builder->AddClock(part.GetName(), nodes[0], 0, clock.GetParameters());
+            m_Builder->AddClock(name, nodes[0], 0, clock.GetParameters());
             return {};
         }
 
         case ComponentType::LOGIC_INPUT: {
             const auto &input = static_cast<const LogicInput &>(part);
-            m_Builder->AddLogicInput(part.GetName(), nodes[0], 0, input.IsHigh(), input.GetParameters().LogicLevel,
-                                     0.0);
+            m_Builder->AddLogicInput(name, nodes[0], 0, input.IsHigh(), input.GetParameters().LogicLevel, 0.0);
             return {};
         }
 
@@ -357,7 +362,7 @@ private:
             if (!value) {
                 return std::unexpected(value.error());
             }
-            m_Builder->AddPotentiometer(part.GetName(), nodes[0], nodes[2], nodes[1], *value, pot.GetWiper());
+            m_Builder->AddPotentiometer(name, nodes[0], nodes[2], nodes[1], *value, pot.GetWiper());
             return {};
         }
 
@@ -384,7 +389,9 @@ private:
                     body_map[static_cast<std::size_t>(body_node)] = m_Builder->AddNode();
                 }
             }
-            return AddCircuit(definition->Body, body_map, InstanceParameters(instance, *definition));
+            const std::string sub_prefix =
+                prefix.empty() ? instance.GetName() : std::format("{}.{}", prefix, instance.GetName());
+            return AddCircuit(definition->Body, body_map, InstanceParameters(instance, *definition), sub_prefix);
         }
 
         case ComponentType::DIODE:
@@ -395,7 +402,7 @@ private:
             if (!resolved) {
                 return std::unexpected(resolved.error());
             }
-            m_Builder->AddDiode(part.GetName(), nodes[0], nodes[1], *resolved);
+            m_Builder->AddDiode(name, nodes[0], nodes[1], *resolved);
             return {};
         }
 
@@ -406,7 +413,7 @@ private:
             if (!resolved) {
                 return std::unexpected(resolved.error());
             }
-            m_Builder->AddBjt(part.GetName(), nodes[0], nodes[1], nodes[2], type != ComponentType::PNP, *resolved);
+            m_Builder->AddBjt(name, nodes[0], nodes[1], nodes[2], type != ComponentType::PNP, *resolved);
             return {};
         }
 
@@ -418,14 +425,13 @@ private:
                 return std::unexpected(resolved.error());
             }
             const int body = nodes.size() > 3 ? nodes[3] : nodes[2];
-            m_Builder->AddMosfet(part.GetName(), nodes[0], nodes[1], nodes[2], body, type != ComponentType::PMOS,
-                                 *resolved);
+            m_Builder->AddMosfet(name, nodes[0], nodes[1], nodes[2], body, type != ComponentType::PMOS, *resolved);
             return {};
         }
 
         case ComponentType::V_SWITCH: {
             const auto &controlled = static_cast<const VoltageControlledSwitch &>(part);
-            m_Builder->AddVoltageControlledSwitch(part.GetName(), nodes[0], nodes[1], nodes[2], nodes[3],
+            m_Builder->AddVoltageControlledSwitch(name, nodes[0], nodes[1], nodes[2], nodes[3],
                                                   controlled.GetParameters());
             return {};
         }
@@ -433,7 +439,7 @@ private:
         case ComponentType::RELAY: {
             const auto &relay = static_cast<const Relay &>(part);
             const RelayParameters &figures = relay.GetParameters();
-            m_Builder->AddRelay(part.GetName(), nodes[2], nodes[3], nodes[0], nodes[1], figures.CoilResistance,
+            m_Builder->AddRelay(name, nodes[2], nodes[3], nodes[0], nodes[1], figures.CoilResistance,
                                 figures.CoilInductance, relay.GetContactParameters());
             return {};
         }
@@ -443,7 +449,7 @@ private:
             const TransformerParameters &figures = transformer.GetParameters();
             const double l1 = transformer.GetValue();
             const double l2 = transformer.GetSecondaryInductance();
-            m_Builder->AddTransformer(part.GetName(), nodes[0], nodes[1], nodes[2], nodes[3], l1, l2, figures.Coupling,
+            m_Builder->AddTransformer(name, nodes[0], nodes[1], nodes[2], nodes[3], l1, l2, figures.Coupling,
                                       figures.WindingResistance);
             return {};
         }
@@ -459,10 +465,10 @@ private:
             const auto &source = static_cast<const ControlledSource &>(part);
             switch (type) {
             case ComponentType::VCVS:
-                m_Builder->AddVcvs(part.GetName(), nodes[0], nodes[1], nodes[2], nodes[3], *value);
+                m_Builder->AddVcvs(name, nodes[0], nodes[1], nodes[2], nodes[3], *value);
                 break;
             case ComponentType::VCCS:
-                m_Builder->AddVccs(part.GetName(), nodes[0], nodes[1], nodes[2], nodes[3], *value);
+                m_Builder->AddVccs(name, nodes[0], nodes[1], nodes[2], nodes[3], *value);
                 break;
             case ComponentType::CCCS:
             case ComponentType::CCVS: {
@@ -470,11 +476,13 @@ private:
                 if (!target) {
                     return std::unexpected(target.error());
                 }
-                const std::string probe_name = std::format("__probe_{}_{}", target->Entry, target->Terminal);
+                const std::string probe_name =
+                    prefix.empty() ? std::format("__probe_{}_{}", target->Entry, target->Terminal)
+                                   : std::format("__probe_{}_{}_{}", prefix, target->Entry, target->Terminal);
                 if (type == ComponentType::CCCS) {
-                    m_Builder->AddCccs(part.GetName(), nodes[0], nodes[1], probe_name, *value);
+                    m_Builder->AddCccs(name, nodes[0], nodes[1], probe_name, *value);
                 } else {
-                    m_Builder->AddCcvs(part.GetName(), nodes[0], nodes[1], probe_name, *value);
+                    m_Builder->AddCcvs(name, nodes[0], nodes[1], probe_name, *value);
                 }
                 break;
             }
@@ -486,13 +494,13 @@ private:
 
         case ComponentType::NOT: {
             const auto &logic = static_cast<const LogicPart &>(part);
-            m_Builder->AddInverter(part.GetName(), nodes[1], nodes[0], MakeLogicParams(logic));
+            m_Builder->AddInverter(name, nodes[1], nodes[0], MakeLogicParams(logic));
             return {};
         }
 
         case ComponentType::BUFFER: {
             const auto &logic = static_cast<const LogicPart &>(part);
-            m_Builder->AddLogicBuffer(part.GetName(), nodes[1], nodes[0], MakeLogicParams(logic));
+            m_Builder->AddLogicBuffer(name, nodes[1], nodes[0], MakeLogicParams(logic));
             return {};
         }
 
@@ -533,13 +541,13 @@ private:
             default:
                 break;
             }
-            m_Builder->AddLogicGate(part.GetName(), gate_type, out_node, std::move(inputs), MakeLogicParams(logic));
+            m_Builder->AddLogicGate(name, gate_type, out_node, std::move(inputs), MakeLogicParams(logic));
             return {};
         }
 
         case ComponentType::D_FLIP_FLOP: {
             const auto &logic = static_cast<const LogicPart &>(part);
-            m_Builder->AddDFlipFlop(part.GetName(), nodes[4], nodes[5], nodes[0], nodes[1], MakeLogicParams(logic));
+            m_Builder->AddDFlipFlop(name, nodes[4], nodes[5], nodes[0], nodes[1], MakeLogicParams(logic));
             return {};
         }
 
@@ -548,21 +556,21 @@ private:
             const int node_not_r = m_Builder->AddNode();
             const int node_and = m_Builder->AddNode();
             const int node_d = m_Builder->AddNode();
-            m_Builder->AddInverter(part.GetName() + ".NOT_R", node_not_r, nodes[1], MakeLogicParams(logic));
-            m_Builder->AddLogicGate(part.GetName() + ".AND", nodalys::LogicGateType::AND, node_and,
-                                    {node_not_r, nodes[5]}, MakeLogicParams(logic));
-            m_Builder->AddLogicGate(part.GetName() + ".OR", nodalys::LogicGateType::OR, node_d, {nodes[0], node_and},
+            m_Builder->AddInverter(name + ".NOT_R", node_not_r, nodes[1], MakeLogicParams(logic));
+            m_Builder->AddLogicGate(name + ".AND", nodalys::LogicGateType::AND, node_and, {node_not_r, nodes[5]},
                                     MakeLogicParams(logic));
-            m_Builder->AddDFlipFlop(part.GetName(), nodes[5], nodes[6], node_d, nodes[2], MakeLogicParams(logic));
+            m_Builder->AddLogicGate(name + ".OR", nodalys::LogicGateType::OR, node_d, {nodes[0], node_and},
+                                    MakeLogicParams(logic));
+            m_Builder->AddDFlipFlop(name, nodes[5], nodes[6], node_d, nodes[2], MakeLogicParams(logic));
             return {};
         }
 
         case ComponentType::T_FLIP_FLOP: {
             const auto &logic = static_cast<const LogicPart &>(part);
             const int internal_d = m_Builder->AddNode();
-            m_Builder->AddLogicGate(part.GetName() + ".XOR", nodalys::LogicGateType::XOR, internal_d,
-                                    {nodes[0], nodes[4]}, MakeLogicParams(logic));
-            m_Builder->AddDFlipFlop(part.GetName(), nodes[4], nodes[5], internal_d, nodes[1], MakeLogicParams(logic));
+            m_Builder->AddLogicGate(name + ".XOR", nodalys::LogicGateType::XOR, internal_d, {nodes[0], nodes[4]},
+                                    MakeLogicParams(logic));
+            m_Builder->AddDFlipFlop(name, nodes[4], nodes[5], internal_d, nodes[1], MakeLogicParams(logic));
             return {};
         }
 
@@ -572,24 +580,24 @@ private:
             const int node_and1 = m_Builder->AddNode();
             const int node_and2 = m_Builder->AddNode();
             const int node_d = m_Builder->AddNode();
-            m_Builder->AddInverter(part.GetName() + ".NOT_K", node_not_k, nodes[1], MakeLogicParams(logic));
-            m_Builder->AddLogicGate(part.GetName() + ".AND1", nodalys::LogicGateType::AND, node_and1,
-                                    {nodes[0], nodes[6]}, MakeLogicParams(logic));
-            m_Builder->AddLogicGate(part.GetName() + ".AND2", nodalys::LogicGateType::AND, node_and2,
-                                    {node_not_k, nodes[5]}, MakeLogicParams(logic));
-            m_Builder->AddLogicGate(part.GetName() + ".OR", nodalys::LogicGateType::OR, node_d, {node_and1, node_and2},
+            m_Builder->AddInverter(name + ".NOT_K", node_not_k, nodes[1], MakeLogicParams(logic));
+            m_Builder->AddLogicGate(name + ".AND1", nodalys::LogicGateType::AND, node_and1, {nodes[0], nodes[6]},
                                     MakeLogicParams(logic));
-            m_Builder->AddDFlipFlop(part.GetName(), nodes[5], nodes[6], node_d, nodes[2], MakeLogicParams(logic));
+            m_Builder->AddLogicGate(name + ".AND2", nodalys::LogicGateType::AND, node_and2, {node_not_k, nodes[5]},
+                                    MakeLogicParams(logic));
+            m_Builder->AddLogicGate(name + ".OR", nodalys::LogicGateType::OR, node_d, {node_and1, node_and2},
+                                    MakeLogicParams(logic));
+            m_Builder->AddDFlipFlop(name, nodes[5], nodes[6], node_d, nodes[2], MakeLogicParams(logic));
             return {};
         }
 
         case ComponentType::OP_AMP: {
             const auto &op_amp = static_cast<const OpAmp &>(part);
             if (op_amp.IsIdeal()) {
-                m_Builder->AddIdealOpAmp(part.GetName(), nodes[0], nodes[1], nodes[2], nodes[3], nodes[4],
+                m_Builder->AddIdealOpAmp(name, nodes[0], nodes[1], nodes[2], nodes[3], nodes[4],
                                          op_amp.GetIdealBandwidth());
             } else {
-                m_Builder->AddBoyleOpAmp(part.GetName(), nodes[0], nodes[1], nodes[2], nodes[3], nodes[4],
+                m_Builder->AddBoyleOpAmp(name, nodes[0], nodes[1], nodes[2], nodes[3], nodes[4],
                                          MakeBoyleParams(op_amp.GetParameters()));
             }
             return {};

@@ -70,4 +70,12 @@ std::expected<PoleZeroResult, std::string> ComputePoleZero(const Circuit &circui
     return ComputePoleZero(impl.Compiled(), config, options, messages);
 }
 
+std::expected<SensitivityResult, std::string> ComputeSensitivity(const Circuit &circuit,
+                                                                 const SensitivityConfig &config,
+                                                                 const ConvergenceOptions &options,
+                                                                 std::vector<DiagnosticMessage> *messages) {
+    auto &impl = const_cast<Circuit &>(circuit).Impl();
+    return ComputeSensitivity(impl.Compiled(), config, options, messages);
+}
+
 } // namespace nodalys

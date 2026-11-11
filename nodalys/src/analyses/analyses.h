@@ -65,6 +65,11 @@ std::expected<PoleZeroResult, std::string> ComputePoleZero(CompiledCircuit &comp
                                                            const ConvergenceOptions &options,
                                                            std::vector<DiagnosticMessage> *messages);
 
+std::expected<SensitivityResult, std::string> ComputeSensitivity(CompiledCircuit &compiled,
+                                                                 const SensitivityConfig &settings,
+                                                                 const ConvergenceOptions &options,
+                                                                 std::vector<DiagnosticMessage> *messages);
+
 } // namespace nodalys
 
 #endif // NODALYS_INTERNAL_ANALYSES_H

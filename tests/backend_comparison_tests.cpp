@@ -20,10 +20,12 @@
 #include "components/op_amp.h"
 #include "components/potentiometer.h"
 #include "components/resistor.h"
+#include "components/subcircuit.h"
 #include "components/transformer.h"
 #include "components/vcc.h"
 #include "components/voltage_controlled_switch.h"
 #include "components/voltage_source.h"
+#include "model/subcircuit.h"
 #include "ngspice/ngspice_backend.h"
 #include "nodalys/nodalys_backend.h"
 #include "plots/touchstone.h"
@@ -311,6 +313,35 @@ void CheckPoleZeroParity(const Core::Circuit &circuit, const Core::PoleZeroSetti
         CHECK(Close(act_root.NaturalFrequencyHertz, exp_root.NaturalFrequencyHertz, relative_tol, abs_tol));
         if (exp_root.QualityFactor.has_value() && act_root.QualityFactor.has_value() && *exp_root.QualityFactor < 1e6) {
             CHECK(Close(*act_root.QualityFactor, *exp_root.QualityFactor, relative_tol, abs_tol));
+        }
+    }
+}
+
+/**
+ * @brief   Runs a DC sensitivity analysis through both backends and compares the part sensitivities.
+ */
+void CheckSensitivityParity(const Core::Circuit &circuit, const Core::SensitivitySettings &settings,
+                            const double relative_tol = 1e-3, const double abs_tol = 1e-5) {
+    Core::NodalysBackend nodalys;
+    const Core::SensitivityRun expected = Ngspice().RunSensitivity(circuit, settings);
+    INFO("ngspice: " + (expected.Result ? std::string("ok") : expected.Result.error()));
+    REQUIRE(expected.Result.has_value());
+    const Core::SensitivityRun actual = nodalys.RunSensitivity(circuit, settings);
+    INFO("nodalys: " + (actual.Result ? std::string("ok") : actual.Result.error()));
+    REQUIRE(actual.Result.has_value());
+
+    REQUIRE(actual.Result->OutputNode == expected.Result->OutputNode);
+    REQUIRE(actual.Result->Parts.size() == expected.Result->Parts.size());
+
+    for (const auto &exp_part : expected.Result->Parts) {
+        const auto act_it = std::ranges::find(actual.Result->Parts, exp_part.Name, &Core::PartSensitivity::Name);
+        INFO(std::format("Part {}: expected abs={:.6e}, norm={:.6e}", exp_part.Name, exp_part.Absolute,
+                         exp_part.Normalized));
+        REQUIRE(act_it != actual.Result->Parts.end());
+        CHECK(Close(act_it->Absolute, exp_part.Absolute, relative_tol, abs_tol));
+        CHECK(Close(act_it->Normalized, exp_part.Normalized, relative_tol, abs_tol));
+        if (exp_part.Value.has_value() && act_it->Value.has_value()) {
+            CHECK(Close(*act_it->Value, *exp_part.Value, relative_tol, abs_tol));
         }
     }
 }
@@ -1328,5 +1359,111 @@ TEST_CASE("Both backends agree on small-signal pole-zero analysis", "[backend][c
         circuit.Add(ground, {0});
 
         CheckPoleZeroParity(circuit, {.OutputNode = 2, .InputSource = "Vin1"});
+    }
+}
+
+TEST_CASE("Both backends agree on small-signal DC sensitivity analysis", "[backend][comparison][sensitivity]") {
+    SECTION("Voltage divider with passive elements and capacitor") {
+        Core::Circuit circuit;
+        Core::VoltageSource source;
+        source.SetName("V1");
+        source.SetValue(10.0);
+        Core::Resistor r1;
+        r1.SetName("R1");
+        r1.SetValue(1e3);
+        Core::Resistor r2;
+        r2.SetName("R2");
+        r2.SetValue(2e3);
+        Core::Capacitor c1;
+        c1.SetName("C1");
+        c1.SetValue(1e-6);
+        Core::Ground ground;
+        circuit.Add(source, {1, 0});
+        circuit.Add(r1, {1, 2});
+        circuit.Add(r2, {2, 0});
+        circuit.Add(c1, {2, 0});
+        circuit.Add(ground, {0});
+
+        CheckSensitivityParity(circuit, {.OutputNode = 2});
+    }
+
+    SECTION("Potentiometer divider") {
+        Core::Circuit circuit;
+        Core::VoltageSource source;
+        source.SetName("V1");
+        source.SetValue(12.0);
+        Core::Potentiometer pot;
+        pot.SetName("RV1");
+        pot.SetValue(10e3);
+        pot.SetWiper(0.4);
+        Core::Ground ground;
+        circuit.Add(source, {1, 0});
+        circuit.Add(pot, {1, 0, 2});
+        circuit.Add(ground, {0});
+
+        CheckSensitivityParity(circuit, {.OutputNode = 2});
+    }
+
+    SECTION("Resistive subcircuit block") {
+        Core::Circuit circuit;
+        Core::VoltageSource source;
+        source.SetName("V1");
+        source.SetValue(15.0);
+        Core::Resistor r_top;
+        r_top.SetName("Rtop");
+        r_top.SetValue(1e3);
+        Core::Ground ground;
+
+        auto sub_def = std::make_shared<Core::SubcircuitDefinition>();
+        sub_def->Name = "divider_block";
+        sub_def->Pins = {{"IN", 1}, {"OUT", 2}};
+        Core::Resistor r1;
+        r1.SetName("R1");
+        r1.SetValue(2e3);
+        Core::Resistor r2;
+        r2.SetName("R2");
+        r2.SetValue(3e3);
+        sub_def->Body.Add(r1, {1, 2});
+        sub_def->Body.Add(r2, {2, 0});
+
+        Core::SubcircuitInstance sub("divider_block", {"IN", "OUT"});
+        sub.SetName("X1");
+
+        circuit.Add(source, {1, 0});
+        circuit.Add(r_top, {1, 2});
+        circuit.Add(sub, {2, 3});
+        circuit.Add(ground, {0});
+        circuit.AddSubcircuit(sub_def);
+
+        CheckSensitivityParity(circuit, {.OutputNode = 3});
+    }
+
+    SECTION("Controlled sources (VCVS and VCCS)") {
+        Core::Circuit circuit;
+        Core::VoltageSource source;
+        source.SetName("V1");
+        source.SetValue(5.0);
+        Core::Resistor r1;
+        r1.SetName("R1");
+        r1.SetValue(1e3);
+        Core::ControlledSource vcvs(Core::ComponentType::VCVS);
+        vcvs.SetName("E1");
+        vcvs.SetValue(2.5);
+        Core::ControlledSource vccs(Core::ComponentType::VCCS);
+        vccs.SetName("G1");
+        vccs.SetValue(1e-3);
+        Core::Resistor rload;
+        rload.SetName("RL");
+        rload.SetValue(500.0);
+        Core::Ground ground;
+
+        circuit.Add(source, {1, 0});
+        circuit.Add(r1, {1, 0});
+        circuit.Add(vcvs, {2, 0, 1, 0});
+        circuit.Add(vccs, {0, 3, 2, 0});
+        circuit.Add(rload, {3, 0});
+        circuit.Add(ground, {0});
+
+        CheckSensitivityParity(circuit, {.OutputNode = 3});
     }
 }

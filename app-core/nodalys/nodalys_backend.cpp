@@ -8,6 +8,7 @@
 #include "components/logic_part.h"
 #include "nodalys/compiler.h"
 #include "simulation/pole_zero.h"
+#include "simulation/sensitivity.h"
 #include <format>
 #include <nodalys/nodalys.h>
 #include <utility>
@@ -16,10 +17,10 @@ namespace Core {
 
 namespace {
 
-constexpr auto NODALYS_ANALYSES = {AnalysisKind::OPERATING_POINT, AnalysisKind::TRANSIENT,
-                                   AnalysisKind::DC_SWEEP,        AnalysisKind::AC_SWEEP,
-                                   AnalysisKind::NOISE,           AnalysisKind::TRANSFER_FUNCTION,
-                                   AnalysisKind::POLE_ZERO,       AnalysisKind::S_PARAMETERS};
+constexpr auto NODALYS_ANALYSES = {
+    AnalysisKind::OPERATING_POINT, AnalysisKind::TRANSIENT, AnalysisKind::DC_SWEEP,
+    AnalysisKind::AC_SWEEP,        AnalysisKind::NOISE,     AnalysisKind::TRANSFER_FUNCTION,
+    AnalysisKind::SENSITIVITY,     AnalysisKind::POLE_ZERO, AnalysisKind::S_PARAMETERS};
 
 std::expected<nodalys::Circuit, std::string> CompileOrFail(const Circuit &circuit) {
     auto compiled = CompileCircuit(circuit);
@@ -46,6 +47,8 @@ NodalysBackend::NodalysBackend() {
     for (int index = 0; index <= static_cast<int>(ComponentType::SEVEN_SEGMENT); ++index) {
         const auto type = static_cast<ComponentType>(index);
         if (IsLogicPart(type)) {
+            m_Capabilities.UnsupportedPartsByAnalysis[AnalysisKind::SENSITIVITY][type] =
+                "Nodalys cannot run a sensitivity analysis on logic gates and flip-flops";
             m_Capabilities.UnsupportedPartsByAnalysis[AnalysisKind::POLE_ZERO][type] =
                 "Pole-zero analysis is small-signal, and digital parts have no small-signal model";
             m_Capabilities.UnsupportedPartsByAnalysis[AnalysisKind::S_PARAMETERS][type] =
@@ -316,8 +319,29 @@ TransferFunctionRun NodalysBackend::RunTransferFunction(const Circuit &circuit,
  * @param[in] settings  Output node.
  * @return  The sensitivity of each part, or an error.
  */
-SensitivityRun NodalysBackend::RunSensitivity(const Circuit & /*circuit*/, const SensitivitySettings & /*settings*/) {
-    return {std::unexpected("Nodalys has no sensitivity analysis yet; it runs with the ngspice backend"), {}};
+SensitivityRun NodalysBackend::RunSensitivity(const Circuit &circuit, const SensitivitySettings &settings) {
+    SensitivityRun run;
+    auto compiled = CompileOrFail(circuit);
+    if (!compiled) {
+        run.Result = std::unexpected(compiled.error());
+        return run;
+    }
+
+    nodalys::SensitivityConfig config{
+        .OutputPositiveNode = settings.OutputNode,
+        .OutputNegativeNode = 0,
+    };
+
+    std::vector<nodalys::DiagnosticMessage> messages;
+    auto result = nodalys::ComputeSensitivity(*compiled, config, {}, &messages);
+    ForwardMessages(messages, run.Messages);
+    if (!result) {
+        run.Result = std::unexpected(result.error());
+        return run;
+    }
+
+    run.Result = BuildSensitivity(circuit, settings.OutputNode, result->Vectors);
+    return run;
 }
 
 /**

@@ -31,7 +31,8 @@ enum class AnalysisKind {
     TransferFunction, ///< .tf
     Noise,            ///< .noise
     SParameters,      ///< .sp
-    PoleZero          ///< .pz
+    PoleZero,         ///< .pz
+    Sensitivity       ///< .sens
 };
 
 /**
@@ -47,7 +48,8 @@ struct ParsedAnalysis {
                  TransferFunctionConfig, // TransferFunction (.tf)
                  NoiseConfig,            // Noise (.noise)
                  SParameterConfig,       // SParameters (.sp)
-                 PoleZeroConfig          // PoleZero (.pz)
+                 PoleZeroConfig,         // PoleZero (.pz)
+                 SensitivityConfig       // Sensitivity (.sens)
                  >
         Config;
 };

@@ -197,4 +197,13 @@ std::string ExportCsv(const PoleZeroResult &result) {
     return ss.str();
 }
 
+std::string ExportCsv(const SensitivityResult &result) {
+    std::ostringstream ss;
+    ss << "Vector,Value\n";
+    for (const auto &[name, val] : result.Vectors) {
+        ss << name << "," << std::format("{:.8g}", val) << "\n";
+    }
+    return ss.str();
+}
+
 } // namespace nodalys
