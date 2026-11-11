@@ -20,7 +20,7 @@ namespace Core {
  *          period, so the shape is the same at every frequency. The duty cycle is the share of each period the clock
  *          spends above half the logic level, which is the high phase plus half of the rising and falling edges.
  */
-using ClockParameters = nodalys::ClockParameters;
+using ClockParameters = Nodalys::ClockParameters;
 
 /**
  * @class   Clock

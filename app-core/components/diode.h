@@ -15,7 +15,7 @@
 
 namespace Core {
 
-using DiodeParameters = nodalys::DiodeParameters;
+using DiodeParameters = Nodalys::DiodeParameters;
 
 /**
  * @enum    LEDColor

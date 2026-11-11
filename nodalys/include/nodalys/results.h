@@ -16,7 +16,7 @@
 #include <variant>
 #include <vector>
 
-namespace nodalys {
+namespace Nodalys {
 
 /**
  * @struct  ComponentCurrent
@@ -265,6 +265,6 @@ using SimulationResult =
     std::variant<OperatingPointResult, TransientResult, DcSweepResult, AcSweepResult, TransferFunctionResult,
                  NoiseResult, SParameterResult, PoleZeroResult, SensitivityResult, HarmonicBalanceResult>;
 
-} // namespace nodalys
+} // namespace Nodalys
 
 #endif // NODALYS_RESULTS_H

@@ -386,7 +386,7 @@ TEST_CASE("Nodalys computes wideband small-signal AC sweeps on 100-node networks
 TEST_CASE("Nodalys simulates 31-stage smooth logic continuous ring oscillator autonomously in the time domain",
           "[benchmark][nodalys]") {
     constexpr int GATE_COUNT = 31;
-    nodalys::CircuitBuilder builder;
+    Nodalys::CircuitBuilder builder;
 
     // Connect in ring: 1 -> 2 -> ... -> 31 -> 1
     for (int i = 1; i <= GATE_COUNT; ++i) {
@@ -399,12 +399,12 @@ TEST_CASE("Nodalys simulates 31-stage smooth logic continuous ring oscillator au
     auto circuit = builder.Build();
     REQUIRE(circuit.has_value());
 
-    nodalys::TransientConfig tran{
+    Nodalys::TransientConfig tran{
         .StopTime = 60e-9, .TimeStep = 0.2e-9, .MaxStep = 0.5e-9, .UseInitialConditions = true};
 
-    nodalys::TransientResult res;
+    Nodalys::TransientResult res;
     const double nodalys_ms = MeasureMs([&]() {
-        auto run = nodalys::ComputeTransient(*circuit, tran);
+        auto run = Nodalys::ComputeTransient(*circuit, tran);
         REQUIRE(run.has_value());
         res = std::move(*run);
     });
@@ -423,22 +423,22 @@ TEST_CASE("Nodalys simulates 31-stage smooth logic continuous ring oscillator au
 TEST_CASE("Nodalys evaluates digital truth table combinations via DC operating points with high speed",
           "[benchmark][nodalys]") {
     const auto solve_adder_row = [](const bool a, const bool b, const bool cin) -> std::pair<double, double> {
-        nodalys::CircuitBuilder builder;
+        Nodalys::CircuitBuilder builder;
         builder.AddVdc("VA", 1, 0, a ? 5.0 : 0.0);
         builder.AddVdc("VB", 2, 0, b ? 5.0 : 0.0);
         builder.AddVdc("VCIN", 3, 0, cin ? 5.0 : 0.0);
 
-        builder.AddLogicGate("UXOR1", nodalys::LogicGateType::XOR, 4, {1, 2});
-        builder.AddLogicGate("USUM", nodalys::LogicGateType::XOR, 5, {4, 3});
-        builder.AddLogicGate("UAND1", nodalys::LogicGateType::AND, 6, {1, 2});
-        builder.AddLogicGate("UAND2", nodalys::LogicGateType::AND, 7, {3, 4});
-        builder.AddLogicGate("UCOUT", nodalys::LogicGateType::OR, 8, {6, 7});
+        builder.AddLogicGate("UXOR1", Nodalys::LogicGateType::XOR, 4, {1, 2});
+        builder.AddLogicGate("USUM", Nodalys::LogicGateType::XOR, 5, {4, 3});
+        builder.AddLogicGate("UAND1", Nodalys::LogicGateType::AND, 6, {1, 2});
+        builder.AddLogicGate("UAND2", Nodalys::LogicGateType::AND, 7, {3, 4});
+        builder.AddLogicGate("UCOUT", Nodalys::LogicGateType::OR, 8, {6, 7});
 
         auto circuit = builder.Build();
         if (!circuit) {
             return {-1.0, -1.0};
         }
-        auto op = nodalys::ComputeOperatingPoint(*circuit);
+        auto op = Nodalys::ComputeOperatingPoint(*circuit);
         if (!op) {
             return {-1.0, -1.0};
         }

@@ -9,7 +9,7 @@
 #include <fstream>
 #include <sstream>
 
-namespace nodalys {
+namespace Nodalys {
 
 std::string ExportRaw(const SimulationResult &result, std::string_view title) {
     return std::visit(
@@ -89,4 +89,4 @@ bool SaveStringToFile(std::string_view filepath, std::string_view content) {
     return file.good();
 }
 
-} // namespace nodalys
+} // namespace Nodalys

@@ -14,7 +14,7 @@
 #include <thread>
 #include <utility>
 
-namespace nodalys {
+namespace Nodalys {
 
 namespace {
 
@@ -129,12 +129,12 @@ void ApplyLiveChanges(CompiledCircuit &compiled, const RunMonitor &monitor, std:
             continue;
         }
         bool applied = false;
-        if (change.Quantity == LiveQuantity::Resistance) {
+        if (change.Quantity == LiveQuantity::RESISTANCE) {
             if (auto *resistor = dynamic_cast<ResistorDevice *>(found->second)) {
                 resistor->SetResistance(change.Value);
                 applied = true;
             }
-        } else if (change.Quantity == LiveQuantity::DcVoltage) {
+        } else if (change.Quantity == LiveQuantity::DC_VOLTAGE) {
             if (auto *source = dynamic_cast<VoltageSourceDevice *>(found->second)) {
                 source->SetDcValue(change.Value);
                 applied = true;
@@ -351,4 +351,4 @@ std::expected<TransientResult, std::string> ComputeTransient(CompiledCircuit &co
     return result;
 }
 
-} // namespace nodalys
+} // namespace Nodalys

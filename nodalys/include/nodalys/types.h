@@ -11,11 +11,11 @@
 #include <utility>
 #include <vector>
 
-namespace nodalys {
+namespace Nodalys {
 
 /// Unique integer identifier for a circuit node. Ground is always node 0.
 using NodeId = int;
-inline constexpr NodeId GroundNode = 0;
+inline constexpr NodeId GROUND_NODE = 0;
 
 /**
  * @struct  DiagnosticMessage
@@ -251,20 +251,20 @@ struct BoyleOpAmpParameters {
 };
 
 enum class SemiconductorPolarity {
-    Npn,
-    Pnp,
-    Nmos,
-    Pmos
+    NPN,
+    PNP,
+    NMOS,
+    PMOS
 };
 
 enum class LiveQuantity {
-    Resistance,
-    DcVoltage
+    RESISTANCE,
+    DC_VOLTAGE
 };
 
 struct LiveChange {
     std::string Element;
-    LiveQuantity Quantity = LiveQuantity::Resistance;
+    LiveQuantity Quantity = LiveQuantity::RESISTANCE;
     double Value = 0.0;
 
     bool operator==(const LiveChange &) const = default;
@@ -322,6 +322,6 @@ struct SmoothLogicParameters {
     bool operator==(const SmoothLogicParameters &) const = default;
 };
 
-} // namespace nodalys
+} // namespace Nodalys
 
 #endif // NODALYS_TYPES_H

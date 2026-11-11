@@ -20,7 +20,7 @@
 #include <string>
 #include <vector>
 
-namespace nodalys {
+namespace Nodalys {
 
 namespace {
 
@@ -120,14 +120,14 @@ std::vector<std::string> TokenizeLine(std::string_view line) {
 
 struct ParsedModel {
     enum class ModelKind {
-        Diode,
-        BjtNpn,
-        BjtPnp,
-        MosfetNmos,
-        MosfetPmos,
-        Switch
+        DIODE,
+        BJT_NPN,
+        BJT_PNP,
+        MOSFET_NMOS,
+        MOSFET_PMOS,
+        SWITCH
     };
-    ModelKind Kind = ModelKind::Diode;
+    ModelKind Kind = ModelKind::DIODE;
     std::map<std::string, double> Params;
 };
 
@@ -262,7 +262,7 @@ public:
     NodeId Resolve(std::string_view name) const {
         const std::string upper = ToUpper(Trim(name));
         if (upper.empty() || upper == "0" || upper == "GND" || upper == "GROUND") {
-            return GroundNode;
+            return GROUND_NODE;
         }
         const auto it = m_NodeMap.find(upper);
         if (it != m_NodeMap.end()) {
@@ -273,7 +273,7 @@ public:
         if (err == std::errc() && end == upper.data() + upper.size() && num > 0) {
             return num;
         }
-        return GroundNode;
+        return GROUND_NODE;
     }
 
 private:
@@ -420,17 +420,17 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
 
             ParsedModel model;
             if (type_str == "D") {
-                model.Kind = ParsedModel::ModelKind::Diode;
+                model.Kind = ParsedModel::ModelKind::DIODE;
             } else if (type_str == "NPN") {
-                model.Kind = ParsedModel::ModelKind::BjtNpn;
+                model.Kind = ParsedModel::ModelKind::BJT_NPN;
             } else if (type_str == "PNP") {
-                model.Kind = ParsedModel::ModelKind::BjtPnp;
+                model.Kind = ParsedModel::ModelKind::BJT_PNP;
             } else if (type_str == "NMOS") {
-                model.Kind = ParsedModel::ModelKind::MosfetNmos;
+                model.Kind = ParsedModel::ModelKind::MOSFET_NMOS;
             } else if (type_str == "PMOS") {
-                model.Kind = ParsedModel::ModelKind::MosfetPmos;
+                model.Kind = ParsedModel::ModelKind::MOSFET_PMOS;
             } else if (type_str == "SW" || type_str == "VSWITCH") {
-                model.Kind = ParsedModel::ModelKind::Switch;
+                model.Kind = ParsedModel::ModelKind::SWITCH;
             } else {
                 result.Diagnostics.push_back(
                     {std::format("Unsupported .model type '{}' in model '{}'", type_str, model_name)});
@@ -694,7 +694,7 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
         if (name.front() == '.') {
             const std::string dir = ToUpper(name);
             if (dir == ".OP") {
-                result.Analyses.push_back({AnalysisKind::OperatingPoint, std::monostate{}});
+                result.Analyses.push_back({AnalysisKind::OPERATING_POINT, std::monostate{}});
             } else if (dir == ".TRAN") {
                 // .TRAN <tstep> <tstop> [<tstart> [<tmax>]] [uic]
                 if (tokens.size() < 3) {
@@ -717,7 +717,7 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
                 if (cfg.MaxStep <= 0.0) {
                     cfg.MaxStep = cfg.TimeStep;
                 }
-                result.Analyses.push_back({AnalysisKind::Transient, cfg});
+                result.Analyses.push_back({AnalysisKind::TRANSIENT, cfg});
             } else if (dir == ".DC") {
                 // .DC <src> <start> <stop> <step> [<src2> <start2> <stop2> <step2>]
                 if (tokens.size() < 5) {
@@ -734,7 +734,7 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
                     cfg.SteppedStop = ParseSpiceNumber(tokens[7]).value_or(0.0);
                     cfg.SteppedStep = ParseSpiceNumber(tokens[8]).value_or(0.0);
                 }
-                result.Analyses.push_back({AnalysisKind::DcSweep, cfg});
+                result.Analyses.push_back({AnalysisKind::DC_SWEEP, cfg});
             } else if (dir == ".AC") {
                 // .AC [DEC|OCT|LIN] <np> <fstart> <fstop>
                 if (tokens.size() < 4) {
@@ -749,7 +749,7 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
                 cfg.PointsPerDecade = static_cast<int>(ParseSpiceNumber(tokens[start_idx]).value_or(10));
                 cfg.StartFrequency = ParseSpiceNumber(tokens[start_idx + 1]).value_or(1.0);
                 cfg.StopFrequency = ParseSpiceNumber(tokens[start_idx + 2]).value_or(1e6);
-                result.Analyses.push_back({AnalysisKind::AcSweep, cfg});
+                result.Analyses.push_back({AnalysisKind::AC_SWEEP, cfg});
             } else if (dir == ".TF") {
                 // .TF <out_var> <in_src>
                 if (tokens.size() < 3) {
@@ -760,7 +760,7 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
                 cfg.OutputPositiveNode = nodes.Resolve(pos_str);
                 cfg.OutputNegativeNode = nodes.Resolve(neg_str);
                 cfg.InputSource = tokens[2];
-                result.Analyses.push_back({AnalysisKind::TransferFunction, cfg});
+                result.Analyses.push_back({AnalysisKind::TRANSFER_FUNCTION, cfg});
             } else if (dir == ".NOISE") {
                 // .NOISE <out_var> <in_src> [DEC|OCT|LIN] <np> <fstart> <fstop>
                 if (tokens.size() < 6) {
@@ -779,7 +779,7 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
                 cfg.PointsPerDecade = static_cast<int>(ParseSpiceNumber(tokens[sidx]).value_or(10));
                 cfg.StartFrequency = ParseSpiceNumber(tokens[sidx + 1]).value_or(1.0);
                 cfg.StopFrequency = ParseSpiceNumber(tokens[sidx + 2]).value_or(1e6);
-                result.Analyses.push_back({AnalysisKind::Noise, cfg});
+                result.Analyses.push_back({AnalysisKind::NOISE, cfg});
             } else if (dir == ".SP") {
                 // .SP [DEC|OCT|LIN] <np> <fstart> <fstop>
                 if (tokens.size() < 4) {
@@ -789,19 +789,19 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
                 int start_idx = 1;
                 const std::string scale_type = ToUpper(tokens[1]);
                 if (scale_type == "DEC") {
-                    cfg.SweepType = FrequencySweepType::Decade;
+                    cfg.SweepType = FrequencySweepType::DECADE;
                     start_idx = 2;
                 } else if (scale_type == "OCT") {
-                    cfg.SweepType = FrequencySweepType::Octave;
+                    cfg.SweepType = FrequencySweepType::OCTAVE;
                     start_idx = 2;
                 } else if (scale_type == "LIN") {
-                    cfg.SweepType = FrequencySweepType::Linear;
+                    cfg.SweepType = FrequencySweepType::LINEAR;
                     start_idx = 2;
                 }
                 cfg.Points = static_cast<int>(ParseSpiceNumber(tokens[start_idx]).value_or(10));
                 cfg.StartFrequency = ParseSpiceNumber(tokens[start_idx + 1]).value_or(1e6);
                 cfg.StopFrequency = ParseSpiceNumber(tokens[start_idx + 2]).value_or(1e9);
-                result.Analyses.push_back({AnalysisKind::SParameters, cfg});
+                result.Analyses.push_back({AnalysisKind::S_PARAMETERS, cfg});
             } else if (dir == ".PZ") {
                 // .PZ <out_var> <in_src> [POL|ZER|PZ]
                 // or .PZ <in_pos> <in_neg> <out_pos> <out_neg> [VOL|CUR] [POL|ZER|PZ]
@@ -854,7 +854,7 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
                         }
                     }
                 }
-                result.Analyses.push_back({AnalysisKind::PoleZero, cfg});
+                result.Analyses.push_back({AnalysisKind::POLE_ZERO, cfg});
             } else if (dir == ".SENS") {
                 // .SENS <out_var> (e.g. .sens v(out) or .sens v(out, ref))
                 if (tokens.size() < 2) {
@@ -864,7 +864,7 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
                 const auto [pos_str, neg_str] = ParseVoltageNodes(tokens[1]);
                 cfg.OutputPositiveNode = nodes.Resolve(pos_str);
                 cfg.OutputNegativeNode = nodes.Resolve(neg_str);
-                result.Analyses.push_back({AnalysisKind::Sensitivity, cfg});
+                result.Analyses.push_back({AnalysisKind::SENSITIVITY, cfg});
             } else if (dir == ".HB") {
                 // .HB <f0> <harmonics> [samples=<M>]
                 if (tokens.size() < 3) {
@@ -895,7 +895,7 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
                             std::format("Unexpected token '{}' in .hb directive: '{}'", tokens[k], line));
                     }
                 }
-                result.Analyses.push_back({AnalysisKind::HarmonicBalance, cfg});
+                result.Analyses.push_back({AnalysisKind::HARMONIC_BALANCE, cfg});
             } else if (dir == ".OPTIONS") {
                 for (std::size_t i = 1; i < tokens.size(); ++i) {
                     const auto eq = tokens[i].find('=');
@@ -1007,15 +1007,15 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
             double z0 = 50.0;
 
             enum class WaveformType {
-                None,
-                Pulse,
-                Sine,
-                Exp,
-                Pwl,
-                Sffm,
-                Am
+                NONE,
+                PULSE,
+                SINE,
+                EXP,
+                PWL,
+                SFFM,
+                AM
             };
-            WaveformType wtype = WaveformType::None;
+            WaveformType wtype = WaveformType::NONE;
             std::string waveform_token;
 
             std::size_t idx = 3;
@@ -1062,22 +1062,22 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
                         continue;
                     }
                 } else if (u.starts_with("PULSE(")) {
-                    wtype = WaveformType::Pulse;
+                    wtype = WaveformType::PULSE;
                     waveform_token = tokens[idx];
                 } else if (u.starts_with("SIN(") || u.starts_with("SINE(")) {
-                    wtype = WaveformType::Sine;
+                    wtype = WaveformType::SINE;
                     waveform_token = tokens[idx];
                 } else if (u.starts_with("EXP(")) {
-                    wtype = WaveformType::Exp;
+                    wtype = WaveformType::EXP;
                     waveform_token = tokens[idx];
                 } else if (u.starts_with("PWL(")) {
-                    wtype = WaveformType::Pwl;
+                    wtype = WaveformType::PWL;
                     waveform_token = tokens[idx];
                 } else if (u.starts_with("SFFM(")) {
-                    wtype = WaveformType::Sffm;
+                    wtype = WaveformType::SFFM;
                     waveform_token = tokens[idx];
                 } else if (u.starts_with("AM(")) {
-                    wtype = WaveformType::Am;
+                    wtype = WaveformType::AM;
                     waveform_token = tokens[idx];
                 } else if (const auto num = ParseSpiceNumber(tokens[idx])) {
                     dc_val = *num;
@@ -1101,7 +1101,7 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
             const bool is_voltage = (first_char == 'V');
 
             switch (wtype) {
-            case WaveformType::Pulse: {
+            case WaveformType::PULSE: {
                 const auto vals = ExtractParenthesizedValues(waveform_token);
                 PulseParameters p;
                 if (vals.size() >= 1) {
@@ -1132,7 +1132,7 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
                 }
                 break;
             }
-            case WaveformType::Sine: {
+            case WaveformType::SINE: {
                 const auto vals = ExtractParenthesizedValues(waveform_token);
                 SineParameters p;
                 if (vals.size() >= 1) {
@@ -1156,7 +1156,7 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
                 }
                 break;
             }
-            case WaveformType::Exp: {
+            case WaveformType::EXP: {
                 const auto vals = ExtractParenthesizedValues(waveform_token);
                 ExpParameters p;
                 if (vals.size() >= 1) {
@@ -1184,7 +1184,7 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
                 }
                 break;
             }
-            case WaveformType::Pwl: {
+            case WaveformType::PWL: {
                 const auto vals = ExtractParenthesizedValues(waveform_token);
                 PwlParameters p;
                 p.Points.clear();
@@ -1198,7 +1198,7 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
                 }
                 break;
             }
-            case WaveformType::Sffm: {
+            case WaveformType::SFFM: {
                 const auto vals = ExtractParenthesizedValues(waveform_token);
                 SffmParameters p;
                 if (vals.size() >= 1) {
@@ -1223,7 +1223,7 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
                 }
                 break;
             }
-            case WaveformType::Am: {
+            case WaveformType::AM: {
                 const auto vals = ExtractParenthesizedValues(waveform_token);
                 AmParameters p;
                 if (vals.size() >= 1) {
@@ -1248,7 +1248,7 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
                 }
                 break;
             }
-            case WaveformType::None:
+            case WaveformType::NONE:
             default:
                 if (is_voltage) {
                     builder.AddVdc(name, n_pos, n_neg, dc_val, ac_mag, ac_phase);
@@ -1386,7 +1386,7 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
             auto it = models.find(mname);
             if (it != models.end()) {
                 p = BuildBjtParameters(it->second);
-                is_npn = (it->second.Kind != ParsedModel::ModelKind::BjtPnp);
+                is_npn = (it->second.Kind != ParsedModel::ModelKind::BJT_PNP);
             }
             double area = 1.0;
             if (tokens.size() >= 6) {
@@ -1412,7 +1412,7 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
             auto it = models.find(mname);
             if (it != models.end()) {
                 p = BuildMosfetParameters(it->second);
-                is_nmos = (it->second.Kind != ParsedModel::ModelKind::MosfetPmos);
+                is_nmos = (it->second.Kind != ParsedModel::ModelKind::MOSFET_PMOS);
             }
             for (std::size_t i = 6; i < tokens.size(); ++i) {
                 const std::string u = ToUpper(tokens[i]);
@@ -1561,10 +1561,10 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
 
     // If no analysis was specified, default to .OP
     if (result.Analyses.empty()) {
-        result.Analyses.push_back({AnalysisKind::OperatingPoint, std::monostate{}});
+        result.Analyses.push_back({AnalysisKind::OPERATING_POINT, std::monostate{}});
     }
 
     return result;
 }
 
-} // namespace nodalys
+} // namespace Nodalys

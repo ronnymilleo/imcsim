@@ -9,7 +9,7 @@
 #include <cmath>
 #include <utility>
 
-namespace nodalys {
+namespace Nodalys {
 
 namespace {
 
@@ -295,4 +295,4 @@ bool MnaSystem::CheckResidual(const std::vector<double> &x, const double voltage
     return true;
 }
 
-} // namespace nodalys
+} // namespace Nodalys

@@ -10,7 +10,7 @@
 #include <numbers>
 #include <sstream>
 
-namespace nodalys {
+namespace Nodalys {
 
 namespace {
 
@@ -383,4 +383,4 @@ std::string ExportRaw(const HarmonicBalanceResult &result, std::string_view titl
     return ss.str();
 }
 
-} // namespace nodalys
+} // namespace Nodalys

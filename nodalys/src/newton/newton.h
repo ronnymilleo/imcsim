@@ -12,7 +12,7 @@
 #include <string>
 #include <vector>
 
-namespace nodalys {
+namespace Nodalys {
 
 /**
  * @struct  NewtonOutcome
@@ -37,6 +37,6 @@ struct NewtonOutcome {
 NewtonOutcome SolveNewton(MnaSystem &sys, const std::vector<std::unique_ptr<Device>> &devices, std::vector<double> &x,
                           const TimeContext &time, const ConvergenceOptions &options);
 
-} // namespace nodalys
+} // namespace Nodalys
 
 #endif // NODALYS_NEWTON_H

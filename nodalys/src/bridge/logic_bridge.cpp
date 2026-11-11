@@ -8,7 +8,7 @@
 #include <algorithm>
 #include <cmath>
 
-namespace nodalys {
+namespace Nodalys {
 
 /**
  * @brief   Quantizes a continuous analog voltage into a discrete digital logic level.
@@ -109,4 +109,4 @@ double EvaluateSmoothTransition(const SmoothTransition &transition, const double
     return transition.StartVoltage + (transition.TargetVoltage - transition.StartVoltage) * scale;
 }
 
-} // namespace nodalys
+} // namespace Nodalys

@@ -12,7 +12,7 @@
 #include <memory>
 #include <string>
 
-namespace nodalys {
+namespace Nodalys {
 
 class CircuitBuilderImpl;
 
@@ -131,6 +131,6 @@ private:
     std::unique_ptr<CircuitBuilderImpl> m_Impl;
 };
 
-} // namespace nodalys
+} // namespace Nodalys
 
 #endif // NODALYS_CIRCUIT_BUILDER_H

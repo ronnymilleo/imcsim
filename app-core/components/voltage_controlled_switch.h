@@ -20,7 +20,7 @@ namespace Core {
  * @details The switch closes when its control voltage rises past Threshold + Hysteresis and opens again when it
  *          falls below Threshold - Hysteresis, so noise around the threshold does not make it chatter.
  */
-using SwitchParameters = nodalys::SwitchParameters;
+using SwitchParameters = Nodalys::SwitchParameters;
 
 /**
  * @class   VoltageControlledSwitch

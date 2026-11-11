@@ -14,7 +14,7 @@
 #include <string>
 #include <vector>
 
-namespace nodalys {
+namespace Nodalys {
 
 /**
  * @struct  CurrentContribution
@@ -61,6 +61,6 @@ struct CompiledCircuit {
     bool HasInitialConditions = false;
 };
 
-} // namespace nodalys
+} // namespace Nodalys
 
 #endif // NODALYS_COMPILED_CIRCUIT_H

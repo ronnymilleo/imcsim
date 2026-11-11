@@ -36,7 +36,7 @@
 #include <utility>
 #include <vector>
 
-namespace nodalys {
+namespace Nodalys {
 
 namespace {
 
@@ -176,7 +176,7 @@ std::expected<PartitionedCircuit, std::string> ValidateAndPartitionDevices(const
             return std::unexpected(
                 std::format("Harmonic Balance does not support non-periodic or damped {} sources", kind_label));
         }
-        if (periodicity.Kind == SourceWaveformKind::Dc) {
+        if (periodicity.Kind == SourceWaveformKind::DC) {
             return {};
         }
         if (periodicity.Frequency <= 0.0) {
@@ -194,7 +194,7 @@ std::expected<PartitionedCircuit, std::string> ValidateAndPartitionDevices(const
                                                periodicity.Frequency, static_cast<int>(harmonic_nearest),
                                                config.Harmonics));
         }
-        if ((periodicity.Kind == SourceWaveformKind::Pulse || periodicity.Kind == SourceWaveformKind::Clock) &&
+        if ((periodicity.Kind == SourceWaveformKind::PULSE || periodicity.Kind == SourceWaveformKind::CLOCK) &&
             !warned_sharp_edge && periodicity.MinEdgeTime < sample_dt) {
             warnings.push_back(std::format(
                 "A periodic pulse/clock edge ({:.3g} s) is faster than the time grid ({:.3g} s); increase Samples or "
@@ -1181,4 +1181,4 @@ std::expected<HarmonicBalanceResult, std::string> ComputeHarmonicBalance(Compile
     return result;
 }
 
-} // namespace nodalys
+} // namespace Nodalys

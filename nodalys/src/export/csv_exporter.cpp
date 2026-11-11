@@ -9,7 +9,7 @@
 #include <numbers>
 #include <sstream>
 
-namespace nodalys {
+namespace Nodalys {
 
 std::string ExportCsv(const OperatingPointResult &result) {
     std::ostringstream ss;
@@ -275,4 +275,4 @@ std::string ExportCsv(const HarmonicBalanceResult &result) {
     return ss.str();
 }
 
-} // namespace nodalys
+} // namespace Nodalys

@@ -15,7 +15,7 @@
 
 namespace Core {
 
-using MOSFETParameters = nodalys::MosfetParameters;
+using MOSFETParameters = Nodalys::MosfetParameters;
 
 /**
  * @struct  MOSFETModel

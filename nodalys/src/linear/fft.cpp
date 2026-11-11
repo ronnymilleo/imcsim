@@ -10,7 +10,7 @@
 #include <numbers>
 #include <utility>
 
-namespace nodalys {
+namespace Nodalys {
 
 /**
  * @brief   Constructs an FFT plan for a power-of-two transform size.
@@ -269,4 +269,4 @@ bool HarmonicsToReal(const std::vector<double> &coeffs, const std::size_t sample
     return plan.HarmonicsToReal(coeffs, samples, scratch);
 }
 
-} // namespace nodalys
+} // namespace Nodalys

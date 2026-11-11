@@ -20,7 +20,7 @@ namespace Core {
  * @details The amplitude is the peak of the sine. The magnitude is apart from it, so a transient can use a small,
  *          realistic signal while the AC sweep, which is linear, uses 1 and reads directly as gain.
  */
-using ACParameters = nodalys::SineParameters;
+using ACParameters = Nodalys::SineParameters;
 
 /**
  * @struct  PulseParameters
@@ -29,7 +29,7 @@ using ACParameters = nodalys::SineParameters;
  * @details The source sits at Low for Delay, ramps to High in RiseTime, stays there for Width, ramps back in
  *          FallTime and starts again every Period.
  */
-using PulseParameters = nodalys::PulseParameters;
+using PulseParameters = Nodalys::PulseParameters;
 
 /**
  * @struct  EXPParameters
@@ -38,7 +38,7 @@ using PulseParameters = nodalys::PulseParameters;
  * @details The source starts at InitialValue, rises towards PeakValue with time constant RiseTimeConstant from
  *          RiseDelay on, then decays back towards InitialValue with time constant FallTimeConstant from FallDelay on.
  */
-using EXPParameters = nodalys::ExpParameters;
+using EXPParameters = Nodalys::ExpParameters;
 
 /**
  * @struct  SFFMParameters
@@ -47,7 +47,7 @@ using EXPParameters = nodalys::ExpParameters;
  * @details The source is Offset plus Amplitude times a carrier at CarrierFrequency whose phase swings by
  *          ModulationIndex times a sine at SignalFrequency.
  */
-using SFFMParameters = nodalys::SffmParameters;
+using SFFMParameters = Nodalys::SffmParameters;
 
 /**
  * @struct  AMParameters
@@ -57,14 +57,14 @@ using SFFMParameters = nodalys::SffmParameters;
  *          CarrierFrequency, both measured from Delay on; until the delay the transient holds it at 0, while the
  *          operating point stays at the offset.
  */
-using AMParameters = nodalys::AmParameters;
+using AMParameters = Nodalys::AmParameters;
 
 /**
  * @struct  PWLPoint
  * @brief   One point of a piecewise linear source: a time in seconds and the value the source holds there, in the
  *          unit of the source.
  */
-using PWLPoint = nodalys::PwlPoint;
+using PWLPoint = Nodalys::PwlPoint;
 
 /**
  * @struct  PWLParameters
@@ -72,7 +72,7 @@ using PWLPoint = nodalys::PwlPoint;
  *          lines and held at the first and last value outside the points.
  * @details The points are ordered by time; at least two are needed, times are not negative and strictly increase.
  */
-using PWLParameters = nodalys::PwlParameters;
+using PWLParameters = Nodalys::PwlParameters;
 
 /**
  * @struct  NoiseParameters

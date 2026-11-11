@@ -11,7 +11,7 @@
 
 #include <vector>
 
-namespace nodalys {
+namespace Nodalys {
 
 /**
  * @class   SmoothLogicDevice
@@ -72,6 +72,6 @@ private:
     double m_SavedCurrent = 0.0;
 };
 
-} // namespace nodalys
+} // namespace Nodalys
 
 #endif // NODALYS_SMOOTH_LOGIC_H

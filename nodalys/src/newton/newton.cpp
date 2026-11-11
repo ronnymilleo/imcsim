@@ -22,7 +22,7 @@
 #include <algorithm>
 #include <cmath>
 
-namespace nodalys {
+namespace Nodalys {
 
 namespace {
 
@@ -155,4 +155,4 @@ NewtonOutcome SolveNewton(MnaSystem &sys, const std::vector<std::unique_ptr<Devi
     return outcome;
 }
 
-} // namespace nodalys
+} // namespace Nodalys

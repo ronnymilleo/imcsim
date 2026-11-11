@@ -24,7 +24,7 @@ constexpr auto NODALYS_ANALYSES = {
     AnalysisKind::NOISE,           AnalysisKind::TRANSFER_FUNCTION, AnalysisKind::SENSITIVITY, AnalysisKind::POLE_ZERO,
     AnalysisKind::S_PARAMETERS,    AnalysisKind::HARMONIC_BALANCE};
 
-std::expected<nodalys::Circuit, std::string> CompileOrFail(const Circuit &circuit) {
+std::expected<Nodalys::Circuit, std::string> CompileOrFail(const Circuit &circuit) {
     auto compiled = CompileCircuit(circuit);
     if (!compiled) {
         return std::unexpected(std::format("Nodalys cannot simulate this circuit: {}", compiled.error()));
@@ -32,7 +32,7 @@ std::expected<nodalys::Circuit, std::string> CompileOrFail(const Circuit &circui
     return std::move(*compiled);
 }
 
-void ForwardMessages(const std::vector<nodalys::DiagnosticMessage> &source, std::vector<SimulatorMessage> &target) {
+void ForwardMessages(const std::vector<Nodalys::DiagnosticMessage> &source, std::vector<SimulatorMessage> &target) {
     for (const auto &msg : source) {
         target.push_back({msg.Text, msg.IsError});
     }
@@ -82,8 +82,8 @@ OperatingPointRun NodalysBackend::RunOperatingPoint(const Circuit &circuit,
         run.Result = std::unexpected(compiled.error());
         return run;
     }
-    std::vector<nodalys::DiagnosticMessage> messages;
-    auto result = nodalys::ComputeOperatingPoint(*compiled, {}, &messages);
+    std::vector<Nodalys::DiagnosticMessage> messages;
+    auto result = Nodalys::ComputeOperatingPoint(*compiled, {}, &messages);
     ForwardMessages(messages, run.Messages);
     if (!result) {
         run.Result = std::unexpected(result.error());
@@ -109,21 +109,21 @@ TransientRun NodalysBackend::RunTransient(const Circuit &circuit, const Transien
         return run;
     }
 
-    nodalys::TransientConfig config{
+    Nodalys::TransientConfig config{
         .StopTime = settings.StopTime, .TimeStep = settings.TimeStep, .MaxStep = settings.TimeStep};
 
-    nodalys::RunMonitor nodalys_monitor;
+    Nodalys::RunMonitor nodalys_monitor;
     // When the clock a live run keeps pace with started, moved later by the time spent paused
     auto live_start = std::chrono::steady_clock::now();
     if (monitor.Control != nullptr) {
         nodalys_monitor.ShouldStop = [&monitor]() { return monitor.Control->IsCancelled(); };
         nodalys_monitor.OnProgress = [&monitor](const double progress) { monitor.Control->SetProgress(progress); };
         nodalys_monitor.TakeLiveChanges = [&monitor]() {
-            std::vector<nodalys::LiveChange> changes;
+            std::vector<Nodalys::LiveChange> changes;
             for (const auto &c : monitor.Control->TakeChanges()) {
                 changes.push_back({c.Element,
-                                   c.Quantity == LiveQuantity::RESISTANCE ? nodalys::LiveQuantity::Resistance
-                                                                          : nodalys::LiveQuantity::DcVoltage,
+                                   c.Quantity == LiveQuantity::RESISTANCE ? Nodalys::LiveQuantity::RESISTANCE
+                                                                          : Nodalys::LiveQuantity::DC_VOLTAGE,
                                    c.Value});
             }
             return changes;
@@ -136,7 +136,7 @@ TransientRun NodalysBackend::RunTransient(const Circuit &circuit, const Transien
         };
     }
     if (monitor.OnChunk) {
-        nodalys_monitor.PostTransientChunk = [&monitor](const nodalys::TransientResult &chunk) {
+        nodalys_monitor.PostTransientChunk = [&monitor](const Nodalys::TransientResult &chunk) {
             Transient c;
             c.Times = chunk.Times;
             c.NodeVoltages = chunk.NodeVoltages;
@@ -150,8 +150,8 @@ TransientRun NodalysBackend::RunTransient(const Circuit &circuit, const Transien
     }
 
     const bool has_initial_conditions = circuit.HasInitialConditions();
-    std::vector<nodalys::DiagnosticMessage> messages;
-    auto result = nodalys::ComputeTransient(*compiled, config, has_initial_conditions, nodalys_monitor, {}, &messages);
+    std::vector<Nodalys::DiagnosticMessage> messages;
+    auto result = Nodalys::ComputeTransient(*compiled, config, has_initial_conditions, nodalys_monitor, {}, &messages);
     ForwardMessages(messages, run.Messages);
     if (!result) {
         run.Result = std::unexpected(result.error());
@@ -185,7 +185,7 @@ DCSweepRun NodalysBackend::RunDCSweep(const Circuit &circuit, const DCSweepSetti
         return run;
     }
 
-    nodalys::DcSweepConfig config;
+    Nodalys::DcSweepConfig config;
     config.SweptSource = settings.Swept.Source;
     config.SweptStart = settings.Swept.Start;
     config.SweptStop = settings.Swept.Stop;
@@ -197,8 +197,8 @@ DCSweepRun NodalysBackend::RunDCSweep(const Circuit &circuit, const DCSweepSetti
         config.SteppedStep = settings.Stepped->Step;
     }
 
-    std::vector<nodalys::DiagnosticMessage> messages;
-    auto result = nodalys::ComputeDCSweep(*compiled, config, {}, &messages);
+    std::vector<Nodalys::DiagnosticMessage> messages;
+    auto result = Nodalys::ComputeDCSweep(*compiled, config, {}, &messages);
     ForwardMessages(messages, run.Messages);
     if (!result) {
         run.Result = std::unexpected(result.error());
@@ -234,12 +234,12 @@ ACSweepRun NodalysBackend::RunACSweep(const Circuit &circuit, const ACSweepSetti
         return run;
     }
 
-    nodalys::AcSweepConfig config{.StartFrequency = settings.StartFrequency,
+    Nodalys::AcSweepConfig config{.StartFrequency = settings.StartFrequency,
                                   .StopFrequency = settings.StopFrequency,
                                   .PointsPerDecade = settings.PointsPerDecade};
 
-    std::vector<nodalys::DiagnosticMessage> messages;
-    auto result = nodalys::ComputeACSweep(*compiled, config, {}, &messages);
+    std::vector<Nodalys::DiagnosticMessage> messages;
+    auto result = Nodalys::ComputeACSweep(*compiled, config, {}, &messages);
     ForwardMessages(messages, run.Messages);
     if (!result) {
         run.Result = std::unexpected(result.error());
@@ -268,15 +268,15 @@ NoiseRun NodalysBackend::RunNoise(const Circuit &circuit, const NoiseSettings &s
         return run;
     }
 
-    nodalys::NoiseConfig config{.OutputPositiveNode = settings.OutputNode,
+    Nodalys::NoiseConfig config{.OutputPositiveNode = settings.OutputNode,
                                 .OutputNegativeNode = 0,
                                 .InputSource = settings.InputSource,
                                 .StartFrequency = settings.StartFrequency,
                                 .StopFrequency = settings.StopFrequency,
                                 .PointsPerDecade = settings.PointsPerDecade};
 
-    std::vector<nodalys::DiagnosticMessage> messages;
-    auto result = nodalys::ComputeNoise(*compiled, config, {}, &messages);
+    std::vector<Nodalys::DiagnosticMessage> messages;
+    auto result = Nodalys::ComputeNoise(*compiled, config, {}, &messages);
     ForwardMessages(messages, run.Messages);
     if (!result) {
         run.Result = std::unexpected(result.error());
@@ -308,11 +308,11 @@ TransferFunctionRun NodalysBackend::RunTransferFunction(const Circuit &circuit,
         return run;
     }
 
-    nodalys::TransferFunctionConfig config{
+    Nodalys::TransferFunctionConfig config{
         .InputSource = settings.InputSource, .OutputPositiveNode = settings.OutputNode, .OutputNegativeNode = 0};
 
-    std::vector<nodalys::DiagnosticMessage> messages;
-    auto result = nodalys::ComputeTransferFunction(*compiled, config, {}, &messages);
+    std::vector<Nodalys::DiagnosticMessage> messages;
+    auto result = Nodalys::ComputeTransferFunction(*compiled, config, {}, &messages);
     ForwardMessages(messages, run.Messages);
     if (!result) {
         run.Result = std::unexpected(result.error());
@@ -344,13 +344,13 @@ SensitivityRun NodalysBackend::RunSensitivity(const Circuit &circuit, const Sens
         return run;
     }
 
-    nodalys::SensitivityConfig config{
+    Nodalys::SensitivityConfig config{
         .OutputPositiveNode = settings.OutputNode,
         .OutputNegativeNode = 0,
     };
 
-    std::vector<nodalys::DiagnosticMessage> messages;
-    auto result = nodalys::ComputeSensitivity(*compiled, config, {}, &messages);
+    std::vector<Nodalys::DiagnosticMessage> messages;
+    auto result = Nodalys::ComputeSensitivity(*compiled, config, {}, &messages);
     ForwardMessages(messages, run.Messages);
     if (!result) {
         run.Result = std::unexpected(result.error());
@@ -375,15 +375,15 @@ PoleZeroRun NodalysBackend::RunPoleZero(const Circuit &circuit, const PoleZeroSe
         return run;
     }
 
-    nodalys::PoleZeroConfig config{
+    Nodalys::PoleZeroConfig config{
         .OutputNode = settings.OutputNode,
         .InputSource = settings.InputSource,
         .FindPoles = true,
         .FindZeros = true,
     };
 
-    std::vector<nodalys::DiagnosticMessage> messages;
-    auto result = nodalys::ComputePoleZero(*compiled, config, {}, &messages);
+    std::vector<Nodalys::DiagnosticMessage> messages;
+    auto result = Nodalys::ComputePoleZero(*compiled, config, {}, &messages);
     ForwardMessages(messages, run.Messages);
     if (!result) {
         run.Result = std::unexpected(result.error());
@@ -413,8 +413,8 @@ SParametersRun NodalysBackend::RunSParameters(const Circuit &circuit, const SPar
         return run;
     }
 
-    nodalys::SParameterConfig config{
-        .SweepType = settings.IsLogarithmic ? nodalys::FrequencySweepType::Decade : nodalys::FrequencySweepType::Linear,
+    Nodalys::SParameterConfig config{
+        .SweepType = settings.IsLogarithmic ? Nodalys::FrequencySweepType::DECADE : Nodalys::FrequencySweepType::LINEAR,
         .StartFrequency = settings.StartFrequency,
         .StopFrequency = settings.StopFrequency,
         .Points = settings.IsLogarithmic ? settings.PointsPerDecade : settings.LinearPoints};
@@ -422,8 +422,8 @@ SParametersRun NodalysBackend::RunSParameters(const Circuit &circuit, const SPar
         config.Ports.push_back({.Number = port.Number, .Node = port.Node, .ReferenceOhms = port.ReferenceOhms});
     }
 
-    std::vector<nodalys::DiagnosticMessage> messages;
-    auto result = nodalys::ComputeSParameters(*compiled, config, {}, &messages);
+    std::vector<Nodalys::DiagnosticMessage> messages;
+    auto result = Nodalys::ComputeSParameters(*compiled, config, {}, &messages);
     ForwardMessages(messages, run.Messages);
     if (!result) {
         run.Result = std::unexpected(result.error());
@@ -448,15 +448,15 @@ HarmonicBalanceRun NodalysBackend::RunHarmonicBalance(const Circuit &circuit, co
         return run;
     }
 
-    nodalys::HarmonicBalanceConfig config{.FundamentalFrequency = settings.FundamentalFrequency,
+    Nodalys::HarmonicBalanceConfig config{.FundamentalFrequency = settings.FundamentalFrequency,
                                           .Harmonics = settings.Harmonics,
                                           .Samples = settings.Samples};
     if (control != nullptr) {
         config.ShouldStop = [control]() { return control->IsCancelled(); };
     }
 
-    std::vector<nodalys::DiagnosticMessage> messages;
-    auto result = nodalys::ComputeHarmonicBalance(*compiled, config, {}, &messages);
+    std::vector<Nodalys::DiagnosticMessage> messages;
+    auto result = Nodalys::ComputeHarmonicBalance(*compiled, config, {}, &messages);
     ForwardMessages(messages, run.Messages);
     if (!result) {
         run.Result = std::unexpected(result.error());

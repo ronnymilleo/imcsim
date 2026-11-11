@@ -57,7 +57,7 @@ std::vector<std::complex<double>> ExtractTransientHarmonics(const std::vector<do
                                                             const std::size_t max_harmonic) {
     const auto uniform = InterpolateUniformPeriod(times, values, t_start, period, fft_samples);
     std::vector<double> coeffs;
-    REQUIRE(nodalys::RealToHarmonics(uniform, static_cast<int>(max_harmonic), coeffs));
+    REQUIRE(Nodalys::RealToHarmonics(uniform, static_cast<int>(max_harmonic), coeffs));
     std::vector<std::complex<double>> phasors(max_harmonic + 1);
     phasors[0] = {coeffs[0], 0.0};
     for (std::size_t k = 1; k <= max_harmonic; ++k) {
@@ -66,7 +66,7 @@ std::vector<std::complex<double>> ExtractTransientHarmonics(const std::vector<do
     return phasors;
 }
 
-const nodalys::ComponentPhasors *FindCurrentPhasor(const nodalys::HarmonicBalanceResult &hb, std::string_view name) {
+const Nodalys::ComponentPhasors *FindCurrentPhasor(const Nodalys::HarmonicBalanceResult &hb, std::string_view name) {
     for (const auto &cur : hb.CurrentPhasors) {
         if (cur.Name == name) {
             return &cur;
@@ -75,7 +75,7 @@ const nodalys::ComponentPhasors *FindCurrentPhasor(const nodalys::HarmonicBalanc
     return nullptr;
 }
 
-const nodalys::ComponentTrace *FindCurrentTrace(const nodalys::TransientResult &tran, std::string_view name) {
+const Nodalys::ComponentTrace *FindCurrentTrace(const Nodalys::TransientResult &tran, std::string_view name) {
     for (const auto &cur : tran.Currents) {
         if (cur.Name == name) {
             return &cur;
@@ -86,25 +86,25 @@ const nodalys::ComponentTrace *FindCurrentTrace(const nodalys::TransientResult &
 
 TEST_CASE("Harmonic Balance validates configuration, waveforms, and unsupported components", "[nodalys][hb]") {
     SECTION("Rejects invalid config parameters") {
-        nodalys::CircuitBuilder b;
+        Nodalys::CircuitBuilder b;
         b.AddVsine("V1", 1, 0, {.Amplitude = 1.0, .Frequency = 1e3});
         b.AddResistor("R1", 1, 0, 1e3);
         auto circuit = b.Build();
         REQUIRE(circuit.has_value());
 
         CHECK_FALSE(
-            nodalys::ComputeHarmonicBalance(*circuit, {.FundamentalFrequency = 0.0, .Harmonics = 4}).has_value());
+            Nodalys::ComputeHarmonicBalance(*circuit, {.FundamentalFrequency = 0.0, .Harmonics = 4}).has_value());
         CHECK_FALSE(
-            nodalys::ComputeHarmonicBalance(*circuit, {.FundamentalFrequency = -1e3, .Harmonics = 4}).has_value());
+            Nodalys::ComputeHarmonicBalance(*circuit, {.FundamentalFrequency = -1e3, .Harmonics = 4}).has_value());
         CHECK_FALSE(
-            nodalys::ComputeHarmonicBalance(*circuit, {.FundamentalFrequency = 1e3, .Harmonics = -1}).has_value());
+            Nodalys::ComputeHarmonicBalance(*circuit, {.FundamentalFrequency = 1e3, .Harmonics = -1}).has_value());
         // Non-power-of-two sample count
         CHECK_FALSE(
-            nodalys::ComputeHarmonicBalance(*circuit, {.FundamentalFrequency = 1e3, .Harmonics = 4, .Samples = 24})
+            Nodalys::ComputeHarmonicBalance(*circuit, {.FundamentalFrequency = 1e3, .Harmonics = 4, .Samples = 24})
                 .has_value());
         // Samples <= 2*H fails Nyquist margin
         CHECK_FALSE(
-            nodalys::ComputeHarmonicBalance(*circuit, {.FundamentalFrequency = 1e3, .Harmonics = 8, .Samples = 16})
+            Nodalys::ComputeHarmonicBalance(*circuit, {.FundamentalFrequency = 1e3, .Harmonics = 8, .Samples = 16})
                 .has_value());
     }
 
@@ -115,69 +115,69 @@ TEST_CASE("Harmonic Balance validates configuration, waveforms, and unsupported 
                                          "R1 2 0 1k\n"
                                          ".model SWMOD SW(Vt=2.5 Vh=0.2 Ron=1 Roff=1Meg)\n"
                                          ".end\n";
-        const auto parsed = nodalys::ParseNetlist(netlist);
+        const auto parsed = Nodalys::ParseNetlist(netlist);
         REQUIRE(parsed.has_value());
 
         const auto res =
-            nodalys::ComputeHarmonicBalance(parsed->CircuitInstance, {.FundamentalFrequency = 1e3, .Harmonics = 4});
+            Nodalys::ComputeHarmonicBalance(parsed->CircuitInstance, {.FundamentalFrequency = 1e3, .Harmonics = 4});
         CHECK_FALSE(res.has_value());
     }
 
     SECTION("Refuses incommensurate, damped SIN, EXP, and PWL waveforms") {
         // Incommensurate source frequency (1.5 kHz with f0 = 1 kHz)
         {
-            const auto parsed = nodalys::ParseNetlist("* Incommensurate\nV1 1 0 SIN(0 1 1.5k)\nR1 1 0 1k\n.end\n");
+            const auto parsed = Nodalys::ParseNetlist("* Incommensurate\nV1 1 0 SIN(0 1 1.5k)\nR1 1 0 1k\n.end\n");
             REQUIRE(parsed.has_value());
             CHECK_FALSE(
-                nodalys::ComputeHarmonicBalance(parsed->CircuitInstance, {.FundamentalFrequency = 1e3, .Harmonics = 4})
+                Nodalys::ComputeHarmonicBalance(parsed->CircuitInstance, {.FundamentalFrequency = 1e3, .Harmonics = 4})
                     .has_value());
         }
 
         // Source frequency above H * f0
         {
-            const auto parsed = nodalys::ParseNetlist("* Above H\nV1 1 0 SIN(0 1 6k)\nR1 1 0 1k\n.end\n");
+            const auto parsed = Nodalys::ParseNetlist("* Above H\nV1 1 0 SIN(0 1 6k)\nR1 1 0 1k\n.end\n");
             REQUIRE(parsed.has_value());
             CHECK_FALSE(
-                nodalys::ComputeHarmonicBalance(parsed->CircuitInstance, {.FundamentalFrequency = 1e3, .Harmonics = 5})
+                Nodalys::ComputeHarmonicBalance(parsed->CircuitInstance, {.FundamentalFrequency = 1e3, .Harmonics = 5})
                     .has_value());
         }
 
         // Damped SIN (theta != 0)
         {
-            const auto parsed = nodalys::ParseNetlist("* Damped SIN\nV1 1 0 SIN(0 5 1k 0 50)\nR1 1 0 1k\n.end\n");
+            const auto parsed = Nodalys::ParseNetlist("* Damped SIN\nV1 1 0 SIN(0 5 1k 0 50)\nR1 1 0 1k\n.end\n");
             REQUIRE(parsed.has_value());
             CHECK_FALSE(
-                nodalys::ComputeHarmonicBalance(parsed->CircuitInstance, {.FundamentalFrequency = 1e3, .Harmonics = 4})
+                Nodalys::ComputeHarmonicBalance(parsed->CircuitInstance, {.FundamentalFrequency = 1e3, .Harmonics = 4})
                     .has_value());
         }
 
         // EXP source
         {
-            const auto parsed = nodalys::ParseNetlist("* EXP\nV1 1 0 EXP(0 5 0 1u 10u 2u 20u)\nR1 1 0 1k\n.end\n");
+            const auto parsed = Nodalys::ParseNetlist("* EXP\nV1 1 0 EXP(0 5 0 1u 10u 2u 20u)\nR1 1 0 1k\n.end\n");
             REQUIRE(parsed.has_value());
             CHECK_FALSE(
-                nodalys::ComputeHarmonicBalance(parsed->CircuitInstance, {.FundamentalFrequency = 1e3, .Harmonics = 4})
+                Nodalys::ComputeHarmonicBalance(parsed->CircuitInstance, {.FundamentalFrequency = 1e3, .Harmonics = 4})
                     .has_value());
         }
 
         // PWL source
         {
-            const auto parsed = nodalys::ParseNetlist("* PWL\nV1 1 0 PWL(0 0 1m 5)\nR1 1 0 1k\n.end\n");
+            const auto parsed = Nodalys::ParseNetlist("* PWL\nV1 1 0 PWL(0 0 1m 5)\nR1 1 0 1k\n.end\n");
             REQUIRE(parsed.has_value());
             CHECK_FALSE(
-                nodalys::ComputeHarmonicBalance(parsed->CircuitInstance, {.FundamentalFrequency = 1e3, .Harmonics = 4})
+                Nodalys::ComputeHarmonicBalance(parsed->CircuitInstance, {.FundamentalFrequency = 1e3, .Harmonics = 4})
                     .has_value());
         }
     }
 
     SECTION("Warns when PULSE edge is narrower than sampling step T0/M") {
-        const auto parsed = nodalys::ParseNetlist("* Narrow pulse edge\n"
+        const auto parsed = Nodalys::ParseNetlist("* Narrow pulse edge\n"
                                                   "V1 1 0 PULSE(0 5 0 1u 1u 500u 1m)\n"
                                                   "R1 1 0 1k\n"
                                                   ".end\n");
         REQUIRE(parsed.has_value());
         // f0 = 1 kHz -> T0 = 1 ms, Samples = 32 -> dt = 31.25 us > 1 us
-        const auto hb = nodalys::ComputeHarmonicBalance(parsed->CircuitInstance,
+        const auto hb = Nodalys::ComputeHarmonicBalance(parsed->CircuitInstance,
                                                         {.FundamentalFrequency = 1e3, .Harmonics = 4, .Samples = 32});
         REQUIRE(hb.has_value());
         CHECK(!hb->Warnings.empty());
@@ -192,7 +192,7 @@ TEST_CASE("Harmonic Balance matches AC analysis and closed-form phasors on linea
         constexpr double VIN_PEAK = 5.0;
         constexpr double VIN_DC = 2.0;
 
-        nodalys::CircuitBuilder b_hb;
+        Nodalys::CircuitBuilder b_hb;
         b_hb.AddVsine("V1", 1, 0, {.Amplitude = VIN_PEAK, .Frequency = F0, .Offset = VIN_DC});
         b_hb.AddResistor("R1", 1, 2, R);
         b_hb.AddCapacitor("C1", 2, 0, C);
@@ -200,7 +200,7 @@ TEST_CASE("Harmonic Balance matches AC analysis and closed-form phasors on linea
         REQUIRE(hb_circuit.has_value());
 
         const auto hb =
-            nodalys::ComputeHarmonicBalance(*hb_circuit, {.FundamentalFrequency = F0, .Harmonics = 5, .Samples = 64});
+            Nodalys::ComputeHarmonicBalance(*hb_circuit, {.FundamentalFrequency = F0, .Harmonics = 5, .Samples = 64});
         REQUIRE(hb.has_value());
         CHECK(hb->Strategy == "linear");
         CHECK(hb->Frequencies.size() == 6);
@@ -234,10 +234,10 @@ TEST_CASE("Harmonic Balance matches AC analysis and closed-form phasors on linea
                                                    ".ac lin 1 {:.12g} {:.12g}\n"
                                                    ".end\n",
                                                    VIN_PEAK, F0, F0);
-        const auto parsed_ac = nodalys::ParseNetlist(ac_netlist);
+        const auto parsed_ac = Nodalys::ParseNetlist(ac_netlist);
         REQUIRE(parsed_ac.has_value());
-        const auto &ac_cfg = std::get<nodalys::AcSweepConfig>(parsed_ac->Analyses[0].Config);
-        const auto ac = nodalys::ComputeACSweep(parsed_ac->CircuitInstance, ac_cfg);
+        const auto &ac_cfg = std::get<Nodalys::AcSweepConfig>(parsed_ac->Analyses[0].Config);
+        const auto ac = Nodalys::ComputeACSweep(parsed_ac->CircuitInstance, ac_cfg);
         REQUIRE(ac.has_value());
         const double ac_mag = std::pow(10.0, ac->NodeMagnitudesDecibels[2][0] / 20.0);
         const double ac_phase = ac->NodePhasesDegrees[2][0] * std::numbers::pi / 180.0;
@@ -266,7 +266,7 @@ TEST_CASE("Harmonic Balance matches AC analysis and closed-form phasors on linea
         }
 
         // Pure linear sine response must have near-zero THD
-        CHECK_THAT(nodalys::ComputeThd(hb->NodePhasors[2]), WithinAbs(0.0, 1e-11));
+        CHECK_THAT(Nodalys::ComputeThd(hb->NodePhasors[2]), WithinAbs(0.0, 1e-11));
     }
 
     SECTION("High-Q series RLC resonant tank matches closed-form resonance") {
@@ -278,7 +278,7 @@ TEST_CASE("Harmonic Balance matches AC analysis and closed-form phasors on linea
         constexpr double L = (Q * R) / W0;
         constexpr double C = 1.0 / (W0 * Q * R);
 
-        nodalys::CircuitBuilder b;
+        Nodalys::CircuitBuilder b;
         b.AddVsine("V1", 1, 0, {.Amplitude = 2.0, .Frequency = F0});
         b.AddResistor("R1", 1, 2, R);
         b.AddInductor("L1", 2, 3, L);
@@ -287,7 +287,7 @@ TEST_CASE("Harmonic Balance matches AC analysis and closed-form phasors on linea
         REQUIRE(circuit.has_value());
 
         const auto hb =
-            nodalys::ComputeHarmonicBalance(*circuit, {.FundamentalFrequency = F0, .Harmonics = 3, .Samples = 32});
+            Nodalys::ComputeHarmonicBalance(*circuit, {.FundamentalFrequency = F0, .Harmonics = 3, .Samples = 32});
         REQUIRE(hb.has_value());
         // At series resonance, current amplitude = V1 / R = 2 A, and |Vc| = Q * V1 = 100 V
         CHECK_THAT(std::abs(hb->NodePhasors[3][1]), WithinRel(Q * 2.0, 1e-8));
@@ -305,10 +305,10 @@ TEST_CASE("Harmonic Balance matches AC analysis and closed-form phasors on linea
                                          "C1 2 0 100n\n"
                                          ".hb 1k 5 samples=64\n"
                                          ".end\n";
-        const auto parsed = nodalys::ParseNetlist(netlist);
+        const auto parsed = Nodalys::ParseNetlist(netlist);
         REQUIRE(parsed.has_value());
-        const auto &cfg = std::get<nodalys::HarmonicBalanceConfig>(parsed->Analyses[0].Config);
-        const auto hb = nodalys::ComputeHarmonicBalance(parsed->CircuitInstance, cfg);
+        const auto &cfg = std::get<Nodalys::HarmonicBalanceConfig>(parsed->Analyses[0].Config);
+        const auto hb = Nodalys::ComputeHarmonicBalance(parsed->CircuitInstance, cfg);
         REQUIRE(hb.has_value());
 
         // DC at node 2: R1=1k, R2=1k divider from V1_dc=1.5 => 0.75 V
@@ -340,14 +340,14 @@ TEST_CASE("Harmonic Balance with H=0 reproduces DC operating point on nonlinear 
                                      "D1 2 0 DMOD\n"
                                      ".model DMOD D(IS=1e-14 N=1.0 RS=0.5)\n"
                                      ".end\n";
-    const auto parsed = nodalys::ParseNetlist(netlist);
+    const auto parsed = Nodalys::ParseNetlist(netlist);
     REQUIRE(parsed.has_value());
 
-    const auto op = nodalys::ComputeOperatingPoint(parsed->CircuitInstance);
+    const auto op = Nodalys::ComputeOperatingPoint(parsed->CircuitInstance);
     REQUIRE(op.has_value());
 
     const auto hb =
-        nodalys::ComputeHarmonicBalance(parsed->CircuitInstance, {.FundamentalFrequency = 1e3, .Harmonics = 0});
+        Nodalys::ComputeHarmonicBalance(parsed->CircuitInstance, {.FundamentalFrequency = 1e3, .Harmonics = 0});
     REQUIRE(hb.has_value());
     REQUIRE(hb->Frequencies.size() == 1);
 
@@ -373,7 +373,7 @@ TEST_CASE("Harmonic Balance matches steady-state transient FFT on nonlinear diod
                                          "C1 2 0 2u\n"
                                          ".model DMOD D(IS=1e-12 N=1.1 RS=1.0)\n"
                                          ".end\n";
-        const auto parsed = nodalys::ParseNetlist(netlist);
+        const auto parsed = Nodalys::ParseNetlist(netlist);
         REQUIRE(parsed.has_value());
 
         constexpr double F0 = 1e3;
@@ -381,14 +381,14 @@ TEST_CASE("Harmonic Balance matches steady-state transient FFT on nonlinear diod
         constexpr int H = 24;
         constexpr int M = 256;
 
-        const auto hb = nodalys::ComputeHarmonicBalance(parsed->CircuitInstance,
+        const auto hb = Nodalys::ComputeHarmonicBalance(parsed->CircuitInstance,
                                                         {.FundamentalFrequency = F0, .Harmonics = H, .Samples = M});
         REQUIRE(hb.has_value());
 
         // tau = R*C = 2 ms = 2*T0 -> 26 ms = 13*tau decays initial transient well below 1e-5
-        nodalys::TransientConfig tran_cfg{
+        Nodalys::TransientConfig tran_cfg{
             .StopTime = 26.0 * T0, .TimeStep = T0 / 2048.0, .MaxStep = T0 / 2048.0, .UseInitialConditions = false};
-        const auto tran = nodalys::ComputeTransient(parsed->CircuitInstance, tran_cfg);
+        const auto tran = Nodalys::ComputeTransient(parsed->CircuitInstance, tran_cfg);
         REQUIRE(tran.has_value());
 
         const auto tran_v2 = ExtractTransientHarmonics(tran->Times, tran->NodeVoltages[2], 25.0 * T0, T0, 512, H);
@@ -410,8 +410,8 @@ TEST_CASE("Harmonic Balance matches steady-state transient FFT on nonlinear diod
         CHECK_THAT(hb_d1->Phasors[0].real(), WithinRel(tran_i_d1[0].real(), 3e-3));
         CHECK_THAT(std::abs(hb_d1->Phasors[1]), WithinAbs(std::abs(tran_i_d1[1]), 1e-4));
 
-        const double hb_thd = nodalys::ComputeThd(hb->NodePhasors[2]);
-        const double tran_thd = nodalys::ComputeThd(tran_v2);
+        const double hb_thd = Nodalys::ComputeThd(hb->NodePhasors[2]);
+        const double tran_thd = Nodalys::ComputeThd(tran_v2);
         CHECK_THAT(hb_thd, WithinAbs(tran_thd, 5e-3));
     }
 
@@ -423,12 +423,12 @@ TEST_CASE("Harmonic Balance matches steady-state transient FFT on nonlinear diod
                                          "D2 0 2 DMOD\n"
                                          ".model DMOD D(IS=1e-13 N=1.0 RS=1.0)\n"
                                          ".end\n";
-        const auto parsed = nodalys::ParseNetlist(netlist);
+        const auto parsed = Nodalys::ParseNetlist(netlist);
         REQUIRE(parsed.has_value());
 
         constexpr double F0 = 1e3;
         constexpr double T0 = 1.0 / F0;
-        const auto hb = nodalys::ComputeHarmonicBalance(parsed->CircuitInstance,
+        const auto hb = Nodalys::ComputeHarmonicBalance(parsed->CircuitInstance,
                                                         {.FundamentalFrequency = F0, .Harmonics = 25, .Samples = 256});
         REQUIRE(hb.has_value());
 
@@ -440,7 +440,7 @@ TEST_CASE("Harmonic Balance matches steady-state transient FFT on nonlinear diod
         CHECK(std::abs(hb->NodePhasors[2][3]) > 0.15);
         CHECK(std::abs(hb->NodePhasors[2][5]) > 0.05);
 
-        const auto tran = nodalys::ComputeTransient(
+        const auto tran = Nodalys::ComputeTransient(
             parsed->CircuitInstance, {.StopTime = 4.0 * T0, .TimeStep = T0 / 1024.0, .MaxStep = T0 / 1024.0});
         REQUIRE(tran.has_value());
         const auto tran_v2 = ExtractTransientHarmonics(tran->Times, tran->NodeVoltages[2], 3.0 * T0, T0, 512, 25);
@@ -459,16 +459,16 @@ TEST_CASE("Harmonic Balance matches steady-state transient FFT on nonlinear diod
                                          "D1 1 0 DMOD\n"
                                          ".model DMOD D(IS=1e-13 N=1.0)\n"
                                          ".end\n";
-        const auto parsed = nodalys::ParseNetlist(netlist);
+        const auto parsed = Nodalys::ParseNetlist(netlist);
         REQUIRE(parsed.has_value());
 
         constexpr double F0 = 2e3;
         constexpr double T0 = 1.0 / F0;
-        const auto hb = nodalys::ComputeHarmonicBalance(parsed->CircuitInstance,
+        const auto hb = Nodalys::ComputeHarmonicBalance(parsed->CircuitInstance,
                                                         {.FundamentalFrequency = F0, .Harmonics = 24, .Samples = 256});
         REQUIRE(hb.has_value());
 
-        const auto tran = nodalys::ComputeTransient(
+        const auto tran = Nodalys::ComputeTransient(
             parsed->CircuitInstance, {.StopTime = 12.0 * T0, .TimeStep = T0 / 1024.0, .MaxStep = T0 / 1024.0});
         REQUIRE(tran.has_value());
         const auto tran_v1 = ExtractTransientHarmonics(tran->Times, tran->NodeVoltages[1], 11.0 * T0, T0, 512, 24);
@@ -488,17 +488,17 @@ TEST_CASE("Harmonic Balance matches steady-state transient FFT on nonlinear diod
                                          "C1 2 0 100n\n"
                                          ".model DMOD D(IS=1e-14 N=1.0)\n"
                                          ".end\n";
-        const auto parsed = nodalys::ParseNetlist(netlist);
+        const auto parsed = Nodalys::ParseNetlist(netlist);
         REQUIRE(parsed.has_value());
 
         constexpr double F0 = 1e3;
         constexpr double T0 = 1.0 / F0;
-        const auto hb = nodalys::ComputeHarmonicBalance(parsed->CircuitInstance,
+        const auto hb = Nodalys::ComputeHarmonicBalance(parsed->CircuitInstance,
                                                         {.FundamentalFrequency = F0, .Harmonics = 24, .Samples = 256});
         REQUIRE(hb.has_value());
 
         // Run past 1.25*T0 + several RC time constants so steady state is reached
-        const auto tran = nodalys::ComputeTransient(
+        const auto tran = Nodalys::ComputeTransient(
             parsed->CircuitInstance, {.StopTime = 8.0 * T0, .TimeStep = T0 / 1024.0, .MaxStep = T0 / 1024.0});
         REQUIRE(tran.has_value());
         const auto tran_v2 = ExtractTransientHarmonics(tran->Times, tran->NodeVoltages[2], 7.0 * T0, T0, 512, 24);
@@ -521,16 +521,16 @@ TEST_CASE("Harmonic Balance matches steady-state transient FFT on BJT and MOSFET
                                          "Q1 4 3 5 QNPN\n"
                                          ".model QNPN NPN(IS=1e-14 BF=150 VAF=80 CJE=10p CJC=5p)\n"
                                          ".end\n";
-        const auto parsed = nodalys::ParseNetlist(netlist);
+        const auto parsed = Nodalys::ParseNetlist(netlist);
         REQUIRE(parsed.has_value());
 
         constexpr double F0 = 1e3;
         constexpr double T0 = 1.0 / F0;
-        const auto hb = nodalys::ComputeHarmonicBalance(parsed->CircuitInstance,
+        const auto hb = Nodalys::ComputeHarmonicBalance(parsed->CircuitInstance,
                                                         {.FundamentalFrequency = F0, .Harmonics = 16, .Samples = 128});
         REQUIRE(hb.has_value());
 
-        const auto tran = nodalys::ComputeTransient(
+        const auto tran = Nodalys::ComputeTransient(
             parsed->CircuitInstance, {.StopTime = 5.0 * T0, .TimeStep = T0 / 1024.0, .MaxStep = T0 / 1024.0});
         REQUIRE(tran.has_value());
         const auto tran_v4 = ExtractTransientHarmonics(tran->Times, tran->NodeVoltages[4], 4.0 * T0, T0, 512, 16);
@@ -543,7 +543,7 @@ TEST_CASE("Harmonic Balance matches steady-state transient FFT on BJT and MOSFET
         CHECK_THAT(hb->NodePhasors[4][2].real(), WithinAbs(tran_v4[2].real(), 5e-3));
         CHECK_THAT(hb->NodePhasors[4][2].imag(), WithinAbs(tran_v4[2].imag(), 5e-3));
         CHECK_THAT(std::abs(hb->NodePhasors[4][3]), WithinAbs(std::abs(tran_v4[3]), 5e-3));
-        CHECK_THAT(nodalys::ComputeThd(hb->NodePhasors[4]), WithinAbs(nodalys::ComputeThd(tran_v4), 5e-3));
+        CHECK_THAT(Nodalys::ComputeThd(hb->NodePhasors[4]), WithinAbs(Nodalys::ComputeThd(tran_v4), 5e-3));
     }
 
     SECTION("MOSFET common-source stage with overlap capacitance Cgs and Cgd") {
@@ -556,16 +556,16 @@ TEST_CASE("Harmonic Balance matches steady-state transient FFT on BJT and MOSFET
                                          "M1 4 3 0 0 NMOSM\n"
                                          ".model NMOSM NMOS(VTO=1.5 KP=5m LAMBDA=0.02 CGS=20p CGD=10p)\n"
                                          ".end\n";
-        const auto parsed = nodalys::ParseNetlist(netlist);
+        const auto parsed = Nodalys::ParseNetlist(netlist);
         REQUIRE(parsed.has_value());
 
         constexpr double F0 = 10e3;
         constexpr double T0 = 1.0 / F0;
-        const auto hb = nodalys::ComputeHarmonicBalance(parsed->CircuitInstance,
+        const auto hb = Nodalys::ComputeHarmonicBalance(parsed->CircuitInstance,
                                                         {.FundamentalFrequency = F0, .Harmonics = 16, .Samples = 128});
         REQUIRE(hb.has_value());
 
-        const auto tran = nodalys::ComputeTransient(
+        const auto tran = Nodalys::ComputeTransient(
             parsed->CircuitInstance, {.StopTime = 6.0 * T0, .TimeStep = T0 / 1024.0, .MaxStep = T0 / 1024.0});
         REQUIRE(tran.has_value());
         const auto tran_v4 = ExtractTransientHarmonics(tran->Times, tran->NodeVoltages[4], 5.0 * T0, T0, 512, 16);
@@ -576,16 +576,16 @@ TEST_CASE("Harmonic Balance matches steady-state transient FFT on BJT and MOSFET
         CHECK_THAT(hb->NodePhasors[4][1].imag(), WithinAbs(tran_v4[1].imag(), 3e-3));
         CHECK_THAT(hb->NodePhasors[4][2].real(), WithinAbs(tran_v4[2].real(), 3e-3));
         CHECK_THAT(hb->NodePhasors[4][2].imag(), WithinAbs(tran_v4[2].imag(), 3e-3));
-        CHECK_THAT(nodalys::ComputeThd(hb->NodePhasors[4]), WithinAbs(nodalys::ComputeThd(tran_v4), 2e-3));
+        CHECK_THAT(Nodalys::ComputeThd(hb->NodePhasors[4]), WithinAbs(Nodalys::ComputeThd(tran_v4), 2e-3));
     }
 }
 
 TEST_CASE("Harmonic Balance matches steady-state transient FFT on continuous smooth logic inverter", "[nodalys][hb]") {
-    nodalys::CircuitBuilder b;
+    Nodalys::CircuitBuilder b;
     constexpr double F0 = 1e6;
     constexpr double T0 = 1.0 / F0;
 
-    nodalys::PulseParameters pulse;
+    Nodalys::PulseParameters pulse;
     pulse.Low = 0.0;
     pulse.High = 5.0;
     pulse.Delay = 0.0;
@@ -595,7 +595,7 @@ TEST_CASE("Harmonic Balance matches steady-state transient FFT on continuous smo
     pulse.Period = T0;
     b.AddVpulse("V_IN", 1, 0, pulse);
 
-    nodalys::SmoothLogicParameters params;
+    Nodalys::SmoothLogicParameters params;
     params.PropagationDelay = 20e-9;
     params.TransitionWidth = 0.3;
     b.AddInverter("U1", 2, 1, params);
@@ -604,11 +604,11 @@ TEST_CASE("Harmonic Balance matches steady-state transient FFT on continuous smo
     REQUIRE(circuit.has_value());
 
     const auto hb =
-        nodalys::ComputeHarmonicBalance(*circuit, {.FundamentalFrequency = F0, .Harmonics = 8, .Samples = 64});
+        Nodalys::ComputeHarmonicBalance(*circuit, {.FundamentalFrequency = F0, .Harmonics = 8, .Samples = 64});
     REQUIRE(hb.has_value());
 
     const auto tran =
-        nodalys::ComputeTransient(*circuit, {.StopTime = 12.0 * T0, .TimeStep = T0 / 512.0, .MaxStep = T0 / 512.0});
+        Nodalys::ComputeTransient(*circuit, {.StopTime = 12.0 * T0, .TimeStep = T0 / 512.0, .MaxStep = T0 / 512.0});
     REQUIRE(tran.has_value());
     const auto tran_v2 = ExtractTransientHarmonics(tran->Times, tran->NodeVoltages[2], 11.0 * T0, T0, 256, 5);
 
@@ -630,20 +630,20 @@ TEST_CASE("Harmonic Balance vs steady-state transient benchmark metrics", "[.ben
                                          "D1 3 0 DMOD\n"
                                          ".model DMOD D(IS=1e-13 N=1.5)\n"
                                          ".end\n";
-        const auto parsed = nodalys::ParseNetlist(netlist);
+        const auto parsed = Nodalys::ParseNetlist(netlist);
         REQUIRE(parsed.has_value());
 
         constexpr double F0 = 1e3;
         constexpr double T0 = 1.0 / F0;
 
         const auto hb_start = std::chrono::steady_clock::now();
-        const auto hb = nodalys::ComputeHarmonicBalance(parsed->CircuitInstance,
+        const auto hb = Nodalys::ComputeHarmonicBalance(parsed->CircuitInstance,
                                                         {.FundamentalFrequency = F0, .Harmonics = 8, .Samples = 64});
         const auto hb_end = std::chrono::steady_clock::now();
         REQUIRE(hb.has_value());
 
         const auto tran_start = std::chrono::steady_clock::now();
-        const auto tran = nodalys::ComputeTransient(
+        const auto tran = Nodalys::ComputeTransient(
             parsed->CircuitInstance, {.StopTime = 400.0 * T0, .TimeStep = T0 / 256.0, .MaxStep = T0 / 256.0});
         const auto tran_end = std::chrono::steady_clock::now();
         REQUIRE(tran.has_value());
@@ -671,20 +671,20 @@ TEST_CASE("Harmonic Balance vs steady-state transient benchmark metrics", "[.ben
                                          "C1 2 0 10u\n"
                                          ".model DMOD D(IS=1e-12 N=1.1 RS=1.0)\n"
                                          ".end\n";
-        const auto parsed = nodalys::ParseNetlist(netlist);
+        const auto parsed = Nodalys::ParseNetlist(netlist);
         REQUIRE(parsed.has_value());
 
         constexpr double F0 = 1e3;
         constexpr double T0 = 1.0 / F0;
 
         const auto hb_start = std::chrono::steady_clock::now();
-        const auto hb = nodalys::ComputeHarmonicBalance(parsed->CircuitInstance,
+        const auto hb = Nodalys::ComputeHarmonicBalance(parsed->CircuitInstance,
                                                         {.FundamentalFrequency = F0, .Harmonics = 16, .Samples = 128});
         const auto hb_end = std::chrono::steady_clock::now();
         REQUIRE(hb.has_value());
 
         const auto tran_start = std::chrono::steady_clock::now();
-        const auto tran = nodalys::ComputeTransient(
+        const auto tran = Nodalys::ComputeTransient(
             parsed->CircuitInstance, {.StopTime = 500.0 * T0, .TimeStep = T0 / 256.0, .MaxStep = T0 / 256.0});
         const auto fft_end = std::chrono::steady_clock::now();
         REQUIRE(tran.has_value());
@@ -708,17 +708,17 @@ TEST_CASE("Harmonic Balance vs steady-state transient benchmark metrics", "[.ben
 
 TEST_CASE("A harmonic balance asked to stop ends with an error before it converges", "[nodalys][hb]") {
     // A diode rectifier is nonlinear, so the run goes through Newton iterations, where the stop is asked
-    nodalys::CircuitBuilder builder;
+    Nodalys::CircuitBuilder builder;
     builder.AddVsine("V1", 1, 0, {.Amplitude = 5.0, .Frequency = 1e3});
     builder.AddDiode("D1", 1, 2, {});
     builder.AddResistor("R1", 2, 0, 1e3);
     auto circuit = builder.Build();
     REQUIRE(circuit.has_value());
     int asked = 0;
-    const nodalys::HarmonicBalanceConfig config{
+    const Nodalys::HarmonicBalanceConfig config{
         .FundamentalFrequency = 1e3, .Harmonics = 8, .ShouldStop = [&asked]() { return ++asked > 1; }};
 
-    const auto result = nodalys::ComputeHarmonicBalance(*circuit, config);
+    const auto result = Nodalys::ComputeHarmonicBalance(*circuit, config);
 
     REQUIRE_FALSE(result.has_value());
     CHECK(result.error().contains("stopped"));
@@ -729,7 +729,7 @@ TEST_CASE("A harmonic balance asked to stop ends with an error before it converg
 TEST_CASE("A harmonic balance too large for the dense Jacobian is refused before it allocates it", "[nodalys][hb]") {
     // A ladder of 40 sections has 41 nodes and a branch, 42 unknowns per harmonic, so 64 harmonics make 5418
     constexpr int SECTIONS = 40;
-    nodalys::CircuitBuilder builder;
+    Nodalys::CircuitBuilder builder;
     builder.AddVsine("V1", 1, 0, {.Amplitude = 1.0, .Frequency = 1e3});
     for (int section = 1; section <= SECTIONS; ++section) {
         builder.AddResistor(std::format("R{}", section), section, section + 1, 1e3);
@@ -738,11 +738,11 @@ TEST_CASE("A harmonic balance too large for the dense Jacobian is refused before
     auto circuit = builder.Build();
     REQUIRE(circuit.has_value());
 
-    const auto refused = nodalys::ComputeHarmonicBalance(*circuit, {.FundamentalFrequency = 1e3, .Harmonics = 64});
+    const auto refused = Nodalys::ComputeHarmonicBalance(*circuit, {.FundamentalFrequency = 1e3, .Harmonics = 64});
     REQUIRE_FALSE(refused.has_value());
     CHECK(refused.error().contains("fewer harmonics"));
 
     // The same ladder with a few harmonics fits
-    const auto solved = nodalys::ComputeHarmonicBalance(*circuit, {.FundamentalFrequency = 1e3, .Harmonics = 4});
+    const auto solved = Nodalys::ComputeHarmonicBalance(*circuit, {.FundamentalFrequency = 1e3, .Harmonics = 4});
     CHECK(solved.has_value());
 }

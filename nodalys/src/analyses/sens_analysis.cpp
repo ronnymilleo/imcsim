@@ -17,7 +17,7 @@
 #include <format>
 #include <string>
 
-namespace nodalys {
+namespace Nodalys {
 
 namespace {
 
@@ -79,19 +79,13 @@ std::expected<SensitivityResult, std::string> ComputeSensitivity(CompiledCircuit
         return std::unexpected("Nodalys encountered a singular matrix while solving the adjoint sensitivity system");
     }
 
-    auto NodeVolt = [&](const int unknown) -> double {
+    auto voltage_at = [&](const int unknown) -> double {
         return (unknown >= 0 && static_cast<std::size_t>(unknown) < x_dc.size())
                    ? x_dc[static_cast<std::size_t>(unknown)]
                    : 0.0;
     };
 
-    auto NodeLambda = [&](const int unknown) -> double {
-        return (unknown >= 0 && static_cast<std::size_t>(unknown) < adjoint.size())
-                   ? adjoint[static_cast<std::size_t>(unknown)]
-                   : 0.0;
-    };
-
-    auto UnknownLambda = [&](const int unknown) -> double {
+    auto adjoint_at = [&](const int unknown) -> double {
         return (unknown >= 0 && static_cast<std::size_t>(unknown) < adjoint.size())
                    ? adjoint[static_cast<std::size_t>(unknown)]
                    : 0.0;
@@ -114,8 +108,8 @@ std::expected<SensitivityResult, std::string> ComputeSensitivity(CompiledCircuit
             if (resistance <= 0.0) {
                 continue;
             }
-            const double vr = NodeVolt(resistor->NodeA()) - NodeVolt(resistor->NodeB());
-            const double lr = NodeLambda(resistor->NodeA()) - NodeLambda(resistor->NodeB());
+            const double vr = voltage_at(resistor->NodeA()) - voltage_at(resistor->NodeB());
+            const double lr = adjoint_at(resistor->NodeA()) - adjoint_at(resistor->NodeB());
             const double d_v_dr = (vr * lr) / (resistance * resistance);
             const double scale = resistance * d_v_dr;
 
@@ -124,7 +118,7 @@ std::expected<SensitivityResult, std::string> ComputeSensitivity(CompiledCircuit
             result.Vectors[vec_key + "_scale"] = scale;
         } else if (const auto *vsource = dynamic_cast<const VoltageSourceDevice *>(device)) {
             const double vs = vsource->GetDcValue();
-            const double d_v_dvs = UnknownLambda(vsource->Branch());
+            const double d_v_dvs = adjoint_at(vsource->Branch());
             const double scale = vs * d_v_dvs;
 
             const std::string vec_key = is_subcircuit ? "v." + lower_name : lower_name;
@@ -132,7 +126,7 @@ std::expected<SensitivityResult, std::string> ComputeSensitivity(CompiledCircuit
             result.Vectors[vec_key + "_scale"] = scale;
         } else if (const auto *isource = dynamic_cast<const CurrentSourceDevice *>(device)) {
             const double is = isource->GetDcValue();
-            const double d_v_dis = NodeLambda(isource->NodeB()) - NodeLambda(isource->NodeA());
+            const double d_v_dis = adjoint_at(isource->NodeB()) - adjoint_at(isource->NodeA());
             const double scale = is * d_v_dis;
 
             const std::string vec_key = is_subcircuit ? "i." + lower_name : lower_name;
@@ -147,15 +141,15 @@ std::expected<SensitivityResult, std::string> ComputeSensitivity(CompiledCircuit
             result.Vectors[vec_key] = 0.0;
             result.Vectors[vec_key + "_scale"] = 0.0;
         } else if (const auto *vcvs = dynamic_cast<const VcvsDevice *>(device)) {
-            const double v_ctrl = NodeVolt(vcvs->ControlPositive()) - NodeVolt(vcvs->ControlNegative());
-            const double d_v_dgain = UnknownLambda(vcvs->Branch()) * v_ctrl;
+            const double v_ctrl = voltage_at(vcvs->ControlPositive()) - voltage_at(vcvs->ControlNegative());
+            const double d_v_dgain = adjoint_at(vcvs->Branch()) * v_ctrl;
             const double scale = vcvs->GetGain() * d_v_dgain;
 
             result.Vectors[lower_name + "_gain"] = d_v_dgain;
             result.Vectors[lower_name + "_scale"] = scale;
         } else if (const auto *vccs = dynamic_cast<const VccsDevice *>(device)) {
-            const double v_ctrl = NodeVolt(vccs->ControlPositive()) - NodeVolt(vccs->ControlNegative());
-            const double d_v_dgain = (NodeLambda(vccs->NodeB()) - NodeLambda(vccs->NodeA())) * v_ctrl;
+            const double v_ctrl = voltage_at(vccs->ControlPositive()) - voltage_at(vccs->ControlNegative());
+            const double d_v_dgain = (adjoint_at(vccs->NodeB()) - adjoint_at(vccs->NodeA())) * v_ctrl;
             const double scale = vccs->GetGain() * d_v_dgain;
 
             result.Vectors[lower_name + "_gain"] = d_v_dgain;
@@ -164,7 +158,7 @@ std::expected<SensitivityResult, std::string> ComputeSensitivity(CompiledCircuit
             const int cb = cccs->ControlBranch();
             const double i_ctrl =
                 (cb >= 0 && static_cast<std::size_t>(cb) < x_dc.size()) ? x_dc[static_cast<std::size_t>(cb)] : 0.0;
-            const double d_v_dgain = (NodeLambda(cccs->NodeB()) - NodeLambda(cccs->NodeA())) * i_ctrl;
+            const double d_v_dgain = (adjoint_at(cccs->NodeB()) - adjoint_at(cccs->NodeA())) * i_ctrl;
             const double scale = cccs->GetGain() * d_v_dgain;
 
             result.Vectors[lower_name + "_gain"] = d_v_dgain;
@@ -173,7 +167,7 @@ std::expected<SensitivityResult, std::string> ComputeSensitivity(CompiledCircuit
             const int cb = ccvs->ControlBranch();
             const double i_ctrl =
                 (cb >= 0 && static_cast<std::size_t>(cb) < x_dc.size()) ? x_dc[static_cast<std::size_t>(cb)] : 0.0;
-            const double d_v_dgain = UnknownLambda(ccvs->Branch()) * i_ctrl;
+            const double d_v_dgain = adjoint_at(ccvs->Branch()) * i_ctrl;
             const double scale = ccvs->GetGain() * d_v_dgain;
 
             result.Vectors[lower_name + "_gain"] = d_v_dgain;
@@ -184,4 +178,4 @@ std::expected<SensitivityResult, std::string> ComputeSensitivity(CompiledCircuit
     return result;
 }
 
-} // namespace nodalys
+} // namespace Nodalys

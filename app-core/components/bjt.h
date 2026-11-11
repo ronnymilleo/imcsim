@@ -15,7 +15,7 @@
 
 namespace Core {
 
-using BJTParameters = nodalys::BjtParameters;
+using BJTParameters = Nodalys::BjtParameters;
 
 /**
  * @struct  BJTModel

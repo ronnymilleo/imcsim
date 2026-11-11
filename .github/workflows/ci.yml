@@ -122,7 +122,7 @@ jobs:
       - name: Check naming
         run: >-
           run-clang-tidy -p build -quiet -j "$(nproc)" -warnings-as-errors='*'
-          '/(app-core|app-gui|tests)/|/main\.cpp$'
+          '/(app-core|app-gui|nodalys|tests)/|/main\.cpp$'
 
   linux-sanitizers:
     runs-on: ubuntu-latest

@@ -10,7 +10,7 @@
 #include <cstddef>
 #include <vector>
 
-namespace nodalys {
+namespace Nodalys {
 
 /**
  * @class   FftPlan
@@ -58,6 +58,6 @@ private:
 [[nodiscard]] bool HarmonicsToReal(const std::vector<double> &coeffs, std::size_t sample_count,
                                    std::vector<double> &samples);
 
-} // namespace nodalys
+} // namespace Nodalys
 
 #endif // NODALYS_FFT_H

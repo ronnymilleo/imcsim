@@ -16,7 +16,7 @@
 #include <utility>
 #include <vector>
 
-namespace nodalys {
+namespace Nodalys {
 
 inline void DescribeOutcome(const NewtonOutcome &outcome, const char *analysis,
                             std::vector<DiagnosticMessage> *messages) {
@@ -75,6 +75,6 @@ std::expected<HarmonicBalanceResult, std::string> ComputeHarmonicBalance(Compile
                                                                          const ConvergenceOptions &options,
                                                                          std::vector<DiagnosticMessage> *messages);
 
-} // namespace nodalys
+} // namespace Nodalys
 
 #endif // NODALYS_INTERNAL_ANALYSES_H

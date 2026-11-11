@@ -10,7 +10,7 @@
 #include <string>
 #include <string_view>
 
-namespace nodalys {
+namespace Nodalys {
 
 // RAW (SPICE Nutmeg rawfile format - compatible with LTspice, ngspice, gaw, Qucs, PySpice)
 std::string ExportRaw(const OperatingPointResult &result, std::string_view title = "Nodalys Simulation");
@@ -55,6 +55,6 @@ std::string ExportTouchstone(const SParameterResult &result);
 // File helper functions
 [[nodiscard]] bool SaveStringToFile(std::string_view filepath, std::string_view content);
 
-} // namespace nodalys
+} // namespace Nodalys
 
 #endif // NODALYS_EXPORTERS_H

@@ -18,7 +18,7 @@
 #include <functional>
 #include <numbers>
 
-namespace nodalys {
+namespace Nodalys {
 
 namespace {
 
@@ -509,7 +509,7 @@ public:
         Track(vcc_neg);
         Defer([this, name = std::move(name), out, in_pos, in_neg, vcc_pos, vcc_neg, bandwidth_hz]() mutable {
             const IdealOpAmpValues figures = ComputeIdealOpAmpValues(bandwidth_hz);
-            constexpr int ground = -1;
+            constexpr int GROUND = -1;
             const int n_stage = AllocateInternalNode();
             MarkDynamic(n_stage);
 
@@ -520,13 +520,13 @@ public:
             const int u_vee = MapNode(vcc_neg);
 
             Device *d1 =
-                AddDevice(std::make_unique<VccsDevice>(ground, n_stage, u_inp, u_inm, figures.Transconductance));
-            Device *d2 = AddDevice(std::make_unique<ResistorDevice>(n_stage, ground, figures.Resistance, false));
-            Device *d3 = AddDevice(std::make_unique<CapacitorDevice>(n_stage, ground, figures.Capacitance, 0.0, false));
+                AddDevice(std::make_unique<VccsDevice>(GROUND, n_stage, u_inp, u_inm, figures.Transconductance));
+            Device *d2 = AddDevice(std::make_unique<ResistorDevice>(n_stage, GROUND, figures.Resistance, false));
+            Device *d3 = AddDevice(std::make_unique<CapacitorDevice>(n_stage, GROUND, figures.Capacitance, 0.0, false));
             Device *d4 = AddDevice(std::make_unique<DiodeDevice>(n_stage, u_vcc, -1, figures.Clamp));
             Device *d5 = AddDevice(std::make_unique<DiodeDevice>(u_vee, n_stage, -1, figures.Clamp));
             Device *output =
-                AddDevice(std::make_unique<VcvsDevice>(u_out, ground, n_stage, ground, AllocateBranch(), 1.0));
+                AddDevice(std::make_unique<VcvsDevice>(u_out, GROUND, n_stage, GROUND, AllocateBranch(), 1.0));
             m_Compiled.Currents.push_back({name, {{output, 0}}});
             m_Compiled.NoiseGroups.push_back({name, {d1, d2, d3, d4, d5, output}});
         });
@@ -541,7 +541,7 @@ public:
         Track(vcc_neg);
         Defer([this, name = std::move(name), out, in_pos, in_neg, vcc_pos, vcc_neg, params]() mutable {
             const BoyleOpAmpValues v = ComputeBoyleOpAmpValues(params);
-            constexpr int ground = -1;
+            constexpr int GROUND = -1;
             const int u_out = MapNode(out);
             const int u_inp = MapNode(in_pos);
             const int u_inm = MapNode(in_neg);
@@ -592,31 +592,31 @@ public:
             AddDevice(std::make_unique<ResistorDevice>(n_emit2, n_tail, v.EmitterResistance));
             AddDevice(
                 std::make_unique<CurrentSourceDevice>(n_tail, u_vee, v.TailCurrent, MakeDcWaveform(v.TailCurrent)));
-            AddDevice(std::make_unique<ResistorDevice>(n_tail, ground, v.TailResistance));
+            AddDevice(std::make_unique<ResistorDevice>(n_tail, GROUND, v.TailResistance));
 
             // 2. Intermediate Gain Stage & Miller Compensation
-            AddDevice(std::make_unique<VccsDevice>(ground, n_gain, n_tail, ground, v.CommonModeTransconductance));
-            AddDevice(std::make_unique<VccsDevice>(n_gain, ground, n_col1, n_col2, v.Transconductance));
-            AddDevice(std::make_unique<ResistorDevice>(n_gain, ground, v.GainStageResistance));
+            AddDevice(std::make_unique<VccsDevice>(GROUND, n_gain, n_tail, GROUND, v.CommonModeTransconductance));
+            AddDevice(std::make_unique<VccsDevice>(n_gain, GROUND, n_col1, n_col2, v.Transconductance));
+            AddDevice(std::make_unique<ResistorDevice>(n_gain, GROUND, v.GainStageResistance));
             AddDevice(std::make_unique<CapacitorDevice>(n_out_int, n_gain, v.CompensationCapacitance, 0.0, false));
 
             // 3. Output Stage
-            AddDevice(std::make_unique<VccsDevice>(n_out_int, ground, n_gain, ground, v.OutputGain));
-            AddDevice(std::make_unique<ResistorDevice>(n_out_int, ground, v.GainStageLoad));
+            AddDevice(std::make_unique<VccsDevice>(n_out_int, GROUND, n_gain, GROUND, v.OutputGain));
+            AddDevice(std::make_unique<ResistorDevice>(n_out_int, GROUND, v.GainStageLoad));
             Device *rso = AddDevice(std::make_unique<ResistorDevice>(n_out_int, u_out, v.OutputSenseResistance));
 
             // 4. Short-Circuit Current Limiter
-            AddDevice(std::make_unique<VcvsDevice>(n_cl_sense, ground, n_out_int, u_out, AllocateBranch(),
+            AddDevice(std::make_unique<VcvsDevice>(n_cl_sense, GROUND, n_out_int, u_out, AllocateBranch(),
                                                    v.CurrentLimitGain));
-            AddDevice(std::make_unique<VccsDevice>(ground, n_gain, n_cl_clamp, ground, 1.0));
-            AddDevice(std::make_unique<ResistorDevice>(n_cl_clamp, ground, 10.0));
+            AddDevice(std::make_unique<VccsDevice>(GROUND, n_gain, n_cl_clamp, GROUND, 1.0));
+            AddDevice(std::make_unique<ResistorDevice>(n_cl_clamp, GROUND, 10.0));
             AddDevice(std::make_unique<DiodeDevice>(n_cl_sense, n_cl_clamp, -1, dm1));
             AddDevice(std::make_unique<DiodeDevice>(n_cl_clamp, n_cl_sense, -1, dm1));
 
             // 5. Rail Swing Limiters
             AddDevice(std::make_unique<DiodeDevice>(n_pos_mid, n_pos_sense, -1, dm3));
             AddDevice(std::make_unique<DiodeDevice>(n_pos_ref, n_pos_mid, -1, dm3));
-            AddDevice(std::make_unique<VccsDevice>(ground, n_gain, n_pos_sense, u_vcc, 1.0));
+            AddDevice(std::make_unique<VccsDevice>(GROUND, n_gain, n_pos_sense, u_vcc, 1.0));
             Device *vc = AddDevice(std::make_unique<VoltageSourceDevice>(
                 n_pos_ref, u_out, AllocateBranch(), v.PositiveSwing, MakeDcWaveform(v.PositiveSwing)));
             AddDevice(std::make_unique<ResistorDevice>(u_vcc, n_pos_sense, 10.0));
@@ -624,7 +624,7 @@ public:
 
             AddDevice(std::make_unique<DiodeDevice>(n_neg_sense, n_neg_mid, -1, dm3));
             AddDevice(std::make_unique<DiodeDevice>(n_neg_mid, n_neg_ref, -1, dm3));
-            AddDevice(std::make_unique<VccsDevice>(ground, n_gain, n_neg_sense, u_vee, 1.0));
+            AddDevice(std::make_unique<VccsDevice>(GROUND, n_gain, n_neg_sense, u_vee, 1.0));
             Device *ve = AddDevice(std::make_unique<VoltageSourceDevice>(
                 u_out, n_neg_ref, AllocateBranch(), v.NegativeSwing, MakeDcWaveform(v.NegativeSwing)));
             AddDevice(std::make_unique<ResistorDevice>(n_neg_sense, u_vee, 10.0));
@@ -794,7 +794,7 @@ void CircuitBuilder::AddIdc(std::string name, NodeId pos, NodeId neg, double dc_
 
 void CircuitBuilder::AddVpulse(std::string name, NodeId pos, NodeId neg, const PulseParameters &params, double ac_mag,
                                double) {
-    const SourcePeriodicity periodicity{.Kind = SourceWaveformKind::Pulse,
+    const SourcePeriodicity periodicity{.Kind = SourceWaveformKind::PULSE,
                                         .Frequency = params.Period > 0.0 ? 1.0 / params.Period : 0.0,
                                         .MinEdgeTime = std::min(params.RiseTime, params.FallTime),
                                         .IsSupportedInHb = params.High == params.Low || params.Period > 0.0};
@@ -804,7 +804,7 @@ void CircuitBuilder::AddVpulse(std::string name, NodeId pos, NodeId neg, const P
 
 void CircuitBuilder::AddIpulse(std::string name, NodeId pos, NodeId neg, const PulseParameters &params, double ac_mag,
                                double) {
-    const SourcePeriodicity periodicity{.Kind = SourceWaveformKind::Pulse,
+    const SourcePeriodicity periodicity{.Kind = SourceWaveformKind::PULSE,
                                         .Frequency = params.Period > 0.0 ? 1.0 / params.Period : 0.0,
                                         .MinEdgeTime = std::min(params.RiseTime, params.FallTime),
                                         .IsSupportedInHb = params.High == params.Low || params.Period > 0.0};
@@ -814,7 +814,7 @@ void CircuitBuilder::AddIpulse(std::string name, NodeId pos, NodeId neg, const P
 
 void CircuitBuilder::AddVsine(std::string name, NodeId pos, NodeId neg, const SineParameters &params, double ac_mag,
                               double, const bool damped) {
-    const SourcePeriodicity periodicity{.Kind = SourceWaveformKind::Sine,
+    const SourcePeriodicity periodicity{.Kind = SourceWaveformKind::SINE,
                                         .Frequency = params.Frequency,
                                         .MinEdgeTime = 0.0,
                                         .IsSupportedInHb =
@@ -825,7 +825,7 @@ void CircuitBuilder::AddVsine(std::string name, NodeId pos, NodeId neg, const Si
 
 void CircuitBuilder::AddIsine(std::string name, NodeId pos, NodeId neg, const SineParameters &params, double ac_mag,
                               double, const bool damped) {
-    const SourcePeriodicity periodicity{.Kind = SourceWaveformKind::Sine,
+    const SourcePeriodicity periodicity{.Kind = SourceWaveformKind::SINE,
                                         .Frequency = params.Frequency,
                                         .MinEdgeTime = 0.0,
                                         .IsSupportedInHb =
@@ -836,7 +836,7 @@ void CircuitBuilder::AddIsine(std::string name, NodeId pos, NodeId neg, const Si
 
 void CircuitBuilder::AddVexp(std::string name, NodeId pos, NodeId neg, const ExpParameters &params, double ac_mag,
                              double) {
-    const SourcePeriodicity non_periodic{.Kind = SourceWaveformKind::NonPeriodic, .IsSupportedInHb = false};
+    const SourcePeriodicity non_periodic{.Kind = SourceWaveformKind::NON_PERIODIC, .IsSupportedInHb = false};
     m_Impl->AddVoltageSourceDevice(std::move(name), pos, neg, params.InitialValue,
                                    MakeExpWaveform(params.InitialValue, params), ac_mag, non_periodic,
                                    MakeExpBreakpoints(params));
@@ -844,7 +844,7 @@ void CircuitBuilder::AddVexp(std::string name, NodeId pos, NodeId neg, const Exp
 
 void CircuitBuilder::AddIexp(std::string name, NodeId pos, NodeId neg, const ExpParameters &params, double ac_mag,
                              double) {
-    const SourcePeriodicity non_periodic{.Kind = SourceWaveformKind::NonPeriodic, .IsSupportedInHb = false};
+    const SourcePeriodicity non_periodic{.Kind = SourceWaveformKind::NON_PERIODIC, .IsSupportedInHb = false};
     m_Impl->AddCurrentSourceDevice(std::move(name), pos, neg, params.InitialValue,
                                    MakeExpWaveform(params.InitialValue, params), ac_mag, non_periodic,
                                    MakeExpBreakpoints(params));
@@ -853,7 +853,7 @@ void CircuitBuilder::AddIexp(std::string name, NodeId pos, NodeId neg, const Exp
 void CircuitBuilder::AddVpwl(std::string name, NodeId pos, NodeId neg, const PwlParameters &params, double ac_mag,
                              double) {
     const double dc = params.Points.empty() ? 0.0 : params.Points.front().Value;
-    const SourcePeriodicity non_periodic{.Kind = SourceWaveformKind::NonPeriodic, .IsSupportedInHb = false};
+    const SourcePeriodicity non_periodic{.Kind = SourceWaveformKind::NON_PERIODIC, .IsSupportedInHb = false};
     m_Impl->AddVoltageSourceDevice(std::move(name), pos, neg, dc, MakePwlWaveform(dc, params), ac_mag, non_periodic,
                                    MakePwlBreakpoints(params));
 }
@@ -861,35 +861,35 @@ void CircuitBuilder::AddVpwl(std::string name, NodeId pos, NodeId neg, const Pwl
 void CircuitBuilder::AddIpwl(std::string name, NodeId pos, NodeId neg, const PwlParameters &params, double ac_mag,
                              double) {
     const double dc = params.Points.empty() ? 0.0 : params.Points.front().Value;
-    const SourcePeriodicity non_periodic{.Kind = SourceWaveformKind::NonPeriodic, .IsSupportedInHb = false};
+    const SourcePeriodicity non_periodic{.Kind = SourceWaveformKind::NON_PERIODIC, .IsSupportedInHb = false};
     m_Impl->AddCurrentSourceDevice(std::move(name), pos, neg, dc, MakePwlWaveform(dc, params), ac_mag, non_periodic,
                                    MakePwlBreakpoints(params));
 }
 
 void CircuitBuilder::AddVsffm(std::string name, NodeId pos, NodeId neg, const SffmParameters &params, double ac_mag,
                               double) {
-    const SourcePeriodicity non_periodic{.Kind = SourceWaveformKind::NonPeriodic, .IsSupportedInHb = false};
+    const SourcePeriodicity non_periodic{.Kind = SourceWaveformKind::NON_PERIODIC, .IsSupportedInHb = false};
     m_Impl->AddVoltageSourceDevice(std::move(name), pos, neg, params.Offset, MakeSffmWaveform(params.Offset, params),
                                    ac_mag, non_periodic);
 }
 
 void CircuitBuilder::AddIsffm(std::string name, NodeId pos, NodeId neg, const SffmParameters &params, double ac_mag,
                               double) {
-    const SourcePeriodicity non_periodic{.Kind = SourceWaveformKind::NonPeriodic, .IsSupportedInHb = false};
+    const SourcePeriodicity non_periodic{.Kind = SourceWaveformKind::NON_PERIODIC, .IsSupportedInHb = false};
     m_Impl->AddCurrentSourceDevice(std::move(name), pos, neg, params.Offset, MakeSffmWaveform(params.Offset, params),
                                    ac_mag, non_periodic);
 }
 
 void CircuitBuilder::AddVam(std::string name, NodeId pos, NodeId neg, const AmParameters &params, double ac_mag,
                             double) {
-    const SourcePeriodicity non_periodic{.Kind = SourceWaveformKind::NonPeriodic, .IsSupportedInHb = false};
+    const SourcePeriodicity non_periodic{.Kind = SourceWaveformKind::NON_PERIODIC, .IsSupportedInHb = false};
     m_Impl->AddVoltageSourceDevice(std::move(name), pos, neg, params.Offset, MakeAmWaveform(params.Offset, params),
                                    ac_mag, non_periodic, MakeAmBreakpoints(params));
 }
 
 void CircuitBuilder::AddIam(std::string name, NodeId pos, NodeId neg, const AmParameters &params, double ac_mag,
                             double) {
-    const SourcePeriodicity non_periodic{.Kind = SourceWaveformKind::NonPeriodic, .IsSupportedInHb = false};
+    const SourcePeriodicity non_periodic{.Kind = SourceWaveformKind::NON_PERIODIC, .IsSupportedInHb = false};
     m_Impl->AddCurrentSourceDevice(std::move(name), pos, neg, params.Offset, MakeAmWaveform(params.Offset, params),
                                    ac_mag, non_periodic, MakeAmBreakpoints(params));
 }
@@ -897,7 +897,7 @@ void CircuitBuilder::AddIam(std::string name, NodeId pos, NodeId neg, const AmPa
 void CircuitBuilder::AddClock(std::string name, NodeId pos, NodeId neg, const ClockParameters &params) {
     constexpr double CLOCK_EDGE_FRACTION = 1e-4;
     const double period = params.Frequency > 0.0 ? 1.0 / params.Frequency : 0.0;
-    const SourcePeriodicity periodicity{.Kind = SourceWaveformKind::Clock,
+    const SourcePeriodicity periodicity{.Kind = SourceWaveformKind::CLOCK,
                                         .Frequency = params.Frequency,
                                         .MinEdgeTime = CLOCK_EDGE_FRACTION * period,
                                         .IsSupportedInHb = params.Frequency > 0.0};
@@ -1062,4 +1062,4 @@ std::expected<Circuit, std::string> CircuitBuilder::Build() {
     return m_Impl->Build();
 }
 
-} // namespace nodalys
+} // namespace Nodalys

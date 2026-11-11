@@ -10,7 +10,7 @@
 #include <memory>
 #include <utility>
 
-namespace nodalys {
+namespace Nodalys {
 
 class CircuitImpl {
 public:
@@ -28,6 +28,6 @@ private:
     CompiledCircuit m_Compiled;
 };
 
-} // namespace nodalys
+} // namespace Nodalys
 
 #endif // NODALYS_CIRCUIT_IMPL_H

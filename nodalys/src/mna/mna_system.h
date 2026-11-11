@@ -31,7 +31,7 @@
 #include "linear/dense_matrix.h"
 #include <vector>
 
-namespace nodalys {
+namespace Nodalys {
 
 /**
  * @struct  TimeContext
@@ -145,6 +145,6 @@ private:
     int m_NodeUnknowns = 0;
 };
 
-} // namespace nodalys
+} // namespace Nodalys
 
 #endif // NODALYS_MNA_SYSTEM_H

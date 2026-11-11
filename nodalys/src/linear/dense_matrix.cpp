@@ -10,7 +10,7 @@
 #include <ranges>
 #include <utility>
 
-namespace nodalys {
+namespace Nodalys {
 
 template <typename Scalar>
 BasicDenseMatrix<Scalar>::BasicDenseMatrix(const std::size_t rows, const std::size_t cols)
@@ -123,4 +123,4 @@ bool BasicDenseMatrix<Scalar>::Solve(const std::vector<Scalar> &rhs, std::vector
 template class BasicDenseMatrix<double>;
 template class BasicDenseMatrix<std::complex<double>>;
 
-} // namespace nodalys
+} // namespace Nodalys

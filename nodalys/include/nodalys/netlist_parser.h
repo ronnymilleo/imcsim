@@ -17,23 +17,23 @@
 #include <variant>
 #include <vector>
 
-namespace nodalys {
+namespace Nodalys {
 
 /**
  * @enum   AnalysisKind
  * @brief  Type of simulation directive found in the SPICE netlist.
  */
 enum class AnalysisKind {
-    OperatingPoint,   ///< .op
-    Transient,        ///< .tran
-    DcSweep,          ///< .dc
-    AcSweep,          ///< .ac
-    TransferFunction, ///< .tf
-    Noise,            ///< .noise
-    SParameters,      ///< .sp
-    PoleZero,         ///< .pz
-    Sensitivity,      ///< .sens
-    HarmonicBalance   ///< .hb
+    OPERATING_POINT,   ///< .op
+    TRANSIENT,         ///< .tran
+    DC_SWEEP,          ///< .dc
+    AC_SWEEP,          ///< .ac
+    TRANSFER_FUNCTION, ///< .tf
+    NOISE,             ///< .noise
+    S_PARAMETERS,      ///< .sp
+    POLE_ZERO,         ///< .pz
+    SENSITIVITY,       ///< .sens
+    HARMONIC_BALANCE   ///< .hb
 };
 
 /**
@@ -41,7 +41,7 @@ enum class AnalysisKind {
  * @brief  Analysis directive and its configured parameters parsed from the netlist.
  */
 struct ParsedAnalysis {
-    AnalysisKind Kind = AnalysisKind::OperatingPoint;
+    AnalysisKind Kind = AnalysisKind::OPERATING_POINT;
     std::variant<std::monostate,         // OperatingPoint (no parameters)
                  TransientConfig,        // Transient (.tran)
                  DcSweepConfig,          // DcSweep (.dc)
@@ -72,6 +72,6 @@ struct ParsedNetlist {
 [[nodiscard]] std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_text);
 [[nodiscard]] std::optional<double> ParseSpiceNumber(std::string_view text);
 
-} // namespace nodalys
+} // namespace Nodalys
 
 #endif // NODALYS_NETLIST_PARSER_H
