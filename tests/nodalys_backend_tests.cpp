@@ -28,6 +28,7 @@
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 #include <cmath>
 #include <complex>
+#include <memory>
 #include <numbers>
 #include <set>
 #include <string>
@@ -88,6 +89,31 @@ TEST_CASE("Nodalys names itself and lists what it runs") {
     REQUIRE(capabilities.Analyses.contains(Core::AnalysisKind::NOISE));
     REQUIRE(capabilities.Analyses.contains(Core::AnalysisKind::TRANSFER_FUNCTION));
     REQUIRE(capabilities.Analyses.contains(Core::AnalysisKind::HARMONIC_BALANCE));
+}
+
+TEST_CASE("Nodalys refuses a run at another temperature and says why, rather than ignoring it") {
+    // Restores the default backend even when a check throws
+    struct NodalysInUse {
+        NodalysInUse() { Core::SetBackend(std::make_unique<Core::NodalysBackend>()); }
+        ~NodalysInUse() { Core::SetBackend(nullptr); }
+        NodalysInUse(const NodalysInUse &) = delete;
+        NodalysInUse &operator=(const NodalysInUse &) = delete;
+    };
+    const NodalysInUse in_use;
+    const Divider divider;
+
+    const Core::OperatingPointRun at_default = Core::RunOperatingPoint(divider.Circuit, std::nullopt);
+    REQUIRE(at_default.Result.has_value());
+
+    const Core::OperatingPointRun heated =
+        Core::RunOperatingPoint(divider.Circuit, Core::ParameterValue{.Part = "", .Value = 85.0});
+    REQUIRE_FALSE(heated.Result.has_value());
+    CHECK(heated.Result.error() == *Core::GetBackend().GetCapabilities().TemperatureUnsupported);
+    // A stepped part is no temperature, so it still runs
+    const Core::OperatingPointRun stepped =
+        Core::RunOperatingPoint(divider.Circuit, Core::ParameterValue{.Part = "R2", .Value = 1e3});
+    REQUIRE(stepped.Result.has_value());
+    CHECK_THAT(stepped.Result->NodeVoltages[2], WithinRel(5.0, 1e-9));
 }
 
 TEST_CASE("The Nodalys backend reports logic parts and analog parts as supported") {

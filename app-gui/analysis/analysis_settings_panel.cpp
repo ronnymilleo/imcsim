@@ -827,12 +827,18 @@ void AnalysisSettingsPanel::DrawParameterPicker(ParameterStepSettings &step, con
     if (!ImGui::BeginCombo("##step_parameter", shown.c_str())) {
         return;
     }
+    const std::optional<std::string> &no_temperature = Core::GetBackend().GetCapabilities().TemperatureUnsupported;
+    ImGui::BeginDisabled(no_temperature.has_value());
     if (ImGui::Selectable("Temperature", step.Part.empty()) && !step.Part.empty()) {
         step.Part.clear();
         step.Start = 0.0;
         step.Stop = 100.0;
         step.Step = 25.0;
         LoadParameterStepFields(step);
+    }
+    ImGui::EndDisabled();
+    if (no_temperature) {
+        ImGui::SetItemTooltip("%s", no_temperature->c_str());
     }
     const std::vector<std::string> steppable = Core::GetSteppableParts(circuit);
     for (const Core::CircuitEntry &entry : circuit.GetEntries()) {

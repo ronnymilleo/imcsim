@@ -33,6 +33,22 @@ std::optional<std::string> FindProblem(const Circuit &circuit, const std::option
     return FindUnsupported(GetBackend(), circuit, kind);
 }
 
+/**
+ * @brief   The circuit of one run at its stepped value, refused when the value is a temperature the backend in use
+ *          cannot simulate, which it would otherwise ignore.
+ */
+std::expected<ParameterCircuit, std::string> ApplyRunParameter(const Circuit &circuit,
+                                                               const std::optional<ParameterValue> &parameter) {
+    auto applied = ApplyParameter(circuit, parameter);
+    if (!applied || !applied->Temperature) {
+        return applied;
+    }
+    if (const std::optional<std::string> &reason = GetBackend().GetCapabilities().TemperatureUnsupported) {
+        return std::unexpected(*reason);
+    }
+    return applied;
+}
+
 /// The chosen logic inputs as copies that each row of a truth table sets, and the circuit that uses them in place of
 /// the originals.
 struct InputCopies {
@@ -143,7 +159,7 @@ OperatingPointRun RunOperatingPoint(const Circuit &circuit, const std::optional<
     if (const std::optional<std::string> error = FindProblem(circuit, std::nullopt, AnalysisKind::OPERATING_POINT)) {
         return {std::unexpected(*error), {}};
     }
-    const auto applied = ApplyParameter(circuit, parameter);
+    const auto applied = ApplyRunParameter(circuit, parameter);
     if (!applied) {
         return {std::unexpected(applied.error()), {}};
     }
@@ -177,7 +193,7 @@ TransientRun RunTransient(const Circuit &circuit, const TransientSettings &setti
     if (const std::optional<std::string> error = FindProblem(circuit, settings_error, AnalysisKind::TRANSIENT)) {
         return {std::unexpected(*error), {}};
     }
-    const auto applied = ApplyParameter(circuit, parameter);
+    const auto applied = ApplyRunParameter(circuit, parameter);
     if (!applied) {
         return {std::unexpected(applied.error()), {}};
     }
@@ -201,7 +217,7 @@ ACSweepRun RunACSweep(const Circuit &circuit, const ACSweepSettings &settings,
             FindProblem(circuit, CheckACSweepSettings(circuit, settings), AnalysisKind::AC_SWEEP)) {
         return {std::unexpected(*error), {}};
     }
-    const auto applied = ApplyParameter(circuit, parameter);
+    const auto applied = ApplyRunParameter(circuit, parameter);
     if (!applied) {
         return {std::unexpected(applied.error()), {}};
     }
@@ -226,7 +242,7 @@ DCSweepRun RunDCSweep(const Circuit &circuit, const DCSweepSettings &settings,
             FindProblem(circuit, CheckDCSweepSettings(circuit, settings), AnalysisKind::DC_SWEEP)) {
         return {std::unexpected(*error), {}};
     }
-    const auto applied = ApplyParameter(circuit, parameter);
+    const auto applied = ApplyRunParameter(circuit, parameter);
     if (!applied) {
         return {std::unexpected(applied.error()), {}};
     }

@@ -44,6 +44,8 @@ NodalysBackend::NodalysBackend() {
         m_Capabilities.UnsupportedParts[type] = "Nodalys has no device for behavioral sources yet";
     }
     m_Capabilities.UnsupportedParts[ComponentType::FUSE] = "Nodalys has no device for fuses yet";
+    m_Capabilities.TemperatureUnsupported =
+        "Nodalys simulates at 27 C only: its device models do not follow the temperature yet";
     for (int index = 0; index <= static_cast<int>(ComponentType::SEVEN_SEGMENT); ++index) {
         const auto type = static_cast<ComponentType>(index);
         if (IsLogicPart(type)) {
