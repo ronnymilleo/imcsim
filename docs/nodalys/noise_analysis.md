@@ -1,10 +1,10 @@
 # Small-Signal AC Noise Analysis (`.noise`)
 
 **Implementation files:**
-- [`app-core/native/noise_analysis.cpp`](../../app-core/native/noise_analysis.cpp) (`ComputeNoise`)
-- [`app-core/native/mna_system.cpp`](../../app-core/native/mna_system.cpp) (`MnaSystem::SolveAcTranspose`)
-- [`app-core/native/devices.cpp`](../../app-core/native/devices.cpp) & [`app-core/native/nonlinear.cpp`](../../app-core/native/nonlinear.cpp) (`Device::OutputNoiseVariance`)
-- [`app-core/native/compiler.cpp`](../../app-core/native/compiler.cpp) (`CompiledCircuit::NoiseGroups`)
+- [`nodalys/src/analyses/noise_analysis.cpp`](../../nodalys/src/analyses/noise_analysis.cpp) (`ComputeNoise`)
+- [`nodalys/src/mna/mna_system.cpp`](../../nodalys/src/mna/mna_system.cpp) (`MnaSystem::SolveAcTranspose`)
+- [`nodalys/src/devices/devices.cpp`](../../nodalys/src/devices/devices.cpp) & [`nodalys/src/devices/nonlinear.cpp`](../../nodalys/src/devices/nonlinear.cpp) (`Device::OutputNoiseVariance`)
+- [`app-core/nodalys/compiler.cpp`](../../app-core/nodalys/compiler.cpp) (`CompiledCircuit::NoiseGroups`)
 - [`tests/backend_comparison_tests.cpp`](../../tests/backend_comparison_tests.cpp) (`Both backends agree on the small-signal noise spectral densities, totals and device contributions`)
 
 ---

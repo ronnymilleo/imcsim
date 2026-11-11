@@ -56,7 +56,7 @@ The three benchmark circuits below span passive networks with closed-form soluti
 
 > [!NOTE]
 > **Why does the closed-loop uA741 output impedance differ by $36\text{ }\mu\Omega$ (`3.806 mOhm` vs. `3.769 mOhm`)?**
-> In the Boyle uA741 macromodel ([`compiler.cpp`](../../app-core/native/compiler.cpp)), the short-circuit current limiter senses the drop across `RSO` ($1\text{ }\Omega$) through a controlled source `ECL` with gain $\approx 33.8$ driving two anti-parallel diodes (`D1` and `D2`) that feed into the high-impedance gain node (`n_gain`, impedance $R_2 \times G_B \times R_{O2} \approx 1.5 \times 10^7$).
+> In the Boyle uA741 macromodel ([`compiler.cpp`](../../app-core/nodalys/compiler.cpp)), the short-circuit current limiter senses the drop across `RSO` ($1\text{ }\Omega$) through a controlled source `ECL` with gain $\approx 33.8$ driving two anti-parallel diodes (`D1` and `D2`) that feed into the high-impedance gain node (`n_gain`, impedance $R_2 \times G_B \times R_{O2} \approx 1.5 \times 10^7$).
 > In `ngspice`, `CKTgmin = 1e-12 S` is placed in parallel with **each diode junction** (`2e-12 S` total across `D1 || D2`), creating a parasitic small-signal leakage path of $33.8 \times 2\times 10^{-12} \times 10 \times 1.5\times 10^7 \approx 0.01$ ($\sim 1\%$ of loop gain). In `Nodalys`, diodes follow the pure Shockley equation and `Gmin` is placed from nodes to ground, yielding $Z_{\text{out}} = 3.769\text{ m}\Omega$ (faithful to the theoretical loop gain without off-diode leakage).
 
 ---

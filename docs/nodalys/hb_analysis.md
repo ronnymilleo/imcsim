@@ -22,7 +22,8 @@ Single-tone Harmonic Balance (`.hb`) solves the **periodic steady state** of non
   - Non-periodic or damped waveforms (`EXP`, `PWL`, `SFFM`, `AM`, `NOISE`, `RANDOM`, damped `SIN`).
   - Frequencies that are not integer multiples of $f_0$ or harmonics exceeding `Harmonics` ($H$).
   - Event-hysteretic switches (`V_SWITCH` / `RELAY` in `imcsim`; static switches and push buttons are supported).
-- **Oversampling & truncation checks:** When `Samples == 0`, `ValidateAndResolveSampleCount` selects $M = \text{NextPowerOfTwo}(\max(16, 4H))$. Explicit power-of-two sample counts must satisfy $M > 2H$ (Nyquist guard against harmonic aliasing). Warnings are emitted when a `PULSE`/`CLOCK` edge is narrower than $T_0 / M$, when $|X_H| > 1\%\,|X_1|$ at any node (harmonic truncation), or when the dense HB Jacobian exceeds `MAX_DENSE_UNKNOWNS_WARNING = 4000` unknowns.
+- **Oversampling & truncation checks:** When `Samples == 0`, `ValidateAndResolveSampleCount` selects $M = \text{NextPowerOfTwo}(\max(16, 4H))$. Explicit power-of-two sample counts must satisfy $M > 2H$ (Nyquist guard against harmonic aliasing). Warnings are emitted when a `PULSE`/`CLOCK` edge is narrower than $T_0 / M$, when $|X_H| > 1\%\,|X_1|$ at any node (harmonic truncation), or when the dense HB Jacobian exceeds `MAX_DENSE_UNKNOWNS_WARNING = 1500` unknowns. Above `MAX_DENSE_UNKNOWNS = 4000` unknowns (128 MB of Jacobian) the run is refused before it allocates anything, asking for fewer harmonics.
+- **Stopping:** `HarmonicBalanceConfig::ShouldStop` is asked before every Newton iteration, so the Stop button of imcsim ends a long run between iterations; once it asks for a stop, the source- and gmin-stepping fallbacks do not start.
 
 ---
 
@@ -88,7 +89,7 @@ Finally, `BuildHarmonicBalanceResult` reconstructs one-cycle waveforms for every
   - Current-driven parallel diode-RC network and phase-delayed `PULSE` source (modulo-$T_0$ periodicity).
   - BJT common-emitter amplifier driven into saturation and harmonic distortion.
   - Level-1 NMOS common-source stage with nonlinear channel + overlap capacitances ($C_{GS}, C_{GD}$).
-  - Continuous smooth logic inverter (`INVERTER`) excited by a periodic `PULSE` train.
+  - Continuous smooth logic inverter (`LogicGateType::NOT`) excited by a periodic `PULSE` train.
 
 ### 4.2 Speedup Benchmark vs. Long-Time Transient + FFT (Release `[.benchmark]`)
 

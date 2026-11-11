@@ -71,6 +71,29 @@ elements, so the results are those of ngspice with the models below. Some things
   dissipates power and negative when it delivers it. An op-amp reports a current only at its output, so its power is
   that of its output stage and leaves out what its supply pins give or take.
 
+### Nodalys
+
+Edit > Preferences > Simulation picks the engine. ngspice is the default; Nodalys is the solver built into imcsim
+([its documentation](nodalys/README.md)), which takes the circuit directly, with no netlist, and runs the same
+analyses plus the harmonic balance. It simulates the parts with the same models as above (Shockley diode, Gummel-Poon
+transistor, level 1 MOSFET, ideal and Boyle op-amps), and differs in these points:
+
+- Logic gates and flip-flops are continuous: each output follows a smooth tanh step of its inputs around half the
+  logic level, over a tenth of it, behind 50 Ohm and a delay of the part's propagation delay, and each input has
+  1 GOhm to ground. There are no X states and no `digital.cm`, so the same circuit can run every analysis, and a
+  flip-flop is built from such gates.
+- Everything is simulated at 27 °C: a stepped temperature is refused with the reason, since the device models do not
+  follow the temperature yet.
+- Behavioral sources and fuses have no device yet, and the analyses refuse them with the reason.
+- A noise or random source holds its DC level (the offset, or the mean of a random source) in the operating point,
+  the sweeps and the small-signal analyses, as in ngspice; a transient with one is refused, since Nodalys cannot draw
+  the values yet.
+- The transient lands a time point on every corner of a source waveform (each edge of a pulse or clock, each point of
+  a piecewise linear source, the delays of the exponential and AM sources) and keeps it in the results, so a pulse
+  narrower than the time step still shows; ngspice does the same with its breakpoints.
+- The harmonic balance solves a dense system of the circuit's unknowns times 2 H + 1 for H harmonics; past 4000
+  unknowns it is refused, asking for fewer harmonics.
+
 ## Passive parts
 
 | Part | SPICE element | Value |

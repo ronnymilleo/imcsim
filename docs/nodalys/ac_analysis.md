@@ -1,10 +1,10 @@
 # Small-Signal AC / Bode Analysis (`.ac`)
 
 **Implementation files:**
-- [`app-core/native/ac_analysis.cpp`](../../app-core/native/ac_analysis.cpp) (`ComputeACSweep`)
-- [`app-core/native/mna_system.cpp`](../../app-core/native/mna_system.cpp) (`MnaSystem::SolveAc`, `MnaSystem::AddComplexA`, `MnaSystem::AddComplexRhs`)
-- [`app-core/native/linear/dense_matrix.cpp`](../../app-core/native/linear/dense_matrix.cpp) (`BasicDenseMatrix<std::complex<double>>`)
-- [`app-core/native/devices.cpp`](../../app-core/native/devices.cpp) and [`app-core/native/nonlinear.cpp`](../../app-core/native/nonlinear.cpp) (`StampAc`, `AcTerminalCurrent`)
+- [`nodalys/src/analyses/ac_analysis.cpp`](../../nodalys/src/analyses/ac_analysis.cpp) (`ComputeACSweep`)
+- [`nodalys/src/mna/mna_system.cpp`](../../nodalys/src/mna/mna_system.cpp) (`MnaSystem::SolveAc`, `MnaSystem::SolveAcMultiple`)
+- [`nodalys/src/linear/dense_matrix.cpp`](../../nodalys/src/linear/dense_matrix.cpp) (`BasicDenseMatrix<std::complex<double>>`)
+- [`nodalys/src/devices/devices.cpp`](../../nodalys/src/devices/devices.cpp) and [`nodalys/src/devices/nonlinear.cpp`](../../nodalys/src/devices/nonlinear.cpp) (`StampAc`, `AcTerminalCurrent`)
 
 ---
 
@@ -31,9 +31,9 @@ At each frequency $f_k$ on the logarithmic grid ($N_{\text{dec}}$ points per dec
 - Capacitors stamp $+j\omega_k C$ between their terminals; inductors stamp $-j\omega_k L$ on their branch-current diagonal; ideal transformers and controlled sources stamp their linear transfer ratios.
 - `MnaSystem::SolveAc` solves the dense complex system $\mathbf{Y}(j\omega_k)\,\tilde{\mathbf{x}} = \tilde{\mathbf{b}}_{\text{AC}}$ using **complex magnitude row equilibration**, **partial-pivoting $PA = LU$ in $\mathbb{C}$**, and **1 step of complex iterative refinement**.
 
-### 1.4 Magnitude in dB and Continuous Phase Unwrapping
+### 1.4 Magnitude in dB and Phase
 - **Magnitude:** $|H|_{\text{dB}} = 20\log_{10}\bigl(\max(|\tilde{X}(j\omega_k)|, 10^{-20})\bigr)$.
-- **Phase Unwrapping (`UnwrapPhaseDegrees`):** because `std::arg` wraps angles into $(-180^\circ, +180^\circ]$, higher-order filters with phase lag beyond $-180^\circ$ would exhibit artificial $+360^\circ$ jumps. `Nodalys` shifts each frequency point $k \ge 1$ by integer multiples of $\pm 360^\circ$ so that $|\phi_k - \phi_{k-1}| \le 180^\circ$, producing smooth Bode phase curves matching `ngspice`.
+- **Phase:** `std::arg` in degrees, wrapped into $(-180^\circ, +180^\circ]$ as the ngspice backend reports it, so a filter whose phase passes $-180^\circ$ jumps by $360^\circ$ on both backends.
 
 ---
 

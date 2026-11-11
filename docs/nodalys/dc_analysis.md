@@ -1,10 +1,10 @@
 # DC Analyses in Nodalys: Operating Point (`.op`) and DC Sweep (`.dc`)
 
 **Implementation files:**
-- [`app-core/native/dc_analysis.cpp`](../../app-core/native/dc_analysis.cpp) (`ComputeOperatingPoint`, `ComputeDCSweep`)
-- [`app-core/native/newton.cpp`](../../app-core/native/newton.cpp) (`RunNewton`, `SolveOperatingPoint`)
-- [`app-core/native/mna_system.cpp`](../../app-core/native/mna_system.cpp) (`MnaSystem::Solve`, `MnaSystem::CheckResidual`)
-- [`app-core/native/linear/dense_matrix.cpp`](../../app-core/native/linear/dense_matrix.cpp) (`BasicDenseMatrix<double>`)
+- [`nodalys/src/analyses/dc_analysis.cpp`](../../nodalys/src/analyses/dc_analysis.cpp) (`ComputeOperatingPoint`, `ComputeDCSweep`)
+- [`nodalys/src/newton/newton.cpp`](../../nodalys/src/newton/newton.cpp) (`SolveNewton`)
+- [`nodalys/src/mna/mna_system.cpp`](../../nodalys/src/mna/mna_system.cpp) (`MnaSystem::Solve`, `MnaSystem::CheckResidual`)
+- [`nodalys/src/linear/dense_matrix.cpp`](../../nodalys/src/linear/dense_matrix.cpp) (`BasicDenseMatrix<double>`)
 
 ---
 
@@ -19,7 +19,7 @@ At DC steady state ($\omega = 0$, $d/dt = 0$):
   where the unknown vector $\mathbf{x} \in \mathbb{R}^N$ partitions into **node voltages** $v_1, \dots, v_n$ (enforcing Kirchhoff's Current Law — KCL) and **branch currents** $i_{b_1}, \dots, i_{b_m}$ for voltage sources, inductors, and transformers (enforcing branch constitutive equations).
 
 ### 1.2 Global Minimum Conductance (`Gmin = 1e-12 S`)
-In [`MnaSystem::Clear`](../../app-core/native/mna_system.cpp), every row corresponding to a node-voltage unknown receives a minimum diagonal conductance to ground:
+In [`MnaSystem::Clear`](../../nodalys/src/mna/mna_system.cpp), every row corresponding to a node-voltage unknown receives a minimum diagonal conductance to ground:
 $$G_{\min} = 10^{-12}\text{ S} \quad (\text{equivalent to a } 1\text{ T}\Omega \text{ bleed resistor to ground})$$
 - **Why keep global `Gmin`?** It guarantees nonsingularity whenever a circuit contains nodes coupled strictly through capacitors (e.g., AC-coupled stages), open switches, or reverse-biased semiconductor junctions.
 
@@ -45,7 +45,7 @@ When direct Newton-Raphson fails to converge from $\mathbf{x}^{(0)} = \mathbf{0}
 3. **Stage 3 — *Source Stepping*:** scales all independent sources by $\lambda \in [0 \to 1]$ with adaptive step halving whenever an intermediate point fails to converge.
 
 ### 1.6 DC Sweep (`.dc`) with Homotopic Continuation
-In [`ComputeDCSweep`](../../app-core/native/dc_analysis.cpp), only the first point of each sweep curve requires a cold start (`SolveOperatingPoint`). Every subsequent point $k = 1, 2, \dots, M$ seeds `RunNewton` directly with the converged vector $\mathbf{x}_{k-1}$ from the preceding source value, typically converging in 2–4 iterations.
+In [`ComputeDCSweep`](../../nodalys/src/analyses/dc_analysis.cpp), only the first point of each sweep curve requires a cold start ([`ComputeOperatingPoint`](../../nodalys/src/analyses/dc_analysis.cpp)). Every subsequent point $k = 1, 2, \dots, M$ seeds `SolveNewton` directly with the converged vector $\mathbf{x}_{k-1}$ from the preceding source value, typically converging in 2–4 iterations.
 
 ---
 

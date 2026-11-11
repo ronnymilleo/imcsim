@@ -60,7 +60,7 @@
 │       ├── newton/                    Damped Newton-Raphson, Gmin/Source stepping
 │       └── parser/                    SPICE netlist lexer, parser, and engineering unit evaluator
 └── app-core/nodalys/                  imcsim Integration Bridge
-    ├── compiler.h / .cpp              Translates Core::Circuit to nodalys::Circuit
+    ├── compiler.h / .cpp              Translates Core::Circuit to Nodalys::Circuit
     └── nodalys_backend.h / .cpp       Core::SimulationBackend implementation (NodalysBackend)
 ```
 
@@ -82,7 +82,7 @@
 
 | File | Responsibility |
 | :--- | :--- |
-| [`compiler.h`](../../app-core/nodalys/compiler.h) / [`compiler.cpp`](../../app-core/nodalys/compiler.cpp) | Translates `Core::Circuit` components, hierarchical subcircuits, parameter expressions, and logic parts directly into `nodalys::CircuitBuilder`. |
+| [`compiler.h`](../../app-core/nodalys/compiler.h) / [`compiler.cpp`](../../app-core/nodalys/compiler.cpp) | Translates `Core::Circuit` components, hierarchical subcircuits, parameter expressions, and logic parts directly into `Nodalys::CircuitBuilder`. |
 | [`nodalys_backend.h`](../../app-core/nodalys/nodalys_backend.h) / [`nodalys_backend.cpp`](../../app-core/nodalys/nodalys_backend.cpp) | Implements `Core::SimulationBackend`, reporting capabilities and executing analyses directly on Nodalys with live chunk streaming and diagnostic forwarding. |
 
 ---
@@ -112,7 +112,9 @@
 | Category | Components / Models | `ngspice` | `Nodalys` | Notes |
 | :--- | :--- | :---: | :---: | :--- |
 | **Passives** | Resistor, Capacitor, Inductor | ✅ | ✅ **Ready** | Exact companion models; Norton charge integration with initial conditions (`uic`). |
-| **Sources** | DC/AC Voltage & Current, Clock, Pulse, Sine, SFFM | ✅ | ✅ **Ready** | Waveform generators with exact analytical derivatives and breakpoint registration. |
+| **Sources** | DC/AC Voltage & Current, Clock, Pulse, Sine, EXP, PWL, SFFM, AM | ✅ | ✅ **Ready** | Waveform generators; the transient lands on the corners of each. |
+| **Noise & Random Sources** | `TRNOISE`, `TRRANDOM` | ✅ | 🟡 **Partial** | Held at their DC level outside a transient; a transient with one is refused. |
+| **Behavioral Sources & Fuses** | `B` element, fuse subcircuit | ✅ | ❌ **Planned** | Refused with the reason, before the run. |
 | **Controlled Sources** | VCVS, VCCS, CCCS, CCVS | ✅ | ✅ **Ready** | Stamped into linear MNA system; zero-voltage current probes handled natively. |
 | **Semiconductors** | Diode, Zener, LED, BJT (NPN/PNP), MOSFET (NMOS/PMOS) | ✅ | ✅ **Ready** | Shockley diode, Gummel-Poon BJT, Shichman-Hodges Level-1 MOSFET with charge depletion/diffusion. |
 | **Macromodels** | Ideal Op-Amp, Boyle Op-Amp (LTC AN48) | ✅ | ✅ **Ready** | Real datasheet-level macromodel with CMRR, slew rate, finite gain-bandwidth, and output clamp. |
@@ -130,8 +132,8 @@
 | **Multi-Format Export** | ✅ **Ready** | Standalone exporter formatting results into CSV, JSON, SPICE Raw, and Touchstone (.sNp) formats (`--format`). |
 | **Component Parameter Stepping** | ✅ **Ready** | Steps $R, C, L$ across `.tran`, `.ac`, and `.dc` runs directly through `imcsim` controls. |
 | **Fourier / Spectrum Analysis** | ✅ **Ready** | High-resolution FFT post-processed over `ComputeTransient` waveforms. |
-| **Live Simulation Mode** | ✅ **Ready** | Real-time interactive simulation streaming chunk deliveries and altering netlist values on the fly. |
-| **Temperature Sweep ($T$)** | ❌ **Planned** | Semiconductor model evaluation at nominal $T_{\text{nom}} = 27\,^\circ\text{C}$; thermal scaling equations pending. |
+| **Live Simulation Mode** | ✅ **Ready** | Live transient paced against the clock (`simulation/live_pace.h`, shared with ngspice), paused and resumed, with changes applied between chunks. |
+| **Temperature Sweep ($T$)** | ❌ **Planned** | Semiconductor model evaluation at nominal $T_{\text{nom}} = 27\,^\circ\text{C}$; a stepped temperature is refused with the reason (`BackendCapabilities::TemperatureUnsupported`) until the thermal scaling equations land. |
 | **Initial Conditions (`.ic`, `.nodeset`)** | 🟡 **Partial** | Element-level `uic` on capacitors ($V_0$) and inductors ($I_0$) supported; arbitrary node `.ic` pending. |
 | **Gear-2 / BDF-2 Integration** | 🟡 **Partial** | 3rd divided-difference LTE step control with Trapezoidal/Euler supported; Gear-2 for stiff switching circuits pending. |
 | **Vendor SPICE `.subckt` Parsing** | 🟡 **Partial** | Schematic hierarchy blocks and `.model` cards work; arbitrary external SPICE subcircuit netlist parser pending. |
@@ -140,7 +142,7 @@
 
 ### 4. Performance Benchmark Summary ([`nodalys_benchmark_tests.cpp`](../../tests/nodalys_benchmark_tests.cpp))
 
-Measured via `./out/release/bin/imcsim-tests "[benchmark]"` across all implemented analyses (`All tests passed`):
+Measured on one development machine with `./out/release/bin/imcsim-tests "[.benchmark]"` (the benchmarks are hidden from the default run). The times depend on the machine and its load, so read the ratios as a rough guide, not as a guarantee:
 
 | Circuit | Analysis | Nodes | `ngspice` | **`Nodalys`** | Speedup |
 | :--- | :--- | ---: | ---: | ---: | :---: |
@@ -183,7 +185,7 @@ Measured via `./out/release/bin/imcsim-tests "[benchmark]"` across all implement
 | **Harmonic Balance (HB)** | `.hb` | Frequency-domain single-tone periodic steady-state AFT solver + `imcsim` exclusive UI integration *(multi-tone HB remains future work)*. | ✅ **Ready** |
 | **AC Sensitivity** | `.sens ac` | Small-signal frequency-domain adjoint sensitivity over complex MNA $\mathbf{Y}(j\omega)^T \boldsymbol{\lambda} = \mathbf{d}$. | Planned |
 | **Sparse MNA Solver** | Infrastructure | Sparse LU decomposition (e.g., KLU-style AMD ordering) for >100-node transient and AC acceleration. | Planned |
-| **Parallel Monte Carlo** | Statistical | Multi-threaded statistical parameter tolerance sweeps across independent `nodalys::Circuit` instances. | Planned |
+| **Parallel Monte Carlo** | Statistical | Multi-threaded statistical parameter tolerance sweeps across independent `Nodalys::Circuit` instances. | Planned |
 
 #### Analyses Beyond Upstream `ngspice 47`
 

@@ -888,6 +888,28 @@ Each row is an independent operating point, so the table describes combinational
 outputs depend on its history has no operating point for the combinations that hold its state; those rows read X and
 the Run report says how many. The table is not exported as a figure, like the operating point.
 
+## Harmonic balance
+
+The Harmonic balance analysis finds the periodic steady state of a circuit driven at one fundamental frequency and its
+harmonics, without waiting out the startup a transient goes through: a rectifier with a large filter capacitor, for
+one, settles in seconds of simulated time, which harmonic balance skips. It runs on Nodalys only (Edit > Preferences >
+Simulation); with ngspice it is disabled, with the reason as its tooltip. Pick it beside Run, then set:
+
+- **Fundamental**: every sine, AC, pulse and clock source must run at a whole multiple of it, up to the number of
+  harmonics; other waveforms are refused. **From sources** takes the fundamental and the harmonics from the periodic
+  sources of the circuit.
+- **Harmonics**: how many above DC, from 1 to 64. More harmonics follow sharper edges but grow the system with them.
+- **Samples**: points per period where the nonlinear parts are evaluated. Auto takes the smallest power of two of at
+  least 16 and 4 times the harmonics; a chosen count stays above twice the harmonics, so no harmonic folds onto
+  another.
+
+The Harmonic balance tab of the Output window plots the spectrum of each measured voltage and current as stems, in a
+linear scale, in dB or in dBc (relative to the fundamental), and the waveform rebuilt from them over 1 to 3 periods.
+Amplitudes are peak values or RMS ones, as Preferences > Results > Harmonic amplitudes says (the tab has the same
+switch); DC is never scaled. The tables list DC and THD per trace and each harmonic with its phase. The Stop button
+ends a long run between its iterations. Export saves the plot as SVG or CSV, and Export CSV... the spectra and the
+waveforms together.
+
 ## Exports
 
 **Plots**: Export... on the right of the Output window tabs saves the plot of the current tab.
