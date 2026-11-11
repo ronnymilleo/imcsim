@@ -8,14 +8,35 @@
 
 #include "components/component.h"
 #include <memory>
-#include <nodalys/types.h>
 #include <span>
 #include <string>
 #include <string_view>
 
 namespace Core {
 
-using DiodeParameters = Nodalys::DiodeParameters;
+/**
+ * @struct  DiodeParameters
+ * @brief   Parameters of the SPICE diode model (IS, N, RS, BV, IBV, CJO, VJ, M, TT) and its ratings, in SI units.
+ * @details Defaults follow ngspice, except BV: ngspice has no breakdown unless BV is given, and every part here
+ *          has one. Parameters that only matter away from 27 degrees Celsius are left at their ngspice defaults.
+ */
+struct DiodeParameters {
+    double SaturationCurrent = 1e-14;
+    double EmissionCoefficient = 1.0;
+    double SeriesResistance = 0.0;
+    /// For a Zener, the voltage it regulates at.
+    double BreakdownVoltage = 100.0;
+    double BreakdownCurrent = 1e-3;
+    double JunctionCapacitance = 0.0;
+    double JunctionPotential = 1.0;
+    double GradingCoefficient = 0.5;
+    double TransitTime = 0.0;
+    /// Datasheet average forward current (IF(AV)), so a rectifier peak above it is no overload; not part of the SPICE
+    /// model, imcsim checks the results against it.
+    double MaxForwardCurrent = 0.2;
+    /// Datasheet power dissipation; not part of the SPICE model, imcsim checks the results against it.
+    double MaxPower = 0.5;
+};
 
 /**
  * @enum    LEDColor

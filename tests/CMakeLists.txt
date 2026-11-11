@@ -45,6 +45,7 @@ add_executable(imcsim-tests
             nonlinear_tests.cpp
             op_amp_tests.cpp
             switches_tests.cpp
+            parameter_conversion_tests.cpp
             parameter_step_tests.cpp
             part_catalog_tests.cpp
             part_names_tests.cpp

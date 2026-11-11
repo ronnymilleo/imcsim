@@ -22,6 +22,7 @@
 #include "components/voltage_controlled_switch.h"
 #include "model/subcircuit.h"
 #include "nodalys/model_parser.h"
+#include "nodalys/parameter_conversion.h"
 #include "spice/spice_library.h"
 #include "spice/spice_value.h"
 #include <algorithm>
@@ -293,22 +294,22 @@ private:
                 m_Builder->AddVdc(name, nodes[0], nodes[1], source.GetValue(), ac_magnitude);
                 break;
             case Source::SourceType::AC:
-                m_Builder->AddVsine(name, nodes[0], nodes[1], source.GetAC(), ac_magnitude);
+                m_Builder->AddVsine(name, nodes[0], nodes[1], ToNodalys(source.GetAC()), ac_magnitude);
                 break;
             case Source::SourceType::PULSE:
-                m_Builder->AddVpulse(name, nodes[0], nodes[1], source.GetPulse(), ac_magnitude);
+                m_Builder->AddVpulse(name, nodes[0], nodes[1], ToNodalys(source.GetPulse()), ac_magnitude);
                 break;
             case Source::SourceType::EXP:
-                m_Builder->AddVexp(name, nodes[0], nodes[1], source.GetEXP(), ac_magnitude);
+                m_Builder->AddVexp(name, nodes[0], nodes[1], ToNodalys(source.GetEXP()), ac_magnitude);
                 break;
             case Source::SourceType::PWL:
-                m_Builder->AddVpwl(name, nodes[0], nodes[1], source.GetPWL(), ac_magnitude);
+                m_Builder->AddVpwl(name, nodes[0], nodes[1], ToNodalys(source.GetPWL()), ac_magnitude);
                 break;
             case Source::SourceType::SFFM:
-                m_Builder->AddVsffm(name, nodes[0], nodes[1], source.GetSFFM(), ac_magnitude);
+                m_Builder->AddVsffm(name, nodes[0], nodes[1], ToNodalys(source.GetSFFM()), ac_magnitude);
                 break;
             case Source::SourceType::AM:
-                m_Builder->AddVam(name, nodes[0], nodes[1], source.GetAM(), ac_magnitude);
+                m_Builder->AddVam(name, nodes[0], nodes[1], ToNodalys(source.GetAM()), ac_magnitude);
                 break;
             }
             return {};
@@ -323,22 +324,22 @@ private:
                 m_Builder->AddIdc(name, nodes[0], nodes[1], source.GetValue(), ac_magnitude);
                 break;
             case Source::SourceType::AC:
-                m_Builder->AddIsine(name, nodes[0], nodes[1], source.GetAC(), ac_magnitude);
+                m_Builder->AddIsine(name, nodes[0], nodes[1], ToNodalys(source.GetAC()), ac_magnitude);
                 break;
             case Source::SourceType::PULSE:
-                m_Builder->AddIpulse(name, nodes[0], nodes[1], source.GetPulse(), ac_magnitude);
+                m_Builder->AddIpulse(name, nodes[0], nodes[1], ToNodalys(source.GetPulse()), ac_magnitude);
                 break;
             case Source::SourceType::EXP:
-                m_Builder->AddIexp(name, nodes[0], nodes[1], source.GetEXP(), ac_magnitude);
+                m_Builder->AddIexp(name, nodes[0], nodes[1], ToNodalys(source.GetEXP()), ac_magnitude);
                 break;
             case Source::SourceType::PWL:
-                m_Builder->AddIpwl(name, nodes[0], nodes[1], source.GetPWL(), ac_magnitude);
+                m_Builder->AddIpwl(name, nodes[0], nodes[1], ToNodalys(source.GetPWL()), ac_magnitude);
                 break;
             case Source::SourceType::SFFM:
-                m_Builder->AddIsffm(name, nodes[0], nodes[1], source.GetSFFM(), ac_magnitude);
+                m_Builder->AddIsffm(name, nodes[0], nodes[1], ToNodalys(source.GetSFFM()), ac_magnitude);
                 break;
             case Source::SourceType::AM:
-                m_Builder->AddIam(name, nodes[0], nodes[1], source.GetAM(), ac_magnitude);
+                m_Builder->AddIam(name, nodes[0], nodes[1], ToNodalys(source.GetAM()), ac_magnitude);
                 break;
             }
             return {};
@@ -346,7 +347,7 @@ private:
 
         case ComponentType::CLOCK: {
             const auto &clock = static_cast<const Clock &>(part);
-            m_Builder->AddClock(name, nodes[0], 0, clock.GetParameters());
+            m_Builder->AddClock(name, nodes[0], 0, ToNodalys(clock.GetParameters()));
             return {};
         }
 
@@ -402,7 +403,7 @@ private:
             if (!resolved) {
                 return std::unexpected(resolved.error());
             }
-            m_Builder->AddDiode(name, nodes[0], nodes[1], *resolved);
+            m_Builder->AddDiode(name, nodes[0], nodes[1], ToNodalys(*resolved));
             return {};
         }
 
@@ -413,7 +414,7 @@ private:
             if (!resolved) {
                 return std::unexpected(resolved.error());
             }
-            m_Builder->AddBjt(name, nodes[0], nodes[1], nodes[2], type != ComponentType::PNP, *resolved);
+            m_Builder->AddBjt(name, nodes[0], nodes[1], nodes[2], type != ComponentType::PNP, ToNodalys(*resolved));
             return {};
         }
 
@@ -425,14 +426,15 @@ private:
                 return std::unexpected(resolved.error());
             }
             const int body = nodes.size() > 3 ? nodes[3] : nodes[2];
-            m_Builder->AddMosfet(name, nodes[0], nodes[1], nodes[2], body, type != ComponentType::PMOS, *resolved);
+            m_Builder->AddMosfet(name, nodes[0], nodes[1], nodes[2], body, type != ComponentType::PMOS,
+                                 ToNodalys(*resolved));
             return {};
         }
 
         case ComponentType::V_SWITCH: {
             const auto &controlled = static_cast<const VoltageControlledSwitch &>(part);
             m_Builder->AddVoltageControlledSwitch(name, nodes[0], nodes[1], nodes[2], nodes[3],
-                                                  controlled.GetParameters());
+                                                  ToNodalys(controlled.GetParameters()));
             return {};
         }
 
@@ -440,7 +442,7 @@ private:
             const auto &relay = static_cast<const Relay &>(part);
             const RelayParameters &figures = relay.GetParameters();
             m_Builder->AddRelay(name, nodes[2], nodes[3], nodes[0], nodes[1], figures.CoilResistance,
-                                figures.CoilInductance, relay.GetContactParameters());
+                                figures.CoilInductance, ToNodalys(relay.GetContactParameters()));
             return {};
         }
 

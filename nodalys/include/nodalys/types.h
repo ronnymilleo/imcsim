@@ -52,9 +52,6 @@ struct DiodeParameters {
     double JunctionPotential = 1.0;
     double GradingCoefficient = 0.5;
     double TransitTime = 0.0;
-    // Maximum ratings
-    double MaxForwardCurrent = 0.2;
-    double MaxPower = 0.5;
 
     bool operator==(const DiodeParameters &) const = default;
 };
@@ -77,10 +74,6 @@ struct BjtParameters {
     double EmitterCapacitance = 0.0;
     double CollectorCapacitance = 0.0;
     double TransitTime = 0.0;
-    // Maximum ratings
-    double MaxCollectorEmitterVoltage = 40.0;
-    double MaxCollectorCurrent = 0.2;
-    double MaxPower = 0.5;
 
     bool operator==(const BjtParameters &) const = default;
 };
@@ -99,11 +92,6 @@ struct MosfetParameters {
     double GateDrainOverlap = 0.0;
     double Width = 100e-6;
     double Length = 100e-6;
-    // Maximum ratings
-    double MaxDrainSourceVoltage = 60.0;
-    double MaxGateSourceVoltage = 20.0;
-    double MaxDrainCurrent = 0.2;
-    double MaxPower = 0.4;
 
     bool operator==(const MosfetParameters &) const = default;
 };
