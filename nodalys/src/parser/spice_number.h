@@ -9,11 +9,11 @@
 #include <optional>
 #include <string_view>
 
-namespace nodalys {
+namespace Nodalys {
 
 // Parsing
 [[nodiscard]] std::optional<double> ParseSpiceNumber(std::string_view text);
 
-} // namespace nodalys
+} // namespace Nodalys
 
 #endif // NODALYS_PARSER_SPICE_NUMBER_H

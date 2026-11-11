@@ -176,7 +176,8 @@ public:
      */
     virtual SParametersRun RunSParameters(const Circuit &circuit, const SParameterSettings &settings) = 0;
 
-    virtual HarmonicBalanceRun RunHarmonicBalance(const Circuit &circuit, const HarmonicBalanceSettings &settings);
+    virtual HarmonicBalanceRun RunHarmonicBalance(const Circuit &circuit, const HarmonicBalanceSettings &settings,
+                                                  RunControl *control);
 };
 
 // Backend in use

@@ -10,7 +10,7 @@
 #include <algorithm>
 #include <cmath>
 
-namespace nodalys {
+namespace Nodalys {
 
 namespace {
 
@@ -117,11 +117,11 @@ struct ChargeCompanion {
     double EquivalentCurrent;
 };
 
-ChargeCompanion ChargeModel(const double dQdv, const double charge_at_iterate, const double voltage_iterate,
-                            const double charge_previous, const double current_previous, const double step,
-                            const bool backward_euler) {
+ChargeCompanion ChargeModel(const double charge_derivative, const double charge_at_iterate,
+                            const double voltage_iterate, const double charge_previous, const double current_previous,
+                            const double step, const bool backward_euler) {
     const double factor = backward_euler ? 1.0 : 2.0;
-    const double conductance = factor * dQdv / step;
+    const double conductance = factor * charge_derivative / step;
     const double current_at_iterate =
         factor * (charge_at_iterate - charge_previous) / step - (backward_euler ? 0.0 : current_previous);
     const double equivalent = current_at_iterate - conductance * voltage_iterate;
@@ -980,4 +980,4 @@ void MosfetDevice::RejectStep() {
 void MosfetDevice::SeedOperatingPoint(std::vector<double> &) const {
 }
 
-} // namespace nodalys
+} // namespace Nodalys

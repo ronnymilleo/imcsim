@@ -9,7 +9,7 @@
 #include "devices/devices.h"
 #include "nodalys/types.h"
 
-namespace nodalys {
+namespace Nodalys {
 
 VoltageSourceDevice::Waveform MakeDcWaveform(double dc_value);
 VoltageSourceDevice::Waveform MakePulseWaveform(double dc_value, const PulseParameters &pulse);
@@ -35,6 +35,6 @@ double EvaluatePwl(const PwlParameters &pwl, double time);
 double EvaluateSffm(const SffmParameters &sffm, double time);
 double EvaluateAm(const AmParameters &am, double time);
 
-} // namespace nodalys
+} // namespace Nodalys
 
 #endif // NODALYS_WAVEFORMS_H

@@ -12,7 +12,7 @@
 #include <format>
 #include <numbers>
 
-namespace nodalys {
+namespace Nodalys {
 
 std::expected<AcSweepResult, std::string> ComputeACSweep(CompiledCircuit &compiled, const AcSweepConfig &settings,
                                                          const ConvergenceOptions &options,
@@ -109,4 +109,4 @@ std::expected<AcSweepResult, std::string> ComputeACSweep(CompiledCircuit &compil
     return result;
 }
 
-} // namespace nodalys
+} // namespace Nodalys

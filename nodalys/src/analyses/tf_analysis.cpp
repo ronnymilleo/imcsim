@@ -10,7 +10,7 @@
 #include <cmath>
 #include <format>
 
-namespace nodalys {
+namespace Nodalys {
 
 namespace {
 
@@ -97,4 +97,4 @@ std::expected<TransferFunctionResult, std::string> ComputeTransferFunction(Compi
     return result;
 }
 
-} // namespace nodalys
+} // namespace Nodalys

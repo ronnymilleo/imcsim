@@ -8,7 +8,7 @@
 #include <algorithm>
 #include <cmath>
 
-namespace nodalys {
+namespace Nodalys {
 
 namespace {
 
@@ -405,4 +405,4 @@ double SmoothLogicDevice::ReadVoltage(const std::vector<double> &x, const int no
     return x[static_cast<std::size_t>(node)];
 }
 
-} // namespace nodalys
+} // namespace Nodalys

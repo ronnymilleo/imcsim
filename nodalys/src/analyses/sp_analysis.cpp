@@ -14,7 +14,7 @@
 #include <utility>
 #include <vector>
 
-namespace nodalys {
+namespace Nodalys {
 
 namespace {
 
@@ -39,7 +39,7 @@ std::expected<std::vector<double>, std::string> GenerateFrequencyPoints(const SP
 
     std::vector<double> frequencies;
     switch (settings.SweepType) {
-    case FrequencySweepType::Linear: {
+    case FrequencySweepType::LINEAR: {
         if (settings.Points == 1 || settings.StartFrequency == settings.StopFrequency) {
             frequencies.push_back(settings.StartFrequency);
         } else {
@@ -52,7 +52,7 @@ std::expected<std::vector<double>, std::string> GenerateFrequencyPoints(const SP
         }
         break;
     }
-    case FrequencySweepType::Decade: {
+    case FrequencySweepType::DECADE: {
         if (settings.StartFrequency == settings.StopFrequency) {
             frequencies.push_back(settings.StartFrequency);
         } else {
@@ -71,7 +71,7 @@ std::expected<std::vector<double>, std::string> GenerateFrequencyPoints(const SP
         }
         break;
     }
-    case FrequencySweepType::Octave: {
+    case FrequencySweepType::OCTAVE: {
         if (settings.StartFrequency == settings.StopFrequency) {
             frequencies.push_back(settings.StartFrequency);
         } else {
@@ -247,4 +247,4 @@ std::expected<SParameterResult, std::string> ComputeSParameters(CompiledCircuit 
     return result;
 }
 
-} // namespace nodalys
+} // namespace Nodalys

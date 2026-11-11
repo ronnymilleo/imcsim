@@ -13,7 +13,7 @@
 #include <string_view>
 #include <vector>
 
-namespace nodalys {
+namespace Nodalys {
 
 /**
  * @enum    PortDirection
@@ -60,6 +60,6 @@ struct SmoothTransition {
 // Smooth Waveforms
 [[nodiscard]] double EvaluateSmoothTransition(const SmoothTransition &transition, double time);
 
-} // namespace nodalys
+} // namespace Nodalys
 
 #endif // NODALYS_LOGIC_BRIDGE_H

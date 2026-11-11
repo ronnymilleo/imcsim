@@ -38,6 +38,7 @@ add_library(imcsim-core-lib
             nodalys/compiler.cpp
             nodalys/model_parser.cpp
             nodalys/nodalys_backend.cpp
+            nodalys/parameter_conversion.cpp
             ngspice/ngspice_backend.cpp
             ngspice/ngspice_library.cpp
             ngspice/ngspice_readers.cpp

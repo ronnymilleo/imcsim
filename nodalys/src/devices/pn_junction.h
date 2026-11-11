@@ -12,7 +12,7 @@
 
 #include <cmath>
 
-namespace nodalys {
+namespace Nodalys {
 
 /// Elementary charge $q$ (C) and Boltzmann constant $k_B$ (J/K) matching modern ngspice (`ngspice/const.h`),
 /// evaluated at nominal temperature $T_{\text{nom}} = 300.15\text{ K}$ ($27\,^\circ\text{C}$).
@@ -52,6 +52,6 @@ inline double PnLimit(const double voltage_new, const double voltage_old, const 
     return voltage_new;
 }
 
-} // namespace nodalys
+} // namespace Nodalys
 
 #endif // NODALYS_PN_JUNCTION_H

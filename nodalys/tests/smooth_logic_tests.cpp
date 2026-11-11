@@ -18,8 +18,8 @@ using Catch::Matchers::WithinRel;
 
 namespace {
 
-nodalys::OperatingPointResult RunOp(const nodalys::Circuit &circuit) {
-    const auto result = nodalys::ComputeOperatingPoint(circuit);
+Nodalys::OperatingPointResult RunOp(const Nodalys::Circuit &circuit) {
+    const auto result = Nodalys::ComputeOperatingPoint(circuit);
     REQUIRE(result.has_value());
     return *result;
 }
@@ -29,7 +29,7 @@ nodalys::OperatingPointResult RunOp(const nodalys::Circuit &circuit) {
 TEST_CASE("Smooth continuous logic gates reproduce exact truth tables in DC operating point", "[nodalys][logic]") {
     SECTION("Inverter and Buffer") {
         for (const double in_val : {0.0, 5.0}) {
-            nodalys::CircuitBuilder b;
+            Nodalys::CircuitBuilder b;
             b.AddVdc("V1", 1, 0, in_val);
             b.AddInverter("U1", 2, 1);
             b.AddLogicBuffer("U2", 3, 1);
@@ -52,16 +52,16 @@ TEST_CASE("Smooth continuous logic gates reproduce exact truth tables in DC oper
             const bool b1 = (v1 > 2.5);
             const bool b2 = (v2 > 2.5);
 
-            nodalys::CircuitBuilder b;
+            Nodalys::CircuitBuilder b;
             b.AddVdc("V1", 1, 0, v1);
             b.AddVdc("V2", 2, 0, v2);
 
-            b.AddLogicGate("U_AND", nodalys::LogicGateType::AND, 3, {1, 2});
-            b.AddLogicGate("U_NAND", nodalys::LogicGateType::NAND, 4, {1, 2});
-            b.AddLogicGate("U_OR", nodalys::LogicGateType::OR, 5, {1, 2});
-            b.AddLogicGate("U_NOR", nodalys::LogicGateType::NOR, 6, {1, 2});
-            b.AddLogicGate("U_XOR", nodalys::LogicGateType::XOR, 7, {1, 2});
-            b.AddLogicGate("U_XNOR", nodalys::LogicGateType::XNOR, 8, {1, 2});
+            b.AddLogicGate("U_AND", Nodalys::LogicGateType::AND, 3, {1, 2});
+            b.AddLogicGate("U_NAND", Nodalys::LogicGateType::NAND, 4, {1, 2});
+            b.AddLogicGate("U_OR", Nodalys::LogicGateType::OR, 5, {1, 2});
+            b.AddLogicGate("U_NOR", Nodalys::LogicGateType::NOR, 6, {1, 2});
+            b.AddLogicGate("U_XOR", Nodalys::LogicGateType::XOR, 7, {1, 2});
+            b.AddLogicGate("U_XNOR", Nodalys::LogicGateType::XNOR, 8, {1, 2});
 
             auto circuit = b.Build();
             REQUIRE(circuit.has_value());
@@ -86,9 +86,9 @@ TEST_CASE("Smooth continuous logic gates reproduce exact truth tables in DC oper
 
 TEST_CASE("Analog transfer curves of smooth gates are infinitely differentiable with continuous transitions",
           "[nodalys][logic]") {
-    nodalys::CircuitBuilder b;
+    Nodalys::CircuitBuilder b;
     b.AddVdc("VIN", 1, 0, 0.0);
-    nodalys::SmoothLogicParameters params;
+    Nodalys::SmoothLogicParameters params;
     params.VThreshold = 2.5;
     params.TransitionWidth = 0.2;
     b.AddInverter("U1", 2, 1, params);
@@ -96,13 +96,13 @@ TEST_CASE("Analog transfer curves of smooth gates are infinitely differentiable 
     auto circuit = b.Build();
     REQUIRE(circuit.has_value());
 
-    nodalys::DcSweepConfig config;
+    Nodalys::DcSweepConfig config;
     config.SweptSource = "VIN";
     config.SweptStart = 0.0;
     config.SweptStop = 5.0;
     config.SweptStep = 0.05;
 
-    const auto res = nodalys::ComputeDCSweep(*circuit, config);
+    const auto res = Nodalys::ComputeDCSweep(*circuit, config);
     REQUIRE(res.has_value());
     REQUIRE(!res->Curves.empty());
     const auto &voltages = res->Curves[0].NodeVoltages[2];
@@ -120,9 +120,9 @@ TEST_CASE("Analog transfer curves of smooth gates are infinitely differentiable 
 
 TEST_CASE("Schmitt trigger displays continuous analog hysteresis with upper and lower thresholds", "[nodalys][logic]") {
     auto build_circuit = [](const double vin_val) {
-        nodalys::CircuitBuilder b;
+        Nodalys::CircuitBuilder b;
         b.AddVdc("VIN", 1, 0, vin_val);
-        nodalys::SmoothLogicParameters params;
+        Nodalys::SmoothLogicParameters params;
         params.VThreshold = 2.5;
         params.Hysteresis = 1.0;
         params.TransitionWidth = 0.05;
@@ -149,8 +149,8 @@ TEST_CASE("Schmitt trigger displays continuous analog hysteresis with upper and 
 }
 
 TEST_CASE("Inertial delay attenuates narrow glitch pulses shorter than propagation delay", "[nodalys][logic]") {
-    nodalys::CircuitBuilder b;
-    nodalys::PulseParameters pulse;
+    Nodalys::CircuitBuilder b;
+    Nodalys::PulseParameters pulse;
     pulse.Low = 0.0;
     pulse.High = 5.0;
     pulse.Delay = 10e-9;
@@ -160,19 +160,19 @@ TEST_CASE("Inertial delay attenuates narrow glitch pulses shorter than propagati
     pulse.Period = 100e-9;
     b.AddVpulse("VIN", 1, 0, pulse);
 
-    nodalys::SmoothLogicParameters params;
+    Nodalys::SmoothLogicParameters params;
     params.PropagationDelay = 5e-9; // 5 ns delay, shorter than 20 ns pulse
     b.AddInverter("U1", 2, 1, params);
 
     auto circuit = b.Build();
     REQUIRE(circuit.has_value());
 
-    nodalys::TransientConfig tran;
+    Nodalys::TransientConfig tran;
     tran.StopTime = 80e-9;
     tran.TimeStep = 0.5e-9;
     tran.UseInitialConditions = true;
 
-    const auto res = nodalys::ComputeTransient(*circuit, tran);
+    const auto res = Nodalys::ComputeTransient(*circuit, tran);
     REQUIRE(res.has_value());
 
     // Check that output reached near 0 V during the pulse
@@ -184,9 +184,9 @@ TEST_CASE("Inertial delay attenuates narrow glitch pulses shorter than propagati
 }
 
 TEST_CASE("Cross-coupled NOR gates form a stable continuous SR latch", "[nodalys][logic]") {
-    nodalys::CircuitBuilder b;
+    Nodalys::CircuitBuilder b;
     // S pulse at 10 ns (width 10 ns)
-    nodalys::PulseParameters pulse_s;
+    Nodalys::PulseParameters pulse_s;
     pulse_s.Low = 0.0;
     pulse_s.High = 5.0;
     pulse_s.Delay = 10e-9;
@@ -197,7 +197,7 @@ TEST_CASE("Cross-coupled NOR gates form a stable continuous SR latch", "[nodalys
     b.AddVpulse("V_S", 1, 0, pulse_s);
 
     // R pulse at 40 ns (width 10 ns)
-    nodalys::PulseParameters pulse_r;
+    Nodalys::PulseParameters pulse_r;
     pulse_r.Low = 0.0;
     pulse_r.High = 5.0;
     pulse_r.Delay = 40e-9;
@@ -207,19 +207,19 @@ TEST_CASE("Cross-coupled NOR gates form a stable continuous SR latch", "[nodalys
     pulse_r.Period = 1e-3;
     b.AddVpulse("V_R", 2, 0, pulse_r);
 
-    nodalys::SmoothLogicParameters params;
+    Nodalys::SmoothLogicParameters params;
     params.PropagationDelay = 1e-9;
     b.AddSRLatch("SR1", 3, 4, 1, 2, params);
 
     auto circuit = b.Build();
     REQUIRE(circuit.has_value());
 
-    nodalys::TransientConfig tran;
+    Nodalys::TransientConfig tran;
     tran.StopTime = 70e-9;
     tran.TimeStep = 0.5e-9;
     tran.UseInitialConditions = true;
 
-    const auto res = nodalys::ComputeTransient(*circuit, tran);
+    const auto res = Nodalys::ComputeTransient(*circuit, tran);
     REQUIRE(res.has_value());
 
     auto sample_at = [&](const double t, const int node) {
@@ -241,9 +241,9 @@ TEST_CASE("Cross-coupled NOR gates form a stable continuous SR latch", "[nodalys
 }
 
 TEST_CASE("Edge-triggered D flip-flop macromodel instantiates and converges cleanly", "[nodalys][logic]") {
-    nodalys::CircuitBuilder b;
+    Nodalys::CircuitBuilder b;
     // D starts at 5 V, drops to 0 V at 45 ns
-    nodalys::PulseParameters pulse_d;
+    Nodalys::PulseParameters pulse_d;
     pulse_d.Low = 5.0;
     pulse_d.High = 0.0;
     pulse_d.Delay = 45e-9;
@@ -254,7 +254,7 @@ TEST_CASE("Edge-triggered D flip-flop macromodel instantiates and converges clea
     b.AddVpulse("V_D", 1, 0, pulse_d);
 
     // Clock square wave with rising edges at 20 ns, 60 ns
-    nodalys::PulseParameters pulse_clk;
+    Nodalys::PulseParameters pulse_clk;
     pulse_clk.Low = 0.0;
     pulse_clk.High = 5.0;
     pulse_clk.Delay = 20e-9;
@@ -264,19 +264,19 @@ TEST_CASE("Edge-triggered D flip-flop macromodel instantiates and converges clea
     pulse_clk.Period = 40e-9;
     b.AddVpulse("V_CLK", 2, 0, pulse_clk);
 
-    nodalys::SmoothLogicParameters params;
+    Nodalys::SmoothLogicParameters params;
     params.PropagationDelay = 1e-9;
     b.AddDFlipFlop("DFF1", 3, 4, 1, 2, params);
 
     auto circuit = b.Build();
     REQUIRE(circuit.has_value());
 
-    nodalys::TransientConfig tran;
+    Nodalys::TransientConfig tran;
     tran.StopTime = 80e-9;
     tran.TimeStep = 0.5e-9;
     tran.UseInitialConditions = true;
 
-    const auto res = nodalys::ComputeTransient(*circuit, tran);
+    const auto res = Nodalys::ComputeTransient(*circuit, tran);
     REQUIRE(res.has_value());
 
     auto sample_at = [&](const double t, const int node) {
@@ -298,52 +298,52 @@ TEST_CASE("Edge-triggered D flip-flop macromodel instantiates and converges clea
 }
 
 TEST_CASE("Verilog co-simulation bridge converts discrete levels and synthesizes smooth ramps", "[nodalys][bridge]") {
-    nodalys::SmoothLogicParameters params;
+    Nodalys::SmoothLogicParameters params;
     params.VLow = 0.0;
     params.VHigh = 3.3;
     params.VThreshold = 1.65;
 
     SECTION("VoltageToDigital") {
-        CHECK(nodalys::VoltageToDigital(0.1, params, 0.3) == nodalys::DigitalLevel::LOW);
-        CHECK(nodalys::VoltageToDigital(3.2, params, 0.3) == nodalys::DigitalLevel::HIGH);
-        CHECK(nodalys::VoltageToDigital(1.65, params, 0.3) == nodalys::DigitalLevel::UNKNOWN);
+        CHECK(Nodalys::VoltageToDigital(0.1, params, 0.3) == Nodalys::DigitalLevel::LOW);
+        CHECK(Nodalys::VoltageToDigital(3.2, params, 0.3) == Nodalys::DigitalLevel::HIGH);
+        CHECK(Nodalys::VoltageToDigital(1.65, params, 0.3) == Nodalys::DigitalLevel::UNKNOWN);
     }
 
     SECTION("DigitalToVoltage") {
-        CHECK_THAT(nodalys::DigitalToVoltage(nodalys::DigitalLevel::LOW, params), WithinAbs(0.0, 1e-9));
-        CHECK_THAT(nodalys::DigitalToVoltage(nodalys::DigitalLevel::HIGH, params), WithinAbs(3.3, 1e-9));
-        CHECK_THAT(nodalys::DigitalToVoltage(nodalys::DigitalLevel::UNKNOWN, params), WithinAbs(1.65, 1e-9));
+        CHECK_THAT(Nodalys::DigitalToVoltage(Nodalys::DigitalLevel::LOW, params), WithinAbs(0.0, 1e-9));
+        CHECK_THAT(Nodalys::DigitalToVoltage(Nodalys::DigitalLevel::HIGH, params), WithinAbs(3.3, 1e-9));
+        CHECK_THAT(Nodalys::DigitalToVoltage(Nodalys::DigitalLevel::UNKNOWN, params), WithinAbs(1.65, 1e-9));
     }
 
     SECTION("Format and Parse") {
-        CHECK(nodalys::FormatDigitalLevel(nodalys::DigitalLevel::LOW) == "0");
-        CHECK(nodalys::FormatDigitalLevel(nodalys::DigitalLevel::HIGH) == "1");
-        CHECK(nodalys::FormatDigitalLevel(nodalys::DigitalLevel::UNKNOWN) == "X");
-        CHECK(nodalys::FormatDigitalLevel(nodalys::DigitalLevel::HIGH_Z) == "Z");
+        CHECK(Nodalys::FormatDigitalLevel(Nodalys::DigitalLevel::LOW) == "0");
+        CHECK(Nodalys::FormatDigitalLevel(Nodalys::DigitalLevel::HIGH) == "1");
+        CHECK(Nodalys::FormatDigitalLevel(Nodalys::DigitalLevel::UNKNOWN) == "X");
+        CHECK(Nodalys::FormatDigitalLevel(Nodalys::DigitalLevel::HIGH_Z) == "Z");
 
-        CHECK(nodalys::ParseDigitalLevel("0") == nodalys::DigitalLevel::LOW);
-        CHECK(nodalys::ParseDigitalLevel("1") == nodalys::DigitalLevel::HIGH);
-        CHECK(nodalys::ParseDigitalLevel("X") == nodalys::DigitalLevel::UNKNOWN);
-        CHECK(nodalys::ParseDigitalLevel("Z") == nodalys::DigitalLevel::HIGH_Z);
-        CHECK(!nodalys::ParseDigitalLevel("invalid").has_value());
+        CHECK(Nodalys::ParseDigitalLevel("0") == Nodalys::DigitalLevel::LOW);
+        CHECK(Nodalys::ParseDigitalLevel("1") == Nodalys::DigitalLevel::HIGH);
+        CHECK(Nodalys::ParseDigitalLevel("X") == Nodalys::DigitalLevel::UNKNOWN);
+        CHECK(Nodalys::ParseDigitalLevel("Z") == Nodalys::DigitalLevel::HIGH_Z);
+        CHECK(!Nodalys::ParseDigitalLevel("invalid").has_value());
     }
 
     SECTION("EvaluateSmoothTransition") {
-        nodalys::SmoothTransition trans;
+        Nodalys::SmoothTransition trans;
         trans.StartTime = 10e-9;
         trans.Duration = 2e-9;
         trans.StartVoltage = 0.0;
         trans.TargetVoltage = 3.3;
 
-        CHECK_THAT(nodalys::EvaluateSmoothTransition(trans, 0.0), WithinAbs(0.0, 0.01));
-        CHECK_THAT(nodalys::EvaluateSmoothTransition(trans, 11e-9), WithinAbs(1.65, 0.05));
-        CHECK_THAT(nodalys::EvaluateSmoothTransition(trans, 20e-9), WithinAbs(3.3, 0.01));
+        CHECK_THAT(Nodalys::EvaluateSmoothTransition(trans, 0.0), WithinAbs(0.0, 0.01));
+        CHECK_THAT(Nodalys::EvaluateSmoothTransition(trans, 11e-9), WithinAbs(1.65, 0.05));
+        CHECK_THAT(Nodalys::EvaluateSmoothTransition(trans, 20e-9), WithinAbs(3.3, 0.01));
     }
 }
 
 TEST_CASE("Autonomous 3-inverter ring oscillator generates continuous periodic oscillations", "[nodalys][logic]") {
-    nodalys::CircuitBuilder b;
-    nodalys::SmoothLogicParameters params;
+    Nodalys::CircuitBuilder b;
+    Nodalys::SmoothLogicParameters params;
     params.PropagationDelay = 2e-9;
     params.TransitionWidth = 0.1;
 
@@ -354,12 +354,12 @@ TEST_CASE("Autonomous 3-inverter ring oscillator generates continuous periodic o
     auto circuit = b.Build();
     REQUIRE(circuit.has_value());
 
-    nodalys::TransientConfig tran;
+    Nodalys::TransientConfig tran;
     tran.StopTime = 40e-9;
     tran.TimeStep = 0.1e-9;
     tran.UseInitialConditions = true;
 
-    const auto res = nodalys::ComputeTransient(*circuit, tran);
+    const auto res = Nodalys::ComputeTransient(*circuit, tran);
     REQUIRE(res.has_value());
 
     // Verify oscillation by checking that node 1 transitions both below 1.0 V and above 4.0 V
@@ -385,7 +385,7 @@ U3 out_inv in1     NOT VHIGH=5 VLOW=0 VTH=2.5
 .END
 )";
 
-    auto parse_res = nodalys::ParseNetlist(netlist);
+    auto parse_res = Nodalys::ParseNetlist(netlist);
     REQUIRE(parse_res.has_value());
 
     const auto op = RunOp(parse_res->CircuitInstance);

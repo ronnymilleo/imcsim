@@ -11,7 +11,7 @@
 #include <limits>
 #include <numbers>
 
-namespace nodalys {
+namespace Nodalys {
 
 namespace {
 
@@ -241,4 +241,4 @@ VoltageSourceDevice::Waveform MakeClockWaveform(const ClockParameters &parameter
     };
 }
 
-} // namespace nodalys
+} // namespace Nodalys

@@ -14,7 +14,7 @@
 #include <string>
 #include <vector>
 
-namespace nodalys {
+namespace Nodalys {
 
 class Circuit;
 
@@ -99,9 +99,9 @@ struct NoiseConfig {
  * @brief   Frequency spacing mode for AC and S-parameter frequency sweeps.
  */
 enum class FrequencySweepType {
-    Linear,
-    Decade,
-    Octave
+    LINEAR,
+    DECADE,
+    OCTAVE
 };
 
 /**
@@ -109,7 +109,7 @@ enum class FrequencySweepType {
  * @brief   Configuration for multiport small-signal scattering parameter analysis (.sp).
  */
 struct SParameterConfig {
-    FrequencySweepType SweepType = FrequencySweepType::Decade;
+    FrequencySweepType SweepType = FrequencySweepType::DECADE;
     double StartFrequency = 1e6;
     double StopFrequency = 1e9;
     int Points = 100;
@@ -145,6 +145,8 @@ struct HarmonicBalanceConfig {
     int Harmonics = 8;                 ///< Highest harmonic order H >= 0 (solves DC + harmonics 1..H).
     int Samples = 0;                   ///< Time samples M per period (power of two); 0 chooses >= max(4H, 16).
     int SourceSteps = 0;               ///< Amplitude homotopy steps on failure; 0 uses ConvergenceOptions.SourceSteps.
+    /// Asked before each Newton iteration, since one run can take long; returning true stops it with an error.
+    std::function<bool()> ShouldStop = nullptr;
 };
 
 /**
@@ -207,6 +209,6 @@ std::expected<HarmonicBalanceResult, std::string>
 ComputeHarmonicBalance(const Circuit &circuit, const HarmonicBalanceConfig &config,
                        const ConvergenceOptions &options = {}, std::vector<DiagnosticMessage> *messages = nullptr);
 
-} // namespace nodalys
+} // namespace Nodalys
 
 #endif // NODALYS_ANALYSES_H

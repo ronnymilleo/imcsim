@@ -10,7 +10,7 @@
 #include <complex>
 #include <vector>
 
-namespace nodalys {
+namespace Nodalys {
 
 /**
  * @brief   Computes the finite generalized eigenvalues lambda of the real matrix pencil (A, B) such that
@@ -22,6 +22,6 @@ namespace nodalys {
  */
 std::vector<std::complex<double>> ComputeGeneralizedEigenvalues(const DenseMatrix &mat_a, const DenseMatrix &mat_b);
 
-} // namespace nodalys
+} // namespace Nodalys
 
 #endif // NODALYS_QZ_H

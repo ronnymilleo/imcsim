@@ -14,7 +14,7 @@
 #include <utility>
 #include <vector>
 
-namespace nodalys {
+namespace Nodalys {
 
 /**
  * @brief   Finds the small-signal poles and zeros of the transfer function from an input source to an output node.
@@ -122,4 +122,4 @@ std::expected<PoleZeroResult, std::string> ComputePoleZero(CompiledCircuit &comp
     return result;
 }
 
-} // namespace nodalys
+} // namespace Nodalys

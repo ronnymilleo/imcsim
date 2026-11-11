@@ -10,7 +10,7 @@
 #include <cmath>
 #include <format>
 
-namespace nodalys {
+namespace Nodalys {
 
 namespace {
 
@@ -168,4 +168,4 @@ std::expected<DcSweepResult, std::string> ComputeDCSweep(CompiledCircuit &compil
     return sweep;
 }
 
-} // namespace nodalys
+} // namespace Nodalys

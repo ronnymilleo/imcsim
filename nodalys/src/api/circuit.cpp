@@ -6,7 +6,7 @@
 #include "nodalys/circuit.h"
 #include "api/circuit_impl.h"
 
-namespace nodalys {
+namespace Nodalys {
 
 Circuit::Circuit() = default;
 Circuit::~Circuit() = default;
@@ -29,8 +29,8 @@ bool Circuit::HasInitialConditions() const {
 }
 
 const std::vector<CircuitPort> &Circuit::Ports() const {
-    static const std::vector<CircuitPort> EMPTY_PORTS;
-    return m_Impl ? m_Impl->Ports() : EMPTY_PORTS;
+    static const std::vector<CircuitPort> empty_ports;
+    return m_Impl ? m_Impl->Ports() : empty_ports;
 }
 
 CircuitImpl &Circuit::Impl() {
@@ -41,4 +41,4 @@ const CircuitImpl &Circuit::Impl() const {
     return *m_Impl;
 }
 
-} // namespace nodalys
+} // namespace Nodalys

@@ -14,7 +14,7 @@
 #include <cstddef>
 #include <vector>
 
-namespace nodalys {
+namespace Nodalys {
 
 /**
  * @class   BasicDenseMatrix
@@ -59,6 +59,6 @@ private:
 using DenseMatrix = BasicDenseMatrix<double>;
 using ComplexDenseMatrix = BasicDenseMatrix<std::complex<double>>;
 
-} // namespace nodalys
+} // namespace Nodalys
 
 #endif // NODALYS_DENSE_MATRIX_H

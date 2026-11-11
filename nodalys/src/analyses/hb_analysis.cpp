@@ -28,6 +28,7 @@
 #include <cmath>
 #include <complex>
 #include <format>
+#include <functional>
 #include <numbers>
 #include <set>
 #include <span>
@@ -35,12 +36,15 @@
 #include <utility>
 #include <vector>
 
-namespace nodalys {
+namespace Nodalys {
 
 namespace {
 
 constexpr std::size_t MIN_AUTO_SAMPLES = 16;
-constexpr std::size_t MAX_DENSE_UNKNOWNS_WARNING = 4000;
+constexpr std::size_t MAX_DENSE_UNKNOWNS_WARNING = 1500;
+/// Most unknowns the dense harmonic Jacobian may hold: 4000^2 doubles are 128 MB, and each Newton iteration factors it
+/// in seconds; a larger system would take the memory and the time of a run nobody waits for.
+constexpr std::size_t MAX_DENSE_UNKNOWNS = 4000;
 constexpr double FREQ_RATIO_RELTOL = 1e-9;
 
 struct PartitionedCircuit {
@@ -86,6 +90,10 @@ struct ActiveMatrixTraces {
 };
 
 struct HbWorkspace {
+    /// Asked before each Newton iteration, or empty.
+    std::function<bool()> ShouldStop;
+    /// Set once ShouldStop() asked for a stop, so the continuation strategies end too.
+    bool IsStopped = false;
     int UnknownCount = 0;
     int Harmonics = 0;
     int CoeffsPerUnknown = 0;
@@ -168,7 +176,7 @@ std::expected<PartitionedCircuit, std::string> ValidateAndPartitionDevices(const
             return std::unexpected(
                 std::format("Harmonic Balance does not support non-periodic or damped {} sources", kind_label));
         }
-        if (periodicity.Kind == SourceWaveformKind::Dc) {
+        if (periodicity.Kind == SourceWaveformKind::DC) {
             return {};
         }
         if (periodicity.Frequency <= 0.0) {
@@ -186,7 +194,7 @@ std::expected<PartitionedCircuit, std::string> ValidateAndPartitionDevices(const
                                                periodicity.Frequency, static_cast<int>(harmonic_nearest),
                                                config.Harmonics));
         }
-        if ((periodicity.Kind == SourceWaveformKind::Pulse || periodicity.Kind == SourceWaveformKind::Clock) &&
+        if ((periodicity.Kind == SourceWaveformKind::PULSE || periodicity.Kind == SourceWaveformKind::CLOCK) &&
             !warned_sharp_edge && periodicity.MinEdgeTime < sample_dt) {
             warnings.push_back(std::format(
                 "A periodic pulse/clock edge ({:.3g} s) is faster than the time grid ({:.3g} s); increase Samples or "
@@ -737,6 +745,10 @@ int RunHbNewton(HbWorkspace &ws, const double ac_scale, const double gmin, const
                                                   std::vector<double>(static_cast<std::size_t>(ws.UnknownCount), 0.0));
 
     for (int iteration = 1; iteration <= options.MaxIterations; ++iteration) {
+        if (ws.IsStopped || (ws.ShouldStop && ws.ShouldStop())) {
+            ws.IsStopped = true;
+            return 0;
+        }
         EvaluateResidualAndJacobian(ws, x_hb, ac_scale, gmin, true, residual, row_scale, &jacobian);
         const double prev_norm = ResidualNormSq(ws, residual);
 
@@ -848,7 +860,7 @@ HbSolveOutcome SolveHarmonicBalanceNonlinear(HbWorkspace &ws, const HarmonicBala
         double step = 1.0 / static_cast<double>(initial_steps);
         constexpr double MIN_STEP = 1e-4;
         std::vector<double> backup;
-        while (lambda < 1.0 - 1e-12) {
+        while (lambda < 1.0 - 1e-12 && !ws.IsStopped) {
             const double next_lambda = std::min(1.0, lambda + step);
             backup = x_hb;
             const int iters = RunHbNewton(ws, next_lambda, gmin, options, x_hb);
@@ -866,7 +878,7 @@ HbSolveOutcome SolveHarmonicBalanceNonlinear(HbWorkspace &ws, const HarmonicBala
                 }
             }
         }
-        return true;
+        return !ws.IsStopped;
     };
 
     reset_to_dc();
@@ -1106,6 +1118,12 @@ std::expected<HarmonicBalanceResult, std::string> ComputeHarmonicBalance(Compile
     const int unknown_count = compiled.System->Size();
     const std::size_t total_unknowns =
         static_cast<std::size_t>(unknown_count) * static_cast<std::size_t>(2 * settings.Harmonics + 1);
+    if (total_unknowns > MAX_DENSE_UNKNOWNS) {
+        return std::unexpected(std::format(
+            "Harmonic balance would solve {} unknowns ({} per harmonic x {}), more than the {} it can hold; use fewer "
+            "harmonics",
+            total_unknowns, unknown_count, 2 * settings.Harmonics + 1, MAX_DENSE_UNKNOWNS));
+    }
     if (total_unknowns > MAX_DENSE_UNKNOWNS_WARNING) {
         warnings.push_back(std::format(
             "Harmonic Balance system has {} unknowns ({} MNA x {}); solving dense Jacobian may take noticeable time",
@@ -1119,6 +1137,7 @@ std::expected<HarmonicBalanceResult, std::string> ComputeHarmonicBalance(Compile
 
     HbWorkspace ws(unknown_count, settings.Harmonics, *sample_count, settings.FundamentalFrequency,
                    std::move(node_flags));
+    ws.ShouldStop = settings.ShouldStop;
     const double period = 1.0 / settings.FundamentalFrequency;
     AssembleLinearAndExcitation(ws, *partitioned, period);
 
@@ -1135,6 +1154,9 @@ std::expected<HarmonicBalanceResult, std::string> ComputeHarmonicBalance(Compile
     } else {
         ws.NonlinearDevices = partitioned->NonlinearDevices;
         outcome = SolveHarmonicBalanceNonlinear(ws, settings, options, x_hb);
+        if (ws.IsStopped) {
+            return std::unexpected("The harmonic balance was stopped before it converged");
+        }
         if (!outcome.Converged) {
             return std::unexpected("Harmonic Balance Newton-Raphson failed to converge for this circuit");
         }
@@ -1159,4 +1181,4 @@ std::expected<HarmonicBalanceResult, std::string> ComputeHarmonicBalance(Compile
     return result;
 }
 
-} // namespace nodalys
+} // namespace Nodalys

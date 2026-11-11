@@ -13,7 +13,7 @@
 #include <numbers>
 #include <unordered_map>
 
-namespace nodalys {
+namespace Nodalys {
 
 namespace {
 
@@ -211,4 +211,4 @@ std::expected<NoiseResult, std::string> ComputeNoise(CompiledCircuit &compiled, 
     return result;
 }
 
-} // namespace nodalys
+} // namespace Nodalys

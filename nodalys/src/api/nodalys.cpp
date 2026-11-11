@@ -8,7 +8,7 @@
 #include "analyses/analyses.h"
 #include "api/circuit_impl.h"
 
-namespace nodalys {
+namespace Nodalys {
 
 std::expected<OperatingPointResult, std::string> ComputeOperatingPoint(const Circuit &circuit,
                                                                        const ConvergenceOptions &options,
@@ -86,4 +86,4 @@ std::expected<HarmonicBalanceResult, std::string> ComputeHarmonicBalance(const C
     return ComputeHarmonicBalance(impl.Compiled(), config, options, messages);
 }
 
-} // namespace nodalys
+} // namespace Nodalys

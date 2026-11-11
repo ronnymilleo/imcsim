@@ -19,7 +19,7 @@
 #include <string>
 #include <vector>
 
-namespace nodalys {
+namespace Nodalys {
 
 /**
  * @class   Device
@@ -255,11 +255,11 @@ private:
  * @brief   Classification of an independent source's waveform for Harmonic Balance validation.
  */
 enum class SourceWaveformKind {
-    Dc,
-    Sine,
-    Pulse,
-    Clock,
-    NonPeriodic
+    DC,
+    SINE,
+    PULSE,
+    CLOCK,
+    NON_PERIODIC
 };
 
 /**
@@ -267,7 +267,7 @@ enum class SourceWaveformKind {
  * @brief   Periodicity metadata attached to independent voltage and current sources.
  */
 struct SourcePeriodicity {
-    SourceWaveformKind Kind = SourceWaveformKind::Dc;
+    SourceWaveformKind Kind = SourceWaveformKind::DC;
     double Frequency = 0.0;
     double MinEdgeTime = 0.0;
     bool IsSupportedInHb = true;
@@ -535,6 +535,6 @@ private:
     double m_SavedI1 = 0.0, m_SavedI2 = 0.0, m_SavedV1 = 0.0, m_SavedV2 = 0.0;
 };
 
-} // namespace nodalys
+} // namespace Nodalys
 
 #endif // NODALYS_DEVICES_H

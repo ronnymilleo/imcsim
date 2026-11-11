@@ -33,7 +33,7 @@
 #include "devices/devices.h"
 #include "nodalys/types.h"
 
-namespace nodalys {
+namespace Nodalys {
 
 /**
  * @class   DiodeDevice
@@ -216,6 +216,6 @@ private:
     double m_Critical; ///< `PNJLIM` critical voltage of the body-drain junction diode.
 };
 
-} // namespace nodalys
+} // namespace Nodalys
 
 #endif // NODALYS_NONLINEAR_H

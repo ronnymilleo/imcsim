@@ -28,17 +28,17 @@ std::vector<std::complex<double>> NaiveDft(const std::vector<std::complex<double
 }
 
 TEST_CASE("Power-of-two helpers handle edge cases", "[linear][fft]") {
-    CHECK_FALSE(nodalys::IsPowerOfTwo(0));
-    CHECK(nodalys::IsPowerOfTwo(1));
-    CHECK(nodalys::IsPowerOfTwo(2));
-    CHECK_FALSE(nodalys::IsPowerOfTwo(3));
-    CHECK(nodalys::IsPowerOfTwo(64));
-    CHECK_FALSE(nodalys::IsPowerOfTwo(65));
+    CHECK_FALSE(Nodalys::IsPowerOfTwo(0));
+    CHECK(Nodalys::IsPowerOfTwo(1));
+    CHECK(Nodalys::IsPowerOfTwo(2));
+    CHECK_FALSE(Nodalys::IsPowerOfTwo(3));
+    CHECK(Nodalys::IsPowerOfTwo(64));
+    CHECK_FALSE(Nodalys::IsPowerOfTwo(65));
 
-    CHECK(nodalys::NextPowerOfTwo(0) == 1);
-    CHECK(nodalys::NextPowerOfTwo(1) == 1);
-    CHECK(nodalys::NextPowerOfTwo(17) == 32);
-    CHECK(nodalys::NextPowerOfTwo(64) == 64);
+    CHECK(Nodalys::NextPowerOfTwo(0) == 1);
+    CHECK(Nodalys::NextPowerOfTwo(1) == 1);
+    CHECK(Nodalys::NextPowerOfTwo(17) == 32);
+    CHECK(Nodalys::NextPowerOfTwo(64) == 64);
 }
 
 TEST_CASE("Radix-2 FFT matches naive DFT and round-trips via IFFT", "[linear][fft]") {
@@ -53,7 +53,7 @@ TEST_CASE("Radix-2 FFT matches naive DFT and round-trips via IFFT", "[linear][ff
 
         const std::vector<std::complex<double>> expected = NaiveDft(signal);
         std::vector<std::complex<double>> spectrum = signal;
-        REQUIRE(nodalys::ComputeFft(spectrum));
+        REQUIRE(Nodalys::ComputeFft(spectrum));
 
         const double tol = 1e-12 * static_cast<double>(n);
         for (std::size_t k = 0; k < n; ++k) {
@@ -61,7 +61,7 @@ TEST_CASE("Radix-2 FFT matches naive DFT and round-trips via IFFT", "[linear][ff
             CHECK_THAT(spectrum[k].imag(), WithinAbs(expected[k].imag(), tol));
         }
 
-        REQUIRE(nodalys::ComputeIfft(spectrum));
+        REQUIRE(Nodalys::ComputeIfft(spectrum));
         for (std::size_t m = 0; m < n; ++m) {
             CHECK_THAT(spectrum[m].real(), WithinAbs(signal[m].real(), 1e-12));
             CHECK_THAT(spectrum[m].imag(), WithinAbs(signal[m].imag(), 1e-12));
@@ -72,14 +72,14 @@ TEST_CASE("Radix-2 FFT matches naive DFT and round-trips via IFFT", "[linear][ff
 TEST_CASE("Non-power-of-two inputs are rejected", "[linear][fft]") {
     std::vector<std::complex<double>> empty;
     std::vector<std::complex<double>> six(6, {1.0, 0.0});
-    CHECK_FALSE(nodalys::ComputeFft(empty));
-    CHECK_FALSE(nodalys::ComputeIfft(six));
+    CHECK_FALSE(Nodalys::ComputeFft(empty));
+    CHECK_FALSE(Nodalys::ComputeIfft(six));
 
     std::vector<double> samples(8, 0.0);
     std::vector<double> coeffs;
     // M = 8 cannot resolve H = 4 without aliasing at Nyquist (requires M > 2 * H)
-    CHECK_FALSE(nodalys::RealToHarmonics(samples, 4, coeffs));
-    CHECK_FALSE(nodalys::RealToHarmonics(samples, -1, coeffs));
+    CHECK_FALSE(Nodalys::RealToHarmonics(samples, 4, coeffs));
+    CHECK_FALSE(Nodalys::RealToHarmonics(samples, -1, coeffs));
 }
 
 TEST_CASE("Real cosine/sine harmonic transforms preserve exact trigonometric signals", "[linear][fft]") {
@@ -99,7 +99,7 @@ TEST_CASE("Real cosine/sine harmonic transforms preserve exact trigonometric sig
     };
 
     std::vector<double> samples;
-    REQUIRE(nodalys::HarmonicsToReal(expected_coeffs, M, samples));
+    REQUIRE(Nodalys::HarmonicsToReal(expected_coeffs, M, samples));
     REQUIRE(samples.size() == M);
 
     for (std::size_t m = 0; m < M; ++m) {
@@ -110,7 +110,7 @@ TEST_CASE("Real cosine/sine harmonic transforms preserve exact trigonometric sig
     }
 
     std::vector<double> recovered;
-    REQUIRE(nodalys::RealToHarmonics(samples, H, recovered));
+    REQUIRE(Nodalys::RealToHarmonics(samples, H, recovered));
     REQUIRE(recovered.size() == expected_coeffs.size());
     for (std::size_t i = 0; i < expected_coeffs.size(); ++i) {
         CHECK_THAT(recovered[i], WithinAbs(expected_coeffs[i], 1e-12));
@@ -123,7 +123,7 @@ TEST_CASE("Parseval energy identity holds for real harmonic conversions", "[line
     const std::vector<double> coeffs = {0.8, 1.2, -0.6, 0.3, 0.4, -0.2, 0.1, 0.0, 0.5, -0.15, 0.25};
 
     std::vector<double> samples;
-    REQUIRE(nodalys::HarmonicsToReal(coeffs, M, samples));
+    REQUIRE(Nodalys::HarmonicsToReal(coeffs, M, samples));
 
     double time_mean_square = 0.0;
     for (const double s : samples) {

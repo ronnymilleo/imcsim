@@ -13,7 +13,7 @@ using Catch::Matchers::WithinRel;
 
 TEST_CASE("DC sensitivity analysis computes exact closed-form sensitivities of a voltage divider",
           "[nodalys][sensitivity]") {
-    nodalys::CircuitBuilder builder;
+    Nodalys::CircuitBuilder builder;
     builder.AddVdc("V1", 1, 0, 10.0);
     builder.AddResistor("R1", 1, 2, 1000.0);
     builder.AddResistor("R2", 2, 0, 2000.0);
@@ -22,8 +22,8 @@ TEST_CASE("DC sensitivity analysis computes exact closed-form sensitivities of a
     auto circuit = builder.Build();
     REQUIRE(circuit.has_value());
 
-    const nodalys::SensitivityConfig config{.OutputPositiveNode = 2, .OutputNegativeNode = 0};
-    const auto result = nodalys::ComputeSensitivity(*circuit, config);
+    const Nodalys::SensitivityConfig config{.OutputPositiveNode = 2, .OutputNegativeNode = 0};
+    const auto result = Nodalys::ComputeSensitivity(*circuit, config);
 
     REQUIRE(result.has_value());
     CHECK(result->OutputPositiveNode == 2);
@@ -62,14 +62,14 @@ TEST_CASE("DC sensitivity analysis computes exact closed-form sensitivities of a
 
 TEST_CASE("DC sensitivity analysis evaluates sensitivities of controlled sources", "[nodalys][sensitivity]") {
     SECTION("Voltage-Controlled Voltage Source (VCVS)") {
-        nodalys::CircuitBuilder builder;
+        Nodalys::CircuitBuilder builder;
         builder.AddVdc("V1", 1, 0, 2.0);
         builder.AddVcvs("E1", 2, 0, 1, 0, 3.0); // V2 = 3.0 * V1 = 6.0 V
         builder.AddResistor("R1", 2, 0, 1000.0);
 
         auto circuit = builder.Build();
         REQUIRE(circuit.has_value());
-        const auto result = nodalys::ComputeSensitivity(*circuit, {.OutputPositiveNode = 2, .OutputNegativeNode = 0});
+        const auto result = Nodalys::ComputeSensitivity(*circuit, {.OutputPositiveNode = 2, .OutputNegativeNode = 0});
 
         REQUIRE(result.has_value());
         // dV2/dGain = V1 = 2.0 V/gain
@@ -81,14 +81,14 @@ TEST_CASE("DC sensitivity analysis evaluates sensitivities of controlled sources
     }
 
     SECTION("Voltage-Controlled Current Source (VCCS)") {
-        nodalys::CircuitBuilder builder;
+        Nodalys::CircuitBuilder builder;
         builder.AddVdc("V1", 1, 0, 2.0);
         builder.AddVccs("G1", 0, 2, 1, 0, 0.005); // Current into node 2 is 5 mA/V * 2 V = 10 mA
         builder.AddResistor("R1", 2, 0, 500.0);   // V2 = 10 mA * 500 Ohm = 5.0 V
 
         auto circuit = builder.Build();
         REQUIRE(circuit.has_value());
-        const auto result = nodalys::ComputeSensitivity(*circuit, {.OutputPositiveNode = 2, .OutputNegativeNode = 0});
+        const auto result = Nodalys::ComputeSensitivity(*circuit, {.OutputPositiveNode = 2, .OutputNegativeNode = 0});
 
         REQUIRE(result.has_value());
         // V2 = Gm * V1 * R1 -> dV2/dGm = V1 * R1 = 2.0 * 500 = 1000.0 V/(A/V)
@@ -108,43 +108,43 @@ TEST_CASE("SPICE netlist parser recognizes .sens directives and exports results"
                                      ".SENS V(2)\n"
                                      ".END\n";
 
-    auto parsed = nodalys::ParseNetlist(netlist);
+    auto parsed = Nodalys::ParseNetlist(netlist);
     REQUIRE(parsed.has_value());
     REQUIRE(parsed->Analyses.size() == 1);
-    CHECK(parsed->Analyses[0].Kind == nodalys::AnalysisKind::Sensitivity);
+    CHECK(parsed->Analyses[0].Kind == Nodalys::AnalysisKind::SENSITIVITY);
 
-    const auto &cfg = std::get<nodalys::SensitivityConfig>(parsed->Analyses[0].Config);
+    const auto &cfg = std::get<Nodalys::SensitivityConfig>(parsed->Analyses[0].Config);
     CHECK(cfg.OutputPositiveNode == 2);
     CHECK(cfg.OutputNegativeNode == 0);
 
-    const auto result = nodalys::ComputeSensitivity(parsed->CircuitInstance, cfg);
+    const auto result = Nodalys::ComputeSensitivity(parsed->CircuitInstance, cfg);
     REQUIRE(result.has_value());
 
-    const std::string csv = nodalys::ExportCsv(*result);
+    const std::string csv = Nodalys::ExportCsv(*result);
     CHECK(csv.contains("Vector,Value"));
     CHECK(csv.contains("r1,"));
     CHECK(csv.contains("r2,"));
     CHECK(csv.contains("v1,"));
 
-    const std::string json = nodalys::ExportJson(*result);
+    const std::string json = Nodalys::ExportJson(*result);
     CHECK(json.contains("\"analysis\": \"sensitivity\""));
     CHECK(json.contains("\"output_positive_node\": 2"));
     CHECK(json.contains("\"vectors\""));
 
-    const std::string raw = nodalys::ExportRaw(*result);
+    const std::string raw = Nodalys::ExportRaw(*result);
     CHECK(raw.contains("Plotname: DC Sensitivity Analysis"));
     CHECK(raw.contains("No. Variables:"));
 }
 
 TEST_CASE("DC sensitivity analysis validates output nodes", "[nodalys][sensitivity]") {
-    nodalys::CircuitBuilder builder;
+    Nodalys::CircuitBuilder builder;
     builder.AddVdc("V1", 1, 0, 5.0);
     builder.AddResistor("R1", 1, 0, 1000.0);
     auto circuit = builder.Build();
     REQUIRE(circuit.has_value());
 
     // Ground output node 0 referenced to 0
-    CHECK_FALSE(nodalys::ComputeSensitivity(*circuit, {.OutputPositiveNode = 0, .OutputNegativeNode = 0}).has_value());
+    CHECK_FALSE(Nodalys::ComputeSensitivity(*circuit, {.OutputPositiveNode = 0, .OutputNegativeNode = 0}).has_value());
     // Out of bounds node
-    CHECK_FALSE(nodalys::ComputeSensitivity(*circuit, {.OutputPositiveNode = 42, .OutputNegativeNode = 0}).has_value());
+    CHECK_FALSE(Nodalys::ComputeSensitivity(*circuit, {.OutputPositiveNode = 42, .OutputNegativeNode = 0}).has_value());
 }

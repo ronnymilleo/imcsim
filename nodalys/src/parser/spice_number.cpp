@@ -12,7 +12,7 @@
 #include <cmath>
 #include <string>
 
-namespace nodalys {
+namespace Nodalys {
 
 namespace {
 
@@ -88,4 +88,4 @@ std::optional<double> ParseSpiceNumber(std::string_view text) {
     return value;
 }
 
-} // namespace nodalys
+} // namespace Nodalys

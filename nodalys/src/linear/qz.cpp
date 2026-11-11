@@ -14,7 +14,7 @@
 #include <limits>
 #include <utility>
 
-namespace nodalys {
+namespace Nodalys {
 
 namespace {
 
@@ -800,4 +800,4 @@ std::vector<std::complex<double>> ComputeGeneralizedEigenvalues(const DenseMatri
     return ExtractEigenvalues(a, b, epsb);
 }
 
-} // namespace nodalys
+} // namespace Nodalys

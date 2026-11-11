@@ -88,10 +88,13 @@ std::string_view GetAnalysisKindName(const AnalysisKind kind) {
  * @brief   Finds periodic steady-state node voltages and currents at the fundamental and its harmonics.
  * @param[in] circuit   Circuit to simulate, already checked.
  * @param[in] settings  Fundamental frequency, harmonic count, and optional sample count, already checked.
+ * @param[in] control   Where to look for a stop request between iterations, or null.
  * @return  The harmonic spectra and one-cycle waveforms or an error, plus the messages of the backend.
+ * @note    A backend that runs no harmonic balance keeps this default, which says so.
  */
 HarmonicBalanceRun SimulationBackend::RunHarmonicBalance(const Circuit & /*circuit*/,
-                                                         const HarmonicBalanceSettings & /*settings*/) {
+                                                         const HarmonicBalanceSettings & /*settings*/,
+                                                         RunControl * /*control*/) {
     HarmonicBalanceRun run;
     run.Result = std::unexpected(std::format("{} does not run the harmonic balance analysis", GetName()));
     return run;

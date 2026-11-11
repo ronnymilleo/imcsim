@@ -38,7 +38,7 @@
 #include <cmath>
 #include <utility>
 
-namespace nodalys {
+namespace Nodalys {
 
 namespace {
 
@@ -607,4 +607,4 @@ void CoupledInductorDevice::RejectStep() {
     m_V2 = m_SavedV2;
 }
 
-} // namespace nodalys
+} // namespace Nodalys
