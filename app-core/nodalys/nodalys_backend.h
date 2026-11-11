@@ -25,7 +25,7 @@ public:
     const BackendCapabilities &GetCapabilities() const override;
 
     OperatingPointRun RunOperatingPoint(const Circuit &circuit,
-                                        const std::optional<double> &temperature_celsius = std::nullopt) override;
+                                        const std::optional<double> &temperature_celsius) override;
     TransientRun RunTransient(const Circuit &circuit, const TransientSettings &settings,
                               const std::optional<double> &temperature_celsius, const RunMonitor &monitor) override;
     DCSweepRun RunDCSweep(const Circuit &circuit, const DCSweepSettings &settings,

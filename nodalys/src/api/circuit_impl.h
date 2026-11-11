@@ -19,10 +19,10 @@ public:
     CompiledCircuit &Compiled() { return m_Compiled; }
     const CompiledCircuit &Compiled() const { return m_Compiled; }
 
-    int NodeCount() const { return m_Compiled.CircuitNodeCount; }
-    int UnknownCount() const { return m_Compiled.System ? m_Compiled.System->Size() : 0; }
+    int GetNodeCount() const { return m_Compiled.CircuitNodeCount; }
+    int GetUnknownCount() const { return m_Compiled.System ? m_Compiled.System->GetSize() : 0; }
     bool HasInitialConditions() const { return m_Compiled.HasInitialConditions; }
-    const std::vector<CircuitPort> &Ports() const { return m_Compiled.Ports; }
+    const std::vector<CircuitPort> &GetPorts() const { return m_Compiled.Ports; }
 
 private:
     CompiledCircuit m_Compiled;

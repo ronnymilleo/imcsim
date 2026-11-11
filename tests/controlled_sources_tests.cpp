@@ -48,7 +48,7 @@ TEST_CASE("A VCVS multiplies the controlling voltage") {
     circuit.Add(ground, {0});
 
     Core::NodalysBackend backend;
-    const Core::OperatingPointRun run = backend.RunOperatingPoint(circuit);
+    const Core::OperatingPointRun run = backend.RunOperatingPoint(circuit, std::nullopt);
     REQUIRE(run.Result.has_value());
     REQUIRE_THAT(run.Result->NodeVoltages[2], WithinRel(6.0, 1e-5));
 }
@@ -72,7 +72,7 @@ TEST_CASE("A VCCS drives a current proportional to the controlling voltage") {
     circuit.Add(ground, {0});
 
     Core::NodalysBackend backend;
-    const Core::OperatingPointRun run = backend.RunOperatingPoint(circuit);
+    const Core::OperatingPointRun run = backend.RunOperatingPoint(circuit, std::nullopt);
     REQUIRE(run.Result.has_value());
     REQUIRE_THAT(run.Result->NodeVoltages[2], WithinRel(-20.0, 1e-5));
 }
@@ -101,7 +101,7 @@ TEST_CASE("A CCCS follows the current of a sense resistor") {
     circuit.Add(ground, {0});
 
     Core::NodalysBackend backend;
-    const Core::OperatingPointRun run = backend.RunOperatingPoint(circuit);
+    const Core::OperatingPointRun run = backend.RunOperatingPoint(circuit, std::nullopt);
     REQUIRE(run.Result.has_value());
     REQUIRE_THAT(CurrentOf(*run.Result, "RS"), WithinRel(50e-3, 1e-5));
     REQUIRE_THAT(run.Result->NodeVoltages[2], WithinRel(-500.0, 1e-5));
@@ -131,7 +131,7 @@ TEST_CASE("A CCVS converts a sense current to a voltage") {
     circuit.Add(ground, {0});
 
     Core::NodalysBackend backend;
-    const Core::OperatingPointRun run = backend.RunOperatingPoint(circuit);
+    const Core::OperatingPointRun run = backend.RunOperatingPoint(circuit, std::nullopt);
     REQUIRE(run.Result.has_value());
     REQUIRE_THAT(run.Result->NodeVoltages[2], WithinRel(20.0, 1e-5));
 }

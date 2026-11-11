@@ -32,6 +32,7 @@ private:
     void DrawAppearance();
     void DrawSchematic();
     void DrawParts();
+    void DrawSimulation();
     void DrawResults();
 };
 

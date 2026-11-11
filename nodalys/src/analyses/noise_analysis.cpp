@@ -72,7 +72,7 @@ std::expected<NoiseResult, std::string> ComputeNoise(CompiledCircuit &compiled, 
         return std::unexpected(std::format("The source {} cannot drive a noise analysis", settings.InputSource));
     }
 
-    const int size = compiled.System->Size();
+    const int size = compiled.System->GetSize();
     std::vector<double> x_dc(static_cast<std::size_t>(size), 0.0);
     const NewtonOutcome outcome = SolveNewton(*compiled.System, compiled.Devices, x_dc, TimeContext{}, options);
     if (!outcome.Converged) {
@@ -138,14 +138,14 @@ std::expected<NoiseResult, std::string> ComputeNoise(CompiledCircuit &compiled, 
 
         std::complex<double> gain{0.0, 0.0};
         if (voltage_source != nullptr) {
-            gain = adjoint[static_cast<std::size_t>(voltage_source->Branch())];
+            gain = adjoint[static_cast<std::size_t>(voltage_source->GetBranch())];
         } else {
-            const std::complex<double> la = current_source->NodeA() < 0
+            const std::complex<double> la = current_source->GetNodeA() < 0
                                                 ? std::complex<double>{0.0, 0.0}
-                                                : adjoint[static_cast<std::size_t>(current_source->NodeA())];
-            const std::complex<double> lb = current_source->NodeB() < 0
+                                                : adjoint[static_cast<std::size_t>(current_source->GetNodeA())];
+            const std::complex<double> lb = current_source->GetNodeB() < 0
                                                 ? std::complex<double>{0.0, 0.0}
-                                                : adjoint[static_cast<std::size_t>(current_source->NodeB())];
+                                                : adjoint[static_cast<std::size_t>(current_source->GetNodeB())];
             gain = lb - la;
         }
         const double inv_gain_sq = 1.0 / std::max(std::norm(gain), MIN_GAIN_SQUARED);

@@ -276,10 +276,10 @@ void Application::ApplyPreferences() {
     if (const std::optional<std::size_t> theme = FindTheme(m_Preferences.Theme); theme && *theme != GetThemeIndex()) {
         SetTheme(*theme);
     }
-    const std::string_view wanted_backend = m_Preferences.SimulationBackend;
+    const SimulationEngine engine = m_Preferences.Engine;
     // The worker of a run, a paused live one too, uses the backend it started on, so the switch waits for its end
-    if (wanted_backend != Core::GetBackend().GetName() && !m_AnalysisControls.IsBackendInUse()) {
-        Core::SetBackend(wanted_backend == "Nodalys" ? std::make_unique<Core::NodalysBackend>() : nullptr);
+    if (GetSimulationEngineName(engine) != Core::GetBackend().GetName() && !m_AnalysisControls.IsBackendInUse()) {
+        Core::SetBackend(engine == SimulationEngine::NODALYS ? std::make_unique<Core::NodalysBackend>() : nullptr);
     }
     if (m_Preferences == m_SavedPreferences) {
         return;

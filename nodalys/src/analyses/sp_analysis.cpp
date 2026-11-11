@@ -155,7 +155,7 @@ std::expected<SParameterResult, std::string> ComputeSParameters(CompiledCircuit 
     }
     const std::vector<double> &frequencies = *freq_points;
 
-    const int size = compiled.System->Size();
+    const int size = compiled.System->GetSize();
 
     // 1. Terminate all ports with their reference impedance to ground for DC operating point linearization
     const std::size_t original_device_count = compiled.Devices.size();

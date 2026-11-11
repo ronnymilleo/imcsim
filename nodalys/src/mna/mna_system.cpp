@@ -138,7 +138,7 @@ MnaSystem::MnaSystem(std::vector<bool> is_node_unknown)
       m_NodeUnknowns(static_cast<int>(std::ranges::count(m_IsNodeUnknown, true))) {
 }
 
-int MnaSystem::Size() const {
+int MnaSystem::GetSize() const {
     return static_cast<int>(m_A.Rows());
 }
 
@@ -150,7 +150,7 @@ int MnaSystem::BranchIndex(const int ordinal) const {
     return m_NodeUnknowns + ordinal;
 }
 
-int MnaSystem::NodeUnknowns() const {
+int MnaSystem::GetNodeUnknownCount() const {
     return m_NodeUnknowns;
 }
 
@@ -182,7 +182,7 @@ void MnaSystem::AddRhs(const int row, const double value) {
 }
 
 void MnaSystem::AddGminToNodes(const double conductance) {
-    const int size = Size();
+    const int size = GetSize();
     for (int index = 0; index < size; ++index) {
         if (IsNodeUnknown(index)) {
             AddA(index, index, conductance);
@@ -273,7 +273,7 @@ bool MnaSystem::SolveAcTranspose(const MnaSystem &reactive, const double omega, 
 
 bool MnaSystem::CheckResidual(const std::vector<double> &x, const double voltage_abstol, const double current_abstol,
                               const double reltol) const {
-    const int size = Size();
+    const int size = GetSize();
     for (int row = 0; row < size; ++row) {
         double sum = 0.0;
         double sum_abs = 0.0;

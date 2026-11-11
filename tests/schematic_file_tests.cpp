@@ -1319,7 +1319,8 @@ TEST_CASE("Invalid harmonic balance settings fall back to their defaults with a 
                                              R"("harmonic_balance": )") +
                                  hb + "}}";
         const GUI::LoadedSchematic loaded = LoadOrFail(text);
-        CHECK(loaded.Warnings.size() == 1);
+        REQUIRE(loaded.Warnings.size() == 1);
+        CHECK(loaded.Warnings.front().starts_with("The harmonic balance settings"));
         CHECK(loaded.Settings.HarmonicBalance == Core::HarmonicBalanceSettings{});
     }
 }

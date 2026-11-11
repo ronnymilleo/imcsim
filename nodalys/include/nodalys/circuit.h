@@ -31,16 +31,16 @@ public:
     Circuit &operator=(const Circuit &) = delete;
 
     /// Number of top-level user-accessible nodes (results report voltages for 0 .. NodeCount - 1).
-    int NodeCount() const;
+    int GetNodeCount() const;
 
     /// Total number of MNA unknowns (including internal nodes and branch currents).
-    int UnknownCount() const;
+    int GetUnknownCount() const;
 
     /// Returns true if any reactive element has a non-zero initial condition (uic).
     bool HasInitialConditions() const;
 
     /// Configured RF ports for S-parameter analysis.
-    const std::vector<CircuitPort> &Ports() const;
+    const std::vector<CircuitPort> &GetPorts() const;
 
     /// Internal accessor for solver execution.
     explicit Circuit(std::unique_ptr<CircuitImpl> impl);

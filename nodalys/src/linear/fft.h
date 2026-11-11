@@ -22,7 +22,7 @@ public:
     explicit FftPlan(std::size_t size);
 
     bool IsValid() const { return m_Size != 0; }
-    std::size_t Size() const { return m_Size; }
+    std::size_t GetSize() const { return m_Size; }
 
     void Forward(std::vector<std::complex<double>> &data) const;
     void Inverse(std::vector<std::complex<double>> &data) const;

@@ -67,6 +67,15 @@ constexpr double MIN_RERUN_DELAY_SECONDS = 0.1;
 constexpr double MAX_RERUN_DELAY_SECONDS = 5.0;
 
 /**
+ * @enum    SimulationEngine
+ * @brief   The engine that solves the circuits.
+ */
+enum class SimulationEngine {
+    NGSPICE,
+    NODALYS
+};
+
+/**
  * @enum    HarmonicAmplitudeUnit
  * @brief   Convention used to display AC harmonic magnitudes in harmonic balance plots and tables.
  */
@@ -99,8 +108,8 @@ struct Preferences {
 
     /// Results: a new result brings the Output window to the front, or only marks it.
     bool BringOutputToFront = true;
-    /// Which simulation engine solves the circuits: "ngspice" or "Nodalys".
-    std::string SimulationBackend = "ngspice";
+    /// Which engine solves the circuits.
+    SimulationEngine Engine = SimulationEngine::NGSPICE;
     /// The selected analysis runs again by itself once an edit of the circuit settles, if it was already run.
     bool RerunOnEdit = false;
     /// Quiet time after the last edit before it runs, from MIN_RERUN_DELAY_SECONDS to MAX_RERUN_DELAY_SECONDS.
@@ -126,6 +135,7 @@ struct LoadedPreferences {
 // Names as menus and the file show them
 const char *GetWireColoringName(WireColoring coloring);
 const char *GetLiveEffectName(LiveEffect effect);
+const char *GetSimulationEngineName(SimulationEngine engine);
 const char *GetHarmonicAmplitudeUnitName(HarmonicAmplitudeUnit unit);
 
 // File

@@ -282,3 +282,12 @@ TEST_CASE("Harmonic balance validates frequency, harmonics, samples and periodic
     setup.Circuit.Add(instance, {3});
     CHECK(Core::CheckHarmonicBalanceSettings(setup.Circuit, valid).value_or("").contains("Vsub"));
 }
+
+TEST_CASE("A frequency is a harmonic of the fundamental only near an integer multiple of it", "[circuit_checks][hb]") {
+    CHECK(Core::FindHarmonicNumber(3e3, 1e3) == 3);
+    // Within the relative tolerance, a rounding error in a period still counts
+    CHECK(Core::FindHarmonicNumber(3e3 * (1.0 + 1e-9), 1e3) == 3);
+    CHECK_FALSE(Core::FindHarmonicNumber(3.1e3, 1e3).has_value());
+    // Below the fundamental there is no harmonic
+    CHECK_FALSE(Core::FindHarmonicNumber(400.0, 1e3).has_value());
+}

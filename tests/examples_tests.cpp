@@ -149,13 +149,13 @@ TEST_CASE("Every example either runs on Nodalys or is flagged unsupported", "[ex
 
         // The precision rectifier example uses a vendor op-amp subcircuit kept as raw SPICE text
         if (std::string_view(example.FileName) == "precision_rectifier.imcsim") {
-            const Core::OperatingPointRun op = nodalys.RunOperatingPoint(circuit);
+            const Core::OperatingPointRun op = nodalys.RunOperatingPoint(circuit, std::nullopt);
             REQUIRE_FALSE(op.Result.has_value());
             CHECK(op.Result.error().find("SPICE text") != std::string::npos);
             continue;
         }
 
-        const Core::OperatingPointRun operating_point = nodalys.RunOperatingPoint(circuit);
+        const Core::OperatingPointRun operating_point = nodalys.RunOperatingPoint(circuit, std::nullopt);
         INFO((operating_point.Result ? std::string{} : operating_point.Result.error()));
         REQUIRE(operating_point.Result.has_value());
         const GUI::SavedMeasurements measurements = schematic.SaveMeasurements();

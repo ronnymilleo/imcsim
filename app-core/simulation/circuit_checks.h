@@ -61,6 +61,8 @@ std::vector<std::string> GetTruthTableInputs(const Circuit &circuit);
 // Harmonic balance
 std::optional<std::string> CheckHarmonicBalanceSettings(const Circuit &circuit,
                                                         const HarmonicBalanceSettings &settings);
+std::optional<std::string> CheckHarmonicBalanceGrid(const HarmonicBalanceSettings &settings);
+std::optional<int> FindHarmonicNumber(double frequency, double fundamental);
 
 } // namespace Core
 

@@ -118,6 +118,7 @@ void PreferencesWindow::Draw() {
     DrawAppearance();
     DrawSchematic();
     DrawParts();
+    DrawSimulation();
     DrawResults();
     ImGui::Spacing();
     ImGui::Separator();
@@ -189,24 +190,27 @@ void PreferencesWindow::DrawParts() {
     ImGui::EndTable();
 }
 
-void PreferencesWindow::DrawResults() {
+void PreferencesWindow::DrawSimulation() {
     if (!BeginSection("Simulation")) {
         return;
     }
     BeginChoice("Backend");
-    if (ImGui::BeginCombo("##simulation_backend", m_Preferences.SimulationBackend.c_str())) {
-        if (ImGui::Selectable("ngspice", m_Preferences.SimulationBackend == "ngspice")) {
-            m_Preferences.SimulationBackend = "ngspice";
+    if (ImGui::BeginCombo("##simulation_backend", GetSimulationEngineName(m_Preferences.Engine))) {
+        if (ImGui::Selectable("ngspice", m_Preferences.Engine == SimulationEngine::NGSPICE)) {
+            m_Preferences.Engine = SimulationEngine::NGSPICE;
         }
         ImGui::SetItemTooltip("The reference simulator, ngspice, as a shared library");
-        if (ImGui::Selectable("Nodalys", m_Preferences.SimulationBackend == "Nodalys")) {
-            m_Preferences.SimulationBackend = "Nodalys";
+        if (ImGui::Selectable("Nodalys", m_Preferences.Engine == SimulationEngine::NODALYS)) {
+            m_Preferences.Engine = SimulationEngine::NODALYS;
         }
         ImGui::SetItemTooltip("Nodalys, the built-in solver of imcsim; it runs analog and digital simulations");
         ImGui::EndCombo();
     }
     ImGui::SetItemTooltip("The engine that solves the circuits; a run in progress ends on the one it started on");
     ImGui::EndTable();
+}
+
+void PreferencesWindow::DrawResults() {
     if (!BeginSection("Results")) {
         return;
     }

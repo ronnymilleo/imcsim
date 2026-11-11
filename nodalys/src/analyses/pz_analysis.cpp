@@ -44,7 +44,7 @@ std::expected<PoleZeroResult, std::string> ComputePoleZero(CompiledCircuit &comp
         return std::unexpected(std::format("The source {} cannot drive a pole-zero analysis", settings.InputSource));
     }
 
-    const int size = compiled.System->Size();
+    const int size = compiled.System->GetSize();
     std::vector<double> x_dc(static_cast<std::size_t>(size), 0.0);
     const NewtonOutcome outcome = SolveNewton(*compiled.System, compiled.Devices, x_dc, TimeContext{}, options);
     if (!outcome.Converged) {
@@ -66,13 +66,13 @@ std::expected<PoleZeroResult, std::string> ComputePoleZero(CompiledCircuit &comp
 
     std::vector<double> b_vec(static_cast<std::size_t>(size), 0.0);
     if (voltage_source != nullptr) {
-        b_vec[static_cast<std::size_t>(voltage_source->Branch())] = 1.0;
+        b_vec[static_cast<std::size_t>(voltage_source->GetBranch())] = 1.0;
     } else {
-        if (current_source->NodeA() >= 0) {
-            b_vec[static_cast<std::size_t>(current_source->NodeA())] = -1.0;
+        if (current_source->GetNodeA() >= 0) {
+            b_vec[static_cast<std::size_t>(current_source->GetNodeA())] = -1.0;
         }
-        if (current_source->NodeB() >= 0) {
-            b_vec[static_cast<std::size_t>(current_source->NodeB())] = 1.0;
+        if (current_source->GetNodeB() >= 0) {
+            b_vec[static_cast<std::size_t>(current_source->GetNodeB())] = 1.0;
         }
     }
 

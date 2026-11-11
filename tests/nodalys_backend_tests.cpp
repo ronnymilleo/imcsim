@@ -140,7 +140,7 @@ TEST_CASE("A Nodalys transient refuses a noise or random source, which the other
         CHECK(run.Result.error().contains(Core::GetSourceTypeName(waveform)));
 
         // The operating point keeps the source, at its offset of 0 V, rather than leaving the node floating
-        const Core::OperatingPointRun point = backend.RunOperatingPoint(circuit);
+        const Core::OperatingPointRun point = backend.RunOperatingPoint(circuit, std::nullopt);
         REQUIRE(point.Result.has_value());
         CHECK_THAT(CurrentOf(*point.Result, "V1"), WithinAbs(0.0, 1e-12));
     }
@@ -168,7 +168,7 @@ TEST_CASE("The Nodalys backend reports logic parts and analog parts as supported
 TEST_CASE("The operating point of a divider follows the divider rule") {
     const Divider divider;
     Core::NodalysBackend backend;
-    const Core::OperatingPointRun run = backend.RunOperatingPoint(divider.Circuit);
+    const Core::OperatingPointRun run = backend.RunOperatingPoint(divider.Circuit, std::nullopt);
     REQUIRE(run.Result.has_value());
     REQUIRE_THAT(run.Result->NodeVoltages[2], WithinRel(7.5, 1e-5));
     // The currents follow the results convention: positive from the first terminal to the second, so the supply
@@ -199,7 +199,7 @@ TEST_CASE("A capacitor is open and an inductor is a short at the operating point
     circuit.Add(inductor, {2, 3});
     circuit.Add(ground, {0});
     Core::NodalysBackend backend;
-    const Core::OperatingPointRun run = backend.RunOperatingPoint(circuit);
+    const Core::OperatingPointRun run = backend.RunOperatingPoint(circuit, std::nullopt);
     REQUIRE(run.Result.has_value());
     // With the capacitor open no current flows, so the inductor drops no voltage
     REQUIRE_THAT(run.Result->NodeVoltages[3], WithinRel(10.0, 1e-5));
@@ -410,7 +410,7 @@ TEST_CASE("A potentiometer reads its three terminal currents") {
     circuit.Add(ground, {0});
 
     Core::NodalysBackend backend;
-    const Core::OperatingPointRun run = backend.RunOperatingPoint(circuit);
+    const Core::OperatingPointRun run = backend.RunOperatingPoint(circuit, std::nullopt);
     REQUIRE(run.Result.has_value());
     // The track splits into 1k (end A to wiper) and 3k (wiper to end B); the wiper loaded by 1k to ground sits
     // at 10 V · (3k || 1k) / (1k + 3k || 1k) = 10 · 750 / 1750
@@ -456,7 +456,7 @@ TEST_CASE("A subcircuit instance flattens with its parameters") {
     circuit.Add(ground, {0});
 
     Core::NodalysBackend backend;
-    const Core::OperatingPointRun run = backend.RunOperatingPoint(circuit);
+    const Core::OperatingPointRun run = backend.RunOperatingPoint(circuit, std::nullopt);
     REQUIRE(run.Result.has_value());
     // 12 V over 1k (default top) and 3k (parameter): the output sits at 9 V
     REQUIRE_THAT(run.Result->NodeVoltages[2], WithinRel(9.0, 1e-5));
@@ -474,7 +474,7 @@ TEST_CASE("A circuit with a digital part simulates its operating point on Nodaly
     circuit.Add(gate, {1, 1, 2});
     circuit.Add(ground, {0});
     Core::NodalysBackend backend;
-    const Core::OperatingPointRun run = backend.RunOperatingPoint(circuit);
+    const Core::OperatingPointRun run = backend.RunOperatingPoint(circuit, std::nullopt);
     REQUIRE(run.Result.has_value());
     REQUIRE(run.Result->NodeVoltages.size() >= 3);
     CHECK(run.Result->NodeVoltages[2] > 4.8);
@@ -574,7 +574,7 @@ TEST_CASE("A D flip-flop with QN fed back runs on Nodalys", "[nodalys]") {
     circuit.Add(dff, {1, 2, 3, 4, 5, 1});
     circuit.Add(gnd, {0});
     Core::NodalysBackend backend;
-    auto op = backend.RunOperatingPoint(circuit);
+    auto op = backend.RunOperatingPoint(circuit, std::nullopt);
     const std::string msg = op.Result.has_value() ? std::string("OK") : op.Result.error();
     INFO(msg);
     CHECK(op.Result.has_value());

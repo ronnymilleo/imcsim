@@ -333,11 +333,6 @@ std::optional<std::string> CheckBehavioralSources(const Circuit &circuit) {
     return std::nullopt;
 }
 
-/// Most AFT time samples per fundamental period allowed for a single harmonic balance run.
-constexpr int MAX_HB_SAMPLES = 65536;
-/// Relative tolerance when matching periodic source frequencies to integer multiples of f0.
-constexpr double HB_FREQ_RATIO_RELTOL = 1e-6;
-
 bool IsPowerOfTwo(const int value) {
     return value > 0 && (value & (value - 1)) == 0;
 }
@@ -347,15 +342,14 @@ std::optional<std::string> CheckSourceHarmonicRatio(const std::string_view name,
     if (!std::isfinite(source_frequency) || source_frequency <= 0.0) {
         return std::format("The frequency of {} must be positive for harmonic balance", name);
     }
-    const double ratio = source_frequency / settings.FundamentalFrequency;
-    const double nearest = std::round(ratio);
-    if (nearest < 1.0 || std::abs(ratio - nearest) > HB_FREQ_RATIO_RELTOL * nearest) {
+    const std::optional<int> harmonic = FindHarmonicNumber(source_frequency, settings.FundamentalFrequency);
+    if (!harmonic) {
         return std::format("{} runs at {} Hz, which is not an integer multiple of the fundamental {} Hz", name,
                            source_frequency, settings.FundamentalFrequency);
     }
-    if (static_cast<int>(nearest) > settings.Harmonics) {
+    if (*harmonic > settings.Harmonics) {
         return std::format("{} runs at {} Hz (harmonic {}), which exceeds the {} configured harmonics", name,
-                           source_frequency, static_cast<int>(nearest), settings.Harmonics);
+                           source_frequency, *harmonic, settings.Harmonics);
     }
     return std::nullopt;
 }
@@ -808,16 +802,8 @@ std::vector<std::string> GetTruthTableInputs(const Circuit &circuit) {
  */
 std::optional<std::string> CheckHarmonicBalanceSettings(const Circuit &circuit,
                                                         const HarmonicBalanceSettings &settings) {
-    if (!std::isfinite(settings.FundamentalFrequency) || settings.FundamentalFrequency <= 0.0) {
-        return "The fundamental frequency must be positive";
-    }
-    if (settings.Harmonics < 1 || settings.Harmonics > MAX_HARMONIC_BALANCE_HARMONICS) {
-        return std::format("The number of harmonics must be between 1 and {}", MAX_HARMONIC_BALANCE_HARMONICS);
-    }
-    if (settings.Samples != 0 && (!IsPowerOfTwo(settings.Samples) || settings.Samples <= 2 * settings.Harmonics ||
-                                  settings.Samples > MAX_HB_SAMPLES)) {
-        return std::format("The sample count must be 0 (automatic) or a power of two greater than {} (up to {})",
-                           2 * settings.Harmonics, MAX_HB_SAMPLES);
+    if (std::optional<std::string> error = CheckHarmonicBalanceGrid(settings)) {
+        return error;
     }
     for (const Component *part : CollectParts(circuit)) {
         if (part->GetType() == ComponentType::CLOCK) {
@@ -866,6 +852,42 @@ std::optional<std::string> CheckHarmonicBalanceSettings(const Circuit &circuit,
         }
     }
     return std::nullopt;
+}
+
+/**
+ * @brief   Checks the frequency grid of a harmonic balance alone, without a circuit, as a file is read.
+ * @param[in] settings  Fundamental frequency, number of harmonics, and optional power-of-two sample count.
+ * @return  The reason the grid cannot be solved, or no value when it can.
+ */
+std::optional<std::string> CheckHarmonicBalanceGrid(const HarmonicBalanceSettings &settings) {
+    if (!std::isfinite(settings.FundamentalFrequency) || settings.FundamentalFrequency <= 0.0) {
+        return "The fundamental frequency must be positive";
+    }
+    if (settings.Harmonics < 1 || settings.Harmonics > MAX_HARMONIC_BALANCE_HARMONICS) {
+        return std::format("The number of harmonics must be between 1 and {}", MAX_HARMONIC_BALANCE_HARMONICS);
+    }
+    if (settings.Samples != 0 && (!IsPowerOfTwo(settings.Samples) || settings.Samples <= 2 * settings.Harmonics ||
+                                  settings.Samples > MAX_HARMONIC_BALANCE_SAMPLES)) {
+        return std::format("The sample count must be 0 (automatic) or a power of two greater than {} (up to {})",
+                           2 * settings.Harmonics, MAX_HARMONIC_BALANCE_SAMPLES);
+    }
+    return std::nullopt;
+}
+
+/**
+ * @brief   Finds which harmonic of a fundamental a frequency is.
+ * @param[in] frequency    Frequency of a periodic source, in hertz.
+ * @param[in] fundamental  Fundamental frequency, in hertz, above 0.
+ * @return  The harmonic number, from 1, or none when the frequency is no integer multiple of the fundamental within
+ *          HARMONIC_RATIO_TOLERANCE.
+ */
+std::optional<int> FindHarmonicNumber(const double frequency, const double fundamental) {
+    const double ratio = frequency / fundamental;
+    const double nearest = std::round(ratio);
+    if (!std::isfinite(ratio) || nearest < 1.0 || std::abs(ratio - nearest) > HARMONIC_RATIO_TOLERANCE * nearest) {
+        return std::nullopt;
+    }
+    return static_cast<int>(nearest);
 }
 
 } // namespace Core

@@ -57,10 +57,10 @@ The transmission zeros are the **finite generalized eigenvalues** of the matrix 
 ### 1.4 Standalone QZ Algorithm (Moler-Stewart Generalized Schur Form)
 `Nodalys` implements a complete, self-contained QZ decomposition in C++23 (`nodalys/src/linear/qz.cpp`) without any external linear algebra libraries (no LAPACK, BLAS, or Eigen):
 
-1. **Hessenberg-Triangular Reduction (`QzHessenbergTriangular`):**
+1. **Hessenberg-Triangular Reduction (`ReduceToHessenbergTriangular`):**
    - Uses Householder reflections to reduce $\mathbf{B}$ to upper triangular form while transforming $\mathbf{A}$.
    - Uses alternating Householder reflections and Givens plane rotations from the left and right to reduce $\mathbf{A}$ to upper Hessenberg form while preserving the upper triangular structure of $\mathbf{B}$.
-2. **QZ Iteration (`QzStep`):**
+2. **QZ Iteration (`IterateQz`):**
    - Applies implicit Francis double-shift and single-shift iterations to drive subdiagonal elements to zero.
    - Monitors convergence and decouples deflated blocks ($1 \times 1$ and $2 \times 2$).
 3. **Finite Eigenvalue Extraction:**

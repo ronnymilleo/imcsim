@@ -39,7 +39,7 @@ std::expected<TransferFunctionResult, std::string> ComputeTransferFunction(Compi
         return std::unexpected(std::format("The source {} cannot drive a transfer function", settings.InputSource));
     }
 
-    const int size = compiled.System->Size();
+    const int size = compiled.System->GetSize();
     std::vector<double> x_dc(static_cast<std::size_t>(size), 0.0);
     const NewtonOutcome outcome = SolveNewton(*compiled.System, compiled.Devices, x_dc, TimeContext{}, options);
     if (!outcome.Converged) {
@@ -51,10 +51,10 @@ std::expected<TransferFunctionResult, std::string> ComputeTransferFunction(Compi
 
     compiled.System->ClearRhs();
     if (voltage_source != nullptr) {
-        compiled.System->AddRhs(voltage_source->Branch(), 1.0);
+        compiled.System->AddRhs(voltage_source->GetBranch(), 1.0);
     } else {
-        compiled.System->AddRhs(current_source->NodeA(), -1.0);
-        compiled.System->AddRhs(current_source->NodeB(), 1.0);
+        compiled.System->AddRhs(current_source->GetNodeA(), -1.0);
+        compiled.System->AddRhs(current_source->GetNodeB(), 1.0);
     }
 
     std::vector<double> dx_in(static_cast<std::size_t>(size), 0.0);
@@ -70,15 +70,17 @@ std::expected<TransferFunctionResult, std::string> ComputeTransferFunction(Compi
     result.Gain = dx_in[static_cast<std::size_t>(out_idx)];
 
     if (voltage_source != nullptr) {
-        const double current_into_circuit = -dx_in[static_cast<std::size_t>(voltage_source->Branch())];
+        const double current_into_circuit = -dx_in[static_cast<std::size_t>(voltage_source->GetBranch())];
         if (std::fabs(current_into_circuit) <= 1.01 * options.Gmin) {
             result.InputImpedance = OPEN_CIRCUIT_IMPEDANCE;
         } else {
             result.InputImpedance = 1.0 / current_into_circuit;
         }
     } else {
-        const double va = current_source->NodeA() < 0 ? 0.0 : dx_in[static_cast<std::size_t>(current_source->NodeA())];
-        const double vb = current_source->NodeB() < 0 ? 0.0 : dx_in[static_cast<std::size_t>(current_source->NodeB())];
+        const double va =
+            current_source->GetNodeA() < 0 ? 0.0 : dx_in[static_cast<std::size_t>(current_source->GetNodeA())];
+        const double vb =
+            current_source->GetNodeB() < 0 ? 0.0 : dx_in[static_cast<std::size_t>(current_source->GetNodeB())];
         result.InputImpedance = std::min(vb - va, OPEN_CIRCUIT_IMPEDANCE);
     }
 

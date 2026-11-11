@@ -307,7 +307,7 @@ public:
             int ctrl_branch = -1;
             if (it != m_Compiled.SourcesByName.end()) {
                 if (auto *vs = dynamic_cast<VoltageSourceDevice *>(it->second)) {
-                    ctrl_branch = vs->Branch();
+                    ctrl_branch = vs->GetBranch();
                 }
             }
             Device *dev = AddDevice(std::make_unique<CcvsDevice>(u_pos, u_neg, branch, ctrl_branch, rm));
@@ -326,7 +326,7 @@ public:
             int ctrl_branch = -1;
             if (it != m_Compiled.SourcesByName.end()) {
                 if (auto *vs = dynamic_cast<VoltageSourceDevice *>(it->second)) {
-                    ctrl_branch = vs->Branch();
+                    ctrl_branch = vs->GetBranch();
                 }
             }
             Device *dev = AddDevice(std::make_unique<CccsDevice>(u_pos, u_neg, ctrl_branch, gain));

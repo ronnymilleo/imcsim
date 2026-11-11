@@ -1,10 +1,10 @@
 # Time-Domain Transient Analysis (`.tran`)
 
 **Implementation files:**
-- [`app-core/native/transient_analysis.cpp`](../../app-core/native/transient_analysis.cpp) (`ComputeTransient`, `TransientCollector`, `EstimateLteRatio`)
-- [`app-core/native/devices.cpp`](../../app-core/native/devices.cpp) (`CapacitorDevice::StampTransient`, `InductorDevice::StampTransient`)
-- [`app-core/native/nonlinear.cpp`](../../app-core/native/nonlinear.cpp) (`ChargeModel` for diode, BJT, and MOSFET junction/diffusion charges)
-- [`app-core/native/waveforms.cpp`](../../app-core/native/waveforms.cpp) (`SIN`, `PULSE`, `EXP`, `PWL`, `SFFM`, `AM`, `NOISE`, and *breakpoint* generation)
+- [`nodalys/src/analyses/transient_analysis.cpp`](../../nodalys/src/analyses/transient_analysis.cpp) (`ComputeTransient`, `TransientCollector`, `FindNextCorner`)
+- [`nodalys/src/devices/devices.cpp`](../../nodalys/src/devices/devices.cpp) (`CapacitorDevice::Stamp`, `InductorDevice::Stamp`)
+- [`nodalys/src/devices/nonlinear.cpp`](../../nodalys/src/devices/nonlinear.cpp) (`ChargeModel` for diode, BJT, and MOSFET junction/diffusion charges)
+- [`nodalys/src/devices/waveforms.cpp`](../../nodalys/src/devices/waveforms.cpp) (`SIN`, `PULSE`, `EXP`, `PWL`, `SFFM`, `AM` and the corners of each, `FindNextPulseCorner`)
 
 ---
 
@@ -21,7 +21,7 @@ where:
 ### 1.2 Time Discretization: Backward Euler (Step 1) + Trapezoidal Rule
 To advance from $t_n$ to $t_{n+1} = t_n + h$, `Nodalys` discretizes each time derivative $\dot{q} = dq/dt$ into an algebraic **Norton companion model** (`ChargeModel`):
 
-1. **Backward Euler (1st-order, L-stable):** used on the first time step ($t_0 \to t_1$) and immediately after switching discontinuities to damp high-frequency numerical ringing:
+1. **Backward Euler (1st-order, L-stable):** used on the first time step ($t_0 \to t_1$) and on the step that leaves each corner of a source waveform, to damp high-frequency numerical ringing:
    $$i_{n+1} = \frac{q(v_{n+1}) - q(v_n)}{h} \implies G_{\text{eq}} = \frac{C(v^{(k)})}{h}, \qquad I_{\text{eq}} = i_{n+1}^{(k)} - G_{\text{eq}}\,v^{(k)}$$
 2. **Trapezoidal Rule (2nd-order, A-stable):** used on all subsequent smooth steps; by Dahlquist's Second Barrier Theorem, it is the 2nd-order A-stable linear multistep method with the smallest truncation error constant ($C_{\text{LTE}} = 1/12$):
    $$i_{n+1} = \frac{2}{h}\bigl(q(v_{n+1}) - q(v_n)\bigr) - i_n \implies G_{\text{eq}} = \frac{2\,C(v^{(k)})}{h}, \qquad I_{\text{eq}} = i_{n+1}^{(k)} - G_{\text{eq}}\,v^{(k)}$$
@@ -37,10 +37,10 @@ To advance from $t_n$ to $t_{n+1} = t_n + h$, `Nodalys` discretizes each time de
 After Newton-Raphson converges at $t_{n+1}$, `Nodalys` estimates the local truncation error of the Trapezoidal Rule using the 3rd divided difference over the 4-point history ($t_{n-2}, t_{n-1}, t_n, t_{n+1}$), following Nagel (SPICE2, Eq. 5.26):
 $$\text{LTE}_{\text{trap}} \approx \frac{1}{2}\,h^3\,\bigl|d_{123}\bigr|$$
 - When the LTE ratio exceeds the allowed tolerance, the step size is scaled according to $h_{\text{new}} = h \cdot \text{ratio}^{-1/3}$.
-- If Newton-Raphson fails to converge on a step, `Nodalys` restores device states (`RestoreState`), cuts the step size ($h \leftarrow h / 4$), and retries with Backward Euler.
+- If Newton-Raphson fails to converge on a step, `Nodalys` restores device states (`Device::RejectStep`), cuts the step to a tenth ($h \leftarrow h / 10$), and retries; the run fails once the step falls below $10^{-15}$ s.
 
 ### 1.4 Breakpoints and Uniform Grid Interpolation
-- **Waveform Breakpoints:** slope discontinuities of `PULSE` sources (delay, rise end, pulse width, fall end, period) and `PWL` corners are pre-registered so the integrator lands exactly on every corner.
+- **Waveform Breakpoints:** each source reports its next corner (`Device::NextBreakpoint`): the start and end of every edge of a `PULSE` or clock, period after period, each `PWL` point, the delays of `EXP` and `AM`. The step is cut to land exactly on the corner, the point solved there is kept in the output even off the grid, and the next step starts at a tenth of the way to the following corner, with Backward Euler and a fresh LTE history, since the slope changes there. A pulse narrower than the output step is therefore never stepped over.
 - **Hysteretic Switching Events:** voltage-controlled switches and relays are checked after each converged step; if a threshold is crossed, the step is re-solved with the updated switch state before committing.
 - **Output Grid Interpolation (`TransientCollector`):** internal adaptive steps are linearly interpolated onto the user-requested uniform output grid (`TimeStep`).
 

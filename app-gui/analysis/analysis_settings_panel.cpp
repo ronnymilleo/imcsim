@@ -625,13 +625,13 @@ void AnalysisSettingsPanel::DrawTruthTableSettings(SimulationSettings &settings)
 }
 
 /**
- * @brief   Below the settings of the operating point, the transient, the AC sweep and the DC sweep: how they repeat,
- * which is not at all, once per value of a parameter or once per draw of the parts within their tolerances.
- * @details The fields share their labels with those of the analysis above, so they get an ID of their own.
+ * @brief   The fundamental, the number of harmonics and the time samples per period, and a button that takes the
+ *          fundamental and the harmonics from the periodic sources of the circuit.
+ * @details An explicit sample count stays above twice the harmonics, so a harmonic never aliases onto another one.
  */
 void AnalysisSettingsPanel::DrawHarmonicBalanceSettings(SimulationSettings &settings) {
     constexpr int MIN_EXPLICIT_SAMPLES = 32;
-    constexpr int MAX_EXPLICIT_SAMPLES = 65536;
+    constexpr int MAX_EXPLICIT_SAMPLES = Core::MAX_HARMONIC_BALANCE_SAMPLES;
     if (const std::optional<double> fundamental = m_HBFundamental.Draw("Fundamental", "Hz", IsPositive)) {
         settings.HarmonicBalance.FundamentalFrequency = *fundamental;
     }
@@ -641,7 +641,7 @@ void AnalysisSettingsPanel::DrawHarmonicBalanceSettings(SimulationSettings &sett
             std::clamp(settings.HarmonicBalance.Harmonics, 1, Core::MAX_HARMONIC_BALANCE_HARMONICS);
     }
     ImGui::SetItemTooltip("Number of harmonics above DC (1 to %d)", Core::MAX_HARMONIC_BALANCE_HARMONICS);
-    // Keep any explicit sample count strictly above the Nyquist threshold 2 * Harmonics.
+    // An explicit sample count stays above twice the harmonics, the Nyquist limit
     if (settings.HarmonicBalance.Samples != 0 &&
         settings.HarmonicBalance.Samples <= 2 * settings.HarmonicBalance.Harmonics) {
         int next_power = MIN_EXPLICIT_SAMPLES;
@@ -657,7 +657,7 @@ void AnalysisSettingsPanel::DrawHarmonicBalanceSettings(SimulationSettings &sett
         if (ImGui::Selectable("Auto", settings.HarmonicBalance.Samples == 0)) {
             settings.HarmonicBalance.Samples = 0;
         }
-        ImGui::SetItemTooltip("Power of two at least max(32, 4 * Harmonics)");
+        ImGui::SetItemTooltip("The smallest power of two of at least 16 and 4 times the harmonics");
         for (int candidate = MIN_EXPLICIT_SAMPLES; candidate <= MAX_EXPLICIT_SAMPLES; candidate *= 2) {
             if (candidate <= 2 * settings.HarmonicBalance.Harmonics) {
                 continue;
@@ -684,6 +684,11 @@ void AnalysisSettingsPanel::DrawHarmonicBalanceSettings(SimulationSettings &sett
                         : "Needs a sine, AC, pulse or clock source with commensurable frequencies");
 }
 
+/**
+ * @brief   Below the settings of the operating point, the transient, the AC sweep and the DC sweep: how they repeat,
+ * which is not at all, once per value of a parameter or once per draw of the parts within their tolerances.
+ * @details The fields share their labels with those of the analysis above, so they get an ID of their own.
+ */
 void AnalysisSettingsPanel::DrawRunModeSettings(SimulationSettings &settings) {
     ImGui::Separator();
     ImGui::PushID("run_mode");

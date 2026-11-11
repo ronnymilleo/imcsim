@@ -30,9 +30,10 @@
 #include "editing/connectivity.h"
 #include "editing/element_factory.h"
 #include "nlohmann/json.hpp"
+#include "simulation/circuit_checks.h"
 #include <algorithm>
 #include <array>
-#include <bit>
+#include <cctype>
 #include <cmath>
 #include <format>
 #include <fstream>
@@ -1216,8 +1217,6 @@ std::optional<Core::ToleranceDistribution> ParseDistributionName(const std::stri
     return std::nullopt;
 }
 
-constexpr int MAX_HARMONIC_BALANCE_SAMPLES = 65536;
-
 nlohmann::json WriteHarmonicBalanceSettings(const Core::HarmonicBalanceSettings &settings) {
     nlohmann::json object = nlohmann::json::object();
     WriteParameters(HARMONIC_BALANCE_KEYS, settings, object);
@@ -1464,19 +1463,9 @@ std::expected<void, std::string> ReadHarmonicBalanceSettings(const nlohmann::jso
         }
         range.Samples = *samples;
     }
-    if (!std::isfinite(range.FundamentalFrequency) || range.FundamentalFrequency <= 0.0) {
-        return std::unexpected("does not have a positive fundamental frequency");
-    }
-    if (range.Harmonics < 1 || range.Harmonics > Core::MAX_HARMONIC_BALANCE_HARMONICS) {
-        return std::unexpected(
-            std::format("must have between 1 and {} harmonics", Core::MAX_HARMONIC_BALANCE_HARMONICS));
-    }
-    if (range.Samples != 0) {
-        const unsigned int count = range.Samples > 0 ? static_cast<unsigned int>(range.Samples) : 0U;
-        if (range.Samples <= 2 * range.Harmonics || range.Samples > MAX_HARMONIC_BALANCE_SAMPLES ||
-            !std::has_single_bit(count)) {
-            return std::unexpected("must have samples set to 0 or a power of two greater than twice the harmonics");
-        }
+    if (std::optional<std::string> error = Core::CheckHarmonicBalanceGrid(range)) {
+        error->front() = static_cast<char>(std::tolower(static_cast<unsigned char>(error->front())));
+        return std::unexpected(std::format("are out of range ({})", *error));
     }
     settings.HarmonicBalance = range;
     return {};

@@ -121,6 +121,21 @@ const char *GetLiveEffectName(const LiveEffect effect) {
 }
 
 /**
+ * @brief   Names a simulation engine, as its backend names itself.
+ * @param[in] engine  ngspice or Nodalys.
+ * @return  "ngspice" or "Nodalys".
+ */
+const char *GetSimulationEngineName(const SimulationEngine engine) {
+    switch (engine) {
+    case SimulationEngine::NODALYS:
+        return "Nodalys";
+    case SimulationEngine::NGSPICE:
+    default:
+        return "ngspice";
+    }
+}
+
+/**
  * @brief   Names a harmonic amplitude convention.
  * @param[in] unit  Peak or RMS.
  * @return  "Peak" or "RMS".
@@ -157,7 +172,7 @@ std::string SavePreferences(const Preferences &preferences) {
         {"live_effects", live_effects},
         {"value_series", Core::GetSeriesName(preferences.ValueSeries)},
         {"bring_output_to_front", preferences.BringOutputToFront},
-        {"simulation_backend", preferences.SimulationBackend},
+        {"simulation_backend", GetSimulationEngineName(preferences.Engine)},
         {"rerun_on_edit", preferences.RerunOnEdit},
         {"rerun_delay_seconds", preferences.RerunDelaySeconds},
         {"harmonic_amplitudes", GetHarmonicAmplitudeUnitName(preferences.HarmonicAmplitudes)},
@@ -233,11 +248,13 @@ LoadedPreferences LoadPreferences(const std::string_view text) {
         return true;
     });
     reader.Read<std::string>("simulation_backend", Type::string, [&choices](const std::string &name) {
-        if (name != "ngspice" && name != "Nodalys") {
-            return false;
+        for (const SimulationEngine engine : {SimulationEngine::NGSPICE, SimulationEngine::NODALYS}) {
+            if (name == GetSimulationEngineName(engine)) {
+                choices.Engine = engine;
+                return true;
+            }
         }
-        choices.SimulationBackend = name;
-        return true;
+        return false;
     });
     reader.Read<bool>("rerun_on_edit", Type::boolean, [&choices](const bool on) {
         choices.RerunOnEdit = on;
