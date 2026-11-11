@@ -87,6 +87,30 @@ public:
         return 0.0;
     }
 
+    /// True when the device is linear and time-invariant; nonlinear devices evaluate via AFT in Harmonic Balance.
+    virtual bool IsLinear() const { return true; }
+
+    /// False when the device cannot be simulated by Harmonic Balance (e.g., hysteretic switches).
+    virtual bool SupportsHarmonicBalance() const { return true; }
+
+    /**
+     * @brief   Stamps this nonlinear device's charge-voltage differential capacitances into `sys.AddA()` and
+     *          linearized equivalent charge into `sys.AddRhs()` at state `x`, for Harmonic Balance AFT.
+     * @param[in,out] sys  System holding $\mathbf{C}_{\text{nl}}(x)$ and $-\mathbf{q}_{\text{eq}}(x)$.
+     * @param[in]     x    Time-sample iterate vector.
+     */
+    virtual void StampCharge(MnaSystem &sys, const std::vector<double> &x) const {
+        (void)sys;
+        (void)x;
+    }
+
+    /// Charge associated with the given terminal at state `x`, for Harmonic Balance current phasors.
+    virtual double TerminalCharge(int terminal, const std::vector<double> &x) const {
+        (void)terminal;
+        (void)x;
+        return 0.0;
+    }
+
     /// True when the device carries state between time points (companion models of C, L and junction charges).
     virtual bool HasTransientState() const { return false; }
     /// Saves the state of the accepted point x (called after each converged transient step).
@@ -214,6 +238,29 @@ private:
 };
 
 /**
+ * @enum    SourceWaveformKind
+ * @brief   Classification of an independent source's waveform for Harmonic Balance validation.
+ */
+enum class SourceWaveformKind {
+    Dc,
+    Sine,
+    Pulse,
+    Clock,
+    NonPeriodic
+};
+
+/**
+ * @struct  SourcePeriodicity
+ * @brief   Periodicity metadata attached to independent voltage and current sources.
+ */
+struct SourcePeriodicity {
+    SourceWaveformKind Kind = SourceWaveformKind::Dc;
+    double Frequency = 0.0;
+    double MinEdgeTime = 0.0;
+    bool IsSupportedInHb = true;
+};
+
+/**
  * @class   VoltageSourceDevice
  * @brief   An independent voltage source between two nodes as a branch unknown.
  * @details Its value comes from a waveform function of time, or from a settable DC level: a DC sweep overrides it
@@ -227,16 +274,18 @@ public:
     using Waveform = std::function<double(double dc_value, const TimeContext &time)>;
 
     VoltageSourceDevice(int node_a, int node_b, int branch, double dc_value, Waveform waveform,
-                        double ac_magnitude = 0.0);
+                        double ac_magnitude = 0.0, SourcePeriodicity periodicity = {});
 
     double GetDcValue() const;
     void SetDcValue(double value);
     int NodeA() const { return m_NodeA; }
     int NodeB() const { return m_NodeB; }
     int Branch() const { return m_Branch; }
+    const SourcePeriodicity &GetPeriodicity() const { return m_Periodicity; }
 
     void Stamp(MnaSystem &sys, const std::vector<double> &x, const TimeContext &time) override;
     void StampAc(MnaSystem &reactive, const std::vector<double> &x_dc) const override;
+    bool SupportsHarmonicBalance() const override;
     double TerminalCurrent(int terminal, const std::vector<double> &x) const override;
     std::complex<double> AcTerminalCurrent(int terminal, const std::vector<double> &x_dc,
                                            const std::vector<std::complex<double>> &x_ac, double omega) const override;
@@ -249,6 +298,7 @@ private:
     double m_DcValue;
     Waveform m_Waveform;
     double m_AcMagnitude;
+    SourcePeriodicity m_Periodicity;
     double m_Scale = 1.0;
 };
 
@@ -259,15 +309,18 @@ private:
 class CurrentSourceDevice : public Device {
 public:
     CurrentSourceDevice(int node_a, int node_b, double dc_value, VoltageSourceDevice::Waveform waveform,
-                        double ac_magnitude = 0.0);
+                        double ac_magnitude = 0.0, SourcePeriodicity periodicity = {});
 
     double GetDcValue() const;
     void SetDcValue(double value);
     int NodeA() const { return m_NodeA; }
     int NodeB() const { return m_NodeB; }
+    const SourcePeriodicity &GetPeriodicity() const { return m_Periodicity; }
+    double SamplePeriodicCurrent(int terminal, double time_seconds) const;
 
     void Stamp(MnaSystem &sys, const std::vector<double> &x, const TimeContext &time) override;
     void StampAc(MnaSystem &reactive, const std::vector<double> &x_dc) const override;
+    bool SupportsHarmonicBalance() const override;
     double TerminalCurrent(int terminal, const std::vector<double> &x) const override;
     std::complex<double> AcTerminalCurrent(int terminal, const std::vector<double> &x_dc,
                                            const std::vector<std::complex<double>> &x_ac, double omega) const override;
@@ -279,6 +332,7 @@ private:
     double m_DcValue;
     VoltageSourceDevice::Waveform m_Waveform;
     double m_AcMagnitude;
+    SourcePeriodicity m_Periodicity;
     double m_Scale = 1.0;
     double m_Value = 0.0;
 };
@@ -404,6 +458,8 @@ public:
     SwitchDevice(int node_a, int node_b, int control_positive, int control_negative, SwitchParameters parameters);
 
     void Stamp(MnaSystem &sys, const std::vector<double> &x, const TimeContext &time) override;
+    bool IsLinear() const override { return false; }
+    bool SupportsHarmonicBalance() const override { return false; }
     double TerminalCurrent(int terminal, const std::vector<double> &x) const override;
     std::complex<double> AcTerminalCurrent(int terminal, const std::vector<double> &x_dc,
                                            const std::vector<std::complex<double>> &x_ac, double omega) const override;

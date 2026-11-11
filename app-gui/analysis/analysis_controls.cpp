@@ -209,6 +209,9 @@ std::vector<std::string> ListWarningsOfResult(const Schematic &schematic, const 
     if (analysis == Analysis::TRUTH_TABLE && schematic.GetTruthTable()) {
         return schematic.GetTruthTable()->Warnings;
     }
+    if (analysis == Analysis::HARMONIC_BALANCE && schematic.GetHarmonicBalance()) {
+        return schematic.GetHarmonicBalance()->Warnings;
+    }
     return {};
 }
 
@@ -597,6 +600,9 @@ void AnalysisControls::StartAnalysis(const Analysis analysis, const Core::Circui
         break;
     case Analysis::TRUTH_TABLE:
         RunTruthTableAnalysis(circuit);
+        break;
+    case Analysis::HARMONIC_BALANCE:
+        RunHarmonicBalanceAnalysis(circuit);
         break;
     default:
         break;
@@ -1033,6 +1039,22 @@ void AnalysisControls::RunTruthTableAnalysis(const Core::Circuit &circuit) {
                  }));
 }
 
+void AnalysisControls::RunHarmonicBalanceAnalysis(const Core::Circuit &circuit) {
+    const Core::HarmonicBalanceSettings run_settings = m_Schematic.GetSimulationSettings().HarmonicBalance;
+    StartRun(Analysis::HARMONIC_BALANCE,
+             MakeJob<Core::HarmonicBalanceRun>(
+                 circuit,
+                 [run_settings](const Core::Circuit &copy, Core::RunControl &) {
+                     return Core::RunHarmonicBalance(copy, run_settings);
+                 },
+                 [this](Core::HarmonicBalanceRun run) {
+                     Finish(Analysis::HARMONIC_BALANCE,
+                            StoreResult(std::move(run.Result),
+                                        [this](auto result) { m_Schematic.SetHarmonicBalance(std::move(result)); }),
+                            std::move(run.Messages));
+                 }));
+}
+
 void AnalysisControls::ClearResult(const Analysis analysis) {
     switch (analysis) {
     case Analysis::OPERATING_POINT:
@@ -1064,6 +1086,11 @@ void AnalysisControls::ClearResult(const Analysis analysis) {
         break;
     case Analysis::TRUTH_TABLE:
         m_Schematic.SetTruthTable(std::nullopt);
+        break;
+    case Analysis::HARMONIC_BALANCE:
+        m_Schematic.SetHarmonicBalance(std::nullopt);
+        break;
+    default:
         break;
     }
 }
@@ -1119,6 +1146,8 @@ bool AnalysisControls::HasResult(const Analysis analysis) const {
         return m_Schematic.GetSParameters().has_value();
     case Analysis::TRUTH_TABLE:
         return m_Schematic.GetTruthTable().has_value();
+    case Analysis::HARMONIC_BALANCE:
+        return m_Schematic.GetHarmonicBalance().has_value();
     }
     return false;
 }

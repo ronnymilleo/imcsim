@@ -11,6 +11,7 @@
 #include <complex>
 #include <map>
 #include <optional>
+#include <span>
 #include <string>
 #include <variant>
 #include <vector>
@@ -224,9 +225,45 @@ struct SensitivityResult {
     std::map<std::string, double> Vectors;
 };
 
+/**
+ * @struct  ComponentPhasors
+ * @brief   Complex peak harmonic phasors for one monitored component current (indexed 0..H).
+ */
+struct ComponentPhasors {
+    std::string Name;
+    std::vector<std::complex<double>> Phasors;
+};
+
+/**
+ * @struct  HarmonicBalanceResult
+ * @brief   Periodic steady-state Harmonic Balance (.hb) spectra, one-cycle waveforms, and diagnostics.
+ * @details Phasors use peak amplitude convention: $x(t) = X_0 + \sum_{k=1}^{H} \text{Re}(X_k e^{j k \omega_0 t})$,
+ *          where DC ($k = 0$) has zero imaginary part.
+ */
+struct HarmonicBalanceResult {
+    std::vector<double> Frequencies;
+    /// Complex peak phasors indexed [node][harmonic], node 0 is ground.
+    std::vector<std::vector<std::complex<double>>> NodePhasors;
+    /// Complex peak current phasors per monitored component.
+    std::vector<ComponentPhasors> CurrentPhasors;
+    /// Reconstructed time points over one period [0, T0).
+    std::vector<double> Times;
+    /// Reconstructed periodic node voltage waveforms indexed [node][sample].
+    std::vector<std::vector<double>> NodeWaveforms;
+    /// Reconstructed periodic component current waveforms.
+    std::vector<ComponentTrace> CurrentWaveforms;
+    /// Diagnostic warnings emitted during analysis.
+    std::vector<std::string> Warnings;
+    int Iterations = 0;
+    /// Recovery strategy used when plain Newton did not converge ("", "source stepping", or "gmin stepping").
+    std::string Strategy;
+};
+
+[[nodiscard]] double ComputeThd(std::span<const std::complex<double>> phasors);
+
 using SimulationResult =
     std::variant<OperatingPointResult, TransientResult, DcSweepResult, AcSweepResult, TransferFunctionResult,
-                 NoiseResult, SParameterResult, PoleZeroResult, SensitivityResult>;
+                 NoiseResult, SParameterResult, PoleZeroResult, SensitivityResult, HarmonicBalanceResult>;
 
 } // namespace nodalys
 

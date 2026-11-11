@@ -266,9 +266,9 @@ void InductorDevice::RejectStep() {
 // ============================================================================
 
 VoltageSourceDevice::VoltageSourceDevice(const int node_a, const int node_b, const int branch, const double dc_value,
-                                         Waveform waveform, const double ac_magnitude)
+                                         Waveform waveform, const double ac_magnitude, SourcePeriodicity periodicity)
     : m_NodeA(node_a), m_NodeB(node_b), m_Branch(branch), m_DcValue(dc_value), m_Waveform(std::move(waveform)),
-      m_AcMagnitude(ac_magnitude) {
+      m_AcMagnitude(ac_magnitude), m_Periodicity(periodicity) {
 }
 
 double VoltageSourceDevice::GetDcValue() const {
@@ -291,6 +291,10 @@ void VoltageSourceDevice::StampAc(MnaSystem &reactive, const std::vector<double>
     reactive.AddRhs(m_Branch, m_AcMagnitude);
 }
 
+bool VoltageSourceDevice::SupportsHarmonicBalance() const {
+    return m_Periodicity.IsSupportedInHb;
+}
+
 void VoltageSourceDevice::SetSourceScale(const double scale) {
     m_Scale = scale;
 }
@@ -308,9 +312,10 @@ std::complex<double> VoltageSourceDevice::AcTerminalCurrent(const int terminal, 
 }
 
 CurrentSourceDevice::CurrentSourceDevice(const int node_a, const int node_b, const double dc_value,
-                                         VoltageSourceDevice::Waveform waveform, const double ac_magnitude)
+                                         VoltageSourceDevice::Waveform waveform, const double ac_magnitude,
+                                         SourcePeriodicity periodicity)
     : m_NodeA(node_a), m_NodeB(node_b), m_DcValue(dc_value), m_Waveform(std::move(waveform)),
-      m_AcMagnitude(ac_magnitude) {
+      m_AcMagnitude(ac_magnitude), m_Periodicity(periodicity) {
 }
 
 double CurrentSourceDevice::GetDcValue() const {
@@ -321,6 +326,12 @@ void CurrentSourceDevice::SetDcValue(const double value) {
     m_DcValue = value;
 }
 
+double CurrentSourceDevice::SamplePeriodicCurrent(const int terminal, const double time_seconds) const {
+    const TimeContext steady_state{.IsPeriodicSteadyState = true, .Time = time_seconds};
+    const double current = m_Scale * m_Waveform(m_DcValue, steady_state);
+    return terminal == 0 ? current : -current;
+}
+
 void CurrentSourceDevice::Stamp(MnaSystem &sys, const std::vector<double> & /*x*/, const TimeContext &time) {
     m_Value = m_Scale * m_Waveform(m_DcValue, time);
     StampCurrentSource(sys, m_NodeA, m_NodeB, m_Value);
@@ -328,6 +339,10 @@ void CurrentSourceDevice::Stamp(MnaSystem &sys, const std::vector<double> & /*x*
 
 void CurrentSourceDevice::StampAc(MnaSystem &reactive, const std::vector<double> & /*x_dc*/) const {
     StampCurrentSource(reactive, m_NodeA, m_NodeB, m_AcMagnitude);
+}
+
+bool CurrentSourceDevice::SupportsHarmonicBalance() const {
+    return m_Periodicity.IsSupportedInHb;
 }
 
 void CurrentSourceDevice::SetSourceScale(const double scale) {

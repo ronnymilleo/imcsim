@@ -223,6 +223,19 @@ void PreferencesWindow::DrawResults() {
     ImGui::EndDisabled();
     ImGui::SetItemTooltip("How long the circuit must stay unchanged before the analysis runs again: shorter follows "
                           "edits sooner, longer waits for a series of edits to end");
+    BeginChoice("Harmonic amplitudes");
+    if (ImGui::BeginCombo("##harmonic_amplitudes", GetHarmonicAmplitudeUnitName(m_Preferences.HarmonicAmplitudes))) {
+        if (ImGui::Selectable("Peak", m_Preferences.HarmonicAmplitudes == HarmonicAmplitudeUnit::PEAK)) {
+            m_Preferences.HarmonicAmplitudes = HarmonicAmplitudeUnit::PEAK;
+        }
+        ImGui::SetItemTooltip("Show AC harmonic magnitudes as peak values (DC stays unscaled)");
+        if (ImGui::Selectable("RMS", m_Preferences.HarmonicAmplitudes == HarmonicAmplitudeUnit::RMS)) {
+            m_Preferences.HarmonicAmplitudes = HarmonicAmplitudeUnit::RMS;
+        }
+        ImGui::SetItemTooltip("Show AC harmonic magnitudes as RMS values, scaled by 1/sqrt(2) (DC stays unscaled)");
+        ImGui::EndCombo();
+    }
+    ImGui::SetItemTooltip("How harmonic balance plots and tables show AC harmonic magnitudes");
     ImGui::EndTable();
 }
 

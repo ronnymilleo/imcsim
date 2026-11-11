@@ -73,8 +73,9 @@ int main(int argc, char **argv) {
     app.add_option("-o,--output", output_file, "Destination output file (default: stdout)");
     app.add_option("-f,--format", format_str, "Output format: raw (Nutmeg ASCII), csv, json, touchstone (default: raw)")
         ->check(CLI::IsMember({"raw", "raw-ascii", "csv", "json", "touchstone", "s2p"}, CLI::ignore_case));
-    app.add_option("-a,--analysis", analysis_override, "Override analysis: op, tran, dc, ac, tf, noise, sp, pz")
-        ->check(CLI::IsMember({"op", "tran", "dc", "ac", "tf", "noise", "sp", "pz"}, CLI::ignore_case));
+    app.add_option("-a,--analysis", analysis_override,
+                   "Override analysis: op, tran, dc, ac, tf, noise, sp, pz, sens, hb")
+        ->check(CLI::IsMember({"op", "tran", "dc", "ac", "tf", "noise", "sp", "pz", "sens", "hb"}, CLI::ignore_case));
     app.add_option("-s,--step", step_override, "Override transient step time / sweep step");
     app.add_option("-t,--stop", stop_override, "Override transient stop time");
 
@@ -172,6 +173,9 @@ int main(int argc, char **argv) {
             if (a_lower == "sens") {
                 return an.Kind == nodalys::AnalysisKind::Sensitivity;
             }
+            if (a_lower == "hb") {
+                return an.Kind == nodalys::AnalysisKind::HarmonicBalance;
+            }
             return false;
         });
 
@@ -195,6 +199,8 @@ int main(int argc, char **argv) {
                 parsed.Analyses.push_back({nodalys::AnalysisKind::PoleZero, nodalys::PoleZeroConfig{}});
             } else if (a_lower == "sens") {
                 parsed.Analyses.push_back({nodalys::AnalysisKind::Sensitivity, nodalys::SensitivityConfig{}});
+            } else if (a_lower == "hb") {
+                parsed.Analyses.push_back({nodalys::AnalysisKind::HarmonicBalance, nodalys::HarmonicBalanceConfig{}});
             }
         }
     }
@@ -356,6 +362,22 @@ int main(int argc, char **argv) {
             }
             auto res = nodalys::ComputeSensitivity(parsed.CircuitInstance, cfg, parsed.Options,
                                                    verbose ? &diagnostics : nullptr);
+            if (!res) {
+                std::cerr << std::format("Simulation Error: {}\n", res.error());
+                return EXIT_FAILURE;
+            }
+            sim_result = std::move(*res);
+            break;
+        }
+
+        case nodalys::AnalysisKind::HarmonicBalance: {
+            const auto &cfg = std::get<nodalys::HarmonicBalanceConfig>(analysis.Config);
+            if (verbose && !batch_mode) {
+                std::cout << std::format("Running Harmonic Balance (.hb) analysis: f0={} Hz, H={}\n",
+                                         cfg.FundamentalFrequency, cfg.Harmonics);
+            }
+            auto res = nodalys::ComputeHarmonicBalance(parsed.CircuitInstance, cfg, parsed.Options,
+                                                       verbose ? &diagnostics : nullptr);
             if (!res) {
                 std::cerr << std::format("Simulation Error: {}\n", res.error());
                 return EXIT_FAILURE;

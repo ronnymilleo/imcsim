@@ -10,6 +10,7 @@ add_library(imcsim-gui-lib
             analysis/auto_rerun.cpp
             analysis/circuit_snapshot.cpp
             analysis/fuse_readings.cpp
+            analysis/harmonic_balance_view.cpp
             analysis/logic_outputs.cpp
             analysis/monte_carlo_results.cpp
             analysis/parameter_step.cpp
@@ -118,6 +119,7 @@ add_library(imcsim-gui-lib
             windows/netlist_window.cpp
             windows/output_tabs/ac_sweep_tab.cpp
             windows/output_tabs/dc_sweep_tab.cpp
+            windows/output_tabs/harmonic_balance_tab.cpp
             windows/output_tabs/monte_carlo_tab.cpp
             windows/output_tabs/noise_tab.cpp
             windows/output_tabs/operating_point_tab.cpp

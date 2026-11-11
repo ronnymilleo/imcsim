@@ -77,6 +77,7 @@ private:
     std::size_t m_ShownPoleZeroVersion = 0;
     std::size_t m_ShownSParametersVersion = 0;
     std::size_t m_ShownTruthTableVersion = 0;
+    std::size_t m_ShownHarmonicBalanceVersion = 0;
     std::size_t m_ShownMonteCarloVersion = 0;
     /// Finished runs seen, so a new failure opens the tab that tells why once.
     std::size_t m_ShownRunCount = 0;

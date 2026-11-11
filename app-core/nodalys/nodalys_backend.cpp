@@ -18,9 +18,9 @@ namespace Core {
 namespace {
 
 constexpr auto NODALYS_ANALYSES = {
-    AnalysisKind::OPERATING_POINT, AnalysisKind::TRANSIENT, AnalysisKind::DC_SWEEP,
-    AnalysisKind::AC_SWEEP,        AnalysisKind::NOISE,     AnalysisKind::TRANSFER_FUNCTION,
-    AnalysisKind::SENSITIVITY,     AnalysisKind::POLE_ZERO, AnalysisKind::S_PARAMETERS};
+    AnalysisKind::OPERATING_POINT, AnalysisKind::TRANSIENT,         AnalysisKind::DC_SWEEP,    AnalysisKind::AC_SWEEP,
+    AnalysisKind::NOISE,           AnalysisKind::TRANSFER_FUNCTION, AnalysisKind::SENSITIVITY, AnalysisKind::POLE_ZERO,
+    AnalysisKind::S_PARAMETERS,    AnalysisKind::HARMONIC_BALANCE};
 
 std::expected<nodalys::Circuit, std::string> CompileOrFail(const Circuit &circuit) {
     auto compiled = CompileCircuit(circuit);
@@ -55,6 +55,10 @@ NodalysBackend::NodalysBackend() {
                 "S-parameters are small-signal, and digital parts have no small-signal RF model";
         }
     }
+    m_Capabilities.UnsupportedPartsByAnalysis[AnalysisKind::HARMONIC_BALANCE][ComponentType::V_SWITCH] =
+        "Nodalys harmonic balance does not support hysteretic switches";
+    m_Capabilities.UnsupportedPartsByAnalysis[AnalysisKind::HARMONIC_BALANCE][ComponentType::RELAY] =
+        "Nodalys harmonic balance does not support hysteretic relays";
 }
 
 std::string_view NodalysBackend::GetName() const {
@@ -419,6 +423,47 @@ SParametersRun NodalysBackend::RunSParameters(const Circuit &circuit, const SPar
     sp.Values = std::move(result->Values);
     sp.Warnings = std::move(result->Warnings);
     run.Result = std::move(sp);
+    return run;
+}
+
+HarmonicBalanceRun NodalysBackend::RunHarmonicBalance(const Circuit &circuit, const HarmonicBalanceSettings &settings) {
+    HarmonicBalanceRun run;
+    auto compiled = CompileOrFail(circuit);
+    if (!compiled) {
+        run.Result = std::unexpected(compiled.error());
+        return run;
+    }
+
+    const nodalys::HarmonicBalanceConfig config{.FundamentalFrequency = settings.FundamentalFrequency,
+                                                .Harmonics = settings.Harmonics,
+                                                .Samples = settings.Samples};
+
+    std::vector<nodalys::DiagnosticMessage> messages;
+    auto result = nodalys::ComputeHarmonicBalance(*compiled, config, {}, &messages);
+    ForwardMessages(messages, run.Messages);
+    if (!result) {
+        run.Result = std::unexpected(result.error());
+        return run;
+    }
+
+    HarmonicBalance hb;
+    hb.FundamentalFrequency = settings.FundamentalFrequency;
+    hb.Frequencies = std::move(result->Frequencies);
+    hb.NodePhasors = std::move(result->NodePhasors);
+    hb.CurrentPhasors.reserve(result->CurrentPhasors.size());
+    for (auto &cur : result->CurrentPhasors) {
+        hb.CurrentPhasors.push_back({std::move(cur.Name), std::move(cur.Phasors)});
+    }
+    hb.Times = std::move(result->Times);
+    hb.NodeWaveforms = std::move(result->NodeWaveforms);
+    hb.CurrentWaveforms.reserve(result->CurrentWaveforms.size());
+    for (auto &cur : result->CurrentWaveforms) {
+        hb.CurrentWaveforms.push_back({std::move(cur.Name), std::move(cur.Values)});
+    }
+    hb.Warnings = std::move(result->Warnings);
+    hb.Iterations = result->Iterations;
+    hb.Strategy = std::move(result->Strategy);
+    run.Result = std::move(hb);
     return run;
 }
 

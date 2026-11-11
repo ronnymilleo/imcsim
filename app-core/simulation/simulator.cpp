@@ -373,4 +373,21 @@ TruthTableRun RunTruthTable(const Circuit &circuit, const TruthTableSettings &se
     return ConcludeTable(std::move(table), std::move(run), std::move(failure));
 }
 
+/**
+ * @brief   Finds periodic steady-state node voltages and component currents at a fundamental and its harmonics.
+ * @param[in] circuit   Circuit to simulate; it needs a ground component, unless it holds only logic parts, logic
+ *                      inputs, clocks and supply rails.
+ * @param[in] settings  Fundamental frequency, harmonic count, and optional sample count per period.
+ * @return  The harmonic spectra, one-cycle reconstructed waveforms, and solver diagnostics, or an error, plus any
+ *          messages from the backend. Invalid settings and backends that do not support harmonic balance are rejected
+ *          before calling the backend.
+ */
+HarmonicBalanceRun RunHarmonicBalance(const Circuit &circuit, const HarmonicBalanceSettings &settings) {
+    if (const std::optional<std::string> error =
+            FindProblem(circuit, CheckHarmonicBalanceSettings(circuit, settings), AnalysisKind::HARMONIC_BALANCE)) {
+        return {std::unexpected(*error), {}};
+    }
+    return GetBackend().RunHarmonicBalance(circuit, settings);
+}
+
 } // namespace Core

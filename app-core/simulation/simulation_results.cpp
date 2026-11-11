@@ -5,6 +5,8 @@
 
 #include "simulation/simulation_results.h"
 
+#include <cmath>
+
 namespace Core {
 
 /**
@@ -36,6 +38,26 @@ std::complex<double> SParameters::Get(const std::size_t frequency, const int row
  */
 bool TruthTableRow::HasOperatingPoint() const {
     return !OutputVoltages.empty();
+}
+
+/**
+ * @brief   Computes total harmonic distortion (THD) from harmonic phasors indexed 0..H.
+ * @param[in] phasors  Complex phasors where index 0 is DC and index 1 is the fundamental.
+ * @return  Dimensionless THD ratio $\sqrt{\sum_{k=2}^{H} |X_k|^2} / |X_1|$, or 0 when no fundamental is present.
+ */
+double ComputeHarmonicBalanceThd(const std::span<const std::complex<double>> phasors) {
+    if (phasors.size() < 3) {
+        return 0.0;
+    }
+    const double fundamental = std::abs(phasors[1]);
+    if (fundamental <= 0.0) {
+        return 0.0;
+    }
+    double harmonic_power = 0.0;
+    for (std::size_t k = 2; k < phasors.size(); ++k) {
+        harmonic_power += std::norm(phasors[k]);
+    }
+    return std::sqrt(harmonic_power) / fundamental;
 }
 
 } // namespace Core

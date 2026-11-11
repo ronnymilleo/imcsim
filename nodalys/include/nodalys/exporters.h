@@ -20,6 +20,7 @@ std::string ExportRaw(const AcSweepResult &result, std::string_view title = "Nod
 std::string ExportRaw(const SParameterResult &result, std::string_view title = "Nodalys Simulation");
 std::string ExportRaw(const PoleZeroResult &result, std::string_view title = "Nodalys Simulation");
 std::string ExportRaw(const SensitivityResult &result, std::string_view title = "Nodalys Simulation");
+std::string ExportRaw(const HarmonicBalanceResult &result, std::string_view title = "Nodalys Simulation");
 std::string ExportRaw(const SimulationResult &result, std::string_view title = "Nodalys Simulation");
 
 // CSV (Comma-Separated Values with headers)
@@ -32,6 +33,7 @@ std::string ExportCsv(const NoiseResult &result);
 std::string ExportCsv(const SParameterResult &result);
 std::string ExportCsv(const PoleZeroResult &result);
 std::string ExportCsv(const SensitivityResult &result);
+std::string ExportCsv(const HarmonicBalanceResult &result);
 std::string ExportCsv(const SimulationResult &result);
 
 // JSON (Structured data format with metadata, variables, and series)
@@ -44,6 +46,7 @@ std::string ExportJson(const NoiseResult &result);
 std::string ExportJson(const SParameterResult &result);
 std::string ExportJson(const PoleZeroResult &result);
 std::string ExportJson(const SensitivityResult &result);
+std::string ExportJson(const HarmonicBalanceResult &result);
 std::string ExportJson(const SimulationResult &result);
 
 // Touchstone (Standard RF .sNp Touchstone version 1 format)

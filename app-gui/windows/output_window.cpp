@@ -78,6 +78,8 @@ const char *GetTabFileSuffix(const PlotTab tab) {
         return "s-parameters";
     case PlotTab::TRUTH_TABLE:
         return "truth-table";
+    case PlotTab::HARMONIC_BALANCE:
+        return "harmonic-balance";
     case PlotTab::MONTE_CARLO:
         return "monte-carlo";
     }
@@ -108,6 +110,8 @@ const char *GetTabTitle(const PlotTab tab) {
         return "S-parameters";
     case PlotTab::TRUTH_TABLE:
         return "truth table";
+    case PlotTab::HARMONIC_BALANCE:
+        return "harmonic balance";
     case PlotTab::MONTE_CARLO:
         return "Monte Carlo";
     }
@@ -131,7 +135,7 @@ OutputWindow::OutputWindow(Schematic &schematic, AnalysisControls &controls, Tra
       m_Preferences(preferences), m_MathChannels(schematic), m_Buses(schematic), m_OperatingPointTab(schematic),
       m_TransientTab(schematic, controls, playback), m_SpectrumTab(schematic), m_ACSweepTab(schematic),
       m_DCSweepTab(schematic), m_NoiseTab(schematic), m_PoleZeroTab(schematic), m_SParameterTab(schematic),
-      m_MonteCarloTab(schematic) {
+      m_HarmonicBalanceTab(schematic, preferences), m_MonteCarloTab(schematic) {
     SetInitialSize(INITIAL_SIZE);
 }
 
@@ -219,6 +223,9 @@ const std::vector<Core::ComponentTrace> &OutputWindow::GetListedCurrents() const
     if (const Core::DCSweep *steps = m_OperatingPointTab.GetStepSweep()) {
         return steps->Curves.front().Currents;
     }
+    if (const auto &hb = m_Schematic.GetHarmonicBalance()) {
+        return hb->CurrentWaveforms;
+    }
     return no_currents;
 }
 
@@ -230,9 +237,11 @@ std::size_t OutputWindow::GetListedNodeCount() const {
     const auto &sweep = m_Schematic.GetACSweep();
     const auto &dc_sweep = m_Schematic.GetDCSweep();
     const Core::DCSweep *point_steps = m_OperatingPointTab.GetStepSweep();
+    const auto &hb = m_Schematic.GetHarmonicBalance();
     return std::max({transient ? transient->NodeVoltages.size() : 0, sweep ? sweep->NodeMagnitudesDecibels.size() : 0,
                      dc_sweep ? dc_sweep->Curves.front().NodeVoltages.size() : 0,
-                     point_steps ? point_steps->Curves.front().NodeVoltages.size() : 0});
+                     point_steps ? point_steps->Curves.front().NodeVoltages.size() : 0,
+                     hb ? hb->NodeWaveforms.size() : 0});
 }
 
 /**
@@ -447,6 +456,7 @@ TabResults OutputWindow::FindTabResults() const {
     set(PlotTab::POLE_ZERO, m_Schematic.GetPoleZero().has_value());
     set(PlotTab::S_PARAMETERS, m_Schematic.GetSParameters().has_value());
     set(PlotTab::TRUTH_TABLE, m_Schematic.GetTruthTable().has_value());
+    set(PlotTab::HARMONIC_BALANCE, m_Schematic.GetHarmonicBalance().has_value());
     set(PlotTab::MONTE_CARLO, m_Schematic.GetMonteCarlo().has_value());
     return has_result;
 }
@@ -516,6 +526,9 @@ void OutputWindow::DrawTab(const PlotTab tab, const FrameResults &frame) {
         break;
     case PlotTab::S_PARAMETERS:
         m_SParameterTab.Draw(m_Exporter);
+        break;
+    case PlotTab::HARMONIC_BALANCE:
+        m_HarmonicBalanceTab.Draw(m_Exporter);
         break;
     case PlotTab::TRUTH_TABLE:
         DrawTruthTableTab(m_Schematic);
@@ -597,6 +610,8 @@ bool OutputWindow::CanExport(const FrameResults &frame) const {
         return m_NoiseTab.CanExport();
     case PlotTab::S_PARAMETERS:
         return m_SParameterTab.CanExport();
+    case PlotTab::HARMONIC_BALANCE:
+        return m_HarmonicBalanceTab.CanExport();
     case PlotTab::OPERATING_POINT:
     case PlotTab::TRANSFER_FUNCTION:
     case PlotTab::SENSITIVITY:
@@ -636,6 +651,8 @@ ExportFigure OutputWindow::BuildShownFigure(const FrameResults &frame, const boo
         return m_NoiseTab.BuildFigure();
     case PlotTab::S_PARAMETERS:
         return m_SParameterTab.BuildFigure(is_table);
+    case PlotTab::HARMONIC_BALANCE:
+        return m_HarmonicBalanceTab.BuildFigure();
     case PlotTab::OPERATING_POINT:
     case PlotTab::TRANSFER_FUNCTION:
     case PlotTab::SENSITIVITY:

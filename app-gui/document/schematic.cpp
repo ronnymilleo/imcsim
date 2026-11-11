@@ -1258,6 +1258,7 @@ void Schematic::MarkLiveChanged(const Core::Component &component) {
     m_PoleZero.reset();
     m_SParameters.reset();
     m_TruthTable.reset();
+    m_HarmonicBalance.reset();
 }
 
 /**
@@ -1753,6 +1754,24 @@ const std::optional<Core::TruthTable> &Schematic::GetTruthTable() const {
 }
 
 /**
+ * @brief   Stores the result of a harmonic balance analysis of the current schematic.
+ * @param[in] harmonic_balance  The harmonic spectra and reconstructed waveforms, or no value to clear it.
+ * @note    The result is dropped on the next change, since it no longer matches the circuit.
+ */
+void Schematic::SetHarmonicBalance(std::optional<Core::HarmonicBalance> harmonic_balance) {
+    m_HarmonicBalance = std::move(harmonic_balance);
+    ++m_HarmonicBalanceVersion;
+}
+
+/**
+ * @brief   Returns the last harmonic balance analysis run for the current schematic.
+ * @return  The harmonic balance result, or no value when there was no simulation since the last change.
+ */
+const std::optional<Core::HarmonicBalance> &Schematic::GetHarmonicBalance() const {
+    return m_HarmonicBalance;
+}
+
+/**
  * @brief   Returns a number that changes whenever an operating point result is stored.
  * @return  The operating point version; compare it with a stored one to know whether the result was replaced.
  */
@@ -1848,6 +1867,14 @@ std::size_t Schematic::GetTruthTableVersion() const {
 }
 
 /**
+ * @brief   Returns a number that changes whenever a harmonic balance result is stored.
+ * @return  The harmonic balance version; compare it with a stored one to know whether the result was replaced.
+ */
+std::size_t Schematic::GetHarmonicBalanceVersion() const {
+    return m_HarmonicBalanceVersion;
+}
+
+/**
  * @brief   Drops the table of a Monte Carlo analysis, which no longer matches the traces next to it.
  */
 void Schematic::ClearMonteCarlo() {
@@ -1874,6 +1901,7 @@ void Schematic::InvalidateDerivedData() {
     m_PoleZero.reset();
     m_SParameters.reset();
     m_TruthTable.reset();
+    m_HarmonicBalance.reset();
 }
 
 /**

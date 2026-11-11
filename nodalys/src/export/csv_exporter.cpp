@@ -206,4 +206,73 @@ std::string ExportCsv(const SensitivityResult &result) {
     return ss.str();
 }
 
+std::string ExportCsv(const HarmonicBalanceResult &result) {
+    std::ostringstream ss;
+    constexpr double RAD_TO_DEG = 180.0 / std::numbers::pi;
+
+    ss << "Harmonic,Frequency_Hz";
+    for (std::size_t node = 1; node < result.NodePhasors.size(); ++node) {
+        ss << std::format(",V({0})_Mag,V({0})_Phase_deg,V({0})_Re,V({0})_Im", node);
+    }
+    for (const auto &cur : result.CurrentPhasors) {
+        ss << std::format(",I({0})_Mag,I({0})_Phase_deg,I({0})_Re,I({0})_Im", cur.Name);
+    }
+    ss << "\n";
+
+    const std::size_t num_harmonics = result.Frequencies.size();
+    for (std::size_t h = 0; h < num_harmonics; ++h) {
+        ss << h << "," << std::format("{:.8g}", result.Frequencies[h]);
+        for (std::size_t node = 1; node < result.NodePhasors.size(); ++node) {
+            const auto phasor =
+                (h < result.NodePhasors[node].size()) ? result.NodePhasors[node][h] : std::complex<double>{};
+            const double mag = std::abs(phasor);
+            const double phase_deg = std::arg(phasor) * RAD_TO_DEG;
+            ss << std::format(",{:.8g},{:.8g},{:.8g},{:.8g}", mag, phase_deg, phasor.real(), phasor.imag());
+        }
+        for (const auto &cur : result.CurrentPhasors) {
+            const auto phasor = (h < cur.Phasors.size()) ? cur.Phasors[h] : std::complex<double>{};
+            const double mag = std::abs(phasor);
+            const double phase_deg = std::arg(phasor) * RAD_TO_DEG;
+            ss << std::format(",{:.8g},{:.8g},{:.8g},{:.8g}", mag, phase_deg, phasor.real(), phasor.imag());
+        }
+        ss << "\n";
+    }
+
+    if (result.NodePhasors.size() > 1 || !result.CurrentPhasors.empty()) {
+        ss << "\nSignal,THD_Percent\n";
+        for (std::size_t node = 1; node < result.NodePhasors.size(); ++node) {
+            ss << "V(" << node << ")," << std::format("{:.6g}", ComputeThd(result.NodePhasors[node]) * 100.0) << "\n";
+        }
+        for (const auto &cur : result.CurrentPhasors) {
+            ss << "I(" << cur.Name << ")," << std::format("{:.6g}", ComputeThd(cur.Phasors) * 100.0) << "\n";
+        }
+    }
+
+    if (!result.Times.empty()) {
+        ss << "\nTime_s";
+        for (std::size_t node = 1; node < result.NodeWaveforms.size(); ++node) {
+            ss << ",V(" << node << ")";
+        }
+        for (const auto &cur : result.CurrentWaveforms) {
+            ss << ",I(" << cur.Name << ")";
+        }
+        ss << "\n";
+
+        for (std::size_t pt = 0; pt < result.Times.size(); ++pt) {
+            ss << std::format("{:.8g}", result.Times[pt]);
+            for (std::size_t node = 1; node < result.NodeWaveforms.size(); ++node) {
+                const double val = (pt < result.NodeWaveforms[node].size()) ? result.NodeWaveforms[node][pt] : 0.0;
+                ss << "," << std::format("{:.8g}", val);
+            }
+            for (const auto &cur : result.CurrentWaveforms) {
+                const double val = (pt < cur.Values.size()) ? cur.Values[pt] : 0.0;
+                ss << "," << std::format("{:.8g}", val);
+            }
+            ss << "\n";
+        }
+    }
+
+    return ss.str();
+}
+
 } // namespace nodalys

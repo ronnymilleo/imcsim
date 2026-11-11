@@ -50,9 +50,9 @@ public:
     void AddIpulse(std::string name, NodeId pos, NodeId neg, const PulseParameters &params, double ac_mag = 0.0,
                    double ac_phase_deg = 0.0);
     void AddVsine(std::string name, NodeId pos, NodeId neg, const SineParameters &params, double ac_mag = 0.0,
-                  double ac_phase_deg = 0.0);
+                  double ac_phase_deg = 0.0, bool damped = false);
     void AddIsine(std::string name, NodeId pos, NodeId neg, const SineParameters &params, double ac_mag = 0.0,
-                  double ac_phase_deg = 0.0);
+                  double ac_phase_deg = 0.0, bool damped = false);
     void AddVexp(std::string name, NodeId pos, NodeId neg, const ExpParameters &params, double ac_mag = 0.0,
                  double ac_phase_deg = 0.0);
     void AddIexp(std::string name, NodeId pos, NodeId neg, const ExpParameters &params, double ac_mag = 0.0,

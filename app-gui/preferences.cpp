@@ -121,6 +121,22 @@ const char *GetLiveEffectName(const LiveEffect effect) {
 }
 
 /**
+ * @brief   Names a harmonic amplitude convention.
+ * @param[in] unit  Peak or RMS.
+ * @return  "Peak" or "RMS".
+ */
+const char *GetHarmonicAmplitudeUnitName(const HarmonicAmplitudeUnit unit) {
+    switch (unit) {
+    case HarmonicAmplitudeUnit::PEAK:
+        return "Peak";
+    case HarmonicAmplitudeUnit::RMS:
+        return "RMS";
+    default:
+        return "Peak";
+    }
+}
+
+/**
  * @brief   Writes the preferences as JSON.
  * @param[in] preferences  Choices to keep.
  * @return  The file contents, with each choice by name, so the file reads and edits by hand.
@@ -144,6 +160,7 @@ std::string SavePreferences(const Preferences &preferences) {
         {"simulation_backend", preferences.SimulationBackend},
         {"rerun_on_edit", preferences.RerunOnEdit},
         {"rerun_delay_seconds", preferences.RerunDelaySeconds},
+        {"harmonic_amplitudes", GetHarmonicAmplitudeUnitName(preferences.HarmonicAmplitudes)},
     };
     return document.dump(2) + "\n";
 }
@@ -232,6 +249,13 @@ LoadedPreferences LoadPreferences(const std::string_view text) {
             return false;
         }
         choices.RerunDelaySeconds = seconds;
+        return true;
+    });
+    reader.Read<std::string>("harmonic_amplitudes", Type::string, [&choices](const std::string &name) {
+        if (name != "Peak" && name != "RMS") {
+            return false;
+        }
+        choices.HarmonicAmplitudes = name == "RMS" ? HarmonicAmplitudeUnit::RMS : HarmonicAmplitudeUnit::PEAK;
         return true;
     });
     return loaded;

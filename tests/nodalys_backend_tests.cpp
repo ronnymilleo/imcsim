@@ -8,6 +8,7 @@
 
 #include "components/capacitor.h"
 #include "components/clock.h"
+#include "components/diode.h"
 #include "components/ground.h"
 #include "components/inductor.h"
 #include "components/logic_input.h"
@@ -26,6 +27,7 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 #include <cmath>
+#include <complex>
 #include <numbers>
 #include <set>
 #include <string>
@@ -85,6 +87,7 @@ TEST_CASE("Nodalys names itself and lists what it runs") {
     REQUIRE(capabilities.Analyses.contains(Core::AnalysisKind::AC_SWEEP));
     REQUIRE(capabilities.Analyses.contains(Core::AnalysisKind::NOISE));
     REQUIRE(capabilities.Analyses.contains(Core::AnalysisKind::TRANSFER_FUNCTION));
+    REQUIRE(capabilities.Analyses.contains(Core::AnalysisKind::HARMONIC_BALANCE));
 }
 
 TEST_CASE("The Nodalys backend reports logic parts and analog parts as supported") {
@@ -492,11 +495,11 @@ TEST_CASE("The noise analysis of an RC low-pass filter matches the Johnson-Nyqui
     REQUIRE(run.Result.has_value());
     const Core::Noise &noise = *run.Result;
     REQUIRE(noise.InputUnit == "V");
-    constexpr double k_t = 1.380649e-23 * 300.15;
-    const double expected_low_freq_density = std::sqrt(4.0 * k_t * 1e3);
+    constexpr double K_T = 1.380649e-23 * 300.15;
+    const double expected_low_freq_density = std::sqrt(4.0 * K_T * 1e3);
     REQUIRE_THAT(noise.OutputDensities.front(), WithinRel(expected_low_freq_density, 1e-5));
     REQUIRE_THAT(noise.InputDensities.front(), WithinRel(expected_low_freq_density, 1e-5));
-    const double expected_kt_over_c = std::sqrt(k_t / 1e-6);
+    const double expected_kt_over_c = std::sqrt(K_T / 1e-6);
     REQUIRE_THAT(noise.OutputTotal, WithinRel(expected_kt_over_c, 1e-3));
     REQUIRE(noise.Contributions.size() == 1);
     REQUIRE(noise.Contributions[0].Name == "R1");
@@ -569,4 +572,132 @@ TEST_CASE("The Nodalys backend computes digital truth tables directly", "[nodaly
     // Row 3: 11 -> Sum = 0, Carry = 1
     CHECK(table.Rows[3].OutputVoltages[0] < 0.5);
     CHECK(table.Rows[3].OutputVoltages[1] > 4.5);
+}
+
+TEST_CASE("NodalysBackend supports harmonic balance and blocks hysteretic switches", "[nodalys][hb]") {
+    const Core::NodalysBackend backend;
+    CHECK_FALSE(
+        Core::FindUnsupported(backend, {Core::ComponentType::DIODE}, Core::AnalysisKind::HARMONIC_BALANCE).has_value());
+    CHECK_FALSE(Core::FindUnsupported(backend, {Core::ComponentType::SWITCH}, Core::AnalysisKind::HARMONIC_BALANCE)
+                    .has_value());
+    CHECK(Core::FindUnsupported(backend, {Core::ComponentType::V_SWITCH}, Core::AnalysisKind::HARMONIC_BALANCE)
+              .value_or("")
+              .contains("switch"));
+    CHECK(Core::FindUnsupported(backend, {Core::ComponentType::RELAY}, Core::AnalysisKind::HARMONIC_BALANCE)
+              .value_or("")
+              .contains("relay"));
+}
+
+TEST_CASE("Core::RunHarmonicBalance solves linear RC filter and nonlinear rectifier on Nodalys", "[nodalys][hb]") {
+    struct BackendRestorer {
+        ~BackendRestorer() { Core::SetBackend(nullptr); }
+    } restorer;
+
+    Core::SetBackend(std::make_unique<Core::NodalysBackend>());
+
+    SECTION("linear RC low-pass matches phasor theory") {
+        constexpr double FREQ = 1e3;
+        constexpr double RESISTANCE = 1e3;
+        constexpr double CAPACITANCE = 100e-9;
+        Core::VoltageSource source;
+        source.SetName("V1");
+        source.SetSourceType(Core::Source::SourceType::AC);
+        source.SetAC({.Amplitude = 4.0, .Frequency = FREQ, .Offset = 1.5});
+        Core::Resistor r1;
+        r1.SetName("R1");
+        r1.SetValue(RESISTANCE);
+        Core::Capacitor c1;
+        c1.SetName("C1");
+        c1.SetValue(CAPACITANCE);
+        Core::Ground gnd;
+
+        Core::Circuit circuit;
+        circuit.Add(source, {1, 0});
+        circuit.Add(r1, {1, 2});
+        circuit.Add(c1, {2, 0});
+        circuit.Add(gnd, {0});
+
+        const Core::HarmonicBalanceRun run =
+            Core::RunHarmonicBalance(circuit, {.FundamentalFrequency = FREQ, .Harmonics = 5, .Samples = 32});
+        REQUIRE(run.Result.has_value());
+        const Core::HarmonicBalance &hb = *run.Result;
+        REQUIRE(hb.Frequencies.size() == 6);
+        REQUIRE(hb.NodePhasors.size() == 3);
+        CHECK(hb.Strategy == "linear");
+
+        // At DC, capacitor is open so v(2) == 1.5 V
+        CHECK_THAT(hb.NodePhasors[2][0].real(), WithinAbs(1.5, 1e-6));
+        CHECK_THAT(hb.NodePhasors[2][0].imag(), WithinAbs(0.0, 1e-9));
+
+        // At 1 kHz, V1 peak phasor for Amplitude * sin(w*t) = Re(-j * Amplitude * e^{jwt}) = -j * 4.0
+        const double omega = 2.0 * std::numbers::pi * FREQ;
+        const std::complex<double> vin(0.0, -4.0);
+        const std::complex<double> expected_vout =
+            vin / (1.0 + std::complex<double>(0.0, omega * RESISTANCE * CAPACITANCE));
+        CHECK_THAT(hb.NodePhasors[2][1].real(), WithinAbs(expected_vout.real(), 1e-5));
+        CHECK_THAT(hb.NodePhasors[2][1].imag(), WithinAbs(expected_vout.imag(), 1e-5));
+        CHECK_THAT(Core::ComputeHarmonicBalanceThd(hb.NodePhasors[2]), WithinAbs(0.0, 1e-8));
+    }
+
+    SECTION("diode half-wave rectifier matches steady-state transient Fourier coefficients") {
+        constexpr double FREQ = 1e3;
+        constexpr double PERIOD = 1.0 / FREQ;
+        Core::VoltageSource source;
+        source.SetName("V1");
+        source.SetSourceType(Core::Source::SourceType::AC);
+        source.SetAC({.Amplitude = 5.0, .Frequency = FREQ});
+        Core::Diode diode(Core::ComponentType::DIODE);
+        diode.SetName("D1");
+        Core::Resistor load;
+        load.SetName("R1");
+        load.SetValue(1e3);
+        Core::Capacitor filter;
+        filter.SetName("C1");
+        filter.SetValue(1e-6);
+        Core::Ground gnd;
+
+        Core::Circuit circuit;
+        circuit.Add(source, {1, 0});
+        circuit.Add(diode, {1, 2});
+        circuit.Add(load, {2, 0});
+        circuit.Add(filter, {2, 0});
+        circuit.Add(gnd, {0});
+
+        const Core::HarmonicBalanceRun hb_run =
+            Core::RunHarmonicBalance(circuit, {.FundamentalFrequency = FREQ, .Harmonics = 8, .Samples = 128});
+        REQUIRE(hb_run.Result.has_value());
+        const Core::HarmonicBalance &hb = *hb_run.Result;
+        REQUIRE(hb.NodePhasors[2].size() == 9);
+        CHECK(hb.NodePhasors[2][0].real() > 2.5);
+        CHECK(Core::ComputeHarmonicBalanceThd(hb.NodePhasors[2]) > 0.05);
+
+        // Compare against steady state of a 40-cycle transient run using trapezoidal integration over the final cycle
+        const Core::TransientRun tran_run =
+            Core::RunTransient(circuit, {.StopTime = 40.0 * PERIOD, .TimeStep = PERIOD / 256.0}, std::nullopt, {});
+        REQUIRE(tran_run.Result.has_value());
+        const Core::Transient &tr = *tran_run.Result;
+        const double t_start = 39.0 * PERIOD;
+        double sum_dc = 0.0;
+        std::complex<double> sum_h1(0.0, 0.0);
+        for (std::size_t i = 1; i < tr.Times.size(); ++i) {
+            if (tr.Times[i] <= t_start) {
+                continue;
+            }
+            const double t0 = std::max(tr.Times[i - 1], t_start);
+            const double t1 = tr.Times[i];
+            const double dt = t1 - t0;
+            const double v0 = tr.NodeVoltages[2][i - 1];
+            const double v1 = tr.NodeVoltages[2][i];
+            const double t_mid = 0.5 * (t0 + t1);
+            const double v_mid = 0.5 * (v0 + v1);
+            sum_dc += v_mid * dt;
+            const double angle = 2.0 * std::numbers::pi * FREQ * t_mid;
+            sum_h1 += v_mid * std::complex<double>(std::cos(angle), -std::sin(angle)) * dt;
+        }
+        const double tran_dc = sum_dc / PERIOD;
+        const std::complex<double> tran_h1 = 2.0 * sum_h1 / PERIOD;
+
+        CHECK_THAT(hb.NodePhasors[2][0].real(), WithinAbs(tran_dc, 2e-2));
+        CHECK_THAT(std::abs(hb.NodePhasors[2][1]), WithinAbs(std::abs(tran_h1), 2e-2));
+    }
 }

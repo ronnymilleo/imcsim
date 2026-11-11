@@ -32,6 +32,7 @@ SensitivityRun RunSensitivity(const Circuit &circuit, const SensitivitySettings 
 PoleZeroRun RunPoleZero(const Circuit &circuit, const PoleZeroSettings &settings);
 SParametersRun RunSParameters(const Circuit &circuit, const SParameterSettings &settings);
 TruthTableRun RunTruthTable(const Circuit &circuit, const TruthTableSettings &settings, RunControl *control = nullptr);
+HarmonicBalanceRun RunHarmonicBalance(const Circuit &circuit, const HarmonicBalanceSettings &settings);
 
 } // namespace Core
 

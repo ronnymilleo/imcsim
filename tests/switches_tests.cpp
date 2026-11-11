@@ -35,46 +35,46 @@ TEST_CASE("A voltage-controlled switch opens and closes with its control voltage
     // A circuit keeps raw pointers to its parts (Circuit::Add), so the parts must outlive it; the bundle
     // lives on the heap, which keeps the pointers stable even when the builder lambda returns
     struct Bundle {
-        Core::VCC supply;
-        Core::Resistor load;
-        Core::VoltageSource control;
-        Core::VoltageControlledSwitch switch_part;
-        Core::Ground ground;
-        Core::Circuit circuit;
+        Core::VCC Supply;
+        Core::Resistor Load;
+        Core::VoltageSource Control;
+        Core::VoltageControlledSwitch SwitchPart;
+        Core::Ground Ground;
+        Core::Circuit Circuit;
     };
     auto build = [](const double control_voltage) {
         auto bundle = std::make_unique<Bundle>();
-        bundle->supply.SetName("V1");
-        bundle->supply.SetValue(10.0);
-        bundle->load.SetName("R1");
-        bundle->load.SetValue(1e3);
-        bundle->control.SetName("V2");
-        bundle->control.SetValue(control_voltage);
-        bundle->switch_part.SetName("S1");
+        bundle->Supply.SetName("V1");
+        bundle->Supply.SetValue(10.0);
+        bundle->Load.SetName("R1");
+        bundle->Load.SetValue(1e3);
+        bundle->Control.SetName("V2");
+        bundle->Control.SetValue(control_voltage);
+        bundle->SwitchPart.SetName("S1");
         Core::SwitchParameters parameters;
         parameters.Threshold = 2.5;
         parameters.Hysteresis = 0.1;
         parameters.OnResistance = 0.01;
-        bundle->switch_part.SetParameters(parameters);
+        bundle->SwitchPart.SetParameters(parameters);
         // S1 sits between node 2 and ground, controlled from node 3
-        bundle->circuit.Add(bundle->supply, {1});
-        bundle->circuit.Add(bundle->load, {1, 2});
-        bundle->circuit.Add(bundle->switch_part, {2, 0, 3, 0});
-        bundle->circuit.Add(bundle->control, {3, 0});
-        bundle->circuit.Add(bundle->ground, {0});
+        bundle->Circuit.Add(bundle->Supply, {1});
+        bundle->Circuit.Add(bundle->Load, {1, 2});
+        bundle->Circuit.Add(bundle->SwitchPart, {2, 0, 3, 0});
+        bundle->Circuit.Add(bundle->Control, {3, 0});
+        bundle->Circuit.Add(bundle->Ground, {0});
         return bundle;
     };
 
     Core::NodalysBackend backend;
     const auto open_circuit = build(0.0);
-    const Core::OperatingPointRun open = backend.RunOperatingPoint(open_circuit->circuit);
+    const Core::OperatingPointRun open = backend.RunOperatingPoint(open_circuit->Circuit);
     REQUIRE(open.Result.has_value());
     REQUIRE_THAT(open.Result->NodeVoltages[2], WithinRel(10.0, 1e-5));
     // Open, the switch leaks the supply across its off resistance (giga-ohms): nano-amperes, not zero
     REQUIRE_THAT(CurrentOf(*open.Result, "S1"), WithinAbs(0.0, 1e-7));
 
     const auto closed_circuit = build(5.0);
-    const Core::OperatingPointRun closed = backend.RunOperatingPoint(closed_circuit->circuit);
+    const Core::OperatingPointRun closed = backend.RunOperatingPoint(closed_circuit->Circuit);
     REQUIRE(closed.Result.has_value());
     REQUIRE_THAT(closed.Result->NodeVoltages[2], WithinRel(10.0 * 0.01 / (1e3 + 0.01), 1e-3));
     REQUIRE_THAT(CurrentOf(*closed.Result, "S1"), WithinRel(10.0 / (1e3 + 0.01), 1e-4));

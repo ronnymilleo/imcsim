@@ -865,6 +865,37 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
                 cfg.OutputPositiveNode = nodes.Resolve(pos_str);
                 cfg.OutputNegativeNode = nodes.Resolve(neg_str);
                 result.Analyses.push_back({AnalysisKind::Sensitivity, cfg});
+            } else if (dir == ".HB") {
+                // .HB <f0> <harmonics> [samples=<M>]
+                if (tokens.size() < 3) {
+                    return std::unexpected(std::format("Malformed .hb directive: '{}'", line));
+                }
+                const auto f0_opt = ParseSpiceNumber(tokens[1]);
+                if (!f0_opt || *f0_opt <= 0.0) {
+                    return std::unexpected(std::format("Invalid fundamental frequency in .hb directive: '{}'", line));
+                }
+                const auto harm_opt = ParseSpiceNumber(tokens[2]);
+                if (!harm_opt || *harm_opt < 0.0 || std::floor(*harm_opt) != *harm_opt) {
+                    return std::unexpected(std::format("Invalid harmonic count in .hb directive: '{}'", line));
+                }
+                HarmonicBalanceConfig cfg;
+                cfg.FundamentalFrequency = *f0_opt;
+                cfg.Harmonics = static_cast<int>(*harm_opt);
+                for (std::size_t k = 3; k < tokens.size(); ++k) {
+                    const std::string tok_upper = ToUpper(tokens[k]);
+                    if (tok_upper.starts_with("SAMPLES=")) {
+                        const auto samp_opt = ParseSpiceNumber(std::string_view{tokens[k]}.substr(8));
+                        if (!samp_opt || *samp_opt <= 0.0 || std::floor(*samp_opt) != *samp_opt) {
+                            return std::unexpected(
+                                std::format("Invalid samples parameter in .hb directive: '{}'", line));
+                        }
+                        cfg.Samples = static_cast<int>(*samp_opt);
+                    } else {
+                        return std::unexpected(
+                            std::format("Unexpected token '{}' in .hb directive: '{}'", tokens[k], line));
+                    }
+                }
+                result.Analyses.push_back({AnalysisKind::HarmonicBalance, cfg});
             } else if (dir == ".OPTIONS") {
                 for (std::size_t i = 1; i < tokens.size(); ++i) {
                     const auto eq = tokens[i].find('=');
@@ -1117,10 +1148,11 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
                     p.Phase = vals[3];
                 }
                 p.Magnitude = ac_mag > 0.0 ? ac_mag : p.Amplitude;
+                const bool damped = vals.size() >= 5 && vals[4] != 0.0;
                 if (is_voltage) {
-                    builder.AddVsine(name, n_pos, n_neg, p, ac_mag, ac_phase);
+                    builder.AddVsine(name, n_pos, n_neg, p, ac_mag, ac_phase, damped);
                 } else {
-                    builder.AddIsine(name, n_pos, n_neg, p, ac_mag, ac_phase);
+                    builder.AddIsine(name, n_pos, n_neg, p, ac_mag, ac_phase, damped);
                 }
                 break;
             }

@@ -102,13 +102,22 @@ VoltageSourceDevice::Waveform MakeDcWaveform(const double) {
 
 VoltageSourceDevice::Waveform MakePulseWaveform(const double, const PulseParameters &pulse) {
     return [pulse](const double dc, const TimeContext &time) {
-        return time.IsTransient ? EvaluatePulse(pulse, time.Time) : dc;
+        if (time.IsTransient) {
+            return EvaluatePulse(pulse, time.Time);
+        }
+        if (time.IsPeriodicSteadyState) {
+            // Wrap startup delay modulo Period so Harmonic Balance evaluates the periodic steady-state extension.
+            const double shift =
+                (pulse.Period > 0.0 && pulse.Delay > 0.0) ? std::ceil(pulse.Delay / pulse.Period) * pulse.Period : 0.0;
+            return EvaluatePulse(pulse, time.Time + shift);
+        }
+        return dc;
     };
 }
 
 VoltageSourceDevice::Waveform MakeSineWaveform(const double, const SineParameters &sine) {
     return [sine](const double dc, const TimeContext &time) {
-        return time.IsTransient ? EvaluateSine(sine, time.Time) : dc;
+        return (time.IsTransient || time.IsPeriodicSteadyState) ? EvaluateSine(sine, time.Time) : dc;
     };
 }
 
@@ -143,7 +152,14 @@ VoltageSourceDevice::Waveform MakeClockWaveform(const ClockParameters &parameter
     pulse.FallTime = edge;
     pulse.Width = std::max(parameters.DutyCycle * period - edge, 0.0);
     pulse.Period = period;
-    return [pulse](const double, const TimeContext &time) { return EvaluatePulse(pulse, time.Time); };
+    return [pulse](const double, const TimeContext &time) {
+        if (time.IsPeriodicSteadyState && !time.IsTransient) {
+            const double shift =
+                (pulse.Period > 0.0 && pulse.Delay > 0.0) ? std::ceil(pulse.Delay / pulse.Period) * pulse.Period : 0.0;
+            return EvaluatePulse(pulse, time.Time + shift);
+        }
+        return EvaluatePulse(pulse, time.Time);
+    };
 }
 
 } // namespace nodalys

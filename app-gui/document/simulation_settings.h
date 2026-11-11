@@ -31,10 +31,11 @@ enum class Analysis {
     SENSITIVITY,
     POLE_ZERO,
     S_PARAMETERS,
-    TRUTH_TABLE
+    TRUTH_TABLE,
+    HARMONIC_BALANCE
 };
 
-constexpr std::size_t ANALYSIS_COUNT = 10;
+constexpr std::size_t ANALYSIS_COUNT = 11;
 
 /// Wall seconds a live transient takes to cover its stop time, at first.
 constexpr double DEFAULT_LIVE_SECONDS = 10.0;
@@ -82,6 +83,8 @@ struct SimulationSettings {
     Core::SParameterSettings SParameters;
     /// Logic inputs the truth table varies; none listed, or none left in the circuit, means every logic input.
     std::vector<std::string> TruthTableInputs;
+    /// Fundamental frequency, harmonic count and oversampling samples of the harmonic balance analysis.
+    Core::HarmonicBalanceSettings HarmonicBalance;
     /// Runs the transient, AC sweep or DC sweep once per value of a part or of the temperature.
     ParameterStepSettings ParameterStep;
     /// Runs the transient, AC sweep or DC sweep once with the nominal values and then with values drawn within the

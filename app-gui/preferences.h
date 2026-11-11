@@ -67,6 +67,15 @@ constexpr double MIN_RERUN_DELAY_SECONDS = 0.1;
 constexpr double MAX_RERUN_DELAY_SECONDS = 5.0;
 
 /**
+ * @enum    HarmonicAmplitudeUnit
+ * @brief   Convention used to display AC harmonic magnitudes in harmonic balance plots and tables.
+ */
+enum class HarmonicAmplitudeUnit {
+    PEAK,
+    RMS
+};
+
+/**
  * @struct  Preferences
  * @brief   How the program looks and behaves for this user, whatever schematic is open.
  * @details What belongs to a circuit, such as the simulation settings, is saved in its file instead. Every field
@@ -96,6 +105,8 @@ struct Preferences {
     bool RerunOnEdit = false;
     /// Quiet time after the last edit before it runs, from MIN_RERUN_DELAY_SECONDS to MAX_RERUN_DELAY_SECONDS.
     double RerunDelaySeconds = DEFAULT_RERUN_DELAY_SECONDS;
+    /// Convention for displaying AC harmonic magnitudes in harmonic balance results (DC is unchanged).
+    HarmonicAmplitudeUnit HarmonicAmplitudes = HarmonicAmplitudeUnit::PEAK;
 
     bool IsEffectOn(LiveEffect effect) const;
     void SetEffectOn(LiveEffect effect, bool on);
@@ -115,6 +126,7 @@ struct LoadedPreferences {
 // Names as menus and the file show them
 const char *GetWireColoringName(WireColoring coloring);
 const char *GetLiveEffectName(LiveEffect effect);
+const char *GetHarmonicAmplitudeUnitName(HarmonicAmplitudeUnit unit);
 
 // File
 inline constexpr std::string_view PREFERENCES_FILE_NAME = "preferences.json";

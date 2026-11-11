@@ -137,6 +137,17 @@ struct SensitivityConfig {
 };
 
 /**
+ * @struct  HarmonicBalanceConfig
+ * @brief   Configuration for periodic steady-state Harmonic Balance analysis (.hb).
+ */
+struct HarmonicBalanceConfig {
+    double FundamentalFrequency = 1e3; ///< Fundamental frequency f0 in Hz.
+    int Harmonics = 8;                 ///< Highest harmonic order H >= 0 (solves DC + harmonics 1..H).
+    int Samples = 0;                   ///< Time samples M per period (power of two); 0 chooses >= max(4H, 16).
+    int SourceSteps = 0;               ///< Amplitude homotopy steps on failure; 0 uses ConvergenceOptions.SourceSteps.
+};
+
+/**
  * @struct  RunMonitor
  * @brief   Asynchronous control and streaming callbacks for interactive/live simulation.
  */
@@ -186,6 +197,10 @@ std::expected<SensitivityResult, std::string> ComputeSensitivity(const Circuit &
                                                                  const SensitivityConfig &config,
                                                                  const ConvergenceOptions &options = {},
                                                                  std::vector<DiagnosticMessage> *messages = nullptr);
+
+std::expected<HarmonicBalanceResult, std::string>
+ComputeHarmonicBalance(const Circuit &circuit, const HarmonicBalanceConfig &config,
+                       const ConvergenceOptions &options = {}, std::vector<DiagnosticMessage> *messages = nullptr);
 
 } // namespace nodalys
 

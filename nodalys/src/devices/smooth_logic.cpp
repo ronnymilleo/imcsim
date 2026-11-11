@@ -129,6 +129,12 @@ void SmoothLogicDevice::StampAc(MnaSystem &reactive, const std::vector<double> &
     }
 }
 
+void SmoothLogicDevice::StampCharge(MnaSystem &sys, const std::vector<double> & /*x*/) const {
+    if (m_Internal >= 0 && m_FilterCapacitance > 0.0) {
+        sys.AddA(m_Internal, m_Internal, m_FilterCapacitance);
+    }
+}
+
 /**
  * @brief   Limits voltage changes at the gate's output and delay nodes to ensure Newton-Raphson convergence.
  * @param[in,out] x_new  Candidate solution vector to limit.

@@ -159,6 +159,7 @@ private:
     void RunPoleZeroAnalysis(const Core::Circuit &circuit);
     void RunSParameterAnalysis(const Core::Circuit &circuit);
     void RunTruthTableAnalysis(const Core::Circuit &circuit);
+    void RunHarmonicBalanceAnalysis(const Core::Circuit &circuit);
 
     // Results
     void ClearResult(Analysis analysis);

@@ -13,7 +13,7 @@ namespace {
 
 constexpr auto ANALYSIS_NAMES =
     std::to_array<const char *>({"Operating point", "Transient", "AC sweep", "DC sweep", "Noise", "Transfer function",
-                                 "Sensitivity", "Poles and zeros", "S-parameters", "Truth table"});
+                                 "Sensitivity", "Poles and zeros", "S-parameters", "Truth table", "Harmonic balance"});
 
 } // namespace
 
@@ -54,6 +54,7 @@ bool IsRepeatable(const Analysis analysis) {
     case Analysis::POLE_ZERO:
     case Analysis::S_PARAMETERS:
     case Analysis::TRUTH_TABLE:
+    case Analysis::HARMONIC_BALANCE:
     default:
         return false;
     }

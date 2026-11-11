@@ -77,9 +77,24 @@ std::string_view GetAnalysisKindName(const AnalysisKind kind) {
         return "S-parameter";
     case AnalysisKind::TRUTH_TABLE:
         return "truth table";
+    case AnalysisKind::HARMONIC_BALANCE:
+        return "harmonic balance";
     default:
         return "analysis";
     }
+}
+
+/**
+ * @brief   Finds periodic steady-state node voltages and currents at the fundamental and its harmonics.
+ * @param[in] circuit   Circuit to simulate, already checked.
+ * @param[in] settings  Fundamental frequency, harmonic count, and optional sample count, already checked.
+ * @return  The harmonic spectra and one-cycle waveforms or an error, plus the messages of the backend.
+ */
+HarmonicBalanceRun SimulationBackend::RunHarmonicBalance(const Circuit & /*circuit*/,
+                                                         const HarmonicBalanceSettings & /*settings*/) {
+    HarmonicBalanceRun run;
+    run.Result = std::unexpected(std::format("{} does not run the harmonic balance analysis", GetName()));
+    return run;
 }
 
 /**

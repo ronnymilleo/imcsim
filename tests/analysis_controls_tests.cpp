@@ -6,10 +6,14 @@
 #include "analysis/analysis_controls.h"
 #include "analysis/monte_carlo_results.h"
 
+#include "components/capacitor.h"
+#include "components/resistor.h"
+#include "components/source.h"
 #include "components/subcircuit_pin.h"
 #include "document/examples.h"
 #include "document/schematic.h"
 #include "editing/live_input.h"
+#include "nodalys/nodalys_backend.h"
 #include "simulation/simulation_backend.h"
 #include "test_printers.h"
 #include <algorithm>
@@ -20,6 +24,7 @@
 #include <cstddef>
 #include <memory>
 #include <mutex>
+#include <numbers>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -552,7 +557,8 @@ TEST_CASE("Analyses have names, and all of them are counted", "[analysis_control
     CHECK(std::string(GUI::GetAnalysisName(GUI::Analysis::POLE_ZERO)) == "Poles and zeros");
     CHECK(std::string(GUI::GetAnalysisName(GUI::Analysis::S_PARAMETERS)) == "S-parameters");
     CHECK(std::string(GUI::GetAnalysisName(GUI::Analysis::TRUTH_TABLE)) == "Truth table");
-    CHECK(static_cast<std::size_t>(GUI::Analysis::TRUTH_TABLE) + 1 == GUI::ANALYSIS_COUNT);
+    CHECK(std::string(GUI::GetAnalysisName(GUI::Analysis::HARMONIC_BALANCE)) == "Harmonic balance");
+    CHECK(static_cast<std::size_t>(GUI::Analysis::HARMONIC_BALANCE) + 1 == GUI::ANALYSIS_COUNT);
 }
 
 TEST_CASE("A transient grows in the schematic while it runs, and the whole run replaces its chunks",
@@ -1009,4 +1015,64 @@ TEST_CASE("The S-parameter analysis runs the example on the worker, and refuses 
     RunAndWait(controls);
     CHECK(controls.GetOutcome(GUI::Analysis::OPERATING_POINT) != GUI::RunOutcome::FAILED);
     CHECK(schematic.GetOperatingPoint().has_value());
+}
+
+TEST_CASE("Harmonic balance runs on Nodalys through AnalysisControls and fails cleanly on ngspice",
+          "[analysis_controls][hb]") {
+    struct BackendRestorer {
+        ~BackendRestorer() { Core::SetBackend(nullptr); }
+    } restore;
+
+    GUI::Schematic schematic;
+    OpenRCFilter(schematic);
+    Core::Source *source = nullptr;
+    const Core::Resistor *resistor = nullptr;
+    const Core::Capacitor *capacitor = nullptr;
+    for (const auto &element : schematic.GetElements()) {
+        Core::Component &component = element->GetComponent();
+        if (component.GetType() == Core::ComponentType::VOLTAGE_SOURCE && source == nullptr) {
+            source = &static_cast<Core::Source &>(component);
+        } else if (component.GetType() == Core::ComponentType::RESISTOR && resistor == nullptr) {
+            resistor = &static_cast<const Core::Resistor &>(component);
+        } else if (component.GetType() == Core::ComponentType::CAPACITOR && capacitor == nullptr) {
+            capacitor = &static_cast<const Core::Capacitor &>(component);
+        }
+    }
+    REQUIRE(source != nullptr);
+    REQUIRE(resistor != nullptr);
+    REQUIRE(capacitor != nullptr);
+    constexpr double FREQ = 1e3;
+    constexpr double AMP = 2.0;
+    source->SetSourceType(Core::Source::SourceType::AC);
+    source->SetAC({.Amplitude = AMP, .Frequency = FREQ});
+    const std::string resistor_name = resistor->GetName();
+    schematic.MarkModified();
+
+    GUI::SimulationSettings settings = schematic.GetSimulationSettings();
+    settings.Selected = GUI::Analysis::HARMONIC_BALANCE;
+    settings.HarmonicBalance = {.FundamentalFrequency = FREQ, .Harmonics = 4, .Samples = 0};
+    schematic.SetSimulationSettings(settings);
+
+    // Default ngspice backend refuses Harmonic Balance cleanly
+    GUI::AnalysisControls controls(schematic);
+    RunAndWait(controls);
+    CHECK(controls.GetOutcome(GUI::Analysis::HARMONIC_BALANCE) == GUI::RunOutcome::FAILED);
+    CHECK_FALSE(schematic.GetHarmonicBalance().has_value());
+    REQUIRE(controls.GetError(GUI::Analysis::HARMONIC_BALANCE).has_value());
+    CHECK(controls.GetError(GUI::Analysis::HARMONIC_BALANCE)->contains("does not run"));
+
+    // Nodalys solves Harmonic Balance and delivers complex spectra matching analytical impedance
+    Core::SetBackend(std::make_unique<Core::NodalysBackend>());
+    RunAndWait(controls);
+    CHECK(controls.GetOutcome(GUI::Analysis::HARMONIC_BALANCE) == GUI::RunOutcome::SUCCEEDED);
+    REQUIRE(schematic.GetHarmonicBalance().has_value());
+    const Core::HarmonicBalance &hb = *schematic.GetHarmonicBalance();
+    CHECK(hb.Frequencies.size() == 5);
+    const auto r_trace = std::ranges::find(hb.CurrentPhasors, resistor_name, &Core::ComponentPhasors::Name);
+    REQUIRE(r_trace != hb.CurrentPhasors.end());
+    REQUIRE(r_trace->Phasors.size() == 5);
+    const double omega = 2.0 * std::numbers::pi * FREQ;
+    const double reactance = 1.0 / (omega * capacitor->GetValue());
+    const double expected_current = AMP / std::hypot(resistor->GetValue(), reactance);
+    CHECK(std::abs(std::abs(r_trace->Phasors[1]) - expected_current) < 1e-6);
 }

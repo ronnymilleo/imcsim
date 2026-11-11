@@ -229,4 +229,113 @@ std::string ExportJson(const SensitivityResult &result) {
     return ss.str();
 }
 
+std::string ExportJson(const HarmonicBalanceResult &result) {
+    std::ostringstream ss;
+    constexpr double RAD_TO_DEG = 180.0 / std::numbers::pi;
+
+    auto write_escaped = [&](std::string_view text) {
+        ss << '"';
+        for (const char ch : text) {
+            if (ch == '"' || ch == '\\') {
+                ss << '\\';
+            }
+            ss << ch;
+        }
+        ss << '"';
+    };
+
+    auto write_phasor_array = [&](const std::vector<std::complex<double>> &phasors) {
+        ss << "[";
+        for (std::size_t k = 0; k < phasors.size(); ++k) {
+            if (k > 0) {
+                ss << ", ";
+            }
+            const auto &p = phasors[k];
+            const double mag = std::abs(p);
+            const double phase_deg = std::arg(p) * RAD_TO_DEG;
+            ss << "{\"re\": " << std::format("{:.8g}", p.real()) << ", \"im\": " << std::format("{:.8g}", p.imag())
+               << ", \"mag\": " << std::format("{:.8g}", mag) << ", \"phase_deg\": " << std::format("{:.8g}", phase_deg)
+               << "}";
+        }
+        ss << "]";
+    };
+
+    ss << "{\n  \"analysis\": \"harmonic_balance\",\n";
+    ss << "  \"iterations\": " << result.Iterations << ",\n";
+    ss << "  \"strategy\": ";
+    write_escaped(result.Strategy);
+    ss << ",\n  \"warnings\": [";
+    for (std::size_t i = 0; i < result.Warnings.size(); ++i) {
+        if (i > 0) {
+            ss << ", ";
+        }
+        write_escaped(result.Warnings[i]);
+    }
+    ss << "],\n  \"frequencies\": ";
+    WriteDoubleArray(ss, result.Frequencies);
+
+    ss << ",\n  \"node_phasors\": {\n";
+    for (std::size_t node = 1; node < result.NodePhasors.size(); ++node) {
+        if (node > 1) {
+            ss << ",\n";
+        }
+        ss << "    \"" << node << "\": ";
+        write_phasor_array(result.NodePhasors[node]);
+    }
+
+    ss << "\n  },\n  \"current_phasors\": {\n";
+    for (std::size_t c = 0; c < result.CurrentPhasors.size(); ++c) {
+        if (c > 0) {
+            ss << ",\n";
+        }
+        ss << "    ";
+        write_escaped(result.CurrentPhasors[c].Name);
+        ss << ": ";
+        write_phasor_array(result.CurrentPhasors[c].Phasors);
+    }
+
+    ss << "\n  },\n  \"thd_percent\": {\n";
+    bool first_thd = true;
+    for (std::size_t node = 1; node < result.NodePhasors.size(); ++node) {
+        if (!first_thd) {
+            ss << ",\n";
+        }
+        first_thd = false;
+        ss << "    \"v(" << node << ")\": " << std::format("{:.6g}", ComputeThd(result.NodePhasors[node]) * 100.0);
+    }
+    for (const auto &cur : result.CurrentPhasors) {
+        if (!first_thd) {
+            ss << ",\n";
+        }
+        first_thd = false;
+        ss << "    \"i(" << cur.Name << ")\": " << std::format("{:.6g}", ComputeThd(cur.Phasors) * 100.0);
+    }
+
+    ss << "\n  },\n  \"times\": ";
+    WriteDoubleArray(ss, result.Times);
+
+    ss << ",\n  \"node_waveforms\": {\n";
+    for (std::size_t node = 1; node < result.NodeWaveforms.size(); ++node) {
+        if (node > 1) {
+            ss << ",\n";
+        }
+        ss << "    \"" << node << "\": ";
+        WriteDoubleArray(ss, result.NodeWaveforms[node]);
+    }
+
+    ss << "\n  },\n  \"current_waveforms\": {\n";
+    for (std::size_t c = 0; c < result.CurrentWaveforms.size(); ++c) {
+        if (c > 0) {
+            ss << ",\n";
+        }
+        ss << "    ";
+        write_escaped(result.CurrentWaveforms[c].Name);
+        ss << ": ";
+        WriteDoubleArray(ss, result.CurrentWaveforms[c].Values);
+    }
+
+    ss << "\n  }\n}\n";
+    return ss.str();
+}
+
 } // namespace nodalys
