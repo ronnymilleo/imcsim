@@ -53,8 +53,13 @@ if(CLANG_FORMAT)
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/*.h
     )
 
+    # The list goes in a file: on the command line it grew past what Windows accepts for one process
+    set(FORMAT_FILE_LIST "${CMAKE_CURRENT_BINARY_DIR}/format_files.txt")
+    list(JOIN ALL_SOURCE_FILES "\n" FORMAT_FILE_LINES)
+    file(WRITE "${FORMAT_FILE_LIST}" "${FORMAT_FILE_LINES}\n${CMAKE_CURRENT_SOURCE_DIR}/main.cpp\n")
+
     add_custom_target(format
-            COMMAND ${CLANG_FORMAT} -i ${ALL_SOURCE_FILES} main.cpp
+            COMMAND ${CLANG_FORMAT} -i --files=${FORMAT_FILE_LIST}
             WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
             COMMENT "Formatting source code with clang-format"
             VERBATIM
