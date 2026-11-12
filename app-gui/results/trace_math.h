@@ -6,6 +6,7 @@
 #ifndef IMCSIM_TRACE_MATH_H
 #define IMCSIM_TRACE_MATH_H
 
+#include "schematic/math_channel_definition.h"
 #include "simulation/simulator.h"
 #include <expected>
 #include <functional>
@@ -29,17 +30,6 @@ struct Dimension {
     bool Known = true;
 
     bool operator==(const Dimension &) const = default;
-};
-
-/**
- * @enum    MathOperator
- * @brief   The operations of the math channel of an oscilloscope, between two traces.
- */
-enum class MathOperator {
-    ADD,
-    SUBTRACT,
-    MULTIPLY,
-    DIVIDE
 };
 
 /**
@@ -110,7 +100,6 @@ std::expected<MathResult, std::string> EvaluateExpression(const MathProgram &pro
 std::expected<ACMathResult, std::string> EvaluateACExpression(const MathProgram &program, const Core::ACSweep &sweep);
 std::string BuildOperatorExpression(std::string_view first, MathOperator math_operator, std::string_view second);
 std::string FormatUnit(Dimension unit);
-const char *GetOperatorSymbol(MathOperator math_operator);
 
 } // namespace GUI
 

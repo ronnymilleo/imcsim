@@ -1,7 +1,8 @@
 /**
  * @file    logic_bus.h
  * @brief   Logic buses: several logic signals read together as one number, as a logic analyzer shows them.
- * @details Pure functions, so the plot and the export only draw what they give.
+ * @details Resolves a bus against a result and reads its value. Pure functions, so the plot and the export only draw
+ *          what they give.
  */
 
 #ifndef IMCSIM_LOGIC_BUS_H
@@ -9,6 +10,7 @@
 
 #include "results/logic_trace.h"
 #include "results/trace_math.h"
+#include "schematic/logic_bus_definition.h"
 #include <cstddef>
 #include <cstdint>
 #include <expected>
@@ -19,34 +21,6 @@
 #include <vector>
 
 namespace GUI {
-
-/**
- * @enum    BusFormat
- * @brief   How the value of a bus is written: in binary, one digit per bit, in hexadecimal or in decimal.
- */
-enum class BusFormat {
-    BINARY,
-    HEXADECIMAL,
-    DECIMAL
-};
-
-/// Most bits a bus may have, so its value fits a number and its label a lane.
-inline constexpr std::size_t MAX_BUS_BITS = 32;
-
-/**
- * @struct  LogicBus
- * @brief   Logic signals read as the bits of one number, the most significant first.
- * @details A bit names a voltage as the trace list does, V(Q0) for a net or V(3) for a node, so a bus saved with the
- *          file finds its nets again after edits that number the nodes anew.
- */
-struct LogicBus {
-    std::string Name;
-    std::vector<std::string> Bits;
-    BusFormat Format = BusFormat::HEXADECIMAL;
-    bool Shown = true;
-
-    bool operator==(const LogicBus &) const = default;
-};
 
 /**
  * @struct  BusLane
@@ -81,11 +55,6 @@ struct BusSegment {
     double To = 0.0;
     std::optional<std::uint64_t> Value;
 };
-
-// Naming
-std::string GetNextBusName(const std::vector<LogicBus> &buses);
-const char *GetBusFormatName(BusFormat format);
-std::optional<BusFormat> ParseBusFormat(std::string_view name);
 
 // Resolving
 std::expected<std::vector<int>, std::string> ResolveBusBits(const LogicBus &bus, const NetResolver &find_node,

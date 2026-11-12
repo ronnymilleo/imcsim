@@ -7,7 +7,7 @@
 #define IMCSIM_SIMULATION_SETTINGS_H
 
 #include "base/helpers.h"
-#include "results/parameter_step.h"
+#include "schematic/parameter_step_settings.h"
 #include "simulation/monte_carlo.h"
 #include "simulation/simulator.h"
 #include <cstddef>

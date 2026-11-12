@@ -33,9 +33,11 @@ add_executable(imcsim-tests
             led_glow_tests.cpp
             live_change_tests.cpp
             live_input_tests.cpp
+            logic_bus_definition_tests.cpp
             logic_bus_tests.cpp
             logic_outputs_tests.cpp
             logic_trace_tests.cpp
+            math_channel_definition_tests.cpp
             math_channel_tests.cpp
             backend_comparison_tests.cpp
             controlled_sources_tests.cpp
@@ -46,6 +48,7 @@ add_executable(imcsim-tests
             op_amp_tests.cpp
             switches_tests.cpp
             parameter_conversion_tests.cpp
+            parameter_step_settings_tests.cpp
             parameter_step_tests.cpp
             part_catalog_tests.cpp
             part_names_tests.cpp

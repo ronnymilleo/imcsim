@@ -718,23 +718,4 @@ std::string FormatUnit(const Dimension unit) {
     return std::format("{}/{}", numerator.empty() ? "1" : numerator, denominator);
 }
 
-/**
- * @brief   Returns how an operation is typed in an expression.
- * @param[in] math_operator  Operation.
- * @return  "+", "-", "*" or "/".
- */
-const char *GetOperatorSymbol(const MathOperator math_operator) {
-    switch (math_operator) {
-    case MathOperator::ADD:
-        return "+";
-    case MathOperator::SUBTRACT:
-        return "-";
-    case MathOperator::MULTIPLY:
-        return "*";
-    case MathOperator::DIVIDE:
-        return "/";
-    }
-    return "+";
-}
-
 } // namespace GUI

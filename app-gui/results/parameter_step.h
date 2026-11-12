@@ -1,6 +1,6 @@
 /**
  * @file    parameter_step.h
- * @brief   Settings and values of a stepped parameter, and the results of an analysis run once per value.
+ * @brief   The results of an analysis run once per value of a stepped parameter, and how they are labeled and joined.
  */
 
 #ifndef IMCSIM_PARAMETER_STEP_H
@@ -8,30 +8,10 @@
 
 #include "simulation/simulator.h"
 #include <cstddef>
-#include <expected>
 #include <string>
 #include <vector>
 
 namespace GUI {
-
-/**
- * @struct  ParameterStepSettings
- * @brief   The parameter a transient, AC sweep or DC sweep steps through, one run per value, and its values.
- * @details Part names a resistor, capacitor or inductor; empty, the temperature steps. The values go from Start to
- *          Stop in steps of Step, or are typed as a list such as "1k, 2.2k, 4.7k". A part that left the circuit fails
- *          the run, so the stored name is never rewritten behind the user.
- */
-struct ParameterStepSettings {
-    bool Enabled = false;
-    std::string Part;
-    bool UsesList = false;
-    double Start = 0.0;
-    double Stop = 100.0;
-    double Step = 25.0;
-    std::string List;
-
-    bool operator==(const ParameterStepSettings &) const = default;
-};
 
 /**
  * @struct  StepFamily
@@ -47,14 +27,9 @@ template <typename Result> struct StepFamily {
     std::size_t Selected = 0;
 };
 
-constexpr std::size_t MAX_PARAMETER_STEPS = 50;
-
 /// Name of the parameter of a Monte Carlo family, whose values are run numbers: 0 is the nominal run.
 constexpr const char *MONTE_CARLO_PARAMETER = "Run";
 
-std::expected<std::vector<double>, std::string> ListStepValues(const ParameterStepSettings &settings,
-                                                               const std::string &unit);
-std::string GetParameterLabel(const ParameterStepSettings &settings);
 std::string FormatStepValue(const std::string &parameter, double value, const std::string &unit);
 Core::DCSweep JoinDCSweepSteps(StepFamily<Core::DCSweep> family);
 Core::DCSweep JoinOperatingPointSteps(const StepFamily<Core::OperatingPoint> &family);

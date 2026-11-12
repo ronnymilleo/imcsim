@@ -1,12 +1,5 @@
 [
   "app-core/simulation/simulation_backend.cpp -> backends/ngspice/ngspice_backend.h",
-  "app-gui/schematic/canvas_view.cpp -> overlays/schematic_drawing.h",
-  "app-gui/schematic/schematic.h -> results/logic_bus.h",
-  "app-gui/schematic/schematic.h -> results/math_channel.h",
   "app-gui/schematic/schematic.h -> results/monte_carlo_results.h",
-  "app-gui/schematic/schematic.h -> results/parameter_step.h",
-  "app-gui/schematic/schematic_file.h -> results/logic_bus.h",
-  "app-gui/schematic/schematic_file.h -> results/math_channel.h",
-  "app-gui/schematic/schematic_file_actions.cpp -> overlays/schematic_drawing.h",
-  "app-gui/schematic/simulation_settings.h -> results/parameter_step.h"
+  "app-gui/schematic/schematic.h -> results/parameter_step.h"
 ]

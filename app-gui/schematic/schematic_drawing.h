@@ -9,7 +9,6 @@
 #include "base/helpers.h"
 #include "canvas/schematic_canvas.h"
 #include "imgui.h"
-#include "results/circuit_snapshot.h"
 #include "schematic/schematic.h"
 #include "ui_elements/ui_element.h"
 #include <expected>
@@ -26,10 +25,6 @@ inline constexpr float SCREEN_TERMINAL_RING_SCALE = 0.2f;
 void DrawMeasurementMarkers(SchematicCanvas &canvas, const ViewTransform &view, Schematic &schematic);
 void DrawTerminalNumbers(SchematicCanvas &canvas, const ViewTransform &view, const Schematic &schematic,
                          float ring_scale);
-
-// Live effects
-void DrawLiveCurrent(SchematicCanvas &canvas, const ViewTransform &view, const Schematic &schematic,
-                     const Core::OperatingPoint &operating_point, const HeatScale &scale, double time);
 
 /**
  * @struct  SchematicBounds

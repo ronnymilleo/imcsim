@@ -6,7 +6,7 @@
 #include "schematic/schematic_file_actions.h"
 
 #include "base/theme.h"
-#include "overlays/schematic_drawing.h"
+#include "schematic/schematic_drawing.h"
 #include "schematic/schematic_file.h"
 #include <array>
 #include <format>

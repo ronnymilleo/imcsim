@@ -7,11 +7,11 @@
 #define IMCSIM_SCHEMATIC_H
 
 #include "base/helpers.h"
-#include "results/logic_bus.h"
-#include "results/math_channel.h"
 #include "results/monte_carlo_results.h"
 #include "results/parameter_step.h"
 #include "schematic/connectivity.h"
+#include "schematic/logic_bus_definition.h"
+#include "schematic/math_channel_definition.h"
 #include "schematic/schematic_file.h"
 #include "schematic/simulation_settings.h"
 #include "simulation/live_change.h"

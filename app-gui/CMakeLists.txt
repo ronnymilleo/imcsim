@@ -23,8 +23,8 @@ add_library(imcsim-gui-lib
             overlays/glow_renderer.cpp
             overlays/heat_glow.cpp
             overlays/led_glow.cpp
+            overlays/live_current.cpp
             overlays/readout_placement.cpp
-            overlays/schematic_drawing.cpp
             overlays/schematic_overlays.cpp
             plots/harmonic_balance_view.cpp
             plots/logic_buses.cpp
@@ -66,12 +66,16 @@ add_library(imcsim-gui-lib
             schematic/examples.cpp
             schematic/group_editing.cpp
             schematic/live_input.cpp
+            schematic/logic_bus_definition.cpp
+            schematic/math_channel_definition.cpp
+            schematic/parameter_step_settings.cpp
             schematic/part_catalog.cpp
             schematic/part_names.cpp
             schematic/preferences.cpp
             schematic/probing.cpp
             schematic/ready_blocks.cpp
             schematic/schematic.cpp
+            schematic/schematic_drawing.cpp
             schematic/schematic_file.cpp
             schematic/schematic_file_actions.cpp
             schematic/selection.cpp

@@ -25,7 +25,7 @@ flowchart TD
     app_core[app-core]
     nodalys[nodalys]
     app_core -->|3| nodalys
-    app_gui -->|219| app_core
+    app_gui -->|220| app_core
 ```
 
 ## app-core
@@ -72,16 +72,16 @@ flowchart TD
     app_gui_analysis -->|6| app_gui_schematic
     app_gui_canvas -->|1| app_gui_base
     app_gui_overlays -->|1| app_gui_analysis
-    app_gui_overlays -->|10| app_gui_base
+    app_gui_overlays -->|8| app_gui_base
     app_gui_overlays -->|2| app_gui_canvas
     app_gui_overlays -->|13| app_gui_results
-    app_gui_overlays -->|6| app_gui_schematic
-    app_gui_overlays -->|7| app_gui_ui_elements
+    app_gui_overlays -->|5| app_gui_schematic
+    app_gui_overlays -->|6| app_gui_ui_elements
     app_gui_plots -->|9| app_gui_base
     app_gui_plots -->|9| app_gui_results
     app_gui_plots -->|8| app_gui_schematic
     app_gui_results -->|2| app_gui_base
-    app_gui_results -->|3| app_gui_schematic
+    app_gui_results -->|6| app_gui_schematic
     app_gui_results -->|5| app_gui_ui_elements
     app_gui_root -->|3| app_gui_analysis
     app_gui_root -->|1| app_gui_base
@@ -89,21 +89,20 @@ flowchart TD
     app_gui_root -->|1| app_gui_results
     app_gui_root -->|5| app_gui_schematic
     app_gui_root -->|9| app_gui_windows
-    app_gui_schematic -->|15| app_gui_base
-    app_gui_schematic -.->|2| app_gui_overlays
-    app_gui_schematic -.->|7| app_gui_results
-    app_gui_schematic -->|53| app_gui_ui_elements
+    app_gui_schematic -->|19| app_gui_base
+    app_gui_schematic -->|1| app_gui_canvas
+    app_gui_schematic -.->|2| app_gui_results
+    app_gui_schematic -->|54| app_gui_ui_elements
     app_gui_ui_elements -->|7| app_gui_base
     app_gui_ui_elements -->|2| app_gui_canvas
     app_gui_windows -->|8| app_gui_analysis
     app_gui_windows -->|31| app_gui_base
     app_gui_windows -->|2| app_gui_canvas
-    app_gui_windows -->|3| app_gui_overlays
+    app_gui_windows -->|2| app_gui_overlays
     app_gui_windows -->|51| app_gui_plots
     app_gui_windows -->|23| app_gui_results
-    app_gui_windows -->|68| app_gui_schematic
+    app_gui_windows -->|69| app_gui_schematic
     app_gui_windows -->|3| app_gui_ui_elements
-    linkStyle 23 stroke:#d33,stroke-width:2px
     linkStyle 24 stroke:#d33,stroke-width:2px
 ```
 

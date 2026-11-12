@@ -5,7 +5,7 @@
 
 #include "schematic/canvas_view.h"
 
-#include "overlays/schematic_drawing.h"
+#include "schematic/schematic_drawing.h"
 #include <algorithm>
 #include <utility>
 
