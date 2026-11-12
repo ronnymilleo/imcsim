@@ -563,4 +563,12 @@ SensitivityRun NgspiceBackend::RunSensitivity(const Circuit &circuit, const Sens
     return run;
 }
 
+/**
+ * @brief   Makes ngspice the backend in use until SetBackend() sets another one.
+ * @note    The program and the tests call it once at startup, before anything asks for the backend.
+ */
+void UseNgspiceByDefault() {
+    SetDefaultBackendFactory([]() -> std::unique_ptr<SimulationBackend> { return std::make_unique<NgspiceBackend>(); });
+}
+
 } // namespace Core

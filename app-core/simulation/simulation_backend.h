@@ -180,9 +180,13 @@ public:
                                                   RunControl *control);
 };
 
+/// Makes the default backend, the one in use when none was set.
+using BackendFactory = std::unique_ptr<SimulationBackend> (*)();
+
 // Backend in use
 SimulationBackend &GetBackend();
 void SetBackend(std::unique_ptr<SimulationBackend> backend);
+void SetDefaultBackendFactory(BackendFactory factory);
 
 // Capabilities
 std::string_view GetAnalysisKindName(AnalysisKind kind);

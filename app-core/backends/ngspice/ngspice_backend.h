@@ -43,6 +43,9 @@ private:
     mutable BackendCapabilities m_Capabilities;
 };
 
+// Default backend
+void UseNgspiceByDefault();
+
 } // namespace Core
 
 #endif // IMCSIM_NGSPICE_BACKEND_H

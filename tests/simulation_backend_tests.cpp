@@ -339,6 +339,25 @@ TEST_CASE("ngspice is the backend until another one is set, and runs every analy
               .contains("harmonic balance"));
 }
 
+TEST_CASE("Without a default backend every analysis is refused with a reason and no run succeeds",
+          "[simulation_backend]") {
+    Core::SetDefaultBackendFactory(nullptr);
+    Core::SetBackend(nullptr);
+    Core::SimulationBackend &backend = Core::GetBackend();
+    CHECK(backend.GetCapabilities().Analyses.empty());
+    const std::optional<std::string> reason =
+        Core::FindUnsupported(backend, {Core::ComponentType::RESISTOR}, Core::AnalysisKind::TRANSIENT);
+    REQUIRE(reason.has_value());
+    CHECK(reason->contains("does not run the transient analysis"));
+    const Core::OperatingPointRun run = backend.RunOperatingPoint(Core::Circuit{}, std::nullopt);
+    REQUIRE_FALSE(run.Result.has_value());
+    CHECK(run.Result.error() == "No simulation engine was installed");
+
+    // A factory registered afterwards takes effect, as the program does at startup
+    Core::UseNgspiceByDefault();
+    CHECK(Core::GetBackend().GetName() == "ngspice");
+}
+
 TEST_CASE("Analyses have names for the messages that refuse them", "[simulation_backend]") {
     CHECK(Core::GetAnalysisKindName(Core::AnalysisKind::OPERATING_POINT) == "operating point");
     CHECK(Core::GetAnalysisKindName(Core::AnalysisKind::AC_SWEEP) == "AC sweep");

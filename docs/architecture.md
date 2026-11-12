@@ -40,10 +40,8 @@ flowchart TD
     app_core_backends -->|16| app_core_simulation
     app_core_backends -->|2| app_core_spice
     app_core_circuit -->|5| app_core_spice
-    app_core_simulation -.->|1| app_core_backends
     app_core_simulation -->|45| app_core_circuit
     app_core_simulation -->|2| app_core_spice
-    linkStyle 4 stroke:#d33,stroke-width:2px
 ```
 
 Layers, lowest first:
