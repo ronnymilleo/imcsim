@@ -116,7 +116,7 @@ New to imcsim? The [tutorial](docs/tutorial.md) builds, simulates and exports a 
 
 ## Screenshots
 
-Bode plot of a common-emitter stage next to its hybrid-pi model, with the -3 dB band and the peak of each response:
+Bode plot of a common-emitter stage next to its hybrid-pi model, with the peak and the -3 dB band of each response in the table under the plots:
 
 ![The small-signal example: a 2N3904 stage and its hybrid-pi model, and their magnitude and phase from 1 Hz to
 100 MHz](docs/images/bode.png)
@@ -142,11 +142,11 @@ roughly in the order they are likely to come.
 - **Sources, parts and models**: XSPICE analog blocks (transfer functions, limiters, integrators), transmission lines,
   a circuit driven from a WAV or CSV file, PWL points read from a CSV file, and a MOSFET body diode and higher-level
   MOSFET models
-- **Longer term, a native simulation backend**: a solver written from published circuit theory that sits beside ngspice,
-  which stays available, tested against closed-form results and built to use modern CPUs well. With the backend
-  interface and capability matrix in place, it would come in steps: a linear core (operating point, DC and AC),
-  small-signal and RF analyses (noise, S-parameters, Touchstone blocks), harmonic balance, bipolar transistors with the
-  transient analysis, digital co-simulation, and extras. Nothing else on the roadmap depends on it
+- **Nodalys, a native simulation backend**: a solver written from published circuit theory that sits beside ngspice,
+  which stays available, tested against closed-form results and against ngspice. The next release is planned to bring
+  it as a choice in the preferences, with every analysis of ngspice and a harmonic balance; what it does not cover yet,
+  such as temperature, behavioral sources and fuses, is refused with the reason. Nothing else on the roadmap depends
+  on it
 
 ## Install
 
