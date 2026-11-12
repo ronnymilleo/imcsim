@@ -6,8 +6,8 @@
 #ifndef IMCSIM_RESULT_TABLES_H
 #define IMCSIM_RESULT_TABLES_H
 
-#include "document/schematic.h"
-#include "preferences.h"
+#include "schematic/preferences.h"
+#include "schematic/schematic.h"
 
 namespace GUI {
 

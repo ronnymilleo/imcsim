@@ -6,10 +6,10 @@
 
 #include "windows/output_tabs/monte_carlo_tab.h"
 
-#include "drawing/theme.h"
-#include "editing/probing.h"
+#include "base/theme.h"
 #include "imgui.h"
 #include "implot.h"
+#include "schematic/probing.h"
 #include "spice/spice_value.h"
 #include "windows/output_tabs/plot_widgets.h"
 #include <algorithm>

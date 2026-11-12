@@ -6,7 +6,7 @@
 #ifndef IMCSIM_PLOT_EXPORTER_H
 #define IMCSIM_PLOT_EXPORTER_H
 
-#include "document/file_dialog.h"
+#include "base/file_dialog.h"
 #include "plots/plot_export.h"
 #include <filesystem>
 #include <optional>

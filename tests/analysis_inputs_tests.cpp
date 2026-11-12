@@ -10,8 +10,8 @@
 #include "circuit/components/logic_input.h"
 #include "circuit/components/resistor.h"
 #include "circuit/components/voltage_source.h"
-#include "document/examples.h"
-#include "document/schematic.h"
+#include "schematic/examples.h"
+#include "schematic/schematic.h"
 #include "test_printers.h"
 #include <algorithm>
 #include <catch2/catch_test_macros.hpp>

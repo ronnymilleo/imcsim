@@ -5,10 +5,10 @@
 
 #include "windows/editor_toolbar.h"
 
-#include "drawing/theme.h"
-#include "drawing/tool_icons.h"
-#include "editing/shortcuts.h"
+#include "base/theme.h"
+#include "schematic/shortcuts.h"
 #include "spice/spice_value.h"
+#include "windows/tool_icons.h"
 #include <algorithm>
 #include <array>
 #include <format>

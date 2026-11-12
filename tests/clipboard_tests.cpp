@@ -7,10 +7,10 @@
 #include "circuit/components/logic_input.h"
 #include "circuit/components/net_label.h"
 #include "circuit/components/subcircuit.h"
-#include "document/clipboard.h"
-#include "document/examples.h"
-#include "document/schematic.h"
-#include "editing/element_factory.h"
+#include "schematic/clipboard.h"
+#include "schematic/element_factory.h"
+#include "schematic/examples.h"
+#include "schematic/schematic.h"
 #include "test_printers.h"
 #include <catch2/catch_test_macros.hpp>
 #include <memory>

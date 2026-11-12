@@ -6,13 +6,13 @@
 #ifndef IMCSIM_HARMONIC_BALANCE_TAB_H
 #define IMCSIM_HARMONIC_BALANCE_TAB_H
 
-#include "analysis/harmonic_balance_view.h"
-#include "document/schematic.h"
+#include "plots/harmonic_balance_view.h"
 #include "plots/plot_export.h"
 #include "plots/plot_exporter.h"
 #include "plots/plot_types.h"
 #include "plots/trace_fit_state.h"
-#include "preferences.h"
+#include "schematic/preferences.h"
+#include "schematic/schematic.h"
 #include <cstddef>
 #include <optional>
 #include <vector>

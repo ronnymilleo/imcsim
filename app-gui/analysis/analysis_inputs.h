@@ -6,9 +6,9 @@
 #ifndef IMCSIM_ANALYSIS_INPUTS_H
 #define IMCSIM_ANALYSIS_INPUTS_H
 
+#include "base/helpers.h"
 #include "circuit/circuit.h"
-#include "document/schematic.h"
-#include "helpers.h"
+#include "schematic/schematic.h"
 #include "simulation/analysis_settings.h"
 #include <cstddef>
 #include <optional>

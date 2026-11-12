@@ -7,11 +7,11 @@
 #ifndef IMCSIM_ANALYSIS_SETTINGS_PANEL_H
 #define IMCSIM_ANALYSIS_SETTINGS_PANEL_H
 
-#include "analysis/parameter_step.h"
-#include "document/schematic.h"
-#include "document/simulation_settings.h"
+#include "base/value_field.h"
+#include "results/parameter_step.h"
+#include "schematic/schematic.h"
+#include "schematic/simulation_settings.h"
 #include "simulation/monte_carlo.h"
-#include "value_field.h"
 #include <array>
 #include <cstddef>
 #include <string>

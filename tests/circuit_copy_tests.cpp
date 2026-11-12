@@ -11,8 +11,8 @@
 #include "circuit/components/op_amp.h"
 #include "circuit/components/resistor.h"
 #include "circuit/components/voltage_source.h"
-#include "document/examples.h"
-#include "document/schematic.h"
+#include "schematic/examples.h"
+#include "schematic/schematic.h"
 #include <catch2/catch_test_macros.hpp>
 #include <memory>
 #include <string>

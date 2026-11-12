@@ -6,13 +6,13 @@
 #ifndef IMCSIM_PLOT_WIDGETS_H
 #define IMCSIM_PLOT_WIDGETS_H
 
-#include "analysis/playback.h"
-#include "document/schematic.h"
 #include "imgui.h"
 #include "implot.h"
 #include "plots/math_channels.h"
 #include "plots/plot_types.h"
 #include "plots/statistics_table.h"
+#include "results/playback.h"
+#include "schematic/schematic.h"
 #include "simulation/simulation_results.h"
 #include <cstddef>
 #include <functional>

@@ -6,7 +6,7 @@
 #ifndef IMCSIM_PREFERENCES_WINDOW_H
 #define IMCSIM_PREFERENCES_WINDOW_H
 
-#include "preferences.h"
+#include "schematic/preferences.h"
 #include "windows/app_window.h"
 
 namespace GUI {

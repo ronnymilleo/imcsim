@@ -7,11 +7,11 @@
 #ifndef IMCSIM_SPECTRUM_TAB_H
 #define IMCSIM_SPECTRUM_TAB_H
 
-#include "document/schematic.h"
 #include "plots/math_channels.h"
 #include "plots/plot_export.h"
 #include "plots/plot_types.h"
 #include "plots/spectrum.h"
+#include "schematic/schematic.h"
 #include "windows/output_tabs/frame_results.h"
 #include <optional>
 #include <vector>

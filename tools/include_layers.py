@@ -37,9 +37,9 @@ ROOT_FOLDER = "root"
 # Lowest first. A library may include the libraries before it in this list, never the ones after it
 LIBRARY_LAYERS = [[NODALYS], [CORE], [GUI]]
 
-# Lowest first, one list per layer. Folders in the same layer may include each other. These are the folders as they
-# are today, ordered as close as possible to the target of jay #211. The backends sit on top of the simulation that
-# they plug into. Update this list in the same change that moves a folder
+# Lowest first, one list per layer. Folders in the same layer may include each other. These are the folders of jay
+# #211. The backends sit on top of the simulation that they plug into. Update this list in the same change that moves
+# a folder
 FOLDER_LAYERS = {
     CORE: [
         ["spice"],
@@ -48,11 +48,14 @@ FOLDER_LAYERS = {
         ["backends"],
     ],
     GUI: [
+        ["base"],
+        ["canvas"],
         ["ui_elements"],
-        ["editing", "document"],
+        ["schematic"],
+        ["results"],
         ["analysis"],
         ["plots"],
-        ["drawing"],
+        ["overlays"],
         ["windows"],
         [ROOT_FOLDER],
     ],

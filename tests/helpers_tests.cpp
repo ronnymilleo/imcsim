@@ -3,7 +3,7 @@
  * @brief   Tests for grid points, rotations, snapping and the world/screen transform.
  */
 
-#include "helpers.h"
+#include "base/helpers.h"
 #include "test_printers.h"
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators.hpp>

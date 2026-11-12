@@ -7,9 +7,9 @@
 #ifndef IMCSIM_ANALYSIS_CONTROLS_H
 #define IMCSIM_ANALYSIS_CONTROLS_H
 
-#include "analysis/parameter_step.h"
-#include "document/schematic.h"
-#include "document/simulation_settings.h"
+#include "results/parameter_step.h"
+#include "schematic/schematic.h"
+#include "schematic/simulation_settings.h"
 #include "simulation/simulation_service.h"
 #include "simulation/simulator.h"
 #include <array>

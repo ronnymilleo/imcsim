@@ -5,14 +5,14 @@
 
 #include "windows/output_tabs/result_tables.h"
 
-#include "analysis/sensitivity_view.h"
-#include "analysis/truth_table.h"
+#include "base/theme.h"
 #include "circuit/components/logic_input.h"
-#include "drawing/theme.h"
-#include "editing/probing.h"
 #include "imgui.h"
-#include "plots/logic_trace.h"
-#include "plots/trace_statistics.h"
+#include "results/logic_trace.h"
+#include "results/sensitivity_view.h"
+#include "results/trace_statistics.h"
+#include "results/truth_table.h"
+#include "schematic/probing.h"
 #include "spice/spice_value.h"
 #include "windows/output_tabs/plot_widgets.h"
 #include <algorithm>

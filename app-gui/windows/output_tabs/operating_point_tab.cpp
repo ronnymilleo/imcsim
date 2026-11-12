@@ -6,10 +6,10 @@
 
 #include "windows/output_tabs/operating_point_tab.h"
 
-#include "analysis/parameter_step.h"
-#include "drawing/theme.h"
+#include "base/theme.h"
 #include "imgui.h"
 #include "implot.h"
+#include "results/parameter_step.h"
 #include "spice/spice_value.h"
 #include "windows/output_tabs/plot_widgets.h"
 #include <format>

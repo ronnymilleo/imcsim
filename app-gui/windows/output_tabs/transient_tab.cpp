@@ -5,14 +5,14 @@
 
 #include "windows/output_tabs/transient_tab.h"
 
-#include "drawing/node_colors.h"
-#include "drawing/theme.h"
-#include "editing/probing.h"
+#include "base/node_colors.h"
+#include "base/theme.h"
 #include "imgui_internal.h"
 #include "implot.h"
 #include "plots/plot_figures.h"
 #include "plots/statistics_table.h"
-#include "plots/trace_statistics.h"
+#include "results/trace_statistics.h"
+#include "schematic/probing.h"
 #include "spice/spice_value.h"
 #include "windows/output_tabs/plot_widgets.h"
 #include <algorithm>

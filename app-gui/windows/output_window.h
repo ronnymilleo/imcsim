@@ -7,14 +7,14 @@
 #define IMCSIM_OUTPUT_WINDOW_H
 
 #include "analysis/analysis_controls.h"
-#include "analysis/playback.h"
-#include "document/schematic.h"
 #include "imgui.h"
 #include "plots/logic_buses.h"
 #include "plots/math_channels.h"
 #include "plots/plot_export.h"
 #include "plots/plot_exporter.h"
-#include "preferences.h"
+#include "results/playback.h"
+#include "schematic/preferences.h"
+#include "schematic/schematic.h"
 #include "simulation/simulation_results.h"
 #include "windows/app_window.h"
 #include "windows/output_tabs/ac_sweep_tab.h"

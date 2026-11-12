@@ -5,7 +5,7 @@
 
 #include "plots/spectrum.h"
 
-#include "plots/trace_statistics.h"
+#include "results/trace_statistics.h"
 #include <algorithm>
 #include <bit>
 #include <cmath>

@@ -7,12 +7,12 @@
 #ifndef IMCSIM_S_PARAMETER_TAB_H
 #define IMCSIM_S_PARAMETER_TAB_H
 
-#include "analysis/s_parameter_view.h"
-#include "document/schematic.h"
 #include "plots/plot_export.h"
 #include "plots/plot_exporter.h"
 #include "plots/plot_types.h"
+#include "plots/s_parameter_view.h"
 #include "plots/touchstone.h"
+#include "schematic/schematic.h"
 #include "simulation/simulation_results.h"
 #include <cstddef>
 #include <string>

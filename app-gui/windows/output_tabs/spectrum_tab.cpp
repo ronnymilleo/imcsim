@@ -6,11 +6,11 @@
 
 #include "windows/output_tabs/spectrum_tab.h"
 
-#include "drawing/theme.h"
+#include "base/theme.h"
+#include "base/value_field.h"
 #include "implot.h"
 #include "plots/plot_figures.h"
 #include "spice/spice_value.h"
-#include "value_field.h"
 #include "windows/output_tabs/plot_widgets.h"
 #include <algorithm>
 #include <cmath>

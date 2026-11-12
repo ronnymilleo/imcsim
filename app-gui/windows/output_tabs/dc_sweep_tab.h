@@ -6,11 +6,11 @@
 #ifndef IMCSIM_DC_SWEEP_TAB_H
 #define IMCSIM_DC_SWEEP_TAB_H
 
-#include "document/schematic.h"
 #include "plots/math_channels.h"
 #include "plots/plot_export.h"
 #include "plots/plot_types.h"
 #include "plots/trace_fit_state.h"
+#include "schematic/schematic.h"
 #include "simulation/simulation_results.h"
 #include "windows/output_tabs/frame_results.h"
 #include <vector>

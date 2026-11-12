@@ -5,11 +5,11 @@
 
 #include "windows/output_tabs/pole_zero_tab.h"
 
-#include "analysis/pole_zero_view.h"
-#include "drawing/theme.h"
-#include "editing/probing.h"
+#include "base/theme.h"
 #include "imgui.h"
 #include "implot.h"
+#include "results/pole_zero_view.h"
+#include "schematic/probing.h"
 #include "spice/spice_value.h"
 #include "windows/output_tabs/plot_widgets.h"
 #include <algorithm>

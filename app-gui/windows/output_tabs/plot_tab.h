@@ -6,7 +6,7 @@
 #ifndef IMCSIM_PLOT_TAB_H
 #define IMCSIM_PLOT_TAB_H
 
-#include "document/simulation_settings.h"
+#include "schematic/simulation_settings.h"
 #include <array>
 #include <cstddef>
 #include <optional>

@@ -7,8 +7,8 @@
 #ifndef IMCSIM_MONTE_CARLO_TAB_H
 #define IMCSIM_MONTE_CARLO_TAB_H
 
-#include "analysis/monte_carlo_results.h"
-#include "document/schematic.h"
+#include "results/monte_carlo_results.h"
+#include "schematic/schematic.h"
 #include <cstddef>
 #include <optional>
 #include <string>

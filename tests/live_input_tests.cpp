@@ -4,12 +4,12 @@
  *          a live transient runs.
  */
 
-#include "editing/live_input.h"
+#include "schematic/live_input.h"
 
 #include "circuit/components/logic_input.h"
 #include "circuit/components/potentiometer.h"
 #include "circuit/components/switch.h"
-#include "editing/element_factory.h"
+#include "schematic/element_factory.h"
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 #include <memory>

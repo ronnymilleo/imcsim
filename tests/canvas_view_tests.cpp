@@ -3,7 +3,7 @@
  * @brief   Tests for the pan and zoom of the schematic canvas.
  */
 
-#include "editing/canvas_view.h"
+#include "schematic/canvas_view.h"
 
 #include "test_printers.h"
 #include <catch2/catch_test_macros.hpp>

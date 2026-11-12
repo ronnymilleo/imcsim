@@ -3,15 +3,15 @@
  * @brief   Tests for the logic output, which shows the logic level of its node and takes no part in the simulation.
  */
 
-#include "analysis/logic_outputs.h"
 #include "circuit/components/logic_input.h"
 #include "circuit/components/logic_output.h"
 #include "digital_models.h"
-#include "document/ready_blocks.h"
-#include "document/schematic.h"
-#include "document/schematic_file.h"
-#include "editing/connectivity.h"
-#include "editing/element_factory.h"
+#include "results/logic_outputs.h"
+#include "schematic/connectivity.h"
+#include "schematic/element_factory.h"
+#include "schematic/ready_blocks.h"
+#include "schematic/schematic.h"
+#include "schematic/schematic_file.h"
 #include "simulation/circuit_checks.h"
 #include "simulation/simulator.h"
 #include <algorithm>

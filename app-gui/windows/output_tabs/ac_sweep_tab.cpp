@@ -8,7 +8,7 @@
 #include "implot.h"
 #include "plots/plot_figures.h"
 #include "plots/statistics_table.h"
-#include "plots/trace_statistics.h"
+#include "results/trace_statistics.h"
 #include "windows/output_tabs/plot_widgets.h"
 #include <cmath>
 #include <format>

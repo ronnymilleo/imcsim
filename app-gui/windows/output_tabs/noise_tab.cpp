@@ -6,11 +6,11 @@
 
 #include "windows/output_tabs/noise_tab.h"
 
-#include "drawing/node_colors.h"
-#include "drawing/theme.h"
-#include "editing/probing.h"
+#include "base/node_colors.h"
+#include "base/theme.h"
 #include "implot.h"
 #include "plots/plot_figures.h"
+#include "schematic/probing.h"
 #include "spice/spice_value.h"
 #include "windows/output_tabs/plot_widgets.h"
 #include <algorithm>

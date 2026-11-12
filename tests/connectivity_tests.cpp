@@ -5,7 +5,7 @@
 
 #include "circuit/components/net_label.h"
 #include "circuit/components/subcircuit_pin.h"
-#include "editing/connectivity.h"
+#include "schematic/connectivity.h"
 #include "test_printers.h"
 #include "ui_elements/ui_ground.h"
 #include "ui_elements/ui_logic_input.h"

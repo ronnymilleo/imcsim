@@ -7,7 +7,7 @@
 #define IMCSIM_SPICE_BLOCK_DIALOG_H
 
 #include "circuit/spice_library.h"
-#include "document/schematic_file.h"
+#include "schematic/schematic_file.h"
 #include <optional>
 #include <string>
 #include <vector>

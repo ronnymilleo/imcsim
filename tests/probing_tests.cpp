@@ -4,8 +4,8 @@
  */
 
 #include "circuit/components/net_label.h"
-#include "editing/element_factory.h"
-#include "editing/probing.h"
+#include "schematic/element_factory.h"
+#include "schematic/probing.h"
 #include "test_printers.h"
 #include <catch2/catch_test_macros.hpp>
 #include <format>

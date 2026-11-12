@@ -6,13 +6,13 @@
 #ifndef IMCSIM_PLOT_FIGURES_H
 #define IMCSIM_PLOT_FIGURES_H
 
-#include "document/schematic.h"
 #include "implot.h"
-#include "plots/logic_bus.h"
-#include "plots/logic_trace.h"
 #include "plots/math_channels.h"
 #include "plots/plot_export.h"
 #include "plots/plot_types.h"
+#include "results/logic_bus.h"
+#include "results/logic_trace.h"
+#include "schematic/schematic.h"
 #include "simulation/simulator.h"
 #include <cstddef>
 #include <set>

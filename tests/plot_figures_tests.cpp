@@ -3,10 +3,10 @@
  * @brief   Tests for the export figures of the Output window plots.
  */
 
-#include "document/schematic.h"
 #include "plots/math_channels.h"
 #include "plots/plot_export.h"
 #include "plots/plot_figures.h"
+#include "schematic/schematic.h"
 #include <catch2/catch_test_macros.hpp>
 #include <string>
 #include <vector>

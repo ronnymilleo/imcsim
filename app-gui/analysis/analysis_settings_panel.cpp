@@ -7,10 +7,10 @@
 #include "analysis/analysis_settings_panel.h"
 
 #include "analysis/analysis_inputs.h"
-#include "drawing/theme.h"
-#include "editing/probing.h"
+#include "base/theme.h"
 #include "imgui.h"
 #include "misc/cpp/imgui_stdlib.h"
+#include "schematic/probing.h"
 #include "simulation/analysis_suggestions.h"
 #include "simulation/circuit_checks.h"
 #include "simulation/simulation_backend.h"

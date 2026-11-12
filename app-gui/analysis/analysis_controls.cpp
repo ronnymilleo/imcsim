@@ -7,7 +7,7 @@
 #include "analysis/analysis_controls.h"
 
 #include "analysis/analysis_inputs.h"
-#include "drawing/theme.h"
+#include "base/theme.h"
 #include "imgui.h"
 #include "simulation/circuit_checks.h"
 #include "simulation/circuit_copy.h"

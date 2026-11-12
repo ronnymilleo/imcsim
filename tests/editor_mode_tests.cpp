@@ -3,7 +3,7 @@
  * @brief   Tests for the modes of the editor: what each one shows in the status bar, placing and drawing wires.
  */
 
-#include "editing/editor_mode.h"
+#include "schematic/editor_mode.h"
 #include "test_printers.h"
 #include <catch2/catch_test_macros.hpp>
 #include <string>

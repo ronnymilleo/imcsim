@@ -5,13 +5,13 @@
 
 #include "windows/output_window.h"
 
-#include "drawing/node_colors.h"
-#include "drawing/theme.h"
-#include "drawing/trace_swatch.h"
-#include "editing/probing.h"
+#include "base/node_colors.h"
+#include "base/theme.h"
+#include "base/trace_swatch.h"
 #include "imgui_internal.h"
 #include "implot.h"
 #include "plots/plot_figures.h"
+#include "schematic/probing.h"
 #include "windows/output_tabs/plot_widgets.h"
 #include "windows/output_tabs/result_tables.h"
 #include <algorithm>

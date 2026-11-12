@@ -1,0 +1,1509 @@
+/**
+ * @file    part_editor.cpp
+ * @brief   Fields that show and edit the component selected in the schematic.
+ */
+
+#include "windows/part_editor.h"
+
+#include "base/theme.h"
+#include "circuit/behavioral_expression.h"
+#include "misc/cpp/imgui_stdlib.h"
+#include "schematic/element_factory.h"
+#include "schematic/live_input.h"
+#include "schematic/subcircuit_pins.h"
+#include "simulation/circuit_checks.h"
+#include "simulation/simulator.h"
+#include "spice/spice_value.h"
+#include <algorithm>
+#include <array>
+#include <cfloat>
+#include <cmath>
+#include <cstddef>
+#include <format>
+#include <optional>
+#include <span>
+#include <string>
+#include <utility>
+
+namespace GUI {
+
+namespace {
+
+/// Width of the expression field of a behavioral source, in font sizes, so a typical expression shows whole.
+constexpr float EXPRESSION_FIELD_WIDTH = 20.0f;
+/// Width at which the help below the expression wraps, in font sizes.
+constexpr float EXPRESSION_HELP_WIDTH = 24.0f;
+
+bool AnyValue(double /*value*/) {
+    return true;
+}
+
+/// Custom model parameters beyond this many scroll.
+constexpr float MAX_VISIBLE_PARAMETERS = 10.0f;
+/// Width, in font sizes, at which the description of a ready model wraps, so a long one does not widen the popover.
+constexpr float DESCRIPTION_WRAP_FONT_SIZES = 26.0f;
+
+/**
+ * @struct  ParameterField
+ * @brief   One member of a parameter set, such as Core::PulseParameters, as a field of the part editor.
+ */
+template <typename Parameters> struct ParameterField {
+    const char *Label;
+    double Parameters::*Value;
+    // No unit means the unit of the source, volts or amperes
+    const char *Unit;
+    // What the field shows is the stored value times this, such as 100 for a share kept as a fraction and typed in %
+    double Scale = 1.0;
+};
+
+constexpr auto AC_FIELDS = std::to_array<ParameterField<Core::ACParameters>>({
+    {"Amplitude", &Core::ACParameters::Amplitude, nullptr},
+    {"Frequency", &Core::ACParameters::Frequency, "Hz"},
+    {"Offset", &Core::ACParameters::Offset, nullptr},
+    {"AC magnitude", &Core::ACParameters::Magnitude, nullptr},
+});
+
+constexpr auto PULSE_FIELDS = std::to_array<ParameterField<Core::PulseParameters>>({
+    {"Low", &Core::PulseParameters::Low, nullptr},
+    {"High", &Core::PulseParameters::High, nullptr},
+    {"Delay", &Core::PulseParameters::Delay, "s"},
+    {"Rise", &Core::PulseParameters::RiseTime, "s"},
+    {"Fall", &Core::PulseParameters::FallTime, "s"},
+    {"Width", &Core::PulseParameters::Width, "s"},
+    {"Period", &Core::PulseParameters::Period, "s"},
+});
+
+constexpr auto EXP_FIELDS = std::to_array<ParameterField<Core::EXPParameters>>({
+    {"Start", &Core::EXPParameters::InitialValue, nullptr},
+    {"Peak", &Core::EXPParameters::PeakValue, nullptr},
+    {"Rise delay", &Core::EXPParameters::RiseDelay, "s"},
+    {"Rise tau", &Core::EXPParameters::RiseTimeConstant, "s"},
+    {"Fall delay", &Core::EXPParameters::FallDelay, "s"},
+    {"Fall tau", &Core::EXPParameters::FallTimeConstant, "s"},
+});
+
+constexpr auto NOISE_FIELDS = std::to_array<ParameterField<Core::NoiseParameters>>({
+    {"Offset", &Core::NoiseParameters::Offset, nullptr},
+    {"White rms", &Core::NoiseParameters::WhiteAmplitude, nullptr},
+    {"Sample step", &Core::NoiseParameters::TimeStep, "s"},
+    {"1/f exponent", &Core::NoiseParameters::FlickerExponent, ""},
+    {"1/f amplitude", &Core::NoiseParameters::FlickerAmplitude, nullptr},
+    {"Telegraph", &Core::NoiseParameters::TelegraphAmplitude, nullptr},
+    {"Capture time", &Core::NoiseParameters::CaptureTime, "s"},
+    {"Emission time", &Core::NoiseParameters::EmissionTime, "s"},
+});
+
+/// What the first and second parameters of each distribution are called; Poisson lambda is a count, with no unit.
+struct RandomLabels {
+    const char *First;
+    const char *Second;
+    const char *FirstUnit;
+};
+
+constexpr RandomLabels GetRandomLabels(const Core::RandomDistribution distribution) {
+    switch (distribution) {
+    case Core::RandomDistribution::UNIFORM:
+        return {"Range +/-", "Offset", nullptr};
+    case Core::RandomDistribution::EXPONENTIAL:
+        return {"Mean", "Offset", nullptr};
+    case Core::RandomDistribution::POISSON:
+        return {"Lambda", "Offset", ""};
+    case Core::RandomDistribution::GAUSSIAN:
+    default:
+        return {"Std deviation", "Mean", nullptr};
+    }
+}
+
+constexpr auto SFFM_FIELDS = std::to_array<ParameterField<Core::SFFMParameters>>({
+    {"Offset", &Core::SFFMParameters::Offset, nullptr},
+    {"Amplitude", &Core::SFFMParameters::Amplitude, nullptr},
+    {"Carrier", &Core::SFFMParameters::CarrierFrequency, "Hz"},
+    {"Mod index", &Core::SFFMParameters::ModulationIndex, ""},
+    {"Signal", &Core::SFFMParameters::SignalFrequency, "Hz"},
+});
+
+constexpr auto AM_FIELDS = std::to_array<ParameterField<Core::AMParameters>>({
+    {"Amplitude", &Core::AMParameters::Amplitude, nullptr},
+    {"Offset", &Core::AMParameters::Offset, nullptr},
+    {"Mod freq", &Core::AMParameters::ModulatingFrequency, "Hz"},
+    {"Carrier", &Core::AMParameters::CarrierFrequency, "Hz"},
+    {"Delay", &Core::AMParameters::Delay, "s"},
+});
+
+/// Labeled with the SPICE parameter names, as datasheet models list them.
+constexpr auto DIODE_FIELDS = std::to_array<ParameterField<Core::DiodeParameters>>({
+    {"IS", &Core::DiodeParameters::SaturationCurrent, "A"},
+    {"N", &Core::DiodeParameters::EmissionCoefficient, ""},
+    {"RS", &Core::DiodeParameters::SeriesResistance, "Ohm"},
+    {"BV", &Core::DiodeParameters::BreakdownVoltage, "V"},
+    {"IBV", &Core::DiodeParameters::BreakdownCurrent, "A"},
+    {"CJO", &Core::DiodeParameters::JunctionCapacitance, "F"},
+    {"VJ", &Core::DiodeParameters::JunctionPotential, "V"},
+    {"M", &Core::DiodeParameters::GradingCoefficient, ""},
+    {"TT", &Core::DiodeParameters::TransitTime, "s"},
+    {"IF max", &Core::DiodeParameters::MaxForwardCurrent, "A"},
+    {"P max", &Core::DiodeParameters::MaxPower, "W"},
+});
+
+constexpr auto BJT_FIELDS = std::to_array<ParameterField<Core::BJTParameters>>({
+    {"IS", &Core::BJTParameters::SaturationCurrent, "A"},
+    {"BF", &Core::BJTParameters::ForwardBeta, ""},
+    {"BR", &Core::BJTParameters::ReverseBeta, ""},
+    {"VAF", &Core::BJTParameters::EarlyVoltage, "V"},
+    {"IKF", &Core::BJTParameters::ForwardKneeCurrent, "A"},
+    {"ISE", &Core::BJTParameters::LeakageSaturationCurrent, "A"},
+    {"NE", &Core::BJTParameters::LeakageEmissionCoefficient, ""},
+    {"RB", &Core::BJTParameters::BaseResistance, "Ohm"},
+    {"RC", &Core::BJTParameters::CollectorResistance, "Ohm"},
+    {"RE", &Core::BJTParameters::EmitterResistance, "Ohm"},
+    {"CJE", &Core::BJTParameters::EmitterCapacitance, "F"},
+    {"CJC", &Core::BJTParameters::CollectorCapacitance, "F"},
+    {"TF", &Core::BJTParameters::TransitTime, "s"},
+    {"VCEO", &Core::BJTParameters::MaxCollectorEmitterVoltage, "V"},
+    {"IC max", &Core::BJTParameters::MaxCollectorCurrent, "A"},
+    {"P max", &Core::BJTParameters::MaxPower, "W"},
+});
+
+constexpr auto MOSFET_FIELDS = std::to_array<ParameterField<Core::MOSFETParameters>>({
+    {"VTO", &Core::MOSFETParameters::ThresholdVoltage, "V"},
+    {"KP", &Core::MOSFETParameters::Transconductance, "A/V2"},
+    {"LAMBDA", &Core::MOSFETParameters::ChannelModulation, "1/V"},
+    {"RD", &Core::MOSFETParameters::DrainResistance, "Ohm"},
+    {"RS", &Core::MOSFETParameters::SourceResistance, "Ohm"},
+    {"CGSO", &Core::MOSFETParameters::GateSourceOverlap, "F/m"},
+    {"CGDO", &Core::MOSFETParameters::GateDrainOverlap, "F/m"},
+    {"W", &Core::MOSFETParameters::Width, "m"},
+    {"L", &Core::MOSFETParameters::Length, "m"},
+    {"VDS max", &Core::MOSFETParameters::MaxDrainSourceVoltage, "V"},
+    {"VGS max", &Core::MOSFETParameters::MaxGateSourceVoltage, "V"},
+    {"ID max", &Core::MOSFETParameters::MaxDrainCurrent, "A"},
+    {"P max", &Core::MOSFETParameters::MaxPower, "W"},
+});
+
+/// Datasheet specifications, from which the macromodel is built.
+constexpr auto OP_AMP_FIELDS = std::to_array<ParameterField<Core::OpAmpParameters>>({
+    {"Avol", &Core::OpAmpParameters::OpenLoopGainDecibels, "dB"},
+    {"GBW", &Core::OpAmpParameters::GainBandwidth, "Hz"},
+    {"Slew rate", &Core::OpAmpParameters::SlewRate, "V/us"},
+    {"Phase margin", &Core::OpAmpParameters::PhaseMarginDegrees, "deg"},
+    {"IB", &Core::OpAmpParameters::InputBiasCurrent, "A"},
+    {"CMRR", &Core::OpAmpParameters::CommonModeRejectionDecibels, "dB"},
+    {"Rout", &Core::OpAmpParameters::OutputResistance, "Ohm"},
+    {"Isc", &Core::OpAmpParameters::ShortCircuitCurrent, "A"},
+    {"V+ headroom", &Core::OpAmpParameters::PositiveHeadroom, "V"},
+    {"V- headroom", &Core::OpAmpParameters::NegativeHeadroom, "V"},
+    {"Supply current", &Core::OpAmpParameters::SupplyCurrent, "A"},
+    {"VOS", &Core::OpAmpParameters::InputOffsetVoltage, "V"},
+});
+
+constexpr auto SWITCH_FIELDS = std::to_array<ParameterField<Core::SwitchParameters>>({
+    {"Threshold", &Core::SwitchParameters::Threshold, "V"},
+    {"Hysteresis", &Core::SwitchParameters::Hysteresis, "V"},
+    {"On resistance", &Core::SwitchParameters::OnResistance, "Ohm"},
+    {"Off resistance", &Core::SwitchParameters::OffResistance, "Ohm"},
+});
+
+constexpr auto RELAY_FIELDS = std::to_array<ParameterField<Core::RelayParameters>>({
+    {"Coil R", &Core::RelayParameters::CoilResistance, "Ohm"},
+    {"Coil L", &Core::RelayParameters::CoilInductance, "H"},
+    {"Pull-in", &Core::RelayParameters::PullInVoltage, "V"},
+    {"Drop-out", &Core::RelayParameters::DropOutVoltage, "V"},
+    {"Contact R", &Core::RelayParameters::ContactResistance, "Ohm"},
+});
+
+constexpr auto FUSE_FIELDS = std::to_array<ParameterField<Core::FuseParameters>>({
+    {"Rated current", &Core::FuseParameters::RatedCurrent, "A"},
+    {"Melting I2t", &Core::FuseParameters::MeltingI2t, "A2s"},
+    {"Cold R", &Core::FuseParameters::ColdResistance, "Ohm"},
+    {"Blown R", &Core::FuseParameters::BlownResistance, "Ohm"},
+});
+
+constexpr auto TRANSFORMER_FIELDS = std::to_array<ParameterField<Core::TransformerParameters>>({
+    {"Turns ratio", &Core::TransformerParameters::TurnsRatio, ":1"},
+    {"Coupling", &Core::TransformerParameters::Coupling, ""},
+    {"Winding R", &Core::TransformerParameters::WindingResistance, "Ohm"},
+});
+
+constexpr auto LOGIC_FIELDS = std::to_array<ParameterField<Core::LogicParameters>>({
+    {"Logic level", &Core::LogicParameters::LogicLevel, "V"},
+    {"Delay", &Core::LogicParameters::PropagationDelay, "s"},
+});
+
+/// A clock picks its own rise and fall times, so the user sets only these figures.
+constexpr auto CLOCK_FIELDS = std::to_array<ParameterField<Core::ClockParameters>>({
+    {"Frequency", &Core::ClockParameters::Frequency, "Hz"},
+    {"Duty", &Core::ClockParameters::DutyCycle, "%", 100.0},
+    {"Logic level", &Core::ClockParameters::LogicLevel, "V"},
+    {"Start delay", &Core::ClockParameters::StartDelay, "s"},
+});
+
+constexpr auto LOGIC_INPUT_FIELDS = std::to_array<ParameterField<Core::LogicInputParameters>>({
+    {"Logic level", &Core::LogicInputParameters::LogicLevel, "V"},
+});
+
+constexpr auto LOGIC_OUTPUT_FIELDS = std::to_array<ParameterField<Core::LogicOutputParameters>>({
+    {"Logic level", &Core::LogicOutputParameters::LogicLevel, "V"},
+});
+
+constexpr auto SEVEN_SEGMENT_FIELDS = std::to_array<ParameterField<Core::SevenSegmentParameters>>({
+    {"Logic level", &Core::SevenSegmentParameters::LogicLevel, "V"},
+});
+
+template <typename Parameters, std::size_t Count>
+void LoadParameterFields(const std::array<ParameterField<Parameters>, Count> &fields,
+                         std::array<ValueField, Count> &value_fields, const Parameters &parameters) {
+    for (std::size_t index = 0; index < Count; ++index) {
+        value_fields[index].Load(parameters.*fields[index].Value * fields[index].Scale);
+    }
+}
+
+/**
+ * @brief   Draws one field per member and applies a valid edit to the parameters; each value is checked by trying it in
+ *          a copy of the whole set, since some limits depend on several members.
+ * @details Returns whether a value changed.
+ */
+template <typename Parameters, std::size_t Count>
+bool DrawParameterFields(const std::array<ParameterField<Parameters>, Count> &fields,
+                         std::array<ValueField, Count> &value_fields, const char *source_unit, const auto &is_valid,
+                         Parameters &parameters) {
+    bool changed = false;
+    for (std::size_t index = 0; index < Count; ++index) {
+        const ParameterField<Parameters> &field = fields[index];
+        const auto is_valid_value = [&](const double value) {
+            Parameters candidate = parameters;
+            candidate.*field.Value = value / field.Scale;
+            return is_valid(candidate);
+        };
+        const char *unit = field.Unit != nullptr ? field.Unit : source_unit;
+        if (const std::optional<double> value = value_fields[index].Draw(field.Label, unit, is_valid_value)) {
+            parameters.*field.Value = *value / field.Scale;
+            changed = true;
+        }
+    }
+    return changed;
+}
+
+/**
+ * @brief   Draws the model combo of a part that offers ready models, models imported from libraries or custom
+ *          parameters, its description or its custom fields, and applies a change; returns whether the part changed.
+ * @details Custom starts from the parameters of the model it replaces, so a ready part can be tweaked.
+ */
+template <typename Part, typename Model, typename Parameters, std::size_t Count>
+bool DrawModelChoice(Part &part, const std::span<const Model> models, const char *custom_name,
+                     const std::array<ParameterField<Parameters>, Count> &fields,
+                     std::array<ValueField, Count> &value_fields,
+                     const std::span<const Core::LibraryModel> library_models = {}) {
+    bool changed = false;
+    DrawFieldLabel("Model");
+    // A library model may share its name with a ready one, so it says where it comes from
+    const std::string preview =
+        part.HasLibraryModel() ? std::format("{} (library)", part.GetModelName()) : std::string(part.GetModelName());
+    if (ImGui::BeginCombo("##Model", preview.c_str())) {
+        for (const Model &model : models) {
+            const bool selected = &model == part.GetModel();
+            if (ImGui::Selectable(model.Name, selected) && !selected) {
+                part.SetModel(model);
+                changed = true;
+            }
+            if (selected) {
+                ImGui::SetItemDefaultFocus();
+            }
+        }
+        // The models imported from libraries that fit the part, after the ready ones
+        for (const Core::LibraryModel &model : library_models) {
+            if (!Core::CanUseLibraryModel(part.GetType(), model.Kind)) {
+                continue;
+            }
+            const bool selected = part.GetLibraryModel() == model.Name;
+            if (ImGui::Selectable(std::format("{} (library)", model.Name).c_str(), selected) && !selected) {
+                part.SetLibraryModel(model.Name);
+                changed = true;
+            }
+        }
+        if (ImGui::Selectable(custom_name, part.IsCustom()) && !part.IsCustom()) {
+            part.SetCustom();
+            LoadParameterFields(fields, value_fields, part.GetParameters());
+            changed = true;
+        }
+        ImGui::EndCombo();
+    }
+
+    if (part.HasLibraryModel()) {
+        ImGui::TextDisabled("From a SPICE library: its parameters are those of its .model text");
+        return changed;
+    }
+    if (!part.IsCustom()) {
+        ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + ImGui::GetFontSize() * DESCRIPTION_WRAP_FONT_SIZES);
+        ImGui::TextDisabled("%s", part.GetModel()->Description);
+        ImGui::PopTextWrapPos();
+        return changed;
+    }
+    Parameters parameters = part.GetParameters();
+    const auto is_valid = [&part](const Parameters &candidate) { return part.IsValidParameters(candidate); };
+    // A long list scrolls, so the editor stays small enough for a popover
+    ImGui::SetNextWindowSizeConstraints({0.0f, 0.0f},
+                                        {FLT_MAX, ImGui::GetFrameHeightWithSpacing() * MAX_VISIBLE_PARAMETERS});
+    ImGui::BeginChild("parameters", {0.0f, 0.0f}, ImGuiChildFlags_AutoResizeX | ImGuiChildFlags_AutoResizeY);
+    if (DrawParameterFields(fields, value_fields, "", is_valid, parameters)) {
+        part.SetCustomParameters(parameters);
+        changed = true;
+    }
+    ImGui::EndChild();
+    return changed;
+}
+
+/**
+ * @brief   Parts with something to edit: a value, a model, a name, a state or parameters; ground has nothing.
+ */
+bool HasFields(const Core::Component &component) {
+    const Core::ComponentType type = component.GetType();
+    if (component.HasValue() || Core::IsSwitch(type) || Core::IsLogicPart(type) || Core::IsSubcircuitPin(type)) {
+        return true;
+    }
+    static constexpr auto OTHER_TYPES = std::to_array(
+        {Core::ComponentType::NET_LABEL, Core::ComponentType::SUBCIRCUIT, Core::ComponentType::V_SWITCH,
+         Core::ComponentType::RELAY, Core::ComponentType::FUSE, Core::ComponentType::CLOCK,
+         Core::ComponentType::LOGIC_INPUT, Core::ComponentType::LOGIC_OUTPUT, Core::ComponentType::SEVEN_SEGMENT,
+         Core::ComponentType::BEHAVIORAL_VOLTAGE, Core::ComponentType::BEHAVIORAL_CURRENT});
+    return std::ranges::contains(OTHER_TYPES, type);
+}
+
+bool HasModel(const Core::ComponentType type) {
+    return Core::IsDiode(type) || Core::IsBJT(type) || Core::IsMOSFET(type) || type == Core::ComponentType::OP_AMP;
+}
+
+/**
+ * @brief   Value fields show for parts with a value, and for parts with a model only while they are custom.
+ */
+bool ShowsValueFields(const Core::Component &component) {
+    const Core::ComponentType type = component.GetType();
+    if (Core::IsDiode(type)) {
+        return static_cast<const Core::Diode &>(component).IsCustom();
+    }
+    if (Core::IsBJT(type)) {
+        return static_cast<const Core::BJT &>(component).IsCustom();
+    }
+    if (Core::IsMOSFET(type)) {
+        return static_cast<const Core::MOSFET &>(component).IsCustom();
+    }
+    // The ideal op-amp has its gain-bandwidth product to edit
+    if (type == Core::ComponentType::OP_AMP) {
+        const auto &op_amp = static_cast<const Core::OpAmp &>(component);
+        return op_amp.IsCustom() || op_amp.IsIdeal();
+    }
+    // The switches that follow a voltage, the logic parts, a clock and the logic inputs and outputs have only their
+    // parameters
+    if (type == Core::ComponentType::V_SWITCH || type == Core::ComponentType::RELAY ||
+        type == Core::ComponentType::FUSE || Core::IsLogicPart(type) || type == Core::ComponentType::CLOCK ||
+        type == Core::ComponentType::LOGIC_INPUT || Core::IsLogicDisplay(type)) {
+        return true;
+    }
+    return component.HasValue();
+}
+
+} // namespace
+
+/**
+ * @brief   Creates the editor for a schematic.
+ * @param[in] schematic    Schematic whose selection is edited; it must outlive the editor.
+ * @param[in] preferences  Gives the series of standard values; it must outlive the editor.
+ */
+PartEditor::PartEditor(Schematic &schematic, const Preferences &preferences)
+    : m_Schematic(&schematic), m_Preferences(preferences) {
+}
+
+/**
+ * @brief   Makes the editor edit the parts of another schematic, such as the contents of a block being edited.
+ * @param[in] schematic  Schematic whose selected part the editor shows; it must outlive its use here.
+ * @note    Back on the document, call SetBlockParameters() with no names too.
+ */
+void PartEditor::SetSchematic(Schematic &schematic) {
+    m_Schematic = &schematic;
+    m_LoadedSelection.reset();
+}
+
+/**
+ * @brief   Sets the parameters that the values of the parts being edited can follow.
+ * @param[in] names  Parameters of the block being edited; none on the document, whose parts cannot follow any.
+ */
+void PartEditor::SetBlockParameters(std::vector<std::string> names) {
+    m_BlockParameters = std::move(names);
+}
+
+/**
+ * @brief   Draws the type and name of the selected component and the fields of its values, model or waveform.
+ * @note    Edits apply as soon as a field holds a valid value, and mark the schematic modified.
+ */
+void PartEditor::Draw() {
+    UIElement *element = m_Schematic->GetSelectedElement();
+    if (element == nullptr) {
+        DrawSelectionSummary();
+        return;
+    }
+
+    Core::Component &component = element->GetComponent();
+    ImGui::TextUnformatted(GetPartName(component.GetType()));
+    if (m_LoadedSelection != m_Schematic->GetSelectionVersion()) {
+        LoadFields(component);
+    }
+    DrawName(component);
+    const Core::ComponentType type = component.GetType();
+    if (!HasFields(component) && !HasModel(type)) {
+        return;
+    }
+    // Most edits end a live run and drop what it made, which should never come as a surprise
+    if (const char *live_note = m_Schematic->IsLiveRun() ? GetLiveEditNote(type) : nullptr) {
+        ImGui::TextColored(GetWarningTextColor(), "%s", live_note);
+    }
+    DrawFields(component);
+    if (!ShowsValueFields(component)) {
+        return;
+    }
+    ImGui::TextDisabled("Suffixes: T G M k m u n p f (case sensitive)");
+}
+
+/**
+ * @brief   What there is to edit when no single part is selected: how many items are, or a hint.
+ */
+void PartEditor::DrawSelectionSummary() {
+    const std::size_t count = m_Schematic->GetSelectedElements().size() + m_Schematic->GetSelectedWires().size();
+    if (count > 1) {
+        ImGui::TextUnformatted(std::format("{} items selected", count).c_str());
+    } else if (count == 1) {
+        ImGui::TextUnformatted("Wire");
+    } else {
+        ImGui::TextDisabled("Select a component to edit it");
+    }
+}
+
+/**
+ * @brief   The name of a part that has one, which a new name replaces when the field is left with Enter or a click
+ *          elsewhere; a name that cannot be used says why and goes back to the one the part has.
+ */
+void PartEditor::DrawName(Core::Component &component) {
+    if (std::string_view(component.GetNamePrefix()).empty()) {
+        return;
+    }
+    DrawFieldLabel("Name");
+    ImGui::InputText("##name", m_Name.data(), m_Name.size(), ImGuiInputTextFlags_CharsNoBlank);
+    if (ImGui::IsItemDeactivatedAfterEdit()) {
+        const std::size_t index = *m_Schematic->GetSelectedElements().begin();
+        const auto renamed = m_Schematic->RenameElement(index, m_Name.data());
+        m_NameError = renamed ? std::string() : renamed.error();
+        m_Name.fill('\0');
+        component.GetName().copy(m_Name.data(), m_Name.size() - 1);
+    }
+    if (!m_NameError.empty()) {
+        ImGui::TextColored(GetErrorTextColor(), "%s", m_NameError.c_str());
+    }
+}
+
+/**
+ * @brief   The fields of the kind of part: its net name, model, waveform, gain or value.
+ */
+void PartEditor::DrawFields(Core::Component &component) {
+    const Core::ComponentType type = component.GetType();
+    if (type == Core::ComponentType::NET_LABEL || Core::IsSubcircuitPin(type)) {
+        DrawNetLabel(static_cast<Core::NetLabel &>(component));
+        return;
+    }
+    if (type == Core::ComponentType::SUBCIRCUIT) {
+        DrawSubcircuit(static_cast<Core::SubcircuitInstance &>(component));
+        return;
+    }
+    if (DrawModeledPart(component) || DrawSettingPart(component)) {
+        return;
+    }
+    if (Core::IsSource(type)) {
+        DrawSource(static_cast<Core::Source &>(component));
+    } else if (Core::IsControlledSource(type)) {
+        DrawControlledSource(static_cast<Core::ControlledSource &>(component));
+    } else if (Core::IsBehavioralSource(type)) {
+        DrawBehavioralSource(static_cast<Core::BehavioralSource &>(component));
+    } else if (type == Core::ComponentType::TRANSFORMER) {
+        DrawValue(component);
+        DrawTransformer(static_cast<Core::Transformer &>(component));
+    } else {
+        DrawValue(component);
+        if (type == Core::ComponentType::POTENTIOMETER) {
+            DrawWiper(static_cast<Core::Potentiometer &>(component));
+        } else if (component.SupportsInitialCondition()) {
+            DrawInitialCondition(component);
+        }
+    }
+    if (component.SupportsTolerance()) {
+        DrawTolerance(component);
+    }
+}
+
+/**
+ * @brief   Diodes, transistors and op-amps, which a model sets; false for the other parts.
+ */
+bool PartEditor::DrawModeledPart(Core::Component &component) {
+    const Core::ComponentType type = component.GetType();
+    if (Core::IsDiode(type)) {
+        DrawDiode(static_cast<Core::Diode &>(component));
+    } else if (Core::IsBJT(type)) {
+        DrawBJT(static_cast<Core::BJT &>(component));
+    } else if (Core::IsMOSFET(type)) {
+        DrawMOSFET(static_cast<Core::MOSFET &>(component));
+    } else if (type == Core::ComponentType::OP_AMP) {
+        DrawOpAmp(static_cast<Core::OpAmp &>(component));
+    } else {
+        return false;
+    }
+    return true;
+}
+
+/**
+ * @brief   Switches, relays and the digital parts, which have a state or parameters instead of a value; false for the
+ *          others.
+ */
+bool PartEditor::DrawSettingPart(Core::Component &component) {
+    const Core::ComponentType type = component.GetType();
+    if (Core::IsSwitch(type)) {
+        DrawSwitch(static_cast<Core::Switch &>(component));
+    } else if (type == Core::ComponentType::V_SWITCH) {
+        DrawControlledSwitch(static_cast<Core::VoltageControlledSwitch &>(component));
+    } else if (type == Core::ComponentType::RELAY) {
+        DrawRelay(static_cast<Core::Relay &>(component));
+    } else if (type == Core::ComponentType::FUSE) {
+        DrawFuse(static_cast<Core::Fuse &>(component));
+    } else if (Core::IsLogicPart(type)) {
+        DrawLogicPart(static_cast<Core::LogicPart &>(component));
+    } else if (type == Core::ComponentType::CLOCK) {
+        DrawClock(static_cast<Core::Clock &>(component));
+    } else if (type == Core::ComponentType::LOGIC_INPUT) {
+        DrawLogicInput(static_cast<Core::LogicInput &>(component));
+    } else if (type == Core::ComponentType::LOGIC_OUTPUT) {
+        DrawLogicOutput(static_cast<Core::LogicOutput &>(component));
+    } else if (type == Core::ComponentType::SEVEN_SEGMENT) {
+        DrawSevenSegment(static_cast<Core::SevenSegmentDisplay &>(component));
+    } else {
+        return false;
+    }
+    return true;
+}
+
+/**
+ * @brief   Tells whether the selected part has a main value that typing can start editing.
+ * @return  True for parts with a value (resistors, capacitors, inductors, VCC, controlled sources), DC sources and
+ *          ideal op-amps; false without a selected part, and for parts set by a model or a waveform.
+ */
+bool PartEditor::CanTypeValue() const {
+    const UIElement *element = m_Schematic->GetSelectedElement();
+    if (element == nullptr) {
+        return false;
+    }
+    const Core::Component &component = element->GetComponent();
+    const Core::ComponentType type = component.GetType();
+    if (Core::IsSource(type)) {
+        return static_cast<const Core::Source &>(component).GetSourceType() == Core::Source::SourceType::DC;
+    }
+    if (type == Core::ComponentType::OP_AMP) {
+        return static_cast<const Core::OpAmp &>(component).IsIdeal();
+    }
+    return component.HasValue() && !HasModel(type);
+}
+
+/**
+ * @brief   Makes the next Draw() focus the main value of the selected part and type a character into it.
+ * @param[in] first  The character the user typed on the part, such as the 4 of "4k7".
+ * @note    Call it only when CanTypeValue() holds, so the value field is drawn.
+ */
+void PartEditor::StartTypingValue(const char first) {
+    m_Value.StartTyping(first);
+}
+
+/**
+ * @brief   Makes the next Draw() focus the name of the selected net label.
+ * @note    Call it when a label has just been placed, so the user can type its name at once.
+ */
+void PartEditor::FocusNetName() {
+    m_FocusNet = true;
+}
+
+void PartEditor::DrawSubcircuit(Core::SubcircuitInstance &instance) {
+    const auto definition =
+        std::ranges::find(m_Schematic->GetSubcircuits(), instance.GetDefinitionName(), &SavedSubcircuit::Name);
+    if (definition == m_Schematic->GetSubcircuits().end()) {
+        ImGui::TextColored(GetErrorTextColor(), "Unknown definition: %s", instance.GetDefinitionName().c_str());
+        return;
+    }
+    ImGui::TextUnformatted(std::format("Definition: {}", definition->Name).c_str());
+    if (definition->Spice) {
+        ImGui::TextDisabled("SPICE text from a library; double click the block for its pins");
+    }
+    for (std::size_t index = 0; index < definition->Parameters.size() && index < m_SubcircuitFields.size(); ++index) {
+        const Core::SubcircuitParameter &parameter = definition->Parameters[index];
+        if (const auto value = m_SubcircuitFields[index].Draw(parameter.Name.c_str(), "", AnyValue)) {
+            instance.SetParameter(parameter.Name, *value);
+            m_Schematic->MarkModified();
+        }
+    }
+    if (ImGui::Button("Reset parameters")) {
+        instance.ClearParameters();
+        m_Schematic->MarkModified();
+        LoadFields(instance);
+    }
+    ImGui::TextDisabled("Values shown are overrides or the definition defaults");
+}
+
+void PartEditor::LoadFields(const Core::Component &component) {
+    m_Name.fill('\0');
+    component.GetName().copy(m_Name.data(), m_Name.size() - 1);
+    m_NameError.clear();
+    m_Value.Load(component.GetValue());
+    m_InitialCondition.LoadOptional(component.GetInitialCondition());
+    m_Tolerance.LoadOptional(component.GetTolerance());
+    if (Core::IsSubcircuitPin(component.GetType())) {
+        m_PortReference.Load(static_cast<const Core::SubcircuitPinMarker &>(component).GetPort().ReferenceOhms);
+    }
+    if (component.GetType() == Core::ComponentType::NET_LABEL || Core::IsSubcircuitPin(component.GetType())) {
+        const std::string &net = static_cast<const Core::NetLabel &>(component).GetNet();
+        m_Net.fill('\0');
+        net.copy(m_Net.data(), m_Net.size() - 1);
+    }
+    if (component.GetType() == Core::ComponentType::SUBCIRCUIT) {
+        LoadSubcircuitFields(static_cast<const Core::SubcircuitInstance &>(component));
+    }
+    if (Core::IsSource(component.GetType())) {
+        const auto &source = static_cast<const Core::Source &>(component);
+        LoadParameterFields(AC_FIELDS, m_ACFields, source.GetAC());
+        LoadParameterFields(PULSE_FIELDS, m_PulseFields, source.GetPulse());
+        LoadParameterFields(EXP_FIELDS, m_EXPFields, source.GetEXP());
+        LoadParameterFields(SFFM_FIELDS, m_SFFMFields, source.GetSFFM());
+        LoadParameterFields(AM_FIELDS, m_AMFields, source.GetAM());
+        LoadParameterFields(NOISE_FIELDS, m_NoiseFields, source.GetNoise());
+        m_RandomFields[0].Load(source.GetRandom().TimeStep);
+        m_RandomFields[1].Load(source.GetRandom().Delay);
+        m_RandomFields[2].Load(source.GetRandom().First);
+        m_RandomFields[3].Load(source.GetRandom().Second);
+        m_PWLText = Core::FormatPWLPoints(source.GetPWL().Points);
+    }
+    if (Core::IsBehavioralSource(component.GetType())) {
+        m_ExpressionText = static_cast<const Core::BehavioralSource &>(component).GetExpression();
+    }
+    LoadModelFields(component);
+    LoadSettingFields(component);
+    m_LoadedSelection = m_Schematic->GetSelectionVersion();
+}
+
+/**
+ * @brief   One field per parameter of the block, showing the override of this instance or the default.
+ */
+void PartEditor::LoadSubcircuitFields(const Core::SubcircuitInstance &instance) {
+    const auto definition =
+        std::ranges::find(m_Schematic->GetSubcircuits(), instance.GetDefinitionName(), &SavedSubcircuit::Name);
+    m_SubcircuitFields.clear();
+    if (definition == m_Schematic->GetSubcircuits().end()) {
+        return;
+    }
+    m_SubcircuitFields.resize(definition->Parameters.size());
+    for (std::size_t index = 0; index < definition->Parameters.size(); ++index) {
+        const Core::SubcircuitParameter &parameter = definition->Parameters[index];
+        const auto override_value = instance.GetParameters().find(parameter.Name);
+        m_SubcircuitFields[index].Load(override_value != instance.GetParameters().end() ? override_value->second
+                                                                                        : parameter.DefaultValue);
+    }
+}
+
+/**
+ * @brief   The custom parameters of diodes, transistors and op-amps, and the bandwidth of the ideal op-amp.
+ */
+void PartEditor::LoadModelFields(const Core::Component &component) {
+    const Core::ComponentType type = component.GetType();
+    if (Core::IsDiode(type)) {
+        LoadParameterFields(DIODE_FIELDS, m_DiodeFields, static_cast<const Core::Diode &>(component).GetParameters());
+    } else if (Core::IsBJT(type)) {
+        LoadParameterFields(BJT_FIELDS, m_BJTFields, static_cast<const Core::BJT &>(component).GetParameters());
+    } else if (Core::IsMOSFET(type)) {
+        LoadParameterFields(MOSFET_FIELDS, m_MOSFETFields,
+                            static_cast<const Core::MOSFET &>(component).GetParameters());
+    } else if (type == Core::ComponentType::OP_AMP) {
+        const auto &op_amp = static_cast<const Core::OpAmp &>(component);
+        LoadParameterFields(OP_AMP_FIELDS, m_OpAmpFields, op_amp.GetParameters());
+        m_Value.Load(op_amp.GetIdealBandwidth());
+    }
+}
+
+/**
+ * @brief   The parameters of the switches, relays, digital parts and transformers.
+ */
+void PartEditor::LoadSettingFields(const Core::Component &component) {
+    const Core::ComponentType type = component.GetType();
+    if (type == Core::ComponentType::V_SWITCH) {
+        LoadParameterFields(SWITCH_FIELDS, m_SwitchFields,
+                            static_cast<const Core::VoltageControlledSwitch &>(component).GetParameters());
+    } else if (type == Core::ComponentType::RELAY) {
+        LoadParameterFields(RELAY_FIELDS, m_RelayFields, static_cast<const Core::Relay &>(component).GetParameters());
+    } else if (type == Core::ComponentType::FUSE) {
+        LoadParameterFields(FUSE_FIELDS, m_FuseFields, static_cast<const Core::Fuse &>(component).GetParameters());
+    } else if (Core::IsLogicPart(type)) {
+        LoadParameterFields(LOGIC_FIELDS, m_LogicFields,
+                            static_cast<const Core::LogicPart &>(component).GetParameters());
+    } else if (type == Core::ComponentType::CLOCK) {
+        LoadParameterFields(CLOCK_FIELDS, m_ClockFields, static_cast<const Core::Clock &>(component).GetParameters());
+    } else if (type == Core::ComponentType::LOGIC_INPUT) {
+        LoadParameterFields(LOGIC_INPUT_FIELDS, m_LogicInputFields,
+                            static_cast<const Core::LogicInput &>(component).GetParameters());
+    } else if (type == Core::ComponentType::LOGIC_OUTPUT) {
+        LoadParameterFields(LOGIC_OUTPUT_FIELDS, m_LogicOutputFields,
+                            static_cast<const Core::LogicOutput &>(component).GetParameters());
+    } else if (type == Core::ComponentType::SEVEN_SEGMENT) {
+        LoadParameterFields(SEVEN_SEGMENT_FIELDS, m_SevenSegmentFields,
+                            static_cast<const Core::SevenSegmentDisplay &>(component).GetParameters());
+    } else if (type == Core::ComponentType::TRANSFORMER) {
+        LoadParameterFields(TRANSFORMER_FIELDS, m_TransformerFields,
+                            static_cast<const Core::Transformer &>(component).GetParameters());
+    }
+}
+
+/**
+ * @brief   The name applies as soon as it is valid, or empty, which leaves the label or marker unnamed.
+ */
+void PartEditor::DrawNetLabel(Core::NetLabel &label) {
+    const bool is_pin = Core::IsSubcircuitPin(label.GetType());
+    DrawFieldLabel(is_pin ? "Pin" : "Net");
+    if (std::exchange(m_FocusNet, false)) {
+        ImGui::SetKeyboardFocusHere();
+    }
+    const bool changed = ImGui::InputText("##net", m_Net.data(), m_Net.size());
+    const std::string typed = m_Net.data();
+    const bool valid = typed.empty() || (is_pin ? Core::SubcircuitInstance::IsValidIdentifier(typed)
+                                                : Core::NetLabel::IsValidNet(typed));
+    if (changed && valid && typed != label.GetNet()) {
+        label.SetNet(typed);
+        m_Schematic->MarkModified();
+    }
+    if (!valid) {
+        ImGui::TextColored(GetErrorTextColor(), "%s",
+                           is_pin ? "Use a letter or _, then letters, digits or _"
+                                  : "1 to 32 letters, digits, _, - or .");
+    } else if (is_pin) {
+        ImGui::TextDisabled("The arrow points from the block's edge into the circuit; turn it to pick the edge");
+        DrawPortSettings(static_cast<Core::SubcircuitPinMarker &>(label));
+    } else {
+        ImGui::TextDisabled("Labels with the same name are one net; 0 and GND are ground, VCC is the supplies");
+    }
+}
+
+/**
+ * @brief   Whether the marker is a port of the S-parameter analysis, with its number and reference impedance.
+ * @details Turning it on takes the lowest number no other port has. Only the markers of the top-level schematic count;
+ *          inside a block they are ignored. A port holds its node at 0 V in DC, so it belongs behind a capacitor where
+ *          the node is biased.
+ */
+void PartEditor::DrawPortSettings(Core::SubcircuitPinMarker &marker) {
+    Core::PortSettings port = marker.GetPort();
+    ImGui::Separator();
+    if (ImGui::Checkbox("S-parameter port", &port.IsPort)) {
+        if (port.IsPort) {
+            port.Number = FindFreePortNumber(m_Schematic->GetElements(), &marker);
+        }
+        marker.SetPort(port);
+        m_Schematic->MarkModified();
+    }
+    ImGui::SetItemTooltip("Makes this marker a port of the S-parameter analysis, with a source and a reference "
+                          "impedance at its node. The port holds the node at 0 V in DC and loads the circuit with its "
+                          "impedance, so couple it through a capacitor where the node has a bias. It counts only in "
+                          "the top-level schematic and is invisible in every other analysis");
+    if (!port.IsPort) {
+        return;
+    }
+    DrawFieldLabel("Number");
+    if (ImGui::InputInt("##port_number", &port.Number, 0)) {
+        port.Number = std::max(port.Number, 1);
+        marker.SetPort(port);
+        m_Schematic->MarkModified();
+    }
+    if (IsPortNumberTaken(m_Schematic->GetElements(), port.Number, &marker)) {
+        ImGui::TextColored(GetErrorTextColor(), "Port %d is already used by another marker", port.Number);
+    }
+    if (const std::optional<double> reference =
+            m_PortReference.Draw("Z0", "Ohm", [](const double value) { return value > 0.0; })) {
+        port.ReferenceOhms = *reference;
+        marker.SetPort(port);
+        m_Schematic->MarkModified();
+    }
+    ImGui::TextDisabled("Ports are numbered 1 to N with no gap; the analysis needs two or more");
+}
+
+void PartEditor::DrawValue(Core::Component &component) {
+    if (DrawParameterChoice(component)) {
+        return;
+    }
+    const auto is_valid = [&component](const double value) { return component.IsValidValue(value); };
+    // Standard values are for the passive parts; the value of a source or a gain is whatever the circuit needs
+    const Core::ComponentType type = component.GetType();
+    const bool passive = type == Core::ComponentType::RESISTOR || type == Core::ComponentType::CAPACITOR ||
+                         type == Core::ComponentType::INDUCTOR;
+    const Core::ValueSeries series = passive ? m_Preferences.ValueSeries : Core::ValueSeries::FREE;
+    if (const std::optional<double> value = m_Value.Draw("Value", component.GetUnit(), is_valid, series)) {
+        component.SetValue(*value);
+        m_Schematic->MarkModified();
+    }
+    if (series != Core::ValueSeries::FREE) {
+        ImGui::TextDisabled("Standard values: %s, %g%%", Core::GetSeriesName(series),
+                            Core::GetSeriesTolerancePercent(series));
+    }
+}
+
+/**
+ * @brief   Inside a block, a resistor, capacitor or inductor can take its value from a parameter of the block, which
+ *          each instance sets.
+ * @details Returns whether it does, in which case it has no value of its own to edit.
+ */
+bool PartEditor::DrawParameterChoice(Core::Component &component) {
+    const std::optional<std::string> &expression = component.GetValueExpression();
+    if (!component.CanFollowParameter() || (m_BlockParameters.empty() && !expression)) {
+        return false;
+    }
+    constexpr const char *OWN_VALUE = "(its own value)";
+    const std::string preview = expression ? std::string(Core::SubcircuitInstance::GetExpressionParameter(*expression))
+                                           : std::string(OWN_VALUE);
+    DrawFieldLabel("Follows");
+    if (ImGui::BeginCombo("##follows", preview.c_str())) {
+        if (ImGui::Selectable(OWN_VALUE, !expression) && expression) {
+            component.ClearValueExpression();
+            m_Value.Load(component.GetValue());
+            m_Schematic->MarkModified();
+        }
+        for (const std::string &name : m_BlockParameters) {
+            if (ImGui::Selectable(name.c_str(), name == preview) && name != preview) {
+                component.SetValueExpression(std::format("{{{}}}", name));
+                m_Schematic->MarkModified();
+            }
+        }
+        ImGui::EndCombo();
+    }
+    if (!component.GetValueExpression()) {
+        return false;
+    }
+    ImGui::TextDisabled("Set by each instance, or the parameter's default");
+    return true;
+}
+
+/**
+ * @brief   A capacitor's initial condition is a voltage and an inductor's a current; leaving the field empty means no
+ *          initial condition, but once any part has one the whole transient runs with uic and an empty part starts at
+ *          zero.
+ */
+void PartEditor::DrawInitialCondition(Core::Component &component) {
+    const bool is_capacitor = component.GetType() == Core::ComponentType::CAPACITOR;
+    const GUI::OptionalValueEdit edit = m_InitialCondition.DrawOptional("Initial", is_capacitor ? "V" : "A", AnyValue);
+    if (edit.Changed) {
+        if (edit.Value) {
+            component.SetInitialCondition(*edit.Value);
+        } else {
+            component.ClearInitialCondition();
+        }
+        m_Schematic->MarkModified();
+    }
+    ImGui::TextDisabled("Skips the operating point (uic); parts left empty start at zero");
+}
+
+/**
+ * @brief   The percent the value may be off in a Monte Carlo run; an empty field means the part keeps its value. A
+ *          voltage source only varies while it is a DC one, and the series of standard values of the preferences
+ *          offers its own tolerance for a resistor, capacitor or inductor.
+ */
+void PartEditor::DrawTolerance(Core::Component &component) {
+    const bool is_source = Core::IsSource(component.GetType());
+    if (is_source && static_cast<const Core::Source &>(component).GetSourceType() != Core::Source::SourceType::DC) {
+        return;
+    }
+    const GUI::OptionalValueEdit edit = m_Tolerance.DrawOptional(
+        "Tolerance", "%", [](const double percent) { return percent > 0.0 && percent <= Core::MAX_TOLERANCE_PERCENT; });
+    if (edit.Changed) {
+        if (edit.Value) {
+            component.SetTolerance(*edit.Value);
+        } else {
+            component.ClearTolerance();
+        }
+        m_Schematic->MarkModified();
+    }
+    const double series_percent = Core::GetSeriesTolerancePercent(m_Preferences.ValueSeries);
+    if (!is_source && !component.HasTolerance() && series_percent > 0.0 &&
+        ImGui::SmallButton(
+            std::format("Use {} ({:g}%)", Core::GetSeriesName(m_Preferences.ValueSeries), series_percent).c_str())) {
+        component.SetTolerance(series_percent);
+        m_Tolerance.LoadOptional(component.GetTolerance());
+        m_Schematic->MarkModified();
+    }
+    ImGui::TextDisabled("Monte Carlo draws the value within it; empty keeps the value");
+}
+
+/**
+ * @brief   The switch closes above the threshold plus the hysteresis, and opens below the threshold minus it.
+ */
+void PartEditor::DrawControlledSwitch(Core::VoltageControlledSwitch &controlled) {
+    Core::SwitchParameters parameters = controlled.GetParameters();
+    const auto is_valid = [](const Core::SwitchParameters &candidate) {
+        return Core::VoltageControlledSwitch::IsValidParameters(candidate);
+    };
+    if (DrawParameterFields(SWITCH_FIELDS, m_SwitchFields, "", is_valid, parameters)) {
+        controlled.SetParameters(parameters);
+        m_Schematic->MarkModified();
+    }
+    ImGui::TextDisabled("Closes above threshold + hysteresis, opens below threshold - hysteresis");
+}
+
+/**
+ * @brief   The contact closes when the coil voltage reaches the pull-in value and opens when it falls to the drop-out
+ *          one.
+ */
+void PartEditor::DrawRelay(Core::Relay &relay) {
+    Core::RelayParameters parameters = relay.GetParameters();
+    const auto is_valid = [](const Core::RelayParameters &candidate) {
+        return Core::Relay::IsValidParameters(candidate);
+    };
+    if (DrawParameterFields(RELAY_FIELDS, m_RelayFields, "", is_valid, parameters)) {
+        relay.SetParameters(parameters);
+        m_Schematic->MarkModified();
+    }
+    ImGui::TextDisabled("The contact follows the coil current, so it lags by L over R");
+}
+
+/**
+ * @brief   A combo of ready fuses fills the figures, which stay editable, and the cooling time constant that they
+ *          imply is shown read-only.
+ */
+void PartEditor::DrawFuse(Core::Fuse &fuse) {
+    Core::FuseParameters parameters = fuse.GetParameters();
+    const std::span<const Core::ReadyFuse> ready_fuses = Core::GetReadyFuses();
+    const auto matching = std::ranges::find(ready_fuses, parameters, &Core::ReadyFuse::Parameters);
+    const Core::ReadyFuse *selected = matching != ready_fuses.end() ? &*matching : nullptr;
+    DrawFieldLabel("Ready fuse");
+    if (ImGui::BeginCombo("##ReadyFuse", selected != nullptr ? selected->Name : "Custom")) {
+        for (const Core::ReadyFuse &ready : ready_fuses) {
+            const bool is_selected = &ready == selected;
+            if (ImGui::Selectable(ready.Name, is_selected) && !is_selected) {
+                fuse.SetParameters(ready.Parameters);
+                LoadParameterFields(FUSE_FIELDS, m_FuseFields, ready.Parameters);
+                m_Schematic->MarkModified();
+            }
+        }
+        ImGui::EndCombo();
+    }
+    parameters = fuse.GetParameters();
+    const auto is_valid = [](const Core::FuseParameters &candidate) {
+        return Core::Fuse::IsValidParameters(candidate);
+    };
+    if (DrawParameterFields(FUSE_FIELDS, m_FuseFields, "", is_valid, parameters)) {
+        fuse.SetParameters(parameters);
+        m_Schematic->MarkModified();
+    }
+    ImGui::TextDisabled("Cooling time constant: %ss",
+                        Core::FormatValue(Core::GetCoolingTimeConstant(parameters)).c_str());
+    ImGui::TextDisabled("Never blows below the rated current; blows open for the rest of the run, and starts whole");
+}
+
+/**
+ * @brief   The value is the primary inductance; the secondary's follows from the turns ratio.
+ */
+void PartEditor::DrawTransformer(Core::Transformer &transformer) {
+    Core::TransformerParameters parameters = transformer.GetParameters();
+    const auto is_valid = [](const Core::TransformerParameters &candidate) {
+        return Core::Transformer::IsValidParameters(candidate);
+    };
+    if (DrawParameterFields(TRANSFORMER_FIELDS, m_TransformerFields, "", is_valid, parameters)) {
+        transformer.SetParameters(parameters);
+        m_Schematic->MarkModified();
+    }
+    ImGui::TextDisabled("Value is the primary inductance; the secondary is %s",
+                        Core::FormatValue(transformer.GetSecondaryInductance()).c_str());
+}
+
+/**
+ * @brief   The levels the part swaps at follow from the logic level: it reads 1 above 70% of it and 0 below 30%.
+ */
+void PartEditor::DrawLogicPart(Core::LogicPart &part) {
+    Core::LogicParameters parameters = part.GetParameters();
+    const auto is_valid = [](const Core::LogicParameters &candidate) {
+        return Core::LogicPart::IsValidParameters(candidate);
+    };
+    if (DrawParameterFields(LOGIC_FIELDS, m_LogicFields, "", is_valid, parameters)) {
+        part.SetParameters(parameters);
+        m_Schematic->MarkModified();
+    }
+    if (Core::HasVariableInputs(part.GetType())) {
+        // The pins that go away when the count falls are left with the wires they had, which stay loose
+        const int input_count = part.GetInputCount();
+        DrawFieldLabel("Inputs");
+        if (ImGui::BeginCombo("##inputs", std::to_string(input_count).c_str())) {
+            for (int candidate = Core::MIN_LOGIC_INPUTS; candidate <= Core::MAX_LOGIC_INPUTS; ++candidate) {
+                if (ImGui::Selectable(std::to_string(candidate).c_str(), candidate == input_count) &&
+                    candidate != input_count) {
+                    part.SetInputCount(candidate);
+                    m_Schematic->MarkModified();
+                }
+            }
+            ImGui::EndCombo();
+        }
+    }
+    ImGui::TextDisabled("Inputs read 1 above 70%% of the level and 0 below 30%%; an open input reads 0");
+}
+
+/**
+ * @brief   The clock picks its own rise and fall times; the frequency sets the period and the duty the share that is
+ *          high.
+ */
+void PartEditor::DrawClock(Core::Clock &clock) {
+    Core::ClockParameters parameters = clock.GetParameters();
+    const auto is_valid = [](const Core::ClockParameters &candidate) {
+        return Core::Clock::IsValidParameters(candidate);
+    };
+    if (DrawParameterFields(CLOCK_FIELDS, m_ClockFields, "", is_valid, parameters)) {
+        clock.SetParameters(parameters);
+        m_Schematic->MarkModified();
+    }
+    ImGui::TextDisabled("Duty is the share of the period above half the level, from 0 to 100%%");
+    ImGui::TextDisabled("The start delay holds the clock low; at 0 the first rising edge is at t = 0");
+}
+
+/**
+ * @brief   A constant source from the part to ground: high drives the logic level and low 0 V, so a latch has a defined
+ *          start.
+ */
+void PartEditor::DrawLogicInput(Core::LogicInput &input) {
+    bool high = input.IsHigh();
+    if (ImGui::Checkbox("High", &high)) {
+        input.SetHigh(high);
+        m_Schematic->MarkLiveChanged(input);
+    }
+    Core::LogicInputParameters parameters = input.GetParameters();
+    const auto is_valid = [](const Core::LogicInputParameters &candidate) {
+        return Core::LogicInput::IsValidParameters(candidate);
+    };
+    if (DrawParameterFields(LOGIC_INPUT_FIELDS, m_LogicInputFields, "", is_valid, parameters)) {
+        input.SetParameters(parameters);
+        m_Schematic->MarkModified();
+    }
+    ImGui::TextDisabled("A source from its terminal to ground, so it gives a gate a defined level");
+}
+
+/**
+ * @brief   The logic level the output reads its node against; it changes no result, only the reading.
+ */
+void PartEditor::DrawLogicOutput(Core::LogicOutput &output) {
+    Core::LogicOutputParameters parameters = output.GetParameters();
+    const auto is_valid = [](const Core::LogicOutputParameters &candidate) {
+        return Core::LogicOutput::IsValidParameters(candidate);
+    };
+    if (DrawParameterFields(LOGIC_OUTPUT_FIELDS, m_LogicOutputFields, "", is_valid, parameters)) {
+        output.SetParameters(parameters);
+        m_Schematic->MarkModified();
+    }
+    ImGui::TextDisabled("Shows 1 at 70%% of the level or above, 0 at 30%% or below, X between; it adds nothing to the "
+                        "circuit");
+}
+
+/**
+ * @brief   The logic level the display reads its inputs against; it changes no result, only which segments light.
+ */
+void PartEditor::DrawSevenSegment(Core::SevenSegmentDisplay &display) {
+    Core::SevenSegmentParameters parameters = display.GetParameters();
+    const auto is_valid = [](const Core::SevenSegmentParameters &candidate) {
+        return Core::SevenSegmentDisplay::IsValidParameters(candidate);
+    };
+    if (DrawParameterFields(SEVEN_SEGMENT_FIELDS, m_SevenSegmentFields, "", is_valid, parameters)) {
+        display.SetParameters(parameters);
+        m_Schematic->MarkModified();
+    }
+    ImGui::TextDisabled("Lights a segment at 70%% of the level or above; it adds nothing to the circuit");
+}
+
+/**
+ * @brief   A closed switch conducts; a push button is pressed when closed.
+ */
+void PartEditor::DrawSwitch(Core::Switch &contact) {
+    bool closed = contact.IsClosed();
+    const bool is_button = contact.GetType() == Core::ComponentType::PUSH_BUTTON;
+    if (ImGui::Checkbox(is_button ? "Pressed" : "Closed", &closed)) {
+        contact.SetClosed(closed);
+        m_Schematic->MarkLiveChanged(contact);
+    }
+    ImGui::TextDisabled("It is a %s while the circuit is simulated", closed ? "wire" : "gap");
+}
+
+/**
+ * @brief   The wiper as a share of the track, counted from terminal 1.
+ */
+void PartEditor::DrawWiper(Core::Potentiometer &pot) {
+    DrawFieldLabel("Wiper");
+    auto percent = static_cast<float>(pot.GetWiper() * 100.0);
+    if (ImGui::SliderFloat("##wiper", &percent, 0.0f, 100.0f, "%.0f%%")) {
+        pot.SetWiper(static_cast<double>(percent) / 100.0);
+        m_Schematic->MarkLiveChanged(pot);
+    }
+    ImGui::TextDisabled("0%% is terminal 1 and 100%% is terminal 2");
+}
+
+void PartEditor::DrawDiode(Core::Diode &diode) {
+    if (DrawModelChoice(diode, Core::GetDiodeModels(diode.GetType()), Core::CUSTOM_DIODE_MODEL_NAME, DIODE_FIELDS,
+                        m_DiodeFields, std::span(m_Schematic->GetLibraryModels()))) {
+        m_Schematic->MarkModified();
+    }
+    if (diode.IsCustom()) {
+        ImGui::TextDisabled("%s", diode.GetType() == Core::ComponentType::ZENER_DIODE
+                                      ? "BV is the voltage the Zener regulates at"
+                                      : "BV is the reverse voltage the diode is rated for");
+    }
+}
+
+void PartEditor::DrawBJT(Core::BJT &bjt) {
+    if (DrawModelChoice(bjt, Core::GetBJTModels(bjt.GetType()), Core::CUSTOM_BJT_MODEL_NAME, BJT_FIELDS, m_BJTFields,
+                        std::span(m_Schematic->GetLibraryModels()))) {
+        m_Schematic->MarkModified();
+    }
+    if (bjt.IsCustom()) {
+        ImGui::TextDisabled("A VAF or IKF of 0 turns that effect off");
+        ImGui::TextDisabled("VCEO, IC max and P max are checked after each simulation");
+    }
+}
+
+void PartEditor::DrawMOSFET(Core::MOSFET &mosfet) {
+    if (DrawModelChoice(mosfet, Core::GetMOSFETModels(mosfet.GetType()), Core::CUSTOM_MOSFET_MODEL_NAME, MOSFET_FIELDS,
+                        m_MOSFETFields, std::span(m_Schematic->GetLibraryModels()))) {
+        m_Schematic->MarkModified();
+    }
+    if (mosfet.IsCustom()) {
+        ImGui::TextDisabled("Level 1: ID = KP/2 W/L (VGS - VTO)^2; VTO is negative for PMOS");
+        ImGui::TextDisabled("The max ratings are checked after each simulation");
+    }
+}
+
+/**
+ * @brief   The ideal op-amp has only its gain-bandwidth product to set; a macromodel shows its specifications when
+ *          custom.
+ */
+void PartEditor::DrawOpAmp(Core::OpAmp &op_amp) {
+    if (DrawModelChoice(op_amp, Core::GetOpAmpModels(op_amp.GetType()), Core::CUSTOM_OP_AMP_MODEL_NAME, OP_AMP_FIELDS,
+                        m_OpAmpFields)) {
+        m_Schematic->MarkModified();
+    }
+    if (op_amp.IsIdeal()) {
+        if (const std::optional<double> bandwidth = m_Value.Draw("GBW", "Hz", Core::IsValidIdealBandwidth)) {
+            op_amp.SetIdealBandwidth(*bandwidth);
+            m_Schematic->MarkModified();
+        }
+        ImGui::TextDisabled("The open-loop gain falls to 1 at the GBW");
+    } else if (op_amp.IsCustom()) {
+        DrawOpAmpInputStage(op_amp);
+        ImGui::TextDisabled("Headrooms: how close the output gets to V+ and V-");
+        ImGui::TextDisabled("VOS adds to the + input; PNP and JFET inputs reach V-");
+        ImGui::TextDisabled("Built as a Boyle macromodel from these specs");
+    }
+}
+
+/**
+ * @brief   The transistors of the input pair of a custom macromodel, which the specification fields leave out since
+ *          they are not a number.
+ */
+void PartEditor::DrawOpAmpInputStage(Core::OpAmp &op_amp) {
+    Core::OpAmpParameters parameters = op_amp.GetParameters();
+    DrawFieldLabel("Input stage");
+    if (ImGui::BeginCombo("##input_stage", Core::GetOpAmpInputStageName(parameters.InputStage))) {
+        for (const Core::OpAmpInputStage stage : Core::GetOpAmpInputStages()) {
+            const bool is_selected = stage == parameters.InputStage;
+            if (ImGui::Selectable(Core::GetOpAmpInputStageName(stage), is_selected) && !is_selected) {
+                parameters.InputStage = stage;
+                op_amp.SetCustomParameters(parameters);
+                m_Schematic->MarkModified();
+            }
+        }
+        ImGui::EndCombo();
+    }
+}
+
+void PartEditor::DrawSource(Core::Source &source) {
+    using SourceType = Core::Source::SourceType;
+    DrawSourceTypes(source);
+    switch (source.GetSourceType()) {
+    case SourceType::DC: {
+        const char *label = source.GetType() == Core::ComponentType::CURRENT_SOURCE ? "Current" : "Voltage";
+        if (const std::optional<double> value = m_Value.Draw(label, source.GetUnit(), AnyValue)) {
+            source.SetValue(*value);
+            m_Schematic->MarkModified();
+        }
+        break;
+    }
+    case SourceType::AC:
+        DrawSine(source);
+        break;
+    case SourceType::PULSE:
+        DrawPulse(source);
+        break;
+    case SourceType::EXP:
+        DrawEXP(source);
+        break;
+    case SourceType::SFFM:
+        DrawSFFM(source);
+        break;
+    case SourceType::AM:
+        DrawAM(source);
+        break;
+    case SourceType::PWL:
+        DrawPWL(source);
+        break;
+    case SourceType::NOISE:
+        DrawNoise(source);
+        break;
+    case SourceType::RANDOM:
+        DrawRandom(source);
+        break;
+    default:
+        break;
+    }
+}
+
+/**
+ * @brief   Draws the choice of waveform of a source, one radio button per kind, in rows as wide as the window.
+ * @param[in,out] source  Source whose waveform is chosen.
+ */
+void PartEditor::DrawSourceTypes(Core::Source &source) {
+    using SourceType = Core::Source::SourceType;
+    const ImGuiStyle &style = ImGui::GetStyle();
+    const float right_edge = ImGui::GetCursorScreenPos().x + ImGui::GetContentRegionAvail().x;
+    bool is_first = true;
+    for (const SourceType type : {SourceType::DC, SourceType::AC, SourceType::PULSE, SourceType::EXP, SourceType::SFFM,
+                                  SourceType::AM, SourceType::PWL, SourceType::NOISE, SourceType::RANDOM}) {
+        const float button_width =
+            ImGui::GetFrameHeight() + style.ItemInnerSpacing.x + ImGui::CalcTextSize(Core::GetSourceTypeName(type)).x;
+        // A button that would cross the edge starts the next row, so a narrow Properties column cuts none of them
+        if (!is_first && ImGui::GetItemRectMax().x + style.ItemSpacing.x + button_width <= right_edge) {
+            ImGui::SameLine();
+        }
+        is_first = false;
+        if (ImGui::RadioButton(Core::GetSourceTypeName(type), source.GetSourceType() == type) &&
+            source.GetSourceType() != type) {
+            source.SetSourceType(type);
+            m_Schematic->MarkModified();
+        }
+    }
+}
+
+void PartEditor::DrawSine(Core::Source &source) {
+    Core::ACParameters ac = source.GetAC();
+    const auto is_valid = [&source](const Core::ACParameters &candidate) { return source.IsValidAC(candidate); };
+    if (DrawParameterFields(AC_FIELDS, m_ACFields, source.GetUnit(), is_valid, ac)) {
+        source.SetAC(ac);
+        m_Schematic->MarkModified();
+    }
+    ImGui::TextDisabled("The amplitude is the peak of the sine in a transient");
+    ImGui::TextDisabled("The AC magnitude drives the AC sweep; 1 reads as gain");
+}
+
+void PartEditor::DrawPulse(Core::Source &source) {
+    Core::PulseParameters pulse = source.GetPulse();
+    const auto is_valid = [&source](const Core::PulseParameters &candidate) { return source.IsValidPulse(candidate); };
+    if (DrawParameterFields(PULSE_FIELDS, m_PulseFields, source.GetUnit(), is_valid, pulse)) {
+        source.SetPulse(pulse);
+        m_Schematic->MarkModified();
+    }
+
+    ImGui::TextDisabled("%s", std::format("Repeats at {}Hz", Core::FormatValue(1.0 / pulse.Period)).c_str());
+    if (pulse.RiseTime + pulse.Width + pulse.FallTime > pulse.Period) {
+        ImGui::TextColored(GetWarningTextColor(), "Rise, width and fall add up to more than the period");
+    }
+}
+
+void PartEditor::DrawEXP(Core::Source &source) {
+    Core::EXPParameters exp = source.GetEXP();
+    const auto is_valid = [&source](const Core::EXPParameters &candidate) { return source.IsValidEXP(candidate); };
+    if (DrawParameterFields(EXP_FIELDS, m_EXPFields, source.GetUnit(), is_valid, exp)) {
+        source.SetEXP(exp);
+        m_Schematic->MarkModified();
+    }
+    ImGui::TextDisabled("Rises towards the peak, then decays back towards the start");
+}
+
+void PartEditor::DrawSFFM(Core::Source &source) {
+    Core::SFFMParameters sffm = source.GetSFFM();
+    const auto is_valid = [&source](const Core::SFFMParameters &candidate) { return source.IsValidSFFM(candidate); };
+    if (DrawParameterFields(SFFM_FIELDS, m_SFFMFields, source.GetUnit(), is_valid, sffm)) {
+        source.SetSFFM(sffm);
+        m_Schematic->MarkModified();
+    }
+    ImGui::TextDisabled("A carrier whose phase swings with the signal");
+}
+
+void PartEditor::DrawAM(Core::Source &source) {
+    Core::AMParameters am = source.GetAM();
+    const auto is_valid = [&source](const Core::AMParameters &candidate) { return source.IsValidAM(candidate); };
+    if (DrawParameterFields(AM_FIELDS, m_AMFields, source.GetUnit(), is_valid, am)) {
+        source.SetAM(am);
+        m_Schematic->MarkModified();
+    }
+    ImGui::TextDisabled("The modulating and carrier sines multiply; the offset shifts the whole waveform");
+}
+
+/**
+ * @brief   The points apply as soon as the text reads, so a half-typed field keeps the last valid shape.
+ */
+void PartEditor::DrawPWL(Core::Source &source) {
+    DrawFieldLabel("Points");
+    const bool changed = ImGui::InputText("##pwl", &m_PWLText);
+    const std::optional<std::vector<Core::PWLPoint>> points = Core::ParsePWLPoints(m_PWLText);
+    if (changed && points) {
+        source.SetPWL({.Points = *points});
+        m_Schematic->MarkModified();
+    }
+    if (!points) {
+        ImGui::TextColored(GetErrorTextColor(), "At least two \"time value\" pairs, times increasing from zero");
+    } else {
+        ImGui::TextDisabled("For example: 0 0, 1m 5, 2m 0");
+    }
+}
+
+/**
+ * @brief   The density below the fields is what the Spectrum tab of a run shows as a floor: the white noise is flat up
+ * to half the sampling rate.
+ */
+void PartEditor::DrawNoise(Core::Source &source) {
+    Core::NoiseParameters noise = source.GetNoise();
+    const auto is_valid = [&source](const Core::NoiseParameters &candidate) { return source.IsValidNoise(candidate); };
+    if (DrawParameterFields(NOISE_FIELDS, m_NoiseFields, source.GetUnit(), is_valid, noise)) {
+        source.SetNoise(noise);
+        m_Schematic->MarkModified();
+    }
+    if (noise.WhiteAmplitude > 0.0 && noise.TimeStep > 0.0) {
+        const double density = noise.WhiteAmplitude * std::sqrt(2.0 * noise.TimeStep);
+        ImGui::TextDisabled("%s", std::format("White noise: {}{}/rtHz, flat up to {}Hz", Core::FormatValue(density),
+                                              source.GetUnit(), Core::FormatValue(0.5 / noise.TimeStep))
+                                      .c_str());
+    }
+    ImGui::TextDisabled("1/f amplitude, telegraph amplitude and white rms at 0 turn that part off");
+    ImGui::TextDisabled("Noise changes on each run; for noise over a signal, put a second source in series");
+}
+
+/**
+ * @brief   The labels of the two parameters follow the distribution, as the ngspice TRRANDOM source defines them.
+ */
+void PartEditor::DrawRandom(Core::Source &source) {
+    Core::RandomParameters random = source.GetRandom();
+    DrawFieldLabel("Distribution");
+    if (ImGui::BeginCombo("##distribution", Core::GetRandomDistributionName(random.Distribution))) {
+        for (const Core::RandomDistribution distribution :
+             {Core::RandomDistribution::UNIFORM, Core::RandomDistribution::GAUSSIAN,
+              Core::RandomDistribution::EXPONENTIAL, Core::RandomDistribution::POISSON}) {
+            const bool is_selected = distribution == random.Distribution;
+            if (ImGui::Selectable(Core::GetRandomDistributionName(distribution), is_selected) && !is_selected) {
+                random.Distribution = distribution;
+                if (source.IsValidRandom(random)) {
+                    source.SetRandom(random);
+                    m_Schematic->MarkModified();
+                }
+            }
+        }
+        ImGui::EndCombo();
+    }
+    random = source.GetRandom();
+    const RandomLabels labels = GetRandomLabels(random.Distribution);
+    const char *unit = source.GetUnit();
+    const auto is_valid = [&source, &random](double Core::RandomParameters::*member, const double value) {
+        Core::RandomParameters candidate = random;
+        candidate.*member = value;
+        return source.IsValidRandom(candidate);
+    };
+    bool changed = false;
+    const auto draw = [&](ValueField &field, const char *label, const char *field_unit,
+                          double Core::RandomParameters::*member) {
+        if (const std::optional<double> value =
+                field.Draw(label, field_unit, [&](const double candidate) { return is_valid(member, candidate); })) {
+            random.*member = *value;
+            changed = true;
+        }
+    };
+    draw(m_RandomFields[0], "Sample step", "s", &Core::RandomParameters::TimeStep);
+    draw(m_RandomFields[1], "Delay", "s", &Core::RandomParameters::Delay);
+    draw(m_RandomFields[2], labels.First, labels.FirstUnit != nullptr ? labels.FirstUnit : unit,
+         &Core::RandomParameters::First);
+    draw(m_RandomFields[3], labels.Second, unit, &Core::RandomParameters::Second);
+    if (changed) {
+        source.SetRandom(random);
+        m_Schematic->MarkModified();
+    }
+    ImGui::TextDisabled("Each value is held for the sample step; the seed is in the Simulation settings");
+}
+
+/**
+ * @brief   The gain is the ratio of output to control, so the line below spells out what it multiplies.
+ */
+void PartEditor::DrawControlledSource(Core::ControlledSource &source) {
+    if (const std::optional<double> value = m_Value.Draw("Gain", source.GetUnit(), AnyValue)) {
+        source.SetValue(*value);
+        m_Schematic->MarkModified();
+    }
+    const Core::ComponentType type = source.GetType();
+    if (Core::IsCurrentControlled(type)) {
+        DrawControllingCurrent(source);
+    }
+    if (type == Core::ComponentType::VCVS) {
+        ImGui::TextDisabled("V(1, 2) = gain x V(+, -) of the control pins");
+    } else if (type == Core::ComponentType::VCCS) {
+        ImGui::TextDisabled("Pushes gain x V(+, -) from terminal 1 to 2");
+    } else if (type == Core::ComponentType::CCCS) {
+        ImGui::TextDisabled("Pushes gain x I from terminal 1 to 2");
+    } else {
+        ImGui::TextDisabled("V(1, 2) = gain x I");
+    }
+    ImGui::TextDisabled("A negative gain inverts the output");
+}
+
+/**
+ * @brief   Any current the results report can control the source, except its own; they read as the plots name them.
+ */
+void PartEditor::DrawControllingCurrent(Core::ControlledSource &source) {
+    const std::string &current = source.GetControllingCurrent();
+    const std::string preview = current.empty() ? "(none)" : std::format("I({})", current);
+    DrawFieldLabel("Follows");
+    if (ImGui::BeginCombo("##Follows", preview.c_str())) {
+        for (const auto &element : m_Schematic->GetElements()) {
+            if (&element->GetComponent() == &source) {
+                continue;
+            }
+            for (const std::string &name : Core::GetCurrentNames(element->GetComponent())) {
+                const bool selected = name == current;
+                if (ImGui::Selectable(std::format("I({})", name).c_str(), selected) && !selected) {
+                    source.SetControllingCurrent(name);
+                    m_Schematic->MarkModified();
+                }
+            }
+        }
+        ImGui::EndCombo();
+    }
+    if (current.empty()) {
+        ImGui::TextColored(GetWarningTextColor(), "Pick the current the source follows");
+    }
+}
+
+/**
+ * @brief   The expression applies as soon as it parses, so a half-typed one keeps the last that did; below it, what is
+ *          wrong with it in the circuit as it is now, or what it may use.
+ */
+void PartEditor::DrawBehavioralSource(Core::BehavioralSource &source) {
+    const bool is_voltage = source.GetType() == Core::ComponentType::BEHAVIORAL_VOLTAGE;
+    DrawFieldLabel(is_voltage ? "V =" : "I =");
+    ImGui::SetNextItemWidth(ImGui::GetFontSize() * EXPRESSION_FIELD_WIDTH);
+    const bool changed = ImGui::InputText("##expression", &m_ExpressionText);
+    const auto parsed = Core::ParseBehavioralExpression(m_ExpressionText);
+    if (changed && parsed) {
+        source.SetExpression(m_ExpressionText);
+        m_Schematic->MarkModified();
+    }
+    ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + ImGui::GetFontSize() * EXPRESSION_HELP_WIDTH);
+    if (!parsed) {
+        ImGui::TextColored(GetErrorTextColor(), "%s", parsed.error().c_str());
+    } else if (const std::optional<std::string> problem =
+                   Core::CheckBehavioralExpression(m_Schematic->BuildCircuit(), source)) {
+        ImGui::TextColored(GetErrorTextColor(), "%s", problem->c_str());
+    }
+    ImGui::TextDisabled("%s", is_voltage ? "Drives this voltage from + to -" : "Pushes this current from + to -");
+    ImGui::TextDisabled("V(OUT), V(IN, OUT) by net label, I(R1), I(Q1.C), numbers such as 2.2k, + - * / ^, and "
+                        "ngspice functions such as tanh(), exp(), abs(), min(), max(), x > 1 ? a : b, time, temper");
+    ImGui::PopTextWrapPos();
+}
+
+} // namespace GUI

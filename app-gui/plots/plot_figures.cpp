@@ -5,11 +5,11 @@
 
 #include "plots/plot_figures.h"
 
-#include "analysis/parameter_step.h"
-#include "drawing/node_colors.h"
-#include "drawing/theme.h"
-#include "editing/probing.h"
+#include "base/node_colors.h"
+#include "base/theme.h"
 #include "plots/plot_helpers.h"
+#include "results/parameter_step.h"
+#include "schematic/probing.h"
 #include "spice/spice_value.h"
 #include <algorithm>
 #include <cmath>

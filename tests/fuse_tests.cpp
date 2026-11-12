@@ -4,7 +4,6 @@
  *          schematic tell that it blew.
  */
 
-#include "analysis/fuse_readings.h"
 #include "circuit/circuit.h"
 #include "circuit/components/fuse.h"
 #include "circuit/components/ground.h"
@@ -13,11 +12,12 @@
 #include "circuit/components/vcc.h"
 #include "circuit/components/voltage_source.h"
 #include "circuit/subcircuit.h"
-#include "document/schematic_file.h"
-#include "drawing/fuse_flash.h"
-#include "editing/connectivity.h"
-#include "editing/element_factory.h"
-#include "preferences.h"
+#include "overlays/fuse_flash.h"
+#include "results/fuse_readings.h"
+#include "schematic/connectivity.h"
+#include "schematic/element_factory.h"
+#include "schematic/preferences.h"
+#include "schematic/schematic_file.h"
 #include "simulation/fuse_state.h"
 #include "simulation/ratings.h"
 #include "simulation/simulation_backend.h"

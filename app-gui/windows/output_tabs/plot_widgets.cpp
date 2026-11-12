@@ -5,18 +5,18 @@
 
 #include "windows/output_tabs/plot_widgets.h"
 
-#include "analysis/parameter_step.h"
-#include "analysis/pole_zero_view.h"
-#include "drawing/node_colors.h"
-#include "drawing/theme.h"
-#include "editing/probing.h"
+#include "base/node_colors.h"
+#include "base/theme.h"
+#include "base/value_field.h"
 #include "implot_internal.h"
-#include "plots/logic_trace.h"
 #include "plots/plot_figures.h"
 #include "plots/plot_helpers.h"
-#include "plots/trace_statistics.h"
+#include "results/logic_trace.h"
+#include "results/parameter_step.h"
+#include "results/pole_zero_view.h"
+#include "results/trace_statistics.h"
+#include "schematic/probing.h"
 #include "spice/spice_value.h"
-#include "value_field.h"
 #include <algorithm>
 #include <cfloat>
 #include <cmath>

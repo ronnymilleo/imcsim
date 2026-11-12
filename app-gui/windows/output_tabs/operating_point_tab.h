@@ -7,8 +7,8 @@
 #ifndef IMCSIM_OPERATING_POINT_TAB_H
 #define IMCSIM_OPERATING_POINT_TAB_H
 
-#include "document/schematic.h"
 #include "plots/trace_fit_state.h"
+#include "schematic/schematic.h"
 #include "simulation/simulation_results.h"
 #include <cstddef>
 #include <optional>

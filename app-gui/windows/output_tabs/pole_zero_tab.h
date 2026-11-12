@@ -6,7 +6,7 @@
 #ifndef IMCSIM_POLE_ZERO_TAB_H
 #define IMCSIM_POLE_ZERO_TAB_H
 
-#include "document/schematic.h"
+#include "schematic/schematic.h"
 #include "simulation/simulation_results.h"
 #include <cstddef>
 

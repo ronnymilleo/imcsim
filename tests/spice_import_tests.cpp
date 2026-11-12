@@ -3,16 +3,16 @@
  * @brief   Tests for turning the subcircuits of a SPICE library into blocks of the schematic.
  */
 
-#include "document/spice_import.h"
+#include "schematic/spice_import.h"
 
 #include "circuit/components/subcircuit.h"
 #include "circuit/library_model.h"
 #include "circuit/spice_library.h"
-#include "document/clipboard.h"
-#include "document/schematic.h"
-#include "document/schematic_file.h"
-#include "document/subcircuit_pins.h"
-#include "editing/element_factory.h"
+#include "schematic/clipboard.h"
+#include "schematic/element_factory.h"
+#include "schematic/schematic.h"
+#include "schematic/schematic_file.h"
+#include "schematic/subcircuit_pins.h"
 #include <catch2/catch_test_macros.hpp>
 #include <memory>
 #include <string>

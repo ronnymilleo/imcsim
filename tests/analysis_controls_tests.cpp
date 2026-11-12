@@ -4,16 +4,16 @@
  */
 
 #include "analysis/analysis_controls.h"
-#include "analysis/monte_carlo_results.h"
+#include "results/monte_carlo_results.h"
 
 #include "backends/nodalys/nodalys_backend.h"
 #include "circuit/components/capacitor.h"
 #include "circuit/components/resistor.h"
 #include "circuit/components/source.h"
 #include "circuit/components/subcircuit_pin.h"
-#include "document/examples.h"
-#include "document/schematic.h"
-#include "editing/live_input.h"
+#include "schematic/examples.h"
+#include "schematic/live_input.h"
+#include "schematic/schematic.h"
 #include "simulation/simulation_backend.h"
 #include "test_printers.h"
 #include <algorithm>

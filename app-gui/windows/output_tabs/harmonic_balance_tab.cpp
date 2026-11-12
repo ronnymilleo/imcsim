@@ -5,13 +5,13 @@
 
 #include "windows/output_tabs/harmonic_balance_tab.h"
 
-#include "drawing/node_colors.h"
-#include "drawing/theme.h"
-#include "editing/probing.h"
+#include "base/node_colors.h"
+#include "base/theme.h"
 #include "imgui.h"
 #include "implot.h"
 #include "plots/plot_figures.h"
 #include "plots/plot_helpers.h"
+#include "schematic/probing.h"
 #include "spice/spice_value.h"
 #include "windows/output_tabs/plot_widgets.h"
 #include <algorithm>

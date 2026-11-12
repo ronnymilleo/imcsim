@@ -7,10 +7,10 @@
 #ifndef IMCSIM_NOISE_TAB_H
 #define IMCSIM_NOISE_TAB_H
 
-#include "document/schematic.h"
 #include "plots/plot_export.h"
 #include "plots/plot_types.h"
 #include "plots/trace_fit_state.h"
+#include "schematic/schematic.h"
 #include "simulation/simulation_results.h"
 #include <set>
 #include <string>

@@ -3,8 +3,8 @@
  * @brief   Tests for the current along each piece of wire.
  */
 
-#include "drawing/current_flow.h"
-#include "editing/element_factory.h"
+#include "results/current_flow.h"
+#include "schematic/element_factory.h"
 #include "test_printers.h"
 #include <algorithm>
 #include <catch2/catch_test_macros.hpp>

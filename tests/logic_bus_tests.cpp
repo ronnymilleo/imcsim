@@ -3,12 +3,12 @@
  * @brief   Tests for logic buses: reading several logic signals as one number and writing its value.
  */
 
-#include "document/schematic.h"
-#include "document/schematic_file.h"
-#include "plots/logic_bus.h"
 #include "plots/logic_buses.h"
 #include "plots/plot_export.h"
 #include "plots/plot_figures.h"
+#include "results/logic_bus.h"
+#include "schematic/schematic.h"
+#include "schematic/schematic_file.h"
 #include <catch2/catch_test_macros.hpp>
 #include <cmath>
 #include <cstdint>

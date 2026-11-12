@@ -5,9 +5,9 @@
 
 #include "circuit/components/net_label.h"
 #include "circuit/components/switch.h"
-#include "document/examples.h"
-#include "document/schematic.h"
-#include "editing/element_factory.h"
+#include "schematic/element_factory.h"
+#include "schematic/examples.h"
+#include "schematic/schematic.h"
 #include "test_printers.h"
 #include <algorithm>
 #include <catch2/catch_test_macros.hpp>

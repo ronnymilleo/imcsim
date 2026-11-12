@@ -9,8 +9,8 @@
 #include "analysis/analysis_controls.h"
 #include "analysis/analysis_settings_panel.h"
 #include "circuit/components/component.h"
-#include "document/schematic.h"
-#include "editing/editor_mode.h"
+#include "schematic/editor_mode.h"
+#include "schematic/schematic.h"
 #include "windows/part_picker.h"
 #include <optional>
 #include <vector>

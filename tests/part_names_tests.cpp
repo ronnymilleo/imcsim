@@ -5,9 +5,9 @@
 
 #include "circuit/components/behavioral_source.h"
 #include "circuit/components/controlled_source.h"
-#include "document/schematic.h"
-#include "editing/element_factory.h"
-#include "editing/part_names.h"
+#include "schematic/element_factory.h"
+#include "schematic/part_names.h"
+#include "schematic/schematic.h"
 #include <catch2/catch_test_macros.hpp>
 #include <memory>
 #include <string>

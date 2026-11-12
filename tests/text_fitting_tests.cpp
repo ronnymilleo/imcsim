@@ -3,7 +3,7 @@
  * @brief   Tests for shortening a line of text to a width, at a word, with an ellipsis.
  */
 
-#include "drawing/text_fitting.h"
+#include "base/text_fitting.h"
 
 #include <catch2/catch_test_macros.hpp>
 #include <string>

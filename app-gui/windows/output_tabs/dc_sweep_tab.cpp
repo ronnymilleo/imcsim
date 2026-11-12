@@ -5,12 +5,12 @@
 
 #include "windows/output_tabs/dc_sweep_tab.h"
 
-#include "analysis/parameter_step.h"
 #include "implot.h"
 #include "plots/plot_figures.h"
 #include "plots/plot_helpers.h"
 #include "plots/statistics_table.h"
-#include "plots/trace_statistics.h"
+#include "results/parameter_step.h"
+#include "results/trace_statistics.h"
 #include "spice/spice_value.h"
 #include "windows/output_tabs/plot_widgets.h"
 #include <algorithm>

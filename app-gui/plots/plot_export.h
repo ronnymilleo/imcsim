@@ -8,7 +8,7 @@
 #ifndef IMCSIM_PLOT_EXPORT_H
 #define IMCSIM_PLOT_EXPORT_H
 
-#include "drawing/svg_writer.h"
+#include "base/svg_writer.h"
 #include <complex>
 #include <cstddef>
 #include <expected>

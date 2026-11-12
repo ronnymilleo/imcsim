@@ -1,14 +1,15 @@
 """Tests for the pure logic of include_layers.py: graph building, layer violations and the baseline comparison."""
 
 import unittest
+from unittest import mock
 
 import include_layers as layers
 
 SOURCES = {
     "app-core/spice/spice_value.h": '#include "circuit/circuit.h"\n',
     "app-core/circuit/circuit.h": '#include "simulation/simulator.h"\n#include <vector>\n',
-    "app-gui/editing/wire.h": '#include "document/schematic.h"\n',
-    "app-gui/document/schematic.h": '#include "editing/wire.h"\n',
+    "app-gui/schematic/wire.h": '#include "results/snapshot.h"\n',
+    "app-gui/results/snapshot.h": '#include "schematic/wire.h"\n',
     "app-core/simulation/simulator.h": '#include "circuit/circuit.h"\n#include <nodalys/types.h>\n',
     "app-gui/application.h": '#include "windows/main_window.h"\n#include "simulation/simulator.h"\n',
     "app-gui/windows/main_window.h": '#include "ui_elements/ui_part.h"\n',
@@ -31,9 +32,9 @@ class IncludeLayersTests(unittest.TestCase):
 
     def test_counts_includes_between_folders_and_skips_the_same_folder(self):
         edges = layers.count_edges(layers.build_includes(SOURCES))
-        self.assertEqual(edges[("app-gui/editing", "app-gui/document")], 1)
-        self.assertEqual(edges[("app-gui/document", "app-gui/editing")], 1)
-        self.assertNotIn(("app-gui/editing", "app-gui/editing"), edges)
+        self.assertEqual(edges[("app-gui/schematic", "app-gui/results")], 1)
+        self.assertEqual(edges[("app-gui/results", "app-gui/schematic")], 1)
+        self.assertNotIn(("app-gui/schematic", "app-gui/schematic"), edges)
 
     def test_an_include_that_goes_up_a_layer_is_a_violation(self):
         violations = layers.find_violations(layers.build_includes(SOURCES))
@@ -41,10 +42,17 @@ class IncludeLayersTests(unittest.TestCase):
         self.assertIn("app-core/spice/spice_value.h -> circuit/circuit.h", keys)
         self.assertIn("app-gui/ui_elements/ui_part.h -> helpers.h", keys)
 
-    def test_folders_in_the_same_layer_may_include_each_other(self):
+    def test_an_include_that_goes_up_between_two_gui_folders_is_a_violation(self):
         keys = {item.key for item in layers.find_violations(layers.build_includes(SOURCES))}
-        self.assertNotIn("app-gui/editing/wire.h -> document/schematic.h", keys)
-        self.assertNotIn("app-gui/document/schematic.h -> editing/wire.h", keys)
+        self.assertIn("app-gui/schematic/wire.h -> results/snapshot.h", keys)
+        self.assertNotIn("app-gui/results/snapshot.h -> schematic/wire.h", keys)
+
+    def test_folders_in_the_same_layer_may_include_each_other(self):
+        merged_layers = [[layers.ROOT_FOLDER], ["schematic", "results"]]
+        with mock.patch.dict(layers.FOLDER_LAYERS, {layers.GUI: merged_layers + [["ui_elements", "windows"]]}):
+            keys = {item.key for item in layers.find_violations(layers.build_includes(SOURCES))}
+        self.assertNotIn("app-gui/schematic/wire.h -> results/snapshot.h", keys)
+        self.assertNotIn("app-gui/results/snapshot.h -> schematic/wire.h", keys)
 
     def test_a_library_may_include_the_ones_below_it_but_not_above(self):
         sources = dict(SOURCES)
