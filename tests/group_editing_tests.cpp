@@ -3,8 +3,8 @@
  * @brief   Tests for turning and mirroring parts about a point and finding that point.
  */
 
-#include "editing/element_factory.h"
-#include "editing/group_editing.h"
+#include "schematic/element_factory.h"
+#include "schematic/group_editing.h"
 #include "test_printers.h"
 #include <catch2/catch_test_macros.hpp>
 #include <memory>

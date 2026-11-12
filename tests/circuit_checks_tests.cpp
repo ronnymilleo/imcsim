@@ -5,14 +5,14 @@
 
 #include "simulation/circuit_checks.h"
 
-#include "components/clock.h"
-#include "components/ground.h"
-#include "components/logic_input.h"
-#include "components/logic_part.h"
-#include "components/resistor.h"
-#include "components/subcircuit.h"
-#include "components/voltage_source.h"
-#include "model/subcircuit.h"
+#include "circuit/components/clock.h"
+#include "circuit/components/ground.h"
+#include "circuit/components/logic_input.h"
+#include "circuit/components/logic_part.h"
+#include "circuit/components/resistor.h"
+#include "circuit/components/subcircuit.h"
+#include "circuit/components/voltage_source.h"
+#include "circuit/subcircuit.h"
 #include <catch2/catch_test_macros.hpp>
 #include <limits>
 #include <memory>

@@ -3,17 +3,19 @@
  * @brief   Tests for the shared schematic document: content, names, selection and modified state.
  */
 
-#include "components/net_label.h"
-#include "components/switch.h"
-#include "document/examples.h"
-#include "document/schematic.h"
-#include "editing/element_factory.h"
+#include "circuit/components/net_label.h"
+#include "circuit/components/switch.h"
+#include "results/result_store.h"
+#include "schematic/element_factory.h"
+#include "schematic/examples.h"
+#include "schematic/schematic.h"
 #include "test_printers.h"
 #include <algorithm>
 #include <catch2/catch_test_macros.hpp>
 #include <memory>
 #include <set>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace {
@@ -221,84 +223,76 @@ TEST_CASE("BuildSpiceNetlist reflects value changes made through MarkModified", 
 
 TEST_CASE("Simulation results are dropped when the circuit changes", "[schematic]") {
     GUI::Schematic schematic;
+    GUI::ResultStore results;
+    schematic.SetListener(&results);
     schematic.AddWire({0, 0}, {4, 0});
-    schematic.SetOperatingPoint(Core::OperatingPoint{{0.0, 5.0}});
-    REQUIRE(schematic.GetOperatingPoint());
+    results.SetOperatingPoint(Core::OperatingPoint{{0.0, 5.0}});
+    REQUIRE(results.GetOperatingPoint());
 
     SECTION("but not when the wires are set to what they already are, as during a drag that did not move") {
         schematic.SetWires(schematic.GetWires());
         schematic.SimplifyAllWires();
-        CHECK(schematic.GetOperatingPoint());
+        CHECK(results.GetOperatingPoint());
     }
     SECTION("when the wires really change") {
         schematic.SetWires({{{0, 0}, {0, 4}}});
-        CHECK_FALSE(schematic.GetOperatingPoint());
+        CHECK_FALSE(results.GetOperatingPoint());
     }
     SECTION("when a value or anything else is edited") {
-        schematic.SetTransient(Core::Transient{});
-        schematic.SetACSweep(Core::ACSweep{});
+        results.SetTransient(Core::Transient{});
+        results.SetACSweep(Core::ACSweep{});
         schematic.MarkModified();
-        CHECK_FALSE(schematic.GetOperatingPoint());
-        CHECK_FALSE(schematic.GetTransient());
-        CHECK_FALSE(schematic.GetACSweep());
+        CHECK_FALSE(results.GetOperatingPoint());
+        CHECK_FALSE(results.GetTransient());
+        CHECK_FALSE(results.GetACSweep());
     }
 }
 
 TEST_CASE("A stepped operating point shows the selected step, and a change or a single run drops the steps",
           "[schematic]") {
     GUI::Schematic schematic;
+    GUI::ResultStore results;
+    schematic.SetListener(&results);
     schematic.AddWire({0, 0}, {4, 0});
     GUI::StepFamily<Core::OperatingPoint> steps{.Parameter = "R1",
                                                 .Unit = "Ohm",
                                                 .Values = {1e3, 2e3, 3e3},
                                                 .Results = {{{0.0, 1.0}}, {{0.0, 2.0}}, {{0.0, 3.0}}},
                                                 .Selected = 0};
-    schematic.SetOperatingPointSteps(steps);
-    REQUIRE(schematic.GetOperatingPoint());
-    CHECK(schematic.GetOperatingPoint()->NodeVoltages[1] == 1.0);
+    results.SetOperatingPointSteps(steps);
+    REQUIRE(results.GetOperatingPoint());
+    CHECK(results.GetOperatingPoint()->NodeVoltages[1] == 1.0);
 
     // Picking a step shows it, as the result of the analysis, with a new version so the schematic redraws it
-    const std::size_t version = schematic.GetOperatingPointVersion();
-    schematic.SelectOperatingPointStep(2);
-    CHECK(schematic.GetOperatingPoint()->NodeVoltages[1] == 3.0);
-    CHECK(schematic.GetOperatingPointSteps()->Selected == 2);
-    CHECK(schematic.GetOperatingPointVersion() != version);
+    const std::size_t version = results.GetOperatingPointVersion();
+    results.SelectOperatingPointStep(2);
+    CHECK(results.GetOperatingPoint()->NodeVoltages[1] == 3.0);
+    CHECK(results.GetOperatingPointSteps()->Selected == 2);
+    CHECK(results.GetOperatingPointVersion() != version);
     // A step out of range is ignored
-    schematic.SelectOperatingPointStep(7);
-    CHECK(schematic.GetOperatingPoint()->NodeVoltages[1] == 3.0);
+    results.SelectOperatingPointStep(7);
+    CHECK(results.GetOperatingPoint()->NodeVoltages[1] == 3.0);
 
     SECTION("a single run replaces the steps") {
-        schematic.SetOperatingPoint(Core::OperatingPoint{{0.0, 5.0}});
-        CHECK_FALSE(schematic.GetOperatingPointSteps());
+        results.SetOperatingPoint(Core::OperatingPoint{{0.0, 5.0}});
+        CHECK_FALSE(results.GetOperatingPointSteps());
     }
     SECTION("an edit of the circuit drops them") {
         schematic.MarkModified();
-        CHECK_FALSE(schematic.GetOperatingPointSteps());
-        CHECK_FALSE(schematic.GetOperatingPoint());
+        CHECK_FALSE(results.GetOperatingPointSteps());
+        CHECK_FALSE(results.GetOperatingPoint());
     }
 }
 
 TEST_CASE("Selecting does not drop simulation results", "[schematic]") {
     GUI::Schematic schematic;
+    GUI::ResultStore results;
+    schematic.SetListener(&results);
     schematic.AddElement(MakeResistor({0, 0}));
-    schematic.SetOperatingPoint(Core::OperatingPoint{{0.0, 5.0}});
+    results.SetOperatingPoint(Core::OperatingPoint{{0.0, 5.0}});
     schematic.SelectElement(0);
     schematic.ClearSelection();
-    CHECK(schematic.GetOperatingPoint());
-}
-
-TEST_CASE("Each analysis has its own results version", "[schematic]") {
-    GUI::Schematic schematic;
-    const std::size_t transient_version = schematic.GetTransientVersion();
-    const std::size_t sweep_version = schematic.GetACSweepVersion();
-
-    schematic.SetTransient(Core::Transient{});
-    CHECK(schematic.GetTransientVersion() != transient_version);
-    CHECK(schematic.GetACSweepVersion() == sweep_version);
-
-    schematic.SetACSweep(Core::ACSweep{});
-    schematic.SetOperatingPoint(Core::OperatingPoint{});
-    CHECK(schematic.GetACSweepVersion() != sweep_version);
+    CHECK(results.GetOperatingPoint());
 }
 
 TEST_CASE("Undo and redo step through committed changes", "[schematic]") {
@@ -424,7 +418,9 @@ TEST_CASE("The history keeps the last 100 steps", "[schematic]") {
 
 TEST_CASE("Changing the simulation settings is an unsaved change that keeps the results", "[schematic]") {
     GUI::Schematic schematic;
-    schematic.SetOperatingPoint(Core::OperatingPoint{{0.0}});
+    GUI::ResultStore results;
+    schematic.SetListener(&results);
+    results.SetOperatingPoint(Core::OperatingPoint{{0.0}});
     const std::size_t version = schematic.GetSimulationSettingsVersion();
 
     GUI::SimulationSettings settings;
@@ -432,7 +428,7 @@ TEST_CASE("Changing the simulation settings is an unsaved change that keeps the 
     schematic.SetSimulationSettings(settings);
     CHECK(schematic.IsModified());
     CHECK(schematic.GetSimulationSettings() == settings);
-    CHECK(schematic.GetOperatingPoint());
+    CHECK(results.GetOperatingPoint());
     CHECK(schematic.GetSimulationSettingsVersion() == version);
 }
 
@@ -670,53 +666,14 @@ TEST_CASE("A measured node that is joined to ground and then freed is measured a
     CHECK(schematic.IsVoltageMeasured(nodes.GetNode({10, 10}).value()));
 }
 
-TEST_CASE("Chunks of a transient make the result grow, and only the first counts as a new result", "[schematic]") {
-    GUI::Schematic schematic;
-    const auto make_chunk = [](const std::vector<double> &times) {
-        Core::Transient chunk;
-        chunk.Times = times;
-        chunk.NodeVoltages = {std::vector<double>(times.size(), 0.0), times};
-        chunk.Currents = {{"R1", times}};
-        return chunk;
-    };
-
-    schematic.AppendTransient(make_chunk({0.0, 1.0}));
-    REQUIRE(schematic.GetTransient().has_value());
-    // A transient that is still being made is not complete
-    CHECK_FALSE(schematic.GetTransient()->IsComplete);
-    const std::size_t result_version = schematic.GetTransientVersion();
-    const std::size_t data_version = schematic.GetTransientDataVersion();
-
-    schematic.AppendTransient(make_chunk({2.0, 3.0}));
-    CHECK(schematic.GetTransient()->Times == std::vector<double>{0.0, 1.0, 2.0, 3.0});
-    CHECK(schematic.GetTransient()->NodeVoltages[1] == std::vector<double>{0.0, 1.0, 2.0, 3.0});
-    CHECK(schematic.GetTransient()->Currents[0].Values == std::vector<double>{0.0, 1.0, 2.0, 3.0});
-    CHECK(schematic.GetTransientVersion() == result_version);
-    CHECK(schematic.GetTransientDataVersion() == data_version + 1);
-
-    // A chunk made for another circuit, with other nodes or other currents, is dropped
-    Core::Transient other = make_chunk({4.0});
-    other.NodeVoltages.push_back({4.0});
-    schematic.AppendTransient(other);
-    other = make_chunk({4.0});
-    other.Currents[0].Name = "R2";
-    schematic.AppendTransient(other);
-    CHECK(schematic.GetTransient()->Times.size() == 4);
-    CHECK(schematic.GetTransientDataVersion() == data_version + 1);
-
-    // The whole run replaces what the chunks made, as a new result
-    schematic.SetTransient(make_chunk({0.0, 5.0}));
-    CHECK(schematic.GetTransient()->IsComplete);
-    CHECK(schematic.GetTransientVersion() == result_version + 1);
-    CHECK(schematic.GetTransientDataVersion() == data_version + 2);
-}
-
 TEST_CASE("A part set by hand during a live run keeps the transient and goes to the run as a change", "[schematic]") {
     GUI::Schematic schematic;
+    GUI::ResultStore results;
+    schematic.SetListener(&results);
     schematic.AddElement(GUI::CreateElement(Core::ComponentType::SWITCH, {0, 0}, GUI::Rotation::R0));
     auto &contact = static_cast<Core::Switch &>(schematic.GetElement(0).GetComponent());
-    schematic.SetTransient(Core::Transient{.Times = {0.0}, .NodeVoltages = {}, .Currents = {}, .Warnings = {}});
-    schematic.SetOperatingPoint(Core::OperatingPoint{});
+    results.SetTransient(Core::Transient{.Times = {0.0}, .NodeVoltages = {}, .Currents = {}, .Warnings = {}});
+    results.SetOperatingPoint(Core::OperatingPoint{});
     schematic.CommitUndoStep();
     const std::size_t circuit_version = schematic.GetCircuitVersion();
 
@@ -725,8 +682,8 @@ TEST_CASE("A part set by hand during a live run keeps the transient and goes to 
     contact.SetClosed(true);
     schematic.MarkLiveChanged(contact);
     // The transient that the run is making stays, the operating point no longer matches the circuit
-    CHECK(schematic.GetTransient().has_value());
-    CHECK_FALSE(schematic.GetOperatingPoint().has_value());
+    CHECK(results.GetTransient().has_value());
+    CHECK_FALSE(results.GetOperatingPoint().has_value());
     CHECK(schematic.GetCircuitVersion() == circuit_version);
     CHECK(schematic.IsModified());
     CHECK(schematic.TakeLiveChanges() == Core::DescribeLiveChange(contact));
@@ -741,14 +698,16 @@ TEST_CASE("A part set by hand during a live run keeps the transient and goes to 
 
 TEST_CASE("Outside a live run a part set by hand is an edit that drops the results", "[schematic]") {
     GUI::Schematic schematic;
+    GUI::ResultStore results;
+    schematic.SetListener(&results);
     schematic.AddElement(GUI::CreateElement(Core::ComponentType::SWITCH, {0, 0}, GUI::Rotation::R0));
     auto &contact = static_cast<Core::Switch &>(schematic.GetElement(0).GetComponent());
-    schematic.SetTransient(Core::Transient{});
+    results.SetTransient(Core::Transient{});
     const std::size_t circuit_version = schematic.GetCircuitVersion();
 
     contact.SetClosed(true);
     schematic.MarkLiveChanged(contact);
-    CHECK_FALSE(schematic.GetTransient().has_value());
+    CHECK_FALSE(results.GetTransient().has_value());
     CHECK(schematic.GetCircuitVersion() != circuit_version);
     CHECK(schematic.TakeLiveChanges().empty());
 
@@ -758,4 +717,53 @@ TEST_CASE("Outside a live run a part set by hand is an edit that drops the resul
     schematic.SetLiveRun(false);
     CHECK_FALSE(schematic.IsLiveRun());
     CHECK(schematic.TakeLiveChanges().empty());
+}
+
+TEST_CASE("A new document, an undo and a redo drop the results, as an edit does", "[schematic]") {
+    GUI::Schematic schematic;
+    GUI::ResultStore results;
+    schematic.SetListener(&results);
+    schematic.AddElement(MakeResistor({0, 0}));
+    schematic.CommitUndoStep();
+
+    SECTION("replacing the content, as opening a file or New does") {
+        results.SetOperatingPoint(Core::OperatingPoint{{0.0, 5.0}});
+        schematic.Clear();
+        CHECK_FALSE(results.GetOperatingPoint());
+    }
+    SECTION("undoing and redoing") {
+        results.SetOperatingPoint(Core::OperatingPoint{{0.0, 5.0}});
+        schematic.Undo();
+        CHECK_FALSE(results.GetOperatingPoint());
+        results.SetOperatingPoint(Core::OperatingPoint{{0.0, 5.0}});
+        schematic.Redo();
+        CHECK_FALSE(results.GetOperatingPoint());
+    }
+}
+
+TEST_CASE("A schematic without a listener edits as usual, and the listener can be taken away", "[schematic]") {
+    GUI::Schematic schematic;
+    schematic.AddElement(MakeResistor({0, 0}));
+    CHECK(schematic.IsModified());
+
+    GUI::ResultStore results;
+    schematic.SetListener(&results);
+    schematic.SetListener(nullptr);
+    results.SetOperatingPoint(Core::OperatingPoint{{0.0, 5.0}});
+    schematic.MarkModified();
+    CHECK(results.GetOperatingPoint());
+}
+
+TEST_CASE("A schematic moved into another one does not carry the listener, so it never tells the store of the original",
+          "[schematic]") {
+    GUI::Schematic original;
+    GUI::ResultStore results;
+    original.SetListener(&results);
+    original.AddElement(MakeResistor({0, 0}));
+    results.SetOperatingPoint(Core::OperatingPoint{{0.0, 5.0}});
+
+    GUI::Schematic moved(std::move(original));
+    moved.MarkModified();
+    CHECK(moved.GetElements().size() == 1);
+    CHECK(results.GetOperatingPoint());
 }

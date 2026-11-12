@@ -7,6 +7,7 @@
 #include "nodalys/version.h"
 
 #include <CLI/CLI.hpp>
+#include <algorithm>
 
 #include <chrono>
 #include <cstdlib>

@@ -3,7 +3,7 @@
 **Implementation files:**
 - [`nodalys/src/analyses/transient_analysis.cpp`](../../nodalys/src/analyses/transient_analysis.cpp) (`ComputeTransient`, `TransientCollector`, `FindNextCorner`)
 - [`nodalys/src/devices/devices.cpp`](../../nodalys/src/devices/devices.cpp) (`CapacitorDevice::Stamp`, `InductorDevice::Stamp`)
-- [`nodalys/src/devices/nonlinear.cpp`](../../nodalys/src/devices/nonlinear.cpp) (`ChargeModel` for diode, BJT, and MOSFET junction/diffusion charges)
+- [`nodalys/src/devices/semiconductor_math.h`](../../nodalys/src/devices/semiconductor_math.h) (`ChargeModel` for diode, BJT, and MOSFET junction/diffusion charges)
 - [`nodalys/src/devices/waveforms.cpp`](../../nodalys/src/devices/waveforms.cpp) (`SIN`, `PULSE`, `EXP`, `PWL`, `SFFM`, `AM` and the corners of each, `FindNextPulseCorner`)
 
 ---

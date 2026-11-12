@@ -5,18 +5,18 @@
  *          `imcsim-tests "[.benchmark]"`.
  */
 
-#include "components/bjt.h"
-#include "components/capacitor.h"
-#include "components/controlled_source.h"
-#include "components/diode.h"
-#include "components/ground.h"
-#include "components/inductor.h"
-#include "components/resistor.h"
-#include "components/source.h"
-#include "components/vcc.h"
-#include "components/voltage_source.h"
-#include "ngspice/ngspice_backend.h"
-#include "nodalys/nodalys_backend.h"
+#include "backends/ngspice/ngspice_backend.h"
+#include "backends/nodalys/nodalys_backend.h"
+#include "circuit/components/bjt.h"
+#include "circuit/components/capacitor.h"
+#include "circuit/components/controlled_source.h"
+#include "circuit/components/diode.h"
+#include "circuit/components/ground.h"
+#include "circuit/components/inductor.h"
+#include "circuit/components/resistor.h"
+#include "circuit/components/source.h"
+#include "circuit/components/vcc.h"
+#include "circuit/components/voltage_source.h"
 
 #include <nodalys/circuit_builder.h>
 #include <nodalys/nodalys.h>

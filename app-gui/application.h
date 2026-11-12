@@ -9,14 +9,15 @@
 #include "analysis/analysis_controls.h"
 #include "analysis/analysis_settings_panel.h"
 #include "analysis/auto_rerun.h"
-#include "analysis/playback.h"
-#include "document/schematic.h"
-#include "drawing/glow_renderer.h"
-#include "part_editor.h"
-#include "preferences.h"
+#include "overlays/glow_renderer.h"
+#include "results/playback.h"
+#include "results/result_store.h"
+#include "schematic/preferences.h"
+#include "schematic/schematic.h"
 #include "windows/editor_window.h"
 #include "windows/netlist_window.h"
 #include "windows/output_window.h"
+#include "windows/part_editor.h"
 #include "windows/preferences_window.h"
 #include "windows/properties_window.h"
 #include "windows/simulation_window.h"
@@ -36,7 +37,7 @@ namespace GUI {
  */
 class Application {
 public:
-    Application() = default;
+    Application();
     ~Application() = default;
 
     int Init();
@@ -86,18 +87,20 @@ private:
 
     /// Declared before the windows that refer to it, so it exists when they are built.
     Schematic m_Schematic;
+    /// The results of the analyses of the schematic, which tells it of every change that drops them.
+    ResultStore m_Results;
     /// Declared before the windows that refer to them, so they exist when they are built.
     Preferences m_Preferences;
-    AnalysisControls m_AnalysisControls{m_Schematic};
+    AnalysisControls m_AnalysisControls{m_Schematic, m_Results};
     AnalysisSettingsPanel m_AnalysisSettings{m_Schematic};
     PartEditor m_PartEditor{m_Schematic, m_Preferences};
     TransientPlayback m_Playback;
-    EditorWindow m_EditorWindow{m_Schematic,    m_AnalysisControls, m_AnalysisSettings, m_PartEditor,
-                                m_GlowRenderer, m_Playback,         m_Preferences};
+    EditorWindow m_EditorWindow{m_Schematic,  m_Results,      m_AnalysisControls, m_AnalysisSettings,
+                                m_PartEditor, m_GlowRenderer, m_Playback,         m_Preferences};
     PropertiesWindow m_PropertiesWindow{m_PartEditor};
     NetlistWindow m_NetlistWindow{m_Schematic};
     SimulationWindow m_SimulationWindow{m_Schematic, m_AnalysisControls, m_AnalysisSettings};
-    OutputWindow m_OutputWindow{m_Schematic, m_AnalysisControls, m_Playback, m_Preferences};
+    OutputWindow m_OutputWindow{m_Schematic, m_Results, m_AnalysisControls, m_Playback, m_Preferences};
     PreferencesWindow m_PreferencesWindow{m_Preferences};
 
     // Errors

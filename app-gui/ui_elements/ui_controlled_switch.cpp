@@ -5,8 +5,8 @@
 
 #include "ui_elements/ui_controlled_switch.h"
 
-#include "components/relay.h"
-#include "components/voltage_controlled_switch.h"
+#include "circuit/components/relay.h"
+#include "circuit/components/voltage_controlled_switch.h"
 #include "spice/spice_value.h"
 #include <cmath>
 #include <format>

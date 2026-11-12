@@ -6,7 +6,7 @@
 #ifndef IMCSIM_ANALYSIS_SUGGESTIONS_H
 #define IMCSIM_ANALYSIS_SUGGESTIONS_H
 
-#include "model/circuit.h"
+#include "circuit/circuit.h"
 #include "simulation/simulator.h"
 #include <optional>
 

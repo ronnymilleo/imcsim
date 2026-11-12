@@ -7,8 +7,9 @@
 #ifndef IMCSIM_MONTE_CARLO_TAB_H
 #define IMCSIM_MONTE_CARLO_TAB_H
 
-#include "analysis/monte_carlo_results.h"
-#include "document/schematic.h"
+#include "results/monte_carlo_results.h"
+#include "results/result_store.h"
+#include "schematic/schematic.h"
 #include <cstddef>
 #include <optional>
 #include <string>
@@ -25,7 +26,7 @@ namespace GUI {
  */
 class MonteCarloTab {
 public:
-    explicit MonteCarloTab(Schematic &schematic);
+    MonteCarloTab(Schematic &schematic, ResultStore &results);
 
     bool Draw();
 
@@ -34,6 +35,7 @@ public:
 
 private:
     Schematic &m_Schematic;
+    ResultStore &m_Results;
     /// Node whose quantity is shown; the first measured one while the user has not picked.
     std::optional<int> m_Node;
     /// Current whose quantity is shown, in place of a node, when the user picked one.

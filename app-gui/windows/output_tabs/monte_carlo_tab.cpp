@@ -6,12 +6,13 @@
 
 #include "windows/output_tabs/monte_carlo_tab.h"
 
-#include "drawing/theme.h"
-#include "editing/probing.h"
+#include "base/theme.h"
 #include "imgui.h"
 #include "implot.h"
+#include "schematic/probing.h"
 #include "spice/spice_value.h"
 #include "windows/output_tabs/plot_widgets.h"
+#include "windows/output_tabs/statistics_widgets.h"
 #include <algorithm>
 #include <format>
 
@@ -34,9 +35,10 @@ std::string FormatMeasure(const std::optional<double> value, const char *unit) {
 
 /**
  * @brief   Creates the tab for a schematic.
- * @param[in] schematic  Schematic whose Monte Carlo table is shown; it must outlive the tab.
+ * @param[in] schematic  Schematic that keeps the measurements and the names of nets; it must outlive the tab.
+ * @param[in] results    Results whose Monte Carlo table is shown; they must outlive the tab.
  */
-MonteCarloTab::MonteCarloTab(Schematic &schematic) : m_Schematic(schematic) {
+MonteCarloTab::MonteCarloTab(Schematic &schematic, ResultStore &results) : m_Schematic(schematic), m_Results(results) {
 }
 
 /**
@@ -45,7 +47,7 @@ MonteCarloTab::MonteCarloTab(Schematic &schematic) : m_Schematic(schematic) {
  * @return  True when the user asked to export the table of runs.
  */
 bool MonteCarloTab::Draw() {
-    const std::optional<MonteCarloTable> &table = m_Schematic.GetMonteCarlo();
+    const std::optional<MonteCarloTable> &table = m_Results.GetMonteCarlo();
     if (!table || table->Columns.empty()) {
         ImGui::TextDisabled("%s", NO_RESULT);
         return false;
@@ -79,7 +81,7 @@ bool MonteCarloTab::Draw() {
  * @return  The CSV text, or nothing without a table.
  */
 std::string MonteCarloTab::BuildCsv() const {
-    const std::optional<MonteCarloTable> &table = m_Schematic.GetMonteCarlo();
+    const std::optional<MonteCarloTable> &table = m_Results.GetMonteCarlo();
     if (!table) {
         return {};
     }
@@ -221,13 +223,13 @@ void MonteCarloTab::DrawHistogram(const MonteCarloTable &table, const std::size_
  * @brief   The run shown in the other tabs, as a run number, or none without a stepped result to take it from.
  */
 std::optional<double> MonteCarloTab::GetShownRun() const {
-    if (const auto &steps = m_Schematic.GetOperatingPointSteps(); steps && steps->Parameter == MONTE_CARLO_PARAMETER) {
+    if (const auto &steps = m_Results.GetOperatingPointSteps(); steps && steps->Parameter == MONTE_CARLO_PARAMETER) {
         return steps->Values[steps->Selected];
     }
-    if (const auto &steps = m_Schematic.GetTransientSteps(); steps && steps->Parameter == MONTE_CARLO_PARAMETER) {
+    if (const auto &steps = m_Results.GetTransientSteps(); steps && steps->Parameter == MONTE_CARLO_PARAMETER) {
         return steps->Values[steps->Selected];
     }
-    if (const auto &steps = m_Schematic.GetACSweepSteps(); steps && steps->Parameter == MONTE_CARLO_PARAMETER) {
+    if (const auto &steps = m_Results.GetACSweepSteps(); steps && steps->Parameter == MONTE_CARLO_PARAMETER) {
         return steps->Values[steps->Selected];
     }
     return std::nullopt;
@@ -244,12 +246,12 @@ void MonteCarloTab::ShowRun(const std::size_t run) {
         const auto found = std::ranges::find(steps->Values, static_cast<double>(run));
         return found == steps->Values.end() ? std::nullopt : std::optional<std::size_t>(found - steps->Values.begin());
     };
-    if (const std::optional<std::size_t> point_step = find_step(m_Schematic.GetOperatingPointSteps())) {
-        m_Schematic.SelectOperatingPointStep(*point_step);
-    } else if (const std::optional<std::size_t> step = find_step(m_Schematic.GetTransientSteps())) {
-        m_Schematic.SelectTransientStep(*step);
-    } else if (const std::optional<std::size_t> ac_step = find_step(m_Schematic.GetACSweepSteps())) {
-        m_Schematic.SelectACSweepStep(*ac_step);
+    if (const std::optional<std::size_t> point_step = find_step(m_Results.GetOperatingPointSteps())) {
+        m_Results.SelectOperatingPointStep(*point_step);
+    } else if (const std::optional<std::size_t> step = find_step(m_Results.GetTransientSteps())) {
+        m_Results.SelectTransientStep(*step);
+    } else if (const std::optional<std::size_t> ac_step = find_step(m_Results.GetACSweepSteps())) {
+        m_Results.SelectACSweepStep(*ac_step);
     }
 }
 

@@ -9,10 +9,12 @@ add_executable(imcsim-tests
             analysis_inputs_tests.cpp
             analysis_suggestions_tests.cpp
             auto_rerun_tests.cpp
+            block_session_tests.cpp
             circuit_checks_tests.cpp
             circuit_copy_tests.cpp
             circuit_snapshot_tests.cpp
             behavioral_expression_tests.cpp
+            block_definitions_tests.cpp
             block_nesting_tests.cpp
             canvas_view_tests.cpp
             clipboard_tests.cpp
@@ -20,9 +22,11 @@ add_executable(imcsim-tests
             circuit_tests.cpp
             component_tests.cpp
             connectivity_tests.cpp
+            editor_command_tests.cpp
             editor_mode_tests.cpp
             element_factory_tests.cpp
             current_flow_tests.cpp
+            default_backend.cpp
             dock_layout_tests.cpp
             examples_tests.cpp
             fuse_tests.cpp
@@ -33,9 +37,11 @@ add_executable(imcsim-tests
             led_glow_tests.cpp
             live_change_tests.cpp
             live_input_tests.cpp
+            logic_bus_definition_tests.cpp
             logic_bus_tests.cpp
             logic_outputs_tests.cpp
             logic_trace_tests.cpp
+            math_channel_definition_tests.cpp
             math_channel_tests.cpp
             backend_comparison_tests.cpp
             controlled_sources_tests.cpp
@@ -44,8 +50,13 @@ add_executable(imcsim-tests
             nodalys_backend_tests.cpp
             nonlinear_tests.cpp
             op_amp_tests.cpp
+            part_properties_tests.cpp
+            placement_editing_tests.cpp
+            run_status_tests.cpp
+            selection_editing_tests.cpp
             switches_tests.cpp
             parameter_conversion_tests.cpp
+            parameter_step_settings_tests.cpp
             parameter_step_tests.cpp
             part_catalog_tests.cpp
             part_names_tests.cpp
@@ -54,12 +65,14 @@ add_executable(imcsim-tests
             plot_export_tests.cpp
             plot_figures_tests.cpp
             plot_helpers_tests.cpp
+            plot_ticks_tests.cpp
             point_window_tests.cpp
             pole_zero_tests.cpp
             pole_zero_view_tests.cpp
             preferences_tests.cpp
             probing_tests.cpp
             readout_placement_tests.cpp
+            result_store_tests.cpp
             s_parameter_view_tests.cpp
             s_parameters_tests.cpp
             schematic_canvas_tests.cpp
@@ -95,6 +108,8 @@ add_executable(imcsim-tests
             truth_table_tests.cpp
             ui_element_tests.cpp
             ui_wire_tests.cpp
+            undo_history_tests.cpp
+            voltage_probes_tests.cpp
             wire_editing_tests.cpp
             nodalys_benchmark_tests.cpp
             wire_routing_tests.cpp

@@ -6,15 +6,16 @@
  *          current gain, and the level-1 saturation current of the parameter documentation in mosfet.h.
  */
 
-#include "components/bjt.h"
-#include "components/diode.h"
-#include "components/ground.h"
-#include "components/mosfet.h"
-#include "components/resistor.h"
-#include "components/vcc.h"
-#include "components/voltage_source.h"
-#include "model/circuit.h"
-#include "nodalys/nodalys_backend.h"
+#include "backends/nodalys/nodalys_backend.h"
+#include "circuit/circuit.h"
+#include "circuit/components/bjt.h"
+#include "circuit/components/diode.h"
+#include "circuit/components/ground.h"
+#include "circuit/components/mosfet.h"
+#include "circuit/components/resistor.h"
+#include "circuit/components/vcc.h"
+#include "circuit/components/voltage_source.h"
+#include <algorithm>
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 #include <cmath>

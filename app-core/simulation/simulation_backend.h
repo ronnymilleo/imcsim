@@ -9,7 +9,7 @@
 #ifndef IMCSIM_SIMULATION_BACKEND_H
 #define IMCSIM_SIMULATION_BACKEND_H
 
-#include "model/circuit.h"
+#include "circuit/circuit.h"
 #include "simulation/analysis_settings.h"
 #include "simulation/run_control.h"
 #include "simulation/simulation_results.h"
@@ -180,9 +180,13 @@ public:
                                                   RunControl *control);
 };
 
+/// Makes the default backend, the one in use when none was set.
+using BackendFactory = std::unique_ptr<SimulationBackend> (*)();
+
 // Backend in use
 SimulationBackend &GetBackend();
 void SetBackend(std::unique_ptr<SimulationBackend> backend);
+void SetDefaultBackendFactory(BackendFactory factory);
 
 // Capabilities
 std::string_view GetAnalysisKindName(AnalysisKind kind);

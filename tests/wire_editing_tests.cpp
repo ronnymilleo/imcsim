@@ -3,7 +3,7 @@
  * @brief   Tests for wires following moved terminals and for the cleanup after a move.
  */
 
-#include "editing/wire_editing.h"
+#include "schematic/wire_editing.h"
 #include "test_printers.h"
 #include <algorithm>
 #include <catch2/catch_test_macros.hpp>

@@ -5,7 +5,6 @@
 
 #include "simulation/simulation_backend.h"
 
-#include "ngspice/ngspice_backend.h"
 #include <format>
 #include <mutex>
 #include <utility>
@@ -14,10 +13,60 @@ namespace Core {
 
 namespace {
 
-/// The backend in use; created as ngspice on first use, by whichever thread asks first.
+/// What every run of the stand-in backend reports.
+constexpr std::string_view NO_BACKEND_REASON = "No simulation engine was installed";
+
+/// The backend in use; made by the default factory on first use, by whichever thread asks first.
 std::unique_ptr<SimulationBackend> g_backend;
-/// Guards g_backend, which any thread may ask for.
+/// Makes the backend that g_backend becomes when none was set, or null before the program registers one.
+BackendFactory g_default_factory = nullptr;
+/// Guards g_backend and g_default_factory, which any thread may ask for.
 std::mutex g_backend_mutex;
+
+/**
+ * @brief   Stands in when no default backend was registered, so the mistake shows up as a reason on every analysis
+ *          instead of a crash.
+ */
+class NoBackend : public SimulationBackend {
+public:
+    std::string_view GetName() const override { return "The missing simulation engine"; }
+    const BackendCapabilities &GetCapabilities() const override { return m_Capabilities; }
+
+    OperatingPointRun RunOperatingPoint(const Circuit &, const std::optional<double> &) override {
+        return Fail<OperatingPointRun>();
+    }
+    TransientRun RunTransient(const Circuit &, const TransientSettings &, const std::optional<double> &,
+                              const RunMonitor &) override {
+        return Fail<TransientRun>();
+    }
+    ACSweepRun RunACSweep(const Circuit &, const ACSweepSettings &, const std::optional<double> &) override {
+        return Fail<ACSweepRun>();
+    }
+    DCSweepRun RunDCSweep(const Circuit &, const DCSweepSettings &, const std::optional<double> &) override {
+        return Fail<DCSweepRun>();
+    }
+    NoiseRun RunNoise(const Circuit &, const NoiseSettings &) override { return Fail<NoiseRun>(); }
+    TransferFunctionRun RunTransferFunction(const Circuit &, const TransferFunctionSettings &) override {
+        return Fail<TransferFunctionRun>();
+    }
+    SensitivityRun RunSensitivity(const Circuit &, const SensitivitySettings &) override {
+        return Fail<SensitivityRun>();
+    }
+    PoleZeroRun RunPoleZero(const Circuit &, const PoleZeroSettings &) override { return Fail<PoleZeroRun>(); }
+    SParametersRun RunSParameters(const Circuit &, const SParameterSettings &) override {
+        return Fail<SParametersRun>();
+    }
+
+private:
+    template <typename Run> static Run Fail() {
+        Run run;
+        run.Result = std::unexpected(std::string(NO_BACKEND_REASON));
+        return run;
+    }
+
+    /// No analysis is listed, so FindUnsupported() refuses each one with this backend's name.
+    BackendCapabilities m_Capabilities;
+};
 
 /**
  * @brief   The truth table asks the backend only for operating points.
@@ -30,24 +79,41 @@ AnalysisKind GetRequiredAnalysis(const AnalysisKind kind) {
 
 /**
  * @brief   Returns the backend that runs the simulations.
- * @return  The backend set with SetBackend(), or ngspice when none was set.
+ * @return  The backend set with SetBackend(), or the one the default factory makes when none was set. When no
+ *          factory was registered either, a backend that runs no analysis and says why.
+ * @note    A program registers the default factory once at startup, with SetDefaultBackendFactory().
  */
 SimulationBackend &GetBackend() {
     const std::lock_guard lock(g_backend_mutex);
+    if (!g_backend && g_default_factory != nullptr) {
+        g_backend = g_default_factory();
+    }
     if (!g_backend) {
-        g_backend = std::make_unique<NgspiceBackend>();
+        // Not kept in g_backend, so a factory registered later still takes effect
+        static NoBackend no_backend;
+        return no_backend;
     }
     return *g_backend;
 }
 
 /**
  * @brief   Replaces the backend that runs the simulations, such as a fake one in a test.
- * @param[in] backend  The new backend, which the simulator owns from now on; null goes back to ngspice.
+ * @param[in] backend  The new backend, which the simulator owns from now on; null goes back to the default backend.
  * @note    Call it while no simulation runs, since the one in progress uses the old backend.
  */
 void SetBackend(std::unique_ptr<SimulationBackend> backend) {
     const std::lock_guard lock(g_backend_mutex);
     g_backend = std::move(backend);
+}
+
+/**
+ * @brief   Registers the function that makes the default backend, the one in use until SetBackend() sets another.
+ * @param[in] factory  Makes a new backend each time it is called, or null to register none.
+ * @note    Call it before anything asks for the backend, and while no simulation runs.
+ */
+void SetDefaultBackendFactory(const BackendFactory factory) {
+    const std::lock_guard lock(g_backend_mutex);
+    g_default_factory = factory;
 }
 
 /**

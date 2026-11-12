@@ -3,13 +3,13 @@
  * @brief   Tests for harmonic balance display scaling, periodic tiling, tables and exports.
  */
 
-#include "analysis/harmonic_balance_view.h"
+#include "plots/harmonic_balance_view.h"
 
-#include "components/resistor.h"
-#include "components/source.h"
-#include "document/schematic.h"
-#include "editing/element_factory.h"
-#include "editing/probing.h"
+#include "circuit/components/resistor.h"
+#include "circuit/components/source.h"
+#include "schematic/element_factory.h"
+#include "schematic/probing.h"
+#include "schematic/schematic.h"
 #include "ui_elements/ui_wire.h"
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>

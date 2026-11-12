@@ -3,8 +3,8 @@
  * @brief   Tests that the text and trace colors of every theme read against what they are drawn on.
  */
 
-#include "drawing/svg_writer.h"
-#include "drawing/theme.h"
+#include "base/svg_writer.h"
+#include "base/theme.h"
 #include "test_printers.h"
 #include <algorithm>
 #include <catch2/catch_test_macros.hpp>

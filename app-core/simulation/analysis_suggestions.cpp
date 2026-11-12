@@ -5,9 +5,9 @@
 
 #include "simulation/analysis_suggestions.h"
 
-#include "components/clock.h"
-#include "components/op_amp.h"
-#include "components/source.h"
+#include "circuit/components/clock.h"
+#include "circuit/components/op_amp.h"
+#include "circuit/components/source.h"
 #include "simulation/circuit_checks.h"
 #include <algorithm>
 #include <array>

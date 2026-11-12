@@ -5,7 +5,7 @@
 
 #include "ui_elements/ui_logic_part.h"
 
-#include "components/logic_part.h"
+#include "circuit/components/logic_part.h"
 #include <algorithm>
 #include <array>
 #include <cmath>

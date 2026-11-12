@@ -5,15 +5,17 @@
 
 #include "windows/output_tabs/harmonic_balance_tab.h"
 
-#include "drawing/node_colors.h"
-#include "drawing/theme.h"
-#include "editing/probing.h"
+#include "base/node_colors.h"
+#include "base/theme.h"
 #include "imgui.h"
 #include "implot.h"
 #include "plots/plot_figures.h"
 #include "plots/plot_helpers.h"
+#include "schematic/probing.h"
 #include "spice/spice_value.h"
+#include "windows/output_tabs/cursor_widgets.h"
 #include "windows/output_tabs/plot_widgets.h"
+#include "windows/output_tabs/statistics_widgets.h"
 #include <algorithm>
 #include <format>
 #include <span>
@@ -105,11 +107,12 @@ void DrawSpectrumTooltip(const Core::HarmonicBalance &result, Schematic &schemat
 
 /**
  * @brief   Creates the tab for a schematic and user preferences.
- * @param[in]     schematic    Schematic holding the harmonic balance result; must outlive the tab.
+ * @param[in]     schematic    Schematic that keeps the measurements and the names of nets; must outlive the tab.
+ * @param[in]     results      Results holding the harmonic balance result; must outlive the tab.
  * @param[in,out] preferences  User preferences storing the Peak/RMS amplitude convention; must outlive the tab.
  */
-HarmonicBalanceTab::HarmonicBalanceTab(Schematic &schematic, Preferences &preferences)
-    : m_Schematic(schematic), m_Preferences(preferences) {
+HarmonicBalanceTab::HarmonicBalanceTab(Schematic &schematic, const ResultStore &results, Preferences &preferences)
+    : m_Schematic(schematic), m_Results(results), m_Preferences(preferences) {
 }
 
 /**
@@ -117,7 +120,7 @@ HarmonicBalanceTab::HarmonicBalanceTab(Schematic &schematic, Preferences &prefer
  * @param[in,out] exporter  Plot/CSV exporter handling the save dialog for the CSV button.
  */
 void HarmonicBalanceTab::Draw(PlotExporter &exporter) {
-    const std::optional<Core::HarmonicBalance> &result = m_Schematic.GetHarmonicBalance();
+    const std::optional<Core::HarmonicBalance> &result = m_Results.GetHarmonicBalance();
     if (!result) {
         ImGui::TextDisabled("%s", NO_RESULT);
         return;
@@ -152,7 +155,7 @@ void HarmonicBalanceTab::Draw(PlotExporter &exporter) {
  * @return  True when a harmonic balance result exists and at least one voltage or current is measured.
  */
 bool HarmonicBalanceTab::CanExport() const {
-    const std::optional<Core::HarmonicBalance> &result = m_Schematic.GetHarmonicBalance();
+    const std::optional<Core::HarmonicBalance> &result = m_Results.GetHarmonicBalance();
     if (!result || result->Times.empty()) {
         return false;
     }
@@ -165,7 +168,7 @@ bool HarmonicBalanceTab::CanExport() const {
  * @return  Figure for SVG or CSV export, or an empty figure when no result is present.
  */
 ExportFigure HarmonicBalanceTab::BuildFigure() const {
-    const std::optional<Core::HarmonicBalance> &result = m_Schematic.GetHarmonicBalance();
+    const std::optional<Core::HarmonicBalance> &result = m_Results.GetHarmonicBalance();
     if (!result) {
         return {};
     }
@@ -230,7 +233,7 @@ void HarmonicBalanceTab::DrawSpectrumPlot(const Core::HarmonicBalance &result, c
     if (result.Frequencies.empty()) {
         return;
     }
-    const std::size_t version = m_Schematic.GetHarmonicBalanceVersion();
+    const std::size_t version = m_Results.GetHarmonicBalanceVersion();
     const bool scale_changed = std::exchange(m_DrawnScale, m_Scale) != m_Scale;
     const bool unit_changed =
         std::exchange(m_DrawnAmplitudeUnit, m_Preferences.HarmonicAmplitudes) != m_Preferences.HarmonicAmplitudes;
@@ -303,7 +306,7 @@ void HarmonicBalanceTab::DrawWaveformPlot(const Core::HarmonicBalance &result, c
         return;
     }
     const bool cycles_changed = std::exchange(m_DrawnCycles, m_Cycles) != m_Cycles;
-    const bool new_result = m_WaveformFit.TakeNewResult(m_Schematic.GetHarmonicBalanceVersion()) || cycles_changed;
+    const bool new_result = m_WaveformFit.TakeNewResult(m_Results.GetHarmonicBalanceVersion()) || cycles_changed;
     const bool nodes_changed =
         m_WaveformFit.TakeNodesChanged(ListMeasuredNodes(result.NodeWaveforms.size(), m_Schematic));
     const bool currents_changed =

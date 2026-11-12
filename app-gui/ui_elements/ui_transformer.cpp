@@ -5,7 +5,7 @@
 
 #include "ui_elements/ui_transformer.h"
 
-#include "components/transformer.h"
+#include "circuit/components/transformer.h"
 #include "spice/spice_value.h"
 #include <array>
 #include <cmath>

@@ -6,7 +6,7 @@
 #ifndef IMCSIM_UI_BEHAVIORAL_SOURCE_H
 #define IMCSIM_UI_BEHAVIORAL_SOURCE_H
 
-#include "components/behavioral_source.h"
+#include "circuit/components/behavioral_source.h"
 #include "ui_elements/ui_element.h"
 
 namespace GUI {

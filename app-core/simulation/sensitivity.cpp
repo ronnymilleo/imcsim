@@ -5,7 +5,7 @@
 
 #include "simulation/sensitivity.h"
 
-#include "components/controlled_source.h"
+#include "circuit/components/controlled_source.h"
 #include <algorithm>
 #include <cctype>
 #include <cmath>

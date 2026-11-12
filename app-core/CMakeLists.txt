@@ -4,44 +4,54 @@
 
 add_library(imcsim-core-lib
         STATIC
-            components/behavioral_source.cpp
-            components/bjt.cpp
-            components/capacitor.cpp
-            components/clock.cpp
-            components/component.cpp
-            components/controlled_source.cpp
-            components/current_source.cpp
-            components/diode.cpp
-            components/fuse.cpp
-            components/ground.cpp
-            components/inductor.cpp
-            components/logic_input.cpp
-            components/logic_output.cpp
-            components/logic_part.cpp
-            components/mosfet.cpp
-            components/net_label.cpp
-            components/op_amp.cpp
-            components/potentiometer.cpp
-            components/relay.cpp
-            components/resistor.cpp
-            components/seven_segment.cpp
-            components/source.cpp
-            components/subcircuit.cpp
-            components/subcircuit_pin.cpp
-            components/switch.cpp
-            components/transformer.cpp
-            components/vcc.cpp
-            components/voltage_controlled_switch.cpp
-            components/voltage_source.cpp
-            model/circuit.cpp
-            model/library_model.cpp
-            nodalys/compiler.cpp
-            nodalys/model_parser.cpp
-            nodalys/nodalys_backend.cpp
-            nodalys/parameter_conversion.cpp
-            ngspice/ngspice_backend.cpp
-            ngspice/ngspice_library.cpp
-            ngspice/ngspice_readers.cpp
+            backends/ngspice/ngspice_backend.cpp
+            backends/ngspice/ngspice_library.cpp
+            backends/ngspice/ngspice_readers.cpp
+            backends/ngspice/ngspice_readers_ac.cpp
+            backends/ngspice/ngspice_readers_noise.cpp
+            backends/ngspice/ngspice_readers_small_signal.cpp
+            backends/ngspice/ngspice_vectors.cpp
+            backends/nodalys/compiler.cpp
+            backends/nodalys/model_parser.cpp
+            backends/nodalys/nodalys_backend.cpp
+            backends/nodalys/parameter_conversion.cpp
+            circuit/behavioral_expression.cpp
+            circuit/circuit.cpp
+            circuit/circuit_currents.cpp
+            circuit/circuit_netlist.cpp
+            circuit/components/behavioral_source.cpp
+            circuit/components/bjt.cpp
+            circuit/components/capacitor.cpp
+            circuit/components/clock.cpp
+            circuit/components/component.cpp
+            circuit/components/controlled_source.cpp
+            circuit/components/current_source.cpp
+            circuit/components/diode.cpp
+            circuit/components/fuse.cpp
+            circuit/components/ground.cpp
+            circuit/components/inductor.cpp
+            circuit/components/logic_input.cpp
+            circuit/components/logic_output.cpp
+            circuit/components/logic_part.cpp
+            circuit/components/mosfet.cpp
+            circuit/components/net_label.cpp
+            circuit/components/op_amp.cpp
+            circuit/components/potentiometer.cpp
+            circuit/components/relay.cpp
+            circuit/components/resistor.cpp
+            circuit/components/seven_segment.cpp
+            circuit/components/source.cpp
+            circuit/components/subcircuit.cpp
+            circuit/components/subcircuit_pin.cpp
+            circuit/components/switch.cpp
+            circuit/components/transformer.cpp
+            circuit/components/vcc.cpp
+            circuit/components/voltage_controlled_switch.cpp
+            circuit/components/voltage_source.cpp
+            circuit/library_model.cpp
+            circuit/spice_library.cpp
+            simulation/analysis_checks.cpp
+            simulation/analysis_sources.cpp
             simulation/analysis_suggestions.cpp
             simulation/circuit_checks.cpp
             simulation/circuit_copy.cpp
@@ -59,9 +69,7 @@ add_library(imcsim-core-lib
             simulation/simulation_service.cpp
             simulation/simulator.cpp
             simulation/stepped_circuit.cpp
-            spice/behavioral_expression.cpp
             spice/spice_inclusions.cpp
-            spice/spice_library.cpp
             spice/spice_text.cpp
             spice/spice_value.cpp
             spice/standard_values.cpp

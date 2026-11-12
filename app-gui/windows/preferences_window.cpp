@@ -5,7 +5,7 @@
 
 #include "windows/preferences_window.h"
 
-#include "drawing/theme.h"
+#include "base/theme.h"
 #include "spice/standard_values.h"
 #include <array>
 #include <cstddef>

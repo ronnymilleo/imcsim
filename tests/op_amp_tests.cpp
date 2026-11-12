@@ -8,16 +8,16 @@
  *          encodes (Shockley for the diode, the level-1 MOSFET equations).
  */
 
-#include "components/bjt.h"
-#include "components/diode.h"
-#include "components/ground.h"
-#include "components/mosfet.h"
-#include "components/op_amp.h"
-#include "components/resistor.h"
-#include "components/vcc.h"
-#include "components/voltage_source.h"
-#include "model/library_model.h"
-#include "nodalys/nodalys_backend.h"
+#include "backends/nodalys/nodalys_backend.h"
+#include "circuit/components/bjt.h"
+#include "circuit/components/diode.h"
+#include "circuit/components/ground.h"
+#include "circuit/components/mosfet.h"
+#include "circuit/components/op_amp.h"
+#include "circuit/components/resistor.h"
+#include "circuit/components/vcc.h"
+#include "circuit/components/voltage_source.h"
+#include "circuit/library_model.h"
 #include <algorithm>
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators.hpp>

@@ -4,11 +4,11 @@
  *          button, sets a logic input or turns a potentiometer.
  */
 
-#include "components/logic_input.h"
-#include "components/potentiometer.h"
-#include "components/resistor.h"
-#include "components/switch.h"
-#include "model/circuit.h"
+#include "circuit/circuit.h"
+#include "circuit/components/logic_input.h"
+#include "circuit/components/potentiometer.h"
+#include "circuit/components/resistor.h"
+#include "circuit/components/switch.h"
 #include "simulation/live_change.h"
 #include "spice/spice_value.h"
 #include "test_printers.h"

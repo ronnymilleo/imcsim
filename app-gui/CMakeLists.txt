@@ -6,80 +6,109 @@ add_library(imcsim-gui-lib
         STATIC
             analysis/analysis_controls.cpp
             analysis/analysis_inputs.cpp
+            analysis/analysis_runs_repeatable.cpp
+            analysis/analysis_runs_single.cpp
             analysis/analysis_settings_panel.cpp
             analysis/auto_rerun.cpp
-            analysis/circuit_snapshot.cpp
-            analysis/fuse_readings.cpp
-            analysis/harmonic_balance_view.cpp
-            analysis/logic_outputs.cpp
-            analysis/monte_carlo_results.cpp
-            analysis/parameter_step.cpp
-            analysis/playback.cpp
-            analysis/point_window.cpp
-            analysis/pole_zero_view.cpp
-            analysis/s_parameter_view.cpp
-            analysis/sensitivity_view.cpp
-            analysis/transient_window.cpp
-            analysis/truth_table.cpp
+            analysis/run_jobs.cpp
+            analysis/run_status.cpp
             application.cpp
-            document/block_nesting.cpp
-            document/clipboard.cpp
-            document/examples.cpp
-            document/file_dialog.cpp
-            document/ready_blocks.cpp
-            document/schematic.cpp
-            document/schematic_file.cpp
-            document/schematic_file_actions.cpp
-            document/simulation_settings.cpp
-            document/spice_import.cpp
-            document/subcircuit_pins.cpp
-            drawing/current_flow.cpp
-            drawing/fuse_flash.cpp
-            drawing/glow_renderer.cpp
-            drawing/heat_glow.cpp
-            drawing/led_glow.cpp
-            drawing/node_colors.cpp
-            drawing/readout_placement.cpp
-            drawing/schematic_canvas.cpp
-            drawing/schematic_drawing.cpp
-            drawing/schematic_overlays.cpp
-            drawing/svg_writer.cpp
-            drawing/text_fitting.cpp
-            drawing/theme.cpp
-            drawing/tool_icons.cpp
-            drawing/trace_swatch.cpp
-            editing/block_wiring.cpp
-            editing/canvas_view.cpp
-            editing/connectivity.cpp
-            editing/editor_mode.cpp
-            editing/element_factory.cpp
-            editing/group_editing.cpp
-            editing/live_input.cpp
-            editing/part_catalog.cpp
-            editing/part_names.cpp
-            editing/probing.cpp
-            editing/selection.cpp
-            editing/wire_editing.cpp
-            editing/wire_routing.cpp
-            helpers.cpp
-            part_editor.cpp
-            plots/logic_bus.cpp
+            base/file_dialog.cpp
+            base/helpers.cpp
+            base/logic_state.cpp
+            base/node_colors.cpp
+            base/svg_writer.cpp
+            base/text_fitting.cpp
+            base/theme.cpp
+            base/trace_swatch.cpp
+            base/value_field.cpp
+            canvas/schematic_canvas.cpp
+            overlays/fuse_flash.cpp
+            overlays/glow_renderer.cpp
+            overlays/heat_glow.cpp
+            overlays/led_glow.cpp
+            overlays/live_current.cpp
+            overlays/readout_placement.cpp
+            overlays/schematic_overlays.cpp
+            plots/harmonic_balance_view.cpp
             plots/logic_buses.cpp
-            plots/logic_trace.cpp
-            plots/math_channel.cpp
             plots/math_channels.cpp
             plots/plot_export.cpp
+            plots/plot_export_csv.cpp
+            plots/plot_export_smith.cpp
+            plots/plot_export_style.cpp
             plots/plot_exporter.cpp
             plots/plot_figures.cpp
             plots/plot_helpers.cpp
+            plots/plot_ticks.cpp
+            plots/s_parameter_view.cpp
             plots/smith_chart.cpp
             plots/spectrum.cpp
             plots/statistics_table.cpp
             plots/touchstone.cpp
             plots/trace_fit_state.cpp
-            plots/trace_math.cpp
-            plots/trace_statistics.cpp
-            preferences.cpp
+            results/circuit_snapshot.cpp
+            results/current_flow.cpp
+            results/fuse_readings.cpp
+            results/logic_bus.cpp
+            results/logic_outputs.cpp
+            results/logic_trace.cpp
+            results/math_channel.cpp
+            results/monte_carlo_results.cpp
+            results/parameter_step.cpp
+            results/playback.cpp
+            results/point_window.cpp
+            results/pole_zero_view.cpp
+            results/result_store.cpp
+            results/sensitivity_view.cpp
+            results/trace_math.cpp
+            results/trace_statistics.cpp
+            results/transient_window.cpp
+            results/truth_table.cpp
+            schematic/block_definitions.cpp
+            schematic/block_nesting.cpp
+            schematic/block_session.cpp
+            schematic/block_wiring.cpp
+            schematic/canvas_view.cpp
+            schematic/clipboard.cpp
+            schematic/connectivity.cpp
+            schematic/editor_command.cpp
+            schematic/editor_mode.cpp
+            schematic/element_factory.cpp
+            schematic/examples.cpp
+            schematic/file_elements.cpp
+            schematic/file_json.cpp
+            schematic/file_library_models.cpp
+            schematic/file_measurements.cpp
+            schematic/file_part_fields.cpp
+            schematic/file_settings.cpp
+            schematic/file_subcircuits.cpp
+            schematic/file_wires.cpp
+            schematic/group_editing.cpp
+            schematic/live_input.cpp
+            schematic/logic_bus_definition.cpp
+            schematic/math_channel_definition.cpp
+            schematic/parameter_step_settings.cpp
+            schematic/part_catalog.cpp
+            schematic/part_names.cpp
+            schematic/part_properties.cpp
+            schematic/placement_editing.cpp
+            schematic/preferences.cpp
+            schematic/probing.cpp
+            schematic/ready_blocks.cpp
+            schematic/schematic.cpp
+            schematic/schematic_drawing.cpp
+            schematic/schematic_file.cpp
+            schematic/schematic_file_actions.cpp
+            schematic/selection.cpp
+            schematic/selection_editing.cpp
+            schematic/simulation_settings.cpp
+            schematic/spice_import.cpp
+            schematic/subcircuit_pins.cpp
+            schematic/undo_history.cpp
+            schematic/voltage_probes.cpp
+            schematic/wire_editing.cpp
+            schematic/wire_routing.cpp
             ui_elements/ui_behavioral_source.cpp
             ui_elements/ui_bjt.cpp
             ui_elements/ui_capacitor.cpp
@@ -111,13 +140,20 @@ add_library(imcsim-gui-lib
             ui_elements/ui_vcc.cpp
             ui_elements/ui_voltage_source.cpp
             ui_elements/ui_wire.cpp
-            value_field.cpp
             windows/app_window.cpp
+            windows/block_dialog.cpp
             windows/dock_layout.cpp
+            windows/editor_canvas_drawing.cpp
+            windows/editor_context_menu.cpp
+            windows/editor_menus.cpp
+            windows/editor_status_bar.cpp
             windows/editor_toolbar.cpp
             windows/editor_window.cpp
+            windows/live_input_handler.cpp
+            windows/mode_input.cpp
             windows/netlist_window.cpp
             windows/output_tabs/ac_sweep_tab.cpp
+            windows/output_tabs/cursor_widgets.cpp
             windows/output_tabs/dc_sweep_tab.cpp
             windows/output_tabs/harmonic_balance_tab.cpp
             windows/output_tabs/monte_carlo_tab.cpp
@@ -129,14 +165,27 @@ add_library(imcsim-gui-lib
             windows/output_tabs/result_tables.cpp
             windows/output_tabs/s_parameter_tab.cpp
             windows/output_tabs/spectrum_tab.cpp
+            windows/output_tabs/statistics_widgets.cpp
+            windows/output_tabs/step_widgets.cpp
             windows/output_tabs/transient_tab.cpp
             windows/output_window.cpp
+            windows/part_editor.cpp
+            windows/part_editor_blocks.cpp
+            windows/part_editor_dependent_sources.cpp
+            windows/part_editor_electromechanical.cpp
+            windows/part_editor_logic.cpp
+            windows/part_editor_models.cpp
+            windows/part_editor_passives.cpp
+            windows/part_editor_sources.cpp
+            windows/part_fields.cpp
             windows/part_picker.cpp
+            windows/part_popover.cpp
             windows/part_rail.cpp
             windows/preferences_window.cpp
             windows/properties_window.cpp
             windows/simulation_window.cpp
             windows/spice_block_dialog.cpp
+            windows/tool_icons.cpp
 )
 
 target_include_directories(imcsim-gui-lib

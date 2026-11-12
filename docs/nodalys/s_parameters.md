@@ -3,7 +3,7 @@
 **Implementation files:**
 - [`nodalys/src/analyses/sp_analysis.cpp`](../../nodalys/src/analyses/sp_analysis.cpp) (`ComputeSParameters`)
 - [`nodalys/src/mna/mna_system.cpp`](../../nodalys/src/mna/mna_system.cpp) (`MnaSystem::SolveAcMultiple`)
-- [`app-core/nodalys/nodalys_backend.cpp`](../../app-core/nodalys/nodalys_backend.cpp) (`NodalysBackend::RunSParameters`)
+- [`app-core/backends/nodalys/nodalys_backend.cpp`](../../app-core/backends/nodalys/nodalys_backend.cpp) (`NodalysBackend::RunSParameters`)
 - [`nodalys/include/nodalys/results.h`](../../nodalys/include/nodalys/results.h) (`SParameterResult`)
 - [`nodalys/src/export/exporters.cpp`](../../nodalys/src/export/exporters.cpp) (`ExportTouchstone`)
 - [`tests/backend_comparison_tests.cpp`](../../tests/backend_comparison_tests.cpp) (`Both backends agree on S-parameters`)

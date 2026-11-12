@@ -7,8 +7,9 @@
 #ifndef IMCSIM_OPERATING_POINT_TAB_H
 #define IMCSIM_OPERATING_POINT_TAB_H
 
-#include "document/schematic.h"
 #include "plots/trace_fit_state.h"
+#include "results/result_store.h"
+#include "schematic/schematic.h"
 #include "simulation/simulation_results.h"
 #include <cstddef>
 #include <optional>
@@ -24,7 +25,7 @@ namespace GUI {
  */
 class OperatingPointTab {
 public:
-    explicit OperatingPointTab(Schematic &schematic);
+    OperatingPointTab(Schematic &schematic, ResultStore &results);
 
     void Update();
     void Draw();
@@ -32,6 +33,7 @@ public:
 
 private:
     Schematic &m_Schematic;
+    ResultStore &m_Results;
     /// The steps laid out as a sweep of the parameter, for a run stepped through a parameter.
     std::optional<Core::DCSweep> m_StepSweep;
     /// The result version m_StepSweep was laid out from.

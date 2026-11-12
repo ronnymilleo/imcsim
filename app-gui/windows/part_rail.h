@@ -6,10 +6,10 @@
 #ifndef IMCSIM_PART_RAIL_H
 #define IMCSIM_PART_RAIL_H
 
-#include "editing/editor_mode.h"
-#include "editing/part_catalog.h"
 #include "imgui.h"
-#include "preferences.h"
+#include "schematic/editor_mode.h"
+#include "schematic/part_catalog.h"
+#include "schematic/preferences.h"
 #include "ui_elements/ui_element.h"
 #include <cstddef>
 #include <memory>

@@ -3,9 +3,9 @@
  * @brief   Tests for the user's own choices and the file that keeps them.
  */
 
-#include "preferences.h"
+#include "schematic/preferences.h"
 
-#include "drawing/theme.h"
+#include "base/theme.h"
 #include <catch2/catch_test_macros.hpp>
 #include <string>
 

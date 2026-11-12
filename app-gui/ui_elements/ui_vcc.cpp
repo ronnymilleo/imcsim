@@ -5,7 +5,7 @@
 
 #include "ui_elements/ui_vcc.h"
 
-#include "components/vcc.h"
+#include "circuit/components/vcc.h"
 #include "spice/spice_value.h"
 #include <format>
 #include <memory>

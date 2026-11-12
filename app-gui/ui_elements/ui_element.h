@@ -6,9 +6,9 @@
 #ifndef IMCSIM_UI_ELEMENT_H
 #define IMCSIM_UI_ELEMENT_H
 
-#include "components/component.h"
-#include "drawing/schematic_canvas.h"
-#include "helpers.h"
+#include "base/helpers.h"
+#include "canvas/schematic_canvas.h"
+#include "circuit/components/component.h"
 #include "imgui.h"
 #include <memory>
 #include <string>

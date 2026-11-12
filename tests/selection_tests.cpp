@@ -3,9 +3,9 @@
  * @brief   Tests for picking elements and wires with a click, a selection box and a node.
  */
 
-#include "editing/connectivity.h"
-#include "editing/element_factory.h"
-#include "editing/selection.h"
+#include "schematic/connectivity.h"
+#include "schematic/element_factory.h"
+#include "schematic/selection.h"
 #include "test_printers.h"
 #include <catch2/catch_test_macros.hpp>
 #include <memory>

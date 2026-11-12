@@ -5,7 +5,7 @@
 
 #include "windows/simulation_window.h"
 
-#include "drawing/theme.h"
+#include "base/theme.h"
 
 namespace GUI {
 

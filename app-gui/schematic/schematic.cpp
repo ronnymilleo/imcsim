@@ -1,0 +1,1169 @@
+/**
+ * @file    schematic.cpp
+ * @brief   The schematic document shared by every window: elements, wires, selection and file state.
+ */
+
+#include "schematic/schematic.h"
+
+#include "circuit/components/behavioral_source.h"
+#include "circuit/components/component.h"
+#include "circuit/components/controlled_source.h"
+#include "circuit/components/net_label.h"
+#include "circuit/components/subcircuit.h"
+#include "schematic/block_definitions.h"
+#include "schematic/block_nesting.h"
+#include "schematic/block_wiring.h"
+#include "schematic/element_factory.h"
+#include "schematic/group_editing.h"
+#include "schematic/part_names.h"
+#include "schematic/schematic_file.h"
+#include "schematic/subcircuit_pins.h"
+#include "schematic/voltage_probes.h"
+#include "schematic/wire_editing.h"
+#include "ui_elements/ui_subcircuit.h"
+#include <algorithm>
+#include <format>
+#include <iterator>
+#include <map>
+#include <set>
+#include <string_view>
+#include <utility>
+
+namespace GUI {
+
+/**
+ * @brief   Creates an empty, untitled and unmodified schematic.
+ */
+Schematic::Schematic() {
+    ResetHistory();
+}
+
+/**
+ * @brief   Returns every element, in the order they were added.
+ * @return  The elements; later ones are drawn on top.
+ */
+const std::vector<std::unique_ptr<UIElement>> &Schematic::GetElements() const {
+    return m_Elements;
+}
+
+/**
+ * @brief   Returns an element for editing its position, rotation or component.
+ * @param[in] index  Index into GetElements().
+ * @return  The element. Call MarkModified() or SetWires() after changing it, as appropriate.
+ */
+UIElement &Schematic::GetElement(const std::size_t index) {
+    return *m_Elements[index];
+}
+
+/**
+ * @brief   Returns every wire segment.
+ * @return  The wires, all horizontal or vertical.
+ */
+const std::vector<UIWire> &Schematic::GetWires() const {
+    return m_Wires;
+}
+
+/**
+ * @brief   Returns the block definitions of the schematic.
+ * @return  Every definition, in the order they were made, whether an instance uses it or not.
+ */
+const std::vector<SavedSubcircuit> &Schematic::GetSubcircuits() const {
+    return m_Subcircuits;
+}
+
+/**
+ * @brief   Returns the device models imported from libraries.
+ * @return  Every model, used by a part or not, in the order they were imported.
+ */
+const std::vector<Core::LibraryModel> &Schematic::GetLibraryModels() const {
+    return m_LibraryModels;
+}
+
+/**
+ * @brief   Checks whether a grid point is the terminal of some element.
+ * @param[in] point  Grid point to test.
+ * @return  True when an element has a terminal there.
+ */
+bool Schematic::IsTerminal(const GridPoint point) const {
+    return std::ranges::any_of(
+        m_Elements, [point](const auto &element) { return std::ranges::contains(element->GetTerminals(), point); });
+}
+
+/**
+ * @brief   Returns the terminals of every element.
+ * @return  Terminal positions in world units.
+ */
+std::vector<GridPoint> Schematic::CollectTerminals() const {
+    std::vector<GridPoint> terminals;
+    for (const auto &element : m_Elements) {
+        std::ranges::copy(element->GetTerminals(), std::back_inserter(terminals));
+    }
+    return terminals;
+}
+
+/**
+ * @brief   Adds an element and gives its component the next free SPICE name.
+ * @param[in] element  Element to add; its component is renamed even if it already had a name.
+ */
+void Schematic::AddElement(std::unique_ptr<UIElement> element) {
+    Core::Component &component = element->GetComponent();
+    const std::string_view prefix = component.GetNamePrefix();
+    if (!prefix.empty()) {
+        std::vector<std::string> names;
+        for (const auto &existing : m_Elements) {
+            names.push_back(existing->GetComponent().GetName());
+        }
+        component.SetName(Core::NextComponentName(prefix, names));
+    }
+    m_Elements.push_back(std::move(element));
+    MarkModified();
+}
+
+/**
+ * @brief   Adds a wire segment.
+ * @param[in] start  First end.
+ * @param[in] end    Second end; when it equals start, nothing is added.
+ * @note    Zero-length segments appear when an L-shaped bend lands on one of its ends.
+ */
+void Schematic::AddWire(const GridPoint start, const GridPoint end) {
+    if (start == end) {
+        return;
+    }
+    m_Wires.emplace_back(start, end);
+    MarkModified();
+}
+
+/**
+ * @brief   Replaces every wire, for example while wires follow a dragged element.
+ * @param[in] wires  New wires.
+ * @note    Only the derived data is invalidated, and only when the wires differ: call MarkModified() once the
+ *          gesture counts as a change.
+ */
+void Schematic::SetWires(std::vector<UIWire> wires) {
+    // Drags call this every frame, so unchanged wires must not throw away the nodes and the results
+    if (wires == m_Wires) {
+        return;
+    }
+    m_Wires = std::move(wires);
+    m_History.NoteChange();
+    InvalidateDerivedData();
+}
+
+/**
+ * @brief   Joins and deduplicates wire segments without changing the circuit.
+ * @note    When something changes, wires are merged and removed, so the selected wires are deselected; the selected
+ *          elements stay selected.
+ */
+void Schematic::SimplifyAllWires() {
+    std::vector<UIWire> simplified = SimplifyWires(m_Wires, CollectTerminals());
+    if (simplified == m_Wires) {
+        return;
+    }
+    m_Wires = std::move(simplified);
+    if (!m_SelectedWires.empty()) {
+        SetSelection(m_SelectedElements, {});
+    }
+    m_History.NoteChange();
+    InvalidateDerivedData();
+}
+
+/**
+ * @brief   Deletes every selected element and wire, if any.
+ * @note    Wires attached to a deleted element stay in place, like in LTspice.
+ */
+void Schematic::DeleteSelection() {
+    if (!HasSelection()) {
+        return;
+    }
+    // Highest index first, so the indices still to erase stay valid
+    for (auto index = m_SelectedElements.rbegin(); index != m_SelectedElements.rend(); ++index) {
+        m_Elements.erase(m_Elements.begin() + static_cast<std::ptrdiff_t>(*index));
+    }
+    for (auto index = m_SelectedWires.rbegin(); index != m_SelectedWires.rend(); ++index) {
+        m_Wires.erase(m_Wires.begin() + static_cast<std::ptrdiff_t>(*index));
+    }
+    ClearSelection();
+    MarkModified();
+}
+
+/**
+ * @brief   Gives a part another name, and keeps what refers to it by name on it.
+ * @param[in] index  Index into GetElements() of a part that has a name.
+ * @param[in] name   The new name, which CheckPartName() must allow.
+ * @return  Nothing on success, the name unchanged too; the reason otherwise, with the schematic unchanged.
+ * @note    The controlled sources that follow the part's current, the measured currents of the part and the math
+ *          channels that read them follow the new name. The results go, since they name the part as it was.
+ */
+std::expected<void, std::string> Schematic::RenameElement(const std::size_t index, const std::string &name) {
+    Core::Component &component = m_Elements[index]->GetComponent();
+    const std::string old_name = component.GetName();
+    if (name == old_name) {
+        return {};
+    }
+    if (const std::optional<std::string> problem = CheckPartName(m_Elements, index, name)) {
+        return std::unexpected(*problem);
+    }
+    component.SetName(name);
+    for (const auto &element : m_Elements) {
+        if (Core::IsControlledSource(element->GetComponent().GetType())) {
+            auto &source = static_cast<Core::ControlledSource &>(element->GetComponent());
+            source.SetControllingCurrent(RenameCurrent(source.GetControllingCurrent(), old_name, name));
+        } else if (Core::IsBehavioralSource(element->GetComponent().GetType())) {
+            auto &source = static_cast<Core::BehavioralSource &>(element->GetComponent());
+            source.SetExpression(RenameCurrentsIn(source.GetExpression(), old_name, name));
+        }
+    }
+    std::set<std::string> measured;
+    for (const std::string &current : m_MeasuredCurrents) {
+        measured.insert(RenameCurrent(current, old_name, name));
+    }
+    m_MeasuredCurrents = std::move(measured);
+    for (MathChannel &channel : m_MathChannels) {
+        channel.First = RenameCurrentsIn(channel.First, old_name, name);
+        channel.Second = RenameCurrentsIn(channel.Second, old_name, name);
+        channel.Expression = RenameCurrentsIn(channel.Expression, old_name, name);
+    }
+    MarkModified();
+    return {};
+}
+
+/**
+ * @brief   Empties the schematic, leaving it untitled and unmodified.
+ */
+void Schematic::Clear() {
+    Replace({}, {}, {});
+    m_FilePath.reset();
+}
+
+/**
+ * @brief   Replaces the whole content, for example with a schematic read from a file.
+ * @param[in] elements  New elements, with names already set.
+ * @param[in] wires     New wires.
+ * @param[in] settings     New simulation settings.
+ * @param[in] subcircuits  New block definitions.
+ * @param[in] models       New library models.
+ * @note    The schematic becomes unmodified and the undo history starts over; the file path is kept.
+ */
+void Schematic::Replace(std::vector<std::unique_ptr<UIElement>> elements, std::vector<UIWire> wires,
+                        SimulationSettings settings, std::vector<SavedSubcircuit> subcircuits,
+                        std::vector<Core::LibraryModel> models) {
+    ClearSelection();
+    m_Elements = std::move(elements);
+    m_Wires = std::move(wires);
+    m_Subcircuits = std::move(subcircuits);
+    m_LibraryModels = std::move(models);
+    m_BuiltSubcircuits.reset();
+    m_SimulationSettings = std::move(settings);
+    ++m_SimulationSettingsVersion;
+    ++m_DocumentVersion;
+    InvalidateDerivedData();
+    // The probes belong to the old content; whoever replaces it sets them again
+    m_VoltageProbes.clear();
+    m_Modified = false;
+    ResetHistory();
+}
+
+/**
+ * @brief   Lists the markers of the selection that would become the pins of a block made from it.
+ * @return  The selected pin markers, in the order of the elements; the reason a block cannot be made
+ *          otherwise: nothing selected, no marker, or markers that repeat a name or share a node. Blocks in the
+ *          selection go into the new block.
+ */
+std::expected<std::vector<Schematic::SubcircuitPinCandidate>, std::string>
+Schematic::GetSubcircuitPinCandidates() const {
+    if (m_SelectedElements.empty()) {
+        return std::unexpected("Select the circuit to turn into a subcircuit");
+    }
+    auto candidates = CollectSubcircuitPinMarkers(m_Elements, m_Wires, &m_SelectedElements);
+    if (candidates && candidates->empty()) {
+        return std::unexpected("Select pin markers with the circuit to choose the block connections");
+    }
+    return candidates;
+}
+
+/**
+ * @brief   Lists every pin marker, as the contents of a block being edited have them.
+ * @return  The markers, in the order of the elements; the reason they cannot be pins when names repeat or markers share
+ *          a node.
+ */
+std::expected<std::vector<Schematic::SubcircuitPinCandidate>, std::string> Schematic::GetSubcircuitPinMarkers() const {
+    return CollectSubcircuitPinMarkers(m_Elements, m_Wires, nullptr);
+}
+
+/**
+ * @brief   Turns the pin marker on a point so its pin goes on an edge of the block.
+ * @param[in] point  Point of the marker's terminal.
+ * @param[in] side   Edge of the block the pin should go on.
+ * @return  True when a marker turned; false when no marker is on the point or it already gives that edge.
+ * @note    The marker turns about its terminal, so the wires on it stay where they are; only its arrow and square face
+ *          the other way. It counts as an edit, which CommitUndoStep() makes one undo step.
+ */
+bool Schematic::SetPinMarkerSide(const GridPoint point, const Core::PinSide side) {
+    for (auto &element : m_Elements) {
+        if (!Core::IsSubcircuitPin(element->GetComponent().GetType()) || element->GetTerminals().front() != point) {
+            continue;
+        }
+        if (GetMarkerSide(*element) == side) {
+            return false;
+        }
+        element->SetRotation(GetSideRotation(side));
+        element->SetMirrored(false);
+        MarkModified();
+        return true;
+    }
+    return false;
+}
+
+/**
+ * @brief   Turns the selection into a block definition and puts one instance of it in its place.
+ * @param[in] name        Name of the new definition, an identifier no other definition has.
+ * @param[in] pins        One pin per selected marker, at the marker's point, in the order of the instance's terminals.
+ * @param[in] parameters  Parameters of the definition, with their defaults.
+ * @return  Nothing on success; the reason otherwise, with the schematic unchanged.
+ * @note    The markers take the names of their pins. The instance sits at the middle of the selection, wired to the
+ *          points where the markers were, and ends up selected. Call CommitUndoStep() after it, so it undoes in one
+ * step.
+ */
+std::expected<void, std::string>
+Schematic::CreateSubcircuitFromSelection(std::string name, std::vector<SavedSubcircuitPin> pins,
+                                         std::vector<Core::SubcircuitParameter> parameters) {
+    if (!Core::SubcircuitInstance::IsValidIdentifier(name)) {
+        return std::unexpected("The subcircuit name must be an identifier");
+    }
+    if (std::ranges::contains(m_Subcircuits, name, &SavedSubcircuit::Name)) {
+        return std::unexpected("A subcircuit with this name already exists");
+    }
+    auto candidates = GetSubcircuitPinCandidates();
+    if (!candidates) {
+        return std::unexpected(candidates.error());
+    }
+    if (auto valid = CheckPinChoice(*candidates, pins); !valid) {
+        return std::unexpected(valid.error());
+    }
+    if (auto valid = ValidateMetadata(pins, parameters); !valid) {
+        return std::unexpected(valid.error());
+    }
+
+    SavedSubcircuit made;
+    made.Name = std::move(name);
+    made.Pins = std::move(pins);
+    made.Parameters = std::move(parameters);
+    auto drawn =
+        DrawDefinition(m_Elements, m_Wires, m_SelectedElements, m_SelectedWires, m_Subcircuits, std::move(made));
+    if (!drawn) {
+        return std::unexpected(drawn.error());
+    }
+    SavedSubcircuit &definition = *drawn;
+
+    const GridPoint pivot = FindPivot(m_Elements, m_SelectedElements, m_Wires, m_SelectedWires);
+    auto instance_element = CreateElement(Core::ComponentType::SUBCIRCUIT, pivot, Rotation::R0);
+    ApplyDefinitionPins(static_cast<Core::SubcircuitInstance &>(instance_element->GetComponent()), definition);
+    std::vector<GridPoint> old_points;
+    for (const SavedSubcircuitPin &pin : definition.Pins) {
+        old_points.push_back(pin.Point);
+    }
+
+    DeleteSelection();
+    m_Subcircuits.push_back(std::move(definition));
+    m_BuiltSubcircuits.reset();
+    MoveToFreeSpot(static_cast<UISubcircuit &>(*instance_element), old_points, m_Elements, m_Wires);
+    AddElement(std::move(instance_element));
+    WireNewBlock(old_points);
+    SelectElement(m_Elements.size() - 1);
+    return {};
+}
+
+/**
+ * @brief   Copies the contents of a block definition into a schematic of their own, to edit them.
+ * @param[in] name  Name of the definition.
+ * @return  The contents, with a PIN marker added at any pin that lost its marker, and a copy of the other blocks and
+ * the library models, which its parts may use; the reason otherwise.
+ * @note    The copy shares nothing with this schematic; UpdateSubcircuit() puts the edited contents back.
+ */
+std::expected<std::unique_ptr<Schematic>, std::string> Schematic::OpenSubcircuit(const std::string &name) const {
+    const auto found = std::ranges::find(m_Subcircuits, name, &SavedSubcircuit::Name);
+    if (found == m_Subcircuits.end()) {
+        return std::unexpected("Unknown subcircuit " + name);
+    }
+    if (found->Spice) {
+        return std::unexpected(name + " is SPICE text, which has no drawing to open");
+    }
+    std::vector<SavedSubcircuit> definitions = CopyDefinitions(m_Subcircuits);
+    const auto copied = std::ranges::find(definitions, name, &SavedSubcircuit::Name);
+    if (copied == definitions.end()) {
+        return std::unexpected("The subcircuit definition could not be opened");
+    }
+    SavedSubcircuit definition = std::move(*copied);
+    definitions.erase(copied);
+    auto content = std::make_unique<Schematic>();
+    // The parts inside can use the blocks and library models of the document, as its own parts can; the block itself
+    // is left out, so it cannot be placed inside itself
+    content->Replace(std::move(definition.Elements), std::move(definition.Wires), {}, std::move(definitions),
+                     m_LibraryModels);
+    for (const SavedSubcircuitPin &pin : definition.Pins) {
+        const bool has_marker = std::ranges::any_of(content->GetElements(), [&](const auto &element) {
+            return Core::IsSubcircuitPin(element->GetComponent().GetType()) &&
+                   element->GetTerminals().front() == pin.Point;
+        });
+        if (!has_marker) {
+            auto marker = CreateElement(Core::ComponentType::PIN, pin.Point, Rotation::R0);
+            static_cast<Core::NetLabel &>(marker->GetComponent()).SetNet(pin.Name);
+            content->AddElement(std::move(marker));
+        }
+    }
+    return content;
+}
+
+/**
+ * @brief   Puts the edited contents of a block back into its definition and brings every instance up to date.
+ * @param[in] name        Name of the definition.
+ * @param[in] content     Edited contents, as OpenSubcircuit() handed them out.
+ * @param[in] pins        Pins of the block, each at the point of its marker in the contents, in terminal order.
+ * @param[in] parameters  Parameters of the block, with their defaults.
+ * @return  Nothing on success; the reason otherwise, with the schematic unchanged.
+ * @note    A pin keeps the wires of its instances when its marker stays where it was, even renamed, or keeps its name;
+ *          the wires on the terminals of the other old pins are removed, and the overrides of removed parameters
+ *          are dropped, in the schematic and inside the other blocks alike. A block that would contain itself,
+ *          directly or through another block, is refused. Call CommitUndoStep() after it, so it undoes in one step.
+ */
+std::expected<void, std::string> Schematic::UpdateSubcircuit(const std::string &name, const Schematic &content,
+                                                             const std::vector<SavedSubcircuitPin> &pins,
+                                                             const std::vector<Core::SubcircuitParameter> &parameters) {
+    const auto found = std::ranges::find(m_Subcircuits, name, &SavedSubcircuit::Name);
+    if (found == m_Subcircuits.end()) {
+        return std::unexpected("Unknown subcircuit " + name);
+    }
+    if (UsesBlock(content.GetElements(), m_Subcircuits, name)) {
+        return std::unexpected(std::format("{} cannot contain itself, directly or through another block", name));
+    }
+    if (auto valid = ValidateMetadata(pins, parameters); !valid) {
+        return std::unexpected(valid.error());
+    }
+    if (const std::optional<std::string> problem =
+            CheckPinNodes(Connectivity(content.GetElements(), content.GetWires()), pins)) {
+        return std::unexpected(*problem);
+    }
+    if (auto valid = ValidateExpressions(content.GetElements(), parameters); !valid) {
+        return std::unexpected(valid.error());
+    }
+    auto copied = LoadSchematic(SaveSchematic(content.GetElements(), content.GetWires(), {}, {}, m_Subcircuits));
+    if (!copied) {
+        return std::unexpected(copied.error());
+    }
+
+    SavedSubcircuit &definition = *found;
+    const std::vector<std::optional<std::size_t>> matches = MatchPins(definition.Pins, pins);
+    std::vector<std::string> old_names;
+    for (const SavedSubcircuitPin &pin : definition.Pins) {
+        old_names.push_back(pin.Name);
+    }
+    definition.Pins = pins;
+    definition.Parameters = parameters;
+    definition.Elements = std::move(copied->Elements);
+    definition.Wires = std::move(copied->Wires);
+    m_BuiltSubcircuits.reset();
+
+    RefreshInstances(definition, old_names, matches);
+    MarkModified();
+    return {};
+}
+
+/**
+ * @brief   Changes the pins and parameters of a block kept as SPICE text, and brings every instance up to date.
+ * @param[in] name        Name of the definition.
+ * @param[in] pins        Its pins, one per port of its .subckt line and in that order, with their names and edges.
+ * @param[in] parameters  Its parameters, with their defaults.
+ * @return  Nothing on success; the reason otherwise, with the schematic unchanged.
+ * @note    The text stays as it came. Each pin keeps the wires of its instances wherever its edge moves it. Call
+ *          CommitUndoStep() after it, so it undoes in one step.
+ */
+std::expected<void, std::string>
+Schematic::UpdateSpiceSubcircuit(const std::string &name, const std::vector<SavedSubcircuitPin> &pins,
+                                 const std::vector<Core::SubcircuitParameter> &parameters) {
+    const auto found = std::ranges::find(m_Subcircuits, name, &SavedSubcircuit::Name);
+    if (found == m_Subcircuits.end()) {
+        return std::unexpected("Unknown SPICE block " + name);
+    }
+    const std::optional<Core::SubcircuitText> &spice = found->Spice;
+    if (!spice) {
+        return std::unexpected(name + " is a drawn block, not SPICE text");
+    }
+    if (pins.size() != spice->Ports.size()) {
+        return std::unexpected("Give every port of the SPICE text a pin");
+    }
+    if (auto valid = ValidateMetadata(pins, parameters); !valid) {
+        return std::unexpected(valid.error());
+    }
+    SavedSubcircuit &definition = *found;
+    std::vector<std::string> old_names;
+    std::vector<std::optional<std::size_t>> matches;
+    for (std::size_t index = 0; index < definition.Pins.size(); ++index) {
+        old_names.push_back(definition.Pins[index].Name);
+        // A port is the same pin whatever it is called now
+        matches.emplace_back(index);
+    }
+    definition.Pins = pins;
+    definition.Parameters = parameters;
+    m_BuiltSubcircuits.reset();
+    RefreshInstances(definition, old_names, matches);
+    MarkModified();
+    return {};
+}
+
+/**
+ * @brief   Adds the definitions a pasted group brought, so its instances have them.
+ * @param[in]     definitions  Definitions the group's instances use, with the blocks those place.
+ * @param[in,out] instances    Elements of the group; the instances of a renamed definition are pointed at its new name.
+ * @return  The name each definition has here, in the order they came: its own, or the free name it was given.
+ * @note    A definition equal to one of the same name already here is dropped, since the instances can use that one.
+ *          One that differs is added under a free name, such as "block_2", so neither replaces the other; the blocks
+ *          that place it are pointed at that name too. Each block is merged after the blocks it places, so it is
+ *          compared with their names as they end up here.
+ */
+std::vector<std::string> Schematic::MergeSubcircuits(std::vector<SavedSubcircuit> definitions,
+                                                     std::vector<std::unique_ptr<UIElement>> &instances) {
+    std::vector<std::string> names(definitions.size());
+    for (const std::size_t index : OrderByUse(definitions)) {
+        SavedSubcircuit &definition = definitions[index];
+        const auto existing = std::ranges::find(m_Subcircuits, definition.Name, &SavedSubcircuit::Name);
+        if (existing != m_Subcircuits.end() && DescribeDefinition(*existing) == DescribeDefinition(definition)) {
+            names[index] = definition.Name;
+            continue;
+        }
+        if (existing != m_Subcircuits.end()) {
+            const std::string old_name = definition.Name;
+            definition.Name = FindFreeName(old_name, m_Subcircuits);
+            RenameBlockInstances(instances, old_name, definition.Name);
+            for (SavedSubcircuit &other : definitions) {
+                RenameBlockInstances(other.Elements, old_name, definition.Name);
+            }
+        }
+        names[index] = definition.Name;
+        m_Subcircuits.push_back(std::move(definition));
+        m_BuiltSubcircuits.reset();
+        MarkModified();
+    }
+    return names;
+}
+/**
+ * @brief   Adds device models from a library or a paste, so the parts that name them have them.
+ * @param[in]     models       Models to add.
+ * @param[in,out] elements     Parts that came with them, pointed at the new name of a renamed model.
+ * @param[in,out] definitions  Blocks that came with them, whose parts are pointed at it too.
+ * @return  The name each model has here, in order: its own, or the free name it was given.
+ * @note    A model equal to one of the same name already here is dropped, since the parts can use that one; one that
+ *          differs is added under a free name, such as "1N4148_2", so neither replaces the other.
+ */
+std::vector<std::string> Schematic::MergeLibraryModels(std::vector<Core::LibraryModel> models,
+                                                       std::vector<std::unique_ptr<UIElement>> &elements,
+                                                       std::vector<SavedSubcircuit> &definitions) {
+    const auto rename_users = [](std::vector<std::unique_ptr<UIElement>> &users, const std::string &old_name,
+                                 const std::string &new_name) {
+        for (auto &user : users) {
+            Core::Component &component = user->GetComponent();
+            if (component.GetLibraryModel() == old_name) {
+                component.SetLibraryModel(new_name);
+            }
+        }
+    };
+    std::vector<std::string> names;
+    for (Core::LibraryModel &model : models) {
+        const auto existing = std::ranges::find(m_LibraryModels, model.Name, &Core::LibraryModel::Name);
+        if (existing != m_LibraryModels.end() && existing->Text == model.Text) {
+            names.push_back(model.Name);
+            continue;
+        }
+        if (existing != m_LibraryModels.end()) {
+            std::string free_name;
+            for (int suffix = 2;
+                 free_name.empty() || std::ranges::contains(m_LibraryModels, free_name, &Core::LibraryModel::Name);
+                 ++suffix) {
+                free_name = std::format("{}_{}", model.Name, suffix);
+            }
+            rename_users(elements, model.Name, free_name);
+            for (SavedSubcircuit &definition : definitions) {
+                rename_users(definition.Elements, model.Name, free_name);
+            }
+            model.Text = Core::RenameLibraryModel(model, free_name);
+            model.Name = free_name;
+        }
+        names.push_back(model.Name);
+        m_LibraryModels.push_back(std::move(model));
+        MarkModified();
+    }
+    return names;
+}
+
+/**
+ * @brief   Takes a copy of the blocks and library models of another schematic, as the contents of an open block need
+ *          those of the document after it gained some.
+ * @param[in] library  The schematic whose blocks and models are copied.
+ * @param[in] left_out  A block to leave out, such as the one these are the contents of, or empty.
+ * @note    The parts here are left as they are, so call it only with a library that still has every block they place.
+ */
+void Schematic::CopyDefinitionsFrom(const Schematic &library, const std::string_view left_out) {
+    m_Subcircuits = CopyDefinitions(library.m_Subcircuits);
+    std::erase_if(m_Subcircuits, [&](const SavedSubcircuit &definition) { return definition.Name == left_out; });
+    m_LibraryModels = library.m_LibraryModels;
+    m_BuiltSubcircuits.reset();
+}
+
+/**
+ * @brief   Selects an element, replacing the previous selection.
+ * @param[in] index  Index into GetElements().
+ */
+void Schematic::SelectElement(const std::size_t index) {
+    SetSelection({index}, {});
+}
+
+/**
+ * @brief   Selects a wire, replacing the previous selection.
+ * @param[in] index  Index into GetWires().
+ */
+void Schematic::SelectWire(const std::size_t index) {
+    SetSelection({}, {index});
+}
+
+/**
+ * @brief   Replaces the selection.
+ * @param[in] elements  Indices into GetElements().
+ * @param[in] wires     Indices into GetWires().
+ */
+void Schematic::SetSelection(std::set<std::size_t> elements, std::set<std::size_t> wires) {
+    m_SelectedElements = std::move(elements);
+    m_SelectedWires = std::move(wires);
+    ++m_SelectionVersion;
+}
+
+/**
+ * @brief   Deselects everything.
+ */
+void Schematic::ClearSelection() {
+    SetSelection({}, {});
+}
+
+/**
+ * @brief   Tells whether an element is selected.
+ * @param[in] index  Index into GetElements().
+ * @return  True when the element is in the selection.
+ */
+bool Schematic::IsElementSelected(const std::size_t index) const {
+    return m_SelectedElements.contains(index);
+}
+
+/**
+ * @brief   Tells whether a wire is selected.
+ * @param[in] index  Index into GetWires().
+ * @return  True when the wire is in the selection.
+ */
+bool Schematic::IsWireSelected(const std::size_t index) const {
+    return m_SelectedWires.contains(index);
+}
+
+/**
+ * @brief   Returns the indices of the selected elements.
+ * @return  Indices into GetElements(), in order.
+ */
+const std::set<std::size_t> &Schematic::GetSelectedElements() const {
+    return m_SelectedElements;
+}
+
+/**
+ * @brief   Returns the indices of the selected wires.
+ * @return  Indices into GetWires(), in order.
+ */
+const std::set<std::size_t> &Schematic::GetSelectedWires() const {
+    return m_SelectedWires;
+}
+
+/**
+ * @brief   Tells whether anything is selected.
+ * @return  True when at least one element or wire is selected.
+ */
+bool Schematic::HasSelection() const {
+    return !m_SelectedElements.empty() || !m_SelectedWires.empty();
+}
+
+/**
+ * @brief   Returns the selected element when it is the only thing selected.
+ * @return  The element, or nullptr when there is no selection, a wire is selected too, or there are several elements.
+ * @note    Editing a part, such as its value, applies to one part at a time, so this is what those edits ask for.
+ */
+UIElement *Schematic::GetSelectedElement() {
+    if (m_SelectedElements.size() != 1 || !m_SelectedWires.empty()) {
+        return nullptr;
+    }
+    return m_Elements[*m_SelectedElements.begin()].get();
+}
+
+/**
+ * @brief   Returns a number that changes every time the selection changes.
+ * @return  The selection version; compare it with a stored one to know whether to reload selection data.
+ */
+std::size_t Schematic::GetSelectionVersion() const {
+    return m_SelectionVersion;
+}
+
+/**
+ * @brief   Tells whether the plots show the voltage of a node.
+ * @param[in] node  Node number, as numbered by GetConnectivity().
+ * @return  True when the node is measured.
+ */
+bool Schematic::IsVoltageMeasured(const int node) const {
+    return std::ranges::any_of(m_VoltageProbes, [node](const VoltageProbe &probe) { return probe.Node == node; });
+}
+
+/**
+ * @brief   Adds or removes the voltage of a node from the plots.
+ * @param[in] node      Node number, as numbered by GetConnectivity().
+ * @param[in] measured  Whether to show it.
+ */
+void Schematic::SetVoltageMeasured(const int node, const bool measured) {
+    if (!measured) {
+        std::erase_if(m_VoltageProbes, [node](const VoltageProbe &probe) { return probe.Node == node; });
+    } else if (!IsVoltageMeasured(node)) {
+        m_VoltageProbes.push_back({.Points = GetConnectivity().GetPointsOfNode(node), .Node = node});
+    }
+}
+
+/**
+ * @brief   Tells whether the plots show a current.
+ * @param[in] name  Current name as in the results, such as "R1" or "Q1.C".
+ * @return  True when the current is measured.
+ */
+bool Schematic::IsCurrentMeasured(const std::string &name) const {
+    return m_MeasuredCurrents.contains(name);
+}
+
+/**
+ * @brief   Adds or removes a current from the plots.
+ * @param[in] name      Current name as in the results, such as "R1" or "Q1.C".
+ * @param[in] measured  Whether to show it.
+ */
+void Schematic::SetCurrentMeasured(const std::string &name, const bool measured) {
+    if (measured) {
+        m_MeasuredCurrents.insert(name);
+    } else {
+        m_MeasuredCurrents.erase(name);
+    }
+}
+
+/**
+ * @brief   Returns the math channels the plots add to the measured traces.
+ * @return  The channels, in the order they were added.
+ */
+const std::vector<MathChannel> &Schematic::GetMathChannels() const {
+    return m_MathChannels;
+}
+
+/**
+ * @brief   Replaces the math channels, as the Output window does when the user adds, edits or removes one.
+ * @param[in] channels  New channels.
+ */
+void Schematic::SetMathChannels(std::vector<MathChannel> channels) {
+    m_MathChannels = std::move(channels);
+}
+
+/**
+ * @brief   Returns the logic buses the transient plot shows as lanes of numbers.
+ * @return  The buses, in the order they were added.
+ */
+const std::vector<LogicBus> &Schematic::GetBuses() const {
+    return m_Buses;
+}
+
+/**
+ * @brief   Replaces the logic buses, as the Output window does when the user adds, edits or removes one.
+ * @param[in] buses  New buses.
+ * @note    Like the math channels, they are saved with the file but stay out of undo and do not mark it modified.
+ */
+void Schematic::SetBuses(std::vector<LogicBus> buses) {
+    m_Buses = std::move(buses);
+}
+
+/**
+ * @brief   Removes every measurement, so the plots start empty; for a new or opened schematic.
+ */
+void Schematic::ClearMeasurements() {
+    m_VoltageProbes.clear();
+    m_MeasuredCurrents.clear();
+    m_MathChannels.clear();
+    m_Buses.clear();
+}
+
+/**
+ * @brief   Describes the measurements for a file, with each voltage as a point of its node.
+ * @return  The measured voltages and currents, and the math channels; nodes that no longer exist are left out.
+ */
+SavedMeasurements Schematic::SaveMeasurements() {
+    SavedMeasurements measurements;
+    const Connectivity &connectivity = GetConnectivity();
+    for (const VoltageProbe &probe : m_VoltageProbes) {
+        if (probe.Node) {
+            if (const std::optional<GridPoint> point = connectivity.FindPointOfNode(*probe.Node)) {
+                measurements.Voltages.push_back(*point);
+            }
+        }
+    }
+    measurements.Currents.assign(m_MeasuredCurrents.begin(), m_MeasuredCurrents.end());
+    measurements.MathChannels = m_MathChannels;
+    measurements.Buses = m_Buses;
+    return measurements;
+}
+
+/**
+ * @brief   Replaces the measurements with those read from a file.
+ * @param[in] measurements  Measured voltages and currents, and math channels; call it after the content they refer to
+ *                          is in place.
+ * @note    Points that connect to nothing, or to ground, are skipped. Currents of parts that do not exist are kept
+ *          but plot nothing, like after deleting a measured part.
+ */
+void Schematic::RestoreMeasurements(const SavedMeasurements &measurements) {
+    ClearMeasurements();
+    for (const GridPoint point : measurements.Voltages) {
+        if (const std::optional<int> node = GetConnectivity().GetNode(point); node && *node != 0) {
+            SetVoltageMeasured(*node, true);
+        }
+    }
+    m_MeasuredCurrents.insert(measurements.Currents.begin(), measurements.Currents.end());
+    m_MathChannels = measurements.MathChannels;
+    m_Buses = measurements.Buses;
+}
+
+/**
+ * @brief   Returns how each analysis runs.
+ * @return  The settings, saved with the schematic.
+ */
+const SimulationSettings &Schematic::GetSimulationSettings() const {
+    return m_SimulationSettings;
+}
+
+/**
+ * @brief   Changes how the analyses run, as the user edits the settings.
+ * @param[in] settings  New settings; when they equal the current ones, nothing changes.
+ * @note    A change counts as unsaved and is undone like an edit, but keeps the results and the version.
+ */
+void Schematic::SetSimulationSettings(const SimulationSettings &settings) {
+    if (settings == m_SimulationSettings) {
+        return;
+    }
+    m_SimulationSettings = settings;
+    m_Modified = true;
+    m_History.NoteChange();
+}
+
+/**
+ * @brief   Returns a number that changes whenever the settings are replaced by something other than
+ *          SetSimulationSettings(), such as opening a file, starting a new schematic, undoing or redoing.
+ * @return  The settings version; compare it with a stored one to know whether to reload the settings.
+ */
+std::size_t Schematic::GetSimulationSettingsVersion() const {
+    return m_SimulationSettingsVersion;
+}
+
+/**
+ * @brief   Tells whether there are unsaved changes.
+ * @return  True after any change since the last save, open or clear.
+ */
+bool Schematic::IsModified() const {
+    return m_Modified;
+}
+
+/**
+ * @brief   Records that the schematic changed, so it counts as unsaved and its nodes are recomputed.
+ * @note    Call it after editing an element obtained from GetElement() or GetSelectedElement().
+ */
+void Schematic::MarkModified() {
+    m_Modified = true;
+    m_History.NoteChange();
+    InvalidateDerivedData();
+}
+
+/**
+ * @brief   Returns the file the schematic was last opened from or saved to.
+ * @return  The path, or no value for an untitled schematic.
+ */
+const std::optional<std::filesystem::path> &Schematic::GetFilePath() const {
+    return m_FilePath;
+}
+
+/**
+ * @brief   Records that the schematic was written to a file, or opened from one.
+ * @param[in] path  The file.
+ * @note    The schematic becomes unmodified, and undoing or redoing back to this state keeps it unmodified.
+ */
+void Schematic::MarkSaved(std::filesystem::path path) {
+    CommitUndoStep();
+    m_FilePath = std::move(path);
+    m_Modified = false;
+    m_History.MarkSaved();
+}
+
+/**
+ * @brief   Records whether a live transient runs, so the parts the user sets by hand change in it.
+ * @param[in] is_live  True from the start of a live run to its end.
+ * @note    The changes the run has not taken are dropped when it ends.
+ */
+void Schematic::SetLiveRun(const bool is_live) {
+    m_IsLiveRun = is_live;
+    if (!is_live) {
+        m_LiveChanges.clear();
+    }
+}
+
+/**
+ * @brief   Tells whether a live transient runs.
+ * @return  True between SetLiveRun(true) and SetLiveRun(false).
+ */
+bool Schematic::IsLiveRun() const {
+    return m_IsLiveRun;
+}
+
+/**
+ * @brief   Records that the user flipped a switch, pressed or released a button, set a logic input or turned a
+ *          potentiometer.
+ * @param[in] component  The part, already in its new state.
+ * @note    It is a change like any other, saved and undone, but while a live run goes on it keeps the transient and
+ *          the circuit version, and queues the change for the run (TakeLiveChanges()); the other results no longer
+ *          match the circuit and are dropped. Without a live run, or for any other part, it is MarkModified().
+ */
+void Schematic::MarkLiveChanged(const Core::Component &component) {
+    if (!m_IsLiveRun || !Core::IsLiveChangeable(component.GetType())) {
+        MarkModified();
+        return;
+    }
+    m_Modified = true;
+    m_History.NoteChange();
+    std::ranges::move(Core::DescribeLiveChange(component), std::back_inserter(m_LiveChanges));
+    if (m_Listener.Target != nullptr) {
+        m_Listener.Target->OnLiveChanged();
+    }
+}
+
+/**
+ * @brief   Takes the changes the live run should apply.
+ * @return  The changes recorded by MarkLiveChanged() since the last call, in order.
+ */
+std::vector<Core::LiveChange> Schematic::TakeLiveChanges() {
+    return std::exchange(m_LiveChanges, {});
+}
+
+/**
+ * @brief   Chooses who hears of the changes that make the results of a simulation stale.
+ * @param[in] listener  Told at each change, from then on; or null for nobody. Not owned, and it must outlive the
+ *                      schematic or be removed first.
+ * @note    Replacing the content, undoing and every other change leave the listener as it is.
+ */
+void Schematic::SetListener(CircuitListener *listener) {
+    m_Listener.Target = listener;
+}
+
+/**
+ * @brief   Turns the changes made since the last call into one undo step.
+ * @note    Call it once the user finishes an interaction, such as at the end of a frame with no item active, so
+ *          a whole drag counts as one step. Changes that leave the schematic as it was add no step. A new step
+ *          clears what could be redone.
+ */
+void Schematic::CommitUndoStep() {
+    if (m_History.HasPendingChange()) {
+        m_History.Commit(TakeSnapshot());
+    }
+}
+
+/**
+ * @brief   Tells whether there is a step to undo.
+ * @return  True when Undo() would change something.
+ */
+bool Schematic::CanUndo() const {
+    return m_History.CanUndo();
+}
+
+/**
+ * @brief   Tells whether there is an undone step to redo.
+ * @return  True when Redo() would change something.
+ */
+bool Schematic::CanRedo() const {
+    return m_History.CanRedo();
+}
+
+/**
+ * @brief   Goes back to the schematic as it was before the last step.
+ * @note    Pending changes are committed first, so they are what gets undone. The selection is cleared.
+ */
+void Schematic::Undo() {
+    CommitUndoStep();
+    if (const std::optional<std::string> snapshot = m_History.Undo()) {
+        RestoreSnapshot(*snapshot);
+    }
+}
+
+/**
+ * @brief   Applies again the last step that was undone.
+ * @note    The selection is cleared.
+ */
+void Schematic::Redo() {
+    if (const std::optional<std::string> snapshot = m_History.Redo()) {
+        RestoreSnapshot(*snapshot);
+    }
+}
+
+/**
+ * @brief   Returns the nodes and junctions of the schematic.
+ * @return  The connectivity, computed on first use after a change and cached until the next one.
+ */
+const Connectivity &Schematic::GetConnectivity() {
+    if (!m_Connectivity) {
+        const Connectivity &connectivity = m_Connectivity.emplace(m_Elements, m_Wires);
+        m_VoltageProbes = FollowVoltageProbes(std::move(m_VoltageProbes), connectivity);
+        return connectivity;
+    }
+    return *m_Connectivity;
+}
+
+/**
+ * @brief   Builds the circuit topology of the schematic, for the simulator.
+ * @return  The circuit; it points at the components of this schematic, so use it before the next change.
+ */
+Core::Circuit Schematic::BuildCircuit() {
+    Core::Circuit circuit = GUI::BuildCircuit(m_Elements, GetConnectivity());
+    if (!m_BuiltSubcircuits) {
+        m_BuiltSubcircuits.emplace();
+        for (const SavedSubcircuit &saved : m_Subcircuits) {
+            const Connectivity connectivity(saved.Elements, saved.Wires);
+            auto definition = std::make_shared<Core::SubcircuitDefinition>();
+            definition->Name = saved.Name;
+            definition->Parameters = saved.Parameters;
+            definition->Spice = saved.Spice;
+            // A pin on no node would be refused by the checks, which read node 0 as ground
+            for (const SavedSubcircuitPin &pin : saved.Pins) {
+                definition->Pins.push_back({pin.Name, connectivity.GetNode(pin.Point).value_or(0)});
+            }
+            definition->Body = GUI::BuildCircuit(saved.Elements, connectivity);
+            m_BuiltSubcircuits->push_back(std::move(definition));
+        }
+    }
+    for (const auto &definition : *m_BuiltSubcircuits) {
+        circuit.AddSubcircuit(definition);
+    }
+    for (const Core::LibraryModel &model : m_LibraryModels) {
+        circuit.AddLibraryModel(model);
+    }
+    return circuit;
+}
+
+/**
+ * @brief   Returns a number that changes whenever the circuit does.
+ * @return  A count of the edits that drop the results; it differs from an earlier value once the circuit was edited.
+ */
+std::size_t Schematic::GetCircuitVersion() const {
+    return m_CircuitVersion;
+}
+
+/**
+ * @brief   Returns a number that changes whenever the whole content is replaced, as by opening a file, an example or a
+ *          new schematic.
+ * @return  A count of the replacements; edits, undo and redo leave it alone.
+ */
+std::size_t Schematic::GetDocumentVersion() const {
+    return m_DocumentVersion;
+}
+
+/**
+ * @brief   Builds the SPICE netlist of the schematic.
+ * @return  The netlist text, without analysis commands.
+ */
+std::string Schematic::BuildSpiceNetlist() {
+    return BuildCircuit().ToSpiceNetlist();
+}
+
+/**
+ * @brief   Moves a slot into a new one, which hears nobody: the listener stays with the schematic it was set on.
+ */
+Schematic::ListenerSlot::ListenerSlot(ListenerSlot &&) noexcept {
+}
+
+void Schematic::InvalidateDerivedData() {
+    ++m_CircuitVersion;
+    m_Connectivity.reset();
+    if (m_Listener.Target != nullptr) {
+        m_Listener.Target->OnCircuitChanged();
+    }
+}
+
+/**
+ * @brief   Brings every instance of a definition that changed up to date, in the schematic and inside every block.
+ */
+void Schematic::RefreshInstances(const SavedSubcircuit &definition, const std::vector<std::string> &old_names,
+                                 const std::vector<std::optional<std::size_t>> &matches) {
+    RefreshInstancesIn(m_Elements, m_Wires, definition, old_names, matches);
+    for (SavedSubcircuit &other : m_Subcircuits) {
+        if (&other != &definition) {
+            RefreshInstancesIn(other.Elements, other.Wires, definition, old_names, matches);
+        }
+    }
+}
+/**
+ * @brief   Wires the terminals of a block just made, the last element, to the points where its pin markers were.
+ * @details Each wire goes around the box from the edge its pin is on, clear of the other wires and terminals; one
+ *          that finds no route bends once instead, as it can always do.
+ */
+void Schematic::WireNewBlock(const std::vector<GridPoint> &old_points) {
+    const UIElement &instance = *m_Elements.back();
+    const std::vector<GridPoint> new_points = instance.GetTerminals();
+    std::vector<WireLink> links;
+    for (std::size_t index = 0; index < new_points.size(); ++index) {
+        links.push_back({.From = old_points[index], .To = new_points[index]});
+    }
+    RoutingObstacles block;
+    KeepOffBlock(block, static_cast<const UISubcircuit &>(instance));
+    const auto routed = RouteLinks(m_Elements, m_Wires, block, links);
+    for (std::size_t index = 0; index < links.size(); ++index) {
+        if (const std::optional<std::vector<UIWire>> &path = routed[index]) {
+            for (const UIWire &wire : *path) {
+                AddWire(wire.GetStart(), wire.GetEnd());
+            }
+            continue;
+        }
+        const GridPoint bend = {links[index].To.X, links[index].From.Y};
+        AddWire(links[index].From, bend);
+        AddWire(bend, links[index].To);
+    }
+}
+
+/**
+ * @brief   Measurements stay out of snapshots, so probing adds no undo step and does not count as a change.
+ */
+std::string Schematic::TakeSnapshot() const {
+    return SaveSchematic(m_Elements, m_Wires, m_SimulationSettings, {}, m_Subcircuits, m_LibraryModels);
+}
+
+/**
+ * @brief   Snapshots come from TakeSnapshot(), so they always load back without warnings.
+ */
+void Schematic::RestoreSnapshot(const std::string &snapshot) {
+    auto loaded = LoadSchematic(snapshot);
+    if (!loaded) {
+        return;
+    }
+    ClearSelection();
+    m_Elements = std::move(loaded->Elements);
+    m_Wires = std::move(loaded->Wires);
+    m_Subcircuits = std::move(loaded->Subcircuits);
+    m_LibraryModels = std::move(loaded->Models);
+    m_BuiltSubcircuits.reset();
+    if (loaded->Settings != m_SimulationSettings) {
+        m_SimulationSettings = std::move(loaded->Settings);
+        ++m_SimulationSettingsVersion;
+    }
+    m_Modified = !m_History.IsAtSavedState();
+    InvalidateDerivedData();
+}
+
+/**
+ * @brief   The current content becomes the only state, and also the saved one.
+ */
+void Schematic::ResetHistory() {
+    m_History.Reset(TakeSnapshot());
+}
+
+} // namespace GUI

@@ -5,7 +5,7 @@
 
 #include "ui_elements/ui_voltage_source.h"
 
-#include "components/voltage_source.h"
+#include "circuit/components/voltage_source.h"
 #include <memory>
 
 namespace GUI {

@@ -7,12 +7,13 @@
 #ifndef IMCSIM_S_PARAMETER_TAB_H
 #define IMCSIM_S_PARAMETER_TAB_H
 
-#include "analysis/s_parameter_view.h"
-#include "document/schematic.h"
 #include "plots/plot_export.h"
 #include "plots/plot_exporter.h"
 #include "plots/plot_types.h"
+#include "plots/s_parameter_view.h"
 #include "plots/touchstone.h"
+#include "results/result_store.h"
+#include "schematic/schematic.h"
 #include "simulation/simulation_results.h"
 #include <cstddef>
 #include <string>
@@ -30,7 +31,7 @@ namespace GUI {
  */
 class SParameterTab {
 public:
-    explicit SParameterTab(Schematic &schematic);
+    SParameterTab(Schematic &schematic, const ResultStore &results);
 
     void Draw(PlotExporter &exporter);
 
@@ -40,6 +41,7 @@ public:
 
 private:
     Schematic &m_Schematic;
+    const ResultStore &m_Results;
     /// The entries of the matrix the magnitude and phase plots show.
     SParameterSelection m_Selection;
     /// The entries the Smith chart shows, which starts from the reflections.

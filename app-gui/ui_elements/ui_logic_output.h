@@ -6,7 +6,7 @@
 #ifndef IMCSIM_UI_LOGIC_OUTPUT_H
 #define IMCSIM_UI_LOGIC_OUTPUT_H
 
-#include "plots/logic_trace.h"
+#include "base/logic_state.h"
 #include "ui_elements/ui_logic_box.h"
 
 namespace GUI {

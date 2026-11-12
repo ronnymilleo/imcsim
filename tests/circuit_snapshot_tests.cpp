@@ -3,9 +3,9 @@
  * @brief   Tests for reading a transient at an instant, the heat scales and the power of each part.
  */
 
-#include "analysis/circuit_snapshot.h"
-#include "drawing/current_flow.h"
-#include "editing/element_factory.h"
+#include "results/circuit_snapshot.h"
+#include "results/current_flow.h"
+#include "schematic/element_factory.h"
 #include "test_printers.h"
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>

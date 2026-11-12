@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+# Stands in for zenity while the docs images are taken. imcsim asks SDL for its file dialogs, and SDL runs zenity and
+# reads the chosen path from its output; this one answers a file selection at once with the path the script wrote to
+# the file named by DOCS_DIALOG_ANSWER, so no dialog has to be driven. Anything else goes to the real zenity.
+
+set -euo pipefail
+
+for argument in "$@"; do
+    if [[ "$argument" == --file-selection ]]; then
+        answer=$(cat "${DOCS_DIALOG_ANSWER:?}" 2>/dev/null || true)
+        # An empty answer reads as Cancel, as zenity reports it
+        [[ -n "$answer" ]] || exit 1
+        echo "$answer"
+        exit 0
+    fi
+done
+
+# SDL checks for zenity with --version before it uses it
+if [[ "${1:-}" == --version ]] && ! command -v /usr/bin/zenity >/dev/null; then
+    echo "4.0.0"
+    exit 0
+fi
+exec /usr/bin/zenity "$@"

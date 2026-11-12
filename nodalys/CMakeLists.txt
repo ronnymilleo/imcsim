@@ -16,8 +16,10 @@ add_library(nodalys STATIC
     src/api/circuit_builder.cpp
     src/api/nodalys.cpp
     src/bridge/logic_bridge.cpp
+    src/devices/bjt_device.cpp
     src/devices/devices.cpp
-    src/devices/nonlinear.cpp
+    src/devices/diode_device.cpp
+    src/devices/mosfet_device.cpp
     src/devices/smooth_logic.cpp
     src/devices/waveforms.cpp
     src/export/csv_exporter.cpp

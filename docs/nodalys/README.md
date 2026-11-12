@@ -1,6 +1,6 @@
 # **Nodalys** Technical Documentation
 
-**Nodalys** (a contraction of ***nodal** ana**lys**is*) is the clean-room C++23 circuit simulation engine of `imcsim`. It is structured as an autonomous, self-contained library (`nodalys/`) with zero external dependencies, accompanied by a standalone CLI executable (`nodalys`) and an integration bridge connecting it directly into `imcsim` (`app-core/nodalys/`).
+**Nodalys** (a contraction of ***nodal** ana**lys**is*) is the clean-room C++23 circuit simulation engine of `imcsim`. It is structured as an autonomous, self-contained library (`nodalys/`) with zero external dependencies, accompanied by a standalone CLI executable (`nodalys`) and an integration bridge connecting it directly into `imcsim` (`app-core/backends/nodalys/`).
 
 ---
 
@@ -59,7 +59,7 @@
 │       ├── mna/                       MnaSystem (real and complex matrix assembly)
 │       ├── newton/                    Damped Newton-Raphson, Gmin/Source stepping
 │       └── parser/                    SPICE netlist lexer, parser, and engineering unit evaluator
-└── app-core/nodalys/                  imcsim Integration Bridge
+└── app-core/backends/nodalys/                  imcsim Integration Bridge
     ├── compiler.h / .cpp              Translates Core::Circuit to Nodalys::Circuit
     └── nodalys_backend.h / .cpp       Core::SimulationBackend implementation (NodalysBackend)
 ```
@@ -78,12 +78,12 @@
 | `src/parser/` & `src/export/` | SPICE netlist syntax parser supporting engineering scales (`1k`, `100n`, `4.7u`) and multi-format simulation result export (CSV, JSON, SPICE Raw, Touchstone). |
 | `src/cli/` | Standalone CLI tool (`nodalys`) processing netlists from files or `stdin` with command-line options (`--analysis`, `--format`, `--output`). |
 
-### 2. imcsim GUI & Model Bridge (`app-core/nodalys/`)
+### 2. imcsim GUI & Model Bridge (`app-core/backends/nodalys/`)
 
 | File | Responsibility |
 | :--- | :--- |
-| [`compiler.h`](../../app-core/nodalys/compiler.h) / [`compiler.cpp`](../../app-core/nodalys/compiler.cpp) | Translates `Core::Circuit` components, hierarchical subcircuits, parameter expressions, and logic parts directly into `Nodalys::CircuitBuilder`. |
-| [`nodalys_backend.h`](../../app-core/nodalys/nodalys_backend.h) / [`nodalys_backend.cpp`](../../app-core/nodalys/nodalys_backend.cpp) | Implements `Core::SimulationBackend`, reporting capabilities and executing analyses directly on Nodalys with live chunk streaming and diagnostic forwarding. |
+| [`compiler.h`](../../app-core/backends/nodalys/compiler.h) / [`compiler.cpp`](../../app-core/backends/nodalys/compiler.cpp) | Translates `Core::Circuit` components, hierarchical subcircuits, parameter expressions, and logic parts directly into `Nodalys::CircuitBuilder`. |
+| [`nodalys_backend.h`](../../app-core/backends/nodalys/nodalys_backend.h) / [`nodalys_backend.cpp`](../../app-core/backends/nodalys/nodalys_backend.cpp) | Implements `Core::SimulationBackend`, reporting capabilities and executing analyses directly on Nodalys with live chunk streaming and diagnostic forwarding. |
 
 ---
 

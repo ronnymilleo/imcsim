@@ -5,13 +5,13 @@
 
 #include "simulation/simulation_backend.h"
 
-#include "components/ground.h"
-#include "components/logic_input.h"
-#include "components/logic_part.h"
-#include "components/resistor.h"
-#include "components/voltage_source.h"
-#include "ngspice/ngspice_backend.h"
-#include "ngspice/ngspice_library.h"
+#include "backends/ngspice/ngspice_backend.h"
+#include "backends/ngspice/ngspice_library.h"
+#include "circuit/components/ground.h"
+#include "circuit/components/logic_input.h"
+#include "circuit/components/logic_part.h"
+#include "circuit/components/resistor.h"
+#include "circuit/components/voltage_source.h"
 #include "simulation/run_control.h"
 #include "simulation/simulator.h"
 #include <catch2/catch_test_macros.hpp>
@@ -337,6 +337,25 @@ TEST_CASE("ngspice is the backend until another one is set, and runs every analy
     CHECK(Core::FindUnsupported(backend, {Core::ComponentType::RESISTOR}, Core::AnalysisKind::HARMONIC_BALANCE)
               .value_or("")
               .contains("harmonic balance"));
+}
+
+TEST_CASE("Without a default backend every analysis is refused with a reason and no run succeeds",
+          "[simulation_backend]") {
+    Core::SetDefaultBackendFactory(nullptr);
+    Core::SetBackend(nullptr);
+    Core::SimulationBackend &backend = Core::GetBackend();
+    CHECK(backend.GetCapabilities().Analyses.empty());
+    const std::optional<std::string> reason =
+        Core::FindUnsupported(backend, {Core::ComponentType::RESISTOR}, Core::AnalysisKind::TRANSIENT);
+    REQUIRE(reason.has_value());
+    CHECK(reason->contains("does not run the transient analysis"));
+    const Core::OperatingPointRun run = backend.RunOperatingPoint(Core::Circuit{}, std::nullopt);
+    REQUIRE_FALSE(run.Result.has_value());
+    CHECK(run.Result.error() == "No simulation engine was installed");
+
+    // A factory registered afterwards takes effect, as the program does at startup
+    Core::UseNgspiceByDefault();
+    CHECK(Core::GetBackend().GetName() == "ngspice");
 }
 
 TEST_CASE("Analyses have names for the messages that refuse them", "[simulation_backend]") {
