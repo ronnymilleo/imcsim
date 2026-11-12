@@ -14,7 +14,10 @@
 #include "results/trace_statistics.h"
 #include "schematic/probing.h"
 #include "spice/spice_value.h"
+#include "windows/output_tabs/cursor_widgets.h"
 #include "windows/output_tabs/plot_widgets.h"
+#include "windows/output_tabs/statistics_widgets.h"
+#include "windows/output_tabs/step_widgets.h"
 #include <algorithm>
 #include <array>
 #include <expected>

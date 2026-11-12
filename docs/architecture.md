@@ -25,7 +25,7 @@ flowchart TD
     app_core[app-core]
     nodalys[nodalys]
     app_core -->|3| nodalys
-    app_gui -->|249| app_core
+    app_gui -->|257| app_core
 ```
 
 ## app-core
@@ -36,11 +36,11 @@ flowchart TD
     app_core_circuit[circuit]
     app_core_simulation[simulation]
     app_core_backends[backends]
-    app_core_backends -->|35| app_core_circuit
-    app_core_backends -->|16| app_core_simulation
+    app_core_backends -->|41| app_core_circuit
+    app_core_backends -->|28| app_core_simulation
     app_core_backends -->|2| app_core_spice
-    app_core_circuit -->|5| app_core_spice
-    app_core_simulation -->|45| app_core_circuit
+    app_core_circuit -->|6| app_core_spice
+    app_core_simulation -->|61| app_core_circuit
     app_core_simulation -->|2| app_core_spice
 ```
 
@@ -66,8 +66,8 @@ flowchart TD
     app_gui_windows[windows]
     app_gui_root[root]
     app_gui_analysis -->|5| app_gui_base
-    app_gui_analysis -->|3| app_gui_results
-    app_gui_analysis -->|7| app_gui_schematic
+    app_gui_analysis -->|6| app_gui_results
+    app_gui_analysis -->|8| app_gui_schematic
     app_gui_canvas -->|1| app_gui_base
     app_gui_overlays -->|1| app_gui_analysis
     app_gui_overlays -->|8| app_gui_base
@@ -75,7 +75,7 @@ flowchart TD
     app_gui_overlays -->|14| app_gui_results
     app_gui_overlays -->|5| app_gui_schematic
     app_gui_overlays -->|6| app_gui_ui_elements
-    app_gui_plots -->|9| app_gui_base
+    app_gui_plots -->|10| app_gui_base
     app_gui_plots -->|10| app_gui_results
     app_gui_plots -->|8| app_gui_schematic
     app_gui_results -->|2| app_gui_base
@@ -93,12 +93,12 @@ flowchart TD
     app_gui_ui_elements -->|7| app_gui_base
     app_gui_ui_elements -->|2| app_gui_canvas
     app_gui_windows -->|11| app_gui_analysis
-    app_gui_windows -->|50| app_gui_base
+    app_gui_windows -->|55| app_gui_base
     app_gui_windows -->|3| app_gui_canvas
     app_gui_windows -->|3| app_gui_overlays
-    app_gui_windows -->|51| app_gui_plots
-    app_gui_windows -->|36| app_gui_results
-    app_gui_windows -->|106| app_gui_schematic
+    app_gui_windows -->|54| app_gui_plots
+    app_gui_windows -->|40| app_gui_results
+    app_gui_windows -->|109| app_gui_schematic
     app_gui_windows -->|3| app_gui_ui_elements
 ```
 

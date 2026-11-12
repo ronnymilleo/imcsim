@@ -9,7 +9,10 @@
 #include "plots/plot_figures.h"
 #include "plots/statistics_table.h"
 #include "results/trace_statistics.h"
+#include "windows/output_tabs/cursor_widgets.h"
 #include "windows/output_tabs/plot_widgets.h"
+#include "windows/output_tabs/statistics_widgets.h"
+#include "windows/output_tabs/step_widgets.h"
 #include <cmath>
 #include <format>
 #include <optional>

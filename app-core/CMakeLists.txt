@@ -7,12 +7,18 @@ add_library(imcsim-core-lib
             backends/ngspice/ngspice_backend.cpp
             backends/ngspice/ngspice_library.cpp
             backends/ngspice/ngspice_readers.cpp
+            backends/ngspice/ngspice_readers_ac.cpp
+            backends/ngspice/ngspice_readers_noise.cpp
+            backends/ngspice/ngspice_readers_small_signal.cpp
+            backends/ngspice/ngspice_vectors.cpp
             backends/nodalys/compiler.cpp
             backends/nodalys/model_parser.cpp
             backends/nodalys/nodalys_backend.cpp
             backends/nodalys/parameter_conversion.cpp
             circuit/behavioral_expression.cpp
             circuit/circuit.cpp
+            circuit/circuit_currents.cpp
+            circuit/circuit_netlist.cpp
             circuit/components/behavioral_source.cpp
             circuit/components/bjt.cpp
             circuit/components/capacitor.cpp
@@ -44,6 +50,8 @@ add_library(imcsim-core-lib
             circuit/components/voltage_source.cpp
             circuit/library_model.cpp
             circuit/spice_library.cpp
+            simulation/analysis_checks.cpp
+            simulation/analysis_sources.cpp
             simulation/analysis_suggestions.cpp
             simulation/circuit_checks.cpp
             simulation/circuit_copy.cpp

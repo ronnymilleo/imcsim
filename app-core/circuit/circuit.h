@@ -98,6 +98,7 @@ private:
 std::vector<const Component *> CollectParts(const Circuit &circuit);
 
 // Current probes
+bool HasBranchCurrent(ComponentType type);
 std::vector<CurrentProbe> GetCurrentProbes(const Component &component);
 std::string GetCurrentProbeName(const Component &component, std::string_view label);
 std::string GetCurrentName(const Component &component, std::string_view label);

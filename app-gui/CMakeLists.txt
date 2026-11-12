@@ -6,8 +6,11 @@ add_library(imcsim-gui-lib
         STATIC
             analysis/analysis_controls.cpp
             analysis/analysis_inputs.cpp
+            analysis/analysis_runs_repeatable.cpp
+            analysis/analysis_runs_single.cpp
             analysis/analysis_settings_panel.cpp
             analysis/auto_rerun.cpp
+            analysis/run_jobs.cpp
             analysis/run_status.cpp
             application.cpp
             base/file_dialog.cpp
@@ -31,9 +34,13 @@ add_library(imcsim-gui-lib
             plots/logic_buses.cpp
             plots/math_channels.cpp
             plots/plot_export.cpp
+            plots/plot_export_csv.cpp
+            plots/plot_export_smith.cpp
+            plots/plot_export_style.cpp
             plots/plot_exporter.cpp
             plots/plot_figures.cpp
             plots/plot_helpers.cpp
+            plots/plot_ticks.cpp
             plots/s_parameter_view.cpp
             plots/smith_chart.cpp
             plots/spectrum.cpp
@@ -146,6 +153,7 @@ add_library(imcsim-gui-lib
             windows/mode_input.cpp
             windows/netlist_window.cpp
             windows/output_tabs/ac_sweep_tab.cpp
+            windows/output_tabs/cursor_widgets.cpp
             windows/output_tabs/dc_sweep_tab.cpp
             windows/output_tabs/harmonic_balance_tab.cpp
             windows/output_tabs/monte_carlo_tab.cpp
@@ -157,6 +165,8 @@ add_library(imcsim-gui-lib
             windows/output_tabs/result_tables.cpp
             windows/output_tabs/s_parameter_tab.cpp
             windows/output_tabs/spectrum_tab.cpp
+            windows/output_tabs/statistics_widgets.cpp
+            windows/output_tabs/step_widgets.cpp
             windows/output_tabs/transient_tab.cpp
             windows/output_window.cpp
             windows/part_editor.cpp
