@@ -13,6 +13,7 @@ add_executable(imcsim-tests
             circuit_copy_tests.cpp
             circuit_snapshot_tests.cpp
             behavioral_expression_tests.cpp
+            block_definitions_tests.cpp
             block_nesting_tests.cpp
             canvas_view_tests.cpp
             clipboard_tests.cpp
@@ -100,6 +101,8 @@ add_executable(imcsim-tests
             truth_table_tests.cpp
             ui_element_tests.cpp
             ui_wire_tests.cpp
+            undo_history_tests.cpp
+            voltage_probes_tests.cpp
             wire_editing_tests.cpp
             nodalys_benchmark_tests.cpp
             wire_routing_tests.cpp

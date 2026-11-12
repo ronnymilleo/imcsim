@@ -57,6 +57,7 @@ add_library(imcsim-gui-lib
             results/trace_statistics.cpp
             results/transient_window.cpp
             results/truth_table.cpp
+            schematic/block_definitions.cpp
             schematic/block_nesting.cpp
             schematic/block_wiring.cpp
             schematic/canvas_view.cpp
@@ -65,6 +66,14 @@ add_library(imcsim-gui-lib
             schematic/editor_mode.cpp
             schematic/element_factory.cpp
             schematic/examples.cpp
+            schematic/file_elements.cpp
+            schematic/file_json.cpp
+            schematic/file_library_models.cpp
+            schematic/file_measurements.cpp
+            schematic/file_part_fields.cpp
+            schematic/file_settings.cpp
+            schematic/file_subcircuits.cpp
+            schematic/file_wires.cpp
             schematic/group_editing.cpp
             schematic/live_input.cpp
             schematic/logic_bus_definition.cpp
@@ -83,6 +92,8 @@ add_library(imcsim-gui-lib
             schematic/simulation_settings.cpp
             schematic/spice_import.cpp
             schematic/subcircuit_pins.cpp
+            schematic/undo_history.cpp
+            schematic/voltage_probes.cpp
             schematic/wire_editing.cpp
             schematic/wire_routing.cpp
             ui_elements/ui_behavioral_source.cpp

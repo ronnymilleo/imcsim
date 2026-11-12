@@ -7,12 +7,15 @@
 #define IMCSIM_SCHEMATIC_H
 
 #include "base/helpers.h"
+#include "schematic/block_definitions.h"
 #include "schematic/circuit_listener.h"
 #include "schematic/connectivity.h"
 #include "schematic/logic_bus_definition.h"
 #include "schematic/math_channel_definition.h"
 #include "schematic/schematic_file.h"
 #include "schematic/simulation_settings.h"
+#include "schematic/undo_history.h"
+#include "schematic/voltage_probes.h"
 #include "simulation/live_change.h"
 #include "simulation/simulator.h"
 #include "ui_elements/ui_element.h"
@@ -53,15 +56,8 @@ namespace GUI {
  */
 class Schematic {
 public:
-    /**
-     * @struct  SubcircuitPinCandidate
-     * @brief   A pin marker that can become a pin of a block: where it sits and the name it suggests.
-     * @details The name is the marker's own, or P1, P2... for an unnamed marker.
-     */
-    struct SubcircuitPinCandidate {
-        GridPoint Point;
-        std::string SuggestedName;
-    };
+    /// A pin marker that can become a pin of a block, as BlockDefinitions finds it.
+    using SubcircuitPinCandidate = GUI::SubcircuitPinCandidate;
 
     Schematic();
     Schematic(const Schematic &) = delete;
@@ -189,18 +185,6 @@ private:
     /// Changes with every change of the selection, so windows can tell even when an index is reused.
     std::size_t m_SelectionVersion = 0;
 
-    /**
-     * @struct  VoltageProbe
-     * @brief   A measured node, kept by the points of the node because its number changes with any edit.
-     * @details Node is the number the probe has in the nodes as last built, or none while the points belong to no
-     *          node a plot can show, such as while the net is joined to ground; the points stay, so the probe comes
-     *          back when they are a node again.
-     */
-    struct VoltageProbe {
-        std::vector<GridPoint> Points;
-        std::optional<int> Node;
-    };
-
     // Measurements
     /// Probes on nodes.
     std::vector<VoltageProbe> m_VoltageProbes;
@@ -251,19 +235,13 @@ private:
     /// Changes of the parts of the live run that it has not taken yet.
     std::vector<Core::LiveChange> m_LiveChanges;
 
-    // History, as whole schematics saved to text: simple and always consistent, at the cost of some memory
-    std::string m_CurrentSnapshot;
-    std::string m_SavedSnapshot;
-    std::vector<std::string> m_UndoSnapshots;
-    std::vector<std::string> m_RedoSnapshots;
-    /// Set by every change and cleared by CommitUndoStep(), so unchanged frames skip taking a snapshot.
-    bool m_ChangedSinceCommit = false;
+    // History
+    UndoHistory m_History;
 
     // Derived data, dropped on every change: nodes are rebuilt on first use
     std::optional<Connectivity> m_Connectivity;
 
     void InvalidateDerivedData();
-    void FollowVoltageProbes();
     void RefreshInstances(const SavedSubcircuit &definition, const std::vector<std::string> &old_names,
                           const std::vector<std::optional<std::size_t>> &matches);
     void WireNewBlock(const std::vector<GridPoint> &old_points);
