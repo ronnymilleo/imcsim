@@ -68,8 +68,13 @@ public:
             return std::nullopt;
         }
         const std::string source = input == InputKind::STANDARD_INPUT ? "- < " + Quote(input_path) : Quote(input_path);
-        const std::string command =
+        std::string command =
             std::format("{} {} -o {} {}", Quote(NODALYS_CLI_PATH), arguments, Quote(output_path), source);
+#ifdef _WIN32
+        // cmd drops the first and the last quote of a line that starts with one and holds more than two, which
+        // would leave the program path cut at its first space; an outer pair is what it drops instead
+        command = "\"" + command + "\"";
+#endif
         if (std::system(command.c_str()) != 0 || !std::filesystem::exists(output_path)) {
             return std::nullopt;
         }
@@ -510,7 +515,7 @@ TEST_CASE("Simulation results export to RAW, CSV, and JSON formats", "[nodalys][
     }
 
     SECTION("SaveStringToFile") {
-        const std::string temp_path = "/tmp/nodalys_test_export.csv";
+        const std::string temp_path = (std::filesystem::temp_directory_path() / "nodalys_test_export.csv").string();
         const std::string csv_content = Nodalys::ExportCsv(*op);
         CHECK(Nodalys::SaveStringToFile(temp_path, csv_content));
         CHECK(std::filesystem::exists(temp_path));
