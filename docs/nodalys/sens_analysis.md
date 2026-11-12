@@ -3,8 +3,8 @@
 **Implementation files:**
 - [`nodalys/src/analyses/sens_analysis.cpp`](../../nodalys/src/analyses/sens_analysis.cpp) (`ComputeSensitivity`)
 - [`nodalys/src/mna/mna_system.cpp`](../../nodalys/src/mna/mna_system.cpp) (`MnaSystem::SolveTranspose`)
-- [`app-core/nodalys/compiler.cpp`](../../app-core/nodalys/compiler.cpp) (`CompileCircuit`)
-- [`app-core/nodalys/nodalys_backend.cpp`](../../app-core/nodalys/nodalys_backend.cpp) (`NodalysBackend::RunSensitivity`)
+- [`app-core/backends/nodalys/compiler.cpp`](../../app-core/backends/nodalys/compiler.cpp) (`CompileCircuit`)
+- [`app-core/backends/nodalys/nodalys_backend.cpp`](../../app-core/backends/nodalys/nodalys_backend.cpp) (`NodalysBackend::RunSensitivity`)
 - [`nodalys/tests/sens_analysis_tests.cpp`](../../nodalys/tests/sens_analysis_tests.cpp)
 - [`tests/backend_comparison_tests.cpp`](../../tests/backend_comparison_tests.cpp) (`Both backends agree on small-signal DC sensitivity analysis`)
 - [`tests/nodalys_benchmark_tests.cpp`](../../tests/nodalys_benchmark_tests.cpp) (`Nodalys outperforms ngspice on DC sensitivity via single-solve adjoint method`)

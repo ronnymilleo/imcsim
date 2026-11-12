@@ -3,7 +3,7 @@
 **Implementation files:**
 - [`nodalys/src/linear/qz.h`](../../nodalys/src/linear/qz.h) / [`qz.cpp`](../../nodalys/src/linear/qz.cpp) (`ComputeGeneralizedEigenvalues`)
 - [`nodalys/src/analyses/pz_analysis.cpp`](../../nodalys/src/analyses/pz_analysis.cpp) (`ComputePoleZero`)
-- [`app-core/nodalys/nodalys_backend.cpp`](../../app-core/nodalys/nodalys_backend.cpp) (`NodalysBackend::RunPoleZero`)
+- [`app-core/backends/nodalys/nodalys_backend.cpp`](../../app-core/backends/nodalys/nodalys_backend.cpp) (`NodalysBackend::RunPoleZero`)
 - [`tests/backend_comparison_tests.cpp`](../../tests/backend_comparison_tests.cpp) (`Both backends agree on small-signal pole-zero analysis`)
 - [`tests/nodalys_benchmark_tests.cpp`](../../tests/nodalys_benchmark_tests.cpp) (`Twin-T Notch Filter`)
 

@@ -6,7 +6,7 @@
 - [`nodalys/include/nodalys/analyses.h`](../../nodalys/include/nodalys/analyses.h) (`HarmonicBalanceConfig`) and [`nodalys/include/nodalys/results.h`](../../nodalys/include/nodalys/results.h) (`HarmonicBalanceResult`)
 - [`nodalys/src/parser/netlist_parser.cpp`](../../nodalys/src/parser/netlist_parser.cpp) (`.hb` directive)
 - [`nodalys/src/cli/main.cpp`](../../nodalys/src/cli/main.cpp) (`-a hb`) and [`nodalys/src/export/`](../../nodalys/src/export/) (`csv_exporter.cpp`, `json_exporter.cpp`, `raw_exporter.cpp`)
-- [`app-core/nodalys/nodalys_backend.cpp`](../../app-core/nodalys/nodalys_backend.cpp) (`NodalysBackend::RunHarmonicBalance` — exclusive to Nodalys in `imcsim`)
+- [`app-core/backends/nodalys/nodalys_backend.cpp`](../../app-core/backends/nodalys/nodalys_backend.cpp) (`NodalysBackend::RunHarmonicBalance` — exclusive to Nodalys in `imcsim`)
 - [`app-gui/analysis/harmonic_balance_view.cpp`](../../app-gui/analysis/harmonic_balance_view.cpp) and [`app-gui/windows/output_tabs/harmonic_balance_tab.cpp`](../../app-gui/windows/output_tabs/harmonic_balance_tab.cpp)
 - [`nodalys/tests/fft_tests.cpp`](../../nodalys/tests/fft_tests.cpp) and [`nodalys/tests/hb_analysis_tests.cpp`](../../nodalys/tests/hb_analysis_tests.cpp)
 
