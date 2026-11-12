@@ -5,6 +5,7 @@
 
 #include "nodalys/exporters.h"
 
+#include <algorithm>
 #include <format>
 #include <numbers>
 #include <sstream>
