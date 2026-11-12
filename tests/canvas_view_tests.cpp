@@ -47,3 +47,13 @@ TEST_CASE("The first canvas size leaves the view where it was", "[canvas_view]")
     CHECK(after.x == before.x);
     CHECK(after.y == before.y);
 }
+
+TEST_CASE("The dots of the grid are thinned out by powers of two once they come closer than eight pixels",
+          "[canvas_view]") {
+    CHECK(GUI::GetGridStep(20.0f) == 1);
+    CHECK(GUI::GetGridStep(8.0f) == 1);
+    CHECK(GUI::GetGridStep(7.9f) == 2);
+    CHECK(GUI::GetGridStep(4.0f) == 2);
+    CHECK(GUI::GetGridStep(3.9f) == 4);
+    CHECK(GUI::GetGridStep(1.0f) == 8);
+}

@@ -15,8 +15,10 @@
 #include "overlays/schematic_overlays.h"
 #include "results/playback.h"
 #include "results/result_store.h"
+#include "schematic/block_session.h"
 #include "schematic/canvas_view.h"
 #include "schematic/clipboard.h"
+#include "schematic/editor_command.h"
 #include "schematic/editor_mode.h"
 #include "schematic/examples.h"
 #include "schematic/preferences.h"
@@ -27,9 +29,13 @@
 #include "schematic/wire_editing.h"
 #include "ui_elements/ui_element.h"
 #include "windows/app_window.h"
+#include "windows/editor_context_menu.h"
+#include "windows/editor_menus.h"
 #include "windows/editor_toolbar.h"
+#include "windows/live_input_handler.h"
 #include "windows/part_editor.h"
 #include "windows/part_picker.h"
+#include "windows/part_popover.h"
 #include "windows/part_rail.h"
 #include "windows/spice_block_dialog.h"
 #include <cstddef>
@@ -51,9 +57,10 @@ namespace GUI {
  *          from the EditorToolbar, their keys, or the PartPicker that Space opens, which only ask for them; a status
  *          bar lists the keys of each mode.
  * Schematics are saved to and opened from JSON files by its SchematicFileActions, the colors of a result are drawn by
- * its SchematicOverlays, and where it looks is kept by its CanvasView. The root schematic belongs to the application.
- * While a subcircuit is open, this window edits a temporary document and applies it back to the root as one undo step;
- * it otherwise keeps interaction state such as the current mode and drag.
+ * its SchematicOverlays, and where it looks is kept by its CanvasView. The blocks it has open are a BlockSession, and
+ * the input of each mode, the menus, the properties popover and the context menu live in modules of their own. The root
+ * schematic belongs to the application. While a subcircuit is open, this window edits a temporary document and applies
+ * it back to the root as one undo step; it otherwise keeps interaction state such as the current mode and drag.
  */
 class EditorWindow : public AppWindow {
 public:
@@ -92,59 +99,14 @@ private:
         double To = 0.0;
     };
 
-    /**
-     * @struct  OpenBlock
-     * @brief   A block whose contents the editor opened, on the way down from the schematic.
-     * @details Pins and Parameters hold its settings while a block inside it is open; the innermost block keeps them in
-     *          the dialog fields instead.
-     */
-    struct OpenBlock {
-        std::string Name;
-        std::unique_ptr<Schematic> Content;
-        std::vector<SavedSubcircuitPin> Pins;
-        std::vector<Core::SubcircuitParameter> Parameters;
-    };
-
-    /**
-     * @enum    EditorCommand
-     * @brief   A command picked in a menu, run by the next Draw() so its popups belong to the editor window.
-     */
-    enum class EditorCommand {
-        NEW,
-        OPEN,
-        SAVE,
-        SAVE_AS,
-        IMPORT,
-        IMPORT_SPICE,
-        EXPORT_SCHEMATIC,
-        UNDO,
-        REDO,
-        ROTATE,
-        MIRROR,
-        FLIP,
-        ROTATE_KEEP_WIRES,
-        MIRROR_KEEP_WIRES,
-        FLIP_KEEP_WIRES,
-        CUT,
-        COPY,
-        PASTE,
-        SELECT_ALL,
-        DELETE_SELECTION
-    };
-
     Schematic &m_RootSchematic;
     Schematic *m_Schematic;
     /// The results of the root schematic, the only one an analysis runs on.
     const ResultStore &m_RootResults;
     /// What the editor shows of the results while a block is open: none, since a block has no run of its own.
     const ResultStore m_NoResults{};
-    /// The blocks open, from the outermost to the one shown; empty while the schematic is shown.
-    std::vector<OpenBlock> m_OpenBlocks;
-    std::vector<SavedSubcircuitPin> m_SubcircuitPins;
-    std::vector<Core::SubcircuitParameter> m_SubcircuitParameters;
-    std::string m_SubcircuitName;
-    std::string m_SubcircuitError;
-    bool m_SubcircuitDialogRequested = false;
+    /// The blocks open, from the outermost to the one shown, and the settings of the dialog that edits them.
+    BlockSession m_Blocks;
     /// Imports SPICE libraries and sets up the pins of the blocks they become.
     SpiceBlockDialog m_SpiceDialog;
     AnalysisControls &m_Controls;
@@ -166,21 +128,12 @@ private:
     EditorMode m_Mode;
     /// Whether wires go up or down before they turn, kept from one wire to the next.
     bool m_WireVerticalFirst = false;
-    /// Live runs: the push button the mouse holds down.
-    std::optional<std::size_t> m_HeldButton;
-
-    // Properties popover
-    /// The point the middle of the top edge of the popover opens on.
-    ImVec2 m_PartPopoverAnchor = {0.0f, 0.0f};
-    /// The middle of the canvas on screen, as drawn last.
-    ImVec2 m_CanvasCenter = {0.0f, 0.0f};
-    /// The top edge of the canvas on screen, as drawn last.
-    float m_CanvasTop = 0.0f;
-    /// Whether a menu asked to open the popover.
-    bool m_PartPopoverRequested = false;
-    // Context menu
-    /// What the right click was on, for the measure item of the context menu.
-    std::optional<MeasurementTarget> m_ContextTarget;
+    /// Live runs: what the mouse does to the parts set by hand, and the push button it holds.
+    LiveInputHandler m_Live;
+    /// Properties of the selected part, over the canvas.
+    PartPopover m_Popover;
+    /// What a right click opens.
+    EditorContextMenu m_ContextMenu;
     /// ImGui closes a popup on Esc before the frame starts, so the editor checks the last frame to leave that
     /// Esc alone.
     bool m_PopupOpenLastFrame = false;
@@ -194,52 +147,22 @@ private:
     void HandleModeKeys();
     void ApplyToolbarRequest(ToolbarRequest request);
     std::optional<TimeSpan> GetWindowSpan() const;
-    void DrawShownInstant(ImDrawList *draw_list, ImVec2 origin) const;
-    void DrawBlockBar(ImVec2 origin);
-    void DrawStatusBar(const ViewTransform &view, bool hovered);
-    std::optional<MeasurementTarget> FindTargetAt(const ViewTransform &view) const;
+    std::optional<double> GetShownInstant() const;
 
     // Modes
     void SetMode(EditorMode mode);
-    SelectingMode *GetSelecting();
-    bool IsDragging() const;
-    void StopEditing();
 
     // Blocks
     bool IsEditingSubcircuit() const;
     const ResultStore &GetShownResults() const;
     bool LeaveSubcircuitForDocument();
     bool ReturnToLevel(std::size_t depth);
-    void ShowSchematic(Schematic &schematic);
-    bool CanPlaceBlock(std::string_view name) const;
-    std::vector<const SavedSubcircuit *> ListPlaceableBlocks() const;
-    void SyncOpenBlockDefinitions();
+    void ShowSchematic();
     void OfferBlockParameters();
-    void RequestCreateSubcircuit();
     void RequestEditSelectedSubcircuit();
-    bool SyncSubcircuitPins();
-    bool ApplySubcircuitPinNames();
     void FinishSubcircuitEditing(bool apply);
-    void DrawSubcircuitDialog();
-    void DrawSubcircuitPinRows(bool editing);
-    void DrawSubcircuitParameterRows();
-    void DrawSubcircuitDialogButtons(bool editing);
+    void RunBlockMenuChoice(BlockMenuChoice choice);
     void ApplySpiceBlockResult(SpiceBlockResult result);
-
-    // Input of each mode, after the schematic is drawn; each returns the mode to switch to, or none
-    std::optional<EditorMode> HandleMode(SelectingMode &mode, SchematicCanvas &canvas, const ViewTransform &view,
-                                         bool hovered);
-    std::optional<EditorMode> HandleMode(PlacingMode &mode, SchematicCanvas &canvas, const ViewTransform &view,
-                                         bool hovered);
-    std::optional<EditorMode> HandleMode(WiringMode &mode, SchematicCanvas &canvas, const ViewTransform &view,
-                                         bool hovered);
-    std::optional<EditorMode> HandleMode(ProbingMode &mode, SchematicCanvas &canvas, const ViewTransform &view,
-                                         bool hovered);
-    std::optional<EditorMode> HandleMode(PastingMode &mode, SchematicCanvas &canvas, const ViewTransform &view,
-                                         bool hovered);
-    bool HandlePastingKeys(PastedGroup &group);
-    void PlacePastedGroup(PastedGroup &group);
-    std::string FindLastNet() const;
 
     // Clipboard
     void HandleClipboardShortcuts();
@@ -250,26 +173,11 @@ private:
 
     // Selection and dragging
     void HandleSelection(const ViewTransform &view, bool hovered);
-    void ApplySelection(const Selection &selection);
-    void ClearSelection();
-    void SelectAll();
-    GroupDrag MakeDrag(GridPoint cursor, std::optional<Selection> collapse_to) const;
-    void UpdateDrag(GridPoint cursor);
-    void EndDrag();
-    void DrawSelectionBox(ImDrawList *draw_list, const ViewTransform &view) const;
-    void TransformSelection(PointTransform::Kind kind, bool keep_wires);
-
-    // Live runs
-    std::optional<std::size_t> FindLivePart(const ViewTransform &view) const;
-    bool HandleLiveInput(std::optional<std::size_t> live_part);
-    void ReleaseHeldButton();
-
-    // Properties popover and context menu
-    void PlacePartPopover();
-    void HandleValueTyping(const ViewTransform &view);
-    void DrawPartPopover();
-    void HandleContextMenu(const ViewTransform &view, bool hovered);
-    void DrawContextMenu();
+    void HandleSelectionClick(SelectingMode &selecting, ImVec2 cursor_world);
+    void HandleSelectionDoubleClick();
+    void UpdateSelectionBox(SelectingMode &selecting, ImVec2 cursor_world);
+    void UpdateSelectionDrag(SelectingMode &selecting, ImVec2 cursor_world);
+    void HandleSelectionKeys(const SelectingMode &selecting);
 
     // Menu commands and shortcuts
     void HandleGlobalShortcuts();
@@ -280,8 +188,6 @@ private:
     bool RunClipboardCommand(EditorCommand command);
     void RunEditCommand(EditorCommand command);
     void RunTurnCommand(EditorCommand command);
-    void DrawTurnMenuItems(bool part_selected);
-    void DrawBlockMenuItems();
 };
 
 } // namespace GUI

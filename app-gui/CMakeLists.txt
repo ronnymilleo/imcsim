@@ -8,6 +8,7 @@ add_library(imcsim-gui-lib
             analysis/analysis_inputs.cpp
             analysis/analysis_settings_panel.cpp
             analysis/auto_rerun.cpp
+            analysis/run_status.cpp
             application.cpp
             base/file_dialog.cpp
             base/helpers.cpp
@@ -59,10 +60,12 @@ add_library(imcsim-gui-lib
             results/truth_table.cpp
             schematic/block_definitions.cpp
             schematic/block_nesting.cpp
+            schematic/block_session.cpp
             schematic/block_wiring.cpp
             schematic/canvas_view.cpp
             schematic/clipboard.cpp
             schematic/connectivity.cpp
+            schematic/editor_command.cpp
             schematic/editor_mode.cpp
             schematic/element_factory.cpp
             schematic/examples.cpp
@@ -81,6 +84,8 @@ add_library(imcsim-gui-lib
             schematic/parameter_step_settings.cpp
             schematic/part_catalog.cpp
             schematic/part_names.cpp
+            schematic/part_properties.cpp
+            schematic/placement_editing.cpp
             schematic/preferences.cpp
             schematic/probing.cpp
             schematic/ready_blocks.cpp
@@ -89,6 +94,7 @@ add_library(imcsim-gui-lib
             schematic/schematic_file.cpp
             schematic/schematic_file_actions.cpp
             schematic/selection.cpp
+            schematic/selection_editing.cpp
             schematic/simulation_settings.cpp
             schematic/spice_import.cpp
             schematic/subcircuit_pins.cpp
@@ -128,9 +134,16 @@ add_library(imcsim-gui-lib
             ui_elements/ui_voltage_source.cpp
             ui_elements/ui_wire.cpp
             windows/app_window.cpp
+            windows/block_dialog.cpp
             windows/dock_layout.cpp
+            windows/editor_canvas_drawing.cpp
+            windows/editor_context_menu.cpp
+            windows/editor_menus.cpp
+            windows/editor_status_bar.cpp
             windows/editor_toolbar.cpp
             windows/editor_window.cpp
+            windows/live_input_handler.cpp
+            windows/mode_input.cpp
             windows/netlist_window.cpp
             windows/output_tabs/ac_sweep_tab.cpp
             windows/output_tabs/dc_sweep_tab.cpp
@@ -147,7 +160,16 @@ add_library(imcsim-gui-lib
             windows/output_tabs/transient_tab.cpp
             windows/output_window.cpp
             windows/part_editor.cpp
+            windows/part_editor_blocks.cpp
+            windows/part_editor_dependent_sources.cpp
+            windows/part_editor_electromechanical.cpp
+            windows/part_editor_logic.cpp
+            windows/part_editor_models.cpp
+            windows/part_editor_passives.cpp
+            windows/part_editor_sources.cpp
+            windows/part_fields.cpp
             windows/part_picker.cpp
+            windows/part_popover.cpp
             windows/part_rail.cpp
             windows/preferences_window.cpp
             windows/properties_window.cpp

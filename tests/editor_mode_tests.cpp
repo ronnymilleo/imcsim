@@ -4,6 +4,8 @@
  */
 
 #include "schematic/editor_mode.h"
+#include "schematic/element_factory.h"
+#include "schematic/schematic.h"
 #include "test_printers.h"
 #include <catch2/catch_test_macros.hpp>
 #include <string>
@@ -89,4 +91,18 @@ TEST_CASE("Esc first drops the wire in progress, then leaves wire mode", "[edito
     CHECK_FALSE(GUI::StopWire(mode));
     CHECK_FALSE(mode.Start);
     CHECK(GUI::StopWire(mode));
+}
+
+TEST_CASE("The status hint is that of the mode, or that of the selection while selecting", "[editor_mode]") {
+    GUI::Schematic schematic;
+    CHECK(GUI::DescribeEditorHint(GUI::ProbingMode{}, schematic, false).starts_with("Probe:"));
+    CHECK(GUI::DescribeEditorHint(GUI::SelectingMode{}, schematic, false).starts_with("Click a part or wire"));
+    CHECK(GUI::DescribeEditorHint(GUI::SelectingMode{}, schematic, true).starts_with("Live:"));
+
+    schematic.AddElement(GUI::CreateElement(Core::ComponentType::RESISTOR, {0, 0}, GUI::Rotation::R0));
+    schematic.SelectElement(0);
+    // A part without a name is told by its kind, and a named one by its name
+    CHECK(GUI::DescribeEditorHint(GUI::SelectingMode{}, schematic, false).starts_with("R"));
+    schematic.GetElement(0).GetComponent().SetName("R7");
+    CHECK(GUI::DescribeEditorHint(GUI::SelectingMode{}, schematic, false).starts_with("R7 selected:"));
 }

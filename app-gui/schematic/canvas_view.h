@@ -46,6 +46,9 @@ private:
     std::optional<ImVec2> m_CanvasSize;
 };
 
+// Grid
+int GetGridStep(float zoom);
+
 } // namespace GUI
 
 #endif // IMCSIM_CANVAS_VIEW_H

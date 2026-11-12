@@ -17,6 +17,9 @@
 
 namespace GUI {
 
+/// How close, in pixels, the cursor must be to a wire to select it.
+inline constexpr float WIRE_PICK_DISTANCE = 5.0f;
+
 /**
  * @struct  Selection
  * @brief   Elements and wires picked, by index into the lists they came from.

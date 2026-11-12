@@ -21,6 +21,8 @@
 
 namespace GUI {
 
+class Schematic;
+
 /**
  * @struct  GroupDrag
  * @brief   Schematic state captured when a drag of the selection starts; every frame of the drag is computed from it.
@@ -106,6 +108,7 @@ std::optional<Core::ComponentType> GetPlacingType(const EditorMode &mode);
 std::optional<std::string> DescribeMode(const EditorMode &mode);
 std::string DescribeSelecting(bool is_live, const std::optional<std::string> &selected_part,
                               std::size_t selected_count);
+std::string DescribeEditorHint(const EditorMode &mode, Schematic &schematic, bool is_live);
 
 // Placing
 void TurnPlacement(PlacingMode &mode);

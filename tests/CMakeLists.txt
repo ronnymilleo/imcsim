@@ -9,6 +9,7 @@ add_executable(imcsim-tests
             analysis_inputs_tests.cpp
             analysis_suggestions_tests.cpp
             auto_rerun_tests.cpp
+            block_session_tests.cpp
             circuit_checks_tests.cpp
             circuit_copy_tests.cpp
             circuit_snapshot_tests.cpp
@@ -21,6 +22,7 @@ add_executable(imcsim-tests
             circuit_tests.cpp
             component_tests.cpp
             connectivity_tests.cpp
+            editor_command_tests.cpp
             editor_mode_tests.cpp
             element_factory_tests.cpp
             current_flow_tests.cpp
@@ -48,6 +50,10 @@ add_executable(imcsim-tests
             nodalys_backend_tests.cpp
             nonlinear_tests.cpp
             op_amp_tests.cpp
+            part_properties_tests.cpp
+            placement_editing_tests.cpp
+            run_status_tests.cpp
+            selection_editing_tests.cpp
             switches_tests.cpp
             parameter_conversion_tests.cpp
             parameter_step_settings_tests.cpp

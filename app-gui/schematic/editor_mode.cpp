@@ -6,6 +6,8 @@
 #include "schematic/editor_mode.h"
 
 #include "schematic/element_factory.h"
+#include "schematic/part_names.h"
+#include "schematic/schematic.h"
 #include <format>
 #include <utility>
 
@@ -87,6 +89,28 @@ std::string DescribeSelecting(const bool is_live, const std::optional<std::strin
     }
     return "Click a part or wire to select it, drag to select an area, middle drag to pan, wheel to zoom, Space find a "
            "part, W wire, P probe";
+}
+
+/**
+ * @brief   The hint of the status bar for the editor as it is: that of the mode, or, while selecting, that of the
+ *          selection.
+ * @param[in]     mode       The mode of the editor.
+ * @param[in,out] schematic  Schematic on show, whose selection names the part the hint talks about.
+ * @param[in]     is_live    Whether a live run goes on.
+ * @return  The hint to show.
+ */
+std::string DescribeEditorHint(const EditorMode &mode, Schematic &schematic, const bool is_live) {
+    if (std::optional<std::string> mode_hint = DescribeMode(mode)) {
+        return std::move(*mode_hint);
+    }
+    std::optional<std::string> selected_part;
+    if (const UIElement *element = schematic.GetSelectedElement()) {
+        const Core::Component &component = element->GetComponent();
+        selected_part =
+            component.GetName().empty() ? std::string(GetPartName(component.GetType())) : component.GetName();
+    }
+    const std::size_t count = schematic.GetSelectedElements().size() + schematic.GetSelectedWires().size();
+    return DescribeSelecting(is_live, selected_part, count);
 }
 
 /**

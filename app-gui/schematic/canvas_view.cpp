@@ -18,6 +18,8 @@ constexpr float MAX_ZOOM = 200.0f;
 constexpr float ZOOM_STEP = 1.1f;
 /// Fit may zoom in this far on a small circuit; opening a file stops at the default zoom.
 constexpr float FIT_MAX_ZOOM = 50.0f;
+/// Below this spacing, in pixels, the dots of the grid are thinned out.
+constexpr float MIN_DOT_SPACING = 8.0f;
 
 } // namespace
 
@@ -106,6 +108,20 @@ ViewTransform CanvasView::GetTransform(const ImVec2 origin) const {
  */
 float CanvasView::GetZoom() const {
     return m_Zoom;
+}
+
+/**
+ * @brief   How many grid units apart the dots of the grid are drawn, so far zoom-out does not draw hundreds of
+ *          thousands of them.
+ * @param[in] zoom  Pixels per grid unit.
+ * @return  A power of two, 1 while the dots are at least MIN_DOT_SPACING pixels apart.
+ */
+int GetGridStep(const float zoom) {
+    int step = 1;
+    while (zoom * static_cast<float>(step) < MIN_DOT_SPACING) {
+        step *= 2;
+    }
+    return step;
 }
 
 } // namespace GUI
