@@ -6,9 +6,9 @@
 
 #include "editing/live_input.h"
 
-#include "components/logic_input.h"
-#include "components/potentiometer.h"
-#include "components/switch.h"
+#include "circuit/components/logic_input.h"
+#include "circuit/components/potentiometer.h"
+#include "circuit/components/switch.h"
 #include <algorithm>
 
 namespace GUI {

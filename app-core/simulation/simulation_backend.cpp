@@ -5,7 +5,7 @@
 
 #include "simulation/simulation_backend.h"
 
-#include "ngspice/ngspice_backend.h"
+#include "backends/ngspice/ngspice_backend.h"
 #include <format>
 #include <mutex>
 #include <utility>

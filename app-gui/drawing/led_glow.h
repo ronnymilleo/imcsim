@@ -6,7 +6,7 @@
 #ifndef IMCSIM_LED_GLOW_H
 #define IMCSIM_LED_GLOW_H
 
-#include "components/diode.h"
+#include "circuit/components/diode.h"
 #include "helpers.h"
 #include "simulation/simulator.h"
 #include "ui_elements/ui_element.h"

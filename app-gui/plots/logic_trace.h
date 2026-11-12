@@ -7,7 +7,7 @@
 #ifndef IMCSIM_LOGIC_TRACE_H
 #define IMCSIM_LOGIC_TRACE_H
 
-#include "model/circuit.h"
+#include "circuit/circuit.h"
 #include <span>
 #include <vector>
 

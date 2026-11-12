@@ -3,8 +3,8 @@
  * @brief   Tests for the shared schematic document: content, names, selection and modified state.
  */
 
-#include "components/net_label.h"
-#include "components/switch.h"
+#include "circuit/components/net_label.h"
+#include "circuit/components/switch.h"
 #include "document/examples.h"
 #include "document/schematic.h"
 #include "editing/element_factory.h"

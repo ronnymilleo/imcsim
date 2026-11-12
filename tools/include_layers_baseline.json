@@ -1,9 +1,5 @@
 [
-  "app-core/simulation/simulation_backend.cpp -> ngspice/ngspice_backend.h",
-  "app-core/spice/behavioral_expression.cpp -> components/net_label.h",
-  "app-core/spice/spice_library.cpp -> components/subcircuit.h",
-  "app-core/spice/spice_library.h -> model/library_model.h",
-  "app-core/spice/spice_library.h -> model/subcircuit.h",
+  "app-core/simulation/simulation_backend.cpp -> backends/ngspice/ngspice_backend.h",
   "app-gui/analysis/analysis_controls.cpp -> drawing/theme.h",
   "app-gui/analysis/analysis_inputs.h -> helpers.h",
   "app-gui/analysis/analysis_settings_panel.cpp -> drawing/theme.h",

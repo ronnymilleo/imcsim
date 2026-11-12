@@ -5,7 +5,7 @@
 
 #include "drawing/current_flow.h"
 
-#include "components/logic_part.h"
+#include "circuit/components/logic_part.h"
 #include <algorithm>
 #include <cmath>
 #include <cstdlib>

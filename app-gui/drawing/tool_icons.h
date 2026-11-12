@@ -6,7 +6,7 @@
 #ifndef IMCSIM_TOOL_ICONS_H
 #define IMCSIM_TOOL_ICONS_H
 
-#include "components/component.h"
+#include "circuit/components/component.h"
 #include "imgui.h"
 #include "ui_elements/ui_element.h"
 

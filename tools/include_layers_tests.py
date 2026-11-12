@@ -5,10 +5,11 @@ import unittest
 import include_layers as layers
 
 SOURCES = {
-    "app-core/spice/spice_value.h": '#include "model/circuit.h"\n',
-    "app-core/model/circuit.h": '#include "components/part.h"\n#include <vector>\n',
-    "app-core/components/part.h": '#include "model/circuit.h"\n',
-    "app-core/simulation/simulator.h": '#include "model/circuit.h"\n#include <nodalys/types.h>\n',
+    "app-core/spice/spice_value.h": '#include "circuit/circuit.h"\n',
+    "app-core/circuit/circuit.h": '#include "simulation/simulator.h"\n#include <vector>\n',
+    "app-gui/editing/wire.h": '#include "document/schematic.h"\n',
+    "app-gui/document/schematic.h": '#include "editing/wire.h"\n',
+    "app-core/simulation/simulator.h": '#include "circuit/circuit.h"\n#include <nodalys/types.h>\n',
     "app-gui/application.h": '#include "windows/main_window.h"\n#include "simulation/simulator.h"\n',
     "app-gui/windows/main_window.h": '#include "ui_elements/ui_part.h"\n',
     "app-gui/ui_elements/ui_part.h": '#include "helpers.h"\n',
@@ -30,33 +31,33 @@ class IncludeLayersTests(unittest.TestCase):
 
     def test_counts_includes_between_folders_and_skips_the_same_folder(self):
         edges = layers.count_edges(layers.build_includes(SOURCES))
-        self.assertEqual(edges[("app-core/model", "app-core/components")], 1)
-        self.assertEqual(edges[("app-core/components", "app-core/model")], 1)
-        self.assertNotIn(("app-core/model", "app-core/model"), edges)
+        self.assertEqual(edges[("app-gui/editing", "app-gui/document")], 1)
+        self.assertEqual(edges[("app-gui/document", "app-gui/editing")], 1)
+        self.assertNotIn(("app-gui/editing", "app-gui/editing"), edges)
 
     def test_an_include_that_goes_up_a_layer_is_a_violation(self):
         violations = layers.find_violations(layers.build_includes(SOURCES))
         keys = {item.key for item in violations}
-        self.assertIn("app-core/spice/spice_value.h -> model/circuit.h", keys)
+        self.assertIn("app-core/spice/spice_value.h -> circuit/circuit.h", keys)
         self.assertIn("app-gui/ui_elements/ui_part.h -> helpers.h", keys)
 
     def test_folders_in_the_same_layer_may_include_each_other(self):
         keys = {item.key for item in layers.find_violations(layers.build_includes(SOURCES))}
-        self.assertNotIn("app-core/model/circuit.h -> components/part.h", keys)
-        self.assertNotIn("app-core/components/part.h -> model/circuit.h", keys)
+        self.assertNotIn("app-gui/editing/wire.h -> document/schematic.h", keys)
+        self.assertNotIn("app-gui/document/schematic.h -> editing/wire.h", keys)
 
     def test_a_library_may_include_the_ones_below_it_but_not_above(self):
         sources = dict(SOURCES)
-        sources["app-core/model/circuit.h"] += '#include "windows/main_window.h"\n'
-        sources["nodalys/include/nodalys/types.h"] = '#include "model/circuit.h"\n'
+        sources["app-core/circuit/circuit.h"] += '#include "windows/main_window.h"\n'
+        sources["nodalys/include/nodalys/types.h"] = '#include "circuit/circuit.h"\n'
         keys = {item.key for item in layers.find_violations(layers.build_includes(sources))}
-        self.assertIn("app-core/model/circuit.h -> windows/main_window.h", keys)
-        self.assertIn("nodalys/include/nodalys/types.h -> model/circuit.h", keys)
+        self.assertIn("app-core/circuit/circuit.h -> windows/main_window.h", keys)
+        self.assertIn("nodalys/include/nodalys/types.h -> circuit/circuit.h", keys)
         self.assertNotIn("app-gui/application.h -> simulation/simulator.h", keys)
         self.assertNotIn("app-core/simulation/simulator.h -> nodalys/types.h", keys)
 
     def test_a_folder_without_a_layer_is_an_error(self):
-        sources = {"app-core/newfolder/a.h": '#include "model/circuit.h"\n', "app-core/model/circuit.h": ""}
+        sources = {"app-core/newfolder/a.h": '#include "circuit/circuit.h"\n', "app-core/circuit/circuit.h": ""}
         with self.assertRaises(KeyError):
             layers.find_violations(layers.build_includes(sources))
 
@@ -73,8 +74,8 @@ class IncludeLayersTests(unittest.TestCase):
         first = layers.render_diagram(layers.build_includes(SOURCES))
         second = layers.render_diagram(layers.build_includes(dict(reversed(list(SOURCES.items())))))
         self.assertEqual(first, second)
-        self.assertIn("app_core_spice -.->|1| app_core_model", first)
-        self.assertIn("app_core_simulation -->|1| app_core_model", first)
+        self.assertIn("app_core_spice -.->|1| app_core_circuit", first)
+        self.assertIn("app_core_simulation -->|1| app_core_circuit", first)
 
 
 if __name__ == "__main__":

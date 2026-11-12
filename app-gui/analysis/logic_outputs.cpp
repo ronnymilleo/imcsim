@@ -5,8 +5,8 @@
 
 #include "analysis/logic_outputs.h"
 
-#include "components/logic_output.h"
-#include "components/seven_segment.h"
+#include "circuit/components/logic_output.h"
+#include "circuit/components/seven_segment.h"
 
 namespace GUI {
 

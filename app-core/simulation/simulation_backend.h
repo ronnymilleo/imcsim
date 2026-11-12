@@ -9,7 +9,7 @@
 #ifndef IMCSIM_SIMULATION_BACKEND_H
 #define IMCSIM_SIMULATION_BACKEND_H
 
-#include "model/circuit.h"
+#include "circuit/circuit.h"
 #include "simulation/analysis_settings.h"
 #include "simulation/run_control.h"
 #include "simulation/simulation_results.h"

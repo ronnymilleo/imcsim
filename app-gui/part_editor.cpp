@@ -5,6 +5,7 @@
 
 #include "part_editor.h"
 
+#include "circuit/behavioral_expression.h"
 #include "document/subcircuit_pins.h"
 #include "drawing/theme.h"
 #include "editing/element_factory.h"
@@ -12,7 +13,6 @@
 #include "misc/cpp/imgui_stdlib.h"
 #include "simulation/circuit_checks.h"
 #include "simulation/simulator.h"
-#include "spice/behavioral_expression.h"
 #include "spice/spice_value.h"
 #include <algorithm>
 #include <array>

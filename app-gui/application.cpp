@@ -5,6 +5,8 @@
 
 #include "application.h"
 
+#include "backends/ngspice/ngspice_library.h"
+#include "backends/nodalys/nodalys_backend.h"
 #include "document/examples.h"
 #include "document/schematic_file.h"
 #include "drawing/theme.h"
@@ -15,8 +17,6 @@
 #include "imgui_impl_sdlgpu3.h"
 #include "imgui_internal.h"
 #include "implot.h"
-#include "ngspice/ngspice_library.h"
-#include "nodalys/nodalys_backend.h"
 #include "simulation/simulator.h"
 #include "windows/dock_layout.h"
 #include <SDL3/SDL.h>

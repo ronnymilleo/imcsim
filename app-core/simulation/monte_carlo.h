@@ -9,8 +9,8 @@
 #ifndef IMCSIM_MONTE_CARLO_H
 #define IMCSIM_MONTE_CARLO_H
 
-#include "components/component.h"
-#include "model/circuit.h"
+#include "circuit/circuit.h"
+#include "circuit/components/component.h"
 #include <expected>
 #include <memory>
 #include <optional>

@@ -3,11 +3,11 @@
  * @brief   Tests for the logic states and lanes of the Output window.
  */
 
-#include "components/ground.h"
-#include "components/logic_part.h"
-#include "components/resistor.h"
-#include "components/subcircuit.h"
-#include "model/subcircuit.h"
+#include "circuit/components/ground.h"
+#include "circuit/components/logic_part.h"
+#include "circuit/components/resistor.h"
+#include "circuit/components/subcircuit.h"
+#include "circuit/subcircuit.h"
 #include "plots/logic_trace.h"
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>

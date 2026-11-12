@@ -5,8 +5,8 @@
 
 #include "simulation/simulator.h"
 
-#include "components/logic_input.h"
-#include "model/subcircuit.h"
+#include "circuit/components/logic_input.h"
+#include "circuit/subcircuit.h"
 #include "simulation/circuit_checks.h"
 #include "simulation/simulation_backend.h"
 #include "simulation/stepped_circuit.h"

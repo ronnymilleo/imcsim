@@ -6,11 +6,11 @@
 #ifndef IMCSIM_SCHEMATIC_FILE_H
 #define IMCSIM_SCHEMATIC_FILE_H
 
-#include "components/subcircuit.h"
+#include "circuit/components/subcircuit.h"
+#include "circuit/library_model.h"
+#include "circuit/subcircuit.h"
 #include "document/simulation_settings.h"
 #include "helpers.h"
-#include "model/library_model.h"
-#include "model/subcircuit.h"
 #include "plots/logic_bus.h"
 #include "plots/math_channel.h"
 #include "ui_elements/ui_element.h"

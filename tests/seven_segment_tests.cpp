@@ -5,8 +5,8 @@
  */
 
 #include "analysis/logic_outputs.h"
-#include "components/logic_input.h"
-#include "components/seven_segment.h"
+#include "circuit/components/logic_input.h"
+#include "circuit/components/seven_segment.h"
 #include "document/schematic.h"
 #include "document/schematic_file.h"
 #include "editing/element_factory.h"

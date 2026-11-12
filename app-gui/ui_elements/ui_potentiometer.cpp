@@ -5,7 +5,7 @@
 
 #include "ui_elements/ui_potentiometer.h"
 
-#include "components/potentiometer.h"
+#include "circuit/components/potentiometer.h"
 #include "spice/spice_value.h"
 #include <format>
 #include <memory>

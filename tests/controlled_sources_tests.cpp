@@ -4,12 +4,12 @@
  *          hand-computed gains.
  */
 
-#include "components/controlled_source.h"
-#include "components/ground.h"
-#include "components/resistor.h"
-#include "components/vcc.h"
-#include "model/circuit.h"
-#include "nodalys/nodalys_backend.h"
+#include "backends/nodalys/nodalys_backend.h"
+#include "circuit/circuit.h"
+#include "circuit/components/controlled_source.h"
+#include "circuit/components/ground.h"
+#include "circuit/components/resistor.h"
+#include "circuit/components/vcc.h"
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 

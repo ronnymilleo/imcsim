@@ -5,14 +5,14 @@
 
 #include "simulation/circuit_checks.h"
 
-#include "components/behavioral_source.h"
-#include "components/clock.h"
-#include "components/controlled_source.h"
-#include "components/logic_part.h"
-#include "components/source.h"
-#include "components/subcircuit.h"
-#include "model/subcircuit.h"
-#include "spice/behavioral_expression.h"
+#include "circuit/behavioral_expression.h"
+#include "circuit/components/behavioral_source.h"
+#include "circuit/components/clock.h"
+#include "circuit/components/controlled_source.h"
+#include "circuit/components/logic_part.h"
+#include "circuit/components/source.h"
+#include "circuit/components/subcircuit.h"
+#include "circuit/subcircuit.h"
 #include <algorithm>
 #include <cmath>
 #include <format>

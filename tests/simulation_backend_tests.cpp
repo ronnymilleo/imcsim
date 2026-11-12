@@ -5,13 +5,13 @@
 
 #include "simulation/simulation_backend.h"
 
-#include "components/ground.h"
-#include "components/logic_input.h"
-#include "components/logic_part.h"
-#include "components/resistor.h"
-#include "components/voltage_source.h"
-#include "ngspice/ngspice_backend.h"
-#include "ngspice/ngspice_library.h"
+#include "backends/ngspice/ngspice_backend.h"
+#include "backends/ngspice/ngspice_library.h"
+#include "circuit/components/ground.h"
+#include "circuit/components/logic_input.h"
+#include "circuit/components/logic_part.h"
+#include "circuit/components/resistor.h"
+#include "circuit/components/voltage_source.h"
 #include "simulation/run_control.h"
 #include "simulation/simulator.h"
 #include <catch2/catch_test_macros.hpp>

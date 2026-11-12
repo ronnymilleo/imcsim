@@ -5,7 +5,7 @@
 
 #include "document/clipboard.h"
 
-#include "components/subcircuit.h"
+#include "circuit/components/subcircuit.h"
 #include "document/block_nesting.h"
 #include "document/schematic_file.h"
 #include "editing/group_editing.h"

@@ -6,7 +6,7 @@
 #ifndef IMCSIM_EDITOR_MODE_H
 #define IMCSIM_EDITOR_MODE_H
 
-#include "components/component.h"
+#include "circuit/components/component.h"
 #include "document/clipboard.h"
 #include "editing/selection.h"
 #include "helpers.h"

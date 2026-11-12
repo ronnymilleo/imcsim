@@ -3,8 +3,8 @@
  * @brief   Tests for renaming a part and keeping what refers to it by name on it.
  */
 
-#include "components/behavioral_source.h"
-#include "components/controlled_source.h"
+#include "circuit/components/behavioral_source.h"
+#include "circuit/components/controlled_source.h"
 #include "document/schematic.h"
 #include "editing/element_factory.h"
 #include "editing/part_names.h"

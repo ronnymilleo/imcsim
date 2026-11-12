@@ -6,12 +6,12 @@
 
 #include "simulation/s_parameters.h"
 
-#include "components/capacitor.h"
-#include "components/ground.h"
-#include "components/inductor.h"
-#include "components/resistor.h"
-#include "components/voltage_source.h"
-#include "model/circuit.h"
+#include "circuit/circuit.h"
+#include "circuit/components/capacitor.h"
+#include "circuit/components/ground.h"
+#include "circuit/components/inductor.h"
+#include "circuit/components/resistor.h"
+#include "circuit/components/voltage_source.h"
 #include "simulation/circuit_checks.h"
 #include "simulation/circuit_copy.h"
 #include "simulation/simulation_backend.h"

@@ -7,7 +7,7 @@
 
 #include "analysis/sensitivity_view.h"
 #include "analysis/truth_table.h"
-#include "components/logic_input.h"
+#include "circuit/components/logic_input.h"
 #include "drawing/theme.h"
 #include "editing/probing.h"
 #include "imgui.h"

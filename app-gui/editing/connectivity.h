@@ -6,8 +6,8 @@
 #ifndef IMCSIM_CONNECTIVITY_H
 #define IMCSIM_CONNECTIVITY_H
 
+#include "circuit/circuit.h"
 #include "helpers.h"
-#include "model/circuit.h"
 #include "ui_elements/ui_element.h"
 #include "ui_elements/ui_wire.h"
 #include <functional>

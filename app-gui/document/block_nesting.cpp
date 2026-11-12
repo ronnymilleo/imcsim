@@ -6,7 +6,7 @@
 
 #include "document/block_nesting.h"
 
-#include "components/subcircuit.h"
+#include "circuit/components/subcircuit.h"
 #include <algorithm>
 #include <functional>
 #include <optional>

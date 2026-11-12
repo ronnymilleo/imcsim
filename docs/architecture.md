@@ -33,40 +33,25 @@ flowchart TD
 ```mermaid
 flowchart TD
     app_core_spice[spice]
-    app_core_model[model]
-    app_core_components[components]
+    app_core_circuit[circuit]
     app_core_simulation[simulation]
-    app_core_ngspice[ngspice]
-    app_core_nodalys[nodalys]
-    app_core_components -->|3| app_core_model
-    app_core_components -->|1| app_core_spice
-    app_core_model -->|23| app_core_components
-    app_core_model -->|2| app_core_spice
-    app_core_ngspice -->|2| app_core_components
-    app_core_ngspice -->|1| app_core_model
-    app_core_ngspice -->|12| app_core_simulation
-    app_core_ngspice -->|1| app_core_spice
-    app_core_nodalys -->|26| app_core_components
-    app_core_nodalys -->|4| app_core_model
-    app_core_nodalys -->|4| app_core_simulation
-    app_core_nodalys -->|3| app_core_spice
-    app_core_simulation -->|28| app_core_components
-    app_core_simulation -->|16| app_core_model
-    app_core_simulation -.->|1| app_core_ngspice
-    app_core_simulation -->|3| app_core_spice
-    app_core_spice -.->|2| app_core_components
-    app_core_spice -.->|2| app_core_model
-    linkStyle 14 stroke:#d33,stroke-width:2px
-    linkStyle 16 stroke:#d33,stroke-width:2px
-    linkStyle 17 stroke:#d33,stroke-width:2px
+    app_core_backends[backends]
+    app_core_backends -->|35| app_core_circuit
+    app_core_backends -->|16| app_core_simulation
+    app_core_backends -->|2| app_core_spice
+    app_core_circuit -->|5| app_core_spice
+    app_core_simulation -.->|1| app_core_backends
+    app_core_simulation -->|45| app_core_circuit
+    app_core_simulation -->|2| app_core_spice
+    linkStyle 4 stroke:#d33,stroke-width:2px
 ```
 
 Layers, lowest first:
 
 1. `spice`
-2. `model`, `components`
+2. `circuit`
 3. `simulation`
-4. `ngspice`, `nodalys`
+4. `backends`
 
 ## app-gui
 

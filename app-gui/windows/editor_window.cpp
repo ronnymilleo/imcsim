@@ -5,8 +5,8 @@
 
 #include "windows/editor_window.h"
 
-#include "components/net_label.h"
-#include "components/subcircuit.h"
+#include "circuit/components/net_label.h"
+#include "circuit/components/subcircuit.h"
 #include "document/block_nesting.h"
 #include "document/subcircuit_pins.h"
 #include "drawing/schematic_drawing.h"

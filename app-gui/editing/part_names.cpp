@@ -5,7 +5,7 @@
 
 #include "editing/part_names.h"
 
-#include "components/component.h"
+#include "circuit/components/component.h"
 #include <algorithm>
 #include <cctype>
 #include <format>

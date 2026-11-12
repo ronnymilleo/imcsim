@@ -7,7 +7,7 @@
 #ifndef IMCSIM_FUSE_STATE_H
 #define IMCSIM_FUSE_STATE_H
 
-#include "components/component.h"
+#include "circuit/components/component.h"
 #include "simulation/simulation_results.h"
 #include <optional>
 #include <span>

@@ -4,8 +4,8 @@
  */
 
 #include "analysis/logic_outputs.h"
-#include "components/logic_input.h"
-#include "components/logic_output.h"
+#include "circuit/components/logic_input.h"
+#include "circuit/components/logic_output.h"
 #include "digital_models.h"
 #include "document/ready_blocks.h"
 #include "document/schematic.h"

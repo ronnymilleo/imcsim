@@ -5,9 +5,9 @@
 
 #include "simulation/monte_carlo.h"
 
-#include "components/source.h"
-#include "components/subcircuit.h"
-#include "model/subcircuit.h"
+#include "circuit/components/source.h"
+#include "circuit/components/subcircuit.h"
+#include "circuit/subcircuit.h"
 #include <cmath>
 #include <cstdint>
 #include <format>

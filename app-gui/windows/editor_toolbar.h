@@ -8,7 +8,7 @@
 
 #include "analysis/analysis_controls.h"
 #include "analysis/analysis_settings_panel.h"
-#include "components/component.h"
+#include "circuit/components/component.h"
 #include "document/schematic.h"
 #include "editing/editor_mode.h"
 #include "windows/part_picker.h"

@@ -7,8 +7,8 @@
 #ifndef IMCSIM_SPICE_IMPORT_H
 #define IMCSIM_SPICE_IMPORT_H
 
+#include "circuit/spice_library.h"
 #include "document/schematic_file.h"
-#include "spice/spice_library.h"
 #include <optional>
 #include <string>
 #include <string_view>

@@ -5,9 +5,9 @@
 
 #include "editing/connectivity.h"
 
-#include "components/component.h"
-#include "components/net_label.h"
-#include "components/subcircuit_pin.h"
+#include "circuit/components/component.h"
+#include "circuit/components/net_label.h"
+#include "circuit/components/subcircuit_pin.h"
 #include <algorithm>
 #include <array>
 #include <numeric>

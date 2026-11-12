@@ -7,7 +7,7 @@
 #ifndef IMCSIM_CIRCUIT_CHECKS_H
 #define IMCSIM_CIRCUIT_CHECKS_H
 
-#include "model/circuit.h"
+#include "circuit/circuit.h"
 #include "simulation/analysis_settings.h"
 #include <optional>
 #include <string>

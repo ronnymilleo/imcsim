@@ -5,7 +5,7 @@
 
 #include "plots/trace_math.h"
 
-#include "components/net_label.h"
+#include "circuit/components/net_label.h"
 #include "spice/spice_value.h"
 #include <algorithm>
 #include <array>

@@ -6,12 +6,12 @@
 #ifndef IMCSIM_SCHEMATIC_FILE_ACTIONS_H
 #define IMCSIM_SCHEMATIC_FILE_ACTIONS_H
 
+#include "circuit/spice_library.h"
 #include "document/clipboard.h"
 #include "document/examples.h"
 #include "document/file_dialog.h"
 #include "document/schematic.h"
 #include "preferences.h"
-#include "spice/spice_library.h"
 #include <filesystem>
 #include <functional>
 #include <optional>

@@ -3,7 +3,7 @@
  * @brief   Tests for what the Probe tool measures at a point of the schematic.
  */
 
-#include "components/net_label.h"
+#include "circuit/components/net_label.h"
 #include "editing/element_factory.h"
 #include "editing/probing.h"
 #include "test_printers.h"

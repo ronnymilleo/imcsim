@@ -38,15 +38,14 @@ ROOT_FOLDER = "root"
 LIBRARY_LAYERS = [[NODALYS], [CORE], [GUI]]
 
 # Lowest first, one list per layer. Folders in the same layer may include each other. These are the folders as they
-# are today, ordered as close as possible to the target of jay #211: model and components are one layer because they
-# are merged there, and the ngspice and nodalys backends sit on top of the simulation that they plug into. Update
-# this list in the same change that moves a folder
+# are today, ordered as close as possible to the target of jay #211. The backends sit on top of the simulation that
+# they plug into. Update this list in the same change that moves a folder
 FOLDER_LAYERS = {
     CORE: [
         ["spice"],
-        ["model", "components"],
+        ["circuit"],
         ["simulation"],
-        ["ngspice", "nodalys"],
+        ["backends"],
     ],
     GUI: [
         ["ui_elements"],

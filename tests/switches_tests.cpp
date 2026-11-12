@@ -4,15 +4,15 @@
  *          pull-in behavior and the transformer turns ratio.
  */
 
-#include "components/ground.h"
-#include "components/relay.h"
-#include "components/resistor.h"
-#include "components/transformer.h"
-#include "components/vcc.h"
-#include "components/voltage_controlled_switch.h"
-#include "components/voltage_source.h"
-#include "model/circuit.h"
-#include "nodalys/nodalys_backend.h"
+#include "backends/nodalys/nodalys_backend.h"
+#include "circuit/circuit.h"
+#include "circuit/components/ground.h"
+#include "circuit/components/relay.h"
+#include "circuit/components/resistor.h"
+#include "circuit/components/transformer.h"
+#include "circuit/components/vcc.h"
+#include "circuit/components/voltage_controlled_switch.h"
+#include "circuit/components/voltage_source.h"
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 #include <cmath>

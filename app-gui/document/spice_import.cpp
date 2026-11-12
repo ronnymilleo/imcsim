@@ -6,7 +6,7 @@
 
 #include "document/spice_import.h"
 
-#include "components/subcircuit.h"
+#include "circuit/components/subcircuit.h"
 #include <algorithm>
 #include <array>
 #include <cctype>

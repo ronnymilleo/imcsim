@@ -6,7 +6,7 @@
 #ifndef IMCSIM_PART_CATALOG_H
 #define IMCSIM_PART_CATALOG_H
 
-#include "components/component.h"
+#include "circuit/components/component.h"
 #include <span>
 #include <string_view>
 

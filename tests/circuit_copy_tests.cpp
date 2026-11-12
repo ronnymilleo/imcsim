@@ -5,12 +5,12 @@
 
 #include "simulation/circuit_copy.h"
 
-#include "components/capacitor.h"
-#include "components/diode.h"
-#include "components/ground.h"
-#include "components/op_amp.h"
-#include "components/resistor.h"
-#include "components/voltage_source.h"
+#include "circuit/components/capacitor.h"
+#include "circuit/components/diode.h"
+#include "circuit/components/ground.h"
+#include "circuit/components/op_amp.h"
+#include "circuit/components/resistor.h"
+#include "circuit/components/voltage_source.h"
 #include "document/examples.h"
 #include "document/schematic.h"
 #include <catch2/catch_test_macros.hpp>

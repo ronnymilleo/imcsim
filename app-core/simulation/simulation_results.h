@@ -6,7 +6,7 @@
 #ifndef IMCSIM_SIMULATION_RESULTS_H
 #define IMCSIM_SIMULATION_RESULTS_H
 
-#include "components/component.h"
+#include "circuit/components/component.h"
 #include <complex>
 #include <cstddef>
 #include <expected>

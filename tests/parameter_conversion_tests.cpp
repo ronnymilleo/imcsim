@@ -3,7 +3,7 @@
  * @brief   Tests for the parameters of the parts of imcsim turned into those the Nodalys devices take.
  */
 
-#include "nodalys/parameter_conversion.h"
+#include "backends/nodalys/parameter_conversion.h"
 
 #include <catch2/catch_test_macros.hpp>
 

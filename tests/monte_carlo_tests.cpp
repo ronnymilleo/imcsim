@@ -5,12 +5,12 @@
 
 #include "simulation/monte_carlo.h"
 
-#include "components/capacitor.h"
-#include "components/ground.h"
-#include "components/resistor.h"
-#include "components/subcircuit.h"
-#include "components/voltage_source.h"
-#include "model/subcircuit.h"
+#include "circuit/components/capacitor.h"
+#include "circuit/components/ground.h"
+#include "circuit/components/resistor.h"
+#include "circuit/components/subcircuit.h"
+#include "circuit/components/voltage_source.h"
+#include "circuit/subcircuit.h"
 #include <algorithm>
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>

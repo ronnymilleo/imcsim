@@ -5,11 +5,11 @@
 
 #include "document/schematic.h"
 
-#include "components/behavioral_source.h"
-#include "components/component.h"
-#include "components/controlled_source.h"
-#include "components/net_label.h"
-#include "components/subcircuit.h"
+#include "circuit/components/behavioral_source.h"
+#include "circuit/components/component.h"
+#include "circuit/components/controlled_source.h"
+#include "circuit/components/net_label.h"
+#include "circuit/components/subcircuit.h"
 #include "document/block_nesting.h"
 #include "document/schematic_file.h"
 #include "document/subcircuit_pins.h"

@@ -6,8 +6,8 @@
 #ifndef IMCSIM_SUBCIRCUIT_PINS_H
 #define IMCSIM_SUBCIRCUIT_PINS_H
 
-#include "components/component.h"
-#include "components/subcircuit.h"
+#include "circuit/components/component.h"
+#include "circuit/components/subcircuit.h"
 #include "document/schematic_file.h"
 #include "editing/connectivity.h"
 #include <array>

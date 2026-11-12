@@ -9,7 +9,7 @@
 #include "analysis/analysis_controls.h"
 #include "analysis/analysis_settings_panel.h"
 #include "analysis/playback.h"
-#include "components/component.h"
+#include "circuit/components/component.h"
 #include "document/clipboard.h"
 #include "document/examples.h"
 #include "document/schematic.h"

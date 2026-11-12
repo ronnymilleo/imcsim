@@ -5,14 +5,14 @@
 
 #include "document/spice_import.h"
 
-#include "components/subcircuit.h"
+#include "circuit/components/subcircuit.h"
+#include "circuit/library_model.h"
+#include "circuit/spice_library.h"
 #include "document/clipboard.h"
 #include "document/schematic.h"
 #include "document/schematic_file.h"
 #include "document/subcircuit_pins.h"
 #include "editing/element_factory.h"
-#include "model/library_model.h"
-#include "spice/spice_library.h"
 #include <catch2/catch_test_macros.hpp>
 #include <memory>
 #include <string>

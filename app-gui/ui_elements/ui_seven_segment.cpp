@@ -5,7 +5,7 @@
 
 #include "ui_elements/ui_seven_segment.h"
 
-#include "components/seven_segment.h"
+#include "circuit/components/seven_segment.h"
 #include "drawing/theme.h"
 #include <algorithm>
 #include <array>

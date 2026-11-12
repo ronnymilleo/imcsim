@@ -5,9 +5,9 @@
 
 #include "plots/logic_trace.h"
 
-#include "components/logic_part.h"
-#include "components/subcircuit.h"
-#include "model/subcircuit.h"
+#include "circuit/components/logic_part.h"
+#include "circuit/components/subcircuit.h"
+#include "circuit/subcircuit.h"
 #include <algorithm>
 #include <cmath>
 #include <limits>

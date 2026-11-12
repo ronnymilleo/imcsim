@@ -5,9 +5,9 @@
 
 #include "simulation/ratings.h"
 
-#include "components/bjt.h"
-#include "components/diode.h"
-#include "components/mosfet.h"
+#include "circuit/components/bjt.h"
+#include "circuit/components/diode.h"
+#include "circuit/components/mosfet.h"
 #include "simulation/fuse_state.h"
 #include "spice/spice_value.h"
 #include <algorithm>

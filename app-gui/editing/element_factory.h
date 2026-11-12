@@ -6,7 +6,7 @@
 #ifndef IMCSIM_ELEMENT_FACTORY_H
 #define IMCSIM_ELEMENT_FACTORY_H
 
-#include "components/component.h"
+#include "circuit/components/component.h"
 #include "helpers.h"
 #include "ui_elements/ui_element.h"
 #include <memory>

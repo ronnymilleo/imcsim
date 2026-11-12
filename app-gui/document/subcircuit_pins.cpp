@@ -5,7 +5,7 @@
 
 #include "document/subcircuit_pins.h"
 
-#include "components/subcircuit_pin.h"
+#include "circuit/components/subcircuit_pin.h"
 #include <algorithm>
 #include <map>
 #include <set>

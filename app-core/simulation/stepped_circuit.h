@@ -7,8 +7,8 @@
 #ifndef IMCSIM_STEPPED_CIRCUIT_H
 #define IMCSIM_STEPPED_CIRCUIT_H
 
-#include "components/component.h"
-#include "model/circuit.h"
+#include "circuit/circuit.h"
+#include "circuit/components/component.h"
 #include "simulation/analysis_settings.h"
 #include <expected>
 #include <memory>

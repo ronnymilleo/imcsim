@@ -5,8 +5,8 @@
 
 #include "analysis/harmonic_balance_view.h"
 
-#include "components/resistor.h"
-#include "components/source.h"
+#include "circuit/components/resistor.h"
+#include "circuit/components/source.h"
 #include "document/schematic.h"
 #include "editing/element_factory.h"
 #include "editing/probing.h"
