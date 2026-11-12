@@ -9,3 +9,5 @@ imgui.ini
 !app-gui/ready_blocks/*.imcsim
 /graphify-out/
 .vs
+.venv/
+__pycache__/

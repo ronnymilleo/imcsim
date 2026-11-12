@@ -88,6 +88,28 @@ jobs:
       - name: Compiler cache statistics
         run: ccache --show-stats
 
+  # Each library is one static library, so the compiler accepts an include between any two folders; this check is what
+  # keeps the folders in layers. It needs no build: it reads the include lines, so it is quick and runs beside the rest
+  linux-architecture:
+    runs-on: ubuntu-latest
+    container: archlinux:latest
+    steps:
+      - name: Install dependencies
+        run: pacman -Syu --noconfirm --needed git python
+
+      - name: Check out the repository
+        uses: actions/checkout@v7
+
+      # The checkout belongs to another user than the container's, which git refuses to list files of
+      - name: Trust the checkout
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
+      - name: Test the include check
+        run: python -m unittest discover -s tools -p '*_tests.py'
+
+      - name: Check the include layers and the diagram
+        run: python tools/include_layers.py --check
+
   # clang-tidy takes longer than the build and the tests together, so it runs beside them; it needs a build for the
   # compile database and the generated headers, which the compiler cache of its own makes quick
   linux-naming:
