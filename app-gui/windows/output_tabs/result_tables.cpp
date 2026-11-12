@@ -220,10 +220,11 @@ void DrawTruthTable(const Core::TruthTable &table, Schematic &schematic) {
 
 /**
  * @brief   Draws the Transfer function tab: the table of the last transfer function, or how to get one.
- * @param[in] schematic  The schematic, whose result is shown.
+ * @param[in] results    The results, whose transfer function is shown.
+ * @param[in] schematic  The schematic, for the names of nets.
  */
-void DrawTransferFunctionTab(Schematic &schematic) {
-    if (const auto &transfer = schematic.GetTransferFunction()) {
+void DrawTransferFunctionTab(const ResultStore &results, Schematic &schematic) {
+    if (const auto &transfer = results.GetTransferFunction()) {
         DrawTransferFunction(*transfer, schematic);
     } else {
         ImGui::TextDisabled("No transfer function for the current circuit; pick it beside Run in the editor");
@@ -232,11 +233,12 @@ void DrawTransferFunctionTab(Schematic &schematic) {
 
 /**
  * @brief   Draws the Sensitivity tab: the table of the last sensitivity, or how to get one.
- * @param[in] schematic    The schematic, whose result is shown.
+ * @param[in] results      The results, whose sensitivity is shown.
+ * @param[in] schematic    The schematic, for the names of nets and the parts a click selects.
  * @param[in,out] preferences  Whose wire coloring the checkbox at the top sets to Sensitivity, or back to Plain.
  */
-void DrawSensitivityTab(Schematic &schematic, Preferences &preferences) {
-    if (const auto &sensitivity = schematic.GetSensitivity()) {
+void DrawSensitivityTab(const ResultStore &results, Schematic &schematic, Preferences &preferences) {
+    if (const auto &sensitivity = results.GetSensitivity()) {
         bool is_colored = preferences.WireColors == WireColoring::SENSITIVITY;
         if (ImGui::Checkbox("Color the schematic", &is_colored)) {
             preferences.WireColors = is_colored ? WireColoring::SENSITIVITY : WireColoring::PLAIN;
@@ -251,10 +253,11 @@ void DrawSensitivityTab(Schematic &schematic, Preferences &preferences) {
 
 /**
  * @brief   Draws the Truth table tab: the last truth table, or how to get one.
- * @param[in] schematic  The schematic, whose result is shown.
+ * @param[in] results    The results, whose truth table is shown.
+ * @param[in] schematic  The circuit as it is now, for the logic levels and the names of nets.
  */
-void DrawTruthTableTab(Schematic &schematic) {
-    if (const auto &truth_table = schematic.GetTruthTable()) {
+void DrawTruthTableTab(const ResultStore &results, Schematic &schematic) {
+    if (const auto &truth_table = results.GetTruthTable()) {
         DrawTruthTable(*truth_table, schematic);
     } else {
         ImGui::TextDisabled("No truth table for the current circuit; pick it beside Run in the editor");

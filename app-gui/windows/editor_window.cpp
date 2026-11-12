@@ -264,6 +264,8 @@ ImU32 WithAlpha(const ImU32 color, const ImU32 alpha) {
 /**
  * @brief   Creates the editor for a schematic.
  * @param[in] schematic       Schematic to edit; it must outlive the window.
+ * @param[in] results         Results of the analyses of that schematic, which the editor shows; it must outlive the
+ *                            window.
  * @param[in] controls        Runs of the analyses, for the Run button; they must outlive the window.
  * @param[in] settings_panel  Analysis picker and settings, for the popover beside Run; it must outlive the window.
  * @param[in] part_editor     Fields of the selected part, for the properties popover; it must outlive the window.
@@ -271,11 +273,12 @@ ImU32 WithAlpha(const ImU32 color, const ImU32 alpha) {
  * @param[in] playback        Instant of the transient to show, which the time bar moves; it must outlive the window.
  * @param[in] preferences     How the schematic is drawn and exported; they must outlive the window.
  */
-EditorWindow::EditorWindow(Schematic &schematic, AnalysisControls &controls, AnalysisSettingsPanel &settings_panel,
-                           PartEditor &part_editor, GlowRenderer &glow_renderer, TransientPlayback &playback,
-                           const Preferences &preferences)
-    : AppWindow("Schematic", false), m_RootSchematic(schematic), m_Schematic(&schematic), m_Controls(controls),
-      m_SettingsPanel(settings_panel), m_PartEditor(part_editor), m_Playback(playback), m_Preferences(preferences),
+EditorWindow::EditorWindow(Schematic &schematic, const ResultStore &results, AnalysisControls &controls,
+                           AnalysisSettingsPanel &settings_panel, PartEditor &part_editor, GlowRenderer &glow_renderer,
+                           TransientPlayback &playback, const Preferences &preferences)
+    : AppWindow("Schematic", false), m_RootSchematic(schematic), m_Schematic(&schematic), m_RootResults(results),
+      m_Controls(controls), m_SettingsPanel(settings_panel), m_PartEditor(part_editor), m_Playback(playback),
+      m_Preferences(preferences),
       m_Files(schematic, preferences,
               {.StopEditing = [this] { StopEditing(); },
                .FrameSchematic = [this] { m_View.RequestDefaultFrame(); },
@@ -468,7 +471,7 @@ void EditorWindow::Draw() {
         ImGui::SetWindowFocus();
     }
     m_PartPicker.WatchShortcut();
-    m_Overlays.Update(*m_Schematic, m_Controls);
+    m_Overlays.Update(*m_Schematic, GetShownResults(), m_Controls);
 
     // The rail runs down the left of the canvas, as tall as it
     RailRequest rail = m_PartRail.Draw(m_Mode, GetCanvasSize().y);
@@ -603,7 +606,7 @@ void EditorWindow::ApplyToolbarRequest(ToolbarRequest request) {
  * @brief   The span of time of the window of the transient that plays, or none without a transient.
  */
 std::optional<EditorWindow::TimeSpan> EditorWindow::GetWindowSpan() const {
-    const auto &transient = m_Schematic->GetTransient();
+    const auto &transient = GetShownResults().GetTransient();
     const PointWindow window = m_Playback.Window.GetWindow();
     if (!transient || window.Count == 0 || window.First + window.Count > transient->Times.size()) {
         return std::nullopt;
@@ -702,7 +705,7 @@ void EditorWindow::DrawStatusBar(const ViewTransform &view, const bool hovered) 
     }
     ImGui::SetCursorScreenPos(line_start);
     // The reason of a failure is worth more than the hint, so it takes the whole line
-    const RunStatusLine line = DescribeRunStatus(m_Controls, m_Schematic->GetTransient());
+    const RunStatusLine line = DescribeRunStatus(m_Controls, GetShownResults().GetTransient());
     if (line.TakesWholeLine) {
         DrawRunStatus(line, m_Controls, right_edge);
         return;
@@ -781,6 +784,14 @@ void EditorWindow::StopEditing() {
 
 bool EditorWindow::IsEditingSubcircuit() const {
     return !m_OpenBlocks.empty();
+}
+
+/**
+ * @brief   The results of the schematic on show: those of the document, and none inside a block, whose parts and nodes
+ *          they do not belong to.
+ */
+const ResultStore &EditorWindow::GetShownResults() const {
+    return IsEditingSubcircuit() ? m_NoResults : m_RootResults;
 }
 
 /**

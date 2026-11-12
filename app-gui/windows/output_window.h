@@ -13,6 +13,7 @@
 #include "plots/plot_export.h"
 #include "plots/plot_exporter.h"
 #include "results/playback.h"
+#include "results/result_store.h"
 #include "schematic/preferences.h"
 #include "schematic/schematic.h"
 #include "simulation/simulation_results.h"
@@ -39,7 +40,7 @@ namespace GUI {
  * @class   OutputWindow
  * @brief   Plots the node voltages and component currents of the last transient over time, the last AC sweep as
  *          a Bode plot, and the last DC sweep against its swept source.
- * @details The results come from the Schematic, which the analysis controls fill, so the plots disappear as
+ * @details The results come from the ResultStore, which the analysis controls fill, so the plots disappear as
  *          soon as the circuit changes. Plots show only the measured traces, picked with the Probe tool of the
  *          editor or in the list beside the plots; voltages take the colors the editor gives the nodes, and
  *          currents are dashed on the secondary Y axis on the right. Hovering a plot reads every shown trace at
@@ -64,7 +65,7 @@ namespace GUI {
  */
 class OutputWindow : public AppWindow {
 public:
-    OutputWindow(Schematic &schematic, AnalysisControls &controls, TransientPlayback &playback,
+    OutputWindow(Schematic &schematic, ResultStore &results, AnalysisControls &controls, TransientPlayback &playback,
                  Preferences &preferences);
     ~OutputWindow() override = default;
 
@@ -72,6 +73,7 @@ public:
 
 private:
     Schematic &m_Schematic;
+    ResultStore &m_Results;
     AnalysisControls &m_Controls;
     TransientPlayback &m_Playback;
     /// Whether a new result brings the window to the front, and the coloring the Sensitivity tab switches on.

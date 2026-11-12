@@ -63,9 +63,10 @@ void LabelCurves(const Core::DCSweep &sweep, Schematic &schematic, const bool sh
 
 /**
  * @brief   Creates the tab.
- * @param[in] schematic  Schematic whose DC sweep is plotted; it must outlive the tab.
+ * @param[in] schematic  Schematic that keeps the measurements and the names of nets; it must outlive the tab.
+ * @param[in] results    Results whose DC sweep is shown; they must outlive the tab.
  */
-DCSweepTab::DCSweepTab(Schematic &schematic) : m_Schematic(schematic) {
+DCSweepTab::DCSweepTab(Schematic &schematic, const ResultStore &results) : m_Schematic(schematic), m_Results(results) {
 }
 
 /**
@@ -73,7 +74,7 @@ DCSweepTab::DCSweepTab(Schematic &schematic) : m_Schematic(schematic) {
  * @param[in] frame  The math channels of each curve, and whether any trace is measured.
  */
 void DCSweepTab::Draw(const FrameResults &frame) {
-    const auto &dc_sweep = m_Schematic.GetDCSweep();
+    const auto &dc_sweep = m_Results.GetDCSweep();
     if (!dc_sweep) {
         ImGui::TextDisabled("No DC sweep for the current circuit; pick it beside Run in the editor");
         return;
@@ -98,7 +99,7 @@ void DCSweepTab::Draw(const FrameResults &frame) {
  * @return  True with a DC sweep and a measured trace or a math channel.
  */
 bool DCSweepTab::CanExport(const FrameResults &frame) const {
-    return m_Schematic.GetDCSweep() &&
+    return m_Results.GetDCSweep() &&
            (frame.AnythingMeasured || (!frame.DCSweepMath.empty() && !frame.DCSweepMath.front().empty()));
 }
 
@@ -108,7 +109,7 @@ bool DCSweepTab::CanExport(const FrameResults &frame) const {
  * @return  The figure, or an empty one without a DC sweep.
  */
 ExportFigure DCSweepTab::BuildFigure(const FrameResults &frame) const {
-    if (const std::optional<Core::DCSweep> &sweep = m_Schematic.GetDCSweep()) {
+    if (const std::optional<Core::DCSweep> &sweep = m_Results.GetDCSweep()) {
         return BuildDCSweepFigure(*sweep, frame.DCSweepMath, m_Schematic, m_View);
     }
     return {};
@@ -126,7 +127,7 @@ void DCSweepTab::DrawPlot(const Core::DCSweep &sweep, const std::vector<std::vec
     const bool currents_changed = m_Fit.TakeCurrentsChanged(std::move(measured_currents));
     const bool voltages_changed =
         m_Fit.TakeNodesChanged(ListMeasuredNodes(first_curve.NodeVoltages.size(), m_Schematic));
-    SetNextFits(m_Fit.TakeNewResult(m_Schematic.GetDCSweepVersion()), voltages_changed, currents_changed);
+    SetNextFits(m_Fit.TakeNewResult(m_Results.GetDCSweepVersion()), voltages_changed, currents_changed);
     if (m_Fit.TakeMathChanged(ListMathLabels(first_math))) {
         FitMathAxes(first_math);
     }

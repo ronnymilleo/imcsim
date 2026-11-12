@@ -51,6 +51,7 @@ add_library(imcsim-gui-lib
             results/playback.cpp
             results/point_window.cpp
             results/pole_zero_view.cpp
+            results/result_store.cpp
             results/sensitivity_view.cpp
             results/trace_math.cpp
             results/trace_statistics.cpp

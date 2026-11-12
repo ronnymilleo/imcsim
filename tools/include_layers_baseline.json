@@ -1,5 +1,3 @@
 [
-  "app-core/simulation/simulation_backend.cpp -> backends/ngspice/ngspice_backend.h",
-  "app-gui/schematic/schematic.h -> results/monte_carlo_results.h",
-  "app-gui/schematic/schematic.h -> results/parameter_step.h"
+  "app-core/simulation/simulation_backend.cpp -> backends/ngspice/ngspice_backend.h"
 ]

@@ -7,8 +7,7 @@
 #define IMCSIM_SCHEMATIC_H
 
 #include "base/helpers.h"
-#include "results/monte_carlo_results.h"
-#include "results/parameter_step.h"
+#include "schematic/circuit_listener.h"
 #include "schematic/connectivity.h"
 #include "schematic/logic_bus_definition.h"
 #include "schematic/math_channel_definition.h"
@@ -36,19 +35,21 @@ namespace GUI {
  * @details Adding and deleting mark the schematic as modified. Geometry updates that may be undone within the
  *          same gesture, such as wires following a dragged element, only invalidate the nodes; the caller
  *          decides when the gesture counts as a change and calls MarkModified(). Nodes are computed lazily and
- *          cached until the next change, and so is the last result of each analysis, which no longer matches
- *          the circuit once it changes; a stepped transient or AC sweep keeps every step, and hands its selected step
- *          to the views that read one result. The selection is a set of elements and a set of wires, by index; the
+ *          cached until the next change. The results of the simulations are not kept here: whoever wants to hear
+ *          when a change makes them stale registers a CircuitListener (SetListener()), which the schematic tells at
+ *          each such change. The selection is a set of elements and a set of wires, by index; the
  *          indices stay valid until an element or wire is added, deleted or the wires are replaced. Undo works on whole
- * snapshots: changes pile up until CommitUndoStep(), which the application calls once the user finishes an interaction,
- * so a whole drag or a typed value is undone in one step. Measurements, the traces the plots show, are view state
- *          shared by the editor and the plots: they are kept by key (node number or current name) across edits,
- *          since small edits rarely renumber nodes, and are saved with the file so it opens ready to plot, but
- *          they stay out of the history and changing them does not count as an unsaved change. The simulation
- *          settings belong to the document: they are saved, undone and count as changes, but changing them keeps
- *          the results, which still match the circuit. While a live transient runs, flipping a switch, pressing a
- *          button, setting a logic input or turning a potentiometer (MarkLiveChanged()) is a change that keeps the
- *          transient and the circuit version: the part changes in the run instead of stopping it.
+ *          snapshots: changes pile up until CommitUndoStep(), which the application calls once the user finishes an
+ *          interaction, so a whole drag or a typed value is undone in one step. Measurements, the traces the plots
+ *          show, are view state shared by the editor and the plots: they are kept by key (node number or current name)
+ *          across edits, since small edits rarely renumber nodes, and are saved with the file so it opens ready to
+ *          plot, but they stay out of the history and changing them does not count as an unsaved change. The
+ *          simulation settings belong to the document: they are saved, undone and count as changes, but changing them
+ *          tells nobody, since the results still match the circuit. While a live transient runs, flipping a switch,
+ *          pressing a button, setting a logic input or turning a potentiometer (MarkLiveChanged()) is a change that
+ *          keeps the transient and the circuit version: the part changes in the run instead of stopping it. A
+ *          schematic is never copied and can only be moved into a new one, which starts without a listener, so no other
+ *          schematic ever tells the store of the document.
  */
 class Schematic {
 public:
@@ -63,6 +64,10 @@ public:
     };
 
     Schematic();
+    Schematic(const Schematic &) = delete;
+    Schematic(Schematic &&) = default;
+    Schematic &operator=(const Schematic &) = delete;
+    Schematic &operator=(Schematic &&) = delete;
 
     // Content
     const std::vector<std::unique_ptr<UIElement>> &GetElements() const;
@@ -151,6 +156,9 @@ public:
     void MarkLiveChanged(const Core::Component &component);
     std::vector<Core::LiveChange> TakeLiveChanges();
 
+    // Listener
+    void SetListener(CircuitListener *listener);
+
     // History
     void CommitUndoStep();
     bool CanUndo() const;
@@ -164,53 +172,6 @@ public:
     std::size_t GetCircuitVersion() const;
     std::size_t GetDocumentVersion() const;
     std::string BuildSpiceNetlist();
-    void SetOperatingPoint(std::optional<Core::OperatingPoint> operating_point);
-    const std::optional<Core::OperatingPoint> &GetOperatingPoint() const;
-    void SetOperatingPointSteps(StepFamily<Core::OperatingPoint> steps);
-    const std::optional<StepFamily<Core::OperatingPoint>> &GetOperatingPointSteps() const;
-    void SelectOperatingPointStep(std::size_t step);
-    void SetTransient(std::optional<Core::Transient> transient);
-    void AppendTransient(Core::Transient chunk);
-    const std::optional<Core::Transient> &GetTransient() const;
-    void SetTransientSteps(StepFamily<Core::Transient> steps);
-    const std::optional<StepFamily<Core::Transient>> &GetTransientSteps() const;
-    void SelectTransientStep(std::size_t step);
-    void SetACSweep(std::optional<Core::ACSweep> sweep);
-    const std::optional<Core::ACSweep> &GetACSweep() const;
-    void SetACSweepSteps(StepFamily<Core::ACSweep> steps);
-    const std::optional<StepFamily<Core::ACSweep>> &GetACSweepSteps() const;
-    void SelectACSweepStep(std::size_t step);
-    void SetDCSweep(std::optional<Core::DCSweep> sweep);
-    const std::optional<Core::DCSweep> &GetDCSweep() const;
-    void SetMonteCarlo(MonteCarloTable table);
-    const std::optional<MonteCarloTable> &GetMonteCarlo() const;
-    void SetNoise(std::optional<Core::Noise> noise);
-    const std::optional<Core::Noise> &GetNoise() const;
-    void SetTransferFunction(std::optional<Core::TransferFunction> transfer_function);
-    const std::optional<Core::TransferFunction> &GetTransferFunction() const;
-    void SetSensitivity(std::optional<Core::Sensitivity> sensitivity);
-    const std::optional<Core::Sensitivity> &GetSensitivity() const;
-    void SetPoleZero(std::optional<Core::PoleZero> pole_zero);
-    const std::optional<Core::PoleZero> &GetPoleZero() const;
-    void SetSParameters(std::optional<Core::SParameters> s_parameters);
-    const std::optional<Core::SParameters> &GetSParameters() const;
-    void SetTruthTable(std::optional<Core::TruthTable> truth_table);
-    const std::optional<Core::TruthTable> &GetTruthTable() const;
-    void SetHarmonicBalance(std::optional<Core::HarmonicBalance> harmonic_balance);
-    const std::optional<Core::HarmonicBalance> &GetHarmonicBalance() const;
-    std::size_t GetOperatingPointVersion() const;
-    std::size_t GetTransientVersion() const;
-    std::size_t GetTransientDataVersion() const;
-    std::size_t GetACSweepVersion() const;
-    std::size_t GetDCSweepVersion() const;
-    std::size_t GetMonteCarloVersion() const;
-    std::size_t GetNoiseVersion() const;
-    std::size_t GetTransferFunctionVersion() const;
-    std::size_t GetSensitivityVersion() const;
-    std::size_t GetPoleZeroVersion() const;
-    std::size_t GetSParametersVersion() const;
-    std::size_t GetTruthTableVersion() const;
-    std::size_t GetHarmonicBalanceVersion() const;
 
 private:
     // Content
@@ -263,6 +224,27 @@ private:
     bool m_Modified = false;
     std::optional<std::filesystem::path> m_FilePath;
 
+    /**
+     * @struct  ListenerSlot
+     * @brief   Holds the listener of a schematic, and stays with that schematic when it is moved.
+     * @details A schematic moved into another one leaves its listener behind: the listener hears of the schematic it
+     *          was set on, and the new one is not that one.
+     */
+    struct ListenerSlot {
+        /// Told when a change drops the results, or null; never owned.
+        CircuitListener *Target = nullptr;
+
+        ListenerSlot() = default;
+        ListenerSlot(const ListenerSlot &) = delete;
+        ListenerSlot(ListenerSlot &&other) noexcept;
+        ListenerSlot &operator=(const ListenerSlot &) = delete;
+        ListenerSlot &operator=(ListenerSlot &&) = delete;
+        ~ListenerSlot() = default;
+    };
+
+    // Listener
+    ListenerSlot m_Listener;
+
     // Live runs
     /// Whether a live run is going on.
     bool m_IsLiveRun = false;
@@ -277,47 +259,10 @@ private:
     /// Set by every change and cleared by CommitUndoStep(), so unchanged frames skip taking a snapshot.
     bool m_ChangedSinceCommit = false;
 
-    // Derived data, dropped on every change: nodes are rebuilt on first use, results by the next simulation
+    // Derived data, dropped on every change: nodes are rebuilt on first use
     std::optional<Connectivity> m_Connectivity;
-    std::optional<Core::OperatingPoint> m_OperatingPoint;
-    /// Every step of the last stepped operating point; m_OperatingPoint holds the selected one.
-    std::optional<StepFamily<Core::OperatingPoint>> m_OperatingPointSteps;
-    /// The transient the views read; for a stepped run, its selected step.
-    std::optional<Core::Transient> m_Transient;
-    /// Every step of a stepped transient, or none.
-    std::optional<StepFamily<Core::Transient>> m_TransientSteps;
-    /// The AC sweep the views read; for a stepped run, its selected step.
-    std::optional<Core::ACSweep> m_ACSweep;
-    /// Every step of a stepped AC sweep, or none.
-    std::optional<StepFamily<Core::ACSweep>> m_ACSweepSteps;
-    std::optional<Core::DCSweep> m_DCSweep;
-    /// What every run of the last Monte Carlo analysis drew and measured, or none.
-    std::optional<MonteCarloTable> m_MonteCarlo;
-    std::optional<Core::Noise> m_Noise;
-    std::optional<Core::TransferFunction> m_TransferFunction;
-    std::optional<Core::Sensitivity> m_Sensitivity;
-    std::optional<Core::PoleZero> m_PoleZero;
-    std::optional<Core::SParameters> m_SParameters;
-    std::optional<Core::TruthTable> m_TruthTable;
-    std::optional<Core::HarmonicBalance> m_HarmonicBalance;
-    // Result versions, which change with every new result, so windows can tell a rerun from one they showed
-    std::size_t m_OperatingPointVersion = 0;
-    std::size_t m_TransientVersion = 0;
-    /// Also counts the chunks added to a transient that is still being made.
-    std::size_t m_TransientDataVersion = 0;
-    std::size_t m_ACSweepVersion = 0;
-    std::size_t m_DCSweepVersion = 0;
-    std::size_t m_MonteCarloVersion = 0;
-    std::size_t m_NoiseVersion = 0;
-    std::size_t m_TransferFunctionVersion = 0;
-    std::size_t m_SensitivityVersion = 0;
-    std::size_t m_PoleZeroVersion = 0;
-    std::size_t m_SParametersVersion = 0;
-    std::size_t m_TruthTableVersion = 0;
-    std::size_t m_HarmonicBalanceVersion = 0;
 
     void InvalidateDerivedData();
-    void ClearMonteCarlo();
     void FollowVoltageProbes();
     void RefreshInstances(const SavedSubcircuit &definition, const std::vector<std::string> &old_names,
                           const std::vector<std::optional<std::size_t>> &matches);

@@ -6,6 +6,7 @@
 #ifndef IMCSIM_POLE_ZERO_TAB_H
 #define IMCSIM_POLE_ZERO_TAB_H
 
+#include "results/result_store.h"
 #include "schematic/schematic.h"
 #include "simulation/simulation_results.h"
 #include <cstddef>
@@ -22,12 +23,13 @@ namespace GUI {
  */
 class PoleZeroTab {
 public:
-    explicit PoleZeroTab(Schematic &schematic);
+    PoleZeroTab(Schematic &schematic, const ResultStore &results);
 
     void Draw();
 
 private:
     Schematic &m_Schematic;
+    const ResultStore &m_Results;
     /// Whether the axes are linear instead of symmetric logarithmic.
     bool m_IsLinear = false;
     /// The result the axes of the plot were fitted to.

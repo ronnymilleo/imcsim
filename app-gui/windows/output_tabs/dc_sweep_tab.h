@@ -10,6 +10,7 @@
 #include "plots/plot_export.h"
 #include "plots/plot_types.h"
 #include "plots/trace_fit_state.h"
+#include "results/result_store.h"
 #include "schematic/schematic.h"
 #include "simulation/simulation_results.h"
 #include "windows/output_tabs/frame_results.h"
@@ -24,7 +25,7 @@ namespace GUI {
  */
 class DCSweepTab {
 public:
-    explicit DCSweepTab(Schematic &schematic);
+    DCSweepTab(Schematic &schematic, const ResultStore &results);
 
     void Draw(const FrameResults &frame);
 
@@ -34,6 +35,7 @@ public:
 
 private:
     Schematic &m_Schematic;
+    const ResultStore &m_Results;
     /// What the plot showed last frame, so its axes fit for a new result and when its traces change.
     TraceFitState m_Fit;
     PlotCursors m_Cursors;

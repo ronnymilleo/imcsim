@@ -21,9 +21,10 @@ namespace GUI {
 
 /**
  * @brief   Creates the tab.
- * @param[in] schematic  Schematic whose AC sweep is plotted; it must outlive the tab.
+ * @param[in] schematic  Schematic that keeps the measurements and the names of nets; it must outlive the tab.
+ * @param[in] results    Results whose AC sweep is shown; they must outlive the tab.
  */
-ACSweepTab::ACSweepTab(Schematic &schematic) : m_Schematic(schematic) {
+ACSweepTab::ACSweepTab(Schematic &schematic, ResultStore &results) : m_Schematic(schematic), m_Results(results) {
 }
 
 /**
@@ -31,7 +32,7 @@ ACSweepTab::ACSweepTab(Schematic &schematic) : m_Schematic(schematic) {
  * @param[in] frame  Whether any trace is measured, and the math channels over the sweep with their errors.
  */
 void ACSweepTab::Draw(const FrameResults &frame) {
-    const auto &sweep = m_Schematic.GetACSweep();
+    const auto &sweep = m_Results.GetACSweep();
     if (!sweep) {
         ImGui::TextDisabled("No AC sweep for the current circuit; pick it beside Run in the editor");
         return;
@@ -46,16 +47,16 @@ void ACSweepTab::Draw(const FrameResults &frame) {
                                     : NOTHING_MEASURED);
             DrawCursorToggle(m_Cursors, right_edge);
             DrawMathErrors(frame.ACSweepErrors);
-            if (const auto &pole_zero = m_Schematic.GetPoleZero()) {
+            if (const auto &pole_zero = m_Results.GetPoleZero()) {
                 ImGui::Checkbox("Show poles and zeros", &m_ShowPoleZero);
                 ImGui::SetItemTooltip(
                     "Mark the natural frequency of each pole (p) and zero (z) of the last Poles and zeros "
                     "analysis with a dashed line; the colors are those of its s-plane");
             }
-            if (const auto &steps = m_Schematic.GetACSweepSteps()) {
+            if (const auto &steps = m_Results.GetACSweepSteps()) {
                 if (const std::optional<std::size_t> picked =
                         DrawStepSelector(steps->Parameter, steps->Unit, steps->Values, steps->Selected)) {
-                    m_Schematic.SelectACSweepStep(*picked);
+                    m_Results.SelectACSweepStep(*picked);
                 }
             }
             DrawPlots(*sweep, frame.ACSweepMath);
@@ -69,7 +70,7 @@ void ACSweepTab::Draw(const FrameResults &frame) {
  * @return  True with an AC sweep and a measured trace or a math channel.
  */
 bool ACSweepTab::CanExport(const FrameResults &frame) const {
-    return m_Schematic.GetACSweep() && (frame.AnythingMeasured || !frame.ACSweepMath.Magnitudes.empty());
+    return m_Results.GetACSweep() && (frame.AnythingMeasured || !frame.ACSweepMath.Magnitudes.empty());
 }
 
 /**
@@ -78,8 +79,8 @@ bool ACSweepTab::CanExport(const FrameResults &frame) const {
  * @return  The figure, or an empty one without an AC sweep.
  */
 ExportFigure ACSweepTab::BuildFigure(const FrameResults &frame) const {
-    if (const std::optional<Core::ACSweep> &sweep = m_Schematic.GetACSweep()) {
-        return BuildACSweepFigure(*sweep, frame.ACSweepMath, m_Schematic, m_View);
+    if (const std::optional<Core::ACSweep> &sweep = m_Results.GetACSweep()) {
+        return BuildACSweepFigure(*sweep, frame.ACSweepMath, m_Results, m_Schematic, m_View);
     }
     return {};
 }
@@ -96,7 +97,7 @@ void ACSweepTab::DrawPlots(const Core::ACSweep &sweep, const ACMathTraces &math)
     const bool has_voltages =
         HasMeasuredVoltage(sweep.NodeMagnitudesDecibels.size(), m_Schematic) || UsesAxis(math.Magnitudes, ImAxis_Y1);
     const bool has_current_axis = shows_currents || UsesAxis(math.Magnitudes, ImAxis_Y2);
-    const PlotFits fits{.IsNewResult = m_Fit.TakeNewResult(m_Schematic.GetACSweepVersion()),
+    const PlotFits fits{.IsNewResult = m_Fit.TakeNewResult(m_Results.GetACSweepVersion()),
                         .HaveVoltagesChanged =
                             m_Fit.TakeNodesChanged(ListMeasuredNodes(sweep.NodeMagnitudesDecibels.size(), m_Schematic)),
                         .HaveCurrentsChanged = m_Fit.TakeCurrentsChanged(std::move(measured_currents)),
@@ -154,7 +155,7 @@ void ACSweepTab::DrawPlot(const Core::ACSweep &sweep, const BodePlot &plot, cons
     if (UsesAxis(*plot.Math, ImAxis_Y3)) {
         ImPlot::SetupAxis(ImAxis_Y3, plot.ThirdAxis.c_str(), ImPlotAxisFlags_AuxDefault);
     }
-    const auto &steps = m_Schematic.GetACSweepSteps();
+    const auto &steps = m_Results.GetACSweepSteps();
     std::vector<StepTraces> step_traces;
     if (steps) {
         for (const Core::ACSweep &step : steps->Results) {
@@ -184,8 +185,8 @@ void ACSweepTab::DrawPlot(const Core::ACSweep &sweep, const BodePlot &plot, cons
  * @note    Call it inside a plot.
  */
 void ACSweepTab::DrawRoots(const bool has_labels) {
-    if (m_ShowPoleZero && m_Schematic.GetPoleZero()) {
-        DrawRootMarkers(*m_Schematic.GetPoleZero(), has_labels);
+    if (m_ShowPoleZero && m_Results.GetPoleZero()) {
+        DrawRootMarkers(*m_Results.GetPoleZero(), has_labels);
     }
 }
 

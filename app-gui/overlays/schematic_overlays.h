@@ -15,6 +15,7 @@
 #include "results/logic_trace.h"
 #include "results/playback.h"
 #include "results/point_window.h"
+#include "results/result_store.h"
 #include "schematic/preferences.h"
 #include "schematic/probing.h"
 #include "schematic/schematic.h"
@@ -59,7 +60,7 @@ public:
     SchematicOverlays(GlowRenderer &glow_renderer, const TransientPlayback &playback, const Preferences &preferences);
 
     // What the schematic shows
-    void Update(Schematic &schematic, const AnalysisControls &controls);
+    void Update(Schematic &schematic, const ResultStore &results, const AnalysisControls &controls);
     void Reset();
     const std::optional<DisplayedState> &GetDisplayed() const;
 
@@ -87,6 +88,9 @@ private:
     /// How the schematic is colored, and which live effects are on.
     const Preferences &m_Preferences;
 
+    /// The results of the frame, from Update(), which the sensitivity coloring reads while drawing; null before the
+    /// first Update().
+    const ResultStore *m_Results = nullptr;
     /// What the schematic shows, resolved at the start of each frame.
     std::optional<DisplayedState> m_Displayed;
     // Heat scale of a transient

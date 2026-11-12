@@ -14,6 +14,7 @@
 #include "results/logic_trace.h"
 #include "results/playback.h"
 #include "results/point_window.h"
+#include "results/result_store.h"
 #include "schematic/schematic.h"
 #include "windows/output_tabs/frame_results.h"
 #include <cstddef>
@@ -33,7 +34,7 @@ namespace GUI {
  */
 class TransientTab {
 public:
-    TransientTab(Schematic &schematic, AnalysisControls &controls, TransientPlayback &playback);
+    TransientTab(Schematic &schematic, ResultStore &results, AnalysisControls &controls, TransientPlayback &playback);
 
     void Draw(const FrameResults &frame);
     PlotSpan GetMeasuredSpan() const;
@@ -44,6 +45,7 @@ public:
 
 private:
     Schematic &m_Schematic;
+    ResultStore &m_Results;
     AnalysisControls &m_Controls;
     TransientPlayback &m_Playback;
 

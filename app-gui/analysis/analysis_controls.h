@@ -1,6 +1,6 @@
 /**
  * @file    analysis_controls.h
- * @brief   Runs of the analyses on the worker thread and what they leave in the schematic, shared by the editor
+ * @brief   Runs of the analyses on the worker thread and what they leave in the results, shared by the editor
  *          toolbar and the Analysis Settings window.
  */
 
@@ -8,6 +8,7 @@
 #define IMCSIM_ANALYSIS_CONTROLS_H
 
 #include "results/parameter_step.h"
+#include "results/result_store.h"
 #include "schematic/schematic.h"
 #include "schematic/simulation_settings.h"
 #include "simulation/simulation_service.h"
@@ -49,7 +50,7 @@ enum class RunAction {
 /**
  * @class   AnalysisControls
  * @brief   Runs the selected analysis on a worker thread and keeps what the last run of each analysis reported.
- * @details The settings and the results live in the Schematic: the settings are saved with it, and the results
+ * @details The settings live in the Schematic and are saved with it; the results live in the ResultStore, and
  *          disappear as soon as the circuit changes. The error and the ngspice output belong to the last run of
  *          each analysis and stay until its next run. The Application owns one instance, which the editor toolbar
  *          and the Analysis Settings window both use. A run works on a copy of the circuit, so the user keeps editing
@@ -61,7 +62,7 @@ enum class RunAction {
  */
 class AnalysisControls {
 public:
-    explicit AnalysisControls(Schematic &schematic);
+    AnalysisControls(Schematic &schematic, ResultStore &results);
 
     // Runs
     void RunSelected();
@@ -116,6 +117,7 @@ private:
     };
 
     Schematic &m_Schematic;
+    ResultStore &m_Results;
 
     // Run in progress
     Core::SimulationService m_Service;

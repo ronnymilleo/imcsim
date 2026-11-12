@@ -14,6 +14,7 @@
 #include "overlays/glow_renderer.h"
 #include "overlays/schematic_overlays.h"
 #include "results/playback.h"
+#include "results/result_store.h"
 #include "schematic/canvas_view.h"
 #include "schematic/clipboard.h"
 #include "schematic/editor_mode.h"
@@ -56,9 +57,9 @@ namespace GUI {
  */
 class EditorWindow : public AppWindow {
 public:
-    EditorWindow(Schematic &schematic, AnalysisControls &controls, AnalysisSettingsPanel &settings_panel,
-                 PartEditor &part_editor, GlowRenderer &glow_renderer, TransientPlayback &playback,
-                 const Preferences &preferences);
+    EditorWindow(Schematic &schematic, const ResultStore &results, AnalysisControls &controls,
+                 AnalysisSettingsPanel &settings_panel, PartEditor &part_editor, GlowRenderer &glow_renderer,
+                 TransientPlayback &playback, const Preferences &preferences);
     ~EditorWindow() override = default;
 
     // Requests, global shortcuts and file popups, whichever window is in front
@@ -133,6 +134,10 @@ private:
 
     Schematic &m_RootSchematic;
     Schematic *m_Schematic;
+    /// The results of the root schematic, the only one an analysis runs on.
+    const ResultStore &m_RootResults;
+    /// What the editor shows of the results while a block is open: none, since a block has no run of its own.
+    const ResultStore m_NoResults{};
     /// The blocks open, from the outermost to the one shown; empty while the schematic is shown.
     std::vector<OpenBlock> m_OpenBlocks;
     std::vector<SavedSubcircuitPin> m_SubcircuitPins;
@@ -202,6 +207,7 @@ private:
 
     // Blocks
     bool IsEditingSubcircuit() const;
+    const ResultStore &GetShownResults() const;
     bool LeaveSubcircuitForDocument();
     bool ReturnToLevel(std::size_t depth);
     void ShowSchematic(Schematic &schematic);

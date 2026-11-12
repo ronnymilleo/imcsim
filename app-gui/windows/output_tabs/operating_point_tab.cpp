@@ -135,9 +135,11 @@ bool HaveSameValues(const Core::DCSweep &first, const Core::DCSweep &second) {
 
 /**
  * @brief   Creates the tab.
- * @param[in] schematic  Schematic whose operating point is shown; it must outlive the tab.
+ * @param[in] schematic  Schematic that keeps the measurements and the names of nets; it must outlive the tab.
+ * @param[in] results    Results whose operating point is shown; they must outlive the tab.
  */
-OperatingPointTab::OperatingPointTab(Schematic &schematic) : m_Schematic(schematic) {
+OperatingPointTab::OperatingPointTab(Schematic &schematic, ResultStore &results)
+    : m_Schematic(schematic), m_Results(results) {
 }
 
 /**
@@ -145,12 +147,12 @@ OperatingPointTab::OperatingPointTab(Schematic &schematic) : m_Schematic(schemat
  * window calls it every frame before it lists the traces, so the steps can be measured from the list.
  */
 void OperatingPointTab::Update() {
-    const std::size_t version = m_Schematic.GetOperatingPointVersion();
+    const std::size_t version = m_Results.GetOperatingPointVersion();
     if (m_SweptVersion == version) {
         return;
     }
     m_SweptVersion = version;
-    const auto &steps = m_Schematic.GetOperatingPointSteps();
+    const auto &steps = m_Results.GetOperatingPointSteps();
     if (!steps || steps->Parameter == MONTE_CARLO_PARAMETER) {
         m_StepSweep.reset();
         return;
@@ -167,15 +169,15 @@ void OperatingPointTab::Update() {
  *          get an operating point.
  */
 void OperatingPointTab::Draw() {
-    const auto &operating_point = m_Schematic.GetOperatingPoint();
+    const auto &operating_point = m_Results.GetOperatingPoint();
     if (!operating_point) {
         ImGui::TextDisabled("No operating point for the current circuit; pick it beside Run in the editor");
         return;
     }
-    if (const auto &steps = m_Schematic.GetOperatingPointSteps()) {
+    if (const auto &steps = m_Results.GetOperatingPointSteps()) {
         if (const std::optional<std::size_t> picked =
                 DrawStepSelector(steps->Parameter, steps->Unit, steps->Values, steps->Selected)) {
-            m_Schematic.SelectOperatingPointStep(*picked);
+            m_Results.SelectOperatingPointStep(*picked);
         }
         ImGui::SetItemTooltip("The step the schematic and the tables below show");
         if (steps->Parameter == MONTE_CARLO_PARAMETER) {
@@ -185,7 +187,7 @@ void OperatingPointTab::Draw() {
         }
     }
     // The selector may have picked another step this frame
-    if (const auto &shown = m_Schematic.GetOperatingPoint()) {
+    if (const auto &shown = m_Results.GetOperatingPoint()) {
         DrawOperatingPoint(*shown, m_Schematic);
     }
 }

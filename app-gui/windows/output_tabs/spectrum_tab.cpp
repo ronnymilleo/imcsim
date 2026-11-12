@@ -360,9 +360,11 @@ void PlotSpectrumLine(const SpectrumTrace &trace, const std::vector<double> &fre
 
 /**
  * @brief   Creates the tab.
- * @param[in] schematic  Schematic whose transient is transformed; it must outlive the tab.
+ * @param[in] schematic  Schematic that keeps the measurements and the names of nets; it must outlive the tab.
+ * @param[in] results    Results whose transient is shown; they must outlive the tab.
  */
-SpectrumTab::SpectrumTab(Schematic &schematic) : m_Schematic(schematic) {
+SpectrumTab::SpectrumTab(Schematic &schematic, const ResultStore &results)
+    : m_Schematic(schematic), m_Results(results) {
 }
 
 /**
@@ -371,7 +373,7 @@ SpectrumTab::SpectrumTab(Schematic &schematic) : m_Schematic(schematic) {
  * @param[in] span   The stretch of the transient to transform, the one its statistics measure.
  */
 void SpectrumTab::Draw(const FrameResults &frame, const PlotSpan span) {
-    const auto &transient = m_Schematic.GetTransient();
+    const auto &transient = m_Results.GetTransient();
     if (!transient) {
         ImGui::TextDisabled("No transient for the current circuit; the spectrum transforms its measured traces");
         return;
@@ -397,7 +399,7 @@ void SpectrumTab::Draw(const FrameResults &frame, const PlotSpan span) {
  * @return  True with a transient and the spectrum of at least one trace.
  */
 bool SpectrumTab::CanExport() const {
-    return m_Schematic.GetTransient() && m_Spectra &&
+    return m_Results.GetTransient() && m_Spectra &&
            std::ranges::any_of(m_Spectra->Traces,
                                [](const SpectrumTrace &trace) { return trace.Decibels.has_value(); });
 }
@@ -424,7 +426,7 @@ void SpectrumTab::Update(const Core::Transient &transient, const std::vector<Mat
     for (const SpectrumTrace &trace : traces) {
         labels.push_back(trace.Label + trace.Unit);
     }
-    const std::size_t version = m_Schematic.GetTransientDataVersion();
+    const std::size_t version = m_Results.GetTransientDataVersion();
     if (m_Spectra && m_Spectra->TransientVersion == version && m_Spectra->Span.From == span.From &&
         m_Spectra->Span.To == span.To && m_Spectra->Window == m_Window && m_Spectra->Labels == labels) {
         return;

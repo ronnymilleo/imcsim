@@ -11,6 +11,7 @@
 #include "plots/plot_exporter.h"
 #include "plots/plot_types.h"
 #include "plots/trace_fit_state.h"
+#include "results/result_store.h"
 #include "schematic/preferences.h"
 #include "schematic/schematic.h"
 #include <cstddef>
@@ -25,7 +26,7 @@ namespace GUI {
  */
 class HarmonicBalanceTab {
 public:
-    HarmonicBalanceTab(Schematic &schematic, Preferences &preferences);
+    HarmonicBalanceTab(Schematic &schematic, const ResultStore &results, Preferences &preferences);
 
     void Draw(PlotExporter &exporter);
 
@@ -35,6 +36,7 @@ public:
 
 private:
     Schematic &m_Schematic;
+    const ResultStore &m_Results;
     Preferences &m_Preferences;
 
     TraceFitState m_SpectrumFit;

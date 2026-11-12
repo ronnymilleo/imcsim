@@ -129,14 +129,16 @@ SchematicOverlays::SchematicOverlays(GlowRenderer &glow_renderer, const Transien
  * @brief   Resolves what the schematic shows this frame: the last operating point, unless a transient was run after it,
  *          then the transient at the instant of the playback, on a scale that covers the window that plays, so a value
  *          keeps its color while the time moves.
- * @param[in] schematic  The schematic being edited, whose results are shown.
+ * @param[in] schematic  The schematic being edited, whose parts and nodes the results are shown on.
+ * @param[in] results    The results to show; the drawing methods read them too, so they must outlive the frame.
  * @param[in] controls   Runs of the analyses, which tell which result came last.
  * @note    Call it once per frame, before drawing.
  */
-void SchematicOverlays::Update(Schematic &schematic, const AnalysisControls &controls) {
+void SchematicOverlays::Update(Schematic &schematic, const ResultStore &results, const AnalysisControls &controls) {
     m_Displayed.reset();
-    const auto &operating_point = schematic.GetOperatingPoint();
-    const auto &transient = schematic.GetTransient();
+    m_Results = &results;
+    const auto &operating_point = results.GetOperatingPoint();
+    const auto &transient = results.GetTransient();
     const bool show_transient = transient && !transient->Times.empty() &&
                                 (!operating_point || controls.GetLastRun() != Analysis::OPERATING_POINT);
     UpdateFuses(schematic, show_transient ? &*transient : nullptr,
@@ -151,13 +153,13 @@ void SchematicOverlays::Update(Schematic &schematic, const AnalysisControls &con
         // The scale goes over the window that plays, so a window of any size costs the same; while chunks keep arriving
         // it is refreshed a few times a second only
         const PointWindow window = m_Playback.Window.GetWindow();
-        const bool is_stale = m_ScaledTransientVersion != schematic.GetTransientDataVersion() ||
+        const bool is_stale = m_ScaledTransientVersion != results.GetTransientDataVersion() ||
                               m_ScaledWindow.First != window.First || m_ScaledWindow.Count != window.Count;
         const bool may_refresh = transient->IsComplete || !m_ScaledTransientVersion.has_value() ||
                                  ImGui::GetTime() - m_LastScaleTime >= SCALE_REFRESH_SECONDS;
         if (is_stale && may_refresh) {
             m_TransientScale = ScaleOf(SliceTransient(*transient, window), elements, connectivity);
-            m_ScaledTransientVersion = schematic.GetTransientDataVersion();
+            m_ScaledTransientVersion = results.GetTransientDataVersion();
             m_ScaledWindow = window;
             m_LastScaleTime = ImGui::GetTime();
         }
@@ -193,10 +195,10 @@ void SchematicOverlays::UpdateFuses(Schematic &schematic, const Core::Transient 
     if (shown == nullptr) {
         m_FuseBlowTimes.clear();
         m_FuseBlowTimesVersion.reset();
-    } else if (m_FuseBlowTimesVersion != schematic.GetTransientDataVersion() ||
+    } else if (m_FuseBlowTimesVersion != m_Results->GetTransientDataVersion() ||
                m_FuseBlowTimes.size() != elements.size()) {
         m_FuseBlowTimes = FindFuseBlowTimes(elements, schematic.GetConnectivity(), *shown);
-        m_FuseBlowTimesVersion = schematic.GetTransientDataVersion();
+        m_FuseBlowTimesVersion = m_Results->GetTransientDataVersion();
     }
     const bool has_previous_frame = shown != nullptr && m_WasFuseBlown.size() == elements.size();
     std::vector<bool> is_blown(elements.size(), false);
@@ -584,7 +586,7 @@ ImU32 SchematicOverlays::GetElementColor(const Schematic &schematic, const std::
  *          analysis does not list, such as a diode or a ground, keeps the color of the theme.
  */
 ImU32 SchematicOverlays::GetSensitivityColor(const Schematic &schematic, const std::size_t index) const {
-    const auto &sensitivity = schematic.GetSensitivity();
+    const auto &sensitivity = m_Results->GetSensitivity();
     if (!sensitivity) {
         return GetPalette().Element;
     }
@@ -631,7 +633,7 @@ void SchematicOverlays::DrawLogicReading(SchematicCanvas &canvas, const ViewTran
  */
 std::optional<SchematicOverlays::LegendLabels> SchematicOverlays::GetLegendLabels(Schematic &schematic) const {
     if (m_Preferences.WireColors == WireColoring::SENSITIVITY) {
-        const auto &sensitivity = schematic.GetSensitivity();
+        const auto &sensitivity = m_Results->GetSensitivity();
         if (!sensitivity) {
             return std::nullopt;
         }
@@ -675,7 +677,7 @@ bool SchematicOverlays::AreWiresHeatColored() const {
  */
 bool SchematicOverlays::ArePartsHeatColored(const Schematic &schematic) const {
     if (m_Preferences.WireColors == WireColoring::SENSITIVITY) {
-        return schematic.GetSensitivity().has_value();
+        return m_Results->GetSensitivity().has_value();
     }
     return m_Displayed &&
            (m_Preferences.WireColors == WireColoring::CURRENT || m_Preferences.WireColors == WireColoring::POWER);

@@ -1,6 +1,6 @@
 /**
  * @file    analysis_controls.cpp
- * @brief   Runs of the analyses on the worker thread and what they leave in the schematic, shared by the editor
+ * @brief   Runs of the analyses on the worker thread and what they leave in the results, shared by the editor
  *          toolbar and the Analysis Settings window.
  */
 
@@ -29,7 +29,7 @@ std::size_t ToIndex(const Analysis analysis) {
 }
 
 /**
- * @brief   Hands a result to the schematic, or clears the old one so stale values never sit next to an error.
+ * @brief   Hands a result to the results, or clears the old one so stale values never sit next to an error.
  */
 template <typename Result, typename Store>
 std::optional<std::string> StoreResult(std::expected<Result, std::string> result, Store store) {
@@ -146,16 +146,16 @@ MonteCarloRuns<Result> RunMonteCarlo(const Core::MonteCarloSettings &settings, c
 }
 
 /**
- * @brief   Hands the traces and the table of the runs to the schematic, or reports why they did not run.
+ * @brief   Hands the traces and the table of the runs to the results, or reports why they did not run.
  */
 template <typename Result, typename Store>
 std::optional<std::string> StoreMonteCarlo(std::expected<StepFamily<Result>, std::string> family, MonteCarloTable table,
-                                           Schematic &schematic, Store store) {
+                                           ResultStore &results, Store store) {
     if (!family) {
         return std::move(family.error());
     }
     store(std::move(*family));
-    schematic.SetMonteCarlo(std::move(table));
+    results.SetMonteCarlo(std::move(table));
     return std::nullopt;
 }
 
@@ -178,7 +178,7 @@ Core::Job MakeJob(const Core::Circuit &circuit, Work work, Store store) {
 }
 
 /**
- * @brief   Hands the steps to the schematic, or reports the step that failed; the old result is cleared before the
+ * @brief   Hands the steps to the results, or reports the step that failed; the old result is cleared before the
  *          steps run.
  */
 template <typename Result, typename Store>
@@ -193,24 +193,24 @@ std::optional<std::string> StoreSteps(std::expected<StepFamily<Result>, std::str
 /**
  * @brief   The warnings the stored result of one analysis carries, or none when it has no result or no warnings.
  */
-std::vector<std::string> ListWarningsOfResult(const Schematic &schematic, const Analysis analysis) {
-    if (analysis == Analysis::OPERATING_POINT && schematic.GetOperatingPoint()) {
-        return schematic.GetOperatingPoint()->Warnings;
+std::vector<std::string> ListWarningsOfResult(const ResultStore &results, const Analysis analysis) {
+    if (analysis == Analysis::OPERATING_POINT && results.GetOperatingPoint()) {
+        return results.GetOperatingPoint()->Warnings;
     }
-    if (analysis == Analysis::TRANSIENT && schematic.GetTransient()) {
-        return schematic.GetTransient()->Warnings;
+    if (analysis == Analysis::TRANSIENT && results.GetTransient()) {
+        return results.GetTransient()->Warnings;
     }
-    if (analysis == Analysis::POLE_ZERO && schematic.GetPoleZero()) {
-        return schematic.GetPoleZero()->Warnings;
+    if (analysis == Analysis::POLE_ZERO && results.GetPoleZero()) {
+        return results.GetPoleZero()->Warnings;
     }
-    if (analysis == Analysis::S_PARAMETERS && schematic.GetSParameters()) {
-        return schematic.GetSParameters()->Warnings;
+    if (analysis == Analysis::S_PARAMETERS && results.GetSParameters()) {
+        return results.GetSParameters()->Warnings;
     }
-    if (analysis == Analysis::TRUTH_TABLE && schematic.GetTruthTable()) {
-        return schematic.GetTruthTable()->Warnings;
+    if (analysis == Analysis::TRUTH_TABLE && results.GetTruthTable()) {
+        return results.GetTruthTable()->Warnings;
     }
-    if (analysis == Analysis::HARMONIC_BALANCE && schematic.GetHarmonicBalance()) {
-        return schematic.GetHarmonicBalance()->Warnings;
+    if (analysis == Analysis::HARMONIC_BALANCE && results.GetHarmonicBalance()) {
+        return results.GetHarmonicBalance()->Warnings;
     }
     return {};
 }
@@ -220,13 +220,15 @@ std::vector<std::string> ListWarningsOfResult(const Schematic &schematic, const 
 /**
  * @brief   Creates the controls for a schematic.
  * @param[in] schematic  Schematic whose analyses are set and run; it must outlive the controls.
+ * @param[in] results    Where the results of the runs go; they must outlive the controls.
  */
-AnalysisControls::AnalysisControls(Schematic &schematic) : m_Schematic(schematic) {
+AnalysisControls::AnalysisControls(Schematic &schematic, ResultStore &results)
+    : m_Schematic(schematic), m_Results(results) {
 }
 
 /**
  * @brief   Starts the selected analysis with its settings on the worker thread.
- * @note    The result, or the error, goes to the schematic when the run ends, which Update() notices. Nothing happens
+ * @note    The result, or the error, goes to the results when the run ends, which Update() notices. Nothing happens
  *          while another run is in progress. A paused live run holds the worker, so it ends first, keeping its points,
  *          and the analysis starts in the Update() that sees it end.
  */
@@ -500,7 +502,7 @@ RunOutcome AnalysisControls::GetOutcome(const Analysis analysis) const {
     if (!HasResult(analysis)) {
         return RunOutcome::NONE;
     }
-    if (analysis == Analysis::TRANSIENT && m_Schematic.GetTransient() && !m_Schematic.GetTransient()->IsComplete) {
+    if (analysis == Analysis::TRANSIENT && m_Results.GetTransient() && !m_Results.GetTransient()->IsComplete) {
         return RunOutcome::STOPPED;
     }
     const bool ngspice_warned = std::ranges::any_of(
@@ -636,8 +638,8 @@ void AnalysisControls::RunOperatingPointAnalysis(const Core::Circuit &circuit, c
                      [this](MonteCarloRuns<Core::OperatingPoint> runs) {
                          Finish(Analysis::OPERATING_POINT,
                                 StoreMonteCarlo(
-                                    std::move(runs.Family), std::move(runs.Table), m_Schematic,
-                                    [this](auto family) { m_Schematic.SetOperatingPointSteps(std::move(family)); }),
+                                    std::move(runs.Family), std::move(runs.Table), m_Results,
+                                    [this](auto family) { m_Results.SetOperatingPointSteps(std::move(family)); }),
                                 std::move(runs.Messages));
                      }));
         return;
@@ -655,7 +657,7 @@ void AnalysisControls::RunOperatingPointAnalysis(const Core::Circuit &circuit, c
                          Finish(
                              Analysis::OPERATING_POINT,
                              StoreSteps(std::move(runs.Family),
-                                        [this](auto family) { m_Schematic.SetOperatingPointSteps(std::move(family)); }),
+                                        [this](auto family) { m_Results.SetOperatingPointSteps(std::move(family)); }),
                              std::move(runs.Messages));
                      }));
         return;
@@ -666,7 +668,7 @@ void AnalysisControls::RunOperatingPointAnalysis(const Core::Circuit &circuit, c
                  [this](Core::OperatingPointRun run) {
                      Finish(Analysis::OPERATING_POINT,
                             StoreResult(std::move(run.Result),
-                                        [this](auto result) { m_Schematic.SetOperatingPoint(std::move(result)); }),
+                                        [this](auto result) { m_Results.SetOperatingPoint(std::move(result)); }),
                             std::move(run.Messages));
                  }));
 }
@@ -692,8 +694,8 @@ void AnalysisControls::RunTransientAnalysis(const Core::Circuit &circuit, const 
                      [this](MonteCarloRuns<Core::Transient> runs) {
                          Finish(
                              Analysis::TRANSIENT,
-                             StoreMonteCarlo(std::move(runs.Family), std::move(runs.Table), m_Schematic,
-                                             [this](auto family) { m_Schematic.SetTransientSteps(std::move(family)); }),
+                             StoreMonteCarlo(std::move(runs.Family), std::move(runs.Table), m_Results,
+                                             [this](auto family) { m_Results.SetTransientSteps(std::move(family)); }),
                              std::move(runs.Messages));
                      }));
         return;
@@ -711,13 +713,13 @@ void AnalysisControls::RunTransientAnalysis(const Core::Circuit &circuit, const 
                      [this](SteppedRuns<Core::Transient> runs) {
                          Finish(Analysis::TRANSIENT,
                                 StoreSteps(std::move(runs.Family),
-                                           [this](auto family) { m_Schematic.SetTransientSteps(std::move(family)); }),
+                                           [this](auto family) { m_Results.SetTransientSteps(std::move(family)); }),
                                 std::move(runs.Messages));
                      }));
         return;
     }
     // The points arrive in chunks while the run goes on, so the old result gives way to the first one
-    m_Schematic.SetTransient(std::nullopt);
+    m_Results.SetTransient(std::nullopt);
     const std::size_t circuit_version = m_Schematic.GetCircuitVersion();
     m_IsLiveRun = m_IsLiveModeOn && !FindLiveObstacle();
     m_IsLiveResult = m_IsLiveRun;
@@ -742,7 +744,7 @@ void AnalysisControls::RunTransientAnalysis(const Core::Circuit &circuit, const 
                          control.Post(
                              [this, circuit_version, points = std::make_shared<Core::Transient>(std::move(chunk))] {
                                  if (m_Schematic.GetCircuitVersion() == circuit_version) {
-                                     m_Schematic.AppendTransient(std::move(*points));
+                                     m_Results.AppendTransient(std::move(*points));
                                  }
                              });
                      };
@@ -757,7 +759,7 @@ void AnalysisControls::RunTransientAnalysis(const Core::Circuit &circuit, const 
                      }
                      Finish(Analysis::TRANSIENT,
                             StoreResult(std::move(run.Result),
-                                        [this](auto result) { m_Schematic.SetTransient(std::move(result)); }),
+                                        [this](auto result) { m_Results.SetTransient(std::move(result)); }),
                             std::move(run.Messages));
                  }));
 }
@@ -776,11 +778,10 @@ void AnalysisControls::RunACSweepAnalysis(const Core::Circuit &circuit, const st
                              MeasureACSweep);
                      },
                      [this](MonteCarloRuns<Core::ACSweep> runs) {
-                         Finish(
-                             Analysis::AC_SWEEP,
-                             StoreMonteCarlo(std::move(runs.Family), std::move(runs.Table), m_Schematic,
-                                             [this](auto family) { m_Schematic.SetACSweepSteps(std::move(family)); }),
-                             std::move(runs.Messages));
+                         Finish(Analysis::AC_SWEEP,
+                                StoreMonteCarlo(std::move(runs.Family), std::move(runs.Table), m_Results,
+                                                [this](auto family) { m_Results.SetACSweepSteps(std::move(family)); }),
+                                std::move(runs.Messages));
                      }));
         return;
     }
@@ -797,7 +798,7 @@ void AnalysisControls::RunACSweepAnalysis(const Core::Circuit &circuit, const st
                      [this](SteppedRuns<Core::ACSweep> runs) {
                          Finish(Analysis::AC_SWEEP,
                                 StoreSteps(std::move(runs.Family),
-                                           [this](auto family) { m_Schematic.SetACSweepSteps(std::move(family)); }),
+                                           [this](auto family) { m_Results.SetACSweepSteps(std::move(family)); }),
                                 std::move(runs.Messages));
                      }));
         return;
@@ -809,7 +810,7 @@ void AnalysisControls::RunACSweepAnalysis(const Core::Circuit &circuit, const st
                  [this](Core::ACSweepRun run) {
                      Finish(Analysis::AC_SWEEP,
                             StoreResult(std::move(run.Result),
-                                        [this](auto result) { m_Schematic.SetACSweep(std::move(result)); }),
+                                        [this](auto result) { m_Results.SetACSweep(std::move(result)); }),
                             std::move(run.Messages));
                  }));
 }
@@ -823,7 +824,7 @@ void AnalysisControls::RunDCSweepAnalysis(const Core::Circuit &circuit, const st
     const SimulationSettings &settings = m_Schematic.GetSimulationSettings();
     const std::vector<SweepSource> sources = ListSweepSources(circuit);
     if (sources.empty() || ((steps || monte_carlo) && settings.StepSource)) {
-        m_Schematic.SetDCSweep(std::nullopt);
+        m_Results.SetDCSweep(std::nullopt);
         Finish(Analysis::DC_SWEEP,
                sources.empty() ? std::format("Add {} to sweep", Core::SWEEPABLE_SOURCES)
                : monte_carlo   ? "Monte Carlo makes one curve per run, so turn off the second stepped source"
@@ -849,10 +850,9 @@ void AnalysisControls::RunDCSweepAnalysis(const Core::Circuit &circuit, const st
                      },
                      [this](MonteCarloRuns<Core::DCSweep> runs) {
                          Finish(Analysis::DC_SWEEP,
-                                StoreMonteCarlo(std::move(runs.Family), std::move(runs.Table), m_Schematic,
-                                                [this](auto family) {
-                                                    m_Schematic.SetDCSweep(JoinDCSweepSteps(std::move(family)));
-                                                }),
+                                StoreMonteCarlo(
+                                    std::move(runs.Family), std::move(runs.Table), m_Results,
+                                    [this](auto family) { m_Results.SetDCSweep(JoinDCSweepSteps(std::move(family))); }),
                                 std::move(runs.Messages));
                      }));
         return;
@@ -869,10 +869,9 @@ void AnalysisControls::RunDCSweepAnalysis(const Core::Circuit &circuit, const st
                      },
                      [this](SteppedRuns<Core::DCSweep> runs) {
                          Finish(Analysis::DC_SWEEP,
-                                StoreSteps(std::move(runs.Family),
-                                           [this](auto family) {
-                                               m_Schematic.SetDCSweep(JoinDCSweepSteps(std::move(family)));
-                                           }),
+                                StoreSteps(
+                                    std::move(runs.Family),
+                                    [this](auto family) { m_Results.SetDCSweep(JoinDCSweepSteps(std::move(family))); }),
                                 std::move(runs.Messages));
                      }));
         return;
@@ -886,7 +885,7 @@ void AnalysisControls::RunDCSweepAnalysis(const Core::Circuit &circuit, const st
                  [this](Core::DCSweepRun run) {
                      Finish(Analysis::DC_SWEEP,
                             StoreResult(std::move(run.Result),
-                                        [this](auto result) { m_Schematic.SetDCSweep(std::move(result)); }),
+                                        [this](auto result) { m_Results.SetDCSweep(std::move(result)); }),
                             std::move(run.Messages));
                  }));
 }
@@ -896,7 +895,7 @@ void AnalysisControls::RunNoiseAnalysis(const Core::Circuit &circuit) {
     const std::vector<std::string> sources = Core::GetNoiseInputSources(circuit);
     const std::optional<int> output = ResolveOutputNode(settings.NoiseOutput, circuit, m_Schematic);
     if (sources.empty() || !output) {
-        m_Schematic.SetNoise(std::nullopt);
+        m_Results.SetNoise(std::nullopt);
         Finish(Analysis::NOISE,
                sources.empty() ? "A noise analysis needs an AC source as its input; select a voltage or current "
                                  "source and set it to AC"
@@ -918,7 +917,7 @@ void AnalysisControls::RunNoiseAnalysis(const Core::Circuit &circuit) {
                  [this](Core::NoiseRun run) {
                      Finish(Analysis::NOISE,
                             StoreResult(std::move(run.Result),
-                                        [this](auto result) { m_Schematic.SetNoise(std::move(result)); }),
+                                        [this](auto result) { m_Results.SetNoise(std::move(result)); }),
                             std::move(run.Messages));
                  }));
 }
@@ -928,7 +927,7 @@ void AnalysisControls::RunTransferFunctionAnalysis(const Core::Circuit &circuit)
     const std::vector<std::string> sources = Core::GetTransferFunctionInputSources(circuit);
     const std::optional<int> output = ResolveOutputNode(settings.TransferFunctionOutput, circuit, m_Schematic);
     if (sources.empty() || !output) {
-        m_Schematic.SetTransferFunction(std::nullopt);
+        m_Results.SetTransferFunction(std::nullopt);
         Finish(Analysis::TRANSFER_FUNCTION,
                sources.empty()
                    ? std::format("A transfer function analysis needs an input source; add {}", Core::SWEEPABLE_SOURCES)
@@ -947,7 +946,7 @@ void AnalysisControls::RunTransferFunctionAnalysis(const Core::Circuit &circuit)
                  [this](Core::TransferFunctionRun run) {
                      Finish(Analysis::TRANSFER_FUNCTION,
                             StoreResult(std::move(run.Result),
-                                        [this](auto result) { m_Schematic.SetTransferFunction(std::move(result)); }),
+                                        [this](auto result) { m_Results.SetTransferFunction(std::move(result)); }),
                             std::move(run.Messages));
                  }));
 }
@@ -956,7 +955,7 @@ void AnalysisControls::RunSensitivityAnalysis(const Core::Circuit &circuit) {
     const SimulationSettings &settings = m_Schematic.GetSimulationSettings();
     const std::optional<int> output = ResolveOutputNode(settings.SensitivityOutput, circuit, m_Schematic);
     if (!output) {
-        m_Schematic.SetSensitivity(std::nullopt);
+        m_Results.SetSensitivity(std::nullopt);
         Finish(Analysis::SENSITIVITY, "Connect some parts: the sensitivity needs a node to measure", {});
         return;
     }
@@ -970,7 +969,7 @@ void AnalysisControls::RunSensitivityAnalysis(const Core::Circuit &circuit) {
                  [this](Core::SensitivityRun run) {
                      Finish(Analysis::SENSITIVITY,
                             StoreResult(std::move(run.Result),
-                                        [this](auto result) { m_Schematic.SetSensitivity(std::move(result)); }),
+                                        [this](auto result) { m_Results.SetSensitivity(std::move(result)); }),
                             std::move(run.Messages));
                  }));
 }
@@ -980,7 +979,7 @@ void AnalysisControls::RunPoleZeroAnalysis(const Core::Circuit &circuit) {
     const std::vector<std::string> sources = Core::GetTransferFunctionInputSources(circuit);
     const std::optional<int> output = ResolveOutputNode(settings.PoleZeroOutput, circuit, m_Schematic);
     if (sources.empty() || !output) {
-        m_Schematic.SetPoleZero(std::nullopt);
+        m_Results.SetPoleZero(std::nullopt);
         Finish(Analysis::POLE_ZERO,
                sources.empty()
                    ? std::format("A pole-zero analysis needs an input source; add {}", Core::SWEEPABLE_SOURCES)
@@ -999,7 +998,7 @@ void AnalysisControls::RunPoleZeroAnalysis(const Core::Circuit &circuit) {
                  [this](Core::PoleZeroRun run) {
                      Finish(Analysis::POLE_ZERO,
                             StoreResult(std::move(run.Result),
-                                        [this](auto result) { m_Schematic.SetPoleZero(std::move(result)); }),
+                                        [this](auto result) { m_Results.SetPoleZero(std::move(result)); }),
                             std::move(run.Messages));
                  }));
 }
@@ -1015,7 +1014,7 @@ void AnalysisControls::RunSParameterAnalysis(const Core::Circuit &circuit) {
                  [this](Core::SParametersRun run) {
                      Finish(Analysis::S_PARAMETERS,
                             StoreResult(std::move(run.Result),
-                                        [this](auto result) { m_Schematic.SetSParameters(std::move(result)); }),
+                                        [this](auto result) { m_Results.SetSParameters(std::move(result)); }),
                             std::move(run.Messages));
                  }));
 }
@@ -1024,7 +1023,7 @@ void AnalysisControls::RunTruthTableAnalysis(const Core::Circuit &circuit) {
     const std::vector<std::string> available = Core::GetTruthTableInputs(circuit);
     const std::vector<int> outputs = ListMeasuredNodes(circuit, m_Schematic);
     if (available.empty() || outputs.empty()) {
-        m_Schematic.SetTruthTable(std::nullopt);
+        m_Results.SetTruthTable(std::nullopt);
         Finish(Analysis::TRUTH_TABLE,
                available.empty() ? "A truth table needs a logic input to vary; add a Logic input"
                                  : "Measure a voltage with the Probe tool: the truth table reads the measured nodes",
@@ -1043,7 +1042,7 @@ void AnalysisControls::RunTruthTableAnalysis(const Core::Circuit &circuit) {
                  [this](Core::TruthTableRun run) {
                      Finish(Analysis::TRUTH_TABLE,
                             StoreResult(std::move(run.Result),
-                                        [this](auto result) { m_Schematic.SetTruthTable(std::move(result)); }),
+                                        [this](auto result) { m_Results.SetTruthTable(std::move(result)); }),
                             std::move(run.Messages));
                  }));
 }
@@ -1059,7 +1058,7 @@ void AnalysisControls::RunHarmonicBalanceAnalysis(const Core::Circuit &circuit) 
                  [this](Core::HarmonicBalanceRun run) {
                      Finish(Analysis::HARMONIC_BALANCE,
                             StoreResult(std::move(run.Result),
-                                        [this](auto result) { m_Schematic.SetHarmonicBalance(std::move(result)); }),
+                                        [this](auto result) { m_Results.SetHarmonicBalance(std::move(result)); }),
                             std::move(run.Messages));
                  }));
 }
@@ -1067,37 +1066,37 @@ void AnalysisControls::RunHarmonicBalanceAnalysis(const Core::Circuit &circuit) 
 void AnalysisControls::ClearResult(const Analysis analysis) {
     switch (analysis) {
     case Analysis::OPERATING_POINT:
-        m_Schematic.SetOperatingPoint(std::nullopt);
+        m_Results.SetOperatingPoint(std::nullopt);
         break;
     case Analysis::TRANSIENT:
-        m_Schematic.SetTransient(std::nullopt);
+        m_Results.SetTransient(std::nullopt);
         break;
     case Analysis::AC_SWEEP:
-        m_Schematic.SetACSweep(std::nullopt);
+        m_Results.SetACSweep(std::nullopt);
         break;
     case Analysis::DC_SWEEP:
-        m_Schematic.SetDCSweep(std::nullopt);
+        m_Results.SetDCSweep(std::nullopt);
         break;
     case Analysis::NOISE:
-        m_Schematic.SetNoise(std::nullopt);
+        m_Results.SetNoise(std::nullopt);
         break;
     case Analysis::TRANSFER_FUNCTION:
-        m_Schematic.SetTransferFunction(std::nullopt);
+        m_Results.SetTransferFunction(std::nullopt);
         break;
     case Analysis::SENSITIVITY:
-        m_Schematic.SetSensitivity(std::nullopt);
+        m_Results.SetSensitivity(std::nullopt);
         break;
     case Analysis::POLE_ZERO:
-        m_Schematic.SetPoleZero(std::nullopt);
+        m_Results.SetPoleZero(std::nullopt);
         break;
     case Analysis::S_PARAMETERS:
-        m_Schematic.SetSParameters(std::nullopt);
+        m_Results.SetSParameters(std::nullopt);
         break;
     case Analysis::TRUTH_TABLE:
-        m_Schematic.SetTruthTable(std::nullopt);
+        m_Results.SetTruthTable(std::nullopt);
         break;
     case Analysis::HARMONIC_BALANCE:
-        m_Schematic.SetHarmonicBalance(std::nullopt);
+        m_Results.SetHarmonicBalance(std::nullopt);
         break;
     default:
         break;
@@ -1120,43 +1119,43 @@ void AnalysisControls::Finish(const Analysis analysis, std::optional<std::string
  *          analysis that failed or did not run.
  */
 std::vector<std::string> AnalysisControls::GetResultWarnings(const Analysis analysis) const {
-    if (const auto &monte_carlo = m_Schematic.GetMonteCarlo(); monte_carlo && IsRepeatable(analysis)) {
+    if (const auto &monte_carlo = m_Results.GetMonteCarlo(); monte_carlo && IsRepeatable(analysis)) {
         std::vector<std::string> warnings = ListMonteCarloWarnings(*monte_carlo);
-        if (analysis == Analysis::TRANSIENT && m_Schematic.GetTransient()) {
-            std::ranges::copy(m_Schematic.GetTransient()->Warnings, std::back_inserter(warnings));
+        if (analysis == Analysis::TRANSIENT && m_Results.GetTransient()) {
+            std::ranges::copy(m_Results.GetTransient()->Warnings, std::back_inserter(warnings));
         }
-        if (analysis == Analysis::OPERATING_POINT && m_Schematic.GetOperatingPoint()) {
-            std::ranges::copy(m_Schematic.GetOperatingPoint()->Warnings, std::back_inserter(warnings));
+        if (analysis == Analysis::OPERATING_POINT && m_Results.GetOperatingPoint()) {
+            std::ranges::copy(m_Results.GetOperatingPoint()->Warnings, std::back_inserter(warnings));
         }
         return warnings;
     }
-    return ListWarningsOfResult(m_Schematic, analysis);
+    return ListWarningsOfResult(m_Results, analysis);
 }
 
 bool AnalysisControls::HasResult(const Analysis analysis) const {
     switch (analysis) {
     case Analysis::OPERATING_POINT:
-        return m_Schematic.GetOperatingPoint().has_value();
+        return m_Results.GetOperatingPoint().has_value();
     case Analysis::TRANSIENT:
-        return m_Schematic.GetTransient().has_value();
+        return m_Results.GetTransient().has_value();
     case Analysis::AC_SWEEP:
-        return m_Schematic.GetACSweep().has_value();
+        return m_Results.GetACSweep().has_value();
     case Analysis::DC_SWEEP:
-        return m_Schematic.GetDCSweep().has_value();
+        return m_Results.GetDCSweep().has_value();
     case Analysis::NOISE:
-        return m_Schematic.GetNoise().has_value();
+        return m_Results.GetNoise().has_value();
     case Analysis::TRANSFER_FUNCTION:
-        return m_Schematic.GetTransferFunction().has_value();
+        return m_Results.GetTransferFunction().has_value();
     case Analysis::SENSITIVITY:
-        return m_Schematic.GetSensitivity().has_value();
+        return m_Results.GetSensitivity().has_value();
     case Analysis::POLE_ZERO:
-        return m_Schematic.GetPoleZero().has_value();
+        return m_Results.GetPoleZero().has_value();
     case Analysis::S_PARAMETERS:
-        return m_Schematic.GetSParameters().has_value();
+        return m_Results.GetSParameters().has_value();
     case Analysis::TRUTH_TABLE:
-        return m_Schematic.GetTruthTable().has_value();
+        return m_Results.GetTruthTable().has_value();
     case Analysis::HARMONIC_BALANCE:
-        return m_Schematic.GetHarmonicBalance().has_value();
+        return m_Results.GetHarmonicBalance().has_value();
     }
     return false;
 }

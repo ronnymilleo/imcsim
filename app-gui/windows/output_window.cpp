@@ -122,20 +122,23 @@ const char *GetTabTitle(const PlotTab tab) {
 
 /**
  * @brief   Creates the window for a schematic.
- * @param[in] schematic  Schematic whose results are plotted; it must outlive the window.
+ * @param[in] schematic  Schematic that keeps the measurements, whose circuit the traces belong to; it must outlive the
+ *                       window.
+ * @param[in] results    Results that are plotted; they must outlive the window.
  * @param[in] controls   Runs of the analyses, to stop one from here while its plot grows; they must outlive the window.
  * @param[in] playback   Instant of the transient shown on the schematic, drawn as a line in the transient plot that
  *                       can be dragged; it must outlive the window.
  * @param[in] preferences  Whether a new result brings the window to the front, and the wire coloring the Sensitivity
  * tab sets; they must outlive the window.
  */
-OutputWindow::OutputWindow(Schematic &schematic, AnalysisControls &controls, TransientPlayback &playback,
-                           Preferences &preferences)
-    : AppWindow("Output", true), m_Schematic(schematic), m_Controls(controls), m_Playback(playback),
-      m_Preferences(preferences), m_MathChannels(schematic), m_Buses(schematic), m_OperatingPointTab(schematic),
-      m_TransientTab(schematic, controls, playback), m_SpectrumTab(schematic), m_ACSweepTab(schematic),
-      m_DCSweepTab(schematic), m_NoiseTab(schematic), m_PoleZeroTab(schematic), m_SParameterTab(schematic),
-      m_HarmonicBalanceTab(schematic, preferences), m_MonteCarloTab(schematic) {
+OutputWindow::OutputWindow(Schematic &schematic, ResultStore &results, AnalysisControls &controls,
+                           TransientPlayback &playback, Preferences &preferences)
+    : AppWindow("Output", true), m_Schematic(schematic), m_Results(results), m_Controls(controls), m_Playback(playback),
+      m_Preferences(preferences), m_MathChannels(schematic), m_Buses(schematic),
+      m_OperatingPointTab(schematic, results), m_TransientTab(schematic, results, controls, playback),
+      m_SpectrumTab(schematic, results), m_ACSweepTab(schematic, results), m_DCSweepTab(schematic, results),
+      m_NoiseTab(schematic, results), m_PoleZeroTab(schematic, results), m_SParameterTab(schematic, results),
+      m_HarmonicBalanceTab(schematic, results, preferences), m_MonteCarloTab(schematic, results) {
     SetInitialSize(INITIAL_SIZE);
 }
 
@@ -211,19 +214,19 @@ void OutputWindow::Draw() {
  */
 const std::vector<Core::ComponentTrace> &OutputWindow::GetListedCurrents() const {
     static const std::vector<Core::ComponentTrace> no_currents;
-    if (const auto &transient = m_Schematic.GetTransient()) {
+    if (const auto &transient = m_Results.GetTransient()) {
         return transient->Currents;
     }
-    if (const auto &sweep = m_Schematic.GetACSweep()) {
+    if (const auto &sweep = m_Results.GetACSweep()) {
         return sweep->CurrentMagnitudesDecibels;
     }
-    if (const auto &dc_sweep = m_Schematic.GetDCSweep()) {
+    if (const auto &dc_sweep = m_Results.GetDCSweep()) {
         return dc_sweep->Curves.front().Currents;
     }
     if (const Core::DCSweep *steps = m_OperatingPointTab.GetStepSweep()) {
         return steps->Curves.front().Currents;
     }
-    if (const auto &hb = m_Schematic.GetHarmonicBalance()) {
+    if (const auto &hb = m_Results.GetHarmonicBalance()) {
         return hb->CurrentWaveforms;
     }
     return no_currents;
@@ -233,11 +236,11 @@ const std::vector<Core::ComponentTrace> &OutputWindow::GetListedCurrents() const
  * @brief   The nodes of the results, which share them as they share the components.
  */
 std::size_t OutputWindow::GetListedNodeCount() const {
-    const auto &transient = m_Schematic.GetTransient();
-    const auto &sweep = m_Schematic.GetACSweep();
-    const auto &dc_sweep = m_Schematic.GetDCSweep();
+    const auto &transient = m_Results.GetTransient();
+    const auto &sweep = m_Results.GetACSweep();
+    const auto &dc_sweep = m_Results.GetDCSweep();
     const Core::DCSweep *point_steps = m_OperatingPointTab.GetStepSweep();
-    const auto &hb = m_Schematic.GetHarmonicBalance();
+    const auto &hb = m_Results.GetHarmonicBalance();
     return std::max({transient ? transient->NodeVoltages.size() : 0, sweep ? sweep->NodeMagnitudesDecibels.size() : 0,
                      dc_sweep ? dc_sweep->Curves.front().NodeVoltages.size() : 0,
                      point_steps ? point_steps->Curves.front().NodeVoltages.size() : 0,
@@ -251,18 +254,18 @@ std::size_t OutputWindow::GetListedNodeCount() const {
  *          the end of the run.
  */
 void OutputWindow::UpdateFullMath() {
-    const auto &transient = m_Schematic.GetTransient();
+    const auto &transient = m_Results.GetTransient();
     if (!transient || (m_Controls.IsRunning() && !transient->IsComplete)) {
         m_FullMath.reset();
         return;
     }
     const std::string signature = m_MathChannels.GetSignature();
-    if (m_FullMath && m_FullMath->DataVersion == m_Schematic.GetTransientDataVersion() &&
+    if (m_FullMath && m_FullMath->DataVersion == m_Results.GetTransientDataVersion() &&
         m_FullMath->Signature == signature) {
         return;
     }
     FullMath math{
-        .DataVersion = m_Schematic.GetTransientDataVersion(), .Signature = signature, .Traces = {}, .Errors = {}};
+        .DataVersion = m_Results.GetTransientDataVersion(), .Signature = signature, .Traces = {}, .Errors = {}};
     math.Traces = m_MathChannels.Evaluate(transient->Times, {.Seconds = 1}, transient->NodeVoltages,
                                           transient->Currents, math.Errors);
     m_FullMath = std::move(math);
@@ -276,11 +279,11 @@ void OutputWindow::UpdateFullMath() {
 FrameResults OutputWindow::EvaluateFrame(const std::size_t node_count,
                                          const std::vector<Core::ComponentTrace> &currents) const {
     FrameResults frame;
-    if (const auto &transient = m_Schematic.GetTransient()) {
+    if (const auto &transient = m_Results.GetTransient()) {
         const PointWindow window = m_Playback.Window.GetWindow();
         frame.TransientWindow = SliceTransient(*transient, window);
         const Core::Transient &shown = *frame.TransientWindow;
-        if (const auto &steps = m_Schematic.GetTransientSteps(); steps && !shown.Times.empty()) {
+        if (const auto &steps = m_Results.GetTransientSteps(); steps && !shown.Times.empty()) {
             StepFamily<Core::Transient> windows{.Parameter = steps->Parameter,
                                                 .Unit = steps->Unit,
                                                 .Values = steps->Values,
@@ -298,7 +301,7 @@ FrameResults OutputWindow::EvaluateFrame(const std::size_t node_count,
             frame.WholeRunMath = &*m_FullMath;
         }
     }
-    if (const auto &dc_sweep = m_Schematic.GetDCSweep()) {
+    if (const auto &dc_sweep = m_Results.GetDCSweep()) {
         const Dimension swept_unit = dc_sweep->SweptUnit == "A" ? Dimension{.Amperes = 1} : Dimension{.Volts = 1};
         for (const Core::DCSweepCurve &curve : dc_sweep->Curves) {
             std::vector<std::string> curve_errors;
@@ -309,7 +312,7 @@ FrameResults OutputWindow::EvaluateFrame(const std::size_t node_count,
             }
         }
     }
-    if (const auto &sweep = m_Schematic.GetACSweep()) {
+    if (const auto &sweep = m_Results.GetACSweep()) {
         frame.ACSweepMath = m_MathChannels.EvaluateAC(*sweep, frame.ACSweepErrors);
     }
     frame.AnythingMeasured = HasMeasuredVoltage(node_count, m_Schematic) || HasMeasuredCurrent(currents, m_Schematic);
@@ -372,7 +375,7 @@ void OutputWindow::DrawMathPanel(const std::size_t node_count, const std::vector
         operands.push_back(std::format("I({})", current.Name));
     }
     // The channels go over the whole run, so they wait for a run that is still going on
-    const auto &growing = m_Schematic.GetTransient();
+    const auto &growing = m_Results.GetTransient();
     const bool is_growing = growing && !growing->IsComplete && m_Controls.IsRunning();
     ImGui::BeginDisabled(is_growing);
     m_MathChannels.Draw(operands);
@@ -445,19 +448,19 @@ TabResults OutputWindow::FindTabResults() const {
     TabResults has_result{};
     const auto set = [&has_result](const PlotTab tab, const bool value) { has_result[ToIndex(tab)] = value; };
     set(PlotTab::OPERATING_POINT,
-        m_Schematic.GetOperatingPoint().has_value() || m_Schematic.GetOperatingPointSteps().has_value());
-    set(PlotTab::TRANSIENT, m_Schematic.GetTransient().has_value());
-    set(PlotTab::SPECTRUM, m_Schematic.GetTransient().has_value());
-    set(PlotTab::AC_SWEEP, m_Schematic.GetACSweep().has_value());
-    set(PlotTab::DC_SWEEP, m_Schematic.GetDCSweep().has_value());
-    set(PlotTab::NOISE, m_Schematic.GetNoise().has_value());
-    set(PlotTab::TRANSFER_FUNCTION, m_Schematic.GetTransferFunction().has_value());
-    set(PlotTab::SENSITIVITY, m_Schematic.GetSensitivity().has_value());
-    set(PlotTab::POLE_ZERO, m_Schematic.GetPoleZero().has_value());
-    set(PlotTab::S_PARAMETERS, m_Schematic.GetSParameters().has_value());
-    set(PlotTab::TRUTH_TABLE, m_Schematic.GetTruthTable().has_value());
-    set(PlotTab::HARMONIC_BALANCE, m_Schematic.GetHarmonicBalance().has_value());
-    set(PlotTab::MONTE_CARLO, m_Schematic.GetMonteCarlo().has_value());
+        m_Results.GetOperatingPoint().has_value() || m_Results.GetOperatingPointSteps().has_value());
+    set(PlotTab::TRANSIENT, m_Results.GetTransient().has_value());
+    set(PlotTab::SPECTRUM, m_Results.GetTransient().has_value());
+    set(PlotTab::AC_SWEEP, m_Results.GetACSweep().has_value());
+    set(PlotTab::DC_SWEEP, m_Results.GetDCSweep().has_value());
+    set(PlotTab::NOISE, m_Results.GetNoise().has_value());
+    set(PlotTab::TRANSFER_FUNCTION, m_Results.GetTransferFunction().has_value());
+    set(PlotTab::SENSITIVITY, m_Results.GetSensitivity().has_value());
+    set(PlotTab::POLE_ZERO, m_Results.GetPoleZero().has_value());
+    set(PlotTab::S_PARAMETERS, m_Results.GetSParameters().has_value());
+    set(PlotTab::TRUTH_TABLE, m_Results.GetTruthTable().has_value());
+    set(PlotTab::HARMONIC_BALANCE, m_Results.GetHarmonicBalance().has_value());
+    set(PlotTab::MONTE_CARLO, m_Results.GetMonteCarlo().has_value());
     return has_result;
 }
 
@@ -516,10 +519,10 @@ void OutputWindow::DrawTab(const PlotTab tab, const FrameResults &frame) {
         m_NoiseTab.Draw();
         break;
     case PlotTab::TRANSFER_FUNCTION:
-        DrawTransferFunctionTab(m_Schematic);
+        DrawTransferFunctionTab(m_Results, m_Schematic);
         break;
     case PlotTab::SENSITIVITY:
-        DrawSensitivityTab(m_Schematic, m_Preferences);
+        DrawSensitivityTab(m_Results, m_Schematic, m_Preferences);
         break;
     case PlotTab::POLE_ZERO:
         m_PoleZeroTab.Draw();
@@ -531,7 +534,7 @@ void OutputWindow::DrawTab(const PlotTab tab, const FrameResults &frame) {
         m_HarmonicBalanceTab.Draw(m_Exporter);
         break;
     case PlotTab::TRUTH_TABLE:
-        DrawTruthTableTab(m_Schematic);
+        DrawTruthTableTab(m_Results, m_Schematic);
         break;
     case PlotTab::MONTE_CARLO:
         if (m_MonteCarloTab.Draw()) {
@@ -628,7 +631,7 @@ bool OutputWindow::CanExport(const FrameResults &frame) const {
  *          can hold.
  */
 bool OutputWindow::HasLongerRun() const {
-    const auto &transient = m_Schematic.GetTransient();
+    const auto &transient = m_Results.GetTransient();
     return m_ShownTab == PlotTab::TRANSIENT && transient &&
            transient->Times.size() > m_Playback.Window.GetWindow().Count && !m_Controls.IsRunning();
 }
