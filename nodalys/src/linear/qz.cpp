@@ -799,6 +799,87 @@ double MaxAbsEntry(const DenseMatrix &matrix) {
     return max_val;
 }
 
+struct AlgebraicPivot {
+    bool IsRow = false;
+    std::size_t Row = 0;
+    std::size_t Col = 0;
+    double Magnitude = 0.0;
+};
+
+void UpdateBestZeroBRowPivot(const DenseMatrix &a, const DenseMatrix &b, const double b_tol, AlgebraicPivot &best) {
+    const std::size_t n = a.Rows();
+    for (std::size_t r = 0; r < n; ++r) {
+        double row_b = 0.0;
+        for (std::size_t c = 0; c < n; ++c) {
+            row_b = std::max(row_b, std::abs(b.At(r, c)));
+        }
+        if (row_b > b_tol) {
+            continue;
+        }
+        for (std::size_t c = 0; c < n; ++c) {
+            const double val = std::abs(a.At(r, c));
+            if (val > best.Magnitude) {
+                best = {.IsRow = true, .Row = r, .Col = c, .Magnitude = val};
+            }
+        }
+    }
+}
+
+void UpdateBestZeroBColPivot(const DenseMatrix &a, const DenseMatrix &b, const double b_tol, AlgebraicPivot &best) {
+    const std::size_t n = a.Rows();
+    for (std::size_t c = 0; c < n; ++c) {
+        double col_b = 0.0;
+        for (std::size_t r = 0; r < n; ++r) {
+            col_b = std::max(col_b, std::abs(b.At(r, c)));
+        }
+        if (col_b > b_tol) {
+            continue;
+        }
+        for (std::size_t r = 0; r < n; ++r) {
+            const double val = std::abs(a.At(r, c));
+            if (val > best.Magnitude) {
+                best = {.IsRow = false, .Row = r, .Col = c, .Magnitude = val};
+            }
+        }
+    }
+}
+
+void EliminateRowPivot(DenseMatrix &a, DenseMatrix &b, const std::size_t pivot_row, const std::size_t pivot_col) {
+    const std::size_t n = a.Rows();
+    const double pivot = a.At(pivot_row, pivot_col);
+    for (std::size_t j = 0; j < n; ++j) {
+        if (j == pivot_col) {
+            continue;
+        }
+        const double factor = a.At(pivot_row, j) / pivot;
+        if (factor == 0.0) {
+            continue;
+        }
+        for (std::size_t i = 0; i < n; ++i) {
+            a.At(i, j) -= factor * a.At(i, pivot_col);
+            b.At(i, j) -= factor * b.At(i, pivot_col);
+        }
+    }
+}
+
+void EliminateColPivot(DenseMatrix &a, DenseMatrix &b, const std::size_t pivot_row, const std::size_t pivot_col) {
+    const std::size_t n = a.Rows();
+    const double pivot = a.At(pivot_row, pivot_col);
+    for (std::size_t i = 0; i < n; ++i) {
+        if (i == pivot_row) {
+            continue;
+        }
+        const double factor = a.At(i, pivot_col) / pivot;
+        if (factor == 0.0) {
+            continue;
+        }
+        for (std::size_t j = 0; j < n; ++j) {
+            a.At(i, j) -= factor * a.At(pivot_row, j);
+            b.At(i, j) -= factor * b.At(pivot_row, j);
+        }
+    }
+}
+
 /**
  * @brief   Deflates algebraic rows and columns (zero rows/columns in B) before running QZ, eliminating spurious
  *          infinite-eigenvalue leaks in singular MNA pencils.
@@ -815,89 +896,28 @@ void DeflateZeroRowsAndColumns(DenseMatrix &a, DenseMatrix &b) {
     const double a_tol = 1e-12 * a_norm_ref;
 
     while (a.Rows() > 0) {
-        const std::size_t n = a.Rows();
         if (MaxAbsEntry(b) <= b_tol) {
             a = DenseMatrix(0, 0);
             b = DenseMatrix(0, 0);
             return;
         }
 
-        bool is_row = false;
-        std::size_t best_r = 0;
-        std::size_t best_c = 0;
-        double best_pivot = 0.0;
+        AlgebraicPivot best;
+        UpdateBestZeroBRowPivot(a, b, b_tol, best);
+        UpdateBestZeroBColPivot(a, b, b_tol, best);
 
-        for (std::size_t r = 0; r < n; ++r) {
-            double row_b = 0.0;
-            for (std::size_t c = 0; c < n; ++c) {
-                row_b = std::max(row_b, std::abs(b.At(r, c)));
-            }
-            if (row_b <= b_tol) {
-                for (std::size_t c = 0; c < n; ++c) {
-                    const double val = std::abs(a.At(r, c));
-                    if (val > best_pivot) {
-                        best_pivot = val;
-                        best_r = r;
-                        best_c = c;
-                        is_row = true;
-                    }
-                }
-            }
-        }
-
-        for (std::size_t c = 0; c < n; ++c) {
-            double col_b = 0.0;
-            for (std::size_t r = 0; r < n; ++r) {
-                col_b = std::max(col_b, std::abs(b.At(r, c)));
-            }
-            if (col_b <= b_tol) {
-                for (std::size_t r = 0; r < n; ++r) {
-                    const double val = std::abs(a.At(r, c));
-                    if (val > best_pivot) {
-                        best_pivot = val;
-                        best_r = r;
-                        best_c = c;
-                        is_row = false;
-                    }
-                }
-            }
-        }
-
-        if (best_pivot <= a_tol) {
+        if (best.Magnitude <= a_tol) {
             break;
         }
 
-        const double pivot = a.At(best_r, best_c);
-        if (is_row) {
-            for (std::size_t j = 0; j < n; ++j) {
-                if (j == best_c) {
-                    continue;
-                }
-                const double factor = a.At(best_r, j) / pivot;
-                if (factor != 0.0) {
-                    for (std::size_t i = 0; i < n; ++i) {
-                        a.At(i, j) -= factor * a.At(i, best_c);
-                        b.At(i, j) -= factor * b.At(i, best_c);
-                    }
-                }
-            }
+        if (best.IsRow) {
+            EliminateRowPivot(a, b, best.Row, best.Col);
         } else {
-            for (std::size_t i = 0; i < n; ++i) {
-                if (i == best_r) {
-                    continue;
-                }
-                const double factor = a.At(i, best_c) / pivot;
-                if (factor != 0.0) {
-                    for (std::size_t j = 0; j < n; ++j) {
-                        a.At(i, j) -= factor * a.At(best_r, j);
-                        b.At(i, j) -= factor * b.At(best_r, j);
-                    }
-                }
-            }
+            EliminateColPivot(a, b, best.Row, best.Col);
         }
 
-        a = RemoveRowAndColumn(a, best_r, best_c);
-        b = RemoveRowAndColumn(b, best_r, best_c);
+        a = RemoveRowAndColumn(a, best.Row, best.Col);
+        b = RemoveRowAndColumn(b, best.Row, best.Col);
     }
 }
 
