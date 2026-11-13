@@ -5,6 +5,7 @@
 
 #include "results/current_flow.h"
 
+#include "circuit/circuit_currents.h"
 #include "circuit/components/logic_part.h"
 #include <algorithm>
 #include <cmath>

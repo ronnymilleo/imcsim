@@ -19,7 +19,7 @@
 #include "circuit/components/vcc.h"
 #include "circuit/components/voltage_source.h"
 #include "circuit/subcircuit.h"
-#include "simulation/circuit_checks.h"
+#include "simulation/check_sensitivity.h"
 #include "simulation/simulation_backend.h"
 #include "simulation/simulator.h"
 #include <algorithm>

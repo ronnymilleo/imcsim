@@ -1,40 +1,28 @@
 /**
  * @file    circuit_currents.cpp
- * @brief   Names the currents a part reports and the probes that measure them.
- * @details Defines the current probe functions of circuit.h.
+ * @brief   The currents a simulation reports for each part: which terminals are probed and how they are named.
  */
 
-#include "circuit/circuit.h"
+#include "circuit/circuit_currents.h"
 
-#include "circuit/behavioral_expression.h"
+#include "circuit/circuit.h"
+#include "circuit/circuit_netlist.h"
 #include "circuit/components/behavioral_source.h"
 #include "circuit/components/bjt.h"
-#include "circuit/components/clock.h"
+#include "circuit/components/component.h"
 #include "circuit/components/controlled_source.h"
 #include "circuit/components/diode.h"
-#include "circuit/components/fuse.h"
-#include "circuit/components/logic_input.h"
 #include "circuit/components/logic_part.h"
 #include "circuit/components/mosfet.h"
-#include "circuit/components/net_label.h"
-#include "circuit/components/op_amp.h"
-#include "circuit/components/potentiometer.h"
-#include "circuit/components/relay.h"
-#include "circuit/components/source.h"
-#include "circuit/components/subcircuit.h"
 #include "circuit/components/switch.h"
-#include "circuit/components/transformer.h"
-#include "circuit/components/voltage_controlled_switch.h"
-#include "circuit/subcircuit.h"
-#include "spice/spice_value.h"
 #include <algorithm>
 #include <array>
-#include <cctype>
+#include <cstddef>
 #include <format>
-#include <iterator>
-#include <set>
-#include <sstream>
-#include <utility>
+#include <optional>
+#include <string>
+#include <string_view>
+#include <vector>
 
 namespace Core {
 

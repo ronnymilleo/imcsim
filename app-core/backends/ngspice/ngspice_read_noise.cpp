@@ -1,30 +1,28 @@
 /**
- * @file    ngspice_readers_noise.cpp
- * @brief   Reads the results of the noise analysis from the plots of ngspice.
- * @details Defines part of what ngspice_readers.h declares; the readers are split by kind of analysis over
- *          ngspice_vectors.h.
+ * @file    ngspice_read_noise.cpp
+ * @brief   Reads the result of a noise analysis from the two plots ngspice leaves.
  */
 
-#include "backends/ngspice/ngspice_readers.h"
+#include "backends/ngspice/ngspice_read_noise.h"
 
 #include "backends/ngspice/ngspice_library.h"
 #include "backends/ngspice/ngspice_vectors.h"
-#include "circuit/components/source.h"
-#include "simulation/circuit_checks.h"
-#include "simulation/pole_zero.h"
-#include "simulation/ratings.h"
-#include "simulation/sensitivity.h"
+#include "circuit/circuit.h"
+#include "circuit/circuit_netlist.h"
+#include "simulation/analysis_settings.h"
+#include "simulation/analysis_sources.h"
+#include "simulation/simulation_results.h"
 #include <algorithm>
-#include <array>
-#include <cctype>
 #include <cmath>
-#include <complex>
+#include <cstddef>
+#include <expected>
 #include <format>
 #include <ngspice/sharedspice.h>
-#include <numbers>
 #include <optional>
+#include <string>
 #include <string_view>
 #include <utility>
+#include <vector>
 
 namespace Core {
 

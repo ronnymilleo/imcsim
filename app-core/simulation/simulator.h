@@ -8,7 +8,6 @@
 
 #include "circuit/circuit.h"
 #include "simulation/analysis_settings.h"
-#include "simulation/circuit_checks.h"
 #include "simulation/run_control.h"
 #include "simulation/simulation_backend.h"
 #include "simulation/simulation_results.h"

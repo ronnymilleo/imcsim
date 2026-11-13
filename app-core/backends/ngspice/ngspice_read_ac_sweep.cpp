@@ -1,30 +1,28 @@
 /**
- * @file    ngspice_readers_ac.cpp
- * @brief   Reads the results of the AC sweep from the current plot of ngspice.
- * @details Defines part of what ngspice_readers.h declares; the readers are split by kind of analysis over
- *          ngspice_vectors.h.
+ * @file    ngspice_read_ac_sweep.cpp
+ * @brief   Reads the result of an AC sweep from the current plot of ngspice.
  */
 
-#include "backends/ngspice/ngspice_readers.h"
+#include "backends/ngspice/ngspice_read_ac_sweep.h"
 
-#include "backends/ngspice/ngspice_library.h"
 #include "backends/ngspice/ngspice_vectors.h"
+#include "circuit/circuit.h"
+#include "circuit/circuit_currents.h"
 #include "circuit/components/source.h"
-#include "simulation/circuit_checks.h"
-#include "simulation/pole_zero.h"
-#include "simulation/ratings.h"
-#include "simulation/sensitivity.h"
+#include "simulation/simulation_results.h"
 #include <algorithm>
 #include <array>
-#include <cctype>
 #include <cmath>
 #include <complex>
+#include <cstddef>
+#include <expected>
 #include <format>
+#include <iterator>
 #include <ngspice/sharedspice.h>
 #include <numbers>
-#include <optional>
-#include <string_view>
+#include <string>
 #include <utility>
+#include <vector>
 
 namespace Core {
 

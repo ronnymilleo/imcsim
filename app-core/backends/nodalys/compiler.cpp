@@ -7,6 +7,7 @@
 
 #include "backends/nodalys/model_parser.h"
 #include "backends/nodalys/parameter_conversion.h"
+#include "circuit/circuit_currents.h"
 #include "circuit/components/bjt.h"
 #include "circuit/components/clock.h"
 #include "circuit/components/controlled_source.h"

@@ -16,7 +16,7 @@
 #include "circuit/components/resistor.h"
 #include "circuit/components/vcc.h"
 #include "circuit/components/voltage_source.h"
-#include "simulation/circuit_checks.h"
+#include "simulation/check_pole_zero.h"
 #include "simulation/simulation_backend.h"
 #include "simulation/simulator.h"
 #include <algorithm>

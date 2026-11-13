@@ -11,8 +11,9 @@
 #include "imgui.h"
 #include "misc/cpp/imgui_stdlib.h"
 #include "schematic/probing.h"
+#include "simulation/analysis_sources.h"
 #include "simulation/analysis_suggestions.h"
-#include "simulation/circuit_checks.h"
+#include "simulation/check_s_parameters.h"
 #include "simulation/simulation_backend.h"
 #include "spice/spice_value.h"
 #include <algorithm>

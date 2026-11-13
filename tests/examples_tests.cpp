@@ -21,7 +21,7 @@
 #include "results/trace_statistics.h"
 #include "schematic/examples.h"
 #include "schematic/schematic.h"
-#include "simulation/circuit_checks.h"
+#include "simulation/analysis_sources.h"
 #include "simulation/monte_carlo.h"
 #include "simulation/simulation_backend.h"
 #include "simulation/simulator.h"

@@ -6,12 +6,21 @@ add_library(imcsim-gui-lib
         STATIC
             analysis/analysis_controls.cpp
             analysis/analysis_inputs.cpp
-            analysis/analysis_runs_repeatable.cpp
-            analysis/analysis_runs_single.cpp
             analysis/analysis_settings_panel.cpp
             analysis/auto_rerun.cpp
+            analysis/run_ac_sweep.cpp
+            analysis/run_dc_sweep.cpp
+            analysis/run_harmonic_balance.cpp
             analysis/run_jobs.cpp
+            analysis/run_noise.cpp
+            analysis/run_operating_point.cpp
+            analysis/run_pole_zero.cpp
+            analysis/run_s_parameters.cpp
+            analysis/run_sensitivity.cpp
             analysis/run_status.cpp
+            analysis/run_transfer_function.cpp
+            analysis/run_transient.cpp
+            analysis/run_truth_table.cpp
             application.cpp
             base/file_dialog.cpp
             base/helpers.cpp

@@ -8,6 +8,7 @@
 
 #include "backends/ngspice/ngspice_library.h"
 #include "circuit/circuit.h"
+#include "circuit/circuit_currents.h"
 #include "circuit/components/source.h"
 #include <algorithm>
 #include <cctype>

@@ -5,6 +5,7 @@
 
 #include "simulation/ratings.h"
 
+#include "circuit/circuit_currents.h"
 #include "circuit/components/bjt.h"
 #include "circuit/components/diode.h"
 #include "circuit/components/mosfet.h"

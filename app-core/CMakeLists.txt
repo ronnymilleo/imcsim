@@ -6,10 +6,15 @@ add_library(imcsim-core-lib
         STATIC
             backends/ngspice/ngspice_backend.cpp
             backends/ngspice/ngspice_library.cpp
-            backends/ngspice/ngspice_readers.cpp
-            backends/ngspice/ngspice_readers_ac.cpp
-            backends/ngspice/ngspice_readers_noise.cpp
-            backends/ngspice/ngspice_readers_small_signal.cpp
+            backends/ngspice/ngspice_read_ac_sweep.cpp
+            backends/ngspice/ngspice_read_dc_sweep.cpp
+            backends/ngspice/ngspice_read_noise.cpp
+            backends/ngspice/ngspice_read_operating_point.cpp
+            backends/ngspice/ngspice_read_pole_zero.cpp
+            backends/ngspice/ngspice_read_s_parameters.cpp
+            backends/ngspice/ngspice_read_sensitivity.cpp
+            backends/ngspice/ngspice_read_transfer_function.cpp
+            backends/ngspice/ngspice_read_transient.cpp
             backends/ngspice/ngspice_vectors.cpp
             backends/nodalys/compiler.cpp
             backends/nodalys/model_parser.cpp
@@ -49,10 +54,23 @@ add_library(imcsim-core-lib
             circuit/components/voltage_controlled_switch.cpp
             circuit/components/voltage_source.cpp
             circuit/library_model.cpp
+            circuit/netlist_logic.cpp
+            circuit/netlist_sources.cpp
+            circuit/netlist_subcircuits.cpp
             circuit/spice_library.cpp
-            simulation/analysis_checks.cpp
             simulation/analysis_sources.cpp
             simulation/analysis_suggestions.cpp
+            simulation/check_ac_sweep.cpp
+            simulation/check_dc_sweep.cpp
+            simulation/check_frequency_range.cpp
+            simulation/check_harmonic_balance.cpp
+            simulation/check_noise.cpp
+            simulation/check_pole_zero.cpp
+            simulation/check_s_parameters.cpp
+            simulation/check_sensitivity.cpp
+            simulation/check_transfer_function.cpp
+            simulation/check_transient.cpp
+            simulation/check_truth_table.cpp
             simulation/circuit_checks.cpp
             simulation/circuit_copy.cpp
             simulation/fuse_state.cpp

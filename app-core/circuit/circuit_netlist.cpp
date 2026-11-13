@@ -1,22 +1,23 @@
 /**
  * @file    circuit_netlist.cpp
- * @brief   Writes a circuit as a SPICE netlist, and lists the netlist elements of a part.
- * @details Defines Circuit::ToSpiceNetlist() and GetElementNames() of circuit.h.
+ * @brief   Writes a circuit as a SPICE netlist and names the elements each part becomes in it.
  */
 
-#include "circuit/circuit.h"
+#include "circuit/circuit_netlist.h"
 
 #include "circuit/behavioral_expression.h"
+#include "circuit/circuit.h"
+#include "circuit/circuit_currents.h"
 #include "circuit/components/behavioral_source.h"
 #include "circuit/components/bjt.h"
 #include "circuit/components/clock.h"
+#include "circuit/components/component.h"
 #include "circuit/components/controlled_source.h"
 #include "circuit/components/diode.h"
 #include "circuit/components/fuse.h"
 #include "circuit/components/logic_input.h"
 #include "circuit/components/logic_part.h"
 #include "circuit/components/mosfet.h"
-#include "circuit/components/net_label.h"
 #include "circuit/components/op_amp.h"
 #include "circuit/components/potentiometer.h"
 #include "circuit/components/relay.h"
@@ -25,112 +26,25 @@
 #include "circuit/components/switch.h"
 #include "circuit/components/transformer.h"
 #include "circuit/components/voltage_controlled_switch.h"
+#include "circuit/library_model.h"
+#include "circuit/netlist_logic.h"
+#include "circuit/netlist_sources.h"
+#include "circuit/netlist_subcircuits.h"
 #include "circuit/subcircuit.h"
 #include "spice/spice_value.h"
 #include <algorithm>
-#include <array>
-#include <cctype>
+#include <cstddef>
 #include <format>
 #include <iterator>
-#include <set>
-#include <sstream>
+#include <optional>
+#include <string>
+#include <string_view>
 #include <utility>
+#include <vector>
 
 namespace Core {
 
 namespace {
-
-/**
- * @brief   The arguments of TRNOISE, with the parts that are off written as 0: ngspice ignores a source with no time
- *          step and no telegraph amplitude, and takes the step only for the white and 1/f noise.
- */
-std::string FormatNoiseArguments(const NoiseParameters &noise) {
-    const bool is_flicker_on = noise.FlickerAmplitude != 0.0;
-    const bool is_telegraph_on = noise.TelegraphAmplitude != 0.0;
-    const bool needs_step = noise.WhiteAmplitude != 0.0 || is_flicker_on;
-    return std::format("{} {} {} {} {} {} {}", FormatSpiceValue(noise.WhiteAmplitude),
-                       FormatSpiceValue(needs_step ? noise.TimeStep : 0.0),
-                       FormatSpiceValue(is_flicker_on ? noise.FlickerExponent : 0.0),
-                       FormatSpiceValue(noise.FlickerAmplitude), FormatSpiceValue(noise.TelegraphAmplitude),
-                       FormatSpiceValue(is_telegraph_on ? noise.CaptureTime : 0.0),
-                       FormatSpiceValue(is_telegraph_on ? noise.EmissionTime : 0.0));
-}
-
-/**
- * @brief   One line serves every analysis: .op reads the DC value, .ac the AC magnitude and .tran the waveform.
- * @details Every waveform writes the value it starts from, so the operating point matches the beginning of the
- *          transient. The name tells SPICE whether it is a voltage or current source.
- */
-std::string FormatSource(const Source &source, const std::vector<int> &nodes) {
-    const std::string start = std::format("{} {} {}", source.GetName(), nodes[0], nodes[1]);
-    switch (source.GetSourceType()) {
-    case Source::SourceType::DC:
-        return std::format("{} DC {}\n", start, FormatSpiceValue(source.GetValue()));
-    case Source::SourceType::AC: {
-        const ACParameters &ac = source.GetAC();
-        const std::string offset = FormatSpiceValue(ac.Offset);
-        return std::format("{} DC {} AC {} SIN({} {} {})\n", start, offset, FormatSpiceValue(ac.Magnitude), offset,
-                           FormatSpiceValue(ac.Amplitude), FormatSpiceValue(ac.Frequency));
-    }
-    case Source::SourceType::PULSE: {
-        const PulseParameters &pulse = source.GetPulse();
-        const std::string low = FormatSpiceValue(pulse.Low);
-        return std::format("{} DC {} PULSE({} {} {} {} {} {} {})\n", start, low, low, FormatSpiceValue(pulse.High),
-                           FormatSpiceValue(pulse.Delay), FormatSpiceValue(pulse.RiseTime),
-                           FormatSpiceValue(pulse.FallTime), FormatSpiceValue(pulse.Width),
-                           FormatSpiceValue(pulse.Period));
-    }
-    case Source::SourceType::EXP: {
-        const EXPParameters &exp = source.GetEXP();
-        const std::string initial = FormatSpiceValue(exp.InitialValue);
-        return std::format("{} DC {} EXP({} {} {} {} {} {})\n", start, initial, initial,
-                           FormatSpiceValue(exp.PeakValue), FormatSpiceValue(exp.RiseDelay),
-                           FormatSpiceValue(exp.RiseTimeConstant), FormatSpiceValue(exp.FallDelay),
-                           FormatSpiceValue(exp.FallTimeConstant));
-    }
-    case Source::SourceType::SFFM: {
-        const SFFMParameters &sffm = source.GetSFFM();
-        const std::string offset = FormatSpiceValue(sffm.Offset);
-        return std::format("{} DC {} SFFM({} {} {} {} {})\n", start, offset, offset, FormatSpiceValue(sffm.Amplitude),
-                           FormatSpiceValue(sffm.CarrierFrequency), FormatSpiceValue(sffm.ModulationIndex),
-                           FormatSpiceValue(sffm.SignalFrequency));
-    }
-    case Source::SourceType::AM: {
-        const AMParameters &am = source.GetAM();
-        const std::string offset = FormatSpiceValue(am.Offset);
-        // ngspice reads AM(offset mod_offset amplitude mod_frequency carrier_frequency delay); the modulation offset
-        // stays 0, so the source is the offset plus the amplitude times the two sines
-        return std::format("{} DC {} AM({} 0 {} {} {} {})\n", start, offset, offset, FormatSpiceValue(am.Amplitude),
-                           FormatSpiceValue(am.ModulatingFrequency), FormatSpiceValue(am.CarrierFrequency),
-                           FormatSpiceValue(am.Delay));
-    }
-    case Source::SourceType::PWL: {
-        const PWLParameters &pwl = source.GetPWL();
-        std::string points;
-        for (const PWLPoint &point : pwl.Points) {
-            if (!points.empty()) {
-                points += " ";
-            }
-            points += std::format("{} {}", FormatSpiceValue(point.Time), FormatSpiceValue(point.Value));
-        }
-        const std::string first = FormatSpiceValue(pwl.Points.front().Value);
-        return std::format("{} DC {} PWL({})\n", start, first, points);
-    }
-    case Source::SourceType::NOISE:
-        return std::format("{} DC {} TRNOISE({})\n", start, FormatSpiceValue(source.GetNoise().Offset),
-                           FormatNoiseArguments(source.GetNoise()));
-    case Source::SourceType::RANDOM: {
-        const RandomParameters &random = source.GetRandom();
-        // ngspice adds the DC value to what TRRANDOM gives, so the offset or mean is written once, as the DC value,
-        // which also makes it the operating point; the offset of TRRANDOM itself stays 0
-        return std::format("{} DC {} TRRANDOM({} {} {} {} 0)\n", start, FormatSpiceValue(random.Second),
-                           static_cast<int>(random.Distribution), FormatSpiceValue(random.TimeStep),
-                           FormatSpiceValue(random.Delay), FormatSpiceValue(random.First));
-    }
-    default:
-        return "";
-    }
-}
 
 /**
  * @brief   The currents that CCCS and CCVS sources of the circuit follow and that behavioral sources read.
@@ -192,97 +106,6 @@ std::string ProbeTerminals(const Component &component, const std::vector<Current
     return lines;
 }
 
-/// Output resistance of the logic family, in series with the digital-to-analog bridge of every output of a gate or
-/// flip-flop, whose digital code model only meets digital nodes.
-constexpr double LOGIC_OUTPUT_RESISTANCE = 50.0;
-/// Resistance from every logic input to ground, so an input left unconnected reads 0.
-constexpr double LOGIC_INPUT_PULL_DOWN = 1e9;
-
-std::string FormatLogicModels(const LogicPart &part) {
-    const LogicParameters &family = part.GetParameters();
-    const std::string name = part.GetName();
-    const std::string delay = FormatSpiceValue(family.PropagationDelay);
-    std::string models = std::format(".model ADC-{} adc_bridge(in_low={} in_high={})\n", name,
-                                     FormatSpiceValue(family.LogicLevel * LOGIC_LOW_FRACTION),
-                                     FormatSpiceValue(family.LogicLevel * LOGIC_HIGH_FRACTION));
-    models += std::format(".model DAC-{} dac_bridge(out_low=0 out_high={} out_undef={})\n", name,
-                          FormatSpiceValue(family.LogicLevel), FormatSpiceValue(family.LogicLevel / 2.0));
-    if (IsFlipFlop(part.GetType())) {
-        models +=
-            std::format(".model LOGIC-{} {}(clk_delay={} set_delay={} reset_delay={} rise_delay={} fall_delay={})\n",
-                        name, GetLogicModelKind(part.GetType()), delay, delay, delay, delay, delay);
-    } else {
-        models += std::format(".model LOGIC-{} {}(rise_delay={} fall_delay={})\n", name,
-                              GetLogicModelKind(part.GetType()), delay, delay);
-    }
-    return models;
-}
-
-/**
- * @brief   The terminal nodes are in the order of GetInputLabels() and GetLogicOutputLabels(); the digital nodes and
- *          the analog nodes behind the output resistors are numbered from next_extra_node.
- */
-std::string FormatLogicPart(const LogicPart &part, const std::vector<int> &nodes, int &next_extra_node) {
-    const std::string &name = part.GetName();
-    const std::vector<std::string> inputs = part.GetInputLabels();
-    const std::vector<std::string> outputs = GetLogicOutputLabels(part.GetType());
-    std::string lines;
-    std::vector<int> digital_inputs;
-    for (std::size_t input = 0; input < inputs.size(); ++input) {
-        const int digital = next_extra_node++;
-        digital_inputs.push_back(digital);
-        lines += std::format("A-{0}-{1} [{2}] [{3}] ADC-{0}\n", name, inputs[input], nodes[input], digital);
-        lines += std::format("R-{}-{} {} 0 {}\n", name, inputs[input], nodes[input],
-                             FormatSpiceValue(LOGIC_INPUT_PULL_DOWN));
-    }
-    std::vector<int> digital_outputs;
-    for (std::size_t output = 0; output < outputs.size(); ++output) {
-        digital_outputs.push_back(next_extra_node++);
-    }
-    // A single-input gate takes its input as a scalar, the others as a vector
-    std::string ports;
-    if (IsLogicGate(part.GetType()) && inputs.size() == 1) {
-        ports = std::to_string(digital_inputs[0]);
-    } else if (IsLogicGate(part.GetType())) {
-        ports = "[";
-        for (const int digital : digital_inputs) {
-            ports += std::format("{} ", digital);
-        }
-        ports.back() = ']';
-    } else {
-        for (const int digital : digital_inputs) {
-            ports += std::format("{} ", digital);
-        }
-        ports.pop_back();
-    }
-    for (const int digital : digital_outputs) {
-        ports += std::format(" {}", digital);
-    }
-    lines += std::format("A-{0} {1} LOGIC-{0}\n", name, ports);
-    for (std::size_t output = 0; output < outputs.size(); ++output) {
-        const int analog = next_extra_node++;
-        lines += std::format("A-{0}-{1} [{2}] [{3}] DAC-{0}\n", name, outputs[output], digital_outputs[output], analog);
-        lines += std::format("R-{}-{} {} {} {}\n", name, outputs[output], analog, nodes[inputs.size() + output],
-                             FormatSpiceValue(LOGIC_OUTPUT_RESISTANCE));
-    }
-    return lines;
-}
-
-/**
- * @brief   The model of a logic part, and a bridge and a resistor on every pin, as FormatLogicPart() writes them.
- */
-std::vector<std::string> GetLogicElementNames(const Component &part) {
-    const std::string &name = part.GetName();
-    std::vector<std::string> names{std::format("A-{}", name)};
-    std::vector<std::string> pins = static_cast<const LogicPart &>(part).GetInputLabels();
-    std::ranges::move(GetLogicOutputLabels(part.GetType()), std::back_inserter(pins));
-    for (const std::string &pin : pins) {
-        names.push_back(std::format("A-{}-{}", name, pin));
-        names.push_back(std::format("R-{}-{}", name, pin));
-    }
-    return names;
-}
-
 /**
  * @brief   Parts that share a ready model share its line, written the first time the model comes up.
  */
@@ -300,20 +123,6 @@ std::string FormatComponentValue(const Component &component) {
         return *expression;
     }
     return FormatSpiceValue(component.GetValue());
-}
-
-/// A fuse needs the Gear integration, since the trapezoidal rule rings for ever on an inductor that an open fuse cuts.
-constexpr std::string_view FUSE_INTEGRATION_OPTION = ".options method=gear\n";
-
-bool IsModelNameCharacter(const char character) {
-    return std::isalnum(static_cast<unsigned char>(character)) != 0 || character == '_' || character == '-';
-}
-
-std::string ToLowerCase(const std::string_view text) {
-    std::string lower(text);
-    std::ranges::transform(lower, lower.begin(),
-                           [](const unsigned char character) { return static_cast<char>(std::tolower(character)); });
-    return lower;
 }
 
 /**
@@ -363,162 +172,11 @@ std::string FormatLibraryModels(const std::vector<LibraryModel> &library_models)
     return text;
 }
 
-/**
- * @brief   The names a body declares with .model or .subckt, lowercase, since SPICE reads names without regard to case.
- */
-std::set<std::string> CollectDeclaredNames(const std::string &body) {
-    std::set<std::string> declared;
-    std::istringstream lines(body);
-    std::string line;
-    while (std::getline(lines, line)) {
-        std::istringstream fields(line);
-        std::string directive;
-        std::string name;
-        if (!(fields >> directive >> name)) {
-            continue;
-        }
-        directive = ToLowerCase(directive);
-        if (directive == ".model" || directive == ".subckt") {
-            declared.insert(ToLowerCase(name));
-        }
-    }
-    return declared;
-}
-
-/**
- * @brief   One line with the declared names prefixed.
- * @details A comment stays as it is, and the first word of an element line is left alone: it is the element's own name,
- *          whose first letter says what the element is.
- */
-std::string ScopeLine(const std::string_view line, const std::set<std::string> &declared, const std::string &prefix) {
-    const std::size_t first = line.find_first_not_of(" \t");
-    if (first == std::string_view::npos || line[first] == '*') {
-        return std::string(line);
-    }
-    bool is_first_word = line[first] != '.' && line[first] != '+';
-    std::string scoped;
-    for (std::size_t position = 0; position < line.size();) {
-        if (!IsModelNameCharacter(line[position])) {
-            scoped += line[position++];
-            continue;
-        }
-        const std::size_t start = position;
-        while (position < line.size() && IsModelNameCharacter(line[position])) {
-            ++position;
-        }
-        const std::string token(line.substr(start, position - start));
-        const bool is_element_name = std::exchange(is_first_word, false);
-        scoped += !is_element_name && declared.contains(ToLowerCase(token)) ? prefix + token : token;
-    }
-    return scoped;
-}
-
-/**
- * @brief   Model names are global in ngspice, even when their declarations sit inside a subcircuit.
- * @details Prefix every declaration and reference of a definition so equal custom parts in two definitions cannot
- *          replace each other's models.
- */
-std::string ScopeModels(const std::string &body, const std::string_view definition_name) {
-    const std::set<std::string> declared = CollectDeclaredNames(body);
-    const std::string prefix = std::format("imcsim_{}_", definition_name);
-    std::string scoped;
-    scoped.reserve(body.size() + declared.size() * prefix.size());
-    std::size_t start = 0;
-    while (start < body.size()) {
-        const std::size_t end = body.find('\n', start);
-        const std::size_t length = end == std::string::npos ? std::string::npos : end - start;
-        scoped += ScopeLine(std::string_view(body).substr(start, length), declared, prefix);
-        if (end == std::string::npos) {
-            break;
-        }
-        scoped += '\n';
-        start = end + 1;
-    }
-    return scoped;
-}
-
-/**
- * @brief   A drawn block lists the nodes of its pins and writes its body as a netlist; a block kept as SPICE text lists
- *          the ports of its .subckt line and writes its text as it came.
- */
-std::string FormatSubcircuit(const SubcircuitDefinition &definition) {
-    std::string text = std::format(".subckt {}", definition.Name);
-    if (definition.Spice) {
-        for (const std::string &port : definition.Spice->Ports) {
-            text += std::format(" {}", port);
-        }
-    } else {
-        for (const SubcircuitPin &pin : definition.Pins) {
-            text += std::format(" {}", pin.Node);
-        }
-    }
-    if (!definition.Parameters.empty()) {
-        text += " params:";
-        for (const SubcircuitParameter &parameter : definition.Parameters) {
-            text += std::format(" {}={}", parameter.Name, FormatSpiceValue(parameter.DefaultValue));
-        }
-    }
-    text += "\n";
-    std::string body;
-    if (definition.Spice) {
-        body = definition.Spice->Text;
-        if (!body.empty() && !body.ends_with('\n')) {
-            body += '\n';
-        }
-    } else {
-        // A pin that no part inside uses still owns its node, which the extra nodes of the body must not take
-        Circuit numbered_body = definition.Body;
-        for (const SubcircuitPin &pin : definition.Pins) {
-            numbered_body.ReserveNode(pin.Node);
-        }
-        body = numbered_body.ToSpiceNetlist();
-        body.erase(0, body.find('\n') + 1);
-        if (body.ends_with(".end\n")) {
-            body.erase(body.size() - 5);
-        }
-        // Options are global and the root netlist writes them once, for the fuses of the blocks too
-        if (const std::size_t option = body.find(FUSE_INTEGRATION_OPTION); option != std::string::npos) {
-            body.erase(option, FUSE_INTEGRATION_OPTION.size());
-        }
-    }
-    text += ScopeModels(body, definition.Name);
-    text += std::format(".ends {}\n", definition.Name);
-    return text;
-}
-
-/**
- * @brief   The definitions in an order that writes each one after the blocks its body places, as a reader of the
- *          netlist meets them; the order of the list stays among the others, and a cycle, which the checks refuse, ends
- *          the walk.
- */
-std::vector<const SubcircuitDefinition *> OrderByUse(const std::vector<std::shared_ptr<SubcircuitDefinition>> &list) {
-    std::vector<const SubcircuitDefinition *> order;
-    std::set<std::string, std::less<>> visited;
-    const auto place = [&](const auto &self, const SubcircuitDefinition &definition) -> void {
-        if (!visited.insert(definition.Name).second) {
-            return;
-        }
-        for (const CircuitEntry &entry : definition.Body.GetEntries()) {
-            if (entry.Part->GetType() != ComponentType::SUBCIRCUIT) {
-                continue;
-            }
-            const std::string &name = static_cast<const SubcircuitInstance &>(*entry.Part).GetDefinitionName();
-            if (const auto inner = std::ranges::find(list, name, &SubcircuitDefinition::Name); inner != list.end()) {
-                self(self, **inner);
-            }
-        }
-        order.push_back(&definition);
-    };
-    for (const auto &definition : list) {
-        place(place, *definition);
-    }
-    return order;
-}
-
 } // namespace
 
 /**
  * @brief   Writes the circuit as a SPICE netlist, ready to hand to ngspice.
+ * @param[in] circuit             Circuit to write.
  * @param[in] analysis            Optional analysis command, such as ".op", written right before ".end".
  * @param[in] add_current_probes  Adds a 0 V source in series with every terminal GetCurrentProbes() lists, named
  *                                by GetCurrentProbeName(), whose branch current is the terminal current; for
@@ -526,25 +184,25 @@ std::vector<const SubcircuitDefinition *> OrderByUse(const std::vector<std::shar
  * @return  One line per component, plus its probes, with node numbers as SPICE node names (0 is ground), then one
  *          ".model" line per model in use and one ".subckt" block per project-local definition, ending in ".end".
  *          Subcircuit instances use X lines, with their pins in definition order and their parameter overrides.
- * @note    Ground components produce no line; they only make their node 0. A supply rail becomes a DC voltage
- *          source from its node to ground. A part whose current controls a CCCS or CCVS gets a probe even without
- *          add_current_probes, unless it is a voltage source itself, since ngspice follows currents through
- *          voltage sources. An AC source writes its offset, AC magnitude and sine together, and every other
- *          waveform its starting value and its shape, so the same netlist works for .op, .ac and .tran. A clock
- *          writes a pulse whose rise and fall times are a fixed share of its period, and a logic input a DC level,
- *          both from their terminal to ground. A capacitor or inductor with an initial condition writes it as IC=,
- * which only a transient with uic uses. Probes and the gain stage of each ideal op-amp use nodes numbered after
- * GetNodeCount(), so the circuit nodes keep their numbers. Op-amp macromodels are subcircuits, written after the
- * models. A fuse is an instance of a subcircuit written once with the models, and a circuit with a fuse, in a block or
- * not, writes ".options method=gear" once.
+ * @note    Ground components produce no line; they only make their node 0. A supply rail becomes a DC voltage source
+ *          from its node to ground. A part whose current controls a CCCS or CCVS gets a probe even without
+ *          add_current_probes, unless it is a voltage source itself, since ngspice follows currents through voltage
+ *          sources. An AC source writes its offset, AC magnitude and sine together, and every other waveform its
+ *          starting value and its shape, so the same netlist works for .op, .ac and .tran. A clock writes a pulse whose
+ *          rise and fall times are a fixed share of its period, and a logic input a DC level, both from their terminal
+ *          to ground. A capacitor or inductor with an initial condition writes it as IC=, which only a transient with
+ *          uic uses. Probes and the gain stage of each ideal op-amp use nodes numbered after GetNodeCount(), so the
+ *          circuit nodes keep their numbers. Op-amp macromodels are subcircuits, written after the models. A fuse is an
+ *          instance of a subcircuit written once with the models, and a circuit with a fuse, in a block or not, writes
+ *          ".options method=gear" once.
  */
-std::string Circuit::ToSpiceNetlist(const std::string_view analysis, const bool add_current_probes) const {
+std::string WriteSpiceNetlist(const Circuit &circuit, const std::string_view analysis, const bool add_current_probes) {
     std::string netlist = "* imcsim netlist\n";
-    const std::vector<std::string> controlling_currents = ListControllingCurrents(m_Entries);
+    const std::vector<std::string> controlling_currents = ListControllingCurrents(circuit.GetEntries());
     std::vector<std::string> model_names;
     std::string models;
-    int next_extra_node = m_NodeCount;
-    for (const CircuitEntry &entry : m_Entries) {
+    int next_extra_node = circuit.GetNodeCount();
+    for (const CircuitEntry &entry : circuit.GetEntries()) {
         const Component &component = *entry.Part;
         const std::string value = FormatComponentValue(component);
         // Probed parts connect through the probe nodes; the probe lines follow the part
@@ -604,7 +262,7 @@ std::string Circuit::ToSpiceNetlist(const std::string_view analysis, const bool 
         case ComponentType::CCVS: {
             // ngspice follows the current through a voltage source: the controlling part's own, or its probe
             const std::string &current = static_cast<const ControlledSource &>(component).GetControllingCurrent();
-            const std::string control = FindControllingSource(*this, current).value_or(current);
+            const std::string control = FindControllingSource(circuit, current).value_or(current);
             netlist += std::format("{} {} {} {} {}\n", component.GetName(), nodes[0], nodes[1], control, value);
             break;
         }
@@ -612,8 +270,8 @@ std::string Circuit::ToSpiceNetlist(const std::string_view analysis, const bool 
         case ComponentType::BEHAVIORAL_CURRENT: {
             const auto &source = static_cast<const BehavioralSource &>(component);
             const auto expression = TranslateBehavioralExpression(
-                source.GetExpression(), [this](const std::string_view net) { return FindNodeOfNet(net); },
-                [this](const std::string_view current) { return FindControllingSource(*this, current); });
+                source.GetExpression(), [&circuit](const std::string_view net) { return circuit.FindNodeOfNet(net); },
+                [&circuit](const std::string_view current) { return FindControllingSource(circuit, current); });
             // A source the checks refuse still shows in the Netlist window, as the user wrote it
             netlist += std::format("{} {} {} {}={}\n", component.GetName(), nodes[0], nodes[1],
                                    component.GetType() == ComponentType::BEHAVIORAL_VOLTAGE ? "V" : "I",
@@ -748,11 +406,11 @@ std::string Circuit::ToSpiceNetlist(const std::string_view analysis, const bool 
         netlist += probes;
     }
     netlist += models;
-    if (HasFuse()) {
+    if (circuit.HasFuse()) {
         netlist += FUSE_INTEGRATION_OPTION;
     }
-    netlist += FormatLibraryModels(m_LibraryModels);
-    for (const SubcircuitDefinition *definition : OrderByUse(m_Subcircuits)) {
+    netlist += FormatLibraryModels(circuit.GetLibraryModels());
+    for (const SubcircuitDefinition *definition : OrderByUse(circuit.GetSubcircuits())) {
         netlist += FormatSubcircuit(*definition);
     }
     if (!analysis.empty()) {

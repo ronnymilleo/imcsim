@@ -17,7 +17,7 @@
 #include "digital_models.h"
 #include "schematic/examples.h"
 #include "schematic/schematic.h"
-#include "simulation/circuit_checks.h"
+#include "simulation/check_transient.h"
 #include "simulation/live_change.h"
 #include "simulation/simulation_backend.h"
 #include "simulation/simulator.h"

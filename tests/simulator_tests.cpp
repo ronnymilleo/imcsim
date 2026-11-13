@@ -4,6 +4,7 @@
  */
 
 #include "circuit/circuit.h"
+#include "circuit/circuit_currents.h"
 #include "circuit/components/behavioral_source.h"
 #include "circuit/components/bjt.h"
 #include "circuit/components/capacitor.h"
@@ -27,6 +28,7 @@
 #include "circuit/components/voltage_source.h"
 #include "circuit/subcircuit.h"
 #include "digital_models.h"
+#include "simulation/analysis_sources.h"
 #include "simulation/circuit_checks.h"
 #include "simulation/simulator.h"
 #include <algorithm>

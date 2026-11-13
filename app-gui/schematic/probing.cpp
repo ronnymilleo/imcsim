@@ -5,6 +5,7 @@
 
 #include "schematic/probing.h"
 
+#include "circuit/circuit_currents.h"
 #include "simulation/simulator.h"
 #include "spice/spice_value.h"
 #include <algorithm>

@@ -32,18 +32,6 @@ struct CircuitEntry {
 };
 
 /**
- * @struct  CurrentProbe
- * @brief   A terminal whose current the simulator measures with a 0 V source in series, positive into the terminal.
- * @details ngspice saves no usable current for diodes and transistors in an AC sweep, so their terminals are
- *          probed in every analysis. Label tells the terminals of one part apart, such as "C" for a collector;
- *          it is empty for a part with a single probe.
- */
-struct CurrentProbe {
-    int Terminal;
-    const char *Label;
-};
-
-/**
  * @struct  CircuitPort
  * @brief   A port of the S-parameter analysis: a node that is driven and measured through its reference impedance.
  */
@@ -96,19 +84,6 @@ private:
 
 // Parts
 std::vector<const Component *> CollectParts(const Circuit &circuit);
-
-// Current probes
-bool HasBranchCurrent(ComponentType type);
-std::vector<CurrentProbe> GetCurrentProbes(const Component &component);
-std::string GetCurrentProbeName(const Component &component, std::string_view label);
-std::string GetCurrentName(const Component &component, std::string_view label);
-bool HasSingleCurrent(ComponentType type);
-std::vector<std::string> GetCurrentNames(const Component &component);
-std::vector<std::size_t> GetCurrentTerminals(const Component &component);
-std::optional<std::string> FindControllingSource(const Circuit &circuit, std::string_view current);
-
-// Netlist elements
-std::vector<std::string> GetElementNames(const Component &component);
 
 } // namespace Core
 
