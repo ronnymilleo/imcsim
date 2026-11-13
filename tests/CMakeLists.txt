@@ -7,27 +7,34 @@ include(Catch)
 add_executable(imcsim-tests
             analysis_controls_tests.cpp
             analysis_inputs_tests.cpp
+            analysis_sources_tests.cpp
             analysis_suggestions_tests.cpp
             auto_rerun_tests.cpp
-            block_session_tests.cpp
-            circuit_checks_tests.cpp
-            circuit_copy_tests.cpp
-            circuit_snapshot_tests.cpp
+            backend_comparison_tests.cpp
             behavioral_expression_tests.cpp
             block_definitions_tests.cpp
             block_nesting_tests.cpp
+            block_session_tests.cpp
             canvas_view_tests.cpp
+            check_ac_sweep_tests.cpp
+            check_dc_sweep_tests.cpp
+            check_harmonic_balance_tests.cpp
+            check_transient_tests.cpp
+            circuit_checks_tests.cpp
+            circuit_copy_tests.cpp
+            circuit_snapshot_tests.cpp
+            circuit_tests.cpp
             clipboard_tests.cpp
             code_models.cpp
-            circuit_tests.cpp
             component_tests.cpp
             connectivity_tests.cpp
-            editor_command_tests.cpp
-            editor_mode_tests.cpp
-            element_factory_tests.cpp
+            controlled_sources_tests.cpp
             current_flow_tests.cpp
             default_backend.cpp
             dock_layout_tests.cpp
+            editor_command_tests.cpp
+            editor_mode_tests.cpp
+            element_factory_tests.cpp
             examples_tests.cpp
             fuse_tests.cpp
             group_editing_tests.cpp
@@ -43,28 +50,24 @@ add_executable(imcsim-tests
             logic_trace_tests.cpp
             math_channel_definition_tests.cpp
             math_channel_tests.cpp
-            backend_comparison_tests.cpp
-            controlled_sources_tests.cpp
             monte_carlo_results_tests.cpp
             monte_carlo_tests.cpp
             nodalys_backend_tests.cpp
+            nodalys_benchmark_tests.cpp
             nonlinear_tests.cpp
             op_amp_tests.cpp
-            part_properties_tests.cpp
-            placement_editing_tests.cpp
-            run_status_tests.cpp
-            selection_editing_tests.cpp
-            switches_tests.cpp
             parameter_conversion_tests.cpp
             parameter_step_settings_tests.cpp
             parameter_step_tests.cpp
             part_catalog_tests.cpp
             part_names_tests.cpp
+            part_properties_tests.cpp
+            placement_editing_tests.cpp
             playback_tests.cpp
-            plot_tab_tests.cpp
             plot_export_tests.cpp
             plot_figures_tests.cpp
             plot_helpers_tests.cpp
+            plot_tab_tests.cpp
             plot_ticks_tests.cpp
             point_window_tests.cpp
             pole_zero_tests.cpp
@@ -72,46 +75,48 @@ add_executable(imcsim-tests
             preferences_tests.cpp
             probing_tests.cpp
             readout_placement_tests.cpp
+            ready_blocks_tests.cpp
             result_store_tests.cpp
+            run_status_tests.cpp
             s_parameter_view_tests.cpp
             s_parameters_tests.cpp
             schematic_canvas_tests.cpp
-            ready_blocks_tests.cpp
             schematic_file_tests.cpp
             schematic_tests.cpp
+            selection_editing_tests.cpp
             selection_tests.cpp
-            seven_segment_tests.cpp
             sensitivity_tests.cpp
             sensitivity_view_tests.cpp
+            seven_segment_tests.cpp
             simulation_backend_tests.cpp
             simulation_service_tests.cpp
             simulator_tests.cpp
             smith_chart_tests.cpp
             spectrum_tests.cpp
-            statistics_table_tests.cpp
             spice_import_tests.cpp
             spice_inclusions_tests.cpp
             spice_library_tests.cpp
             spice_value_tests.cpp
             standard_values_tests.cpp
+            statistics_table_tests.cpp
             stepped_circuit_tests.cpp
             subcircuit_tests.cpp
             svg_writer_tests.cpp
+            switches_tests.cpp
             text_fitting_tests.cpp
             theme_contrast_tests.cpp
             touchstone_tests.cpp
             trace_fit_state_tests.cpp
-            transient_chunks_tests.cpp
-            transient_window_tests.cpp
             trace_math_tests.cpp
             trace_statistics_tests.cpp
+            transient_chunks_tests.cpp
+            transient_window_tests.cpp
             truth_table_tests.cpp
             ui_element_tests.cpp
             ui_wire_tests.cpp
             undo_history_tests.cpp
             voltage_probes_tests.cpp
             wire_editing_tests.cpp
-            nodalys_benchmark_tests.cpp
             wire_routing_tests.cpp
 )
 
