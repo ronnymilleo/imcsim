@@ -976,3 +976,32 @@ TEST_CASE("Nodalys results carry rating warnings for overloaded parts and blown 
                                   [](const std::string &warning) { return warning.contains("FU1 blew at"); }));
     }
 }
+
+TEST_CASE("Nodalys names switch and push-button currents after the part", "[nodalys][switch]") {
+    Core::VoltageSource source;
+    source.SetName("V1");
+    source.SetValue(5.0);
+    Core::Switch sw(Core::ComponentType::SWITCH);
+    sw.SetName("SW1");
+    sw.SetClosed(true);
+    Core::Switch pb(Core::ComponentType::PUSH_BUTTON);
+    pb.SetName("PB1");
+    pb.SetClosed(true);
+    Core::Resistor load;
+    load.SetName("R1");
+    load.SetValue(1e3);
+    Core::Ground ground;
+
+    Core::Circuit circuit;
+    circuit.Add(source, {1, 0});
+    circuit.Add(sw, {1, 2});
+    circuit.Add(pb, {2, 3});
+    circuit.Add(load, {3, 0});
+    circuit.Add(ground, {0});
+
+    Core::NodalysBackend backend;
+    const Core::OperatingPointRun run = backend.RunOperatingPoint(circuit, std::nullopt);
+    REQUIRE(run.Result.has_value());
+    CHECK_THAT(CurrentOf(*run.Result, "SW1"), WithinRel(5e-3, 1e-4));
+    CHECK_THAT(CurrentOf(*run.Result, "PB1"), WithinRel(5e-3, 1e-4));
+}

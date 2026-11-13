@@ -295,9 +295,7 @@ private:
         case ComponentType::SWITCH:
         case ComponentType::PUSH_BUTTON: {
             const auto &contact = static_cast<const Switch &>(part);
-            m_Builder->AddResistor(prefix.empty() ? std::format("R-{}", part.GetName())
-                                                  : std::format("{}.R-{}", prefix, part.GetName()),
-                                   nodes[0], nodes[1], contact.GetResistance());
+            m_Builder->AddResistor(name, nodes[0], nodes[1], contact.GetResistance());
             return {};
         }
 

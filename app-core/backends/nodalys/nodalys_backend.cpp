@@ -76,7 +76,11 @@ Nodalys::RunMonitor ToNodalysMonitor(const RunMonitor &monitor, std::chrono::ste
                 const Nodalys::LiveQuantity quantity = change.Quantity == LiveQuantity::RESISTANCE
                                                            ? Nodalys::LiveQuantity::RESISTANCE
                                                            : Nodalys::LiveQuantity::DC_VOLTAGE;
-                changes.push_back({.Element = change.Element, .Quantity = quantity, .Value = change.Value});
+                std::string element = change.Element;
+                if (change.Quantity == LiveQuantity::RESISTANCE && element.starts_with("R-")) {
+                    element.erase(0, 2);
+                }
+                changes.push_back({.Element = std::move(element), .Quantity = quantity, .Value = change.Value});
             }
             return changes;
         };

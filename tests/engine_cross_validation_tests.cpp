@@ -187,8 +187,7 @@ constexpr std::array KNOWN_DIFFERENCES{
                     "the sensitivity to the input through a transistor that is off is set by its leakage, as the "
                     "transfer function is"},
     KnownDifference{"switches_and_or.imcsim", OPERATING_POINT_NAME,
-                    "Nodalys returns the current of a switch as R-SW1 where ngspice and the schematic call it SW1, "
-                    "and the node of the LED behind the off switch differs by 1 % (pico-ampere leakage)"},
+                    "the node of the LED behind the off switch differs by 1 % (pico-ampere leakage)"},
     KnownDifference{"op_amp_input_offset.imcsim", OPERATING_POINT_NAME,
                     "the closed-loop offsets of the LM358 (0.2947 V on ngspice, 0.3106 V on Nodalys, 3 mV x 101 = "
                     "0.303 V ideal) and the OP07 are 4 % apart in opposite directions; cause not found"},
