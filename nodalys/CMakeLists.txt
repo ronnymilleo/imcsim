@@ -19,6 +19,7 @@ add_library(nodalys STATIC
     src/devices/bjt_device.cpp
     src/devices/devices.cpp
     src/devices/diode_device.cpp
+    src/devices/fuse_device.cpp
     src/devices/integration.cpp
     src/devices/mosfet_device.cpp
     src/devices/smooth_logic.cpp

@@ -329,12 +329,11 @@ std::expected<TransientResult, std::string> ComputeTransient(CompiledCircuit &co
         const double next = step * std::clamp(LTE_SAFETY * std::pow(std::max(ratio, 1e-3), -1.0 / 3.0),
                                               STEP_SHRINK_LIMIT, STEP_GROW_LIMIT);
         step = std::clamp(next, MIN_STEP, output_step);
+        // A device whose state decides its corners, such as a fuse about to blow, moves its next one at every point
+        next_corner = FindNextCorner(compiled, time);
         if (reaches_corner || has_switched) {
             // The slope changes at a corner, and at a switch that flipped inside the step, so the points before it
             // say nothing about the error after it
-            if (reaches_corner) {
-                next_corner = FindNextCorner(compiled, time);
-            }
             is_restart = true;
             previous_step = 0.0;
             older_step = 0.0;

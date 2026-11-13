@@ -124,6 +124,24 @@ struct SwitchParameters {
 };
 
 /**
+ * @struct  FuseParameters
+ * @brief   Datasheet figures of a fuse that blows by I squared t.
+ * @details The element heats with the current squared and cools with the time constant I2t / Ih^2, so it never
+ *          blows at or below the rated current, and blows a short overload once the current squared times its
+ *          duration reaches the melting I2t.
+ */
+struct FuseParameters {
+    /// Largest current the fuse carries for ever, in amperes.
+    double RatedCurrent = 1.0;
+    /// Current squared times time that melts the element in a short overload, in A^2 s.
+    double MeltingI2t = 1.045;
+    double ColdResistance = 0.0964;
+    double BlownResistance = 1e9;
+
+    bool operator==(const FuseParameters &) const = default;
+};
+
+/**
  * @struct  PulseParameters
  * @brief   SPICE PULSE(V1 V2 TD TR TF PW PER) parameters.
  */

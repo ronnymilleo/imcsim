@@ -55,6 +55,7 @@ add_executable(imcsim-tests
             monte_carlo_tests.cpp
             nodalys_backend_tests.cpp
             nodalys_benchmark_tests.cpp
+            nodalys_in_use.cpp
             nonlinear_tests.cpp
             op_amp_tests.cpp
             parameter_conversion_tests.cpp

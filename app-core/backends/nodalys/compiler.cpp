@@ -12,6 +12,7 @@
 #include "circuit/components/clock.h"
 #include "circuit/components/controlled_source.h"
 #include "circuit/components/diode.h"
+#include "circuit/components/fuse.h"
 #include "circuit/components/logic_input.h"
 #include "circuit/components/logic_part.h"
 #include "circuit/components/mosfet.h"
@@ -452,6 +453,11 @@ private:
             const auto &controlled = static_cast<const VoltageControlledSwitch &>(part);
             m_Builder->AddVoltageControlledSwitch(name, nodes[0], nodes[1], nodes[2], nodes[3],
                                                   ToNodalys(controlled.GetParameters()));
+            return {};
+        }
+
+        case ComponentType::FUSE: {
+            m_Builder->AddFuse(name, nodes[0], nodes[1], ToNodalys(static_cast<const Fuse &>(part).GetParameters()));
             return {};
         }
 

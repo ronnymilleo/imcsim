@@ -167,4 +167,16 @@ Nodalys::SwitchParameters ToNodalys(const SwitchParameters &parameters) {
             .OffResistance = parameters.OffResistance};
 }
 
+/**
+ * @brief   The figures of a fuse.
+ * @param[in] parameters  Datasheet figures of the fuse.
+ * @return  The same fuse for Nodalys, which works out the cooling time constant from the rated current and the I2t.
+ */
+Nodalys::FuseParameters ToNodalys(const FuseParameters &parameters) {
+    return {.RatedCurrent = parameters.RatedCurrent,
+            .MeltingI2t = parameters.MeltingI2t,
+            .ColdResistance = parameters.ColdResistance,
+            .BlownResistance = parameters.BlownResistance};
+}
+
 } // namespace Core

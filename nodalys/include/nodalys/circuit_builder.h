@@ -95,6 +95,9 @@ public:
     void AddVoltageControlledSwitch(std::string name, NodeId node_a, NodeId node_b, NodeId ctrl_pos, NodeId ctrl_neg,
                                     const SwitchParameters &params);
 
+    // Fuses
+    void AddFuse(std::string name, NodeId node_a, NodeId node_b, const FuseParameters &params);
+
     // Relays
     void AddRelay(std::string name, NodeId coil_pos, NodeId coil_neg, NodeId contact_a, NodeId contact_b,
                   double coil_resistance, double coil_inductance, const SwitchParameters &contact_params);
