@@ -8,16 +8,20 @@
 
 #include <nodalys/nodalys.h>
 
+#include "cli/cli.h"
+
 #include <cstdlib>
 #include <filesystem>
 #include <format>
 #include <fstream>
 #include <optional>
 #include <random>
+#include <ranges>
 #include <sstream>
 #include <string>
 #include <string_view>
 #include <variant>
+#include <vector>
 
 using Catch::Matchers::WithinAbs;
 using Catch::Matchers::WithinRel;
@@ -31,10 +35,24 @@ enum class InputKind {
 };
 
 /**
- * @brief   A path in double quotes, so the shell keeps a path with spaces in one piece.
+ * @brief   Runs the command line in this process, as main() does, with streams of its own.
+ * @param[in] arguments  Arguments after the program name.
+ * @param[in] input      What the command line reads as its standard input.
+ * @param[out] output    What it writes to its standard output.
+ * @return  Its exit code.
  */
-std::string Quote(const std::filesystem::path &path) {
-    return std::format("\"{}\"", path.string());
+int RunCommandLine(const std::vector<std::string> &arguments, const std::string &input, std::string &output) {
+    std::vector<const char *> argv{"nodalys"};
+    for (const std::string &argument : arguments) {
+        argv.push_back(argument.c_str());
+    }
+    std::istringstream standard_input(input);
+    std::ostringstream standard_output;
+    std::ostringstream standard_error;
+    const int code =
+        Nodalys::RunCli(static_cast<int>(argv.size()), argv.data(), standard_input, standard_output, standard_error);
+    output = standard_output.str();
+    return code;
 }
 
 /**
@@ -57,7 +75,7 @@ public:
     CliFolder &operator=(const CliFolder &) = delete;
 
     /**
-     * @brief   Runs the CLI on a netlist and reads the file it writes.
+     * @brief   Runs the command line on a netlist and reads the file it writes.
      * @return  The contents of the output file, or none when the CLI failed or wrote nothing.
      */
     std::optional<std::string> Run(const std::string_view arguments, const std::string_view netlist,
@@ -65,18 +83,23 @@ public:
         const std::filesystem::path input_path = m_Path / "input.cir";
         const std::filesystem::path output_path = m_Path / "output";
         std::filesystem::remove(output_path);
-        if (!Nodalys::SaveStringToFile(input_path.string(), std::string(netlist))) {
-            return std::nullopt;
+        std::vector<std::string> command;
+        for (const auto word : std::views::split(arguments, ' ')) {
+            command.emplace_back(word.begin(), word.end());
         }
-        const std::string source = input == InputKind::STANDARD_INPUT ? "- < " + Quote(input_path) : Quote(input_path);
-        std::string command =
-            std::format("{} {} -o {} {}", Quote(NODALYS_CLI_PATH), arguments, Quote(output_path), source);
-#ifdef _WIN32
-        // cmd drops the first and the last quote of a line that starts with one and holds more than two, which
-        // would leave the program path cut at its first space; an outer pair is what it drops instead
-        command = "\"" + command + "\"";
-#endif
-        if (std::system(command.c_str()) != 0 || !std::filesystem::exists(output_path)) {
+        command.insert(command.end(), {"-o", output_path.string()});
+        std::string standard_input;
+        if (input == InputKind::STANDARD_INPUT) {
+            command.emplace_back("-");
+            standard_input = netlist;
+        } else {
+            if (!Nodalys::SaveStringToFile(input_path.string(), std::string(netlist))) {
+                return std::nullopt;
+            }
+            command.push_back(input_path.string());
+        }
+        std::string printed;
+        if (RunCommandLine(command, standard_input, printed) != EXIT_SUCCESS || !std::filesystem::exists(output_path)) {
             return std::nullopt;
         }
         const std::ifstream file(output_path);
@@ -650,11 +673,13 @@ TEST_CASE("SParameterResult computes derived RF figures of merit", "[nodalys][sp
     CHECK(!result.ReturnLossDb(0, 1).has_value());
 }
 
-TEST_CASE("The Nodalys standalone binary runs netlists from arguments or standard input", "[nodalys][cli]") {
+TEST_CASE("The Nodalys command line runs netlists from arguments or standard input", "[nodalys][cli]") {
     const CliFolder folder;
 
     SECTION("It names its version") {
-        CHECK(std::system(Quote(NODALYS_CLI_PATH).append(" --version").c_str()) == 0);
+        std::string printed;
+        CHECK(RunCommandLine({"--version"}, "", printed) == EXIT_SUCCESS);
+        CHECK(printed.contains("nodalys"));
     }
 
     SECTION("It writes an operating point as JSON") {
