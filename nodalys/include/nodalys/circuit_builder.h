@@ -136,6 +136,9 @@ public:
     void AddDFlipFlop(std::string name, NodeId q, NodeId q_bar, NodeId d, NodeId clk,
                       const SmoothLogicParameters &params = {});
 
+    // Initial Conditions
+    void SetInitialVoltage(NodeId node, double voltage);
+
     // Build finalized Circuit
     std::expected<Circuit, std::string> Build();
 

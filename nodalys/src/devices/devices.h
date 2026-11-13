@@ -580,6 +580,26 @@ private:
     ChargeHistory m_SavedHistory2;
 };
 
+/**
+ * @class   NodeInitialConditionDevice
+ * @brief   Clamps a node to a fixed initial voltage at the start of a transient (SPICE `.ic`), then disconnects.
+ * @details Stamps a stiff Norton companion to ground only while `IsTransientStart` is true, leaving operating point
+ *          and small-signal analyses unaffected and letting the node evolve freely for $t > 0$.
+ */
+class NodeInitialConditionDevice : public Device {
+public:
+    NodeInitialConditionDevice(int node, double voltage);
+
+    void Stamp(MnaSystem &sys, const std::vector<double> &x, const TimeContext &time) override;
+    double TerminalCurrent(int terminal, const std::vector<double> &x) const override;
+    std::complex<double> AcTerminalCurrent(int terminal, const std::vector<double> &x_dc,
+                                           const std::vector<std::complex<double>> &x_ac, double omega) const override;
+
+private:
+    int m_Node;
+    double m_Voltage;
+};
+
 } // namespace Nodalys
 
 #endif // NODALYS_DEVICES_H

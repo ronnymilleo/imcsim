@@ -291,6 +291,51 @@ private:
     std::map<std::string, NodeId> m_NodeMap;
 };
 
+/// Parses a `.ic` directive such as `.ic v(1)=5 v(out) = 0` and records each node initial voltage.
+std::expected<void, std::string> ParseInitialConditionDirective(const std::vector<std::string> &tokens,
+                                                                std::string_view line, const NodeManager &nodes,
+                                                                CircuitBuilder &builder) {
+    for (std::size_t i = 1; i < tokens.size(); ++i) {
+        std::string_view lhs;
+        std::string_view rhs;
+        const std::size_t eq = tokens[i].find('=');
+        if (eq != std::string::npos) {
+            lhs = std::string_view(tokens[i]).substr(0, eq);
+            rhs = std::string_view(tokens[i]).substr(eq + 1);
+            if (rhs.empty()) {
+                if (i + 1 >= tokens.size()) {
+                    return std::unexpected(std::format("Missing voltage after '=' in .ic: '{}'", line));
+                }
+                rhs = tokens[++i];
+            }
+        } else if (i + 1 < tokens.size() && tokens[i + 1].starts_with('=')) {
+            lhs = tokens[i];
+            if (tokens[i + 1].size() > 1) {
+                rhs = std::string_view(tokens[++i]).substr(1);
+            } else {
+                if (i + 2 >= tokens.size()) {
+                    return std::unexpected(std::format("Missing voltage after '=' in .ic: '{}'", line));
+                }
+                rhs = tokens[i + 2];
+                i += 2;
+            }
+        } else {
+            return std::unexpected(std::format("Malformed entry '{}' in .ic: '{}'", tokens[i], line));
+        }
+
+        if (lhs.size() <= 3 || (lhs[0] != 'v' && lhs[0] != 'V') || lhs[1] != '(' || lhs.back() != ')') {
+            return std::unexpected(std::format("Expected v(node)=value in .ic, got '{}': '{}'", lhs, line));
+        }
+        const std::string_view node_name = lhs.substr(2, lhs.size() - 3);
+        const auto voltage = ParseSpiceNumber(rhs);
+        if (!voltage) {
+            return std::unexpected(std::format("Invalid voltage '{}' in .ic: '{}'", rhs, line));
+        }
+        builder.SetInitialVoltage(nodes.Resolve(node_name), *voltage);
+    }
+    return {};
+}
+
 // Helper to extract numbers inside parentheses: "PULSE(0 5 1u 1u ...)" -> vector of numbers
 std::vector<double> ExtractParenthesizedValues(std::string_view token) {
     const std::size_t open = token.find('(');
@@ -1020,6 +1065,10 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
                     } else {
                         return std::unexpected(std::format("Invalid temperature '{}' in .temp: '{}'", tokens[1], line));
                     }
+                }
+            } else if (dir == ".IC") {
+                if (const auto ic_res = ParseInitialConditionDirective(tokens, line, nodes, builder); !ic_res) {
+                    return std::unexpected(ic_res.error());
                 }
             }
             continue;

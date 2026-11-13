@@ -391,6 +391,8 @@ TEST_CASE("Autonomous 3-inverter ring oscillator generates continuous periodic o
     b.AddInverter("INV1", 2, 1, params);
     b.AddInverter("INV2", 3, 2, params);
     b.AddInverter("INV3", 1, 3, params);
+    // Break the 2.5 V symmetric balance on purpose so the ring starts oscillating right away
+    b.SetInitialVoltage(1, 0.0);
 
     auto circuit = b.Build();
     REQUIRE(circuit.has_value());
@@ -403,17 +405,24 @@ TEST_CASE("Autonomous 3-inverter ring oscillator generates continuous periodic o
     const auto res = Nodalys::ComputeTransient(*circuit, tran);
     REQUIRE(res.has_value());
 
-    // The three nodes start equal and settle at the 2.5 V balance point, which only rounding noise leaves, some 10 ns
-    // in. The swing then grows towards 1.0 V to 4.0 V, so the peak seen by the stop time sits within a millivolt of
-    // 4.0 V, on either side depending on the platform's rounding: the upper bound leaves room for that
     double min_v = 5.0;
     double max_v = 0.0;
-    for (const double v : res->NodeVoltages[1]) {
+    std::vector<double> rising_crossings;
+    for (std::size_t i = 0; i < res->NodeVoltages[1].size(); ++i) {
+        const double v = res->NodeVoltages[1][i];
         min_v = std::min(min_v, v);
         max_v = std::max(max_v, v);
+        if (i > 0 && res->NodeVoltages[1][i - 1] < 2.5 && v >= 2.5) {
+            rising_crossings.push_back(res->Times[i]);
+        }
     }
-    CHECK(min_v < 1.0);
+    CHECK(res->NodeVoltages[1].front() < 0.01);
+    CHECK(min_v < 0.2);
     CHECK(max_v > 3.9);
+    // Once settled, the 3-inverter ring oscillates with a steady period of about 8.4 ns
+    REQUIRE(rising_crossings.size() >= 3);
+    const double period = rising_crossings.back() - rising_crossings[rising_crossings.size() - 2];
+    CHECK_THAT(period, WithinAbs(8.4e-9, 0.5e-9));
 }
 
 TEST_CASE("SPICE netlist parser instantiates and simulates smooth logic gates", "[nodalys][parser][logic]") {
