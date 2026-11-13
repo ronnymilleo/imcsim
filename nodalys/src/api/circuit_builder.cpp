@@ -700,15 +700,21 @@ public:
 
             // 1. Differential Input Stage
             const std::size_t first_device = m_Compiled.Devices.size();
-            AddDevice(std::make_unique<ResistorDevice>(u_vcc, n_col1, v.CollectorResistance));
-            AddDevice(std::make_unique<ResistorDevice>(u_vcc, n_col2, v.CollectorResistance));
-            AddDevice(std::make_unique<BjtDevice>(n_col1, u_inm, n_emit1, -1, -1, -1, pair, false));
-            AddDevice(std::make_unique<BjtDevice>(n_col2, u_inp_actual, n_emit2, -1, -1, -1, pair, false));
+            const int load_node = params.IsPnpInput ? u_vee : u_vcc;
+            AddDevice(std::make_unique<ResistorDevice>(load_node, n_col1, v.CollectorResistance));
+            AddDevice(std::make_unique<ResistorDevice>(load_node, n_col2, v.CollectorResistance));
+            AddDevice(std::make_unique<BjtDevice>(n_col1, u_inm, n_emit1, -1, -1, -1, pair, params.IsPnpInput));
+            AddDevice(std::make_unique<BjtDevice>(n_col2, u_inp_actual, n_emit2, -1, -1, -1, pair, params.IsPnpInput));
             AddDevice(std::make_unique<CapacitorDevice>(n_col1, n_col2, v.CollectorCapacitance, 0.0, false));
             AddDevice(std::make_unique<ResistorDevice>(n_emit1, n_tail, v.EmitterResistance));
             AddDevice(std::make_unique<ResistorDevice>(n_emit2, n_tail, v.EmitterResistance));
-            AddDevice(
-                std::make_unique<CurrentSourceDevice>(n_tail, u_vee, v.TailCurrent, MakeDcWaveform(v.TailCurrent)));
+            if (params.IsPnpInput) {
+                AddDevice(
+                    std::make_unique<CurrentSourceDevice>(u_vcc, n_tail, v.TailCurrent, MakeDcWaveform(v.TailCurrent)));
+            } else {
+                AddDevice(
+                    std::make_unique<CurrentSourceDevice>(n_tail, u_vee, v.TailCurrent, MakeDcWaveform(v.TailCurrent)));
+            }
             AddDevice(std::make_unique<ResistorDevice>(n_tail, GROUND, v.TailResistance));
 
             // 2. Intermediate Gain Stage & Miller Compensation

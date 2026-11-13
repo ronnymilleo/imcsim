@@ -140,16 +140,10 @@ constexpr std::string_view LOGIC_OPERATING_POINT =
 constexpr std::string_view LEAKAGE_BIASED_NODES =
     "a node between an off transistor or switch and a diode is set by pico-ampere leakage, which each engine adds "
     "its own GMIN to, so the voltage is 1 % apart and neither is more right";
-constexpr std::string_view ZENER_BREAKDOWN =
-    "the voltage across the zener in breakdown is 0.4 mV (8e-5) apart, within the RELTOL of ngspice, which shows as "
-    "0.2 % in the currents and the small-signal values read from it; which engine is closer is not known";
 
 /// Differences found by this test and investigated; each one is a task of its own. Keep the reason to one line, with
 /// the engine that is right.
 constexpr std::array KNOWN_DIFFERENCES{
-    KnownDifference{"zener_regulator.imcsim", DC_SWEEP_NAME, ZENER_BREAKDOWN},
-    KnownDifference{"zener_regulator.imcsim", TRANSFER_FUNCTION_NAME, ZENER_BREAKDOWN},
-    KnownDifference{"zener_regulator.imcsim", SENSITIVITY_NAME, ZENER_BREAKDOWN},
     KnownDifference{"full_bridge_rectifier.imcsim", NOISE_NAME,
                     "the input-referred noise divides by a gain of 1e-22 (every diode is off at DC), where ngspice "
                     "gives 20 and Nodalys 2e7; the output totals agree and neither input figure means anything"},
@@ -174,15 +168,19 @@ constexpr std::array KNOWN_DIFFERENCES{
                     "transfer function is"},
     KnownDifference{"switches_and_or.imcsim", OPERATING_POINT_NAME,
                     "the node of the LED behind the off switch differs by 1 % (pico-ampere leakage)"},
-    KnownDifference{"op_amp_input_offset.imcsim", OPERATING_POINT_NAME,
-                    "the closed-loop offsets of the LM358 (0.2947 V on ngspice, 0.3106 V on Nodalys, 3 mV x 101 = "
-                    "0.303 V ideal) and the OP07 are 4 % apart in opposite directions; cause not found"},
+    KnownDifference{"half_adder.imcsim", TRANSFER_FUNCTION_NAME,
+                    "the smooth gate's tanh tail still has a 9e-4 slope at 0 V, whereas ngspice's digital gate has "
+                    "zero gain"},
     KnownDifference{"op_amp_input_offset.imcsim", TRANSFER_FUNCTION_NAME,
-                    "gain from a supply to the output is 0 on ngspice and 7.7e-6 on Nodalys; same cause as the "
-                    "operating point"},
+                    "gain from a supply to the output is 0 on ngspice and 7.7e-6 on Nodalys"},
     KnownDifference{"op_amp_input_offset.imcsim", SENSITIVITY_NAME,
-                    "follows the operating point, and the normalized sensitivity to each supply is 1.2e-4 on Nodalys "
-                    "and under 2e-6 on ngspice"},
+                    "the normalized sensitivity to each supply is 1.2e-4 on Nodalys and under 2e-6 on ngspice"},
+    KnownDifference{"buck_converter.imcsim", TRANSIENT_NAME,
+                    "the currents and the waveforms agree, but after the inductor current stops the diode node rings "
+                    "against the diode capacitance at about 600 kHz, which the 1 us step resolves in under two points, "
+                    "so the samples of the ring differ: both engines ring above the 12 V supply, as the inductor "
+                    "pushes the node up to about 19 V when the step shrinks, and at this step ngspice reaches 14.9 V "
+                    "and Nodalys 18.5 V (jay #227)"},
     KnownDifference{"schmitt_trigger.imcsim", TRANSIENT_NAME,
                     "the start state at 0 V is metastable and each engine leaves it its way in the first 75 us; "
                     "all subsequent switching edges agree"},

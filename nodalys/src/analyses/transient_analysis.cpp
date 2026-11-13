@@ -315,13 +315,9 @@ std::expected<TransientResult, std::string> ComputeTransient(CompiledCircuit &co
                 device->RejectStep();
             }
             if (ratio > 4.0) {
-                // Sharp corners (such as a clamp diode turning on or off) excite trapezoidal ringing; restart with
-                // Backward Euler.
+                // Sharp corners (such as a clamp diode turning on or off) excite trapezoidal ringing; retry with
+                // Backward Euler without discarding the step history
                 is_restart = true;
-                previous_step = 0.0;
-                older_step = 0.0;
-                x_old = x_now;
-                x_older = x_now;
             }
             step = std::max(step * std::max(LTE_SAFETY * std::pow(ratio, -1.0 / 3.0), STEP_SHRINK_LIMIT), MIN_STEP);
             if (step <= MIN_STEP) {

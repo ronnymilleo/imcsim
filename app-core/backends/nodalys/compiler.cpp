@@ -155,6 +155,7 @@ Nodalys::SmoothLogicParameters MakeLogicParams(const LogicPart &part) {
 
 Nodalys::BoyleOpAmpParameters MakeBoyleParams(const OpAmpParameters &params) {
     return {
+        .IsPnpInput = params.InputStage == OpAmpInputStage::PNP,
         .OpenLoopGainDecibels = params.OpenLoopGainDecibels,
         .GainBandwidth = params.GainBandwidth,
         .SlewRate = params.SlewRate,
