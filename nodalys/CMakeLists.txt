@@ -53,6 +53,23 @@ endif()
 # nodalys-cli executable (Standalone SPICE CLI)
 # =============================================================================
 
+# The command line is a library apart from main(), so the tests run it in their own process
+add_library(nodalys-cli-lib STATIC
+    src/cli/cli.cpp
+)
+
+target_include_directories(nodalys-cli-lib
+    PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
+)
+
+target_link_libraries(nodalys-cli-lib
+    PUBLIC
+        nodalys
+    PRIVATE
+        CLI11::CLI11
+)
+
 add_executable(nodalys-cli
     src/cli/main.cpp
 )
@@ -63,11 +80,11 @@ set_target_properties(nodalys-cli PROPERTIES
 
 target_link_libraries(nodalys-cli
     PRIVATE
-        nodalys
-        CLI11::CLI11
+        nodalys-cli-lib
 )
 
 if(COMMAND imcsim_target_coverage)
+    imcsim_target_coverage(nodalys-cli-lib)
     imcsim_target_coverage(nodalys-cli)
 endif()
 
