@@ -7,6 +7,7 @@
 
 #include "api/circuit_impl.h"
 #include "compiler/compiled_circuit.h"
+#include "devices/behavioral_device.h"
 #include "devices/bjt_device.h"
 #include "devices/devices.h"
 #include "devices/diode_device.h"
@@ -15,11 +16,16 @@
 #include "devices/pn_junction.h"
 #include "devices/smooth_logic.h"
 #include "devices/waveforms.h"
+#include "nodalys/expression.h"
 #include <algorithm>
+#include <cctype>
+#include <charconv>
 #include <cmath>
 #include <format>
 #include <functional>
+#include <map>
 #include <numbers>
+#include <optional>
 
 namespace Nodalys {
 
@@ -106,6 +112,38 @@ BoyleOpAmpValues ComputeBoyleOpAmpValues(const BoyleOpAmpParameters &parameters)
             .CompensationCapacitance = COMPENSATION_CAPACITANCE,
             .GainStageResistance = GAIN_STAGE_RESISTANCE,
             .OutputSenseResistance = OUTPUT_SENSE_RESISTANCE};
+}
+
+/// Reads the node of a voltage in an expression: its number, or 0, gnd or ground for the reference.
+std::optional<NodeId> ReadExpressionNode(const std::string &text) {
+    std::string lowered = text;
+    std::ranges::transform(lowered, lowered.begin(),
+                           [](const char character) { return static_cast<char>(std::tolower(character)); });
+    if (lowered == "gnd" || lowered == "ground") {
+        return GROUND_NODE;
+    }
+    NodeId node = 0;
+    const auto [end, error] = std::from_chars(lowered.data(), lowered.data() + lowered.size(), node);
+    if (error != std::errc() || end != lowered.data() + lowered.size() || node < 0) {
+        return std::nullopt;
+    }
+    return node;
+}
+
+/// Finds the voltage source an expression reads the current of, whatever the case of the name.
+VoltageSourceDevice *FindVoltageSource(const std::map<std::string, Device *> &sources, const std::string &name) {
+    const auto lowered = [](std::string text) {
+        std::ranges::transform(text, text.begin(),
+                               [](const char character) { return static_cast<char>(std::tolower(character)); });
+        return text;
+    };
+    const std::string wanted = lowered(name);
+    for (const auto &[source_name, device] : sources) {
+        if (source_name == name || lowered(source_name) == wanted) {
+            return dynamic_cast<VoltageSourceDevice *>(device);
+        }
+    }
+    return nullptr;
 }
 
 } // namespace
@@ -335,6 +373,61 @@ public:
             Device *dev = AddDevice(std::make_unique<CccsDevice>(u_pos, u_neg, ctrl_branch, gain));
             m_Compiled.ElementsByName[name] = dev;
             m_Compiled.Currents.push_back({name, {{dev, 0}}});
+        });
+    }
+
+    /// A behavioral source: the expression is read now, so a mistake is reported by Build(), and its inputs are
+    /// bound once every source of the circuit exists, since a current may name a source added after the line.
+    void AddBehavioral(std::string name, NodeId pos, NodeId neg, const std::string &text, bool is_voltage) {
+        Track(pos);
+        Track(neg);
+        std::expected<Expression, std::string> expression = Expression::Parse(text);
+        if (!expression) {
+            m_Errors.push_back(std::format("{}: {}", name, expression.error()));
+            return;
+        }
+        std::vector<BehavioralBinding> bindings;
+        std::vector<PendingCurrent> currents;
+        for (const ExpressionInput &input : expression->GetInputs()) {
+            BehavioralBinding binding;
+            if (input.Type == ExpressionInput::Kind::CURRENT) {
+                binding.IsCurrent = true;
+                currents.push_back({.Owner = name, .Device = nullptr, .Input = bindings.size(), .Source = input.First});
+            } else {
+                const std::optional<NodeId> node = ReadExpressionNode(input.First);
+                const std::optional<NodeId> reference =
+                    input.Second.empty() ? std::optional<NodeId>(GROUND_NODE) : ReadExpressionNode(input.Second);
+                if (!node || !reference) {
+                    m_Errors.push_back(std::format("{}: v({}{}{}) must name nodes by their number", name, input.First,
+                                                   input.Second.empty() ? "" : ", ", input.Second));
+                    return;
+                }
+                Track(*node);
+                Track(*reference);
+                binding.Unknown = MapNode(*node);
+                binding.Reference = MapNode(*reference);
+            }
+            bindings.push_back(binding);
+        }
+        Defer([this, name, pos, neg, is_voltage, expression = std::move(*expression), bindings = std::move(bindings),
+               currents = std::move(currents)]() mutable {
+            const int u_pos = MapNode(pos);
+            const int u_neg = MapNode(neg);
+            BehavioralSourceDevice *device = nullptr;
+            if (is_voltage) {
+                const int branch = AllocateBranch();
+                device = static_cast<BehavioralSourceDevice *>(AddDevice(std::make_unique<BehavioralVoltageDevice>(
+                    name, u_pos, u_neg, branch, std::move(expression), std::move(bindings))));
+            } else {
+                device = static_cast<BehavioralSourceDevice *>(AddDevice(std::make_unique<BehavioralCurrentDevice>(
+                    name, u_pos, u_neg, std::move(expression), std::move(bindings))));
+            }
+            m_Compiled.ElementsByName[name] = device;
+            m_Compiled.Currents.push_back({name, {{device, 0}}});
+            for (PendingCurrent &current : currents) {
+                current.Device = device;
+                m_PendingCurrents.push_back(std::move(current));
+            }
         });
     }
 
@@ -747,6 +840,10 @@ public:
             action();
         }
         m_Actions.clear();
+        BindBehavioralCurrents();
+        if (!m_Errors.empty()) {
+            return std::unexpected(m_Errors.front());
+        }
 
         m_Compiled.CircuitNodeCount = m_CircuitNodeCount;
         m_Compiled.CompiledNodeCount = static_cast<int>(std::ranges::count(m_IsNodeUnknown, true)) + 1;
@@ -756,9 +853,32 @@ public:
     }
 
 private:
+    /// A current that a behavioral source reads, to be bound to the branch of its source once all exist.
+    struct PendingCurrent {
+        std::string Owner;
+        BehavioralSourceDevice *Device;
+        std::size_t Input;
+        std::string Source;
+    };
+
+    void BindBehavioralCurrents() {
+        for (const PendingCurrent &current : m_PendingCurrents) {
+            const VoltageSourceDevice *source = FindVoltageSource(m_Compiled.SourcesByName, current.Source);
+            if (source == nullptr) {
+                m_Errors.push_back(
+                    std::format("{}: i({}) must name a voltage source of the circuit", current.Owner, current.Source));
+                continue;
+            }
+            current.Device->BindCurrent(current.Input, source->GetBranch());
+        }
+        m_PendingCurrents.clear();
+    }
+
     int m_CircuitNodeCount = 0;
     int m_MaxNode = 0;
     std::vector<std::function<void()>> m_Actions;
+    std::vector<PendingCurrent> m_PendingCurrents;
+    std::vector<std::string> m_Errors;
     std::vector<bool> m_IsNodeUnknown;
     std::vector<bool> m_DynamicUnknown;
     CompiledCircuit m_Compiled;
@@ -944,6 +1064,14 @@ void CircuitBuilder::AddCcvs(std::string name, NodeId pos, NodeId neg, const std
 
 void CircuitBuilder::AddCccs(std::string name, NodeId pos, NodeId neg, const std::string &ctrl_source, double gain) {
     m_Impl->AddCccs(std::move(name), pos, neg, ctrl_source, gain);
+}
+
+void CircuitBuilder::AddBehavioralVoltage(std::string name, NodeId pos, NodeId neg, const std::string &expression) {
+    m_Impl->AddBehavioral(std::move(name), pos, neg, expression, true);
+}
+
+void CircuitBuilder::AddBehavioralCurrent(std::string name, NodeId pos, NodeId neg, const std::string &expression) {
+    m_Impl->AddBehavioral(std::move(name), pos, neg, expression, false);
 }
 
 void CircuitBuilder::AddDiode(std::string name, NodeId anode, NodeId cathode, const DiodeParameters &params,

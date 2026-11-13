@@ -221,13 +221,15 @@ std::expected<TransientResult, std::string> ComputeTransient(CompiledCircuit &co
             .IsTransient = true, .UseInitialConditions = true, .Time = 0.0, .TimeStep = output_step};
         const NewtonOutcome outcome = SolveNewton(*compiled.System, compiled.Devices, x_now, initial, options);
         if (!outcome.Converged) {
-            return std::unexpected("Nodalys could not start the transient from the initial conditions");
+            return std::unexpected(
+                DescribeFailure("Nodalys could not start the transient from the initial conditions", outcome));
         }
         DescribeOutcome(outcome, "initial point", messages);
     } else {
         const NewtonOutcome outcome = SolveNewton(*compiled.System, compiled.Devices, x_now, TimeContext{}, options);
         if (!outcome.Converged) {
-            return std::unexpected("Nodalys found no operating point to start the transient from");
+            return std::unexpected(
+                DescribeFailure("Nodalys found no operating point to start the transient from", outcome));
         }
         DescribeOutcome(outcome, "operating point", messages);
     }
@@ -273,7 +275,8 @@ std::expected<TransientResult, std::string> ComputeTransient(CompiledCircuit &co
             }
             step *= 0.1;
             if (step < MIN_STEP) {
-                failure = std::format("Nodalys could not converge at t = {}; the time step collapsed", time + step);
+                failure = DescribeFailure(
+                    std::format("Nodalys could not converge at t = {}; the time step collapsed", time + step), outcome);
                 break;
             }
             continue;

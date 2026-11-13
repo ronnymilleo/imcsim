@@ -88,8 +88,9 @@ std::expected<OperatingPointResult, std::string> ComputeOperatingPoint(CompiledC
     SeedOperatingPoint(compiled.Devices, x);
     const NewtonOutcome outcome = SolveNewton(*compiled.System, compiled.Devices, x, TimeContext{}, options);
     if (!outcome.Converged) {
-        return std::unexpected("Nodalys found no operating point; the circuit may have no DC path to "
-                               "ground or need initial conditions");
+        return std::unexpected(DescribeFailure("Nodalys found no operating point; the circuit may have no DC path to "
+                                               "ground or need initial conditions",
+                                               outcome));
     }
     DescribeOutcome(outcome, "operating point", messages);
     OperatingPointResult point;
@@ -145,8 +146,9 @@ std::expected<DcSweepResult, std::string> ComputeDCSweep(CompiledCircuit &compil
             }
             outcome = SolveNewton(*compiled.System, compiled.Devices, x, TimeContext{}, options);
             if (!outcome.Converged) {
-                return std::unexpected(
-                    std::format("Nodalys found no operating point at {} = {}", sweep.SweptSource, swept_value));
+                return std::unexpected(DescribeFailure(
+                    std::format("Nodalys found no operating point at {} = {}", sweep.SweptSource, swept_value),
+                    outcome));
             }
             const std::vector<double> voltages = ReadNodeVoltages(compiled, x);
             for (int node = 0; node < compiled.CircuitNodeCount; ++node) {

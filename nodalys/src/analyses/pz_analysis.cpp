@@ -48,7 +48,8 @@ std::expected<PoleZeroResult, std::string> ComputePoleZero(CompiledCircuit &comp
     std::vector<double> x_dc(static_cast<std::size_t>(size), 0.0);
     const NewtonOutcome outcome = SolveNewton(*compiled.System, compiled.Devices, x_dc, TimeContext{}, options);
     if (!outcome.Converged) {
-        return std::unexpected("Nodalys found no operating point to linearize the pole-zero analysis around");
+        return std::unexpected(
+            DescribeFailure("Nodalys found no operating point to linearize the pole-zero analysis around", outcome));
     }
     DescribeOutcome(outcome, "operating point", messages);
 

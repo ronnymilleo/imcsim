@@ -7,6 +7,7 @@
  */
 
 #include "backends/nodalys/nodalys_backend.h"
+#include "circuit/components/behavioral_source.h"
 #include "circuit/components/capacitor.h"
 #include "circuit/components/clock.h"
 #include "circuit/components/diode.h"
@@ -21,6 +22,7 @@
 #include "circuit/components/vcc.h"
 #include "circuit/components/voltage_source.h"
 #include "circuit/subcircuit.h"
+#include "nodalys_in_use.h"
 #include "simulation/simulation_backend.h"
 #include "simulation/simulator.h"
 #include <algorithm>
@@ -69,6 +71,38 @@ double CurrentOf(const Core::OperatingPoint &point, const std::string &name) {
     REQUIRE(found != point.Currents.end());
     return found->Current;
 }
+
+/**
+ * @struct  BehavioralStage
+ * @brief   A source of 2 V on net IN with 1k to ground, and a behavioral source from net OUT to ground loaded by 1k.
+ * @details Nodes: IN 1 and OUT 2. The expression is the argument.
+ */
+struct BehavioralStage {
+    Core::VCC Supply;
+    Core::Resistor Sense;
+    Core::BehavioralSource Source;
+    Core::Resistor Load;
+    Core::Ground Reference;
+    Core::Circuit Circuit;
+
+    explicit BehavioralStage(const std::string &expression,
+                             const Core::ComponentType type = Core::ComponentType::BEHAVIORAL_VOLTAGE)
+        : Source(type) {
+        Supply.SetName("V1");
+        Supply.SetValue(2.0);
+        Sense.SetName("R1");
+        Source.SetName("B1");
+        Source.SetExpression(expression);
+        Load.SetName("R2");
+        Circuit.Add(Supply, {1});
+        Circuit.Add(Sense, {1, 0});
+        Circuit.Add(Source, {2, 0});
+        Circuit.Add(Load, {2, 0});
+        Circuit.Add(Reference, {0});
+        Circuit.NameNet("IN", 1);
+        Circuit.NameNet("OUT", 2);
+    }
+};
 
 Core::Transient RunTransient(Core::SimulationBackend &backend, const Core::Circuit &circuit, double stop, double step) {
     Core::TransientRun run = backend.RunTransient(circuit, {.StopTime = stop, .TimeStep = step}, std::nullopt, {});
@@ -757,4 +791,103 @@ TEST_CASE("Core::RunHarmonicBalance solves linear RC filter and nonlinear rectif
         CHECK_THAT(hb.NodePhasors[2][0].real(), WithinAbs(tran_dc, 2e-2));
         CHECK_THAT(std::abs(hb.NodePhasors[2][1]), WithinAbs(std::abs(tran_h1), 2e-2));
     }
+}
+
+TEST_CASE("Nodalys simulates behavioral sources and does not list them among what it cannot", "[nodalys][behavioral]") {
+    const Core::NodalysBackend backend;
+    const Core::BackendCapabilities &capabilities = backend.GetCapabilities();
+    CHECK_FALSE(capabilities.UnsupportedParts.contains(Core::ComponentType::BEHAVIORAL_VOLTAGE));
+    CHECK_FALSE(capabilities.UnsupportedParts.contains(Core::ComponentType::BEHAVIORAL_CURRENT));
+    for (const Core::AnalysisKind kind :
+         {Core::AnalysisKind::OPERATING_POINT, Core::AnalysisKind::TRANSIENT, Core::AnalysisKind::AC_SWEEP,
+          Core::AnalysisKind::DC_SWEEP, Core::AnalysisKind::NOISE, Core::AnalysisKind::TRANSFER_FUNCTION,
+          Core::AnalysisKind::SENSITIVITY, Core::AnalysisKind::POLE_ZERO, Core::AnalysisKind::HARMONIC_BALANCE}) {
+        const BehavioralStage stage("1m*tanh(V(IN)/26m) + V(IN)^2");
+        INFO(Core::GetAnalysisKindName(kind));
+        CHECK_FALSE(Core::FindUnsupported(backend, stage.Circuit, kind).has_value());
+    }
+}
+
+TEST_CASE("Nodalys refuses, before the run and by name, an expression it cannot read", "[nodalys][behavioral]") {
+    const Core::NodalysBackend backend;
+    const auto reason = [&backend](const std::string &expression, const Core::AnalysisKind kind) {
+        const BehavioralStage stage(expression);
+        return Core::FindUnsupported(backend, stage.Circuit, kind).value_or("");
+    };
+    // limit() is a Monte Carlo function in ngspice, so a clamp written with it would mean something else there
+    CHECK(reason("limit(V(IN), -1, 1)", Core::AnalysisKind::OPERATING_POINT).contains("Monte Carlo"));
+    CHECK(reason("limit(V(IN), -1, 1)", Core::AnalysisKind::OPERATING_POINT).contains("B1"));
+    CHECK(reason("atan2(V(IN), 2)", Core::AnalysisKind::TRANSIENT).contains("atan2"));
+    CHECK(reason("V(IN) * hertz", Core::AnalysisKind::AC_SWEEP).contains("hertz"));
+    CHECK(reason("gauss(1, 2)", Core::AnalysisKind::OPERATING_POINT).contains("random numbers"));
+    CHECK(reason("V(IN) % 2", Core::AnalysisKind::OPERATING_POINT).contains("\"%\""));
+    // The harmonic balance has no instant to give `time`, so a time-dependent expression is refused there only
+    CHECK(reason("V(IN) * time", Core::AnalysisKind::HARMONIC_BALANCE).contains("reads time"));
+    CHECK(reason("V(IN) * time", Core::AnalysisKind::TRANSIENT).empty());
+    CHECK(reason("V(IN) * time", Core::AnalysisKind::OPERATING_POINT).empty());
+}
+
+TEST_CASE("A run on Nodalys stops with that reason before it reaches the engine", "[nodalys][behavioral]") {
+    const TestSupport::NodalysInUse in_use;
+    const BehavioralStage stage("limit(V(IN), -1, 1)");
+    const Core::OperatingPointRun run = Core::RunOperatingPoint(stage.Circuit);
+    REQUIRE_FALSE(run.Result.has_value());
+    CHECK(run.Result.error() ==
+          Core::FindUnsupported(Core::GetBackend(), stage.Circuit, Core::AnalysisKind::OPERATING_POINT).value());
+}
+
+TEST_CASE("A behavioral source whose expression has no value says which one and why", "[nodalys][behavioral]") {
+    Core::NodalysBackend backend;
+    // The square root of 2 V - 5 V, with the supply the only thing that sets the node
+    const BehavioralStage stage("sqrt(V(IN) - 5)");
+    const Core::OperatingPointRun run = backend.RunOperatingPoint(stage.Circuit, std::nullopt);
+    REQUIRE_FALSE(run.Result.has_value());
+    CHECK(run.Result.error().contains("B1"));
+    CHECK(run.Result.error().contains("sqrt("));
+}
+
+TEST_CASE("The results of Nodalys hold the nodes of the circuit, though a current that a source reads adds a probe",
+          "[nodalys][behavioral]") {
+    Core::NodalysBackend backend;
+    const BehavioralStage stage("1k*I(R1)");
+    const int node_count = stage.Circuit.GetNodeCount();
+
+    const Core::OperatingPointRun point = backend.RunOperatingPoint(stage.Circuit, std::nullopt);
+    REQUIRE(point.Result.has_value());
+    CHECK(point.Result->NodeVoltages.size() == static_cast<std::size_t>(node_count));
+    // 2 V across 1k is 2 mA, read through the probe of R1, times 1k
+    CHECK_THAT(point.Result->NodeVoltages[2], WithinAbs(2.0, 1e-6));
+
+    const Core::TransientRun transient =
+        backend.RunTransient(stage.Circuit, {.StopTime = 1e-4, .TimeStep = 1e-5}, std::nullopt, {});
+    REQUIRE(transient.Result.has_value());
+    CHECK(transient.Result->NodeVoltages.size() == static_cast<std::size_t>(node_count));
+
+    const Core::DCSweepRun sweep = backend.RunDCSweep(
+        stage.Circuit, {.Swept = {.Source = "V1", .Start = 0.0, .Stop = 2.0, .Step = 1.0}}, std::nullopt);
+    REQUIRE(sweep.Result.has_value());
+    CHECK(sweep.Result->Curves.front().NodeVoltages.size() == static_cast<std::size_t>(node_count));
+
+    const Core::ACSweepRun ac = backend.RunACSweep(
+        stage.Circuit, {.StartFrequency = 1e3, .StopFrequency = 1e4, .PointsPerDecade = 1}, std::nullopt);
+    REQUIRE(ac.Result.has_value());
+    CHECK(ac.Result->NodeMagnitudesDecibels.size() == static_cast<std::size_t>(node_count));
+    CHECK(ac.Result->NodePhasesDegrees.size() == static_cast<std::size_t>(node_count));
+}
+
+TEST_CASE("A behavioral current source and voltage source report their current like their kind",
+          "[nodalys][behavioral]") {
+    Core::NodalysBackend backend;
+    const BehavioralStage voltage("V(IN)*3");
+    const Core::OperatingPointRun voltage_run = backend.RunOperatingPoint(voltage.Circuit, std::nullopt);
+    REQUIRE(voltage_run.Result.has_value());
+    // 6 V into 1k: the source delivers 6 mA, so it reports -6 mA into its + terminal
+    CHECK_THAT(CurrentOf(*voltage_run.Result, "B1"), WithinAbs(-6e-3, 1e-9));
+
+    const BehavioralStage current("V(IN)*1m", Core::ComponentType::BEHAVIORAL_CURRENT);
+    const Core::OperatingPointRun current_run = backend.RunOperatingPoint(current.Circuit, std::nullopt);
+    REQUIRE(current_run.Result.has_value());
+    // 2 mA from + to - through the source, which pulls OUT to -2 V
+    CHECK_THAT(CurrentOf(*current_run.Result, "B1"), WithinAbs(2e-3, 1e-9));
+    CHECK_THAT(current_run.Result->NodeVoltages[2], WithinAbs(-2.0, 1e-6));
 }

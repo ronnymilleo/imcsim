@@ -82,6 +82,10 @@ public:
     void AddCcvs(std::string name, NodeId pos, NodeId neg, const std::string &ctrl_source, double transresistance);
     void AddCccs(std::string name, NodeId pos, NodeId neg, const std::string &ctrl_source, double gain);
 
+    // Behavioral Sources (an expression of voltages and currents, SPICE B)
+    void AddBehavioralVoltage(std::string name, NodeId pos, NodeId neg, const std::string &expression);
+    void AddBehavioralCurrent(std::string name, NodeId pos, NodeId neg, const std::string &expression);
+
     // Semiconductor Devices
     void AddDiode(std::string name, NodeId anode, NodeId cathode, const DiodeParameters &params, double area = 1.0);
     void AddBjt(std::string name, NodeId collector, NodeId base, NodeId emitter, bool is_npn,

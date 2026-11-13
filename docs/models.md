@@ -84,8 +84,10 @@ transistor, level 1 MOSFET, ideal and Boyle op-amps), and differs in these point
   flip-flop is built from such gates.
 - Everything is simulated at 27 °C: a stepped temperature is refused with the reason, since the device models do not
   follow the temperature yet.
-- Behavioral sources have no device yet, and the analyses refuse them with the reason. A fuse is a native device with
-  the same thermal equation and blow level as the ngspice subcircuit; see Fuses.
+- A behavioral source is a native device that evaluates the same expression language with exact derivatives, and
+  refuses before the run what ngspice reads and Nodalys does not, such as `limit()`, the random functions and `hertz`;
+  see Behavioral sources. A fuse is a native device with the same thermal equation and blow level as the ngspice
+  subcircuit; see Fuses.
 - A noise or random source holds its DC level (the offset, or the mean of a random source) in the operating point,
   the sweeps and the small-signal analyses, as in ngspice; a transient with one is refused, since Nodalys cannot draw
   the values yet.
@@ -406,8 +408,16 @@ Everything else, numbers with SPICE suffixes, operators, comparisons, the ternar
   without bound, such as `exp(V(IN))`, can stop the solver.
 - In `.ac` and `.noise` the source is linearized at the operating point: `V(IN)*V(IN)` has the gain `2*V(IN)` there,
   and nothing at all around 0 V. A behavioral source adds no noise.
-- `time` is 0 in `.op` and `.dc`; a transient follows it.
+- `time` is 0 in `.op`, `.dc` and the small-signal analyses; a transient follows it. ngspice has a defect here: in a
+  `.dc` it sets `time` to the previous point of the sweep, which Nodalys does not copy, so avoid `time` in a DC sweep.
 - Inside a block, the expression reads the nets and currents of the block.
+- Nodalys runs the same language, with the semantics ngspice has (checked against ngspice 47): `log` is the natural
+  logarithm, `^` and `**` group from the left and give 0 for a negative base to a fractional power, `pwr(x, y)` is the
+  sign of `x` times `|x|^y`, `u(0)` is 0.5 and `nint` rounds a half to the even integer. It refuses, with the name in the
+  message and before the run, what ngspice reads and Nodalys does not: `limit()` (a Monte Carlo function in ngspice,
+  not a clamp, so write `min(max(x, low), high)`), `atan2()` (ngspice has none either), the random functions and
+  `hertz`. A time-dependent expression is also refused in the harmonic balance. See
+  [`nodalys/behavioral_source.md`](nodalys/behavioral_source.md) for the grammar and the table of every function.
 
 ## Diodes, Zener diodes and LEDs
 

@@ -58,7 +58,8 @@ std::expected<SensitivityResult, std::string> ComputeSensitivity(CompiledCircuit
     std::vector<double> x_dc(static_cast<std::size_t>(size), 0.0);
     const NewtonOutcome outcome = SolveNewton(*compiled.System, compiled.Devices, x_dc, TimeContext{}, options);
     if (!outcome.Converged) {
-        return std::unexpected("Nodalys found no operating point for the sensitivity analysis");
+        return std::unexpected(
+            DescribeFailure("Nodalys found no operating point for the sensitivity analysis", outcome));
     }
     DescribeOutcome(outcome, "operating point", messages);
 

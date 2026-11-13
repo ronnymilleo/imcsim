@@ -1,6 +1,6 @@
 # Fuse Device
 
-The fuse of `imcsim` is a resistance that opens for good once the current has heated it enough. `ngspice` runs it as the subcircuit `imcsim_fuse` (see the Fuses section of [`docs/models.md`](../models.md)); `Nodalys` has no behavioral sources, so the same behavior is one native device with a thermal state, [`FuseDevice`](../../nodalys/src/devices/fuse_device.cpp), built with `CircuitBuilder::AddFuse(name, a, b, FuseParameters)`.
+The fuse of `imcsim` is a resistance that opens for good once the current has heated it enough. `ngspice` runs it as the subcircuit `imcsim_fuse` (see the Fuses section of [`docs/models.md`](../models.md)); `Nodalys` models the same behavior as one native device with a thermal state, [`FuseDevice`](../../nodalys/src/devices/fuse_device.cpp), built with `CircuitBuilder::AddFuse(name, a, b, FuseParameters)`.
 
 ---
 

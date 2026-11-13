@@ -169,8 +169,8 @@ std::expected<SParameterResult, std::string> ComputeSParameters(CompiledCircuit 
     std::vector<double> x_dc(static_cast<std::size_t>(size), 0.0);
     const NewtonOutcome outcome = SolveNewton(*compiled.System, compiled.Devices, x_dc, TimeContext{}, options);
     if (!outcome.Converged) {
-        return std::unexpected(
-            "The native solver found no operating point to linearize the S-parameter analysis around");
+        return std::unexpected(DescribeFailure(
+            "The native solver found no operating point to linearize the S-parameter analysis around", outcome));
     }
     DescribeOutcome(outcome, "operating point", messages);
 
