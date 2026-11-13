@@ -197,9 +197,6 @@ constexpr std::array KNOWN_DIFFERENCES{
     KnownDifference{"rlc_low_pass_poles_and_zeros.imcsim", POLE_ZERO_NAME,
                     "Nodalys adds two zeros at +-4.6e13 rad/s, which are numerical infinity for a transfer with no "
                     "zeros; ngspice's pole pair -5000 +-j31225 rad/s is the analytic one, so ngspice is right"},
-    KnownDifference{"rc_blocks.imcsim", SENSITIVITY_NAME,
-                    "Nodalys lists no sensitivity for the block instances X1 and X2, which ngspice reports as the "
-                    "largest of their inner parts"},
     KnownDifference{"buck_converter.imcsim", TRANSIENT_NAME,
                     "the currents and the waveforms agree, but after the inductor current stops the diode node rings "
                     "against the diode capacitance at about 600 kHz, which the 1 us step resolves in under two points, "

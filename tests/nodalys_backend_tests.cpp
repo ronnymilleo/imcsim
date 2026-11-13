@@ -1005,3 +1005,38 @@ TEST_CASE("Nodalys names switch and push-button currents after the part", "[noda
     CHECK_THAT(CurrentOf(*run.Result, "SW1"), WithinRel(5e-3, 1e-4));
     CHECK_THAT(CurrentOf(*run.Result, "PB1"), WithinRel(5e-3, 1e-4));
 }
+
+TEST_CASE("Nodalys sensitivity includes block instances by their dominant inner element", "[nodalys][sensitivity]") {
+    Core::Resistor top;
+    top.SetName("R1");
+    top.SetValue(1e3);
+    Core::Resistor bottom;
+    bottom.SetName("R2");
+    bottom.SetValue(3e3);
+    auto definition = std::make_shared<Core::SubcircuitDefinition>();
+    definition->Name = "divider";
+    definition->Pins = {{"IN", 1}, {"OUT", 2}};
+    definition->Body.Add(top, {1, 2});
+    definition->Body.Add(bottom, {2, 0});
+
+    Core::SubcircuitInstance instance("divider", {"IN", "OUT"});
+    instance.SetName("X1");
+    Core::VoltageSource source;
+    source.SetName("V1");
+    source.SetValue(4.0);
+    const Core::Ground ground;
+
+    Core::Circuit circuit;
+    circuit.Add(source, {1, 0});
+    circuit.Add(instance, {1, 2});
+    circuit.Add(ground, {0});
+    circuit.AddSubcircuit(definition);
+
+    Core::NodalysBackend backend;
+    const Core::SensitivityRun run = backend.RunSensitivity(circuit, {.OutputNode = 2});
+    REQUIRE(run.Result.has_value());
+    const auto found = std::ranges::find(run.Result->Parts, "X1", &Core::PartSensitivity::Name);
+    REQUIRE(found != run.Result->Parts.end());
+    CHECK(found->Unit == "Ohm");
+    CHECK_THAT(std::abs(found->Normalized), WithinRel(0.75, 1e-4));
+}
