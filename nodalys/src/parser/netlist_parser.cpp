@@ -291,45 +291,57 @@ private:
     std::map<std::string, NodeId> m_NodeMap;
 };
 
+struct IcAssignment {
+    std::string_view Lhs;
+    std::string_view Rhs;
+};
+
+std::expected<IcAssignment, std::string> NextIcAssignment(const std::vector<std::string> &tokens, std::size_t &index,
+                                                          std::string_view line) {
+    const std::size_t eq = tokens[index].find('=');
+    if (eq != std::string::npos) {
+        const std::string_view lhs = std::string_view(tokens[index]).substr(0, eq);
+        std::string_view rhs = std::string_view(tokens[index]).substr(eq + 1);
+        if (rhs.empty()) {
+            if (index + 1 >= tokens.size()) {
+                return std::unexpected(std::format("Missing voltage after '=' in .ic: '{}'", line));
+            }
+            rhs = tokens[++index];
+        }
+        return IcAssignment{.Lhs = lhs, .Rhs = rhs};
+    }
+    if (index + 1 < tokens.size() && tokens[index + 1].starts_with('=')) {
+        const std::string_view lhs = tokens[index];
+        if (tokens[index + 1].size() > 1) {
+            return IcAssignment{.Lhs = lhs, .Rhs = std::string_view(tokens[++index]).substr(1)};
+        }
+        if (index + 2 >= tokens.size()) {
+            return std::unexpected(std::format("Missing voltage after '=' in .ic: '{}'", line));
+        }
+        const std::string_view rhs = tokens[index + 2];
+        index += 2;
+        return IcAssignment{.Lhs = lhs, .Rhs = rhs};
+    }
+    return std::unexpected(std::format("Malformed entry '{}' in .ic: '{}'", tokens[index], line));
+}
+
 /// Parses a `.ic` directive such as `.ic v(1)=5 v(out) = 0` and records each node initial voltage.
 std::expected<void, std::string> ParseInitialConditionDirective(const std::vector<std::string> &tokens,
                                                                 std::string_view line, const NodeManager &nodes,
                                                                 CircuitBuilder &builder) {
     for (std::size_t i = 1; i < tokens.size(); ++i) {
-        std::string_view lhs;
-        std::string_view rhs;
-        const std::size_t eq = tokens[i].find('=');
-        if (eq != std::string::npos) {
-            lhs = std::string_view(tokens[i]).substr(0, eq);
-            rhs = std::string_view(tokens[i]).substr(eq + 1);
-            if (rhs.empty()) {
-                if (i + 1 >= tokens.size()) {
-                    return std::unexpected(std::format("Missing voltage after '=' in .ic: '{}'", line));
-                }
-                rhs = tokens[++i];
-            }
-        } else if (i + 1 < tokens.size() && tokens[i + 1].starts_with('=')) {
-            lhs = tokens[i];
-            if (tokens[i + 1].size() > 1) {
-                rhs = std::string_view(tokens[++i]).substr(1);
-            } else {
-                if (i + 2 >= tokens.size()) {
-                    return std::unexpected(std::format("Missing voltage after '=' in .ic: '{}'", line));
-                }
-                rhs = tokens[i + 2];
-                i += 2;
-            }
-        } else {
-            return std::unexpected(std::format("Malformed entry '{}' in .ic: '{}'", tokens[i], line));
+        const auto assignment = NextIcAssignment(tokens, i, line);
+        if (!assignment) {
+            return std::unexpected(assignment.error());
         }
-
+        const std::string_view lhs = assignment->Lhs;
         if (lhs.size() <= 3 || (lhs[0] != 'v' && lhs[0] != 'V') || lhs[1] != '(' || lhs.back() != ')') {
             return std::unexpected(std::format("Expected v(node)=value in .ic, got '{}': '{}'", lhs, line));
         }
         const std::string_view node_name = lhs.substr(2, lhs.size() - 3);
-        const auto voltage = ParseSpiceNumber(rhs);
+        const auto voltage = ParseSpiceNumber(assignment->Rhs);
         if (!voltage) {
-            return std::unexpected(std::format("Invalid voltage '{}' in .ic: '{}'", rhs, line));
+            return std::unexpected(std::format("Invalid voltage '{}' in .ic: '{}'", assignment->Rhs, line));
         }
         builder.SetInitialVoltage(nodes.Resolve(node_name), *voltage);
     }
