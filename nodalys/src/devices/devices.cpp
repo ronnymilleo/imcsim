@@ -662,4 +662,28 @@ std::complex<double> NodeInitialConditionDevice::AcTerminalCurrent(const int /*t
     return {};
 }
 
+NodeSeedDevice::NodeSeedDevice(std::vector<NodeSeed> seeds) : m_Seeds(std::move(seeds)) {
+}
+
+void NodeSeedDevice::Stamp(MnaSystem & /*sys*/, const std::vector<double> & /*x*/, const TimeContext & /*time*/) {
+}
+
+void NodeSeedDevice::SeedOperatingPoint(std::vector<double> &x) const {
+    for (const NodeSeed &seed : m_Seeds) {
+        if (seed.Node >= 0 && static_cast<std::size_t>(seed.Node) < x.size()) {
+            x[static_cast<std::size_t>(seed.Node)] = seed.Voltage;
+        }
+    }
+}
+
+double NodeSeedDevice::TerminalCurrent(const int /*terminal*/, const std::vector<double> & /*x*/) const {
+    return 0.0;
+}
+
+std::complex<double> NodeSeedDevice::AcTerminalCurrent(const int /*terminal*/, const std::vector<double> & /*x_dc*/,
+                                                       const std::vector<std::complex<double>> & /*x_ac*/,
+                                                       const double /*omega*/) const {
+    return {};
+}
+
 } // namespace Nodalys

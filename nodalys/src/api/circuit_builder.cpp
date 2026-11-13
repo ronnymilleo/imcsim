@@ -844,6 +844,16 @@ public:
             g5_params.VThreshold *= 0.99;
             AddRawLogicGate(name + ".G5", LogicGateType::NAND, u_q, {n2, u_qb}, g5_params);
             AddRawLogicGate(name + ".G6", LogicGateType::NAND, u_qb, {n3, u_q}, params);
+
+            // Seed Newton in the reset equilibrium so downstream stages clocked HIGH still start reset
+            m_Compiled.Devices.push_back(std::make_unique<NodeSeedDevice>(std::vector<NodeSeed>{
+                {.Node = u_q, .Voltage = params.VLow},
+                {.Node = u_qb, .Voltage = params.VHigh},
+                {.Node = n1, .Voltage = params.VLow},
+                {.Node = n2, .Voltage = params.VHigh},
+                {.Node = n3, .Voltage = params.VLow},
+                {.Node = n4, .Voltage = params.VHigh},
+            }));
         });
     }
 

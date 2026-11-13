@@ -600,6 +600,33 @@ private:
     double m_Voltage;
 };
 
+/**
+ * @struct  NodeSeed
+ * @brief   One node index and its initial Newton guess for `NodeSeedDevice`.
+ */
+struct NodeSeed {
+    int Node = -1;
+    double Voltage = 0.0;
+};
+
+/**
+ * @class   NodeSeedDevice
+ * @brief   Provides an initial Newton guess for bistable subcircuits such as flip-flops without stamping any branch.
+ */
+class NodeSeedDevice : public Device {
+public:
+    explicit NodeSeedDevice(std::vector<NodeSeed> seeds);
+
+    void Stamp(MnaSystem &sys, const std::vector<double> &x, const TimeContext &time) override;
+    void SeedOperatingPoint(std::vector<double> &x) const override;
+    double TerminalCurrent(int terminal, const std::vector<double> &x) const override;
+    std::complex<double> AcTerminalCurrent(int terminal, const std::vector<double> &x_dc,
+                                           const std::vector<std::complex<double>> &x_ac, double omega) const override;
+
+private:
+    std::vector<NodeSeed> m_Seeds;
+};
+
 } // namespace Nodalys
 
 #endif // NODALYS_DEVICES_H

@@ -319,6 +319,24 @@ TEST_CASE("D flip-flop starts reset at DC and logic gate output impedance equals
         CHECK(op->NodeVoltages[3] > 4.99);
     }
 
+    SECTION("D flip-flop with D tied to Q_bar starts reset even when CLK is HIGH (5 V)") {
+        Nodalys::CircuitBuilder b;
+        b.AddVdc("V_CLK", 1, 0, 5.0);
+        Nodalys::SmoothLogicParameters params;
+        params.TransitionWidth = 0.5;
+        params.PropagationDelay = 1e-9;
+        // Downstream ripple-counter stage clocked by the previous stage's Q_bar (5 V at DC)
+        b.AddDFlipFlop("DFF1", 2, 3, 3, 1, params);
+
+        auto circuit = b.Build();
+        REQUIRE(circuit.has_value());
+
+        const auto op = Nodalys::ComputeOperatingPoint(*circuit);
+        REQUIRE(op.has_value());
+        CHECK(op->NodeVoltages[2] < 0.01);
+        CHECK(op->NodeVoltages[3] > 4.99);
+    }
+
     SECTION("Buffered output stage gives exact OutputResistance even with propagation delay") {
         Nodalys::CircuitBuilder b;
         b.AddVdc("V_IN", 1, 0, 0.0);
