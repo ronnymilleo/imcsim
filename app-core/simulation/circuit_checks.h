@@ -1,6 +1,6 @@
 /**
  * @file    circuit_checks.h
- * @brief   Checks of a circuit and of the settings of an analysis, and the lists of parts an analysis can use.
+ * @brief   Checks of a circuit before any analysis runs on it.
  * @details Independent of the simulation backend: whatever runs the circuit, these say whether it can be asked to.
  */
 
@@ -8,61 +8,13 @@
 #define IMCSIM_CIRCUIT_CHECKS_H
 
 #include "circuit/circuit.h"
-#include "simulation/analysis_settings.h"
 #include <optional>
 #include <string>
-#include <string_view>
-#include <vector>
 
 namespace Core {
 
-/// Most time steps a transient may span, which keeps a mistyped setting from running for minutes or exhausting memory.
-constexpr int MAX_TRANSIENT_POINTS = 1000000;
-
-/// Fewest ports an S-parameter analysis runs with, since ngspice refuses fewer.
-constexpr std::size_t MIN_S_PARAMETER_PORTS = 2;
-
-/// The parts a DC sweep or a transfer function can drive, as messages name them.
-constexpr std::string_view SWEEPABLE_SOURCES = "a voltage or current source, VCC, clock or logic input";
-
-// What is wrong with a circuit or with settings, in words for the user, or no value when nothing is
 std::optional<std::string> CheckCircuit(const Circuit &circuit);
 std::optional<std::string> CheckBehavioralExpression(const Circuit &circuit, const Component &source);
-std::optional<std::string> CheckTransientSettings(const TransientSettings &settings);
-
-// Noise and random sources step the transient on their own, so they count in its points
-std::optional<double> FindFinestSignalStep(const Circuit &circuit);
-std::optional<std::string> CheckSourceSteps(const Circuit &circuit, const TransientSettings &settings);
-
-// What is wrong with the settings of the other analyses, or no value when nothing is
-std::optional<std::string> CheckACSweepSettings(const Circuit &circuit, const ACSweepSettings &settings);
-std::optional<std::string> CheckDCSweepSettings(const Circuit &circuit, const DCSweepSettings &settings);
-std::optional<std::string> CheckNoiseSettings(const Circuit &circuit, const NoiseSettings &settings);
-std::optional<std::string> CheckTransferFunctionSettings(const Circuit &circuit,
-                                                         const TransferFunctionSettings &settings);
-std::optional<std::string> CheckPoleZeroSettings(const Circuit &circuit, const PoleZeroSettings &settings);
-std::optional<std::string> CheckSParameterSettings(const Circuit &circuit, const SParameterSettings &settings);
-std::optional<std::string> CheckSensitivitySettings(const Circuit &circuit, const SensitivitySettings &settings);
-std::optional<std::string> CheckTruthTableSettings(const Circuit &circuit, const TruthTableSettings &settings);
-
-// Parts by name
-const Component *FindSweepableSource(const Circuit &circuit, std::string_view name);
-const Component *FindNoiseInput(const Circuit &circuit, std::string_view name);
-const Component *FindTransferFunctionInput(const Circuit &circuit, std::string_view name);
-const Component *FindLogicInput(const Circuit &circuit, std::string_view name);
-const char *SourceUnit(const Component &source);
-
-// The parts an analysis offers as its sources
-std::vector<std::string> GetSweepableSources(const Circuit &circuit);
-std::vector<std::string> GetNoiseInputSources(const Circuit &circuit);
-std::vector<std::string> GetTransferFunctionInputSources(const Circuit &circuit);
-std::vector<std::string> GetTruthTableInputs(const Circuit &circuit);
-
-// Harmonic balance
-std::optional<std::string> CheckHarmonicBalanceSettings(const Circuit &circuit,
-                                                        const HarmonicBalanceSettings &settings);
-std::optional<std::string> CheckHarmonicBalanceGrid(const HarmonicBalanceSettings &settings);
-std::optional<int> FindHarmonicNumber(double frequency, double fundamental);
 
 } // namespace Core
 

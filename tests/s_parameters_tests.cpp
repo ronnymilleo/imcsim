@@ -12,7 +12,7 @@
 #include "circuit/components/inductor.h"
 #include "circuit/components/resistor.h"
 #include "circuit/components/voltage_source.h"
-#include "simulation/circuit_checks.h"
+#include "simulation/check_s_parameters.h"
 #include "simulation/circuit_copy.h"
 #include "simulation/simulation_backend.h"
 #include "simulation/simulator.h"

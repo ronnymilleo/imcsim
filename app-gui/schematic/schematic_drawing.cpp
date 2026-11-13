@@ -8,6 +8,7 @@
 #include "base/node_colors.h"
 #include "base/svg_writer.h"
 #include "base/theme.h"
+#include "circuit/circuit_currents.h"
 #include "schematic/probing.h"
 #include <algorithm>
 #include <cfloat>

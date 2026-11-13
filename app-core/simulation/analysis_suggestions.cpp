@@ -8,7 +8,7 @@
 #include "circuit/components/clock.h"
 #include "circuit/components/op_amp.h"
 #include "circuit/components/source.h"
-#include "simulation/circuit_checks.h"
+#include "simulation/check_harmonic_balance.h"
 #include <algorithm>
 #include <array>
 #include <cmath>

@@ -3,6 +3,12 @@
  * @brief   Tests for the checks of a circuit and of the settings of an analysis, which no backend takes part in.
  */
 
+#include "simulation/analysis_sources.h"
+#include "simulation/check_ac_sweep.h"
+#include "simulation/check_dc_sweep.h"
+#include "simulation/check_harmonic_balance.h"
+#include "simulation/check_transfer_function.h"
+#include "simulation/check_transient.h"
 #include "simulation/circuit_checks.h"
 
 #include "circuit/components/clock.h"

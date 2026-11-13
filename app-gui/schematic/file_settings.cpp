@@ -7,6 +7,7 @@
 
 #include "nlohmann/json.hpp"
 #include "schematic/file_json.h"
+#include "simulation/check_harmonic_balance.h"
 #include <algorithm>
 #include <array>
 #include <cmath>

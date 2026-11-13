@@ -1,13 +1,13 @@
 /**
  * @file    circuit_checks.cpp
- * @brief   Checks that a circuit can be simulated at all, before any analysis settings are looked at.
- * @details Defines part of what circuit_checks.h declares; circuit_checks.cpp, analysis_checks.cpp and
- *          analysis_sources.cpp split it by topic.
+ * @brief   Checks of a circuit before any analysis runs on it.
  */
 
 #include "simulation/circuit_checks.h"
 
 #include "circuit/behavioral_expression.h"
+#include "circuit/circuit.h"
+#include "circuit/circuit_currents.h"
 #include "circuit/components/behavioral_source.h"
 #include "circuit/components/clock.h"
 #include "circuit/components/controlled_source.h"
@@ -16,9 +16,11 @@
 #include "circuit/components/subcircuit.h"
 #include "circuit/subcircuit.h"
 #include <algorithm>
-#include <cmath>
 #include <format>
+#include <functional>
+#include <optional>
 #include <set>
+#include <string>
 #include <string_view>
 
 namespace Core {

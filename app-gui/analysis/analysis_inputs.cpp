@@ -5,7 +5,7 @@
 
 #include "analysis/analysis_inputs.h"
 
-#include "simulation/circuit_checks.h"
+#include "simulation/analysis_sources.h"
 #include <algorithm>
 
 namespace GUI {

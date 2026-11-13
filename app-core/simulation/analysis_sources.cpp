@@ -1,25 +1,17 @@
 /**
  * @file    analysis_sources.cpp
- * @brief   Finds the parts an analysis can use as its source and lists them by name.
- * @details Defines part of what circuit_checks.h declares; circuit_checks.cpp, analysis_checks.cpp and
- *          analysis_sources.cpp split it by topic.
+ * @brief   The parts of a circuit an analysis can take as its source or input, found by name or listed.
  */
 
-#include "simulation/circuit_checks.h"
+#include "simulation/analysis_sources.h"
 
-#include "circuit/behavioral_expression.h"
-#include "circuit/components/behavioral_source.h"
-#include "circuit/components/clock.h"
-#include "circuit/components/controlled_source.h"
-#include "circuit/components/logic_part.h"
+#include "circuit/circuit.h"
 #include "circuit/components/source.h"
-#include "circuit/components/subcircuit.h"
-#include "circuit/subcircuit.h"
+#include "simulation/check_frequency_range.h"
 #include <algorithm>
-#include <cmath>
-#include <format>
-#include <set>
+#include <string>
 #include <string_view>
+#include <vector>
 
 namespace Core {
 

@@ -10,6 +10,7 @@
 #include <memory>
 #include <span>
 #include <string>
+#include <string_view>
 
 namespace Core {
 
@@ -59,6 +60,10 @@ public:
 private:
     FuseParameters m_Parameters;
 };
+
+/// The netlist option a circuit with a fuse writes: the Gear integration, since the trapezoidal rule rings for ever
+/// on an inductor that an open fuse cuts.
+constexpr std::string_view FUSE_INTEGRATION_OPTION = ".options method=gear\n";
 
 // Figures
 double GetCoolingTimeConstant(const FuseParameters &parameters);

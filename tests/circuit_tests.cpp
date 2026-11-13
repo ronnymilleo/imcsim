@@ -4,6 +4,8 @@
  */
 
 #include "circuit/circuit.h"
+#include "circuit/circuit_currents.h"
+#include "circuit/circuit_netlist.h"
 #include "circuit/components/bjt.h"
 #include "circuit/components/capacitor.h"
 #include "circuit/components/clock.h"

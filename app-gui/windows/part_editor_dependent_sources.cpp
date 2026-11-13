@@ -8,7 +8,9 @@
 
 #include "base/theme.h"
 #include "circuit/behavioral_expression.h"
+#include "circuit/circuit_currents.h"
 #include "misc/cpp/imgui_stdlib.h"
+#include "simulation/circuit_checks.h"
 #include "simulation/simulator.h"
 #include "windows/part_fields.h"
 #include <format>
