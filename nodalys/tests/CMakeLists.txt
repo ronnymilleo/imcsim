@@ -5,6 +5,8 @@
 include(Catch)
 
 add_executable(nodalys-tests
+    behavioral_device_tests.cpp
+    expression_tests.cpp
     fft_tests.cpp
     fuse_device_tests.cpp
     hb_analysis_tests.cpp

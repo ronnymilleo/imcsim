@@ -7,7 +7,9 @@
 
 #include "backends/nodalys/model_parser.h"
 #include "backends/nodalys/parameter_conversion.h"
+#include "circuit/behavioral_expression.h"
 #include "circuit/circuit_currents.h"
+#include "circuit/components/behavioral_source.h"
 #include "circuit/components/bjt.h"
 #include "circuit/components/clock.h"
 #include "circuit/components/controlled_source.h"
@@ -58,18 +60,42 @@ std::expected<ProbeSpec, std::string> FindControllingCurrent(const Circuit &circ
     return std::unexpected(std::format("The circuit has no part reporting the current {}", name));
 }
 
+/**
+ * @brief   Names the 0 V source that carries the current of one terminal of a part, inside the block named by prefix.
+ */
+std::string ProbeName(const std::string &prefix, const int entry, const int terminal) {
+    return prefix.empty() ? std::format("__probe_{}_{}", entry, terminal)
+                          : std::format("__probe_{}_{}_{}", prefix, entry, terminal);
+}
+
+/**
+ * @brief   Plans a probe for every terminal whose current a controlled or a behavioral source reads, one for each
+ *          terminal however many sources read it.
+ */
 std::expected<std::vector<ProbeSpec>, std::string> PlanProbes(const Circuit &circuit) {
     std::vector<ProbeSpec> probes;
+    const auto add_probe = [&probes](const ProbeSpec &target) {
+        const bool is_planned = std::ranges::any_of(probes, [&target](const ProbeSpec &probe) {
+            return probe.Entry == target.Entry && probe.Terminal == target.Terminal;
+        });
+        if (!is_planned) {
+            probes.push_back(target);
+        }
+    };
     for (const CircuitEntry &entry : circuit.GetEntries()) {
-        if (!IsCurrentControlled(entry.Part->GetType())) {
-            continue;
+        std::vector<std::string> currents;
+        if (IsCurrentControlled(entry.Part->GetType())) {
+            currents.push_back(static_cast<const ControlledSource &>(*entry.Part).GetControllingCurrent());
+        } else if (IsBehavioralSource(entry.Part->GetType())) {
+            currents = ListBehavioralCurrents(static_cast<const BehavioralSource &>(*entry.Part).GetExpression());
         }
-        const auto &source = static_cast<const ControlledSource &>(*entry.Part);
-        const auto target = FindControllingCurrent(circuit, source.GetControllingCurrent());
-        if (!target) {
-            return std::unexpected(target.error());
+        for (const std::string &current : currents) {
+            const auto target = FindControllingCurrent(circuit, current);
+            if (!target) {
+                return std::unexpected(target.error());
+            }
+            add_probe(*target);
         }
-        probes.push_back(*target);
     }
     return probes;
 }
@@ -197,10 +223,7 @@ private:
             const int original_node =
                 node_map[static_cast<std::size_t>(target.Nodes[static_cast<std::size_t>(probe.Terminal)])];
             const int probe_node = m_Builder->AddNode();
-            const std::string probe_name = prefix.empty()
-                                               ? std::format("__probe_{}_{}", probe.Entry, probe.Terminal)
-                                               : std::format("__probe_{}_{}_{}", prefix, probe.Entry, probe.Terminal);
-            m_Builder->AddCurrentProbe(probe_name, original_node, probe_node);
+            m_Builder->AddCurrentProbe(ProbeName(prefix, probe.Entry, probe.Terminal), original_node, probe_node);
             probe_nodes[probe.Entry][probe.Terminal] = probe_node;
         }
 
@@ -501,9 +524,7 @@ private:
                 if (!target) {
                     return std::unexpected(target.error());
                 }
-                const std::string probe_name =
-                    prefix.empty() ? std::format("__probe_{}_{}", target->Entry, target->Terminal)
-                                   : std::format("__probe_{}_{}_{}", prefix, target->Entry, target->Terminal);
+                const std::string probe_name = ProbeName(prefix, target->Entry, target->Terminal);
                 if (type == ComponentType::CCCS) {
                     m_Builder->AddCccs(name, nodes[0], nodes[1], probe_name, *value);
                 } else {
@@ -513,6 +534,32 @@ private:
             }
             default:
                 break;
+            }
+            return {};
+        }
+
+        case ComponentType::BEHAVIORAL_VOLTAGE:
+        case ComponentType::BEHAVIORAL_CURRENT: {
+            // The nets of the expression become the nodes of the compiled circuit, and the currents it reads the
+            // probes planned for them, so the engine gets an expression of plain node numbers and source names
+            const auto expression = TranslateBehavioralExpression(
+                static_cast<const BehavioralSource &>(part).GetExpression(),
+                [&owner, &node_map](const std::string_view net) -> std::optional<int> {
+                    const std::optional<int> node = owner.FindNodeOfNet(net);
+                    return node ? std::optional<int>(node_map[static_cast<std::size_t>(*node)]) : std::nullopt;
+                },
+                [&owner, &prefix](const std::string_view current) -> std::optional<std::string> {
+                    const auto target = FindControllingCurrent(owner, std::string(current));
+                    return target ? std::optional<std::string>(ProbeName(prefix, target->Entry, target->Terminal))
+                                  : std::nullopt;
+                });
+            if (!expression) {
+                return std::unexpected(std::format("{}: {}", name, expression.error()));
+            }
+            if (type == ComponentType::BEHAVIORAL_VOLTAGE) {
+                m_Builder->AddBehavioralVoltage(name, nodes[0], nodes[1], *expression);
+            } else {
+                m_Builder->AddBehavioralCurrent(name, nodes[0], nodes[1], *expression);
             }
             return {};
         }

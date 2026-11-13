@@ -5,6 +5,7 @@
 
 #include "nodalys/netlist_parser.h"
 #include "nodalys/circuit_builder.h"
+#include "nodalys/expression.h"
 #include "parser/spice_number.h"
 
 #include <algorithm>
@@ -317,6 +318,45 @@ std::pair<std::string, std::string> ParseVoltageNodes(std::string_view s) {
     return {std::string(s), "0"};
 }
 
+/// The kind and the text of the expression of a B element line, `B1 n+ n- V=<expression>`; the text is taken from
+/// the line itself, since the tokens break an expression at its spaces and parentheses.
+struct BehavioralLine {
+    bool IsVoltage = true;
+    std::string Expression;
+};
+
+std::optional<BehavioralLine> SplitBehavioralLine(std::string_view line) {
+    constexpr int WORDS_BEFORE_EXPRESSION = 3;
+    std::size_t position = 0;
+    for (int word = 0; word < WORDS_BEFORE_EXPRESSION; ++word) {
+        while (position < line.size() && std::isspace(static_cast<unsigned char>(line[position]))) {
+            ++position;
+        }
+        while (position < line.size() && !std::isspace(static_cast<unsigned char>(line[position]))) {
+            ++position;
+        }
+    }
+    std::string_view rest = line.substr(position);
+    if (const std::size_t comment = rest.find_first_of(";$"); comment != std::string_view::npos) {
+        rest = rest.substr(0, comment);
+    }
+    rest = Trim(rest);
+    if (rest.size() < 2 || (std::toupper(static_cast<unsigned char>(rest.front())) != 'V' &&
+                            std::toupper(static_cast<unsigned char>(rest.front())) != 'I')) {
+        return std::nullopt;
+    }
+    const bool is_voltage = std::toupper(static_cast<unsigned char>(rest.front())) == 'V';
+    rest = Trim(rest.substr(1));
+    if (rest.empty() || rest.front() != '=') {
+        return std::nullopt;
+    }
+    rest = Trim(rest.substr(1));
+    if (rest.empty()) {
+        return std::nullopt;
+    }
+    return BehavioralLine{.IsVoltage = is_voltage, .Expression = std::string(rest)};
+}
+
 } // namespace
 
 std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_text) {
@@ -549,6 +589,14 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
         }
 
         // Normal element inside subcircuit: map its nodes and prepend instance prefix
+        if (!prefix.empty() && std::toupper(static_cast<unsigned char>(tokens[0].front())) == 'B') {
+            // The nodes and sources an expression names are not renamed for the instance, which would read the nodes of
+            // the circuit around it instead
+            return std::unexpected(
+                std::format("A behavioral source inside a subcircuit is not supported, since its expression cannot be "
+                            "renamed for each instance: '{}'",
+                            line));
+        }
         if (!prefix.empty()) {
             std::string rewritten = prefix + "." + tokens[0];
             for (std::size_t i = 1; i < tokens.size(); ++i) {
@@ -660,6 +708,25 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
                 nodes.Register(tokens[2]);
             }
             break;
+
+        case 'B': {
+            if (tokens.size() >= 3) {
+                nodes.Register(tokens[1]);
+                nodes.Register(tokens[2]);
+            }
+            // The nodes the expression reads are circuit nodes too, even when no other element touches them
+            if (const std::optional<BehavioralLine> behavioral = SplitBehavioralLine(line)) {
+                if (const auto expression = Expression::Parse(behavioral->Expression)) {
+                    for (const ExpressionInput &input : expression->GetInputs()) {
+                        if (input.Type == ExpressionInput::Kind::VOLTAGE) {
+                            nodes.Register(input.First);
+                            nodes.Register(input.Second);
+                        }
+                    }
+                }
+            }
+            break;
+        }
 
         case 'U': {
             for (std::size_t i = 1; i < tokens.size(); ++i) {
@@ -1362,6 +1429,41 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
                 return std::unexpected(std::format("Invalid CCCS gain '{}'", tokens[4]));
             }
             builder.AddCccs(name, p, n, vctrl, *gain);
+            break;
+        }
+
+        case 'B': { // Behavioral source: B<name> <pos> <neg> V=<expression> or I=<expression>
+            const std::optional<BehavioralLine> behavioral = SplitBehavioralLine(line);
+            if (tokens.size() < 4 || !behavioral) {
+                return std::unexpected(std::format("Malformed behavioral source: '{}'", line));
+            }
+            const auto expression = Expression::Parse(behavioral->Expression);
+            if (!expression) {
+                return std::unexpected(std::format("{}: {}", name, expression.error()));
+            }
+            // The builder reads nodes by number, so every v(...) is written with the numbers this netlist gave them
+            std::string resolved;
+            std::size_t copied = 0;
+            for (const ExpressionReference &reference : expression->GetReferences()) {
+                resolved.append(behavioral->Expression, copied, reference.Start - copied);
+                copied = reference.Start + reference.Length;
+                if (reference.Input.Type == ExpressionInput::Kind::CURRENT) {
+                    resolved.append(behavioral->Expression, reference.Start, reference.Length);
+                } else if (reference.Input.Second.empty()) {
+                    resolved.append(std::format("v({})", nodes.Resolve(reference.Input.First)));
+                } else {
+                    resolved.append(std::format("v({},{})", nodes.Resolve(reference.Input.First),
+                                                nodes.Resolve(reference.Input.Second)));
+                }
+            }
+            resolved.append(behavioral->Expression, copied, std::string::npos);
+            const NodeId p = nodes.Resolve(tokens[1]);
+            const NodeId n = nodes.Resolve(tokens[2]);
+            if (behavioral->IsVoltage) {
+                builder.AddBehavioralVoltage(name, p, n, resolved);
+            } else {
+                builder.AddBehavioralCurrent(name, p, n, resolved);
+            }
             break;
         }
 

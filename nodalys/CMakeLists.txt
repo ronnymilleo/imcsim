@@ -16,6 +16,7 @@ add_library(nodalys STATIC
     src/api/circuit_builder.cpp
     src/api/nodalys.cpp
     src/bridge/logic_bridge.cpp
+    src/devices/behavioral_device.cpp
     src/devices/bjt_device.cpp
     src/devices/devices.cpp
     src/devices/diode_device.cpp
@@ -28,6 +29,9 @@ add_library(nodalys STATIC
     src/export/exporters.cpp
     src/export/json_exporter.cpp
     src/export/raw_exporter.cpp
+    src/expression/expression.cpp
+    src/expression/expression_math.cpp
+    src/expression/expression_parser.cpp
     src/linear/dense_matrix.cpp
     src/linear/fft.cpp
     src/linear/qz.cpp

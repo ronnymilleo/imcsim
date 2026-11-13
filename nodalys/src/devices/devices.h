@@ -18,6 +18,7 @@
 #include <functional>
 #include <limits>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace Nodalys {
@@ -147,6 +148,15 @@ public:
      * @param[in] scale  Share of the source values stamped; devices that are not sources ignore it.
      */
     virtual void SetSourceScale(double scale) { (void)scale; }
+
+    /**
+     * @brief   Tells why the last stamp of the device cannot be trusted, so a Newton iteration that stamped it is not
+     *          taken as converged.
+     * @details A behavioral source whose expression has no value at the iterate, such as the square root of a negative
+     *          voltage, stamps nothing useful: the solve keeps iterating, and when it fails the message says why.
+     * @return  The reason, or an empty text when the last stamp was good.
+     */
+    virtual std::string_view GetFault() const { return {}; }
 
     /**
      * @brief   Seeds the initial iterate of a DC operating point solve for nonlinear junctions.

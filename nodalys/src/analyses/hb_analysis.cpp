@@ -33,6 +33,7 @@
 #include <set>
 #include <span>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -94,6 +95,11 @@ struct HbWorkspace {
     std::function<bool()> ShouldStop;
     /// Set once ShouldStop() asked for a stop, so the continuation strategies end too.
     bool IsStopped = false;
+    /// True when the last evaluation of the residual met a device that has no value at the state, such as a behavioral
+    /// source whose expression is out of range; the state it gave cannot be a solution.
+    bool IsFaulty = false;
+    /// The fault of a device at some evaluation, for the message when the balance does not converge.
+    std::string Fault;
     int UnknownCount = 0;
     int Harmonics = 0;
     int CoeffsPerUnknown = 0;
@@ -217,7 +223,8 @@ std::expected<PartitionedCircuit, std::string> ValidateAndPartitionDevices(const
             }
             partitioned.CurrentSources.push_back(cs);
         } else if (!device->SupportsHarmonicBalance()) {
-            return std::unexpected("Harmonic Balance does not support hysteretic switches or relays");
+            return std::unexpected("Harmonic Balance does not support hysteretic switches or relays, nor a "
+                                   "behavioral source that reads time");
         }
 
         if (device->IsLinear()) {
@@ -334,6 +341,16 @@ void AddMatrixScaled(MnaSystem &target, const MnaSystem &source) {
     }
 }
 
+/// The first fault among the devices at their last stamp, or an empty text.
+std::string_view FindFault(const std::vector<Device *> &devices) {
+    for (const Device *device : devices) {
+        if (const std::string_view fault = device->GetFault(); !fault.empty()) {
+            return fault;
+        }
+    }
+    return {};
+}
+
 bool RunDcNewtonWithB0(const HbWorkspace &ws, const std::vector<double> &b0, const double b0_scale, const double gmin,
                        const ConvergenceOptions &options, std::vector<double> &x) {
     const int n = ws.UnknownCount;
@@ -362,7 +379,7 @@ bool RunDcNewtonWithB0(const HbWorkspace &ws, const std::vector<double> &b0, con
             }
         }
 
-        bool converged = iteration >= 2 && !any_limited;
+        bool converged = iteration >= 2 && !any_limited && FindFault(ws.NonlinearDevices).empty();
         for (int index = 0; index < n && converged; ++index) {
             const double abs_tol =
                 ws.IsNodeUnknown[static_cast<std::size_t>(index)] ? options.VoltageAbsTol : options.CurrentAbsTol;
@@ -384,7 +401,8 @@ bool RunDcNewtonWithB0(const HbWorkspace &ws, const std::vector<double> &b0, con
                 device->Stamp(sys, x, TimeContext{});
             }
             sys.AddGminToNodes(gmin);
-            if (sys.CheckResidual(x, options.VoltageAbsTol, options.CurrentAbsTol, options.RelTol)) {
+            if (FindFault(ws.NonlinearDevices).empty() &&
+                sys.CheckResidual(x, options.VoltageAbsTol, options.CurrentAbsTol, options.RelTol)) {
                 return true;
             }
         }
@@ -543,6 +561,7 @@ void EvaluateResidualAndJacobian(HbWorkspace &ws, const std::vector<double> &x_h
     const std::size_t total = x_hb.size();
     residual.assign(total, 0.0);
     row_scale.assign(total, 0.0);
+    ws.IsFaulty = false;
 
     const DenseMatrix &g_lin = ws.GLin.Matrix();
     const DenseMatrix &c_lin = ws.CLin.Matrix();
@@ -626,6 +645,10 @@ void EvaluateResidualAndJacobian(HbWorkspace &ws, const std::vector<double> &x_h
         for (Device *device : ws.NonlinearDevices) {
             device->Stamp(ws.SampleG, xm, TimeContext{});
             device->StampCharge(ws.SampleC, xm);
+            if (const std::string_view fault = device->GetFault(); !fault.empty()) {
+                ws.IsFaulty = true;
+                ws.Fault = fault;
+            }
         }
 
         const DenseMatrix &gm = ws.SampleG.Matrix();
@@ -815,7 +838,7 @@ int RunHbNewton(HbWorkspace &ws, const double ac_scale, const double gmin, const
 
         if (step_converged) {
             EvaluateResidualAndJacobian(ws, x_hb, ac_scale, gmin, false, residual, row_scale, nullptr);
-            if (CheckHbResidual(ws, residual, row_scale, options)) {
+            if (!ws.IsFaulty && CheckHbResidual(ws, residual, row_scale, options)) {
                 return iteration;
             }
         }
@@ -1158,7 +1181,11 @@ std::expected<HarmonicBalanceResult, std::string> ComputeHarmonicBalance(Compile
             return std::unexpected("The harmonic balance was stopped before it converged");
         }
         if (!outcome.Converged) {
-            return std::unexpected("Harmonic Balance Newton-Raphson failed to converge for this circuit");
+            std::string failure = "Harmonic Balance Newton-Raphson failed to converge for this circuit";
+            if (!ws.Fault.empty()) {
+                failure += std::format("; {}", ws.Fault);
+            }
+            return std::unexpected(std::move(failure));
         }
     }
 

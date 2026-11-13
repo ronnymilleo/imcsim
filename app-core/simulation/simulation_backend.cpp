@@ -208,10 +208,23 @@ std::optional<std::string> FindUnsupported(const SimulationBackend &backend, con
 std::optional<std::string> FindUnsupported(const SimulationBackend &backend, const Circuit &circuit,
                                            const AnalysisKind kind) {
     std::set<ComponentType> parts;
-    for (const Component *part : CollectParts(circuit)) {
+    const std::vector<const Component *> all_parts = CollectParts(circuit);
+    for (const Component *part : all_parts) {
         parts.insert(part->GetType());
     }
-    return FindUnsupported(backend, parts, kind);
+    if (const std::optional<std::string> reason = FindUnsupported(backend, parts, kind)) {
+        return reason;
+    }
+    const auto &find_problem = backend.GetCapabilities().FindPartProblem;
+    if (!find_problem) {
+        return std::nullopt;
+    }
+    for (const Component *part : all_parts) {
+        if (const std::optional<std::string> reason = find_problem(*part, kind)) {
+            return reason;
+        }
+    }
+    return std::nullopt;
 }
 
 } // namespace Core

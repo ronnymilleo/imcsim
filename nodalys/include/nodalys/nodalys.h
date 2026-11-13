@@ -10,6 +10,7 @@
 #include "nodalys/circuit.h"
 #include "nodalys/circuit_builder.h"
 #include "nodalys/exporters.h"
+#include "nodalys/expression.h"
 #include "nodalys/logic_bridge.h"
 #include "nodalys/netlist_parser.h"
 #include "nodalys/results.h"

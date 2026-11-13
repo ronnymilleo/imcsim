@@ -21,13 +21,25 @@
 
 #include <algorithm>
 #include <cmath>
+#include <format>
+#include <string_view>
 
 namespace Nodalys {
 
 namespace {
 
+/// The first fault among the devices at their last stamp, or an empty text.
+std::string_view FindFault(const std::vector<std::unique_ptr<Device>> &devices) {
+    for (const std::unique_ptr<Device> &device : devices) {
+        if (const std::string_view fault = device->GetFault(); !fault.empty()) {
+            return fault;
+        }
+    }
+    return {};
+}
+
 int RunNewton(MnaSystem &sys, const std::vector<std::unique_ptr<Device>> &devices, std::vector<double> &x,
-              const ConvergenceOptions &options, const double gmin, const TimeContext &time) {
+              const ConvergenceOptions &options, const double gmin, const TimeContext &time, std::string &fault) {
     const int size = sys.GetSize();
     std::vector<double> candidate(static_cast<std::size_t>(size), 0.0);
 
@@ -38,6 +50,11 @@ int RunNewton(MnaSystem &sys, const std::vector<std::unique_ptr<Device>> &device
             device->Stamp(sys, x, time);
         }
         sys.AddGminToNodes(gmin);
+        // An iterate where a device has no value stamps a placeholder, so it cannot count as converged
+        const std::string_view stamp_fault = FindFault(devices);
+        if (!stamp_fault.empty()) {
+            fault = stamp_fault;
+        }
 
         // Step 2: Solve the linearized MNA system
         if (!sys.Solve(candidate)) {
@@ -53,7 +70,7 @@ int RunNewton(MnaSystem &sys, const std::vector<std::unique_ptr<Device>> &device
         }
 
         // Step 4: Check step delta |candidate - x|
-        bool converged = iteration >= 2 && !any_limited;
+        bool converged = iteration >= 2 && !any_limited && stamp_fault.empty();
         for (int index = 0; index < size && converged; ++index) {
             const bool is_node = sys.IsNodeUnknown(index);
             const double abs_tol = is_node ? options.VoltageAbsTol : options.CurrentAbsTol;
@@ -73,7 +90,8 @@ int RunNewton(MnaSystem &sys, const std::vector<std::unique_ptr<Device>> &device
                 device->Stamp(sys, x, time);
             }
             sys.AddGminToNodes(gmin);
-            if (sys.CheckResidual(x, options.VoltageAbsTol, options.CurrentAbsTol, options.RelTol)) {
+            const bool is_faulty = !FindFault(devices).empty();
+            if (!is_faulty && sys.CheckResidual(x, options.VoltageAbsTol, options.CurrentAbsTol, options.RelTol)) {
                 return iteration;
             }
         }
@@ -93,7 +111,7 @@ NewtonOutcome SolveNewton(MnaSystem &sys, const std::vector<std::unique_ptr<Devi
 
     // Attempt 1: Direct Newton-Raphson
     NewtonOutcome outcome;
-    if (const int iterations = RunNewton(sys, devices, x, options, options.Gmin, time)) {
+    if (const int iterations = RunNewton(sys, devices, x, options, options.Gmin, time, outcome.Fault)) {
         outcome.Converged = true;
         outcome.Iterations = iterations;
         return outcome;
@@ -112,7 +130,7 @@ NewtonOutcome SolveNewton(MnaSystem &sys, const std::vector<std::unique_ptr<Devi
     }
     for (int step = 0; step <= GMIN_STEPS; ++step) {
         const double gmin = GMIN_STEP_START * std::pow(GMIN_STEP_FACTOR, static_cast<double>(step));
-        if (!RunNewton(sys, devices, x, options, std::max(gmin, options.Gmin), time)) {
+        if (!RunNewton(sys, devices, x, options, std::max(gmin, options.Gmin), time, outcome.Fault)) {
             break;
         }
         if (step == GMIN_STEPS) {
@@ -141,7 +159,7 @@ NewtonOutcome SolveNewton(MnaSystem &sys, const std::vector<std::unique_ptr<Devi
         for (const std::unique_ptr<Device> &device : devices) {
             device->SetSourceScale(scale);
         }
-        if (!RunNewton(sys, devices, x, options, options.Gmin, time)) {
+        if (!RunNewton(sys, devices, x, options, options.Gmin, time, outcome.Fault)) {
             break;
         }
         if (step == SOURCE_STEPS) {
@@ -153,6 +171,13 @@ NewtonOutcome SolveNewton(MnaSystem &sys, const std::vector<std::unique_ptr<Devi
         device->SetSourceScale(1.0);
     }
     return outcome;
+}
+
+std::string DescribeFailure(std::string message, const NewtonOutcome &outcome) {
+    if (!outcome.Fault.empty()) {
+        message += std::format("; {}", outcome.Fault);
+    }
+    return message;
 }
 
 } // namespace Nodalys

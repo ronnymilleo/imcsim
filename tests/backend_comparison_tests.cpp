@@ -12,6 +12,7 @@
 
 #include "backends/ngspice/ngspice_backend.h"
 #include "backends/nodalys/nodalys_backend.h"
+#include "circuit/components/behavioral_source.h"
 #include "circuit/components/bjt.h"
 #include "circuit/components/capacitor.h"
 #include "circuit/components/controlled_source.h"
@@ -614,6 +615,124 @@ TEST_CASE("Both backends agree on the operating point of controlled sources") {
     circuit.Add(ground, {0});
     CheckOperatingPointParity(circuit);
     CheckDCSweepParity(circuit, {.Swept = {.Source = "V1", .Start = 0.0, .Stop = 12.0, .Step = 2.0}});
+}
+
+/**
+ * @struct  BehavioralStage
+ * @brief   A bias of 2 V under a small AC source on net IN, loaded by 1k, and a behavioral source from net OUT to
+ * ground into 1k, so the expression is read at a bias, swept, followed in a transient and linearized in an AC sweep.
+ * @details Nodes: IN 1, OUT 2 and the bias 3. The bias source is V1, which a DC sweep moves.
+ */
+struct BehavioralStage {
+    Core::VCC Bias;
+    Core::VoltageSource Small;
+    Core::Resistor Sense;
+    Core::BehavioralSource Source;
+    Core::Resistor Load;
+    Core::Ground Reference;
+    Core::Circuit Circuit;
+
+    BehavioralStage(const Core::ComponentType type, const std::string &expression) : Source(type) {
+        Bias.SetName("V1");
+        Bias.SetValue(2.0);
+        Small.SetName("V2");
+        Small.SetSourceType(Core::VoltageSource::SourceType::AC);
+        Small.SetAC({.Amplitude = 0.5, .Frequency = 1e3, .Offset = 0.0, .Magnitude = 1.0});
+        Sense.SetName("R1");
+        Source.SetName("B1");
+        Source.SetExpression(expression);
+        Load.SetName("R2");
+        Circuit.Add(Bias, {3});
+        Circuit.Add(Small, {1, 3});
+        Circuit.Add(Sense, {1, 0});
+        Circuit.Add(Source, {2, 0});
+        Circuit.Add(Load, {2, 0});
+        Circuit.Add(Reference, {0});
+        Circuit.NameNet("IN", 1);
+        Circuit.NameNet("OUT", 2);
+    }
+};
+
+TEST_CASE("Both backends agree on a smooth behavioral source in its voltage and current forms",
+          "[backend_comparison][behavioral]") {
+    const Core::ComponentType type =
+        GENERATE(Core::ComponentType::BEHAVIORAL_VOLTAGE, Core::ComponentType::BEHAVIORAL_CURRENT);
+    const std::string expression =
+        GENERATE("V(IN)*V(IN)", "3*V(IN) + 1", "1m*tanh(V(IN)/26m)", "exp(V(IN)/2)", "sqrt(V(IN))", "V(IN)^3 - V(IN)",
+                 "log10(V(IN)) + ln(V(IN)) + log(V(IN))", "atan(V(IN))*sin(V(IN))", "1k*I(R1)", "pwr(V(IN), 1.5)",
+                 "V(IN)/(1 + V(IN)*V(IN))", "cosh(V(IN)) - sinh(V(IN))/2", "V(IN, 0)*V(IN, OUT)",
+                 "2**V(IN) + pow(V(IN), 2.5) + asinh(V(IN)) + acosh(V(IN) + 1)", "min(V(IN), 1.5)*max(V(IN), 0.5)");
+    INFO(Core::GetTypeName(type) << ": " << expression);
+    BehavioralStage stage(type, expression);
+    CheckOperatingPointParity(stage.Circuit);
+    CheckDCSweepParity(stage.Circuit, {.Swept = {.Source = "V1", .Start = 0.5, .Stop = 3.0, .Step = 0.25}});
+    CheckACSweepParity(stage.Circuit, {.StartFrequency = 100.0, .StopFrequency = 1e4, .PointsPerDecade = 2});
+    CheckTransientParity(stage.Circuit, {.StopTime = 2e-3, .TimeStep = 10e-6});
+}
+
+TEST_CASE("Both backends agree on a behavioral source that follows time, which a DC sweep holds at 0 on Nodalys",
+          "[backend_comparison][behavioral]") {
+    // ngspice sets time to the previous point of the sweep in a DC sweep, 0.25 V behind the swept one here, which is a
+    // defect of its sweep and not a value to match, so only the analyses that have a time of their own are compared
+    const Core::ComponentType type =
+        GENERATE(Core::ComponentType::BEHAVIORAL_VOLTAGE, Core::ComponentType::BEHAVIORAL_CURRENT);
+    const std::string expression = GENERATE("V(IN)*(1 + time*1k)", "1k*time + 2*V(IN)", "sin(2*pi*200*time)*V(IN)");
+    INFO(Core::GetTypeName(type) << ": " << expression);
+    BehavioralStage stage(type, expression);
+    CheckOperatingPointParity(stage.Circuit);
+    CheckACSweepParity(stage.Circuit, {.StartFrequency = 100.0, .StopFrequency = 1e4, .PointsPerDecade = 2});
+    // A 2 us step keeps the points of ngspice, which are sparse at the start, close enough for the linear
+    // interpolation of its trace not to differ from the curve by more than the tolerance
+    CheckTransientParity(stage.Circuit, {.StopTime = 1e-3, .TimeStep = 2e-6});
+}
+
+TEST_CASE("Both backends agree on a behavioral source with jumps and corners away from them",
+          "[backend_comparison][behavioral]") {
+    const Core::ComponentType type =
+        GENERATE(Core::ComponentType::BEHAVIORAL_VOLTAGE, Core::ComponentType::BEHAVIORAL_CURRENT);
+    const std::string expression =
+        GENERATE("V(IN) > 1 ? 5 : 1", "abs(V(IN) - 3)", "u(V(IN) - 1)*uramp(V(IN))", "min(max(V(IN), -1), 1)*2",
+                 "floor(V(IN)*2)/2 + V(IN)", "V(IN) > 1.5 && V(IN) < 2.5 ? 1 : 0", "nint(V(IN)) + u2(V(IN) - 1.5)",
+                 "(V(IN) < 1) * 3 + (V(IN) >= 1) * V(IN)", "sgn(V(IN) - 2.2)*V(IN) + ceil(V(IN))", "!(V(IN) > 1.2)");
+    INFO(Core::GetTypeName(type) << ": " << expression);
+    BehavioralStage stage(type, expression);
+    CheckOperatingPointParity(stage.Circuit);
+    // The steps stay clear of the places where an expression jumps, so each engine takes the same side
+    CheckDCSweepParity(stage.Circuit, {.Swept = {.Source = "V1", .Start = 0.55, .Stop = 2.95, .Step = 0.3}});
+    CheckACSweepParity(stage.Circuit, {.StartFrequency = 100.0, .StopFrequency = 1e4, .PointsPerDecade = 2});
+}
+
+TEST_CASE("Both backends agree on a behavioral source inside a block, reading its nets and currents",
+          "[backend_comparison][behavioral]") {
+    Core::Resistor inner;
+    inner.SetName("R1");
+    Core::BehavioralSource mixer(Core::ComponentType::BEHAVIORAL_VOLTAGE);
+    mixer.SetName("B1");
+    mixer.SetExpression("2k*I(R1) + V(MID)*V(IN)");
+    auto definition = std::make_shared<Core::SubcircuitDefinition>();
+    definition->Name = "mixer";
+    definition->Pins = {{"IN", 1}, {"OUT", 2}};
+    definition->Body.Add(inner, {1, 0});
+    definition->Body.Add(mixer, {2, 0});
+    definition->Body.NameNet("MID", 1);
+    definition->Body.NameNet("IN", 1);
+
+    Core::VCC supply;
+    supply.SetName("V1");
+    supply.SetValue(1.5);
+    Core::SubcircuitInstance instance("mixer", {"IN", "OUT"});
+    instance.SetName("X1");
+    Core::Resistor load;
+    load.SetName("R9");
+    const Core::Ground reference;
+    Core::Circuit circuit;
+    circuit.Add(supply, {1});
+    circuit.Add(instance, {1, 2});
+    circuit.Add(load, {2, 0});
+    circuit.Add(reference, {0});
+    circuit.AddSubcircuit(definition);
+    CheckOperatingPointParity(circuit);
+    CheckDCSweepParity(circuit, {.Swept = {.Source = "V1", .Start = 0.0, .Stop = 3.0, .Step = 0.5}});
 }
 
 TEST_CASE("Both backends agree on the operating point of a voltage-controlled switch") {

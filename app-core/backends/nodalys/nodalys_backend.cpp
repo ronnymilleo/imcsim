@@ -6,6 +6,7 @@
 #include "backends/nodalys/nodalys_backend.h"
 
 #include "backends/nodalys/compiler.h"
+#include "circuit/components/behavioral_source.h"
 #include "circuit/components/logic_part.h"
 #include "circuit/components/source.h"
 #include "simulation/live_pace.h"
@@ -43,6 +44,18 @@ std::optional<std::string> FindRandomSource(const Circuit &circuit) {
     return std::nullopt;
 }
 
+/**
+ * @brief   Keeps the rows of the nodes of the circuit and drops the rest.
+ * @details Nodalys also reports the nodes it adds, one for each probe that carries a current a source reads and one
+ *          for each node inside a block. ngspice gives the nodes of the circuit only, and what reads a result by node
+ *          number, such as the table of the operating point, must not meet nodes that are not in the schematic.
+ */
+template <typename Row> void KeepCircuitNodes(std::vector<Row> &rows, const int node_count) {
+    if (rows.size() > static_cast<std::size_t>(node_count)) {
+        rows.resize(static_cast<std::size_t>(node_count));
+    }
+}
+
 std::vector<ComponentTrace> ToTraces(std::vector<Nodalys::ComponentTrace> traces) {
     std::vector<ComponentTrace> converted;
     converted.reserve(traces.size());
@@ -52,7 +65,8 @@ std::vector<ComponentTrace> ToTraces(std::vector<Nodalys::ComponentTrace> traces
     return converted;
 }
 
-Transient ToTransient(Nodalys::TransientResult result) {
+Transient ToTransient(Nodalys::TransientResult result, const int node_count) {
+    KeepCircuitNodes(result.NodeVoltages, node_count);
     return {.Times = std::move(result.Times),
             .NodeVoltages = std::move(result.NodeVoltages),
             .Currents = ToTraces(std::move(result.Currents)),
@@ -65,8 +79,10 @@ Transient ToTransient(Nodalys::TransientResult result) {
  *          pace of the caller's monitor.
  * @param[in]     monitor     What the caller watches; it outlives the run.
  * @param[in,out] live_start  When the clock of a live run started, moved later by the time spent paused.
+ * @param[in]     node_count  Nodes of the circuit, which the chunks keep.
  */
-Nodalys::RunMonitor ToNodalysMonitor(const RunMonitor &monitor, std::chrono::steady_clock::time_point &live_start) {
+Nodalys::RunMonitor ToNodalysMonitor(const RunMonitor &monitor, std::chrono::steady_clock::time_point &live_start,
+                                     const int node_count) {
     Nodalys::RunMonitor nodalys_monitor;
     if (monitor.Control != nullptr) {
         nodalys_monitor.ShouldStop = [&monitor]() { return monitor.Control->IsCancelled(); };
@@ -89,11 +105,31 @@ Nodalys::RunMonitor ToNodalysMonitor(const RunMonitor &monitor, std::chrono::ste
         };
     }
     if (monitor.OnChunk) {
-        nodalys_monitor.PostTransientChunk = [&monitor](const Nodalys::TransientResult &chunk) {
-            monitor.OnChunk(ToTransient(chunk));
+        nodalys_monitor.PostTransientChunk = [&monitor, node_count](const Nodalys::TransientResult &chunk) {
+            monitor.OnChunk(ToTransient(chunk, node_count));
         };
     }
     return nodalys_monitor;
+}
+
+/**
+ * @brief   Tells why Nodalys cannot run the expression of a behavioral source: a function or a variable it has not, or
+ *          a time-dependent expression in the harmonic balance, which evaluates the circuit at samples without the
+ *          instant.
+ * @details The engine reads the same text as ngspice, so this is only what ngspice reads and Nodalys does not.
+ */
+std::optional<std::string> FindBehavioralProblem(const Component &part, const AnalysisKind kind) {
+    if (!IsBehavioralSource(part.GetType())) {
+        return std::nullopt;
+    }
+    const auto expression = Nodalys::Expression::Parse(static_cast<const BehavioralSource &>(part).GetExpression());
+    if (!expression) {
+        return std::format("Nodalys cannot read the expression of {}: {}", part.GetName(), expression.error());
+    }
+    if (kind == AnalysisKind::HARMONIC_BALANCE && expression->IsTimeDependent()) {
+        return std::format("Nodalys harmonic balance cannot run {}: its expression reads time", part.GetName());
+    }
+    return std::nullopt;
 }
 
 /**
@@ -128,13 +164,11 @@ Run RunOnNodalys(const Circuit &circuit, Compute compute, Convert convert) {
 } // namespace
 
 /**
- * @brief   Sets up what Nodalys runs and the parts it has no device for yet, each with the reason shown to the user.
+ * @brief   Sets up what Nodalys runs and the parts it cannot simulate, each with the reason shown to the user.
  */
 NodalysBackend::NodalysBackend() {
     m_Capabilities.Analyses = NODALYS_ANALYSES;
-    for (const ComponentType type : {ComponentType::BEHAVIORAL_VOLTAGE, ComponentType::BEHAVIORAL_CURRENT}) {
-        m_Capabilities.UnsupportedParts[type] = "Nodalys has no device for behavioral sources yet";
-    }
+    m_Capabilities.FindPartProblem = FindBehavioralProblem;
     m_Capabilities.TemperatureUnsupported =
         "Nodalys simulates at 27 C only: its device models do not follow the temperature yet";
     for (int index = 0; index <= static_cast<int>(ComponentType::SEVEN_SEGMENT); ++index) {
@@ -184,7 +218,8 @@ OperatingPointRun NodalysBackend::RunOperatingPoint(const Circuit &circuit,
         [](const Nodalys::Circuit &compiled, std::vector<Nodalys::DiagnosticMessage> *messages) {
             return Nodalys::ComputeOperatingPoint(compiled, {}, messages);
         },
-        [](Nodalys::OperatingPointResult result) {
+        [node_count = circuit.GetNodeCount()](Nodalys::OperatingPointResult result) {
+            KeepCircuitNodes(result.NodeVoltages, node_count);
             OperatingPoint point{
                 .NodeVoltages = std::move(result.NodeVoltages), .Currents = {}, .Warnings = std::move(result.Warnings)};
             for (Nodalys::ComponentCurrent &current : result.Currents) {
@@ -218,14 +253,14 @@ TransientRun NodalysBackend::RunTransient(const Circuit &circuit, const Transien
                                                                       : Nodalys::IntegrationMethod::TRAPEZOIDAL};
     const bool has_initial_conditions = circuit.HasInitialConditions();
     auto live_start = std::chrono::steady_clock::now();
-    const Nodalys::RunMonitor nodalys_monitor = ToNodalysMonitor(monitor, live_start);
+    const Nodalys::RunMonitor nodalys_monitor = ToNodalysMonitor(monitor, live_start, circuit.GetNodeCount());
     return RunOnNodalys<TransientRun>(
         circuit,
         [&](const Nodalys::Circuit &compiled, std::vector<Nodalys::DiagnosticMessage> *messages) {
             return Nodalys::ComputeTransient(compiled, config, has_initial_conditions, nodalys_monitor, {}, messages);
         },
-        [has_initial_conditions](Nodalys::TransientResult result) {
-            Transient transient = ToTransient(std::move(result));
+        [has_initial_conditions, node_count = circuit.GetNodeCount()](Nodalys::TransientResult result) {
+            Transient transient = ToTransient(std::move(result), node_count);
             if (has_initial_conditions) {
                 transient.Warnings.emplace_back(
                     "The transient starts from the initial conditions (uic): the parts that have one start from it "
@@ -260,7 +295,7 @@ DCSweepRun NodalysBackend::RunDCSweep(const Circuit &circuit, const DCSweepSetti
         [&config](const Nodalys::Circuit &compiled, std::vector<Nodalys::DiagnosticMessage> *messages) {
             return Nodalys::ComputeDCSweep(compiled, config, {}, messages);
         },
-        [](Nodalys::DcSweepResult result) {
+        [node_count = circuit.GetNodeCount()](Nodalys::DcSweepResult result) {
             DCSweep sweep{.SweptSource = std::move(result.SweptSource),
                           .SweptUnit = std::move(result.SweptUnit),
                           .SweptValues = std::move(result.SweptValues),
@@ -268,6 +303,7 @@ DCSweepRun NodalysBackend::RunDCSweep(const Circuit &circuit, const DCSweepSetti
                           .SteppedUnit = std::move(result.SteppedUnit),
                           .Curves = {}};
             for (Nodalys::DcSweepCurve &curve : result.Curves) {
+                KeepCircuitNodes(curve.NodeVoltages, node_count);
                 sweep.Curves.push_back({.StepValue = curve.StepValue,
                                         .NodeVoltages = std::move(curve.NodeVoltages),
                                         .Currents = ToTraces(std::move(curve.Currents))});
@@ -293,7 +329,9 @@ ACSweepRun NodalysBackend::RunACSweep(const Circuit &circuit, const ACSweepSetti
         [&config](const Nodalys::Circuit &compiled, std::vector<Nodalys::DiagnosticMessage> *messages) {
             return Nodalys::ComputeACSweep(compiled, config, {}, messages);
         },
-        [](Nodalys::AcSweepResult result) {
+        [node_count = circuit.GetNodeCount()](Nodalys::AcSweepResult result) {
+            KeepCircuitNodes(result.NodeMagnitudesDecibels, node_count);
+            KeepCircuitNodes(result.NodePhasesDegrees, node_count);
             return ACSweep{.Frequencies = std::move(result.Frequencies),
                            .NodeMagnitudesDecibels = std::move(result.NodeMagnitudesDecibels),
                            .NodePhasesDegrees = std::move(result.NodePhasesDegrees),
@@ -453,7 +491,9 @@ HarmonicBalanceRun NodalysBackend::RunHarmonicBalance(const Circuit &circuit, co
         [&config](const Nodalys::Circuit &compiled, std::vector<Nodalys::DiagnosticMessage> *messages) {
             return Nodalys::ComputeHarmonicBalance(compiled, config, {}, messages);
         },
-        [&settings](Nodalys::HarmonicBalanceResult result) {
+        [&settings, node_count = circuit.GetNodeCount()](Nodalys::HarmonicBalanceResult result) {
+            KeepCircuitNodes(result.NodePhasors, node_count);
+            KeepCircuitNodes(result.NodeWaveforms, node_count);
             HarmonicBalance balance{.FundamentalFrequency = settings.FundamentalFrequency,
                                     .Frequencies = std::move(result.Frequencies),
                                     .NodePhasors = std::move(result.NodePhasors),

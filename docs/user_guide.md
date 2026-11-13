@@ -454,8 +454,10 @@ or a current through itself from + to -. Type it in Properties, such as `V(IN)*V
 `1m*tanh(V(IN)/26m)` for a soft limiter or `10m*V(TEMP)` for a sensor. It names voltages by net label, `V(OUT)` or
 `V(IN, OUT)`, so put a label on every net it reads (`0` and `GND` are ground), and currents as the plots name them,
 `I(R1)` or `I(Q1.C)`. Numbers take SPICE suffixes, and the functions and operators are those of ngspice: `tanh()`,
-`exp()`, `abs()`, `min()`, `max()`, comparisons with `a ? b : c`, `time` and `temper`. Properties says at once what is
-wrong, a net no label names, a current the circuit lacks or a parenthesis that does not close, and keeps the last
+`exp()`, `abs()`, `min()`, `max()`, comparisons with `a ? b : c`, `time` and `temper`. With the Nodalys engine, an
+expression that uses what ngspice reads and Nodalys does not (`limit()`, which is a random function in ngspice, the
+random functions, `hertz`) is refused before the run with its name; `min(max(x, low), high)` clamps on both.
+Properties says at once what is wrong, a net no label names, a current the circuit lacks or a parenthesis that does not close, and keeps the last
 expression that read until the new one does; ngspice reports the rest when it runs. The schematic labels it as
 `V=...` or `I=...`, cut after 24 characters. Renaming a part it reads renames it in the expression too. In an AC
 sweep it is linearized at the operating point (see the models page).

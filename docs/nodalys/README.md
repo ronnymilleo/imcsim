@@ -40,6 +40,10 @@
     - Algorithms: heat equation $\tau\,\dot h = i^2/I_h^2 - h$ advanced by its exact solution, blow criterion and latch, a resistance that opens along a smooth step, and the blow predicted as a transient breakpoint.
     - Benchmarks: blow time against the closed form and the `ngspice` subcircuit.
 
+12. **[Behavioral Sources (`B` element)](./behavioral_source.md)**
+    - Algorithms: a recursive-descent parser of the `ngspice` expression language into a flat program, forward-mode automatic differentiation for the exact partial derivatives with respect to every node voltage and branch current, and the linearized stamp of a branch (`V=`) or a current (`I=`) at each Newton iterate.
+    - Benchmarks: the parity tests against `ngspice` over 29 expressions in both forms and four analyses.
+
 ---
 
 ## Architecture & Modular Layout
@@ -50,6 +54,7 @@
 │   │   ├── nodalys.h                  Analysis execution entry points
 │   │   ├── types.h                    Parameters, analysis settings, and results
 │   │   ├── circuit.h                  Opaque Circuit handle
+│   │   ├── expression.h               Expression of voltages, currents and time with exact derivatives
 │   │   └── circuit_builder.h          Fluent CircuitBuilder for components & models
 │   └── src/
 │       ├── api/                       CircuitBuilder implementation and Circuit internals
@@ -59,6 +64,7 @@
 │       ├── compiler/                  CompiledCircuit internal representation
 │       ├── devices/                   Passive, source, semiconductor, and smooth logic models
 │       ├── export/                    CSV, JSON, SPICE Raw, and Touchstone multi-format exporters
+│       ├── expression/                Parser, evaluation and derivatives of behavioral source expressions
 │       ├── linear/                    BasicDenseMatrix (LU) and QZ generalized eigenvalue solver
 │       ├── mna/                       MnaSystem (real and complex matrix assembly)
 │       ├── newton/                    Damped Newton-Raphson, Gmin/Source stepping
@@ -76,7 +82,8 @@
 | `src/mna/` | Real and complex Modified Nodal Analysis (MNA) matrix assembly, transpose solve, dynamic $G_{\min}$ stabilization, and residual verification. |
 | `src/linear/` | `BasicDenseMatrix<Scalar>` (LU decomposition), Moler-Stewart QZ generalized eigenvalue solver (`ComputeGeneralizedEigenvalues`), and internal radix-2 Cooley-Tukey FFT (`FftPlan`, `RealToHarmonics`, `HarmonicsToReal`). |
 | `src/newton/` | Damped nonlinear Newton-Raphson driver with semiconductor junction damping (`pnjlim`, `fetlim`), logic output limiting, and fallback homotopy strategies (*Gmin stepping* and *Source stepping*). |
-| `src/devices/` | Device models: linear passives, independent/controlled sources, hysteretic switches, relays, transformers, ideal & Boyle op-amps, nonlinear semiconductors (Shockley diode, Gummel-Poon BJT, Shichman-Hodges Level-1 MOSFET), and smooth continuous logic gates. |
+| `src/devices/` | Device models: linear passives, independent/controlled/behavioral sources, hysteretic switches, relays, transformers, fuses, ideal & Boyle op-amps, nonlinear semiconductors (Shockley diode, Gummel-Poon BJT, Shichman-Hodges Level-1 MOSFET), and smooth continuous logic gates. |
+| `src/expression/` | The language of the behavioral source: a recursive-descent parser to a flat program, forward-mode automatic differentiation, and the value and partial derivatives of every operator and function ([`behavioral_source.md`](./behavioral_source.md)). |
 | `src/analyses/` | Complete numerical solvers for DC Operating Point, DC Sweep (1D/2D), Time-Domain Transient, AC Small-Signal Sweep, DC Transfer Function, AC Adjoint Noise, Multiport S-Parameters, Pole-Zero, DC Sensitivity, and Harmonic Balance. |
 | `src/bridge/` | `LogicBridge` translating discrete event-driven logic levels (`0`, `1`, `X`, `Z`) into continuous analog waveforms with realistic slew rates and configurable supply rails. |
 | `src/parser/` & `src/export/` | SPICE netlist syntax parser supporting engineering scales (`1k`, `100n`, `4.7u`) and multi-format simulation result export (CSV, JSON, SPICE Raw, Touchstone). |
@@ -118,7 +125,7 @@
 | **Passives** | Resistor, Capacitor, Inductor | ✅ | ✅ **Ready** | Exact companion models; Norton charge integration with initial conditions (`uic`). |
 | **Sources** | DC/AC Voltage & Current, Clock, Pulse, Sine, EXP, PWL, SFFM, AM | ✅ | ✅ **Ready** | Waveform generators; the transient lands on the corners of each. |
 | **Noise & Random Sources** | `TRNOISE`, `TRRANDOM` | ✅ | 🟡 **Partial** | Held at their DC level outside a transient; a transient with one is refused. |
-| **Behavioral Sources** | `B` element | ✅ | ❌ **Planned** | Refused with the reason, before the run. |
+| **Behavioral Sources** | `B` element | ✅ | ✅ **Ready** | An expression of node voltages, currents and time with exact derivatives for Newton, the operators and functions of `ngspice`; what `ngspice` reads and `Nodalys` does not (`limit`, the random functions, `hertz`) is refused by name before the run ([`behavioral_source.md`](./behavioral_source.md)). |
 | **Fuses** | `imcsim_fuse` subcircuit | ✅ | ✅ **Ready** | Native device with a thermal state and a latch, with the blow time of `ngspice` within 3 % ([`fuse_device.md`](./fuse_device.md)). |
 | **Controlled Sources** | VCVS, VCCS, CCCS, CCVS | ✅ | ✅ **Ready** | Stamped into linear MNA system; zero-voltage current probes handled natively. |
 | **Semiconductors** | Diode, Zener, LED, BJT (NPN/PNP), MOSFET (NMOS/PMOS) | ✅ | ✅ **Ready** | Shockley diode, Gummel-Poon BJT, Shichman-Hodges Level-1 MOSFET with charge depletion/diffusion. |
@@ -200,7 +207,7 @@ starts once the one before it is done.
 | :--- | :--- | :--- |
 | **Sparse MNA Solver** (KLU-style, AMD ordering, symbolic reuse) | The dense LU makes the analyses users run most the slowest: the transient runs at 0.07x to 0.26x of `ngspice` and the AC sweep of a 100-node network at 0.34x (section 4), and it caps harmonic balance at 4000 unknowns. | Dense LU |
 | **Gear-2 / BDF-2 Integration** | The trapezoidal rule rings on stiff switching, and the fuse needs Gear, as the `ngspice` backend writes `method=gear` for it. | Trapezoidal and Backward Euler |
-| **Behavioral Sources** (`B` element) | Free expressions of node voltages and branch currents, already checked by `imcsim`. | Refused |
+| **Behavioral Sources** (`B` element) | Free expressions of node voltages and branch currents, already checked by `imcsim`. | Done ([`behavioral_source.md`](./behavioral_source.md)) |
 | **Temperature** | The SPICE temperature laws of the diode, BJT and MOSFET (`IS`, `VJ`, `EG`, `BF`...), so a stepped temperature runs. | Refused with the reason |
 | **Noise and Random Sources in a Transient** | White, $1/f$ and telegraph noise, and the random distributions, drawn as `ngspice` draws them where possible. | DC level outside a transient; transient refused |
 | **SPICE-Text Subcircuits** | Vendor `.subckt` models kept as SPICE text, such as the op-amp of the precision rectifier example. | Refused |
