@@ -183,16 +183,9 @@ constexpr std::array KNOWN_DIFFERENCES{
     KnownDifference{"op_amp_input_offset.imcsim", SENSITIVITY_NAME,
                     "follows the operating point, and the normalized sensitivity to each supply is 1.2e-4 on Nodalys "
                     "and under 2e-6 on ngspice"},
-    KnownDifference{"buck_converter.imcsim", TRANSIENT_NAME,
-                    "the currents and the waveforms agree, but after the inductor current stops the diode node rings "
-                    "against the diode capacitance at about 600 kHz, which the 1 us step resolves in under two points, "
-                    "so the samples of the ring differ: both engines ring above the 12 V supply, as the inductor "
-                    "pushes the node up to about 19 V when the step shrinks, and at this step ngspice reaches 14.9 V "
-                    "and Nodalys 18.5 V (jay #227)"},
     KnownDifference{"schmitt_trigger.imcsim", TRANSIENT_NAME,
-                    "Nodalys switches 25 to 100 us before ngspice and once before the input reaches the threshold; "
-                    "the model's pole at 10 Hz makes a delay of about 100 us, which ngspice shows, so ngspice is "
-                    "more likely right; the start state at 0 V is metastable and each engine leaves it its way"},
+                    "the start state at 0 V is metastable and each engine leaves it its way in the first 75 us; "
+                    "all subsequent switching edges agree"},
 };
 
 using Differences = std::vector<std::string>;

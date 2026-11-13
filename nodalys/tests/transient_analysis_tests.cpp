@@ -419,3 +419,34 @@ TEST_CASE("A switch that closes onto a capacitor leaves no ringing of the trapez
     }
     CHECK(largest_error < 1e-5);
 }
+
+TEST_CASE("A Schmitt trigger with an ideal op-amp does not switch early from trapezoidal ringing",
+          "[nodalys][transient]") {
+    Nodalys::CircuitBuilder builder;
+    // Inverting Schmitt trigger: 3 V, 1 kHz sine on - input; 1 k / 10 k divider on + input (+-1.364 V thresholds)
+    builder.AddVsine("Vin1", 1, 0, {.Amplitude = 3.0, .Frequency = 1000.0, .Offset = 0.0});
+    builder.AddResistor("R1", 2, 0, 1000.0);
+    builder.AddResistor("R2", 2, 5, 10000.0);
+    builder.AddVdc("V1", 3, 0, 15.0);
+    builder.AddVdc("V2", 4, 0, -15.0);
+    builder.AddIdealOpAmp("U1", 5, 2, 1, 3, 4, 1e6);
+    auto circuit = builder.Build();
+    REQUIRE(circuit.has_value());
+
+    const Nodalys::TransientResult result =
+        RunTransient(*circuit, 1.2e-3, 5e-6, Nodalys::IntegrationMethod::TRAPEZOIDAL, false);
+
+    auto sample_at = [&](const double target_time) {
+        for (std::size_t i = 0; i < result.Times.size(); ++i) {
+            if (result.Times[i] >= target_time) {
+                return result.NodeVoltages[5][i];
+            }
+        }
+        return result.NodeVoltages[5].back();
+    };
+
+    // Input crosses +1.364 V at ~1.075 ms; at 1.055 ms (input = 1.016 V) the output must still be clamped HIGH
+    CHECK(sample_at(1.055e-3) > 14.0);
+    // By 1.100 ms (well past the threshold) it must have switched LOW
+    CHECK(sample_at(1.100e-3) < -14.0);
+}

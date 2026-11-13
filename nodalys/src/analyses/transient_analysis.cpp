@@ -314,6 +314,15 @@ std::expected<TransientResult, std::string> ComputeTransient(CompiledCircuit &co
             for (const std::unique_ptr<Device> &device : compiled.Devices) {
                 device->RejectStep();
             }
+            if (ratio > 4.0) {
+                // Sharp corners (such as a clamp diode turning on or off) excite trapezoidal ringing; restart with
+                // Backward Euler.
+                is_restart = true;
+                previous_step = 0.0;
+                older_step = 0.0;
+                x_old = x_now;
+                x_older = x_now;
+            }
             step = std::max(step * std::max(LTE_SAFETY * std::pow(ratio, -1.0 / 3.0), STEP_SHRINK_LIMIT), MIN_STEP);
             if (step <= MIN_STEP) {
                 failure = std::format("Nodalys kept rejecting the time step at t = {}; the step collapsed", time);
