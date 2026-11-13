@@ -833,11 +833,11 @@ public:
             AddRawLogicGate(name + ".G3", LogicGateType::NAND, n3, {n2, u_clk, n4}, params);
             AddRawLogicGate(name + ".G4", LogicGateType::NAND, n4, {n3, u_d}, params);
 
-            // Slave output latch (slight asymmetry breaks DC operating point metastability)
-            SmoothLogicParameters g6_params = params;
-            g6_params.VThreshold *= 0.99;
-            AddRawLogicGate(name + ".G5", LogicGateType::NAND, u_q, {n2, u_qb}, params);
-            AddRawLogicGate(name + ".G6", LogicGateType::NAND, u_qb, {n3, u_q}, g6_params);
+            // Slave output latch (slight asymmetry breaks DC operating point metastability in the reset state)
+            SmoothLogicParameters g5_params = params;
+            g5_params.VThreshold *= 0.99;
+            AddRawLogicGate(name + ".G5", LogicGateType::NAND, u_q, {n2, u_qb}, g5_params);
+            AddRawLogicGate(name + ".G6", LogicGateType::NAND, u_qb, {n3, u_q}, params);
         });
     }
 

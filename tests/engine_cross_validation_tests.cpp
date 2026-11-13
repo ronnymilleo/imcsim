@@ -131,14 +131,12 @@ struct KnownDifference {
 
 constexpr std::string_view LOGIC_LOW_LEVEL =
     "a low gate output sits at 0.45 mV on Nodalys (smooth gate) and at exactly 0 V on ngspice, which is the ideal one";
-constexpr std::string_view LOGIC_OUTPUT_IMPEDANCE =
-    "a gate output reads 51 Ohm on Nodalys and 50 Ohm on ngspice, where the part has a 50 Ohm resistor";
 constexpr std::string_view LOGIC_START_STATE =
-    "the flip-flops start in the opposite state: ngspice starts the d_dff reset, Nodalys where the asymmetry of its "
-    "latch macromodel leaves it (unverified which input of the model decides)";
+    "downstream flip-flops clocked at 5 V (by a reset stage's QN) start set on Nodalys because the master latch's "
+    "2-input vs 3-input NAND asymmetry overrides the slave reset bias, whereas ngspice starts every d_dff reset";
 constexpr std::string_view LOGIC_OPERATING_POINT =
     "a low gate output sits at 0.45 mV on Nodalys (smooth gate) and at exactly 0 V on ngspice, which is the ideal "
-    "one; the flip-flops also start in the opposite state (unverified which input of the model decides)";
+    "one; downstream flip-flops clocked at 5 V also start set on Nodalys instead of reset";
 constexpr std::string_view LEAKAGE_BIASED_NODES =
     "a node between an off transistor or switch and a diode is set by pico-ampere leakage, which each engine adds "
     "its own GMIN to, so the voltage is 1 % apart and neither is more right";
@@ -164,15 +162,6 @@ constexpr std::array KNOWN_DIFFERENCES{
     KnownDifference{"logic_gates.imcsim", OPERATING_POINT_NAME, LOGIC_LOW_LEVEL},
     KnownDifference{"logic_truth_table.imcsim", OPERATING_POINT_NAME, LOGIC_LOW_LEVEL},
     KnownDifference{"sr_latch.imcsim", OPERATING_POINT_NAME, LOGIC_LOW_LEVEL},
-    KnownDifference{"counter_8bit_blocks.imcsim", TRANSFER_FUNCTION_NAME, LOGIC_OUTPUT_IMPEDANCE},
-    KnownDifference{"decade_counter.imcsim", TRANSFER_FUNCTION_NAME, LOGIC_OUTPUT_IMPEDANCE},
-    KnownDifference{"decoder_logic_outputs.imcsim", TRANSFER_FUNCTION_NAME, LOGIC_OUTPUT_IMPEDANCE},
-    KnownDifference{"full_adder.imcsim", TRANSFER_FUNCTION_NAME, LOGIC_OUTPUT_IMPEDANCE},
-    KnownDifference{"half_adder.imcsim", TRANSFER_FUNCTION_NAME, LOGIC_OUTPUT_IMPEDANCE},
-    KnownDifference{"logic_gates.imcsim", TRANSFER_FUNCTION_NAME, LOGIC_OUTPUT_IMPEDANCE},
-    KnownDifference{"logic_truth_table.imcsim", TRANSFER_FUNCTION_NAME, LOGIC_OUTPUT_IMPEDANCE},
-    KnownDifference{"ripple_counter.imcsim", TRANSFER_FUNCTION_NAME, LOGIC_OUTPUT_IMPEDANCE},
-    KnownDifference{"sr_latch.imcsim", TRANSFER_FUNCTION_NAME, LOGIC_OUTPUT_IMPEDANCE},
     KnownDifference{"counter_8bit_blocks.imcsim", TRANSIENT_NAME, LOGIC_START_STATE},
     KnownDifference{"decade_counter.imcsim", TRANSIENT_NAME, LOGIC_START_STATE},
     KnownDifference{"ripple_counter.imcsim", TRANSIENT_NAME, LOGIC_START_STATE},

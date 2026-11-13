@@ -10,23 +10,6 @@
 
 namespace Nodalys {
 
-namespace {
-
-void StampConductance(MnaSystem &sys, const int node_a, const int node_b, const double g) {
-    if (node_a >= 0) {
-        sys.AddA(node_a, node_a, g);
-    }
-    if (node_b >= 0) {
-        sys.AddA(node_b, node_b, g);
-    }
-    if (node_a >= 0 && node_b >= 0) {
-        sys.AddA(node_a, node_b, -g);
-        sys.AddA(node_b, node_a, -g);
-    }
-}
-
-} // namespace
-
 /**
  * @brief   Constructs a smooth continuous logic gate.
  * @param[in] type      Kind of logic function (AND, OR, NOT, etc.).
@@ -92,9 +75,12 @@ void SmoothLogicDevice::Stamp(MnaSystem &sys, const std::vector<double> &x, cons
         }
         sys.AddRhs(m_Internal, g_drv * (eval.TargetVoltage - sum_lin));
 
-        // Thevenin output stage resistance between internal node and output pin
+        // Buffered Thevenin output stage between internal delay node and output pin
         const double g_out = 1.0 / std::max(m_Params.OutputResistance, 1e-6);
-        StampConductance(sys, m_Internal, m_Output, g_out);
+        if (m_Output >= 0) {
+            sys.AddA(m_Output, m_Output, g_out);
+            sys.AddA(m_Output, m_Internal, -g_out);
+        }
     } else {
         // Direct output drive with finite output resistance
         const double g_out = 1.0 / std::max(m_Params.OutputResistance, 1e-6);

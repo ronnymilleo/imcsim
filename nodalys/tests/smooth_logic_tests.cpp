@@ -297,6 +297,47 @@ TEST_CASE("Edge-triggered D flip-flop macromodel instantiates and converges clea
     CHECK_THAT(sample_at(75e-9, 4), WithinAbs(5.0, 0.3));
 }
 
+TEST_CASE("D flip-flop starts reset at DC and logic gate output impedance equals OutputResistance",
+          "[nodalys][logic]") {
+    SECTION("D flip-flop with D tied to Q_bar starts in the reset state (Q = LOW, Q_bar = HIGH)") {
+        Nodalys::CircuitBuilder b;
+        b.AddVdc("V_CLK", 1, 0, 0.0);
+        Nodalys::SmoothLogicParameters params;
+        params.TransitionWidth = 0.5;
+        params.PropagationDelay = 1e-9;
+        // D tied to Q_bar (node 3), just like a ripple counter stage
+        b.AddDFlipFlop("DFF1", 2, 3, 3, 1, params);
+
+        auto circuit = b.Build();
+        REQUIRE(circuit.has_value());
+
+        const auto op = Nodalys::ComputeOperatingPoint(*circuit);
+        if (!op.has_value()) {
+            FAIL(op.error());
+        }
+        CHECK(op->NodeVoltages[2] < 0.01);
+        CHECK(op->NodeVoltages[3] > 4.99);
+    }
+
+    SECTION("Buffered output stage gives exact OutputResistance even with propagation delay") {
+        Nodalys::CircuitBuilder b;
+        b.AddVdc("V_IN", 1, 0, 0.0);
+        Nodalys::SmoothLogicParameters params;
+        params.PropagationDelay = 5e-9;
+        params.OutputResistance = 50.0;
+        b.AddInverter("U1", 2, 1, params);
+        // Load output with 50 Ohm to ground: V(2) should be half of VHigh = 2.5 V
+        b.AddResistor("R_LOAD", 2, 0, 50.0);
+
+        auto circuit = b.Build();
+        REQUIRE(circuit.has_value());
+
+        const auto op = Nodalys::ComputeOperatingPoint(*circuit);
+        REQUIRE(op.has_value());
+        CHECK_THAT(op->NodeVoltages[2], WithinAbs(2.5, 1e-3));
+    }
+}
+
 TEST_CASE("Verilog co-simulation bridge converts discrete levels and synthesizes smooth ramps", "[nodalys][bridge]") {
     Nodalys::SmoothLogicParameters params;
     params.VLow = 0.0;
