@@ -17,6 +17,7 @@
 #include <sstream>
 #include <string>
 #include <string_view>
+#include <variant>
 
 using Catch::Matchers::WithinAbs;
 using Catch::Matchers::WithinRel;
@@ -520,6 +521,91 @@ TEST_CASE("Simulation results export to RAW, CSV, and JSON formats", "[nodalys][
         CHECK(Nodalys::SaveStringToFile(temp_path, csv_content));
         CHECK(std::filesystem::exists(temp_path));
         std::filesystem::remove(temp_path);
+    }
+}
+
+TEST_CASE("Sweeps, the transfer function and the noise export to RAW, CSV and JSON", "[nodalys][export]") {
+    // A divider of two 1k resistors: half the source at node 2, 2k seen by the source and 500 ohm at the output
+    const std::string_view netlist = "* Sweep exports\n"
+                                     "V1 1 0 DC 10 AC 1\n"
+                                     "R1 1 2 1k\n"
+                                     "R2 2 0 1k\n"
+                                     ".dc V1 0 10 5\n"
+                                     ".ac dec 1 10 1k\n"
+                                     ".tf V(2) V1\n"
+                                     ".noise V(2) V1 dec 1 10 1k\n"
+                                     ".end\n";
+    const auto parsed = Nodalys::ParseNetlist(netlist);
+    REQUIRE(parsed.has_value());
+    REQUIRE(parsed->Analyses.size() == 4);
+    const Nodalys::Circuit &circuit = parsed->CircuitInstance;
+
+    SECTION("DC sweep") {
+        const auto sweep =
+            Nodalys::ComputeDCSweep(circuit, std::get<Nodalys::DcSweepConfig>(parsed->Analyses[0].Config));
+        REQUIRE(sweep.has_value());
+        const std::string csv = Nodalys::ExportCsv(*sweep);
+        CHECK(csv.starts_with("V1,V(1),V(2)"));
+        // One row per swept value, the output at half of it
+        CHECK(csv.contains("\n0,0,0"));
+        CHECK(csv.contains("\n5,5,2.5"));
+        CHECK(csv.contains("\n10,10,5"));
+        const std::string json = Nodalys::ExportJson(*sweep);
+        CHECK(json.contains("\"swept_source\": \"V1\""));
+        CHECK(json.contains("\"swept_values\""));
+        CHECK(json.contains("\"curves\""));
+        const std::string raw = Nodalys::ExportRaw(*sweep, "DC Test");
+        CHECK(raw.contains("Title: DC Test"));
+        CHECK(raw.contains("Plotname: DC transfer characteristic"));
+        CHECK(raw.contains("No. Points: 3"));
+        CHECK(raw.contains("Flags: real"));
+    }
+
+    SECTION("AC sweep") {
+        const auto sweep =
+            Nodalys::ComputeACSweep(circuit, std::get<Nodalys::AcSweepConfig>(parsed->Analyses[1].Config));
+        REQUIRE(sweep.has_value());
+        const std::string csv = Nodalys::ExportCsv(*sweep);
+        CHECK(csv.starts_with("Frequency_Hz,V(1)_dB,V(1)_Phase_deg,V(2)_dB,V(2)_Phase_deg"));
+        // Half the source is -6.02 dB at every frequency
+        CHECK(csv.contains("\n10,0,0,-6.0205999,0"));
+        const std::string json = Nodalys::ExportJson(*sweep);
+        CHECK(json.contains("\"frequencies\""));
+        CHECK(json.contains("\"node_magnitudes_db\""));
+        CHECK(json.contains("\"node_phases_deg\""));
+        const std::string raw = Nodalys::ExportRaw(*sweep, "AC Test");
+        CHECK(raw.contains("Plotname: AC Analysis"));
+        CHECK(raw.contains("Flags: complex"));
+        CHECK(raw.contains("\tfrequency\tfrequency"));
+    }
+
+    SECTION("Transfer function") {
+        const auto transfer = Nodalys::ComputeTransferFunction(
+            circuit, std::get<Nodalys::TransferFunctionConfig>(parsed->Analyses[2].Config));
+        REQUIRE(transfer.has_value());
+        const std::string csv = Nodalys::ExportCsv(*transfer);
+        CHECK(csv.contains("Gain,0.5,"));
+        CHECK(csv.contains("InputImpedance,2000,Ohm"));
+        CHECK(csv.contains("OutputImpedance,500,Ohm"));
+        const std::string json = Nodalys::ExportJson(*transfer);
+        CHECK(json.contains("\"gain\": 0.5"));
+        CHECK(json.contains("\"input_source\": \"V1\""));
+        CHECK(json.contains("\"input_impedance_ohm\""));
+        CHECK(json.contains("\"output_impedance_ohm\""));
+    }
+
+    SECTION("Noise") {
+        const auto noise = Nodalys::ComputeNoise(circuit, std::get<Nodalys::NoiseConfig>(parsed->Analyses[3].Config));
+        REQUIRE(noise.has_value());
+        const std::string csv = Nodalys::ExportCsv(*noise);
+        CHECK(csv.starts_with("Frequency_Hz,OutputDensity_V_rtHz,InputDensity"));
+        // One column per part that makes noise
+        CHECK(csv.contains("R1_Density"));
+        CHECK(csv.contains("R2_Density"));
+        const std::string json = Nodalys::ExportJson(*noise);
+        CHECK(json.contains("\"output_densities\""));
+        CHECK(json.contains("\"input_densities\""));
+        CHECK(json.contains("\"output_total\""));
     }
 }
 

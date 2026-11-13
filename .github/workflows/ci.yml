@@ -76,11 +76,13 @@ jobs:
       # gcov also reports the system headers that the sources instantiate (the standard library templates), named
       # after their path with the slashes replaced by #; they are not project code, so they would drag the result down.
       # The project headers go too: they hold declarations and = default members only, and each translation unit that
-      # includes one writes the same .gcov file, so the last one wins and the total moved without any code change
+      # includes one writes the same .gcov file, so the last one wins and the total moved without any code change.
+      # The benchmarks are hidden tests, timed by hand on a quiet machine and never run here, so they would count as
+      # code no test covers
       - name: Report coverage
         run: |
           find build -name "*.gcda" | while read -r gcda; do gcov -p -o "$gcda" "$gcda"; done > /dev/null 2>&1
-          rm -f '#usr#include#'*.gcov ./*.h.gcov
+          rm -f '#usr#include#'*.gcov ./*.h.gcov ./*nodalys_benchmark_tests.cpp.gcov
           curl -sL https://coveralls.io/coveralls-linux.tar.gz | tar -xz && ./coveralls
         env:
           COVERALLS_REPO_TOKEN: ${{ secrets.GITHUB_TOKEN }}
