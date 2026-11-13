@@ -48,9 +48,10 @@ struct Tolerance {
 
 // Operating point, DC sweep and AC currents and voltages
 
-/// ngspice itself stops its Newton iteration at a relative change of 1e-3 (RELTOL), so two solvers can legitimately
-/// differ by that much.
-constexpr double SOLVER_RELATIVE_TOLERANCE = 1e-3;
+/// Each engine stops its Newton iteration at a relative change of 1e-3 (ngspice's RELTOL), so each may sit that far
+/// from the solution, on opposite sides: two converged solvers can legitimately differ by twice that. The margin is
+/// used: on the knee of a diode curve ngspice 47, which the Windows build ships, sits 1.07e-3 from Nodalys.
+constexpr double SOLVER_RELATIVE_TOLERANCE = 2e-3;
 /// ngspice's VNTOL, the voltage change below which it calls a node settled.
 constexpr double VOLTAGE_FLOOR_VOLTS = 1e-6;
 /// Well above ngspice's ABSTOL of 1e-12 A, so the leakage of a reverse-biased junction, which depends on how each
