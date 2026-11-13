@@ -353,6 +353,8 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
     }
 
     ParsedNetlist result;
+    // .options may follow the .tran it applies to, so the method is applied once the whole deck is read
+    std::optional<IntegrationMethod> integration_method;
     // SPICE standard: first line is circuit title
     result.Title = logical_lines.front();
 
@@ -901,6 +903,18 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
                     const auto eq = tokens[i].find('=');
                     if (eq != std::string::npos) {
                         const std::string opt_name = ToUpper(tokens[i].substr(0, eq));
+                        if (opt_name == "METHOD") {
+                            const std::string method_name = ToUpper(tokens[i].substr(eq + 1));
+                            if (method_name == "GEAR") {
+                                integration_method = IntegrationMethod::GEAR2;
+                            } else if (method_name == "TRAP" || method_name == "TRAPEZOIDAL") {
+                                integration_method = IntegrationMethod::TRAPEZOIDAL;
+                            } else {
+                                return std::unexpected(std::format("Unknown integration method '{}' in .options: '{}'",
+                                                                   method_name, line));
+                            }
+                            continue;
+                        }
                         const auto opt_val = ParseSpiceNumber(tokens[i].substr(eq + 1));
                         if (opt_val) {
                             if (opt_name == "RELTOL") {
@@ -1558,6 +1572,14 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
         return std::unexpected(circuit_res.error());
     }
     result.CircuitInstance = std::move(*circuit_res);
+
+    if (integration_method) {
+        for (ParsedAnalysis &analysis : result.Analyses) {
+            if (auto *transient = std::get_if<TransientConfig>(&analysis.Config)) {
+                transient->Method = *integration_method;
+            }
+        }
+    }
 
     // If no analysis was specified, default to .OP
     if (result.Analyses.empty()) {

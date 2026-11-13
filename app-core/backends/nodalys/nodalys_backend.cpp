@@ -210,8 +210,13 @@ TransientRun NodalysBackend::RunTransient(const Circuit &circuit, const Transien
     if (std::optional<std::string> reason = FindRandomSource(circuit)) {
         return {std::unexpected(std::move(*reason)), {}};
     }
-    const Nodalys::TransientConfig config{
-        .StopTime = settings.StopTime, .TimeStep = settings.TimeStep, .MaxStep = settings.TimeStep};
+    // A fuse that cuts an inductor makes the trapezoidal rule ring for ever, so the netlist for ngspice asks for Gear
+    // and Nodalys follows it
+    const Nodalys::TransientConfig config{.StopTime = settings.StopTime,
+                                          .TimeStep = settings.TimeStep,
+                                          .MaxStep = settings.TimeStep,
+                                          .Method = circuit.HasFuse() ? Nodalys::IntegrationMethod::GEAR2
+                                                                      : Nodalys::IntegrationMethod::TRAPEZOIDAL};
     const bool has_initial_conditions = circuit.HasInitialConditions();
     auto live_start = std::chrono::steady_clock::now();
     const Nodalys::RunMonitor nodalys_monitor = ToNodalysMonitor(monitor, live_start);

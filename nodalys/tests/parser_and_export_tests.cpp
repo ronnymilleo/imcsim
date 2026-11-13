@@ -733,3 +733,26 @@ TEST_CASE("The Nodalys standalone binary runs netlists from arguments or standar
         CHECK(json->contains("\"frequencies\": [0, 1000, 2000, 3000, 4000]"));
     }
 }
+
+TEST_CASE("The .options method line picks the integration method of the transient, wherever it stands",
+          "[nodalys][parser][gear]") {
+    const std::string_view body = "V1 1 0 PULSE(0 5 0 1u 1u 50u 100u)\n"
+                                  "R1 1 2 1k\n"
+                                  "C1 2 0 10n\n"
+                                  ".tran 0.5u 20u\n";
+
+    const auto method_of = [](const std::string &netlist) {
+        const auto parsed = Nodalys::ParseNetlist(netlist);
+        REQUIRE(parsed.has_value());
+        REQUIRE(parsed->Analyses.size() == 1);
+        return std::get<Nodalys::TransientConfig>(parsed->Analyses[0].Config).Method;
+    };
+
+    CHECK(method_of(std::format("* t\n{}.end\n", body)) == Nodalys::IntegrationMethod::TRAPEZOIDAL);
+    CHECK(method_of(std::format("* t\n{}.options method=gear\n.end\n", body)) == Nodalys::IntegrationMethod::GEAR2);
+    CHECK(method_of(std::format("* t\n.OPTIONS METHOD=GEAR reltol=1e-4\n{}.end\n", body)) ==
+          Nodalys::IntegrationMethod::GEAR2);
+    CHECK(method_of(std::format("* t\n.options method=gear\n.options method=trap\n{}.end\n", body)) ==
+          Nodalys::IntegrationMethod::TRAPEZOIDAL);
+    CHECK_FALSE(Nodalys::ParseNetlist(std::format("* t\n.options method=euler\n{}.end\n", body)).has_value());
+}

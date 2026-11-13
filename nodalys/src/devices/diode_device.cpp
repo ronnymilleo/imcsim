@@ -60,8 +60,7 @@ void DiodeDevice::Stamp(MnaSystem &sys, const std::vector<double> &x, const Time
     m_CapConductance = 0.0;
     m_CapEquivalent = 0.0;
     if (time.IsTransient && HasTransientState()) {
-        const ChargeCompanion cap = ChargeModel(Capacitance(voltage), Charge(voltage), voltage, m_Charge,
-                                                m_ChargeCurrent, time.TimeStep, time.BackwardEuler);
+        const ChargeCompanion cap = ChargeModel(Capacitance(voltage), Charge(voltage), voltage, m_History, time);
         m_CapConductance = cap.Conductance;
         m_CapEquivalent = cap.EquivalentCurrent;
         StampConductance(sys, m_Anode, m_JunctionNode, cap.Conductance);
@@ -164,15 +163,12 @@ void DiodeDevice::AcceptStep(const std::vector<double> &x) {
         return;
     }
     const double voltage = VoltageAt(x);
-    m_Charge = Charge(voltage);
-    m_ChargeCurrent = m_CapConductance * voltage + m_CapEquivalent;
-    m_SavedCharge = m_Charge;
-    m_SavedChargeCurrent = m_ChargeCurrent;
+    m_History = AdvanceHistory(m_History, Charge(voltage), m_CapConductance * voltage + m_CapEquivalent);
+    m_SavedHistory = m_History;
 }
 
 void DiodeDevice::RejectStep() {
-    m_Charge = m_SavedCharge;
-    m_ChargeCurrent = m_SavedChargeCurrent;
+    m_History = m_SavedHistory;
 }
 
 } // namespace Nodalys

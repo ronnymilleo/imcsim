@@ -72,8 +72,8 @@ private:
     double m_Vt;
     double m_Critical;
     /// Trapezoidal charge histories of the BE and BC junctions.
-    double m_Qbe = 0.0, m_IQbe = 0.0, m_SavedQbe = 0.0, m_SavedIQbe = 0.0;
-    double m_Qbc = 0.0, m_IQbc = 0.0, m_SavedQbc = 0.0, m_SavedIQbc = 0.0;
+    ChargeHistory m_HistoryBe, m_SavedHistoryBe;
+    ChargeHistory m_HistoryBc, m_SavedHistoryBc;
     double m_Gqbe = 0.0, m_Ieqbe = 0.0, m_Gqbc = 0.0, m_Ieqbc = 0.0;
 };
 

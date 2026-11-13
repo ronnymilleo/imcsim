@@ -152,9 +152,8 @@ void BjtDevice::Stamp(MnaSystem &sys, const std::vector<double> &x, const TimeCo
                                                       BJT_GRADING_COEFFICIENT, JUNCTION_FORWARD_LIMIT);
         const ChargeCompanion cap_be =
             ChargeModel(qbe.Capacitance + p.TransitTime * dc.DIfwdQbDvbe, qbe.Charge + p.TransitTime * dc.IfwdQb,
-                        vbe_signed, m_Qbe, m_IQbe, time.TimeStep, time.BackwardEuler);
-        const ChargeCompanion cap_bc =
-            ChargeModel(qbc.Capacitance, qbc.Charge, vbc_signed, m_Qbc, m_IQbc, time.TimeStep, time.BackwardEuler);
+                        vbe_signed, m_HistoryBe, time);
+        const ChargeCompanion cap_bc = ChargeModel(qbc.Capacitance, qbc.Charge, vbc_signed, m_HistoryBc, time);
         m_Gqbe = cap_be.Conductance;
         m_Ieqbe = cap_be.EquivalentCurrent;
         m_Gqbc = cap_bc.Conductance;
@@ -382,26 +381,22 @@ void BjtDevice::AcceptStep(const std::vector<double> &x) {
     const double vbc_signed = m_Pnp ? -vbc : vbc;
     const BjtParameters &p = m_Parameters;
     const Intrinsic dc = EvaluateAt(x);
-    m_Qbe = EvaluateDepletion(vbe_signed, p.EmitterCapacitance, BJT_JUNCTION_POTENTIAL, BJT_GRADING_COEFFICIENT,
-                              JUNCTION_FORWARD_LIMIT)
-                .Charge +
-            p.TransitTime * dc.IfwdQb;
-    m_Qbc = EvaluateDepletion(vbc_signed, p.CollectorCapacitance, BJT_JUNCTION_POTENTIAL, BJT_GRADING_COEFFICIENT,
-                              JUNCTION_FORWARD_LIMIT)
-                .Charge;
-    m_IQbe = m_Gqbe * vbe_signed + m_Ieqbe;
-    m_IQbc = m_Gqbc * vbc_signed + m_Ieqbc;
-    m_SavedQbe = m_Qbe;
-    m_SavedIQbe = m_IQbe;
-    m_SavedQbc = m_Qbc;
-    m_SavedIQbc = m_IQbc;
+    const double charge_be = EvaluateDepletion(vbe_signed, p.EmitterCapacitance, BJT_JUNCTION_POTENTIAL,
+                                               BJT_GRADING_COEFFICIENT, JUNCTION_FORWARD_LIMIT)
+                                 .Charge +
+                             p.TransitTime * dc.IfwdQb;
+    const double charge_bc = EvaluateDepletion(vbc_signed, p.CollectorCapacitance, BJT_JUNCTION_POTENTIAL,
+                                               BJT_GRADING_COEFFICIENT, JUNCTION_FORWARD_LIMIT)
+                                 .Charge;
+    m_HistoryBe = AdvanceHistory(m_HistoryBe, charge_be, m_Gqbe * vbe_signed + m_Ieqbe);
+    m_HistoryBc = AdvanceHistory(m_HistoryBc, charge_bc, m_Gqbc * vbc_signed + m_Ieqbc);
+    m_SavedHistoryBe = m_HistoryBe;
+    m_SavedHistoryBc = m_HistoryBc;
 }
 
 void BjtDevice::RejectStep() {
-    m_Qbe = m_SavedQbe;
-    m_IQbe = m_SavedIQbe;
-    m_Qbc = m_SavedQbc;
-    m_IQbc = m_SavedIQbc;
+    m_HistoryBe = m_SavedHistoryBe;
+    m_HistoryBc = m_SavedHistoryBc;
 }
 
 } // namespace Nodalys

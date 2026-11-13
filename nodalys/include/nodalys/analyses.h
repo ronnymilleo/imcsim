@@ -59,6 +59,7 @@ struct TransientConfig {
     double TimeStep = 0.0;
     double MaxStep = 0.0;
     bool UseInitialConditions = false;
+    IntegrationMethod Method = IntegrationMethod::TRAPEZOIDAL;
 };
 
 /**

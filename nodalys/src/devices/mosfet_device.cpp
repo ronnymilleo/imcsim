@@ -112,10 +112,8 @@ void MosfetDevice::Stamp(MnaSystem &sys, const std::vector<double> &x, const Tim
     if (time.IsTransient && HasTransientState()) {
         const double vgs = NodeVoltage(x, m_Gate) - NodeVoltage(x, m_Source);
         const double vgd = NodeVoltage(x, m_Gate) - NodeVoltage(x, m_Drain);
-        const ChargeCompanion cap_gs =
-            ChargeModel(m_Cgs, m_Cgs * vgs, vgs, m_Cgs * m_Vgs, m_Igs, time.TimeStep, time.BackwardEuler);
-        const ChargeCompanion cap_gd =
-            ChargeModel(m_Cgd, m_Cgd * vgd, vgd, m_Cgd * m_Vgd, m_Igd, time.TimeStep, time.BackwardEuler);
+        const ChargeCompanion cap_gs = ChargeModel(m_Cgs, m_Cgs * vgs, vgs, m_HistoryGs, time);
+        const ChargeCompanion cap_gd = ChargeModel(m_Cgd, m_Cgd * vgd, vgd, m_HistoryGd, time);
         m_Gcgs = cap_gs.Conductance;
         m_Ieqgs = cap_gs.EquivalentCurrent;
         m_Gcgd = cap_gd.Conductance;
@@ -294,21 +292,15 @@ void MosfetDevice::AcceptStep(const std::vector<double> &x) {
     }
     const double vgs = NodeVoltage(x, m_Gate) - NodeVoltage(x, m_Source);
     const double vgd = NodeVoltage(x, m_Gate) - NodeVoltage(x, m_Drain);
-    m_Vgs = vgs;
-    m_Vgd = vgd;
-    m_Igs = m_Gcgs * vgs + m_Ieqgs;
-    m_Igd = m_Gcgd * vgd + m_Ieqgd;
-    m_SavedVgs = m_Vgs;
-    m_SavedIgs = m_Igs;
-    m_SavedVgd = m_Vgd;
-    m_SavedIgd = m_Igd;
+    m_HistoryGs = AdvanceHistory(m_HistoryGs, m_Cgs * vgs, m_Gcgs * vgs + m_Ieqgs);
+    m_HistoryGd = AdvanceHistory(m_HistoryGd, m_Cgd * vgd, m_Gcgd * vgd + m_Ieqgd);
+    m_SavedHistoryGs = m_HistoryGs;
+    m_SavedHistoryGd = m_HistoryGd;
 }
 
 void MosfetDevice::RejectStep() {
-    m_Vgs = m_SavedVgs;
-    m_Igs = m_SavedIgs;
-    m_Vgd = m_SavedVgd;
-    m_Igd = m_SavedIgd;
+    m_HistoryGs = m_SavedHistoryGs;
+    m_HistoryGd = m_SavedHistoryGd;
 }
 
 void MosfetDevice::SeedOperatingPoint(std::vector<double> &) const {

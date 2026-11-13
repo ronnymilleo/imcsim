@@ -62,8 +62,8 @@ private:
     /// Gate-source ($C_{GSO} \cdot W$) and gate-drain ($C_{GDO} \cdot W$) linear overlap capacitances.
     double m_Cgs;
     double m_Cgd;
-    double m_Vgs = 0.0, m_Igs = 0.0, m_SavedVgs = 0.0, m_SavedIgs = 0.0;
-    double m_Vgd = 0.0, m_Igd = 0.0, m_SavedVgd = 0.0, m_SavedIgd = 0.0;
+    ChargeHistory m_HistoryGs, m_SavedHistoryGs;
+    ChargeHistory m_HistoryGd, m_SavedHistoryGd;
     double m_Gcgs = 0.0, m_Ieqgs = 0.0, m_Gcgd = 0.0, m_Ieqgd = 0.0;
     double m_Critical; ///< `PNJLIM` critical voltage of the body-drain junction diode.
 };

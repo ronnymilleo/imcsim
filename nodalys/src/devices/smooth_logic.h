@@ -66,10 +66,8 @@ private:
     // Transient State
     double m_CapConductance = 0.0;
     double m_CapEquivalent = 0.0;
-    double m_Voltage = 0.0;
-    double m_Current = 0.0;
-    double m_SavedVoltage = 0.0;
-    double m_SavedCurrent = 0.0;
+    ChargeHistory m_History;
+    ChargeHistory m_SavedHistory;
 };
 
 } // namespace Nodalys

@@ -30,6 +30,7 @@
 #ifndef NODALYS_SEMICONDUCTOR_MATH_H
 #define NODALYS_SEMICONDUCTOR_MATH_H
 
+#include "devices/integration.h"
 #include "mna/mna_system.h"
 #include <algorithm>
 #include <cmath>
@@ -126,9 +127,8 @@ inline DepletionCharge EvaluateDepletion(const double voltage, const double cj0,
 
 /**
  * @struct  ChargeCompanion
- * @brief   Linearized Trapezoidal (or Backward Euler) companion for a nonlinear charge $Q(v)$:
- *          $i(t+h) = \frac{\text{factor}}{h} (Q(v) - Q(t)) - i_{\text{past}} \approx G_{\text{cap}} v +
- * I_{\text{eq,cap}}$.
+ * @brief   Linearized companion for a nonlinear charge $Q(v)$ under the integration method of the step:
+ *          $i = a\,Q(v) + b \approx G_{\text{cap}} v + I_{\text{eq,cap}}$, with $a$ and $b$ from `MakeCompanion()`.
  */
 struct ChargeCompanion {
     double Conductance;
@@ -136,12 +136,11 @@ struct ChargeCompanion {
 };
 
 inline ChargeCompanion ChargeModel(const double charge_derivative, const double charge_at_iterate,
-                                   const double voltage_iterate, const double charge_previous,
-                                   const double current_previous, const double step, const bool backward_euler) {
-    const double factor = backward_euler ? 1.0 : 2.0;
-    const double conductance = factor * charge_derivative / step;
-    const double current_at_iterate =
-        factor * (charge_at_iterate - charge_previous) / step - (backward_euler ? 0.0 : current_previous);
+                                   const double voltage_iterate, const ChargeHistory &history,
+                                   const TimeContext &time) {
+    const Companion integration = MakeCompanion(history, time);
+    const double conductance = integration.Coefficient * charge_derivative;
+    const double current_at_iterate = integration.Coefficient * charge_at_iterate + integration.Offset;
     const double equivalent = current_at_iterate - conductance * voltage_iterate;
     return {conductance, equivalent};
 }

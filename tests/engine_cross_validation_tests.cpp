@@ -207,9 +207,11 @@ constexpr std::array KNOWN_DIFFERENCES{
                     "Nodalys lists no sensitivity for the block instances X1 and X2, which ngspice reports as the "
                     "largest of their inner parts"},
     KnownDifference{"buck_converter.imcsim", TRANSIENT_NAME,
-                    "the waveforms agree to 0.1 % between the switching edges, but at the switch-off edge Nodalys "
-                    "shows 1.26 A through S1 where ngspice shows 0.57 A, and the diode rings after the inductor "
-                    "current stops, to 15.5 V on Nodalys, above the 12 V supply, which a passive ring cannot reach"},
+                    "the currents and the waveforms agree, but after the inductor current stops the diode node rings "
+                    "against the diode capacitance at about 600 kHz, which the 1 us step resolves in under two points, "
+                    "so the samples of the ring differ: both engines ring above the 12 V supply, as the inductor "
+                    "pushes the node up to about 19 V when the step shrinks, and at this step ngspice reaches 14.9 V "
+                    "and Nodalys 18.5 V (jay #227)"},
     KnownDifference{"schmitt_trigger.imcsim", TRANSIENT_NAME,
                     "Nodalys switches 25 to 100 us before ngspice and once before the input reaches the threshold; "
                     "the model's pole at 10 Hz makes a delay of about 100 us, which ngspice shows, so ngspice is "

@@ -64,9 +64,9 @@ void SmoothLogicDevice::Stamp(MnaSystem &sys, const std::vector<double> &x, cons
     if (m_Internal >= 0 && m_FilterCapacitance > 0.0) {
         // Internal low-pass RC inertial delay stage
         if (time.IsTransient) {
-            m_CapConductance =
-                time.BackwardEuler ? m_FilterCapacitance / time.TimeStep : 2.0 * m_FilterCapacitance / time.TimeStep;
-            m_CapEquivalent = -m_CapConductance * m_Voltage - (time.BackwardEuler ? 0.0 : m_Current);
+            const Companion companion = MakeCompanion(m_History, time);
+            m_CapConductance = companion.Coefficient * m_FilterCapacitance;
+            m_CapEquivalent = companion.Offset;
             sys.AddA(m_Internal, m_Internal, m_CapConductance);
             sys.AddRhs(m_Internal, -m_CapEquivalent);
         } else {
@@ -218,10 +218,8 @@ bool SmoothLogicDevice::HasTransientState() const {
 void SmoothLogicDevice::AcceptStep(const std::vector<double> &x) {
     if (HasTransientState()) {
         const double v_int = ReadVoltage(x, m_Internal);
-        m_Current = m_CapConductance * v_int + m_CapEquivalent;
-        m_Voltage = v_int;
-        m_SavedVoltage = m_Voltage;
-        m_SavedCurrent = m_Current;
+        m_History = AdvanceHistory(m_History, m_FilterCapacitance * v_int, m_CapConductance * v_int + m_CapEquivalent);
+        m_SavedHistory = m_History;
     }
 }
 
@@ -230,8 +228,7 @@ void SmoothLogicDevice::AcceptStep(const std::vector<double> &x) {
  */
 void SmoothLogicDevice::RejectStep() {
     if (HasTransientState()) {
-        m_Voltage = m_SavedVoltage;
-        m_Current = m_SavedCurrent;
+        m_History = m_SavedHistory;
     }
 }
 
