@@ -11,6 +11,7 @@
 #include "circuit/components/capacitor.h"
 #include "circuit/components/clock.h"
 #include "circuit/components/diode.h"
+#include "circuit/components/fuse.h"
 #include "circuit/components/ground.h"
 #include "circuit/components/inductor.h"
 #include "circuit/components/logic_input.h"
@@ -921,4 +922,121 @@ TEST_CASE("A behavioral current source and voltage source report their current l
     // 2 mA from + to - through the source, which pulls OUT to -2 V
     CHECK_THAT(CurrentOf(*current_run.Result, "B1"), WithinAbs(2e-3, 1e-9));
     CHECK_THAT(current_run.Result->NodeVoltages[2], WithinAbs(-2.0, 1e-6));
+}
+
+TEST_CASE("Nodalys results carry rating warnings for overloaded parts and blown fuses", "[nodalys][ratings]") {
+    Core::NodalysBackend backend;
+
+    SECTION("an overloaded diode earns a rating warning in the operating point") {
+        Core::VoltageSource source;
+        source.SetName("V1");
+        source.SetValue(10.0);
+        Core::Diode diode(Core::ComponentType::DIODE);
+        diode.SetName("D1");
+        Core::Resistor resistor;
+        resistor.SetName("R1");
+        resistor.SetValue(10.0);
+        Core::Ground ground;
+
+        Core::Circuit circuit;
+        circuit.Add(source, {1, 0});
+        circuit.Add(diode, {1, 2});
+        circuit.Add(resistor, {2, 0});
+        circuit.Add(ground, {0});
+
+        const Core::OperatingPointRun run = backend.RunOperatingPoint(circuit, std::nullopt);
+        REQUIRE(run.Result.has_value());
+        REQUIRE_FALSE(run.Result->Warnings.empty());
+        CHECK(run.Result->Warnings.front().contains("D1"));
+    }
+
+    SECTION("a blown fuse earns a blow-time warning in the transient") {
+        Core::VoltageSource source;
+        source.SetName("V1");
+        source.SetValue(10.0);
+        Core::Fuse fuse;
+        fuse.SetName("FU1");
+        fuse.SetParameters({.RatedCurrent = 1.0, .MeltingI2t = 1e-3, .ColdResistance = 0.1, .BlownResistance = 1e9});
+        Core::Resistor load;
+        load.SetName("R1");
+        load.SetValue(1.0);
+        Core::Ground ground;
+
+        Core::Circuit circuit;
+        circuit.Add(source, {1, 0});
+        circuit.Add(fuse, {1, 2});
+        circuit.Add(load, {2, 0});
+        circuit.Add(ground, {0});
+
+        const Core::TransientRun run =
+            backend.RunTransient(circuit, {.StopTime = 1e-3, .TimeStep = 1e-5}, std::nullopt, {});
+        REQUIRE(run.Result.has_value());
+        REQUIRE_FALSE(run.Result->Warnings.empty());
+        CHECK(std::ranges::any_of(run.Result->Warnings,
+                                  [](const std::string &warning) { return warning.contains("FU1 blew at"); }));
+    }
+}
+
+TEST_CASE("Nodalys names switch and push-button currents after the part", "[nodalys][switch]") {
+    Core::VoltageSource source;
+    source.SetName("V1");
+    source.SetValue(5.0);
+    Core::Switch sw(Core::ComponentType::SWITCH);
+    sw.SetName("SW1");
+    sw.SetClosed(true);
+    Core::Switch pb(Core::ComponentType::PUSH_BUTTON);
+    pb.SetName("PB1");
+    pb.SetClosed(true);
+    Core::Resistor load;
+    load.SetName("R1");
+    load.SetValue(1e3);
+    Core::Ground ground;
+
+    Core::Circuit circuit;
+    circuit.Add(source, {1, 0});
+    circuit.Add(sw, {1, 2});
+    circuit.Add(pb, {2, 3});
+    circuit.Add(load, {3, 0});
+    circuit.Add(ground, {0});
+
+    Core::NodalysBackend backend;
+    const Core::OperatingPointRun run = backend.RunOperatingPoint(circuit, std::nullopt);
+    REQUIRE(run.Result.has_value());
+    CHECK_THAT(CurrentOf(*run.Result, "SW1"), WithinRel(5e-3, 1e-4));
+    CHECK_THAT(CurrentOf(*run.Result, "PB1"), WithinRel(5e-3, 1e-4));
+}
+
+TEST_CASE("Nodalys sensitivity includes block instances by their dominant inner element", "[nodalys][sensitivity]") {
+    Core::Resistor top;
+    top.SetName("R1");
+    top.SetValue(1e3);
+    Core::Resistor bottom;
+    bottom.SetName("R2");
+    bottom.SetValue(3e3);
+    auto definition = std::make_shared<Core::SubcircuitDefinition>();
+    definition->Name = "divider";
+    definition->Pins = {{"IN", 1}, {"OUT", 2}};
+    definition->Body.Add(top, {1, 2});
+    definition->Body.Add(bottom, {2, 0});
+
+    Core::SubcircuitInstance instance("divider", {"IN", "OUT"});
+    instance.SetName("X1");
+    Core::VoltageSource source;
+    source.SetName("V1");
+    source.SetValue(4.0);
+    const Core::Ground ground;
+
+    Core::Circuit circuit;
+    circuit.Add(source, {1, 0});
+    circuit.Add(instance, {1, 2});
+    circuit.Add(ground, {0});
+    circuit.AddSubcircuit(definition);
+
+    Core::NodalysBackend backend;
+    const Core::SensitivityRun run = backend.RunSensitivity(circuit, {.OutputNode = 2});
+    REQUIRE(run.Result.has_value());
+    const auto found = std::ranges::find(run.Result->Parts, "X1", &Core::PartSensitivity::Name);
+    REQUIRE(found != run.Result->Parts.end());
+    CHECK(found->Unit == "Ohm");
+    CHECK_THAT(std::abs(found->Normalized), WithinRel(0.75, 1e-4));
 }

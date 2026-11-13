@@ -6,6 +6,7 @@
 #include "simulation/sensitivity.h"
 
 #include "circuit/components/controlled_source.h"
+#include "circuit/components/source.h"
 #include <algorithm>
 #include <cctype>
 #include <cmath>
@@ -42,12 +43,43 @@ std::optional<double> Find(const SensitivityVectors &vectors, const std::string 
     return found->second;
 }
 
+/// DC level of a part as written in the netlist; for non-DC independent sources this is the waveform start/offset,
+/// not the stored AC/peak magnitude in GetValue().
+double EffectiveSensitivityValue(const Component &part) {
+    if (!IsSource(part.GetType())) {
+        return part.GetValue();
+    }
+    const auto &source = static_cast<const Source &>(part);
+    switch (source.GetSourceType()) {
+    case Source::SourceType::DC:
+        return source.GetValue();
+    case Source::SourceType::AC:
+        return source.GetAC().Offset;
+    case Source::SourceType::PULSE:
+        return source.GetPulse().Low;
+    case Source::SourceType::EXP:
+        return source.GetEXP().InitialValue;
+    case Source::SourceType::SFFM:
+        return source.GetSFFM().Offset;
+    case Source::SourceType::AM:
+        return source.GetAM().Offset;
+    case Source::SourceType::PWL:
+        return source.GetPWL().Points.empty() ? 0.0 : source.GetPWL().Points.front().Value;
+    case Source::SourceType::NOISE:
+        return source.GetNoise().Offset;
+    case Source::SourceType::RANDOM:
+        return source.GetRandom().Second;
+    default:
+        return source.GetValue();
+    }
+}
+
 PartSensitivity MakePart(const Component &part, const double absolute, const double normalized) {
     return {.Name = part.GetName(),
             .Type = part.GetType(),
             .Element = {},
             .Unit = part.GetUnit(),
-            .Value = part.GetValue(),
+            .Value = EffectiveSensitivityValue(part),
             .Absolute = absolute,
             .Normalized = normalized};
 }
@@ -63,7 +95,7 @@ PartSensitivity MakeValuePart(const Component &part, const SensitivityVectors &v
     const std::string vector_name = IsControlledSource(type) ? name + std::string(GAIN_SUFFIX) : name;
     const double absolute = Find(vectors, vector_name).value_or(0.0);
     const std::optional<double> scale = Find(vectors, name + std::string(SCALE_SUFFIX));
-    return MakePart(part, absolute, scale.value_or(absolute * part.GetValue()));
+    return MakePart(part, absolute, scale.value_or(absolute * EffectiveSensitivityValue(part)));
 }
 
 /**
@@ -125,19 +157,32 @@ bool IsPlacedInside(const std::vector<std::string> &segments) {
 
 std::optional<InnerElement> ReadInnerElement(const std::string &vector_name, const std::string &instance,
                                              const SensitivityVectors &vectors) {
-    constexpr std::size_t PREFIX_LENGTH = 2;
-    if (vector_name.size() <= PREFIX_LENGTH || vector_name[1] != '.' ||
-        std::string_view("rcl").find(vector_name[0]) == std::string_view::npos) {
+    if (vector_name.ends_with(SCALE_SUFFIX) || vector_name.ends_with(GAIN_SUFFIX)) {
         return std::nullopt;
     }
-    const std::vector<std::string> segments = SplitPath(std::string_view(vector_name).substr(PREFIX_LENGTH));
+    std::size_t prefix_length = 0;
+    char type_letter = '\0';
+    // ngspice prefixes subcircuit element vectors with "<type>." (e.g. "r.x1.r1"); Nodalys uses "<instance>.<part>"
+    if (vector_name.size() > 2 && vector_name[1] == '.' &&
+        std::string_view("rcl").find(vector_name[0]) != std::string_view::npos) {
+        prefix_length = 2;
+        type_letter = vector_name[0];
+    }
+    const std::vector<std::string> segments = SplitPath(std::string_view(vector_name).substr(prefix_length));
     const std::optional<double> scale = Find(vectors, vector_name + std::string(SCALE_SUFFIX));
     if (segments.front() != instance || !scale || !IsPlacedInside(segments)) {
         return std::nullopt;
     }
-    const std::string path = ToUpper(vector_name.substr(PREFIX_LENGTH + instance.size() + 1));
+    if (type_letter == '\0') {
+        if (segments.back().empty() ||
+            std::string_view("rcl").find(segments.back().front()) == std::string_view::npos) {
+            return std::nullopt;
+        }
+        type_letter = segments.back().front();
+    }
+    const std::string path = ToUpper(vector_name.substr(prefix_length + instance.size() + 1));
     return InnerElement{
-        .Path = path, .Unit = InnerUnit(vector_name[0]), .Absolute = vectors.at(vector_name), .Normalized = *scale};
+        .Path = path, .Unit = InnerUnit(type_letter), .Absolute = vectors.at(vector_name), .Normalized = *scale};
 }
 
 /**
@@ -149,7 +194,13 @@ std::optional<PartSensitivity> MakeBlockPart(const Component &part, const Sensit
     std::optional<InnerElement> largest;
     for (const auto &[vector_name, value] : vectors) {
         const std::optional<InnerElement> element = ReadInnerElement(vector_name, instance, vectors);
-        if (element && (!largest || std::abs(element->Normalized) > std::abs(largest->Normalized))) {
+        if (!element) {
+            continue;
+        }
+        const bool is_better = !largest || std::abs(element->Normalized) > std::abs(largest->Normalized) ||
+                               (std::abs(element->Normalized) == std::abs(largest->Normalized) &&
+                                element->Unit == "Ohm" && largest->Unit != "Ohm");
+        if (is_better) {
             largest = element;
         }
     }

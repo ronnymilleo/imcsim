@@ -307,6 +307,7 @@ struct RandomParameters {
  * @brief   Datasheet specifications for the Boyle op-amp macromodel (IEEE JSSC 1974).
  */
 struct BoyleOpAmpParameters {
+    bool IsPnpInput = false;
     double OpenLoopGainDecibels = 106.0;
     double GainBandwidth = 1e6;
     /// Volts per microsecond, as datasheets specify.

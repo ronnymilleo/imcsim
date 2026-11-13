@@ -164,3 +164,27 @@ TEST_CASE("Initial conditions and ports in a netlist reach the circuit", "[nodal
         CHECK_FALSE(Nodalys::ParseNetlist("* ports\nP1 1\n.end\n").has_value());
     }
 }
+
+TEST_CASE("A Boyle op-amp with a PNP input stage sources bias current out of its inputs", "[nodalys][opamp]") {
+    auto closed_loop_output = [](const bool is_pnp) {
+        Nodalys::CircuitBuilder builder;
+        builder.AddVdc("VCC", 1, 0, 15.0);
+        builder.AddVdc("VEE", 2, 0, -15.0);
+        // 100 k feedback resistor from output (node 4) to - input (node 3), + input grounded
+        builder.AddResistor("RF", 4, 3, 100e3);
+        Nodalys::BoyleOpAmpParameters params;
+        params.IsPnpInput = is_pnp;
+        params.InputBiasCurrent = 20e-9;
+        params.InputOffsetVoltage = 0.0;
+        builder.AddBoyleOpAmp("U1", 4, 0, 3, 1, 2, params);
+        auto circuit = builder.Build();
+        REQUIRE(circuit.has_value());
+        const auto op = Nodalys::ComputeOperatingPoint(*circuit);
+        REQUIRE(op.has_value());
+        return op->NodeVoltages[4];
+    };
+
+    // NPN sinks 20 nA into - input -> +2 mV output; PNP sources 20 nA out -> -2 mV output
+    CHECK_THAT(closed_loop_output(false), WithinAbs(2e-3, 1e-4));
+    CHECK_THAT(closed_loop_output(true), WithinAbs(-2e-3, 1e-4));
+}
