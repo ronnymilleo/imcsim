@@ -6,6 +6,7 @@ include(Catch)
 
 add_executable(nodalys-tests
     fft_tests.cpp
+    fuse_device_tests.cpp
     hb_analysis_tests.cpp
     linear_tests.cpp
     netlist_elements_tests.cpp

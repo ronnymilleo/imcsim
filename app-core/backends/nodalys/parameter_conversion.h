@@ -11,6 +11,7 @@
 #include "circuit/components/bjt.h"
 #include "circuit/components/clock.h"
 #include "circuit/components/diode.h"
+#include "circuit/components/fuse.h"
 #include "circuit/components/mosfet.h"
 #include "circuit/components/source.h"
 #include "circuit/components/voltage_controlled_switch.h"
@@ -34,6 +35,9 @@ Nodalys::ClockParameters ToNodalys(const ClockParameters &parameters);
 
 // Switches
 Nodalys::SwitchParameters ToNodalys(const SwitchParameters &parameters);
+
+// Fuses
+Nodalys::FuseParameters ToNodalys(const FuseParameters &parameters);
 
 } // namespace Core
 

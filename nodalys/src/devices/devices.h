@@ -132,6 +132,8 @@ public:
      * @brief   Finds the next instant after `time` where the waveform of the device has a corner.
      * @details The transient lands a time point on every corner, so an edge narrower than the time step is never
      *          stepped over, and the step that leaves a corner starts small and uses Backward Euler.
+     * @note    The transient asks again after every accepted point, so a device whose corners depend on its state, such
+     *          as a fuse that predicts the instant it blows, may move them as the run goes.
      * @param[in] time  Instant already reached.
      * @return  The next corner, strictly after `time`, or infinity when the device has none.
      */

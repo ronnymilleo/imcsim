@@ -1,9 +1,10 @@
 /**
  * @file    fuse_tests.cpp
- * @brief   Tests for the fuse: its figures, its netlist, the ngspice runs that blow it and how the results and the
- *          schematic tell that it blew.
+ * @brief   Tests for the fuse: its figures, its netlist, the runs that blow it on ngspice and on Nodalys and how the
+ * results and the schematic tell that it blew.
  */
 
+#include "backends/nodalys/nodalys_backend.h"
 #include "circuit/circuit.h"
 #include "circuit/components/fuse.h"
 #include "circuit/components/ground.h"
@@ -12,11 +13,14 @@
 #include "circuit/components/vcc.h"
 #include "circuit/components/voltage_source.h"
 #include "circuit/subcircuit.h"
+#include "nodalys_in_use.h"
 #include "overlays/fuse_flash.h"
 #include "results/fuse_readings.h"
 #include "schematic/connectivity.h"
 #include "schematic/element_factory.h"
+#include "schematic/examples.h"
 #include "schematic/preferences.h"
+#include "schematic/schematic.h"
 #include "schematic/schematic_file.h"
 #include "simulation/fuse_state.h"
 #include "simulation/ratings.h"
@@ -578,4 +582,223 @@ TEST_CASE("The fuse flash is on for a new user, and the other effects are not", 
     GUI::Preferences off;
     off.SetEffectOn(GUI::LiveEffect::FUSE, false);
     CHECK_FALSE(GUI::LoadPreferences(GUI::SavePreferences(off)).Choices.IsEffectOn(GUI::LiveEffect::FUSE));
+}
+
+TEST_CASE("Nodalys declares no fuse unsupported in any analysis", "[fuse][nodalys]") {
+    const Core::NodalysBackend nodalys;
+    FuseLoop loop(2.5);
+    for (const Core::AnalysisKind kind :
+         {Core::AnalysisKind::OPERATING_POINT, Core::AnalysisKind::TRANSIENT, Core::AnalysisKind::DC_SWEEP,
+          Core::AnalysisKind::AC_SWEEP, Core::AnalysisKind::NOISE, Core::AnalysisKind::TRANSFER_FUNCTION}) {
+        CHECK_FALSE(Core::FindUnsupported(nodalys, loop.Circuit, kind).has_value());
+    }
+}
+
+TEST_CASE("The blow time of a fuse agrees between ngspice and Nodalys within 3 percent", "[fuse][nodalys]") {
+    // ngspice smooths the blow level of its latch over 0.0004 of the heat, so near the threshold it blows a little
+    // before the sharp level of Nodalys, which follows the closed form; the larger the overload, the closer they sit
+    constexpr double BLOW_TIME_TOLERANCE = 0.03;
+    for (const double load_resistance : {1.0, 2.5, 4.7}) {
+        FuseLoop loop(load_resistance);
+        const Core::CircuitEntry &entry = loop.Circuit.GetEntries()[1];
+        const Core::TransientRun on_ngspice = Core::RunTransient(loop.Circuit, {.StopTime = 2.0, .TimeStep = 1e-3});
+        const Core::TransientRun on_nodalys = [&loop] {
+            const TestSupport::NodalysInUse nodalys;
+            return Core::RunTransient(loop.Circuit, {.StopTime = 2.0, .TimeStep = 1e-3});
+        }();
+        INFO("load " << load_resistance << " Ohm");
+        REQUIRE(on_ngspice.Result.has_value());
+        REQUIRE(on_nodalys.Result.has_value());
+        const std::optional<double> expected = Core::FindFuseBlowTime(*entry.Part, entry.Nodes, *on_ngspice.Result);
+        const std::optional<double> actual = Core::FindFuseBlowTime(*entry.Part, entry.Nodes, *on_nodalys.Result);
+        REQUIRE(expected.has_value());
+        REQUIRE(actual.has_value());
+        INFO("ngspice " << *expected << " s, Nodalys " << *actual << " s");
+        CHECK_THAT(*actual, WithinRel(*expected, BLOW_TIME_TOLERANCE));
+    }
+}
+
+TEST_CASE("Both engines blow a fuse on the same pulse of a train, and keep it whole between farther ones",
+          "[fuse][nodalys]") {
+    for (const double period : {10e-3, 1.0}) {
+        PulsedFuseLoop loop(period, 1e-3);
+        const Core::CircuitEntry &entry = loop.Circuit.GetEntries()[1];
+        const Core::TransientSettings settings{.StopTime = 0.5, .TimeStep = 200e-6};
+        const Core::TransientRun on_ngspice = Core::RunTransient(loop.Circuit, settings);
+        const Core::TransientRun on_nodalys = [&] {
+            const TestSupport::NodalysInUse nodalys;
+            return Core::RunTransient(loop.Circuit, settings);
+        }();
+        INFO("period " << period << " s");
+        REQUIRE(on_ngspice.Result.has_value());
+        REQUIRE(on_nodalys.Result.has_value());
+        const std::optional<double> expected = Core::FindFuseBlowTime(*entry.Part, entry.Nodes, *on_ngspice.Result);
+        const std::optional<double> actual = Core::FindFuseBlowTime(*entry.Part, entry.Nodes, *on_nodalys.Result);
+        REQUIRE(expected.has_value() == actual.has_value());
+        if (expected) {
+            // The same pulse: the pulses of the train are 10 ms apart, so the blow times are within a pulse
+            CHECK_THAT(*actual, WithinAbs(*expected, 1e-3));
+        }
+    }
+}
+
+TEST_CASE("A circuit with a fuse runs with Gear-2 on Nodalys, so an inductor the open fuse cuts settles",
+          "[fuse][nodalys]") {
+    // 5 V over 2.5 Ohm in series with 10 mH: the fuse opens with the inductor carrying 2 A. Only the Gear-2 integration
+    // lets the node beside the fuse settle to within 10 uV; the trapezoidal rule leaves it 1.1 mV off, alternating in
+    // sign at every point, for ever
+    constexpr double SETTLED_VOLTS = 1e-5;
+    FuseLoop loop(2.5);
+    Core::Inductor inductor;
+    inductor.SetName("L1");
+    inductor.SetValue(10e-3);
+    Core::Circuit circuit;
+    circuit.Add(loop.Supply, {1});
+    circuit.Add(loop.Part, {1, 2});
+    circuit.Add(inductor, {2, 3});
+    circuit.Add(loop.Load, {3, 0});
+    circuit.Add(loop.Reference, {0});
+    const TestSupport::NodalysInUse nodalys;
+    const Core::TransientRun run = Core::RunTransient(circuit, {.StopTime = 0.5, .TimeStep = 1e-3});
+    if (!run.Result) {
+        FAIL(run.Result.error());
+    }
+    // Nodalys writes no rating warnings, so the fuse is known to have blown from its resistance
+    const Core::CircuitEntry &entry = circuit.GetEntries()[1];
+    REQUIRE(Core::FindFuseBlowTime(*entry.Part, entry.Nodes, *run.Result).has_value());
+    const std::vector<double> &node = run.Result->NodeVoltages[2];
+    CHECK_THAT(node.back(), WithinAbs(0.0, SETTLED_VOLTS));
+    const std::size_t last_quarter = node.size() * 3 / 4;
+    const double swing =
+        std::ranges::max(std::span(node).subspan(last_quarter), {}, [](const double v) { return std::abs(v); });
+    CHECK_THAT(swing, WithinAbs(0.0, SETTLED_VOLTS));
+}
+
+TEST_CASE("A fuse inside a block blows on Nodalys at the time of the same fuse outside it", "[fuse][nodalys]") {
+    Core::Fuse inside;
+    inside.SetName("FU1");
+    inside.SetParameters(QUICK_FUSE);
+    auto definition = std::make_shared<Core::SubcircuitDefinition>();
+    definition->Name = "protected";
+    definition->Pins = {{"IN", 1}, {"OUT", 2}};
+    definition->Body.Add(inside, {1, 2});
+    Core::SubcircuitInstance instance("protected", {"IN", "OUT"});
+    instance.SetName("X1");
+    Core::VCC supply;
+    supply.SetName("V1");
+    supply.SetValue(5.0);
+    Core::Resistor load;
+    load.SetName("R1");
+    load.SetValue(2.5);
+    Core::Ground reference;
+    Core::Circuit circuit;
+    circuit.Add(supply, {1});
+    circuit.Add(instance, {1, 2});
+    circuit.Add(load, {2, 0});
+    circuit.Add(reference, {0});
+    circuit.AddSubcircuit(definition);
+
+    const TestSupport::NodalysInUse nodalys;
+    const Core::TransientRun run = Core::RunTransient(circuit, {.StopTime = 0.5, .TimeStep = 1e-3});
+    if (!run.Result) {
+        FAIL(run.Result.error());
+    }
+    const std::vector<double> &voltage = run.Result->NodeVoltages[2];
+    CHECK_THAT(voltage.front(), WithinAbs(5.0 * 2.5 / 2.65, 1e-3));
+    CHECK_THAT(voltage.back(), WithinAbs(0.0, 1e-3));
+    const auto first_open = std::ranges::find_if(voltage, [](const double volts) { return volts < 0.1; });
+    REQUIRE(first_open != voltage.end());
+    CHECK_THAT(run.Result->Times[static_cast<std::size_t>(first_open - voltage.begin())],
+               WithinAbs(BlowTime(5.0 / 2.65), 1e-3));
+}
+
+TEST_CASE("The fast and slow-blow fuses of the example blow at the same times on both engines", "[fuse][nodalys]") {
+    const auto examples = GUI::GetExamples();
+    const auto example =
+        std::ranges::find(examples, std::string("fuse_fast_and_slow_blow.imcsim"),
+                          [](const GUI::Example &candidate) { return std::string(candidate.FileName); });
+    REQUIRE(example != examples.end());
+    auto loaded = GUI::LoadExample(*example);
+    if (!loaded) {
+        FAIL(loaded.error());
+    }
+    GUI::Schematic schematic;
+    schematic.Replace(std::move(loaded->Elements), std::move(loaded->Wires), std::move(loaded->Settings),
+                      std::move(loaded->Subcircuits), std::move(loaded->Models));
+    const Core::Circuit circuit = schematic.BuildCircuit();
+    const Core::TransientSettings settings = schematic.GetSimulationSettings().Transient;
+    const Core::TransientRun on_ngspice = Core::RunTransient(circuit, settings);
+    const Core::TransientRun on_nodalys = [&] {
+        const TestSupport::NodalysInUse nodalys;
+        return Core::RunTransient(circuit, settings);
+    }();
+    REQUIRE(on_ngspice.Result.has_value());
+    REQUIRE(on_nodalys.Result.has_value());
+    int fuse_count = 0;
+    for (const Core::CircuitEntry &entry : circuit.GetEntries()) {
+        if (entry.Part->GetType() != Core::ComponentType::FUSE) {
+            continue;
+        }
+        ++fuse_count;
+        const std::optional<double> expected = Core::FindFuseBlowTime(*entry.Part, entry.Nodes, *on_ngspice.Result);
+        const std::optional<double> actual = Core::FindFuseBlowTime(*entry.Part, entry.Nodes, *on_nodalys.Result);
+        INFO(entry.Part->GetName());
+        REQUIRE(expected.has_value() == actual.has_value());
+        if (expected) {
+            INFO("ngspice " << *expected << " s, Nodalys " << *actual << " s");
+            CHECK_THAT(*actual, WithinRel(*expected, 0.03));
+        }
+    }
+    CHECK(fuse_count == 2);
+}
+
+TEST_CASE("A fuse is whole in the operating point and the AC sweep on Nodalys, past its rating", "[fuse][nodalys]") {
+    FuseLoop loop(0.5);
+    const TestSupport::NodalysInUse nodalys;
+    const Core::OperatingPointRun point = Core::RunOperatingPoint(loop.Circuit);
+    if (!point.Result) {
+        FAIL(point.Result.error());
+    }
+    CHECK_THAT(point.Result->NodeVoltages[2], WithinAbs(5.0 * 0.5 / 0.65, 1e-3));
+    CHECK(point.Result->Warnings.empty());
+
+    Core::VoltageSource source;
+    source.SetName("Vin1");
+    source.SetSourceType(Core::VoltageSource::SourceType::AC);
+    Core::Circuit circuit;
+    circuit.Add(source, {1, 0});
+    circuit.Add(loop.Part, {1, 2});
+    circuit.Add(loop.Load, {2, 0});
+    circuit.Add(loop.Reference, {0});
+    const Core::ACSweepRun response =
+        Core::RunACSweep(circuit, {.StartFrequency = 10.0, .StopFrequency = 1e3, .PointsPerDecade = 2});
+    if (!response.Result) {
+        FAIL(response.Result.error());
+    }
+    for (const double magnitude : response.Result->NodeMagnitudesDecibels[2]) {
+        CHECK_THAT(magnitude, WithinAbs(20.0 * std::log10(0.5 / 0.65), 1e-3));
+    }
+}
+
+TEST_CASE("A noise analysis with a fuse gives the same total on ngspice and on Nodalys, the fuse adding none",
+          "[fuse][nodalys]") {
+    FuseLoop loop(2.5);
+    Core::VoltageSource source;
+    source.SetName("Vin1");
+    source.SetSourceType(Core::VoltageSource::SourceType::AC);
+    Core::Circuit circuit;
+    circuit.Add(source, {1, 0});
+    circuit.Add(loop.Part, {1, 2});
+    circuit.Add(loop.Load, {2, 0});
+    circuit.Add(loop.Reference, {0});
+    const Core::NoiseSettings settings{
+        .OutputNode = 2, .InputSource = "Vin1", .StartFrequency = 10.0, .StopFrequency = 100.0, .PointsPerDecade = 1};
+    const Core::NoiseRun on_ngspice = Core::RunNoise(circuit, settings);
+    const Core::NoiseRun on_nodalys = [&] {
+        const TestSupport::NodalysInUse nodalys;
+        return Core::RunNoise(circuit, settings);
+    }();
+    REQUIRE(on_ngspice.Result.has_value());
+    REQUIRE(on_nodalys.Result.has_value());
+    CHECK_THAT(on_nodalys.Result->OutputTotal, WithinRel(on_ngspice.Result->OutputTotal, 2e-3));
 }

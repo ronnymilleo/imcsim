@@ -11,6 +11,7 @@
 #include "analysis/analysis_inputs.h"
 #include "backends/nodalys/nodalys_backend.h"
 #include "circuit/components/source.h"
+#include "nodalys_in_use.h"
 #include "schematic/examples.h"
 #include "schematic/schematic.h"
 #include "simulation/analysis_sources.h"
@@ -220,15 +221,6 @@ constexpr std::array KNOWN_DIFFERENCES{
 };
 
 using Differences = std::vector<std::string>;
-
-/// Puts Nodalys in use while it lives and restores the default backend, ngspice, afterwards.
-class NodalysInUse {
-public:
-    NodalysInUse() { Core::SetBackend(std::make_unique<Core::NodalysBackend>()); }
-    ~NodalysInUse() { Core::SetBackend(nullptr); }
-    NodalysInUse(const NodalysInUse &) = delete;
-    NodalysInUse &operator=(const NodalysInUse &) = delete;
-};
 
 /// Two values of one quantity, as the engines gave them.
 bool Agree(const double expected, const double actual, const Tolerance tolerance) {
@@ -634,7 +626,7 @@ template <typename Run, typename Compare> Outcome RunBoth(Run &&run, Compare &&c
         return {.SkipReason = "ngspice does not run it: " + expected.Result.error(), .Found = {}};
     }
     const auto actual = [&run] {
-        const NodalysInUse nodalys;
+        const TestSupport::NodalysInUse nodalys;
         return run();
     }();
     if (!actual.Result) {

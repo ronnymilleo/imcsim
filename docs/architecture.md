@@ -36,7 +36,7 @@ flowchart TD
     app_core_circuit[circuit]
     app_core_simulation[simulation]
     app_core_backends[backends]
-    app_core_backends -->|60| app_core_circuit
+    app_core_backends -->|62| app_core_circuit
     app_core_backends -->|45| app_core_simulation
     app_core_backends -->|2| app_core_spice
     app_core_circuit -->|8| app_core_spice

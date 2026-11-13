@@ -84,7 +84,8 @@ transistor, level 1 MOSFET, ideal and Boyle op-amps), and differs in these point
   flip-flop is built from such gates.
 - Everything is simulated at 27 °C: a stepped temperature is refused with the reason, since the device models do not
   follow the temperature yet.
-- Behavioral sources and fuses have no device yet, and the analyses refuse them with the reason.
+- Behavioral sources have no device yet, and the analyses refuse them with the reason. A fuse is a native device with
+  the same thermal equation and blow level as the ngspice subcircuit; see Fuses.
 - A noise or random source holds its DC level (the offset, or the mean of a random source) in the operating point,
   the sweeps and the small-signal analyses, as in ngspice; a transient with one is refused, since Nodalys cannot draw
   the values yet.
@@ -213,6 +214,13 @@ blows when the heat reaches 1.015, a margin above the 1 that the rated current s
   datasheets: the 100 mA, 500 mA, 1 A and 5 A fast fuses of the 217 Series (0.0026, 0.215, 1.045 and 42.8 A2s; 5.70 Ohm,
   207, 96.4 and 13.7 mOhm) and the 1 A slow-blow of the 218 Series (6.73 A2s, 61.3 mOhm). A datasheet measures the
   melting I2t at ten times the rated current; the model takes it as the adiabatic limit of a short overload.
+- **Nodalys** runs the same model as one device with a thermal state instead of a subcircuit, so it needs no latch node
+  or sigmoid: the heat follows the equation above exactly, the fuse opens when it reaches 1.015, and the resistance
+  goes from cold to blown over a ten-thousandth of `tau`. Its blow time matches the closed form, and ngspice sits within
+  3% of it, up to 1.7% earlier close to the threshold, where the sigmoid of its latch starts to open the fuse a little
+  before 1.015. A circuit with a fuse runs with the Gear integration on both. Nodalys writes no rating warnings, so the
+  "blew at" text of the Output window is not added to its results; the schematic and its flash read the blow from the
+  results and show it.
 - A fuse is a model of the thermal state, not of the arc: there is no breaking capacity, arc voltage or voltage rating,
   no temperature dependence of the cold resistance, and the part carries a current through its probe like a switch.
   In a noise analysis the model adds none.

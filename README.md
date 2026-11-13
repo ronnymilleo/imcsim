@@ -145,7 +145,7 @@ roughly in the order they are likely to come.
 - **Nodalys, a native simulation backend**: a solver written from published circuit theory that sits beside ngspice,
   which stays available, tested against closed-form results and against ngspice. The next release is planned to bring
   it as a choice in the preferences, with every analysis of ngspice and a harmonic balance; what it does not cover yet,
-  such as temperature, behavioral sources and fuses, is refused with the reason. Nothing else on the roadmap depends
+  such as temperature and behavioral sources, is refused with the reason. Nothing else on the roadmap depends
   on it
 
 ## Install

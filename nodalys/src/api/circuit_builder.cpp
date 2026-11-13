@@ -10,6 +10,7 @@
 #include "devices/bjt_device.h"
 #include "devices/devices.h"
 #include "devices/diode_device.h"
+#include "devices/fuse_device.h"
 #include "devices/mosfet_device.h"
 #include "devices/pn_junction.h"
 #include "devices/smooth_logic.h"
@@ -425,6 +426,18 @@ public:
             const int ucp = MapNode(cp);
             const int ucn = MapNode(cn);
             Device *dev = AddDevice(std::make_unique<SwitchDevice>(ua, ub, ucp, ucn, params));
+            m_Compiled.ElementsByName[name] = dev;
+            m_Compiled.Currents.push_back({name, {{dev, 0}}});
+        });
+    }
+
+    void AddFuse(std::string name, NodeId a, NodeId b, const FuseParameters &params) {
+        Track(a);
+        Track(b);
+        Defer([this, name = std::move(name), a, b, params]() mutable {
+            const int ua = MapNode(a);
+            const int ub = MapNode(b);
+            Device *dev = AddDevice(std::make_unique<FuseDevice>(ua, ub, params));
             m_Compiled.ElementsByName[name] = dev;
             m_Compiled.Currents.push_back({name, {{dev, 0}}});
         });
@@ -956,6 +969,10 @@ void CircuitBuilder::AddSwitch(std::string name, NodeId a, NodeId b, NodeId cp, 
 void CircuitBuilder::AddVoltageControlledSwitch(std::string name, NodeId a, NodeId b, NodeId cp, NodeId cn,
                                                 const SwitchParameters &params) {
     m_Impl->AddSwitch(std::move(name), a, b, cp, cn, params);
+}
+
+void CircuitBuilder::AddFuse(std::string name, NodeId a, NodeId b, const FuseParameters &params) {
+    m_Impl->AddFuse(std::move(name), a, b, params);
 }
 
 void CircuitBuilder::AddRelay(std::string name, NodeId coil_p, NodeId coil_n, NodeId contact_a, NodeId contact_b,

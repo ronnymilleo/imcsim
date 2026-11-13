@@ -36,6 +36,10 @@
     - Algorithms: Alternating Frequency-Time (AFT) Newton-Raphson, internal pure C++23 radix-2 FFT (`FftPlan`), $(2H+1)\times(2H+1)$ Toeplitz/circulant harmonic conversion Jacobian, time-domain PN-junction limiting, and source/gmin stepping continuation.
     - Benchmarks: **`.tran` Steady-State + FFT vs. `Nodalys` HB** (`134.2x` speedup on $Q=200$ RLC diode limiter; `42.4x` speedup on $\tau=100\text{ ms}$ half-wave rectifier) and `imcsim` exclusive UI integration.
 
+11. **[Fuse Device (`fuse`)](./fuse_device.md)**
+    - Algorithms: heat equation $\tau\,\dot h = i^2/I_h^2 - h$ advanced by its exact solution, blow criterion and latch, a resistance that opens along a smooth step, and the blow predicted as a transient breakpoint.
+    - Benchmarks: blow time against the closed form and the `ngspice` subcircuit.
+
 ---
 
 ## Architecture & Modular Layout
@@ -114,7 +118,8 @@
 | **Passives** | Resistor, Capacitor, Inductor | ✅ | ✅ **Ready** | Exact companion models; Norton charge integration with initial conditions (`uic`). |
 | **Sources** | DC/AC Voltage & Current, Clock, Pulse, Sine, EXP, PWL, SFFM, AM | ✅ | ✅ **Ready** | Waveform generators; the transient lands on the corners of each. |
 | **Noise & Random Sources** | `TRNOISE`, `TRRANDOM` | ✅ | 🟡 **Partial** | Held at their DC level outside a transient; a transient with one is refused. |
-| **Behavioral Sources & Fuses** | `B` element, fuse subcircuit | ✅ | ❌ **Planned** | Refused with the reason, before the run. |
+| **Behavioral Sources** | `B` element | ✅ | ❌ **Planned** | Refused with the reason, before the run. |
+| **Fuses** | `imcsim_fuse` subcircuit | ✅ | ✅ **Ready** | Native device with a thermal state and a latch, with the blow time of `ngspice` within 3 % ([`fuse_device.md`](./fuse_device.md)). |
 | **Controlled Sources** | VCVS, VCCS, CCCS, CCVS | ✅ | ✅ **Ready** | Stamped into linear MNA system; zero-voltage current probes handled natively. |
 | **Semiconductors** | Diode, Zener, LED, BJT (NPN/PNP), MOSFET (NMOS/PMOS) | ✅ | ✅ **Ready** | Shockley diode, Gummel-Poon BJT, Shichman-Hodges Level-1 MOSFET with charge depletion/diffusion. |
 | **Macromodels** | Ideal Op-Amp, Boyle Op-Amp (LTC AN48) | ✅ | ✅ **Ready** | Real datasheet-level macromodel with CMRR, slew rate, finite gain-bandwidth, and output clamp. |
@@ -195,7 +200,6 @@ starts once the one before it is done.
 | :--- | :--- | :--- |
 | **Sparse MNA Solver** (KLU-style, AMD ordering, symbolic reuse) | The dense LU makes the analyses users run most the slowest: the transient runs at 0.07x to 0.26x of `ngspice` and the AC sweep of a 100-node network at 0.34x (section 4), and it caps harmonic balance at 4000 unknowns. | Dense LU |
 | **Gear-2 / BDF-2 Integration** | The trapezoidal rule rings on stiff switching, and the fuse needs Gear, as the `ngspice` backend writes `method=gear` for it. | Trapezoidal and Backward Euler |
-| **Fuse** | The thermal model and latch of the `imcsim_fuse` subcircuit, after Gear-2. | Refused |
 | **Behavioral Sources** (`B` element) | Free expressions of node voltages and branch currents, already checked by `imcsim`. | Refused |
 | **Temperature** | The SPICE temperature laws of the diode, BJT and MOSFET (`IS`, `VJ`, `EG`, `BF`...), so a stepped temperature runs. | Refused with the reason |
 | **Noise and Random Sources in a Transient** | White, $1/f$ and telegraph noise, and the random distributions, drawn as `ngspice` draws them where possible. | DC level outside a transient; transient refused |
