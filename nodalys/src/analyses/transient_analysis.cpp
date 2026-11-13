@@ -6,11 +6,13 @@
 #include "analyses/analyses.h"
 
 #include "devices/devices.h"
+#include "devices/transient_noise.h"
 #include <algorithm>
 #include <chrono>
 #include <cmath>
 #include <format>
 #include <limits>
+#include <random>
 #include <thread>
 #include <utility>
 
@@ -214,6 +216,12 @@ std::expected<TransientResult, std::string> ComputeTransient(CompiledCircuit &co
     const int size = compiled.System->GetSize();
     const double output_step = settings.TimeStep > 0.0 ? settings.TimeStep : (settings.StopTime / 1000.0);
     TransientCollector collector(compiled, output_step);
+
+    const std::uint64_t base_seed =
+        settings.Seed != 0 ? static_cast<std::uint64_t>(settings.Seed) : std::random_device{}();
+    for (std::size_t index = 0; index < compiled.Devices.size(); ++index) {
+        compiled.Devices[index]->SetRandomSeed(MixTransientSeed(base_seed, index));
+    }
 
     std::vector<double> x_now(static_cast<std::size_t>(size), 0.0);
     if (has_initial_conditions) {

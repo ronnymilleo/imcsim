@@ -17,6 +17,7 @@ add_executable(nodalys-tests
     smooth_logic_tests.cpp
     thermal_tests.cpp
     transient_analysis_tests.cpp
+    transient_noise_tests.cpp
 )
 
 target_include_directories(nodalys-tests

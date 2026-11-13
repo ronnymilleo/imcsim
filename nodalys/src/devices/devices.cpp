@@ -291,6 +291,10 @@ void VoltageSourceDevice::SetBreakpoints(Breakpoints breakpoints) {
     m_Breakpoints = std::move(breakpoints);
 }
 
+void VoltageSourceDevice::SetSeedCallback(std::function<void(std::uint64_t)> set_seed) {
+    m_SetSeed = std::move(set_seed);
+}
+
 void VoltageSourceDevice::Stamp(MnaSystem &sys, const std::vector<double> & /*x*/, const TimeContext &time) {
     sys.AddA(m_NodeA, m_Branch, 1.0);
     sys.AddA(m_NodeB, m_Branch, -1.0);
@@ -313,6 +317,12 @@ void VoltageSourceDevice::SetSourceScale(const double scale) {
 
 double VoltageSourceDevice::NextBreakpoint(const double time) const {
     return m_Breakpoints ? m_Breakpoints(time) : Device::NextBreakpoint(time);
+}
+
+void VoltageSourceDevice::SetRandomSeed(const std::uint64_t seed) {
+    if (m_SetSeed) {
+        m_SetSeed(seed);
+    }
 }
 
 double VoltageSourceDevice::TerminalCurrent(const int terminal, const std::vector<double> &x) const {
@@ -352,6 +362,10 @@ void CurrentSourceDevice::SetBreakpoints(VoltageSourceDevice::Breakpoints breakp
     m_Breakpoints = std::move(breakpoints);
 }
 
+void CurrentSourceDevice::SetSeedCallback(std::function<void(std::uint64_t)> set_seed) {
+    m_SetSeed = std::move(set_seed);
+}
+
 void CurrentSourceDevice::Stamp(MnaSystem &sys, const std::vector<double> & /*x*/, const TimeContext &time) {
     m_Value = m_Scale * m_Waveform(m_DcValue, time);
     StampCurrentSource(sys, m_NodeA, m_NodeB, m_Value);
@@ -371,6 +385,12 @@ void CurrentSourceDevice::SetSourceScale(const double scale) {
 
 double CurrentSourceDevice::NextBreakpoint(const double time) const {
     return m_Breakpoints ? m_Breakpoints(time) : Device::NextBreakpoint(time);
+}
+
+void CurrentSourceDevice::SetRandomSeed(const std::uint64_t seed) {
+    if (m_SetSeed) {
+        m_SetSeed(seed);
+    }
 }
 
 double CurrentSourceDevice::TerminalCurrent(const int terminal, const std::vector<double> & /*x*/) const {

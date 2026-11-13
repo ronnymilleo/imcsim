@@ -32,6 +32,8 @@ Nodalys::PwlParameters ToNodalys(const PWLParameters &parameters);
 Nodalys::SffmParameters ToNodalys(const SFFMParameters &parameters);
 Nodalys::AmParameters ToNodalys(const AMParameters &parameters);
 Nodalys::ClockParameters ToNodalys(const ClockParameters &parameters);
+Nodalys::NoiseParameters ToNodalys(const NoiseParameters &parameters);
+Nodalys::RandomParameters ToNodalys(const RandomParameters &parameters);
 
 // Switches
 Nodalys::SwitchParameters ToNodalys(const SwitchParameters &parameters);

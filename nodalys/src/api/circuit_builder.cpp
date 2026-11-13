@@ -15,6 +15,7 @@
 #include "devices/mosfet_device.h"
 #include "devices/pn_junction.h"
 #include "devices/smooth_logic.h"
+#include "devices/transient_noise.h"
 #include "devices/waveforms.h"
 #include "nodalys/expression.h"
 #include <algorithm>
@@ -267,17 +268,19 @@ public:
 
     void AddVoltageSourceDevice(std::string name, NodeId pos, NodeId neg, double dc_val,
                                 VoltageSourceDevice::Waveform waveform, double ac_mag,
-                                SourcePeriodicity periodicity = {}, VoltageSourceDevice::Breakpoints breakpoints = {}) {
+                                SourcePeriodicity periodicity = {}, VoltageSourceDevice::Breakpoints breakpoints = {},
+                                std::function<void(std::uint64_t)> set_seed = {}) {
         Track(pos);
         Track(neg);
         Defer([this, name = std::move(name), pos, neg, dc_val, waveform = std::move(waveform), ac_mag, periodicity,
-               breakpoints = std::move(breakpoints)]() mutable {
+               breakpoints = std::move(breakpoints), set_seed = std::move(set_seed)]() mutable {
             const int u_pos = MapNode(pos);
             const int u_neg = MapNode(neg);
             const int branch = AllocateBranch();
             auto source = std::make_unique<VoltageSourceDevice>(u_pos, u_neg, branch, dc_val, std::move(waveform),
                                                                 ac_mag, periodicity);
             source->SetBreakpoints(std::move(breakpoints));
+            source->SetSeedCallback(std::move(set_seed));
             Device *dev = AddDevice(std::move(source));
             m_Compiled.SourcesByName[name] = dev;
             m_Compiled.ElementsByName[name] = dev;
@@ -287,16 +290,18 @@ public:
 
     void AddCurrentSourceDevice(std::string name, NodeId pos, NodeId neg, double dc_val,
                                 VoltageSourceDevice::Waveform waveform, double ac_mag,
-                                SourcePeriodicity periodicity = {}, VoltageSourceDevice::Breakpoints breakpoints = {}) {
+                                SourcePeriodicity periodicity = {}, VoltageSourceDevice::Breakpoints breakpoints = {},
+                                std::function<void(std::uint64_t)> set_seed = {}) {
         Track(pos);
         Track(neg);
         Defer([this, name = std::move(name), pos, neg, dc_val, waveform = std::move(waveform), ac_mag, periodicity,
-               breakpoints = std::move(breakpoints)]() mutable {
+               breakpoints = std::move(breakpoints), set_seed = std::move(set_seed)]() mutable {
             const int u_pos = MapNode(pos);
             const int u_neg = MapNode(neg);
             auto source =
                 std::make_unique<CurrentSourceDevice>(u_pos, u_neg, dc_val, std::move(waveform), ac_mag, periodicity);
             source->SetBreakpoints(std::move(breakpoints));
+            source->SetSeedCallback(std::move(set_seed));
             Device *dev = AddDevice(std::move(source));
             m_Compiled.SourcesByName[name] = dev;
             m_Compiled.ElementsByName[name] = dev;
@@ -1037,6 +1042,36 @@ void CircuitBuilder::AddIam(std::string name, NodeId pos, NodeId neg, const AmPa
     const SourcePeriodicity non_periodic{.Kind = SourceWaveformKind::NON_PERIODIC, .IsSupportedInHb = false};
     m_Impl->AddCurrentSourceDevice(std::move(name), pos, neg, params.Offset, MakeAmWaveform(params.Offset, params),
                                    ac_mag, non_periodic, MakeAmBreakpoints(params));
+}
+
+void CircuitBuilder::AddVnoise(std::string name, NodeId pos, NodeId neg, const NoiseParameters &params, double ac_mag) {
+    const SourcePeriodicity non_periodic{.Kind = SourceWaveformKind::NON_PERIODIC, .IsSupportedInHb = false};
+    TransientNoiseSource noise = MakeNoiseSource(params);
+    m_Impl->AddVoltageSourceDevice(std::move(name), pos, neg, params.Offset, std::move(noise.Evaluate), ac_mag,
+                                   non_periodic, std::move(noise.NextBreakpoint), std::move(noise.ResetSeed));
+}
+
+void CircuitBuilder::AddInoise(std::string name, NodeId pos, NodeId neg, const NoiseParameters &params, double ac_mag) {
+    const SourcePeriodicity non_periodic{.Kind = SourceWaveformKind::NON_PERIODIC, .IsSupportedInHb = false};
+    TransientNoiseSource noise = MakeNoiseSource(params);
+    m_Impl->AddCurrentSourceDevice(std::move(name), pos, neg, params.Offset, std::move(noise.Evaluate), ac_mag,
+                                   non_periodic, std::move(noise.NextBreakpoint), std::move(noise.ResetSeed));
+}
+
+void CircuitBuilder::AddVrandom(std::string name, NodeId pos, NodeId neg, const RandomParameters &params,
+                                double ac_mag) {
+    const SourcePeriodicity non_periodic{.Kind = SourceWaveformKind::NON_PERIODIC, .IsSupportedInHb = false};
+    TransientNoiseSource random = MakeRandomSource(params);
+    m_Impl->AddVoltageSourceDevice(std::move(name), pos, neg, params.Second, std::move(random.Evaluate), ac_mag,
+                                   non_periodic, std::move(random.NextBreakpoint), std::move(random.ResetSeed));
+}
+
+void CircuitBuilder::AddIrandom(std::string name, NodeId pos, NodeId neg, const RandomParameters &params,
+                                double ac_mag) {
+    const SourcePeriodicity non_periodic{.Kind = SourceWaveformKind::NON_PERIODIC, .IsSupportedInHb = false};
+    TransientNoiseSource random = MakeRandomSource(params);
+    m_Impl->AddCurrentSourceDevice(std::move(name), pos, neg, params.Second, std::move(random.Evaluate), ac_mag,
+                                   non_periodic, std::move(random.NextBreakpoint), std::move(random.ResetSeed));
 }
 
 void CircuitBuilder::AddClock(std::string name, NodeId pos, NodeId neg, const ClockParameters &params) {

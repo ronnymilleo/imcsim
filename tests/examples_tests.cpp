@@ -79,19 +79,6 @@ double PeakOf(const std::vector<double> &values) {
     return std::abs(std::ranges::max(values, {}, [](const double value) { return std::abs(value); }));
 }
 
-/**
- * @brief   Whether a circuit holds a source whose waveform is noise or random values.
- */
-bool HasRandomSource(const Core::Circuit &circuit) {
-    return std::ranges::any_of(Core::CollectParts(circuit), [](const Core::Component *part) {
-        if (!Core::IsSource(part->GetType())) {
-            return false;
-        }
-        const Core::Source::SourceType waveform = static_cast<const Core::Source &>(*part).GetSourceType();
-        return waveform == Core::Source::SourceType::NOISE || waveform == Core::Source::SourceType::RANDOM;
-    });
-}
-
 } // namespace
 
 TEST_CASE("Every example opens without warnings, measures existing traces and runs", "[examples]") {
@@ -167,12 +154,7 @@ TEST_CASE("Every example either runs on Nodalys or is flagged unsupported", "[ex
         const GUI::SimulationSettings &settings = schematic.GetSimulationSettings();
         const Core::TransientRun transient = nodalys.RunTransient(circuit, settings.Transient, std::nullopt, {});
         INFO((transient.Result ? std::string{} : transient.Result.error()));
-        // Nodalys draws no noise or random values yet, so a transient of such a source is refused, not run without it
-        if (HasRandomSource(circuit)) {
-            CHECK_FALSE(transient.Result.has_value());
-        } else {
-            CHECK(transient.Result.has_value());
-        }
+        CHECK(transient.Result.has_value());
 
         if (settings.Selected == GUI::Analysis::DC_SWEEP) {
             const Core::DCSweepRun dc_sweep = nodalys.RunDCSweep(

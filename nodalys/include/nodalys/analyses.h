@@ -60,6 +60,8 @@ struct TransientConfig {
     double MaxStep = 0.0;
     bool UseInitialConditions = false;
     IntegrationMethod Method = IntegrationMethod::TRAPEZOIDAL;
+    /// Seed for TRNOISE and TRRANDOM sources; 0 draws a new sequence on each run.
+    unsigned int Seed = 0;
 };
 
 /**

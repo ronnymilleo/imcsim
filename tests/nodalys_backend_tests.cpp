@@ -169,12 +169,21 @@ TEST_CASE("Nodalys runs at a stepped temperature and its capabilities allow it")
     CHECK(hot_diode.Result->NodeVoltages[2] < cold_diode.Result->NodeVoltages[2] - 0.05);
 }
 
-TEST_CASE("A Nodalys transient refuses a noise or random source, which the other analyses hold at its level") {
+TEST_CASE("A Nodalys transient runs noise and random sources and repeats when given a seed") {
     for (const Core::Source::SourceType waveform :
          {Core::Source::SourceType::NOISE, Core::Source::SourceType::RANDOM}) {
         Core::VoltageSource source;
         source.SetName("V1");
         source.SetSourceType(waveform);
+        if (waveform == Core::Source::SourceType::NOISE) {
+            source.SetNoise({.Offset = 1.5, .WhiteAmplitude = 0.5, .TimeStep = 1e-5});
+        } else {
+            source.SetRandom({.Distribution = Core::RandomDistribution::GAUSSIAN,
+                              .TimeStep = 1e-5,
+                              .Delay = 0.0,
+                              .First = 0.5,
+                              .Second = 1.5});
+        }
         Core::Resistor load;
         load.SetName("R1");
         Core::Ground ground;
@@ -184,18 +193,21 @@ TEST_CASE("A Nodalys transient refuses a noise or random source, which the other
         circuit.Add(ground, {0});
 
         Core::NodalysBackend backend;
-        const Core::TransientRun run =
-            backend.RunTransient(circuit, {.StopTime = 1e-3, .TimeStep = 1e-5}, std::nullopt, {});
+        const Core::TransientSettings seeded{.StopTime = 1e-4, .TimeStep = 1e-5, .Seed = 42};
+        const Core::TransientRun first = backend.RunTransient(circuit, seeded, std::nullopt, {});
+        const Core::TransientRun second = backend.RunTransient(circuit, seeded, std::nullopt, {});
 
         INFO(Core::GetSourceTypeName(waveform));
-        REQUIRE_FALSE(run.Result.has_value());
-        CHECK(run.Result.error().contains("V1"));
-        CHECK(run.Result.error().contains(Core::GetSourceTypeName(waveform)));
+        REQUIRE(first.Result.has_value());
+        REQUIRE(second.Result.has_value());
+        REQUIRE(first.Result->Times.size() > 2);
+        CHECK(first.Result->Times == second.Result->Times);
+        CHECK(first.Result->NodeVoltages == second.Result->NodeVoltages);
 
-        // The operating point keeps the source, at its offset of 0 V, rather than leaving the node floating
+        // The operating point holds the source at its DC level (1.5 V)
         const Core::OperatingPointRun point = backend.RunOperatingPoint(circuit, std::nullopt);
         REQUIRE(point.Result.has_value());
-        CHECK_THAT(CurrentOf(*point.Result, "V1"), WithinAbs(0.0, 1e-12));
+        CHECK_THAT(point.Result->NodeVoltages[1], WithinAbs(1.5, 1e-9));
     }
 }
 
