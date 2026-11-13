@@ -24,6 +24,7 @@ target_include_directories(nodalys-tests
 target_link_libraries(nodalys-tests
     PRIVATE
         nodalys
+        nodalys-cli-lib
         Catch2::Catch2WithMain
 )
 
@@ -31,8 +32,5 @@ if(COMMAND imcsim_target_coverage)
     imcsim_target_coverage(nodalys-tests)
 endif()
 
-# The CLI tests run the binary of this build, wherever its output folder is
-target_compile_definitions(nodalys-tests PRIVATE NODALYS_CLI_PATH="$<TARGET_FILE:nodalys-cli>")
-add_dependencies(nodalys-tests nodalys-cli)
 
 catch_discover_tests(nodalys-tests)

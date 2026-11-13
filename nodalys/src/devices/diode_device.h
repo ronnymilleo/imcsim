@@ -60,10 +60,8 @@ private:
     double m_Vt;
     double m_Critical;
     /// Trapezoidal charge history at the last accepted time point.
-    double m_Charge = 0.0;
-    double m_ChargeCurrent = 0.0;
-    double m_SavedCharge = 0.0;
-    double m_SavedChargeCurrent = 0.0;
+    ChargeHistory m_History;
+    ChargeHistory m_SavedHistory;
     /// Companion model of the junction capacitance from the most recent transient stamp.
     double m_CapConductance = 0.0;
     double m_CapEquivalent = 0.0;

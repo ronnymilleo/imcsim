@@ -11,6 +11,7 @@
 #ifndef NODALYS_DEVICES_H
 #define NODALYS_DEVICES_H
 
+#include "devices/integration.h"
 #include "mna/mna_system.h"
 #include "nodalys/types.h"
 #include <complex>
@@ -120,6 +121,14 @@ public:
     virtual void RejectStep() {}
 
     /**
+     * @brief   Tells whether the discrete state of the device changed on the step just solved.
+     * @details A switch that opens or closes inside a step turns the slope of every stiff mode around it: the step
+     *          that follows must restart with Backward Euler, which damps those modes, as it does after a corner.
+     * @return  True when the state differs from the last accepted point; call before AcceptStep().
+     */
+    virtual bool HasSwitched() const { return false; }
+
+    /**
      * @brief   Finds the next instant after `time` where the waveform of the device has a corner.
      * @details The transient lands a time point on every corner, so an edge narrower than the time step is never
      *          stepped over, and the step that leaves a corner starts small and uses Backward Euler.
@@ -173,10 +182,11 @@ private:
 
 /**
  * @class   CapacitorDevice
- * @brief   A capacitor between two nodes with a trapezoidal companion model in a transient.
- * @details Trapezoidal integration, as in Vlach & Singhal, chapter on numerical integration of differential
- *          equations: i(t+h) = (2C/h)(v(t+h) − v(t)) − i(t). At the operating point the capacitor is an open
- *          circuit. With an initial condition and uic, the first point starts from it.
+ * @brief   A capacitor between two nodes with a companion model of the chosen integration method in a transient.
+ * @details With the trapezoidal rule, as in Vlach & Singhal, chapter on numerical integration of differential
+ *          equations: i(t+h) = (2C/h)(v(t+h) − v(t)) − i(t); see `integration.h` for the other formulas. At the
+ *          operating point the capacitor is an open circuit. With an initial condition and uic, the first point starts
+ * from it.
  */
 class CapacitorDevice : public Device {
 public:
@@ -199,24 +209,22 @@ private:
     int m_NodeA;
     int m_NodeB;
     double m_Capacitance;
-    /// State at the last accepted point: voltage and current, trapezoidal history.
-    double m_Voltage = 0.0;
-    double m_Current = 0.0;
-    double m_SavedVoltage = 0.0;
-    double m_SavedCurrent = 0.0;
+    /// Charge C v and its current at the last accepted points.
+    ChargeHistory m_History;
+    ChargeHistory m_SavedHistory;
     double m_InitialVoltage;
     bool m_HasInitial;
-    /// Companion model of the last stamp: conductance 2C/h and current source, for the results.
+    /// Companion model of the last stamp: conductance and current source, for the results.
     double m_LastConductance = 0.0;
     double m_EquivalentCurrent = 0.0;
 };
 
 /**
  * @class   InductorDevice
- * @brief   An inductor as a branch between two nodes with a trapezoidal companion model.
+ * @brief   An inductor as a branch between two nodes with a companion model of the chosen integration method.
  * @details The branch unknown carries the inductor current, so at the operating point the inductor is an exact
- *          short (v = 0). In a transient, v(t+h) = (2L/h)(i(t+h) − i(t)) − v(t) stamps a resistance 2L/h on the
- *          branch row.
+ *          short (v = 0). In a transient with the trapezoidal rule, v(t+h) = (2L/h)(i(t+h) − i(t)) − v(t) stamps a
+ *          resistance 2L/h on the branch row.
  */
 class InductorDevice : public Device {
 public:
@@ -241,11 +249,9 @@ private:
     int m_NodeB;
     int m_Branch;
     double m_Inductance;
-    /// State at the last accepted point: current and voltage, trapezoidal history.
-    double m_Current = 0.0;
-    double m_Voltage = 0.0;
-    double m_SavedCurrent = 0.0;
-    double m_SavedVoltage = 0.0;
+    /// Flux L i and its derivative, the voltage, at the last accepted points.
+    ChargeHistory m_History;
+    ChargeHistory m_SavedHistory;
     double m_InitialCurrent;
     bool m_HasInitial;
 };
@@ -486,6 +492,7 @@ public:
                                            const std::vector<std::complex<double>> &x_ac, double omega) const override;
     void AcceptStep(const std::vector<double> &x) override;
     void RejectStep() override;
+    bool HasSwitched() const override;
 
 private:
     int m_NodeA;
@@ -501,8 +508,8 @@ private:
 /**
  * @class   CoupledInductorDevice
  * @brief   Two coupled inductors as a pair of branch unknowns (the transformer windings): v1 = L1 di1/dt + M di2/dt
- *         and v2 = M di1/dt + L2 di2/dt, with the trapezoidal companion built from the inverse inductance matrix,
- *         which stays well-behaved for coupling below 1 and gives exact shorts at the operating point.
+ *         and v2 = M di1/dt + L2 di2/dt, with the companion built from the fluxes of the windings, which gives
+ *         exact shorts at the operating point.
  */
 class CoupledInductorDevice : public Device {
 public:
@@ -530,9 +537,11 @@ private:
     double m_L1;
     double m_L2;
     double m_M;
-    /// Trapezoidal histories: branch currents and branch voltages at the last accepted point.
-    double m_I1 = 0.0, m_I2 = 0.0, m_V1 = 0.0, m_V2 = 0.0;
-    double m_SavedI1 = 0.0, m_SavedI2 = 0.0, m_SavedV1 = 0.0, m_SavedV2 = 0.0;
+    /// Fluxes of the two windings and their voltages at the last accepted points.
+    ChargeHistory m_History1;
+    ChargeHistory m_History2;
+    ChargeHistory m_SavedHistory1;
+    ChargeHistory m_SavedHistory2;
 };
 
 } // namespace Nodalys

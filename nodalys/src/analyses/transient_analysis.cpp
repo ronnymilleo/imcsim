@@ -157,6 +157,26 @@ double FindNextCorner(const CompiledCircuit &compiled, const double time) {
     return corner;
 }
 
+/**
+ * @brief   Scales the third divided difference of a point into the local truncation error of the step that made it.
+ * @details The trapezoidal rule errs by h^3 y'''/12, and the third divided difference is y'''/6, so the factor is
+ *          h^3 / 2. Variable-step BDF-2 errs by the derivative error of its parabola, h (h + h_p) y'''/6, divided by
+ *          its leading coefficient a0 = (1 + 2w) / ((1 + w) h), which is h^3 (1 + w)^2 / (w (1 + 2w)) times the
+ *          divided difference, with w = h / h_p; at a constant step that is the known 2/9 h^3 y'''.
+ * @param[in] method         Method of the step.
+ * @param[in] step           Length h of the step.
+ * @param[in] previous_step  Length h_p of the step before it.
+ * @return  The factor that multiplies the absolute value of the third divided difference.
+ */
+double TruncationErrorFactor(const IntegrationMethod method, const double step, const double previous_step) {
+    const double cube = step * step * step;
+    if (method == IntegrationMethod::GEAR2) {
+        const double ratio = step / previous_step;
+        return cube * (1.0 + ratio) * (1.0 + ratio) / (ratio * (1.0 + 2.0 * ratio));
+    }
+    return 0.5 * cube;
+}
+
 bool PublishChunk(TransientResult &result, const RunMonitor &monitor, const double progress, std::size_t &sent) {
     if (monitor.OnProgress) {
         monitor.OnProgress(progress);
@@ -241,6 +261,8 @@ std::expected<TransientResult, std::string> ComputeTransient(CompiledCircuit &co
         const TimeContext context{.IsTransient = true,
                                   .UseInitialConditions = false,
                                   .BackwardEuler = is_restart,
+                                  .Method = settings.Method,
+                                  .PreviousTimeStep = previous_step,
                                   .Time = time + step,
                                   .TimeStep = step};
         std::vector<double> x_new = x_now;
@@ -271,7 +293,7 @@ std::expected<TransientResult, std::string> ComputeTransient(CompiledCircuit &co
                 const double d12 = (d1 - d2) / (step + previous_step);
                 const double d23 = (d2 - d3) / (previous_step + older_step);
                 const double d123 = (d12 - d23) / (step + previous_step + older_step);
-                const double error = 0.5 * step * step * step * std::fabs(d123);
+                const double error = TruncationErrorFactor(settings.Method, step, previous_step) * std::fabs(d123);
                 const double scale_v = std::max({std::fabs(x_new[i]), std::fabs(x_now[i]), std::fabs(x_old[i])});
                 const double tolerance = 7.0 * (options.RelTol * scale_v + options.VoltageAbsTol);
                 ratio = std::max(ratio, error / tolerance);
@@ -289,6 +311,8 @@ std::expected<TransientResult, std::string> ComputeTransient(CompiledCircuit &co
             continue;
         }
 
+        const bool has_switched = std::ranges::any_of(
+            compiled.Devices, [](const std::unique_ptr<Device> &device) { return device->HasSwitched(); });
         for (const std::unique_ptr<Device> &device : compiled.Devices) {
             device->AcceptStep(x_new);
         }
@@ -305,9 +329,12 @@ std::expected<TransientResult, std::string> ComputeTransient(CompiledCircuit &co
         const double next = step * std::clamp(LTE_SAFETY * std::pow(std::max(ratio, 1e-3), -1.0 / 3.0),
                                               STEP_SHRINK_LIMIT, STEP_GROW_LIMIT);
         step = std::clamp(next, MIN_STEP, output_step);
-        if (reaches_corner) {
-            // The slope changes at a corner, so the points before it say nothing about the error after it
-            next_corner = FindNextCorner(compiled, time);
+        if (reaches_corner || has_switched) {
+            // The slope changes at a corner, and at a switch that flipped inside the step, so the points before it
+            // say nothing about the error after it
+            if (reaches_corner) {
+                next_corner = FindNextCorner(compiled, time);
+            }
             is_restart = true;
             previous_step = 0.0;
             older_step = 0.0;

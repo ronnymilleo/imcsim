@@ -18,6 +18,20 @@ using NodeId = int;
 inline constexpr NodeId GROUND_NODE = 0;
 
 /**
+ * @enum    IntegrationMethod
+ * @brief   Formula that turns each charge or flux derivative of a transient into a companion model.
+ * @details Both are second order. Backward Euler always takes the first step and the step that leaves a source
+ *          corner, whatever the method.
+ */
+enum class IntegrationMethod {
+    /// A-stable, keeps the amplitude of a lossless resonance, but rings on a stiff mode.
+    TRAPEZOIDAL,
+    /// Variable-step BDF-2 (SPICE `method=gear`): L-stable, so it settles stiff switching without ringing, at the
+    /// cost of some numerical damping of a lightly damped resonance.
+    GEAR2
+};
+
+/**
  * @struct  DiagnosticMessage
  * @brief   A message emitted by the simulator (e.g. convergence statistics, warnings).
  */

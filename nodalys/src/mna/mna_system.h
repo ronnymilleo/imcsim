@@ -29,6 +29,7 @@
 #define NODALYS_MNA_SYSTEM_H
 
 #include "linear/dense_matrix.h"
+#include "nodalys/types.h"
 #include <vector>
 
 namespace Nodalys {
@@ -42,9 +43,13 @@ struct TimeContext {
     bool IsTransient = false;
     /// True at t = 0 when starting a transient from user-specified initial conditions (`uic`).
     bool UseInitialConditions = false;
-    /// True on the first integration step of a transient: uses Backward Euler (1st-order, needs no past derivatives)
-    /// to bootstrap the state before switching to the Trapezoidal rule (2nd-order) on subsequent steps.
+    /// True on the first integration step of a transient and on the step that leaves a source corner: uses Backward
+    /// Euler (1st-order, needs no past derivatives) whatever `Method` says.
     bool BackwardEuler = false;
+    /// Second-order formula of the steps that are not Backward Euler.
+    IntegrationMethod Method = IntegrationMethod::TRAPEZOIDAL;
+    /// Length of the step before this one, in seconds; Gear-2 needs it for its variable-step coefficients.
+    double PreviousTimeStep = 0.0;
     /// True while evaluating periodic steady-state waveforms over one Harmonic Balance cycle.
     bool IsPeriodicSteadyState = false;
     /// Current simulation time $t$, in seconds.

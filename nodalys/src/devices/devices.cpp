@@ -119,10 +119,11 @@ double ResistorDevice::OutputNoiseVariance(const std::vector<double> & /*x_dc*/,
 // ============================================================================
 // CapacitorDevice
 // ============================================================================
-// Companion model for i = C dv/dt over step h:
-//   i(t + h) = G_eq * v(t + h) + I_eq
-// - Backward Euler (1st step): G_eq = C / h,    I_eq = -G_eq * v(t)
-// - Trapezoidal rule:          G_eq = 2C / h,   I_eq = -G_eq * v(t) - i(t)
+// Companion model for i = dq/dt, q = C v, over step h (formulas in integration.cpp):
+//   i(t + h) = G_eq * v(t + h) + I_eq,  G_eq = a * C,  I_eq = b
+// - Backward Euler (1st step): a = 1 / h,    b = -q(t) / h
+// - Trapezoidal rule:          a = 2 / h,    b = -2 q(t) / h - i(t)
+// - Gear-2:                    a = a0,       b = a1 q(t) + a2 q(t - hp)
 // ============================================================================
 
 CapacitorDevice::CapacitorDevice(const int node_a, const int node_b, const double capacitance,
@@ -130,7 +131,7 @@ CapacitorDevice::CapacitorDevice(const int node_a, const int node_b, const doubl
     : m_NodeA(node_a), m_NodeB(node_b), m_Capacitance(capacitance), m_InitialVoltage(initial_voltage),
       m_HasInitial(has_initial) {
     if (m_HasInitial) {
-        m_Voltage = m_InitialVoltage;
+        m_History.Charge = m_Capacitance * m_InitialVoltage;
     }
 }
 
@@ -149,8 +150,9 @@ void CapacitorDevice::Stamp(MnaSystem &sys, const std::vector<double> &, const T
         m_EquivalentCurrent = 0.0;
         return;
     }
-    m_LastConductance = time.BackwardEuler ? m_Capacitance / time.TimeStep : 2.0 * m_Capacitance / time.TimeStep;
-    m_EquivalentCurrent = -m_LastConductance * m_Voltage - (time.BackwardEuler ? 0.0 : m_Current);
+    const Companion companion = MakeCompanion(m_History, time);
+    m_LastConductance = companion.Coefficient * m_Capacitance;
+    m_EquivalentCurrent = companion.Offset;
     StampConductance(sys, m_NodeA, m_NodeB, m_LastConductance);
     StampCurrentSource(sys, m_NodeA, m_NodeB, m_EquivalentCurrent);
 }
@@ -179,25 +181,24 @@ bool CapacitorDevice::HasTransientState() const {
 
 void CapacitorDevice::AcceptStep(const std::vector<double> &x) {
     const double voltage = BranchVoltage(x, m_NodeA, m_NodeB);
-    m_Current = m_LastConductance * voltage + m_EquivalentCurrent;
-    m_Voltage = voltage;
-    m_SavedVoltage = m_Voltage;
-    m_SavedCurrent = m_Current;
+    const double current = m_LastConductance * voltage + m_EquivalentCurrent;
+    m_History = AdvanceHistory(m_History, m_Capacitance * voltage, current);
+    m_SavedHistory = m_History;
 }
 
 void CapacitorDevice::RejectStep() {
-    m_Voltage = m_SavedVoltage;
-    m_Current = m_SavedCurrent;
+    m_History = m_SavedHistory;
 }
 
 // ============================================================================
 // InductorDevice
 // ============================================================================
-// Companion model for v = L di/dt over step h (stamped on the branch row):
-//   v(t + h) - R_eq * i(t + h) = V_eq
+// Companion model for v = dphi/dt, phi = L i, over step h (stamped on the branch row; formulas in integration.cpp):
+//   v(t + h) - R_eq * i(t + h) = V_eq,  R_eq = a * L,  V_eq = b
 // - DC operating point:        R_eq = 0,        V_eq = 0  (exact short circuit)
-// - Backward Euler (1st step): R_eq = L / h,    V_eq = -R_eq * i(t)
-// - Trapezoidal rule:          R_eq = 2L / h,   V_eq = -R_eq * i(t) - v(t)
+// - Backward Euler (1st step): a = 1 / h,    b = -phi(t) / h
+// - Trapezoidal rule:          a = 2 / h,    b = -2 phi(t) / h - v(t)
+// - Gear-2:                    a = a0,       b = a1 phi(t) + a2 phi(t - hp)
 // ============================================================================
 
 InductorDevice::InductorDevice(const int node_a, const int node_b, const int branch, const double inductance,
@@ -205,7 +206,7 @@ InductorDevice::InductorDevice(const int node_a, const int node_b, const int bra
     : m_NodeA(node_a), m_NodeB(node_b), m_Branch(branch), m_Inductance(inductance), m_InitialCurrent(initial_current),
       m_HasInitial(has_initial) {
     if (m_HasInitial) {
-        m_Current = m_InitialCurrent;
+        m_History.Charge = m_Inductance * m_InitialCurrent;
     }
 }
 
@@ -221,8 +222,9 @@ void InductorDevice::Stamp(MnaSystem &sys, const std::vector<double> &, const Ti
             resistance = 1e9;
             equivalent_voltage = -resistance * m_InitialCurrent;
         } else {
-            resistance = time.BackwardEuler ? m_Inductance / time.TimeStep : 2.0 * m_Inductance / time.TimeStep;
-            equivalent_voltage = time.BackwardEuler ? -resistance * m_Current : -(resistance * m_Current + m_Voltage);
+            const Companion companion = MakeCompanion(m_History, time);
+            resistance = companion.Coefficient * m_Inductance;
+            equivalent_voltage = companion.Offset;
         }
     }
     sys.AddA(m_Branch, m_Branch, -resistance);
@@ -250,15 +252,13 @@ bool InductorDevice::HasTransientState() const {
 }
 
 void InductorDevice::AcceptStep(const std::vector<double> &x) {
-    m_Current = x[static_cast<std::size_t>(m_Branch)];
-    m_Voltage = BranchVoltage(x, m_NodeA, m_NodeB);
-    m_SavedCurrent = m_Current;
-    m_SavedVoltage = m_Voltage;
+    const double current = x[static_cast<std::size_t>(m_Branch)];
+    m_History = AdvanceHistory(m_History, m_Inductance * current, BranchVoltage(x, m_NodeA, m_NodeB));
+    m_SavedHistory = m_History;
 }
 
 void InductorDevice::RejectStep() {
-    m_Current = m_SavedCurrent;
-    m_Voltage = m_SavedVoltage;
+    m_History = m_SavedHistory;
 }
 
 // ============================================================================
@@ -526,15 +526,20 @@ void SwitchDevice::RejectStep() {
     m_Resistance = m_IsClosed ? m_Parameters.OnResistance : m_Parameters.OffResistance;
 }
 
+bool SwitchDevice::HasSwitched() const {
+    return m_IsClosed != m_SavedIsClosed;
+}
+
 // ============================================================================
 // CoupledInductorDevice (Transformer windings)
 // ============================================================================
 // Constitutive equations:
 //   v1 = L1 * di1/dt + M * di2/dt
 //   v2 = M  * di1/dt + L2 * di2/dt
-// Discretized with Trapezoidal rule (scale = 2/h) or Backward Euler (scale = 1/h):
-//   v1(t+h) - scale*L1*i1(t+h) - scale*M*i2(t+h) = -scale*(L1*i1(t) + M*i2(t)) - v1(t)
-//   v2(t+h) - scale*M*i1(t+h) - scale*L2*i2(t+h) = -scale*(M*i1(t) + L2*i2(t)) - v2(t)
+// With the fluxes phi1 = L1*i1 + M*i2 and phi2 = M*i1 + L2*i2, v = dphi/dt discretizes (integration.cpp) as
+//   v1(t+h) - a*L1*i1(t+h) - a*M*i2(t+h) = b1
+//   v2(t+h) - a*M*i1(t+h) - a*L2*i2(t+h) = b2
+// where a and b are the coefficient and the offset of the integration method, b taken from the history of each flux.
 // ============================================================================
 
 CoupledInductorDevice::CoupledInductorDevice(const int primary_a, const int primary_b, const int secondary_a,
@@ -555,14 +560,15 @@ void CoupledInductorDevice::Stamp(MnaSystem &sys, const std::vector<double> &, c
     sys.AddA(m_Branch2, m_SecondaryA, 1.0);
     sys.AddA(m_Branch2, m_SecondaryB, -1.0);
     if (time.IsTransient) {
-        const double factor = time.BackwardEuler ? 1.0 : 2.0;
-        const double scale = factor / time.TimeStep;
+        const Companion first = MakeCompanion(m_History1, time);
+        const Companion second = MakeCompanion(m_History2, time);
+        const double scale = first.Coefficient;
         sys.AddA(m_Branch1, m_Branch1, -scale * m_L1);
         sys.AddA(m_Branch1, m_Branch2, -scale * m_M);
-        sys.AddRhs(m_Branch1, -scale * (m_L1 * m_I1 + m_M * m_I2) - (time.BackwardEuler ? 0.0 : m_V1));
+        sys.AddRhs(m_Branch1, first.Offset);
         sys.AddA(m_Branch2, m_Branch1, -scale * m_M);
         sys.AddA(m_Branch2, m_Branch2, -scale * m_L2);
-        sys.AddRhs(m_Branch2, -scale * (m_M * m_I1 + m_L2 * m_I2) - (time.BackwardEuler ? 0.0 : m_V2));
+        sys.AddRhs(m_Branch2, second.Offset);
     }
 }
 
@@ -590,21 +596,18 @@ bool CoupledInductorDevice::HasTransientState() const {
 }
 
 void CoupledInductorDevice::AcceptStep(const std::vector<double> &x) {
-    m_I1 = x[static_cast<std::size_t>(m_Branch1)];
-    m_I2 = x[static_cast<std::size_t>(m_Branch2)];
-    m_V1 = BranchVoltage(x, m_PrimaryA, m_PrimaryB);
-    m_V2 = BranchVoltage(x, m_SecondaryA, m_SecondaryB);
-    m_SavedI1 = m_I1;
-    m_SavedI2 = m_I2;
-    m_SavedV1 = m_V1;
-    m_SavedV2 = m_V2;
+    const double current1 = x[static_cast<std::size_t>(m_Branch1)];
+    const double current2 = x[static_cast<std::size_t>(m_Branch2)];
+    m_History1 = AdvanceHistory(m_History1, m_L1 * current1 + m_M * current2, BranchVoltage(x, m_PrimaryA, m_PrimaryB));
+    m_History2 =
+        AdvanceHistory(m_History2, m_M * current1 + m_L2 * current2, BranchVoltage(x, m_SecondaryA, m_SecondaryB));
+    m_SavedHistory1 = m_History1;
+    m_SavedHistory2 = m_History2;
 }
 
 void CoupledInductorDevice::RejectStep() {
-    m_I1 = m_SavedI1;
-    m_I2 = m_SavedI2;
-    m_V1 = m_SavedV1;
-    m_V2 = m_SavedV2;
+    m_History1 = m_SavedHistory1;
+    m_History2 = m_SavedHistory2;
 }
 
 } // namespace Nodalys
