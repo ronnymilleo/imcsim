@@ -38,6 +38,7 @@ public:
     bool HasTransientState() const override;
     void AcceptStep(const std::vector<double> &x) override;
     void RejectStep() override;
+    void SetTemperature(const ThermalConditions &thermal) override;
 
 private:
     struct Channel {
@@ -45,6 +46,8 @@ private:
         double Gm;      ///< Transconductance $\partial I / \partial v_{gs,\text{eff}} \ge 0$.
         double Gds;     ///< Output conductance $\partial I / \partial v_{ds,\text{eff}} \ge 0$.
     };
+    /// Recomputes the parameters at the temperature, from the ones given at the nominal temperature.
+    void ApplyTemperature(const ThermalConditions &thermal);
     /// Evaluates the level-1 channel equations for nonnegative effective $v_{ds} \ge 0$.
     Channel Evaluate(double vgs_eff, double vds_eff) const;
     double Vgs(const std::vector<double> &x) const;
@@ -55,7 +58,11 @@ private:
     int m_Source;
     int m_D; ///< Intrinsic drain node (`internal_drain` if $R_D > 0$, else `m_Drain`).
     int m_S; ///< Intrinsic source node (`internal_source` if $R_S > 0$, else `m_Source`).
+    /// The parameters as the model gives them, at the nominal temperature.
+    MosfetParameters m_Given;
+    /// The parameters at the temperature of the run, which every evaluation reads.
     MosfetParameters m_Parameters;
+    ThermalConditions m_Thermal;
     bool m_Pmos;
     double m_Beta; ///< $\text{KP} \cdot (W / L)$.
     double m_Vt;

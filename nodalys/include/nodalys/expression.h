@@ -82,7 +82,8 @@ public:
     const std::vector<ExpressionReference> &GetReferences() const;
     bool IsTimeDependent() const;
 
-    std::expected<ExpressionResult, std::string> Evaluate(std::span<const double> inputs, double time_seconds) const;
+    std::expected<ExpressionResult, std::string> Evaluate(std::span<const double> inputs, double time_seconds,
+                                                          double temperature_celsius = 27.0) const;
 
 private:
     explicit Expression(std::shared_ptr<const ExpressionProgram> program);

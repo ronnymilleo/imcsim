@@ -125,7 +125,7 @@ TEST_CASE("Nodalys names itself and lists what it runs") {
     REQUIRE(capabilities.Analyses.contains(Core::AnalysisKind::HARMONIC_BALANCE));
 }
 
-TEST_CASE("Nodalys refuses a run at another temperature and says why, rather than ignoring it") {
+TEST_CASE("Nodalys runs at a stepped temperature and its capabilities allow it") {
     // Restores the default backend even when a check throws
     struct NodalysInUse {
         NodalysInUse() { Core::SetBackend(std::make_unique<Core::NodalysBackend>()); }
@@ -134,20 +134,39 @@ TEST_CASE("Nodalys refuses a run at another temperature and says why, rather tha
         NodalysInUse &operator=(const NodalysInUse &) = delete;
     };
     const NodalysInUse in_use;
-    const Divider divider;
+    REQUIRE_FALSE(Core::GetBackend().GetCapabilities().TemperatureUnsupported.has_value());
 
+    const Divider divider;
     const Core::OperatingPointRun at_default = Core::RunOperatingPoint(divider.Circuit, std::nullopt);
     REQUIRE(at_default.Result.has_value());
 
     const Core::OperatingPointRun heated =
         Core::RunOperatingPoint(divider.Circuit, Core::ParameterValue{.Part = "", .Value = 85.0});
-    REQUIRE_FALSE(heated.Result.has_value());
-    CHECK(heated.Result.error() == *Core::GetBackend().GetCapabilities().TemperatureUnsupported);
-    // A stepped part is no temperature, so it still runs
-    const Core::OperatingPointRun stepped =
-        Core::RunOperatingPoint(divider.Circuit, Core::ParameterValue{.Part = "R2", .Value = 1e3});
-    REQUIRE(stepped.Result.has_value());
-    CHECK_THAT(stepped.Result->NodeVoltages[2], WithinRel(5.0, 1e-9));
+    REQUIRE(heated.Result.has_value());
+    CHECK_THAT(heated.Result->NodeVoltages[2], WithinRel(at_default.Result->NodeVoltages[2], 1e-9));
+
+    // A diode forward drop decreases when heated (~2 mV/K)
+    Core::VoltageSource source;
+    source.SetName("V1");
+    source.SetValue(5.0);
+    Core::Resistor resistor;
+    resistor.SetName("R1");
+    resistor.SetValue(1e3);
+    Core::Diode diode(Core::ComponentType::DIODE);
+    diode.SetName("D1");
+    Core::Ground ground;
+    Core::Circuit diode_circuit;
+    diode_circuit.Add(source, {1, 0});
+    diode_circuit.Add(resistor, {1, 2});
+    diode_circuit.Add(diode, {2, 0});
+    diode_circuit.Add(ground, {0});
+
+    const Core::OperatingPointRun cold_diode = Core::RunOperatingPoint(diode_circuit, std::nullopt);
+    const Core::OperatingPointRun hot_diode =
+        Core::RunOperatingPoint(diode_circuit, Core::ParameterValue{.Part = "", .Value = 85.0});
+    REQUIRE(cold_diode.Result.has_value());
+    REQUIRE(hot_diode.Result.has_value());
+    CHECK(hot_diode.Result->NodeVoltages[2] < cold_diode.Result->NodeVoltages[2] - 0.05);
 }
 
 TEST_CASE("A Nodalys transient refuses a noise or random source, which the other analyses hold at its level") {

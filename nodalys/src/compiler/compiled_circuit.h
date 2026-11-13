@@ -59,6 +59,7 @@ struct CompiledCircuit {
     std::map<std::string, Device *> ElementsByName;
     std::vector<CircuitPort> Ports;
     bool HasInitialConditions = false;
+    ThermalConditions Thermal;
 };
 
 } // namespace Nodalys

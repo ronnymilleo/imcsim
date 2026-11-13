@@ -15,8 +15,29 @@ namespace Nodalys {
 
 DiodeDevice::DiodeDevice(const int anode, const int cathode, const int internal, DiodeParameters parameters)
     : m_Anode(anode), m_Cathode(cathode), m_Internal(internal), m_JunctionNode(internal >= 0 ? internal : cathode),
-      m_Parameters(parameters), m_Vt(parameters.EmissionCoefficient * THERMAL_VOLTAGE),
+      m_Given(parameters), m_Parameters(parameters), m_Vt(parameters.EmissionCoefficient * THERMAL_VOLTAGE),
       m_Critical(PnCriticalVoltage(std::max(parameters.SaturationCurrent, 1e-30), m_Vt)) {
+    ApplyTemperature(m_Thermal);
+}
+
+/**
+ * @brief   Scales the saturation current, the junction potential and the junction capacitance with the temperature.
+ * @details The breakdown voltage and current keep their values: ngspice solves its breakdown knee again at the new
+ *          temperature, but a model without `TCV` keeps the current at the breakdown voltage at $I_{BV}$, which is
+ *          what the exponential here is anchored to. The exponent of the junction uses the emission coefficient, as
+ *          ngspice divides the growth of $I_S$ by it. The series resistance and the transit time have no coefficient.
+ */
+void DiodeDevice::ApplyTemperature(const ThermalConditions &thermal) {
+    m_Thermal = thermal;
+    m_Parameters = m_Given;
+    const double log_ratio =
+        GetSaturationCurrentLogRatio(thermal, m_Given.EnergyGap, m_Given.SaturationCurrentExponent);
+    m_Parameters.SaturationCurrent = m_Given.SaturationCurrent * std::exp(log_ratio / m_Given.EmissionCoefficient);
+    m_Parameters.JunctionPotential = GetJunctionPotential(thermal, m_Given.JunctionPotential);
+    m_Parameters.JunctionCapacitance = GetJunctionCapacitance(thermal, m_Given.JunctionCapacitance,
+                                                              m_Given.JunctionPotential, m_Given.GradingCoefficient);
+    m_Vt = m_Given.EmissionCoefficient * GetThermalVoltage(thermal);
+    m_Critical = PnCriticalVoltage(std::max(m_Parameters.SaturationCurrent, 1e-30), m_Vt);
 }
 
 DiodeDevice::Junction DiodeDevice::Evaluate(const double voltage) const {
@@ -143,7 +164,7 @@ double DiodeDevice::OutputNoiseVariance(const std::vector<double> &x_dc,
     double variance = 0.0;
     if (m_Internal >= 0 && m_Parameters.SeriesResistance > 0.0) {
         const std::complex<double> rs_tf = AcNodeVoltage(adjoint, m_Internal) - AcNodeVoltage(adjoint, m_Cathode);
-        variance += (FOUR_KT_NOMINAL / m_Parameters.SeriesResistance) * std::norm(rs_tf);
+        variance += (GetFourKt(m_Thermal) / m_Parameters.SeriesResistance) * std::norm(rs_tf);
     }
     const double vd = VoltageAt(x_dc);
     // In SPICE3f5 / ngspice (`dioload.c`), `DIOcurrent` includes the parallel junction `CKTgmin * vd` term (1e-12 S),
@@ -169,6 +190,14 @@ void DiodeDevice::AcceptStep(const std::vector<double> &x) {
 
 void DiodeDevice::RejectStep() {
     m_History = m_SavedHistory;
+}
+
+/**
+ * @brief   Moves the diode to the temperature of the run.
+ * @param[in] thermal  Temperature of the run and the nominal temperature the parameters are given at.
+ */
+void DiodeDevice::SetTemperature(const ThermalConditions &thermal) {
+    ApplyTemperature(thermal);
 }
 
 } // namespace Nodalys

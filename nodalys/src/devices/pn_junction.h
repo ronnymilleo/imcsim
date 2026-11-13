@@ -19,7 +19,9 @@ namespace Nodalys {
 inline constexpr double ELEMENTARY_CHARGE = 1.602176634e-19;
 inline constexpr double BOLTZMANN_CONSTANT = 1.380649e-23;
 inline constexpr double NOMINAL_TEMPERATURE_KELVIN = 300.15;
-inline constexpr double THERMAL_VOLTAGE = 8.617087399994e-5 * NOMINAL_TEMPERATURE_KELVIN;
+/// $k/q$ in volts per kelvin, so the thermal voltage at any temperature is this times the temperature.
+inline constexpr double BOLTZMANN_OVER_CHARGE = 8.617087399994e-5;
+inline constexpr double THERMAL_VOLTAGE = BOLTZMANN_OVER_CHARGE * NOMINAL_TEMPERATURE_KELVIN;
 inline constexpr double FOUR_KT_NOMINAL = 4.0 * BOLTZMANN_CONSTANT * NOMINAL_TEMPERATURE_KELVIN;
 inline constexpr double TWO_Q = 2.0 * ELEMENTARY_CHARGE;
 

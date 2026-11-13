@@ -66,6 +66,10 @@ struct DiodeParameters {
     double JunctionPotential = 1.0;
     double GradingCoefficient = 0.5;
     double TransitTime = 0.0;
+    /// Band gap `EG` in electron-volts, which sets how fast the saturation current grows with the temperature.
+    double EnergyGap = 1.11;
+    /// Exponent `XTI` of the temperature ratio in the growth of the saturation current.
+    double SaturationCurrentExponent = 3.0;
 
     bool operator==(const DiodeParameters &) const = default;
 };
@@ -88,6 +92,12 @@ struct BjtParameters {
     double EmitterCapacitance = 0.0;
     double CollectorCapacitance = 0.0;
     double TransitTime = 0.0;
+    /// Band gap `EG` in electron-volts, which sets how fast the saturation currents grow with the temperature.
+    double EnergyGap = 1.11;
+    /// Exponent `XTI` of the temperature ratio in the growth of the saturation currents.
+    double SaturationCurrentExponent = 3.0;
+    /// Exponent `XTB` of the temperature ratio in the forward and reverse current gains.
+    double BetaExponent = 0.0;
 
     bool operator==(const BjtParameters &) const = default;
 };
@@ -106,6 +116,8 @@ struct MosfetParameters {
     double GateDrainOverlap = 0.0;
     double Width = 100e-6;
     double Length = 100e-6;
+    /// Surface potential `PHI` in volts, which the threshold voltage follows with the temperature.
+    double SurfacePotential = 0.6;
 
     bool operator==(const MosfetParameters &) const = default;
 };
