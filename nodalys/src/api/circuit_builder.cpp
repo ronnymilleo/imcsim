@@ -7,8 +7,10 @@
 
 #include "api/circuit_impl.h"
 #include "compiler/compiled_circuit.h"
+#include "devices/bjt_device.h"
 #include "devices/devices.h"
-#include "devices/nonlinear.h"
+#include "devices/diode_device.h"
+#include "devices/mosfet_device.h"
 #include "devices/pn_junction.h"
 #include "devices/smooth_logic.h"
 #include "devices/waveforms.h"

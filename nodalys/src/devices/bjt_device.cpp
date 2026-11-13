@@ -1,10 +1,10 @@
 /**
  * @file    bjt_device.cpp
  * @brief   Bipolar transistor of Nodalys, the SPICE Gummel-Poon model.
- * @details Part of what nonlinear.h declares, split by device; the helpers they share are in semiconductor_math.h.
+ * @details The helpers the nonlinear devices share are in semiconductor_math.h.
  */
 
-#include "devices/nonlinear.h"
+#include "devices/bjt_device.h"
 
 #include "devices/pn_junction.h"
 #include "devices/semiconductor_math.h"

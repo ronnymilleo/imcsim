@@ -2,6 +2,29 @@
  * @file    semiconductor_math.h
  * @brief   Helpers shared by the nonlinear devices of Nodalys: node voltages, the stamps of a branch and the depletion
  *          charge and charge companion of a junction.
+ * @details
+ * ### How Nonlinear Devices Are Solved in MNA
+ * At each Newton-Raphson iteration $k$, every nonlinear branch $I(v)$ is linearized around the current iterate
+ * $v^{(k)}$ via its first-order Taylor expansion (Norton equivalent companion model):
+ *
+ * $$I(v) \approx I(v^{(k)}) + G_{\text{eq}} \cdot (v - v^{(k)}) = G_{\text{eq}} \cdot v + I_{\text{eq}}$$
+ *
+ * where:
+ * - $G_{\text{eq}} = \left.\frac{\partial I}{\partial v}\right|_{v^{(k)}}$ is the differential conductance (stamped
+ * into $A$),
+ * - $I_{\text{eq}} = I(v^{(k)}) - G_{\text{eq}} \cdot v^{(k)}$ is the equivalent independent current source (stamped
+ * into $\text{rhs}$).
+ *
+ * ```text
+ *         node_a o----+----[ G_eq ]----+----o node_b
+ *                     |                |
+ *                     +---(  I_eq  )---+
+ *                            --->
+ * ```
+ *
+ * After solving the linear system for $x^{(k+1)}$, each device's `Limit()` method applies SPICE's `PNJLIM` damping
+ * (`pn_junction.h`) so forward-biased junction voltages cannot jump by more than a few thermal voltages $V_T$ in a
+ * single iteration, preventing exponential overflow.
  */
 
 #ifndef NODALYS_SEMICONDUCTOR_MATH_H
