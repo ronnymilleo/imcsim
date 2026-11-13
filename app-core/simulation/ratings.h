@@ -7,7 +7,7 @@
 #ifndef IMCSIM_RATINGS_H
 #define IMCSIM_RATINGS_H
 
-#include "model/circuit.h"
+#include "circuit/circuit.h"
 #include "simulation/simulator.h"
 
 namespace Core {

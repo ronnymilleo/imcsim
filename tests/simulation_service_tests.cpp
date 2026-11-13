@@ -5,10 +5,10 @@
 
 #include "simulation/simulation_service.h"
 
-#include "components/capacitor.h"
-#include "components/ground.h"
-#include "components/resistor.h"
-#include "components/voltage_source.h"
+#include "circuit/components/capacitor.h"
+#include "circuit/components/ground.h"
+#include "circuit/components/resistor.h"
+#include "circuit/components/voltage_source.h"
 #include "simulation/circuit_copy.h"
 #include "simulation/simulator.h"
 #include "test_printers.h"

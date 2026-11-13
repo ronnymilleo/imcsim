@@ -3,26 +3,26 @@
  * @brief   Tests for saving schematics to JSON and loading them back.
  */
 
-#include "components/behavioral_source.h"
-#include "components/bjt.h"
-#include "components/clock.h"
-#include "components/controlled_source.h"
-#include "components/current_source.h"
-#include "components/diode.h"
-#include "components/logic_input.h"
-#include "components/logic_part.h"
-#include "components/mosfet.h"
-#include "components/net_label.h"
-#include "components/op_amp.h"
-#include "components/potentiometer.h"
-#include "components/relay.h"
-#include "components/subcircuit_pin.h"
-#include "components/switch.h"
-#include "components/transformer.h"
-#include "components/voltage_controlled_switch.h"
-#include "components/voltage_source.h"
-#include "document/schematic_file.h"
-#include "editing/element_factory.h"
+#include "circuit/components/behavioral_source.h"
+#include "circuit/components/bjt.h"
+#include "circuit/components/clock.h"
+#include "circuit/components/controlled_source.h"
+#include "circuit/components/current_source.h"
+#include "circuit/components/diode.h"
+#include "circuit/components/logic_input.h"
+#include "circuit/components/logic_part.h"
+#include "circuit/components/mosfet.h"
+#include "circuit/components/net_label.h"
+#include "circuit/components/op_amp.h"
+#include "circuit/components/potentiometer.h"
+#include "circuit/components/relay.h"
+#include "circuit/components/subcircuit_pin.h"
+#include "circuit/components/switch.h"
+#include "circuit/components/transformer.h"
+#include "circuit/components/voltage_controlled_switch.h"
+#include "circuit/components/voltage_source.h"
+#include "schematic/element_factory.h"
+#include "schematic/schematic_file.h"
 #include "test_printers.h"
 #include <catch2/catch_test_macros.hpp>
 #include <format>
@@ -1298,6 +1298,31 @@ TEST_CASE("A file saved before the S-parameter analysis loads it as its defaults
     CHECK(loaded.Warnings.empty());
     CHECK(loaded.Settings.Selected == GUI::Analysis::POLE_ZERO);
     CHECK(loaded.Settings.SParameters == Core::SParameterSettings{});
+    CHECK(loaded.Settings.HarmonicBalance == Core::HarmonicBalanceSettings{});
+}
+
+TEST_CASE("The harmonic balance settings load back unchanged", "[schematic_file]") {
+    GUI::SimulationSettings settings;
+    settings.HarmonicBalance = {.FundamentalFrequency = 50.0, .Harmonics = 15, .Samples = 64};
+    settings.Selected = GUI::Analysis::HARMONIC_BALANCE;
+    const GUI::LoadedSchematic loaded = LoadOrFail(GUI::SaveSchematic({}, {}, settings, {}));
+    CHECK(loaded.Warnings.empty());
+    CHECK(loaded.Settings == settings);
+    CHECK(loaded.Settings.Selected == GUI::Analysis::HARMONIC_BALANCE);
+}
+
+TEST_CASE("Invalid harmonic balance settings fall back to their defaults with a warning", "[schematic_file]") {
+    for (const char *hb : {R"({"fundamental": 0})", R"({"fundamental": "1k"})", R"({"harmonics": 0})",
+                           R"({"harmonics": 65})", R"({"harmonics": 8, "samples": 16})",
+                           R"({"harmonics": 8, "samples": 30})", R"({"harmonics": 8, "samples": 131072})"}) {
+        const std::string text = std::string(R"({"format": "imcsim-schematic", "version": 1, "simulation": {)"
+                                             R"("harmonic_balance": )") +
+                                 hb + "}}";
+        const GUI::LoadedSchematic loaded = LoadOrFail(text);
+        REQUIRE(loaded.Warnings.size() == 1);
+        CHECK(loaded.Warnings.front().starts_with("The harmonic balance settings"));
+        CHECK(loaded.Settings.HarmonicBalance == Core::HarmonicBalanceSettings{});
+    }
 }
 
 TEST_CASE("A behavioral source keeps its expression as written, and loads with the default when it has none",

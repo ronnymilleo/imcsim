@@ -76,17 +76,41 @@ jobs:
       # gcov also reports the system headers that the sources instantiate (the standard library templates), named
       # after their path with the slashes replaced by #; they are not project code, so they would drag the result down.
       # The project headers go too: they hold declarations and = default members only, and each translation unit that
-      # includes one writes the same .gcov file, so the last one wins and the total moved without any code change
+      # includes one writes the same .gcov file, so the last one wins and the total moved without any code change.
+      # The benchmarks are hidden tests, timed by hand on a quiet machine and never run here, so they would count as
+      # code no test covers
       - name: Report coverage
         run: |
           find build -name "*.gcda" | while read -r gcda; do gcov -p -o "$gcda" "$gcda"; done > /dev/null 2>&1
-          rm -f '#usr#include#'*.gcov ./*.h.gcov
+          rm -f '#usr#include#'*.gcov ./*.h.gcov ./*nodalys_benchmark_tests.cpp.gcov
           curl -sL https://coveralls.io/coveralls-linux.tar.gz | tar -xz && ./coveralls
         env:
           COVERALLS_REPO_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Compiler cache statistics
         run: ccache --show-stats
+
+  # Each library is one static library, so the compiler accepts an include between any two folders; this check is what
+  # keeps the folders in layers. It needs no build: it reads the include lines, so it is quick and runs beside the rest
+  linux-architecture:
+    runs-on: ubuntu-latest
+    container: archlinux:latest
+    steps:
+      - name: Install dependencies
+        run: pacman -Syu --noconfirm --needed git python
+
+      - name: Check out the repository
+        uses: actions/checkout@v7
+
+      # The checkout belongs to another user than the container's, which git refuses to list files of
+      - name: Trust the checkout
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
+      - name: Test the include check
+        run: python -m unittest discover -s tools -p '*_tests.py'
+
+      - name: Check the include layers and the diagram
+        run: python tools/include_layers.py --check
 
   # clang-tidy takes longer than the build and the tests together, so it runs beside them; it needs a build for the
   # compile database and the generated headers, which the compiler cache of its own makes quick
@@ -122,7 +146,7 @@ jobs:
       - name: Check naming
         run: >-
           run-clang-tidy -p build -quiet -j "$(nproc)" -warnings-as-errors='*'
-          '/(app-core|app-gui|tests)/|/main\.cpp$'
+          '/(app-core|app-gui|nodalys|tests)/|/main\.cpp$'
 
   linux-sanitizers:
     runs-on: ubuntu-latest

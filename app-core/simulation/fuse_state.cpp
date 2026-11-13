@@ -5,7 +5,7 @@
 
 #include "simulation/fuse_state.h"
 
-#include "components/fuse.h"
+#include "circuit/components/fuse.h"
 #include <algorithm>
 #include <cmath>
 

@@ -1,22 +1,23 @@
 /**
  * @file    transient_chunks_tests.cpp
- * @brief   Tests for the transient that ngspice runs in stretches of simulated time, which can be stopped and shown
+ * @brief   Tests for the transient that a backend runs in stretches of simulated time, which can be stopped and shown
  *          while it goes on.
  */
 
-#include "components/capacitor.h"
-#include "components/ground.h"
-#include "components/logic_input.h"
-#include "components/logic_part.h"
-#include "components/potentiometer.h"
-#include "components/resistor.h"
-#include "components/switch.h"
-#include "components/voltage_source.h"
+#include "backends/ngspice/ngspice_library.h"
+#include "backends/nodalys/nodalys_backend.h"
+#include "circuit/components/capacitor.h"
+#include "circuit/components/ground.h"
+#include "circuit/components/logic_input.h"
+#include "circuit/components/logic_part.h"
+#include "circuit/components/potentiometer.h"
+#include "circuit/components/resistor.h"
+#include "circuit/components/switch.h"
+#include "circuit/components/voltage_source.h"
 #include "digital_models.h"
-#include "document/examples.h"
-#include "document/schematic.h"
-#include "ngspice/ngspice_library.h"
-#include "simulation/circuit_checks.h"
+#include "schematic/examples.h"
+#include "schematic/schematic.h"
+#include "simulation/check_transient.h"
 #include "simulation/live_change.h"
 #include "simulation/simulation_backend.h"
 #include "simulation/simulator.h"
@@ -25,10 +26,13 @@
 #include <array>
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/generators/catch_generators.hpp>
 #include <chrono>
 #include <cmath>
 #include <cstddef>
+#include <memory>
 #include <optional>
+#include <string>
 #include <string_view>
 #include <thread>
 #include <utility>
@@ -154,6 +158,18 @@ struct LiveRun {
             }
         };
     }
+};
+
+/// Puts the backend a test runs on in use, by name, and goes back to ngspice at the end, even when a check throws.
+struct BackendInUse {
+    explicit BackendInUse(const std::string_view name) {
+        if (name == "Nodalys") {
+            Core::SetBackend(std::make_unique<Core::NodalysBackend>());
+        }
+    }
+    ~BackendInUse() { Core::SetBackend(nullptr); }
+    BackendInUse(const BackendInUse &) = delete;
+    BackendInUse &operator=(const BackendInUse &) = delete;
 };
 
 double SecondsSince(const std::chrono::steady_clock::time_point start) {
@@ -298,6 +314,9 @@ TEST_CASE("A stop request ends the transient between chunks and keeps the points
 }
 
 TEST_CASE("A monitored transient reports its progress up to the end", "[transient_chunks]") {
+    const std::string backend = GENERATE("ngspice", "Nodalys");
+    INFO("Backend: " << backend);
+    const BackendInUse in_use(backend);
     ChargingCapacitor setup;
     Core::RunControl control;
     Received received(&control);
@@ -341,6 +360,9 @@ TEST_CASE("The lines ngspice prints at each chunk are left out of the messages, 
 }
 
 TEST_CASE("A live transient keeps the pace it was given", "[transient_chunks][live]") {
+    const std::string backend = GENERATE("ngspice", "Nodalys");
+    INFO("Backend: " << backend);
+    const BackendInUse in_use(backend);
     ChargingCapacitor setup;
     // The stop time in 0.4 s of the clock
     LiveRun live(setup.Settings.StopTime / 0.4, setup.Settings.StopTime, {});
@@ -356,6 +378,9 @@ TEST_CASE("A live transient keeps the pace it was given", "[transient_chunks][li
 }
 
 TEST_CASE("A stop ends a live transient while it waits for the clock", "[transient_chunks][live]") {
+    const std::string backend = GENERATE("ngspice", "Nodalys");
+    INFO("Backend: " << backend);
+    const BackendInUse in_use(backend);
     ChargingCapacitor setup;
     LiveRun live(setup.Settings.StopTime / 30.0, 0.0, {});
     live.Monitor.OnChunk = [&live](const Core::Transient &) { live.Control.Cancel(); };
@@ -369,6 +394,9 @@ TEST_CASE("A stop ends a live transient while it waits for the clock", "[transie
 
 TEST_CASE("A paused live transient holds until resumed, then keeps its pace instead of catching up",
           "[transient_chunks][live]") {
+    const std::string backend = GENERATE("ngspice", "Nodalys");
+    INFO("Backend: " << backend);
+    const BackendInUse in_use(backend);
     ChargingCapacitor setup;
     LiveRun live(setup.Settings.StopTime / 0.4, 0.0, {});
     double paused_at = 0.0;
@@ -397,6 +425,9 @@ TEST_CASE("A paused live transient holds until resumed, then keeps its pace inst
 }
 
 TEST_CASE("A stop ends a paused live transient with the points it made", "[transient_chunks][live]") {
+    const std::string backend = GENERATE("ngspice", "Nodalys");
+    INFO("Backend: " << backend);
+    const BackendInUse in_use(backend);
     ChargingCapacitor setup;
     LiveRun live(setup.Settings.StopTime / 0.4, 0.0, {});
     std::jthread stopper;

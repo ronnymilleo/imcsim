@@ -5,10 +5,10 @@
 
 #include "simulation/stepped_circuit.h"
 
-#include "components/capacitor.h"
-#include "components/inductor.h"
-#include "components/resistor.h"
-#include "model/subcircuit.h"
+#include "circuit/components/capacitor.h"
+#include "circuit/components/inductor.h"
+#include "circuit/components/resistor.h"
+#include "circuit/subcircuit.h"
 #include <algorithm>
 #include <format>
 

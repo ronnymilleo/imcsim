@@ -6,11 +6,12 @@
 #ifndef IMCSIM_SIMULATION_RESULTS_H
 #define IMCSIM_SIMULATION_RESULTS_H
 
-#include "components/component.h"
+#include "circuit/components/component.h"
 #include <complex>
 #include <cstddef>
 #include <expected>
 #include <optional>
+#include <span>
 #include <string>
 #include <vector>
 
@@ -288,6 +289,42 @@ struct TruthTable {
 };
 
 /**
+ * @struct  ComponentPhasors
+ * @brief   Complex peak harmonic phasors for one component current, indexed from DC (0) to H.
+ */
+struct ComponentPhasors {
+    std::string Name;
+    std::vector<std::complex<double>> Phasors;
+};
+
+/**
+ * @struct  HarmonicBalance
+ * @brief   Periodic steady-state spectra and one-cycle waveforms solved in the frequency domain.
+ * @details Phasors store peak complex amplitudes indexed from DC (0) to the highest harmonic, matching the
+ *          real signal $x(t) = X_0 + \sum_{k=1}^{H} \operatorname{Re}(X_k e^{j k \omega_0 t})$.
+ */
+struct HarmonicBalance {
+    double FundamentalFrequency = 0.0;
+    std::vector<double> Frequencies;
+    /// Indexed by node number, then by harmonic index; node 0 is ground and stays zero.
+    std::vector<std::vector<std::complex<double>>> NodePhasors;
+    /// One per named component, in circuit order.
+    std::vector<ComponentPhasors> CurrentPhasors;
+    /// Sample instants across one fundamental period $[0, T_0)$.
+    std::vector<double> Times;
+    /// Reconstructed periodic voltage waveforms indexed by node number, then by time sample.
+    std::vector<std::vector<double>> NodeWaveforms;
+    /// Reconstructed periodic current waveforms per component.
+    std::vector<ComponentTrace> CurrentWaveforms;
+    std::vector<std::string> Warnings;
+    int Iterations = 0;
+    /// Solver strategy that converged: "linear", "direct", "source stepping", or "gmin stepping".
+    std::string Strategy;
+};
+
+[[nodiscard]] double ComputeHarmonicBalanceThd(std::span<const std::complex<double>> phasors);
+
+/**
  * @struct  SimulationRun
  * @brief   Outcome of a simulation, with everything the simulator printed.
  */
@@ -306,6 +343,7 @@ using PoleZeroRun = SimulationRun<PoleZero>;
 using SParametersRun = SimulationRun<SParameters>;
 using TransferFunctionRun = SimulationRun<TransferFunction>;
 using TruthTableRun = SimulationRun<TruthTable>;
+using HarmonicBalanceRun = SimulationRun<HarmonicBalance>;
 
 } // namespace Core
 

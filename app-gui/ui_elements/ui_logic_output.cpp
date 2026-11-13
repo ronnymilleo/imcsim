@@ -5,7 +5,7 @@
 
 #include "ui_elements/ui_logic_output.h"
 
-#include "components/logic_output.h"
+#include "circuit/components/logic_output.h"
 #include <memory>
 
 namespace GUI {

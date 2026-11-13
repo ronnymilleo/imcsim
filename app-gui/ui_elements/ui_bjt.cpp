@@ -5,7 +5,7 @@
 
 #include "ui_elements/ui_bjt.h"
 
-#include "components/bjt.h"
+#include "circuit/components/bjt.h"
 #include <memory>
 
 namespace GUI {

@@ -5,13 +5,13 @@
 
 #include "simulation/simulation_backend.h"
 
-#include "components/ground.h"
-#include "components/logic_input.h"
-#include "components/logic_part.h"
-#include "components/resistor.h"
-#include "components/voltage_source.h"
-#include "ngspice/ngspice_backend.h"
-#include "ngspice/ngspice_library.h"
+#include "backends/ngspice/ngspice_backend.h"
+#include "backends/ngspice/ngspice_library.h"
+#include "circuit/components/ground.h"
+#include "circuit/components/logic_input.h"
+#include "circuit/components/logic_part.h"
+#include "circuit/components/resistor.h"
+#include "circuit/components/voltage_source.h"
 #include "simulation/run_control.h"
 #include "simulation/simulator.h"
 #include <catch2/catch_test_macros.hpp>
@@ -327,12 +327,35 @@ TEST_CASE("ngspice is the backend until another one is set, and runs every analy
     CHECK(dynamic_cast<const Core::NgspiceBackend *>(&backend) != nullptr);
     const Core::BackendCapabilities &capabilities = backend.GetCapabilities();
     CHECK(capabilities.Analyses.size() == 9);
+    CHECK_FALSE(capabilities.Analyses.contains(Core::AnalysisKind::HARMONIC_BALANCE));
     // Logic parts are refused only when the digital models are missing, whatever the system ngspice has
     CHECK(capabilities.UnsupportedParts.empty() == Core::AreDigitalModelsAvailable());
     // ngspice cannot recover from a sensitivity analysis of logic parts, with its digital models or without
     CHECK(Core::FindUnsupported(backend, {Core::ComponentType::NAND}, Core::AnalysisKind::SENSITIVITY).has_value());
     CHECK_FALSE(
         Core::FindUnsupported(backend, {Core::ComponentType::DIODE}, Core::AnalysisKind::SENSITIVITY).has_value());
+    CHECK(Core::FindUnsupported(backend, {Core::ComponentType::RESISTOR}, Core::AnalysisKind::HARMONIC_BALANCE)
+              .value_or("")
+              .contains("harmonic balance"));
+}
+
+TEST_CASE("Without a default backend every analysis is refused with a reason and no run succeeds",
+          "[simulation_backend]") {
+    Core::SetDefaultBackendFactory(nullptr);
+    Core::SetBackend(nullptr);
+    Core::SimulationBackend &backend = Core::GetBackend();
+    CHECK(backend.GetCapabilities().Analyses.empty());
+    const std::optional<std::string> reason =
+        Core::FindUnsupported(backend, {Core::ComponentType::RESISTOR}, Core::AnalysisKind::TRANSIENT);
+    REQUIRE(reason.has_value());
+    CHECK(reason->contains("does not run the transient analysis"));
+    const Core::OperatingPointRun run = backend.RunOperatingPoint(Core::Circuit{}, std::nullopt);
+    REQUIRE_FALSE(run.Result.has_value());
+    CHECK(run.Result.error() == "No simulation engine was installed");
+
+    // A factory registered afterwards takes effect, as the program does at startup
+    Core::UseNgspiceByDefault();
+    CHECK(Core::GetBackend().GetName() == "ngspice");
 }
 
 TEST_CASE("Analyses have names for the messages that refuse them", "[simulation_backend]") {
@@ -340,4 +363,27 @@ TEST_CASE("Analyses have names for the messages that refuse them", "[simulation_
     CHECK(Core::GetAnalysisKindName(Core::AnalysisKind::AC_SWEEP) == "AC sweep");
     CHECK(Core::GetAnalysisKindName(Core::AnalysisKind::POLE_ZERO) == "pole-zero");
     CHECK(Core::GetAnalysisKindName(Core::AnalysisKind::TRUTH_TABLE) == "truth table");
+    CHECK(Core::GetAnalysisKindName(Core::AnalysisKind::HARMONIC_BALANCE) == "harmonic balance");
+}
+
+TEST_CASE("Harmonic balance is refused cleanly when the active backend does not support it",
+          "[simulation_backend][hb]") {
+    Core::SetBackend(nullptr);
+    Core::VoltageSource source;
+    source.SetName("V1");
+    source.SetSourceType(Core::Source::SourceType::AC);
+    source.SetAC({.Amplitude = 1.0, .Frequency = 1e3});
+    Core::Resistor load;
+    load.SetName("R1");
+    Core::Ground ground;
+    Core::Circuit circuit;
+    circuit.Add(source, {1, 0});
+    circuit.Add(load, {1, 0});
+    circuit.Add(ground, {0});
+
+    const Core::HarmonicBalanceRun run =
+        Core::RunHarmonicBalance(circuit, {.FundamentalFrequency = 1e3, .Harmonics = 4});
+    REQUIRE_FALSE(run.Result.has_value());
+    CHECK(run.Result.error().contains("ngspice"));
+    CHECK(run.Result.error().contains("harmonic balance"));
 }

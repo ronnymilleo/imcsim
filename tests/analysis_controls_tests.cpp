@@ -4,12 +4,16 @@
  */
 
 #include "analysis/analysis_controls.h"
-#include "analysis/monte_carlo_results.h"
+#include "results/monte_carlo_results.h"
 
-#include "components/subcircuit_pin.h"
-#include "document/examples.h"
-#include "document/schematic.h"
-#include "editing/live_input.h"
+#include "backends/nodalys/nodalys_backend.h"
+#include "circuit/components/capacitor.h"
+#include "circuit/components/resistor.h"
+#include "circuit/components/source.h"
+#include "circuit/components/subcircuit_pin.h"
+#include "schematic/examples.h"
+#include "schematic/live_input.h"
+#include "schematic/schematic.h"
 #include "simulation/simulation_backend.h"
 #include "test_printers.h"
 #include <algorithm>
@@ -20,6 +24,7 @@
 #include <cstddef>
 #include <memory>
 #include <mutex>
+#include <numbers>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -160,8 +165,8 @@ void UpdateFor(GUI::AnalysisControls &controls, const std::chrono::milliseconds 
 /**
  * @brief   The time the transient on display has reached, or 0 without one.
  */
-double ReachedTime(const GUI::Schematic &schematic) {
-    const std::optional<Core::Transient> &transient = schematic.GetTransient();
+double ReachedTime(const GUI::ResultStore &results) {
+    const std::optional<Core::Transient> &transient = results.GetTransient();
     return transient && !transient->Times.empty() ? transient->Times.back() : 0.0;
 }
 
@@ -313,27 +318,31 @@ struct ReleaseAtEnd {
 TEST_CASE("A run goes on in the background and its result reaches the schematic when Update takes it in",
           "[analysis_controls]") {
     GUI::Schematic schematic;
+    GUI::ResultStore results;
+    schematic.SetListener(&results);
     OpenRCFilter(schematic);
     Select(schematic, GUI::Analysis::TRANSIENT);
-    GUI::AnalysisControls controls(schematic);
+    GUI::AnalysisControls controls(schematic, results);
 
     controls.RunSelected();
     CHECK(controls.IsRunning());
     CHECK(controls.GetRunningAnalysis() == GUI::Analysis::TRANSIENT);
     // Nothing is stored before Update runs on this thread
-    CHECK_FALSE(schematic.GetTransient().has_value());
+    CHECK_FALSE(results.GetTransient().has_value());
 
     REQUIRE(UpdateUntilIdle(controls));
-    REQUIRE(schematic.GetTransient().has_value());
+    REQUIRE(results.GetTransient().has_value());
     CHECK(controls.GetOutcome(GUI::Analysis::TRANSIENT) != GUI::RunOutcome::FAILED);
     CHECK(controls.GetLastRun() == GUI::Analysis::TRANSIENT);
 }
 
 TEST_CASE("A finished run keeps the time it took, for the status bar", "[analysis_controls]") {
     GUI::Schematic schematic;
+    GUI::ResultStore results;
+    schematic.SetListener(&results);
     OpenRCFilter(schematic);
     Select(schematic, GUI::Analysis::TRANSIENT);
-    GUI::AnalysisControls controls(schematic);
+    GUI::AnalysisControls controls(schematic, results);
     CHECK_FALSE(controls.GetRunSeconds(GUI::Analysis::TRANSIENT).has_value());
 
     controls.RunSelected();
@@ -347,9 +356,11 @@ TEST_CASE("A finished run keeps the time it took, for the status bar", "[analysi
 
 TEST_CASE("Run does nothing while another run is in progress", "[analysis_controls]") {
     GUI::Schematic schematic;
+    GUI::ResultStore results;
+    schematic.SetListener(&results);
     OpenRCFilter(schematic);
     SelectLongSteppedTransient(schematic);
-    GUI::AnalysisControls controls(schematic);
+    GUI::AnalysisControls controls(schematic, results);
 
     controls.RunSelected();
     Select(schematic, GUI::Analysis::OPERATING_POINT);
@@ -364,9 +375,11 @@ TEST_CASE("Stopping a stepped run ends it between steps and keeps no result", "[
     const auto hold = std::make_shared<TransientHold>();
     const HeldBackendInUse backend(hold);
     GUI::Schematic schematic;
+    GUI::ResultStore results;
+    schematic.SetListener(&results);
     OpenRCFilter(schematic);
     SelectLongSteppedTransient(schematic);
-    GUI::AnalysisControls controls(schematic);
+    GUI::AnalysisControls controls(schematic, results);
     const ReleaseAtEnd release{.Hold = hold};
 
     // The stop comes while the first step is held, so the run cannot end before it
@@ -378,83 +391,91 @@ TEST_CASE("Stopping a stepped run ends it between steps and keeps no result", "[
     REQUIRE(UpdateUntilIdle(controls));
 
     CHECK_FALSE(controls.IsStopping());
-    CHECK_FALSE(schematic.GetTransientSteps().has_value());
+    CHECK_FALSE(results.GetTransientSteps().has_value());
     CHECK(controls.GetOutcome(GUI::Analysis::TRANSIENT) == GUI::RunOutcome::NONE);
 }
 
 TEST_CASE("Editing the circuit stops the run, whose answer would no longer fit", "[analysis_controls]") {
     GUI::Schematic schematic;
+    GUI::ResultStore results;
+    schematic.SetListener(&results);
     OpenRCFilter(schematic);
     SelectLongSteppedTransient(schematic);
-    GUI::AnalysisControls controls(schematic);
+    GUI::AnalysisControls controls(schematic, results);
 
     controls.RunSelected();
     schematic.MarkModified();
     REQUIRE(UpdateUntilIdle(controls));
 
-    CHECK_FALSE(schematic.GetTransientSteps().has_value());
+    CHECK_FALSE(results.GetTransientSteps().has_value());
     CHECK(controls.GetOutcome(GUI::Analysis::TRANSIENT) == GUI::RunOutcome::NONE);
 }
 
 TEST_CASE("A stepped run reports its progress and delivers one transient per value", "[analysis_controls]") {
     GUI::Schematic schematic;
+    GUI::ResultStore results;
+    schematic.SetListener(&results);
     OpenRCFilter(schematic);
     GUI::SimulationSettings settings = schematic.GetSimulationSettings();
     settings.Selected = GUI::Analysis::TRANSIENT;
     settings.ParameterStep = {
         .Enabled = true, .Part = "R1", .UsesList = true, .Start = 0.0, .Stop = 0.0, .Step = 0.0, .List = "1k, 2k, 4k"};
     schematic.SetSimulationSettings(settings);
-    GUI::AnalysisControls controls(schematic);
+    GUI::AnalysisControls controls(schematic, results);
 
     controls.RunSelected();
     REQUIRE(UpdateUntilIdle(controls));
-    REQUIRE(schematic.GetTransientSteps().has_value());
-    CHECK(schematic.GetTransientSteps()->Results.size() == 3);
+    REQUIRE(results.GetTransientSteps().has_value());
+    CHECK(results.GetTransientSteps()->Results.size() == 3);
 }
 
 TEST_CASE("Every analysis runs on the worker and stores its result in the schematic", "[analysis_controls]") {
     GUI::Schematic schematic;
+    GUI::ResultStore results;
+    schematic.SetListener(&results);
     OpenRCFilter(schematic);
-    GUI::AnalysisControls controls(schematic);
+    GUI::AnalysisControls controls(schematic, results);
 
     Select(schematic, GUI::Analysis::OPERATING_POINT);
     RunAndWait(controls);
-    CHECK(schematic.GetOperatingPoint().has_value());
+    CHECK(results.GetOperatingPoint().has_value());
 
     Select(schematic, GUI::Analysis::AC_SWEEP);
     RunAndWait(controls);
-    CHECK(schematic.GetACSweep().has_value());
+    CHECK(results.GetACSweep().has_value());
 
     Select(schematic, GUI::Analysis::DC_SWEEP);
     RunAndWait(controls);
-    CHECK(schematic.GetDCSweep().has_value());
+    CHECK(results.GetDCSweep().has_value());
 
     Select(schematic, GUI::Analysis::NOISE);
     RunAndWait(controls);
-    CHECK(schematic.GetNoise().has_value());
+    CHECK(results.GetNoise().has_value());
 
     Select(schematic, GUI::Analysis::TRANSFER_FUNCTION);
     RunAndWait(controls);
-    CHECK(schematic.GetTransferFunction().has_value());
+    CHECK(results.GetTransferFunction().has_value());
     CHECK(controls.GetLastRun() == GUI::Analysis::TRANSFER_FUNCTION);
 
     Select(schematic, GUI::Analysis::SENSITIVITY);
     RunAndWait(controls);
-    REQUIRE(schematic.GetSensitivity().has_value());
-    CHECK_FALSE(schematic.GetSensitivity()->Parts.empty());
+    REQUIRE(results.GetSensitivity().has_value());
+    CHECK_FALSE(results.GetSensitivity()->Parts.empty());
     CHECK(controls.GetLastRun() == GUI::Analysis::SENSITIVITY);
 
     Select(schematic, GUI::Analysis::POLE_ZERO);
     RunAndWait(controls);
-    REQUIRE(schematic.GetPoleZero().has_value());
-    CHECK_FALSE(schematic.GetPoleZero()->Roots.empty());
+    REQUIRE(results.GetPoleZero().has_value());
+    CHECK_FALSE(results.GetPoleZero()->Roots.empty());
     CHECK(controls.GetLastRun() == GUI::Analysis::POLE_ZERO);
 }
 
 TEST_CASE("A stepped AC sweep and a stepped DC sweep deliver one result per value", "[analysis_controls]") {
     GUI::Schematic schematic;
+    GUI::ResultStore results;
+    schematic.SetListener(&results);
     OpenRCFilter(schematic);
-    GUI::AnalysisControls controls(schematic);
+    GUI::AnalysisControls controls(schematic, results);
     GUI::SimulationSettings settings = schematic.GetSimulationSettings();
     settings.ParameterStep = {
         .Enabled = true, .Part = "R1", .UsesList = true, .Start = 0.0, .Stop = 0.0, .Step = 0.0, .List = "1k, 2k"};
@@ -462,19 +483,21 @@ TEST_CASE("A stepped AC sweep and a stepped DC sweep deliver one result per valu
     settings.Selected = GUI::Analysis::AC_SWEEP;
     schematic.SetSimulationSettings(settings);
     RunAndWait(controls);
-    REQUIRE(schematic.GetACSweepSteps().has_value());
-    CHECK(schematic.GetACSweepSteps()->Results.size() == 2);
+    REQUIRE(results.GetACSweepSteps().has_value());
+    CHECK(results.GetACSweepSteps()->Results.size() == 2);
 
     settings.Selected = GUI::Analysis::DC_SWEEP;
     schematic.SetSimulationSettings(settings);
     RunAndWait(controls);
-    CHECK(schematic.GetDCSweep().has_value());
+    CHECK(results.GetDCSweep().has_value());
 }
 
 TEST_CASE("A stepped operating point delivers one result per value and shows the first", "[analysis_controls]") {
     GUI::Schematic schematic;
+    GUI::ResultStore results;
+    schematic.SetListener(&results);
     OpenRCFilter(schematic);
-    GUI::AnalysisControls controls(schematic);
+    GUI::AnalysisControls controls(schematic, results);
     GUI::SimulationSettings settings = schematic.GetSimulationSettings();
     settings.Selected = GUI::Analysis::OPERATING_POINT;
     settings.ParameterStep = {
@@ -482,27 +505,29 @@ TEST_CASE("A stepped operating point delivers one result per value and shows the
     schematic.SetSimulationSettings(settings);
     RunAndWait(controls);
     REQUIRE_FALSE(controls.GetError(GUI::Analysis::OPERATING_POINT));
-    REQUIRE(schematic.GetOperatingPointSteps().has_value());
-    const GUI::StepFamily<Core::OperatingPoint> &steps = *schematic.GetOperatingPointSteps();
+    REQUIRE(results.GetOperatingPointSteps().has_value());
+    const GUI::StepFamily<Core::OperatingPoint> &steps = *results.GetOperatingPointSteps();
     CHECK(steps.Parameter == "R1");
     CHECK(steps.Values == std::vector<double>{1e3, 2e3, 5e3});
     CHECK(steps.Results.size() == 3);
     CHECK(steps.Selected == 0);
-    CHECK(schematic.GetOperatingPoint().has_value());
+    CHECK(results.GetOperatingPoint().has_value());
 }
 
 TEST_CASE("A Monte Carlo operating point measures every node voltage and every current in each run",
           "[analysis_controls][monte_carlo]") {
     GUI::Schematic schematic;
+    GUI::ResultStore results;
+    schematic.SetListener(&results);
     OpenMonteCarloFilter(schematic, GUI::Analysis::OPERATING_POINT, 4);
-    GUI::AnalysisControls controls(schematic);
+    GUI::AnalysisControls controls(schematic, results);
     RunAndWait(controls);
     REQUIRE_FALSE(controls.GetError(GUI::Analysis::OPERATING_POINT));
-    REQUIRE(schematic.GetOperatingPointSteps().has_value());
-    CHECK(schematic.GetOperatingPointSteps()->Parameter == GUI::MONTE_CARLO_PARAMETER);
-    CHECK(schematic.GetOperatingPointSteps()->Results.size() == 5);
-    REQUIRE(schematic.GetMonteCarlo().has_value());
-    const GUI::MonteCarloTable &table = *schematic.GetMonteCarlo();
+    REQUIRE(results.GetOperatingPointSteps().has_value());
+    CHECK(results.GetOperatingPointSteps()->Parameter == GUI::MONTE_CARLO_PARAMETER);
+    CHECK(results.GetOperatingPointSteps()->Results.size() == 5);
+    REQUIRE(results.GetMonteCarlo().has_value());
+    const GUI::MonteCarloTable &table = *results.GetMonteCarlo();
     CHECK(table.Runs.size() == 5);
     CHECK_FALSE(GUI::ListTableNodes(table).empty());
     CHECK(std::ranges::contains(GUI::ListTableCurrents(table), "R1"));
@@ -511,8 +536,10 @@ TEST_CASE("A Monte Carlo operating point measures every node voltage and every c
 TEST_CASE("A run that cannot start says why, and a circuit that cannot run fails with the reason",
           "[analysis_controls]") {
     GUI::Schematic schematic;
+    GUI::ResultStore results;
+    schematic.SetListener(&results);
     OpenRCFilter(schematic);
-    GUI::AnalysisControls controls(schematic);
+    GUI::AnalysisControls controls(schematic, results);
 
     // The example has no logic input
     Select(schematic, GUI::Analysis::TRUTH_TABLE);
@@ -533,7 +560,9 @@ TEST_CASE("A run that cannot start says why, and a circuit that cannot run fails
 
     // A circuit without a source, or without even a ground
     GUI::Schematic empty;
-    GUI::AnalysisControls empty_controls(empty);
+    GUI::ResultStore empty_results;
+    empty.SetListener(&empty_results);
+    GUI::AnalysisControls empty_controls(empty, empty_results);
     for (const GUI::Analysis analysis : {GUI::Analysis::DC_SWEEP, GUI::Analysis::NOISE,
                                          GUI::Analysis::TRANSFER_FUNCTION, GUI::Analysis::SENSITIVITY}) {
         Select(empty, analysis);
@@ -543,7 +572,7 @@ TEST_CASE("A run that cannot start says why, and a circuit that cannot run fails
     Select(empty, GUI::Analysis::OPERATING_POINT);
     RunAndWait(empty_controls);
     CHECK(empty_controls.GetOutcome(GUI::Analysis::OPERATING_POINT) == GUI::RunOutcome::FAILED);
-    CHECK_FALSE(empty.GetOperatingPoint().has_value());
+    CHECK_FALSE(empty_results.GetOperatingPoint().has_value());
 }
 
 TEST_CASE("Analyses have names, and all of them are counted", "[analysis_controls]") {
@@ -552,93 +581,102 @@ TEST_CASE("Analyses have names, and all of them are counted", "[analysis_control
     CHECK(std::string(GUI::GetAnalysisName(GUI::Analysis::POLE_ZERO)) == "Poles and zeros");
     CHECK(std::string(GUI::GetAnalysisName(GUI::Analysis::S_PARAMETERS)) == "S-parameters");
     CHECK(std::string(GUI::GetAnalysisName(GUI::Analysis::TRUTH_TABLE)) == "Truth table");
-    CHECK(static_cast<std::size_t>(GUI::Analysis::TRUTH_TABLE) + 1 == GUI::ANALYSIS_COUNT);
+    CHECK(std::string(GUI::GetAnalysisName(GUI::Analysis::HARMONIC_BALANCE)) == "Harmonic balance");
+    CHECK(static_cast<std::size_t>(GUI::Analysis::HARMONIC_BALANCE) + 1 == GUI::ANALYSIS_COUNT);
 }
 
 TEST_CASE("A transient grows in the schematic while it runs, and the whole run replaces its chunks",
           "[analysis_controls]") {
     GUI::Schematic schematic;
+    GUI::ResultStore results;
+    schematic.SetListener(&results);
     OpenRCFilter(schematic);
     SelectLongTransient(schematic);
-    GUI::AnalysisControls controls(schematic);
+    GUI::AnalysisControls controls(schematic, results);
 
     controls.RunSelected();
     // The first chunk starts the result, which is incomplete until the run ends
     const auto deadline = std::chrono::steady_clock::now() + WAIT_LIMIT;
-    while (!schematic.GetTransient() && std::chrono::steady_clock::now() < deadline) {
+    while (!results.GetTransient() && std::chrono::steady_clock::now() < deadline) {
         controls.Update();
         std::this_thread::sleep_for(1ms);
     }
-    REQUIRE(schematic.GetTransient().has_value());
-    CHECK_FALSE(schematic.GetTransient()->IsComplete);
+    REQUIRE(results.GetTransient().has_value());
+    CHECK_FALSE(results.GetTransient()->IsComplete);
     CHECK(controls.IsRunning());
-    const std::size_t first_version = schematic.GetTransientVersion();
+    const std::size_t first_version = results.GetTransientVersion();
 
-    std::size_t points = schematic.GetTransient()->Times.size();
+    std::size_t points = results.GetTransient()->Times.size();
     while (controls.IsRunning() && std::chrono::steady_clock::now() < deadline) {
         controls.Update();
         if (!controls.IsRunning()) {
             break;
         }
         // The chunks add points without counting as a new result, so the view is not reset under the user
-        CHECK(schematic.GetTransientVersion() == first_version);
-        CHECK(schematic.GetTransient()->Times.size() >= points);
-        points = schematic.GetTransient()->Times.size();
+        CHECK(results.GetTransientVersion() == first_version);
+        CHECK(results.GetTransient()->Times.size() >= points);
+        points = results.GetTransient()->Times.size();
         std::this_thread::sleep_for(1ms);
     }
     REQUIRE_FALSE(controls.IsRunning());
-    REQUIRE(schematic.GetTransient().has_value());
-    CHECK(schematic.GetTransient()->IsComplete);
-    CHECK(schematic.GetTransientVersion() == first_version + 1);
+    REQUIRE(results.GetTransient().has_value());
+    CHECK(results.GetTransient()->IsComplete);
+    CHECK(results.GetTransientVersion() == first_version + 1);
     CHECK(controls.GetOutcome(GUI::Analysis::TRANSIENT) == GUI::RunOutcome::SUCCEEDED);
 }
 
 TEST_CASE("Stopping a transient keeps the points made so far and reports it as stopped", "[analysis_controls]") {
     GUI::Schematic schematic;
+    GUI::ResultStore results;
+    schematic.SetListener(&results);
     OpenRCFilter(schematic);
     SelectLongTransient(schematic);
-    GUI::AnalysisControls controls(schematic);
+    GUI::AnalysisControls controls(schematic, results);
 
     controls.RunSelected();
     const auto deadline = std::chrono::steady_clock::now() + WAIT_LIMIT;
-    while (!schematic.GetTransient() && std::chrono::steady_clock::now() < deadline) {
+    while (!results.GetTransient() && std::chrono::steady_clock::now() < deadline) {
         controls.Update();
         std::this_thread::sleep_for(1ms);
     }
-    REQUIRE(schematic.GetTransient().has_value());
+    REQUIRE(results.GetTransient().has_value());
     controls.StopRun();
     CHECK(controls.IsStopping());
     REQUIRE(UpdateUntilIdle(controls));
 
-    REQUIRE(schematic.GetTransient().has_value());
-    CHECK_FALSE(schematic.GetTransient()->IsComplete);
-    CHECK_FALSE(schematic.GetTransient()->Times.empty());
-    CHECK(schematic.GetTransient()->Times.back() < schematic.GetSimulationSettings().Transient.StopTime);
+    REQUIRE(results.GetTransient().has_value());
+    CHECK_FALSE(results.GetTransient()->IsComplete);
+    CHECK_FALSE(results.GetTransient()->Times.empty());
+    CHECK(results.GetTransient()->Times.back() < schematic.GetSimulationSettings().Transient.StopTime);
     CHECK(controls.GetOutcome(GUI::Analysis::TRANSIENT) == GUI::RunOutcome::STOPPED);
 }
 
 TEST_CASE("Editing the circuit during a transient drops what it made", "[analysis_controls]") {
     GUI::Schematic schematic;
+    GUI::ResultStore results;
+    schematic.SetListener(&results);
     OpenRCFilter(schematic);
     SelectLongTransient(schematic);
-    GUI::AnalysisControls controls(schematic);
+    GUI::AnalysisControls controls(schematic, results);
 
     controls.RunSelected();
     const auto deadline = std::chrono::steady_clock::now() + WAIT_LIMIT;
-    while (!schematic.GetTransient() && std::chrono::steady_clock::now() < deadline) {
+    while (!results.GetTransient() && std::chrono::steady_clock::now() < deadline) {
         controls.Update();
         std::this_thread::sleep_for(1ms);
     }
     schematic.MarkModified();
     REQUIRE(UpdateUntilIdle(controls));
-    CHECK_FALSE(schematic.GetTransient().has_value());
+    CHECK_FALSE(results.GetTransient().has_value());
     CHECK(controls.GetOutcome(GUI::Analysis::TRANSIENT) == GUI::RunOutcome::NONE);
 }
 
 TEST_CASE("Live is for a transient that is not stepped, and says why for anything else", "[analysis_controls][live]") {
     GUI::Schematic schematic;
+    GUI::ResultStore results;
+    schematic.SetListener(&results);
     OpenRCFilter(schematic);
-    GUI::AnalysisControls controls(schematic);
+    GUI::AnalysisControls controls(schematic, results);
     CHECK_FALSE(controls.IsLiveModeOn());
     controls.SetLiveMode(true);
     CHECK(controls.IsLiveModeOn());
@@ -660,9 +698,11 @@ TEST_CASE("Live is for a transient that is not stepped, and says why for anythin
 TEST_CASE("A live run goes on past its stop time and a switch flipped on the way changes it from then on",
           "[analysis_controls][live]") {
     GUI::Schematic schematic;
+    GUI::ResultStore results;
+    schematic.SetListener(&results);
     OpenExample(schematic, "switches_and_or.imcsim");
     SelectLiveTransient(schematic);
-    GUI::AnalysisControls controls(schematic);
+    GUI::AnalysisControls controls(schematic, results);
     controls.SetLiveMode(true);
 
     controls.RunSelected();
@@ -670,8 +710,8 @@ TEST_CASE("A live run goes on past its stop time and a switch flipped on the way
     CHECK(controls.IsLiveResult());
     CHECK(schematic.IsLiveRun());
     // SW1 is closed and SW2 open, so the LED behind both is dark until SW2 closes, a few milliseconds in
-    REQUIRE(UpdateUntil(controls, [&] { return ReachedTime(schematic) > 3e-3; }));
-    const double flipped_at = ReachedTime(schematic);
+    REQUIRE(UpdateUntil(controls, [&] { return ReachedTime(results) > 3e-3; }));
+    const double flipped_at = ReachedTime(results);
     const std::size_t circuit_version = schematic.GetCircuitVersion();
     Core::Component &switch_two = schematic.GetElement(FindElement(schematic, "SW2")).GetComponent();
     GUI::Flip(switch_two);
@@ -679,11 +719,11 @@ TEST_CASE("A live run goes on past its stop time and a switch flipped on the way
     // The run goes on with the change instead of stopping
     CHECK(schematic.GetCircuitVersion() == circuit_version);
     const double stop_time = schematic.GetSimulationSettings().Transient.StopTime;
-    REQUIRE(UpdateUntil(controls, [&] { return ReachedTime(schematic) > stop_time * 1.2; }));
+    REQUIRE(UpdateUntil(controls, [&] { return ReachedTime(results) > stop_time * 1.2; }));
 
     CHECK(controls.IsRunning());
     CHECK(controls.IsLive());
-    const Core::Transient &transient = *schematic.GetTransient();
+    const Core::Transient &transient = *results.GetTransient();
     CHECK_FALSE(transient.IsComplete);
     CHECK(std::abs(CurrentAt(transient, "D1", flipped_at / 2.0)) < 1e-6);
     CHECK(CurrentAt(transient, "D1", transient.Times.back()) > 1e-3);
@@ -692,23 +732,48 @@ TEST_CASE("A live run goes on past its stop time and a switch flipped on the way
     controls.DiscardLive();
     CHECK_FALSE(controls.IsLive());
     CHECK_FALSE(schematic.IsLiveRun());
-    CHECK_FALSE(schematic.GetTransient().has_value());
+    CHECK_FALSE(results.GetTransient().has_value());
     REQUIRE(UpdateUntil(controls, [&] { return !controls.GetRunningAnalysis(); }));
-    CHECK_FALSE(schematic.GetTransient().has_value());
+    CHECK_FALSE(results.GetTransient().has_value());
     CHECK(controls.GetOutcome(GUI::Analysis::TRANSIENT) == GUI::RunOutcome::NONE);
+}
+
+TEST_CASE("A run holds the backend until it ends, a paused live run too, so it is not replaced under it",
+          "[analysis_controls][live]") {
+    GUI::Schematic schematic;
+    GUI::ResultStore results;
+    schematic.SetListener(&results);
+    OpenRCFilter(schematic);
+    SelectLiveTransient(schematic);
+    GUI::AnalysisControls controls(schematic, results);
+    CHECK_FALSE(controls.IsBackendInUse());
+    controls.SetLiveMode(true);
+
+    controls.RunSelected();
+    CHECK(controls.IsBackendInUse());
+    REQUIRE(UpdateUntil(controls, [&] { return ReachedTime(results) > 1e-3; }));
+    controls.StopRun();
+    // Paused, the run is not running, yet its worker still holds the backend
+    CHECK_FALSE(controls.IsRunning());
+    CHECK(controls.IsBackendInUse());
+
+    controls.DiscardLive();
+    REQUIRE(UpdateUntil(controls, [&] { return !controls.IsBackendInUse(); }));
 }
 
 TEST_CASE("Stopping a live run pauses it with its points, Continue takes it on and Run starts over",
           "[analysis_controls][live]") {
     GUI::Schematic schematic;
+    GUI::ResultStore results;
+    schematic.SetListener(&results);
     OpenRCFilter(schematic);
     SelectLiveTransient(schematic);
-    GUI::AnalysisControls controls(schematic);
+    GUI::AnalysisControls controls(schematic, results);
     controls.SetLiveMode(true);
 
     controls.RunSelected();
     CHECK(controls.GetRunAction() == GUI::RunAction::STOP);
-    REQUIRE(UpdateUntil(controls, [&] { return ReachedTime(schematic) > 2e-3; }));
+    REQUIRE(UpdateUntil(controls, [&] { return ReachedTime(results) > 2e-3; }));
     controls.StopRun();
     CHECK(controls.IsLivePaused());
     CHECK_FALSE(controls.IsRunning());
@@ -716,26 +781,26 @@ TEST_CASE("Stopping a live run pauses it with its points, Continue takes it on a
     CHECK(controls.GetRunAction() == GUI::RunAction::CONTINUE);
     // The chunk under way may still arrive; after that the run holds
     UpdateFor(controls, 100ms);
-    const double paused_at = ReachedTime(schematic);
+    const double paused_at = ReachedTime(results);
     UpdateFor(controls, 300ms);
-    CHECK(ReachedTime(schematic) == paused_at);
-    REQUIRE(schematic.GetTransient().has_value());
-    CHECK_FALSE(schematic.GetTransient()->IsComplete);
+    CHECK(ReachedTime(results) == paused_at);
+    REQUIRE(results.GetTransient().has_value());
+    CHECK_FALSE(results.GetTransient()->IsComplete);
 
     controls.PressRun();
     CHECK_FALSE(controls.IsLivePaused());
     CHECK(controls.IsRunning());
-    REQUIRE(UpdateUntil(controls, [&] { return ReachedTime(schematic) > paused_at + 1e-3; }));
+    REQUIRE(UpdateUntil(controls, [&] { return ReachedTime(results) > paused_at + 1e-3; }));
     // What the run made before the pause is still there
-    CHECK(schematic.GetTransient()->Times.front() == 0.0);
+    CHECK(results.GetTransient()->Times.front() == 0.0);
 
     // Run, not Continue, starts a new run from zero once the paused one has ended
     controls.StopRun();
     REQUIRE(controls.IsLivePaused());
-    const double restarted_from = ReachedTime(schematic);
+    const double restarted_from = ReachedTime(results);
     controls.RunSelected();
     REQUIRE(UpdateUntil(controls, [&] {
-        return controls.IsRunning() && schematic.GetTransient() && ReachedTime(schematic) < restarted_from;
+        return controls.IsRunning() && results.GetTransient() && ReachedTime(results) < restarted_from;
     }));
     CHECK(controls.IsLive());
     controls.DiscardLive();
@@ -745,43 +810,47 @@ TEST_CASE("Stopping a live run pauses it with its points, Continue takes it on a
 TEST_CASE("Running another analysis while a live run is paused ends the live run and keeps its points",
           "[analysis_controls][live]") {
     GUI::Schematic schematic;
+    GUI::ResultStore results;
+    schematic.SetListener(&results);
     OpenRCFilter(schematic);
     SelectLiveTransient(schematic);
-    GUI::AnalysisControls controls(schematic);
+    GUI::AnalysisControls controls(schematic, results);
     controls.SetLiveMode(true);
 
     controls.RunSelected();
-    REQUIRE(UpdateUntil(controls, [&] { return ReachedTime(schematic) > 1e-3; }));
+    REQUIRE(UpdateUntil(controls, [&] { return ReachedTime(results) > 1e-3; }));
     controls.StopRun();
     Select(schematic, GUI::Analysis::OPERATING_POINT);
     CHECK(controls.GetRunAction() == GUI::RunAction::RUN);
     controls.PressRun();
-    REQUIRE(UpdateUntil(controls, [&] { return schematic.GetOperatingPoint().has_value(); }));
+    REQUIRE(UpdateUntil(controls, [&] { return results.GetOperatingPoint().has_value(); }));
     REQUIRE(UpdateUntilIdle(controls));
 
     CHECK_FALSE(controls.IsLive());
     CHECK_FALSE(schematic.IsLiveRun());
-    REQUIRE(schematic.GetTransient().has_value());
-    CHECK_FALSE(schematic.GetTransient()->IsComplete);
+    REQUIRE(results.GetTransient().has_value());
+    CHECK_FALSE(results.GetTransient()->IsComplete);
     CHECK(controls.GetOutcome(GUI::Analysis::TRANSIENT) == GUI::RunOutcome::STOPPED);
 }
 
 TEST_CASE("A Monte Carlo AC sweep delivers the nominal run first and a table of every run",
           "[analysis_controls][monte_carlo]") {
     GUI::Schematic schematic;
+    GUI::ResultStore results;
+    schematic.SetListener(&results);
     OpenMonteCarloFilter(schematic, GUI::Analysis::AC_SWEEP, 20);
-    GUI::AnalysisControls controls(schematic);
+    GUI::AnalysisControls controls(schematic, results);
 
     RunAndWait(controls);
     REQUIRE_FALSE(controls.GetError(GUI::Analysis::AC_SWEEP));
-    REQUIRE(schematic.GetACSweepSteps().has_value());
-    const GUI::StepFamily<Core::ACSweep> &family = *schematic.GetACSweepSteps();
+    REQUIRE(results.GetACSweepSteps().has_value());
+    const GUI::StepFamily<Core::ACSweep> &family = *results.GetACSweepSteps();
     CHECK(family.Parameter == GUI::MONTE_CARLO_PARAMETER);
     CHECK(family.Results.size() == 21);
     CHECK(family.Values.front() == 0.0);
     CHECK(family.Values.back() == 20.0);
-    REQUIRE(schematic.GetMonteCarlo().has_value());
-    const GUI::MonteCarloTable &table = *schematic.GetMonteCarlo();
+    REQUIRE(results.GetMonteCarlo().has_value());
+    const GUI::MonteCarloTable &table = *results.GetMonteCarlo();
     CHECK(table.Runs.size() == 21);
     CHECK(table.Parts == std::vector<std::string>{"R1", "C1"});
     CHECK(table.Runs.front().Values == std::vector<double>{1e3, 100e-9});
@@ -792,28 +861,32 @@ TEST_CASE("A Monte Carlo AC sweep delivers the nominal run first and a table of 
 
 TEST_CASE("The same seed draws the same values and another seed draws others", "[analysis_controls][monte_carlo]") {
     GUI::Schematic schematic;
+    GUI::ResultStore results;
+    schematic.SetListener(&results);
     OpenMonteCarloFilter(schematic, GUI::Analysis::AC_SWEEP, 5);
-    GUI::AnalysisControls controls(schematic);
+    GUI::AnalysisControls controls(schematic, results);
     RunAndWait(controls);
-    const std::vector<double> first = schematic.GetMonteCarlo()->Runs[3].Values;
+    const std::vector<double> first = results.GetMonteCarlo()->Runs[3].Values;
     RunAndWait(controls);
-    CHECK(schematic.GetMonteCarlo()->Runs[3].Values == first);
+    CHECK(results.GetMonteCarlo()->Runs[3].Values == first);
 
     GUI::SimulationSettings settings = schematic.GetSimulationSettings();
     settings.MonteCarlo.Seed += 1;
     schematic.SetSimulationSettings(settings);
     RunAndWait(controls);
-    CHECK(schematic.GetMonteCarlo()->Runs[3].Values != first);
+    CHECK(results.GetMonteCarlo()->Runs[3].Values != first);
 }
 
 TEST_CASE("The cutoff of the filter spreads around its nominal value over the runs",
           "[analysis_controls][monte_carlo]") {
     GUI::Schematic schematic;
+    GUI::ResultStore results;
+    schematic.SetListener(&results);
     OpenMonteCarloFilter(schematic, GUI::Analysis::AC_SWEEP, 100);
-    GUI::AnalysisControls controls(schematic);
+    GUI::AnalysisControls controls(schematic, results);
     RunAndWait(controls);
-    REQUIRE(schematic.GetMonteCarlo().has_value());
-    const GUI::MonteCarloTable &table = *schematic.GetMonteCarlo();
+    REQUIRE(results.GetMonteCarlo().has_value());
+    const GUI::MonteCarloTable &table = *results.GetMonteCarlo();
     const auto column =
         std::ranges::find(table.Columns, GUI::MeasureColumn{.Node = 2, .Kind = GUI::MeasureKind::UPPER_CUTOFF});
     REQUIRE(column != table.Columns.end());
@@ -840,56 +913,64 @@ TEST_CASE("The cutoff of the filter spreads around its nominal value over the ru
 TEST_CASE("Only the first runs keep their traces, and every run keeps its measurements",
           "[analysis_controls][monte_carlo]") {
     GUI::Schematic schematic;
+    GUI::ResultStore results;
+    schematic.SetListener(&results);
     OpenMonteCarloFilter(schematic, GUI::Analysis::AC_SWEEP, 150);
-    GUI::AnalysisControls controls(schematic);
+    GUI::AnalysisControls controls(schematic, results);
     RunAndWait(controls);
-    REQUIRE(schematic.GetACSweepSteps().has_value());
-    CHECK(schematic.GetACSweepSteps()->Results.size() == 101);
-    CHECK(schematic.GetMonteCarlo()->Runs.size() == 151);
-    CHECK(schematic.GetMonteCarlo()->Runs.back().Measures.size() == schematic.GetMonteCarlo()->Columns.size());
+    REQUIRE(results.GetACSweepSteps().has_value());
+    CHECK(results.GetACSweepSteps()->Results.size() == 101);
+    CHECK(results.GetMonteCarlo()->Runs.size() == 151);
+    CHECK(results.GetMonteCarlo()->Runs.back().Measures.size() == results.GetMonteCarlo()->Columns.size());
 }
 
 TEST_CASE("A Monte Carlo transient and DC sweep deliver their runs as steps and curves",
           "[analysis_controls][monte_carlo]") {
     GUI::Schematic schematic;
+    GUI::ResultStore results;
+    schematic.SetListener(&results);
     OpenMonteCarloFilter(schematic, GUI::Analysis::TRANSIENT, 4);
-    GUI::AnalysisControls controls(schematic);
+    GUI::AnalysisControls controls(schematic, results);
     RunAndWait(controls);
-    REQUIRE(schematic.GetTransientSteps().has_value());
-    CHECK(schematic.GetTransientSteps()->Results.size() == 5);
-    CHECK(schematic.GetMonteCarlo()->Runs.size() == 5);
+    REQUIRE(results.GetTransientSteps().has_value());
+    CHECK(results.GetTransientSteps()->Results.size() == 5);
+    CHECK(results.GetMonteCarlo()->Runs.size() == 5);
     // The run on show is the nominal one
-    CHECK(schematic.GetTransientSteps()->Selected == 0);
+    CHECK(results.GetTransientSteps()->Selected == 0);
 
     Select(schematic, GUI::Analysis::DC_SWEEP);
     RunAndWait(controls);
-    REQUIRE(schematic.GetDCSweep().has_value());
-    CHECK(schematic.GetDCSweep()->Curves.size() == 5);
-    CHECK(schematic.GetDCSweep()->SteppedSource == GUI::MONTE_CARLO_PARAMETER);
-    CHECK(schematic.GetDCSweep()->Curves[3].StepValue == 3.0);
-    CHECK(schematic.GetMonteCarlo().has_value());
+    REQUIRE(results.GetDCSweep().has_value());
+    CHECK(results.GetDCSweep()->Curves.size() == 5);
+    CHECK(results.GetDCSweep()->SteppedSource == GUI::MONTE_CARLO_PARAMETER);
+    CHECK(results.GetDCSweep()->Curves[3].StepValue == 3.0);
+    CHECK(results.GetMonteCarlo().has_value());
 }
 
 TEST_CASE("A new single run drops the Monte Carlo table", "[analysis_controls][monte_carlo]") {
     GUI::Schematic schematic;
+    GUI::ResultStore results;
+    schematic.SetListener(&results);
     OpenMonteCarloFilter(schematic, GUI::Analysis::AC_SWEEP, 3);
-    GUI::AnalysisControls controls(schematic);
+    GUI::AnalysisControls controls(schematic, results);
     RunAndWait(controls);
-    REQUIRE(schematic.GetMonteCarlo().has_value());
+    REQUIRE(results.GetMonteCarlo().has_value());
     GUI::SimulationSettings settings = schematic.GetSimulationSettings();
     settings.MonteCarlo.Enabled = false;
     schematic.SetSimulationSettings(settings);
     RunAndWait(controls);
-    CHECK_FALSE(schematic.GetMonteCarlo().has_value());
-    CHECK_FALSE(schematic.GetACSweepSteps().has_value());
-    CHECK(schematic.GetACSweep().has_value());
+    CHECK_FALSE(results.GetMonteCarlo().has_value());
+    CHECK_FALSE(results.GetACSweepSteps().has_value());
+    CHECK(results.GetACSweep().has_value());
 }
 
 TEST_CASE("A Monte Carlo run without a tolerance, or with a second stepped source, says why it cannot start",
           "[analysis_controls][monte_carlo]") {
     GUI::Schematic schematic;
+    GUI::ResultStore results;
+    schematic.SetListener(&results);
     OpenMonteCarloFilter(schematic, GUI::Analysis::AC_SWEEP, 5);
-    GUI::AnalysisControls controls(schematic);
+    GUI::AnalysisControls controls(schematic, results);
     for (const std::unique_ptr<GUI::UIElement> &element : schematic.GetElements()) {
         element->GetComponent().ClearTolerance();
     }
@@ -911,8 +992,10 @@ TEST_CASE("A Monte Carlo run without a tolerance, or with a second stepped sourc
 
 TEST_CASE("Live is refused while Monte Carlo is on", "[analysis_controls][monte_carlo]") {
     GUI::Schematic schematic;
+    GUI::ResultStore results;
+    schematic.SetListener(&results);
     OpenMonteCarloFilter(schematic, GUI::Analysis::TRANSIENT, 5);
-    GUI::AnalysisControls controls(schematic);
+    GUI::AnalysisControls controls(schematic, results);
     const std::optional<std::string> obstacle = controls.FindLiveObstacle();
     REQUIRE(obstacle);
     CHECK(obstacle->contains("Monte Carlo"));
@@ -921,21 +1004,23 @@ TEST_CASE("Live is refused while Monte Carlo is on", "[analysis_controls][monte_
 TEST_CASE("Stopping a Monte Carlo run keeps the runs made and says it stopped early",
           "[analysis_controls][monte_carlo]") {
     GUI::Schematic schematic;
+    GUI::ResultStore results;
+    schematic.SetListener(&results);
     OpenMonteCarloFilter(schematic, GUI::Analysis::TRANSIENT, 1000);
     GUI::SimulationSettings settings = schematic.GetSimulationSettings();
     settings.Transient = {.StopTime = 0.5, .TimeStep = 1e-6};
     schematic.SetSimulationSettings(settings);
-    GUI::AnalysisControls controls(schematic);
+    GUI::AnalysisControls controls(schematic, results);
 
     controls.RunSelected();
     REQUIRE(UpdateUntil(controls, [&] { return controls.GetRunProgress() > 0.0; }));
     controls.StopRun();
     REQUIRE(UpdateUntilIdle(controls));
 
-    REQUIRE(schematic.GetTransientSteps().has_value());
-    REQUIRE(schematic.GetMonteCarlo().has_value());
-    CHECK(schematic.GetMonteCarlo()->Runs.size() < 1001);
-    CHECK(schematic.GetTransientSteps()->Results.size() == schematic.GetMonteCarlo()->Runs.size());
+    REQUIRE(results.GetTransientSteps().has_value());
+    REQUIRE(results.GetMonteCarlo().has_value());
+    CHECK(results.GetMonteCarlo()->Runs.size() < 1001);
+    CHECK(results.GetTransientSteps()->Results.size() == results.GetMonteCarlo()->Runs.size());
     CHECK(controls.GetOutcome(GUI::Analysis::TRANSIENT) == GUI::RunOutcome::SUCCEEDED_WITH_WARNINGS);
 }
 
@@ -943,17 +1028,19 @@ TEST_CASE("A run that fails is skipped with a warning, but the nominal run has t
           "[analysis_controls][monte_carlo]") {
     const FailingBackendInUse backend;
     GUI::Schematic schematic;
+    GUI::ResultStore results;
+    schematic.SetListener(&results);
     OpenMonteCarloFilter(schematic, GUI::Analysis::TRANSIENT, 30);
-    GUI::AnalysisControls controls(schematic);
+    GUI::AnalysisControls controls(schematic, results);
     RunAndWait(controls);
 
-    REQUIRE(schematic.GetMonteCarlo().has_value());
-    const GUI::MonteCarloTable &table = *schematic.GetMonteCarlo();
+    REQUIRE(results.GetMonteCarlo().has_value());
+    const GUI::MonteCarloTable &table = *results.GetMonteCarlo();
     CHECK(table.Runs.size() == 31);
     const auto failed = std::ranges::count_if(table.Runs, &GUI::MonteCarloRun::IsFailed);
     CHECK(failed > 0);
     CHECK(failed < 30);
-    CHECK(schematic.GetTransientSteps()->Results.size() == 31 - static_cast<std::size_t>(failed));
+    CHECK(results.GetTransientSteps()->Results.size() == 31 - static_cast<std::size_t>(failed));
     CHECK(table.Runs.front().IsFailed == false);
     for (const GUI::MonteCarloRun &run : table.Runs) {
         CHECK(run.IsFailed == (run.Values[0] > 1e3));
@@ -974,18 +1061,20 @@ TEST_CASE("A run that fails is skipped with a warning, but the nominal run has t
     REQUIRE(UpdateUntilIdle(controls));
     REQUIRE(controls.GetError(GUI::Analysis::TRANSIENT));
     CHECK(controls.GetError(GUI::Analysis::TRANSIENT)->contains("The nominal run failed"));
-    CHECK_FALSE(schematic.GetMonteCarlo().has_value());
+    CHECK_FALSE(results.GetMonteCarlo().has_value());
 }
 
 TEST_CASE("The S-parameter analysis runs the example on the worker, and refuses a circuit with one port",
           "[analysis_controls]") {
     GUI::Schematic schematic;
+    GUI::ResultStore results;
+    schematic.SetListener(&results);
     OpenExample(schematic, "s_parameters_lc_low_pass.imcsim");
-    GUI::AnalysisControls controls(schematic);
+    GUI::AnalysisControls controls(schematic, results);
     CHECK(schematic.GetSimulationSettings().Selected == GUI::Analysis::S_PARAMETERS);
     RunAndWait(controls);
-    REQUIRE(schematic.GetSParameters().has_value());
-    CHECK(schematic.GetSParameters()->GetPortCount() == 2);
+    REQUIRE(results.GetSParameters().has_value());
+    CHECK(results.GetSParameters()->GetPortCount() == 2);
     CHECK(controls.GetLastRun() == GUI::Analysis::S_PARAMETERS);
     CHECK(controls.GetOutcome(GUI::Analysis::S_PARAMETERS) == GUI::RunOutcome::SUCCEEDED);
 
@@ -1003,10 +1092,72 @@ TEST_CASE("The S-parameter analysis runs the example on the worker, and refuses 
     CHECK(controls.GetOutcome(GUI::Analysis::S_PARAMETERS) == GUI::RunOutcome::FAILED);
     REQUIRE(controls.GetError(GUI::Analysis::S_PARAMETERS).has_value());
     CHECK(controls.GetError(GUI::Analysis::S_PARAMETERS)->contains("at least two S-parameter ports"));
-    CHECK_FALSE(schematic.GetSParameters().has_value());
+    CHECK_FALSE(results.GetSParameters().has_value());
     // The library was not stopped: the operating point still runs
     Select(schematic, GUI::Analysis::OPERATING_POINT);
     RunAndWait(controls);
     CHECK(controls.GetOutcome(GUI::Analysis::OPERATING_POINT) != GUI::RunOutcome::FAILED);
-    CHECK(schematic.GetOperatingPoint().has_value());
+    CHECK(results.GetOperatingPoint().has_value());
+}
+
+TEST_CASE("Harmonic balance runs on Nodalys through AnalysisControls and fails cleanly on ngspice",
+          "[analysis_controls][hb]") {
+    struct BackendRestorer {
+        ~BackendRestorer() { Core::SetBackend(nullptr); }
+    } restore;
+
+    GUI::Schematic schematic;
+    GUI::ResultStore results;
+    schematic.SetListener(&results);
+    OpenRCFilter(schematic);
+    Core::Source *source = nullptr;
+    const Core::Resistor *resistor = nullptr;
+    const Core::Capacitor *capacitor = nullptr;
+    for (const auto &element : schematic.GetElements()) {
+        Core::Component &component = element->GetComponent();
+        if (component.GetType() == Core::ComponentType::VOLTAGE_SOURCE && source == nullptr) {
+            source = &static_cast<Core::Source &>(component);
+        } else if (component.GetType() == Core::ComponentType::RESISTOR && resistor == nullptr) {
+            resistor = &static_cast<const Core::Resistor &>(component);
+        } else if (component.GetType() == Core::ComponentType::CAPACITOR && capacitor == nullptr) {
+            capacitor = &static_cast<const Core::Capacitor &>(component);
+        }
+    }
+    REQUIRE(source != nullptr);
+    REQUIRE(resistor != nullptr);
+    REQUIRE(capacitor != nullptr);
+    constexpr double FREQ = 1e3;
+    constexpr double AMP = 2.0;
+    source->SetSourceType(Core::Source::SourceType::AC);
+    source->SetAC({.Amplitude = AMP, .Frequency = FREQ});
+    const std::string resistor_name = resistor->GetName();
+    schematic.MarkModified();
+
+    GUI::SimulationSettings settings = schematic.GetSimulationSettings();
+    settings.Selected = GUI::Analysis::HARMONIC_BALANCE;
+    settings.HarmonicBalance = {.FundamentalFrequency = FREQ, .Harmonics = 4, .Samples = 0};
+    schematic.SetSimulationSettings(settings);
+
+    // Default ngspice backend refuses Harmonic Balance cleanly
+    GUI::AnalysisControls controls(schematic, results);
+    RunAndWait(controls);
+    CHECK(controls.GetOutcome(GUI::Analysis::HARMONIC_BALANCE) == GUI::RunOutcome::FAILED);
+    CHECK_FALSE(results.GetHarmonicBalance().has_value());
+    REQUIRE(controls.GetError(GUI::Analysis::HARMONIC_BALANCE).has_value());
+    CHECK(controls.GetError(GUI::Analysis::HARMONIC_BALANCE)->contains("does not run"));
+
+    // Nodalys solves Harmonic Balance and delivers complex spectra matching analytical impedance
+    Core::SetBackend(std::make_unique<Core::NodalysBackend>());
+    RunAndWait(controls);
+    CHECK(controls.GetOutcome(GUI::Analysis::HARMONIC_BALANCE) == GUI::RunOutcome::SUCCEEDED);
+    REQUIRE(results.GetHarmonicBalance().has_value());
+    const Core::HarmonicBalance &hb = *results.GetHarmonicBalance();
+    CHECK(hb.Frequencies.size() == 5);
+    const auto r_trace = std::ranges::find(hb.CurrentPhasors, resistor_name, &Core::ComponentPhasors::Name);
+    REQUIRE(r_trace != hb.CurrentPhasors.end());
+    REQUIRE(r_trace->Phasors.size() == 5);
+    const double omega = 2.0 * std::numbers::pi * FREQ;
+    const double reactance = 1.0 / (omega * capacitor->GetValue());
+    const double expected_current = AMP / std::hypot(resistor->GetValue(), reactance);
+    CHECK(std::abs(std::abs(r_trace->Phasors[1]) - expected_current) < 1e-6);
 }

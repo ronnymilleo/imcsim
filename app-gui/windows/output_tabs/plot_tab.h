@@ -6,7 +6,7 @@
 #ifndef IMCSIM_PLOT_TAB_H
 #define IMCSIM_PLOT_TAB_H
 
-#include "document/simulation_settings.h"
+#include "schematic/simulation_settings.h"
 #include <array>
 #include <cstddef>
 #include <optional>
@@ -30,14 +30,16 @@ enum class PlotTab {
     POLE_ZERO,
     S_PARAMETERS,
     TRUTH_TABLE,
+    HARMONIC_BALANCE,
     MONTE_CARLO
 };
 
 /// Every tab, in the order of the tab bar.
-inline constexpr std::array<PlotTab, 12> PLOT_TABS = {
+inline constexpr std::array<PlotTab, 13> PLOT_TABS = {
     PlotTab::OPERATING_POINT, PlotTab::TRANSIENT,    PlotTab::SPECTRUM,          PlotTab::AC_SWEEP,
     PlotTab::DC_SWEEP,        PlotTab::NOISE,        PlotTab::TRANSFER_FUNCTION, PlotTab::SENSITIVITY,
-    PlotTab::POLE_ZERO,       PlotTab::S_PARAMETERS, PlotTab::TRUTH_TABLE,       PlotTab::MONTE_CARLO};
+    PlotTab::POLE_ZERO,       PlotTab::S_PARAMETERS, PlotTab::TRUTH_TABLE,       PlotTab::HARMONIC_BALANCE,
+    PlotTab::MONTE_CARLO};
 
 /// Whether each tab has a result to show, indexed by the tab.
 using TabResults = std::array<bool, PLOT_TABS.size()>;

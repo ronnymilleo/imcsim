@@ -47,12 +47,19 @@ if(CLANG_FORMAT)
             ${CMAKE_CURRENT_SOURCE_DIR}/app-core/*.h
             ${CMAKE_CURRENT_SOURCE_DIR}/app-gui/*.cpp
             ${CMAKE_CURRENT_SOURCE_DIR}/app-gui/*.h
+            ${CMAKE_CURRENT_SOURCE_DIR}/nodalys/*.cpp
+            ${CMAKE_CURRENT_SOURCE_DIR}/nodalys/*.h
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/*.cpp
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/*.h
     )
 
+    # The list goes in a file: on the command line it grew past what Windows accepts for one process
+    set(FORMAT_FILE_LIST "${CMAKE_CURRENT_BINARY_DIR}/format_files.txt")
+    list(JOIN ALL_SOURCE_FILES "\n" FORMAT_FILE_LINES)
+    file(WRITE "${FORMAT_FILE_LIST}" "${FORMAT_FILE_LINES}\n${CMAKE_CURRENT_SOURCE_DIR}/main.cpp\n")
+
     add_custom_target(format
-            COMMAND ${CLANG_FORMAT} -i ${ALL_SOURCE_FILES} main.cpp
+            COMMAND ${CLANG_FORMAT} -i --files=${FORMAT_FILE_LIST}
             WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
             COMMENT "Formatting source code with clang-format"
             VERBATIM
@@ -83,7 +90,14 @@ function(imcsim_target_coverage target)
     endif()
 endfunction()
 
+option(BUILD_TESTS "Build tests" OFF)
+if(BUILD_TESTS)
+    enable_testing()
+    list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/vendor/Catch2/extras)
+endif()
+
 add_subdirectory(vendor)
+add_subdirectory(nodalys)
 add_subdirectory(app-core)
 add_subdirectory(app-gui)
 
@@ -123,9 +137,7 @@ add_dependencies(imcsim format)
 # Testing
 # =============================================================================
 
-option(BUILD_TESTS "Build tests" OFF)
 if(BUILD_TESTS)
-    enable_testing()
     add_subdirectory(tests)
 endif()
 

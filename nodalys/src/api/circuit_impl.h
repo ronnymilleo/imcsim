@@ -1,0 +1,33 @@
+/**
+ * @file    circuit_impl.h
+ * @brief   Internal implementation class holding the compiled circuit representation.
+ */
+
+#ifndef NODALYS_CIRCUIT_IMPL_H
+#define NODALYS_CIRCUIT_IMPL_H
+
+#include "compiler/compiled_circuit.h"
+#include <memory>
+#include <utility>
+
+namespace Nodalys {
+
+class CircuitImpl {
+public:
+    explicit CircuitImpl(CompiledCircuit compiled) : m_Compiled(std::move(compiled)) {}
+
+    CompiledCircuit &Compiled() { return m_Compiled; }
+    const CompiledCircuit &Compiled() const { return m_Compiled; }
+
+    int GetNodeCount() const { return m_Compiled.CircuitNodeCount; }
+    int GetUnknownCount() const { return m_Compiled.System ? m_Compiled.System->GetSize() : 0; }
+    bool HasInitialConditions() const { return m_Compiled.HasInitialConditions; }
+    const std::vector<CircuitPort> &GetPorts() const { return m_Compiled.Ports; }
+
+private:
+    CompiledCircuit m_Compiled;
+};
+
+} // namespace Nodalys
+
+#endif // NODALYS_CIRCUIT_IMPL_H

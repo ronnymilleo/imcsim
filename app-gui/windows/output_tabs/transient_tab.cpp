@@ -5,16 +5,19 @@
 
 #include "windows/output_tabs/transient_tab.h"
 
-#include "drawing/node_colors.h"
-#include "drawing/theme.h"
-#include "editing/probing.h"
+#include "base/node_colors.h"
+#include "base/theme.h"
 #include "imgui_internal.h"
 #include "implot.h"
 #include "plots/plot_figures.h"
 #include "plots/statistics_table.h"
-#include "plots/trace_statistics.h"
+#include "results/trace_statistics.h"
+#include "schematic/probing.h"
 #include "spice/spice_value.h"
+#include "windows/output_tabs/cursor_widgets.h"
 #include "windows/output_tabs/plot_widgets.h"
+#include "windows/output_tabs/statistics_widgets.h"
+#include "windows/output_tabs/step_widgets.h"
 #include <algorithm>
 #include <array>
 #include <expected>
@@ -173,13 +176,15 @@ void DrawBusLane(const Core::Transient &transient, const BusLane &lane, const st
 
 /**
  * @brief   Creates the tab.
- * @param[in] schematic  Schematic whose transient is plotted; it must outlive the tab.
+ * @param[in] schematic  Schematic that keeps the measurements and the names of nets; it must outlive the tab.
+ * @param[in] results    Results whose transient is shown; they must outlive the tab.
  * @param[in] controls   Runs of the analyses, to stop one from here while its plot grows; they must outlive the tab.
  * @param[in] playback   Instant of the transient shown on the schematic, drawn as a line that can be dragged, and the
  *                       window of points that plays; it must outlive the tab.
  */
-TransientTab::TransientTab(Schematic &schematic, AnalysisControls &controls, TransientPlayback &playback)
-    : m_Schematic(schematic), m_Controls(controls), m_Playback(playback) {
+TransientTab::TransientTab(Schematic &schematic, ResultStore &results, AnalysisControls &controls,
+                           TransientPlayback &playback)
+    : m_Schematic(schematic), m_Results(results), m_Controls(controls), m_Playback(playback) {
 }
 
 /**
@@ -193,10 +198,10 @@ void TransientTab::Draw(const FrameResults &frame) {
     }
     DrawWithStatistics(
         [&] {
-            if (const auto &steps = m_Schematic.GetTransientSteps()) {
+            if (const auto &steps = m_Results.GetTransientSteps()) {
                 if (const std::optional<std::size_t> picked =
                         DrawStepSelector(steps->Parameter, steps->Unit, steps->Values, steps->Selected)) {
-                    m_Schematic.SelectTransientStep(*picked);
+                    m_Results.SelectTransientStep(*picked);
                 }
             }
             if (!frame.AnythingMeasured && frame.TransientMath.empty()) {
@@ -224,7 +229,7 @@ void TransientTab::Draw(const FrameResults &frame) {
  *          clipped to the run from the earlier end; an empty span without a transient.
  */
 PlotSpan TransientTab::GetMeasuredSpan() const {
-    const auto &transient = m_Schematic.GetTransient();
+    const auto &transient = m_Results.GetTransient();
     if (!transient || transient->Times.empty()) {
         return {};
     }
@@ -256,7 +261,7 @@ bool TransientTab::CanExport(const FrameResults &frame) const {
  * @return  The figure, or an empty one without a transient.
  */
 ExportFigure TransientTab::BuildFigure(const FrameResults &frame, const bool is_whole_run) const {
-    if (const auto &transient = m_Schematic.GetTransient(); is_whole_run && transient) {
+    if (const auto &transient = m_Results.GetTransient(); is_whole_run && transient) {
         static const std::vector<MathTrace> no_math;
         return BuildTransientFigure(*transient, frame.WholeRunMath != nullptr ? frame.WholeRunMath->Traces : no_math,
                                     FindMeasuredLanes(transient->NodeVoltages.size()),
@@ -440,14 +445,14 @@ void TransientTab::DrawPlots(const Core::Transient &transient, const std::vector
     const bool voltages_changed = m_Fit.TakeNodesChanged(std::move(analog_nodes));
     // A transient that is still being made fits its axes as the chunks arrive, so the plot follows the run; once the
     // run ends, whether whole or stopped, the axes are the user's again
-    const bool has_grown = std::exchange(m_DrawnDataVersion, m_Schematic.GetTransientDataVersion()) !=
-                               m_Schematic.GetTransientDataVersion() &&
-                           !transient.IsComplete;
+    const bool has_grown =
+        std::exchange(m_DrawnDataVersion, m_Results.GetTransientDataVersion()) != m_Results.GetTransientDataVersion() &&
+        !transient.IsComplete;
     // The window that moved is the one this frame's points come from, so the fit sees the points it moved to
     const PointWindow window = m_Playback.Window.GetWindow();
     const PointWindow previous = std::exchange(m_DrawnWindow, window);
     const bool has_moved = previous.First != window.First || previous.Count != window.Count;
-    const bool new_result = m_Fit.TakeNewResult(m_Schematic.GetTransientVersion()) || has_grown || has_moved;
+    const bool new_result = m_Fit.TakeNewResult(m_Results.GetTransientVersion()) || has_grown || has_moved;
     SetNextFits(new_result, voltages_changed, currents_changed);
     if (m_Fit.TakeMathChanged(ListMathLabels(math))) {
         FitMathAxes(math);

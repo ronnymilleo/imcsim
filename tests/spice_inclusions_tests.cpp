@@ -3,8 +3,8 @@
  * @brief   Tests for following the .include and .lib lines of a SPICE library.
  */
 
+#include "circuit/spice_library.h"
 #include "spice/spice_inclusions.h"
-#include "spice/spice_library.h"
 #include <algorithm>
 #include <catch2/catch_test_macros.hpp>
 #include <expected>

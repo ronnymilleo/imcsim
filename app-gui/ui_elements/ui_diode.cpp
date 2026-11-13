@@ -5,7 +5,7 @@
 
 #include "ui_elements/ui_diode.h"
 
-#include "components/diode.h"
+#include "circuit/components/diode.h"
 #include <memory>
 
 namespace GUI {

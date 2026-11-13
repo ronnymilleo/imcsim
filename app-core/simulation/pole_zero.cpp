@@ -6,7 +6,7 @@
 
 #include "simulation/pole_zero.h"
 
-#include "simulation/circuit_checks.h"
+#include "simulation/analysis_sources.h"
 #include <algorithm>
 #include <array>
 #include <cmath>

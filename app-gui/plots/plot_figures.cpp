@@ -5,11 +5,11 @@
 
 #include "plots/plot_figures.h"
 
-#include "analysis/parameter_step.h"
-#include "drawing/node_colors.h"
-#include "drawing/theme.h"
-#include "editing/probing.h"
+#include "base/node_colors.h"
+#include "base/theme.h"
 #include "plots/plot_helpers.h"
+#include "results/parameter_step.h"
+#include "schematic/probing.h"
 #include "spice/spice_value.h"
 #include <algorithm>
 #include <cmath>
@@ -447,12 +447,13 @@ ExportFigure BuildSpectrumFigure(const TransientSpectra &spectra, const bool log
  *          of a stepped sweep, and the math channels of the step shown.
  * @param[in] sweep      The AC sweep shown.
  * @param[in] math       Math traces over the sweep shown.
- * @param[in] schematic  Schematic that keeps the measurements and the other steps.
+ * @param[in] results    Results that keep the other steps.
+ * @param[in] schematic  Schematic that keeps the measurements.
  * @param[in] view       The frequencies the plots show.
  * @return  The magnitude and phase panels.
  */
-ExportFigure BuildACSweepFigure(const Core::ACSweep &sweep, const ACMathTraces &math, Schematic &schematic,
-                                const PlotSpan &view) {
+ExportFigure BuildACSweepFigure(const Core::ACSweep &sweep, const ACMathTraces &math, const ResultStore &results,
+                                Schematic &schematic, const PlotSpan &view) {
     const std::string third_unit = ThirdAxisUnit(math.Magnitudes);
     const std::string third_name = third_unit.empty() ? "Math" : third_unit;
     ExportFigure figure;
@@ -473,7 +474,7 @@ ExportFigure BuildACSweepFigure(const Core::ACSweep &sweep, const ACMathTraces &
     AddExportTraces(phase, sweep.NodePhasesDegrees, sweep.CurrentPhasesDegrees, schematic, "", true);
     AddExportMath(phase, math.Phases, "", true);
     // The other steps share the frequencies, so they go in as more columns, without legend entries
-    if (const auto &steps = schematic.GetACSweepSteps()) {
+    if (const auto &steps = results.GetACSweepSteps()) {
         for (std::size_t step = 0; step < steps->Results.size(); ++step) {
             if (step == steps->Selected) {
                 continue;

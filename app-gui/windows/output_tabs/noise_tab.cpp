@@ -6,13 +6,15 @@
 
 #include "windows/output_tabs/noise_tab.h"
 
-#include "drawing/node_colors.h"
-#include "drawing/theme.h"
-#include "editing/probing.h"
+#include "base/node_colors.h"
+#include "base/theme.h"
 #include "implot.h"
 #include "plots/plot_figures.h"
+#include "schematic/probing.h"
 #include "spice/spice_value.h"
+#include "windows/output_tabs/cursor_widgets.h"
 #include "windows/output_tabs/plot_widgets.h"
+#include "windows/output_tabs/statistics_widgets.h"
 #include <algorithm>
 #include <cmath>
 #include <format>
@@ -105,9 +107,10 @@ void PlotNoiseTraces(const Core::Noise &noise, const Connectivity &connectivity,
 
 /**
  * @brief   Creates the tab.
- * @param[in] schematic  Schematic whose noise analysis is plotted; it must outlive the tab.
+ * @param[in] schematic  Schematic that keeps the measurements and the names of nets; it must outlive the tab.
+ * @param[in] results    Results whose noise analysis is shown; they must outlive the tab.
  */
-NoiseTab::NoiseTab(Schematic &schematic) : m_Schematic(schematic) {
+NoiseTab::NoiseTab(Schematic &schematic, const ResultStore &results) : m_Schematic(schematic), m_Results(results) {
 }
 
 /**
@@ -116,7 +119,7 @@ NoiseTab::NoiseTab(Schematic &schematic) : m_Schematic(schematic) {
  *          why.
  */
 void NoiseTab::Draw() {
-    const auto &noise = m_Schematic.GetNoise();
+    const auto &noise = m_Results.GetNoise();
     if (!noise) {
         ImGui::TextDisabled("No noise analysis for the current circuit; pick it beside Run in the editor");
         return;
@@ -143,7 +146,7 @@ void NoiseTab::Draw() {
  * @return  True with a noise analysis.
  */
 bool NoiseTab::CanExport() const {
-    return m_Schematic.GetNoise().has_value();
+    return m_Results.GetNoise().has_value();
 }
 
 /**
@@ -151,7 +154,7 @@ bool NoiseTab::CanExport() const {
  * @return  The figure, or an empty one without a noise analysis.
  */
 ExportFigure NoiseTab::BuildFigure() const {
-    if (const std::optional<Core::Noise> &noise = m_Schematic.GetNoise()) {
+    if (const std::optional<Core::Noise> &noise = m_Results.GetNoise()) {
         return BuildNoiseFigure(*noise, m_Schematic, m_ShownContributions, m_View);
     }
     return {};
@@ -199,7 +202,7 @@ void NoiseTab::DrawPlot(const Core::Noise &noise) {
  */
 void NoiseTab::SetupAxes(const Core::Noise &noise, const bool input_shown, const std::string &output_unit,
                          const std::string &input_unit) {
-    const bool new_result = m_Fit.TakeNewResult(m_Schematic.GetNoiseVersion());
+    const bool new_result = m_Fit.TakeNewResult(m_Results.GetNoiseVersion());
     const bool shares_changed = TakeTracesChanged(
         m_PlottedContributions, std::vector<std::string>(m_ShownContributions.begin(), m_ShownContributions.end()));
     const bool input_in_volts = noise.InputUnit == "V";

@@ -3,12 +3,12 @@
  * @brief   Tests for the transient and AC sweep settings suggested from a circuit.
  */
 
-#include "components/capacitor.h"
-#include "components/clock.h"
-#include "components/current_source.h"
-#include "components/op_amp.h"
-#include "components/resistor.h"
-#include "components/voltage_source.h"
+#include "circuit/components/capacitor.h"
+#include "circuit/components/clock.h"
+#include "circuit/components/current_source.h"
+#include "circuit/components/op_amp.h"
+#include "circuit/components/resistor.h"
+#include "circuit/components/voltage_source.h"
 #include "simulation/analysis_suggestions.h"
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
@@ -183,5 +183,49 @@ TEST_CASE("SuggestACSweepSettings spans two decades around the corners", "[sugge
         REQUIRE(settings.has_value());
         CHECK(settings->StartFrequency == Catch::Approx(10.0));
         CHECK(settings->StopFrequency == Catch::Approx(1e8));
+    }
+}
+
+TEST_CASE("SuggestHarmonicBalanceSettings derives the fundamental from periodic sources", "[suggestions][hb]") {
+    Core::Circuit circuit;
+
+    SECTION("returns no value when the circuit has only DC or passive parts") {
+        const Core::VoltageSource dc;
+        const Core::Resistor resistor;
+        circuit.Add(dc, {1, 0});
+        circuit.Add(resistor, {1, 0});
+        CHECK_FALSE(Core::SuggestHarmonicBalanceSettings(circuit).has_value());
+    }
+
+    SECTION("uses a single periodic tone directly") {
+        Core::VoltageSource sine;
+        sine.SetSourceType(Core::Source::SourceType::AC);
+        sine.SetAC({.Amplitude = 2.0, .Frequency = 2.5e3});
+        circuit.Add(sine, {1, 0});
+        const auto settings = Core::SuggestHarmonicBalanceSettings(circuit);
+        REQUIRE(settings.has_value());
+        CHECK(settings->FundamentalFrequency == Catch::Approx(2.5e3));
+        CHECK(settings->Harmonics == 8);
+    }
+
+    SECTION("finds a common fundamental for commensurate sine, pulse, and clock tones") {
+        Core::VoltageSource sine;
+        sine.SetName("V1");
+        sine.SetSourceType(Core::Source::SourceType::AC);
+        sine.SetAC({.Amplitude = 1.0, .Frequency = 2e3});
+        Core::CurrentSource pulse;
+        pulse.SetName("I1");
+        pulse.SetSourceType(Core::Source::SourceType::PULSE);
+        pulse.SetPulse({.Low = 0.0, .High = 1e-3, .Period = 1.0 / 3e3});
+        Core::Clock clock;
+        clock.SetName("CLK1");
+        clock.SetParameters({.Frequency = 10e3});
+        circuit.Add(sine, {1, 0});
+        circuit.Add(pulse, {1, 0});
+        circuit.Add(clock, {2});
+        const auto settings = Core::SuggestHarmonicBalanceSettings(circuit);
+        REQUIRE(settings.has_value());
+        CHECK(settings->FundamentalFrequency == Catch::Approx(1e3));
+        CHECK(settings->Harmonics == 10);
     }
 }

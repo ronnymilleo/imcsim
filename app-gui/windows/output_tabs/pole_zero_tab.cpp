@@ -5,11 +5,11 @@
 
 #include "windows/output_tabs/pole_zero_tab.h"
 
-#include "analysis/pole_zero_view.h"
-#include "drawing/theme.h"
-#include "editing/probing.h"
+#include "base/theme.h"
 #include "imgui.h"
 #include "implot.h"
+#include "results/pole_zero_view.h"
+#include "schematic/probing.h"
 #include "spice/spice_value.h"
 #include "windows/output_tabs/plot_widgets.h"
 #include <algorithm>
@@ -97,9 +97,11 @@ void DrawHoveredRoot(const Core::PoleZero &result) {
 
 /**
  * @brief   Creates the tab.
- * @param[in] schematic  Schematic whose pole-zero result is shown; it must outlive the tab.
+ * @param[in] schematic  Schematic that keeps the measurements and the names of nets; it must outlive the tab.
+ * @param[in] results    Results whose pole-zero result is shown; they must outlive the tab.
  */
-PoleZeroTab::PoleZeroTab(Schematic &schematic) : m_Schematic(schematic) {
+PoleZeroTab::PoleZeroTab(Schematic &schematic, const ResultStore &results)
+    : m_Schematic(schematic), m_Results(results) {
 }
 
 /**
@@ -107,7 +109,7 @@ PoleZeroTab::PoleZeroTab(Schematic &schematic) : m_Schematic(schematic) {
  * result.
  */
 void PoleZeroTab::Draw() {
-    const std::optional<Core::PoleZero> &result = m_Schematic.GetPoleZero();
+    const std::optional<Core::PoleZero> &result = m_Results.GetPoleZero();
     if (!result) {
         ImGui::TextDisabled(
             "No poles and zeros for the current circuit; pick Poles and zeros beside Run in the editor");
@@ -149,7 +151,7 @@ void PoleZeroTab::DrawPlane(const Core::PoleZero &result) {
     const std::string cancelled = DescribeCancelledPairs(result.CancelledPairs);
     ImGui::SameLine();
     ImGui::TextDisabled("%s", cancelled.c_str());
-    const std::size_t version = m_Schematic.GetPoleZeroVersion();
+    const std::size_t version = m_Results.GetPoleZeroVersion();
     // The limits follow a new result and a change of scale; the user's zoom and pan stay in between
     const bool is_fitting = m_FittedVersion != version || m_FittedLinear != m_IsLinear;
     m_FittedVersion = version;

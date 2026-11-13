@@ -5,7 +5,7 @@
 
 #include "ui_elements/ui_ground.h"
 
-#include "components/ground.h"
+#include "circuit/components/ground.h"
 #include <memory>
 
 namespace GUI {

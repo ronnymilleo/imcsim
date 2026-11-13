@@ -165,8 +165,27 @@ struct TruthTableSettings {
     bool operator==(const TruthTableSettings &) const = default;
 };
 
+/**
+ * @struct  HarmonicBalanceSettings
+ * @brief   Fundamental frequency, harmonic count, and time-grid sampling of a harmonic balance run.
+ */
+struct HarmonicBalanceSettings {
+    double FundamentalFrequency = 1e3;
+    int Harmonics = 8;
+    /// Samples per fundamental period for AFT; 0 chooses an automatic power of two from Harmonics.
+    int Samples = 0;
+
+    bool operator==(const HarmonicBalanceSettings &) const = default;
+};
+
 /// Most inputs a truth table varies; each one doubles the number of runs.
 inline constexpr std::size_t MAX_TRUTH_TABLE_INPUTS = 10;
+/// Most harmonics asked from a Harmonic Balance run; larger counts grow the harmonic Jacobian quadratically.
+inline constexpr int MAX_HARMONIC_BALANCE_HARMONICS = 64;
+/// Most time samples per fundamental period a harmonic balance may ask for.
+inline constexpr int MAX_HARMONIC_BALANCE_SAMPLES = 65536;
+/// Relative distance from a multiple of the fundamental within which a source frequency still counts as a harmonic.
+inline constexpr double HARMONIC_RATIO_TOLERANCE = 1e-6;
 
 } // namespace Core
 

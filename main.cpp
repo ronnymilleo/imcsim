@@ -5,9 +5,11 @@
 
 #include "application.h"
 
+#include "backends/ngspice/ngspice_backend.h"
 #include <cstdlib>
 
 int main(int, char **) {
+    Core::UseNgspiceByDefault();
     GUI::Application app;
     int result = app.Init();
     if (result == EXIT_SUCCESS) {

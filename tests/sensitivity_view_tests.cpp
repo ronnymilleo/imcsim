@@ -3,7 +3,7 @@
  * @brief   Tests of what the editor and the Output window show of a sensitivity: heat levels and table rows.
  */
 
-#include "analysis/sensitivity_view.h"
+#include "results/sensitivity_view.h"
 
 #include "test_printers.h"
 #include <catch2/catch_test_macros.hpp>

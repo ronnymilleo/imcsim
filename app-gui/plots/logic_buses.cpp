@@ -5,7 +5,7 @@
 
 #include "plots/logic_buses.h"
 
-#include "drawing/theme.h"
+#include "base/theme.h"
 #include "imgui.h"
 #include "misc/cpp/imgui_stdlib.h"
 #include <algorithm>

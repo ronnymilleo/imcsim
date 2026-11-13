@@ -5,7 +5,7 @@
 
 #include "ui_elements/ui_clock.h"
 
-#include "components/clock.h"
+#include "circuit/components/clock.h"
 #include "spice/spice_value.h"
 #include <array>
 #include <format>

@@ -6,8 +6,8 @@
 #ifndef IMCSIM_FRAME_RESULTS_H
 #define IMCSIM_FRAME_RESULTS_H
 
-#include "analysis/parameter_step.h"
 #include "plots/math_channels.h"
+#include "results/parameter_step.h"
 #include "simulation/simulation_results.h"
 #include <cstddef>
 #include <optional>

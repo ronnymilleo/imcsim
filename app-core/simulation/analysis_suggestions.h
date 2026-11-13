@@ -6,7 +6,7 @@
 #ifndef IMCSIM_ANALYSIS_SUGGESTIONS_H
 #define IMCSIM_ANALYSIS_SUGGESTIONS_H
 
-#include "model/circuit.h"
+#include "circuit/circuit.h"
 #include "simulation/simulator.h"
 #include <optional>
 
@@ -14,6 +14,7 @@ namespace Core {
 
 std::optional<TransientSettings> SuggestTransientSettings(const Circuit &circuit);
 std::optional<ACSweepSettings> SuggestACSweepSettings(const Circuit &circuit);
+std::optional<HarmonicBalanceSettings> SuggestHarmonicBalanceSettings(const Circuit &circuit);
 
 } // namespace Core
 

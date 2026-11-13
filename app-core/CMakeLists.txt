@@ -4,45 +4,78 @@
 
 add_library(imcsim-core-lib
         STATIC
-            components/behavioral_source.cpp
-            components/bjt.cpp
-            components/capacitor.cpp
-            components/clock.cpp
-            components/component.cpp
-            components/controlled_source.cpp
-            components/current_source.cpp
-            components/diode.cpp
-            components/fuse.cpp
-            components/ground.cpp
-            components/inductor.cpp
-            components/logic_input.cpp
-            components/logic_output.cpp
-            components/logic_part.cpp
-            components/mosfet.cpp
-            components/net_label.cpp
-            components/op_amp.cpp
-            components/potentiometer.cpp
-            components/relay.cpp
-            components/resistor.cpp
-            components/seven_segment.cpp
-            components/source.cpp
-            components/subcircuit.cpp
-            components/subcircuit_pin.cpp
-            components/switch.cpp
-            components/transformer.cpp
-            components/vcc.cpp
-            components/voltage_controlled_switch.cpp
-            components/voltage_source.cpp
-            model/circuit.cpp
-            model/library_model.cpp
-            ngspice/ngspice_backend.cpp
-            ngspice/ngspice_library.cpp
-            ngspice/ngspice_readers.cpp
+            backends/ngspice/ngspice_backend.cpp
+            backends/ngspice/ngspice_library.cpp
+            backends/ngspice/ngspice_read_ac_sweep.cpp
+            backends/ngspice/ngspice_read_dc_sweep.cpp
+            backends/ngspice/ngspice_read_noise.cpp
+            backends/ngspice/ngspice_read_operating_point.cpp
+            backends/ngspice/ngspice_read_pole_zero.cpp
+            backends/ngspice/ngspice_read_s_parameters.cpp
+            backends/ngspice/ngspice_read_sensitivity.cpp
+            backends/ngspice/ngspice_read_transfer_function.cpp
+            backends/ngspice/ngspice_read_transient.cpp
+            backends/ngspice/ngspice_vectors.cpp
+            backends/nodalys/compiler.cpp
+            backends/nodalys/model_parser.cpp
+            backends/nodalys/nodalys_backend.cpp
+            backends/nodalys/parameter_conversion.cpp
+            circuit/behavioral_expression.cpp
+            circuit/circuit.cpp
+            circuit/circuit_currents.cpp
+            circuit/circuit_netlist.cpp
+            circuit/components/behavioral_source.cpp
+            circuit/components/bjt.cpp
+            circuit/components/capacitor.cpp
+            circuit/components/clock.cpp
+            circuit/components/component.cpp
+            circuit/components/controlled_source.cpp
+            circuit/components/current_source.cpp
+            circuit/components/diode.cpp
+            circuit/components/fuse.cpp
+            circuit/components/ground.cpp
+            circuit/components/inductor.cpp
+            circuit/components/logic_input.cpp
+            circuit/components/logic_output.cpp
+            circuit/components/logic_part.cpp
+            circuit/components/mosfet.cpp
+            circuit/components/net_label.cpp
+            circuit/components/op_amp.cpp
+            circuit/components/potentiometer.cpp
+            circuit/components/relay.cpp
+            circuit/components/resistor.cpp
+            circuit/components/seven_segment.cpp
+            circuit/components/source.cpp
+            circuit/components/subcircuit.cpp
+            circuit/components/subcircuit_pin.cpp
+            circuit/components/switch.cpp
+            circuit/components/transformer.cpp
+            circuit/components/vcc.cpp
+            circuit/components/voltage_controlled_switch.cpp
+            circuit/components/voltage_source.cpp
+            circuit/library_model.cpp
+            circuit/netlist_logic.cpp
+            circuit/netlist_sources.cpp
+            circuit/netlist_subcircuits.cpp
+            circuit/spice_library.cpp
+            simulation/analysis_sources.cpp
             simulation/analysis_suggestions.cpp
+            simulation/check_ac_sweep.cpp
+            simulation/check_dc_sweep.cpp
+            simulation/check_frequency_range.cpp
+            simulation/check_harmonic_balance.cpp
+            simulation/check_noise.cpp
+            simulation/check_pole_zero.cpp
+            simulation/check_s_parameters.cpp
+            simulation/check_sensitivity.cpp
+            simulation/check_transfer_function.cpp
+            simulation/check_transient.cpp
+            simulation/check_truth_table.cpp
             simulation/circuit_checks.cpp
             simulation/circuit_copy.cpp
             simulation/fuse_state.cpp
             simulation/live_change.cpp
+            simulation/live_pace.cpp
             simulation/monte_carlo.cpp
             simulation/pole_zero.cpp
             simulation/ratings.cpp
@@ -54,9 +87,7 @@ add_library(imcsim-core-lib
             simulation/simulation_service.cpp
             simulation/simulator.cpp
             simulation/stepped_circuit.cpp
-            spice/behavioral_expression.cpp
             spice/spice_inclusions.cpp
-            spice/spice_library.cpp
             spice/spice_text.cpp
             spice/spice_value.cpp
             spice/standard_values.cpp
@@ -103,6 +134,7 @@ find_package(Threads REQUIRED)
 target_link_libraries(imcsim-core-lib
         PUBLIC
             Threads::Threads
+            nodalys
         PRIVATE
             ${NGSPICE_LINK_TARGET}
 )

@@ -4,7 +4,7 @@
  *          the CSV table.
  */
 
-#include "analysis/monte_carlo_results.h"
+#include "results/monte_carlo_results.h"
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>

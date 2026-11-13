@@ -4,23 +4,24 @@
  */
 
 #include "analysis/analysis_inputs.h"
-#include "analysis/circuit_snapshot.h"
-#include "analysis/fuse_readings.h"
-#include "analysis/logic_outputs.h"
-#include "analysis/monte_carlo_results.h"
-#include "components/potentiometer.h"
-#include "components/seven_segment.h"
-#include "components/source.h"
-#include "components/switch.h"
+#include "backends/ngspice/ngspice_library.h"
+#include "backends/nodalys/nodalys_backend.h"
+#include "circuit/components/potentiometer.h"
+#include "circuit/components/seven_segment.h"
+#include "circuit/components/source.h"
+#include "circuit/components/switch.h"
 #include "digital_models.h"
-#include "document/examples.h"
-#include "document/schematic.h"
-#include "ngspice/ngspice_library.h"
-#include "plots/logic_trace.h"
 #include "plots/spectrum.h"
-#include "plots/trace_math.h"
-#include "plots/trace_statistics.h"
-#include "simulation/circuit_checks.h"
+#include "results/circuit_snapshot.h"
+#include "results/fuse_readings.h"
+#include "results/logic_outputs.h"
+#include "results/logic_trace.h"
+#include "results/monte_carlo_results.h"
+#include "results/trace_math.h"
+#include "results/trace_statistics.h"
+#include "schematic/examples.h"
+#include "schematic/schematic.h"
+#include "simulation/analysis_sources.h"
 #include "simulation/monte_carlo.h"
 #include "simulation/simulation_backend.h"
 #include "simulation/simulator.h"
@@ -78,6 +79,19 @@ double PeakOf(const std::vector<double> &values) {
     return std::abs(std::ranges::max(values, {}, [](const double value) { return std::abs(value); }));
 }
 
+/**
+ * @brief   Whether a circuit holds a source whose waveform is noise or random values.
+ */
+bool HasRandomSource(const Core::Circuit &circuit) {
+    return std::ranges::any_of(Core::CollectParts(circuit), [](const Core::Component *part) {
+        if (!Core::IsSource(part->GetType())) {
+            return false;
+        }
+        const Core::Source::SourceType waveform = static_cast<const Core::Source &>(*part).GetSourceType();
+        return waveform == Core::Source::SourceType::NOISE || waveform == Core::Source::SourceType::RANDOM;
+    });
+}
+
 } // namespace
 
 TEST_CASE("Every example opens without warnings, measures existing traces and runs", "[examples]") {
@@ -115,6 +129,64 @@ TEST_CASE("Every example opens without warnings, measures existing traces and ru
                 INFO(warning);
                 CHECK_FALSE(warning.contains("exceeds its"));
             }
+        }
+    }
+}
+
+TEST_CASE("Every example either runs on Nodalys or is flagged unsupported", "[examples]") {
+    Core::NodalysBackend nodalys;
+    for (const GUI::Example &example : GUI::GetExamples()) {
+        INFO(example.Title);
+        GUI::Schematic schematic;
+        OpenOrFail(example, schematic);
+        const Core::Circuit circuit = schematic.BuildCircuit();
+
+        const auto unsupported = Core::FindUnsupported(nodalys, circuit, Core::AnalysisKind::OPERATING_POINT);
+        if (unsupported.has_value()) {
+            CHECK(unsupported->find("Nodalys") != std::string::npos);
+            continue;
+        }
+
+        // The precision rectifier example uses a vendor op-amp subcircuit kept as raw SPICE text
+        if (std::string_view(example.FileName) == "precision_rectifier.imcsim") {
+            const Core::OperatingPointRun op = nodalys.RunOperatingPoint(circuit, std::nullopt);
+            REQUIRE_FALSE(op.Result.has_value());
+            CHECK(op.Result.error().find("SPICE text") != std::string::npos);
+            continue;
+        }
+
+        const Core::OperatingPointRun operating_point = nodalys.RunOperatingPoint(circuit, std::nullopt);
+        INFO((operating_point.Result ? std::string{} : operating_point.Result.error()));
+        REQUIRE(operating_point.Result.has_value());
+        const GUI::SavedMeasurements measurements = schematic.SaveMeasurements();
+        for (const std::string &name : measurements.Currents) {
+            INFO(name);
+            CHECK(std::ranges::contains(operating_point.Result->Currents, name, &Core::ComponentCurrent::Name));
+        }
+
+        const GUI::SimulationSettings &settings = schematic.GetSimulationSettings();
+        const Core::TransientRun transient = nodalys.RunTransient(circuit, settings.Transient, std::nullopt, {});
+        INFO((transient.Result ? std::string{} : transient.Result.error()));
+        // Nodalys draws no noise or random values yet, so a transient of such a source is refused, not run without it
+        if (HasRandomSource(circuit)) {
+            CHECK_FALSE(transient.Result.has_value());
+        } else {
+            CHECK(transient.Result.has_value());
+        }
+
+        if (settings.Selected == GUI::Analysis::DC_SWEEP) {
+            const Core::DCSweepRun dc_sweep = nodalys.RunDCSweep(
+                circuit,
+                {.Swept = settings.SweptRange,
+                 .Stepped = settings.StepSource ? std::optional(settings.SteppedRange) : std::nullopt},
+                std::nullopt);
+            INFO((dc_sweep.Result ? std::string{} : dc_sweep.Result.error()));
+            CHECK(dc_sweep.Result.has_value());
+        }
+        if (settings.Selected == GUI::Analysis::AC_SWEEP) {
+            const Core::ACSweepRun ac_sweep = nodalys.RunACSweep(circuit, settings.ACSweep, std::nullopt);
+            INFO((ac_sweep.Result ? std::string{} : ac_sweep.Result.error()));
+            CHECK(ac_sweep.Result.has_value());
         }
     }
 }

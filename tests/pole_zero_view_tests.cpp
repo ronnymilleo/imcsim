@@ -4,7 +4,7 @@
  *          frequencies that mark a Bode plot.
  */
 
-#include "analysis/pole_zero_view.h"
+#include "results/pole_zero_view.h"
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>

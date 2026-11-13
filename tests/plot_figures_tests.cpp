@@ -3,10 +3,10 @@
  * @brief   Tests for the export figures of the Output window plots.
  */
 
-#include "document/schematic.h"
 #include "plots/math_channels.h"
 #include "plots/plot_export.h"
 #include "plots/plot_figures.h"
+#include "schematic/schematic.h"
 #include <catch2/catch_test_macros.hpp>
 #include <string>
 #include <vector>
@@ -24,7 +24,9 @@ TEST_CASE("The Bode figure exports math channels on both panels, an impedance on
     const GUI::ACMathTraces math{.Magnitudes = {magnitude}, .Phases = {phase}};
     // Nothing is measured, so the math channel is the only trace of each panel
     GUI::Schematic schematic;
-    const GUI::ExportFigure figure = GUI::BuildACSweepFigure(sweep, math, schematic, {.From = 10.0, .To = 1000.0});
+    const GUI::ResultStore results;
+    const GUI::ExportFigure figure =
+        GUI::BuildACSweepFigure(sweep, math, results, schematic, {.From = 10.0, .To = 1000.0});
     REQUIRE(figure.Panels.size() == 2);
     const GUI::ExportPanel &magnitudes = figure.Panels[0];
     REQUIRE(magnitudes.Series.size() == 1);

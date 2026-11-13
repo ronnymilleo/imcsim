@@ -9,7 +9,7 @@
 #ifndef IMCSIM_SIMULATION_BACKEND_H
 #define IMCSIM_SIMULATION_BACKEND_H
 
-#include "model/circuit.h"
+#include "circuit/circuit.h"
 #include "simulation/analysis_settings.h"
 #include "simulation/run_control.h"
 #include "simulation/simulation_results.h"
@@ -37,7 +37,8 @@ enum class AnalysisKind {
     SENSITIVITY,
     POLE_ZERO,
     S_PARAMETERS,
-    TRUTH_TABLE
+    TRUTH_TABLE,
+    HARMONIC_BALANCE
 };
 
 /**
@@ -51,6 +52,8 @@ struct BackendCapabilities {
     std::map<ComponentType, std::string> UnsupportedParts;
     /// Parts the backend cannot simulate in one analysis only, each with the reason shown to the user.
     std::map<AnalysisKind, std::map<ComponentType, std::string>> UnsupportedPartsByAnalysis;
+    /// Why the backend cannot simulate at a temperature other than the default one, or none when it can.
+    std::optional<std::string> TemperatureUnsupported;
 };
 
 /**
@@ -172,11 +175,18 @@ public:
      * @return  The matrix at every frequency or an error, plus the messages of the backend.
      */
     virtual SParametersRun RunSParameters(const Circuit &circuit, const SParameterSettings &settings) = 0;
+
+    virtual HarmonicBalanceRun RunHarmonicBalance(const Circuit &circuit, const HarmonicBalanceSettings &settings,
+                                                  RunControl *control);
 };
+
+/// Makes the default backend, the one in use when none was set.
+using BackendFactory = std::unique_ptr<SimulationBackend> (*)();
 
 // Backend in use
 SimulationBackend &GetBackend();
 void SetBackend(std::unique_ptr<SimulationBackend> backend);
+void SetDefaultBackendFactory(BackendFactory factory);
 
 // Capabilities
 std::string_view GetAnalysisKindName(AnalysisKind kind);

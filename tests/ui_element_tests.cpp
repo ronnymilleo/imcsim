@@ -3,7 +3,7 @@
  * @brief   Tests for terminal positions and picking of schematic elements.
  */
 
-#include "components/logic_part.h"
+#include "circuit/components/logic_part.h"
 #include "test_printers.h"
 #include "ui_elements/ui_behavioral_source.h"
 #include "ui_elements/ui_bjt.h"

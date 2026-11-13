@@ -6,9 +6,8 @@
 #ifndef IMCSIM_SIMULATOR_H
 #define IMCSIM_SIMULATOR_H
 
-#include "model/circuit.h"
+#include "circuit/circuit.h"
 #include "simulation/analysis_settings.h"
-#include "simulation/circuit_checks.h"
 #include "simulation/run_control.h"
 #include "simulation/simulation_backend.h"
 #include "simulation/simulation_results.h"
@@ -32,6 +31,8 @@ SensitivityRun RunSensitivity(const Circuit &circuit, const SensitivitySettings 
 PoleZeroRun RunPoleZero(const Circuit &circuit, const PoleZeroSettings &settings);
 SParametersRun RunSParameters(const Circuit &circuit, const SParameterSettings &settings);
 TruthTableRun RunTruthTable(const Circuit &circuit, const TruthTableSettings &settings, RunControl *control = nullptr);
+HarmonicBalanceRun RunHarmonicBalance(const Circuit &circuit, const HarmonicBalanceSettings &settings,
+                                      RunControl *control = nullptr);
 
 } // namespace Core
 

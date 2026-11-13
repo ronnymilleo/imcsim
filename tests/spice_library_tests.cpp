@@ -3,16 +3,16 @@
  * @brief   Tests for reading the subcircuits of SPICE library files and simulating them as text.
  */
 
-#include "spice/spice_library.h"
+#include "circuit/spice_library.h"
 
-#include "components/diode.h"
-#include "components/ground.h"
-#include "components/mosfet.h"
-#include "components/resistor.h"
-#include "components/subcircuit.h"
-#include "components/vcc.h"
-#include "model/circuit.h"
-#include "model/subcircuit.h"
+#include "circuit/circuit.h"
+#include "circuit/components/diode.h"
+#include "circuit/components/ground.h"
+#include "circuit/components/mosfet.h"
+#include "circuit/components/resistor.h"
+#include "circuit/components/subcircuit.h"
+#include "circuit/components/vcc.h"
+#include "circuit/subcircuit.h"
 #include "simulation/circuit_checks.h"
 #include "simulation/simulator.h"
 #include <catch2/catch_approx.hpp>

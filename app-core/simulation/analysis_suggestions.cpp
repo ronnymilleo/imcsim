@@ -5,9 +5,10 @@
 
 #include "simulation/analysis_suggestions.h"
 
-#include "components/clock.h"
-#include "components/op_amp.h"
-#include "components/source.h"
+#include "circuit/components/clock.h"
+#include "circuit/components/op_amp.h"
+#include "circuit/components/source.h"
+#include "simulation/check_harmonic_balance.h"
 #include <algorithm>
 #include <array>
 #include <cmath>
@@ -211,6 +212,64 @@ std::optional<ACSweepSettings> SuggestACSweepSettings(const Circuit &circuit) {
     const double stop = std::pow(10.0, std::ceil(std::log10(highest) + AC_MARGIN_DECADES));
     return ACSweepSettings{.StartFrequency = std::clamp(start, MIN_AC_FREQUENCY, MAX_AC_FREQUENCY),
                            .StopFrequency = std::clamp(stop, MIN_AC_FREQUENCY, MAX_AC_FREQUENCY)};
+}
+
+/**
+ * @brief   Suggests a fundamental frequency and harmonic count from the periodic sources and clocks in the circuit.
+ * @param[in] circuit  Circuit to inspect, including sources inside blocks.
+ * @return  Settings whose fundamental divides all periodic source frequencies by integers up to 64, or none when the
+ *          circuit has no periodic sources.
+ */
+std::optional<HarmonicBalanceSettings> SuggestHarmonicBalanceSettings(const Circuit &circuit) {
+    constexpr int DEFAULT_HB_HARMONICS = 8;
+    std::vector<double> frequencies;
+    for (const Component *part : CollectParts(circuit)) {
+        if (part->GetType() == ComponentType::CLOCK) {
+            const double frequency = static_cast<const Clock &>(*part).GetParameters().Frequency;
+            if (frequency > 0.0) {
+                frequencies.push_back(frequency);
+            }
+            continue;
+        }
+        if (!IsSource(part->GetType())) {
+            continue;
+        }
+        const auto &source = static_cast<const Source &>(*part);
+        if (source.GetSourceType() == Source::SourceType::AC) {
+            const ACParameters &ac = source.GetAC();
+            if (ac.Amplitude != 0.0 && ac.Frequency > 0.0) {
+                frequencies.push_back(ac.Frequency);
+            }
+        } else if (source.GetSourceType() == Source::SourceType::PULSE) {
+            const PulseParameters &pulse = source.GetPulse();
+            if (pulse.High != pulse.Low && pulse.Period > 0.0) {
+                frequencies.push_back(1.0 / pulse.Period);
+            }
+        }
+    }
+    if (frequencies.empty()) {
+        return std::nullopt;
+    }
+
+    const double lowest = *std::ranges::min_element(frequencies);
+    for (int divisor = 1; divisor <= MAX_HARMONIC_BALANCE_HARMONICS; ++divisor) {
+        const double candidate = lowest / static_cast<double>(divisor);
+        int max_harmonic = 1;
+        bool matches_all = true;
+        for (const double frequency : frequencies) {
+            const std::optional<int> harmonic = FindHarmonicNumber(frequency, candidate);
+            if (!harmonic || *harmonic > MAX_HARMONIC_BALANCE_HARMONICS) {
+                matches_all = false;
+                break;
+            }
+            max_harmonic = std::max(max_harmonic, *harmonic);
+        }
+        if (matches_all) {
+            return HarmonicBalanceSettings{.FundamentalFrequency = candidate,
+                                           .Harmonics = std::max(DEFAULT_HB_HARMONICS, max_harmonic)};
+        }
+    }
+    return HarmonicBalanceSettings{.FundamentalFrequency = lowest, .Harmonics = DEFAULT_HB_HARMONICS};
 }
 
 } // namespace Core

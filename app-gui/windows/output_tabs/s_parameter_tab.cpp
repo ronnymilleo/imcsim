@@ -6,7 +6,7 @@
 
 #include "windows/output_tabs/s_parameter_tab.h"
 
-#include "drawing/theme.h"
+#include "base/theme.h"
 #include "imgui.h"
 #include "implot.h"
 #include "plots/smith_chart.h"
@@ -147,9 +147,11 @@ double FindLargestMagnitude(const Core::SParameters &result, const std::vector<S
 
 /**
  * @brief   Creates the tab.
- * @param[in] schematic  Schematic whose S-parameter result is shown; it must outlive the tab.
+ * @param[in] schematic  Schematic that keeps the measurements and the names of nets; it must outlive the tab.
+ * @param[in] results    Results whose S-parameter result is shown; they must outlive the tab.
  */
-SParameterTab::SParameterTab(Schematic &schematic) : m_Schematic(schematic) {
+SParameterTab::SParameterTab(Schematic &schematic, const ResultStore &results)
+    : m_Schematic(schematic), m_Results(results) {
 }
 
 /**
@@ -158,12 +160,12 @@ SParameterTab::SParameterTab(Schematic &schematic) : m_Schematic(schematic) {
  * @param[in,out] exporter  Saves the Touchstone file when the user asks for it.
  */
 void SParameterTab::Draw(PlotExporter &exporter) {
-    const std::optional<Core::SParameters> &result = m_Schematic.GetSParameters();
+    const std::optional<Core::SParameters> &result = m_Results.GetSParameters();
     if (!result) {
         ImGui::TextDisabled("No S-parameters for the current circuit; pick S-parameters beside Run in the editor");
         return;
     }
-    if (const std::size_t version = m_Schematic.GetSParametersVersion(); m_FittedVersion != version) {
+    if (const std::size_t version = m_Results.GetSParametersVersion(); m_FittedVersion != version) {
         m_FittedVersion = version;
         m_IsFitting = true;
         if (m_Selection.GetPortCount() != result->GetPortCount()) {
@@ -189,7 +191,7 @@ void SParameterTab::Draw(PlotExporter &exporter) {
  * @return  True with a result and at least one entry checked.
  */
 bool SParameterTab::CanExport() const {
-    return m_Schematic.GetSParameters().has_value() && !GetShownSelection().ListShown().empty();
+    return m_Results.GetSParameters().has_value() && !GetShownSelection().ListShown().empty();
 }
 
 /**
@@ -199,7 +201,7 @@ bool SParameterTab::CanExport() const {
  * @return  The Smith chart or the magnitude and phase panels, or an empty figure without a result.
  */
 ExportFigure SParameterTab::BuildFigure(const bool is_table) const {
-    const std::optional<Core::SParameters> &result = m_Schematic.GetSParameters();
+    const std::optional<Core::SParameters> &result = m_Results.GetSParameters();
     if (!result) {
         return {};
     }

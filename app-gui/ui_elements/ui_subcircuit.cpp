@@ -5,7 +5,7 @@
 
 #include "ui_elements/ui_subcircuit.h"
 
-#include "components/subcircuit.h"
+#include "circuit/components/subcircuit.h"
 #include <algorithm>
 #include <array>
 #include <map>
