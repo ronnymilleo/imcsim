@@ -768,6 +768,139 @@ std::vector<std::complex<double>> ExtractEigenvalues(DenseMatrix &a, DenseMatrix
     return eigenvalues;
 }
 
+DenseMatrix RemoveRowAndColumn(const DenseMatrix &matrix, const std::size_t drop_row, const std::size_t drop_col) {
+    const std::size_t n = matrix.Rows();
+    DenseMatrix reduced(n - 1, n - 1);
+    std::size_t dst_r = 0;
+    for (std::size_t r = 0; r < n; ++r) {
+        if (r == drop_row) {
+            continue;
+        }
+        std::size_t dst_c = 0;
+        for (std::size_t c = 0; c < n; ++c) {
+            if (c == drop_col) {
+                continue;
+            }
+            reduced.At(dst_r, dst_c) = matrix.At(r, c);
+            ++dst_c;
+        }
+        ++dst_r;
+    }
+    return reduced;
+}
+
+double MaxAbsEntry(const DenseMatrix &matrix) {
+    double max_val = 0.0;
+    for (std::size_t r = 0; r < matrix.Rows(); ++r) {
+        for (std::size_t c = 0; c < matrix.Cols(); ++c) {
+            max_val = std::max(max_val, std::abs(matrix.At(r, c)));
+        }
+    }
+    return max_val;
+}
+
+/**
+ * @brief   Deflates algebraic rows and columns (zero rows/columns in B) before running QZ, eliminating spurious
+ *          infinite-eigenvalue leaks in singular MNA pencils.
+ */
+void DeflateZeroRowsAndColumns(DenseMatrix &a, DenseMatrix &b) {
+    const double a_norm_ref = MaxAbsEntry(a);
+    const double b_norm_ref = MaxAbsEntry(b);
+    if (b_norm_ref == 0.0) {
+        a = DenseMatrix(0, 0);
+        b = DenseMatrix(0, 0);
+        return;
+    }
+    const double b_tol = 1e-12 * b_norm_ref;
+    const double a_tol = 1e-12 * a_norm_ref;
+
+    while (a.Rows() > 0) {
+        const std::size_t n = a.Rows();
+        if (MaxAbsEntry(b) <= b_tol) {
+            a = DenseMatrix(0, 0);
+            b = DenseMatrix(0, 0);
+            return;
+        }
+
+        bool is_row = false;
+        std::size_t best_r = 0;
+        std::size_t best_c = 0;
+        double best_pivot = 0.0;
+
+        for (std::size_t r = 0; r < n; ++r) {
+            double row_b = 0.0;
+            for (std::size_t c = 0; c < n; ++c) {
+                row_b = std::max(row_b, std::abs(b.At(r, c)));
+            }
+            if (row_b <= b_tol) {
+                for (std::size_t c = 0; c < n; ++c) {
+                    const double val = std::abs(a.At(r, c));
+                    if (val > best_pivot) {
+                        best_pivot = val;
+                        best_r = r;
+                        best_c = c;
+                        is_row = true;
+                    }
+                }
+            }
+        }
+
+        for (std::size_t c = 0; c < n; ++c) {
+            double col_b = 0.0;
+            for (std::size_t r = 0; r < n; ++r) {
+                col_b = std::max(col_b, std::abs(b.At(r, c)));
+            }
+            if (col_b <= b_tol) {
+                for (std::size_t r = 0; r < n; ++r) {
+                    const double val = std::abs(a.At(r, c));
+                    if (val > best_pivot) {
+                        best_pivot = val;
+                        best_r = r;
+                        best_c = c;
+                        is_row = false;
+                    }
+                }
+            }
+        }
+
+        if (best_pivot <= a_tol) {
+            break;
+        }
+
+        const double pivot = a.At(best_r, best_c);
+        if (is_row) {
+            for (std::size_t j = 0; j < n; ++j) {
+                if (j == best_c) {
+                    continue;
+                }
+                const double factor = a.At(best_r, j) / pivot;
+                if (factor != 0.0) {
+                    for (std::size_t i = 0; i < n; ++i) {
+                        a.At(i, j) -= factor * a.At(i, best_c);
+                        b.At(i, j) -= factor * b.At(i, best_c);
+                    }
+                }
+            }
+        } else {
+            for (std::size_t i = 0; i < n; ++i) {
+                if (i == best_r) {
+                    continue;
+                }
+                const double factor = a.At(i, best_c) / pivot;
+                if (factor != 0.0) {
+                    for (std::size_t j = 0; j < n; ++j) {
+                        a.At(i, j) -= factor * a.At(best_r, j);
+                        b.At(i, j) -= factor * b.At(best_r, j);
+                    }
+                }
+            }
+        }
+
+        a = RemoveRowAndColumn(a, best_r, best_c);
+        b = RemoveRowAndColumn(b, best_r, best_c);
+    }
+}
+
 } // namespace
 
 /**
@@ -777,22 +910,28 @@ std::vector<std::complex<double>> ExtractEigenvalues(DenseMatrix &a, DenseMatrix
  * @return  Vector of finite complex generalized eigenvalues in rad/s.
  */
 std::vector<std::complex<double>> ComputeGeneralizedEigenvalues(const DenseMatrix &mat_a, const DenseMatrix &mat_b) {
-    const std::size_t n = mat_a.Rows();
-    if (n == 0 || mat_a.Cols() != n || mat_b.Rows() != n || mat_b.Cols() != n) {
+    if (mat_a.Rows() == 0 || mat_a.Cols() != mat_a.Rows() || mat_b.Rows() != mat_a.Rows() ||
+        mat_b.Cols() != mat_a.Rows()) {
         return {};
-    }
-
-    if (n == 1) {
-        const double b00 = mat_b.At(0, 0);
-        const double b_norm = std::abs(b00);
-        if (std::abs(b00) <= 1e-12 * std::max(b_norm, 1.0)) {
-            return {};
-        }
-        return {std::complex<double>(mat_a.At(0, 0) / b00, 0.0)};
     }
 
     DenseMatrix a = mat_a;
     DenseMatrix b = mat_b;
+    DeflateZeroRowsAndColumns(a, b);
+
+    const std::size_t n = a.Rows();
+    if (n == 0) {
+        return {};
+    }
+
+    if (n == 1) {
+        const double b00 = b.At(0, 0);
+        const double b_norm = std::abs(b00);
+        if (std::abs(b00) <= 1e-12 * std::max(b_norm, 1.0)) {
+            return {};
+        }
+        return {std::complex<double>(a.At(0, 0) / b00, 0.0)};
+    }
 
     ReduceToHessenbergTriangular(a, b);
     double epsb = 0.0;

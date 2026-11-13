@@ -10,6 +10,7 @@
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 #include <cmath>
 #include <complex>
+#include <nodalys/nodalys.h>
 #include <vector>
 
 namespace {
@@ -173,6 +174,24 @@ TEST_CASE("Generalized eigenvalues of a 3x3 singular B pencil", "[linear][qz]") 
     CHECK_THAT(eigs[0].imag(), WithinAbs(0.0, 1e-12));
     CHECK_THAT(eigs[1].real(), WithinRel(expected2, 1e-9));
     CHECK_THAT(eigs[1].imag(), WithinAbs(0.0, 1e-12));
+}
+
+TEST_CASE("RLC low-pass pole-zero analysis returns the two poles and no spurious infinite zeros", "[pz][linear]") {
+    Nodalys::CircuitBuilder builder;
+    const Nodalys::NodeId n1 = builder.AddNode();
+    const Nodalys::NodeId n2 = builder.AddNode();
+    const Nodalys::NodeId n3 = builder.AddNode();
+    builder.AddVdc("V1", n1, Nodalys::GROUND_NODE, 0.0, 1.0);
+    builder.AddResistor("R1", n1, n2, 10.0);
+    builder.AddInductor("L1", n2, n3, 1e-3);
+    builder.AddCapacitor("C1", n3, Nodalys::GROUND_NODE, 1e-6);
+    const auto circuit = builder.Build();
+    REQUIRE(circuit.has_value());
+
+    const auto pz = Nodalys::ComputePoleZero(*circuit, {.OutputNode = n3, .InputSource = "V1"});
+    REQUIRE(pz.has_value());
+    CHECK(pz->Poles.size() == 2);
+    CHECK(pz->Zeros.empty());
 }
 
 } // namespace

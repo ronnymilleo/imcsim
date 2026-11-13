@@ -194,9 +194,6 @@ constexpr std::array KNOWN_DIFFERENCES{
     KnownDifference{"op_amp_input_offset.imcsim", SENSITIVITY_NAME,
                     "follows the operating point, and the normalized sensitivity to each supply is 1.2e-4 on Nodalys "
                     "and under 2e-6 on ngspice"},
-    KnownDifference{"rlc_low_pass_poles_and_zeros.imcsim", POLE_ZERO_NAME,
-                    "Nodalys adds two zeros at +-4.6e13 rad/s, which are numerical infinity for a transfer with no "
-                    "zeros; ngspice's pole pair -5000 +-j31225 rad/s is the analytic one, so ngspice is right"},
     KnownDifference{"buck_converter.imcsim", TRANSIENT_NAME,
                     "the currents and the waveforms agree, but after the inductor current stops the diode node rings "
                     "against the diode capacitance at about 600 kHz, which the 1 us step resolves in under two points, "
