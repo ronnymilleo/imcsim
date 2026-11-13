@@ -638,4 +638,52 @@ void CoupledInductorDevice::RejectStep() {
     m_History2 = m_SavedHistory2;
 }
 
+NodeInitialConditionDevice::NodeInitialConditionDevice(const int node, const double voltage)
+    : m_Node(node), m_Voltage(voltage) {
+}
+
+void NodeInitialConditionDevice::Stamp(MnaSystem &sys, const std::vector<double> & /*x*/, const TimeContext &time) {
+    if (!time.IsTransientStart) {
+        return;
+    }
+    constexpr double IC_CONDUCTANCE = 1e9;
+    StampConductance(sys, m_Node, -1, IC_CONDUCTANCE);
+    StampCurrentSource(sys, m_Node, -1, -IC_CONDUCTANCE * m_Voltage);
+}
+
+double NodeInitialConditionDevice::TerminalCurrent(const int /*terminal*/, const std::vector<double> & /*x*/) const {
+    return 0.0;
+}
+
+std::complex<double> NodeInitialConditionDevice::AcTerminalCurrent(const int /*terminal*/,
+                                                                   const std::vector<double> & /*x_dc*/,
+                                                                   const std::vector<std::complex<double>> & /*x_ac*/,
+                                                                   const double /*omega*/) const {
+    return {};
+}
+
+NodeSeedDevice::NodeSeedDevice(std::vector<NodeSeed> seeds) : m_Seeds(std::move(seeds)) {
+}
+
+void NodeSeedDevice::Stamp(MnaSystem & /*sys*/, const std::vector<double> & /*x*/, const TimeContext & /*time*/) {
+}
+
+void NodeSeedDevice::SeedOperatingPoint(std::vector<double> &x) const {
+    for (const NodeSeed &seed : m_Seeds) {
+        if (seed.Node >= 0 && static_cast<std::size_t>(seed.Node) < x.size()) {
+            x[static_cast<std::size_t>(seed.Node)] = seed.Voltage;
+        }
+    }
+}
+
+double NodeSeedDevice::TerminalCurrent(const int /*terminal*/, const std::vector<double> & /*x*/) const {
+    return 0.0;
+}
+
+std::complex<double> NodeSeedDevice::AcTerminalCurrent(const int /*terminal*/, const std::vector<double> & /*x_dc*/,
+                                                       const std::vector<std::complex<double>> & /*x_ac*/,
+                                                       const double /*omega*/) const {
+    return {};
+}
+
 } // namespace Nodalys

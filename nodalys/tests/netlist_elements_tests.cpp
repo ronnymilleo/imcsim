@@ -151,6 +151,28 @@ TEST_CASE("Initial conditions and ports in a netlist reach the circuit", "[nodal
         CHECK(parsed->CircuitInstance.HasInitialConditions());
     }
 
+    SECTION(".ic clamps a node voltage at the start of a transient, without affecting .op") {
+        const auto parsed =
+            Nodalys::ParseNetlist("* node ic\nC1 out 0 1u\nR1 out 0 1k\n.ic v(out) = 3\n.tran 10u 5m\n.end\n");
+        REQUIRE(parsed.has_value());
+        CHECK(parsed->CircuitInstance.HasInitialConditions());
+
+        const auto op = Nodalys::ComputeOperatingPoint(parsed->CircuitInstance);
+        REQUIRE(op.has_value());
+        CHECK_THAT(op->NodeVoltages[1], WithinAbs(0.0, 1e-9));
+
+        const auto tran = Nodalys::ComputeTransient(parsed->CircuitInstance,
+                                                    std::get<Nodalys::TransientConfig>(parsed->Analyses[0].Config));
+        REQUIRE(tran.has_value());
+        CHECK_THAT(tran->NodeVoltages[1].front(), WithinAbs(3.0, 1e-6));
+        CHECK_THAT(VoltageAt(*tran, 1, 1e-3), WithinAbs(3.0 * std::exp(-1.0), WAVEFORM_TOLERANCE));
+    }
+
+    SECTION("Malformed .ic directives are rejected") {
+        CHECK_FALSE(Nodalys::ParseNetlist("* bad ic\nR1 1 0 1k\n.ic 1=5\n.op\n.end\n").has_value());
+        CHECK_FALSE(Nodalys::ParseNetlist("* bad ic\nR1 1 0 1k\n.ic v(1)=abc\n.op\n.end\n").has_value());
+    }
+
     SECTION("P elements are the ports of an S-parameter analysis") {
         // A matched through connection: nothing reflects and everything passes
         const auto parsed =

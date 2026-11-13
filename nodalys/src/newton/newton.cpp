@@ -103,7 +103,7 @@ int RunNewton(MnaSystem &sys, const std::vector<std::unique_ptr<Device>> &device
 
 NewtonOutcome SolveNewton(MnaSystem &sys, const std::vector<std::unique_ptr<Device>> &devices, std::vector<double> &x,
                           const TimeContext &time, const ConvergenceOptions &options) {
-    if (!time.IsTransient) {
+    if (!time.IsTransient || time.IsTransientStart) {
         for (const std::unique_ptr<Device> &device : devices) {
             device->SeedOperatingPoint(x);
         }
@@ -123,7 +123,7 @@ NewtonOutcome SolveNewton(MnaSystem &sys, const std::vector<std::unique_ptr<Devi
     constexpr double GMIN_STEP_FACTOR = 0.1;
     constexpr int GMIN_STEPS = 10;
     x.assign(static_cast<std::size_t>(sys.GetSize()), 0.0);
-    if (!time.IsTransient) {
+    if (!time.IsTransient || time.IsTransientStart) {
         for (const std::unique_ptr<Device> &device : devices) {
             device->SeedOperatingPoint(x);
         }
@@ -146,7 +146,7 @@ NewtonOutcome SolveNewton(MnaSystem &sys, const std::vector<std::unique_ptr<Devi
     // the operating point continuously from the trivial zero solution.
     constexpr int SOURCE_STEPS = 20;
     x.assign(static_cast<std::size_t>(sys.GetSize()), 0.0);
-    if (!time.IsTransient) {
+    if (!time.IsTransient || time.IsTransientStart) {
         for (const std::unique_ptr<Device> &device : devices) {
             device->SeedOperatingPoint(x);
         }

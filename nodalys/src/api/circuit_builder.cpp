@@ -844,6 +844,27 @@ public:
             g5_params.VThreshold *= 0.99;
             AddRawLogicGate(name + ".G5", LogicGateType::NAND, u_q, {n2, u_qb}, g5_params);
             AddRawLogicGate(name + ".G6", LogicGateType::NAND, u_qb, {n3, u_q}, params);
+
+            // Seed Newton in the reset equilibrium so downstream stages clocked HIGH still start reset
+            m_Compiled.Devices.push_back(std::make_unique<NodeSeedDevice>(std::vector<NodeSeed>{
+                {.Node = u_q, .Voltage = params.VLow},
+                {.Node = u_qb, .Voltage = params.VHigh},
+                {.Node = n1, .Voltage = params.VLow},
+                {.Node = n2, .Voltage = params.VHigh},
+                {.Node = n3, .Voltage = params.VLow},
+                {.Node = n4, .Voltage = params.VHigh},
+            }));
+        });
+    }
+
+    void SetInitialVoltage(const NodeId node, const double voltage) {
+        Track(node);
+        m_Compiled.HasInitialConditions = true;
+        Defer([this, node, voltage]() {
+            const int mapped = MapNode(node);
+            if (mapped >= 0) {
+                m_InitialNodeVoltages[mapped] = voltage;
+            }
         });
     }
 
@@ -855,6 +876,10 @@ public:
             action();
         }
         m_Actions.clear();
+        for (const auto &[node, voltage] : m_InitialNodeVoltages) {
+            m_Compiled.Devices.push_back(std::make_unique<NodeInitialConditionDevice>(node, voltage));
+        }
+        m_InitialNodeVoltages.clear();
         BindBehavioralCurrents();
         if (!m_Errors.empty()) {
             return std::unexpected(m_Errors.front());
@@ -899,6 +924,7 @@ private:
     std::vector<std::string> m_Errors;
     std::vector<bool> m_IsNodeUnknown;
     std::vector<bool> m_DynamicUnknown;
+    std::map<int, double> m_InitialNodeVoltages;
     CompiledCircuit m_Compiled;
 };
 
@@ -1254,6 +1280,15 @@ void CircuitBuilder::AddSRLatch(std::string name, const NodeId q, const NodeId q
 void CircuitBuilder::AddDFlipFlop(std::string name, const NodeId q, const NodeId q_bar, const NodeId d,
                                   const NodeId clk, const SmoothLogicParameters &params) {
     m_Impl->AddDFlipFlop(std::move(name), q, q_bar, d, clk, params);
+}
+
+/**
+ * @brief   Sets the initial voltage of a node at $t = 0$ in a transient analysis (SPICE `.ic`).
+ * @param[in] node     Node to clamp at the start of the transient; ground (0) is ignored.
+ * @param[in] voltage  Initial voltage in volts.
+ */
+void CircuitBuilder::SetInitialVoltage(const NodeId node, const double voltage) {
+    m_Impl->SetInitialVoltage(node, voltage);
 }
 
 std::expected<Circuit, std::string> CircuitBuilder::Build() {
