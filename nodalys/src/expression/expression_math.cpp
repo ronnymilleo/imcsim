@@ -7,9 +7,11 @@
 #include "expression/expression_math.h"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <format>
 #include <numbers>
+#include <utility>
 
 namespace Nodalys {
 
@@ -168,7 +170,11 @@ OperationResult Flat(const double value) {
     return OperationResult{.Value = value};
 }
 
-Result ApplyFunction(const Operation operation, const double argument) {
+bool IsInRange(const Operation operation, const Operation first, const Operation last) {
+    return operation >= first && operation <= last;
+}
+
+Result ApplyElementary(const Operation operation, const double argument) {
     switch (operation) {
     case Operation::ABS:
         return OperationResult{.Value = std::fabs(argument), .PartialFirst = Sign(argument)};
@@ -186,7 +192,13 @@ Result ApplyFunction(const Operation operation, const double argument) {
     case Operation::LN:
         return Logarithm(operation, argument, 1.0);
     case Operation::LOG10:
+    default:
         return Logarithm(operation, argument, 1.0 / std::numbers::ln10);
+    }
+}
+
+Result ApplyTrigonometric(const Operation operation, const double argument) {
+    switch (operation) {
     case Operation::SIN:
         return OperationResult{.Value = std::sin(argument), .PartialFirst = std::cos(argument)};
     case Operation::COS:
@@ -199,7 +211,13 @@ Result ApplyFunction(const Operation operation, const double argument) {
     case Operation::ACOS:
         return InverseTrigonometric(operation, argument);
     case Operation::ATAN:
+    default:
         return OperationResult{.Value = std::atan(argument), .PartialFirst = 1.0 / (1.0 + argument * argument)};
+    }
+}
+
+Result ApplyHyperbolic(const Operation operation, const double argument) {
+    switch (operation) {
     case Operation::SINH:
         return OperationResult{.Value = std::sinh(argument), .PartialFirst = std::cosh(argument)};
     case Operation::COSH:
@@ -211,7 +229,13 @@ Result ApplyFunction(const Operation operation, const double argument) {
     case Operation::ASINH:
     case Operation::ACOSH:
     case Operation::ATANH:
+    default:
         return InverseHyperbolic(operation, argument);
+    }
+}
+
+Result ApplyShaping(const Operation operation, const double argument) {
+    switch (operation) {
     case Operation::SIGN:
         return Flat(Sign(argument));
     case Operation::STEP:
@@ -237,7 +261,20 @@ Result ApplyFunction(const Operation operation, const double argument) {
     }
 }
 
-Result ApplyBinary(const Operation operation, const double first, const double second) {
+Result ApplyFunction(const Operation operation, const double argument) {
+    if (IsInRange(operation, Operation::ABS, Operation::LOG10)) {
+        return ApplyElementary(operation, argument);
+    }
+    if (IsInRange(operation, Operation::SIN, Operation::ATAN)) {
+        return ApplyTrigonometric(operation, argument);
+    }
+    if (IsInRange(operation, Operation::SINH, Operation::ATANH)) {
+        return ApplyHyperbolic(operation, argument);
+    }
+    return ApplyShaping(operation, argument);
+}
+
+Result ApplyArithmetic(const Operation operation, const double first, const double second) {
     switch (operation) {
     case Operation::ADD:
         return OperationResult{.Value = first + second, .PartialFirst = 1.0, .PartialSecond = 1.0};
@@ -259,6 +296,13 @@ Result ApplyBinary(const Operation operation, const double first, const double s
     case Operation::MAX:
         return first > second ? OperationResult{.Value = first, .PartialFirst = 1.0}
                               : OperationResult{.Value = second, .PartialSecond = 1.0};
+    default:
+        return std::unexpected(std::format("{} is not an operation of two operands", GetOperationName(operation)));
+    }
+}
+
+Result ApplyComparison(const Operation operation, const double first, const double second) {
+    switch (operation) {
     case Operation::LESS:
         return Flat(TruthValue(first < second));
     case Operation::GREATER:
@@ -274,11 +318,68 @@ Result ApplyBinary(const Operation operation, const double first, const double s
     case Operation::AND:
         return Flat(TruthValue(first != 0.0 && second != 0.0));
     case Operation::OR:
-        return Flat(TruthValue(first != 0.0 || second != 0.0));
     default:
-        return std::unexpected(std::format("{} is not an operation of two operands", GetOperationName(operation)));
+        return Flat(TruthValue(first != 0.0 || second != 0.0));
     }
 }
+
+Result ApplyBinary(const Operation operation, const double first, const double second) {
+    if (IsInRange(operation, Operation::LESS, Operation::OR)) {
+        return ApplyComparison(operation, first, second);
+    }
+    return ApplyArithmetic(operation, first, second);
+}
+
+constexpr auto OPERATION_NAMES = std::to_array<std::pair<Operation, std::string_view>>({
+    {Operation::CONSTANT, "constant"},
+    {Operation::INPUT, "input"},
+    {Operation::TIME, "time"},
+    {Operation::TEMPERATURE, "temper"},
+    {Operation::NEGATE, "-"},
+    {Operation::NOT, "!"},
+    {Operation::ADD, "+"},
+    {Operation::SUBTRACT, "-"},
+    {Operation::MULTIPLY, "*"},
+    {Operation::DIVIDE, "/"},
+    {Operation::POWER, "^"},
+    {Operation::LESS, "<"},
+    {Operation::GREATER, ">"},
+    {Operation::LESS_EQUAL, "<="},
+    {Operation::GREATER_EQUAL, ">="},
+    {Operation::EQUAL, "=="},
+    {Operation::NOT_EQUAL, "!="},
+    {Operation::AND, "&&"},
+    {Operation::OR, "||"},
+    {Operation::TERNARY, "?:"},
+    {Operation::ABS, "abs"},
+    {Operation::SQRT, "sqrt"},
+    {Operation::EXP, "exp"},
+    {Operation::LN, "ln"},
+    {Operation::LOG10, "log10"},
+    {Operation::SIN, "sin"},
+    {Operation::COS, "cos"},
+    {Operation::TAN, "tan"},
+    {Operation::ASIN, "asin"},
+    {Operation::ACOS, "acos"},
+    {Operation::ATAN, "atan"},
+    {Operation::SINH, "sinh"},
+    {Operation::COSH, "cosh"},
+    {Operation::TANH, "tanh"},
+    {Operation::ASINH, "asinh"},
+    {Operation::ACOSH, "acosh"},
+    {Operation::ATANH, "atanh"},
+    {Operation::SIGN, "sgn"},
+    {Operation::STEP, "u"},
+    {Operation::RAMP_STEP, "u2"},
+    {Operation::RAMP, "uramp"},
+    {Operation::FLOOR, "floor"},
+    {Operation::CEIL, "ceil"},
+    {Operation::NEAREST_INTEGER, "nint"},
+    {Operation::MIN, "min"},
+    {Operation::MAX, "max"},
+    {Operation::POW, "pow"},
+    {Operation::PWR, "pwr"},
+});
 
 } // namespace
 
@@ -298,62 +399,19 @@ Result ApplyBinary(const Operation operation, const double first, const double s
  */
 std::expected<OperationResult, std::string> ApplyOperation(const Operation operation, const double first,
                                                            const double second) {
-    switch (operation) {
-    case Operation::NEGATE:
+    if (operation == Operation::NEGATE) {
         return OperationResult{.Value = -first, .PartialFirst = -1.0};
-    case Operation::NOT:
-        return Flat(TruthValue(first == 0.0));
-    case Operation::ADD:
-    case Operation::SUBTRACT:
-    case Operation::MULTIPLY:
-    case Operation::DIVIDE:
-    case Operation::POWER:
-    case Operation::POW:
-    case Operation::PWR:
-    case Operation::MIN:
-    case Operation::MAX:
-    case Operation::LESS:
-    case Operation::GREATER:
-    case Operation::LESS_EQUAL:
-    case Operation::GREATER_EQUAL:
-    case Operation::EQUAL:
-    case Operation::NOT_EQUAL:
-    case Operation::AND:
-    case Operation::OR:
-        return ApplyBinary(operation, first, second);
-    case Operation::CONSTANT:
-    case Operation::INPUT:
-    case Operation::TIME:
-    case Operation::TEMPERATURE:
-    case Operation::TERNARY:
-        return std::unexpected(std::format("{} is not an operation on values", GetOperationName(operation)));
-    case Operation::ABS:
-    case Operation::SQRT:
-    case Operation::EXP:
-    case Operation::LN:
-    case Operation::LOG10:
-    case Operation::SIN:
-    case Operation::COS:
-    case Operation::TAN:
-    case Operation::ASIN:
-    case Operation::ACOS:
-    case Operation::ATAN:
-    case Operation::SINH:
-    case Operation::COSH:
-    case Operation::TANH:
-    case Operation::ASINH:
-    case Operation::ACOSH:
-    case Operation::ATANH:
-    case Operation::SIGN:
-    case Operation::STEP:
-    case Operation::RAMP_STEP:
-    case Operation::RAMP:
-    case Operation::FLOOR:
-    case Operation::CEIL:
-    case Operation::NEAREST_INTEGER:
-    default:
-        return ApplyFunction(operation, first);
     }
+    if (operation == Operation::NOT) {
+        return Flat(TruthValue(first == 0.0));
+    }
+    if (IsInRange(operation, Operation::ADD, Operation::OR) || IsInRange(operation, Operation::MIN, Operation::PWR)) {
+        return ApplyBinary(operation, first, second);
+    }
+    if (IsInRange(operation, Operation::CONSTANT, Operation::TEMPERATURE) || operation == Operation::TERNARY) {
+        return std::unexpected(std::format("{} is not an operation on values", GetOperationName(operation)));
+    }
+    return ApplyFunction(operation, first);
 }
 
 /**
@@ -362,105 +420,12 @@ std::expected<OperationResult, std::string> ApplyOperation(const Operation opera
  * @return  The operator or function name, such as "sqrt" or "^".
  */
 std::string_view GetOperationName(const Operation operation) {
-    switch (operation) {
-    case Operation::CONSTANT:
-        return "constant";
-    case Operation::INPUT:
-        return "input";
-    case Operation::TIME:
-        return "time";
-    case Operation::TEMPERATURE:
-        return "temper";
-    case Operation::NEGATE:
-    case Operation::SUBTRACT:
-        return "-";
-    case Operation::NOT:
-        return "!";
-    case Operation::ADD:
-        return "+";
-    case Operation::MULTIPLY:
-        return "*";
-    case Operation::DIVIDE:
-        return "/";
-    case Operation::POWER:
-        return "^";
-    case Operation::LESS:
-        return "<";
-    case Operation::GREATER:
-        return ">";
-    case Operation::LESS_EQUAL:
-        return "<=";
-    case Operation::GREATER_EQUAL:
-        return ">=";
-    case Operation::EQUAL:
-        return "==";
-    case Operation::NOT_EQUAL:
-        return "!=";
-    case Operation::AND:
-        return "&&";
-    case Operation::OR:
-        return "||";
-    case Operation::TERNARY:
-        return "?:";
-    case Operation::ABS:
-        return "abs";
-    case Operation::SQRT:
-        return "sqrt";
-    case Operation::EXP:
-        return "exp";
-    case Operation::LN:
-        return "ln";
-    case Operation::LOG10:
-        return "log10";
-    case Operation::SIN:
-        return "sin";
-    case Operation::COS:
-        return "cos";
-    case Operation::TAN:
-        return "tan";
-    case Operation::ASIN:
-        return "asin";
-    case Operation::ACOS:
-        return "acos";
-    case Operation::ATAN:
-        return "atan";
-    case Operation::SINH:
-        return "sinh";
-    case Operation::COSH:
-        return "cosh";
-    case Operation::TANH:
-        return "tanh";
-    case Operation::ASINH:
-        return "asinh";
-    case Operation::ACOSH:
-        return "acosh";
-    case Operation::ATANH:
-        return "atanh";
-    case Operation::SIGN:
-        return "sgn";
-    case Operation::STEP:
-        return "u";
-    case Operation::RAMP_STEP:
-        return "u2";
-    case Operation::RAMP:
-        return "uramp";
-    case Operation::FLOOR:
-        return "floor";
-    case Operation::CEIL:
-        return "ceil";
-    case Operation::NEAREST_INTEGER:
-        return "nint";
-    case Operation::MIN:
-        return "min";
-    case Operation::MAX:
-        return "max";
-    case Operation::POW:
-        return "pow";
-    case Operation::PWR:
-        return "pwr";
-    default:
-        return "operation";
+    for (const auto &[entry, name] : OPERATION_NAMES) {
+        if (entry == operation) {
+            return name;
+        }
     }
+    return "operation";
 }
 
 } // namespace Nodalys
