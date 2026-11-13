@@ -164,6 +164,10 @@ public:
         m_DynamicUnknown.assign(static_cast<std::size_t>(top_node_unknowns), false);
     }
 
+    void SetTemperature(const double temperature_celsius, const double nominal_celsius) {
+        m_Compiled.Thermal = MakeThermalConditions(temperature_celsius, nominal_celsius);
+    }
+
     NodeId AddNode() { return ++m_MaxNode; }
 
     void AddPort(int number, NodeId node, double reference_ohms) {
@@ -849,6 +853,9 @@ public:
         m_Compiled.CompiledNodeCount = static_cast<int>(std::ranges::count(m_IsNodeUnknown, true)) + 1;
         m_Compiled.System = std::make_unique<MnaSystem>(std::move(m_IsNodeUnknown));
         m_Compiled.DynamicNode = std::move(m_DynamicUnknown);
+        for (const auto &device : m_Compiled.Devices) {
+            device->SetTemperature(m_Compiled.Thermal);
+        }
         return Circuit(std::make_unique<CircuitImpl>(std::move(m_Compiled)));
     }
 
@@ -894,6 +901,9 @@ CircuitBuilder &CircuitBuilder::operator=(CircuitBuilder &&) noexcept = default;
 
 void CircuitBuilder::SetCircuitNodeCount(int count) {
     m_Impl->SetCircuitNodeCount(count);
+}
+void CircuitBuilder::SetTemperature(const double temperature_celsius, const double nominal_celsius) {
+    m_Impl->SetTemperature(temperature_celsius, nominal_celsius);
 }
 NodeId CircuitBuilder::AddNode() {
     return m_Impl->AddNode();

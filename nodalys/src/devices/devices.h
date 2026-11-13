@@ -12,6 +12,7 @@
 #define NODALYS_DEVICES_H
 
 #include "devices/integration.h"
+#include "devices/thermal.h"
 #include "mna/mna_system.h"
 #include "nodalys/types.h"
 #include <complex>
@@ -163,6 +164,13 @@ public:
      * @param[in,out] x  The iterate to seed; devices that need an initial bias guess update it.
      */
     virtual void SeedOperatingPoint(std::vector<double> &x) const { (void)x; }
+
+    /**
+     * @brief   Moves the device to the temperature of the run, so its models and its thermal noise follow it.
+     * @details Every analysis calls it before it solves. A device that does not depend on the temperature ignores it.
+     * @param[in] thermal  Temperature of the run and the nominal temperature its parameters are given at.
+     */
+    virtual void SetTemperature(const ThermalConditions &thermal) { (void)thermal; }
 };
 
 /**
@@ -184,12 +192,15 @@ public:
                                            const std::vector<std::complex<double>> &x_ac, double omega) const override;
     double OutputNoiseVariance(const std::vector<double> &x_dc, const std::vector<std::complex<double>> &adjoint,
                                double frequency_hz) const override;
+    void SetTemperature(const ThermalConditions &thermal) override;
 
 private:
     int m_NodeA;
     int m_NodeB;
     double m_Conductance;
     bool m_Noisy;
+    /// $4kT$ of the thermal noise; a resistor keeps its value at any temperature, as no temperature coefficient is set.
+    double m_FourKt = FOUR_KT_NOMINAL;
 };
 
 /**

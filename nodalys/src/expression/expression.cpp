@@ -30,9 +30,11 @@ constexpr double NOMINAL_TEMPERATURE_CELSIUS = 27.0;
  */
 class Evaluator {
 public:
-    Evaluator(const ExpressionProgram &program, const std::span<const double> inputs, const double time_seconds)
-        : m_Program(program), m_Inputs(inputs), m_TimeSeconds(time_seconds), m_InputCount(program.Inputs.size()),
-          m_Values(program.Nodes.size(), 0.0), m_Partials(program.Nodes.size() * program.Inputs.size(), 0.0) {}
+    Evaluator(const ExpressionProgram &program, const std::span<const double> inputs, const double time_seconds,
+              const double temperature_celsius)
+        : m_Program(program), m_Inputs(inputs), m_TimeSeconds(time_seconds), m_TemperatureCelsius(temperature_celsius),
+          m_InputCount(program.Inputs.size()), m_Values(program.Nodes.size(), 0.0),
+          m_Partials(program.Nodes.size() * program.Inputs.size(), 0.0) {}
 
     std::expected<ExpressionResult, std::string> Run() {
         if (const auto done = Evaluate(m_Program.Root); !done) {
@@ -54,6 +56,7 @@ private:
     const ExpressionProgram &m_Program;
     std::span<const double> m_Inputs;
     double m_TimeSeconds;
+    double m_TemperatureCelsius;
     std::size_t m_InputCount;
     std::vector<double> m_Values;
     std::vector<double> m_Partials;
@@ -77,7 +80,7 @@ private:
             m_Values[slot] = m_TimeSeconds;
             return {};
         case Operation::TEMPERATURE:
-            m_Values[slot] = NOMINAL_TEMPERATURE_CELSIUS;
+            m_Values[slot] = m_TemperatureCelsius;
             return {};
         case Operation::TERNARY:
             return EvaluateTernary(node, slot);
@@ -181,19 +184,21 @@ bool Expression::IsTimeDependent() const {
 
 /**
  * @brief   Computes the value of the expression and its derivative with respect to each input.
- * @param[in] inputs        The value of each input, in the order of GetInputs(): the voltage between the nodes of a
- *                          voltage, the current of a source.
- * @param[in] time_seconds  What `time` reads; 0 outside a transient.
+ * @param[in] inputs               The value of each input, in the order of GetInputs(): the voltage between the nodes
+ *                                 of a voltage, the current of a source.
+ * @param[in] time_seconds         What `time` reads; 0 outside a transient.
+ * @param[in] temperature_celsius  What `temper` reads, in degrees Celsius.
  * @return  The value and the partial derivatives, or why the operands are out of range, such as the square root of a
  *          negative number, or a value that is not finite.
  */
 std::expected<ExpressionResult, std::string> Expression::Evaluate(const std::span<const double> inputs,
-                                                                  const double time_seconds) const {
+                                                                  const double time_seconds,
+                                                                  const double temperature_celsius) const {
     if (inputs.size() != m_Program->Inputs.size()) {
         return std::unexpected(
             std::format("The expression reads {} inputs, not {}", m_Program->Inputs.size(), inputs.size()));
     }
-    return Evaluator(*m_Program, inputs, time_seconds).Run();
+    return Evaluator(*m_Program, inputs, time_seconds, temperature_celsius).Run();
 }
 
 Expression::Expression(std::shared_ptr<const ExpressionProgram> program) : m_Program(std::move(program)) {

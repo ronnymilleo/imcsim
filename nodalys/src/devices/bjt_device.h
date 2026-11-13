@@ -39,6 +39,7 @@ public:
     bool HasTransientState() const override;
     void AcceptStep(const std::vector<double> &x) override;
     void RejectStep() override;
+    void SetTemperature(const ThermalConditions &thermal) override;
 
 private:
     struct Intrinsic {
@@ -56,6 +57,8 @@ private:
         double DIfwdQbDvbc; ///< $\partial (I_{\text{fwd}} / q_b) / \partial v_{bc}$ for SPICE `geqcb` base-width
                             ///< modulation transcapacitance.
     };
+    /// Recomputes the parameters at the temperature, from the ones given at the nominal temperature.
+    void ApplyTemperature(const ThermalConditions &thermal);
     /// Evaluates the intrinsic transport equations in NPN polarity ($v_{be}, v_{bc}$ forward-positive).
     Intrinsic Evaluate(double vbe, double vbc) const;
     /// Evaluates the intrinsic transistor at state vector `x`, accounting for NPN/PNP polarity.
@@ -67,8 +70,14 @@ private:
     int m_C; ///< Intrinsic collector node (`internal_collector` if $R_C > 0$, else `m_Collector`).
     int m_B; ///< Intrinsic base node (`internal_base` if $R_B > 0$, else `m_Base`).
     int m_E; ///< Intrinsic emitter node (`internal_emitter` if $R_E > 0$, else `m_Emitter`).
+    /// The parameters as the model gives them, at the nominal temperature.
+    BjtParameters m_Given;
+    /// The parameters at the temperature of the run, which every evaluation reads.
     BjtParameters m_Parameters;
+    ThermalConditions m_Thermal;
     bool m_Pnp;
+    /// Potential of both junctions at the temperature of the run, since they share the default $V_{JE} = V_{JC}$.
+    double m_JunctionPotential;
     double m_Vt;
     double m_Critical;
     /// Trapezoidal charge histories of the BE and BC junctions.

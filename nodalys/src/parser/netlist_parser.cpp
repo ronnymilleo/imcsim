@@ -147,6 +147,8 @@ DiodeParameters BuildDiodeParameters(const ParsedModel &m) {
     p.JunctionPotential = get("VJ", p.JunctionPotential);
     p.GradingCoefficient = get("M", p.GradingCoefficient);
     p.TransitTime = get("TT", p.TransitTime);
+    p.EnergyGap = get("EG", p.EnergyGap);
+    p.SaturationCurrentExponent = get("XTI", p.SaturationCurrentExponent);
     return p;
 }
 
@@ -169,6 +171,9 @@ BjtParameters BuildBjtParameters(const ParsedModel &m) {
     p.EmitterCapacitance = get("CJE", p.EmitterCapacitance);
     p.CollectorCapacitance = get("CJC", p.CollectorCapacitance);
     p.TransitTime = get("TF", p.TransitTime);
+    p.EnergyGap = get("EG", p.EnergyGap);
+    p.SaturationCurrentExponent = get("XTI", p.SaturationCurrentExponent);
+    p.BetaExponent = get("XTB", p.BetaExponent);
     return p;
 }
 
@@ -187,6 +192,7 @@ MosfetParameters BuildMosfetParameters(const ParsedModel &m) {
     p.GateDrainOverlap = get("CGDO", p.GateDrainOverlap);
     p.Length = get("L", p.Length);
     p.Width = get("W", p.Width);
+    p.SurfacePotential = get("PHI", p.SurfacePotential);
     return p;
 }
 
@@ -395,6 +401,8 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
     ParsedNetlist result;
     // .options may follow the .tran it applies to, so the method is applied once the whole deck is read
     std::optional<IntegrationMethod> integration_method;
+    double temperature_celsius = 27.0;
+    double nominal_celsius = 27.0;
     // SPICE standard: first line is circuit title
     result.Title = logical_lines.front();
 
@@ -994,8 +1002,20 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
                                 result.Options.Gmin = *opt_val;
                             } else if (opt_name == "MAXITER" || opt_name == "ITL1") {
                                 result.Options.MaxIterations = static_cast<int>(*opt_val);
+                            } else if (opt_name == "TEMP") {
+                                temperature_celsius = *opt_val;
+                            } else if (opt_name == "TNOM") {
+                                nominal_celsius = *opt_val;
                             }
                         }
+                    }
+                }
+            } else if (dir == ".TEMP") {
+                if (tokens.size() >= 2) {
+                    if (const auto temp_val = ParseSpiceNumber(tokens[1])) {
+                        temperature_celsius = *temp_val;
+                    } else {
+                        return std::unexpected(std::format("Invalid temperature '{}' in .temp: '{}'", tokens[1], line));
                     }
                 }
             }
@@ -1669,6 +1689,7 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
         }
     }
 
+    builder.SetTemperature(temperature_celsius, nominal_celsius);
     auto circuit_res = builder.Build();
     if (!circuit_res) {
         return std::unexpected(circuit_res.error());

@@ -136,17 +136,23 @@ std::optional<std::string> FindBehavioralProblem(const Component &part, const An
  * @brief   Compiles a circuit, runs one Nodalys analysis on it and turns the result into the one of imcsim.
  * @details Every analysis goes the same way, so a compile failure, the messages of the engine and its failures read
  *          alike whatever the analysis.
- * @param[in] circuit  Circuit to simulate.
- * @param[in] compute  Runs the analysis on the compiled circuit, filling the messages it is handed.
- * @param[in] convert  Turns the result of Nodalys into the result of imcsim, or into the reason it has none.
+ * @param[in] circuit              Circuit to simulate.
+ * @param[in] compute              Runs the analysis on the compiled circuit, filling the messages it is handed.
+ * @param[in] convert              Turns the result of Nodalys into the result of imcsim, or into the reason it has
+ * none.
+ * @param[in] temperature_celsius  Simulation temperature in degrees Celsius, or none for the nominal 27 C.
  */
 template <typename Run, typename Compute, typename Convert>
-Run RunOnNodalys(const Circuit &circuit, Compute compute, Convert convert) {
+Run RunOnNodalys(const Circuit &circuit, Compute compute, Convert convert,
+                 const std::optional<double> &temperature_celsius = std::nullopt) {
     Run run;
     std::expected<Nodalys::Circuit, std::string> compiled = CompileCircuit(circuit);
     if (!compiled) {
         run.Result = std::unexpected(std::format("Nodalys cannot simulate this circuit: {}", compiled.error()));
         return run;
+    }
+    if (temperature_celsius) {
+        compiled->SetTemperature(*temperature_celsius);
     }
     std::vector<Nodalys::DiagnosticMessage> messages;
     auto result = compute(*compiled, &messages);
@@ -169,8 +175,6 @@ Run RunOnNodalys(const Circuit &circuit, Compute compute, Convert convert) {
 NodalysBackend::NodalysBackend() {
     m_Capabilities.Analyses = NODALYS_ANALYSES;
     m_Capabilities.FindPartProblem = FindBehavioralProblem;
-    m_Capabilities.TemperatureUnsupported =
-        "Nodalys simulates at 27 C only: its device models do not follow the temperature yet";
     for (int index = 0; index <= static_cast<int>(ComponentType::SEVEN_SEGMENT); ++index) {
         const auto type = static_cast<ComponentType>(index);
         if (IsLogicPart(type)) {
@@ -207,12 +211,11 @@ const BackendCapabilities &NodalysBackend::GetCapabilities() const {
 /**
  * @brief   Computes the DC operating point of a circuit.
  * @param[in] circuit              Circuit to simulate, already checked.
- * @param[in] temperature_celsius  Unused: the simulator refuses another temperature before the run, as the
- *                                 capabilities say.
+ * @param[in] temperature_celsius  Simulation temperature in degrees Celsius, or none for 27 C.
  * @return  The node voltages and currents or an error, plus the messages of Nodalys.
  */
 OperatingPointRun NodalysBackend::RunOperatingPoint(const Circuit &circuit,
-                                                    const std::optional<double> & /*temperature_celsius*/) {
+                                                    const std::optional<double> &temperature_celsius) {
     return RunOnNodalys<OperatingPointRun>(
         circuit,
         [](const Nodalys::Circuit &compiled, std::vector<Nodalys::DiagnosticMessage> *messages) {
@@ -226,21 +229,21 @@ OperatingPointRun NodalysBackend::RunOperatingPoint(const Circuit &circuit,
                 point.Currents.push_back({std::move(current.Name), current.Current});
             }
             return point;
-        });
+        },
+        temperature_celsius);
 }
 
 /**
  * @brief   Simulates how the node voltages and currents of a circuit change over time.
  * @param[in] circuit              Circuit to simulate, already checked.
  * @param[in] settings             Stop time and time step.
- * @param[in] temperature_celsius  Unused, as for the operating point.
+ * @param[in] temperature_celsius  Simulation temperature in degrees Celsius, or none for 27 C.
  * @param[in] monitor              Stop request, progress, chunks, live changes and pace of the run.
  * @return  The voltages and currents at every time point or an error, plus the messages of Nodalys. A circuit with a
  *          noise or random source is refused, since Nodalys cannot draw its values yet.
  */
 TransientRun NodalysBackend::RunTransient(const Circuit &circuit, const TransientSettings &settings,
-                                          const std::optional<double> & /*temperature_celsius*/,
-                                          const RunMonitor &monitor) {
+                                          const std::optional<double> &temperature_celsius, const RunMonitor &monitor) {
     if (std::optional<std::string> reason = FindRandomSource(circuit)) {
         return {std::unexpected(std::move(*reason)), {}};
     }
@@ -268,18 +271,19 @@ TransientRun NodalysBackend::RunTransient(const Circuit &circuit, const Transien
                     "first");
             }
             return transient;
-        });
+        },
+        temperature_celsius);
 }
 
 /**
  * @brief   Sweeps a source through a range of DC values, once per value of a second stepped source if there is one.
  * @param[in] circuit              Circuit to simulate, already checked.
  * @param[in] settings             Swept source and range, and the stepped one.
- * @param[in] temperature_celsius  Unused, as for the operating point.
+ * @param[in] temperature_celsius  Simulation temperature in degrees Celsius, or none for 27 C.
  * @return  One curve per stepped value or an error, plus the messages of Nodalys.
  */
 DCSweepRun NodalysBackend::RunDCSweep(const Circuit &circuit, const DCSweepSettings &settings,
-                                      const std::optional<double> & /*temperature_celsius*/) {
+                                      const std::optional<double> &temperature_celsius) {
     Nodalys::DcSweepConfig config{.SweptSource = settings.Swept.Source,
                                   .SweptStart = settings.Swept.Start,
                                   .SweptStop = settings.Swept.Stop,
@@ -309,18 +313,19 @@ DCSweepRun NodalysBackend::RunDCSweep(const Circuit &circuit, const DCSweepSetti
                                         .Currents = ToTraces(std::move(curve.Currents))});
             }
             return sweep;
-        });
+        },
+        temperature_celsius);
 }
 
 /**
  * @brief   Sweeps the small-signal response of a circuit across frequency.
  * @param[in] circuit              Circuit to simulate, already checked.
  * @param[in] settings             Frequency range and points per decade.
- * @param[in] temperature_celsius  Unused, as for the operating point.
+ * @param[in] temperature_celsius  Simulation temperature in degrees Celsius, or none for 27 C.
  * @return  The magnitude and phase of every node and current or an error, plus the messages of Nodalys.
  */
 ACSweepRun NodalysBackend::RunACSweep(const Circuit &circuit, const ACSweepSettings &settings,
-                                      const std::optional<double> & /*temperature_celsius*/) {
+                                      const std::optional<double> &temperature_celsius) {
     const Nodalys::AcSweepConfig config{.StartFrequency = settings.StartFrequency,
                                         .StopFrequency = settings.StopFrequency,
                                         .PointsPerDecade = settings.PointsPerDecade};
@@ -337,7 +342,8 @@ ACSweepRun NodalysBackend::RunACSweep(const Circuit &circuit, const ACSweepSetti
                            .NodePhasesDegrees = std::move(result.NodePhasesDegrees),
                            .CurrentMagnitudesDecibels = ToTraces(std::move(result.CurrentMagnitudesDecibels)),
                            .CurrentPhasesDegrees = ToTraces(std::move(result.CurrentPhasesDegrees))};
-        });
+        },
+        temperature_celsius);
 }
 
 /**

@@ -113,7 +113,15 @@ double ResistorDevice::OutputNoiseVariance(const std::vector<double> & /*x_dc*/,
         return 0.0;
     }
     const std::complex<double> transfer = AcBranchVoltage(adjoint, m_NodeA, m_NodeB);
-    return FOUR_KT_NOMINAL * m_Conductance * std::norm(transfer);
+    return m_FourKt * m_Conductance * std::norm(transfer);
+}
+
+/**
+ * @brief   Moves the thermal noise of the resistor to the temperature of the run.
+ * @param[in] thermal  Temperature of the run; the resistance itself does not change.
+ */
+void ResistorDevice::SetTemperature(const ThermalConditions &thermal) {
+    m_FourKt = GetFourKt(thermal);
 }
 
 // ============================================================================

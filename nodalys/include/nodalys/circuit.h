@@ -42,6 +42,9 @@ public:
     /// Configured RF ports for S-parameter analysis.
     const std::vector<CircuitPort> &GetPorts() const;
 
+    /// Sets the simulation and nominal temperatures in degrees Celsius for subsequent analyses.
+    void SetTemperature(double temperature_celsius, double nominal_celsius = 27.0);
+
     /// Internal accessor for solver execution.
     explicit Circuit(std::unique_ptr<CircuitImpl> impl);
     CircuitImpl &Impl();

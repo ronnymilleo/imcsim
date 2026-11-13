@@ -41,6 +41,14 @@ std::string_view BehavioralSourceDevice::GetFault() const {
     return m_Fault;
 }
 
+/**
+ * @brief   Updates the temperature that `temper` reads inside the expression.
+ * @param[in] thermal  Temperature of the run.
+ */
+void BehavioralSourceDevice::SetTemperature(const ThermalConditions &thermal) {
+    m_TemperatureCelsius = thermal.TemperatureKelvin - CELSIUS_TO_KELVIN;
+}
+
 BehavioralSourceDevice::BehavioralSourceDevice(std::string name, Expression expression,
                                                std::vector<BehavioralBinding> bindings)
     : m_Name(std::move(name)), m_Expression(std::move(expression)), m_Bindings(std::move(bindings)),
@@ -56,7 +64,8 @@ BehavioralSourceDevice::BehavioralSourceDevice(std::string name, Expression expr
 void BehavioralSourceDevice::Linearize(const std::vector<double> &x, const TimeContext &time) {
     m_TimeSeconds = time.IsTransient ? time.Time : 0.0;
     const std::vector<double> inputs = ReadInputs(x);
-    const std::expected<ExpressionResult, std::string> result = m_Expression.Evaluate(inputs, m_TimeSeconds);
+    const std::expected<ExpressionResult, std::string> result =
+        m_Expression.Evaluate(inputs, m_TimeSeconds, m_TemperatureCelsius);
     if (result) {
         m_Fault.clear();
         m_Value = result->Value;
@@ -95,7 +104,8 @@ void BehavioralSourceDevice::StampPartials(MnaSystem &sys, const int row, const 
  * @return  The value, or 0 where the expression has none, which the fault of the stamp reports.
  */
 double BehavioralSourceDevice::EvaluateAt(const std::vector<double> &x) const {
-    const std::expected<ExpressionResult, std::string> result = m_Expression.Evaluate(ReadInputs(x), m_TimeSeconds);
+    const std::expected<ExpressionResult, std::string> result =
+        m_Expression.Evaluate(ReadInputs(x), m_TimeSeconds, m_TemperatureCelsius);
     return result ? result->Value : 0.0;
 }
 

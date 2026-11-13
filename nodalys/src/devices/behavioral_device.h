@@ -46,6 +46,7 @@ public:
     bool IsLinear() const override;
     bool SupportsHarmonicBalance() const override;
     std::string_view GetFault() const override;
+    void SetTemperature(const ThermalConditions &thermal) override;
 
 protected:
     BehavioralSourceDevice(std::string name, Expression expression, std::vector<BehavioralBinding> bindings);
@@ -65,6 +66,7 @@ private:
     std::vector<BehavioralBinding> m_Bindings;
     std::string m_Fault;
     double m_TimeSeconds = 0.0;
+    double m_TemperatureCelsius = 27.0;
     double m_Value = 0.0;
     double m_Offset = 0.0;
     /// Derivative of the value with respect to each input at the last stamp.

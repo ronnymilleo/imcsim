@@ -31,6 +31,7 @@ public:
 
     // Node & Reference Management
     void SetCircuitNodeCount(int count);
+    void SetTemperature(double temperature_celsius, double nominal_celsius = 27.0);
     NodeId AddNode();
     void AddPort(int number, NodeId node, double reference_ohms = 50.0);
     void AddPort(const CircuitPort &port);

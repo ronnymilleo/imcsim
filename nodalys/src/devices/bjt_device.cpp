@@ -26,8 +26,39 @@ BjtDevice::BjtDevice(const int collector, const int base, const int emitter, con
                      const int internal_base, const int internal_emitter, BjtParameters parameters, const bool pnp)
     : m_Collector(collector), m_Base(base), m_Emitter(emitter),
       m_C(internal_collector >= 0 ? internal_collector : collector), m_B(internal_base >= 0 ? internal_base : base),
-      m_E(internal_emitter >= 0 ? internal_emitter : emitter), m_Parameters(parameters), m_Pnp(pnp),
-      m_Vt(THERMAL_VOLTAGE), m_Critical(PnCriticalVoltage(std::max(parameters.SaturationCurrent, 1e-30), m_Vt)) {
+      m_E(internal_emitter >= 0 ? internal_emitter : emitter), m_Given(parameters), m_Parameters(parameters),
+      m_Pnp(pnp), m_JunctionPotential(BJT_JUNCTION_POTENTIAL), m_Vt(THERMAL_VOLTAGE),
+      m_Critical(PnCriticalVoltage(std::max(parameters.SaturationCurrent, 1e-30), m_Vt)) {
+    ApplyTemperature(m_Thermal);
+}
+
+/**
+ * @brief   Scales the saturation currents, the current gains and the junction capacitances with the temperature.
+ * @details The laws are those of ngspice with the default `TLEV` and `TLEVC`: $I_S(T) = I_S e^{f}$ with $f$ from
+ *          GetSaturationCurrentLogRatio(), the base-emitter leakage $I_{SE}(T) = I_{SE} e^{f/N_E} / b$ and the gains
+ *          $eta(T) = eta b$ with $b = (T/T_{nom})^{X_{TB}}$, and the junction potential and capacitances of
+ *          GetJunctionPotential() and GetJunctionCapacitance(). The resistances, the transit time and the Early
+ *          voltage have no coefficient set, so they stay.
+ */
+void BjtDevice::ApplyTemperature(const ThermalConditions &thermal) {
+    m_Thermal = thermal;
+    m_Parameters = m_Given;
+    const double log_ratio =
+        GetSaturationCurrentLogRatio(thermal, m_Given.EnergyGap, m_Given.SaturationCurrentExponent);
+    const double beta_factor =
+        std::exp(std::log(thermal.TemperatureKelvin / thermal.NominalKelvin) * m_Given.BetaExponent);
+    m_Parameters.SaturationCurrent = m_Given.SaturationCurrent * std::exp(log_ratio);
+    m_Parameters.LeakageSaturationCurrent =
+        m_Given.LeakageSaturationCurrent * std::exp(log_ratio / m_Given.LeakageEmissionCoefficient) / beta_factor;
+    m_Parameters.ForwardBeta = m_Given.ForwardBeta * beta_factor;
+    m_Parameters.ReverseBeta = m_Given.ReverseBeta * beta_factor;
+    m_JunctionPotential = GetJunctionPotential(thermal, BJT_JUNCTION_POTENTIAL);
+    m_Parameters.EmitterCapacitance =
+        GetJunctionCapacitance(thermal, m_Given.EmitterCapacitance, BJT_JUNCTION_POTENTIAL, BJT_GRADING_COEFFICIENT);
+    m_Parameters.CollectorCapacitance =
+        GetJunctionCapacitance(thermal, m_Given.CollectorCapacitance, BJT_JUNCTION_POTENTIAL, BJT_GRADING_COEFFICIENT);
+    m_Vt = GetThermalVoltage(thermal);
+    m_Critical = PnCriticalVoltage(std::max(m_Parameters.SaturationCurrent, 1e-30), m_Vt);
 }
 
 BjtDevice::Intrinsic BjtDevice::Evaluate(const double vbe, const double vbc) const {
@@ -146,9 +177,9 @@ void BjtDevice::Stamp(MnaSystem &sys, const std::vector<double> &x, const TimeCo
     if (time.IsTransient && HasTransientState()) {
         const double vbe_signed = m_Pnp ? -vbe : vbe;
         const double vbc_signed = m_Pnp ? -vbc : vbc;
-        const DepletionCharge qbe = EvaluateDepletion(vbe_signed, p.EmitterCapacitance, BJT_JUNCTION_POTENTIAL,
+        const DepletionCharge qbe = EvaluateDepletion(vbe_signed, p.EmitterCapacitance, m_JunctionPotential,
                                                       BJT_GRADING_COEFFICIENT, JUNCTION_FORWARD_LIMIT);
-        const DepletionCharge qbc = EvaluateDepletion(vbc_signed, p.CollectorCapacitance, BJT_JUNCTION_POTENTIAL,
+        const DepletionCharge qbc = EvaluateDepletion(vbc_signed, p.CollectorCapacitance, m_JunctionPotential,
                                                       BJT_GRADING_COEFFICIENT, JUNCTION_FORWARD_LIMIT);
         const ChargeCompanion cap_be =
             ChargeModel(qbe.Capacitance + p.TransitTime * dc.DIfwdQbDvbe, qbe.Charge + p.TransitTime * dc.IfwdQb,
@@ -195,9 +226,9 @@ void BjtDevice::StampAc(MnaSystem &reactive, const std::vector<double> &x_dc) co
     const double vbc = NodeVoltage(x_dc, m_B) - NodeVoltage(x_dc, m_C);
     const double vbe_signed = m_Pnp ? -vbe : vbe;
     const double vbc_signed = m_Pnp ? -vbc : vbc;
-    const DepletionCharge qbe = EvaluateDepletion(vbe_signed, p.EmitterCapacitance, BJT_JUNCTION_POTENTIAL,
+    const DepletionCharge qbe = EvaluateDepletion(vbe_signed, p.EmitterCapacitance, m_JunctionPotential,
                                                   BJT_GRADING_COEFFICIENT, JUNCTION_FORWARD_LIMIT);
-    const DepletionCharge qbc = EvaluateDepletion(vbc_signed, p.CollectorCapacitance, BJT_JUNCTION_POTENTIAL,
+    const DepletionCharge qbc = EvaluateDepletion(vbc_signed, p.CollectorCapacitance, m_JunctionPotential,
                                                   BJT_GRADING_COEFFICIENT, JUNCTION_FORWARD_LIMIT);
     StampConductance(reactive, m_B, m_E, qbe.Capacitance + p.TransitTime * dc.DIfwdQbDvbe);
     StampConductance(reactive, m_B, m_C, qbc.Capacitance);
@@ -219,9 +250,9 @@ void BjtDevice::StampCharge(MnaSystem &sys, const std::vector<double> &x) const 
     const double vbc = NodeVoltage(x, m_B) - NodeVoltage(x, m_C);
     const double vbe_signed = m_Pnp ? -vbe : vbe;
     const double vbc_signed = m_Pnp ? -vbc : vbc;
-    const DepletionCharge qbe = EvaluateDepletion(vbe_signed, p.EmitterCapacitance, BJT_JUNCTION_POTENTIAL,
+    const DepletionCharge qbe = EvaluateDepletion(vbe_signed, p.EmitterCapacitance, m_JunctionPotential,
                                                   BJT_GRADING_COEFFICIENT, JUNCTION_FORWARD_LIMIT);
-    const DepletionCharge qbc = EvaluateDepletion(vbc_signed, p.CollectorCapacitance, BJT_JUNCTION_POTENTIAL,
+    const DepletionCharge qbc = EvaluateDepletion(vbc_signed, p.CollectorCapacitance, m_JunctionPotential,
                                                   BJT_GRADING_COEFFICIENT, JUNCTION_FORWARD_LIMIT);
 
     const double c_be = qbe.Capacitance + p.TransitTime * dc.DIfwdQbDvbe;
@@ -251,9 +282,9 @@ double BjtDevice::TerminalCharge(const int terminal, const std::vector<double> &
     const double vbc = NodeVoltage(x, m_B) - NodeVoltage(x, m_C);
     const double vbe_signed = m_Pnp ? -vbe : vbe;
     const double vbc_signed = m_Pnp ? -vbc : vbc;
-    const DepletionCharge qbe = EvaluateDepletion(vbe_signed, p.EmitterCapacitance, BJT_JUNCTION_POTENTIAL,
+    const DepletionCharge qbe = EvaluateDepletion(vbe_signed, p.EmitterCapacitance, m_JunctionPotential,
                                                   BJT_GRADING_COEFFICIENT, JUNCTION_FORWARD_LIMIT);
-    const DepletionCharge qbc = EvaluateDepletion(vbc_signed, p.CollectorCapacitance, BJT_JUNCTION_POTENTIAL,
+    const DepletionCharge qbc = EvaluateDepletion(vbc_signed, p.CollectorCapacitance, m_JunctionPotential,
                                                   BJT_GRADING_COEFFICIENT, JUNCTION_FORWARD_LIMIT);
     const double sign = m_Pnp ? -1.0 : 1.0;
     const double q_be = sign * (qbe.Charge + p.TransitTime * dc.IfwdQb);
@@ -285,9 +316,9 @@ std::complex<double> BjtDevice::AcTerminalCurrent(const int terminal, const std:
         const double vbc = NodeVoltage(x_dc, m_B) - NodeVoltage(x_dc, m_C);
         const double vbe_signed = m_Pnp ? -vbe : vbe;
         const double vbc_signed = m_Pnp ? -vbc : vbc;
-        const DepletionCharge qbe = EvaluateDepletion(vbe_signed, p.EmitterCapacitance, BJT_JUNCTION_POTENTIAL,
+        const DepletionCharge qbe = EvaluateDepletion(vbe_signed, p.EmitterCapacitance, m_JunctionPotential,
                                                       BJT_GRADING_COEFFICIENT, JUNCTION_FORWARD_LIMIT);
-        const DepletionCharge qbc = EvaluateDepletion(vbc_signed, p.CollectorCapacitance, BJT_JUNCTION_POTENTIAL,
+        const DepletionCharge qbc = EvaluateDepletion(vbc_signed, p.CollectorCapacitance, m_JunctionPotential,
                                                       BJT_GRADING_COEFFICIENT, JUNCTION_FORWARD_LIMIT);
         iqbe_ac = std::complex<double>(0.0, omega) * ((qbe.Capacitance + p.TransitTime * dc.DIfwdQbDvbe) * vbe_ac +
                                                       (p.TransitTime * dc.DIfwdQbDvbc) * vbc_ac);
@@ -348,15 +379,15 @@ double BjtDevice::OutputNoiseVariance(const std::vector<double> &x_dc, const std
     double variance = 0.0;
     if (m_C != m_Collector && p.CollectorResistance > 0.0) {
         const std::complex<double> rc_tf = AcNodeVoltage(adjoint, m_Collector) - AcNodeVoltage(adjoint, m_C);
-        variance += (FOUR_KT_NOMINAL / p.CollectorResistance) * std::norm(rc_tf);
+        variance += (GetFourKt(m_Thermal) / p.CollectorResistance) * std::norm(rc_tf);
     }
     if (m_B != m_Base && p.BaseResistance > 0.0) {
         const std::complex<double> rb_tf = AcNodeVoltage(adjoint, m_Base) - AcNodeVoltage(adjoint, m_B);
-        variance += (FOUR_KT_NOMINAL / p.BaseResistance) * std::norm(rb_tf);
+        variance += (GetFourKt(m_Thermal) / p.BaseResistance) * std::norm(rb_tf);
     }
     if (m_E != m_Emitter && p.EmitterResistance > 0.0) {
         const std::complex<double> re_tf = AcNodeVoltage(adjoint, m_Emitter) - AcNodeVoltage(adjoint, m_E);
-        variance += (FOUR_KT_NOMINAL / p.EmitterResistance) * std::norm(re_tf);
+        variance += (GetFourKt(m_Thermal) / p.EmitterResistance) * std::norm(re_tf);
     }
     const Intrinsic op = EvaluateAt(x_dc);
     const std::complex<double> ic_tf = AcNodeVoltage(adjoint, m_C) - AcNodeVoltage(adjoint, m_E);
@@ -381,11 +412,11 @@ void BjtDevice::AcceptStep(const std::vector<double> &x) {
     const double vbc_signed = m_Pnp ? -vbc : vbc;
     const BjtParameters &p = m_Parameters;
     const Intrinsic dc = EvaluateAt(x);
-    const double charge_be = EvaluateDepletion(vbe_signed, p.EmitterCapacitance, BJT_JUNCTION_POTENTIAL,
+    const double charge_be = EvaluateDepletion(vbe_signed, p.EmitterCapacitance, m_JunctionPotential,
                                                BJT_GRADING_COEFFICIENT, JUNCTION_FORWARD_LIMIT)
                                  .Charge +
                              p.TransitTime * dc.IfwdQb;
-    const double charge_bc = EvaluateDepletion(vbc_signed, p.CollectorCapacitance, BJT_JUNCTION_POTENTIAL,
+    const double charge_bc = EvaluateDepletion(vbc_signed, p.CollectorCapacitance, m_JunctionPotential,
                                                BJT_GRADING_COEFFICIENT, JUNCTION_FORWARD_LIMIT)
                                  .Charge;
     m_HistoryBe = AdvanceHistory(m_HistoryBe, charge_be, m_Gqbe * vbe_signed + m_Ieqbe);
@@ -397,6 +428,14 @@ void BjtDevice::AcceptStep(const std::vector<double> &x) {
 void BjtDevice::RejectStep() {
     m_HistoryBe = m_SavedHistoryBe;
     m_HistoryBc = m_SavedHistoryBc;
+}
+
+/**
+ * @brief   Moves the transistor to the temperature of the run.
+ * @param[in] thermal  Temperature of the run and the nominal temperature the parameters are given at.
+ */
+void BjtDevice::SetTemperature(const ThermalConditions &thermal) {
+    ApplyTemperature(thermal);
 }
 
 } // namespace Nodalys

@@ -24,6 +24,7 @@ add_library(nodalys STATIC
     src/devices/integration.cpp
     src/devices/mosfet_device.cpp
     src/devices/smooth_logic.cpp
+    src/devices/thermal.cpp
     src/devices/waveforms.cpp
     src/export/csv_exporter.cpp
     src/export/exporters.cpp

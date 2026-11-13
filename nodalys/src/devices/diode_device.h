@@ -41,12 +41,15 @@ public:
     bool HasTransientState() const override;
     void AcceptStep(const std::vector<double> &x) override;
     void RejectStep() override;
+    void SetTemperature(const ThermalConditions &thermal) override;
 
 private:
     struct Junction {
         double Current;
         double Conductance;
     };
+    /// Recomputes the parameters at the temperature, from the ones given at the nominal temperature.
+    void ApplyTemperature(const ThermalConditions &thermal);
     Junction Evaluate(double voltage) const;
     double Charge(double voltage) const;
     double Capacitance(double voltage) const;
@@ -56,7 +59,11 @@ private:
     int m_Cathode;
     int m_Internal;
     int m_JunctionNode; ///< Cathode side of the intrinsic junction (`m_Internal` when $R_S > 0$, else `m_Cathode`).
+    /// The parameters as the model gives them, at the nominal temperature.
+    DiodeParameters m_Given;
+    /// The parameters at the temperature of the run, which every evaluation reads.
     DiodeParameters m_Parameters;
+    ThermalConditions m_Thermal;
     double m_Vt;
     double m_Critical;
     /// Trapezoidal charge history at the last accepted time point.

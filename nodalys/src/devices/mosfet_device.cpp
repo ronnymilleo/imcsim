@@ -23,10 +23,33 @@ constexpr double MOSFET_BODY_SATURATION_CURRENT = 1e-14;
 MosfetDevice::MosfetDevice(const int drain, const int gate, const int source, const int internal_drain,
                            const int internal_source, MosfetParameters parameters, const bool pmos)
     : m_Drain(drain), m_Gate(gate), m_Source(source), m_D(internal_drain >= 0 ? internal_drain : drain),
-      m_S(internal_source >= 0 ? internal_source : source), m_Parameters(parameters), m_Pmos(pmos),
+      m_S(internal_source >= 0 ? internal_source : source), m_Given(parameters), m_Parameters(parameters), m_Pmos(pmos),
       m_Beta(parameters.Transconductance * parameters.Width / parameters.Length), m_Vt(THERMAL_VOLTAGE),
       m_Cgs(parameters.GateSourceOverlap * parameters.Width), m_Cgd(parameters.GateDrainOverlap * parameters.Width),
       m_Critical(PnCriticalVoltage(MOSFET_BODY_SATURATION_CURRENT, THERMAL_VOLTAGE)) {
+    ApplyTemperature(m_Thermal);
+}
+
+/**
+ * @brief   Scales the transconductance, the threshold voltage and the body-diode thermal voltage with the temperature.
+ * @details In SPICE level 1 (`mos1temp.c`), the mobility drops as $(T / T_{nom})^{-3/2}$ and the threshold voltage
+ *          follows half the shift of the surface potential $\phi$ and the silicon band gap:
+ *          $V_{TO}(T) = V_{TO} + \frac{1}{2} (s (\phi(T) - \phi) - (E_g(T) - E_g(T_{nom})))$ with $s = +1$ for NMOS
+ *          and $-1$ for PMOS. The series resistances and overlap capacitances have no coefficient set, so they stay.
+ */
+void MosfetDevice::ApplyTemperature(const ThermalConditions &thermal) {
+    m_Thermal = thermal;
+    m_Parameters = m_Given;
+    const double ratio = thermal.TemperatureKelvin / thermal.NominalKelvin;
+    m_Parameters.Transconductance = m_Given.Transconductance * std::pow(ratio, -1.5);
+    m_Beta = m_Parameters.Transconductance * m_Parameters.Width / m_Parameters.Length;
+    const double phi_t = GetJunctionPotential(thermal, m_Given.SurfacePotential);
+    const double eg_delta = GetBandGap(thermal.TemperatureKelvin) - GetBandGap(thermal.NominalKelvin);
+    const double polarity = m_Pmos ? -1.0 : 1.0;
+    m_Parameters.ThresholdVoltage =
+        m_Given.ThresholdVoltage + 0.5 * (polarity * (phi_t - m_Given.SurfacePotential) - eg_delta);
+    m_Vt = GetThermalVoltage(thermal);
+    m_Critical = PnCriticalVoltage(MOSFET_BODY_SATURATION_CURRENT, m_Vt);
 }
 
 MosfetDevice::Channel MosfetDevice::Evaluate(const double vgs_eff, const double vds_eff) const {
@@ -244,14 +267,15 @@ double MosfetDevice::OutputNoiseVariance(const std::vector<double> &x_dc,
                                          const std::vector<std::complex<double>> &adjoint,
                                          const double /*frequency_hz*/) const {
     const MosfetParameters &p = m_Parameters;
+    const double four_kt = GetFourKt(m_Thermal);
     double variance = 0.0;
     if (m_D != m_Drain && p.DrainResistance > 0.0) {
         const std::complex<double> rd_tf = AcNodeVoltage(adjoint, m_Drain) - AcNodeVoltage(adjoint, m_D);
-        variance += (FOUR_KT_NOMINAL / p.DrainResistance) * std::norm(rd_tf);
+        variance += (four_kt / p.DrainResistance) * std::norm(rd_tf);
     }
     if (m_S != m_Source && p.SourceResistance > 0.0) {
         const std::complex<double> rs_tf = AcNodeVoltage(adjoint, m_Source) - AcNodeVoltage(adjoint, m_S);
-        variance += (FOUR_KT_NOMINAL / p.SourceResistance) * std::norm(rs_tf);
+        variance += (four_kt / p.SourceResistance) * std::norm(rs_tf);
     }
     const double pol = m_Pmos ? -1.0 : 1.0;
     const double vd = NodeVoltage(x_dc, m_D);
@@ -264,7 +288,7 @@ double MosfetDevice::OutputNoiseVariance(const std::vector<double> &x_dc,
     const double vds_eff = pol * (NodeVoltage(x_dc, d_eff) - NodeVoltage(x_dc, s_eff));
     const Channel channel = Evaluate(vgs_eff, vds_eff);
     const std::complex<double> ch_tf = AcNodeVoltage(adjoint, m_D) - AcNodeVoltage(adjoint, m_S);
-    variance += (2.0 / 3.0) * FOUR_KT_NOMINAL * std::fabs(channel.Gm) * std::norm(ch_tf);
+    variance += (2.0 / 3.0) * four_kt * std::fabs(channel.Gm) * std::norm(ch_tf);
     return variance;
 }
 
@@ -301,6 +325,14 @@ void MosfetDevice::AcceptStep(const std::vector<double> &x) {
 void MosfetDevice::RejectStep() {
     m_HistoryGs = m_SavedHistoryGs;
     m_HistoryGd = m_SavedHistoryGd;
+}
+
+/**
+ * @brief   Moves the MOSFET to the temperature of the run.
+ * @param[in] thermal  Temperature of the run and the nominal temperature the parameters are given at.
+ */
+void MosfetDevice::SetTemperature(const ThermalConditions &thermal) {
+    ApplyTemperature(thermal);
 }
 
 void MosfetDevice::SeedOperatingPoint(std::vector<double> &) const {

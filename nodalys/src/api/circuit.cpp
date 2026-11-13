@@ -5,6 +5,7 @@
 
 #include "nodalys/circuit.h"
 #include "api/circuit_impl.h"
+#include "devices/thermal.h"
 
 namespace Nodalys {
 
@@ -31,6 +32,17 @@ bool Circuit::HasInitialConditions() const {
 const std::vector<CircuitPort> &Circuit::GetPorts() const {
     static const std::vector<CircuitPort> empty_ports;
     return m_Impl ? m_Impl->GetPorts() : empty_ports;
+}
+
+void Circuit::SetTemperature(const double temperature_celsius, const double nominal_celsius) {
+    if (!m_Impl) {
+        return;
+    }
+    CompiledCircuit &compiled = m_Impl->Compiled();
+    compiled.Thermal = MakeThermalConditions(temperature_celsius, nominal_celsius);
+    for (const auto &device : compiled.Devices) {
+        device->SetTemperature(compiled.Thermal);
+    }
 }
 
 CircuitImpl &Circuit::Impl() {
