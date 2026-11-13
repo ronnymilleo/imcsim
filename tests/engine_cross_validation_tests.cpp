@@ -139,9 +139,6 @@ constexpr std::string_view LOGIC_START_STATE =
 constexpr std::string_view LOGIC_OPERATING_POINT =
     "a low gate output sits at 0.45 mV on Nodalys (smooth gate) and at exactly 0 V on ngspice, which is the ideal "
     "one; the flip-flops also start in the opposite state (unverified which input of the model decides)";
-constexpr std::string_view SOURCE_VALUE_SENSITIVITY =
-    "the normalized sensitivity of a source is scaled by its stored value, 5 V for an AC source whose DC level in the "
-    "netlist is 0: ngspice reads the stored value, Nodalys the DC level, which is right";
 constexpr std::string_view LEAKAGE_BIASED_NODES =
     "a node between an off transistor or switch and a diode is set by pico-ampere leakage, which each engine adds "
     "its own GMIN to, so the voltage is 1 % apart and neither is more right";
@@ -200,10 +197,6 @@ constexpr std::array KNOWN_DIFFERENCES{
     KnownDifference{"rlc_low_pass_poles_and_zeros.imcsim", POLE_ZERO_NAME,
                     "Nodalys adds two zeros at +-4.6e13 rad/s, which are numerical infinity for a transfer with no "
                     "zeros; ngspice's pole pair -5000 +-j31225 rad/s is the analytic one, so ngspice is right"},
-    KnownDifference{"rc_low_pass_filter.imcsim", SENSITIVITY_NAME, SOURCE_VALUE_SENSITIVITY},
-    KnownDifference{"noise_through_rc_low_pass.imcsim", SENSITIVITY_NAME, SOURCE_VALUE_SENSITIVITY},
-    KnownDifference{"monte_carlo_rc_low_pass.imcsim", SENSITIVITY_NAME, SOURCE_VALUE_SENSITIVITY},
-    KnownDifference{"rlc_low_pass_poles_and_zeros.imcsim", SENSITIVITY_NAME, SOURCE_VALUE_SENSITIVITY},
     KnownDifference{"rc_blocks.imcsim", SENSITIVITY_NAME,
                     "Nodalys lists no sensitivity for the block instances X1 and X2, which ngspice reports as the "
                     "largest of their inner parts"},

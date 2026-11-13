@@ -6,6 +6,7 @@
 #include "simulation/sensitivity.h"
 
 #include "circuit/components/controlled_source.h"
+#include "circuit/components/source.h"
 #include <algorithm>
 #include <cctype>
 #include <cmath>
@@ -42,12 +43,43 @@ std::optional<double> Find(const SensitivityVectors &vectors, const std::string 
     return found->second;
 }
 
+/// DC level of a part as written in the netlist; for non-DC independent sources this is the waveform start/offset,
+/// not the stored AC/peak magnitude in GetValue().
+double EffectiveSensitivityValue(const Component &part) {
+    if (!IsSource(part.GetType())) {
+        return part.GetValue();
+    }
+    const auto &source = static_cast<const Source &>(part);
+    switch (source.GetSourceType()) {
+    case Source::SourceType::DC:
+        return source.GetValue();
+    case Source::SourceType::AC:
+        return source.GetAC().Offset;
+    case Source::SourceType::PULSE:
+        return source.GetPulse().Low;
+    case Source::SourceType::EXP:
+        return source.GetEXP().InitialValue;
+    case Source::SourceType::SFFM:
+        return source.GetSFFM().Offset;
+    case Source::SourceType::AM:
+        return source.GetAM().Offset;
+    case Source::SourceType::PWL:
+        return source.GetPWL().Points.empty() ? 0.0 : source.GetPWL().Points.front().Value;
+    case Source::SourceType::NOISE:
+        return source.GetNoise().Offset;
+    case Source::SourceType::RANDOM:
+        return source.GetRandom().Second;
+    default:
+        return source.GetValue();
+    }
+}
+
 PartSensitivity MakePart(const Component &part, const double absolute, const double normalized) {
     return {.Name = part.GetName(),
             .Type = part.GetType(),
             .Element = {},
             .Unit = part.GetUnit(),
-            .Value = part.GetValue(),
+            .Value = EffectiveSensitivityValue(part),
             .Absolute = absolute,
             .Normalized = normalized};
 }
@@ -63,7 +95,7 @@ PartSensitivity MakeValuePart(const Component &part, const SensitivityVectors &v
     const std::string vector_name = IsControlledSource(type) ? name + std::string(GAIN_SUFFIX) : name;
     const double absolute = Find(vectors, vector_name).value_or(0.0);
     const std::optional<double> scale = Find(vectors, name + std::string(SCALE_SUFFIX));
-    return MakePart(part, absolute, scale.value_or(absolute * part.GetValue()));
+    return MakePart(part, absolute, scale.value_or(absolute * EffectiveSensitivityValue(part)));
 }
 
 /**
