@@ -35,6 +35,7 @@ add_executable(imcsim-tests
             editor_command_tests.cpp
             editor_mode_tests.cpp
             element_factory_tests.cpp
+            engine_cross_validation_tests.cpp
             examples_tests.cpp
             fuse_tests.cpp
             group_editing_tests.cpp
