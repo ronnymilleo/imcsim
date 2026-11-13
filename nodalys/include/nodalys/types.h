@@ -261,6 +261,48 @@ struct ClockParameters {
 };
 
 /**
+ * @struct  NoiseParameters
+ * @brief   SPICE TRNOISE(NA NT ALPHA NALPHA RTSAM RTSCAPT RTSEMT) parameters, plus DC offset.
+ */
+struct NoiseParameters {
+    double Offset = 0.0;
+    double WhiteAmplitude = 0.1;
+    double TimeStep = 10e-6;
+    double FlickerExponent = 1.0;
+    double FlickerAmplitude = 0.0;
+    double TelegraphAmplitude = 0.0;
+    double CaptureTime = 1e-3;
+    double EmissionTime = 1e-3;
+
+    bool operator==(const NoiseParameters &) const = default;
+};
+
+/**
+ * @enum    RandomDistribution
+ * @brief   Distribution of the values of a SPICE TRRANDOM source, numbered as its TYPE parameter.
+ */
+enum class RandomDistribution {
+    UNIFORM = 1,
+    GAUSSIAN = 2,
+    EXPONENTIAL = 3,
+    POISSON = 4
+};
+
+/**
+ * @struct  RandomParameters
+ * @brief   SPICE TRRANDOM(TYPE TS TD P1 P2) parameters.
+ */
+struct RandomParameters {
+    RandomDistribution Distribution = RandomDistribution::GAUSSIAN;
+    double TimeStep = 10e-6;
+    double Delay = 0.0;
+    double First = 0.1;
+    double Second = 0.0;
+
+    bool operator==(const RandomParameters &) const = default;
+};
+
+/**
  * @struct  BoyleOpAmpParameters
  * @brief   Datasheet specifications for the Boyle op-amp macromodel (IEEE JSSC 1974).
  */

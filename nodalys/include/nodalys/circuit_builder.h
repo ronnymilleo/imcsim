@@ -70,6 +70,10 @@ public:
                 double ac_phase_deg = 0.0);
     void AddIam(std::string name, NodeId pos, NodeId neg, const AmParameters &params, double ac_mag = 0.0,
                 double ac_phase_deg = 0.0);
+    void AddVnoise(std::string name, NodeId pos, NodeId neg, const NoiseParameters &params, double ac_mag = 0.0);
+    void AddInoise(std::string name, NodeId pos, NodeId neg, const NoiseParameters &params, double ac_mag = 0.0);
+    void AddVrandom(std::string name, NodeId pos, NodeId neg, const RandomParameters &params, double ac_mag = 0.0);
+    void AddIrandom(std::string name, NodeId pos, NodeId neg, const RandomParameters &params, double ac_mag = 0.0);
     void AddClock(std::string name, NodeId pos, NodeId neg, const ClockParameters &params);
     void AddLogicInput(std::string name, NodeId pos, NodeId neg, bool high_state, double high_volts = 5.0,
                        double low_volts = 0.0);

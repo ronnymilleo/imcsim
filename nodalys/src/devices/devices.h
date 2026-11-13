@@ -16,6 +16,7 @@
 #include "mna/mna_system.h"
 #include "nodalys/types.h"
 #include <complex>
+#include <cstdint>
 #include <functional>
 #include <limits>
 #include <string>
@@ -171,6 +172,12 @@ public:
      * @param[in] thermal  Temperature of the run and the nominal temperature its parameters are given at.
      */
     virtual void SetTemperature(const ThermalConditions &thermal) { (void)thermal; }
+
+    /**
+     * @brief   Sets the random seed for transient noise or random waveform sources.
+     * @param[in] seed  Independent 64-bit stream seed for this device.
+     */
+    virtual void SetRandomSeed(std::uint64_t seed) { (void)seed; }
 };
 
 /**
@@ -327,6 +334,7 @@ public:
     int GetBranch() const { return m_Branch; }
     const SourcePeriodicity &GetPeriodicity() const { return m_Periodicity; }
     void SetBreakpoints(Breakpoints breakpoints);
+    void SetSeedCallback(std::function<void(std::uint64_t)> set_seed);
 
     void Stamp(MnaSystem &sys, const std::vector<double> &x, const TimeContext &time) override;
     void StampAc(MnaSystem &reactive, const std::vector<double> &x_dc) const override;
@@ -336,6 +344,7 @@ public:
                                            const std::vector<std::complex<double>> &x_ac, double omega) const override;
     void SetSourceScale(double scale) override;
     double NextBreakpoint(double time) const override;
+    void SetRandomSeed(std::uint64_t seed) override;
 
 private:
     int m_NodeA;
@@ -344,6 +353,7 @@ private:
     double m_DcValue;
     Waveform m_Waveform;
     Breakpoints m_Breakpoints;
+    std::function<void(std::uint64_t)> m_SetSeed;
     double m_AcMagnitude;
     SourcePeriodicity m_Periodicity;
     double m_Scale = 1.0;
@@ -365,6 +375,7 @@ public:
     const SourcePeriodicity &GetPeriodicity() const { return m_Periodicity; }
     double SamplePeriodicCurrent(int terminal, double time_seconds) const;
     void SetBreakpoints(VoltageSourceDevice::Breakpoints breakpoints);
+    void SetSeedCallback(std::function<void(std::uint64_t)> set_seed);
 
     void Stamp(MnaSystem &sys, const std::vector<double> &x, const TimeContext &time) override;
     void StampAc(MnaSystem &reactive, const std::vector<double> &x_dc) const override;
@@ -374,6 +385,7 @@ public:
                                            const std::vector<std::complex<double>> &x_ac, double omega) const override;
     void SetSourceScale(double scale) override;
     double NextBreakpoint(double time) const override;
+    void SetRandomSeed(std::uint64_t seed) override;
 
 private:
     int m_NodeA;
@@ -381,6 +393,7 @@ private:
     double m_DcValue;
     VoltageSourceDevice::Waveform m_Waveform;
     VoltageSourceDevice::Breakpoints m_Breakpoints;
+    std::function<void(std::uint64_t)> m_SetSeed;
     double m_AcMagnitude;
     SourcePeriodicity m_Periodicity;
     double m_Scale = 1.0;

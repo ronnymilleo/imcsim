@@ -403,6 +403,7 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
     std::optional<IntegrationMethod> integration_method;
     double temperature_celsius = 27.0;
     double nominal_celsius = 27.0;
+    std::optional<unsigned int> random_seed;
     // SPICE standard: first line is circuit title
     result.Title = logical_lines.front();
 
@@ -1006,6 +1007,8 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
                                 temperature_celsius = *opt_val;
                             } else if (opt_name == "TNOM") {
                                 nominal_celsius = *opt_val;
+                            } else if (opt_name == "SEED") {
+                                random_seed = static_cast<unsigned int>(std::max(0.0, *opt_val));
                             }
                         }
                     }
@@ -1114,7 +1117,9 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
                 EXP,
                 PWL,
                 SFFM,
-                AM
+                AM,
+                TRNOISE,
+                TRRANDOM
             };
             WaveformType wtype = WaveformType::NONE;
             std::string waveform_token;
@@ -1179,6 +1184,12 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
                     waveform_token = tokens[idx];
                 } else if (u.starts_with("AM(")) {
                     wtype = WaveformType::AM;
+                    waveform_token = tokens[idx];
+                } else if (u.starts_with("TRNOISE(")) {
+                    wtype = WaveformType::TRNOISE;
+                    waveform_token = tokens[idx];
+                } else if (u.starts_with("TRRANDOM(")) {
+                    wtype = WaveformType::TRRANDOM;
                     waveform_token = tokens[idx];
                 } else if (const auto num = ParseSpiceNumber(tokens[idx])) {
                     dc_val = *num;
@@ -1346,6 +1357,44 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
                     builder.AddVam(name, n_pos, n_neg, p, ac_mag, ac_phase);
                 } else {
                     builder.AddIam(name, n_pos, n_neg, p, ac_mag, ac_phase);
+                }
+                break;
+            }
+            case WaveformType::TRNOISE: {
+                const auto vals = ExtractParenthesizedValues(waveform_token);
+                NoiseParameters p;
+                p.Offset = dc_val;
+                p.WhiteAmplitude = vals.size() >= 1 ? vals[0] : 0.0;
+                p.TimeStep = vals.size() >= 2 ? vals[1] : 0.0;
+                p.FlickerExponent = vals.size() >= 3 ? vals[2] : 1.0;
+                p.FlickerAmplitude = vals.size() >= 4 ? vals[3] : 0.0;
+                p.TelegraphAmplitude = vals.size() >= 5 ? vals[4] : 0.0;
+                p.CaptureTime = vals.size() >= 6 ? vals[5] : 0.0;
+                p.EmissionTime = vals.size() >= 7 ? vals[6] : 0.0;
+                if (is_voltage) {
+                    builder.AddVnoise(name, n_pos, n_neg, p, ac_mag);
+                } else {
+                    builder.AddInoise(name, n_pos, n_neg, p, ac_mag);
+                }
+                break;
+            }
+            case WaveformType::TRRANDOM: {
+                const auto vals = ExtractParenthesizedValues(waveform_token);
+                RandomParameters p;
+                if (vals.size() >= 1) {
+                    const int dist = static_cast<int>(vals[0]);
+                    if (dist >= 1 && dist <= 4) {
+                        p.Distribution = static_cast<RandomDistribution>(dist);
+                    }
+                }
+                p.TimeStep = vals.size() >= 2 ? vals[1] : 10e-6;
+                p.Delay = vals.size() >= 3 ? vals[2] : 0.0;
+                p.First = vals.size() >= 4 ? vals[3] : 0.1;
+                p.Second = dc_val + (vals.size() >= 5 ? vals[4] : 0.0);
+                if (is_voltage) {
+                    builder.AddVrandom(name, n_pos, n_neg, p, ac_mag);
+                } else {
+                    builder.AddIrandom(name, n_pos, n_neg, p, ac_mag);
                 }
                 break;
             }
@@ -1696,10 +1745,15 @@ std::expected<ParsedNetlist, std::string> ParseNetlist(std::string_view netlist_
     }
     result.CircuitInstance = std::move(*circuit_res);
 
-    if (integration_method) {
+    if (integration_method || random_seed) {
         for (ParsedAnalysis &analysis : result.Analyses) {
             if (auto *transient = std::get_if<TransientConfig>(&analysis.Config)) {
-                transient->Method = *integration_method;
+                if (integration_method) {
+                    transient->Method = *integration_method;
+                }
+                if (random_seed) {
+                    transient->Seed = *random_seed;
+                }
             }
         }
     }

@@ -27,24 +27,6 @@ constexpr auto NODALYS_ANALYSES = {
     AnalysisKind::S_PARAMETERS,    AnalysisKind::HARMONIC_BALANCE};
 
 /**
- * @brief   Why a transient cannot run on Nodalys, which has no device that draws noise or random values yet, or none.
- */
-std::optional<std::string> FindRandomSource(const Circuit &circuit) {
-    for (const Component *part : CollectParts(circuit)) {
-        if (!IsSource(part->GetType())) {
-            continue;
-        }
-        const auto &source = static_cast<const Source &>(*part);
-        if (source.GetSourceType() == Source::SourceType::NOISE ||
-            source.GetSourceType() == Source::SourceType::RANDOM) {
-            return std::format("{} uses a {} waveform, which a Nodalys transient cannot draw yet", source.GetName(),
-                               GetSourceTypeName(source.GetSourceType()));
-        }
-    }
-    return std::nullopt;
-}
-
-/**
  * @brief   Keeps the rows of the nodes of the circuit and drops the rest.
  * @details Nodalys also reports the nodes it adds, one for each probe that carries a current a source reads and one
  *          for each node inside a block. ngspice gives the nodes of the circuit only, and what reads a result by node
@@ -236,24 +218,21 @@ OperatingPointRun NodalysBackend::RunOperatingPoint(const Circuit &circuit,
 /**
  * @brief   Simulates how the node voltages and currents of a circuit change over time.
  * @param[in] circuit              Circuit to simulate, already checked.
- * @param[in] settings             Stop time and time step.
+ * @param[in] settings             Stop time, time step and optional random seed.
  * @param[in] temperature_celsius  Simulation temperature in degrees Celsius, or none for 27 C.
  * @param[in] monitor              Stop request, progress, chunks, live changes and pace of the run.
- * @return  The voltages and currents at every time point or an error, plus the messages of Nodalys. A circuit with a
- *          noise or random source is refused, since Nodalys cannot draw its values yet.
+ * @return  The voltages and currents at every time point or an error, plus the messages of Nodalys.
  */
 TransientRun NodalysBackend::RunTransient(const Circuit &circuit, const TransientSettings &settings,
                                           const std::optional<double> &temperature_celsius, const RunMonitor &monitor) {
-    if (std::optional<std::string> reason = FindRandomSource(circuit)) {
-        return {std::unexpected(std::move(*reason)), {}};
-    }
     // A fuse that cuts an inductor makes the trapezoidal rule ring for ever, so the netlist for ngspice asks for Gear
     // and Nodalys follows it
     const Nodalys::TransientConfig config{.StopTime = settings.StopTime,
                                           .TimeStep = settings.TimeStep,
                                           .MaxStep = settings.TimeStep,
                                           .Method = circuit.HasFuse() ? Nodalys::IntegrationMethod::GEAR2
-                                                                      : Nodalys::IntegrationMethod::TRAPEZOIDAL};
+                                                                      : Nodalys::IntegrationMethod::TRAPEZOIDAL,
+                                          .Seed = settings.Seed};
     const bool has_initial_conditions = circuit.HasInitialConditions();
     auto live_start = std::chrono::steady_clock::now();
     const Nodalys::RunMonitor nodalys_monitor = ToNodalysMonitor(monitor, live_start, circuit.GetNodeCount());

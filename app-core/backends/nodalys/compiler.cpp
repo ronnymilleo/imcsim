@@ -336,13 +336,12 @@ private:
             case Source::SourceType::AM:
                 m_Builder->AddVam(name, nodes[0], nodes[1], ToNodalys(source.GetAM()), ac_magnitude);
                 break;
-            // Outside a transient, which refuses them, a noise or random source holds the level ngspice gives it
             case Source::SourceType::NOISE:
-                m_Builder->AddVdc(name, nodes[0], nodes[1], source.GetNoise().Offset, ac_magnitude);
+                m_Builder->AddVnoise(name, nodes[0], nodes[1], ToNodalys(source.GetNoise()), ac_magnitude);
                 break;
             case Source::SourceType::RANDOM:
             default:
-                m_Builder->AddVdc(name, nodes[0], nodes[1], source.GetRandom().Second, ac_magnitude);
+                m_Builder->AddVrandom(name, nodes[0], nodes[1], ToNodalys(source.GetRandom()), ac_magnitude);
                 break;
             }
             return {};
@@ -374,13 +373,12 @@ private:
             case Source::SourceType::AM:
                 m_Builder->AddIam(name, nodes[0], nodes[1], ToNodalys(source.GetAM()), ac_magnitude);
                 break;
-            // Outside a transient, which refuses them, a noise or random source holds the level ngspice gives it
             case Source::SourceType::NOISE:
-                m_Builder->AddIdc(name, nodes[0], nodes[1], source.GetNoise().Offset, ac_magnitude);
+                m_Builder->AddInoise(name, nodes[0], nodes[1], ToNodalys(source.GetNoise()), ac_magnitude);
                 break;
             case Source::SourceType::RANDOM:
             default:
-                m_Builder->AddIdc(name, nodes[0], nodes[1], source.GetRandom().Second, ac_magnitude);
+                m_Builder->AddIrandom(name, nodes[0], nodes[1], ToNodalys(source.GetRandom()), ac_magnitude);
                 break;
             }
             return {};

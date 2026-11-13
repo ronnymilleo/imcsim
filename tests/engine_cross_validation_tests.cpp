@@ -640,7 +640,7 @@ template <typename Run, typename Compare> Outcome RunBoth(Run &&run, Compare &&c
     return {.SkipReason = {}, .Found = log.Take()};
 }
 
-/// Whether a circuit holds a source of noise or random values, which Nodalys refuses in a transient.
+/// Whether a circuit holds a source of noise or random values, whose random draws differ between engines.
 bool HasRandomSource(const Core::Circuit &circuit) {
     return std::ranges::any_of(Core::CollectParts(circuit), [](const Core::Component *part) {
         if (!Core::IsSource(part->GetType())) {
@@ -731,8 +731,12 @@ TEST_CASE("Every example gives the same results on ngspice and on Nodalys", "[cr
     switch (settings.Selected) {
     case GUI::Analysis::TRANSIENT:
         if (HasRandomSource(circuit)) {
-            WARN(std::format("Skipped transient of {}: it holds a noise or random source, whose values differ on "
-                             "every run and which Nodalys refuses in a transient",
+            const Core::TransientRun nodalys_run =
+                Core::NodalysBackend().RunTransient(circuit, settings.Transient, std::nullopt, {});
+            REQUIRE(nodalys_run.Result.has_value());
+            REQUIRE_FALSE(nodalys_run.Result->Times.empty());
+            WARN(std::format("Skipped transient comparison of {}: it holds a noise or random source, whose random "
+                             "draws differ between engines",
                              example.FileName));
             break;
         }

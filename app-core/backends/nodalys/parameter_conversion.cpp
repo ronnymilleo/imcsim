@@ -156,6 +156,52 @@ Nodalys::ClockParameters ToNodalys(const ClockParameters &parameters) {
 }
 
 /**
+ * @brief   Converts transient noise source parameters to Nodalys.
+ * @param[in] parameters  Core noise parameters.
+ * @return  Equivalent Nodalys noise parameters.
+ */
+Nodalys::NoiseParameters ToNodalys(const NoiseParameters &parameters) {
+    return {.Offset = parameters.Offset,
+            .WhiteAmplitude = parameters.WhiteAmplitude,
+            .TimeStep = parameters.TimeStep,
+            .FlickerExponent = parameters.FlickerExponent,
+            .FlickerAmplitude = parameters.FlickerAmplitude,
+            .TelegraphAmplitude = parameters.TelegraphAmplitude,
+            .CaptureTime = parameters.CaptureTime,
+            .EmissionTime = parameters.EmissionTime};
+}
+
+/**
+ * @brief   Converts transient random source parameters to Nodalys.
+ * @param[in] parameters  Core random parameters.
+ * @return  Equivalent Nodalys random parameters.
+ */
+Nodalys::RandomParameters ToNodalys(const RandomParameters &parameters) {
+    Nodalys::RandomDistribution distribution = Nodalys::RandomDistribution::UNIFORM;
+    switch (parameters.Distribution) {
+    case RandomDistribution::UNIFORM:
+        distribution = Nodalys::RandomDistribution::UNIFORM;
+        break;
+    case RandomDistribution::GAUSSIAN:
+        distribution = Nodalys::RandomDistribution::GAUSSIAN;
+        break;
+    case RandomDistribution::EXPONENTIAL:
+        distribution = Nodalys::RandomDistribution::EXPONENTIAL;
+        break;
+    case RandomDistribution::POISSON:
+        distribution = Nodalys::RandomDistribution::POISSON;
+        break;
+    default:
+        break;
+    }
+    return {.Distribution = distribution,
+            .TimeStep = parameters.TimeStep,
+            .Delay = parameters.Delay,
+            .First = parameters.First,
+            .Second = parameters.Second};
+}
+
+/**
  * @brief   The thresholds and resistances of a voltage-controlled switch or a relay contact.
  * @param[in] parameters  Settings of the switch.
  * @return  The same switch for Nodalys.
