@@ -11,6 +11,7 @@
 #include "circuit/components/source.h"
 #include "simulation/live_pace.h"
 #include "simulation/pole_zero.h"
+#include "simulation/ratings.h"
 #include "simulation/sensitivity.h"
 #include <chrono>
 #include <format>
@@ -203,13 +204,14 @@ OperatingPointRun NodalysBackend::RunOperatingPoint(const Circuit &circuit,
         [](const Nodalys::Circuit &compiled, std::vector<Nodalys::DiagnosticMessage> *messages) {
             return Nodalys::ComputeOperatingPoint(compiled, {}, messages);
         },
-        [node_count = circuit.GetNodeCount()](Nodalys::OperatingPointResult result) {
+        [&circuit, node_count = circuit.GetNodeCount()](Nodalys::OperatingPointResult result) {
             KeepCircuitNodes(result.NodeVoltages, node_count);
             OperatingPoint point{
                 .NodeVoltages = std::move(result.NodeVoltages), .Currents = {}, .Warnings = std::move(result.Warnings)};
             for (Nodalys::ComponentCurrent &current : result.Currents) {
                 point.Currents.push_back({std::move(current.Name), current.Current});
             }
+            AddRatingWarnings(circuit, point);
             return point;
         },
         temperature_celsius);
@@ -241,7 +243,7 @@ TransientRun NodalysBackend::RunTransient(const Circuit &circuit, const Transien
         [&](const Nodalys::Circuit &compiled, std::vector<Nodalys::DiagnosticMessage> *messages) {
             return Nodalys::ComputeTransient(compiled, config, has_initial_conditions, nodalys_monitor, {}, messages);
         },
-        [has_initial_conditions, node_count = circuit.GetNodeCount()](Nodalys::TransientResult result) {
+        [&circuit, has_initial_conditions, node_count = circuit.GetNodeCount()](Nodalys::TransientResult result) {
             Transient transient = ToTransient(std::move(result), node_count);
             if (has_initial_conditions) {
                 transient.Warnings.emplace_back(
@@ -249,6 +251,7 @@ TransientRun NodalysBackend::RunTransient(const Circuit &circuit, const Transien
                     "and the other capacitors and inductors from zero, since the operating point is not computed "
                     "first");
             }
+            AddRatingWarnings(circuit, transient);
             return transient;
         },
         temperature_celsius);
