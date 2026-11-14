@@ -143,10 +143,10 @@ roughly in the order they are likely to come.
   a circuit driven from a WAV or CSV file, PWL points read from a CSV file, and a MOSFET body diode and higher-level
   MOSFET models
 - **Nodalys, a native simulation backend**: a solver written from published circuit theory that sits beside ngspice,
-  which stays available, tested against closed-form results and against ngspice. The next release is planned to bring
-  it as a choice in the preferences, with every analysis of ngspice and a harmonic balance; what it does not cover yet,
-  such as temperature, is refused with the reason. Nothing else on the roadmap depends
-  on it
+  which stays available, tested against closed-form results and against ngspice. Edit > Preferences > Simulation picks
+  it in place of ngspice. It runs every analysis of ngspice, plus a harmonic balance, with temperature, fuses,
+  behavioral sources, and seedable noise and random sources; what it does not cover is refused with the reason (see
+  the [user guide](docs/user_guide.md#choosing-the-simulation-engine)).
 
 ## Install
 
