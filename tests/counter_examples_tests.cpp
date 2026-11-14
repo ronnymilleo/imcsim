@@ -3,6 +3,7 @@
  * @brief   Reads the count of the counter examples on Nodalys and compares it with ngspice as logic states.
  */
 
+#include "backends/ngspice/ngspice_library.h"
 #include "base/logic_state.h"
 #include "nodalys_in_use.h"
 #include "schematic/examples.h"
@@ -127,17 +128,23 @@ void CheckCounter(const std::string_view file_name, const std::size_t bit_count,
     settings.StopTime = FIRST_EDGE_SECONDS + static_cast<double>(edge_count) * CLOCK_PERIOD_SECONDS;
     const std::vector<std::size_t> bit_nodes = FindBitNodes(example.Circuit, bit_count);
 
-    const Core::TransientRun ngspice = Core::RunTransient(example.Circuit, settings);
-    REQUIRE(ngspice.Result.has_value());
+    // An ngspice without the digital models (digital.cm) cannot run a counter, so only Nodalys is read there
+    std::optional<std::vector<std::optional<int>>> on_ngspice;
+    if (Core::AreDigitalModelsAvailable()) {
+        const Core::TransientRun ngspice = Core::RunTransient(example.Circuit, settings);
+        REQUIRE(ngspice.Result.has_value());
+        on_ngspice = ReadCountPerEdge(*ngspice.Result, bit_nodes, settings.StopTime);
+    }
     const TestSupport::NodalysInUse nodalys_in_use;
     const Core::TransientRun nodalys = Core::RunTransient(example.Circuit, settings);
     REQUIRE(nodalys.Result.has_value());
 
     const std::vector<std::optional<int>> on_nodalys = ReadCountPerEdge(*nodalys.Result, bit_nodes, settings.StopTime);
-    const std::vector<std::optional<int>> on_ngspice = ReadCountPerEdge(*ngspice.Result, bit_nodes, settings.StopTime);
     CHECK(on_nodalys == ExpectedCounts(edge_count, modulus));
-    // Logic states, not voltages: the engines draw the levels and the edges differently
-    CHECK(on_nodalys == on_ngspice);
+    if (on_ngspice) {
+        // Logic states, not voltages: the engines draw the levels and the edges differently
+        CHECK(on_nodalys == *on_ngspice);
+    }
 }
 
 } // namespace
