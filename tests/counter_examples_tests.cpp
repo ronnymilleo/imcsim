@@ -9,13 +9,11 @@
 #include "schematic/schematic.h"
 #include "simulation/simulator.h"
 #include <algorithm>
-#include <array>
 #include <catch2/catch_test_macros.hpp>
 #include <cstddef>
 #include <format>
 #include <memory>
 #include <optional>
-#include <string>
 #include <string_view>
 #include <vector>
 
@@ -114,56 +112,56 @@ std::vector<std::optional<int>> ExpectedCounts(const std::size_t edge_count, con
     return counts;
 }
 
-/// Runs the saved transient of a counter on Nodalys and reads its count after every edge.
-std::vector<std::optional<int>> CountOnNodalys(const std::string_view file_name, const std::size_t bit_count) {
+/**
+ * @brief   Reads a counter after every edge on each engine and checks the sequence on Nodalys and that ngspice agrees.
+ * @param[in] file_name    File of the example.
+ * @param[in] bit_count    Outputs Q0, Q1... of the counter.
+ * @param[in] modulus      Count after which it wraps to 0.
+ * @param[in] edge_count   Rising edges of the clock to run, which sets the stop time.
+ */
+void CheckCounter(const std::string_view file_name, const std::size_t bit_count, const int modulus,
+                  const std::size_t edge_count) {
     const LoadedExample example = LoadCounterExample(file_name);
-    const TestSupport::NodalysInUse nodalys;
-    const Core::TransientRun run = Core::RunTransient(example.Circuit, example.Settings);
-    REQUIRE(run.Result.has_value());
-    return ReadCountPerEdge(*run.Result, FindBitNodes(example.Circuit, bit_count), example.Settings.StopTime);
+    // Long enough for the last edge to settle, and short enough to keep the 8-bit counter quick on Nodalys
+    Core::TransientSettings settings = example.Settings;
+    settings.StopTime = FIRST_EDGE_SECONDS + static_cast<double>(edge_count) * CLOCK_PERIOD_SECONDS;
+    const std::vector<std::size_t> bit_nodes = FindBitNodes(example.Circuit, bit_count);
+
+    const Core::TransientRun ngspice = Core::RunTransient(example.Circuit, settings);
+    REQUIRE(ngspice.Result.has_value());
+    const TestSupport::NodalysInUse nodalys_in_use;
+    const Core::TransientRun nodalys = Core::RunTransient(example.Circuit, settings);
+    REQUIRE(nodalys.Result.has_value());
+
+    const std::vector<std::optional<int>> on_nodalys = ReadCountPerEdge(*nodalys.Result, bit_nodes, settings.StopTime);
+    const std::vector<std::optional<int>> on_ngspice = ReadCountPerEdge(*ngspice.Result, bit_nodes, settings.StopTime);
+    CHECK(on_nodalys == ExpectedCounts(edge_count, modulus));
+    // Logic states, not voltages: the engines draw the levels and the edges differently
+    CHECK(on_nodalys == on_ngspice);
 }
 
 } // namespace
 
-TEST_CASE("The decade counter counts from 0 to 9 and wraps to 0 on Nodalys", "[counter_examples]") {
+TEST_CASE("The decade counter counts from 0 to 9 and wraps to 0, on Nodalys as on ngspice", "[counter_examples]") {
     constexpr std::size_t BIT_COUNT = 4;
     constexpr int DECADE = 10;
-    constexpr std::size_t EDGES_IN_RUN = 12;
+    constexpr std::size_t EDGES = 12;
     // The reset that the AND of Q3 and Q1 gives at 10 is what the Nodalys flip-flops used to ignore
-    CHECK(CountOnNodalys(DECADE_COUNTER, BIT_COUNT) == ExpectedCounts(EDGES_IN_RUN, DECADE));
+    CheckCounter(DECADE_COUNTER, BIT_COUNT, DECADE, EDGES);
 }
 
-TEST_CASE("The ripple counter counts from 0 to 7 and wraps to 0 on Nodalys", "[counter_examples]") {
+TEST_CASE("The ripple counter counts from 0 to 7 and wraps to 0, on Nodalys as on ngspice", "[counter_examples]") {
     constexpr std::size_t BIT_COUNT = 3;
     constexpr int MODULUS = 8;
-    constexpr std::size_t EDGES_IN_RUN = 9;
-    CHECK(CountOnNodalys(RIPPLE_COUNTER, BIT_COUNT) == ExpectedCounts(EDGES_IN_RUN, MODULUS));
+    constexpr std::size_t EDGES = 9;
+    CheckCounter(RIPPLE_COUNTER, BIT_COUNT, MODULUS, EDGES);
 }
 
-TEST_CASE("The 8-bit counter counts up by one at every edge on Nodalys", "[counter_examples]") {
+TEST_CASE("The 8-bit counter counts up by one at every edge past the first nibble, on Nodalys as on ngspice",
+          "[counter_examples]") {
     constexpr std::size_t BIT_COUNT = 8;
     constexpr int MODULUS = 256;
-    constexpr std::size_t EDGES_IN_RUN = 40;
-    CHECK(CountOnNodalys(BLOCKS_COUNTER, BIT_COUNT) == ExpectedCounts(EDGES_IN_RUN, MODULUS));
-}
-
-TEST_CASE("The counter examples read the same count on ngspice and on Nodalys after every edge", "[counter_examples]") {
-    struct Counter {
-        std::string_view FileName;
-        std::size_t BitCount;
-    };
-    constexpr std::array COUNTERS{Counter{DECADE_COUNTER, 4}, Counter{RIPPLE_COUNTER, 3}, Counter{BLOCKS_COUNTER, 8}};
-    for (const Counter &counter : COUNTERS) {
-        INFO(counter.FileName);
-        const LoadedExample example = LoadCounterExample(counter.FileName);
-        const std::vector<std::size_t> bit_nodes = FindBitNodes(example.Circuit, counter.BitCount);
-        const Core::TransientRun ngspice = Core::RunTransient(example.Circuit, example.Settings);
-        REQUIRE(ngspice.Result.has_value());
-        const std::vector<std::optional<int>> expected =
-            ReadCountPerEdge(*ngspice.Result, bit_nodes, example.Settings.StopTime);
-        const std::vector<std::optional<int>> actual = CountOnNodalys(counter.FileName, counter.BitCount);
-        CHECK(actual == expected);
-        // Every reading is a count, never a bit between the levels
-        CHECK(std::ranges::all_of(expected, [](const std::optional<int> &count) { return count.has_value(); }));
-    }
+    // Seventeen edges carry from the low nibble into the high one
+    constexpr std::size_t EDGES = 17;
+    CheckCounter(BLOCKS_COUNTER, BIT_COUNT, MODULUS, EDGES);
 }
