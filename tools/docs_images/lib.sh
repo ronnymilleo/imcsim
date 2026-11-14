@@ -168,14 +168,16 @@ docs_cleanup() {
 #   --theme NAME               theme, as View > Theme names it (default: Graphite)
 #   --wire-colors NAME         Plain, Nodes, Voltage, Current, Power (default: Plain)
 #   --layout FILE              an imgui.ini to start from instead of the default layout
+#   --engine NAME              simulation engine, as Preferences names it: ngspice or Nodalys (default: ngspice)
 docs_launch() {
-    local size=full theme=Graphite wire_colors=Plain layout=""
+    local size=full theme=Graphite wire_colors=Plain layout="" engine=ngspice
     while [[ $# -gt 0 ]]; do
         case "$1" in
             --size) size=$2; shift 2 ;;
             --theme) theme=$2; shift 2 ;;
             --wire-colors) wire_colors=$2; shift 2 ;;
             --layout) layout=$2; shift 2 ;;
+            --engine) engine=$2; shift 2 ;;
             *) docs_fail "docs_launch: unknown option $1" ;;
         esac
     done
@@ -190,9 +192,9 @@ docs_launch() {
         cp "$layout" "$data_dir/imcsim/imgui.ini"
     fi
     # Every choice that changes the look is fixed here, so the shots do not depend on the user's own preferences
-    jq -n --arg theme "$theme" --arg wire_colors "$wire_colors" '{
+    jq -n --arg theme "$theme" --arg wire_colors "$wire_colors" --arg engine "$engine" '{
         version: 1, theme: $theme, symbols: "IEC", terminal_numbers: false, wire_colors: $wire_colors,
-        live_effects: ["Fuse"], value_series: "Free",
+        live_effects: ["Fuse"], value_series: "Free", simulation_backend: $engine,
         bring_output_to_front: true, rerun_on_edit: false, rerun_delay_seconds: 0.5}' \
         >"$data_dir/imcsim/preferences.json"
 
@@ -321,6 +323,27 @@ docs_find_text() {
         fi
     done
     return 1
+}
+
+# Prints the words found by OCR inside the box X0 Y0 X1 Y1 of a fresh shot, on one line, for a check that needs the
+# text itself, such as a number or a whole status line, where docs_find_text only gives positions. Uses the first of
+# the same filters that finds any word; prints nothing when none does.
+docs_read_words() {
+    local x0=$1 y0=$2 x1=$3 y1=$4
+    local shot="$DOCS_SCRATCH/shots/ocr.png" scaled="$DOCS_SCRATCH/shots/ocr_scaled.png"
+    "$GUI_HELPER" --window-id "$DOCS_WID" shot "$shot" >/dev/null 2>&1
+    local crop="$((x1 - x0))x$((y1 - y0))+$x0+$y0"
+    local filter words
+    for filter in "-negate -normalize" "-negate -threshold 60%" "-normalize" "-threshold 40%"; do
+        # shellcheck disable=SC2086
+        magick "$shot" -crop "$crop" +repage -colorspace Gray -resize 300% $filter "$scaled"
+        words=$(tesseract "$scaled" - --psm 11 tsv 2>/dev/null | awk -F'\t' 'NR > 1 && $12 != "" {printf "%s ", $12}')
+        if [[ -n "$words" ]]; then
+            echo "$words"
+            return 0
+        fi
+    done
+    return 0
 }
 
 # Clicks the first word on screen that matches WORD, see docs_find_text
