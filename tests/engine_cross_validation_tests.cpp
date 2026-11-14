@@ -5,7 +5,9 @@
  *          the inputs and output the editor would pick, so every quantity the engines share is seen on real circuits.
  *          What Nodalys declares unsupported, or cannot read from an example, is skipped and listed with its reason in
  *          the output. A difference beyond the tolerances fails the test, unless it is in KNOWN_DIFFERENCES, which
- *          the output lists as a warning instead, with the reason found when it was investigated.
+ *          the output lists as a warning instead, with the reason found when it was investigated. Each entry also
+ *          bounds the difference it covers, so it grows into a failure; an entry that no longer finds a difference
+ *          fails too, so the list never keeps a cause that was fixed.
  */
 
 #include "analysis/analysis_inputs.h"
@@ -122,68 +124,136 @@ constexpr std::string_view TRUTH_TABLE_NAME = "truth table";
 /**
  * @struct  KnownDifference
  * @brief   A comparison where the engines disagree and the cause is understood, so it is reported and not failed.
+ * @details The entry covers the quantities whose name starts with Quantity (all of them when it is empty) and allows
+ *          them to differ by Bound, set a little above what was measured, so a regression past it fails. A quantity
+ *          that Nodalys does not report at all counts as covered, since there is no value to bound. A transient may
+ *          also widen the window in time that an edge may move within. The entry fails
+ *          when it covers no difference at the usual tolerance, so it is removed once its cause is fixed.
  */
 struct KnownDifference {
     std::string_view FileName;
     std::string_view Analysis;
+    std::string_view Quantity;
+    Tolerance Bound;
     std::string_view Reason;
+    /// For a transient: how many output steps apart an edge may sit between the engines.
+    double TimeWindowSteps = TRANSIENT_TIME_WINDOW_STEPS;
 };
 
 constexpr std::string_view LOGIC_LOW_LEVEL =
     "a low gate output sits at 0.45 mV on Nodalys (smooth gate) and at exactly 0 V on ngspice, which is the ideal one";
-constexpr std::string_view LOGIC_START_STATE =
-    "downstream flip-flops clocked at 5 V (by a reset stage's QN) start set on Nodalys because the master latch's "
-    "2-input vs 3-input NAND asymmetry overrides the slave reset bias, whereas ngspice starts every d_dff reset";
 constexpr std::string_view LOGIC_OPERATING_POINT =
-    "a low gate output sits at 0.45 mV on Nodalys (smooth gate) and at exactly 0 V on ngspice, which is the ideal "
-    "one; downstream flip-flops clocked at 5 V also start set on Nodalys instead of reset";
+    "a low gate output sits at 0.45 to 1.6 mV on Nodalys (smooth gate) and at exactly 0 V on ngspice, which is the "
+    "ideal one; the logic states agree, and the counter tests read the count";
+constexpr std::string_view COUNTER_LOW_LEVEL =
+    "a node that stays low sits at 0.6 mV on Nodalys (smooth gate) and at exactly 0 V on ngspice; the count itself is "
+    "compared by the counter tests, as logic states";
+constexpr std::string_view COUNTER_CLOCK_CURRENT =
+    "the clock draws 10 nA on Nodalys and 5 nA on ngspice, since a Nodalys flip-flop feeds the clock to two gates, "
+    "each with its 1 GOhm pull-down, and ngspice to one input";
+constexpr std::string_view LOGIC_CURRENTS_MISSING =
+    "ngspice reports the output currents of a flip-flop (U1.Q, U1.QN...) and Nodalys, whose flip-flop is gates, does "
+    "not";
 constexpr std::string_view LEAKAGE_BIASED_NODES =
     "a node between an off transistor or switch and a diode is set by pico-ampere leakage, which each engine adds "
     "its own GMIN to, so the voltage is 1 % apart and neither is more right";
 
+constexpr std::string_view SCHMITT_EDGES =
+    "at the 5 us step ngspice puts the switching edges at 0.58 ms and 1.08 ms 20.7 us and 86.5 us late (602.7 and "
+    "1168.6 us), and Nodalys 3.0 us early and 0.15 us late; with a 0.2 us or a 0.05 us step both engines give 582.0 "
+    "and "
+    "1082.0 us, so ngspice is the imprecise one, and the later edges agree within 1 us; the start at 0 V is "
+    "metastable: Nodalys samples +1.6 V and +1.3 V at 5 us and 10 us and reaches -15 V at 15 us, where ngspice, with "
+    "adaptive steps, is at -15 V from 7 us";
+
+// Bounds of the known differences, each a little above what the example measures today
+
+/// A low logic level is 0 V on ngspice and at most 1.6 mV on Nodalys.
+constexpr Tolerance LOGIC_LOW_LEVEL_BOUND{SOLVER_RELATIVE_TOLERANCE, 2e-3};
+/// A node that stays low on Nodalys reads 0.62 mV.
+constexpr Tolerance COUNTER_LOW_LEVEL_BOUND{TRANSIENT_RELATIVE_TOLERANCE, 1e-3};
+/// The clock of a counter differs by 5 nA.
+constexpr Tolerance COUNTER_CLOCK_CURRENT_BOUND{TRANSIENT_RELATIVE_TOLERANCE, 7e-9};
+/// Never read: a quantity that Nodalys lacks has no value to bound.
+constexpr Tolerance NO_VALUE_BOUND{0.0, 0.0};
+/// A node behind an off switch or transistor differs by 1.5 % and 40 mV.
+constexpr Tolerance LEAKAGE_VOLTAGE_BOUND{2e-2, VOLTAGE_FLOOR_VOLTS};
+/// The gain through an off transistor is +2.6e-3 on ngspice and -1.7e-3 on Nodalys.
+constexpr Tolerance LEAKAGE_GAIN_BOUND{SOLVER_RELATIVE_TOLERANCE, 6e-3};
+/// The smooth gate has a gain of 9e-4 where ngspice has none.
+constexpr Tolerance SMOOTH_GATE_GAIN_BOUND{SOLVER_RELATIVE_TOLERANCE, 1.5e-3};
+/// A gain of 7.7e-6 from a supply to the output of an op-amp.
+constexpr Tolerance SUPPLY_GAIN_BOUND{SOLVER_RELATIVE_TOLERANCE, 1e-5};
+/// A normalized sensitivity of 1.2e-4 to a supply.
+constexpr Tolerance SUPPLY_SENSITIVITY_BOUND{SOLVER_RELATIVE_TOLERANCE, 2e-4};
+/// Input-referred noise of 2.3e7 on Nodalys against 20 on ngspice.
+constexpr Tolerance DIVIDED_BY_NOTHING_BOUND{NOISE_TOTAL.Relative, 1e8};
+/// The ring of the buck converter's diode node, sampled at 1 us, differs by 6.4 V.
+constexpr Tolerance RINGING_BOUND{TRANSIENT_RELATIVE_TOLERANCE, 9.0};
+/// Nodalys reads 1.6 V at the first 5 us sample, before the metastable start leaves 0 V, where ngspice is at -0.3 mV.
+constexpr Tolerance SCHMITT_VOLTAGE_BOUND{TRANSIENT_RELATIVE_TOLERANCE, 2.0};
+/// The currents of that start differ by 0.13 mA.
+constexpr Tolerance SCHMITT_CURRENT_BOUND{TRANSIENT_RELATIVE_TOLERANCE, 2e-4};
+/// ngspice puts an edge of the Schmitt trigger up to 17.3 output steps late.
+constexpr double SCHMITT_WINDOW_STEPS = 20.0;
+
 /// Differences found by this test and investigated; each one is a task of its own. Keep the reason to one line, with
 /// the engine that is right.
 constexpr std::array KNOWN_DIFFERENCES{
-    KnownDifference{"full_bridge_rectifier.imcsim", NOISE_NAME,
+    KnownDifference{"full_bridge_rectifier.imcsim", NOISE_NAME, "input noise total", DIVIDED_BY_NOTHING_BOUND,
                     "the input-referred noise divides by a gain of 1e-22 (every diode is off at DC), where ngspice "
                     "gives 20 and Nodalys 2e7; the output totals agree and neither input figure means anything"},
-    KnownDifference{"counter_8bit_blocks.imcsim", OPERATING_POINT_NAME, LOGIC_OPERATING_POINT},
-    KnownDifference{"decade_counter.imcsim", OPERATING_POINT_NAME, LOGIC_OPERATING_POINT},
-    KnownDifference{"ripple_counter.imcsim", OPERATING_POINT_NAME, LOGIC_OPERATING_POINT},
-    KnownDifference{"decoder_logic_outputs.imcsim", OPERATING_POINT_NAME, LOGIC_LOW_LEVEL},
-    KnownDifference{"full_adder.imcsim", OPERATING_POINT_NAME, LOGIC_LOW_LEVEL},
-    KnownDifference{"half_adder.imcsim", OPERATING_POINT_NAME, LOGIC_LOW_LEVEL},
-    KnownDifference{"logic_gates.imcsim", OPERATING_POINT_NAME, LOGIC_LOW_LEVEL},
-    KnownDifference{"logic_truth_table.imcsim", OPERATING_POINT_NAME, LOGIC_LOW_LEVEL},
-    KnownDifference{"sr_latch.imcsim", OPERATING_POINT_NAME, LOGIC_LOW_LEVEL},
-    KnownDifference{"counter_8bit_blocks.imcsim", TRANSIENT_NAME, LOGIC_START_STATE},
-    KnownDifference{"decade_counter.imcsim", TRANSIENT_NAME, LOGIC_START_STATE},
-    KnownDifference{"ripple_counter.imcsim", TRANSIENT_NAME, LOGIC_START_STATE},
-    KnownDifference{"led_driver.imcsim", OPERATING_POINT_NAME, LEAKAGE_BIASED_NODES},
-    KnownDifference{"led_driver.imcsim", TRANSFER_FUNCTION_NAME,
+    KnownDifference{"counter_8bit_blocks.imcsim", OPERATING_POINT_NAME, "node voltages", LOGIC_LOW_LEVEL_BOUND,
+                    LOGIC_OPERATING_POINT},
+    KnownDifference{"decade_counter.imcsim", OPERATING_POINT_NAME, "node voltages", LOGIC_LOW_LEVEL_BOUND,
+                    LOGIC_OPERATING_POINT},
+    KnownDifference{"ripple_counter.imcsim", OPERATING_POINT_NAME, "node voltages", LOGIC_LOW_LEVEL_BOUND,
+                    LOGIC_OPERATING_POINT},
+    KnownDifference{"ripple_counter.imcsim", OPERATING_POINT_NAME, "current U", NO_VALUE_BOUND, LOGIC_CURRENTS_MISSING},
+    KnownDifference{"decoder_logic_outputs.imcsim", OPERATING_POINT_NAME, "node voltages", LOGIC_LOW_LEVEL_BOUND,
+                    LOGIC_LOW_LEVEL},
+    KnownDifference{"full_adder.imcsim", OPERATING_POINT_NAME, "node voltages", LOGIC_LOW_LEVEL_BOUND, LOGIC_LOW_LEVEL},
+    KnownDifference{"half_adder.imcsim", OPERATING_POINT_NAME, "node voltages", LOGIC_LOW_LEVEL_BOUND, LOGIC_LOW_LEVEL},
+    KnownDifference{"logic_gates.imcsim", OPERATING_POINT_NAME, "node voltages", LOGIC_LOW_LEVEL_BOUND,
+                    LOGIC_LOW_LEVEL},
+    KnownDifference{"logic_truth_table.imcsim", OPERATING_POINT_NAME, "node voltages", LOGIC_LOW_LEVEL_BOUND,
+                    LOGIC_LOW_LEVEL},
+    KnownDifference{"sr_latch.imcsim", OPERATING_POINT_NAME, "node voltages", LOGIC_LOW_LEVEL_BOUND, LOGIC_LOW_LEVEL},
+    KnownDifference{"counter_8bit_blocks.imcsim", TRANSIENT_NAME, "V(", COUNTER_LOW_LEVEL_BOUND, COUNTER_LOW_LEVEL},
+    KnownDifference{"counter_8bit_blocks.imcsim", TRANSIENT_NAME, "current V", COUNTER_CLOCK_CURRENT_BOUND,
+                    COUNTER_CLOCK_CURRENT},
+    KnownDifference{"decade_counter.imcsim", TRANSIENT_NAME, "current V", COUNTER_CLOCK_CURRENT_BOUND,
+                    COUNTER_CLOCK_CURRENT},
+    KnownDifference{"ripple_counter.imcsim", TRANSIENT_NAME, "current V", COUNTER_CLOCK_CURRENT_BOUND,
+                    COUNTER_CLOCK_CURRENT},
+    KnownDifference{"ripple_counter.imcsim", TRANSIENT_NAME, "current U", NO_VALUE_BOUND, LOGIC_CURRENTS_MISSING},
+    KnownDifference{"led_driver.imcsim", OPERATING_POINT_NAME, "node voltages", LEAKAGE_VOLTAGE_BOUND,
+                    LEAKAGE_BIASED_NODES},
+    KnownDifference{"led_driver.imcsim", TRANSFER_FUNCTION_NAME, "gain", LEAKAGE_GAIN_BOUND,
                     "the gain through a transistor that is off is set by its pico-ampere leakage: +2.6e-3 on "
                     "ngspice, -1.7e-3 on Nodalys, with the opposite sign"},
-    KnownDifference{"led_driver.imcsim", SENSITIVITY_NAME,
+    KnownDifference{"led_driver.imcsim", SENSITIVITY_NAME, "Vin", LEAKAGE_GAIN_BOUND,
                     "the sensitivity to the input through a transistor that is off is set by its leakage, as the "
                     "transfer function is"},
-    KnownDifference{"switches_and_or.imcsim", OPERATING_POINT_NAME,
+    KnownDifference{"switches_and_or.imcsim", OPERATING_POINT_NAME, "node voltages", LEAKAGE_VOLTAGE_BOUND,
                     "the node of the LED behind the off switch differs by 1 % (pico-ampere leakage)"},
-    KnownDifference{"half_adder.imcsim", TRANSFER_FUNCTION_NAME,
+    KnownDifference{"half_adder.imcsim", TRANSFER_FUNCTION_NAME, "gain", SMOOTH_GATE_GAIN_BOUND,
                     "the smooth gate's tanh tail still has a 9e-4 slope at 0 V, whereas ngspice's digital gate has "
                     "zero gain"},
-    KnownDifference{"op_amp_input_offset.imcsim", TRANSFER_FUNCTION_NAME,
+    KnownDifference{"op_amp_input_offset.imcsim", TRANSFER_FUNCTION_NAME, "gain", SUPPLY_GAIN_BOUND,
                     "gain from a supply to the output is 0 on ngspice and 7.7e-6 on Nodalys"},
-    KnownDifference{"op_amp_input_offset.imcsim", SENSITIVITY_NAME,
+    KnownDifference{"op_amp_input_offset.imcsim", SENSITIVITY_NAME, "V", SUPPLY_SENSITIVITY_BOUND,
                     "the normalized sensitivity to each supply is 1.2e-4 on Nodalys and under 2e-6 on ngspice"},
-    KnownDifference{"buck_converter.imcsim", TRANSIENT_NAME,
+    KnownDifference{"buck_converter.imcsim", TRANSIENT_NAME, "V(", RINGING_BOUND,
                     "the currents and the waveforms agree, but after the inductor current stops the diode node rings "
                     "against the diode capacitance at about 600 kHz, which the 1 us step resolves in under two points, "
                     "so the samples of the ring differ: both engines ring above the 12 V supply, as the inductor "
                     "pushes the node up to about 19 V when the step shrinks, and at this step ngspice reaches 14.9 V "
                     "and Nodalys 18.5 V (jay #227)"},
-    KnownDifference{"schmitt_trigger.imcsim", TRANSIENT_NAME,
-                    "the start state at 0 V is metastable and each engine leaves it its way in the first 75 us; "
-                    "all subsequent switching edges agree"},
+    KnownDifference{"schmitt_trigger.imcsim", TRANSIENT_NAME, "V(", SCHMITT_VOLTAGE_BOUND, SCHMITT_EDGES,
+                    SCHMITT_WINDOW_STEPS},
+    KnownDifference{"schmitt_trigger.imcsim", TRANSIENT_NAME, "current", SCHMITT_CURRENT_BOUND, SCHMITT_EDGES,
+                    SCHMITT_WINDOW_STEPS},
 };
 
 using Differences = std::vector<std::string>;
@@ -196,9 +266,33 @@ bool Agree(const double expected, const double actual, const Tolerance tolerance
 
 /**
  * @brief   Collects the differences of one comparison and counts the ones past the listed few.
+ * @details A log made with known differences allows the quantities they cover to differ by their bounds.
  */
 class DifferenceLog {
 public:
+    DifferenceLog() = default;
+
+    explicit DifferenceLog(std::vector<const KnownDifference *> known) : m_Known(std::move(known)) {}
+
+    /// The tolerance a quantity is held to: the bound of the entry that covers it, or the usual one.
+    Tolerance Allowed(const std::string &quantity, const Tolerance usual) const {
+        const KnownDifference *covering = FindCovering(quantity);
+        return covering != nullptr ? covering->Bound : usual;
+    }
+
+    /// How many output steps an edge of a transient quantity may sit from the other engine's.
+    double AllowedWindowSteps(const std::string &quantity) const {
+        const KnownDifference *covering = FindCovering(quantity);
+        return covering != nullptr ? covering->TimeWindowSteps : TRANSIENT_TIME_WINDOW_STEPS;
+    }
+
+    /// A quantity that Nodalys does not report, which no bound can cover, unless a known difference names it.
+    void AddMissing(const std::string &quantity) {
+        if (FindCovering(quantity) == nullptr) {
+            Add(quantity, "missing from Nodalys");
+        }
+    }
+
     void Add(const std::string &quantity, const std::string &detail) {
         ++m_Counts[quantity];
         if (m_Counts[quantity] <= MAX_LISTED_DIFFERENCES) {
@@ -207,7 +301,7 @@ public:
     }
 
     void Compare(const std::string &quantity, const double expected, const double actual, const Tolerance tolerance) {
-        if (!Agree(expected, actual, tolerance)) {
+        if (!Agree(expected, actual, Allowed(quantity, tolerance))) {
             Add(quantity, std::format("ngspice {:.6g}, Nodalys {:.6g}", expected, actual));
         }
     }
@@ -220,7 +314,7 @@ public:
             return;
         }
         for (std::size_t index = 0; index < expected.size(); ++index) {
-            if (!Agree(expected[index], actual[index], tolerance)) {
+            if (!Agree(expected[index], actual[index], Allowed(quantity, tolerance))) {
                 Add(quantity,
                     std::format("at point {} ngspice {:.6g}, Nodalys {:.6g}", index, expected[index], actual[index]));
             }
@@ -241,6 +335,13 @@ public:
     }
 
 private:
+    const KnownDifference *FindCovering(const std::string &quantity) const {
+        const auto found = std::ranges::find_if(
+            m_Known, [&quantity](const KnownDifference *known) { return quantity.starts_with(known->Quantity); });
+        return found != m_Known.end() ? *found : nullptr;
+    }
+
+    std::vector<const KnownDifference *> m_Known;
     Differences m_Lines;
     std::map<std::string, std::size_t> m_Counts;
 };
@@ -290,17 +391,19 @@ double PeakOf(const std::vector<double> &values) {
  */
 void CompareWaveforms(DifferenceLog &log, const std::string &quantity, const std::vector<double> &expected_times,
                       const std::vector<double> &expected, const std::vector<double> &actual_times,
-                      const std::vector<double> &actual, const double stop_time, const double window,
+                      const std::vector<double> &actual, const double stop_time, const double step,
                       const double floor_volts_or_amperes) {
+    const double window = log.AllowedWindowSteps(quantity) * step;
     if (expected.empty() || actual.empty()) {
         if (expected.size() != actual.size()) {
             log.Add(quantity, "one engine has no points");
         }
         return;
     }
-    const Tolerance tolerance{
-        TRANSIENT_RELATIVE_TOLERANCE,
-        std::max(floor_volts_or_amperes, TRANSIENT_FLOOR_OF_PEAK * std::max(PeakOf(expected), PeakOf(actual)))};
+    const Tolerance tolerance = log.Allowed(
+        quantity,
+        {TRANSIENT_RELATIVE_TOLERANCE,
+         std::max(floor_volts_or_amperes, TRANSIENT_FLOOR_OF_PEAK * std::max(PeakOf(expected), PeakOf(actual)))});
     for (std::size_t instant = 0; instant < TRANSIENT_COMPARISON_INSTANTS; ++instant) {
         const double time = stop_time * static_cast<double>(instant) / (TRANSIENT_COMPARISON_INSTANTS - 1);
         const double expected_value = ValueAt(expected_times, expected, time);
@@ -343,7 +446,7 @@ void CompareOperatingPoints(DifferenceLog &log, const Core::OperatingPoint &expe
     for (const Core::ComponentCurrent &current : expected.Currents) {
         const auto found = std::ranges::find(actual.Currents, current.Name, &Core::ComponentCurrent::Name);
         if (found == actual.Currents.end()) {
-            log.Add("current " + current.Name, "missing from Nodalys");
+            log.AddMissing("current " + current.Name);
             continue;
         }
         log.Compare("current " + current.Name, current.Current, found->Current, SOLVED_CURRENT);
@@ -352,7 +455,6 @@ void CompareOperatingPoints(DifferenceLog &log, const Core::OperatingPoint &expe
 
 void CompareTransients(DifferenceLog &log, const Core::Transient &expected, const Core::Transient &actual,
                        const Core::TransientSettings &settings, const int node_count) {
-    const double window = TRANSIENT_TIME_WINDOW_STEPS * settings.TimeStep;
     if (HasFewerNodes(expected.NodeVoltages.size(), actual.NodeVoltages.size(), node_count)) {
         log.Add("node voltages", std::format("ngspice has {} nodes, Nodalys {}, of {}", expected.NodeVoltages.size(),
                                              actual.NodeVoltages.size(), node_count));
@@ -360,16 +462,16 @@ void CompareTransients(DifferenceLog &log, const Core::Transient &expected, cons
     }
     for (std::size_t node = 1; node < static_cast<std::size_t>(node_count); ++node) {
         CompareWaveforms(log, std::format("V({})", node), expected.Times, expected.NodeVoltages[node], actual.Times,
-                         actual.NodeVoltages[node], settings.StopTime, window, VOLTAGE_FLOOR_VOLTS);
+                         actual.NodeVoltages[node], settings.StopTime, settings.TimeStep, VOLTAGE_FLOOR_VOLTS);
     }
     for (const Core::ComponentTrace &trace : expected.Currents) {
         const Core::ComponentTrace *other = FindTrace(actual.Currents, trace.Name);
         if (other == nullptr) {
-            log.Add("current " + trace.Name, "missing from Nodalys");
+            log.AddMissing("current " + trace.Name);
             continue;
         }
         CompareWaveforms(log, "current " + trace.Name, expected.Times, trace.Values, actual.Times, other->Values,
-                         settings.StopTime, window, CURRENT_FLOOR_AMPERES);
+                         settings.StopTime, settings.TimeStep, CURRENT_FLOOR_AMPERES);
     }
 }
 
@@ -418,7 +520,7 @@ void CompareACSweeps(DifferenceLog &log, const Core::ACSweep &expected, const Co
         const Core::ComponentTrace &magnitude = expected.CurrentMagnitudesDecibels[index];
         const Core::ComponentTrace *other = FindTrace(actual.CurrentMagnitudesDecibels, magnitude.Name);
         if (other == nullptr) {
-            log.Add("current " + magnitude.Name, "missing from Nodalys");
+            log.AddMissing("current " + magnitude.Name);
             continue;
         }
         const Core::ComponentTrace *phase = FindTrace(expected.CurrentPhasesDegrees, magnitude.Name);
@@ -453,7 +555,7 @@ void CompareDCSweeps(DifferenceLog &log, const Core::DCSweep &expected, const Co
                 log.CompareSeries(std::format("curve {} current {}", curve, trace.Name), trace.Values, other->Values,
                                   SOLVED_CURRENT);
             } else {
-                log.Add("current " + trace.Name, "missing from Nodalys");
+                log.AddMissing("current " + trace.Name);
             }
         }
     }
@@ -485,7 +587,7 @@ void CompareSensitivities(DifferenceLog &log, const Core::Sensitivity &expected,
             return other.Name == part.Name && other.Element == part.Element;
         });
         if (found == actual.Parts.end()) {
-            log.Add(part.Name, "missing from Nodalys");
+            log.AddMissing(part.Name);
             continue;
         }
         log.Compare(part.Name + " absolute", part.Absolute, found->Absolute, SENSITIVITY);
@@ -578,7 +680,10 @@ void CompareTruthTables(DifferenceLog &log, const Core::TruthTable &expected, co
 struct Outcome {
     /// Why the comparison could not be made, or empty when it was.
     std::string SkipReason;
+    /// Differences at the usual tolerances.
     Differences Found;
+    /// Differences left once the known ones are allowed their bounds; equal to Found when there are none.
+    Differences Beyond;
 };
 
 /**
@@ -586,10 +691,11 @@ struct Outcome {
  * @param[in] run      Runs the analysis through the backend in use.
  * @param[in] compare  Adds the differences of two results to a log.
  */
-template <typename Run, typename Compare> Outcome RunBoth(Run &&run, Compare &&compare) {
+template <typename Run, typename Compare>
+Outcome RunBoth(Run &&run, Compare &&compare, const std::vector<const KnownDifference *> &known) {
     const auto expected = run();
     if (!expected.Result) {
-        return {.SkipReason = "ngspice does not run it: " + expected.Result.error(), .Found = {}};
+        return {.SkipReason = "ngspice does not run it: " + expected.Result.error(), .Found = {}, .Beyond = {}};
     }
     const auto actual = [&run] {
         const TestSupport::NodalysInUse nodalys;
@@ -597,13 +703,16 @@ template <typename Run, typename Compare> Outcome RunBoth(Run &&run, Compare &&c
     }();
     if (!actual.Result) {
         if (actual.Result.error().contains(SPICE_TEXT_ERROR)) {
-            return {.SkipReason = "Nodalys cannot read parts kept as SPICE text", .Found = {}};
+            return {.SkipReason = "Nodalys cannot read parts kept as SPICE text", .Found = {}, .Beyond = {}};
         }
-        return {.SkipReason = {}, .Found = {"Nodalys fails where ngspice runs: " + actual.Result.error()}};
+        const Differences failure = {"Nodalys fails where ngspice runs: " + actual.Result.error()};
+        return {.SkipReason = {}, .Found = failure, .Beyond = failure};
     }
-    DifferenceLog log;
-    compare(log, *expected.Result, *actual.Result);
-    return {.SkipReason = {}, .Found = log.Take()};
+    DifferenceLog usual;
+    compare(usual, *expected.Result, *actual.Result);
+    DifferenceLog bounded(known);
+    compare(bounded, *expected.Result, *actual.Result);
+    return {.SkipReason = {}, .Found = usual.Take(), .Beyond = bounded.Take()};
 }
 
 /// Whether a circuit holds a source of noise or random values, whose random draws differ between engines.
@@ -617,32 +726,62 @@ bool HasRandomSource(const Core::Circuit &circuit) {
     });
 }
 
+/// The entries of KNOWN_DIFFERENCES for one analysis of one example.
+std::vector<const KnownDifference *> FindKnownDifferences(const GUI::Example &example,
+                                                          const std::string_view analysis) {
+    std::vector<const KnownDifference *> known;
+    for (const KnownDifference &difference : KNOWN_DIFFERENCES) {
+        if (difference.FileName == example.FileName && difference.Analysis == analysis) {
+            known.push_back(&difference);
+        }
+    }
+    return known;
+}
+
+std::string Indented(const Differences &lines) {
+    std::string text;
+    for (const std::string &line : lines) {
+        text += "\n    " + line;
+    }
+    return text;
+}
+
 /**
- * @brief   Reports one comparison: a skip is listed, a known difference is a warning, any other is a failure.
+ * @brief   Reports one comparison: a skip is listed, a known difference within its bound is a warning, any other is a
+ *          failure, and so is a known difference that is gone.
  */
-void Judge(const GUI::Example &example, const std::string_view analysis, const Outcome &outcome) {
-    const auto known = std::ranges::find_if(KNOWN_DIFFERENCES, [&](const KnownDifference &difference) {
-        return difference.FileName == example.FileName && difference.Analysis == analysis;
-    });
+void Judge(const GUI::Example &example, const std::string_view analysis,
+           const std::vector<const KnownDifference *> &known, const Outcome &outcome) {
     if (!outcome.SkipReason.empty()) {
         WARN(std::format("Skipped {} of {}: {}", analysis, example.FileName, outcome.SkipReason));
         return;
     }
-    std::string text;
-    for (const std::string &line : outcome.Found) {
-        text += "\n    " + line;
-    }
-    if (known != KNOWN_DIFFERENCES.end()) {
-        if (outcome.Found.empty()) {
-            WARN(std::format("Known difference gone: {} of {} now agrees", analysis, example.FileName));
-        } else {
-            WARN(std::format("Known difference in {} of {} ({}):{}", analysis, example.FileName, known->Reason, text));
+    if (known.empty()) {
+        if (!outcome.Found.empty()) {
+            FAIL_CHECK(
+                std::format("The engines differ in {} of {}:{}", analysis, example.FileName, Indented(outcome.Found)));
         }
         return;
     }
-    if (!outcome.Found.empty()) {
-        FAIL_CHECK(std::format("The engines differ in {} of {}:{}", analysis, example.FileName, text));
+    for (const KnownDifference *entry : known) {
+        const bool is_found = std::ranges::any_of(
+            outcome.Found, [entry](const std::string &line) { return line.starts_with(entry->Quantity); });
+        if (!is_found) {
+            FAIL_CHECK(std::format("Known difference gone: {} of {} now agrees on \"{}\"; remove the entry", analysis,
+                                   example.FileName, entry->Quantity));
+        }
     }
+    if (!outcome.Beyond.empty()) {
+        FAIL_CHECK(std::format("The engines differ in {} of {} beyond what its known differences allow:{}", analysis,
+                               example.FileName, Indented(outcome.Beyond)));
+        return;
+    }
+    std::string reasons;
+    for (const KnownDifference *entry : known) {
+        reasons += std::format("\n    {}", entry->Reason);
+    }
+    WARN(std::format("Known difference in {} of {}:{}\n  found:{}", analysis, example.FileName, reasons,
+                     Indented(outcome.Found)));
 }
 
 /**
@@ -660,10 +799,34 @@ void Examine(const GUI::Example &example, const Core::Circuit &circuit, const st
         WARN(std::format("Skipped {} of {} on Nodalys: {}", analysis, example.FileName, *reason));
         return;
     }
-    Judge(example, analysis, RunBoth(std::forward<Run>(run), std::forward<Compare>(compare)));
+    const std::vector<const KnownDifference *> known = FindKnownDifferences(example, analysis);
+    Judge(example, analysis, known, RunBoth(std::forward<Run>(run), std::forward<Compare>(compare), known));
 }
 
 } // namespace
+
+TEST_CASE("A known difference allows its quantities to differ by its bound and no more", "[cross_validation]") {
+    constexpr KnownDifference COVERING{"example.imcsim", TRANSIENT_NAME, "V(", {1e-2, 0.5}, "test", 4.0};
+    DifferenceLog log({&COVERING});
+
+    // Within the bound, which a usual tolerance would not allow
+    log.Compare("V(1)", 1.0, 1.3, SOLVED_VOLTAGE);
+    // Beyond it
+    log.Compare("V(2)", 1.0, 2.0, SOLVED_VOLTAGE);
+    // Another quantity keeps the usual tolerance
+    log.Compare("current V1", 1.0, 1.3, SOLVED_CURRENT);
+    // A quantity that Nodalys lacks is covered only when an entry names it
+    log.AddMissing("V(3)");
+    log.AddMissing("current V2");
+
+    const Differences lines = log.Take();
+    REQUIRE(lines.size() == 3);
+    CHECK(lines[0].starts_with("V(2)"));
+    CHECK(lines[1].starts_with("current V1"));
+    CHECK(lines[2].starts_with("current V2"));
+    CHECK(log.AllowedWindowSteps("V(1)") == 4.0);
+    CHECK(log.AllowedWindowSteps("current V1") == TRANSIENT_TIME_WINDOW_STEPS);
+}
 
 TEST_CASE("Every example gives the same results on ngspice and on Nodalys", "[cross_validation]") {
     const std::span<const GUI::Example> examples = GUI::GetExamples();
