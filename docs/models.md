@@ -75,13 +75,15 @@ elements, so the results are those of ngspice with the models below. Some things
 
 Edit > Preferences > Simulation picks the engine. ngspice is the default; Nodalys is the solver built into imcsim
 ([its documentation](nodalys/README.md)), which takes the circuit directly, with no netlist, and runs the same
-analyses plus the harmonic balance (the user guide has a section on choosing the engine). It simulates the parts with the same models as above (Shockley diode, Gummel-Poon
-transistor, level 1 MOSFET, ideal and Boyle op-amps), and differs in these points:
+analyses plus the harmonic balance (the user guide has a section on choosing the engine). It simulates the parts with
+the same models as above (Shockley diode, Gummel-Poon transistor, level 1 MOSFET, ideal and Boyle op-amps), and differs
+in these points:
 
 - Logic gates and flip-flops are continuous: each output follows a smooth tanh step of its inputs around half the
   logic level, over a tenth of it, behind 50 Ohm and a delay of the part's propagation delay, and each input has
-  1 GOhm to ground. There are no X states and no `digital.cm`, so the same circuit can run every analysis, and a
-  flip-flop is built from such gates.
+  1 GOhm to ground. There are no X states and no `digital.cm`, so an AC sweep or a noise analysis sees through
+  them (the sensitivity, pole-zero and S-parameters analyses still refuse them), and a flip-flop is built from such
+  gates.
 - Temperature works as in ngspice: a stepped temperature scales the saturation currents and junction voltages of
   diodes and transistors, while resistors, capacitors and inductors keep their values.
 - A behavioral source is a native device that evaluates the same expression language with exact derivatives, and

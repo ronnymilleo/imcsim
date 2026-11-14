@@ -900,27 +900,29 @@ imcsim solves circuits with one of two engines, picked in Edit > Preferences > S
   rest of this guide describes.
 - **Nodalys** is the solver built into imcsim. It reads the circuit directly, with no netlist, and runs every analysis
   of ngspice plus the harmonic balance, which ngspice cannot. Its logic gates and flip-flops are continuous (a smooth
-  step of the inputs, with no X states), so a circuit with logic runs every analysis, and a run is repeatable from its
-  seed even for white and 1/f noise.
+  step of the inputs, with no X states), so an AC sweep or a noise analysis sees through them, and a run is repeatable
+  from its seed even for white and 1/f noise.
 
 Pick ngspice when you want the established reference, an X state in a latch or a library model that is only SPICE
-text. Pick Nodalys for the harmonic balance, to run a small-signal analysis on a circuit with logic gates, or to
+text. Pick Nodalys for the harmonic balance, for an AC sweep or a noise analysis of a circuit with logic gates, or to
 compare the two engines on a circuit: a difference between them is worth a second look at the circuit. Both use the
 same part models (see the models page, which lists where Nodalys differs).
 
 What an engine cannot run is said, not guessed at:
 
 - An analysis the engine cannot run on the circuit is grayed out in the analysis list, and its tooltip gives the
-  reason. This covers analyses and the kinds of parts on the schematic: the harmonic balance with ngspice, and
-  logic gates and flip-flops in the sensitivity, pole-zero and S-parameters analyses with either engine (and with
-  ngspice also in any analysis when its digital models, `digital.cm`, are missing).
+  reason. This covers analyses and the kinds of parts on the schematic: the harmonic balance with ngspice, a
+  voltage-controlled switch or a relay in the harmonic balance, and logic gates and flip-flops in the sensitivity,
+  pole-zero and S-parameters analyses with either engine (and with ngspice also in any analysis when its digital
+  models, `digital.cm`, are missing).
 - Other limits depend on what a part holds, so they show when you run, as an error with the reason: on Nodalys, a
   behavioral source whose expression uses something it does not read (`limit()`, the random functions, `hertz`, or
-  `time` in the harmonic balance), a MOSFET model that is not level 1, a block imported from a library, which is kept as
-  SPICE text, and, in the harmonic balance, a voltage-controlled switch or a relay.
+  `time` in the harmonic balance), a MOSFET model that is not level 1, and a block imported from a library, which is
+  kept as SPICE text.
 
 A run keeps the engine it started on, a paused live run too. If you change the engine in Preferences meanwhile, the
-change takes effect once no run is using the backend, that is, once the run ends, or its paused live run is ended or discarded.
+change takes effect once no run is using it, that is, once the run ends, or its paused live run is ended or
+discarded.
 Results already in the Output window stay as they are until you run again.
 
 ## Harmonic balance

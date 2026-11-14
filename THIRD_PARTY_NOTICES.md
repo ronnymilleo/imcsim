@@ -17,8 +17,9 @@ license.
 | JetBrains Mono | SIL Open Font License 1.1 | The JetBrains Mono Project Authors | https://github.com/JetBrains/JetBrainsMono |
 
 Their license texts are in `vendor/imgui/LICENSE.txt`, `vendor/implot/LICENSE`, `vendor/json/LICENSE.MIT`,
-`vendor/SDL/LICENSE.txt`, `vendor/CLI11/LICENSE` and `assets/fonts/`, and are installed with the program under `share/doc/imcsim/licenses/`
-(Linux), `licenses/` (the Windows zip) or `imcsim.app/Contents/Resources/licenses/` (macOS).
+`vendor/SDL/LICENSE.txt`, `vendor/CLI11/LICENSE` and `assets/fonts/`, and are installed with the program under
+`share/doc/imcsim/licenses/` (Linux), `licenses/` (the Windows zip) or `imcsim.app/Contents/Resources/licenses/`
+(macOS).
 
 ## Bundled with the AppImage
 
