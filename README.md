@@ -7,7 +7,7 @@
 [![CI](https://github.com/ronnymilleo/imcsim/actions/workflows/ci.yml/badge.svg)](https://github.com/ronnymilleo/imcsim/actions/workflows/ci.yml)
 
 Immediate Mode Circuit Simulator, built with Dear ImGui and SDL3. Circuits are simulated with
-[ngspice](https://ngspice.sourceforge.io/).
+[ngspice](https://ngspice.sourceforge.io/) or with Nodalys, the solver built into imcsim.
 
 ![imcsim with an RC low-pass filter driven by a 1 kHz sine: the schematic with its probed nodes and their voltages at
 the playhead on the left, and the transient of both nodes with their statistics in the Output window on the
@@ -60,6 +60,14 @@ New to imcsim? The [tutorial](docs/tutorial.md) builds, simulates and exports a 
   under the pointer, magnitude and phase plots, and the whole matrix saved as a Touchstone `.sNp` file
 - A truth table of a digital circuit: every combination of the chosen logic inputs and the 0, 1 or X it gives at the
   measured outputs
+- Two simulation engines, picked in Edit > Preferences > Simulation: ngspice, the default, and Nodalys, a solver written
+  for imcsim from published circuit theory and tested against closed-form results and against ngspice on every
+  example. Nodalys runs every analysis of ngspice, with temperature, fuses, behavioral sources and seedable noise and
+  random sources, and what it does not cover is refused with the reason (see the
+  [user guide](docs/user_guide.md#choosing-the-simulation-engine)). It also comes as `nodalys`, a command line that
+  reads SPICE netlists
+- A harmonic balance, on Nodalys: the periodic steady state of a circuit driven at one frequency, with the amplitude
+  of each harmonic, the waveform over one period and the THD
 - Math channels on transient, DC sweep and AC sweep plots, as on an oscilloscope: an operation between two traces picked
   with buttons, or a typed expression such as `V(OUT, IN)`, `V(3)*I(R1)` or `ddt(V(2))`, with units followed (W, Ohm,
   V/s) and a third axis for any unit other than volts and amperes; on an AC sweep they work on complex values, so
@@ -130,7 +138,8 @@ Output characteristics of a 2N3904 from a stepped DC sweep, one curve per base c
 The [tutorial](docs/tutorial.md) walks through a first circuit step by step. The [user guide](docs/user_guide.md)
 explains the editor, terminal numbers, current signs, probes, plots and exports, and
 [Simulation models](docs/models.md) describes the model behind every part and what it leaves out. [Themes](docs/themes.md)
-shows the same circuit and its plots in each color theme.
+shows the same circuit and its plots in each color theme. [Nodalys](docs/nodalys/README.md) documents the engine:
+each analysis and device, with the equations behind it.
 
 ## Roadmap
 
@@ -142,11 +151,7 @@ roughly in the order they are likely to come.
 - **Sources, parts and models**: XSPICE analog blocks (transfer functions, limiters, integrators), transmission lines,
   a circuit driven from a WAV or CSV file, PWL points read from a CSV file, and a MOSFET body diode and higher-level
   MOSFET models
-- **Nodalys, a native simulation backend**: a solver written from published circuit theory that sits beside ngspice,
-  which stays available, tested against closed-form results and against ngspice. Edit > Preferences > Simulation picks
-  it in place of ngspice. It runs every analysis of ngspice, plus a harmonic balance, with temperature, fuses,
-  behavioral sources, and seedable noise and random sources; what it does not cover is refused with the reason (see
-  the [user guide](docs/user_guide.md#choosing-the-simulation-engine)).
+- **Nodalys**: blocks kept as SPICE text, and initial voltages of nodes set in the editor
 
 ## Install
 
