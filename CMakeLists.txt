@@ -163,10 +163,11 @@ add_dependencies(imcsim copy_compile_commands)
 
 # Windows gets a folder to unzip anywhere, with ngspice next to the program; macOS the application bundle, with
 # ngspice in its Frameworks folder; Linux the standard layout, with the desktop entry and icon. All carry the licenses
-# of what the program includes
+# of what the program includes. The nodalys command line ships in the Windows zip and the Linux layout, next to imcsim;
+# the macOS bundle carries the app only, since the disk image has no place for a loose executable
 if(WIN32)
     set(IMCSIM_DOC_DIR .)
-    install(TARGETS imcsim RUNTIME DESTINATION .)
+    install(TARGETS imcsim nodalys-cli RUNTIME DESTINATION .)
     install(FILES vendor/ngspice-windows/bin/ngspice.dll vendor/ngspice-windows/bin/digital.cm DESTINATION .)
     install(FILES vendor/ngspice-windows/licenses/ngspice-COPYING.txt RENAME ngspice-LICENSE.txt
             DESTINATION licenses)
@@ -181,7 +182,7 @@ elseif(APPLE)
 else()
     include(GNUInstallDirs)
     set(IMCSIM_DOC_DIR ${CMAKE_INSTALL_DOCDIR})
-    install(TARGETS imcsim RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+    install(TARGETS imcsim nodalys-cli RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
     install(FILES packaging/imcsim.desktop DESTINATION ${CMAKE_INSTALL_DATADIR}/applications)
     install(FILES packaging/imcsim.svg DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/scalable/apps)
 endif()
@@ -190,6 +191,9 @@ install(FILES vendor/imgui/LICENSE.txt RENAME imgui-LICENSE.txt DESTINATION ${IM
 install(FILES vendor/implot/LICENSE RENAME implot-LICENSE.txt DESTINATION ${IMCSIM_DOC_DIR}/licenses)
 install(FILES vendor/json/LICENSE.MIT RENAME json-LICENSE.txt DESTINATION ${IMCSIM_DOC_DIR}/licenses)
 install(FILES vendor/SDL/LICENSE.txt RENAME SDL-LICENSE.txt DESTINATION ${IMCSIM_DOC_DIR}/licenses)
+if(NOT APPLE)
+    install(FILES vendor/CLI11/LICENSE RENAME CLI11-LICENSE.txt DESTINATION ${IMCSIM_DOC_DIR}/licenses)
+endif()
 install(FILES assets/fonts/Inter-LICENSE.txt assets/fonts/JetBrainsMono-LICENSE.txt
         DESTINATION ${IMCSIM_DOC_DIR}/licenses)
 # Last, since the signature seals every file of the bundle
