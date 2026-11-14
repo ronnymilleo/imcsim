@@ -124,7 +124,7 @@
 | :--- | :--- | :---: | :---: | :--- |
 | **Passives** | Resistor, Capacitor, Inductor | ✅ | ✅ **Ready** | Exact companion models; Norton charge integration with initial conditions (`uic`). |
 | **Sources** | DC/AC Voltage & Current, Clock, Pulse, Sine, EXP, PWL, SFFM, AM | ✅ | ✅ **Ready** | Waveform generators; the transient lands on the corners of each. |
-| **Noise & Random Sources** | `TRNOISE`, `TRRANDOM` | ✅ | 🟡 **Partial** | Held at their DC level outside a transient; a transient with one is refused. |
+| **Noise & Random Sources** | `TRNOISE`, `TRRANDOM` | ✅ | ✅ **Ready** | Held at their DC level outside a transient; in a transient, white, $1/f$ and telegraph noise and the uniform, Gaussian, exponential and Poisson draws from a `std::mt19937_64` seeded by the run seed. The draws are written out in [`random_draws.cpp`](../../nodalys/src/devices/random_draws.cpp) (top 53 bits for the uniform number, Box-Muller, inversion, Knuth), not taken from the standard distributions, so a seed gives the same run on Linux, Windows and macOS up to the last digit of `log` and `cos`. The values differ from those of `ngspice`. |
 | **Behavioral Sources** | `B` element | ✅ | ✅ **Ready** | An expression of node voltages, currents and time with exact derivatives for Newton, the operators and functions of `ngspice`; what `ngspice` reads and `Nodalys` does not (`limit`, the random functions, `hertz`) is refused by name before the run ([`behavioral_source.md`](./behavioral_source.md)). |
 | **Fuses** | `imcsim_fuse` subcircuit | ✅ | ✅ **Ready** | Native device with a thermal state and a latch, with the blow time of `ngspice` within 3 % ([`fuse_device.md`](./fuse_device.md)). |
 | **Controlled Sources** | VCVS, VCCS, CCCS, CCVS | ✅ | ✅ **Ready** | Stamped into linear MNA system; zero-voltage current probes handled natively. |
@@ -145,7 +145,7 @@
 | **Component Parameter Stepping** | ✅ **Ready** | Steps $R, C, L$ across `.tran`, `.ac`, and `.dc` runs directly through `imcsim` controls. |
 | **Fourier / Spectrum Analysis** | ✅ **Ready** | High-resolution FFT post-processed over `ComputeTransient` waveforms. |
 | **Live Simulation Mode** | ✅ **Ready** | Live transient paced against the clock (`simulation/live_pace.h`, shared with ngspice), paused and resumed, with changes applied between chunks. |
-| **Temperature Sweep ($T$)** | ❌ **Planned** | Semiconductor model evaluation at nominal $T_{\text{nom}} = 27\,^\circ\text{C}$; a stepped temperature is refused with the reason (`BackendCapabilities::TemperatureUnsupported`) until the thermal scaling equations land. |
+| **Temperature Sweep ($T$)** | ✅ **Ready** | `Circuit::SetTemperature()` applies the SPICE temperature laws of the diode, BJT and MOSFET relative to the nominal $T_{\text{nom}} = 27\,^\circ\text{C}$, and `temper` in an expression reads it. |
 | **Initial Conditions (`.ic`, `.nodeset`)** | 🟡 **Partial** | Element-level `uic` on capacitors ($V_0$) and inductors ($I_0$) supported; arbitrary node `.ic` pending. |
 | **Gear-2 / BDF-2 Integration** | 🟡 **Partial** | 3rd divided-difference LTE step control with Trapezoidal/Euler supported; Gear-2 for stiff switching circuits pending. |
 | **Vendor SPICE `.subckt` Parsing** | 🟡 **Partial** | Schematic hierarchy blocks and `.model` cards work; arbitrary external SPICE subcircuit netlist parser pending. |
@@ -208,8 +208,8 @@ starts once the one before it is done.
 | **Sparse MNA Solver** (KLU-style, AMD ordering, symbolic reuse) | The dense LU makes the analyses users run most the slowest: the transient runs at 0.07x to 0.26x of `ngspice` and the AC sweep of a 100-node network at 0.34x (section 4), and it caps harmonic balance at 4000 unknowns. | Dense LU |
 | **Gear-2 / BDF-2 Integration** | The trapezoidal rule rings on stiff switching, and the fuse needs Gear, as the `ngspice` backend writes `method=gear` for it. | Trapezoidal and Backward Euler |
 | **Behavioral Sources** (`B` element) | Free expressions of node voltages and branch currents, already checked by `imcsim`. | Done ([`behavioral_source.md`](./behavioral_source.md)) |
-| **Temperature** | The SPICE temperature laws of the diode, BJT and MOSFET (`IS`, `VJ`, `EG`, `BF`...), so a stepped temperature runs. | Refused with the reason |
-| **Noise and Random Sources in a Transient** | White, $1/f$ and telegraph noise, and the random distributions, drawn as `ngspice` draws them where possible. | DC level outside a transient; transient refused |
+| **Temperature** | The SPICE temperature laws of the diode, BJT and MOSFET (`IS`, `VJ`, `EG`, `BF`...), so a stepped temperature runs. | Done |
+| **Noise and Random Sources in a Transient** | White, $1/f$ and telegraph noise, and the random distributions, drawn from a seeded generator written out in `random_draws.cpp`, so a seed repeats on every platform. | Done |
 | **SPICE-Text Subcircuits** | Vendor `.subckt` models kept as SPICE text, such as the op-amp of the precision rectifier example. | Refused |
 | **Node Initial Conditions** (`.ic`, `.nodeset`) | Starting a transient or guiding an operating point from node voltages, not only from parts. | Parts only (`uic`) |
 

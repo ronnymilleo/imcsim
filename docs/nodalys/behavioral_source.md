@@ -73,7 +73,7 @@ Comparisons and logic give 1 or 0; for a condition, any value but 0 is true. The
 | :--- | :--- | :--- |
 | `pi`, `e` | 3.14159..., 2.71828... | |
 | `time` | the instant of the transient point, in seconds | 0 in every other analysis. In a transient the source follows it; in the small-signal analyses it is 0, as in `ngspice`. A `.dc` of `ngspice` sets `time` to the previous point of the sweep, a defect of its sweep that `Nodalys` does not copy: it holds 0, as documented. |
-| `temper` | 27 | The temperature in degrees Celsius. `Nodalys` simulates at 27 °C only, which is what `ngspice` reads without a `.temp`; a stepped temperature is refused before the run. |
+| `temper` | 27 | The temperature in degrees Celsius: 27 unless the circuit sets another one (`Circuit::SetTemperature()`, a `.temp` card in `ngspice`), which `temper` then reads. |
 | `hertz` | refused | `ngspice` gives the frequency of the AC sweep, and the small-signal gain then depends on it, which an AC sweep of `Nodalys` stamps once. |
 
 ### 2.3 Operators and functions
