@@ -131,7 +131,7 @@
 | **Semiconductors** | Diode, Zener, LED, BJT (NPN/PNP), MOSFET (NMOS/PMOS) | ✅ | ✅ **Ready** | Shockley diode, Gummel-Poon BJT, Shichman-Hodges Level-1 MOSFET with charge depletion/diffusion. |
 | **Macromodels** | Ideal Op-Amp, Boyle Op-Amp (LTC AN48) | ✅ | ✅ **Ready** | Real datasheet-level macromodel with CMRR, slew rate, finite gain-bandwidth, and output clamp. |
 | **Continuous Logic ($C^\infty$)** | NOT, BUFFER, AND, NAND, OR, NOR, XOR, XNOR, Schmitt Trigger | ✅ (`digital.cm`) | ✅ **Ready** | Hyperbolic tangent smooth macromodels with inertial delay RC filtering and Thevenin output stages. |
-| **Sequential Logic** | D Flip-Flop, SR Latch, SR Flip-Flop, T Flip-Flop, JK Flip-Flop | ✅ (`digital.cm`) | ✅ **Ready** | Cross-coupled multi-stage implementations with Newton-Raphson voltage change damping. |
+| **Sequential Logic** | D Flip-Flop, SR Latch, SR Flip-Flop, T Flip-Flop, JK Flip-Flop | ✅ (`digital.cm`) | ✅ **Ready** | Cross-coupled multi-stage implementations with Newton-Raphson voltage change damping; the D flip-flop is the classic 7474 six-gate form, whose active-high asynchronous set and reset (`CircuitBuilder::AddDFlipFlop()`) override the clock. |
 | **Co-Simulation Bridge** | Verilog discrete-to-analog converter | ❌ | ✅ **Ready** | Converts discrete HDL levels (`0`, `1`, `X`, `Z`) to continuous analog ramps with slew limiting. |
 
 ---

@@ -83,7 +83,8 @@ in these points:
   logic level, over a tenth of it, behind 50 Ohm and a delay of the part's propagation delay, and each input has
   1 GOhm to ground. There are no X states and no `digital.cm`, so an AC sweep or a noise analysis sees through
   them (the sensitivity, pole-zero and S-parameters analyses still refuse them), and a flip-flop is built from such
-  gates.
+  gates, as the classic 7474: its asynchronous SET and RESET (active high, through an inverter each) feed the gates that
+  hold the state, so a reset overrides the clock, as a decade counter needs.
 - Temperature works as in ngspice: a stepped temperature scales the saturation currents and junction voltages of
   diodes and transistors, while resistors, capacitors and inductors keep their values.
 - A behavioral source is a native device that evaluates the same expression language with exact derivatives, and
