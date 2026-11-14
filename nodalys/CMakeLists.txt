@@ -23,6 +23,7 @@ add_library(nodalys STATIC
     src/devices/fuse_device.cpp
     src/devices/integration.cpp
     src/devices/mosfet_device.cpp
+    src/devices/random_draws.cpp
     src/devices/smooth_logic.cpp
     src/devices/thermal.cpp
     src/devices/transient_noise.cpp

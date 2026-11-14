@@ -13,6 +13,7 @@ add_executable(nodalys-tests
     linear_tests.cpp
     netlist_elements_tests.cpp
     parser_and_export_tests.cpp
+    random_draws_tests.cpp
     sens_analysis_tests.cpp
     smooth_logic_tests.cpp
     thermal_tests.cpp

@@ -4,8 +4,8 @@
  *          derivatives.
  * @details The language is the one of the ngspice behavioral source (the `B` element), so a netlist written for one
  *          engine means the same on the other: numbers with SPICE suffixes (`4.7k`, `1meg`, `10n`), the constants `pi`
- *          and `e`, the variables `time` (seconds, 0 outside a transient) and `temper` (27, the one temperature
- *          Nodalys simulates at), the references `v(node)`, `v(node, reference)` and `i(source)`, the operators
+ *          and `e`, the variables `time` (seconds, 0 outside a transient) and `temper` (27 unless the circuit sets
+ *          another temperature), the references `v(node)`, `v(node, reference)` and `i(source)`, the operators
  *          `^` and `**` (power), unary `-` `+` `!`, `*` `/`, `+` `-`, `<` `>` `<=` `>=`, `==` `!=` `<>`, `&&`, `||`
  *          and the ternary `condition ? then : otherwise`, and the functions `abs`, `sqrt`, `exp`, `ln`, `log`
  *          (natural, as in ngspice), `log10`, `sin`, `cos`, `tan`, `asin`, `acos`, `atan`, `sinh`, `cosh`, `tanh`,
