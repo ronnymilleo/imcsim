@@ -163,7 +163,9 @@ chmod +x imcsim-*-x86_64.AppImage
 ./imcsim-*-x86_64.AppImage
 ```
 
-It carries ngspice and SDL3; only a Vulkan driver for your GPU is needed.
+It carries ngspice and SDL3; only a Vulkan driver for your GPU is needed. The `nodalys` command line, the
+standalone form of the Nodalys engine, sits beside `imcsim` in `usr/bin` inside the image (run
+`./imcsim-*-x86_64.AppImage --appimage-extract` to get it out).
 
 On Arch Linux, the package is not on the AUR yet, since AUR registrations are paused for now. Until it is, build
 it from the PKGBUILD in this repository, which builds the release it names:
@@ -172,6 +174,8 @@ it from the PKGBUILD in this repository, which builds the release it names:
 cd packaging/aur
 makepkg -si
 ```
+
+The package installs `nodalys`, the command line of the Nodalys engine, beside `imcsim`.
 
 ### macOS
 
@@ -188,7 +192,7 @@ On an Intel Mac, build it with `packaging/macos/build.sh` (see [Build › macOS]
 ### Windows
 
 Windows 10 version 1903 or newer, x64: download `imcsim-<version>-windows-x64.zip`, extract it anywhere and run
-`imcsim.exe`.
+`imcsim.exe`. The zip also carries `nodalys.exe`, the command line of the Nodalys engine.
 
 ### Settings
 

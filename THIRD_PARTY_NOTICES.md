@@ -11,12 +11,13 @@ license.
 | Dear ImGui (docking branch) | MIT | Omar Cornut | https://github.com/ocornut/imgui |
 | ImPlot | MIT | Evan Pezent | https://github.com/epezent/implot |
 | nlohmann/json | MIT | Niels Lohmann | https://github.com/nlohmann/json |
+| CLI11 (the `nodalys` command line only, not in the macOS app) | BSD 3-Clause | University of Cincinnati, Henry Schreiner | https://github.com/CLIUtils/CLI11 |
 | SDL 3 | zlib license | Sam Lantinga | https://github.com/libsdl-org/SDL |
 | Inter | SIL Open Font License 1.1 | The Inter Project Authors | https://github.com/rsms/inter |
 | JetBrains Mono | SIL Open Font License 1.1 | The JetBrains Mono Project Authors | https://github.com/JetBrains/JetBrainsMono |
 
 Their license texts are in `vendor/imgui/LICENSE.txt`, `vendor/implot/LICENSE`, `vendor/json/LICENSE.MIT`,
-`vendor/SDL/LICENSE.txt` and `assets/fonts/`, and are installed with the program under `share/doc/imcsim/licenses/`
+`vendor/SDL/LICENSE.txt`, `vendor/CLI11/LICENSE` and `assets/fonts/`, and are installed with the program under `share/doc/imcsim/licenses/`
 (Linux), `licenses/` (the Windows zip) or `imcsim.app/Contents/Resources/licenses/` (macOS).
 
 ## Bundled with the AppImage
