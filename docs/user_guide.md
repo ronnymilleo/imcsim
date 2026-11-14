@@ -681,7 +681,8 @@ A voltage or current source set to **Noise** adds noise to a transient on top of
 - The noise changes on each run. The **Seed** of the transient settings (0 draws new ones) makes the Random sources and
   the telegraph part repeat, but never the white and 1/f noise, which ngspice does not seed. A seeded Gaussian
   Random source repeats only every other run in one session, since ngspice keeps half of its last pair of Gaussian
-  values for the next run; the other distributions repeat every run.
+  values for the next run; the other distributions repeat every run. With the Nodalys engine, a seed repeats the whole
+  run, white and 1/f noise included, though the values drawn differ from those of ngspice.
 - **Random** holds a new value every **Sample step**, after the **Delay**, from a distribution whose two parameters
   are called after it: uniform (range around the offset), Gaussian (standard deviation, mean), exponential (mean,
   offset) or Poisson (lambda, offset).
@@ -889,6 +890,38 @@ the table on the clipboard.
 Each row is an independent operating point, so the table describes combinational circuits. A latch or flip-flop whose
 outputs depend on its history has no operating point for the combinations that hold its state; those rows read X and
 the Run report says how many. The table is not exported as a figure, like the operating point.
+
+## Choosing the simulation engine
+
+imcsim solves circuits with one of two engines, picked in Edit > Preferences > Simulation (the **Backend** choice):
+
+- **ngspice** is the reference simulator, the open-source successor of Berkeley SPICE, used as a shared library. It is
+  the default. Logic gates and flip-flops run as its digital models, with X states, and its results are the ones the
+  rest of this guide describes.
+- **Nodalys** is the solver built into imcsim. It reads the circuit directly, with no netlist, and runs every analysis
+  of ngspice plus the harmonic balance, which ngspice cannot. Its logic gates and flip-flops are continuous (a smooth
+  step of the inputs, with no X states), so a circuit with logic runs every analysis, and a run is repeatable from its
+  seed even for white and 1/f noise.
+
+Pick ngspice when you want the established reference, an X state in a latch or a library model that is only SPICE
+text. Pick Nodalys for the harmonic balance, to run a small-signal analysis on a circuit with logic gates, or to
+compare the two engines on a circuit: a difference between them is worth a second look at the circuit. Both use the
+same part models (see the models page, which lists where Nodalys differs).
+
+What an engine cannot run is said, not guessed at:
+
+- An analysis the engine cannot run on the circuit is grayed out in the analysis list, and its tooltip gives the
+  reason. This covers analyses and the kinds of parts on the schematic: the harmonic balance with ngspice, and
+  logic gates and flip-flops in the sensitivity, pole-zero and S-parameters analyses with either engine (and with
+  ngspice also in any analysis when its digital models, `digital.cm`, are missing).
+- Other limits depend on what a part holds, so they show when you run, as an error with the reason: on Nodalys, a
+  behavioral source whose expression uses something it does not read (`limit()`, the random functions, `hertz`, or
+  `time` in the harmonic balance), a MOSFET model that is not level 1, a block imported from a library, which is kept as
+  SPICE text, and, in the harmonic balance, a voltage-controlled switch or a relay.
+
+A run keeps the engine it started on, a paused live run too. If you change the engine in Preferences meanwhile, the
+change takes effect once no run is using the backend, that is, once the run ends, or its paused live run is ended or discarded.
+Results already in the Output window stay as they are until you run again.
 
 ## Harmonic balance
 
