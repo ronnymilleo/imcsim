@@ -158,14 +158,6 @@ constexpr std::string_view LEAKAGE_BIASED_NODES =
     "a node between an off transistor or switch and a diode is set by pico-ampere leakage, which each engine adds "
     "its own GMIN to, so the voltage is 1 % apart and neither is more right";
 
-constexpr std::string_view SCHMITT_EDGES =
-    "at the 5 us step ngspice puts the switching edges at 0.58 ms and 1.08 ms 20.7 us and 86.5 us late (602.7 and "
-    "1168.6 us), and Nodalys 3.0 us early and 0.15 us late; with a 0.2 us or a 0.05 us step both engines give 582.0 "
-    "and "
-    "1082.0 us, so ngspice is the imprecise one, and the later edges agree within 1 us; the start at 0 V is "
-    "metastable: Nodalys samples +1.6 V and +1.3 V at 5 us and 10 us and reaches -15 V at 15 us, where ngspice, with "
-    "adaptive steps, is at -15 V from 7 us";
-
 // Bounds of the known differences, each a little above what the example measures today
 
 /// A low logic level is 0 V on ngspice and at most 1.6 mV on Nodalys.
@@ -190,12 +182,6 @@ constexpr Tolerance SUPPLY_SENSITIVITY_BOUND{SOLVER_RELATIVE_TOLERANCE, 2e-4};
 constexpr Tolerance DIVIDED_BY_NOTHING_BOUND{NOISE_TOTAL.Relative, 1e8};
 /// The ring of the buck converter's diode node, sampled at 1 us, differs by 6.4 V.
 constexpr Tolerance RINGING_BOUND{TRANSIENT_RELATIVE_TOLERANCE, 9.0};
-/// Nodalys reads 1.6 V at the first 5 us sample, before the metastable start leaves 0 V, where ngspice is at -0.3 mV.
-constexpr Tolerance SCHMITT_VOLTAGE_BOUND{TRANSIENT_RELATIVE_TOLERANCE, 2.0};
-/// The currents of that start differ by 0.13 mA.
-constexpr Tolerance SCHMITT_CURRENT_BOUND{TRANSIENT_RELATIVE_TOLERANCE, 2e-4};
-/// ngspice puts an edge of the Schmitt trigger up to 17.3 output steps late.
-constexpr double SCHMITT_WINDOW_STEPS = 20.0;
 
 /// Differences found by this test and investigated; each one is a task of its own. Keep the reason to one line, with
 /// the engine that is right.
@@ -250,10 +236,6 @@ constexpr std::array KNOWN_DIFFERENCES{
                     "so the samples of the ring differ: both engines ring above the 12 V supply, as the inductor "
                     "pushes the node up to about 19 V when the step shrinks, and at this step ngspice reaches 14.9 V "
                     "and Nodalys 18.5 V (jay #227)"},
-    KnownDifference{"schmitt_trigger.imcsim", TRANSIENT_NAME, "V(", SCHMITT_VOLTAGE_BOUND, SCHMITT_EDGES,
-                    SCHMITT_WINDOW_STEPS},
-    KnownDifference{"schmitt_trigger.imcsim", TRANSIENT_NAME, "current", SCHMITT_CURRENT_BOUND, SCHMITT_EDGES,
-                    SCHMITT_WINDOW_STEPS},
 };
 
 using Differences = std::vector<std::string>;
