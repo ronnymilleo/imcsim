@@ -817,12 +817,19 @@ public:
     }
 
     void AddDFlipFlop(std::string name, NodeId q, NodeId q_bar, NodeId d, NodeId clk,
-                      const SmoothLogicParameters &params) {
+                      const SmoothLogicParameters &params, const std::optional<NodeId> set,
+                      const std::optional<NodeId> reset) {
         Track(q);
         Track(q_bar);
         Track(d);
         Track(clk);
-        Defer([this, name = std::move(name), q, q_bar, d, clk, params]() mutable {
+        if (set) {
+            Track(*set);
+        }
+        if (reset) {
+            Track(*reset);
+        }
+        Defer([this, name = std::move(name), q, q_bar, d, clk, params, set, reset]() mutable {
             const int u_q = MapNode(q);
             const int u_qb = MapNode(q_bar);
             const int u_d = MapNode(d);
@@ -833,17 +840,34 @@ public:
             const int n3 = AllocateInternalNode();
             const int n4 = AllocateInternalNode();
 
+            // The set and reset inputs are active high, so each goes through an inverter into the active-low
+            // inputs of the gates, as in the classic 7474 (preset on G1 and G5, clear on G2, G4 and G6)
+            std::vector<int> set_bar;
+            std::vector<int> reset_bar;
+            if (set) {
+                set_bar.push_back(AllocateInternalNode());
+                AddRawLogicGate(name + ".NOT_SET", LogicGateType::NOT, set_bar.front(), {MapNode(*set)}, params);
+            }
+            if (reset) {
+                reset_bar.push_back(AllocateInternalNode());
+                AddRawLogicGate(name + ".NOT_RESET", LogicGateType::NOT, reset_bar.front(), {MapNode(*reset)}, params);
+            }
+            const auto with = [](std::vector<int> inputs, const std::vector<int> &extra) {
+                inputs.insert(inputs.end(), extra.begin(), extra.end());
+                return inputs;
+            };
+
             // Master latch and edge-steering section
-            AddRawLogicGate(name + ".G1", LogicGateType::NAND, n1, {n4, n2}, params);
-            AddRawLogicGate(name + ".G2", LogicGateType::NAND, n2, {n1, u_clk}, params);
+            AddRawLogicGate(name + ".G1", LogicGateType::NAND, n1, with({n4, n2}, set_bar), params);
+            AddRawLogicGate(name + ".G2", LogicGateType::NAND, n2, with({n1, u_clk}, reset_bar), params);
             AddRawLogicGate(name + ".G3", LogicGateType::NAND, n3, {n2, u_clk, n4}, params);
-            AddRawLogicGate(name + ".G4", LogicGateType::NAND, n4, {n3, u_d}, params);
+            AddRawLogicGate(name + ".G4", LogicGateType::NAND, n4, with({n3, u_d}, reset_bar), params);
 
             // Slave output latch (slight asymmetry breaks DC operating point metastability in the reset state)
             SmoothLogicParameters g5_params = params;
             g5_params.VThreshold *= 0.99;
-            AddRawLogicGate(name + ".G5", LogicGateType::NAND, u_q, {n2, u_qb}, g5_params);
-            AddRawLogicGate(name + ".G6", LogicGateType::NAND, u_qb, {n3, u_q}, params);
+            AddRawLogicGate(name + ".G5", LogicGateType::NAND, u_q, with({n2, u_qb}, set_bar), g5_params);
+            AddRawLogicGate(name + ".G6", LogicGateType::NAND, u_qb, with({n3, u_q}, reset_bar), params);
 
             // Seed Newton in the reset equilibrium so downstream stages clocked HIGH still start reset
             m_Compiled.Devices.push_back(std::make_unique<NodeSeedDevice>(std::vector<NodeSeed>{
@@ -1276,10 +1300,13 @@ void CircuitBuilder::AddSRLatch(std::string name, const NodeId q, const NodeId q
  * @param[in] d       Data input node.
  * @param[in] clk     Clock input node.
  * @param[in] params  Physical logic parameters.
+ * @param[in] set     Asynchronous set node, active high, or empty when the flip-flop has none.
+ * @param[in] reset   Asynchronous reset node, active high, or empty when the flip-flop has none.
  */
 void CircuitBuilder::AddDFlipFlop(std::string name, const NodeId q, const NodeId q_bar, const NodeId d,
-                                  const NodeId clk, const SmoothLogicParameters &params) {
-    m_Impl->AddDFlipFlop(std::move(name), q, q_bar, d, clk, params);
+                                  const NodeId clk, const SmoothLogicParameters &params,
+                                  const std::optional<NodeId> set, const std::optional<NodeId> reset) {
+    m_Impl->AddDFlipFlop(std::move(name), q, q_bar, d, clk, params, set, reset);
 }
 
 /**

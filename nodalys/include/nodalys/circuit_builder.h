@@ -10,6 +10,7 @@
 #include "nodalys/types.h"
 #include <expected>
 #include <memory>
+#include <optional>
 #include <string>
 
 namespace Nodalys {
@@ -134,7 +135,8 @@ public:
     void AddSRLatch(std::string name, NodeId q, NodeId q_bar, NodeId set, NodeId reset,
                     const SmoothLogicParameters &params = {});
     void AddDFlipFlop(std::string name, NodeId q, NodeId q_bar, NodeId d, NodeId clk,
-                      const SmoothLogicParameters &params = {});
+                      const SmoothLogicParameters &params = {}, std::optional<NodeId> set = std::nullopt,
+                      std::optional<NodeId> reset = std::nullopt);
 
     // Initial Conditions
     void SetInitialVoltage(NodeId node, double voltage);

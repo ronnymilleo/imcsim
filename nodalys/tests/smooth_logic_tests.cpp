@@ -11,6 +11,7 @@
 #include <algorithm>
 #include <cmath>
 #include <string>
+#include <utility>
 #include <vector>
 
 using Catch::Matchers::WithinAbs;
@@ -295,6 +296,104 @@ TEST_CASE("Edge-triggered D flip-flop macromodel instantiates and converges clea
     // At t = 75 ns (after second rising clock edge when D=0V): Q must be LOW
     CHECK_THAT(sample_at(75e-9, 3), WithinAbs(0.0, 0.3));
     CHECK_THAT(sample_at(75e-9, 4), WithinAbs(5.0, 0.3));
+}
+
+TEST_CASE("The asynchronous set and reset of a D flip-flop override the clock and are released by going low",
+          "[nodalys][logic]") {
+    constexpr double SUPPLY = 5.0;
+    constexpr double CLOCK_PERIOD = 40e-9;
+    // Nodes: 1 = D, 2 = CLK, 3 = Q, 4 = Q_bar, 5 = SET, 6 = RESET
+    constexpr Nodalys::NodeId D = 1;
+    constexpr Nodalys::NodeId CLK = 2;
+    constexpr Nodalys::NodeId Q = 3;
+    constexpr Nodalys::NodeId Q_BAR = 4;
+    constexpr Nodalys::NodeId SET = 5;
+    constexpr Nodalys::NodeId RESET = 6;
+
+    /// A pulse of the given level, which starts at the delay and ends before the stop time.
+    const auto pulse = [](const double low, const double high, const double delay, const double width) {
+        Nodalys::PulseParameters parameters;
+        parameters.Low = low;
+        parameters.High = high;
+        parameters.Delay = delay;
+        parameters.RiseTime = 1e-9;
+        parameters.FallTime = 1e-9;
+        parameters.Width = width;
+        parameters.Period = 1e-3;
+        return parameters;
+    };
+
+    // Runs a transient of a flip-flop whose D is 5 V, clocked at 20 ns and 60 ns, with the given set and reset
+    // pulses, and returns the voltage of Q and Q_bar at the given instants
+    const auto run = [&](const Nodalys::PulseParameters &set, const Nodalys::PulseParameters &reset,
+                         const std::vector<double> &instants) {
+        Nodalys::CircuitBuilder builder;
+        builder.AddVdc("V_D", D, Nodalys::GROUND_NODE, SUPPLY);
+        Nodalys::PulseParameters clock = pulse(0.0, SUPPLY, 20e-9, 20e-9);
+        clock.Period = CLOCK_PERIOD;
+        builder.AddVpulse("V_CLK", CLK, Nodalys::GROUND_NODE, clock);
+        builder.AddVpulse("V_SET", SET, Nodalys::GROUND_NODE, set);
+        builder.AddVpulse("V_RESET", RESET, Nodalys::GROUND_NODE, reset);
+        Nodalys::SmoothLogicParameters params;
+        params.PropagationDelay = 1e-9;
+        builder.AddDFlipFlop("DFF1", Q, Q_BAR, D, CLK, params, SET, RESET);
+        const auto circuit = builder.Build();
+        REQUIRE(circuit.has_value());
+        Nodalys::TransientConfig config;
+        config.StopTime = 90e-9;
+        config.TimeStep = 0.5e-9;
+        config.UseInitialConditions = true;
+        const auto result = Nodalys::ComputeTransient(*circuit, config);
+        REQUIRE(result.has_value());
+        std::vector<std::pair<double, double>> levels;
+        for (const double instant : instants) {
+            const std::size_t index =
+                static_cast<std::size_t>(std::ranges::lower_bound(result->Times, instant) - result->Times.begin());
+            const std::size_t last = std::min(index, result->Times.size() - 1);
+            levels.emplace_back(result->NodeVoltages[static_cast<std::size_t>(Q)][last],
+                                result->NodeVoltages[static_cast<std::size_t>(Q_BAR)][last]);
+        }
+        return levels;
+    };
+    const Nodalys::PulseParameters never = pulse(0.0, 0.0, 0.0, 1.0);
+
+    SECTION("A reset held high keeps Q low through the clock edges") {
+        const auto levels = run(never, pulse(0.0, SUPPLY, 5e-9, 1.0), {35e-9, 75e-9});
+        for (const auto &[q, q_bar] : levels) {
+            CHECK_THAT(q, WithinAbs(0.0, 0.3));
+            CHECK_THAT(q_bar, WithinAbs(SUPPLY, 0.3));
+        }
+    }
+
+    SECTION("A set held high keeps Q high with D low") {
+        Nodalys::CircuitBuilder builder;
+        builder.AddVdc("V_D", D, Nodalys::GROUND_NODE, 0.0);
+        builder.AddVdc("V_CLK", CLK, Nodalys::GROUND_NODE, 0.0);
+        builder.AddVdc("V_SET", SET, Nodalys::GROUND_NODE, SUPPLY);
+        builder.AddVdc("V_RESET", RESET, Nodalys::GROUND_NODE, 0.0);
+        builder.AddDFlipFlop("DFF1", Q, Q_BAR, D, CLK, {}, SET, RESET);
+        const auto circuit = builder.Build();
+        REQUIRE(circuit.has_value());
+        const auto op = Nodalys::ComputeOperatingPoint(*circuit);
+        REQUIRE(op.has_value());
+        CHECK_THAT(op->NodeVoltages[static_cast<std::size_t>(Q)], WithinAbs(SUPPLY, 0.3));
+        CHECK_THAT(op->NodeVoltages[static_cast<std::size_t>(Q_BAR)], WithinAbs(0.0, 0.3));
+    }
+
+    SECTION("A reset pulse clears Q at once, without a clock edge, and the next edge sets it again") {
+        // Q is set by the edge at 20 ns, cleared by the pulse from 30 ns to 40 ns, and set again by the edge at 60 ns
+        const auto levels = run(never, pulse(0.0, SUPPLY, 30e-9, 10e-9), {28e-9, 45e-9, 75e-9});
+        CHECK_THAT(levels[0].first, WithinAbs(SUPPLY, 0.3));
+        CHECK_THAT(levels[1].first, WithinAbs(0.0, 0.3));
+        CHECK_THAT(levels[2].first, WithinAbs(SUPPLY, 0.3));
+    }
+
+    SECTION("A set pulse sets Q at once, before the first clock edge") {
+        // D is 5 V here, so move it low through a set that arrives first: Q must be high at 15 ns, before any edge
+        const auto levels = run(pulse(0.0, SUPPLY, 5e-9, 5e-9), never, {15e-9});
+        CHECK_THAT(levels[0].first, WithinAbs(SUPPLY, 0.3));
+        CHECK_THAT(levels[0].second, WithinAbs(0.0, 0.3));
+    }
 }
 
 TEST_CASE("D flip-flop starts reset at DC and logic gate output impedance equals OutputResistance",
