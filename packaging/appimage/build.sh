@@ -79,6 +79,7 @@ cmake -S "$SOURCE_DIR" -B "$WORK_DIR/imcsim-build" -G Ninja -DCMAKE_BUILD_TYPE=R
     -DCMAKE_EXE_LINKER_FLAGS="-static-libstdc++ -static-libgcc"
 cmake --build "$WORK_DIR/imcsim-build"
 rm -rf "$WORK_DIR/AppDir"
+# The install rules also put the nodalys command line in usr/bin; it needs no library beyond libc and the static C++ runtime
 DESTDIR="$WORK_DIR/AppDir" cmake --install "$WORK_DIR/imcsim-build"
 # The spinit of this ngspice names the build folder, so the program loads the digital code models itself, from
 # usr/lib/imcsim; they need only libc and libm

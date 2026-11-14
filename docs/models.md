@@ -75,22 +75,28 @@ elements, so the results are those of ngspice with the models below. Some things
 
 Edit > Preferences > Simulation picks the engine. ngspice is the default; Nodalys is the solver built into imcsim
 ([its documentation](nodalys/README.md)), which takes the circuit directly, with no netlist, and runs the same
-analyses plus the harmonic balance. It simulates the parts with the same models as above (Shockley diode, Gummel-Poon
-transistor, level 1 MOSFET, ideal and Boyle op-amps), and differs in these points:
+analyses plus the harmonic balance (the user guide has a section on choosing the engine). It simulates the parts with
+the same models as above (Shockley diode, Gummel-Poon transistor, level 1 MOSFET, ideal and Boyle op-amps), and differs
+in these points:
 
 - Logic gates and flip-flops are continuous: each output follows a smooth tanh step of its inputs around half the
   logic level, over a tenth of it, behind 50 Ohm and a delay of the part's propagation delay, and each input has
-  1 GOhm to ground. There are no X states and no `digital.cm`, so the same circuit can run every analysis, and a
-  flip-flop is built from such gates.
-- Everything is simulated at 27 °C: a stepped temperature is refused with the reason, since the device models do not
-  follow the temperature yet.
+  1 GOhm to ground. There are no X states and no `digital.cm`, so an AC sweep or a noise analysis sees through
+  them (the sensitivity, pole-zero and S-parameters analyses still refuse them), and a flip-flop is built from such
+  gates, as the classic 7474: its asynchronous SET and RESET (active high, through an inverter each) feed the gates that
+  hold the state, so a reset overrides the clock, as a decade counter needs.
+- Temperature works as in ngspice: a stepped temperature scales the saturation currents and junction voltages of
+  diodes and transistors, while resistors, capacitors and inductors keep their values.
 - A behavioral source is a native device that evaluates the same expression language with exact derivatives, and
   refuses before the run what ngspice reads and Nodalys does not, such as `limit()`, the random functions and `hertz`;
   see Behavioral sources. A fuse is a native device with the same thermal equation and blow level as the ngspice
   subcircuit; see Fuses.
 - A noise or random source holds its DC level (the offset, or the mean of a random source) in the operating point,
-  the sweeps and the small-signal analyses, as in ngspice; a transient with one is refused, since Nodalys cannot draw
-  the values yet.
+  the sweeps and the small-signal analyses, as in ngspice. A transient draws it, from a generator Nodalys seeds, so
+  the seed of the transient settings repeats the whole run, white and 1/f noise included; the values differ from those
+  of ngspice, which draws its own.
+- A block imported from a library, which imcsim keeps as SPICE text, and a MOSFET model of a level other than 1 are
+  refused with the reason; the harmonic balance also refuses voltage-controlled switches and relays.
 - The transient lands a time point on every corner of a source waveform (each edge of a pulse or clock, each point of
   a piecewise linear source, the delays of the exponential and AM sources) and keeps it in the results, so a pulse
   narrower than the time step still shows; ngspice does the same with its breakpoints.

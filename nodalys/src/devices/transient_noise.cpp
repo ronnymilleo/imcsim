@@ -5,6 +5,8 @@
 
 #include "devices/transient_noise.h"
 
+#include "devices/random_draws.h"
+
 #include <algorithm>
 #include <cmath>
 #include <limits>
@@ -96,14 +98,13 @@ private:
     }
 
     void EnsureNoiseSample(const std::size_t target) {
-        std::normal_distribution<double> normal(0.0, 1.0);
         while (m_Samples.size() <= target) {
             double sample = 0.0;
             if (m_Params.WhiteAmplitude != 0.0) {
-                sample += m_Params.WhiteAmplitude * normal(m_Rng);
+                sample += m_Params.WhiteAmplitude * DrawStandardNormal(m_Rng);
             }
             if (m_Params.FlickerAmplitude != 0.0) {
-                m_FlickerWhite.push_back(m_Params.FlickerAmplitude * normal(m_Rng));
+                m_FlickerWhite.push_back(m_Params.FlickerAmplitude * DrawStandardNormal(m_Rng));
                 const std::size_t n = m_FlickerWhite.size() - 1;
                 const std::size_t count = std::min(n, FLICKER_TAPS);
                 double flicker = 0.0;
@@ -120,9 +121,7 @@ private:
         while (m_TelegraphTimes.back() <= time) {
             const bool currently_high = m_TelegraphValues.back() != 0.0;
             const double mean_duration = currently_high ? m_Params.CaptureTime : m_Params.EmissionTime;
-            std::exponential_distribution<double> exp_dist(1.0 / mean_duration);
-            double dt = exp_dist(m_Rng);
-            dt = std::max(dt, 1e-18);
+            const double dt = std::max(DrawExponential(m_Rng, mean_duration), 1e-18);
             m_TelegraphTimes.push_back(m_TelegraphTimes.back() + dt);
             m_TelegraphValues.push_back(currently_high ? 0.0 : m_Params.TelegraphAmplitude);
         }
@@ -186,17 +185,17 @@ private:
         switch (m_Params.Distribution) {
         case RandomDistribution::UNIFORM: {
             const double span = std::fabs(m_Params.First);
-            return std::uniform_real_distribution<double>(-span, span)(m_Rng);
+            return span * (2.0 * DrawUniform(m_Rng) - 1.0);
         }
         case RandomDistribution::GAUSSIAN:
-            return std::normal_distribution<double>(0.0, std::fabs(m_Params.First))(m_Rng);
+            return std::fabs(m_Params.First) * DrawStandardNormal(m_Rng);
         case RandomDistribution::EXPONENTIAL: {
             const double mean = m_Params.First > 0.0 ? m_Params.First : 1.0;
-            return std::exponential_distribution<double>(1.0 / mean)(m_Rng);
+            return DrawExponential(m_Rng, mean);
         }
         case RandomDistribution::POISSON: {
             const double lambda = m_Params.First > 0.0 ? m_Params.First : 1.0;
-            return static_cast<double>(std::poisson_distribution<int>(lambda)(m_Rng));
+            return static_cast<double>(DrawPoisson(m_Rng, lambda));
         }
         default:
             return 0.0;

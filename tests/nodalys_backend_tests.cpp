@@ -24,6 +24,8 @@
 #include "circuit/components/voltage_source.h"
 #include "circuit/subcircuit.h"
 #include "nodalys_in_use.h"
+#include "simulation/live_change.h"
+#include "simulation/run_control.h"
 #include "simulation/simulation_backend.h"
 #include "simulation/simulator.h"
 #include <algorithm>
@@ -1004,6 +1006,55 @@ TEST_CASE("Nodalys names switch and push-button currents after the part", "[noda
     REQUIRE(run.Result.has_value());
     CHECK_THAT(CurrentOf(*run.Result, "SW1"), WithinRel(5e-3, 1e-4));
     CHECK_THAT(CurrentOf(*run.Result, "PB1"), WithinRel(5e-3, 1e-4));
+}
+
+TEST_CASE("A live run on Nodalys follows a switch that opens and a potentiometer that turns", "[nodalys][live]") {
+    Core::VoltageSource source;
+    source.SetName("V1");
+    source.SetValue(10.0);
+    Core::Potentiometer pot;
+    pot.SetName("RV1");
+    pot.SetValue(4e3);
+    pot.SetWiper(0.25);
+    Core::Switch contact(Core::ComponentType::SWITCH);
+    contact.SetName("SW1");
+    contact.SetClosed(true);
+    Core::Resistor load;
+    load.SetName("R1");
+    load.SetValue(1e3);
+    Core::Ground ground;
+
+    Core::Circuit circuit;
+    circuit.Add(source, {1, 0});
+    circuit.Add(pot, {1, 0, 2});
+    circuit.Add(contact, {1, 3});
+    circuit.Add(load, {3, 0});
+    circuit.Add(ground, {0});
+
+    // The changes wait in the mailbox, as the editor leaves them, and the run takes them after its first chunk
+    Core::Potentiometer turned = pot;
+    turned.SetWiper(0.75);
+    Core::Switch opened = contact;
+    opened.SetClosed(false);
+    Core::RunControl control;
+    control.SendChanges(Core::DescribeLiveChange(turned));
+    control.SendChanges(Core::DescribeLiveChange(opened));
+
+    // A chunk covers 30 ms of the clock, so this pace cuts the millisecond into a few chunks
+    Core::NodalysBackend backend;
+    const Core::RunMonitor monitor{.Control = &control, .OnChunk = {}, .LivePace = 1e-2};
+    const Core::TransientRun run =
+        backend.RunTransient(circuit, {.StopTime = 1e-3, .TimeStep = 1e-5}, std::nullopt, monitor);
+    REQUIRE(run.Result.has_value());
+
+    // The wiper divides 10 V: 3k of 4k below it at first, then 1k of 4k
+    const std::vector<double> &wiper = run.Result->NodeVoltages[2];
+    CHECK_THAT(wiper.front(), WithinRel(7.5, 1e-6));
+    CHECK_THAT(wiper.back(), WithinRel(2.5, 1e-6));
+    // The closed switch puts the supply on the load, and the open one leaves it at ground
+    const std::vector<double> &loaded = run.Result->NodeVoltages[3];
+    CHECK_THAT(loaded.front(), WithinRel(10.0, 1e-3));
+    CHECK_THAT(loaded.back(), WithinAbs(0.0, 1e-3));
 }
 
 TEST_CASE("Nodalys sensitivity includes block instances by their dominant inner element", "[nodalys][sensitivity]") {

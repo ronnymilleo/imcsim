@@ -9,6 +9,7 @@
 #include "circuit/components/behavioral_source.h"
 #include "circuit/components/logic_part.h"
 #include "circuit/components/source.h"
+#include "circuit/components/switch.h"
 #include "simulation/live_pace.h"
 #include "simulation/pole_zero.h"
 #include "simulation/ratings.h"
@@ -16,6 +17,7 @@
 #include <chrono>
 #include <format>
 #include <nodalys/nodalys.h>
+#include <set>
 #include <utility>
 
 namespace Core {
@@ -57,28 +59,47 @@ Transient ToTransient(Nodalys::TransientResult result, const int node_count) {
             .IsComplete = result.IsComplete};
 }
 
+/// What the netlist of ngspice puts before the name of a switch to name its resistor, as a live change does.
+constexpr std::string_view SWITCH_RESISTOR_PREFIX = "R-";
+
+/**
+ * @brief   The elements a live change names that Nodalys knows by the name of the part alone: the resistors of the
+ *          switches and push buttons, which it names after the part so their currents read SW1.
+ * @details The two halves of a potentiometer keep the names of the netlist (R-RV1a, R-RV1b) in the engine.
+ */
+std::set<std::string> FindSwitchElements(const Circuit &circuit) {
+    std::set<std::string> elements;
+    for (const Component *part : CollectParts(circuit)) {
+        if (IsSwitch(part->GetType())) {
+            elements.insert(std::format("{}{}", SWITCH_RESISTOR_PREFIX, part->GetName()));
+        }
+    }
+    return elements;
+}
+
 /**
  * @brief   The monitor Nodalys reads, wired to the stop request, the progress, the live changes, the chunks and the
  *          pace of the caller's monitor.
  * @param[in]     monitor     What the caller watches; it outlives the run.
  * @param[in,out] live_start  When the clock of a live run started, moved later by the time spent paused.
- * @param[in]     node_count  Nodes of the circuit, which the chunks keep.
+ * @param[in]     circuit     Circuit of the run, for its node count, which the chunks keep, and its switches.
  */
 Nodalys::RunMonitor ToNodalysMonitor(const RunMonitor &monitor, std::chrono::steady_clock::time_point &live_start,
-                                     const int node_count) {
+                                     const Circuit &circuit) {
+    const int node_count = circuit.GetNodeCount();
     Nodalys::RunMonitor nodalys_monitor;
     if (monitor.Control != nullptr) {
         nodalys_monitor.ShouldStop = [&monitor]() { return monitor.Control->IsCancelled(); };
         nodalys_monitor.OnProgress = [&monitor](const double progress) { monitor.Control->SetProgress(progress); };
-        nodalys_monitor.TakeLiveChanges = [&monitor]() {
+        nodalys_monitor.TakeLiveChanges = [&monitor, switch_elements = FindSwitchElements(circuit)]() {
             std::vector<Nodalys::LiveChange> changes;
             for (const LiveChange &change : monitor.Control->TakeChanges()) {
                 const Nodalys::LiveQuantity quantity = change.Quantity == LiveQuantity::RESISTANCE
                                                            ? Nodalys::LiveQuantity::RESISTANCE
                                                            : Nodalys::LiveQuantity::DC_VOLTAGE;
                 std::string element = change.Element;
-                if (change.Quantity == LiveQuantity::RESISTANCE && element.starts_with("R-")) {
-                    element.erase(0, 2);
+                if (switch_elements.contains(element)) {
+                    element.erase(0, SWITCH_RESISTOR_PREFIX.size());
                 }
                 changes.push_back({.Element = std::move(element), .Quantity = quantity, .Value = change.Value});
             }
@@ -241,7 +262,7 @@ TransientRun NodalysBackend::RunTransient(const Circuit &circuit, const Transien
                                           .Seed = settings.Seed};
     const bool has_initial_conditions = circuit.HasInitialConditions();
     auto live_start = std::chrono::steady_clock::now();
-    const Nodalys::RunMonitor nodalys_monitor = ToNodalysMonitor(monitor, live_start, circuit.GetNodeCount());
+    const Nodalys::RunMonitor nodalys_monitor = ToNodalysMonitor(monitor, live_start, circuit);
     return RunOnNodalys<TransientRun>(
         circuit,
         [&](const Nodalys::Circuit &compiled, std::vector<Nodalys::DiagnosticMessage> *messages) {

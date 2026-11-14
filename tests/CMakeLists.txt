@@ -29,6 +29,7 @@ add_executable(imcsim-tests
             component_tests.cpp
             connectivity_tests.cpp
             controlled_sources_tests.cpp
+            counter_examples_tests.cpp
             current_flow_tests.cpp
             default_backend.cpp
             dock_layout_tests.cpp

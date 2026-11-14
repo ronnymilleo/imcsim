@@ -616,7 +616,8 @@ private:
 
         case ComponentType::D_FLIP_FLOP: {
             const auto &logic = static_cast<const LogicPart &>(part);
-            m_Builder->AddDFlipFlop(name, nodes[4], nodes[5], nodes[0], nodes[1], MakeLogicParams(logic));
+            m_Builder->AddDFlipFlop(name, nodes[4], nodes[5], nodes[0], nodes[1], MakeLogicParams(logic), nodes[2],
+                                    nodes[3]);
             return {};
         }
 
@@ -630,7 +631,8 @@ private:
                                     MakeLogicParams(logic));
             m_Builder->AddLogicGate(name + ".OR", Nodalys::LogicGateType::OR, node_d, {nodes[0], node_and},
                                     MakeLogicParams(logic));
-            m_Builder->AddDFlipFlop(name, nodes[5], nodes[6], node_d, nodes[2], MakeLogicParams(logic));
+            m_Builder->AddDFlipFlop(name, nodes[5], nodes[6], node_d, nodes[2], MakeLogicParams(logic), nodes[3],
+                                    nodes[4]);
             return {};
         }
 
@@ -639,7 +641,8 @@ private:
             const int internal_d = m_Builder->AddNode();
             m_Builder->AddLogicGate(name + ".XOR", Nodalys::LogicGateType::XOR, internal_d, {nodes[0], nodes[4]},
                                     MakeLogicParams(logic));
-            m_Builder->AddDFlipFlop(name, nodes[4], nodes[5], internal_d, nodes[1], MakeLogicParams(logic));
+            m_Builder->AddDFlipFlop(name, nodes[4], nodes[5], internal_d, nodes[1], MakeLogicParams(logic), nodes[2],
+                                    nodes[3]);
             return {};
         }
 
@@ -656,7 +659,8 @@ private:
                                     MakeLogicParams(logic));
             m_Builder->AddLogicGate(name + ".OR", Nodalys::LogicGateType::OR, node_d, {node_and1, node_and2},
                                     MakeLogicParams(logic));
-            m_Builder->AddDFlipFlop(name, nodes[5], nodes[6], node_d, nodes[2], MakeLogicParams(logic));
+            m_Builder->AddDFlipFlop(name, nodes[5], nodes[6], node_d, nodes[2], MakeLogicParams(logic), nodes[3],
+                                    nodes[4]);
             return {};
         }
 
