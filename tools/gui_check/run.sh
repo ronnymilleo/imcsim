@@ -203,7 +203,7 @@ check_circuit_run() {
     local name=$1 circuit=$2 word=$3 timeout=${4:-$RUN_TIMEOUT}
     open_circuit "$circuit"
     run_and_wait "$timeout"
-    check_step "$name" "$word" done
+    check_step "$name" "$word" "done"
 }
 
 # =============================================================================
@@ -266,7 +266,7 @@ check_harmonic_balance() {
     if [[ "$ENGINE" == ngspice ]]; then
         check_step harmonic_balance_refused 'Harmonic' failed 'does not run'
     else
-        check_step harmonic_balance 'Amplitudes:?' done
+        check_step harmonic_balance 'Amplitudes:?' "done"
     fi
 }
 
@@ -324,7 +324,7 @@ check_refusals() {
 check_edit_drops_results() {
     open_circuit rc_low_pass_filter
     run_and_wait
-    check_step before_edit Magnitude done
+    check_step before_edit Magnitude "done"
     # The bottom wire runs from (4, 10) to (14, 10); the capacitor C1 stands at (14, 7)
     docs_calibrate_on_wire 4 14 10
     # shellcheck disable=SC2046
@@ -336,7 +336,7 @@ check_edit_drops_results() {
     sleep "$MEDIUM_PAUSE"
     check_step after_undo "Run"
     run_and_wait
-    check_step rerun_after_undo Magnitude done
+    check_step rerun_after_undo Magnitude "done"
     ui_key ctrl+y
     sleep "$MEDIUM_PAUSE"
     check_step after_redo "Run"
@@ -349,7 +349,7 @@ check_edit_drops_results() {
 check_block() {
     open_circuit rc_blocks
     run_and_wait
-    check_step block_root_result Magnitude done
+    check_step block_root_result Magnitude "done"
     # The input wire runs from the source at (0, 0) to the IN pin of X1 at (5, 0); X1 sits at (8, 0)
     docs_calibrate_on_wire 0 5 0
     # shellcheck disable=SC2046
