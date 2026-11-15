@@ -13,6 +13,7 @@
 #include "simulation/analysis_settings.h"
 #include "simulation/run_control.h"
 #include "simulation/simulation_results.h"
+#include <cstddef>
 #include <functional>
 #include <map>
 #include <memory>
@@ -42,6 +43,23 @@ enum class AnalysisKind {
 };
 
 /**
+ * @struct  SParameterLimits
+ * @brief   What a backend asks of an S-parameter analysis, beyond what every backend asks.
+ * @details Each limit comes with the reason shown to the user when a circuit or a setting runs into it, so the checks
+ *          that run before the backend name no engine. The defaults are no limit at all.
+ */
+struct SParameterLimits {
+    /// Fewest ports the backend runs with.
+    std::size_t MinPorts = 1;
+    /// Why it needs that many, as a sentence without a period, such as "ngspice needs at least two S-parameter ports".
+    std::string MinPortsReason;
+    /// Fewest points of a linear sweep the backend gives all of.
+    int MinLinearPoints = 2;
+    /// Why it needs that many, as a sentence without a period.
+    std::string MinLinearPointsReason;
+};
+
+/**
  * @struct  BackendCapabilities
  * @brief   What a backend can simulate.
  * @details The truth table is not listed: it runs an operating point for each combination, so it needs only that.
@@ -54,6 +72,8 @@ struct BackendCapabilities {
     std::map<AnalysisKind, std::map<ComponentType, std::string>> UnsupportedPartsByAnalysis;
     /// Why the backend cannot simulate at a temperature other than the default one, or none when it can.
     std::optional<std::string> TemperatureUnsupported;
+    /// What the backend asks of the ports and of the sweep of an S-parameter analysis.
+    SParameterLimits SParameters;
     /// Finds why the backend cannot simulate one part in one analysis when that depends on what the part holds, such
     /// as the expression of a behavioral source, which names functions the backend may not have, or the text of a
     /// block kept as SPICE text, which the circuit holds the definition of; empty when the backend has no such limit.
@@ -176,7 +196,8 @@ public:
     virtual PoleZeroRun RunPoleZero(const Circuit &circuit, const PoleZeroSettings &settings) = 0;
     /**
      * @brief   Measures the scattering matrix of the ports of a circuit across frequency.
-     * @param[in] circuit   Circuit to simulate, already checked: it holds at least two ports, numbered 1 to N.
+     * @param[in] circuit   Circuit to simulate, already checked: its ports are numbered 1 to N and
+     *                      are as many as the backend asks for (see SParameterLimits).
      * @param[in] settings  Frequency range and points, already checked.
      * @return  The matrix at every frequency or an error, plus the messages of the backend.
      */

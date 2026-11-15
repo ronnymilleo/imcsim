@@ -2,10 +2,12 @@
 
 **Implementation files:**
 - [`nodalys/src/analyses/sp_analysis.cpp`](../../nodalys/src/analyses/sp_analysis.cpp) (`ComputeSParameters`)
+- [`nodalys/src/analyses/port_matrices.cpp`](../../nodalys/src/analyses/port_matrices.cpp) (`ComputeImpedanceMatrix`, `ComputeAdmittanceMatrix`)
 - [`nodalys/src/mna/mna_system.cpp`](../../nodalys/src/mna/mna_system.cpp) (`MnaSystem::SolveAcMultiple`)
 - [`app-core/backends/nodalys/nodalys_backend.cpp`](../../app-core/backends/nodalys/nodalys_backend.cpp) (`NodalysBackend::RunSParameters`)
 - [`nodalys/include/nodalys/results.h`](../../nodalys/include/nodalys/results.h) (`SParameterResult`)
 - [`nodalys/src/export/exporters.cpp`](../../nodalys/src/export/exporters.cpp) (`ExportTouchstone`)
+- [`nodalys/tests/sp_analysis_tests.cpp`](../../nodalys/tests/sp_analysis_tests.cpp) (one port, Z and Y, sweeps, errors, exports)
 - [`tests/backend_comparison_tests.cpp`](../../tests/backend_comparison_tests.cpp) (`Both backends agree on S-parameters`)
 
 ---
@@ -96,6 +98,37 @@ From the complex S-matrix $\mathbf{S}(f)$, `Nodalys` computes standard RF figure
   $$Z_{\text{in},i} = Z_{0i} \frac{1 + S_{ii}}{1 - S_{ii}}$$
   Complex input impedance seen looking into port $i$ with all other ports terminated in their reference impedances.
 
+### 1.5 Impedance and Admittance Matrices
+
+With real reference impedances, the power-wave definitions of section 1.1 give $V = D (I + S) a$ and $I = D^{-1} (I - S) a$ with $D = \operatorname{diag}(\sqrt{Z_{0k}})$, so for every frequency `Nodalys` also returns
+
+$$\mathbf{Z} = D (I + \mathbf{S}) (I - \mathbf{S})^{-1} D, \qquad \mathbf{Y} = D^{-1} (I - \mathbf{S}) (I + \mathbf{S})^{-1} D^{-1}$$
+
+in `SParameterResult::ImpedanceMatrices` and `AdmittanceMatrices`, one `std::optional` matrix per frequency, row by row like `Values`. A matrix is **absent** (`std::nullopt`, never a huge number) at a frequency where the circuit has no finite one:
+
+- $\mathbf{Z}$ does not exist when $I - \mathbf{S}$ is singular, as for two ports joined by a series element and nothing else (the ports float, so a current into one cannot set a voltage), or for an open one-port.
+- $\mathbf{Y}$ does not exist when $I + \mathbf{S}$ is singular, as for a port shorted to ground.
+
+A matrix is taken as singular when a pivot of its Gauss-Jordan inversion is below $10^{-9}$ of the larger of 1 and its biggest entry (`SINGULAR_PIVOT_RATIO` in `port_matrices.cpp`). That is an impedance above about $10^{9} Z_0$, an open circuit for practical purposes; the engine's own $10^{-12}$ S leak from every node to ground keeps a true open from being an exact infinity, and shows in $\mathbf{Y}$ at the picosiemens. `GetImpedance()` and `GetAdmittance()` of the imcsim result, and `Impedance()` and `Admittance()` of the engine's, read one entry and give no value for an absent matrix, or for a result built without them.
+
+### 1.6 Ports and Sweeps
+
+- **One port** gives $S_{11}$ directly, and its $Z$ and $Y$ are the impedance and admittance of the load against the ground. A circuit with no port is refused.
+- Ports may be listed in any order in the netlist or the circuit; the matrix follows their numbers. The numbers must run from 1 to $N$ with no gap and no repeat: the matrix, the Touchstone file and the Output tab index the ports by number, so a gap would leave a row with no port.
+- A linear sweep of 2 points gives both frequencies (start and stop), and of 1 point only the start.
+- Each wrong setting is reported in words, with the same text as the checks that imcsim runs before any engine (`tests/s_parameters_tests.cpp` keeps the two in step):
+
+| Cause | Message |
+| :--- | :--- |
+| No port | `The circuit has no S-parameter port` |
+| Reference impedance of zero or less | `The reference impedance of port 1 must be positive` |
+| Port on ground | `Port 1 is on ground; an S-parameter port needs a node of its own` |
+| Two ports on one node | `Ports 1 and 2 are on the same node; each port needs a node of its own` |
+| Number repeated | `Two S-parameter ports are numbered 1; give each port its own number` |
+| Gap in the numbers | `The S-parameter ports must be numbered 1 to 2 with no gap; port 2 is missing` |
+| Start of zero or less | `The start frequency must be positive` |
+| Stop below start | `The stop frequency must be higher than the start frequency` |
+
 ---
 
 ## 2. Benchmark Table: Analytical Golden vs. `ngspice` vs. `Nodalys`
@@ -143,4 +176,6 @@ The table below summarizes verified test cases comparing analytical RF theory, `
 ...
 ```
 
-The exported file is directly compatible with Keysight ADS, Cadence AWR Microwave Office, Qucs, and scikit-rf.
+A single port is written as `.s1p`: one pair of numbers after each frequency. The exported file is directly compatible with Keysight ADS, Cadence AWR Microwave Office, Qucs, and scikit-rf.
+
+The CSV (`-f csv`) and JSON (`-f json`) exports carry the impedance and admittance matrices after the S matrix: CSV columns `Z11_re,Z11_im,...,Y11_re,Y11_im,...` (empty where the matrix is absent) and the JSON arrays `impedance` and `admittance`, one entry per frequency, `null` where absent.

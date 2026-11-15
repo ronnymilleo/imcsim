@@ -1281,7 +1281,7 @@ TEST_CASE("The S-parameter settings load back unchanged", "[schematic_file]") {
 
 TEST_CASE("Invalid S-parameter settings fall back to their defaults with a warning", "[schematic_file]") {
     for (const char *settings : {R"({"start": -1, "stop": 1e9})", R"({"points_per_decade": 0})",
-                                 R"({"linear_points": 2})", R"({"logarithmic": "yes"})"}) {
+                                 R"({"linear_points": 1})", R"({"logarithmic": "yes"})"}) {
         const std::string text = std::string(R"({"format": "imcsim-schematic", "version": 1, "simulation": {)"
                                              R"("s_parameters": )") +
                                  settings + "}}";
@@ -1289,6 +1289,16 @@ TEST_CASE("Invalid S-parameter settings fall back to their defaults with a warni
         CHECK(loaded.Warnings.size() == 1);
         CHECK(loaded.Settings.SParameters == Core::SParameterSettings{});
     }
+}
+
+TEST_CASE("A linear S-parameter sweep of two points loads, as Nodalys runs it and ngspice says it cannot",
+          "[schematic_file]") {
+    const std::string text = R"({"format": "imcsim-schematic", "version": 1, "simulation": {)"
+                             R"("s_parameters": {"logarithmic": false, "linear_points": 2}}})";
+    const GUI::LoadedSchematic loaded = LoadOrFail(text);
+    CHECK(loaded.Warnings.empty());
+    CHECK(loaded.Settings.SParameters.LinearPoints == 2);
+    CHECK_FALSE(loaded.Settings.SParameters.IsLogarithmic);
 }
 
 TEST_CASE("A file saved before the S-parameter analysis loads it as its defaults", "[schematic_file]") {

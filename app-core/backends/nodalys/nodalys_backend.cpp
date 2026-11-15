@@ -496,6 +496,8 @@ SParametersRun NodalysBackend::RunSParameters(const Circuit &circuit, const SPar
             return SParameters{.Frequencies = std::move(result.Frequencies),
                                .ReferenceOhms = std::move(result.ReferenceOhms),
                                .Values = std::move(result.Values),
+                               .ImpedanceMatrices = std::move(result.ImpedanceMatrices),
+                               .AdmittanceMatrices = std::move(result.AdmittanceMatrices),
                                .Warnings = std::move(result.Warnings)};
         });
 }

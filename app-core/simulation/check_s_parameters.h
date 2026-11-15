@@ -8,16 +8,16 @@
 
 #include "circuit/circuit.h"
 #include "simulation/analysis_settings.h"
+#include "simulation/simulation_backend.h"
 #include <cstddef>
 #include <optional>
 #include <string>
 
 namespace Core {
 
-/// Fewest ports an S-parameter analysis runs with, since ngspice refuses fewer.
-constexpr std::size_t MIN_S_PARAMETER_PORTS = 2;
-
-std::optional<std::string> CheckSParameterSettings(const Circuit &circuit, const SParameterSettings &settings);
+std::optional<std::string> CheckSParameterPortCount(std::size_t port_count, const SParameterLimits &limits);
+std::optional<std::string> CheckSParameterSettings(const Circuit &circuit, const SParameterSettings &settings,
+                                                   const SParameterLimits &limits);
 
 } // namespace Core
 

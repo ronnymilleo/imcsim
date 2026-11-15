@@ -36,7 +36,8 @@
 #   Transfer function      transfer_function_attenuator
 #   Sensitivity            bias_sensitivity
 #   Poles and zeros        rlc_low_pass_poles_and_zeros
-#   S-parameters           s_parameters_lc_low_pass
+#   S-parameters           s_parameters_lc_low_pass; fixtures/s_parameters_one_port (the same filter with its second
+#                          port turned off): Nodalys gives S11, ngspice refuses it, since it needs two ports
 #   Truth table            logic_truth_table
 #   Harmonic balance       harmonic_balance_rectifier
 #                          Nodalys only: with ngspice the step expects it disabled and refused with its reason
@@ -252,11 +253,23 @@ check_analyses() {
     check_circuit_run sensitivity bias_sensitivity Share
     check_circuit_run poles_and_zeros rlc_low_pass_poles_and_zeros Poles
     check_circuit_run s_parameters s_parameters_lc_low_pass Smith
+    check_s_parameters_one_port
     check_circuit_run truth_table logic_truth_table 'combinations;?'
     check_harmonic_balance
     # Logic parts and a random source in a transient, the two things the engines treat differently
     check_circuit_run transient_logic decade_counter Spectrum
     check_circuit_run transient_noise_source noise_through_rc_low_pass Spectrum
+}
+
+# Nodalys measures a single port; ngspice needs two, so the run is refused with the reason
+check_s_parameters_one_port() {
+    open_circuit s_parameters_one_port
+    run_and_wait
+    if [[ "$ENGINE" == ngspice ]]; then
+        check_step s_parameters_one_port_refused 'S-parameters' failed 'two'
+    else
+        check_step s_parameters_one_port Smith "done"
+    fi
 }
 
 # Nodalys runs it and plots the spectra; ngspice cannot, so the run is refused with the reason
